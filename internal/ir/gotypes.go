@@ -50,10 +50,16 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 		if _, isStruct := named.Underlying().(*types.Struct); !isStruct {
 			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "pointer to non-struct type " + spelled, Span: span}
 		}
-		if named.Obj().Pkg() == nil || !b.unit.Owns(named.Obj().Pkg().Path()) {
+		if named.Obj().Pkg() == nil {
 			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "pointer to type outside the translated unit: " + spelled, Span: span}
 		}
 		declaringPkg := named.Obj().Pkg().Path()
+		if !b.unit.Owns(declaringPkg) {
+			// A pointer to an external struct: the handle itself, with
+			// undefined for nil (external handles have object identity).
+			element := Type{Kind: KindExternal, Go: named.String(), Named: named.Obj().Name(), Pkg: declaringPkg}
+			return Type{Kind: KindPointer, Go: spelled, Named: named.Obj().Name(), Pkg: declaringPkg, Elem: &element}, nil
+		}
 		element := Type{Kind: KindStruct, Go: named.String(), Named: named.Obj().Name(), Pkg: declaringPkg}
 		return Type{Kind: KindPointer, Go: spelled, Named: named.Obj().Name(), Pkg: declaringPkg, Elem: &element}, nil
 
@@ -108,6 +114,11 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 				// The anonymous empty struct is the unit type; named empty
 				// structs keep their identity (methods, pointers, rtti).
 				return Type{Kind: KindUnit, Go: spelled}, nil
+			}
+			if ok && named.Obj().Pkg() != nil {
+				// A named struct outside the unit is an opaque external
+				// handle under the external-contract policy.
+				return Type{Kind: KindExternal, Go: spelled, Named: named.Obj().Name(), Pkg: named.Obj().Pkg().Path()}, nil
 			}
 			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "struct type " + spelled, Span: span}
 		}

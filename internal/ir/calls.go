@@ -163,19 +163,20 @@ func (b *builder) staticCallee(fun ast.Expr) (*types.Func, *ast.Ident) {
 func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, selection *types.Selection) (Expr, error) {
 	span := b.span(n.Pos())
 	method := selection.Obj().(*types.Func)
-	if method.Pkg() == nil || !b.unit.Owns(method.Pkg().Path()) {
-		callee := "unqualified"
-		if method.Pkg() != nil {
-			callee = method.Pkg().Path() + "." + method.Name()
-		}
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method call outside the translated unit (" + callee + ")", Span: span}
+	if method.Pkg() == nil {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method call outside the translated unit (unqualified)", Span: span}
 	}
 	recv, err := b.buildExpr(selector.X)
 	if err != nil {
 		return nil, err
 	}
 	if recv.Type().Kind == KindIface {
+		// Interface dispatch is dynamic through the box's method table,
+		// whether the interface type is owned or external.
 		return b.buildIfaceMethodCall(n, recv, method)
+	}
+	if !b.unit.Owns(method.Pkg().Path()) {
+		return b.buildExternalMethodCall(n, selector, method, recv)
 	}
 	signature := method.Type().(*types.Signature)
 	if signature.TypeParams() != nil {

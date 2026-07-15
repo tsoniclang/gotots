@@ -246,9 +246,33 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			}
 			return "gosl$.goArrayClone(" + x + ", " + cloneElem + ")", nil
 		}
+		if t := n.X.Type(); t.Kind == ir.KindExternal {
+			spelled, err := p.tsType(t)
+			if err != nil {
+				return "", err
+			}
+			return fmt.Sprintf("(goext$.goExternalCall(%q, [%s]) as %s)", t.Pkg+"."+t.Named+".goClone$", x, spelled), nil
+		}
 		return x + ".goClone$()", nil
 	case *ir.StructZero:
 		return p.zeroLiteral(n.T)
+	case *ir.ExternZero:
+		return p.zeroLiteral(n.T)
+	case *ir.ExternalMethodCall:
+		recv, err := p.printExpr(n.Recv)
+		if err != nil {
+			return "", err
+		}
+		args, err := p.printArgs(n.Args)
+		if err != nil {
+			return "", err
+		}
+		operands := recv
+		if args != "" {
+			operands += ", " + args
+		}
+		call := fmt.Sprintf("goext$.goExternalCall(%q, [%s])", n.TypeID+"."+n.Method, operands)
+		return p.castResults(call, n.Results)
 	case *ir.AddrOf:
 		// The pointer to an addressable struct value is the instance.
 		return p.printExpr(n.X)
@@ -476,6 +500,12 @@ func (p *printer) zeroLiteral(t ir.Type) (string, error) {
 		return p.arrayZeroFactory(t)
 	case t.Kind == ir.KindUnit:
 		return "0", nil
+	case t.Kind == ir.KindExternal:
+		spelled, err := p.tsType(t)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("(goext$.goExternalCall(%q, []) as %s)", t.Pkg+"."+t.Named+".goZero$", spelled), nil
 	case t.Kind.Wide64():
 		return "0n", nil
 	case t.Kind.Integer(), t.Kind.Float():

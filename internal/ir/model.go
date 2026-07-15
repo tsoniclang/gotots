@@ -61,6 +61,13 @@ const (
 	// whole-value stores overwrite elements in place, so element aliases
 	// (including slices over the array) observe them exactly.
 	KindArray
+	// KindExternal is a named type declared outside the translated unit,
+	// carried as an opaque handle. Every operation on it is a reviewed
+	// external contract: methods, zero construction, and value copies
+	// dispatch by canonical identity and fail closed at runtime unless
+	// the emulation layer registered behavior. Value-receiver contracts
+	// must not mutate their receiver (Go runs them on copies).
+	KindExternal
 	// KindUnit is the anonymous empty struct type struct{}: a unit type
 	// with exactly one value, carried as the number literal 0. Copies,
 	// stores, and equality are all trivially exact.

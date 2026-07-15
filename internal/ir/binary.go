@@ -70,7 +70,7 @@ func (b *builder) buildBinary(n *ast.BinaryExpr, resultType types.Type) (Expr, e
 		if operand.Kind == KindArray {
 			return b.buildArrayEqual(left, right, n.Op, span)
 		}
-		if operand.Kind == KindMap || operand.Kind == KindStruct {
+		if operand.Kind == KindMap || operand.Kind == KindStruct || operand.Kind == KindExternal {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "equality on " + operand.Go, Span: span}
 		}
 	case token.LSS, token.LEQ, token.GTR, token.GEQ:

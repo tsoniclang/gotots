@@ -211,6 +211,11 @@ func (p *printer) printDecl(n *ir.DeclStmt) error {
 				p.line("let %s: %s = gosl$.goArrayClone(%s[%d], %s);", tsName(name), spelled, tuple, i, cloneElem)
 				continue
 			}
+			if t := n.Types[i]; t.Kind == ir.KindExternal {
+				p.line("let %s: %s = goext$.goExternalCall(%q, [%s[%d]]) as %s;",
+					tsName(name), spelled, t.Pkg+"."+t.Named+".goClone$", tuple, i, spelled)
+				continue
+			}
 			p.line("let %s: %s = %s[%d];", tsName(name), spelled, tuple, i)
 		}
 		return nil

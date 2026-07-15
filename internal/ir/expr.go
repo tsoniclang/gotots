@@ -97,6 +97,12 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			b.use("unitLiteral")
 			return &Const{T: t, Value: "0"}, nil
 		}
+		if t.Kind == KindExternal && len(n.Elts) == 0 {
+			// T{} of an external type with no fields set is its zero
+			// contract; keyed externals stay outside the reviewed surface.
+			b.use("externZero")
+			return &ExternZero{T: t}, nil
+		}
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "composite literal of " + t.Go, Span: span}
 
 	case *ast.FuncLit:
@@ -308,7 +314,7 @@ func (b *builder) buildExprAs(e ast.Expr, expected Type) (Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	if expected.Kind == KindStruct || expected.Kind == KindArray {
+	if expected.Kind == KindStruct || expected.Kind == KindArray || expected.Kind == KindExternal {
 		return b.bindStructValue(built), nil
 	}
 	if expected.Kind == KindIface {
@@ -342,16 +348,19 @@ func (b *builder) buildVarRef(variable *types.Var, name string, span Span) (Expr
 // sites) — bind directly.
 func (b *builder) bindStructValue(e Expr) Expr {
 	kind := e.Type().Kind
-	if kind != KindStruct && kind != KindArray {
+	if kind != KindStruct && kind != KindArray && kind != KindExternal {
 		return e
 	}
 	switch e.(type) {
-	case *StructNew, *StructZero, *StructCopy, *Call, *MethodCall, *ArrayLit:
+	case *StructNew, *StructZero, *StructCopy, *Call, *MethodCall, *ArrayLit, *ExternZero, *ExternalMethodCall, *ExternalCall:
 		return e
 	}
-	if kind == KindArray {
+	switch kind {
+	case KindArray:
 		b.use("arrayCopy")
-	} else {
+	case KindExternal:
+		b.use("externCopy")
+	default:
 		b.use("structCopy")
 	}
 	return &StructCopy{X: e}
@@ -372,7 +381,7 @@ func (b *builder) buildUnary(n *ast.UnaryExpr, resultType types.Type) (Expr, err
 		if err != nil {
 			return nil, err
 		}
-		if x.Type().Kind != KindStruct {
+		if x.Type().Kind != KindStruct && x.Type().Kind != KindExternal {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "address of " + x.Type().Go, Span: span}
 		}
 		switch x.(type) {
@@ -412,6 +421,14 @@ func (b *builder) buildStructNew(lit *ast.CompositeLit, resultType types.Type) (
 	}
 	if t.Kind != KindPointer {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "composite literal of " + t.Go, Span: span}
+	}
+	if t.Elem != nil && t.Elem.Kind == KindExternal {
+		if len(lit.Elts) != 0 {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "composite literal of " + t.Elem.Go, Span: span}
+		}
+		// &T{} of an external type: a fresh zero handle is the pointer.
+		b.use("externZero")
+		return &AddrOf{X: &ExternZero{T: *t.Elem}, T: t}, nil
 	}
 	return b.buildStructLit(lit, t)
 }
@@ -546,6 +563,8 @@ func zeroValue(t Type, span Span) (Expr, error) {
 		return &StructZero{T: t}, nil
 	case t.Kind == KindUnit:
 		return &Const{T: t, Value: "0"}, nil
+	case t.Kind == KindExternal:
+		return &ExternZero{T: t}, nil
 	case t.Kind.Integer(), t.Kind.Float():
 		return &Const{T: t, Value: "0"}, nil
 	}

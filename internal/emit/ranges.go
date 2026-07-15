@@ -43,6 +43,9 @@ func (p *printer) printRangeSlice(n *ir.RangeSlice) error {
 				return err
 			}
 			p.line("let %s: %s = gosl$.goArrayClone(gosl$.goSliceGet(%s, %s), %s);", tsName(n.Value), spelled, sliceTemp, induction, cloneElem)
+		} else if n.VarT.Kind == ir.KindExternal {
+			p.line("let %s: %s = goext$.goExternalCall(%q, [gosl$.goSliceGet(%s, %s)]) as %s;",
+				tsName(n.Value), spelled, n.VarT.Pkg+"."+n.VarT.Named+".goClone$", sliceTemp, induction, spelled)
 		} else {
 			p.line("let %s: %s = gosl$.goSliceGet(%s, %s);", tsName(n.Value), spelled, sliceTemp, induction)
 		}
@@ -122,6 +125,9 @@ func (p *printer) printRangeMap(n *ir.RangeMap) error {
 				return err
 			}
 			value = "gosl$.goArrayClone(" + value + ", " + cloneElem + ")"
+		case ir.KindExternal:
+			value = fmt.Sprintf("(goext$.goExternalCall(%q, [%s]) as %s)",
+				n.ValT.Pkg+"."+n.ValT.Named+".goClone$", value, spelled)
 		}
 		p.line("let %s: %s = %s;", tsName(n.Value), spelled, value)
 	}

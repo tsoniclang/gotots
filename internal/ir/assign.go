@@ -73,6 +73,9 @@ func (b *builder) buildTarget(lhs ast.Expr) (Target, error) {
 			b.use("mapStore")
 			return &MapTarget{Map: operand, Key: key}, nil
 		case KindSlice:
+			if operand.Type().Elem.Kind == KindExternal {
+				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "store into a slice of external values", Span: span}
+			}
 			index, err := b.buildExpr(n.Index)
 			if err != nil {
 				return nil, err
@@ -80,6 +83,9 @@ func (b *builder) buildTarget(lhs ast.Expr) (Target, error) {
 			b.use("sliceStore")
 			return &SliceTarget{X: operand, Index: index}, nil
 		case KindArray:
+			if operand.Type().Elem.Kind == KindExternal {
+				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "store into an array of external values", Span: span}
+			}
 			index, err := b.buildExpr(n.Index)
 			if err != nil {
 				return nil, err

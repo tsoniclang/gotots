@@ -341,12 +341,12 @@ func Case() int {
 			code: "GOTOTS_UNSUPPORTED_EXPRESSION", mention: "full slice expression",
 		},
 		{
-			name: "external call with an unreviewed signature",
+			name: "external method value",
 			source: `package fixture
-import "os"
-func Case() bool { f, err := os.Open("x"); return f != nil && err == nil }
+import "strings"
+func Case() func(string) (int, error) { var sb strings.Builder; return sb.WriteString }
 `,
-			code: "GOTOTS_UNSUPPORTED_EXPRESSION", mention: "call outside the translated unit",
+			code: "GOTOTS_UNSUPPORTED_EXPRESSION", mention: "method value outside the translated unit",
 		},
 		{
 			name: "nested defer with named results",

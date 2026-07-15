@@ -169,26 +169,33 @@ func TestCrossPackageFailClosed(t *testing.T) {
 			name: "external call whose signature cannot be typed",
 			source: `package fixture
 
-import "os"
+import (
+	"os"
+	"os/signal"
+)
 
-func Case() bool {
-	f, err := os.Open("x")
-	return f != nil && err == nil
+func Case() int {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c)
+	return 1
 }
 `,
-			code:    "GOTOTS_UNSUPPORTED_EXPRESSION",
-			mention: "call outside the translated unit",
+			code:    "GOTOTS_UNSUPPORTED",
+			mention: "channel type",
 		},
 		{
-			name: "pointer type outside the unit",
+			name: "equality on external values",
 			source: `package fixture
 
-import "bytes"
+import "time"
 
-func Case(b *bytes.Buffer) bool { return b == nil }
+func Case() bool {
+	var a, b time.Time
+	return a == b
+}
 `,
-			code:    "GOTOTS_UNSUPPORTED_TYPE",
-			mention: "pointer to type outside the translated unit",
+			code:    "GOTOTS_UNSUPPORTED_OPERATION",
+			mention: "equality on time.Time",
 		},
 		{
 			name: "blank import",

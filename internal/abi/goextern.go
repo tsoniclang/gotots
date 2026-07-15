@@ -25,4 +25,9 @@ export function goExternalCall(id: string, args: unknown[]): unknown {
   }
   return fn(...args);
 }
+
+// An external value: an opaque handle whose behavior the emulation
+// layer supplies per contract. The brand keeps distinct external types
+// from cross-assigning inside generated code.
+export type GoExtern<T extends string> = { readonly goExternType$?: T };
 `

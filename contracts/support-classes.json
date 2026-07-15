@@ -302,6 +302,21 @@
       "specClause": "docs/spec/03-declarations-bodies-control.md"
     },
     {
+      "key": "externCopy",
+      "state": "generated",
+      "specClause": "docs/spec/08-externals-manual-extensions.md"
+    },
+    {
+      "key": "externMethodCall",
+      "state": "generated",
+      "specClause": "docs/spec/08-externals-manual-extensions.md"
+    },
+    {
+      "key": "externZero",
+      "state": "generated",
+      "specClause": "docs/spec/08-externals-manual-extensions.md"
+    },
+    {
       "key": "externalCall",
       "state": "generated",
       "specClause": "docs/spec/08-externals-manual-extensions.md"
