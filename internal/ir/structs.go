@@ -8,14 +8,16 @@ import (
 )
 
 // BuildStruct converts one named struct type declaration into IR: an
-// ordered typed field list generated as a class. Embedding, tags with
-// semantic weight, and non-reviewed field types fail closed.
-func BuildStruct(p *packages.Package, sourceDir string, spec *ast.TypeSpec, id string) (*Struct, error) {
+// ordered typed field list generated as a class. unit is the set of
+// co-translated package paths field types may reference. Embedding, tags
+// with semantic weight, and non-reviewed field types fail closed.
+func BuildStruct(p *packages.Package, sourceDir string, unit Scope, spec *ast.TypeSpec, id string) (*Struct, error) {
 	b := &builder{
 		fset:       p.Fset,
 		info:       p.TypesInfo,
 		pkgPath:    p.PkgPath,
 		sourceDir:  sourceDir,
+		unit:       unit,
 		operations: map[string]bool{},
 	}
 	span := b.span(spec.Pos())

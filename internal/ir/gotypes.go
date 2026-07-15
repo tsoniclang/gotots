@@ -6,8 +6,8 @@ import (
 
 // typeOf resolves a go/types type into the reviewed IR type set. Types
 // outside the subset produce GOTOTS_UNSUPPORTED_TYPE with the requesting
-// construct's span. pkgPath scopes named struct types to the translated
-// package: structs from other packages are external contracts, not local
+// construct's span. Named struct types are scoped to the translated unit:
+// structs from packages outside it are external contracts, not generated
 // classes.
 func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 	if t == nil {
@@ -31,11 +31,12 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 		if _, isStruct := named.Underlying().(*types.Struct); !isStruct {
 			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "pointer to non-struct type " + spelled, Span: span}
 		}
-		if named.Obj().Pkg() == nil || named.Obj().Pkg().Path() != b.pkgPath {
-			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "pointer to type outside the translated package: " + spelled, Span: span}
+		if named.Obj().Pkg() == nil || !b.unit[named.Obj().Pkg().Path()] {
+			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "pointer to type outside the translated unit: " + spelled, Span: span}
 		}
-		element := Type{Kind: KindStruct, Go: named.String(), Named: named.Obj().Name()}
-		return Type{Kind: KindPointer, Go: spelled, Named: named.Obj().Name(), Elem: &element}, nil
+		declaringPkg := named.Obj().Pkg().Path()
+		element := Type{Kind: KindStruct, Go: named.String(), Named: named.Obj().Name(), Pkg: declaringPkg}
+		return Type{Kind: KindPointer, Go: spelled, Named: named.Obj().Name(), Pkg: declaringPkg, Elem: &element}, nil
 
 	case *types.Slice:
 		element, err := b.typeOf(u.Elem(), span)
@@ -63,12 +64,12 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 
 	case *types.Struct:
 		named, ok := types.Unalias(t).(*types.Named)
-		if !ok || named.Obj().Pkg() == nil || named.Obj().Pkg().Path() != b.pkgPath {
+		if !ok || named.Obj().Pkg() == nil || !b.unit[named.Obj().Pkg().Path()] {
 			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "struct type " + spelled, Span: span}
 		}
 		// Struct values are reviewed only behind pointers and receivers;
 		// the caller decides whether a bare struct kind is admissible.
-		return Type{Kind: KindStruct, Go: spelled, Named: named.Obj().Name()}, nil
+		return Type{Kind: KindStruct, Go: spelled, Named: named.Obj().Name(), Pkg: named.Obj().Pkg().Path()}, nil
 	}
 	return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "type " + spelled, Span: span}
 }

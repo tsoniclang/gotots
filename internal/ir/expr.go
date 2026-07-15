@@ -308,7 +308,7 @@ func (b *builder) buildStructNew(lit *ast.CompositeLit, resultType types.Type) (
 		}
 	}
 
-	out := &StructNew{TypeName: t.Named, T: t}
+	out := &StructNew{Pkg: t.Pkg, TypeName: t.Named, T: t}
 	for i := range structType.NumFields() {
 		field := structType.Field(i)
 		if value, ok := provided[field.Name()]; ok {
@@ -423,39 +423,52 @@ func (b *builder) buildBuiltin(call *ast.CallExpr, builtin *types.Builtin, resul
 }
 
 // buildAnyCall lowers a direct function call or a pointer-receiver method
-// call within the translated package.
+// call within the translated unit.
 func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
 	span := b.span(n.Pos())
 	if n.Ellipsis.IsValid() {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "slice-expansion call", Span: span}
 	}
 
-	// Method call through selection evidence.
-	if selector, ok := ast.Unparen(n.Fun).(*ast.SelectorExpr); ok {
-		selection, hasSelection := b.info.Selections[selector]
-		if hasSelection && selection.Kind() == types.MethodVal {
-			return b.buildMethodCall(n, selector, selection)
+	// The callee is a plain identifier, a method selection, or a
+	// package-qualified identifier (pkg.Fn — qualified identifiers have no
+	// selection evidence; their object comes from Uses on the selector).
+	var object types.Object
+	switch fun := ast.Unparen(n.Fun).(type) {
+	case *ast.SelectorExpr:
+		if selection, hasSelection := b.info.Selections[fun]; hasSelection {
+			if selection.Kind() == types.MethodVal {
+				return b.buildMethodCall(n, fun, selection)
+			}
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "call of selected value", Span: span}
 		}
-	}
-
-	callee, ok := ast.Unparen(n.Fun).(*ast.Ident)
-	if !ok {
+		base, isIdent := ast.Unparen(fun.X).(*ast.Ident)
+		if !isIdent {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: fmt.Sprintf("call of %T", n.Fun), Span: span}
+		}
+		if _, isPkg := b.info.Uses[base].(*types.PkgName); !isPkg {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: fmt.Sprintf("call of %T", n.Fun), Span: span}
+		}
+		object = b.info.Uses[fun.Sel]
+	case *ast.Ident:
+		object = b.info.Uses[fun]
+	default:
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: fmt.Sprintf("call of %T", n.Fun), Span: span}
 	}
-	object := b.info.Uses[callee]
+
 	function, ok := object.(*types.Func)
 	if !ok {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: fmt.Sprintf("call of %T", object), Span: span}
 	}
-	if function.Pkg() == nil || function.Pkg().Path() != b.pkgPath {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "call outside the translated package", Span: span}
+	if function.Pkg() == nil || !b.unit[function.Pkg().Path()] {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "call outside the translated unit", Span: span}
 	}
 	signature := function.Type().(*types.Signature)
 	if signature.Recv() != nil || signature.Variadic() || signature.TypeParams() != nil {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "variadic or generic call", Span: span}
 	}
 
-	call := &Call{Callee: function.Name()}
+	call := &Call{Pkg: function.Pkg().Path(), Callee: function.Name()}
 	if err := b.buildCallArgsResults(n, signature, &call.Args, &call.Results); err != nil {
 		return nil, err
 	}
@@ -466,8 +479,8 @@ func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
 func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, selection *types.Selection) (Expr, error) {
 	span := b.span(n.Pos())
 	method := selection.Obj().(*types.Func)
-	if method.Pkg() == nil || method.Pkg().Path() != b.pkgPath {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method call outside the translated package", Span: span}
+	if method.Pkg() == nil || !b.unit[method.Pkg().Path()] {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method call outside the translated unit", Span: span}
 	}
 	recv, err := b.buildExpr(selector.X)
 	if err != nil {

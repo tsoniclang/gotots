@@ -13,7 +13,7 @@ import (
 
 func runOracle(t *testing.T, fixtureSource string) *oracle.Result {
 	t.Helper()
-	result, err := oracle.Run(t.TempDir(), fixtureSource)
+	result, err := oracle.Run(t.TempDir(), map[string]string{"fixture": fixtureSource})
 	if err != nil {
 		t.Fatalf("oracle: %v", err)
 	}
@@ -347,12 +347,12 @@ func Case() bool { a := "x"; b := "y"; return a < b }
 			code: "GOTOTS_UNSUPPORTED_OPERATION", mention: "string ordering",
 		},
 		{
-			name: "package import",
+			name: "reference outside the translated unit",
 			source: `package fixture
 import "strings"
 func Case() string { return strings.ToUpper("x") }
 `,
-			code: "GOTOTS_UNSUPPORTED_DECLARATION", mention: "package imports",
+			code: "GOTOTS_UNSUPPORTED_EXPRESSION", mention: "call outside the translated unit",
 		},
 		{
 			name: "defer below top level",
@@ -397,7 +397,7 @@ func Case() int32 {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			_, err := oracle.Run(t.TempDir(), c.source)
+			_, err := oracle.Run(t.TempDir(), map[string]string{"fixture": c.source})
 			if err == nil {
 				t.Fatalf("expected fail-closed diagnostic %s", c.code)
 			}
@@ -413,7 +413,7 @@ func Case() int32 {
 
 func translateFixture(t *testing.T, source string) *translate.Generated {
 	t.Helper()
-	generated, _, err := oracle.Translate(t.TempDir(), source)
+	generated, _, err := oracle.Translate(t.TempDir(), map[string]string{"fixture": source})
 	if err != nil {
 		t.Fatalf("translate: %v", err)
 	}

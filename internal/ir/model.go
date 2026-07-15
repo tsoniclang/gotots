@@ -30,11 +30,11 @@ const (
 	KindUintptr
 	KindFloat32
 	KindFloat64
-	// KindPointer is a pointer to a named struct of the translated package,
+	// KindPointer is a pointer to a named struct of the translated unit,
 	// carried as direct object identity with undefined for nil.
 	KindPointer
-	// KindStruct is a named struct type of the translated package; values
-	// of this kind appear only behind pointers and as receivers in the
+	// KindStruct is a named struct type of the translated unit; values of
+	// this kind appear only behind pointers and as receivers in the
 	// reviewed subset (value copies have their own future lowering).
 	KindStruct
 	// KindMap is a Go map, carried as Map | undefined with exact nil, zero,
@@ -50,15 +50,23 @@ const (
 type Type struct {
 	Kind Kind
 	Go   string // canonical Go type string
-	// Named is the local struct type name for KindStruct and for the
-	// element of a KindPointer.
+	// Named is the struct type name for KindStruct and for the element of
+	// a KindPointer.
 	Named string
+	// Pkg is the Go package path declaring Named. The emitter compares it
+	// against the emitting module to select local or imported spelling.
+	Pkg string
 	// Elem is the pointee (KindPointer), value (KindMap), or element
 	// (KindSlice) type.
 	Elem *Type
 	// Key is the key type of a KindMap.
 	Key *Type
 }
+
+// Scope is the set of Go package paths translated together as one unit.
+// References into any scope package resolve to generated modules; every
+// reference outside the scope fails closed.
+type Scope map[string]bool
 
 // Signed reports whether the kind is a signed integer.
 func (k Kind) Signed() bool {

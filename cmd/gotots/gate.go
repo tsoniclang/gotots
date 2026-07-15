@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/tsoniclang/gotots/internal/census"
+	"github.com/tsoniclang/gotots/internal/policy"
 	"github.com/tsoniclang/gotots/internal/profile"
 )
 
@@ -79,7 +80,14 @@ func runGate(args []string) error {
 	// complete unit/fixture/oracle suite with race detection, and the
 	// policy gates that run inside it).
 	run("format", func() (string, []string, error) {
-		out, err := runInRepo(*repoDir, "gofmt", "-l", ".")
+		// The formatting gate covers exactly the hand-maintained source
+		// tree (the shared policy definition), never scratch or evidence
+		// directories.
+		files, err := policy.SourceFiles(*repoDir)
+		if err != nil {
+			return "fail", nil, err
+		}
+		out, err := runInRepo(*repoDir, "gofmt", append([]string{"-l"}, files...)...)
 		if err != nil {
 			return "fail", splitLines(out), err
 		}

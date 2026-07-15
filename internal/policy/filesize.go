@@ -48,10 +48,11 @@ func (v Violation) String() string {
 		v.Path, v.Lines, MaxSourceFileLines)
 }
 
-// CheckTree walks root and returns every source file exceeding the limit,
-// sorted by path.
-func CheckTree(root string) ([]Violation, error) {
-	var violations []Violation
+// SourceFiles walks root and returns every hand-maintained source file —
+// the single tree definition every repository-wide gate shares — as
+// root-relative slash paths, sorted.
+func SourceFiles(root string) ([]string, error) {
+	var files []string
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -65,24 +66,37 @@ func CheckTree(root string) ([]Violation, error) {
 		if !sourceExtensions[filepath.Ext(entry.Name())] {
 			return nil
 		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
+		relative, relErr := filepath.Rel(root, path)
+		if relErr != nil {
+			relative = path
 		}
-		lines := countPhysicalLines(data)
-		if lines > MaxSourceFileLines {
-			relative, relErr := filepath.Rel(root, path)
-			if relErr != nil {
-				relative = path
-			}
-			violations = append(violations, Violation{Path: filepath.ToSlash(relative), Lines: lines})
-		}
+		files = append(files, filepath.ToSlash(relative))
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	sort.Slice(violations, func(i, j int) bool { return violations[i].Path < violations[j].Path })
+	sort.Strings(files)
+	return files, nil
+}
+
+// CheckTree returns every source file exceeding the limit, sorted by path.
+func CheckTree(root string) ([]Violation, error) {
+	files, err := SourceFiles(root)
+	if err != nil {
+		return nil, err
+	}
+	var violations []Violation
+	for _, relative := range files {
+		data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+		if err != nil {
+			return nil, err
+		}
+		lines := countPhysicalLines(data)
+		if lines > MaxSourceFileLines {
+			violations = append(violations, Violation{Path: relative, Lines: lines})
+		}
+	}
 	return violations, nil
 }
 

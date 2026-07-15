@@ -41,38 +41,36 @@ func FileWithProvenance(p Provenance, body string) (string, error) {
 
 // Package prints one translated package into a single TypeScript module:
 // classes for named structs (methods attached), then functions, each in
-// sorted name order. intsImport and runtimeImport are the language-ABI
-// module specifiers (with .js).
-func Package(structs []*ir.Struct, functions []*ir.Func, intsImport, runtimeImport, sliceImport string) (string, error) {
+// sorted name order. module carries the package identity, the
+// language-ABI specifiers, and the co-generated import environment; the
+// body is printed first so only referenced packages are imported.
+func Package(module *Module, structs []*ir.Struct, functions []*ir.Func) (string, error) {
 	sortedStructs := append([]*ir.Struct{}, structs...)
 	sort.Slice(sortedStructs, func(i, j int) bool { return sortedStructs[i].Name < sortedStructs[j].Name })
 	sorted := append([]*ir.Func{}, functions...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
 
-	var out strings.Builder
-	fmt.Fprintf(&out, "import * as goabi from %q;\n", intsImport)
-	fmt.Fprintf(&out, "import * as gort from %q;\n", runtimeImport)
-	fmt.Fprintf(&out, "import * as gosl from %q;\n", sliceImport)
+	var body strings.Builder
 	for _, structDecl := range sortedStructs {
-		out.WriteString("\n")
-		if err := printStruct(&out, structDecl); err != nil {
+		body.WriteString("\n")
+		if err := printStruct(&body, module, structDecl); err != nil {
 			return "", err
 		}
 	}
 	for _, function := range sorted {
-		out.WriteString("\n")
-		if err := printFunc(&out, function); err != nil {
+		body.WriteString("\n")
+		if err := printFunc(&body, module, function); err != nil {
 			return "", err
 		}
 	}
-	return out.String(), nil
+	return module.importLines() + body.String(), nil
 }
 
 // printStruct emits one named struct as a class whose constructor takes
 // every field in declaration order (composite literals pass explicit
 // zeros for omitted fields, so construction is always total).
-func printStruct(out *strings.Builder, structDecl *ir.Struct) error {
-	p := &printer{out: out}
+func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct) error {
+	p := &printer{out: out, module: module}
 	export := ""
 	if structDecl.Exported {
 		export = "export "
@@ -81,7 +79,7 @@ func printStruct(out *strings.Builder, structDecl *ir.Struct) error {
 	p.indent++
 	var params []string
 	for _, field := range structDecl.Fields {
-		spelled, err := tsType(field.Type)
+		spelled, err := p.tsType(field.Type)
 		if err != nil {
 			return fmt.Errorf("%s: %w", structDecl.ID, err)
 		}
@@ -111,7 +109,7 @@ func printStruct(out *strings.Builder, structDecl *ir.Struct) error {
 // binds to the instance on entry so body references keep source naming.
 func printMethod(p *printer, method *ir.Func) error {
 	p.temps = 0
-	signature, err := functionSignature(method)
+	signature, err := p.functionSignature(method)
 	if err != nil {
 		return fmt.Errorf("%s: %w", method.ID, err)
 	}
@@ -126,9 +124,10 @@ func printMethod(p *printer, method *ir.Func) error {
 	return nil
 }
 
-// printer carries per-function emission state.
+// printer carries per-function emission state and the module context.
 type printer struct {
 	out    *strings.Builder
+	module *Module
 	indent int
 	temps  int
 }
@@ -145,9 +144,9 @@ func (p *printer) temp() string {
 	return name
 }
 
-func printFunc(out *strings.Builder, function *ir.Func) error {
-	p := &printer{out: out}
-	signature, err := functionSignature(function)
+func printFunc(out *strings.Builder, module *Module, function *ir.Func) error {
+	p := &printer{out: out, module: module}
+	signature, err := p.functionSignature(function)
 	if err != nil {
 		return fmt.Errorf("%s: %w", function.ID, err)
 	}
@@ -165,24 +164,25 @@ func printFunc(out *strings.Builder, function *ir.Func) error {
 	return nil
 }
 
-func functionSignature(function *ir.Func) (string, error) {
+func (p *printer) functionSignature(function *ir.Func) (string, error) {
 	var params []string
 	for _, parameter := range function.Params {
-		spelled, err := tsType(parameter.Type)
+		spelled, err := p.tsType(parameter.Type)
 		if err != nil {
 			return "", err
 		}
 		params = append(params, parameter.Name+": "+spelled)
 	}
-	result, err := tsResultType(function.Results)
+	result, err := p.tsResultType(function.Results)
 	if err != nil {
 		return "", err
 	}
 	return "(" + strings.Join(params, ", ") + "): " + result, nil
 }
 
-// tsType spells the static TypeScript type of one IR type.
-func tsType(t ir.Type) (string, error) {
+// tsType spells the static TypeScript type of one IR type, qualifying
+// named types from other unit packages with their module alias.
+func (p *printer) tsType(t ir.Type) (string, error) {
 	switch t.Kind {
 	case ir.KindBool:
 		return "boolean", nil
@@ -213,19 +213,23 @@ func tsType(t ir.Type) (string, error) {
 	case ir.KindUintptr:
 		return "goabi.GoUintptr", nil
 	case ir.KindPointer:
-		return t.Named + " | undefined", nil
+		name, err := p.module.symbol(t.Pkg, t.Named)
+		if err != nil {
+			return "", err
+		}
+		return name + " | undefined", nil
 	case ir.KindSlice:
-		element, err := tsType(*t.Elem)
+		element, err := p.tsType(*t.Elem)
 		if err != nil {
 			return "", err
 		}
 		return "gosl.GoSliceValue<" + element + ">", nil
 	case ir.KindMap:
-		key, err := tsType(*t.Key)
+		key, err := p.tsType(*t.Key)
 		if err != nil {
 			return "", err
 		}
-		value, err := tsType(*t.Elem)
+		value, err := p.tsType(*t.Elem)
 		if err != nil {
 			return "", err
 		}
@@ -234,16 +238,16 @@ func tsType(t ir.Type) (string, error) {
 	return "", fmt.Errorf("no TypeScript spelling for IR type %q", t.Go)
 }
 
-func tsResultType(results []ir.Var) (string, error) {
+func (p *printer) tsResultType(results []ir.Var) (string, error) {
 	switch len(results) {
 	case 0:
 		return "void", nil
 	case 1:
-		return tsType(results[0].Type)
+		return p.tsType(results[0].Type)
 	default:
 		var parts []string
 		for _, result := range results {
-			spelled, err := tsType(result.Type)
+			spelled, err := p.tsType(result.Type)
 			if err != nil {
 				return "", err
 			}

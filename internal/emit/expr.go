@@ -26,50 +26,58 @@ func family(kind ir.Kind) (abi.Family, bool) {
 func helper(name string) string { return "goabi." + name }
 
 // printExpr renders one IR expression, fully parenthesized.
-func printExpr(e ir.Expr) (string, error) {
+func (p *printer) printExpr(e ir.Expr) (string, error) {
 	switch n := e.(type) {
 	case *ir.Const:
 		return printConst(n)
 	case *ir.VarRef:
 		return n.Name, nil
 	case *ir.Binary:
-		return printBinary(n)
+		return p.printBinary(n)
 	case *ir.Unary:
-		return printUnary(n)
+		return p.printUnary(n)
 	case *ir.Convert:
-		return printConvert(n)
+		return p.printConvert(n)
 	case *ir.Call:
-		args, err := printArgs(n.Args)
+		args, err := p.printArgs(n.Args)
 		if err != nil {
 			return "", err
 		}
-		return fmt.Sprintf("%s(%s)", n.Callee, args), nil
+		callee, err := p.module.symbol(n.Pkg, n.Callee)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("%s(%s)", callee, args), nil
 	case *ir.MethodCall:
-		recv, err := printExpr(n.Recv)
+		recv, err := p.printExpr(n.Recv)
 		if err != nil {
 			return "", err
 		}
-		args, err := printArgs(n.Args)
+		args, err := p.printArgs(n.Args)
 		if err != nil {
 			return "", err
 		}
 		return fmt.Sprintf("gort.goNilCheck(%s).%s(%s)", recv, n.Method, args), nil
 	case *ir.FieldLoad:
-		base, err := printExpr(n.X)
+		base, err := p.printExpr(n.X)
 		if err != nil {
 			return "", err
 		}
 		return fmt.Sprintf("gort.goNilCheck(%s).%s", base, n.Field), nil
 	case *ir.StructNew:
-		args, err := printArgs(n.Args)
+		args, err := p.printArgs(n.Args)
 		if err != nil {
 			return "", err
 		}
-		return fmt.Sprintf("new %s(%s)", n.TypeName, args), nil
+		class, err := p.module.symbol(n.Pkg, n.TypeName)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("new %s(%s)", class, args), nil
 	case *ir.NilConst:
 		return "undefined", nil
 	case *ir.IsNil:
-		x, err := printExpr(n.X)
+		x, err := p.printExpr(n.X)
 		if err != nil {
 			return "", err
 		}
@@ -82,11 +90,11 @@ func printExpr(e ir.Expr) (string, error) {
 	case *ir.MapFrom:
 		var entries []string
 		for i := range n.Keys {
-			key, err := printExpr(n.Keys[i])
+			key, err := p.printExpr(n.Keys[i])
 			if err != nil {
 				return "", err
 			}
-			value, err := printExpr(n.Values[i])
+			value, err := p.printExpr(n.Values[i])
 			if err != nil {
 				return "", err
 			}
@@ -94,35 +102,35 @@ func printExpr(e ir.Expr) (string, error) {
 		}
 		return "gort.goMapFrom([" + joinComma(entries) + "])", nil
 	case *ir.MapGet:
-		return printMapAccess("goMapGet", n.Map, n.Key, n.T)
+		return p.printMapAccess("goMapGet", n.Map, n.Key, n.T)
 	case *ir.MapLookup:
-		return printMapAccess("goMapLookup", n.Map, n.Key, n.T)
+		return p.printMapAccess("goMapLookup", n.Map, n.Key, n.T)
 	case *ir.MapLen:
-		x, err := printExpr(n.X)
+		x, err := p.printExpr(n.X)
 		if err != nil {
 			return "", err
 		}
 		return "gort.goMapLen(" + x + ")", nil
 	case *ir.StringLen:
-		x, err := printExpr(n.X)
+		x, err := p.printExpr(n.X)
 		if err != nil {
 			return "", err
 		}
 		return "gort.goStringLen(" + x + ")", nil
 	case *ir.SliceLit:
-		values, err := printArgs(n.Values)
+		values, err := p.printArgs(n.Values)
 		if err != nil {
 			return "", err
 		}
 		return "gosl.goSliceFrom([" + values + "])", nil
 	case *ir.SliceMake:
-		length, err := printExpr(n.Length)
+		length, err := p.printExpr(n.Length)
 		if err != nil {
 			return "", err
 		}
 		capacity := length
 		if n.Capacity != nil {
-			capacity, err = printExpr(n.Capacity)
+			capacity, err = p.printExpr(n.Capacity)
 			if err != nil {
 				return "", err
 			}
@@ -133,30 +141,30 @@ func printExpr(e ir.Expr) (string, error) {
 		}
 		return "gosl.goSliceMake(" + length + ", " + capacity + ", " + zero + ")", nil
 	case *ir.SliceGet:
-		x, err := printExpr(n.X)
+		x, err := p.printExpr(n.X)
 		if err != nil {
 			return "", err
 		}
-		index, err := printExpr(n.Index)
+		index, err := p.printExpr(n.Index)
 		if err != nil {
 			return "", err
 		}
 		return "gosl.goSliceGet(" + x + ", " + index + ")", nil
 	case *ir.SliceReslice:
-		x, err := printExpr(n.X)
+		x, err := p.printExpr(n.X)
 		if err != nil {
 			return "", err
 		}
 		low := "0"
 		if n.Low != nil {
-			low, err = printExpr(n.Low)
+			low, err = p.printExpr(n.Low)
 			if err != nil {
 				return "", err
 			}
 		}
 		high := "gosl.goSliceLen(" + x + ")"
 		if n.High != nil {
-			high, err = printExpr(n.High)
+			high, err = p.printExpr(n.High)
 			if err != nil {
 				return "", err
 			}
@@ -167,23 +175,23 @@ func printExpr(e ir.Expr) (string, error) {
 		// fields of pure bases). Revisit with effectful operands.
 		return "gosl.goSliceSlice(" + x + ", " + low + ", " + high + ")", nil
 	case *ir.SliceAppend:
-		x, err := printExpr(n.X)
+		x, err := p.printExpr(n.X)
 		if err != nil {
 			return "", err
 		}
-		values, err := printArgs(n.Values)
+		values, err := p.printArgs(n.Values)
 		if err != nil {
 			return "", err
 		}
 		return "gosl.goSliceAppend(" + x + ", [" + values + "])", nil
 	case *ir.SliceLen:
-		x, err := printExpr(n.X)
+		x, err := p.printExpr(n.X)
 		if err != nil {
 			return "", err
 		}
 		return "gosl.goSliceLen(" + x + ")", nil
 	case *ir.SliceCap:
-		x, err := printExpr(n.X)
+		x, err := p.printExpr(n.X)
 		if err != nil {
 			return "", err
 		}
@@ -192,10 +200,10 @@ func printExpr(e ir.Expr) (string, error) {
 	return "", fmt.Errorf("no emission for IR expression %T", e)
 }
 
-func printArgs(args []ir.Expr) (string, error) {
+func (p *printer) printArgs(args []ir.Expr) (string, error) {
 	parts := make([]string, len(args))
 	for i, arg := range args {
-		printed, err := printExpr(arg)
+		printed, err := p.printExpr(arg)
 		if err != nil {
 			return "", err
 		}
@@ -206,12 +214,12 @@ func printArgs(args []ir.Expr) (string, error) {
 
 // printMapAccess emits a map read with the exact zero value of the map's
 // value type.
-func printMapAccess(helper string, mapExpr, key ir.Expr, valueType ir.Type) (string, error) {
-	m, err := printExpr(mapExpr)
+func (p *printer) printMapAccess(helper string, mapExpr, key ir.Expr, valueType ir.Type) (string, error) {
+	m, err := p.printExpr(mapExpr)
 	if err != nil {
 		return "", err
 	}
-	k, err := printExpr(key)
+	k, err := p.printExpr(key)
 	if err != nil {
 		return "", err
 	}
@@ -252,12 +260,12 @@ func printConst(n *ir.Const) (string, error) {
 	return "", fmt.Errorf("no emission for constant of type %q", n.T.Go)
 }
 
-func printBinary(n *ir.Binary) (string, error) {
-	left, err := printExpr(n.L)
+func (p *printer) printBinary(n *ir.Binary) (string, error) {
+	left, err := p.printExpr(n.L)
 	if err != nil {
 		return "", err
 	}
-	right, err := printExpr(n.R)
+	right, err := p.printExpr(n.R)
 	if err != nil {
 		return "", err
 	}
@@ -352,8 +360,8 @@ func shiftCount(countExpr ir.Expr, printed string) (string, error) {
 	return printed, nil
 }
 
-func printUnary(n *ir.Unary) (string, error) {
-	x, err := printExpr(n.X)
+func (p *printer) printUnary(n *ir.Unary) (string, error) {
+	x, err := p.printExpr(n.X)
 	if err != nil {
 		return "", err
 	}
@@ -386,8 +394,8 @@ func printUnary(n *ir.Unary) (string, error) {
 	return "", fmt.Errorf("no emission for unary operator %s", n.Op)
 }
 
-func printConvert(n *ir.Convert) (string, error) {
-	x, err := printExpr(n.X)
+func (p *printer) printConvert(n *ir.Convert) (string, error) {
+	x, err := p.printExpr(n.X)
 	if err != nil {
 		return "", err
 	}

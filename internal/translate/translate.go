@@ -1,12 +1,12 @@
 // Package translate orchestrates the translation proof chain for one
-// package: census-aligned declaration identity -> typed body IR ->
-// conservative representation plan -> lowering -> deterministic TypeScript
-// with provenance -> per-declaration proof records.
+// unit of packages: census-aligned declaration identity -> typed body IR
+// -> conservative representation plan -> lowering -> deterministic
+// TypeScript with provenance -> per-declaration proof records. Named
+// types, calls, and pointer-receiver methods resolve across the unit
+// through generated module imports.
 //
-// Version 1 covers the reviewed vertical-slice subset (exact integer,
-// boolean, string-equality, float64, and control-flow semantics on plain
-// functions). Every construct outside the subset fails closed with a
-// stable GOTOTS_UNSUPPORTED_* diagnostic; nothing is approximated.
+// Every construct outside the reviewed subset fails closed with a stable
+// GOTOTS_UNSUPPORTED_* diagnostic; nothing is approximated.
 package translate
 
 import (
@@ -65,117 +65,33 @@ type Options struct {
 // optimizations are selected.
 const LoweringPlanV1 = "conservative-v1"
 
-// Package translates one loaded production package.
-func Package(p *packages.Package, sourceDir string, options Options) (*Generated, error) {
+// abiDir is the bundle directory of the language-ABI modules.
+const abiDir = "language-abi"
+
+// Packages translates a set of loaded production packages as one unit:
+// named types, direct calls, and pointer-receiver method calls resolve
+// across every package in the set, and each package emits one module at
+// core/<pkgPath>/package.ts importing its co-generated dependencies.
+func Packages(pkgs []*packages.Package, sourceDir string, options Options) (*Generated, error) {
+	sorted := append([]*packages.Package{}, pkgs...)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].PkgPath < sorted[j].PkgPath })
+	unit := ir.Scope{}
+	for _, p := range sorted {
+		if unit[p.PkgPath] {
+			return nil, fmt.Errorf("package %s appears twice in the translation unit", p.PkgPath)
+		}
+		unit[p.PkgPath] = true
+	}
+
 	out := &Generated{
 		Files:     map[string]string{},
 		Ownership: map[string]string{},
 	}
-
-	corePath := path.Join("core", p.PkgPath, "package.ts")
-	abiDir := "language-abi"
-	intsImport, err := relativeImport(path.Dir(corePath), path.Join(abiDir, "goints.js"))
-	if err != nil {
-		return nil, err
-	}
-	runtimeImport, err := relativeImport(path.Dir(corePath), path.Join(abiDir, "goruntime.js"))
-	if err != nil {
-		return nil, err
-	}
-	sliceImport, err := relativeImport(path.Dir(corePath), path.Join(abiDir, "goslice.js"))
-	if err != nil {
-		return nil, err
-	}
-
-	var functions []*ir.Func
-	structs := map[string]*ir.Struct{}
-	var structOrder []string
-	for _, file := range p.Syntax {
-		filename := p.Fset.Position(file.Pos()).Filename
-		relative, err := filepath.Rel(sourceDir, filename)
-		if err != nil || strings.HasPrefix(relative, "..") {
-			return nil, fmt.Errorf("file %s is outside the source checkout", filename)
-		}
-		relative = filepath.ToSlash(relative)
-		source, err := os.ReadFile(filename)
-		if err != nil {
+	for _, p := range sorted {
+		if err := translatePackage(out, p, sourceDir, unit, options); err != nil {
 			return nil, err
 		}
-		for _, decl := range file.Decls {
-			switch d := decl.(type) {
-			case *ast.FuncDecl:
-				function, proof, err := translateFunc(p, sourceDir, relative, source, d, options)
-				if err != nil {
-					return nil, err
-				}
-				proof.GeneratedFile = corePath
-				out.Proofs = append(out.Proofs, *proof)
-				if function.Receiver == nil {
-					functions = append(functions, function)
-				} else {
-					owner := function.Receiver.Type.Named
-					structDecl, ok := structs[owner]
-					if !ok {
-						return nil, fmt.Errorf("method %s declared before its receiver type %s (multi-file ordering not resolved)", function.Name, owner)
-					}
-					structDecl.Methods = append(structDecl.Methods, function)
-				}
-			case *ast.GenDecl:
-				switch d.Tok {
-				case token.IMPORT:
-					if len(d.Specs) > 0 {
-						return nil, &ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
-							Construct: "package imports", Span: spanOf(p, sourceDir, d.Pos())}
-					}
-				case token.TYPE:
-					for _, spec := range d.Specs {
-						typeSpec := spec.(*ast.TypeSpec)
-						id := goid.TypeName(p.PkgPath, "type", typeSpec.Name.Name)
-						structDecl, err := ir.BuildStruct(p, sourceDir, typeSpec, id)
-						if err != nil {
-							return nil, err
-						}
-						structs[structDecl.Name] = structDecl
-						structOrder = append(structOrder, structDecl.Name)
-						out.Proofs = append(out.Proofs, Proof{
-							ID: id, SourceRevision: options.SourceRevision,
-							Package: p.PkgPath, File: relative,
-							LoweringPlan:    LoweringPlanV1,
-							Representations: map[string]string{typeSpec.Name.Name: "class-direct-identity"},
-							GeneratedFile:   corePath, GeneratedSymbol: structDecl.Name,
-						})
-					}
-				default:
-					return nil, &ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
-						Construct: "package-level " + d.Tok.String() + " declaration", Span: spanOf(p, sourceDir, d.Pos())}
-				}
-			}
-		}
 	}
-	if len(functions) == 0 && len(structs) == 0 {
-		return nil, fmt.Errorf("package %s has no translatable declarations", p.PkgPath)
-	}
-
-	structList := make([]*ir.Struct, 0, len(structOrder))
-	for _, name := range structOrder {
-		structList = append(structList, structs[name])
-	}
-	body, err := emit.Package(structList, functions, intsImport, runtimeImport, sliceImport)
-	if err != nil {
-		return nil, err
-	}
-	coreContent, err := emit.FileWithProvenance(emit.Provenance{
-		SchemaVersion:  1,
-		SourceRevision: options.SourceRevision,
-		ProfileHash:    options.ProfileHash,
-		AbiVersion:     abi.Version,
-		Path:           corePath,
-	}, body)
-	if err != nil {
-		return nil, err
-	}
-	out.Files[corePath] = coreContent
-	out.Ownership[corePath] = "generated-core"
 
 	abiFiles := abi.Files()
 	abiNames := make([]string, 0, len(abiFiles))
@@ -203,7 +119,192 @@ func Package(p *packages.Package, sourceDir string, options Options) (*Generated
 	return out, nil
 }
 
-func translateFunc(p *packages.Package, sourceDir, relativeFile string, source []byte, decl *ast.FuncDecl, options Options) (*ir.Func, *Proof, error) {
+// translatePackage translates one unit package into its generated module.
+// Declarations are collected in two passes — types first, then functions
+// and methods — so a method may precede its receiver type in file order.
+func translatePackage(out *Generated, p *packages.Package, sourceDir string, unit ir.Scope, options Options) error {
+	corePath := path.Join("core", p.PkgPath, "package.ts")
+	module, err := newModule(corePath, p.PkgPath, unit)
+	if err != nil {
+		return err
+	}
+
+	type fileSource struct {
+		file     *ast.File
+		relative string
+		source   []byte
+	}
+	var files []fileSource
+	for _, file := range p.Syntax {
+		filename := p.Fset.Position(file.Pos()).Filename
+		relative, err := filepath.Rel(sourceDir, filename)
+		if err != nil || strings.HasPrefix(relative, "..") {
+			return fmt.Errorf("file %s is outside the source checkout", filename)
+		}
+		source, err := os.ReadFile(filename)
+		if err != nil {
+			return err
+		}
+		files = append(files, fileSource{file: file, relative: filepath.ToSlash(relative), source: source})
+	}
+
+	// Pass 1: type declarations, plus fail-closed screening of every
+	// other package-level GenDecl.
+	structs := map[string]*ir.Struct{}
+	var structOrder []string
+	for _, f := range files {
+		for _, decl := range f.file.Decls {
+			d, isGen := decl.(*ast.GenDecl)
+			if !isGen {
+				continue
+			}
+			switch d.Tok {
+			case token.IMPORT:
+				// Imports carry no semantics of their own — every use is
+				// identity-checked against the unit — except blank imports,
+				// whose only meaning is the imported package's init side
+				// effects.
+				for _, spec := range d.Specs {
+					importSpec := spec.(*ast.ImportSpec)
+					if importSpec.Name != nil && importSpec.Name.Name == "_" {
+						return &ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+							Construct: "blank import (init side effects)", Span: spanOf(p, sourceDir, spec.Pos())}
+					}
+				}
+			case token.TYPE:
+				for _, spec := range d.Specs {
+					typeSpec := spec.(*ast.TypeSpec)
+					id := goid.TypeName(p.PkgPath, "type", typeSpec.Name.Name)
+					structDecl, err := ir.BuildStruct(p, sourceDir, unit, typeSpec, id)
+					if err != nil {
+						return err
+					}
+					structs[structDecl.Name] = structDecl
+					structOrder = append(structOrder, structDecl.Name)
+					out.Proofs = append(out.Proofs, Proof{
+						ID: id, SourceRevision: options.SourceRevision,
+						Package: p.PkgPath, File: f.relative,
+						LoweringPlan:    LoweringPlanV1,
+						Representations: map[string]string{typeSpec.Name.Name: "class-direct-identity"},
+						GeneratedFile:   corePath, GeneratedSymbol: structDecl.Name,
+					})
+				}
+			case token.CONST:
+				// Package-level constants generate no code: go/types folds
+				// every use — including cross-package uses — into an exact
+				// Const during body building, so the declaration's complete
+				// disposition is fold-at-use.
+				for _, spec := range d.Specs {
+					valueSpec := spec.(*ast.ValueSpec)
+					for _, name := range valueSpec.Names {
+						if name.Name == "_" {
+							continue
+						}
+						out.Proofs = append(out.Proofs, Proof{
+							ID: goid.Value(p.PkgPath, "const", name.Name), SourceRevision: options.SourceRevision,
+							Package: p.PkgPath, File: f.relative,
+							LoweringPlan:    LoweringPlanV1,
+							Representations: map[string]string{name.Name: "const-folded-at-use"},
+							GeneratedFile:   corePath, GeneratedSymbol: "",
+						})
+					}
+				}
+			default:
+				return &ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+					Construct: "package-level " + d.Tok.String() + " declaration", Span: spanOf(p, sourceDir, d.Pos())}
+			}
+		}
+	}
+
+	// Pass 2: functions and methods, attached to their receiver classes.
+	var functions []*ir.Func
+	for _, f := range files {
+		for _, decl := range f.file.Decls {
+			funcDecl, isFunc := decl.(*ast.FuncDecl)
+			if !isFunc {
+				continue
+			}
+			function, proof, err := translateFunc(p, sourceDir, unit, f.relative, f.source, funcDecl, options)
+			if err != nil {
+				return err
+			}
+			proof.GeneratedFile = corePath
+			out.Proofs = append(out.Proofs, *proof)
+			if function.Receiver == nil {
+				functions = append(functions, function)
+				continue
+			}
+			owner := function.Receiver.Type.Named
+			structDecl, ok := structs[owner]
+			if !ok {
+				return fmt.Errorf("method %s has no generated receiver type %s in package %s", function.Name, owner, p.PkgPath)
+			}
+			structDecl.Methods = append(structDecl.Methods, function)
+		}
+	}
+	if len(functions) == 0 && len(structs) == 0 {
+		return fmt.Errorf("package %s has no translatable declarations", p.PkgPath)
+	}
+
+	structList := make([]*ir.Struct, 0, len(structOrder))
+	for _, name := range structOrder {
+		structList = append(structList, structs[name])
+	}
+	body, err := emit.Package(module, structList, functions)
+	if err != nil {
+		return err
+	}
+	coreContent, err := emit.FileWithProvenance(emit.Provenance{
+		SchemaVersion:  1,
+		SourceRevision: options.SourceRevision,
+		ProfileHash:    options.ProfileHash,
+		AbiVersion:     abi.Version,
+		Path:           corePath,
+	}, body)
+	if err != nil {
+		return err
+	}
+	out.Files[corePath] = coreContent
+	out.Ownership[corePath] = "generated-core"
+	return nil
+}
+
+// newModule builds the emission context of one generated module: the
+// language-ABI specifiers plus one specifier per co-generated package,
+// all relative to the module's own directory.
+func newModule(corePath, pkgPath string, unit ir.Scope) (*emit.Module, error) {
+	fromDir := path.Dir(corePath)
+	intsImport, err := relativeImport(fromDir, path.Join(abiDir, "goints.js"))
+	if err != nil {
+		return nil, err
+	}
+	runtimeImport, err := relativeImport(fromDir, path.Join(abiDir, "goruntime.js"))
+	if err != nil {
+		return nil, err
+	}
+	sliceImport, err := relativeImport(fromDir, path.Join(abiDir, "goslice.js"))
+	if err != nil {
+		return nil, err
+	}
+	specifiers := map[string]string{}
+	for other := range unit {
+		if other == pkgPath {
+			continue
+		}
+		specifier, err := relativeImport(fromDir, path.Join("core", other, "package.js"))
+		if err != nil {
+			return nil, err
+		}
+		specifiers[other] = specifier
+	}
+	return emit.NewModule(pkgPath, emit.ABIImports{
+		Ints:    intsImport,
+		Runtime: runtimeImport,
+		Slice:   sliceImport,
+	}, specifiers), nil
+}
+
+func translateFunc(p *packages.Package, sourceDir string, unit ir.Scope, relativeFile string, source []byte, decl *ast.FuncDecl, options Options) (*ir.Func, *Proof, error) {
 	name := decl.Name.Name
 	id := goid.Func(p.PkgPath, name)
 	if decl.Recv != nil {
@@ -221,7 +322,7 @@ func translateFunc(p *packages.Package, sourceDir, relativeFile string, source [
 		bodyHash = hex.EncodeToString(digest[:])
 	}
 
-	function, err := ir.BuildFunc(p, sourceDir, decl, id, bodyHash)
+	function, err := ir.BuildFunc(p, sourceDir, unit, decl, id, bodyHash)
 	if err != nil {
 		return nil, nil, err
 	}

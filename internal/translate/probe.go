@@ -49,12 +49,24 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 	}
 	sort.Slice(loaded, func(i, j int) bool { return loaded[i].ID < loaded[j].ID })
 
-	for _, p := range loaded {
+	// The unit is every owned production package: cross-package references
+	// among them resolve to co-generated modules.
+	owned := func(p *packages.Package) bool {
 		if typedload.RoleOf(p, sourceDir) != typedload.RoleProduction {
-			continue
+			return false
 		}
 		class, _ := prof.Classify(p.PkgPath)
-		if class != profile.ClassOwned {
+		return class == profile.ClassOwned
+	}
+	unit := ir.Scope{}
+	for _, p := range loaded {
+		if owned(p) {
+			unit[p.PkgPath] = true
+		}
+	}
+
+	for _, p := range loaded {
+		if !owned(p) {
 			continue
 		}
 		result.Packages++
@@ -77,7 +89,7 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 				}
 				result.Bodies++
 				packageBodies++
-				if err := probeFunc(p, sourceDir, source, funcDecl); err != nil {
+				if err := probeFunc(p, sourceDir, unit, source, funcDecl); err != nil {
 					result.Blocked++
 					result.BlockerHistogram[blockerKey(err)]++
 				} else {
@@ -97,7 +109,7 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 	return result, nil
 }
 
-func probeFunc(p *packages.Package, sourceDir string, source []byte, decl *ast.FuncDecl) error {
+func probeFunc(p *packages.Package, sourceDir string, unit ir.Scope, source []byte, decl *ast.FuncDecl) error {
 	start := p.Fset.Position(decl.Body.Pos()).Offset
 	end := p.Fset.Position(decl.Body.End()).Offset
 	if start < 0 || end > len(source) || start >= end {
@@ -108,7 +120,7 @@ func probeFunc(p *packages.Package, sourceDir string, source []byte, decl *ast.F
 	if decl.Recv != nil {
 		id = goid.Method(p.PkgPath, receiverBase(decl.Recv), decl.Name.Name)
 	}
-	_, err := ir.BuildFunc(p, sourceDir, decl, id, hex.EncodeToString(digest[:]))
+	_, err := ir.BuildFunc(p, sourceDir, unit, decl, id, hex.EncodeToString(digest[:]))
 	return err
 }
 
@@ -122,7 +134,7 @@ func blockerKey(err error) string {
 		// stable class prefix for aggregation.
 		for _, prefix := range []string{
 			"non-basic type ", "basic type ", "pointer to non-named type ",
-			"pointer to non-struct type ", "pointer to type outside the translated package: ",
+			"pointer to non-struct type ", "pointer to type outside the translated unit: ",
 			"map key type ", "type ", "identifier ", "call of ", "field access on ",
 			"index on ", "nil comparison on ", "operator ", "conversion from ",
 			"len of ", "make of ", "builtin ", "constant of type ", "zero value of ",

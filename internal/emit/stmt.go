@@ -44,7 +44,7 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		return p.printReturn(n)
 
 	case *ir.ExprStmt:
-		call, err := printExpr(n.Call)
+		call, err := p.printExpr(n.Call)
 		if err != nil {
 			return err
 		}
@@ -79,11 +79,11 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		return p.printRangeSlice(n)
 
 	case *ir.MapDeleteStmt:
-		mapExpr, err := printExpr(n.Map)
+		mapExpr, err := p.printExpr(n.Map)
 		if err != nil {
 			return err
 		}
-		key, err := printExpr(n.Key)
+		key, err := p.printExpr(n.Key)
 		if err != nil {
 			return err
 		}
@@ -95,7 +95,7 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 
 func (p *printer) printDecl(n *ir.DeclStmt) error {
 	if n.Tuple != nil {
-		tupleValue, err := printExpr(n.Tuple)
+		tupleValue, err := p.printExpr(n.Tuple)
 		if err != nil {
 			return err
 		}
@@ -105,7 +105,7 @@ func (p *printer) printDecl(n *ir.DeclStmt) error {
 			if name == "_" {
 				continue // discarded slot; the tuple was evaluated once
 			}
-			spelled, err := tsType(n.Types[i])
+			spelled, err := p.tsType(n.Types[i])
 			if err != nil {
 				return err
 			}
@@ -114,7 +114,7 @@ func (p *printer) printDecl(n *ir.DeclStmt) error {
 		return nil
 	}
 	for i, name := range n.Names {
-		value, err := printExpr(n.Values[i])
+		value, err := p.printExpr(n.Values[i])
 		if err != nil {
 			return err
 		}
@@ -123,7 +123,7 @@ func (p *printer) printDecl(n *ir.DeclStmt) error {
 			p.line("void (%s);", value)
 			continue
 		}
-		spelled, err := tsType(n.Types[i])
+		spelled, err := p.tsType(n.Types[i])
 		if err != nil {
 			return err
 		}
@@ -134,7 +134,7 @@ func (p *printer) printDecl(n *ir.DeclStmt) error {
 
 func (p *printer) printAssign(n *ir.AssignStmt) error {
 	if n.Tuple != nil {
-		tupleValue, err := printExpr(n.Tuple)
+		tupleValue, err := p.printExpr(n.Tuple)
 		if err != nil {
 			return err
 		}
@@ -148,7 +148,7 @@ func (p *printer) printAssign(n *ir.AssignStmt) error {
 		return nil
 	}
 	if len(n.Targets) == 1 {
-		value, err := printExpr(n.Values[0])
+		value, err := p.printExpr(n.Values[0])
 		if err != nil {
 			return err
 		}
@@ -167,7 +167,7 @@ func (p *printer) printAssign(n *ir.AssignStmt) error {
 	}
 	temps := make([]string, len(n.Values))
 	for i, value := range n.Values {
-		printed, err := printExpr(value)
+		printed, err := p.printExpr(value)
 		if err != nil {
 			return err
 		}
@@ -185,7 +185,7 @@ func (p *printer) printAssign(n *ir.AssignStmt) error {
 // printRangeSlice emits range-over-slice with the operand and length
 // evaluated once and per-iteration element loads.
 func (p *printer) printRangeSlice(n *ir.RangeSlice) error {
-	operand, err := printExpr(n.X)
+	operand, err := p.printExpr(n.X)
 	if err != nil {
 		return err
 	}
@@ -200,7 +200,7 @@ func (p *printer) printRangeSlice(n *ir.RangeSlice) error {
 	p.line("for (let %s: goabi.GoInt = 0n; %s < %s; %s = goabi.goInt64Add(%s, 1n)) {", index, index, lengthTemp, index, index)
 	p.indent++
 	if n.Value != "" {
-		spelled, err := tsType(n.VarT)
+		spelled, err := p.tsType(n.VarT)
 		if err != nil {
 			return err
 		}
@@ -229,7 +229,7 @@ func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
 	case ir.VarTarget:
 		return stagedTarget{kind: "var", name: t.Name}, nil
 	case *ir.FieldTarget:
-		base, err := printExpr(t.X)
+		base, err := p.printExpr(t.X)
 		if err != nil {
 			return stagedTarget{}, err
 		}
@@ -237,13 +237,13 @@ func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
 		p.line("const %s = gort.goNilCheck(%s);", baseTemp, base)
 		return stagedTarget{kind: "field", name: baseTemp, field: t.Field}, nil
 	case *ir.MapTarget:
-		mapExpr, err := printExpr(t.Map)
+		mapExpr, err := p.printExpr(t.Map)
 		if err != nil {
 			return stagedTarget{}, err
 		}
 		mapTemp := p.temp()
 		p.line("const %s = %s;", mapTemp, mapExpr)
-		key, err := printExpr(t.Key)
+		key, err := p.printExpr(t.Key)
 		if err != nil {
 			return stagedTarget{}, err
 		}
@@ -251,13 +251,13 @@ func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
 		p.line("const %s = %s;", keyTemp, key)
 		return stagedTarget{kind: "map", name: mapTemp, keyTemp: keyTemp}, nil
 	case *ir.SliceTarget:
-		sliceExpr, err := printExpr(t.X)
+		sliceExpr, err := p.printExpr(t.X)
 		if err != nil {
 			return stagedTarget{}, err
 		}
 		sliceTemp := p.temp()
 		p.line("const %s = %s;", sliceTemp, sliceExpr)
-		index, err := printExpr(t.Index)
+		index, err := p.printExpr(t.Index)
 		if err != nil {
 			return stagedTarget{}, err
 		}
@@ -295,29 +295,29 @@ func (p *printer) printStore(target ir.Target, value string) error {
 		p.line("%s = %s;", t.Name, value)
 		return nil
 	case *ir.FieldTarget:
-		base, err := printExpr(t.X)
+		base, err := p.printExpr(t.X)
 		if err != nil {
 			return err
 		}
 		p.line("gort.goNilCheck(%s).%s = %s;", base, t.Field, value)
 		return nil
 	case *ir.MapTarget:
-		mapExpr, err := printExpr(t.Map)
+		mapExpr, err := p.printExpr(t.Map)
 		if err != nil {
 			return err
 		}
-		key, err := printExpr(t.Key)
+		key, err := p.printExpr(t.Key)
 		if err != nil {
 			return err
 		}
 		p.line("gort.goMapSet(%s, %s, %s);", mapExpr, key, value)
 		return nil
 	case *ir.SliceTarget:
-		sliceExpr, err := printExpr(t.X)
+		sliceExpr, err := p.printExpr(t.X)
 		if err != nil {
 			return err
 		}
-		index, err := printExpr(t.Index)
+		index, err := p.printExpr(t.Index)
 		if err != nil {
 			return err
 		}
@@ -336,7 +336,7 @@ func (p *printer) printIf(n *ir.IfStmt) error {
 			return err
 		}
 	}
-	cond, err := printExpr(n.Cond)
+	cond, err := p.printExpr(n.Cond)
 	if err != nil {
 		return err
 	}
@@ -386,7 +386,7 @@ func (p *printer) printFor(n *ir.ForStmt) error {
 	}
 	cond := ""
 	if n.Cond != nil {
-		cond, err = printExpr(n.Cond)
+		cond, err = p.printExpr(n.Cond)
 		if err != nil {
 			return err
 		}
@@ -416,11 +416,11 @@ func (p *printer) forClause(stmt ir.Stmt, isInit bool) (string, error) {
 		}
 		parts := make([]string, len(n.Names))
 		for i, name := range n.Names {
-			spelled, err := tsType(n.Types[i])
+			spelled, err := p.tsType(n.Types[i])
 			if err != nil {
 				return "", err
 			}
-			value, err := printExpr(n.Values[i])
+			value, err := p.printExpr(n.Values[i])
 			if err != nil {
 				return "", err
 			}
@@ -435,7 +435,7 @@ func (p *printer) forClause(stmt ir.Stmt, isInit bool) (string, error) {
 		if !isVar {
 			return "", fmt.Errorf("non-variable assignment in a for-loop clause")
 		}
-		value, err := printExpr(n.Values[0])
+		value, err := p.printExpr(n.Values[0])
 		if err != nil {
 			return "", err
 		}
@@ -446,7 +446,7 @@ func (p *printer) forClause(stmt ir.Stmt, isInit bool) (string, error) {
 
 func (p *printer) printReturn(n *ir.ReturnStmt) error {
 	if n.CallValue != nil {
-		call, err := printExpr(n.CallValue)
+		call, err := p.printExpr(n.CallValue)
 		if err != nil {
 			return err
 		}
@@ -457,7 +457,7 @@ func (p *printer) printReturn(n *ir.ReturnStmt) error {
 	case 0:
 		p.line("return;")
 	case 1:
-		value, err := printExpr(n.Values[0])
+		value, err := p.printExpr(n.Values[0])
 		if err != nil {
 			return err
 		}
@@ -465,7 +465,7 @@ func (p *printer) printReturn(n *ir.ReturnStmt) error {
 	default:
 		parts := make([]string, len(n.Values))
 		for i, value := range n.Values {
-			printed, err := printExpr(value)
+			printed, err := p.printExpr(value)
 			if err != nil {
 				return err
 			}

@@ -160,9 +160,10 @@ type Convert struct {
 	To Type
 }
 
-// Call invokes an owned package-level function directly.
+// Call invokes a package-level function of the translated unit directly.
 type Call struct {
-	Callee  string // generated symbol name (same package, v1)
+	Pkg     string // Go package path declaring the callee
+	Callee  string // generated symbol name
 	Args    []Expr
 	Results []Type
 }
@@ -185,6 +186,7 @@ type FieldLoad struct {
 // StructNew allocates a struct on the heap (&T{...}) with every field
 // value in declaration order (omitted fields are explicit zeros).
 type StructNew struct {
+	Pkg      string // Go package path declaring the struct type
 	TypeName string
 	Args     []Expr
 	T        Type // the pointer type

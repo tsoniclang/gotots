@@ -14,10 +14,14 @@ import (
 
 // builder carries the typed context for one function body.
 type builder struct {
-	fset       *token.FileSet
-	info       *types.Info
-	pkgPath    string
-	sourceDir  string
+	fset      *token.FileSet
+	info      *types.Info
+	pkgPath   string
+	sourceDir string
+	// unit is the set of package paths translated together; named types,
+	// calls, and methods resolve across it, and everything outside fails
+	// closed.
+	unit       Scope
 	operations map[string]bool
 	deferCount int
 	// results are the enclosing function's result types, giving return
@@ -37,13 +41,15 @@ func (b *builder) span(pos token.Pos) Span {
 func (b *builder) use(operation string) { b.operations[operation] = true }
 
 // BuildFunc converts one typed top-level function or method declaration
-// into IR. bodyHash is the census body hash for proof-chain linkage.
-func BuildFunc(p *packages.Package, sourceDir string, decl *ast.FuncDecl, id, bodyHash string) (*Func, error) {
+// into IR. unit is the set of co-translated package paths; bodyHash is the
+// census body hash for proof-chain linkage.
+func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.FuncDecl, id, bodyHash string) (*Func, error) {
 	b := &builder{
 		fset:       p.Fset,
 		info:       p.TypesInfo,
 		pkgPath:    p.PkgPath,
 		sourceDir:  sourceDir,
+		unit:       unit,
 		operations: map[string]bool{},
 	}
 	span := b.span(decl.Pos())
