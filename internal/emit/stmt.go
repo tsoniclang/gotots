@@ -134,10 +134,18 @@ func (p *printer) printDecl(n *ir.DeclStmt) error {
 			if err != nil {
 				return err
 			}
-			// A struct slot binds a value copy (a comma-ok lookup yields
-			// the stored instance).
+			// A struct or array slot binds a value copy (a comma-ok
+			// lookup yields the stored instance).
 			if n.Types[i].Kind == ir.KindStruct {
 				p.line("let %s: %s = %s[%d].goClone$();", tsName(name), spelled, tuple, i)
+				continue
+			}
+			if n.Types[i].Kind == ir.KindArray {
+				cloneElem, err := p.arrayElemClone(*n.Types[i].Elem)
+				if err != nil {
+					return err
+				}
+				p.line("let %s: %s = gosl$.goArrayClone(%s[%d], %s);", tsName(name), spelled, tuple, i, cloneElem)
 				continue
 			}
 			p.line("let %s: %s = %s[%d];", tsName(name), spelled, tuple, i)
@@ -308,6 +316,12 @@ func (p *printer) printRangeSlice(n *ir.RangeSlice) error {
 		if n.VarT.Kind == ir.KindStruct {
 			// The range variable binds a per-iteration value copy.
 			p.line("let %s: %s = gosl$.goSliceGet(%s, %s).goClone$();", tsName(n.Value), spelled, sliceTemp, induction)
+		} else if n.VarT.Kind == ir.KindArray {
+			cloneElem, err := p.arrayElemClone(*n.VarT.Elem)
+			if err != nil {
+				return err
+			}
+			p.line("let %s: %s = gosl$.goArrayClone(gosl$.goSliceGet(%s, %s), %s);", tsName(n.Value), spelled, sliceTemp, induction, cloneElem)
 		} else {
 			p.line("let %s: %s = gosl$.goSliceGet(%s, %s);", tsName(n.Value), spelled, sliceTemp, induction)
 		}
@@ -468,6 +482,13 @@ func (p *printer) forClause(stmt ir.Stmt, isInit bool) (string, error) {
 		}
 		if variable.T.Kind == ir.KindStruct {
 			return tsName(variable.Name) + ".goSet$(" + value + ")", nil
+		}
+		if variable.T.Kind == ir.KindArray {
+			setElem, err := p.arrayElemSet(*variable.T.Elem)
+			if err != nil {
+				return "", err
+			}
+			return "gosl$.goArraySetAll(" + tsName(variable.Name) + ", " + value + ", " + setElem + ")", nil
 		}
 		return tsName(variable.Name) + " = " + value, nil
 	}

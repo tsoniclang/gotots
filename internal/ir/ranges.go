@@ -22,6 +22,15 @@ func (b *builder) buildRange(n *ast.RangeStmt) (Stmt, error) {
 	if operand.Type().Kind.Integer() {
 		return b.buildRangeInt(n, operand)
 	}
+	if operand.Type().Kind == KindArray {
+		// The range expression evaluates once; iterating a snapshot view
+		// makes body assignments to the source array unobservable to the
+		// loop, exactly like Go's array-value evaluation.
+		snapshot := b.bindStructValue(operand)
+		elem := operand.Type().Elem
+		operand = &ArraySliceView{X: snapshot, T: Type{Kind: KindSlice, Go: "[]" + elem.Go, Elem: elem}}
+		b.use("range:array")
+	}
 	if operand.Type().Kind != KindSlice {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range over " + operand.Type().Go, Span: span}
 	}

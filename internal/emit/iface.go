@@ -139,6 +139,13 @@ func (p *printer) printTypeSwitchClause(n *ir.TypeSwitchStmt, clause *ir.TypeSwi
 				// The asserted struct value binds as a copy.
 				value += ".goClone$()"
 			}
+			if clause.BindType.Kind == ir.KindArray {
+				cloneElem, err := p.arrayElemClone(*clause.BindType.Elem)
+				if err != nil {
+					return err
+				}
+				value = "gosl$.goArrayClone(" + value + ", " + cloneElem + ")"
+			}
 			p.line("let %s: %s = %s;", tsName(n.Bind), spelled, value)
 		}
 	}

@@ -11,16 +11,29 @@ import (
 // and right-hand values first; panics (nil deref, nil map, bounds)
 // happen at each store, so nil checks stay in the store step.
 type stagedTarget struct {
-	kind    string // blank | var | field | map | slice | pointee
-	name    string // var name, or staged base/map/slice/pointer temp
+	kind    string // blank | var | field | map | slice | array | pointee
+	name    string // var name, or staged base/map/slice/array/pointer temp
 	field   string
 	keyTemp string
 	// structValue marks a struct-valued store: fields overwrite in place
 	// (variables, fields, pointees) or through the in-place ABI element
 	// store.
 	structValue bool
+	// arrayValue marks a fixed-array-valued store: the slots overwrite in
+	// place with the composed element callback, so element aliases and
+	// slice views observe the store.
+	arrayValue string
 	// nilCheckBase marks a pointer base dereferenced at store time.
 	nilCheckBase bool
+}
+
+// arrayValueCallback spells the goArraySetAll element callback when the
+// stored type is a fixed array, else "".
+func (p *printer) arrayValueCallback(t ir.Type) (string, error) {
+	if t.Kind != ir.KindArray {
+		return "", nil
+	}
+	return p.arrayElemSet(*t.Elem)
 }
 
 func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
@@ -28,7 +41,12 @@ func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
 	case ir.BlankTarget:
 		return stagedTarget{kind: "blank"}, nil
 	case ir.VarTarget:
-		return stagedTarget{kind: "var", name: tsName(t.Name), structValue: t.T.Kind == ir.KindStruct}, nil
+		setElem, err := p.arrayValueCallback(t.T)
+		if err != nil {
+			return stagedTarget{}, err
+		}
+		return stagedTarget{kind: "var", name: tsName(t.Name),
+			structValue: t.T.Kind == ir.KindStruct, arrayValue: setElem}, nil
 	case *ir.FieldTarget:
 		base, err := p.printExpr(t.X)
 		if err != nil {
@@ -36,8 +54,13 @@ func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
 		}
 		baseTemp := p.temp()
 		p.line("const %s = %s;", baseTemp, base)
+		setElem, err := p.arrayValueCallback(t.T)
+		if err != nil {
+			return stagedTarget{}, err
+		}
 		return stagedTarget{kind: "field", name: baseTemp, field: t.Field,
-			structValue: t.T.Kind == ir.KindStruct, nilCheckBase: t.X.Type().Kind != ir.KindStruct}, nil
+			structValue: t.T.Kind == ir.KindStruct, arrayValue: setElem,
+			nilCheckBase: t.X.Type().Kind != ir.KindStruct}, nil
 	case *ir.PointeeTarget:
 		pointer, err := p.printExpr(t.X)
 		if err != nil {
@@ -74,7 +97,33 @@ func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
 		indexTemp := p.temp()
 		p.line("const %s = %s;", indexTemp, index)
 		structElem := t.X.Type().Elem != nil && t.X.Type().Elem.Kind == ir.KindStruct
-		return stagedTarget{kind: "slice", name: sliceTemp, keyTemp: indexTemp, structValue: structElem}, nil
+		setElem := ""
+		if t.X.Type().Elem != nil {
+			if setElem, err = p.arrayValueCallback(*t.X.Type().Elem); err != nil {
+				return stagedTarget{}, err
+			}
+		}
+		return stagedTarget{kind: "slice", name: sliceTemp, keyTemp: indexTemp,
+			structValue: structElem, arrayValue: setElem}, nil
+	case *ir.ArrayTarget:
+		arrayExpr, err := p.printExpr(t.X)
+		if err != nil {
+			return stagedTarget{}, err
+		}
+		arrayTemp := p.temp()
+		p.line("const %s = %s;", arrayTemp, arrayExpr)
+		index, err := p.printExpr(t.Index)
+		if err != nil {
+			return stagedTarget{}, err
+		}
+		indexTemp := p.temp()
+		p.line("const %s = %s;", indexTemp, index)
+		staged := stagedTarget{kind: "array", name: arrayTemp, keyTemp: indexTemp,
+			structValue: t.X.Type().Elem.Kind == ir.KindStruct}
+		if staged.arrayValue, err = p.arrayValueCallback(*t.X.Type().Elem); err != nil {
+			return stagedTarget{}, err
+		}
+		return staged, nil
 	}
 	return stagedTarget{}, fmt.Errorf("no staging for target %T", target)
 }
@@ -88,15 +137,21 @@ func (s stagedTarget) store(p *printer, value string) error {
 	case "blank":
 		p.line("void (%s);", value)
 	case "var":
-		if s.structValue {
+		switch {
+		case s.structValue:
 			p.line("%s.goSet$(%s);", s.name, value)
-		} else {
+		case s.arrayValue != "":
+			p.line("gosl$.goArraySetAll(%s, %s, %s);", s.name, value, s.arrayValue)
+		default:
 			p.line("%s = %s;", s.name, value)
 		}
 	case "field":
-		if s.structValue {
+		switch {
+		case s.structValue:
 			p.line("%s.%s.goSet$(%s);", base, s.field, value)
-		} else {
+		case s.arrayValue != "":
+			p.line("gosl$.goArraySetAll(%s.%s, %s, %s);", base, s.field, value, s.arrayValue)
+		default:
 			p.line("%s.%s = %s;", base, s.field, value)
 		}
 	case "pointee":
@@ -104,13 +159,33 @@ func (s stagedTarget) store(p *printer, value string) error {
 	case "map":
 		p.line("gort$.goMapSet(%s, %s, %s);", s.name, s.keyTemp, value)
 	case "slice":
-		if s.structValue {
+		switch {
+		case s.structValue:
 			p.line("gosl$.goSliceSetStruct(%s, %s, %s);", s.name, s.keyTemp, value)
-		} else {
+		case s.arrayValue != "":
+			p.line("gosl$.goSliceSetArray(%s, %s, %s, %s);", s.name, s.keyTemp, value, s.arrayValue)
+		default:
 			p.line("gosl$.goSliceSet(%s, %s, %s);", s.name, s.keyTemp, value)
 		}
+	case "array":
+		p.printArrayElemStore(s.name, s.keyTemp, value, s)
 	}
 	return nil
+}
+
+// printArrayElemStore emits one bounds-checked element store into a
+// fixed array: struct and nested-array elements overwrite in place.
+func (p *printer) printArrayElemStore(array, index, value string, s stagedTarget) {
+	switch {
+	case s.structValue:
+		p.line("gosl$.goArrayElemSetStruct(%s, %s, %s);", array, index, value)
+	case s.arrayValue != "":
+		// goArrayGet bounds-checks the slot, then the nested array
+		// overwrites in place.
+		p.line("gosl$.goArraySetAll(gosl$.goArrayGet(%s, %s), %s, %s);", array, index, value, s.arrayValue)
+	default:
+		p.line("gosl$.goArrayElemSet(%s, %s, %s);", array, index, value)
+	}
 }
 
 // printStore emits a single-target store without staging (single
@@ -128,6 +203,14 @@ func (p *printer) printStore(target ir.Target, value string) error {
 			p.line("%s.goSet$(%s);", tsName(t.Name), value)
 			return nil
 		}
+		if t.T.Kind == ir.KindArray {
+			setElem, err := p.arrayElemSet(*t.T.Elem)
+			if err != nil {
+				return err
+			}
+			p.line("gosl$.goArraySetAll(%s, %s, %s);", tsName(t.Name), value, setElem)
+			return nil
+		}
 		p.line("%s = %s;", tsName(t.Name), value)
 		return nil
 	case *ir.FieldTarget:
@@ -135,12 +218,19 @@ func (p *printer) printStore(target ir.Target, value string) error {
 		if err != nil {
 			return err
 		}
+		setElem, err := p.arrayValueCallback(t.T)
+		if err != nil {
+			return err
+		}
 		if t.X.Type().Kind == ir.KindStruct {
 			// A struct-value base cannot panic; the direct member store
 			// already evaluates base, then value, then stores.
-			if t.T.Kind == ir.KindStruct {
+			switch {
+			case t.T.Kind == ir.KindStruct:
 				p.line("%s.%s.goSet$(%s);", base, t.Field, value)
-			} else {
+			case setElem != "":
+				p.line("gosl$.goArraySetAll(%s.%s, %s, %s);", base, t.Field, value, setElem)
+			default:
 				p.line("%s.%s = %s;", base, t.Field, value)
 			}
 			return nil
@@ -151,9 +241,12 @@ func (p *printer) printStore(target ir.Target, value string) error {
 		p.line("const %s = %s;", baseTemp, base)
 		valueTemp := p.temp()
 		p.line("const %s = %s;", valueTemp, value)
-		if t.T.Kind == ir.KindStruct {
+		switch {
+		case t.T.Kind == ir.KindStruct:
 			p.line("gort$.goNilCheck(%s).%s.goSet$(%s);", baseTemp, t.Field, valueTemp)
-		} else {
+		case setElem != "":
+			p.line("gosl$.goArraySetAll(gort$.goNilCheck(%s).%s, %s, %s);", baseTemp, t.Field, valueTemp, setElem)
+		default:
 			p.line("gort$.goNilCheck(%s).%s = %s;", baseTemp, t.Field, valueTemp)
 		}
 		return nil
@@ -181,6 +274,14 @@ func (p *printer) printStore(target ir.Target, value string) error {
 			p.line("gosl$.goSliceSetStruct(%s, %s, %s);", sliceExpr, index, value)
 			return nil
 		}
+		if t.X.Type().Elem != nil && t.X.Type().Elem.Kind == ir.KindArray {
+			setElem, err := p.arrayElemSet(*t.X.Type().Elem.Elem)
+			if err != nil {
+				return err
+			}
+			p.line("gosl$.goSliceSetArray(%s, %s, %s, %s);", sliceExpr, index, value, setElem)
+			return nil
+		}
 		p.line("gosl$.goSliceSet(%s, %s, %s);", sliceExpr, index, value)
 		return nil
 	case *ir.PointeeTarget:
@@ -193,6 +294,29 @@ func (p *printer) printStore(target ir.Target, value string) error {
 		valueTemp := p.temp()
 		p.line("const %s = %s;", valueTemp, value)
 		p.line("gort$.goNilCheck(%s).goSet$(%s);", pointerTemp, valueTemp)
+		return nil
+	case *ir.ArrayTarget:
+		arrayExpr, err := p.printExpr(t.X)
+		if err != nil {
+			return err
+		}
+		arrayTemp := p.temp()
+		p.line("const %s = %s;", arrayTemp, arrayExpr)
+		index, err := p.printExpr(t.Index)
+		if err != nil {
+			return err
+		}
+		indexTemp := p.temp()
+		p.line("const %s = %s;", indexTemp, index)
+		// The value evaluates before the bounds panic, matching Go's
+		// operands-then-store order.
+		valueTemp := p.temp()
+		p.line("const %s = %s;", valueTemp, value)
+		staged := stagedTarget{structValue: t.X.Type().Elem.Kind == ir.KindStruct}
+		if staged.arrayValue, err = p.arrayValueCallback(*t.X.Type().Elem); err != nil {
+			return err
+		}
+		p.printArrayElemStore(arrayTemp, indexTemp, valueTemp, staged)
 		return nil
 	}
 	return fmt.Errorf("no emission for target %T", target)

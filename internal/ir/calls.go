@@ -41,9 +41,9 @@ func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
 				if err != nil {
 					return nil, err
 				}
-				if argType.Kind == KindStruct {
+				if argType.Kind == KindStruct || argType.Kind == KindArray {
 					return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
-						Construct: "generic call instantiated with a struct value (copy semantics vary per instantiation)", Span: span}
+						Construct: "generic call instantiated with a value-copy carrier (copy semantics vary per instantiation)", Span: span}
 				}
 				typeArgs = append(typeArgs, argType)
 			}

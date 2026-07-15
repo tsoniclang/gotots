@@ -17,6 +17,36 @@
       "specClause": "docs/spec/05-collections-strings.md"
     },
     {
+      "key": "arrayCopy",
+      "state": "generated",
+      "specClause": "docs/spec/05-collections-strings.md"
+    },
+    {
+      "key": "arrayEqual",
+      "state": "generated",
+      "specClause": "docs/spec/05-collections-strings.md"
+    },
+    {
+      "key": "arrayGet",
+      "state": "generated",
+      "specClause": "docs/spec/05-collections-strings.md"
+    },
+    {
+      "key": "arrayLiteral",
+      "state": "generated",
+      "specClause": "docs/spec/05-collections-strings.md"
+    },
+    {
+      "key": "arraySliceView",
+      "state": "generated",
+      "specClause": "docs/spec/05-collections-strings.md"
+    },
+    {
+      "key": "arrayStore",
+      "state": "generated",
+      "specClause": "docs/spec/05-collections-strings.md"
+    },
+    {
       "key": "assign",
       "state": "generated",
       "specClause": "docs/spec/03-declarations-bodies-control.md"
@@ -297,6 +327,11 @@
       "specClause": "docs/spec/04-types-values-pointers.md"
     },
     {
+      "key": "len:array",
+      "state": "generated",
+      "specClause": "docs/spec/05-collections-strings.md"
+    },
+    {
       "key": "len:map",
       "state": "generated",
       "specClause": "docs/spec/05-collections-strings.md"
@@ -375,6 +410,11 @@
       "key": "pointeeStore",
       "state": "generated",
       "specClause": "docs/spec/04-types-values-pointers.md"
+    },
+    {
+      "key": "range:array",
+      "state": "generated",
+      "specClause": "docs/spec/05-collections-strings.md"
     },
     {
       "key": "range:int",

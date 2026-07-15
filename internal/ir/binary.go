@@ -65,7 +65,11 @@ func (b *builder) buildBinary(n *ast.BinaryExpr, resultType types.Type) (Expr, e
 		}
 	case token.EQL, token.NEQ:
 		// Equality is exact for scalar carriers (UTF-8 string equality
-		// coincides with JS code-unit equality) and for pointer identity.
+		// coincides with JS code-unit equality) and for pointer identity;
+		// arrays compare element-wise in index order.
+		if operand.Kind == KindArray {
+			return b.buildArrayEqual(left, right, n.Op, span)
+		}
 		if operand.Kind == KindMap || operand.Kind == KindStruct {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "equality on " + operand.Go, Span: span}
 		}

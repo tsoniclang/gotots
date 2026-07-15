@@ -18,7 +18,7 @@ func Case() int {
 	_ = ch
 	select {}
 	total := 0
-	var arr [4]int
+	arr := [4]int{2: 1}
 	total = total + arr[0]
 	goto done
 done:
@@ -33,10 +33,10 @@ done:
 		t.Fatalf("expected a withheld diagnostic, got: %v", err)
 	}
 	for _, mention := range []string{
-		"channel type",   // make(chan int)
-		"ast.SelectStmt", // select {}
-		"array type",     // var arr [4]int
-		"branch goto",    // goto done
+		"channel type",        // make(chan int)
+		"ast.SelectStmt",      // select {}
+		"keyed array literal", // [4]int{2: 1}
+		"branch goto",         // goto done
 	} {
 		if !strings.Contains(text, mention) {
 			t.Errorf("site %q missing from the exhaustive account:\n%s", mention, text)

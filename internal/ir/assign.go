@@ -79,6 +79,13 @@ func (b *builder) buildTarget(lhs ast.Expr) (Target, error) {
 			}
 			b.use("sliceStore")
 			return &SliceTarget{X: operand, Index: index}, nil
+		case KindArray:
+			index, err := b.buildExpr(n.Index)
+			if err != nil {
+				return nil, err
+			}
+			b.use("arrayStore")
+			return &ArrayTarget{X: operand, Index: index}, nil
 		}
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "indexed assignment on " + operand.Type().Go, Span: span}
 
@@ -291,6 +298,9 @@ func (b *builder) compoundTarget(lhs ast.Expr) (Target, Expr, error) {
 		case *SliceGet:
 			b.use("sliceStore")
 			return &SliceTarget{X: load.X, Index: load.Index}, load, nil
+		case *ArrayGet:
+			b.use("arrayStore")
+			return &ArrayTarget{X: load.X, Index: load.Index}, load, nil
 		}
 		return nil, nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "indexed compound assignment on " + built.Type().Go, Span: span}
 	}

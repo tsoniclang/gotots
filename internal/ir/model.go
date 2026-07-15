@@ -56,6 +56,11 @@ const (
 	// interface. Boxing at conversion sites preserves the nil-pointer-in-
 	// interface distinction exactly.
 	KindIface
+	// KindArray is a Go fixed array [N]T: a value type carried as a
+	// native array whose copies happen at Go copy boundaries and whose
+	// whole-value stores overwrite elements in place, so element aliases
+	// (including slices over the array) observe them exactly.
+	KindArray
 	// KindTypeParam is a generic function's type parameter: an opaque
 	// carrier admitted only for operations exact under every recorded
 	// instantiation (the unit-wide closed-world evidence excludes struct
@@ -81,6 +86,8 @@ type Type struct {
 	Key *Type
 	// Sig is the signature of a KindFunc.
 	Sig *FuncSig
+	// ArrayLen is the fixed length of a KindArray.
+	ArrayLen int64
 }
 
 // FuncSig is the shape of a function value's type.

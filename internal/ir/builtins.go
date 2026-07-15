@@ -36,6 +36,9 @@ func (b *builder) buildBuiltin(call *ast.CallExpr, builtin *types.Builtin, resul
 		case KindSlice:
 			b.use("len:slice")
 			return &SliceLen{X: operand}, nil
+		case KindArray:
+			b.use("len:array")
+			return &ArrayLenExpr{X: operand}, nil
 		}
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "len of " + operand.Type().Go, Span: span}
 	case "cap":
@@ -60,6 +63,11 @@ func (b *builder) buildBuiltin(call *ast.CallExpr, builtin *types.Builtin, resul
 		if dst.Type().Kind != KindSlice || src.Type().Kind != KindSlice {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "copy between " + dst.Type().Go + " and " + src.Type().Go, Span: span}
 		}
+		if dst.Type().Elem.Kind == KindArray {
+			// copy() overwrites each destination array's memory; the ABI
+			// struct copy path requires goSet$ carriers.
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "copy of fixed-array elements", Span: span}
+		}
 		b.use("copy:slice")
 		return &SliceCopy{Dst: dst, Src: src}, nil
 	case "append":
@@ -69,6 +77,11 @@ func (b *builder) buildBuiltin(call *ast.CallExpr, builtin *types.Builtin, resul
 		}
 		if operand.Type().Kind != KindSlice {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "append to " + operand.Type().Go, Span: span}
+		}
+		if operand.Type().Elem.Kind == KindArray {
+			// Appended values must copy into the backing store; the ABI
+			// struct append path requires goClone$/goSet$ carriers.
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "append of fixed-array elements", Span: span}
 		}
 		if call.Ellipsis.IsValid() {
 			source, err := b.buildExprAs(call.Args[1], operand.Type())

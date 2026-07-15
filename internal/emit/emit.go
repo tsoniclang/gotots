@@ -206,9 +206,16 @@ func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct) er
 func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 	clone := make([]string, 0, len(structDecl.Fields))
 	for _, field := range structDecl.Fields {
-		if field.Type.Kind == ir.KindStruct {
+		switch field.Type.Kind {
+		case ir.KindStruct:
 			clone = append(clone, "this."+field.Name+".goClone$()")
-		} else {
+		case ir.KindArray:
+			cloneElem, err := p.arrayElemClone(*field.Type.Elem)
+			if err != nil {
+				return err
+			}
+			clone = append(clone, "gosl$.goArrayClone(this."+field.Name+", "+cloneElem+")")
+		default:
 			clone = append(clone, "this."+field.Name)
 		}
 	}
@@ -221,9 +228,16 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 	p.line("goSet$(other: %s): void {", tsName(structDecl.Name))
 	p.indent++
 	for _, field := range structDecl.Fields {
-		if field.Type.Kind == ir.KindStruct {
+		switch field.Type.Kind {
+		case ir.KindStruct:
 			p.line("this.%s.goSet$(other.%s);", field.Name, field.Name)
-		} else {
+		case ir.KindArray:
+			setElem, err := p.arrayElemSet(*field.Type.Elem)
+			if err != nil {
+				return err
+			}
+			p.line("gosl$.goArraySetAll(this.%s, other.%s, %s);", field.Name, field.Name, setElem)
+		default:
 			p.line("this.%s = other.%s;", field.Name, field.Name)
 		}
 	}
@@ -260,8 +274,9 @@ func printMethodFunction(out *strings.Builder, module *Module, className string,
 		return fmt.Errorf("%s: %w", method.ID, err)
 	}
 	structValueReceiver := method.Receiver.Type.Kind == ir.KindStruct
+	arrayValueReceiver := method.Receiver.Type.Kind == ir.KindArray
 	recvParam := tsName(method.Receiver.Name)
-	if structValueReceiver {
+	if structValueReceiver || arrayValueReceiver {
 		recvParam = "$recv"
 	}
 	params := []string{recvParam + ": " + recvSpelled}
@@ -284,6 +299,13 @@ func printMethodFunction(out *strings.Builder, module *Module, className string,
 	p.indent++
 	if structValueReceiver {
 		p.line("const %s = $recv.goClone$();", tsName(method.Receiver.Name))
+	}
+	if arrayValueReceiver {
+		cloneElem, err := p.arrayElemClone(*method.Receiver.Type.Elem)
+		if err != nil {
+			return fmt.Errorf("%s: %w", method.ID, err)
+		}
+		p.line("const %s = gosl$.goArrayClone($recv, %s);", tsName(method.Receiver.Name), cloneElem)
 	}
 	if err := p.printBlockBody(method.Body); err != nil {
 		return fmt.Errorf("%s: %w", method.ID, err)
@@ -393,6 +415,12 @@ func (p *printer) tsType(t ir.Type) (string, error) {
 		return name + " | undefined", nil
 	case ir.KindStruct:
 		return p.module.symbol(t.Pkg, t.Named)
+	case ir.KindArray:
+		element, err := p.tsType(*t.Elem)
+		if err != nil {
+			return "", err
+		}
+		return element + "[]", nil
 	case ir.KindIface:
 		return "goif$.GoIface", nil
 	case ir.KindTypeParam:

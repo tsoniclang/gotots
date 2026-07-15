@@ -27,6 +27,9 @@ func helper(name string) string { return "goabi$." + name }
 
 // printExpr renders one IR expression, fully parenthesized.
 func (p *printer) printExpr(e ir.Expr) (string, error) {
+	if printed, isArray, err := p.printArrayExpr(e); isArray {
+		return printed, err
+	}
 	switch n := e.(type) {
 	case *ir.Const:
 		return printConst(n)
@@ -231,6 +234,13 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		if n.X.Type().Kind == ir.KindArray {
+			cloneElem, err := p.arrayElemClone(*n.X.Type().Elem)
+			if err != nil {
+				return "", err
+			}
+			return "gosl$.goArrayClone(" + x + ", " + cloneElem + ")", nil
+		}
 		return x + ".goClone$()", nil
 	case *ir.StructZero:
 		return p.zeroLiteral(n.T)
@@ -310,8 +320,9 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		if n.T.Elem.Kind == ir.KindStruct {
-			// Every struct element is a distinct fresh zero instance.
+		if n.T.Elem.Kind == ir.KindStruct || n.T.Elem.Kind == ir.KindArray {
+			// Every struct or array element is a distinct fresh zero
+			// instance.
 			return "gosl$.goSliceMakeStruct(" + length + ", " + capacity + ", () => " + zero + ")", nil
 		}
 		return "gosl$.goSliceMake(" + length + ", " + capacity + ", " + zero + ")", nil
@@ -506,6 +517,8 @@ func (p *printer) zeroLiteral(t ir.Type) (string, error) {
 			return "", err
 		}
 		return class + ".goZero$()", nil
+	case t.Kind == ir.KindArray:
+		return p.arrayZeroFactory(t)
 	case t.Kind.Wide64():
 		return "0n", nil
 	case t.Kind.Integer(), t.Kind.Float():

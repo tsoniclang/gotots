@@ -116,7 +116,16 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 		return out, nil
 
 	case *types.Array:
-		return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "array type " + spelled, Span: span}
+		element, err := b.typeOf(u.Elem(), span)
+		if err != nil {
+			return Type{}, err
+		}
+		out := Type{Kind: KindArray, Go: spelled, Elem: &element, ArrayLen: u.Len()}
+		if named, isNamed := types.Unalias(t).(*types.Named); isNamed && named.Obj().Pkg() != nil {
+			out.Named = named.Obj().Name()
+			out.Pkg = named.Obj().Pkg().Path()
+		}
+		return out, nil
 
 	case *types.Chan:
 		return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "channel type " + spelled, Span: span}

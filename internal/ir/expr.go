@@ -91,6 +91,9 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 		if t.Kind == KindStruct {
 			return b.buildStructLit(n, t)
 		}
+		if t.Kind == KindArray {
+			return b.buildArrayLit(n, t)
+		}
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "composite literal of " + t.Go, Span: span}
 
 	case *ast.FuncLit:
@@ -163,6 +166,13 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			}
 			b.use("sliceGet")
 			return &SliceGet{X: operand, Index: index, T: *operand.Type().Elem}, nil
+		case KindArray:
+			index, err := b.buildExpr(n.Index)
+			if err != nil {
+				return nil, err
+			}
+			b.use("arrayGet")
+			return &ArrayGet{X: operand, Index: index, T: *operand.Type().Elem}, nil
 		}
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "index on " + operand.Type().Go, Span: span}
 
@@ -173,6 +183,23 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 		operand, err := b.buildExpr(n.X)
 		if err != nil {
 			return nil, err
+		}
+		if operand.Type().Kind == KindArray {
+			// Slicing an addressable array (the checker enforces
+			// addressability) yields a slice sharing its storage.
+			view := &ArraySliceView{X: operand, T: Type{Kind: KindSlice, Go: "[]" + operand.Type().Elem.Go, Elem: operand.Type().Elem}}
+			if n.Low != nil {
+				if view.Low, err = b.buildExpr(n.Low); err != nil {
+					return nil, err
+				}
+			}
+			if n.High != nil {
+				if view.High, err = b.buildExpr(n.High); err != nil {
+					return nil, err
+				}
+			}
+			b.use("arraySliceView")
+			return view, nil
 		}
 		if operand.Type().Kind != KindSlice {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "reslice of " + operand.Type().Go, Span: span}
@@ -264,7 +291,7 @@ func (b *builder) buildExprAs(e ast.Expr, expected Type) (Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	if expected.Kind == KindStruct {
+	if expected.Kind == KindStruct || expected.Kind == KindArray {
 		return b.bindStructValue(built), nil
 	}
 	if expected.Kind == KindIface {
@@ -297,14 +324,19 @@ func (b *builder) buildVarRef(variable *types.Var, name string, span Span) (Expr
 // allocations, zeros, copies, and call results (copied at their return
 // sites) — bind directly.
 func (b *builder) bindStructValue(e Expr) Expr {
-	if e.Type().Kind != KindStruct {
+	kind := e.Type().Kind
+	if kind != KindStruct && kind != KindArray {
 		return e
 	}
 	switch e.(type) {
-	case *StructNew, *StructZero, *StructCopy, *Call, *MethodCall:
+	case *StructNew, *StructZero, *StructCopy, *Call, *MethodCall, *ArrayLit:
 		return e
 	}
-	b.use("structCopy")
+	if kind == KindArray {
+		b.use("arrayCopy")
+	} else {
+		b.use("structCopy")
+	}
 	return &StructCopy{X: e}
 }
 
@@ -501,7 +533,7 @@ func zeroValue(t Type, span Span) (Expr, error) {
 		return &Const{T: t, Value: `""`}, nil
 	case t.Kind.Nilable():
 		return &NilConst{T: t}, nil
-	case t.Kind == KindStruct:
+	case t.Kind == KindStruct, t.Kind == KindArray:
 		return &StructZero{T: t}, nil
 	case t.Kind.Integer(), t.Kind.Float():
 		return &Const{T: t, Value: "0"}, nil
