@@ -4,8 +4,10 @@ gotots mechanically translates the complete declared TS-Go source corpus
 into statically analyzable TypeScript — closed-world completeness over
 the current corpus, fail-closed detection of future TS-Go idioms. It is
 not a universal Go compiler. The committed specification under
-`docs/spec/` (start with `mission-and-scope.md`) and the design scope
-packet (`.analysis/scope/`, local) govern the work.
+`docs/spec/` governs the work. Start with `mission-and-scope.md`, then read
+`translation-and-output.md`, `performance-and-representation.md`, and
+`testing-and-acceptance.md`. The local `.analysis/scope/` packet contains
+review context and candidate designs; it is not normative.
 
 ## Hard rules
 
@@ -45,3 +47,11 @@ This is enforced repository-wide by `internal/policy`
   invariant, and keep the remote up to date.
 - `gofmt`, `go vet ./...`, and `go test ./...` must be green before every
   commit; `go test -race` before every push.
+- Follow the ordered gates in `docs/spec/testing-and-acceptance.md`; a later
+  product suite never substitutes for an earlier completeness proof.
+- Add a source-linked Go input, typed decision, generated TypeScript shape,
+  semantic oracle, and staticness/performance evidence for each semantic
+  lowering class.
+- Continue through the complete declared scope. Census, declaration,
+  vertical-slice, focused-test, and corpus milestones are checkpoints rather
+  than completion conditions.

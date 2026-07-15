@@ -5,6 +5,23 @@ GoToTS is and is not; every other document must agree with it.
 Machine-enforceable requirements have validation gates
 (`internal/policy`); this document governs the rest.
 
+## Normative Contract Set
+
+Read and apply the committed specification as one contract:
+
+1. `mission-and-scope.md` defines the corpus boundary and completion model.
+2. `translation-and-output.md` defines the generated TSTS architecture,
+   language-semantic lowerings, product-extension boundary, and worked
+   Go-to-TypeScript shapes.
+3. `performance-and-representation.md` defines representation proof,
+   benchmark evidence, regression budgets, and native-target requirements.
+4. `testing-and-acceptance.md` defines ordered gates, exact coverage ledgers,
+   differential oracles, corpus validation, self-compilation, and completion.
+5. `file-size-and-decomposition.md` defines repository maintainability.
+
+No local analysis packet, generated report, or passing subset of tests can
+weaken these committed requirements.
+
 ## Mission
 
 > Mechanically translate the complete declared TS-Go source corpus into
@@ -132,6 +149,10 @@ on append reallocation). Absent proof, the semantics-preserving
 representation is used. Every choice is recorded and testable; none is
 selected by source name or optimistic fallback.
 
+The complete measurement protocol, required metrics, default regression
+budgets, TSTS hot-path inventory, and native-target gates are normative in
+`performance-and-representation.md`.
+
 ## Future TS-Go Upgrade Contract
 
 Every new TS-Go pin follows this process:
@@ -153,6 +174,10 @@ Every new TS-Go pin follows this process:
 The correct response to a new idiom (for example a first integer-range
 loop) is to implement the semantic class, never to patch the first
 occurrence.
+
+`testing-and-acceptance.md` defines the evidence and exact gate ordering for
+this process. `translation-and-output.md` defines the output contract against
+which each regenerated revision is checked.
 
 ## Manual-Body Contract
 

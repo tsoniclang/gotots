@@ -19,10 +19,29 @@ gotots emits exact typed fail-closed stubs and never implements library
 behavior. LSP and fourslash are hard exclusions, inventoried with durable
 dispositions.
 
-The normative committed specification lives in `docs/spec/`
-(`mission-and-scope.md` first); durable architecture decisions in
-`docs/decisions/`; the reviewed design packet in `.analysis/scope/`
-(local, untracked).
+The normative committed specification lives in `docs/spec/`; durable
+architecture decisions live in `docs/decisions/`. The design packet in
+`.analysis/scope/` is local review context and candidate analysis, not a
+substitute for the committed specification.
+
+## Specification
+
+Read the normative documents in this order:
+
+1. `docs/spec/mission-and-scope.md` — corpus boundary and completion model.
+2. `docs/spec/translation-and-output.md` — generated TSTS architecture and
+   worked Go-to-TypeScript shapes.
+3. `docs/spec/performance-and-representation.md` — representation proof,
+   benchmarks, and regression gates.
+4. `docs/spec/testing-and-acceptance.md` — ordered test layers, differential
+   oracles, corpus proof, self-compilation, and final acceptance.
+5. `docs/spec/file-size-and-decomposition.md` — mandatory semantic file
+   decomposition and repository-wide enforcement.
+
+The output target is a strict static ESM TSTS compiler core, a generated
+Go-language ABI and exact external contracts, and separately owned TSTS
+product extensions composed through typed generated seams. Generated output
+must remain suitable for Tsonic C# and Rust compilation.
 
 ## Layout
 
@@ -52,6 +71,20 @@ The normative committed specification lives in `docs/spec/`
 - `pins/` — pinned upstream source identities.
 - `profiles/` — per-product project profiles (`profiles/tsts`).
 - `docs/decisions/` — architecture decision records.
+
+## Validation
+
+The complete process is normative in
+`docs/spec/testing-and-acceptance.md`. Local checkpoints run formatting,
+vetting, unit/fixture tests, and diff checks; pushes additionally run the race
+suite. Product acceptance adds exact census/disposition proof, declaration and
+body verification, Go semantic oracles, strict generated-TypeScript checks,
+byte-identical regeneration, no-extension TS-Go differential behavior, TSTS
+extension tests, the complete selected compiler corpus, proof projects,
+self-compilation/native-target probes, and measured performance gates.
+
+No fixed remembered test count is authoritative. The machine-discovered,
+identity-bearing test ledger is the denominator for each run.
 
 ## Census
 

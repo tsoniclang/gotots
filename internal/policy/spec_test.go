@@ -40,12 +40,35 @@ func TestCanonicalSpecificationPresent(t *testing.T) {
 			"GOTOTS_FILE_TOO_LARGE",
 			"There is no allowlist",
 		},
+		"docs/spec/translation-and-output.md": {
+			"Generated compiler core.",
+			"strict ESM with explicit `.js` relative imports",
+			"Worked Translation Shapes",
+			"sourceSelectedDeclaration",
+			"Two clean generations from identical inputs",
+		},
+		"docs/spec/performance-and-representation.md": {
+			"at least three warmup runs and seven measured runs",
+			"Default Regression Gates",
+			"TSTS-Specific Hot Paths",
+			"Native-Target Shape",
+		},
+		"docs/spec/testing-and-acceptance.md": {
+			"Gate Ordering",
+			"No-Extension TS-Go Differential",
+			"Every in-scope TS-Go `_test.go`",
+			"Compiler Corpus",
+			"Intermediate census, declaration, vertical-slice, or focused-test milestones",
+		},
 		"README.md": {
 			"docs/spec/",
+			"translation-and-output.md",
+			"testing-and-acceptance.md",
 		},
 		"CONTRIBUTING.md": {
 			"mission-and-scope.md",
 			"exactly one disposition",
+			"performance-and-representation.md",
 		},
 	}
 
