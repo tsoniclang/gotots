@@ -48,6 +48,20 @@ func (b *builder) buildBuiltin(call *ast.CallExpr, builtin *types.Builtin, resul
 			return &SliceCap{X: operand}, nil
 		}
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "cap of " + operand.Type().Go, Span: span}
+	case "copy":
+		dst, err := b.buildExpr(call.Args[0])
+		if err != nil {
+			return nil, err
+		}
+		src, err := b.buildExpr(call.Args[1])
+		if err != nil {
+			return nil, err
+		}
+		if dst.Type().Kind != KindSlice || src.Type().Kind != KindSlice {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "copy between " + dst.Type().Go + " and " + src.Type().Go, Span: span}
+		}
+		b.use("copy:slice")
+		return &SliceCopy{Dst: dst, Src: src}, nil
 	case "append":
 		operand, err := b.buildExpr(call.Args[0])
 		if err != nil {
@@ -57,7 +71,12 @@ func (b *builder) buildBuiltin(call *ast.CallExpr, builtin *types.Builtin, resul
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "append to " + operand.Type().Go, Span: span}
 		}
 		if call.Ellipsis.IsValid() {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "append with slice expansion", Span: span}
+			source, err := b.buildExprAs(call.Args[1], operand.Type())
+			if err != nil {
+				return nil, err
+			}
+			b.use("append:spread")
+			return &SliceAppendSlice{X: operand, Source: source, T: operand.Type()}, nil
 		}
 		out := &SliceAppend{X: operand, T: operand.Type()}
 		for _, arg := range call.Args[1:] {
@@ -97,4 +116,46 @@ func (b *builder) buildBuiltin(call *ast.CallExpr, builtin *types.Builtin, resul
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "make of " + t.Go, Span: span}
 	}
 	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "builtin " + builtin.Name(), Span: span}
+}
+
+func (b *builder) buildMapDelete(call *ast.CallExpr) (Stmt, error) {
+	mapExpr, err := b.buildExpr(call.Args[0])
+	if err != nil {
+		return nil, err
+	}
+	key, err := b.buildExpr(call.Args[1])
+	if err != nil {
+		return nil, err
+	}
+	b.use("mapDelete")
+	return &MapDeleteStmt{Map: mapExpr, Key: key}, nil
+}
+
+func (b *builder) buildClear(call *ast.CallExpr) (Stmt, error) {
+	operand, err := b.buildExpr(call.Args[0])
+	if err != nil {
+		return nil, err
+	}
+	if operand.Type().Kind != KindMap {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "clear of " + operand.Type().Go, Span: b.span(call.Pos())}
+	}
+	b.use("mapClear")
+	return &MapClearStmt{Map: operand}, nil
+}
+
+// buildPanic lowers panic(v) for argument kinds whose Go %v formatting
+// coincides with JS String(): strings, canonical-range and bigint
+// integers, and booleans.
+func (b *builder) buildPanic(call *ast.CallExpr) (Stmt, error) {
+	span := b.span(call.Pos())
+	value, err := b.buildExpr(call.Args[0])
+	if err != nil {
+		return nil, err
+	}
+	kind := value.Type().Kind
+	if kind != KindString && kind != KindBool && !kind.Integer() {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "panic with " + value.Type().Go + " (formatting not reviewed)", Span: span}
+	}
+	b.use("panic")
+	return &PanicStmt{Value: value}, nil
 }

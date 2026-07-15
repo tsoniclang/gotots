@@ -175,6 +175,28 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 				for _, spec := range d.Specs {
 					typeSpec := spec.(*ast.TypeSpec)
 					id := goid.TypeName(p.PkgPath, "type", typeSpec.Name.Name)
+					object, hasDef := p.TypesInfo.Defs[typeSpec.Name].(*types.TypeName)
+					if !hasDef {
+						return &ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+							Construct: "type without typed definition", Span: spanOf(p, sourceDir, spec.Pos())}
+					}
+					if _, isStruct := object.Type().Underlying().(*types.Struct); !isStruct || object.IsAlias() {
+						// A non-struct named type (or alias) erases to its
+						// underlying carrier: uses spell the carrier type, and
+						// its methods generate as package-level functions.
+						carrier, err := erasedCarrier(p, sourceDir, unit, typeSpec, object)
+						if err != nil {
+							return err
+						}
+						out.Proofs = append(out.Proofs, Proof{
+							ID: id, SourceRevision: options.SourceRevision,
+							Package: p.PkgPath, File: f.relative,
+							LoweringPlan:    LoweringPlanV1,
+							Representations: map[string]string{typeSpec.Name.Name: "erased-to-carrier(" + carrier + ")"},
+							GeneratedFile:   corePath, GeneratedSymbol: "",
+						})
+						continue
+					}
 					structDecl, err := ir.BuildStruct(p, sourceDir, unit, typeSpec, id)
 					if err != nil {
 						return err
@@ -216,8 +238,10 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 		}
 	}
 
-	// Pass 2: functions and methods, attached to their receiver classes.
+	// Pass 2: functions and methods — attached to their receiver classes,
+	// or standalone for receivers erased to carriers.
 	var functions []*ir.Func
+	var carrierMethods []emit.Method
 	for _, f := range files {
 		for _, decl := range f.file.Decls {
 			funcDecl, isFunc := decl.(*ast.FuncDecl)
@@ -234,15 +258,18 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 				functions = append(functions, function)
 				continue
 			}
-			owner := function.Receiver.Type.Named
-			structDecl, ok := structs[owner]
-			if !ok {
-				return fmt.Errorf("method %s has no generated receiver type %s in package %s", function.Name, owner, p.PkgPath)
+			owner := receiverBase(funcDecl.Recv)
+			if owner == "" {
+				return fmt.Errorf("method %s has no named receiver type in package %s", function.Name, p.PkgPath)
 			}
-			structDecl.Methods = append(structDecl.Methods, function)
+			if structDecl, ok := structs[owner]; ok {
+				structDecl.Methods = append(structDecl.Methods, function)
+				continue
+			}
+			carrierMethods = append(carrierMethods, emit.Method{TypeName: owner, Fn: function})
 		}
 	}
-	if len(functions) == 0 && len(structs) == 0 {
+	if len(functions) == 0 && len(structs) == 0 && len(carrierMethods) == 0 {
 		return fmt.Errorf("package %s has no translatable declarations", p.PkgPath)
 	}
 
@@ -250,7 +277,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 	for _, name := range structOrder {
 		structList = append(structList, structs[name])
 	}
-	body, err := emit.Package(module, structList, functions)
+	body, err := emit.Package(module, structList, carrierMethods, functions)
 	if err != nil {
 		return err
 	}
@@ -357,6 +384,16 @@ func translateFunc(p *packages.Package, sourceDir string, unit ir.Scope, relativ
 		LoweringPlan:    LoweringPlanV1,
 		GeneratedSymbol: name,
 	}, nil
+}
+
+// erasedCarrier resolves the reviewed carrier of a non-struct named type
+// or alias declaration; a type outside the subset fails closed.
+func erasedCarrier(p *packages.Package, sourceDir string, unit ir.Scope, spec *ast.TypeSpec, object *types.TypeName) (string, error) {
+	t, err := ir.ResolveType(p, sourceDir, unit, object.Type(), spec.Pos())
+	if err != nil {
+		return "", err
+	}
+	return conservativeCarrier(t), nil
 }
 
 // receiverBase names the receiver's base type from its AST.

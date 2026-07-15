@@ -103,7 +103,7 @@ export function goPanicNilMapWrite(): never {
 const goruntimeSource = `// Go language runtime carriers beyond integers: nil-checked pointer
 // access, maps with exact nil/zero/comma-ok/write-panic behavior, and
 // UTF-8 string semantics.
-import { goPanicNil, goPanicNilMapWrite } from "./gopanic.js";
+import { GoPanic, goPanicNil, goPanicNilMapWrite } from "./gopanic.js";
 
 // A Go map: undefined is the nil map.
 export type GoMap<K, V> = Map<K, V> | undefined;
@@ -150,6 +150,18 @@ export function goMapDelete<K, V>(m: GoMap<K, V>, key: K): void {
 
 export function goMapLen<K, V>(m: GoMap<K, V>): bigint {
   return m === undefined ? 0n : BigInt(m.size);
+}
+
+// clear(m): a no-op on nil maps.
+export function goMapClear<K, V>(m: GoMap<K, V>): void {
+  if (m === undefined) return;
+  m.clear();
+}
+
+// panic(v) for values whose Go %v formatting coincides with JS String():
+// strings, canonical-range and bigint integers, and booleans.
+export function goPanicValue(value: string | number | bigint | boolean): never {
+  throw new GoPanic(String(value));
 }
 
 // len(string) is the UTF-8 byte length; JS string length counts UTF-16
@@ -432,5 +444,67 @@ export function goSliceAppend<T>(s: GoSliceValue<T>, values: T[]): GoSlice<T> {
     backing[length + index] = values[index] as T;
   }
   return new GoSlice(backing, 0, needed, capacity);
+}
+
+// append(s, source...): source's current elements are read first, so a
+// self-append with capacity reuse stays exact.
+export function goSliceAppendSlice<T>(s: GoSliceValue<T>, source: GoSliceValue<T>): GoSlice<T> {
+  const values: T[] = [];
+  const length = source === undefined ? 0 : source.length;
+  for (let index = 0; index < length; index++) {
+    const src = source as GoSlice<T>;
+    values.push(src.backing[src.offset + index] as T);
+  }
+  return goSliceAppend(s, values);
+}
+
+// The struct-element spread clones each copied value: Go copies struct
+// values into the destination's storage.
+export function goSliceAppendSliceStruct<T extends GoStructValue<T>>(s: GoSliceValue<T>, source: GoSliceValue<T>): GoSlice<T> {
+  const values: T[] = [];
+  const length = source === undefined ? 0 : source.length;
+  for (let index = 0; index < length; index++) {
+    const src = source as GoSlice<T>;
+    values.push((src.backing[src.offset + index] as T).goClone$());
+  }
+  return goSliceAppend(s, values);
+}
+
+// copy(dst, src): min(len) elements with memmove semantics — the source
+// window is read completely before any write, so overlapping ranges on
+// shared backing stay exact.
+export function goSliceCopy<T>(dst: GoSliceValue<T>, src: GoSliceValue<T>): bigint {
+  const dstLength = dst === undefined ? 0 : dst.length;
+  const srcLength = src === undefined ? 0 : src.length;
+  const count = dstLength < srcLength ? dstLength : srcLength;
+  const staged: T[] = [];
+  for (let index = 0; index < count; index++) {
+    const source = src as GoSlice<T>;
+    staged.push(source.backing[source.offset + index] as T);
+  }
+  for (let index = 0; index < count; index++) {
+    const destination = dst as GoSlice<T>;
+    destination.backing[destination.offset + index] = staged[index] as T;
+  }
+  return BigInt(count);
+}
+
+// The struct-element copy stages clones and overwrites destination
+// elements in place, so element aliases observe the store like Go's
+// memory write.
+export function goSliceCopyStruct<T extends GoStructValue<T>>(dst: GoSliceValue<T>, src: GoSliceValue<T>): bigint {
+  const dstLength = dst === undefined ? 0 : dst.length;
+  const srcLength = src === undefined ? 0 : src.length;
+  const count = dstLength < srcLength ? dstLength : srcLength;
+  const staged: T[] = [];
+  for (let index = 0; index < count; index++) {
+    const source = src as GoSlice<T>;
+    staged.push((source.backing[source.offset + index] as T).goClone$());
+  }
+  for (let index = 0; index < count; index++) {
+    const destination = dst as GoSlice<T>;
+    (destination.backing[destination.offset + index] as T).goSet$(staged[index] as T);
+  }
+  return BigInt(count);
 }
 `

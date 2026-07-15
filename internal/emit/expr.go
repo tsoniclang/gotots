@@ -236,6 +236,32 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			return "", err
 		}
 		return "gosl.goSliceAppend(" + x + ", [" + values + "])", nil
+	case *ir.SliceAppendSlice:
+		x, err := p.printExpr(n.X)
+		if err != nil {
+			return "", err
+		}
+		source, err := p.printExpr(n.Source)
+		if err != nil {
+			return "", err
+		}
+		if n.T.Elem != nil && n.T.Elem.Kind == ir.KindStruct {
+			return "gosl.goSliceAppendSliceStruct(" + x + ", " + source + ")", nil
+		}
+		return "gosl.goSliceAppendSlice(" + x + ", " + source + ")", nil
+	case *ir.SliceCopy:
+		dst, err := p.printExpr(n.Dst)
+		if err != nil {
+			return "", err
+		}
+		src, err := p.printExpr(n.Src)
+		if err != nil {
+			return "", err
+		}
+		if n.Dst.Type().Elem != nil && n.Dst.Type().Elem.Kind == ir.KindStruct {
+			return "gosl.goSliceCopyStruct(" + dst + ", " + src + ")", nil
+		}
+		return "gosl.goSliceCopy(" + dst + ", " + src + ")", nil
 	case *ir.SliceLen:
 		x, err := p.printExpr(n.X)
 		if err != nil {
@@ -487,6 +513,10 @@ func (p *printer) printConvert(n *ir.Convert) (string, error) {
 	to := n.To.Kind
 
 	switch {
+	case from == to && (to == ir.KindString || to == ir.KindBool || to == ir.KindFloat64):
+		// Same-carrier conversion between named types: identity.
+		return "(" + x + ")", nil
+
 	case to == ir.KindFloat64 && from.Integer():
 		if from.Wide64() {
 			return "Number(" + x + ")", nil

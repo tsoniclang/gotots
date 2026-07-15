@@ -92,6 +92,25 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		}
 		p.line("gort.goMapDelete(%s, %s);", mapExpr, key)
 		return nil
+
+	case *ir.MapClearStmt:
+		mapExpr, err := p.printExpr(n.Map)
+		if err != nil {
+			return err
+		}
+		p.line("gort.goMapClear(%s);", mapExpr)
+		return nil
+
+	case *ir.PanicStmt:
+		value, err := p.printExpr(n.Value)
+		if err != nil {
+			return err
+		}
+		p.line("gort.goPanicValue(%s);", value)
+		return nil
+
+	case *ir.RangeInt:
+		return p.printRangeInt(n)
 	}
 	return fmt.Errorf("no emission for IR statement %T", stmt)
 }
@@ -276,6 +295,39 @@ func (p *printer) printRangeSlice(n *ir.RangeSlice) error {
 			p.line("let %s: %s = gosl.goSliceGet(%s, %s);", n.Value, spelled, sliceTemp, index)
 		}
 	}
+	if err := p.printBlockBody(n.Body); err != nil {
+		return err
+	}
+	p.indent--
+	p.line("}")
+	return nil
+}
+
+// printRangeInt emits `for i := range n`: n evaluates once and the
+// index counts in n's own carrier.
+func (p *printer) printRangeInt(n *ir.RangeInt) error {
+	operand, err := p.printExpr(n.N)
+	if err != nil {
+		return err
+	}
+	limit := p.temp()
+	p.line("const %s = %s;", limit, operand)
+	index := n.Index
+	if index == "" {
+		index = p.temp()
+	}
+	spelled, err := p.tsType(n.N.Type())
+	if err != nil {
+		return err
+	}
+	// Bounds keep increments exact without wrap helpers: the index stays
+	// strictly below the operand, which its carrier already holds.
+	if n.N.Type().Kind.Wide64() {
+		p.line("for (let %s: %s = 0n; %s < %s; %s = %s + 1n) {", index, spelled, index, limit, index, index)
+	} else {
+		p.line("for (let %s: %s = 0; %s < %s; %s = %s + 1) {", index, spelled, index, limit, index, index)
+	}
+	p.indent++
 	if err := p.printBlockBody(n.Body); err != nil {
 		return err
 	}

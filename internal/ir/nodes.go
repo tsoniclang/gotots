@@ -117,6 +117,26 @@ type MapDeleteStmt struct {
 	Key Expr
 }
 
+// MapClearStmt is the clear builtin on a map (a no-op on nil maps).
+type MapClearStmt struct {
+	Map Expr
+}
+
+// PanicStmt is the panic builtin: the value formats as Go's %v (the
+// reviewed argument kinds format identically on both sides) and unwinds
+// as the GoPanic carrier.
+type PanicStmt struct {
+	Value Expr
+}
+
+// RangeInt is `for i := range n`: n is evaluated once and i counts from
+// zero to n-1 in n's own carrier. Index may be empty (discarded).
+type RangeInt struct {
+	Index string
+	N     Expr
+	Body  *Block
+}
+
 // BranchStmt is an unlabeled break or continue.
 type BranchStmt struct {
 	Tok token.Token // token.BREAK or token.CONTINUE
@@ -143,8 +163,11 @@ type SwitchClause struct {
 func (*Block) stmt()         {}
 func (*SwitchStmt) stmt()    {}
 func (*RangeSlice) stmt()    {}
+func (*RangeInt) stmt()      {}
 func (*TryFinally) stmt()    {}
 func (*MapDeleteStmt) stmt() {}
+func (*MapClearStmt) stmt()  {}
+func (*PanicStmt) stmt()     {}
 func (*DeclStmt) stmt()      {}
 func (*AssignStmt) stmt()    {}
 func (*IfStmt) stmt()        {}
@@ -354,6 +377,22 @@ type SliceAppend struct {
 	T      Type
 }
 
+// SliceAppendSlice is append(s, source...) — the spread form: source's
+// current elements are copied (struct values clone) with the same
+// capacity-reuse aliasing as element append.
+type SliceAppendSlice struct {
+	X      Expr
+	Source Expr
+	T      Type
+}
+
+// SliceCopy is copy(dst, src) between slices: min(len) elements with
+// memmove overlap semantics; struct elements overwrite in place.
+type SliceCopy struct {
+	Dst Expr
+	Src Expr
+}
+
 // SliceLen / SliceCap are len/cap (0 for nil).
 type SliceLen struct{ X Expr }
 type SliceCap struct{ X Expr }
@@ -394,11 +433,13 @@ func (*MapGet) expr()       {}
 func (*MapLookup) expr()    {}
 func (*MapLen) expr()       {}
 func (*StringLen) expr()    {}
-func (*SliceLit) expr()     {}
-func (*SliceMake) expr()    {}
-func (*SliceGet) expr()     {}
-func (*SliceReslice) expr() {}
-func (*SliceAppend) expr()  {}
+func (*SliceLit) expr()         {}
+func (*SliceMake) expr()        {}
+func (*SliceGet) expr()         {}
+func (*SliceReslice) expr()     {}
+func (*SliceAppend) expr()      {}
+func (*SliceAppendSlice) expr() {}
+func (*SliceCopy) expr()        {}
 func (*SliceLen) expr()     {}
 func (*SliceCap) expr()     {}
 func (*VarRef) expr()       {}
@@ -457,10 +498,12 @@ func (m *MapLookup) Type() Type  { return m.T }
 func (m *MapLen) Type() Type     { return intType }
 func (s *StringLen) Type() Type  { return intType }
 
-func (s *SliceLit) Type() Type     { return s.T }
-func (s *SliceMake) Type() Type    { return s.T }
-func (s *SliceGet) Type() Type     { return s.T }
-func (s *SliceReslice) Type() Type { return s.T }
-func (s *SliceAppend) Type() Type  { return s.T }
-func (s *SliceLen) Type() Type     { return intType }
-func (s *SliceCap) Type() Type     { return intType }
+func (s *SliceLit) Type() Type         { return s.T }
+func (s *SliceMake) Type() Type        { return s.T }
+func (s *SliceGet) Type() Type         { return s.T }
+func (s *SliceReslice) Type() Type     { return s.T }
+func (s *SliceAppend) Type() Type      { return s.T }
+func (s *SliceAppendSlice) Type() Type { return s.T }
+func (s *SliceCopy) Type() Type        { return intType }
+func (s *SliceLen) Type() Type         { return intType }
+func (s *SliceCap) Type() Type         { return intType }

@@ -84,9 +84,6 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 	if err != nil {
 		return nil, err
 	}
-	if recv.Type().Kind != KindPointer && recv.Type().Kind != KindStruct {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method call on " + recv.Type().Go, Span: span}
-	}
 	signature := method.Type().(*types.Signature)
 	if signature.TypeParams() != nil {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic method call", Span: span}
@@ -105,6 +102,12 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 	}
 	if !ok {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method on unnamed receiver type", Span: span}
+	}
+	// A pointer-receiver method needs an addressable instance; a value
+	// receiver copies at the call and admits any reviewed carrier
+	// (scalars copy as JS values; struct instances clone inside).
+	if pointerRecv && recv.Type().Kind != KindPointer && recv.Type().Kind != KindStruct {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "pointer-receiver method call on " + recv.Type().Go, Span: span}
 	}
 
 	out := &MethodCall{
@@ -196,13 +199,20 @@ func (b *builder) conversionTarget(call *ast.CallExpr) (types.Type, bool) {
 }
 
 // checkConversion admits only conversions in the reviewed subset:
-// integer-to-integer of any widths, and integer-to-float64.
+// integer-to-integer of any widths, integer-to-float64, and same-carrier
+// conversions between named types (identity on the shared carrier).
 func (b *builder) checkConversion(from, to Type, span Span) error {
 	if from.Kind.Integer() && to.Kind.Integer() {
 		return nil
 	}
 	if from.Kind.Integer() && to.Kind == KindFloat64 {
 		return nil
+	}
+	if from.Kind == to.Kind {
+		switch from.Kind {
+		case KindString, KindBool, KindFloat64:
+			return nil
+		}
 	}
 	return &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION",
 		Construct: "conversion from " + from.Go + " to " + to.Go, Span: span}

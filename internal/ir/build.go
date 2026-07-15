@@ -286,8 +286,21 @@ func (b *builder) buildStmt(stmt ast.Stmt) (Stmt, error) {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "conversion as statement", Span: span}
 		}
 		if builtin, isBuiltin := b.builtinCallee(call); isBuiltin {
-			if builtin.Name() == "delete" {
+			switch builtin.Name() {
+			case "delete":
 				return b.buildMapDelete(call)
+			case "clear":
+				return b.buildClear(call)
+			case "panic":
+				return b.buildPanic(call)
+			case "copy":
+				// copy for effect: the returned count is discarded.
+				built, err := b.buildBuiltin(call, builtin, nil)
+				if err != nil {
+					return nil, err
+				}
+				b.use("exprStmt")
+				return &ExprStmt{Call: built}, nil
 			}
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "builtin statement " + builtin.Name(), Span: span}
 		}
@@ -306,19 +319,6 @@ func (b *builder) buildStmt(stmt ast.Stmt) (Stmt, error) {
 		return &BranchStmt{Tok: n.Tok}, nil
 	}
 	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: fmt.Sprintf("%T", stmt), Span: span}
-}
-
-func (b *builder) buildMapDelete(call *ast.CallExpr) (Stmt, error) {
-	mapExpr, err := b.buildExpr(call.Args[0])
-	if err != nil {
-		return nil, err
-	}
-	key, err := b.buildExpr(call.Args[1])
-	if err != nil {
-		return nil, err
-	}
-	b.use("mapDelete")
-	return &MapDeleteStmt{Map: mapExpr, Key: key}, nil
 }
 
 func (b *builder) buildDeclStmt(n *ast.DeclStmt) (Stmt, error) {
@@ -465,6 +465,9 @@ func (b *builder) buildRange(n *ast.RangeStmt) (Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
+	if operand.Type().Kind.Integer() {
+		return b.buildRangeInt(n, operand)
+	}
 	if operand.Type().Kind != KindSlice {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range over " + operand.Type().Go, Span: span}
 	}
@@ -494,6 +497,32 @@ func (b *builder) buildRange(n *ast.RangeStmt) (Stmt, error) {
 	}
 	out.Body = body
 	b.use("range:slice")
+	return out, nil
+}
+
+// buildRangeInt lowers `for i := range n`: n evaluates once and i
+// counts from zero to n-1 in n's own carrier.
+func (b *builder) buildRangeInt(n *ast.RangeStmt, operand Expr) (Stmt, error) {
+	span := b.span(n.Pos())
+	if n.Value != nil {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range over an integer with a second variable", Span: span}
+	}
+	out := &RangeInt{N: operand}
+	if n.Key != nil {
+		ident, ok := n.Key.(*ast.Ident)
+		if !ok {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range variable is not an identifier", Span: span}
+		}
+		if ident.Name != "_" {
+			out.Index = ident.Name
+		}
+	}
+	body, err := b.buildBlock(n.Body)
+	if err != nil {
+		return nil, err
+	}
+	out.Body = body
+	b.use("range:int")
 	return out, nil
 }
 

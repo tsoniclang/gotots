@@ -1,8 +1,26 @@
 package ir
 
 import (
+	"go/token"
 	"go/types"
+
+	"golang.org/x/tools/go/packages"
 )
+
+// ResolveType resolves one go/types type through the reviewed type set:
+// a standalone entry to the builder's resolver for declaration-level
+// checks.
+func ResolveType(p *packages.Package, sourceDir string, unit Scope, t types.Type, pos token.Pos) (Type, error) {
+	b := &builder{
+		fset:       p.Fset,
+		info:       p.TypesInfo,
+		pkgPath:    p.PkgPath,
+		sourceDir:  sourceDir,
+		unit:       unit,
+		operations: map[string]bool{},
+	}
+	return b.typeOf(t, b.span(pos))
+}
 
 // typeOf resolves a go/types type into the reviewed IR type set. Types
 // outside the subset produce GOTOTS_UNSUPPORTED_TYPE with the requesting

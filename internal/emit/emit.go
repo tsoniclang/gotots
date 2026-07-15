@@ -39,14 +39,29 @@ func FileWithProvenance(p Provenance, body string) (string, error) {
 		"// @gotots-generated " + string(header) + "\n\n" + body, nil
 }
 
+// Method is one method whose receiver type has no generated class — a
+// named type erased to its carrier — emitted as a standalone function.
+type Method struct {
+	TypeName string
+	Fn       *ir.Func
+}
+
 // Package prints one translated package into a single TypeScript module:
-// classes for named structs (methods attached), then functions, each in
-// sorted name order. module carries the package identity, the
-// language-ABI specifiers, and the co-generated import environment; the
-// body is printed first so only referenced packages are imported.
-func Package(module *Module, structs []*ir.Struct, functions []*ir.Func) (string, error) {
+// classes for named structs (each followed by its method functions),
+// then carrier-type methods, then functions, each in sorted name order.
+// module carries the package identity, the language-ABI specifiers, and
+// the co-generated import environment; the body is printed first so only
+// referenced packages are imported.
+func Package(module *Module, structs []*ir.Struct, methods []Method, functions []*ir.Func) (string, error) {
 	sortedStructs := append([]*ir.Struct{}, structs...)
 	sort.Slice(sortedStructs, func(i, j int) bool { return sortedStructs[i].Name < sortedStructs[j].Name })
+	sortedMethodDecls := append([]Method{}, methods...)
+	sort.Slice(sortedMethodDecls, func(i, j int) bool {
+		if sortedMethodDecls[i].TypeName != sortedMethodDecls[j].TypeName {
+			return sortedMethodDecls[i].TypeName < sortedMethodDecls[j].TypeName
+		}
+		return sortedMethodDecls[i].Fn.Name < sortedMethodDecls[j].Fn.Name
+	})
 	sorted := append([]*ir.Func{}, functions...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
 
@@ -63,6 +78,12 @@ func Package(module *Module, structs []*ir.Struct, functions []*ir.Func) (string
 			if err := printMethodFunction(&body, module, structDecl.Name, method); err != nil {
 				return "", err
 			}
+		}
+	}
+	for _, method := range sortedMethodDecls {
+		body.WriteString("\n")
+		if err := printMethodFunction(&body, module, method.TypeName, method.Fn); err != nil {
+			return "", err
 		}
 	}
 	for _, function := range sorted {
@@ -163,17 +184,17 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 // identifier alphabet, so the name can never collide). A pointer
 // receiver is the first parameter, nilable — Go runs pointer-receiver
 // methods on nil receivers and only the body's dereferences panic. A
-// value receiver clones on entry, so the caller's instance never
-// mutates.
+// struct value receiver clones on entry, so the caller's instance never
+// mutates; scalar value receivers copy at the call like every JS value.
 func printMethodFunction(out *strings.Builder, module *Module, className string, method *ir.Func) error {
 	p := &printer{out: out, module: module}
 	recvSpelled, err := p.tsType(method.Receiver.Type)
 	if err != nil {
 		return fmt.Errorf("%s: %w", method.ID, err)
 	}
-	valueReceiver := method.Receiver.Type.Kind == ir.KindStruct
+	structValueReceiver := method.Receiver.Type.Kind == ir.KindStruct
 	recvParam := method.Receiver.Name
-	if valueReceiver {
+	if structValueReceiver {
 		recvParam = "$recv"
 	}
 	params := []string{recvParam + ": " + recvSpelled}
@@ -194,7 +215,7 @@ func printMethodFunction(out *strings.Builder, module *Module, className string,
 	}
 	p.line("%sfunction %s$%s(%s): %s {", export, className, method.Name, strings.Join(params, ", "), result)
 	p.indent++
-	if valueReceiver {
+	if structValueReceiver {
 		p.line("const %s = $recv.goClone$();", method.Receiver.Name)
 	}
 	if err := p.printBlockBody(method.Body); err != nil {
