@@ -545,4 +545,21 @@ export function goUint16FromBig(x: bigint): number { return Number(BigInt.asUint
 export function goUint32FromBig(x: bigint): number { return Number(BigInt.asUintN(32, x)); }
 export function goInt64FromNumber(x: number): bigint { return BigInt.asIntN(64, BigInt(x)); }
 export function goUint64FromNumber(x: number): bigint { return BigInt.asUintN(64, BigInt(x)); }
+
+// float64 to signed integers: truncation toward zero; NaN and
+// out-of-range inputs produce the pinned amd64 conversion values
+// (cvttsd2si's integer-indefinite results).
+export function goInt64FromFloat(f: number): bigint {
+  if (Number.isNaN(f) || f >= 9223372036854775808 || f < -9223372036854775808) {
+    return -9223372036854775808n;
+  }
+  return BigInt(Math.trunc(f));
+}
+
+export function goInt32FromFloat(f: number): number {
+  if (Number.isNaN(f) || f >= 2147483648 || f < -2147483648) {
+    return -2147483648;
+  }
+  return Math.trunc(f);
+}
 `

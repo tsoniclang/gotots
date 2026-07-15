@@ -276,3 +276,39 @@ func ForwardTuple() string {
 }
 `)
 }
+
+func TestOracleFloatToIntConversions(t *testing.T) {
+	runOracle(t, `package fixture
+
+func values() []float64 {
+	inf := 1.0
+	zero := 0.0
+	return []float64{2.9, -2.9, 0.0, 1e30, -1e30, inf / zero, -inf / zero, zero / zero}
+}
+
+func FloatToInt64() string {
+	out := ""
+	for _, f := range values() {
+		out += " "
+		v := int64(f)
+		if v == -9223372036854775808 {
+			out += "MIN"
+		} else {
+			out += string(rune('0' + v%10))
+		}
+	}
+	return out
+}
+
+func FloatToInt() (int, int) {
+	a := 7.99
+	b := -7.99
+	return int(a), int(b)
+}
+
+func FloatToInt32() (int32, int32, int32, int32) {
+	vs := values()
+	return int32(vs[0]), int32(vs[1]), int32(vs[3]), int32(vs[7])
+}
+`)
+}

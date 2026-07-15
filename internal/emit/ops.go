@@ -174,6 +174,11 @@ func (p *printer) printConvert(n *ir.Convert) (string, error) {
 		}
 		return "(" + x + ")", nil
 
+	case from == ir.KindFloat64 && (to == ir.KindInt || to == ir.KindInt64):
+		return helper("goInt64FromFloat") + "(" + x + ")", nil
+	case from == ir.KindFloat64 && to == ir.KindInt32:
+		return helper("goInt32FromFloat") + "(" + x + ")", nil
+
 	case to.Integer() && from.Integer():
 		toFamily, _ := family(to)
 		switch {

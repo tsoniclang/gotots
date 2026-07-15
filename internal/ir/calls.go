@@ -358,6 +358,11 @@ func (b *builder) checkConversion(from, to Type, span Span) error {
 	if from.Kind.Integer() && to.Kind == KindFloat64 {
 		return nil
 	}
+	if from.Kind == KindFloat64 && (to.Kind == KindInt || to.Kind == KindInt64 || to.Kind == KindInt32) {
+		// Truncation toward zero; out-of-range and NaN produce the
+		// pinned amd64 values (the build profile fixes the platform).
+		return nil
+	}
 	if from.Kind == to.Kind {
 		switch from.Kind {
 		case KindString, KindBool, KindFloat64:
