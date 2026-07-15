@@ -4,6 +4,7 @@
 //
 //	census        verify the source pin and produce the typed source census
 //	gate          run every applicable acceptance layer and write a report
+//	translate-probe report translation coverage and diagnostics without claiming acceptance
 //	toolchain-id  print the resolved toolchain identity for pinning
 package main
 

@@ -16,6 +16,7 @@ import (
 // document under docs/spec.
 var forbiddenSpecPhrases = []string{
 	"previously",
+	"previous ",
 	"supersede",
 	"legacy",
 	"dual path",

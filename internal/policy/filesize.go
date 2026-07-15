@@ -14,7 +14,7 @@ import (
 )
 
 // MaxSourceFileLines is the normative limit from
-// docs/spec/file-size-and-decomposition.md: no hand-maintained
+// docs/spec/13-governance-upgrades.md: no hand-maintained
 // implementation or test source file may exceed this many physical lines.
 const MaxSourceFileLines = 600
 
@@ -24,17 +24,29 @@ const MaxSourceFileLines = 600
 var skippedDirs = map[string]bool{
 	".git":         true,
 	".analysis":    true,
+	".claude":      true,
 	".temp":        true,
 	".tests":       true,
 	"node_modules": true,
 	"testdata":     true,
 }
 
-// sourceExtensions are the hand-maintained source classes the limit
-// applies to. Extend this list when the repository gains new
-// implementation languages; do not exempt individual files.
+// sourceExtensions are Go files consumed by Go-specific gates such as gofmt.
 var sourceExtensions = map[string]bool{
 	".go": true,
+}
+
+// maintainedExtensions are repository source/specification classes governed
+// by the physical-line limit. Product-generated trees belong under separately
+// manifest-owned output roots, not the maintained repository tree scanned here.
+var maintainedExtensions = map[string]bool{
+	".cjs": true,
+	".go":  true,
+	".js":  true,
+	".md":  true,
+	".mjs": true,
+	".ts":  true,
+	".tsx": true,
 }
 
 // Violation is one file exceeding the limit.
@@ -52,6 +64,16 @@ func (v Violation) String() string {
 // the single tree definition every repository-wide gate shares — as
 // root-relative slash paths, sorted.
 func SourceFiles(root string) ([]string, error) {
+	return walkFiles(root, sourceExtensions)
+}
+
+// MaintainedFiles returns every implementation, test, and normative Markdown
+// file governed by the physical-line policy.
+func MaintainedFiles(root string) ([]string, error) {
+	return walkFiles(root, maintainedExtensions)
+}
+
+func walkFiles(root string, extensions map[string]bool) ([]string, error) {
 	var files []string
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
@@ -63,7 +85,7 @@ func SourceFiles(root string) ([]string, error) {
 			}
 			return nil
 		}
-		if !sourceExtensions[filepath.Ext(entry.Name())] {
+		if !extensions[filepath.Ext(entry.Name())] {
 			return nil
 		}
 		relative, relErr := filepath.Rel(root, path)
@@ -82,7 +104,7 @@ func SourceFiles(root string) ([]string, error) {
 
 // CheckTree returns every source file exceeding the limit, sorted by path.
 func CheckTree(root string) ([]Violation, error) {
-	files, err := SourceFiles(root)
+	files, err := MaintainedFiles(root)
 	if err != nil {
 		return nil, err
 	}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -9,7 +10,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/tsoniclang/gotots/internal/census"
 	"github.com/tsoniclang/gotots/internal/policy"
@@ -18,30 +18,66 @@ import (
 
 // GateResult is one acceptance layer's outcome.
 type GateResult struct {
-	Name       string   `json:"name"`
-	Status     string   `json:"status"` // pass | fail | blocked
-	DurationMs int64    `json:"durationMs"`
-	Details    []string `json:"details,omitempty"`
+	Name    string   `json:"name"`
+	Status  string   `json:"status"` // pass | fail | blocked
+	Details []string `json:"details,omitempty"`
 }
 
 // GateReport is the machine-readable full-gate outcome over the
-// seventeen normative gates of testing-and-acceptance.md. Passed means
+// ordered stages in docs/spec/11-testing-acceptance.md. Passed means
 // complete: every gate passes. Blocked gates name their missing
 // subsystem — the contract is never silently narrowed to the
 // implemented subset.
 type GateReport struct {
-	SchemaVersion int          `json:"schemaVersion"`
-	Passed        bool         `json:"passed"`
-	Failed        int          `json:"failed"`
-	Blocked       int          `json:"blocked"`
-	Gates         []GateResult `json:"gates"`
+	SchemaVersion  int          `json:"schemaVersion"`
+	ExpectedStages int          `json:"expectedStages"`
+	ReportedStages int          `json:"reportedStages"`
+	PassedStages   int          `json:"passedStages"`
+	Failed         int          `json:"failed"`
+	Blocked        int          `json:"blocked"`
+	MissingStages  int          `json:"missingStages"`
+	Passed         bool         `json:"passed"`
+	Inputs         GateInputs   `json:"inputs"`
+	Gates          []GateResult `json:"gates"`
 }
 
-// runGate represents every one of the seventeen normative acceptance
-// layers in order as pass, fail, or blocked, and writes a
-// machine-readable report. It exits nonzero for any failed gate;
-// blocked layers are reported honestly and keep the overall report
-// incomplete (Passed=false) without masking implemented-gate failures.
+type GateInputs struct {
+	ImplementationRevision      string   `json:"implementationRevision"`
+	SpecificationManifestSha256 string   `json:"specificationManifestSha256"`
+	DecisionRegistrySha256      string   `json:"decisionRegistrySha256"`
+	SourceRevision              string   `json:"sourceRevision,omitempty"`
+	ProfileSha256               string   `json:"profileSha256,omitempty"`
+	BuildProfile                string   `json:"buildProfile"`
+	GoVersion                   string   `json:"goVersion,omitempty"`
+	GoExecutableSha256          string   `json:"goExecutableSha256,omitempty"`
+	GorootSourceSha256          string   `json:"gorootSourceSha256,omitempty"`
+	Missing                     []string `json:"missing"`
+}
+
+var acceptanceStageNames = []string{
+	"01-repository-specification-policy",
+	"02-input-toolchain-profile-attestation",
+	"03-selected-scope-dependency-closure",
+	"04-census-denominator-reconciliation",
+	"05-declaration-signature-type-completeness",
+	"06-semantic-ir-operation-class-completeness",
+	"07-ownership-support-state-completeness",
+	"08-fixed-point-representation-verification",
+	"09-deterministic-staged-generation",
+	"10-strict-typescript-staticness",
+	"11-semantic-oracles",
+	"12-generated-packages-selected-tests",
+	"13-no-extension-tsgo-differential",
+	"14-extensions-assembled-product",
+	"15-compiler-corpus-proof-common-projects",
+	"16-performance",
+	"17-source-update-repeatability",
+	"18-complete-product-publication",
+}
+
+// runGate represents the exact 18-stage acceptance contract as pass, fail, or
+// blocked and writes a machine-readable report. It exits nonzero unless every
+// required stage passes; blocked is an incomplete build, never command success.
 func runGate(args []string) error {
 	flags := flag.NewFlagSet("gate", flag.ExitOnError)
 	repoDir := flags.String("repo", ".", "gotots repository root")
@@ -56,24 +92,54 @@ func runGate(args []string) error {
 		return fmt.Errorf("--source and --report are required")
 	}
 
-	report := &GateReport{SchemaVersion: 2}
+	implementationRevision, err := runInRepo(*repoDir, "git", "rev-parse", "HEAD")
+	if err != nil {
+		return fmt.Errorf("resolve implementation revision: %w", err)
+	}
+	specificationDigest, err := digestFile(filepath.Join(*repoDir, "docs", "spec", "manifest.json"))
+	if err != nil {
+		return err
+	}
+	decisionDigest, err := digestFile(filepath.Join(*repoDir, "docs", "decisions", "registry.json"))
+	if err != nil {
+		return err
+	}
+	report := &GateReport{
+		SchemaVersion:  4,
+		ExpectedStages: len(acceptanceStageNames),
+		Inputs: GateInputs{
+			ImplementationRevision:      strings.TrimSpace(implementationRevision),
+			SpecificationManifestSha256: specificationDigest,
+			DecisionRegistrySha256:      decisionDigest,
+			BuildProfile:                *buildProfile,
+			Missing: []string{
+				"typescriptCompiler",
+				"javascriptRuntime",
+				"moduleResolver",
+				"strictTypeScriptConfig",
+				"generatedHelperRuntime",
+			},
+		},
+	}
 	run := func(name string, gate func() (string, []string, error)) {
-		started := time.Now()
 		status, details, err := gate()
 		if err != nil {
 			status = "fail"
 			details = append(details, err.Error())
 		}
 		switch status {
+		case "pass":
 		case "fail":
 			report.Failed++
 		case "blocked":
 			report.Blocked++
+		default:
+			status = "fail"
+			report.Failed++
+			details = append(details, "gate returned invalid status")
 		}
 		report.Gates = append(report.Gates, GateResult{
-			Name: name, Status: status,
-			DurationMs: time.Since(started).Milliseconds(),
-			Details:    details,
+			Name: name, Status: status, Details: details,
 		})
 		fmt.Printf("gate %-44s %s\n", name, status)
 	}
@@ -85,18 +151,9 @@ func runGate(args []string) error {
 		fmt.Printf("gate %-44s blocked\n", name)
 	}
 
-	command := func(name string, args ...string) (string, []string, error) {
-		out, err := runInRepo(*repoDir, name, args...)
-		if err != nil {
-			return "fail", splitLines(out), err
-		}
-		return "pass", nil, nil
-	}
-
 	// Gate 1: repository and specification policy (formatting, vetting,
-	// the complete unit/fixture suite with race detection, and the
-	// policy gates that run inside it).
-	run("01-policy/format", func() (string, []string, error) {
+	// diff hygiene, and the complete unit/fixture suite with race detection).
+	run("01-repository-specification-policy", func() (string, []string, error) {
 		// The formatting gate covers exactly the hand-maintained source
 		// tree (the shared policy definition), never scratch or evidence
 		// directories.
@@ -111,18 +168,34 @@ func runGate(args []string) error {
 		if strings.TrimSpace(out) != "" {
 			return "fail", splitLines(out), fmt.Errorf("unformatted files")
 		}
+		for _, step := range []struct {
+			name string
+			args []string
+		}{
+			{name: "go", args: []string{"vet", "./..."}},
+			{name: "git", args: []string{"diff", "--check"}},
+			{name: "go", args: []string{"test", "-count=1", "./..."}},
+			{name: "go", args: []string{"test", "-count=1", "-race", "./..."}},
+		} {
+			stepOut, stepErr := runInRepo(*repoDir, step.name, step.args...)
+			if stepErr != nil {
+				return "fail", splitLines(stepOut), stepErr
+			}
+		}
+		statusOut, statusErr := runInRepo(*repoDir, "git", "status", "--porcelain")
+		if statusErr != nil {
+			return "fail", splitLines(statusOut), statusErr
+		}
+		if strings.TrimSpace(statusOut) != "" {
+			return "fail", splitLines(statusOut), fmt.Errorf("repository is not clean; implementation revision does not attest the working tree")
+		}
 		return "pass", nil, nil
 	})
-	run("01-policy/vet", func() (string, []string, error) { return command("go", "vet", "./...") })
-	run("01-policy/diff-check", func() (string, []string, error) { return command("git", "diff", "--check") })
-	run("01-policy/tests-race", func() (string, []string, error) {
-		return command("go", "test", "-count=1", "-race", "./...")
-	})
 
-	// Gates 2-3: input attestation and census dispositions through the
+	// Gates 2-4: input attestation and census dispositions through the
 	// census pipeline against the pin.
 	var firstRun *census.Result
-	run("02-input-attestation", func() (string, []string, error) {
+	run("02-input-toolchain-profile-attestation", func() (string, []string, error) {
 		prof, err := profile.Load(filepath.Join(*repoDir, filepath.FromSlash(*profilePath)))
 		if err != nil {
 			return "fail", nil, err
@@ -131,26 +204,33 @@ func runGate(args []string) error {
 		if err != nil {
 			return "fail", nil, err
 		}
-		return "pass", nil, nil
+		report.Inputs.SourceRevision = firstRun.Report.Pin.Revision
+		report.Inputs.ProfileSha256 = firstRun.Report.Profile.Hash
+		report.Inputs.GoVersion = firstRun.Report.Pin.Toolchain.Version
+		report.Inputs.GoExecutableSha256 = firstRun.Report.Pin.Toolchain.GoExecutableSha256
+		report.Inputs.GorootSourceSha256 = firstRun.Report.Pin.Toolchain.GorootSrcDigest
+		return "blocked", []string{"Go/source inputs are attested; TypeScript compiler, JavaScript runtime, resolver, strict config, and helper-runtime identities are not yet in the profile"}, nil
 	})
-	run("03-census-dispositions", func() (string, []string, error) {
+	run("03-selected-scope-dependency-closure", func() (string, []string, error) {
 		if firstRun == nil {
 			return "blocked", []string{"census did not run"}, nil
 		}
 		if len(firstRun.Report.Blockers) > 0 {
 			return "blocked", firstRun.Report.Blockers, nil
 		}
-		return "pass", nil, nil
+		return "blocked", []string{"outside-universe roots are still represented by the current hard-exclusion inventory instead of being filtered before census"}, nil
 	})
-	blocked("04-declaration-and-external-contracts",
-		"external-contract implementation-status gate not implemented (typed inventory and generated stubs only)")
-	blocked("05-body-ir-and-ownership-verification",
-		"corpus body-IR acceptance gate not implemented (translate-probe is diagnostic evidence only)")
-	blocked("06-representation-plan-verification",
-		"two-outcome representation proof not implemented (conservative-v1 is the only plan)")
-	blocked("07-lowering-and-generated-artifact-verification",
-		"full-unit generated-artifact gate not implemented")
-	run("08-deterministic-regeneration", func() (string, []string, error) {
+	blocked("04-census-denominator-reconciliation",
+		"complete operation, ownership, support, and selected-test ledgers are not implemented")
+	blocked("05-declaration-signature-type-completeness",
+		"complete independently verified declaration/signature/type-identity gate not implemented")
+	blocked("06-semantic-ir-operation-class-completeness",
+		"complete semantic-IR operation schema/verifier not implemented")
+	blocked("07-ownership-support-state-completeness",
+		"complete generated/manual/unimplemented/external/extension ownership gate not implemented")
+	blocked("08-fixed-point-representation-verification",
+		"constraint propagation, representation, necessity, and boundary proof verifier not implemented")
+	run("09-deterministic-staged-generation", func() (string, []string, error) {
 		if firstRun == nil {
 			return "blocked", []string{"census did not run"}, nil
 		}
@@ -192,31 +272,43 @@ func runGate(args []string) error {
 		if _, err := census.VerifyBundle(first); err != nil {
 			return "fail", nil, err
 		}
-		return "pass", nil, nil
+		return "blocked", []string{"census evidence is deterministic; complete generated TypeScript staged emission is not implemented"}, nil
 	})
-	run("09-go-semantic-differential-oracles", func() (string, []string, error) {
-		return command("go", "test", "-count=1",
-			"-run", "TestOracle|TestReviewRegression|TestCrossPackage|TestExternalStubShape|TestGenerationIsDeterministic",
-			"./internal/translate/")
-	})
-	blocked("10-generated-ts-strict-validation",
+	blocked("10-strict-typescript-staticness",
 		"strict tsc typecheck gate over generated output not implemented (Node execution strips types)")
-	blocked("11-no-extension-tsgo-differential-validation",
+	blocked("11-semantic-oracles",
+		"ordered static-output prerequisites are incomplete; local oracle tests run under gate 01 only")
+	blocked("12-generated-packages-selected-tests",
+		"complete generated-package build and translated-test gate not implemented")
+	blocked("13-no-extension-tsgo-differential",
 		"whole-compiler no-extension differential not implemented")
-	blocked("12-tsts-extension-and-product-validation",
+	blocked("14-extensions-assembled-product",
 		"extension seams and product composition not implemented")
-	blocked("13-complete-selected-compiler-corpus",
-		"corpus generation incomplete (see translate-probe evidence)")
-	blocked("14-proof-and-common-downstream-projects",
-		"proof projects not implemented")
-	blocked("15-self-compilation-and-native-target-probes",
-		"self-compilation and C#/Rust target probes not implemented")
-	blocked("16-performance-acceptance",
+	blocked("15-compiler-corpus-proof-common-projects",
+		"complete compiler corpus, proof projects, and common projects not implemented")
+	blocked("16-performance",
 		"performance baselines and regression gates not implemented")
-	blocked("17-upgrade-repeatability-proof",
+	blocked("17-source-update-repeatability",
 		"upgrade repeatability proof not implemented")
+	blocked("18-complete-product-publication",
+		"atomic complete product publication gate not implemented")
 
-	report.Passed = report.Failed == 0 && report.Blocked == 0
+	report.ReportedStages = len(report.Gates)
+	report.MissingStages = report.ExpectedStages - report.ReportedStages
+	if report.MissingStages < 0 {
+		report.MissingStages = 0
+	}
+	if report.ReportedStages != report.ExpectedStages {
+		return fmt.Errorf("internal gate schema error: reported %d stages; want %d", len(report.Gates), len(acceptanceStageNames))
+	}
+	for index, gate := range report.Gates {
+		if gate.Name != acceptanceStageNames[index] {
+			return fmt.Errorf("internal gate schema error: stage %d is %q; want %q", index+1, gate.Name, acceptanceStageNames[index])
+		}
+	}
+
+	report.PassedStages = report.ReportedStages - report.Failed - report.Blocked
+	report.Passed = report.Failed == 0 && report.Blocked == 0 && report.MissingStages == 0
 	data, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
 		return err
@@ -224,11 +316,11 @@ func runGate(args []string) error {
 	if err := os.WriteFile(*reportPath, append(data, '\n'), 0o644); err != nil {
 		return err
 	}
-	passCount := len(report.Gates) - report.Failed - report.Blocked
 	fmt.Printf("gates: %d pass, %d blocked, %d fail; report at %s\n",
-		passCount, report.Blocked, report.Failed, *reportPath)
-	if report.Failed > 0 {
-		return fmt.Errorf("gate failures; report at %s", *reportPath)
+		report.PassedStages, report.Blocked, report.Failed, *reportPath)
+	if report.Failed > 0 || report.Blocked > 0 {
+		return fmt.Errorf("acceptance incomplete: %d failed, %d blocked; report at %s",
+			report.Failed, report.Blocked, *reportPath)
 	}
 	return nil
 }
@@ -254,4 +346,13 @@ func splitLines(out string) []string {
 		lines = lines[len(lines)-40:]
 	}
 	return lines
+}
+
+func digestFile(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("read attested input %s: %w", path, err)
+	}
+	digest := sha256.Sum256(data)
+	return fmt.Sprintf("%x", digest), nil
 }

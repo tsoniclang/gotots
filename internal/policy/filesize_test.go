@@ -48,8 +48,10 @@ func TestRepositoryFileSizes(t *testing.T) {
 func TestCheckTreeRejectsOversizedFile(t *testing.T) {
 	dir := t.TempDir()
 	oversized := strings.Repeat("// line\n", MaxSourceFileLines+1)
-	if err := os.WriteFile(filepath.Join(dir, "big.go"), []byte(oversized), 0o644); err != nil {
-		t.Fatal(err)
+	for _, name := range []string{"big.go", "big.ts", "big.md"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(oversized), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	compliant := strings.Repeat("// line\n", MaxSourceFileLines)
 	if err := os.WriteFile(filepath.Join(dir, "ok.go"), []byte(compliant), 0o644); err != nil {
@@ -70,10 +72,15 @@ func TestCheckTreeRejectsOversizedFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(violations) != 1 || violations[0].Path != "big.go" || violations[0].Lines != MaxSourceFileLines+1 {
-		t.Fatalf("expected exactly one violation for big.go, got %v", violations)
+	if len(violations) != 3 {
+		t.Fatalf("expected Go, TypeScript, and Markdown violations, got %v", violations)
 	}
-	if !strings.Contains(violations[0].String(), "GOTOTS_FILE_TOO_LARGE") {
-		t.Errorf("diagnostic format wrong: %s", violations[0].String())
+	for index, want := range []string{"big.go", "big.md", "big.ts"} {
+		if violations[index].Path != want || violations[index].Lines != MaxSourceFileLines+1 {
+			t.Errorf("violation %d = %+v; want %s at %d lines", index, violations[index], want, MaxSourceFileLines+1)
+		}
+		if !strings.Contains(violations[index].String(), "GOTOTS_FILE_TOO_LARGE") {
+			t.Errorf("diagnostic format wrong: %s", violations[index].String())
+		}
 	}
 }

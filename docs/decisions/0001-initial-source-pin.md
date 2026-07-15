@@ -2,7 +2,27 @@
 
 Date: 2026-07-15
 Status: accepted
-Packet reference: `.analysis/scope/24-open-decisions.md` D1
+Owner: gotots-maintainers
+Implementation revision: `58f4d8b`
+Schema/ABI impact: `pin-schema-v3`
+Spec reference: `docs/spec/01-input-census-publication.md` and
+`docs/spec/13-governance-upgrades.md`
+
+## Context
+
+Translation evidence is meaningful only against one immutable source and
+toolchain identity. A branch name, version string, or clean checkout does not
+attest parser/type-checker behavior or selected source bytes.
+
+## Alternatives
+
+- Track an upstream branch: rejected because the input can change without a
+  GoToTS revision.
+- Pin source but accept any same-version Go toolchain: rejected because binary
+  and GOROOT contents can differ.
+- Select another initial revision: rejected because the accepted TSTS and
+  translator evidence is tied to the recorded revision with no compensating
+  product requirement.
 
 ## Decision
 
@@ -18,24 +38,29 @@ complete GOROOT/src tree. Two different toolchains reporting the same
 version string do not pass. Checkout cleanliness is re-verified after
 loading to prove extraction mutated nothing.
 
+## Effects
+
+Every census and generated bundle carries the source/toolchain identity.
+Changing either creates a separate upgrade domain and requires regeneration;
+there is no compatibility path between evidence from different pins.
+
+## Migration
+
+Inputs and reports that do not satisfy pin schema v3 are regenerated from the
+committed pin. They are not upgraded heuristically or accepted by version
+string alone.
+
 ## Evidence
 
-The candidate revisions in the packet (current TSTS `main` pin, the strongest
-experimental Porter pin, a new latest pin) collapse to one choice, verified on
-2026-07-15:
+Registry entry: `docs/decisions/registry.json#ADR-0001`. Proof artifacts:
+`pins/typescript-go.json`, `internal/pinning`, and the attestation fixtures.
 
-- TSTS `main` (`a80a5da3`) vendors `typescript-go` at `c78d39e7`.
-- The experimental carrier-redesign worktree pins the same `c78d39e7`.
-- Two clean local checkouts of that revision exist and verify clean.
-- The pinned toolchain `go1.26.4 linux/amd64` is the active local toolchain.
-- All existing Porter declaration evidence, semantic oracles, and TSTS test
-  baselines were produced against this revision.
-
-Choosing any other revision would discard the only existing cross-checkable
-evidence while providing no product benefit at this phase.
+The committed pin, attestation fixtures, and TSTS reference revision provide
+the cross-checkable evidence. Machine-local checkout count and active-shell
+toolchain state are not durable proof.
 
 ## Reconsider when
 
 - The product selects a newer TypeScript-Go release for TSTS.
-- The upgrade-proof milestone (packet phase 11) needs a second pin; that pin
+- The upgrade-repeatability milestone needs a second pin; that pin
   is chosen fresh and does not modify this one.
