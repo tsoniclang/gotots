@@ -13,7 +13,7 @@ package abi
 import "fmt"
 
 // Version identifies the ABI contract carried in generated output.
-const Version = 6
+const Version = 7
 
 // Family is the static carrier family of an integer kind.
 type Family string
@@ -215,6 +215,81 @@ export function goStringRange(s: string): [bigint, number][] {
     i += size;
   }
   return out;
+}
+
+// Composite map keys: a struct key's class carries goKey$(), a
+// deterministic injective encoding of its comparable fields. The keyed
+// carrier stores [key, value] under the encoding, so lookups follow Go
+// value equality and iteration recovers the stored key.
+export interface GoKeyed {
+  goKey$(): string;
+}
+
+export type GoKeyedMap<K extends GoKeyed, V> = Map<string, [K, V]> | undefined;
+
+const keyIds = new WeakMap<object, string>();
+let keyIdCounter = 0;
+
+// goKeyId is the deterministic identity component of a pointer field:
+// object identity in insertion order, "u" for nil.
+export function goKeyId(x: object | undefined): string {
+  if (x === undefined) return "u";
+  let id = keyIds.get(x);
+  if (id === undefined) {
+    keyIdCounter++;
+    id = "#" + String(keyIdCounter);
+    keyIds.set(x, id);
+  }
+  return id;
+}
+
+// goKeyArray encodes a fixed array field element-wise (the length is
+// fixed by the type, so the composition stays injective).
+export function goKeyArray<T>(a: T[], encodeElem: (v: T) => string): string {
+  let out = "[";
+  for (let i = 0; i < a.length; i++) out += encodeElem(a[i] as T) + "|";
+  return out + "]";
+}
+
+export function goKMapMake<K extends GoKeyed, V>(): Map<string, [K, V]> {
+  return new Map<string, [K, V]>();
+}
+
+export function goKMapFrom<K extends GoKeyed, V>(entries: readonly (readonly [K, V])[]): Map<string, [K, V]> {
+  const out = new Map<string, [K, V]>();
+  for (const [key, value] of entries) {
+    out.set(key.goKey$(), [key, value]);
+  }
+  return out;
+}
+
+export function goKMapGet<K extends GoKeyed, V>(m: GoKeyedMap<K, V>, key: K, zero: V): V {
+  if (m === undefined) return zero;
+  const entry = m.get(key.goKey$());
+  return entry === undefined ? zero : entry[1];
+}
+
+export function goKMapLookup<K extends GoKeyed, V>(m: GoKeyedMap<K, V>, key: K, zero: V): [V, boolean] {
+  if (m === undefined) return [zero, false];
+  const entry = m.get(key.goKey$());
+  return entry === undefined ? [zero, false] : [entry[1], true];
+}
+
+export function goKMapSet<K extends GoKeyed, V>(m: GoKeyedMap<K, V>, key: K, value: V): void {
+  if (m === undefined) goPanicNilMapWrite();
+  (m as Map<string, [K, V]>).set(key.goKey$(), [key, value]);
+}
+
+export function goKMapDelete<K extends GoKeyed, V>(m: GoKeyedMap<K, V>, key: K): void {
+  if (m !== undefined) m.delete(key.goKey$());
+}
+
+export function goKMapClear<K extends GoKeyed, V>(m: GoKeyedMap<K, V>): void {
+  if (m !== undefined) m.clear();
+}
+
+export function goKMapLen<K extends GoKeyed, V>(m: GoKeyedMap<K, V>): bigint {
+  return m === undefined ? 0n : BigInt(m.size);
 }
 
 // Ordered min/max over every ordered carrier (numbers, bigints, byte

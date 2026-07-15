@@ -70,7 +70,9 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 			return Type{}, err
 		}
 		if !mapKeySupported(key.Kind) {
-			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "map key type " + key.Go + " (Go key equality is not JS SameValueZero)", Span: span}
+			if key.Kind != KindStruct || !b.structKeyEncodable(u.Key(), span) {
+				return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "map key type " + key.Go + " (Go key equality is not JS SameValueZero)", Span: span}
+			}
 		}
 		value, err := b.typeOf(u.Elem(), span)
 		if err != nil {
@@ -184,5 +186,36 @@ func basicKind(basic *types.Basic) (Kind, bool) {
 // excluded (NaN semantics differ) and composite keys need generated
 // hashing.
 func mapKeySupported(kind Kind) bool {
-	return kind == KindString || kind == KindBool || kind == KindPointer || kind.Integer()
+	return kind == KindString || kind == KindBool || kind == KindPointer || kind.Integer() || kind == KindUnit
+}
+
+// KeyEncodableField reports whether one field type participates in the
+// generated canonical key encoding (goKey$): kinds whose Go equality
+// maps injectively onto a deterministic string component. Floats (NaN,
+// signed zeros), interfaces, and nested named structs stay out.
+func KeyEncodableField(t Type) bool {
+	switch t.Kind {
+	case KindString, KindBool, KindPointer, KindUnit:
+		return true
+	case KindArray:
+		return KeyEncodableField(*t.Elem)
+	}
+	return t.Kind.Integer()
+}
+
+// structKeyEncodable reports whether a named struct key's fields are all
+// encodable, so its class carries goKey$ and the keyed-map carrier can
+// hold it.
+func (b *builder) structKeyEncodable(keyType types.Type, span Span) bool {
+	structType, ok := types.Unalias(keyType).Underlying().(*types.Struct)
+	if !ok {
+		return false
+	}
+	for i := range structType.NumFields() {
+		fieldType, err := b.typeOf(structType.Field(i).Type(), span)
+		if err != nil || !KeyEncodableField(fieldType) {
+			return false
+		}
+	}
+	return true
 }

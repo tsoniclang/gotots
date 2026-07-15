@@ -25,6 +25,8 @@ type stagedTarget struct {
 	arrayValue string
 	// nilCheckBase marks a pointer base dereferenced at store time.
 	nilCheckBase bool
+	// keyedMap routes the store through the composite-key carrier.
+	keyedMap bool
 }
 
 // arrayValueCallback spells the goArraySetAll element callback when the
@@ -82,7 +84,8 @@ func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
 		}
 		keyTemp := p.temp()
 		p.line("const %s = %s;", keyTemp, key)
-		return stagedTarget{kind: "map", name: mapTemp, keyTemp: keyTemp}, nil
+		return stagedTarget{kind: "map", name: mapTemp, keyTemp: keyTemp,
+			keyedMap: t.Map.Type().Key.Kind == ir.KindStruct}, nil
 	case *ir.SliceTarget:
 		sliceExpr, err := p.printExpr(t.X)
 		if err != nil {
@@ -157,7 +160,11 @@ func (s stagedTarget) store(p *printer, value string) error {
 	case "pointee":
 		p.line("%s.goSet$(%s);", base, value)
 	case "map":
-		p.line("gort$.goMapSet(%s, %s, %s);", s.name, s.keyTemp, value)
+		if s.keyedMap {
+			p.line("gort$.goKMapSet(%s, %s, %s);", s.name, s.keyTemp, value)
+		} else {
+			p.line("gort$.goMapSet(%s, %s, %s);", s.name, s.keyTemp, value)
+		}
 	case "slice":
 		switch {
 		case s.structValue:
@@ -259,7 +266,7 @@ func (p *printer) printStore(target ir.Target, value string) error {
 		if err != nil {
 			return err
 		}
-		p.line("gort$.goMapSet(%s, %s, %s);", mapExpr, key, value)
+		p.line("gort$.%s(%s, %s, %s);", mapHelper("goMapSet", t.Map), mapExpr, key, value)
 		return nil
 	case *ir.SliceTarget:
 		sliceExpr, err := p.printExpr(t.X)

@@ -87,13 +87,23 @@ func (p *printer) printRangeMap(n *ir.RangeMap) error {
 	if err != nil {
 		return err
 	}
+	keyed := n.X.Type().Key.Kind == ir.KindStruct
 	mapTemp := p.temp()
 	p.line("const %s = %s;", mapTemp, operand)
 	entry := p.temp()
-	p.line("for (const %s of (%s === undefined ? [] : %s)) {", entry, mapTemp, mapTemp)
+	if keyed {
+		p.line("for (const %s of (%s === undefined ? [] : %s.values())) {", entry, mapTemp, mapTemp)
+	} else {
+		p.line("for (const %s of (%s === undefined ? [] : %s)) {", entry, mapTemp, mapTemp)
+	}
 	p.indent++
 	if n.Key != "" {
-		p.line("let %s = %s[0];", tsName(n.Key), entry)
+		if keyed {
+			// The stored struct key binds as a per-iteration value copy.
+			p.line("let %s = %s[0].goClone$();", tsName(n.Key), entry)
+		} else {
+			p.line("let %s = %s[0];", tsName(n.Key), entry)
+		}
 	}
 	if n.Value != "" {
 		spelled, err := p.tsType(n.ValT)

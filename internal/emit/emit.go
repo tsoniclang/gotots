@@ -257,7 +257,61 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 	p.line("return new %s(%s);", tsName(structDecl.Name), strings.Join(zeros, ", "))
 	p.indent--
 	p.line("}")
+
+	// Structs whose comparable fields all encode deterministically carry
+	// goKey$ — the injective canonical key for the keyed-map carrier.
+	encodable := true
+	for _, field := range structDecl.Fields {
+		if !ir.KeyEncodableField(field.Type) {
+			encodable = false
+			break
+		}
+	}
+	if encodable {
+		components := make([]string, 0, len(structDecl.Fields))
+		for _, field := range structDecl.Fields {
+			component, err := keyComponent("this."+field.Name, field.Type)
+			if err != nil {
+				return err
+			}
+			components = append(components, component)
+		}
+		if len(components) == 0 {
+			components = append(components, `"z"`)
+		}
+		p.line("goKey$(): string {")
+		p.indent++
+		p.line("return %s;", strings.Join(components, ` + "|" + `))
+		p.indent--
+		p.line("}")
+	}
 	return nil
+}
+
+// keyComponent spells one field's deterministic key encoding: each
+// component parses left to right unambiguously, so the composition is
+// injective (strings are length-prefixed; array lengths are fixed by
+// the type).
+func keyComponent(access string, t ir.Type) (string, error) {
+	switch {
+	case t.Kind == ir.KindString:
+		return `String(` + access + `.length) + ":" + ` + access, nil
+	case t.Kind == ir.KindBool:
+		return `(` + access + ` ? "t" : "f")`, nil
+	case t.Kind == ir.KindPointer:
+		return "gort$.goKeyId(" + access + ")", nil
+	case t.Kind == ir.KindUnit:
+		return `"z"`, nil
+	case t.Kind == ir.KindArray:
+		elem, err := keyComponent("$v", *t.Elem)
+		if err != nil {
+			return "", err
+		}
+		return "gort$.goKeyArray(" + access + ", ($v) => " + elem + ")", nil
+	case t.Kind.Integer():
+		return `"i" + String(` + access + `)`, nil
+	}
+	return "", fmt.Errorf("no key encoding for field type %q", t.Go)
 }
 
 // printMethodFunction emits one statically resolved method as a
@@ -459,6 +513,9 @@ func (p *printer) tsType(t ir.Type) (string, error) {
 		value, err := p.tsType(*t.Elem)
 		if err != nil {
 			return "", err
+		}
+		if t.Key.Kind == ir.KindStruct {
+			return "gort$.GoKeyedMap<" + key + ", " + value + ">", nil
 		}
 		return "gort$.GoMap<" + key + ", " + value + ">", nil
 	}
