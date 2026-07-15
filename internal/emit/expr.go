@@ -150,6 +150,8 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			strings.Join(params, ", "), class, strings.Join(ctorArgs, ", "), strings.Join(values, ", ")), nil
 	case *ir.Closure:
 		return p.printClosure(n)
+	case *ir.MethodValue:
+		return p.printMethodValue(n)
 	case *ir.FuncRef:
 		return p.module.symbol(n.Pkg, n.Name)
 	case *ir.DynCall:

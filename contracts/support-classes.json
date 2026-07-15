@@ -317,6 +317,11 @@
       "specClause": "docs/spec/06-interfaces-generics-functions.md"
     },
     {
+      "key": "ifaceMethodValue",
+      "state": "generated",
+      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+    },
+    {
       "key": "incDec",
       "state": "generated",
       "specClause": "docs/spec/03-declarations-bodies-control.md"
@@ -393,6 +398,16 @@
     },
     {
       "key": "methodCall",
+      "state": "generated",
+      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+    },
+    {
+      "key": "methodExpr",
+      "state": "generated",
+      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+    },
+    {
+      "key": "methodValue",
       "state": "generated",
       "specClause": "docs/spec/06-interfaces-generics-functions.md"
     },

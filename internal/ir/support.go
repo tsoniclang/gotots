@@ -66,6 +66,8 @@ var classPayloadPrefixes = []string{
 	"call outside the translated unit ", "method call outside the translated unit ",
 	"map key type ", "type ", "identifier ", "call of ", "field access on ",
 	"index on ", "nil comparison on ", "operator ", "conversion from ",
+	"non-field selector ", "method value outside the translated unit (",
+	"method expression outside the translated unit (", "pointer-receiver method value on ",
 	"len of ", "cap of ", "make of ", "builtin ", "constant of type ", "zero value of ",
 	"nil of type ", "equality on ", "ordering on ", "inc/dec of ",
 	"struct type ", "composite literal of ", "reslice of ", "range over ",

@@ -127,10 +127,16 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 					}
 				}
 			}
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "non-field selector", Span: span}
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "non-field selector " + n.Sel.Name + " (no selection evidence)", Span: span}
+		}
+		if selection.Kind() == types.MethodVal {
+			return b.buildMethodValue(n, selection, tv.Type)
+		}
+		if selection.Kind() == types.MethodExpr {
+			return b.buildMethodExpr(n, selection, tv.Type)
 		}
 		if selection.Kind() != types.FieldVal {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "non-field selector", Span: span}
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "non-field selector " + n.Sel.Name, Span: span}
 		}
 		base, err := b.buildExpr(n.X)
 		if err != nil {
