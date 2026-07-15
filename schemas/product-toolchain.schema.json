@@ -85,10 +85,15 @@
         "version": {
           "pattern": "nonempty",
           "type": "string"
+        },
+        "tscJsSha256": {
+          "pattern": "sha256-hex",
+          "type": "string"
         }
       },
       "required": [
         "package",
+        "tscJsSha256",
         "version"
       ],
       "type": "object"

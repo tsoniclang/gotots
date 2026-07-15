@@ -42,6 +42,9 @@ type Pin struct {
 type CompilerIdentity struct {
 	Package string `json:"package"`
 	Version string `json:"version"`
+	// TscJsSha256 is the digest of the materialized compiler's lib/tsc.js,
+	// verified before the strict typecheck stage runs it.
+	TscJsSha256 string `json:"tscJsSha256"`
 }
 
 // RuntimeIdentity names the exact JavaScript runtime revision.
@@ -96,15 +99,16 @@ func Load(pinPath string) (*Pin, error) {
 		return nil, fmt.Errorf("product-toolchain pin %s: unsupported schemaVersion %d", pinPath, pin.SchemaVersion)
 	}
 	for name, value := range map[string]string{
-		"typescriptCompiler.package":    pin.TypescriptCompiler.Package,
-		"typescriptCompiler.version":    pin.TypescriptCompiler.Version,
-		"javascriptRuntime.name":        pin.JavascriptRuntime.Name,
-		"javascriptRuntime.version":     pin.JavascriptRuntime.Version,
-		"moduleResolver.policy":         pin.ModuleResolver.Policy,
-		"moduleResolver.loaderSha256":   pin.ModuleResolver.LoaderSha256,
-		"strictTypeScriptConfig.path":   pin.StrictConfig.Path,
-		"strictTypeScriptConfig.sha256": pin.StrictConfig.Sha256,
-		"generatedHelperRuntime.sha256": pin.HelperRuntime.Sha256,
+		"typescriptCompiler.package":     pin.TypescriptCompiler.Package,
+		"typescriptCompiler.version":     pin.TypescriptCompiler.Version,
+		"typescriptCompiler.tscJsSha256": pin.TypescriptCompiler.TscJsSha256,
+		"javascriptRuntime.name":         pin.JavascriptRuntime.Name,
+		"javascriptRuntime.version":      pin.JavascriptRuntime.Version,
+		"moduleResolver.policy":          pin.ModuleResolver.Policy,
+		"moduleResolver.loaderSha256":    pin.ModuleResolver.LoaderSha256,
+		"strictTypeScriptConfig.path":    pin.StrictConfig.Path,
+		"strictTypeScriptConfig.sha256":  pin.StrictConfig.Sha256,
+		"generatedHelperRuntime.sha256":  pin.HelperRuntime.Sha256,
 	} {
 		if value == "" {
 			return nil, fmt.Errorf("product-toolchain pin %s: %s is required", pinPath, name)

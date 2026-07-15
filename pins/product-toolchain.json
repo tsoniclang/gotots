@@ -2,7 +2,8 @@
   "schemaVersion": 1,
   "typescriptCompiler": {
     "package": "typescript",
-    "version": "6.0.3"
+    "version": "6.0.3",
+    "tscJsSha256": "2cffde0b8c6760dfb0b5b0382bbb7e00ba6a8b2d981b9205b256a700a481d983"
   },
   "javascriptRuntime": {
     "name": "node",

@@ -387,7 +387,10 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 		return nil
 	}
 	if len(functions) == 0 && len(structs) == 0 && len(carrierMethods) == 0 && len(packageVars) == 0 {
-		return fmt.Errorf("package %s has no translatable declarations", p.PkgPath)
+		// A package whose declarations are all compile-time (constants
+		// fold at use sites) emits an empty module: dependents reference
+		// no runtime symbol from it.
+		return nil
 	}
 
 	structList := make([]*ir.Struct, 0, len(structOrder))
