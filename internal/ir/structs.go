@@ -1,6 +1,8 @@
 package ir
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"go/ast"
 	"go/types"
 	"sort"
@@ -197,4 +199,33 @@ func (b *builder) admitGenericType(named *types.Named, span Span) ([]string, err
 		}
 	}
 	return names, nil
+}
+
+// anonStructType synthesizes the class of one anonymous struct shape:
+// deterministic per canonical spelling, registered for the package's
+// module, structurally identical across packages (TypeScript's
+// structural classes keep cross-package values assignable).
+func (b *builder) anonStructType(structType *types.Struct, spelled string, span Span) (Type, error) {
+	digest := sha256.Sum256([]byte(spelled))
+	name := "Anon$" + hex.EncodeToString(digest[:6])
+	out := Type{Kind: KindStruct, Go: spelled, Named: name, Pkg: b.pkgPath}
+	decl := &Struct{
+		ID:       b.pkgPath + "::type::" + name,
+		Name:     name,
+		Exported: false,
+		Span:     span,
+	}
+	for i := range structType.NumFields() {
+		field := structType.Field(i)
+		if field.Name() == "_" {
+			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "struct type " + spelled + " (blank field)", Span: span}
+		}
+		fieldType, err := b.typeOf(field.Type(), span)
+		if err != nil {
+			return Type{}, err
+		}
+		decl.Fields = append(decl.Fields, Var{Name: field.Name(), Type: fieldType})
+	}
+	b.unit.RegisterAnonStruct(b.pkgPath, decl)
+	return out, nil
 }

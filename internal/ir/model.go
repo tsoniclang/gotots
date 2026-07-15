@@ -128,6 +128,9 @@ type Scope struct {
 	// typeGenerics maps each generic named type to the type-argument
 	// tuples of every instantiation anywhere in the unit.
 	typeGenerics map[*types.TypeName][][]types.Type
+	// anonStructs collects, per package, the synthesized classes of the
+	// anonymous struct shapes its bodies use, keyed by class name.
+	anonStructs map[string]map[string]*Struct
 }
 
 // NewScope builds a unit scope over the given package paths.
@@ -141,6 +144,7 @@ func NewScope(paths ...string) Scope {
 		generics:     map[*types.Func][][]types.Type{},
 		externals:    map[*types.Func]bool{},
 		typeGenerics: map[*types.TypeName][][]types.Type{},
+		anonStructs:  map[string]map[string]*Struct{},
 	}
 }
 
@@ -173,6 +177,30 @@ func (s Scope) AddGenericTypeInstance(name *types.TypeName, typeArgs []types.Typ
 // GenericTypeInstances returns every recorded instantiation of a
 // generic named type.
 func (s Scope) GenericTypeInstances(name *types.TypeName) [][]types.Type { return s.typeGenerics[name] }
+
+// RegisterAnonStruct records one synthesized anonymous-struct class for
+// the package's module (idempotent per shape).
+func (s Scope) RegisterAnonStruct(pkg string, decl *Struct) {
+	if s.anonStructs[pkg] == nil {
+		s.anonStructs[pkg] = map[string]*Struct{}
+	}
+	s.anonStructs[pkg][decl.Name] = decl
+}
+
+// AnonStructs returns the synthesized anonymous-struct classes of one
+// package in sorted name order.
+func (s Scope) AnonStructs(pkg string) []*Struct {
+	names := make([]string, 0, len(s.anonStructs[pkg]))
+	for name := range s.anonStructs[pkg] {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	out := make([]*Struct, 0, len(names))
+	for _, name := range names {
+		out = append(out, s.anonStructs[pkg][name])
+	}
+	return out
+}
 
 // AddExternalFunc records one admitted external function contract.
 func (s Scope) AddExternalFunc(fn *types.Func) { s.externals[fn] = true }

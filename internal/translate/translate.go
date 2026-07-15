@@ -411,6 +411,8 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 	for _, name := range structOrder {
 		structList = append(structList, structs[name])
 	}
+	// Synthesized anonymous-struct classes the package's bodies use.
+	structList = append(structList, unit.AnonStructs(p.PkgPath)...)
 	// The module's import environment is built after the declaration
 	// passes so external obligations discovered while building bodies
 	// resolve to their stub modules.
@@ -508,40 +510,6 @@ func collectGenericInstances(unit ir.Scope, pkgs []*packages.Package) {
 			case *types.TypeName:
 				unit.AddGenericTypeInstance(object, args)
 			}
-		}
-	}
-}
-
-// erasedCarrier resolves the reviewed carrier of a non-struct named type
-// or alias declaration; a type outside the subset fails closed.
-func erasedCarrier(p *packages.Package, sourceDir string, unit ir.Scope, spec *ast.TypeSpec, object *types.TypeName) (string, error) {
-	t, err := ir.ResolveType(p, sourceDir, unit, object.Type(), spec.Pos())
-	if err != nil {
-		return "", err
-	}
-	return conservativeCarrier(t), nil
-}
-
-// receiverBase names the receiver's base type from its AST.
-func receiverBase(recv *ast.FieldList) string {
-	if len(recv.List) == 0 {
-		return ""
-	}
-	t := recv.List[0].Type
-	for {
-		switch base := t.(type) {
-		case *ast.StarExpr:
-			t = base.X
-		case *ast.ParenExpr:
-			t = base.X
-		case *ast.IndexExpr:
-			t = base.X
-		case *ast.IndexListExpr:
-			t = base.X
-		case *ast.Ident:
-			return base.Name
-		default:
-			return ""
 		}
 	}
 }

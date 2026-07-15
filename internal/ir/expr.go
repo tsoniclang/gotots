@@ -391,8 +391,10 @@ func (b *builder) bindStructValue(e Expr) Expr {
 // explicit zeros).
 func (b *builder) buildStructLit(lit *ast.CompositeLit, t Type) (Expr, error) {
 	span := b.span(lit.Pos())
-	named := types.Unalias(b.info.Types[lit].Type).(*types.Named)
-	structType := named.Underlying().(*types.Struct)
+	structType, isAnon := types.Unalias(b.info.Types[lit].Type).(*types.Struct)
+	if !isAnon {
+		structType = types.Unalias(b.info.Types[lit].Type).(*types.Named).Underlying().(*types.Struct)
+	}
 
 	fieldIRType := func(field *types.Var) (Type, error) { return b.typeOf(field.Type(), span) }
 	fieldByName := map[string]*types.Var{}

@@ -423,3 +423,42 @@ func TwoParamGeneric() (string, int, string, int) {
 }
 `)
 }
+
+func TestOracleAnonymousStructs(t *testing.T) {
+	runOracle(t, `package fixture
+
+var table = []struct {
+	name  string
+	score int
+}{
+	{name: "a", score: 1},
+	{name: "b", score: 2},
+}
+
+func AnonymousTable() (string, int) {
+	total := 0
+	names := ""
+	for _, row := range table {
+		total += row.score
+		names += row.name
+	}
+	return names, total
+}
+
+func AnonymousLocal() (int, bool) {
+	entry := struct {
+		id   int
+		live bool
+	}{id: 9, live: true}
+	copyOf := entry
+	copyOf.id = 10
+	return entry.id + copyOf.id, entry.live
+}
+
+func AnonymousEquality() bool {
+	a := struct{ x int }{x: 1}
+	b := struct{ x int }{x: 1}
+	return a == b
+}
+`)
+}

@@ -362,14 +362,17 @@ func helper() {}
 			code: "GOTOTS_UNSUPPORTED_STATEMENT", mention: "defer in a function with named results",
 		},
 		{
-			name: "anonymous struct type",
+			name: "anonymous struct with a blank field",
 			source: `package fixture
-func Case() int32 {
-	point := struct{ X int32 }{X: 1}
-	return point.X
+func Case() int {
+	v := struct {
+		_ int
+		N int
+	}{N: 2}
+	return v.N
 }
 `,
-			code: "GOTOTS_UNSUPPORTED_TYPE", mention: "struct type",
+			code: "GOTOTS_UNSUPPORTED_TYPE", mention: "blank field",
 		},
 		{
 			name: "promotion through an embedded pointer",

@@ -156,6 +156,9 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 				// structs keep their identity (methods, pointers, rtti).
 				return Type{Kind: KindUnit, Go: spelled}, nil
 			}
+			if !ok {
+				return b.anonStructType(u, spelled, span)
+			}
 			if ok && named.Obj().Pkg() != nil {
 				// A named struct outside the unit is an opaque external
 				// handle under the external-contract policy.
