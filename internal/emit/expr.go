@@ -519,6 +519,8 @@ func (p *printer) zeroLiteral(t ir.Type) (string, error) {
 		return class + ".goZero$()", nil
 	case t.Kind == ir.KindArray:
 		return p.arrayZeroFactory(t)
+	case t.Kind == ir.KindUnit:
+		return "0", nil
 	case t.Kind.Wide64():
 		return "0n", nil
 	case t.Kind.Integer(), t.Kind.Float():

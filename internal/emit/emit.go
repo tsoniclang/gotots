@@ -421,6 +421,8 @@ func (p *printer) tsType(t ir.Type) (string, error) {
 			return "", err
 		}
 		return element + "[]", nil
+	case ir.KindUnit:
+		return "0", nil
 	case ir.KindIface:
 		return "goif$.GoIface", nil
 	case ir.KindTypeParam:

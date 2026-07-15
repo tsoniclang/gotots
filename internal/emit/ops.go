@@ -11,7 +11,7 @@ import (
 func printConst(n *ir.Const) (string, error) {
 	kind := n.T.Kind
 	switch {
-	case kind == ir.KindBool, kind == ir.KindString, kind.Float():
+	case kind == ir.KindBool, kind == ir.KindString, kind.Float(), kind == ir.KindUnit:
 		return n.Value, nil
 	case kind.Wide64():
 		return "(" + n.Value + "n)", nil

@@ -502,6 +502,11 @@
       "specClause": "docs/spec/04-types-values-pointers.md"
     },
     {
+      "key": "unitLiteral",
+      "state": "generated",
+      "specClause": "docs/spec/04-types-values-pointers.md"
+    },
+    {
       "key": "varDecl",
       "state": "generated",
       "specClause": "docs/spec/03-declarations-bodies-control.md"

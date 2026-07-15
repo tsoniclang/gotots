@@ -61,6 +61,10 @@ const (
 	// whole-value stores overwrite elements in place, so element aliases
 	// (including slices over the array) observe them exactly.
 	KindArray
+	// KindUnit is the anonymous empty struct type struct{}: a unit type
+	// with exactly one value, carried as the number literal 0. Copies,
+	// stores, and equality are all trivially exact.
+	KindUnit
 	// KindTypeParam is a generic function's type parameter: an opaque
 	// carrier admitted only for operations exact under every recorded
 	// instantiation (the unit-wide closed-world evidence excludes struct

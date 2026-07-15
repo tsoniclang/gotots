@@ -102,6 +102,11 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 	case *types.Struct:
 		named, ok := types.Unalias(t).(*types.Named)
 		if !ok || named.Obj().Pkg() == nil || !b.unit.Owns(named.Obj().Pkg().Path()) {
+			if !ok && u.NumFields() == 0 {
+				// The anonymous empty struct is the unit type; named empty
+				// structs keep their identity (methods, pointers, rtti).
+				return Type{Kind: KindUnit, Go: spelled}, nil
+			}
 			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "struct type " + spelled, Span: span}
 		}
 		// Struct values are reviewed only behind pointers and receivers;

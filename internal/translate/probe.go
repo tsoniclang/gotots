@@ -28,6 +28,9 @@ type ProbeResult struct {
 	Translated       int            `json:"translated"`
 	Blocked          int            `json:"blocked"`
 	BlockerHistogram map[string]int `json:"blockerHistogram"`
+	// ConstructHistogram counts the raw (unnormalized) construct
+	// spellings, ranking the exact shapes inside each blocker class.
+	ConstructHistogram map[string]int `json:"constructHistogram"`
 	// PackagesFullyTranslated lists packages whose COMPLETE declaration
 	// set translates — verified by running the package translation, not
 	// just body IR construction.
@@ -52,9 +55,10 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 	}
 
 	result := &ProbeResult{
-		BlockerHistogram: map[string]int{},
-		PerPackage:       map[string]string{},
-		ExternalRefs:     map[string]int{},
+		BlockerHistogram:   map[string]int{},
+		ConstructHistogram: map[string]int{},
+		PerPackage:         map[string]string{},
+		ExternalRefs:       map[string]int{},
 	}
 	sort.Slice(loaded, func(i, j int) bool { return loaded[i].ID < loaded[j].ID })
 
@@ -110,6 +114,7 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 					result.Blocked++
 					for _, site := range function.Sites {
 						result.BlockerHistogram[site.Class]++
+						result.ConstructHistogram[site.Construct]++
 						if ref, isExternal := externalRefOfSite(site); isExternal {
 							result.ExternalRefs[ref]++
 						}

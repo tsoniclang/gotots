@@ -94,6 +94,11 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 		if t.Kind == KindArray {
 			return b.buildArrayLit(n, t)
 		}
+		if t.Kind == KindUnit {
+			// struct{}{} is the unit value.
+			b.use("unitLiteral")
+			return &Const{T: t, Value: "0"}, nil
+		}
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "composite literal of " + t.Go, Span: span}
 
 	case *ast.FuncLit:
@@ -535,6 +540,8 @@ func zeroValue(t Type, span Span) (Expr, error) {
 		return &NilConst{T: t}, nil
 	case t.Kind == KindStruct, t.Kind == KindArray:
 		return &StructZero{T: t}, nil
+	case t.Kind == KindUnit:
+		return &Const{T: t, Value: "0"}, nil
 	case t.Kind.Integer(), t.Kind.Float():
 		return &Const{T: t, Value: "0"}, nil
 	}
