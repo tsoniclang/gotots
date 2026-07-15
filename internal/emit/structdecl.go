@@ -246,6 +246,7 @@ func printMethodFunction(out *strings.Builder, module *Module, className string,
 	if len(method.TypeParams) > 0 {
 		generics = "<" + strings.Join(method.TypeParams, ", ") + ">"
 	}
+	p.slicePlans = method.SlicePlans
 	p.line("%sfunction %s$%s%s(%s): %s {", export, className, method.Name, generics, strings.Join(params, ", "), result)
 	p.indent++
 	if len(method.TypeParams) > 0 {

@@ -16,10 +16,14 @@ func (p *printer) printRangeSlice(n *ir.RangeSlice) error {
 	if err != nil {
 		return err
 	}
+	get, length := "gosl$.goSliceGet", "gosl$.goSliceLen"
+	if p.nativeSlice(n.X) {
+		get, length = "gosl$.goArrayGet", "gosl$.goArrayLen"
+	}
 	sliceTemp := p.temp()
 	p.line("const %s = %s;", sliceTemp, operand)
 	lengthTemp := p.temp()
-	p.line("const %s = gosl$.goSliceLen(%s);", lengthTemp, sliceTemp)
+	p.line("const %s = %s(%s);", lengthTemp, length, sliceTemp)
 	// The induction variable is always hidden: the source index name
 	// binds a per-iteration copy, so assigning to it inside the body
 	// never affects iteration — exactly Go.
@@ -36,18 +40,18 @@ func (p *printer) printRangeSlice(n *ir.RangeSlice) error {
 		}
 		if n.VarT.Kind == ir.KindStruct {
 			// The range variable binds a per-iteration value copy.
-			p.line("let %s: %s = gosl$.goSliceGet(%s, %s).goClone$();", tsName(n.Value), spelled, sliceTemp, induction)
+			p.line("let %s: %s = %s(%s, %s).goClone$();", tsName(n.Value), spelled, get, sliceTemp, induction)
 		} else if n.VarT.Kind == ir.KindArray {
 			cloneElem, err := p.arrayElemClone(*n.VarT.Elem)
 			if err != nil {
 				return err
 			}
-			p.line("let %s: %s = gosl$.goArrayClone(gosl$.goSliceGet(%s, %s), %s);", tsName(n.Value), spelled, sliceTemp, induction, cloneElem)
+			p.line("let %s: %s = gosl$.goArrayClone(%s(%s, %s), %s);", tsName(n.Value), spelled, get, sliceTemp, induction, cloneElem)
 		} else if n.VarT.Kind == ir.KindExternal {
-			p.line("let %s: %s = goext$.goExternalCall(%q, [gosl$.goSliceGet(%s, %s)]) as %s;",
-				tsName(n.Value), spelled, n.VarT.Pkg+"."+n.VarT.Named+".goClone$", sliceTemp, induction, spelled)
+			p.line("let %s: %s = goext$.goExternalCall(%q, [%s(%s, %s)]) as %s;",
+				tsName(n.Value), spelled, n.VarT.Pkg+"."+n.VarT.Named+".goClone$", get, sliceTemp, induction, spelled)
 		} else {
-			p.line("let %s: %s = gosl$.goSliceGet(%s, %s);", tsName(n.Value), spelled, sliceTemp, induction)
+			p.line("let %s: %s = %s(%s, %s);", tsName(n.Value), spelled, get, sliceTemp, induction)
 		}
 	}
 	if err := p.printLoopBody(n.Body); err != nil {

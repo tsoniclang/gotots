@@ -219,6 +219,7 @@ func (b *builder) finalize(function *Func) *Func {
 		function.Body = nil
 	} else {
 		function.Support = SupportGenerated
+		function.SlicePlans = AnalyzeSlicePlans(function)
 	}
 	return function
 }

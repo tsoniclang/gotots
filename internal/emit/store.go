@@ -130,8 +130,12 @@ func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
 				return stagedTarget{}, err
 			}
 		}
-		return stagedTarget{kind: "slice", name: sliceTemp, keyTemp: indexTemp,
-			structValue: structElem, arrayValue: setElem}, nil
+		staged := stagedTarget{kind: "slice", name: sliceTemp, keyTemp: indexTemp,
+			structValue: structElem, arrayValue: setElem}
+		if p.nativeSlice(t.X) {
+			staged.kind = "array"
+		}
+		return staged, nil
 	case *ir.ArrayTarget:
 		arrayExpr, err := p.printExpr(t.X)
 		if err != nil {
@@ -368,6 +372,10 @@ func (p *printer) printStore(target ir.Target, value string) error {
 				return err
 			}
 			p.line("gosl$.goSliceSetArray(%s, %s, %s, %s);", sliceExpr, index, value, setElem)
+			return nil
+		}
+		if p.nativeSlice(t.X) {
+			p.line("gosl$.goArrayElemSet(%s, %s, %s);", sliceExpr, index, value)
 			return nil
 		}
 		p.line("gosl$.goSliceSet(%s, %s, %s);", sliceExpr, index, value)

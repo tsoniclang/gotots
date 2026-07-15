@@ -302,6 +302,9 @@ type Func struct {
 	// whole body wraps in one try/finally draining a per-function defer
 	// stack in LIFO order.
 	UsesDeferStack bool
+	// SlicePlans maps each slice-typed local variable to its selected
+	// representation candidate (the planner's fixed point).
+	SlicePlans map[string]string
 	// BodyHash matches the census body record for drift detection.
 	BodyHash string
 	// Support is the implementation support state; Sites records every

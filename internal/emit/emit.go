@@ -236,6 +236,16 @@ type printer struct {
 	// zeroFactories maps in-scope type parameters to their zero-factory
 	// parameter names while a generic goZero$ body prints.
 	zeroFactories map[string]string
+	// slicePlans maps this body's slice-typed locals to their selected
+	// representation; "native-array" locals lower onto plain arrays.
+	slicePlans map[string]string
+}
+
+// nativeSlice reports whether the expression reads a local whose region
+// selected the native-array representation.
+func (p *printer) nativeSlice(e ir.Expr) bool {
+	ref, isVar := e.(*ir.VarRef)
+	return isVar && ref.Pkg == "" && p.slicePlans[ref.Name] == "native-array"
 }
 
 // takeLoopLabel consumes the pending label as a "name: " prefix.
@@ -281,6 +291,7 @@ func printFunc(out *strings.Builder, module *Module, function *ir.Func) error {
 	if len(function.TypeParams) > 0 {
 		generics = "<" + strings.Join(function.TypeParams, ", ") + ">"
 	}
+	p.slicePlans = function.SlicePlans
 	p.line("%sfunction %s%s%s {", export, tsName(function.Name), generics, signature)
 	p.indent++
 	if len(function.TypeParams) > 0 {

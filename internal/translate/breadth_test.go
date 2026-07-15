@@ -396,3 +396,46 @@ func ElidedAllocations() (string, int, string) {
 }
 `)
 }
+
+func TestOraclePlannedNativeSlices(t *testing.T) {
+	runOracle(t, `package fixture
+
+func OwnerOnlySlice() (int, int, int) {
+	values := []int{1, 2}
+	values = append(values, 3)
+	values = append(values, 4, 5)
+	values[0] = 10
+	total := 0
+	for _, v := range values {
+		total += v
+	}
+	return total, len(values), values[4]
+}
+
+func OwnerOnlyMake() (int, int) {
+	buf := make([]int, 3)
+	buf[1] = 7
+	buf = append(buf, 9)
+	return len(buf), buf[1] + buf[3]
+}
+
+func OwnerOnlyBounds() int {
+	values := []int{1}
+	i := 5
+	return values[i]
+}
+
+func CarrierWhenNilObserved() bool {
+	var s []int
+	s = append(s, 1)
+	return s == nil
+}
+
+func CarrierWhenShared() (int, int) {
+	base := []int{1, 2, 3, 4}
+	view := base[1:3]
+	view[0] = 99
+	return base[1], len(view)
+}
+`)
+}

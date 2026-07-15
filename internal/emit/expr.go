@@ -331,127 +331,6 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			return "(" + x + " !== undefined)", nil
 		}
 		return "(" + x + " === undefined)", nil
-	case *ir.SliceLit:
-		values, err := p.printArgs(n.Values)
-		if err != nil {
-			return "", err
-		}
-		return "gosl$.goSliceFrom([" + values + "])", nil
-	case *ir.SliceMake:
-		length, err := p.printExpr(n.Length)
-		if err != nil {
-			return "", err
-		}
-		// An omitted capacity defaults inside the helper, so the length
-		// expression evaluates exactly once.
-		capacity := "undefined"
-		if n.Capacity != nil {
-			capacity, err = p.printExpr(n.Capacity)
-			if err != nil {
-				return "", err
-			}
-		}
-		zero, err := p.zeroLiteral(*n.T.Elem)
-		if err != nil {
-			return "", err
-		}
-		if n.T.Elem.Kind == ir.KindStruct || n.T.Elem.Kind == ir.KindArray {
-			// Every struct or array element is a distinct fresh zero
-			// instance.
-			return "gosl$.goSliceMakeStruct(" + length + ", " + capacity + ", () => " + zero + ")", nil
-		}
-		return "gosl$.goSliceMake(" + length + ", " + capacity + ", " + zero + ")", nil
-	case *ir.SliceGet:
-		x, err := p.printExpr(n.X)
-		if err != nil {
-			return "", err
-		}
-		index, err := p.printExpr(n.Index)
-		if err != nil {
-			return "", err
-		}
-		return "gosl$.goSliceGet(" + x + ", " + index + ")", nil
-	case *ir.SliceReslice:
-		x, err := p.printExpr(n.X)
-		if err != nil {
-			return "", err
-		}
-		low := "0"
-		if n.Low != nil {
-			low, err = p.printExpr(n.Low)
-			if err != nil {
-				return "", err
-			}
-		}
-		// An omitted high bound defaults to len(s) inside the helper,
-		// computed from the single evaluation of the operand.
-		high := "undefined"
-		if n.High != nil {
-			high, err = p.printExpr(n.High)
-			if err != nil {
-				return "", err
-			}
-		}
-		return "gosl$.goSliceSlice(" + x + ", " + low + ", " + high + ")", nil
-	case *ir.SliceAppend:
-		x, err := p.printExpr(n.X)
-		if err != nil {
-			return "", err
-		}
-		values, err := p.printArgs(n.Values)
-		if err != nil {
-			return "", err
-		}
-		zero, err := p.zeroLiteral(*n.T.Elem)
-		if err != nil {
-			return "", err
-		}
-		if n.T.Elem.Kind == ir.KindStruct {
-			return "gosl$.goSliceAppendStruct(" + x + ", [" + values + "], () => " + zero + ")", nil
-		}
-		return "gosl$.goSliceAppend(" + x + ", [" + values + "], " + zero + ")", nil
-	case *ir.SliceAppendSlice:
-		x, err := p.printExpr(n.X)
-		if err != nil {
-			return "", err
-		}
-		source, err := p.printExpr(n.Source)
-		if err != nil {
-			return "", err
-		}
-		zero, err := p.zeroLiteral(*n.T.Elem)
-		if err != nil {
-			return "", err
-		}
-		if n.T.Elem != nil && n.T.Elem.Kind == ir.KindStruct {
-			return "gosl$.goSliceAppendSliceStruct(" + x + ", " + source + ", () => " + zero + ")", nil
-		}
-		return "gosl$.goSliceAppendSlice(" + x + ", " + source + ", " + zero + ")", nil
-	case *ir.SliceCopy:
-		dst, err := p.printExpr(n.Dst)
-		if err != nil {
-			return "", err
-		}
-		src, err := p.printExpr(n.Src)
-		if err != nil {
-			return "", err
-		}
-		if n.Dst.Type().Elem != nil && n.Dst.Type().Elem.Kind == ir.KindStruct {
-			return "gosl$.goSliceCopyStruct(" + dst + ", " + src + ")", nil
-		}
-		return "gosl$.goSliceCopy(" + dst + ", " + src + ")", nil
-	case *ir.SliceLen:
-		x, err := p.printExpr(n.X)
-		if err != nil {
-			return "", err
-		}
-		return "gosl$.goSliceLen(" + x + ")", nil
-	case *ir.SliceCap:
-		x, err := p.printExpr(n.X)
-		if err != nil {
-			return "", err
-		}
-		return "gosl$.goSliceCap(" + x + ")", nil
 	}
 	return "", fmt.Errorf("no emission for IR expression %T", e)
 }
@@ -498,7 +377,7 @@ func (p *printer) printClosure(n *ir.Closure) (string, error) {
 		return "", err
 	}
 	var sub strings.Builder
-	subPrinter := &printer{out: &sub, module: p.module, indent: p.indent + 1, zeroFactories: p.zeroFactories}
+	subPrinter := &printer{out: &sub, module: p.module, indent: p.indent + 1, zeroFactories: p.zeroFactories, slicePlans: p.slicePlans}
 	if err := subPrinter.printDeferWrappedBody(n.Body, n.UsesDeferStack); err != nil {
 		return "", err
 	}
