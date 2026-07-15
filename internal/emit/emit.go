@@ -179,6 +179,20 @@ type printer struct {
 	// a range-over-func yield closure into the captured-return protocol;
 	// only a nested function literal clears it.
 	rangeReturn *rangeFuncCtx
+	// pendingLoopLabel is a Go label awaiting its loop or switch line
+	// (multi-statement lowerings put their temps before it, so the label
+	// binds the actual loop and continue-label works).
+	pendingLoopLabel string
+}
+
+// takeLoopLabel consumes the pending label as a "name: " prefix.
+func (p *printer) takeLoopLabel() string {
+	if p.pendingLoopLabel == "" {
+		return ""
+	}
+	label := p.pendingLoopLabel
+	p.pendingLoopLabel = ""
+	return label + ": "
 }
 
 // rangeFuncCtx carries one range-over-func loop's protocol variables.

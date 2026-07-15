@@ -52,6 +52,17 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		return nil
 
 	case *ir.BranchStmt:
+		if n.Label != "" {
+			// Go's labeled loop/switch branches coincide exactly with JS
+			// labeled statements (yield-boundary crossings fail closed at
+			// build).
+			if n.Tok == token.BREAK {
+				p.line("break %s;", labelName(n.Label))
+			} else {
+				p.line("continue %s;", labelName(n.Label))
+			}
+			return nil
+		}
 		// Inside a range-over-func body, break stops the iteration
 		// through the yield protocol and continue yields true; a nested
 		// loop or switch that owns the branch cleared the transform.
@@ -70,6 +81,12 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		}
 		p.line("continue;")
 		return nil
+
+	case *ir.LabeledStmt:
+		p.pendingLoopLabel = labelName(n.Label)
+		err := p.printStmt(n.Stmt)
+		p.pendingLoopLabel = ""
+		return err
 
 	case *ir.TryFinally:
 		p.line("try {")
@@ -157,6 +174,10 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		value, err := p.printExpr(n.Value)
 		if err != nil {
 			return err
+		}
+		if n.IsError {
+			p.line("gort$.goPanicError(%s);", value)
+			return nil
 		}
 		p.line("gort$.goPanicValue(%s);", value)
 		return nil
@@ -339,7 +360,7 @@ func (p *printer) printSwitch(n *ir.SwitchStmt) error {
 	if err != nil {
 		return err
 	}
-	p.line("switch (%s) {", tag)
+	p.line("%sswitch (%s) {", p.takeLoopLabel(), tag)
 	p.indent++
 	for _, clause := range n.Clauses {
 		if clause.Values == nil {
@@ -444,7 +465,7 @@ func (p *printer) printFor(n *ir.ForStmt) error {
 	if err != nil {
 		return err
 	}
-	p.line("for (%s; %s; %s) {", init, cond, post)
+	p.line("%sfor (%s; %s; %s) {", p.takeLoopLabel(), init, cond, post)
 	p.indent++
 	if err := p.printLoopBody(n.Body); err != nil {
 		return err
@@ -556,6 +577,10 @@ func (p *printer) emitFunctionReturn(value string) {
 	}
 	p.line("return %s;", value)
 }
+
+// labelName spells a Go label in the emitted namespace ("$" keeps it
+// clear of every source identifier; JS labels live in their own space).
+func labelName(label string) string { return label + "$l" }
 
 func joinComma(parts []string) string {
 	out := ""

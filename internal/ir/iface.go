@@ -3,6 +3,7 @@ package ir
 import (
 	"go/ast"
 	"go/types"
+	"sort"
 	"strings"
 )
 
@@ -158,8 +159,27 @@ func (b *builder) buildTypeAssert(n *ast.TypeAssertExpr, commaOk bool) (Expr, er
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "type assertion on " + operand.Type().Go, Span: span}
 	}
 	targetGoType := b.info.Types[n.Type].Type
-	if _, isIface := targetGoType.Underlying().(*types.Interface); isIface {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "type assertion to an interface type (method-set test)", Span: span}
+	if targetIface, isIface := targetGoType.Underlying().(*types.Interface); isIface {
+		// x.(I): the dynamic type's method set must carry every method
+		// of the target interface; the result is the same boxed value.
+		target, err := b.typeOf(targetGoType, span)
+		if err != nil {
+			return nil, err
+		}
+		methods := make([]string, 0, targetIface.NumMethods())
+		for i := range targetIface.NumMethods() {
+			methods = append(methods, targetIface.Method(i).Name())
+		}
+		sort.Strings(methods)
+		b.use("typeAssert:iface")
+		return &IfaceAssert{
+			X:             operand,
+			Target:        target,
+			Methods:       methods,
+			SourceDisplay: displayOf(b.info.Types[n.X].Type),
+			TargetDisplay: displayOf(targetGoType),
+			CommaOk:       commaOk,
+		}, nil
 	}
 	target, err := b.typeOf(targetGoType, span)
 	if err != nil {
@@ -184,6 +204,8 @@ func (b *builder) buildTypeAssert(n *ast.TypeAssertExpr, commaOk bool) (Expr, er
 func (b *builder) buildTypeSwitch(n *ast.TypeSwitchStmt) (Stmt, error) {
 	span := b.span(n.Pos())
 	out := &TypeSwitchStmt{}
+	b.typeSwitchLabels = append(b.typeSwitchLabels, &out.BreakLabel)
+	defer func() { b.typeSwitchLabels = b.typeSwitchLabels[:len(b.typeSwitchLabels)-1] }()
 	if n.Init != nil {
 		init, err := b.buildStmt(n.Init)
 		if err != nil {
@@ -254,4 +276,23 @@ func (b *builder) buildTypeSwitch(n *ast.TypeSwitchStmt) (Stmt, error) {
 	}
 	b.use("typeSwitch")
 	return out, nil
+}
+
+// IfaceAssert is x.(I) for an interface target: a method-set test over
+// the dynamic type's rtti, returning the same boxed value.
+type IfaceAssert struct {
+	X             Expr
+	Target        Type
+	Methods       []string
+	SourceDisplay string
+	TargetDisplay string
+	CommaOk       bool
+}
+
+func (*IfaceAssert) expr() {}
+func (a *IfaceAssert) Type() Type {
+	if a.CommaOk {
+		return Type{Kind: KindInvalid, Go: "(iface, bool)"}
+	}
+	return a.Target
 }

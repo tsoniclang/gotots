@@ -234,6 +234,15 @@ func (b *builder) buildPanic(call *ast.CallExpr) (Stmt, error) {
 		return nil, err
 	}
 	kind := value.Type().Kind
+	if kind == KindIface {
+		// panic(err) for a static error type: %v formats through the
+		// dynamic Error method, dispatched at the panic.
+		errorType := types.Universe.Lookup("error").Type().Underlying().(*types.Interface)
+		if goType := b.info.Types[call.Args[0]].Type; goType != nil && types.Implements(goType, errorType) {
+			b.use("panic:error")
+			return &PanicStmt{Value: value, IsError: true}, nil
+		}
+	}
 	if kind != KindString && kind != KindBool && !kind.Integer() {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "panic with " + value.Type().Go + " (formatting not reviewed)", Span: span}
 	}

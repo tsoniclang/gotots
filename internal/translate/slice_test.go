@@ -315,15 +315,15 @@ loop:
 	return i
 }
 `,
-			code: "GOTOTS_UNSUPPORTED_STATEMENT", mention: "LabeledStmt",
+			code: "GOTOTS_UNSUPPORTED_STATEMENT", mention: "label on a non-loop statement",
 		},
 		{
-			name: "struct value equality",
+			name: "struct equality with a non-encodable field",
 			source: `package fixture
-type Point struct{ X int32 }
+type Holder struct{ V any }
 func Case() bool {
-	a := Point{X: 1}
-	b := Point{X: 1}
+	a := Holder{}
+	b := Holder{}
 	return a == b
 }
 `,

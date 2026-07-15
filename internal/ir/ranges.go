@@ -215,7 +215,9 @@ func (b *builder) buildRangeFunc(n *ast.RangeStmt, operand Expr) (Stmt, error) {
 	if out.Value != "" && !out.TwoVars {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "two range variables over a one-value sequence", Span: span}
 	}
+	b.rangeFuncDepth++
 	body, err := b.buildBreakableBody(n.Body)
+	b.rangeFuncDepth--
 	if err != nil {
 		return nil, err
 	}

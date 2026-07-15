@@ -70,6 +70,11 @@ func (b *builder) buildBinary(n *ast.BinaryExpr, resultType types.Type) (Expr, e
 		if operand.Kind == KindArray {
 			return b.buildArrayEqual(left, right, n.Op, span)
 		}
+		if operand.Kind == KindStruct && b.structKeyEncodable(b.info.Types[n.X].Type, span) {
+			// Field-wise equality through the canonical injective key.
+			b.use("structEqual")
+			return &StructEqual{L: left, R: right, Negate: n.Op == token.NEQ}, nil
+		}
 		if operand.Kind == KindMap || operand.Kind == KindStruct || operand.Kind == KindExternal {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "equality on " + operand.Go, Span: span}
 		}
@@ -87,3 +92,13 @@ func (b *builder) buildBinary(n *ast.BinaryExpr, resultType types.Type) (Expr, e
 	b.use("binary:" + n.Op.String())
 	return &Binary{Op: n.Op, L: left, R: right, T: t}, nil
 }
+
+// StructEqual compares two encodable struct values field-wise through
+// their canonical injective keys.
+type StructEqual struct {
+	L, R   Expr
+	Negate bool
+}
+
+func (*StructEqual) expr()        {}
+func (s *StructEqual) Type() Type { return boolType }

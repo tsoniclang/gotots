@@ -234,6 +234,38 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			return "", err
 		}
 		return fmt.Sprintf("(goif$.goIfaceAssert(%s, %s, %q) as (%s))", x, rtti, n.SourceDisplay, spelled), nil
+	case *ir.StructEqual:
+		left, err := p.printExpr(n.L)
+		if err != nil {
+			return "", err
+		}
+		right, err := p.printExpr(n.R)
+		if err != nil {
+			return "", err
+		}
+		op := "==="
+		if n.Negate {
+			op = "!=="
+		}
+		return "(" + left + ".goKey$() " + op + " " + right + ".goKey$())", nil
+	case *ir.IfaceAssert:
+		x, err := p.printExpr(n.X)
+		if err != nil {
+			return "", err
+		}
+		methods := make([]string, len(n.Methods))
+		for i, method := range n.Methods {
+			methods[i] = fmt.Sprintf("%q", method)
+		}
+		list := "[" + joinComma(methods) + "]"
+		if n.CommaOk {
+			return fmt.Sprintf("goif$.goIfaceLookupIface(%s, %s)", x, list), nil
+		}
+		spelled, err := p.tsType(n.Target)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("(goif$.goIfaceAssertIface(%s, %s, %q, %q) as (%s))", x, list, n.SourceDisplay, n.TargetDisplay, spelled), nil
 	case *ir.StructCopy:
 		x, err := p.printExpr(n.X)
 		if err != nil {
@@ -258,6 +290,12 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		return p.zeroLiteral(n.T)
 	case *ir.ExternZero:
 		return p.zeroLiteral(n.T)
+	case *ir.ExternVar:
+		spelled, err := p.tsType(n.T)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("(goext$.goExternalCall(%q, []) as (%s))", n.ID, spelled), nil
 	case *ir.ExternalMethodCall:
 		recv, err := p.printExpr(n.Recv)
 		if err != nil {

@@ -60,7 +60,16 @@ func printRtti(out *strings.Builder, module *Module, typeName string, exported, 
 // clause order: the operand evaluates once, non-default clauses test in
 // source order, and the default clause is the final else.
 func (p *printer) printTypeSwitch(n *ir.TypeSwitchStmt) error {
-	p.line("{")
+	userLabel := p.takeLoopLabel()
+	if n.BreakLabel != "" {
+		// A direct break inside a clause exits this labeled block; a Go
+		// label on the type switch nests outside it.
+		p.line("%s%s: {", userLabel, labelName(n.BreakLabel))
+	} else if userLabel != "" {
+		p.line("%s{", userLabel)
+	} else {
+		p.line("{")
+	}
 	p.indent++
 	if n.Init != nil {
 		if err := p.printStmt(n.Init); err != nil {

@@ -50,6 +50,12 @@ type builder struct {
 	// type-parameter admissions (map keys) consult its closed-world
 	// instantiation evidence.
 	genericObj *types.Func
+	// typeSwitchLabels carries one synthesized-label slot per enclosing
+	// type switch under construction; a direct break fills the innermost.
+	typeSwitchLabels []*string
+	// rangeFuncDepth counts enclosing range-over-func bodies: labeled
+	// branches cannot cross the yield-closure boundary.
+	rangeFuncDepth int
 }
 
 func (b *builder) span(pos token.Pos) Span {
@@ -397,203 +403,52 @@ func (b *builder) buildStmt(stmt ast.Stmt) (Stmt, error) {
 		return &ExprStmt{Call: built}, nil
 
 	case *ast.BranchStmt:
-		if n.Label != nil || (n.Tok != token.BREAK && n.Tok != token.CONTINUE) {
+		if n.Tok != token.BREAK && n.Tok != token.CONTINUE {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "branch " + n.Tok.String(), Span: span}
 		}
-		if n.Tok == token.BREAK && b.typeSwitchDepth > 0 {
-			// break exits the type switch; the if/else lowering has no
-			// construct for it yet.
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "break inside a type switch clause", Span: span}
+		label := ""
+		if n.Label != nil {
+			if b.rangeFuncDepth > 0 {
+				// A labeled branch cannot cross the yield-closure boundary.
+				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "labeled branch inside a range-over-func body", Span: span}
+			}
+			label = n.Label.Name
+		}
+		if label == "" && n.Tok == token.BREAK && b.typeSwitchDepth > 0 {
+			// break exits the type switch: the if/else lowering routes it
+			// through the type switch's synthesized labeled block.
+			if len(b.typeSwitchLabels) == 0 {
+				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "break inside a type switch clause", Span: span}
+			}
+			slot := b.typeSwitchLabels[len(b.typeSwitchLabels)-1]
+			if *slot == "" {
+				*slot = fmt.Sprintf("ts%d$", len(b.typeSwitchLabels))
+			}
+			b.use("branch:break")
+			return &BranchStmt{Tok: token.BREAK, Label: *slot}, nil
 		}
 		b.use("branch:" + n.Tok.String())
-		return &BranchStmt{Tok: n.Tok}, nil
+		return &BranchStmt{Tok: n.Tok, Label: label}, nil
+
+	case *ast.LabeledStmt:
+		switch n.Stmt.(type) {
+		case *ast.ForStmt, *ast.RangeStmt, *ast.SwitchStmt, *ast.TypeSwitchStmt:
+		default:
+			// Labels exist for branch targets; a label on any other
+			// statement implies goto, which stays out.
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "label on a non-loop statement", Span: span}
+		}
+		inner, err := b.buildStmt(n.Stmt)
+		if err != nil {
+			return nil, err
+		}
+		if _, isRangeFunc := inner.(*RangeFunc); isRangeFunc {
+			// The sequence-call lowering is not a loop statement; its
+			// branches already fail closed inside the yield closure.
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "label on a range-over-func loop", Span: span}
+		}
+		b.use("label")
+		return &LabeledStmt{Label: n.Label.Name, Stmt: inner}, nil
 	}
 	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: fmt.Sprintf("%T", stmt), Span: span}
-}
-
-func (b *builder) buildDeclStmt(n *ast.DeclStmt) (Stmt, error) {
-	span := b.span(n.Pos())
-	decl, ok := n.Decl.(*ast.GenDecl)
-	if ok && decl.Tok == token.CONST {
-		// Local constants are compile-time values: every use folds to its
-		// exact constant at the use site, so the declaration emits nothing.
-		b.use("localConst")
-		return &Block{}, nil
-	}
-	if !ok || decl.Tok != token.VAR {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "non-var declaration statement", Span: span}
-	}
-	out := &DeclStmt{}
-	for _, spec := range decl.Specs {
-		value, ok := spec.(*ast.ValueSpec)
-		if !ok {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "non-value var spec", Span: span}
-		}
-		for i, name := range value.Names {
-			if name.Name == "_" {
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "blank variable declaration", Span: span}
-			}
-			object := b.info.Defs[name]
-			if object == nil {
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "var without typed definition", Span: span}
-			}
-			t, err := b.typeOf(object.Type(), span)
-			if err != nil {
-				return nil, err
-			}
-			out.Names = append(out.Names, name.Name)
-			out.Types = append(out.Types, t)
-			if i < len(value.Values) {
-				built, err := b.buildExprAs(value.Values[i], t)
-				if err != nil {
-					return nil, err
-				}
-				out.Values = append(out.Values, built)
-			} else {
-				zero, err := zeroValue(t, span)
-				if err != nil {
-					return nil, err
-				}
-				out.Values = append(out.Values, zero)
-			}
-		}
-		if len(value.Values) != 0 && len(value.Values) != len(value.Names) {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "multi-value var initializer", Span: span}
-		}
-	}
-	b.use("varDecl")
-	return out, nil
-}
-
-// buildIncDec lowers x++ / x-- through the shared single-evaluation
-// compound-target resolver.
-func (b *builder) buildIncDec(n *ast.IncDecStmt) (Stmt, error) {
-	span := b.span(n.Pos())
-	target, x, err := b.compoundTarget(n.X)
-	if err != nil {
-		return nil, err
-	}
-	if !x.Type().Kind.Integer() {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "inc/dec of " + x.Type().Go, Span: span}
-	}
-	op := token.ADD
-	if n.Tok == token.DEC {
-		op = token.SUB
-	}
-	one := &Const{T: x.Type(), Value: "1"}
-	b.use("incDec")
-	return &AssignStmt{
-		Targets: []Target{target},
-		Values:  []Expr{&Binary{Op: op, L: x, R: one, T: x.Type()}},
-	}, nil
-}
-
-func (b *builder) buildIf(n *ast.IfStmt) (Stmt, error) {
-	out := &IfStmt{}
-	if n.Init != nil {
-		init, err := b.buildStmt(n.Init)
-		if err != nil {
-			return nil, err
-		}
-		out.Init = init
-	}
-	cond, err := b.buildExpr(n.Cond)
-	if err != nil {
-		return nil, err
-	}
-	out.Cond = cond
-	then, err := b.buildBlock(n.Body)
-	if err != nil {
-		return nil, err
-	}
-	out.Then = then
-	if n.Else != nil {
-		built, err := b.buildStmt(n.Else)
-		if err != nil {
-			return nil, err
-		}
-		out.Else = built
-	}
-	b.use("if")
-	return out, nil
-}
-
-func (b *builder) buildFor(n *ast.ForStmt) (Stmt, error) {
-	out := &ForStmt{}
-	if n.Init != nil {
-		init, err := b.buildStmt(n.Init)
-		if err != nil {
-			return nil, err
-		}
-		if _, isSeq := init.(*StmtSeq); isSeq {
-			// A boxed (address-taken) loop-clause variable has no
-			// expressible cell declaration inside the clause yet.
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "address of a loop-clause variable", Span: b.span(n.Pos())}
-		}
-		out.Init = init
-	}
-	if n.Cond != nil {
-		cond, err := b.buildExpr(n.Cond)
-		if err != nil {
-			return nil, err
-		}
-		out.Cond = cond
-	}
-	if n.Post != nil {
-		post, err := b.buildStmt(n.Post)
-		if err != nil {
-			return nil, err
-		}
-		out.Post = post
-	}
-	body, err := b.buildBreakableBody(n.Body)
-	if err != nil {
-		return nil, err
-	}
-	out.Body = body
-	b.use("for")
-	return out, nil
-}
-
-func (b *builder) buildReturn(n *ast.ReturnStmt) (Stmt, error) {
-	if len(n.Results) == 0 {
-		out := &ReturnStmt{}
-		// A bare return in a function with named results returns their
-		// current values.
-		for _, result := range b.namedResults {
-			out.Values = append(out.Values, &VarRef{Name: result.Name, T: result.Type})
-		}
-		b.use("return")
-		return out, nil
-	}
-	// A single multi-result call forwarded as the complete result list.
-	if len(n.Results) == 1 {
-		if callAST, ok := ast.Unparen(n.Results[0]).(*ast.CallExpr); ok {
-			if _, isConversion := b.conversionTarget(callAST); !isConversion {
-				if _, isBuiltin := b.builtinCallee(callAST); !isBuiltin {
-					if tuple, ok := b.info.Types[callAST].Type.(*types.Tuple); ok && tuple.Len() > 1 {
-						call, err := b.buildAnyCall(callAST)
-						if err != nil {
-							return nil, err
-						}
-						b.use("return")
-						return &ReturnStmt{CallValue: call}, nil
-					}
-				}
-			}
-		}
-	}
-	out := &ReturnStmt{}
-	for i, result := range n.Results {
-		if i >= len(b.results) {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "return arity mismatch", Span: b.span(n.Pos())}
-		}
-		built, err := b.buildExprAs(result, b.results[i])
-		if err != nil {
-			return nil, err
-		}
-		out.Values = append(out.Values, built)
-	}
-	b.use("return")
-	return out, nil
 }

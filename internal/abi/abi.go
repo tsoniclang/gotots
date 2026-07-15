@@ -13,7 +13,7 @@ package abi
 import "fmt"
 
 // Version identifies the ABI contract carried in generated output.
-const Version = 8
+const Version = 9
 
 // Family is the static carrier family of an integer kind.
 type Family string
@@ -106,6 +106,7 @@ const goruntimeSource = `// Go language runtime carriers beyond integers: nil-ch
 // access, maps with exact nil/zero/comma-ok/write-panic behavior, and
 // byte-string semantics (one code unit per Go byte, canonical).
 import { GoPanic, goPanicNil, goPanicNilMapWrite } from "./gopanic.js";
+import { goExternalCall } from "./goextern.js";
 
 // A Go map: undefined is the nil map.
 export type GoMap<K, V> = Map<K, V> | undefined;
@@ -179,6 +180,20 @@ export function goMapClear<K, V>(m: GoMap<K, V>): void {
 // strings, canonical-range and bigint integers, and booleans.
 export function goPanicValue(value: string | number | bigint | boolean): never {
   throw new GoPanic(String(value));
+}
+
+// panic(err): the message is the error's dynamic Error() result — the
+// %v of an error value — dispatched here; a nil error panics like
+// panic(nil).
+export function goPanicError(err: { r: { m: Readonly<Record<string, Function>>; x?: string }; v: unknown } | undefined): never {
+  if (err === undefined) {
+    throw new GoPanic("panic called with nil argument");
+  }
+  const fn = err.r.m["Error"] as Function | undefined;
+  const message = fn === undefined && err.r.x !== undefined
+    ? goExternalCall(err.r.x + ".Error", [err.v])
+    : (fn as Function)(err.v);
+  throw new GoPanic(String(message));
 }
 
 // Invoking a function value: the arguments were already evaluated (JS

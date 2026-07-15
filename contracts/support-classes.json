@@ -332,6 +332,11 @@
       "specClause": "docs/spec/08-externals-manual-extensions.md"
     },
     {
+      "key": "externVar",
+      "state": "generated",
+      "specClause": "docs/spec/08-externals-manual-extensions.md"
+    },
+    {
       "key": "externZero",
       "state": "generated",
       "specClause": "docs/spec/08-externals-manual-extensions.md"
@@ -400,6 +405,11 @@
       "key": "isNil",
       "state": "generated",
       "specClause": "docs/spec/04-types-values-pointers.md"
+    },
+    {
+      "key": "label",
+      "state": "generated",
+      "specClause": "docs/spec/03-declarations-bodies-control.md"
     },
     {
       "key": "len:array",
@@ -517,6 +527,11 @@
       "specClause": "docs/spec/03-declarations-bodies-control.md"
     },
     {
+      "key": "panic:error",
+      "state": "generated",
+      "specClause": "docs/spec/03-declarations-bodies-control.md"
+    },
+    {
       "key": "pointeeStore",
       "state": "generated",
       "specClause": "docs/spec/04-types-values-pointers.md"
@@ -592,6 +607,11 @@
       "specClause": "docs/spec/04-types-values-pointers.md"
     },
     {
+      "key": "structEqual",
+      "state": "generated",
+      "specClause": "docs/spec/04-types-values-pointers.md"
+    },
+    {
       "key": "structLitStaged",
       "state": "generated",
       "specClause": "docs/spec/04-types-values-pointers.md"
@@ -613,6 +633,11 @@
     },
     {
       "key": "typeAssert",
+      "state": "generated",
+      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+    },
+    {
+      "key": "typeAssert:iface",
       "state": "generated",
       "specClause": "docs/spec/06-interfaces-generics-functions.md"
     },

@@ -74,6 +74,38 @@ export function goIfaceAssert(i: GoIface, r: GoRtti, sourceDisplay: string): unk
   return i.v;
 }
 
+// x.(I), interface-target panic form: the dynamic type must carry
+// every method of the target interface. External dynamic types cannot
+// prove their method sets statically, so they fail closed.
+export function goIfaceAssertIface(i: GoIface, methods: string[], sourceDisplay: string, targetDisplay: string): GoIfaceBox {
+  if (i === undefined) {
+    throw new GoPanic("interface conversion: " + sourceDisplay + " is nil, not " + targetDisplay);
+  }
+  const missing = ifaceMissingMethod(i.r, methods);
+  if (missing !== undefined) {
+    throw new GoPanic("interface conversion: " + i.r.d + " is not " + targetDisplay + ": missing method " + missing);
+  }
+  return i;
+}
+
+// x.(I), comma-ok form: undefined (the nil interface) fills the miss.
+export function goIfaceLookupIface(i: GoIface, methods: string[]): [GoIface, boolean] {
+  if (i === undefined || ifaceMissingMethod(i.r, methods) !== undefined) {
+    return [undefined, false];
+  }
+  return [i, true];
+}
+
+function ifaceMissingMethod(rtti: GoRtti, methods: string[]): string | undefined {
+  if (rtti.x !== undefined) {
+    throw new GoPanic("GOTOTS_EXTERNAL_UNIMPLEMENTED: method set of " + rtti.x);
+  }
+  for (const method of methods) {
+    if (rtti.m[method] === undefined) return method;
+  }
+  return undefined;
+}
+
 // x.(T), comma-ok form: the zero value fills the miss.
 export function goIfaceLookup<T>(i: GoIface, r: GoRtti, zero: T): readonly [T, boolean] {
   if (i === undefined || i.r !== r) {

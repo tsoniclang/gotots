@@ -89,6 +89,9 @@ type MapClearStmt struct {
 // as the GoPanic carrier.
 type PanicStmt struct {
 	Value Expr
+	// IsError formats the value through its dynamic Error method (the
+	// %v of an error), dispatched when the panic executes.
+	IsError bool
 }
 
 // TupleSpread forwards a multi-result call's values as the complete
@@ -121,9 +124,17 @@ type RangeInt struct {
 	Body  *Block
 }
 
-// BranchStmt is an unlabeled break or continue.
+// BranchStmt is a break or continue, optionally labeled: Go's labeled
+// loop/switch branches coincide exactly with JS labeled statements.
 type BranchStmt struct {
-	Tok token.Token // token.BREAK or token.CONTINUE
+	Tok   token.Token // token.BREAK or token.CONTINUE
+	Label string      // "" when unlabeled
+}
+
+// LabeledStmt labels a loop or switch as a branch target.
+type LabeledStmt struct {
+	Label string
+	Stmt  Stmt
 }
 
 // SwitchStmt is a Go expression switch. The tag is evaluated once (bool
@@ -153,6 +164,9 @@ type TypeSwitchStmt struct {
 	Bind    string
 	X       Expr
 	Clauses []TypeSwitchClause
+	// BreakLabel, when set, names the labeled block a direct break
+	// inside a clause exits (the if/else lowering has no native break).
+	BreakLabel string
 }
 
 // TypeSwitchClause is one clause of a type switch. Targets is nil for
@@ -188,6 +202,7 @@ func (*ForStmt) stmt()        {}
 func (*ReturnStmt) stmt()     {}
 func (*ExprStmt) stmt()       {}
 func (*BranchStmt) stmt()     {}
+func (*LabeledStmt) stmt()    {}
 func (*DeferPush) stmt()      {}
 func (*StmtSeq) stmt()        {}
 func (*TupleSpread) expr()    {}

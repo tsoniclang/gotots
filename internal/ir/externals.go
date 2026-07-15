@@ -40,6 +40,17 @@ func (m *ExternalMethodCall) Type() Type {
 	return Type{Kind: KindInvalid, Go: "()"}
 }
 
+// ExternVar reads an external package variable through its contract by
+// canonical identity; the emulation must return an identity-stable
+// value (sentinel comparisons rely on it).
+type ExternVar struct {
+	ID string
+	T  Type
+}
+
+func (*ExternVar) expr()        {}
+func (e *ExternVar) Type() Type { return e.T }
+
 // buildExternalMethodCall admits a method call on a receiver declared
 // outside the unit when the whole signature resolves in the reviewed
 // type set.

@@ -41,6 +41,10 @@ type ProbeResult struct {
 	PackagesBodyOnly []string `json:"packagesBodyOnly"`
 	// PerPackage maps package path -> translated/total.
 	PerPackage map[string]string `json:"perPackage"`
+	// PackageBlockers lists, for packages close to full body coverage
+	// (at most three blocked bodies), each blocked body's sites — the
+	// highest-leverage targets for package-level completion.
+	PackageBlockers map[string][]string `json:"packageBlockers"`
 	// ExternalRefs counts blocked references per external function or
 	// method (pkg.Name) — the evidence ranking emulation-layer priorities.
 	ExternalRefs map[string]int `json:"externalRefs"`
@@ -58,6 +62,7 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 		BlockerHistogram:   map[string]int{},
 		ConstructHistogram: map[string]int{},
 		PerPackage:         map[string]string{},
+		PackageBlockers:    map[string][]string{},
 		ExternalRefs:       map[string]int{},
 	}
 	sort.Slice(loaded, func(i, j int) bool { return loaded[i].ID < loaded[j].ID })
@@ -88,6 +93,7 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 		}
 		result.Packages++
 		packageBodies, packageTranslated := 0, 0
+		var packageSites []string
 
 		for _, file := range p.Syntax {
 			filename := p.Fset.Position(file.Pos()).Filename
@@ -115,6 +121,8 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 					for _, site := range function.Sites {
 						result.BlockerHistogram[site.Class]++
 						result.ConstructHistogram[site.Construct]++
+						packageSites = append(packageSites,
+							fmt.Sprintf("%s: %s (%s:%d)", function.ID, site.Construct, site.Span.File, site.Span.Line))
 						if ref, isExternal := externalRefOfSite(site); isExternal {
 							result.ExternalRefs[ref]++
 						}
@@ -129,6 +137,9 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 			result.PerPackage[p.PkgPath] = fmt.Sprintf("%d/%d", packageTranslated, packageBodies)
 			if packageTranslated == packageBodies {
 				result.PackagesFullyTranslated = append(result.PackagesFullyTranslated, p.PkgPath)
+			}
+			if blocked := packageBodies - packageTranslated; blocked > 0 && blocked <= 3 {
+				result.PackageBlockers[p.PkgPath] = packageSites
 			}
 		}
 	}

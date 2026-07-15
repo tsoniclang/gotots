@@ -24,7 +24,7 @@ func (p *printer) printRangeSlice(n *ir.RangeSlice) error {
 	// binds a per-iteration copy, so assigning to it inside the body
 	// never affects iteration — exactly Go.
 	induction := p.temp()
-	p.line("for (let %s: goabi$.GoInt = 0n; %s < %s; %s = %s + 1n) {", induction, induction, lengthTemp, induction, induction)
+	p.line("%sfor (let %s: goabi$.GoInt = 0n; %s < %s; %s = %s + 1n) {", p.takeLoopLabel(), induction, induction, lengthTemp, induction, induction)
 	p.indent++
 	if n.Index != "" {
 		p.line("let %s: goabi$.GoInt = %s;", tsName(n.Index), induction)
@@ -68,7 +68,7 @@ func (p *printer) printRangeString(n *ir.RangeString) error {
 		return err
 	}
 	entry := p.temp()
-	p.line("for (const %s of gort$.goStringRange(%s)) {", entry, operand)
+	p.line("%sfor (const %s of gort$.goStringRange(%s)) {", p.takeLoopLabel(), entry, operand)
 	p.indent++
 	if n.Index != "" {
 		p.line("let %s: goabi$.GoInt = %s[0];", tsName(n.Index), entry)
@@ -97,9 +97,9 @@ func (p *printer) printRangeMap(n *ir.RangeMap) error {
 	p.line("const %s = %s;", mapTemp, operand)
 	entry := p.temp()
 	if keyed {
-		p.line("for (const %s of (%s === undefined ? [] : %s.values())) {", entry, mapTemp, mapTemp)
+		p.line("%sfor (const %s of (%s === undefined ? [] : %s.values())) {", p.takeLoopLabel(), entry, mapTemp, mapTemp)
 	} else {
-		p.line("for (const %s of (%s === undefined ? [] : %s)) {", entry, mapTemp, mapTemp)
+		p.line("%sfor (const %s of (%s === undefined ? [] : %s)) {", p.takeLoopLabel(), entry, mapTemp, mapTemp)
 	}
 	p.indent++
 	if n.Key != "" {
@@ -157,9 +157,9 @@ func (p *printer) printRangeInt(n *ir.RangeInt) error {
 	// helpers, since the index stays strictly below the operand.
 	induction := p.temp()
 	if n.N.Type().Kind.Wide64() {
-		p.line("for (let %s: %s = 0n; %s < %s; %s = %s + 1n) {", induction, spelled, induction, limit, induction, induction)
+		p.line("%sfor (let %s: %s = 0n; %s < %s; %s = %s + 1n) {", p.takeLoopLabel(), induction, spelled, induction, limit, induction, induction)
 	} else {
-		p.line("for (let %s: %s = 0; %s < %s; %s = %s + 1) {", induction, spelled, induction, limit, induction, induction)
+		p.line("%sfor (let %s: %s = 0; %s < %s; %s = %s + 1) {", p.takeLoopLabel(), induction, spelled, induction, limit, induction, induction)
 	}
 	p.indent++
 	if n.Index != "" {
