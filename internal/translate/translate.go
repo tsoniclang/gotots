@@ -391,6 +391,8 @@ func conservativeCarrier(t ir.Type) string {
 		return "object-identity-nilable(undefined)"
 	case t.Kind == ir.KindStruct:
 		return "class-instance-value(copy-on-bind,in-place-store)"
+	case t.Kind == ir.KindFunc:
+		return "js-closure-nilable(undefined)-capture-by-reference"
 	case t.Kind == ir.KindMap:
 		return "js-map-nilable(undefined)-has-based-lookup"
 	case t.Kind == ir.KindSlice:

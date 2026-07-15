@@ -147,6 +147,32 @@ func AddrOfValue() int {
 	p.Total = 6
 	return c.Total
 }
+
+func (c *Counter) isNilReceiver() bool {
+	return c == nil
+}
+
+func (c *Counter) totalOrDefault() int {
+	if c == nil {
+		return -1
+	}
+	return c.Total
+}
+
+// NilReceiverRuns proves Go's exact semantics: a pointer-receiver
+// method runs with a nil receiver, and only the body's own
+// dereferences panic.
+func NilReceiverRuns() (bool, bool, int, int) {
+	var absent *Counter
+	present := &Counter{Total: 7}
+	return absent.isNilReceiver(), present.isNilReceiver(),
+		absent.totalOrDefault(), present.totalOrDefault()
+}
+
+func NilReceiverDerefPanics() int {
+	var absent *Counter
+	return absent.Bump(1)
+}
 `)
 }
 

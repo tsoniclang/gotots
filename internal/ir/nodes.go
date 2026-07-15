@@ -201,12 +201,19 @@ type Call struct {
 	Results []Type
 }
 
-// MethodCall invokes a method through a nil-checked pointer receiver.
+// MethodCall invokes a statically resolved method, generated as a
+// package-level function over its receiver. A nil pointer receiver flows
+// into a pointer-receiver method exactly as in Go (the body's own
+// dereferences carry the panics); a value receiver dereferences a
+// pointer caller at the call and clones inside the method.
 type MethodCall struct {
-	Recv    Expr
-	Method  string
-	Args    []Expr
-	Results []Type
+	Pkg         string // Go package path declaring the method
+	TypeName    string // receiver's named type
+	PointerRecv bool   // the declared receiver is a pointer
+	Recv        Expr
+	Method      string
+	Args        []Expr
+	Results     []Type
 }
 
 // FieldLoad reads a struct field through a nil-checked pointer.
@@ -214,6 +221,31 @@ type FieldLoad struct {
 	X     Expr
 	Field string
 	T     Type
+}
+
+// Closure is a function literal: a JS arrow function capturing enclosing
+// variables by reference, exactly as Go captures them.
+type Closure struct {
+	Params  []Var
+	Results []Var
+	Body    *Block
+	T       Type // the KindFunc type
+}
+
+// FuncRef references a package-level function of the translated unit as
+// a first-class value.
+type FuncRef struct {
+	Pkg  string
+	Name string
+	T    Type // the KindFunc type
+}
+
+// DynCall invokes a function value (a nil value panics at the call, as
+// in Go).
+type DynCall struct {
+	Fun     Expr
+	Args    []Expr
+	Results []Type
 }
 
 // StructNew allocates a struct on the heap (&T{...}) with every field
@@ -351,6 +383,9 @@ func (*StructCopy) expr()   {}
 func (*StructZero) expr()   {}
 func (*AddrOf) expr()       {}
 func (*Deref) expr()        {}
+func (*Closure) expr()      {}
+func (*FuncRef) expr()      {}
+func (*DynCall) expr()      {}
 func (*NilConst) expr()     {}
 func (*IsNil) expr()        {}
 func (*MapMake) expr()      {}
@@ -390,6 +425,16 @@ func (c *Call) Type() Type {
 func (m *MethodCall) Type() Type {
 	if len(m.Results) == 1 {
 		return m.Results[0]
+	}
+	return Type{}
+}
+
+func (c *Closure) Type() Type { return c.T }
+func (f *FuncRef) Type() Type { return f.T }
+
+func (d *DynCall) Type() Type {
+	if len(d.Results) == 1 {
+		return d.Results[0]
 	}
 	return Type{}
 }

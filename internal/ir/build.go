@@ -128,19 +128,8 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 		return nil, err
 	}
 	// Named results are zero-initialized locals declared before the body.
-	if len(b.namedResults) > 0 {
-		declStmt := &DeclStmt{}
-		for _, result := range b.namedResults {
-			zero, err := zeroValue(result.Type, span)
-			if err != nil {
-				return nil, err
-			}
-			declStmt.Names = append(declStmt.Names, result.Name)
-			declStmt.Types = append(declStmt.Types, result.Type)
-			declStmt.Values = append(declStmt.Values, zero)
-		}
-		b.use("namedResults")
-		body.Stmts = append([]Stmt{declStmt}, body.Stmts...)
+	if err := b.prependNamedResultZeros(body, span); err != nil {
+		return nil, err
 	}
 	function.Body = body
 	for operation := range b.operations {
@@ -226,6 +215,14 @@ func (b *builder) buildDeferredCall(deferStmt *ast.DeferStmt) ([]Stmt, Expr, err
 		return captures, call, nil
 	case *MethodCall:
 		call.Recv = capture(prefix+"_r", call.Recv)
+		for i, arg := range call.Args {
+			call.Args[i] = capture(fmt.Sprintf("%s_a%d", prefix, i), arg)
+		}
+		return captures, call, nil
+	case *DynCall:
+		// The function value is captured at the defer site; a nil value
+		// panics when invoked, not when deferred — exactly Go.
+		call.Fun = capture(prefix+"_f", call.Fun)
 		for i, arg := range call.Args {
 			call.Args[i] = capture(fmt.Sprintf("%s_a%d", prefix, i), arg)
 		}

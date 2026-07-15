@@ -1,60 +1,77 @@
 package ir
 
 import (
-	"fmt"
 	"go/ast"
 	"go/types"
 )
 
-// buildAnyCall lowers a direct function call or a pointer-receiver method
-// call within the translated unit.
+// buildAnyCall lowers a call: a statically resolved package-level
+// function, a statically resolved method, or a dynamic call of any
+// function-typed value (a nil value panics at the call, as in Go).
 func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
 	span := b.span(n.Pos())
 
-	// The callee is a plain identifier, a method selection, or a
-	// package-qualified identifier (pkg.Fn — qualified identifiers have no
-	// selection evidence; their object comes from Uses on the selector).
-	var object types.Object
-	switch fun := ast.Unparen(n.Fun).(type) {
-	case *ast.SelectorExpr:
-		if selection, hasSelection := b.info.Selections[fun]; hasSelection {
-			if selection.Kind() == types.MethodVal {
-				return b.buildMethodCall(n, fun, selection)
-			}
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "call of selected value", Span: span}
+	if selector, ok := ast.Unparen(n.Fun).(*ast.SelectorExpr); ok {
+		if selection, hasSelection := b.info.Selections[selector]; hasSelection && selection.Kind() == types.MethodVal {
+			return b.buildMethodCall(n, selector, selection)
 		}
-		base, isIdent := ast.Unparen(fun.X).(*ast.Ident)
-		if !isIdent {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: fmt.Sprintf("call of %T", n.Fun), Span: span}
-		}
-		if _, isPkg := b.info.Uses[base].(*types.PkgName); !isPkg {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: fmt.Sprintf("call of %T", n.Fun), Span: span}
-		}
-		object = b.info.Uses[fun.Sel]
-	case *ast.Ident:
-		object = b.info.Uses[fun]
-	default:
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: fmt.Sprintf("call of %T", n.Fun), Span: span}
 	}
 
-	function, ok := object.(*types.Func)
-	if !ok {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: fmt.Sprintf("call of %T", object), Span: span}
-	}
-	if function.Pkg() == nil || !b.unit[function.Pkg().Path()] {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "call outside the translated unit", Span: span}
-	}
-	signature := function.Type().(*types.Signature)
-	if signature.Recv() != nil || signature.TypeParams() != nil {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic call", Span: span}
+	if function := b.staticCallee(n.Fun); function != nil {
+		if function.Pkg() == nil || !b.unit[function.Pkg().Path()] {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "call outside the translated unit", Span: span}
+		}
+		signature := function.Type().(*types.Signature)
+		if signature.Recv() != nil || signature.TypeParams() != nil {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic call", Span: span}
+		}
+		call := &Call{Pkg: function.Pkg().Path(), Callee: function.Name()}
+		if err := b.buildCallArgsResults(n, signature, &call.Args, &call.Results); err != nil {
+			return nil, err
+		}
+		b.use("call")
+		return call, nil
 	}
 
-	call := &Call{Pkg: function.Pkg().Path(), Callee: function.Name()}
-	if err := b.buildCallArgsResults(n, signature, &call.Args, &call.Results); err != nil {
+	// Dynamic: any callee expression of function type.
+	fun, err := b.buildExpr(n.Fun)
+	if err != nil {
 		return nil, err
 	}
-	b.use("call")
-	return call, nil
+	if fun.Type().Kind != KindFunc {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "call of " + fun.Type().Go, Span: span}
+	}
+	signature, ok := b.info.Types[ast.Unparen(n.Fun)].Type.Underlying().(*types.Signature)
+	if !ok {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "call without signature evidence", Span: span}
+	}
+	out := &DynCall{Fun: fun}
+	if err := b.buildCallArgsResults(n, signature, &out.Args, &out.Results); err != nil {
+		return nil, err
+	}
+	b.use("dynCall")
+	return out, nil
+}
+
+// staticCallee resolves a plain or package-qualified identifier naming a
+// package-level function, by object identity — never spelling.
+func (b *builder) staticCallee(fun ast.Expr) *types.Func {
+	switch f := ast.Unparen(fun).(type) {
+	case *ast.Ident:
+		function, _ := b.info.Uses[f].(*types.Func)
+		return function
+	case *ast.SelectorExpr:
+		if _, hasSelection := b.info.Selections[f]; hasSelection {
+			return nil
+		}
+		if base, isIdent := ast.Unparen(f.X).(*ast.Ident); isIdent {
+			if _, isPkg := b.info.Uses[base].(*types.PkgName); isPkg {
+				function, _ := b.info.Uses[f.Sel].(*types.Func)
+				return function
+			}
+		}
+	}
+	return nil
 }
 
 func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, selection *types.Selection) (Expr, error) {
@@ -74,13 +91,29 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 	if signature.TypeParams() != nil {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic method call", Span: span}
 	}
-	// Receiver flavors are exact through the generated class: a value
-	// receiver clones on method entry (the caller's instance is never
-	// mutated), and a pointer receiver binds the instance itself — the
-	// type checker has already required an addressable receiver, whose
-	// stores this lowering keeps in place.
+	// Receiver flavors are exact through the generated method function:
+	// a value receiver clones inside (the caller's instance is never
+	// mutated) after any pointer caller dereferences at the call; a
+	// pointer receiver takes the possibly-nil pointer itself — Go runs
+	// pointer-receiver methods on nil receivers, and only the body's own
+	// dereferences panic.
+	recvNamed, ok := types.Unalias(signature.Recv().Type()).(*types.Named)
+	pointerRecv := false
+	if pointerType, isPointer := signature.Recv().Type().(*types.Pointer); isPointer {
+		pointerRecv = true
+		recvNamed, ok = types.Unalias(pointerType.Elem()).(*types.Named)
+	}
+	if !ok {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method on unnamed receiver type", Span: span}
+	}
 
-	out := &MethodCall{Recv: recv, Method: method.Name()}
+	out := &MethodCall{
+		Pkg:         method.Pkg().Path(),
+		TypeName:    recvNamed.Obj().Name(),
+		PointerRecv: pointerRecv,
+		Recv:        recv,
+		Method:      method.Name(),
+	}
 	if err := b.buildCallArgsResults(n, signature, &out.Args, &out.Results); err != nil {
 		return nil, err
 	}

@@ -92,8 +92,14 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 		}
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "composite literal of " + t.Go, Span: span}
 
+	case *ast.FuncLit:
+		return b.buildClosure(n)
+
 	case *ast.Ident:
 		object := b.info.Uses[n]
+		if function, isFunc := object.(*types.Func); isFunc {
+			return b.buildFuncRef(function, span)
+		}
 		variable, ok := object.(*types.Var)
 		if !ok {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: fmt.Sprintf("identifier %q (%T)", n.Name, object), Span: span}
@@ -107,7 +113,19 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 
 	case *ast.SelectorExpr:
 		selection, ok := b.info.Selections[n]
-		if !ok || selection.Kind() != types.FieldVal {
+		if !ok {
+			// A package-qualified identifier (no selection evidence).
+			if base, isIdent := ast.Unparen(n.X).(*ast.Ident); isIdent {
+				if _, isPkg := b.info.Uses[base].(*types.PkgName); isPkg {
+					if function, isFunc := b.info.Uses[n.Sel].(*types.Func); isFunc {
+						return b.buildFuncRef(function, span)
+					}
+					return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "package-level variable reference", Span: span}
+				}
+			}
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "non-field selector", Span: span}
+		}
+		if selection.Kind() != types.FieldVal {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "non-field selector", Span: span}
 		}
 		base, err := b.buildExpr(n.X)
@@ -231,7 +249,7 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 // when a struct value is bound.
 func (b *builder) buildExprAs(e ast.Expr, expected Type) (Expr, error) {
 	if tv, ok := b.info.Types[e]; ok && tv.IsNil() {
-		if expected.Kind == KindPointer || expected.Kind == KindMap || expected.Kind == KindSlice {
+		if expected.Kind.Nilable() {
 			b.use("nil")
 			return &NilConst{T: expected}, nil
 		}
@@ -424,7 +442,7 @@ func zeroValue(t Type, span Span) (Expr, error) {
 		return &Const{T: t, Value: "false"}, nil
 	case t.Kind == KindString:
 		return &Const{T: t, Value: `""`}, nil
-	case t.Kind == KindPointer, t.Kind == KindMap, t.Kind == KindSlice:
+	case t.Kind.Nilable():
 		return &NilConst{T: t}, nil
 	case t.Kind == KindStruct:
 		return &StructZero{T: t}, nil

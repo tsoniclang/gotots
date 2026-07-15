@@ -56,6 +56,14 @@ func Package(module *Module, structs []*ir.Struct, functions []*ir.Func) (string
 		if err := printStruct(&body, module, structDecl); err != nil {
 			return "", err
 		}
+		sortedMethods := append([]*ir.Func{}, structDecl.Methods...)
+		sort.Slice(sortedMethods, func(i, j int) bool { return sortedMethods[i].Name < sortedMethods[j].Name })
+		for _, method := range sortedMethods {
+			body.WriteString("\n")
+			if err := printMethodFunction(&body, module, structDecl.Name, method); err != nil {
+				return "", err
+			}
+		}
 	}
 	for _, function := range sorted {
 		body.WriteString("\n")
@@ -95,13 +103,6 @@ func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct) er
 	p.line("}")
 	if err := printStructValueContract(p, structDecl); err != nil {
 		return fmt.Errorf("%s: %w", structDecl.ID, err)
-	}
-	sortedMethods := append([]*ir.Func{}, structDecl.Methods...)
-	sort.Slice(sortedMethods, func(i, j int) bool { return sortedMethods[i].Name < sortedMethods[j].Name })
-	for _, method := range sortedMethods {
-		if err := printMethod(p, method); err != nil {
-			return err
-		}
 	}
 	p.indent--
 	p.line("}")
@@ -157,21 +158,44 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 	return nil
 }
 
-// printMethod emits one method. A pointer receiver binds the instance; a
-// value receiver binds a clone on entry, so receiver mutations never
-// reach the caller.
-func printMethod(p *printer, method *ir.Func) error {
-	p.temps = 0
-	signature, err := p.functionSignature(method)
+// printMethodFunction emits one statically resolved method as a
+// package-level function named Type$Method ("$" spells outside Go's
+// identifier alphabet, so the name can never collide). A pointer
+// receiver is the first parameter, nilable — Go runs pointer-receiver
+// methods on nil receivers and only the body's dereferences panic. A
+// value receiver clones on entry, so the caller's instance never
+// mutates.
+func printMethodFunction(out *strings.Builder, module *Module, className string, method *ir.Func) error {
+	p := &printer{out: out, module: module}
+	recvSpelled, err := p.tsType(method.Receiver.Type)
 	if err != nil {
 		return fmt.Errorf("%s: %w", method.ID, err)
 	}
-	p.line("%s%s {", method.Name, signature)
+	valueReceiver := method.Receiver.Type.Kind == ir.KindStruct
+	recvParam := method.Receiver.Name
+	if valueReceiver {
+		recvParam = "$recv"
+	}
+	params := []string{recvParam + ": " + recvSpelled}
+	for _, parameter := range method.Params {
+		spelled, err := p.tsType(parameter.Type)
+		if err != nil {
+			return fmt.Errorf("%s: %w", method.ID, err)
+		}
+		params = append(params, parameter.Name+": "+spelled)
+	}
+	result, err := p.tsResultType(method.Results)
+	if err != nil {
+		return fmt.Errorf("%s: %w", method.ID, err)
+	}
+	export := ""
+	if method.Exported {
+		export = "export "
+	}
+	p.line("%sfunction %s$%s(%s): %s {", export, className, method.Name, strings.Join(params, ", "), result)
 	p.indent++
-	if method.Receiver.Type.Kind == ir.KindStruct {
-		p.line("const %s = this.goClone$();", method.Receiver.Name)
-	} else {
-		p.line("const %s = this;", method.Receiver.Name)
+	if valueReceiver {
+		p.line("const %s = $recv.goClone$();", method.Receiver.Name)
 	}
 	if err := p.printBlockBody(method.Body); err != nil {
 		return fmt.Errorf("%s: %w", method.ID, err)
@@ -277,6 +301,24 @@ func (p *printer) tsType(t ir.Type) (string, error) {
 		return name + " | undefined", nil
 	case ir.KindStruct:
 		return p.module.symbol(t.Pkg, t.Named)
+	case ir.KindFunc:
+		var params []string
+		for i, parameter := range t.Sig.Params {
+			spelled, err := p.tsType(parameter)
+			if err != nil {
+				return "", err
+			}
+			params = append(params, fmt.Sprintf("p%d: %s", i, spelled))
+		}
+		resultVars := make([]ir.Var, len(t.Sig.Results))
+		for i, result := range t.Sig.Results {
+			resultVars[i] = ir.Var{Type: result}
+		}
+		result, err := p.tsResultType(resultVars)
+		if err != nil {
+			return "", err
+		}
+		return "((" + strings.Join(params, ", ") + ") => " + result + ") | undefined", nil
 	case ir.KindSlice:
 		element, err := p.tsType(*t.Elem)
 		if err != nil {

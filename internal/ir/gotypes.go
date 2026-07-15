@@ -59,6 +59,27 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 		}
 		return Type{Kind: KindMap, Go: spelled, Key: &key, Elem: &value}, nil
 
+	case *types.Signature:
+		if u.Variadic() || u.TypeParams() != nil || u.Recv() != nil {
+			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "variadic or generic function type " + spelled, Span: span}
+		}
+		sig := &FuncSig{}
+		for i := range u.Params().Len() {
+			parameter, err := b.typeOf(u.Params().At(i).Type(), span)
+			if err != nil {
+				return Type{}, err
+			}
+			sig.Params = append(sig.Params, parameter)
+		}
+		for i := range u.Results().Len() {
+			result, err := b.typeOf(u.Results().At(i).Type(), span)
+			if err != nil {
+				return Type{}, err
+			}
+			sig.Results = append(sig.Results, result)
+		}
+		return Type{Kind: KindFunc, Go: spelled, Sig: sig}, nil
+
 	case *types.Struct:
 		named, ok := types.Unalias(t).(*types.Named)
 		if !ok || named.Obj().Pkg() == nil || !b.unit[named.Obj().Pkg().Path()] {

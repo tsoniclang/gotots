@@ -3,6 +3,7 @@ package emit
 import (
 	"fmt"
 	"go/token"
+	"strings"
 
 	"github.com/tsoniclang/gotots/internal/abi"
 	"github.com/tsoniclang/gotots/internal/ir"
@@ -57,12 +58,20 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		// A struct-value receiver can never be nil; a pointer receiver
-		// dereferences with Go's exact nil panic.
-		if n.Recv.Type().Kind == ir.KindStruct {
-			return fmt.Sprintf("%s.%s(%s)", recv, n.Method, args), nil
+		callee, err := p.module.symbol(n.Pkg, n.TypeName+"$"+n.Method)
+		if err != nil {
+			return "", err
 		}
-		return fmt.Sprintf("gort.goNilCheck(%s).%s(%s)", recv, n.Method, args), nil
+		// A value receiver dereferences a pointer caller at the call (Go
+		// copies the pointee); a pointer receiver takes the pointer as
+		// is — nil receivers run, as in Go.
+		if !n.PointerRecv && n.Recv.Type().Kind == ir.KindPointer {
+			recv = "gort.goNilCheck(" + recv + ")"
+		}
+		if args == "" {
+			return fmt.Sprintf("%s(%s)", callee, recv), nil
+		}
+		return fmt.Sprintf("%s(%s, %s)", callee, recv, args), nil
 	case *ir.FieldLoad:
 		base, err := p.printExpr(n.X)
 		if err != nil {
@@ -82,6 +91,20 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			return "", err
 		}
 		return fmt.Sprintf("new %s(%s)", class, args), nil
+	case *ir.Closure:
+		return p.printClosure(n)
+	case *ir.FuncRef:
+		return p.module.symbol(n.Pkg, n.Name)
+	case *ir.DynCall:
+		fun, err := p.printExpr(n.Fun)
+		if err != nil {
+			return "", err
+		}
+		args, err := p.printArgs(n.Args)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("gort.goNilCheck(%s)(%s)", fun, args), nil
 	case *ir.StructCopy:
 		x, err := p.printExpr(n.X)
 		if err != nil {
@@ -229,6 +252,31 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 	return "", fmt.Errorf("no emission for IR expression %T", e)
 }
 
+// printClosure emits a function literal as an arrow function: JS arrows
+// capture enclosing variables by reference with per-iteration loop
+// bindings, exactly matching Go's capture semantics.
+func (p *printer) printClosure(n *ir.Closure) (string, error) {
+	var params []string
+	for _, parameter := range n.Params {
+		spelled, err := p.tsType(parameter.Type)
+		if err != nil {
+			return "", err
+		}
+		params = append(params, parameter.Name+": "+spelled)
+	}
+	result, err := p.tsResultType(n.Results)
+	if err != nil {
+		return "", err
+	}
+	var sub strings.Builder
+	subPrinter := &printer{out: &sub, module: p.module, indent: p.indent + 1}
+	if err := subPrinter.printBlockBody(n.Body); err != nil {
+		return "", err
+	}
+	closing := strings.Repeat("  ", p.indent)
+	return "((" + strings.Join(params, ", ") + "): " + result + " => {\n" + sub.String() + closing + "})", nil
+}
+
 func (p *printer) printArgs(args []ir.Expr) (string, error) {
 	parts := make([]string, len(args))
 	for i, arg := range args {
@@ -267,7 +315,7 @@ func (p *printer) zeroLiteral(t ir.Type) (string, error) {
 		return "false", nil
 	case t.Kind == ir.KindString:
 		return `""`, nil
-	case t.Kind == ir.KindPointer, t.Kind == ir.KindMap, t.Kind == ir.KindSlice:
+	case t.Kind.Nilable():
 		return "undefined", nil
 	case t.Kind == ir.KindStruct:
 		class, err := p.module.symbol(t.Pkg, t.Named)

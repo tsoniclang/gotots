@@ -43,6 +43,10 @@ const (
 	// KindSlice is a Go slice; its representation is selected per value
 	// flow by the planner (native array or GoSliceView).
 	KindSlice
+	// KindFunc is a first-class function value, carried as a JS closure
+	// with undefined for nil. Go and JS both capture variables by
+	// reference, so closure semantics coincide.
+	KindFunc
 )
 
 // Type is the resolved semantic type of an IR value with its canonical Go
@@ -61,6 +65,14 @@ type Type struct {
 	Elem *Type
 	// Key is the key type of a KindMap.
 	Key *Type
+	// Sig is the signature of a KindFunc.
+	Sig *FuncSig
+}
+
+// FuncSig is the shape of a function value's type.
+type FuncSig struct {
+	Params  []Type
+	Results []Type
 }
 
 // Scope is the set of Go package paths translated together as one unit.
@@ -100,6 +112,12 @@ func (k Kind) Wide64() bool {
 
 // Float reports whether the kind is a floating-point type.
 func (k Kind) Float() bool { return k == KindFloat32 || k == KindFloat64 }
+
+// Nilable reports whether the kind's zero value is Go nil (carried as
+// undefined).
+func (k Kind) Nilable() bool {
+	return k == KindPointer || k == KindMap || k == KindSlice || k == KindFunc
+}
 
 // Bits returns the integer width in bits.
 func (k Kind) Bits() int {
