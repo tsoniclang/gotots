@@ -31,6 +31,10 @@ type Generator struct {
 type Manifest struct {
 	SchemaVersion int       `json:"schemaVersion"`
 	Generator     Generator `json:"generator"`
+	// ProfileHash and PinRevision make a bundle self-identifying without
+	// opening census.json.
+	ProfileHash string `json:"profileHash,omitempty"`
+	PinRevision string `json:"pinRevision,omitempty"`
 	// Authoritative is true only when generator provenance is clean and the
 	// census recorded no blockers (unknown directives, contradictions).
 	Authoritative bool              `json:"authoritative"`
@@ -109,8 +113,10 @@ func WriteReports(result *Result, outDir string) error {
 	defer os.RemoveAll(staging) // no-op after successful rename
 
 	manifest := Manifest{
-		SchemaVersion: 1,
+		SchemaVersion: 2,
 		Generator:     generatorProvenance(),
+		ProfileHash:   result.Report.Profile.Hash,
+		PinRevision:   result.Report.Pin.Revision,
 		Blockers:      result.Report.Blockers,
 	}
 	manifest.Authoritative = len(manifest.Generator.ProvenanceIssues) == 0 && len(manifest.Blockers) == 0

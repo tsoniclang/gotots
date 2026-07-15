@@ -22,7 +22,7 @@ type fileStats struct {
 	aliasShapes     []AliasShape
 	testFunctions   []TestFunctionRecord
 	externalUses    map[string]*ExternalObligation
-	externalObjects map[types.Object]bool
+	externalObjects map[types.Object]string // object -> field-owner qualifier ("" otherwise)
 	constructs      map[string]int
 	builtins        map[string]int
 	rangeOperands   map[string]int
@@ -56,7 +56,7 @@ var rareConstructs = map[string]bool{
 func inspectFile(p *packages.Package, file *ast.File, relativePath, scopeName, owner string, source []byte, isExternal func(string) bool) (*fileStats, error) {
 	stats := &fileStats{
 		externalUses:    map[string]*ExternalObligation{},
-		externalObjects: map[types.Object]bool{},
+		externalObjects: map[types.Object]string{},
 		constructs:      map[string]int{},
 		builtins:        map[string]int{},
 		rangeOperands:   map[string]int{},
@@ -188,6 +188,12 @@ func inspectFile(p *packages.Package, file *ast.File, relativePath, scopeName, o
 			if _, ok := info.Instances[n]; ok {
 				record("genericInstantiation", n.Pos())
 			}
+			// Compiler-recognized unsafe operations are pinned at the
+			// identifier use, so dot-imported bare Sizeof/Pointer uses are
+			// captured identically to qualified unsafe.Sizeof selectors.
+			if obj := info.Uses[n]; obj != nil && obj.Pkg() == types.Unsafe {
+				record("unsafe", n.Pos())
+			}
 			if err := recordExternalUse(info, n, isExternal, stats); err != nil {
 				return fail(fmt.Errorf("%s:%d: %w", relativePath, lineOf(n.Pos()), err))
 			}
@@ -213,18 +219,34 @@ func inspectFile(p *packages.Package, file *ast.File, relativePath, scopeName, o
 				return fail(fmt.Errorf("%s: %w", relativePath, err))
 			}
 		case *ast.SelectorExpr:
-			if selection, ok := info.Selections[n]; ok && !calleeSelectors[n] {
-				switch selection.Kind() {
-				case types.FieldVal:
-					stats.constructs["fieldAccess"]++
-				case types.MethodVal:
-					record("methodValue", n.Pos())
-				case types.MethodExpr:
-					record("methodExpr", n.Pos())
+			if selection, ok := info.Selections[n]; ok {
+				if !calleeSelectors[n] {
+					switch selection.Kind() {
+					case types.FieldVal:
+						stats.constructs["fieldAccess"]++
+					case types.MethodVal:
+						record("methodValue", n.Pos())
+					case types.MethodExpr:
+						record("methodExpr", n.Pos())
+					}
+				}
+				if selection.Kind() == types.FieldVal {
+					recordExternalField(info, selection.Recv(), n.Sel, isExternal, stats)
 				}
 			}
-			if obj := info.Uses[n.Sel]; obj != nil && obj.Pkg() == types.Unsafe {
-				record("unsafe", n.Pos())
+		case *ast.CompositeLit:
+			// Field identifiers in keyed composite literals are field uses
+			// whose owner is the literal's type.
+			if tv, ok := info.Types[n]; ok {
+				for _, element := range n.Elts {
+					keyValue, ok := element.(*ast.KeyValueExpr)
+					if !ok {
+						continue
+					}
+					if key, ok := keyValue.Key.(*ast.Ident); ok {
+						recordExternalField(info, tv.Type, key, isExternal, stats)
+					}
+				}
 			}
 		}
 		return true
@@ -263,10 +285,11 @@ func recordExternalUse(info *types.Info, ident *ast.Ident, isExternal func(strin
 		}
 	case *types.Var:
 		if concrete.IsField() {
-			kind = "field"
-		} else {
-			kind = "var"
+			// Fields are recorded through their selection or composite-
+			// literal context, which carries the owning type.
+			return nil
 		}
+		kind = "var"
 	case *types.Const:
 		kind = "const"
 	case *types.TypeName:
@@ -276,15 +299,51 @@ func recordExternalUse(info *types.Info, ident *ast.Ident, isExternal func(strin
 	default:
 		return fmt.Errorf("unreviewed external object class %T for %s.%s", object, object.Pkg().Path(), object.Name())
 	}
+	recordObligation(stats, object, name, kind, "")
+	return nil
+}
+
+// recordObligation counts one external object use in this file's stats.
+func recordObligation(stats *fileStats, object types.Object, name, kind, ownerQualifier string) {
 	key := object.Pkg().Path() + "\x00" + name + "\x00" + kind
 	obligation := stats.externalUses[key]
 	if obligation == nil {
 		obligation = &ExternalObligation{Package: object.Pkg().Path(), Name: name, Kind: kind}
 		stats.externalUses[key] = obligation
 	}
-	obligation.Uses++
-	stats.externalObjects[object] = true
-	return nil
+	obligation.ProductionUses++ // scope split happens at merge time
+	if existing, ok := stats.externalObjects[object]; !ok || existing == "" {
+		stats.externalObjects[object] = ownerQualifier
+	}
+}
+
+// recordExternalField records a field obligation qualified by the receiver
+// type it was selected through.
+func recordExternalField(info *types.Info, receiver types.Type, fieldIdent *ast.Ident, isExternal func(string) bool, stats *fileStats) {
+	field, ok := info.Uses[fieldIdent].(*types.Var)
+	if !ok || !field.IsField() || field.Pkg() == nil || !isExternal(field.Pkg().Path()) {
+		return
+	}
+	owner := receiverTypeName(receiver)
+	name := field.Name()
+	if owner != "" {
+		name = owner + "." + name
+	}
+	recordObligation(stats, field, name, "field", owner)
+}
+
+// receiverTypeName names the named type a selection went through.
+func receiverTypeName(receiver types.Type) string {
+	if receiver == nil {
+		return ""
+	}
+	if pointer, ok := receiver.(*types.Pointer); ok {
+		receiver = pointer.Elem()
+	}
+	if named, ok := types.Unalias(receiver).(*types.Named); ok {
+		return named.Obj().Name()
+	}
+	return ""
 }
 
 // methodQualifiedName returns "Receiver.Method" for methods, so methods of
@@ -340,8 +399,11 @@ var knownDirectives = map[string]bool{
 
 // collectDirectives records every compiler directive occurrence. The
 // toolchain contract for directive comments is a line comment whose text
-// begins exactly "//go:" with no space; //line and /*line*/ position
-// directives and cgo //export markers are also recognized.
+// begins exactly "//go:" with no space; cgo //export markers and line
+// position directives are also recognized. Per the compiler's documented
+// rule, a //line directive is recognized only when the comment starts at
+// column 1 and its content ends in a valid ":line" suffix — anything else
+// is an ordinary comment, not a directive.
 func collectDirectives(file *ast.File, relativePath string, lineOf, colOf func(token.Pos) int, stats *fileStats) {
 	for _, group := range file.Comments {
 		for _, comment := range group.List {
@@ -352,8 +414,18 @@ func collectDirectives(file *ast.File, relativePath string, lineOf, colOf func(t
 				name = "go:" + directive
 			} else if strings.HasPrefix(text, "//export ") {
 				name = "export"
-			} else if strings.HasPrefix(text, "//line ") || strings.HasPrefix(text, "/*line ") {
-				name = "line"
+			} else if rest, ok := strings.CutPrefix(text, "//line "); ok {
+				if colOf(comment.Pos()) == 1 && isLineDirectiveContent(rest) {
+					name = "line"
+				} else {
+					continue
+				}
+			} else if rest, ok := strings.CutPrefix(text, "/*line "); ok {
+				if isLineDirectiveContent(strings.TrimSuffix(rest, "*/")) {
+					name = "line"
+				} else {
+					continue
+				}
 			} else {
 				continue
 			}
@@ -366,4 +438,35 @@ func collectDirectives(file *ast.File, relativePath string, lineOf, colOf func(t
 			})
 		}
 	}
+}
+
+// isLineDirectiveContent checks the documented "file:line", "file:line:col",
+// ":line", or "file:line" forms: the content must end in one or two colon-
+// separated positive integers.
+func isLineDirectiveContent(content string) bool {
+	content = strings.TrimRight(content, " \t")
+	trailingInts := 0
+	for trailingInts < 2 {
+		idx := strings.LastIndexByte(content, ':')
+		if idx < 0 {
+			break
+		}
+		number := content[idx+1:]
+		if number == "" {
+			break
+		}
+		allDigits := true
+		for _, c := range number {
+			if c < '0' || c > '9' {
+				allDigits = false
+				break
+			}
+		}
+		if !allDigits {
+			break
+		}
+		trailingInts++
+		content = content[:idx]
+	}
+	return trailingInts >= 1
 }

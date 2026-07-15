@@ -180,16 +180,22 @@ type Universe struct {
 	// NonBuildFiles counts tracked files that are not build inputs of any
 	// package and carry no Go source: documentation, fixtures, CI
 	// configuration. They are enumerated by extension as evidence.
-	NonBuildFiles       int               `json:"nonBuildFiles"`
-	NonBuildByExtension map[string]int    `json:"nonBuildByExtension,omitempty"`
-	Submodules          []SubmoduleRecord `json:"submodules,omitempty"`
+	NonBuildFiles       int            `json:"nonBuildFiles"`
+	NonBuildByExtension map[string]int `json:"nonBuildByExtension,omitempty"`
+	// ClassDigests prove exact per-class membership without enumerating
+	// tens of thousands of paths: sha256 over the sorted member paths of
+	// each universe class. Any membership change changes the digest, and
+	// the attested git tree supplies the per-file identity.
+	ClassDigests map[string]string `json:"classDigests"`
+	Submodules   []SubmoduleRecord `json:"submodules,omitempty"`
 }
 
 // Inventory is the complete pass-1 result.
 type Inventory struct {
-	Universe Universe          `json:"universe"`
-	Module   []ModulePackage   `json:"module"`
-	External []ExternalPackage `json:"external"`
+	SchemaVersion int               `json:"schemaVersion"`
+	Universe      Universe          `json:"universe"`
+	Module        []ModulePackage   `json:"module"`
+	External      []ExternalPackage `json:"external"`
 }
 
 // ExternalIndex returns import path -> evidence for pass-2 classification.

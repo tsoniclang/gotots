@@ -59,9 +59,12 @@ type FileRecord struct {
 	Scope   string `json:"scope"` // production|test
 	Lines   int    `json:"lines"`
 	Sha256  string `json:"sha256"`
-	// Generated marks files carrying the toolchain's canonical
-	// "Code generated ... DO NOT EDIT." marker.
-	Generated bool `json:"generated,omitempty"`
+	// Generated marks files following the toolchain's documented
+	// generated-code convention (marker before the first non-comment,
+	// non-blank text); GeneratedBy is the exact marker line, which names
+	// the generator.
+	Generated   bool   `json:"generated,omitempty"`
+	GeneratedBy string `json:"generatedBy,omitempty"`
 }
 
 // DirectiveRecord is one compiler directive occurrence. Unknown directives
@@ -161,11 +164,23 @@ type PartitionCounts struct {
 	ExternalProductClosure int `json:"externalProductClosure"`
 }
 
+// ProfileAttestation records the exact corpus boundary that produced a
+// census: the profile file's content hash plus the resolved scope roots,
+// so two bundles from different boundaries are always distinguishable.
+type ProfileAttestation struct {
+	Hash              string              `json:"hash"`
+	OwnedRoots        []string            `json:"ownedRoots"`
+	TestOnlyRoots     []string            `json:"testOnlyRoots,omitempty"`
+	HardExcludedRoots map[string][]string `json:"hardExcludedRoots,omitempty"`
+	ToolingRoots      []string            `json:"toolingRoots,omitempty"`
+}
+
 // Report is the deterministic census output. It contains no machine paths;
 // machine evidence lives in the environment report.
 type Report struct {
 	SchemaVersion int                     `json:"schemaVersion"`
 	Product       string                  `json:"product"`
+	Profile       ProfileAttestation      `json:"profile"`
 	BuildProfile  profile.BuildProfile    `json:"buildProfile"`
 	Pin           pinning.Pin             `json:"pin"`
 	Source        *pinning.VerifiedSource `json:"source"`

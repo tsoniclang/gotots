@@ -89,11 +89,16 @@ type DeclarationShapes struct {
 
 // ExternalObligation is one external object referenced by owned source: a
 // deterministic declaration/stub obligation for the emulation layer.
+// Production and test uses stay distinct so product stub obligations are
+// never inflated by test-only demand. Field obligations are qualified by
+// the receiver type they were selected through (Owner.Field), so
+// same-named fields of different types keep distinct identities.
 type ExternalObligation struct {
-	Package string `json:"package"`
-	Name    string `json:"name"`
-	Kind    string `json:"kind"` // func|var|const|type|field
-	Uses    int    `json:"uses"`
+	Package        string `json:"package"`
+	Name           string `json:"name"`
+	Kind           string `json:"kind"` // func|method|var|const|type|field
+	ProductionUses int    `json:"productionUses"`
+	TestUses       int    `json:"testUses"`
 }
 
 // TestFunctionRecord is one test-discovery function in owned test scope,

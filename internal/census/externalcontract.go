@@ -12,22 +12,36 @@ import (
 // stub generation and the emulation layer. It is built from go/types
 // export evidence only — external bodies are never read.
 
+// contractRef records how owned source references one external object.
+type contractRef struct {
+	Production bool
+	Test       bool
+	Owner      string // receiver-type qualifier for field objects
+}
+
 // ExternalObjectShape is one external object's exact contract.
 type ExternalObjectShape struct {
 	Name string `json:"name"`
-	Kind string `json:"kind"` // func|var|const|type|field
-	// Signature for funcs; declared type for vars/consts/fields.
-	Signature string `json:"signature,omitempty"`
-	Type      string `json:"type,omitempty"`
-	Value     string `json:"value,omitempty"` // consts: exact value
+	Kind string `json:"kind"` // func|method|var|const|type|field
+	// Signature is the canonical rendering; Params/Results/Receiver give
+	// the same contract structurally for independent verification.
+	Signature string  `json:"signature,omitempty"`
+	Receiver  string  `json:"receiver,omitempty"`
+	Params    []Param `json:"params,omitempty"`
+	Results   []Param `json:"results,omitempty"`
+	Variadic  bool    `json:"variadic,omitempty"`
+	Type      string  `json:"type,omitempty"`
+	Value     string  `json:"value,omitempty"` // consts: exact value
 	// For kind=type: the underlying shape and the complete exported
 	// method set (assignability at the boundary depends on it).
 	Underlying string        `json:"underlying,omitempty"`
 	TypeParams []string      `json:"typeParams,omitempty"`
 	Methods    []MethodShape `json:"methods,omitempty"`
-	// Referenced is true when owned source names this object directly;
-	// closure entries exist only because a referenced contract needs them.
-	Referenced bool `json:"referenced"`
+	// Scope attribution: which owned scopes reference this object
+	// directly; closure entries exist only because a referenced contract
+	// needs them.
+	ReferencedFromProduction bool `json:"referencedFromProduction"`
+	ReferencedFromTest       bool `json:"referencedFromTest"`
 }
 
 // ExternalPackageContract is the complete demanded surface of one package.
@@ -42,10 +56,12 @@ type ExternalContract struct {
 	Packages      []ExternalPackageContract `json:"packages"`
 }
 
+const externalContractSchemaVersion = 2
+
 // buildExternalContract renders the exact contract for every directly
 // referenced external object plus the transitive closure of external
 // named types their contracts mention.
-func buildExternalContract(referenced map[types.Object]bool, isExternal func(string) bool) (*ExternalContract, error) {
+func buildExternalContract(referenced map[types.Object]*contractRef, isExternal func(string) bool) (*ExternalContract, error) {
 	closure := newTypeClosure(isExternal)
 	for object := range referenced {
 		closure.addObject(object)
@@ -65,31 +81,32 @@ func buildExternalContract(referenced map[types.Object]bool, isExternal func(str
 			byPackage[pkg] = map[string]ExternalObjectShape{}
 		}
 		if existing, ok := byPackage[pkg][identity]; ok {
-			existing.Referenced = existing.Referenced || shape.Referenced
+			existing.ReferencedFromProduction = existing.ReferencedFromProduction || shape.ReferencedFromProduction
+			existing.ReferencedFromTest = existing.ReferencedFromTest || shape.ReferencedFromTest
 			byPackage[pkg][identity] = existing
 			return
 		}
 		byPackage[pkg][identity] = shape
 	}
-	for object := range referenced {
-		shape, err := objectShape(object, true)
+	for object, reference := range referenced {
+		shape, err := objectShape(object, reference)
 		if err != nil {
 			return nil, err
 		}
 		emit(object.Pkg().Path(), shape)
 	}
 	for _, typeName := range closure.closureTypes() {
-		if referenced[typeName] {
+		if referenced[typeName] != nil {
 			continue
 		}
-		shape, err := objectShape(typeName, false)
+		shape, err := objectShape(typeName, &contractRef{})
 		if err != nil {
 			return nil, err
 		}
 		emit(typeName.Pkg().Path(), shape)
 	}
 
-	contract := &ExternalContract{SchemaVersion: 1}
+	contract := &ExternalContract{SchemaVersion: externalContractSchemaVersion}
 	paths := make([]string, 0, len(byPackage))
 	for path := range byPackage {
 		paths = append(paths, path)
@@ -111,10 +128,10 @@ func buildExternalContract(referenced map[types.Object]bool, isExternal func(str
 }
 
 // shapeIdentity is the total ordering and merge key for one object shape:
-// every contract-bearing field participates, so distinct contracts never
-// collide and identical ones merge.
+// every contract-bearing field except scope attribution participates, so
+// distinct contracts never collide and identical ones merge.
 func shapeIdentity(shape ExternalObjectShape) string {
-	parts := []string{shape.Name, shape.Kind, shape.Signature, shape.Type, shape.Value, shape.Underlying}
+	parts := []string{shape.Name, shape.Kind, shape.Signature, shape.Receiver, shape.Type, shape.Value, shape.Underlying}
 	for _, param := range shape.TypeParams {
 		parts = append(parts, param)
 	}
@@ -124,8 +141,12 @@ func shapeIdentity(shape ExternalObjectShape) string {
 	return strings.Join(parts, "\x00")
 }
 
-func objectShape(object types.Object, referenced bool) (ExternalObjectShape, error) {
-	shape := ExternalObjectShape{Name: object.Name(), Referenced: referenced}
+func objectShape(object types.Object, reference *contractRef) (ExternalObjectShape, error) {
+	shape := ExternalObjectShape{
+		Name:                     object.Name(),
+		ReferencedFromProduction: reference.Production,
+		ReferencedFromTest:       reference.Test,
+	}
 	switch concrete := object.(type) {
 	case *types.Func:
 		shape.Kind = "func"
@@ -133,10 +154,20 @@ func objectShape(object types.Object, referenced bool) (ExternalObjectShape, err
 			shape.Kind = "method"
 			shape.Name = qualified
 		}
-		shape.Signature = typeString(concrete.Type())
+		signature := concrete.Type().(*types.Signature)
+		shape.Signature = typeString(signature)
+		if recv := signature.Recv(); recv != nil {
+			shape.Receiver = typeString(recv.Type())
+		}
+		shape.Params = tupleParams(signature.Params())
+		shape.Results = tupleParams(signature.Results())
+		shape.Variadic = signature.Variadic()
 	case *types.Var:
 		if concrete.IsField() {
 			shape.Kind = "field"
+			if reference.Owner != "" {
+				shape.Name = reference.Owner + "." + concrete.Name()
+			}
 		} else {
 			shape.Kind = "var"
 		}

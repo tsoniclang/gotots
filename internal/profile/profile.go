@@ -4,6 +4,8 @@ package profile
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -49,6 +51,9 @@ type Profile struct {
 
 	// Pin is resolved from PinPath at load time.
 	Pin *pinning.Pin `json:"-"`
+	// Hash is the sha256 of the profile file's exact bytes, computed at
+	// load time; it attests the corpus boundary in every published report.
+	Hash string `json:"-"`
 }
 
 // Load reads a profile and its referenced pin. PinPath is resolved relative
@@ -60,6 +65,8 @@ func Load(profilePath string) (*Profile, error) {
 		return nil, fmt.Errorf("read profile: %w", err)
 	}
 	var p Profile
+	digest := sha256.Sum256(data)
+	p.Hash = hex.EncodeToString(digest[:])
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&p); err != nil {

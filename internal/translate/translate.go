@@ -26,6 +26,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/abi"
 	"github.com/tsoniclang/gotots/internal/emit"
+	"github.com/tsoniclang/gotots/internal/goid"
 	"github.com/tsoniclang/gotots/internal/ir"
 )
 
@@ -163,7 +164,7 @@ func Package(p *packages.Package, sourceDir string, options Options) (*Generated
 func translateFunc(p *packages.Package, sourceDir, relativeFile string, source []byte, decl *ast.FuncDecl, options Options) (*ir.Func, *Proof, error) {
 	span := spanOf(p, sourceDir, decl.Pos())
 	name := decl.Name.Name
-	id := p.PkgPath + "::" + relativeFile + "::func::" + name
+	id := goid.Func(p.PkgPath, name)
 	if decl.Recv != nil {
 		return nil, nil, &ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "method declaration", Span: span}
 	}

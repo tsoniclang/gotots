@@ -7,8 +7,11 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"strings"
 
 	"golang.org/x/tools/go/packages"
+
+	"github.com/tsoniclang/gotots/internal/goid"
 )
 
 // qualifier renders package identity as the canonical import path.
@@ -41,18 +44,21 @@ func collectDeclarations(p *packages.Package, file *ast.File, relativePath, scop
 		if owner != pkgPath {
 			declaration.Owner = owner
 		}
-		qualified := name
-		if receiver != "" {
-			qualified = receiver + "." + name
+		// Canonical identity derives from package and object identity, so
+		// file moves inside a package never change it. Only Go's legally
+		// repeatable declarations (package-level func init, blank
+		// identifiers) carry file/position qualification — by the declared
+		// identifier's own position, so `var _, _ = f()` stays unique.
+		switch {
+		case goid.IsRepeatable(kind, name):
+			declaration.ID = goid.Repeatable(pkgPath, kind, name, relativePath, lineOf(namePos), colOf(namePos))
+		case kind == "method":
+			declaration.ID = goid.Method(pkgPath, receiver, name)
+		case kind == "func":
+			declaration.ID = goid.Func(pkgPath, name)
+		default:
+			declaration.ID = goid.Value(pkgPath, kind, name)
 		}
-		// Blank identifiers and init functions are the only declarations Go
-		// permits to repeat; only they need position qualification (by the
-		// declared identifier's own position, so `var _, _ = f()` stays
-		// unique), and all other IDs stay position-independent.
-		if name == "_" || ((kind == "func" || kind == "method") && name == "init") {
-			qualified = fmt.Sprintf("%s@%d:%d", qualified, lineOf(namePos), colOf(namePos))
-		}
-		declaration.ID = pkgPath + "::" + relativePath + "::" + kind + "::" + qualified
 		if body != nil {
 			declaration.HasBody = true
 			declaration.Statements = countStatements(body)
@@ -84,7 +90,10 @@ func collectDeclarations(p *packages.Package, file *ast.File, relativePath, scop
 			if err := shapeFunction(info, d, id, stats); err != nil {
 				return err
 			}
-			if scopeName == "test" && d.Recv == nil {
+			// The go test discovery contract applies only to functions
+			// declared in _test.go files (the toolchain's documented
+			// test-file rule), never to test-support production files.
+			if scopeName == "test" && d.Recv == nil && strings.HasSuffix(relativePath, "_test.go") {
 				recordTestFunction(info, d, id, relativePath, lineOf(d.Pos()), stats)
 			}
 		case *ast.GenDecl:

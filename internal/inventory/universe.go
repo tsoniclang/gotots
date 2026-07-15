@@ -1,6 +1,8 @@
 package inventory
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"path"
 	"sort"
@@ -27,6 +29,7 @@ func reconcileUniverse(prof *profile.Profile, tree *pinning.Tree, modulePackages
 	tracked := tree.Files()
 	universe.TrackedFiles = len(tracked)
 	universe.NonBuildByExtension = map[string]int{}
+	classMembers := map[string][]string{}
 
 	underAny := func(filePath string, roots []string) bool {
 		for _, root := range roots {
@@ -41,6 +44,7 @@ func reconcileUniverse(prof *profile.Profile, tree *pinning.Tree, modulePackages
 	for _, filePath := range tracked {
 		if inPackage[filePath] {
 			universe.InPackages++
+			classMembers["in-package"] = append(classMembers["in-package"], filePath)
 			continue
 		}
 		base := path.Base(filePath)
@@ -50,6 +54,7 @@ func reconcileUniverse(prof *profile.Profile, tree *pinning.Tree, modulePackages
 		switch {
 		case base == "go.mod" || base == "go.sum" || base == "go.work" || base == "go.work.sum":
 			universe.ModuleMetadata = append(universe.ModuleMetadata, filePath)
+			classMembers["module-metadata"] = append(classMembers["module-metadata"], filePath)
 			continue
 		case underAny(filePath, prof.ToolingRoots):
 			class = "tooling"
@@ -71,9 +76,11 @@ func reconcileUniverse(prof *profile.Profile, tree *pinning.Tree, modulePackages
 					extension = "(none)"
 				}
 				universe.NonBuildByExtension[extension]++
+				classMembers["non-build"] = append(classMembers["non-build"], filePath)
 			}
 			continue
 		}
+		classMembers[class] = append(classMembers[class], filePath)
 		if isGo {
 			universe.GoOutsidePackages = append(universe.GoOutsidePackages, TrackedFile{Path: filePath, Class: class})
 		} else {
@@ -84,6 +91,17 @@ func reconcileUniverse(prof *profile.Profile, tree *pinning.Tree, modulePackages
 	if len(unclassifiedGo) > 0 {
 		return fmt.Errorf("universe reconciliation fails closed: %d tracked .go files have no disposition:\n%s",
 			len(unclassifiedGo), strings.Join(unclassifiedGo, "\n"))
+	}
+
+	universe.ClassDigests = map[string]string{}
+	for class, members := range classMembers {
+		sort.Strings(members)
+		hash := sha256.New()
+		for _, member := range members {
+			hash.Write([]byte(member))
+			hash.Write([]byte{0})
+		}
+		universe.ClassDigests[class] = hex.EncodeToString(hash.Sum(nil))
 	}
 
 	for submodulePath, revision := range tree.Submodules {

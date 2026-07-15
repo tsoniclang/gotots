@@ -55,13 +55,20 @@ func Run(prof *profile.Profile, sourceDir string, buildProfileName string) (*Res
 	}
 
 	report := &Report{
-		SchemaVersion: 3,
+		SchemaVersion: 4,
 		Product:       prof.Product,
-		BuildProfile:  *build,
-		Pin:           *prof.Pin,
-		Source:        verified,
-		Production:    newScopeReport(),
-		Test:          newScopeReport(),
+		Profile: ProfileAttestation{
+			Hash:              prof.Hash,
+			OwnedRoots:        prof.OwnedRoots,
+			TestOnlyRoots:     prof.TestOnlyRoots,
+			HardExcludedRoots: prof.HardExcludedRoots,
+			ToolingRoots:      prof.ToolingRoots,
+		},
+		BuildProfile: *build,
+		Pin:          *prof.Pin,
+		Source:       verified,
+		Production:   newScopeReport(),
+		Test:         newScopeReport(),
 	}
 	fillPartition(inv, report)
 

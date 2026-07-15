@@ -39,6 +39,8 @@ func testFunctionKind(name string, signature *types.Signature) string {
 	}
 
 	switch {
+	case name == "TestMain" && paramType == "*testing.M":
+		return "testmain"
 	case matchesDiscoveryName(name, "Test") && paramType == "*testing.T":
 		return "test"
 	case matchesDiscoveryName(name, "Benchmark") && paramType == "*testing.B":

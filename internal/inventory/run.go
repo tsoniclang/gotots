@@ -27,7 +27,7 @@ func Run(prof *profile.Profile, resolved *goenv.Resolved, env []string, sourceDi
 		return nil, fmt.Errorf("inventory pass: %w", err)
 	}
 
-	inventory := &Inventory{}
+	inventory := &Inventory{SchemaVersion: 1}
 	modulePackages := map[string]*ModulePackage{}
 	externals := map[string]*ExternalPackage{}
 

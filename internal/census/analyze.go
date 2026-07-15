@@ -21,8 +21,28 @@ import (
 )
 
 // generatedFileMarker is the toolchain's documented convention for
-// source-generated files (go.dev/s/generatedcode).
-var generatedFileMarker = regexp.MustCompile(`(?m)^// Code generated .* DO NOT EDIT\.$`)
+// source-generated files (go.dev/s/generatedcode). The convention requires
+// the marker line to appear before the first non-comment, non-blank text.
+var generatedFileMarker = regexp.MustCompile(`^// Code generated .* DO NOT EDIT\.$`)
+
+// generatedBy returns the marker line when the file follows the
+// generated-code convention, or "" otherwise.
+func generatedBy(data []byte) string {
+	for line := range strings.Lines(string(data)) {
+		trimmed := strings.TrimRight(line, "\r\n")
+		if generatedFileMarker.MatchString(trimmed) {
+			return trimmed
+		}
+		blank := strings.TrimSpace(trimmed) == ""
+		comment := strings.HasPrefix(trimmed, "//")
+		if !blank && !comment {
+			// Block comments before the marker are unusual; the documented
+			// convention is satisfied by line comments and blank lines only.
+			return ""
+		}
+	}
+	return ""
+}
 
 // analyze walks every loaded owned/test-only variant: it verifies each file
 // against the pinned tree, produces the identity-bearing records and typed
@@ -33,7 +53,7 @@ func analyze(prof *profile.Profile, inv *inventory.Inventory, tree *pinning.Tree
 	externalIndex := inv.ExternalIndex()
 	externalUse := map[string]*ExternalUse{}
 	obligations := map[string]*ExternalObligation{}
-	externalObjects := map[types.Object]bool{}
+	externalObjects := map[types.Object]*contractRef{}
 	var edges []Edge
 	isExternal := func(pkgPath string) bool {
 		class, _ := prof.Classify(pkgPath)
@@ -107,13 +127,15 @@ func analyze(prof *profile.Profile, inv *inventory.Inventory, tree *pinning.Tree
 
 			lines := countLines(data)
 			digest := sha256.Sum256(data)
+			marker := generatedBy(data)
 			fileRecord := FileRecord{
-				Path:      relative,
-				Package:   p.PkgPath,
-				Scope:     scopeName,
-				Lines:     lines,
-				Sha256:    hex.EncodeToString(digest[:]),
-				Generated: generatedFileMarker.Match(data),
+				Path:        relative,
+				Package:     p.PkgPath,
+				Scope:       scopeName,
+				Lines:       lines,
+				Sha256:      hex.EncodeToString(digest[:]),
+				Generated:   marker != "",
+				GeneratedBy: marker,
 			}
 			if owner != p.PkgPath {
 				fileRecord.Owner = owner
@@ -135,16 +157,33 @@ func analyze(prof *profile.Profile, inv *inventory.Inventory, tree *pinning.Tree
 			shapes.Constants = append(shapes.Constants, stats.constShapes...)
 			shapes.Variables = append(shapes.Variables, stats.varShapes...)
 			shapes.Aliases = append(shapes.Aliases, stats.aliasShapes...)
-			for object := range stats.externalObjects {
-				externalObjects[object] = true
+			for object, owner := range stats.externalObjects {
+				reference := externalObjects[object]
+				if reference == nil {
+					reference = &contractRef{}
+					externalObjects[object] = reference
+				}
+				if isTestScope {
+					reference.Test = true
+				} else {
+					reference.Production = true
+				}
+				if reference.Owner == "" {
+					reference.Owner = owner
+				}
 			}
 			for key, use := range stats.externalUses {
 				existing := obligations[key]
 				if existing == nil {
-					copied := *use
-					obligations[key] = &copied
+					existing = &ExternalObligation{Package: use.Package, Name: use.Name, Kind: use.Kind}
+					obligations[key] = existing
+				}
+				// Per-file stats count into ProductionUses; the file's scope
+				// decides the real bucket here.
+				if isTestScope {
+					existing.TestUses += use.ProductionUses
 				} else {
-					existing.Uses += use.Uses
+					existing.ProductionUses += use.ProductionUses
 				}
 			}
 			mergeAggregates(scope, stats)
