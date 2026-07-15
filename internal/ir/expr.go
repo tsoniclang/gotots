@@ -269,6 +269,9 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			if err != nil {
 				return nil, err
 			}
+			if converted, isString := b.buildStringConversion(x, to); isString {
+				return converted, nil
+			}
 			if err := b.checkConversion(x.Type(), to, span); err != nil {
 				return nil, err
 			}

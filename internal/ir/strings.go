@@ -124,3 +124,46 @@ func (b *builder) buildStringSlice(operand Expr, n *ast.SliceExpr) (Expr, error)
 	b.use("reslice:string")
 	return out, nil
 }
+
+// StringConvert is a conversion in the string family, exact over the
+// byte carrier: rune/integer to string (UTF-8 encoding, U+FFFD for
+// invalid code points), []byte/string round trips (fresh copies), and
+// []rune/string round trips (decode with U+FFFD per invalid byte).
+type StringConvert struct {
+	Op string // fromRune | fromBytes | toBytes | fromRunes | toRunes
+	X  Expr
+	T  Type
+}
+
+func (*StringConvert) expr()        {}
+func (s *StringConvert) Type() Type { return s.T }
+
+// buildStringConversion intercepts conversions into and out of the
+// string family; ok reports whether the conversion was one.
+func (b *builder) buildStringConversion(x Expr, to Type) (Expr, bool) {
+	from := x.Type()
+	elemKind := func(t Type) Kind {
+		if t.Kind != KindSlice || t.Elem == nil {
+			return KindInvalid
+		}
+		return t.Elem.Kind
+	}
+	switch {
+	case from.Kind.Integer() && to.Kind == KindString:
+		b.use("convert:runeToString")
+		return &StringConvert{Op: "fromRune", X: x, T: to}, true
+	case elemKind(from) == KindUint8 && to.Kind == KindString:
+		b.use("convert:bytesToString")
+		return &StringConvert{Op: "fromBytes", X: x, T: to}, true
+	case from.Kind == KindString && elemKind(to) == KindUint8:
+		b.use("convert:stringToBytes")
+		return &StringConvert{Op: "toBytes", X: x, T: to}, true
+	case elemKind(from) == KindInt32 && to.Kind == KindString:
+		b.use("convert:runesToString")
+		return &StringConvert{Op: "fromRunes", X: x, T: to}, true
+	case from.Kind == KindString && elemKind(to) == KindInt32:
+		b.use("convert:stringToRunes")
+		return &StringConvert{Op: "toRunes", X: x, T: to}, true
+	}
+	return nil, false
+}

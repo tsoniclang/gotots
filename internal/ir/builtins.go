@@ -128,8 +128,55 @@ func (b *builder) buildBuiltin(call *ast.CallExpr, builtin *types.Builtin, resul
 		}
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "make of " + t.Go, Span: span}
 	}
+	switch builtin.Name() {
+	case "min", "max":
+		t, err := b.typeOf(resultType, span)
+		if err != nil {
+			return nil, err
+		}
+		if !t.Kind.Integer() && !t.Kind.Float() && t.Kind != KindString {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "builtin " + builtin.Name() + " over " + t.Go, Span: span}
+		}
+		if t.Kind == KindFloat32 {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "float32 arithmetic", Span: span}
+		}
+		out := &MinMax{Max: builtin.Name() == "max", T: t}
+		for _, arg := range call.Args {
+			built, err := b.buildExprAs(arg, t)
+			if err != nil {
+				return nil, err
+			}
+			out.Args = append(out.Args, built)
+		}
+		b.use(builtin.Name())
+		return out, nil
+	case "new":
+		t, err := b.typeOf(resultType, span)
+		if err != nil {
+			return nil, err
+		}
+		if t.Kind != KindPointer || t.Elem == nil || t.Elem.Kind != KindStruct {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "new of " + t.Go, Span: span}
+		}
+		// new(T) for a named struct: the fresh zero instance is the
+		// pointer (object identity is the address).
+		b.use("new:struct")
+		return &AddrOf{X: &StructZero{T: *t.Elem}, T: t}, nil
+	}
 	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "builtin " + builtin.Name(), Span: span}
 }
+
+// MinMax is the min/max builtin over ordered carriers: arguments
+// evaluate left to right; float NaN propagates and -0/+0 order exactly
+// as Go defines; strings compare byte-wise.
+type MinMax struct {
+	Max  bool
+	Args []Expr
+	T    Type
+}
+
+func (*MinMax) expr()        {}
+func (m *MinMax) Type() Type { return m.T }
 
 func (b *builder) buildMapDelete(call *ast.CallExpr) (Stmt, error) {
 	mapExpr, err := b.buildExpr(call.Args[0])

@@ -20,6 +20,10 @@ type DeclStmt struct {
 	// comma-ok lookup) initializing all names simultaneously; Values is
 	// nil in that case.
 	Tuple Expr
+	// Reused marks names a := statement reassigns instead of declaring
+	// (Go permits existing names alongside at least one new one); nil
+	// means every name is new.
+	Reused []bool
 }
 
 // AssignStmt stores values into existing locations. Go's two-phase rule is

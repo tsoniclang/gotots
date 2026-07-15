@@ -298,6 +298,33 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			return "", err
 		}
 		return "gort$.goStringLen(" + x + ")", nil
+	case *ir.MinMax:
+		values, err := p.printArgs(n.Args)
+		if err != nil {
+			return "", err
+		}
+		if n.Max {
+			return "gort$.goMax([" + values + "])", nil
+		}
+		return "gort$.goMin([" + values + "])", nil
+	case *ir.StringConvert:
+		x, err := p.printExpr(n.X)
+		if err != nil {
+			return "", err
+		}
+		switch n.Op {
+		case "fromRune":
+			return "gort$.goStringFromRune(" + x + ")", nil
+		case "fromBytes":
+			return "gort$.goStringFromBytes(" + x + ")", nil
+		case "fromRunes":
+			return "gort$.goStringFromRunes(" + x + ")", nil
+		case "toBytes":
+			return "gosl$.goSliceFrom(gort$.goStringBytes(" + x + "))", nil
+		case "toRunes":
+			return "gosl$.goSliceFrom(gort$.goStringRunes(" + x + "))", nil
+		}
+		return "", fmt.Errorf("no emission for string conversion %q", n.Op)
 	case *ir.StringIndex:
 		x, err := p.printExpr(n.X)
 		if err != nil {

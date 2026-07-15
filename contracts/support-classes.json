@@ -242,6 +242,31 @@
       "specClause": "docs/spec/04-types-values-pointers.md"
     },
     {
+      "key": "convert:bytesToString",
+      "state": "generated",
+      "specClause": "docs/spec/05-collections-strings.md"
+    },
+    {
+      "key": "convert:runeToString",
+      "state": "generated",
+      "specClause": "docs/spec/05-collections-strings.md"
+    },
+    {
+      "key": "convert:runesToString",
+      "state": "generated",
+      "specClause": "docs/spec/05-collections-strings.md"
+    },
+    {
+      "key": "convert:stringToBytes",
+      "state": "generated",
+      "specClause": "docs/spec/05-collections-strings.md"
+    },
+    {
+      "key": "convert:stringToRunes",
+      "state": "generated",
+      "specClause": "docs/spec/05-collections-strings.md"
+    },
+    {
       "key": "copy:slice",
       "state": "generated",
       "specClause": "docs/spec/05-collections-strings.md"
@@ -397,6 +422,11 @@
       "specClause": "docs/spec/05-collections-strings.md"
     },
     {
+      "key": "max",
+      "state": "generated",
+      "specClause": "docs/spec/04-types-values-pointers.md"
+    },
+    {
       "key": "methodCall",
       "state": "generated",
       "specClause": "docs/spec/06-interfaces-generics-functions.md"
@@ -412,9 +442,19 @@
       "specClause": "docs/spec/06-interfaces-generics-functions.md"
     },
     {
+      "key": "min",
+      "state": "generated",
+      "specClause": "docs/spec/04-types-values-pointers.md"
+    },
+    {
       "key": "namedResults",
       "state": "generated",
       "specClause": "docs/spec/03-declarations-bodies-control.md"
+    },
+    {
+      "key": "new:struct",
+      "state": "generated",
+      "specClause": "docs/spec/04-types-values-pointers.md"
     },
     {
       "key": "nil",
@@ -440,6 +480,11 @@
       "key": "range:int",
       "state": "generated",
       "specClause": "docs/spec/03-declarations-bodies-control.md"
+    },
+    {
+      "key": "range:map",
+      "state": "generated",
+      "specClause": "docs/spec/05-collections-strings.md"
     },
     {
       "key": "range:slice",

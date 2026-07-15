@@ -136,24 +136,41 @@ func (b *builder) buildAssign(n *ast.AssignStmt) (Stmt, error) {
 				out.Types = append(out.Types, t)
 				continue
 			}
-			definition, isNew := b.info.Defs[target].(*types.Var)
+			variable, isNew := b.info.Defs[target].(*types.Var)
 			if !isNew {
-				// Go permits := to reassign existing names alongside one new
-				// one; that scoping subtlety has its own reviewed lowering
-				// later.
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "short declaration reusing an existing variable", Span: span}
+				// := reassigns this existing name (Go requires at least one
+				// new variable alongside it).
+				existing, isVar := b.info.Uses[target].(*types.Var)
+				if !isVar {
+					return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "short declaration reusing a non-variable", Span: span}
+				}
+				variable = existing
 			}
-			t, err := b.typeOf(definition.Type(), span)
+			t, err := b.typeOf(variable.Type(), span)
 			if err != nil {
 				return nil, err
 			}
 			out.Names = append(out.Names, target.Name)
 			out.Types = append(out.Types, t)
+			for len(out.Reused) < len(out.Names) {
+				out.Reused = append(out.Reused, false)
+			}
+			out.Reused[len(out.Names)-1] = !isNew
+		}
+		anyReused := false
+		for _, reused := range out.Reused {
+			anyReused = anyReused || reused
 		}
 		if tuple != nil {
 			out.Tuple = tuple
 			b.use("declTuple")
 			return out, nil
+		}
+		if anyReused {
+			// The non-tuple mixed form needs staged right-hand values (an
+			// existing name may feed a later slot); it stays out until that
+			// staging is reviewed.
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "short declaration reusing an existing variable without a tuple source", Span: span}
 		}
 		if len(n.Rhs) != len(n.Lhs) {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "short declaration arity mismatch", Span: span}
@@ -266,8 +283,8 @@ func (b *builder) compoundTarget(lhs ast.Expr) (Target, Expr, error) {
 		return VarTarget{Name: operand.Name, T: load.Type()}, load, nil
 
 	case *ast.SelectorExpr:
-		if _, baseIsIdent := ast.Unparen(operand.X).(*ast.Ident); !baseIsIdent {
-			return nil, nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "compound assignment to a field with a non-variable base", Span: span}
+		if !b.pureFieldBase(operand.X) {
+			return nil, nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "compound assignment to a field with an impure base", Span: span}
 		}
 		built, err := b.buildExpr(operand)
 		if err != nil {
@@ -305,6 +322,26 @@ func (b *builder) compoundTarget(lhs ast.Expr) (Target, Expr, error) {
 		return nil, nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "indexed compound assignment on " + built.Type().Go, Span: span}
 	}
 	return nil, nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: fmt.Sprintf("compound assignment to %T", lhs), Span: span}
+}
+
+// pureFieldBase reports whether re-evaluating a compound target's base
+// is exact: chains of variables, field selections, and dereferences —
+// no calls or indexing. A nil-pointer panic surfaces on the load
+// re-evaluation first, so re-running the chain observes nothing new.
+func (b *builder) pureFieldBase(e ast.Expr) bool {
+	switch base := ast.Unparen(e).(type) {
+	case *ast.Ident:
+		return true
+	case *ast.StarExpr:
+		return b.pureFieldBase(base.X)
+	case *ast.SelectorExpr:
+		selection, ok := b.info.Selections[base]
+		if !ok || selection.Kind() != types.FieldVal {
+			return false
+		}
+		return b.pureFieldBase(base.X)
+	}
+	return false
 }
 
 // pureOperand reports whether re-evaluating the expression is exact: a

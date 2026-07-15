@@ -13,7 +13,7 @@ package abi
 import "fmt"
 
 // Version identifies the ABI contract carried in generated output.
-const Version = 5
+const Version = 6
 
 // Family is the static carrier family of an integer kind.
 type Family string
@@ -212,6 +212,85 @@ export function goStringRange(s: string): [bigint, number][] {
   while (i < s.length) {
     const [r, size] = decodeRune(s, i);
     out.push([BigInt(i), r]);
+    i += size;
+  }
+  return out;
+}
+
+// Ordered min/max over every ordered carrier (numbers, bigints, byte
+// strings): NaN propagates and -0 sorts below +0, exactly Go.
+export function goMin<T extends number | bigint | string>(values: T[]): T {
+  let m = values[0] as T;
+  for (let i = 1; i < values.length; i++) {
+    const v = values[i] as T;
+    if (typeof m === "number" && m !== m) return m;
+    if (typeof v === "number" && v !== v) return v;
+    if (v < m || (v === m && typeof v === "number" && Object.is(v, -0))) m = v;
+  }
+  return m;
+}
+
+export function goMax<T extends number | bigint | string>(values: T[]): T {
+  let m = values[0] as T;
+  for (let i = 1; i < values.length; i++) {
+    const v = values[i] as T;
+    if (typeof m === "number" && m !== m) return m;
+    if (typeof v === "number" && v !== v) return v;
+    if (v > m || (v === m && typeof m === "number" && Object.is(m, -0))) m = v;
+  }
+  return m;
+}
+
+// string(r): the UTF-8 encoding of one code point; out-of-range and
+// surrogate values encode U+FFFD, exactly Go.
+export function goStringFromRune(r: number | bigint): string {
+  let code = Number(r);
+  if (code < 0 || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff)) code = 0xfffd;
+  if (code < 0x80) return String.fromCharCode(code);
+  if (code < 0x800) {
+    return String.fromCharCode(0xc0 | (code >> 6), 0x80 | (code & 0x3f));
+  }
+  if (code < 0x10000) {
+    return String.fromCharCode(0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
+  }
+  return String.fromCharCode(
+    0xf0 | (code >> 18), 0x80 | ((code >> 12) & 0x3f), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
+}
+
+// string(b) for []byte: a fresh string of the slice's bytes (nil is "").
+export function goStringFromBytes(s: { length: number; backing: number[]; offset: number } | undefined): string {
+  if (s === undefined) return "";
+  let out = "";
+  for (let i = 0; i < s.length; i++) {
+    out += String.fromCharCode(s.backing[s.offset + i] as number);
+  }
+  return out;
+}
+
+// string(rs) for []rune: the concatenated UTF-8 encodings (nil is "").
+export function goStringFromRunes(s: { length: number; backing: number[]; offset: number } | undefined): string {
+  if (s === undefined) return "";
+  let out = "";
+  for (let i = 0; i < s.length; i++) {
+    out += goStringFromRune(s.backing[s.offset + i] as number);
+  }
+  return out;
+}
+
+// goStringBytes / goStringRunes return the string's bytes / decoded
+// runes as plain arrays for the slice carrier to wrap.
+export function goStringBytes(s: string): number[] {
+  const out: number[] = new Array(s.length);
+  for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+  return out;
+}
+
+export function goStringRunes(s: string): number[] {
+  const out: number[] = [];
+  let i = 0;
+  while (i < s.length) {
+    const [r, size] = decodeRune(s, i);
+    out.push(r);
     i += size;
   }
   return out;

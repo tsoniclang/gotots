@@ -81,6 +81,9 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 	case *ir.RangeString:
 		return p.printRangeString(n)
 
+	case *ir.RangeMap:
+		return p.printRangeMap(n)
+
 	case *ir.SwitchStmt:
 		return p.printSwitch(n)
 
@@ -132,6 +135,20 @@ func (p *printer) printDecl(n *ir.DeclStmt) error {
 		for i, name := range n.Names {
 			if name == "_" {
 				continue // discarded slot; the tuple was evaluated once
+			}
+			if i < len(n.Reused) && n.Reused[i] {
+				// := reassigns this existing name: a whole-value store
+				// with the same in-place semantics as any assignment.
+				staged := stagedTarget{kind: "var", name: tsName(name),
+					structValue: n.Types[i].Kind == ir.KindStruct}
+				var err error
+				if staged.arrayValue, err = p.arrayValueCallback(n.Types[i]); err != nil {
+					return err
+				}
+				if err := staged.store(p, fmt.Sprintf("%s[%d]", tuple, i)); err != nil {
+					return err
+				}
+				continue
 			}
 			spelled, err := p.tsType(n.Types[i])
 			if err != nil {
@@ -288,112 +305,6 @@ func (p *printer) printSwitch(n *ir.SwitchStmt) error {
 		p.indent--
 		p.line("}")
 	}
-	return nil
-}
-
-// printRangeSlice emits range-over-slice with the operand and length
-// evaluated once and per-iteration element loads.
-func (p *printer) printRangeSlice(n *ir.RangeSlice) error {
-	operand, err := p.printExpr(n.X)
-	if err != nil {
-		return err
-	}
-	sliceTemp := p.temp()
-	p.line("const %s = %s;", sliceTemp, operand)
-	lengthTemp := p.temp()
-	p.line("const %s = gosl$.goSliceLen(%s);", lengthTemp, sliceTemp)
-	// The induction variable is always hidden: the source index name
-	// binds a per-iteration copy, so assigning to it inside the body
-	// never affects iteration — exactly Go.
-	induction := p.temp()
-	p.line("for (let %s: goabi$.GoInt = 0n; %s < %s; %s = %s + 1n) {", induction, induction, lengthTemp, induction, induction)
-	p.indent++
-	if n.Index != "" {
-		p.line("let %s: goabi$.GoInt = %s;", tsName(n.Index), induction)
-	}
-	if n.Value != "" {
-		spelled, err := p.tsType(n.VarT)
-		if err != nil {
-			return err
-		}
-		if n.VarT.Kind == ir.KindStruct {
-			// The range variable binds a per-iteration value copy.
-			p.line("let %s: %s = gosl$.goSliceGet(%s, %s).goClone$();", tsName(n.Value), spelled, sliceTemp, induction)
-		} else if n.VarT.Kind == ir.KindArray {
-			cloneElem, err := p.arrayElemClone(*n.VarT.Elem)
-			if err != nil {
-				return err
-			}
-			p.line("let %s: %s = gosl$.goArrayClone(gosl$.goSliceGet(%s, %s), %s);", tsName(n.Value), spelled, sliceTemp, induction, cloneElem)
-		} else {
-			p.line("let %s: %s = gosl$.goSliceGet(%s, %s);", tsName(n.Value), spelled, sliceTemp, induction)
-		}
-	}
-	if err := p.printBlockBody(n.Body); err != nil {
-		return err
-	}
-	p.indent--
-	p.line("}")
-	return nil
-}
-
-// printRangeString emits range over a string: the operand evaluates
-// once; each iteration binds the starting byte offset and the decoded
-// rune. Strings are immutable, so the decoded sequence is a snapshot by
-// construction.
-func (p *printer) printRangeString(n *ir.RangeString) error {
-	operand, err := p.printExpr(n.X)
-	if err != nil {
-		return err
-	}
-	entry := p.temp()
-	p.line("for (const %s of gort$.goStringRange(%s)) {", entry, operand)
-	p.indent++
-	if n.Index != "" {
-		p.line("let %s: goabi$.GoInt = %s[0];", tsName(n.Index), entry)
-	}
-	if n.Value != "" {
-		p.line("let %s: number = %s[1];", tsName(n.Value), entry)
-	}
-	if err := p.printBlockBody(n.Body); err != nil {
-		return err
-	}
-	p.indent--
-	p.line("}")
-	return nil
-}
-
-// printRangeInt emits `for i := range n`: n evaluates once and the
-// index counts in n's own carrier.
-func (p *printer) printRangeInt(n *ir.RangeInt) error {
-	operand, err := p.printExpr(n.N)
-	if err != nil {
-		return err
-	}
-	limit := p.temp()
-	p.line("const %s = %s;", limit, operand)
-	spelled, err := p.tsType(n.N.Type())
-	if err != nil {
-		return err
-	}
-	// The induction variable is always hidden (the source name binds a
-	// per-iteration copy); bounds keep increments exact without wrap
-	// helpers, since the index stays strictly below the operand.
-	induction := p.temp()
-	if n.N.Type().Kind.Wide64() {
-		p.line("for (let %s: %s = 0n; %s < %s; %s = %s + 1n) {", induction, spelled, induction, limit, induction, induction)
-	} else {
-		p.line("for (let %s: %s = 0; %s < %s; %s = %s + 1) {", induction, spelled, induction, limit, induction, induction)
-	}
-	p.indent++
-	if n.Index != "" {
-		p.line("let %s: %s = %s;", tsName(n.Index), spelled, induction)
-	}
-	if err := p.printBlockBody(n.Body); err != nil {
-		return err
-	}
-	p.indent--
-	p.line("}")
 	return nil
 }
 
