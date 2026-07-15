@@ -82,6 +82,10 @@ func Package(p *packages.Package, sourceDir string, options Options) (*Generated
 	if err != nil {
 		return nil, err
 	}
+	sliceImport, err := relativeImport(path.Dir(corePath), path.Join(abiDir, "goslice.js"))
+	if err != nil {
+		return nil, err
+	}
 
 	var functions []*ir.Func
 	structs := map[string]*ir.Struct{}
@@ -156,7 +160,7 @@ func Package(p *packages.Package, sourceDir string, options Options) (*Generated
 	for _, name := range structOrder {
 		structList = append(structList, structs[name])
 	}
-	body, err := emit.Package(structList, functions, intsImport, runtimeImport)
+	body, err := emit.Package(structList, functions, intsImport, runtimeImport, sliceImport)
 	if err != nil {
 		return nil, err
 	}
@@ -286,6 +290,8 @@ func conservativeCarrier(t ir.Type) string {
 		return "object-identity-nilable(undefined)"
 	case t.Kind == ir.KindMap:
 		return "js-map-nilable(undefined)-has-based-lookup"
+	case t.Kind == ir.KindSlice:
+		return "goslice-view-nilable(undefined)-conservative"
 	case t.Kind.Float():
 		return "number"
 	case t.Kind.Wide64():

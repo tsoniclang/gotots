@@ -22,7 +22,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: gotots <census|gate|toolchain-id> [flags]")
+		fmt.Fprintln(os.Stderr, "usage: gotots <census|gate|translate-probe|toolchain-id> [flags]")
 		os.Exit(2)
 	}
 	var err error
@@ -33,6 +33,8 @@ func main() {
 		err = runToolchainID()
 	case "gate":
 		err = runGate(os.Args[2:])
+	case "translate-probe":
+		err = runTranslateProbe(os.Args[2:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown subcommand %q\n", os.Args[1])
 		os.Exit(2)

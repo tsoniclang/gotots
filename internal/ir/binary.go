@@ -25,7 +25,7 @@ func (b *builder) buildBinary(n *ast.BinaryExpr, resultType types.Type) (Expr, e
 				return nil, err
 			}
 			kind := operand.Type().Kind
-			if kind != KindPointer && kind != KindMap {
+			if kind != KindPointer && kind != KindMap && kind != KindSlice {
 				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "nil comparison on " + operand.Type().Go, Span: span}
 			}
 			b.use("isNil")

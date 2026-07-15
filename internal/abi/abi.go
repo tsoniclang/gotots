@@ -68,6 +68,7 @@ func Files() map[string]string {
 		"gopanic.ts":   gopanicSource,
 		"goints.ts":    gointsSource,
 		"goruntime.ts": goruntimeSource,
+		"goslice.ts":   gosliceSource,
 	}
 }
 
@@ -284,4 +285,120 @@ export function goUint16FromBig(x: bigint): number { return Number(BigInt.asUint
 export function goUint32FromBig(x: bigint): number { return Number(BigInt.asUintN(32, x)); }
 export function goInt64FromNumber(x: number): bigint { return BigInt.asIntN(64, BigInt(x)); }
 export function goUint64FromNumber(x: number): bigint { return BigInt.asUintN(64, BigInt(x)); }
+`
+
+const gosliceSource = `// The exact Go slice carrier: backing array, offset, length, and
+// capacity, with undefined as the nil slice. Aliasing, capacity reuse on
+// append, reslicing, and Go's exact bounds panics are all preserved.
+// Indices arrive as the static carrier of their Go type (number or
+// bigint); JS mixed comparisons are exact, and conversion to an array
+// offset happens only after the bounds proof.
+import { GoPanic } from "./gopanic.js";
+
+export class GoSlice<T> {
+  backing: T[];
+  offset: number;
+  length: number;
+  capacity: number;
+  constructor(backing: T[], offset: number, length: number, capacity: number) {
+    this.backing = backing;
+    this.offset = offset;
+    this.length = length;
+    this.capacity = capacity;
+  }
+}
+
+// undefined is the nil slice (len 0, cap 0).
+export type GoSliceValue<T> = GoSlice<T> | undefined;
+
+type GoIndex = number | bigint;
+
+function panicIndex(index: GoIndex, length: number): never {
+  throw new GoPanic("runtime error: index out of range [" + String(index) + "] with length " + String(length));
+}
+
+export function goSliceFrom<T>(values: T[]): GoSlice<T> {
+  return new GoSlice(values, 0, values.length, values.length);
+}
+
+export function goSliceMake<T>(length: GoIndex, capacity: GoIndex, zero: T): GoSlice<T> {
+  if (length < 0 || capacity < 0 || length > capacity) {
+    throw new GoPanic("runtime error: makeslice: len out of range");
+  }
+  const cap = Number(capacity);
+  const backing: T[] = new Array(cap);
+  for (let index = 0; index < cap; index++) {
+    backing[index] = zero;
+  }
+  return new GoSlice(backing, 0, Number(length), cap);
+}
+
+export function goSliceLen<T>(s: GoSliceValue<T>): bigint {
+  return s === undefined ? 0n : BigInt(s.length);
+}
+
+export function goSliceCap<T>(s: GoSliceValue<T>): bigint {
+  return s === undefined ? 0n : BigInt(s.capacity);
+}
+
+export function goSliceGet<T>(s: GoSliceValue<T>, index: GoIndex): T {
+  const length = s === undefined ? 0 : s.length;
+  if (index < 0 || index >= length) panicIndex(index, length);
+  const slice = s as GoSlice<T>;
+  return slice.backing[slice.offset + Number(index)] as T;
+}
+
+export function goSliceSet<T>(s: GoSliceValue<T>, index: GoIndex, value: T): void {
+  const length = s === undefined ? 0 : s.length;
+  if (index < 0 || index >= length) panicIndex(index, length);
+  const slice = s as GoSlice<T>;
+  slice.backing[slice.offset + Number(index)] = value;
+}
+
+// s[low:high]: 0 <= low <= high <= cap; shares backing storage. A nil
+// slice permits only [0:0].
+export function goSliceSlice<T>(s: GoSliceValue<T>, low: GoIndex, high: GoIndex): GoSliceValue<T> {
+  const capacity = s === undefined ? 0 : s.capacity;
+  if (high > capacity || high < 0) {
+    throw new GoPanic("runtime error: slice bounds out of range [:" + String(high) + "] with capacity " + String(capacity));
+  }
+  if (low < 0 || low > high) {
+    throw new GoPanic("runtime error: slice bounds out of range [" + String(low) + ":" + String(high) + "]");
+  }
+  if (s === undefined) {
+    return undefined; // only [0:0] reaches here; nil stays nil
+  }
+  return new GoSlice(s.backing, s.offset + Number(low), Number(high) - Number(low), s.capacity - Number(low));
+}
+
+// append: reuses backing storage when capacity allows (aliasing is
+// observable); otherwise allocates. Go leaves the grown capacity
+// implementation-defined; this carrier uses the documented doubling /
+// 1.25x progression without allocator size-class rounding, and grown
+// capacity is not a differential target.
+export function goSliceAppend<T>(s: GoSliceValue<T>, values: T[]): GoSlice<T> {
+  const length = s === undefined ? 0 : s.length;
+  const needed = length + values.length;
+  if (s !== undefined && needed <= s.capacity) {
+    for (let index = 0; index < values.length; index++) {
+      s.backing[s.offset + length + index] = values[index] as T;
+    }
+    return new GoSlice(s.backing, s.offset, needed, s.capacity);
+  }
+  let capacity = s === undefined ? 0 : s.capacity;
+  if (capacity === 0) capacity = needed;
+  while (capacity < needed) {
+    capacity = capacity < 256 ? capacity * 2 : capacity + Math.trunc((capacity + 3 * 256) / 4);
+  }
+  const backing: T[] = new Array(capacity);
+  if (s !== undefined) {
+    for (let index = 0; index < length; index++) {
+      backing[index] = s.backing[s.offset + index] as T;
+    }
+  }
+  for (let index = 0; index < values.length; index++) {
+    backing[length + index] = values[index] as T;
+  }
+  return new GoSlice(backing, 0, needed, capacity);
+}
 `

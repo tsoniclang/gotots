@@ -43,7 +43,7 @@ func FileWithProvenance(p Provenance, body string) (string, error) {
 // classes for named structs (methods attached), then functions, each in
 // sorted name order. intsImport and runtimeImport are the language-ABI
 // module specifiers (with .js).
-func Package(structs []*ir.Struct, functions []*ir.Func, intsImport, runtimeImport string) (string, error) {
+func Package(structs []*ir.Struct, functions []*ir.Func, intsImport, runtimeImport, sliceImport string) (string, error) {
 	sortedStructs := append([]*ir.Struct{}, structs...)
 	sort.Slice(sortedStructs, func(i, j int) bool { return sortedStructs[i].Name < sortedStructs[j].Name })
 	sorted := append([]*ir.Func{}, functions...)
@@ -52,6 +52,7 @@ func Package(structs []*ir.Struct, functions []*ir.Func, intsImport, runtimeImpo
 	var out strings.Builder
 	fmt.Fprintf(&out, "import * as goabi from %q;\n", intsImport)
 	fmt.Fprintf(&out, "import * as gort from %q;\n", runtimeImport)
+	fmt.Fprintf(&out, "import * as gosl from %q;\n", sliceImport)
 	for _, structDecl := range sortedStructs {
 		out.WriteString("\n")
 		if err := printStruct(&out, structDecl); err != nil {
@@ -213,6 +214,12 @@ func tsType(t ir.Type) (string, error) {
 		return "goabi.GoUintptr", nil
 	case ir.KindPointer:
 		return t.Named + " | undefined", nil
+	case ir.KindSlice:
+		element, err := tsType(*t.Elem)
+		if err != nil {
+			return "", err
+		}
+		return "gosl.GoSliceValue<" + element + ">", nil
 	case ir.KindMap:
 		key, err := tsType(*t.Key)
 		if err != nil {

@@ -51,6 +51,21 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
+		if t.Kind == KindSlice {
+			out := &SliceLit{T: t}
+			for _, element := range n.Elts {
+				if _, isKeyed := element.(*ast.KeyValueExpr); isKeyed {
+					return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "keyed slice literal", Span: span}
+				}
+				value, err := b.buildExprAs(element, *t.Elem)
+				if err != nil {
+					return nil, err
+				}
+				out.Values = append(out.Values, value)
+			}
+			b.use("sliceLiteral")
+			return out, nil
+		}
 		if t.Kind == KindMap {
 			out := &MapFrom{T: t}
 			for _, element := range n.Elts {
@@ -113,19 +128,52 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 		return &FieldLoad{X: base, Field: n.Sel.Name, T: t}, nil
 
 	case *ast.IndexExpr:
-		mapExpr, err := b.buildExpr(n.X)
+		operand, err := b.buildExpr(n.X)
 		if err != nil {
 			return nil, err
 		}
-		if mapExpr.Type().Kind != KindMap {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "index on " + mapExpr.Type().Go, Span: span}
-		}
-		key, err := b.buildExpr(n.Index)
+		index, err := b.buildExpr(n.Index)
 		if err != nil {
 			return nil, err
 		}
-		b.use("mapGet")
-		return &MapGet{Map: mapExpr, Key: key, T: *mapExpr.Type().Elem}, nil
+		switch operand.Type().Kind {
+		case KindMap:
+			b.use("mapGet")
+			return &MapGet{Map: operand, Key: index, T: *operand.Type().Elem}, nil
+		case KindSlice:
+			b.use("sliceGet")
+			return &SliceGet{X: operand, Index: index, T: *operand.Type().Elem}, nil
+		}
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "index on " + operand.Type().Go, Span: span}
+
+	case *ast.SliceExpr:
+		if n.Slice3 {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "full slice expression (capacity-limiting)", Span: span}
+		}
+		operand, err := b.buildExpr(n.X)
+		if err != nil {
+			return nil, err
+		}
+		if operand.Type().Kind != KindSlice {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "reslice of " + operand.Type().Go, Span: span}
+		}
+		out := &SliceReslice{X: operand, T: operand.Type()}
+		if n.Low != nil {
+			low, err := b.buildExpr(n.Low)
+			if err != nil {
+				return nil, err
+			}
+			out.Low = low
+		}
+		if n.High != nil {
+			high, err := b.buildExpr(n.High)
+			if err != nil {
+				return nil, err
+			}
+			out.High = high
+		}
+		b.use("reslice")
+		return out, nil
 
 	case *ast.UnaryExpr:
 		return b.buildUnary(n, tv.Type)
@@ -171,7 +219,7 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 // giving untyped nil its exact typed zero.
 func (b *builder) buildExprAs(e ast.Expr, expected Type) (Expr, error) {
 	if tv, ok := b.info.Types[e]; ok && tv.IsNil() {
-		if expected.Kind == KindPointer || expected.Kind == KindMap {
+		if expected.Kind == KindPointer || expected.Kind == KindMap || expected.Kind == KindSlice {
 			b.use("nil")
 			return &NilConst{T: expected}, nil
 		}
@@ -308,8 +356,42 @@ func (b *builder) buildBuiltin(call *ast.CallExpr, builtin *types.Builtin, resul
 		case KindMap:
 			b.use("len:map")
 			return &MapLen{X: operand}, nil
+		case KindSlice:
+			b.use("len:slice")
+			return &SliceLen{X: operand}, nil
 		}
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "len of " + operand.Type().Go, Span: span}
+	case "cap":
+		operand, err := b.buildExpr(call.Args[0])
+		if err != nil {
+			return nil, err
+		}
+		if operand.Type().Kind == KindSlice {
+			b.use("cap:slice")
+			return &SliceCap{X: operand}, nil
+		}
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "cap of " + operand.Type().Go, Span: span}
+	case "append":
+		operand, err := b.buildExpr(call.Args[0])
+		if err != nil {
+			return nil, err
+		}
+		if operand.Type().Kind != KindSlice {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "append to " + operand.Type().Go, Span: span}
+		}
+		if call.Ellipsis.IsValid() {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "append with slice expansion", Span: span}
+		}
+		out := &SliceAppend{X: operand, T: operand.Type()}
+		for _, arg := range call.Args[1:] {
+			value, err := b.buildExprAs(arg, *operand.Type().Elem)
+			if err != nil {
+				return nil, err
+			}
+			out.Values = append(out.Values, value)
+		}
+		b.use("append")
+		return out, nil
 	case "make":
 		t, err := b.typeOf(resultType, span)
 		if err != nil {
@@ -318,6 +400,22 @@ func (b *builder) buildBuiltin(call *ast.CallExpr, builtin *types.Builtin, resul
 		if t.Kind == KindMap && len(call.Args) == 1 {
 			b.use("makeMap")
 			return &MapMake{T: t}, nil
+		}
+		if t.Kind == KindSlice && (len(call.Args) == 2 || len(call.Args) == 3) {
+			length, err := b.buildExpr(call.Args[1])
+			if err != nil {
+				return nil, err
+			}
+			out := &SliceMake{T: t, Length: length}
+			if len(call.Args) == 3 {
+				capacity, err := b.buildExpr(call.Args[2])
+				if err != nil {
+					return nil, err
+				}
+				out.Capacity = capacity
+			}
+			b.use("makeSlice")
+			return out, nil
 		}
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "make of " + t.Go, Span: span}
 	}
@@ -473,7 +571,7 @@ func zeroValue(t Type, span Span) (Expr, error) {
 		return &Const{T: t, Value: "false"}, nil
 	case t.Kind == KindString:
 		return &Const{T: t, Value: `""`}, nil
-	case t.Kind == KindPointer, t.Kind == KindMap:
+	case t.Kind == KindPointer, t.Kind == KindMap, t.Kind == KindSlice:
 		return &NilConst{T: t}, nil
 	case t.Kind.Integer(), t.Kind.Float():
 		return &Const{T: t, Value: "0"}, nil

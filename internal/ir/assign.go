@@ -51,19 +51,23 @@ func (b *builder) buildTarget(lhs ast.Expr) (Target, error) {
 		return &FieldTarget{X: base, Field: n.Sel.Name}, nil
 
 	case *ast.IndexExpr:
-		mapExpr, err := b.buildExpr(n.X)
+		operand, err := b.buildExpr(n.X)
 		if err != nil {
 			return nil, err
 		}
-		if mapExpr.Type().Kind != KindMap {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "indexed assignment on " + mapExpr.Type().Go, Span: span}
-		}
-		key, err := b.buildExpr(n.Index)
+		index, err := b.buildExpr(n.Index)
 		if err != nil {
 			return nil, err
 		}
-		b.use("mapStore")
-		return &MapTarget{Map: mapExpr, Key: key}, nil
+		switch operand.Type().Kind {
+		case KindMap:
+			b.use("mapStore")
+			return &MapTarget{Map: operand, Key: index}, nil
+		case KindSlice:
+			b.use("sliceStore")
+			return &SliceTarget{X: operand, Index: index}, nil
+		}
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "indexed assignment on " + operand.Type().Go, Span: span}
 	}
 	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: fmt.Sprintf("assignment to %T", lhs), Span: span}
 }

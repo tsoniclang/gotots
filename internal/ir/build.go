@@ -239,6 +239,9 @@ func (b *builder) buildStmt(stmt ast.Stmt) (Stmt, error) {
 	case *ast.ForStmt:
 		return b.buildFor(n)
 
+	case *ast.RangeStmt:
+		return b.buildRange(n)
+
 	case *ast.ReturnStmt:
 		return b.buildReturn(n)
 
@@ -450,6 +453,49 @@ func (b *builder) buildFor(n *ast.ForStmt) (Stmt, error) {
 	}
 	out.Body = body
 	b.use("for")
+	return out, nil
+}
+
+// buildRange lowers range over a slice: the operand and its length are
+// evaluated once, index is an int, and each element loads per iteration.
+func (b *builder) buildRange(n *ast.RangeStmt) (Stmt, error) {
+	span := b.span(n.Pos())
+	if n.Tok != token.DEFINE && n.Tok != token.ILLEGAL {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range with assignment form", Span: span}
+	}
+	operand, err := b.buildExpr(n.X)
+	if err != nil {
+		return nil, err
+	}
+	if operand.Type().Kind != KindSlice {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range over " + operand.Type().Go, Span: span}
+	}
+	out := &RangeSlice{X: operand, VarT: *operand.Type().Elem}
+	name := func(e ast.Expr) (string, error) {
+		if e == nil {
+			return "", nil
+		}
+		ident, ok := e.(*ast.Ident)
+		if !ok {
+			return "", &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range variable is not an identifier", Span: span}
+		}
+		if ident.Name == "_" {
+			return "", nil
+		}
+		return ident.Name, nil
+	}
+	if out.Index, err = name(n.Key); err != nil {
+		return nil, err
+	}
+	if out.Value, err = name(n.Value); err != nil {
+		return nil, err
+	}
+	body, err := b.buildBlock(n.Body)
+	if err != nil {
+		return nil, err
+	}
+	out.Body = body
+	b.use("range:slice")
 	return out, nil
 }
 

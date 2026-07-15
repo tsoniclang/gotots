@@ -46,6 +46,7 @@ type MapTarget struct {
 
 func (VarTarget) target()    {}
 func (BlankTarget) target()  {}
+func (*SliceTarget) target() {}
 func (*FieldTarget) target() {}
 func (*MapTarget) target()   {}
 
@@ -108,6 +109,7 @@ type BranchStmt struct {
 }
 
 func (*Block) stmt()         {}
+func (*RangeSlice) stmt()    {}
 func (*TryFinally) stmt()    {}
 func (*MapDeleteStmt) stmt() {}
 func (*DeclStmt) stmt()      {}
@@ -228,23 +230,86 @@ type MapLen struct{ X Expr }
 // StringLen is len(s): the UTF-8 byte length.
 type StringLen struct{ X Expr }
 
-func (*Const) expr()      {}
-func (*MethodCall) expr() {}
-func (*FieldLoad) expr()  {}
-func (*StructNew) expr()  {}
-func (*NilConst) expr()   {}
-func (*IsNil) expr()      {}
-func (*MapMake) expr()    {}
-func (*MapFrom) expr()    {}
-func (*MapGet) expr()     {}
-func (*MapLookup) expr()  {}
-func (*MapLen) expr()     {}
-func (*StringLen) expr()  {}
-func (*VarRef) expr()     {}
-func (*Binary) expr()     {}
-func (*Unary) expr()      {}
-func (*Convert) expr()    {}
-func (*Call) expr()       {}
+// SliceLit builds a slice from ordered element values.
+type SliceLit struct {
+	T      Type
+	Values []Expr
+}
+
+// SliceMake is make([]T, len[, cap]) with zero-filled elements.
+type SliceMake struct {
+	T        Type
+	Length   Expr
+	Capacity Expr // nil means Length
+}
+
+// SliceGet loads one element with Go's exact bounds panic.
+type SliceGet struct {
+	X     Expr
+	Index Expr
+	T     Type // element type
+}
+
+// SliceReslice is s[low:high] sharing backing storage.
+type SliceReslice struct {
+	X    Expr
+	Low  Expr // nil means 0
+	High Expr // nil means len(s)
+	T    Type
+}
+
+// SliceAppend is append(s, values...) with capacity-reuse aliasing.
+type SliceAppend struct {
+	X      Expr
+	Values []Expr
+	T      Type
+}
+
+// SliceLen / SliceCap are len/cap (0 for nil).
+type SliceLen struct{ X Expr }
+type SliceCap struct{ X Expr }
+
+// SliceTarget assigns one element (bounds-checked).
+type SliceTarget struct {
+	X     Expr
+	Index Expr
+}
+
+// RangeSlice is `for index, value := range s` over a slice: the range
+// expression and its length are evaluated once, and each element is
+// loaded per iteration. Index or Value may be empty (discarded).
+type RangeSlice struct {
+	Index string
+	Value string
+	VarT  Type // element type
+	X     Expr
+	Body  *Block
+}
+
+func (*Const) expr()        {}
+func (*MethodCall) expr()   {}
+func (*FieldLoad) expr()    {}
+func (*StructNew) expr()    {}
+func (*NilConst) expr()     {}
+func (*IsNil) expr()        {}
+func (*MapMake) expr()      {}
+func (*MapFrom) expr()      {}
+func (*MapGet) expr()       {}
+func (*MapLookup) expr()    {}
+func (*MapLen) expr()       {}
+func (*StringLen) expr()    {}
+func (*SliceLit) expr()     {}
+func (*SliceMake) expr()    {}
+func (*SliceGet) expr()     {}
+func (*SliceReslice) expr() {}
+func (*SliceAppend) expr()  {}
+func (*SliceLen) expr()     {}
+func (*SliceCap) expr()     {}
+func (*VarRef) expr()       {}
+func (*Binary) expr()       {}
+func (*Unary) expr()        {}
+func (*Convert) expr()      {}
+func (*Call) expr()         {}
 
 func (c *Const) Type() Type   { return c.T }
 func (v *VarRef) Type() Type  { return v.T }
@@ -281,3 +346,11 @@ func (m *MapGet) Type() Type    { return m.T }
 func (m *MapLookup) Type() Type { return m.T }
 func (m *MapLen) Type() Type    { return intType }
 func (s *StringLen) Type() Type { return intType }
+
+func (s *SliceLit) Type() Type     { return s.T }
+func (s *SliceMake) Type() Type    { return s.T }
+func (s *SliceGet) Type() Type     { return s.T }
+func (s *SliceReslice) Type() Type { return s.T }
+func (s *SliceAppend) Type() Type  { return s.T }
+func (s *SliceLen) Type() Type     { return intType }
+func (s *SliceCap) Type() Type     { return intType }

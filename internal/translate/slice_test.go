@@ -318,11 +318,26 @@ loop:
 			code: "GOTOTS_UNSUPPORTED_STATEMENT", mention: "LabeledStmt",
 		},
 		{
-			name: "slice type",
+			name: "slice of struct values",
 			source: `package fixture
-func Case(values []int) int { return values[0] }
+type Point struct{ X int32 }
+func Case() int32 {
+	points := []Point{{X: 1}}
+	return points[0].X
+}
 `,
-			code: "GOTOTS_UNSUPPORTED_TYPE", mention: "[]int",
+			code: "GOTOTS_UNSUPPORTED_TYPE", mention: "slice of struct values",
+		},
+		{
+			name: "full slice expression",
+			source: `package fixture
+func Case() int {
+	values := []int{1, 2, 3}
+	limited := values[0:1:2]
+	return int(len(limited))
+}
+`,
+			code: "GOTOTS_UNSUPPORTED_EXPRESSION", mention: "full slice expression",
 		},
 		{
 			name: "string ordering",

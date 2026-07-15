@@ -109,6 +109,85 @@ func printExpr(e ir.Expr) (string, error) {
 			return "", err
 		}
 		return "gort.goStringLen(" + x + ")", nil
+	case *ir.SliceLit:
+		values, err := printArgs(n.Values)
+		if err != nil {
+			return "", err
+		}
+		return "gosl.goSliceFrom([" + values + "])", nil
+	case *ir.SliceMake:
+		length, err := printExpr(n.Length)
+		if err != nil {
+			return "", err
+		}
+		capacity := length
+		if n.Capacity != nil {
+			capacity, err = printExpr(n.Capacity)
+			if err != nil {
+				return "", err
+			}
+		}
+		zero, err := zeroLiteral(*n.T.Elem)
+		if err != nil {
+			return "", err
+		}
+		return "gosl.goSliceMake(" + length + ", " + capacity + ", " + zero + ")", nil
+	case *ir.SliceGet:
+		x, err := printExpr(n.X)
+		if err != nil {
+			return "", err
+		}
+		index, err := printExpr(n.Index)
+		if err != nil {
+			return "", err
+		}
+		return "gosl.goSliceGet(" + x + ", " + index + ")", nil
+	case *ir.SliceReslice:
+		x, err := printExpr(n.X)
+		if err != nil {
+			return "", err
+		}
+		low := "0"
+		if n.Low != nil {
+			low, err = printExpr(n.Low)
+			if err != nil {
+				return "", err
+			}
+		}
+		high := "gosl.goSliceLen(" + x + ")"
+		if n.High != nil {
+			high, err = printExpr(n.High)
+			if err != nil {
+				return "", err
+			}
+		}
+		// The operand is evaluated once even when the default high bound
+		// re-reads its length; a temp is unnecessary for pure operands and
+		// the builder only produces pure slice operands today (vars,
+		// fields of pure bases). Revisit with effectful operands.
+		return "gosl.goSliceSlice(" + x + ", " + low + ", " + high + ")", nil
+	case *ir.SliceAppend:
+		x, err := printExpr(n.X)
+		if err != nil {
+			return "", err
+		}
+		values, err := printArgs(n.Values)
+		if err != nil {
+			return "", err
+		}
+		return "gosl.goSliceAppend(" + x + ", [" + values + "])", nil
+	case *ir.SliceLen:
+		x, err := printExpr(n.X)
+		if err != nil {
+			return "", err
+		}
+		return "gosl.goSliceLen(" + x + ")", nil
+	case *ir.SliceCap:
+		x, err := printExpr(n.X)
+		if err != nil {
+			return "", err
+		}
+		return "gosl.goSliceCap(" + x + ")", nil
 	}
 	return "", fmt.Errorf("no emission for IR expression %T", e)
 }
@@ -150,7 +229,7 @@ func zeroLiteral(t ir.Type) (string, error) {
 		return "false", nil
 	case t.Kind == ir.KindString:
 		return `""`, nil
-	case t.Kind == ir.KindPointer, t.Kind == ir.KindMap:
+	case t.Kind == ir.KindPointer, t.Kind == ir.KindMap, t.Kind == ir.KindSlice:
 		return "undefined", nil
 	case t.Kind.Wide64():
 		return "0n", nil

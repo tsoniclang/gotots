@@ -75,6 +75,9 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		p.line("}")
 		return nil
 
+	case *ir.RangeSlice:
+		return p.printRangeSlice(n)
+
 	case *ir.MapDeleteStmt:
 		mapExpr, err := printExpr(n.Map)
 		if err != nil {
@@ -179,6 +182,38 @@ func (p *printer) printAssign(n *ir.AssignStmt) error {
 	return nil
 }
 
+// printRangeSlice emits range-over-slice with the operand and length
+// evaluated once and per-iteration element loads.
+func (p *printer) printRangeSlice(n *ir.RangeSlice) error {
+	operand, err := printExpr(n.X)
+	if err != nil {
+		return err
+	}
+	sliceTemp := p.temp()
+	p.line("const %s = %s;", sliceTemp, operand)
+	lengthTemp := p.temp()
+	p.line("const %s = gosl.goSliceLen(%s);", lengthTemp, sliceTemp)
+	index := n.Index
+	if index == "" {
+		index = p.temp()
+	}
+	p.line("for (let %s: goabi.GoInt = 0n; %s < %s; %s = goabi.goInt64Add(%s, 1n)) {", index, index, lengthTemp, index, index)
+	p.indent++
+	if n.Value != "" {
+		spelled, err := tsType(n.VarT)
+		if err != nil {
+			return err
+		}
+		p.line("let %s: %s = gosl.goSliceGet(%s, %s);", n.Value, spelled, sliceTemp, index)
+	}
+	if err := p.printBlockBody(n.Body); err != nil {
+		return err
+	}
+	p.indent--
+	p.line("}")
+	return nil
+}
+
 // stagedTarget is a target whose operands were pre-evaluated.
 type stagedTarget struct {
 	kind    string // var | field | map
@@ -215,6 +250,20 @@ func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
 		keyTemp := p.temp()
 		p.line("const %s = %s;", keyTemp, key)
 		return stagedTarget{kind: "map", name: mapTemp, keyTemp: keyTemp}, nil
+	case *ir.SliceTarget:
+		sliceExpr, err := printExpr(t.X)
+		if err != nil {
+			return stagedTarget{}, err
+		}
+		sliceTemp := p.temp()
+		p.line("const %s = %s;", sliceTemp, sliceExpr)
+		index, err := printExpr(t.Index)
+		if err != nil {
+			return stagedTarget{}, err
+		}
+		indexTemp := p.temp()
+		p.line("const %s = %s;", indexTemp, index)
+		return stagedTarget{kind: "slice", name: sliceTemp, keyTemp: indexTemp}, nil
 	}
 	return stagedTarget{}, fmt.Errorf("no staging for target %T", target)
 }
@@ -229,6 +278,8 @@ func (s stagedTarget) store(p *printer, value string) error {
 		p.line("%s.%s = %s;", s.name, s.field, value)
 	case "map":
 		p.line("gort.goMapSet(%s, %s, %s);", s.name, s.keyTemp, value)
+	case "slice":
+		p.line("gosl.goSliceSet(%s, %s, %s);", s.name, s.keyTemp, value)
 	}
 	return nil
 }
@@ -260,6 +311,17 @@ func (p *printer) printStore(target ir.Target, value string) error {
 			return err
 		}
 		p.line("gort.goMapSet(%s, %s, %s);", mapExpr, key, value)
+		return nil
+	case *ir.SliceTarget:
+		sliceExpr, err := printExpr(t.X)
+		if err != nil {
+			return err
+		}
+		index, err := printExpr(t.Index)
+		if err != nil {
+			return err
+		}
+		p.line("gosl.goSliceSet(%s, %s, %s);", sliceExpr, index, value)
 		return nil
 	}
 	return fmt.Errorf("no emission for target %T", target)
