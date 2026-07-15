@@ -41,7 +41,7 @@ type Profile struct {
 	OwnedRoots    []string       `json:"ownedRoots"`
 	// TestOnlyRoots are owned test-support roots: their source is analyzed
 	// under the owned-test scope and may be imported only from test scope.
-	TestOnlyRoots     []string            `json:"testOnlyRoots"`
+	TestOnlyRoots []string `json:"testOnlyRoots"`
 	// OutsideUniverseRoots declare package roots that are completely
 	// outside the GoToTS input universe (LSP, fourslash, editor-service
 	// and their support trees). They are filtered before census: no file,
@@ -256,10 +256,10 @@ func (p *Profile) BuildProfileByName(name string) (*BuildProfile, error) {
 type PackageClass string
 
 const (
-	ClassOwned        PackageClass = "selected-owned"
-	ClassTestOnly     PackageClass = "selected-test-support"
+	ClassOwned           PackageClass = "selected-owned"
+	ClassTestOnly        PackageClass = "selected-test-support"
 	ClassOutsideUniverse PackageClass = "outside-universe"
-	ClassUnselected   PackageClass = "unselected"
+	ClassUnselected      PackageClass = "unselected"
 	// ClassExternal covers every package outside the owned module. The
 	// standard-library versus third-party split is not decided here: it
 	// requires loader evidence (go list Standard/Module), never path shape.

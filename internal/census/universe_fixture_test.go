@@ -275,16 +275,16 @@ func TestPublicationIgnoresForeignStaging(t *testing.T) {
 // without extending the fixture matrix fails this gate.
 func TestProfileFieldsHaveFixtureDispositions(t *testing.T) {
 	dispositions := map[string]string{
-		"schemaVersion":     "fixtureutil_test.go writeFixtureConfig",
-		"product":           "fixtureutil_test.go writeFixtureConfig",
-		"goModule":          "fixtureutil_test.go writeFixtureConfig",
-		"pin":               "fixtureutil_test.go writeFixtureConfig + attestation fixtures",
-		"buildProfiles":     "TestBuildProfileSelectsFiles",
-		"ownedRoots":        "TestCensusFixture partition assertions",
-		"testOnlyRoots":     "TestCensusFixture support-scope assertions",
+		"schemaVersion":        "fixtureutil_test.go writeFixtureConfig",
+		"product":              "fixtureutil_test.go writeFixtureConfig",
+		"goModule":             "fixtureutil_test.go writeFixtureConfig",
+		"pin":                  "fixtureutil_test.go writeFixtureConfig + attestation fixtures",
+		"buildProfiles":        "TestBuildProfileSelectsFiles",
+		"ownedRoots":           "TestCensusFixture partition assertions",
+		"testOnlyRoots":        "TestCensusFixture support-scope assertions",
 		"outsideUniverseRoots": "TestCensusFixture pre-census filtering and TestScopeDependencyOutside rejection",
-		"toolingRoots":      "TestCensusFixture universe assertions",
-		"notes":             "documentation-only field, no behavior",
+		"toolingRoots":         "TestCensusFixture universe assertions",
+		"notes":                "documentation-only field, no behavior",
 	}
 	for _, field := range profileJSONFields(t) {
 		if _, reviewed := dispositions[field]; !reviewed {
