@@ -13,11 +13,14 @@ import (
 )
 
 // reconcileUniverse proves that every tracked file has exactly one
-// disposition. Build inputs claimed by inventoried packages are
-// in-package; module metadata, profile tooling roots, testdata, and the
-// toolchain's documented underscore/dot exclusions classify the rest. A
-// tracked .go file with no disposition fails the census; other files fall
-// into the explicit non-build-file class, enumerated by extension.
+// disposition. Outside-universe roots are filtered first: their files
+// receive no per-file records — only per-category counts and one
+// aggregate digest attest what the filter removed. Build inputs claimed
+// by inventoried packages are in-package; module metadata, profile
+// tooling roots, testdata, and the toolchain's documented
+// underscore/dot exclusions classify the rest. A tracked .go file with
+// no disposition fails the census; other files fall into the explicit
+// non-build-file class, enumerated by extension.
 func reconcileUniverse(prof *profile.Profile, tree *pinning.Tree, modulePackages map[string]*ModulePackage, universe *Universe) error {
 	inPackage := map[string]bool{}
 	for _, pkg := range modulePackages {
@@ -29,6 +32,7 @@ func reconcileUniverse(prof *profile.Profile, tree *pinning.Tree, modulePackages
 	tracked := tree.Files()
 	universe.TrackedFiles = len(tracked)
 	universe.NonBuildByExtension = map[string]int{}
+	universe.OutsideUniverse = map[string]int{}
 	classMembers := map[string][]string{}
 
 	underAny := func(filePath string, roots []string) bool {
@@ -39,9 +43,28 @@ func reconcileUniverse(prof *profile.Profile, tree *pinning.Tree, modulePackages
 		}
 		return false
 	}
+	outsideCategory := func(filePath string) (string, bool) {
+		categories := make([]string, 0, len(prof.OutsideUniverseRoots))
+		for category := range prof.OutsideUniverseRoots {
+			categories = append(categories, category)
+		}
+		sort.Strings(categories)
+		for _, category := range categories {
+			if underAny(filePath, prof.OutsideUniverseRoots[category]) {
+				return category, true
+			}
+		}
+		return "", false
+	}
 
 	var unclassifiedGo []string
 	for _, filePath := range tracked {
+		if category, outside := outsideCategory(filePath); outside {
+			universe.OutsideUniverseFiles++
+			universe.OutsideUniverse[category]++
+			classMembers["outside-universe"] = append(classMembers["outside-universe"], filePath)
+			continue
+		}
 		if inPackage[filePath] {
 			universe.InPackages++
 			classMembers["in-package"] = append(classMembers["in-package"], filePath)

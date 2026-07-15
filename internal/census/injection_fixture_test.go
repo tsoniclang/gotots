@@ -1,6 +1,6 @@
 // Build-input injection fixtures: every input class any inventoried
 // package can name — build-tag-excluded Go files, non-Go build inputs,
-// embed payloads, and files in hard-excluded packages — must be attested
+// embed payloads, and files in unselected packages — must be attested
 // against the pinned commit tree even though none of them is type-checked.
 // An untracked injection in any class fails the census while git status
 // stays clean.
@@ -72,8 +72,26 @@ var payloadFS embed.FS
 	runInjection(t, extra, "a/payload/extra_injected.txt", "injected payload\n")
 }
 
-func TestInjectionHardExcludedPackage(t *testing.T) {
-	// Hard-excluded packages are inventoried, never analyzed — their build
-	// inputs are attested all the same.
-	runInjection(t, nil, "ex/ex_injected.go", "package ex\n\nfunc Injected() {}\n")
+func TestInjectionOutsideUniverseRootIsInert(t *testing.T) {
+	// Outside-universe roots are filtered before census: nothing below
+	// them is a census input, so an injected file there cannot affect any
+	// selected record — the run succeeds and the file has no disposition.
+	files := basicFixtureFiles()
+	files[".gitignore"] = "ex_injected.go\n"
+	dir, revision := writeFixtureRepo(t, files)
+	prof := writeFixtureConfig(t, revision, basicFixtureProfile())
+
+	full := filepath.Join(dir, "ex", "ex_injected.go")
+	if err := os.WriteFile(full, []byte("package ex\n\nfunc Injected() {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := Run(prof, dir, "fixture")
+	if err != nil {
+		t.Fatalf("injection below an outside-universe root must be inert: %v", err)
+	}
+	// Only the tracked outside file is counted by the filter evidence.
+	if result.Inventory.Universe.OutsideUniverseFiles != 1 {
+		t.Errorf("untracked injected file must not enter filter evidence: %+v", result.Inventory.Universe.OutsideUniverse)
+	}
 }

@@ -15,9 +15,12 @@ import (
 )
 
 // Run executes pass 1 in sourceDir under the hermetic environment against
-// the verified tracked tree.
+// the verified tracked tree. Outside-universe roots are filtered before
+// any record is created: their packages and files never enter the
+// inventory, and a selected dependency into one is a blocking scope
+// error.
 func Run(prof *profile.Profile, resolved *goenv.Resolved, env []string, sourceDir string, tree *pinning.Tree) (*Inventory, error) {
-	// -e tolerates packages that cannot build (hard-excluded roots may have
+	// -e tolerates packages that cannot build (unselected roots may have
 	// profile-specific breakage); errors are recorded per package and owned
 	// packages with errors fail the census.
 	// -deps expands the transitive closure, providing Standard/Module
@@ -32,6 +35,9 @@ func Run(prof *profile.Profile, resolved *goenv.Resolved, env []string, sourceDi
 	externals := map[string]*ExternalPackage{}
 
 	if err := decodeList(prof, sourceDir, output, true, modulePackages, externals); err != nil {
+		return nil, err
+	}
+	if err := checkScopeClosure(prof, modulePackages); err != nil {
 		return nil, err
 	}
 
@@ -80,6 +86,13 @@ func Run(prof *profile.Profile, resolved *goenv.Resolved, env []string, sourceDi
 
 	attributeReachability(prof, modulePackages, externals)
 	for _, entry := range externals {
+		if !entry.ReachableFromProduction && !entry.ReachableFromTest && !entry.ReachableFromExcluded {
+			// Evidence that arrived only through outside-universe roots
+			// (go list -deps walks them before the filter drops their
+			// packages): no inventoried package reaches it, so no record
+			// derives from it.
+			continue
+		}
 		entry.ExcludedOrUnselectedOnly = !entry.ReachableFromProduction && !entry.ReachableFromTest
 		inventory.External = append(inventory.External, *entry)
 	}
@@ -111,6 +124,12 @@ func decodeList(prof *profile.Profile, sourceDir string, output []byte, allowMod
 		}
 
 		class, category := prof.Classify(pkg.ImportPath)
+		if class == profile.ClassOutsideUniverse {
+			// Completely outside the input universe: filtered before any
+			// record exists. The scope-closure check separately proves no
+			// selected package depends on it.
+			continue
+		}
 		if class == profile.ClassExternal {
 			if err := recordExternal(externals, &pkg); err != nil {
 				return err
@@ -224,6 +243,38 @@ func recordExternal(externals map[string]*ExternalPackage, pkg *listPackage) err
 		return nil
 	}
 	externals[pkg.ImportPath] = &entry
+	return nil
+}
+
+// checkScopeClosure proves no selected package depends on an
+// outside-universe root, across production and test import scopes. A
+// violation is a blocking scope error, never an external obligation.
+func checkScopeClosure(prof *profile.Profile, modulePackages map[string]*ModulePackage) error {
+	var violations []string
+	for _, pkg := range modulePackages {
+		class := profile.PackageClass(pkg.Class)
+		if class != profile.ClassOwned && class != profile.ClassTestOnly {
+			continue
+		}
+		check := func(scope string, imports []string) {
+			for _, imported := range imports {
+				importClass, category := prof.Classify(imported)
+				if importClass == profile.ClassOutsideUniverse {
+					violations = append(violations, fmt.Sprintf(
+						"%s (%s, %s) imports outside-universe package %s (%s)",
+						pkg.ImportPath, pkg.Class, scope, imported, category))
+				}
+			}
+		}
+		check("production", pkg.Imports)
+		check("test", pkg.TestImports)
+		check("test", pkg.XTestImports)
+	}
+	if len(violations) > 0 {
+		sort.Strings(violations)
+		return fmt.Errorf("GOTOTS_SCOPE_DEPENDENCY_OUTSIDE:\nselected packages depend on outside-universe roots:\n%s",
+			strings.Join(violations, "\n"))
+	}
 	return nil
 }
 

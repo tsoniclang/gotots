@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/tsoniclang/gotots/internal/census"
@@ -215,10 +216,24 @@ func runGate(args []string) error {
 		if firstRun == nil {
 			return "blocked", []string{"census did not run"}, nil
 		}
-		if len(firstRun.Report.Blockers) > 0 {
-			return "blocked", firstRun.Report.Blockers, nil
+		// The census fails closed on GOTOTS_SCOPE_DEPENDENCY_OUTSIDE, so a
+		// completed run proves the selected dependency closure avoids every
+		// outside-universe root; the filter evidence is the per-category
+		// counts of pre-census-filtered files.
+		universe := firstRun.Inventory.Universe
+		details := []string{fmt.Sprintf("outside-universe files filtered before census: %d", universe.OutsideUniverseFiles)}
+		categories := make([]string, 0, len(universe.OutsideUniverse))
+		for category := range universe.OutsideUniverse {
+			categories = append(categories, category)
 		}
-		return "blocked", []string{"outside-universe roots are still represented by the current hard-exclusion inventory instead of being filtered before census"}, nil
+		sort.Strings(categories)
+		for _, category := range categories {
+			details = append(details, fmt.Sprintf("  %s: %d files", category, universe.OutsideUniverse[category]))
+		}
+		if universe.OutsideUniverseFiles == 0 && len(categories) == 0 {
+			details = append(details, "profile declares no outside-universe roots")
+		}
+		return "pass", details, nil
 	})
 	blocked("04-census-denominator-reconciliation",
 		"complete operation, ownership, support, and selected-test ledgers are not implemented")

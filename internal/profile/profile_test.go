@@ -7,7 +7,7 @@ func testProfile() *Profile {
 		GoModule:      "example.com/mod",
 		OwnedRoots:    []string{"internal/execute", "internal/scanner", "internal/vfs"},
 		TestOnlyRoots: []string{"internal/execute/tsctests", "internal/testutil", "internal/vfs/vfstest"},
-		HardExcludedRoots: map[string][]string{
+		OutsideUniverseRoots: map[string][]string{
 			"lsp":            {"internal/lsp"},
 			"editor-service": {"internal/ls", "internal/testutil/lsptestutil"},
 		},
@@ -29,10 +29,10 @@ func TestClassify(t *testing.T) {
 		{"example.com/mod/internal/execute/tsctests", ClassTestOnly, ""},
 		{"example.com/mod/internal/testutil", ClassTestOnly, ""},
 		// Hard-excluded carve-out inside a test-only root wins over test-only.
-		{"example.com/mod/internal/testutil/lsptestutil", ClassHardExcluded, "editor-service"},
-		{"example.com/mod/internal/lsp", ClassHardExcluded, "lsp"},
-		{"example.com/mod/internal/lsp/lsproto", ClassHardExcluded, "lsp"},
-		{"example.com/mod/internal/ls", ClassHardExcluded, "editor-service"},
+		{"example.com/mod/internal/testutil/lsptestutil", ClassOutsideUniverse, "editor-service"},
+		{"example.com/mod/internal/lsp", ClassOutsideUniverse, "lsp"},
+		{"example.com/mod/internal/lsp/lsproto", ClassOutsideUniverse, "lsp"},
+		{"example.com/mod/internal/ls", ClassOutsideUniverse, "editor-service"},
 		// Prefix matching is by path segment, not by string prefix.
 		{"example.com/mod/internal/lspx", ClassUnselected, ""},
 		{"example.com/mod/internal/other", ClassUnselected, ""},
@@ -101,7 +101,7 @@ func TestValidate(t *testing.T) {
 	}
 
 	crossCategory := base()
-	crossCategory.HardExcludedRoots["other-category"] = []string{"internal/ls/nested"}
+	crossCategory.OutsideUniverseRoots["other-category"] = []string{"internal/ls/nested"}
 	if err := crossCategory.validate(); err == nil {
 		t.Error("cross-category nested exclusion roots were not rejected")
 	}
@@ -116,13 +116,13 @@ func TestInvalidRootNesting(t *testing.T) {
 	ownedInsideExcluded := testProfile()
 	ownedInsideExcluded.OwnedRoots = append(ownedInsideExcluded.OwnedRoots, "internal/lsp/inner")
 	if problem := ownedInsideExcluded.invalidRootNesting(); problem == "" {
-		t.Error("owned root inside hard-excluded root was not rejected")
+		t.Error("owned root inside outside-universe root was not rejected")
 	}
 
 	testOnlyInsideExcluded := testProfile()
 	testOnlyInsideExcluded.TestOnlyRoots = append(testOnlyInsideExcluded.TestOnlyRoots, "internal/ls/testutil")
 	if problem := testOnlyInsideExcluded.invalidRootNesting(); problem == "" {
-		t.Error("test-only root inside hard-excluded root was not rejected")
+		t.Error("test-only root inside outside-universe root was not rejected")
 	}
 
 	ownedInsideTestOnly := testProfile()

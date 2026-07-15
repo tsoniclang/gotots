@@ -88,16 +88,32 @@ func TestCensusFixture(t *testing.T) {
 	if !strings.Contains(metadata, "go.mod") || !strings.Contains(metadata, "_tools/gen/go.mod") {
 		t.Errorf("module metadata incomplete: %v", universe.ModuleMetadata)
 	}
-	accounted := universe.InPackages + len(universe.GoOutsidePackages) +
+	accounted := universe.OutsideUniverseFiles + universe.InPackages + len(universe.GoOutsidePackages) +
 		len(universe.ModuleMetadata) + universe.NonBuildFiles
 	if universe.TrackedFiles != accounted {
 		t.Errorf("universe does not reconcile: tracked=%d accounted=%d (%+v)", universe.TrackedFiles, accounted, universe)
 	}
 
-	// External attribution: os is a test-only dependency (via support);
-	// net/http is reachable only through the hard-excluded package. The
-	// -deps contract must supply transitive test-dependency evidence (io is
-	// in os's closure).
+	// Outside-universe roots are filtered before census: their files get
+	// per-category counts and one class digest, never per-file records,
+	// and their packages never enter the inventory.
+	if universe.OutsideUniverseFiles != 1 || universe.OutsideUniverse["editor-service"] != 1 {
+		t.Errorf("outside-universe filter evidence wrong: files=%d categories=%v",
+			universe.OutsideUniverseFiles, universe.OutsideUniverse)
+	}
+	if universe.ClassDigests["outside-universe"] == "" {
+		t.Error("outside-universe class digest missing")
+	}
+	for _, pkg := range result.Inventory.Module {
+		if pkg.ImportPath == "example.com/fix/ex" {
+			t.Errorf("outside-universe package was inventoried: %+v", pkg)
+		}
+	}
+
+	// External attribution: os is a test-only dependency (via support).
+	// The -deps contract must supply transitive test-dependency evidence
+	// (io is in os's closure). net/http is imported only by the filtered
+	// outside-universe package, so no record derives from it.
 	externals := map[string]*ExternalUseEvidence{}
 	for i := range result.Inventory.External {
 		e := &result.Inventory.External[i]
@@ -111,21 +127,8 @@ func TestCensusFixture(t *testing.T) {
 	if e := externals["io"]; e == nil || !e.Test {
 		t.Errorf("io (transitive test dependency) missing or misattributed: %+v", e)
 	}
-	if e := externals["net/http"]; e == nil || !e.ExcludedOnly {
-		t.Errorf("net/http should be excluded-only: %+v", e)
-	}
-
-	// The production import of a hard-excluded package is a recorded
-	// contradiction, not a silent reclassification.
-	foundEdge := false
-	for _, edge := range report.Contradictions {
-		if edge.From == "example.com/fix/c" && edge.To == "example.com/fix/ex" &&
-			edge.Class == "hard-excluded" && edge.Scope == "production" && edge.File == "c/c.go" {
-			foundEdge = true
-		}
-	}
-	if !foundEdge {
-		t.Errorf("expected contradiction edge for c -> ex, got %+v", report.Contradictions)
+	if e := externals["net/http"]; e != nil {
+		t.Errorf("net/http derives only through the outside-universe root and must have no record: %+v", e)
 	}
 
 	// Publication is transactional and deterministic.

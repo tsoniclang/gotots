@@ -1,5 +1,6 @@
 // Package profile defines the explicit project profile that selects owned
-// package roots, hard exclusions, and build profiles for one product.
+// package roots, declares completely outside-universe roots (filtered
+// before census), and fixes build profiles for one product.
 package profile
 
 import (
@@ -41,7 +42,12 @@ type Profile struct {
 	// TestOnlyRoots are owned test-support roots: their source is analyzed
 	// under the owned-test scope and may be imported only from test scope.
 	TestOnlyRoots     []string            `json:"testOnlyRoots"`
-	HardExcludedRoots map[string][]string `json:"hardExcludedRoots"`
+	// OutsideUniverseRoots declare package roots that are completely
+	// outside the GoToTS input universe (LSP, fourslash, editor-service
+	// and their support trees). They are filtered before census: no file,
+	// declaration, test, or external record derives through them, and a
+	// selected dependency into one is a blocking scope error.
+	OutsideUniverseRoots map[string][]string `json:"outsideUniverseRoots"`
 	// ToolingRoots name directory trees (relative to the checkout root, not
 	// package paths) that hold generator/tooling source such as nested tool
 	// modules. Their files are classified tooling in the tracked-source
@@ -162,13 +168,13 @@ func (p *Profile) validate() error {
 	if err := checkRoots("testOnlyRoots", p.TestOnlyRoots); err != nil {
 		return err
 	}
-	categories := make([]string, 0, len(p.HardExcludedRoots))
-	for category := range p.HardExcludedRoots {
+	categories := make([]string, 0, len(p.OutsideUniverseRoots))
+	for category := range p.OutsideUniverseRoots {
 		categories = append(categories, category)
 	}
 	sort.Strings(categories)
 	for _, category := range categories {
-		if err := checkRoots("hardExcludedRoots."+category, p.HardExcludedRoots[category]); err != nil {
+		if err := checkRoots("outsideUniverseRoots."+category, p.OutsideUniverseRoots[category]); err != nil {
 			return err
 		}
 	}
@@ -183,7 +189,7 @@ func (p *Profile) validate() error {
 
 	sort.Strings(p.OwnedRoots)
 	sort.Strings(p.TestOnlyRoots)
-	for _, roots := range p.HardExcludedRoots {
+	for _, roots := range p.OutsideUniverseRoots {
 		sort.Strings(roots)
 	}
 	if problem := p.invalidRootNesting(); problem != "" {
@@ -193,33 +199,34 @@ func (p *Profile) validate() error {
 }
 
 // invalidRootNesting rejects root layouts that would make some root
-// unreachable. Hard-excluded carve-outs inside owned or test-only roots are
-// legal because exclusion is matched first; the reverse nesting is not.
+// unreachable. Outside-universe carve-outs inside owned or test-only roots
+// are legal because the outside match wins first; the reverse nesting is
+// not.
 func (p *Profile) invalidRootNesting() string {
 	under := func(inner, outer string) bool {
 		return inner == outer || strings.HasPrefix(inner, outer+"/")
 	}
-	for categoryName, category := range p.HardExcludedRoots {
+	for categoryName, category := range p.OutsideUniverseRoots {
 		for _, excluded := range category {
 			for _, owned := range p.OwnedRoots {
 				if under(owned, excluded) {
-					return "owned root " + owned + " is inside hard-excluded root " + excluded
+					return "owned root " + owned + " is inside outside-universe root " + excluded
 				}
 			}
 			for _, testOnly := range p.TestOnlyRoots {
 				if under(testOnly, excluded) {
-					return "test-only root " + testOnly + " is inside hard-excluded root " + excluded
+					return "test-only root " + testOnly + " is inside outside-universe root " + excluded
 				}
 			}
 			// Nesting across exclusion categories would make classification
 			// depend on category iteration order; reject it outright.
-			for otherName, other := range p.HardExcludedRoots {
+			for otherName, other := range p.OutsideUniverseRoots {
 				if otherName == categoryName {
 					continue
 				}
 				for _, otherRoot := range other {
 					if under(otherRoot, excluded) {
-						return "hard-excluded root " + otherRoot + " (" + otherName + ") is nested inside " + excluded + " (" + categoryName + ")"
+						return "outside-universe root " + otherRoot + " (" + otherName + ") is nested inside " + excluded + " (" + categoryName + ")"
 					}
 				}
 			}
@@ -249,9 +256,9 @@ func (p *Profile) BuildProfileByName(name string) (*BuildProfile, error) {
 type PackageClass string
 
 const (
-	ClassOwned        PackageClass = "owned"
-	ClassTestOnly     PackageClass = "owned-test-support"
-	ClassHardExcluded PackageClass = "hard-excluded"
+	ClassOwned        PackageClass = "selected-owned"
+	ClassTestOnly     PackageClass = "selected-test-support"
+	ClassOutsideUniverse PackageClass = "outside-universe"
 	ClassUnselected   PackageClass = "unselected"
 	// ClassExternal covers every package outside the owned module. The
 	// standard-library versus third-party split is not decided here: it
@@ -268,19 +275,19 @@ func matchRoot(relative string, roots []string) bool {
 	return false
 }
 
-// Classify assigns exactly one class to a package import path.
-// The second result names the hard-exclusion category when applicable.
+// Classify assigns exactly one scope class to a package import path.
+// The second result names the outside-universe category when applicable.
 func (p *Profile) Classify(pkgPath string) (PackageClass, string) {
 	if pkgPath == p.GoModule || strings.HasPrefix(pkgPath, p.GoModule+"/") {
 		relative := strings.TrimPrefix(strings.TrimPrefix(pkgPath, p.GoModule), "/")
-		categories := make([]string, 0, len(p.HardExcludedRoots))
-		for category := range p.HardExcludedRoots {
+		categories := make([]string, 0, len(p.OutsideUniverseRoots))
+		for category := range p.OutsideUniverseRoots {
 			categories = append(categories, category)
 		}
 		sort.Strings(categories)
 		for _, category := range categories {
-			if matchRoot(relative, p.HardExcludedRoots[category]) {
-				return ClassHardExcluded, category
+			if matchRoot(relative, p.OutsideUniverseRoots[category]) {
+				return ClassOutsideUniverse, category
 			}
 		}
 		if matchRoot(relative, p.TestOnlyRoots) {

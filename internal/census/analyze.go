@@ -252,11 +252,11 @@ func recordImports(prof *profile.Profile, externalIndex map[string]*inventory.Ex
 			if importSpec.Name != nil && importSpec.Name.Name == "." {
 				use.DotImports++
 			}
-		case profile.ClassHardExcluded:
-			*edges = append(*edges, Edge{
-				From: owner, File: relative, To: importPath,
-				Class: "hard-excluded", Category: category, Scope: scopeName,
-			})
+		case profile.ClassOutsideUniverse:
+			// The inventory scope-closure check fails before analysis can
+			// see such an edge; reaching here is a filter defect.
+			return fmt.Errorf("GOTOTS_SCOPE_DEPENDENCY_OUTSIDE:\n%s (%s) imports outside-universe package %s (%s)",
+				owner, scopeName, importPath, category)
 		case profile.ClassUnselected:
 			*edges = append(*edges, Edge{
 				From: owner, File: relative, To: importPath,

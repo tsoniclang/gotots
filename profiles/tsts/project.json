@@ -61,7 +61,7 @@
     "internal/tsoptions/tsoptionstest",
     "internal/vfs/vfstest"
   ],
-  "hardExcludedRoots": {
+  "outsideUniverseRoots": {
     "lsp": [
       "internal/lsp"
     ],

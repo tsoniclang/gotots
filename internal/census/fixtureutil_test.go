@@ -192,9 +192,7 @@ const Value = 7
 `,
 		"c/c.go": `package c
 
-import "example.com/fix/ex"
-
-func UseExcluded() { ex.Touch() }
+const Selected = 1
 `,
 		"ex/ex.go": `package ex
 
@@ -214,7 +212,7 @@ func basicFixtureProfile() map[string]any {
 		"product":       "fixture",
 		"ownedRoots":    []string{"a", "b.test", "c"},
 		"testOnlyRoots": []string{"support"},
-		"hardExcludedRoots": map[string]any{
+		"outsideUniverseRoots": map[string]any{
 			"editor-service": []string{"ex"},
 		},
 		"toolingRoots": []string{"_tools"},

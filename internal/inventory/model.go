@@ -12,7 +12,7 @@
 // Every build input any inventoried package names — selected or ignored,
 // Go or not, embed payloads included — is attested byte-for-byte against
 // the pinned commit tree, and dependency evidence is scope-attributed so
-// externals reachable only through hard-excluded or unselected source
+// externals reachable only through unselected source
 // cannot inflate product obligations.
 //
 // File layout: model.go owns the data model; run.go drives the go list
@@ -168,6 +168,12 @@ type TrackedFile struct {
 // every tracked file has exactly one disposition.
 type Universe struct {
 	TrackedFiles int `json:"trackedFiles"`
+	// OutsideUniverseFiles counts tracked files filtered before census
+	// because they lie under declared outside-universe roots. They have
+	// no per-file records: only these counts (per category) and the
+	// aggregate class digest attest what the filter removed.
+	OutsideUniverseFiles int            `json:"outsideUniverseFiles"`
+	OutsideUniverse      map[string]int `json:"outsideUniverse,omitempty"`
 	// InPackages counts tracked files claimed as build inputs (any class,
 	// embeds included) by inventoried packages.
 	InPackages int `json:"inPackages"`

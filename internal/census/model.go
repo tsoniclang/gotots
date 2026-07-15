@@ -94,7 +94,7 @@ type Edge struct {
 	From     string `json:"from"`
 	File     string `json:"file"`
 	To       string `json:"to"`
-	Class    string `json:"class"` // hard-excluded | unselected | test-only
+	Class    string `json:"class"` // unselected | test-only
 	Category string `json:"category,omitempty"`
 	Scope    string `json:"scope"` // production | test
 }
@@ -153,12 +153,11 @@ func newScopeReport() *ScopeReport {
 
 // PartitionCounts summarizes the complete pass-1 partition.
 type PartitionCounts struct {
-	Owned        int `json:"owned"`
-	TestOnly     int `json:"ownedTestSupport"`
-	HardExcluded int `json:"hardExcluded"`
-	Unselected   int `json:"unselected"`
-	ExternalStd  int `json:"externalStd"`
-	ExternalMod  int `json:"externalModule"`
+	Owned       int `json:"owned"`
+	TestOnly    int `json:"ownedTestSupport"`
+	Unselected  int `json:"unselected"`
+	ExternalStd int `json:"externalStd"`
+	ExternalMod int `json:"externalModule"`
 	// Product externals reachable from owned production/test scope; the
 	// remainder is reachable only through excluded or unselected source.
 	ExternalProductClosure int `json:"externalProductClosure"`
@@ -168,11 +167,11 @@ type PartitionCounts struct {
 // census: the profile file's content hash plus the resolved scope roots,
 // so two bundles from different boundaries are always distinguishable.
 type ProfileAttestation struct {
-	Hash              string              `json:"hash"`
-	OwnedRoots        []string            `json:"ownedRoots"`
-	TestOnlyRoots     []string            `json:"testOnlyRoots,omitempty"`
-	HardExcludedRoots map[string][]string `json:"hardExcludedRoots,omitempty"`
-	ToolingRoots      []string            `json:"toolingRoots,omitempty"`
+	Hash                 string              `json:"hash"`
+	OwnedRoots           []string            `json:"ownedRoots"`
+	TestOnlyRoots        []string            `json:"testOnlyRoots,omitempty"`
+	OutsideUniverseRoots map[string][]string `json:"outsideUniverseRoots,omitempty"`
+	ToolingRoots         []string            `json:"toolingRoots,omitempty"`
 }
 
 // Report is the deterministic census output. It contains no machine paths;

@@ -102,8 +102,8 @@ func runCensus(args []string) error {
 func printSummary(r *census.Report) {
 	fmt.Printf("pin        %s @ %s (%s)\n", r.Pin.GoModule, r.Pin.Revision[:12], r.Source.ToolchainVersion)
 	fmt.Printf("clean      before-load=%v after-load=%v\n", r.Source.CleanBeforeLoad, r.Source.CleanAfterLoad)
-	fmt.Printf("partition  owned=%d test-support=%d hard-excluded=%d unselected=%d external-std=%d external-module=%d\n",
-		r.Partition.Owned, r.Partition.TestOnly, r.Partition.HardExcluded,
+	fmt.Printf("partition  owned=%d test-support=%d unselected=%d external-std=%d external-module=%d\n",
+		r.Partition.Owned, r.Partition.TestOnly,
 		r.Partition.Unselected, r.Partition.ExternalStd, r.Partition.ExternalMod)
 	fmt.Printf("records    files=%d declarations=%d directives=%d rare-constructs=%d\n",
 		len(r.Files), len(r.Declarations), len(r.Directives), len(r.RareConstructs))

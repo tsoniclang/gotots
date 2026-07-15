@@ -3,7 +3,7 @@ package inventory
 import "github.com/tsoniclang/gotots/internal/profile"
 
 // attributeReachability walks the dependency graph from owned production,
-// owned test/test-support, and hard-excluded/unselected scopes separately,
+// owned test/test-support, and unselected scopes separately,
 // marking every external package with the scopes that can actually reach
 // it. Only external edges are traversed transitively; module-internal
 // traversal stays within the seeding scope because a cross-scope module
@@ -45,7 +45,7 @@ func attributeReachability(prof *profile.Profile, modulePackages map[string]*Mod
 			seedExternals(pkg.Imports, &testSeeds)
 			seedExternals(pkg.TestImports, &testSeeds)
 			seedExternals(pkg.XTestImports, &testSeeds)
-		case profile.ClassHardExcluded, profile.ClassUnselected:
+		case profile.ClassUnselected:
 			seedExternals(pkg.Imports, &excludedSeeds)
 			seedExternals(pkg.TestImports, &excludedSeeds)
 			seedExternals(pkg.XTestImports, &excludedSeeds)

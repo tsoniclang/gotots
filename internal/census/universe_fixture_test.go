@@ -282,7 +282,7 @@ func TestProfileFieldsHaveFixtureDispositions(t *testing.T) {
 		"buildProfiles":     "TestBuildProfileSelectsFiles",
 		"ownedRoots":        "TestCensusFixture partition assertions",
 		"testOnlyRoots":     "TestCensusFixture support-scope assertions",
-		"hardExcludedRoots": "TestCensusFixture contradiction assertions",
+		"outsideUniverseRoots": "TestCensusFixture pre-census filtering and TestScopeDependencyOutside rejection",
 		"toolingRoots":      "TestCensusFixture universe assertions",
 		"notes":             "documentation-only field, no behavior",
 	}
