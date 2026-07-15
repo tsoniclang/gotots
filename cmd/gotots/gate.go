@@ -438,48 +438,7 @@ func runGate(args []string) error {
 	blocked("08-fixed-point-representation-verification",
 		"constraint propagation, representation, necessity, and boundary proof verifier not implemented")
 	run("09-deterministic-staged-generation", func() (string, []string, error) {
-		if firstRun == nil {
-			return "blocked", []string{"census did not run"}, nil
-		}
-		prof, err := profile.Load(filepath.Join(*repoDir, filepath.FromSlash(*profilePath)))
-		if err != nil {
-			return "fail", nil, err
-		}
-		secondRun, err := census.Run(prof, *sourceDir, *buildProfile)
-		if err != nil {
-			return "fail", nil, err
-		}
-		staging := filepath.Join(os.TempDir(), fmt.Sprintf("gotots-gate-%d", os.Getpid()))
-		defer os.RemoveAll(staging)
-		first := filepath.Join(staging, "run1")
-		second := filepath.Join(staging, "run2")
-		if err := census.WriteReports(firstRun, first); err != nil {
-			return "fail", nil, err
-		}
-		if err := census.WriteReports(secondRun, second); err != nil {
-			return "fail", nil, err
-		}
-		var mismatches []string
-		for _, name := range []string{"inventory.json", "census.json", "declarations.json", "externals.json"} {
-			firstBytes, err := os.ReadFile(filepath.Join(first, name))
-			if err != nil {
-				return "fail", nil, err
-			}
-			secondBytes, err := os.ReadFile(filepath.Join(second, name))
-			if err != nil {
-				return "fail", nil, err
-			}
-			if !bytes.Equal(firstBytes, secondBytes) {
-				mismatches = append(mismatches, name)
-			}
-		}
-		if len(mismatches) > 0 {
-			return "fail", mismatches, fmt.Errorf("nondeterministic reports")
-		}
-		if _, err := census.VerifyBundle(first); err != nil {
-			return "fail", nil, err
-		}
-		return "blocked", []string{"census evidence is deterministic; complete generated TypeScript staged emission is not implemented"}, nil
+		return runStagedGenerationGate(*repoDir, *profilePath, *buildProfile, *sourceDir, report, firstRun, corpusGenerated)
 	})
 	run("10-strict-typescript-staticness", func() (string, []string, error) {
 		return runTscGate(*repoDir, *profilePath, *buildProfile, *sourceDir, report, productPin, firstRun)
