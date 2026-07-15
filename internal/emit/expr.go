@@ -52,7 +52,21 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return fmt.Sprintf("%s(%s)", callee, args), nil
+		// An instantiated generic call spells its type arguments
+		// explicitly, so inference differences can never change types.
+		typeArgs := ""
+		if len(n.TypeArgs) > 0 {
+			parts := make([]string, len(n.TypeArgs))
+			for i, typeArg := range n.TypeArgs {
+				spelled, err := p.tsType(typeArg)
+				if err != nil {
+					return "", err
+				}
+				parts[i] = spelled
+			}
+			typeArgs = "<" + strings.Join(parts, ", ") + ">"
+		}
+		return fmt.Sprintf("%s%s(%s)", callee, typeArgs, args), nil
 	case *ir.MethodCall:
 		recv, err := p.printExpr(n.Recv)
 		if err != nil {

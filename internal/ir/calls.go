@@ -17,15 +17,37 @@ func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
 		}
 	}
 
-	if function := b.staticCallee(n.Fun); function != nil {
-		if function.Pkg() == nil || !b.unit[function.Pkg().Path()] {
+	if function, nameIdent := b.staticCallee(n.Fun); function != nil {
+		if function.Pkg() == nil || !b.unit.Owns(function.Pkg().Path()) {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "call outside the translated unit", Span: span}
 		}
 		signature := function.Type().(*types.Signature)
-		if signature.Recv() != nil || signature.TypeParams() != nil {
+		if signature.Recv() != nil {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic call", Span: span}
 		}
 		call := &Call{Pkg: function.Pkg().Path(), Callee: function.Name()}
+		if signature.TypeParams() != nil {
+			// An instantiated generic call: the checker's substituted
+			// signature types the arguments and results, and the type
+			// arguments spell explicitly in the generated call.
+			instance, hasInstance := b.info.Instances[nameIdent]
+			if !hasInstance {
+				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic call without instantiation evidence", Span: span}
+			}
+			instantiated, ok := instance.Type.(*types.Signature)
+			if !ok {
+				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic call without instantiation evidence", Span: span}
+			}
+			signature = instantiated
+			for i := range instance.TypeArgs.Len() {
+				argType, err := b.typeOf(instance.TypeArgs.At(i), span)
+				if err != nil {
+					return nil, err
+				}
+				call.TypeArgs = append(call.TypeArgs, argType)
+			}
+			b.use("genericCall")
+		}
 		if err := b.buildCallArgsResults(n, signature, &call.Args, &call.Results); err != nil {
 			return nil, err
 		}
@@ -54,30 +76,41 @@ func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
 }
 
 // staticCallee resolves a plain or package-qualified identifier naming a
-// package-level function, by object identity — never spelling.
-func (b *builder) staticCallee(fun ast.Expr) *types.Func {
-	switch f := ast.Unparen(fun).(type) {
+// package-level function, by object identity — never spelling. The name
+// identifier keys the checker's instantiation evidence for generics.
+func (b *builder) staticCallee(fun ast.Expr) (*types.Func, *ast.Ident) {
+	unwrapped := ast.Unparen(fun)
+	// Explicit instantiation (F[T] or F[T, U]) names the function under
+	// the index expression; a non-function object there (a map or slice
+	// index) simply resolves to no static callee.
+	switch indexed := unwrapped.(type) {
+	case *ast.IndexExpr:
+		unwrapped = ast.Unparen(indexed.X)
+	case *ast.IndexListExpr:
+		unwrapped = ast.Unparen(indexed.X)
+	}
+	switch f := unwrapped.(type) {
 	case *ast.Ident:
 		function, _ := b.info.Uses[f].(*types.Func)
-		return function
+		return function, f
 	case *ast.SelectorExpr:
 		if _, hasSelection := b.info.Selections[f]; hasSelection {
-			return nil
+			return nil, nil
 		}
 		if base, isIdent := ast.Unparen(f.X).(*ast.Ident); isIdent {
 			if _, isPkg := b.info.Uses[base].(*types.PkgName); isPkg {
 				function, _ := b.info.Uses[f.Sel].(*types.Func)
-				return function
+				return function, f.Sel
 			}
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, selection *types.Selection) (Expr, error) {
 	span := b.span(n.Pos())
 	method := selection.Obj().(*types.Func)
-	if method.Pkg() == nil || !b.unit[method.Pkg().Path()] {
+	if method.Pkg() == nil || !b.unit.Owns(method.Pkg().Path()) {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method call outside the translated unit", Span: span}
 	}
 	recv, err := b.buildExpr(selector.X)

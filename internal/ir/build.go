@@ -56,9 +56,6 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 		operations: map[string]bool{},
 	}
 	span := b.span(decl.Pos())
-	if decl.Type.TypeParams != nil {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "generic function", Span: span}
-	}
 	if decl.Body == nil {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "bodyless function", Span: span}
 	}
@@ -78,6 +75,13 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 		Exported: decl.Name.IsExported(),
 		Span:     span,
 		BodyHash: bodyHash,
+	}
+	if decl.Type.TypeParams != nil {
+		names, err := b.admitGenericFunction(object, span)
+		if err != nil {
+			return nil, err
+		}
+		function.TypeParams = names
 	}
 
 	if recv := signature.Recv(); recv != nil {

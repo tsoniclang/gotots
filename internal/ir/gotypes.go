@@ -49,7 +49,7 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 		if _, isStruct := named.Underlying().(*types.Struct); !isStruct {
 			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "pointer to non-struct type " + spelled, Span: span}
 		}
-		if named.Obj().Pkg() == nil || !b.unit[named.Obj().Pkg().Path()] {
+		if named.Obj().Pkg() == nil || !b.unit.Owns(named.Obj().Pkg().Path()) {
 			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "pointer to type outside the translated unit: " + spelled, Span: span}
 		}
 		declaringPkg := named.Obj().Pkg().Path()
@@ -100,7 +100,7 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 
 	case *types.Struct:
 		named, ok := types.Unalias(t).(*types.Named)
-		if !ok || named.Obj().Pkg() == nil || !b.unit[named.Obj().Pkg().Path()] {
+		if !ok || named.Obj().Pkg() == nil || !b.unit.Owns(named.Obj().Pkg().Path()) {
 			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "struct type " + spelled, Span: span}
 		}
 		// Struct values are reviewed only behind pointers and receivers;
@@ -121,7 +121,7 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 		return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "channel type " + spelled, Span: span}
 
 	case *types.TypeParam:
-		return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "type parameter " + spelled, Span: span}
+		return Type{Kind: KindTypeParam, Go: spelled, Named: u.Obj().Name()}, nil
 	}
 	return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "type " + spelled, Span: span}
 }

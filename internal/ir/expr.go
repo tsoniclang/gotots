@@ -282,7 +282,7 @@ func (b *builder) buildVarRef(variable *types.Var, name string, span Span) (Expr
 	}
 	pkg := ""
 	if variable.Pkg() != nil && variable.Parent() == variable.Pkg().Scope() {
-		if !b.unit[variable.Pkg().Path()] {
+		if !b.unit.Owns(variable.Pkg().Path()) {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "variable outside the translated unit", Span: span}
 		}
 		pkg = variable.Pkg().Path()

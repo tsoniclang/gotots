@@ -58,12 +58,16 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 		class, _ := prof.Classify(p.PkgPath)
 		return class == profile.ClassOwned
 	}
-	unit := ir.Scope{}
+	var ownedPaths []string
+	var ownedPackages []*packages.Package
 	for _, p := range loaded {
 		if owned(p) {
-			unit[p.PkgPath] = true
+			ownedPaths = append(ownedPaths, p.PkgPath)
+			ownedPackages = append(ownedPackages, p)
 		}
 	}
+	unit := ir.NewScope(ownedPaths...)
+	collectGenericInstances(unit, ownedPackages)
 
 	for _, p := range loaded {
 		if !owned(p) {

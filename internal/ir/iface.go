@@ -24,7 +24,7 @@ func (b *builder) rttiFor(t types.Type, span Span) (RttiRef, error) {
 
 	case *types.Named:
 		obj := concrete.Obj()
-		if obj.Pkg() == nil || !b.unit[obj.Pkg().Path()] {
+		if obj.Pkg() == nil || !b.unit.Owns(obj.Pkg().Path()) {
 			return RttiRef{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
 				Construct: "interface value of a type outside the translated unit", Span: span}
 		}
@@ -37,7 +37,7 @@ func (b *builder) rttiFor(t types.Type, span Span) (RttiRef, error) {
 				Construct: "interface value of a pointer to an unnamed type", Span: span}
 		}
 		obj := named.Obj()
-		if obj.Pkg() == nil || !b.unit[obj.Pkg().Path()] {
+		if obj.Pkg() == nil || !b.unit.Owns(obj.Pkg().Path()) {
 			return RttiRef{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
 				Construct: "interface value of a type outside the translated unit", Span: span}
 		}

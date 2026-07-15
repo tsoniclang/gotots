@@ -72,7 +72,7 @@ func (b *builder) buildClosure(lit *ast.FuncLit) (Expr, error) {
 // buildFuncRef references a package-level function of the translated
 // unit as a first-class value.
 func (b *builder) buildFuncRef(function *types.Func, span Span) (Expr, error) {
-	if function.Pkg() == nil || !b.unit[function.Pkg().Path()] {
+	if function.Pkg() == nil || !b.unit.Owns(function.Pkg().Path()) {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "reference to a function outside the translated unit", Span: span}
 	}
 	signature := function.Type().(*types.Signature)

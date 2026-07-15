@@ -8,7 +8,10 @@
 // source span — they are never approximated, skipped, or passed through.
 package ir
 
-import "fmt"
+import (
+	"fmt"
+	"go/types"
+)
 
 // Kind is the exact Go semantic type class of an IR value.
 type Kind int
@@ -52,6 +55,11 @@ const (
 	// interface. Boxing at conversion sites preserves the nil-pointer-in-
 	// interface distinction exactly.
 	KindIface
+	// KindTypeParam is a generic function's type parameter: an opaque
+	// carrier admitted only for operations exact under every recorded
+	// instantiation (the unit-wide closed-world evidence excludes struct
+	// values, whose copy semantics a single body cannot express).
+	KindTypeParam
 )
 
 // Type is the resolved semantic type of an IR value with its canonical Go
@@ -80,10 +88,45 @@ type FuncSig struct {
 	Results []Type
 }
 
-// Scope is the set of Go package paths translated together as one unit.
-// References into any scope package resolve to generated modules; every
-// reference outside the scope fails closed.
-type Scope map[string]bool
+// Scope is the translation unit's shared context: the set of package
+// paths translated together (references outside it fail closed) plus the
+// unit-wide generic instantiation evidence that admits generic
+// declarations under the closed-world contract.
+type Scope struct {
+	packages map[string]bool
+	// generics maps each generic function to the type-argument tuples of
+	// every instantiation anywhere in the unit.
+	generics map[*types.Func][][]types.Type
+}
+
+// NewScope builds a unit scope over the given package paths.
+func NewScope(paths ...string) Scope {
+	packages := make(map[string]bool, len(paths))
+	for _, path := range paths {
+		packages[path] = true
+	}
+	return Scope{packages: packages, generics: map[*types.Func][][]types.Type{}}
+}
+
+// Owns reports whether the package path is part of the unit.
+func (s Scope) Owns(path string) bool { return s.packages[path] }
+
+// Paths returns every unit package path (unordered).
+func (s Scope) Paths() []string {
+	paths := make([]string, 0, len(s.packages))
+	for path := range s.packages {
+		paths = append(paths, path)
+	}
+	return paths
+}
+
+// AddGenericInstance records one instantiation of a generic function.
+func (s Scope) AddGenericInstance(fn *types.Func, typeArgs []types.Type) {
+	s.generics[fn] = append(s.generics[fn], typeArgs)
+}
+
+// GenericInstances returns every recorded instantiation of fn.
+func (s Scope) GenericInstances(fn *types.Func) [][]types.Type { return s.generics[fn] }
 
 // Signed reports whether the kind is a signed integer.
 func (k Kind) Signed() bool {
@@ -153,6 +196,9 @@ type Func struct {
 	Name     string
 	Exported bool
 	Span     Span
+	// TypeParams are the generic type parameter names, admitted under
+	// the unit's closed-world instantiation evidence.
+	TypeParams []string
 	// Receiver is set for methods: a pointer-to-struct parameter bound to
 	// the generated class instance.
 	Receiver *Var

@@ -323,7 +323,11 @@ func printFunc(out *strings.Builder, module *Module, function *ir.Func) error {
 	if function.Exported {
 		export = "export "
 	}
-	p.line("%sfunction %s%s {", export, function.Name, signature)
+	generics := ""
+	if len(function.TypeParams) > 0 {
+		generics = "<" + strings.Join(function.TypeParams, ", ") + ">"
+	}
+	p.line("%sfunction %s%s%s {", export, function.Name, generics, signature)
 	p.indent++
 	if err := p.printBlockBody(function.Body); err != nil {
 		return fmt.Errorf("%s: %w", function.ID, err)
@@ -391,6 +395,8 @@ func (p *printer) tsType(t ir.Type) (string, error) {
 		return p.module.symbol(t.Pkg, t.Named)
 	case ir.KindIface:
 		return "goif.GoIface", nil
+	case ir.KindTypeParam:
+		return t.Named, nil
 	case ir.KindFunc:
 		var params []string
 		for i, parameter := range t.Sig.Params {

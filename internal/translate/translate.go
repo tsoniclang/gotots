@@ -75,13 +75,17 @@ const abiDir = "language-abi"
 func Packages(pkgs []*packages.Package, sourceDir string, options Options) (*Generated, error) {
 	sorted := append([]*packages.Package{}, pkgs...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].PkgPath < sorted[j].PkgPath })
-	unit := ir.Scope{}
+	seen := map[string]bool{}
+	paths := make([]string, 0, len(sorted))
 	for _, p := range sorted {
-		if unit[p.PkgPath] {
+		if seen[p.PkgPath] {
 			return nil, fmt.Errorf("package %s appears twice in the translation unit", p.PkgPath)
 		}
-		unit[p.PkgPath] = true
+		seen[p.PkgPath] = true
+		paths = append(paths, p.PkgPath)
 	}
+	unit := ir.NewScope(paths...)
+	collectGenericInstances(unit, sorted)
 
 	out := &Generated{
 		Files:     map[string]string{},
@@ -375,7 +379,7 @@ func newModule(corePath, pkgPath, pkgName string, unit ir.Scope) (*emit.Module, 
 		return nil, err
 	}
 	specifiers := map[string]string{}
-	for other := range unit {
+	for _, other := range unit.Paths() {
 		if other == pkgPath {
 			continue
 		}
@@ -446,6 +450,25 @@ func translateFunc(p *packages.Package, sourceDir string, unit ir.Scope, relativ
 		LoweringPlan:    LoweringPlanV1,
 		GeneratedSymbol: name,
 	}, nil
+}
+
+// collectGenericInstances records every generic-function instantiation
+// across the unit: the closed-world evidence that admits generic
+// declarations.
+func collectGenericInstances(unit ir.Scope, pkgs []*packages.Package) {
+	for _, p := range pkgs {
+		for ident, instance := range p.TypesInfo.Instances {
+			fn, isFunc := p.TypesInfo.Uses[ident].(*types.Func)
+			if !isFunc {
+				continue
+			}
+			args := make([]types.Type, 0, instance.TypeArgs.Len())
+			for i := range instance.TypeArgs.Len() {
+				args = append(args, instance.TypeArgs.At(i))
+			}
+			unit.AddGenericInstance(fn, args)
+		}
+	}
 }
 
 // erasedCarrier resolves the reviewed carrier of a non-struct named type
