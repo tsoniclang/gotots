@@ -33,6 +33,9 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 	if printed, isCollection, err := p.printCollectionExpr(e); isCollection {
 		return printed, err
 	}
+	if printed, isIface, err := p.printIfaceExpr(e); isIface {
+		return printed, err
+	}
 	switch n := e.(type) {
 	case *ir.Const:
 		return printConst(n)
@@ -192,80 +195,6 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			typeArgs = "<" + strings.Join(parts, ", ") + ">"
 		}
 		return fmt.Sprintf("%s%s(%s)", callee, typeArgs, args), nil
-	case *ir.IfaceBox:
-		x, err := p.printExpr(n.X)
-		if err != nil {
-			return "", err
-		}
-		rtti, err := p.rttiRef(n.Rtti)
-		if err != nil {
-			return "", err
-		}
-		return "goif$.goIfaceBox(" + rtti + ", " + x + ")", nil
-	case *ir.IfaceCall:
-		recv, err := p.printExpr(n.Recv)
-		if err != nil {
-			return "", err
-		}
-		args, err := p.printArgs(n.Args)
-		if err != nil {
-			return "", err
-		}
-		call := fmt.Sprintf("goif$.goIfaceCall(%s, %q, [%s])", recv, n.Method, args)
-		return p.castResults(call, n.Results)
-	case *ir.TypeAssert:
-		x, err := p.printExpr(n.X)
-		if err != nil {
-			return "", err
-		}
-		rtti, err := p.rttiRef(n.Rtti)
-		if err != nil {
-			return "", err
-		}
-		if n.CommaOk {
-			zero, err := p.zeroLiteral(n.Target)
-			if err != nil {
-				return "", err
-			}
-			return "goif$.goIfaceLookup(" + x + ", " + rtti + ", " + zero + ")", nil
-		}
-		spelled, err := p.tsType(n.Target)
-		if err != nil {
-			return "", err
-		}
-		return fmt.Sprintf("(goif$.goIfaceAssert(%s, %s, %q) as (%s))", x, rtti, n.SourceDisplay, spelled), nil
-	case *ir.StructEqual:
-		left, err := p.printExpr(n.L)
-		if err != nil {
-			return "", err
-		}
-		right, err := p.printExpr(n.R)
-		if err != nil {
-			return "", err
-		}
-		op := "==="
-		if n.Negate {
-			op = "!=="
-		}
-		return "(" + left + ".goKey$() " + op + " " + right + ".goKey$())", nil
-	case *ir.IfaceAssert:
-		x, err := p.printExpr(n.X)
-		if err != nil {
-			return "", err
-		}
-		methods := make([]string, len(n.Methods))
-		for i, method := range n.Methods {
-			methods[i] = fmt.Sprintf("%q", method)
-		}
-		list := "[" + joinComma(methods) + "]"
-		if n.CommaOk {
-			return fmt.Sprintf("goif$.goIfaceLookupIface(%s, %s)", x, list), nil
-		}
-		spelled, err := p.tsType(n.Target)
-		if err != nil {
-			return "", err
-		}
-		return fmt.Sprintf("(goif$.goIfaceAssertIface(%s, %s, %q, %q) as (%s))", x, list, n.SourceDisplay, n.TargetDisplay, spelled), nil
 	case *ir.StructCopy:
 		x, err := p.printExpr(n.X)
 		if err != nil {

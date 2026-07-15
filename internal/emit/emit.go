@@ -374,6 +374,9 @@ func (p *printer) tsType(t ir.Type) (string, error) {
 	case ir.KindExternal:
 		return fmt.Sprintf("goext$.GoExtern<%q>", t.Pkg+"."+t.Named), nil
 	case ir.KindIface:
+		if t.TypeParamName != "" {
+			return tsName(t.TypeParamName), nil
+		}
 		return "goif$.GoIface", nil
 	case ir.KindTypeParam:
 		return t.Named, nil

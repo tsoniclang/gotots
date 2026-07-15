@@ -387,6 +387,11 @@
       "specClause": "docs/spec/06-interfaces-generics-functions.md"
     },
     {
+      "key": "ifaceEqual",
+      "state": "generated",
+      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+    },
+    {
       "key": "ifaceMethodValue",
       "state": "generated",
       "specClause": "docs/spec/06-interfaces-generics-functions.md"

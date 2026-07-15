@@ -34,6 +34,13 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 	}
 	spelled := t.String()
 
+	if param, isParam := types.Unalias(t).(*types.TypeParam); isParam {
+		// A type parameter's underlying is its constraint interface; the
+		// carrier is the opaque interface kind, spelled by the parameter
+		// name so generic signatures stay generic.
+		return Type{Kind: KindIface, Go: spelled, TypeParamName: param.Obj().Name()}, nil
+	}
+
 	switch u := t.Underlying().(type) {
 	case *types.Basic:
 		kind, ok := basicKind(u)
@@ -170,8 +177,6 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 	case *types.Chan:
 		return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "channel type " + spelled, Span: span}
 
-	case *types.TypeParam:
-		return Type{Kind: KindTypeParam, Go: spelled, Named: u.Obj().Name()}, nil
 	}
 	return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "type " + spelled, Span: span}
 }

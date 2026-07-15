@@ -64,7 +64,7 @@ func printRtti(out *strings.Builder, module *Module, typeName string, exported, 
 	display := module.PkgName + "." + typeName
 	p.line("%sconst %s$rtti: goif$.GoRtti = { d: %q, m: %s };", export, typeName, display, table)
 	if pointer {
-		p.line("%sconst %s$rttiPtr: goif$.GoRtti = { d: %q, m: %s };", export, typeName, "*"+display, table)
+		p.line("%sconst %s$rttiPtr: goif$.GoRtti = { d: %q, m: %s, p: true };", export, typeName, "*"+display, table)
 	}
 	return nil
 }

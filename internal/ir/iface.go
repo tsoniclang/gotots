@@ -2,6 +2,7 @@ package ir
 
 import (
 	"go/ast"
+	"go/token"
 	"go/types"
 	"sort"
 	"strings"
@@ -295,4 +296,78 @@ func (a *IfaceAssert) Type() Type {
 		return Type{Kind: KindInvalid, Go: "(iface, bool)"}
 	}
 	return a.Target
+}
+
+// IfaceEqual compares two interface values by Go's rule: equal dynamic
+// types and equal values (uncomparable dynamic types panic at runtime).
+type IfaceEqual struct {
+	L, R   Expr
+	Negate bool
+}
+
+// IfaceConcreteEqual compares an interface value against a concrete
+// operand: the dynamic type must be the concrete type and the values
+// must be equal. Form selects the value comparison.
+type IfaceConcreteEqual struct {
+	Iface     Expr
+	Concrete  Expr
+	IfaceLeft bool
+	Rtti      RttiRef
+	Form      string // "prim" (=== carriers) | "key" (canonical struct key)
+	Negate    bool
+}
+
+func (*IfaceEqual) expr()                {}
+func (e *IfaceEqual) Type() Type         { return boolType }
+func (*IfaceConcreteEqual) expr()        {}
+func (e *IfaceConcreteEqual) Type() Type { return boolType }
+
+// buildIfaceEquality intercepts ==/!= where at least one operand is an
+// interface (nil comparisons are handled earlier). Returns (nil, nil)
+// when neither side is an interface.
+func (b *builder) buildIfaceEquality(n *ast.BinaryExpr, left, right Expr, span Span) (Expr, error) {
+	leftIface := left.Type().Kind == KindIface
+	rightIface := right.Type().Kind == KindIface
+	negate := n.Op == token.NEQ
+	if !leftIface && !rightIface {
+		return nil, nil
+	}
+	if left.Type().TypeParamName != "" || right.Type().TypeParamName != "" {
+		// Type-parameter operands carry raw values, not boxes: their ==
+		// stays the direct carrier comparison (the instantiation guard
+		// admits only carriers whose === is exact).
+		return nil, nil
+	}
+	if leftIface && rightIface {
+		b.use("ifaceEqual")
+		return &IfaceEqual{L: left, R: right, Negate: negate}, nil
+	}
+	iface, concrete := left, right
+	concreteAST := n.Y
+	if rightIface {
+		iface, concrete = right, left
+		concreteAST = n.X
+	}
+	concreteGoType := b.info.Types[concreteAST].Type
+	rtti, err := b.rttiFor(concreteGoType, span)
+	if err != nil {
+		return nil, err
+	}
+	form := ""
+	kind := concrete.Type().Kind
+	switch {
+	case kind.Integer() || kind.Float() || kind == KindString || kind == KindBool ||
+		kind == KindPointer || kind == KindUnit:
+		form = "prim"
+	case kind == KindStruct && b.structKeyEncodable(concreteGoType, span):
+		form = "key"
+	default:
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION",
+			Construct: "equality between an interface and " + concrete.Type().Go, Span: span}
+	}
+	b.use("ifaceEqual")
+	return &IfaceConcreteEqual{
+		Iface: iface, Concrete: concrete, IfaceLeft: leftIface,
+		Rtti: rtti, Form: form, Negate: negate,
+	}, nil
 }

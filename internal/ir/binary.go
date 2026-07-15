@@ -46,6 +46,12 @@ func (b *builder) buildBinary(n *ast.BinaryExpr, resultType types.Type) (Expr, e
 	}
 	operand := left.Type()
 
+	if n.Op == token.EQL || n.Op == token.NEQ {
+		if mixed, err := b.buildIfaceEquality(n, left, right, span); mixed != nil || err != nil {
+			return mixed, err
+		}
+	}
+
 	switch n.Op {
 	case token.ADD, token.SUB, token.MUL, token.QUO, token.REM,
 		token.AND, token.OR, token.XOR, token.AND_NOT,

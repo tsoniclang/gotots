@@ -99,6 +99,9 @@ type Type struct {
 	Sig *FuncSig
 	// ArrayLen is the fixed length of a KindArray.
 	ArrayLen int64
+	// TypeParamName, on a KindIface carrier, names the generic type
+	// parameter this type is; signatures spell it generically.
+	TypeParamName string
 }
 
 // FuncSig is the shape of a function value's type.

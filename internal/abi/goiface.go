@@ -20,6 +20,8 @@ export interface GoRtti {
   readonly d: string;
   readonly m: Readonly<Record<string, Function>>;
   readonly x?: string;
+  // p marks a pointer type: its boxed values compare by identity.
+  readonly p?: boolean;
 }
 
 // Composite and external rttis intern per canonical type identity, so
@@ -61,6 +63,48 @@ export function goIfaceCall(i: GoIface, method: string, args: unknown[]): unknow
 
 export function goIfaceIs(i: GoIface, r: GoRtti): boolean {
   return i !== undefined && i.r === r;
+}
+
+// Interface equality: equal dynamic types and equal values. Pointer
+// dynamic values compare by identity; struct values with a canonical
+// key compare field-wise through it; every other object-carried
+// dynamic value has no reviewed equality yet and fails closed with a
+// stable diagnostic (Go panics only for genuinely uncomparable types).
+export function goIfaceEqual(a: GoIface, b: GoIface): boolean {
+  if (a === undefined || b === undefined) {
+    return a === b;
+  }
+  if (a.r !== b.r) {
+    return false;
+  }
+  return ifaceValueEqual(a.r, a.v, b.v);
+}
+
+// Interface-against-concrete equality with === value carriers.
+export function goIfaceEqualPrim(i: GoIface, r: GoRtti, v: unknown): boolean {
+  return i !== undefined && i.r === r && i.v === v;
+}
+
+// Interface-against-concrete equality through the canonical struct key.
+export function goIfaceEqualKey(i: GoIface, r: GoRtti, v: { goKey$(): string }): boolean {
+  return i !== undefined && i.r === r && (i.v as { goKey$(): string }).goKey$() === v.goKey$();
+}
+
+function ifaceValueEqual(r: GoRtti, a: unknown, b: unknown): boolean {
+  if (a === b) {
+    return true; // identity covers pointers and every equal primitive
+  }
+  if (typeof a !== "object" || a === null || typeof b !== "object" || b === null) {
+    return false;
+  }
+  if (r.p === true) {
+    return false; // distinct pointer identities
+  }
+  const keyed = a as { goKey$?: () => string };
+  if (typeof keyed.goKey$ === "function") {
+    return keyed.goKey$() === (b as { goKey$(): string }).goKey$();
+  }
+  throw new GoPanic("GOTOTS_UNIMPLEMENTED: interface equality over " + r.d);
 }
 
 // x.(T), panic form: both messages name the static source interface.

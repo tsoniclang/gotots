@@ -317,3 +317,55 @@ func InitializationOrder() (string, string, int) {
 }
 `)
 }
+
+func TestOracleInterfaceEquality(t *testing.T) {
+	runOracle(t, `package fixture
+
+type coord struct {
+	x int
+	y int
+}
+
+type tag struct {
+	label string
+}
+
+func IfaceVsConcrete() (bool, bool, bool, bool) {
+	var v any = 5
+	var s any = "go"
+	var c any = coord{x: 1, y: 2}
+	return v == 5, 5 == v, s == "rust", c == coord{x: 1, y: 2}
+}
+
+func IfaceVsIface() (bool, bool, bool, bool) {
+	var a any = 7
+	var b any = 7
+	var c any = int32(7)
+	var d any = coord{x: 3}
+	var e any = coord{x: 3}
+	return a == b, a == c, d == e, a == d
+}
+
+func NilIfacePairs() (bool, bool) {
+	var a any
+	var b any
+	var c any = 1
+	return a == b, a == c
+}
+
+func PointerDynamicValues() (bool, bool) {
+	p := &tag{label: "t"}
+	q := &tag{label: "t"}
+	var a any = p
+	var b any = p
+	var c any = q
+	return a == b, a == c
+}
+
+func ErrorComparison() bool {
+	var e1 error
+	var e2 error
+	return e1 == e2
+}
+`)
+}
