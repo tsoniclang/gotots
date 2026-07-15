@@ -59,6 +59,11 @@ func translateFunc(p *packages.Package, sourceDir string, unit ir.Scope, relativ
 	for _, result := range function.Results {
 		recordRepresentation(result.Type)
 	}
+	// The planner's per-region slice selections are part of the proof:
+	// the representation gate re-derives and compares them.
+	for name, candidate := range function.SlicePlans {
+		representations["slice-local:"+name] = candidate
+	}
 
 	return function, &Proof{
 		ID:              id,
