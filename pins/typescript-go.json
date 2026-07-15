@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "upstream": "microsoft/typescript-go",
+  "goModule": "github.com/microsoft/typescript-go",
+  "revision": "c78d39e7075b4fc641b12b1f35d905c54cdc13ef",
+  "toolchain": {
+    "version": "go1.26.4",
+    "goos": "linux",
+    "goarch": "amd64"
+  }
+}
