@@ -12,22 +12,22 @@ import (
 
 // fileStats collects the typed inventory of one source file.
 type fileStats struct {
-	declarations   []DeclarationRecord
-	directives     []DirectiveRecord
-	rare           []RareConstructRecord
-	functionShapes []FunctionShape
-	typeShapes     []TypeShape
-	constShapes    []ConstShape
-	varShapes      []VarShape
-	aliasShapes    []AliasShape
+	declarations    []DeclarationRecord
+	directives      []DirectiveRecord
+	rare            []RareConstructRecord
+	functionShapes  []FunctionShape
+	typeShapes      []TypeShape
+	constShapes     []ConstShape
+	varShapes       []VarShape
+	aliasShapes     []AliasShape
 	testFunctions   []TestFunctionRecord
 	externalUses    map[string]*ExternalObligation
 	externalObjects map[types.Object]bool
-	constructs     map[string]int
-	builtins       map[string]int
-	rangeOperands  map[string]int
-	indexOperands  map[string]int
-	astKinds       map[string]int
+	constructs      map[string]int
+	builtins        map[string]int
+	rangeOperands   map[string]int
+	indexOperands   map[string]int
+	astKinds        map[string]int
 }
 
 // rareConstructs are low-volume constructs whose every occurrence is
