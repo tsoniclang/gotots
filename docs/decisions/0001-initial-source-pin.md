@@ -12,8 +12,11 @@ linux/amd64` under the `linux-amd64` build profile.
 
 The pin is recorded in `pins/typescript-go.json` and verified fail-closed by
 `internal/pinning` before any extraction: exact revision, clean checkout,
-module identity, and toolchain identity (version, GOOS/GOARCH, executable
-digest).
+module identity, and complete toolchain identity — version, GOOS/GOARCH, the
+go executable sha256, and a digest of the GOROOT VERSION file plus the
+complete GOROOT/src tree. Two different toolchains reporting the same
+version string do not pass. Checkout cleanliness is re-verified after
+loading to prove extraction mutated nothing.
 
 ## Evidence
 

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -40,11 +41,11 @@ type Profile struct {
 	Pin *pinning.Pin `json:"-"`
 }
 
-// Load reads a profile and its referenced pin. Paths inside the profile are
-// resolved relative to the profile file's directory's repository root, i.e.
-// relative to the directory that contains the profile path's first segment.
-func Load(path string) (*Profile, error) {
-	data, err := os.ReadFile(path)
+// Load reads a profile and its referenced pin. PinPath is resolved relative
+// to the directory containing the profile file — one explicit, deterministic
+// base; no parent-directory searching.
+func Load(profilePath string) (*Profile, error) {
+	data, err := os.ReadFile(profilePath)
 	if err != nil {
 		return nil, fmt.Errorf("read profile: %w", err)
 	}
@@ -52,39 +53,21 @@ func Load(path string) (*Profile, error) {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&p); err != nil {
-		return nil, fmt.Errorf("parse profile %s: %w", path, err)
+		return nil, fmt.Errorf("parse profile %s: %w", profilePath, err)
 	}
 	if p.SchemaVersion != 1 {
-		return nil, fmt.Errorf("profile %s: unsupported schemaVersion %d", path, p.SchemaVersion)
+		return nil, fmt.Errorf("profile %s: unsupported schemaVersion %d", profilePath, p.SchemaVersion)
 	}
-	if p.GoModule == "" || len(p.OwnedRoots) == 0 || len(p.BuildProfiles) == 0 {
-		return nil, fmt.Errorf("profile %s: goModule, ownedRoots, and buildProfiles are required", path)
+	if p.GoModule == "" || len(p.OwnedRoots) == 0 || len(p.BuildProfiles) == 0 || p.PinPath == "" {
+		return nil, fmt.Errorf("profile %s: goModule, pin, ownedRoots, and buildProfiles are required", profilePath)
 	}
-	sort.Strings(p.OwnedRoots)
-	sort.Strings(p.TestOnlyRoots)
-	for _, roots := range p.HardExcludedRoots {
-		sort.Strings(roots)
-	}
-	if problem := p.invalidRootNesting(); problem != "" {
-		return nil, fmt.Errorf("profile %s: invalid root nesting: %s", path, problem)
+	if err := p.validate(); err != nil {
+		return nil, fmt.Errorf("profile %s: %w", profilePath, err)
 	}
 
 	pinPath := p.PinPath
 	if !filepath.IsAbs(pinPath) {
-		// Profile-relative paths resolve against the repository root, which is
-		// assumed to be the parent of the profiles/ directory the profile
-		// lives in. Fall back to profile-file-relative resolution.
-		base := filepath.Dir(path)
-		for dir := base; ; dir = filepath.Dir(dir) {
-			candidate := filepath.Join(dir, pinPath)
-			if _, err := os.Stat(candidate); err == nil {
-				pinPath = candidate
-				break
-			}
-			if dir == filepath.Dir(dir) {
-				return nil, fmt.Errorf("profile %s: pin file %q not found relative to any parent directory", path, p.PinPath)
-			}
-		}
+		pinPath = filepath.Join(filepath.Dir(profilePath), filepath.FromSlash(pinPath))
 	}
 	pin, err := pinning.Load(pinPath)
 	if err != nil {
@@ -95,6 +78,62 @@ func Load(path string) (*Profile, error) {
 	}
 	p.Pin = pin
 	return &p, nil
+}
+
+// validate enforces normalized roots, unique names, disjoint root lists, and
+// reachable nesting. It sorts every list for deterministic iteration.
+func (p *Profile) validate() error {
+	names := map[string]bool{}
+	for _, build := range p.BuildProfiles {
+		if build.Name == "" || build.GOOS == "" || build.GOARCH == "" {
+			return fmt.Errorf("build profile %q: name, goos, and goarch are required", build.Name)
+		}
+		if names[build.Name] {
+			return fmt.Errorf("duplicate build profile name %q", build.Name)
+		}
+		names[build.Name] = true
+	}
+
+	seen := map[string]string{} // root -> list it came from
+	checkRoots := func(listName string, roots []string) error {
+		for _, root := range roots {
+			if root == "" || path.Clean(root) != root || path.IsAbs(root) ||
+				strings.HasPrefix(root, "./") || strings.HasPrefix(root, "../") || root == "." {
+				return fmt.Errorf("%s: root %q is not a normalized module-relative path", listName, root)
+			}
+			if previous, ok := seen[root]; ok {
+				return fmt.Errorf("root %q appears in both %s and %s", root, previous, listName)
+			}
+			seen[root] = listName
+		}
+		return nil
+	}
+	if err := checkRoots("ownedRoots", p.OwnedRoots); err != nil {
+		return err
+	}
+	if err := checkRoots("testOnlyRoots", p.TestOnlyRoots); err != nil {
+		return err
+	}
+	categories := make([]string, 0, len(p.HardExcludedRoots))
+	for category := range p.HardExcludedRoots {
+		categories = append(categories, category)
+	}
+	sort.Strings(categories)
+	for _, category := range categories {
+		if err := checkRoots("hardExcludedRoots."+category, p.HardExcludedRoots[category]); err != nil {
+			return err
+		}
+	}
+
+	sort.Strings(p.OwnedRoots)
+	sort.Strings(p.TestOnlyRoots)
+	for _, roots := range p.HardExcludedRoots {
+		sort.Strings(roots)
+	}
+	if problem := p.invalidRootNesting(); problem != "" {
+		return fmt.Errorf("invalid root nesting: %s", problem)
+	}
+	return nil
 }
 
 // invalidRootNesting rejects root layouts that would make some root
@@ -128,6 +167,16 @@ func (p *Profile) invalidRootNesting() string {
 	return ""
 }
 
+// BuildProfileByName returns the named build profile.
+func (p *Profile) BuildProfileByName(name string) (*BuildProfile, error) {
+	for i := range p.BuildProfiles {
+		if p.BuildProfiles[i].Name == name {
+			return &p.BuildProfiles[i], nil
+		}
+	}
+	return nil, fmt.Errorf("build profile %q is not defined in the project profile", name)
+}
+
 // PackageClass classifies one package path under this profile.
 type PackageClass string
 
@@ -136,8 +185,10 @@ const (
 	ClassTestOnly     PackageClass = "owned-test-support"
 	ClassHardExcluded PackageClass = "hard-excluded"
 	ClassUnselected   PackageClass = "unselected"
-	ClassExternalStd  PackageClass = "external-std"
-	ClassExternalMod  PackageClass = "external-module"
+	// ClassExternal covers every package outside the owned module. The
+	// standard-library versus third-party split is not decided here: it
+	// requires loader evidence (go list Standard/Module), never path shape.
+	ClassExternal PackageClass = "external"
 )
 
 func matchRoot(relative string, roots []string) bool {
@@ -154,8 +205,13 @@ func matchRoot(relative string, roots []string) bool {
 func (p *Profile) Classify(pkgPath string) (PackageClass, string) {
 	if pkgPath == p.GoModule || strings.HasPrefix(pkgPath, p.GoModule+"/") {
 		relative := strings.TrimPrefix(strings.TrimPrefix(pkgPath, p.GoModule), "/")
-		for category, roots := range p.HardExcludedRoots {
-			if matchRoot(relative, roots) {
+		categories := make([]string, 0, len(p.HardExcludedRoots))
+		for category := range p.HardExcludedRoots {
+			categories = append(categories, category)
+		}
+		sort.Strings(categories)
+		for _, category := range categories {
+			if matchRoot(relative, p.HardExcludedRoots[category]) {
 				return ClassHardExcluded, category
 			}
 		}
@@ -167,9 +223,5 @@ func (p *Profile) Classify(pkgPath string) (PackageClass, string) {
 		}
 		return ClassUnselected, ""
 	}
-	firstSegment, _, _ := strings.Cut(pkgPath, "/")
-	if strings.Contains(firstSegment, ".") {
-		return ClassExternalMod, ""
-	}
-	return ClassExternalStd, ""
+	return ClassExternal, ""
 }

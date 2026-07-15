@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "product": "tsts",
   "goModule": "github.com/microsoft/typescript-go",
-  "pin": "pins/typescript-go.json",
+  "pin": "../../pins/typescript-go.json",
   "buildProfiles": [
     {
       "name": "linux-amd64",

@@ -37,17 +37,49 @@ func TestClassify(t *testing.T) {
 		{"example.com/mod/internal/lspx", ClassUnselected, ""},
 		{"example.com/mod/internal/other", ClassUnselected, ""},
 		{"example.com/mod/cmd/tool", ClassUnselected, ""},
-		// External split: std has no dot in the first segment.
-		{"fmt", ClassExternalStd, ""},
-		{"go/types", ClassExternalStd, ""},
-		{"github.com/zeebo/xxh3", ClassExternalMod, ""},
-		{"golang.org/x/sync/errgroup", ClassExternalMod, ""},
+		// Everything outside the module is one external class here; the
+		// std/module split needs loader evidence and happens in inventory.
+		{"fmt", ClassExternal, ""},
+		{"go/types", ClassExternal, ""},
+		{"github.com/zeebo/xxh3", ClassExternal, ""},
+		{"golang.org/x/sync/errgroup", ClassExternal, ""},
 	}
 	for _, c := range cases {
 		class, category := p.Classify(c.pkg)
 		if class != c.class || category != c.category {
 			t.Errorf("Classify(%q) = (%s, %q), want (%s, %q)", c.pkg, class, category, c.class, c.category)
 		}
+	}
+}
+
+func TestValidate(t *testing.T) {
+	base := func() *Profile {
+		p := testProfile()
+		p.BuildProfiles = []BuildProfile{{Name: "linux-amd64", GOOS: "linux", GOARCH: "amd64"}}
+		return p
+	}
+	if err := base().validate(); err != nil {
+		t.Fatalf("valid profile rejected: %v", err)
+	}
+
+	duplicateBuild := base()
+	duplicateBuild.BuildProfiles = append(duplicateBuild.BuildProfiles, duplicateBuild.BuildProfiles[0])
+	if err := duplicateBuild.validate(); err == nil {
+		t.Error("duplicate build profile name was not rejected")
+	}
+
+	for _, bad := range []string{"./internal/x", "internal/x/", "/abs", "../up", ".", ""} {
+		p := base()
+		p.OwnedRoots = append(p.OwnedRoots, bad)
+		if err := p.validate(); err == nil {
+			t.Errorf("non-normalized root %q was not rejected", bad)
+		}
+	}
+
+	duplicateRoot := base()
+	duplicateRoot.TestOnlyRoots = append(duplicateRoot.TestOnlyRoots, "internal/scanner")
+	if err := duplicateRoot.validate(); err == nil {
+		t.Error("root appearing in two lists was not rejected")
 	}
 }
 

@@ -2,34 +2,61 @@
 //
 // Current subcommands:
 //
-//	census   verify the source pin and produce the typed source census
+//	census        verify the source pin and produce the typed source census
+//	toolchain-id  print the resolved toolchain identity for pinning
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/census"
+	"github.com/tsoniclang/gotots/internal/goenv"
+	"github.com/tsoniclang/gotots/internal/pinning"
 	"github.com/tsoniclang/gotots/internal/profile"
 )
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: gotots census [flags]")
+		fmt.Fprintln(os.Stderr, "usage: gotots <census|toolchain-id> [flags]")
 		os.Exit(2)
 	}
+	var err error
 	switch os.Args[1] {
 	case "census":
-		if err := runCensus(os.Args[2:]); err != nil {
-			fmt.Fprintln(os.Stderr, "gotots census:", err)
-			os.Exit(1)
-		}
+		err = runCensus(os.Args[2:])
+	case "toolchain-id":
+		err = runToolchainID()
 	default:
 		fmt.Fprintf(os.Stderr, "unknown subcommand %q\n", os.Args[1])
 		os.Exit(2)
 	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "gotots %s: %v\n", os.Args[1], err)
+		os.Exit(1)
+	}
+}
+
+// runToolchainID measures the local toolchain identity so its digests can be
+// reviewed and recorded in a pin file.
+func runToolchainID() error {
+	resolved, err := goenv.Resolve()
+	if err != nil {
+		return err
+	}
+	identity, err := pinning.ToolchainIdentity(resolved)
+	if err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(identity, "", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(data))
+	return nil
 }
 
 func runCensus(args []string) error {
@@ -37,11 +64,11 @@ func runCensus(args []string) error {
 	profilePath := flags.String("profile", "profiles/tsts/project.json", "project profile path")
 	sourceDir := flags.String("source", "", "path to the pinned source checkout (required)")
 	buildProfile := flags.String("build-profile", "linux-amd64", "build profile name from the project profile")
-	outPath := flags.String("out", "", "census report output path (required)")
+	outDir := flags.String("out", "", "report output directory (required)")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
-	if *sourceDir == "" || *outPath == "" {
+	if *sourceDir == "" || *outDir == "" {
 		return fmt.Errorf("--source and --out are required")
 	}
 
@@ -49,22 +76,25 @@ func runCensus(args []string) error {
 	if err != nil {
 		return err
 	}
-	report, err := census.Run(prof, *sourceDir, *buildProfile)
+	result, err := census.Run(prof, *sourceDir, *buildProfile)
 	if err != nil {
 		return err
 	}
-	if err := census.Write(report, *outPath); err != nil {
+	if err := census.WriteReports(result, *outDir); err != nil {
 		return err
 	}
-	printSummary(report)
+	printSummary(result.Report)
 	return nil
 }
 
 func printSummary(r *census.Report) {
-	fmt.Printf("pin        %s @ %s (%s)\n", r.Pin.GoModule, r.Pin.Revision[:12], r.Source.ToolchainOutput)
+	fmt.Printf("pin        %s @ %s (%s)\n", r.Pin.GoModule, r.Pin.Revision[:12], r.Source.ToolchainVersion)
+	fmt.Printf("clean      before-load=%v after-load=%v\n", r.Source.CleanBeforeLoad, r.Source.CleanAfterLoad)
 	fmt.Printf("partition  owned=%d test-support=%d hard-excluded=%d unselected=%d external-std=%d external-module=%d\n",
-		len(r.Partition.Owned), len(r.Partition.TestOnly), len(r.Partition.HardExcluded),
-		len(r.Partition.Unselected), len(r.Partition.ExternalStd), len(r.Partition.ExternalMod))
+		r.Partition.Owned, r.Partition.TestOnly, r.Partition.HardExcluded,
+		r.Partition.Unselected, r.Partition.ExternalStd, r.Partition.ExternalMod)
+	fmt.Printf("records    files=%d declarations=%d directives=%d rare-constructs=%d\n",
+		len(r.Files), len(r.Declarations), len(r.Directives), len(r.RareConstructs))
 	fmt.Printf("production packages=%d files=%d lines=%d\n", r.Production.Packages, r.Production.Files, r.Production.Lines)
 	fmt.Printf("           funcs=%d methods=%d bodyless=%d bodies=%d statements=%d\n",
 		r.Production.Declarations.Functions, r.Production.Declarations.Methods,
@@ -92,13 +122,21 @@ func printSummary(r *census.Report) {
 	printMap("production index operands", r.Production.IndexOperands)
 	printMap("production directives", r.Production.Directives)
 
-	fmt.Printf("external packages: %d\n", len(r.External))
+	unknownDirectives := 0
+	for _, d := range r.Directives {
+		if !d.Known {
+			unknownDirectives++
+			fmt.Printf("  UNKNOWN directive %s at %s:%d\n", d.Directive, d.File, d.Line)
+		}
+	}
+	fmt.Printf("unknown directives: %d\n", unknownDirectives)
+	fmt.Printf("external packages (direct): %d\n", len(r.External))
 	fmt.Printf("contradiction edges: %d\n", len(r.Contradictions))
 	for _, e := range r.Contradictions {
 		category := e.Class
 		if e.Category != "" {
 			category += ":" + e.Category
 		}
-		fmt.Printf("  [%s] %s -> %s (%s)\n", e.Scope, e.From, e.To, category)
+		fmt.Printf("  [%s] %s -> %s (%s) at %s\n", e.Scope, e.From, e.To, category, e.File)
 	}
 }
