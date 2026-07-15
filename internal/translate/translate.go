@@ -89,37 +89,6 @@ func Packages(pkgs []*packages.Package, sourceDir string, options Options) (*Gen
 	return out, nil
 }
 
-// withholdDependents extends withholding over the unit dependency
-// graph: a runnable module cannot import a withheld one, so every
-// dependent package is withheld too (its analysis records remain).
-func withholdDependents(out *Generated, sorted []*packages.Package) {
-	imports := map[string][]string{}
-	for _, p := range sorted {
-		for importPath := range p.Imports {
-			imports[p.PkgPath] = append(imports[p.PkgPath], importPath)
-		}
-		sort.Strings(imports[p.PkgPath])
-	}
-	for changed := true; changed; {
-		changed = false
-		for _, p := range sorted {
-			if _, withheld := out.Withheld[p.PkgPath]; withheld {
-				continue
-			}
-			for _, importPath := range imports[p.PkgPath] {
-				if _, withheld := out.Withheld[importPath]; withheld {
-					out.Withheld[p.PkgPath] = "depends on withheld package " + importPath
-					corePath := path.Join("core", p.PkgPath, "package.ts")
-					delete(out.Files, corePath)
-					delete(out.Ownership, corePath)
-					changed = true
-					break
-				}
-			}
-		}
-	}
-}
-
 // translatePackage translates one unit package into its generated module.
 // Declarations are collected in two passes — types first, then functions
 // and methods — so a method may precede its receiver type in file order.
@@ -144,6 +113,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 		}
 		files = append(files, fileSource{file: file, relative: filepath.ToSlash(relative), source: source})
 	}
+	sort.Slice(files, func(i, j int) bool { return files[i].relative < files[j].relative })
 
 	// Pass 1: type and variable declarations, plus fail-closed screening
 	// of every other package-level GenDecl. An unsupported declaration
@@ -172,6 +142,20 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 		unimplementedUnits++
 		return true
 	}
+	// The type checker's initialization order: each initialized variable
+	// maps to its position; multi-variable initializers stay out.
+	initOrder := map[*types.Var]int{}
+	multiInit := map[*types.Var]bool{}
+	for index, initializer := range p.TypesInfo.InitOrder {
+		for _, lhs := range initializer.Lhs {
+			if len(initializer.Lhs) > 1 {
+				multiInit[lhs] = true
+				continue
+			}
+			initOrder[lhs] = index
+		}
+	}
+
 	for _, f := range files {
 		for _, decl := range f.file.Decls {
 			d, isGen := decl.(*ast.GenDecl)
@@ -258,17 +242,26 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 						continue
 					}
 					for i, name := range valueSpec.Names {
-						if name.Name == "_" {
-							// Order-independent initializers make a blank
-							// package variable effect-free.
-							continue
-						}
 						variableID := goid.Value(p.PkgPath, "var", name.Name)
+						if name.Name == "_" {
+							position := p.Fset.Position(name.Pos())
+							variableID = goid.Repeatable(p.PkgPath, "var", "_", f.relative, position.Line, position.Column)
+						}
 						object, hasDef := p.TypesInfo.Defs[name].(*types.Var)
 						if !hasDef {
 							declSite(variableID, &ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 								Construct: "var without typed definition", Span: spanOf(p, sourceDir, name.Pos())})
 							continue
+						}
+						if multiInit[object] {
+							declSite(variableID, &ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+								Construct: "package-level multi-variable initializer", Span: spanOf(p, sourceDir, name.Pos())})
+							continue
+						}
+						if name.Name == "_" {
+							if i >= len(valueSpec.Values) {
+								continue // a blank variable without an initializer has no effect
+							}
 						}
 						t, err := ir.ResolveType(p, sourceDir, unit, object.Type(), name.Pos())
 						if err != nil {
@@ -288,8 +281,20 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 							}
 							return err
 						}
+						order := -1
+						if position, has := initOrder[object]; has {
+							order = position
+						}
+						if name.Name == "_" {
+							// A blank variable's initializer still runs in
+							// order; there is no binding to declare.
+							packageVars = append(packageVars, emit.PackageVar{
+								Name: "_", Type: t, Init: init, Order: order, Blank: true,
+							})
+							continue
+						}
 						packageVars = append(packageVars, emit.PackageVar{
-							Name: name.Name, Type: t, Init: init, Exported: name.IsExported(),
+							Name: name.Name, Type: t, Init: init, Exported: name.IsExported(), Order: order,
 						})
 						out.Proofs = append(out.Proofs, Proof{
 							ID: goid.Value(p.PkgPath, "var", name.Name), SourceRevision: options.SourceRevision,
@@ -330,9 +335,12 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 	}
 
 	// Pass 2: functions and methods — attached to their receiver classes,
-	// or standalone for receivers erased to carriers.
+	// or standalone for receivers erased to carriers. Package init
+	// functions take synthesized names and run at module evaluation in
+	// file order, after every variable initializer — exactly Go.
 	var functions []*ir.Func
 	var carrierMethods []emit.Method
+	var initCalls []string
 	for _, f := range files {
 		for _, decl := range f.file.Decls {
 			funcDecl, isFunc := decl.(*ast.FuncDecl)
@@ -342,6 +350,12 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 			function, proof, err := translateFunc(p, sourceDir, unit, f.relative, f.source, funcDecl, options)
 			if err != nil {
 				return err
+			}
+			if funcDecl.Recv == nil && funcDecl.Name.Name == "init" {
+				function.Name = fmt.Sprintf("init$%d", len(initCalls))
+				if function.Support == ir.SupportGenerated {
+					initCalls = append(initCalls, function.Name)
+				}
 			}
 			ledger = append(ledger, BodySupport{
 				ID: function.ID, Package: p.PkgPath, State: function.Support, Sites: function.Sites,
@@ -405,6 +419,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 		return err
 	}
 	body, err := emit.Package(module, emit.Decls{
+		InitCalls:    initCalls,
 		Structs:      structList,
 		Methods:      carrierMethods,
 		CarrierTypes: carrierTypes,

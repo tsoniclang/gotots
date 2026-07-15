@@ -155,21 +155,13 @@ func PointerKeys() (int, int, bool, bool, int) {
 `)
 }
 
-func TestPackageVarInitializerFailsClosed(t *testing.T) {
-	assertTranslateFails(t, `package fixture
+func TestOraclePackageVarCallInitializer(t *testing.T) {
+	runOracle(t, `package fixture
 
-func produce() int { return 1 }
+func produce() int { return 41 }
 
-var v = produce()
+var v = produce() + 1
 
 func Case() int { return v }
-`, "GOTOTS_UNSUPPORTED_DECLARATION", "initializer with a call")
-
-	assertTranslateFails(t, `package fixture
-
-var a = 1
-var b = a
-
-func Case() int { return b }
-`, "GOTOTS_UNSUPPORTED_DECLARATION", "initializer with a variable read")
+`)
 }

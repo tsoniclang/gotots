@@ -281,3 +281,39 @@ func PromotedMethodSetAssertion() (bool, string) {
 }
 `)
 }
+
+func TestOraclePackageInitialization(t *testing.T) {
+	runOracle(t, `package fixture
+
+var trace = record("first")
+
+var derived = compute() * 2
+
+var independent = 5
+
+func record(tag string) string {
+	order += tag + ";"
+	return tag
+}
+
+var order string
+
+func compute() int {
+	return independent + 1
+}
+
+func init() {
+	order += "init1;"
+}
+
+func init() {
+	order += "init2;"
+}
+
+var _ = record("blankEffect")
+
+func InitializationOrder() (string, string, int) {
+	return order, trace, derived
+}
+`)
+}

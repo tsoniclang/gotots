@@ -270,11 +270,19 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "type in call position", Span: span}
 		}
 		if convert, is := b.conversionTarget(n); is {
-			x, err := b.buildExpr(n.Args[0])
+			to, err := b.typeOf(convert, span)
 			if err != nil {
 				return nil, err
 			}
-			to, err := b.typeOf(convert, span)
+			if argInfo, hasArg := b.info.Types[n.Args[0]]; hasArg && argInfo.IsNil() {
+				// T(nil): the typed nil of a nilable target.
+				if !to.Kind.Nilable() {
+					return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "conversion from untyped nil to " + to.Go, Span: span}
+				}
+				b.use("convert")
+				return &NilConst{T: to}, nil
+			}
+			x, err := b.buildExpr(n.Args[0])
 			if err != nil {
 				return nil, err
 			}

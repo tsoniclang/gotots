@@ -238,17 +238,9 @@ type holder2 struct {
 }
 
 func TestReviewRegressionFailClosed(t *testing.T) {
-	assertTranslateFails(t, `package fixture
-
-var flag int
-
-func init() {
-	flag = 41
-}
-
-func Case() int { return flag }
-`, "GOTOTS_UNSUPPORTED_DECLARATION", "package init function")
-
-	// Non-UTF-8 string constants are exact under the byte-string carrier;
-	// their differential coverage lives in the string oracle fixtures.
+	// The package initialization subsystem now runs init functions in
+	// order at module evaluation; its differential coverage lives in the
+	// initialization oracle fixture. Non-UTF-8 string constants are
+	// exact under the byte-string carrier; their coverage lives in the
+	// string oracle fixtures.
 }

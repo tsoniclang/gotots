@@ -112,12 +112,6 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 	if decl.Body == nil {
 		return declarationSite(&Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "bodyless function", Span: span})
 	}
-	if decl.Recv == nil && decl.Name.Name == "init" {
-		// Package initializers need the initialization subsystem (import
-		// DAG order, once semantics); emitting them as ordinary functions
-		// would silently drop their effects.
-		return declarationSite(&Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "package init function (initialization order subsystem)", Span: span})
-	}
 	if decl.Type.TypeParams != nil {
 		names, err := b.admitGenericFunction(object, span)
 		if err != nil {

@@ -47,12 +47,19 @@ type Method struct {
 }
 
 // PackageVar is one package-level variable, generated as a module-level
-// let whose exported form is a live ESM binding.
+// let whose exported form is a live ESM binding: declared with its zero
+// value, then assigned in the type checker's initialization order.
 type PackageVar struct {
 	Name     string
 	Type     ir.Type
 	Init     ir.Expr
 	Exported bool
+	// Order is the initializer's position in types.Info.InitOrder, or -1
+	// for variables with no initializer (their zero value stands).
+	Order int
+	// Blank marks a blank (_) variable: no binding declares, but the
+	// initializer still runs in order for its effects.
+	Blank bool
 }
 
 // CarrierType is one named non-struct type: erased to its carrier, it
@@ -69,6 +76,10 @@ type Decls struct {
 	CarrierTypes []CarrierType
 	Vars         []PackageVar
 	Functions    []*ir.Func
+	// InitCalls names the package's init functions in Go's execution
+	// order (file order, then position), invoked at module evaluation
+	// after every variable initializer.
+	InitCalls []string
 }
 
 // Package prints one translated package into a single TypeScript module:
@@ -137,13 +148,26 @@ func Package(module *Module, decls Decls) (string, error) {
 	if len(sortedVars) > 0 {
 		body.WriteString("\n")
 	}
+	// Every variable declares with its zero value; initializers run below
+	// in the type checker's dependency order — exactly Go's sequence.
+	ordered := map[int]PackageVar{}
+	maxOrder := -1
 	for _, packageVar := range sortedVars {
+		if packageVar.Order >= 0 {
+			ordered[packageVar.Order] = packageVar
+			if packageVar.Order > maxOrder {
+				maxOrder = packageVar.Order
+			}
+		}
+		if packageVar.Blank {
+			continue
+		}
 		p := &printer{out: &body, module: module}
 		spelled, err := p.tsType(packageVar.Type)
 		if err != nil {
 			return "", err
 		}
-		init, err := p.printExpr(packageVar.Init)
+		zero, err := p.zeroLiteral(packageVar.Type)
 		if err != nil {
 			return "", err
 		}
@@ -151,12 +175,36 @@ func Package(module *Module, decls Decls) (string, error) {
 		if packageVar.Exported {
 			export = "export "
 		}
-		p.line("%slet %s: %s = %s;", export, tsName(packageVar.Name), spelled, init)
+		p.line("%slet %s: %s = %s;", export, tsName(packageVar.Name), spelled, zero)
 	}
 	for _, function := range sorted {
 		body.WriteString("\n")
 		if err := printFunc(&body, module, function); err != nil {
 			return "", err
+		}
+	}
+	if maxOrder >= 0 || len(decls.InitCalls) > 0 {
+		body.WriteString("\n")
+		p := &printer{out: &body, module: module}
+		for order := 0; order <= maxOrder; order++ {
+			packageVar, has := ordered[order]
+			if !has {
+				continue
+			}
+			init, err := p.printExpr(packageVar.Init)
+			if err != nil {
+				return "", err
+			}
+			var target ir.Target = ir.VarTarget{Name: packageVar.Name, T: packageVar.Type}
+			if packageVar.Blank {
+				target = ir.BlankTarget{}
+			}
+			if err := p.printStore(target, init); err != nil {
+				return "", err
+			}
+		}
+		for _, initCall := range decls.InitCalls {
+			p.line("%s();", initCall)
 		}
 	}
 	return module.importLines() + body.String(), nil
