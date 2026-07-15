@@ -30,10 +30,15 @@ func (b *builder) buildTarget(lhs ast.Expr) (Target, error) {
 		if n.Name == "_" {
 			return BlankTarget{}, nil
 		}
-		if _, isVar := b.info.Uses[n].(*types.Var); !isVar {
+		variable, isVar := b.info.Uses[n].(*types.Var)
+		if !isVar {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "assignment to non-variable " + n.Name, Span: span}
 		}
-		return VarTarget{Name: n.Name}, nil
+		t, err := b.typeOf(variable.Type(), span)
+		if err != nil {
+			return nil, err
+		}
+		return VarTarget{Name: n.Name, T: t}, nil
 
 	case *ast.SelectorExpr:
 		selection, ok := b.info.Selections[n]
@@ -44,11 +49,15 @@ func (b *builder) buildTarget(lhs ast.Expr) (Target, error) {
 		if err != nil {
 			return nil, err
 		}
-		if base.Type().Kind != KindPointer {
+		if base.Type().Kind != KindPointer && base.Type().Kind != KindStruct {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "field assignment on " + base.Type().Go, Span: span}
 		}
+		fieldType, err := b.typeOf(b.info.Types[lhs].Type, span)
+		if err != nil {
+			return nil, err
+		}
 		b.use("fieldStore")
-		return &FieldTarget{X: base, Field: n.Sel.Name}, nil
+		return &FieldTarget{X: base, Field: n.Sel.Name, T: fieldType}, nil
 
 	case *ast.IndexExpr:
 		operand, err := b.buildExpr(n.X)
@@ -68,6 +77,17 @@ func (b *builder) buildTarget(lhs ast.Expr) (Target, error) {
 			return &SliceTarget{X: operand, Index: index}, nil
 		}
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "indexed assignment on " + operand.Type().Go, Span: span}
+
+	case *ast.StarExpr:
+		operand, err := b.buildExpr(n.X)
+		if err != nil {
+			return nil, err
+		}
+		if operand.Type().Kind != KindPointer {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "assignment through " + operand.Type().Go, Span: span}
+		}
+		b.use("pointeeStore")
+		return &PointeeTarget{X: operand}, nil
 	}
 	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: fmt.Sprintf("assignment to %T", lhs), Span: span}
 }
@@ -115,9 +135,6 @@ func (b *builder) buildAssign(n *ast.AssignStmt) (Stmt, error) {
 			t, err := b.typeOf(definition.Type(), span)
 			if err != nil {
 				return nil, err
-			}
-			if t.Kind == KindStruct {
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "struct value variable (value-copy semantics)", Span: span}
 			}
 			out.Names = append(out.Names, target.Name)
 			out.Types = append(out.Types, t)
@@ -225,7 +242,7 @@ func (b *builder) compoundTarget(lhs ast.Expr) (Target, Expr, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		return VarTarget{Name: operand.Name}, load, nil
+		return VarTarget{Name: operand.Name, T: load.Type()}, load, nil
 
 	case *ast.SelectorExpr:
 		if _, baseIsIdent := ast.Unparen(operand.X).(*ast.Ident); !baseIsIdent {
@@ -240,7 +257,7 @@ func (b *builder) compoundTarget(lhs ast.Expr) (Target, Expr, error) {
 			return nil, nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "compound assignment to a non-field selector", Span: span}
 		}
 		b.use("fieldStore")
-		return &FieldTarget{X: load.X, Field: load.Field}, load, nil
+		return &FieldTarget{X: load.X, Field: load.Field, T: load.T}, load, nil
 
 	case *ast.IndexExpr:
 		if _, baseIsIdent := ast.Unparen(operand.X).(*ast.Ident); !baseIsIdent {

@@ -112,6 +112,12 @@ func (p *printer) printDecl(n *ir.DeclStmt) error {
 			if err != nil {
 				return err
 			}
+			// A struct slot binds a value copy (a comma-ok lookup yields
+			// the stored instance).
+			if n.Types[i].Kind == ir.KindStruct {
+				p.line("let %s: %s = %s[%d].goClone$();", name, spelled, tuple, i)
+				continue
+			}
 			p.line("let %s: %s = %s[%d];", name, spelled, tuple, i)
 		}
 		return nil
@@ -263,7 +269,12 @@ func (p *printer) printRangeSlice(n *ir.RangeSlice) error {
 		if err != nil {
 			return err
 		}
-		p.line("let %s: %s = gosl.goSliceGet(%s, %s);", n.Value, spelled, sliceTemp, index)
+		if n.VarT.Kind == ir.KindStruct {
+			// The range variable binds a per-iteration value copy.
+			p.line("let %s: %s = gosl.goSliceGet(%s, %s).goClone$();", n.Value, spelled, sliceTemp, index)
+		} else {
+			p.line("let %s: %s = gosl.goSliceGet(%s, %s);", n.Value, spelled, sliceTemp, index)
+		}
 	}
 	if err := p.printBlockBody(n.Body); err != nil {
 		return err
@@ -271,119 +282,6 @@ func (p *printer) printRangeSlice(n *ir.RangeSlice) error {
 	p.indent--
 	p.line("}")
 	return nil
-}
-
-// stagedTarget is a target whose operands were pre-evaluated.
-type stagedTarget struct {
-	kind    string // var | field | map
-	name    string // var name, or staged base/map temp
-	field   string
-	keyTemp string
-}
-
-func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
-	switch t := target.(type) {
-	case ir.BlankTarget:
-		return stagedTarget{kind: "blank"}, nil
-	case ir.VarTarget:
-		return stagedTarget{kind: "var", name: t.Name}, nil
-	case *ir.FieldTarget:
-		base, err := p.printExpr(t.X)
-		if err != nil {
-			return stagedTarget{}, err
-		}
-		baseTemp := p.temp()
-		p.line("const %s = gort.goNilCheck(%s);", baseTemp, base)
-		return stagedTarget{kind: "field", name: baseTemp, field: t.Field}, nil
-	case *ir.MapTarget:
-		mapExpr, err := p.printExpr(t.Map)
-		if err != nil {
-			return stagedTarget{}, err
-		}
-		mapTemp := p.temp()
-		p.line("const %s = %s;", mapTemp, mapExpr)
-		key, err := p.printExpr(t.Key)
-		if err != nil {
-			return stagedTarget{}, err
-		}
-		keyTemp := p.temp()
-		p.line("const %s = %s;", keyTemp, key)
-		return stagedTarget{kind: "map", name: mapTemp, keyTemp: keyTemp}, nil
-	case *ir.SliceTarget:
-		sliceExpr, err := p.printExpr(t.X)
-		if err != nil {
-			return stagedTarget{}, err
-		}
-		sliceTemp := p.temp()
-		p.line("const %s = %s;", sliceTemp, sliceExpr)
-		index, err := p.printExpr(t.Index)
-		if err != nil {
-			return stagedTarget{}, err
-		}
-		indexTemp := p.temp()
-		p.line("const %s = %s;", indexTemp, index)
-		return stagedTarget{kind: "slice", name: sliceTemp, keyTemp: indexTemp}, nil
-	}
-	return stagedTarget{}, fmt.Errorf("no staging for target %T", target)
-}
-
-func (s stagedTarget) store(p *printer, value string) error {
-	switch s.kind {
-	case "blank":
-		p.line("void (%s);", value)
-	case "var":
-		p.line("%s = %s;", s.name, value)
-	case "field":
-		p.line("%s.%s = %s;", s.name, s.field, value)
-	case "map":
-		p.line("gort.goMapSet(%s, %s, %s);", s.name, s.keyTemp, value)
-	case "slice":
-		p.line("gosl.goSliceSet(%s, %s, %s);", s.name, s.keyTemp, value)
-	}
-	return nil
-}
-
-// printStore emits a single-target store without staging (single
-// assignments evaluate left-to-right naturally).
-func (p *printer) printStore(target ir.Target, value string) error {
-	switch t := target.(type) {
-	case ir.BlankTarget:
-		p.line("void (%s);", value)
-		return nil
-	case ir.VarTarget:
-		p.line("%s = %s;", t.Name, value)
-		return nil
-	case *ir.FieldTarget:
-		base, err := p.printExpr(t.X)
-		if err != nil {
-			return err
-		}
-		p.line("gort.goNilCheck(%s).%s = %s;", base, t.Field, value)
-		return nil
-	case *ir.MapTarget:
-		mapExpr, err := p.printExpr(t.Map)
-		if err != nil {
-			return err
-		}
-		key, err := p.printExpr(t.Key)
-		if err != nil {
-			return err
-		}
-		p.line("gort.goMapSet(%s, %s, %s);", mapExpr, key, value)
-		return nil
-	case *ir.SliceTarget:
-		sliceExpr, err := p.printExpr(t.X)
-		if err != nil {
-			return err
-		}
-		index, err := p.printExpr(t.Index)
-		if err != nil {
-			return err
-		}
-		p.line("gosl.goSliceSet(%s, %s, %s);", sliceExpr, index, value)
-		return nil
-	}
-	return fmt.Errorf("no emission for target %T", target)
 }
 
 func (p *printer) printIf(n *ir.IfStmt) error {
@@ -497,6 +395,9 @@ func (p *printer) forClause(stmt ir.Stmt, isInit bool) (string, error) {
 		value, err := p.printExpr(n.Values[0])
 		if err != nil {
 			return "", err
+		}
+		if variable.T.Kind == ir.KindStruct {
+			return variable.Name + ".goSet$(" + value + ")", nil
 		}
 		return variable.Name + " = " + value, nil
 	}

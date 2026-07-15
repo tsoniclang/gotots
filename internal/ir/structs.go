@@ -55,9 +55,6 @@ func BuildStruct(p *packages.Package, sourceDir string, unit Scope, spec *ast.Ty
 		if err != nil {
 			return nil, err
 		}
-		if fieldType.Kind == KindStruct {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "struct-valued field (value-copy semantics)", Span: span}
-		}
 		out.Fields = append(out.Fields, Var{Name: field.Name(), Type: fieldType})
 	}
 	return out, nil

@@ -25,17 +25,24 @@ type DeclStmt struct {
 // Target is one assignable location.
 type Target interface{ target() }
 
-// VarTarget assigns a plain variable.
-type VarTarget struct{ Name string }
+// VarTarget assigns a plain variable. A struct-valued variable is stored
+// in place (field overwrite), preserving every alias of the value.
+type VarTarget struct {
+	Name string
+	T    Type
+}
 
 // BlankTarget discards a value (the blank identifier); the value is still
 // evaluated.
 type BlankTarget struct{}
 
-// FieldTarget assigns a struct field through a (nil-checked) pointer.
+// FieldTarget assigns a field through a nil-checked pointer or an
+// addressable struct-value chain. A struct-valued field is stored in
+// place.
 type FieldTarget struct {
 	X     Expr
 	Field string
+	T     Type // field type
 }
 
 // MapTarget assigns a map entry (nil-map assignment panics).
@@ -44,11 +51,18 @@ type MapTarget struct {
 	Key Expr
 }
 
-func (VarTarget) target()    {}
-func (BlankTarget) target()  {}
-func (*SliceTarget) target() {}
-func (*FieldTarget) target() {}
-func (*MapTarget) target()   {}
+// PointeeTarget assigns through a pointer (*p = v): the nil-checked
+// pointee's fields are overwritten in place.
+type PointeeTarget struct {
+	X Expr // the pointer
+}
+
+func (VarTarget) target()      {}
+func (BlankTarget) target()    {}
+func (*SliceTarget) target()   {}
+func (*FieldTarget) target()   {}
+func (*MapTarget) target()     {}
+func (*PointeeTarget) target() {}
 
 // AssignStmt stores values into existing locations. Go's two-phase rule is
 // preserved: target operands and right-hand values are evaluated in source
@@ -211,6 +225,28 @@ type StructNew struct {
 	T        Type // the pointer type
 }
 
+// StructCopy is Go's value copy at a binding site: a deep clone along the
+// value-struct spine of one struct instance.
+type StructCopy struct{ X Expr }
+
+// AddrOf is &x on an addressable struct value: the pointer is the very
+// instance (whole-value stores are in place, so the alias stays exact).
+type AddrOf struct {
+	X Expr
+	T Type // the pointer type
+}
+
+// Deref is *p: the nil-checked pointee instance as a struct value (the
+// copy, when the context binds it, happens at the binding site).
+type Deref struct {
+	X Expr
+	T Type // the pointee struct type
+}
+
+// StructZero is the zero value of a named struct type: a fresh instance
+// with every field zeroed.
+type StructZero struct{ T Type }
+
 // NilConst is a typed nil (pointer or map zero value).
 type NilConst struct{ T Type }
 
@@ -311,6 +347,10 @@ func (*Const) expr()        {}
 func (*MethodCall) expr()   {}
 func (*FieldLoad) expr()    {}
 func (*StructNew) expr()    {}
+func (*StructCopy) expr()   {}
+func (*StructZero) expr()   {}
+func (*AddrOf) expr()       {}
+func (*Deref) expr()        {}
 func (*NilConst) expr()     {}
 func (*IsNil) expr()        {}
 func (*MapMake) expr()      {}
@@ -357,16 +397,20 @@ func (m *MethodCall) Type() Type {
 var boolType = Type{Kind: KindBool, Go: "bool"}
 var intType = Type{Kind: KindInt, Go: "int"}
 
-func (f *FieldLoad) Type() Type { return f.T }
-func (s *StructNew) Type() Type { return s.T }
-func (n *NilConst) Type() Type  { return n.T }
-func (i *IsNil) Type() Type     { return boolType }
-func (m *MapMake) Type() Type   { return m.T }
-func (m *MapFrom) Type() Type   { return m.T }
-func (m *MapGet) Type() Type    { return m.T }
-func (m *MapLookup) Type() Type { return m.T }
-func (m *MapLen) Type() Type    { return intType }
-func (s *StringLen) Type() Type { return intType }
+func (f *FieldLoad) Type() Type  { return f.T }
+func (s *StructNew) Type() Type  { return s.T }
+func (s *StructCopy) Type() Type { return s.X.Type() }
+func (s *StructZero) Type() Type { return s.T }
+func (a *AddrOf) Type() Type     { return a.T }
+func (d *Deref) Type() Type      { return d.T }
+func (n *NilConst) Type() Type   { return n.T }
+func (i *IsNil) Type() Type      { return boolType }
+func (m *MapMake) Type() Type    { return m.T }
+func (m *MapFrom) Type() Type    { return m.T }
+func (m *MapGet) Type() Type     { return m.T }
+func (m *MapLookup) Type() Type  { return m.T }
+func (m *MapLen) Type() Type     { return intType }
+func (s *StringLen) Type() Type  { return intType }
 
 func (s *SliceLit) Type() Type     { return s.T }
 func (s *SliceMake) Type() Type    { return s.T }

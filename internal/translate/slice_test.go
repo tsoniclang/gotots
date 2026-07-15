@@ -318,15 +318,16 @@ loop:
 			code: "GOTOTS_UNSUPPORTED_STATEMENT", mention: "LabeledStmt",
 		},
 		{
-			name: "slice of struct values",
+			name: "struct value equality",
 			source: `package fixture
 type Point struct{ X int32 }
-func Case() int32 {
-	points := []Point{{X: 1}}
-	return points[0].X
+func Case() bool {
+	a := Point{X: 1}
+	b := Point{X: 1}
+	return a == b
 }
 `,
-			code: "GOTOTS_UNSUPPORTED_TYPE", mention: "slice of struct values",
+			code: "GOTOTS_UNSUPPORTED_OPERATION", mention: "equality on",
 		},
 		{
 			name: "full slice expression",
@@ -368,12 +369,14 @@ func helper() {}
 			code: "GOTOTS_UNSUPPORTED_STATEMENT", mention: "defer below the function's top-level block",
 		},
 		{
-			name: "value receiver method",
+			name: "anonymous struct type",
 			source: `package fixture
-type Point struct{ X int32 }
-func (p Point) Get() int32 { return p.X }
+func Case() int32 {
+	point := struct{ X int32 }{X: 1}
+	return point.X
+}
 `,
-			code: "GOTOTS_UNSUPPORTED_DECLARATION", mention: "value receiver",
+			code: "GOTOTS_UNSUPPORTED_TYPE", mention: "struct type",
 		},
 		{
 			name: "embedded field",

@@ -13,7 +13,7 @@ package abi
 import "fmt"
 
 // Version identifies the ABI contract carried in generated output.
-const Version = 1
+const Version = 2
 
 // Family is the static carrier family of an integer kind.
 type Family string
@@ -353,6 +353,38 @@ export function goSliceSet<T>(s: GoSliceValue<T>, index: GoIndex, value: T): voi
   if (index < 0 || index >= length) panicIndex(index, length);
   const slice = s as GoSlice<T>;
   slice.backing[slice.offset + Number(index)] = value;
+}
+
+// GoStructValue is the generated contract of every struct-value class:
+// deep copy along the value-struct spine, in-place field overwrite, and
+// a fresh zero value.
+export interface GoStructValue<T> {
+  goClone$(): T;
+  goSet$(other: T): void;
+}
+
+// make([]T, len[, cap]) for struct elements: every element is a distinct
+// fresh zero instance.
+export function goSliceMakeStruct<T>(length: GoIndex, capacity: GoIndex, zero: () => T): GoSlice<T> {
+  if (length < 0 || capacity < 0 || length > capacity) {
+    throw new GoPanic("runtime error: makeslice: len out of range");
+  }
+  const cap = Number(capacity);
+  const backing: T[] = new Array(cap);
+  for (let index = 0; index < cap; index++) {
+    backing[index] = zero();
+  }
+  return new GoSlice(backing, 0, Number(length), cap);
+}
+
+// s[i] = v for struct elements: Go overwrites the element's memory, so
+// the stored instance's fields are copied in place and every alias of
+// the element observes the store.
+export function goSliceSetStruct<T extends GoStructValue<T>>(s: GoSliceValue<T>, index: GoIndex, value: T): void {
+  const length = s === undefined ? 0 : s.length;
+  if (index < 0 || index >= length) panicIndex(index, length);
+  const slice = s as GoSlice<T>;
+  (slice.backing[slice.offset + Number(index)] as T).goSet$(value);
 }
 
 // s[low:high]: 0 <= low <= high <= cap; shares backing storage. A nil

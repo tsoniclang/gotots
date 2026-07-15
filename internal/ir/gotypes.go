@@ -43,9 +43,6 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 		if err != nil {
 			return Type{}, err
 		}
-		if element.Kind == KindStruct {
-			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "slice of struct values (element copy semantics)", Span: span}
-		}
 		return Type{Kind: KindSlice, Go: spelled, Elem: &element}, nil
 
 	case *types.Map:

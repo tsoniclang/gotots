@@ -57,11 +57,19 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		// A struct-value receiver can never be nil; a pointer receiver
+		// dereferences with Go's exact nil panic.
+		if n.Recv.Type().Kind == ir.KindStruct {
+			return fmt.Sprintf("%s.%s(%s)", recv, n.Method, args), nil
+		}
 		return fmt.Sprintf("gort.goNilCheck(%s).%s(%s)", recv, n.Method, args), nil
 	case *ir.FieldLoad:
 		base, err := p.printExpr(n.X)
 		if err != nil {
 			return "", err
+		}
+		if n.X.Type().Kind == ir.KindStruct {
+			return fmt.Sprintf("%s.%s", base, n.Field), nil
 		}
 		return fmt.Sprintf("gort.goNilCheck(%s).%s", base, n.Field), nil
 	case *ir.StructNew:
@@ -74,6 +82,23 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			return "", err
 		}
 		return fmt.Sprintf("new %s(%s)", class, args), nil
+	case *ir.StructCopy:
+		x, err := p.printExpr(n.X)
+		if err != nil {
+			return "", err
+		}
+		return x + ".goClone$()", nil
+	case *ir.StructZero:
+		return p.zeroLiteral(n.T)
+	case *ir.AddrOf:
+		// The pointer to an addressable struct value is the instance.
+		return p.printExpr(n.X)
+	case *ir.Deref:
+		x, err := p.printExpr(n.X)
+		if err != nil {
+			return "", err
+		}
+		return "gort.goNilCheck(" + x + ")", nil
 	case *ir.NilConst:
 		return "undefined", nil
 	case *ir.IsNil:
@@ -135,9 +160,13 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 				return "", err
 			}
 		}
-		zero, err := zeroLiteral(*n.T.Elem)
+		zero, err := p.zeroLiteral(*n.T.Elem)
 		if err != nil {
 			return "", err
+		}
+		if n.T.Elem.Kind == ir.KindStruct {
+			// Every struct element is a distinct fresh zero instance.
+			return "gosl.goSliceMakeStruct(" + length + ", " + capacity + ", () => " + zero + ")", nil
 		}
 		return "gosl.goSliceMake(" + length + ", " + capacity + ", " + zero + ")", nil
 	case *ir.SliceGet:
@@ -223,7 +252,7 @@ func (p *printer) printMapAccess(helper string, mapExpr, key ir.Expr, valueType 
 	if err != nil {
 		return "", err
 	}
-	zero, err := zeroLiteral(valueType)
+	zero, err := p.zeroLiteral(valueType)
 	if err != nil {
 		return "", err
 	}
@@ -231,7 +260,8 @@ func (p *printer) printMapAccess(helper string, mapExpr, key ir.Expr, valueType 
 }
 
 // zeroLiteral spells the Go zero value of a reviewed type in TypeScript.
-func zeroLiteral(t ir.Type) (string, error) {
+// A struct zero is a fresh instance from the class's zero factory.
+func (p *printer) zeroLiteral(t ir.Type) (string, error) {
 	switch {
 	case t.Kind == ir.KindBool:
 		return "false", nil
@@ -239,6 +269,12 @@ func zeroLiteral(t ir.Type) (string, error) {
 		return `""`, nil
 	case t.Kind == ir.KindPointer, t.Kind == ir.KindMap, t.Kind == ir.KindSlice:
 		return "undefined", nil
+	case t.Kind == ir.KindStruct:
+		class, err := p.module.symbol(t.Pkg, t.Named)
+		if err != nil {
+			return "", err
+		}
+		return class + ".goZero$()", nil
 	case t.Kind.Wide64():
 		return "0n", nil
 	case t.Kind.Integer(), t.Kind.Float():

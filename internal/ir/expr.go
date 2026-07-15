@@ -87,7 +87,10 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			b.use("mapLiteral")
 			return out, nil
 		}
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "composite literal of " + t.Go + " (struct values need &T{...})", Span: span}
+		if t.Kind == KindStruct {
+			return b.buildStructLit(n, t)
+		}
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "composite literal of " + t.Go, Span: span}
 
 	case *ast.Ident:
 		object := b.info.Uses[n]
@@ -98,9 +101,6 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 		t, err := b.typeOf(variable.Type(), span)
 		if err != nil {
 			return nil, err
-		}
-		if t.Kind == KindStruct {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "struct value variable (value-copy semantics)", Span: span}
 		}
 		b.use("varRef")
 		return &VarRef{Name: n.Name, T: t}, nil
@@ -114,16 +114,16 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		if base.Type().Kind != KindPointer {
+		if base.Type().Kind != KindPointer && base.Type().Kind != KindStruct {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "field access on " + base.Type().Go, Span: span}
 		}
 		t, err := b.typeOf(tv.Type, span)
 		if err != nil {
 			return nil, err
 		}
-		if t.Kind == KindStruct {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "struct-valued field load (value-copy semantics)", Span: span}
-		}
+		// Struct-valued field loads read the stored instance; Go's value
+		// copy happens where the value is bound, never on the read path,
+		// so addressable chains (x.F.G = v, x.F.M()) stay in place.
 		b.use("fieldLoad")
 		return &FieldLoad{X: base, Field: n.Sel.Name, T: t}, nil
 
@@ -178,6 +178,17 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 	case *ast.UnaryExpr:
 		return b.buildUnary(n, tv.Type)
 
+	case *ast.StarExpr:
+		operand, err := b.buildExpr(n.X)
+		if err != nil {
+			return nil, err
+		}
+		if operand.Type().Kind != KindPointer || operand.Type().Elem == nil {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "dereference of " + operand.Type().Go, Span: span}
+		}
+		b.use("deref")
+		return &Deref{X: operand, T: *operand.Type().Elem}, nil
+
 	case *ast.BinaryExpr:
 		return b.buildBinary(n, tv.Type)
 
@@ -216,7 +227,8 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 }
 
 // buildExprAs builds an expression whose context expects a known type,
-// giving untyped nil its exact typed zero.
+// giving untyped nil its exact typed zero and inserting Go's value copy
+// when a struct value is bound.
 func (b *builder) buildExprAs(e ast.Expr, expected Type) (Expr, error) {
 	if tv, ok := b.info.Types[e]; ok && tv.IsNil() {
 		if expected.Kind == KindPointer || expected.Kind == KindMap || expected.Kind == KindSlice {
@@ -225,7 +237,30 @@ func (b *builder) buildExprAs(e ast.Expr, expected Type) (Expr, error) {
 		}
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "nil of type " + expected.Go, Span: b.span(e.Pos())}
 	}
-	return b.buildExpr(e)
+	built, err := b.buildExpr(e)
+	if err != nil {
+		return nil, err
+	}
+	if expected.Kind == KindStruct {
+		return b.bindStructValue(built), nil
+	}
+	return built, nil
+}
+
+// bindStructValue inserts the value copy of a struct binding. Loads from
+// variables, fields, and elements clone; already-fresh values — new
+// allocations, zeros, copies, and call results (copied at their return
+// sites) — bind directly.
+func (b *builder) bindStructValue(e Expr) Expr {
+	if e.Type().Kind != KindStruct {
+		return e
+	}
+	switch e.(type) {
+	case *StructNew, *StructZero, *StructCopy, *Call, *MethodCall:
+		return e
+	}
+	b.use("structCopy")
+	return &StructCopy{X: e}
 }
 
 func (b *builder) buildUnary(n *ast.UnaryExpr, resultType types.Type) (Expr, error) {
@@ -233,11 +268,29 @@ func (b *builder) buildUnary(n *ast.UnaryExpr, resultType types.Type) (Expr, err
 	switch n.Op {
 	case token.AND:
 		// Heap allocation of a struct literal: &T{...}.
-		lit, ok := ast.Unparen(n.X).(*ast.CompositeLit)
-		if !ok {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "address of non-composite-literal", Span: span}
+		if lit, ok := ast.Unparen(n.X).(*ast.CompositeLit); ok {
+			return b.buildStructNew(lit, resultType)
 		}
-		return b.buildStructNew(lit, resultType)
+		// &x on an addressable struct value: the pointer is the very
+		// instance — whole-value stores overwrite fields in place, so the
+		// alias observes them exactly like Go's memory write.
+		x, err := b.buildExpr(ast.Unparen(n.X))
+		if err != nil {
+			return nil, err
+		}
+		if x.Type().Kind != KindStruct {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "address of " + x.Type().Go, Span: span}
+		}
+		switch x.(type) {
+		case *VarRef, *FieldLoad, *SliceGet, *Deref:
+			t, err := b.typeOf(resultType, span)
+			if err != nil {
+				return nil, err
+			}
+			b.use("addrOf")
+			return &AddrOf{X: x, T: t}, nil
+		}
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "address of a non-addressable expression", Span: span}
 	case token.SUB, token.NOT, token.XOR, token.ADD:
 		x, err := b.buildExpr(n.X)
 		if err != nil {
@@ -266,6 +319,15 @@ func (b *builder) buildStructNew(lit *ast.CompositeLit, resultType types.Type) (
 	if t.Kind != KindPointer {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "composite literal of " + t.Go, Span: span}
 	}
+	return b.buildStructLit(lit, t)
+}
+
+// buildStructLit materializes a struct composite literal — as a heap
+// allocation (&T{...}, pointer type) or a fresh struct value (T{...}) —
+// with every field value in declaration order (omitted fields are
+// explicit zeros).
+func (b *builder) buildStructLit(lit *ast.CompositeLit, t Type) (Expr, error) {
+	span := b.span(lit.Pos())
 	named := types.Unalias(b.info.Types[lit].Type).(*types.Named)
 	structType := named.Underlying().(*types.Struct)
 
@@ -329,173 +391,6 @@ func (b *builder) buildStructNew(lit *ast.CompositeLit, resultType types.Type) (
 	return out, nil
 }
 
-// buildAnyCall lowers a direct function call or a pointer-receiver method
-// call within the translated unit.
-func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
-	span := b.span(n.Pos())
-
-	// The callee is a plain identifier, a method selection, or a
-	// package-qualified identifier (pkg.Fn — qualified identifiers have no
-	// selection evidence; their object comes from Uses on the selector).
-	var object types.Object
-	switch fun := ast.Unparen(n.Fun).(type) {
-	case *ast.SelectorExpr:
-		if selection, hasSelection := b.info.Selections[fun]; hasSelection {
-			if selection.Kind() == types.MethodVal {
-				return b.buildMethodCall(n, fun, selection)
-			}
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "call of selected value", Span: span}
-		}
-		base, isIdent := ast.Unparen(fun.X).(*ast.Ident)
-		if !isIdent {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: fmt.Sprintf("call of %T", n.Fun), Span: span}
-		}
-		if _, isPkg := b.info.Uses[base].(*types.PkgName); !isPkg {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: fmt.Sprintf("call of %T", n.Fun), Span: span}
-		}
-		object = b.info.Uses[fun.Sel]
-	case *ast.Ident:
-		object = b.info.Uses[fun]
-	default:
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: fmt.Sprintf("call of %T", n.Fun), Span: span}
-	}
-
-	function, ok := object.(*types.Func)
-	if !ok {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: fmt.Sprintf("call of %T", object), Span: span}
-	}
-	if function.Pkg() == nil || !b.unit[function.Pkg().Path()] {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "call outside the translated unit", Span: span}
-	}
-	signature := function.Type().(*types.Signature)
-	if signature.Recv() != nil || signature.TypeParams() != nil {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic call", Span: span}
-	}
-
-	call := &Call{Pkg: function.Pkg().Path(), Callee: function.Name()}
-	if err := b.buildCallArgsResults(n, signature, &call.Args, &call.Results); err != nil {
-		return nil, err
-	}
-	b.use("call")
-	return call, nil
-}
-
-func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, selection *types.Selection) (Expr, error) {
-	span := b.span(n.Pos())
-	method := selection.Obj().(*types.Func)
-	if method.Pkg() == nil || !b.unit[method.Pkg().Path()] {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method call outside the translated unit", Span: span}
-	}
-	recv, err := b.buildExpr(selector.X)
-	if err != nil {
-		return nil, err
-	}
-	if recv.Type().Kind != KindPointer {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method call on " + recv.Type().Go, Span: span}
-	}
-	signature := method.Type().(*types.Signature)
-	if signature.TypeParams() != nil {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic method call", Span: span}
-	}
-	if _, isPointerRecv := signature.Recv().Type().(*types.Pointer); !isPointerRecv {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "value-receiver method call (receiver copy semantics)", Span: span}
-	}
-
-	out := &MethodCall{Recv: recv, Method: method.Name()}
-	if err := b.buildCallArgsResults(n, signature, &out.Args, &out.Results); err != nil {
-		return nil, err
-	}
-	b.use("methodCall")
-	return out, nil
-}
-
-func (b *builder) buildCallArgsResults(n *ast.CallExpr, signature *types.Signature, args *[]Expr, results *[]Type) error {
-	span := b.span(n.Pos())
-	params := signature.Params()
-	fixed := params.Len()
-	if signature.Variadic() {
-		fixed--
-	}
-	for i := 0; i < fixed; i++ {
-		expected, err := b.typeOf(params.At(i).Type(), b.span(n.Args[i].Pos()))
-		if err != nil {
-			return err
-		}
-		built, err := b.buildExprAs(n.Args[i], expected)
-		if err != nil {
-			return err
-		}
-		*args = append(*args, built)
-	}
-	if signature.Variadic() {
-		variadic, err := b.buildVariadicSlot(n, params.At(fixed), fixed)
-		if err != nil {
-			return err
-		}
-		*args = append(*args, variadic)
-	}
-	tuple := signature.Results()
-	for i := range tuple.Len() {
-		t, err := b.typeOf(tuple.At(i).Type(), span)
-		if err != nil {
-			return err
-		}
-		*results = append(*results, t)
-	}
-	return nil
-}
-
-// buildVariadicSlot materializes the final argument of a variadic call
-// with Go's exact packing: a spread call (xs...) passes the very slice
-// value (aliasing preserved), no trailing arguments pass nil, and
-// trailing arguments allocate a fresh slice per call.
-func (b *builder) buildVariadicSlot(n *ast.CallExpr, param *types.Var, fixed int) (Expr, error) {
-	sliceType, err := b.typeOf(param.Type(), b.span(n.Pos()))
-	if err != nil {
-		return nil, err
-	}
-	if n.Ellipsis.IsValid() {
-		b.use("variadic:spread")
-		return b.buildExprAs(n.Args[len(n.Args)-1], sliceType)
-	}
-	if len(n.Args) == fixed {
-		b.use("variadic:empty")
-		return &NilConst{T: sliceType}, nil
-	}
-	out := &SliceLit{T: sliceType}
-	for _, arg := range n.Args[fixed:] {
-		built, err := b.buildExprAs(arg, *sliceType.Elem)
-		if err != nil {
-			return nil, err
-		}
-		out.Values = append(out.Values, built)
-	}
-	b.use("variadic:pack")
-	return out, nil
-}
-
-// conversionTarget reports whether the call is a type conversion and, if
-// so, the target type — decided by type-checker evidence, never spelling.
-func (b *builder) conversionTarget(call *ast.CallExpr) (types.Type, bool) {
-	if tv, ok := b.info.Types[call.Fun]; ok && tv.IsType() && len(call.Args) == 1 {
-		return tv.Type, true
-	}
-	return nil, false
-}
-
-// checkConversion admits only conversions in the reviewed subset:
-// integer-to-integer of any widths, and integer-to-float64.
-func (b *builder) checkConversion(from, to Type, span Span) error {
-	if from.Kind.Integer() && to.Kind.Integer() {
-		return nil
-	}
-	if from.Kind.Integer() && to.Kind == KindFloat64 {
-		return nil
-	}
-	return &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION",
-		Construct: "conversion from " + from.Go + " to " + to.Go, Span: span}
-}
-
 // constValue renders an exact go/constant value for the resolved type.
 func constValue(v constant.Value, t Type, span Span) (string, error) {
 	switch t.Kind {
@@ -531,6 +426,8 @@ func zeroValue(t Type, span Span) (Expr, error) {
 		return &Const{T: t, Value: `""`}, nil
 	case t.Kind == KindPointer, t.Kind == KindMap, t.Kind == KindSlice:
 		return &NilConst{T: t}, nil
+	case t.Kind == KindStruct:
+		return &StructZero{T: t}, nil
 	case t.Kind.Integer(), t.Kind.Float():
 		return &Const{T: t, Value: "0"}, nil
 	}

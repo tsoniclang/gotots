@@ -389,6 +389,8 @@ func conservativeCarrier(t ir.Type) string {
 		return "js-string(equality-only-ordering-unsupported)"
 	case t.Kind == ir.KindPointer:
 		return "object-identity-nilable(undefined)"
+	case t.Kind == ir.KindStruct:
+		return "class-instance-value(copy-on-bind,in-place-store)"
 	case t.Kind == ir.KindMap:
 		return "js-map-nilable(undefined)-has-based-lookup"
 	case t.Kind == ir.KindSlice:

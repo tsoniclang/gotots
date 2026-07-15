@@ -81,9 +81,9 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 	}
 
 	if recv := signature.Recv(); recv != nil {
-		if _, isPointer := recv.Type().(*types.Pointer); !isPointer {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "value receiver (receiver copy semantics)", Span: span}
-		}
+		// A pointer receiver binds the class instance; a value receiver
+		// binds a clone on entry, so receiver mutations never reach the
+		// caller — Go's receiver copy exactly.
 		if recv.Name() == "" || recv.Name() == "_" {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "unnamed or blank receiver", Span: span}
 		}
@@ -104,9 +104,6 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 		if err != nil {
 			return nil, err
 		}
-		if t.Kind == KindStruct {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "struct value parameter (value-copy semantics)", Span: span}
-		}
 		function.Params = append(function.Params, Var{Name: parameter.Name(), Type: t})
 	}
 	results := signature.Results()
@@ -118,9 +115,6 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 		t, err := b.typeOf(result.Type(), span)
 		if err != nil {
 			return nil, err
-		}
-		if t.Kind == KindStruct {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "struct value result (value-copy semantics)", Span: span}
 		}
 		function.Results = append(function.Results, Var{Name: result.Name(), Type: t})
 		b.results = append(b.results, t)
@@ -353,9 +347,6 @@ func (b *builder) buildDeclStmt(n *ast.DeclStmt) (Stmt, error) {
 			t, err := b.typeOf(object.Type(), span)
 			if err != nil {
 				return nil, err
-			}
-			if t.Kind == KindStruct {
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "struct value variable (value-copy semantics)", Span: span}
 			}
 			out.Names = append(out.Names, name.Name)
 			out.Types = append(out.Types, t)

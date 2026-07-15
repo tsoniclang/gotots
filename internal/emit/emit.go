@@ -93,6 +93,9 @@ func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct) er
 	}
 	p.indent--
 	p.line("}")
+	if err := printStructValueContract(p, structDecl); err != nil {
+		return fmt.Errorf("%s: %w", structDecl.ID, err)
+	}
 	sortedMethods := append([]*ir.Func{}, structDecl.Methods...)
 	sort.Slice(sortedMethods, func(i, j int) bool { return sortedMethods[i].Name < sortedMethods[j].Name })
 	for _, method := range sortedMethods {
@@ -105,8 +108,58 @@ func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct) er
 	return nil
 }
 
-// printMethod emits one pointer-receiver method; the Go receiver name
-// binds to the instance on entry so body references keep source naming.
+// printStructValueContract emits the value-semantics members of every
+// struct class: a deep clone along the value-struct spine, an in-place
+// field overwrite (so aliases of the value observe whole-value stores,
+// exactly like Go's memory write), and a fresh zero value. The names
+// carry a "$" that no Go identifier can spell, so no source method can
+// collide.
+func printStructValueContract(p *printer, structDecl *ir.Struct) error {
+	clone := make([]string, 0, len(structDecl.Fields))
+	for _, field := range structDecl.Fields {
+		if field.Type.Kind == ir.KindStruct {
+			clone = append(clone, "this."+field.Name+".goClone$()")
+		} else {
+			clone = append(clone, "this."+field.Name)
+		}
+	}
+	p.line("goClone$(): %s {", structDecl.Name)
+	p.indent++
+	p.line("return new %s(%s);", structDecl.Name, strings.Join(clone, ", "))
+	p.indent--
+	p.line("}")
+
+	p.line("goSet$(other: %s): void {", structDecl.Name)
+	p.indent++
+	for _, field := range structDecl.Fields {
+		if field.Type.Kind == ir.KindStruct {
+			p.line("this.%s.goSet$(other.%s);", field.Name, field.Name)
+		} else {
+			p.line("this.%s = other.%s;", field.Name, field.Name)
+		}
+	}
+	p.indent--
+	p.line("}")
+
+	zeros := make([]string, 0, len(structDecl.Fields))
+	for _, field := range structDecl.Fields {
+		zero, err := p.zeroLiteral(field.Type)
+		if err != nil {
+			return err
+		}
+		zeros = append(zeros, zero)
+	}
+	p.line("static goZero$(): %s {", structDecl.Name)
+	p.indent++
+	p.line("return new %s(%s);", structDecl.Name, strings.Join(zeros, ", "))
+	p.indent--
+	p.line("}")
+	return nil
+}
+
+// printMethod emits one method. A pointer receiver binds the instance; a
+// value receiver binds a clone on entry, so receiver mutations never
+// reach the caller.
 func printMethod(p *printer, method *ir.Func) error {
 	p.temps = 0
 	signature, err := p.functionSignature(method)
@@ -115,7 +168,11 @@ func printMethod(p *printer, method *ir.Func) error {
 	}
 	p.line("%s%s {", method.Name, signature)
 	p.indent++
-	p.line("const %s = this;", method.Receiver.Name)
+	if method.Receiver.Type.Kind == ir.KindStruct {
+		p.line("const %s = this.goClone$();", method.Receiver.Name)
+	} else {
+		p.line("const %s = this;", method.Receiver.Name)
+	}
 	if err := p.printBlockBody(method.Body); err != nil {
 		return fmt.Errorf("%s: %w", method.ID, err)
 	}
@@ -218,6 +275,8 @@ func (p *printer) tsType(t ir.Type) (string, error) {
 			return "", err
 		}
 		return name + " | undefined", nil
+	case ir.KindStruct:
+		return p.module.symbol(t.Pkg, t.Named)
 	case ir.KindSlice:
 		element, err := p.tsType(*t.Elem)
 		if err != nil {
