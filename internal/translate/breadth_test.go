@@ -312,3 +312,62 @@ func FloatToInt32() (int32, int32, int32, int32) {
 }
 `)
 }
+
+func TestOracleStagedCompoundTargets(t *testing.T) {
+	runOracle(t, `package fixture
+
+type node struct {
+	weight int
+	next   *node
+}
+
+func chain() *node {
+	return &node{weight: 1, next: &node{weight: 10}}
+}
+
+var calls int
+
+func pick(n *node) *node {
+	calls++
+	return n.next
+}
+
+func CompoundThroughCallBase() (int, int) {
+	calls = 0
+	n := chain()
+	pick(n).weight += 5
+	return n.next.weight, calls
+}
+
+func CompoundOnMapMissing() (int, int) {
+	m := map[string]int{}
+	m["k"] += 3
+	m["k"] *= 4
+	return m["k"], len(m)
+}
+
+func indexOnce() func() int {
+	i := 0
+	return func() int {
+		i++
+		return i - 1
+	}
+}
+
+func CompoundSliceImpureIndex() (int, int, int) {
+	next := indexOnce()
+	s := []int{10, 20}
+	s[next()] += 7
+	s[next()] += 9
+	return s[0], s[1], 2
+}
+
+func CompoundIncDecPointee() int {
+	x := 5
+	p := &x
+	*p += 2
+	*p++
+	return x
+}
+`)
+}

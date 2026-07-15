@@ -102,6 +102,17 @@ type TupleSpread struct {
 	T Type
 }
 
+// CompoundStmt is x op= y (and x++/x--): the target's operands stage
+// exactly once, the right-hand side evaluates, the staged location
+// loads, the operation applies, and the staged location stores — Go's
+// single-evaluation rule for every admissible target shape.
+type CompoundStmt struct {
+	Target   Target
+	Op       token.Token
+	Rhs      Expr
+	OperandT Type
+}
+
 // StmtSeq is a flat statement sequence spliced into the surrounding
 // block without introducing a lexical scope (used by lowerings that
 // expand one source statement into several).
@@ -203,6 +214,7 @@ func (*ReturnStmt) stmt()     {}
 func (*ExprStmt) stmt()       {}
 func (*BranchStmt) stmt()     {}
 func (*LabeledStmt) stmt()    {}
+func (*CompoundStmt) stmt()   {}
 func (*DeferPush) stmt()      {}
 func (*StmtSeq) stmt()        {}
 func (*TupleSpread) expr()    {}

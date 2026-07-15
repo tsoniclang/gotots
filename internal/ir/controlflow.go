@@ -74,23 +74,23 @@ func (b *builder) buildDeclStmt(n *ast.DeclStmt) (Stmt, error) {
 // compound-target resolver.
 func (b *builder) buildIncDec(n *ast.IncDecStmt) (Stmt, error) {
 	span := b.span(n.Pos())
-	target, x, err := b.compoundTarget(n.X)
+	operandT, err := b.typeOf(b.info.Types[n.X].Type, span)
 	if err != nil {
 		return nil, err
 	}
-	if !x.Type().Kind.Integer() {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "inc/dec of " + x.Type().Go, Span: span}
+	if !operandT.Kind.Integer() && !operandT.Kind.Float() {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "inc/dec of " + operandT.Go, Span: span}
+	}
+	target, err := b.buildTarget(n.X)
+	if err != nil {
+		return nil, err
 	}
 	op := token.ADD
 	if n.Tok == token.DEC {
 		op = token.SUB
 	}
-	one := &Const{T: x.Type(), Value: "1"}
 	b.use("incDec")
-	return &AssignStmt{
-		Targets: []Target{target},
-		Values:  []Expr{&Binary{Op: op, L: x, R: one, T: x.Type()}},
-	}, nil
+	return &CompoundStmt{Target: target, Op: op, Rhs: &Const{T: operandT, Value: "1"}, OperandT: operandT}, nil
 }
 
 func (b *builder) buildIf(n *ast.IfStmt) (Stmt, error) {

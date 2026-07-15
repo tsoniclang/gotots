@@ -136,6 +136,29 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		p.line("const %s: gort$.GoCell<%s> = { v: %s };", n.Cell, spelled, init)
 		return nil
 
+	case *ir.CompoundStmt:
+		staged, err := p.stageTarget(n.Target)
+		if err != nil {
+			return err
+		}
+		rhs, err := p.printExpr(n.Rhs)
+		if err != nil {
+			return err
+		}
+		rhsTemp := p.temp()
+		p.line("const %s = %s;", rhsTemp, rhs)
+		loaded, err := staged.load(p, n.OperandT)
+		if err != nil {
+			return err
+		}
+		loadTemp := p.temp()
+		p.line("const %s = %s;", loadTemp, loaded)
+		value, err := p.printBinaryOp(n.Op, loadTemp, rhsTemp, n.OperandT, n.Rhs.Type().Kind)
+		if err != nil {
+			return err
+		}
+		return staged.store(p, value)
+
 	case *ir.DeferPush:
 		call, err := p.printExpr(n.Call)
 		if err != nil {
@@ -341,62 +364,6 @@ func (p *printer) printAssign(n *ir.AssignStmt) error {
 	return nil
 }
 
-// printSwitch emits a Go expression switch as a JS switch, whose
-// semantics coincide exactly for the reviewed carriers: the tag is
-// evaluated once, case expressions are evaluated in source order under
-// identity equality, the first match wins, and default runs only when
-// nothing matches. Each clause body gets its own block for Go's per-case
-// scoping; an emitted break is Go's implicit clause exit, and omitting it
-// is Go's fallthrough.
-func (p *printer) printSwitch(n *ir.SwitchStmt) error {
-	if n.Init != nil {
-		p.line("{")
-		p.indent++
-		if err := p.printStmt(n.Init); err != nil {
-			return err
-		}
-	}
-	tag, err := p.printExpr(n.Tag)
-	if err != nil {
-		return err
-	}
-	p.line("%sswitch (%s) {", p.takeLoopLabel(), tag)
-	p.indent++
-	for _, clause := range n.Clauses {
-		if clause.Values == nil {
-			p.line("default: {")
-		} else {
-			for i, value := range clause.Values {
-				printed, err := p.printExpr(value)
-				if err != nil {
-					return err
-				}
-				if i < len(clause.Values)-1 {
-					p.line("case %s:", printed)
-				} else {
-					p.line("case %s: {", printed)
-				}
-			}
-		}
-		p.indent++
-		if err := p.printSwitchClauseBody(clause.Body); err != nil {
-			return err
-		}
-		if !clause.Fallthrough {
-			p.line("break;")
-		}
-		p.indent--
-		p.line("}")
-	}
-	p.indent--
-	p.line("}")
-	if n.Init != nil {
-		p.indent--
-		p.line("}")
-	}
-	return nil
-}
-
 func (p *printer) printIf(n *ir.IfStmt) error {
 	// A Go if-init introduces its own scope covering both branches.
 	if n.Init != nil {
@@ -520,6 +487,27 @@ func (p *printer) forClause(stmt ir.Stmt, isInit bool) (string, error) {
 			return "gosl$.goArraySetAll(" + tsName(variable.Name) + ", " + value + ", " + setElem + ")", nil
 		}
 		return tsName(variable.Name) + " = " + value, nil
+	case *ir.CompoundStmt:
+		// Simple variable and cell targets evaluate once trivially, so
+		// the clause form needs no staging.
+		var location string
+		switch target := n.Target.(type) {
+		case ir.VarTarget:
+			location = tsName(target.Name)
+		case ir.BoxedTarget:
+			location = target.Cell + ".v"
+		default:
+			return "", fmt.Errorf("compound target %T not expressible in a for-loop clause", n.Target)
+		}
+		rhs, err := p.printExpr(n.Rhs)
+		if err != nil {
+			return "", err
+		}
+		value, err := p.printBinaryOp(n.Op, location, rhs, n.OperandT, n.Rhs.Type().Kind)
+		if err != nil {
+			return "", err
+		}
+		return location + " = " + value, nil
 	}
 	return "", fmt.Errorf("statement %T not expressible in a for-loop clause", stmt)
 }

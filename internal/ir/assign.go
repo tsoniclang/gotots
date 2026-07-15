@@ -247,133 +247,55 @@ func (b *builder) buildAssign(n *ast.AssignStmt) (Stmt, error) {
 	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "assignment token " + n.Tok.String(), Span: span}
 }
 
-// buildCompoundAssign lowers x op= y into x = x op y. Go evaluates x's
-// operands once, so the lowering — whose load and store each spell the
-// operands — is restricted to shapes whose re-evaluation is pure.
+// buildCompoundAssign lowers x op= y: the target's operands stage
+// exactly once at emission, so every assignable shape is admissible.
 func (b *builder) buildCompoundAssign(n *ast.AssignStmt, operator token.Token) (Stmt, error) {
 	span := b.span(n.Pos())
 	if len(n.Lhs) != 1 || len(n.Rhs) != 1 {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "compound assignment arity", Span: span}
 	}
-	target, left, err := b.compoundTarget(n.Lhs[0])
+	operandT, err := b.typeOf(b.info.Types[n.Lhs[0]].Type, span)
 	if err != nil {
 		return nil, err
 	}
-	right, err := b.buildExpr(n.Rhs[0])
+	if err := compoundOpAdmissible(operator, operandT, span); err != nil {
+		return nil, err
+	}
+	target, err := b.buildTarget(n.Lhs[0])
 	if err != nil {
 		return nil, err
 	}
-	operand := left.Type()
-	if operand.Kind == KindString && operator != token.ADD {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "operator " + operator.String() + " on string", Span: span}
+	if _, isBlank := target.(BlankTarget); isBlank {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "compound assignment to the blank identifier", Span: span}
 	}
-	if operand.Kind == KindBool {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "compound assignment on bool", Span: span}
-	}
-	if operand.Kind == KindFloat32 {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "float32 arithmetic", Span: span}
+	right, err := b.buildExprAs(n.Rhs[0], operandT)
+	if err != nil {
+		return nil, err
 	}
 	b.use("compoundAssign:" + operator.String())
-	return &AssignStmt{
-		Targets: []Target{target},
-		Values:  []Expr{&Binary{Op: operator, L: left, R: right, T: operand}},
-	}, nil
+	return &CompoundStmt{Target: target, Op: operator, Rhs: right, OperandT: operandT}, nil
 }
 
-// compoundTarget resolves the operand of a compound assignment or
-// inc/dec into its store target and load expression. Go evaluates the
-// operand's address once; the lowering evaluates operands in both the
-// load and the store, so admitted shapes are exactly those whose
-// re-evaluation is pure: variables, fields of variables, and maps or
-// slices held in variables indexed by pure keys. The load runs before
-// the store on both sides, preserving nil-map and bounds panic order.
-func (b *builder) compoundTarget(lhs ast.Expr) (Target, Expr, error) {
-	span := b.span(lhs.Pos())
-	switch operand := ast.Unparen(lhs).(type) {
-	case *ast.Ident:
-		if operand.Name == "_" {
-			return nil, nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "compound assignment to the blank identifier", Span: span}
+// compoundOpAdmissible mirrors the binary-operation review for the
+// compound forms.
+func compoundOpAdmissible(operator token.Token, operand Type, span Span) error {
+	if operand.Kind == KindString {
+		if operator != token.ADD {
+			return &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "operator " + operator.String() + " on string", Span: span}
 		}
-		load, err := b.buildExpr(operand)
-		if err != nil {
-			return nil, nil, err
-		}
-		if _, isBoxed := b.boxedVar(operand); isBoxed && boxable(load.Type().Kind) {
-			b.use("boxedStore")
-			return BoxedTarget{Cell: cellName(operand.Name), T: load.Type()}, load, nil
-		}
-		return VarTarget{Name: operand.Name, T: load.Type()}, load, nil
-
-	case *ast.SelectorExpr:
-		if !b.pureFieldBase(operand.X) {
-			return nil, nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "compound assignment to a field with an impure base", Span: span}
-		}
-		built, err := b.buildExpr(operand)
-		if err != nil {
-			return nil, nil, err
-		}
-		load, isField := built.(*FieldLoad)
-		if !isField {
-			return nil, nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "compound assignment to a non-field selector", Span: span}
-		}
-		b.use("fieldStore")
-		return &FieldTarget{X: load.X, Field: load.Field, T: load.T}, load, nil
-
-	case *ast.IndexExpr:
-		if _, baseIsIdent := ast.Unparen(operand.X).(*ast.Ident); !baseIsIdent {
-			return nil, nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "indexed compound assignment on a non-variable operand", Span: span}
-		}
-		if !b.pureOperand(operand.Index) {
-			return nil, nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "indexed compound assignment with a non-pure index", Span: span}
-		}
-		built, err := b.buildExpr(operand)
-		if err != nil {
-			return nil, nil, err
-		}
-		switch load := built.(type) {
-		case *MapGet:
-			b.use("mapStore")
-			return &MapTarget{Map: load.Map, Key: load.Key}, load, nil
-		case *SliceGet:
-			b.use("sliceStore")
-			return &SliceTarget{X: load.X, Index: load.Index}, load, nil
-		case *ArrayGet:
-			b.use("arrayStore")
-			return &ArrayTarget{X: load.X, Index: load.Index}, load, nil
-		}
-		return nil, nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "indexed compound assignment on " + built.Type().Go, Span: span}
+		return nil
 	}
-	return nil, nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: fmt.Sprintf("compound assignment to %T", lhs), Span: span}
-}
-
-// pureFieldBase reports whether re-evaluating a compound target's base
-// is exact: chains of variables, field selections, and dereferences —
-// no calls or indexing. A nil-pointer panic surfaces on the load
-// re-evaluation first, so re-running the chain observes nothing new.
-func (b *builder) pureFieldBase(e ast.Expr) bool {
-	switch base := ast.Unparen(e).(type) {
-	case *ast.Ident:
-		return true
-	case *ast.StarExpr:
-		return b.pureFieldBase(base.X)
-	case *ast.SelectorExpr:
-		selection, ok := b.info.Selections[base]
-		if !ok || selection.Kind() != types.FieldVal {
-			return false
-		}
-		return b.pureFieldBase(base.X)
+	if operand.Kind == KindFloat32 {
+		return &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "float32 arithmetic", Span: span}
 	}
-	return false
-}
-
-// pureOperand reports whether re-evaluating the expression is exact: a
-// folded constant or a plain variable reference.
-func (b *builder) pureOperand(e ast.Expr) bool {
-	if tv, ok := b.info.Types[e]; ok && tv.Value != nil {
-		return true
+	if !operand.Kind.Integer() && !operand.Kind.Float() {
+		return &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "compound assignment on " + operand.Go, Span: span}
 	}
-	_, isIdent := ast.Unparen(e).(*ast.Ident)
-	return isIdent
+	if operand.Kind.Float() && operator != token.ADD && operator != token.SUB &&
+		operator != token.MUL && operator != token.QUO {
+		return &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "operator " + operator.String() + " on " + operand.Go, Span: span}
+	}
+	return nil
 }
 
 // blankSlotType resolves the type of a discarded (_) slot from the tuple

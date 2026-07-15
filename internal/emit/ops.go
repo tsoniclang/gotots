@@ -30,7 +30,14 @@ func (p *printer) printBinary(n *ir.Binary) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	operand := n.L.Type().Kind
+	return p.printBinaryOp(n.Op, left, right, n.L.Type(), n.R.Type().Kind)
+}
+
+// printBinaryOp renders one binary operation over already-printed
+// operands (shared by the expression and the staged compound forms).
+func (p *printer) printBinaryOp(op token.Token, left, right string, operandT ir.Type, rightKind ir.Kind) (string, error) {
+	n := struct{ Op token.Token }{Op: op}
+	operand := operandT.Kind
 
 	// Comparisons and boolean logic are direct for every reviewed carrier:
 	// canonical-range numbers, bigints, booleans, and string equality.
@@ -61,7 +68,7 @@ func (p *printer) printBinary(n *ir.Binary) (string, error) {
 
 	carrierFamily, isInteger := family(operand)
 	if !isInteger {
-		return "", fmt.Errorf("no emission for operator %s on %q", n.Op, n.L.Type().Go)
+		return "", fmt.Errorf("no emission for operator %s on %q", n.Op, operandT.Go)
 	}
 	bits := operand.Bits()
 	wrap := helper(abi.Wrap(carrierFamily, bits))
@@ -95,7 +102,7 @@ func (p *printer) printBinary(n *ir.Binary) (string, error) {
 		}
 		return wrap + "(" + left + " " + js + " " + right + ")", nil
 	case token.SHL, token.SHR:
-		count, err := shiftCount(n.R, right)
+		count, err := shiftCount(rightKind, right)
 		if err != nil {
 			return "", err
 		}
@@ -110,10 +117,9 @@ func (p *printer) printBinary(n *ir.Binary) (string, error) {
 
 // shiftCount adapts the count operand to the ABI's number-typed count with
 // the exact Go negative-count panic and beyond-width clamping.
-func shiftCount(countExpr ir.Expr, printed string) (string, error) {
-	kind := countExpr.Type().Kind
+func shiftCount(kind ir.Kind, printed string) (string, error) {
 	if !kind.Integer() {
-		return "", fmt.Errorf("shift count of type %q", countExpr.Type().Go)
+		return "", fmt.Errorf("shift count of kind %d", kind)
 	}
 	if kind.Wide64() {
 		return helper("goShiftCountFromBig") + "(" + printed + ")", nil

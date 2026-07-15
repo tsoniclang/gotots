@@ -155,6 +155,40 @@ func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
 	return stagedTarget{}, fmt.Errorf("no staging for target %T", target)
 }
 
+// load spells the staged location's current value; reading happens
+// after the right-hand side evaluates and before the store, exactly
+// Go's compound sequence.
+func (s stagedTarget) load(p *printer, operandT ir.Type) (string, error) {
+	base := s.name
+	if s.nilCheckBase {
+		base = "gort$.goNilCheck(" + s.name + ")"
+	}
+	switch s.kind {
+	case "var":
+		return s.name, nil
+	case "boxed":
+		return s.name + ".v", nil
+	case "field":
+		return base + "." + s.field, nil
+	case "pointee":
+		return base + ".v", nil
+	case "map":
+		zero, err := p.zeroLiteral(operandT)
+		if err != nil {
+			return "", err
+		}
+		if s.keyedMap {
+			return "gort$.goKMapGet(" + s.name + ", " + s.keyTemp + ", " + zero + ")", nil
+		}
+		return "gort$.goMapGet(" + s.name + ", " + s.keyTemp + ", " + zero + ")", nil
+	case "slice":
+		return "gosl$.goSliceGet(" + s.name + ", " + s.keyTemp + ")", nil
+	case "array":
+		return "gosl$.goArrayGet(" + s.name + ", " + s.keyTemp + ")", nil
+	}
+	return "", fmt.Errorf("no load for staged target kind %q", s.kind)
+}
+
 func (s stagedTarget) store(p *printer, value string) error {
 	base := s.name
 	if s.nilCheckBase {
