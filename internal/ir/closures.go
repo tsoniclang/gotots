@@ -29,6 +29,7 @@ func (b *builder) buildClosure(lit *ast.FuncLit) (Expr, error) {
 		operations: b.operations,
 		sites:      b.sites,
 		boxed:      b.boxed,
+		genericObj: b.genericObj,
 	}
 	out := &Closure{T: t}
 	var boxedParams []Var

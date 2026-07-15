@@ -87,7 +87,15 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 			return Type{}, err
 		}
 		if !mapKeySupported(key.Kind) {
-			if key.Kind != KindStruct || !b.structKeyEncodable(u.Key(), span) {
+			admitted := key.Kind == KindStruct && b.structKeyEncodable(u.Key(), span)
+			if !admitted {
+				// A type-parameter key hides behind its constraint
+				// interface; the instantiation evidence decides it.
+				if _, isParam := types.Unalias(u.Key()).(*types.TypeParam); isParam {
+					admitted = b.typeParamKeySupported(u.Key(), span)
+				}
+			}
+			if !admitted {
 				return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "map key type " + key.Go + " (Go key equality is not JS SameValueZero)", Span: span}
 			}
 		}
@@ -226,6 +234,36 @@ func KeyEncodableField(t Type) bool {
 		return KeyEncodableField(*t.Elem)
 	}
 	return t.Kind.Integer()
+}
+
+// typeParamKeySupported admits a type-parameter map key when every
+// recorded instantiation of the enclosing generic function binds it to
+// a carrier whose Go equality is JS SameValueZero — the closed-world
+// evidence makes the direct Map carrier exact for all of them.
+func (b *builder) typeParamKeySupported(keyType types.Type, span Span) bool {
+	param, ok := types.Unalias(keyType).(*types.TypeParam)
+	if !ok || b.genericObj == nil {
+		return false
+	}
+	signature := b.genericObj.Type().(*types.Signature)
+	if signature.TypeParams() == nil || param.Index() >= signature.TypeParams().Len() ||
+		signature.TypeParams().At(param.Index()) != param {
+		return false
+	}
+	instances := b.unit.GenericInstances(b.genericObj)
+	if len(instances) == 0 {
+		return false
+	}
+	for _, instance := range instances {
+		if param.Index() >= len(instance) {
+			return false
+		}
+		bound, err := b.typeOf(instance[param.Index()], span)
+		if err != nil || !mapKeySupported(bound.Kind) {
+			return false
+		}
+	}
+	return true
 }
 
 // structKeyEncodable reports whether a named struct key's fields are all

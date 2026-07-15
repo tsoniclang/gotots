@@ -118,3 +118,23 @@ func NilKeyedMapWritePanics() int {
 }
 `)
 }
+
+func TestOracleTypeParamMapKeys(t *testing.T) {
+	runOracle(t, `package fixture
+
+func index[K comparable, V any](keys []K, values []V) map[K]V {
+	out := make(map[K]V)
+	for i, k := range keys {
+		out[k] = values[i]
+	}
+	return out
+}
+
+func TypeParamKeys() (int, string, bool) {
+	byInt := index([]int{1, 2}, []string{"one", "two"})
+	byString := index([]string{"a"}, []int{10})
+	v, ok := byInt[2]
+	return byString["a"], v, ok
+}
+`)
+}

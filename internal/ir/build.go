@@ -46,6 +46,10 @@ type builder struct {
 	// carriers among them live in mutable cells (shared with closure
 	// child builders — an inner &x may address an outer variable).
 	boxed map[*types.Var]bool
+	// genericObj is the generic function being built, when there is one:
+	// type-parameter admissions (map keys) consult its closed-world
+	// instantiation evidence.
+	genericObj *types.Func
 }
 
 func (b *builder) span(pos token.Pos) Span {
@@ -114,6 +118,7 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 			return declarationSite(err)
 		}
 		function.TypeParams = names
+		b.genericObj = object
 	}
 
 	if recv := signature.Recv(); recv != nil {
