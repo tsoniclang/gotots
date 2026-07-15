@@ -72,24 +72,64 @@ func boxable(kind Kind) bool {
 // variable whose address is taken. Package-level variables stay out:
 // their addresses need the module-level cell story.
 func scanBoxedVars(info *types.Info, stmts []ast.Stmt, boxed map[*types.Var]bool) {
+	box := func(e ast.Expr) {
+		ident, ok := ast.Unparen(e).(*ast.Ident)
+		if !ok {
+			return
+		}
+		variable, ok := info.Uses[ident].(*types.Var)
+		if !ok || variable.Pkg() == nil {
+			return
+		}
+		if variable.Parent() == variable.Pkg().Scope() {
+			return // package-level variable
+		}
+		switch variable.Type().Underlying().(type) {
+		case *types.Struct, *types.Array:
+			return // identity carriers never box
+		}
+		boxed[variable] = true
+	}
+	// implicitRecv boxes a method receiver only when the pointer-receiver
+	// call must take the variable's address: pointer-typed (and boxed
+	// interface) receivers already carry it.
+	implicitRecv := func(e ast.Expr) {
+		ident, ok := ast.Unparen(e).(*ast.Ident)
+		if !ok {
+			return
+		}
+		variable, ok := info.Uses[ident].(*types.Var)
+		if !ok {
+			return
+		}
+		switch variable.Type().Underlying().(type) {
+		case *types.Pointer, *types.Interface:
+			return
+		}
+		box(e)
+	}
 	for _, stmt := range stmts {
 		ast.Inspect(stmt, func(n ast.Node) bool {
-			unary, ok := n.(*ast.UnaryExpr)
-			if !ok || unary.Op != token.AND {
-				return true
+			switch node := n.(type) {
+			case *ast.UnaryExpr:
+				if node.Op == token.AND {
+					box(node.X)
+				}
+			case *ast.SelectorExpr:
+				// A pointer-receiver method on an addressable variable
+				// takes its address implicitly.
+				selection, ok := info.Selections[node]
+				if !ok || selection.Kind() != types.MethodVal {
+					return true
+				}
+				method, ok := selection.Obj().(*types.Func)
+				if !ok {
+					return true
+				}
+				if _, isPointer := method.Type().(*types.Signature).Recv().Type().(*types.Pointer); isPointer {
+					implicitRecv(node.X)
+				}
 			}
-			ident, ok := ast.Unparen(unary.X).(*ast.Ident)
-			if !ok {
-				return true
-			}
-			variable, ok := info.Uses[ident].(*types.Var)
-			if !ok || variable.Pkg() == nil {
-				return true
-			}
-			if variable.Parent() == variable.Pkg().Scope() {
-				return true // package-level variable
-			}
-			boxed[variable] = true
 			return true
 		})
 	}

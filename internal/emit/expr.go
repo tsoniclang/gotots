@@ -119,9 +119,17 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		}
 		// A value receiver dereferences a pointer caller at the call (Go
 		// copies the pointee); a pointer receiver takes the pointer as
-		// is — nil receivers run, as in Go.
+		// is — nil receivers run, as in Go. Cell pointees read through
+		// the cell.
 		if !n.PointerRecv && n.Recv.Type().Kind == ir.KindPointer {
 			recv = "gort$.goNilCheck(" + recv + ")"
+			if elem := n.Recv.Type().Elem; elem != nil {
+				switch elem.Kind {
+				case ir.KindStruct, ir.KindArray, ir.KindExternal:
+				default:
+					recv += ".v"
+				}
+			}
 		}
 		if args == "" {
 			return fmt.Sprintf("%s(%s)", callee, recv), nil

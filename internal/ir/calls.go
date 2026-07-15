@@ -219,9 +219,22 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 	recvTypeArgs := recvIRType.TypeArgs
 	// A pointer-receiver method needs an addressable instance; a value
 	// receiver copies at the call and admits any reviewed carrier
-	// (scalars copy as JS values; struct instances clone inside).
+	// (scalars copy as JS values; struct instances clone inside). An
+	// addressable carrier variable takes its address implicitly through
+	// its cell.
 	if pointerRecv && recv.Type().Kind != KindPointer && recv.Type().Kind != KindStruct {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "pointer-receiver method call on " + recv.Type().Go, Span: span}
+		replaced := false
+		if ident, isIdent := ast.Unparen(selector.X).(*ast.Ident); isIdent && boxable(recv.Type().Kind) {
+			if _, isBoxed := b.boxedVar(ident); isBoxed {
+				elem := recv.Type()
+				recv = &BoxedRef{Cell: cellName(ident.Name),
+					T: Type{Kind: KindPointer, Go: "*" + elem.Go, Named: recvNamed.Obj().Name(), Pkg: method.Pkg().Path(), Elem: &elem}}
+				replaced = true
+			}
+		}
+		if !replaced {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "pointer-receiver method call on " + recv.Type().Go, Span: span}
+		}
 	}
 
 	out := &MethodCall{

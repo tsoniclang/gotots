@@ -66,6 +66,18 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 				element := Type{Kind: KindStruct, Go: named.String(), Named: named.Obj().Name(), Pkg: declaringPkg}
 				return Type{Kind: KindPointer, Go: spelled, Named: named.Obj().Name(), Pkg: declaringPkg, Elem: &element}, nil
 			}
+			if named.Obj().Pkg() != nil && b.unit.Owns(named.Obj().Pkg().Path()) {
+				// A pointer to an owned named carrier type: a mutable
+				// cell, with the name preserved for method dispatch.
+				element, err := b.typeOf(named, span)
+				if err != nil {
+					return Type{}, err
+				}
+				if !boxable(element.Kind) {
+					return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "pointer to non-struct type " + spelled, Span: span}
+				}
+				return Type{Kind: KindPointer, Go: spelled, Named: named.Obj().Name(), Pkg: named.Obj().Pkg().Path(), Elem: &element}, nil
+			}
 			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "pointer to non-struct type " + spelled, Span: span}
 		}
 		// A pointer to a non-named type: fixed arrays keep their carrier

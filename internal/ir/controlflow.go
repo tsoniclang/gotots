@@ -59,7 +59,15 @@ func (b *builder) buildDeclStmt(n *ast.DeclStmt) (Stmt, error) {
 		}
 	}
 	b.use("varDecl")
-	return out, nil
+	var idents []ast.Expr
+	for _, spec := range decl.Specs {
+		if value, isValue := spec.(*ast.ValueSpec); isValue {
+			for _, name := range value.Names {
+				idents = append(idents, name)
+			}
+		}
+	}
+	return b.boxDeclaredNames(idents, out, span)
 }
 
 // buildIncDec lowers x++ / x-- through the shared single-evaluation

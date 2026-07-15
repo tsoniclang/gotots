@@ -112,3 +112,32 @@ func BoolAndFloatCells() (bool, float64) {
 }
 `)
 }
+
+func TestOracleNamedCarrierPointers(t *testing.T) {
+	runOracle(t, `package fixture
+
+type counter int
+
+func (c *counter) bump() {
+	*c = *c + 1
+}
+
+func (c counter) get() int {
+	return int(c)
+}
+
+func NamedCarrierPointerMethods() (int, int) {
+	var c counter
+	c.bump()
+	c.bump()
+	p := &c
+	p.bump()
+	return p.get(), int(c)
+}
+
+func NilCarrierPointerValueReceiverPanics() int {
+	var p *counter
+	return p.get()
+}
+`)
+}
