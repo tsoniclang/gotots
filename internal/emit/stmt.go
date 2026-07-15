@@ -81,6 +81,9 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 	case *ir.SwitchStmt:
 		return p.printSwitch(n)
 
+	case *ir.TypeSwitchStmt:
+		return p.printTypeSwitch(n)
+
 	case *ir.MapDeleteStmt:
 		mapExpr, err := p.printExpr(n.Map)
 		if err != nil {

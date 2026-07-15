@@ -107,7 +107,12 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 		// the caller decides whether a bare struct kind is admissible.
 		return Type{Kind: KindStruct, Go: spelled, Named: named.Obj().Name(), Pkg: named.Obj().Pkg().Path()}, nil
 	case *types.Interface:
-		return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "interface type " + spelled, Span: span}
+		out := Type{Kind: KindIface, Go: spelled}
+		if named, isNamed := types.Unalias(t).(*types.Named); isNamed && named.Obj().Pkg() != nil {
+			out.Named = named.Obj().Name()
+			out.Pkg = named.Obj().Pkg().Path()
+		}
+		return out, nil
 
 	case *types.Array:
 		return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "array type " + spelled, Span: span}

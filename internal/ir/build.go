@@ -270,6 +270,9 @@ func (b *builder) buildStmt(stmt ast.Stmt) (Stmt, error) {
 	case *ast.SwitchStmt:
 		return b.buildSwitch(n)
 
+	case *ast.TypeSwitchStmt:
+		return b.buildTypeSwitch(n)
+
 	case *ast.ReturnStmt:
 		return b.buildReturn(n)
 

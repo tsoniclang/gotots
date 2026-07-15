@@ -318,10 +318,15 @@ func (b *builder) blankSlotType(n *ast.AssignStmt, index int, span Span) (Type, 
 		if index == 1 {
 			return Type{Kind: KindBool, Go: "bool"}, nil
 		}
-		if mapType, ok := b.info.Types[ast.Unparen(n.Rhs[0]).(*ast.IndexExpr).X]; ok {
-			if goMap, isMap := mapType.Type.Underlying().(*types.Map); isMap {
-				return b.typeOf(goMap.Elem(), span)
+		switch rhs := ast.Unparen(n.Rhs[0]).(type) {
+		case *ast.IndexExpr:
+			if mapType, ok := b.info.Types[rhs.X]; ok {
+				if goMap, isMap := mapType.Type.Underlying().(*types.Map); isMap {
+					return b.typeOf(goMap.Elem(), span)
+				}
 			}
+		case *ast.TypeAssertExpr:
+			return b.typeOf(b.info.Types[rhs.Type].Type, span)
 		}
 		return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "blank slot in unrecognized tuple form", Span: span}
 	}
@@ -365,6 +370,11 @@ func (b *builder) tupleValue(rhs []ast.Expr, targetCount int) (Expr, error) {
 		}
 		b.use("mapCommaOk")
 		return &MapLookup{Map: mapExpr, Key: key, T: *mapExpr.Type().Elem}, nil
+	case *ast.TypeAssertExpr:
+		if targetCount != 2 || n.Type == nil {
+			return nil, nil
+		}
+		return b.buildTypeAssert(n, true)
 	}
 	return nil, nil
 }

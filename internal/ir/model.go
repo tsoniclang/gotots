@@ -47,6 +47,11 @@ const (
 	// with undefined for nil. Go and JS both capture variables by
 	// reference, so closure semantics coincide.
 	KindFunc
+	// KindIface is an interface value, carried as a box pairing a shared
+	// per-type rtti object with the concrete value; undefined is the nil
+	// interface. Boxing at conversion sites preserves the nil-pointer-in-
+	// interface distinction exactly.
+	KindIface
 )
 
 // Type is the resolved semantic type of an IR value with its canonical Go
@@ -116,7 +121,7 @@ func (k Kind) Float() bool { return k == KindFloat32 || k == KindFloat64 }
 // Nilable reports whether the kind's zero value is Go nil (carried as
 // undefined).
 func (k Kind) Nilable() bool {
-	return k == KindPointer || k == KindMap || k == KindSlice || k == KindFunc
+	return k == KindPointer || k == KindMap || k == KindSlice || k == KindFunc || k == KindIface
 }
 
 // Bits returns the integer width in bits.

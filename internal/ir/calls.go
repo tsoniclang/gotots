@@ -84,6 +84,9 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 	if err != nil {
 		return nil, err
 	}
+	if recv.Type().Kind == KindIface {
+		return b.buildIfaceMethodCall(n, recv, method)
+	}
 	signature := method.Type().(*types.Signature)
 	if signature.TypeParams() != nil {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic method call", Span: span}

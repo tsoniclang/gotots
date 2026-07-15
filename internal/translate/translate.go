@@ -124,7 +124,7 @@ func Packages(pkgs []*packages.Package, sourceDir string, options Options) (*Gen
 // and methods — so a method may precede its receiver type in file order.
 func translatePackage(out *Generated, p *packages.Package, sourceDir string, unit ir.Scope, options Options) error {
 	corePath := path.Join("core", p.PkgPath, "package.ts")
-	module, err := newModule(corePath, p.PkgPath, unit)
+	module, err := newModule(corePath, p.PkgPath, p.Types.Name(), unit)
 	if err != nil {
 		return err
 	}
@@ -153,6 +153,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 	structs := map[string]*ir.Struct{}
 	var structOrder []string
 	var packageVars []emit.PackageVar
+	var carrierTypes []emit.CarrierType
 	for _, f := range files {
 		for _, decl := range f.file.Decls {
 			d, isGen := decl.(*ast.GenDecl)
@@ -184,10 +185,17 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 					if _, isStruct := object.Type().Underlying().(*types.Struct); !isStruct || object.IsAlias() {
 						// A non-struct named type (or alias) erases to its
 						// underlying carrier: uses spell the carrier type, and
-						// its methods generate as package-level functions.
+						// its methods generate as package-level functions. A
+						// non-alias named type still owns an rtti object for
+						// interface use.
 						carrier, err := erasedCarrier(p, sourceDir, unit, typeSpec, object)
 						if err != nil {
 							return err
+						}
+						if !object.IsAlias() {
+							carrierTypes = append(carrierTypes, emit.CarrierType{
+								Name: typeSpec.Name.Name, Exported: typeSpec.Name.IsExported(),
+							})
 						}
 						out.Proofs = append(out.Proofs, Proof{
 							ID: id, SourceRevision: options.SourceRevision,
@@ -320,7 +328,13 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 	for _, name := range structOrder {
 		structList = append(structList, structs[name])
 	}
-	body, err := emit.Package(module, structList, carrierMethods, packageVars, functions)
+	body, err := emit.Package(module, emit.Decls{
+		Structs:      structList,
+		Methods:      carrierMethods,
+		CarrierTypes: carrierTypes,
+		Vars:         packageVars,
+		Functions:    functions,
+	})
 	if err != nil {
 		return err
 	}
@@ -342,7 +356,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 // newModule builds the emission context of one generated module: the
 // language-ABI specifiers plus one specifier per co-generated package,
 // all relative to the module's own directory.
-func newModule(corePath, pkgPath string, unit ir.Scope) (*emit.Module, error) {
+func newModule(corePath, pkgPath, pkgName string, unit ir.Scope) (*emit.Module, error) {
 	fromDir := path.Dir(corePath)
 	intsImport, err := relativeImport(fromDir, path.Join(abiDir, "goints.js"))
 	if err != nil {
@@ -353,6 +367,10 @@ func newModule(corePath, pkgPath string, unit ir.Scope) (*emit.Module, error) {
 		return nil, err
 	}
 	sliceImport, err := relativeImport(fromDir, path.Join(abiDir, "goslice.js"))
+	if err != nil {
+		return nil, err
+	}
+	ifaceImport, err := relativeImport(fromDir, path.Join(abiDir, "goiface.js"))
 	if err != nil {
 		return nil, err
 	}
@@ -367,10 +385,11 @@ func newModule(corePath, pkgPath string, unit ir.Scope) (*emit.Module, error) {
 		}
 		specifiers[other] = specifier
 	}
-	return emit.NewModule(pkgPath, emit.ABIImports{
+	return emit.NewModule(pkgPath, pkgName, emit.ABIImports{
 		Ints:    intsImport,
 		Runtime: runtimeImport,
 		Slice:   sliceImport,
+		Iface:   ifaceImport,
 	}, specifiers), nil
 }
 
@@ -473,6 +492,8 @@ func conservativeCarrier(t ir.Type) string {
 		return "class-instance-value(copy-on-bind,in-place-store)"
 	case t.Kind == ir.KindFunc:
 		return "js-closure-nilable(undefined)-capture-by-reference"
+	case t.Kind == ir.KindIface:
+		return "iface-box-nilable(undefined)-rtti-identity"
 	case t.Kind == ir.KindMap:
 		return "js-map-nilable(undefined)-has-based-lookup"
 	case t.Kind == ir.KindSlice:

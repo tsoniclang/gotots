@@ -55,23 +55,40 @@ type PackageVar struct {
 	Exported bool
 }
 
+// CarrierType is one named non-struct type: erased to its carrier, it
+// still owns an rtti object (and possibly methods) for interface use.
+type CarrierType struct {
+	Name     string
+	Exported bool
+}
+
+// Decls is the complete declaration set of one translated package.
+type Decls struct {
+	Structs      []*ir.Struct
+	Methods      []Method
+	CarrierTypes []CarrierType
+	Vars         []PackageVar
+	Functions    []*ir.Func
+}
+
 // Package prints one translated package into a single TypeScript module:
-// classes for named structs (each followed by its method functions),
-// then carrier-type methods, then package variables, then functions,
-// each in sorted name order. module carries the package identity, the
-// language-ABI specifiers, and the co-generated import environment; the
-// body is printed first so only referenced packages are imported.
-func Package(module *Module, structs []*ir.Struct, methods []Method, vars []PackageVar, functions []*ir.Func) (string, error) {
-	sortedStructs := append([]*ir.Struct{}, structs...)
+// classes for named structs (each followed by its method functions and
+// rtti constants), then carrier-type methods and rttis, then package
+// variables, then functions, each in sorted name order. module carries
+// the package identity, the language-ABI specifiers, and the
+// co-generated import environment; the body is printed first so only
+// referenced packages are imported.
+func Package(module *Module, decls Decls) (string, error) {
+	sortedStructs := append([]*ir.Struct{}, decls.Structs...)
 	sort.Slice(sortedStructs, func(i, j int) bool { return sortedStructs[i].Name < sortedStructs[j].Name })
-	sortedMethodDecls := append([]Method{}, methods...)
+	sortedMethodDecls := append([]Method{}, decls.Methods...)
 	sort.Slice(sortedMethodDecls, func(i, j int) bool {
 		if sortedMethodDecls[i].TypeName != sortedMethodDecls[j].TypeName {
 			return sortedMethodDecls[i].TypeName < sortedMethodDecls[j].TypeName
 		}
 		return sortedMethodDecls[i].Fn.Name < sortedMethodDecls[j].Fn.Name
 	})
-	sorted := append([]*ir.Func{}, functions...)
+	sorted := append([]*ir.Func{}, decls.Functions...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
 
 	var body strings.Builder
@@ -88,6 +105,10 @@ func Package(module *Module, structs []*ir.Struct, methods []Method, vars []Pack
 				return "", err
 			}
 		}
+		body.WriteString("\n")
+		if err := printRtti(&body, module, structDecl.Name, structDecl.Exported, true, structDecl.Methods); err != nil {
+			return "", err
+		}
 	}
 	for _, method := range sortedMethodDecls {
 		body.WriteString("\n")
@@ -95,7 +116,23 @@ func Package(module *Module, structs []*ir.Struct, methods []Method, vars []Pack
 			return "", err
 		}
 	}
-	sortedVars := append([]PackageVar{}, vars...)
+	sortedCarriers := append([]CarrierType{}, decls.CarrierTypes...)
+	sort.Slice(sortedCarriers, func(i, j int) bool { return sortedCarriers[i].Name < sortedCarriers[j].Name })
+	if len(sortedCarriers) > 0 {
+		body.WriteString("\n")
+	}
+	for _, carrier := range sortedCarriers {
+		var carrierMethods []*ir.Func
+		for _, method := range sortedMethodDecls {
+			if method.TypeName == carrier.Name {
+				carrierMethods = append(carrierMethods, method.Fn)
+			}
+		}
+		if err := printRtti(&body, module, carrier.Name, carrier.Exported, false, carrierMethods); err != nil {
+			return "", err
+		}
+	}
+	sortedVars := append([]PackageVar{}, decls.Vars...)
 	sort.Slice(sortedVars, func(i, j int) bool { return sortedVars[i].Name < sortedVars[j].Name })
 	if len(sortedVars) > 0 {
 		body.WriteString("\n")
@@ -352,6 +389,8 @@ func (p *printer) tsType(t ir.Type) (string, error) {
 		return name + " | undefined", nil
 	case ir.KindStruct:
 		return p.module.symbol(t.Pkg, t.Named)
+	case ir.KindIface:
+		return "goif.GoIface", nil
 	case ir.KindFunc:
 		var params []string
 		for i, parameter := range t.Sig.Params {

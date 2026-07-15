@@ -17,6 +17,7 @@ type ABIImports struct {
 	Ints    string
 	Runtime string
 	Slice   string
+	Iface   string
 }
 
 // Module is the emission context of one generated package module: its Go
@@ -25,7 +26,10 @@ type ABIImports struct {
 // co-generated packages are recorded during printing and emitted only
 // when referenced.
 type Module struct {
-	Pkg     string
+	Pkg string
+	// PkgName is the Go package name, qualifying type displays in
+	// runtime messages.
+	PkgName string
 	ABI     ABIImports
 	imports map[string]ModuleImport
 	used    map[string]bool
@@ -37,7 +41,7 @@ type Module struct {
 // Aliases are package-path segments with a "$" suffix: Go identifiers can
 // never contain "$", so an alias can never collide with any source-named
 // symbol, parameter, or local, and never shadows or is shadowed.
-func NewModule(pkg string, abiImports ABIImports, specifiers map[string]string) *Module {
+func NewModule(pkg, pkgName string, abiImports ABIImports, specifiers map[string]string) *Module {
 	var paths []string
 	for path := range specifiers {
 		if path != pkg {
@@ -49,7 +53,7 @@ func NewModule(pkg string, abiImports ABIImports, specifiers map[string]string) 
 	for _, path := range paths {
 		imports[path] = ModuleImport{Alias: aliases[path], Specifier: specifiers[path]}
 	}
-	return &Module{Pkg: pkg, ABI: abiImports, imports: imports, used: map[string]bool{}}
+	return &Module{Pkg: pkg, PkgName: pkgName, ABI: abiImports, imports: imports, used: map[string]bool{}}
 }
 
 // symbol spells a reference to a package-level symbol: unqualified within
@@ -75,6 +79,7 @@ func (m *Module) importLines() string {
 	fmt.Fprintf(&out, "import * as goabi from %q;\n", m.ABI.Ints)
 	fmt.Fprintf(&out, "import * as gort from %q;\n", m.ABI.Runtime)
 	fmt.Fprintf(&out, "import * as gosl from %q;\n", m.ABI.Slice)
+	fmt.Fprintf(&out, "import * as goif from %q;\n", m.ABI.Iface)
 	usedPaths := make([]string, 0, len(m.used))
 	for path := range m.used {
 		usedPaths = append(usedPaths, path)

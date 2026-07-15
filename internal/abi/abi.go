@@ -69,6 +69,7 @@ func Files() map[string]string {
 		"goints.ts":    gointsSource,
 		"goruntime.ts": goruntimeSource,
 		"goslice.ts":   gosliceSource,
+		"goiface.ts":   goifaceSource,
 	}
 }
 

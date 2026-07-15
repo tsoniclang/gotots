@@ -160,21 +160,50 @@ type SwitchClause struct {
 	Fallthrough bool
 }
 
-func (*Block) stmt()         {}
-func (*SwitchStmt) stmt()    {}
-func (*RangeSlice) stmt()    {}
-func (*RangeInt) stmt()      {}
-func (*TryFinally) stmt()    {}
-func (*MapDeleteStmt) stmt() {}
-func (*MapClearStmt) stmt()  {}
-func (*PanicStmt) stmt()     {}
-func (*DeclStmt) stmt()      {}
-func (*AssignStmt) stmt()    {}
-func (*IfStmt) stmt()        {}
-func (*ForStmt) stmt()       {}
-func (*ReturnStmt) stmt()    {}
-func (*ExprStmt) stmt()      {}
-func (*BranchStmt) stmt()    {}
+// TypeSwitchStmt is a Go type switch, lowered onto rtti identity tests
+// in clause order. Bind, when set, names the per-clause variable: a
+// single concrete clause binds the unboxed value in that type; every
+// other clause binds the interface value itself.
+type TypeSwitchStmt struct {
+	Init    Stmt
+	Bind    string
+	X       Expr
+	Clauses []TypeSwitchClause
+}
+
+// TypeSwitchClause is one clause of a type switch. Targets is nil for
+// the default clause; a target with Nil set matches the nil interface.
+type TypeSwitchClause struct {
+	Targets []TypeSwitchTarget
+	// BindType is the clause variable's type: the concrete target for a
+	// single-type clause, the switch operand's interface type otherwise.
+	BindType Type
+	Body     *Block
+}
+
+// TypeSwitchTarget is one matched type (or nil) in a type-switch clause.
+type TypeSwitchTarget struct {
+	Nil    bool
+	Rtti   RttiRef
+	Target Type
+}
+
+func (*Block) stmt()          {}
+func (*SwitchStmt) stmt()     {}
+func (*TypeSwitchStmt) stmt() {}
+func (*RangeSlice) stmt()     {}
+func (*RangeInt) stmt()       {}
+func (*TryFinally) stmt()     {}
+func (*MapDeleteStmt) stmt()  {}
+func (*MapClearStmt) stmt()   {}
+func (*PanicStmt) stmt()      {}
+func (*DeclStmt) stmt()       {}
+func (*AssignStmt) stmt()     {}
+func (*IfStmt) stmt()         {}
+func (*ForStmt) stmt()        {}
+func (*ReturnStmt) stmt()     {}
+func (*ExprStmt) stmt()       {}
+func (*BranchStmt) stmt()     {}
 
 // Expr is one Go expression in IR form with its resolved type.
 type Expr interface {
@@ -272,6 +301,48 @@ type DynCall struct {
 	Fun     Expr
 	Args    []Expr
 	Results []Type
+}
+
+// RttiRef names the shared rtti object of one concrete type. Identity
+// tests compare the rtti object itself — a single ESM export per type —
+// never a spelling.
+type RttiRef struct {
+	// Predeclared names an ABI rtti (int, string, bool, ...) when set.
+	Predeclared string
+	// Pkg/TypeName locate a generated named type's rtti; Pointer selects
+	// the pointer-type rtti (*T) over the value rtti (T).
+	Pkg      string
+	TypeName string
+	Pointer  bool
+}
+
+// IfaceBox converts a concrete value into an interface value (struct
+// values are copied into the box, as Go copies them into the interface).
+type IfaceBox struct {
+	X    Expr
+	Rtti RttiRef
+	T    Type // the interface type
+}
+
+// IfaceCall invokes an interface method through the box's method table;
+// a nil interface panics with Go's exact message.
+type IfaceCall struct {
+	Recv    Expr
+	Method  string
+	Args    []Expr
+	Results []Type
+}
+
+// TypeAssert is x.(T) for a concrete target: identity comparison against
+// the target's rtti. The panic form carries the static source interface
+// spelling for Go's exact message; the comma-ok form is consumed through
+// tuple slots.
+type TypeAssert struct {
+	X             Expr
+	Target        Type
+	Rtti          RttiRef
+	SourceDisplay string
+	CommaOk       bool
 }
 
 // StructNew allocates a struct on the heap (&T{...}) with every field
@@ -428,6 +499,9 @@ func (*Deref) expr()            {}
 func (*Closure) expr()          {}
 func (*FuncRef) expr()          {}
 func (*DynCall) expr()          {}
+func (*IfaceBox) expr()         {}
+func (*IfaceCall) expr()        {}
+func (*TypeAssert) expr()       {}
 func (*NilConst) expr()         {}
 func (*IsNil) expr()            {}
 func (*MapMake) expr()          {}
@@ -473,8 +547,9 @@ func (m *MethodCall) Type() Type {
 	return Type{}
 }
 
-func (c *Closure) Type() Type { return c.T }
-func (f *FuncRef) Type() Type { return f.T }
+func (c *Closure) Type() Type  { return c.T }
+func (f *FuncRef) Type() Type  { return f.T }
+func (b *IfaceBox) Type() Type { return b.T }
 
 func (d *DynCall) Type() Type {
 	if len(d.Results) == 1 {
@@ -482,6 +557,17 @@ func (d *DynCall) Type() Type {
 	}
 	return Type{}
 }
+
+func (c *IfaceCall) Type() Type {
+	if len(c.Results) == 1 {
+		return c.Results[0]
+	}
+	return Type{}
+}
+
+// Type of a TypeAssert is the asserted concrete type; the comma-ok form
+// is consumed through tuple slots.
+func (a *TypeAssert) Type() Type { return a.Target }
 
 var boolType = Type{Kind: KindBool, Go: "bool"}
 var intType = Type{Kind: KindInt, Go: "int"}

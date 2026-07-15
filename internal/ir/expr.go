@@ -208,6 +208,9 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 		b.use("deref")
 		return &Deref{X: operand, T: *operand.Type().Elem}, nil
 
+	case *ast.TypeAssertExpr:
+		return b.buildTypeAssert(n, false)
+
 	case *ast.BinaryExpr:
 		return b.buildBinary(n, tv.Type)
 
@@ -262,6 +265,9 @@ func (b *builder) buildExprAs(e ast.Expr, expected Type) (Expr, error) {
 	}
 	if expected.Kind == KindStruct {
 		return b.bindStructValue(built), nil
+	}
+	if expected.Kind == KindIface {
+		return b.boxIfaceValue(built, b.info.Types[e].Type, expected, b.span(e.Pos()))
 	}
 	return built, nil
 }
