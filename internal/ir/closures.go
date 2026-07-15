@@ -1,6 +1,7 @@
 package ir
 
 import (
+	"fmt"
 	"go/ast"
 	"go/types"
 )
@@ -32,14 +33,17 @@ func (b *builder) buildClosure(lit *ast.FuncLit) (Expr, error) {
 	params := signature.Params()
 	for i := range params.Len() {
 		parameter := params.At(i)
-		if parameter.Name() == "" || parameter.Name() == "_" {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "unnamed or blank closure parameter", Span: span}
+		name := parameter.Name()
+		if name == "" || name == "_" {
+			// A discarded parameter binds a synthetic name no Go source
+			// can spell or reference.
+			name = fmt.Sprintf("$discard%d", i)
 		}
 		parameterType, err := child.typeOf(parameter.Type(), span)
 		if err != nil {
 			return nil, err
 		}
-		out.Params = append(out.Params, Var{Name: parameter.Name(), Type: parameterType})
+		out.Params = append(out.Params, Var{Name: name, Type: parameterType})
 	}
 	results := signature.Results()
 	for i := range results.Len() {

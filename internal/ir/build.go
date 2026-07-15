@@ -391,6 +391,12 @@ func (b *builder) buildStmt(stmt ast.Stmt) (Stmt, error) {
 func (b *builder) buildDeclStmt(n *ast.DeclStmt) (Stmt, error) {
 	span := b.span(n.Pos())
 	decl, ok := n.Decl.(*ast.GenDecl)
+	if ok && decl.Tok == token.CONST {
+		// Local constants are compile-time values: every use folds to its
+		// exact constant at the use site, so the declaration emits nothing.
+		b.use("localConst")
+		return &Block{}, nil
+	}
 	if !ok || decl.Tok != token.VAR {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "non-var declaration statement", Span: span}
 	}

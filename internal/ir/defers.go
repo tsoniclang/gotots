@@ -82,6 +82,27 @@ func (b *builder) buildDeferredCall(deferStmt *ast.DeferStmt) ([]Stmt, Expr, err
 			call.Args[i] = capture(fmt.Sprintf("%s_a%d", prefix, i), arg)
 		}
 		return captures, call, nil
+	case *ExternalCall:
+		for i, arg := range call.Args {
+			call.Args[i] = capture(fmt.Sprintf("%s_a%d", prefix, i), arg)
+		}
+		return captures, call, nil
+	case *ExternalMethodCall:
+		recv := call.Recv
+		if !call.PointerRecv {
+			recv = b.bindStructValue(recv)
+		}
+		call.Recv = capture(prefix+"_r", recv)
+		for i, arg := range call.Args {
+			call.Args[i] = capture(fmt.Sprintf("%s_a%d", prefix, i), arg)
+		}
+		return captures, call, nil
+	case *IfaceCall:
+		call.Recv = capture(prefix+"_r", call.Recv)
+		for i, arg := range call.Args {
+			call.Args[i] = capture(fmt.Sprintf("%s_a%d", prefix, i), arg)
+		}
+		return captures, call, nil
 	}
 	return nil, nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "deferred non-call expression", Span: span}
 }

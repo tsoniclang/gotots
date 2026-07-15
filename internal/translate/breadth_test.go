@@ -182,3 +182,40 @@ func CompoundNilChainPanics() int {
 }
 `)
 }
+
+func TestOracleDeferredClosuresAndLocalConsts(t *testing.T) {
+	runOracle(t, `package fixture
+
+var trace string
+
+func deferredClosure() {
+	x := 1
+	defer func() {
+		trace += "deferred"
+	}()
+	x = 2
+	_ = x
+	trace += "body:"
+}
+
+func DeferredClosureRuns() string {
+	trace = ""
+	deferredClosure()
+	return trace
+}
+
+func LocalConsts() (int, string) {
+	const width = 640
+	const label = "px"
+	const derived = width / 2
+	return derived, label
+}
+
+func BlankClosureParams() int {
+	f := func(_ int, y int, _ string) int {
+		return y * 2
+	}
+	return f(9, 21, "ignored")
+}
+`)
+}
