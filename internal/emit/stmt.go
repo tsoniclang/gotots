@@ -93,7 +93,7 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		if err != nil {
 			return err
 		}
-		p.line("gort.goMapDelete(%s, %s);", mapExpr, key)
+		p.line("gort$.goMapDelete(%s, %s);", mapExpr, key)
 		return nil
 
 	case *ir.MapClearStmt:
@@ -101,7 +101,7 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		if err != nil {
 			return err
 		}
-		p.line("gort.goMapClear(%s);", mapExpr)
+		p.line("gort$.goMapClear(%s);", mapExpr)
 		return nil
 
 	case *ir.PanicStmt:
@@ -109,7 +109,7 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		if err != nil {
 			return err
 		}
-		p.line("gort.goPanicValue(%s);", value)
+		p.line("gort$.goPanicValue(%s);", value)
 		return nil
 
 	case *ir.RangeInt:
@@ -137,10 +137,10 @@ func (p *printer) printDecl(n *ir.DeclStmt) error {
 			// A struct slot binds a value copy (a comma-ok lookup yields
 			// the stored instance).
 			if n.Types[i].Kind == ir.KindStruct {
-				p.line("let %s: %s = %s[%d].goClone$();", name, spelled, tuple, i)
+				p.line("let %s: %s = %s[%d].goClone$();", tsName(name), spelled, tuple, i)
 				continue
 			}
-			p.line("let %s: %s = %s[%d];", name, spelled, tuple, i)
+			p.line("let %s: %s = %s[%d];", tsName(name), spelled, tuple, i)
 		}
 		return nil
 	}
@@ -158,21 +158,32 @@ func (p *printer) printDecl(n *ir.DeclStmt) error {
 		if err != nil {
 			return err
 		}
-		p.line("let %s: %s = %s;", name, spelled, value)
+		p.line("let %s: %s = %s;", tsName(name), spelled, value)
 	}
 	return nil
 }
 
 func (p *printer) printAssign(n *ir.AssignStmt) error {
 	if n.Tuple != nil {
+		// Go's usual order is lexical: the left-hand operands (pointer
+		// bases, map operands, keys) evaluate before the right-hand
+		// tuple expression, and the stores happen last.
+		staged := make([]stagedTarget, len(n.Targets))
+		for i, target := range n.Targets {
+			var err error
+			staged[i], err = p.stageTarget(target)
+			if err != nil {
+				return err
+			}
+		}
 		tupleValue, err := p.printExpr(n.Tuple)
 		if err != nil {
 			return err
 		}
 		tuple := p.temp()
 		p.line("const %s = %s;", tuple, tupleValue)
-		for i, target := range n.Targets {
-			if err := p.printStore(target, fmt.Sprintf("%s[%d]", tuple, i)); err != nil {
+		for i := range n.Targets {
+			if err := staged[i].store(p, fmt.Sprintf("%s[%d]", tuple, i)); err != nil {
 				return err
 			}
 		}
@@ -279,13 +290,16 @@ func (p *printer) printRangeSlice(n *ir.RangeSlice) error {
 	sliceTemp := p.temp()
 	p.line("const %s = %s;", sliceTemp, operand)
 	lengthTemp := p.temp()
-	p.line("const %s = gosl.goSliceLen(%s);", lengthTemp, sliceTemp)
-	index := n.Index
-	if index == "" {
-		index = p.temp()
-	}
-	p.line("for (let %s: goabi.GoInt = 0n; %s < %s; %s = goabi.goInt64Add(%s, 1n)) {", index, index, lengthTemp, index, index)
+	p.line("const %s = gosl$.goSliceLen(%s);", lengthTemp, sliceTemp)
+	// The induction variable is always hidden: the source index name
+	// binds a per-iteration copy, so assigning to it inside the body
+	// never affects iteration — exactly Go.
+	induction := p.temp()
+	p.line("for (let %s: goabi$.GoInt = 0n; %s < %s; %s = %s + 1n) {", induction, induction, lengthTemp, induction, induction)
 	p.indent++
+	if n.Index != "" {
+		p.line("let %s: goabi$.GoInt = %s;", tsName(n.Index), induction)
+	}
 	if n.Value != "" {
 		spelled, err := p.tsType(n.VarT)
 		if err != nil {
@@ -293,9 +307,9 @@ func (p *printer) printRangeSlice(n *ir.RangeSlice) error {
 		}
 		if n.VarT.Kind == ir.KindStruct {
 			// The range variable binds a per-iteration value copy.
-			p.line("let %s: %s = gosl.goSliceGet(%s, %s).goClone$();", n.Value, spelled, sliceTemp, index)
+			p.line("let %s: %s = gosl$.goSliceGet(%s, %s).goClone$();", tsName(n.Value), spelled, sliceTemp, induction)
 		} else {
-			p.line("let %s: %s = gosl.goSliceGet(%s, %s);", n.Value, spelled, sliceTemp, index)
+			p.line("let %s: %s = gosl$.goSliceGet(%s, %s);", tsName(n.Value), spelled, sliceTemp, induction)
 		}
 	}
 	if err := p.printBlockBody(n.Body); err != nil {
@@ -315,22 +329,23 @@ func (p *printer) printRangeInt(n *ir.RangeInt) error {
 	}
 	limit := p.temp()
 	p.line("const %s = %s;", limit, operand)
-	index := n.Index
-	if index == "" {
-		index = p.temp()
-	}
 	spelled, err := p.tsType(n.N.Type())
 	if err != nil {
 		return err
 	}
-	// Bounds keep increments exact without wrap helpers: the index stays
-	// strictly below the operand, which its carrier already holds.
+	// The induction variable is always hidden (the source name binds a
+	// per-iteration copy); bounds keep increments exact without wrap
+	// helpers, since the index stays strictly below the operand.
+	induction := p.temp()
 	if n.N.Type().Kind.Wide64() {
-		p.line("for (let %s: %s = 0n; %s < %s; %s = %s + 1n) {", index, spelled, index, limit, index, index)
+		p.line("for (let %s: %s = 0n; %s < %s; %s = %s + 1n) {", induction, spelled, induction, limit, induction, induction)
 	} else {
-		p.line("for (let %s: %s = 0; %s < %s; %s = %s + 1) {", index, spelled, index, limit, index, index)
+		p.line("for (let %s: %s = 0; %s < %s; %s = %s + 1) {", induction, spelled, induction, limit, induction, induction)
 	}
 	p.indent++
+	if n.Index != "" {
+		p.line("let %s: %s = %s;", tsName(n.Index), spelled, induction)
+	}
 	if err := p.printBlockBody(n.Body); err != nil {
 		return err
 	}
@@ -436,7 +451,7 @@ func (p *printer) forClause(stmt ir.Stmt, isInit bool) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			parts[i] = fmt.Sprintf("%s: %s = %s", name, spelled, value)
+			parts[i] = fmt.Sprintf("%s: %s = %s", tsName(name), spelled, value)
 		}
 		return "let " + joinComma(parts), nil
 	case *ir.AssignStmt:
@@ -452,9 +467,9 @@ func (p *printer) forClause(stmt ir.Stmt, isInit bool) (string, error) {
 			return "", err
 		}
 		if variable.T.Kind == ir.KindStruct {
-			return variable.Name + ".goSet$(" + value + ")", nil
+			return tsName(variable.Name) + ".goSet$(" + value + ")", nil
 		}
-		return variable.Name + " = " + value, nil
+		return tsName(variable.Name) + " = " + value, nil
 	}
 	return "", fmt.Errorf("statement %T not expressible in a for-loop clause", stmt)
 }

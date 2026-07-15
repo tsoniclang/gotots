@@ -319,11 +319,15 @@ type TypeAssert struct {
 
 // StructNew allocates a struct on the heap (&T{...}) with every field
 // value in declaration order (omitted fields are explicit zeros).
+// EvalOrder, when set, lists the Args indexes of the provided values in
+// their SOURCE order: a keyed literal whose source order differs from
+// field order stages its values so evaluation stays exact.
 type StructNew struct {
-	Pkg      string // Go package path declaring the struct type
-	TypeName string
-	Args     []Expr
-	T        Type // the pointer type
+	Pkg       string // Go package path declaring the struct type
+	TypeName  string
+	Args      []Expr
+	EvalOrder []int
+	T         Type // the pointer type
 }
 
 // StructCopy is Go's value copy at a binding site: a deep clone along the

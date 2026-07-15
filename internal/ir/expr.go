@@ -9,6 +9,7 @@ import (
 	"go/types"
 	"math/big"
 	"strconv"
+	"unicode/utf8"
 )
 
 // buildExpr converts one typed Go expression into IR, folding constants
@@ -382,8 +383,10 @@ func (b *builder) buildStructLit(lit *ast.CompositeLit, t Type) (Expr, error) {
 	}
 
 	// Resolve provided values, keyed or positional, typing each against
-	// its field so nil literals get exact zeros.
+	// its field so nil literals get exact zeros. Source order is
+	// recorded: Go evaluates literal values in the order written.
 	provided := map[string]Expr{}
+	var sourceOrder []string
 	if len(lit.Elts) > 0 {
 		_, keyed := lit.Elts[0].(*ast.KeyValueExpr)
 		for index, element := range lit.Elts {
@@ -400,6 +403,7 @@ func (b *builder) buildStructLit(lit *ast.CompositeLit, t Type) (Expr, error) {
 					return nil, err
 				}
 				provided[name] = value
+				sourceOrder = append(sourceOrder, name)
 			} else {
 				expected, err := fieldIRType(structType.Field(index))
 				if err != nil {
@@ -410,14 +414,17 @@ func (b *builder) buildStructLit(lit *ast.CompositeLit, t Type) (Expr, error) {
 					return nil, err
 				}
 				provided[structType.Field(index).Name()] = value
+				sourceOrder = append(sourceOrder, structType.Field(index).Name())
 			}
 		}
 	}
 
 	out := &StructNew{Pkg: t.Pkg, TypeName: t.Named, T: t}
+	argIndexOf := map[string]int{}
 	for i := range structType.NumFields() {
 		field := structType.Field(i)
 		if value, ok := provided[field.Name()]; ok {
+			argIndexOf[field.Name()] = len(out.Args)
 			out.Args = append(out.Args, value)
 			continue
 		}
@@ -431,6 +438,23 @@ func (b *builder) buildStructLit(lit *ast.CompositeLit, t Type) (Expr, error) {
 		}
 		out.Args = append(out.Args, zero)
 	}
+	// A keyed literal whose source order differs from field order stages
+	// its provided values so they evaluate in source order.
+	ascending := true
+	order := make([]int, 0, len(sourceOrder))
+	for _, name := range sourceOrder {
+		order = append(order, argIndexOf[name])
+	}
+	for k := 1; k < len(order); k++ {
+		if order[k] < order[k-1] {
+			ascending = false
+			break
+		}
+	}
+	if !ascending {
+		out.EvalOrder = order
+		b.use("structLitStaged")
+	}
 	b.use("structNew")
 	return out, nil
 }
@@ -441,7 +465,14 @@ func constValue(v constant.Value, t Type, span Span) (string, error) {
 	case KindBool:
 		return fmt.Sprintf("%v", constant.BoolVal(v)), nil
 	case KindString:
-		quoted, err := json.Marshal(constant.StringVal(v))
+		text := constant.StringVal(v)
+		if !utf8.ValidString(text) {
+			// Go strings are byte strings; the JS string carrier holds
+			// UTF-16 text, so non-UTF-8 constants cannot round-trip and
+			// need the byte-string representation.
+			return "", &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "string constant with non-UTF-8 bytes (byte-string representation)", Span: span}
+		}
+		quoted, err := json.Marshal(text)
 		if err != nil {
 			return "", err
 		}

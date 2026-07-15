@@ -98,7 +98,7 @@ func Use() bool { return strings.HasPrefix("a", "b") }
 	if !strings.Contains(stub, "export function HasPrefix(s: string, prefix: string): boolean {") {
 		t.Fatalf("stub lacks the typed signature:\n%s", stub)
 	}
-	if !strings.Contains(stub, `goext.goExternalCall("strings.HasPrefix", [s, prefix])`) {
+	if !strings.Contains(stub, `goext$.goExternalCall("strings.HasPrefix", [s, prefix])`) {
 		t.Fatalf("stub lacks the registry delegation:\n%s", stub)
 	}
 	if generated.Ownership["external-stubs/strings/package.ts"] != "generated-external-contracts" {

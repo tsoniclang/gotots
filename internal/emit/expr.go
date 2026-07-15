@@ -23,7 +23,7 @@ func family(kind ir.Kind) (abi.Family, bool) {
 	return "", false
 }
 
-func helper(name string) string { return "goabi." + name }
+func helper(name string) string { return "goabi$." + name }
 
 // printExpr renders one IR expression, fully parenthesized.
 func (p *printer) printExpr(e ir.Expr) (string, error) {
@@ -32,7 +32,7 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		return printConst(n)
 	case *ir.VarRef:
 		if n.Pkg == "" {
-			return n.Name, nil
+			return tsName(n.Name), nil
 		}
 		// A package-level variable: reads from other unit packages go
 		// through the live ESM namespace binding.
@@ -84,7 +84,7 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		// copies the pointee); a pointer receiver takes the pointer as
 		// is — nil receivers run, as in Go.
 		if !n.PointerRecv && n.Recv.Type().Kind == ir.KindPointer {
-			recv = "gort.goNilCheck(" + recv + ")"
+			recv = "gort$.goNilCheck(" + recv + ")"
 		}
 		if args == "" {
 			return fmt.Sprintf("%s(%s)", callee, recv), nil
@@ -98,17 +98,53 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if n.X.Type().Kind == ir.KindStruct {
 			return fmt.Sprintf("%s.%s", base, n.Field), nil
 		}
-		return fmt.Sprintf("gort.goNilCheck(%s).%s", base, n.Field), nil
+		return fmt.Sprintf("gort$.goNilCheck(%s).%s", base, n.Field), nil
 	case *ir.StructNew:
-		args, err := p.printArgs(n.Args)
-		if err != nil {
-			return "", err
-		}
 		class, err := p.module.symbol(n.Pkg, n.TypeName)
 		if err != nil {
 			return "", err
 		}
-		return fmt.Sprintf("new %s(%s)", class, args), nil
+		if len(n.EvalOrder) == 0 {
+			args, err := p.printArgs(n.Args)
+			if err != nil {
+				return "", err
+			}
+			return fmt.Sprintf("new %s(%s)", class, args), nil
+		}
+		// A keyed literal whose source order differs from field order:
+		// the provided values evaluate in source order as arrow-function
+		// arguments, then slot into constructor position. The staged
+		// parameter names carry "$", which no Go identifier can spell.
+		stagedParam := map[int]string{}
+		var params, values []string
+		for k, argIndex := range n.EvalOrder {
+			spelled, err := p.tsType(n.Args[argIndex].Type())
+			if err != nil {
+				return "", err
+			}
+			name := fmt.Sprintf("$v%d", k)
+			stagedParam[argIndex] = name
+			params = append(params, name+": "+spelled)
+			printed, err := p.printExpr(n.Args[argIndex])
+			if err != nil {
+				return "", err
+			}
+			values = append(values, printed)
+		}
+		ctorArgs := make([]string, len(n.Args))
+		for i, arg := range n.Args {
+			if name, staged := stagedParam[i]; staged {
+				ctorArgs[i] = name
+				continue
+			}
+			printed, err := p.printExpr(arg)
+			if err != nil {
+				return "", err
+			}
+			ctorArgs[i] = printed
+		}
+		return fmt.Sprintf("((%s) => new %s(%s))(%s)",
+			strings.Join(params, ", "), class, strings.Join(ctorArgs, ", "), strings.Join(values, ", ")), nil
 	case *ir.Closure:
 		return p.printClosure(n)
 	case *ir.FuncRef:
@@ -122,7 +158,10 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return fmt.Sprintf("gort.goNilCheck(%s)(%s)", fun, args), nil
+		// The helper preserves Go's order: callee operand, then the
+		// arguments, then the nil panic at the invocation.
+		call := fmt.Sprintf("gort$.goFuncInvoke(%s, [%s])", fun, args)
+		return p.castResults(call, n.Results)
 	case *ir.ExternalCall:
 		args, err := p.printArgs(n.Args)
 		if err != nil {
@@ -154,7 +193,7 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return "goif.goIfaceBox(" + rtti + ", " + x + ")", nil
+		return "goif$.goIfaceBox(" + rtti + ", " + x + ")", nil
 	case *ir.IfaceCall:
 		recv, err := p.printExpr(n.Recv)
 		if err != nil {
@@ -164,7 +203,7 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		call := fmt.Sprintf("goif.goIfaceCall(%s, %q, [%s])", recv, n.Method, args)
+		call := fmt.Sprintf("goif$.goIfaceCall(%s, %q, [%s])", recv, n.Method, args)
 		return p.castResults(call, n.Results)
 	case *ir.TypeAssert:
 		x, err := p.printExpr(n.X)
@@ -180,13 +219,13 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			return "goif.goIfaceLookup(" + x + ", " + rtti + ", " + zero + ")", nil
+			return "goif$.goIfaceLookup(" + x + ", " + rtti + ", " + zero + ")", nil
 		}
 		spelled, err := p.tsType(n.Target)
 		if err != nil {
 			return "", err
 		}
-		return fmt.Sprintf("(goif.goIfaceAssert(%s, %s, %q) as (%s))", x, rtti, n.SourceDisplay, spelled), nil
+		return fmt.Sprintf("(goif$.goIfaceAssert(%s, %s, %q) as (%s))", x, rtti, n.SourceDisplay, spelled), nil
 	case *ir.StructCopy:
 		x, err := p.printExpr(n.X)
 		if err != nil {
@@ -203,7 +242,7 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return "gort.goNilCheck(" + x + ")", nil
+		return "gort$.goNilCheck(" + x + ")", nil
 	case *ir.NilConst:
 		return "undefined", nil
 	case *ir.IsNil:
@@ -216,7 +255,7 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		}
 		return "(" + x + " === undefined)", nil
 	case *ir.MapMake:
-		return "gort.goMapMake()", nil
+		return "gort$.goMapMake()", nil
 	case *ir.MapFrom:
 		var entries []string
 		for i := range n.Keys {
@@ -230,7 +269,7 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			}
 			entries = append(entries, "["+key+", "+value+"]")
 		}
-		return "gort.goMapFrom([" + joinComma(entries) + "])", nil
+		return "gort$.goMapFrom([" + joinComma(entries) + "])", nil
 	case *ir.MapGet:
 		return p.printMapAccess("goMapGet", n.Map, n.Key, n.T)
 	case *ir.MapLookup:
@@ -240,25 +279,27 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return "gort.goMapLen(" + x + ")", nil
+		return "gort$.goMapLen(" + x + ")", nil
 	case *ir.StringLen:
 		x, err := p.printExpr(n.X)
 		if err != nil {
 			return "", err
 		}
-		return "gort.goStringLen(" + x + ")", nil
+		return "gort$.goStringLen(" + x + ")", nil
 	case *ir.SliceLit:
 		values, err := p.printArgs(n.Values)
 		if err != nil {
 			return "", err
 		}
-		return "gosl.goSliceFrom([" + values + "])", nil
+		return "gosl$.goSliceFrom([" + values + "])", nil
 	case *ir.SliceMake:
 		length, err := p.printExpr(n.Length)
 		if err != nil {
 			return "", err
 		}
-		capacity := length
+		// An omitted capacity defaults inside the helper, so the length
+		// expression evaluates exactly once.
+		capacity := "undefined"
 		if n.Capacity != nil {
 			capacity, err = p.printExpr(n.Capacity)
 			if err != nil {
@@ -271,9 +312,9 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		}
 		if n.T.Elem.Kind == ir.KindStruct {
 			// Every struct element is a distinct fresh zero instance.
-			return "gosl.goSliceMakeStruct(" + length + ", " + capacity + ", () => " + zero + ")", nil
+			return "gosl$.goSliceMakeStruct(" + length + ", " + capacity + ", () => " + zero + ")", nil
 		}
-		return "gosl.goSliceMake(" + length + ", " + capacity + ", " + zero + ")", nil
+		return "gosl$.goSliceMake(" + length + ", " + capacity + ", " + zero + ")", nil
 	case *ir.SliceGet:
 		x, err := p.printExpr(n.X)
 		if err != nil {
@@ -283,7 +324,7 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return "gosl.goSliceGet(" + x + ", " + index + ")", nil
+		return "gosl$.goSliceGet(" + x + ", " + index + ")", nil
 	case *ir.SliceReslice:
 		x, err := p.printExpr(n.X)
 		if err != nil {
@@ -296,18 +337,16 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 				return "", err
 			}
 		}
-		high := "gosl.goSliceLen(" + x + ")"
+		// An omitted high bound defaults to len(s) inside the helper,
+		// computed from the single evaluation of the operand.
+		high := "undefined"
 		if n.High != nil {
 			high, err = p.printExpr(n.High)
 			if err != nil {
 				return "", err
 			}
 		}
-		// The operand is evaluated once even when the default high bound
-		// re-reads its length; a temp is unnecessary for pure operands and
-		// the builder only produces pure slice operands today (vars,
-		// fields of pure bases). Revisit with effectful operands.
-		return "gosl.goSliceSlice(" + x + ", " + low + ", " + high + ")", nil
+		return "gosl$.goSliceSlice(" + x + ", " + low + ", " + high + ")", nil
 	case *ir.SliceAppend:
 		x, err := p.printExpr(n.X)
 		if err != nil {
@@ -317,7 +356,14 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return "gosl.goSliceAppend(" + x + ", [" + values + "])", nil
+		zero, err := p.zeroLiteral(*n.T.Elem)
+		if err != nil {
+			return "", err
+		}
+		if n.T.Elem.Kind == ir.KindStruct {
+			return "gosl$.goSliceAppendStruct(" + x + ", [" + values + "], () => " + zero + ")", nil
+		}
+		return "gosl$.goSliceAppend(" + x + ", [" + values + "], " + zero + ")", nil
 	case *ir.SliceAppendSlice:
 		x, err := p.printExpr(n.X)
 		if err != nil {
@@ -327,10 +373,14 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		if n.T.Elem != nil && n.T.Elem.Kind == ir.KindStruct {
-			return "gosl.goSliceAppendSliceStruct(" + x + ", " + source + ")", nil
+		zero, err := p.zeroLiteral(*n.T.Elem)
+		if err != nil {
+			return "", err
 		}
-		return "gosl.goSliceAppendSlice(" + x + ", " + source + ")", nil
+		if n.T.Elem != nil && n.T.Elem.Kind == ir.KindStruct {
+			return "gosl$.goSliceAppendSliceStruct(" + x + ", " + source + ", () => " + zero + ")", nil
+		}
+		return "gosl$.goSliceAppendSlice(" + x + ", " + source + ", " + zero + ")", nil
 	case *ir.SliceCopy:
 		dst, err := p.printExpr(n.Dst)
 		if err != nil {
@@ -341,21 +391,21 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			return "", err
 		}
 		if n.Dst.Type().Elem != nil && n.Dst.Type().Elem.Kind == ir.KindStruct {
-			return "gosl.goSliceCopyStruct(" + dst + ", " + src + ")", nil
+			return "gosl$.goSliceCopyStruct(" + dst + ", " + src + ")", nil
 		}
-		return "gosl.goSliceCopy(" + dst + ", " + src + ")", nil
+		return "gosl$.goSliceCopy(" + dst + ", " + src + ")", nil
 	case *ir.SliceLen:
 		x, err := p.printExpr(n.X)
 		if err != nil {
 			return "", err
 		}
-		return "gosl.goSliceLen(" + x + ")", nil
+		return "gosl$.goSliceLen(" + x + ")", nil
 	case *ir.SliceCap:
 		x, err := p.printExpr(n.X)
 		if err != nil {
 			return "", err
 		}
-		return "gosl.goSliceCap(" + x + ")", nil
+		return "gosl$.goSliceCap(" + x + ")", nil
 	}
 	return "", fmt.Errorf("no emission for IR expression %T", e)
 }
@@ -395,7 +445,7 @@ func (p *printer) printClosure(n *ir.Closure) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		params = append(params, parameter.Name+": "+spelled)
+		params = append(params, tsName(parameter.Name)+": "+spelled)
 	}
 	result, err := p.tsResultType(n.Results)
 	if err != nil {
@@ -437,7 +487,7 @@ func (p *printer) printMapAccess(helper string, mapExpr, key ir.Expr, valueType 
 	if err != nil {
 		return "", err
 	}
-	return "gort." + helper + "(" + m + ", " + k + ", " + zero + ")", nil
+	return "gort$." + helper + "(" + m + ", " + k + ", " + zero + ")", nil
 }
 
 // zeroLiteral spells the Go zero value of a reviewed type in TypeScript.

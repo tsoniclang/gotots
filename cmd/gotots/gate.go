@@ -24,17 +24,24 @@ type GateResult struct {
 	Details    []string `json:"details,omitempty"`
 }
 
-// GateReport is the machine-readable full-gate outcome.
+// GateReport is the machine-readable full-gate outcome over the
+// seventeen normative gates of testing-and-acceptance.md. Passed means
+// complete: every gate passes. Blocked gates name their missing
+// subsystem — the contract is never silently narrowed to the
+// implemented subset.
 type GateReport struct {
 	SchemaVersion int          `json:"schemaVersion"`
 	Passed        bool         `json:"passed"`
+	Failed        int          `json:"failed"`
+	Blocked       int          `json:"blocked"`
 	Gates         []GateResult `json:"gates"`
 }
 
-// runGate executes every applicable acceptance layer in the normative
-// order and writes a machine-readable report. It exits nonzero for any
-// failed or blocked gate: unresolved dispositions are honest blockers,
-// never warnings.
+// runGate represents every one of the seventeen normative acceptance
+// layers in order as pass, fail, or blocked, and writes a
+// machine-readable report. It exits nonzero for any failed gate;
+// blocked layers are reported honestly and keep the overall report
+// incomplete (Passed=false) without masking implemented-gate failures.
 func runGate(args []string) error {
 	flags := flag.NewFlagSet("gate", flag.ExitOnError)
 	repoDir := flags.String("repo", ".", "gotots repository root")
@@ -49,7 +56,7 @@ func runGate(args []string) error {
 		return fmt.Errorf("--source and --report are required")
 	}
 
-	report := &GateReport{SchemaVersion: 1, Passed: true}
+	report := &GateReport{SchemaVersion: 2}
 	run := func(name string, gate func() (string, []string, error)) {
 		started := time.Now()
 		status, details, err := gate()
@@ -57,15 +64,25 @@ func runGate(args []string) error {
 			status = "fail"
 			details = append(details, err.Error())
 		}
-		if status != "pass" {
-			report.Passed = false
+		switch status {
+		case "fail":
+			report.Failed++
+		case "blocked":
+			report.Blocked++
 		}
 		report.Gates = append(report.Gates, GateResult{
 			Name: name, Status: status,
 			DurationMs: time.Since(started).Milliseconds(),
 			Details:    details,
 		})
-		fmt.Printf("gate %-28s %s\n", name, status)
+		fmt.Printf("gate %-44s %s\n", name, status)
+	}
+	blocked := func(name, reason string) {
+		report.Blocked++
+		report.Gates = append(report.Gates, GateResult{
+			Name: name, Status: "blocked", Details: []string{reason},
+		})
+		fmt.Printf("gate %-44s blocked\n", name)
 	}
 
 	command := func(name string, args ...string) (string, []string, error) {
@@ -76,10 +93,10 @@ func runGate(args []string) error {
 		return "pass", nil, nil
 	}
 
-	// 1. Repository and specification policy (formatting, vetting, the
-	// complete unit/fixture/oracle suite with race detection, and the
+	// Gate 1: repository and specification policy (formatting, vetting,
+	// the complete unit/fixture suite with race detection, and the
 	// policy gates that run inside it).
-	run("format", func() (string, []string, error) {
+	run("01-policy/format", func() (string, []string, error) {
 		// The formatting gate covers exactly the hand-maintained source
 		// tree (the shared policy definition), never scratch or evidence
 		// directories.
@@ -96,16 +113,16 @@ func runGate(args []string) error {
 		}
 		return "pass", nil, nil
 	})
-	run("vet", func() (string, []string, error) { return command("go", "vet", "./...") })
-	run("diff-check", func() (string, []string, error) { return command("git", "diff", "--check") })
-	run("test-race", func() (string, []string, error) {
+	run("01-policy/vet", func() (string, []string, error) { return command("go", "vet", "./...") })
+	run("01-policy/diff-check", func() (string, []string, error) { return command("git", "diff", "--check") })
+	run("01-policy/tests-race", func() (string, []string, error) {
 		return command("go", "test", "-count=1", "-race", "./...")
 	})
 
-	// 2-8. Input attestation, census dispositions, and deterministic
-	// regeneration, all through the census pipeline against the pin.
+	// Gates 2-3: input attestation and census dispositions through the
+	// census pipeline against the pin.
 	var firstRun *census.Result
-	run("census-attestation", func() (string, []string, error) {
+	run("02-input-attestation", func() (string, []string, error) {
 		prof, err := profile.Load(filepath.Join(*repoDir, filepath.FromSlash(*profilePath)))
 		if err != nil {
 			return "fail", nil, err
@@ -116,7 +133,7 @@ func runGate(args []string) error {
 		}
 		return "pass", nil, nil
 	})
-	run("census-dispositions", func() (string, []string, error) {
+	run("03-census-dispositions", func() (string, []string, error) {
 		if firstRun == nil {
 			return "blocked", []string{"census did not run"}, nil
 		}
@@ -125,7 +142,15 @@ func runGate(args []string) error {
 		}
 		return "pass", nil, nil
 	})
-	run("deterministic-regeneration", func() (string, []string, error) {
+	blocked("04-declaration-and-external-contracts",
+		"external-contract implementation-status gate not implemented (typed inventory and generated stubs only)")
+	blocked("05-body-ir-and-ownership-verification",
+		"corpus body-IR acceptance gate not implemented (translate-probe is diagnostic evidence only)")
+	blocked("06-representation-plan-verification",
+		"two-outcome representation proof not implemented (conservative-v1 is the only plan)")
+	blocked("07-lowering-and-generated-artifact-verification",
+		"full-unit generated-artifact gate not implemented")
+	run("08-deterministic-regeneration", func() (string, []string, error) {
 		if firstRun == nil {
 			return "blocked", []string{"census did not run"}, nil
 		}
@@ -169,7 +194,29 @@ func runGate(args []string) error {
 		}
 		return "pass", nil, nil
 	})
+	run("09-go-semantic-differential-oracles", func() (string, []string, error) {
+		return command("go", "test", "-count=1",
+			"-run", "TestOracle|TestReviewRegression|TestCrossPackage|TestExternalStubShape|TestGenerationIsDeterministic",
+			"./internal/translate/")
+	})
+	blocked("10-generated-ts-strict-validation",
+		"strict tsc typecheck gate over generated output not implemented (Node execution strips types)")
+	blocked("11-no-extension-tsgo-differential-validation",
+		"whole-compiler no-extension differential not implemented")
+	blocked("12-tsts-extension-and-product-validation",
+		"extension seams and product composition not implemented")
+	blocked("13-complete-selected-compiler-corpus",
+		"corpus generation incomplete (see translate-probe evidence)")
+	blocked("14-proof-and-common-downstream-projects",
+		"proof projects not implemented")
+	blocked("15-self-compilation-and-native-target-probes",
+		"self-compilation and C#/Rust target probes not implemented")
+	blocked("16-performance-acceptance",
+		"performance baselines and regression gates not implemented")
+	blocked("17-upgrade-repeatability-proof",
+		"upgrade repeatability proof not implemented")
 
+	report.Passed = report.Failed == 0 && report.Blocked == 0
 	data, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
 		return err
@@ -177,10 +224,12 @@ func runGate(args []string) error {
 	if err := os.WriteFile(*reportPath, append(data, '\n'), 0o644); err != nil {
 		return err
 	}
-	if !report.Passed {
-		return fmt.Errorf("gate failed; report at %s", *reportPath)
+	passCount := len(report.Gates) - report.Failed - report.Blocked
+	fmt.Printf("gates: %d pass, %d blocked, %d fail; report at %s\n",
+		passCount, report.Blocked, report.Failed, *reportPath)
+	if report.Failed > 0 {
+		return fmt.Errorf("gate failures; report at %s", *reportPath)
 	}
-	fmt.Printf("all gates passed; report at %s\n", *reportPath)
 	return nil
 }
 

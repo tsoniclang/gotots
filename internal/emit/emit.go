@@ -151,7 +151,7 @@ func Package(module *Module, decls Decls) (string, error) {
 		if packageVar.Exported {
 			export = "export "
 		}
-		p.line("%slet %s: %s = %s;", export, packageVar.Name, spelled, init)
+		p.line("%slet %s: %s = %s;", export, tsName(packageVar.Name), spelled, init)
 	}
 	for _, function := range sorted {
 		body.WriteString("\n")
@@ -171,7 +171,7 @@ func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct) er
 	if structDecl.Exported {
 		export = "export "
 	}
-	p.line("%sclass %s {", export, structDecl.Name)
+	p.line("%sclass %s {", export, tsName(structDecl.Name))
 	p.indent++
 	var params []string
 	for _, field := range structDecl.Fields {
@@ -180,12 +180,12 @@ func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct) er
 			return fmt.Errorf("%s: %w", structDecl.ID, err)
 		}
 		p.line("%s: %s;", field.Name, spelled)
-		params = append(params, field.Name+": "+spelled)
+		params = append(params, tsName(field.Name)+": "+spelled)
 	}
 	p.line("constructor(%s) {", strings.Join(params, ", "))
 	p.indent++
 	for _, field := range structDecl.Fields {
-		p.line("this.%s = %s;", field.Name, field.Name)
+		p.line("this.%s = %s;", field.Name, tsName(field.Name))
 	}
 	p.indent--
 	p.line("}")
@@ -212,13 +212,13 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 			clone = append(clone, "this."+field.Name)
 		}
 	}
-	p.line("goClone$(): %s {", structDecl.Name)
+	p.line("goClone$(): %s {", tsName(structDecl.Name))
 	p.indent++
-	p.line("return new %s(%s);", structDecl.Name, strings.Join(clone, ", "))
+	p.line("return new %s(%s);", tsName(structDecl.Name), strings.Join(clone, ", "))
 	p.indent--
 	p.line("}")
 
-	p.line("goSet$(other: %s): void {", structDecl.Name)
+	p.line("goSet$(other: %s): void {", tsName(structDecl.Name))
 	p.indent++
 	for _, field := range structDecl.Fields {
 		if field.Type.Kind == ir.KindStruct {
@@ -238,9 +238,9 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 		}
 		zeros = append(zeros, zero)
 	}
-	p.line("static goZero$(): %s {", structDecl.Name)
+	p.line("static goZero$(): %s {", tsName(structDecl.Name))
 	p.indent++
-	p.line("return new %s(%s);", structDecl.Name, strings.Join(zeros, ", "))
+	p.line("return new %s(%s);", tsName(structDecl.Name), strings.Join(zeros, ", "))
 	p.indent--
 	p.line("}")
 	return nil
@@ -260,7 +260,7 @@ func printMethodFunction(out *strings.Builder, module *Module, className string,
 		return fmt.Errorf("%s: %w", method.ID, err)
 	}
 	structValueReceiver := method.Receiver.Type.Kind == ir.KindStruct
-	recvParam := method.Receiver.Name
+	recvParam := tsName(method.Receiver.Name)
 	if structValueReceiver {
 		recvParam = "$recv"
 	}
@@ -270,7 +270,7 @@ func printMethodFunction(out *strings.Builder, module *Module, className string,
 		if err != nil {
 			return fmt.Errorf("%s: %w", method.ID, err)
 		}
-		params = append(params, parameter.Name+": "+spelled)
+		params = append(params, tsName(parameter.Name)+": "+spelled)
 	}
 	result, err := p.tsResultType(method.Results)
 	if err != nil {
@@ -283,7 +283,7 @@ func printMethodFunction(out *strings.Builder, module *Module, className string,
 	p.line("%sfunction %s$%s(%s): %s {", export, className, method.Name, strings.Join(params, ", "), result)
 	p.indent++
 	if structValueReceiver {
-		p.line("const %s = $recv.goClone$();", method.Receiver.Name)
+		p.line("const %s = $recv.goClone$();", tsName(method.Receiver.Name))
 	}
 	if err := p.printBlockBody(method.Body); err != nil {
 		return fmt.Errorf("%s: %w", method.ID, err)
@@ -308,7 +308,7 @@ func (p *printer) line(format string, args ...any) {
 }
 
 func (p *printer) temp() string {
-	name := fmt.Sprintf("_t%d", p.temps)
+	name := fmt.Sprintf("_t%d$", p.temps)
 	p.temps++
 	return name
 }
@@ -327,7 +327,7 @@ func printFunc(out *strings.Builder, module *Module, function *ir.Func) error {
 	if len(function.TypeParams) > 0 {
 		generics = "<" + strings.Join(function.TypeParams, ", ") + ">"
 	}
-	p.line("%sfunction %s%s%s {", export, function.Name, generics, signature)
+	p.line("%sfunction %s%s%s {", export, tsName(function.Name), generics, signature)
 	p.indent++
 	if err := p.printBlockBody(function.Body); err != nil {
 		return fmt.Errorf("%s: %w", function.ID, err)
@@ -344,7 +344,7 @@ func (p *printer) functionSignature(function *ir.Func) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		params = append(params, parameter.Name+": "+spelled)
+		params = append(params, tsName(parameter.Name)+": "+spelled)
 	}
 	result, err := p.tsResultType(function.Results)
 	if err != nil {
@@ -364,27 +364,27 @@ func (p *printer) tsType(t ir.Type) (string, error) {
 	case ir.KindFloat32, ir.KindFloat64:
 		return "number", nil
 	case ir.KindInt8:
-		return "goabi.GoInt8", nil
+		return "goabi$.GoInt8", nil
 	case ir.KindInt16:
-		return "goabi.GoInt16", nil
+		return "goabi$.GoInt16", nil
 	case ir.KindInt32:
-		return "goabi.GoInt32", nil
+		return "goabi$.GoInt32", nil
 	case ir.KindInt64:
-		return "goabi.GoInt64", nil
+		return "goabi$.GoInt64", nil
 	case ir.KindInt:
-		return "goabi.GoInt", nil
+		return "goabi$.GoInt", nil
 	case ir.KindUint8:
-		return "goabi.GoUint8", nil
+		return "goabi$.GoUint8", nil
 	case ir.KindUint16:
-		return "goabi.GoUint16", nil
+		return "goabi$.GoUint16", nil
 	case ir.KindUint32:
-		return "goabi.GoUint32", nil
+		return "goabi$.GoUint32", nil
 	case ir.KindUint64:
-		return "goabi.GoUint64", nil
+		return "goabi$.GoUint64", nil
 	case ir.KindUint:
-		return "goabi.GoUint", nil
+		return "goabi$.GoUint", nil
 	case ir.KindUintptr:
-		return "goabi.GoUintptr", nil
+		return "goabi$.GoUintptr", nil
 	case ir.KindPointer:
 		name, err := p.module.symbol(t.Pkg, t.Named)
 		if err != nil {
@@ -394,7 +394,7 @@ func (p *printer) tsType(t ir.Type) (string, error) {
 	case ir.KindStruct:
 		return p.module.symbol(t.Pkg, t.Named)
 	case ir.KindIface:
-		return "goif.GoIface", nil
+		return "goif$.GoIface", nil
 	case ir.KindTypeParam:
 		return t.Named, nil
 	case ir.KindFunc:
@@ -420,7 +420,7 @@ func (p *printer) tsType(t ir.Type) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return "gosl.GoSliceValue<" + element + ">", nil
+		return "gosl$.GoSliceValue<" + element + ">", nil
 	case ir.KindMap:
 		key, err := p.tsType(*t.Key)
 		if err != nil {
@@ -430,7 +430,7 @@ func (p *printer) tsType(t ir.Type) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return "gort.GoMap<" + key + ", " + value + ">", nil
+		return "gort$.GoMap<" + key + ", " + value + ">", nil
 	}
 	return "", fmt.Errorf("no TypeScript spelling for IR type %q", t.Go)
 }

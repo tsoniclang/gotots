@@ -28,7 +28,7 @@ func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
 	case ir.BlankTarget:
 		return stagedTarget{kind: "blank"}, nil
 	case ir.VarTarget:
-		return stagedTarget{kind: "var", name: t.Name, structValue: t.T.Kind == ir.KindStruct}, nil
+		return stagedTarget{kind: "var", name: tsName(t.Name), structValue: t.T.Kind == ir.KindStruct}, nil
 	case *ir.FieldTarget:
 		base, err := p.printExpr(t.X)
 		if err != nil {
@@ -82,7 +82,7 @@ func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
 func (s stagedTarget) store(p *printer, value string) error {
 	base := s.name
 	if s.nilCheckBase {
-		base = "gort.goNilCheck(" + s.name + ")"
+		base = "gort$.goNilCheck(" + s.name + ")"
 	}
 	switch s.kind {
 	case "blank":
@@ -102,12 +102,12 @@ func (s stagedTarget) store(p *printer, value string) error {
 	case "pointee":
 		p.line("%s.goSet$(%s);", base, value)
 	case "map":
-		p.line("gort.goMapSet(%s, %s, %s);", s.name, s.keyTemp, value)
+		p.line("gort$.goMapSet(%s, %s, %s);", s.name, s.keyTemp, value)
 	case "slice":
 		if s.structValue {
-			p.line("gosl.goSliceSetStruct(%s, %s, %s);", s.name, s.keyTemp, value)
+			p.line("gosl$.goSliceSetStruct(%s, %s, %s);", s.name, s.keyTemp, value)
 		} else {
-			p.line("gosl.goSliceSet(%s, %s, %s);", s.name, s.keyTemp, value)
+			p.line("gosl$.goSliceSet(%s, %s, %s);", s.name, s.keyTemp, value)
 		}
 	}
 	return nil
@@ -125,10 +125,10 @@ func (p *printer) printStore(target ir.Target, value string) error {
 		return nil
 	case ir.VarTarget:
 		if t.T.Kind == ir.KindStruct {
-			p.line("%s.goSet$(%s);", t.Name, value)
+			p.line("%s.goSet$(%s);", tsName(t.Name), value)
 			return nil
 		}
-		p.line("%s = %s;", t.Name, value)
+		p.line("%s = %s;", tsName(t.Name), value)
 		return nil
 	case *ir.FieldTarget:
 		base, err := p.printExpr(t.X)
@@ -152,9 +152,9 @@ func (p *printer) printStore(target ir.Target, value string) error {
 		valueTemp := p.temp()
 		p.line("const %s = %s;", valueTemp, value)
 		if t.T.Kind == ir.KindStruct {
-			p.line("gort.goNilCheck(%s).%s.goSet$(%s);", baseTemp, t.Field, valueTemp)
+			p.line("gort$.goNilCheck(%s).%s.goSet$(%s);", baseTemp, t.Field, valueTemp)
 		} else {
-			p.line("gort.goNilCheck(%s).%s = %s;", baseTemp, t.Field, valueTemp)
+			p.line("gort$.goNilCheck(%s).%s = %s;", baseTemp, t.Field, valueTemp)
 		}
 		return nil
 	case *ir.MapTarget:
@@ -166,7 +166,7 @@ func (p *printer) printStore(target ir.Target, value string) error {
 		if err != nil {
 			return err
 		}
-		p.line("gort.goMapSet(%s, %s, %s);", mapExpr, key, value)
+		p.line("gort$.goMapSet(%s, %s, %s);", mapExpr, key, value)
 		return nil
 	case *ir.SliceTarget:
 		sliceExpr, err := p.printExpr(t.X)
@@ -178,10 +178,10 @@ func (p *printer) printStore(target ir.Target, value string) error {
 			return err
 		}
 		if t.X.Type().Elem != nil && t.X.Type().Elem.Kind == ir.KindStruct {
-			p.line("gosl.goSliceSetStruct(%s, %s, %s);", sliceExpr, index, value)
+			p.line("gosl$.goSliceSetStruct(%s, %s, %s);", sliceExpr, index, value)
 			return nil
 		}
-		p.line("gosl.goSliceSet(%s, %s, %s);", sliceExpr, index, value)
+		p.line("gosl$.goSliceSet(%s, %s, %s);", sliceExpr, index, value)
 		return nil
 	case *ir.PointeeTarget:
 		pointer, err := p.printExpr(t.X)
@@ -192,7 +192,7 @@ func (p *printer) printStore(target ir.Target, value string) error {
 		p.line("const %s = %s;", pointerTemp, pointer)
 		valueTemp := p.temp()
 		p.line("const %s = %s;", valueTemp, value)
-		p.line("gort.goNilCheck(%s).goSet$(%s);", pointerTemp, valueTemp)
+		p.line("gort$.goNilCheck(%s).goSet$(%s);", pointerTemp, valueTemp)
 		return nil
 	}
 	return fmt.Errorf("no emission for target %T", target)

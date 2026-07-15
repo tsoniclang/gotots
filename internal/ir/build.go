@@ -59,6 +59,12 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 	if decl.Body == nil {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "bodyless function", Span: span}
 	}
+	if decl.Recv == nil && decl.Name.Name == "init" {
+		// Package initializers need the initialization subsystem (import
+		// DAG order, once semantics); emitting them as ordinary functions
+		// would silently drop their effects.
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "package init function (initialization order subsystem)", Span: span}
+	}
 	object, ok := b.info.Defs[decl.Name].(*types.Func)
 	if !ok {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "function without typed definition", Span: span}
@@ -198,7 +204,7 @@ func (b *builder) buildDeferredCall(deferStmt *ast.DeferStmt) ([]Stmt, Expr, err
 	if err != nil {
 		return nil, nil, err
 	}
-	prefix := fmt.Sprintf("_d%d", b.deferCount)
+	prefix := fmt.Sprintf("_d%d$", b.deferCount)
 	b.deferCount++
 
 	var captures []Stmt
@@ -218,7 +224,14 @@ func (b *builder) buildDeferredCall(deferStmt *ast.DeferStmt) ([]Stmt, Expr, err
 		}
 		return captures, call, nil
 	case *MethodCall:
-		call.Recv = capture(prefix+"_r", call.Recv)
+		// A value receiver copies when the defer statement evaluates —
+		// mutations between the defer and the call never reach it — so a
+		// struct-valued receiver captures a clone.
+		recv := call.Recv
+		if !call.PointerRecv {
+			recv = b.bindStructValue(recv)
+		}
+		call.Recv = capture(prefix+"_r", recv)
 		for i, arg := range call.Args {
 			call.Args[i] = capture(fmt.Sprintf("%s_a%d", prefix, i), arg)
 		}

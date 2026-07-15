@@ -13,7 +13,7 @@ package abi
 import "fmt"
 
 // Version identifies the ABI contract carried in generated output.
-const Version = 2
+const Version = 3
 
 // Family is the static carrier family of an integer kind.
 type Family string
@@ -164,6 +164,14 @@ export function goMapClear<K, V>(m: GoMap<K, V>): void {
 // strings, canonical-range and bigint integers, and booleans.
 export function goPanicValue(value: string | number | bigint | boolean): never {
   throw new GoPanic(String(value));
+}
+
+// Invoking a function value: the arguments were already evaluated (JS
+// argument order runs the array literal first), and a nil function
+// panics at the invocation — exactly Go's order.
+export function goFuncInvoke(f: Function | undefined, args: unknown[]): unknown {
+  if (f === undefined) goPanicNil();
+  return (f as Function)(...args);
 }
 
 // len(string) is the UTF-8 byte length; JS string length counts UTF-16
@@ -335,7 +343,8 @@ export function goSliceFrom<T>(values: T[]): GoSlice<T> {
   return new GoSlice(values, 0, values.length, values.length);
 }
 
-export function goSliceMake<T>(length: GoIndex, capacity: GoIndex, zero: T): GoSlice<T> {
+export function goSliceMake<T>(length: GoIndex, capacity: GoIndex | undefined, zero: T): GoSlice<T> {
+  if (capacity === undefined) capacity = length; // make([]T, n): length evaluated once
   if (length < 0 || capacity < 0 || length > capacity) {
     throw new GoPanic("runtime error: makeslice: len out of range");
   }
@@ -379,7 +388,8 @@ export interface GoStructValue<T> {
 
 // make([]T, len[, cap]) for struct elements: every element is a distinct
 // fresh zero instance.
-export function goSliceMakeStruct<T>(length: GoIndex, capacity: GoIndex, zero: () => T): GoSlice<T> {
+export function goSliceMakeStruct<T>(length: GoIndex, capacity: GoIndex | undefined, zero: () => T): GoSlice<T> {
+  if (capacity === undefined) capacity = length; // make([]T, n): length evaluated once
   if (length < 0 || capacity < 0 || length > capacity) {
     throw new GoPanic("runtime error: makeslice: len out of range");
   }
@@ -402,8 +412,10 @@ export function goSliceSetStruct<T extends GoStructValue<T>>(s: GoSliceValue<T>,
 }
 
 // s[low:high]: 0 <= low <= high <= cap; shares backing storage. A nil
-// slice permits only [0:0].
-export function goSliceSlice<T>(s: GoSliceValue<T>, low: GoIndex, high: GoIndex): GoSliceValue<T> {
+// slice permits only [0:0]. An undefined high bound is len(s), computed
+// from the single evaluation of the operand.
+export function goSliceSlice<T>(s: GoSliceValue<T>, low: GoIndex, high: GoIndex | undefined): GoSliceValue<T> {
+  if (high === undefined) high = s === undefined ? 0n : BigInt(s.length);
   const capacity = s === undefined ? 0 : s.capacity;
   if (high > capacity || high < 0) {
     throw new GoPanic("runtime error: slice bounds out of range [:" + String(high) + "] with capacity " + String(capacity));
@@ -417,12 +429,16 @@ export function goSliceSlice<T>(s: GoSliceValue<T>, low: GoIndex, high: GoIndex)
   return new GoSlice(s.backing, s.offset + Number(low), Number(high) - Number(low), s.capacity - Number(low));
 }
 
-// append: reuses backing storage when capacity allows (aliasing is
-// observable); otherwise allocates. Go leaves the grown capacity
-// implementation-defined; this carrier uses the documented doubling /
-// 1.25x progression without allocator size-class rounding, and grown
-// capacity is not a differential target.
-export function goSliceAppend<T>(s: GoSliceValue<T>, values: T[]): GoSlice<T> {
+// append: returns the very slice value when nothing is appended (a nil
+// slice stays nil); reuses backing storage when capacity allows
+// (aliasing is observable); otherwise allocates, copying the old
+// elements and zero-filling the region between the new length and the
+// grown capacity so extended reslices read exact zeros. Go leaves the
+// grown capacity implementation-defined; this carrier uses the
+// documented doubling / 1.25x progression without allocator size-class
+// rounding, and grown capacity is not a differential target.
+export function goSliceAppend<T>(s: GoSliceValue<T>, values: T[], zero: T): GoSliceValue<T> {
+  if (values.length === 0) return s;
   const length = s === undefined ? 0 : s.length;
   const needed = length + values.length;
   if (s !== undefined && needed <= s.capacity) {
@@ -445,31 +461,75 @@ export function goSliceAppend<T>(s: GoSliceValue<T>, values: T[]): GoSlice<T> {
   for (let index = 0; index < values.length; index++) {
     backing[length + index] = values[index] as T;
   }
+  for (let index = needed; index < capacity; index++) {
+    backing[index] = zero;
+  }
+  return new GoSlice(backing, 0, needed, capacity);
+}
+
+// The struct-element append overwrites reused-capacity slots in place
+// (element aliases observe the store, exactly like Go's memory write),
+// clones old elements into a grown backing (Go copies values, never
+// shares them), and fills the grown tail with distinct fresh zeros. The
+// incoming values are already fresh copies from their binding sites.
+export function goSliceAppendStruct<T extends GoStructValue<T>>(s: GoSliceValue<T>, values: T[], zero: () => T): GoSliceValue<T> {
+  if (values.length === 0) return s;
+  const length = s === undefined ? 0 : s.length;
+  const needed = length + values.length;
+  if (s !== undefined && needed <= s.capacity) {
+    for (let index = 0; index < values.length; index++) {
+      const slot = s.backing[s.offset + length + index] as T | undefined;
+      if (slot === undefined) {
+        s.backing[s.offset + length + index] = values[index] as T;
+      } else {
+        slot.goSet$(values[index] as T);
+      }
+    }
+    return new GoSlice(s.backing, s.offset, needed, s.capacity);
+  }
+  let capacity = s === undefined ? 0 : s.capacity;
+  if (capacity === 0) capacity = needed;
+  while (capacity < needed) {
+    capacity = capacity < 256 ? capacity * 2 : capacity + Math.trunc((capacity + 3 * 256) / 4);
+  }
+  const backing: T[] = new Array(capacity);
+  if (s !== undefined) {
+    for (let index = 0; index < length; index++) {
+      backing[index] = (s.backing[s.offset + index] as T).goClone$();
+    }
+  }
+  for (let index = 0; index < values.length; index++) {
+    backing[length + index] = values[index] as T;
+  }
+  for (let index = needed; index < capacity; index++) {
+    backing[index] = zero();
+  }
   return new GoSlice(backing, 0, needed, capacity);
 }
 
 // append(s, source...): source's current elements are read first, so a
-// self-append with capacity reuse stays exact.
-export function goSliceAppendSlice<T>(s: GoSliceValue<T>, source: GoSliceValue<T>): GoSlice<T> {
+// self-append with capacity reuse stays exact; an empty source returns
+// the very slice value.
+export function goSliceAppendSlice<T>(s: GoSliceValue<T>, source: GoSliceValue<T>, zero: T): GoSliceValue<T> {
   const values: T[] = [];
   const length = source === undefined ? 0 : source.length;
   for (let index = 0; index < length; index++) {
     const src = source as GoSlice<T>;
     values.push(src.backing[src.offset + index] as T);
   }
-  return goSliceAppend(s, values);
+  return goSliceAppend(s, values, zero);
 }
 
 // The struct-element spread clones each copied value: Go copies struct
 // values into the destination's storage.
-export function goSliceAppendSliceStruct<T extends GoStructValue<T>>(s: GoSliceValue<T>, source: GoSliceValue<T>): GoSlice<T> {
+export function goSliceAppendSliceStruct<T extends GoStructValue<T>>(s: GoSliceValue<T>, source: GoSliceValue<T>, zero: () => T): GoSliceValue<T> {
   const values: T[] = [];
   const length = source === undefined ? 0 : source.length;
   for (let index = 0; index < length; index++) {
     const src = source as GoSlice<T>;
     values.push((src.backing[src.offset + index] as T).goClone$());
   }
-  return goSliceAppend(s, values);
+  return goSliceAppendStruct(s, values, zero);
 }
 
 // copy(dst, src): min(len) elements with memmove semantics — the source

@@ -36,8 +36,8 @@ func printStubFunc(out *strings.Builder, module *Module, fn StubFunc) error {
 	params := make([]string, 0, len(fn.Params))
 	names := make([]string, 0, len(fn.Params))
 	for i, parameter := range fn.Params {
-		name := parameter.Name
-		if name == "" || name == "_" {
+		name := tsName(parameter.Name)
+		if parameter.Name == "" || parameter.Name == "_" {
 			name = fmt.Sprintf("p%d", i)
 		}
 		spelled, err := p.tsType(parameter.Type)
@@ -60,7 +60,7 @@ func printStubFunc(out *strings.Builder, module *Module, fn StubFunc) error {
 	for i, r := range fn.Results {
 		resultTypes[i] = r.Type
 	}
-	call := fmt.Sprintf("goext.goExternalCall(%q, [%s])", fn.ID, strings.Join(names, ", "))
+	call := fmt.Sprintf("goext$.goExternalCall(%q, [%s])", fn.ID, strings.Join(names, ", "))
 	cast, err := p.castResults(call, resultTypes)
 	if err != nil {
 		return fmt.Errorf("%s: %w", fn.ID, err)

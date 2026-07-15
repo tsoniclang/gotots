@@ -62,14 +62,14 @@ func NewModule(pkg, pkgName string, abiImports ABIImports, specifiers map[string
 // every other co-generated package.
 func (m *Module) symbol(pkg, name string) (string, error) {
 	if pkg == m.Pkg {
-		return name, nil
+		return tsName(name), nil
 	}
 	imported, ok := m.imports[pkg]
 	if !ok {
 		return "", fmt.Errorf("reference to package %q which is not part of the translated unit", pkg)
 	}
 	m.used[pkg] = true
-	return imported.Alias + "." + name, nil
+	return imported.Alias + "." + tsName(name), nil
 }
 
 // importLines renders the deterministic import block: the language-ABI
@@ -77,11 +77,11 @@ func (m *Module) symbol(pkg, name string) (string, error) {
 // order.
 func (m *Module) importLines() string {
 	var out strings.Builder
-	fmt.Fprintf(&out, "import * as goabi from %q;\n", m.ABI.Ints)
-	fmt.Fprintf(&out, "import * as gort from %q;\n", m.ABI.Runtime)
-	fmt.Fprintf(&out, "import * as gosl from %q;\n", m.ABI.Slice)
-	fmt.Fprintf(&out, "import * as goif from %q;\n", m.ABI.Iface)
-	fmt.Fprintf(&out, "import * as goext from %q;\n", m.ABI.Extern)
+	fmt.Fprintf(&out, "import * as goabi$ from %q;\n", m.ABI.Ints)
+	fmt.Fprintf(&out, "import * as gort$ from %q;\n", m.ABI.Runtime)
+	fmt.Fprintf(&out, "import * as gosl$ from %q;\n", m.ABI.Slice)
+	fmt.Fprintf(&out, "import * as goif$ from %q;\n", m.ABI.Iface)
+	fmt.Fprintf(&out, "import * as goext$ from %q;\n", m.ABI.Extern)
 	usedPaths := make([]string, 0, len(m.used))
 	for path := range m.used {
 		usedPaths = append(usedPaths, path)

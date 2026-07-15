@@ -11,7 +11,7 @@ import (
 // rttiRef spells a reference to a concrete type's shared rtti object.
 func (p *printer) rttiRef(r ir.RttiRef) (string, error) {
 	if r.Predeclared != "" {
-		return "goif.goRtti$" + r.Predeclared, nil
+		return "goif$.goRtti$" + r.Predeclared, nil
 	}
 	name := r.TypeName + "$rtti"
 	if r.Pointer {
@@ -42,9 +42,9 @@ func printRtti(out *strings.Builder, module *Module, typeName string, exported, 
 		export = "export "
 	}
 	display := module.PkgName + "." + typeName
-	p.line("%sconst %s$rtti: goif.GoRtti = { d: %q, m: %s };", export, typeName, display, table)
+	p.line("%sconst %s$rtti: goif$.GoRtti = { d: %q, m: %s };", export, typeName, display, table)
 	if pointer {
-		p.line("%sconst %s$rttiPtr: goif.GoRtti = { d: %q, m: %s };", export, typeName, "*"+display, table)
+		p.line("%sconst %s$rttiPtr: goif$.GoRtti = { d: %q, m: %s };", export, typeName, "*"+display, table)
 	}
 	return nil
 }
@@ -85,7 +85,7 @@ func (p *printer) printTypeSwitch(n *ir.TypeSwitchStmt) error {
 			if err != nil {
 				return err
 			}
-			conditions = append(conditions, "goif.goIfaceIs("+boxTemp+", "+rtti+")")
+			conditions = append(conditions, "goif$.goIfaceIs("+boxTemp+", "+rtti+")")
 		}
 		keyword := "} else if"
 		if first {
@@ -132,14 +132,14 @@ func (p *printer) printTypeSwitchClause(n *ir.TypeSwitchStmt, clause *ir.TypeSwi
 			return err
 		}
 		if clause.BindType.Kind == ir.KindIface {
-			p.line("let %s: %s = %s;", n.Bind, spelled, boxTemp)
+			p.line("let %s: %s = %s;", tsName(n.Bind), spelled, boxTemp)
 		} else {
-			value := fmt.Sprintf("((%s as goif.GoIfaceBox).v as (%s))", boxTemp, spelled)
+			value := fmt.Sprintf("((%s as goif$.GoIfaceBox).v as (%s))", boxTemp, spelled)
 			if clause.BindType.Kind == ir.KindStruct {
 				// The asserted struct value binds as a copy.
 				value += ".goClone$()"
 			}
-			p.line("let %s: %s = %s;", n.Bind, spelled, value)
+			p.line("let %s: %s = %s;", tsName(n.Bind), spelled, value)
 		}
 	}
 	return p.printBlockBody(clause.Body)

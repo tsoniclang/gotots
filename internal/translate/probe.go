@@ -28,9 +28,14 @@ type ProbeResult struct {
 	Translated       int            `json:"translated"`
 	Blocked          int            `json:"blocked"`
 	BlockerHistogram map[string]int `json:"blockerHistogram"`
-	// PackagesFullyTranslated lists packages where every production body
-	// builds — candidates for end-to-end generation.
+	// PackagesFullyTranslated lists packages whose COMPLETE declaration
+	// set translates — verified by running the package translation, not
+	// just body IR construction.
 	PackagesFullyTranslated []string `json:"packagesFullyTranslated"`
+	// PackagesBodyOnly lists packages where every body builds but a
+	// declaration-level construct (initializer, type, var) still blocks
+	// full translation, with the blocking diagnostic.
+	PackagesBodyOnly []string `json:"packagesBodyOnly"`
 	// PerPackage maps package path -> translated/total.
 	PerPackage map[string]string `json:"perPackage"`
 	// ExternalRefs counts blocked references per external function or
@@ -117,6 +122,26 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 		}
 	}
 	sort.Strings(result.PackagesFullyTranslated)
+
+	// Body IR alone is not package translatability: initializers, type
+	// declarations, and package variables all count. Every candidate is
+	// verified by actually translating the package.
+	byPath := map[string]*packages.Package{}
+	for _, p := range loaded {
+		if owned(p) {
+			byPath[p.PkgPath] = p
+		}
+	}
+	verified := make([]string, 0, len(result.PackagesFullyTranslated))
+	for _, candidate := range result.PackagesFullyTranslated {
+		throwaway := &Generated{Files: map[string]string{}, Ownership: map[string]string{}}
+		if err := translatePackage(throwaway, byPath[candidate], sourceDir, unit, Options{}); err != nil {
+			result.PackagesBodyOnly = append(result.PackagesBodyOnly, candidate+": "+firstLine(err.Error()))
+			continue
+		}
+		verified = append(verified, candidate)
+	}
+	result.PackagesFullyTranslated = verified
 	return result, nil
 }
 

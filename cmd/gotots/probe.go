@@ -62,7 +62,7 @@ func runTranslateProbe(args []string) error {
 	fmt.Printf("bodies %d translated %d (%.1f%%) blocked %d across %d packages\n",
 		result.Bodies, result.Translated,
 		100*float64(result.Translated)/float64(result.Bodies), result.Blocked, result.Packages)
-	fmt.Printf("fully translated packages: %d %v\n", len(result.PackagesFullyTranslated), result.PackagesFullyTranslated)
+	fmt.Printf("fully translatable packages (declaration-verified): %d %v\n", len(result.PackagesFullyTranslated), result.PackagesFullyTranslated)
 	type entry struct {
 		key   string
 		count int
