@@ -78,6 +78,9 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 	case *ir.RangeSlice:
 		return p.printRangeSlice(n)
 
+	case *ir.SwitchStmt:
+		return p.printSwitch(n)
+
 	case *ir.MapDeleteStmt:
 		mapExpr, err := p.printExpr(n.Map)
 		if err != nil {
@@ -178,6 +181,62 @@ func (p *printer) printAssign(n *ir.AssignStmt) error {
 		if err := staged[i].store(p, temps[i]); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// printSwitch emits a Go expression switch as a JS switch, whose
+// semantics coincide exactly for the reviewed carriers: the tag is
+// evaluated once, case expressions are evaluated in source order under
+// identity equality, the first match wins, and default runs only when
+// nothing matches. Each clause body gets its own block for Go's per-case
+// scoping; an emitted break is Go's implicit clause exit, and omitting it
+// is Go's fallthrough.
+func (p *printer) printSwitch(n *ir.SwitchStmt) error {
+	if n.Init != nil {
+		p.line("{")
+		p.indent++
+		if err := p.printStmt(n.Init); err != nil {
+			return err
+		}
+	}
+	tag, err := p.printExpr(n.Tag)
+	if err != nil {
+		return err
+	}
+	p.line("switch (%s) {", tag)
+	p.indent++
+	for _, clause := range n.Clauses {
+		if clause.Values == nil {
+			p.line("default: {")
+		} else {
+			for i, value := range clause.Values {
+				printed, err := p.printExpr(value)
+				if err != nil {
+					return err
+				}
+				if i < len(clause.Values)-1 {
+					p.line("case %s:", printed)
+				} else {
+					p.line("case %s: {", printed)
+				}
+			}
+		}
+		p.indent++
+		if err := p.printBlockBody(clause.Body); err != nil {
+			return err
+		}
+		if !clause.Fallthrough {
+			p.line("break;")
+		}
+		p.indent--
+		p.line("}")
+	}
+	p.indent--
+	p.line("}")
+	if n.Init != nil {
+		p.indent--
+		p.line("}")
 	}
 	return nil
 }

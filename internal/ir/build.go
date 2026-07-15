@@ -27,6 +27,9 @@ type builder struct {
 	// results are the enclosing function's result types, giving return
 	// expressions their expected types.
 	results []Type
+	// namedResults, when set, are the enclosing function's named results:
+	// zero-initialized locals that bare returns return.
+	namedResults []Var
 }
 
 func (b *builder) span(pos token.Pos) Span {
@@ -63,10 +66,10 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 	if !ok {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "function without typed definition", Span: span}
 	}
+	// A variadic function's final parameter is exactly a slice: call
+	// sites pack trailing arguments (or pass nil, or the spread slice
+	// itself), so the declaration needs no special shape.
 	signature := object.Type().(*types.Signature)
-	if signature.Variadic() {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "variadic function", Span: span}
-	}
 
 	function := &Func{
 		ID:       id,
@@ -109,8 +112,8 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 	results := signature.Results()
 	for i := range results.Len() {
 		result := results.At(i)
-		if result.Name() != "" {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "named result", Span: span}
+		if result.Name() == "_" {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "blank named result", Span: span}
 		}
 		t, err := b.typeOf(result.Type(), span)
 		if err != nil {
@@ -119,13 +122,31 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 		if t.Kind == KindStruct {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "struct value result (value-copy semantics)", Span: span}
 		}
-		function.Results = append(function.Results, Var{Type: t})
+		function.Results = append(function.Results, Var{Name: result.Name(), Type: t})
 		b.results = append(b.results, t)
+		if result.Name() != "" {
+			b.namedResults = append(b.namedResults, Var{Name: result.Name(), Type: t})
+		}
 	}
 
 	body, err := b.buildTopLevel(decl.Body.List)
 	if err != nil {
 		return nil, err
+	}
+	// Named results are zero-initialized locals declared before the body.
+	if len(b.namedResults) > 0 {
+		declStmt := &DeclStmt{}
+		for _, result := range b.namedResults {
+			zero, err := zeroValue(result.Type, span)
+			if err != nil {
+				return nil, err
+			}
+			declStmt.Names = append(declStmt.Names, result.Name)
+			declStmt.Types = append(declStmt.Types, result.Type)
+			declStmt.Values = append(declStmt.Values, zero)
+		}
+		b.use("namedResults")
+		body.Stmts = append([]Stmt{declStmt}, body.Stmts...)
 	}
 	function.Body = body
 	for operation := range b.operations {
@@ -155,6 +176,13 @@ func (b *builder) buildTopLevel(stmts []ast.Stmt) (*Block, error) {
 			continue
 		}
 
+		if len(b.namedResults) > 0 {
+			// A deferred call can observe and mutate named results after
+			// the return values are set; try/finally cannot express that
+			// visibility, so the combination fails closed.
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT",
+				Construct: "defer in a function with named results (deferred result mutation)", Span: b.span(deferStmt.Pos())}
+		}
 		captures, deferredCall, err := b.buildDeferredCall(deferStmt)
 		if err != nil {
 			return nil, err
@@ -247,6 +275,9 @@ func (b *builder) buildStmt(stmt ast.Stmt) (Stmt, error) {
 
 	case *ast.RangeStmt:
 		return b.buildRange(n)
+
+	case *ast.SwitchStmt:
+		return b.buildSwitch(n)
 
 	case *ast.ReturnStmt:
 		return b.buildReturn(n)
@@ -350,49 +381,22 @@ func (b *builder) buildDeclStmt(n *ast.DeclStmt) (Stmt, error) {
 	return out, nil
 }
 
+// buildIncDec lowers x++ / x-- through the shared single-evaluation
+// compound-target resolver.
 func (b *builder) buildIncDec(n *ast.IncDecStmt) (Stmt, error) {
 	span := b.span(n.Pos())
-
-	// The operand address is evaluated once in Go; the lowering to
-	// load-op-store is exact only when re-evaluating the operand is pure,
-	// so bases are restricted to plain identifiers.
-	var target Target
-	var x Expr
-	switch operand := ast.Unparen(n.X).(type) {
-	case *ast.Ident:
-		built, err := b.buildExpr(operand)
-		if err != nil {
-			return nil, err
-		}
-		x = built
-		target = VarTarget{Name: operand.Name}
-	case *ast.SelectorExpr:
-		if _, baseIsIdent := ast.Unparen(operand.X).(*ast.Ident); !baseIsIdent {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "inc/dec of field with non-variable base", Span: span}
-		}
-		built, err := b.buildExpr(operand)
-		if err != nil {
-			return nil, err
-		}
-		load, isField := built.(*FieldLoad)
-		if !isField {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "inc/dec of non-field selector", Span: span}
-		}
-		x = load
-		target = &FieldTarget{X: load.X, Field: load.Field}
-		b.use("fieldStore")
-	default:
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "inc/dec of non-variable", Span: span}
+	target, x, err := b.compoundTarget(n.X)
+	if err != nil {
+		return nil, err
 	}
-
+	if !x.Type().Kind.Integer() {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "inc/dec of " + x.Type().Go, Span: span}
+	}
 	op := token.ADD
 	if n.Tok == token.DEC {
 		op = token.SUB
 	}
 	one := &Const{T: x.Type(), Value: "1"}
-	if !x.Type().Kind.Integer() {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "inc/dec of " + x.Type().Go, Span: span}
-	}
 	b.use("incDec")
 	return &AssignStmt{
 		Targets: []Target{target},
@@ -507,8 +511,14 @@ func (b *builder) buildRange(n *ast.RangeStmt) (Stmt, error) {
 
 func (b *builder) buildReturn(n *ast.ReturnStmt) (Stmt, error) {
 	if len(n.Results) == 0 {
+		out := &ReturnStmt{}
+		// A bare return in a function with named results returns their
+		// current values.
+		for _, result := range b.namedResults {
+			out.Values = append(out.Values, &VarRef{Name: result.Name, T: result.Type})
+		}
 		b.use("return")
-		return &ReturnStmt{}, nil
+		return out, nil
 	}
 	// A single multi-result call forwarded as the complete result list.
 	if len(n.Results) == 1 {

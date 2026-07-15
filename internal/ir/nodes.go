@@ -108,7 +108,26 @@ type BranchStmt struct {
 	Tok token.Token // token.BREAK or token.CONTINUE
 }
 
+// SwitchStmt is a Go expression switch. The tag is evaluated once (bool
+// true for tagless switches); clauses match in source order by the tag
+// carrier's exact equality; at most one clause without values is the
+// default. A clause with Fallthrough transfers into the next clause's
+// body unconditionally.
+type SwitchStmt struct {
+	Init    Stmt // nil or DeclStmt/AssignStmt
+	Tag     Expr
+	Clauses []SwitchClause
+}
+
+// SwitchClause is one case (or default) clause with its own scope.
+type SwitchClause struct {
+	Values      []Expr // nil for the default clause
+	Body        *Block
+	Fallthrough bool
+}
+
 func (*Block) stmt()         {}
+func (*SwitchStmt) stmt()    {}
 func (*RangeSlice) stmt()    {}
 func (*TryFinally) stmt()    {}
 func (*MapDeleteStmt) stmt() {}

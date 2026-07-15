@@ -329,106 +329,10 @@ func (b *builder) buildStructNew(lit *ast.CompositeLit, resultType types.Type) (
 	return out, nil
 }
 
-// builtinCallee resolves a call to a predeclared operation by object
-// identity, never spelling.
-func (b *builder) builtinCallee(call *ast.CallExpr) (*types.Builtin, bool) {
-	ident, ok := ast.Unparen(call.Fun).(*ast.Ident)
-	if !ok {
-		return nil, false
-	}
-	builtin, ok := b.info.Uses[ident].(*types.Builtin)
-	return builtin, ok
-}
-
-// buildBuiltin lowers the reviewed predeclared operations.
-func (b *builder) buildBuiltin(call *ast.CallExpr, builtin *types.Builtin, resultType types.Type) (Expr, error) {
-	span := b.span(call.Pos())
-	switch builtin.Name() {
-	case "len":
-		operand, err := b.buildExpr(call.Args[0])
-		if err != nil {
-			return nil, err
-		}
-		switch operand.Type().Kind {
-		case KindString:
-			b.use("len:string")
-			return &StringLen{X: operand}, nil
-		case KindMap:
-			b.use("len:map")
-			return &MapLen{X: operand}, nil
-		case KindSlice:
-			b.use("len:slice")
-			return &SliceLen{X: operand}, nil
-		}
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "len of " + operand.Type().Go, Span: span}
-	case "cap":
-		operand, err := b.buildExpr(call.Args[0])
-		if err != nil {
-			return nil, err
-		}
-		if operand.Type().Kind == KindSlice {
-			b.use("cap:slice")
-			return &SliceCap{X: operand}, nil
-		}
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "cap of " + operand.Type().Go, Span: span}
-	case "append":
-		operand, err := b.buildExpr(call.Args[0])
-		if err != nil {
-			return nil, err
-		}
-		if operand.Type().Kind != KindSlice {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "append to " + operand.Type().Go, Span: span}
-		}
-		if call.Ellipsis.IsValid() {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "append with slice expansion", Span: span}
-		}
-		out := &SliceAppend{X: operand, T: operand.Type()}
-		for _, arg := range call.Args[1:] {
-			value, err := b.buildExprAs(arg, *operand.Type().Elem)
-			if err != nil {
-				return nil, err
-			}
-			out.Values = append(out.Values, value)
-		}
-		b.use("append")
-		return out, nil
-	case "make":
-		t, err := b.typeOf(resultType, span)
-		if err != nil {
-			return nil, err
-		}
-		if t.Kind == KindMap && len(call.Args) == 1 {
-			b.use("makeMap")
-			return &MapMake{T: t}, nil
-		}
-		if t.Kind == KindSlice && (len(call.Args) == 2 || len(call.Args) == 3) {
-			length, err := b.buildExpr(call.Args[1])
-			if err != nil {
-				return nil, err
-			}
-			out := &SliceMake{T: t, Length: length}
-			if len(call.Args) == 3 {
-				capacity, err := b.buildExpr(call.Args[2])
-				if err != nil {
-					return nil, err
-				}
-				out.Capacity = capacity
-			}
-			b.use("makeSlice")
-			return out, nil
-		}
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "make of " + t.Go, Span: span}
-	}
-	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "builtin " + builtin.Name(), Span: span}
-}
-
 // buildAnyCall lowers a direct function call or a pointer-receiver method
 // call within the translated unit.
 func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
 	span := b.span(n.Pos())
-	if n.Ellipsis.IsValid() {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "slice-expansion call", Span: span}
-	}
 
 	// The callee is a plain identifier, a method selection, or a
 	// package-qualified identifier (pkg.Fn — qualified identifiers have no
@@ -464,8 +368,8 @@ func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "call outside the translated unit", Span: span}
 	}
 	signature := function.Type().(*types.Signature)
-	if signature.Recv() != nil || signature.Variadic() || signature.TypeParams() != nil {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "variadic or generic call", Span: span}
+	if signature.Recv() != nil || signature.TypeParams() != nil {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic call", Span: span}
 	}
 
 	call := &Call{Pkg: function.Pkg().Path(), Callee: function.Name()}
@@ -490,8 +394,8 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method call on " + recv.Type().Go, Span: span}
 	}
 	signature := method.Type().(*types.Signature)
-	if signature.Variadic() || signature.TypeParams() != nil {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "variadic or generic method call", Span: span}
+	if signature.TypeParams() != nil {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic method call", Span: span}
 	}
 	if _, isPointerRecv := signature.Recv().Type().(*types.Pointer); !isPointerRecv {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "value-receiver method call (receiver copy semantics)", Span: span}
@@ -507,16 +411,28 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 
 func (b *builder) buildCallArgsResults(n *ast.CallExpr, signature *types.Signature, args *[]Expr, results *[]Type) error {
 	span := b.span(n.Pos())
-	for i, arg := range n.Args {
-		expected, err := b.typeOf(signature.Params().At(i).Type(), b.span(arg.Pos()))
+	params := signature.Params()
+	fixed := params.Len()
+	if signature.Variadic() {
+		fixed--
+	}
+	for i := 0; i < fixed; i++ {
+		expected, err := b.typeOf(params.At(i).Type(), b.span(n.Args[i].Pos()))
 		if err != nil {
 			return err
 		}
-		built, err := b.buildExprAs(arg, expected)
+		built, err := b.buildExprAs(n.Args[i], expected)
 		if err != nil {
 			return err
 		}
 		*args = append(*args, built)
+	}
+	if signature.Variadic() {
+		variadic, err := b.buildVariadicSlot(n, params.At(fixed), fixed)
+		if err != nil {
+			return err
+		}
+		*args = append(*args, variadic)
 	}
 	tuple := signature.Results()
 	for i := range tuple.Len() {
@@ -527,6 +443,35 @@ func (b *builder) buildCallArgsResults(n *ast.CallExpr, signature *types.Signatu
 		*results = append(*results, t)
 	}
 	return nil
+}
+
+// buildVariadicSlot materializes the final argument of a variadic call
+// with Go's exact packing: a spread call (xs...) passes the very slice
+// value (aliasing preserved), no trailing arguments pass nil, and
+// trailing arguments allocate a fresh slice per call.
+func (b *builder) buildVariadicSlot(n *ast.CallExpr, param *types.Var, fixed int) (Expr, error) {
+	sliceType, err := b.typeOf(param.Type(), b.span(n.Pos()))
+	if err != nil {
+		return nil, err
+	}
+	if n.Ellipsis.IsValid() {
+		b.use("variadic:spread")
+		return b.buildExprAs(n.Args[len(n.Args)-1], sliceType)
+	}
+	if len(n.Args) == fixed {
+		b.use("variadic:empty")
+		return &NilConst{T: sliceType}, nil
+	}
+	out := &SliceLit{T: sliceType}
+	for _, arg := range n.Args[fixed:] {
+		built, err := b.buildExprAs(arg, *sliceType.Elem)
+		if err != nil {
+			return nil, err
+		}
+		out.Values = append(out.Values, built)
+	}
+	b.use("variadic:pack")
+	return out, nil
 }
 
 // conversionTarget reports whether the call is a type conversion and, if
