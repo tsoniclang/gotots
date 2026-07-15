@@ -498,15 +498,16 @@ func newModule(modulePath, pkgPath, pkgName string, unit ir.Scope) (*emit.Module
 func collectGenericInstances(unit ir.Scope, pkgs []*packages.Package) {
 	for _, p := range pkgs {
 		for ident, instance := range p.TypesInfo.Instances {
-			fn, isFunc := p.TypesInfo.Uses[ident].(*types.Func)
-			if !isFunc {
-				continue
-			}
 			args := make([]types.Type, 0, instance.TypeArgs.Len())
 			for i := range instance.TypeArgs.Len() {
 				args = append(args, instance.TypeArgs.At(i))
 			}
-			unit.AddGenericInstance(fn, args)
+			switch object := p.TypesInfo.Uses[ident].(type) {
+			case *types.Func:
+				unit.AddGenericInstance(object, args)
+			case *types.TypeName:
+				unit.AddGenericTypeInstance(object, args)
+			}
 		}
 	}
 }
@@ -532,6 +533,10 @@ func receiverBase(recv *ast.FieldList) string {
 		case *ast.StarExpr:
 			t = base.X
 		case *ast.ParenExpr:
+			t = base.X
+		case *ast.IndexExpr:
+			t = base.X
+		case *ast.IndexListExpr:
 			t = base.X
 		case *ast.Ident:
 			return base.Name

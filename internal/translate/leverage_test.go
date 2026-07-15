@@ -369,3 +369,57 @@ func ErrorComparison() bool {
 }
 `)
 }
+
+func TestOracleGenericTypes(t *testing.T) {
+	runOracle(t, `package fixture
+
+type box[T any] struct {
+	value T
+	count int
+}
+
+func (b *box[T]) put(v T) {
+	b.value = v
+	b.count = b.count + 1
+}
+
+func (b *box[T]) get() T {
+	return b.value
+}
+
+func (b box[T]) size() int {
+	return b.count
+}
+
+type pairbox[K any, V any] struct {
+	key K
+	val V
+}
+
+func (p *pairbox[K, V]) swap(k K, v V) (K, V) {
+	oldK, oldV := p.key, p.val
+	p.key, p.val = k, v
+	return oldK, oldV
+}
+
+func GenericStructValues() (int, string, int) {
+	ints := &box[int]{}
+	ints.put(41)
+	ints.put(ints.get() + 1)
+	words := box[string]{value: "hi"}
+	return ints.get(), words.get(), ints.size()
+}
+
+func GenericZeroValues() (int, string, bool) {
+	var b box[int]
+	var s box[string]
+	return b.get() + b.count, s.get(), s.count == 0
+}
+
+func TwoParamGeneric() (string, int, string, int) {
+	p := &pairbox[string, int]{key: "a", val: 1}
+	oldK, oldV := p.swap("b", 2)
+	return oldK, oldV, p.key, p.val
+}
+`)
+}

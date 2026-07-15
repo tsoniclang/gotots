@@ -281,10 +281,13 @@ type MethodCall struct {
 	Pkg         string // Go package path declaring the method
 	TypeName    string // receiver's named type
 	PointerRecv bool   // the declared receiver is a pointer
-	Recv        Expr
-	Method      string
-	Args        []Expr
-	Results     []Type
+	// TypeArgs are the receiver's type arguments for methods of generic
+	// types, spelled explicitly so inference can never change types.
+	TypeArgs []Type
+	Recv     Expr
+	Method   string
+	Args     []Expr
+	Results  []Type
 }
 
 // FieldLoad reads a struct field through a nil-checked pointer.

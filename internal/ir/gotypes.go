@@ -153,7 +153,17 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 		}
 		// Struct values are reviewed only behind pointers and receivers;
 		// the caller decides whether a bare struct kind is admissible.
-		return Type{Kind: KindStruct, Go: spelled, Named: named.Obj().Name(), Pkg: named.Obj().Pkg().Path()}, nil
+		out := Type{Kind: KindStruct, Go: spelled, Named: named.Obj().Name(), Pkg: named.Obj().Pkg().Path()}
+		if named.TypeArgs() != nil {
+			for i := range named.TypeArgs().Len() {
+				arg, err := b.typeOf(named.TypeArgs().At(i), span)
+				if err != nil {
+					return Type{}, err
+				}
+				out.TypeArgs = append(out.TypeArgs, arg)
+			}
+		}
+		return out, nil
 	case *types.Interface:
 		out := Type{Kind: KindIface, Go: spelled}
 		if named, isNamed := types.Unalias(t).(*types.Named); isNamed && named.Obj().Pkg() != nil {

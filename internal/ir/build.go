@@ -122,10 +122,13 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 	}
 
 	if recv := signature.Recv(); recv != nil {
-		if signature.RecvTypeParams() != nil {
-			// Methods of generic types need the monomorphization decision;
-			// a single body cannot carry per-instantiation semantics.
-			return declarationSite(&Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "method on a generic type (per-instantiation semantics)", Span: span})
+		if recvParams := signature.RecvTypeParams(); recvParams != nil {
+			// A method on a generic type: one generic function per
+			// method, admitted under the type's instantiation evidence
+			// (verified at the type declaration).
+			for i := range recvParams.Len() {
+				function.TypeParams = append(function.TypeParams, recvParams.At(i).Obj().Name())
+			}
 		}
 		// A pointer receiver binds the class instance; a value receiver
 		// binds a clone on entry, so receiver mutations never reach the

@@ -102,6 +102,9 @@ type Type struct {
 	// TypeParamName, on a KindIface carrier, names the generic type
 	// parameter this type is; signatures spell it generically.
 	TypeParamName string
+	// TypeArgs are the type arguments of an instantiated generic named
+	// type (structs), spelling the class generically at every use.
+	TypeArgs []Type
 }
 
 // FuncSig is the shape of a function value's type.
@@ -122,6 +125,9 @@ type Scope struct {
 	// externals records every admitted external package-level function:
 	// the typed contracts the generated stub modules cover.
 	externals map[*types.Func]bool
+	// typeGenerics maps each generic named type to the type-argument
+	// tuples of every instantiation anywhere in the unit.
+	typeGenerics map[*types.TypeName][][]types.Type
 }
 
 // NewScope builds a unit scope over the given package paths.
@@ -131,9 +137,10 @@ func NewScope(paths ...string) Scope {
 		packages[path] = true
 	}
 	return Scope{
-		packages:  packages,
-		generics:  map[*types.Func][][]types.Type{},
-		externals: map[*types.Func]bool{},
+		packages:     packages,
+		generics:     map[*types.Func][][]types.Type{},
+		externals:    map[*types.Func]bool{},
+		typeGenerics: map[*types.TypeName][][]types.Type{},
 	}
 }
 
@@ -156,6 +163,16 @@ func (s Scope) AddGenericInstance(fn *types.Func, typeArgs []types.Type) {
 
 // GenericInstances returns every recorded instantiation of fn.
 func (s Scope) GenericInstances(fn *types.Func) [][]types.Type { return s.generics[fn] }
+
+// AddGenericTypeInstance records one instantiation of a generic named
+// type.
+func (s Scope) AddGenericTypeInstance(name *types.TypeName, typeArgs []types.Type) {
+	s.typeGenerics[name] = append(s.typeGenerics[name], typeArgs)
+}
+
+// GenericTypeInstances returns every recorded instantiation of a
+// generic named type.
+func (s Scope) GenericTypeInstances(name *types.TypeName) [][]types.Type { return s.typeGenerics[name] }
 
 // AddExternalFunc records one admitted external function contract.
 func (s Scope) AddExternalFunc(fn *types.Func) { s.externals[fn] = true }
@@ -281,8 +298,11 @@ type Struct struct {
 	Name     string
 	Exported bool
 	Span     Span
-	Fields   []Var
-	Methods  []*Func
+	// TypeParams are the generic type parameter names, admitted under
+	// the unit's closed-world instantiation evidence.
+	TypeParams []string
+	Fields     []Var
+	Methods    []*Func
 	// Promoted lists the embedded-field method promotions the rtti
 	// method table delegates through value-field chains.
 	Promoted []PromotedDelegate

@@ -509,6 +509,10 @@ func zeroValue(t Type, span Span) (Expr, error) {
 		return &Const{T: t, Value: "false"}, nil
 	case t.Kind == KindString:
 		return &Const{T: t, Value: `""`}, nil
+	case t.Kind == KindIface && t.TypeParamName != "":
+		// The zero of a type parameter comes from the instantiation's
+		// zero factory, passed as a trailing parameter.
+		return &ParamZero{T: t}, nil
 	case t.Kind.Nilable():
 		return &NilConst{T: t}, nil
 	case t.Kind == KindStruct, t.Kind == KindArray:

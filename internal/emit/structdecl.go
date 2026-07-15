@@ -20,7 +20,11 @@ func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct) er
 	if structDecl.Exported {
 		export = "export "
 	}
-	p.line("%sclass %s {", export, tsName(structDecl.Name))
+	generics := ""
+	if len(structDecl.TypeParams) > 0 {
+		generics = "<" + strings.Join(structDecl.TypeParams, ", ") + ">"
+	}
+	p.line("%sclass %s%s {", export, tsName(structDecl.Name), generics)
 	p.indent++
 	var params []string
 	for _, field := range structDecl.Fields {
@@ -75,13 +79,17 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 			clone = append(clone, "this."+field.Name)
 		}
 	}
-	p.line("goClone$(): %s {", tsName(structDecl.Name))
+	self := tsName(structDecl.Name)
+	if len(structDecl.TypeParams) > 0 {
+		self += "<" + strings.Join(structDecl.TypeParams, ", ") + ">"
+	}
+	p.line("goClone$(): %s {", self)
 	p.indent++
-	p.line("return new %s(%s);", tsName(structDecl.Name), strings.Join(clone, ", "))
+	p.line("return new %s(%s);", self, strings.Join(clone, ", "))
 	p.indent--
 	p.line("}")
 
-	p.line("goSet$(other: %s): void {", tsName(structDecl.Name))
+	p.line("goSet$(other: %s): void {", self)
 	p.indent++
 	for _, field := range structDecl.Fields {
 		switch field.Type.Kind {
@@ -103,19 +111,42 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 	p.indent--
 	p.line("}")
 
+	// A generic class's zero needs one factory per type parameter: a
+	// bare-parameter field's zero depends on the instantiation.
+	savedFactories := p.zeroFactories
+	if len(structDecl.TypeParams) > 0 {
+		p.zeroFactories = map[string]string{}
+		for _, param := range structDecl.TypeParams {
+			p.zeroFactories[param] = "zero$" + param
+		}
+	}
 	zeros := make([]string, 0, len(structDecl.Fields))
 	for _, field := range structDecl.Fields {
 		zero, err := p.zeroLiteral(field.Type)
 		if err != nil {
+			p.zeroFactories = savedFactories
 			return err
 		}
 		zeros = append(zeros, zero)
 	}
-	p.line("static goZero$(): %s {", tsName(structDecl.Name))
-	p.indent++
-	p.line("return new %s(%s);", tsName(structDecl.Name), strings.Join(zeros, ", "))
-	p.indent--
-	p.line("}")
+	p.zeroFactories = savedFactories
+	if len(structDecl.TypeParams) > 0 {
+		factories := make([]string, 0, len(structDecl.TypeParams))
+		for _, param := range structDecl.TypeParams {
+			factories = append(factories, "zero$"+param+": () => "+param)
+		}
+		p.line("static goZero$<%s>(%s): %s {", strings.Join(structDecl.TypeParams, ", "), strings.Join(factories, ", "), self)
+		p.indent++
+		p.line("return new %s(%s);", self, strings.Join(zeros, ", "))
+		p.indent--
+		p.line("}")
+	} else {
+		p.line("static goZero$(): %s {", self)
+		p.indent++
+		p.line("return new %s(%s);", self, strings.Join(zeros, ", "))
+		p.indent--
+		p.line("}")
+	}
 
 	// Structs whose comparable fields all encode deterministically carry
 	// goKey$ — the injective canonical key for the keyed-map carrier.
@@ -200,6 +231,9 @@ func printMethodFunction(out *strings.Builder, module *Module, className string,
 		}
 		params = append(params, tsName(parameter.Name)+": "+spelled)
 	}
+	for _, param := range method.TypeParams {
+		params = append(params, "zero$"+param+": () => "+param)
+	}
 	result, err := p.tsResultType(method.Results)
 	if err != nil {
 		return fmt.Errorf("%s: %w", method.ID, err)
@@ -208,8 +242,18 @@ func printMethodFunction(out *strings.Builder, module *Module, className string,
 	if method.Exported {
 		export = "export "
 	}
-	p.line("%sfunction %s$%s(%s): %s {", export, className, method.Name, strings.Join(params, ", "), result)
+	generics := ""
+	if len(method.TypeParams) > 0 {
+		generics = "<" + strings.Join(method.TypeParams, ", ") + ">"
+	}
+	p.line("%sfunction %s$%s%s(%s): %s {", export, className, method.Name, generics, strings.Join(params, ", "), result)
 	p.indent++
+	if len(method.TypeParams) > 0 {
+		p.zeroFactories = map[string]string{}
+		for _, param := range method.TypeParams {
+			p.zeroFactories[param] = "zero$" + param
+		}
+	}
 	if structValueReceiver {
 		p.line("const %s = $recv.goClone$();", tsName(method.Receiver.Name))
 	}

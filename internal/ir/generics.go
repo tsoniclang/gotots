@@ -34,3 +34,11 @@ func (b *builder) admitGenericFunction(object *types.Func, span Span) ([]string,
 	}
 	return names, nil
 }
+
+// ParamZero is the zero value of a type parameter: the instantiation's
+// zero factory (a trailing parameter of every generic function) makes
+// it exact per instantiation.
+type ParamZero struct{ T Type }
+
+func (*ParamZero) expr()        {}
+func (z *ParamZero) Type() Type { return z.T }

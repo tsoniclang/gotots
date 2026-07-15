@@ -184,8 +184,15 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 	if !b.unit.Owns(method.Pkg().Path()) {
 		return b.buildExternalMethodCall(n, selector, method, recv)
 	}
-	signature := method.Type().(*types.Signature)
-	if signature.TypeParams() != nil {
+	// The selection's signature is instantiated at the call and types the
+	// arguments; the DECLARED signature names the receiver flavor and the
+	// generated function (a promoted call declares on the embedded type).
+	signature, ok := selection.Type().(*types.Signature)
+	if !ok {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method call without signature evidence", Span: span}
+	}
+	declared := method.Type().(*types.Signature)
+	if signature.TypeParams() != nil || declared.TypeParams() != nil {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic method call", Span: span}
 	}
 	// Receiver flavors are exact through the generated method function:
@@ -194,15 +201,22 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 	// pointer receiver takes the possibly-nil pointer itself — Go runs
 	// pointer-receiver methods on nil receivers, and only the body's own
 	// dereferences panic.
-	recvNamed, ok := types.Unalias(signature.Recv().Type()).(*types.Named)
+	recvNamed, ok := types.Unalias(declared.Recv().Type()).(*types.Named)
 	pointerRecv := false
-	if pointerType, isPointer := signature.Recv().Type().(*types.Pointer); isPointer {
+	if pointerType, isPointer := declared.Recv().Type().(*types.Pointer); isPointer {
 		pointerRecv = true
 		recvNamed, ok = types.Unalias(pointerType.Elem()).(*types.Named)
 	}
 	if !ok {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method on unnamed receiver type", Span: span}
 	}
+	// A generic type's method call spells the receiver's instantiated
+	// type arguments, read off the (possibly promotion-chained) receiver.
+	recvIRType := recv.Type()
+	if recvIRType.Kind == KindPointer && recvIRType.Elem != nil {
+		recvIRType = *recvIRType.Elem
+	}
+	recvTypeArgs := recvIRType.TypeArgs
 	// A pointer-receiver method needs an addressable instance; a value
 	// receiver copies at the call and admits any reviewed carrier
 	// (scalars copy as JS values; struct instances clone inside).
@@ -214,6 +228,7 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 		Pkg:         method.Pkg().Path(),
 		TypeName:    recvNamed.Obj().Name(),
 		PointerRecv: pointerRecv,
+		TypeArgs:    recvTypeArgs,
 		Recv:        recv,
 		Method:      method.Name(),
 	}

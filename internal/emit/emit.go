@@ -116,9 +116,11 @@ func Package(module *Module, decls Decls) (string, error) {
 				return "", err
 			}
 		}
-		body.WriteString("\n")
-		if err := printRtti(&body, module, structDecl.Name, structDecl.Exported, true, structDecl.Methods, structDecl.Promoted); err != nil {
-			return "", err
+		if len(structDecl.TypeParams) == 0 {
+			body.WriteString("\n")
+			if err := printRtti(&body, module, structDecl.Name, structDecl.Exported, true, structDecl.Methods, structDecl.Promoted); err != nil {
+				return "", err
+			}
 		}
 	}
 	for _, method := range sortedMethodDecls {
@@ -231,6 +233,9 @@ type printer struct {
 	// (multi-statement lowerings put their temps before it, so the label
 	// binds the actual loop and continue-label works).
 	pendingLoopLabel string
+	// zeroFactories maps in-scope type parameters to their zero-factory
+	// parameter names while a generic goZero$ body prints.
+	zeroFactories map[string]string
 }
 
 // takeLoopLabel consumes the pending label as a "name: " prefix.
@@ -278,6 +283,12 @@ func printFunc(out *strings.Builder, module *Module, function *ir.Func) error {
 	}
 	p.line("%sfunction %s%s%s {", export, tsName(function.Name), generics, signature)
 	p.indent++
+	if len(function.TypeParams) > 0 {
+		p.zeroFactories = map[string]string{}
+		for _, param := range function.TypeParams {
+			p.zeroFactories[param] = "zero$" + param
+		}
+	}
 	if err := p.printDeferWrappedBody(function.Body, function.UsesDeferStack); err != nil {
 		return fmt.Errorf("%s: %w", function.ID, err)
 	}
@@ -294,6 +305,11 @@ func (p *printer) functionSignature(function *ir.Func) (string, error) {
 			return "", err
 		}
 		params = append(params, tsName(parameter.Name)+": "+spelled)
+	}
+	// A generic function takes one zero factory per type parameter as
+	// trailing parameters: the instantiation's exact zeros.
+	for _, param := range function.TypeParams {
+		params = append(params, "zero$"+param+": () => "+param)
 	}
 	result, err := p.tsResultType(function.Results)
 	if err != nil {
@@ -356,13 +372,26 @@ func (p *printer) tsType(t ir.Type) (string, error) {
 			}
 			return "gort$.GoCell<" + element + "> | undefined", nil
 		}
-		name, err := p.module.symbol(t.Pkg, t.Named)
+		name, err := p.tsType(*t.Elem)
 		if err != nil {
 			return "", err
 		}
 		return name + " | undefined", nil
 	case ir.KindStruct:
-		return p.module.symbol(t.Pkg, t.Named)
+		name, err := p.module.symbol(t.Pkg, t.Named)
+		if err != nil {
+			return "", err
+		}
+		if len(t.TypeArgs) > 0 {
+			args := make([]string, len(t.TypeArgs))
+			for i, arg := range t.TypeArgs {
+				if args[i], err = p.tsType(arg); err != nil {
+					return "", err
+				}
+			}
+			name += "<" + strings.Join(args, ", ") + ">"
+		}
+		return name, nil
 	case ir.KindArray:
 		element, err := p.tsType(*t.Elem)
 		if err != nil {

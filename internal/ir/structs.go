@@ -31,8 +31,13 @@ func BuildStruct(p *packages.Package, sourceDir string, unit Scope, spec *ast.Ty
 	if !ok {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "alias declaration", Span: span}
 	}
+	var typeParams []string
 	if named.TypeParams() != nil && named.TypeParams().Len() > 0 {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "generic type", Span: span}
+		names, err := b.admitGenericType(named, span)
+		if err != nil {
+			return nil, err
+		}
+		typeParams = names
 	}
 	structType, ok := named.Underlying().(*types.Struct)
 	if !ok {
@@ -40,10 +45,11 @@ func BuildStruct(p *packages.Package, sourceDir string, unit Scope, spec *ast.Ty
 	}
 
 	out := &Struct{
-		ID:       id,
-		Name:     spec.Name.Name,
-		Exported: spec.Name.IsExported(),
-		Span:     span,
+		ID:         id,
+		TypeParams: typeParams,
+		Name:       spec.Name.Name,
+		Exported:   spec.Name.IsExported(),
+		Span:       span,
 	}
 	for i := range structType.NumFields() {
 		field := structType.Field(i)
@@ -164,4 +170,30 @@ func (b *builder) chainPromotedReceiver(recv Expr, recvType types.Type, selectio
 		return recv, nil
 	}
 	return b.chainFieldPath(recv, recvType, path[:len(path)-1], span)
+}
+
+// admitGenericType verifies a generic named type under the unit's
+// closed-world instantiation evidence: every recorded type argument
+// resolves in the reviewed set and no argument is a value-copy carrier
+// (a single class body cannot express per-instantiation copies).
+func (b *builder) admitGenericType(named *types.Named, span Span) ([]string, error) {
+	typeParams := named.TypeParams()
+	names := make([]string, 0, typeParams.Len())
+	for i := range typeParams.Len() {
+		names = append(names, typeParams.At(i).Obj().Name())
+	}
+	for _, instance := range b.unit.GenericTypeInstances(named.Obj()) {
+		for _, arg := range instance {
+			resolved, err := b.typeOf(arg, span)
+			if err != nil {
+				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+					Construct: "generic type instantiated with an unreviewed type argument (" + arg.String() + ")", Span: span}
+			}
+			if resolved.Kind == KindStruct || resolved.Kind == KindArray {
+				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+					Construct: "generic type instantiated with a value-copy carrier (copy semantics vary per instantiation)", Span: span}
+			}
+		}
+	}
+	return names, nil
 }

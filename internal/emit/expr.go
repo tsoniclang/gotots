@@ -62,7 +62,8 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			return "", err
 		}
 		// An instantiated generic call spells its type arguments
-		// explicitly, so inference differences can never change types.
+		// explicitly, so inference differences can never change types,
+		// and passes each argument's zero factory as trailing arguments.
 		typeArgs := ""
 		if len(n.TypeArgs) > 0 {
 			parts := make([]string, len(n.TypeArgs))
@@ -74,6 +75,15 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 				parts[i] = spelled
 			}
 			typeArgs = "<" + strings.Join(parts, ", ") + ">"
+			factories, err := p.zeroFactoryArgs(n.TypeArgs)
+			if err != nil {
+				return "", err
+			}
+			if args == "" {
+				args = factories
+			} else {
+				args += ", " + factories
+			}
 		}
 		return fmt.Sprintf("%s%s(%s)", callee, typeArgs, args), nil
 	case *ir.MethodCall:
@@ -88,6 +98,24 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		callee, err := p.module.symbol(n.Pkg, n.TypeName+"$"+n.Method)
 		if err != nil {
 			return "", err
+		}
+		if len(n.TypeArgs) > 0 {
+			parts := make([]string, len(n.TypeArgs))
+			for i, typeArg := range n.TypeArgs {
+				if parts[i], err = p.tsType(typeArg); err != nil {
+					return "", err
+				}
+			}
+			callee += "<" + joinComma(parts) + ">"
+			factories, err := p.zeroFactoryArgs(n.TypeArgs)
+			if err != nil {
+				return "", err
+			}
+			if args == "" {
+				args = factories
+			} else {
+				args += ", " + factories
+			}
 		}
 		// A value receiver dereferences a pointer caller at the call (Go
 		// copies the pointee); a pointer receiver takes the pointer as
@@ -112,6 +140,19 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		class, err := p.module.symbol(n.Pkg, n.TypeName)
 		if err != nil {
 			return "", err
+		}
+		structT := n.T
+		if structT.Kind == ir.KindPointer && structT.Elem != nil {
+			structT = *structT.Elem
+		}
+		if len(structT.TypeArgs) > 0 {
+			args := make([]string, len(structT.TypeArgs))
+			for i, arg := range structT.TypeArgs {
+				if args[i], err = p.tsType(arg); err != nil {
+					return "", err
+				}
+			}
+			class += "<" + joinComma(args) + ">"
 		}
 		if len(n.EvalOrder) == 0 {
 			args, err := p.printArgs(n.Args)
@@ -218,6 +259,8 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 	case *ir.StructZero:
 		return p.zeroLiteral(n.T)
 	case *ir.ExternZero:
+		return p.zeroLiteral(n.T)
+	case *ir.ParamZero:
 		return p.zeroLiteral(n.T)
 	case *ir.ExternVar:
 		spelled, err := p.tsType(n.T)
@@ -447,7 +490,7 @@ func (p *printer) printClosure(n *ir.Closure) (string, error) {
 		return "", err
 	}
 	var sub strings.Builder
-	subPrinter := &printer{out: &sub, module: p.module, indent: p.indent + 1}
+	subPrinter := &printer{out: &sub, module: p.module, indent: p.indent + 1, zeroFactories: p.zeroFactories}
 	if err := subPrinter.printDeferWrappedBody(n.Body, n.UsesDeferStack); err != nil {
 		return "", err
 	}
@@ -475,6 +518,20 @@ func (p *printer) printArgs(args []ir.Expr) (string, error) {
 	return joinComma(parts), nil
 }
 
+// zeroFactoryArgs spells one zero factory per instantiated type
+// argument, the trailing arguments of every generic call.
+func (p *printer) zeroFactoryArgs(typeArgs []ir.Type) (string, error) {
+	parts := make([]string, len(typeArgs))
+	for i, arg := range typeArgs {
+		zero, err := p.zeroLiteral(arg)
+		if err != nil {
+			return "", err
+		}
+		parts[i] = "() => " + zero
+	}
+	return joinComma(parts), nil
+}
+
 // zeroLiteral spells the Go zero value of a reviewed type in TypeScript.
 // A struct zero is a fresh instance from the class's zero factory.
 func (p *printer) zeroLiteral(t ir.Type) (string, error) {
@@ -483,12 +540,35 @@ func (p *printer) zeroLiteral(t ir.Type) (string, error) {
 		return "false", nil
 	case t.Kind == ir.KindString:
 		return `""`, nil
+	case t.Kind == ir.KindIface && t.TypeParamName != "":
+		factory, has := p.zeroFactories[t.TypeParamName]
+		if !has {
+			return "", fmt.Errorf("no zero factory in scope for type parameter %q", t.TypeParamName)
+		}
+		return factory + "()", nil
 	case t.Kind.Nilable():
 		return "undefined", nil
 	case t.Kind == ir.KindStruct:
 		class, err := p.module.symbol(t.Pkg, t.Named)
 		if err != nil {
 			return "", err
+		}
+		if len(t.TypeArgs) > 0 {
+			args := make([]string, len(t.TypeArgs))
+			factories := make([]string, len(t.TypeArgs))
+			for i, arg := range t.TypeArgs {
+				spelled, err := p.tsType(arg)
+				if err != nil {
+					return "", err
+				}
+				args[i] = spelled
+				zero, err := p.zeroLiteral(arg)
+				if err != nil {
+					return "", err
+				}
+				factories[i] = "() => " + zero
+			}
+			return class + ".goZero$<" + joinComma(args) + ">(" + joinComma(factories) + ")", nil
 		}
 		return class + ".goZero$()", nil
 	case t.Kind == ir.KindArray:

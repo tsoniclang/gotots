@@ -36,6 +36,13 @@ func (b *builder) rttiFor(t types.Type, span Span) (RttiRef, error) {
 			return RttiRef{Composite: t.String(), Display: displayOf(t),
 				ExternID: obj.Pkg().Path() + "." + obj.Name()}, nil
 		}
+		if concrete.TypeArgs() != nil && concrete.TypeArgs().Len() > 0 {
+			// Instantiated generic types have per-instantiation identity;
+			// their interned rtti (with a dispatching method table) is a
+			// separate lowering.
+			return RttiRef{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+				Construct: "interface value of an instantiated generic type", Span: span}
+		}
 		return RttiRef{Pkg: obj.Pkg().Path(), TypeName: obj.Name()}, nil
 
 	case *types.Pointer:
