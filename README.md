@@ -1,16 +1,28 @@
 # gotots
 
-A project-focused Go-to-TypeScript compiler. Its first product is a cleanly
-regenerated TSTS compiler translated from a pinned
-[typescript-go](https://github.com/microsoft/typescript-go) revision.
+A project-focused Go-to-TypeScript compiler, **not** a general-purpose
+one. Its mission: mechanically translate the complete declared
+[typescript-go](https://github.com/microsoft/typescript-go) source corpus
+into high-quality, statically analyzable TypeScript, with exact semantic
+preservation, deterministic regeneration, and automatic detection of new
+constructs introduced by future TS-Go revisions. Its first product is a
+cleanly regenerated TSTS compiler.
 
-Gotots translates **Go language semantics and explicitly selected owned
-project source**. Every imported package — including the entire Go standard
-library — is external: gotots emits exact typed fail-closed stubs for it and
-never implements library behavior. LSP and fourslash are hard exclusions.
+The scope is closed-world completeness over the declared corpus with
+open-ended detection for future revisions: every source-bearing unit
+receives exactly one disposition (automatically translated, declared
+manual body, external stub obligation, or explicitly excluded), supported
+behavior is expressed in Go semantics — never source names — and an
+unrecognized construct blocks generation instead of degrading it. Every
+imported package — including the entire Go standard library — is external:
+gotots emits exact typed fail-closed stubs and never implements library
+behavior. LSP and fourslash are hard exclusions, inventoried with durable
+dispositions.
 
-The reviewed design packet lives in `.analysis/scope/` (local, untracked).
-Durable architecture decisions are recorded in `docs/decisions/`.
+The normative committed specification lives in `docs/spec/`
+(`mission-and-scope.md` first); durable architecture decisions in
+`docs/decisions/`; the reviewed design packet in `.analysis/scope/`
+(local, untracked).
 
 ## Layout
 

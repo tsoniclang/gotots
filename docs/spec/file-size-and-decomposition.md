@@ -15,11 +15,10 @@ committed gotots specification; it supplements the design scope packet.
   and a narrow internal API.
 - Forbidden split shapes: `part1`/`part2` fragments, `helpers2`, numbered
   shards, arbitrary line-based cuts, and thin forwarding files that
-  preserve the original monolith.
-- The original implementation is never retained as a compatibility path;
-  there is exactly one implementation path after a split.
+  preserve a hidden monolith.
+- A split yields exactly one implementation path.
 - The gate scans the entire repository. There is no allowlist, and no file
-  is exempt because it predates the policy.
+  is exempt.
 - Reproducibly generated artifacts are handled by fixing their generator's
   output organization, not by normalizing oversized generated monoliths.
 
@@ -30,7 +29,7 @@ deterministically, and reports every violation as:
 
 ```text
 GOTOTS_FILE_TOO_LARGE:
-internal/census/census.go has 772 lines; maximum is 600.
+internal/example/monolith.go has 742 lines; maximum is 600.
 Split it by semantic responsibility.
 ```
 
