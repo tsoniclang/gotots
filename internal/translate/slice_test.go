@@ -349,9 +349,9 @@ func Case() bool { f, err := os.Open("x"); return f != nil && err == nil }
 			code: "GOTOTS_UNSUPPORTED_EXPRESSION", mention: "call outside the translated unit",
 		},
 		{
-			name: "defer below top level",
+			name: "nested defer with named results",
 			source: `package fixture
-func Case(enabled bool) int {
+func Case(enabled bool) (n int) {
 	if enabled {
 		defer helper()
 	}
@@ -359,7 +359,7 @@ func Case(enabled bool) int {
 }
 func helper() {}
 `,
-			code: "GOTOTS_UNSUPPORTED_STATEMENT", mention: "defer below the function's top-level block",
+			code: "GOTOTS_UNSUPPORTED_STATEMENT", mention: "defer in a function with named results",
 		},
 		{
 			name: "anonymous struct type",
