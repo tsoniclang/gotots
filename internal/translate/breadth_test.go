@@ -371,3 +371,28 @@ func CompoundIncDecPointee() int {
 }
 `)
 }
+
+func TestOracleElidedPointerLiterals(t *testing.T) {
+	runOracle(t, `package fixture
+
+type entry struct {
+	code int
+	name string
+}
+
+var registry = map[int]*entry{
+	1: {code: 1, name: "one"},
+	2: {code: 2, name: "two"},
+}
+
+var flat = []*entry{
+	{code: 10, name: "ten"},
+	{code: 20, name: "twenty"},
+}
+
+func ElidedAllocations() (string, int, string) {
+	registry[1].name = "uno"
+	return registry[1].name, flat[1].code, flat[0].name
+}
+`)
+}

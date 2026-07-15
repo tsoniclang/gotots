@@ -96,6 +96,11 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			b.use("unitLiteral")
 			return &Const{T: t, Value: "0"}, nil
 		}
+		if t.Kind == KindPointer && t.Elem != nil && t.Elem.Kind == KindStruct {
+			// The elided allocation form inside composite literals:
+			// []*T{{...}} allocates like &T{...}.
+			return b.buildStructLit(n, t)
+		}
 		if t.Kind == KindExternal && len(n.Elts) == 0 {
 			// T{} of an external type with no fields set is its zero
 			// contract; keyed externals stay outside the reviewed surface.
@@ -391,9 +396,14 @@ func (b *builder) bindStructValue(e Expr) Expr {
 // explicit zeros).
 func (b *builder) buildStructLit(lit *ast.CompositeLit, t Type) (Expr, error) {
 	span := b.span(lit.Pos())
-	structType, isAnon := types.Unalias(b.info.Types[lit].Type).(*types.Struct)
+	litGoType := b.info.Types[lit].Type
+	if pointer, isPointer := types.Unalias(litGoType).(*types.Pointer); isPointer {
+		// The elided allocation form: the literal's type is the pointee.
+		litGoType = pointer.Elem()
+	}
+	structType, isAnon := types.Unalias(litGoType).(*types.Struct)
 	if !isAnon {
-		structType = types.Unalias(b.info.Types[lit].Type).(*types.Named).Underlying().(*types.Struct)
+		structType = types.Unalias(litGoType).(*types.Named).Underlying().(*types.Struct)
 	}
 
 	fieldIRType := func(field *types.Var) (Type, error) { return b.typeOf(field.Type(), span) }
