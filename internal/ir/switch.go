@@ -64,7 +64,7 @@ func (b *builder) buildSwitch(n *ast.SwitchStmt) (Stmt, error) {
 				bodyStmts = bodyStmts[:last]
 			}
 		}
-		body, err := b.buildBlock(&ast.BlockStmt{List: bodyStmts})
+		body, err := b.buildBreakableBody(&ast.BlockStmt{List: bodyStmts})
 		if err != nil {
 			return nil, err
 		}

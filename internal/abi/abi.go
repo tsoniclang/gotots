@@ -112,6 +112,12 @@ export type GoMap<K, V> = Map<K, V> | undefined;
 
 type GoStrIndex = number | bigint;
 
+// goPanicRangeExit is the exact runtime panic when a range-over-func
+// sequence keeps yielding after the loop body stopped iteration.
+export function goPanicRangeExit(): never {
+  throw new GoPanic("runtime error: range function continued iteration after function for loop body returned false");
+}
+
 export function goNilCheck<T>(x: T | undefined): T {
   if (x === undefined) goPanicNil();
   return x;

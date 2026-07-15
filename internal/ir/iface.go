@@ -222,7 +222,9 @@ func (b *builder) buildTypeSwitch(n *ast.TypeSwitchStmt) (Stmt, error) {
 		if len(built.Targets) == 1 && !built.Targets[0].Nil {
 			built.BindType = built.Targets[0].Target
 		}
+		b.typeSwitchDepth++
 		body, err := b.buildBlock(&ast.BlockStmt{List: clause.Body})
+		b.typeSwitchDepth--
 		if err != nil {
 			return nil, err
 		}

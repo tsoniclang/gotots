@@ -4,6 +4,8 @@
 package emit
 
 import (
+	"fmt"
+
 	"github.com/tsoniclang/gotots/internal/ir"
 )
 
@@ -45,7 +47,7 @@ func (p *printer) printRangeSlice(n *ir.RangeSlice) error {
 			p.line("let %s: %s = gosl$.goSliceGet(%s, %s);", tsName(n.Value), spelled, sliceTemp, induction)
 		}
 	}
-	if err := p.printBlockBody(n.Body); err != nil {
+	if err := p.printLoopBody(n.Body); err != nil {
 		return err
 	}
 	p.indent--
@@ -71,7 +73,7 @@ func (p *printer) printRangeString(n *ir.RangeString) error {
 	if n.Value != "" {
 		p.line("let %s: number = %s[1];", tsName(n.Value), entry)
 	}
-	if err := p.printBlockBody(n.Body); err != nil {
+	if err := p.printLoopBody(n.Body); err != nil {
 		return err
 	}
 	p.indent--
@@ -123,7 +125,7 @@ func (p *printer) printRangeMap(n *ir.RangeMap) error {
 		}
 		p.line("let %s: %s = %s;", tsName(n.Value), spelled, value)
 	}
-	if err := p.printBlockBody(n.Body); err != nil {
+	if err := p.printLoopBody(n.Body); err != nil {
 		return err
 	}
 	p.indent--
@@ -157,8 +159,93 @@ func (p *printer) printRangeInt(n *ir.RangeInt) error {
 	if n.Index != "" {
 		p.line("let %s: %s = %s;", tsName(n.Index), spelled, induction)
 	}
-	if err := p.printBlockBody(n.Body); err != nil {
+	if err := p.printLoopBody(n.Body); err != nil {
 		return err
+	}
+	p.indent--
+	p.line("}")
+	return nil
+}
+
+// printRangeFunc emits range over a function iterator: the sequence
+// runs once with a synthesized yield closure. Break and continue in the
+// body follow the yield protocol, a body return is captured and
+// re-issued after the sequence unwinds, and a yield after loop exit
+// panics with Go's exact runtime message.
+func (p *printer) printRangeFunc(n *ir.RangeFunc) error {
+	seq, err := p.printExpr(n.Seq)
+	if err != nil {
+		return err
+	}
+	ctx := &rangeFuncCtx{doneVar: p.temp(), returnedVar: p.temp()}
+	p.line("let %s = false;", ctx.doneVar)
+	p.line("let %s = false;", ctx.returnedVar)
+	resultSpelled := ""
+	if len(n.Results) > 0 {
+		if resultSpelled, err = p.tsFuncResultType(n.Results); err != nil {
+			return err
+		}
+		ctx.retVar = p.temp()
+		p.line("let %s: (%s) | undefined = undefined;", ctx.retVar, resultSpelled)
+	}
+	params := make([]string, 0, 2)
+	yieldArgs := []struct {
+		name string
+		t    ir.Type
+	}{{n.Key, n.KeyT}}
+	if n.TwoVars {
+		yieldArgs = append(yieldArgs, struct {
+			name string
+			t    ir.Type
+		}{n.Value, n.ValT})
+	}
+	for i, arg := range yieldArgs {
+		spelled, err := p.tsType(arg.t)
+		if err != nil {
+			return err
+		}
+		params = append(params, fmt.Sprintf("$y%d: %s", i, spelled))
+	}
+	p.line("(%s)((%s): boolean => {", seq, joinComma(params))
+	p.indent++
+	p.line("if (%s) {", ctx.doneVar)
+	p.indent++
+	p.line("gort$.goPanicRangeExit();")
+	p.indent--
+	p.line("}")
+	for i, arg := range yieldArgs {
+		if arg.name == "" {
+			continue
+		}
+		value := fmt.Sprintf("$y%d", i)
+		switch arg.t.Kind {
+		case ir.KindStruct:
+			value += ".goClone$()"
+		case ir.KindArray:
+			cloneElem, err := p.arrayElemClone(*arg.t.Elem)
+			if err != nil {
+				return err
+			}
+			value = "gosl$.goArrayClone(" + value + ", " + cloneElem + ")"
+		}
+		p.line("let %s = %s;", tsName(arg.name), value)
+	}
+	savedBreak, savedContinue, savedReturn := p.rangeBreak, p.rangeContinue, p.rangeReturn
+	p.rangeBreak, p.rangeContinue, p.rangeReturn = ctx, ctx, ctx
+	err = p.printBlockBody(n.Body)
+	p.rangeBreak, p.rangeContinue, p.rangeReturn = savedBreak, savedContinue, savedReturn
+	if err != nil {
+		return err
+	}
+	p.line("return true;")
+	p.indent--
+	p.line("});")
+	p.line("if (%s) {", ctx.returnedVar)
+	p.indent++
+	if ctx.retVar != "" {
+		p.emitFunctionReturn("(" + ctx.retVar + " as (" + resultSpelled + "))")
+	} else {
+		p.emitFunctionReturn("")
 	}
 	p.indent--
 	p.line("}")

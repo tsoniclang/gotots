@@ -33,6 +33,11 @@ type builder struct {
 	// namedResults, when set, are the enclosing function's named results:
 	// zero-initialized locals that bare returns return.
 	namedResults []Var
+	// typeSwitchDepth counts enclosing type-switch clauses with no loop
+	// or switch between them and the current statement: a break there
+	// exits the type switch, which the if/else lowering cannot express
+	// yet, so it fails closed.
+	typeSwitchDepth int
 }
 
 func (b *builder) span(pos token.Pos) Span {
@@ -290,6 +295,16 @@ func (b *builder) buildDeferredCall(deferStmt *ast.DeferStmt) ([]Stmt, Expr, err
 // unsupported operation records its exact site and the walk continues,
 // so one finding never hides later unsupported operations. A body with
 // any site is unimplemented and never emitted.
+// buildBreakableBody builds a body owning break (loop or switch),
+// clearing the type-switch break restriction.
+func (b *builder) buildBreakableBody(body *ast.BlockStmt) (*Block, error) {
+	saved := b.typeSwitchDepth
+	b.typeSwitchDepth = 0
+	out, err := b.buildBlock(body)
+	b.typeSwitchDepth = saved
+	return out, err
+}
+
 func (b *builder) buildBlock(block *ast.BlockStmt) (*Block, error) {
 	out := &Block{}
 	for _, stmt := range block.List {
@@ -380,6 +395,11 @@ func (b *builder) buildStmt(stmt ast.Stmt) (Stmt, error) {
 	case *ast.BranchStmt:
 		if n.Label != nil || (n.Tok != token.BREAK && n.Tok != token.CONTINUE) {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "branch " + n.Tok.String(), Span: span}
+		}
+		if n.Tok == token.BREAK && b.typeSwitchDepth > 0 {
+			// break exits the type switch; the if/else lowering has no
+			// construct for it yet.
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "break inside a type switch clause", Span: span}
 		}
 		b.use("branch:" + n.Tok.String())
 		return &BranchStmt{Tok: n.Tok}, nil
@@ -511,7 +531,7 @@ func (b *builder) buildFor(n *ast.ForStmt) (Stmt, error) {
 		}
 		out.Post = post
 	}
-	body, err := b.buildBlock(n.Body)
+	body, err := b.buildBreakableBody(n.Body)
 	if err != nil {
 		return nil, err
 	}

@@ -375,6 +375,24 @@ type printer struct {
 	module *Module
 	indent int
 	temps  int
+	// rangeBreak, when set, transforms break inside a range-over-func
+	// body into the yield protocol; nested loops and switches (which own
+	// their own break) clear it.
+	rangeBreak *rangeFuncCtx
+	// rangeContinue transforms continue likewise; only nested loops
+	// (which own continue) clear it — switches do not.
+	rangeContinue *rangeFuncCtx
+	// rangeReturn, when set, transforms function returns anywhere inside
+	// a range-over-func yield closure into the captured-return protocol;
+	// only a nested function literal clears it.
+	rangeReturn *rangeFuncCtx
+}
+
+// rangeFuncCtx carries one range-over-func loop's protocol variables.
+type rangeFuncCtx struct {
+	doneVar     string
+	returnedVar string
+	retVar      string // "" when the enclosing function returns nothing
 }
 
 func (p *printer) line(format string, args ...any) {

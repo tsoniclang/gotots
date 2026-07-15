@@ -149,5 +149,5 @@ func (p *printer) printTypeSwitchClause(n *ir.TypeSwitchStmt, clause *ir.TypeSwi
 			p.line("let %s: %s = %s;", tsName(n.Bind), spelled, value)
 		}
 	}
-	return p.printBlockBody(clause.Body)
+	return p.printSwitchClauseBody(clause.Body)
 }

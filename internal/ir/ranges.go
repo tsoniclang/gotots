@@ -37,6 +37,9 @@ func (b *builder) buildRange(n *ast.RangeStmt) (Stmt, error) {
 	if operand.Type().Kind == KindMap {
 		return b.buildRangeMap(n, operand)
 	}
+	if operand.Type().Kind == KindFunc {
+		return b.buildRangeFunc(n, operand)
+	}
 	if operand.Type().Kind != KindSlice {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range over " + operand.Type().Go, Span: span}
 	}
@@ -60,7 +63,7 @@ func (b *builder) buildRange(n *ast.RangeStmt) (Stmt, error) {
 	if out.Value, err = name(n.Value); err != nil {
 		return nil, err
 	}
-	body, err := b.buildBlock(n.Body)
+	body, err := b.buildBreakableBody(n.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +89,7 @@ func (b *builder) buildRangeInt(n *ast.RangeStmt, operand Expr) (Stmt, error) {
 			out.Index = ident.Name
 		}
 	}
-	body, err := b.buildBlock(n.Body)
+	body, err := b.buildBreakableBody(n.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -134,11 +137,80 @@ func (b *builder) buildRangeMap(n *ast.RangeStmt, operand Expr) (Stmt, error) {
 	if out.Value, err = name(n.Value); err != nil {
 		return nil, err
 	}
-	body, err := b.buildBlock(n.Body)
+	body, err := b.buildBreakableBody(n.Body)
 	if err != nil {
 		return nil, err
 	}
 	out.Body = body
 	b.use("range:map")
+	return out, nil
+}
+
+// RangeFunc is range over a function iterator (iter.Seq / iter.Seq2):
+// the sequence function is called once with a synthesized yield closure;
+// break stops iteration (yield returns false), continue yields true, and
+// a return inside the body captures its values, stops iteration, and
+// returns from the enclosing function after the sequence unwinds. A
+// yield after the loop exits panics with Go's exact runtime message.
+type RangeFunc struct {
+	Key     string // first range variable ("" when omitted)
+	Value   string // second range variable ("" when omitted)
+	KeyT    Type
+	ValT    Type // meaningful only for two-variable sequences
+	TwoVars bool
+	Seq     Expr
+	Body    *Block
+	// Results carries the enclosing function's result types so a body
+	// return can be captured and re-issued after the sequence returns.
+	Results []Type
+}
+
+func (*RangeFunc) stmt() {}
+
+func (b *builder) buildRangeFunc(n *ast.RangeStmt, operand Expr) (Stmt, error) {
+	span := b.span(n.Pos())
+	sig := operand.Type().Sig
+	if sig == nil || len(sig.Params) != 1 || len(sig.Results) != 0 ||
+		sig.Params[0].Kind != KindFunc || sig.Params[0].Sig == nil ||
+		len(sig.Params[0].Sig.Results) != 1 || sig.Params[0].Sig.Results[0].Kind != KindBool {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range over " + operand.Type().Go, Span: span}
+	}
+	yieldParams := sig.Params[0].Sig.Params
+	if len(yieldParams) != 1 && len(yieldParams) != 2 {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range over " + operand.Type().Go, Span: span}
+	}
+	out := &RangeFunc{Seq: operand, KeyT: yieldParams[0], TwoVars: len(yieldParams) == 2, Results: b.results}
+	if out.TwoVars {
+		out.ValT = yieldParams[1]
+	}
+	name := func(e ast.Expr) (string, error) {
+		if e == nil {
+			return "", nil
+		}
+		ident, ok := e.(*ast.Ident)
+		if !ok {
+			return "", &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range variable is not an identifier", Span: span}
+		}
+		if ident.Name == "_" {
+			return "", nil
+		}
+		return ident.Name, nil
+	}
+	var err error
+	if out.Key, err = name(n.Key); err != nil {
+		return nil, err
+	}
+	if out.Value, err = name(n.Value); err != nil {
+		return nil, err
+	}
+	if out.Value != "" && !out.TwoVars {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "two range variables over a one-value sequence", Span: span}
+	}
+	body, err := b.buildBreakableBody(n.Body)
+	if err != nil {
+		return nil, err
+	}
+	out.Body = body
+	b.use("range:func")
 	return out, nil
 }

@@ -477,6 +477,11 @@
       "specClause": "docs/spec/05-collections-strings.md"
     },
     {
+      "key": "range:func",
+      "state": "generated",
+      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+    },
+    {
       "key": "range:int",
       "state": "generated",
       "specClause": "docs/spec/03-declarations-bodies-control.md"

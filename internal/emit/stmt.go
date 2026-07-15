@@ -52,11 +52,23 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		return nil
 
 	case *ir.BranchStmt:
+		// Inside a range-over-func body, break stops the iteration
+		// through the yield protocol and continue yields true; a nested
+		// loop or switch that owns the branch cleared the transform.
 		if n.Tok == token.BREAK {
+			if ctx := p.rangeBreak; ctx != nil {
+				p.line("%s = true;", ctx.doneVar)
+				p.line("return false;")
+				return nil
+			}
 			p.line("break;")
-		} else {
-			p.line("continue;")
+			return nil
 		}
+		if ctx := p.rangeContinue; ctx != nil {
+			p.line("return true;")
+			return nil
+		}
+		p.line("continue;")
 		return nil
 
 	case *ir.TryFinally:
@@ -83,6 +95,9 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 
 	case *ir.RangeMap:
 		return p.printRangeMap(n)
+
+	case *ir.RangeFunc:
+		return p.printRangeFunc(n)
 
 	case *ir.SwitchStmt:
 		return p.printSwitch(n)
@@ -122,6 +137,26 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		return p.printRangeInt(n)
 	}
 	return fmt.Errorf("no emission for IR statement %T", stmt)
+}
+
+// printLoopBody prints a nested loop's body: the loop owns break and
+// continue, so both range-over-func branch transforms clear.
+func (p *printer) printLoopBody(block *ir.Block) error {
+	savedBreak, savedContinue := p.rangeBreak, p.rangeContinue
+	p.rangeBreak, p.rangeContinue = nil, nil
+	err := p.printBlockBody(block)
+	p.rangeBreak, p.rangeContinue = savedBreak, savedContinue
+	return err
+}
+
+// printSwitchClauseBody prints a switch clause body: the switch owns
+// break, but continue still targets the enclosing loop.
+func (p *printer) printSwitchClauseBody(block *ir.Block) error {
+	savedBreak := p.rangeBreak
+	p.rangeBreak = nil
+	err := p.printBlockBody(block)
+	p.rangeBreak = savedBreak
+	return err
 }
 
 func (p *printer) printDecl(n *ir.DeclStmt) error {
@@ -290,7 +325,7 @@ func (p *printer) printSwitch(n *ir.SwitchStmt) error {
 			}
 		}
 		p.indent++
-		if err := p.printBlockBody(clause.Body); err != nil {
+		if err := p.printSwitchClauseBody(clause.Body); err != nil {
 			return err
 		}
 		if !clause.Fallthrough {
@@ -378,7 +413,7 @@ func (p *printer) printFor(n *ir.ForStmt) error {
 	}
 	p.line("for (%s; %s; %s) {", init, cond, post)
 	p.indent++
-	if err := p.printBlockBody(n.Body); err != nil {
+	if err := p.printLoopBody(n.Body); err != nil {
 		return err
 	}
 	p.indent--
@@ -441,18 +476,18 @@ func (p *printer) printReturn(n *ir.ReturnStmt) error {
 		if err != nil {
 			return err
 		}
-		p.line("return %s;", call)
+		p.emitFunctionReturn(call)
 		return nil
 	}
 	switch len(n.Values) {
 	case 0:
-		p.line("return;")
+		p.emitFunctionReturn("")
 	case 1:
 		value, err := p.printExpr(n.Values[0])
 		if err != nil {
 			return err
 		}
-		p.line("return %s;", value)
+		p.emitFunctionReturn(value)
 	default:
 		parts := make([]string, len(n.Values))
 		for i, value := range n.Values {
@@ -462,9 +497,31 @@ func (p *printer) printReturn(n *ir.ReturnStmt) error {
 			}
 			parts[i] = printed
 		}
-		p.line("return [%s];", joinComma(parts))
+		p.emitFunctionReturn("[" + joinComma(parts) + "]")
 	}
 	return nil
+}
+
+// emitFunctionReturn returns from the enclosing Go function: directly,
+// or — inside a range-over-func yield closure — by capturing the value,
+// stopping the iteration, and letting the loop re-issue the return
+// after the sequence function unwinds. The empty string is a bare
+// return.
+func (p *printer) emitFunctionReturn(value string) {
+	if ctx := p.rangeReturn; ctx != nil {
+		if value != "" {
+			p.line("%s = %s;", ctx.retVar, value)
+		}
+		p.line("%s = true;", ctx.returnedVar)
+		p.line("%s = true;", ctx.doneVar)
+		p.line("return false;")
+		return
+	}
+	if value == "" {
+		p.line("return;")
+		return
+	}
+	p.line("return %s;", value)
 }
 
 func joinComma(parts []string) string {
