@@ -64,6 +64,16 @@ func LoadRegistry() (*Registry, error) {
 	return &registry, nil
 }
 
+// Keys returns every reviewed class key in sorted order.
+func (r *Registry) Keys() []string {
+	out := make([]string, 0, len(r.byKey))
+	for key := range r.byKey {
+		out = append(out, key)
+	}
+	sort.Strings(out)
+	return out
+}
+
 // Generated reports whether the operation class has a reviewed
 // generated-support decision. Absence is unimplemented, never implicit
 // support.

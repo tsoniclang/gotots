@@ -12,8 +12,10 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/tsoniclang/gotots/contracts"
 	"github.com/tsoniclang/gotots/internal/census"
 	"github.com/tsoniclang/gotots/internal/goenv"
+	"github.com/tsoniclang/gotots/internal/ir"
 	"github.com/tsoniclang/gotots/internal/pinning"
 	"github.com/tsoniclang/gotots/internal/policy"
 	"github.com/tsoniclang/gotots/internal/productinputs"
@@ -210,6 +212,7 @@ func runGate(args []string) error {
 	// census pipeline against the pin.
 	var firstRun *census.Result
 	var productPin *productinputs.Pin
+	var corpusGenerated *translate.Generated
 	run("02-input-toolchain-profile-attestation", func() (string, []string, error) {
 		prof, err := profile.Load(filepath.Join(*repoDir, filepath.FromSlash(*profilePath)))
 		if err != nil {
@@ -300,6 +303,7 @@ func runGate(args []string) error {
 		if err != nil {
 			return "fail", nil, err
 		}
+		corpusGenerated = generated
 		// Every production declaration of every owned package must hold a
 		// disposition: a support-ledger state, a generation proof, the
 		// fold-at-use constant rule, or its package's withholding.
@@ -359,10 +363,78 @@ func runGate(args []string) error {
 	})
 	blocked("05-declaration-signature-type-completeness",
 		"complete independently verified declaration/signature/type-identity gate not implemented")
-	blocked("06-semantic-ir-operation-class-completeness",
-		"complete semantic-IR operation schema/verifier not implemented")
-	blocked("07-ownership-support-state-completeness",
-		"complete generated/manual/unimplemented/external/extension ownership gate not implemented")
+	run("06-semantic-ir-operation-class-completeness", func() (string, []string, error) {
+		if corpusGenerated == nil {
+			return "blocked", []string{"corpus generation did not run"}, nil
+		}
+		registry, err := contracts.LoadRegistry()
+		if err != nil {
+			return "fail", nil, err
+		}
+		// Translation fails closed on any unregistered class, so a
+		// completed corpus run proves the join; the gate re-verifies from
+		// the proofs and reports registry coverage.
+		used := map[string]bool{}
+		for _, proof := range corpusGenerated.Proofs {
+			for _, operation := range proof.Operations {
+				if !registry.Generated(operation) {
+					return "fail", []string{proof.ID}, fmt.Errorf("generated body uses unregistered operation class %q", operation)
+				}
+				used[operation] = true
+			}
+		}
+		var unused []string
+		for _, key := range registry.Keys() {
+			if !used[key] {
+				unused = append(unused, key)
+			}
+		}
+		details := []string{
+			fmt.Sprintf("operation classes used by generated bodies: %d", len(used)),
+			fmt.Sprintf("reviewed classes not exercised by this corpus: %d", len(unused)),
+		}
+		return "pass", details, nil
+	})
+	run("07-ownership-support-state-completeness", func() (string, []string, error) {
+		if corpusGenerated == nil {
+			return "blocked", []string{"corpus generation did not run"}, nil
+		}
+		ownership := map[string]int{}
+		for path, owner := range corpusGenerated.Ownership {
+			switch owner {
+			case "generated-core", "generated-language-abi", "generated-external-contracts":
+				ownership[owner]++
+			default:
+				return "fail", []string{path}, fmt.Errorf("file carries unreviewed ownership class %q", owner)
+			}
+		}
+		for path := range corpusGenerated.Files {
+			if _, has := corpusGenerated.Ownership[path]; !has {
+				return "fail", []string{path}, fmt.Errorf("generated file carries no ownership class")
+			}
+		}
+		states := map[string]int{}
+		for _, support := range corpusGenerated.Support {
+			switch support.State {
+			case ir.SupportGenerated, ir.SupportUnimplemented:
+				states[string(support.State)]++
+			default:
+				return "fail", []string{support.ID}, fmt.Errorf("unit carries unreviewed support state %q", support.State)
+			}
+			if support.State == ir.SupportUnimplemented && len(support.Sites) == 0 {
+				return "fail", []string{support.ID}, fmt.Errorf("unimplemented unit records no sites")
+			}
+		}
+		details := []string{
+			fmt.Sprintf("ownership: core %d, language-abi %d, external-contracts %d",
+				ownership["generated-core"], ownership["generated-language-abi"], ownership["generated-external-contracts"]),
+			fmt.Sprintf("support: generated %d, unimplemented %d (every site on record)",
+				states["generated"], states["unimplemented"]),
+			fmt.Sprintf("withheld packages: %d (transitive closure over dependents)", len(corpusGenerated.Withheld)),
+			"manual and extension ownership classes: none declared yet (no artifacts to verify)",
+		}
+		return "pass", details, nil
+	})
 	blocked("08-fixed-point-representation-verification",
 		"constraint propagation, representation, necessity, and boundary proof verifier not implemented")
 	run("09-deterministic-staged-generation", func() (string, []string, error) {
@@ -410,82 +482,7 @@ func runGate(args []string) error {
 		return "blocked", []string{"census evidence is deterministic; complete generated TypeScript staged emission is not implemented"}, nil
 	})
 	run("10-strict-typescript-staticness", func() (string, []string, error) {
-		if firstRun == nil || productPin == nil {
-			return "blocked", []string{"input attestation did not complete"}, nil
-		}
-		// The compiler materialization must match the declared identity
-		// before it is trusted to judge staticness.
-		tscJs, err := filepath.Abs(filepath.Join(*repoDir, "product", "node_modules", "typescript", "lib", "tsc.js"))
-		if err != nil {
-			return "fail", nil, err
-		}
-		tscDigest, err := digestFile(tscJs)
-		if err != nil {
-			return "blocked", []string{"typescript compiler not materialized under product/node_modules (install the pinned typescript version)"}, nil
-		}
-		if tscDigest != productPin.TypescriptCompiler.TscJsSha256 {
-			return "fail", nil, fmt.Errorf("materialized tsc.js digest %s does not match pinned %s", tscDigest, productPin.TypescriptCompiler.TscJsSha256)
-		}
-		prof, err := profile.Load(filepath.Join(*repoDir, filepath.FromSlash(*profilePath)))
-		if err != nil {
-			return "fail", nil, err
-		}
-		build, err := prof.BuildProfileByName(*buildProfile)
-		if err != nil {
-			return "fail", nil, err
-		}
-		resolved, err := pinning.VerifyToolchain(prof.Pin)
-		if err != nil {
-			return "fail", nil, err
-		}
-		env := resolved.Environ(goenv.EnvOptions{
-			GOOS: build.GOOS, GOARCH: build.GOARCH,
-			GOAMD64: build.GOAMD64, GOARM64: build.GOARM64,
-		})
-		generated, err := translate.Corpus(prof, env, *sourceDir, translate.Options{
-			SourceRevision: report.Inputs.SourceRevision,
-			ProfileHash:    report.Inputs.ProfileSha256,
-		})
-		if err != nil {
-			return "fail", nil, err
-		}
-		staging, err := os.MkdirTemp("", "gotots-tsc-")
-		if err != nil {
-			return "fail", nil, err
-		}
-		defer os.RemoveAll(staging)
-		for path, content := range generated.Files {
-			target := filepath.Join(staging, filepath.FromSlash(path))
-			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-				return "fail", nil, err
-			}
-			if err := os.WriteFile(target, []byte(content), 0o644); err != nil {
-				return "fail", nil, err
-			}
-		}
-		strictConfig, err := os.ReadFile(filepath.Join(*repoDir, "product", "tsconfig.strict.json"))
-		if err != nil {
-			return "fail", nil, err
-		}
-		if err := os.WriteFile(filepath.Join(staging, "tsconfig.json"), strictConfig, 0o644); err != nil {
-			return "fail", nil, err
-		}
-		// The generated output is strict ESM.
-		if err := os.WriteFile(filepath.Join(staging, "package.json"), []byte("{\n  \"type\": \"module\"\n}\n"), 0o644); err != nil {
-			return "fail", nil, err
-		}
-		out, err := runInRepo(staging, "node", tscJs, "-p", ".")
-		if err != nil {
-			lines := splitLines(out)
-			if len(lines) > 40 {
-				lines = append(lines[:40], fmt.Sprintf("... and %d more lines", len(lines)-40))
-			}
-			return "fail", lines, fmt.Errorf("strict typecheck rejected the generated output")
-		}
-		return "pass", []string{
-			fmt.Sprintf("strict tsc (%s@%s) accepted %d generated files", productPin.TypescriptCompiler.Package, productPin.TypescriptCompiler.Version, len(generated.Files)),
-			fmt.Sprintf("withheld packages (honest unimplemented, not typechecked): %d", len(generated.Withheld)),
-		}, nil
+		return runTscGate(*repoDir, *profilePath, *buildProfile, *sourceDir, report, productPin, firstRun)
 	})
 	blocked("11-semantic-oracles",
 		"ordered static-output prerequisites are incomplete; local oracle tests run under gate 01 only")
