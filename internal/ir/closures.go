@@ -58,6 +58,7 @@ func (b *builder) buildClosure(lit *ast.FuncLit) (Expr, error) {
 		}
 	}
 
+	child.useDeferStack = hasNestedDefer(lit.Body.List)
 	body, err := child.buildTopLevel(lit.Body.List)
 	if err != nil {
 		return nil, err
@@ -66,6 +67,7 @@ func (b *builder) buildClosure(lit *ast.FuncLit) (Expr, error) {
 		return nil, err
 	}
 	out.Body = body
+	out.UsesDeferStack = child.useDeferStack
 	b.use("closure")
 	return out, nil
 }

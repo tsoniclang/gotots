@@ -91,6 +91,13 @@ type PanicStmt struct {
 	Value Expr
 }
 
+// DeferPush pushes one deferred call — its receiver and arguments
+// already captured at the defer site — onto the function's defer stack;
+// the stack drains LIFO at every function exit.
+type DeferPush struct {
+	Call Expr
+}
+
 // RangeInt is `for i := range n`: n is evaluated once and i counts from
 // zero to n-1 in n's own carrier. Index may be empty (discarded).
 type RangeInt struct {
@@ -166,6 +173,7 @@ func (*ForStmt) stmt()        {}
 func (*ReturnStmt) stmt()     {}
 func (*ExprStmt) stmt()       {}
 func (*BranchStmt) stmt()     {}
+func (*DeferPush) stmt()      {}
 
 // Expr is one Go expression in IR form with its resolved type.
 type Expr interface {
@@ -260,7 +268,10 @@ type Closure struct {
 	Params  []Var
 	Results []Var
 	Body    *Block
-	T       Type // the KindFunc type
+	// UsesDeferStack marks a closure body with defers below its top
+	// level (see Func.UsesDeferStack).
+	UsesDeferStack bool
+	T              Type // the KindFunc type
 }
 
 // FuncRef references a package-level function of the translated unit as

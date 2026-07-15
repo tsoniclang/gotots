@@ -243,6 +243,10 @@ type Func struct {
 	Params   []Var
 	Results  []Var
 	Body     *Block
+	// UsesDeferStack marks a body with defers below the top level: the
+	// whole body wraps in one try/finally draining a per-function defer
+	// stack in LIFO order.
+	UsesDeferStack bool
 	// BodyHash matches the census body record for drift detection.
 	BodyHash string
 	// Support is the implementation support state; Sites records every

@@ -282,6 +282,11 @@
       "specClause": "docs/spec/03-declarations-bodies-control.md"
     },
     {
+      "key": "defer:stack",
+      "state": "generated",
+      "specClause": "docs/spec/03-declarations-bodies-control.md"
+    },
+    {
       "key": "deref",
       "state": "generated",
       "specClause": "docs/spec/04-types-values-pointers.md"

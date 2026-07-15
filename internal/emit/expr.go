@@ -437,7 +437,7 @@ func (p *printer) printClosure(n *ir.Closure) (string, error) {
 	}
 	var sub strings.Builder
 	subPrinter := &printer{out: &sub, module: p.module, indent: p.indent + 1}
-	if err := subPrinter.printBlockBody(n.Body); err != nil {
+	if err := subPrinter.printDeferWrappedBody(n.Body, n.UsesDeferStack); err != nil {
 		return "", err
 	}
 	closing := strings.Repeat("  ", p.indent)

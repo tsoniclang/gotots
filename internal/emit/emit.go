@@ -361,9 +361,35 @@ func printMethodFunction(out *strings.Builder, module *Module, className string,
 		}
 		p.line("const %s = gosl$.goArrayClone($recv, %s);", tsName(method.Receiver.Name), cloneElem)
 	}
-	if err := p.printBlockBody(method.Body); err != nil {
+	if err := p.printDeferWrappedBody(method.Body, method.UsesDeferStack); err != nil {
 		return fmt.Errorf("%s: %w", method.ID, err)
 	}
+	p.indent--
+	p.line("}")
+	return nil
+}
+
+// printDeferWrappedBody prints a function body, wrapping it — when the
+// body uses the defer stack — in one try/finally that drains deferred
+// calls in LIFO order at every exit.
+func (p *printer) printDeferWrappedBody(body *ir.Block, usesDeferStack bool) error {
+	if !usesDeferStack {
+		return p.printBlockBody(body)
+	}
+	p.line("const _ds$: (() => void)[] = [];")
+	p.line("try {")
+	p.indent++
+	if err := p.printBlockBody(body); err != nil {
+		return err
+	}
+	p.indent--
+	p.line("} finally {")
+	p.indent++
+	p.line("for (let _di$ = _ds$.length - 1; _di$ >= 0; _di$--) {")
+	p.indent++
+	p.line("(_ds$[_di$] as () => void)();")
+	p.indent--
+	p.line("}")
 	p.indent--
 	p.line("}")
 	return nil
@@ -423,7 +449,7 @@ func printFunc(out *strings.Builder, module *Module, function *ir.Func) error {
 	}
 	p.line("%sfunction %s%s%s {", export, tsName(function.Name), generics, signature)
 	p.indent++
-	if err := p.printBlockBody(function.Body); err != nil {
+	if err := p.printDeferWrappedBody(function.Body, function.UsesDeferStack); err != nil {
 		return fmt.Errorf("%s: %w", function.ID, err)
 	}
 	p.indent--

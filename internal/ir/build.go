@@ -38,6 +38,10 @@ type builder struct {
 	// exits the type switch, which the if/else lowering cannot express
 	// yet, so it fails closed.
 	typeSwitchDepth int
+	// useDeferStack switches every defer in this body onto the LIFO
+	// defer stack — set when any defer sits below the top-level block,
+	// where try/finally nesting cannot express function-exit timing.
+	useDeferStack bool
 }
 
 func (b *builder) span(pos token.Pos) Span {
@@ -151,6 +155,7 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 		}
 	}
 
+	b.useDeferStack = hasNestedDefer(decl.Body.List)
 	body, err := b.buildTopLevel(decl.Body.List)
 	if err != nil {
 		return nil, err
@@ -160,6 +165,7 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 		return declarationSite(err)
 	}
 	function.Body = body
+	function.UsesDeferStack = b.useDeferStack
 	return b.finalize(function), nil
 }
 
@@ -215,6 +221,22 @@ func (b *builder) buildTopLevel(stmts []ast.Stmt) (*Block, error) {
 			out.Stmts = append(out.Stmts, &UnimplementedStmt{Site: (*b.sites)[len(*b.sites)-1]})
 			continue
 		}
+		if b.useDeferStack {
+			// Uniform LIFO through the defer stack: a top-level defer
+			// pushed before a nested one runs after it, exactly Go.
+			captures, deferredCall, err := b.buildDeferredCall(deferStmt)
+			if err != nil {
+				if b.recordSite(err) {
+					out.Stmts = append(out.Stmts, &UnimplementedStmt{Site: (*b.sites)[len(*b.sites)-1]})
+					continue
+				}
+				return nil, err
+			}
+			out.Stmts = append(out.Stmts, captures...)
+			out.Stmts = append(out.Stmts, &DeferPush{Call: deferredCall})
+			b.use("defer:stack")
+			continue
+		}
 		captures, deferredCall, err := b.buildDeferredCall(deferStmt)
 		if err != nil {
 			if b.recordSite(err) {
@@ -236,59 +258,6 @@ func (b *builder) buildTopLevel(stmts []ast.Stmt) (*Block, error) {
 		return out, nil
 	}
 	return out, nil
-}
-
-// buildDeferredCall captures the deferred call's receiver and arguments at
-// the defer site (Go evaluates them when the defer statement executes) and
-// returns the capture declarations plus the call over the captures.
-func (b *builder) buildDeferredCall(deferStmt *ast.DeferStmt) ([]Stmt, Expr, error) {
-	span := b.span(deferStmt.Pos())
-	built, err := b.buildAnyCall(deferStmt.Call)
-	if err != nil {
-		return nil, nil, err
-	}
-	prefix := fmt.Sprintf("_d%d$", b.deferCount)
-	b.deferCount++
-
-	var captures []Stmt
-	capture := func(name string, value Expr) *VarRef {
-		captures = append(captures, &DeclStmt{
-			Names:  []string{name},
-			Types:  []Type{value.Type()},
-			Values: []Expr{value},
-		})
-		return &VarRef{Name: name, T: value.Type()}
-	}
-
-	switch call := built.(type) {
-	case *Call:
-		for i, arg := range call.Args {
-			call.Args[i] = capture(fmt.Sprintf("%s_a%d", prefix, i), arg)
-		}
-		return captures, call, nil
-	case *MethodCall:
-		// A value receiver copies when the defer statement evaluates —
-		// mutations between the defer and the call never reach it — so a
-		// struct-valued receiver captures a clone.
-		recv := call.Recv
-		if !call.PointerRecv {
-			recv = b.bindStructValue(recv)
-		}
-		call.Recv = capture(prefix+"_r", recv)
-		for i, arg := range call.Args {
-			call.Args[i] = capture(fmt.Sprintf("%s_a%d", prefix, i), arg)
-		}
-		return captures, call, nil
-	case *DynCall:
-		// The function value is captured at the defer site; a nil value
-		// panics when invoked, not when deferred — exactly Go.
-		call.Fun = capture(prefix+"_f", call.Fun)
-		for i, arg := range call.Args {
-			call.Args[i] = capture(fmt.Sprintf("%s_a%d", prefix, i), arg)
-		}
-		return captures, call, nil
-	}
-	return nil, nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "deferred non-call expression", Span: span}
 }
 
 // buildBlock builds one statement list, recovering per statement: an
@@ -355,8 +324,20 @@ func (b *builder) buildStmt(stmt ast.Stmt) (Stmt, error) {
 		return b.buildReturn(n)
 
 	case *ast.DeferStmt:
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT",
-			Construct: "defer below the function's top-level block (runs at function exit; needs the defer-stack lowering)", Span: span}
+		if !b.useDeferStack {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT",
+				Construct: "defer below the function's top-level block (runs at function exit; needs the defer-stack lowering)", Span: span}
+		}
+		if len(b.namedResults) > 0 {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT",
+				Construct: "defer in a function with named results (deferred result mutation)", Span: span}
+		}
+		captures, deferredCall, err := b.buildDeferredCall(n)
+		if err != nil {
+			return nil, err
+		}
+		b.use("defer:stack")
+		return &Block{Stmts: append(captures, &DeferPush{Call: deferredCall})}, nil
 
 	case *ast.ExprStmt:
 		call, ok := n.X.(*ast.CallExpr)

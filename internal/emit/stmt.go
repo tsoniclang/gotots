@@ -99,6 +99,14 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 	case *ir.RangeFunc:
 		return p.printRangeFunc(n)
 
+	case *ir.DeferPush:
+		call, err := p.printExpr(n.Call)
+		if err != nil {
+			return err
+		}
+		p.line("_ds$.push(() => { %s; });", call)
+		return nil
+
 	case *ir.SwitchStmt:
 		return p.printSwitch(n)
 
