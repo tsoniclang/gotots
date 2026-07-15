@@ -42,6 +42,10 @@ type builder struct {
 	// defer stack — set when any defer sits below the top-level block,
 	// where try/finally nesting cannot express function-exit timing.
 	useDeferStack bool
+	// boxed marks every local variable whose address is taken; boxable
+	// carriers among them live in mutable cells (shared with closure
+	// child builders — an inner &x may address an outer variable).
+	boxed map[*types.Var]bool
 }
 
 func (b *builder) span(pos token.Pos) Span {
@@ -126,6 +130,11 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 		function.Receiver = &Var{Name: recv.Name(), Type: recvType}
 	}
 
+	if b.boxed == nil {
+		b.boxed = map[*types.Var]bool{}
+	}
+	scanBoxedVars(b.info, decl.Body.List, b.boxed)
+	var boxedParams []Var
 	params := signature.Params()
 	for i := range params.Len() {
 		parameter := params.At(i)
@@ -137,6 +146,9 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 			return declarationSite(err)
 		}
 		function.Params = append(function.Params, Var{Name: parameter.Name(), Type: t})
+		if b.boxed[parameter] && boxable(t.Kind) {
+			boxedParams = append(boxedParams, Var{Name: parameter.Name(), Type: t})
+		}
 	}
 	results := signature.Results()
 	for i := range results.Len() {
@@ -164,6 +176,7 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 	if err := b.prependNamedResultZeros(body, span); err != nil {
 		return declarationSite(err)
 	}
+	prependBoxedParams(body, boxedParams)
 	function.Body = body
 	function.UsesDeferStack = b.useDeferStack
 	return b.finalize(function), nil
@@ -337,7 +350,7 @@ func (b *builder) buildStmt(stmt ast.Stmt) (Stmt, error) {
 			return nil, err
 		}
 		b.use("defer:stack")
-		return &Block{Stmts: append(captures, &DeferPush{Call: deferredCall})}, nil
+		return &StmtSeq{Stmts: append(captures, &DeferPush{Call: deferredCall})}, nil
 
 	case *ast.ExprStmt:
 		call, ok := n.X.(*ast.CallExpr)
@@ -501,6 +514,11 @@ func (b *builder) buildFor(n *ast.ForStmt) (Stmt, error) {
 		init, err := b.buildStmt(n.Init)
 		if err != nil {
 			return nil, err
+		}
+		if _, isSeq := init.(*StmtSeq); isSeq {
+			// A boxed (address-taken) loop-clause variable has no
+			// expressible cell declaration inside the clause yet.
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "address of a loop-clause variable", Span: b.span(n.Pos())}
 		}
 		out.Init = init
 	}

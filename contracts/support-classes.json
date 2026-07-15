@@ -152,6 +152,26 @@
       "specClause": "docs/spec/04-types-values-pointers.md"
     },
     {
+      "key": "boxedDecl",
+      "state": "generated",
+      "specClause": "docs/spec/04-types-values-pointers.md"
+    },
+    {
+      "key": "boxedLoad",
+      "state": "generated",
+      "specClause": "docs/spec/04-types-values-pointers.md"
+    },
+    {
+      "key": "boxedRef",
+      "state": "generated",
+      "specClause": "docs/spec/04-types-values-pointers.md"
+    },
+    {
+      "key": "boxedStore",
+      "state": "generated",
+      "specClause": "docs/spec/04-types-values-pointers.md"
+    },
+    {
       "key": "branch:break",
       "state": "generated",
       "specClause": "docs/spec/03-declarations-bodies-control.md"
@@ -475,6 +495,11 @@
       "key": "namedResults",
       "state": "generated",
       "specClause": "docs/spec/03-declarations-bodies-control.md"
+    },
+    {
+      "key": "new:cell",
+      "state": "generated",
+      "specClause": "docs/spec/04-types-values-pointers.md"
     },
     {
       "key": "new:struct",

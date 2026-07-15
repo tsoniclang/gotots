@@ -338,6 +338,10 @@ func (b *builder) buildVarRef(variable *types.Var, name string, span Span) (Expr
 		}
 		pkg = variable.Pkg().Path()
 	}
+	if pkg == "" && b.boxed[variable] && boxable(t.Kind) {
+		b.use("boxedLoad")
+		return &BoxedLoad{Cell: cellName(name), T: t}, nil
+	}
 	b.use("varRef")
 	return &VarRef{Name: name, Pkg: pkg, T: t}, nil
 }
@@ -374,18 +378,36 @@ func (b *builder) buildUnary(n *ast.UnaryExpr, resultType types.Type) (Expr, err
 		if lit, ok := ast.Unparen(n.X).(*ast.CompositeLit); ok {
 			return b.buildStructNew(lit, resultType)
 		}
-		// &x on an addressable struct value: the pointer is the very
-		// instance — whole-value stores overwrite fields in place, so the
-		// alias observes them exactly like Go's memory write.
+		// &x on a boxed local: the pointer is the cell itself.
+		if ident, isIdent := ast.Unparen(n.X).(*ast.Ident); isIdent {
+			if variable, isBoxed := b.boxedVar(ident); isBoxed {
+				elemType, err := b.typeOf(variable.Type(), span)
+				if err != nil {
+					return nil, err
+				}
+				if boxable(elemType.Kind) {
+					t, err := b.typeOf(resultType, span)
+					if err != nil {
+						return nil, err
+					}
+					b.use("boxedRef")
+					return &BoxedRef{Cell: cellName(ident.Name), T: t}, nil
+				}
+			}
+		}
+		// &x on an addressable struct, array, or external value: the
+		// pointer is the very instance — whole-value stores overwrite in
+		// place, so the alias observes them exactly like Go's memory
+		// write.
 		x, err := b.buildExpr(ast.Unparen(n.X))
 		if err != nil {
 			return nil, err
 		}
-		if x.Type().Kind != KindStruct && x.Type().Kind != KindExternal {
+		if x.Type().Kind != KindStruct && x.Type().Kind != KindExternal && x.Type().Kind != KindArray {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "address of " + x.Type().Go, Span: span}
 		}
 		switch x.(type) {
-		case *VarRef, *FieldLoad, *SliceGet, *Deref:
+		case *VarRef, *FieldLoad, *SliceGet, *Deref, *ArrayGet:
 			t, err := b.typeOf(resultType, span)
 			if err != nil {
 				return nil, err
@@ -429,6 +451,25 @@ func (b *builder) buildStructNew(lit *ast.CompositeLit, resultType types.Type) (
 		// &T{} of an external type: a fresh zero handle is the pointer.
 		b.use("externZero")
 		return &AddrOf{X: &ExternZero{T: *t.Elem}, T: t}, nil
+	}
+	if t.Elem != nil && t.Elem.Kind == KindArray {
+		// &[N]T{...}: the fresh array carrier is the pointer.
+		built, err := b.buildExprAs(lit, *t.Elem)
+		if err != nil {
+			return nil, err
+		}
+		b.use("addrOf")
+		return &AddrOf{X: built, T: t}, nil
+	}
+	if t.Elem != nil && boxable(t.Elem.Kind) {
+		// &T{...} of a cell-carried pointee: a fresh cell holding the
+		// literal value.
+		built, err := b.buildExprAs(lit, *t.Elem)
+		if err != nil {
+			return nil, err
+		}
+		b.use("new:cell")
+		return &CellNew{Zero: built, T: t}, nil
 	}
 	return b.buildStructLit(lit, t)
 }

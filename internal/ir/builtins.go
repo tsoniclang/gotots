@@ -155,13 +155,24 @@ func (b *builder) buildBuiltin(call *ast.CallExpr, builtin *types.Builtin, resul
 		if err != nil {
 			return nil, err
 		}
-		if t.Kind != KindPointer || t.Elem == nil || t.Elem.Kind != KindStruct {
+		if t.Kind != KindPointer || t.Elem == nil {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "new of " + t.Go, Span: span}
 		}
-		// new(T) for a named struct: the fresh zero instance is the
-		// pointer (object identity is the address).
-		b.use("new:struct")
-		return &AddrOf{X: &StructZero{T: *t.Elem}, T: t}, nil
+		if t.Elem.Kind == KindStruct {
+			// new(T) for a named struct: the fresh zero instance is the
+			// pointer (object identity is the address).
+			b.use("new:struct")
+			return &AddrOf{X: &StructZero{T: *t.Elem}, T: t}, nil
+		}
+		if boxable(t.Elem.Kind) {
+			zero, err := zeroValue(*t.Elem, span)
+			if err != nil {
+				return nil, err
+			}
+			b.use("new:cell")
+			return &CellNew{Zero: zero, T: t}, nil
+		}
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "new of " + t.Go, Span: span}
 	}
 	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "builtin " + builtin.Name(), Span: span}
 }

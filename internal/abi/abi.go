@@ -112,6 +112,12 @@ export type GoMap<K, V> = Map<K, V> | undefined;
 
 type GoStrIndex = number | bigint;
 
+// A mutable cell: the carrier of a pointer to a value with no object
+// identity of its own (scalars, strings, slices, maps, functions,
+// interfaces, nested pointers). The cell is created where the address
+// is taken; undefined is the nil pointer.
+export type GoCell<T> = { v: T };
+
 // goPanicRangeExit is the exact runtime panic when a range-over-func
 // sequence keeps yielding after the loop body stopped iteration.
 export function goPanicRangeExit(): never {

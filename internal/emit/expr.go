@@ -281,7 +281,27 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return "gort$.goNilCheck(" + x + ")", nil
+		// Identity carriers (structs, arrays, external handles) ARE their
+		// pointer; cell carriers read through the cell.
+		switch n.T.Kind {
+		case ir.KindStruct, ir.KindArray, ir.KindExternal:
+			return "gort$.goNilCheck(" + x + ")", nil
+		}
+		return "gort$.goNilCheck(" + x + ").v", nil
+	case *ir.BoxedLoad:
+		return n.Cell + ".v", nil
+	case *ir.BoxedRef:
+		return n.Cell, nil
+	case *ir.CellNew:
+		zero, err := p.printExpr(n.Zero)
+		if err != nil {
+			return "", err
+		}
+		spelled, err := p.tsType(*n.T.Elem)
+		if err != nil {
+			return "", err
+		}
+		return "({ v: " + zero + " } as gort$.GoCell<" + spelled + ">)", nil
 	case *ir.NilConst:
 		return "undefined", nil
 	case *ir.IsNil:

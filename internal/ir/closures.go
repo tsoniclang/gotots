@@ -28,8 +28,10 @@ func (b *builder) buildClosure(lit *ast.FuncLit) (Expr, error) {
 		unit:       b.unit,
 		operations: b.operations,
 		sites:      b.sites,
+		boxed:      b.boxed,
 	}
 	out := &Closure{T: t}
+	var boxedParams []Var
 	params := signature.Params()
 	for i := range params.Len() {
 		parameter := params.At(i)
@@ -44,6 +46,9 @@ func (b *builder) buildClosure(lit *ast.FuncLit) (Expr, error) {
 			return nil, err
 		}
 		out.Params = append(out.Params, Var{Name: name, Type: parameterType})
+		if child.boxed[parameter] && boxable(parameterType.Kind) {
+			boxedParams = append(boxedParams, Var{Name: name, Type: parameterType})
+		}
 	}
 	results := signature.Results()
 	for i := range results.Len() {
@@ -70,6 +75,7 @@ func (b *builder) buildClosure(lit *ast.FuncLit) (Expr, error) {
 	if err := child.prependNamedResultZeros(body, span); err != nil {
 		return nil, err
 	}
+	prependBoxedParams(body, boxedParams)
 	out.Body = body
 	out.UsesDeferStack = child.useDeferStack
 	b.use("closure")

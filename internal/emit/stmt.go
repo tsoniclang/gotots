@@ -99,6 +99,26 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 	case *ir.RangeFunc:
 		return p.printRangeFunc(n)
 
+	case *ir.StmtSeq:
+		for _, inner := range n.Stmts {
+			if err := p.printStmt(inner); err != nil {
+				return err
+			}
+		}
+		return nil
+
+	case *ir.BoxedDecl:
+		init, err := p.printExpr(n.Init)
+		if err != nil {
+			return err
+		}
+		spelled, err := p.tsType(n.Elem)
+		if err != nil {
+			return err
+		}
+		p.line("const %s: gort$.GoCell<%s> = { v: %s };", n.Cell, spelled, init)
+		return nil
+
 	case *ir.DeferPush:
 		call, err := p.printExpr(n.Call)
 		if err != nil {

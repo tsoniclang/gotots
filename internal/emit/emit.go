@@ -280,6 +280,20 @@ func (p *printer) tsType(t ir.Type) (string, error) {
 			}
 			return element + " | undefined", nil
 		}
+		if t.Elem != nil && t.Elem.Kind == ir.KindArray {
+			element, err := p.tsType(*t.Elem)
+			if err != nil {
+				return "", err
+			}
+			return element + " | undefined", nil
+		}
+		if t.Elem != nil && t.Elem.Kind != ir.KindStruct {
+			element, err := p.tsType(*t.Elem)
+			if err != nil {
+				return "", err
+			}
+			return "gort$.GoCell<" + element + "> | undefined", nil
+		}
 		name, err := p.module.symbol(t.Pkg, t.Named)
 		if err != nil {
 			return "", err

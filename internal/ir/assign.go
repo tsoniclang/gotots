@@ -38,6 +38,10 @@ func (b *builder) buildTarget(lhs ast.Expr) (Target, error) {
 		if err != nil {
 			return nil, err
 		}
+		if _, isBoxed := b.boxedVar(n); isBoxed && boxable(t.Kind) {
+			b.use("boxedStore")
+			return BoxedTarget{Cell: cellName(n.Name), T: t}, nil
+		}
 		return VarTarget{Name: n.Name, T: t}, nil
 
 	case *ast.SelectorExpr:
@@ -170,7 +174,7 @@ func (b *builder) buildAssign(n *ast.AssignStmt) (Stmt, error) {
 		if tuple != nil {
 			out.Tuple = tuple
 			b.use("declTuple")
-			return out, nil
+			return b.boxDeclaredNames(n.Lhs, out, span)
 		}
 		if anyReused {
 			// The non-tuple mixed form needs staged right-hand values (an
@@ -189,7 +193,7 @@ func (b *builder) buildAssign(n *ast.AssignStmt) (Stmt, error) {
 			out.Values = append(out.Values, value)
 		}
 		b.use("shortDecl")
-		return out, nil
+		return b.boxDeclaredNames(n.Lhs, out, span)
 
 	case token.ASSIGN:
 		out := &AssignStmt{}
@@ -285,6 +289,10 @@ func (b *builder) compoundTarget(lhs ast.Expr) (Target, Expr, error) {
 		load, err := b.buildExpr(operand)
 		if err != nil {
 			return nil, nil, err
+		}
+		if _, isBoxed := b.boxedVar(operand); isBoxed && boxable(load.Type().Kind) {
+			b.use("boxedStore")
+			return BoxedTarget{Cell: cellName(operand.Name), T: load.Type()}, load, nil
 		}
 		return VarTarget{Name: operand.Name, T: load.Type()}, load, nil
 

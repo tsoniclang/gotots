@@ -43,25 +43,36 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 		return Type{Kind: kind, Go: spelled}, nil
 
 	case *types.Pointer:
-		named, ok := types.Unalias(u.Elem()).(*types.Named)
-		if !ok {
-			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "pointer to non-named type " + spelled, Span: span}
-		}
-		if _, isStruct := named.Underlying().(*types.Struct); !isStruct {
+		if named, ok := types.Unalias(u.Elem()).(*types.Named); ok {
+			if _, isStruct := named.Underlying().(*types.Struct); isStruct {
+				if named.Obj().Pkg() == nil {
+					return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "pointer to type outside the translated unit: " + spelled, Span: span}
+				}
+				declaringPkg := named.Obj().Pkg().Path()
+				if !b.unit.Owns(declaringPkg) {
+					// A pointer to an external struct: the handle itself,
+					// with undefined for nil (external handles have object
+					// identity).
+					element := Type{Kind: KindExternal, Go: named.String(), Named: named.Obj().Name(), Pkg: declaringPkg}
+					return Type{Kind: KindPointer, Go: spelled, Named: named.Obj().Name(), Pkg: declaringPkg, Elem: &element}, nil
+				}
+				element := Type{Kind: KindStruct, Go: named.String(), Named: named.Obj().Name(), Pkg: declaringPkg}
+				return Type{Kind: KindPointer, Go: spelled, Named: named.Obj().Name(), Pkg: declaringPkg, Elem: &element}, nil
+			}
 			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "pointer to non-struct type " + spelled, Span: span}
 		}
-		if named.Obj().Pkg() == nil {
-			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "pointer to type outside the translated unit: " + spelled, Span: span}
+		// A pointer to a non-named type: fixed arrays keep their carrier
+		// identity (the handle is the pointer); every other reviewed
+		// pointee is carried as a mutable cell created where the address
+		// is taken.
+		element, err := b.typeOf(u.Elem(), span)
+		if err != nil {
+			return Type{}, err
 		}
-		declaringPkg := named.Obj().Pkg().Path()
-		if !b.unit.Owns(declaringPkg) {
-			// A pointer to an external struct: the handle itself, with
-			// undefined for nil (external handles have object identity).
-			element := Type{Kind: KindExternal, Go: named.String(), Named: named.Obj().Name(), Pkg: declaringPkg}
-			return Type{Kind: KindPointer, Go: spelled, Named: named.Obj().Name(), Pkg: declaringPkg, Elem: &element}, nil
+		if element.Kind == KindStruct || element.Kind == KindExternal || element.Kind == KindTypeParam {
+			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "pointer to non-named type " + spelled, Span: span}
 		}
-		element := Type{Kind: KindStruct, Go: named.String(), Named: named.Obj().Name(), Pkg: declaringPkg}
-		return Type{Kind: KindPointer, Go: spelled, Named: named.Obj().Name(), Pkg: declaringPkg, Elem: &element}, nil
+		return Type{Kind: KindPointer, Go: spelled, Elem: &element}, nil
 
 	case *types.Slice:
 		element, err := b.typeOf(u.Elem(), span)

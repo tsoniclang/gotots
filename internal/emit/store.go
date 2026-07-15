@@ -84,7 +84,17 @@ func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
 		}
 		pointerTemp := p.temp()
 		p.line("const %s = %s;", pointerTemp, pointer)
-		return stagedTarget{kind: "pointee", name: pointerTemp, structValue: true, nilCheckBase: true}, nil
+		staged := stagedTarget{kind: "pointee", name: pointerTemp, nilCheckBase: true}
+		if elem := t.X.Type().Elem; elem != nil {
+			staged.structValue = elem.Kind == ir.KindStruct
+			if staged.arrayValue, err = p.arrayValueCallback(*elem); err != nil {
+				return stagedTarget{}, err
+			}
+			staged.externSet = externSetID(*elem)
+		}
+		return staged, nil
+	case ir.BoxedTarget:
+		return stagedTarget{kind: "boxed", name: t.Cell}, nil
 	case *ir.MapTarget:
 		mapExpr, err := p.printExpr(t.Map)
 		if err != nil {
@@ -176,7 +186,18 @@ func (s stagedTarget) store(p *printer, value string) error {
 			p.line("%s.%s = %s;", base, s.field, value)
 		}
 	case "pointee":
-		p.line("%s.goSet$(%s);", base, value)
+		switch {
+		case s.structValue:
+			p.line("%s.goSet$(%s);", base, value)
+		case s.arrayValue != "":
+			p.line("gosl$.goArraySetAll(%s, %s, %s);", base, value, s.arrayValue)
+		case s.externSet != "":
+			p.line("goext$.goExternalCall(%q, [%s, %s]);", s.externSet, base, value)
+		default:
+			p.line("%s.v = %s;", base, value)
+		}
+	case "boxed":
+		p.line("%s.v = %s;", s.name, value)
 	case "map":
 		if s.keyedMap {
 			p.line("gort$.goKMapSet(%s, %s, %s);", s.name, s.keyTemp, value)
@@ -326,7 +347,24 @@ func (p *printer) printStore(target ir.Target, value string) error {
 		p.line("const %s = %s;", pointerTemp, pointer)
 		valueTemp := p.temp()
 		p.line("const %s = %s;", valueTemp, value)
-		p.line("gort$.goNilCheck(%s).goSet$(%s);", pointerTemp, valueTemp)
+		elem := t.X.Type().Elem
+		switch {
+		case elem == nil || elem.Kind == ir.KindStruct:
+			p.line("gort$.goNilCheck(%s).goSet$(%s);", pointerTemp, valueTemp)
+		case elem.Kind == ir.KindArray:
+			setElem, err := p.arrayElemSet(*elem.Elem)
+			if err != nil {
+				return err
+			}
+			p.line("gosl$.goArraySetAll(gort$.goNilCheck(%s), %s, %s);", pointerTemp, valueTemp, setElem)
+		case elem.Kind == ir.KindExternal:
+			p.line("goext$.goExternalCall(%q, [gort$.goNilCheck(%s), %s]);", externSetID(*elem), pointerTemp, valueTemp)
+		default:
+			p.line("gort$.goNilCheck(%s).v = %s;", pointerTemp, valueTemp)
+		}
+		return nil
+	case ir.BoxedTarget:
+		p.line("%s.v = %s;", t.Cell, value)
 		return nil
 	case *ir.ArrayTarget:
 		arrayExpr, err := p.printExpr(t.X)
