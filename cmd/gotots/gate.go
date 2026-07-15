@@ -14,6 +14,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/census"
 	"github.com/tsoniclang/gotots/internal/policy"
+	"github.com/tsoniclang/gotots/internal/productinputs"
 	"github.com/tsoniclang/gotots/internal/profile"
 )
 
@@ -52,6 +53,13 @@ type GateInputs struct {
 	GoVersion                   string   `json:"goVersion,omitempty"`
 	GoExecutableSha256          string   `json:"goExecutableSha256,omitempty"`
 	GorootSourceSha256          string   `json:"gorootSourceSha256,omitempty"`
+	TypescriptCompiler          string   `json:"typescriptCompiler,omitempty"`
+	JavascriptRuntime           string   `json:"javascriptRuntime,omitempty"`
+	NodeExecutableSha256        string   `json:"nodeExecutableSha256,omitempty"`
+	ModuleResolverPolicy        string   `json:"moduleResolverPolicy,omitempty"`
+	ModuleResolverSha256        string   `json:"moduleResolverSha256,omitempty"`
+	StrictConfigSha256          string   `json:"strictConfigSha256,omitempty"`
+	HelperRuntimeSha256         string   `json:"helperRuntimeSha256,omitempty"`
 	Missing                     []string `json:"missing"`
 }
 
@@ -86,6 +94,7 @@ func runGate(args []string) error {
 	sourceDir := flags.String("source", "", "pinned source checkout (required)")
 	buildProfile := flags.String("build-profile", "linux-amd64", "build profile name")
 	reportPath := flags.String("report", "", "gate report output path (required)")
+	productToolchainPath := flags.String("product-toolchain", "pins/product-toolchain.json", "product toolchain pin path (repo-relative)")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -210,7 +219,31 @@ func runGate(args []string) error {
 		report.Inputs.GoVersion = firstRun.Report.Pin.Toolchain.Version
 		report.Inputs.GoExecutableSha256 = firstRun.Report.Pin.Toolchain.GoExecutableSha256
 		report.Inputs.GorootSourceSha256 = firstRun.Report.Pin.Toolchain.GorootSrcDigest
-		return "blocked", []string{"Go/source inputs are attested; TypeScript compiler, JavaScript runtime, resolver, strict config, and helper-runtime identities are not yet in the profile"}, nil
+
+		// The non-Go half of the closed input contract: TypeScript
+		// compiler, JavaScript runtime, module resolver, strict
+		// configuration, and generated-helper-runtime identities, all
+		// declared in the committed pin and verified against their
+		// materializations.
+		productPin, err := productinputs.Load(filepath.Join(*repoDir, filepath.FromSlash(*productToolchainPath)))
+		if err != nil {
+			return "fail", nil, err
+		}
+		if err := productPin.Verify(*repoDir); err != nil {
+			return "fail", nil, err
+		}
+		report.Inputs.TypescriptCompiler = productPin.TypescriptCompiler.Package + "@" + productPin.TypescriptCompiler.Version
+		report.Inputs.JavascriptRuntime = productPin.JavascriptRuntime.Name + " " + productPin.Verified.NodeVersion
+		report.Inputs.NodeExecutableSha256 = productPin.Verified.NodeExecutableSha256
+		report.Inputs.ModuleResolverPolicy = productPin.ModuleResolver.Policy
+		report.Inputs.ModuleResolverSha256 = productPin.ModuleResolver.LoaderSha256
+		report.Inputs.StrictConfigSha256 = productPin.StrictConfig.Sha256
+		report.Inputs.HelperRuntimeSha256 = productPin.HelperRuntime.Sha256
+		report.Inputs.Missing = nil
+		return "pass", []string{
+			"typescript compiler identity declared: " + report.Inputs.TypescriptCompiler + " (materialization verified at stage 10)",
+			"javascript runtime verified: " + report.Inputs.JavascriptRuntime,
+		}, nil
 	})
 	run("03-selected-scope-dependency-closure", func() (string, []string, error) {
 		if firstRun == nil {

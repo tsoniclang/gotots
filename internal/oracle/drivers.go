@@ -94,21 +94,7 @@ func main() {
 // for execution — a host-execution normalization, never a mutation of
 // generated output.
 func runNodeDriver(nodeExecutable, workDir string, cases []fixtureCase, emulationTS string) (string, error) {
-	loader := `import { pathToFileURL } from "node:url";
-import { access } from "node:fs/promises";
-
-export async function resolve(specifier, context, nextResolve) {
-  if (specifier.startsWith(".") && specifier.endsWith(".js")) {
-    const parent = context.parentURL ? new URL(context.parentURL) : pathToFileURL(process.cwd() + "/");
-    const candidate = new URL(specifier.slice(0, -3) + ".ts", parent);
-    try {
-      await access(candidate);
-      return nextResolve(candidate.href, context);
-    } catch {}
-  }
-  return nextResolve(specifier, context);
-}
-`
+	loader := LoaderSource
 	register := `import { register } from "node:module";
 register(new URL("./loader.mjs", import.meta.url));
 `
