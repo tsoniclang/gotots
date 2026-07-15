@@ -166,12 +166,15 @@ func TestCrossPackageFailClosed(t *testing.T) {
 		mention string
 	}{
 		{
-			name: "call into a package outside the unit",
+			name: "external call whose signature cannot be typed",
 			source: `package fixture
 
-import "strings"
+import "os"
 
-func Case() string { return strings.ToUpper("x") }
+func Case() bool {
+	f, err := os.Open("x")
+	return f != nil && err == nil
+}
 `,
 			code:    "GOTOTS_UNSUPPORTED_EXPRESSION",
 			mention: "call outside the translated unit",

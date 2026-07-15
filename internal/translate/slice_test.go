@@ -348,10 +348,10 @@ func Case() bool { a := "x"; b := "y"; return a < b }
 			code: "GOTOTS_UNSUPPORTED_OPERATION", mention: "string ordering",
 		},
 		{
-			name: "reference outside the translated unit",
+			name: "external call with an unreviewed signature",
 			source: `package fixture
-import "strings"
-func Case() string { return strings.ToUpper("x") }
+import "os"
+func Case() bool { f, err := os.Open("x"); return f != nil && err == nil }
 `,
 			code: "GOTOTS_UNSUPPORTED_EXPRESSION", mention: "call outside the translated unit",
 		},

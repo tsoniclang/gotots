@@ -11,6 +11,7 @@ package ir
 import (
 	"fmt"
 	"go/types"
+	"sort"
 )
 
 // Kind is the exact Go semantic type class of an IR value.
@@ -97,6 +98,9 @@ type Scope struct {
 	// generics maps each generic function to the type-argument tuples of
 	// every instantiation anywhere in the unit.
 	generics map[*types.Func][][]types.Type
+	// externals records every admitted external package-level function:
+	// the typed contracts the generated stub modules cover.
+	externals map[*types.Func]bool
 }
 
 // NewScope builds a unit scope over the given package paths.
@@ -105,7 +109,11 @@ func NewScope(paths ...string) Scope {
 	for _, path := range paths {
 		packages[path] = true
 	}
-	return Scope{packages: packages, generics: map[*types.Func][][]types.Type{}}
+	return Scope{
+		packages:  packages,
+		generics:  map[*types.Func][][]types.Type{},
+		externals: map[*types.Func]bool{},
+	}
 }
 
 // Owns reports whether the package path is part of the unit.
@@ -127,6 +135,25 @@ func (s Scope) AddGenericInstance(fn *types.Func, typeArgs []types.Type) {
 
 // GenericInstances returns every recorded instantiation of fn.
 func (s Scope) GenericInstances(fn *types.Func) [][]types.Type { return s.generics[fn] }
+
+// AddExternalFunc records one admitted external function contract.
+func (s Scope) AddExternalFunc(fn *types.Func) { s.externals[fn] = true }
+
+// ExternalFuncs returns every admitted external function contract,
+// sorted by package path then name.
+func (s Scope) ExternalFuncs() []*types.Func {
+	out := make([]*types.Func, 0, len(s.externals))
+	for fn := range s.externals {
+		out = append(out, fn)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Pkg().Path() != out[j].Pkg().Path() {
+			return out[i].Pkg().Path() < out[j].Pkg().Path()
+		}
+		return out[i].Name() < out[j].Name()
+	})
+	return out
+}
 
 // Signed reports whether the kind is a signed integer.
 func (k Kind) Signed() bool {

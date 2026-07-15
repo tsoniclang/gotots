@@ -217,6 +217,17 @@ type Call struct {
 	Results  []Type
 }
 
+// ExternalCall invokes an external package-level function through its
+// generated typed stub: a runtime-fail-closed contract the emulation
+// layer supplies behavior for.
+type ExternalCall struct {
+	Pkg      string
+	Name     string
+	TypeArgs []Type
+	Args     []Expr
+	Results  []Type
+}
+
 // MethodCall invokes a statically resolved method, generated as a
 // package-level function over its receiver. A nil pointer receiver flows
 // into a pointer-receiver method exactly as in Go (the body's own
@@ -460,6 +471,7 @@ func (*Deref) expr()            {}
 func (*Closure) expr()          {}
 func (*FuncRef) expr()          {}
 func (*DynCall) expr()          {}
+func (*ExternalCall) expr()     {}
 func (*IfaceBox) expr()         {}
 func (*IfaceCall) expr()        {}
 func (*TypeAssert) expr()       {}
@@ -520,6 +532,13 @@ func (d *DynCall) Type() Type {
 }
 
 func (c *IfaceCall) Type() Type {
+	if len(c.Results) == 1 {
+		return c.Results[0]
+	}
+	return Type{}
+}
+
+func (c *ExternalCall) Type() Type {
 	if len(c.Results) == 1 {
 		return c.Results[0]
 	}

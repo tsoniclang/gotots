@@ -119,6 +119,13 @@ func Translate(workDir string, packageSources map[string]string) (*translate.Gen
 // Node toolchain is required: its absence blocks the gate rather than
 // skipping it.
 func Run(workDir string, packageSources map[string]string) (*Result, error) {
+	return RunEmulated(workDir, packageSources, "")
+}
+
+// RunEmulated additionally loads emulationTS — a TypeScript module
+// registering external-contract behavior — before the generated cases
+// execute, mirroring the product's hand-maintained emulation layer.
+func RunEmulated(workDir string, packageSources map[string]string, emulationTS string) (*Result, error) {
 	resolved, err := bootstrapOnce()
 	if err != nil {
 		return nil, err
@@ -159,7 +166,7 @@ func Run(workDir string, packageSources map[string]string) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	tsOutput, err := runNodeDriver(nodeExecutable, workDir, cases)
+	tsOutput, err := runNodeDriver(nodeExecutable, workDir, cases, emulationTS)
 	if err != nil {
 		return nil, err
 	}

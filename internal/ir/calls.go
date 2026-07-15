@@ -18,14 +18,11 @@ func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
 	}
 
 	if function, nameIdent := b.staticCallee(n.Fun); function != nil {
-		if function.Pkg() == nil || !b.unit.Owns(function.Pkg().Path()) {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "call outside the translated unit", Span: span}
-		}
 		signature := function.Type().(*types.Signature)
 		if signature.Recv() != nil {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic call", Span: span}
 		}
-		call := &Call{Pkg: function.Pkg().Path(), Callee: function.Name()}
+		var typeArgs []Type
 		if signature.TypeParams() != nil {
 			// An instantiated generic call: the checker's substituted
 			// signature types the arguments and results, and the type
@@ -44,10 +41,19 @@ func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
 				if err != nil {
 					return nil, err
 				}
-				call.TypeArgs = append(call.TypeArgs, argType)
+				if argType.Kind == KindStruct {
+					return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+						Construct: "generic call instantiated with a struct value (copy semantics vary per instantiation)", Span: span}
+				}
+				typeArgs = append(typeArgs, argType)
 			}
 			b.use("genericCall")
 		}
+
+		if function.Pkg() == nil || !b.unit.Owns(function.Pkg().Path()) {
+			return b.buildExternalCall(n, function, signature, typeArgs)
+		}
+		call := &Call{Pkg: function.Pkg().Path(), Callee: function.Name(), TypeArgs: typeArgs}
 		if err := b.buildCallArgsResults(n, signature, &call.Args, &call.Results); err != nil {
 			return nil, err
 		}
@@ -72,6 +78,53 @@ func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
 		return nil, err
 	}
 	b.use("dynCall")
+	return out, nil
+}
+
+// buildExternalCall admits a call of an external package-level function
+// whose signature resolves in the reviewed type set: a typed contract
+// routed through the generated stub for that package. The stub fails
+// closed at runtime unless the emulation layer registered behavior.
+func (b *builder) buildExternalCall(n *ast.CallExpr, function *types.Func, signature *types.Signature, typeArgs []Type) (Expr, error) {
+	span := b.span(n.Pos())
+	if function.Pkg() == nil {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+			Construct: "call outside the translated unit (unqualified)", Span: span}
+	}
+	callee := function.Pkg().Path() + "." + function.Name()
+
+	// The whole signature must resolve in the reviewed type set — the
+	// stub's contract cannot be typed otherwise. For generics both the
+	// instantiated signature (typing this call) and the declared one
+	// (typing the generated stub) must resolve. Argument expressions
+	// build afterwards so their own diagnostics stay precise.
+	check := []*types.Signature{signature}
+	if declared := function.Type().(*types.Signature); declared != signature {
+		check = append(check, declared)
+	}
+	for _, sig := range check {
+		params := sig.Params()
+		for i := range params.Len() {
+			if _, err := b.typeOf(params.At(i).Type(), span); err != nil {
+				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+					Construct: "call outside the translated unit (" + callee + ")", Span: span}
+			}
+		}
+		resultTuple := sig.Results()
+		for i := range resultTuple.Len() {
+			if _, err := b.typeOf(resultTuple.At(i).Type(), span); err != nil {
+				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+					Construct: "call outside the translated unit (" + callee + ")", Span: span}
+			}
+		}
+	}
+
+	out := &ExternalCall{Pkg: function.Pkg().Path(), Name: function.Name(), TypeArgs: typeArgs}
+	if err := b.buildCallArgsResults(n, signature, &out.Args, &out.Results); err != nil {
+		return nil, err
+	}
+	b.unit.AddExternalFunc(function)
+	b.use("externalCall")
 	return out, nil
 }
 
@@ -111,7 +164,11 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 	span := b.span(n.Pos())
 	method := selection.Obj().(*types.Func)
 	if method.Pkg() == nil || !b.unit.Owns(method.Pkg().Path()) {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method call outside the translated unit", Span: span}
+		callee := "unqualified"
+		if method.Pkg() != nil {
+			callee = method.Pkg().Path() + "." + method.Name()
+		}
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method call outside the translated unit (" + callee + ")", Span: span}
 	}
 	recv, err := b.buildExpr(selector.X)
 	if err != nil {

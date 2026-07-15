@@ -33,6 +33,9 @@ type ProbeResult struct {
 	PackagesFullyTranslated []string `json:"packagesFullyTranslated"`
 	// PerPackage maps package path -> translated/total.
 	PerPackage map[string]string `json:"perPackage"`
+	// ExternalRefs counts blocked references per external function or
+	// method (pkg.Name) — the evidence ranking emulation-layer priorities.
+	ExternalRefs map[string]int `json:"externalRefs"`
 }
 
 // Probe loads the owned corpus under the profile and attempts IR building
@@ -46,6 +49,7 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 	result := &ProbeResult{
 		BlockerHistogram: map[string]int{},
 		PerPackage:       map[string]string{},
+		ExternalRefs:     map[string]int{},
 	}
 	sort.Slice(loaded, func(i, j int) bool { return loaded[i].ID < loaded[j].ID })
 
@@ -96,6 +100,9 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 				if err := probeFunc(p, sourceDir, unit, source, funcDecl); err != nil {
 					result.Blocked++
 					result.BlockerHistogram[blockerKey(err)]++
+					if ref, isExternal := externalRef(err); isExternal {
+						result.ExternalRefs[ref]++
+					}
 				} else {
 					result.Translated++
 					packageTranslated++
@@ -128,6 +135,22 @@ func probeFunc(p *packages.Package, sourceDir string, unit ir.Scope, source []by
 	return err
 }
 
+// externalRef extracts the qualified callee of an external-reference
+// diagnostic, when the blocker is one.
+func externalRef(err error) (string, bool) {
+	var unsupported *ir.Unsupported
+	if !asUnsupported(err, &unsupported) {
+		return "", false
+	}
+	construct := unsupported.Construct
+	for _, prefix := range []string{"call outside the translated unit (", "method call outside the translated unit ("} {
+		if strings.HasPrefix(construct, prefix) && strings.HasSuffix(construct, ")") {
+			return strings.TrimSuffix(strings.TrimPrefix(construct, prefix), ")"), true
+		}
+	}
+	return "", false
+}
+
 // blockerKey normalizes a diagnostic to its construct class so the
 // histogram ranks semantic families, not source locations.
 func blockerKey(err error) string {
@@ -140,6 +163,7 @@ func blockerKey(err error) string {
 			"non-basic type ", "basic type ", "pointer to non-named type ",
 			"pointer to non-struct type ", "pointer to type outside the translated unit: ",
 			"interface type ", "array type ", "channel type ", "type parameter ",
+			"call outside the translated unit ", "method call outside the translated unit ",
 			"map key type ", "type ", "identifier ", "call of ", "field access on ",
 			"index on ", "nil comparison on ", "operator ", "conversion from ",
 			"len of ", "make of ", "builtin ", "constant of type ", "zero value of ",

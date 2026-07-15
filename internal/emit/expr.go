@@ -123,6 +123,28 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			return "", err
 		}
 		return fmt.Sprintf("gort.goNilCheck(%s)(%s)", fun, args), nil
+	case *ir.ExternalCall:
+		args, err := p.printArgs(n.Args)
+		if err != nil {
+			return "", err
+		}
+		callee, err := p.module.symbol(n.Pkg, n.Name)
+		if err != nil {
+			return "", err
+		}
+		typeArgs := ""
+		if len(n.TypeArgs) > 0 {
+			parts := make([]string, len(n.TypeArgs))
+			for i, typeArg := range n.TypeArgs {
+				spelled, err := p.tsType(typeArg)
+				if err != nil {
+					return "", err
+				}
+				parts[i] = spelled
+			}
+			typeArgs = "<" + strings.Join(parts, ", ") + ">"
+		}
+		return fmt.Sprintf("%s%s(%s)", callee, typeArgs, args), nil
 	case *ir.IfaceBox:
 		x, err := p.printExpr(n.X)
 		if err != nil {

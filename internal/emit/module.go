@@ -18,6 +18,7 @@ type ABIImports struct {
 	Runtime string
 	Slice   string
 	Iface   string
+	Extern  string
 }
 
 // Module is the emission context of one generated package module: its Go
@@ -80,6 +81,7 @@ func (m *Module) importLines() string {
 	fmt.Fprintf(&out, "import * as gort from %q;\n", m.ABI.Runtime)
 	fmt.Fprintf(&out, "import * as gosl from %q;\n", m.ABI.Slice)
 	fmt.Fprintf(&out, "import * as goif from %q;\n", m.ABI.Iface)
+	fmt.Fprintf(&out, "import * as goext from %q;\n", m.ABI.Extern)
 	usedPaths := make([]string, 0, len(m.used))
 	for path := range m.used {
 		usedPaths = append(usedPaths, path)
