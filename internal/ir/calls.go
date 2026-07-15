@@ -221,6 +221,22 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 func (b *builder) buildCallArgsResults(n *ast.CallExpr, signature *types.Signature, args *[]Expr, results *[]Type) error {
 	span := b.span(n.Pos())
 	params := signature.Params()
+	if len(n.Args) == 1 && params.Len() > 1 {
+		innerCall, isCall := ast.Unparen(n.Args[0]).(*ast.CallExpr)
+		if _, isTuple := b.info.Types[n.Args[0]].Type.(*types.Tuple); isTuple && isCall {
+			if signature.Variadic() {
+				return &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "multi-result forwarding into a variadic call", Span: span}
+			}
+			// f(g()): the inner call's fresh results spread positionally.
+			inner, err := b.buildAnyCall(innerCall)
+			if err != nil {
+				return err
+			}
+			b.use("tupleSpread")
+			*args = append(*args, &TupleSpread{X: inner})
+			return b.appendCallResults(n, signature, results)
+		}
+	}
 	fixed := params.Len()
 	if signature.Variadic() {
 		fixed--
@@ -243,6 +259,12 @@ func (b *builder) buildCallArgsResults(n *ast.CallExpr, signature *types.Signatu
 		}
 		*args = append(*args, variadic)
 	}
+	return b.appendCallResults(n, signature, results)
+}
+
+// appendCallResults resolves the call's result types.
+func (b *builder) appendCallResults(n *ast.CallExpr, signature *types.Signature, results *[]Type) error {
+	span := b.span(n.Pos())
 	tuple := signature.Results()
 	for i := range tuple.Len() {
 		t, err := b.typeOf(tuple.At(i).Type(), span)

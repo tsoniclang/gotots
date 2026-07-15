@@ -91,6 +91,14 @@ type PanicStmt struct {
 	Value Expr
 }
 
+// TupleSpread forwards a multi-result call's values as the complete
+// argument list of an enclosing call (Go's f(g()) form): the results
+// spread positionally in evaluation order.
+type TupleSpread struct {
+	X Expr // the multi-result call
+	T Type
+}
+
 // StmtSeq is a flat statement sequence spliced into the surrounding
 // block without introducing a lexical scope (used by lowerings that
 // expand one source statement into several).
@@ -182,6 +190,7 @@ func (*ExprStmt) stmt()       {}
 func (*BranchStmt) stmt()     {}
 func (*DeferPush) stmt()      {}
 func (*StmtSeq) stmt()        {}
+func (*TupleSpread) expr()    {}
 
 // Expr is one Go expression in IR form with its resolved type.
 type Expr interface {
@@ -518,3 +527,5 @@ func (s *SliceAppendSlice) Type() Type { return s.T }
 func (s *SliceCopy) Type() Type        { return intType }
 func (s *SliceLen) Type() Type         { return intType }
 func (s *SliceCap) Type() Type         { return intType }
+
+func (t *TupleSpread) Type() Type { return t.T }

@@ -491,6 +491,14 @@ func (p *printer) printClosure(n *ir.Closure) (string, error) {
 func (p *printer) printArgs(args []ir.Expr) (string, error) {
 	parts := make([]string, len(args))
 	for i, arg := range args {
+		if spread, isSpread := arg.(*ir.TupleSpread); isSpread {
+			inner, err := p.printExpr(spread.X)
+			if err != nil {
+				return "", err
+			}
+			parts[i] = "...(" + inner + ")"
+			continue
+		}
 		printed, err := p.printExpr(arg)
 		if err != nil {
 			return "", err

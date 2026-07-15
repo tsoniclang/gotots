@@ -98,9 +98,12 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 		return Type{Kind: KindMap, Go: spelled, Key: &key, Elem: &value}, nil
 
 	case *types.Signature:
-		if u.Variadic() || u.TypeParams() != nil || u.Recv() != nil {
-			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "variadic or generic function type " + spelled, Span: span}
+		if u.TypeParams() != nil || u.Recv() != nil {
+			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "generic function type " + spelled, Span: span}
 		}
+		// A variadic signature is exact through its carrier: the final
+		// parameter is the packed slice, and every call site packs (or
+		// spreads) through the call-building evidence.
 		sig := &FuncSig{}
 		for i := range u.Params().Len() {
 			parameter, err := b.typeOf(u.Params().At(i).Type(), span)

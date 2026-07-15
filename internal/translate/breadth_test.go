@@ -219,3 +219,60 @@ func BlankClosureParams() int {
 }
 `)
 }
+
+func TestOracleVariadicFunctionValues(t *testing.T) {
+	runOracle(t, `package fixture
+
+func sum(base int, values ...int) int {
+	total := base
+	for _, v := range values {
+		total += v
+	}
+	return total
+}
+
+func VariadicFuncValue() (int, int, int) {
+	f := sum
+	direct := f(10, 1, 2, 3)
+	empty := f(5)
+	spread := f(0, []int{4, 5}...)
+	return direct, empty, spread
+}
+
+func VariadicClosure() int {
+	join := func(sep string, parts ...string) string {
+		out := ""
+		for i, part := range parts {
+			if i > 0 {
+				out += sep
+			}
+			out += part
+		}
+		return out
+	}
+	g := join
+	return len(g("-", "a", "b", "c"))
+}
+`)
+}
+
+func TestOracleTupleForwarding(t *testing.T) {
+	runOracle(t, `package fixture
+
+func pair() (int, string) {
+	return 7, "seven"
+}
+
+func consume(n int, s string) string {
+	out := s
+	for i := 0; i < n; i++ {
+		out += "!"
+	}
+	return out
+}
+
+func ForwardTuple() string {
+	return consume(pair())
+}
+`)
+}
