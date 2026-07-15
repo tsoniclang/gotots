@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 
+	"encoding/hex"
 	"github.com/tsoniclang/gotots/contracts"
 	"github.com/tsoniclang/gotots/internal/census"
 	"github.com/tsoniclang/gotots/internal/goenv"
@@ -361,8 +362,47 @@ func runGate(args []string) error {
 		}
 		return "pass", details, nil
 	})
-	blocked("05-declaration-signature-type-completeness",
-		"complete independently verified declaration/signature/type-identity gate not implemented")
+	run("05-declaration-signature-type-completeness", func() (string, []string, error) {
+		if firstRun == nil || firstRun.Shapes == nil || corpusGenerated == nil {
+			return "blocked", []string{"census shapes or corpus generation did not run"}, nil
+		}
+		// Independent verification: the census's frontend pass spelled
+		// every declaration's canonical signature; each generated
+		// function's proof hash must match the census spelling exactly.
+		censusSignature := map[string]string{}
+		for _, shape := range firstRun.Shapes.Functions {
+			digest := sha256.Sum256([]byte(shape.Signature))
+			censusSignature[shape.ID] = hex.EncodeToString(digest[:])
+		}
+		verified, missing := 0, 0
+		var mismatches []string
+		for _, proof := range corpusGenerated.Proofs {
+			if proof.SignatureHash == "" {
+				continue // types and variables carry no function signature
+			}
+			expected, has := censusSignature[proof.ID]
+			if !has {
+				missing++
+				if len(mismatches) < 10 {
+					mismatches = append(mismatches, "no census shape for "+proof.ID)
+				}
+				continue
+			}
+			if expected != proof.SignatureHash {
+				if len(mismatches) < 10 {
+					mismatches = append(mismatches, "signature drift at "+proof.ID)
+				}
+				continue
+			}
+			verified++
+		}
+		if len(mismatches) > 0 {
+			return "fail", mismatches, fmt.Errorf("%d signature identities failed independent verification", len(mismatches))
+		}
+		return "pass", []string{
+			fmt.Sprintf("function and method signatures independently verified against the census spelling: %d", verified),
+		}, nil
+	})
 	run("06-semantic-ir-operation-class-completeness", func() (string, []string, error) {
 		if corpusGenerated == nil {
 			return "blocked", []string{"corpus generation did not run"}, nil

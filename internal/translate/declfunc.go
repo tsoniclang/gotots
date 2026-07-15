@@ -19,6 +19,11 @@ func translateFunc(p *packages.Package, sourceDir string, unit ir.Scope, relativ
 	id := goid.Func(p.PkgPath, name)
 	if decl.Recv != nil {
 		id = goid.Method(p.PkgPath, receiverBase(decl.Recv), name)
+	} else if goid.IsRepeatable("func", name) {
+		// init and blank functions repeat legally: their identities are
+		// position-qualified, exactly like the census records them.
+		position := p.Fset.Position(decl.Name.Pos())
+		id = goid.Repeatable(p.PkgPath, "func", name, relativeFile, position.Line, position.Column)
 	}
 
 	bodyHash := ""
