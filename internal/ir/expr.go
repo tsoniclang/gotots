@@ -147,6 +147,10 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
+		if len(selection.Index()) > 1 {
+			// A promoted field: chain through the embedded fields.
+			return b.chainFieldPath(base, b.info.Types[n.X].Type, selection.Index(), span)
+		}
 		if base.Type().Kind != KindPointer && base.Type().Kind != KindStruct {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "field access on " + base.Type().Go, Span: span}
 		}

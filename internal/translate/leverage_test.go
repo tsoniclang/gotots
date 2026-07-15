@@ -179,3 +179,105 @@ func Case(err error) bool {
 		t.Errorf("expected external variable contract dispatch, got:\n%s", core)
 	}
 }
+
+func TestOracleEmbeddedFields(t *testing.T) {
+	runOracle(t, `package fixture
+
+type base struct {
+	id   int
+	name string
+}
+
+func (b *base) describe() string {
+	return b.name
+}
+
+func (b base) ident() int {
+	return b.id
+}
+
+type derived struct {
+	base
+	extra int
+}
+
+func PromotedFieldAccess() (int, string, int) {
+	d := derived{base: base{id: 7, name: "d"}, extra: 3}
+	return d.id, d.name, d.extra
+}
+
+func PromotedFieldStore() int {
+	d := derived{}
+	d.id = 41
+	d.base.id += 1
+	return d.id
+}
+
+func PromotedMethodCalls() (string, int) {
+	d := derived{base: base{id: 9, name: "emb"}}
+	return d.describe(), d.ident()
+}
+
+func PromotedPointerReceiverMutation() string {
+	d := &derived{}
+	d.name = "before"
+	d.describe()
+	d.base.name = "after"
+	return d.describe()
+}
+
+type deep struct {
+	derived
+}
+
+func TwoLevelPromotion() (int, string) {
+	x := deep{derived: derived{base: base{id: 5, name: "deep"}}}
+	return x.id, x.describe()
+}
+
+func EmbeddedValueCopySemantics() (int, int) {
+	d := derived{base: base{id: 1}}
+	e := d
+	e.id = 99
+	return d.id, e.id
+}
+`)
+}
+
+func TestOraclePromotedInterfaceDispatch(t *testing.T) {
+	runOracle(t, `package fixture
+
+type namer interface {
+	name() string
+}
+
+type core struct {
+	label string
+}
+
+func (c *core) name() string {
+	return "core:" + c.label
+}
+
+type wrapper struct {
+	core
+	extra int
+}
+
+func PromotedDispatchThroughInterface() (string, string) {
+	w := &wrapper{core: core{label: "x"}}
+	var n namer = w
+	direct := w.name()
+	return n.name(), direct
+}
+
+func PromotedMethodSetAssertion() (bool, string) {
+	var v any = &wrapper{core: core{label: "y"}}
+	n, ok := v.(namer)
+	if !ok {
+		return false, ""
+	}
+	return ok, n.name()
+}
+`)
+}

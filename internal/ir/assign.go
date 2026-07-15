@@ -53,6 +53,14 @@ func (b *builder) buildTarget(lhs ast.Expr) (Target, error) {
 		if err != nil {
 			return nil, err
 		}
+		if path := selection.Index(); len(path) > 1 {
+			// A promoted field target: the base chains through the
+			// embedded fields; the final segment is the stored field.
+			base, err = b.chainFieldPath(base, b.info.Types[n.X].Type, path[:len(path)-1], span)
+			if err != nil {
+				return nil, err
+			}
+		}
 		if base.Type().Kind != KindPointer && base.Type().Kind != KindStruct {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "field assignment on " + base.Type().Go, Span: span}
 		}

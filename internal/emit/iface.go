@@ -32,13 +32,26 @@ func (p *printer) rttiRef(r ir.RttiRef) (string, error) {
 // method table maps method names onto the generated method functions;
 // Go's method-set rules guarantee only reachable entries are ever
 // dispatched.
-func printRtti(out *strings.Builder, module *Module, typeName string, exported, pointer bool, methods []*ir.Func) error {
+func printRtti(out *strings.Builder, module *Module, typeName string, exported, pointer bool, methods []*ir.Func, promoted []ir.PromotedDelegate) error {
 	p := &printer{out: out, module: module}
 	sorted := append([]*ir.Func{}, methods...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
-	entries := make([]string, 0, len(sorted))
+	entries := make([]string, 0, len(sorted)+len(promoted))
 	for _, method := range sorted {
 		entries = append(entries, fmt.Sprintf("%s: %s$%s", method.Name, typeName, method.Name))
+	}
+	for _, delegate := range promoted {
+		// A promoted method delegates through the embedded value fields
+		// to the declaring type's generated function.
+		target, err := p.module.symbol(delegate.Pkg, delegate.TypeName+"$"+delegate.Name)
+		if err != nil {
+			return err
+		}
+		chain := "($r as " + tsName(typeName) + ")"
+		for _, field := range delegate.Path {
+			chain += "." + field
+		}
+		entries = append(entries, fmt.Sprintf("%s: ($r: unknown, ...$a: unknown[]) => %s(%s, ...$a)", delegate.Name, target, chain))
 	}
 	table := "{ " + strings.Join(entries, ", ") + " }"
 	if len(entries) == 0 {

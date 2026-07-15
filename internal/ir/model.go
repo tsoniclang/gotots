@@ -280,6 +280,19 @@ type Struct struct {
 	Span     Span
 	Fields   []Var
 	Methods  []*Func
+	// Promoted lists the embedded-field method promotions the rtti
+	// method table delegates through value-field chains.
+	Promoted []PromotedDelegate
+}
+
+// PromotedDelegate is one promoted method in a struct's method set: the
+// rtti table entry delegates through the embedded value fields to the
+// declaring type's generated method function.
+type PromotedDelegate struct {
+	Name     string
+	Path     []string // embedded field names, outermost first
+	Pkg      string
+	TypeName string
 }
 
 // Unsupported is the stable fail-closed diagnostic for a construct outside

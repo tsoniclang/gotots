@@ -372,12 +372,19 @@ func Case() int32 {
 			code: "GOTOTS_UNSUPPORTED_TYPE", mention: "struct type",
 		},
 		{
-			name: "embedded field",
+			name: "promotion through an embedded pointer",
 			source: `package fixture
-type Base struct{ N int32 }
-type Derived struct{ Base }
+type Base struct{ N int }
+func (b *Base) Get() int { return b.N }
+type Outer struct{ *Base }
+func Case() int {
+	o := Outer{Base: &Base{N: 1}}
+	var v any = o
+	_ = v
+	return o.Get()
+}
 `,
-			code: "GOTOTS_UNSUPPORTED_DECLARATION", mention: "embedded field",
+			code: "GOTOTS_UNSUPPORTED_DECLARATION", mention: "promotion through an embedded pointer",
 		},
 		{
 			name: "float map key",

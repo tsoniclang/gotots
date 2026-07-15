@@ -51,6 +51,10 @@ func (b *builder) buildMethodValue(n *ast.SelectorExpr, selection *types.Selecti
 	if err != nil {
 		return nil, err
 	}
+	recv, err = b.chainPromotedReceiver(recv, b.info.Types[n.X].Type, selection, span)
+	if err != nil {
+		return nil, err
+	}
 	t, err := b.typeOf(valueType, span)
 	if err != nil {
 		return nil, err

@@ -170,6 +170,12 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 	if err != nil {
 		return nil, err
 	}
+	// A promoted method's receiver is the embedded field the selection
+	// path names.
+	recv, err = b.chainPromotedReceiver(recv, b.info.Types[selector.X].Type, selection, span)
+	if err != nil {
+		return nil, err
+	}
 	if recv.Type().Kind == KindIface {
 		// Interface dispatch is dynamic through the box's method table,
 		// whether the interface type is owned or external.

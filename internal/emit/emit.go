@@ -106,7 +106,7 @@ func Package(module *Module, decls Decls) (string, error) {
 			}
 		}
 		body.WriteString("\n")
-		if err := printRtti(&body, module, structDecl.Name, structDecl.Exported, true, structDecl.Methods); err != nil {
+		if err := printRtti(&body, module, structDecl.Name, structDecl.Exported, true, structDecl.Methods, structDecl.Promoted); err != nil {
 			return "", err
 		}
 	}
@@ -128,7 +128,7 @@ func Package(module *Module, decls Decls) (string, error) {
 				carrierMethods = append(carrierMethods, method.Fn)
 			}
 		}
-		if err := printRtti(&body, module, carrier.Name, carrier.Exported, false, carrierMethods); err != nil {
+		if err := printRtti(&body, module, carrier.Name, carrier.Exported, false, carrierMethods, nil); err != nil {
 			return "", err
 		}
 	}
