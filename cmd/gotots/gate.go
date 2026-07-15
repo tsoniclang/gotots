@@ -16,6 +16,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/policy"
 	"github.com/tsoniclang/gotots/internal/productinputs"
 	"github.com/tsoniclang/gotots/internal/profile"
+	"github.com/tsoniclang/gotots/internal/schema"
 )
 
 // GateResult is one acceptance layer's outcome.
@@ -239,7 +240,7 @@ func runGate(args []string) error {
 		report.Inputs.ModuleResolverSha256 = productPin.ModuleResolver.LoaderSha256
 		report.Inputs.StrictConfigSha256 = productPin.StrictConfig.Sha256
 		report.Inputs.HelperRuntimeSha256 = productPin.HelperRuntime.Sha256
-		report.Inputs.Missing = nil
+		report.Inputs.Missing = []string{}
 		return "pass", []string{
 			"typescript compiler identity declared: " + report.Inputs.TypescriptCompiler + " (materialization verified at stage 10)",
 			"javascript runtime verified: " + report.Inputs.JavascriptRuntime,
@@ -360,6 +361,13 @@ func runGate(args []string) error {
 	data, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
 		return err
+	}
+	reportSchema, err := schema.Load(filepath.Join(*repoDir, "schemas", "gate-report.schema.json"))
+	if err != nil {
+		return err
+	}
+	if err := reportSchema.Validate(data); err != nil {
+		return fmt.Errorf("gate report does not satisfy its schema: %w", err)
 	}
 	if err := os.WriteFile(*reportPath, append(data, '\n'), 0o644); err != nil {
 		return err

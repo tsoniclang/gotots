@@ -1,0 +1,106 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "generatedHelperRuntime": {
+      "additionalProperties": false,
+      "properties": {
+        "abiVersion": {
+          "type": "integer"
+        },
+        "sha256": {
+          "pattern": "sha256-hex",
+          "type": "string"
+        }
+      },
+      "required": [
+        "abiVersion",
+        "sha256"
+      ],
+      "type": "object"
+    },
+    "javascriptRuntime": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "pattern": "nonempty",
+          "type": "string"
+        },
+        "version": {
+          "pattern": "nonempty",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ],
+      "type": "object"
+    },
+    "moduleResolver": {
+      "additionalProperties": false,
+      "properties": {
+        "loaderSha256": {
+          "pattern": "sha256-hex",
+          "type": "string"
+        },
+        "policy": {
+          "pattern": "nonempty",
+          "type": "string"
+        }
+      },
+      "required": [
+        "loaderSha256",
+        "policy"
+      ],
+      "type": "object"
+    },
+    "schemaVersion": {
+      "type": "integer"
+    },
+    "strictTypeScriptConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "pattern": "nonempty",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "sha256-hex",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "type": "object"
+    },
+    "typescriptCompiler": {
+      "additionalProperties": false,
+      "properties": {
+        "package": {
+          "pattern": "nonempty",
+          "type": "string"
+        },
+        "version": {
+          "pattern": "nonempty",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package",
+        "version"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "generatedHelperRuntime",
+    "javascriptRuntime",
+    "moduleResolver",
+    "schemaVersion",
+    "strictTypeScriptConfig",
+    "typescriptCompiler"
+  ],
+  "type": "object"
+}

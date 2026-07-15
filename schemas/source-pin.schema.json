@@ -1,0 +1,66 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "goModule": {
+      "pattern": "nonempty",
+      "type": "string"
+    },
+    "revision": {
+      "pattern": "nonempty",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "type": "integer"
+    },
+    "toolchain": {
+      "additionalProperties": false,
+      "properties": {
+        "goExecutableSha256": {
+          "pattern": "sha256-hex",
+          "type": "string"
+        },
+        "goarch": {
+          "pattern": "nonempty",
+          "type": "string"
+        },
+        "goos": {
+          "pattern": "nonempty",
+          "type": "string"
+        },
+        "gorootSrcDigest": {
+          "pattern": "sha256-hex",
+          "type": "string"
+        },
+        "gorootToolDigest": {
+          "pattern": "sha256-hex",
+          "type": "string"
+        },
+        "version": {
+          "pattern": "nonempty",
+          "type": "string"
+        }
+      },
+      "required": [
+        "goExecutableSha256",
+        "goarch",
+        "goos",
+        "gorootSrcDigest",
+        "gorootToolDigest",
+        "version"
+      ],
+      "type": "object"
+    },
+    "upstream": {
+      "pattern": "nonempty",
+      "type": "string"
+    }
+  },
+  "required": [
+    "goModule",
+    "revision",
+    "schemaVersion",
+    "toolchain",
+    "upstream"
+  ],
+  "type": "object"
+}
