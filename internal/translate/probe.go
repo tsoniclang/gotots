@@ -135,6 +135,7 @@ func blockerKey(err error) string {
 		for _, prefix := range []string{
 			"non-basic type ", "basic type ", "pointer to non-named type ",
 			"pointer to non-struct type ", "pointer to type outside the translated unit: ",
+			"interface type ", "array type ", "channel type ", "type parameter ",
 			"map key type ", "type ", "identifier ", "call of ", "field access on ",
 			"index on ", "nil comparison on ", "operator ", "conversion from ",
 			"len of ", "make of ", "builtin ", "constant of type ", "zero value of ",

@@ -46,13 +46,22 @@ type Method struct {
 	Fn       *ir.Func
 }
 
+// PackageVar is one package-level variable, generated as a module-level
+// let whose exported form is a live ESM binding.
+type PackageVar struct {
+	Name     string
+	Type     ir.Type
+	Init     ir.Expr
+	Exported bool
+}
+
 // Package prints one translated package into a single TypeScript module:
 // classes for named structs (each followed by its method functions),
-// then carrier-type methods, then functions, each in sorted name order.
-// module carries the package identity, the language-ABI specifiers, and
-// the co-generated import environment; the body is printed first so only
-// referenced packages are imported.
-func Package(module *Module, structs []*ir.Struct, methods []Method, functions []*ir.Func) (string, error) {
+// then carrier-type methods, then package variables, then functions,
+// each in sorted name order. module carries the package identity, the
+// language-ABI specifiers, and the co-generated import environment; the
+// body is printed first so only referenced packages are imported.
+func Package(module *Module, structs []*ir.Struct, methods []Method, vars []PackageVar, functions []*ir.Func) (string, error) {
 	sortedStructs := append([]*ir.Struct{}, structs...)
 	sort.Slice(sortedStructs, func(i, j int) bool { return sortedStructs[i].Name < sortedStructs[j].Name })
 	sortedMethodDecls := append([]Method{}, methods...)
@@ -85,6 +94,27 @@ func Package(module *Module, structs []*ir.Struct, methods []Method, functions [
 		if err := printMethodFunction(&body, module, method.TypeName, method.Fn); err != nil {
 			return "", err
 		}
+	}
+	sortedVars := append([]PackageVar{}, vars...)
+	sort.Slice(sortedVars, func(i, j int) bool { return sortedVars[i].Name < sortedVars[j].Name })
+	if len(sortedVars) > 0 {
+		body.WriteString("\n")
+	}
+	for _, packageVar := range sortedVars {
+		p := &printer{out: &body, module: module}
+		spelled, err := p.tsType(packageVar.Type)
+		if err != nil {
+			return "", err
+		}
+		init, err := p.printExpr(packageVar.Init)
+		if err != nil {
+			return "", err
+		}
+		export := ""
+		if packageVar.Exported {
+			export = "export "
+		}
+		p.line("%slet %s: %s = %s;", export, packageVar.Name, spelled, init)
 	}
 	for _, function := range sorted {
 		body.WriteString("\n")

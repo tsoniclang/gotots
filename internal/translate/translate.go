@@ -148,10 +148,11 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 		files = append(files, fileSource{file: file, relative: filepath.ToSlash(relative), source: source})
 	}
 
-	// Pass 1: type declarations, plus fail-closed screening of every
-	// other package-level GenDecl.
+	// Pass 1: type and variable declarations, plus fail-closed screening
+	// of every other package-level GenDecl.
 	structs := map[string]*ir.Struct{}
 	var structOrder []string
+	var packageVars []emit.PackageVar
 	for _, f := range files {
 		for _, decl := range f.file.Decls {
 			d, isGen := decl.(*ast.GenDecl)
@@ -211,6 +212,48 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 						GeneratedFile:   corePath, GeneratedSymbol: structDecl.Name,
 					})
 				}
+			case token.VAR:
+				for _, spec := range d.Specs {
+					valueSpec := spec.(*ast.ValueSpec)
+					if len(valueSpec.Values) != 0 && len(valueSpec.Values) != len(valueSpec.Names) {
+						return &ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+							Construct: "package-level multi-value var initializer", Span: spanOf(p, sourceDir, spec.Pos())}
+					}
+					for i, name := range valueSpec.Names {
+						if name.Name == "_" {
+							// Order-independent initializers make a blank
+							// package variable effect-free.
+							continue
+						}
+						object, hasDef := p.TypesInfo.Defs[name].(*types.Var)
+						if !hasDef {
+							return &ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+								Construct: "var without typed definition", Span: spanOf(p, sourceDir, name.Pos())}
+						}
+						t, err := ir.ResolveType(p, sourceDir, unit, object.Type(), name.Pos())
+						if err != nil {
+							return err
+						}
+						var initExpr ast.Expr
+						if i < len(valueSpec.Values) {
+							initExpr = valueSpec.Values[i]
+						}
+						init, err := ir.BuildPackageVarInit(p, sourceDir, unit, initExpr, t, name.Pos())
+						if err != nil {
+							return err
+						}
+						packageVars = append(packageVars, emit.PackageVar{
+							Name: name.Name, Type: t, Init: init, Exported: name.IsExported(),
+						})
+						out.Proofs = append(out.Proofs, Proof{
+							ID: goid.Value(p.PkgPath, "var", name.Name), SourceRevision: options.SourceRevision,
+							Package: p.PkgPath, File: f.relative,
+							LoweringPlan:    LoweringPlanV1,
+							Representations: map[string]string{name.Name: "module-let(live-binding," + conservativeCarrier(t) + ")"},
+							GeneratedFile:   corePath, GeneratedSymbol: name.Name,
+						})
+					}
+				}
 			case token.CONST:
 				// Package-level constants generate no code: go/types folds
 				// every use — including cross-package uses — into an exact
@@ -269,7 +312,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 			carrierMethods = append(carrierMethods, emit.Method{TypeName: owner, Fn: function})
 		}
 	}
-	if len(functions) == 0 && len(structs) == 0 && len(carrierMethods) == 0 {
+	if len(functions) == 0 && len(structs) == 0 && len(carrierMethods) == 0 && len(packageVars) == 0 {
 		return fmt.Errorf("package %s has no translatable declarations", p.PkgPath)
 	}
 
@@ -277,7 +320,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 	for _, name := range structOrder {
 		structList = append(structList, structs[name])
 	}
-	body, err := emit.Package(module, structList, carrierMethods, functions)
+	body, err := emit.Package(module, structList, carrierMethods, packageVars, functions)
 	if err != nil {
 		return err
 	}

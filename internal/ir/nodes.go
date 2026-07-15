@@ -190,9 +190,12 @@ type Const struct {
 	Value string
 }
 
-// VarRef reads a variable.
+// VarRef reads a variable. Pkg is empty for locals and parameters; for
+// package-level variables it names the declaring package, and reads
+// from other unit packages go through the (live) ESM namespace binding.
 type VarRef struct {
 	Name string
+	Pkg  string
 	T    Type
 }
 

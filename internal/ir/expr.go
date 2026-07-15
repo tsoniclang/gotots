@@ -104,12 +104,7 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 		if !ok {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: fmt.Sprintf("identifier %q (%T)", n.Name, object), Span: span}
 		}
-		t, err := b.typeOf(variable.Type(), span)
-		if err != nil {
-			return nil, err
-		}
-		b.use("varRef")
-		return &VarRef{Name: n.Name, T: t}, nil
+		return b.buildVarRef(variable, n.Name, span)
 
 	case *ast.SelectorExpr:
 		selection, ok := b.info.Selections[n]
@@ -120,7 +115,9 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 					if function, isFunc := b.info.Uses[n.Sel].(*types.Func); isFunc {
 						return b.buildFuncRef(function, span)
 					}
-					return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "package-level variable reference", Span: span}
+					if variable, isVar := b.info.Uses[n.Sel].(*types.Var); isVar {
+						return b.buildVarRef(variable, n.Sel.Name, span)
+					}
 				}
 			}
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "non-field selector", Span: span}
@@ -150,15 +147,19 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		index, err := b.buildExpr(n.Index)
-		if err != nil {
-			return nil, err
-		}
 		switch operand.Type().Kind {
 		case KindMap:
+			key, err := b.buildExprAs(n.Index, *operand.Type().Key)
+			if err != nil {
+				return nil, err
+			}
 			b.use("mapGet")
-			return &MapGet{Map: operand, Key: index, T: *operand.Type().Elem}, nil
+			return &MapGet{Map: operand, Key: key, T: *operand.Type().Elem}, nil
 		case KindSlice:
+			index, err := b.buildExpr(n.Index)
+			if err != nil {
+				return nil, err
+			}
 			b.use("sliceGet")
 			return &SliceGet{X: operand, Index: index, T: *operand.Type().Elem}, nil
 		}
@@ -263,6 +264,25 @@ func (b *builder) buildExprAs(e ast.Expr, expected Type) (Expr, error) {
 		return b.bindStructValue(built), nil
 	}
 	return built, nil
+}
+
+// buildVarRef reads a variable. Package-level variables carry their
+// declaring package: reads from other unit packages go through the live
+// ESM namespace binding; a variable outside the unit fails closed.
+func (b *builder) buildVarRef(variable *types.Var, name string, span Span) (Expr, error) {
+	t, err := b.typeOf(variable.Type(), span)
+	if err != nil {
+		return nil, err
+	}
+	pkg := ""
+	if variable.Pkg() != nil && variable.Parent() == variable.Pkg().Scope() {
+		if !b.unit[variable.Pkg().Path()] {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "variable outside the translated unit", Span: span}
+		}
+		pkg = variable.Pkg().Path()
+	}
+	b.use("varRef")
+	return &VarRef{Name: name, Pkg: pkg, T: t}, nil
 }
 
 // bindStructValue inserts the value copy of a struct binding. Loads from

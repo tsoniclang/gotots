@@ -64,15 +64,19 @@ func (b *builder) buildTarget(lhs ast.Expr) (Target, error) {
 		if err != nil {
 			return nil, err
 		}
-		index, err := b.buildExpr(n.Index)
-		if err != nil {
-			return nil, err
-		}
 		switch operand.Type().Kind {
 		case KindMap:
+			key, err := b.buildExprAs(n.Index, *operand.Type().Key)
+			if err != nil {
+				return nil, err
+			}
 			b.use("mapStore")
-			return &MapTarget{Map: operand, Key: index}, nil
+			return &MapTarget{Map: operand, Key: key}, nil
 		case KindSlice:
+			index, err := b.buildExpr(n.Index)
+			if err != nil {
+				return nil, err
+			}
 			b.use("sliceStore")
 			return &SliceTarget{X: operand, Index: index}, nil
 		}
@@ -175,6 +179,16 @@ func (b *builder) buildAssign(n *ast.AssignStmt) (Stmt, error) {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "assignment arity mismatch", Span: span}
 		}
 		for i, rhs := range n.Rhs {
+			// A blank target has no type of its own; the value is built
+			// with its natural type and evaluated for effect.
+			if _, isBlank := out.Targets[i].(BlankTarget); isBlank {
+				value, err := b.buildExpr(rhs)
+				if err != nil {
+					return nil, err
+				}
+				out.Values = append(out.Values, value)
+				continue
+			}
 			expected, err := b.typeOf(b.info.Types[n.Lhs[i]].Type, b.span(n.Lhs[i].Pos()))
 			if err != nil {
 				return nil, err
@@ -345,7 +359,7 @@ func (b *builder) tupleValue(rhs []ast.Expr, targetCount int) (Expr, error) {
 		if mapExpr.Type().Kind != KindMap {
 			return nil, nil
 		}
-		key, err := b.buildExpr(n.Index)
+		key, err := b.buildExprAs(n.Index, *mapExpr.Type().Key)
 		if err != nil {
 			return nil, err
 		}

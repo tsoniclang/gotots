@@ -106,6 +106,17 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 		// Struct values are reviewed only behind pointers and receivers;
 		// the caller decides whether a bare struct kind is admissible.
 		return Type{Kind: KindStruct, Go: spelled, Named: named.Obj().Name(), Pkg: named.Obj().Pkg().Path()}, nil
+	case *types.Interface:
+		return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "interface type " + spelled, Span: span}
+
+	case *types.Array:
+		return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "array type " + spelled, Span: span}
+
+	case *types.Chan:
+		return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "channel type " + spelled, Span: span}
+
+	case *types.TypeParam:
+		return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "type parameter " + spelled, Span: span}
 	}
 	return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "type " + spelled, Span: span}
 }
@@ -147,9 +158,11 @@ func basicKind(basic *types.Basic) (Kind, bool) {
 }
 
 // mapKeySupported admits key kinds whose Go equality coincides with JS
-// Map's SameValueZero over the canonical carriers: strings, booleans, and
-// canonical-range integers/bigints. Floats are excluded (NaN semantics
-// differ) and composite keys need generated hashing.
+// Map's SameValueZero over the canonical carriers: strings, booleans,
+// canonical-range integers/bigints, and pointers (Go pointer equality is
+// exactly JS object identity, with undefined for nil). Floats are
+// excluded (NaN semantics differ) and composite keys need generated
+// hashing.
 func mapKeySupported(kind Kind) bool {
-	return kind == KindString || kind == KindBool || kind.Integer()
+	return kind == KindString || kind == KindBool || kind == KindPointer || kind.Integer()
 }

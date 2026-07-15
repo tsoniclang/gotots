@@ -32,7 +32,12 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 	case *ir.Const:
 		return printConst(n)
 	case *ir.VarRef:
-		return n.Name, nil
+		if n.Pkg == "" {
+			return n.Name, nil
+		}
+		// A package-level variable: reads from other unit packages go
+		// through the live ESM namespace binding.
+		return p.module.symbol(n.Pkg, n.Name)
 	case *ir.Binary:
 		return p.printBinary(n)
 	case *ir.Unary:
