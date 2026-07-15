@@ -414,25 +414,25 @@ type RangeSlice struct {
 	Body  *Block
 }
 
-func (*Const) expr()        {}
-func (*MethodCall) expr()   {}
-func (*FieldLoad) expr()    {}
-func (*StructNew) expr()    {}
-func (*StructCopy) expr()   {}
-func (*StructZero) expr()   {}
-func (*AddrOf) expr()       {}
-func (*Deref) expr()        {}
-func (*Closure) expr()      {}
-func (*FuncRef) expr()      {}
-func (*DynCall) expr()      {}
-func (*NilConst) expr()     {}
-func (*IsNil) expr()        {}
-func (*MapMake) expr()      {}
-func (*MapFrom) expr()      {}
-func (*MapGet) expr()       {}
-func (*MapLookup) expr()    {}
-func (*MapLen) expr()       {}
-func (*StringLen) expr()    {}
+func (*Const) expr()            {}
+func (*MethodCall) expr()       {}
+func (*FieldLoad) expr()        {}
+func (*StructNew) expr()        {}
+func (*StructCopy) expr()       {}
+func (*StructZero) expr()       {}
+func (*AddrOf) expr()           {}
+func (*Deref) expr()            {}
+func (*Closure) expr()          {}
+func (*FuncRef) expr()          {}
+func (*DynCall) expr()          {}
+func (*NilConst) expr()         {}
+func (*IsNil) expr()            {}
+func (*MapMake) expr()          {}
+func (*MapFrom) expr()          {}
+func (*MapGet) expr()           {}
+func (*MapLookup) expr()        {}
+func (*MapLen) expr()           {}
+func (*StringLen) expr()        {}
 func (*SliceLit) expr()         {}
 func (*SliceMake) expr()        {}
 func (*SliceGet) expr()         {}
@@ -440,13 +440,13 @@ func (*SliceReslice) expr()     {}
 func (*SliceAppend) expr()      {}
 func (*SliceAppendSlice) expr() {}
 func (*SliceCopy) expr()        {}
-func (*SliceLen) expr()     {}
-func (*SliceCap) expr()     {}
-func (*VarRef) expr()       {}
-func (*Binary) expr()       {}
-func (*Unary) expr()        {}
-func (*Convert) expr()      {}
-func (*Call) expr()         {}
+func (*SliceLen) expr()         {}
+func (*SliceCap) expr()         {}
+func (*VarRef) expr()           {}
+func (*Binary) expr()           {}
+func (*Unary) expr()            {}
+func (*Convert) expr()          {}
+func (*Call) expr()             {}
 
 func (c *Const) Type() Type   { return c.T }
 func (v *VarRef) Type() Type  { return v.T }
