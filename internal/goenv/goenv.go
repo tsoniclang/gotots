@@ -93,6 +93,7 @@ type EnvOptions struct {
 	GOOS       string
 	GOARCH     string
 	GOAMD64    string // required when GOARCH is amd64
+	GOARM64    string // required when GOARCH is arm64
 	CgoEnabled bool
 }
 
@@ -131,6 +132,9 @@ func (r *Resolved) Environ(options EnvOptions) []string {
 	}
 	if options.GOAMD64 != "" {
 		env = append(env, "GOAMD64="+options.GOAMD64)
+	}
+	if options.GOARM64 != "" {
+		env = append(env, "GOARM64="+options.GOARM64)
 	}
 	if tmp := os.Getenv("TMPDIR"); tmp != "" {
 		env = append(env, "TMPDIR="+tmp)

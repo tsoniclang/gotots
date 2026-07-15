@@ -1,0 +1,137 @@
+package census
+
+import (
+	"fmt"
+	"path/filepath"
+
+	"github.com/tsoniclang/gotots/internal/goenv"
+	"github.com/tsoniclang/gotots/internal/inventory"
+	"github.com/tsoniclang/gotots/internal/pinning"
+	"github.com/tsoniclang/gotots/internal/profile"
+)
+
+// Run orchestrates both census passes: toolchain attestation, source
+// verification, the whole-universe inventory, the typed owned-source load,
+// and the post-load mutation check.
+func Run(prof *profile.Profile, sourceDir string, buildProfileName string) (*Result, error) {
+	build, err := prof.BuildProfileByName(buildProfileName)
+	if err != nil {
+		return nil, err
+	}
+
+	absSource, err := filepath.Abs(sourceDir)
+	if err != nil {
+		return nil, err
+	}
+	sourceDir = absSource
+
+	// Toolchain first: the go executable's digest is verified before it is
+	// ever executed, and the in-process Go frontend must match the pin.
+	resolved, err := pinning.VerifyToolchain(prof.Pin)
+	if err != nil {
+		return nil, err
+	}
+	env := resolved.Environ(goenv.EnvOptions{
+		GOOS:       build.GOOS,
+		GOARCH:     build.GOARCH,
+		GOAMD64:    build.GOAMD64,
+		GOARM64:    build.GOARM64,
+		CgoEnabled: build.CgoEnabled,
+	})
+
+	checkout, err := pinning.VerifySource(prof.Pin, sourceDir)
+	if err != nil {
+		return nil, err
+	}
+	verified := checkout.Source
+	verified.ToolchainVersion = prof.Pin.Toolchain.Version
+	verified.GoExecutableSha256 = prof.Pin.Toolchain.GoExecutableSha256
+	verified.GorootSrcDigest = prof.Pin.Toolchain.GorootSrcDigest
+
+	inv, err := inventory.Run(prof, resolved, env, sourceDir, checkout.Tree)
+	if err != nil {
+		return nil, err
+	}
+
+	report := &Report{
+		SchemaVersion: 3,
+		Product:       prof.Product,
+		BuildProfile:  *build,
+		Pin:           *prof.Pin,
+		Source:        verified,
+		Production:    newScopeReport(),
+		Test:          newScopeReport(),
+	}
+	fillPartition(inv, report)
+
+	loaded, err := load(prof, env, sourceDir)
+	if err != nil {
+		return nil, err
+	}
+	if err := analyze(prof, inv, checkout.Tree, loaded, sourceDir, report); err != nil {
+		return nil, err
+	}
+	report.Blockers = collectBlockers(report)
+
+	// Extraction must not have mutated the pinned source.
+	clean, err := pinning.CheckClean(sourceDir)
+	if err != nil {
+		return nil, err
+	}
+	if !clean {
+		return nil, fmt.Errorf("source checkout %s is dirty after loading; extraction mutated pinned input", sourceDir)
+	}
+	report.Source.CleanAfterLoad = true
+
+	return &Result{
+		Inventory:   inv,
+		Report:      report,
+		Environment: &Environment{SourceDir: sourceDir, Toolchain: resolved, ChildEnv: env},
+		sourceDir:   sourceDir,
+	}, nil
+}
+
+// collectBlockers names every condition that prevents this census from
+// being an authoritative-success result. Blockers do not invalidate the
+// evidence; they gate downstream generation.
+func collectBlockers(report *Report) []string {
+	var blockers []string
+	for _, edge := range report.Contradictions {
+		label := edge.Class
+		if edge.Category != "" {
+			label += ":" + edge.Category
+		}
+		blockers = append(blockers, fmt.Sprintf("contradiction [%s] %s -> %s (%s)", edge.Scope, edge.From, edge.To, label))
+	}
+	for _, directive := range report.Directives {
+		if !directive.Known {
+			blockers = append(blockers, fmt.Sprintf("unknown directive %s at %s:%d", directive.Directive, directive.File, directive.Line))
+		}
+	}
+	return blockers
+}
+
+func fillPartition(inv *inventory.Inventory, report *Report) {
+	for _, pkg := range inv.Module {
+		switch profile.PackageClass(pkg.Class) {
+		case profile.ClassOwned:
+			report.Partition.Owned++
+		case profile.ClassTestOnly:
+			report.Partition.TestOnly++
+		case profile.ClassHardExcluded:
+			report.Partition.HardExcluded++
+		case profile.ClassUnselected:
+			report.Partition.Unselected++
+		}
+	}
+	for _, pkg := range inv.External {
+		if pkg.Standard {
+			report.Partition.ExternalStd++
+		} else {
+			report.Partition.ExternalMod++
+		}
+		if pkg.ReachableFromProduction || pkg.ReachableFromTest {
+			report.Partition.ExternalProductClosure++
+		}
+	}
+}

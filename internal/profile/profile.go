@@ -23,6 +23,7 @@ type BuildProfile struct {
 	GOOS       string   `json:"goos"`
 	GOARCH     string   `json:"goarch"`
 	GOAMD64    string   `json:"goamd64,omitempty"` // required when goarch is amd64
+	GOARM64    string   `json:"goarm64,omitempty"` // required when goarch is arm64
 	CgoEnabled bool     `json:"cgoEnabled"`
 	Tags       []string `json:"tags"`
 }
@@ -105,12 +106,26 @@ func (p *Profile) validate() error {
 		}
 		names[build.Name] = true
 		// Unsupported source-selection inputs are rejected before loading
-		// rather than silently producing a wrong file selection.
-		if build.GOARCH == "amd64" && build.GOAMD64 == "" {
-			return fmt.Errorf("build profile %q: goamd64 is required when goarch is amd64", build.Name)
-		}
-		if build.GOARCH != "amd64" && build.GOAMD64 != "" {
-			return fmt.Errorf("build profile %q: goamd64 is only valid when goarch is amd64", build.Name)
+		// rather than silently producing a wrong file selection. Every
+		// supported architecture's feature variable must be explicit;
+		// architectures without a complete modeled profile fail closed.
+		switch build.GOARCH {
+		case "amd64":
+			if build.GOAMD64 == "" {
+				return fmt.Errorf("build profile %q: goamd64 is required when goarch is amd64", build.Name)
+			}
+			if build.GOARM64 != "" {
+				return fmt.Errorf("build profile %q: goarm64 is only valid when goarch is arm64", build.Name)
+			}
+		case "arm64":
+			if build.GOARM64 == "" {
+				return fmt.Errorf("build profile %q: goarm64 is required when goarch is arm64", build.Name)
+			}
+			if build.GOAMD64 != "" {
+				return fmt.Errorf("build profile %q: goamd64 is only valid when goarch is amd64", build.Name)
+			}
+		default:
+			return fmt.Errorf("build profile %q: goarch %q has no complete modeled feature profile yet", build.Name, build.GOARCH)
 		}
 		if build.CgoEnabled {
 			return fmt.Errorf("build profile %q: cgoEnabled=true is not supported yet", build.Name)
