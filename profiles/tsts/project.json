@@ -26,7 +26,8 @@
     "internal/diagnostics",
     "internal/diagnosticwriter",
     "internal/evaluator",
-    "internal/execute",
+    "internal/execute/incremental",
+    "internal/execute/tsc",
     "internal/fswatch",
     "internal/glob",
     "internal/jsnum",
@@ -55,15 +56,18 @@
     "internal/vfs"
   ],
   "testOnlyRoots": [
-    "internal/execute/tsctests",
     "internal/testrunner",
     "internal/testutil",
     "internal/tsoptions/tsoptionstest",
     "internal/vfs/vfstest"
   ],
   "hardExcludedRoots": {
-    "lsp": ["internal/lsp"],
-    "fourslash": ["internal/fourslash"],
+    "lsp": [
+      "internal/lsp"
+    ],
+    "fourslash": [
+      "internal/fourslash"
+    ],
     "editor-service": [
       "internal/api",
       "internal/format",
@@ -74,13 +78,15 @@
       "internal/testutil/projecttestutil"
     ]
   },
-  "toolingRoots": ["_tools"],
+  "toolingRoots": [
+    "_tools"
+  ],
   "notes": [
     "ownedRoots is the canonical package-root allowlist derived from the packages implemented by TSTS main a80a5da32ee5335928e44ee3fe9357fe1e51056e under packages/tsts/src/internal.",
     "cmd/tsgo is deliberately not owned: at pin c78d39e7 it depends on internal/lsp, internal/ls, internal/project, internal/format, and internal/api, all hard-excluded. The product CLI surface is TSTS-owned assembly.",
     "testOnlyRoots are owned test-support source: analyzed under the test scope, importable from test scope only. A production import of a test-only root is a contradiction.",
     "internal/testutil/{autoimporttestutil,lsptestutil,projecttestutil} are hard-excluded carve-outs inside the testutil test-only root: they exist to support excluded LSP/project tests and their dependency closure reaches internal/lsp and internal/project.",
     "editor-service exclusions follow the packet plus Porter exclusion records: internal/format and internal/api are recorded as outside the standalone compiler runtime port.",
-    "Known production contradictions at pin c78d39e7: internal/execute/tsc.go imports internal/format and internal/ls/lsutil. TSTS main historically dropped those paths manually during porting; the disposition (trimmed execute profile, product-owned CLI assembly, or seam) is an open profile review item."
+    "internal/execute (the tsc CLI driver, tsc.go/watcher.go) is unselected by ADR 0003: at pin c78d39e7 its tsc.go binds hard-excluded editor-service packages (internal/format, internal/ls/lsutil), and the TSTS product CLI is product-owned assembly that deliberately omits those paths. Its subpackages incremental/ and tsc/ remain owned; build/ (the tsc --build driver mode, whose tests run through the driver harness) and the harness tsctests/ follow the driver into unselected."
   ]
 }

@@ -3,6 +3,7 @@
 // Current subcommands:
 //
 //	census        verify the source pin and produce the typed source census
+//	gate          run every applicable acceptance layer and write a report
 //	toolchain-id  print the resolved toolchain identity for pinning
 package main
 
@@ -21,7 +22,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: gotots <census|toolchain-id> [flags]")
+		fmt.Fprintln(os.Stderr, "usage: gotots <census|gate|toolchain-id> [flags]")
 		os.Exit(2)
 	}
 	var err error
@@ -30,6 +31,8 @@ func main() {
 		err = runCensus(os.Args[2:])
 	case "toolchain-id":
 		err = runToolchainID()
+	case "gate":
+		err = runGate(os.Args[2:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown subcommand %q\n", os.Args[1])
 		os.Exit(2)
