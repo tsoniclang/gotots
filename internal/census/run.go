@@ -24,7 +24,14 @@ func Run(prof *profile.Profile, sourceDir string, buildProfileName string) (*Res
 	if err != nil {
 		return nil, err
 	}
-	sourceDir = absSource
+	// Resolve symlinks once so every path comparison — go list package
+	// directories, file attestation, publication containment — happens in
+	// one canonical path space.
+	resolvedSource, err := filepath.EvalSymlinks(absSource)
+	if err != nil {
+		return nil, err
+	}
+	sourceDir = resolvedSource
 
 	// Toolchain first: the go executable's digest is verified before it is
 	// ever executed, and the in-process Go frontend must match the pin.

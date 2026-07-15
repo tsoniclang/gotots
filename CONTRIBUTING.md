@@ -45,8 +45,9 @@ This is enforced repository-wide by `internal/policy`
 - All accepted edits land serially on the single active feature branch.
 - Commit coherent checkpoints after each completed architectural
   invariant, and keep the remote up to date.
-- `gofmt`, `go vet ./...`, and `go test ./...` must be green before every
-  commit; `go test -race` before every push.
+- Before every commit: `test -z "$(gofmt -l .)"`, `go vet ./...`,
+  `go test -count=1 ./...`, and `git diff --check` must all pass; before
+  every push additionally `go test -count=1 -race ./...`.
 - Follow the ordered gates in `docs/spec/testing-and-acceptance.md`; a later
   product suite never substitutes for an earlier completeness proof.
 - Add a source-linked Go input, typed decision, generated TypeScript shape,
