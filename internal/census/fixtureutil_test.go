@@ -80,7 +80,7 @@ func writeFixtureConfig(t *testing.T, revision string, prof map[string]any) *pro
 	configDir := t.TempDir()
 
 	pin := map[string]any{
-		"schemaVersion": 2,
+		"schemaVersion": 3,
 		"upstream":      "fixture",
 		"goModule":      "example.com/fix",
 		"revision":      revision,
@@ -90,6 +90,7 @@ func writeFixtureConfig(t *testing.T, revision string, prof map[string]any) *pro
 			"goarch":             toolchain.GOARCH,
 			"goExecutableSha256": toolchain.GoExecutableSha256,
 			"gorootSrcDigest":    toolchain.GorootSrcDigest,
+			"gorootToolDigest":   toolchain.GorootToolDigest,
 		},
 	}
 	pinData, err := json.Marshal(pin)

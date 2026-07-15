@@ -71,10 +71,11 @@ func TestCensusFixture(t *testing.T) {
 		t.Error("package with path ending in .test was not analyzed as production source")
 	}
 
-	// Universe: tool-module and testdata files are classified, none lost.
+	// Universe: tool-module and testdata files are classified, none lost,
+	// module metadata enumerated, and the total reconciles.
 	universe := result.Inventory.Universe
 	classes := map[string]string{}
-	for _, f := range universe.OutsidePackages {
+	for _, f := range universe.GoOutsidePackages {
 		classes[f.Path] = f.Class
 	}
 	if classes["_tools/gen/main.go"] != "tooling" {
@@ -83,8 +84,14 @@ func TestCensusFixture(t *testing.T) {
 	if classes["a/testdata/fixture.go"] != "testdata" {
 		t.Errorf("testdata file not classified: %v", classes)
 	}
-	if universe.TrackedGoFiles != universe.InPackages+len(universe.OutsidePackages) {
-		t.Errorf("universe does not add up: %+v", universe)
+	metadata := strings.Join(universe.ModuleMetadata, ",")
+	if !strings.Contains(metadata, "go.mod") || !strings.Contains(metadata, "_tools/gen/go.mod") {
+		t.Errorf("module metadata incomplete: %v", universe.ModuleMetadata)
+	}
+	accounted := universe.InPackages + len(universe.GoOutsidePackages) +
+		len(universe.ModuleMetadata) + universe.NonBuildFiles
+	if universe.TrackedFiles != accounted {
+		t.Errorf("universe does not reconcile: tracked=%d accounted=%d (%+v)", universe.TrackedFiles, accounted, universe)
 	}
 
 	// External attribution: os is a test-only dependency (via support);
