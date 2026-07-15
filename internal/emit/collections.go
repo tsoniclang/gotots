@@ -25,10 +25,18 @@ var errNotCollection = fmt.Errorf("not a collection expression")
 func (p *printer) collectionExpr(e ir.Expr) (string, error) {
 	switch n := e.(type) {
 	case *ir.MapMake:
-		if n.Type().Key != nil && n.Type().Key.Kind == ir.KindStruct {
-			return "gort$.goKMapMake()", nil
+		hint := ""
+		if n.Hint != nil {
+			printed, err := p.printExpr(n.Hint)
+			if err != nil {
+				return "", err
+			}
+			hint = printed
 		}
-		return "gort$.goMapMake()", nil
+		if n.Type().Key != nil && n.Type().Key.Kind == ir.KindStruct {
+			return "gort$.goKMapMake(" + hint + ")", nil
+		}
+		return "gort$.goMapMake(" + hint + ")", nil
 	case *ir.MapFrom:
 		var entries []string
 		for i := range n.Keys {

@@ -309,6 +309,13 @@ type RttiRef struct {
 	Pkg      string
 	TypeName string
 	Pointer  bool
+	// Composite is the canonical (path-qualified) type identity of a
+	// composite or external type, interned to one rtti object at
+	// runtime; Display is its runtime-message spelling; ExternID, when
+	// set, routes method dispatch through the external contracts.
+	Composite string
+	Display   string
+	ExternID  string
 }
 
 // IfaceBox converts a concrete value into an interface value (struct

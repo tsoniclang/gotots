@@ -110,6 +110,16 @@ func (b *builder) buildBuiltin(call *ast.CallExpr, builtin *types.Builtin, resul
 			b.use("makeMap")
 			return &MapMake{T: t}, nil
 		}
+		if t.Kind == KindMap && len(call.Args) == 2 {
+			// The capacity hint changes no observable behavior (Go
+			// tolerates any int hint) but still evaluates.
+			hint, err := b.buildExpr(call.Args[1])
+			if err != nil {
+				return nil, err
+			}
+			b.use("makeMap")
+			return &MapMake{T: t, Hint: hint}, nil
+		}
 		if t.Kind == KindSlice && (len(call.Args) == 2 || len(call.Args) == 3) {
 			length, err := b.buildExpr(call.Args[1])
 			if err != nil {

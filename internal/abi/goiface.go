@@ -9,13 +9,30 @@ const goifaceSource = `// Go interface-value carrier: boxed (rtti, value) pairs 
 // nil-interface vs nil-pointer-in-interface distinction, method-table
 // dispatch, and Go's interface-conversion panic messages.
 import { GoPanic, goPanicNil } from "./gopanic.js";
+import { goExternalCall } from "./goextern.js";
 
 // GoRtti identifies one concrete type: its Go display spelling (package
-// names qualify, as in runtime messages) and its method table mapping
-// method names onto the generated method functions.
+// names qualify, as in runtime messages), its method table mapping
+// method names onto the generated method functions, and — for external
+// named types — the canonical identity that routes method dispatch
+// through the external-contract registry.
 export interface GoRtti {
   readonly d: string;
   readonly m: Readonly<Record<string, Function>>;
+  readonly x?: string;
+}
+
+// Composite and external rttis intern per canonical type identity, so
+// rtti comparison stays object identity across every module.
+const compositeRttis = new Map<string, GoRtti>();
+
+export function goRttiComposite(key: string, display: string, externId: string | undefined): GoRtti {
+  let rtti = compositeRttis.get(key);
+  if (rtti === undefined) {
+    rtti = externId === undefined ? { d: display, m: {} } : { d: display, m: {}, x: externId };
+    compositeRttis.set(key, rtti);
+  }
+  return rtti;
 }
 
 // GoIfaceBox pairs the dynamic type with the concrete value.
@@ -35,8 +52,11 @@ export function goIfaceBox(r: GoRtti, v: unknown): GoIfaceBox {
 export function goIfaceCall(i: GoIface, method: string, args: unknown[]): unknown {
   if (i === undefined) goPanicNil();
   const boxed = i as GoIfaceBox;
-  const fn = boxed.r.m[method] as Function;
-  return fn(boxed.v, ...args);
+  const fn = boxed.r.m[method] as Function | undefined;
+  if (fn === undefined && boxed.r.x !== undefined) {
+    return goExternalCall(boxed.r.x + "." + method, [boxed.v, ...args]);
+  }
+  return (fn as Function)(boxed.v, ...args);
 }
 
 export function goIfaceIs(i: GoIface, r: GoRtti): boolean {

@@ -13,6 +13,13 @@ func (p *printer) rttiRef(r ir.RttiRef) (string, error) {
 	if r.Predeclared != "" {
 		return "goif$.goRtti$" + r.Predeclared, nil
 	}
+	if r.Composite != "" {
+		externID := "undefined"
+		if r.ExternID != "" {
+			externID = fmt.Sprintf("%q", r.ExternID)
+		}
+		return fmt.Sprintf("goif$.goRttiComposite(%q, %q, %s)", r.Composite, r.Display, externID), nil
+	}
 	name := r.TypeName + "$rtti"
 	if r.Pointer {
 		name = r.TypeName + "$rttiPtr"
@@ -145,6 +152,10 @@ func (p *printer) printTypeSwitchClause(n *ir.TypeSwitchStmt, clause *ir.TypeSwi
 					return err
 				}
 				value = "gosl$.goArrayClone(" + value + ", " + cloneElem + ")"
+			}
+			if t := clause.BindType; t.Kind == ir.KindExternal {
+				value = fmt.Sprintf("(goext$.goExternalCall(%q, [%s]) as %s)",
+					t.Pkg+"."+t.Named+".goClone$", value, spelled)
 			}
 			p.line("let %s: %s = %s;", tsName(n.Bind), spelled, value)
 		}

@@ -24,27 +24,48 @@ func (b *builder) rttiFor(t types.Type, span Span) (RttiRef, error) {
 
 	case *types.Named:
 		obj := concrete.Obj()
-		if obj.Pkg() == nil || !b.unit.Owns(obj.Pkg().Path()) {
+		if obj.Pkg() == nil {
 			return RttiRef{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
-				Construct: "interface value of a type outside the translated unit", Span: span}
+				Construct: "interface value of type " + t.String(), Span: span}
+		}
+		if !b.unit.Owns(obj.Pkg().Path()) {
+			// An external named type: an interned rtti whose method
+			// dispatch routes through the external contracts.
+			return RttiRef{Composite: t.String(), Display: displayOf(t),
+				ExternID: obj.Pkg().Path() + "." + obj.Name()}, nil
 		}
 		return RttiRef{Pkg: obj.Pkg().Path(), TypeName: obj.Name()}, nil
 
 	case *types.Pointer:
 		named, ok := types.Unalias(concrete.Elem()).(*types.Named)
 		if !ok {
-			return RttiRef{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
-				Construct: "interface value of a pointer to an unnamed type", Span: span}
+			// A pointer to an unnamed type: the interned composite rtti.
+			return b.compositeRtti(t, span, "")
 		}
 		obj := named.Obj()
-		if obj.Pkg() == nil || !b.unit.Owns(obj.Pkg().Path()) {
+		if obj.Pkg() == nil {
 			return RttiRef{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
-				Construct: "interface value of a type outside the translated unit", Span: span}
+				Construct: "interface value of type " + t.String(), Span: span}
+		}
+		if !b.unit.Owns(obj.Pkg().Path()) {
+			return b.compositeRtti(t, span, obj.Pkg().Path()+"."+obj.Name())
 		}
 		return RttiRef{Pkg: obj.Pkg().Path(), TypeName: obj.Name(), Pointer: true}, nil
+
+	case *types.Slice, *types.Map, *types.Array, *types.Signature:
+		return b.compositeRtti(t, span, "")
 	}
 	return RttiRef{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
 		Construct: "interface value of type " + t.String(), Span: span}
+}
+
+// compositeRtti interns an rtti for a composite or external type when
+// the value's carrier itself is reviewed.
+func (b *builder) compositeRtti(t types.Type, span Span, externID string) (RttiRef, error) {
+	if _, err := b.typeOf(t, span); err != nil {
+		return RttiRef{}, err
+	}
+	return RttiRef{Composite: t.String(), Display: displayOf(t), ExternID: externID}, nil
 }
 
 // displayOf spells a type the way Go's runtime messages do: package

@@ -129,7 +129,8 @@ export function goNilCheck<T>(x: T | undefined): T {
   return x;
 }
 
-export function goMapMake<K, V>(): Map<K, V> {
+export function goMapMake<K, V>(hint?: unknown): Map<K, V> {
+  void hint; // the capacity hint evaluates but changes nothing
   return new Map<K, V>();
 }
 
@@ -263,7 +264,8 @@ export function goKeyArray<T>(a: T[], encodeElem: (v: T) => string): string {
   return out + "]";
 }
 
-export function goKMapMake<K extends GoKeyed, V>(): Map<string, [K, V]> {
+export function goKMapMake<K extends GoKeyed, V>(hint?: unknown): Map<string, [K, V]> {
+  void hint;
   return new Map<string, [K, V]>();
 }
 

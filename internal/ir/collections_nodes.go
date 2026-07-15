@@ -2,8 +2,13 @@
 // exact nil/zero/comma-ok/bounds semantics.
 package ir
 
-// MapMake allocates an empty map (make or an empty literal).
-type MapMake struct{ T Type }
+// MapMake allocates an empty map (make or an empty literal). Hint,
+// when set, is the capacity hint: evaluated for effect, observably
+// inert.
+type MapMake struct {
+	T    Type
+	Hint Expr
+}
 
 // MapFrom builds a map from ordered key/value pairs (composite literal).
 type MapFrom struct {
