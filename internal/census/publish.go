@@ -135,6 +135,9 @@ func WriteReports(result *Result, outDir string) error {
 	if err := write("declarations.json", result.Shapes); err != nil {
 		return err
 	}
+	if err := write("externals.json", result.Externals); err != nil {
+		return err
+	}
 	if err := write("environment.json", result.Environment); err != nil {
 		return err
 	}

@@ -20,8 +20,9 @@ type fileStats struct {
 	constShapes    []ConstShape
 	varShapes      []VarShape
 	aliasShapes    []AliasShape
-	testFunctions  []TestFunctionRecord
-	externalUses   map[string]*ExternalObligation
+	testFunctions   []TestFunctionRecord
+	externalUses    map[string]*ExternalObligation
+	externalObjects map[types.Object]bool
 	constructs     map[string]int
 	builtins       map[string]int
 	rangeOperands  map[string]int
@@ -54,12 +55,13 @@ var rareConstructs = map[string]bool{
 // defining package under the project profile.
 func inspectFile(p *packages.Package, file *ast.File, relativePath, scopeName, owner string, source []byte, isExternal func(string) bool) (*fileStats, error) {
 	stats := &fileStats{
-		externalUses:  map[string]*ExternalObligation{},
-		constructs:    map[string]int{},
-		builtins:      map[string]int{},
-		rangeOperands: map[string]int{},
-		indexOperands: map[string]int{},
-		astKinds:      map[string]int{},
+		externalUses:    map[string]*ExternalObligation{},
+		externalObjects: map[types.Object]bool{},
+		constructs:      map[string]int{},
+		builtins:        map[string]int{},
+		rangeOperands:   map[string]int{},
+		indexOperands:   map[string]int{},
+		astKinds:        map[string]int{},
 	}
 	info := p.TypesInfo
 	fset := p.Fset
@@ -250,10 +252,15 @@ func recordExternalUse(info *types.Info, ident *ast.Ident, isExternal func(strin
 	if object.Pkg() == types.Unsafe {
 		return nil
 	}
+	name := object.Name()
 	var kind string
 	switch concrete := object.(type) {
 	case *types.Func:
 		kind = "func"
+		if qualified, isMethod := methodQualifiedName(concrete); isMethod {
+			kind = "method"
+			name = qualified
+		}
 	case *types.Var:
 		if concrete.IsField() {
 			kind = "field"
@@ -269,14 +276,35 @@ func recordExternalUse(info *types.Info, ident *ast.Ident, isExternal func(strin
 	default:
 		return fmt.Errorf("unreviewed external object class %T for %s.%s", object, object.Pkg().Path(), object.Name())
 	}
-	key := object.Pkg().Path() + "\x00" + object.Name() + "\x00" + kind
+	key := object.Pkg().Path() + "\x00" + name + "\x00" + kind
 	obligation := stats.externalUses[key]
 	if obligation == nil {
-		obligation = &ExternalObligation{Package: object.Pkg().Path(), Name: object.Name(), Kind: kind}
+		obligation = &ExternalObligation{Package: object.Pkg().Path(), Name: name, Kind: kind}
 		stats.externalUses[key] = obligation
 	}
 	obligation.Uses++
+	stats.externalObjects[object] = true
 	return nil
+}
+
+// methodQualifiedName returns "Receiver.Method" for methods, so methods of
+// different types with the same name keep distinct identities.
+func methodQualifiedName(function *types.Func) (string, bool) {
+	signature, ok := function.Type().(*types.Signature)
+	if !ok || signature.Recv() == nil {
+		return "", false
+	}
+	recv := signature.Recv().Type()
+	if pointer, ok := recv.(*types.Pointer); ok {
+		recv = pointer.Elem()
+	}
+	if named, ok := types.Unalias(recv).(*types.Named); ok {
+		return named.Obj().Name() + "." + function.Name(), true
+	}
+	if _, ok := recv.Underlying().(*types.Interface); ok {
+		return "", false // interface methods keep their own name
+	}
+	return "", false
 }
 
 func isInstantiation(info *types.Info, fun ast.Expr) bool {

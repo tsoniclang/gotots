@@ -206,6 +206,7 @@ type Result struct {
 	Inventory   *inventory.Inventory
 	Report      *Report
 	Shapes      *DeclarationShapes
+	Externals   *ExternalContract
 	Environment *Environment
 	sourceDir   string
 }

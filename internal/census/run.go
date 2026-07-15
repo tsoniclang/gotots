@@ -78,7 +78,8 @@ func Run(prof *profile.Profile, sourceDir string, buildProfileName string) (*Res
 		return nil, err
 	}
 	shapes := &DeclarationShapes{SchemaVersion: 1}
-	if err := analyze(prof, inv, checkout.Tree, loaded, sourceDir, report, shapes); err != nil {
+	externals, err := analyze(prof, inv, checkout.Tree, loaded, sourceDir, report, shapes)
+	if err != nil {
 		return nil, err
 	}
 	report.Blockers = collectBlockers(report)
@@ -97,6 +98,7 @@ func Run(prof *profile.Profile, sourceDir string, buildProfileName string) (*Res
 		Inventory:   inv,
 		Report:      report,
 		Shapes:      shapes,
+		Externals:   externals,
 		Environment: &Environment{SourceDir: sourceDir, Toolchain: resolved, ChildEnv: env},
 		sourceDir:   sourceDir,
 	}, nil

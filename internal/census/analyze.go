@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"go/ast"
+	"go/types"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -27,10 +28,11 @@ var generatedFileMarker = regexp.MustCompile(`(?m)^// Code generated .* DO NOT E
 // declaration shapes, records dependency edges and external obligations,
 // and enforces the pass-1/pass-2 file reconciliation and identity
 // uniqueness gates.
-func analyze(prof *profile.Profile, inv *inventory.Inventory, tree *pinning.Tree, loaded []*packages.Package, sourceDir string, report *Report, shapes *DeclarationShapes) error {
+func analyze(prof *profile.Profile, inv *inventory.Inventory, tree *pinning.Tree, loaded []*packages.Package, sourceDir string, report *Report, shapes *DeclarationShapes) (*ExternalContract, error) {
 	externalIndex := inv.ExternalIndex()
 	externalUse := map[string]*ExternalUse{}
 	obligations := map[string]*ExternalObligation{}
+	externalObjects := map[types.Object]bool{}
 	var edges []Edge
 	isExternal := func(pkgPath string) bool {
 		class, _ := prof.Classify(pkgPath)
@@ -78,7 +80,7 @@ func analyze(prof *profile.Profile, inv *inventory.Inventory, tree *pinning.Tree
 			}
 			relative, err := filepath.Rel(sourceDir, filename)
 			if err != nil || strings.HasPrefix(relative, "..") {
-				return fmt.Errorf("file %s is outside the source checkout", filename)
+				return nil, fmt.Errorf("file %s is outside the source checkout", filename)
 			}
 			relative = filepath.ToSlash(relative)
 			countedFiles++
@@ -94,12 +96,12 @@ func analyze(prof *profile.Profile, inv *inventory.Inventory, tree *pinning.Tree
 
 			data, err := os.ReadFile(filename)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			// Reconcile against the pinned commit: cleanliness alone does
 			// not catch ignored files injected into package directories.
 			if err := tree.VerifyFile(relative, data); err != nil {
-				return err
+				return nil, err
 			}
 
 			lines := countLines(data)
@@ -121,7 +123,7 @@ func analyze(prof *profile.Profile, inv *inventory.Inventory, tree *pinning.Tree
 
 			stats, err := inspectFile(p, file, relative, scopeName, owner, data, isExternal)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			report.Declarations = append(report.Declarations, stats.declarations...)
 			report.Directives = append(report.Directives, stats.directives...)
@@ -132,6 +134,9 @@ func analyze(prof *profile.Profile, inv *inventory.Inventory, tree *pinning.Tree
 			shapes.Constants = append(shapes.Constants, stats.constShapes...)
 			shapes.Variables = append(shapes.Variables, stats.varShapes...)
 			shapes.Aliases = append(shapes.Aliases, stats.aliasShapes...)
+			for object := range stats.externalObjects {
+				externalObjects[object] = true
+			}
 			for key, use := range stats.externalUses {
 				existing := obligations[key]
 				if existing == nil {
@@ -144,7 +149,7 @@ func analyze(prof *profile.Profile, inv *inventory.Inventory, tree *pinning.Tree
 			mergeAggregates(scope, stats)
 
 			if err := recordImports(prof, externalIndex, externalUse, &edges, file, owner, relative, scopeName, isTestScope); err != nil {
-				return err
+				return nil, err
 			}
 		}
 		if countedFiles > 0 && role != roleInPackageTest {
@@ -153,7 +158,7 @@ func analyze(prof *profile.Profile, inv *inventory.Inventory, tree *pinning.Tree
 	}
 
 	if err := reconcileFileSets(inv, analyzedGoFiles, analyzedTestFiles, analyzedXTestFiles); err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, obligation := range obligations {
@@ -162,10 +167,15 @@ func analyze(prof *profile.Profile, inv *inventory.Inventory, tree *pinning.Tree
 	sortRecords(report, edges, externalUse)
 	sortShapes(shapes)
 	if err := validateIdentities(report); err != nil {
-		return err
+		return nil, err
 	}
 	deriveDeclarationAggregates(report)
-	return nil
+
+	contract, err := buildExternalContract(externalObjects, isExternal)
+	if err != nil {
+		return nil, err
+	}
+	return contract, nil
 }
 
 // recordImports classifies one file's imports: external use is recorded
