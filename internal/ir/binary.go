@@ -74,13 +74,9 @@ func (b *builder) buildBinary(n *ast.BinaryExpr, resultType types.Type) (Expr, e
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "equality on " + operand.Go, Span: span}
 		}
 	case token.LSS, token.LEQ, token.GTR, token.GEQ:
-		if operand.Kind == KindString {
-			// Go compares UTF-8 bytes; JS compares UTF-16 code units. The
-			// orders differ outside ASCII, so string ordering needs its own
-			// reviewed lowering.
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "string ordering comparison", Span: span}
-		}
-		if !operand.Kind.Integer() && !operand.Kind.Float() {
+		// Byte-string carriers compare code units, which ARE the Go
+		// bytes, so JS ordering coincides with Go's byte-wise ordering.
+		if operand.Kind != KindString && !operand.Kind.Integer() && !operand.Kind.Float() {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "ordering on " + operand.Go, Span: span}
 		}
 	case token.LAND, token.LOR:

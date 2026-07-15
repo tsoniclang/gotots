@@ -29,12 +29,29 @@ func runGoDriver(resolved *goenv.Resolved, env []string, workDir string, cases [
 	driver.WriteString(`package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math"
-	"strconv"
 
 	"oracle.fixture/fixture"
 )
+
+// formatText prints ASCII-printable text directly and anything else as
+// exact bytes — the same rule the TS driver applies, so formatting can
+// never mask or invent a byte difference.
+func formatText(text string) string {
+	printable := true
+	for i := 0; i < len(text); i++ {
+		if text[i] < 0x20 || text[i] > 0x7e || text[i] == '"' || text[i] == '\\' {
+			printable = false
+			break
+		}
+	}
+	if printable {
+		return "\"" + text + "\""
+	}
+	return "hex:" + hex.EncodeToString([]byte(text))
+}
 
 func formatValue(value any, kind string) string {
 	if kind == "float" {
@@ -46,7 +63,7 @@ func formatValue(value any, kind string) string {
 		}
 	}
 	if text, ok := value.(string); ok {
-		return strconv.Quote(text)
+		return formatText(text)
 	}
 	return fmt.Sprintf("%v", value)
 }
@@ -54,7 +71,7 @@ func formatValue(value any, kind string) string {
 func runCase(name string, kinds []string, callCase func() []any) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			fmt.Printf("%s: panic: %v\n", name, recovered)
+			fmt.Printf("%s: panic: %s\n", name, formatText(fmt.Sprintf("%v", recovered)))
 		}
 	}()
 	values := callCase()
@@ -109,6 +126,31 @@ import { GoPanic } from "./generated/language-abi/gopanic.ts";
 
 const floatView = new DataView(new ArrayBuffer(8));
 
+// formatText mirrors the Go driver's rule exactly: ASCII-printable text
+// prints directly, anything else as the byte-carrier's exact bytes.
+function formatText(text: string): string {
+  let printable = true;
+  for (let i = 0; i < text.length; i++) {
+    const unit = text.charCodeAt(i);
+    if (unit < 0x20 || unit > 0x7e || unit === 0x22 || unit === 0x5c) {
+      printable = false;
+      break;
+    }
+  }
+  if (printable) {
+    return '"' + text + '"';
+  }
+  let out = "hex:";
+  for (let i = 0; i < text.length; i++) {
+    const unit = text.charCodeAt(i);
+    if (unit > 0xff) {
+      return "not-a-byte-string:" + JSON.stringify(text);
+    }
+    out += unit.toString(16).padStart(2, "0");
+  }
+  return out;
+}
+
 function formatValue(value: unknown, kind: string): string {
   if (kind === "float" && typeof value === "number") {
     floatView.setFloat64(0, value, false);
@@ -116,7 +158,7 @@ function formatValue(value: unknown, kind: string): string {
     return "float64(0x" + bits + ")";
   }
   if (typeof value === "string") {
-    return JSON.stringify(value);
+    return formatText(value);
   }
   return String(value);
 }
@@ -127,7 +169,7 @@ function runCase(name: string, kinds: readonly string[], callCase: () => readonl
     values = callCase();
   } catch (thrown) {
     if (thrown instanceof GoPanic) {
-      console.log(name + ": panic: " + thrown.goMessage);
+      console.log(name + ": panic: " + formatText(thrown.goMessage));
       return;
     }
     throw thrown;

@@ -322,6 +322,11 @@
       "specClause": "docs/spec/03-declarations-bodies-control.md"
     },
     {
+      "key": "index:string",
+      "state": "generated",
+      "specClause": "docs/spec/05-collections-strings.md"
+    },
+    {
       "key": "isNil",
       "state": "generated",
       "specClause": "docs/spec/04-types-values-pointers.md"
@@ -427,7 +432,17 @@
       "specClause": "docs/spec/03-declarations-bodies-control.md"
     },
     {
+      "key": "range:string",
+      "state": "generated",
+      "specClause": "docs/spec/05-collections-strings.md"
+    },
+    {
       "key": "reslice",
+      "state": "generated",
+      "specClause": "docs/spec/05-collections-strings.md"
+    },
+    {
+      "key": "reslice:string",
       "state": "generated",
       "specClause": "docs/spec/05-collections-strings.md"
     },

@@ -296,6 +296,34 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			return "", err
 		}
 		return "gort$.goStringLen(" + x + ")", nil
+	case *ir.StringIndex:
+		x, err := p.printExpr(n.X)
+		if err != nil {
+			return "", err
+		}
+		index, err := p.printExpr(n.Index)
+		if err != nil {
+			return "", err
+		}
+		return "gort$.goStringIndex(" + x + ", " + index + ")", nil
+	case *ir.StringSlice:
+		x, err := p.printExpr(n.X)
+		if err != nil {
+			return "", err
+		}
+		low := "0"
+		if n.Low != nil {
+			if low, err = p.printExpr(n.Low); err != nil {
+				return "", err
+			}
+		}
+		high := "undefined"
+		if n.High != nil {
+			if high, err = p.printExpr(n.High); err != nil {
+				return "", err
+			}
+		}
+		return "gort$.goStringSlice(" + x + ", " + low + ", " + high + ")", nil
 	case *ir.SliceLit:
 		values, err := p.printArgs(n.Values)
 		if err != nil {

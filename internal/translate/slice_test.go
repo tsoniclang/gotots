@@ -341,13 +341,6 @@ func Case() int {
 			code: "GOTOTS_UNSUPPORTED_EXPRESSION", mention: "full slice expression",
 		},
 		{
-			name: "string ordering",
-			source: `package fixture
-func Case() bool { a := "x"; b := "y"; return a < b }
-`,
-			code: "GOTOTS_UNSUPPORTED_OPERATION", mention: "string ordering",
-		},
-		{
 			name: "external call with an unreviewed signature",
 			source: `package fixture
 import "os"

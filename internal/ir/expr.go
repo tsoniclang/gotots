@@ -1,7 +1,6 @@
 package ir
 
 import (
-	"encoding/json"
 	"fmt"
 	"go/ast"
 	"go/constant"
@@ -9,7 +8,6 @@ import (
 	"go/types"
 	"math/big"
 	"strconv"
-	"unicode/utf8"
 )
 
 // buildExpr converts one typed Go expression into IR, folding constants
@@ -178,6 +176,8 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			}
 			b.use("arrayGet")
 			return &ArrayGet{X: operand, Index: index, T: *operand.Type().Elem}, nil
+		case KindString:
+			return b.buildStringIndex(operand, n.Index)
 		}
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "index on " + operand.Type().Go, Span: span}
 
@@ -205,6 +205,9 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			}
 			b.use("arraySliceView")
 			return view, nil
+		}
+		if operand.Type().Kind == KindString {
+			return b.buildStringSlice(operand, n)
 		}
 		if operand.Type().Kind != KindSlice {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "reslice of " + operand.Type().Go, Span: span}
@@ -502,18 +505,10 @@ func constValue(v constant.Value, t Type, span Span) (string, error) {
 	case KindBool:
 		return fmt.Sprintf("%v", constant.BoolVal(v)), nil
 	case KindString:
-		text := constant.StringVal(v)
-		if !utf8.ValidString(text) {
-			// Go strings are byte strings; the JS string carrier holds
-			// UTF-16 text, so non-UTF-8 constants cannot round-trip and
-			// need the byte-string representation.
-			return "", &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "string constant with non-UTF-8 bytes (byte-string representation)", Span: span}
-		}
-		quoted, err := json.Marshal(text)
-		if err != nil {
-			return "", err
-		}
-		return string(quoted), nil
+		// The byte-string carrier holds one Go byte per JS code unit, so
+		// the literal spells each byte: printable ASCII directly, all
+		// other bytes (including non-UTF-8) as \xNN escapes.
+		return byteStringLiteral(constant.StringVal(v)), nil
 	case KindFloat32, KindFloat64:
 		f, _ := constant.Float64Val(v)
 		return strconv.FormatFloat(f, 'g', -1, 64), nil

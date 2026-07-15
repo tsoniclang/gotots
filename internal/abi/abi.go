@@ -13,7 +13,7 @@ package abi
 import "fmt"
 
 // Version identifies the ABI contract carried in generated output.
-const Version = 4
+const Version = 5
 
 // Family is the static carrier family of an integer kind.
 type Family string
@@ -104,11 +104,13 @@ export function goPanicNilMapWrite(): never {
 
 const goruntimeSource = `// Go language runtime carriers beyond integers: nil-checked pointer
 // access, maps with exact nil/zero/comma-ok/write-panic behavior, and
-// UTF-8 string semantics.
+// byte-string semantics (one code unit per Go byte, canonical).
 import { GoPanic, goPanicNil, goPanicNilMapWrite } from "./gopanic.js";
 
 // A Go map: undefined is the nil map.
 export type GoMap<K, V> = Map<K, V> | undefined;
+
+type GoStrIndex = number | bigint;
 
 export function goNilCheck<T>(x: T | undefined): T {
   if (x === undefined) goPanicNil();
@@ -175,26 +177,79 @@ export function goFuncInvoke(f: Function | undefined, args: unknown[]): unknown 
 }
 
 // len(string) is the UTF-8 byte length; JS string length counts UTF-16
-// code units. Surrogate pairs (one code point, 4 UTF-8 bytes) and lone
-// surrogates (encoded as 3-byte replacement U+FFFD by Go's conversion,
-// but valid strings never contain them) are handled by code-point math.
 export function goStringLen(s: string): bigint {
-  let bytes = 0;
-  for (let index = 0; index < s.length; index++) {
-    const code = s.charCodeAt(index);
-    if (code < 0x80) bytes += 1;
-    else if (code < 0x800) bytes += 2;
-    else if (code >= 0xd800 && code < 0xdc00 && index + 1 < s.length) {
-      const next = s.charCodeAt(index + 1);
-      if (next >= 0xdc00 && next < 0xe000) {
-        bytes += 4;
-        index++;
-      } else {
-        bytes += 3;
-      }
-    } else bytes += 3;
+  return BigInt(s.length);
+}
+
+export function goStringIndex(s: string, index: GoStrIndex): number {
+  if (index < 0 || index >= s.length) {
+    if (index < 0) {
+      throw new GoPanic("runtime error: index out of range [" + String(index) + "]");
+    }
+    throw new GoPanic("runtime error: index out of range [" + String(index) + "] with length " + String(s.length));
   }
-  return BigInt(bytes);
+  return s.charCodeAt(Number(index));
+}
+
+// s[low:high] by byte offsets: 0 <= low <= high <= len. Mid-rune cuts
+// are exact — the carrier is bytes, not text.
+export function goStringSlice(s: string, low: GoStrIndex, high: GoStrIndex | undefined): string {
+  if (high === undefined) high = BigInt(s.length);
+  if (high > s.length || high < 0) {
+    throw new GoPanic("runtime error: slice bounds out of range [:" + String(high) + "] with length " + String(s.length));
+  }
+  if (low < 0 || low > high) {
+    throw new GoPanic("runtime error: slice bounds out of range [" + String(low) + ":" + String(high) + "]");
+  }
+  return s.substring(Number(low), Number(high));
+}
+
+// Rune iteration exactly as Go's range: each entry is [starting byte
+// offset, decoded rune]; invalid UTF-8 yields U+FFFD advancing one byte.
+export function goStringRange(s: string): [bigint, number][] {
+  const out: [bigint, number][] = [];
+  let i = 0;
+  while (i < s.length) {
+    const [r, size] = decodeRune(s, i);
+    out.push([BigInt(i), r]);
+    i += size;
+  }
+  return out;
+}
+
+// decodeRune mirrors Go's utf8.DecodeRuneInString over the byte
+// carrier: strict continuation checks, overlong/surrogate/out-of-range
+// rejection, and [U+FFFD, 1] for every invalid sequence.
+function decodeRune(s: string, i: number): [number, number] {
+  const b0 = s.charCodeAt(i);
+  if (b0 < 0x80) return [b0, 1];
+  if (b0 < 0xc2 || b0 > 0xf4) return [0xfffd, 1];
+  const remaining = s.length - i;
+  const cont = (offset: number): number => {
+    if (offset >= remaining) return -1;
+    const b = s.charCodeAt(i + offset);
+    return b >= 0x80 && b <= 0xbf ? b & 0x3f : -1;
+  };
+  if (b0 < 0xe0) {
+    const c1 = cont(1);
+    if (c1 < 0) return [0xfffd, 1];
+    return [((b0 & 0x1f) << 6) | c1, 2];
+  }
+  if (b0 < 0xf0) {
+    const c1 = cont(1);
+    const c2 = cont(2);
+    if (c1 < 0 || c2 < 0) return [0xfffd, 1];
+    const r = ((b0 & 0x0f) << 12) | (c1 << 6) | c2;
+    if (r < 0x800 || (r >= 0xd800 && r <= 0xdfff)) return [0xfffd, 1];
+    return [r, 3];
+  }
+  const c1 = cont(1);
+  const c2 = cont(2);
+  const c3 = cont(3);
+  if (c1 < 0 || c2 < 0 || c3 < 0) return [0xfffd, 1];
+  const r = ((b0 & 0x07) << 18) | (c1 << 12) | (c2 << 6) | c3;
+  if (r < 0x10000 || r > 0x10ffff) return [0xfffd, 1];
+  return [r, 4];
 }
 `
 

@@ -31,6 +31,9 @@ func (b *builder) buildRange(n *ast.RangeStmt) (Stmt, error) {
 		operand = &ArraySliceView{X: snapshot, T: Type{Kind: KindSlice, Go: "[]" + elem.Go, Elem: elem}}
 		b.use("range:array")
 	}
+	if operand.Type().Kind == KindString {
+		return b.buildRangeString(n, operand)
+	}
 	if operand.Type().Kind != KindSlice {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range over " + operand.Type().Go, Span: span}
 	}

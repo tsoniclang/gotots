@@ -249,11 +249,6 @@ func init() {
 func Case() int { return flag }
 `, "GOTOTS_UNSUPPORTED_DECLARATION", "package init function")
 
-	assertTranslateFails(t, `package fixture
-
-func Case() int {
-	s := "\xff"
-	return len(s)
-}
-`, "GOTOTS_UNSUPPORTED_EXPRESSION", "non-UTF-8")
+	// Non-UTF-8 string constants are exact under the byte-string carrier;
+	// their differential coverage lives in the string oracle fixtures.
 }

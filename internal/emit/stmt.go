@@ -78,6 +78,9 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 	case *ir.RangeSlice:
 		return p.printRangeSlice(n)
 
+	case *ir.RangeString:
+		return p.printRangeString(n)
+
 	case *ir.SwitchStmt:
 		return p.printSwitch(n)
 
@@ -325,6 +328,32 @@ func (p *printer) printRangeSlice(n *ir.RangeSlice) error {
 		} else {
 			p.line("let %s: %s = gosl$.goSliceGet(%s, %s);", tsName(n.Value), spelled, sliceTemp, induction)
 		}
+	}
+	if err := p.printBlockBody(n.Body); err != nil {
+		return err
+	}
+	p.indent--
+	p.line("}")
+	return nil
+}
+
+// printRangeString emits range over a string: the operand evaluates
+// once; each iteration binds the starting byte offset and the decoded
+// rune. Strings are immutable, so the decoded sequence is a snapshot by
+// construction.
+func (p *printer) printRangeString(n *ir.RangeString) error {
+	operand, err := p.printExpr(n.X)
+	if err != nil {
+		return err
+	}
+	entry := p.temp()
+	p.line("for (const %s of gort$.goStringRange(%s)) {", entry, operand)
+	p.indent++
+	if n.Index != "" {
+		p.line("let %s: goabi$.GoInt = %s[0];", tsName(n.Index), entry)
+	}
+	if n.Value != "" {
+		p.line("let %s: number = %s[1];", tsName(n.Value), entry)
 	}
 	if err := p.printBlockBody(n.Body); err != nil {
 		return err
