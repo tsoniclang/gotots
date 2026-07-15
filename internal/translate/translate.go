@@ -74,12 +74,18 @@ func Package(p *packages.Package, sourceDir string, options Options) (*Generated
 
 	corePath := path.Join("core", p.PkgPath, "package.ts")
 	abiDir := "language-abi"
-	abiImport, err := relativeImport(path.Dir(corePath), path.Join(abiDir, "goints.js"))
+	intsImport, err := relativeImport(path.Dir(corePath), path.Join(abiDir, "goints.js"))
+	if err != nil {
+		return nil, err
+	}
+	runtimeImport, err := relativeImport(path.Dir(corePath), path.Join(abiDir, "goruntime.js"))
 	if err != nil {
 		return nil, err
 	}
 
 	var functions []*ir.Func
+	structs := map[string]*ir.Struct{}
+	var structOrder []string
 	for _, file := range p.Syntax {
 		filename := p.Fset.Position(file.Pos()).Filename
 		relative, err := filepath.Rel(sourceDir, filename)
@@ -99,26 +105,58 @@ func Package(p *packages.Package, sourceDir string, options Options) (*Generated
 					return nil, err
 				}
 				proof.GeneratedFile = corePath
-				functions = append(functions, function)
 				out.Proofs = append(out.Proofs, *proof)
+				if function.Receiver == nil {
+					functions = append(functions, function)
+				} else {
+					owner := function.Receiver.Type.Named
+					structDecl, ok := structs[owner]
+					if !ok {
+						return nil, fmt.Errorf("method %s declared before its receiver type %s (multi-file ordering not resolved)", function.Name, owner)
+					}
+					structDecl.Methods = append(structDecl.Methods, function)
+				}
 			case *ast.GenDecl:
-				if d.Tok == token.IMPORT {
+				switch d.Tok {
+				case token.IMPORT:
 					if len(d.Specs) > 0 {
 						return nil, &ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 							Construct: "package imports", Span: spanOf(p, sourceDir, d.Pos())}
 					}
-					continue
+				case token.TYPE:
+					for _, spec := range d.Specs {
+						typeSpec := spec.(*ast.TypeSpec)
+						id := goid.TypeName(p.PkgPath, "type", typeSpec.Name.Name)
+						structDecl, err := ir.BuildStruct(p, sourceDir, typeSpec, id)
+						if err != nil {
+							return nil, err
+						}
+						structs[structDecl.Name] = structDecl
+						structOrder = append(structOrder, structDecl.Name)
+						out.Proofs = append(out.Proofs, Proof{
+							ID: id, SourceRevision: options.SourceRevision,
+							Package: p.PkgPath, File: relative,
+							LoweringPlan:    LoweringPlanV1,
+							Representations: map[string]string{typeSpec.Name.Name: "class-direct-identity"},
+							GeneratedFile:   corePath, GeneratedSymbol: structDecl.Name,
+						})
+					}
+				default:
+					return nil, &ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+						Construct: "package-level " + d.Tok.String() + " declaration", Span: spanOf(p, sourceDir, d.Pos())}
 				}
-				return nil, &ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
-					Construct: "package-level " + d.Tok.String() + " declaration", Span: spanOf(p, sourceDir, d.Pos())}
 			}
 		}
 	}
-	if len(functions) == 0 {
+	if len(functions) == 0 && len(structs) == 0 {
 		return nil, fmt.Errorf("package %s has no translatable declarations", p.PkgPath)
 	}
 
-	body, err := emit.Package(functions, abiImport)
+	structList := make([]*ir.Struct, 0, len(structOrder))
+	for _, name := range structOrder {
+		structList = append(structList, structs[name])
+	}
+	body, err := emit.Package(structList, functions, intsImport, runtimeImport)
 	if err != nil {
 		return nil, err
 	}
@@ -162,11 +200,10 @@ func Package(p *packages.Package, sourceDir string, options Options) (*Generated
 }
 
 func translateFunc(p *packages.Package, sourceDir, relativeFile string, source []byte, decl *ast.FuncDecl, options Options) (*ir.Func, *Proof, error) {
-	span := spanOf(p, sourceDir, decl.Pos())
 	name := decl.Name.Name
 	id := goid.Func(p.PkgPath, name)
 	if decl.Recv != nil {
-		return nil, nil, &ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "method declaration", Span: span}
+		id = goid.Method(p.PkgPath, receiverBase(decl.Recv), name)
 	}
 
 	bodyHash := ""
@@ -193,6 +230,9 @@ func translateFunc(p *packages.Package, sourceDir, relativeFile string, source [
 	recordRepresentation := func(t ir.Type) {
 		representations[t.Go] = conservativeCarrier(t)
 	}
+	if function.Receiver != nil {
+		recordRepresentation(function.Receiver.Type)
+	}
 	for _, parameter := range function.Params {
 		recordRepresentation(parameter.Type)
 	}
@@ -214,6 +254,26 @@ func translateFunc(p *packages.Package, sourceDir, relativeFile string, source [
 	}, nil
 }
 
+// receiverBase names the receiver's base type from its AST.
+func receiverBase(recv *ast.FieldList) string {
+	if len(recv.List) == 0 {
+		return ""
+	}
+	t := recv.List[0].Type
+	for {
+		switch base := t.(type) {
+		case *ast.StarExpr:
+			t = base.X
+		case *ast.ParenExpr:
+			t = base.X
+		case *ast.Ident:
+			return base.Name
+		default:
+			return ""
+		}
+	}
+}
+
 // conservativeCarrier names the exact conservative representation of one
 // reviewed type under plan v1.
 func conservativeCarrier(t ir.Type) string {
@@ -222,6 +282,10 @@ func conservativeCarrier(t ir.Type) string {
 		return "boolean"
 	case t.Kind == ir.KindString:
 		return "js-string(equality-only-ordering-unsupported)"
+	case t.Kind == ir.KindPointer:
+		return "object-identity-nilable(undefined)"
+	case t.Kind == ir.KindMap:
+		return "js-map-nilable(undefined)-has-based-lookup"
 	case t.Kind.Float():
 		return "number"
 	case t.Kind.Wide64():

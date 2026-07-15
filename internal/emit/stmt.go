@@ -58,19 +58,50 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 			p.line("continue;")
 		}
 		return nil
+
+	case *ir.TryFinally:
+		p.line("try {")
+		p.indent++
+		if err := p.printBlockBody(n.Body); err != nil {
+			return err
+		}
+		p.indent--
+		p.line("} finally {")
+		p.indent++
+		if err := p.printBlockBody(n.Finally); err != nil {
+			return err
+		}
+		p.indent--
+		p.line("}")
+		return nil
+
+	case *ir.MapDeleteStmt:
+		mapExpr, err := printExpr(n.Map)
+		if err != nil {
+			return err
+		}
+		key, err := printExpr(n.Key)
+		if err != nil {
+			return err
+		}
+		p.line("gort.goMapDelete(%s, %s);", mapExpr, key)
+		return nil
 	}
 	return fmt.Errorf("no emission for IR statement %T", stmt)
 }
 
 func (p *printer) printDecl(n *ir.DeclStmt) error {
-	if n.CallValues != nil {
-		call, err := printExpr(n.CallValues)
+	if n.Tuple != nil {
+		tupleValue, err := printExpr(n.Tuple)
 		if err != nil {
 			return err
 		}
 		tuple := p.temp()
-		p.line("const %s = %s;", tuple, call)
+		p.line("const %s = %s;", tuple, tupleValue)
 		for i, name := range n.Names {
+			if name == "_" {
+				continue // discarded slot; the tuple was evaluated once
+			}
 			spelled, err := tsType(n.Types[i])
 			if err != nil {
 				return err
@@ -80,11 +111,16 @@ func (p *printer) printDecl(n *ir.DeclStmt) error {
 		return nil
 	}
 	for i, name := range n.Names {
-		spelled, err := tsType(n.Types[i])
+		value, err := printExpr(n.Values[i])
 		if err != nil {
 			return err
 		}
-		value, err := printExpr(n.Values[i])
+		if name == "_" {
+			// Go evaluates discarded values.
+			p.line("void (%s);", value)
+			continue
+		}
+		spelled, err := tsType(n.Types[i])
 		if err != nil {
 			return err
 		}
@@ -94,15 +130,17 @@ func (p *printer) printDecl(n *ir.DeclStmt) error {
 }
 
 func (p *printer) printAssign(n *ir.AssignStmt) error {
-	if n.CallValues != nil {
-		call, err := printExpr(n.CallValues)
+	if n.Tuple != nil {
+		tupleValue, err := printExpr(n.Tuple)
 		if err != nil {
 			return err
 		}
 		tuple := p.temp()
-		p.line("const %s = %s;", tuple, call)
+		p.line("const %s = %s;", tuple, tupleValue)
 		for i, target := range n.Targets {
-			p.line("%s = %s[%d];", target, tuple, i)
+			if err := p.printStore(target, fmt.Sprintf("%s[%d]", tuple, i)); err != nil {
+				return err
+			}
 		}
 		return nil
 	}
@@ -111,11 +149,19 @@ func (p *printer) printAssign(n *ir.AssignStmt) error {
 		if err != nil {
 			return err
 		}
-		p.line("%s = %s;", n.Targets[0], value)
-		return nil
+		return p.printStore(n.Targets[0], value)
 	}
-	// Simultaneous assignment: every right-hand value is evaluated into a
-	// temporary in source order before any store.
+	// Go's two-phase rule: target operands (pointer bases, map operands
+	// and keys) and right-hand values are evaluated in source order into
+	// temporaries first, then every store happens.
+	staged := make([]stagedTarget, len(n.Targets))
+	for i, target := range n.Targets {
+		var err error
+		staged[i], err = p.stageTarget(target)
+		if err != nil {
+			return err
+		}
+	}
 	temps := make([]string, len(n.Values))
 	for i, value := range n.Values {
 		printed, err := printExpr(value)
@@ -125,10 +171,98 @@ func (p *printer) printAssign(n *ir.AssignStmt) error {
 		temps[i] = p.temp()
 		p.line("const %s = %s;", temps[i], printed)
 	}
-	for i, target := range n.Targets {
-		p.line("%s = %s;", target, temps[i])
+	for i := range n.Targets {
+		if err := staged[i].store(p, temps[i]); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+// stagedTarget is a target whose operands were pre-evaluated.
+type stagedTarget struct {
+	kind    string // var | field | map
+	name    string // var name, or staged base/map temp
+	field   string
+	keyTemp string
+}
+
+func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
+	switch t := target.(type) {
+	case ir.BlankTarget:
+		return stagedTarget{kind: "blank"}, nil
+	case ir.VarTarget:
+		return stagedTarget{kind: "var", name: t.Name}, nil
+	case *ir.FieldTarget:
+		base, err := printExpr(t.X)
+		if err != nil {
+			return stagedTarget{}, err
+		}
+		baseTemp := p.temp()
+		p.line("const %s = gort.goNilCheck(%s);", baseTemp, base)
+		return stagedTarget{kind: "field", name: baseTemp, field: t.Field}, nil
+	case *ir.MapTarget:
+		mapExpr, err := printExpr(t.Map)
+		if err != nil {
+			return stagedTarget{}, err
+		}
+		mapTemp := p.temp()
+		p.line("const %s = %s;", mapTemp, mapExpr)
+		key, err := printExpr(t.Key)
+		if err != nil {
+			return stagedTarget{}, err
+		}
+		keyTemp := p.temp()
+		p.line("const %s = %s;", keyTemp, key)
+		return stagedTarget{kind: "map", name: mapTemp, keyTemp: keyTemp}, nil
+	}
+	return stagedTarget{}, fmt.Errorf("no staging for target %T", target)
+}
+
+func (s stagedTarget) store(p *printer, value string) error {
+	switch s.kind {
+	case "blank":
+		p.line("void (%s);", value)
+	case "var":
+		p.line("%s = %s;", s.name, value)
+	case "field":
+		p.line("%s.%s = %s;", s.name, s.field, value)
+	case "map":
+		p.line("gort.goMapSet(%s, %s, %s);", s.name, s.keyTemp, value)
+	}
+	return nil
+}
+
+// printStore emits a single-target store without staging (single
+// assignments evaluate left-to-right naturally).
+func (p *printer) printStore(target ir.Target, value string) error {
+	switch t := target.(type) {
+	case ir.BlankTarget:
+		p.line("void (%s);", value)
+		return nil
+	case ir.VarTarget:
+		p.line("%s = %s;", t.Name, value)
+		return nil
+	case *ir.FieldTarget:
+		base, err := printExpr(t.X)
+		if err != nil {
+			return err
+		}
+		p.line("gort.goNilCheck(%s).%s = %s;", base, t.Field, value)
+		return nil
+	case *ir.MapTarget:
+		mapExpr, err := printExpr(t.Map)
+		if err != nil {
+			return err
+		}
+		key, err := printExpr(t.Key)
+		if err != nil {
+			return err
+		}
+		p.line("gort.goMapSet(%s, %s, %s);", mapExpr, key, value)
+		return nil
+	}
+	return fmt.Errorf("no emission for target %T", target)
 }
 
 func (p *printer) printIf(n *ir.IfStmt) error {
@@ -215,7 +349,7 @@ func (p *printer) forClause(stmt ir.Stmt, isInit bool) (string, error) {
 	case nil:
 		return "", nil
 	case *ir.DeclStmt:
-		if !isInit || n.CallValues != nil {
+		if !isInit || n.Tuple != nil {
 			return "", fmt.Errorf("declaration not expressible in this for-loop clause")
 		}
 		parts := make([]string, len(n.Names))
@@ -232,14 +366,18 @@ func (p *printer) forClause(stmt ir.Stmt, isInit bool) (string, error) {
 		}
 		return "let " + joinComma(parts), nil
 	case *ir.AssignStmt:
-		if n.CallValues != nil || len(n.Targets) != 1 {
+		if n.Tuple != nil || len(n.Targets) != 1 {
 			return "", fmt.Errorf("assignment not expressible in this for-loop clause")
+		}
+		variable, isVar := n.Targets[0].(ir.VarTarget)
+		if !isVar {
+			return "", fmt.Errorf("non-variable assignment in a for-loop clause")
 		}
 		value, err := printExpr(n.Values[0])
 		if err != nil {
 			return "", err
 		}
-		return n.Targets[0] + " = " + value, nil
+		return variable.Name + " = " + value, nil
 	}
 	return "", fmt.Errorf("statement %T not expressible in a for-loop clause", stmt)
 }

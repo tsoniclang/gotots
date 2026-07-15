@@ -20,10 +20,17 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "expression without type evidence", Span: span}
 	}
 
+	// Untyped nil is only meaningful in a typed context (assignment,
+	// argument, field, return, map value) or a comparison; those callers
+	// use buildExprAs / the buildBinary intercept.
+	if tv.IsNil() {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "untyped nil outside a typed context", Span: span}
+	}
+
 	// Exact constant folding: any expression the Go type checker evaluated
 	// to a constant becomes a Const with the exact value.
 	if tv.Value != nil {
-		t, err := typeOf(tv.Type, span)
+		t, err := b.typeOf(tv.Type, span)
 		if err != nil {
 			return nil, err
 		}
@@ -39,41 +46,92 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 	case *ast.ParenExpr:
 		return b.buildExpr(n.X)
 
+	case *ast.CompositeLit:
+		t, err := b.typeOf(tv.Type, span)
+		if err != nil {
+			return nil, err
+		}
+		if t.Kind == KindMap {
+			out := &MapFrom{T: t}
+			for _, element := range n.Elts {
+				keyValue, ok := element.(*ast.KeyValueExpr)
+				if !ok {
+					return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "map literal without keys", Span: span}
+				}
+				key, err := b.buildExprAs(keyValue.Key, *t.Key)
+				if err != nil {
+					return nil, err
+				}
+				value, err := b.buildExprAs(keyValue.Value, *t.Elem)
+				if err != nil {
+					return nil, err
+				}
+				out.Keys = append(out.Keys, key)
+				out.Values = append(out.Values, value)
+			}
+			b.use("mapLiteral")
+			return out, nil
+		}
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "composite literal of " + t.Go + " (struct values need &T{...})", Span: span}
+
 	case *ast.Ident:
 		object := b.info.Uses[n]
 		variable, ok := object.(*types.Var)
 		if !ok {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: fmt.Sprintf("identifier %q (%T)", n.Name, object), Span: span}
 		}
-		t, err := typeOf(variable.Type(), span)
+		t, err := b.typeOf(variable.Type(), span)
 		if err != nil {
 			return nil, err
+		}
+		if t.Kind == KindStruct {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "struct value variable (value-copy semantics)", Span: span}
 		}
 		b.use("varRef")
 		return &VarRef{Name: n.Name, T: t}, nil
 
-	case *ast.BinaryExpr:
-		return b.buildBinary(n, tv.Type)
+	case *ast.SelectorExpr:
+		selection, ok := b.info.Selections[n]
+		if !ok || selection.Kind() != types.FieldVal {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "non-field selector", Span: span}
+		}
+		base, err := b.buildExpr(n.X)
+		if err != nil {
+			return nil, err
+		}
+		if base.Type().Kind != KindPointer {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "field access on " + base.Type().Go, Span: span}
+		}
+		t, err := b.typeOf(tv.Type, span)
+		if err != nil {
+			return nil, err
+		}
+		if t.Kind == KindStruct {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "struct-valued field load (value-copy semantics)", Span: span}
+		}
+		b.use("fieldLoad")
+		return &FieldLoad{X: base, Field: n.Sel.Name, T: t}, nil
+
+	case *ast.IndexExpr:
+		mapExpr, err := b.buildExpr(n.X)
+		if err != nil {
+			return nil, err
+		}
+		if mapExpr.Type().Kind != KindMap {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "index on " + mapExpr.Type().Go, Span: span}
+		}
+		key, err := b.buildExpr(n.Index)
+		if err != nil {
+			return nil, err
+		}
+		b.use("mapGet")
+		return &MapGet{Map: mapExpr, Key: key, T: *mapExpr.Type().Elem}, nil
 
 	case *ast.UnaryExpr:
-		switch n.Op {
-		case token.SUB, token.NOT, token.XOR, token.ADD:
-			x, err := b.buildExpr(n.X)
-			if err != nil {
-				return nil, err
-			}
-			if n.Op == token.ADD {
-				return x, nil // unary plus is identity
-			}
-			t, err := typeOf(tv.Type, span)
-			if err != nil {
-				return nil, err
-			}
-			b.use("unary:" + n.Op.String())
-			return &Unary{Op: n.Op, X: x, T: t}, nil
-		default:
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "unary operator " + n.Op.String(), Span: span}
-		}
+		return b.buildUnary(n, tv.Type)
+
+	case *ast.BinaryExpr:
+		return b.buildBinary(n, tv.Type)
 
 	case *ast.CallExpr:
 		if tv.IsType() {
@@ -84,7 +142,7 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			if err != nil {
 				return nil, err
 			}
-			to, err := typeOf(convert, span)
+			to, err := b.typeOf(convert, span)
 			if err != nil {
 				return nil, err
 			}
@@ -94,68 +152,270 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			b.use("convert")
 			return &Convert{X: x, To: to}, nil
 		}
-		call, err := b.buildCall(n)
+		if builtin, isBuiltin := b.builtinCallee(n); isBuiltin {
+			return b.buildBuiltin(n, builtin, tv.Type)
+		}
+		call, err := b.buildAnyCall(n)
 		if err != nil {
 			return nil, err
 		}
-		if len(call.Results) != 1 {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: fmt.Sprintf("call with %d results in expression position", len(call.Results)), Span: span}
+		if _, isTuple := b.info.Types[n].Type.(*types.Tuple); isTuple {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "multi-result call in expression position", Span: span}
 		}
 		return call, nil
 	}
 	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: fmt.Sprintf("%T", e), Span: span}
 }
 
-func (b *builder) buildBinary(n *ast.BinaryExpr, resultType types.Type) (Expr, error) {
-	span := b.span(n.Pos())
-	left, err := b.buildExpr(n.X)
-	if err != nil {
-		return nil, err
+// buildExprAs builds an expression whose context expects a known type,
+// giving untyped nil its exact typed zero.
+func (b *builder) buildExprAs(e ast.Expr, expected Type) (Expr, error) {
+	if tv, ok := b.info.Types[e]; ok && tv.IsNil() {
+		if expected.Kind == KindPointer || expected.Kind == KindMap {
+			b.use("nil")
+			return &NilConst{T: expected}, nil
+		}
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "nil of type " + expected.Go, Span: b.span(e.Pos())}
 	}
-	right, err := b.buildExpr(n.Y)
-	if err != nil {
-		return nil, err
-	}
-	t, err := typeOf(resultType, span)
-	if err != nil {
-		return nil, err
-	}
-	operand := left.Type()
+	return b.buildExpr(e)
+}
 
+func (b *builder) buildUnary(n *ast.UnaryExpr, resultType types.Type) (Expr, error) {
+	span := b.span(n.Pos())
 	switch n.Op {
-	case token.ADD, token.SUB, token.MUL, token.QUO, token.REM,
-		token.AND, token.OR, token.XOR, token.AND_NOT,
-		token.SHL, token.SHR:
-		if n.Op == token.ADD && operand.Kind == KindString {
-			// String concatenation is exact under direct JS +.
-		} else if !operand.Kind.Integer() && !operand.Kind.Float() {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "operator " + n.Op.String() + " on " + operand.Go, Span: span}
+	case token.AND:
+		// Heap allocation of a struct literal: &T{...}.
+		lit, ok := ast.Unparen(n.X).(*ast.CompositeLit)
+		if !ok {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "address of non-composite-literal", Span: span}
 		}
-		if operand.Kind.Float() && (n.Op == token.REM || n.Op == token.AND || n.Op == token.OR ||
-			n.Op == token.XOR || n.Op == token.AND_NOT || n.Op == token.SHL || n.Op == token.SHR) {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "operator " + n.Op.String() + " on " + operand.Go, Span: span}
+		return b.buildStructNew(lit, resultType)
+	case token.SUB, token.NOT, token.XOR, token.ADD:
+		x, err := b.buildExpr(n.X)
+		if err != nil {
+			return nil, err
 		}
-		if operand.Kind == KindFloat32 {
-			// Exact float32 rounding points are not lowered yet.
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "float32 arithmetic", Span: span}
+		if n.Op == token.ADD {
+			return x, nil // unary plus is identity
 		}
-	case token.EQL, token.NEQ:
-		// Equality is exact for the whole subset (UTF-8 string equality
-		// coincides with JS code-unit equality).
-	case token.LSS, token.LEQ, token.GTR, token.GEQ:
-		if operand.Kind == KindString {
-			// Go compares UTF-8 bytes; JS compares UTF-16 code units. The
-			// orders differ outside ASCII, so string ordering needs its own
-			// reviewed lowering.
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "string ordering comparison", Span: span}
+		t, err := b.typeOf(resultType, span)
+		if err != nil {
+			return nil, err
 		}
-	case token.LAND, token.LOR:
-		// Short-circuit boolean semantics match JS exactly.
-	default:
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "operator " + n.Op.String(), Span: span}
+		b.use("unary:" + n.Op.String())
+		return &Unary{Op: n.Op, X: x, T: t}, nil
 	}
-	b.use("binary:" + n.Op.String())
-	return &Binary{Op: n.Op, L: left, R: right, T: t}, nil
+	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "unary operator " + n.Op.String(), Span: span}
+}
+
+// buildStructNew lowers &T{...} into an ordered full-field allocation.
+func (b *builder) buildStructNew(lit *ast.CompositeLit, resultType types.Type) (Expr, error) {
+	span := b.span(lit.Pos())
+	t, err := b.typeOf(resultType, span)
+	if err != nil {
+		return nil, err
+	}
+	if t.Kind != KindPointer {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "composite literal of " + t.Go, Span: span}
+	}
+	named := types.Unalias(b.info.Types[lit].Type).(*types.Named)
+	structType := named.Underlying().(*types.Struct)
+
+	fieldIRType := func(field *types.Var) (Type, error) { return b.typeOf(field.Type(), span) }
+	fieldByName := map[string]*types.Var{}
+	for i := range structType.NumFields() {
+		fieldByName[structType.Field(i).Name()] = structType.Field(i)
+	}
+
+	// Resolve provided values, keyed or positional, typing each against
+	// its field so nil literals get exact zeros.
+	provided := map[string]Expr{}
+	if len(lit.Elts) > 0 {
+		_, keyed := lit.Elts[0].(*ast.KeyValueExpr)
+		for index, element := range lit.Elts {
+			if keyValue, isKeyed := element.(*ast.KeyValueExpr); isKeyed != keyed {
+				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "mixed keyed and positional literal", Span: span}
+			} else if isKeyed {
+				name := keyValue.Key.(*ast.Ident).Name
+				expected, err := fieldIRType(fieldByName[name])
+				if err != nil {
+					return nil, err
+				}
+				value, err := b.buildExprAs(keyValue.Value, expected)
+				if err != nil {
+					return nil, err
+				}
+				provided[name] = value
+			} else {
+				expected, err := fieldIRType(structType.Field(index))
+				if err != nil {
+					return nil, err
+				}
+				value, err := b.buildExprAs(element, expected)
+				if err != nil {
+					return nil, err
+				}
+				provided[structType.Field(index).Name()] = value
+			}
+		}
+	}
+
+	out := &StructNew{TypeName: t.Named, T: t}
+	for i := range structType.NumFields() {
+		field := structType.Field(i)
+		if value, ok := provided[field.Name()]; ok {
+			out.Args = append(out.Args, value)
+			continue
+		}
+		fieldType, err := b.typeOf(field.Type(), span)
+		if err != nil {
+			return nil, err
+		}
+		zero, err := zeroValue(fieldType, span)
+		if err != nil {
+			return nil, err
+		}
+		out.Args = append(out.Args, zero)
+	}
+	b.use("structNew")
+	return out, nil
+}
+
+// builtinCallee resolves a call to a predeclared operation by object
+// identity, never spelling.
+func (b *builder) builtinCallee(call *ast.CallExpr) (*types.Builtin, bool) {
+	ident, ok := ast.Unparen(call.Fun).(*ast.Ident)
+	if !ok {
+		return nil, false
+	}
+	builtin, ok := b.info.Uses[ident].(*types.Builtin)
+	return builtin, ok
+}
+
+// buildBuiltin lowers the reviewed predeclared operations.
+func (b *builder) buildBuiltin(call *ast.CallExpr, builtin *types.Builtin, resultType types.Type) (Expr, error) {
+	span := b.span(call.Pos())
+	switch builtin.Name() {
+	case "len":
+		operand, err := b.buildExpr(call.Args[0])
+		if err != nil {
+			return nil, err
+		}
+		switch operand.Type().Kind {
+		case KindString:
+			b.use("len:string")
+			return &StringLen{X: operand}, nil
+		case KindMap:
+			b.use("len:map")
+			return &MapLen{X: operand}, nil
+		}
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "len of " + operand.Type().Go, Span: span}
+	case "make":
+		t, err := b.typeOf(resultType, span)
+		if err != nil {
+			return nil, err
+		}
+		if t.Kind == KindMap && len(call.Args) == 1 {
+			b.use("makeMap")
+			return &MapMake{T: t}, nil
+		}
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "make of " + t.Go, Span: span}
+	}
+	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "builtin " + builtin.Name(), Span: span}
+}
+
+// buildAnyCall lowers a direct function call or a pointer-receiver method
+// call within the translated package.
+func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
+	span := b.span(n.Pos())
+	if n.Ellipsis.IsValid() {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "slice-expansion call", Span: span}
+	}
+
+	// Method call through selection evidence.
+	if selector, ok := ast.Unparen(n.Fun).(*ast.SelectorExpr); ok {
+		selection, hasSelection := b.info.Selections[selector]
+		if hasSelection && selection.Kind() == types.MethodVal {
+			return b.buildMethodCall(n, selector, selection)
+		}
+	}
+
+	callee, ok := ast.Unparen(n.Fun).(*ast.Ident)
+	if !ok {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: fmt.Sprintf("call of %T", n.Fun), Span: span}
+	}
+	object := b.info.Uses[callee]
+	function, ok := object.(*types.Func)
+	if !ok {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: fmt.Sprintf("call of %T", object), Span: span}
+	}
+	if function.Pkg() == nil || function.Pkg().Path() != b.pkgPath {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "call outside the translated package", Span: span}
+	}
+	signature := function.Type().(*types.Signature)
+	if signature.Recv() != nil || signature.Variadic() || signature.TypeParams() != nil {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "variadic or generic call", Span: span}
+	}
+
+	call := &Call{Callee: function.Name()}
+	if err := b.buildCallArgsResults(n, signature, &call.Args, &call.Results); err != nil {
+		return nil, err
+	}
+	b.use("call")
+	return call, nil
+}
+
+func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, selection *types.Selection) (Expr, error) {
+	span := b.span(n.Pos())
+	method := selection.Obj().(*types.Func)
+	if method.Pkg() == nil || method.Pkg().Path() != b.pkgPath {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method call outside the translated package", Span: span}
+	}
+	recv, err := b.buildExpr(selector.X)
+	if err != nil {
+		return nil, err
+	}
+	if recv.Type().Kind != KindPointer {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method call on " + recv.Type().Go, Span: span}
+	}
+	signature := method.Type().(*types.Signature)
+	if signature.Variadic() || signature.TypeParams() != nil {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "variadic or generic method call", Span: span}
+	}
+	if _, isPointerRecv := signature.Recv().Type().(*types.Pointer); !isPointerRecv {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "value-receiver method call (receiver copy semantics)", Span: span}
+	}
+
+	out := &MethodCall{Recv: recv, Method: method.Name()}
+	if err := b.buildCallArgsResults(n, signature, &out.Args, &out.Results); err != nil {
+		return nil, err
+	}
+	b.use("methodCall")
+	return out, nil
+}
+
+func (b *builder) buildCallArgsResults(n *ast.CallExpr, signature *types.Signature, args *[]Expr, results *[]Type) error {
+	span := b.span(n.Pos())
+	for i, arg := range n.Args {
+		expected, err := b.typeOf(signature.Params().At(i).Type(), b.span(arg.Pos()))
+		if err != nil {
+			return err
+		}
+		built, err := b.buildExprAs(arg, expected)
+		if err != nil {
+			return err
+		}
+		*args = append(*args, built)
+	}
+	tuple := signature.Results()
+	for i := range tuple.Len() {
+		t, err := b.typeOf(tuple.At(i).Type(), span)
+		if err != nil {
+			return err
+		}
+		*results = append(*results, t)
+	}
+	return nil
 }
 
 // conversionTarget reports whether the call is a type conversion and, if
@@ -178,48 +438,6 @@ func (b *builder) checkConversion(from, to Type, span Span) error {
 	}
 	return &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION",
 		Construct: "conversion from " + from.Go + " to " + to.Go, Span: span}
-}
-
-func (b *builder) buildCall(n *ast.CallExpr) (*Call, error) {
-	span := b.span(n.Pos())
-	callee, ok := ast.Unparen(n.Fun).(*ast.Ident)
-	if !ok {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: fmt.Sprintf("call of %T", n.Fun), Span: span}
-	}
-	object := b.info.Uses[callee]
-	function, ok := object.(*types.Func)
-	if !ok {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: fmt.Sprintf("call of %T", object), Span: span}
-	}
-	if function.Pkg() == nil || function.Pkg().Path() != b.pkgPath {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "call outside the translated package", Span: span}
-	}
-	signature := function.Type().(*types.Signature)
-	if signature.Recv() != nil || signature.Variadic() || signature.TypeParams() != nil {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method, variadic, or generic call", Span: span}
-	}
-	if n.Ellipsis.IsValid() {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "slice-expansion call", Span: span}
-	}
-
-	call := &Call{Callee: function.Name()}
-	for _, arg := range n.Args {
-		built, err := b.buildExpr(arg)
-		if err != nil {
-			return nil, err
-		}
-		call.Args = append(call.Args, built)
-	}
-	results := signature.Results()
-	for i := range results.Len() {
-		t, err := typeOf(results.At(i).Type(), span)
-		if err != nil {
-			return nil, err
-		}
-		call.Results = append(call.Results, t)
-	}
-	b.use("call")
-	return call, nil
 }
 
 // constValue renders an exact go/constant value for the resolved type.
@@ -246,4 +464,19 @@ func constValue(v constant.Value, t Type, span Span) (string, error) {
 		}
 		return text, nil
 	}
+}
+
+// zeroValue materializes the Go zero value for a reviewed type.
+func zeroValue(t Type, span Span) (Expr, error) {
+	switch {
+	case t.Kind == KindBool:
+		return &Const{T: t, Value: "false"}, nil
+	case t.Kind == KindString:
+		return &Const{T: t, Value: `""`}, nil
+	case t.Kind == KindPointer, t.Kind == KindMap:
+		return &NilConst{T: t}, nil
+	case t.Kind.Integer(), t.Kind.Float():
+		return &Const{T: t, Value: "0"}, nil
+	}
+	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "zero value of " + t.Go, Span: span}
 }

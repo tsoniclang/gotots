@@ -340,15 +340,44 @@ func Case() string { return strings.ToUpper("x") }
 			code: "GOTOTS_UNSUPPORTED_DECLARATION", mention: "package imports",
 		},
 		{
-			name: "defer",
+			name: "defer below top level",
 			source: `package fixture
-func Case() int {
-	defer helper()
+func Case(enabled bool) int {
+	if enabled {
+		defer helper()
+	}
 	return 1
 }
 func helper() {}
 `,
-			code: "GOTOTS_UNSUPPORTED_STATEMENT", mention: "DeferStmt",
+			code: "GOTOTS_UNSUPPORTED_STATEMENT", mention: "defer below the function's top-level block",
+		},
+		{
+			name: "value receiver method",
+			source: `package fixture
+type Point struct{ X int32 }
+func (p Point) Get() int32 { return p.X }
+`,
+			code: "GOTOTS_UNSUPPORTED_DECLARATION", mention: "value receiver",
+		},
+		{
+			name: "embedded field",
+			source: `package fixture
+type Base struct{ N int32 }
+type Derived struct{ Base }
+`,
+			code: "GOTOTS_UNSUPPORTED_DECLARATION", mention: "embedded field",
+		},
+		{
+			name: "float map key",
+			source: `package fixture
+func Case() int32 {
+	m := make(map[float64]int32)
+	m[1.5] = 1
+	return m[1.5]
+}
+`,
+			code: "GOTOTS_UNSUPPORTED_TYPE", mention: "map key type float64",
 		},
 	}
 	for _, c := range cases {

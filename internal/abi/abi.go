@@ -65,8 +65,9 @@ func Op(family Family, bits int, op string) string {
 // relative to the language-abi root.
 func Files() map[string]string {
 	return map[string]string{
-		"gopanic.ts": gopanicSource,
-		"goints.ts":  gointsSource,
+		"gopanic.ts":   gopanicSource,
+		"goints.ts":    gointsSource,
+		"goruntime.ts": goruntimeSource,
 	}
 }
 
@@ -87,6 +88,90 @@ export function goPanicDivide(): never {
 
 export function goPanicShift(): never {
   throw new GoPanic("runtime error: negative shift amount");
+}
+
+export function goPanicNil(): never {
+  throw new GoPanic("runtime error: invalid memory address or nil pointer dereference");
+}
+
+export function goPanicNilMapWrite(): never {
+  throw new GoPanic("assignment to entry in nil map");
+}
+`
+
+const goruntimeSource = `// Go language runtime carriers beyond integers: nil-checked pointer
+// access, maps with exact nil/zero/comma-ok/write-panic behavior, and
+// UTF-8 string semantics.
+import { goPanicNil, goPanicNilMapWrite } from "./gopanic.js";
+
+// A Go map: undefined is the nil map.
+export type GoMap<K, V> = Map<K, V> | undefined;
+
+export function goNilCheck<T>(x: T | undefined): T {
+  if (x === undefined) goPanicNil();
+  return x;
+}
+
+export function goMapMake<K, V>(): Map<K, V> {
+  return new Map<K, V>();
+}
+
+export function goMapFrom<K, V>(entries: readonly (readonly [K, V])[]): Map<K, V> {
+  const out = new Map<K, V>();
+  for (const [key, value] of entries) {
+    out.set(key, value);
+  }
+  return out;
+}
+
+// Reads of a nil map and missing keys yield the zero value. A stored value
+// may itself be undefined (a nil pointer), so presence uses has(), never a
+// get() sentinel.
+export function goMapGet<K, V>(m: GoMap<K, V>, key: K, zero: V): V {
+  if (m === undefined || !m.has(key)) return zero;
+  return m.get(key) as V;
+}
+
+export function goMapLookup<K, V>(m: GoMap<K, V>, key: K, zero: V): readonly [V, boolean] {
+  if (m === undefined || !m.has(key)) return [zero, false];
+  return [m.get(key) as V, true];
+}
+
+export function goMapSet<K, V>(m: GoMap<K, V>, key: K, value: V): void {
+  if (m === undefined) goPanicNilMapWrite();
+  m.set(key, value);
+}
+
+export function goMapDelete<K, V>(m: GoMap<K, V>, key: K): void {
+  if (m === undefined) return;
+  m.delete(key);
+}
+
+export function goMapLen<K, V>(m: GoMap<K, V>): bigint {
+  return m === undefined ? 0n : BigInt(m.size);
+}
+
+// len(string) is the UTF-8 byte length; JS string length counts UTF-16
+// code units. Surrogate pairs (one code point, 4 UTF-8 bytes) and lone
+// surrogates (encoded as 3-byte replacement U+FFFD by Go's conversion,
+// but valid strings never contain them) are handled by code-point math.
+export function goStringLen(s: string): bigint {
+  let bytes = 0;
+  for (let index = 0; index < s.length; index++) {
+    const code = s.charCodeAt(index);
+    if (code < 0x80) bytes += 1;
+    else if (code < 0x800) bytes += 2;
+    else if (code >= 0xd800 && code < 0xdc00 && index + 1 < s.length) {
+      const next = s.charCodeAt(index + 1);
+      if (next >= 0xdc00 && next < 0xe000) {
+        bytes += 4;
+        index++;
+      } else {
+        bytes += 3;
+      }
+    } else bytes += 3;
+  }
+  return BigInt(bytes);
 }
 `
 

@@ -39,17 +39,125 @@ func printExpr(e ir.Expr) (string, error) {
 	case *ir.Convert:
 		return printConvert(n)
 	case *ir.Call:
-		args := make([]string, len(n.Args))
-		for i, arg := range n.Args {
-			printed, err := printExpr(arg)
+		args, err := printArgs(n.Args)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("%s(%s)", n.Callee, args), nil
+	case *ir.MethodCall:
+		recv, err := printExpr(n.Recv)
+		if err != nil {
+			return "", err
+		}
+		args, err := printArgs(n.Args)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("gort.goNilCheck(%s).%s(%s)", recv, n.Method, args), nil
+	case *ir.FieldLoad:
+		base, err := printExpr(n.X)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("gort.goNilCheck(%s).%s", base, n.Field), nil
+	case *ir.StructNew:
+		args, err := printArgs(n.Args)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("new %s(%s)", n.TypeName, args), nil
+	case *ir.NilConst:
+		return "undefined", nil
+	case *ir.IsNil:
+		x, err := printExpr(n.X)
+		if err != nil {
+			return "", err
+		}
+		if n.Negate {
+			return "(" + x + " !== undefined)", nil
+		}
+		return "(" + x + " === undefined)", nil
+	case *ir.MapMake:
+		return "gort.goMapMake()", nil
+	case *ir.MapFrom:
+		var entries []string
+		for i := range n.Keys {
+			key, err := printExpr(n.Keys[i])
 			if err != nil {
 				return "", err
 			}
-			args[i] = printed
+			value, err := printExpr(n.Values[i])
+			if err != nil {
+				return "", err
+			}
+			entries = append(entries, "["+key+", "+value+"]")
 		}
-		return fmt.Sprintf("%s(%s)", n.Callee, joinComma(args)), nil
+		return "gort.goMapFrom([" + joinComma(entries) + "])", nil
+	case *ir.MapGet:
+		return printMapAccess("goMapGet", n.Map, n.Key, n.T)
+	case *ir.MapLookup:
+		return printMapAccess("goMapLookup", n.Map, n.Key, n.T)
+	case *ir.MapLen:
+		x, err := printExpr(n.X)
+		if err != nil {
+			return "", err
+		}
+		return "gort.goMapLen(" + x + ")", nil
+	case *ir.StringLen:
+		x, err := printExpr(n.X)
+		if err != nil {
+			return "", err
+		}
+		return "gort.goStringLen(" + x + ")", nil
 	}
 	return "", fmt.Errorf("no emission for IR expression %T", e)
+}
+
+func printArgs(args []ir.Expr) (string, error) {
+	parts := make([]string, len(args))
+	for i, arg := range args {
+		printed, err := printExpr(arg)
+		if err != nil {
+			return "", err
+		}
+		parts[i] = printed
+	}
+	return joinComma(parts), nil
+}
+
+// printMapAccess emits a map read with the exact zero value of the map's
+// value type.
+func printMapAccess(helper string, mapExpr, key ir.Expr, valueType ir.Type) (string, error) {
+	m, err := printExpr(mapExpr)
+	if err != nil {
+		return "", err
+	}
+	k, err := printExpr(key)
+	if err != nil {
+		return "", err
+	}
+	zero, err := zeroLiteral(valueType)
+	if err != nil {
+		return "", err
+	}
+	return "gort." + helper + "(" + m + ", " + k + ", " + zero + ")", nil
+}
+
+// zeroLiteral spells the Go zero value of a reviewed type in TypeScript.
+func zeroLiteral(t ir.Type) (string, error) {
+	switch {
+	case t.Kind == ir.KindBool:
+		return "false", nil
+	case t.Kind == ir.KindString:
+		return `""`, nil
+	case t.Kind == ir.KindPointer, t.Kind == ir.KindMap:
+		return "undefined", nil
+	case t.Kind.Wide64():
+		return "0n", nil
+	case t.Kind.Integer(), t.Kind.Float():
+		return "0", nil
+	}
+	return "", fmt.Errorf("no zero literal for type %q", t.Go)
 }
 
 func printConst(n *ir.Const) (string, error) {

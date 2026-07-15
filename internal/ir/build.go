@@ -19,6 +19,10 @@ type builder struct {
 	pkgPath    string
 	sourceDir  string
 	operations map[string]bool
+	deferCount int
+	// results are the enclosing function's result types, giving return
+	// expressions their expected types.
+	results []Type
 }
 
 func (b *builder) span(pos token.Pos) Span {
@@ -32,8 +36,8 @@ func (b *builder) span(pos token.Pos) Span {
 
 func (b *builder) use(operation string) { b.operations[operation] = true }
 
-// BuildFunc converts one typed top-level function declaration into IR.
-// bodyHash is the census body hash for proof-chain linkage.
+// BuildFunc converts one typed top-level function or method declaration
+// into IR. bodyHash is the census body hash for proof-chain linkage.
 func BuildFunc(p *packages.Package, sourceDir string, decl *ast.FuncDecl, id, bodyHash string) (*Func, error) {
 	b := &builder{
 		fset:       p.Fset,
@@ -43,9 +47,6 @@ func BuildFunc(p *packages.Package, sourceDir string, decl *ast.FuncDecl, id, bo
 		operations: map[string]bool{},
 	}
 	span := b.span(decl.Pos())
-	if decl.Recv != nil {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "method declaration", Span: span}
-	}
 	if decl.Type.TypeParams != nil {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "generic function", Span: span}
 	}
@@ -69,15 +70,33 @@ func BuildFunc(p *packages.Package, sourceDir string, decl *ast.FuncDecl, id, bo
 		Span:     span,
 		BodyHash: bodyHash,
 	}
+
+	if recv := signature.Recv(); recv != nil {
+		if _, isPointer := recv.Type().(*types.Pointer); !isPointer {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "value receiver (receiver copy semantics)", Span: span}
+		}
+		if recv.Name() == "" || recv.Name() == "_" {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "unnamed or blank receiver", Span: span}
+		}
+		recvType, err := b.typeOf(recv.Type(), span)
+		if err != nil {
+			return nil, err
+		}
+		function.Receiver = &Var{Name: recv.Name(), Type: recvType}
+	}
+
 	params := signature.Params()
 	for i := range params.Len() {
 		parameter := params.At(i)
 		if parameter.Name() == "" || parameter.Name() == "_" {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "unnamed or blank parameter", Span: span}
 		}
-		t, err := typeOf(parameter.Type(), span)
+		t, err := b.typeOf(parameter.Type(), span)
 		if err != nil {
 			return nil, err
+		}
+		if t.Kind == KindStruct {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "struct value parameter (value-copy semantics)", Span: span}
 		}
 		function.Params = append(function.Params, Var{Name: parameter.Name(), Type: t})
 	}
@@ -87,14 +106,18 @@ func BuildFunc(p *packages.Package, sourceDir string, decl *ast.FuncDecl, id, bo
 		if result.Name() != "" {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "named result", Span: span}
 		}
-		t, err := typeOf(result.Type(), span)
+		t, err := b.typeOf(result.Type(), span)
 		if err != nil {
 			return nil, err
 		}
+		if t.Kind == KindStruct {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "struct value result (value-copy semantics)", Span: span}
+		}
 		function.Results = append(function.Results, Var{Type: t})
+		b.results = append(b.results, t)
 	}
 
-	body, err := b.buildBlock(decl.Body)
+	body, err := b.buildTopLevel(decl.Body.List)
 	if err != nil {
 		return nil, err
 	}
@@ -104,6 +127,83 @@ func BuildFunc(p *packages.Package, sourceDir string, decl *ast.FuncDecl, id, bo
 	}
 	sort.Strings(function.Operations)
 	return function, nil
+}
+
+// buildTopLevel builds the function's top-level statement list, lowering
+// defers into nested try/finally: everything after a defer becomes the
+// try body, the deferred call (with its receiver and arguments captured
+// at the defer site) becomes the finally. Recursion yields Go's LIFO
+// order. Defers below the top level run at function exit, which block
+// nesting cannot express — they fail closed until the general defer-stack
+// lowering exists.
+func (b *builder) buildTopLevel(stmts []ast.Stmt) (*Block, error) {
+	out := &Block{}
+	for index, stmt := range stmts {
+		deferStmt, isDefer := stmt.(*ast.DeferStmt)
+		if !isDefer {
+			built, err := b.buildStmt(stmt)
+			if err != nil {
+				return nil, err
+			}
+			out.Stmts = append(out.Stmts, built)
+			continue
+		}
+
+		captures, deferredCall, err := b.buildDeferredCall(deferStmt)
+		if err != nil {
+			return nil, err
+		}
+		rest, err := b.buildTopLevel(stmts[index+1:])
+		if err != nil {
+			return nil, err
+		}
+		out.Stmts = append(out.Stmts, captures...)
+		out.Stmts = append(out.Stmts, &TryFinally{
+			Body:    rest,
+			Finally: &Block{Stmts: []Stmt{&ExprStmt{Call: deferredCall}}},
+		})
+		b.use("defer")
+		return out, nil
+	}
+	return out, nil
+}
+
+// buildDeferredCall captures the deferred call's receiver and arguments at
+// the defer site (Go evaluates them when the defer statement executes) and
+// returns the capture declarations plus the call over the captures.
+func (b *builder) buildDeferredCall(deferStmt *ast.DeferStmt) ([]Stmt, Expr, error) {
+	span := b.span(deferStmt.Pos())
+	built, err := b.buildAnyCall(deferStmt.Call)
+	if err != nil {
+		return nil, nil, err
+	}
+	prefix := fmt.Sprintf("_d%d", b.deferCount)
+	b.deferCount++
+
+	var captures []Stmt
+	capture := func(name string, value Expr) *VarRef {
+		captures = append(captures, &DeclStmt{
+			Names:  []string{name},
+			Types:  []Type{value.Type()},
+			Values: []Expr{value},
+		})
+		return &VarRef{Name: name, T: value.Type()}
+	}
+
+	switch call := built.(type) {
+	case *Call:
+		for i, arg := range call.Args {
+			call.Args[i] = capture(fmt.Sprintf("%s_a%d", prefix, i), arg)
+		}
+		return captures, call, nil
+	case *MethodCall:
+		call.Recv = capture(prefix+"_r", call.Recv)
+		for i, arg := range call.Args {
+			call.Args[i] = capture(fmt.Sprintf("%s_a%d", prefix, i), arg)
+		}
+		return captures, call, nil
+	}
+	return nil, nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "deferred non-call expression", Span: span}
 }
 
 func (b *builder) buildBlock(block *ast.BlockStmt) (*Block, error) {
@@ -142,6 +242,10 @@ func (b *builder) buildStmt(stmt ast.Stmt) (Stmt, error) {
 	case *ast.ReturnStmt:
 		return b.buildReturn(n)
 
+	case *ast.DeferStmt:
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT",
+			Construct: "defer below the function's top-level block (runs at function exit; needs the defer-stack lowering)", Span: span}
+
 	case *ast.ExprStmt:
 		call, ok := n.X.(*ast.CallExpr)
 		if !ok {
@@ -150,7 +254,13 @@ func (b *builder) buildStmt(stmt ast.Stmt) (Stmt, error) {
 		if _, isConversion := b.conversionTarget(call); isConversion {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "conversion as statement", Span: span}
 		}
-		built, err := b.buildCall(call)
+		if builtin, isBuiltin := b.builtinCallee(call); isBuiltin {
+			if builtin.Name() == "delete" {
+				return b.buildMapDelete(call)
+			}
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "builtin statement " + builtin.Name(), Span: span}
+		}
+		built, err := b.buildAnyCall(call)
 		if err != nil {
 			return nil, err
 		}
@@ -165,6 +275,19 @@ func (b *builder) buildStmt(stmt ast.Stmt) (Stmt, error) {
 		return &BranchStmt{Tok: n.Tok}, nil
 	}
 	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: fmt.Sprintf("%T", stmt), Span: span}
+}
+
+func (b *builder) buildMapDelete(call *ast.CallExpr) (Stmt, error) {
+	mapExpr, err := b.buildExpr(call.Args[0])
+	if err != nil {
+		return nil, err
+	}
+	key, err := b.buildExpr(call.Args[1])
+	if err != nil {
+		return nil, err
+	}
+	b.use("mapDelete")
+	return &MapDeleteStmt{Map: mapExpr, Key: key}, nil
 }
 
 func (b *builder) buildDeclStmt(n *ast.DeclStmt) (Stmt, error) {
@@ -187,20 +310,27 @@ func (b *builder) buildDeclStmt(n *ast.DeclStmt) (Stmt, error) {
 			if object == nil {
 				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "var without typed definition", Span: span}
 			}
-			t, err := typeOf(object.Type(), span)
+			t, err := b.typeOf(object.Type(), span)
 			if err != nil {
 				return nil, err
+			}
+			if t.Kind == KindStruct {
+				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "struct value variable (value-copy semantics)", Span: span}
 			}
 			out.Names = append(out.Names, name.Name)
 			out.Types = append(out.Types, t)
 			if i < len(value.Values) {
-				built, err := b.buildExpr(value.Values[i])
+				built, err := b.buildExprAs(value.Values[i], t)
 				if err != nil {
 					return nil, err
 				}
 				out.Values = append(out.Values, built)
 			} else {
-				out.Values = append(out.Values, zeroValue(t))
+				zero, err := zeroValue(t, span)
+				if err != nil {
+					return nil, err
+				}
+				out.Values = append(out.Values, zero)
 			}
 		}
 		if len(value.Values) != 0 && len(value.Values) != len(value.Names) {
@@ -213,14 +343,39 @@ func (b *builder) buildDeclStmt(n *ast.DeclStmt) (Stmt, error) {
 
 func (b *builder) buildIncDec(n *ast.IncDecStmt) (Stmt, error) {
 	span := b.span(n.Pos())
-	target, ok := n.X.(*ast.Ident)
-	if !ok {
+
+	// The operand address is evaluated once in Go; the lowering to
+	// load-op-store is exact only when re-evaluating the operand is pure,
+	// so bases are restricted to plain identifiers.
+	var target Target
+	var x Expr
+	switch operand := ast.Unparen(n.X).(type) {
+	case *ast.Ident:
+		built, err := b.buildExpr(operand)
+		if err != nil {
+			return nil, err
+		}
+		x = built
+		target = VarTarget{Name: operand.Name}
+	case *ast.SelectorExpr:
+		if _, baseIsIdent := ast.Unparen(operand.X).(*ast.Ident); !baseIsIdent {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "inc/dec of field with non-variable base", Span: span}
+		}
+		built, err := b.buildExpr(operand)
+		if err != nil {
+			return nil, err
+		}
+		load, isField := built.(*FieldLoad)
+		if !isField {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "inc/dec of non-field selector", Span: span}
+		}
+		x = load
+		target = &FieldTarget{X: load.X, Field: load.Field}
+		b.use("fieldStore")
+	default:
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "inc/dec of non-variable", Span: span}
 	}
-	x, err := b.buildExpr(target)
-	if err != nil {
-		return nil, err
-	}
+
 	op := token.ADD
 	if n.Tok == token.DEC {
 		op = token.SUB
@@ -230,7 +385,10 @@ func (b *builder) buildIncDec(n *ast.IncDecStmt) (Stmt, error) {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "inc/dec of " + x.Type().Go, Span: span}
 	}
 	b.use("incDec")
-	return &AssignStmt{Targets: []string{target.Name}, Values: []Expr{&Binary{Op: op, L: x, R: one, T: x.Type()}}}, nil
+	return &AssignStmt{
+		Targets: []Target{target},
+		Values:  []Expr{&Binary{Op: op, L: x, R: one, T: x.Type()}},
+	}, nil
 }
 
 func (b *builder) buildIf(n *ast.IfStmt) (Stmt, error) {
@@ -296,7 +454,6 @@ func (b *builder) buildFor(n *ast.ForStmt) (Stmt, error) {
 }
 
 func (b *builder) buildReturn(n *ast.ReturnStmt) (Stmt, error) {
-	span := b.span(n.Pos())
 	if len(n.Results) == 0 {
 		b.use("return")
 		return &ReturnStmt{}, nil
@@ -305,38 +462,30 @@ func (b *builder) buildReturn(n *ast.ReturnStmt) (Stmt, error) {
 	if len(n.Results) == 1 {
 		if callAST, ok := ast.Unparen(n.Results[0]).(*ast.CallExpr); ok {
 			if _, isConversion := b.conversionTarget(callAST); !isConversion {
-				if tuple, ok := b.info.Types[callAST].Type.(*types.Tuple); ok && tuple.Len() > 1 {
-					call, err := b.buildCall(callAST)
-					if err != nil {
-						return nil, err
+				if _, isBuiltin := b.builtinCallee(callAST); !isBuiltin {
+					if tuple, ok := b.info.Types[callAST].Type.(*types.Tuple); ok && tuple.Len() > 1 {
+						call, err := b.buildAnyCall(callAST)
+						if err != nil {
+							return nil, err
+						}
+						b.use("return")
+						return &ReturnStmt{CallValue: call}, nil
 					}
-					b.use("return")
-					return &ReturnStmt{CallValue: call}, nil
 				}
 			}
 		}
 	}
 	out := &ReturnStmt{}
-	for _, result := range n.Results {
-		built, err := b.buildExpr(result)
+	for i, result := range n.Results {
+		if i >= len(b.results) {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "return arity mismatch", Span: b.span(n.Pos())}
+		}
+		built, err := b.buildExprAs(result, b.results[i])
 		if err != nil {
 			return nil, err
 		}
 		out.Values = append(out.Values, built)
 	}
-	_ = span
 	b.use("return")
 	return out, nil
-}
-
-// zeroValue materializes the Go zero value for a reviewed type.
-func zeroValue(t Type) Expr {
-	switch {
-	case t.Kind == KindBool:
-		return &Const{T: t, Value: "false"}
-	case t.Kind == KindString:
-		return &Const{T: t, Value: `""`}
-	default:
-		return &Const{T: t, Value: "0"}
-	}
 }

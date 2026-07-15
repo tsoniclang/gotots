@@ -39,14 +39,25 @@ func FileWithProvenance(p Provenance, body string) (string, error) {
 		"// @gotots-generated " + string(header) + "\n\n" + body, nil
 }
 
-// Package prints one translated package into a single TypeScript module.
-// abiImport is the module specifier of the language ABI (with .js).
-func Package(functions []*ir.Func, abiImport string) (string, error) {
+// Package prints one translated package into a single TypeScript module:
+// classes for named structs (methods attached), then functions, each in
+// sorted name order. intsImport and runtimeImport are the language-ABI
+// module specifiers (with .js).
+func Package(structs []*ir.Struct, functions []*ir.Func, intsImport, runtimeImport string) (string, error) {
+	sortedStructs := append([]*ir.Struct{}, structs...)
+	sort.Slice(sortedStructs, func(i, j int) bool { return sortedStructs[i].Name < sortedStructs[j].Name })
 	sorted := append([]*ir.Func{}, functions...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
 
 	var out strings.Builder
-	fmt.Fprintf(&out, "import * as goabi from %q;\n", abiImport)
+	fmt.Fprintf(&out, "import * as goabi from %q;\n", intsImport)
+	fmt.Fprintf(&out, "import * as gort from %q;\n", runtimeImport)
+	for _, structDecl := range sortedStructs {
+		out.WriteString("\n")
+		if err := printStruct(&out, structDecl); err != nil {
+			return "", err
+		}
+	}
 	for _, function := range sorted {
 		out.WriteString("\n")
 		if err := printFunc(&out, function); err != nil {
@@ -54,6 +65,64 @@ func Package(functions []*ir.Func, abiImport string) (string, error) {
 		}
 	}
 	return out.String(), nil
+}
+
+// printStruct emits one named struct as a class whose constructor takes
+// every field in declaration order (composite literals pass explicit
+// zeros for omitted fields, so construction is always total).
+func printStruct(out *strings.Builder, structDecl *ir.Struct) error {
+	p := &printer{out: out}
+	export := ""
+	if structDecl.Exported {
+		export = "export "
+	}
+	p.line("%sclass %s {", export, structDecl.Name)
+	p.indent++
+	var params []string
+	for _, field := range structDecl.Fields {
+		spelled, err := tsType(field.Type)
+		if err != nil {
+			return fmt.Errorf("%s: %w", structDecl.ID, err)
+		}
+		p.line("%s: %s;", field.Name, spelled)
+		params = append(params, field.Name+": "+spelled)
+	}
+	p.line("constructor(%s) {", strings.Join(params, ", "))
+	p.indent++
+	for _, field := range structDecl.Fields {
+		p.line("this.%s = %s;", field.Name, field.Name)
+	}
+	p.indent--
+	p.line("}")
+	sortedMethods := append([]*ir.Func{}, structDecl.Methods...)
+	sort.Slice(sortedMethods, func(i, j int) bool { return sortedMethods[i].Name < sortedMethods[j].Name })
+	for _, method := range sortedMethods {
+		if err := printMethod(p, method); err != nil {
+			return err
+		}
+	}
+	p.indent--
+	p.line("}")
+	return nil
+}
+
+// printMethod emits one pointer-receiver method; the Go receiver name
+// binds to the instance on entry so body references keep source naming.
+func printMethod(p *printer, method *ir.Func) error {
+	p.temps = 0
+	signature, err := functionSignature(method)
+	if err != nil {
+		return fmt.Errorf("%s: %w", method.ID, err)
+	}
+	p.line("%s%s {", method.Name, signature)
+	p.indent++
+	p.line("const %s = this;", method.Receiver.Name)
+	if err := p.printBlockBody(method.Body); err != nil {
+		return fmt.Errorf("%s: %w", method.ID, err)
+	}
+	p.indent--
+	p.line("}")
+	return nil
 }
 
 // printer carries per-function emission state.
@@ -77,16 +146,7 @@ func (p *printer) temp() string {
 
 func printFunc(out *strings.Builder, function *ir.Func) error {
 	p := &printer{out: out}
-
-	var params []string
-	for _, parameter := range function.Params {
-		spelled, err := tsType(parameter.Type)
-		if err != nil {
-			return fmt.Errorf("%s: %w", function.ID, err)
-		}
-		params = append(params, parameter.Name+": "+spelled)
-	}
-	result, err := tsResultType(function.Results)
+	signature, err := functionSignature(function)
 	if err != nil {
 		return fmt.Errorf("%s: %w", function.ID, err)
 	}
@@ -94,7 +154,7 @@ func printFunc(out *strings.Builder, function *ir.Func) error {
 	if function.Exported {
 		export = "export "
 	}
-	p.line("%sfunction %s(%s): %s {", export, function.Name, strings.Join(params, ", "), result)
+	p.line("%sfunction %s%s {", export, function.Name, signature)
 	p.indent++
 	if err := p.printBlockBody(function.Body); err != nil {
 		return fmt.Errorf("%s: %w", function.ID, err)
@@ -102,6 +162,22 @@ func printFunc(out *strings.Builder, function *ir.Func) error {
 	p.indent--
 	p.line("}")
 	return nil
+}
+
+func functionSignature(function *ir.Func) (string, error) {
+	var params []string
+	for _, parameter := range function.Params {
+		spelled, err := tsType(parameter.Type)
+		if err != nil {
+			return "", err
+		}
+		params = append(params, parameter.Name+": "+spelled)
+	}
+	result, err := tsResultType(function.Results)
+	if err != nil {
+		return "", err
+	}
+	return "(" + strings.Join(params, ", ") + "): " + result, nil
 }
 
 // tsType spells the static TypeScript type of one IR type.
@@ -135,6 +211,18 @@ func tsType(t ir.Type) (string, error) {
 		return "goabi.GoUint", nil
 	case ir.KindUintptr:
 		return "goabi.GoUintptr", nil
+	case ir.KindPointer:
+		return t.Named + " | undefined", nil
+	case ir.KindMap:
+		key, err := tsType(*t.Key)
+		if err != nil {
+			return "", err
+		}
+		value, err := tsType(*t.Elem)
+		if err != nil {
+			return "", err
+		}
+		return "gort.GoMap<" + key + ", " + value + ">", nil
 	}
 	return "", fmt.Errorf("no TypeScript spelling for IR type %q", t.Go)
 }
