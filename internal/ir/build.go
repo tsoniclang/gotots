@@ -23,6 +23,9 @@ type builder struct {
 	// closed.
 	unit       Scope
 	operations map[string]bool
+	// sites collects every unsupported operation of the outermost body,
+	// shared with closure child builders so nested findings bubble up.
+	sites      *[]UnsupportedSite
 	deferCount int
 	// results are the enclosing function's result types, giving return
 	// expressions their expected types.
@@ -54,17 +57,9 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 		sourceDir:  sourceDir,
 		unit:       unit,
 		operations: map[string]bool{},
+		sites:      &[]UnsupportedSite{},
 	}
 	span := b.span(decl.Pos())
-	if decl.Body == nil {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "bodyless function", Span: span}
-	}
-	if decl.Recv == nil && decl.Name.Name == "init" {
-		// Package initializers need the initialization subsystem (import
-		// DAG order, once semantics); emitting them as ordinary functions
-		// would silently drop their effects.
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "package init function (initialization order subsystem)", Span: span}
-	}
 	object, ok := b.info.Defs[decl.Name].(*types.Func)
 	if !ok {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "function without typed definition", Span: span}
@@ -82,10 +77,28 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 		Span:     span,
 		BodyHash: bodyHash,
 	}
+	// A declaration-level finding makes the whole body unimplemented:
+	// its one site is recorded and the body is not built (its types are
+	// unavailable or its effects cannot be represented).
+	declarationSite := func(err error) (*Func, error) {
+		if !b.recordSite(err) {
+			return nil, err
+		}
+		return b.finalize(function), nil
+	}
+	if decl.Body == nil {
+		return declarationSite(&Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "bodyless function", Span: span})
+	}
+	if decl.Recv == nil && decl.Name.Name == "init" {
+		// Package initializers need the initialization subsystem (import
+		// DAG order, once semantics); emitting them as ordinary functions
+		// would silently drop their effects.
+		return declarationSite(&Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "package init function (initialization order subsystem)", Span: span})
+	}
 	if decl.Type.TypeParams != nil {
 		names, err := b.admitGenericFunction(object, span)
 		if err != nil {
-			return nil, err
+			return declarationSite(err)
 		}
 		function.TypeParams = names
 	}
@@ -95,11 +108,11 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 		// binds a clone on entry, so receiver mutations never reach the
 		// caller — Go's receiver copy exactly.
 		if recv.Name() == "" || recv.Name() == "_" {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "unnamed or blank receiver", Span: span}
+			return declarationSite(&Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "unnamed or blank receiver", Span: span})
 		}
 		recvType, err := b.typeOf(recv.Type(), span)
 		if err != nil {
-			return nil, err
+			return declarationSite(err)
 		}
 		function.Receiver = &Var{Name: recv.Name(), Type: recvType}
 	}
@@ -108,11 +121,11 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 	for i := range params.Len() {
 		parameter := params.At(i)
 		if parameter.Name() == "" || parameter.Name() == "_" {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "unnamed or blank parameter", Span: span}
+			return declarationSite(&Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "unnamed or blank parameter", Span: span})
 		}
 		t, err := b.typeOf(parameter.Type(), span)
 		if err != nil {
-			return nil, err
+			return declarationSite(err)
 		}
 		function.Params = append(function.Params, Var{Name: parameter.Name(), Type: t})
 	}
@@ -120,11 +133,11 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 	for i := range results.Len() {
 		result := results.At(i)
 		if result.Name() == "_" {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "blank named result", Span: span}
+			return declarationSite(&Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "blank named result", Span: span})
 		}
 		t, err := b.typeOf(result.Type(), span)
 		if err != nil {
-			return nil, err
+			return declarationSite(err)
 		}
 		function.Results = append(function.Results, Var{Name: result.Name(), Type: t})
 		b.results = append(b.results, t)
@@ -139,14 +152,28 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 	}
 	// Named results are zero-initialized locals declared before the body.
 	if err := b.prependNamedResultZeros(body, span); err != nil {
-		return nil, err
+		return declarationSite(err)
 	}
 	function.Body = body
+	return b.finalize(function), nil
+}
+
+// finalize assigns the body's support state: any recorded site makes it
+// unimplemented, its body is withheld (never emitted), and every site
+// stays on the record.
+func (b *builder) finalize(function *Func) *Func {
 	for operation := range b.operations {
 		function.Operations = append(function.Operations, operation)
 	}
 	sort.Strings(function.Operations)
-	return function, nil
+	function.Sites = *b.sites
+	if len(function.Sites) > 0 {
+		function.Support = SupportUnimplemented
+		function.Body = nil
+	} else {
+		function.Support = SupportGenerated
+	}
+	return function
 }
 
 // buildTopLevel builds the function's top-level statement list, lowering
@@ -163,6 +190,10 @@ func (b *builder) buildTopLevel(stmts []ast.Stmt) (*Block, error) {
 		if !isDefer {
 			built, err := b.buildStmt(stmt)
 			if err != nil {
+				if b.recordSite(err) {
+					out.Stmts = append(out.Stmts, &UnimplementedStmt{Site: (*b.sites)[len(*b.sites)-1]})
+					continue
+				}
 				return nil, err
 			}
 			out.Stmts = append(out.Stmts, built)
@@ -172,12 +203,19 @@ func (b *builder) buildTopLevel(stmts []ast.Stmt) (*Block, error) {
 		if len(b.namedResults) > 0 {
 			// A deferred call can observe and mutate named results after
 			// the return values are set; try/finally cannot express that
-			// visibility, so the combination fails closed.
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT",
-				Construct: "defer in a function with named results (deferred result mutation)", Span: b.span(deferStmt.Pos())}
+			// visibility, so the combination fails closed. Accounting
+			// continues over the remaining statements.
+			b.recordSite(&Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT",
+				Construct: "defer in a function with named results (deferred result mutation)", Span: b.span(deferStmt.Pos())})
+			out.Stmts = append(out.Stmts, &UnimplementedStmt{Site: (*b.sites)[len(*b.sites)-1]})
+			continue
 		}
 		captures, deferredCall, err := b.buildDeferredCall(deferStmt)
 		if err != nil {
+			if b.recordSite(err) {
+				out.Stmts = append(out.Stmts, &UnimplementedStmt{Site: (*b.sites)[len(*b.sites)-1]})
+				continue
+			}
 			return nil, err
 		}
 		rest, err := b.buildTopLevel(stmts[index+1:])
@@ -248,11 +286,19 @@ func (b *builder) buildDeferredCall(deferStmt *ast.DeferStmt) ([]Stmt, Expr, err
 	return nil, nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "deferred non-call expression", Span: span}
 }
 
+// buildBlock builds one statement list, recovering per statement: an
+// unsupported operation records its exact site and the walk continues,
+// so one finding never hides later unsupported operations. A body with
+// any site is unimplemented and never emitted.
 func (b *builder) buildBlock(block *ast.BlockStmt) (*Block, error) {
 	out := &Block{}
 	for _, stmt := range block.List {
 		built, err := b.buildStmt(stmt)
 		if err != nil {
+			if b.recordSite(err) {
+				out.Stmts = append(out.Stmts, &UnimplementedStmt{Site: (*b.sites)[len(*b.sites)-1]})
+				continue
+			}
 			return nil, err
 		}
 		out.Stmts = append(out.Stmts, built)

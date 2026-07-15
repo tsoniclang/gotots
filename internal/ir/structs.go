@@ -19,6 +19,7 @@ func BuildStruct(p *packages.Package, sourceDir string, unit Scope, spec *ast.Ty
 		sourceDir:  sourceDir,
 		unit:       unit,
 		operations: map[string]bool{},
+		sites:      &[]UnsupportedSite{},
 	}
 	span := b.span(spec.Pos())
 	object, ok := b.info.Defs[spec.Name].(*types.TypeName)

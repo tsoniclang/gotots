@@ -102,11 +102,17 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 				}
 				result.Bodies++
 				packageBodies++
-				if err := probeFunc(p, sourceDir, unit, source, funcDecl); err != nil {
+				function, err := probeFunc(p, sourceDir, unit, source, funcDecl)
+				if err != nil {
+					return nil, err
+				}
+				if function.Support == ir.SupportUnimplemented {
 					result.Blocked++
-					result.BlockerHistogram[blockerKey(err)]++
-					if ref, isExternal := externalRef(err); isExternal {
-						result.ExternalRefs[ref]++
+					for _, site := range function.Sites {
+						result.BlockerHistogram[site.Class]++
+						if ref, isExternal := externalRefOfSite(site); isExternal {
+							result.ExternalRefs[ref]++
+						}
 					}
 				} else {
 					result.Translated++
@@ -134,9 +140,20 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 	}
 	verified := make([]string, 0, len(result.PackagesFullyTranslated))
 	for _, candidate := range result.PackagesFullyTranslated {
-		throwaway := &Generated{Files: map[string]string{}, Ownership: map[string]string{}}
+		throwaway := &Generated{Files: map[string]string{}, Ownership: map[string]string{}, Withheld: map[string]string{}}
 		if err := translatePackage(throwaway, byPath[candidate], sourceDir, unit, Options{}); err != nil {
 			result.PackagesBodyOnly = append(result.PackagesBodyOnly, candidate+": "+firstLine(err.Error()))
+			continue
+		}
+		if reason, withheld := throwaway.Withheld[candidate]; withheld {
+			blocking := reason
+			for _, support := range throwaway.Support {
+				if support.State == ir.SupportUnimplemented && len(support.Sites) > 0 {
+					blocking = support.Sites[0].Class
+					break
+				}
+			}
+			result.PackagesBodyOnly = append(result.PackagesBodyOnly, candidate+": "+blocking)
 			continue
 		}
 		verified = append(verified, candidate)
@@ -145,79 +162,29 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 	return result, nil
 }
 
-func probeFunc(p *packages.Package, sourceDir string, unit ir.Scope, source []byte, decl *ast.FuncDecl) error {
+func probeFunc(p *packages.Package, sourceDir string, unit ir.Scope, source []byte, decl *ast.FuncDecl) (*ir.Func, error) {
 	start := p.Fset.Position(decl.Body.Pos()).Offset
 	end := p.Fset.Position(decl.Body.End()).Offset
 	if start < 0 || end > len(source) || start >= end {
-		return fmt.Errorf("invalid body span")
+		return nil, fmt.Errorf("invalid body span")
 	}
 	digest := sha256.Sum256(source[start:end])
 	id := goid.Func(p.PkgPath, decl.Name.Name)
 	if decl.Recv != nil {
 		id = goid.Method(p.PkgPath, receiverBase(decl.Recv), decl.Name.Name)
 	}
-	_, err := ir.BuildFunc(p, sourceDir, unit, decl, id, hex.EncodeToString(digest[:]))
-	return err
+	return ir.BuildFunc(p, sourceDir, unit, decl, id, hex.EncodeToString(digest[:]))
 }
 
-// externalRef extracts the qualified callee of an external-reference
-// diagnostic, when the blocker is one.
-func externalRef(err error) (string, bool) {
-	var unsupported *ir.Unsupported
-	if !asUnsupported(err, &unsupported) {
-		return "", false
-	}
-	construct := unsupported.Construct
+// externalRefOfSite extracts the qualified callee of an external-
+// reference site, when the blocker is one.
+func externalRefOfSite(site ir.UnsupportedSite) (string, bool) {
 	for _, prefix := range []string{"call outside the translated unit (", "method call outside the translated unit ("} {
-		if strings.HasPrefix(construct, prefix) && strings.HasSuffix(construct, ")") {
-			return strings.TrimSuffix(strings.TrimPrefix(construct, prefix), ")"), true
+		if strings.HasPrefix(site.Construct, prefix) && strings.HasSuffix(site.Construct, ")") {
+			return strings.TrimSuffix(strings.TrimPrefix(site.Construct, prefix), ")"), true
 		}
 	}
 	return "", false
-}
-
-// blockerKey normalizes a diagnostic to its construct class so the
-// histogram ranks semantic families, not source locations.
-func blockerKey(err error) string {
-	var unsupported *ir.Unsupported
-	if ok := asUnsupported(err, &unsupported); ok {
-		construct := unsupported.Construct
-		// Strip per-site payloads (type spellings, identifiers) after the
-		// stable class prefix for aggregation.
-		for _, prefix := range []string{
-			"non-basic type ", "basic type ", "pointer to non-named type ",
-			"pointer to non-struct type ", "pointer to type outside the translated unit: ",
-			"interface type ", "array type ", "channel type ", "type parameter ",
-			"call outside the translated unit ", "method call outside the translated unit ",
-			"map key type ", "type ", "identifier ", "call of ", "field access on ",
-			"index on ", "nil comparison on ", "operator ", "conversion from ",
-			"len of ", "make of ", "builtin ", "constant of type ", "zero value of ",
-			"nil of type ", "equality on ", "ordering on ", "inc/dec of ",
-			"struct type ", "composite literal of ", "index",
-		} {
-			if strings.HasPrefix(construct, prefix) {
-				construct = strings.TrimSpace(prefix)
-				break
-			}
-		}
-		return unsupported.Code + ": " + construct
-	}
-	return "error: " + firstLine(err.Error())
-}
-
-func asUnsupported(err error, target **ir.Unsupported) bool {
-	for err != nil {
-		if u, ok := err.(*ir.Unsupported); ok {
-			*target = u
-			return true
-		}
-		unwrapper, ok := err.(interface{ Unwrap() error })
-		if !ok {
-			return false
-		}
-		err = unwrapper.Unwrap()
-	}
-	return false
 }
 
 func firstLine(s string) string {

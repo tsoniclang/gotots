@@ -18,6 +18,7 @@ func ResolveType(p *packages.Package, sourceDir string, unit Scope, t types.Type
 		sourceDir:  sourceDir,
 		unit:       unit,
 		operations: map[string]bool{},
+		sites:      &[]UnsupportedSite{},
 	}
 	return b.typeOf(t, b.span(pos))
 }

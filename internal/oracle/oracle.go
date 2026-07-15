@@ -111,6 +111,19 @@ func Translate(workDir string, packageSources map[string]string) (*translate.Gen
 	if err != nil {
 		return nil, nil, err
 	}
+	if len(generated.Withheld) > 0 {
+		// Oracles execute complete runnable fixtures; a withheld package
+		// surfaces every recorded unsupported site.
+		var lines []string
+		for _, support := range generated.Support {
+			for _, site := range support.Sites {
+				lines = append(lines, fmt.Sprintf("%s:\n%s at %s:%d:%d",
+					site.Code, site.Construct, site.Span.File, site.Span.Line, site.Span.Col))
+			}
+		}
+		sort.Strings(lines)
+		return nil, nil, fmt.Errorf("fixture translation withheld:\n%s", strings.Join(lines, "\n"))
+	}
 	return generated, fixture, nil
 }
 

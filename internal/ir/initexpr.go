@@ -22,6 +22,7 @@ func BuildPackageVarInit(p *packages.Package, sourceDir string, unit Scope, e as
 		sourceDir:  sourceDir,
 		unit:       unit,
 		operations: map[string]bool{},
+		sites:      &[]UnsupportedSite{},
 	}
 	span := b.span(pos)
 	if e == nil {

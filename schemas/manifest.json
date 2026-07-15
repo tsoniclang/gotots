@@ -30,6 +30,12 @@
       "path": "schemas/source-pin.schema.json",
       "contract": "pins/typescript-go.json",
       "schemaVersion": 3
+    },
+    {
+      "id": "support-classes",
+      "path": "schemas/support-classes.schema.json",
+      "contract": "contracts/support-classes.json",
+      "schemaVersion": 1
     }
   ]
 }

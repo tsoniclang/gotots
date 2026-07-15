@@ -26,6 +26,7 @@ func (b *builder) buildClosure(lit *ast.FuncLit) (Expr, error) {
 		sourceDir:  b.sourceDir,
 		unit:       b.unit,
 		operations: b.operations,
+		sites:      b.sites,
 	}
 	out := &Closure{T: t}
 	params := signature.Params()

@@ -1,0 +1,42 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "classes": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "pattern": "nonempty",
+            "type": "string"
+          },
+          "specClause": {
+            "pattern": "nonempty",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "generated"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "state",
+          "specClause"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "schemaVersion": {
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "classes"
+  ],
+  "type": "object"
+}

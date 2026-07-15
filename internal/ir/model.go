@@ -234,6 +234,10 @@ type Func struct {
 	Body     *Block
 	// BodyHash matches the census body record for drift detection.
 	BodyHash string
+	// Support is the implementation support state; Sites records every
+	// unsupported operation when the state is unimplemented.
+	Support SupportState
+	Sites   []UnsupportedSite
 	// Operations is the sorted set of IR operation names the body uses,
 	// recorded in the proof chain.
 	Operations []string

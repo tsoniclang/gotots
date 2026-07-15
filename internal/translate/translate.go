@@ -21,9 +21,11 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"golang.org/x/tools/go/packages"
 
+	"github.com/tsoniclang/gotots/contracts"
 	"github.com/tsoniclang/gotots/internal/abi"
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/goid"
@@ -45,13 +47,29 @@ type Proof struct {
 	GeneratedSymbol string            `json:"generatedSymbol"`
 }
 
-// Generated is one deterministic translation result.
+// BodySupport is one implementation unit's support-state record: every
+// unsupported operation site is retained, and an unimplemented unit
+// never has an emitted body.
+type BodySupport struct {
+	ID      string               `json:"id"`
+	Package string               `json:"package"`
+	State   ir.SupportState      `json:"state"`
+	Sites   []ir.UnsupportedSite `json:"sites,omitempty"`
+}
+
+// Generated is one deterministic translation result. Packages whose
+// dependency closure contains an unimplemented unit are withheld from
+// runnable output; their analysis records remain.
 type Generated struct {
 	// Files maps bundle-relative paths to complete file contents.
 	Files map[string]string
 	// Ownership maps every generated path to its ownership root.
 	Ownership map[string]string
 	Proofs    []Proof
+	// Support is the per-unit implementation support ledger.
+	Support []BodySupport
+	// Withheld maps package path -> reason runnable output is withheld.
+	Withheld map[string]string
 }
 
 // Options carries provenance inputs for product runs.
@@ -67,6 +85,11 @@ const LoweringPlanV1 = "conservative-v1"
 
 // abiDir is the bundle directory of the language-ABI modules.
 const abiDir = "language-abi"
+
+// supportRegistry is the reviewed semantic-class support registry; a
+// generated body whose operation census contains an unregistered class
+// fails the run — support is explicit, never implicit.
+var supportRegistry = sync.OnceValues(contracts.LoadRegistry)
 
 // Packages translates a set of loaded production packages as one unit:
 // named types, direct calls, and pointer-receiver method calls resolve
@@ -90,12 +113,14 @@ func Packages(pkgs []*packages.Package, sourceDir string, options Options) (*Gen
 	out := &Generated{
 		Files:     map[string]string{},
 		Ownership: map[string]string{},
+		Withheld:  map[string]string{},
 	}
 	for _, p := range sorted {
 		if err := translatePackage(out, p, sourceDir, unit, options); err != nil {
 			return nil, err
 		}
 	}
+	withholdDependents(out, sorted)
 	if err := emitExternalStubs(out, unit, sorted[0], sourceDir, options); err != nil {
 		return nil, err
 	}
@@ -123,7 +148,39 @@ func Packages(pkgs []*packages.Package, sourceDir string, options Options) (*Gen
 	}
 
 	sort.Slice(out.Proofs, func(i, j int) bool { return out.Proofs[i].ID < out.Proofs[j].ID })
+	sort.Slice(out.Support, func(i, j int) bool { return out.Support[i].ID < out.Support[j].ID })
 	return out, nil
+}
+
+// withholdDependents extends withholding over the unit dependency
+// graph: a runnable module cannot import a withheld one, so every
+// dependent package is withheld too (its analysis records remain).
+func withholdDependents(out *Generated, sorted []*packages.Package) {
+	imports := map[string][]string{}
+	for _, p := range sorted {
+		for importPath := range p.Imports {
+			imports[p.PkgPath] = append(imports[p.PkgPath], importPath)
+		}
+		sort.Strings(imports[p.PkgPath])
+	}
+	for changed := true; changed; {
+		changed = false
+		for _, p := range sorted {
+			if _, withheld := out.Withheld[p.PkgPath]; withheld {
+				continue
+			}
+			for _, importPath := range imports[p.PkgPath] {
+				if _, withheld := out.Withheld[importPath]; withheld {
+					out.Withheld[p.PkgPath] = "depends on withheld package " + importPath
+					corePath := path.Join("core", p.PkgPath, "package.ts")
+					delete(out.Files, corePath)
+					delete(out.Ownership, corePath)
+					changed = true
+					break
+				}
+			}
+		}
+	}
 }
 
 // translatePackage translates one unit package into its generated module.
@@ -152,11 +209,32 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 	}
 
 	// Pass 1: type and variable declarations, plus fail-closed screening
-	// of every other package-level GenDecl.
+	// of every other package-level GenDecl. An unsupported declaration
+	// records its exact site (the unit becomes unimplemented and the
+	// package's runnable output is withheld) without stopping analysis.
 	structs := map[string]*ir.Struct{}
 	var structOrder []string
 	var packageVars []emit.PackageVar
 	var carrierTypes []emit.CarrierType
+	var ledger []BodySupport
+	unimplementedUnits := 0
+	declSite := func(id string, err error) bool {
+		unsupported, ok := ir.AsUnsupported(err)
+		if !ok {
+			return false
+		}
+		ledger = append(ledger, BodySupport{
+			ID: id, Package: p.PkgPath, State: ir.SupportUnimplemented,
+			Sites: []ir.UnsupportedSite{{
+				Code:      unsupported.Code,
+				Class:     ir.ClassOf(unsupported),
+				Construct: unsupported.Construct,
+				Span:      unsupported.Span,
+			}},
+		})
+		unimplementedUnits++
+		return true
+	}
 	for _, f := range files {
 		for _, decl := range f.file.Decls {
 			d, isGen := decl.(*ast.GenDecl)
@@ -172,8 +250,10 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 				for _, spec := range d.Specs {
 					importSpec := spec.(*ast.ImportSpec)
 					if importSpec.Name != nil && importSpec.Name.Name == "_" {
-						return &ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
-							Construct: "blank import (init side effects)", Span: spanOf(p, sourceDir, spec.Pos())}
+						position := p.Fset.Position(spec.Pos())
+						declSite(goid.Repeatable(p.PkgPath, "import", "_", f.relative, position.Line, position.Column),
+							&ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+								Construct: "blank import (init side effects)", Span: spanOf(p, sourceDir, spec.Pos())})
 					}
 				}
 			case token.TYPE:
@@ -182,8 +262,9 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 					id := goid.TypeName(p.PkgPath, "type", typeSpec.Name.Name)
 					object, hasDef := p.TypesInfo.Defs[typeSpec.Name].(*types.TypeName)
 					if !hasDef {
-						return &ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
-							Construct: "type without typed definition", Span: spanOf(p, sourceDir, spec.Pos())}
+						declSite(id, &ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+							Construct: "type without typed definition", Span: spanOf(p, sourceDir, spec.Pos())})
+						continue
 					}
 					if _, isStruct := object.Type().Underlying().(*types.Struct); !isStruct || object.IsAlias() {
 						// A non-struct named type (or alias) erases to its
@@ -193,6 +274,9 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 						// interface use.
 						carrier, err := erasedCarrier(p, sourceDir, unit, typeSpec, object)
 						if err != nil {
+							if declSite(id, err) {
+								continue
+							}
 							return err
 						}
 						if !object.IsAlias() {
@@ -211,6 +295,9 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 					}
 					structDecl, err := ir.BuildStruct(p, sourceDir, unit, typeSpec, id)
 					if err != nil {
+						if declSite(id, err) {
+							continue
+						}
 						return err
 					}
 					structs[structDecl.Name] = structDecl
@@ -227,8 +314,11 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 				for _, spec := range d.Specs {
 					valueSpec := spec.(*ast.ValueSpec)
 					if len(valueSpec.Values) != 0 && len(valueSpec.Values) != len(valueSpec.Names) {
-						return &ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
-							Construct: "package-level multi-value var initializer", Span: spanOf(p, sourceDir, spec.Pos())}
+						position := p.Fset.Position(spec.Pos())
+						declSite(goid.Repeatable(p.PkgPath, "var", "multi", f.relative, position.Line, position.Column),
+							&ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+								Construct: "package-level multi-value var initializer", Span: spanOf(p, sourceDir, spec.Pos())})
+						continue
 					}
 					for i, name := range valueSpec.Names {
 						if name.Name == "_" {
@@ -236,13 +326,18 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 							// package variable effect-free.
 							continue
 						}
+						variableID := goid.Value(p.PkgPath, "var", name.Name)
 						object, hasDef := p.TypesInfo.Defs[name].(*types.Var)
 						if !hasDef {
-							return &ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
-								Construct: "var without typed definition", Span: spanOf(p, sourceDir, name.Pos())}
+							declSite(variableID, &ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+								Construct: "var without typed definition", Span: spanOf(p, sourceDir, name.Pos())})
+							continue
 						}
 						t, err := ir.ResolveType(p, sourceDir, unit, object.Type(), name.Pos())
 						if err != nil {
+							if declSite(variableID, err) {
+								continue
+							}
 							return err
 						}
 						var initExpr ast.Expr
@@ -251,6 +346,9 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 						}
 						init, err := ir.BuildPackageVarInit(p, sourceDir, unit, initExpr, t, name.Pos())
 						if err != nil {
+							if declSite(variableID, err) {
+								continue
+							}
 							return err
 						}
 						packageVars = append(packageVars, emit.PackageVar{
@@ -286,8 +384,10 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 					}
 				}
 			default:
-				return &ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
-					Construct: "package-level " + d.Tok.String() + " declaration", Span: spanOf(p, sourceDir, d.Pos())}
+				position := p.Fset.Position(d.Pos())
+				declSite(goid.Repeatable(p.PkgPath, "decl", d.Tok.String(), f.relative, position.Line, position.Column),
+					&ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+						Construct: "package-level " + d.Tok.String() + " declaration", Span: spanOf(p, sourceDir, d.Pos())})
 			}
 		}
 	}
@@ -306,6 +406,27 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 			if err != nil {
 				return err
 			}
+			ledger = append(ledger, BodySupport{
+				ID: function.ID, Package: p.PkgPath, State: function.Support, Sites: function.Sites,
+			})
+			if function.Support == ir.SupportGenerated {
+				registry, err := supportRegistry()
+				if err != nil {
+					return err
+				}
+				for _, operation := range function.Operations {
+					if !registry.Generated(operation) {
+						return fmt.Errorf("GOTOTS_CENSUS_UNREGISTERED_CLASS:\ngenerated body %s uses operation class %q with no reviewed support decision in contracts/support-classes.json",
+							function.ID, operation)
+					}
+				}
+			}
+			if function.Support == ir.SupportUnimplemented {
+				// Every unsupported site is on the record; no runnable body
+				// exists and the package's module is withheld below.
+				unimplementedUnits++
+				continue
+			}
 			proof.GeneratedFile = corePath
 			out.Proofs = append(out.Proofs, *proof)
 			if function.Receiver == nil {
@@ -322,6 +443,11 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 			}
 			carrierMethods = append(carrierMethods, emit.Method{TypeName: owner, Fn: function})
 		}
+	}
+	out.Support = append(out.Support, ledger...)
+	if unimplementedUnits > 0 {
+		out.Withheld[p.PkgPath] = fmt.Sprintf("%d unimplemented units", unimplementedUnits)
+		return nil
 	}
 	if len(functions) == 0 && len(structs) == 0 && len(carrierMethods) == 0 && len(packageVars) == 0 {
 		return fmt.Errorf("package %s has no translatable declarations", p.PkgPath)
