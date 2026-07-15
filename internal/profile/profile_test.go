@@ -55,7 +55,7 @@ func TestClassify(t *testing.T) {
 func TestValidate(t *testing.T) {
 	base := func() *Profile {
 		p := testProfile()
-		p.BuildProfiles = []BuildProfile{{Name: "linux-amd64", GOOS: "linux", GOARCH: "amd64"}}
+		p.BuildProfiles = []BuildProfile{{Name: "linux-amd64", GOOS: "linux", GOARCH: "amd64", GOAMD64: "v1"}}
 		return p
 	}
 	if err := base().validate(); err != nil {
@@ -80,6 +80,30 @@ func TestValidate(t *testing.T) {
 	duplicateRoot.TestOnlyRoots = append(duplicateRoot.TestOnlyRoots, "internal/scanner")
 	if err := duplicateRoot.validate(); err == nil {
 		t.Error("root appearing in two lists was not rejected")
+	}
+
+	missingAmd64 := base()
+	missingAmd64.BuildProfiles[0].GOAMD64 = ""
+	if err := missingAmd64.validate(); err == nil {
+		t.Error("amd64 profile without goamd64 was not rejected")
+	}
+
+	cgo := base()
+	cgo.BuildProfiles[0].CgoEnabled = true
+	if err := cgo.validate(); err == nil {
+		t.Error("cgoEnabled=true was not rejected")
+	}
+
+	tags := base()
+	tags.BuildProfiles[0].Tags = []string{"race"}
+	if err := tags.validate(); err == nil {
+		t.Error("build tags were not rejected")
+	}
+
+	crossCategory := base()
+	crossCategory.HardExcludedRoots["other-category"] = []string{"internal/ls/nested"}
+	if err := crossCategory.validate(); err == nil {
+		t.Error("cross-category nested exclusion roots were not rejected")
 	}
 }
 

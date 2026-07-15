@@ -8,6 +8,8 @@
       "name": "linux-amd64",
       "goos": "linux",
       "goarch": "amd64",
+      "goamd64": "v1",
+      "cgoEnabled": false,
       "tags": []
     }
   ],
@@ -72,6 +74,7 @@
       "internal/testutil/projecttestutil"
     ]
   },
+  "toolingRoots": ["_tools"],
   "notes": [
     "ownedRoots is the canonical package-root allowlist derived from the packages implemented by TSTS main a80a5da32ee5335928e44ee3fe9357fe1e51056e under packages/tsts/src/internal.",
     "cmd/tsgo is deliberately not owned: at pin c78d39e7 it depends on internal/lsp, internal/ls, internal/project, internal/format, and internal/api, all hard-excluded. The product CLI surface is TSTS-owned assembly.",

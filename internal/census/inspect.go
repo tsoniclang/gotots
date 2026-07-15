@@ -61,7 +61,11 @@ var knownDirectives = map[string]bool{
 // classification uses go/types identity, never source spelling: a local
 // function named append is not the builtin, and an imported package named
 // maps is not the language map operation.
-func inspectFile(p *packages.Package, file *ast.File, relativePath, scopeName string, source []byte) (*fileStats, error) {
+//
+// pkgPath in records is the semantic package identity (p.PkgPath — a
+// black-box test file keeps its p_test identity); owner is the package
+// whose profile scope owns the file.
+func inspectFile(p *packages.Package, file *ast.File, relativePath, scopeName, owner string, source []byte) (*fileStats, error) {
 	stats := &fileStats{
 		constructs:    map[string]int{},
 		builtins:      map[string]int{},
@@ -71,13 +75,14 @@ func inspectFile(p *packages.Package, file *ast.File, relativePath, scopeName st
 	}
 	info := p.TypesInfo
 	fset := p.Fset
-	pkgPath := classificationPath(p)
+	pkgPath := p.PkgPath
 
 	lineOf := func(pos token.Pos) int { return fset.Position(pos).Line }
+	colOf := func(pos token.Pos) int { return fset.Position(pos).Column }
 	rareOnly := func(construct string, pos token.Pos) {
 		if rareConstructs[construct] {
 			stats.rare = append(stats.rare, RareConstructRecord{
-				Construct: construct, File: relativePath, Line: lineOf(pos),
+				Construct: construct, File: relativePath, Line: lineOf(pos), Col: colOf(pos),
 			})
 		}
 	}
@@ -86,7 +91,7 @@ func inspectFile(p *packages.Package, file *ast.File, relativePath, scopeName st
 		rareOnly(construct, pos)
 	}
 
-	declare := func(kind, name, receiver string, node ast.Node, body *ast.BlockStmt) {
+	declare := func(kind, name, receiver string, node ast.Node, namePos token.Pos, body *ast.BlockStmt) error {
 		declaration := DeclarationRecord{
 			Package:   pkgPath,
 			File:      relativePath,
@@ -98,9 +103,19 @@ func inspectFile(p *packages.Package, file *ast.File, relativePath, scopeName st
 			StartLine: lineOf(node.Pos()),
 			EndLine:   lineOf(node.End()),
 		}
+		if owner != pkgPath {
+			declaration.Owner = owner
+		}
 		qualified := name
 		if receiver != "" {
 			qualified = receiver + "." + name
+		}
+		// Blank identifiers and init functions are the only declarations Go
+		// permits to repeat; only they need position qualification (by the
+		// declared identifier's own position, so `var _, _ = f()` stays
+		// unique), and all other IDs stay position-independent.
+		if name == "_" || ((kind == "func" || kind == "method") && name == "init") {
+			qualified = fmt.Sprintf("%s@%d:%d", qualified, lineOf(namePos), colOf(namePos))
 		}
 		declaration.ID = pkgPath + "::" + relativePath + "::" + kind + "::" + qualified
 		if body != nil {
@@ -108,22 +123,27 @@ func inspectFile(p *packages.Package, file *ast.File, relativePath, scopeName st
 			declaration.Statements = countStatements(body)
 			start := fset.Position(body.Pos()).Offset
 			end := fset.Position(body.End()).Offset
-			if start < 0 || end > len(source) || start > end {
-				start, end = 0, 0
+			if start < 0 || end > len(source) || start >= end {
+				return fmt.Errorf("declaration %s has an invalid body span [%d, %d) in a %d-byte file", declaration.ID, start, end, len(source))
 			}
 			digest := sha256.Sum256(source[start:end])
 			declaration.BodySha256 = hex.EncodeToString(digest[:])
 		}
 		stats.declarations = append(stats.declarations, declaration)
+		return nil
 	}
 
 	for _, decl := range file.Decls {
 		switch d := decl.(type) {
 		case *ast.FuncDecl:
+			var err error
 			if d.Recv != nil {
-				declare("method", d.Name.Name, receiverBaseName(d.Recv), d, d.Body)
+				err = declare("method", d.Name.Name, receiverBaseName(d.Recv), d, d.Name.Pos(), d.Body)
 			} else {
-				declare("func", d.Name.Name, "", d, d.Body)
+				err = declare("func", d.Name.Name, "", d, d.Name.Pos(), d.Body)
+			}
+			if err != nil {
+				return nil, err
 			}
 		case *ast.GenDecl:
 			for _, spec := range d.Specs {
@@ -134,13 +154,17 @@ func inspectFile(p *packages.Package, file *ast.File, relativePath, scopeName st
 						kind = "const"
 					}
 					for _, name := range s.Names {
-						declare(kind, name.Name, "", s, nil)
+						if err := declare(kind, name.Name, "", s, name.Pos(), nil); err != nil {
+							return nil, err
+						}
 					}
 				case *ast.TypeSpec:
+					kind := "type"
 					if s.Assign.IsValid() {
-						declare("alias", s.Name.Name, "", s, nil)
-					} else {
-						declare("type", s.Name.Name, "", s, nil)
+						kind = "alias"
+					}
+					if err := declare(kind, s.Name.Name, "", s, s.Name.Pos(), nil); err != nil {
+						return nil, err
 					}
 				}
 			}
@@ -270,6 +294,7 @@ func inspectFile(p *packages.Package, file *ast.File, relativePath, scopeName st
 			stats.directives = append(stats.directives, DirectiveRecord{
 				File:      relativePath,
 				Line:      lineOf(comment.Pos()),
+				Col:       colOf(comment.Pos()),
 				Directive: name,
 				Known:     knownDirectives[name],
 			})

@@ -3,25 +3,24 @@
 //
 // The census runs in two explicit passes:
 //
-//  1. inventory (no syntax): a complete module/file/dependency enumeration
-//     via the go list driver, so the partition provably covers every package
-//     in the pinned module and every external dependency carries toolchain
-//     evidence (Standard/Module), never path-shape guessing;
+//  1. inventory (no syntax): the tracked Git tree defines the source
+//     universe; the go list driver enriches it with build/package semantics
+//     and toolchain evidence for external dependencies;
 //  2. typed load (owned syntax only): owned and test-only roots are loaded
 //     with full type information while dependencies are consumed as export
 //     data — external implementation bodies are never parsed.
 //
-// All aggregate numbers are derived from identity-bearing records
-// (declarations, files, directives, rare constructs). The census fails
-// closed on load errors, unknown AST kinds, dirty checkouts, or a pass-1 /
-// pass-2 owned-set mismatch, and must never reclassify a unit because
-// analysis failed.
+// Every analyzed file is reconciled byte-for-byte against the pinned commit
+// tree, the two passes must agree on exact per-package file sets, and every
+// record carries a validated unique identity. Aggregates are derived from
+// records. The census fails closed on load errors, unknown AST kinds, dirty
+// or injected source, missing external evidence, and identity collisions,
+// and must never reclassify a unit because analysis failed.
 package census
 
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -38,11 +37,14 @@ import (
 
 // DeclarationRecord identifies one top-level declaration with source span
 // and, for bodies, a content hash usable later for drift detection.
+// Package is the semantic Go package identity (a black-box test file keeps
+// its p_test identity); Owner is the package whose scope owns it.
 type DeclarationRecord struct {
-	ID         string `json:"id"` // pkg::file::kind::name
+	ID         string `json:"id"`
 	Package    string `json:"package"`
-	File       string `json:"file"` // module-relative
-	Kind       string `json:"kind"` // func|method|type|alias|const|var
+	Owner      string `json:"owner,omitempty"` // set when different from Package
+	File       string `json:"file"`            // module-relative
+	Kind       string `json:"kind"`            // func|method|type|alias|const|var
 	Name       string `json:"name"`
 	Receiver   string `json:"receiver,omitempty"` // methods: base type name
 	Exported   bool   `json:"exported"`
@@ -54,10 +56,12 @@ type DeclarationRecord struct {
 	BodySha256 string `json:"bodySha256,omitempty"`
 }
 
-// FileRecord identifies one analyzed source file.
+// FileRecord identifies one analyzed source file, verified against the
+// pinned commit tree.
 type FileRecord struct {
 	Path    string `json:"path"` // module-relative
 	Package string `json:"package"`
+	Owner   string `json:"owner,omitempty"`
 	Scope   string `json:"scope"` // production|test
 	Lines   int    `json:"lines"`
 	Sha256  string `json:"sha256"`
@@ -69,6 +73,7 @@ type FileRecord struct {
 type DirectiveRecord struct {
 	File      string `json:"file"`
 	Line      int    `json:"line"`
+	Col       int    `json:"col"`
 	Directive string `json:"directive"`
 	Known     bool   `json:"known"`
 }
@@ -80,6 +85,7 @@ type RareConstructRecord struct {
 	Construct string `json:"construct"`
 	File      string `json:"file"`
 	Line      int    `json:"line"`
+	Col       int    `json:"col"`
 }
 
 // Edge records one dependency from an owned package to a package it must
@@ -94,7 +100,8 @@ type Edge struct {
 }
 
 // ExternalUse merges pass-1 evidence with pass-2 importer counts for
-// packages directly imported by owned source.
+// packages directly imported by owned source. Pass-1 evidence is
+// mandatory: a direct import with no inventory evidence fails the census.
 type ExternalUse struct {
 	Path                string `json:"path"`
 	Standard            bool   `json:"standard"`
@@ -152,6 +159,9 @@ type PartitionCounts struct {
 	Unselected   int `json:"unselected"`
 	ExternalStd  int `json:"externalStd"`
 	ExternalMod  int `json:"externalModule"`
+	// Product externals reachable from owned production/test scope; the
+	// remainder is reachable only through excluded or unselected source.
+	ExternalProductClosure int `json:"externalProductClosure"`
 }
 
 // Report is the deterministic census output. It contains no machine paths;
@@ -173,11 +183,18 @@ type Report struct {
 	RareConstructs []RareConstructRecord   `json:"rareConstructs"`
 }
 
-// Result bundles the two deterministic reports and the machine evidence.
+// Environment is the machine-specific evidence report.
+type Environment struct {
+	SourceDir string          `json:"sourceDir"`
+	Toolchain *goenv.Resolved `json:"toolchain"`
+}
+
+// Result bundles the deterministic reports and the machine evidence.
 type Result struct {
 	Inventory   *inventory.Inventory
 	Report      *Report
-	Environment *goenv.Resolved
+	Environment *Environment
+	sourceDir   string
 }
 
 // Run executes both census passes.
@@ -186,30 +203,42 @@ func Run(prof *profile.Profile, sourceDir string, buildProfileName string) (*Res
 	if err != nil {
 		return nil, err
 	}
-	if len(build.Tags) > 0 {
-		// Tag plumbing (BuildFlags for both passes) is untested; refuse
-		// rather than silently produce a wrong file selection.
-		return nil, fmt.Errorf("build profile %q: build tags are not supported yet", build.Name)
-	}
 
-	resolved, err := goenv.Resolve()
+	absSource, err := filepath.Abs(sourceDir)
 	if err != nil {
 		return nil, err
 	}
-	env := resolved.Environ(build.GOOS, build.GOARCH, false)
+	sourceDir = absSource
 
-	verified, err := pinning.Verify(prof.Pin, sourceDir, resolved)
+	// Toolchain first: the go executable's digest is verified before it is
+	// ever executed, and the in-process Go frontend must match the pin.
+	resolved, err := pinning.VerifyToolchain(prof.Pin)
 	if err != nil {
 		return nil, err
 	}
+	env := resolved.Environ(goenv.EnvOptions{
+		GOOS:       build.GOOS,
+		GOARCH:     build.GOARCH,
+		GOAMD64:    build.GOAMD64,
+		CgoEnabled: build.CgoEnabled,
+	})
 
-	inv, err := inventory.Run(prof, resolved, env, sourceDir)
+	checkout, err := pinning.VerifySource(prof.Pin, sourceDir)
+	if err != nil {
+		return nil, err
+	}
+	verified := checkout.Source
+	verified.ToolchainVersion = prof.Pin.Toolchain.Version
+	verified.GoExecutableSha256 = prof.Pin.Toolchain.GoExecutableSha256
+	verified.GorootSrcDigest = prof.Pin.Toolchain.GorootSrcDigest
+
+	inv, err := inventory.Run(prof, resolved, env, sourceDir, checkout.Tree)
 	if err != nil {
 		return nil, err
 	}
 
 	report := &Report{
-		SchemaVersion: 2,
+		SchemaVersion: 3,
 		Product:       prof.Product,
 		BuildProfile:  *build,
 		Pin:           *prof.Pin,
@@ -217,13 +246,13 @@ func Run(prof *profile.Profile, sourceDir string, buildProfileName string) (*Res
 		Production:    newScopeReport(),
 		Test:          newScopeReport(),
 	}
-	fillPartition(prof, inv, report)
+	fillPartition(inv, report)
 
-	loaded, err := load(prof, resolved, env, sourceDir)
+	loaded, err := load(prof, env, sourceDir)
 	if err != nil {
 		return nil, err
 	}
-	if err := analyze(prof, inv, loaded, sourceDir, report); err != nil {
+	if err := analyze(prof, inv, checkout.Tree, loaded, sourceDir, report); err != nil {
 		return nil, err
 	}
 
@@ -237,10 +266,15 @@ func Run(prof *profile.Profile, sourceDir string, buildProfileName string) (*Res
 	}
 	report.Source.CleanAfterLoad = true
 
-	return &Result{Inventory: inv, Report: report, Environment: resolved}, nil
+	return &Result{
+		Inventory:   inv,
+		Report:      report,
+		Environment: &Environment{SourceDir: sourceDir, Toolchain: resolved},
+		sourceDir:   sourceDir,
+	}, nil
 }
 
-func fillPartition(prof *profile.Profile, inv *inventory.Inventory, report *Report) {
+func fillPartition(inv *inventory.Inventory, report *Report) {
 	for _, pkg := range inv.Module {
 		switch profile.PackageClass(pkg.Class) {
 		case profile.ClassOwned:
@@ -259,10 +293,13 @@ func fillPartition(prof *profile.Profile, inv *inventory.Inventory, report *Repo
 		} else {
 			report.Partition.ExternalMod++
 		}
+		if pkg.ReachableFromProduction || pkg.ReachableFromTest {
+			report.Partition.ExternalProductClosure++
+		}
 	}
 }
 
-func load(prof *profile.Profile, resolved *goenv.Resolved, env []string, sourceDir string) ([]*packages.Package, error) {
+func load(prof *profile.Profile, env []string, sourceDir string) ([]*packages.Package, error) {
 	patternRoots := append(append([]string{}, prof.OwnedRoots...), prof.TestOnlyRoots...)
 	sort.Strings(patternRoots)
 	patterns := make([]string, 0, len(patternRoots))
@@ -304,38 +341,53 @@ func load(prof *profile.Profile, resolved *goenv.Resolved, env []string, sourceD
 }
 
 // packageRole distinguishes the go/packages test variants using the
-// loader's ForTest field, never package ID or path-suffix parsing.
+// loader's ForTest field plus explicit file-location evidence for the
+// synthesized test binary — never package IDs or path-suffix parsing.
 type packageRole int
 
 const (
 	roleProduction packageRole = iota
-	roleTestVariant
+	roleInPackageTest
+	roleExternalTest
 	roleSynthesizedTestMain
 )
 
-func roleOf(p *packages.Package) packageRole {
-	if p.ForTest == "" {
-		if strings.HasSuffix(p.PkgPath, ".test") {
-			return roleSynthesizedTestMain // defensive: drivers vary here
+func roleOf(p *packages.Package, sourceDir string) packageRole {
+	if p.ForTest != "" {
+		if p.PkgPath == p.ForTest {
+			return roleInPackageTest
 		}
-		return roleProduction
+		return roleExternalTest
 	}
-	if p.Name == "main" {
-		return roleSynthesizedTestMain
+	if p.Name == "main" && len(p.GoFiles) > 0 {
+		// The toolchain-synthesized test binary consists entirely of
+		// generated files (its _testmain.go) outside the pinned checkout.
+		// A genuine owned main package has in-tree files and remains
+		// production source.
+		allOutside := true
+		for _, file := range p.GoFiles {
+			if relative, err := filepath.Rel(sourceDir, file); err == nil && !strings.HasPrefix(relative, "..") {
+				allOutside = false
+				break
+			}
+		}
+		if allOutside {
+			return roleSynthesizedTestMain
+		}
 	}
-	return roleTestVariant
+	return roleProduction
 }
 
-// classificationPath is the package path used for profile classification:
-// test variants classify as the package under test.
-func classificationPath(p *packages.Package) string {
+// ownerPath is the package whose profile scope owns this variant: the
+// package under test for test variants, the package itself otherwise.
+func ownerPath(p *packages.Package) string {
 	if p.ForTest != "" {
 		return p.ForTest
 	}
 	return p.PkgPath
 }
 
-func analyze(prof *profile.Profile, inv *inventory.Inventory, loaded []*packages.Package, sourceDir string, report *Report) error {
+func analyze(prof *profile.Profile, inv *inventory.Inventory, tree *pinning.Tree, loaded []*packages.Package, sourceDir string, report *Report) error {
 	externalIndex := inv.ExternalIndex()
 	externalUse := map[string]*ExternalUse{}
 	var edges []Edge
@@ -344,26 +396,28 @@ func analyze(prof *profile.Profile, inv *inventory.Inventory, loaded []*packages
 	roots := append([]*packages.Package{}, loaded...)
 	sort.Slice(roots, func(i, j int) bool { return roots[i].ID < roots[j].ID })
 
-	loadedOwned := map[string]bool{}
+	// Per-package analyzed file sets for exact pass-1/pass-2 reconciliation.
+	analyzedGoFiles := map[string][]string{}    // production variant files
+	analyzedTestFiles := map[string][]string{}  // in-package _test files
+	analyzedXTestFiles := map[string][]string{} // black-box files, keyed by owner
 
 	for _, p := range roots {
-		role := roleOf(p)
+		role := roleOf(p, sourceDir)
 		if role == roleSynthesizedTestMain {
 			continue
 		}
-		class, _ := prof.Classify(classificationPath(p))
+		owner := ownerPath(p)
+		class, _ := prof.Classify(owner)
 		if class != profile.ClassOwned && class != profile.ClassTestOnly {
 			continue
 		}
-		if role == roleProduction {
-			loadedOwned[p.PkgPath] = true
-		}
 
 		// Test-only packages are owned test-support source: every file they
-		// contain belongs to the owned-test scope. Owned packages split by
-		// variant, with the in-package test variant contributing only its
-		// _test.go files (the rest belong to the production variant).
-		isTestScope := class == profile.ClassTestOnly || role == roleTestVariant
+		// contain belongs to the owned-test scope, whichever variant carries
+		// it. Owned packages split by variant, with the in-package test
+		// variant contributing only its _test.go files (the rest belong to
+		// the production variant).
+		isTestScope := class == profile.ClassTestOnly || role != roleProduction
 		scope := report.Production
 		scopeName := "production"
 		if isTestScope {
@@ -374,7 +428,7 @@ func analyze(prof *profile.Profile, inv *inventory.Inventory, loaded []*packages
 		countedFiles := 0
 		for _, file := range p.Syntax {
 			filename := p.Fset.Position(file.Pos()).Filename
-			if role == roleTestVariant && p.PkgPath == p.ForTest && !strings.HasSuffix(filename, "_test.go") {
+			if role == roleInPackageTest && !strings.HasSuffix(filename, "_test.go") {
 				continue // production files re-listed in the in-package test variant
 			}
 			relative, err := filepath.Rel(sourceDir, filename)
@@ -384,23 +438,42 @@ func analyze(prof *profile.Profile, inv *inventory.Inventory, loaded []*packages
 			relative = filepath.ToSlash(relative)
 			countedFiles++
 
+			switch role {
+			case roleProduction:
+				analyzedGoFiles[p.PkgPath] = append(analyzedGoFiles[p.PkgPath], relative)
+			case roleInPackageTest:
+				analyzedTestFiles[owner] = append(analyzedTestFiles[owner], relative)
+			case roleExternalTest:
+				analyzedXTestFiles[owner] = append(analyzedXTestFiles[owner], relative)
+			}
+
 			data, err := os.ReadFile(filename)
 			if err != nil {
 				return err
 			}
+			// Reconcile against the pinned commit: cleanliness alone does
+			// not catch ignored files injected into package directories.
+			if err := tree.VerifyFile(relative, data); err != nil {
+				return err
+			}
+
 			lines := countLines(data)
 			digest := sha256.Sum256(data)
-			report.Files = append(report.Files, FileRecord{
+			fileRecord := FileRecord{
 				Path:    relative,
-				Package: classificationPath(p),
+				Package: p.PkgPath,
 				Scope:   scopeName,
 				Lines:   lines,
 				Sha256:  hex.EncodeToString(digest[:]),
-			})
+			}
+			if owner != p.PkgPath {
+				fileRecord.Owner = owner
+			}
+			report.Files = append(report.Files, fileRecord)
 			scope.Files++
 			scope.Lines += lines
 
-			stats, err := inspectFile(p, file, relative, scopeName, data)
+			stats, err := inspectFile(p, file, relative, scopeName, owner, data)
 			if err != nil {
 				return err
 			}
@@ -416,11 +489,15 @@ func analyze(prof *profile.Profile, inv *inventory.Inventory, loaded []*packages
 				case profile.ClassExternal:
 					use := externalUse[importPath]
 					if use == nil {
-						use = &ExternalUse{Path: importPath}
-						if evidence := externalIndex[importPath]; evidence != nil {
-							use.Standard = evidence.Standard
-							use.ModulePath = evidence.ModulePath
-							use.ModuleVersion = evidence.ModuleVersion
+						evidence := externalIndex[importPath]
+						if evidence == nil {
+							return fmt.Errorf("typed pass imports external package %s with no pass-1 evidence", importPath)
+						}
+						use = &ExternalUse{
+							Path:          importPath,
+							Standard:      evidence.Standard,
+							ModulePath:    evidence.ModulePath,
+							ModuleVersion: evidence.ModuleVersion,
 						}
 						externalUse[importPath] = use
 					}
@@ -437,55 +514,129 @@ func analyze(prof *profile.Profile, inv *inventory.Inventory, loaded []*packages
 					}
 				case profile.ClassHardExcluded:
 					edges = append(edges, Edge{
-						From: classificationPath(p), File: relative, To: importPath,
+						From: owner, File: relative, To: importPath,
 						Class: "hard-excluded", Category: category, Scope: scopeName,
 					})
 				case profile.ClassUnselected:
 					edges = append(edges, Edge{
-						From: classificationPath(p), File: relative, To: importPath,
+						From: owner, File: relative, To: importPath,
 						Class: "unselected", Scope: scopeName,
 					})
 				case profile.ClassTestOnly:
 					if !isTestScope {
 						edges = append(edges, Edge{
-							From: classificationPath(p), File: relative, To: importPath,
+							From: owner, File: relative, To: importPath,
 							Class: "test-only", Scope: scopeName,
 						})
 					}
 				}
 			}
 		}
-		if countedFiles > 0 && (role == roleProduction || p.PkgPath != p.ForTest) {
+		if countedFiles > 0 && role != roleInPackageTest {
 			scope.Packages++
 		}
 	}
 
-	// Completeness cross-check: every owned/test-only package pass 1 found
-	// must have been loaded and analyzed by pass 2.
-	var missing []string
-	for _, pkg := range inv.Module {
-		class := profile.PackageClass(pkg.Class)
-		if (class == profile.ClassOwned || class == profile.ClassTestOnly) && len(pkg.GoFiles) > 0 {
-			if !loadedOwned[pkg.ImportPath] {
-				missing = append(missing, pkg.ImportPath)
-			}
-		}
-	}
-	if len(missing) > 0 {
-		sort.Strings(missing)
-		return fmt.Errorf("census fails closed: %d owned packages in the inventory were not loaded by the typed pass:\n%s",
-			len(missing), strings.Join(missing, "\n"))
+	if err := reconcileFileSets(inv, analyzedGoFiles, analyzedTestFiles, analyzedXTestFiles); err != nil {
+		return err
 	}
 
 	sortRecords(report, edges, externalUse)
+	if err := validateIdentities(report); err != nil {
+		return err
+	}
 	deriveDeclarationAggregates(report)
+	return nil
+}
+
+// reconcileFileSets proves exact selected file-set equivalence between the
+// pass-1 inventory and the pass-2 typed load for every owned and test-only
+// package: production files, in-package tests, and black-box tests each
+// match exactly.
+func reconcileFileSets(inv *inventory.Inventory, goFiles, testFiles, xtestFiles map[string][]string) error {
+	var problems []string
+	compare := func(pkg, kind string, want, got []string) {
+		sort.Strings(got)
+		if len(want) != len(got) {
+			problems = append(problems, fmt.Sprintf("%s: %s: inventory has %d files, typed pass analyzed %d", pkg, kind, len(want), len(got)))
+			return
+		}
+		for i := range want {
+			if want[i] != got[i] {
+				problems = append(problems, fmt.Sprintf("%s: %s: inventory %s vs typed pass %s", pkg, kind, want[i], got[i]))
+				return
+			}
+		}
+	}
+	for _, pkg := range inv.Module {
+		class := profile.PackageClass(pkg.Class)
+		if class != profile.ClassOwned && class != profile.ClassTestOnly {
+			continue
+		}
+		if len(pkg.CgoFiles) > 0 {
+			problems = append(problems, fmt.Sprintf("%s: cgo files selected but cgo analysis is unsupported", pkg.ImportPath))
+		}
+		compare(pkg.ImportPath, "go files", pkg.GoFiles, goFiles[pkg.ImportPath])
+		compare(pkg.ImportPath, "in-package test files", pkg.TestGoFiles, testFiles[pkg.ImportPath])
+		compare(pkg.ImportPath, "black-box test files", pkg.XTestGoFiles, xtestFiles[pkg.ImportPath])
+	}
+	if len(problems) > 0 {
+		sort.Strings(problems)
+		return fmt.Errorf("pass-1/pass-2 file reconciliation fails closed on %d mismatches:\n%s",
+			len(problems), strings.Join(problems, "\n"))
+	}
+	return nil
+}
+
+// validateIdentities proves that every purported record identity is unique.
+func validateIdentities(report *Report) error {
+	var duplicates []string
+	check := func(kind string, keys []string) {
+		seen := map[string]bool{}
+		for _, key := range keys {
+			if seen[key] {
+				duplicates = append(duplicates, kind+": "+key)
+			}
+			seen[key] = true
+		}
+	}
+
+	declarationIDs := make([]string, len(report.Declarations))
+	for i, d := range report.Declarations {
+		declarationIDs[i] = d.ID
+	}
+	check("declaration", declarationIDs)
+
+	filePaths := make([]string, len(report.Files))
+	for i, f := range report.Files {
+		filePaths[i] = f.Path
+	}
+	check("file", filePaths)
+
+	directiveKeys := make([]string, len(report.Directives))
+	for i, d := range report.Directives {
+		directiveKeys[i] = fmt.Sprintf("%s:%d:%d %s", d.File, d.Line, d.Col, d.Directive)
+	}
+	check("directive", directiveKeys)
+
+	rareKeys := make([]string, len(report.RareConstructs))
+	for i, r := range report.RareConstructs {
+		rareKeys[i] = fmt.Sprintf("%s:%d:%d %s", r.File, r.Line, r.Col, r.Construct)
+	}
+	check("rare-construct", rareKeys)
+
+	if len(duplicates) > 0 {
+		sort.Strings(duplicates)
+		return fmt.Errorf("identity validation fails closed on %d duplicates:\n%s",
+			len(duplicates), strings.Join(duplicates, "\n"))
+	}
 	return nil
 }
 
 func sortRecords(report *Report, edges []Edge, externalUse map[string]*ExternalUse) {
 	edgeSeen := map[string]bool{}
 	for _, e := range edges {
-		key := e.From + "\x00" + e.To + "\x00" + e.Scope
+		key := e.From + "\x00" + e.File + "\x00" + e.To + "\x00" + e.Scope
 		if !edgeSeen[key] {
 			edgeSeen[key] = true
 			report.Contradictions = append(report.Contradictions, e)
@@ -498,6 +649,9 @@ func sortRecords(report *Report, edges []Edge, externalUse map[string]*ExternalU
 		}
 		if a.To != b.To {
 			return a.To < b.To
+		}
+		if a.File != b.File {
+			return a.File < b.File
 		}
 		return a.Scope < b.Scope
 	})
@@ -520,14 +674,20 @@ func sortRecords(report *Report, edges []Edge, externalUse map[string]*ExternalU
 		if a.File != b.File {
 			return a.File < b.File
 		}
-		return a.Line < b.Line
+		if a.Line != b.Line {
+			return a.Line < b.Line
+		}
+		return a.Col < b.Col
 	})
 	sort.Slice(report.RareConstructs, func(i, j int) bool {
 		a, b := report.RareConstructs[i], report.RareConstructs[j]
 		if a.File != b.File {
 			return a.File < b.File
 		}
-		return a.Line < b.Line
+		if a.Line != b.Line {
+			return a.Line < b.Line
+		}
+		return a.Col < b.Col
 	})
 }
 
@@ -609,27 +769,4 @@ func countLines(data []byte) int {
 		lines++
 	}
 	return lines
-}
-
-// WriteReports serializes the deterministic reports and the machine
-// evidence into outDir. inventory.json and census.json are byte-stable
-// across runs; environment.json holds machine-specific paths.
-func WriteReports(result *Result, outDir string) error {
-	if err := os.MkdirAll(outDir, 0o755); err != nil {
-		return err
-	}
-	write := func(name string, value any) error {
-		data, err := json.MarshalIndent(value, "", "  ")
-		if err != nil {
-			return err
-		}
-		return os.WriteFile(filepath.Join(outDir, name), append(data, '\n'), 0o644)
-	}
-	if err := write("inventory.json", result.Inventory); err != nil {
-		return err
-	}
-	if err := write("census.json", result.Report); err != nil {
-		return err
-	}
-	return write("environment.json", result.Environment)
 }

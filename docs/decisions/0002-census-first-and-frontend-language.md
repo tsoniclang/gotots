@@ -46,14 +46,21 @@ reports contradictions; generation will refuse to run while any exist.
 
 ## Evidence
 
-First census run against pin `c78d39e7` (linux-amd64), byte-identical across
-two runs, zero load/type errors, zero unclassified packages:
+The published census bundle — not this document — is the authoritative
+record; numbers here are orientation from the accepted run. Census against
+pin `c78d39e7` (linux-amd64), byte-identical across two clean runs, zero
+load/type errors, every tracked source unit classified:
 
 - owned production: 56 packages, 290 files, 186,642 lines, 9,627 bodies
   (2,332 functions + 7,295 methods), 0 bodyless declarations,
-  116,401 statements;
-- owned test: 37 packages, 113 files, 39,283 lines, 1,038 bodies;
-- 58 directly imported external packages;
+  116,232 body statements (derived from per-declaration records);
+- owned test: 37 packages, 113 files, 39,283 lines, 1,038 bodies, including
+  35 black-box test files retaining their `_test` package identity;
+- tracked-source universe: 4,917 tracked `.go` files = 4,899 in inventoried
+  packages + 18 tooling (`_tools` nested module); 1 submodule gitlink;
+- externals: 152 total with toolchain evidence, 139 reachable from
+  owned production/test scope, 13 reachable only through hard-excluded or
+  unselected source (excluded from product obligations);
 - 2 contradiction edges, both `internal/execute/tsc.go` importing
   hard-excluded editor-service packages (`internal/format`,
   `internal/ls/lsutil`) — a known product finding recorded in the profile

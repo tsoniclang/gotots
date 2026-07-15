@@ -2,6 +2,10 @@
 // toolchain invocation. Ambient environment variables must not silently
 // influence extraction, and no invocation may mutate the pinned source or
 // fetch modules.
+//
+// Trust ordering matters: Locate finds the candidate go executable without
+// running it, so callers can verify its digest against a pin before any
+// invocation. Only Bootstrap executes the binary.
 package goenv
 
 import (
@@ -13,8 +17,17 @@ import (
 	"strings"
 )
 
+// Locate finds the candidate go executable on PATH without executing it.
+func Locate() (string, error) {
+	goExecutable, err := exec.LookPath("go")
+	if err != nil {
+		return "", fmt.Errorf("locate go executable: %w", err)
+	}
+	return goExecutable, nil
+}
+
 // Resolved records the machine-specific toolchain locations discovered once
-// from the ambient environment and then frozen for all child invocations.
+// from a verified executable and then frozen for all child invocations.
 // These values are evidence, not deterministic report content.
 type Resolved struct {
 	GoExecutable string `json:"goExecutable"`
@@ -24,14 +37,31 @@ type Resolved struct {
 	GOPATH       string `json:"gopath"`
 }
 
-// Resolve locates the go executable and its cache/root directories using the
-// ambient environment exactly once.
-func Resolve() (*Resolved, error) {
-	goExecutable, err := exec.LookPath("go")
-	if err != nil {
-		return nil, fmt.Errorf("locate go executable: %w", err)
+// BootstrapEnviron is the environment for interrogating the go binary
+// itself: ambient toolchain switching and workspace state are disabled so
+// the verified binary cannot re-exec a different toolchain, while the
+// user's cache/path configuration is still honored (the resolved values are
+// recorded as machine evidence).
+func BootstrapEnviron() []string {
+	env := []string{
+		"PATH=" + os.Getenv("PATH"),
+		"HOME=" + os.Getenv("HOME"),
+		"GOTOOLCHAIN=local",
+		"GOWORK=off",
 	}
+	if tmp := os.Getenv("TMPDIR"); tmp != "" {
+		env = append(env, "TMPDIR="+tmp)
+	}
+	return env
+}
+
+// Bootstrap executes the given go binary to resolve its root and cache
+// locations. Callers must have verified the executable's identity first
+// when a pin is available; the unverified path exists only for the
+// toolchain-id bootstrap command.
+func Bootstrap(goExecutable string) (*Resolved, error) {
 	command := exec.Command(goExecutable, "env", "-json", "GOROOT", "GOCACHE", "GOMODCACHE", "GOPATH")
+	command.Env = BootstrapEnviron()
 	var out bytes.Buffer
 	command.Stdout = &out
 	command.Stderr = &out
@@ -44,7 +74,8 @@ func Resolve() (*Resolved, error) {
 		GOMODCACHE string
 		GOPATH     string
 	}
-	if err := json.Unmarshal(out.Bytes(), &values); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(out.Bytes()))
+	if err := decoder.Decode(&values); err != nil {
 		return nil, fmt.Errorf("parse go env output: %w", err)
 	}
 	return &Resolved{
@@ -56,18 +87,27 @@ func Resolve() (*Resolved, error) {
 	}, nil
 }
 
+// EnvOptions are the complete source-selection inputs for one build
+// profile. Every field is explicit; there are no ambient defaults.
+type EnvOptions struct {
+	GOOS       string
+	GOARCH     string
+	GOAMD64    string // required when GOARCH is amd64
+	CgoEnabled bool
+}
+
 // Environ builds the complete, closed child environment for one build
 // profile. Nothing from the ambient environment leaks through except the
-// values resolved and frozen in r.
+// values resolved and frozen in r plus PATH/HOME/TMPDIR.
 //
 // The policy is fail-closed and read-only:
 //   - GOFLAGS=-mod=readonly: the loader may never rewrite go.mod/go.sum;
-//   - GOPROXY=off and GONOSUMDB unset with GOSUMDB=off: no network;
+//   - GOPROXY=off and GOSUMDB=off: no network;
 //   - GOWORK=off, GOENV=off: no workspace or user configuration input;
 //   - GOTOOLCHAIN=local: the pinned local toolchain only, no auto-switch.
-func (r *Resolved) Environ(goos, goarch string, cgoEnabled bool) []string {
+func (r *Resolved) Environ(options EnvOptions) []string {
 	cgo := "0"
-	if cgoEnabled {
+	if options.CgoEnabled {
 		cgo = "1"
 	}
 	env := []string{
@@ -77,8 +117,8 @@ func (r *Resolved) Environ(goos, goarch string, cgoEnabled bool) []string {
 		"GOCACHE=" + r.GOCACHE,
 		"GOMODCACHE=" + r.GOMODCACHE,
 		"GOPATH=" + r.GOPATH,
-		"GOOS=" + goos,
-		"GOARCH=" + goarch,
+		"GOOS=" + options.GOOS,
+		"GOARCH=" + options.GOARCH,
 		"CGO_ENABLED=" + cgo,
 		"GOFLAGS=-mod=readonly",
 		"GOPROXY=off",
@@ -88,6 +128,9 @@ func (r *Resolved) Environ(goos, goarch string, cgoEnabled bool) []string {
 		"GOTOOLCHAIN=local",
 		"LANG=C",
 		"LC_ALL=C",
+	}
+	if options.GOAMD64 != "" {
+		env = append(env, "GOAMD64="+options.GOAMD64)
 	}
 	if tmp := os.Getenv("TMPDIR"); tmp != "" {
 		env = append(env, "TMPDIR="+tmp)

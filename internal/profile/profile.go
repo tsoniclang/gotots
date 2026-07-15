@@ -15,12 +15,16 @@ import (
 	"github.com/tsoniclang/gotots/internal/pinning"
 )
 
-// BuildProfile is one explicit GOOS/GOARCH/tags selection.
+// BuildProfile is one explicit, complete source-selection input set. Every
+// input that affects file selection is stated here; nothing relies on
+// ambient or undocumented defaults.
 type BuildProfile struct {
-	Name   string   `json:"name"`
-	GOOS   string   `json:"goos"`
-	GOARCH string   `json:"goarch"`
-	Tags   []string `json:"tags"`
+	Name       string   `json:"name"`
+	GOOS       string   `json:"goos"`
+	GOARCH     string   `json:"goarch"`
+	GOAMD64    string   `json:"goamd64,omitempty"` // required when goarch is amd64
+	CgoEnabled bool     `json:"cgoEnabled"`
+	Tags       []string `json:"tags"`
 }
 
 // Profile is the explicit, reviewed project scope for one product.
@@ -35,7 +39,12 @@ type Profile struct {
 	// under the owned-test scope and may be imported only from test scope.
 	TestOnlyRoots     []string            `json:"testOnlyRoots"`
 	HardExcludedRoots map[string][]string `json:"hardExcludedRoots"`
-	Notes             []string            `json:"notes"`
+	// ToolingRoots name directory trees (relative to the checkout root, not
+	// package paths) that hold generator/tooling source such as nested tool
+	// modules. Their files are classified tooling in the tracked-source
+	// universe and never enter translation denominators.
+	ToolingRoots []string `json:"toolingRoots"`
+	Notes        []string `json:"notes"`
 
 	// Pin is resolved from PinPath at load time.
 	Pin *pinning.Pin `json:"-"`
@@ -54,6 +63,9 @@ func Load(profilePath string) (*Profile, error) {
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&p); err != nil {
 		return nil, fmt.Errorf("parse profile %s: %w", profilePath, err)
+	}
+	if decoder.More() {
+		return nil, fmt.Errorf("parse profile %s: trailing content after JSON document", profilePath)
 	}
 	if p.SchemaVersion != 1 {
 		return nil, fmt.Errorf("profile %s: unsupported schemaVersion %d", profilePath, p.SchemaVersion)
@@ -92,6 +104,20 @@ func (p *Profile) validate() error {
 			return fmt.Errorf("duplicate build profile name %q", build.Name)
 		}
 		names[build.Name] = true
+		// Unsupported source-selection inputs are rejected before loading
+		// rather than silently producing a wrong file selection.
+		if build.GOARCH == "amd64" && build.GOAMD64 == "" {
+			return fmt.Errorf("build profile %q: goamd64 is required when goarch is amd64", build.Name)
+		}
+		if build.GOARCH != "amd64" && build.GOAMD64 != "" {
+			return fmt.Errorf("build profile %q: goamd64 is only valid when goarch is amd64", build.Name)
+		}
+		if build.CgoEnabled {
+			return fmt.Errorf("build profile %q: cgoEnabled=true is not supported yet", build.Name)
+		}
+		if len(build.Tags) > 0 {
+			return fmt.Errorf("build profile %q: build tags are not supported yet", build.Name)
+		}
 	}
 
 	seen := map[string]string{} // root -> list it came from
@@ -125,6 +151,14 @@ func (p *Profile) validate() error {
 		}
 	}
 
+	for _, root := range p.ToolingRoots {
+		if root == "" || path.Clean(root) != root || path.IsAbs(root) ||
+			strings.HasPrefix(root, "./") || strings.HasPrefix(root, "../") || root == "." {
+			return fmt.Errorf("toolingRoots: root %q is not a normalized checkout-relative path", root)
+		}
+	}
+	sort.Strings(p.ToolingRoots)
+
 	sort.Strings(p.OwnedRoots)
 	sort.Strings(p.TestOnlyRoots)
 	for _, roots := range p.HardExcludedRoots {
@@ -143,7 +177,7 @@ func (p *Profile) invalidRootNesting() string {
 	under := func(inner, outer string) bool {
 		return inner == outer || strings.HasPrefix(inner, outer+"/")
 	}
-	for _, category := range p.HardExcludedRoots {
+	for categoryName, category := range p.HardExcludedRoots {
 		for _, excluded := range category {
 			for _, owned := range p.OwnedRoots {
 				if under(owned, excluded) {
@@ -153,6 +187,18 @@ func (p *Profile) invalidRootNesting() string {
 			for _, testOnly := range p.TestOnlyRoots {
 				if under(testOnly, excluded) {
 					return "test-only root " + testOnly + " is inside hard-excluded root " + excluded
+				}
+			}
+			// Nesting across exclusion categories would make classification
+			// depend on category iteration order; reject it outright.
+			for otherName, other := range p.HardExcludedRoots {
+				if otherName == categoryName {
+					continue
+				}
+				for _, otherRoot := range other {
+					if under(otherRoot, excluded) {
+						return "hard-excluded root " + otherRoot + " (" + otherName + ") is nested inside " + excluded + " (" + categoryName + ")"
+					}
 				}
 			}
 		}

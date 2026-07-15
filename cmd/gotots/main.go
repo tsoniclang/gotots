@@ -41,9 +41,15 @@ func main() {
 }
 
 // runToolchainID measures the local toolchain identity so its digests can be
-// reviewed and recorded in a pin file.
+// reviewed and recorded in a pin file. This is the bootstrap path: it runs
+// before any pin exists and therefore executes the ambient go command
+// unverified. Census verification never uses this path.
 func runToolchainID() error {
-	resolved, err := goenv.Resolve()
+	goExecutable, err := goenv.Locate()
+	if err != nil {
+		return err
+	}
+	resolved, err := goenv.Bootstrap(goExecutable)
 	if err != nil {
 		return err
 	}

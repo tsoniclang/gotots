@@ -4,21 +4,32 @@
 // A pin identifies both the source revision and the complete toolchain
 // identity: version string, target platform, the go executable digest, and a
 // digest of the GOROOT source tree. Two different toolchains reporting the
-// same version string do not pass.
+// same version string do not pass. The candidate go executable's digest is
+// checked before the binary is ever executed, and the Go frontend compiled
+// into the gotots binary itself must match the pinned version, because
+// go/parser and go/types run in-process.
+//
+// Source identity is stronger than cleanliness: every analyzed file must be
+// reconciled against the pinned commit tree, so an ignored-but-present file
+// cannot be admitted while git status stays clean.
 package pinning
 
 import (
 	"bytes"
+	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"hash"
 	"io"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/tsoniclang/gotots/internal/goenv"
@@ -45,6 +56,32 @@ type Pin struct {
 	Toolchain     Toolchain `json:"toolchain"`
 }
 
+func isLowerHex(value string, length int) bool {
+	if len(value) != length {
+		return false
+	}
+	for _, c := range value {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
+// decodeStrict parses exactly one JSON document with no unknown fields and
+// no trailing content.
+func decodeStrict(data []byte, value any, what string) error {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(value); err != nil {
+		return fmt.Errorf("parse %s: %w", what, err)
+	}
+	if decoder.More() {
+		return fmt.Errorf("parse %s: trailing content after JSON document", what)
+	}
+	return nil
+}
+
 // Load reads and validates a pin file.
 func Load(path string) (*Pin, error) {
 	data, err := os.ReadFile(path)
@@ -52,20 +89,19 @@ func Load(path string) (*Pin, error) {
 		return nil, fmt.Errorf("read pin: %w", err)
 	}
 	var pin Pin
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&pin); err != nil {
-		return nil, fmt.Errorf("parse pin %s: %w", path, err)
+	if err := decodeStrict(data, &pin, "pin "+path); err != nil {
+		return nil, err
 	}
 	if pin.SchemaVersion != 2 {
 		return nil, fmt.Errorf("pin %s: unsupported schemaVersion %d", path, pin.SchemaVersion)
 	}
-	if pin.GoModule == "" || len(pin.Revision) != 40 {
-		return nil, fmt.Errorf("pin %s: goModule and 40-hex revision are required", path)
+	if pin.GoModule == "" || !isLowerHex(pin.Revision, 40) {
+		return nil, fmt.Errorf("pin %s: goModule and a 40-hex-digit revision are required", path)
 	}
 	t := pin.Toolchain
-	if t.Version == "" || t.GOOS == "" || t.GOARCH == "" || len(t.GoExecutableSha256) != 64 || len(t.GorootSrcDigest) != 64 {
-		return nil, fmt.Errorf("pin %s: complete toolchain identity (version, goos, goarch, executable sha256, GOROOT src digest) is required", path)
+	if t.Version == "" || t.GOOS == "" || t.GOARCH == "" ||
+		!isLowerHex(t.GoExecutableSha256, 64) || !isLowerHex(t.GorootSrcDigest, 64) {
+		return nil, fmt.Errorf("pin %s: complete toolchain identity (version, goos, goarch, hex executable sha256, hex GOROOT src digest) is required", path)
 	}
 	return &pin, nil
 }
@@ -77,8 +113,11 @@ type VerifiedSource struct {
 	Revision           string `json:"revision"`
 	GoModule           string `json:"goModule"`
 	ToolchainVersion   string `json:"toolchainVersion"`
+	FrontendVersion    string `json:"frontendVersion"` // Go release compiled into gotots
 	GoExecutableSha256 string `json:"goExecutableSha256"`
 	GorootSrcDigest    string `json:"gorootSrcDigest"`
+	TrackedFiles       int    `json:"trackedFiles"`
+	Submodules         int    `json:"submodules"`
 	CleanBeforeLoad    bool   `json:"cleanBeforeLoad"`
 	CleanAfterLoad     bool   `json:"cleanAfterLoad"`
 }
@@ -86,18 +125,74 @@ type VerifiedSource struct {
 func git(dir string, args ...string) (string, error) {
 	command := exec.Command("git", append([]string{"-C", dir}, args...)...)
 	var out bytes.Buffer
+	var errOut bytes.Buffer
 	command.Stdout = &out
-	command.Stderr = &out
+	command.Stderr = &errOut
 	if err := command.Run(); err != nil {
-		return "", fmt.Errorf("git %s: %v: %s", strings.Join(args, " "), err, out.String())
+		return "", fmt.Errorf("git %s: %v: %s", strings.Join(args, " "), err, errOut.String())
 	}
-	return strings.TrimSpace(out.String()), nil
+	return strings.TrimRight(out.String(), "\n"), nil
 }
 
-// ToolchainIdentity measures the identity of the resolved toolchain.
+// VerifyToolchain locates the go executable, verifies its digest against
+// the pin BEFORE executing it, then bootstraps it and verifies the full
+// toolchain identity including the GOROOT source digest and the Go frontend
+// compiled into this process.
+func VerifyToolchain(pin *Pin) (*goenv.Resolved, error) {
+	if frontend := runtime.Version(); frontend != pin.Toolchain.Version {
+		return nil, fmt.Errorf("gotots was compiled with Go frontend %s but the pin requires %s; in-process go/parser and go/types semantics would not match", frontend, pin.Toolchain.Version)
+	}
+
+	goExecutable, err := goenv.Locate()
+	if err != nil {
+		return nil, err
+	}
+	digest, err := fileSHA256(goExecutable)
+	if err != nil {
+		return nil, err
+	}
+	if digest != pin.Toolchain.GoExecutableSha256 {
+		return nil, fmt.Errorf("go executable %s digest %s does not match pinned %s; refusing to execute an unverified toolchain",
+			goExecutable, digest, pin.Toolchain.GoExecutableSha256)
+	}
+
+	resolved, err := goenv.Bootstrap(goExecutable)
+	if err != nil {
+		return nil, err
+	}
+	identity, err := measureIdentity(resolved)
+	if err != nil {
+		return nil, err
+	}
+	if identity.Version != pin.Toolchain.Version ||
+		identity.GOOS != pin.Toolchain.GOOS ||
+		identity.GOARCH != pin.Toolchain.GOARCH {
+		return nil, fmt.Errorf("active toolchain %s %s/%s does not match pinned %s %s/%s",
+			identity.Version, identity.GOOS, identity.GOARCH,
+			pin.Toolchain.Version, pin.Toolchain.GOOS, pin.Toolchain.GOARCH)
+	}
+	if identity.GorootSrcDigest != pin.Toolchain.GorootSrcDigest {
+		return nil, fmt.Errorf("GOROOT src digest %s does not match pinned %s",
+			identity.GorootSrcDigest, pin.Toolchain.GorootSrcDigest)
+	}
+	return resolved, nil
+}
+
+// ToolchainIdentity measures the identity of an already-bootstrapped
+// toolchain. It exists for the toolchain-id bootstrap command, which by
+// definition runs before a pin exists; census verification must use
+// VerifyToolchain instead.
 func ToolchainIdentity(resolved *goenv.Resolved) (*Toolchain, error) {
+	identity, err := measureIdentity(resolved)
+	if err != nil {
+		return nil, err
+	}
+	return identity, nil
+}
+
+func measureIdentity(resolved *goenv.Resolved) (*Toolchain, error) {
 	command := exec.Command(resolved.GoExecutable, "env", "-json", "GOVERSION", "GOHOSTOS", "GOHOSTARCH")
-	command.Env = resolved.Environ("", "", false)
+	command.Env = goenv.BootstrapEnviron()
 	var out bytes.Buffer
 	command.Stdout = &out
 	command.Stderr = &out
@@ -109,8 +204,8 @@ func ToolchainIdentity(resolved *goenv.Resolved) (*Toolchain, error) {
 		GOHOSTOS   string
 		GOHOSTARCH string
 	}
-	if err := json.Unmarshal(out.Bytes(), &values); err != nil {
-		return nil, fmt.Errorf("parse go env output: %w", err)
+	if err := decodeStrict(out.Bytes(), &values, "go env output"); err != nil {
+		return nil, err
 	}
 	executableDigest, err := fileSHA256(resolved.GoExecutable)
 	if err != nil {
@@ -129,10 +224,33 @@ func ToolchainIdentity(resolved *goenv.Resolved) (*Toolchain, error) {
 	}, nil
 }
 
-// Verify confirms that dir is a clean checkout of exactly pin.Revision, that
-// its module identity matches, and that the resolved toolchain matches the
-// pinned toolchain identity byte-for-byte. It fails closed on any mismatch.
-func Verify(pin *Pin, dir string, resolved *goenv.Resolved) (*VerifiedSource, error) {
+// TreeEntry is one blob in the pinned commit tree.
+type TreeEntry struct {
+	OID  string // object ID in the repository's object format
+	Path string // slash-separated, relative to the checkout root
+}
+
+// Tree is the complete tracked-file manifest of the pinned commit.
+type Tree struct {
+	dir     string
+	Entries map[string]TreeEntry // path -> entry (blobs only)
+	// Submodules maps gitlink paths to their pinned commit IDs.
+	Submodules map[string]string
+	// objectFormat is "sha1" or "sha256".
+	objectFormat string
+}
+
+// VerifiedCheckout bundles the source verification evidence with the
+// tracked tree used for per-file reconciliation.
+type VerifiedCheckout struct {
+	Source *VerifiedSource
+	Tree   *Tree
+}
+
+// VerifySource confirms that dir is a clean checkout of exactly
+// pin.Revision with matching module identity, and loads its complete
+// tracked tree for file reconciliation.
+func VerifySource(pin *Pin, dir string) (*VerifiedCheckout, error) {
 	revision, err := git(dir, "rev-parse", "HEAD")
 	if err != nil {
 		return nil, err
@@ -163,34 +281,110 @@ func Verify(pin *Pin, dir string, resolved *goenv.Resolved) (*VerifiedSource, er
 		return nil, fmt.Errorf("source module %q does not match pinned module %q", moduleLine, pin.GoModule)
 	}
 
-	identity, err := ToolchainIdentity(resolved)
+	tree, err := loadTree(dir)
 	if err != nil {
 		return nil, err
 	}
-	if identity.Version != pin.Toolchain.Version ||
-		identity.GOOS != pin.Toolchain.GOOS ||
-		identity.GOARCH != pin.Toolchain.GOARCH {
-		return nil, fmt.Errorf("active toolchain %s %s/%s does not match pinned %s %s/%s",
-			identity.Version, identity.GOOS, identity.GOARCH,
-			pin.Toolchain.Version, pin.Toolchain.GOOS, pin.Toolchain.GOARCH)
-	}
-	if identity.GoExecutableSha256 != pin.Toolchain.GoExecutableSha256 {
-		return nil, fmt.Errorf("go executable digest %s does not match pinned %s",
-			identity.GoExecutableSha256, pin.Toolchain.GoExecutableSha256)
-	}
-	if identity.GorootSrcDigest != pin.Toolchain.GorootSrcDigest {
-		return nil, fmt.Errorf("GOROOT src digest %s does not match pinned %s",
-			identity.GorootSrcDigest, pin.Toolchain.GorootSrcDigest)
-	}
 
-	return &VerifiedSource{
-		Revision:           revision,
-		GoModule:           moduleLine,
-		ToolchainVersion:   identity.Version,
-		GoExecutableSha256: identity.GoExecutableSha256,
-		GorootSrcDigest:    identity.GorootSrcDigest,
-		CleanBeforeLoad:    true,
+	return &VerifiedCheckout{
+		Source: &VerifiedSource{
+			Revision:        revision,
+			GoModule:        moduleLine,
+			FrontendVersion: runtime.Version(),
+			TrackedFiles:    len(tree.Entries),
+			Submodules:      len(tree.Submodules),
+			CleanBeforeLoad: true,
+		},
+		Tree: tree,
 	}, nil
+}
+
+func loadTree(dir string) (*Tree, error) {
+	objectFormat, err := git(dir, "rev-parse", "--show-object-format")
+	if err != nil {
+		return nil, err
+	}
+	if objectFormat != "sha1" && objectFormat != "sha256" {
+		return nil, fmt.Errorf("unsupported git object format %q", objectFormat)
+	}
+	output, err := git(dir, "ls-tree", "-r", "-z", "HEAD")
+	if err != nil {
+		return nil, err
+	}
+	tree := &Tree{
+		dir:          dir,
+		Entries:      map[string]TreeEntry{},
+		Submodules:   map[string]string{},
+		objectFormat: objectFormat,
+	}
+	for _, record := range strings.Split(output, "\x00") {
+		if record == "" {
+			continue
+		}
+		// Format: <mode> <type> <oid>\t<path>
+		meta, path, ok := strings.Cut(record, "\t")
+		if !ok {
+			return nil, fmt.Errorf("unexpected ls-tree record %q", record)
+		}
+		fields := strings.Fields(meta)
+		if len(fields) != 3 {
+			return nil, fmt.Errorf("unexpected ls-tree record %q", record)
+		}
+		mode, objectType, oid := fields[0], fields[1], fields[2]
+		switch objectType {
+		case "blob":
+			tree.Entries[path] = TreeEntry{OID: oid, Path: path}
+		case "commit":
+			tree.Submodules[path] = oid
+		default:
+			return nil, fmt.Errorf("unexpected ls-tree object type %q for %s (mode %s)", objectType, path, mode)
+		}
+	}
+	return tree, nil
+}
+
+// VerifyFile proves that the given content is byte-identical to the blob
+// recorded for path in the pinned commit tree. This catches files that git
+// status does not report, such as ignored files injected into package
+// directories.
+func (t *Tree) VerifyFile(path string, content []byte) error {
+	entry, ok := t.Entries[path]
+	if !ok {
+		return fmt.Errorf("file %s is not tracked by the pinned commit; refusing untracked source", path)
+	}
+	var h hash.Hash
+	switch t.objectFormat {
+	case "sha1":
+		h = sha1.New()
+	case "sha256":
+		h = sha256.New()
+	}
+	h.Write([]byte("blob " + strconv.Itoa(len(content))))
+	h.Write([]byte{0})
+	h.Write(content)
+	actual := hex.EncodeToString(h.Sum(nil))
+	if actual != entry.OID {
+		return fmt.Errorf("file %s content (blob %s) does not match the pinned commit blob %s", path, actual, entry.OID)
+	}
+	return nil
+}
+
+// Has reports whether path is a tracked blob in the pinned commit.
+func (t *Tree) Has(path string) bool {
+	_, ok := t.Entries[path]
+	return ok
+}
+
+// GoFiles returns every tracked path ending in .go, sorted.
+func (t *Tree) GoFiles() []string {
+	var files []string
+	for path := range t.Entries {
+		if strings.HasSuffix(path, ".go") {
+			files = append(files, path)
+		}
+	}
+	sort.Strings(files)
+	return files
 }
 
 // CheckClean reports whether the checkout has no modified or untracked
