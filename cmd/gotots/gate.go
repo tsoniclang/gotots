@@ -273,8 +273,90 @@ func runGate(args []string) error {
 		}
 		return "pass", details, nil
 	})
-	blocked("04-census-denominator-reconciliation",
-		"complete operation, ownership, support, and selected-test ledgers are not implemented")
+	run("04-census-denominator-reconciliation", func() (string, []string, error) {
+		if firstRun == nil {
+			return "blocked", []string{"census did not run"}, nil
+		}
+		prof, err := profile.Load(filepath.Join(*repoDir, filepath.FromSlash(*profilePath)))
+		if err != nil {
+			return "fail", nil, err
+		}
+		build, err := prof.BuildProfileByName(*buildProfile)
+		if err != nil {
+			return "fail", nil, err
+		}
+		resolved, err := pinning.VerifyToolchain(prof.Pin)
+		if err != nil {
+			return "fail", nil, err
+		}
+		env := resolved.Environ(goenv.EnvOptions{
+			GOOS: build.GOOS, GOARCH: build.GOARCH,
+			GOAMD64: build.GOAMD64, GOARM64: build.GOARM64,
+		})
+		generated, err := translate.Corpus(prof, env, *sourceDir, translate.Options{
+			SourceRevision: report.Inputs.SourceRevision,
+			ProfileHash:    report.Inputs.ProfileSha256,
+		})
+		if err != nil {
+			return "fail", nil, err
+		}
+		// Every production declaration of every owned package must hold a
+		// disposition: a support-ledger state, a generation proof, the
+		// fold-at-use constant rule, or its package's withholding.
+		covered := map[string]string{}
+		for _, support := range generated.Support {
+			covered[support.ID] = string(support.State)
+		}
+		for _, proof := range generated.Proofs {
+			if _, has := covered[proof.ID]; !has {
+				covered[proof.ID] = "generated"
+			}
+		}
+		counts := map[string]int{}
+		var unreconciled []string
+		for _, decl := range firstRun.Report.Declarations {
+			if decl.Scope != "production" {
+				counts["test-scope"]++
+				continue
+			}
+			if class, _ := prof.Classify(decl.Package); class != profile.ClassOwned {
+				counts["unowned"]++
+				continue
+			}
+			if decl.Kind == "const" {
+				counts["const-fold-at-use"]++
+				continue
+			}
+			if state, has := covered[decl.ID]; has {
+				counts[state]++
+				continue
+			}
+			if reason, withheld := generated.Withheld[decl.Package]; withheld {
+				_ = reason
+				counts["withheld-package"]++
+				continue
+			}
+			counts["unreconciled"]++
+			if len(unreconciled) < 25 {
+				unreconciled = append(unreconciled, decl.ID)
+			}
+		}
+		details := make([]string, 0, len(counts)+len(unreconciled))
+		keys := make([]string, 0, len(counts))
+		for key := range counts {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			details = append(details, fmt.Sprintf("%s: %d", key, counts[key]))
+		}
+		if counts["unreconciled"] > 0 {
+			details = append(details, "first unreconciled declarations:")
+			details = append(details, unreconciled...)
+			return "fail", details, fmt.Errorf("%d production declarations hold no disposition", counts["unreconciled"])
+		}
+		return "pass", details, nil
+	})
 	blocked("05-declaration-signature-type-completeness",
 		"complete independently verified declaration/signature/type-identity gate not implemented")
 	blocked("06-semantic-ir-operation-class-completeness",

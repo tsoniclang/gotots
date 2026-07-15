@@ -181,6 +181,9 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 				for _, spec := range d.Specs {
 					typeSpec := spec.(*ast.TypeSpec)
 					id := goid.TypeName(p.PkgPath, "type", typeSpec.Name.Name)
+					if object, isType := p.TypesInfo.Defs[typeSpec.Name].(*types.TypeName); isType && object.IsAlias() {
+						id = goid.TypeName(p.PkgPath, "alias", typeSpec.Name.Name)
+					}
 					object, hasDef := p.TypesInfo.Defs[typeSpec.Name].(*types.TypeName)
 					if !hasDef {
 						declSite(id, &ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
@@ -290,6 +293,13 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 							// order; there is no binding to declare.
 							packageVars = append(packageVars, emit.PackageVar{
 								Name: "_", Type: t, Init: init, Order: order, Blank: true,
+							})
+							out.Proofs = append(out.Proofs, Proof{
+								ID: variableID, SourceRevision: options.SourceRevision,
+								Package: p.PkgPath, File: f.relative,
+								LoweringPlan:    LoweringPlanV1,
+								Representations: map[string]string{"_": "ordered-effect(no binding)"},
+								GeneratedFile:   corePath, GeneratedSymbol: "",
 							})
 							continue
 						}
