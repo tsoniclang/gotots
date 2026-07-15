@@ -17,6 +17,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/inventory"
 	"github.com/tsoniclang/gotots/internal/pinning"
 	"github.com/tsoniclang/gotots/internal/profile"
+	"github.com/tsoniclang/gotots/internal/typedload"
 )
 
 // generatedFileMarker is the toolchain's documented convention for
@@ -49,11 +50,11 @@ func analyze(prof *profile.Profile, inv *inventory.Inventory, tree *pinning.Tree
 	analyzedXTestFiles := map[string][]string{} // black-box files, keyed by owner
 
 	for _, p := range roots {
-		role := roleOf(p, sourceDir)
-		if role == roleSynthesizedTestMain {
+		role := typedload.RoleOf(p, sourceDir)
+		if role == typedload.RoleSynthesizedTestMain {
 			continue
 		}
-		owner := ownerPath(p)
+		owner := typedload.OwnerPath(p)
 		class, _ := prof.Classify(owner)
 		if class != profile.ClassOwned && class != profile.ClassTestOnly {
 			continue
@@ -64,7 +65,7 @@ func analyze(prof *profile.Profile, inv *inventory.Inventory, tree *pinning.Tree
 		// it. Owned packages split by variant, with the in-package test
 		// variant contributing only its _test.go files (the rest belong to
 		// the production variant).
-		isTestScope := class == profile.ClassTestOnly || role != roleProduction
+		isTestScope := class == profile.ClassTestOnly || role != typedload.RoleProduction
 		scope := report.Production
 		scopeName := "production"
 		if isTestScope {
@@ -75,7 +76,7 @@ func analyze(prof *profile.Profile, inv *inventory.Inventory, tree *pinning.Tree
 		countedFiles := 0
 		for _, file := range p.Syntax {
 			filename := p.Fset.Position(file.Pos()).Filename
-			if role == roleInPackageTest && !strings.HasSuffix(filename, "_test.go") {
+			if role == typedload.RoleInPackageTest && !strings.HasSuffix(filename, "_test.go") {
 				continue // production files re-listed in the in-package test variant
 			}
 			relative, err := filepath.Rel(sourceDir, filename)
@@ -86,11 +87,11 @@ func analyze(prof *profile.Profile, inv *inventory.Inventory, tree *pinning.Tree
 			countedFiles++
 
 			switch role {
-			case roleProduction:
+			case typedload.RoleProduction:
 				analyzedGoFiles[p.PkgPath] = append(analyzedGoFiles[p.PkgPath], relative)
-			case roleInPackageTest:
+			case typedload.RoleInPackageTest:
 				analyzedTestFiles[owner] = append(analyzedTestFiles[owner], relative)
-			case roleExternalTest:
+			case typedload.RoleExternalTest:
 				analyzedXTestFiles[owner] = append(analyzedXTestFiles[owner], relative)
 			}
 
@@ -152,7 +153,7 @@ func analyze(prof *profile.Profile, inv *inventory.Inventory, tree *pinning.Tree
 				return nil, err
 			}
 		}
-		if countedFiles > 0 && role != roleInPackageTest {
+		if countedFiles > 0 && role != typedload.RoleInPackageTest {
 			scope.Packages++
 		}
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/inventory"
 	"github.com/tsoniclang/gotots/internal/pinning"
 	"github.com/tsoniclang/gotots/internal/profile"
+	"github.com/tsoniclang/gotots/internal/typedload"
 )
 
 // Run orchestrates both census passes: toolchain attestation, source
@@ -73,7 +74,7 @@ func Run(prof *profile.Profile, sourceDir string, buildProfileName string) (*Res
 	}
 	report.PredeclaredUniverse = universeNames
 
-	loaded, err := load(prof, env, sourceDir)
+	loaded, err := typedload.Load(prof, env, sourceDir)
 	if err != nil {
 		return nil, err
 	}
