@@ -97,8 +97,8 @@ func TestPublicationIsImmutableAndVerifiable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("verify: %v", err)
 	}
-	if len(manifest.Files) != 3 {
-		t.Errorf("expected 3 manifest files, got %v", manifest.Files)
+	if len(manifest.Files) != 4 {
+		t.Errorf("expected 4 manifest files, got %v", manifest.Files)
 	}
 
 	// Bundles are immutable: a second publication to the same path is

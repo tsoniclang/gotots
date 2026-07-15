@@ -64,11 +64,21 @@ func Run(prof *profile.Profile, sourceDir string, buildProfileName string) (*Res
 	}
 	fillPartition(inv, report)
 
+	// The predeclared universe of the toolchain actually running in this
+	// process must match the reviewed contract before any body evidence is
+	// trusted.
+	universeNames, err := checkPredeclaredUniverse()
+	if err != nil {
+		return nil, err
+	}
+	report.PredeclaredUniverse = universeNames
+
 	loaded, err := load(prof, env, sourceDir)
 	if err != nil {
 		return nil, err
 	}
-	if err := analyze(prof, inv, checkout.Tree, loaded, sourceDir, report); err != nil {
+	shapes := &DeclarationShapes{SchemaVersion: 1}
+	if err := analyze(prof, inv, checkout.Tree, loaded, sourceDir, report, shapes); err != nil {
 		return nil, err
 	}
 	report.Blockers = collectBlockers(report)
@@ -86,6 +96,7 @@ func Run(prof *profile.Profile, sourceDir string, buildProfileName string) (*Res
 	return &Result{
 		Inventory:   inv,
 		Report:      report,
+		Shapes:      shapes,
 		Environment: &Environment{SourceDir: sourceDir, Toolchain: resolved, ChildEnv: env},
 		sourceDir:   sourceDir,
 	}, nil

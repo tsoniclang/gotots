@@ -1,8 +1,6 @@
 package census
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"go/ast"
 	"go/token"
@@ -14,14 +12,21 @@ import (
 
 // fileStats collects the typed inventory of one source file.
 type fileStats struct {
-	declarations  []DeclarationRecord
-	directives    []DirectiveRecord
-	rare          []RareConstructRecord
-	constructs    map[string]int
-	builtins      map[string]int
-	rangeOperands map[string]int
-	indexOperands map[string]int
-	astKinds      map[string]int
+	declarations   []DeclarationRecord
+	directives     []DirectiveRecord
+	rare           []RareConstructRecord
+	functionShapes []FunctionShape
+	typeShapes     []TypeShape
+	constShapes    []ConstShape
+	varShapes      []VarShape
+	aliasShapes    []AliasShape
+	testFunctions  []TestFunctionRecord
+	externalUses   map[string]*ExternalObligation
+	constructs     map[string]int
+	builtins       map[string]int
+	rangeOperands  map[string]int
+	indexOperands  map[string]int
+	astKinds       map[string]int
 }
 
 // rareConstructs are low-volume constructs whose every occurrence is
@@ -38,25 +43,6 @@ var rareConstructs = map[string]bool{
 	"recover":        true,
 }
 
-// knownDirectives is the reviewed set of compiler directives. An occurrence
-// outside this set is recorded with Known=false and blocks generation until
-// it receives a disposition.
-var knownDirectives = map[string]bool{
-	"go:build":            true,
-	"go:embed":            true,
-	"go:generate":         true,
-	"go:linkname":         true,
-	"go:noinline":         true,
-	"go:nosplit":          true,
-	"go:noescape":         true,
-	"go:norace":           true,
-	"go:nocheckptr":       true,
-	"go:uintptrescapes":   true,
-	"go:uintptrkeepalive": true,
-	"line":                true,
-	"export":              true,
-}
-
 // inspectFile walks one file with full type information. Construct
 // classification uses go/types identity, never source spelling: a local
 // function named append is not the builtin, and an imported package named
@@ -64,9 +50,11 @@ var knownDirectives = map[string]bool{
 //
 // pkgPath in records is the semantic package identity (p.PkgPath — a
 // black-box test file keeps its p_test identity); owner is the package
-// whose profile scope owns the file.
-func inspectFile(p *packages.Package, file *ast.File, relativePath, scopeName, owner string, source []byte) (*fileStats, error) {
+// whose profile scope owns the file. isExternal classifies an object's
+// defining package under the project profile.
+func inspectFile(p *packages.Package, file *ast.File, relativePath, scopeName, owner string, source []byte, isExternal func(string) bool) (*fileStats, error) {
 	stats := &fileStats{
+		externalUses:  map[string]*ExternalObligation{},
 		constructs:    map[string]int{},
 		builtins:      map[string]int{},
 		rangeOperands: map[string]int{},
@@ -75,7 +63,6 @@ func inspectFile(p *packages.Package, file *ast.File, relativePath, scopeName, o
 	}
 	info := p.TypesInfo
 	fset := p.Fset
-	pkgPath := p.PkgPath
 
 	lineOf := func(pos token.Pos) int { return fset.Position(pos).Line }
 	colOf := func(pos token.Pos) int { return fset.Position(pos).Column }
@@ -91,102 +78,46 @@ func inspectFile(p *packages.Package, file *ast.File, relativePath, scopeName, o
 		rareOnly(construct, pos)
 	}
 
-	declare := func(kind, name, receiver string, node ast.Node, namePos token.Pos, body *ast.BlockStmt) error {
-		declaration := DeclarationRecord{
-			Package:   pkgPath,
-			File:      relativePath,
-			Kind:      kind,
-			Name:      name,
-			Receiver:  receiver,
-			Exported:  token.IsExported(name),
-			Scope:     scopeName,
-			StartLine: lineOf(node.Pos()),
-			EndLine:   lineOf(node.End()),
-		}
-		if owner != pkgPath {
-			declaration.Owner = owner
-		}
-		qualified := name
-		if receiver != "" {
-			qualified = receiver + "." + name
-		}
-		// Blank identifiers and init functions are the only declarations Go
-		// permits to repeat; only they need position qualification (by the
-		// declared identifier's own position, so `var _, _ = f()` stays
-		// unique), and all other IDs stay position-independent.
-		if name == "_" || ((kind == "func" || kind == "method") && name == "init") {
-			qualified = fmt.Sprintf("%s@%d:%d", qualified, lineOf(namePos), colOf(namePos))
-		}
-		declaration.ID = pkgPath + "::" + relativePath + "::" + kind + "::" + qualified
-		if body != nil {
-			declaration.HasBody = true
-			declaration.Statements = countStatements(body)
-			start := fset.Position(body.Pos()).Offset
-			end := fset.Position(body.End()).Offset
-			if start < 0 || end > len(source) || start >= end {
-				return fmt.Errorf("declaration %s has an invalid body span [%d, %d) in a %d-byte file", declaration.ID, start, end, len(source))
-			}
-			digest := sha256.Sum256(source[start:end])
-			declaration.BodySha256 = hex.EncodeToString(digest[:])
-		}
-		stats.declarations = append(stats.declarations, declaration)
-		return nil
+	if err := collectDeclarations(p, file, relativePath, scopeName, owner, source, stats); err != nil {
+		return nil, err
 	}
 
-	for _, decl := range file.Decls {
-		switch d := decl.(type) {
-		case *ast.FuncDecl:
-			var err error
-			if d.Recv != nil {
-				err = declare("method", d.Name.Name, receiverBaseName(d.Recv), d, d.Name.Pos(), d.Body)
-			} else {
-				err = declare("func", d.Name.Name, "", d, d.Name.Pos(), d.Body)
-			}
-			if err != nil {
-				return nil, err
-			}
-		case *ast.GenDecl:
-			for _, spec := range d.Specs {
-				switch s := spec.(type) {
-				case *ast.ValueSpec:
-					kind := "var"
-					if d.Tok == token.CONST {
-						kind = "const"
-					}
-					for _, name := range s.Names {
-						if err := declare(kind, name.Name, "", s, name.Pos(), nil); err != nil {
-							return nil, err
-						}
-					}
-				case *ast.TypeSpec:
-					kind := "type"
-					if s.Assign.IsValid() {
-						kind = "alias"
-					}
-					if err := declare(kind, s.Name.Name, "", s, s.Name.Pos(), nil); err != nil {
-						return nil, err
-					}
-				}
+	// Selector expressions in call position are classified by
+	// classifyCall; the pre-pass marks them so standalone selections
+	// (field reads, bound method values) are counted distinctly.
+	calleeSelectors := map[*ast.SelectorExpr]bool{}
+	ast.Inspect(file, func(node ast.Node) bool {
+		if call, ok := node.(*ast.CallExpr); ok {
+			if selector, ok := ast.Unparen(call.Fun).(*ast.SelectorExpr); ok {
+				calleeSelectors[selector] = true
 			}
 		}
-	}
+		return true
+	})
 
 	var inspectError error
+	fail := func(err error) bool {
+		inspectError = err
+		return false
+	}
 	ast.Inspect(file, func(node ast.Node) bool {
 		if node == nil || inspectError != nil {
 			return false
 		}
 		kind, err := astKindName(node)
 		if err != nil {
-			inspectError = err
-			return false
+			return fail(err)
 		}
 		stats.astKinds[kind]++
 
 		switch n := node.(type) {
 		case *ast.RangeStmt:
 			record("range", n.Pos())
-			stats.rangeOperands[typeClass(info.TypeOf(n.X))]++
+			class, err := typeClass(info.TypeOf(n.X))
+			if err != nil {
+				return fail(fmt.Errorf("range operand at %s:%d: %w", relativePath, lineOf(n.Pos()), err))
+			}
+			stats.rangeOperands[class]++
 		case *ast.DeferStmt:
 			record("defer", n.Pos())
 		case *ast.GoStmt:
@@ -201,6 +132,12 @@ func inspectFile(p *packages.Package, file *ast.File, relativePath, scopeName, o
 			record("channelSend", n.Pos())
 		case *ast.LabeledStmt:
 			record("label", n.Pos())
+		case *ast.AssignStmt:
+			stats.constructs["assign:"+n.Tok.String()]++
+		case *ast.IncDecStmt:
+			stats.constructs["incDec:"+n.Tok.String()]++
+		case *ast.BinaryExpr:
+			stats.constructs["binaryOp:"+n.Op.String()]++
 		case *ast.BranchStmt:
 			switch n.Tok {
 			case token.GOTO:
@@ -209,11 +146,11 @@ func inspectFile(p *packages.Package, file *ast.File, relativePath, scopeName, o
 				record("fallthrough", n.Pos())
 			case token.BREAK:
 				if n.Label != nil {
-					record("labeledBreak", n.Pos())
+					stats.constructs["labeledBreak"]++
 				}
 			case token.CONTINUE:
 				if n.Label != nil {
-					record("labeledContinue", n.Pos())
+					stats.constructs["labeledContinue"]++
 				}
 			}
 		case *ast.UnaryExpr:
@@ -222,6 +159,8 @@ func inspectFile(p *packages.Package, file *ast.File, relativePath, scopeName, o
 				record("channelReceive", n.Pos())
 			case token.AND:
 				record("addressOf", n.Pos())
+			default:
+				stats.constructs["unaryOp:"+n.Op.String()]++
 			}
 		case *ast.StarExpr:
 			if tv, ok := info.Types[n.X]; ok && tv.IsType() {
@@ -247,6 +186,9 @@ func inspectFile(p *packages.Package, file *ast.File, relativePath, scopeName, o
 			if _, ok := info.Instances[n]; ok {
 				record("genericInstantiation", n.Pos())
 			}
+			if err := recordExternalUse(info, n, isExternal, stats); err != nil {
+				return fail(fmt.Errorf("%s:%d: %w", relativePath, lineOf(n.Pos()), err))
+			}
 		case *ast.IndexExpr:
 			// A value-level generic instantiation F[int] is an IndexExpr
 			// whose operand identifier appears in Instances; it was counted
@@ -257,12 +199,28 @@ func inspectFile(p *packages.Package, file *ast.File, relativePath, scopeName, o
 			if tv, ok := info.Types[n]; ok && tv.IsType() {
 				break // type instantiation, counted at its Ident
 			}
-			stats.indexOperands[typeClass(info.TypeOf(n.X))]++
+			class, err := typeClass(info.TypeOf(n.X))
+			if err != nil {
+				return fail(fmt.Errorf("index operand at %s:%d: %w", relativePath, lineOf(n.Pos()), err))
+			}
+			stats.indexOperands[class]++
 		case *ast.IndexListExpr:
 			// Always an instantiation; counted at its Ident.
 		case *ast.CallExpr:
-			classifyCall(info, n, stats, rareOnly)
+			if err := classifyCall(info, n, stats, rareOnly); err != nil {
+				return fail(fmt.Errorf("%s: %w", relativePath, err))
+			}
 		case *ast.SelectorExpr:
+			if selection, ok := info.Selections[n]; ok && !calleeSelectors[n] {
+				switch selection.Kind() {
+				case types.FieldVal:
+					stats.constructs["fieldAccess"]++
+				case types.MethodVal:
+					record("methodValue", n.Pos())
+				case types.MethodExpr:
+					record("methodExpr", n.Pos())
+				}
+			}
 			if obj := info.Uses[n.Sel]; obj != nil && obj.Pkg() == types.Unsafe {
 				record("unsafe", n.Pos())
 			}
@@ -273,10 +231,90 @@ func inspectFile(p *packages.Package, file *ast.File, relativePath, scopeName, o
 		return nil, fmt.Errorf("%s: %w", relativePath, inspectError)
 	}
 
-	// Directive census. The toolchain contract for directive comments is a
-	// line comment whose text begins exactly "//go:" with no space; //line
-	// and /*line*/ position directives and cgo //export markers are also
-	// recognized.
+	collectDirectives(file, relativePath, lineOf, colOf, stats)
+	return stats, nil
+}
+
+// recordExternalUse records one reference to an object defined in an
+// external package: a deterministic declaration/stub obligation. Object
+// classes outside the reviewed set fail closed.
+func recordExternalUse(info *types.Info, ident *ast.Ident, isExternal func(string) bool, stats *fileStats) error {
+	object := info.Uses[ident]
+	if object == nil || object.Pkg() == nil || !isExternal(object.Pkg().Path()) {
+		return nil
+	}
+	// Objects of the compiler-recognized unsafe package are language-level
+	// operations, not library obligations: every occurrence is already
+	// pinned as an "unsafe" rare-construct record, and its disposition is
+	// the unsupported/manual language-operation policy, never a stub.
+	if object.Pkg() == types.Unsafe {
+		return nil
+	}
+	var kind string
+	switch concrete := object.(type) {
+	case *types.Func:
+		kind = "func"
+	case *types.Var:
+		if concrete.IsField() {
+			kind = "field"
+		} else {
+			kind = "var"
+		}
+	case *types.Const:
+		kind = "const"
+	case *types.TypeName:
+		kind = "type"
+	case *types.PkgName:
+		return nil // the import itself, not an object obligation
+	default:
+		return fmt.Errorf("unreviewed external object class %T for %s.%s", object, object.Pkg().Path(), object.Name())
+	}
+	key := object.Pkg().Path() + "\x00" + object.Name() + "\x00" + kind
+	obligation := stats.externalUses[key]
+	if obligation == nil {
+		obligation = &ExternalObligation{Package: object.Pkg().Path(), Name: object.Name(), Kind: kind}
+		stats.externalUses[key] = obligation
+	}
+	obligation.Uses++
+	return nil
+}
+
+func isInstantiation(info *types.Info, fun ast.Expr) bool {
+	switch f := ast.Unparen(fun).(type) {
+	case *ast.Ident:
+		_, ok := info.Instances[f]
+		return ok
+	case *ast.SelectorExpr:
+		_, ok := info.Instances[f.Sel]
+		return ok
+	}
+	return false
+}
+
+// knownDirectives is the reviewed set of compiler directives. An
+// occurrence outside this set is recorded with Known=false and blocks an
+// authoritative result until it receives a disposition.
+var knownDirectives = map[string]bool{
+	"go:build":            true,
+	"go:embed":            true,
+	"go:generate":         true,
+	"go:linkname":         true,
+	"go:noinline":         true,
+	"go:nosplit":          true,
+	"go:noescape":         true,
+	"go:norace":           true,
+	"go:nocheckptr":       true,
+	"go:uintptrescapes":   true,
+	"go:uintptrkeepalive": true,
+	"line":                true,
+	"export":              true,
+}
+
+// collectDirectives records every compiler directive occurrence. The
+// toolchain contract for directive comments is a line comment whose text
+// begins exactly "//go:" with no space; //line and /*line*/ position
+// directives and cgo //export markers are also recognized.
+func collectDirectives(file *ast.File, relativePath string, lineOf, colOf func(token.Pos) int, stats *fileStats) {
 	for _, group := range file.Comments {
 		for _, comment := range group.List {
 			text := comment.Text
@@ -299,232 +337,5 @@ func inspectFile(p *packages.Package, file *ast.File, relativePath, scopeName, o
 				Known:     knownDirectives[name],
 			})
 		}
-	}
-	return stats, nil
-}
-
-func isInstantiation(info *types.Info, fun ast.Expr) bool {
-	switch f := ast.Unparen(fun).(type) {
-	case *ast.Ident:
-		_, ok := info.Instances[f]
-		return ok
-	case *ast.SelectorExpr:
-		_, ok := info.Instances[f.Sel]
-		return ok
-	}
-	return false
-}
-
-func receiverBaseName(recv *ast.FieldList) string {
-	if recv == nil || len(recv.List) == 0 {
-		return ""
-	}
-	t := recv.List[0].Type
-	for {
-		switch base := t.(type) {
-		case *ast.StarExpr:
-			t = base.X
-		case *ast.IndexExpr:
-			t = base.X
-		case *ast.IndexListExpr:
-			t = base.X
-		case *ast.ParenExpr:
-			t = base.X
-		case *ast.Ident:
-			return base.Name
-		default:
-			return ""
-		}
-	}
-}
-
-func countStatements(body *ast.BlockStmt) int {
-	count := 0
-	ast.Inspect(body, func(node ast.Node) bool {
-		if _, ok := node.(ast.Stmt); ok {
-			count++
-		}
-		return true
-	})
-	return count
-}
-
-func classifyCall(info *types.Info, call *ast.CallExpr, stats *fileStats, rareOnly func(string, token.Pos)) {
-	// Conversion: the operand in call position is a type.
-	if tv, ok := info.Types[call.Fun]; ok && tv.IsType() {
-		stats.constructs["conversion"]++
-		return
-	}
-
-	var ident *ast.Ident
-	switch f := ast.Unparen(call.Fun).(type) {
-	case *ast.Ident:
-		ident = f
-	case *ast.SelectorExpr:
-		ident = f.Sel
-	}
-	if ident == nil {
-		return
-	}
-	if builtin, ok := info.Uses[ident].(*types.Builtin); ok {
-		stats.builtins[builtin.Name()]++
-		rareOnly(builtin.Name(), call.Pos())
-	}
-}
-
-// typeClass names the semantic operand class of a type for range/index
-// census purposes, resolving named types to their underlying form.
-func typeClass(t types.Type) string {
-	if t == nil {
-		return "unknown"
-	}
-	if _, ok := types.Unalias(t).(*types.TypeParam); ok {
-		return "typeParam"
-	}
-	switch u := t.Underlying().(type) {
-	case *types.Slice:
-		return "slice"
-	case *types.Array:
-		return "array"
-	case *types.Map:
-		return "map"
-	case *types.Chan:
-		return "chan"
-	case *types.Signature:
-		return "func"
-	case *types.Interface:
-		return "interface"
-	case *types.Pointer:
-		if _, ok := u.Elem().Underlying().(*types.Array); ok {
-			return "pointerToArray"
-		}
-		return "pointer"
-	case *types.Basic:
-		switch {
-		case u.Info()&types.IsString != 0:
-			return "string"
-		case u.Info()&types.IsInteger != 0:
-			return "integer"
-		default:
-			return "basic:" + u.Name()
-		}
-	default:
-		return "other"
-	}
-}
-
-// astKindName names every AST node kind the pinned toolchain grammar can
-// produce. An unknown kind fails the census: it means the grammar has a
-// construct this tool has never been reviewed against.
-func astKindName(node ast.Node) (string, error) {
-	switch node.(type) {
-	case *ast.File:
-		return "File", nil
-	case *ast.Comment:
-		return "Comment", nil
-	case *ast.CommentGroup:
-		return "CommentGroup", nil
-	case *ast.Field:
-		return "Field", nil
-	case *ast.FieldList:
-		return "FieldList", nil
-	case *ast.Ident:
-		return "Ident", nil
-	case *ast.Ellipsis:
-		return "Ellipsis", nil
-	case *ast.BasicLit:
-		return "BasicLit", nil
-	case *ast.FuncLit:
-		return "FuncLit", nil
-	case *ast.CompositeLit:
-		return "CompositeLit", nil
-	case *ast.ParenExpr:
-		return "ParenExpr", nil
-	case *ast.SelectorExpr:
-		return "SelectorExpr", nil
-	case *ast.IndexExpr:
-		return "IndexExpr", nil
-	case *ast.IndexListExpr:
-		return "IndexListExpr", nil
-	case *ast.SliceExpr:
-		return "SliceExpr", nil
-	case *ast.TypeAssertExpr:
-		return "TypeAssertExpr", nil
-	case *ast.CallExpr:
-		return "CallExpr", nil
-	case *ast.StarExpr:
-		return "StarExpr", nil
-	case *ast.UnaryExpr:
-		return "UnaryExpr", nil
-	case *ast.BinaryExpr:
-		return "BinaryExpr", nil
-	case *ast.KeyValueExpr:
-		return "KeyValueExpr", nil
-	case *ast.ArrayType:
-		return "ArrayType", nil
-	case *ast.StructType:
-		return "StructType", nil
-	case *ast.FuncType:
-		return "FuncType", nil
-	case *ast.InterfaceType:
-		return "InterfaceType", nil
-	case *ast.MapType:
-		return "MapType", nil
-	case *ast.ChanType:
-		return "ChanType", nil
-	case *ast.DeclStmt:
-		return "DeclStmt", nil
-	case *ast.EmptyStmt:
-		return "EmptyStmt", nil
-	case *ast.LabeledStmt:
-		return "LabeledStmt", nil
-	case *ast.ExprStmt:
-		return "ExprStmt", nil
-	case *ast.SendStmt:
-		return "SendStmt", nil
-	case *ast.IncDecStmt:
-		return "IncDecStmt", nil
-	case *ast.AssignStmt:
-		return "AssignStmt", nil
-	case *ast.GoStmt:
-		return "GoStmt", nil
-	case *ast.DeferStmt:
-		return "DeferStmt", nil
-	case *ast.ReturnStmt:
-		return "ReturnStmt", nil
-	case *ast.BranchStmt:
-		return "BranchStmt", nil
-	case *ast.BlockStmt:
-		return "BlockStmt", nil
-	case *ast.IfStmt:
-		return "IfStmt", nil
-	case *ast.CaseClause:
-		return "CaseClause", nil
-	case *ast.SwitchStmt:
-		return "SwitchStmt", nil
-	case *ast.TypeSwitchStmt:
-		return "TypeSwitchStmt", nil
-	case *ast.CommClause:
-		return "CommClause", nil
-	case *ast.SelectStmt:
-		return "SelectStmt", nil
-	case *ast.ForStmt:
-		return "ForStmt", nil
-	case *ast.RangeStmt:
-		return "RangeStmt", nil
-	case *ast.GenDecl:
-		return "GenDecl", nil
-	case *ast.FuncDecl:
-		return "FuncDecl", nil
-	case *ast.ImportSpec:
-		return "ImportSpec", nil
-	case *ast.ValueSpec:
-		return "ValueSpec", nil
-	case *ast.TypeSpec:
-		return "TypeSpec", nil
-	case *ast.BadExpr, *ast.BadStmt, *ast.BadDecl:
-		return "", fmt.Errorf("parse produced a Bad node at an analyzed position; refusing to count a broken file")
-	default:
-		return "", fmt.Errorf("unknown AST node kind %T: the pinned toolchain grammar has a construct this census has not been reviewed against", node)
 	}
 }

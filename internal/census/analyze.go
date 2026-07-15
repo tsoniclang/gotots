@@ -23,13 +23,19 @@ import (
 var generatedFileMarker = regexp.MustCompile(`(?m)^// Code generated .* DO NOT EDIT\.$`)
 
 // analyze walks every loaded owned/test-only variant: it verifies each file
-// against the pinned tree, produces the identity-bearing records, records
-// dependency edges and external use, and enforces the pass-1/pass-2 file
-// reconciliation and identity uniqueness gates.
-func analyze(prof *profile.Profile, inv *inventory.Inventory, tree *pinning.Tree, loaded []*packages.Package, sourceDir string, report *Report) error {
+// against the pinned tree, produces the identity-bearing records and typed
+// declaration shapes, records dependency edges and external obligations,
+// and enforces the pass-1/pass-2 file reconciliation and identity
+// uniqueness gates.
+func analyze(prof *profile.Profile, inv *inventory.Inventory, tree *pinning.Tree, loaded []*packages.Package, sourceDir string, report *Report, shapes *DeclarationShapes) error {
 	externalIndex := inv.ExternalIndex()
 	externalUse := map[string]*ExternalUse{}
+	obligations := map[string]*ExternalObligation{}
 	var edges []Edge
+	isExternal := func(pkgPath string) bool {
+		class, _ := prof.Classify(pkgPath)
+		return class == profile.ClassExternal
+	}
 
 	// Deterministic iteration order.
 	roots := append([]*packages.Package{}, loaded...)
@@ -113,13 +119,28 @@ func analyze(prof *profile.Profile, inv *inventory.Inventory, tree *pinning.Tree
 			scope.Files++
 			scope.Lines += lines
 
-			stats, err := inspectFile(p, file, relative, scopeName, owner, data)
+			stats, err := inspectFile(p, file, relative, scopeName, owner, data, isExternal)
 			if err != nil {
 				return err
 			}
 			report.Declarations = append(report.Declarations, stats.declarations...)
 			report.Directives = append(report.Directives, stats.directives...)
 			report.RareConstructs = append(report.RareConstructs, stats.rare...)
+			report.TestFunctions = append(report.TestFunctions, stats.testFunctions...)
+			shapes.Functions = append(shapes.Functions, stats.functionShapes...)
+			shapes.Types = append(shapes.Types, stats.typeShapes...)
+			shapes.Constants = append(shapes.Constants, stats.constShapes...)
+			shapes.Variables = append(shapes.Variables, stats.varShapes...)
+			shapes.Aliases = append(shapes.Aliases, stats.aliasShapes...)
+			for key, use := range stats.externalUses {
+				existing := obligations[key]
+				if existing == nil {
+					copied := *use
+					obligations[key] = &copied
+				} else {
+					existing.Uses += use.Uses
+				}
+			}
 			mergeAggregates(scope, stats)
 
 			if err := recordImports(prof, externalIndex, externalUse, &edges, file, owner, relative, scopeName, isTestScope); err != nil {
@@ -135,7 +156,11 @@ func analyze(prof *profile.Profile, inv *inventory.Inventory, tree *pinning.Tree
 		return err
 	}
 
+	for _, obligation := range obligations {
+		report.ExternalObligations = append(report.ExternalObligations, *obligation)
+	}
 	sortRecords(report, edges, externalUse)
+	sortShapes(shapes)
 	if err := validateIdentities(report); err != nil {
 		return err
 	}

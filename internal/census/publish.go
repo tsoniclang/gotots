@@ -132,6 +132,9 @@ func WriteReports(result *Result, outDir string) error {
 	if err := write("census.json", result.Report); err != nil {
 		return err
 	}
+	if err := write("declarations.json", result.Shapes); err != nil {
+		return err
+	}
 	if err := write("environment.json", result.Environment); err != nil {
 		return err
 	}

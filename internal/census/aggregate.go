@@ -60,6 +60,28 @@ func sortRecords(report *Report, edges []Edge, externalUse map[string]*ExternalU
 		}
 		return a.Col < b.Col
 	})
+	sort.Slice(report.ExternalObligations, func(i, j int) bool {
+		a, b := report.ExternalObligations[i], report.ExternalObligations[j]
+		if a.Package != b.Package {
+			return a.Package < b.Package
+		}
+		if a.Name != b.Name {
+			return a.Name < b.Name
+		}
+		return a.Kind < b.Kind
+	})
+	sort.Slice(report.TestFunctions, func(i, j int) bool {
+		return report.TestFunctions[i].ID < report.TestFunctions[j].ID
+	})
+}
+
+// sortShapes imposes the deterministic declaration-contract ordering.
+func sortShapes(shapes *DeclarationShapes) {
+	sort.Slice(shapes.Functions, func(i, j int) bool { return shapes.Functions[i].ID < shapes.Functions[j].ID })
+	sort.Slice(shapes.Types, func(i, j int) bool { return shapes.Types[i].ID < shapes.Types[j].ID })
+	sort.Slice(shapes.Constants, func(i, j int) bool { return shapes.Constants[i].ID < shapes.Constants[j].ID })
+	sort.Slice(shapes.Variables, func(i, j int) bool { return shapes.Variables[i].ID < shapes.Variables[j].ID })
+	sort.Slice(shapes.Aliases, func(i, j int) bool { return shapes.Aliases[i].ID < shapes.Aliases[j].ID })
 }
 
 // deriveDeclarationAggregates computes every DeclCounts/Bodies/Statements

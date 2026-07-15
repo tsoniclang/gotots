@@ -182,6 +182,14 @@ type Report struct {
 	Declarations   []DeclarationRecord   `json:"declarations"`
 	Directives     []DirectiveRecord     `json:"directives"`
 	RareConstructs []RareConstructRecord `json:"rareConstructs"`
+	// PredeclaredUniverse is the pinned toolchain's complete predeclared
+	// object list, verified against the reviewed contract.
+	PredeclaredUniverse []string `json:"predeclaredUniverse"`
+	// ExternalObligations are the object-level declaration/stub obligations
+	// owned source places on external packages.
+	ExternalObligations []ExternalObligation `json:"externalObligations"`
+	// TestFunctions is the test-discovery ledger for owned test scope.
+	TestFunctions []TestFunctionRecord `json:"testFunctions"`
 }
 
 // Environment is the machine-specific evidence report: the resolved
@@ -197,6 +205,7 @@ type Environment struct {
 type Result struct {
 	Inventory   *inventory.Inventory
 	Report      *Report
+	Shapes      *DeclarationShapes
 	Environment *Environment
 	sourceDir   string
 }
