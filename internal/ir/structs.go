@@ -38,6 +38,7 @@ func BuildStruct(p *packages.Package, sourceDir string, unit Scope, spec *ast.Ty
 			return nil, err
 		}
 		typeParams = names
+		b.genericTypeObj = named
 	}
 	structType, ok := named.Underlying().(*types.Struct)
 	if !ok {

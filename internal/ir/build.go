@@ -50,6 +50,9 @@ type builder struct {
 	// type-parameter admissions (map keys) consult its closed-world
 	// instantiation evidence.
 	genericObj *types.Func
+	// genericTypeObj is the generic named type whose method is being
+	// built; its instantiation evidence admits receiver type parameters.
+	genericTypeObj *types.Named
 	// typeSwitchLabels carries one synthesized-label slot per enclosing
 	// type switch under construction; a direct break fills the innermost.
 	typeSwitchLabels []*string
@@ -128,6 +131,13 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 			// (verified at the type declaration).
 			for i := range recvParams.Len() {
 				function.TypeParams = append(function.TypeParams, recvParams.At(i).Obj().Name())
+			}
+			recvType := signature.Recv().Type()
+			if pointer, isPointer := recvType.(*types.Pointer); isPointer {
+				recvType = pointer.Elem()
+			}
+			if named, isNamed := types.Unalias(recvType).(*types.Named); isNamed {
+				b.genericTypeObj = named
 			}
 		}
 		// A pointer receiver binds the class instance; a value receiver

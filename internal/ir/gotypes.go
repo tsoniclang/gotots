@@ -257,15 +257,28 @@ func KeyEncodableField(t Type) bool {
 // evidence makes the direct Map carrier exact for all of them.
 func (b *builder) typeParamKeySupported(keyType types.Type, span Span) bool {
 	param, ok := types.Unalias(keyType).(*types.TypeParam)
-	if !ok || b.genericObj == nil {
+	if !ok {
 		return false
 	}
-	signature := b.genericObj.Type().(*types.Signature)
-	if signature.TypeParams() == nil || param.Index() >= signature.TypeParams().Len() ||
-		signature.TypeParams().At(param.Index()) != param {
+	var instances [][]types.Type
+	switch {
+	case b.genericObj != nil:
+		signature := b.genericObj.Type().(*types.Signature)
+		if signature.TypeParams() == nil || param.Index() >= signature.TypeParams().Len() ||
+			signature.TypeParams().At(param.Index()) != param {
+			return false
+		}
+		instances = b.unit.GenericInstances(b.genericObj)
+	case b.genericTypeObj != nil:
+		typeParams := b.genericTypeObj.TypeParams()
+		if typeParams == nil || param.Index() >= typeParams.Len() ||
+			typeParams.At(param.Index()).Obj().Name() != param.Obj().Name() {
+			return false
+		}
+		instances = b.unit.GenericTypeInstances(b.genericTypeObj.Obj())
+	default:
 		return false
 	}
-	instances := b.unit.GenericInstances(b.genericObj)
 	if len(instances) == 0 {
 		return false
 	}
