@@ -209,14 +209,19 @@ func (b *builder) admitGenericType(named *types.Named, span Span) ([]string, err
 // module, structurally identical across packages (TypeScript's
 // structural classes keep cross-package values assignable).
 func (b *builder) anonStructType(structType *types.Struct, spelled string, span Span) (Type, error) {
-	digest := sha256.Sum256([]byte(spelled))
-	name := "Anon$" + hex.EncodeToString(digest[:6])
+	// Package-path-qualified structural identity so anonymous shapes from
+	// different packages never collide, and the full digest so distinct
+	// shapes never coincide.
+	identity := types.TypeString(structType, func(p *types.Package) string { return p.Path() })
+	digest := sha256.Sum256([]byte(identity))
+	name := "Anon$" + hex.EncodeToString(digest[:])
 	out := Type{Kind: KindStruct, Go: spelled, Named: name, Pkg: b.pkgPath}
 	decl := &Struct{
 		ID:       b.pkgPath + "::type::" + name,
 		Name:     name,
 		Exported: false,
 		Span:     span,
+		Identity: identity,
 	}
 	for i := range structType.NumFields() {
 		field := structType.Field(i)
@@ -230,6 +235,8 @@ func (b *builder) anonStructType(structType *types.Struct, spelled string, span 
 		decl.Fields = append(decl.Fields, Var{Name: field.Name(), Type: fieldType})
 	}
 	decl.Comparable = b.structEqComparable(structType)
-	b.unit.RegisterAnonStruct(b.pkgPath, decl)
+	if err := b.unit.RegisterAnonStruct(b.pkgPath, decl); err != nil {
+		return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: err.Error(), Span: span}
+	}
 	return out, nil
 }

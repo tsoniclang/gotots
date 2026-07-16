@@ -211,6 +211,35 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		return p.printMethodValue(n)
 	case *ir.FuncRef:
 		return p.module.symbol(n.Pkg, n.Name)
+	case *ir.MethodExprAdapter:
+		callee, err := p.module.symbol(n.Pkg, n.Method)
+		if err != nil {
+			return "", err
+		}
+		recvSpelled, err := p.tsType(ir.Type{Kind: ir.KindPointer, Elem: &n.RecvValue})
+		if err != nil {
+			return "", err
+		}
+		params := []string{"$r$: " + recvSpelled}
+		names := []string{}
+		for i, param := range n.Params {
+			spelled, err := p.tsType(param.Type)
+			if err != nil {
+				return "", err
+			}
+			name := fmt.Sprintf("$a%d", i)
+			params = append(params, name+": "+spelled)
+			names = append(names, name)
+		}
+		result, err := p.tsFuncResultType(n.Results)
+		if err != nil {
+			return "", err
+		}
+		// (*T).ValueMethod: deref the pointer (nil panics) and forward;
+		// the value-receiver function copies on entry.
+		operands := append([]string{"gort$.goNilCheck($r$)"}, names...)
+		return fmt.Sprintf("(%s): %s => %s(%s)",
+			joinComma(params), result, callee, joinComma(operands)), nil
 	case *ir.TupleAdapt:
 		return p.printTupleAdapt(n)
 	case *ir.DynCall:

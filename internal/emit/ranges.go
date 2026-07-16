@@ -222,7 +222,8 @@ func (p *printer) printRangeFunc(n *ir.RangeFunc) error {
 		}
 		params = append(params, fmt.Sprintf("$y%d: %s", i, spelled))
 	}
-	p.line("(%s)((%s): boolean => {", seq, joinComma(params))
+	// A nil sequence function panics exactly like Go's nil call.
+	p.line("(gort$.goNilCheck(%s))((%s): boolean => {", seq, joinComma(params))
 	p.indent++
 	p.line("if (%s) {", ctx.doneVar)
 	p.indent++
@@ -256,6 +257,9 @@ func (p *printer) printRangeFunc(n *ir.RangeFunc) error {
 	p.line("return true;")
 	p.indent--
 	p.line("});")
+	// The sequence has returned: any subsequent call of a retained yield
+	// is invalid, exactly as Go marks the iterator done.
+	p.line("%s = true;", ctx.doneVar)
 	p.line("if (%s) {", ctx.returnedVar)
 	p.indent++
 	if ctx.retVar != "" {

@@ -497,6 +497,11 @@
       "specClause": "docs/spec/06-interfaces-generics-functions.md"
     },
     {
+      "key": "methodExpr:derefAdapter",
+      "state": "generated",
+      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+    },
+    {
       "key": "methodValue",
       "state": "generated",
       "specClause": "docs/spec/06-interfaces-generics-functions.md"

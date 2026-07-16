@@ -209,11 +209,18 @@ func (s Scope) GenericTypeInstances(name *types.TypeName) [][]types.Type { retur
 
 // RegisterAnonStruct records one synthesized anonymous-struct class for
 // the package's module (idempotent per shape).
-func (s Scope) RegisterAnonStruct(pkg string, decl *Struct) {
+func (s Scope) RegisterAnonStruct(pkg string, decl *Struct) error {
 	if s.anonStructs[pkg] == nil {
 		s.anonStructs[pkg] = map[string]*Struct{}
 	}
+	if existing, ok := s.anonStructs[pkg][decl.Name]; ok && existing.Identity != decl.Identity {
+		// A digest collision between distinct anonymous shapes must never
+		// silently overwrite: the identity is not injective, so fail
+		// closed rather than mis-dispatch one shape as the other.
+		return fmt.Errorf("anonymous struct identity collision on %s: %q vs %q", decl.Name, existing.Identity, decl.Identity)
+	}
 	s.anonStructs[pkg][decl.Name] = decl
+	return nil
 }
 
 // AnonStructs returns the synthesized anonymous-struct classes of one
@@ -454,6 +461,10 @@ type Struct struct {
 	Name     string
 	Exported bool
 	Span     Span
+	// Identity is the package-path-qualified structural identity string
+	// an anonymous struct's name digests; the collision check compares
+	// it (empty for named structs).
+	Identity string
 	// TypeParams are the generic type parameter names, admitted under
 	// the unit's closed-world instantiation evidence.
 	TypeParams []string

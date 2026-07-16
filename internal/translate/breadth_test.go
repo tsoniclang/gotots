@@ -518,3 +518,51 @@ func KeyThenRHSLexicalOrder() (int, int) {
 }
 `)
 }
+
+func TestOracleRangeFuncInvalidation(t *testing.T) {
+	runOracle(t, `package fixture
+
+func seq(yield func(int) bool) {
+	yield(1)
+	yield(2)
+	yield(3)
+}
+
+func NormalIteration() int {
+	total := 0
+	for v := range seq {
+		total += v
+	}
+	return total
+}
+
+func BreakStopsIteration() int {
+	total := 0
+	for v := range seq {
+		total += v
+		if v == 2 {
+			break
+		}
+	}
+	return total
+}
+
+func NilSequencePanics() int {
+	var s func(func(int) bool)
+	count := 0
+	for range s {
+		count++
+	}
+	return count
+}
+
+func ReturnFromRange() int {
+	for v := range seq {
+		if v == 2 {
+			return v * 10
+		}
+	}
+	return -1
+}
+`)
+}

@@ -142,6 +142,63 @@ func (b *builder) buildMethodExpr(n *ast.SelectorExpr, selection *types.Selectio
 	if err != nil {
 		return nil, err
 	}
+	// (*T).ValueMethod: the method expression's first parameter is *T,
+	// but the generated value-receiver function takes T. An adapter
+	// dereferences (a nil pointer panics) and the value copies on entry.
+	_, exprRecvPointer := signature2FirstParam(valueType).(*types.Pointer)
+	_, methodRecvPointer := signature.Recv().Type().(*types.Pointer)
+	if exprRecvPointer && !methodRecvPointer {
+		params := make([]Var, 0, signature.Params().Len())
+		for i := range signature.Params().Len() {
+			pt, err := b.typeOf(signature.Params().At(i).Type(), span)
+			if err != nil {
+				return nil, err
+			}
+			params = append(params, Var{Name: signature.Params().At(i).Name(), Type: pt})
+		}
+		results := make([]Type, 0, signature.Results().Len())
+		for i := range signature.Results().Len() {
+			rt, err := b.typeOf(signature.Results().At(i).Type(), span)
+			if err != nil {
+				return nil, err
+			}
+			results = append(results, rt)
+		}
+		recvT, err := b.typeOf(signature.Recv().Type(), span)
+		if err != nil {
+			return nil, err
+		}
+		b.use("methodExpr:derefAdapter")
+		return &MethodExprAdapter{
+			Pkg: method.Pkg().Path(), Method: recvNamed.Obj().Name() + "$" + method.Name(),
+			RecvValue: recvT, Params: params, Results: results, T: t,
+		}, nil
+	}
 	b.use("methodExpr")
 	return &FuncRef{Pkg: method.Pkg().Path(), Name: recvNamed.Obj().Name() + "$" + method.Name(), T: t}, nil
 }
+
+// signature2FirstParam returns the first parameter type of a function
+// type (a method expression's spelled receiver parameter), or nil.
+func signature2FirstParam(t types.Type) types.Type {
+	sig, ok := t.Underlying().(*types.Signature)
+	if !ok || sig.Params().Len() == 0 {
+		return nil
+	}
+	return sig.Params().At(0).Type()
+}
+
+// MethodExprAdapter is (*T).ValueMethod: an arrow taking *T,
+// dereferencing (nil panics) and forwarding to the value-receiver
+// method, which copies on entry.
+type MethodExprAdapter struct {
+	Pkg       string
+	Method    string
+	RecvValue Type // the value receiver type T
+	Params    []Var
+	Results   []Type
+	T         Type
+}
+
+func (*MethodExprAdapter) expr()        {}
+func (a *MethodExprAdapter) Type() Type { return a.T }
