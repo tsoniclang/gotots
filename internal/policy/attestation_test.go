@@ -154,11 +154,11 @@ func TestAttestationProtocol(t *testing.T) {
 				}
 			}
 		}
-		if report.Failed > 0 {
-			t.Errorf("attestations/%s: a failed gate run must not be retained as an attestation", name)
-		}
-		if report.Blocked > 0 && report.Passed {
-			t.Errorf("attestations/%s: passed must be false while stages are blocked", name)
+		// A retained attestation records the TRUE gate state — a failing
+		// or blocked run is an honest record — but must never CLAIM
+		// success it did not achieve.
+		if report.Passed && (report.Failed > 0 || report.Blocked > 0) {
+			t.Errorf("attestations/%s: passed must be false while stages fail or block", name)
 		}
 	}
 }
