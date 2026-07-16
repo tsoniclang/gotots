@@ -45,6 +45,23 @@ type Module struct {
 	ExternMethods map[string][]ExternMethod
 	imports       map[string]ModuleImport
 	used          map[string]bool
+	// initEdges are co-generated packages this package imports whose
+	// module must still be imported (evaluated) even when no symbol
+	// reference survives — folded constants and type-only uses erase the
+	// reference but not the initialization dependency.
+	initEdges map[string]bool
+}
+
+// RequireInitEdge records that this package imports a co-generated
+// package for its initialization side effects; the import is emitted
+// even without a surviving symbol reference.
+func (m *Module) RequireInitEdge(pkg string) {
+	if pkg == m.Pkg {
+		return
+	}
+	if _, importable := m.imports[pkg]; importable {
+		m.initEdges[pkg] = true
+	}
 }
 
 // NewModule builds the emission context for one generated module.
@@ -65,7 +82,8 @@ func NewModule(pkg, pkgName string, abiImports ABIImports, specifiers map[string
 	for _, path := range paths {
 		imports[path] = ModuleImport{Alias: aliases[path], Specifier: specifiers[path]}
 	}
-	return &Module{Pkg: pkg, PkgName: pkgName, ABI: abiImports, imports: imports, used: map[string]bool{}}
+	return &Module{Pkg: pkg, PkgName: pkgName, ABI: abiImports, imports: imports,
+		used: map[string]bool{}, initEdges: map[string]bool{}}
 }
 
 // symbol spells a reference to a package-level symbol: unqualified within
@@ -93,8 +111,15 @@ func (m *Module) importLines() string {
 	fmt.Fprintf(&out, "import * as gosl$ from %q;\n", m.ABI.Slice)
 	fmt.Fprintf(&out, "import * as goif$ from %q;\n", m.ABI.Iface)
 	fmt.Fprintf(&out, "import * as goext$ from %q;\n", m.ABI.Extern)
-	usedPaths := make([]string, 0, len(m.used))
+	emit := map[string]bool{}
 	for path := range m.used {
+		emit[path] = true
+	}
+	for path := range m.initEdges {
+		emit[path] = true
+	}
+	usedPaths := make([]string, 0, len(emit))
+	for path := range emit {
 		usedPaths = append(usedPaths, path)
 	}
 	sort.Strings(usedPaths)

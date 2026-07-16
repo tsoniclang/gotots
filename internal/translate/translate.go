@@ -430,6 +430,14 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 	if err != nil {
 		return err
 	}
+	// Every co-generated package this package imports is an
+	// initialization edge: its module must evaluate even when constant
+	// folding or type-only use erased every symbol reference.
+	for importPath := range p.Imports {
+		if unit.Owns(importPath) {
+			module.RequireInitEdge(importPath)
+		}
+	}
 	body, err := emit.Package(module, emit.Decls{
 		InitCalls:    initCalls,
 		Structs:      structList,
