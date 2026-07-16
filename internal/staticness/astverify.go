@@ -43,15 +43,35 @@ const files = [];
   }
 })(root);
 
+// A real whole-program verifier: the pinned compiler builds a Program,
+// its TypeChecker resolves every symbol, aliases are followed via
+// getAliasedSymbol, and every invocation must receive a positive
+// disposition — an unresolvable or erased-typed callee is a violation.
+const program = ts.createProgram(files, {
+  target: ts.ScriptTarget.ES2022,
+  module: ts.ModuleKind.ESNext,
+  moduleResolution: ts.ModuleResolutionKind.Bundler,
+  strict: true,
+  noEmit: true,
+  allowImportingTsExtensions: true,
+});
+const checker = program.getTypeChecker();
+
 const violations = [];
 const mechanisms = {};
-const mechanismSymbols = {
-  "slice-carrier": ["GoSlice", "goSliceFrom", "goSliceMake", "goSliceMakeStruct", "goNativeMakeLen", "goNativeMakeCap"],
-  "pointer-cell": ["GoCell"],
-  "interface-box": ["goIfaceBox", "GoIface", "GoIfaceBox", "goRttiComposite"],
-  "keyed-map": ["GoKeyedMap", "goKMapGet", "goKMapSet", "goKMapValues"],
+const mechanismByFile = {
+  "goslice.ts": "slice-carrier",
+  "goiface.ts": "interface-box",
 };
-const bannedIdentifiers = new Set([
+const mechanismBySymbol = {
+  "GoCell": "pointer-cell",
+  "goKeyed": "keyed-map",
+  "GoKeyedMap": "keyed-map",
+  "goKMapGet": "keyed-map",
+  "goKMapSet": "keyed-map",
+  "goKMapValues": "keyed-map",
+};
+const bannedNames = new Set([
   "goIfaceCall", "goFuncInvoke", "goExternalCall", "goExternalRegister", "eval",
 ]);
 
@@ -65,19 +85,45 @@ function report(file, node, source, pattern) {
   });
 }
 
+// resolve follows import and local aliases to the original symbol.
+function resolveSymbol(node) {
+  let symbol = checker.getSymbolAtLocation(node);
+  if (!symbol) return undefined;
+  while (symbol.flags & ts.SymbolFlags.Alias) {
+    const next = checker.getAliasedSymbol(symbol);
+    if (!next || next === symbol) break;
+    symbol = next;
+  }
+  // A const initialized from another symbol: follow the initializer.
+  const decl = symbol.valueDeclaration;
+  if (decl && ts.isVariableDeclaration(decl) && decl.initializer &&
+      (ts.isIdentifier(decl.initializer) || ts.isPropertyAccessExpression(decl.initializer))) {
+    const target = resolveSymbol(ts.isIdentifier(decl.initializer) ? decl.initializer : decl.initializer.name);
+    if (target) return target;
+  }
+  return symbol;
+}
+
+function declaringFile(symbol) {
+  const decls = symbol.getDeclarations();
+  if (!decls || decls.length === 0) return undefined;
+  return decls[0].getSourceFile().fileName;
+}
+
 function isFunctionTypeName(node) {
   return ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName) && node.typeName.text === "Function";
 }
 
-for (const file of files) {
-  const text = fs.readFileSync(file, "utf8");
-  const source = ts.createSourceFile(file, text, ts.ScriptTarget.ES2022, true);
+for (const source of program.getSourceFiles()) {
+  const file = source.fileName;
+  if (!file.startsWith(root) || file.endsWith(".d.ts")) continue;
+  if (file.endsWith("verify.cjs")) continue;
   const relative = path.relative(root, file).split(path.sep).join("/");
   const seenMechanisms = new Set();
   (function walk(node) {
-    // Call through a computed member: obj[expr](...) or obj[expr].call/.apply.
     if (ts.isCallExpression(node)) {
       const callee = node.expression;
+      // Computed-member invocation is name-selected dispatch.
       if (ts.isElementAccessExpression(callee)) {
         report(file, node, source, "computed-member-call");
       }
@@ -88,28 +134,38 @@ for (const file of files) {
       ) {
         report(file, node, source, "computed-member-call");
       }
-      if (ts.isIdentifier(callee) && bannedIdentifiers.has(callee.text)) {
-        report(file, node, source, "erased-dispatch-helper");
-      }
-      if (ts.isPropertyAccessExpression(callee) && bannedIdentifiers.has(callee.name.text)) {
-        report(file, node, source, "erased-dispatch-helper");
+      // Symbol-resolved ban: follows aliases, so ` + "`" + `const g = goIfaceCall;
+      // g(...)` + "`" + ` is caught by the resolved symbol's name.
+      const nameNode = ts.isPropertyAccessExpression(callee) ? callee.name
+        : ts.isIdentifier(callee) ? callee : undefined;
+      if (nameNode) {
+        const symbol = resolveSymbol(nameNode);
+        if (symbol && bannedNames.has(symbol.getName())) {
+          report(file, node, source, "erased-dispatch-helper");
+        }
+        // Positive disposition: the callee's type must be a concrete
+        // callable — any/unknown/Function-typed callees are erased.
+        const calleeType = checker.getTypeAtLocation(callee);
+        const nonNull = calleeType.getNonNullableType();
+        if (nonNull.getCallSignatures().length === 0 && !(nonNull.getFlags() & ts.TypeFlags.Never)) {
+          const display = checker.typeToString(nonNull);
+          if (display === "any" || display === "unknown" || display === "Function") {
+            report(file, node, source, "erased-callee-type");
+          }
+        }
       }
     }
-    // new Proxy(...) / new Function(...).
     if (ts.isNewExpression(node) && ts.isIdentifier(node.expression)) {
       if (node.expression.text === "Proxy" || node.expression.text === "Function") {
         report(file, node, source, "reflection-construct");
       }
     }
-    // Reflect.* usage.
     if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "Reflect") {
       report(file, node, source, "reflection-construct");
     }
-    // Erased Function type in any type position.
     if (isFunctionTypeName(node)) {
       report(file, node, source, "erased-function-type");
     }
-    // Record<string, Function> / Map<string, Function> registries.
     if (ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName)) {
       const name = node.typeName.text;
       if ((name === "Record" || name === "Map") && node.typeArguments && node.typeArguments.length === 2) {
@@ -119,10 +175,22 @@ for (const file of files) {
         }
       }
     }
-    // Mechanism identifiers (typed usage evidence for necessity records).
+    // Mechanism detection by RESOLVED symbol: a use site counts only
+    // when the symbol's declaring file is the ABI module — a local
+    // declaration named like an ABI symbol never counts, and an
+    // imported alias always does. The ABI's own definitions are not
+    // use sites.
     if (ts.isIdentifier(node)) {
-      for (const [mechanism, symbols] of Object.entries(mechanismSymbols)) {
-        if (symbols.includes(node.text)) seenMechanisms.add(mechanism);
+      const symbol = resolveSymbol(node);
+      if (symbol) {
+        const declared = declaringFile(symbol);
+        if (declared && declared !== file && declared.startsWith(root)) {
+          const base = path.basename(declared);
+          const byFile = mechanismByFile[base];
+          if (byFile) seenMechanisms.add(byFile);
+          const bySymbol = mechanismBySymbol[symbol.getName()];
+          if (bySymbol && base.startsWith("go")) seenMechanisms.add(bySymbol);
+        }
       }
     }
     ts.forEachChild(node, walk);

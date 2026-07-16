@@ -54,10 +54,105 @@ function h(i: unknown) {
 	}
 }
 
+// TestASTVerifierFollowsAliases proves the symbol-resolved walk catches
+// an aliased banned helper — the audit's exact bypass:
+// const invoke = goIfaceCall; invoke(box, "Read", args).
+func TestASTVerifierFollowsAliases(t *testing.T) {
+	files := map[string]string{
+		"language-abi/legacy.ts": `
+export function goIfaceCall(i: unknown, m: string, a: unknown[]): unknown {
+  return undefined;
+}
+`,
+		"core/pkg/package.ts": `
+import { goIfaceCall } from "../../language-abi/legacy.ts";
+const invoke = goIfaceCall;
+export function f(box: unknown): unknown {
+  return invoke(box, "Read", []);
+}
+`,
+	}
+	report, err := VerifyAST(files, typescriptDir(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	caught := false
+	for _, v := range report.Violations {
+		if v.Pattern == "erased-dispatch-helper" && v.File == "core/pkg/package.ts" {
+			caught = true
+		}
+	}
+	if !caught {
+		t.Errorf("aliased banned-helper invocation not caught: %+v", report.Violations)
+	}
+}
+
+// TestASTVerifierMechanismBySymbolResolution proves mechanism discovery
+// derives from resolved declaring files, not identifier text: a local
+// declaration named goIfaceBox is not a mechanism use, while an imported
+// ABI symbol is, and the ABI's own definition is not a use site.
+func TestASTVerifierMechanismBySymbolResolution(t *testing.T) {
+	files := map[string]string{
+		"language-abi/goslice.ts": `
+export class GoSlice<T> { constructor(readonly backing: T[]) {} }
+export function goSliceFrom<T>(v: T[]): GoSlice<T> { return new GoSlice(v); }
+`,
+		"core/user/package.ts": `
+import { goSliceFrom } from "../../language-abi/goslice.ts";
+export const s = goSliceFrom([1n]);
+`,
+		"core/localname/package.ts": `
+function goIfaceBox(x: number): number { return x; }
+export const y = goIfaceBox(1);
+`,
+	}
+	report, err := VerifyAST(files, typescriptDir(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	users := report.Mechanisms["slice-carrier"]
+	if len(users) != 1 || users[0] != "core/user/package.ts" {
+		t.Errorf("slice-carrier use sites = %v; want exactly the importing module", users)
+	}
+	if len(report.Mechanisms["interface-box"]) != 0 {
+		t.Errorf("local goIfaceBox declaration must not register a mechanism: %v", report.Mechanisms)
+	}
+}
+
+// TestASTVerifierErasedCalleeType proves an any-typed callee (erased
+// dispatch through a value) receives no positive disposition.
+func TestASTVerifierErasedCalleeType(t *testing.T) {
+	files := map[string]string{
+		"core/pkg/package.ts": `
+export function f(dispatch: any): unknown {
+  return dispatch("method", []);
+}
+`,
+	}
+	report, err := VerifyAST(files, typescriptDir(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	caught := false
+	for _, v := range report.Violations {
+		if v.Pattern == "erased-callee-type" {
+			caught = true
+		}
+	}
+	if !caught {
+		t.Errorf("any-typed callee not rejected: %+v", report.Violations)
+	}
+}
+
 // TestASTVerifierPassesDirectCode proves clean generated shapes carry
 // zero verdicts and mechanism detection is identifier-resolved.
 func TestASTVerifierPassesDirectCode(t *testing.T) {
 	files := map[string]string{
+		"language-abi/goslice.ts": `
+export class GoSlice<T> { constructor(readonly backing: T[]) {} }
+export function goSliceFrom<T>(v: T[]): GoSlice<T> { return new GoSlice(v); }
+export function goSliceLen<T>(s: GoSlice<T>): bigint { return BigInt(s.backing.length); }
+`,
 		"core/pkg/package.ts": `
 import * as gosl$ from "../../language-abi/goslice.js";
 export function f(): bigint {
