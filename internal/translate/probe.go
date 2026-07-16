@@ -23,8 +23,15 @@ import (
 // diagnostic evidence for roadmap ordering — never authoritative
 // generation, which requires complete package coverage.
 type ProbeResult struct {
-	Packages int `json:"packages"`
-	Bodies   int `json:"bodies"`
+	// Diagnostic marks this report as a development probe, never
+	// acceptance evidence: it carries no body ledger or manifest and is
+	// not gate output.
+	Diagnostic bool `json:"diagnostic"`
+	// SourceRevision and ProfileHash attest the probed inputs.
+	SourceRevision string `json:"sourceRevision,omitempty"`
+	ProfileHash    string `json:"profileHash,omitempty"`
+	Packages       int    `json:"packages"`
+	Bodies         int    `json:"bodies"`
 	// IRAdmitted counts bodies with complete typed semantic IR — the
 	// ir-admitted evidence stage. It is NOT module-retained coverage: a
 	// body can be ir-admitted yet removed from every runnable module by
@@ -64,6 +71,9 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 	}
 
 	result := &ProbeResult{
+		Diagnostic:         true,
+		SourceRevision:     prof.Pin.Revision,
+		ProfileHash:        prof.Hash,
 		BlockerHistogram:   map[string]int{},
 		ConstructHistogram: map[string]int{},
 		PerPackage:         map[string]string{},

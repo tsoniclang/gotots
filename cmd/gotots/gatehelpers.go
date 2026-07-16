@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime/debug"
 	"sort"
 	"strings"
 
@@ -252,4 +253,24 @@ func committedTestFunctions(repoDir string) (map[string]bool, error) {
 		return nil
 	})
 	return index, err
+}
+
+// binaryBuildProvenance reads the executing binary's VCS stamp: the
+// revision it was built from and whether the tree was modified. Empty
+// when the build carries no stamp (e.g. go run of a dirty local tree
+// without VCS info).
+func binaryBuildProvenance() (revision string, modified bool) {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "", false
+	}
+	for _, setting := range info.Settings {
+		switch setting.Key {
+		case "vcs.revision":
+			revision = setting.Value
+		case "vcs.modified":
+			modified = setting.Value == "true"
+		}
+	}
+	return revision, modified
 }

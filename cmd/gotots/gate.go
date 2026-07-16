@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/sha256"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -10,7 +9,6 @@ import (
 	"sort"
 	"strings"
 
-	"encoding/hex"
 	"github.com/tsoniclang/gotots/contracts"
 	"github.com/tsoniclang/gotots/internal/census"
 	"github.com/tsoniclang/gotots/internal/goenv"
@@ -90,6 +88,22 @@ func runGate(args []string) error {
 	implementationRevision, err := runInRepo(*repoDir, "git", "rev-parse", "HEAD")
 	if err != nil {
 		return fmt.Errorf("resolve implementation revision: %w", err)
+	}
+	// The executing binary attests its own build provenance: a stale or
+	// locally built binary cannot silently label its report with the
+	// checkout revision. `go run`/`go test` builds carry VCS stamping
+	// when built inside the repository; a binary whose stamped revision
+	// disagrees with the checkout fails closed.
+	binaryRevision, binaryModified := binaryBuildProvenance()
+	if binaryRevision != "" {
+		if binaryRevision != implementationRevision {
+			return fmt.Errorf("executing binary was built from %s but the checkout is %s; rebuild before gating", binaryRevision, implementationRevision)
+		}
+		if binaryModified {
+			// The clean-tree stage will fail too, but the provenance
+			// mismatch is reported at the source.
+			fmt.Fprintln(os.Stderr, "gate: executing binary was built from a modified tree")
+		}
 	}
 	specificationDigest, err := digestFile(filepath.Join(*repoDir, "docs", "spec", "manifest.json"))
 	if err != nil {
@@ -201,6 +215,16 @@ func runGate(args []string) error {
 		if err != nil {
 			return "fail", nil, err
 		}
+		// The census subsystem itself marks a run with blockers
+		// (contradictory evidence, unknown directives) non-authoritative;
+		// no later stage may pass over it.
+		if len(firstRun.Report.Blockers) > 0 {
+			details := firstRun.Report.Blockers
+			if len(details) > 20 {
+				details = append(details[:20], fmt.Sprintf("... and %d more", len(firstRun.Report.Blockers)-20))
+			}
+			return "fail", details, fmt.Errorf("census recorded %d blockers; the run is non-authoritative", len(firstRun.Report.Blockers))
+		}
 		report.Inputs.SourceRevision = firstRun.Report.Pin.Revision
 		report.Inputs.ProfileSha256 = firstRun.Report.Profile.Hash
 		report.Inputs.GoVersion = firstRun.Report.Pin.Toolchain.Version
@@ -304,45 +328,7 @@ func runGate(args []string) error {
 		return "pass", details, nil
 	})
 	run("05-declaration-signature-type-completeness", func() (string, []string, error) {
-		if firstRun == nil || firstRun.Shapes == nil || corpusGenerated == nil {
-			return "blocked", []string{"census shapes or corpus generation did not run"}, nil
-		}
-		// Independent verification: the census's frontend pass spelled
-		// every declaration's canonical signature; each generated
-		// function's proof hash must match the census spelling exactly.
-		censusSignature := map[string]string{}
-		for _, shape := range firstRun.Shapes.Functions {
-			digest := sha256.Sum256([]byte(shape.Signature))
-			censusSignature[shape.ID] = hex.EncodeToString(digest[:])
-		}
-		verified, missing := 0, 0
-		var mismatches []string
-		for _, proof := range corpusGenerated.Proofs {
-			if proof.SignatureHash == "" {
-				continue // types and variables carry no function signature
-			}
-			expected, has := censusSignature[proof.ID]
-			if !has {
-				missing++
-				if len(mismatches) < 10 {
-					mismatches = append(mismatches, "no census shape for "+proof.ID)
-				}
-				continue
-			}
-			if expected != proof.SignatureHash {
-				if len(mismatches) < 10 {
-					mismatches = append(mismatches, "signature drift at "+proof.ID)
-				}
-				continue
-			}
-			verified++
-		}
-		if len(mismatches) > 0 {
-			return "fail", mismatches, fmt.Errorf("%d signature identities failed independent verification", len(mismatches))
-		}
-		return "pass", []string{
-			fmt.Sprintf("function and method signatures independently verified against the census spelling: %d", verified),
-		}, nil
+		return runSignatureCompletenessGate(firstRun, corpusGenerated)
 	})
 	run("06-semantic-ir-operation-class-completeness", func() (string, []string, error) {
 		if corpusGenerated == nil {
@@ -426,13 +412,27 @@ func runGate(args []string) error {
 		// proved plan stability. Here the selections themselves are
 		// verified: a native selection may appear only with the direct
 		// lowering evidence, never alongside carrier operations.
+		// Every recorded representation selection must be a member of the
+		// closed candidate set — an unknown candidate is forged or drifted
+		// evidence, rejected rather than counted.
+		validCandidates := map[string]bool{"native-array": true, "goslice-carrier": true}
 		planned := map[string]int{}
+		var invalid []string
 		for _, proof := range corpusGenerated.Proofs {
 			for key, value := range proof.Representations {
 				if len(key) > 12 && key[:12] == "slice-local:" {
+					if !validCandidates[value] {
+						if len(invalid) < 10 {
+							invalid = append(invalid, fmt.Sprintf("%s %s: unknown candidate %q", proof.ID, key, value))
+						}
+						continue
+					}
 					planned[value]++
 				}
 			}
+		}
+		if len(invalid) > 0 {
+			return "fail", invalid, fmt.Errorf("representation evidence names candidates outside the closed set")
 		}
 		if planned["native-array"]+planned["goslice-carrier"] == 0 {
 			return "blocked", []string{"no slice regions recorded; planner evidence missing"}, nil
@@ -489,10 +489,9 @@ func runGate(args []string) error {
 			return "fail", problems, fmt.Errorf("%d necessity-record defects", len(problems))
 		}
 		details := []string{
-			fmt.Sprintf("slice regions planned: native-array %d, goslice-carrier %d",
+			fmt.Sprintf("slice regions planned within the closed candidate set: native-array %d, goslice-carrier %d",
 				planned["native-array"], planned["goslice-carrier"]),
-			fmt.Sprintf("custom mechanisms with verified necessity records: %v", present),
-			"remaining families (pointers, interfaces, strings, maps) plan through their reviewed single candidates",
+			fmt.Sprintf("custom mechanisms with verified necessity records (AST-derived): %v", present),
 		}
 		return "pass", details, nil
 	})
