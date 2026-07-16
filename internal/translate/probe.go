@@ -60,6 +60,10 @@ type ProbeResult struct {
 	// ExternalRefs counts blocked references per external function or
 	// method (pkg.Name) — the evidence ranking emulation-layer priorities.
 	ExternalRefs map[string]int `json:"externalRefs"`
+	// PerBodyState maps each body's canonical identity to its probe
+	// classification ("generated" or "unimplemented"), the join key for
+	// reconciling probe results against corpus support ledgers.
+	PerBodyState map[string]string `json:"perBodyState"`
 }
 
 // Probe loads the owned corpus under the profile and attempts IR building
@@ -72,6 +76,7 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 
 	result := &ProbeResult{
 		Diagnostic:         true,
+		PerBodyState:       map[string]string{},
 		SourceRevision:     prof.Pin.Revision,
 		ProfileHash:        prof.Hash,
 		BlockerHistogram:   map[string]int{},
@@ -131,6 +136,7 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 				if err != nil {
 					return nil, err
 				}
+				result.PerBodyState[function.ID] = string(function.Support)
 				if function.Support == ir.SupportUnimplemented {
 					result.Blocked++
 					for _, site := range function.Sites {
@@ -203,6 +209,17 @@ func probeFunc(p *packages.Package, sourceDir string, unit ir.Scope, source []by
 	id := goid.Func(p.PkgPath, decl.Name.Name)
 	if decl.Recv != nil {
 		id = goid.Method(p.PkgPath, receiverBase(decl.Recv), decl.Name.Name)
+	} else if goid.IsRepeatable("func", decl.Name.Name) {
+		// init and blank functions repeat legally: their identities are
+		// position-qualified, exactly like the census and the corpus, so
+		// probe and corpus classifications join one-to-one.
+		filename := p.Fset.Position(decl.Pos()).Filename
+		relative, err := filepath.Rel(sourceDir, filename)
+		if err != nil {
+			return nil, err
+		}
+		position := p.Fset.Position(decl.Name.Pos())
+		id = goid.Repeatable(p.PkgPath, "func", decl.Name.Name, filepath.ToSlash(relative), position.Line, position.Column)
 	}
 	return ir.BuildFunc(p, sourceDir, unit, decl, id, hex.EncodeToString(digest[:]))
 }
