@@ -157,6 +157,7 @@ func analyze(prof *profile.Profile, inv *inventory.Inventory, tree *pinning.Tree
 			shapes.Constants = append(shapes.Constants, stats.constShapes...)
 			shapes.Variables = append(shapes.Variables, stats.varShapes...)
 			shapes.Aliases = append(shapes.Aliases, stats.aliasShapes...)
+			shapes.FunctionLiterals = append(shapes.FunctionLiterals, stats.funcLitShapes...)
 			for object, owner := range stats.externalObjects {
 				reference := externalObjects[object]
 				if reference == nil {

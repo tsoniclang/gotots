@@ -68,6 +68,19 @@ type ConstShape struct {
 type VarShape struct {
 	ID   string `json:"id"`
 	Type string `json:"type"`
+	// InitializerHash is the sha256 of the initializer expression's exact
+	// source bytes when an initializer exists — the identity-bearing
+	// evidence the specification requires for initializer bodies.
+	InitializerHash string `json:"initializerHash,omitempty"`
+}
+
+// FuncLitShape is one function literal: an independent implementation
+// unit with canonical identity (position-qualified inside its parent
+// declaration) and exact body hash.
+type FuncLitShape struct {
+	ID       string `json:"id"`
+	Parent   string `json:"parent"` // the enclosing declaration's ID
+	BodyHash string `json:"bodyHash"`
 }
 
 // AliasShape is one type alias and its target.
@@ -85,6 +98,9 @@ type DeclarationShapes struct {
 	Constants     []ConstShape    `json:"constants"`
 	Variables     []VarShape      `json:"variables"`
 	Aliases       []AliasShape    `json:"aliases"`
+	// FunctionLiterals are the independent function-literal units of
+	// production scope, each with canonical identity and body hash.
+	FunctionLiterals []FuncLitShape `json:"functionLiterals"`
 }
 
 // ExternalObligation is one external object referenced by owned source: a

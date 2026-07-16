@@ -82,6 +82,7 @@ func sortShapes(shapes *DeclarationShapes) {
 	sort.Slice(shapes.Constants, func(i, j int) bool { return shapes.Constants[i].ID < shapes.Constants[j].ID })
 	sort.Slice(shapes.Variables, func(i, j int) bool { return shapes.Variables[i].ID < shapes.Variables[j].ID })
 	sort.Slice(shapes.Aliases, func(i, j int) bool { return shapes.Aliases[i].ID < shapes.Aliases[j].ID })
+	sort.Slice(shapes.FunctionLiterals, func(i, j int) bool { return shapes.FunctionLiterals[i].ID < shapes.FunctionLiterals[j].ID })
 }
 
 // deriveDeclarationAggregates computes every DeclCounts/Bodies/Statements

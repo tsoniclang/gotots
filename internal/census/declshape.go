@@ -29,6 +29,32 @@ func collectDeclarations(p *packages.Package, file *ast.File, relativePath, scop
 	lineOf := func(pos token.Pos) int { return fset.Position(pos).Line }
 	colOf := func(pos token.Pos) int { return fset.Position(pos).Column }
 
+	// Every function literal in production scope is an independent
+	// implementation unit: canonical position-qualified identity inside
+	// its parent declaration, with the exact body hash.
+	collectFuncLits := func(parentID string, node ast.Node) {
+		if scopeName != "production" {
+			return
+		}
+		ast.Inspect(node, func(n ast.Node) bool {
+			lit, ok := n.(*ast.FuncLit)
+			if !ok {
+				return true
+			}
+			position := fset.Position(lit.Pos())
+			id := goid.Repeatable(pkgPath, "funclit", "", relativePath, position.Line, position.Column)
+			start := fset.Position(lit.Body.Pos()).Offset
+			end := fset.Position(lit.Body.End()).Offset
+			bodyHash := ""
+			if start >= 0 && end <= len(source) && start < end {
+				digest := sha256.Sum256(source[start:end])
+				bodyHash = hex.EncodeToString(digest[:])
+			}
+			stats.funcLitShapes = append(stats.funcLitShapes, FuncLitShape{ID: id, Parent: parentID, BodyHash: bodyHash})
+			return true
+		})
+	}
+
 	declare := func(kind, name, receiver string, node ast.Node, namePos token.Pos, body *ast.BlockStmt) (string, error) {
 		declaration := DeclarationRecord{
 			Package:   pkgPath,
@@ -90,6 +116,9 @@ func collectDeclarations(p *packages.Package, file *ast.File, relativePath, scop
 			if err := shapeFunction(info, d, id, stats); err != nil {
 				return err
 			}
+			if d.Body != nil {
+				collectFuncLits(id, d.Body)
+			}
 			// The go test discovery contract applies only to functions
 			// declared in _test.go files (the toolchain's documented
 			// test-file rule), never to test-support production files.
@@ -104,13 +133,28 @@ func collectDeclarations(p *packages.Package, file *ast.File, relativePath, scop
 					if d.Tok == token.CONST {
 						kind = "const"
 					}
-					for _, name := range s.Names {
+					for i, name := range s.Names {
 						id, err := declare(kind, name.Name, "", s, name.Pos(), nil)
 						if err != nil {
 							return err
 						}
-						if err := shapeValue(info, name, kind, id, stats); err != nil {
+						initializerHash := ""
+						if kind == "var" && i < len(s.Values) {
+							// The initializer's exact source bytes are
+							// identity-bearing evidence for the
+							// initialization body.
+							start := fset.Position(s.Values[i].Pos()).Offset
+							end := fset.Position(s.Values[i].End()).Offset
+							if start >= 0 && end <= len(source) && start < end {
+								digest := sha256.Sum256(source[start:end])
+								initializerHash = hex.EncodeToString(digest[:])
+							}
+						}
+						if err := shapeValue(info, name, kind, id, initializerHash, stats); err != nil {
 							return err
+						}
+						if kind == "var" && i < len(s.Values) {
+							collectFuncLits(id, s.Values[i])
 						}
 					}
 				case *ast.TypeSpec:
@@ -156,7 +200,7 @@ func shapeFunction(info *types.Info, d *ast.FuncDecl, id string, stats *fileStat
 	return nil
 }
 
-func shapeValue(info *types.Info, name *ast.Ident, kind, id string, stats *fileStats) error {
+func shapeValue(info *types.Info, name *ast.Ident, kind, id, initializerHash string, stats *fileStats) error {
 	object := info.Defs[name]
 	if object == nil {
 		return fmt.Errorf("declaration %s has no typed definition", id)
@@ -173,7 +217,7 @@ func shapeValue(info *types.Info, name *ast.Ident, kind, id string, stats *fileS
 		})
 		return nil
 	}
-	stats.varShapes = append(stats.varShapes, VarShape{ID: id, Type: typeString(object.Type())})
+	stats.varShapes = append(stats.varShapes, VarShape{ID: id, Type: typeString(object.Type()), InitializerHash: initializerHash})
 	return nil
 }
 

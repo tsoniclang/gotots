@@ -48,6 +48,15 @@ type BodySupport struct {
 	Sites   []ir.UnsupportedSite `json:"sites,omitempty"`
 }
 
+// FuncLitSupport is one function literal's independent disposition.
+type FuncLitSupport struct {
+	ID       string `json:"id"`
+	Parent   string `json:"parent"`
+	Package  string `json:"package"`
+	BodyHash string `json:"bodyHash"`
+	State    string `json:"state"`
+}
+
 // Generated is one deterministic translation result. Packages whose
 // dependency closure contains an unimplemented unit are withheld from
 // runnable output; their analysis records remain.
@@ -61,6 +70,11 @@ type Generated struct {
 	Support []BodySupport
 	// Withheld maps package path -> reason runnable output is withheld.
 	Withheld map[string]string
+	// FuncLits is the independent function-literal ledger: each literal's
+	// canonical identity with its own support disposition, derived from
+	// whether any unsupported site falls within the literal's span, and
+	// its withholding linkage through the parent's package.
+	FuncLits []FuncLitSupport
 	// ModuleImports maps each package path to the co-generated packages
 	// its emitted module actually imports (symbol references, including
 	// interface-dispatch branch targets, plus init edges). Withholding

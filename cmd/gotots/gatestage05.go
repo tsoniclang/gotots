@@ -105,11 +105,48 @@ func runSignatureCompletenessGate(firstRun *census.Result, corpusGenerated *tran
 		}
 		return "fail", compact, fmt.Errorf("%d census identities failed independent signature verification", n)
 	}
+	// Function literals: every census funclit shape must join to exactly
+	// one translate disposition with the identical body hash — the
+	// independent-unit ledger the specification requires.
+	litStates := map[string]translate.FuncLitSupport{}
+	for _, lit := range corpusGenerated.FuncLits {
+		if _, dup := litStates[lit.ID]; dup {
+			defects = append(defects, "duplicate funclit disposition "+lit.ID)
+		}
+		litStates[lit.ID] = lit
+	}
+	litJoined, litUnimplemented := 0, 0
+	for _, shape := range firstRun.Shapes.FunctionLiterals {
+		lit, has := litStates[shape.ID]
+		if !has {
+			defects = append(defects, "no funclit disposition for census shape "+shape.ID)
+			continue
+		}
+		if lit.BodyHash != shape.BodyHash {
+			defects = append(defects, "funclit body-hash drift at "+shape.ID)
+			continue
+		}
+		if lit.State == "unimplemented" {
+			litUnimplemented++
+		}
+		litJoined++
+		delete(litStates, shape.ID)
+	}
+	for id := range litStates {
+		defects = append(defects, "orphan funclit disposition (no census shape): "+id)
+	}
+	if len(defects) > 0 {
+		if len(defects) > 15 {
+			defects = defects[:15]
+		}
+		return "fail", defects, fmt.Errorf("function-literal ledger failed the identity join")
+	}
 	return "pass", []string{
 		fmt.Sprintf("census production function/method denominator: %d", denominator),
 		fmt.Sprintf("signatures independently verified against the census spelling: %d", verified),
 		fmt.Sprintf("explicit unimplemented records: %d", unimplementedCount),
 		fmt.Sprintf("orphan proofs: %d", orphans),
+		fmt.Sprintf("function literals joined by identity and body hash: %d (%d unimplemented)", litJoined, litUnimplemented),
 	}, nil
 }
 

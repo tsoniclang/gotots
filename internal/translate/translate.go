@@ -95,17 +95,19 @@ func Packages(pkgs []*packages.Package, sourceDir string, options Options) (*Gen
 	return out, nil
 }
 
+// fileSource pairs one production file's AST with its exact source.
+type fileSource struct {
+	file     *ast.File
+	relative string
+	source   []byte
+}
+
 // translatePackage translates one unit package into its generated module.
 // Declarations are collected in two passes — types first, then functions
 // and methods — so a method may precede its receiver type in file order.
 func translatePackage(out *Generated, p *packages.Package, sourceDir string, unit ir.Scope, options Options) error {
 	corePath := path.Join("core", p.PkgPath, "package.ts")
 
-	type fileSource struct {
-		file     *ast.File
-		relative string
-		source   []byte
-	}
 	var files []fileSource
 	for _, file := range p.Syntax {
 		filename := p.Fset.Position(file.Pos()).Filename
@@ -425,6 +427,9 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 		}
 	}
 	out.Support = append(out.Support, ledger...)
+	// The function-literal ledger covers EVERY package — withheld ones
+	// included: analysis dispositions exist regardless of emission.
+	out.FuncLits = append(out.FuncLits, packageFuncLits(p, sourceDir, files, ledger)...)
 	if unimplementedUnits > 0 {
 		out.Withheld[p.PkgPath] = fmt.Sprintf("%d unimplemented units", unimplementedUnits)
 		return nil

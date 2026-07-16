@@ -20,6 +20,7 @@ type fileStats struct {
 	constShapes     []ConstShape
 	varShapes       []VarShape
 	aliasShapes     []AliasShape
+	funcLitShapes   []FuncLitShape
 	testFunctions   []TestFunctionRecord
 	externalUses    map[string]*ExternalObligation
 	externalObjects map[types.Object]string // object -> field-owner qualifier ("" otherwise)

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"go/ast"
+	"go/token"
 	"go/types"
 
 	"golang.org/x/tools/go/packages"
@@ -114,4 +115,114 @@ func receiverBase(recv *ast.FieldList) string {
 			return ""
 		}
 	}
+}
+
+// packageFuncLits derives the independent disposition of every
+// production function literal in the package: canonical identity and
+// body hash exactly as the census records them, state from the
+// enclosing unit's outcome — an unsupported site within the literal's
+// span, or a declaration-level rejection of the parent, is
+// unimplemented; everything else is generated.
+func packageFuncLits(p *packages.Package, sourceDir string, files []fileSource, ledger []BodySupport) []FuncLitSupport {
+	sitesByID := map[string][]ir.UnsupportedSite{}
+	stateByID := map[string]ir.SupportState{}
+	for _, support := range ledger {
+		sitesByID[support.ID] = support.Sites
+		stateByID[support.ID] = support.State
+	}
+	var out []FuncLitSupport
+	for _, f := range files {
+		for _, decl := range f.file.Decls {
+			parentID, parentState, parentSites := declOutcome(p, f.relative, decl, stateByID, sitesByID)
+			if parentID == "" {
+				continue
+			}
+			ast.Inspect(decl, func(n ast.Node) bool {
+				lit, ok := n.(*ast.FuncLit)
+				if !ok {
+					return true
+				}
+				position := p.Fset.Position(lit.Pos())
+				id := goid.Repeatable(p.PkgPath, "funclit", "", f.relative, position.Line, position.Column)
+				startPos := p.Fset.Position(lit.Body.Pos())
+				endPos := p.Fset.Position(lit.Body.End())
+				bodyHash := ""
+				if startPos.Offset >= 0 && endPos.Offset <= len(f.source) && startPos.Offset < endPos.Offset {
+					digest := sha256.Sum256(f.source[startPos.Offset:endPos.Offset])
+					bodyHash = hex.EncodeToString(digest[:])
+				}
+				state := "generated"
+				if parentState == ir.SupportUnimplemented {
+					state = "unimplemented"
+					// A parent with site records may still have literals
+					// outside every unsupported span; only sites inside
+					// the literal make IT unimplemented. A parent with no
+					// sites (declaration-level rejection) blocks all.
+					if len(parentSites) > 0 {
+						state = "generated"
+						for _, site := range parentSites {
+							if site.Span.File == f.relative && site.Span.Line >= startPos.Line && site.Span.Line <= endPos.Line {
+								state = "unimplemented"
+								break
+							}
+						}
+					}
+				}
+				out = append(out, FuncLitSupport{ID: id, Parent: parentID, Package: p.PkgPath, BodyHash: bodyHash, State: state})
+				return true
+			})
+		}
+	}
+	return out
+}
+
+// declOutcome names a declaration's canonical identity and support
+// outcome for funclit-parent linkage. Declarations that carry no
+// production funclits (types, consts, imports) return "".
+func declOutcome(p *packages.Package, relativeFile string, decl ast.Decl, states map[string]ir.SupportState, sites map[string][]ir.UnsupportedSite) (string, ir.SupportState, []ir.UnsupportedSite) {
+	switch d := decl.(type) {
+	case *ast.FuncDecl:
+		if d.Body == nil {
+			return "", "", nil
+		}
+		id := goid.Func(p.PkgPath, d.Name.Name)
+		if d.Recv != nil {
+			id = goid.Method(p.PkgPath, receiverBase(d.Recv), d.Name.Name)
+		} else if goid.IsRepeatable("func", d.Name.Name) {
+			position := p.Fset.Position(d.Name.Pos())
+			id = goid.Repeatable(p.PkgPath, "func", d.Name.Name, relativeFile, position.Line, position.Column)
+		}
+		state, has := states[id]
+		if !has {
+			// A body with no ledger record was rejected at declaration
+			// level: everything inside is blocked.
+			state = ir.SupportUnimplemented
+		}
+		return id, state, sites[id]
+	case *ast.GenDecl:
+		if d.Tok != token.VAR {
+			return "", "", nil
+		}
+		// Package-variable initializers: the group links through the
+		// first named variable's identity; a var group whose translation
+		// failed has no proof, and its literals block.
+		for _, spec := range d.Specs {
+			valueSpec, ok := spec.(*ast.ValueSpec)
+			if !ok || len(valueSpec.Values) == 0 {
+				continue
+			}
+			name := valueSpec.Names[0]
+			id := goid.Value(p.PkgPath, "var", name.Name)
+			if name.Name == "_" {
+				position := p.Fset.Position(name.Pos())
+				id = goid.Repeatable(p.PkgPath, "var", "_", relativeFile, position.Line, position.Column)
+			}
+			state, has := states[id]
+			if !has {
+				state = ir.SupportGenerated
+			}
+			return id, state, sites[id]
+		}
+	}
+	return "", "", nil
 }
