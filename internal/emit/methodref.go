@@ -36,7 +36,7 @@ func (p *printer) printMethodValue(n *ir.MethodValue) (string, error) {
 	}
 	var call string
 	if n.Iface {
-		call = fmt.Sprintf("goif$.goIfaceCall($r, %q, [%s])", n.Method, joinComma(args))
+		call = fmt.Sprintf("goif$.goIfaceCall($r, %q, [%s])", n.DispatchKey, joinComma(args))
 		if call, err = p.castResults(call, n.Results); err != nil {
 			return "", err
 		}

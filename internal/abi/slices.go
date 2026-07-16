@@ -281,6 +281,17 @@ export function goSliceSetArray<T>(s: GoSliceValue<T[]>, index: GoIndex, value: 
   goArraySetAll(slice.backing[slice.offset + Number(index)] as T[], value, setElem);
 }
 
+// Element-wise equality in index order with a composed element
+// comparison (nested structs, arrays, and interfaces).
+export function goArrayEqualWith<T>(a: T[], b: T[], eq: (x: T, y: T) => boolean): boolean {
+  for (let index = 0; index < a.length; index++) {
+    if (!eq(a[index] as T, b[index] as T)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // Element-wise equality in index order for element carriers whose Go
 // equality is exact identity/scalar equality.
 export function goArrayEqual<T>(a: T[], b: T[]): boolean {

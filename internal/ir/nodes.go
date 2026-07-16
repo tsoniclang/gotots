@@ -90,8 +90,10 @@ type MapClearStmt struct {
 type PanicStmt struct {
 	Value Expr
 	// IsError formats the value through its dynamic Error method (the
-	// %v of an error), dispatched when the panic executes.
-	IsError bool
+	// %v of an error), dispatched when the panic executes; ErrorKey is
+	// that method's canonical dispatch identity.
+	IsError  bool
+	ErrorKey string
 }
 
 // TupleSpread forwards a multi-result call's values as the complete
@@ -351,10 +353,15 @@ type RttiRef struct {
 	// Composite is the canonical (path-qualified) type identity of a
 	// composite or external type, interned to one rtti object at
 	// runtime; Display is its runtime-message spelling; ExternID, when
-	// set, routes method dispatch through the external contracts.
+	// set, names the external contract the static method table covers.
 	Composite string
 	Display   string
 	ExternID  string
+	// CompositeEq states the composite's equality class:
+	// "uncomparable" (slices, maps, functions — Go panics),
+	// "identity" (pointers to unnamed types), "array-prim" (fixed
+	// arrays of === carriers), or "unknown" (fails closed).
+	CompositeEq string
 }
 
 // IfaceBox converts a concrete value into an interface value (struct
@@ -368,8 +375,11 @@ type IfaceBox struct {
 // IfaceCall invokes an interface method through the box's method table;
 // a nil interface panics with Go's exact message.
 type IfaceCall struct {
-	Recv    Expr
+	Recv Expr
+	// Method is the canonical dispatch identity (MethodKey); Display is
+	// the source spelling for diagnostics.
 	Method  string
+	Display string
 	Args    []Expr
 	Results []Type
 }

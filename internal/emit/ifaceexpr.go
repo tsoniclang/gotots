@@ -64,11 +64,11 @@ func (p *printer) printIfaceExpr(e ir.Expr) (string, bool, error) {
 		if err != nil {
 			return "", true, err
 		}
-		op := "==="
+		call := left + ".goEq$(" + right + ")"
 		if n.Negate {
-			op = "!=="
+			return "(!" + call + ")", true, nil
 		}
-		return "(" + left + ".goKey$() " + op + " " + right + ".goKey$())", true, nil
+		return call, true, nil
 	case *ir.IfaceEqual:
 		left, err := p.printExpr(n.L)
 		if err != nil {
@@ -97,8 +97,8 @@ func (p *printer) printIfaceExpr(e ir.Expr) (string, bool, error) {
 			return "", true, err
 		}
 		helper := "goIfaceEqualPrim"
-		if n.Form == "key" {
-			helper = "goIfaceEqualKey"
+		if n.Form == "via" {
+			helper = "goIfaceEqualVia"
 		}
 		var call string
 		if n.IfaceLeft {
@@ -117,11 +117,15 @@ func (p *printer) printIfaceExpr(e ir.Expr) (string, bool, error) {
 		if err != nil {
 			return "", true, err
 		}
-		methods := make([]string, len(n.Methods))
+		pairs := make([]string, len(n.Methods))
 		for i, method := range n.Methods {
-			methods[i] = fmt.Sprintf("%q", method)
+			display := method
+			if i < len(n.Displays) {
+				display = n.Displays[i]
+			}
+			pairs[i] = fmt.Sprintf("[%q, %q]", method, display)
 		}
-		list := "[" + joinComma(methods) + "]"
+		list := "[" + joinComma(pairs) + "]"
 		if n.CommaOk {
 			return fmt.Sprintf("goif$.goIfaceLookupIface(%s, %s)", x, list), true, nil
 		}

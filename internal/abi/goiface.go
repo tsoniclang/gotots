@@ -17,23 +17,33 @@ import { GoPanic, goPanicNil } from "./gopanic.js";
 // through the external-contract registry.
 export interface GoRtti {
   readonly d: string;
+  // m maps canonical method identities (name, unexported package
+  // qualifier, signature digest) onto statically selected functions —
+  // the exact method SET of this dynamic type (value and pointer types
+  // carry distinct tables).
   readonly m: Readonly<Record<string, Function>>;
-  readonly x?: string;
+  // c states comparability: true (equality defined), false (Go panics),
+  // or absent (unknown — external contract — equality fails closed).
+  readonly c?: boolean;
+  // e is the exact equality of a comparable non-primitive value type.
+  readonly e?: (a: unknown, b: unknown) => boolean;
   // p marks a pointer type: its boxed values compare by identity.
   readonly p?: boolean;
+  // x is an external type's canonical contract identity (diagnostics).
+  readonly x?: string;
 }
 
 // Composite and external rttis intern per canonical type identity, so
 // rtti comparison stays object identity across every module.
 const compositeRttis = new Map<string, GoRtti>();
 
-export function goRttiComposite(key: string, display: string, m: Readonly<Record<string, Function>>, externId: string | undefined): GoRtti {
-  let rtti = compositeRttis.get(key);
-  if (rtti === undefined) {
-    rtti = externId === undefined ? { d: display, m } : { d: display, m, x: externId };
+export function goRttiComposite(key: string, rtti: GoRtti): GoRtti {
+  let interned = compositeRttis.get(key);
+  if (interned === undefined) {
+    interned = rtti;
     compositeRttis.set(key, rtti);
   }
-  return rtti;
+  return interned;
 }
 
 // GoIfaceBox pairs the dynamic type with the concrete value.
@@ -66,11 +76,10 @@ export function goIfaceIs(i: GoIface, r: GoRtti): boolean {
   return i !== undefined && i.r === r;
 }
 
-// Interface equality: equal dynamic types and equal values. Pointer
-// dynamic values compare by identity; struct values with a canonical
-// key compare field-wise through it; every other object-carried
-// dynamic value has no reviewed equality yet and fails closed with a
-// stable diagnostic (Go panics only for genuinely uncomparable types).
+// Interface equality by Go's rule: equal dynamic types, then equal
+// values by that type's own equality. Uncomparable dynamic types panic
+// with Go's exact message; unknown (external) comparability fails
+// closed rather than guessing.
 export function goIfaceEqual(a: GoIface, b: GoIface): boolean {
   if (a === undefined || b === undefined) {
     return a === b;
@@ -86,26 +95,25 @@ export function goIfaceEqualPrim(i: GoIface, r: GoRtti, v: unknown): boolean {
   return i !== undefined && i.r === r && i.v === v;
 }
 
-// Interface-against-concrete equality through the canonical struct key.
-export function goIfaceEqualKey(i: GoIface, r: GoRtti, v: { goKey$(): string }): boolean {
-  return i !== undefined && i.r === r && (i.v as { goKey$(): string }).goKey$() === v.goKey$();
+// Interface-against-concrete equality through the dynamic type's own
+// exact equality (comparable structs and arrays).
+export function goIfaceEqualVia(i: GoIface, r: GoRtti, v: unknown): boolean {
+  return i !== undefined && i.r === r && (r.e as (a: unknown, b: unknown) => boolean)(i.v, v);
 }
 
 function ifaceValueEqual(r: GoRtti, a: unknown, b: unknown): boolean {
-  if (a === b) {
-    return true; // identity covers pointers and every equal primitive
+  if (r.c === false) {
+    throw new GoPanic("runtime error: comparing uncomparable type " + r.d);
   }
-  if (typeof a !== "object" || a === null || typeof b !== "object" || b === null) {
-    return false;
+  if (r.c === undefined) {
+    throw new GoPanic("GOTOTS_EXTERNAL_UNIMPLEMENTED: equality of " + (r.x ?? r.d));
   }
-  if (r.p === true) {
-    return false; // distinct pointer identities
+  if (r.e !== undefined) {
+    return r.e(a, b);
   }
-  const keyed = a as { goKey$?: () => string };
-  if (typeof keyed.goKey$ === "function") {
-    return keyed.goKey$() === (b as { goKey$(): string }).goKey$();
-  }
-  throw new GoPanic("GOTOTS_UNIMPLEMENTED: interface equality over " + r.d);
+  // Comparable without a value equality: primitive carriers and pointer
+  // identities, both exact under ===.
+  return a === b;
 }
 
 // x.(T), panic form: both messages name the static source interface.
@@ -122,7 +130,7 @@ export function goIfaceAssert(i: GoIface, r: GoRtti, sourceDisplay: string): unk
 // x.(I), interface-target panic form: the dynamic type must carry
 // every method of the target interface. External dynamic types cannot
 // prove their method sets statically, so they fail closed.
-export function goIfaceAssertIface(i: GoIface, methods: string[], sourceDisplay: string, targetDisplay: string): GoIfaceBox {
+export function goIfaceAssertIface(i: GoIface, methods: readonly (readonly [string, string])[], sourceDisplay: string, targetDisplay: string): GoIfaceBox {
   if (i === undefined) {
     throw new GoPanic("interface conversion: " + sourceDisplay + " is nil, not " + targetDisplay);
   }
@@ -134,22 +142,24 @@ export function goIfaceAssertIface(i: GoIface, methods: string[], sourceDisplay:
 }
 
 // x.(I), comma-ok form: undefined (the nil interface) fills the miss.
-export function goIfaceLookupIface(i: GoIface, methods: string[]): [GoIface, boolean] {
+export function goIfaceLookupIface(i: GoIface, methods: readonly (readonly [string, string])[]): [GoIface, boolean] {
   if (i === undefined || ifaceMissingMethod(i.r, methods) !== undefined) {
     return [undefined, false];
   }
   return [i, true];
 }
 
-function ifaceMissingMethod(rtti: GoRtti, methods: string[]): string | undefined {
-  for (const method of methods) {
-    if (rtti.m[method] === undefined) {
+// methods pairs the canonical dispatch identity with the source
+// spelling for the missing-method panic.
+function ifaceMissingMethod(rtti: GoRtti, methods: readonly (readonly [string, string])[]): string | undefined {
+  for (const [key, display] of methods) {
+    if (rtti.m[key] === undefined) {
       if (rtti.x !== undefined) {
         // The recorded external contract cannot prove the method's
         // absence; deciding either way would guess.
         throw new GoPanic("GOTOTS_EXTERNAL_UNIMPLEMENTED: method set of " + rtti.x);
       }
-      return method;
+      return display;
     }
   }
   return undefined;
@@ -164,7 +174,9 @@ export function goIfaceLookup<T>(i: GoIface, r: GoRtti, zero: T): readonly [T, b
 }
 
 function rtti(d: string): GoRtti {
-  return { d, m: {} };
+  // Every predeclared basic type is comparable, and === is its exact
+  // equality (floats keep NaN and signed-zero semantics).
+  return { d, c: true, m: {} };
 }
 
 // Predeclared types' rttis (methodless).

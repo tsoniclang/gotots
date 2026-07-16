@@ -179,10 +179,14 @@ func externTypeMembers(obligation *ir.ExternTypeObligation, unit ir.Scope, conte
 	for _, name := range names {
 		method := obligation.Methods[name]
 		signature := method.Type().(*types.Signature)
+		// The receiver arrives as the handle a caller holds: through a
+		// pointer it may be nil, and the implementation carries the
+		// concrete method's exact nil semantics.
+		recvType := ir.Type{Kind: ir.KindPointer, Go: "*" + typeID, Named: obligation.Name, Pkg: obligation.Pkg, Elem: &handle}
 		member := emit.StubMember{
 			ID:     typeID + "." + name,
 			Name:   obligation.Name + "$" + name,
-			Params: []ir.Var{{Name: "recv", Type: handle}},
+			Params: []ir.Var{{Name: "recv", Type: recvType}},
 		}
 		params := signature.Params()
 		for i := range params.Len() {

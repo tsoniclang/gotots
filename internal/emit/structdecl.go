@@ -150,6 +150,28 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 		p.line("}")
 	}
 
+	// Comparable structs carry goEq$: exact field-wise equality (floats
+	// keep NaN and signed-zero semantics under ===; interface fields may
+	// panic, exactly Go).
+	if structDecl.Comparable {
+		comparisons := make([]string, 0, len(structDecl.Fields))
+		for _, field := range structDecl.Fields {
+			comparison, err := p.eqComponent("this."+field.Name, "other."+field.Name, field.Type)
+			if err != nil {
+				return err
+			}
+			comparisons = append(comparisons, comparison)
+		}
+		if len(comparisons) == 0 {
+			comparisons = append(comparisons, "true")
+		}
+		p.line("goEq$(other: %s): boolean {", self)
+		p.indent++
+		p.line("return %s;", strings.Join(comparisons, " && "))
+		p.indent--
+		p.line("}")
+	}
+
 	// Structs whose comparable fields all encode deterministically carry
 	// goKey$ — the injective canonical key for the keyed-map carrier.
 	encodable := true
@@ -299,4 +321,25 @@ func (p *printer) printDeferWrappedBody(body *ir.Block, usesDeferStack bool) err
 	p.indent--
 	p.line("}")
 	return nil
+}
+
+// eqComponent spells one field's exact equality comparison.
+func (p *printer) eqComponent(left, right string, t ir.Type) (string, error) {
+	switch t.Kind {
+	case ir.KindStruct:
+		return left + ".goEq$(" + right + ")", nil
+	case ir.KindIface:
+		return "goif$.goIfaceEqual(" + left + ", " + right + ")", nil
+	case ir.KindArray:
+		elem, err := p.eqComponent("$x", "$y", *t.Elem)
+		if err != nil {
+			return "", err
+		}
+		spelled, err := p.tsType(*t.Elem)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("gosl$.goArrayEqualWith(%s, %s, ($x: %s, $y: %s) => %s)", left, right, spelled, spelled, elem), nil
+	}
+	return "(" + left + " === " + right + ")", nil
 }

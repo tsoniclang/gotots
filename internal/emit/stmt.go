@@ -199,7 +199,7 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 			return err
 		}
 		if n.IsError {
-			p.line("gort$.goPanicError(%s);", value)
+			p.line("gort$.goPanicError(%s, %q);", value, n.ErrorKey)
 			return nil
 		}
 		p.line("gort$.goPanicValue(%s);", value)

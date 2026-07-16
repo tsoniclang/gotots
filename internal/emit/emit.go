@@ -118,7 +118,11 @@ func Package(module *Module, decls Decls) (string, error) {
 		}
 		if len(structDecl.TypeParams) == 0 {
 			body.WriteString("\n")
-			if err := printRtti(&body, module, structDecl.Name, structDecl.Exported, true, structDecl.Methods, structDecl.Promoted); err != nil {
+			if err := printRtti(&body, module, RttiInfo{
+				TypeName: structDecl.Name, Exported: structDecl.Exported,
+				Pointer: true, Comparable: structDecl.Comparable, HasEq: structDecl.Comparable,
+				Methods: structDecl.Methods, Promoted: structDecl.Promoted,
+			}); err != nil {
 				return "", err
 			}
 		}
@@ -141,7 +145,13 @@ func Package(module *Module, decls Decls) (string, error) {
 				carrierMethods = append(carrierMethods, method.Fn)
 			}
 		}
-		if err := printRtti(&body, module, carrier.Name, carrier.Exported, false, carrierMethods, nil); err != nil {
+		// A named carrier's payload is a primitive: comparable directly,
+		// and its pointer type (a cell) boxes with its own rtti.
+		if err := printRtti(&body, module, RttiInfo{
+			TypeName: carrier.Name, Exported: carrier.Exported,
+			Pointer: true, Comparable: true,
+			Methods: carrierMethods,
+		}); err != nil {
 			return "", err
 		}
 	}

@@ -318,9 +318,10 @@ loop:
 			code: "GOTOTS_UNSUPPORTED_STATEMENT", mention: "label on a non-loop statement",
 		},
 		{
-			name: "struct equality with a non-encodable field",
+			name: "struct equality with an external field",
 			source: `package fixture
-type Holder struct{ V any }
+import "time"
+type Holder struct{ T time.Time }
 func Case() bool {
 	a := Holder{}
 	b := Holder{}

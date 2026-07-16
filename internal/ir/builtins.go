@@ -240,7 +240,7 @@ func (b *builder) buildPanic(call *ast.CallExpr) (Stmt, error) {
 		errorType := types.Universe.Lookup("error").Type().Underlying().(*types.Interface)
 		if goType := b.info.Types[call.Args[0]].Type; goType != nil && types.Implements(goType, errorType) {
 			b.use("panic:error")
-			return &PanicStmt{Value: value, IsError: true}, nil
+			return &PanicStmt{Value: value, IsError: true, ErrorKey: MethodKey(errorType.Method(0))}, nil
 		}
 	}
 	if kind != KindString && kind != KindBool && !kind.Integer() {

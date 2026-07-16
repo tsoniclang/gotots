@@ -73,6 +73,7 @@ func BuildStruct(p *packages.Package, sourceDir string, unit Scope, spec *ast.Ty
 		return nil, err
 	}
 	out.Promoted = promoted
+	out.Comparable = b.structEqComparable(named)
 	return out, nil
 }
 
@@ -108,7 +109,9 @@ func (b *builder) promotedDelegates(named *types.Named, span Span) ([]PromotedDe
 				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 					Construct: "promoted generic method (" + method.Name() + ")", Span: span}
 			}
-			entry := PromotedDelegate{Name: method.Name(), Pkg: method.Pkg().Path()}
+			_, pointerRecv := method.Type().(*types.Signature).Recv().Type().(*types.Pointer)
+			entry := PromotedDelegate{Name: method.Name(), Pkg: method.Pkg().Path(),
+				DispatchKey: MethodKey(method), ValueReceiver: !pointerRecv}
 			current := types.Type(named)
 			for _, index := range path[:len(path)-1] {
 				structType, ok := types.Unalias(current).Underlying().(*types.Struct)
@@ -226,6 +229,7 @@ func (b *builder) anonStructType(structType *types.Struct, spelled string, span 
 		}
 		decl.Fields = append(decl.Fields, Var{Name: field.Name(), Type: fieldType})
 	}
+	decl.Comparable = b.structEqComparable(structType)
 	b.unit.RegisterAnonStruct(b.pkgPath, decl)
 	return out, nil
 }

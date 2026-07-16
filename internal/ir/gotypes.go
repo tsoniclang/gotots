@@ -311,6 +311,44 @@ func (b *builder) typeParamKeySupported(keyType types.Type, span Span) bool {
 	return true
 }
 
+// EqComparableField reports whether one field type participates in the
+// generated exact equality (goEq$): direct === carriers (floats keep
+// NaN and signed-zero semantics under ===), nested comparable structs,
+// arrays of those, and interfaces (whose equality may panic, exactly
+// Go). External fields and uncomparable kinds stay out.
+func (b *builder) EqComparableField(t Type, goType types.Type) bool {
+	switch t.Kind {
+	case KindString, KindBool, KindPointer, KindUnit, KindFloat32, KindFloat64, KindIface:
+		return true
+	case KindArray:
+		elemGo := goType
+		if arr, ok := types.Unalias(goType).Underlying().(*types.Array); ok {
+			elemGo = arr.Elem()
+		}
+		return b.EqComparableField(*t.Elem, elemGo)
+	case KindStruct:
+		return b.structEqComparable(goType)
+	}
+	return t.Kind.Integer()
+}
+
+// structEqComparable reports whether a struct's generated class carries
+// goEq$ — exact field-wise equality over every field.
+func (b *builder) structEqComparable(goType types.Type) bool {
+	structType, ok := types.Unalias(goType).Underlying().(*types.Struct)
+	if !ok {
+		return false
+	}
+	for i := range structType.NumFields() {
+		field := structType.Field(i)
+		fieldIR, err := b.typeOf(field.Type(), Span{})
+		if err != nil || !b.EqComparableField(fieldIR, field.Type()) {
+			return false
+		}
+	}
+	return true
+}
+
 // structKeyEncodable reports whether a named struct key's fields are all
 // encodable, so its class carries goKey$ and the keyed-map carrier can
 // hold it.

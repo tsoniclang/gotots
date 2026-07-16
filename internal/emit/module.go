@@ -12,6 +12,13 @@ type ModuleImport struct {
 	Specifier string // ESM specifier with explicit .js
 }
 
+// ExternMethod is one recorded external method: its source name (the
+// stub symbol derives from it) and its canonical dispatch identity.
+type ExternMethod struct {
+	Name string
+	Key  string
+}
+
 // ABIImports carries the language-ABI module specifiers for one module.
 type ABIImports struct {
 	Ints    string
@@ -33,9 +40,9 @@ type Module struct {
 	PkgName string
 	ABI     ABIImports
 	// ExternMethods maps each external named type ("pkg.Type") to its
-	// unit-recorded method names in sorted order: the static dispatch
-	// tables of external rttis.
-	ExternMethods map[string][]string
+	// unit-recorded methods (name plus canonical dispatch identity) in
+	// sorted order: the static dispatch tables of external rttis.
+	ExternMethods map[string][]ExternMethod
 	imports       map[string]ModuleImport
 	used          map[string]bool
 }

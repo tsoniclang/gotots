@@ -186,11 +186,11 @@ export function goPanicValue(value: string | number | bigint | boolean): never {
 // panic(err): the message is the error's dynamic Error() result — the
 // %v of an error value — dispatched here; a nil error panics like
 // panic(nil).
-export function goPanicError(err: { r: { d: string; m: Readonly<Record<string, Function>>; x?: string }; v: unknown } | undefined): never {
+export function goPanicError(err: { r: { d: string; m: Readonly<Record<string, Function>>; x?: string }; v: unknown } | undefined, errorKey: string): never {
   if (err === undefined) {
     throw new GoPanic("panic called with nil argument");
   }
-  const fn = err.r.m["Error"] as Function | undefined;
+  const fn = err.r.m[errorKey] as Function | undefined;
   if (fn === undefined) {
     throw new GoPanic("GOTOTS_EXTERNAL_UNIMPLEMENTED: " + (err.r.x ?? err.r.d) + ".Error");
   }

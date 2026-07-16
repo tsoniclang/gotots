@@ -125,6 +125,8 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 	}
 
 	if recv := signature.Recv(); recv != nil {
+		function.DispatchKey = MethodKey(object)
+		_, function.PointerReceiver = recv.Type().(*types.Pointer)
 		if recvParams := signature.RecvTypeParams(); recvParams != nil {
 			// A method on a generic type: one generic function per
 			// method, admitted under the type's instantiation evidence

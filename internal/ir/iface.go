@@ -1,6 +1,8 @@
 package ir
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"go/ast"
 	"go/token"
 	"go/types"
@@ -71,10 +73,30 @@ func (b *builder) rttiFor(t types.Type, span Span) (RttiRef, error) {
 // compositeRtti interns an rtti for a composite or external type when
 // the value's carrier itself is reviewed.
 func (b *builder) compositeRtti(t types.Type, span Span, externID string) (RttiRef, error) {
-	if _, err := b.typeOf(t, span); err != nil {
+	resolved, err := b.typeOf(t, span)
+	if err != nil {
 		return RttiRef{}, err
 	}
-	return RttiRef{Composite: t.String(), Display: displayOf(t), ExternID: externID}, nil
+	out := RttiRef{Composite: t.String(), Display: displayOf(t), ExternID: externID}
+	if externID == "" {
+		switch types.Unalias(t).Underlying().(type) {
+		case *types.Slice, *types.Map, *types.Signature:
+			out.CompositeEq = "uncomparable"
+		case *types.Pointer:
+			out.CompositeEq = "identity"
+		case *types.Array:
+			elem := resolved.Elem
+			if elem != nil && (elem.Kind.Integer() || elem.Kind.Float() ||
+				elem.Kind == KindString || elem.Kind == KindBool || elem.Kind == KindPointer) {
+				out.CompositeEq = "array-prim"
+			} else {
+				out.CompositeEq = "unknown"
+			}
+		default:
+			out.CompositeEq = "unknown"
+		}
+	}
+	return out, nil
 }
 
 // displayOf spells a type the way Go's runtime messages do: package
@@ -144,11 +166,26 @@ func (b *builder) boxIfaceValue(built Expr, source types.Type, expected Type, sp
 	return &IfaceBox{X: b.bindStructValue(built), Rtti: rtti, T: expected}, nil
 }
 
+// MethodKey is the canonical dynamic-dispatch identity of one method:
+// its name, its package identity when unexported (Go's method sets
+// match unexported methods only within their declaring package), and a
+// digest of its path-qualified signature — so name-only collisions can
+// never dispatch or satisfy a method-set test.
+func MethodKey(method *types.Func) string {
+	signature := types.TypeString(method.Type(), func(p *types.Package) string { return p.Path() })
+	digest := sha256.Sum256([]byte(signature))
+	key := method.Name()
+	if !method.Exported() && method.Pkg() != nil {
+		key += "@" + method.Pkg().Path()
+	}
+	return key + "|" + hex.EncodeToString(digest[:6])
+}
+
 // buildIfaceMethodCall dispatches a method through an interface value's
 // method table (a nil interface panics exactly like a nil dereference).
 func (b *builder) buildIfaceMethodCall(n *ast.CallExpr, recv Expr, method *types.Func) (Expr, error) {
 	signature := method.Type().(*types.Signature)
-	out := &IfaceCall{Recv: recv, Method: method.Name()}
+	out := &IfaceCall{Recv: recv, Method: MethodKey(method), Display: method.Name()}
 	if err := b.buildCallArgsResults(n, signature, &out.Args, &out.Results); err != nil {
 		return nil, err
 	}
@@ -174,16 +211,24 @@ func (b *builder) buildTypeAssert(n *ast.TypeAssertExpr, commaOk bool) (Expr, er
 		if err != nil {
 			return nil, err
 		}
-		methods := make([]string, 0, targetIface.NumMethods())
+		type keyed struct{ key, display string }
+		entries := make([]keyed, 0, targetIface.NumMethods())
 		for i := range targetIface.NumMethods() {
-			methods = append(methods, targetIface.Method(i).Name())
+			entries = append(entries, keyed{key: MethodKey(targetIface.Method(i)), display: targetIface.Method(i).Name()})
 		}
-		sort.Strings(methods)
+		sort.Slice(entries, func(i, j int) bool { return entries[i].key < entries[j].key })
+		methods := make([]string, 0, len(entries))
+		displays := make([]string, 0, len(entries))
+		for _, entry := range entries {
+			methods = append(methods, entry.key)
+			displays = append(displays, entry.display)
+		}
 		b.use("typeAssert:iface")
 		return &IfaceAssert{
 			X:             operand,
 			Target:        target,
 			Methods:       methods,
+			Displays:      displays,
 			SourceDisplay: displayOf(b.info.Types[n.X].Type),
 			TargetDisplay: displayOf(targetGoType),
 			CommaOk:       commaOk,
@@ -289,9 +334,12 @@ func (b *builder) buildTypeSwitch(n *ast.TypeSwitchStmt) (Stmt, error) {
 // IfaceAssert is x.(I) for an interface target: a method-set test over
 // the dynamic type's rtti, returning the same boxed value.
 type IfaceAssert struct {
-	X             Expr
-	Target        Type
+	X      Expr
+	Target Type
+	// Methods are canonical dispatch identities; Displays the parallel
+	// source spellings for the missing-method panic.
 	Methods       []string
+	Displays      []string
 	SourceDisplay string
 	TargetDisplay string
 	CommaOk       bool
@@ -366,8 +414,9 @@ func (b *builder) buildIfaceEquality(n *ast.BinaryExpr, left, right Expr, span S
 	case kind.Integer() || kind.Float() || kind == KindString || kind == KindBool ||
 		kind == KindPointer || kind == KindUnit:
 		form = "prim"
-	case kind == KindStruct && b.structKeyEncodable(concreteGoType, span):
-		form = "key"
+	case kind == KindStruct && b.structEqComparable(concreteGoType):
+		// The dynamic type's own generated equality (goEq$) compares.
+		form = "via"
 	default:
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION",
 			Construct: "equality between an interface and " + concrete.Type().Go, Span: span}

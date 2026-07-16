@@ -76,8 +76,8 @@ func (b *builder) buildBinary(n *ast.BinaryExpr, resultType types.Type) (Expr, e
 		if operand.Kind == KindArray {
 			return b.buildArrayEqual(left, right, n.Op, span)
 		}
-		if operand.Kind == KindStruct && b.structKeyEncodable(b.info.Types[n.X].Type, span) {
-			// Field-wise equality through the canonical injective key.
+		if operand.Kind == KindStruct && b.structEqComparable(b.info.Types[n.X].Type) {
+			// The generated exact field-wise equality compares.
 			b.use("structEqual")
 			return &StructEqual{L: left, R: right, Negate: n.Op == token.NEQ}, nil
 		}

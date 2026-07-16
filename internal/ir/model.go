@@ -382,6 +382,13 @@ type Func struct {
 	// SlicePlans maps each slice-typed local variable to its selected
 	// representation candidate (the planner's fixed point).
 	SlicePlans map[string]string
+	// DispatchKey is the method's canonical dynamic-dispatch identity
+	// (methods only): name, unexported package qualifier, and signature
+	// digest — the rtti table key.
+	DispatchKey string
+	// PointerReceiver marks a pointer-receiver method: it belongs to the
+	// pointer method set only, never the value method set.
+	PointerReceiver bool
 	// BodyHash matches the census body record for drift detection.
 	BodyHash string
 	// Support is the implementation support state; Sites records every
@@ -414,6 +421,10 @@ type Struct struct {
 	// Promoted lists the embedded-field method promotions the rtti
 	// method table delegates through value-field chains.
 	Promoted []PromotedDelegate
+	// Comparable marks a struct whose fields all support exact generated
+	// equality: it carries goEq$, and interface equality over it never
+	// panics.
+	Comparable bool
 }
 
 // PromotedDelegate is one promoted method in a struct's method set: the
@@ -424,6 +435,10 @@ type PromotedDelegate struct {
 	Path     []string // embedded field names, outermost first
 	Pkg      string
 	TypeName string
+	// DispatchKey is the promoted method's canonical dynamic identity;
+	// ValueReceiver marks it part of the value method set.
+	DispatchKey   string
+	ValueReceiver bool
 }
 
 // Unsupported is the stable fail-closed diagnostic for a construct outside
