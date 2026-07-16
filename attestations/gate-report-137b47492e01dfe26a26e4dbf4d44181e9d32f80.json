@@ -1,0 +1,228 @@
+{
+  "schemaVersion": 4,
+  "expectedStages": 18,
+  "reportedStages": 18,
+  "passedStages": 6,
+  "failed": 1,
+  "blocked": 11,
+  "missingStages": 0,
+  "passed": false,
+  "inputs": {
+    "implementationRevision": "137b47492e01dfe26a26e4dbf4d44181e9d32f80",
+    "specificationManifestSha256": "97c6dbe57268e5e7d04e72ffb79883829d19c8e8d781137d8befdc92eef8bdc1",
+    "decisionRegistrySha256": "27786bac09748eed886786a9c010f3ae23cf79a12d337a943e4b788055645777",
+    "sourceRevision": "c78d39e7075b4fc641b12b1f35d905c54cdc13ef",
+    "profileSha256": "618e6ad102b4e5b0fa3ff15a25c08acf74fdbd3ec2bed86796bd5e23d61df960",
+    "buildProfile": "linux-amd64",
+    "goVersion": "go1.26.4",
+    "goExecutableSha256": "86b748c64de0175db601f56805251f3b08cd12bffb927ad5c68ef8497c50c7ba",
+    "gorootSourceSha256": "39e8e659c758ad267d0199863507b208af02f9818c6d59bfafdd23f3375c6062",
+    "typescriptCompiler": "typescript@6.0.3",
+    "javascriptRuntime": "node v26.1.0",
+    "nodeExecutableSha256": "da220b82279ed9885a7759f6efb8c4b9351ece579f93429bf7b7d2fbd481bcf8",
+    "moduleResolverPolicy": "node-esm-explicit-js-specifiers",
+    "moduleResolverSha256": "4435432658c71b93d4a09c6870432e2009dae5e613a5df4c1afb90ede3559bab",
+    "strictConfigSha256": "7a4d36d04666ef79512486741dad04adb2883a4d565285237aad9162abc570fb",
+    "helperRuntimeSha256": "e11fbd29fbbe771d5f3542cbf28d4f7c11402093de170ca66dab5acff815b8e1",
+    "missing": []
+  },
+  "gates": [
+    {
+      "name": "01-repository-specification-policy",
+      "status": "pass"
+    },
+    {
+      "name": "02-input-toolchain-profile-attestation",
+      "status": "pass",
+      "details": [
+        "typescript compiler identity declared: typescript@6.0.3 (materialization verified at stage 10)",
+        "javascript runtime verified: node v26.1.0"
+      ]
+    },
+    {
+      "name": "03-selected-scope-dependency-closure",
+      "status": "blocked",
+      "details": [
+        "outside-universe files filtered before census: 4481",
+        "  editor-service: 177 files",
+        "  fourslash: 4273 files",
+        "  lsp: 31 files",
+        "BLOCKED: ownedRoots is a hand-maintained allowlist; the selected closure is not yet independently derived from product entry points, so an unauthorized scope shrink would not be detected"
+      ]
+    },
+    {
+      "name": "04-census-denominator-reconciliation",
+      "status": "pass",
+      "details": [
+        "const-fold-at-use: 1960",
+        "generated: 13194",
+        "stage:module-retained: 163",
+        "stage:module-retained-blocked: 12946",
+        "stage:no-output: 391",
+        "test-scope: 1061",
+        "unimplemented: 306",
+        "evidence-stage ir-admitted (declarations disposed): 13194",
+        "evidence-stage module-retained (disposed, in emitted packages): 163",
+        "evidence-stage module-retained-blocked (disposed, in withheld packages): 12946",
+        "packages emitted (module-retained): 9",
+        "packages withheld (honest unimplemented): 45"
+      ]
+    },
+    {
+      "name": "05-declaration-signature-type-completeness",
+      "status": "pass",
+      "details": [
+        "census production function/method denominator: 9518",
+        "signatures independently verified against the census spelling: 9261",
+        "explicit unimplemented records: 257",
+        "orphan proofs: 0",
+        "function literals joined by identity, parent, and body hash: 1013 (47 unimplemented)",
+        "variable initializers joined by identity and hash: 2416 (22 explicitly unimplemented)"
+      ]
+    },
+    {
+      "name": "06-semantic-ir-operation-class-completeness",
+      "status": "pass",
+      "details": [
+        "operation classes used by generated bodies: 136",
+        "reviewed classes not exercised by this corpus: 6"
+      ]
+    },
+    {
+      "name": "07-ownership-support-state-completeness",
+      "status": "pass",
+      "details": [
+        "ownership: core 9, language-abi 6, external-contracts 40",
+        "support: generated 9261, unimplemented 308 (every site on record)",
+        "withheld packages: 45 (transitive closure over dependents)",
+        "manual and extension ownership classes: none declared yet (no artifacts to verify)"
+      ]
+    },
+    {
+      "name": "08-fixed-point-representation-verification",
+      "status": "blocked",
+      "details": [
+        "slice regions planned within the closed candidate set: native-array 10, goslice-carrier 2060",
+        "representation entries per family (all registry-classified): [carrier:24912 declaration:6332 slice-local:2070]",
+        "custom mechanisms with verified necessity records (AST-derived): [interface-box pointer-cell slice-carrier]",
+        "BLOCKED: necessity evidence names committed tests but is not yet bound to executed results (requires the stage-11 test ledger)"
+      ]
+    },
+    {
+      "name": "09-deterministic-staged-generation",
+      "status": "blocked",
+      "details": [
+        "census evidence deterministic across two hermetic runs",
+        "generated output deterministic across two runs (55 files byte-identical)",
+        "complete evidence (proofs, support, ownership, withholding, module imports) deterministic across two runs",
+        "publication = immutable bundles + one atomic current-pointer rename; replacement leaves the previous bundle intact",
+        "partial bundle: 45 packages withheld as honest unimplemented",
+        "BLOCKED: environment.json carries machine-local paths inside semantic evidence identity; relocated-checkout reproducibility is unproven",
+        "BLOCKED: body-materialization artifacts for withheld packages are not retained (spec 01)"
+      ]
+    },
+    {
+      "name": "10-strict-typescript-staticness",
+      "status": "fail",
+      "details": [
+        "  Type 'GoAnyBox' is not assignable to type 'Iface$5259034e8c65'.",
+        "    Type 'string' is not assignable to type '\"*github.com/microsoft/typescript-go/internal/semver.SemverParseError\"'.",
+        "core/github.com/microsoft/typescript-go/internal/pprof/package.ts(287,21): error TS2322: Type 'GoIface' is not assignable to type 'Iface$5259034e8c65'.",
+        "  Type 'GoAnyBox' is not assignable to type 'Iface$5259034e8c65'.",
+        "    Type 'string' is not assignable to type '\"*github.com/microsoft/typescript-go/internal/semver.SemverParseError\"'.",
+        "core/github.com/microsoft/typescript-go/internal/repo/package.ts(11,23): error TS2307: Cannot find module '../ast/package.js' or its corresponding type declarations.",
+        "core/github.com/microsoft/typescript-go/internal/repo/package.ts(95,11): error TS2322: Type 'GoIface' is not assignable to type 'Iface$5259034e8c65'.",
+        "  Type 'GoAnyBox' is not assignable to type 'Iface$5259034e8c65'.",
+        "    Type 'string' is not assignable to type '\"*github.com/microsoft/typescript-go/internal/semver.SemverParseError\"'.",
+        "core/github.com/microsoft/typescript-go/internal/repo/package.ts(117,9): error TS2322: Type 'GoIface' is not assignable to type 'Iface$5259034e8c65'.",
+        "  Type 'GoAnyBox' is not assignable to type 'Iface$5259034e8c65'.",
+        "    Type 'string' is not assignable to type '\"*github.com/microsoft/typescript-go/internal/semver.SemverParseError\"'.",
+        "core/github.com/microsoft/typescript-go/internal/semver/package.ts(13,23): error TS2307: Cannot find module '../ast/package.js' or its corresponding type declarations.",
+        "core/github.com/microsoft/typescript-go/internal/semver/package.ts(420,7): error TS2322: Type 'GoIface' is not assignable to type 'Iface$5259034e8c65'.",
+        "  Type 'GoAnyBox' is not assignable to type 'Iface$5259034e8c65'.",
+        "    Type 'string' is not assignable to type '\"*github.com/microsoft/typescript-go/internal/semver.SemverParseError\"'.",
+        "core/github.com/microsoft/typescript-go/internal/vfs/package.ts(11,23): error TS2307: Cannot find module '../ast/package.js' or its corresponding type declarations.",
+        "core/github.com/microsoft/typescript-go/internal/vfs/package.ts(73,1): error TS2322: Type 'GoIface' is not assignable to type 'Iface$5259034e8c65'.",
+        "  Type 'GoAnyBox' is not assignable to type 'Iface$5259034e8c65'.",
+        "    Type 'string' is not assignable to type '\"*github.com/microsoft/typescript-go/internal/semver.SemverParseError\"'.",
+        "core/github.com/microsoft/typescript-go/internal/vfs/package.ts(74,1): error TS2322: Type 'GoIface' is not assignable to type 'Iface$5259034e8c65'.",
+        "  Type 'GoAnyBox' is not assignable to type 'Iface$5259034e8c65'.",
+        "    Type 'string' is not assignable to type '\"*github.com/microsoft/typescript-go/internal/semver.SemverParseError\"'.",
+        "core/github.com/microsoft/typescript-go/internal/vfs/package.ts(75,1): error TS2322: Type 'GoIface' is not assignable to type 'Iface$5259034e8c65'.",
+        "  Type 'GoAnyBox' is not assignable to type 'Iface$5259034e8c65'.",
+        "    Type 'string' is not assignable to type '\"*github.com/microsoft/typescript-go/internal/semver.SemverParseError\"'.",
+        "core/github.com/microsoft/typescript-go/internal/vfs/package.ts(76,1): error TS2322: Type 'GoIface' is not assignable to type 'Iface$5259034e8c65'.",
+        "  Type 'GoAnyBox' is not assignable to type 'Iface$5259034e8c65'.",
+        "    Type 'string' is not assignable to type '\"*github.com/microsoft/typescript-go/internal/semver.SemverParseError\"'.",
+        "core/github.com/microsoft/typescript-go/internal/vfs/package.ts(77,1): error TS2322: Type 'GoIface' is not assignable to type 'Iface$5259034e8c65'.",
+        "  Type 'GoAnyBox' is not assignable to type 'Iface$5259034e8c65'.",
+        "    Type 'string' is not assignable to type '\"*github.com/microsoft/typescript-go/internal/semver.SemverParseError\"'.",
+        "core/github.com/microsoft/typescript-go/internal/vfs/package.ts(78,1): error TS2322: Type 'GoIface' is not assignable to type 'Iface$5259034e8c65'.",
+        "  Type 'GoAnyBox' is not assignable to type 'Iface$5259034e8c65'.",
+        "    Type 'string' is not assignable to type '\"*github.com/microsoft/typescript-go/internal/semver.SemverParseError\"'.",
+        "core/github.com/microsoft/typescript-go/internal/vfs/package.ts(79,1): error TS2322: Type 'GoIface' is not assignable to type 'Iface$5259034e8c65'.",
+        "  Type 'GoAnyBox' is not assignable to type 'Iface$5259034e8c65'.",
+        "    Type 'string' is not assignable to type '\"*github.com/microsoft/typescript-go/internal/semver.SemverParseError\"'.",
+        "core/github.com/microsoft/typescript-go/internal/vfs/vfsmock/package.ts(11,23): error TS2307: Cannot find module '../../ast/package.js' or its corresponding type declarations.",
+        "core/github.com/microsoft/typescript-go/internal/vfs/wrapvfs/package.ts(11,23): error TS2307: Cannot find module '../../ast/package.js' or its corresponding type declarations.",
+        "strict typecheck rejected the generated output"
+      ]
+    },
+    {
+      "name": "11-semantic-oracles",
+      "status": "blocked",
+      "details": [
+        "ordered static-output prerequisites are incomplete; local oracle tests run under gate 01 only"
+      ]
+    },
+    {
+      "name": "12-generated-packages-selected-tests",
+      "status": "blocked",
+      "details": [
+        "complete generated-package build and translated-test gate not implemented"
+      ]
+    },
+    {
+      "name": "13-no-extension-tsgo-differential",
+      "status": "blocked",
+      "details": [
+        "whole-compiler no-extension differential not implemented"
+      ]
+    },
+    {
+      "name": "14-extensions-assembled-product",
+      "status": "blocked",
+      "details": [
+        "extension seams and product composition not implemented"
+      ]
+    },
+    {
+      "name": "15-compiler-corpus-proof-common-projects",
+      "status": "blocked",
+      "details": [
+        "complete compiler corpus, proof projects, and common projects not implemented"
+      ]
+    },
+    {
+      "name": "16-performance",
+      "status": "blocked",
+      "details": [
+        "performance baselines and regression gates not implemented"
+      ]
+    },
+    {
+      "name": "17-source-update-repeatability",
+      "status": "blocked",
+      "details": [
+        "upgrade repeatability proof not implemented"
+      ]
+    },
+    {
+      "name": "18-complete-product-publication",
+      "status": "blocked",
+      "details": [
+        "atomic complete product publication gate not implemented"
+      ]
+    }
+  ]
+}
