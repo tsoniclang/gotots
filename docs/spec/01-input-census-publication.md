@@ -120,6 +120,30 @@ Every report defines its denominator and derivation. Production bodies,
 translation candidates, synthetic initializers, declaration-only objects,
 generated toolchain units, and selected tests are separate classes.
 
+For selected function and method bodies, every run reports identity-bearing
+counts for each translation evidence stage from `00-authority-scope.md`. It
+also reports separately:
+
+- selected packages;
+- packages containing directly unimplemented units;
+- packages withheld transitively through dependency closure;
+- retained runnable packages;
+- selected declarations that are not bodies;
+- unsupported non-body declarations;
+- selected function literals and synthetic initializers; and
+- retained runnable body artifacts.
+
+The report includes exact joins from each earlier stage to the next. A body
+that is IR-admitted and lowered but belongs to a withheld package remains in
+those denominators and is absent from `module-retained`. It cannot be counted
+as emitted, runnable, typechecked, executed, or certified.
+
+Operation-site counts, operation-bearing-body counts, and deduplicated unions
+are distinct. Overlapping semantic classes never have their body counts added
+without an identity join. A percentage always names its numerator and
+denominator; “coverage”, “translated”, and “completed” are invalid denominator
+labels.
+
 If two reports present different body totals, a machine join must account for
 every difference by canonical identity and disposition. Historical totals are
 never embedded as normative constants.
@@ -139,8 +163,10 @@ The required bundle includes:
 - operation classes and site membership;
 - external obligations;
 - support coverage;
+- per-body translation evidence stages and their gate/artifact references;
 - representation plans;
 - unimplemented diagnostics;
+- body-materialization artifacts for every automatically lowered body;
 - generated artifact inventory;
 - test results; and
 - manifest hashes.
@@ -168,6 +194,17 @@ A partial bundle contains reports and IR plus either declaration-only output or
 runnable modules whose complete transitive implementation closure is closed. A
 package containing an omitted body is never emitted as a runnable module, and
 no import path may make a withheld implementation appear available.
+
+Every automatically lowered body, including one in a withheld package, retains
+an analysis-only canonical TypeScript body AST or equivalent canonical body
+serialization and its hash. This artifact exists for audit and regeneration;
+it is not a module, cannot be imported or executed, and cannot satisfy
+`module-retained`. Keeping it does not create a second implementation path.
+
+A proof may name an emitted module artifact only when that artifact exists and
+contains the identified body. A body in a withheld module instead records its
+body-materialization artifact, withholding reason, and affected closure. A
+`generatedFile`-style field pointing to an absent file is invalid evidence.
 
 Product publication requires `complete: true` and zero reachable
 unimplemented units.

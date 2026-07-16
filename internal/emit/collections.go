@@ -149,9 +149,11 @@ func (p *printer) collectionExpr(e ir.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		if n.T.Elem.Kind == ir.KindStruct || n.T.Elem.Kind == ir.KindArray {
-			// Every struct or array element is a distinct fresh zero
-			// instance.
+		switch n.T.Elem.Kind {
+		case ir.KindStruct, ir.KindArray, ir.KindExternal, ir.KindIface:
+			// Every element needing independent storage (struct, array,
+			// external handle, or a type-parameter carrier) is a distinct
+			// fresh zero, never one shared mutable object.
 			return "gosl$.goSliceMakeStruct(" + length + ", " + capacity + ", () => " + zero + ")", nil
 		}
 		return "gosl$.goSliceMake(" + length + ", " + capacity + ", " + zero + ")", nil

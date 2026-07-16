@@ -148,16 +148,18 @@ func (p *printer) printNativeSliceValue(t ir.Type, value ir.Expr) (string, error
 		if err != nil {
 			return "", err
 		}
-		make := "gosl$.goArrayZero(Number(" + length + "), () => " + zero + ")"
-		if n.Capacity != nil {
-			capacity, err := p.printExpr(n.Capacity)
-			if err != nil {
-				return "", err
-			}
-			// The capacity hint evaluates (the region never observes it).
-			make = "(void (" + capacity + "), " + make + ")"
+		if n.Capacity == nil {
+			return "gosl$.goNativeMakeLen(" + length + ", () => " + zero + ")", nil
 		}
-		return make, nil
+		capacity, err := p.printExpr(n.Capacity)
+		if err != nil {
+			return "", err
+		}
+		// gc evaluates the capacity operand before the length; the arrow
+		// binds capacity first, then the validated fill runs. Negative or
+		// too-small values panic with Go's exact makeslice messages.
+		return "(($c$: goabi$.GoInt, $l$: goabi$.GoInt) => gosl$.goNativeMakeCap($l$, $c$, () => " + zero +
+			"))(" + capacity + ", " + length + ")", nil
 	case *ir.NilConst:
 		// The region never compares against nil, so its zero is the
 		// empty backing.

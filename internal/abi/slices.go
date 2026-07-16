@@ -43,9 +43,7 @@ export function goSliceFrom<T>(values: T[]): GoSlice<T> {
 
 export function goSliceMake<T>(length: GoIndex, capacity: GoIndex | undefined, zero: T): GoSlice<T> {
   if (capacity === undefined) capacity = length; // make([]T, n): length evaluated once
-  if (length < 0 || capacity < 0 || length > capacity) {
-    throw new GoPanic("runtime error: makeslice: len out of range");
-  }
+  goMakeCheck(length, capacity);
   const cap = Number(capacity);
   const backing: T[] = new Array(cap);
   for (let index = 0; index < cap; index++) {
@@ -88,9 +86,7 @@ export interface GoStructValue<T> {
 // fresh zero instance.
 export function goSliceMakeStruct<T>(length: GoIndex, capacity: GoIndex | undefined, zero: () => T): GoSlice<T> {
   if (capacity === undefined) capacity = length; // make([]T, n): length evaluated once
-  if (length < 0 || capacity < 0 || length > capacity) {
-    throw new GoPanic("runtime error: makeslice: len out of range");
-  }
+  goMakeCheck(length, capacity);
   const cap = Number(capacity);
   const backing: T[] = new Array(cap);
   for (let index = 0; index < cap; index++) {
@@ -242,6 +238,31 @@ export function goArraySetAll<T>(dst: T[], src: T[], setElem: ((d: T, s: T) => v
       setElem(dst[index] as T, src[index] as T);
     }
   }
+}
+
+// makeslice's exact panics: a negative length is "len out of range";
+// a negative capacity or capacity below length is "cap out of range".
+export function goMakeCheck(length: GoIndex, capacity: GoIndex): void {
+  if (length < 0) {
+    throw new GoPanic("runtime error: makeslice: len out of range");
+  }
+  if (capacity < 0 || capacity < length) {
+    throw new GoPanic("runtime error: makeslice: cap out of range");
+  }
+}
+
+// make([]T, len) for a native-array region: validated, filled with fresh
+// zeros. Capacity equals length (native arrays carry no separate cap).
+export function goNativeMakeLen<T>(length: GoIndex, zero: () => T): T[] {
+  goMakeCheck(length, length);
+  return goArrayZero(Number(length), zero);
+}
+
+// make([]T, len, cap) for a native-array region: capacity is validated
+// and evaluated (its only observable effects) but not stored.
+export function goNativeMakeCap<T>(length: GoIndex, capacity: GoIndex, zero: () => T): T[] {
+  goMakeCheck(length, capacity);
+  return goArrayZero(Number(length), zero);
 }
 
 export function goArrayZero<T>(length: number, makeElem: () => T): T[] {

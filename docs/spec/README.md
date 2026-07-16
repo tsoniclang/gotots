@@ -85,6 +85,20 @@ Translator development may therefore advance by semantic class without
 misrepresenting completeness. Complete selected-product acceptance requires no
 reachable unimplemented unit.
 
+## Progress Language
+
+Progress reports distinguish support state from translation evidence. A body
+with complete IR and automatic lowering is `generated`, but it is not thereby
+present in a retained module, typechecked, executed, Go-equivalent, or
+certified. Reports use the evidence stages defined in
+`00-authority-scope.md` and publish the denominator for every count.
+
+For example, “9,000 bodies are IR-admitted” says nothing by itself about how
+many bodies are present in runnable retained modules. Package withholding can
+remove thousands of otherwise lowered bodies from runnable output. No report
+may shorten `ir-admitted` to “completed” or present its percentage as product
+coverage.
+
 ## One Implementation
 
 Each emitted artifact contains one statically selected implementation for every

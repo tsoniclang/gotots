@@ -164,7 +164,7 @@ Package spelling alone never creates intrinsic status.
 
 Every selected implementation unit has exactly one support state:
 
-- `generated`: typed IR and lowering are complete;
+- `generated`: typed IR and a complete automatic lowering exist;
 - `accepted-manual`: typed IR is complete and one reviewed structural body
   supplies the implementation;
 - `unimplemented`: semantics are recognized but no accepted implementation
@@ -176,6 +176,46 @@ in `08-externals-manual-extensions.md`.
 Unimplemented is a valid development result, not product success. It permits
 the compiler to continue classifying independent work while withholding every
 artifact whose dependency closure reaches that unit.
+
+Support state is an implementation-ownership decision, not a completion or
+validation result. In particular, `generated` does not mean that a body is
+present in a retained module, typechecks with its dependency closure, executes,
+matches Go, or is product-certified.
+
+## Translation Evidence Stages
+
+Each selected implementation has independent, monotonic evidence for these
+stages:
+
+1. `selected` — the body has canonical identity in the selected census;
+2. `typed` — frontend declaration, type, selection, and body evidence is
+   complete;
+3. `ir-admitted` — complete typed semantic IR exists;
+4. `lowered` — one complete typed TypeScript body AST exists;
+5. `body-materialized` — the canonical body AST and generated-fragment hash are
+   retained as an inspectable analysis artifact;
+6. `module-retained` — the body is present in a runnable module whose complete
+   transitive implementation closure is retained;
+7. `strict-typechecked` — that retained module passed the strict TypeScript and
+   staticness gate;
+8. `semantic-class-validated` — every operation class used by the body has its
+   required differential, property, and mutation evidence;
+9. `package-executed` — generated package and selected translated tests ran;
+10. `compiler-differential-validated` — applicable no-extension compiler
+    workloads matched pinned Go;
+11. `product-assembled` — external bindings, manual bodies, and extension seams
+    were assembled and validated; and
+12. `certified` — every gate required for selected-product completion passed.
+
+These are evidence predicates, not one mutable enum: a body may be lowered but
+not module-retained, or typechecked but not executed. Every achieved stage names
+the exact artifact and gate evidence that establishes it. A later stage cannot
+be inferred from an earlier stage, a support state, a hash, or an aggregate
+percentage.
+
+Reports use the exact stage names above. The unqualified words “translated”,
+“completed”, “working”, “safe”, and “correct” are not machine classifications
+and cannot substitute for them.
 
 ## Completion Levels
 
