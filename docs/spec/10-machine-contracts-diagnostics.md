@@ -77,8 +77,10 @@ ledgers cover:
 - manual bodies;
 - extension seams;
 - regions and representation plans;
-- unimplemented units; and
-- emitted artifacts.
+- unimplemented units;
+- body-materialization artifacts;
+- emitted module artifacts; and
+- translation evidence stages.
 
 Joins are exact one-to-one or explicitly typed one-to-many relations. Missing,
 duplicate, orphaned, or multiply owned records block.
@@ -93,7 +95,10 @@ An implementation support record contains:
 - operation-class IDs;
 - dependency closure;
 - owner;
-- emitted artifact IDs, if any;
+- canonical lowered-body AST and materialization artifact IDs, if generated;
+- each achieved translation evidence stage and its evidence IDs;
+- emitted module artifact IDs only when those artifacts exist;
+- retained-runnable state or direct/transitive withholding reason;
 - diagnostic IDs; and
 - source/profile/tool revisions.
 
@@ -102,6 +107,30 @@ ledgers. An unimplemented body record contains every unsupported operation-site
 ID, not only the first one. Each site record contains semantic class, source
 span, concise reason, missing accepted mechanism, and affected product roots.
 It never points to a runnable owned-body stub.
+
+The verifier rejects a stage without its required evidence, a later stage whose
+predecessor is absent, a materialized body whose hash cannot be reconstructed,
+an emitted-module reference to an absent file, a body claimed by a module that
+does not contain its generated symbol, and a withheld body marked
+`module-retained`.
+
+## Correctness Evidence Record
+
+Operation-class evidence and implementation-body evidence are related but not
+interchangeable. Machine reports classify findings as:
+
+- `confirmed-defect` — a concrete generated body or shared lowering has a
+  minimized Go counterexample and observed mismatch;
+- `exposed` — a body uses a lowering or ABI class with a confirmed defect, but
+  no body-specific counterexample establishes that the defect is observable in
+  that body; or
+- `certified` — the body has reached the `certified` evidence stage.
+
+`exposed` is not counted as behaviorally wrong, and absence from the exposed
+set is not counted as safe. A semantic-class oracle establishes evidence for
+that class and its tested dimensions; it does not by itself certify every body
+that names the class. Aggregate defect, exposure, and certification counts are
+deduplicated by canonical implementation ID and reported separately.
 
 ## Representation Record
 
@@ -226,6 +255,13 @@ Repository policy scans complete maintained roots for:
 - stale spec paths;
 - unlisted specification files; and
 - prohibited runtime fallback patterns.
+
+Generated and assembled output scanners additionally reject erased invocation
+or dispatch mechanisms, including `Function`, `unknown[]`, string-keyed
+function/method registries, universal external-call registries, and typed casts
+from their results. Scanner findings are confirmed structurally against the
+typed AST so ordinary uses of words in comments or unrelated generic types do
+not create allowlist pressure.
 
 Scanners support structural validation but do not substitute for typed semantic
 analysis. False-positive suppressions require exact parser-backed evidence and

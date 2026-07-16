@@ -30,6 +30,44 @@ The default output is an ordinary TypeScript function type, with
 Invoking a nil function evaluates the callee and arguments in Go order and then
 panics. Generated code must not leak a host `TypeError` with different timing.
 
+## Static Analysis Before Dynamic Representation
+
+GoToTS computes the complete selected-product target closure for package
+functions, methods, function values, closures, interface dynamic types, generic
+instantiations, callbacks, external call-in contracts, and initialization
+before choosing a runtime representation. Every fact available from typed
+whole-program analysis must become a direct call, ordinary typed function
+value, specialization, finite discriminated union, or exhaustive static switch.
+
+Runtime machinery is not permitted merely because static analysis has not yet
+been implemented. Unknown or open target evidence is `unimplemented` until an
+exact static contract exists. A runtime discriminant is allowed only when the
+selected Go program can observe genuine dynamic type/state after the target set
+and payload types have already been closed statically.
+
+For example:
+
+```go
+var operation func(int) int
+if chooseA {
+    operation = A
+} else {
+    operation = B
+}
+return operation(1)
+```
+
+uses the ordinary exact TypeScript function type `(value: int) => int` and a
+direct invocation. It never widens to `Function`, `unknown[]`, or a registry.
+For an interface whose only reachable dynamic types are `A` and `B`, dispatch
+uses direct calls in an exhaustive typed `A | B` branch. It never performs
+`methods[methodName](...args)`.
+
+The analysis records the closed target set, its roots, escape/call-in edges,
+invalidation dependencies, and the emitted direct or exhaustive call sites.
+The verifier independently proves that no statically resolvable edge was
+routed through erased or name-selected dispatch.
+
 ## Closures
 
 Closures capture variables rather than snapshots unless Go defines a copy

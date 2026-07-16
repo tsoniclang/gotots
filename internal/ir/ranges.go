@@ -88,6 +88,9 @@ func (b *builder) buildRangeInt(n *ast.RangeStmt, operand Expr) (Stmt, error) {
 		if !ok {
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range variable is not an identifier", Span: span}
 		}
+		if err := b.rejectBoxedBinding(ident, "a range variable", span); err != nil {
+			return nil, err
+		}
 		if ident.Name != "_" {
 			out.Index = ident.Name
 		}

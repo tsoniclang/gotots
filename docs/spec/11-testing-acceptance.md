@@ -108,6 +108,27 @@ One oracle covers a class, with generated/property cases exploring its type and
 operation dimensions. It does not require manually authored tests for every
 call site.
 
+Passing a class oracle establishes `semantic-class-validated` evidence only for
+the dimensions represented by the oracle and its generators. It does not prove
+that every body using the operation has correct evaluation order, surrounding
+alias/effect interactions, boundary conversion, package initialization, or
+integration behavior. It therefore cannot establish `package-executed`,
+`compiler-differential-validated`, or `certified` by implication.
+
+For example, a compound-assignment oracle must include an RHS that mutates the
+same storage location:
+
+```go
+x := 1
+x += func() int { x = 10; return 2 }()
+```
+
+Go loads the old value before evaluating the RHS and produces `3`; a lowering
+that reloads after the callback produces `12`. A body containing `+=` is
+`exposed` when this shared lowering is defective, but is a
+`confirmed-defect` only when the mismatch is shown to be observable for that
+body or the shared emitted form is unconditionally invalid.
+
 Oracle transport is a versioned canonical tagged event stream, not ordinary
 JSON values or ad hoc stdout. It preserves integer width, bigint, float bits
 including NaN and signed zero, arbitrary bytes, dynamic defined type, nil and
@@ -208,6 +229,30 @@ configuration. The gate rejects:
 
 The generated AST and printed source are structurally reconciled.
 
+Strict TypeScript success proves syntax, imports, and declared static types. It
+does not prove Go semantics, runtime execution, package completeness, external
+behavior, or certification. A withheld package is not covered by this gate
+merely because some of its bodies have lowered AST records.
+
+## Staticness Sweep
+
+The staticness gate performs a complete typed-AST sweep across generator-owned
+ABI/templates, generated core, generated helpers, external stubs, manual-body
+assembly, extension bridges, and selected-product output. Every invocation,
+member selection, callback target, interface branch, external binding, and
+representation decision receives one machine disposition:
+
+- direct statically typed operation;
+- finite typed dynamic Go-semantic state with closed target branches and an
+  accepted necessity record; or
+- unimplemented/blocking.
+
+The sweep rejects erased `Function`/`unknown[]` calls, string-selected members,
+universal operation registries, reflection-like target recovery, typed wrappers
+around erased dispatch, and dynamic fallback paths. It also verifies that
+whole-product target analysis was attempted before accepting any runtime
+discriminant. Suppressions and file-local allowlists cannot satisfy this gate.
+
 ## Compiler Differential
 
 With product extensions disabled, generated TypeScript-Go behavior is compared
@@ -236,9 +281,15 @@ same generated contracts used by the product.
 Every accepted run reports:
 
 - selected source files/packages;
-- declarations and bodies;
-- generated, manual, and unimplemented support;
+- declarations, function/method bodies, function literals, synthetic
+  initializers, and unsupported non-body declarations as separate denominators;
+- generated, manual, and unimplemented support states;
+- every translation evidence stage from `00-authority-scope.md`;
+- directly incomplete, transitively withheld, retained runnable, and published
+  package counts;
 - operation classes and sites;
+- operation-bearing body counts and deduplicated exposure unions;
+- confirmed-defect, exposed, and certified body counts;
 - test entities scheduled/passed/failed/timed out/crashed;
 - missing machine counts;
 - external resolved/unresolved;
@@ -246,8 +297,19 @@ Every accepted run reports:
 - emitted/withheld artifacts; and
 - representation forms.
 
+Each count is backed by canonical IDs and exact joins. In particular, an
+`ir-admitted` or `lowered` percentage cannot be labeled “translated coverage,”
+and bodies removed by package withholding cannot appear in emitted, runnable,
+typechecked, executed, or certified totals.
+
 No skipped, todo, focused-only, or missing-count test can satisfy complete
 selected-product acceptance.
+
+Passing gates 1–10 establishes neither body correctness nor selected-product
+completion. No body is reported `certified` until all applicable gates through
+18 pass, including generated execution, compiler differential, extension
+assembly, representative projects, performance, source-update regeneration,
+and complete publication.
 
 ## Deterministic Regeneration
 

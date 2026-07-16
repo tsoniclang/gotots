@@ -105,7 +105,7 @@ combinations are:
 
 | Declaration owner | Implementation state | Meaning |
 | --- | --- | --- |
-| generated-core | generated | normal translated implementation |
+| generated-core | generated | automatic IR/lowering ownership; evidence stage reported separately |
 | generated-core | accepted-manual | reviewed complete structural body |
 | generated-core | unimplemented | recognized implementation withheld |
 | external-contract | no-source-body | typed external obligation |

@@ -129,6 +129,36 @@ A binding identifies:
 Assembly imports the selected implementation directly. There is no runtime
 registry, name lookup, package fallback, or speculative host adaptation.
 
+A typed wrapper around erased dispatch is still erased dispatch and is
+forbidden. This is not an external binding:
+
+```ts
+export function Clone(value: string): string {
+  return goExternalCall("strings.Clone", [value] as unknown[]) as string;
+}
+```
+
+Nor may the implementation be recovered through
+`Map<string, Function>`, `Record<string, Function>`, a string-keyed method
+table, `Function`, `unknown[]`, or a cast from an untyped dispatcher. The
+generated signature does not make the hidden call edge static.
+
+An unresolved translator-capability stub is a direct typed function that
+throws. A selected-product binding is a direct typed ESM import selected at
+assembly:
+
+```ts
+import { Clone as cloneImpl } from "@gotots-extern/strings.js";
+
+export function Clone(value: string): string {
+  return cloneImpl(value);
+}
+```
+
+Function values and interface calls follow the same rule: their finite typed
+target representation and call ABI must be explicit. Open or erased target
+sets are unimplemented rather than routed through a universal dispatcher.
+
 ## Manual Body Purpose
 
 Manual ownership is an honest completion mechanism for a body whose typed IR is

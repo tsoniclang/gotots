@@ -156,11 +156,20 @@ Generated core contains no:
 - CommonJS;
 - triple-slash references;
 - unchecked `any` or `unknown` recovery;
+- erased `Function`, `unknown[]`, or universal invocation helpers;
 - reflection or source-name dispatch;
 - dynamic property names for statically selected fields/methods;
+- string-keyed function, external-operation, or interface-method registries;
 - `eval`, generated functions, or proxies;
 - host-shape or emitted-representation inference; or
 - fallback import or implementation selection.
+
+These prohibitions apply transitively to generated language ABI, helper,
+external-stub, and assembled extension modules. A statically typed wrapper does
+not legalize an erased implementation behind it. Interface dynamic-type state
+may select among a finite typed method set established by the representation
+plan; it may not select a member by source spelling or invoke it through
+`Function`/`unknown[]`.
 
 Runtime checks of explicitly planned Go semantic state—such as a canonical
 interface dynamic-type token, channel close state, or Go panic brand—are
@@ -203,8 +212,15 @@ source span. Synthetic temporaries and helpers map to the semantic operation
 that required them.
 
 Per-body records include source semantic hash, IR hash, plan hash, canonical
-generated AST hash, emitted file, and source-map identity. Formatting does not
-change canonical AST identity.
+generated body-AST hash, canonical materialized-body artifact and hash,
+translation evidence stages with their evidence IDs, and source-map identity.
+Formatting does not change canonical AST identity.
+
+An emitted module/file ID is present only when the module exists and contains
+the body. The record separately names whether that module is retained runnable,
+withheld directly, or withheld transitively. A lowered body whose module is
+withheld keeps its analysis-only materialized-body artifact and never claims an
+absent generated file.
 
 ## Deterministic Emission
 

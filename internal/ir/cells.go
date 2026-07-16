@@ -199,3 +199,24 @@ func (b *builder) boxDeclaredNames(idents []ast.Expr, decl *DeclStmt, span Span)
 	}
 	return out, nil
 }
+
+// rejectBoxedBinding fails closed when a fresh binding form (a range
+// variable, a type-switch clause variable, a named result) has its
+// address taken: those sites declare plain bindings, not cells, so
+// boxing them would emit references to a cell that was never declared.
+func (b *builder) rejectBoxedBinding(ident *ast.Ident, construct string, span Span) error {
+	if ident == nil || ident.Name == "_" {
+		return nil
+	}
+	if _, isBoxed := b.boxedVar(ident); isBoxed {
+		return &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "address of " + construct, Span: span}
+	}
+	return nil
+}
+
+// namedResultAddressed reports whether the boxing scan marked this named
+// result's variable — its address is taken, which the plain named-result
+// binding cannot express.
+func (b *builder) namedResultAddressed(result *types.Var) bool {
+	return b.boxed[result]
+}

@@ -191,6 +191,10 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 		b.results = append(b.results, t)
 		b.resultGoTypes = append(b.resultGoTypes, result.Type())
 		if result.Name() != "" {
+			if result.Parent() != nil && b.namedResultAddressed(result) {
+				return declarationSite(&Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+					Construct: "address of a named result", Span: span})
+			}
 			b.namedResults = append(b.namedResults, Var{Name: result.Name(), Type: t})
 		}
 	}

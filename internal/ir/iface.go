@@ -292,6 +292,15 @@ func (b *builder) buildTypeSwitch(n *ast.TypeSwitchStmt) (Stmt, error) {
 
 	for _, clauseStmt := range n.Body.List {
 		clause := clauseStmt.(*ast.CaseClause)
+		if out.Bind != "" {
+			// The clause's implicit binding variable (typed to the case)
+			// cannot have its address taken: the plain binding is not a
+			// cell.
+			if implicit, ok := b.info.Implicits[clause].(*types.Var); ok && b.boxed[implicit] {
+				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT",
+					Construct: "address of a type-switch variable", Span: b.span(clause.Pos())}
+			}
+		}
 		built := TypeSwitchClause{BindType: operand.Type()}
 		for _, expr := range clause.List {
 			if tv, ok := b.info.Types[expr]; ok && tv.IsNil() {

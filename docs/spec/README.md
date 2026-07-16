@@ -90,8 +90,8 @@ reachable unimplemented unit.
 Progress reports distinguish support state from translation evidence. A body
 with complete IR and automatic lowering is `generated`, but it is not thereby
 present in a retained module, typechecked, executed, Go-equivalent, or
-certified. Reports use the evidence stages defined in
-`00-authority-scope.md` and publish the denominator for every count.
+certified. Reports use the evidence stages defined in the authority and
+scope chapter and publish the denominator for every count.
 
 For example, “9,000 bodies are IR-admitted” says nothing by itself about how
 many bodies are present in runnable retained modules. Package withholding can

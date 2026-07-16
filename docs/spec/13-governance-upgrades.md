@@ -96,6 +96,8 @@ Before accepting a fix, reviewers ask:
 - Is an apparently local failure evidence of a missing IR operation,
   constraint, boundary effect, or verifier rule?
 - Is ordinary TypeScript sufficient?
+- Can typed whole-product static analysis eliminate the proposed runtime
+  dispatch, lookup, carrier, or adapter?
 - Is custom runtime behavior actually observed?
 - Can a rare difficult body remain manual or unimplemented instead?
 - Does the change introduce more than one implementation path?
