@@ -58,6 +58,106 @@ func (p *printer) arrayValueCallback(t ir.Type) (string, error) {
 	return p.arrayElemSet(*t.Elem)
 }
 
+// operandSlot spells one compound-target operand: a pure operand
+// (variable or folded constant) re-emits directly, so a compound
+// assignment observes its post-RHS value exactly as gc does; an impure
+// operand (a call, index, etc.) evaluates into a temp before the RHS,
+// preserving lexical evaluation order.
+func (p *printer) operandSlot(e ir.Expr) (string, error) {
+	printed, err := p.printExpr(e)
+	if err != nil {
+		return "", err
+	}
+	if pureOperandExpr(e) {
+		return printed, nil
+	}
+	temp := p.temp()
+	p.line("const %s = %s;", temp, printed)
+	return temp, nil
+}
+
+// pureOperandExpr reports whether re-evaluating one operand is exact and
+// observes the current value: a local variable read or a folded
+// constant. Package variables (live ESM bindings) also qualify.
+func pureOperandExpr(e ir.Expr) bool {
+	switch e.(type) {
+	case *ir.VarRef, *ir.Const, *ir.BoxedLoad:
+		return true
+	}
+	return false
+}
+
+// stageCompoundTarget stages one compound-assignment target for gc's
+// evaluation order: impure operands evaluate (into temps) before the
+// RHS at the call site; pure operands re-emit at load and store, so the
+// container/base/pointer is read AFTER the RHS.
+func (p *printer) stageCompoundTarget(target ir.Target) (stagedTarget, error) {
+	switch t := target.(type) {
+	case ir.VarTarget:
+		return stagedTarget{kind: "var", name: tsName(t.Name), structValue: t.T.Kind == ir.KindStruct,
+			externSet: mustExternSet(p, t.T)}, nil
+	case ir.BoxedTarget:
+		return stagedTarget{kind: "boxed", name: t.Cell}, nil
+	case *ir.FieldTarget:
+		base, err := p.operandSlot(t.X)
+		if err != nil {
+			return stagedTarget{}, err
+		}
+		return stagedTarget{kind: "field", name: base, field: t.Field,
+			structValue: t.T.Kind == ir.KindStruct, externSet: mustExternSet(p, t.T),
+			nilCheckBase: t.X.Type().Kind != ir.KindStruct}, nil
+	case *ir.PointeeTarget:
+		pointer, err := p.operandSlot(t.X)
+		if err != nil {
+			return stagedTarget{}, err
+		}
+		staged := stagedTarget{kind: "pointee", name: pointer, nilCheckBase: true}
+		if elem := t.X.Type().Elem; elem != nil {
+			staged.structValue = elem.Kind == ir.KindStruct
+			staged.externSet = mustExternSet(p, *elem)
+		}
+		return staged, nil
+	case *ir.MapTarget:
+		mapOp, err := p.operandSlot(t.Map)
+		if err != nil {
+			return stagedTarget{}, err
+		}
+		key, err := p.operandSlot(t.Key)
+		if err != nil {
+			return stagedTarget{}, err
+		}
+		return stagedTarget{kind: "map", name: mapOp, keyTemp: key,
+			keyedMap: t.Map.Type().Key.Kind == ir.KindStruct}, nil
+	case *ir.SliceTarget:
+		sliceOp, err := p.operandSlot(t.X)
+		if err != nil {
+			return stagedTarget{}, err
+		}
+		index, err := p.operandSlot(t.Index)
+		if err != nil {
+			return stagedTarget{}, err
+		}
+		structElem := t.X.Type().Elem != nil && t.X.Type().Elem.Kind == ir.KindStruct
+		staged := stagedTarget{kind: "slice", name: sliceOp, keyTemp: index, structValue: structElem}
+		if p.nativeSlice(t.X) {
+			staged.kind = "array"
+		}
+		return staged, nil
+	case *ir.ArrayTarget:
+		arrayOp, err := p.operandSlot(t.X)
+		if err != nil {
+			return stagedTarget{}, err
+		}
+		index, err := p.operandSlot(t.Index)
+		if err != nil {
+			return stagedTarget{}, err
+		}
+		return stagedTarget{kind: "array", name: arrayOp, keyTemp: index,
+			structValue: t.X.Type().Elem.Kind == ir.KindStruct}, nil
+	}
+	return stagedTarget{}, fmt.Errorf("no compound staging for target %T", target)
+}
+
 func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
 	switch t := target.(type) {
 	case ir.BlankTarget:

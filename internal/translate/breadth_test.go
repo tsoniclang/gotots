@@ -439,3 +439,82 @@ func CarrierWhenShared() (int, int) {
 }
 `)
 }
+
+func TestOracleCompoundEvaluationOrder(t *testing.T) {
+	runOracle(t, `package fixture
+
+var mapVar map[string]int
+var sliceVar []int
+var ptrVar *int
+var fieldPtr *holder2
+var callCount int
+
+type holder2 struct{ v int }
+
+func rebindMapRHS() int {
+	fresh := map[string]int{"k": 100}
+	mapVar = fresh
+	return 2
+}
+
+func MapContainerReadAfterRHS() int {
+	mapVar = map[string]int{"k": 1}
+	mapVar["k"] += rebindMapRHS()
+	return mapVar["k"]
+}
+
+func rebindSliceRHS() int {
+	sliceVar = []int{0, 100}
+	return 2
+}
+
+func SliceHeaderReadAfterRHS() int {
+	sliceVar = []int{0, 1}
+	sliceVar[1] += rebindSliceRHS()
+	return sliceVar[1]
+}
+
+func rebindPtrRHS() int {
+	fresh := 100
+	ptrVar = &fresh
+	return 7
+}
+
+func PointerReadAfterRHS() int {
+	base := 1
+	ptrVar = &base
+	*ptrVar += rebindPtrRHS()
+	return *ptrVar
+}
+
+func rebindFieldPtr() int {
+	fresh := holder2{v: 700}
+	fieldPtr = &fresh
+	return 7
+}
+
+func FieldBaseReadAfterRHS() int {
+	base := holder2{v: 1}
+	fieldPtr = &base
+	fieldPtr.v += rebindFieldPtr()
+	return fieldPtr.v
+}
+
+func lexicalKey() string {
+	callCount = 1
+	return "a"
+}
+
+func lexicalRHS() int {
+	callCount = callCount*10 + 2
+	return 5
+}
+
+func KeyThenRHSLexicalOrder() (int, int) {
+	m := map[string]int{"a": 20}
+	callCount = 0
+	m[lexicalKey()] += lexicalRHS()
+	return m["a"], callCount
+}
+`)
+}

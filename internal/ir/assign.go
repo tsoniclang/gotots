@@ -42,7 +42,11 @@ func (b *builder) buildTarget(lhs ast.Expr) (Target, error) {
 			b.use("boxedStore")
 			return BoxedTarget{Cell: cellName(n.Name), T: t}, nil
 		}
-		return VarTarget{Name: n.Name, T: t}, nil
+		pkg := ""
+		if variable.Pkg() != nil && variable.Parent() == variable.Pkg().Scope() {
+			pkg = variable.Pkg().Path()
+		}
+		return VarTarget{Name: n.Name, Pkg: pkg, T: t}, nil
 
 	case *ast.SelectorExpr:
 		selection, ok := b.info.Selections[n]

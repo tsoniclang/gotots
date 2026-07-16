@@ -7,7 +7,12 @@ type Target interface{ target() }
 // in place (field overwrite), preserving every alias of the value.
 type VarTarget struct {
 	Name string
-	T    Type
+	// Pkg names the declaring package for a package-level variable
+	// (empty for locals and parameters); package variables are live ESM
+	// bindings and never body-local, so the representation planner never
+	// treats them as owner-local regions.
+	Pkg string
+	T   Type
 }
 
 // BlankTarget discards a value (the blank identifier); the value is still

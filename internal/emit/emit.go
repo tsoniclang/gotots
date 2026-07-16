@@ -207,7 +207,7 @@ func Package(module *Module, decls Decls) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			var target ir.Target = ir.VarTarget{Name: packageVar.Name, T: packageVar.Type}
+			var target ir.Target = ir.VarTarget{Name: packageVar.Name, Pkg: module.Pkg, T: packageVar.Type}
 			if packageVar.Blank {
 				target = ir.BlankTarget{}
 			}

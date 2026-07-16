@@ -293,8 +293,13 @@ func (s *slicePlanner) walkStmt(stmt Stmt) {
 	case *AssignStmt:
 		for i, target := range n.Targets {
 			variable, isVar := target.(VarTarget)
-			if isVar && variable.T.Kind == KindSlice && i < len(n.Values) {
+			if isVar && variable.Pkg == "" && variable.T.Kind == KindSlice && i < len(n.Values) {
 				s.connectNamedValue(variable.Name, n.Values[i])
+				continue
+			}
+			if isVar && variable.Pkg != "" && i < len(n.Values) {
+				// A package variable escapes (assigned from any function).
+				s.escapeIfSlice(n.Values[i])
 				continue
 			}
 			if i < len(n.Values) {

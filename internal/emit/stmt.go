@@ -3,6 +3,7 @@ package emit
 import (
 	"fmt"
 	"go/token"
+	"strings"
 
 	"github.com/tsoniclang/gotots/internal/ir"
 )
@@ -137,10 +138,19 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		return nil
 
 	case *ir.CompoundStmt:
-		staged, err := p.stageTarget(n.Target)
+		// gc's order: impure target operands (calls) evaluate first at
+		// their lexical position; then the RHS; then the pure container /
+		// base / pointer is read; then the store. Impure operand temps
+		// print inside stageCompoundTarget BEFORE the RHS temp below.
+		var impure strings.Builder
+		operandPrinter := &printer{out: &impure, module: p.module, indent: p.indent,
+			temps: p.temps, zeroFactories: p.zeroFactories, slicePlans: p.slicePlans}
+		staged, err := operandPrinter.stageCompoundTarget(n.Target)
 		if err != nil {
 			return err
 		}
+		p.temps = operandPrinter.temps
+		p.out.WriteString(impure.String())
 		rhs, err := p.printExpr(n.Rhs)
 		if err != nil {
 			return err
@@ -213,7 +223,7 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 
 func (p *printer) printAssign(n *ir.AssignStmt) error {
 	if n.Tuple == nil && len(n.Targets) == 1 {
-		if variable, isVar := n.Targets[0].(ir.VarTarget); isVar &&
+		if variable, isVar := n.Targets[0].(ir.VarTarget); isVar && variable.Pkg == "" &&
 			variable.T.Kind == ir.KindSlice && p.slicePlans[variable.Name] == "native-array" {
 			return p.printNativeSliceAssign(variable, n.Values[0])
 		}
