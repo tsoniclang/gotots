@@ -209,6 +209,8 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		return p.printMethodValue(n)
 	case *ir.FuncRef:
 		return p.module.symbol(n.Pkg, n.Name)
+	case *ir.TupleAdapt:
+		return p.printTupleAdapt(n)
 	case *ir.DynCall:
 		fun, err := p.printExpr(n.Fun)
 		if err != nil {
@@ -420,6 +422,41 @@ func (p *printer) printClosure(n *ir.Closure) (string, error) {
 	}
 	closing := strings.Repeat("  ", p.indent)
 	return "((" + strings.Join(params, ", ") + "): " + result + " => {\n" + sub.String() + closing + "})", nil
+}
+
+// printTupleAdapt spells a per-slot converted multi-result value: the
+// inner value evaluates once, each slot converts, and the converted
+// tuple is rebuilt in order.
+func (p *printer) printTupleAdapt(n *ir.TupleAdapt) (string, error) {
+	inner, err := p.printExpr(n.X)
+	if err != nil {
+		return "", err
+	}
+	converted := make([]string, len(n.Slots))
+	for i, slot := range n.Slots {
+		element := fmt.Sprintf("$t[%d]", i)
+		switch slot.Op {
+		case ir.TupleSlotBox:
+			rtti, err := p.rttiRef(slot.Rtti)
+			if err != nil {
+				return "", err
+			}
+			converted[i] = "goif$.goIfaceBox(" + rtti + ", " + element + ")"
+		case ir.TupleSlotClone:
+			converted[i] = element + ".goClone$()"
+		default:
+			converted[i] = element
+		}
+	}
+	slotTypes := make([]string, len(n.SrcType))
+	for i, t := range n.SrcType {
+		spelled, err := p.tsType(t)
+		if err != nil {
+			return "", err
+		}
+		slotTypes[i] = spelled
+	}
+	return "((($t: readonly [" + joinComma(slotTypes) + "]) => [" + joinComma(converted) + "])(" + inner + "))", nil
 }
 
 func (p *printer) printArgs(args []ir.Expr) (string, error) {

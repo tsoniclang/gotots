@@ -632,6 +632,11 @@
       "specClause": "docs/spec/03-declarations-bodies-control.md"
     },
     {
+      "key": "tupleAdapt",
+      "state": "generated",
+      "specClause": "docs/spec/03-declarations-bodies-control.md"
+    },
+    {
       "key": "tupleSpread",
       "state": "generated",
       "specClause": "docs/spec/03-declarations-bodies-control.md"

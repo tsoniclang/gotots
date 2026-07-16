@@ -134,7 +134,19 @@ func (b *builder) buildAssign(n *ast.AssignStmt) (Stmt, error) {
 
 	// A single multi-valued expression spreading into all targets: a
 	// multi-result call or a comma-ok map lookup.
-	tuple, err := b.tupleValue(n.Rhs, len(n.Lhs))
+	targets := make([]types.Type, len(n.Lhs))
+	for i, lhs := range n.Lhs {
+		if ident, ok := lhs.(*ast.Ident); ok && ident.Name != "_" {
+			if def := b.info.Defs[ident]; def != nil {
+				targets[i] = def.Type()
+			} else if tv, ok := b.info.Types[lhs]; ok {
+				targets[i] = tv.Type
+			}
+		} else if tv, ok := b.info.Types[lhs]; ok {
+			targets[i] = tv.Type
+		}
+	}
+	tuple, err := b.tupleValue(n.Rhs, len(n.Lhs), targets)
 	if err != nil {
 		return nil, err
 	}
@@ -334,7 +346,7 @@ func (b *builder) blankSlotType(n *ast.AssignStmt, index int, span Span) (Type, 
 // tupleValue recognizes a single expression whose multiple values
 // initialize several targets: a multi-result call or a comma-ok map
 // lookup. It returns nil when the shape does not apply.
-func (b *builder) tupleValue(rhs []ast.Expr, targetCount int) (Expr, error) {
+func (b *builder) tupleValue(rhs []ast.Expr, targetCount int, targets []types.Type) (Expr, error) {
 	if len(rhs) != 1 || targetCount < 2 {
 		return nil, nil
 	}
@@ -347,7 +359,13 @@ func (b *builder) tupleValue(rhs []ast.Expr, targetCount int) (Expr, error) {
 		if !ok || tuple.Len() != targetCount {
 			return nil, nil
 		}
-		return b.buildAnyCall(n)
+		call, err := b.buildAnyCall(n)
+		if err != nil {
+			return nil, err
+		}
+		// Each destination slot undergoes the same assignability
+		// conversion an ordinary single assignment would.
+		return b.adaptTupleSlots(call, tuple, targets, b.span(n.Pos()))
 	case *ast.IndexExpr:
 		if targetCount != 2 {
 			return nil, nil
@@ -364,7 +382,17 @@ func (b *builder) tupleValue(rhs []ast.Expr, targetCount int) (Expr, error) {
 			return nil, err
 		}
 		b.use("mapCommaOk")
-		return &MapLookup{Map: mapExpr, Key: key, T: *mapExpr.Type().Elem}, nil
+		lookup := Expr(&MapLookup{Map: mapExpr, Key: key, T: *mapExpr.Type().Elem})
+		// The value slot boxes when the destination is an interface; the
+		// ok slot is always bool.
+		if len(targets) == 2 && targets[0] != nil {
+			mapType := types.Unalias(b.info.Types[n.X].Type).Underlying().(*types.Map)
+			sourceTuple := types.NewTuple(
+				types.NewVar(0, nil, "", mapType.Elem()),
+				types.NewVar(0, nil, "", types.Typ[types.Bool]))
+			return b.adaptTupleSlots(lookup, sourceTuple, targets, b.span(n.Pos()))
+		}
+		return lookup, nil
 	case *ast.TypeAssertExpr:
 		if targetCount != 2 || n.Type == nil {
 			return nil, nil

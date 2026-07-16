@@ -63,6 +63,7 @@ func (b *builder) buildClosure(lit *ast.FuncLit) (Expr, error) {
 		}
 		out.Results = append(out.Results, Var{Name: result.Name(), Type: resultType})
 		child.results = append(child.results, resultType)
+		child.resultGoTypes = append(child.resultGoTypes, result.Type())
 		if result.Name() != "" {
 			child.namedResults = append(child.namedResults, Var{Name: result.Name(), Type: resultType})
 		}

@@ -181,8 +181,14 @@ func (b *builder) buildReturn(n *ast.ReturnStmt) (Stmt, error) {
 						if err != nil {
 							return nil, err
 						}
+						targets := make([]types.Type, len(b.resultGoTypes))
+						copy(targets, b.resultGoTypes)
+						adapted, err := b.adaptTupleSlots(call, tuple, targets, b.span(n.Pos()))
+						if err != nil {
+							return nil, err
+						}
 						b.use("return")
-						return &ReturnStmt{CallValue: call}, nil
+						return &ReturnStmt{CallValue: adapted}, nil
 					}
 				}
 			}

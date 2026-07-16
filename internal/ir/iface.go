@@ -427,3 +427,87 @@ func (b *builder) buildIfaceEquality(n *ast.BinaryExpr, left, right Expr, span S
 		Rtti: rtti, Form: form, Negate: negate,
 	}, nil
 }
+
+// TupleSlot is one per-slot conversion applied to a multi-result value
+// as it crosses an assignability boundary.
+type TupleSlotOp int
+
+const (
+	TupleSlotPassthrough TupleSlotOp = iota
+	TupleSlotBox                     // box a concrete value into an interface
+	TupleSlotClone                   // copy a struct value at the boundary
+)
+
+// TupleSlot pairs one conversion with the rtti a box needs.
+type TupleSlot struct {
+	Op   TupleSlotOp
+	Rtti RttiRef
+}
+
+// TupleAdapt applies per-slot assignability conversions to a
+// multi-result value (f(g()) forwarding, tuple returns, and tuple
+// assignment): the inner value evaluates once and each slot converts.
+type TupleAdapt struct {
+	X       Expr
+	Slots   []TupleSlot
+	SrcType []Type // the inner value's result slot types (for exact typing)
+	T       Type   // a synthetic tuple marker
+}
+
+func (*TupleAdapt) expr()        {}
+func (a *TupleAdapt) Type() Type { return a.T }
+
+// adaptTupleSlots wraps a multi-result value with the per-slot
+// conversions each destination requires; it returns the value unchanged
+// when no slot converts. sourceTuple is the inner value's Go result
+// tuple; targets are the destination Go types.
+func (b *builder) adaptTupleSlots(inner Expr, sourceTuple *types.Tuple, targets []types.Type, span Span) (Expr, error) {
+	if sourceTuple == nil || sourceTuple.Len() != len(targets) {
+		return inner, nil
+	}
+	slots := make([]TupleSlot, len(targets))
+	any := false
+	for i := range targets {
+		source := sourceTuple.At(i).Type()
+		target := targets[i]
+		if target == nil {
+			// A blank slot or an untyped destination: no conversion.
+			slots[i] = TupleSlot{Op: TupleSlotPassthrough}
+			continue
+		}
+		_, targetIsIface := target.Underlying().(*types.Interface)
+		_, sourceIsIface := source.Underlying().(*types.Interface)
+		switch {
+		case targetIsIface && !sourceIsIface:
+			// A concrete result flowing into an interface slot boxes,
+			// unless it is the untyped nil (no dynamic type).
+			if b.info != nil {
+				// nil results cannot occur in a call's result tuple.
+			}
+			rtti, err := b.rttiFor(source, span)
+			if err != nil {
+				return nil, err
+			}
+			slots[i] = TupleSlot{Op: TupleSlotBox, Rtti: rtti}
+			any = true
+		default:
+			// A call's result slot is a fresh value; like a single
+			// assignment (bindStructValue passes call results through),
+			// only interface boxing is inserted — never a redundant copy.
+			slots[i] = TupleSlot{Op: TupleSlotPassthrough}
+		}
+	}
+	if !any {
+		return inner, nil
+	}
+	srcTypes := make([]Type, len(targets))
+	for i := range srcTypes {
+		t, err := b.typeOf(sourceTuple.At(i).Type(), span)
+		if err != nil {
+			return nil, err
+		}
+		srcTypes[i] = t
+	}
+	b.use("tupleAdapt")
+	return &TupleAdapt{X: inner, Slots: slots, SrcType: srcTypes, T: Type{Kind: KindInvalid, Go: "(tuple)"}}, nil
+}

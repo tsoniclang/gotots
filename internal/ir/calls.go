@@ -261,13 +261,24 @@ func (b *builder) buildCallArgsResults(n *ast.CallExpr, signature *types.Signatu
 			if signature.Variadic() {
 				return &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "multi-result forwarding into a variadic call", Span: span}
 			}
-			// f(g()): the inner call's fresh results spread positionally.
+			// f(g()): the inner call's fresh results spread positionally,
+			// each slot undergoing the same assignability conversion an
+			// ordinary argument would.
 			inner, err := b.buildAnyCall(innerCall)
 			if err != nil {
 				return err
 			}
+			sourceTuple, _ := b.info.Types[innerCall].Type.(*types.Tuple)
+			targets := make([]types.Type, params.Len())
+			for i := range targets {
+				targets[i] = params.At(i).Type()
+			}
+			adapted, err := b.adaptTupleSlots(inner, sourceTuple, targets, span)
+			if err != nil {
+				return err
+			}
 			b.use("tupleSpread")
-			*args = append(*args, &TupleSpread{X: inner})
+			*args = append(*args, &TupleSpread{X: adapted})
 			return b.appendCallResults(n, signature, results)
 		}
 	}

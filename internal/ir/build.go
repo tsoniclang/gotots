@@ -28,8 +28,10 @@ type builder struct {
 	sites      *[]UnsupportedSite
 	deferCount int
 	// results are the enclosing function's result types, giving return
-	// expressions their expected types.
-	results []Type
+	// expressions their expected types; resultGoTypes keeps the parallel
+	// go/types results for tuple-return assignability conversions.
+	results       []Type
+	resultGoTypes []types.Type
 	// namedResults, when set, are the enclosing function's named results:
 	// zero-initialized locals that bare returns return.
 	namedResults []Var
@@ -187,6 +189,7 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 		}
 		function.Results = append(function.Results, Var{Name: result.Name(), Type: t})
 		b.results = append(b.results, t)
+		b.resultGoTypes = append(b.resultGoTypes, result.Type())
 		if result.Name() != "" {
 			b.namedResults = append(b.namedResults, Var{Name: result.Name(), Type: t})
 		}
