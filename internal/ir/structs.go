@@ -83,7 +83,8 @@ func BuildStruct(p *packages.Package, sourceDir string, unit Scope, spec *ast.Ty
 // generic declaring types) fails the declaration — an incomplete table
 // would silently mis-dispatch.
 func (b *builder) promotedDelegates(named *types.Named, span Span) ([]PromotedDelegate, error) {
-	seen := map[string]bool{}
+	seen := map[string]bool{}     // full package-qualified identity already emitted
+	byName := map[string]string{} // bare method name -> the identity that claimed it
 	var out []PromotedDelegate
 	for _, methodSet := range []*types.MethodSet{
 		types.NewMethodSet(types.NewPointer(named)),
@@ -96,10 +97,27 @@ func (b *builder) promotedDelegates(named *types.Named, span Span) ([]PromotedDe
 				continue // a direct method
 			}
 			method := selection.Obj().(*types.Func)
-			if seen[method.Name()] {
-				continue
+			// Identity is package-qualified: two unexported methods with the
+			// same spelling from DIFFERENT packages are distinct methods and
+			// both promote (Go qualifies unexported identifiers by package).
+			identity := method.Name()
+			if !method.Exported() && method.Pkg() != nil {
+				identity += "@" + method.Pkg().Path()
 			}
-			seen[method.Name()] = true
+			if seen[identity] {
+				continue // the same method seen through both method sets
+			}
+			seen[identity] = true
+			if prior, taken := byName[method.Name()]; taken && prior != identity {
+				// Two DISTINCT promoted methods share a bare name (unexported
+				// methods from different packages). The vtable keys and the
+				// $r.m.<name> dispatch are bare-name, so keeping both would
+				// collide and mis-dispatch; fail closed rather than silently
+				// drop one delegate.
+				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+					Construct: "promoted methods collide on name " + method.Name() + " from distinct packages", Span: span}
+			}
+			byName[method.Name()] = identity
 			if method.Pkg() == nil || !b.unit.Owns(method.Pkg().Path()) {
 				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 					Construct: "promoted method from a type outside the translated unit (" + method.Name() + ")", Span: span}
@@ -110,11 +128,12 @@ func (b *builder) promotedDelegates(named *types.Named, span Span) ([]PromotedDe
 					Construct: "promoted generic method (" + method.Name() + ")", Span: span}
 			}
 			_, pointerRecv := method.Type().(*types.Signature).Recv().Type().(*types.Pointer)
-			// Go's method-set resolution guarantees AT MOST ONE method per
-			// name in a type's method set (same-depth same-name embeddings
-			// promote NEITHER; different depths promote only the
-			// shallowest), so name-keyed delegation is exact by the
-			// language's own rule — types.NewMethodSet already applied it.
+			// Same-depth same-name embeddings promote NEITHER and different
+			// depths promote only the shallowest, so within ONE package a
+			// bare name is unambiguous — but unexported methods from
+			// different packages share a spelling yet are distinct, and the
+			// bare-name collision above rejects that case rather than
+			// mis-dispatching.
 			entry := PromotedDelegate{Name: method.Name(), Pkg: method.Pkg().Path(),
 				ValueReceiver: !pointerRecv}
 			current := types.Type(named)

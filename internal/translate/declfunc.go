@@ -52,12 +52,19 @@ func translateFunc(p *packages.Package, sourceDir string, unit ir.Scope, relativ
 	signatureDigest := sha256.Sum256([]byte(signatureText))
 
 	representations := map[string]string{}
+	var representationErr error
 	recordRepresentation := func(t ir.Type) {
-		key := t.Canon
-		if key == "" {
-			key = t.Go
+		// The canonical identity is the ONLY carrier key: the Go spelling
+		// is not a semantic identity (aliases and unexported members
+		// collide), so an empty Canon fails closed rather than keying the
+		// representation ledger by a spelling.
+		if t.Canon == "" {
+			if representationErr == nil {
+				representationErr = fmt.Errorf("%s: carrier type %q has no canonical identity", id, t.Go)
+			}
+			return
 		}
-		representations["carrier:"+key] = conservativeCarrier(t)
+		representations["carrier:"+t.Canon] = conservativeCarrier(t)
 	}
 	if function.Receiver != nil {
 		recordRepresentation(function.Receiver.Type)
@@ -67,6 +74,9 @@ func translateFunc(p *packages.Package, sourceDir string, unit ir.Scope, relativ
 	}
 	for _, result := range function.Results {
 		recordRepresentation(result.Type)
+	}
+	if representationErr != nil {
+		return nil, nil, representationErr
 	}
 	// The planner's per-region slice selections are part of the proof:
 	// the representation gate re-derives and compares them.
@@ -186,8 +196,12 @@ func collectLits(p *packages.Package, f fileSource, node ast.Node, parentID stri
 		}
 		position := p.Fset.Position(lit.Pos())
 		id := goid.Repeatable(p.PkgPath, "funclit", "", f.relative, position.Line, position.Column)
-		startPos := p.Fset.Position(lit.Body.Pos())
-		endPos := p.Fset.Position(lit.Body.End())
+		// The span covers the WHOLE literal — the func keyword, parameter
+		// and result lists, and the body — so a rejection anywhere in the
+		// signature (an unsupported parameter or result type) is contained
+		// by the literal and does not fail open to "generated".
+		startPos := p.Fset.Position(lit.Pos())
+		endPos := p.Fset.Position(lit.End())
 		bodyHash := ""
 		if startPos.Offset >= 0 && endPos.Offset <= len(f.source) && startPos.Offset < endPos.Offset {
 			digest := sha256.Sum256(f.source[startPos.Offset:endPos.Offset])

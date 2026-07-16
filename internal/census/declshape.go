@@ -44,8 +44,11 @@ func collectDeclarations(p *packages.Package, file *ast.File, relativePath, scop
 			}
 			position := fset.Position(lit.Pos())
 			id := goid.Repeatable(pkgPath, "funclit", "", relativePath, position.Line, position.Column)
-			start := fset.Position(lit.Body.Pos()).Offset
-			end := fset.Position(lit.Body.End()).Offset
+			// Whole-literal span (func keyword through closing brace): the
+			// signature is part of the identity so a parameter or result
+			// type change is detected, matching the translator's span.
+			start := fset.Position(lit.Pos()).Offset
+			end := fset.Position(lit.End()).Offset
 			bodyHash := ""
 			if start >= 0 && end <= len(source) && start < end {
 				digest := sha256.Sum256(source[start:end])

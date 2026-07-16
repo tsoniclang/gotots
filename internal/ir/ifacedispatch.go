@@ -12,18 +12,14 @@ import (
 	"sort"
 )
 
-// lookupSelection returns the method selection named `name` in a method
-// set, resolving exported methods without package qualification.
+// lookupSelection returns the interface method's selection in a concrete
+// type's method set by Go's own rule: exported names match regardless of
+// package, unexported names match only within their declaring package.
+// The pkg MUST be the INTERFACE METHOD's declaring package (not the
+// concrete type's) — there is no bare-name fallback, which would match
+// an unrelated same-spelled unexported method from another package.
 func lookupSelection(set *types.MethodSet, pkg *types.Package, name string) *types.Selection {
-	if selection := set.Lookup(pkg, name); selection != nil {
-		return selection
-	}
-	for i := range set.Len() {
-		if set.At(i).Obj().Name() == name {
-			return set.At(i)
-		}
-	}
-	return nil
+	return set.Lookup(pkg, name)
 }
 
 // resolveImplementerTokens computes the closed set of dynamic-type
@@ -141,7 +137,7 @@ func (b *builder) ifaceMembers(iface *types.Interface, span Span) ([]IfaceMember
 			set := types.NewMethodSet(t)
 			for i := range iface.NumMethods() {
 				method := iface.Method(i)
-				selection := lookupSelection(set, named.Obj().Pkg(), method.Name())
+				selection := lookupSelection(set, method.Pkg(), method.Name())
 				if selection == nil {
 					continue
 				}

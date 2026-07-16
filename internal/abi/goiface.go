@@ -140,25 +140,9 @@ function ifaceValueEqual(r: GoRtti, a: unknown, b: unknown): boolean {
   return a === b;
 }
 
-// x.(T), panic form: both messages name the static source interface.
-export function goIfaceAssert(i: GoIface, r: GoRtti, sourceDisplay: string): unknown {
-  if (i === undefined) {
-    throw new GoPanic("interface conversion: " + sourceDisplay + " is nil, not " + r.d);
-  }
-  if (i.r !== r) {
-    throw new GoPanic("interface conversion: " + sourceDisplay + " is " + i.r.d + ", not " + r.d);
-  }
-  return i.v;
-}
-
-
-// x.(T), comma-ok form: the zero value fills the miss.
-export function goIfaceLookup<T>(i: GoIface, r: GoRtti, zero: T): readonly [T, boolean] {
-  if (i === undefined || i.r !== r) {
-    return [zero, false];
-  }
-  return [i.v as T, true];
-}
+// Assertions (x.(T), both panic and comma-ok forms) emit INLINE at the
+// use site as literal-discriminant narrowing that reads the exact member
+// payload with no cast (ADR-0004); no payload-recovering helper exists.
 
 function rtti(d: string): GoRtti {
   // Every predeclared basic type is comparable, and === is its exact

@@ -363,7 +363,11 @@ func TypedAdapterType(module *Module, params []ir.Var, results []ir.Type) (strin
 func (p *printer) ifaceUnionAlias(t ir.Type) (string, error) {
 	identity := t.IfaceID
 	if identity == "" {
-		identity = t.Go
+		// The canonical interface identity is the ONLY key: falling back
+		// to the Go spelling would let two structurally distinct
+		// interfaces with equal spellings share one alias. An empty
+		// identity is a construction defect, not a spelling to guess.
+		return "", fmt.Errorf("interface %q has no canonical identity", t.Go)
 	}
 	digest := sha256.Sum256([]byte(identity))
 	name := "Iface$" + hex.EncodeToString(digest[:6])

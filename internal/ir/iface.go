@@ -206,7 +206,7 @@ func (b *builder) boxIfaceValue(built Expr, source types.Type, expected Type, sp
 // digest of its path-qualified signature — so name-only collisions can
 // never dispatch or satisfy a method-set test.
 func MethodKey(method *types.Func) string {
-	signature := types.TypeString(method.Type(), func(p *types.Package) string { return p.Path() })
+	signature := typeid.Canonical(method.Type())
 	digest := sha256.Sum256([]byte(signature))
 	key := method.Name()
 	if !method.Exported() && method.Pkg() != nil {
@@ -553,6 +553,19 @@ func (b *builder) adaptTupleSlots(inner Expr, sourceTuple *types.Tuple, targets 
 			if err != nil {
 				return nil, err
 			}
+			// A tuple slot boxes exactly like boxIfaceValue: the boxed
+			// composite or external named type must join the dynamic-type
+			// universe, or the empty-interface union would lack this exact
+			// member and the box (and any assert-back) would be statically
+			// invalid.
+			if rtti.Composite != "" && rtti.ExternID == "" && !mentionsTypeParamType(source) {
+				sourceIR, err := b.typeOf(source, span)
+				if err != nil {
+					return nil, err
+				}
+				b.unit.AddBoxedComposite(rtti.Composite, sourceIR)
+			}
+			b.registerBoxedExtern(source)
 			slots[i] = TupleSlot{Op: TupleSlotBox, Rtti: rtti, Target: targetIR}
 			any = true
 		default:
