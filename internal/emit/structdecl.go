@@ -304,20 +304,38 @@ func (p *printer) printDeferWrappedBody(body *ir.Block, usesDeferStack bool) err
 	if !usesDeferStack {
 		return p.printBlockBody(body)
 	}
+	// Go's defer/panic drain: every deferred call runs at function exit,
+	// LIFO; a panic from one defer replaces the in-flight panic but the
+	// remaining (older) defers still run, and the last surviving panic
+	// propagates. Normal returns run the same drain via finally.
 	p.line("const _ds$: (() => void)[] = [];")
+	p.line("let _dp$: { readonly v: unknown } | undefined = undefined;")
 	p.line("try {")
 	p.indent++
 	if err := p.printBlockBody(body); err != nil {
 		return err
 	}
 	p.indent--
+	p.line("} catch (_de$) {")
+	p.indent++
+	p.line("_dp$ = { v: _de$ };")
+	p.indent--
 	p.line("} finally {")
 	p.indent++
 	p.line("for (let _di$ = _ds$.length - 1; _di$ >= 0; _di$--) {")
 	p.indent++
+	p.line("try {")
+	p.indent++
 	p.line("(_ds$[_di$] as () => void)();")
 	p.indent--
+	p.line("} catch (_de$) {")
+	p.indent++
+	p.line("_dp$ = { v: _de$ };")
+	p.indent--
 	p.line("}")
+	p.indent--
+	p.line("}")
+	p.line("if (_dp$ !== undefined) { throw _dp$.v; }")
 	p.indent--
 	p.line("}")
 	return nil

@@ -13,7 +13,7 @@ package abi
 import "fmt"
 
 // Version identifies the ABI contract carried in generated output.
-const Version = 10
+const Version = 11
 
 // Family is the static carrier family of an integer kind.
 type Family string
@@ -77,11 +77,23 @@ func Files() map[string]string {
 const gopanicSource = `// The Go panic carrier: distinguishes translated Go panics from host
 // errors and carries the exact Go runtime-error message.
 export class GoPanic extends Error {
-  goMessage: string;
-  constructor(message: string) {
+  // value retains the exact typed panic payload through deferred
+  // execution and recovery; format lazily produces the printed message
+  // at the point the runtime would finally print it (after all defers).
+  readonly value: unknown;
+  private readonly format: () => string;
+  private computed: string | undefined;
+  constructor(message: string, value?: unknown, format?: () => string) {
     super(message);
     this.name = "GoPanic";
-    this.goMessage = message;
+    this.value = value === undefined ? message : value;
+    this.format = format ?? (() => message);
+  }
+  get goMessage(): string {
+    if (this.computed === undefined) {
+      this.computed = this.format();
+    }
+    return this.computed;
   }
 }
 
@@ -194,7 +206,10 @@ export function goPanicError(err: { r: { d: string; m: Readonly<Record<string, F
   if (fn === undefined) {
     throw new GoPanic("GOTOTS_EXTERNAL_UNIMPLEMENTED: " + (err.r.x ?? err.r.d) + ".Error");
   }
-  throw new GoPanic(String(fn(err.v)));
+  // The typed error value is retained; its message formats lazily, so a
+  // deferred function that mutates the error is reflected exactly as Go
+  // prints the panic after defers run.
+  throw new GoPanic("panic", err, () => String((fn as Function)(err.v)));
 }
 
 // len(string) is the UTF-8 byte length; JS string length counts UTF-16

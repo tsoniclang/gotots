@@ -62,11 +62,16 @@ func (b *builder) buildDeferredCall(deferStmt *ast.DeferStmt) ([]Stmt, Expr, err
 		}
 		return captures, call, nil
 	case *MethodCall:
-		// A value receiver copies when the defer statement evaluates —
-		// mutations between the defer and the call never reach it — so a
-		// struct-valued receiver captures a clone.
+		// A value receiver is dereferenced (when reached through a
+		// pointer) and copied when the defer statement evaluates, so
+		// mutations between the defer and the call never reach it — Go
+		// evaluates the implicit deref-and-copy at the defer statement.
 		recv := call.Recv
 		if !call.PointerRecv {
+			if recv.Type().Kind == KindPointer {
+				b.use("deref")
+				recv = &Deref{X: recv, T: *recv.Type().Elem}
+			}
 			recv = b.bindStructValue(recv)
 		}
 		call.Recv = capture(prefix+"_r", recv)
