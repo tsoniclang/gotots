@@ -101,7 +101,9 @@ func (b *builder) resolveIfaceBranches(ifaceType *types.Interface, method *types
 			continue // generic types dispatch per instantiation, handled elsewhere
 		}
 		// A boxed value may be the value type or its pointer; both tokens
-		// join the switch when they implement the interface.
+		// join the switch when they implement the interface. Whole-unit
+		// coverage is sound: an over-approximated branch is dead, never a
+		// missing case (which would be an unsound runtime panic).
 		if types.Implements(named, ifaceType) {
 			if err := add(named, false); err != nil {
 				return nil, err
