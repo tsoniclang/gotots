@@ -52,12 +52,20 @@ func Packages(pkgs []*packages.Package, sourceDir string, options Options) (*Gen
 		Ownership: map[string]string{},
 		Withheld:  map[string]string{},
 	}
+	var emitters []func() error
 	for _, p := range sorted {
-		if err := translatePackage(out, p, sourceDir, unit, options); err != nil {
+		if err := translatePackage(out, p, sourceDir, unit, options, &emitters); err != nil {
 			return nil, err
 		}
 	}
+	// The complete withholding closure is known before any module
+	// renders, so retained output never references a withheld class.
 	withholdDependents(out, sorted)
+	for _, emitPackage := range emitters {
+		if err := emitPackage(); err != nil {
+			return nil, err
+		}
+	}
 	if err := emitExternalStubs(out, unit, sorted[0], sourceDir, options); err != nil {
 		return nil, err
 	}
@@ -105,7 +113,7 @@ type fileSource struct {
 // translatePackage translates one unit package into its generated module.
 // Declarations are collected in two passes — types first, then functions
 // and methods — so a method may precede its receiver type in file order.
-func translatePackage(out *Generated, p *packages.Package, sourceDir string, unit ir.Scope, options Options) error {
+func translatePackage(out *Generated, p *packages.Package, sourceDir string, unit ir.Scope, options Options, emitters *[]func() error) error {
 	corePath := path.Join("core", p.PkgPath, "package.ts")
 
 	var files []fileSource
@@ -204,7 +212,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 						// its methods generate as package-level functions. A
 						// non-alias named type still owns an rtti object for
 						// interface use.
-						carrier, err := erasedCarrier(p, sourceDir, unit, typeSpec, object)
+						carrier, underlying, err := erasedCarrier(p, sourceDir, unit, typeSpec, object)
 						if err != nil {
 							if declSite(id, err) {
 								continue
@@ -214,6 +222,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 						if !object.IsAlias() {
 							carrierTypes = append(carrierTypes, emit.CarrierType{
 								Name: typeSpec.Name.Name, Exported: typeSpec.Name.IsExported(),
+								Underlying: underlying,
 							})
 						}
 						out.Proofs = append(out.Proofs, Proof{
@@ -441,54 +450,16 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 		return nil
 	}
 
-	structList := make([]*ir.Struct, 0, len(structOrder))
-	for _, name := range structOrder {
-		structList = append(structList, structs[name])
-	}
-	// Synthesized anonymous-struct classes the package's bodies use.
-	structList = append(structList, unit.AnonStructs(p.PkgPath)...)
-	// The module's import environment is built after the declaration
-	// passes so external obligations discovered while building bodies
-	// resolve to their stub modules.
-	module, err := newModule(corePath, p.PkgPath, p.Types.Name(), unit)
-	if err != nil {
-		return err
-	}
-	// Every co-generated package this package imports is an
-	// initialization edge: its module must evaluate even when constant
-	// folding or type-only use erased every symbol reference.
-	for importPath := range p.Imports {
-		if unit.Owns(importPath) {
-			module.RequireInitEdge(importPath)
+	// Emission is deferred until the complete withholding closure is
+	// known: union aliases must reference only retained classes, and a
+	// package withheld by the dependency cascade emits nothing.
+	*emitters = append(*emitters, func() error {
+		if _, withheld := out.Withheld[p.PkgPath]; withheld {
+			return nil
 		}
-	}
-	body, err := emit.Package(module, emit.Decls{
-		InitCalls:    initCalls,
-		Structs:      structList,
-		Methods:      carrierMethods,
-		CarrierTypes: carrierTypes,
-		Vars:         packageVars,
-		Functions:    functions,
+		return emitCorePackage(out, p, sourceDir, unit, options, corePath, files,
+			functions, structs, structOrder, carrierMethods, carrierTypes, packageVars, initCalls)
 	})
-	if err != nil {
-		return err
-	}
-	coreContent, err := emit.FileWithProvenance(emit.Provenance{
-		SchemaVersion:  1,
-		SourceRevision: options.SourceRevision,
-		ProfileHash:    options.ProfileHash,
-		AbiVersion:     abi.Version,
-		Path:           corePath,
-	}, body)
-	if err != nil {
-		return err
-	}
-	out.Files[corePath] = coreContent
-	out.Ownership[corePath] = "generated-core"
-	if out.ModuleImports == nil {
-		out.ModuleImports = map[string][]string{}
-	}
-	out.ModuleImports[p.PkgPath] = module.CoGeneratedImports()
 	return nil
 }
 

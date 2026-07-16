@@ -99,6 +99,11 @@ type Type struct {
 	Sig *FuncSig
 	// ArrayLen is the fixed length of a KindArray.
 	ArrayLen int64
+	// IfaceMembers is the closed implementer union of an interface type:
+	// one member per concrete implementer (value or pointer flavor),
+	// resolved from the whole-unit type universe. Only TYPE identities —
+	// spelling uses erased type-only imports, never runtime edges.
+	IfaceMembers []IfaceMember
 	// TypeParamName, on a KindIface carrier, names the generic type
 	// parameter this type is; signatures spell it generically.
 	TypeParamName string
@@ -143,6 +148,9 @@ type Scope struct {
 	// (owned and referenced external), the closed-world set from which
 	// each interface method call's dispatch branches are resolved.
 	concreteTypes *[]*types.TypeName
+	// ifaceMembers caches each interface identity's resolved closed
+	// implementer union (typeOf recursion makes this hot).
+	ifaceMembers map[string][]IfaceMember
 	// importClosures maps each package path to the set of package paths
 	// it can reference (itself plus its transitive imports). A dynamic
 	// value can only reach a call from a package the caller imports, so
@@ -173,6 +181,7 @@ func NewScope(paths ...string) Scope {
 		externTypes:    map[string]*ExternTypeObligation{},
 		externVars:     map[string]*types.Var{},
 		concreteTypes:  &[]*types.TypeName{},
+		ifaceMembers:   map[string][]IfaceMember{},
 		importClosures: map[string]map[string]bool{},
 	}
 }
@@ -282,6 +291,17 @@ func (s Scope) AddConcreteType(name *types.TypeName) {
 
 // ConcreteTypes returns the whole-unit named-type universe.
 func (s Scope) ConcreteTypes() []*types.TypeName { return *s.concreteTypes }
+
+// IfaceMemberCache returns a cached implementer union.
+func (s Scope) IfaceMemberCache(key string) ([]IfaceMember, bool) {
+	members, ok := s.ifaceMembers[key]
+	return members, ok
+}
+
+// SetIfaceMemberCache stores one interface identity's implementer union.
+func (s Scope) SetIfaceMemberCache(key string, members []IfaceMember) {
+	s.ifaceMembers[key] = members
+}
 
 // SetImportClosure records the set of package paths one package can
 // reference (itself plus its transitive imports).
@@ -482,6 +502,24 @@ type Struct struct {
 // PromotedDelegate is one promoted method in a struct's method set: the
 // rtti table entry delegates through the embedded value fields to the
 // declaring type's generated method function.
+// IfaceMember is one branch of a closed interface union: the literal
+// discriminant, the payload's concrete type, and the vtable const's
+// location (the concrete type's own package).
+type IfaceMember struct {
+	K       string // "pkg.Type" or "*pkg.Type"
+	Pkg     string
+	Type    string
+	Pointer bool
+	// Struct distinguishes class payloads (identity carriers: the
+	// pointer IS the instance) from named value carriers (pointer = a
+	// cell). Payloads spell by NAME ONLY — no eager type resolution, so
+	// interface membership can never recurse through generic arguments.
+	Struct bool
+	// Extern marks an external implementer whose vtable is built inline
+	// over stub exports at box sites.
+	Extern bool
+}
+
 type PromotedDelegate struct {
 	Name     string
 	Path     []string // embedded field names, outermost first

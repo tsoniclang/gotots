@@ -67,6 +67,10 @@ type PackageVar struct {
 type CarrierType struct {
 	Name     string
 	Exported bool
+	// Underlying is the carrier's resolved value type; the module
+	// declares `export type Name = <underlying>` so union members and
+	// signatures can reference the named carrier directly.
+	Underlying ir.Type
 }
 
 // Decls is the complete declaration set of one translated package.
@@ -118,11 +122,15 @@ func Package(module *Module, decls Decls) (string, error) {
 		}
 		if len(structDecl.TypeParams) == 0 {
 			body.WriteString("\n")
-			if err := printRtti(&body, module, RttiInfo{
+			info := RttiInfo{
 				TypeName: structDecl.Name, Exported: structDecl.Exported,
 				Pointer: true, Comparable: structDecl.Comparable, HasEq: structDecl.Comparable,
 				Methods: structDecl.Methods, Promoted: structDecl.Promoted,
-			}); err != nil {
+			}
+			if err := printRtti(&body, module, info); err != nil {
+				return "", err
+			}
+			if err := printVtables(&body, module, info); err != nil {
 				return "", err
 			}
 		}
@@ -145,13 +153,24 @@ func Package(module *Module, decls Decls) (string, error) {
 				carrierMethods = append(carrierMethods, method.Fn)
 			}
 		}
+		// The carrier's named alias: union members and signatures can
+		// reference the Go type name directly.
+		underlyingSpelled, err := (&printer{out: &body, module: module}).tsType(carrier.Underlying)
+		if err != nil {
+			return "", err
+		}
+		fmt.Fprintf(&body, "export type %s = %s;\n", tsName(carrier.Name), underlyingSpelled)
 		// A named carrier's payload is a primitive: comparable directly,
 		// and its pointer type (a cell) boxes with its own rtti.
-		if err := printRtti(&body, module, RttiInfo{
+		carrierInfo := RttiInfo{
 			TypeName: carrier.Name, Exported: carrier.Exported,
 			Pointer: true, Comparable: true,
 			Methods: carrierMethods,
-		}); err != nil {
+		}
+		if err := printRtti(&body, module, carrierInfo); err != nil {
+			return "", err
+		}
+		if err := printVtables(&body, module, carrierInfo); err != nil {
 			return "", err
 		}
 	}
@@ -216,7 +235,7 @@ func Package(module *Module, decls Decls) (string, error) {
 			p.line("%s();", initCall)
 		}
 	}
-	return module.importLines() + body.String(), nil
+	return module.importLines() + module.aliasLines() + body.String(), nil
 }
 
 // printer carries per-function emission state and the module context.
@@ -440,7 +459,7 @@ func (p *printer) tsType(t ir.Type) (string, error) {
 		if t.TypeParamName != "" {
 			return tsName(t.TypeParamName), nil
 		}
-		return "goif$.GoIface", nil
+		return p.ifaceUnionAlias(t)
 	case ir.KindTypeParam:
 		return t.Named, nil
 	case ir.KindFunc:

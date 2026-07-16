@@ -85,12 +85,12 @@ func translateFunc(p *packages.Package, sourceDir string, unit ir.Scope, relativ
 
 // erasedCarrier resolves the reviewed carrier of a non-struct named type
 // or alias declaration; a type outside the subset fails closed.
-func erasedCarrier(p *packages.Package, sourceDir string, unit ir.Scope, spec *ast.TypeSpec, object *types.TypeName) (string, error) {
+func erasedCarrier(p *packages.Package, sourceDir string, unit ir.Scope, spec *ast.TypeSpec, object *types.TypeName) (string, ir.Type, error) {
 	t, err := ir.ResolveType(p, sourceDir, unit, object.Type(), spec.Pos())
 	if err != nil {
-		return "", err
+		return "", ir.Type{}, err
 	}
-	return conservativeCarrier(t), nil
+	return conservativeCarrier(t), t, nil
 }
 
 // receiverBase names the receiver's base type from its AST.

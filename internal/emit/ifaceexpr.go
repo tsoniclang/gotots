@@ -22,7 +22,11 @@ func (p *printer) printIfaceExpr(e ir.Expr) (string, bool, error) {
 		if err != nil {
 			return "", true, err
 		}
-		return "goif$.goIfaceBox(" + rtti + ", " + x + ")", true, nil
+		vtable, err := p.boxVtable(n.Rtti)
+		if err != nil {
+			return "", true, err
+		}
+		return fmt.Sprintf("goif$.goIfaceBox(%q, %s, %s, %s)", boxDiscriminant(n.Rtti), rtti, x, vtable), true, nil
 	case *ir.IfaceCall:
 		printed, err := p.printIfaceCall(n)
 		return printed, true, err
@@ -109,13 +113,18 @@ func (p *printer) printIfaceExpr(e ir.Expr) (string, bool, error) {
 		if err != nil {
 			return "", true, err
 		}
-		tokens := make([]string, len(n.Implementers))
-		for i, token := range n.Implementers {
+		tokens := make([]string, 0, len(n.Implementers))
+		for _, token := range n.Implementers {
+			// A withheld package's token cannot exist at runtime (its
+			// module never evaluates) and must not be referenced.
+			if token.Pkg != "" && p.module.Withheld != nil && p.module.Withheld(token.Pkg) {
+				continue
+			}
 			spelled, err := p.rttiRef(token)
 			if err != nil {
 				return "", true, err
 			}
-			tokens[i] = spelled
+			tokens = append(tokens, spelled)
 		}
 		list := "[" + joinComma(tokens) + "]"
 		required := make([]string, len(n.Required))
@@ -124,28 +133,37 @@ func (p *printer) printIfaceExpr(e ir.Expr) (string, bool, error) {
 		}
 		reqList := "[" + joinComma(required) + "]"
 		if n.CommaOk {
-			return fmt.Sprintf("goif$.goIfaceLookupSet(%s, %s)", x, list), true, nil
+			targetUnion, err := p.tsType(n.Target)
+			if err != nil {
+				return "", true, err
+			}
+			return fmt.Sprintf("goif$.goIfaceLookupSet<Exclude<%s, undefined>>(%s, %s)", targetUnion, x, list), true, nil
 		}
 		spelled, err := p.tsType(n.Target)
 		if err != nil {
 			return "", true, err
 		}
-		return fmt.Sprintf("(goif$.goIfaceAssertSet(%s, %s, %s, %q, %q) as (%s))", x, list, reqList, n.SourceDisplay, n.TargetDisplay, spelled), true, nil
+		return fmt.Sprintf("goif$.goIfaceAssertSet<Exclude<%s, undefined>>(%s, %s, %s, %q, %q)", spelled, x, list, reqList, n.SourceDisplay, n.TargetDisplay), true, nil
 	}
 	return "", false, nil
 }
 
-// printIfaceCall lowers an interface method call to an exhaustive token
-// switch over the closed dynamic-type set: the receiver and arguments
-// evaluate once, a nil interface panics, and each branch dispatches
-// directly to the concrete generated method. No name-selected member
-// lookup occurs.
+// printIfaceCall lowers an interface method call onto the closed
+// discriminated union (ADR-0004): the literal switch narrows each member
+// so the payload and vtable are exactly typed — no cast, no erased
+// recovery, no value import of any implementer. A nil interface panics
+// first, exactly Go.
 func (p *printer) printIfaceCall(n *ir.IfaceCall) (string, error) {
 	recv, err := p.printExpr(n.Recv)
 	if err != nil {
 		return "", err
 	}
-	params := []string{"$r: goif$.GoIface"}
+	recvType := n.Recv.Type()
+	union, err := p.tsType(recvType)
+	if err != nil {
+		return "", err
+	}
+	params := []string{"$r: " + union}
 	passed := []string{recv}
 	argNames := make([]string, len(n.Args))
 	for i, arg := range n.Args {
@@ -169,63 +187,31 @@ func (p *printer) printIfaceCall(n *ir.IfaceCall) (string, error) {
 	var body strings.Builder
 	sub := &printer{out: &body, module: p.module, indent: 0}
 	sub.line("if ($r === undefined) { gort$.goPanicNil(); }")
-	sub.line("const $box = $r as goif$.GoIfaceBox;")
-	sub.line("switch ($box.r) {")
+	if len(p.retainedMembers(recvType)) == 0 {
+		// Every implementer is withheld: no value of this interface can
+		// exist at runtime in this bundle, so the call is unreachable.
+		// Routing through goIndirect keeps TypeScript from applying IIFE
+		// control-flow analysis (which would mark the CALLER's subsequent
+		// statements unreachable and disable narrowing there).
+		sub.line("gort$.goPanicUnreachableType(%q);", recvType.Go)
+		closing := strings.Repeat("  ", p.indent)
+		return fmt.Sprintf("(gort$.goIndirect((%s): %s => {\n%s%s}))(%s)",
+			joinComma(params), result, body.String(), closing, joinComma(passed)), nil
+	}
+	sub.line("switch ($r.k) {")
 	sub.indent++
-	for _, branch := range n.Branches {
-		token, err := p.rttiRef(branch.Rtti)
-		if err != nil {
-			return "", err
-		}
-		callee, err := p.ifaceBranchCallee(branch)
-		if err != nil {
-			return "", err
-		}
-		payload, err := p.tsType(branch.Payload)
-		if err != nil {
-			return "", err
-		}
-		receiver := "($box.v as (" + payload + "))"
-		// A pointer dynamic value dereferences before a value-receiver
-		// call (Go's implicit deref: nil panics, the method copies on
-		// entry) and before a promoted field chain.
-		if branch.Payload.Kind == ir.KindPointer && (branch.ValueReceiver || len(branch.FieldPath) > 0) {
-			checked, err := p.nilCheckOf(receiver, branch.Payload)
-			if err != nil {
-				return "", err
-			}
-			receiver = checked
-		}
-		for _, step := range branch.FieldPath {
-			receiver += "." + step.Field
-			if step.Pointer {
-				if receiver, err = p.nilCheckOf(receiver, step.FieldType); err != nil {
-					return "", err
-				}
-			}
-		}
-		operands := append([]string{receiver}, argNames...)
-		call := callee + "(" + joinComma(operands) + ")"
+	for _, member := range p.retainedMembers(recvType) {
+		call := "$r.m." + n.Display + "(" + joinComma(append([]string{"$r.v"}, argNames...)) + ")"
 		if result == "void" {
-			sub.line("case %s: %s; return;", token, call)
+			sub.line("case %q: %s; return;", member.K, call)
 		} else {
-			sub.line("case %s: return %s;", token, call)
+			sub.line("case %q: return %s;", member.K, call)
 		}
 	}
-	sub.line("default: gort$.goPanicUnreachableType($box.r.d);")
+	sub.line("default: gort$.goPanicUnreachableType(($r as goif$.GoAnyBox).r.d);")
 	sub.indent--
 	sub.line("}")
 	closing := strings.Repeat("  ", p.indent)
 	return fmt.Sprintf("((%s): %s => {\n%s%s})(%s)",
-		strings.Join(params, ", "), result, body.String(), closing, joinComma(passed)), nil
-}
-
-// ifaceBranchCallee spells the direct method function for one dispatch
-// branch: the generated DeclType$Method (owned or external stub) of the
-// method's declaring type.
-func (p *printer) ifaceBranchCallee(branch ir.IfaceBranch) (string, error) {
-	if branch.External {
-		return p.module.symbol(branch.DeclPkg, externMethodSymbol(branch.DeclType, branch.Method))
-	}
-	return p.module.symbol(branch.DeclPkg, branch.DeclType+"$"+branch.Method)
+		joinComma(params), result, body.String(), closing, joinComma(passed)), nil
 }

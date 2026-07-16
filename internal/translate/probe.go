@@ -178,7 +178,8 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 	verified := make([]string, 0, len(result.PackagesFullyTranslated))
 	for _, candidate := range result.PackagesFullyTranslated {
 		throwaway := &Generated{Files: map[string]string{}, Ownership: map[string]string{}, Withheld: map[string]string{}}
-		if err := translatePackage(throwaway, byPath[candidate], sourceDir, unit, Options{}); err != nil {
+		var emitters []func() error
+		if err := translatePackage(throwaway, byPath[candidate], sourceDir, unit, Options{}, &emitters); err != nil {
 			result.PackagesBodyOnly = append(result.PackagesBodyOnly, candidate+": "+firstLine(err.Error()))
 			continue
 		}

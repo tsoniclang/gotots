@@ -190,18 +190,11 @@ func (b *builder) buildIfaceMethodCall(n *ast.CallExpr, recv Expr, method *types
 	if err := b.buildCallArgsResults(n, signature, &out.Args, &out.Results); err != nil {
 		return nil, err
 	}
-	// Resolve the closed dynamic-type set for a static exhaustive token
-	// switch. The interface type comes from the receiver's static type.
-	ifaceGoType := b.info.Types[selector.X].Type
-	ifaceType, ok := ifaceGoType.Underlying().(*types.Interface)
-	if !ok {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "interface method call on " + ifaceGoType.String(), Span: span}
-	}
-	branches, err := b.resolveIfaceBranches(ifaceType, method, span)
-	if err != nil {
-		return nil, err
-	}
-	out.Branches = branches
+	// The closed dispatch set lives on the receiver's interface TYPE
+	// (its IfaceMembers union); emission switches the literal
+	// discriminant — no per-call set, no value imports of implementers.
+	_ = span
+	_ = selector
 	b.use("ifaceCall")
 	return out, nil
 }
@@ -459,10 +452,12 @@ const (
 	TupleSlotClone                   // copy a struct value at the boundary
 )
 
-// TupleSlot pairs one conversion with the rtti a box needs.
+// TupleSlot pairs one conversion with the rtti a box needs and the
+// destination type the converted slot carries.
 type TupleSlot struct {
-	Op   TupleSlotOp
-	Rtti RttiRef
+	Op     TupleSlotOp
+	Rtti   RttiRef
+	Target Type
 }
 
 // TupleAdapt applies per-slot assignability conversions to a
@@ -509,7 +504,11 @@ func (b *builder) adaptTupleSlots(inner Expr, sourceTuple *types.Tuple, targets 
 			if err != nil {
 				return nil, err
 			}
-			slots[i] = TupleSlot{Op: TupleSlotBox, Rtti: rtti}
+			targetIR, err := b.typeOf(target, span)
+			if err != nil {
+				return nil, err
+			}
+			slots[i] = TupleSlot{Op: TupleSlotBox, Rtti: rtti, Target: targetIR}
 			any = true
 		default:
 			// A call's result slot is a fresh value; like a single

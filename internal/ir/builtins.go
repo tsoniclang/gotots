@@ -252,16 +252,15 @@ func (b *builder) buildPanic(call *ast.CallExpr) (Stmt, error) {
 			}
 		}
 		errorMethod := errorType.Method(0)
-		branches, err := b.resolveIfaceBranches(errorType, errorMethod, span)
+		errorIface, err := b.typeOf(types.Universe.Lookup("error").Type(), span)
 		if err != nil {
 			return nil, err
 		}
 		format := &IfaceCall{
-			Recv:     &ParamRef{Name: "$err", T: Type{Kind: KindIface, Go: "error"}},
-			Method:   MethodKey(errorMethod),
-			Display:  "Error",
-			Results:  []Type{{Kind: KindString, Go: "string"}},
-			Branches: branches,
+			Recv:    &ParamRef{Name: "$err", T: errorIface},
+			Method:  MethodKey(errorMethod),
+			Display: "Error",
+			Results: []Type{{Kind: KindString, Go: "string"}},
 		}
 		b.use("panic:error")
 		return &PanicStmt{Value: boxed, ErrorFormat: format}, nil

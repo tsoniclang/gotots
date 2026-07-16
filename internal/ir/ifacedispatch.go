@@ -9,119 +9,8 @@ package ir
 
 import (
 	"go/types"
+	"sort"
 )
-
-// resolveIfaceBranches computes the closed dispatch set for one
-// interface method call: every concrete type in the unit that
-// implements the receiver's interface, with the direct method to call.
-func (b *builder) resolveIfaceBranches(ifaceType *types.Interface, method *types.Func, span Span) ([]IfaceBranch, error) {
-	target := method.Name()
-	var branches []IfaceBranch
-	seen := map[string]bool{}
-	add := func(named *types.Named, pointer bool) error {
-		var t types.Type = named
-		if pointer {
-			t = types.NewPointer(named)
-		}
-		set := types.NewMethodSet(t)
-		selection := lookupSelection(set, named.Obj().Pkg(), target)
-		if selection == nil {
-			return nil
-		}
-		obj := named.Obj()
-		key := obj.Pkg().Path() + "." + obj.Name()
-		if pointer {
-			key = "*" + key
-		}
-		if seen[key] {
-			return nil
-		}
-		seen[key] = true
-		payload, err := b.typeOf(t, span)
-		if err != nil {
-			return err
-		}
-		rtti, err := b.rttiFor(t, span)
-		if err != nil {
-			return err
-		}
-		method := selection.Obj().(*types.Func)
-		methodRecv := method.Type().(*types.Signature).Recv()
-		declNamed, ok := types.Unalias(methodRecv.Type()).(*types.Named)
-		if pointerType, isPtr := methodRecv.Type().(*types.Pointer); isPtr {
-			declNamed, ok = types.Unalias(pointerType.Elem()).(*types.Named)
-		}
-		if !ok {
-			return &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
-				Construct: "interface dispatch to a method on an unnamed receiver", Span: span}
-		}
-		_, isPointerRecv := methodRecv.Type().(*types.Pointer)
-		branch := IfaceBranch{
-			Rtti:          rtti,
-			Payload:       payload,
-			DeclPkg:       declNamed.Obj().Pkg().Path(),
-			DeclType:      declNamed.Obj().Name(),
-			External:      !b.unit.Owns(declNamed.Obj().Pkg().Path()),
-			Method:        method.Name(),
-			ValueReceiver: !isPointerRecv,
-		}
-		// A promoted method chains through the embedded value fields of
-		// the concrete type; the selection index names that path.
-		if path := selection.Index(); len(path) > 1 {
-			current := named.Underlying()
-			for _, index := range path[:len(path)-1] {
-				structType, isStruct := current.(*types.Struct)
-				if !isStruct {
-					return &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
-						Construct: "interface dispatch through non-struct promotion", Span: span}
-				}
-				field := structType.Field(index)
-				step := PromotionStep{Field: field.Name()}
-				resolved, err := b.typeOf(field.Type(), span)
-				if err != nil {
-					return err
-				}
-				step.FieldType = resolved
-				fieldType := field.Type()
-				if pointer, isPtr := fieldType.Underlying().(*types.Pointer); isPtr {
-					step.Pointer = true
-					fieldType = pointer.Elem()
-				}
-				branch.FieldPath = append(branch.FieldPath, step)
-				current = fieldType.Underlying()
-			}
-		}
-		branches = append(branches, branch)
-		return nil
-	}
-	for _, name := range b.unit.ConcreteTypes() {
-		named, ok := name.Type().(*types.Named)
-		if !ok {
-			continue
-		}
-		if _, isIface := named.Underlying().(*types.Interface); isIface {
-			continue
-		}
-		if named.TypeParams() != nil && named.TypeParams().Len() > 0 {
-			continue // generic types dispatch per instantiation, handled elsewhere
-		}
-		// A boxed value may be the value type or its pointer; both tokens
-		// join the switch when they implement the interface. Whole-unit
-		// coverage is sound: an over-approximated branch is dead, never a
-		// missing case (which would be an unsound runtime panic).
-		if types.Implements(named, ifaceType) {
-			if err := add(named, false); err != nil {
-				return nil, err
-			}
-		}
-		if types.Implements(types.NewPointer(named), ifaceType) {
-			if err := add(named, true); err != nil {
-				return nil, err
-			}
-		}
-	}
-	return branches, nil
-}
 
 // lookupSelection returns the method selection named `name` in a method
 // set, resolving exported methods without package qualification.
@@ -179,4 +68,55 @@ func (b *builder) resolveImplementerTokens(target *types.Interface, span Span) (
 		}
 	}
 	return tokens, nil
+}
+
+// ifaceMembers resolves the closed implementer union of one interface
+// type from the whole-unit universe: only TYPE identities (spelling uses
+// erased type-only imports), cached per canonical interface identity.
+func (b *builder) ifaceMembers(iface *types.Interface, span Span) ([]IfaceMember, error) {
+	key := types.TypeString(iface, func(p *types.Package) string { return p.Path() })
+	if cached, ok := b.unit.IfaceMemberCache(key); ok {
+		return cached, nil
+	}
+	var members []IfaceMember
+	add := func(named *types.Named, pointer bool) error {
+		obj := named.Obj()
+		k := obj.Pkg().Path() + "." + obj.Name()
+		if pointer {
+			k = "*" + k
+		}
+		_, isStruct := named.Underlying().(*types.Struct)
+		members = append(members, IfaceMember{
+			K:   k,
+			Pkg: obj.Pkg().Path(), Type: obj.Name(), Pointer: pointer,
+			Struct: isStruct,
+			Extern: !b.unit.Owns(obj.Pkg().Path()),
+		})
+		return nil
+	}
+	for _, name := range b.unit.ConcreteTypes() {
+		named, ok := name.Type().(*types.Named)
+		if !ok {
+			continue
+		}
+		if _, isIface := named.Underlying().(*types.Interface); isIface {
+			continue
+		}
+		if named.TypeParams() != nil && named.TypeParams().Len() > 0 {
+			continue
+		}
+		if types.Implements(named, iface) {
+			if err := add(named, false); err != nil {
+				return nil, err
+			}
+		}
+		if types.Implements(types.NewPointer(named), iface) {
+			if err := add(named, true); err != nil {
+				return nil, err
+			}
+		}
+	}
+	sort.Slice(members, func(i, j int) bool { return members[i].K < members[j].K })
+	b.unit.SetIfaceMemberCache(key, members)
+	return members, nil
 }

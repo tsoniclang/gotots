@@ -47,7 +47,7 @@ func StubModule(module *Module, funcs []StubFunc, members []StubMember) (string,
 			return "", err
 		}
 	}
-	return module.importLines() + body.String(), nil
+	return module.importLines() + module.aliasLines() + body.String(), nil
 }
 
 func printStubFunc(out *strings.Builder, module *Module, fn StubFunc) error {

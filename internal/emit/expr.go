@@ -31,8 +31,12 @@ func helper(name string) string { return "goabi$." + name }
 // of a provably nil operand (legal Go that panics at runtime) cannot
 // collapse the result type.
 func (p *printer) nilCheckOf(expr string, nilable ir.Type) (string, error) {
-	if nilable.Kind == ir.KindIface {
-		return "gort$.goNilCheck<goif$.GoIfaceBox>(" + expr + ")", nil
+	if nilable.Kind == ir.KindIface && nilable.TypeParamName == "" {
+		union, err := p.tsType(nilable)
+		if err != nil {
+			return "", err
+		}
+		return "gort$.goNilCheck<Exclude<" + union + ", undefined>>(" + expr + ")", nil
 	}
 	spelled, err := p.tsType(nilable)
 	if err != nil {
@@ -525,7 +529,11 @@ func (p *printer) printTupleAdapt(n *ir.TupleAdapt) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			converted[i] = "goif$.goIfaceBox(" + rtti + ", " + element + ")"
+			vtable, err := p.boxVtable(slot.Rtti)
+			if err != nil {
+				return "", err
+			}
+			converted[i] = fmt.Sprintf("goif$.goIfaceBox(%q, %s, %s, %s)", boxDiscriminant(slot.Rtti), rtti, element, vtable)
 		case ir.TupleSlotClone:
 			converted[i] = element + ".goClone$()"
 		default:
@@ -541,7 +549,11 @@ func (p *printer) printTupleAdapt(n *ir.TupleAdapt) (string, error) {
 		}
 		slotTypes[i] = spelled
 		if n.Slots[i].Op == ir.TupleSlotBox {
-			resultTypes[i] = "goif$.GoIface"
+			target, err := p.tsType(n.Slots[i].Target)
+			if err != nil {
+				return "", err
+			}
+			resultTypes[i] = target
 		} else {
 			resultTypes[i] = spelled
 		}

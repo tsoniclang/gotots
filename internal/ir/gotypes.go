@@ -201,6 +201,11 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 			out.Named = named.Obj().Name()
 			out.Pkg = named.Obj().Pkg().Path()
 		}
+		members, err := b.ifaceMembers(u, span)
+		if err != nil {
+			return Type{}, err
+		}
+		out.IfaceMembers = members
 		return out, nil
 
 	case *types.Array:

@@ -13,7 +13,7 @@ package abi
 import "fmt"
 
 // Version identifies the ABI contract carried in generated output.
-const Version = 15
+const Version = 16
 
 // Family is the static carrier family of an integer kind.
 type Family string
@@ -143,6 +143,14 @@ export function goPanicRangeExit(): never {
 // generation; it fails closed rather than silently mis-dispatching.
 export function goPanicUnreachableType(display: string): never {
   throw new GoPanic("GOTOTS_UNREACHABLE: dynamic type " + display + " outside the resolved dispatch set");
+}
+
+// goIndirect returns its function unchanged: an identity indirection
+// that keeps TypeScript's IIFE control-flow analysis from treating an
+// always-panicking (provably unreachable) dispatch as making the
+// caller's subsequent statements unreachable.
+export function goIndirect<F>(f: F): F {
+  return f;
 }
 
 export function goNilCheck<T>(x: T | undefined): T {

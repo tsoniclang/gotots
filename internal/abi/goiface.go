@@ -15,6 +15,20 @@ import { GoPanic, goPanicNil } from "./gopanic.js";
 // method names onto the generated method functions, and — for external
 // named types — the canonical identity that routes method dispatch
 // through the external-contract registry.
+// DropFirst removes a function's receiver parameter from its tuple —
+// the exact typing of promoted vtable adapters.
+export type DropFirst<T extends readonly unknown[]> = T extends readonly [unknown, ...infer R] ? R : never;
+
+// GoBox is one member of a closed interface union: the literal
+// discriminant k narrows the payload v and vtable m to their exact
+// member types — dispatch never recovers a payload from an erased type.
+export interface GoBox<K extends string, V, M> {
+  readonly k: K;
+  readonly r: GoRtti;
+  readonly v: V;
+  readonly m: M;
+}
+
 export interface GoRtti {
   // d is the Go runtime display of the dynamic type; it is the switch
   // discriminant identity (rtti objects are interned per canonical
@@ -50,16 +64,18 @@ export function goRttiComposite(key: string, rtti: GoRtti): GoRtti {
   return interned;
 }
 
-// GoIfaceBox pairs the dynamic type with the concrete value.
-export interface GoIfaceBox {
-  readonly r: GoRtti;
-  readonly v: unknown;
-}
+// GoAnyBox is the helper-facing supertype of every union member: the
+// helpers below read only the token r (equality, assertion membership)
+// and never recover the payload — construction-bound functions on the
+// token (r.e) and the member's own vtable are the only value readers.
+export type GoAnyBox = GoBox<string, unknown, object>;
 
-export type GoIface = GoIfaceBox | undefined;
+// GoIface is the nil-or-box helper-facing shape; generated interface
+// positions spell their exact closed member unions.
+export type GoIface = GoAnyBox | undefined;
 
-export function goIfaceBox(r: GoRtti, v: unknown): GoIfaceBox {
-  return { r, v };
+export function goIfaceBox<K extends string, V, M>(k: K, r: GoRtti, v: V, m: M): GoBox<K, V, M> {
+  return { k, r, v, m };
 }
 
 
@@ -121,12 +137,14 @@ export function goIfaceAssert(i: GoIface, r: GoRtti, sourceDisplay: string): unk
 // x.(I) as a static token-membership test: the dynamic type must be one
 // of the closed set of tokens that implement the target interface
 // (resolved at generation from the whole-unit type universe).
-export function goIfaceAssertSet(i: GoIface, tokens: readonly GoRtti[], required: readonly string[], sourceDisplay: string, targetDisplay: string): GoIfaceBox {
+export function goIfaceAssertSet<T extends GoAnyBox>(i: GoIface, tokens: readonly GoRtti[], required: readonly string[], sourceDisplay: string, targetDisplay: string): T {
   if (i === undefined) {
     throw new GoPanic("interface conversion: " + sourceDisplay + " is nil, not " + targetDisplay);
   }
   for (const token of tokens) {
-    if (i.r === token) return i;
+    // Membership of the token set is the runtime proof of the target
+    // union; the conversion is checked, never blind.
+    if (i.r === token) return i as T;
   }
   const missing = missingMethod(i.r, required);
   throw new GoPanic("interface conversion: " + i.r.d + " is not " + targetDisplay +
@@ -145,10 +163,10 @@ function missingMethod(r: GoRtti, required: readonly string[]): string | undefin
 }
 
 // x.(I), comma-ok form: undefined (the nil interface) fills the miss.
-export function goIfaceLookupSet(i: GoIface, tokens: readonly GoRtti[]): [GoIface, boolean] {
+export function goIfaceLookupSet<T extends GoAnyBox>(i: GoIface, tokens: readonly GoRtti[]): [T | undefined, boolean] {
   if (i === undefined) return [undefined, false];
   for (const token of tokens) {
-    if (i.r === token) return [i, true];
+    if (i.r === token) return [i as T, true];
   }
   return [undefined, false];
 }

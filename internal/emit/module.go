@@ -17,6 +17,10 @@ type ModuleImport struct {
 type ExternMethod struct {
 	Name string
 	Key  string
+	// Adapter is the pre-spelled exactly typed vtable arrow delegating
+	// to the stub export (built where the obligation's signature is
+	// known).
+	Adapter string
 }
 
 // ABIImports carries the language-ABI module specifiers for one module.
@@ -45,11 +49,65 @@ type Module struct {
 	ExternMethods map[string][]ExternMethod
 	imports       map[string]ModuleImport
 	used          map[string]bool
+	// typeUsed marks packages referenced only in type positions: their
+	// imports emit as `import type` — erased, adding no runtime edge and
+	// no initialization (ADR-0004).
+	typeUsed map[string]bool
+	// ifaceAliases collects the closed union aliases this module spells,
+	// keyed by alias name, emitted after imports.
+	ifaceAliases map[string]string
+	aliasOrder   []string
+	// Withheld reports packages whose modules are not in the bundle:
+	// union aliases exclude their classes (nothing of theirs can box at
+	// runtime — their code does not run) and never reference their
+	// absent files.
+	Withheld func(pkg string) bool
 	// initEdges are co-generated packages this package imports whose
 	// module must still be imported (evaluated) even when no symbol
 	// reference survives — folded constants and type-only uses erase the
 	// reference but not the initialization dependency.
 	initEdges map[string]bool
+}
+
+// Symbol exposes the module's qualified-symbol spelling.
+func (m *Module) Symbol(pkg, name string) (string, error) { return m.symbol(pkg, name) }
+
+// typeSymbol spells a qualified symbol used only in a TYPE position:
+// the package import may then be type-only (erased).
+func (m *Module) typeSymbol(pkg, name string) (string, error) {
+	if pkg == m.Pkg {
+		return tsName(name), nil
+	}
+	imported, ok := m.imports[pkg]
+	if !ok {
+		return "", fmt.Errorf("package %s is not importable from %s", pkg, m.Pkg)
+	}
+	m.typeUsed[pkg] = true
+	return imported.Alias + "." + tsName(name), nil
+}
+
+// RegisterIfaceAlias records one closed-union alias; returns whether it
+// was newly added.
+func (m *Module) RegisterIfaceAlias(name, declaration string) bool {
+	if _, exists := m.ifaceAliases[name]; exists {
+		return false
+	}
+	m.ifaceAliases[name] = declaration
+	m.aliasOrder = append(m.aliasOrder, name)
+	return true
+}
+
+// aliasLines renders the union aliases in first-registration order.
+func (m *Module) aliasLines() string {
+	if len(m.aliasOrder) == 0 {
+		return ""
+	}
+	var out strings.Builder
+	for _, name := range m.aliasOrder {
+		out.WriteString(m.ifaceAliases[name])
+		out.WriteString("\n")
+	}
+	return out.String()
 }
 
 // CoGeneratedImports returns every co-generated package this module
@@ -103,7 +161,8 @@ func NewModule(pkg, pkgName string, abiImports ABIImports, specifiers map[string
 		imports[path] = ModuleImport{Alias: aliases[path], Specifier: specifiers[path]}
 	}
 	return &Module{Pkg: pkg, PkgName: pkgName, ABI: abiImports, imports: imports,
-		used: map[string]bool{}, initEdges: map[string]bool{}}
+		used: map[string]bool{}, initEdges: map[string]bool{},
+		typeUsed: map[string]bool{}, ifaceAliases: map[string]string{}}
 }
 
 // symbol spells a reference to a package-level symbol: unqualified within
@@ -138,14 +197,26 @@ func (m *Module) importLines() string {
 	for path := range m.initEdges {
 		emit[path] = true
 	}
+	typeOnly := make([]string, 0, len(m.typeUsed))
+	for path := range m.typeUsed {
+		if !emit[path] {
+			typeOnly = append(typeOnly, path)
+		}
+	}
 	usedPaths := make([]string, 0, len(emit))
 	for path := range emit {
 		usedPaths = append(usedPaths, path)
 	}
 	sort.Strings(usedPaths)
+	sort.Strings(typeOnly)
 	for _, path := range usedPaths {
 		imported := m.imports[path]
 		fmt.Fprintf(&out, "import * as %s from %q;\n", imported.Alias, imported.Specifier)
+	}
+	for _, path := range typeOnly {
+		imported := m.imports[path]
+		// Erased: no runtime module edge, no initialization (ADR-0004).
+		fmt.Fprintf(&out, "import type * as %s from %q;\n", imported.Alias, imported.Specifier)
 	}
 	return out.String()
 }
