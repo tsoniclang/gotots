@@ -36,8 +36,23 @@ func (p *printer) printMethodValue(n *ir.MethodValue) (string, error) {
 	}
 	var call string
 	if n.Iface {
-		call = fmt.Sprintf("goif$.goIfaceCall($r, %q, [%s])", n.DispatchKey, joinComma(args))
-		if call, err = p.castResults(call, n.Results); err != nil {
+		// Reuse the closed token-switch dispatch: the bound receiver $r
+		// is the interface box, and the method value's parameters are the
+		// call arguments.
+		argExprs := make([]ir.Expr, len(args))
+		for i := range args {
+			argExprs[i] = &ir.RawExpr{Text: args[i], T: n.T.Sig.Params[i]}
+		}
+		synthetic := &ir.IfaceCall{
+			Recv:     &ir.RawExpr{Text: "$r", T: n.Recv.Type()},
+			Method:   n.DispatchKey,
+			Display:  n.Method,
+			Args:     argExprs,
+			Results:  n.Results,
+			Branches: n.Branches,
+		}
+		call, err = p.printIfaceCall(synthetic)
+		if err != nil {
 			return "", err
 		}
 	} else {

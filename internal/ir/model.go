@@ -139,6 +139,15 @@ type Scope struct {
 	// externVars records external package variables the unit reads, by
 	// canonical "pkg.Name" identity.
 	externVars map[string]*types.Var
+	// concreteTypes is the whole-unit universe of concrete named types
+	// (owned and referenced external), the closed-world set from which
+	// each interface method call's dispatch branches are resolved.
+	concreteTypes *[]*types.TypeName
+	// importClosures maps each package path to the set of package paths
+	// it can reference (itself plus its transitive imports). A dynamic
+	// value can only reach a call from a package the caller imports, so
+	// interface dispatch is bounded to the caller's closure.
+	importClosures map[string]map[string]bool
 }
 
 // ExternTypeObligation is one external named type's referenced contract
@@ -156,13 +165,15 @@ func NewScope(paths ...string) Scope {
 		packages[path] = true
 	}
 	return Scope{
-		packages:     packages,
-		generics:     map[*types.Func][][]types.Type{},
-		externals:    map[*types.Func]bool{},
-		typeGenerics: map[*types.TypeName][][]types.Type{},
-		anonStructs:  map[string]map[string]*Struct{},
-		externTypes:  map[string]*ExternTypeObligation{},
-		externVars:   map[string]*types.Var{},
+		packages:       packages,
+		generics:       map[*types.Func][][]types.Type{},
+		externals:      map[*types.Func]bool{},
+		typeGenerics:   map[*types.TypeName][][]types.Type{},
+		anonStructs:    map[string]map[string]*Struct{},
+		externTypes:    map[string]*ExternTypeObligation{},
+		externVars:     map[string]*types.Var{},
+		concreteTypes:  &[]*types.TypeName{},
+		importClosures: map[string]map[string]bool{},
 	}
 }
 
@@ -253,6 +264,36 @@ func (s Scope) ExternalTypes() []*ExternTypeObligation {
 		out = append(out, s.externTypes[id])
 	}
 	return out
+}
+
+// AddConcreteType records one named type in the unit's dynamic-type
+// universe (idempotent by object identity is not enforced; callers add
+// each once during the pre-pass).
+func (s Scope) AddConcreteType(name *types.TypeName) {
+	*s.concreteTypes = append(*s.concreteTypes, name)
+}
+
+// ConcreteTypes returns the whole-unit named-type universe.
+func (s Scope) ConcreteTypes() []*types.TypeName { return *s.concreteTypes }
+
+// SetImportClosure records the set of package paths one package can
+// reference (itself plus its transitive imports).
+func (s Scope) SetImportClosure(pkg string, closure map[string]bool) {
+	s.importClosures[pkg] = closure
+}
+
+// CanReference reports whether package `from` can reference a value of a
+// type declared in package `target` — target is in from's import
+// closure. An unknown closure is permissive (no filtering evidence).
+func (s Scope) CanReference(from, target string) bool {
+	if from == target {
+		return true
+	}
+	closure, ok := s.importClosures[from]
+	if !ok {
+		return true
+	}
+	return closure[target]
 }
 
 // AddExternalVar records one external package variable the unit reads.

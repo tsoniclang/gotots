@@ -461,6 +461,10 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 	}
 	out.Files[corePath] = coreContent
 	out.Ownership[corePath] = "generated-core"
+	if out.ModuleImports == nil {
+		out.ModuleImports = map[string][]string{}
+	}
+	out.ModuleImports[p.PkgPath] = module.CoGeneratedImports()
 	return nil
 }
 
@@ -468,6 +472,25 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 // across the unit: the closed-world evidence that admits generic
 // declarations.
 func collectGenericInstances(unit ir.Scope, pkgs []*packages.Package) {
+	// The dynamic-type universe: every named type declared in an owned
+	// package, the closed-world set interface dispatch resolves over.
+	for _, p := range pkgs {
+		scope := p.Types.Scope()
+		for _, name := range scope.Names() {
+			if typeName, ok := scope.Lookup(name).(*types.TypeName); ok && !typeName.IsAlias() {
+				if _, isNamed := typeName.Type().(*types.Named); isNamed {
+					unit.AddConcreteType(typeName)
+				}
+			}
+		}
+	}
+	// Per-package transitive import closures bound interface dispatch to
+	// the types a caller can actually reference.
+	for _, p := range pkgs {
+		closure := map[string]bool{p.PkgPath: true}
+		collectImportClosure(p, closure)
+		unit.SetImportClosure(p.PkgPath, closure)
+	}
 	for _, p := range pkgs {
 		for ident, instance := range p.TypesInfo.Instances {
 			args := make([]types.Type, 0, instance.TypeArgs.Len())
@@ -535,4 +558,15 @@ func relativeImport(fromDir, to string) (string, error) {
 		specifier = "./" + specifier
 	}
 	return specifier, nil
+}
+
+// collectImportClosure adds every transitive import path of p to closure.
+func collectImportClosure(p *packages.Package, closure map[string]bool) {
+	for importPath, imported := range p.Imports {
+		if closure[importPath] {
+			continue
+		}
+		closure[importPath] = true
+		collectImportClosure(imported, closure)
+	}
 }

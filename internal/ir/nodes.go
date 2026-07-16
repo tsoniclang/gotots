@@ -89,12 +89,22 @@ type MapClearStmt struct {
 // as the GoPanic carrier.
 type PanicStmt struct {
 	Value Expr
-	// IsError formats the value through its dynamic Error method (the
-	// %v of an error), dispatched when the panic executes; ErrorKey is
-	// that method's canonical dispatch identity.
-	IsError  bool
-	ErrorKey string
+	// ErrorFormat, when set, is the closed token-switch dispatch of the
+	// value's dynamic Error method (the %v of an error), evaluated
+	// lazily so a deferred mutation is reflected. The Recv of this
+	// IfaceCall reads the panic value.
+	ErrorFormat *IfaceCall
 }
+
+// RawExpr is a pre-printed expression fragment with a known type, used
+// by lowerings that synthesize a node around already-emitted text.
+type RawExpr struct {
+	Text string
+	T    Type
+}
+
+func (*RawExpr) expr()        {}
+func (e *RawExpr) Type() Type { return e.T }
 
 // TupleSpread forwards a multi-result call's values as the complete
 // argument list of an enclosing call (Go's f(g()) form): the results
@@ -335,51 +345,6 @@ type FuncRef struct {
 // in Go).
 type DynCall struct {
 	Fun     Expr
-	Args    []Expr
-	Results []Type
-}
-
-// RttiRef names the shared rtti object of one concrete type. Identity
-// tests compare the rtti object itself — a single ESM export per type —
-// never a spelling.
-type RttiRef struct {
-	// Predeclared names an ABI rtti (int, string, bool, ...) when set.
-	Predeclared string
-	// Pkg/TypeName locate a generated named type's rtti; Pointer selects
-	// the pointer-type rtti (*T) over the value rtti (T).
-	Pkg      string
-	TypeName string
-	Pointer  bool
-	// Composite is the canonical (path-qualified) type identity of a
-	// composite or external type, interned to one rtti object at
-	// runtime; Display is its runtime-message spelling; ExternID, when
-	// set, names the external contract the static method table covers.
-	Composite string
-	Display   string
-	ExternID  string
-	// CompositeEq states the composite's equality class:
-	// "uncomparable" (slices, maps, functions — Go panics),
-	// "identity" (pointers to unnamed types), "array-prim" (fixed
-	// arrays of === carriers), or "unknown" (fails closed).
-	CompositeEq string
-}
-
-// IfaceBox converts a concrete value into an interface value (struct
-// values are copied into the box, as Go copies them into the interface).
-type IfaceBox struct {
-	X    Expr
-	Rtti RttiRef
-	T    Type // the interface type
-}
-
-// IfaceCall invokes an interface method through the box's method table;
-// a nil interface panics with Go's exact message.
-type IfaceCall struct {
-	Recv Expr
-	// Method is the canonical dispatch identity (MethodKey); Display is
-	// the source spelling for diagnostics.
-	Method  string
-	Display string
 	Args    []Expr
 	Results []Type
 }

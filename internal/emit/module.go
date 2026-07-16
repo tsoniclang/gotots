@@ -52,6 +52,26 @@ type Module struct {
 	initEdges map[string]bool
 }
 
+// CoGeneratedImports returns every co-generated package this module
+// actually imports in its emitted output: symbol references (including
+// interface-dispatch branch targets) and initialization edges. These
+// are the real dependency edges for withholding.
+func (m *Module) CoGeneratedImports() []string {
+	seen := map[string]bool{}
+	for path := range m.used {
+		seen[path] = true
+	}
+	for path := range m.initEdges {
+		seen[path] = true
+	}
+	out := make([]string, 0, len(seen))
+	for path := range seen {
+		out = append(out, path)
+	}
+	sort.Strings(out)
+	return out
+}
+
 // RequireInitEdge records that this package imports a co-generated
 // package for its initialization side effects; the import is emitted
 // even without a surviving symbol reference.

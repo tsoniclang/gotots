@@ -47,6 +47,11 @@ type Generated struct {
 	Support []BodySupport
 	// Withheld maps package path -> reason runnable output is withheld.
 	Withheld map[string]string
+	// ModuleImports maps each package path to the co-generated packages
+	// its emitted module actually imports (symbol references, including
+	// interface-dispatch branch targets, plus init edges). Withholding
+	// cascades over these real edges.
+	ModuleImports map[string][]string
 }
 
 // Options carries provenance inputs for product runs.

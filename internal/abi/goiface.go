@@ -16,12 +16,12 @@ import { GoPanic, goPanicNil } from "./gopanic.js";
 // named types — the canonical identity that routes method dispatch
 // through the external-contract registry.
 export interface GoRtti {
+  // d is the Go runtime display of the dynamic type; it is the switch
+  // discriminant identity (rtti objects are interned per canonical
+  // type, so === comparison is the type token test). There is no method
+  // table — dispatch is a generated exhaustive token switch of direct
+  // calls.
   readonly d: string;
-  // m maps canonical method identities (name, unexported package
-  // qualifier, signature digest) onto statically selected functions —
-  // the exact method SET of this dynamic type (value and pointer types
-  // carry distinct tables).
-  readonly m: Readonly<Record<string, Function>>;
   // c states comparability: true (equality defined), false (Go panics),
   // or absent (unknown — external contract — equality fails closed).
   readonly c?: boolean;
@@ -29,6 +29,10 @@ export interface GoRtti {
   readonly e?: (a: unknown, b: unknown) => boolean;
   // p marks a pointer type: its boxed values compare by identity.
   readonly p?: boolean;
+  // ms is the type's sorted method-name list — data used only for the
+  // missing-method diagnostic of a failed interface assertion, never for
+  // dispatch (dispatch is a generated exhaustive token switch).
+  readonly ms?: readonly string[];
   // x is an external type's canonical contract identity (diagnostics).
   readonly x?: string;
 }
@@ -58,19 +62,6 @@ export function goIfaceBox(r: GoRtti, v: unknown): GoIfaceBox {
   return { r, v };
 }
 
-// Method dispatch: a nil interface panics exactly like a nil pointer
-// dereference.
-export function goIfaceCall(i: GoIface, method: string, args: unknown[]): unknown {
-  if (i === undefined) goPanicNil();
-  const boxed = i as GoIfaceBox;
-  const fn = boxed.r.m[method] as Function | undefined;
-  if (fn === undefined) {
-    // Every table is statically populated at generation; an external
-    // dynamic type dispatched beyond its recorded contract fails closed.
-    throw new GoPanic("GOTOTS_EXTERNAL_UNIMPLEMENTED: " + (boxed.r.x ?? boxed.r.d) + "." + method);
-  }
-  return fn(boxed.v, ...args);
-}
 
 export function goIfaceIs(i: GoIface, r: GoRtti): boolean {
   return i !== undefined && i.r === r;
@@ -127,42 +118,39 @@ export function goIfaceAssert(i: GoIface, r: GoRtti, sourceDisplay: string): unk
   return i.v;
 }
 
-// x.(I), interface-target panic form: the dynamic type must carry
-// every method of the target interface. External dynamic types cannot
-// prove their method sets statically, so they fail closed.
-export function goIfaceAssertIface(i: GoIface, methods: readonly (readonly [string, string])[], sourceDisplay: string, targetDisplay: string): GoIfaceBox {
+// x.(I) as a static token-membership test: the dynamic type must be one
+// of the closed set of tokens that implement the target interface
+// (resolved at generation from the whole-unit type universe).
+export function goIfaceAssertSet(i: GoIface, tokens: readonly GoRtti[], required: readonly string[], sourceDisplay: string, targetDisplay: string): GoIfaceBox {
   if (i === undefined) {
     throw new GoPanic("interface conversion: " + sourceDisplay + " is nil, not " + targetDisplay);
   }
-  const missing = ifaceMissingMethod(i.r, methods);
-  if (missing !== undefined) {
-    throw new GoPanic("interface conversion: " + i.r.d + " is not " + targetDisplay + ": missing method " + missing);
+  for (const token of tokens) {
+    if (i.r === token) return i;
   }
-  return i;
+  const missing = missingMethod(i.r, required);
+  throw new GoPanic("interface conversion: " + i.r.d + " is not " + targetDisplay +
+    (missing === undefined ? "" : ": missing method " + missing));
+}
+
+// missingMethod returns the first required method the dynamic type lacks
+// (Go reports methods in the interface's sorted method order).
+function missingMethod(r: GoRtti, required: readonly string[]): string | undefined {
+  const have = r.ms;
+  if (have === undefined) return undefined;
+  for (const method of required) {
+    if (!have.includes(method)) return method;
+  }
+  return undefined;
 }
 
 // x.(I), comma-ok form: undefined (the nil interface) fills the miss.
-export function goIfaceLookupIface(i: GoIface, methods: readonly (readonly [string, string])[]): [GoIface, boolean] {
-  if (i === undefined || ifaceMissingMethod(i.r, methods) !== undefined) {
-    return [undefined, false];
+export function goIfaceLookupSet(i: GoIface, tokens: readonly GoRtti[]): [GoIface, boolean] {
+  if (i === undefined) return [undefined, false];
+  for (const token of tokens) {
+    if (i.r === token) return [i, true];
   }
-  return [i, true];
-}
-
-// methods pairs the canonical dispatch identity with the source
-// spelling for the missing-method panic.
-function ifaceMissingMethod(rtti: GoRtti, methods: readonly (readonly [string, string])[]): string | undefined {
-  for (const [key, display] of methods) {
-    if (rtti.m[key] === undefined) {
-      if (rtti.x !== undefined) {
-        // The recorded external contract cannot prove the method's
-        // absence; deciding either way would guess.
-        throw new GoPanic("GOTOTS_EXTERNAL_UNIMPLEMENTED: method set of " + rtti.x);
-      }
-      return display;
-    }
-  }
-  return undefined;
+  return [undefined, false];
 }
 
 // x.(T), comma-ok form: the zero value fills the miss.
@@ -175,8 +163,9 @@ export function goIfaceLookup<T>(i: GoIface, r: GoRtti, zero: T): readonly [T, b
 
 function rtti(d: string): GoRtti {
   // Every predeclared basic type is comparable, and === is its exact
-  // equality (floats keep NaN and signed-zero semantics).
-  return { d, c: true, m: {} };
+  // equality (floats keep NaN and signed-zero semantics). Predeclared
+  // types are methodless.
+  return { d, c: true, ms: [] };
 }
 
 // Predeclared types' rttis (methodless).

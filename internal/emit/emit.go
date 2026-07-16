@@ -183,10 +183,7 @@ func Package(module *Module, decls Decls) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		export := ""
-		if packageVar.Exported {
-			export = "export "
-		}
+		export := "export "
 		p.line("%slet %s: %s = %s;", export, tsName(packageVar.Name), spelled, zero)
 	}
 	for _, function := range sorted {
@@ -293,10 +290,7 @@ func printFunc(out *strings.Builder, module *Module, function *ir.Func) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", function.ID, err)
 	}
-	export := ""
-	if function.Exported {
-		export = "export "
-	}
+	export := "export "
 	generics := ""
 	if len(function.TypeParams) > 0 {
 		generics = "<" + strings.Join(function.TypeParams, ", ") + ">"

@@ -183,12 +183,25 @@ func MethodKey(method *types.Func) string {
 
 // buildIfaceMethodCall dispatches a method through an interface value's
 // method table (a nil interface panics exactly like a nil dereference).
-func (b *builder) buildIfaceMethodCall(n *ast.CallExpr, recv Expr, method *types.Func) (Expr, error) {
+func (b *builder) buildIfaceMethodCall(n *ast.CallExpr, recv Expr, method *types.Func, selector *ast.SelectorExpr) (Expr, error) {
+	span := b.span(n.Pos())
 	signature := method.Type().(*types.Signature)
 	out := &IfaceCall{Recv: recv, Method: MethodKey(method), Display: method.Name()}
 	if err := b.buildCallArgsResults(n, signature, &out.Args, &out.Results); err != nil {
 		return nil, err
 	}
+	// Resolve the closed dynamic-type set for a static exhaustive token
+	// switch. The interface type comes from the receiver's static type.
+	ifaceGoType := b.info.Types[selector.X].Type
+	ifaceType, ok := ifaceGoType.Underlying().(*types.Interface)
+	if !ok {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "interface method call on " + ifaceGoType.String(), Span: span}
+	}
+	branches, err := b.resolveIfaceBranches(ifaceType, method, span)
+	if err != nil {
+		return nil, err
+	}
+	out.Branches = branches
 	b.use("ifaceCall")
 	return out, nil
 }
@@ -211,24 +224,21 @@ func (b *builder) buildTypeAssert(n *ast.TypeAssertExpr, commaOk bool) (Expr, er
 		if err != nil {
 			return nil, err
 		}
-		type keyed struct{ key, display string }
-		entries := make([]keyed, 0, targetIface.NumMethods())
+		implementers, err := b.resolveImplementerTokens(targetIface, span)
+		if err != nil {
+			return nil, err
+		}
+		required := make([]string, 0, targetIface.NumMethods())
 		for i := range targetIface.NumMethods() {
-			entries = append(entries, keyed{key: MethodKey(targetIface.Method(i)), display: targetIface.Method(i).Name()})
+			required = append(required, targetIface.Method(i).Name())
 		}
-		sort.Slice(entries, func(i, j int) bool { return entries[i].key < entries[j].key })
-		methods := make([]string, 0, len(entries))
-		displays := make([]string, 0, len(entries))
-		for _, entry := range entries {
-			methods = append(methods, entry.key)
-			displays = append(displays, entry.display)
-		}
+		sort.Strings(required)
 		b.use("typeAssert:iface")
 		return &IfaceAssert{
 			X:             operand,
 			Target:        target,
-			Methods:       methods,
-			Displays:      displays,
+			Implementers:  implementers,
+			Required:      required,
 			SourceDisplay: displayOf(b.info.Types[n.X].Type),
 			TargetDisplay: displayOf(targetGoType),
 			CommaOk:       commaOk,
@@ -345,10 +355,12 @@ func (b *builder) buildTypeSwitch(n *ast.TypeSwitchStmt) (Stmt, error) {
 type IfaceAssert struct {
 	X      Expr
 	Target Type
-	// Methods are canonical dispatch identities; Displays the parallel
-	// source spellings for the missing-method panic.
-	Methods       []string
-	Displays      []string
+	// Implementers is the closed set of dynamic-type tokens that satisfy
+	// the target interface (whole-unit static resolution). The assert is
+	// a token-membership test, not a runtime method-set probe. Required
+	// is the target's sorted method displays for the miss diagnostic.
+	Implementers  []RttiRef
+	Required      []string
 	SourceDisplay string
 	TargetDisplay string
 	CommaOk       bool

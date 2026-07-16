@@ -208,8 +208,20 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		if err != nil {
 			return err
 		}
-		if n.IsError {
-			p.line("gort$.goPanicError(%s, %q);", value, n.ErrorKey)
+		if n.ErrorFormat != nil {
+			errTemp := p.temp()
+			p.line("const %s = %s;", errTemp, value)
+			format, err := p.printIfaceCall(&ir.IfaceCall{
+				Recv:     &ir.RawExpr{Text: errTemp, T: n.Value.Type()},
+				Method:   n.ErrorFormat.Method,
+				Display:  n.ErrorFormat.Display,
+				Results:  n.ErrorFormat.Results,
+				Branches: n.ErrorFormat.Branches,
+			})
+			if err != nil {
+				return err
+			}
+			p.line("gort$.goPanicError(%s, () => %s);", errTemp, format)
 			return nil
 		}
 		p.line("gort$.goPanicValue(%s);", value)

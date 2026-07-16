@@ -16,8 +16,16 @@ import (
 func withholdDependents(out *Generated, sorted []*packages.Package) {
 	imports := map[string][]string{}
 	for _, p := range sorted {
-		for importPath := range p.Imports {
-			imports[p.PkgPath] = append(imports[p.PkgPath], importPath)
+		// The emitted module's real import edges — symbol references
+		// (including interface-dispatch branch targets) and init edges —
+		// are the withholding dependency graph. A package with no emitted
+		// module falls back to its source imports.
+		if edges, ok := out.ModuleImports[p.PkgPath]; ok {
+			imports[p.PkgPath] = append([]string(nil), edges...)
+		} else {
+			for importPath := range p.Imports {
+				imports[p.PkgPath] = append(imports[p.PkgPath], importPath)
+			}
 		}
 		sort.Strings(imports[p.PkgPath])
 	}

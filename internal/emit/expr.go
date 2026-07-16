@@ -37,6 +37,8 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		return printed, err
 	}
 	switch n := e.(type) {
+	case *ir.RawExpr:
+		return n.Text, nil
 	case *ir.Const:
 		return printConst(n)
 	case *ir.VarRef:

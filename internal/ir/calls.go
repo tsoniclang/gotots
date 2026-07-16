@@ -177,9 +177,9 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 		return nil, err
 	}
 	if recv.Type().Kind == KindIface {
-		// Interface dispatch is dynamic through the box's method table,
-		// whether the interface type is owned or external.
-		return b.buildIfaceMethodCall(n, recv, method)
+		// Interface dispatch resolves the closed dynamic-type set to an
+		// exhaustive token switch of direct calls.
+		return b.buildIfaceMethodCall(n, recv, method, selector)
 	}
 	if !b.unit.Owns(method.Pkg().Path()) {
 		return b.buildExternalMethodCall(n, selector, method, recv)

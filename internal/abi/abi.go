@@ -13,7 +13,7 @@ package abi
 import "fmt"
 
 // Version identifies the ABI contract carried in generated output.
-const Version = 12
+const Version = 14
 
 // Family is the static carrier family of an integer kind.
 type Family string
@@ -138,6 +138,13 @@ export function goPanicRangeExit(): never {
   throw new GoPanic("runtime error: range function continued iteration after function for loop body returned false");
 }
 
+// goPanicUnreachableType is the closed-world default of a token switch:
+// the dynamic type set is complete, so this never fires under correct
+// generation; it fails closed rather than silently mis-dispatching.
+export function goPanicUnreachableType(display: string): never {
+  throw new GoPanic("GOTOTS_UNREACHABLE: dynamic type " + display + " outside the resolved dispatch set");
+}
+
 export function goNilCheck<T>(x: T | undefined): T {
   if (x === undefined) goPanicNil();
   return x;
@@ -198,18 +205,14 @@ export function goPanicValue(value: string | number | bigint | boolean): never {
 // panic(err): the message is the error's dynamic Error() result — the
 // %v of an error value — dispatched here; a nil error panics like
 // panic(nil).
-export function goPanicError(err: { r: { d: string; m: Readonly<Record<string, Function>>; x?: string }; v: unknown } | undefined, errorKey: string): never {
+export function goPanicError(err: unknown, format: () => string): never {
   if (err === undefined) {
     throw new GoPanic("panic called with nil argument");
   }
-  const fn = err.r.m[errorKey] as Function | undefined;
-  if (fn === undefined) {
-    throw new GoPanic("GOTOTS_EXTERNAL_UNIMPLEMENTED: " + (err.r.x ?? err.r.d) + ".Error");
-  }
-  // The typed error value is retained; its message formats lazily, so a
-  // deferred function that mutates the error is reflected exactly as Go
-  // prints the panic after defers run.
-  throw new GoPanic("panic", err, () => String((fn as Function)(err.v)));
+  // The typed error value is retained; the message formats lazily
+  // through the closed token-switch dispatch of its Error method, so a
+  // deferred mutation is reflected exactly as Go prints it.
+  throw new GoPanic("panic", err, format);
 }
 
 // len(string) is the UTF-8 byte length; JS string length counts UTF-16

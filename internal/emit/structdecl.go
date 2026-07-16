@@ -16,10 +16,7 @@ import (
 // zeros for omitted fields, so construction is always total).
 func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct) error {
 	p := &printer{out: out, module: module}
-	export := ""
-	if structDecl.Exported {
-		export = "export "
-	}
+	export := "export "
 	generics := ""
 	if len(structDecl.TypeParams) > 0 {
 		generics = "<" + strings.Join(structDecl.TypeParams, ", ") + ">"
@@ -262,10 +259,7 @@ func printMethodFunction(out *strings.Builder, module *Module, className string,
 	if err != nil {
 		return fmt.Errorf("%s: %w", method.ID, err)
 	}
-	export := ""
-	if method.Exported {
-		export = "export "
-	}
+	export := "export "
 	generics := ""
 	if len(method.TypeParams) > 0 {
 		generics = "<" + strings.Join(method.TypeParams, ", ") + ">"

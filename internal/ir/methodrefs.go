@@ -22,9 +22,10 @@ type MethodValue struct {
 	// NilCheckRecv dereferences a pointer caller of a value-receiver
 	// method at evaluation — Go panics there, not at the call.
 	NilCheckRecv bool
-	// Iface dispatches through the interface box at call time; a nil
-	// interface panics at evaluation.
-	Iface bool
+	// Iface dispatches through the closed token switch at call time; a
+	// nil interface panics at evaluation. Branches is that closed set.
+	Iface    bool
+	Branches []IfaceBranch
 	// Results carries the method's result types for dynamic-dispatch
 	// casting when Iface is set.
 	Results []Type
@@ -74,6 +75,17 @@ func (b *builder) buildMethodValue(n *ast.SelectorExpr, selection *types.Selecti
 			}
 			out.Results = append(out.Results, result)
 		}
+		// The bound method value dispatches through the same closed
+		// token switch as a direct interface call.
+		ifaceType, ok := b.info.Types[n.X].Type.Underlying().(*types.Interface)
+		if !ok {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "interface method value on " + b.info.Types[n.X].Type.String(), Span: span}
+		}
+		branches, err := b.resolveIfaceBranches(ifaceType, method, span)
+		if err != nil {
+			return nil, err
+		}
+		out.Branches = branches
 		b.use("ifaceMethodValue")
 		return out, nil
 	}

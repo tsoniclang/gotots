@@ -27,21 +27,16 @@ func (p *printer) rttiRef(r ir.RttiRef) (string, error) {
 			// "unknown" omits c: equality over it fails closed.
 			return fmt.Sprintf("goif$.goRttiComposite(%q, { %s })", r.Composite, fields), nil
 		}
-		// An external named type's rtti carries a STATIC method table over
-		// the unit-recorded contract stubs (keyed by canonical dispatch
-		// identity); anything beyond the recorded surface fails closed at
-		// the dispatch site, and its comparability stays unknown.
-		dot := strings.LastIndex(r.ExternID, ".")
-		externPkg, typeName := r.ExternID[:dot], r.ExternID[dot+1:]
-		entries := make([]string, 0, len(p.module.ExternMethods[r.ExternID]))
+		// An external named type's rtti is an identity token plus its
+		// method-name data (for the assertion diagnostic); dispatch
+		// itself is the generated exhaustive token switch that calls the
+		// external contract stubs directly. Comparability stays unknown.
+		names := make([]string, 0, len(p.module.ExternMethods[r.ExternID]))
 		for _, method := range p.module.ExternMethods[r.ExternID] {
-			callee, err := p.module.symbol(externPkg, externMethodSymbol(typeName, method.Name))
-			if err != nil {
-				return "", err
-			}
-			entries = append(entries, fmt.Sprintf("%q: %s", method.Key, callee))
+			names = append(names, fmt.Sprintf("%q", method.Name))
 		}
-		return fmt.Sprintf("goif$.goRttiComposite(%q, { d: %q, m: { %s }, x: %q })", r.Composite, r.Display, strings.Join(entries, ", "), r.ExternID), nil
+		sort.Strings(names)
+		return fmt.Sprintf("goif$.goRttiComposite(%q, { d: %q, ms: [%s], x: %q })", r.Composite, r.Display, strings.Join(names, ", "), r.ExternID), nil
 	}
 	name := r.TypeName + "$rtti"
 	if r.Pointer {
@@ -76,14 +71,7 @@ type RttiInfo struct {
 // is exact and uncomparable dynamic types panic.
 func printRtti(out *strings.Builder, module *Module, info RttiInfo) error {
 	p := &printer{out: out, module: module}
-	valueEntry, pointerEntry, err := p.rttiTables(info)
-	if err != nil {
-		return err
-	}
-	export := ""
-	if info.Exported {
-		export = "export "
-	}
+	export := "export "
 	display := module.PkgName + "." + info.TypeName
 	eqSuffix := ""
 	if info.HasEq {
@@ -93,56 +81,48 @@ func printRtti(out *strings.Builder, module *Module, info RttiInfo) error {
 	if info.Comparable {
 		comparable = "true"
 	}
-	p.line("%sconst %s$rtti: goif$.GoRtti = { d: %q, c: %s, m: %s%s };", export, info.TypeName, display, comparable, valueEntry, eqSuffix)
+	valueMethods, pointerMethods := info.methodDisplays()
+	p.line("%sconst %s$rtti: goif$.GoRtti = { d: %q, c: %s, ms: %s%s };", export, info.TypeName, display, comparable, valueMethods, eqSuffix)
 	if info.Pointer {
 		// A pointer's dynamic type is always comparable (identity) and
 		// has no goEq$ of its own.
-		p.line("%sconst %s$rttiPtr: goif$.GoRtti = { d: %q, c: true, p: true, m: %s };", export, info.TypeName, "*"+display, pointerEntry)
+		p.line("%sconst %s$rttiPtr: goif$.GoRtti = { d: %q, c: true, p: true, ms: %s };", export, info.TypeName, "*"+display, pointerMethods)
 	}
 	return nil
 }
 
-// rttiTables builds the value and pointer method tables keyed by
-// canonical dispatch identity.
-func (p *printer) rttiTables(info RttiInfo) (string, string, error) {
-	type entry struct{ key, spelling string }
-	var valueSet, pointerSet []entry
-	add := func(pointerOnly bool, key, spelling string) {
-		pointerSet = append(pointerSet, entry{key, spelling})
-		if !pointerOnly {
-			valueSet = append(valueSet, entry{key, spelling})
+// methodDisplays spells the sorted method-name lists of the value and
+// pointer method sets — data used only for the missing-method
+// diagnostic of a failed interface assertion, never for dispatch.
+func (info RttiInfo) methodDisplays() (string, string) {
+	valueSet := map[string]bool{}
+	pointerSet := map[string]bool{}
+	for _, method := range info.Methods {
+		pointerSet[method.Name] = true
+		if !method.PointerReceiver {
+			valueSet[method.Name] = true
 		}
 	}
-	methods := append([]*ir.Func{}, info.Methods...)
-	sort.Slice(methods, func(i, j int) bool { return methods[i].DispatchKey < methods[j].DispatchKey })
-	for _, method := range methods {
-		add(method.PointerReceiver, method.DispatchKey, fmt.Sprintf("%s$%s", info.TypeName, method.Name))
+	for _, delegate := range info.Promoted {
+		pointerSet[delegate.Name] = true
+		if delegate.ValueReceiver {
+			valueSet[delegate.Name] = true
+		}
 	}
-	promoted := append([]ir.PromotedDelegate{}, info.Promoted...)
-	sort.Slice(promoted, func(i, j int) bool { return promoted[i].DispatchKey < promoted[j].DispatchKey })
-	for _, delegate := range promoted {
-		target, err := p.module.symbol(delegate.Pkg, delegate.TypeName+"$"+delegate.Name)
-		if err != nil {
-			return "", "", err
-		}
-		chain := "($r as " + tsName(info.TypeName) + ")"
-		for _, field := range delegate.Path {
-			chain += "." + field
-		}
-		spelling := fmt.Sprintf("($r: unknown, ...$a: unknown[]) => %s(%s, ...$a)", target, chain)
-		add(!delegate.ValueReceiver, delegate.DispatchKey, spelling)
+	return methodList(valueSet), methodList(pointerSet)
+}
+
+func methodList(set map[string]bool) string {
+	names := make([]string, 0, len(set))
+	for name := range set {
+		names = append(names, name)
 	}
-	spell := func(entries []entry) string {
-		if len(entries) == 0 {
-			return "{}"
-		}
-		parts := make([]string, len(entries))
-		for i, e := range entries {
-			parts[i] = fmt.Sprintf("%q: %s", e.key, e.spelling)
-		}
-		return "{ " + strings.Join(parts, ", ") + " }"
+	sort.Strings(names)
+	quoted := make([]string, len(names))
+	for i, name := range names {
+		quoted[i] = fmt.Sprintf("%q", name)
 	}
-	return spell(valueSet), spell(pointerSet), nil
+	return "[" + strings.Join(quoted, ", ") + "]"
 }
 
 // printTypeSwitch lowers a type switch onto rtti identity tests in
