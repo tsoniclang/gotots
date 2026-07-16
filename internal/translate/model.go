@@ -60,10 +60,13 @@ type Options struct {
 	ProfileHash    string
 }
 
-// LoweringPlanV1 names the conservative vertical-slice plan: every value
-// uses the exact conservative carrier of its Go type; no direct-form
-// optimizations are selected.
-const LoweringPlanV1 = "conservative-v1"
+// LoweringPlanV2 names the fixed-point representation plan: each
+// value-flow region is lowered to the least elaborate representation
+// its observed requirements admit — the slice planner selects the
+// native array for owner-only regions and the exact carrier otherwise,
+// and interface dispatch is a closed discriminated token switch. The
+// version advances when the planner's selection space changes.
+const LoweringPlanV2 = "representation-fixedpoint-v2"
 
 // abiDir is the bundle directory of the language-ABI modules.
 const abiDir = "language-abi"

@@ -92,7 +92,7 @@ func emitExternalStubs(out *Generated, unit ir.Scope, context *packages.Package,
 			out.Proofs = append(out.Proofs, Proof{
 				ID: goid.Func(external, fn.Name()), SourceRevision: options.SourceRevision,
 				Package:         external,
-				LoweringPlan:    LoweringPlanV1,
+				LoweringPlan:    LoweringPlanV2,
 				Representations: map[string]string{fn.Name(): "external-stub(typed-static, fail-closed)"},
 				GeneratedFile:   stubPath, GeneratedSymbol: fn.Name(),
 			})
@@ -103,7 +103,7 @@ func emitExternalStubs(out *Generated, unit ir.Scope, context *packages.Package,
 			out.Proofs = append(out.Proofs, Proof{
 				ID: goid.Value(external, "extern-member", member.Name), SourceRevision: options.SourceRevision,
 				Package:         external,
-				LoweringPlan:    LoweringPlanV1,
+				LoweringPlan:    LoweringPlanV2,
 				Representations: map[string]string{member.Name: "external-stub(typed-static, fail-closed)"},
 				GeneratedFile:   stubPath, GeneratedSymbol: member.Name,
 			})

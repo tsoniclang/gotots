@@ -74,7 +74,7 @@ func translateFunc(p *packages.Package, sourceDir string, unit ir.Scope, relativ
 		BodyHash:        bodyHash,
 		Operations:      function.Operations,
 		Representations: representations,
-		LoweringPlan:    LoweringPlanV1,
+		LoweringPlan:    LoweringPlanV2,
 		GeneratedSymbol: name,
 	}, nil
 }

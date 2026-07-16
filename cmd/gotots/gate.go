@@ -1,13 +1,11 @@
 package main
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -346,7 +344,7 @@ func runGate(args []string) error {
 				unreconciled = append(unreconciled, decl.ID)
 			}
 		}
-		details := make([]string, 0, len(counts)+len(unreconciled))
+		details := make([]string, 0, len(counts)+len(unreconciled)+4)
 		keys := make([]string, 0, len(counts))
 		for key := range counts {
 			keys = append(keys, key)
@@ -355,6 +353,19 @@ func runGate(args []string) error {
 		for _, key := range keys {
 			details = append(details, fmt.Sprintf("%s: %d", key, counts[key]))
 		}
+		// Honest evidence stages (spec 00): ir-admitted is not
+		// module-retained. Report both denominators explicitly.
+		emittedPackages := 0
+		for _, path := range ownedProductionPackages(firstRun) {
+			if _, withheld := generated.Withheld[path]; !withheld {
+				emittedPackages++
+			}
+		}
+		details = append(details,
+			fmt.Sprintf("evidence-stage ir-admitted (declarations disposed): %d", counts["generated"]+counts["accepted-manual"]),
+			fmt.Sprintf("evidence-stage module-retained-blocked (in withheld packages): %d", counts["withheld-package"]),
+			fmt.Sprintf("packages emitted (module-retained): %d", emittedPackages),
+			fmt.Sprintf("packages withheld (honest unimplemented): %d", len(generated.Withheld)))
 		if counts["unreconciled"] > 0 {
 			details = append(details, "first unreconciled declarations:")
 			details = append(details, unreconciled...)
@@ -563,36 +574,4 @@ func runGate(args []string) error {
 			report.Failed, report.Blocked, *reportPath)
 	}
 	return nil
-}
-
-func runInRepo(dir, name string, args ...string) (string, error) {
-	command := exec.Command(name, args...)
-	command.Dir = dir
-	var out bytes.Buffer
-	command.Stdout = &out
-	command.Stderr = &out
-	err := command.Run()
-	return out.String(), err
-}
-
-func splitLines(out string) []string {
-	var lines []string
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-		if line != "" {
-			lines = append(lines, line)
-		}
-	}
-	if len(lines) > 40 {
-		lines = lines[len(lines)-40:]
-	}
-	return lines
-}
-
-func digestFile(path string) (string, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", fmt.Errorf("read attested input %s: %w", path, err)
-	}
-	digest := sha256.Sum256(data)
-	return fmt.Sprintf("%x", digest), nil
 }

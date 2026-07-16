@@ -448,7 +448,7 @@ func Value() (int32, string) {
 			t.Errorf("nondeterministic generation for %s", path)
 		}
 	}
-	if len(first.Proofs) != 1 || first.Proofs[0].LoweringPlan != translate.LoweringPlanV1 {
+	if len(first.Proofs) != 1 || first.Proofs[0].LoweringPlan != translate.LoweringPlanV2 {
 		t.Fatalf("unexpected proof records: %+v", first.Proofs)
 	}
 	proof := first.Proofs[0]

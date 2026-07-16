@@ -23,9 +23,14 @@ import (
 // diagnostic evidence for roadmap ordering — never authoritative
 // generation, which requires complete package coverage.
 type ProbeResult struct {
-	Packages         int            `json:"packages"`
-	Bodies           int            `json:"bodies"`
-	Translated       int            `json:"translated"`
+	Packages int `json:"packages"`
+	Bodies   int `json:"bodies"`
+	// IRAdmitted counts bodies with complete typed semantic IR — the
+	// ir-admitted evidence stage. It is NOT module-retained coverage: a
+	// body can be ir-admitted yet removed from every runnable module by
+	// package withholding. See ModuleRetainedPackages / WithheldPackages
+	// and spec 00 Translation Evidence Stages.
+	IRAdmitted       int            `json:"irAdmitted"`
 	Blocked          int            `json:"blocked"`
 	BlockerHistogram map[string]int `json:"blockerHistogram"`
 	// ConstructHistogram counts the raw (unnormalized) construct
@@ -128,7 +133,7 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 						}
 					}
 				} else {
-					result.Translated++
+					result.IRAdmitted++
 					packageTranslated++
 				}
 			}

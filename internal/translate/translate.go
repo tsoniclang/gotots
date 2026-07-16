@@ -211,7 +211,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 						out.Proofs = append(out.Proofs, Proof{
 							ID: id, SourceRevision: options.SourceRevision,
 							Package: p.PkgPath, File: f.relative,
-							LoweringPlan:    LoweringPlanV1,
+							LoweringPlan:    LoweringPlanV2,
 							Representations: map[string]string{typeSpec.Name.Name: "erased-to-carrier(" + carrier + ")"},
 							GeneratedFile:   corePath, GeneratedSymbol: "",
 						})
@@ -229,7 +229,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 					out.Proofs = append(out.Proofs, Proof{
 						ID: id, SourceRevision: options.SourceRevision,
 						Package: p.PkgPath, File: f.relative,
-						LoweringPlan:    LoweringPlanV1,
+						LoweringPlan:    LoweringPlanV2,
 						Representations: map[string]string{typeSpec.Name.Name: "class-direct-identity"},
 						GeneratedFile:   corePath, GeneratedSymbol: structDecl.Name,
 					})
@@ -297,7 +297,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 							out.Proofs = append(out.Proofs, Proof{
 								ID: variableID, SourceRevision: options.SourceRevision,
 								Package: p.PkgPath, File: f.relative,
-								LoweringPlan:    LoweringPlanV1,
+								LoweringPlan:    LoweringPlanV2,
 								Representations: map[string]string{"_": "ordered-effect(no binding)"},
 								GeneratedFile:   corePath, GeneratedSymbol: "",
 							})
@@ -309,7 +309,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 						out.Proofs = append(out.Proofs, Proof{
 							ID: goid.Value(p.PkgPath, "var", name.Name), SourceRevision: options.SourceRevision,
 							Package: p.PkgPath, File: f.relative,
-							LoweringPlan:    LoweringPlanV1,
+							LoweringPlan:    LoweringPlanV2,
 							Representations: map[string]string{name.Name: "module-let(live-binding," + conservativeCarrier(t) + ")"},
 							GeneratedFile:   corePath, GeneratedSymbol: name.Name,
 						})
@@ -329,7 +329,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 						out.Proofs = append(out.Proofs, Proof{
 							ID: goid.Value(p.PkgPath, "const", name.Name), SourceRevision: options.SourceRevision,
 							Package: p.PkgPath, File: f.relative,
-							LoweringPlan:    LoweringPlanV1,
+							LoweringPlan:    LoweringPlanV2,
 							Representations: map[string]string{name.Name: "const-folded-at-use"},
 							GeneratedFile:   corePath, GeneratedSymbol: "",
 						})
