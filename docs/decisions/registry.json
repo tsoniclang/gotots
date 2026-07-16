@@ -1,69 +1,100 @@
 {
-  "schemaVersion": 1,
-  "decisions": [
-    {
-      "id": "ADR-0001",
-      "path": "docs/decisions/0001-initial-source-pin.md",
-      "status": "accepted",
-      "owner": "gotots-maintainers",
-      "affectedSpecClauses": [
-        "docs/spec/01-input-census-publication.md#closed-input-contract",
-        "docs/spec/13-governance-upgrades.md#source-upgrade"
-      ],
-      "schemaOrAbiVersions": ["pin-schema-v3"],
-      "implementationRevision": "58f4d8b",
-      "proofArtifacts": [
-        "pins/typescript-go.json",
-        "internal/pinning",
-        "internal/census/attestation_fixture_test.go"
-      ],
-      "reopeningConditions": [
-        "the product selects another TS-Go revision",
-        "upgrade repeatability introduces a separately identified second pin"
-      ]
-    },
-    {
-      "id": "ADR-0002",
-      "path": "docs/decisions/0002-census-first-and-frontend-language.md",
-      "status": "accepted",
-      "owner": "gotots-maintainers",
-      "affectedSpecClauses": [
-        "docs/spec/00-authority-scope.md#selected-product-universe",
-        "docs/spec/01-input-census-publication.md#scope-filter-before-census",
-        "docs/spec/02-compiler-semantic-ir.md#typed-go-frontend"
-      ],
-      "schemaOrAbiVersions": ["census-schema-v4", "profile-schema-v1"],
-      "implementationRevision": "f7f2aea",
-      "proofArtifacts": [
-        "profiles/tsts/project.json",
-        "internal/census",
-        "internal/inventory",
-        "internal/profile"
-      ],
-      "reopeningConditions": [
-        "a replacement frontend proves the complete typed frontend, census, determinism, and selected-product contract"
-      ]
-    },
-    {
-      "id": "ADR-0003",
-      "path": "docs/decisions/0003-execute-driver-disposition.md",
-      "status": "accepted",
-      "owner": "gotots-maintainers",
-      "affectedSpecClauses": [
-        "docs/spec/00-authority-scope.md#selected-product-universe",
-        "docs/spec/01-input-census-publication.md#scope-filter-before-census"
-      ],
-      "schemaOrAbiVersions": ["profile-schema-v1"],
-      "implementationRevision": "e56ed2e",
-      "proofArtifacts": [
-        "profiles/tsts/project.json",
-        "internal/census/census_fixture_test.go",
-        "internal/profile/profile_test.go"
-      ],
-      "reopeningConditions": [
-        "upstream removes the editor-service dependency",
-        "the product selects generation of the CLI driver through an accepted seam or ownership contract"
-      ]
-    }
-  ]
+ "schemaVersion": 1,
+ "decisions": [
+  {
+   "id": "ADR-0001",
+   "path": "docs/decisions/0001-initial-source-pin.md",
+   "status": "accepted",
+   "owner": "gotots-maintainers",
+   "affectedSpecClauses": [
+    "docs/spec/01-input-census-publication.md#closed-input-contract",
+    "docs/spec/13-governance-upgrades.md#source-upgrade"
+   ],
+   "schemaOrAbiVersions": [
+    "pin-schema-v3"
+   ],
+   "implementationRevision": "58f4d8b",
+   "proofArtifacts": [
+    "pins/typescript-go.json",
+    "internal/pinning",
+    "internal/census/attestation_fixture_test.go"
+   ],
+   "reopeningConditions": [
+    "the product selects another TS-Go revision",
+    "upgrade repeatability introduces a separately identified second pin"
+   ]
+  },
+  {
+   "id": "ADR-0002",
+   "path": "docs/decisions/0002-census-first-and-frontend-language.md",
+   "status": "accepted",
+   "owner": "gotots-maintainers",
+   "affectedSpecClauses": [
+    "docs/spec/00-authority-scope.md#selected-product-universe",
+    "docs/spec/01-input-census-publication.md#scope-filter-before-census",
+    "docs/spec/02-compiler-semantic-ir.md#typed-go-frontend"
+   ],
+   "schemaOrAbiVersions": [
+    "census-schema-v4",
+    "profile-schema-v1"
+   ],
+   "implementationRevision": "f7f2aea",
+   "proofArtifacts": [
+    "profiles/tsts/project.json",
+    "internal/census",
+    "internal/inventory",
+    "internal/profile"
+   ],
+   "reopeningConditions": [
+    "a replacement frontend proves the complete typed frontend, census, determinism, and selected-product contract"
+   ]
+  },
+  {
+   "id": "ADR-0003",
+   "path": "docs/decisions/0003-execute-driver-disposition.md",
+   "status": "accepted",
+   "owner": "gotots-maintainers",
+   "affectedSpecClauses": [
+    "docs/spec/00-authority-scope.md#selected-product-universe",
+    "docs/spec/01-input-census-publication.md#scope-filter-before-census"
+   ],
+   "schemaOrAbiVersions": [
+    "profile-schema-v1"
+   ],
+   "implementationRevision": "e56ed2e",
+   "proofArtifacts": [
+    "profiles/tsts/project.json",
+    "internal/census/census_fixture_test.go",
+    "internal/profile/profile_test.go"
+   ],
+   "reopeningConditions": [
+    "upstream removes the editor-service dependency",
+    "the product selects generation of the CLI driver through an accepted seam or ownership contract"
+   ]
+  },
+  {
+   "id": "ADR-0004",
+   "path": "docs/decisions/0004-interface-representation.md",
+   "status": "accepted",
+   "owner": "gotots-maintainers",
+   "affectedSpecClauses": [
+    "docs/spec/06-interfaces-generics-functions.md#dynamic-type-identity",
+    "docs/spec/06-interfaces-generics-functions.md#interface-representation-candidates"
+   ],
+   "schemaOrAbiVersions": [
+    "abi-v16"
+   ],
+   "implementationRevision": "2faec6f",
+   "proofArtifacts": [
+    "contracts/necessity-records.json",
+    "internal/abi/goiface.go",
+    "internal/staticness/astverify.go"
+   ],
+   "reopeningConditions": [
+    "TypeScript gains nominal discrimination over identity tokens",
+    "vtable bundle or allocation cost exceeds the committed performance budget",
+    "every region's dynamic-type set closes statically"
+   ]
+  }
+ ]
 }
