@@ -84,7 +84,7 @@
    "schemaOrAbiVersions": [
     "abi-v16"
    ],
-   "implementationRevision": "2faec6f",
+   "implementationRevision": "e04d202",
    "proofArtifacts": [
     "contracts/necessity-records.json",
     "internal/abi/goiface.go",

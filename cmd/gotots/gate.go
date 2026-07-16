@@ -419,27 +419,30 @@ func runGate(args []string) error {
 				"interface representation contradicts docs/spec/06 (erased unknown payload); redesign pending",
 			}, nil
 		}
-		// Every recorded representation selection must be a member of the
-		// closed candidate set — an unknown candidate is forged or drifted
-		// evidence, rejected rather than counted.
-		validCandidates := map[string]bool{"native-array": true, "goslice-carrier": true}
+		// EVERY representation entry in EVERY family must classify into
+		// the versioned registry's closed candidate sets — an unknown key
+		// family or unknown candidate anywhere is forged or drifted
+		// evidence, never only for slices.
 		planned := map[string]int{}
+		familyCounts := map[string]int{}
 		var invalid []string
 		for _, proof := range corpusGenerated.Proofs {
 			for key, value := range proof.Representations {
-				if len(key) > 12 && key[:12] == "slice-local:" {
-					if !validCandidates[value] {
-						if len(invalid) < 10 {
-							invalid = append(invalid, fmt.Sprintf("%s %s: unknown candidate %q", proof.ID, key, value))
-						}
-						continue
+				family, ok := translate.ClassifyRepresentation(key, value)
+				if !ok {
+					if len(invalid) < 10 {
+						invalid = append(invalid, fmt.Sprintf("%s %s: unknown candidate %q", proof.ID, key, value))
 					}
+					continue
+				}
+				familyCounts[family]++
+				if family == "slice-local" {
 					planned[value]++
 				}
 			}
 		}
 		if len(invalid) > 0 {
-			return "fail", invalid, fmt.Errorf("representation evidence names candidates outside the closed set")
+			return "fail", invalid, fmt.Errorf("representation evidence outside the closed registry")
 		}
 		if planned["native-array"]+planned["goslice-carrier"] == 0 {
 			return "blocked", []string{"no slice regions recorded; planner evidence missing"}, nil
@@ -495,9 +498,15 @@ func runGate(args []string) error {
 			sort.Strings(problems)
 			return "fail", problems, fmt.Errorf("%d necessity-record defects", len(problems))
 		}
+		familyDetail := make([]string, 0, len(familyCounts))
+		for family, count := range familyCounts {
+			familyDetail = append(familyDetail, fmt.Sprintf("%s:%d", family, count))
+		}
+		sort.Strings(familyDetail)
 		details := []string{
 			fmt.Sprintf("slice regions planned within the closed candidate set: native-array %d, goslice-carrier %d",
 				planned["native-array"], planned["goslice-carrier"]),
+			fmt.Sprintf("representation entries per family (all registry-classified): %v", familyDetail),
 			fmt.Sprintf("custom mechanisms with verified necessity records (AST-derived): %v", present),
 		}
 		return "pass", details, nil

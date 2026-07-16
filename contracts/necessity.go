@@ -56,8 +56,14 @@ type NecessityRegistry struct {
 
 // LoadNecessityRecords parses the embedded necessity records fail-closed.
 func LoadNecessityRecords() (*NecessityRegistry, error) {
+	return parseNecessityRecords(necessityRecordsJSON)
+}
+
+// parseNecessityRecords is the byte-level parser, exposed to mutation
+// tests that inject forged registries.
+func parseNecessityRecords(data []byte) (*NecessityRegistry, error) {
 	var registry NecessityRegistry
-	decoder := json.NewDecoder(bytes.NewReader(necessityRecordsJSON))
+	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&registry); err != nil {
 		return nil, fmt.Errorf("parse necessity records: %w", err)

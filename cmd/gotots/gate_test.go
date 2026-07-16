@@ -174,3 +174,27 @@ func TestBinaryProvenanceFailsClosed(t *testing.T) {
 		t.Fatalf("matching provenance must pass: %v", err)
 	}
 }
+
+// TestRepresentationRegistryRejectsUnknown proves an unknown candidate
+// in ANY family fails classification — not only slices.
+func TestRepresentationRegistryRejectsUnknown(t *testing.T) {
+	cases := []struct {
+		key, candidate string
+		ok             bool
+	}{
+		{"slice-local:x", "native-array", true},
+		{"slice-local:x", "quantum-array", false},
+		{"int", "bigint-exact-64", true},
+		{"int", "forged-carrier", false},
+		{"T", "unreviewed-kind(chan int)", false},
+		{"Name", "const-folded-at-use", true},
+		{"Name", "erased-to-carrier(bigint)", true},
+		{"Name", "totally-made-up", false},
+	}
+	for _, c := range cases {
+		_, ok := translate.ClassifyRepresentation(c.key, c.candidate)
+		if ok != c.ok {
+			t.Errorf("ClassifyRepresentation(%q, %q) = %v; want %v", c.key, c.candidate, ok, c.ok)
+		}
+	}
+}

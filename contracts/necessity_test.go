@@ -44,8 +44,27 @@ func TestNecessityRecordRejectsBareFlag(t *testing.T) {
 }
 
 func TestNecessityRecordRejectsDuplicateMechanism(t *testing.T) {
-	// The registry loader rejects two records for one mechanism.
-	if _, err := LoadNecessityRecords(); err != nil {
-		t.Fatalf("baseline load: %v", err)
+	// A FORGED registry with two records for one mechanism must fail:
+	// the duplicate is genuinely injected, not merely a reload of the
+	// valid baseline.
+	record := `{
+		"mechanism": "x", "kind": "dispatch", "proofTier": "dynamic-type",
+		"semanticClass": "c", "specClause": "s", "siteClasses": ["a"],
+		"counterexample": "ce", "ordinaryTypescript": "t", "ordinaryMismatch": "m",
+		"alternatives": [{"candidate": "c", "rejected": "r"}],
+		"smallestMechanism": "s", "oracleTests": ["o"], "mutationTests": ["m"],
+		"performanceEvidence": "p", "invalidation": ["i"], "acceptance": "a",
+		"reopening": ["r"]
+	}`
+	forged := []byte(`{"schemaVersion": 1, "records": [` + record + `, ` + record + `]}`)
+	if _, err := parseNecessityRecords(forged); err == nil || !strings.Contains(err.Error(), "duplicate mechanism") {
+		t.Fatalf("injected duplicate not rejected: %v", err)
+	}
+	// Trailing content and unknown schema versions also fail closed.
+	if _, err := parseNecessityRecords(append([]byte(`{"schemaVersion": 1, "records": [`+record+`]}`), []byte("garbage")...)); err == nil {
+		t.Fatal("trailing content not rejected")
+	}
+	if _, err := parseNecessityRecords([]byte(`{"schemaVersion": 99, "records": [` + record + `]}`)); err == nil {
+		t.Fatal("unknown schema version not rejected")
 	}
 }

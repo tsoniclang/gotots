@@ -526,10 +526,20 @@ func conservativeCarrier(t ir.Type) string {
 		return "number"
 	case t.Kind.Wide64():
 		return "bigint-exact-64"
+	case t.Kind == ir.KindUnit:
+		return "unit-literal-0"
+	case t.Kind == ir.KindArray:
+		return "native-array-of-element-carrier"
+	case t.Kind == ir.KindExternal:
+		return "external-branded-handle"
 	case t.Kind.Integer():
 		return fmt.Sprintf("number-wrapped-%d", t.Kind.Bits())
+	case t.TypeParamName != "":
+		return "type-parameter-instantiation"
 	}
-	return "unsupported"
+	// Every reviewed kind is named above; an unnamed kind is a
+	// contradiction the representation gate rejects.
+	return "unreviewed-kind(" + t.Go + ")"
 }
 
 func spanOf(p *packages.Package, sourceDir string, pos token.Pos) ir.Span {

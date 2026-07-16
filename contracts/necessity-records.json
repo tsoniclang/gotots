@@ -121,9 +121,13 @@
         {
           "candidate": "untagged union",
           "rejected": "two defined types with the same primitive storage collapse, losing assertion/equality/dispatch identity"
+        },
+        {
+          "candidate": "direct finite unions with call-site dispatch or interface-specific dispatch modules",
+          "rejected": "both add artificial ESM value-import edges executing package initializers absent from Go's initialization graph (ADR-0004 alternatives A and B)"
         }
       ],
-      "smallestMechanism": "a two-field box {r, v} where r is a canonical per-type rtti token; method, assertion, and equality dispatch is a generated exhaustive token switch (no method table, no name lookup)",
+      "smallestMechanism": "a closed discriminated union member { k: literal token; r: identity token; v: exact payload; m: the type's shared vtable const } \u2014 dispatch is a literal switch narrowing the member (ADR-0004); no method table, no name lookup, no erased payload recovery",
       "oracleTests": [
         "TestOracleInterfaceValues",
         "TestOracleValueVsPointerMethodSets",
@@ -138,7 +142,8 @@
       "performanceEvidence": "dispatch is a direct token switch of typed calls with no runtime member lookup; the rtti carries no method table",
       "invalidation": [
         "a region's dynamic type is statically known at every site (direct value)",
-        "the reachable dynamic-type set cannot be proven closed (fail closed)"
+        "the reachable dynamic-type set cannot be proven closed (fail closed)",
+        "ADR-0004 reopening conditions"
       ],
       "acceptance": "accepted: Go interface dynamic type, typed nil, assertion, equality, and dispatch are runtime-observable and inexpressible by an untagged value",
       "reopening": [

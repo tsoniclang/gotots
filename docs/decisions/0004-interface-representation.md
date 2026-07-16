@@ -3,7 +3,7 @@
 Date: 2026-07-16
 Status: accepted
 Owner: gotots-maintainers
-Implementation revision: `2faec6f`
+Implementation revision: `e04d202`
 Schema/ABI impact: `abi-v16`
 Spec reference: `docs/spec/06-interfaces-generics-functions.md`
 Registry entry: `docs/decisions/registry.json#ADR-0004`
