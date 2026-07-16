@@ -423,6 +423,14 @@ func (p *printer) ifaceUnionAlias(t ir.Type) (string, error) {
 			members = append(members, fmt.Sprintf("goif$.GoBox<%q, %s, Record<never, never>>", "p:"+member.name, member.payload))
 		}
 		for _, composite := range p.module.BoxedComposites {
+			if p.referencesWithheldType(composite.T) {
+				// A composite whose spelling would reference a withheld
+				// package cannot appear as an exact member here: no runnable
+				// module defines its type, so nothing of it can box at
+				// runtime and its file is absent. It is not a member of this
+				// bundle's empty-interface union.
+				continue
+			}
 			payload, err := p.tsType(composite.T)
 			if err != nil {
 				return "", err
@@ -466,6 +474,40 @@ func (p *printer) memberPayload(member ir.IfaceMember) (string, error) {
 		return "(" + base + " | undefined)", nil
 	}
 	return "(gort$.GoCell<" + base + "> | undefined)", nil
+}
+
+// referencesWithheldType reports whether an ir.Type's spelling would
+// reference a package whose module is withheld from the bundle: such a
+// type has no runnable module and its file is absent, so it can neither
+// box at runtime nor be imported.
+func (p *printer) referencesWithheldType(t ir.Type) bool {
+	if p.module == nil || p.module.Withheld == nil {
+		return false
+	}
+	var walk func(ir.Type) bool
+	walk = func(t ir.Type) bool {
+		if t.Pkg != "" && t.Kind != ir.KindExternal && p.module.Withheld(t.Pkg) {
+			return true
+		}
+		if t.Elem != nil && walk(*t.Elem) {
+			return true
+		}
+		if t.Key != nil && walk(*t.Key) {
+			return true
+		}
+		for _, arg := range t.TypeArgs {
+			if walk(arg) {
+				return true
+			}
+		}
+		for _, member := range t.IfaceMembers {
+			if !member.Extern && member.Pkg != "" && p.module.Withheld(member.Pkg) {
+				return true
+			}
+		}
+		return false
+	}
+	return walk(t)
 }
 
 // retainedMembers filters an interface's implementer union to the
