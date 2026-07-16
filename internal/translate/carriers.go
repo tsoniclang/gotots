@@ -79,15 +79,17 @@ func relativeImport(fromDir, to string) (string, error) {
 
 // blankInitHash hashes a blank variable's initializer source exactly as
 // the census records it.
-func blankInitHash(p *packages.Package, source []byte, initExpr ast.Expr) string {
+func blankInitHash(p *packages.Package, source []byte, initExpr ast.Expr) (string, error) {
 	if initExpr == nil {
-		return ""
+		return "", nil
 	}
 	start := p.Fset.Position(initExpr.Pos()).Offset
 	end := p.Fset.Position(initExpr.End()).Offset
 	if start < 0 || end > len(source) || start >= end {
-		return ""
+		// A present blank-var initializer always spans a valid range; an
+		// invalid span is a hard error, never silently absent evidence.
+		return "", fmt.Errorf("blank var initializer: invalid span [%d,%d) over %d bytes", start, end, len(source))
 	}
 	digest := sha256.Sum256(source[start:end])
-	return hex.EncodeToString(digest[:])
+	return hex.EncodeToString(digest[:]), nil
 }

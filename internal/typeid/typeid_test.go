@@ -110,3 +110,23 @@ func contains(s, sub string) bool {
 	}
 	return false
 }
+
+// TestHasUnsupported verifies the fail-closed detector: a poisoned
+// identity is flagged, an ordinary one is not.
+func TestHasUnsupported(t *testing.T) {
+	src := `package p
+type T struct{ x int }
+func F(a int) string { return "" }
+`
+	pkg := pkgOf(t, "p", src)
+	scope := pkg.Scope()
+	for _, name := range []string{"T", "F"} {
+		id := Canonical(scope.Lookup(name).Type())
+		if HasUnsupported(id) {
+			t.Errorf("%s: ordinary type flagged unsupported: %q", name, id)
+		}
+	}
+	if !HasUnsupported("x" + unsupportedMarker + "y") {
+		t.Errorf("poisoned identity not detected")
+	}
+}

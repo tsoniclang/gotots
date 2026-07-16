@@ -152,14 +152,17 @@ func collectDeclarations(p *packages.Package, file *ast.File, relativePath, scop
 						initializerHash := ""
 						if kind == "var" && i < len(s.Values) {
 							// The initializer's exact source bytes are
-							// identity-bearing evidence for the
-							// initialization body.
+							// identity-bearing evidence. A PRESENT initializer
+							// always spans a non-empty in-bounds range; an
+							// invalid span is a source/fileset mismatch and a
+							// hard error, never silently absent evidence.
 							start := fset.Position(s.Values[i].Pos()).Offset
 							end := fset.Position(s.Values[i].End()).Offset
-							if start >= 0 && end <= len(source) && start < end {
-								digest := sha256.Sum256(source[start:end])
-								initializerHash = hex.EncodeToString(digest[:])
+							if start < 0 || end > len(source) || start >= end {
+								return fmt.Errorf("var %s: invalid initializer span [%d,%d) over %d bytes", id, start, end, len(source))
 							}
+							digest := sha256.Sum256(source[start:end])
+							initializerHash = hex.EncodeToString(digest[:])
 						}
 						if err := shapeValue(info, name, kind, id, initializerHash, stats); err != nil {
 							return err

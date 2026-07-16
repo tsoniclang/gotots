@@ -348,6 +348,10 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 						if name.Name == "_" {
 							// A blank variable's initializer still runs in
 							// order; there is no binding to declare.
+							blankHash, err := blankInitHash(p, f.source, initExpr)
+							if err != nil {
+								return err
+							}
 							packageVars = append(packageVars, emit.PackageVar{
 								Name: "_", Type: t, Init: init, Order: order, Blank: true,
 							})
@@ -358,7 +362,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 								Representations: map[string]string{"decl:_": "ordered-effect(no binding)"},
 								GeneratedFile:   corePath, GeneratedSymbol: "",
 								EffectOnly: true,
-								InitHash:   blankInitHash(p, f.source, initExpr),
+								InitHash:   blankHash,
 							})
 							continue
 						}
@@ -369,10 +373,14 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 						if initExpr != nil {
 							start := p.Fset.Position(initExpr.Pos()).Offset
 							end := p.Fset.Position(initExpr.End()).Offset
-							if start >= 0 && end <= len(f.source) && start < end {
-								digest := sha256.Sum256(f.source[start:end])
-								varInitHash = hex.EncodeToString(digest[:])
+							if start < 0 || end > len(f.source) || start >= end {
+								// A present initializer always spans a valid,
+								// non-empty range; an invalid span is a hard
+								// error, not silently absent evidence.
+								return fmt.Errorf("var %s.%s: invalid initializer span [%d,%d) over %d bytes", p.PkgPath, name.Name, start, end, len(f.source))
 							}
+							digest := sha256.Sum256(f.source[start:end])
+							varInitHash = hex.EncodeToString(digest[:])
 						}
 						out.Proofs = append(out.Proofs, Proof{
 							ID: goid.Value(p.PkgPath, "var", name.Name), SourceRevision: options.SourceRevision,
