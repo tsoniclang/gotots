@@ -20,6 +20,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/productinputs"
 	"github.com/tsoniclang/gotots/internal/profile"
 	"github.com/tsoniclang/gotots/internal/schema"
+	"github.com/tsoniclang/gotots/internal/staticness"
 	"github.com/tsoniclang/gotots/internal/translate"
 )
 
@@ -447,16 +448,45 @@ func runGate(args []string) error {
 		if err != nil {
 			return "fail", nil, err
 		}
-		present := detectMechanisms(corpusGenerated.Files)
-		var missing []string
+		// Mechanisms are derived from the typed AST of the generated
+		// output (resolved identifiers, not substrings), and every
+		// record's oracle and mutation evidence must resolve to actual
+		// committed test functions — prose is not evidence.
+		typescriptModule := filepath.Join(*repoDir, "product", "node_modules", "typescript")
+		astReport, err := staticness.VerifyAST(corpusGenerated.Files, typescriptModule)
+		if err != nil {
+			return "fail", nil, err
+		}
+		present := make([]string, 0, len(astReport.Mechanisms))
+		for mechanism := range astReport.Mechanisms {
+			present = append(present, mechanism)
+		}
+		sort.Strings(present)
+		var problems []string
+		testIndex, err := committedTestFunctions(*repoDir)
+		if err != nil {
+			return "fail", nil, err
+		}
 		for _, mechanism := range present {
-			if _, ok := necessity.RecordFor(mechanism); !ok {
-				missing = append(missing, mechanism)
+			record, ok := necessity.RecordFor(mechanism)
+			if !ok {
+				problems = append(problems, mechanism+": no necessity record")
+				continue
+			}
+			for _, test := range record.OracleTests {
+				if !testIndex[test] {
+					problems = append(problems, fmt.Sprintf("%s: oracle evidence %q is not a committed test function", mechanism, test))
+				}
+			}
+			for _, test := range record.MutationTests {
+				if !testIndex[test] {
+					problems = append(problems, fmt.Sprintf("%s: mutation evidence %q is not a committed test function", mechanism, test))
+				}
 			}
 		}
-		if len(missing) > 0 {
-			sort.Strings(missing)
-			return "fail", missing, fmt.Errorf("%d custom mechanisms in generated output have no necessity record", len(missing))
+		if len(problems) > 0 {
+			sort.Strings(problems)
+			return "fail", problems, fmt.Errorf("%d necessity-record defects", len(problems))
 		}
 		details := []string{
 			fmt.Sprintf("slice regions planned: native-array %d, goslice-carrier %d",

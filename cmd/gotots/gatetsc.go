@@ -91,9 +91,36 @@ func runTscGate(repoDir, profilePath, buildProfile, sourceDir string, report *Ga
 		}
 		return "fail", lines, fmt.Errorf("strict typecheck rejected the generated output")
 	}
-	// The staticness sweep: every generated file (ABI, core, stubs) must
-	// be free of erased or name-selected dispatch. There are no
-	// file-local suppressions.
+	// The staticness verdict comes from the typed-AST verifier (the
+	// pinned TypeScript compiler parses every generated file and the AST
+	// is walked structurally), so aliases, multiline forms, and renamed
+	// equivalents cannot evade it; the text sweep remains as a fast
+	// defense-in-depth pre-check. No file-local suppressions exist.
+	typescriptModule := filepath.Join(repoDir, "product", "node_modules", "typescript")
+	astReport, err := staticness.VerifyAST(generated.Files, typescriptModule)
+	if err != nil {
+		return "fail", nil, err
+	}
+	if len(astReport.Violations) > 0 {
+		counts := staticness.Counts(astReport.Violations)
+		keys := make([]string, 0, len(counts))
+		for key := range counts {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		details := make([]string, 0, len(keys)+8)
+		for _, key := range keys {
+			details = append(details, fmt.Sprintf("%s: %d", key, counts[key]))
+		}
+		for i, v := range astReport.Violations {
+			if i >= 8 {
+				details = append(details, fmt.Sprintf("... and %d more sites", len(astReport.Violations)-8))
+				break
+			}
+			details = append(details, fmt.Sprintf("%s:%d %s", v.File, v.Line, v.Pattern))
+		}
+		return "fail", details, fmt.Errorf("AST staticness verifier found %d prohibited dispatch sites", len(astReport.Violations))
+	}
 	violations := staticness.Sweep(generated.Files)
 	if len(violations) > 0 {
 		counts := staticness.Counts(violations)
@@ -117,7 +144,8 @@ func runTscGate(repoDir, profilePath, buildProfile, sourceDir string, report *Ga
 	}
 	return "pass", []string{
 		fmt.Sprintf("strict tsc (%s@%s) accepted %d generated files", productPin.TypescriptCompiler.Package, productPin.TypescriptCompiler.Version, len(generated.Files)),
-		"staticness sweep: zero erased or name-selected dispatch sites",
+		"typed-AST staticness verifier: zero erased or name-selected dispatch sites",
+		"text sweep (defense in depth): zero prohibited sites",
 		fmt.Sprintf("withheld packages (honest unimplemented, not typechecked): %d", len(generated.Withheld)),
 	}, nil
 }

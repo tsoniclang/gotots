@@ -7,21 +7,48 @@
       "proofTier": "aliasing-identity",
       "semanticClass": "slice",
       "specClause": "docs/spec/05-collections-strings.md",
-      "siteClasses": ["sliceLit", "sliceMake", "append", "sliceExpr", "copy", "rangeSlice"],
-      "counterexample": "s := []int{1,2,3}; t := s[1:]; t[0] = 9; return s[1] == 9 — Go observes the shared backing (true); a plain JS array reslice loses aliasing.",
+      "siteClasses": [
+        "sliceLit",
+        "sliceMake",
+        "append",
+        "sliceExpr",
+        "copy",
+        "rangeSlice"
+      ],
+      "counterexample": "s := []int{1,2,3}; t := s[1:]; t[0] = 9; return s[1] == 9 \u2014 Go observes the shared backing (true); a plain JS array reslice loses aliasing.",
       "ordinaryTypescript": "A plain T[] with slice() copies.",
       "ordinaryMismatch": "T[].slice() allocates a fresh array, so a write through the reslice is not observed by the original, and capacity/append growth aliasing is lost.",
       "alternatives": [
-        {"candidate": "plain T[] with slice() copies", "rejected": "loses backing-array aliasing and capacity semantics observable by append/reslice"},
-        {"candidate": "native array direct form", "rejected": "selected by the planner only for owner-only regions with no shared view; the carrier is required whenever a shared view or capacity is observed"}
+        {
+          "candidate": "plain T[] with slice() copies",
+          "rejected": "loses backing-array aliasing and capacity semantics observable by append/reslice"
+        },
+        {
+          "candidate": "native array direct form",
+          "rejected": "selected by the planner only for owner-only regions with no shared view; the carrier is required whenever a shared view or capacity is observed"
+        }
       ],
       "smallestMechanism": "a four-field record {backing, offset, length, capacity} over a shared backing array; nil is undefined",
-      "oracleTests": ["TestOracleSliceAliasing", "TestOracleSliceAppend", "TestOracleStagedCompoundTargets", "TestOracleDistinctSliceZeros"],
-      "mutationTests": ["TestFailClosedDiagnostics", "internal/plan fixed-point plancheck_test"],
+      "oracleTests": [
+        "TestOracleSliceAliasing",
+        "TestOracleSliceAppend",
+        "TestOracleStagedCompoundTargets",
+        "TestOracleDistinctSliceZeros"
+      ],
+      "mutationTests": [
+        "TestFailClosedDiagnostics",
+        "TestMutationInjectedDispatchIsCaught"
+      ],
       "performanceEvidence": "native-array selection removes the carrier for owner-only regions; the 10/2070 native distribution is recorded per region in the representation plan",
-      "invalidation": ["a region loses its shared-view or capacity requirement", "the planner selects the native array for the region"],
+      "invalidation": [
+        "a region loses its shared-view or capacity requirement",
+        "the planner selects the native array for the region"
+      ],
       "acceptance": "accepted: Go's slice aliasing, capacity, and reslice identity are runtime-observable and inexpressible by a copying plain array",
-      "reopening": ["TypeScript gains an addressable shared-view array primitive", "the selected program no longer observes slice aliasing or capacity in any region"]
+      "reopening": [
+        "TypeScript gains an addressable shared-view array primitive",
+        "the selected program no longer observes slice aliasing or capacity in any region"
+      ]
     },
     {
       "mechanism": "pointer-cell",
@@ -29,21 +56,44 @@
       "proofTier": "aliasing-identity",
       "semanticClass": "pointer",
       "specClause": "docs/spec/04-types-values-pointers.md",
-      "siteClasses": ["addrOf", "boxedStore", "boxedLoad", "cellNew"],
-      "counterexample": "x := 1; p := &x; *p = 2; return x == 2 — Go observes the write through the pointer (true); a captured value copy does not.",
+      "siteClasses": [
+        "addrOf",
+        "boxedStore",
+        "boxedLoad",
+        "cellNew"
+      ],
+      "counterexample": "x := 1; p := &x; *p = 2; return x == 2 \u2014 Go observes the write through the pointer (true); a captured value copy does not.",
       "ordinaryTypescript": "A direct variable binding.",
       "ordinaryMismatch": "A plain binding cannot be aliased: taking its address and mutating through the pointer would not be observed by the original variable.",
       "alternatives": [
-        {"candidate": "direct binding (no cell)", "rejected": "selected for every variable whose address is never taken; the cell is introduced only for address-taken locals"},
-        {"candidate": "object-field mutation", "rejected": "still requires a boxed storage cell to alias a scalar local"}
+        {
+          "candidate": "direct binding (no cell)",
+          "rejected": "selected for every variable whose address is never taken; the cell is introduced only for address-taken locals"
+        },
+        {
+          "candidate": "object-field mutation",
+          "rejected": "still requires a boxed storage cell to alias a scalar local"
+        }
       ],
       "smallestMechanism": "a one-field cell {v} introduced only when a local's address is taken",
-      "oracleTests": ["TestOrdinaryLocalBoxingStillWorks", "TestOracleMethodExpressions", "TestOracleStagedCompoundTargets"],
-      "mutationTests": ["TestBoxedBindingsFailClosed"],
+      "oracleTests": [
+        "TestOrdinaryLocalBoxingStillWorks",
+        "TestOracleMethodExpressionAdapters",
+        "TestOracleStagedCompoundTargets",
+        "TestOraclePointerCells"
+      ],
+      "mutationTests": [
+        "TestBoxedBindingsFailClosed"
+      ],
       "performanceEvidence": "cells are introduced only for address-taken locals, verified by the boxing scan; unboxed locals bind directly",
-      "invalidation": ["a local's address is no longer taken anywhere"],
+      "invalidation": [
+        "a local's address is no longer taken anywhere"
+      ],
       "acceptance": "accepted: Go pointer aliasing to a scalar local is runtime-observable and inexpressible by a plain binding",
-      "reopening": ["the boxing scan proves a variable's address is never taken", "TypeScript gains addressable scalar references"]
+      "reopening": [
+        "the boxing scan proves a variable's address is never taken",
+        "TypeScript gains addressable scalar references"
+      ]
     },
     {
       "mechanism": "interface-box",
@@ -51,21 +101,49 @@
       "proofTier": "dynamic-type",
       "semanticClass": "interface",
       "specClause": "docs/spec/06-interfaces-generics-functions.md",
-      "siteClasses": ["ifaceBox", "ifaceCall", "typeAssert:iface", "typeAssert", "structEqual", "panic:error"],
-      "counterexample": "var p *T; var v any = p; return v == nil — Go's interface carries dynamic type *T with nil data, so the result is false; a plain undefined representation loses the dynamic type and returns true.",
+      "siteClasses": [
+        "ifaceBox",
+        "ifaceCall",
+        "typeAssert:iface",
+        "typeAssert",
+        "structEqual",
+        "panic:error"
+      ],
+      "counterexample": "var p *T; var v any = p; return v == nil \u2014 Go's interface carries dynamic type *T with nil data, so the result is false; a plain undefined representation loses the dynamic type and returns true.",
       "ordinaryTypescript": "A direct union of the concrete branch types without a type tag.",
       "ordinaryMismatch": "An untagged union cannot distinguish typed nil from nil interface, cannot answer a type assertion between two types with the same storage, and cannot dispatch a method or interface equality by dynamic type.",
       "alternatives": [
-        {"candidate": "direct concrete value", "rejected": "selected when dynamic behavior is unobservable; the box is required when typed nil, assertions, equality, or open dispatch is observed"},
-        {"candidate": "untagged union", "rejected": "two defined types with the same primitive storage collapse, losing assertion/equality/dispatch identity"}
+        {
+          "candidate": "direct concrete value",
+          "rejected": "selected when dynamic behavior is unobservable; the box is required when typed nil, assertions, equality, or open dispatch is observed"
+        },
+        {
+          "candidate": "untagged union",
+          "rejected": "two defined types with the same primitive storage collapse, losing assertion/equality/dispatch identity"
+        }
       ],
       "smallestMechanism": "a two-field box {r, v} where r is a canonical per-type rtti token; method, assertion, and equality dispatch is a generated exhaustive token switch (no method table, no name lookup)",
-      "oracleTests": ["TestOracleInterfaceValues", "TestOracleValueVsPointerMethodSets", "TestOracleUncomparableDynamicEquality", "TestOracleTupleInterfaceForwarding", "TestOracleGenericEquality"],
-      "mutationTests": ["TestMutationInjectedDispatchIsCaught", "TestSweepFlagsErasedDispatch"],
+      "oracleTests": [
+        "TestOracleInterfaceValues",
+        "TestOracleValueVsPointerMethodSets",
+        "TestOracleUncomparableDynamicEquality",
+        "TestOracleTupleInterfaceForwarding",
+        "TestOracleGenericEquality"
+      ],
+      "mutationTests": [
+        "TestMutationInjectedDispatchIsCaught",
+        "TestSweepFlagsErasedDispatch"
+      ],
       "performanceEvidence": "dispatch is a direct token switch of typed calls with no runtime member lookup; the rtti carries no method table",
-      "invalidation": ["a region's dynamic type is statically known at every site (direct value)", "the reachable dynamic-type set cannot be proven closed (fail closed)"],
+      "invalidation": [
+        "a region's dynamic type is statically known at every site (direct value)",
+        "the reachable dynamic-type set cannot be proven closed (fail closed)"
+      ],
       "acceptance": "accepted: Go interface dynamic type, typed nil, assertion, equality, and dispatch are runtime-observable and inexpressible by an untagged value",
-      "reopening": ["a region proves its dynamic type is unobservable", "the reachable dynamic-type set is no longer closed"]
+      "reopening": [
+        "a region proves its dynamic type is unobservable",
+        "the reachable dynamic-type set is no longer closed"
+      ]
     },
     {
       "mechanism": "keyed-map",
@@ -73,21 +151,45 @@
       "proofTier": "aliasing-identity",
       "semanticClass": "map",
       "specClause": "docs/spec/05-collections-strings.md",
-      "siteClasses": ["mapMake", "mapGet", "mapSet", "mapDelete", "mapLen", "rangeMap"],
-      "counterexample": "m := map[key]V{}; m[key{1,2}] = v; return m[key{1,2}] — Go keys structs by value; a JS Map keys objects by identity, so a fresh equal key misses.",
+      "siteClasses": [
+        "mapMake",
+        "mapGet",
+        "mapSet",
+        "mapDelete",
+        "mapLen",
+        "rangeMap"
+      ],
+      "counterexample": "m := map[key]V{}; m[key{1,2}] = v; return m[key{1,2}] \u2014 Go keys structs by value; a JS Map keys objects by identity, so a fresh equal key misses.",
       "ordinaryTypescript": "A JS Map<K, V> keyed directly.",
       "ordinaryMismatch": "A JS Map keys object and struct keys by reference identity, not by Go's value equality, so two equal-but-distinct struct keys are treated as different.",
       "alternatives": [
-        {"candidate": "JS Map keyed directly", "rejected": "scalar keys work but struct/array keys must key by value, which Map does by identity"},
-        {"candidate": "plain object", "rejected": "coerces keys to strings and cannot represent non-string Go key types"}
+        {
+          "candidate": "JS Map keyed directly",
+          "rejected": "scalar keys work but struct/array keys must key by value, which Map does by identity"
+        },
+        {
+          "candidate": "plain object",
+          "rejected": "coerces keys to strings and cannot represent non-string Go key types"
+        }
       ],
       "smallestMechanism": "a Map<string, [K, V]> whose string key is the type's injective canonical encoding, retaining the original key for range",
-      "oracleTests": ["TestOracleMapStructKeys", "TestOracleMapCommaOk", "TestOracleRangeMapAndReuse"],
-      "mutationTests": ["TestFailClosedDiagnostics"],
+      "oracleTests": [
+        "TestOracleStructMapKeys",
+        "TestOracleRangeMapAndReuse"
+      ],
+      "mutationTests": [
+        "TestFailClosedDiagnostics",
+        "TestMutationInjectedDispatchIsCaught"
+      ],
       "performanceEvidence": "scalar-keyed maps use the direct string/number key; the composite encoding is used only for struct/array keys",
-      "invalidation": ["a map's key type is a scalar with a direct JS key"],
+      "invalidation": [
+        "a map's key type is a scalar with a direct JS key"
+      ],
       "acceptance": "accepted: Go value-equality map keys are runtime-observable and inexpressible by identity-keyed JS Maps",
-      "reopening": ["TypeScript gains value-keyed maps", "the selected program uses only scalar map keys"]
+      "reopening": [
+        "TypeScript gains value-keyed maps",
+        "the selected program uses only scalar map keys"
+      ]
     }
   ]
 }

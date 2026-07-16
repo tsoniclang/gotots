@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -59,36 +60,6 @@ func ownedProductionPackages(run *census.Result) []string {
 			out = append(out, decl.Package)
 		}
 	}
-	return out
-}
-
-// detectMechanisms derives the custom runtime mechanisms present in
-// generated output structurally, by their emitted markers — the spec's
-// "verifier derives the requirement from emitted AST/helper ownership".
-func detectMechanisms(files map[string]string) []string {
-	markers := []struct{ mechanism, marker string }{
-		{"slice-carrier", "gosl$.goSlice"},
-		{"slice-carrier", "new GoSlice("},
-		{"interface-box", "goif$.goIfaceBox("},
-		{"interface-box", "goif$.GoIface"},
-		{"pointer-cell", "$b: goabi$.GoCell"},
-		{"pointer-cell", "gort$.goCellNew("},
-		{"keyed-map", "gort$.goKeyed"},
-		{"keyed-map", "GoKeyedMap"},
-	}
-	seen := map[string]bool{}
-	for _, content := range files {
-		for _, m := range markers {
-			if !seen[m.mechanism] && strings.Contains(content, m.marker) {
-				seen[m.mechanism] = true
-			}
-		}
-	}
-	out := make([]string, 0, len(seen))
-	for mechanism := range seen {
-		out = append(out, mechanism)
-	}
-	sort.Strings(out)
 	return out
 }
 
@@ -245,4 +216,40 @@ func reconcileDispositions(prof *profile.Profile, firstRun *census.Result, gener
 		fmt.Sprintf("packages emitted (module-retained): %d", emittedPackages),
 		fmt.Sprintf("packages withheld (honest unimplemented): %d", len(generated.Withheld)))
 	return counts, details, conflicts, unreconciled
+}
+
+// committedTestFunctions indexes every Go test function name in the
+// repository's committed test files, the resolution target for
+// necessity-record oracle and mutation evidence.
+func committedTestFunctions(repoDir string) (map[string]bool, error) {
+	index := map[string]bool{}
+	err := filepath.WalkDir(repoDir, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			name := entry.Name()
+			if name == ".git" || name == "node_modules" || name == ".temp" || name == ".analysis" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(entry.Name(), "_test.go") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			trimmed := strings.TrimSpace(line)
+			if rest, ok := strings.CutPrefix(trimmed, "func Test"); ok {
+				if paren := strings.Index(rest, "("); paren > 0 {
+					index["Test"+rest[:paren]] = true
+				}
+			}
+		}
+		return nil
+	})
+	return index, err
 }
