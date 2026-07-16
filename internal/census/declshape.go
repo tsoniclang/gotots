@@ -33,6 +33,7 @@ func collectDeclarations(p *packages.Package, file *ast.File, relativePath, scop
 	// Every function literal in production scope is an independent
 	// implementation unit: canonical position-qualified identity inside
 	// its parent declaration, with the exact body hash.
+	var funcLitErr error
 	collectFuncLits := func(parentID string, node ast.Node) {
 		if scopeName != "production" {
 			return
@@ -49,11 +50,17 @@ func collectDeclarations(p *packages.Package, file *ast.File, relativePath, scop
 			// type change is detected, matching the translator's span.
 			start := fset.Position(lit.Pos()).Offset
 			end := fset.Position(lit.End()).Offset
-			bodyHash := ""
-			if start >= 0 && end <= len(source) && start < end {
-				digest := sha256.Sum256(source[start:end])
-				bodyHash = hex.EncodeToString(digest[:])
+			if start < 0 || end > len(source) || start >= end {
+				// A function literal always spans a non-empty, in-bounds
+				// source range; an invalid span is a source/fileset mismatch
+				// (a bug), never silently absent evidence.
+				if funcLitErr == nil {
+					funcLitErr = fmt.Errorf("funclit %s: invalid source span [%d,%d) over %d bytes", id, start, end, len(source))
+				}
+				return false
 			}
+			digest := sha256.Sum256(source[start:end])
+			bodyHash := hex.EncodeToString(digest[:])
 			stats.funcLitShapes = append(stats.funcLitShapes, FuncLitShape{ID: id, Parent: parentID, BodyHash: bodyHash})
 			return true
 		})
@@ -176,6 +183,9 @@ func collectDeclarations(p *packages.Package, file *ast.File, relativePath, scop
 				}
 			}
 		}
+	}
+	if funcLitErr != nil {
+		return funcLitErr
 	}
 	return nil
 }

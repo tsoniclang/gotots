@@ -122,6 +122,13 @@ func runSignatureCompletenessGate(firstRun *census.Result, corpusGenerated *tran
 			defects = append(defects, "no funclit disposition for census shape "+shape.ID)
 			continue
 		}
+		if shape.BodyHash == "" || lit.BodyHash == "" {
+			// A function literal ALWAYS has a body: an empty hash is a
+			// missing-evidence defect (an invalid source span), never a
+			// silently-joined pair of empty strings.
+			defects = append(defects, "funclit missing body-hash evidence at "+shape.ID)
+			continue
+		}
 		if lit.BodyHash != shape.BodyHash {
 			defects = append(defects, "funclit body-hash drift at "+shape.ID)
 			continue

@@ -75,6 +75,19 @@ func write(out *strings.Builder, t types.Type, seen map[types.Type]bool) {
 			return
 		}
 		seen[t] = true
+		// The receiver is part of a method's identity: func (T) M and
+		// func (*T) M are DIFFERENT methods with different method sets, and
+		// must never share an identity.
+		if recv := u.Recv(); recv != nil {
+			out.WriteString("recv(")
+			write(out, recv.Type(), seen)
+			out.WriteString(")")
+		}
+		// Type parameters and their CONSTRAINTS are part of a generic
+		// signature's identity: func F[T any] and func F[T comparable]
+		// differ in what T admits and must not collide.
+		writeTypeParams(out, u.RecvTypeParams(), seen)
+		writeTypeParams(out, u.TypeParams(), seen)
 		out.WriteString("func(")
 		params := u.Params()
 		for i := range params.Len() {
@@ -111,6 +124,12 @@ func write(out *strings.Builder, t types.Type, seen map[types.Type]bool) {
 				out.WriteString(";")
 			}
 			field := u.Field(i)
+			// An embedded field (struct{T}) promotes T's methods and fields
+			// where a named field of the same spelling (struct{T T}) does
+			// not: tag the anonymous case so the two never share identity.
+			if field.Anonymous() {
+				out.WriteString("embed ")
+			}
 			writeMemberName(out, field.Name(), field.Exported(), field.Pkg())
 			out.WriteString(" ")
 			write(out, field.Type(), seen)
@@ -140,6 +159,21 @@ func write(out *strings.Builder, t types.Type, seen map[types.Type]bool) {
 	case *types.TypeParam:
 		out.WriteString("$")
 		out.WriteString(u.Obj().Name())
+	case *types.Union:
+		// A constraint union (int | ~string | …): each term path-qualified
+		// so terms from different packages never collide.
+		out.WriteString("union{")
+		for i := range u.Len() {
+			if i > 0 {
+				out.WriteString("|")
+			}
+			term := u.Term(i)
+			if term.Tilde() {
+				out.WriteString("~")
+			}
+			write(out, term.Type(), seen)
+		}
+		out.WriteString("}")
 	case *types.Tuple:
 		for i := range u.Len() {
 			if i > 0 {
@@ -148,8 +182,44 @@ func write(out *strings.Builder, t types.Type, seen map[types.Type]bool) {
 			write(out, u.At(i).Type(), seen)
 		}
 	default:
+		// Every well-formed type form is handled above. An unhandled form
+		// is a construction gap, not a spelling to guess: emit a poison
+		// marker that can never collide with a real identity and is
+		// detectable (typeid.HasUnsupported), rather than falling back to
+		// the ambiguous, non-package-qualified t.String() spelling.
+		out.WriteString(unsupportedMarker)
 		out.WriteString(t.String())
 	}
+}
+
+// unsupportedMarker prefixes any identity that could not be built
+// exactly; it contains a NUL so it can never appear in a real spelling.
+const unsupportedMarker = "\x00!typeid-unsupported:"
+
+// HasUnsupported reports whether a canonical identity was built over an
+// unsupported type form and is therefore not an exact identity.
+func HasUnsupported(id string) bool {
+	return strings.Contains(id, unsupportedMarker)
+}
+
+// writeTypeParams writes a type-parameter list with each parameter's
+// constraint, so two generic signatures that differ only in a constraint
+// have distinct identities.
+func writeTypeParams(out *strings.Builder, params *types.TypeParamList, seen map[types.Type]bool) {
+	if params == nil || params.Len() == 0 {
+		return
+	}
+	out.WriteString("[")
+	for i := range params.Len() {
+		if i > 0 {
+			out.WriteString(",")
+		}
+		param := params.At(i)
+		out.WriteString(param.Obj().Name())
+		out.WriteString(":")
+		write(out, param.Constraint(), seen)
+	}
+	out.WriteString("]")
 }
 
 // writeMemberName qualifies unexported member names with their declaring

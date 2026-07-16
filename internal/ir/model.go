@@ -181,6 +181,10 @@ type ExternTypeObligation struct {
 	Pkg     string
 	Name    string
 	Methods map[string]*types.Func
+	// NameCollisions records method names under which two DISTINCT method
+	// identities were seen; emission fails closed rather than silently
+	// dropping one contract member.
+	NameCollisions []string
 }
 
 // NewScope builds a unit scope over the given package paths.
@@ -262,41 +266,6 @@ func (s Scope) AnonStructs(pkg string) []*Struct {
 	out := make([]*Struct, 0, len(names))
 	for _, name := range names {
 		out = append(out, s.anonStructs[pkg][name])
-	}
-	return out
-}
-
-// AddExternalFunc records one admitted external function contract.
-func (s Scope) AddExternalFunc(fn *types.Func) { s.externals[fn] = true }
-
-// AddExternalType records one external named type the unit carries; the
-// stub module exports its value-semantics contract.
-func (s Scope) AddExternalType(pkg, name string) *ExternTypeObligation {
-	id := pkg + "." + name
-	obligation, has := s.externTypes[id]
-	if !has {
-		obligation = &ExternTypeObligation{Pkg: pkg, Name: name, Methods: map[string]*types.Func{}}
-		s.externTypes[id] = obligation
-	}
-	return obligation
-}
-
-// AddExternalMethod records one referenced method of an external type.
-func (s Scope) AddExternalMethod(pkg, name string, method *types.Func) {
-	s.AddExternalType(pkg, name).Methods[method.Name()] = method
-}
-
-// ExternalTypes returns every referenced external type obligation in
-// sorted identity order.
-func (s Scope) ExternalTypes() []*ExternTypeObligation {
-	ids := make([]string, 0, len(s.externTypes))
-	for id := range s.externTypes {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-	out := make([]*ExternTypeObligation, 0, len(ids))
-	for _, id := range ids {
-		out = append(out, s.externTypes[id])
 	}
 	return out
 }

@@ -5,6 +5,7 @@
 package translate
 
 import (
+	"fmt"
 	"go/token"
 	"go/types"
 	"path"
@@ -170,6 +171,10 @@ func externTypeMembers(obligation *ir.ExternTypeObligation, unit ir.Scope, conte
 			Params: []ir.Var{{Name: "v", Type: handle}}, ResultType: &handle},
 		{ID: typeID + ".goSet$", Name: obligation.Name + "$goSet$",
 			Params: []ir.Var{{Name: "dst", Type: handle}, {Name: "src", Type: handle}}},
+	}
+	if len(obligation.NameCollisions) > 0 {
+		return nil, fmt.Errorf("GOTOTS_EXTERNAL_UNSUPPORTED: external type %s.%s has methods colliding on name(s) %v from distinct identities",
+			obligation.Pkg, obligation.Name, obligation.NameCollisions)
 	}
 	names := make([]string, 0, len(obligation.Methods))
 	for name := range obligation.Methods {
