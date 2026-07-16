@@ -26,7 +26,14 @@ func (p *printer) printSwitch(n *ir.SwitchStmt) error {
 	if err != nil {
 		return err
 	}
-	p.line("%sswitch (%s) {", p.takeLoopLabel(), tag)
+	// The tag switches under its full declared carrier type: a folded
+	// constant tag must not narrow to its literal type, which would make
+	// non-matching literal cases a type error.
+	spelledTag, err := p.tsType(n.Tag.Type())
+	if err != nil {
+		return err
+	}
+	p.line("%sswitch (%s as (%s)) {", p.takeLoopLabel(), tag, spelledTag)
 	p.indent++
 	for _, clause := range n.Clauses {
 		if clause.Values == nil {

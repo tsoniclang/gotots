@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -46,6 +47,61 @@ var bootstrapOnce = sync.OnceValues(func() (*goenv.Resolved, error) {
 	}
 	return goenv.Bootstrap(goExecutable)
 })
+
+// tscOnce locates the pinned TypeScript compiler and the strict
+// configuration in the repository (resolved from this source file's
+// location, so tests in temp working directories still find it).
+var tscOnce = sync.OnceValues(func() (*strictTsc, error) {
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		return nil, fmt.Errorf("cannot resolve the oracle package path")
+	}
+	repo := filepath.Dir(filepath.Dir(filepath.Dir(thisFile)))
+	tscJs := filepath.Join(repo, "product", "node_modules", "typescript", "lib", "tsc.js")
+	if _, err := os.Stat(tscJs); err != nil {
+		return nil, fmt.Errorf("pinned tsc.js: %w", err)
+	}
+	strictConfig, err := os.ReadFile(filepath.Join(repo, "product", "tsconfig.strict.json"))
+	if err != nil {
+		return nil, fmt.Errorf("strict tsconfig: %w", err)
+	}
+	return &strictTsc{tscJs: tscJs, strictConfig: strictConfig}, nil
+})
+
+type strictTsc struct {
+	tscJs        string
+	strictConfig []byte
+}
+
+// typecheckFixture strict-typechecks one differential fixture's complete
+// generated tree (including assembled implementation modules) with the
+// pinned TypeScript compiler before any execution: a fixture that does
+// not typecheck must never be executed under type stripping, where type
+// errors are silently ignored.
+func typecheckFixture(nodeExecutable, workDir string) error {
+	tsc, err := tscOnce()
+	if err != nil {
+		return err
+	}
+	generatedDir := filepath.Join(workDir, "generated")
+	if err := os.WriteFile(filepath.Join(generatedDir, "tsconfig.json"), tsc.strictConfig, 0o644); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(generatedDir, "package.json"), []byte("{\n  \"type\": \"module\"\n}\n"), 0o644); err != nil {
+		return err
+	}
+	command := exec.Command(nodeExecutable, tsc.tscJs, "-p", ".")
+	command.Dir = generatedDir
+	out, err := command.CombinedOutput()
+	if err != nil {
+		text := string(out)
+		if len(text) > 4000 {
+			text = text[:4000] + "\n... (truncated)"
+		}
+		return fmt.Errorf("fixture failed the strict typecheck (fix the generated types, never weaken the check):\n%s", text)
+	}
+	return nil
+}
 
 // Translate materializes a fixture module in workDir — one Go package per
 // entry, mapping the package directory to its single-file source, with
@@ -181,6 +237,14 @@ func RunAssembled(workDir string, packageSources map[string]string, implementati
 		if err := os.WriteFile(full, []byte(moduleTS), 0o644); err != nil {
 			return nil, err
 		}
+	}
+
+	nodeForTsc, err := exec.LookPath("node")
+	if err != nil {
+		return nil, err
+	}
+	if err := typecheckFixture(nodeForTsc, workDir); err != nil {
+		return nil, err
 	}
 
 	hostEnv, err := hostEnviron(resolved)

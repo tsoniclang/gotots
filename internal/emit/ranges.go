@@ -101,12 +101,19 @@ func (p *printer) printRangeMap(n *ir.RangeMap) error {
 	}
 	keyed := n.X.Type().Key.Kind == ir.KindStruct
 	mapTemp := p.temp()
-	p.line("const %s = %s;", mapTemp, operand)
+	// The temp declares its full nilable map type so a provably nil
+	// operand (legal Go: range over a nil map iterates zero times) does
+	// not narrow to literal undefined.
+	spelledMap, err := p.tsType(n.X.Type())
+	if err != nil {
+		return err
+	}
+	p.line("const %s: %s = %s;", mapTemp, spelledMap, operand)
 	entry := p.temp()
 	if keyed {
-		p.line("%sfor (const %s of (%s === undefined ? [] : %s.values())) {", p.takeLoopLabel(), entry, mapTemp, mapTemp)
+		p.line("%sfor (const %s of gort$.goKMapValues(%s)) {", p.takeLoopLabel(), entry, mapTemp)
 	} else {
-		p.line("%sfor (const %s of (%s === undefined ? [] : %s)) {", p.takeLoopLabel(), entry, mapTemp, mapTemp)
+		p.line("%sfor (const %s of gort$.goMapEntries(%s)) {", p.takeLoopLabel(), entry, mapTemp)
 	}
 	p.indent++
 	if n.Key != "" {
@@ -201,8 +208,11 @@ func (p *printer) printRangeFunc(n *ir.RangeFunc) error {
 		if resultSpelled, err = p.tsFuncResultType(n.Results); err != nil {
 			return err
 		}
+		// A one-field slot rather than a bare let: property reads are not
+		// control-flow narrowed, so the propagated value keeps its type
+		// even when TypeScript cannot see the closure assignment.
 		ctx.retVar = p.temp()
-		p.line("let %s: (%s) | undefined = undefined;", ctx.retVar, resultSpelled)
+		p.line("const %s: { v?: (%s) } = {};", ctx.retVar, resultSpelled)
 	}
 	params := make([]string, 0, 2)
 	yieldArgs := []struct {
@@ -223,7 +233,11 @@ func (p *printer) printRangeFunc(n *ir.RangeFunc) error {
 		params = append(params, fmt.Sprintf("$y%d: %s", i, spelled))
 	}
 	// A nil sequence function panics exactly like Go's nil call.
-	p.line("(gort$.goNilCheck(%s))((%s): boolean => {", seq, joinComma(params))
+	checkedSeq, err := p.nilCheckOf(seq, n.Seq.Type())
+	if err != nil {
+		return err
+	}
+	p.line("(%s)((%s): boolean => {", checkedSeq, joinComma(params))
 	p.indent++
 	p.line("if (%s) {", ctx.doneVar)
 	p.indent++
@@ -260,14 +274,20 @@ func (p *printer) printRangeFunc(n *ir.RangeFunc) error {
 	// The sequence has returned: any subsequent call of a retained yield
 	// is invalid, exactly as Go marks the iterator done.
 	p.line("%s = true;", ctx.doneVar)
-	p.line("if (%s) {", ctx.returnedVar)
-	p.indent++
-	if ctx.retVar != "" {
-		p.emitFunctionReturn("(" + ctx.retVar + " as (" + resultSpelled + "))")
-	} else {
-		p.emitFunctionReturn("")
+	// The propagated-return epilogue exists only when some body return
+	// actually set it: with no body return the flag and slot are never
+	// assigned, and TypeScript correctly narrows them to their initial
+	// undefined/false.
+	if ctx.returnUsed {
+		p.line("if (%s) {", ctx.returnedVar)
+		p.indent++
+		if ctx.retVar != "" {
+			p.emitFunctionReturn("(" + ctx.retVar + ".v as (" + resultSpelled + "))")
+		} else {
+			p.emitFunctionReturn("")
+		}
+		p.indent--
+		p.line("}")
 	}
-	p.indent--
-	p.line("}")
 	return nil
 }

@@ -23,8 +23,11 @@ type stagedTarget struct {
 	// place with the composed element callback, so element aliases and
 	// slice views observe the store.
 	arrayValue string
-	// nilCheckBase marks a pointer base dereferenced at store time.
+	// nilCheckBase marks a pointer base dereferenced at store time;
+	// baseNilable is its nilable type for the explicit-generic check
+	// (defeats literal-undefined narrowing on provably nil operands).
 	nilCheckBase bool
+	baseNilable  ir.Type
 	// keyedMap routes the store through the composite-key carrier.
 	keyedMap bool
 	// externSet, when set, is the typed goSet$ stub reference for an
@@ -105,13 +108,14 @@ func (p *printer) stageCompoundTarget(target ir.Target) (stagedTarget, error) {
 		}
 		return stagedTarget{kind: "field", name: base, field: t.Field,
 			structValue: t.T.Kind == ir.KindStruct, externSet: mustExternSet(p, t.T),
-			nilCheckBase: t.X.Type().Kind != ir.KindStruct}, nil
+			nilCheckBase: t.X.Type().Kind != ir.KindStruct,
+			baseNilable:  t.X.Type()}, nil
 	case *ir.PointeeTarget:
 		pointer, err := p.operandSlot(t.X)
 		if err != nil {
 			return stagedTarget{}, err
 		}
-		staged := stagedTarget{kind: "pointee", name: pointer, nilCheckBase: true}
+		staged := stagedTarget{kind: "pointee", name: pointer, nilCheckBase: true, baseNilable: t.X.Type()}
 		if elem := t.X.Type().Elem; elem != nil {
 			staged.structValue = elem.Kind == ir.KindStruct
 			staged.externSet = mustExternSet(p, *elem)
@@ -184,7 +188,8 @@ func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
 		return stagedTarget{kind: "field", name: baseTemp, field: t.Field,
 			structValue: t.T.Kind == ir.KindStruct, arrayValue: setElem,
 			externSet:    mustExternSet(p, t.T),
-			nilCheckBase: t.X.Type().Kind != ir.KindStruct}, nil
+			nilCheckBase: t.X.Type().Kind != ir.KindStruct,
+			baseNilable:  t.X.Type()}, nil
 	case *ir.PointeeTarget:
 		pointer, err := p.printExpr(t.X)
 		if err != nil {
@@ -192,7 +197,7 @@ func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
 		}
 		pointerTemp := p.temp()
 		p.line("const %s = %s;", pointerTemp, pointer)
-		staged := stagedTarget{kind: "pointee", name: pointerTemp, nilCheckBase: true}
+		staged := stagedTarget{kind: "pointee", name: pointerTemp, nilCheckBase: true, baseNilable: t.X.Type()}
 		if elem := t.X.Type().Elem; elem != nil {
 			staged.structValue = elem.Kind == ir.KindStruct
 			if staged.arrayValue, err = p.arrayValueCallback(*elem); err != nil {
@@ -273,7 +278,11 @@ func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
 func (s stagedTarget) load(p *printer, operandT ir.Type) (string, error) {
 	base := s.name
 	if s.nilCheckBase {
-		base = "gort$.goNilCheck(" + s.name + ")"
+		checked, err := p.nilCheckOf(s.name, s.baseNilable)
+		if err != nil {
+			return "", err
+		}
+		base = checked
 	}
 	switch s.kind {
 	case "var":
@@ -304,7 +313,11 @@ func (s stagedTarget) load(p *printer, operandT ir.Type) (string, error) {
 func (s stagedTarget) store(p *printer, value string) error {
 	base := s.name
 	if s.nilCheckBase {
-		base = "gort$.goNilCheck(" + s.name + ")"
+		checked, err := p.nilCheckOf(s.name, s.baseNilable)
+		if err != nil {
+			return err
+		}
+		base = checked
 	}
 	switch s.kind {
 	case "blank":
@@ -439,15 +452,19 @@ func (p *printer) printStore(target ir.Target, value string) error {
 		p.line("const %s = %s;", baseTemp, base)
 		valueTemp := p.temp()
 		p.line("const %s = %s;", valueTemp, value)
+		checkedBase, err := p.nilCheckOf(baseTemp, t.X.Type())
+		if err != nil {
+			return err
+		}
 		switch {
 		case t.T.Kind == ir.KindStruct:
-			p.line("gort$.goNilCheck(%s).%s.goSet$(%s);", baseTemp, t.Field, valueTemp)
+			p.line("%s.%s.goSet$(%s);", checkedBase, t.Field, valueTemp)
 		case setElem != "":
-			p.line("gosl$.goArraySetAll(gort$.goNilCheck(%s).%s, %s, %s);", baseTemp, t.Field, valueTemp, setElem)
+			p.line("gosl$.goArraySetAll(%s.%s, %s, %s);", checkedBase, t.Field, valueTemp, setElem)
 		case mustExternSet(p, t.T) != "":
-			p.line("%s(gort$.goNilCheck(%s).%s, %s);", mustExternSet(p, t.T), baseTemp, t.Field, valueTemp)
+			p.line("%s(%s.%s, %s);", mustExternSet(p, t.T), checkedBase, t.Field, valueTemp)
 		default:
-			p.line("gort$.goNilCheck(%s).%s = %s;", baseTemp, t.Field, valueTemp)
+			p.line("%s.%s = %s;", checkedBase, t.Field, valueTemp)
 		}
 		return nil
 	case *ir.MapTarget:
@@ -498,19 +515,23 @@ func (p *printer) printStore(target ir.Target, value string) error {
 		valueTemp := p.temp()
 		p.line("const %s = %s;", valueTemp, value)
 		elem := t.X.Type().Elem
+		checkedPointer, err := p.nilCheckOf(pointerTemp, t.X.Type())
+		if err != nil {
+			return err
+		}
 		switch {
 		case elem == nil || elem.Kind == ir.KindStruct:
-			p.line("gort$.goNilCheck(%s).goSet$(%s);", pointerTemp, valueTemp)
+			p.line("%s.goSet$(%s);", checkedPointer, valueTemp)
 		case elem.Kind == ir.KindArray:
 			setElem, err := p.arrayElemSet(*elem.Elem)
 			if err != nil {
 				return err
 			}
-			p.line("gosl$.goArraySetAll(gort$.goNilCheck(%s), %s, %s);", pointerTemp, valueTemp, setElem)
+			p.line("gosl$.goArraySetAll(%s, %s, %s);", checkedPointer, valueTemp, setElem)
 		case elem.Kind == ir.KindExternal:
-			p.line("%s(gort$.goNilCheck(%s), %s);", mustExternSet(p, *elem), pointerTemp, valueTemp)
+			p.line("%s(%s, %s);", mustExternSet(p, *elem), checkedPointer, valueTemp)
 		default:
-			p.line("gort$.goNilCheck(%s).v = %s;", pointerTemp, valueTemp)
+			p.line("%s.v = %s;", checkedPointer, valueTemp)
 		}
 		return nil
 	case ir.BoxedTarget:

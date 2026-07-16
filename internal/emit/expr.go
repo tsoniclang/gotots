@@ -26,6 +26,24 @@ func family(kind ir.Kind) (abi.Family, bool) {
 func helper(name string) string { return "goabi$." + name }
 
 // printExpr renders one IR expression, fully parenthesized.
+// nilCheckOf spells a nil-checked read of a nilable-typed operand with
+// an explicit type argument, so TypeScript's literal-undefined narrowing
+// of a provably nil operand (legal Go that panics at runtime) cannot
+// collapse the result type.
+func (p *printer) nilCheckOf(expr string, nilable ir.Type) (string, error) {
+	if nilable.Kind == ir.KindIface {
+		return "gort$.goNilCheck<goif$.GoIfaceBox>(" + expr + ")", nil
+	}
+	spelled, err := p.tsType(nilable)
+	if err != nil {
+		return "", err
+	}
+	if inner, ok := strings.CutSuffix(spelled, " | undefined"); ok {
+		return "gort$.goNilCheck<" + inner + ">(" + expr + ")", nil
+	}
+	return "gort$.goNilCheck(" + expr + ")", nil
+}
+
 func (p *printer) printExpr(e ir.Expr) (string, error) {
 	if printed, isArray, err := p.printArrayExpr(e); isArray {
 		return printed, err
@@ -124,7 +142,9 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		// is — nil receivers run, as in Go. Cell pointees read through
 		// the cell.
 		if !n.PointerRecv && n.Recv.Type().Kind == ir.KindPointer {
-			recv = "gort$.goNilCheck(" + recv + ")"
+			if recv, err = p.nilCheckOf(recv, n.Recv.Type()); err != nil {
+				return "", err
+			}
 			if elem := n.Recv.Type().Elem; elem != nil {
 				switch elem.Kind {
 				case ir.KindStruct, ir.KindArray, ir.KindExternal:
@@ -145,7 +165,11 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if n.X.Type().Kind == ir.KindStruct {
 			return fmt.Sprintf("%s.%s", base, n.Field), nil
 		}
-		return fmt.Sprintf("gort$.goNilCheck(%s).%s", base, n.Field), nil
+		checked, err := p.nilCheckOf(base, n.X.Type())
+		if err != nil {
+			return "", err
+		}
+		return checked + "." + n.Field, nil
 	case *ir.StructNew:
 		class, err := p.module.symbol(n.Pkg, n.TypeName)
 		if err != nil {
@@ -237,7 +261,11 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		}
 		// (*T).ValueMethod: deref the pointer (nil panics) and forward;
 		// the value-receiver function copies on entry.
-		operands := append([]string{"gort$.goNilCheck($r$)"}, names...)
+		checkedRecv, err := p.nilCheckOf("$r$", ir.Type{Kind: ir.KindPointer, Elem: &n.RecvValue})
+		if err != nil {
+			return "", err
+		}
+		operands := append([]string{checkedRecv}, names...)
 		return fmt.Sprintf("(%s): %s => %s(%s)",
 			joinComma(params), result, callee, joinComma(operands)), nil
 	case *ir.TupleAdapt:
@@ -389,11 +417,15 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		}
 		// Identity carriers (structs, arrays, external handles) ARE their
 		// pointer; cell carriers read through the cell.
+		checked, err := p.nilCheckOf(x, n.X.Type())
+		if err != nil {
+			return "", err
+		}
 		switch n.T.Kind {
 		case ir.KindStruct, ir.KindArray, ir.KindExternal:
-			return "gort$.goNilCheck(" + x + ")", nil
+			return checked, nil
 		}
-		return "gort$.goNilCheck(" + x + ").v", nil
+		return checked + ".v", nil
 	case *ir.BoxedLoad:
 		return n.Cell + ".v", nil
 	case *ir.BoxedRef:
@@ -498,14 +530,20 @@ func (p *printer) printTupleAdapt(n *ir.TupleAdapt) (string, error) {
 		}
 	}
 	slotTypes := make([]string, len(n.SrcType))
+	resultTypes := make([]string, len(n.SrcType))
 	for i, t := range n.SrcType {
 		spelled, err := p.tsType(t)
 		if err != nil {
 			return "", err
 		}
 		slotTypes[i] = spelled
+		if n.Slots[i].Op == ir.TupleSlotBox {
+			resultTypes[i] = "goif$.GoIface"
+		} else {
+			resultTypes[i] = spelled
+		}
 	}
-	return "((($t: readonly [" + joinComma(slotTypes) + "]) => [" + joinComma(converted) + "])(" + inner + "))", nil
+	return "((($t: readonly [" + joinComma(slotTypes) + "]): readonly [" + joinComma(resultTypes) + "] => [" + joinComma(converted) + "])(" + inner + "))", nil
 }
 
 func (p *printer) printArgs(args []ir.Expr) (string, error) {

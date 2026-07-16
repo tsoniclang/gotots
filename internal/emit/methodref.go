@@ -80,11 +80,19 @@ func (p *printer) methodValueCapture(n *ir.MethodValue, recv string) (string, st
 		if err != nil {
 			return "", "", err
 		}
-		return "gort$.goNilCheck(" + recv + ")", spelled, nil
+		checked, err := p.nilCheckOf(recv, n.Recv.Type())
+		if err != nil {
+			return "", "", err
+		}
+		return checked, spelled, nil
 	}
 	captured := recvType
 	if n.NilCheckRecv {
-		recv = "gort$.goNilCheck(" + recv + ")"
+		checked, err := p.nilCheckOf(recv, n.Recv.Type())
+		if err != nil {
+			return "", "", err
+		}
+		recv = checked
 		captured = *recvType.Elem
 	}
 	spelled, err := p.tsType(captured)

@@ -273,6 +273,9 @@ type rangeFuncCtx struct {
 	doneVar     string
 	returnedVar string
 	retVar      string // "" when the enclosing function returns nothing
+	// returnUsed marks that a body return actually set the flag: the
+	// propagated-return epilogue is emitted only then.
+	returnUsed bool
 }
 
 func (p *printer) line(format string, args ...any) {
@@ -422,6 +425,11 @@ func (p *printer) tsType(t ir.Type) (string, error) {
 		element, err := p.tsType(*t.Elem)
 		if err != nil {
 			return "", err
+		}
+		if strings.Contains(element, "|") || strings.Contains(element, "=>") {
+			// A union or function element must parenthesize: T | U[] is
+			// not (T | U)[].
+			element = "(" + element + ")"
 		}
 		return element + "[]", nil
 	case ir.KindUnit:

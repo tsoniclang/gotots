@@ -252,8 +252,13 @@ func printMethodFunction(out *strings.Builder, module *Module, className string,
 		}
 		params = append(params, tsName(parameter.Name)+": "+spelled)
 	}
+	// The instantiation's zero and equality operations, mirroring
+	// generic function signatures.
 	for _, param := range method.TypeParams {
 		params = append(params, "zero$"+param+": () => "+param)
+	}
+	for _, param := range method.TypeParams {
+		params = append(params, "eq$"+param+": (a: "+param+", b: "+param+") => boolean")
 	}
 	result, err := p.tsResultType(method.Results)
 	if err != nil {
@@ -269,8 +274,10 @@ func printMethodFunction(out *strings.Builder, module *Module, className string,
 	p.indent++
 	if len(method.TypeParams) > 0 {
 		p.zeroFactories = map[string]string{}
+		p.eqOps = map[string]string{}
 		for _, param := range method.TypeParams {
 			p.zeroFactories[param] = "zero$" + param
+			p.eqOps[param] = "eq$" + param
 		}
 	}
 	if structValueReceiver {

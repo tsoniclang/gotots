@@ -186,10 +186,22 @@ func (p *printer) printIfaceCall(n *ir.IfaceCall) (string, error) {
 			return "", err
 		}
 		receiver := "($box.v as (" + payload + "))"
+		// A pointer dynamic value dereferences before a value-receiver
+		// call (Go's implicit deref: nil panics, the method copies on
+		// entry) and before a promoted field chain.
+		if branch.Payload.Kind == ir.KindPointer && (branch.ValueReceiver || len(branch.FieldPath) > 0) {
+			checked, err := p.nilCheckOf(receiver, branch.Payload)
+			if err != nil {
+				return "", err
+			}
+			receiver = checked
+		}
 		for _, step := range branch.FieldPath {
 			receiver += "." + step.Field
 			if step.Pointer {
-				receiver = "gort$.goNilCheck(" + receiver + ")"
+				if receiver, err = p.nilCheckOf(receiver, step.FieldType); err != nil {
+					return "", err
+				}
 			}
 		}
 		operands := append([]string{receiver}, argNames...)

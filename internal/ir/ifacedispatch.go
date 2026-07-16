@@ -77,6 +77,11 @@ func (b *builder) resolveIfaceBranches(ifaceType *types.Interface, method *types
 				}
 				field := structType.Field(index)
 				step := PromotionStep{Field: field.Name()}
+				resolved, err := b.typeOf(field.Type(), span)
+				if err != nil {
+					return err
+				}
+				step.FieldType = resolved
 				fieldType := field.Type()
 				if pointer, isPtr := fieldType.Underlying().(*types.Pointer); isPtr {
 					step.Pointer = true

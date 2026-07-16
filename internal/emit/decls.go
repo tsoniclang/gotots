@@ -5,6 +5,7 @@ package emit
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/tsoniclang/gotots/internal/ir"
 )
@@ -119,6 +120,9 @@ func (p *printer) printNativeSliceDecl(name string, t ir.Type, value ir.Expr) er
 	element, err := p.tsType(*t.Elem)
 	if err != nil {
 		return err
+	}
+	if strings.Contains(element, "|") || strings.Contains(element, "=>") {
+		element = "(" + element + ")"
 	}
 	printed, err := p.printNativeSliceValue(t, value)
 	if err != nil {

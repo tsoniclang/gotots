@@ -59,6 +59,9 @@ type IfaceCall struct {
 type PromotionStep struct {
 	Field   string
 	Pointer bool // an embedded pointer field: deref with a nil check
+	// FieldType is the embedded field's type (the nilable pointer type
+	// when Pointer), for exact deref typing.
+	FieldType Type
 }
 
 type IfaceBranch struct {

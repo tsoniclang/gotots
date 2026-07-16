@@ -11,7 +11,7 @@ import (
 
 // zeroFactoryArgs spells one zero factory then one equality operation
 // per instantiated type argument, the trailing arguments of every
-// generic call.
+// generic function and method call.
 func (p *printer) zeroFactoryArgs(typeArgs []ir.Type) (string, error) {
 	parts := make([]string, 0, len(typeArgs)*2)
 	for _, arg := range typeArgs {
@@ -27,6 +27,20 @@ func (p *printer) zeroFactoryArgs(typeArgs []ir.Type) (string, error) {
 			return "", err
 		}
 		parts = append(parts, eq)
+	}
+	return joinComma(parts), nil
+}
+
+// zeroOnlyFactoryArgs spells the zero factories alone — generic class
+// constructors and goZero$ take no equality operations.
+func (p *printer) zeroOnlyFactoryArgs(typeArgs []ir.Type) (string, error) {
+	parts := make([]string, 0, len(typeArgs))
+	for _, arg := range typeArgs {
+		zero, err := p.zeroLiteral(arg)
+		if err != nil {
+			return "", err
+		}
+		parts = append(parts, "() => "+zero)
 	}
 	return joinComma(parts), nil
 }

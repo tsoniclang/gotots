@@ -15,7 +15,7 @@ func (p *printer) rttiRef(r ir.RttiRef) (string, error) {
 	}
 	if r.Composite != "" {
 		if r.ExternID == "" {
-			fields := fmt.Sprintf("d: %q, m: {}", r.Display)
+			fields := fmt.Sprintf("d: %q", r.Display)
 			switch r.CompositeEq {
 			case "uncomparable":
 				fields += ", c: false"

@@ -13,7 +13,7 @@ package abi
 import "fmt"
 
 // Version identifies the ABI contract carried in generated output.
-const Version = 14
+const Version = 15
 
 // Family is the static carrier family of an integer kind.
 type Family string
@@ -190,6 +190,14 @@ export function goMapLen<K, V>(m: GoMap<K, V>): bigint {
   return m === undefined ? 0n : BigInt(m.size);
 }
 
+// Range iteration sources: a nil map ranges zero times. Central helpers
+// keep the nil test inside the ABI so a provably nil operand (which
+// TypeScript narrows to literal undefined) still typechecks exactly.
+export function goMapEntries<K, V>(m: GoMap<K, V>): readonly (readonly [K, V])[] {
+  if (m === undefined) return [];
+  return Array.from(m.entries());
+}
+
 // clear(m): a no-op on nil maps.
 export function goMapClear<K, V>(m: GoMap<K, V>): void {
   if (m === undefined) return;
@@ -322,6 +330,11 @@ export function goKMapSet<K extends GoKeyed, V>(m: GoKeyedMap<K, V>, key: K, val
 
 export function goKMapDelete<K extends GoKeyed, V>(m: GoKeyedMap<K, V>, key: K): void {
   if (m !== undefined) m.delete(key.goKey$());
+}
+
+export function goKMapValues<K extends GoKeyed, V>(m: GoKeyedMap<K, V>): readonly (readonly [K, V])[] {
+  if (m === undefined) return [];
+  return Array.from(m.values());
 }
 
 export function goKMapClear<K extends GoKeyed, V>(m: GoKeyedMap<K, V>): void {

@@ -63,7 +63,10 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 					element := Type{Kind: KindExternal, Go: named.String(), Named: named.Obj().Name(), Pkg: declaringPkg}
 					return Type{Kind: KindPointer, Go: spelled, Named: named.Obj().Name(), Pkg: declaringPkg, Elem: &element}, nil
 				}
-				element := Type{Kind: KindStruct, Go: named.String(), Named: named.Obj().Name(), Pkg: declaringPkg}
+				element, err := b.typeOf(named, span)
+				if err != nil {
+					return Type{}, err
+				}
 				return Type{Kind: KindPointer, Go: spelled, Named: named.Obj().Name(), Pkg: declaringPkg, Elem: &element}, nil
 			}
 			if named.Obj().Pkg() != nil && b.unit.Owns(named.Obj().Pkg().Path()) {
@@ -174,6 +177,17 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 		if named.TypeArgs() != nil {
 			for i := range named.TypeArgs().Len() {
 				arg, err := b.typeOf(named.TypeArgs().At(i), span)
+				if err != nil {
+					return Type{}, err
+				}
+				out.TypeArgs = append(out.TypeArgs, arg)
+			}
+		} else if named.TypeParams() != nil && named.TypeParams().Len() > 0 {
+			// The generic type referenced inside its own declaration
+			// scope (a method receiver, a recursive field): its arguments
+			// are its own type parameters.
+			for i := range named.TypeParams().Len() {
+				arg, err := b.typeOf(named.TypeParams().At(i), span)
 				if err != nil {
 					return Type{}, err
 				}
@@ -318,7 +332,12 @@ func (b *builder) typeParamKeySupported(keyType types.Type, span Span) bool {
 // Go). External fields and uncomparable kinds stay out.
 func (b *builder) EqComparableField(t Type, goType types.Type) bool {
 	switch t.Kind {
-	case KindString, KindBool, KindPointer, KindUnit, KindFloat32, KindFloat64, KindIface:
+	case KindIface:
+		// A type-parameter field's equality is instantiation-dependent
+		// (=== for one instantiation, interface equality for another):
+		// the shared goEq$ body cannot be exact, so the struct stays out.
+		return t.TypeParamName == ""
+	case KindString, KindBool, KindPointer, KindUnit, KindFloat32, KindFloat64:
 		return true
 	case KindArray:
 		elemGo := goType

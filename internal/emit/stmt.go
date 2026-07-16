@@ -487,8 +487,9 @@ func (p *printer) printReturn(n *ir.ReturnStmt) error {
 // return.
 func (p *printer) emitFunctionReturn(value string) {
 	if ctx := p.rangeReturn; ctx != nil {
+		ctx.returnUsed = true
 		if value != "" {
-			p.line("%s = %s;", ctx.retVar, value)
+			p.line("%s.v = %s;", ctx.retVar, value)
 		}
 		p.line("%s = true;", ctx.returnedVar)
 		p.line("%s = true;", ctx.doneVar)
