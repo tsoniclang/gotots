@@ -35,7 +35,7 @@ func (b *builder) rttiFor(t types.Type, span Span) (RttiRef, error) {
 		if !b.unit.Owns(obj.Pkg().Path()) {
 			// An external named type: an interned rtti whose method
 			// dispatch routes through the external contracts.
-			return RttiRef{Composite: t.String(), Display: displayOf(t),
+			return RttiRef{Composite: canonicalTypeID(t), Display: displayOf(t),
 				ExternID: obj.Pkg().Path() + "." + obj.Name()}, nil
 		}
 		if concrete.TypeArgs() != nil && concrete.TypeArgs().Len() > 0 {
@@ -70,6 +70,27 @@ func (b *builder) rttiFor(t types.Type, span Span) (RttiRef, error) {
 		Construct: "interface value of type " + t.String(), Span: span}
 }
 
+// canonicalTypeID is the path-qualified identity of one Go type: the
+// ONLY string used as generated dynamic-type identity. types.Type.String
+// qualifies by package NAME and can collide across packages sharing a
+// name; this cannot.
+func canonicalTypeID(t types.Type) string {
+	return types.TypeString(t, func(p *types.Package) string { return p.Path() })
+}
+
+// canonicalIfaceID extends the path-qualified type string with each
+// method's canonical key: the type string alone does not package-qualify
+// UNEXPORTED method names, so two structurally identical unexported
+// interfaces from different packages would collide (distinct Go types,
+// disjoint implementer sets).
+func canonicalIfaceID(iface *types.Interface) string {
+	id := canonicalTypeID(iface)
+	for i := range iface.NumMethods() {
+		id += "|" + MethodKey(iface.Method(i))
+	}
+	return id
+}
+
 // compositeRtti interns an rtti for a composite or external type when
 // the value's carrier itself is reviewed.
 func (b *builder) compositeRtti(t types.Type, span Span, externID string) (RttiRef, error) {
@@ -77,7 +98,7 @@ func (b *builder) compositeRtti(t types.Type, span Span, externID string) (RttiR
 	if err != nil {
 		return RttiRef{}, err
 	}
-	out := RttiRef{Composite: t.String(), Display: displayOf(t), ExternID: externID}
+	out := RttiRef{Composite: canonicalTypeID(t), Display: displayOf(t), ExternID: externID}
 	if externID == "" {
 		switch types.Unalias(t).Underlying().(type) {
 		case *types.Slice, *types.Map, *types.Signature:
@@ -186,7 +207,7 @@ func MethodKey(method *types.Func) string {
 func (b *builder) buildIfaceMethodCall(n *ast.CallExpr, recv Expr, method *types.Func, selector *ast.SelectorExpr) (Expr, error) {
 	span := b.span(n.Pos())
 	signature := method.Type().(*types.Signature)
-	out := &IfaceCall{Recv: recv, Method: MethodKey(method), Display: method.Name()}
+	out := &IfaceCall{Recv: recv, Display: method.Name()}
 	if err := b.buildCallArgsResults(n, signature, &out.Args, &out.Results); err != nil {
 		return nil, err
 	}
@@ -221,6 +242,11 @@ func (b *builder) buildTypeAssert(n *ast.TypeAssertExpr, commaOk bool) (Expr, er
 		if err != nil {
 			return nil, err
 		}
+		// x.(interface{}) and other empty-interface targets are
+		// universal: EVERY non-nil dynamic value passes, including
+		// predeclared and composite tokens the named-implementer sweep
+		// cannot enumerate.
+		universal := targetIface.NumMethods() == 0
 		required := make([]string, 0, targetIface.NumMethods())
 		for i := range targetIface.NumMethods() {
 			required = append(required, targetIface.Method(i).Name())
@@ -230,6 +256,7 @@ func (b *builder) buildTypeAssert(n *ast.TypeAssertExpr, commaOk bool) (Expr, er
 		return &IfaceAssert{
 			X:             operand,
 			Target:        target,
+			Universal:     universal,
 			Implementers:  implementers,
 			Required:      required,
 			SourceDisplay: displayOf(b.info.Types[n.X].Type),
@@ -348,6 +375,10 @@ func (b *builder) buildTypeSwitch(n *ast.TypeSwitchStmt) (Stmt, error) {
 type IfaceAssert struct {
 	X      Expr
 	Target Type
+	// Universal marks an empty-interface target: every non-nil dynamic
+	// value passes (predeclared and composite tokens included), so the
+	// assert is only the nil test.
+	Universal bool
 	// Implementers is the closed set of dynamic-type tokens that satisfy
 	// the target interface (whole-unit static resolution). The assert is
 	// a token-membership test, not a runtime method-set probe. Required

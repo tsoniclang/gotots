@@ -32,6 +32,9 @@ type Proof struct {
 	// generated symbol exists in it — finalized once, after every proof
 	// and file exists.
 	ModuleRetained bool `json:"moduleRetained"`
+	// InitHash is a package variable's initializer source hash — joined
+	// against the census's identity-bearing initializer evidence.
+	InitHash string `json:"initHash,omitempty"`
 	// NoOutput marks a declaration whose exact lowering emits nothing (a
 	// blank variable without initializer, a fold-at-use constant): it is
 	// disposed but never counted as a retained body.

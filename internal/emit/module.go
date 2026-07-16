@@ -19,8 +19,10 @@ type ExternMethod struct {
 	Key  string
 	// Adapter is the pre-spelled exactly typed vtable arrow delegating
 	// to the stub export (built where the obligation's signature is
-	// known).
-	Adapter string
+	// known); AdapterType is its exact arrow TYPE for union-member
+	// spelling.
+	Adapter     string
+	AdapterType string
 }
 
 // ABIImports carries the language-ABI module specifiers for one module.

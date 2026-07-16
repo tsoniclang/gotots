@@ -133,46 +133,89 @@ func packageFuncLits(p *packages.Package, sourceDir string, files []fileSource, 
 	var out []FuncLitSupport
 	for _, f := range files {
 		for _, decl := range f.file.Decls {
+			// Var groups attribute EACH VALUE expression to ITS OWN
+			// variable's identity — never the group's first name.
+			if gen, isGen := decl.(*ast.GenDecl); isGen && gen.Tok == token.VAR {
+				for _, spec := range gen.Specs {
+					valueSpec, ok := spec.(*ast.ValueSpec)
+					if !ok {
+						continue
+					}
+					for i, value := range valueSpec.Values {
+						if i >= len(valueSpec.Names) {
+							break
+						}
+						name := valueSpec.Names[i]
+						id := goid.Value(p.PkgPath, "var", name.Name)
+						if name.Name == "_" {
+							position := p.Fset.Position(name.Pos())
+							id = goid.Repeatable(p.PkgPath, "var", "_", f.relative, position.Line, position.Column)
+						}
+						state, has := stateByID[id]
+						if !has {
+							state = ir.SupportUnimplemented
+						}
+						out = append(out, collectLits(p, f, value, id, state, sitesByID[id])...)
+					}
+				}
+				continue
+			}
 			parentID, parentState, parentSites := declOutcome(p, f.relative, decl, stateByID, sitesByID)
 			if parentID == "" {
 				continue
 			}
-			ast.Inspect(decl, func(n ast.Node) bool {
-				lit, ok := n.(*ast.FuncLit)
-				if !ok {
-					return true
-				}
-				position := p.Fset.Position(lit.Pos())
-				id := goid.Repeatable(p.PkgPath, "funclit", "", f.relative, position.Line, position.Column)
-				startPos := p.Fset.Position(lit.Body.Pos())
-				endPos := p.Fset.Position(lit.Body.End())
-				bodyHash := ""
-				if startPos.Offset >= 0 && endPos.Offset <= len(f.source) && startPos.Offset < endPos.Offset {
-					digest := sha256.Sum256(f.source[startPos.Offset:endPos.Offset])
-					bodyHash = hex.EncodeToString(digest[:])
-				}
-				state := "generated"
-				if parentState == ir.SupportUnimplemented {
-					state = "unimplemented"
-					// A parent with site records may still have literals
-					// outside every unsupported span; only sites inside
-					// the literal make IT unimplemented. A parent with no
-					// sites (declaration-level rejection) blocks all.
-					if len(parentSites) > 0 {
-						state = "generated"
-						for _, site := range parentSites {
-							if site.Span.File == f.relative && site.Span.Line >= startPos.Line && site.Span.Line <= endPos.Line {
-								state = "unimplemented"
-								break
-							}
-						}
-					}
-				}
-				out = append(out, FuncLitSupport{ID: id, Parent: parentID, Package: p.PkgPath, BodyHash: bodyHash, State: state})
-				return true
-			})
+			out = append(out, collectLits(p, f, decl, parentID, parentState, parentSites)...)
 		}
 	}
+	return out
+}
+
+// collectLits walks one attributed region for function literals with
+// exact source-span membership (offset containment, not line numbers).
+func collectLits(p *packages.Package, f fileSource, node ast.Node, parentID string, parentState ir.SupportState, parentSites []ir.UnsupportedSite) []FuncLitSupport {
+	var out []FuncLitSupport
+	ast.Inspect(node, func(n ast.Node) bool {
+		lit, ok := n.(*ast.FuncLit)
+		if !ok {
+			return true
+		}
+		position := p.Fset.Position(lit.Pos())
+		id := goid.Repeatable(p.PkgPath, "funclit", "", f.relative, position.Line, position.Column)
+		startPos := p.Fset.Position(lit.Body.Pos())
+		endPos := p.Fset.Position(lit.Body.End())
+		bodyHash := ""
+		if startPos.Offset >= 0 && endPos.Offset <= len(f.source) && startPos.Offset < endPos.Offset {
+			digest := sha256.Sum256(f.source[startPos.Offset:endPos.Offset])
+			bodyHash = hex.EncodeToString(digest[:])
+		}
+		state := "generated"
+		if parentState == ir.SupportUnimplemented {
+			state = "unimplemented"
+			// A parent with site records may still have literals outside
+			// every unsupported span; only sites strictly inside the
+			// literal's exact (line, column) range make IT unimplemented.
+			// A parent with no sites (declaration-level rejection) blocks
+			// everything inside it.
+			if len(parentSites) > 0 {
+				state = "generated"
+				for _, site := range parentSites {
+					if site.Span.File != f.relative {
+						continue
+					}
+					afterStart := site.Span.Line > startPos.Line ||
+						(site.Span.Line == startPos.Line && site.Span.Col >= startPos.Column)
+					beforeEnd := site.Span.Line < endPos.Line ||
+						(site.Span.Line == endPos.Line && site.Span.Col <= endPos.Column)
+					if afterStart && beforeEnd {
+						state = "unimplemented"
+						break
+					}
+				}
+			}
+		}
+		out = append(out, FuncLitSupport{ID: id, Parent: parentID, Package: p.PkgPath, BodyHash: bodyHash, State: state})
+		return true
+	})
 	return out
 }
 
@@ -199,30 +242,6 @@ func declOutcome(p *packages.Package, relativeFile string, decl ast.Decl, states
 			state = ir.SupportUnimplemented
 		}
 		return id, state, sites[id]
-	case *ast.GenDecl:
-		if d.Tok != token.VAR {
-			return "", "", nil
-		}
-		// Package-variable initializers: the group links through the
-		// first named variable's identity; a var group whose translation
-		// failed has no proof, and its literals block.
-		for _, spec := range d.Specs {
-			valueSpec, ok := spec.(*ast.ValueSpec)
-			if !ok || len(valueSpec.Values) == 0 {
-				continue
-			}
-			name := valueSpec.Names[0]
-			id := goid.Value(p.PkgPath, "var", name.Name)
-			if name.Name == "_" {
-				position := p.Fset.Position(name.Pos())
-				id = goid.Repeatable(p.PkgPath, "var", "_", relativeFile, position.Line, position.Column)
-			}
-			state, has := states[id]
-			if !has {
-				state = ir.SupportGenerated
-			}
-			return id, state, sites[id]
-		}
 	}
 	return "", "", nil
 }

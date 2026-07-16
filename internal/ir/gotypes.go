@@ -206,6 +206,8 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 			return Type{}, err
 		}
 		out.IfaceMembers = members
+		out.IfaceID = canonicalIfaceID(u)
+		out.IfaceEmpty = u.NumMethods() == 0
 		return out, nil
 
 	case *types.Array:

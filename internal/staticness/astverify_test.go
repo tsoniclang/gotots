@@ -175,3 +175,36 @@ export const viaTypedProperty = record.M(2n);
 		t.Errorf("slice-carrier mechanism not derived from identifiers: %+v", report.Mechanisms)
 	}
 }
+
+// TestASTVerifierErasedPayloadInCore proves the structural checks catch
+// the generic erased form the old literal search missed: a
+// GoBox<string, unknown, object> type reference, a .v recovery cast, and
+// a GoAnyBox reference — each in generated core.
+func TestASTVerifierErasedPayloadInCore(t *testing.T) {
+	files := map[string]string{
+		"language-abi/goiface.ts": `
+export interface GoRtti { readonly d: string }
+export interface GoBox<K extends string, V, M> { readonly k: K; readonly r: GoRtti; readonly v: V; readonly m: M }
+export type GoAnyBox = GoBox<string, unknown, object>;
+`,
+		"core/pkg/package.ts": `
+import * as goif$ from "../../language-abi/goiface.ts";
+export function f(b: goif$.GoBox<string, unknown, object>): unknown {
+  return (b as goif$.GoAnyBox).v as string;
+}
+`,
+	}
+	report, err := VerifyAST(files, typescriptDir(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := map[string]bool{}
+	for _, v := range report.Violations {
+		found[v.Pattern] = true
+	}
+	for _, want := range []string{"erased-iface-payload", "erased-anybox-in-core"} {
+		if !found[want] {
+			t.Errorf("missed %s: %+v", want, report.Violations)
+		}
+	}
+}

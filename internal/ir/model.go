@@ -99,6 +99,11 @@ type Type struct {
 	Sig *FuncSig
 	// ArrayLen is the fixed length of a KindArray.
 	ArrayLen int64
+	// IfaceEmpty marks the zero-method interface: universal membership.
+	IfaceEmpty bool
+	// IfaceID is the interface's canonical path-qualified identity — the
+	// union alias digests THIS, never the name-qualified spelling.
+	IfaceID string
 	// IfaceMembers is the closed implementer union of an interface type:
 	// one member per concrete implementer (value or pointer flavor),
 	// resolved from the whole-unit type universe. Only TYPE identities —
@@ -148,6 +153,10 @@ type Scope struct {
 	// (owned and referenced external), the closed-world set from which
 	// each interface method call's dispatch branches are resolved.
 	concreteTypes *[]*types.TypeName
+	// externConcrete is the parallel universe of REFERENCED external
+	// named types: external implementers join interface unions through
+	// stub-adapter vtables.
+	externConcrete *[]*types.TypeName
 	// ifaceMembers caches each interface identity's resolved closed
 	// implementer union (typeOf recursion makes this hot).
 	ifaceMembers map[string][]IfaceMember
@@ -181,6 +190,7 @@ func NewScope(paths ...string) Scope {
 		externTypes:    map[string]*ExternTypeObligation{},
 		externVars:     map[string]*types.Var{},
 		concreteTypes:  &[]*types.TypeName{},
+		externConcrete: &[]*types.TypeName{},
 		ifaceMembers:   map[string][]IfaceMember{},
 		importClosures: map[string]map[string]bool{},
 	}
@@ -291,6 +301,15 @@ func (s Scope) AddConcreteType(name *types.TypeName) {
 
 // ConcreteTypes returns the whole-unit named-type universe.
 func (s Scope) ConcreteTypes() []*types.TypeName { return *s.concreteTypes }
+
+// AddExternConcrete records one referenced external named type in the
+// dynamic-type universe.
+func (s Scope) AddExternConcrete(name *types.TypeName) {
+	*s.externConcrete = append(*s.externConcrete, name)
+}
+
+// ExternConcreteTypes returns the referenced external named types.
+func (s Scope) ExternConcreteTypes() []*types.TypeName { return *s.externConcrete }
 
 // IfaceMemberCache returns a cached implementer union.
 func (s Scope) IfaceMemberCache(key string) ([]IfaceMember, bool) {

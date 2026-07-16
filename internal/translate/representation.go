@@ -37,11 +37,6 @@ var RepresentationFamilies = map[string]map[string]bool{
 		"const-folded-at-use":                      true,
 		"class-direct-identity":                    true,
 	},
-	"declaration-prefixed": {
-		"erased-to-carrier": true,
-		"module-let":        true,
-		"number-wrapped":    true,
-	},
 }
 
 // ClassifyRepresentation resolves one proof representation entry to its
@@ -49,23 +44,50 @@ var RepresentationFamilies = map[string]map[string]bool{
 // whether the candidate is a member of that family's closed set.
 func ClassifyRepresentation(key, candidate string) (string, bool) {
 	if strings.HasPrefix(key, "slice-local:") {
+		// A slice-local key admits ONLY slice-plan candidates.
 		return "slice-local", RepresentationFamilies["slice-local"][candidate]
+	}
+	if RepresentationFamilies["slice-local"][candidate] {
+		// A slice-plan candidate under any other key is a misfiled entry.
+		return "", false
 	}
 	if RepresentationFamilies["declaration"][candidate] {
 		return "declaration", true
 	}
-	for prefix := range RepresentationFamilies["declaration-prefixed"] {
-		if strings.HasPrefix(candidate, prefix+"(") {
+	// Prefixed forms validate their EXACT inner grammar — never a bare
+	// prefix match that would admit malformed values.
+	if inner, ok := cutWrapped(candidate, "erased-to-carrier("); ok {
+		_, valid := ClassifyRepresentation(key, inner)
+		if valid {
 			return "declaration-prefixed", true
 		}
+		return "", false
+	}
+	if inner, ok := cutWrapped(candidate, "module-let(live-binding,"); ok {
+		_, valid := ClassifyRepresentation(key, inner)
+		if valid {
+			return "declaration-prefixed", true
+		}
+		return "", false
+	}
+	if bits, ok := strings.CutPrefix(candidate, "number-wrapped-"); ok {
+		switch bits {
+		case "8", "16", "32":
+			return "carrier", true
+		}
+		return "", false
 	}
 	if RepresentationFamilies["carrier"][candidate] {
 		return "carrier", true
 	}
-	for prefix := range RepresentationFamilies["declaration-prefixed"] {
-		if strings.HasPrefix(candidate, prefix+"-") {
-			return "declaration-prefixed", true
-		}
-	}
 	return "", false
+}
+
+// cutWrapped extracts the inner value of "prefix(inner)".
+func cutWrapped(candidate, prefix string) (string, bool) {
+	rest, ok := strings.CutPrefix(candidate, prefix)
+	if !ok || !strings.HasSuffix(rest, ")") {
+		return "", false
+	}
+	return strings.TrimSuffix(rest, ")"), true
 }

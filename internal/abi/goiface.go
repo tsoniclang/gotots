@@ -64,6 +64,12 @@ export function goRttiComposite(key: string, rtti: GoRtti): GoRtti {
   return interned;
 }
 
+// GoCompositeBox is the open-composite union member: slices, maps,
+// functions, arrays, and pointers to unnamed types box under the
+// disjoint "c:"-prefixed discriminant namespace; their payloads
+// re-emerge only through token-checked assertions (ADR-0004).
+export type GoCompositeBox = GoBox<` + "`c:${string}`" + `, unknown, Record<never, never>>;
+
 // GoAnyBox is the helper-facing supertype of every union member: the
 // helpers below read only the token r (equality, assertion membership)
 // and never recover the payload — construction-bound functions on the
@@ -160,6 +166,20 @@ function missingMethod(r: GoRtti, required: readonly string[]): string | undefin
     if (!have.includes(method)) return method;
   }
   return undefined;
+}
+
+// x.(interface{}): the empty interface is universal — every non-nil
+// dynamic value passes; only nil misses.
+export function goIfaceAssertAny<T extends GoAnyBox>(i: GoIface, sourceDisplay: string, targetDisplay: string): T {
+  if (i === undefined) {
+    throw new GoPanic("interface conversion: " + sourceDisplay + " is nil, not " + targetDisplay);
+  }
+  return i as T;
+}
+
+export function goIfaceLookupAny<T extends GoAnyBox>(i: GoIface): [T | undefined, boolean] {
+  if (i === undefined) return [undefined, false];
+  return [i as T, true];
 }
 
 // x.(I), comma-ok form: undefined (the nil interface) fills the miss.

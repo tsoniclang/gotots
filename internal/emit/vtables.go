@@ -1,0 +1,147 @@
+// Per-type dispatch vtables (ADR-0004): one shared const per method-set
+// flavor with exactly typed adapters, generated in the type's own
+// package so no dispatch site ever imports an implementer.
+package emit
+
+import (
+	"fmt"
+	"sort"
+	"strings"
+
+	"github.com/tsoniclang/gotots/internal/ir"
+)
+
+// printVtables emits the type's shared dispatch tables: one const per
+// method-set flavor, each entry an exactly typed adapter to the
+// generated method function. A value-receiver method reached through
+// the pointer flavor dereferences with Go's nil panic; promoted methods
+// chain through embedded fields (pointer steps nil-check) — all inside
+// the adapter, in the type's own package, so no dispatch site ever
+// imports an implementer.
+func printVtables(out *strings.Builder, module *Module, info RttiInfo) error {
+	p := &printer{out: out, module: module}
+	value, pointer, err := p.vtableEntries(info)
+	if err != nil {
+		return err
+	}
+	export := "export "
+	p.line("%sconst %s$vtable = { %s } as const;", export, info.TypeName, joinComma(value))
+	if info.Pointer {
+		p.line("%sconst %s$vtablePtr = { %s } as const;", export, info.TypeName, joinComma(pointer))
+	}
+	return nil
+}
+
+// vtableEntries spells the adapters of both flavors.
+func (p *printer) vtableEntries(info RttiInfo) ([]string, []string, error) {
+	self := tsName(info.TypeName)
+	adapter := func(methodName string, params []ir.Var, resultVars []ir.Var, callee string, recvSpelling string, chain string) (string, error) {
+		results := make([]ir.Type, len(resultVars))
+		for i, r := range resultVars {
+			results[i] = r.Type
+		}
+		parts := []string{"$r: " + recvSpelling}
+		names := []string{}
+		for i, param := range params {
+			spelled, err := p.tsType(param.Type)
+			if err != nil {
+				return "", err
+			}
+			name := fmt.Sprintf("$a%d", i)
+			parts = append(parts, name+": "+spelled)
+			names = append(names, name)
+		}
+		result, err := p.tsFuncResultType(results)
+		if err != nil {
+			return "", err
+		}
+		operands := append([]string{chain}, names...)
+		return fmt.Sprintf("%s: (%s): %s => %s(%s)", methodName, joinComma(parts), result, callee, joinComma(operands)), nil
+	}
+	var valueSet, pointerSet []string
+	methods := append([]*ir.Func{}, info.Methods...)
+	sort.Slice(methods, func(i, j int) bool { return methods[i].Name < methods[j].Name })
+	for _, method := range methods {
+		callee := info.TypeName + "$" + method.Name
+		recvType := method.Receiver.Type
+		if !method.PointerReceiver {
+			// Value flavor: the payload is the receiver value exactly.
+			recvSpelled, err := p.tsType(recvType)
+			if err != nil {
+				return nil, nil, err
+			}
+			entry, err := adapter(method.Name, method.Params, method.Results, callee, recvSpelled, "$r")
+			if err != nil {
+				return nil, nil, err
+			}
+			valueSet = append(valueSet, entry)
+			// Pointer flavor of a value-receiver method: the payload is
+			// the pointer carrier; deref with Go's nil panic (identity
+			// carriers ARE their pointer, cells read .v), then the method
+			// itself copies on entry.
+			pointerType := ir.Type{Kind: ir.KindPointer, Go: "*" + recvType.Go, Elem: &recvType}
+			ptrSpelled, err := p.tsType(pointerType)
+			if err != nil {
+				return nil, nil, err
+			}
+			chain := "gort$.goNilCheck<" + recvSpelled + ">($r)"
+			switch recvType.Kind {
+			case ir.KindStruct, ir.KindArray, ir.KindExternal:
+				// identity carrier: the deref is the instance
+			default:
+				cell := "gort$.GoCell<" + recvSpelled + ">"
+				chain = "gort$.goNilCheck<" + cell + ">($r).v"
+			}
+			entryPtr, err := adapter(method.Name, method.Params, method.Results, callee, ptrSpelled, chain)
+			if err != nil {
+				return nil, nil, err
+			}
+			pointerSet = append(pointerSet, entryPtr)
+			continue
+		}
+		// Pointer receiver: the generated function takes the pointer
+		// carrier itself; Go runs it on nil (body derefs panic).
+		recvSpelled, err := p.tsType(recvType)
+		if err != nil {
+			return nil, nil, err
+		}
+		entry, err := adapter(method.Name, method.Params, method.Results, callee, recvSpelled, "$r")
+		if err != nil {
+			return nil, nil, err
+		}
+		pointerSet = append(pointerSet, entry)
+	}
+	promoted := append([]ir.PromotedDelegate{}, info.Promoted...)
+	sort.Slice(promoted, func(i, j int) bool { return promoted[i].Name < promoted[j].Name })
+	for _, delegate := range promoted {
+		target, err := p.module.symbol(delegate.Pkg, delegate.TypeName+"$"+delegate.Name)
+		if err != nil {
+			return nil, nil, err
+		}
+		chain := "$r"
+		for _, field := range delegate.Path {
+			chain += "." + field
+		}
+		// Promoted adapters spell their exact parameters through the
+		// declaring method's generated function type (Parameters<> minus
+		// the receiver) — exact and erased-free.
+		valueEntry := fmt.Sprintf("%s: ($r: %s, ...$a: goif$.DropFirst<Parameters<typeof %s>>) => %s(%s, ...$a)",
+			delegate.Name, self, target, target, chain)
+		pointerEntry := fmt.Sprintf("%s: ($r: (%s | undefined), ...$a: goif$.DropFirst<Parameters<typeof %s>>) => %s(gort$.goNilCheck<%s>($r)%s, ...$a)",
+			delegate.Name, self, target, target, self, chainSuffix(delegate.Path))
+		if delegate.ValueReceiver {
+			valueSet = append(valueSet, valueEntry)
+		}
+		pointerSet = append(pointerSet, pointerEntry)
+	}
+	return valueSet, pointerSet, nil
+}
+
+// chainSuffix spells the promoted field chain after a nil-checked base.
+func chainSuffix(path []string) string {
+	out := ""
+	for _, field := range path {
+		out += "." + field
+	}
+	return out
+}

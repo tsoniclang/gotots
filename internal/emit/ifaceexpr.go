@@ -126,6 +126,16 @@ func (p *printer) printIfaceExpr(e ir.Expr) (string, bool, error) {
 			}
 			tokens = append(tokens, spelled)
 		}
+		if n.Universal {
+			targetUnion, err := p.tsType(n.Target)
+			if err != nil {
+				return "", true, err
+			}
+			if n.CommaOk {
+				return fmt.Sprintf("goif$.goIfaceLookupAny<Exclude<%s, undefined>>(%s)", targetUnion, x), true, nil
+			}
+			return fmt.Sprintf("goif$.goIfaceAssertAny<Exclude<%s, undefined>>(%s, %q, %q)", targetUnion, x, n.SourceDisplay, n.TargetDisplay), true, nil
+		}
 		list := "[" + joinComma(tokens) + "]"
 		required := make([]string, len(n.Required))
 		for i, name := range n.Required {
@@ -201,6 +211,11 @@ func (p *printer) printIfaceCall(n *ir.IfaceCall) (string, error) {
 	sub.line("switch ($r.k) {")
 	sub.indent++
 	for _, member := range p.retainedMembers(recvType) {
+		// Plain-name property dispatch is exact BY CONSTRUCTION: a member
+		// joins the union only through types.Implements, which enforces
+		// signature identity and unexported-method package identity, and
+		// Go permits one method per name per type — so within a narrowed
+		// member, the name selects exactly the interface's method.
 		call := "$r.m." + n.Display + "(" + joinComma(append([]string{"$r.v"}, argNames...)) + ")"
 		if result == "void" {
 			sub.line("case %q: %s; return;", member.K, call)
@@ -208,7 +223,7 @@ func (p *printer) printIfaceCall(n *ir.IfaceCall) (string, error) {
 			sub.line("case %q: return %s;", member.K, call)
 		}
 	}
-	sub.line("default: gort$.goPanicUnreachableType(($r as goif$.GoAnyBox).r.d);")
+	sub.line("default: gort$.goPanicUnreachableType(%q);", recvType.Go)
 	sub.indent--
 	sub.line("}")
 	closing := strings.Repeat("  ", p.indent)

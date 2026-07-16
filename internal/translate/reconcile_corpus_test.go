@@ -8,6 +8,7 @@ package translate_test
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/goenv"
@@ -59,13 +60,19 @@ func TestProbeCorpusClassificationsJoinExactly(t *testing.T) {
 		}
 		joined++
 	}
+	// The REVERSE join: every corpus body-support record (functions and
+	// methods — identities the probe walks) must appear in the probe's
+	// ledger; a corpus-only body identity is a walk divergence.
+	reverse := 0
 	for id, state := range corpusState {
-		if _, has := probe.PerBodyState[id]; !has && state == "generated" {
-			// Support records exist for declaration-level units the
-			// probe does not walk (types, vars); only body records with
-			// generated state and body identities must join.
+		if _, has := probe.PerBodyState[id]; has {
 			continue
 		}
+		if strings.Contains(id, "::func::") || strings.Contains(id, "::method::") {
+			t.Errorf("corpus body %s (state %s) missing from the probe ledger", id, state)
+			continue
+		}
+		reverse++ // declaration-level units (types, vars) — not probe-walked
 	}
 	if joined != probe.Bodies {
 		t.Errorf("joined %d of %d probe bodies", joined, probe.Bodies)

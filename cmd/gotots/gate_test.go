@@ -188,7 +188,13 @@ func TestRepresentationRegistryRejectsUnknown(t *testing.T) {
 		{"int", "forged-carrier", false},
 		{"T", "unreviewed-kind(chan int)", false},
 		{"Name", "const-folded-at-use", true},
-		{"Name", "erased-to-carrier(bigint)", true},
+		{"Name", "erased-to-carrier(bigint-exact-64)", true},
+		{"Name", "erased-to-carrier(bigint)", false},
+		{"Name", "module-let(live-binding,boolean)", true},
+		{"Name", "module-let(garbage", false},
+		{"int8", "number-wrapped-8", true},
+		{"int8", "number-wrapped-anything", false},
+		{"other", "native-array", false},
 		{"Name", "totally-made-up", false},
 	}
 	for _, c := range cases {

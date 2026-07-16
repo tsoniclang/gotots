@@ -115,11 +115,16 @@ func runStagedGenerationGate(repoDir, profilePath, buildProfile, sourceDir strin
 			return "fail", []string{name}, fmt.Errorf("nondeterministic %s evidence across two runs", name)
 		}
 	}
-	publicationRoot := filepath.Join(staging, "publication")
-	stage := func() error {
-		stagingRoot := publicationRoot + ".staging"
+	// Publication is immutable-bundle plus one atomic CURRENT-pointer
+	// swap (the census bundle model): the new bundle materializes fully
+	// under its own versioned root, then a symlink rename replaces the
+	// pointer — a crash at ANY point leaves the previous accepted root
+	// reachable; no sequence of steps removes it first.
+	publicationDir := filepath.Join(staging, "publication")
+	publish := func(version string) error {
+		bundle := filepath.Join(publicationDir, "bundle-"+version)
 		for path, content := range corpusGenerated.Files {
-			target := filepath.Join(stagingRoot, filepath.FromSlash(path))
+			target := filepath.Join(bundle, filepath.FromSlash(path))
 			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 				return err
 			}
@@ -127,33 +132,40 @@ func runStagedGenerationGate(repoDir, profilePath, buildProfile, sourceDir strin
 				return err
 			}
 		}
-		// Replace-existing semantics: an accepted root may already exist;
-		// publication retires it only after the complete staging root is
-		// ready, never leaving a partial tree.
-		replaced := publicationRoot + ".retired"
-		if _, err := os.Stat(publicationRoot); err == nil {
-			if err := os.Rename(publicationRoot, replaced); err != nil {
-				return fmt.Errorf("retire existing accepted root: %w", err)
-			}
+		pointer := filepath.Join(publicationDir, "current")
+		next := pointer + ".next"
+		os.Remove(next)
+		if err := os.Symlink("bundle-"+version, next); err != nil {
+			return err
 		}
-		if err := os.Rename(stagingRoot, publicationRoot); err != nil {
-			return fmt.Errorf("atomic staging swap: %w", err)
-		}
-		return os.RemoveAll(replaced)
+		// One atomic rename: readers always resolve either the previous
+		// or the new bundle, never nothing.
+		return os.Rename(next, pointer)
 	}
-	// First publication into an empty destination, then a second
-	// publication REPLACING the accepted root — both paths exercised.
-	if err := stage(); err != nil {
+	if err := publish("one"); err != nil {
 		return "fail", nil, err
 	}
-	if err := stage(); err != nil {
-		return "fail", nil, fmt.Errorf("replacing an existing accepted root: %w", err)
+	firstTarget, err := os.Readlink(filepath.Join(publicationDir, "current"))
+	if err != nil || firstTarget != "bundle-one" {
+		return "fail", nil, fmt.Errorf("current pointer after first publication: %q %v", firstTarget, err)
+	}
+	if err := publish("two"); err != nil {
+		return "fail", nil, fmt.Errorf("replacing the accepted root: %w", err)
+	}
+	secondTarget, err := os.Readlink(filepath.Join(publicationDir, "current"))
+	if err != nil || secondTarget != "bundle-two" {
+		return "fail", nil, fmt.Errorf("current pointer after replacement: %q %v", secondTarget, err)
+	}
+	// The previous accepted bundle is still intact after replacement (a
+	// failed swap can never have removed it).
+	if _, err := os.Stat(filepath.Join(publicationDir, "bundle-one")); err != nil {
+		return "fail", nil, fmt.Errorf("previous accepted bundle removed by replacement: %w", err)
 	}
 	return "pass", []string{
 		"census evidence deterministic across two hermetic runs",
 		fmt.Sprintf("generated output deterministic across two runs (%d files byte-identical)", len(corpusGenerated.Files)),
 		"complete evidence (proofs, support, ownership, withholding, module imports) deterministic across two runs",
-		"emission staged as a complete root, swapped atomically, and re-published over an existing accepted root",
+		"publication = immutable bundles + one atomic current-pointer rename; replacement leaves the previous bundle intact",
 		fmt.Sprintf("partial bundle: %d packages withheld as honest unimplemented", len(corpusGenerated.Withheld)),
 	}, nil
 }

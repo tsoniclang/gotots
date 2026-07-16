@@ -106,11 +106,12 @@ func newModule(modulePath, pkgPath, pkgName string, unit ir.Scope, context *pack
 			typeID := obligation.Pkg + "." + obligation.Name
 			methods := module.ExternMethods[typeID]
 			for i := range methods {
-				adapter, err := externAdapter(module, unit, context, sourceDir, obligation, methods[i].Name)
+				adapter, adapterType, err := externAdapter(module, unit, context, sourceDir, obligation, methods[i].Name)
 				if err != nil {
 					return nil, err
 				}
 				methods[i].Adapter = adapter
+				methods[i].AdapterType = adapterType
 			}
 		}
 	}
@@ -118,7 +119,7 @@ func newModule(modulePath, pkgPath, pkgName string, unit ir.Scope, context *pack
 }
 
 // externAdapter spells one external method's typed vtable arrow.
-func externAdapter(module *emit.Module, unit ir.Scope, context *packages.Package, sourceDir string, obligation *ir.ExternTypeObligation, name string) (string, error) {
+func externAdapter(module *emit.Module, unit ir.Scope, context *packages.Package, sourceDir string, obligation *ir.ExternTypeObligation, name string) (string, string, error) {
 	method := obligation.Methods[name]
 	signature := method.Type().(*types.Signature)
 	handle := ir.Type{Kind: ir.KindExternal, Go: obligation.Pkg + "." + obligation.Name, Named: obligation.Name, Pkg: obligation.Pkg}
@@ -127,7 +128,7 @@ func externAdapter(module *emit.Module, unit ir.Scope, context *packages.Package
 	for i := range signature.Params().Len() {
 		t, err := ir.ResolveType(context, sourceDir, unit, signature.Params().At(i).Type(), token.NoPos)
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 		params = append(params, ir.Var{Name: fmt.Sprintf("p%d", i), Type: t})
 	}
@@ -135,13 +136,21 @@ func externAdapter(module *emit.Module, unit ir.Scope, context *packages.Package
 	for i := range signature.Results().Len() {
 		t, err := ir.ResolveType(context, sourceDir, unit, signature.Results().At(i).Type(), token.NoPos)
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 		results = append(results, t)
 	}
 	callee, err := module.Symbol(obligation.Pkg, emit.ExternMethodSymbol(obligation.Name, name))
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	return emit.TypedAdapter(module, params, results, callee)
+	adapter, err := emit.TypedAdapter(module, params, results, callee)
+	if err != nil {
+		return "", "", err
+	}
+	adapterType, err := emit.TypedAdapterType(module, params, results)
+	if err != nil {
+		return "", "", err
+	}
+	return adapter, adapterType, nil
 }

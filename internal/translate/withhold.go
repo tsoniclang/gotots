@@ -27,10 +27,19 @@ func finalizeEvidenceStages(out *Generated) error {
 	for i := range out.Proofs {
 		proof := &out.Proofs[i]
 		if proof.GeneratedFile == "" {
-			// A declaration whose exact lowering emits nothing: explicit
-			// no-output disposition, never a retained body.
+			// Only a proof that DECLARED itself no-output at creation may
+			// lack a generated file; an undeclared empty reference is an
+			// emitter defect, never silently normalized into a valid
+			// disposition.
+			if !proof.NoOutput {
+				defects = append(defects, proof.ID+": no generated file and no declared no-output disposition")
+				continue
+			}
 			proof.ModuleRetained = false
-			proof.NoOutput = true
+			continue
+		}
+		if proof.NoOutput {
+			defects = append(defects, proof.ID+": declared no-output yet references generated file "+proof.GeneratedFile)
 			continue
 		}
 		if _, withheld := out.Withheld[proof.Package]; withheld {
@@ -64,21 +73,32 @@ func finalizeEvidenceStages(out *Generated) error {
 	return nil
 }
 
-// symbolPresent reports whether the generated module declares the
-// symbol (function, const, class, or type declaration spelling).
+// symbolPresent verifies a generated declaration STRUCTURALLY within
+// the deterministic generated grammar: a declaration always begins a
+// line with the export keyword and one declaration form — a comment or
+// string mention can never start a line that way in generated output.
+// The acceptance gate additionally joins proofs to the typed-AST export
+// list (the authoritative check).
 func symbolPresent(content, symbol string) bool {
-	for _, form := range []string{
-		"function " + symbol + "(",
-		"function " + symbol + "<",
-		"const " + symbol + ":",
-		"const " + symbol + " =",
-		"class " + symbol + " ",
-		"class " + symbol + "<",
-		"type " + symbol + " ",
-		"let " + symbol + ":",
-	} {
-		if strings.Contains(content, form) {
-			return true
+	for _, line := range strings.Split(content, "\n") {
+		rest, ok := strings.CutPrefix(line, "export ")
+		if !ok {
+			continue
+		}
+		for _, keyword := range []string{"function ", "const ", "class ", "type ", "let "} {
+			body, has := strings.CutPrefix(rest, keyword)
+			if !has {
+				continue
+			}
+			if name, matched := strings.CutPrefix(body, symbol); matched {
+				if name == "" {
+					return true
+				}
+				switch name[0] {
+				case '(', '<', ' ', ':', '=', ';':
+					return true
+				}
+			}
 		}
 	}
 	return false

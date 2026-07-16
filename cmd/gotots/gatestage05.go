@@ -126,6 +126,10 @@ func runSignatureCompletenessGate(firstRun *census.Result, corpusGenerated *tran
 			defects = append(defects, "funclit body-hash drift at "+shape.ID)
 			continue
 		}
+		if lit.Parent != shape.Parent {
+			defects = append(defects, "funclit parent drift at "+shape.ID+": census "+shape.Parent+" vs translate "+lit.Parent)
+			continue
+		}
 		if lit.State == "unimplemented" {
 			litUnimplemented++
 		}
@@ -141,12 +145,55 @@ func runSignatureCompletenessGate(firstRun *census.Result, corpusGenerated *tran
 		}
 		return "fail", defects, fmt.Errorf("function-literal ledger failed the identity join")
 	}
+	// Variable initializers: each census initializer hash must join to
+	// the var proof's recorded initializer hash.
+	initHash := map[string]string{}
+	for _, proof := range corpusGenerated.Proofs {
+		if proof.InitHash != "" {
+			initHash[proof.ID] = proof.InitHash
+		}
+	}
+	varUnimplemented := map[string]bool{}
+	for _, support := range corpusGenerated.Support {
+		if string(support.State) == "unimplemented" {
+			varUnimplemented[support.ID] = true
+		}
+	}
+	initJoined, initBlocked := 0, 0
+	for _, shape := range firstRun.Shapes.Variables {
+		if shape.InitializerHash == "" || !production[shape.ID] {
+			continue
+		}
+		if varUnimplemented[shape.ID] {
+			// An explicitly unimplemented variable has its disposition;
+			// hash evidence exists when the lowering does.
+			initBlocked++
+			continue
+		}
+		got, has := initHash[shape.ID]
+		if !has {
+			defects = append(defects, "no initializer evidence for census var "+shape.ID)
+			continue
+		}
+		if got != shape.InitializerHash {
+			defects = append(defects, "initializer hash drift at "+shape.ID)
+			continue
+		}
+		initJoined++
+	}
+	if len(defects) > 0 {
+		if len(defects) > 15 {
+			defects = defects[:15]
+		}
+		return "fail", defects, fmt.Errorf("initializer evidence failed the identity join")
+	}
 	return "pass", []string{
 		fmt.Sprintf("census production function/method denominator: %d", denominator),
 		fmt.Sprintf("signatures independently verified against the census spelling: %d", verified),
 		fmt.Sprintf("explicit unimplemented records: %d", unimplementedCount),
 		fmt.Sprintf("orphan proofs: %d", orphans),
-		fmt.Sprintf("function literals joined by identity and body hash: %d (%d unimplemented)", litJoined, litUnimplemented),
+		fmt.Sprintf("function literals joined by identity, parent, and body hash: %d (%d unimplemented)", litJoined, litUnimplemented),
+		fmt.Sprintf("variable initializers joined by identity and hash: %d (%d explicitly unimplemented)", initJoined, initBlocked),
 	}, nil
 }
 

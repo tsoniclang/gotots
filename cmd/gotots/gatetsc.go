@@ -134,6 +134,29 @@ func runTscGate(repoDir, profilePath, buildProfile, sourceDir string, report *Ga
 			"the representation redesign (spec/ADR pending) unblocks this stage",
 		}, nil
 	}
+	// Authoritative symbol evidence: every retained proof's generated
+	// symbol must be an exported declaration in its file's typed AST.
+	var symbolDefects []string
+	for _, proof := range generated.Proofs {
+		if !proof.ModuleRetained || proof.GeneratedSymbol == "" {
+			continue
+		}
+		found := false
+		for _, name := range astReport.Exports[proof.GeneratedFile] {
+			if name == proof.GeneratedSymbol {
+				found = true
+				break
+			}
+		}
+		if !found {
+			if len(symbolDefects) < 10 {
+				symbolDefects = append(symbolDefects, proof.ID+": symbol "+proof.GeneratedSymbol+" not an exported AST declaration of "+proof.GeneratedFile)
+			}
+		}
+	}
+	if len(symbolDefects) > 0 {
+		return "fail", symbolDefects, fmt.Errorf("proof symbol evidence failed the typed-AST join")
+	}
 	violations := staticness.Sweep(generated.Files)
 	if len(violations) > 0 {
 		counts := staticness.Counts(violations)

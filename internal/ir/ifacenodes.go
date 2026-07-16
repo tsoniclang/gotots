@@ -40,9 +40,10 @@ type IfaceBox struct {
 // a nil interface panics with Go's exact message.
 type IfaceCall struct {
 	Recv Expr
-	// Method is the canonical dispatch identity (MethodKey); Display is
-	// the source spelling for diagnostics.
-	Method  string
+	// Display is the method's source name: within a narrowed union
+	// member it is exact by construction (types.Implements gates
+	// membership with signature and unexported-package identity, and Go
+	// allows one method per name per type).
 	Display string
 	Args    []Expr
 	Results []Type

@@ -67,6 +67,29 @@ func TestAttestationProtocol(t *testing.T) {
 		if err := check.Run(); err != nil {
 			t.Errorf("attestations/%s: revision %s is not an ancestor of HEAD", name, revision)
 		}
+		// The attestation's own commit must be an evidence-only commit
+		// whose PARENT is exactly the attested revision, and no product
+		// source may change in it — the machine-enforced protocol.
+		commitOut, err := gitOutput(root, "log", "--format=%H %P", "-1", "--", "attestations/"+name)
+		if err != nil {
+			t.Fatalf("attestations/%s: %v", name, err)
+		}
+		fields := strings.Fields(commitOut)
+		if len(fields) >= 2 {
+			attestCommit, parent := fields[0], fields[1]
+			if parent != revision {
+				t.Errorf("attestations/%s: evidence commit %s has parent %s, not the attested revision", name, attestCommit[:12], parent[:12])
+			}
+			filesOut, err := gitOutput(root, "diff-tree", "--no-commit-id", "--name-only", "-r", attestCommit)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, changed := range strings.Split(strings.TrimSpace(filesOut), "\n") {
+				if changed != "" && !strings.HasPrefix(changed, "attestations/") {
+					t.Errorf("attestations/%s: evidence commit changes product source %s", name, changed)
+				}
+			}
+		}
 		if report.Failed > 0 {
 			t.Errorf("attestations/%s: a failed gate run must not be retained as an attestation", name)
 		}
@@ -74,4 +97,12 @@ func TestAttestationProtocol(t *testing.T) {
 			t.Errorf("attestations/%s: passed must be false while stages are blocked", name)
 		}
 	}
+}
+
+// gitOutput runs one git query in the repository.
+func gitOutput(root string, args ...string) (string, error) {
+	command := exec.Command("git", args...)
+	command.Dir = root
+	out, err := command.Output()
+	return strings.TrimSpace(string(out)), err
 }

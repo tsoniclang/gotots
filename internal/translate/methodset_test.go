@@ -4,7 +4,11 @@
 // equality through generated goEq$.
 package translate_test
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/tsoniclang/gotots/internal/oracle"
+)
 
 func TestOracleValueVsPointerMethodSets(t *testing.T) {
 	runOracle(t, `package fixture
@@ -123,4 +127,57 @@ func IfaceFieldPanicsWhenUncomparable() bool {
 	return a == b
 }
 `)
+}
+
+// TestOracleUnexportedCrossPackageDispatch is the adversarial identity
+// fixture: two packages declare same-named UNEXPORTED methods; each
+// package's interface is satisfiable only by its own types (Go's
+// unexported method-set rule), and dispatch through each union must
+// select exactly the right package's method.
+func TestOracleUnexportedCrossPackageDispatch(t *testing.T) {
+	result, err := oracle.RunAssembled(t.TempDir(), map[string]string{
+		"fixture": `package fixture
+
+import (
+	"oracle.fixture/alpha"
+	"oracle.fixture/beta"
+)
+
+func AlphaDispatch() int {
+	return alpha.Call(alpha.New())
+}
+
+func BetaDispatch() int {
+	return beta.Call(beta.New())
+}
+`,
+		"alpha": `package alpha
+
+type secret interface{ tag() int }
+
+type impl struct{}
+
+func (i impl) tag() int { _ = i; return 100 }
+
+func New() secret    { return impl{} }
+func Call(s secret) int { return s.tag() }
+`,
+		"beta": `package beta
+
+type secret interface{ tag() int }
+
+type impl struct{}
+
+func (i impl) tag() int { _ = i; return 200 }
+
+func New() secret    { return impl{} }
+func Call(s secret) int { return s.tag() }
+`,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Match() {
+		t.Fatalf("differential mismatch:\n--- go ---\n%s\n--- generated ---\n%s", result.GoOutput, result.TSOutput)
+	}
 }

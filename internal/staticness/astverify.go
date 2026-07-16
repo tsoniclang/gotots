@@ -22,6 +22,9 @@ type ASTReport struct {
 	// Mechanisms maps each custom-mechanism identity to the generated
 	// files whose ASTs reference its ABI symbols.
 	Mechanisms map[string][]string `json:"mechanisms"`
+	// Exports maps each generated file to its exported declaration
+	// names — the authoritative join target for proof symbol evidence.
+	Exports map[string][]string `json:"exports"`
 }
 
 // verifierScript walks every parsed source file. Prohibited structural
@@ -59,6 +62,7 @@ const checker = program.getTypeChecker();
 
 const violations = [];
 const mechanisms = {};
+const exportedNames = {};
 const mechanismByFile = {
   "goslice.ts": "slice-carrier",
   "goiface.ts": "interface-box",
@@ -166,6 +170,30 @@ for (const source of program.getSourceFiles()) {
     if (isFunctionTypeName(node)) {
       report(file, node, source, "erased-function-type");
     }
+    // Erased interface payload in generated CORE: a GoBox type argument
+    // of unknown/any, or an "as" cast recovering from a .v property —
+    // each recovers a payload from an erased type (spec 06, ADR-0004).
+    if (relative.startsWith("core/")) {
+      if (ts.isTypeReferenceNode(node) && ts.isQualifiedName(node.typeName) &&
+          node.typeName.right.text === "GoBox" &&
+          node.typeArguments && node.typeArguments.length >= 3) {
+        const payload = node.typeArguments[1];
+        if (payload.kind === ts.SyntaxKind.UnknownKeyword || payload.kind === ts.SyntaxKind.AnyKeyword) {
+          report(file, node, source, "erased-iface-payload");
+        }
+      }
+      if (ts.isAsExpression(node) && ts.isPropertyAccessExpression(node.expression) &&
+          node.expression.name.text === "v") {
+        const boxType = checker.getTypeAtLocation(node.expression.expression);
+        const display = checker.typeToString(boxType);
+        if (display.includes("GoBox") || display.includes("GoAnyBox")) {
+          report(file, node, source, "erased-payload-recovery-cast");
+        }
+      }
+      if (ts.isQualifiedName(node) && node.right.text === "GoAnyBox") {
+        report(file, node, source, "erased-anybox-in-core");
+      }
+    }
     if (ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName)) {
       const name = node.typeName.text;
       if ((name === "Record" || name === "Map") && node.typeArguments && node.typeArguments.length === 2) {
@@ -198,9 +226,26 @@ for (const source of program.getSourceFiles()) {
   for (const mechanism of seenMechanisms) {
     (mechanisms[mechanism] ??= []).push(relative);
   }
+  // The file's exported value/type declaration names: the authoritative
+  // join target for proof generated-symbol evidence.
+  const names = [];
+  for (const stmt of source.statements) {
+    const mods = ts.canHaveModifiers(stmt) ? ts.getModifiers(stmt) : undefined;
+    const exported = mods && mods.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+    if (!exported) continue;
+    if (ts.isFunctionDeclaration(stmt) && stmt.name) names.push(stmt.name.text);
+    else if (ts.isClassDeclaration(stmt) && stmt.name) names.push(stmt.name.text);
+    else if (ts.isTypeAliasDeclaration(stmt)) names.push(stmt.name.text);
+    else if (ts.isVariableStatement(stmt)) {
+      for (const d of stmt.declarationList.declarations) {
+        if (ts.isIdentifier(d.name)) names.push(d.name.text);
+      }
+    }
+  }
+  exportedNames[relative] = names.sort();
 }
 for (const key of Object.keys(mechanisms)) mechanisms[key].sort();
-process.stdout.write(JSON.stringify({ violations, mechanisms }));
+process.stdout.write(JSON.stringify({ violations, mechanisms, exports: exportedNames }));
 `
 
 // VerifyAST writes the generated files to a staging directory, parses

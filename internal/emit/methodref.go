@@ -45,7 +45,6 @@ func (p *printer) printMethodValue(n *ir.MethodValue) (string, error) {
 		}
 		synthetic := &ir.IfaceCall{
 			Recv:    &ir.ParamRef{Name: "$r", T: n.Recv.Type()},
-			Method:  n.DispatchKey,
 			Display: n.Method,
 			Args:    argExprs,
 			Results: n.Results,
