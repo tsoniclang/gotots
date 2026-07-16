@@ -104,38 +104,61 @@ func symbolPresent(content, symbol string) bool {
 	return false
 }
 
-func withholdDependents(out *Generated, sorted []*packages.Package) {
-	imports := map[string][]string{}
+// growWithheldByImports withholds, by ONE level, every retained package
+// whose freshly emitted co-generated imports reach an already-withheld
+// package, and reports whether anything changed. It does NOT propagate
+// transitively in a single call: the caller re-emits between calls so a
+// package's droppable (union-member) references to a newly-withheld
+// package are filtered out before the next level is computed — only
+// UNAVOIDABLE dependencies cascade.
+func growWithheldByImports(out *Generated, sorted []*packages.Package) bool {
+	changed := false
 	for _, p := range sorted {
-		// The emitted module's real import edges — symbol references
-		// (including interface-dispatch branch targets) and init edges —
-		// are the withholding dependency graph. A package with no emitted
-		// module falls back to its source imports.
-		if edges, ok := out.ModuleImports[p.PkgPath]; ok {
-			imports[p.PkgPath] = append([]string(nil), edges...)
-		} else {
+		if _, withheld := out.Withheld[p.PkgPath]; withheld {
+			continue
+		}
+		edges, emitted := out.ModuleImports[p.PkgPath]
+		if !emitted {
+			// A package that emitted no runnable module (all declarations
+			// compile-time / type-only) records no import edges; its
+			// dependency graph is its SOURCE imports, so it is still
+			// withheld when it depends on a withheld package (and its
+			// type-only proofs are cleared by finalization).
 			for importPath := range p.Imports {
-				imports[p.PkgPath] = append(imports[p.PkgPath], importPath)
+				edges = append(edges, importPath)
 			}
 		}
-		sort.Strings(imports[p.PkgPath])
-	}
-	for changed := true; changed; {
-		changed = false
-		for _, p := range sorted {
-			if _, withheld := out.Withheld[p.PkgPath]; withheld {
-				continue
-			}
-			for _, importPath := range imports[p.PkgPath] {
-				if _, withheld := out.Withheld[importPath]; withheld {
-					out.Withheld[p.PkgPath] = "depends on withheld package " + importPath
-					corePath := path.Join("core", p.PkgPath, "package.ts")
-					delete(out.Files, corePath)
-					delete(out.Ownership, corePath)
-					changed = true
-					break
-				}
+		sorted := append([]string(nil), edges...)
+		sort.Strings(sorted)
+		for _, importPath := range sorted {
+			if _, withheld := out.Withheld[importPath]; withheld {
+				out.Withheld[p.PkgPath] = "depends on withheld package " + importPath
+				corePath := path.Join("core", p.PkgPath, "package.ts")
+				delete(out.Files, corePath)
+				delete(out.Ownership, corePath)
+				changed = true
+				break
 			}
 		}
 	}
+	return changed
+}
+
+// assertRetainedImportsResolve fails closed if any retained core module
+// imports a package that ended up withheld: the emitted output must be a
+// forward-dependency-closed set, so a dangling import is a closure
+// defect, never tolerable output.
+func assertRetainedImportsResolve(out *Generated) error {
+	for pkgPath, edges := range out.ModuleImports {
+		if _, withheld := out.Withheld[pkgPath]; withheld {
+			continue // the module was withheld; its file is gone
+		}
+		for _, importPath := range edges {
+			if reason, withheld := out.Withheld[importPath]; withheld {
+				return fmt.Errorf("retained package %s imports withheld package %s (%s): forward closure incomplete",
+					pkgPath, importPath, reason)
+			}
+		}
+	}
+	return nil
 }

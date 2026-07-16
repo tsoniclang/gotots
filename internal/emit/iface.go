@@ -504,6 +504,18 @@ func (p *printer) referencesWithheldType(t ir.Type) bool {
 				return true
 			}
 		}
+		if t.Sig != nil {
+			for _, param := range t.Sig.Params {
+				if walk(param) {
+					return true
+				}
+			}
+			for _, result := range t.Sig.Results {
+				if walk(result) {
+					return true
+				}
+			}
+		}
 		for _, member := range t.IfaceMembers {
 			if !member.Extern && member.Pkg != "" && p.module.Withheld(member.Pkg) {
 				return true

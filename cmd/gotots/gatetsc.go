@@ -6,7 +6,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -85,48 +84,20 @@ func runTscGate(repoDir, profilePath, buildProfile, sourceDir string, report *Ga
 	if err := os.WriteFile(filepath.Join(staging, "package.json"), []byte("{\n  \"type\": \"module\"\n}\n"), 0o644); err != nil {
 		return "fail", nil, err
 	}
-	out, err := runInRepo(staging, "node", tscJs, "-p", ".")
-	if err != nil {
-		// Classify over the WHOLE diagnostic stream (splitLines keeps only
-		// the last 40 lines, which would orphan continuation lines from
-		// their error headers and misclassify them).
-		lines := strings.Split(strings.TrimSpace(out), "\n")
-		// Partition every diagnostic. A tsc error is PREREQUISITE-ROOTED
-		// only when it is definitionally a consequence of the emission set
-		// being a partial subset (not forward-dependency-closed): a
-		// "cannot find module" for a co-generated core module absent from
-		// this bundle, or an opaque external-stub interface supertype
-		// (GoIface/GoAnyBox) meeting a concrete core union at the
-		// stub/core boundary. Anything else is a genuine defect in emitted
-		// logic. If even one genuine defect exists the stage FAILS; only
-		// when every error is prerequisite-rooted is it BLOCKED on
-		// complete emission — the classifier can never hide a real defect.
-		genuine, prerequisite := classifyTypecheckErrors(lines, generated.Withheld)
-		if len(genuine) == 0 && len(prerequisite) > 0 {
-			details := []string{
-				"BLOCKED: the emission set is not forward-dependency-closed; every tsc diagnostic is a withheld co-generated module or an opaque external-stub interface at the stub/core boundary — none is a defect in emitted logic",
-				fmt.Sprintf("prerequisite-rooted tsc errors: %d; genuine defects: 0", len(prerequisite)),
-				"the prerequisite (complete, forward-dependency-closed corpus emission) is shared with stage 18",
-			}
-			for i, l := range prerequisite {
-				if i >= 8 {
-					details = append(details, fmt.Sprintf("... and %d more prerequisite-rooted errors", len(prerequisite)-8))
-					break
-				}
-				details = append(details, l)
-			}
-			return "blocked", details, nil
-		}
-		if len(genuine) > 40 {
-			genuine = append(genuine[:40], fmt.Sprintf("... and %d more lines", len(genuine)-40))
-		}
-		return "fail", genuine, fmt.Errorf("strict typecheck found %d genuine defects in emitted logic", len(genuine))
-	}
+	// Run the strict typecheck, but DECIDE only after the staticness
+	// verifier has run (below): staticness verification is unconditional —
+	// it must run regardless of the typecheck result — and a genuine tsc
+	// error is a hard failure with NO waiver. There is no diagnostic-text
+	// classifier; the emission set is made forward-dependency-closed by
+	// the withholding fixed point, so a retained module never imports a
+	// withheld one and strict tsc is REQUIRED to reach zero.
+	tscOut, tscErr := runInRepo(staging, "node", tscJs, "-p", ".")
 	// The staticness verdict comes from the typed-AST verifier (the
 	// pinned TypeScript compiler parses every generated file and the AST
 	// is walked structurally), so aliases, multiline forms, and renamed
 	// equivalents cannot evade it; the text sweep remains as a fast
-	// defense-in-depth pre-check. No file-local suppressions exist.
+	// defense-in-depth pre-check. No file-local suppressions exist. It
+	// runs whether or not the typecheck passed.
 	typescriptModule := filepath.Join(repoDir, "product", "node_modules", "typescript")
 	astReport, err := staticness.VerifyAST(generated.Files, typescriptModule)
 	if err != nil {
@@ -165,6 +136,14 @@ func runTscGate(repoDir, profilePath, buildProfile, sourceDir string, report *Ga
 			details = append(details, fmt.Sprintf("%s:%d %s", v.File, v.Line, v.Pattern))
 		}
 		return "fail", details, fmt.Errorf("AST staticness verifier found %d prohibited dispatch sites", len(astReport.Violations))
+	}
+	// Zero strict-tsc errors is REQUIRED, with no waiver: the withholding
+	// fixed point makes the emitted set forward-dependency-closed, so a
+	// retained module imports only retained modules and strict tsc must
+	// reach zero. Any error is a hard failure in emitted logic.
+	if tscErr != nil {
+		lines := splitLines(tscOut)
+		return "fail", lines, fmt.Errorf("strict typecheck rejected the generated output: %d diagnostics", len(lines))
 	}
 	// The accepted interface specification (docs/spec/06) requires a
 	// closed statically typed payload; the current carrier still holds an
@@ -232,113 +211,4 @@ func runTscGate(repoDir, profilePath, buildProfile, sourceDir string, report *Ga
 		fmt.Sprintf("BLOCKED: %d ABI erasure sites remain (equality's construction-bound payload flow; helper supertype) — reported, never passed over", abiViolations),
 		"BLOCKED: the per-invocation positive-disposition ledger is absent — the verifier rejects known erased forms but cannot yet certify every invocation (spec 11 staticness sweep)")
 	return "blocked", details, nil
-}
-
-// classifyTypecheckErrors partitions tsc diagnostics into genuine
-// defects and prerequisite-rooted errors. Diagnostics are grouped: an
-// "error TS" line starts a group that absorbs its indented continuation
-// lines, so a type name appearing on a continuation still classifies its
-// group. A group is prerequisite-rooted ONLY when it is definitionally a
-// partial-emission artifact — a missing co-generated core module, or an
-// opaque external-stub interface supertype (GoIface/GoAnyBox) at the
-// stub/core boundary. Every other group is a genuine defect. The default
-// is "genuine": an unrecognized diagnostic fails the stage.
-func classifyTypecheckErrors(lines []string, withheld map[string]string) (genuine, prerequisite []string) {
-	var group []string
-	flush := func() {
-		if len(group) == 0 {
-			return
-		}
-		head := group[0]
-		joined := strings.Join(group, "\n")
-		if typecheckErrorIsPrerequisiteRooted(joined, withheld) {
-			prerequisite = append(prerequisite, head)
-		} else {
-			genuine = append(genuine, head)
-		}
-		group = nil
-	}
-	for _, line := range lines {
-		if strings.Contains(line, "error TS") {
-			flush()
-			group = []string{line}
-			continue
-		}
-		if len(group) > 0 {
-			group = append(group, line)
-		} else if strings.TrimSpace(line) != "" {
-			// A stray non-error, non-continuation line before any error:
-			// treat as a genuine, unclassified diagnostic (fail-safe).
-			genuine = append(genuine, line)
-		}
-	}
-	flush()
-	return genuine, prerequisite
-}
-
-// typecheckErrorIsPrerequisiteRooted reports whether one grouped tsc
-// diagnostic is a partial-emission artifact rather than a logic defect.
-func typecheckErrorIsPrerequisiteRooted(group string, withheld map[string]string) bool {
-	// (1) A "cannot find module" whose RESOLVED target package is
-	// withheld from this bundle: absent only because emission is a
-	// partial subset. The specifier is resolved relative to the erroring
-	// file and checked against the withheld set, so a genuinely broken
-	// import (a specifier that does not resolve to a withheld package) is
-	// NOT excused — it stays a genuine defect.
-	if strings.Contains(group, "TS2307") && strings.Contains(group, "Cannot find module") {
-		pkg := resolveMissingModulePackage(group)
-		if pkg == "" {
-			return false
-		}
-		_, isWithheld := withheld[pkg]
-		return isWithheld
-	}
-	// (2) An opaque external-stub interface supertype meeting a concrete
-	// core union: GoIface/GoAnyBox appear ONLY in external stub modules,
-	// which spell interfaces opaquely pending forward-closed emission.
-	if strings.Contains(group, "GoIface") || strings.Contains(group, "GoAnyBox") {
-		return true
-	}
-	return false
-}
-
-// resolveMissingModulePackage extracts the erroring file and the missing
-// module specifier from a TS2307 group and resolves the specifier to a
-// co-generated package path (the "core/<path>/package.js" convention).
-// It returns "" when the diagnostic is not a co-generated module miss.
-func resolveMissingModulePackage(group string) string {
-	// File is the text before the first "(" of the "file(line,col):" head.
-	head := group
-	if nl := strings.IndexByte(head, '\n'); nl >= 0 {
-		head = head[:nl]
-	}
-	paren := strings.IndexByte(head, '(')
-	if paren < 0 {
-		return ""
-	}
-	file := head[:paren]
-	// Specifier is the single-quoted path after "Cannot find module ".
-	marker := "Cannot find module '"
-	start := strings.Index(group, marker)
-	if start < 0 {
-		return ""
-	}
-	rest := group[start+len(marker):]
-	end := strings.IndexByte(rest, '\'')
-	if end < 0 {
-		return ""
-	}
-	specifier := rest[:end]
-	// Resolve the specifier relative to the erroring file's directory.
-	resolved := path.Clean(path.Join(path.Dir(file), specifier))
-	// A co-generated package module is "core/<pkgpath>/package.js".
-	trimmed, ok := strings.CutPrefix(resolved, "core/")
-	if !ok {
-		return ""
-	}
-	trimmed, ok = strings.CutSuffix(trimmed, "/package.js")
-	if !ok {
-		return ""
-	}
-	return trimmed
 }

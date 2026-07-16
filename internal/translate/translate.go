@@ -60,15 +60,33 @@ func Packages(pkgs []*packages.Package, sourceDir string, options Options) (*Gen
 			return nil, err
 		}
 	}
-	// The complete withholding closure is known before any module
-	// renders, so retained output never references a withheld class.
-	withholdDependents(out, sorted)
-	for _, emitPackage := range emitters {
-		if err := emitPackage(); err != nil {
-			return nil, err
+	// The withholding closure is a fixed point over the REAL emitted
+	// imports (value, init, AND type-only), which are only known after a
+	// module renders. Each round: emit every retained package (filtering
+	// union members and references to already-withheld packages), then
+	// withhold, by ONE level, any package whose refreshed imports still
+	// reach a withheld package. Re-emission between levels drops the
+	// droppable (union-member) references before they can over-withhold,
+	// so only UNAVOIDABLE dependencies on withheld packages cascade. The
+	// loop converges because withholding grows monotonically and the
+	// retained set is finite.
+	for {
+		for _, emitPackage := range emitters {
+			if err := emitPackage(); err != nil {
+				return nil, err
+			}
+		}
+		if !growWithheldByImports(out, sorted) {
+			break
 		}
 	}
 	if err := emitExternalStubs(out, unit, sorted[0], sourceDir, options); err != nil {
+		return nil, err
+	}
+	// Every retained module must import only retained modules: a dangling
+	// import into a withheld package is a closure defect, not tolerable
+	// output.
+	if err := assertRetainedImportsResolve(out); err != nil {
 		return nil, err
 	}
 

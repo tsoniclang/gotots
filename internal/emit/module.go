@@ -132,15 +132,21 @@ func (m *Module) aliasLines() string {
 }
 
 // CoGeneratedImports returns every co-generated package this module
-// actually imports in its emitted output: symbol references (including
-// interface-dispatch branch targets) and initialization edges. These
-// are the real dependency edges for withholding.
+// actually imports in its emitted output: value symbol references
+// (including interface-dispatch branch targets), initialization edges,
+// AND type-only references. Every one is a real ESM import in the
+// emitted file — an `import type` of a withheld (absent) module fails
+// module resolution exactly like a value import — so all three are
+// dependency edges for the withholding closure.
 func (m *Module) CoGeneratedImports() []string {
 	seen := map[string]bool{}
 	for path := range m.used {
 		seen[path] = true
 	}
 	for path := range m.initEdges {
+		seen[path] = true
+	}
+	for path := range m.typeUsed {
 		seen[path] = true
 	}
 	out := make([]string, 0, len(seen))
