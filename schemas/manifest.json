@@ -14,6 +14,12 @@
       "schemaVersion": 4
     },
     {
+      "id": "necessity-records",
+      "path": "schemas/necessity-records.schema.json",
+      "contract": "contracts/necessity-records.json",
+      "schemaVersion": 1
+    },
+    {
       "id": "product-toolchain",
       "path": "schemas/product-toolchain.schema.json",
       "contract": "pins/product-toolchain.json",

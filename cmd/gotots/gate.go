@@ -68,27 +68,6 @@ type GateInputs struct {
 	Missing                     []string `json:"missing"`
 }
 
-var acceptanceStageNames = []string{
-	"01-repository-specification-policy",
-	"02-input-toolchain-profile-attestation",
-	"03-selected-scope-dependency-closure",
-	"04-census-denominator-reconciliation",
-	"05-declaration-signature-type-completeness",
-	"06-semantic-ir-operation-class-completeness",
-	"07-ownership-support-state-completeness",
-	"08-fixed-point-representation-verification",
-	"09-deterministic-staged-generation",
-	"10-strict-typescript-staticness",
-	"11-semantic-oracles",
-	"12-generated-packages-selected-tests",
-	"13-no-extension-tsgo-differential",
-	"14-extensions-assembled-product",
-	"15-compiler-corpus-proof-common-projects",
-	"16-performance",
-	"17-source-update-repeatability",
-	"18-complete-product-publication",
-}
-
 // runGate represents the exact 18-stage acceptance contract as pass, fail, or
 // blocked and writes a machine-readable report. It exits nonzero unless every
 // required stage passes; blocked is an incomplete build, never command success.
@@ -526,9 +505,32 @@ func runGate(args []string) error {
 		if planned["native-array"]+planned["goslice-carrier"] == 0 {
 			return "blocked", []string{"no slice regions recorded; planner evidence missing"}, nil
 		}
+		// Every custom runtime mechanism present in generated output must
+		// have a machine-checked necessity record (spec 10): the record
+		// carries the counterexample, ordinary-TypeScript mismatch,
+		// rejected alternatives, oracle/mutation/perf evidence,
+		// invalidation, acceptance, and reopening — a bare "proven" flag
+		// is rejected. The requirement is derived structurally from the
+		// emitted output, not a generator flag.
+		necessity, err := contracts.LoadNecessityRecords()
+		if err != nil {
+			return "fail", nil, err
+		}
+		present := detectMechanisms(corpusGenerated.Files)
+		var missing []string
+		for _, mechanism := range present {
+			if _, ok := necessity.RecordFor(mechanism); !ok {
+				missing = append(missing, mechanism)
+			}
+		}
+		if len(missing) > 0 {
+			sort.Strings(missing)
+			return "fail", missing, fmt.Errorf("%d custom mechanisms in generated output have no necessity record", len(missing))
+		}
 		details := []string{
 			fmt.Sprintf("slice regions planned: native-array %d, goslice-carrier %d",
 				planned["native-array"], planned["goslice-carrier"]),
+			fmt.Sprintf("custom mechanisms with verified necessity records: %v", present),
 			"remaining families (pointers, interfaces, strings, maps) plan through their reviewed single candidates",
 		}
 		return "pass", details, nil
@@ -539,22 +541,7 @@ func runGate(args []string) error {
 	run("10-strict-typescript-staticness", func() (string, []string, error) {
 		return runTscGate(*repoDir, *profilePath, *buildProfile, *sourceDir, report, productPin, firstRun)
 	})
-	blocked("11-semantic-oracles",
-		"ordered static-output prerequisites are incomplete; local oracle tests run under gate 01 only")
-	blocked("12-generated-packages-selected-tests",
-		"complete generated-package build and translated-test gate not implemented")
-	blocked("13-no-extension-tsgo-differential",
-		"whole-compiler no-extension differential not implemented")
-	blocked("14-extensions-assembled-product",
-		"extension seams and product composition not implemented")
-	blocked("15-compiler-corpus-proof-common-projects",
-		"complete compiler corpus, proof projects, and common projects not implemented")
-	blocked("16-performance",
-		"performance baselines and regression gates not implemented")
-	blocked("17-source-update-repeatability",
-		"upgrade repeatability proof not implemented")
-	blocked("18-complete-product-publication",
-		"atomic complete product publication gate not implemented")
+	blockExecutionStages(blocked)
 
 	report.ReportedStages = len(report.Gates)
 	report.MissingStages = report.ExpectedStages - report.ReportedStages
