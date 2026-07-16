@@ -76,12 +76,14 @@ func (b *builder) resolveIfaceBranches(ifaceType *types.Interface, method *types
 						Construct: "interface dispatch through non-struct promotion", Span: span}
 				}
 				field := structType.Field(index)
-				if _, isPtr := field.Type().Underlying().(*types.Pointer); isPtr {
-					return &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
-						Construct: "interface dispatch through embedded pointer promotion", Span: span}
+				step := PromotionStep{Field: field.Name()}
+				fieldType := field.Type()
+				if pointer, isPtr := fieldType.Underlying().(*types.Pointer); isPtr {
+					step.Pointer = true
+					fieldType = pointer.Elem()
 				}
-				branch.FieldPath = append(branch.FieldPath, field.Name())
-				current = field.Type().Underlying()
+				branch.FieldPath = append(branch.FieldPath, step)
+				current = fieldType.Underlying()
 			}
 		}
 		branches = append(branches, branch)

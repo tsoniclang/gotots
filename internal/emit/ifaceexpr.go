@@ -186,10 +186,11 @@ func (p *printer) printIfaceCall(n *ir.IfaceCall) (string, error) {
 			return "", err
 		}
 		receiver := "($box.v as (" + payload + "))"
-		for _, field := range branch.FieldPath {
-			// A promoted method delegates through the embedded value
-			// fields to the declaring type.
-			receiver += "." + field
+		for _, step := range branch.FieldPath {
+			receiver += "." + step.Field
+			if step.Pointer {
+				receiver = "gort$.goNilCheck(" + receiver + ")"
+			}
 		}
 		operands := append([]string{receiver}, argNames...)
 		call := callee + "(" + joinComma(operands) + ")"

@@ -55,6 +55,12 @@ type IfaceCall struct {
 
 // IfaceBranch is one closed dispatch case: a concrete dynamic type's
 // rtti token and the direct method to call for it.
+// PromotionStep is one embedded-field hop in a promoted dispatch chain.
+type PromotionStep struct {
+	Field   string
+	Pointer bool // an embedded pointer field: deref with a nil check
+}
+
 type IfaceBranch struct {
 	// Rtti is the branch's dynamic-type token (the switch discriminant).
 	Rtti RttiRef
@@ -68,10 +74,11 @@ type IfaceBranch struct {
 	DeclType string
 	External bool
 	Method   string
-	// FieldPath chains through embedded value fields from the concrete
-	// payload to the promoted method's receiver (empty for a direct
-	// method).
-	FieldPath []string
+	// FieldPath chains through embedded fields from the concrete payload
+	// to the promoted method's receiver (empty for a direct method).
+	// Each step names the field and whether it is an embedded pointer
+	// (dereferenced with a nil check).
+	FieldPath []PromotionStep
 	// ValueReceiver marks a value-receiver method: the narrowed payload
 	// clones at the call (a pointer receiver takes it as is).
 	ValueReceiver bool
