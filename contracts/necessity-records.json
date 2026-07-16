@@ -30,8 +30,9 @@
       ],
       "smallestMechanism": "a four-field record {backing, offset, length, capacity} over a shared backing array; nil is undefined",
       "oracleTests": [
+        "TestOracleSliceBasics",
         "TestOracleSliceAliasing",
-        "TestOracleSliceAppend",
+        "TestOracleSlicePanics",
         "TestOracleStagedCompoundTargets",
         "TestOracleDistinctSliceZeros"
       ],
