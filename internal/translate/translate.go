@@ -456,54 +456,6 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 	return nil
 }
 
-// newModule builds the emission context of one generated module: the
-// language-ABI specifiers plus one specifier per co-generated package,
-// all relative to the module's own directory.
-func newModule(modulePath, pkgPath, pkgName string, unit ir.Scope) (*emit.Module, error) {
-	fromDir := path.Dir(modulePath)
-	abiImports := emit.ABIImports{}
-	for _, entry := range []struct {
-		target *string
-		file   string
-	}{
-		{&abiImports.Ints, "goints.js"},
-		{&abiImports.Runtime, "goruntime.js"},
-		{&abiImports.Slice, "goslice.js"},
-		{&abiImports.Iface, "goiface.js"},
-		{&abiImports.Extern, "goextern.js"},
-	} {
-		specifier, err := relativeImport(fromDir, path.Join(abiDir, entry.file))
-		if err != nil {
-			return nil, err
-		}
-		*entry.target = specifier
-	}
-	specifiers := map[string]string{}
-	for _, other := range unit.Paths() {
-		if other == pkgPath {
-			continue
-		}
-		specifier, err := relativeImport(fromDir, path.Join("core", other, "package.js"))
-		if err != nil {
-			return nil, err
-		}
-		specifiers[other] = specifier
-	}
-	// Every admitted external contract resolves to its stub module.
-	for _, fn := range unit.ExternalFuncs() {
-		external := fn.Pkg().Path()
-		if _, exists := specifiers[external]; exists {
-			continue
-		}
-		specifier, err := relativeImport(fromDir, path.Join("external-stubs", external, "package.js"))
-		if err != nil {
-			return nil, err
-		}
-		specifiers[external] = specifier
-	}
-	return emit.NewModule(pkgPath, pkgName, abiImports, specifiers), nil
-}
-
 // collectGenericInstances records every generic-function instantiation
 // across the unit: the closed-world evidence that admits generic
 // declarations.

@@ -214,14 +214,47 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		args, err := p.printArgs(n.Args)
+		// A fully typed staged invocation preserving Go's order: the
+		// callee operand and every argument evaluate as the arrow's
+		// arguments (left to right), then a nil callee panics, then the
+		// call runs. goPanicNil returns never, so the callee narrows to
+		// its exact signature — no erased Function, no result cast.
+		funcType := n.Fun.Type()
+		if funcType.Sig == nil {
+			return "", fmt.Errorf("dynamic call without a function signature")
+		}
+		arrowParams := []string{}
+		callArgs := []string{}
+		passed := []string{fun}
+		spelledFun, err := p.tsType(funcType)
 		if err != nil {
 			return "", err
 		}
-		// The helper preserves Go's order: callee operand, then the
-		// arguments, then the nil panic at the invocation.
-		call := fmt.Sprintf("gort$.goFuncInvoke(%s, [%s])", fun, args)
-		return p.castResults(call, n.Results)
+		arrowParams = append(arrowParams, "f$: "+spelledFun)
+		for i, argument := range n.Args {
+			printed, err := p.printExpr(argument)
+			if err != nil {
+				return "", err
+			}
+			spelled, err := p.tsType(argument.Type())
+			if err != nil {
+				return "", err
+			}
+			name := fmt.Sprintf("a%d$", i)
+			arrowParams = append(arrowParams, name+": "+spelled)
+			callArgs = append(callArgs, name)
+			passed = append(passed, printed)
+		}
+		result, err := p.tsFuncResultType(n.Results)
+		if err != nil {
+			return "", err
+		}
+		body := "if (f$ === undefined) { gort$.goPanicNil(); } return f$(" + joinComma(callArgs) + ");"
+		if result == "void" {
+			body = "if (f$ === undefined) { gort$.goPanicNil(); } f$(" + joinComma(callArgs) + ");"
+		}
+		return fmt.Sprintf("((%s): %s => { %s })(%s)",
+			joinComma(arrowParams), result, body, joinComma(passed)), nil
 	case *ir.ExternalCall:
 		args, err := p.printArgs(n.Args)
 		if err != nil {
@@ -257,11 +290,11 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			return "gosl$.goArrayClone(" + x + ", " + cloneElem + ")", nil
 		}
 		if t := n.X.Type(); t.Kind == ir.KindExternal {
-			spelled, err := p.tsType(t)
+			callee, err := p.module.symbol(t.Pkg, externCloneSymbol(t.Named))
 			if err != nil {
 				return "", err
 			}
-			return fmt.Sprintf("(goext$.goExternalCall(%q, [%s]) as %s)", t.Pkg+"."+t.Named+".goClone$", x, spelled), nil
+			return callee + "(" + x + ")", nil
 		}
 		return x + ".goClone$()", nil
 	case *ir.StructZero:
@@ -271,11 +304,12 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 	case *ir.ParamZero:
 		return p.zeroLiteral(n.T)
 	case *ir.ExternVar:
-		spelled, err := p.tsType(n.T)
+		dot := strings.LastIndex(n.ID, ".")
+		callee, err := p.module.symbol(n.ID[:dot], externVarSymbol(n.ID[dot+1:]))
 		if err != nil {
 			return "", err
 		}
-		return fmt.Sprintf("(goext$.goExternalCall(%q, []) as (%s))", n.ID, spelled), nil
+		return callee + "()", nil
 	case *ir.ExternalMethodCall:
 		recv, err := p.printExpr(n.Recv)
 		if err != nil {
@@ -285,12 +319,15 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		callee, err := p.module.symbol(n.Pkg, externMethodSymbol(n.TypeName, n.Method))
+		if err != nil {
+			return "", err
+		}
 		operands := recv
 		if args != "" {
 			operands += ", " + args
 		}
-		call := fmt.Sprintf("goext$.goExternalCall(%q, [%s])", n.TypeID+"."+n.Method, operands)
-		return p.castResults(call, n.Results)
+		return fmt.Sprintf("%s(%s)", callee, operands), nil
 	case *ir.AddrOf:
 		// The pointer to an addressable struct value is the instance.
 		return p.printExpr(n.X)
@@ -463,11 +500,11 @@ func (p *printer) zeroLiteral(t ir.Type) (string, error) {
 	case t.Kind == ir.KindUnit:
 		return "0", nil
 	case t.Kind == ir.KindExternal:
-		spelled, err := p.tsType(t)
+		callee, err := p.module.symbol(t.Pkg, externZeroSymbol(t.Named))
 		if err != nil {
 			return "", err
 		}
-		return fmt.Sprintf("(goext$.goExternalCall(%q, []) as %s)", t.Pkg+"."+t.Named+".goZero$", spelled), nil
+		return callee + "()", nil
 	case t.Kind.Wide64():
 		return "0n", nil
 	case t.Kind.Integer(), t.Kind.Float():

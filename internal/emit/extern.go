@@ -19,12 +19,31 @@ type StubFunc struct {
 	Results    []ir.Var
 }
 
-// StubModule prints one external package's typed stubs.
-func StubModule(module *Module, funcs []StubFunc) (string, error) {
+// Stub symbol spellings: "$"-suffixed member names no Go identifier can
+// collide with. Generated call sites and stub exports must agree.
+func externMethodSymbol(typeName, method string) string { return typeName + "$" + method }
+func externZeroSymbol(typeName string) string           { return typeName + "$goZero$" }
+func externCloneSymbol(typeName string) string          { return typeName + "$goClone$" }
+func externSetSymbol(typeName string) string            { return typeName + "$goSet$" }
+func externVarSymbol(name string) string                { return name + "$get$" }
+
+// ExternMethodSymbol exposes the method-stub spelling for call sites
+// outside the emit package.
+func ExternMethodSymbol(typeName, method string) string { return externMethodSymbol(typeName, method) }
+
+// StubModule prints one external package's typed stubs: package-level
+// functions, then type members and variables, all failing closed.
+func StubModule(module *Module, funcs []StubFunc, members []StubMember) (string, error) {
 	var body strings.Builder
 	for _, fn := range funcs {
 		body.WriteString("\n")
 		if err := printStubFunc(&body, module, fn); err != nil {
+			return "", err
+		}
+	}
+	for _, member := range members {
+		body.WriteString("\n")
+		if err := printStubMember(&body, module, member); err != nil {
 			return "", err
 		}
 	}
@@ -56,23 +75,56 @@ func printStubFunc(out *strings.Builder, module *Module, fn StubFunc) error {
 		generics = "<" + strings.Join(fn.TypeParams, ", ") + ">"
 	}
 
-	resultTypes := make([]ir.Type, len(fn.Results))
-	for i, r := range fn.Results {
-		resultTypes[i] = r.Type
-	}
-	call := fmt.Sprintf("goext$.goExternalCall(%q, [%s])", fn.ID, strings.Join(names, ", "))
-	cast, err := p.castResults(call, resultTypes)
-	if err != nil {
-		return fmt.Errorf("%s: %w", fn.ID, err)
-	}
-
+	_ = names
 	p.line("export function %s%s(%s): %s {", fn.Name, generics, strings.Join(params, ", "), result)
 	p.indent++
-	if len(fn.Results) == 0 {
-		p.line("%s;", cast)
-	} else {
-		p.line("return %s;", cast)
+	// The stub is the typed contract with no behavior: it fails closed
+	// until assembly replaces this module with an implementation module
+	// exporting the same statically selected symbols.
+	p.line("return goext$.goExternalUnimplemented(%q);", fn.ID)
+	p.indent--
+	p.line("}")
+	return nil
+}
+
+// StubMember is one external type-member or variable contract: a typed
+// export whose stub body fails closed.
+type StubMember struct {
+	ID     string // canonical diagnostic identity
+	Name   string // exported stub symbol
+	Params []ir.Var
+	// ResultType, when set, is a single result; Results is the general
+	// list. Both empty means void.
+	ResultType *ir.Type
+	Results    []ir.Type
+}
+
+// printStubMember prints one member stub.
+func printStubMember(out *strings.Builder, module *Module, member StubMember) error {
+	p := &printer{out: out, module: module}
+	params := make([]string, 0, len(member.Params))
+	for i, parameter := range member.Params {
+		name := tsName(parameter.Name)
+		if parameter.Name == "" || parameter.Name == "_" {
+			name = fmt.Sprintf("p%d", i)
+		}
+		spelled, err := p.tsType(parameter.Type)
+		if err != nil {
+			return fmt.Errorf("%s: %w", member.ID, err)
+		}
+		params = append(params, name+": "+spelled)
 	}
+	results := member.Results
+	if member.ResultType != nil {
+		results = []ir.Type{*member.ResultType}
+	}
+	result, err := p.tsFuncResultType(results)
+	if err != nil {
+		return fmt.Errorf("%s: %w", member.ID, err)
+	}
+	p.line("export function %s(%s): %s {", member.Name, strings.Join(params, ", "), result)
+	p.indent++
+	p.line("return goext$.goExternalUnimplemented(%q);", member.ID)
 	p.indent--
 	p.line("}")
 	return nil

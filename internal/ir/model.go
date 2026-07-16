@@ -131,6 +131,22 @@ type Scope struct {
 	// anonStructs collects, per package, the synthesized classes of the
 	// anonymous struct shapes its bodies use, keyed by class name.
 	anonStructs map[string]map[string]*Struct
+	// externTypes records, per external named type ("pkg.Type"), the
+	// contract members the unit references: methods by declared object,
+	// plus the value-semantics trio every external value carrier needs.
+	// The stub modules type and export each one statically.
+	externTypes map[string]*ExternTypeObligation
+	// externVars records external package variables the unit reads, by
+	// canonical "pkg.Name" identity.
+	externVars map[string]*types.Var
+}
+
+// ExternTypeObligation is one external named type's referenced contract
+// surface.
+type ExternTypeObligation struct {
+	Pkg     string
+	Name    string
+	Methods map[string]*types.Func
 }
 
 // NewScope builds a unit scope over the given package paths.
@@ -145,6 +161,8 @@ func NewScope(paths ...string) Scope {
 		externals:    map[*types.Func]bool{},
 		typeGenerics: map[*types.TypeName][][]types.Type{},
 		anonStructs:  map[string]map[string]*Struct{},
+		externTypes:  map[string]*ExternTypeObligation{},
+		externVars:   map[string]*types.Var{},
 	}
 }
 
@@ -204,6 +222,65 @@ func (s Scope) AnonStructs(pkg string) []*Struct {
 
 // AddExternalFunc records one admitted external function contract.
 func (s Scope) AddExternalFunc(fn *types.Func) { s.externals[fn] = true }
+
+// AddExternalType records one external named type the unit carries; the
+// stub module exports its value-semantics contract.
+func (s Scope) AddExternalType(pkg, name string) *ExternTypeObligation {
+	id := pkg + "." + name
+	obligation, has := s.externTypes[id]
+	if !has {
+		obligation = &ExternTypeObligation{Pkg: pkg, Name: name, Methods: map[string]*types.Func{}}
+		s.externTypes[id] = obligation
+	}
+	return obligation
+}
+
+// AddExternalMethod records one referenced method of an external type.
+func (s Scope) AddExternalMethod(pkg, name string, method *types.Func) {
+	s.AddExternalType(pkg, name).Methods[method.Name()] = method
+}
+
+// ExternalTypes returns every referenced external type obligation in
+// sorted identity order.
+func (s Scope) ExternalTypes() []*ExternTypeObligation {
+	ids := make([]string, 0, len(s.externTypes))
+	for id := range s.externTypes {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	out := make([]*ExternTypeObligation, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, s.externTypes[id])
+	}
+	return out
+}
+
+// AddExternalVar records one external package variable the unit reads.
+func (s Scope) AddExternalVar(id string, variable *types.Var) { s.externVars[id] = variable }
+
+// ExternalVars returns the referenced external variables in sorted
+// identity order.
+func (s Scope) ExternalVars() []struct {
+	ID       string
+	Variable *types.Var
+} {
+	ids := make([]string, 0, len(s.externVars))
+	for id := range s.externVars {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	out := make([]struct {
+		ID       string
+		Variable *types.Var
+	}, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, struct {
+			ID       string
+			Variable *types.Var
+		}{ID: id, Variable: s.externVars[id]})
+	}
+	return out
+}
 
 // ExternalFuncs returns every admitted external function contract,
 // sorted by package path then name.

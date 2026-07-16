@@ -12,11 +12,12 @@ import (
 	"github.com/tsoniclang/gotots/internal/oracle"
 )
 
-// builderEmulations implements the strings.Builder external contract
-// with Go-exact behavior over the byte-string carrier.
-const builderEmulations = `import { goExternalRegister } from "./generated/language-abi/goextern.ts";
-
-import { GoPanic } from "./generated/language-abi/gopanic.ts";
+// builderImplementation replaces the strings stub module with a
+// reviewed strings.Builder contract implementation exporting exactly
+// the generated stub symbols, including Go's real use-after-copy panic.
+var builderImplementation = map[string]string{
+	"strings": `import { GoPanic } from "../../language-abi/gopanic.js";
+import { type GoExtern } from "../../language-abi/goextern.js";
 
 class BuilderEmu {
   buf = "";
@@ -24,31 +25,49 @@ class BuilderEmu {
   stale = false; // a copy of a used builder panics on its next write
 }
 
-goExternalRegister("strings.Builder.goZero$", (): BuilderEmu => new BuilderEmu());
-goExternalRegister("strings.Builder.goClone$", (b: BuilderEmu): BuilderEmu => {
+type Handle = GoExtern<"strings.Builder">;
+
+export function Builder$goZero$(): Handle {
+  return new BuilderEmu() as Handle;
+}
+
+export function Builder$goClone$(v: Handle): Handle {
+  const b = v as unknown as BuilderEmu;
   const out = new BuilderEmu();
   out.buf = b.buf;
   out.stale = b.used;
-  return out;
-});
-goExternalRegister("strings.Builder.goSet$", (dst: BuilderEmu, src: BuilderEmu): void => {
-  dst.buf = src.buf;
-  dst.stale = src.used;
-});
-goExternalRegister("strings.Builder.WriteString", (b: BuilderEmu, s: string): readonly [bigint, undefined] => {
+  return out as Handle;
+}
+
+export function Builder$goSet$(dst: Handle, src: Handle): void {
+  const d = dst as unknown as BuilderEmu;
+  const s = src as unknown as BuilderEmu;
+  d.buf = s.buf;
+  d.stale = s.used;
+}
+
+export function Builder$WriteString(recv: Handle, s: string): readonly [bigint, undefined] {
+  const b = recv as unknown as BuilderEmu;
   if (b.stale) {
     throw new GoPanic("strings: illegal use of non-zero Builder copied by value");
   }
   b.used = true;
   b.buf += s;
   return [BigInt(s.length), undefined];
-});
-goExternalRegister("strings.Builder.String", (b: BuilderEmu): string => b.buf);
-goExternalRegister("strings.Builder.Len", (b: BuilderEmu): bigint => BigInt(b.buf.length));
-`
+}
+
+export function Builder$String(recv: Handle): string {
+  return (recv as unknown as BuilderEmu).buf;
+}
+
+export function Builder$Len(recv: Handle): bigint {
+  return BigInt((recv as unknown as BuilderEmu).buf.length);
+}
+`,
+}
 
 func TestOracleExternalTypes(t *testing.T) {
-	result, err := oracle.RunEmulated(t.TempDir(), map[string]string{"fixture": `package fixture
+	result, err := oracle.RunAssembled(t.TempDir(), map[string]string{"fixture": `package fixture
 
 import "strings"
 
@@ -88,7 +107,7 @@ func HandleThroughField() string {
 	sb.WriteString("y")
 	return sb.String()
 }
-`}, builderEmulations)
+`}, builderImplementation)
 	if err != nil {
 		t.Fatalf("oracle: %v", err)
 	}
@@ -97,7 +116,7 @@ func HandleThroughField() string {
 	}
 }
 
-func TestExternalTypeUnregisteredFailsClosed(t *testing.T) {
+func TestExternalTypeStaticStubs(t *testing.T) {
 	generated, _, err := oracle.Translate(t.TempDir(), map[string]string{"fixture": `package fixture
 
 import "sync"
@@ -110,21 +129,38 @@ func Case() int {
 }
 `})
 	if err != nil {
-		t.Fatalf("translation must succeed statically (contracts fail at runtime): %v", err)
+		t.Fatalf("translation must succeed statically (stubs fail closed at runtime): %v", err)
 	}
-	var core string
+	var core, stub string
 	for path, content := range generated.Files {
 		if strings.Contains(path, "fixture/package.ts") {
 			core = content
 		}
+		if path == "external-stubs/sync/package.ts" {
+			stub = content
+		}
 	}
+	// The generated module binds statically selected typed stub exports;
+	// no registry, lookup, or result recovery cast exists anywhere.
 	for _, want := range []string{
-		`goext$.goExternalCall("sync.Mutex.goZero$", [])`,
-		`goext$.goExternalCall("sync.Mutex.Lock", `,
-		`goext$.goExternalCall("sync.Mutex.Unlock", `,
+		"Mutex$goZero$()",
+		"Mutex$Lock(",
+		"Mutex$Unlock(",
 	} {
 		if !strings.Contains(core, want) {
-			t.Errorf("generated module missing contract dispatch %q:\n%s", want, core)
+			t.Errorf("generated module missing static stub call %q:\n%s", want, core)
+		}
+	}
+	if strings.Contains(core, "goExternalCall") {
+		t.Errorf("generated module still routes through a registry:\n%s", core)
+	}
+	for _, want := range []string{
+		"export function Mutex$goZero$(",
+		"export function Mutex$Lock(",
+		"goext$.goExternalUnimplemented(\"sync.Mutex.Lock\");",
+	} {
+		if !strings.Contains(stub, want) {
+			t.Errorf("sync stub module missing %q:\n%s", want, stub)
 		}
 	}
 }

@@ -175,8 +175,11 @@ func Case(err error) bool {
 			core = content
 		}
 	}
-	if !strings.Contains(core, `goext$.goExternalCall("io/fs.SkipDir", [])`) {
-		t.Errorf("expected external variable contract dispatch, got:\n%s", core)
+	if !strings.Contains(core, `fs$.SkipDir$get$()`) {
+		t.Errorf("expected the static typed variable stub call, got:\n%s", core)
+	}
+	if strings.Contains(core, "goExternalCall") {
+		t.Errorf("generated module still routes through a registry:\n%s", core)
 	}
 }
 

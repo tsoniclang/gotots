@@ -27,18 +27,26 @@ type stagedTarget struct {
 	nilCheckBase bool
 	// keyedMap routes the store through the composite-key carrier.
 	keyedMap bool
-	// externSet, when set, is the goSet$ contract identity for an
+	// externSet, when set, is the typed goSet$ stub reference for an
 	// external-valued in-place store.
 	externSet string
 }
 
-// externSetID is the goSet$ contract identity when the stored type is
-// external, else "".
-func externSetID(t ir.Type) string {
-	if t.Kind != ir.KindExternal {
+// externSetCallee spells the typed goSet$ stub reference when the
+// stored type is external, else "".
+func mustExternSet(p *printer, t ir.Type) string {
+	callee, err := p.externSetCallee(t)
+	if err != nil {
 		return ""
 	}
-	return t.Pkg + "." + t.Named + ".goSet$"
+	return callee
+}
+
+func (p *printer) externSetCallee(t ir.Type) (string, error) {
+	if t.Kind != ir.KindExternal {
+		return "", nil
+	}
+	return p.module.symbol(t.Pkg, externSetSymbol(t.Named))
 }
 
 // arrayValueCallback spells the goArraySetAll element callback when the
@@ -61,7 +69,7 @@ func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
 		}
 		return stagedTarget{kind: "var", name: tsName(t.Name),
 			structValue: t.T.Kind == ir.KindStruct, arrayValue: setElem,
-			externSet: externSetID(t.T)}, nil
+			externSet: mustExternSet(p, t.T)}, nil
 	case *ir.FieldTarget:
 		base, err := p.printExpr(t.X)
 		if err != nil {
@@ -75,7 +83,7 @@ func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
 		}
 		return stagedTarget{kind: "field", name: baseTemp, field: t.Field,
 			structValue: t.T.Kind == ir.KindStruct, arrayValue: setElem,
-			externSet:    externSetID(t.T),
+			externSet:    mustExternSet(p, t.T),
 			nilCheckBase: t.X.Type().Kind != ir.KindStruct}, nil
 	case *ir.PointeeTarget:
 		pointer, err := p.printExpr(t.X)
@@ -90,7 +98,7 @@ func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
 			if staged.arrayValue, err = p.arrayValueCallback(*elem); err != nil {
 				return stagedTarget{}, err
 			}
-			staged.externSet = externSetID(*elem)
+			staged.externSet = mustExternSet(p, *elem)
 		}
 		return staged, nil
 	case ir.BoxedTarget:
@@ -208,7 +216,7 @@ func (s stagedTarget) store(p *printer, value string) error {
 		case s.arrayValue != "":
 			p.line("gosl$.goArraySetAll(%s, %s, %s);", s.name, value, s.arrayValue)
 		case s.externSet != "":
-			p.line("goext$.goExternalCall(%q, [%s, %s]);", s.externSet, s.name, value)
+			p.line("%s(%s, %s);", s.externSet, s.name, value)
 		default:
 			p.line("%s = %s;", s.name, value)
 		}
@@ -219,7 +227,7 @@ func (s stagedTarget) store(p *printer, value string) error {
 		case s.arrayValue != "":
 			p.line("gosl$.goArraySetAll(%s.%s, %s, %s);", base, s.field, value, s.arrayValue)
 		case s.externSet != "":
-			p.line("goext$.goExternalCall(%q, [%s.%s, %s]);", s.externSet, base, s.field, value)
+			p.line("%s(%s.%s, %s);", s.externSet, base, s.field, value)
 		default:
 			p.line("%s.%s = %s;", base, s.field, value)
 		}
@@ -230,7 +238,7 @@ func (s stagedTarget) store(p *printer, value string) error {
 		case s.arrayValue != "":
 			p.line("gosl$.goArraySetAll(%s, %s, %s);", base, value, s.arrayValue)
 		case s.externSet != "":
-			p.line("goext$.goExternalCall(%q, [%s, %s]);", s.externSet, base, value)
+			p.line("%s(%s, %s);", s.externSet, base, value)
 		default:
 			p.line("%s.v = %s;", base, value)
 		}
@@ -295,8 +303,8 @@ func (p *printer) printStore(target ir.Target, value string) error {
 			p.line("gosl$.goArraySetAll(%s, %s, %s);", tsName(t.Name), value, setElem)
 			return nil
 		}
-		if id := externSetID(t.T); id != "" {
-			p.line("goext$.goExternalCall(%q, [%s, %s]);", id, tsName(t.Name), value)
+		if callee := mustExternSet(p, t.T); callee != "" {
+			p.line("%s(%s, %s);", callee, tsName(t.Name), value)
 			return nil
 		}
 		p.line("%s = %s;", tsName(t.Name), value)
@@ -318,8 +326,8 @@ func (p *printer) printStore(target ir.Target, value string) error {
 				p.line("%s.%s.goSet$(%s);", base, t.Field, value)
 			case setElem != "":
 				p.line("gosl$.goArraySetAll(%s.%s, %s, %s);", base, t.Field, value, setElem)
-			case externSetID(t.T) != "":
-				p.line("goext$.goExternalCall(%q, [%s.%s, %s]);", externSetID(t.T), base, t.Field, value)
+			case mustExternSet(p, t.T) != "":
+				p.line("%s(%s.%s, %s);", mustExternSet(p, t.T), base, t.Field, value)
 			default:
 				p.line("%s.%s = %s;", base, t.Field, value)
 			}
@@ -336,8 +344,8 @@ func (p *printer) printStore(target ir.Target, value string) error {
 			p.line("gort$.goNilCheck(%s).%s.goSet$(%s);", baseTemp, t.Field, valueTemp)
 		case setElem != "":
 			p.line("gosl$.goArraySetAll(gort$.goNilCheck(%s).%s, %s, %s);", baseTemp, t.Field, valueTemp, setElem)
-		case externSetID(t.T) != "":
-			p.line("goext$.goExternalCall(%q, [gort$.goNilCheck(%s).%s, %s]);", externSetID(t.T), baseTemp, t.Field, valueTemp)
+		case mustExternSet(p, t.T) != "":
+			p.line("%s(gort$.goNilCheck(%s).%s, %s);", mustExternSet(p, t.T), baseTemp, t.Field, valueTemp)
 		default:
 			p.line("gort$.goNilCheck(%s).%s = %s;", baseTemp, t.Field, valueTemp)
 		}
@@ -400,7 +408,7 @@ func (p *printer) printStore(target ir.Target, value string) error {
 			}
 			p.line("gosl$.goArraySetAll(gort$.goNilCheck(%s), %s, %s);", pointerTemp, valueTemp, setElem)
 		case elem.Kind == ir.KindExternal:
-			p.line("goext$.goExternalCall(%q, [gort$.goNilCheck(%s), %s]);", externSetID(*elem), pointerTemp, valueTemp)
+			p.line("%s(gort$.goNilCheck(%s), %s);", mustExternSet(p, *elem), pointerTemp, valueTemp)
 		default:
 			p.line("gort$.goNilCheck(%s).v = %s;", pointerTemp, valueTemp)
 		}

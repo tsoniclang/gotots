@@ -14,11 +14,23 @@ func (p *printer) rttiRef(r ir.RttiRef) (string, error) {
 		return "goif$.goRtti$" + r.Predeclared, nil
 	}
 	if r.Composite != "" {
-		externID := "undefined"
-		if r.ExternID != "" {
-			externID = fmt.Sprintf("%q", r.ExternID)
+		if r.ExternID == "" {
+			return fmt.Sprintf("goif$.goRttiComposite(%q, %q, {}, undefined)", r.Composite, r.Display), nil
 		}
-		return fmt.Sprintf("goif$.goRttiComposite(%q, %q, %s)", r.Composite, r.Display, externID), nil
+		// An external named type's rtti carries a STATIC method table over
+		// the unit-recorded contract stubs; anything beyond the recorded
+		// surface fails closed at the dispatch site.
+		dot := strings.LastIndex(r.ExternID, ".")
+		externPkg, typeName := r.ExternID[:dot], r.ExternID[dot+1:]
+		entries := make([]string, 0, len(p.module.ExternMethods[r.ExternID]))
+		for _, method := range p.module.ExternMethods[r.ExternID] {
+			callee, err := p.module.symbol(externPkg, externMethodSymbol(typeName, method))
+			if err != nil {
+				return "", err
+			}
+			entries = append(entries, method+": "+callee)
+		}
+		return fmt.Sprintf("goif$.goRttiComposite(%q, %q, { %s }, %q)", r.Composite, r.Display, strings.Join(entries, ", "), r.ExternID), nil
 	}
 	name := r.TypeName + "$rtti"
 	if r.Pointer {
@@ -176,8 +188,11 @@ func (p *printer) printTypeSwitchClause(n *ir.TypeSwitchStmt, clause *ir.TypeSwi
 				value = "gosl$.goArrayClone(" + value + ", " + cloneElem + ")"
 			}
 			if t := clause.BindType; t.Kind == ir.KindExternal {
-				value = fmt.Sprintf("(goext$.goExternalCall(%q, [%s]) as %s)",
-					t.Pkg+"."+t.Named+".goClone$", value, spelled)
+				callee, err := p.module.symbol(t.Pkg, externCloneSymbol(t.Named))
+				if err != nil {
+					return err
+				}
+				value = fmt.Sprintf("%s(%s)", callee, value)
 			}
 			p.line("let %s: %s = %s;", tsName(n.Bind), spelled, value)
 		}

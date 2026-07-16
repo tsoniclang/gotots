@@ -22,8 +22,9 @@ func (e *ExternZero) Type() Type { return e.T }
 // ExternalMethodCall dispatches a method on an external receiver (the
 // handle itself, whatever its carrier kind) by canonical identity.
 type ExternalMethodCall struct {
-	TypeID string // "<package path>.<TypeName>"
-	Method string
+	Pkg      string
+	TypeName string
+	Method   string
 	// PointerRecv reports the declared receiver flavor: a value receiver
 	// captures a copy when deferred, exactly like owned methods.
 	PointerRecv bool
@@ -68,8 +69,10 @@ func (b *builder) buildExternalMethodCall(n *ast.CallExpr, selector *ast.Selecto
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method call outside the translated unit (unqualified)", Span: span}
 	}
 	_, pointerRecv := signature.Recv().Type().(*types.Pointer)
+	b.unit.AddExternalMethod(recvNamed.Obj().Pkg().Path(), recvNamed.Obj().Name(), method)
 	out := &ExternalMethodCall{
-		TypeID:      recvNamed.Obj().Pkg().Path() + "." + recvNamed.Obj().Name(),
+		Pkg:         recvNamed.Obj().Pkg().Path(),
+		TypeName:    recvNamed.Obj().Name(),
 		Method:      method.Name(),
 		PointerRecv: pointerRecv,
 		Recv:        recv,

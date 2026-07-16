@@ -110,17 +110,12 @@ func main() {
 // specifiers; a documented resolver shim maps them onto the .ts sources
 // for execution — a host-execution normalization, never a mutation of
 // generated output.
-func runNodeDriver(nodeExecutable, workDir string, cases []fixtureCase, emulationTS string) (string, error) {
+func runNodeDriver(nodeExecutable, workDir string, cases []fixtureCase) (string, error) {
 	loader := LoaderSource
 	register := `import { register } from "node:module";
 register(new URL("./loader.mjs", import.meta.url));
 `
 	var driver strings.Builder
-	if emulationTS != "" {
-		// The emulation module registers external-contract behavior
-		// before any case executes.
-		driver.WriteString("import \"./emulation.ts\";\n")
-	}
 	driver.WriteString(`import * as fixture from "./generated/core/oracle.fixture/fixture/package.ts";
 import { GoPanic } from "./generated/language-abi/gopanic.ts";
 
@@ -198,9 +193,6 @@ function runCase(name: string, kinds: readonly string[], callCase: () => readonl
 		"loader.mjs":   loader,
 		"register.mjs": register,
 		"driver.ts":    driver.String(),
-	}
-	if emulationTS != "" {
-		files["emulation.ts"] = emulationTS
 	}
 	for name, content := range files {
 		if err := os.WriteFile(filepath.Join(workDir, name), []byte(content), 0o644); err != nil {

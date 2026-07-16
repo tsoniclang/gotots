@@ -13,7 +13,7 @@ package abi
 import "fmt"
 
 // Version identifies the ABI contract carried in generated output.
-const Version = 9
+const Version = 10
 
 // Family is the static carrier family of an integer kind.
 type Family string
@@ -106,7 +106,8 @@ const goruntimeSource = `// Go language runtime carriers beyond integers: nil-ch
 // access, maps with exact nil/zero/comma-ok/write-panic behavior, and
 // byte-string semantics (one code unit per Go byte, canonical).
 import { GoPanic, goPanicNil, goPanicNilMapWrite } from "./gopanic.js";
-import { goExternalCall } from "./goextern.js";
+
+export { goPanicNil } from "./gopanic.js";
 
 // A Go map: undefined is the nil map.
 export type GoMap<K, V> = Map<K, V> | undefined;
@@ -185,23 +186,15 @@ export function goPanicValue(value: string | number | bigint | boolean): never {
 // panic(err): the message is the error's dynamic Error() result — the
 // %v of an error value — dispatched here; a nil error panics like
 // panic(nil).
-export function goPanicError(err: { r: { m: Readonly<Record<string, Function>>; x?: string }; v: unknown } | undefined): never {
+export function goPanicError(err: { r: { d: string; m: Readonly<Record<string, Function>>; x?: string }; v: unknown } | undefined): never {
   if (err === undefined) {
     throw new GoPanic("panic called with nil argument");
   }
   const fn = err.r.m["Error"] as Function | undefined;
-  const message = fn === undefined && err.r.x !== undefined
-    ? goExternalCall(err.r.x + ".Error", [err.v])
-    : (fn as Function)(err.v);
-  throw new GoPanic(String(message));
-}
-
-// Invoking a function value: the arguments were already evaluated (JS
-// argument order runs the array literal first), and a nil function
-// panics at the invocation — exactly Go's order.
-export function goFuncInvoke(f: Function | undefined, args: unknown[]): unknown {
-  if (f === undefined) goPanicNil();
-  return (f as Function)(...args);
+  if (fn === undefined) {
+    throw new GoPanic("GOTOTS_EXTERNAL_UNIMPLEMENTED: " + (err.r.x ?? err.r.d) + ".Error");
+  }
+  throw new GoPanic(String(fn(err.v)));
 }
 
 // len(string) is the UTF-8 byte length; JS string length counts UTF-16

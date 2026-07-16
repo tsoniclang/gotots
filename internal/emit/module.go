@@ -32,8 +32,12 @@ type Module struct {
 	// runtime messages.
 	PkgName string
 	ABI     ABIImports
-	imports map[string]ModuleImport
-	used    map[string]bool
+	// ExternMethods maps each external named type ("pkg.Type") to its
+	// unit-recorded method names in sorted order: the static dispatch
+	// tables of external rttis.
+	ExternMethods map[string][]string
+	imports       map[string]ModuleImport
+	used          map[string]bool
 }
 
 // NewModule builds the emission context for one generated module.

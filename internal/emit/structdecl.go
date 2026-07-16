@@ -69,12 +69,11 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 			}
 			clone = append(clone, "gosl$.goArrayClone(this."+field.Name+", "+cloneElem+")")
 		case ir.KindExternal:
-			spelled, err := p.tsType(field.Type)
+			callee, err := p.module.symbol(field.Type.Pkg, externCloneSymbol(field.Type.Named))
 			if err != nil {
 				return err
 			}
-			clone = append(clone, fmt.Sprintf("(goext$.goExternalCall(%q, [this.%s]) as %s)",
-				field.Type.Pkg+"."+field.Type.Named+".goClone$", field.Name, spelled))
+			clone = append(clone, fmt.Sprintf("%s(this.%s)", callee, field.Name))
 		default:
 			clone = append(clone, "this."+field.Name)
 		}
@@ -102,8 +101,11 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 			}
 			p.line("gosl$.goArraySetAll(this.%s, other.%s, %s);", field.Name, field.Name, setElem)
 		case ir.KindExternal:
-			p.line("goext$.goExternalCall(%q, [this.%s, other.%s]);",
-				field.Type.Pkg+"."+field.Type.Named+".goSet$", field.Name, field.Name)
+			callee, err := p.module.symbol(field.Type.Pkg, externSetSymbol(field.Type.Named))
+			if err != nil {
+				return err
+			}
+			p.line("%s(this.%s, other.%s);", callee, field.Name, field.Name)
 		default:
 			p.line("this.%s = other.%s;", field.Name, field.Name)
 		}

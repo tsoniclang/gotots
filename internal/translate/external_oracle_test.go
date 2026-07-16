@@ -10,13 +10,27 @@ import (
 // externalEmulations registers Go-exact behavior for the external
 // contracts the fixtures reference, mirroring the product's
 // hand-maintained emulation layer.
-const externalEmulations = `import { goExternalRegister } from "./generated/language-abi/goextern.ts";
-import { goSliceLen, goSliceGet, type GoSliceValue } from "./generated/language-abi/goslice.ts";
+// Implementation modules assembled in place of the generated stubs:
+// each exports exactly the stub's typed symbols with Go-exact behavior,
+// mirroring the product's hand-maintained implementation layer.
+var externalImplementations = map[string]string{
+	"strings": `import { type GoSliceValue } from "../../language-abi/goslice.js";
 
-goExternalRegister("strings.HasPrefix", (s: string, prefix: string): boolean => s.startsWith(prefix));
-goExternalRegister("strings.Repeat", (s: string, count: bigint): string => s.repeat(Number(count)));
-goExternalRegister("strconv.Itoa", (i: bigint): string => String(i));
-goExternalRegister("slices.Contains", (s: GoSliceValue<unknown>, v: unknown): boolean => {
+export function HasPrefix(s: string, prefix: string): boolean {
+  return s.startsWith(prefix);
+}
+
+export function Repeat(s: string, count: bigint): string {
+  return s.repeat(Number(count));
+}
+`,
+	"strconv": `export function Itoa(i: bigint): string {
+  return String(i);
+}
+`,
+	"slices": `import { goSliceLen, goSliceGet, type GoSliceValue } from "../../language-abi/goslice.js";
+
+export function Contains<S, E>(s: GoSliceValue<E>, v: E): boolean {
   const length = Number(goSliceLen(s));
   for (let index = 0; index < length; index++) {
     if (goSliceGet(s, BigInt(index)) === v) {
@@ -24,12 +38,13 @@ goExternalRegister("slices.Contains", (s: GoSliceValue<unknown>, v: unknown): bo
     }
   }
   return false;
-});
-`
+}
+`,
+}
 
 func runExternalOracle(t *testing.T, fixtureSource string) {
 	t.Helper()
-	result, err := oracle.RunEmulated(t.TempDir(), map[string]string{"fixture": fixtureSource}, externalEmulations)
+	result, err := oracle.RunAssembled(t.TempDir(), map[string]string{"fixture": fixtureSource}, externalImplementations)
 	if err != nil {
 		t.Fatalf("oracle: %v", err)
 	}
@@ -98,8 +113,11 @@ func Use() bool { return strings.HasPrefix("a", "b") }
 	if !strings.Contains(stub, "export function HasPrefix(s: string, prefix: string): boolean {") {
 		t.Fatalf("stub lacks the typed signature:\n%s", stub)
 	}
-	if !strings.Contains(stub, `goext$.goExternalCall("strings.HasPrefix", [s, prefix])`) {
-		t.Fatalf("stub lacks the registry delegation:\n%s", stub)
+	if !strings.Contains(stub, `goext$.goExternalUnimplemented("strings.HasPrefix");`) {
+		t.Fatalf("stub does not fail closed statically:\n%s", stub)
+	}
+	if strings.Contains(stub, "goExternalCall") || strings.Contains(stub, "goExternalRegister") {
+		t.Fatalf("stub still references a runtime registry:\n%s", stub)
 	}
 	if generated.Ownership["external-stubs/strings/package.ts"] != "generated-external-contracts" {
 		t.Fatalf("stub ownership root missing")

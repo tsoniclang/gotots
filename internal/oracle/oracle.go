@@ -132,13 +132,14 @@ func Translate(workDir string, packageSources map[string]string) (*translate.Gen
 // Node toolchain is required: its absence blocks the gate rather than
 // skipping it.
 func Run(workDir string, packageSources map[string]string) (*Result, error) {
-	return RunEmulated(workDir, packageSources, "")
+	return RunAssembled(workDir, packageSources, nil)
 }
 
-// RunEmulated additionally loads emulationTS — a TypeScript module
-// registering external-contract behavior — before the generated cases
-// execute, mirroring the product's hand-maintained emulation layer.
-func RunEmulated(workDir string, packageSources map[string]string, emulationTS string) (*Result, error) {
+// RunAssembled additionally assembles reviewed implementation modules in
+// place of generated external stubs — keyed by external package path,
+// each module exports exactly the stub's typed symbols — mirroring the
+// product's static assembly step. No runtime registration exists.
+func RunAssembled(workDir string, packageSources map[string]string, implementations map[string]string) (*Result, error) {
 	resolved, err := bootstrapOnce()
 	if err != nil {
 		return nil, err
@@ -170,6 +171,17 @@ func RunEmulated(workDir string, packageSources map[string]string, emulationTS s
 			return nil, err
 		}
 	}
+	// Static assembly: each implementation module replaces its stub at
+	// the same path, so every import site binds the reviewed behavior.
+	for externalPkg, moduleTS := range implementations {
+		full := filepath.Join(generatedDir, "external-stubs", filepath.FromSlash(externalPkg), "package.ts")
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			return nil, err
+		}
+		if err := os.WriteFile(full, []byte(moduleTS), 0o644); err != nil {
+			return nil, err
+		}
+	}
 
 	hostEnv, err := hostEnviron(resolved)
 	if err != nil {
@@ -179,7 +191,7 @@ func RunEmulated(workDir string, packageSources map[string]string, emulationTS s
 	if err != nil {
 		return nil, err
 	}
-	tsOutput, err := runNodeDriver(nodeExecutable, workDir, cases, emulationTS)
+	tsOutput, err := runNodeDriver(nodeExecutable, workDir, cases)
 	if err != nil {
 		return nil, err
 	}

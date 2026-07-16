@@ -9,7 +9,6 @@ const goifaceSource = `// Go interface-value carrier: boxed (rtti, value) pairs 
 // nil-interface vs nil-pointer-in-interface distinction, method-table
 // dispatch, and Go's interface-conversion panic messages.
 import { GoPanic, goPanicNil } from "./gopanic.js";
-import { goExternalCall } from "./goextern.js";
 
 // GoRtti identifies one concrete type: its Go display spelling (package
 // names qualify, as in runtime messages), its method table mapping
@@ -28,10 +27,10 @@ export interface GoRtti {
 // rtti comparison stays object identity across every module.
 const compositeRttis = new Map<string, GoRtti>();
 
-export function goRttiComposite(key: string, display: string, externId: string | undefined): GoRtti {
+export function goRttiComposite(key: string, display: string, m: Readonly<Record<string, Function>>, externId: string | undefined): GoRtti {
   let rtti = compositeRttis.get(key);
   if (rtti === undefined) {
-    rtti = externId === undefined ? { d: display, m: {} } : { d: display, m: {}, x: externId };
+    rtti = externId === undefined ? { d: display, m } : { d: display, m, x: externId };
     compositeRttis.set(key, rtti);
   }
   return rtti;
@@ -55,10 +54,12 @@ export function goIfaceCall(i: GoIface, method: string, args: unknown[]): unknow
   if (i === undefined) goPanicNil();
   const boxed = i as GoIfaceBox;
   const fn = boxed.r.m[method] as Function | undefined;
-  if (fn === undefined && boxed.r.x !== undefined) {
-    return goExternalCall(boxed.r.x + "." + method, [boxed.v, ...args]);
+  if (fn === undefined) {
+    // Every table is statically populated at generation; an external
+    // dynamic type dispatched beyond its recorded contract fails closed.
+    throw new GoPanic("GOTOTS_EXTERNAL_UNIMPLEMENTED: " + (boxed.r.x ?? boxed.r.d) + "." + method);
   }
-  return (fn as Function)(boxed.v, ...args);
+  return fn(boxed.v, ...args);
 }
 
 export function goIfaceIs(i: GoIface, r: GoRtti): boolean {
@@ -141,11 +142,15 @@ export function goIfaceLookupIface(i: GoIface, methods: string[]): [GoIface, boo
 }
 
 function ifaceMissingMethod(rtti: GoRtti, methods: string[]): string | undefined {
-  if (rtti.x !== undefined) {
-    throw new GoPanic("GOTOTS_EXTERNAL_UNIMPLEMENTED: method set of " + rtti.x);
-  }
   for (const method of methods) {
-    if (rtti.m[method] === undefined) return method;
+    if (rtti.m[method] === undefined) {
+      if (rtti.x !== undefined) {
+        // The recorded external contract cannot prove the method's
+        // absence; deciding either way would guess.
+        throw new GoPanic("GOTOTS_EXTERNAL_UNIMPLEMENTED: method set of " + rtti.x);
+      }
+      return method;
+    }
   }
   return undefined;
 }

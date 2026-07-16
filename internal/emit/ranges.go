@@ -48,8 +48,11 @@ func (p *printer) printRangeSlice(n *ir.RangeSlice) error {
 			}
 			p.line("let %s: %s = gosl$.goArrayClone(%s(%s, %s), %s);", tsName(n.Value), spelled, get, sliceTemp, induction, cloneElem)
 		} else if n.VarT.Kind == ir.KindExternal {
-			p.line("let %s: %s = goext$.goExternalCall(%q, [%s(%s, %s)]) as %s;",
-				tsName(n.Value), spelled, n.VarT.Pkg+"."+n.VarT.Named+".goClone$", get, sliceTemp, induction, spelled)
+			callee, err := p.module.symbol(n.VarT.Pkg, externCloneSymbol(n.VarT.Named))
+			if err != nil {
+				return err
+			}
+			p.line("let %s: %s = %s(%s(%s, %s));", tsName(n.Value), spelled, callee, get, sliceTemp, induction)
 		} else {
 			p.line("let %s: %s = %s(%s, %s);", tsName(n.Value), spelled, get, sliceTemp, induction)
 		}
@@ -130,8 +133,11 @@ func (p *printer) printRangeMap(n *ir.RangeMap) error {
 			}
 			value = "gosl$.goArrayClone(" + value + ", " + cloneElem + ")"
 		case ir.KindExternal:
-			value = fmt.Sprintf("(goext$.goExternalCall(%q, [%s]) as %s)",
-				n.ValT.Pkg+"."+n.ValT.Named+".goClone$", value, spelled)
+			callee, err := p.module.symbol(n.ValT.Pkg, externCloneSymbol(n.ValT.Named))
+			if err != nil {
+				return err
+			}
+			value = fmt.Sprintf("%s(%s)", callee, value)
 		}
 		p.line("let %s: %s = %s;", tsName(n.Value), spelled, value)
 	}

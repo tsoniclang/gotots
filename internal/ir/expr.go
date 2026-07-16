@@ -350,11 +350,13 @@ func (b *builder) buildVarRef(variable *types.Var, name string, span Span) (Expr
 	pkg := ""
 	if variable.Pkg() != nil && variable.Parent() == variable.Pkg().Scope() {
 		if !b.unit.Owns(variable.Pkg().Path()) {
-			// An external package variable reads through its contract:
-			// the registered behavior supplies the (identity-stable)
+			// An external package variable reads through its typed stub:
+			// the assembled implementation supplies the identity-stable
 			// value; writes stay outside the reviewed surface.
 			b.use("externVar")
-			return &ExternVar{ID: variable.Pkg().Path() + "." + variable.Name(), T: t}, nil
+			id := variable.Pkg().Path() + "." + variable.Name()
+			b.unit.AddExternalVar(id, variable)
+			return &ExternVar{ID: id, T: t}, nil
 		}
 		pkg = variable.Pkg().Path()
 	}

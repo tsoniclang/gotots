@@ -161,7 +161,9 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 			}
 			if ok && named.Obj().Pkg() != nil {
 				// A named struct outside the unit is an opaque external
-				// handle under the external-contract policy.
+				// handle under the external-contract policy; the stub
+				// module carries its value-semantics contract.
+				b.unit.AddExternalType(named.Obj().Pkg().Path(), named.Obj().Name())
 				return Type{Kind: KindExternal, Go: spelled, Named: named.Obj().Name(), Pkg: named.Obj().Pkg().Path()}, nil
 			}
 			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "struct type " + spelled, Span: span}
