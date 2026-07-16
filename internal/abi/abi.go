@@ -13,7 +13,7 @@ package abi
 import "fmt"
 
 // Version identifies the ABI contract carried in generated output.
-const Version = 17
+const Version = 18
 
 // Family is the static carrier family of an integer kind.
 type Family string
@@ -74,46 +74,6 @@ func Files() map[string]string {
 	}
 }
 
-const gopanicSource = `// The Go panic carrier: distinguishes translated Go panics from host
-// errors and carries the exact Go runtime-error message.
-export class GoPanic extends Error {
-  // value retains the exact typed panic payload through deferred
-  // execution and recovery; format lazily produces the printed message
-  // at the point the runtime would finally print it (after all defers).
-  readonly value: unknown;
-  private readonly format: () => string;
-  private computed: string | undefined;
-  constructor(message: string, value?: unknown, format?: () => string) {
-    super(message);
-    this.name = "GoPanic";
-    this.value = value === undefined ? message : value;
-    this.format = format ?? (() => message);
-  }
-  get goMessage(): string {
-    if (this.computed === undefined) {
-      this.computed = this.format();
-    }
-    return this.computed;
-  }
-}
-
-export function goPanicDivide(): never {
-  throw new GoPanic("runtime error: integer divide by zero");
-}
-
-export function goPanicShift(): never {
-  throw new GoPanic("runtime error: negative shift amount");
-}
-
-export function goPanicNil(): never {
-  throw new GoPanic("runtime error: invalid memory address or nil pointer dereference");
-}
-
-export function goPanicNilMapWrite(): never {
-  throw new GoPanic("assignment to entry in nil map");
-}
-`
-
 const goruntimeSource = `// Go language runtime carriers beyond integers: nil-checked pointer
 // access, maps with exact nil/zero/comma-ok/write-panic behavior, and
 // byte-string semantics (one code unit per Go byte, canonical).
@@ -134,6 +94,15 @@ export type GoCell<T> = { v: T };
 
 // goPanicRangeExit is the exact runtime panic when a range-over-func
 // sequence keeps yielding after the loop body stopped iteration.
+// goPanicConversion is Go's failed type-assertion panic with the exact
+// dynamic-type, source, and target spellings.
+export function goPanicConversion(dynamic: string, sourceDisplay: string, targetDisplay: string): never {
+  if (dynamic === "nil") {
+    throw new GoPanic("interface conversion: " + sourceDisplay + " is nil, not " + targetDisplay);
+  }
+  throw new GoPanic("interface conversion: " + sourceDisplay + " is " + dynamic + ", not " + targetDisplay);
+}
+
 export function goPanicRangeExit(): never {
   throw new GoPanic("runtime error: range function continued iteration after function for loop body returned false");
 }

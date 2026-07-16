@@ -69,6 +69,12 @@ func (b *builder) buildExternalMethodCall(n *ast.CallExpr, selector *ast.Selecto
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method call outside the translated unit (unqualified)", Span: span}
 	}
 	_, pointerRecv := signature.Recv().Type().(*types.Pointer)
+	if (signature.TypeParams() != nil && signature.TypeParams().Len() > 0) ||
+		(signature.RecvTypeParams() != nil && signature.RecvTypeParams().Len() > 0) ||
+		SignatureMentionsTypeParam(signature) {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+			Construct: "call to a generic external method (" + method.Name() + ")", Span: span}
+	}
 	b.unit.AddExternalMethod(recvNamed.Obj().Pkg().Path(), recvNamed.Obj().Name(), method)
 	out := &ExternalMethodCall{
 		Pkg:         recvNamed.Obj().Pkg().Path(),

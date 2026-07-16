@@ -35,6 +35,10 @@ type Proof struct {
 	// InitHash is a package variable's initializer source hash — joined
 	// against the census's identity-bearing initializer evidence.
 	InitHash string `json:"initHash,omitempty"`
+	// EffectOnly marks the enumerated symbol-less retained forms: a
+	// blank variable's ordered initializer effect, emitted inside the
+	// module's initialization sequence with no named binding.
+	EffectOnly bool `json:"effectOnly,omitempty"`
 	// NoOutput marks a declaration whose exact lowering emits nothing (a
 	// blank variable without initializer, a fold-at-use constant): it is
 	// disposed but never counted as a retained body.

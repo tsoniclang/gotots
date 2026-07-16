@@ -55,6 +55,23 @@ export interface GoRtti {
 // rtti comparison stays object identity across every module.
 const compositeRttis = new Map<string, GoRtti>();
 
+// goPanicConversionIface is Go's failed interface-to-interface
+// assertion panic: the dynamic type first, then the first missing
+// method (from the token's method-name data).
+export function goPanicConversionIface(i: GoIface, sourceDisplay: string, targetDisplay: string, required: readonly string[]): never {
+  if (i === undefined) {
+    throw new GoPanic("interface conversion: " + sourceDisplay + " is nil, not " + targetDisplay);
+  }
+  let missing = "";
+  const have = i.r.ms;
+  if (have !== undefined) {
+    for (const method of required) {
+      if (!have.includes(method)) { missing = ": missing method " + method; break; }
+    }
+  }
+  throw new GoPanic("interface conversion: " + i.r.d + " is not " + targetDisplay + missing);
+}
+
 export function goRttiComposite(key: string, rtti: GoRtti): GoRtti {
   let interned = compositeRttis.get(key);
   if (interned === undefined) {
@@ -63,12 +80,6 @@ export function goRttiComposite(key: string, rtti: GoRtti): GoRtti {
   }
   return interned;
 }
-
-// GoCompositeBox is the open-composite union member: slices, maps,
-// functions, arrays, and pointers to unnamed types box under the
-// disjoint "c:"-prefixed discriminant namespace; their payloads
-// re-emerge only through token-checked assertions (ADR-0004).
-export type GoCompositeBox = GoBox<` + "`c:${string}`" + `, unknown, Record<never, never>>;
 
 // GoAnyBox is the helper-facing supertype of every union member: the
 // helpers below read only the token r (equality, assertion membership)
@@ -140,56 +151,6 @@ export function goIfaceAssert(i: GoIface, r: GoRtti, sourceDisplay: string): unk
   return i.v;
 }
 
-// x.(I) as a static token-membership test: the dynamic type must be one
-// of the closed set of tokens that implement the target interface
-// (resolved at generation from the whole-unit type universe).
-export function goIfaceAssertSet<T extends GoAnyBox>(i: GoIface, tokens: readonly GoRtti[], required: readonly string[], sourceDisplay: string, targetDisplay: string): T {
-  if (i === undefined) {
-    throw new GoPanic("interface conversion: " + sourceDisplay + " is nil, not " + targetDisplay);
-  }
-  for (const token of tokens) {
-    // Membership of the token set is the runtime proof of the target
-    // union; the conversion is checked, never blind.
-    if (i.r === token) return i as T;
-  }
-  const missing = missingMethod(i.r, required);
-  throw new GoPanic("interface conversion: " + i.r.d + " is not " + targetDisplay +
-    (missing === undefined ? "" : ": missing method " + missing));
-}
-
-// missingMethod returns the first required method the dynamic type lacks
-// (Go reports methods in the interface's sorted method order).
-function missingMethod(r: GoRtti, required: readonly string[]): string | undefined {
-  const have = r.ms;
-  if (have === undefined) return undefined;
-  for (const method of required) {
-    if (!have.includes(method)) return method;
-  }
-  return undefined;
-}
-
-// x.(interface{}): the empty interface is universal — every non-nil
-// dynamic value passes; only nil misses.
-export function goIfaceAssertAny<T extends GoAnyBox>(i: GoIface, sourceDisplay: string, targetDisplay: string): T {
-  if (i === undefined) {
-    throw new GoPanic("interface conversion: " + sourceDisplay + " is nil, not " + targetDisplay);
-  }
-  return i as T;
-}
-
-export function goIfaceLookupAny<T extends GoAnyBox>(i: GoIface): [T | undefined, boolean] {
-  if (i === undefined) return [undefined, false];
-  return [i as T, true];
-}
-
-// x.(I), comma-ok form: undefined (the nil interface) fills the miss.
-export function goIfaceLookupSet<T extends GoAnyBox>(i: GoIface, tokens: readonly GoRtti[]): [T | undefined, boolean] {
-  if (i === undefined) return [undefined, false];
-  for (const token of tokens) {
-    if (i.r === token) return [i as T, true];
-  }
-  return [undefined, false];
-}
 
 // x.(T), comma-ok form: the zero value fills the miss.
 export function goIfaceLookup<T>(i: GoIface, r: GoRtti, zero: T): readonly [T, boolean] {

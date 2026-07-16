@@ -123,6 +123,11 @@ func runStagedGenerationGate(repoDir, profilePath, buildProfile, sourceDir strin
 	publicationDir := filepath.Join(staging, "publication")
 	publish := func(version string) error {
 		bundle := filepath.Join(publicationDir, "bundle-"+version)
+		if _, err := os.Stat(bundle); err == nil {
+			// Bundles are IMMUTABLE: republishing an existing version is
+			// a protocol violation, never an overwrite.
+			return fmt.Errorf("bundle version %s already published; bundles are immutable", version)
+		}
 		for path, content := range corpusGenerated.Files {
 			target := filepath.Join(bundle, filepath.FromSlash(path))
 			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
@@ -161,11 +166,32 @@ func runStagedGenerationGate(repoDir, profilePath, buildProfile, sourceDir strin
 	if _, err := os.Stat(filepath.Join(publicationDir, "bundle-one")); err != nil {
 		return "fail", nil, fmt.Errorf("previous accepted bundle removed by replacement: %w", err)
 	}
-	return "pass", []string{
+	// Immutability: republishing an existing version must fail.
+	if err := publish("two"); err == nil {
+		return "fail", nil, fmt.Errorf("same-version republication was not rejected")
+	}
+	// Injected swap failure: with the pointer's staging name occupied by
+	// a directory, the atomic rename fails — and the accepted pointer
+	// must remain exactly where it was.
+	if err := os.MkdirAll(filepath.Join(publicationDir, "current.next", "block"), 0o755); err != nil {
+		return "fail", nil, err
+	}
+	if err := publish("three"); err == nil {
+		return "fail", nil, fmt.Errorf("injected swap failure did not surface")
+	}
+	target, err := os.Readlink(filepath.Join(publicationDir, "current"))
+	if err != nil || target != "bundle-two" {
+		return "fail", nil, fmt.Errorf("accepted pointer damaged by failed swap: %q %v", target, err)
+	}
+	details := []string{
 		"census evidence deterministic across two hermetic runs",
 		fmt.Sprintf("generated output deterministic across two runs (%d files byte-identical)", len(corpusGenerated.Files)),
 		"complete evidence (proofs, support, ownership, withholding, module imports) deterministic across two runs",
 		"publication = immutable bundles + one atomic current-pointer rename; replacement leaves the previous bundle intact",
 		fmt.Sprintf("partial bundle: %d packages withheld as honest unimplemented", len(corpusGenerated.Withheld)),
-	}, nil
+	}
+	details = append(details,
+		"BLOCKED: environment.json carries machine-local paths inside semantic evidence identity; relocated-checkout reproducibility is unproven",
+		"BLOCKED: body-materialization artifacts for withheld packages are not retained (spec 01)")
+	return "blocked", details, nil
 }

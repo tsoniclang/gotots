@@ -110,8 +110,13 @@ func (b *builder) promotedDelegates(named *types.Named, span Span) ([]PromotedDe
 					Construct: "promoted generic method (" + method.Name() + ")", Span: span}
 			}
 			_, pointerRecv := method.Type().(*types.Signature).Recv().Type().(*types.Pointer)
+			// Go's method-set resolution guarantees AT MOST ONE method per
+			// name in a type's method set (same-depth same-name embeddings
+			// promote NEITHER; different depths promote only the
+			// shallowest), so name-keyed delegation is exact by the
+			// language's own rule — types.NewMethodSet already applied it.
 			entry := PromotedDelegate{Name: method.Name(), Pkg: method.Pkg().Path(),
-				DispatchKey: MethodKey(method), ValueReceiver: !pointerRecv}
+				ValueReceiver: !pointerRecv}
 			current := types.Type(named)
 			for _, index := range path[:len(path)-1] {
 				structType, ok := types.Unalias(current).Underlying().(*types.Struct)

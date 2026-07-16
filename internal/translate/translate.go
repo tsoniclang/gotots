@@ -227,13 +227,21 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 								Underlying: underlying,
 							})
 						}
-						out.Proofs = append(out.Proofs, Proof{
+						aliasProof := Proof{
 							ID: id, SourceRevision: options.SourceRevision,
 							Package: p.PkgPath, File: f.relative,
 							LoweringPlan:    LoweringPlanV2,
-							Representations: map[string]string{typeSpec.Name.Name: "erased-to-carrier(" + carrier + ")"},
-							GeneratedFile:   corePath, GeneratedSymbol: "",
-						})
+							Representations: map[string]string{"decl:" + typeSpec.Name.Name: "erased-to-carrier(" + carrier + ")"},
+						}
+						if object.IsAlias() {
+							// An alias erases to its target at every use and
+							// emits no declaration of its own.
+							aliasProof.NoOutput = true
+						} else {
+							aliasProof.GeneratedFile = corePath
+							aliasProof.GeneratedSymbol = typeSpec.Name.Name
+						}
+						out.Proofs = append(out.Proofs, aliasProof)
 						continue
 					}
 					structDecl, err := ir.BuildStruct(p, sourceDir, unit, typeSpec, id)
@@ -249,7 +257,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 						ID: id, SourceRevision: options.SourceRevision,
 						Package: p.PkgPath, File: f.relative,
 						LoweringPlan:    LoweringPlanV2,
-						Representations: map[string]string{typeSpec.Name.Name: "class-direct-identity"},
+						Representations: map[string]string{"decl:" + typeSpec.Name.Name: "class-direct-identity"},
 						GeneratedFile:   corePath, GeneratedSymbol: structDecl.Name,
 					})
 				}
@@ -291,7 +299,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 									ID: variableID, SourceRevision: options.SourceRevision,
 									Package: p.PkgPath, File: f.relative,
 									LoweringPlan:    LoweringPlanV2,
-									Representations: map[string]string{"_": "blank-var(no-initializer, no output)"},
+									Representations: map[string]string{"decl:_": "blank-var(no-initializer, no output)"},
 									NoOutput:        true,
 								})
 								continue
@@ -329,9 +337,10 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 								ID: variableID, SourceRevision: options.SourceRevision,
 								Package: p.PkgPath, File: f.relative,
 								LoweringPlan:    LoweringPlanV2,
-								Representations: map[string]string{"_": "ordered-effect(no binding)"},
+								Representations: map[string]string{"decl:_": "ordered-effect(no binding)"},
 								GeneratedFile:   corePath, GeneratedSymbol: "",
-								InitHash: blankInitHash(p, f.source, initExpr),
+								EffectOnly: true,
+								InitHash:   blankInitHash(p, f.source, initExpr),
 							})
 							continue
 						}
@@ -351,7 +360,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 							ID: goid.Value(p.PkgPath, "var", name.Name), SourceRevision: options.SourceRevision,
 							Package: p.PkgPath, File: f.relative,
 							LoweringPlan:    LoweringPlanV2,
-							Representations: map[string]string{name.Name: "module-let(live-binding," + conservativeCarrier(t) + ")"},
+							Representations: map[string]string{"decl:" + name.Name: "module-let(live-binding," + conservativeCarrier(t) + ")"},
 							GeneratedFile:   corePath, GeneratedSymbol: name.Name,
 							InitHash: varInitHash,
 						})
@@ -372,7 +381,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 							ID: goid.Value(p.PkgPath, "const", name.Name), SourceRevision: options.SourceRevision,
 							Package: p.PkgPath, File: f.relative,
 							LoweringPlan:    LoweringPlanV2,
-							Representations: map[string]string{name.Name: "const-folded-at-use"},
+							Representations: map[string]string{"decl:" + name.Name: "const-folded-at-use"},
 							NoOutput:        true,
 						})
 					}
@@ -483,32 +492,12 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 func collectGenericInstances(unit ir.Scope, pkgs []*packages.Package) {
 	// The dynamic-type universe: every named type declared in an owned
 	// package, the closed-world set interface dispatch resolves over.
-	seenExtern := map[*types.TypeName]bool{}
 	for _, p := range pkgs {
 		scope := p.Types.Scope()
 		for _, name := range scope.Names() {
 			if typeName, ok := scope.Lookup(name).(*types.TypeName); ok && !typeName.IsAlias() {
 				if _, isNamed := typeName.Type().(*types.Named); isNamed {
 					unit.AddConcreteType(typeName)
-				}
-			}
-		}
-		// REFERENCED external named types join the dynamic-type universe
-		// too: an external implementer participates in interface unions
-		// through its typed stub adapters (a union missing it would
-		// wrongly exclude a boxable dynamic type).
-		for _, obj := range p.TypesInfo.Uses {
-			typeName, ok := obj.(*types.TypeName)
-			if !ok || typeName.IsAlias() || typeName.Pkg() == nil || seenExtern[typeName] {
-				continue
-			}
-			if unit.Owns(typeName.Pkg().Path()) {
-				continue
-			}
-			if named, isNamed := typeName.Type().(*types.Named); isNamed {
-				if _, isIface := named.Underlying().(*types.Interface); !isIface {
-					seenExtern[typeName] = true
-					unit.AddExternConcrete(typeName)
 				}
 			}
 		}

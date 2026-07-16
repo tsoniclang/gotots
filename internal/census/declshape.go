@@ -12,12 +12,13 @@ import (
 	"golang.org/x/tools/go/packages"
 
 	"github.com/tsoniclang/gotots/internal/goid"
+	"github.com/tsoniclang/gotots/internal/typeid"
 )
 
 // qualifier renders package identity as the canonical import path.
 func qualifier(p *types.Package) string { return p.Path() }
 
-func typeString(t types.Type) string { return types.TypeString(t, qualifier) }
+func typeString(t types.Type) string { return typeid.Canonical(t) }
 
 // collectDeclarations walks one file's top-level declarations, producing
 // both the identity records and the exact typed shapes. Every declared

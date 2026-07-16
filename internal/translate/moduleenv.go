@@ -95,6 +95,9 @@ func newModule(modulePath, pkgPath, pkgName string, unit ir.Scope, context *pack
 		}
 	}
 	module := emit.NewModule(pkgPath, pkgName, abiImports, specifiers)
+	for _, composite := range unit.BoxedComposites() {
+		module.BoxedComposites = append(module.BoxedComposites, emit.BoxedComposite{Canon: composite.Canon, T: composite.T})
+	}
 	module.Withheld = func(pkg string) bool { _, is := withheld[pkg]; return is }
 	module.ExternMethods = externMethods
 	// Extern vtable adapters: exactly typed arrows over the stub

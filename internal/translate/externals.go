@@ -23,6 +23,68 @@ import (
 // with admitted contracts. Each stub delegates to the external-contract
 // registry by canonical identity and fails closed at runtime unless the
 // emulation layer registered behavior.
+// referencesWithheld reports whether an ir.Type references a package
+// whose module is withheld from the bundle.
+func referencesWithheld(t ir.Type, withheld map[string]string) bool {
+	if t.Pkg != "" {
+		if _, isWithheld := withheld[t.Pkg]; isWithheld {
+			return true
+		}
+	}
+	if t.Elem != nil && referencesWithheld(*t.Elem, withheld) {
+		return true
+	}
+	if t.Key != nil && referencesWithheld(*t.Key, withheld) {
+		return true
+	}
+	for _, arg := range t.TypeArgs {
+		if referencesWithheld(arg, withheld) {
+			return true
+		}
+	}
+	for _, member := range t.IfaceMembers {
+		if _, isWithheld := withheld[member.Pkg]; isWithheld {
+			return true
+		}
+	}
+	return false
+}
+
+// stubFuncClean reports whether a function stub's signature avoids
+// withheld references.
+func stubFuncClean(fn emit.StubFunc, withheld map[string]string) bool {
+	for _, p := range fn.Params {
+		if referencesWithheld(p.Type, withheld) {
+			return false
+		}
+	}
+	for _, r := range fn.Results {
+		if referencesWithheld(r.Type, withheld) {
+			return false
+		}
+	}
+	return true
+}
+
+// stubMemberClean reports whether a member stub's signature avoids
+// withheld references.
+func stubMemberClean(member emit.StubMember, withheld map[string]string) bool {
+	for _, p := range member.Params {
+		if referencesWithheld(p.Type, withheld) {
+			return false
+		}
+	}
+	if member.ResultType != nil && referencesWithheld(*member.ResultType, withheld) {
+		return false
+	}
+	for _, r := range member.Results {
+		if referencesWithheld(r, withheld) {
+			return false
+		}
+	}
+	return true
+}
+
 func emitExternalStubs(out *Generated, unit ir.Scope, context *packages.Package, sourceDir string, options Options) error {
 	byPackage := map[string][]*types.Func{}
 	packageNames := map[string]string{}
@@ -82,29 +144,42 @@ func emitExternalStubs(out *Generated, unit ir.Scope, context *packages.Package,
 		if err != nil {
 			return err
 		}
+		module.OpaqueInterfaces = true
 		var stubs []emit.StubFunc
 		for _, fn := range byPackage[external] {
 			stub, err := stubFor(fn, unit, context, sourceDir)
 			if err != nil {
 				return err
 			}
+			if !stubFuncClean(stub, out.Withheld) {
+				// The contract references a withheld owned type; the stub
+				// cannot be exactly typed and is an unimplemented external
+				// contract member (no erased fallback).
+				continue
+			}
 			stubs = append(stubs, stub)
 			out.Proofs = append(out.Proofs, Proof{
 				ID: goid.Func(external, fn.Name()), SourceRevision: options.SourceRevision,
 				Package:         external,
 				LoweringPlan:    LoweringPlanV2,
-				Representations: map[string]string{fn.Name(): "external-stub(typed-static, fail-closed)"},
+				Representations: map[string]string{"decl:" + fn.Name(): "external-stub(typed-static, fail-closed)"},
 				GeneratedFile:   stubPath, GeneratedSymbol: fn.Name(),
 			})
 		}
-		members := membersByPackage[external]
+		allMembers := membersByPackage[external]
+		members := allMembers[:0]
+		for _, member := range allMembers {
+			if stubMemberClean(member, out.Withheld) {
+				members = append(members, member)
+			}
+		}
 		sort.Slice(members, func(i, j int) bool { return members[i].Name < members[j].Name })
 		for _, member := range members {
 			out.Proofs = append(out.Proofs, Proof{
 				ID: goid.Value(external, "extern-member", member.Name), SourceRevision: options.SourceRevision,
 				Package:         external,
 				LoweringPlan:    LoweringPlanV2,
-				Representations: map[string]string{member.Name: "external-stub(typed-static, fail-closed)"},
+				Representations: map[string]string{"decl:" + member.Name: "external-stub(typed-static, fail-closed)"},
 				GeneratedFile:   stubPath, GeneratedSymbol: member.Name,
 			})
 		}
@@ -179,6 +254,17 @@ func externTypeMembers(obligation *ir.ExternTypeObligation, unit ir.Scope, conte
 	for _, name := range names {
 		method := obligation.Methods[name]
 		signature := method.Type().(*types.Signature)
+		if signature.TypeParams() != nil && signature.TypeParams().Len() > 0 {
+			// A generic external method has no single exact stub
+			// signature; it is an unimplemented external contract member.
+			continue
+		}
+		if ir.SignatureMentionsTypeParam(signature) {
+			// A method whose signature references a type parameter (e.g.
+			// a method of an uninstantiated generic external type) cannot
+			// be spelled exactly; it is an unimplemented contract member.
+			continue
+		}
 		// The receiver arrives as the handle a caller holds: through a
 		// pointer it may be nil, and the implementation carries the
 		// concrete method's exact nil semantics.

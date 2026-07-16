@@ -20,6 +20,9 @@ import (
 
 func runInRepo(dir, name string, args ...string) (string, error) {
 	command := exec.Command(name, args...)
+	// The gate run is the evidence-production context: the attestation-
+	// currency policy exempts it (it produces the next report).
+	command.Env = append(os.Environ(), "GOTOTS_ATTESTING=1")
 	command.Dir = dir
 	var out bytes.Buffer
 	command.Stdout = &out
@@ -151,6 +154,8 @@ func reconcileDispositions(prof *profile.Profile, firstRun *census.Result, gener
 			conflicts = append(conflicts, fmt.Sprintf("%s: unretained despite an emitted package and no no-output disposition", proof.ID))
 		case proof.NoOutput && proof.GeneratedFile != "":
 			conflicts = append(conflicts, fmt.Sprintf("%s: no-output disposition with a generated file reference", proof.ID))
+		case proof.ModuleRetained && proof.GeneratedSymbol == "" && !proof.EffectOnly:
+			conflicts = append(conflicts, fmt.Sprintf("%s: retained without a generated symbol and no enumerated effect-only reason", proof.ID))
 		}
 		if proof.GeneratedFile != "" && !fileExists {
 			conflicts = append(conflicts, fmt.Sprintf("%s: phantom generated file %s", proof.ID, proof.GeneratedFile))
@@ -192,7 +197,16 @@ func reconcileDispositions(prof *profile.Profile, firstRun *census.Result, gener
 			}
 		}
 		if decl.Kind == "const" {
-			counts["const-fold-at-use"]++
+			// A constant is never auto-accepted: its explicit no-output
+			// proof must exist (deleting constant evidence fails).
+			if retention[decl.ID] == "no-output" {
+				counts["const-fold-at-use"]++
+				continue
+			}
+			counts["unreconciled"]++
+			if len(unreconciled) < 25 {
+				unreconciled = append(unreconciled, decl.ID+" (constant without no-output proof)")
+			}
 			continue
 		}
 		if state, has := covered[decl.ID]; has {

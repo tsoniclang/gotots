@@ -181,3 +181,34 @@ func Call(s secret) int { return s.tag() }
 		t.Fatalf("differential mismatch:\n--- go ---\n%s\n--- generated ---\n%s", result.GoOutput, result.TSOutput)
 	}
 }
+
+// TestOracleEmbeddedPromotionAmbiguity locks Go's own promotion rule:
+// same-name unexported methods embedded at the SAME depth promote
+// NEITHER (the interfaces are unsatisfied); at DIFFERENT depths only the
+// shallowest promotes and dispatch selects exactly it.
+func TestOracleEmbeddedPromotionAmbiguity(t *testing.T) {
+	runOracle(t, `package fixture
+
+type shallow struct{}
+
+func (s shallow) tag() int { _ = s; return 1 }
+
+type deepHolder struct{ deep }
+
+type deep struct{}
+
+func (d deep) tag() int { _ = d; return 2 }
+
+type wins struct {
+	shallow
+	deepHolder
+}
+
+type tagged interface{ tag() int }
+
+func ShallowestWins() int {
+	var v tagged = wins{}
+	return v.tag()
+}
+`)
+}

@@ -370,9 +370,13 @@ func (p *printer) ifaceUnionAlias(t ir.Type) (string, error) {
 	if p.module == nil {
 		return name, nil
 	}
-	if _, exists := p.module.ifaceAliases[name]; exists {
+	if prior, exists := p.module.ifaceIdentity[name]; exists {
+		if prior != identity {
+			return "", fmt.Errorf("interface alias digest collision: %q names both %q and %q", name, prior, identity)
+		}
 		return name, nil
 	}
+	p.module.ifaceIdentity[name] = identity
 	// Reserve first: member payloads may mention this same interface
 	// (via method signatures they do not — payloads are concrete — but
 	// reservation keeps registration idempotent under recursion).
@@ -411,14 +415,20 @@ func (p *printer) ifaceUnionAlias(t ir.Type) (string, error) {
 		members = append(members, fmt.Sprintf("goif$.GoBox<%q, %s, %s>", member.K, payload, vtable))
 	}
 	if t.IfaceEmpty {
-		// The empty interface accepts every predeclared type (exact
-		// payload members) and every composite type (one template-literal
-		// member in the disjoint "c:" namespace, whose payload re-emerges
-		// only through token-checked assertions — ADR-0004).
+		// The empty interface accepts every predeclared type and every
+		// composite type ACTUALLY BOXED in the unit — each an exact
+		// member, so composite assertions narrow without any cast
+		// (ADR-0004; the enumeration is closed by construction).
 		for _, member := range predeclaredMembers {
 			members = append(members, fmt.Sprintf("goif$.GoBox<%q, %s, Record<never, never>>", "p:"+member.name, member.payload))
 		}
-		members = append(members, "goif$.GoCompositeBox")
+		for _, composite := range p.module.BoxedComposites {
+			payload, err := p.tsType(composite.T)
+			if err != nil {
+				return "", err
+			}
+			members = append(members, fmt.Sprintf("goif$.GoBox<%q, %s, Record<never, never>>", "c:"+composite.Canon, payload))
+		}
 	}
 	declaration := "type " + name + " = " + strings.Join(members, " | ") + ";"
 	p.module.ifaceAliases[name] = declaration
@@ -431,6 +441,14 @@ func (p *printer) ifaceUnionAlias(t ir.Type) (string, error) {
 // its cell; external handles are branded and nilable through pointers.
 func (p *printer) memberPayload(member ir.IfaceMember) (string, error) {
 	if member.Extern {
+		if member.ExternCarrier != "" {
+			// Basic-underlying external named type: the payload is its
+			// exact value carrier.
+			if member.Pointer {
+				return "(gort$.GoCell<" + member.ExternCarrier + "> | undefined)", nil
+			}
+			return member.ExternCarrier, nil
+		}
 		handle := fmt.Sprintf("goext$.GoExtern<%q>", member.Pkg+"."+member.Type)
 		if member.Pointer {
 			return "(" + handle + " | undefined)", nil

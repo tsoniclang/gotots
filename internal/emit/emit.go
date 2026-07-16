@@ -459,6 +459,9 @@ func (p *printer) tsType(t ir.Type) (string, error) {
 		if t.TypeParamName != "" {
 			return tsName(t.TypeParamName), nil
 		}
+		if p.module != nil && p.module.OpaqueInterfaces {
+			return "goif$.GoIface", nil
+		}
 		return p.ifaceUnionAlias(t)
 	case ir.KindTypeParam:
 		return t.Named, nil

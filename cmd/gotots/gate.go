@@ -276,7 +276,9 @@ func runGate(args []string) error {
 		if universe.OutsideUniverseFiles == 0 && len(categories) == 0 {
 			details = append(details, "profile declares no outside-universe roots")
 		}
-		return "pass", details, nil
+		details = append(details,
+			"BLOCKED: ownedRoots is a hand-maintained allowlist; the selected closure is not yet independently derived from product entry points, so an unauthorized scope shrink would not be detected")
+		return "blocked", details, nil
 	})
 	run("04-census-denominator-reconciliation", func() (string, []string, error) {
 		if firstRun == nil {
@@ -444,6 +446,42 @@ func runGate(args []string) error {
 		if len(invalid) > 0 {
 			return "fail", invalid, fmt.Errorf("representation evidence outside the closed registry")
 		}
+		// Deletion detection: the OBLIGATION set is derived independently
+		// from census shapes (params and results share the translator's
+		// canonical identity), and every obligation must appear in the
+		// proof's carrier evidence.
+		proofCarriers := map[string]map[string]bool{}
+		for _, proof := range corpusGenerated.Proofs {
+			keys := map[string]bool{}
+			for key := range proof.Representations {
+				keys[key] = true
+			}
+			proofCarriers[proof.ID] = keys
+		}
+		var missingEvidence []string
+		for _, shape := range firstRun.Shapes.Functions {
+			keys, has := proofCarriers[shape.ID]
+			if !has {
+				continue // unimplemented bodies carry no proof (stage 05 joins them)
+			}
+			for _, param := range shape.Params {
+				if !keys["carrier:"+param.Type] {
+					if len(missingEvidence) < 10 {
+						missingEvidence = append(missingEvidence, shape.ID+": missing carrier evidence for "+param.Type)
+					}
+				}
+			}
+			for _, result := range shape.Results {
+				if !keys["carrier:"+result.Type] {
+					if len(missingEvidence) < 10 {
+						missingEvidence = append(missingEvidence, shape.ID+": missing carrier evidence for "+result.Type)
+					}
+				}
+			}
+		}
+		if len(missingEvidence) > 0 {
+			return "fail", missingEvidence, fmt.Errorf("representation obligations missing from proof evidence")
+		}
 		if planned["native-array"]+planned["goslice-carrier"] == 0 {
 			return "blocked", []string{"no slice regions recorded; planner evidence missing"}, nil
 		}
@@ -509,7 +547,9 @@ func runGate(args []string) error {
 			fmt.Sprintf("representation entries per family (all registry-classified): %v", familyDetail),
 			fmt.Sprintf("custom mechanisms with verified necessity records (AST-derived): %v", present),
 		}
-		return "pass", details, nil
+		details = append(details,
+			"BLOCKED: necessity evidence names committed tests but is not yet bound to executed results (requires the stage-11 test ledger)")
+		return "blocked", details, nil
 	})
 	run("09-deterministic-staged-generation", func() (string, []string, error) {
 		return runStagedGenerationGate(*repoDir, *profilePath, *buildProfile, *sourceDir, report, firstRun, corpusGenerated)

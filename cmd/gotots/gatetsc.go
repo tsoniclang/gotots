@@ -102,6 +102,20 @@ func runTscGate(repoDir, profilePath, buildProfile, sourceDir string, report *Ga
 	if err != nil {
 		return "fail", nil, err
 	}
+	// ABI-scoped erasure findings are the REMAINING reviewed mechanism
+	// (equality's construction-bound payload flow and the helper
+	// supertype): they are reported and keep this stage blocked, never
+	// silently passed; anything in generated core fails outright.
+	var coreViolations []staticness.Violation
+	abiViolations := 0
+	for _, v := range astReport.Violations {
+		if strings.HasPrefix(v.Pattern, "abi:") {
+			abiViolations++
+			continue
+		}
+		coreViolations = append(coreViolations, v)
+	}
+	astReport.Violations = coreViolations
 	if len(astReport.Violations) > 0 {
 		counts := staticness.Counts(astReport.Violations)
 		keys := make([]string, 0, len(counts))
@@ -178,10 +192,14 @@ func runTscGate(repoDir, profilePath, buildProfile, sourceDir string, report *Ga
 		}
 		return "fail", details, fmt.Errorf("staticness sweep found %d prohibited dispatch sites", len(violations))
 	}
-	return "pass", []string{
+	details := []string{
 		fmt.Sprintf("strict tsc (%s@%s) accepted %d generated files", productPin.TypescriptCompiler.Package, productPin.TypescriptCompiler.Version, len(generated.Files)),
 		"typed-AST staticness verifier: zero erased or name-selected dispatch sites",
 		"text sweep (defense in depth): zero prohibited sites",
 		fmt.Sprintf("withheld packages (honest unimplemented, not typechecked): %d", len(generated.Withheld)),
-	}, nil
+	}
+	details = append(details,
+		fmt.Sprintf("BLOCKED: %d ABI erasure sites remain (equality's construction-bound payload flow; helper supertype) — reported, never passed over", abiViolations),
+		"BLOCKED: the per-invocation positive-disposition ledger is absent — the verifier rejects known erased forms but cannot yet certify every invocation (spec 11 staticness sweep)")
+	return "blocked", details, nil
 }

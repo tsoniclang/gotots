@@ -81,10 +81,11 @@ const bannedNames = new Set([
 
 function report(file, node, source, pattern) {
   const { line } = source.getLineAndCharacterOfPosition(node.getStart(source));
+  const relative = path.relative(root, file).split(path.sep).join("/");
   violations.push({
-    file: path.relative(root, file).split(path.sep).join("/"),
+    file: relative,
     line: line + 1,
-    pattern,
+    pattern: relative.startsWith("language-abi/") ? "abi:" + pattern : pattern,
     detail: node.getText(source).slice(0, 160),
   });
 }
@@ -173,7 +174,7 @@ for (const source of program.getSourceFiles()) {
     // Erased interface payload in generated CORE: a GoBox type argument
     // of unknown/any, or an "as" cast recovering from a .v property —
     // each recovers a payload from an erased type (spec 06, ADR-0004).
-    if (relative.startsWith("core/")) {
+    {
       if (ts.isTypeReferenceNode(node) && ts.isQualifiedName(node.typeName) &&
           node.typeName.right.text === "GoBox" &&
           node.typeArguments && node.typeArguments.length >= 3) {

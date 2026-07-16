@@ -15,6 +15,70 @@ import (
 	"testing"
 )
 
+// TestAttestationCoversCurrentProduct: the newest attestation must
+// cover the current product revision — every commit AFTER the attested
+// revision must be evidence-only (touch nothing outside attestations/),
+// so a later source commit without a fresh report fails.
+func TestAttestationCoversCurrentProduct(t *testing.T) {
+	if os.Getenv("GOTOTS_ATTESTING") != "" {
+		// The gate run that PRODUCES the next attestation is the one
+		// context that cannot yet require it.
+		t.Skip("evidence-production run")
+	}
+	root := repositoryRoot(t)
+	dir := filepath.Join(root, "attestations")
+	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	newest := ""
+	for _, entry := range entries {
+		rest, ok := strings.CutPrefix(entry.Name(), "gate-report-")
+		if !ok {
+			continue
+		}
+		revision := strings.TrimSuffix(rest, ".json")
+		if len(revision) != 40 {
+			continue
+		}
+		// newest by commit order: the one whose revision is a descendant
+		// of every other attested revision.
+		if newest == "" {
+			newest = revision
+			continue
+		}
+		check := exec.Command("git", "merge-base", "--is-ancestor", newest, revision)
+		check.Dir = root
+		if check.Run() == nil {
+			newest = revision
+		}
+	}
+	if newest == "" {
+		return
+	}
+	listing, err := gitOutput(root, "log", "--format=%H", newest+"..HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, commit := range strings.Split(strings.TrimSpace(listing), "\n") {
+		if commit == "" {
+			continue
+		}
+		files, err := gitOutput(root, "diff-tree", "--no-commit-id", "--name-only", "-r", commit)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, changed := range strings.Split(strings.TrimSpace(files), "\n") {
+			if changed != "" && !strings.HasPrefix(changed, "attestations/") {
+				t.Errorf("commit %s changes product source %s after the newest attestation (%s); re-run the gate and retain a fresh report", commit[:12], changed, newest[:12])
+			}
+		}
+	}
+}
+
 func TestAttestationProtocol(t *testing.T) {
 	root := repositoryRoot(t)
 	dir := filepath.Join(root, "attestations")

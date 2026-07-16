@@ -45,7 +45,8 @@ func (b *builder) resolveImplementerTokens(target *types.Interface, span Span) (
 		tokens = append(tokens, rtti)
 		return nil
 	}
-	for _, name := range b.unit.ConcreteTypes() {
+	universe := append(append([]*types.TypeName{}, b.unit.ConcreteTypes()...), b.unit.ExternConcreteTypes()...)
+	for _, name := range universe {
 		named, ok := name.Type().(*types.Named)
 		if !ok {
 			continue
@@ -86,12 +87,20 @@ func (b *builder) ifaceMembers(iface *types.Interface, span Span) ([]IfaceMember
 			k = "*" + k
 		}
 		_, isStruct := named.Underlying().(*types.Struct)
-		members = append(members, IfaceMember{
+		member := IfaceMember{
 			K:   k,
 			Pkg: obj.Pkg().Path(), Type: obj.Name(), Pointer: pointer,
 			Struct: isStruct,
 			Extern: !b.unit.Owns(obj.Pkg().Path()),
-		})
+		}
+		if member.Extern && !isStruct {
+			// An external named type over a BASIC underlying boxes its
+			// value carrier, not a branded handle.
+			if basic, isBasic := named.Underlying().(*types.Basic); isBasic {
+				member.ExternCarrier = basicCarrier(basic)
+			}
+		}
+		members = append(members, member)
 		return nil
 	}
 	for _, name := range b.unit.ConcreteTypes() {
@@ -132,9 +141,16 @@ func (b *builder) ifaceMembers(iface *types.Interface, span Span) ([]IfaceMember
 			set := types.NewMethodSet(t)
 			for i := range iface.NumMethods() {
 				method := iface.Method(i)
-				if selection := lookupSelection(set, named.Obj().Pkg(), method.Name()); selection != nil {
-					b.unit.AddExternalMethod(named.Obj().Pkg().Path(), named.Obj().Name(), selection.Obj().(*types.Func))
+				selection := lookupSelection(set, named.Obj().Pkg(), method.Name())
+				if selection == nil {
+					continue
 				}
+				fn := selection.Obj().(*types.Func)
+				sig := fn.Type().(*types.Signature)
+				if (sig.TypeParams() != nil && sig.TypeParams().Len() > 0) || SignatureMentionsTypeParam(sig) {
+					continue // no single exact adapter
+				}
+				b.unit.AddExternalMethod(named.Obj().Pkg().Path(), named.Obj().Name(), fn)
 			}
 		}
 		if types.Implements(named, iface) {
@@ -153,4 +169,106 @@ func (b *builder) ifaceMembers(iface *types.Interface, span Span) ([]IfaceMember
 	sort.Slice(members, func(i, j int) bool { return members[i].K < members[j].K })
 	b.unit.SetIfaceMemberCache(key, members)
 	return members, nil
+}
+
+// basicCarrier spells the TS value carrier of a basic kind.
+func basicCarrier(basic *types.Basic) string {
+	switch {
+	case basic.Info()&types.IsBoolean != 0:
+		return "boolean"
+	case basic.Info()&types.IsString != 0:
+		return "string"
+	case basic.Kind() == types.Int64 || basic.Kind() == types.Int ||
+		basic.Kind() == types.Uint64 || basic.Kind() == types.Uint || basic.Kind() == types.Uintptr:
+		return "bigint"
+	case basic.Info()&types.IsNumeric != 0:
+		return "number"
+	}
+	return ""
+}
+
+// SignatureMentionsTypeParam reports whether a signature references any
+// type parameter.
+func SignatureMentionsTypeParam(sig *types.Signature) bool {
+	var mentions func(types.Type, map[types.Type]bool) bool
+	mentions = func(t types.Type, seen map[types.Type]bool) bool {
+		if t == nil || seen[t] {
+			return false
+		}
+		seen[t] = true
+		switch u := t.(type) {
+		case *types.TypeParam:
+			return true
+		case *types.Named:
+			if args := u.TypeArgs(); args != nil {
+				for i := range args.Len() {
+					if mentions(args.At(i), seen) {
+						return true
+					}
+				}
+			}
+		case *types.Pointer:
+			return mentions(u.Elem(), seen)
+		case *types.Slice:
+			return mentions(u.Elem(), seen)
+		case *types.Array:
+			return mentions(u.Elem(), seen)
+		case *types.Map:
+			return mentions(u.Key(), seen) || mentions(u.Elem(), seen)
+		case *types.Chan:
+			return mentions(u.Elem(), seen)
+		case *types.Signature:
+			for i := range u.Params().Len() {
+				if mentions(u.Params().At(i).Type(), seen) {
+					return true
+				}
+			}
+			for i := range u.Results().Len() {
+				if mentions(u.Results().At(i).Type(), seen) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	seen := map[types.Type]bool{}
+	for i := range sig.Params().Len() {
+		if mentions(sig.Params().At(i).Type(), seen) {
+			return true
+		}
+	}
+	for i := range sig.Results().Len() {
+		if mentions(sig.Results().At(i).Type(), seen) {
+			return true
+		}
+	}
+	return false
+}
+
+// registerBoxedExtern records the external named component of a boxed
+// value's type in the dynamic-type universe.
+func (b *builder) registerBoxedExtern(source types.Type) {
+	t := types.Unalias(source)
+	if pointer, ok := t.(*types.Pointer); ok {
+		t = types.Unalias(pointer.Elem())
+	}
+	named, ok := t.(*types.Named)
+	if !ok || named.Obj().Pkg() == nil || b.unit.Owns(named.Obj().Pkg().Path()) {
+		return
+	}
+	if named.TypeParams() != nil && named.TypeParams().Len() > 0 {
+		return
+	}
+	if _, isIface := named.Underlying().(*types.Interface); isIface {
+		return
+	}
+	b.unit.AddExternConcrete(named.Obj())
+}
+
+// mentionsTypeParamType reports whether a Go type references any type
+// parameter.
+func mentionsTypeParamType(t types.Type) bool {
+	sig := types.NewSignatureType(nil, nil, nil,
+		types.NewTuple(types.NewVar(0, nil, "", t)), types.NewTuple(), false)
+	return SignatureMentionsTypeParam(sig)
 }

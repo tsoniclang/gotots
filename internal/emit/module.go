@@ -2,6 +2,7 @@ package emit
 
 import (
 	"fmt"
+	"github.com/tsoniclang/gotots/internal/ir"
 	"sort"
 	"strings"
 )
@@ -10,6 +11,12 @@ import (
 type ModuleImport struct {
 	Alias     string
 	Specifier string // ESM specifier with explicit .js
+}
+
+// BoxedComposite is one boxed composite type.
+type BoxedComposite struct {
+	Canon string
+	T     ir.Type
 }
 
 // ExternMethod is one recorded external method: its source name (the
@@ -58,7 +65,19 @@ type Module struct {
 	// ifaceAliases collects the closed union aliases this module spells,
 	// keyed by alias name, emitted after imports.
 	ifaceAliases map[string]string
-	aliasOrder   []string
+	// ifaceIdentity maps alias name -> full canonical identity: a digest
+	// collision between DISTINCT identities fails closed.
+	ifaceIdentity map[string]string
+	aliasOrder    []string
+	// BoxedComposites is the unit's closed boxed-composite enumeration
+	// (canonical id + payload type), spelled as exact empty-interface
+	// union members.
+	BoxedComposites []BoxedComposite
+	// OpaqueInterfaces makes interface types spell the opaque helper
+	// supertype (GoIface) rather than the closed union: stub modules
+	// never dispatch, so they carry no union aliases and pull in no
+	// implementer surfaces.
+	OpaqueInterfaces bool
 	// Withheld reports packages whose modules are not in the bundle:
 	// union aliases exclude their classes (nothing of theirs can box at
 	// runtime — their code does not run) and never reference their
@@ -164,7 +183,7 @@ func NewModule(pkg, pkgName string, abiImports ABIImports, specifiers map[string
 	}
 	return &Module{Pkg: pkg, PkgName: pkgName, ABI: abiImports, imports: imports,
 		used: map[string]bool{}, initEdges: map[string]bool{},
-		typeUsed: map[string]bool{}, ifaceAliases: map[string]string{}}
+		typeUsed: map[string]bool{}, ifaceAliases: map[string]string{}, ifaceIdentity: map[string]string{}}
 }
 
 // symbol spells a reference to a package-level symbol: unqualified within

@@ -6,6 +6,8 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+
+	"github.com/tsoniclang/gotots/internal/typeid"
 	"sort"
 	"strings"
 )
@@ -75,7 +77,7 @@ func (b *builder) rttiFor(t types.Type, span Span) (RttiRef, error) {
 // qualifies by package NAME and can collide across packages sharing a
 // name; this cannot.
 func canonicalTypeID(t types.Type) string {
-	return types.TypeString(t, func(p *types.Package) string { return p.Path() })
+	return typeid.Canonical(t)
 }
 
 // canonicalIfaceID extends the path-qualified type string with each
@@ -183,6 +185,17 @@ func (b *builder) boxIfaceValue(built Expr, source types.Type, expected Type, sp
 	if err != nil {
 		return nil, err
 	}
+	if rtti.Composite != "" && rtti.ExternID == "" && !mentionsTypeParamType(source) {
+		// The boxed-composite enumeration: this exact composite becomes
+		// an exact union member (its payload type, no erasure). A
+		// composite that mentions a type parameter is per-instantiation
+		// and never a concrete boxed member.
+		b.unit.AddBoxedComposite(rtti.Composite, built.Type())
+	}
+	// An external named type BOXED here joins the dynamic-type universe:
+	// this catches inferred external dynamic types (value := external.New())
+	// precisely, without walking unrelated external internals.
+	b.registerBoxedExtern(source)
 	b.use("ifaceBox")
 	return &IfaceBox{X: b.bindStructValue(built), Rtti: rtti, T: expected}, nil
 }
@@ -278,6 +291,7 @@ func (b *builder) buildTypeAssert(n *ast.TypeAssertExpr, commaOk bool) (Expr, er
 		Target:        target,
 		Rtti:          rtti,
 		SourceDisplay: displayOf(b.info.Types[n.X].Type),
+		TargetDisplay: displayOf(targetGoType),
 		CommaOk:       commaOk,
 	}, nil
 }

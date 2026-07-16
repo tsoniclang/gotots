@@ -4,6 +4,8 @@ import (
 	"go/token"
 	"go/types"
 
+	"github.com/tsoniclang/gotots/internal/typeid"
+
 	"golang.org/x/tools/go/packages"
 )
 
@@ -28,7 +30,20 @@ func ResolveType(p *packages.Package, sourceDir string, unit Scope, t types.Type
 // construct's span. Named struct types are scoped to the translated unit:
 // structs from packages outside it are external contracts, not generated
 // classes.
+// typeOf resolves one Go type and stamps its canonical semantic
+// identity (typeid.Canonical) — the ONE key every evidence ledger uses.
 func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
+	resolved, err := b.typeOfInner(t, span)
+	if err != nil {
+		return resolved, err
+	}
+	if resolved.Canon == "" {
+		resolved.Canon = typeid.Canonical(t)
+	}
+	return resolved, nil
+}
+
+func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 	if t == nil {
 		return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "expression without type evidence", Span: span}
 	}

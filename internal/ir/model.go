@@ -99,6 +99,9 @@ type Type struct {
 	Sig *FuncSig
 	// ArrayLen is the fixed length of a KindArray.
 	ArrayLen int64
+	// Canon is the canonical semantic identity from internal/typeid: the
+	// only string used as an evidence-ledger key for this type.
+	Canon string
 	// IfaceEmpty marks the zero-method interface: universal membership.
 	IfaceEmpty bool
 	// IfaceID is the interface's canonical path-qualified identity — the
@@ -157,6 +160,11 @@ type Scope struct {
 	// named types: external implementers join interface unions through
 	// stub-adapter vtables.
 	externConcrete *[]*types.TypeName
+	// boxedComposites records every composite type actually boxed
+	// anywhere in the unit (canonical id -> resolved type): the closed
+	// enumeration the empty-interface union spells as EXACT members, so
+	// composite assertions narrow without any cast.
+	boxedComposites map[string]*Type
 	// ifaceMembers caches each interface identity's resolved closed
 	// implementer union (typeOf recursion makes this hot).
 	ifaceMembers map[string][]IfaceMember
@@ -182,17 +190,18 @@ func NewScope(paths ...string) Scope {
 		packages[path] = true
 	}
 	return Scope{
-		packages:       packages,
-		generics:       map[*types.Func][][]types.Type{},
-		externals:      map[*types.Func]bool{},
-		typeGenerics:   map[*types.TypeName][][]types.Type{},
-		anonStructs:    map[string]map[string]*Struct{},
-		externTypes:    map[string]*ExternTypeObligation{},
-		externVars:     map[string]*types.Var{},
-		concreteTypes:  &[]*types.TypeName{},
-		externConcrete: &[]*types.TypeName{},
-		ifaceMembers:   map[string][]IfaceMember{},
-		importClosures: map[string]map[string]bool{},
+		packages:        packages,
+		generics:        map[*types.Func][][]types.Type{},
+		externals:       map[*types.Func]bool{},
+		typeGenerics:    map[*types.TypeName][][]types.Type{},
+		anonStructs:     map[string]map[string]*Struct{},
+		externTypes:     map[string]*ExternTypeObligation{},
+		externVars:      map[string]*types.Var{},
+		concreteTypes:   &[]*types.TypeName{},
+		externConcrete:  &[]*types.TypeName{},
+		boxedComposites: map[string]*Type{},
+		ifaceMembers:    map[string][]IfaceMember{},
+		importClosures:  map[string]map[string]bool{},
 	}
 }
 
@@ -310,6 +319,37 @@ func (s Scope) AddExternConcrete(name *types.TypeName) {
 
 // ExternConcreteTypes returns the referenced external named types.
 func (s Scope) ExternConcreteTypes() []*types.TypeName { return *s.externConcrete }
+
+// AddBoxedComposite records one composite type boxed into an interface.
+func (s Scope) AddBoxedComposite(canon string, t Type) {
+	if _, has := s.boxedComposites[canon]; !has {
+		copied := t
+		s.boxedComposites[canon] = &copied
+	}
+}
+
+// BoxedComposites returns the boxed-composite enumeration sorted by id.
+func (s Scope) BoxedComposites() []struct {
+	Canon string
+	T     Type
+} {
+	ids := make([]string, 0, len(s.boxedComposites))
+	for id := range s.boxedComposites {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	out := make([]struct {
+		Canon string
+		T     Type
+	}, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, struct {
+			Canon string
+			T     Type
+		}{id, *s.boxedComposites[id]})
+	}
+	return out
+}
 
 // IfaceMemberCache returns a cached implementer union.
 func (s Scope) IfaceMemberCache(key string) ([]IfaceMember, bool) {
@@ -469,10 +509,6 @@ type Func struct {
 	// SlicePlans maps each slice-typed local variable to its selected
 	// representation candidate (the planner's fixed point).
 	SlicePlans map[string]string
-	// DispatchKey is the method's canonical dynamic-dispatch identity
-	// (methods only): name, unexported package qualifier, and signature
-	// digest — the rtti table key.
-	DispatchKey string
 	// PointerReceiver marks a pointer-receiver method: it belongs to the
 	// pointer method set only, never the value method set.
 	PointerReceiver bool
@@ -535,18 +571,18 @@ type IfaceMember struct {
 	// interface membership can never recurse through generic arguments.
 	Struct bool
 	// Extern marks an external implementer whose vtable is built inline
-	// over stub exports at box sites.
-	Extern bool
+	// over stub exports at box sites. ExternCarrier spells its payload
+	// class: "" (branded handle, struct-underlying) or the exact value
+	// carrier for basic-underlying external named types.
+	Extern        bool
+	ExternCarrier string
 }
 
 type PromotedDelegate struct {
-	Name     string
-	Path     []string // embedded field names, outermost first
-	Pkg      string
-	TypeName string
-	// DispatchKey is the promoted method's canonical dynamic identity;
-	// ValueReceiver marks it part of the value method set.
-	DispatchKey   string
+	Name          string
+	Path          []string // embedded field names, outermost first
+	Pkg           string
+	TypeName      string
 	ValueReceiver bool
 }
 

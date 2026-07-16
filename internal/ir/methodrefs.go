@@ -14,9 +14,6 @@ type MethodValue struct {
 	Pkg      string
 	TypeName string // empty for an interface receiver
 	Method   string
-	// DispatchKey is the canonical dynamic identity for interface
-	// receivers (MethodKey of the interface method).
-	DispatchKey string
 	// PointerRecv reports the method's receiver flavor.
 	PointerRecv bool
 	// NilCheckRecv dereferences a pointer caller of a value-receiver
@@ -62,7 +59,7 @@ func (b *builder) buildMethodValue(n *ast.SelectorExpr, selection *types.Selecti
 	if err != nil {
 		return nil, err
 	}
-	out := &MethodValue{Pkg: method.Pkg().Path(), Method: method.Name(), DispatchKey: MethodKey(method), Recv: recv, T: t}
+	out := &MethodValue{Pkg: method.Pkg().Path(), Method: method.Name(), Recv: recv, T: t}
 
 	if recv.Type().Kind == KindIface {
 		out.Iface = true

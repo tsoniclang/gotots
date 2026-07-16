@@ -360,6 +360,7 @@ type TypeAssert struct {
 	Target        Type
 	Rtti          RttiRef
 	SourceDisplay string
+	TargetDisplay string
 	CommaOk       bool
 }
 

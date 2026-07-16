@@ -13,6 +13,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/goid"
 	"github.com/tsoniclang/gotots/internal/ir"
+	"github.com/tsoniclang/gotots/internal/typeid"
 )
 
 func translateFunc(p *packages.Package, sourceDir string, unit ir.Scope, relativeFile string, source []byte, decl *ast.FuncDecl, options Options) (*ir.Func, *Proof, error) {
@@ -47,12 +48,16 @@ func translateFunc(p *packages.Package, sourceDir string, unit ir.Scope, relativ
 	}
 
 	object := p.TypesInfo.Defs[decl.Name].(*types.Func)
-	signatureText := types.TypeString(object.Type(), func(pkg *types.Package) string { return pkg.Path() })
+	signatureText := typeid.Canonical(object.Type())
 	signatureDigest := sha256.Sum256([]byte(signatureText))
 
 	representations := map[string]string{}
 	recordRepresentation := func(t ir.Type) {
-		representations[t.Go] = conservativeCarrier(t)
+		key := t.Canon
+		if key == "" {
+			key = t.Go
+		}
+		representations["carrier:"+key] = conservativeCarrier(t)
 	}
 	if function.Receiver != nil {
 		recordRepresentation(function.Receiver.Type)

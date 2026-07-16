@@ -9,7 +9,7 @@ import "strings"
 
 // RepresentationFamilies maps each proof-key family to its closed
 // candidate set. Key families are recognized by classifyRepresentation.
-var RepresentationFamilies = map[string]map[string]bool{
+var representationFamilies = map[string]map[string]bool{
 	"slice-local": {
 		"native-array":    true,
 		"goslice-carrier": true,
@@ -43,33 +43,42 @@ var RepresentationFamilies = map[string]map[string]bool{
 // family and validates the candidate. It returns the family name and
 // whether the candidate is a member of that family's closed set.
 func ClassifyRepresentation(key, candidate string) (string, bool) {
-	if strings.HasPrefix(key, "slice-local:") {
-		// A slice-local key admits ONLY slice-plan candidates.
-		return "slice-local", RepresentationFamilies["slice-local"][candidate]
+	// Keys DECLARE their family by prefix; an unprefixed or unknown-
+	// prefixed key fails, and each family admits only its own candidates.
+	switch {
+	case strings.HasPrefix(key, "slice-local:"):
+		return "slice-local", representationFamilies["slice-local"][candidate]
+	case strings.HasPrefix(key, "carrier:"):
+		return classifyCarrier(key, candidate)
+	case strings.HasPrefix(key, "decl:"):
+		return classifyDeclaration(key, candidate)
 	}
-	if RepresentationFamilies["slice-local"][candidate] {
-		// A slice-plan candidate under any other key is a misfiled entry.
-		return "", false
-	}
-	if RepresentationFamilies["declaration"][candidate] {
+	return "", false
+}
+
+func classifyDeclaration(key, candidate string) (string, bool) {
+	if representationFamilies["declaration"][candidate] {
 		return "declaration", true
 	}
-	// Prefixed forms validate their EXACT inner grammar — never a bare
-	// prefix match that would admit malformed values.
+	// Prefixed forms validate their EXACT inner grammar against the
+	// CARRIER family only — a declaration disposition can never nest.
 	if inner, ok := cutWrapped(candidate, "erased-to-carrier("); ok {
-		_, valid := ClassifyRepresentation(key, inner)
-		if valid {
-			return "declaration-prefixed", true
+		if _, valid := classifyCarrier("carrier:inner", inner); valid {
+			return "declaration", true
 		}
 		return "", false
 	}
 	if inner, ok := cutWrapped(candidate, "module-let(live-binding,"); ok {
-		_, valid := ClassifyRepresentation(key, inner)
-		if valid {
-			return "declaration-prefixed", true
+		if _, valid := classifyCarrier("carrier:inner", inner); valid {
+			return "declaration", true
 		}
 		return "", false
 	}
+	return "", false
+}
+
+func classifyCarrier(key, candidate string) (string, bool) {
+	_ = key
 	if bits, ok := strings.CutPrefix(candidate, "number-wrapped-"); ok {
 		switch bits {
 		case "8", "16", "32":
@@ -77,7 +86,7 @@ func ClassifyRepresentation(key, candidate string) (string, bool) {
 		}
 		return "", false
 	}
-	if RepresentationFamilies["carrier"][candidate] {
+	if representationFamilies["carrier"][candidate] {
 		return "carrier", true
 	}
 	return "", false

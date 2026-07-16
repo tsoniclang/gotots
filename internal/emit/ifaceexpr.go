@@ -35,22 +35,31 @@ func (p *printer) printIfaceExpr(e ir.Expr) (string, bool, error) {
 		if err != nil {
 			return "", true, err
 		}
-		rtti, err := p.rttiRef(n.Rtti)
+		union, err := p.tsType(n.X.Type())
 		if err != nil {
 			return "", true, err
 		}
+		k := boxDiscriminant(n.Rtti)
 		if n.CommaOk {
 			zero, err := p.zeroLiteral(n.Target)
 			if err != nil {
 				return "", true, err
 			}
-			return "goif$.goIfaceLookup(" + x + ", " + rtti + ", " + zero + ")", true, nil
+			spelled, err := p.tsType(n.Target)
+			if err != nil {
+				return "", true, err
+			}
+			// Literal-discriminant narrowing: the true branch reads the
+			// member's EXACT payload — no cast, no helper.
+			return fmt.Sprintf("(($i: %s): readonly [%s, boolean] => ($i !== undefined && $i.k === %q ? [$i.v, true] : [%s, false]))(%s)",
+				union, spelled, k, zero, x), true, nil
 		}
-		spelled, err := p.tsType(n.Target)
+		result, err := p.tsType(n.Target)
 		if err != nil {
 			return "", true, err
 		}
-		return fmt.Sprintf("(goif$.goIfaceAssert(%s, %s, %q) as (%s))", x, rtti, n.SourceDisplay, spelled), true, nil
+		return fmt.Sprintf("(($i: %s): %s => { if ($i !== undefined && $i.k === %q) { return $i.v; } gort$.goPanicConversion($i === undefined ? %q : $i.r.d, %q, %q); })(%s)",
+			union, result, k, "nil", n.SourceDisplay, n.TargetDisplay, x), true, nil
 	case *ir.StructEqual:
 		left, err := p.printExpr(n.L)
 		if err != nil {
@@ -113,47 +122,50 @@ func (p *printer) printIfaceExpr(e ir.Expr) (string, bool, error) {
 		if err != nil {
 			return "", true, err
 		}
-		tokens := make([]string, 0, len(n.Implementers))
-		for _, token := range n.Implementers {
-			// A withheld package's token cannot exist at runtime (its
-			// module never evaluates) and must not be referenced.
-			if token.Pkg != "" && p.module.Withheld != nil && p.module.Withheld(token.Pkg) {
-				continue
-			}
-			spelled, err := p.rttiRef(token)
-			if err != nil {
-				return "", true, err
-			}
-			tokens = append(tokens, spelled)
-		}
-		if n.Universal {
-			targetUnion, err := p.tsType(n.Target)
-			if err != nil {
-				return "", true, err
-			}
-			if n.CommaOk {
-				return fmt.Sprintf("goif$.goIfaceLookupAny<Exclude<%s, undefined>>(%s)", targetUnion, x), true, nil
-			}
-			return fmt.Sprintf("goif$.goIfaceAssertAny<Exclude<%s, undefined>>(%s, %q, %q)", targetUnion, x, n.SourceDisplay, n.TargetDisplay), true, nil
-		}
-		list := "[" + joinComma(tokens) + "]"
-		required := make([]string, len(n.Required))
-		for i, name := range n.Required {
-			required[i] = fmt.Sprintf("%q", name)
-		}
-		reqList := "[" + joinComma(required) + "]"
-		if n.CommaOk {
-			targetUnion, err := p.tsType(n.Target)
-			if err != nil {
-				return "", true, err
-			}
-			return fmt.Sprintf("goif$.goIfaceLookupSet<Exclude<%s, undefined>>(%s, %s)", targetUnion, x, list), true, nil
-		}
-		spelled, err := p.tsType(n.Target)
+		union, err := p.tsType(n.X.Type())
 		if err != nil {
 			return "", true, err
 		}
-		return fmt.Sprintf("goif$.goIfaceAssertSet<Exclude<%s, undefined>>(%s, %s, %s, %q, %q)", spelled, x, list, reqList, n.SourceDisplay, n.TargetDisplay), true, nil
+		targetUnion, err := p.tsType(n.Target)
+		if err != nil {
+			return "", true, err
+		}
+		// Membership by literal-discriminant ||-chain: TypeScript narrows
+		// the source union to exactly the target's member subset — the
+		// result needs no cast (its type IS the target union).
+		var condition string
+		if n.Universal {
+			condition = "$i !== undefined"
+		} else {
+			clauses := make([]string, 0, len(n.Implementers))
+			for _, token := range n.Implementers {
+				if token.Pkg != "" && p.module.Withheld != nil && p.module.Withheld(token.Pkg) {
+					continue
+				}
+				clauses = append(clauses, fmt.Sprintf("$i.k === %q", boxDiscriminant(token)))
+			}
+			if len(clauses) == 0 {
+				condition = "false"
+			} else {
+				condition = "$i !== undefined && (" + strings.Join(clauses, " || ") + ")"
+			}
+		}
+		if condition == "false" {
+			// No retained implementer: the assertion can never succeed —
+			// the true branch would be dead yet still typechecked, so it
+			// is not emitted at all.
+			if n.CommaOk {
+				return fmt.Sprintf("((void (%s)), [undefined, false] as readonly [%s, boolean])", x, targetUnion), true, nil
+			}
+			return fmt.Sprintf("(($i: %s): %s => { goif$.goPanicConversionIface($i, %q, %q, %s); })(%s)",
+				union, targetUnion, n.SourceDisplay, n.TargetDisplay, requiredList(n.Required), x), true, nil
+		}
+		if n.CommaOk {
+			return fmt.Sprintf("(($i: %s): readonly [%s, boolean] => (%s ? [$i, true] : [undefined, false]))(%s)",
+				union, targetUnion, condition, x), true, nil
+		}
+		return fmt.Sprintf("(($i: %s): %s => { if (%s) { return $i; } goif$.goPanicConversionIface($i, %q, %q, %s); })(%s)",
+			union, targetUnion, condition, n.SourceDisplay, n.TargetDisplay, requiredList(n.Required), x), true, nil
 	}
 	return "", false, nil
 }
@@ -229,4 +241,13 @@ func (p *printer) printIfaceCall(n *ir.IfaceCall) (string, error) {
 	closing := strings.Repeat("  ", p.indent)
 	return fmt.Sprintf("((%s): %s => {\n%s%s})(%s)",
 		joinComma(params), result, body.String(), closing, joinComma(passed)), nil
+}
+
+// requiredList spells the target interface's method displays.
+func requiredList(required []string) string {
+	quoted := make([]string, len(required))
+	for i, name := range required {
+		quoted[i] = fmt.Sprintf("%q", name)
+	}
+	return "[" + joinComma(quoted) + "]"
 }
