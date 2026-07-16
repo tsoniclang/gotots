@@ -58,6 +58,7 @@ func Packages(pkgs []*packages.Package, sourceDir string, options Options) (*Gen
 		}
 	}
 	withholdDependents(out, sorted)
+	reconcileProofRetention(out)
 	if err := emitExternalStubs(out, unit, sorted[0], sourceDir, options); err != nil {
 		return nil, err
 	}
@@ -263,7 +264,18 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 						}
 						if name.Name == "_" {
 							if i >= len(valueSpec.Values) {
-								continue // a blank variable without an initializer has no effect
+								// A blank variable without an initializer
+								// has no effect and no binding, but its
+								// census identity still needs an explicit
+								// disposition: a proof of the (empty)
+								// lowering.
+								out.Proofs = append(out.Proofs, Proof{
+									ID: variableID, SourceRevision: options.SourceRevision,
+									Package: p.PkgPath, File: f.relative,
+									LoweringPlan:    LoweringPlanV2,
+									Representations: map[string]string{"_": "blank-var(no-initializer, no output)"},
+								})
+								continue
 							}
 						}
 						t, err := ir.ResolveType(p, sourceDir, unit, object.Type(), name.Pos())

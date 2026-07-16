@@ -96,15 +96,17 @@ type PanicStmt struct {
 	ErrorFormat *IfaceCall
 }
 
-// RawExpr is a pre-printed expression fragment with a known type, used
-// by lowerings that synthesize a node around already-emitted text.
-type RawExpr struct {
-	Text string
+// ParamRef is a reference to a generated binding parameter (an adapter
+// arrow's own parameter) with a known type. Its name must be a bare
+// generated identifier — it can never carry arbitrary expression text,
+// so no unverified TypeScript enters the IR.
+type ParamRef struct {
+	Name string
 	T    Type
 }
 
-func (*RawExpr) expr()        {}
-func (e *RawExpr) Type() Type { return e.T }
+func (*ParamRef) expr()        {}
+func (e *ParamRef) Type() Type { return e.T }
 
 // TupleSpread forwards a multi-result call's values as the complete
 // argument list of an enclosing call (Go's f(g()) form): the results

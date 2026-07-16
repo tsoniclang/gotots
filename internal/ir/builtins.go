@@ -257,7 +257,7 @@ func (b *builder) buildPanic(call *ast.CallExpr) (Stmt, error) {
 			return nil, err
 		}
 		format := &IfaceCall{
-			Recv:     &RawExpr{Text: "$err", T: Type{Kind: KindIface, Go: "error"}},
+			Recv:     &ParamRef{Name: "$err", T: Type{Kind: KindIface, Go: "error"}},
 			Method:   MethodKey(errorMethod),
 			Display:  "Error",
 			Results:  []Type{{Kind: KindString, Go: "string"}},

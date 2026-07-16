@@ -287,83 +287,14 @@ func runGate(args []string) error {
 		// fold-at-use constant rule, or its package's withholding.
 		// Exactly one support disposition per identity: a duplicate or a
 		// support/proof state conflict fails closed.
-		covered := map[string]string{}
-		var conflicts []string
-		for _, support := range generated.Support {
-			if prior, dup := covered[support.ID]; dup && prior != string(support.State) {
-				conflicts = append(conflicts, fmt.Sprintf("%s: %s vs %s", support.ID, prior, support.State))
-			}
-			covered[support.ID] = string(support.State)
-		}
-		for _, proof := range generated.Proofs {
-			// A proof states "generated"; it must not contradict a
-			// recorded unimplemented support state for the same identity.
-			if prior, has := covered[proof.ID]; has {
-				if prior != "generated" {
-					conflicts = append(conflicts, fmt.Sprintf("%s: proof=generated vs support=%s", proof.ID, prior))
-				}
-				continue
-			}
-			covered[proof.ID] = "generated"
-		}
+		counts, details, conflicts, unreconciled := reconcileDispositions(prof, firstRun, generated)
 		if len(conflicts) > 0 {
 			sort.Strings(conflicts)
 			if len(conflicts) > 20 {
 				conflicts = append(conflicts[:20], fmt.Sprintf("... and %d more", len(conflicts)-20))
 			}
-			return "fail", conflicts, fmt.Errorf("%d declaration identities hold conflicting dispositions", len(conflicts))
+			return "fail", conflicts, fmt.Errorf("%d ledger defects (duplicates, conflicts, phantom references)", len(conflicts))
 		}
-		counts := map[string]int{}
-		var unreconciled []string
-		for _, decl := range firstRun.Report.Declarations {
-			if decl.Scope != "production" {
-				counts["test-scope"]++
-				continue
-			}
-			if class, _ := prof.Classify(decl.Package); class != profile.ClassOwned {
-				counts["unowned"]++
-				continue
-			}
-			if decl.Kind == "const" {
-				counts["const-fold-at-use"]++
-				continue
-			}
-			if state, has := covered[decl.ID]; has {
-				counts[state]++
-				continue
-			}
-			if reason, withheld := generated.Withheld[decl.Package]; withheld {
-				_ = reason
-				counts["withheld-package"]++
-				continue
-			}
-			counts["unreconciled"]++
-			if len(unreconciled) < 25 {
-				unreconciled = append(unreconciled, decl.ID)
-			}
-		}
-		details := make([]string, 0, len(counts)+len(unreconciled)+4)
-		keys := make([]string, 0, len(counts))
-		for key := range counts {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
-		for _, key := range keys {
-			details = append(details, fmt.Sprintf("%s: %d", key, counts[key]))
-		}
-		// Honest evidence stages (spec 00): ir-admitted is not
-		// module-retained. Report both denominators explicitly.
-		emittedPackages := 0
-		for _, path := range ownedProductionPackages(firstRun) {
-			if _, withheld := generated.Withheld[path]; !withheld {
-				emittedPackages++
-			}
-		}
-		details = append(details,
-			fmt.Sprintf("evidence-stage ir-admitted (declarations disposed): %d", counts["generated"]+counts["accepted-manual"]),
-			fmt.Sprintf("evidence-stage module-retained-blocked (in withheld packages): %d", counts["withheld-package"]),
-			fmt.Sprintf("packages emitted (module-retained): %d", emittedPackages),
-			fmt.Sprintf("packages withheld (honest unimplemented): %d", len(generated.Withheld)))
 		if counts["unreconciled"] > 0 {
 			details = append(details, "first unreconciled declarations:")
 			details = append(details, unreconciled...)

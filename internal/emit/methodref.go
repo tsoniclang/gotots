@@ -41,10 +41,10 @@ func (p *printer) printMethodValue(n *ir.MethodValue) (string, error) {
 		// call arguments.
 		argExprs := make([]ir.Expr, len(args))
 		for i := range args {
-			argExprs[i] = &ir.RawExpr{Text: args[i], T: n.T.Sig.Params[i]}
+			argExprs[i] = &ir.ParamRef{Name: args[i], T: n.T.Sig.Params[i]}
 		}
 		synthetic := &ir.IfaceCall{
-			Recv:     &ir.RawExpr{Text: "$r", T: n.Recv.Type()},
+			Recv:     &ir.ParamRef{Name: "$r", T: n.Recv.Type()},
 			Method:   n.DispatchKey,
 			Display:  n.Method,
 			Args:     argExprs,

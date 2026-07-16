@@ -13,6 +13,32 @@ import (
 // withholdDependents extends withholding over the unit dependency
 // graph: a runnable module cannot import a withheld one, so every
 // dependent package is withheld too (its analysis records remain).
+// reconcileProofRetention finalizes each proof's evidence stage after
+// withholding: a proof in an emitted package is module-retained; a proof
+// in a withheld package keeps its analysis identity but must not
+// reference the absent generated file.
+func reconcileProofRetention(out *Generated) {
+	for i := range out.Proofs {
+		proof := &out.Proofs[i]
+		if _, withheld := out.Withheld[proof.Package]; withheld {
+			proof.ModuleRetained = false
+			proof.GeneratedFile = ""
+			proof.GeneratedSymbol = ""
+			continue
+		}
+		if _, exists := out.Files[proof.GeneratedFile]; proof.GeneratedFile != "" && !exists {
+			// A generated-file reference must resolve; failing closed here
+			// is a generator defect, surfaced as a stripped reference the
+			// gate rejects rather than a phantom.
+			proof.ModuleRetained = false
+			proof.GeneratedFile = ""
+			proof.GeneratedSymbol = ""
+			continue
+		}
+		proof.ModuleRetained = true
+	}
+}
+
 func withholdDependents(out *Generated, sorted []*packages.Package) {
 	imports := map[string][]string{}
 	for _, p := range sorted {

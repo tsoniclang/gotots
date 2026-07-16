@@ -20,8 +20,15 @@ type Proof struct {
 	Operations      []string          `json:"operations"`
 	Representations map[string]string `json:"representations"`
 	LoweringPlan    string            `json:"loweringPlan"`
-	GeneratedFile   string            `json:"generatedFile"`
-	GeneratedSymbol string            `json:"generatedSymbol"`
+	// GeneratedFile/GeneratedSymbol reference the retained module output;
+	// withholding clears them (a proof must never reference an absent
+	// file) and records the fact in ModuleRetained.
+	GeneratedFile   string `json:"generatedFile,omitempty"`
+	GeneratedSymbol string `json:"generatedSymbol,omitempty"`
+	// ModuleRetained states whether the body survived into a runnable
+	// module: the ir-admitted / module-retained evidence-stage split, per
+	// proof rather than inferred from aggregates.
+	ModuleRetained bool `json:"moduleRetained"`
 }
 
 // BodySupport is one implementation unit's support-state record: every

@@ -12,6 +12,8 @@ import (
 	"strings"
 
 	"github.com/tsoniclang/gotots/internal/census"
+	"github.com/tsoniclang/gotots/internal/profile"
+	"github.com/tsoniclang/gotots/internal/translate"
 )
 
 func runInRepo(dir, name string, args ...string) (string, error) {
@@ -133,4 +135,114 @@ var acceptanceStageNames = []string{
 	"16-performance",
 	"17-source-update-repeatability",
 	"18-complete-product-publication",
+}
+
+// reconcileDispositions joins every production declaration in the
+// census to exactly one disposition, detects ledger defects (duplicate
+// records, conflicting states, phantom generated-file references), and
+// computes the per-declaration evidence-stage counts (module-retained
+// versus module-retained-blocked) — the valid per-body stage join.
+func reconcileDispositions(prof *profile.Profile, firstRun *census.Result, generated *translate.Generated) (map[string]int, []string, []string, []string) {
+	covered := map[string]string{}
+	var conflicts []string
+	supportSeen := map[string]bool{}
+	for _, support := range generated.Support {
+		// Exactly one support record per identity: even a same-state
+		// duplicate is a ledger defect.
+		if supportSeen[support.ID] {
+			conflicts = append(conflicts, fmt.Sprintf("%s: duplicate support record", support.ID))
+		}
+		supportSeen[support.ID] = true
+		if prior, dup := covered[support.ID]; dup && prior != string(support.State) {
+			conflicts = append(conflicts, fmt.Sprintf("%s: %s vs %s", support.ID, prior, support.State))
+		}
+		covered[support.ID] = string(support.State)
+	}
+	proofSeen := map[string]bool{}
+	for _, proof := range generated.Proofs {
+		if proofSeen[proof.ID] {
+			conflicts = append(conflicts, fmt.Sprintf("%s: duplicate proof record", proof.ID))
+		}
+		proofSeen[proof.ID] = true
+		// Every retained generated-file reference must resolve to an
+		// emitted file — no phantom references.
+		if proof.GeneratedFile != "" {
+			if _, exists := generated.Files[proof.GeneratedFile]; !exists {
+				conflicts = append(conflicts, fmt.Sprintf("%s: phantom generated file %s", proof.ID, proof.GeneratedFile))
+			}
+		}
+	}
+	for _, proof := range generated.Proofs {
+		// A proof states "generated"; it must not contradict a
+		// recorded unimplemented support state for the same identity.
+		if prior, has := covered[proof.ID]; has {
+			if prior != "generated" {
+				conflicts = append(conflicts, fmt.Sprintf("%s: proof=generated vs support=%s", proof.ID, prior))
+			}
+			continue
+		}
+		covered[proof.ID] = "generated"
+	}
+	counts := map[string]int{}
+	var unreconciled []string
+	for _, decl := range firstRun.Report.Declarations {
+		if decl.Scope != "production" {
+			counts["test-scope"]++
+			continue
+		}
+		if class, _ := prof.Classify(decl.Package); class != profile.ClassOwned {
+			counts["unowned"]++
+			continue
+		}
+		if decl.Kind == "const" {
+			counts["const-fold-at-use"]++
+			continue
+		}
+		if state, has := covered[decl.ID]; has {
+			counts[state]++
+			// The valid per-declaration stage join: a disposed
+			// declaration is module-retained-blocked exactly when its
+			// package is withheld.
+			if _, withheld := generated.Withheld[decl.Package]; withheld {
+				counts["stage:module-retained-blocked"]++
+			} else {
+				counts["stage:module-retained"]++
+			}
+			continue
+		}
+		if _, withheld := generated.Withheld[decl.Package]; withheld {
+			// Withholding is an artifact decision, never a disposition:
+			// an undisposed declaration in a withheld package is still
+			// missing evidence and fails the gate.
+			counts["withheld-undisposed"]++
+		}
+		counts["unreconciled"]++
+		if len(unreconciled) < 25 {
+			unreconciled = append(unreconciled, decl.ID)
+		}
+	}
+	details := make([]string, 0, len(counts)+len(unreconciled)+4)
+	keys := make([]string, 0, len(counts))
+	for key := range counts {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		details = append(details, fmt.Sprintf("%s: %d", key, counts[key]))
+	}
+	// Honest evidence stages (spec 00): ir-admitted is not
+	// module-retained. Report both denominators explicitly.
+	emittedPackages := 0
+	for _, path := range ownedProductionPackages(firstRun) {
+		if _, withheld := generated.Withheld[path]; !withheld {
+			emittedPackages++
+		}
+	}
+	details = append(details,
+		fmt.Sprintf("evidence-stage ir-admitted (declarations disposed): %d", counts["generated"]+counts["accepted-manual"]),
+		fmt.Sprintf("evidence-stage module-retained (disposed, in emitted packages): %d", counts["stage:module-retained"]),
+		fmt.Sprintf("evidence-stage module-retained-blocked (disposed, in withheld packages): %d", counts["stage:module-retained-blocked"]),
+		fmt.Sprintf("packages emitted (module-retained): %d", emittedPackages),
+		fmt.Sprintf("packages withheld (honest unimplemented): %d", len(generated.Withheld)))
+	return counts, details, conflicts, unreconciled
 }

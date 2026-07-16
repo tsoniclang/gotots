@@ -55,8 +55,11 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		return printed, err
 	}
 	switch n := e.(type) {
-	case *ir.RawExpr:
-		return n.Text, nil
+	case *ir.ParamRef:
+		if !generatedIdentifier(n.Name) {
+			return "", fmt.Errorf("ParamRef %q is not a bare generated identifier", n.Name)
+		}
+		return n.Name, nil
 	case *ir.Const:
 		return printConst(n)
 	case *ir.VarRef:
@@ -564,4 +567,19 @@ func (p *printer) printArgs(args []ir.Expr) (string, error) {
 		parts[i] = printed
 	}
 	return joinComma(parts), nil
+}
+
+// generatedIdentifier accepts only bare generated binding names — ASCII
+// letters, digits, "$", and "_" — never expression text.
+func generatedIdentifier(name string) bool {
+	if name == "" {
+		return false
+	}
+	for _, r := range name {
+		ok := r == '$' || r == '_' || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')
+		if !ok {
+			return false
+		}
+	}
+	return true
 }
