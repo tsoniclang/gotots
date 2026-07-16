@@ -306,14 +306,33 @@ func runGate(args []string) error {
 		// Every production declaration of every owned package must hold a
 		// disposition: a support-ledger state, a generation proof, the
 		// fold-at-use constant rule, or its package's withholding.
+		// Exactly one support disposition per identity: a duplicate or a
+		// support/proof state conflict fails closed.
 		covered := map[string]string{}
+		var conflicts []string
 		for _, support := range generated.Support {
+			if prior, dup := covered[support.ID]; dup && prior != string(support.State) {
+				conflicts = append(conflicts, fmt.Sprintf("%s: %s vs %s", support.ID, prior, support.State))
+			}
 			covered[support.ID] = string(support.State)
 		}
 		for _, proof := range generated.Proofs {
-			if _, has := covered[proof.ID]; !has {
-				covered[proof.ID] = "generated"
+			// A proof states "generated"; it must not contradict a
+			// recorded unimplemented support state for the same identity.
+			if prior, has := covered[proof.ID]; has {
+				if prior != "generated" {
+					conflicts = append(conflicts, fmt.Sprintf("%s: proof=generated vs support=%s", proof.ID, prior))
+				}
+				continue
 			}
+			covered[proof.ID] = "generated"
+		}
+		if len(conflicts) > 0 {
+			sort.Strings(conflicts)
+			if len(conflicts) > 20 {
+				conflicts = append(conflicts[:20], fmt.Sprintf("... and %d more", len(conflicts)-20))
+			}
+			return "fail", conflicts, fmt.Errorf("%d declaration identities hold conflicting dispositions", len(conflicts))
 		}
 		counts := map[string]int{}
 		var unreconciled []string
