@@ -108,13 +108,36 @@ func newModule(modulePath, pkgPath, pkgName string, unit ir.Scope, context *pack
 		for _, obligation := range unit.ExternalTypes() {
 			typeID := obligation.Pkg + "." + obligation.Name
 			methods := module.ExternMethods[typeID]
+			kept := methods[:0]
 			for i := range methods {
-				adapter, adapterType, err := externAdapter(module, unit, context, sourceDir, obligation, methods[i].Name)
+				// Resolve the signature and check for withheld references
+				// BEFORE any symbol is marked used, so a dropped member
+				// leaves no import behind.
+				refs, err := externMethodRefs(unit, context, sourceDir, obligation, methods[i].Name)
 				if err != nil {
 					return nil, err
 				}
-				methods[i].Adapter = adapter
-				methods[i].AdapterType = adapterType
+				withheldRef := false
+				for _, ref := range refs {
+					if _, is := withheld[ref]; is {
+						withheldRef = true
+						break
+					}
+				}
+				if withheldRef {
+					continue
+				}
+				kept = append(kept, methods[i])
+			}
+			module.ExternMethods[typeID] = kept
+			// Build adapters only for surviving members.
+			for i := range module.ExternMethods[typeID] {
+				adapter, adapterType, _, err := externAdapter(module, unit, context, sourceDir, obligation, module.ExternMethods[typeID][i].Name)
+				if err != nil {
+					return nil, err
+				}
+				module.ExternMethods[typeID][i].Adapter = adapter
+				module.ExternMethods[typeID][i].AdapterType = adapterType
 			}
 		}
 	}
@@ -122,7 +145,7 @@ func newModule(modulePath, pkgPath, pkgName string, unit ir.Scope, context *pack
 }
 
 // externAdapter spells one external method's typed vtable arrow.
-func externAdapter(module *emit.Module, unit ir.Scope, context *packages.Package, sourceDir string, obligation *ir.ExternTypeObligation, name string) (string, string, error) {
+func externAdapter(module *emit.Module, unit ir.Scope, context *packages.Package, sourceDir string, obligation *ir.ExternTypeObligation, name string) (string, string, []string, error) {
 	method := obligation.Methods[name]
 	signature := method.Type().(*types.Signature)
 	handle := ir.Type{Kind: ir.KindExternal, Go: obligation.Pkg + "." + obligation.Name, Named: obligation.Name, Pkg: obligation.Pkg}
@@ -131,7 +154,7 @@ func externAdapter(module *emit.Module, unit ir.Scope, context *packages.Package
 	for i := range signature.Params().Len() {
 		t, err := ir.ResolveType(context, sourceDir, unit, signature.Params().At(i).Type(), token.NoPos)
 		if err != nil {
-			return "", "", err
+			return "", "", nil, err
 		}
 		params = append(params, ir.Var{Name: fmt.Sprintf("p%d", i), Type: t})
 	}
@@ -139,21 +162,79 @@ func externAdapter(module *emit.Module, unit ir.Scope, context *packages.Package
 	for i := range signature.Results().Len() {
 		t, err := ir.ResolveType(context, sourceDir, unit, signature.Results().At(i).Type(), token.NoPos)
 		if err != nil {
-			return "", "", err
+			return "", "", nil, err
 		}
 		results = append(results, t)
 	}
 	callee, err := module.Symbol(obligation.Pkg, emit.ExternMethodSymbol(obligation.Name, name))
 	if err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 	adapter, err := emit.TypedAdapter(module, params, results, callee)
 	if err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 	adapterType, err := emit.TypedAdapterType(module, params, results)
 	if err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
-	return adapter, adapterType, nil
+	var refs []string
+	seen := map[string]bool{}
+	for _, p := range params {
+		collectPkgRefs(p.Type, seen, &refs)
+	}
+	for _, r := range results {
+		collectPkgRefs(r, seen, &refs)
+	}
+	return adapter, adapterType, refs, nil
+}
+
+// collectPkgRefs gathers every package path an ir.Type references.
+func collectPkgRefs(t ir.Type, seen map[string]bool, out *[]string) {
+	if t.Pkg != "" && !seen[t.Pkg] {
+		seen[t.Pkg] = true
+		*out = append(*out, t.Pkg)
+	}
+	if t.Elem != nil {
+		collectPkgRefs(*t.Elem, seen, out)
+	}
+	if t.Key != nil {
+		collectPkgRefs(*t.Key, seen, out)
+	}
+	for _, arg := range t.TypeArgs {
+		collectPkgRefs(arg, seen, out)
+	}
+	for _, member := range t.IfaceMembers {
+		if member.Pkg != "" && !seen[member.Pkg] {
+			seen[member.Pkg] = true
+			*out = append(*out, member.Pkg)
+		}
+	}
+}
+
+// externMethodRefs resolves one external method's signature and returns
+// the package paths it references, without touching the module.
+func externMethodRefs(unit ir.Scope, context *packages.Package, sourceDir string, obligation *ir.ExternTypeObligation, name string) ([]string, error) {
+	signature := obligation.Methods[name].Type().(*types.Signature)
+	var refs []string
+	seen := map[string]bool{}
+	add := func(goType types.Type) error {
+		t, err := ir.ResolveType(context, sourceDir, unit, goType, token.NoPos)
+		if err != nil {
+			return err
+		}
+		collectPkgRefs(t, seen, &refs)
+		return nil
+	}
+	for i := range signature.Params().Len() {
+		if err := add(signature.Params().At(i).Type()); err != nil {
+			return nil, err
+		}
+	}
+	for i := range signature.Results().Len() {
+		if err := add(signature.Results().At(i).Type()); err != nil {
+			return nil, err
+		}
+	}
+	return refs, nil
 }
