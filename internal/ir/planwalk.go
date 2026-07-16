@@ -242,6 +242,9 @@ func (s *slicePlanner) walkExpr(e Expr) {
 		for _, argument := range n.Args {
 			s.escapeIfSlice(argument)
 		}
+	case *ParamEqual:
+		s.walkExpr(n.L)
+		s.walkExpr(n.R)
 	case *MethodValue:
 		s.escapeIfSlice(n.Recv)
 	case *CellNew:

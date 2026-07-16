@@ -334,6 +334,24 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		return p.zeroLiteral(n.T)
 	case *ir.ExternZero:
 		return p.zeroLiteral(n.T)
+	case *ir.ParamEqual:
+		left, err := p.printExpr(n.L)
+		if err != nil {
+			return "", err
+		}
+		right, err := p.printExpr(n.R)
+		if err != nil {
+			return "", err
+		}
+		op, has := p.eqOps[n.Param]
+		if !has {
+			return "", fmt.Errorf("no equality operation in scope for type parameter %q", n.Param)
+		}
+		call := op + "(" + left + ", " + right + ")"
+		if n.Negate {
+			return "(!" + call + ")", nil
+		}
+		return call, nil
 	case *ir.ParamZero:
 		return p.zeroLiteral(n.T)
 	case *ir.ExternVar:
@@ -508,75 +526,4 @@ func (p *printer) printArgs(args []ir.Expr) (string, error) {
 		parts[i] = printed
 	}
 	return joinComma(parts), nil
-}
-
-// zeroFactoryArgs spells one zero factory per instantiated type
-// argument, the trailing arguments of every generic call.
-func (p *printer) zeroFactoryArgs(typeArgs []ir.Type) (string, error) {
-	parts := make([]string, len(typeArgs))
-	for i, arg := range typeArgs {
-		zero, err := p.zeroLiteral(arg)
-		if err != nil {
-			return "", err
-		}
-		parts[i] = "() => " + zero
-	}
-	return joinComma(parts), nil
-}
-
-// zeroLiteral spells the Go zero value of a reviewed type in TypeScript.
-// A struct zero is a fresh instance from the class's zero factory.
-func (p *printer) zeroLiteral(t ir.Type) (string, error) {
-	switch {
-	case t.Kind == ir.KindBool:
-		return "false", nil
-	case t.Kind == ir.KindString:
-		return `""`, nil
-	case t.Kind == ir.KindIface && t.TypeParamName != "":
-		factory, has := p.zeroFactories[t.TypeParamName]
-		if !has {
-			return "", fmt.Errorf("no zero factory in scope for type parameter %q", t.TypeParamName)
-		}
-		return factory + "()", nil
-	case t.Kind.Nilable():
-		return "undefined", nil
-	case t.Kind == ir.KindStruct:
-		class, err := p.module.symbol(t.Pkg, t.Named)
-		if err != nil {
-			return "", err
-		}
-		if len(t.TypeArgs) > 0 {
-			args := make([]string, len(t.TypeArgs))
-			factories := make([]string, len(t.TypeArgs))
-			for i, arg := range t.TypeArgs {
-				spelled, err := p.tsType(arg)
-				if err != nil {
-					return "", err
-				}
-				args[i] = spelled
-				zero, err := p.zeroLiteral(arg)
-				if err != nil {
-					return "", err
-				}
-				factories[i] = "() => " + zero
-			}
-			return class + ".goZero$<" + joinComma(args) + ">(" + joinComma(factories) + ")", nil
-		}
-		return class + ".goZero$()", nil
-	case t.Kind == ir.KindArray:
-		return p.arrayZeroFactory(t)
-	case t.Kind == ir.KindUnit:
-		return "0", nil
-	case t.Kind == ir.KindExternal:
-		callee, err := p.module.symbol(t.Pkg, externZeroSymbol(t.Named))
-		if err != nil {
-			return "", err
-		}
-		return callee + "()", nil
-	case t.Kind.Wide64():
-		return "0n", nil
-	case t.Kind.Integer(), t.Kind.Float():
-		return "0", nil
-	}
-	return "", fmt.Errorf("no zero literal for type %q", t.Go)
 }

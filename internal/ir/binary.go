@@ -47,6 +47,13 @@ func (b *builder) buildBinary(n *ast.BinaryExpr, resultType types.Type) (Expr, e
 	operand := left.Type()
 
 	if n.Op == token.EQL || n.Op == token.NEQ {
+		// == over a type-parameter value dispatches to the instantiation's
+		// exact equality, not a shared === (which is wrong for interface
+		// instantiations).
+		if operand.Kind == KindIface && operand.TypeParamName != "" {
+			b.use("paramEqual")
+			return &ParamEqual{L: left, R: right, Negate: n.Op == token.NEQ, Param: operand.TypeParamName}, nil
+		}
 		if mixed, err := b.buildIfaceEquality(n, left, right, span); mixed != nil || err != nil {
 			return mixed, err
 		}

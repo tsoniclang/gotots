@@ -42,3 +42,16 @@ type ParamZero struct{ T Type }
 
 func (*ParamZero) expr()        {}
 func (z *ParamZero) Type() Type { return z.T }
+
+// ParamEqual is == / != over type-parameter values: the instantiation's
+// eq operation (a trailing parameter of every generic function) makes it
+// exact — direct === for comparable scalars, interface equality (with
+// the uncomparable panic) for interface instantiations.
+type ParamEqual struct {
+	L, R   Expr
+	Negate bool
+	Param  string // the type parameter name
+}
+
+func (*ParamEqual) expr()        {}
+func (e *ParamEqual) Type() Type { return Type{Kind: KindBool, Go: "bool"} }

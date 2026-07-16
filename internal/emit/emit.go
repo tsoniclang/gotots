@@ -243,6 +243,9 @@ type printer struct {
 	// zeroFactories maps in-scope type parameters to their zero-factory
 	// parameter names while a generic goZero$ body prints.
 	zeroFactories map[string]string
+	// eqOps maps in-scope type parameters to their equality-operation
+	// parameter names while a generic body prints.
+	eqOps map[string]string
 	// slicePlans maps this body's slice-typed locals to their selected
 	// representation; "native-array" locals lower onto plain arrays.
 	slicePlans map[string]string
@@ -300,8 +303,10 @@ func printFunc(out *strings.Builder, module *Module, function *ir.Func) error {
 	p.indent++
 	if len(function.TypeParams) > 0 {
 		p.zeroFactories = map[string]string{}
+		p.eqOps = map[string]string{}
 		for _, param := range function.TypeParams {
 			p.zeroFactories[param] = "zero$" + param
+			p.eqOps[param] = "eq$" + param
 		}
 	}
 	if err := p.printDeferWrappedBody(function.Body, function.UsesDeferStack); err != nil {
@@ -321,10 +326,16 @@ func (p *printer) functionSignature(function *ir.Func) (string, error) {
 		}
 		params = append(params, tsName(parameter.Name)+": "+spelled)
 	}
-	// A generic function takes one zero factory per type parameter as
-	// trailing parameters: the instantiation's exact zeros.
+	// A generic function takes one zero factory and one equality
+	// operation per type parameter as trailing parameters: the
+	// instantiation's exact zero and exact == (direct === for comparable
+	// scalars, interface equality with the uncomparable panic for
+	// interface instantiations).
 	for _, param := range function.TypeParams {
 		params = append(params, "zero$"+param+": () => "+param)
+	}
+	for _, param := range function.TypeParams {
+		params = append(params, "eq$"+param+": (a: "+param+", b: "+param+") => boolean")
 	}
 	result, err := p.tsResultType(function.Results)
 	if err != nil {
