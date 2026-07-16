@@ -37,3 +37,52 @@ func TestSweepIgnoresComments(t *testing.T) {
 		t.Errorf("comment flagged: %+v", v)
 	}
 }
+
+// TestMutationInjectedDispatchIsCaught proves the sweep fails closed on
+// injected erased dispatch — the mutation test the acceptance spec
+// requires: forging a registry or erased call into generated output must
+// be rejected, and no file-local form evades detection.
+func TestMutationInjectedDispatchIsCaught(t *testing.T) {
+	mutations := []struct {
+		name    string
+		line    string
+		pattern string
+	}{
+		{"registry-record", "const table: Record<string, Function> = {};", "record-function-table"},
+		{"registry-map", "const t = new Map<string, Function>();", "map-function-table"},
+		{"name-dispatch", "return goif$.goIfaceCall(i, \"M|abc\", []);", "iface-name-dispatch"},
+		{"method-table", "const fn = box.r.m[method];", "method-table-index"},
+		{"func-invoke", "return goFuncInvoke(fn, args);", "erased-func-invoke"},
+		{"external-registry", "return goExternalCall(\"strings.Clone\", [v]);", "external-registry-call"},
+		{"computed-call", "return obj[methodName](arg);", "computed-member-call"},
+		{"apply-dispatch", "return obj[key].apply(obj, args);", "computed-member-call"},
+		{"eval", "return eval(source);", "eval"},
+		{"reflect", "return Reflect.get(o, k);", "reflect-construct"},
+		{"erased-func-type", "let f: Function = g;", "erased-function-type"},
+	}
+	for _, m := range mutations {
+		t.Run(m.name, func(t *testing.T) {
+			v := Sweep(map[string]string{"core/pkg/package.ts": m.line})
+			found := false
+			for _, viol := range v {
+				if viol.Pattern == m.pattern {
+					found = true
+				}
+			}
+			if !found {
+				t.Errorf("injected %q not caught as %q; got %+v", m.line, m.pattern, v)
+			}
+		})
+	}
+}
+
+// TestNoFileLocalSuppression proves an in-file allowlist comment cannot
+// exempt a prohibited site.
+func TestNoFileLocalSuppression(t *testing.T) {
+	files := map[string]string{
+		"a.ts": "// staticness-allow: registry\nconst t: Record<string, Function> = {};",
+	}
+	if len(Sweep(files)) == 0 {
+		t.Error("a file-local allowlist comment must not suppress a prohibited site")
+	}
+}

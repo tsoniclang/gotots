@@ -10,6 +10,7 @@
 package staticness
 
 import (
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -57,7 +58,28 @@ var prohibited = []pattern{
 	contains("eval", "eval("),
 	contains("proxy", "new Proxy("),
 	contains("function-constructor", "new Function("),
+	contains("reflect-construct", "Reflect."),
+	contains("constructor-name", ".constructor"),
+	// Computed-member invocation: a call through a dynamically selected
+	// member is name-selected dispatch. Matches `[<expr>](` and
+	// `[<expr>].call(`/`.apply(`.
+	pattern{id: "computed-member-call", matches: func(line string) bool {
+		return computedMemberCall.MatchString(line)
+	}},
+	// Erased argument carriers passed positionally to a call.
+	pattern{id: "erased-arg-array", matches: func(line string) bool {
+		return strings.Contains(line, "...(args as unknown[])") ||
+			strings.Contains(line, "as unknown[])(") || strings.Contains(line, ": unknown[]): unknown")
+	}},
+	// A cast recovering a value from an erased dispatch result.
+	contains("erased-result-cast", ") as unknown)("),
 }
+
+// computedMemberCall matches a call through a computed (dynamically
+// selected) member — obj[expr](...) or obj[expr].call/apply — which is
+// name-selected dispatch. It deliberately does not match numeric or
+// bigint index reads followed by no call.
+var computedMemberCall = regexp.MustCompile(`\][ ]*\(|\][ ]*\.(call|apply)\(`)
 
 // Sweep scans every generated file and returns each prohibited site,
 // sorted by file then line. files maps generated paths to source.
