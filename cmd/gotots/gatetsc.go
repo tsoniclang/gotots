@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/tsoniclang/gotots/internal/census"
 	"github.com/tsoniclang/gotots/internal/goenv"
 	"github.com/tsoniclang/gotots/internal/pinning"
 	"github.com/tsoniclang/gotots/internal/productinputs"
 	"github.com/tsoniclang/gotots/internal/profile"
+	"github.com/tsoniclang/gotots/internal/staticness"
 	"github.com/tsoniclang/gotots/internal/translate"
 )
 
@@ -89,8 +91,33 @@ func runTscGate(repoDir, profilePath, buildProfile, sourceDir string, report *Ga
 		}
 		return "fail", lines, fmt.Errorf("strict typecheck rejected the generated output")
 	}
+	// The staticness sweep: every generated file (ABI, core, stubs) must
+	// be free of erased or name-selected dispatch. There are no
+	// file-local suppressions.
+	violations := staticness.Sweep(generated.Files)
+	if len(violations) > 0 {
+		counts := staticness.Counts(violations)
+		keys := make([]string, 0, len(counts))
+		for key := range counts {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		details := make([]string, 0, len(keys)+8)
+		for _, key := range keys {
+			details = append(details, fmt.Sprintf("%s: %d", key, counts[key]))
+		}
+		for i, v := range violations {
+			if i >= 8 {
+				details = append(details, fmt.Sprintf("... and %d more sites", len(violations)-8))
+				break
+			}
+			details = append(details, fmt.Sprintf("%s:%d %s", v.File, v.Line, v.Pattern))
+		}
+		return "fail", details, fmt.Errorf("staticness sweep found %d prohibited dispatch sites", len(violations))
+	}
 	return "pass", []string{
 		fmt.Sprintf("strict tsc (%s@%s) accepted %d generated files", productPin.TypescriptCompiler.Package, productPin.TypescriptCompiler.Version, len(generated.Files)),
+		"staticness sweep: zero erased or name-selected dispatch sites",
 		fmt.Sprintf("withheld packages (honest unimplemented, not typechecked): %d", len(generated.Withheld)),
 	}, nil
 }
