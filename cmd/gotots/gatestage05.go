@@ -16,6 +16,9 @@ import (
 // signature or an explicit unimplemented record, over the census
 // denominator, with orphan proofs rejected.
 func runSignatureCompletenessGate(firstRun *census.Result, corpusGenerated *translate.Generated) (string, []string, error) {
+	if firstRun == nil || firstRun.Shapes == nil || corpusGenerated == nil {
+		return "blocked", []string{"census shapes or corpus generation did not run"}, nil
+	}
 	// The verified denominator is the PRODUCTION function/method shape
 	// set: test-scope declarations receive their disposition through the
 	// test-ledger stages, exactly like the census reconciliation.
@@ -26,9 +29,6 @@ func runSignatureCompletenessGate(firstRun *census.Result, corpusGenerated *tran
 		}
 	}
 
-	if firstRun == nil || firstRun.Shapes == nil || corpusGenerated == nil {
-		return "blocked", []string{"census shapes or corpus generation did not run"}, nil
-	}
 	// Independent verification over the CENSUS DENOMINATOR, never
 	// only the proofs that happen to exist: every census function and
 	// method shape must be accounted for — a matching proof signature
@@ -75,9 +75,7 @@ func runSignatureCompletenessGate(firstRun *census.Result, corpusGenerated *tran
 			defects = append(defects, "")
 		}
 	}
-	if verified == 0 {
-		return "fail", nil, fmt.Errorf("zero signatures verified: the proof set is empty or disjoint from the census")
-	}
+
 	// Reverse join: a proof for an identity absent from the census is
 	// an orphan record.
 	censusIDs := map[string]bool{}
@@ -95,6 +93,9 @@ func runSignatureCompletenessGate(firstRun *census.Result, corpusGenerated *tran
 			}
 		}
 	}
+	if verified == 0 && len(defects) == 0 && denominator > unimplementedCount {
+		return "fail", nil, fmt.Errorf("zero signatures verified: the proof set is empty or disjoint from the census")
+	}
 	if n := len(defects); n > 0 {
 		compact := defects[:0]
 		for _, d := range defects {
@@ -110,4 +111,10 @@ func runSignatureCompletenessGate(firstRun *census.Result, corpusGenerated *tran
 		fmt.Sprintf("explicit unimplemented records: %d", unimplementedCount),
 		fmt.Sprintf("orphan proofs: %d", orphans),
 	}, nil
+}
+
+// signatureHashOf is the canonical signature digest stage 05 verifies.
+func signatureHashOf(signature string) string {
+	digest := sha256.Sum256([]byte(signature))
+	return hex.EncodeToString(digest[:])
 }

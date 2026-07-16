@@ -27,8 +27,15 @@ type Proof struct {
 	GeneratedSymbol string `json:"generatedSymbol,omitempty"`
 	// ModuleRetained states whether the body survived into a runnable
 	// module: the ir-admitted / module-retained evidence-stage split, per
-	// proof rather than inferred from aggregates.
+	// proof rather than inferred from aggregates. It is true exactly when
+	// the package is retained AND the generated file exists AND the
+	// generated symbol exists in it — finalized once, after every proof
+	// and file exists.
 	ModuleRetained bool `json:"moduleRetained"`
+	// NoOutput marks a declaration whose exact lowering emits nothing (a
+	// blank variable without initializer, a fold-at-use constant): it is
+	// disposed but never counted as a retained body.
+	NoOutput bool `json:"noOutput,omitempty"`
 }
 
 // BodySupport is one implementation unit's support-state record: every

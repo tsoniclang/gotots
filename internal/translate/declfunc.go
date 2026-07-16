@@ -17,8 +17,11 @@ import (
 func translateFunc(p *packages.Package, sourceDir string, unit ir.Scope, relativeFile string, source []byte, decl *ast.FuncDecl, options Options) (*ir.Func, *Proof, error) {
 	name := decl.Name.Name
 	id := goid.Func(p.PkgPath, name)
+	generatedSymbol := name
 	if decl.Recv != nil {
 		id = goid.Method(p.PkgPath, receiverBase(decl.Recv), name)
+		// The emitted method function spells Type$Method.
+		generatedSymbol = receiverBase(decl.Recv) + "$" + name
 	} else if goid.IsRepeatable("func", name) {
 		// init and blank functions repeat legally: their identities are
 		// position-qualified, exactly like the census records them.
@@ -75,7 +78,7 @@ func translateFunc(p *packages.Package, sourceDir string, unit ir.Scope, relativ
 		Operations:      function.Operations,
 		Representations: representations,
 		LoweringPlan:    LoweringPlanV2,
-		GeneratedSymbol: name,
+		GeneratedSymbol: generatedSymbol,
 	}, nil
 }
 

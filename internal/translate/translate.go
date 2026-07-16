@@ -58,7 +58,6 @@ func Packages(pkgs []*packages.Package, sourceDir string, options Options) (*Gen
 		}
 	}
 	withholdDependents(out, sorted)
-	reconcileProofRetention(out)
 	if err := emitExternalStubs(out, unit, sorted[0], sourceDir, options); err != nil {
 		return nil, err
 	}
@@ -87,6 +86,12 @@ func Packages(pkgs []*packages.Package, sourceDir string, options Options) (*Gen
 
 	sort.Slice(out.Proofs, func(i, j int) bool { return out.Proofs[i].ID < out.Proofs[j].ID })
 	sort.Slice(out.Support, func(i, j int) bool { return out.Support[i].ID < out.Support[j].ID })
+	// The single final evidence pass: every file and proof now exists
+	// (core, ABI, external stubs), so stages finalize exactly once and
+	// invalid evidence is a build failure, not a normalization.
+	if err := finalizeEvidenceStages(out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
@@ -375,6 +380,8 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 			}
 			if funcDecl.Recv == nil && funcDecl.Name.Name == "init" {
 				function.Name = fmt.Sprintf("init$%d", len(initCalls))
+				// The proof records the exact emitted symbol.
+				proof.GeneratedSymbol = function.Name
 				if function.Support == ir.SupportGenerated {
 					initCalls = append(initCalls, function.Name)
 				}

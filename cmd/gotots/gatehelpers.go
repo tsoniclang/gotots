@@ -136,12 +136,24 @@ func reconcileDispositions(prof *profile.Profile, firstRun *census.Result, gener
 			conflicts = append(conflicts, fmt.Sprintf("%s: duplicate proof record", proof.ID))
 		}
 		proofSeen[proof.ID] = true
-		// Every retained generated-file reference must resolve to an
-		// emitted file — no phantom references.
-		if proof.GeneratedFile != "" {
-			if _, exists := generated.Files[proof.GeneratedFile]; !exists {
-				conflicts = append(conflicts, fmt.Sprintf("%s: phantom generated file %s", proof.ID, proof.GeneratedFile))
-			}
+		// Bidirectional stage verification of the proof's OWN claim:
+		// moduleRetained ⇔ package retained ∧ generated file exists (the
+		// generator's finalization already proved symbol presence; the
+		// gate re-derives the rest independently).
+		_, pkgWithheld := generated.Withheld[proof.Package]
+		_, fileExists := generated.Files[proof.GeneratedFile]
+		switch {
+		case proof.ModuleRetained && pkgWithheld:
+			conflicts = append(conflicts, fmt.Sprintf("%s: claims module-retained inside withheld package %s", proof.ID, proof.Package))
+		case proof.ModuleRetained && (proof.GeneratedFile == "" || !fileExists):
+			conflicts = append(conflicts, fmt.Sprintf("%s: claims module-retained with no emitted file", proof.ID))
+		case !proof.ModuleRetained && !pkgWithheld && !proof.NoOutput:
+			conflicts = append(conflicts, fmt.Sprintf("%s: unretained despite an emitted package and no no-output disposition", proof.ID))
+		case proof.NoOutput && proof.GeneratedFile != "":
+			conflicts = append(conflicts, fmt.Sprintf("%s: no-output disposition with a generated file reference", proof.ID))
+		}
+		if proof.GeneratedFile != "" && !fileExists {
+			conflicts = append(conflicts, fmt.Sprintf("%s: phantom generated file %s", proof.ID, proof.GeneratedFile))
 		}
 	}
 	for _, proof := range generated.Proofs {
@@ -155,6 +167,17 @@ func reconcileDispositions(prof *profile.Profile, firstRun *census.Result, gener
 		}
 		covered[proof.ID] = "generated"
 	}
+	retention := map[string]string{}
+	for _, proof := range generated.Proofs {
+		switch {
+		case proof.ModuleRetained:
+			retention[proof.ID] = "retained"
+		case proof.NoOutput:
+			retention[proof.ID] = "no-output"
+		default:
+			retention[proof.ID] = "blocked"
+		}
+	}
 	counts := map[string]int{}
 	var unreconciled []string
 	for _, decl := range firstRun.Report.Declarations {
@@ -162,9 +185,11 @@ func reconcileDispositions(prof *profile.Profile, firstRun *census.Result, gener
 			counts["test-scope"]++
 			continue
 		}
-		if class, _ := prof.Classify(decl.Package); class != profile.ClassOwned {
-			counts["unowned"]++
-			continue
+		if prof != nil {
+			if class, _ := prof.Classify(decl.Package); class != profile.ClassOwned {
+				counts["unowned"]++
+				continue
+			}
 		}
 		if decl.Kind == "const" {
 			counts["const-fold-at-use"]++
@@ -172,13 +197,15 @@ func reconcileDispositions(prof *profile.Profile, firstRun *census.Result, gener
 		}
 		if state, has := covered[decl.ID]; has {
 			counts[state]++
-			// The valid per-declaration stage join: a disposed
-			// declaration is module-retained-blocked exactly when its
-			// package is withheld.
-			if _, withheld := generated.Withheld[decl.Package]; withheld {
-				counts["stage:module-retained-blocked"]++
-			} else {
+			// The valid per-declaration stage join, from each proof's own
+			// verified stage claim (bidirectionally checked above).
+			switch retention[decl.ID] {
+			case "retained":
 				counts["stage:module-retained"]++
+			case "no-output":
+				counts["stage:no-output"]++
+			default:
+				counts["stage:module-retained-blocked"]++
 			}
 			continue
 		}
@@ -273,4 +300,17 @@ func binaryBuildProvenance() (revision string, modified bool) {
 		}
 	}
 	return revision, modified
+}
+
+// checkBinaryProvenance fails closed unless the executing binary's
+// VCS-stamped revision exists and matches the checkout: an unstamped or
+// stale binary can never label a gate report.
+func checkBinaryProvenance(binaryRevision, checkoutRevision string) error {
+	if binaryRevision == "" {
+		return fmt.Errorf("executing binary carries no VCS build stamp; build inside the repository so provenance is attested")
+	}
+	if binaryRevision != checkoutRevision {
+		return fmt.Errorf("executing binary was built from %s but the checkout is %s; rebuild before gating", binaryRevision, checkoutRevision)
+	}
+	return nil
 }

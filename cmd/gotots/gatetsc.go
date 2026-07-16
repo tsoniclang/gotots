@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/tsoniclang/gotots/internal/census"
 	"github.com/tsoniclang/gotots/internal/goenv"
@@ -120,6 +121,18 @@ func runTscGate(repoDir, profilePath, buildProfile, sourceDir string, report *Ga
 			details = append(details, fmt.Sprintf("%s:%d %s", v.File, v.Line, v.Pattern))
 		}
 		return "fail", details, fmt.Errorf("AST staticness verifier found %d prohibited dispatch sites", len(astReport.Violations))
+	}
+	// The accepted interface specification (docs/spec/06) requires a
+	// closed statically typed payload; the current carrier still holds an
+	// erased unknown payload recovered by casts at dispatch. Until the
+	// representation redesign lands, this stage is BLOCKED — passing
+	// would attest output that contradicts the accepted specification.
+	if iface, ok := generated.Files["language-abi/goiface.ts"]; ok && strings.Contains(iface, "readonly v: unknown") {
+		return "blocked", []string{
+			"interface carrier retains an erased unknown payload (GoIfaceBox.v: unknown) with cast recovery at dispatch",
+			"contradicts docs/spec/06-interfaces-generics-functions.md (closed statically typed payload union required)",
+			"the representation redesign (spec/ADR pending) unblocks this stage",
+		}, nil
 	}
 	violations := staticness.Sweep(generated.Files)
 	if len(violations) > 0 {

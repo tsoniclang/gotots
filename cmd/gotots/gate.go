@@ -89,21 +89,20 @@ func runGate(args []string) error {
 	if err != nil {
 		return fmt.Errorf("resolve implementation revision: %w", err)
 	}
+	implementationRevision = strings.TrimSpace(implementationRevision)
 	// The executing binary attests its own build provenance: a stale or
 	// locally built binary cannot silently label its report with the
 	// checkout revision. `go run`/`go test` builds carry VCS stamping
 	// when built inside the repository; a binary whose stamped revision
 	// disagrees with the checkout fails closed.
 	binaryRevision, binaryModified := binaryBuildProvenance()
-	if binaryRevision != "" {
-		if binaryRevision != implementationRevision {
-			return fmt.Errorf("executing binary was built from %s but the checkout is %s; rebuild before gating", binaryRevision, implementationRevision)
-		}
-		if binaryModified {
-			// The clean-tree stage will fail too, but the provenance
-			// mismatch is reported at the source.
-			fmt.Fprintln(os.Stderr, "gate: executing binary was built from a modified tree")
-		}
+	if err := checkBinaryProvenance(binaryRevision, implementationRevision); err != nil {
+		return err
+	}
+	if binaryModified {
+		// The clean-tree stage will fail too, but the provenance
+		// mismatch is reported at the source.
+		fmt.Fprintln(os.Stderr, "gate: executing binary was built from a modified tree")
 	}
 	specificationDigest, err := digestFile(filepath.Join(*repoDir, "docs", "spec", "manifest.json"))
 	if err != nil {
@@ -412,6 +411,14 @@ func runGate(args []string) error {
 		// proved plan stability. Here the selections themselves are
 		// verified: a native selection may appear only with the direct
 		// lowering evidence, never alongside carrier operations.
+		// The interface family's current representation contradicts the
+		// accepted specification (erased unknown payload); representation
+		// verification cannot pass over a known spec violation.
+		if iface, ok := corpusGenerated.Files["language-abi/goiface.ts"]; ok && strings.Contains(iface, "readonly v: unknown") {
+			return "blocked", []string{
+				"interface representation contradicts docs/spec/06 (erased unknown payload); redesign pending",
+			}, nil
+		}
 		// Every recorded representation selection must be a member of the
 		// closed candidate set — an unknown candidate is forged or drifted
 		// evidence, rejected rather than counted.

@@ -4,8 +4,10 @@
 package translate
 
 import (
+	"fmt"
 	"path"
 	"sort"
+	"strings"
 
 	"golang.org/x/tools/go/packages"
 )
@@ -13,30 +15,73 @@ import (
 // withholdDependents extends withholding over the unit dependency
 // graph: a runnable module cannot import a withheld one, so every
 // dependent package is withheld too (its analysis records remain).
-// reconcileProofRetention finalizes each proof's evidence stage after
-// withholding: a proof in an emitted package is module-retained; a proof
-// in a withheld package keeps its analysis identity but must not
-// reference the absent generated file.
-func reconcileProofRetention(out *Generated) {
+// finalizeEvidenceStages is the single, final evidence pass, run after
+// EVERY generated file and proof exists (core, ABI, external stubs).
+// The invariant is bidirectional: moduleRetained ⇔ the package is
+// retained ∧ the generated file exists ∧ the generated symbol appears in
+// it. Invalid evidence is a returned defect — never normalized away.
+// No-output declarations carry their explicit disposition and are never
+// retained bodies.
+func finalizeEvidenceStages(out *Generated) error {
+	var defects []string
 	for i := range out.Proofs {
 		proof := &out.Proofs[i]
+		if proof.GeneratedFile == "" {
+			// A declaration whose exact lowering emits nothing: explicit
+			// no-output disposition, never a retained body.
+			proof.ModuleRetained = false
+			proof.NoOutput = true
+			continue
+		}
 		if _, withheld := out.Withheld[proof.Package]; withheld {
+			// The package's runnable module is withheld: the proof keeps
+			// its analysis identity, the reference is cleared because the
+			// file genuinely does not exist in the bundle, and the stage
+			// records the blockage.
 			proof.ModuleRetained = false
 			proof.GeneratedFile = ""
 			proof.GeneratedSymbol = ""
 			continue
 		}
-		if _, exists := out.Files[proof.GeneratedFile]; proof.GeneratedFile != "" && !exists {
-			// A generated-file reference must resolve; failing closed here
-			// is a generator defect, surfaced as a stripped reference the
-			// gate rejects rather than a phantom.
-			proof.ModuleRetained = false
-			proof.GeneratedFile = ""
-			proof.GeneratedSymbol = ""
+		content, exists := out.Files[proof.GeneratedFile]
+		if !exists {
+			defects = append(defects, proof.ID+": references absent generated file "+proof.GeneratedFile)
+			continue
+		}
+		if proof.GeneratedSymbol != "" && !symbolPresent(content, proof.GeneratedSymbol) {
+			defects = append(defects, proof.ID+": generated symbol "+proof.GeneratedSymbol+" absent from "+proof.GeneratedFile)
 			continue
 		}
 		proof.ModuleRetained = true
 	}
+	if len(defects) > 0 {
+		sort.Strings(defects)
+		if len(defects) > 10 {
+			defects = append(defects[:10], "...")
+		}
+		return fmt.Errorf("GOTOTS_OUTPUT_EVIDENCE_INVALID: %s", strings.Join(defects, "; "))
+	}
+	return nil
+}
+
+// symbolPresent reports whether the generated module declares the
+// symbol (function, const, class, or type declaration spelling).
+func symbolPresent(content, symbol string) bool {
+	for _, form := range []string{
+		"function " + symbol + "(",
+		"function " + symbol + "<",
+		"const " + symbol + ":",
+		"const " + symbol + " =",
+		"class " + symbol + " ",
+		"class " + symbol + "<",
+		"type " + symbol + " ",
+		"let " + symbol + ":",
+	} {
+		if strings.Contains(content, form) {
+			return true
+		}
+	}
+	return false
 }
 
 func withholdDependents(out *Generated, sorted []*packages.Package) {
