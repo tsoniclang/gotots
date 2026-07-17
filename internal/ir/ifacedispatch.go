@@ -373,26 +373,6 @@ func SignatureMentionsTypeParam(sig *types.Signature) bool {
 	return false
 }
 
-// registerBoxedExtern records the external named component of a boxed
-// value's type in the dynamic-type universe.
-func (b *builder) registerBoxedExtern(source types.Type) {
-	t := types.Unalias(source)
-	if pointer, ok := t.(*types.Pointer); ok {
-		t = types.Unalias(pointer.Elem())
-	}
-	named, ok := t.(*types.Named)
-	if !ok || named.Obj().Pkg() == nil || b.unit.Owns(named.Obj().Pkg().Path()) {
-		return
-	}
-	if named.TypeParams() != nil && named.TypeParams().Len() > 0 {
-		return
-	}
-	if _, isIface := named.Underlying().(*types.Interface); isIface {
-		return
-	}
-	b.unit.AddExternConcrete(named.Obj())
-}
-
 // mentionsTypeParamType reports whether a Go type references any type
 // parameter.
 func mentionsTypeParamType(t types.Type) bool {

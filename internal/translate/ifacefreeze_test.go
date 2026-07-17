@@ -56,3 +56,50 @@ export function Buffer$String(recv: Handle | undefined): string { return (recv a
 		t.Fatalf("differential mismatch:\n--- go ---\n%s--- generated ---\n%s", result.GoOutput, result.TSOutput)
 	}
 }
+
+// TestOracleSealedTupleBoxedExternalImplementer: with the box-site universe
+// mutation removed, the whole-unit pre-pass freeze must recursively reach an
+// external implementer that surfaces only through a producer's multi-result
+// signature. dispatchFirst caches the Stringy union before Case boxes
+// *bytes.Buffer through the tuple-slot forwarding of producer(); the value
+// must dispatch exactly, proving the sealed universe already carried it.
+func TestOracleSealedTupleBoxedExternalImplementer(t *testing.T) {
+	result, err := oracle.RunAssembled(t.TempDir(), map[string]string{"fixture": `package fixture
+
+import "bytes"
+
+type Stringy interface {
+	String() string
+}
+
+func dispatchFirst(s Stringy, tag string) string {
+	return s.String() + tag
+}
+
+func producer() (*bytes.Buffer, string) {
+	var b bytes.Buffer
+	b.WriteString("hi")
+	return &b, "!"
+}
+
+func Case() string {
+	return dispatchFirst(producer())
+}
+`}, map[string]string{
+		"bytes": `import { type GoExtern } from "../../language-abi/goextern.js";
+class BufferEmu { buf = ""; }
+type Handle = GoExtern<"bytes.Buffer">;
+export function Buffer$goZero$(): Handle { return new BufferEmu() as Handle; }
+export function Buffer$goClone$(v: Handle): Handle { const b = v as unknown as BufferEmu; const o = new BufferEmu(); o.buf = b.buf; return o as Handle; }
+export function Buffer$goSet$(dst: Handle, src: Handle): void { (dst as unknown as BufferEmu).buf = (src as unknown as BufferEmu).buf; }
+export function Buffer$WriteString(recv: Handle | undefined, s: string): readonly [bigint, undefined] { const b = recv as unknown as BufferEmu; b.buf += s; return [BigInt(s.length), undefined]; }
+export function Buffer$String(recv: Handle | undefined): string { return (recv as unknown as BufferEmu).buf; }
+`,
+	})
+	if err != nil {
+		t.Fatalf("oracle: %v", err)
+	}
+	if !result.Match() {
+		t.Fatalf("differential mismatch:\n--- go ---\n%s--- generated ---\n%s", result.GoOutput, result.TSOutput)
+	}
+}

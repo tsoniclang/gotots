@@ -78,11 +78,6 @@ type Module struct {
 	// (canonical id + payload type), spelled as exact empty-interface
 	// union members.
 	BoxedComposites []BoxedComposite
-	// OpaqueInterfaces makes interface types spell the opaque helper
-	// supertype (GoIface) rather than the closed union: stub modules
-	// never dispatch, so they carry no union aliases and pull in no
-	// implementer surfaces.
-	OpaqueInterfaces bool
 	// Withheld reports packages whose modules are not in the bundle:
 	// union aliases exclude their classes (nothing of theirs can box at
 	// runtime — their code does not run) and never reference their

@@ -63,25 +63,70 @@ func freezeExternUniverse(unit ir.Scope, pkgs []*packages.Package) {
 	// the universe set is identical every run and its registration order is
 	// deterministic, so all downstream evidence stays byte-stable.
 	candidates := map[string]*types.TypeName{}
-	consider := func(t types.Type) {
-		if t == nil {
+	// consider walks a type's full structure — through pointers, containers,
+	// tuples, signatures, struct fields, and generic type arguments — and
+	// records every external, non-generic, non-interface NAMED type it
+	// reaches. A box site's source type is always a component of some
+	// expression's or used object's type (an owned function's result is a
+	// type-expression in its own AST; an EXTERNAL function's result appears
+	// only inside its signature, reached here by descent), so the frozen set
+	// is a superset of everything any body can box. Freezing the complete
+	// set in this pre-pass — before any interface union is resolved and
+	// cached — is what seals the universe: box sites never introduce an
+	// external implementer a cached union could already have missed.
+	seen := map[types.Type]bool{}
+	var consider func(t types.Type)
+	consider = func(t types.Type) {
+		if t == nil || seen[t] {
 			return
 		}
-		u := types.Unalias(t)
-		if pointer, ok := u.(*types.Pointer); ok {
-			u = types.Unalias(pointer.Elem())
+		seen[t] = true
+		switch u := types.Unalias(t).(type) {
+		case *types.Named:
+			// A named type's own type arguments carry distinct dynamic
+			// identities (List[extern] surfaces extern); descend before the
+			// generic/interface guards so nested externals are never lost.
+			if args := u.TypeArgs(); args != nil {
+				for i := range args.Len() {
+					consider(args.At(i))
+				}
+			}
+			if u.Obj().Pkg() != nil && !unit.Owns(u.Obj().Pkg().Path()) &&
+				(u.TypeParams() == nil || u.TypeParams().Len() == 0) {
+				if _, isIface := u.Underlying().(*types.Interface); !isIface {
+					candidates[u.Obj().Pkg().Path()+"."+u.Obj().Name()] = u.Obj()
+				}
+			}
+			// The underlying structure (struct fields, embedded types) may
+			// name further externals reachable only through this type.
+			consider(u.Underlying())
+		case *types.Pointer:
+			consider(u.Elem())
+		case *types.Slice:
+			consider(u.Elem())
+		case *types.Array:
+			consider(u.Elem())
+		case *types.Chan:
+			consider(u.Elem())
+		case *types.Map:
+			consider(u.Key())
+			consider(u.Elem())
+		case *types.Struct:
+			for i := range u.NumFields() {
+				consider(u.Field(i).Type())
+			}
+		case *types.Tuple:
+			for i := range u.Len() {
+				consider(u.At(i).Type())
+			}
+		case *types.Signature:
+			consider(u.Params())
+			consider(u.Results())
+		case *types.Interface:
+			// An interface is not a boxable dynamic type; its method
+			// signatures reference no additional boxable concrete carriers
+			// that a concrete value would not itself surface.
 		}
-		named, ok := u.(*types.Named)
-		if !ok || named.Obj().Pkg() == nil || unit.Owns(named.Obj().Pkg().Path()) {
-			return
-		}
-		if named.TypeParams() != nil && named.TypeParams().Len() > 0 {
-			return
-		}
-		if _, isIface := named.Underlying().(*types.Interface); isIface {
-			return
-		}
-		candidates[named.Obj().Pkg().Path()+"."+named.Obj().Name()] = named.Obj()
 	}
 	for _, p := range pkgs {
 		for _, tv := range p.TypesInfo.Types {

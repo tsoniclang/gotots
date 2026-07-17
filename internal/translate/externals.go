@@ -80,7 +80,7 @@ func emitExternalStubs(out *Generated, unit ir.Scope, context *packages.Package,
 		if goName == "" {
 			goName = path.Base(external)
 		}
-		module, err := newModule(stubPath, external, goName, unit, context, sourceDir, out.Withheld, true)
+		module, err := newModule(stubPath, external, goName, unit, context, sourceDir, out.Withheld)
 		if err != nil {
 			return err
 		}

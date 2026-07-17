@@ -21,8 +21,11 @@ func (s Scope) AddConcreteType(name *types.TypeName) {
 func (s Scope) ConcreteTypes() []*types.TypeName { return *s.concreteTypes }
 
 // AddExternConcrete records one referenced external named type in the
-// dynamic-type universe (idempotent: a type registered twice — e.g. boxed
-// in two bodies, or pre-frozen then re-seen — appears once).
+// dynamic-type universe. It is called only from the whole-unit pre-pass
+// freeze, which sorts and de-duplicates its candidates by canonical
+// identity, so the universe is sealed once before any interface union is
+// resolved; the object-identity guard keeps the contract idempotent
+// regardless.
 func (s Scope) AddExternConcrete(name *types.TypeName) {
 	for _, existing := range *s.externConcrete {
 		if existing == name {

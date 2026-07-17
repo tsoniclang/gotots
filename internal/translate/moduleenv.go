@@ -19,7 +19,7 @@ import (
 // newModule builds the emission context of one generated module: the
 // language-ABI specifiers plus one specifier per co-generated package,
 // all relative to the module's own directory.
-func newModule(modulePath, pkgPath, pkgName string, unit ir.Scope, context *packages.Package, sourceDir string, withheld map[string]string, opaqueInterfaces bool) (*emit.Module, error) {
+func newModule(modulePath, pkgPath, pkgName string, unit ir.Scope, context *packages.Package, sourceDir string, withheld map[string]string) (*emit.Module, error) {
 	fromDir := path.Dir(modulePath)
 	abiImports := emit.ABIImports{}
 	for _, entry := range []struct {
@@ -96,10 +96,6 @@ func newModule(modulePath, pkgPath, pkgName string, unit ir.Scope, context *pack
 	}
 	module.Withheld = func(pkg string) bool { _, is := withheld[pkg]; return is }
 	module.ExternMethods = externMethods
-	// The opacity choice must be settled BEFORE the vtable adapters below
-	// spell any interface type: a stub module spells interfaces as the
-	// opaque supertype and must register no implementer-union aliases.
-	module.OpaqueInterfaces = opaqueInterfaces
 	// Extern vtable adapters: exactly typed arrows over the stub
 	// exports, spelled here where the obligations' declared signatures
 	// are available. External types then participate in interface

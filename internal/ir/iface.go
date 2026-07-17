@@ -448,7 +448,6 @@ func (b *builder) adaptTupleSlots(inner Expr, sourceTuple *types.Tuple, targets 
 				}
 				b.unit.AddBoxedComposite(rtti.Composite, sourceIR, b.compositeEqPlan(source))
 			}
-			b.registerBoxedExtern(source)
 			slots[i] = TupleSlot{Op: TupleSlotBox, Rtti: rtti, Target: targetIR}
 			any = true
 		default:

@@ -148,10 +148,6 @@ func (b *builder) boxIfaceValue(built Expr, source types.Type, expected Type, sp
 		// and never a concrete boxed member.
 		b.unit.AddBoxedComposite(rtti.Composite, built.Type(), b.compositeEqPlan(source))
 	}
-	// An external named type BOXED here joins the dynamic-type universe:
-	// this catches inferred external dynamic types (value := external.New())
-	// precisely, without walking unrelated external internals.
-	b.registerBoxedExtern(source)
 	b.use("ifaceBox")
 	return &IfaceBox{X: b.bindStructValue(built), Rtti: rtti, T: expected}, nil
 }
