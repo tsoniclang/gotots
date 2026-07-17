@@ -64,6 +64,71 @@ type ProbeResult struct {
 	// classification ("generated" or "unimplemented"), the join key for
 	// reconciling probe results against corpus support ledgers.
 	PerBodyState map[string]string `json:"perBodyState"`
+	// ClassInventory summarizes every unsupported class blocking the
+	// corpus: its disposition category (the kind of solution it needs),
+	// the shared root abstraction that would clear the whole class, and
+	// the exact unique-unit and raw-site counts — the reusable-solution
+	// roadmap, so no repeated class is silently routed to manual bodies.
+	ClassInventory []ClassRow `json:"classInventory"`
+	// UnimplementedUnits is one machine-readable row per unimplemented
+	// body, carrying EVERY unsupported site (not only the first) with its
+	// classification — the exhaustive residual accounting.
+	UnimplementedUnits []UnitInventory `json:"unimplementedUnits"`
+}
+
+// ClassRow is one unsupported class's residual-inventory summary.
+type ClassRow struct {
+	Class    string `json:"class"`
+	Category string `json:"category"`
+	Root     string `json:"rootAbstraction"`
+	Units    int    `json:"units"`
+	Sites    int    `json:"sites"`
+}
+
+// UnitInventory is one unimplemented body with every unsupported site.
+type UnitInventory struct {
+	ID    string          `json:"id"`
+	Sites []InventorySite `json:"sites"`
+}
+
+// InventorySite is one classified unsupported site.
+type InventorySite struct {
+	Class     string `json:"class"`
+	Category  string `json:"category"`
+	Construct string `json:"construct"`
+	File      string `json:"file"`
+	Line      int    `json:"line"`
+}
+
+// classifySite maps one unsupported-site class to its disposition
+// category and the shared root abstraction that would clear the class.
+// The category names the KIND of solution required — a language lowering,
+// a representation-planning decision, an external typed contract, or a
+// product policy — so no repeated class is silently deferred to a manual
+// body. The default is a language lowering (an owned-code construct not
+// yet lowered), never an unexplained "miscellaneous" bucket.
+func classifySite(class string) (category, root string) {
+	switch {
+	case strings.Contains(class, "map key type"):
+		return "representation-planning", "keyed-map: per-instantiation static key encoding (uniform keyed carrier)"
+	case strings.Contains(class, "value-copy carrier") || strings.Contains(class, "instantiated with a struct value"):
+		return "language-lowering", "generic value semantics: per-instantiation copy operation threading"
+	case strings.Contains(class, "channel type") || strings.Contains(class, "*ast.GoStmt") ||
+		strings.Contains(class, "*ast.SelectStmt") || strings.Contains(class, "*ast.SendStmt") ||
+		strings.Contains(class, "builtin statement close") || strings.Contains(class, "builtin recover"):
+		return "product-policy", "concurrency: one explicit TS-Go concurrency product policy"
+	case strings.Contains(class, "outside the translated unit") || strings.Contains(class, "field access on") ||
+		strings.Contains(class, "composite literal of") || strings.Contains(class, "promoted selection through") ||
+		strings.Contains(class, "external"):
+		return "external-typed-contract", "external contract surface: typed obligation/stub, never a manual caller body"
+	case strings.Contains(class, "conversion from"):
+		return "language-lowering", "type conversion: same-underlying and generic-parameter conversion lowering"
+	case strings.Contains(class, "address of"):
+		return "language-lowering", "pointer cells: stable storage for the remaining address-taken locations"
+	case strings.Contains(class, "non-var declaration statement"):
+		return "language-lowering", "local type declarations: on-the-fly type-universe registration"
+	}
+	return "language-lowering", "owned-code construct not yet lowered"
 }
 
 // Probe loads the owned corpus under the profile and attempts IR building
@@ -139,15 +204,21 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 				result.PerBodyState[function.ID] = string(function.Support)
 				if function.Support == ir.SupportUnimplemented {
 					result.Blocked++
+					unitInv := UnitInventory{ID: function.ID}
 					for _, site := range function.Sites {
 						result.BlockerHistogram[site.Class]++
 						result.ConstructHistogram[site.Construct]++
+						category, _ := classifySite(site.Class)
+						unitInv.Sites = append(unitInv.Sites, InventorySite{
+							Class: site.Class, Category: category, Construct: site.Construct,
+							File: site.Span.File, Line: site.Span.Line})
 						packageSites = append(packageSites,
 							fmt.Sprintf("%s: %s (%s:%d)", function.ID, site.Construct, site.Span.File, site.Span.Line))
 						if ref, isExternal := externalRefOfSite(site); isExternal {
 							result.ExternalRefs[ref]++
 						}
 					}
+					result.UnimplementedUnits = append(result.UnimplementedUnits, unitInv)
 				} else {
 					result.IRAdmitted++
 					packageTranslated++
@@ -197,7 +268,37 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 		verified = append(verified, candidate)
 	}
 	result.PackagesFullyTranslated = verified
+	result.ClassInventory = buildClassInventory(result)
 	return result, nil
+}
+
+// buildClassInventory summarizes every unsupported class: its disposition
+// category and root abstraction, its raw site count, and the number of
+// DISTINCT units it blocks — sorted most-blocking first.
+func buildClassInventory(result *ProbeResult) []ClassRow {
+	unitsByClass := map[string]map[string]bool{}
+	for _, unitInv := range result.UnimplementedUnits {
+		for _, site := range unitInv.Sites {
+			if unitsByClass[site.Class] == nil {
+				unitsByClass[site.Class] = map[string]bool{}
+			}
+			unitsByClass[site.Class][unitInv.ID] = true
+		}
+	}
+	rows := make([]ClassRow, 0, len(result.BlockerHistogram))
+	for class, sites := range result.BlockerHistogram {
+		category, root := classifySite(class)
+		rows = append(rows, ClassRow{
+			Class: class, Category: category, Root: root,
+			Units: len(unitsByClass[class]), Sites: sites})
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].Sites != rows[j].Sites {
+			return rows[i].Sites > rows[j].Sites
+		}
+		return rows[i].Class < rows[j].Class
+	})
+	return rows
 }
 
 func probeFunc(p *packages.Package, sourceDir string, unit ir.Scope, source []byte, decl *ast.FuncDecl) (*ir.Func, error) {
