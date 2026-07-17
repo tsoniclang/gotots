@@ -205,3 +205,54 @@ func Case() int {
 		})
 	}
 }
+
+// crossPackageMethodImplementations provides two external types from
+// DIFFERENT packages that share a method spelling (Len): the canonical
+// keying gives each its own obligation member and its own emitted symbol
+// (Builder$Len vs Buffer$Len), so neither overwrites the other and both
+// dispatch to their own reviewed contract.
+var crossPackageMethodImplementations = map[string]string{
+	"strings": `import { type GoExtern } from "../../language-abi/goextern.js";
+class BuilderEmu { buf = ""; }
+type Handle = GoExtern<"strings.Builder">;
+export function Builder$goZero$(): Handle { return new BuilderEmu() as Handle; }
+export function Builder$goClone$(v: Handle): Handle { const b = v as unknown as BuilderEmu; const o = new BuilderEmu(); o.buf = b.buf; return o as Handle; }
+export function Builder$goSet$(dst: Handle, src: Handle): void { (dst as unknown as BuilderEmu).buf = (src as unknown as BuilderEmu).buf; }
+export function Builder$WriteString(recv: Handle, s: string): readonly [bigint, undefined] { const b = recv as unknown as BuilderEmu; b.buf += s; return [BigInt(s.length), undefined]; }
+export function Builder$Len(recv: Handle): bigint { return BigInt((recv as unknown as BuilderEmu).buf.length); }
+`,
+	"bytes": `import { type GoExtern } from "../../language-abi/goextern.js";
+class BufferEmu { buf = ""; }
+type Handle = GoExtern<"bytes.Buffer">;
+export function Buffer$goZero$(): Handle { return new BufferEmu() as Handle; }
+export function Buffer$goClone$(v: Handle): Handle { const b = v as unknown as BufferEmu; const o = new BufferEmu(); o.buf = b.buf; return o as Handle; }
+export function Buffer$goSet$(dst: Handle, src: Handle): void { (dst as unknown as BufferEmu).buf = (src as unknown as BufferEmu).buf; }
+export function Buffer$WriteString(recv: Handle, s: string): readonly [bigint, undefined] { const b = recv as unknown as BufferEmu; b.buf += s; return [BigInt(s.length), undefined]; }
+export function Buffer$Len(recv: Handle): bigint { return BigInt((recv as unknown as BufferEmu).buf.length); }
+`,
+}
+
+func TestOracleCrossPackageSameMethodName(t *testing.T) {
+	result, err := oracle.RunAssembled(t.TempDir(), map[string]string{"fixture": `package fixture
+
+import (
+	"bytes"
+	"strings"
+)
+
+// Two external types from different packages, each with a Len method.
+func BothLen() (int, int) {
+	var sb strings.Builder
+	sb.WriteString("abc")
+	var bb bytes.Buffer
+	bb.WriteString("de")
+	return sb.Len(), bb.Len()
+}
+`}, crossPackageMethodImplementations)
+	if err != nil {
+		t.Fatalf("oracle: %v", err)
+	}
+	if !result.Match() {
+		t.Fatalf("differential mismatch:\n--- go ---\n%s--- generated ---\n%s", result.GoOutput, result.TSOutput)
+	}
+}

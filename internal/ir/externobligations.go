@@ -18,30 +18,63 @@ func (s Scope) AddExternalType(pkg, name string) *ExternTypeObligation {
 	id := pkg + "." + name
 	obligation, has := s.externTypes[id]
 	if !has {
-		obligation = &ExternTypeObligation{Pkg: pkg, Name: name, Methods: map[string]*types.Func{}}
+		obligation = &ExternTypeObligation{Pkg: pkg, Name: name, methods: map[string]*types.Func{}}
 		s.externTypes[id] = obligation
 	}
 	return obligation
 }
 
-// AddExternalMethod records one referenced method of an external type.
-// The stub symbol and dispatch table are keyed by the method's Go name
-// (Go forbids one type from exposing two accessible methods of the same
-// name), but a same-name record of a DISTINCT method identity — which
-// would silently overwrite the first — is flagged so emission fails
-// closed rather than dropping a contract member.
+// AddExternalMethod records one referenced method of an external type,
+// keyed by its FULL canonical identity (MethodKey) — never its bare Go
+// name. Two distinct methods (e.g. same-spelled unexported methods owned
+// by different packages) are therefore distinct obligation members with
+// distinct keys; neither overwrites the other, and there is no bare-name
+// fallback. A method whose identity cannot be resolved fails closed
+// through a poison key that emission rejects.
 func (s Scope) AddExternalMethod(pkg, name string, method *types.Func) {
 	obligation := s.AddExternalType(pkg, name)
-	if prior, ok := obligation.Methods[method.Name()]; ok {
-		priorKey, err1 := MethodKey(prior)
-		newKey, err2 := MethodKey(method)
-		if err1 != nil || err2 != nil || priorKey != newKey {
-			// Distinct (or un-keyable) methods under one spelling: flag so
-			// emission fails closed rather than silently overwriting.
-			obligation.NameCollisions = append(obligation.NameCollisions, method.Name())
-		}
+	key, err := MethodKey(method)
+	if err != nil {
+		key = "\x00unresolved\x00" + method.Name()
 	}
-	obligation.Methods[method.Name()] = method
+	obligation.methods[key] = method
+}
+
+// ExternMethodEntry pairs one external method with its canonical key —
+// the join key between dispatch, vtable, and stub emission.
+type ExternMethodEntry struct {
+	Key    string
+	Method *types.Func
+}
+
+// SortedMethods returns the type's referenced methods in deterministic
+// canonical-key order — each a distinct method identity.
+func (o *ExternTypeObligation) SortedMethods() []*types.Func {
+	out := make([]*types.Func, 0, len(o.methods))
+	for _, entry := range o.MethodKeys() {
+		out = append(out, entry.Method)
+	}
+	return out
+}
+
+// MethodByKey returns the method with the given canonical key, or nil.
+func (o *ExternTypeObligation) MethodByKey(key string) *types.Func {
+	return o.methods[key]
+}
+
+// MethodKeys returns each referenced method's canonical key alongside its
+// object, in deterministic (key-sorted) order.
+func (o *ExternTypeObligation) MethodKeys() []ExternMethodEntry {
+	keys := make([]string, 0, len(o.methods))
+	for key := range o.methods {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	out := make([]ExternMethodEntry, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, ExternMethodEntry{Key: key, Method: o.methods[key]})
+	}
+	return out
 }
 
 // ExternalTypes returns every referenced external type obligation in

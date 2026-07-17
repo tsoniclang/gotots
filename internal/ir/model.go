@@ -177,15 +177,17 @@ type Scope struct {
 }
 
 // ExternTypeObligation is one external named type's referenced contract
-// surface.
+// surface. Methods are held by canonical identity, never by bare name.
 type ExternTypeObligation struct {
-	Pkg     string
-	Name    string
-	Methods map[string]*types.Func
-	// NameCollisions records method names under which two DISTINCT method
-	// identities were seen; emission fails closed rather than silently
-	// dropping one contract member.
-	NameCollisions []string
+	Pkg  string
+	Name string
+	// methods maps each referenced method's canonical MethodKey to its
+	// object: distinct methods (including same-spelled unexported methods
+	// from different packages) are distinct keys, so none overwrites
+	// another. The emitted symbol derives from the display name; a genuine
+	// display collision fails closed at emission (SortedMethods reports
+	// them so the stub builder can detect it).
+	methods map[string]*types.Func
 }
 
 // NewScope builds a unit scope over the given package paths.

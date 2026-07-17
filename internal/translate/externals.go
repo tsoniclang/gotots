@@ -174,17 +174,15 @@ func externTypeMembers(obligation *ir.ExternTypeObligation, unit ir.Scope, conte
 		{ID: typeID + ".goSet$", Name: obligation.Name + "$goSet$",
 			Params: []ir.Var{{Name: "dst", Type: handle}, {Name: "src", Type: handle}}},
 	}
-	if len(obligation.NameCollisions) > 0 {
-		return nil, fmt.Errorf("GOTOTS_EXTERNAL_UNSUPPORTED: external type %s.%s has methods colliding on name(s) %v from distinct identities",
-			obligation.Pkg, obligation.Name, obligation.NameCollisions)
-	}
-	names := make([]string, 0, len(obligation.Methods))
-	for name := range obligation.Methods {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	for _, name := range names {
-		method := obligation.Methods[name]
+	// Every referenced method (by canonical identity) contributes one stub
+	// export. The emitted symbol derives from the display spelling; two
+	// DISTINCT methods that would emit the same symbol (impossible for a
+	// valid Go method set, which has unique names, but kept collision-safe
+	// since the identities are canonical) fail closed rather than one
+	// silently overwriting the other's export.
+	emittedSymbols := map[string]string{}
+	for _, method := range obligation.SortedMethods() {
+		name := method.Name()
 		signature := method.Type().(*types.Signature)
 		if signature.TypeParams() != nil && signature.TypeParams().Len() > 0 {
 			// A generic external method has no single exact stub
@@ -197,13 +195,23 @@ func externTypeMembers(obligation *ir.ExternTypeObligation, unit ir.Scope, conte
 			// be spelled exactly; it is an unimplemented contract member.
 			continue
 		}
+		symbol := obligation.Name + "$" + name
+		methodKey, err := ir.MethodKey(method)
+		if err != nil {
+			return nil, fmt.Errorf("GOTOTS_EXTERNAL_UNSUPPORTED: external method %s.%s has no canonical identity: %w", obligation.Pkg, name, err)
+		}
+		if priorKey, seen := emittedSymbols[symbol]; seen && priorKey != methodKey {
+			return nil, fmt.Errorf("GOTOTS_EXTERNAL_UNSUPPORTED: external type %s.%s has two distinct methods emitting symbol %s",
+				obligation.Pkg, obligation.Name, symbol)
+		}
+		emittedSymbols[symbol] = methodKey
 		// The receiver arrives as the handle a caller holds: through a
 		// pointer it may be nil, and the implementation carries the
 		// concrete method's exact nil semantics.
 		recvType := ir.Type{Kind: ir.KindPointer, Go: "*" + typeID, Named: obligation.Name, Pkg: obligation.Pkg, Elem: &handle}
 		member := emit.StubMember{
 			ID:     typeID + "." + name,
-			Name:   obligation.Name + "$" + name,
+			Name:   symbol,
 			Params: []ir.Var{{Name: "recv", Type: recvType}},
 		}
 		params := signature.Params()
