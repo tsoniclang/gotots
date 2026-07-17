@@ -7,6 +7,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"sort"
 
 	"golang.org/x/tools/go/packages"
 
@@ -57,7 +58,12 @@ func collectGenericInstances(unit ir.Scope, pkgs []*packages.Package) {
 // so the closed universe is complete and order-independent — the two-phase
 // interface/external-universe collection the closed union depends on.
 func freezeExternUniverse(unit ir.Scope, pkgs []*packages.Package) {
-	register := func(t types.Type) {
+	// The candidate types come from go/types maps (random iteration order),
+	// so collect them by canonical identity and register in SORTED order:
+	// the universe set is identical every run and its registration order is
+	// deterministic, so all downstream evidence stays byte-stable.
+	candidates := map[string]*types.TypeName{}
+	consider := func(t types.Type) {
 		if t == nil {
 			return
 		}
@@ -75,17 +81,25 @@ func freezeExternUniverse(unit ir.Scope, pkgs []*packages.Package) {
 		if _, isIface := named.Underlying().(*types.Interface); isIface {
 			return
 		}
-		unit.AddExternConcrete(named.Obj())
+		candidates[named.Obj().Pkg().Path()+"."+named.Obj().Name()] = named.Obj()
 	}
 	for _, p := range pkgs {
 		for _, tv := range p.TypesInfo.Types {
-			register(tv.Type)
+			consider(tv.Type)
 		}
 		for _, obj := range p.TypesInfo.Uses {
 			if obj != nil {
-				register(obj.Type())
+				consider(obj.Type())
 			}
 		}
+	}
+	ids := make([]string, 0, len(candidates))
+	for id := range candidates {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		unit.AddExternConcrete(candidates[id])
 	}
 }
 
