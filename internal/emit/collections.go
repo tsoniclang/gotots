@@ -191,6 +191,15 @@ func (p *printer) collectionExpr(e ir.Expr) (string, error) {
 				return "", err
 			}
 		}
+		if n.Max != nil {
+			// The three-index form caps the result at max-low; high is
+			// mandatory here, so it is always the printed bound.
+			max, err := p.printExpr(n.Max)
+			if err != nil {
+				return "", err
+			}
+			return "gosl$.goSliceSlice3(" + x + ", " + low + ", " + high + ", " + max + ")", nil
+		}
 		return "gosl$.goSliceSlice(" + x + ", " + low + ", " + high + ")", nil
 	case *ir.SliceAppend:
 		x, err := p.printExpr(n.X)

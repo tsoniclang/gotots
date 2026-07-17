@@ -123,6 +123,27 @@ export function goSliceSlice<T>(s: GoSliceValue<T>, low: GoIndex, high: GoIndex 
   return new GoSlice(s.backing, s.offset + Number(low), Number(high) - Number(low), s.capacity - Number(low));
 }
 
+// s[low:high:max]: 0 <= low <= high <= max <= cap; shares backing storage
+// but caps the result at max-low, so a later append reallocates once the
+// limited capacity is exhausted instead of overwriting the operand's
+// tail. high and max are both mandatory in Go's three-index form.
+export function goSliceSlice3<T>(s: GoSliceValue<T>, low: GoIndex, high: GoIndex, max: GoIndex): GoSliceValue<T> {
+  const capacity = s === undefined ? 0 : s.capacity;
+  if (max > capacity || max < 0) {
+    throw new GoPanic("runtime error: slice bounds out of range [::" + String(max) + "] with capacity " + String(capacity));
+  }
+  if (high > max || high < 0) {
+    throw new GoPanic("runtime error: slice bounds out of range [:" + String(high) + ":" + String(max) + "]");
+  }
+  if (low < 0 || low > high) {
+    throw new GoPanic("runtime error: slice bounds out of range [" + String(low) + ":" + String(high) + ":]");
+  }
+  if (s === undefined) {
+    return undefined; // only [0:0:0] reaches here; nil stays nil
+  }
+  return new GoSlice(s.backing, s.offset + Number(low), Number(high) - Number(low), Number(max) - Number(low));
+}
+
 // append: returns the very slice value when nothing is appended (a nil
 // slice stays nil); reuses backing storage when capacity allows
 // (aliasing is observable); otherwise allocates, copying the old

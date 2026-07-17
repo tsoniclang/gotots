@@ -592,6 +592,11 @@
       "specClause": "docs/spec/05-collections-strings.md"
     },
     {
+      "key": "reslice3",
+      "state": "generated",
+      "specClause": "docs/spec/05-collections-strings.md"
+    },
+    {
       "key": "reslice:string",
       "state": "generated",
       "specClause": "docs/spec/05-collections-strings.md"

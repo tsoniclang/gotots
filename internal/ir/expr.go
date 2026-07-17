@@ -202,12 +202,32 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "index on " + operand.Type().Go, Span: span}
 
 	case *ast.SliceExpr:
-		if n.Slice3 {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "full slice expression (capacity-limiting)", Span: span}
-		}
 		operand, err := b.buildExpr(n.X)
 		if err != nil {
 			return nil, err
+		}
+		if n.Slice3 {
+			// The three-index form s[low:high:max] caps the result at
+			// max-low so a later append reallocates sooner, protecting the
+			// operand's tail. It is defined only over slices (Go forbids it
+			// on strings; array operands would need the array-view carrier).
+			if operand.Type().Kind != KindSlice {
+				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "full slice expression on " + operand.Type().Go, Span: span}
+			}
+			out := &SliceReslice{X: operand, T: operand.Type()}
+			if n.Low != nil {
+				if out.Low, err = b.buildExpr(n.Low); err != nil {
+					return nil, err
+				}
+			}
+			if out.High, err = b.buildExpr(n.High); err != nil {
+				return nil, err
+			}
+			if out.Max, err = b.buildExpr(n.Max); err != nil {
+				return nil, err
+			}
+			b.use("reslice3")
+			return out, nil
 		}
 		if operand.Type().Kind == KindArray {
 			// Slicing an addressable array (the checker enforces

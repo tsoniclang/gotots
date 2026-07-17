@@ -63,6 +63,7 @@ type SliceReslice struct {
 	X    Expr
 	Low  Expr // nil means 0
 	High Expr // nil means len(s)
+	Max  Expr // non-nil only for the three-index form s[low:high:max]
 	T    Type
 }
 

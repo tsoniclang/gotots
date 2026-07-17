@@ -331,17 +331,6 @@ func Case() bool {
 			code: "GOTOTS_UNSUPPORTED_OPERATION", mention: "equality on",
 		},
 		{
-			name: "full slice expression",
-			source: `package fixture
-func Case() int {
-	values := []int{1, 2, 3}
-	limited := values[0:1:2]
-	return int(len(limited))
-}
-`,
-			code: "GOTOTS_UNSUPPORTED_EXPRESSION", mention: "full slice expression",
-		},
-		{
 			name: "external method value",
 			source: `package fixture
 import "strings"
