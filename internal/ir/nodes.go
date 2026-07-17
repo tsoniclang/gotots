@@ -395,6 +395,19 @@ type Deref struct {
 	T Type // the pointee struct type
 }
 
+// FieldCell is &s.f on a struct field whose type is NOT an identity
+// carrier (a map, slice, scalar, pointer, interface, or function): the
+// pointer is a proxying cell that reads and writes the live field, so an
+// aliasing write through the pointer (the *p = make(...) lazy-init
+// idiom) mutates the very field. The struct base is evaluated exactly
+// once at the address-of; the cell closes over that single reference.
+type FieldCell struct {
+	Base  Expr   // the addressable struct base (a value or a pointer to one)
+	Field string // the Go field name accessed
+	Elem  Type   // the field's type (the pointee)
+	T     Type   // the pointer type (result)
+}
+
 // StructZero is the zero value of a named struct type: a fresh instance
 // with every field zeroed.
 type StructZero struct{ T Type }
@@ -427,6 +440,7 @@ func (*StructCopy) expr()       {}
 func (*StructZero) expr()       {}
 func (*AddrOf) expr()           {}
 func (*Deref) expr()            {}
+func (*FieldCell) expr()        {}
 func (*Closure) expr()          {}
 func (*FuncRef) expr()          {}
 func (*DynCall) expr()          {}
@@ -517,6 +531,7 @@ func (s *StructCopy) Type() Type { return s.X.Type() }
 func (s *StructZero) Type() Type { return s.T }
 func (a *AddrOf) Type() Type     { return a.T }
 func (d *Deref) Type() Type      { return d.T }
+func (f *FieldCell) Type() Type  { return f.T }
 func (n *NilConst) Type() Type   { return n.T }
 func (i *IsNil) Type() Type      { return boolType }
 func (m *MapMake) Type() Type    { return m.T }

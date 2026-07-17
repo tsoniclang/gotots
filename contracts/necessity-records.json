@@ -61,7 +61,8 @@
         "addrOf",
         "boxedStore",
         "boxedLoad",
-        "cellNew"
+        "cellNew",
+        "fieldCell"
       ],
       "counterexample": "x := 1; p := &x; *p = 2; return x == 2 \u2014 Go observes the write through the pointer (true); a captured value copy does not.",
       "ordinaryTypescript": "A direct variable binding.",

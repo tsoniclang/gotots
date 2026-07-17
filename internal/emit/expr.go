@@ -26,28 +26,6 @@ func family(kind ir.Kind) (abi.Family, bool) {
 func helper(name string) string { return "goabi$." + name }
 
 // printExpr renders one IR expression, fully parenthesized.
-// nilCheckOf spells a nil-checked read of a nilable-typed operand with
-// an explicit type argument, so TypeScript's literal-undefined narrowing
-// of a provably nil operand (legal Go that panics at runtime) cannot
-// collapse the result type.
-func (p *printer) nilCheckOf(expr string, nilable ir.Type) (string, error) {
-	if nilable.Kind == ir.KindIface && nilable.TypeParamName == "" {
-		union, err := p.tsType(nilable)
-		if err != nil {
-			return "", err
-		}
-		return "gort$.goNilCheck<Exclude<" + union + ", undefined>>(" + expr + ")", nil
-	}
-	spelled, err := p.tsType(nilable)
-	if err != nil {
-		return "", err
-	}
-	if inner, ok := strings.CutSuffix(spelled, " | undefined"); ok {
-		return "gort$.goNilCheck<" + inner + ">(" + expr + ")", nil
-	}
-	return "gort$.goNilCheck(" + expr + ")", nil
-}
-
 func (p *printer) printExpr(e ir.Expr) (string, error) {
 	if printed, isArray, err := p.printArrayExpr(e); isArray {
 		return printed, err
@@ -417,6 +395,8 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 	case *ir.AddrOf:
 		// The pointer to an addressable struct value is the instance.
 		return p.printExpr(n.X)
+	case *ir.FieldCell:
+		return p.printFieldCell(n)
 	case *ir.Deref:
 		x, err := p.printExpr(n.X)
 		if err != nil {

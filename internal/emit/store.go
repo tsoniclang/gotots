@@ -512,9 +512,21 @@ func (p *printer) printStore(target ir.Target, value string) error {
 		}
 		pointerTemp := p.temp()
 		p.line("const %s = %s;", pointerTemp, pointer)
-		valueTemp := p.temp()
-		p.line("const %s = %s;", valueTemp, value)
 		elem := t.X.Type().Elem
+		valueTemp := p.temp()
+		// The value temp carries the pointee's exact type so a
+		// contextually-typed right side (a bare goMapMake(), goSliceNil(),
+		// or undefined nil) infers its element types here instead of
+		// collapsing to unknown once the assignment target is a staged temp.
+		if elem != nil {
+			elemSpelled, err := p.tsType(*elem)
+			if err != nil {
+				return err
+			}
+			p.line("const %s: %s = %s;", valueTemp, elemSpelled, value)
+		} else {
+			p.line("const %s = %s;", valueTemp, value)
+		}
 		checkedPointer, err := p.nilCheckOf(pointerTemp, t.X.Type())
 		if err != nil {
 			return err

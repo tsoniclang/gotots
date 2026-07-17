@@ -43,6 +43,18 @@ func (b *builder) buildUnary(n *ast.UnaryExpr, resultType types.Type) (Expr, err
 			return nil, err
 		}
 		if x.Type().Kind != KindStruct && x.Type().Kind != KindExternal && x.Type().Kind != KindArray {
+			// &s.f where the field is not an identity carrier (a map, slice,
+			// scalar, pointer, interface, or function): a proxying cell over
+			// the live field aliases it exactly, so a store through the
+			// pointer mutates the field (the *p = make(...) lazy-init idiom).
+			if field, isField := x.(*FieldLoad); isField {
+				t, err := b.typeOf(resultType, span)
+				if err != nil {
+					return nil, err
+				}
+				b.use("fieldCell")
+				return &FieldCell{Base: field.X, Field: field.Field, Elem: field.T, T: t}, nil
+			}
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "address of " + x.Type().Go, Span: span}
 		}
 		switch x.(type) {
