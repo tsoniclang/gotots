@@ -87,23 +87,26 @@ func contains(s, sub string) bool {
 	return false
 }
 
-// TestHasUnsupported verifies the fail-closed detector: a poisoned
-// identity is flagged, an ordinary one is not.
-func TestHasUnsupported(t *testing.T) {
+// TestTotalContract: Canonical is a total (string,error) contract with no
+// in-band poison marker — an ordinary type returns a clean identity, and
+// a type with no exact identity (a free type parameter with no binder)
+// returns an ERROR directly.
+func TestTotalContract(t *testing.T) {
 	src := `package p
 type T struct{ x int }
-func F(a int) string { return "" }
+func F[A any](a A) {}
 `
 	pkg := pkgOf(t, "p", src)
 	scope := pkg.Scope()
-	for _, name := range []string{"T", "F"} {
-		id := canon(t, scope.Lookup(name).Type())
-		if HasUnsupported(id) {
-			t.Errorf("%s: ordinary type flagged unsupported: %q", name, id)
-		}
+	if _, err := Canonical(scope.Lookup("T").Type()); err != nil {
+		t.Errorf("ordinary type returned an error: %v", err)
 	}
-	if !HasUnsupported("x" + unsupportedMarker + "y") {
-		t.Errorf("poisoned identity not detected")
+	// A[A].M's callable references A (free receiver-like param); a bare
+	// Canonical of a free parameter fails closed.
+	fsig := scope.Lookup("F").Type().(*types.Signature)
+	free := fsig.Params().At(0).Type() // the type parameter A, free here
+	if _, err := Canonical(free); err == nil {
+		t.Errorf("a free type parameter should fail closed, got no error")
 	}
 }
 

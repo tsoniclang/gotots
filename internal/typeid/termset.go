@@ -9,7 +9,6 @@
 package typeid
 
 import (
-	"fmt"
 	"go/types"
 	"sort"
 	"strings"
@@ -211,12 +210,13 @@ func serializeTermset(terms termlist, comparable bool, c *idctx) (string, error)
 		// Write within the CURRENT binder context: a term like ~[]E
 		// references a type parameter bound by an enclosing generic
 		// signature, which a fresh Canonical() would not have.
+		child := c.child()
 		var b strings.Builder
-		write(&b, t.typ, c.child())
-		s := b.String()
-		if strings.Contains(s, unsupportedMarker) {
-			return "", fmt.Errorf("typeid: no exact canonical identity for constraint term %s", t.typ.String())
+		write(&b, t.typ, child)
+		if *child.errp != nil {
+			return "", *child.errp
 		}
+		s := b.String()
 		if t.tilde {
 			s = "~" + s
 		}

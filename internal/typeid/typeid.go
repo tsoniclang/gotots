@@ -24,8 +24,12 @@ import (
 // contract is eliminated.
 func Canonical(t types.Type) (string, error) {
 	var out strings.Builder
-	write(&out, t, newCtx())
-	return finish(&out, t)
+	c := newCtx()
+	write(&out, t, c)
+	if *c.errp != nil {
+		return "", *c.errp
+	}
+	return out.String(), nil
 }
 
 // MethodCanonical builds a method's callable identity WITH its receiver's
@@ -56,7 +60,10 @@ func MethodCanonical(method *types.Func) (string, error) {
 	}
 	var out strings.Builder
 	writeSignatureBody(&out, sig, c)
-	return finish(&out, method.Type())
+	if *c.errp != nil {
+		return "", *c.errp
+	}
+	return out.String(), nil
 }
 
 // receiverOwnerID is the canonical identity of the generic type that owns
@@ -144,10 +151,16 @@ func MethodBinders(fn *types.Func) (*Binders, error) {
 }
 
 // Canonical renders one type's identity within this binder environment.
+// A Binders is reusable across many types, so each call gets a FRESH
+// error slot (and cycle guard) — one failure never poisons the next.
 func (b *Binders) Canonical(t types.Type) (string, error) {
+	c := &idctx{seen: map[types.Type]bool{}, binders: b.c.binders, errp: new(error)}
 	var out strings.Builder
-	write(&out, t, b.c.child())
-	return finish(&out, t)
+	write(&out, t, c)
+	if *c.errp != nil {
+		return "", *c.errp
+	}
+	return out.String(), nil
 }
 
 // DeclSignature is the canonical signature identity of a declared
@@ -165,26 +178,26 @@ func DeclSignature(fn *types.Func) (string, error) {
 	return Canonical(fn.Type())
 }
 
-// finish converts an internal unsupported marker into the total
-// contract's returned error.
-func finish(out *strings.Builder, t types.Type) (string, error) {
-	s := out.String()
-	if strings.Contains(s, unsupportedMarker) {
-		return "", fmt.Errorf("typeid: no exact canonical identity for %s", t.String())
-	}
-	return s, nil
-}
-
-// idctx carries the recursion-cycle guard and the type-parameter binder
-// environment: only parameters bound in this environment may appear in an
-// identity; a free parameter fails closed.
+// idctx carries the recursion-cycle guard, the type-parameter binder
+// environment, and a SHARED error slot. Recursive construction records
+// the first failure directly through fail(); there is no in-band poison
+// marker and no dual "string plus optional check" contract.
 type idctx struct {
 	seen    map[types.Type]bool
 	binders map[*types.TypeParam]string
+	errp    *error
 }
 
 func newCtx() *idctx {
-	return &idctx{seen: map[types.Type]bool{}, binders: map[*types.TypeParam]string{}}
+	return &idctx{seen: map[types.Type]bool{}, binders: map[*types.TypeParam]string{}, errp: new(error)}
+}
+
+// fail records the first construction error (an unhandled type form or a
+// free parameter with no provable binder).
+func (c *idctx) fail(t types.Type) {
+	if *c.errp == nil {
+		*c.errp = fmt.Errorf("typeid: no exact canonical identity for %s", t.String())
+	}
 }
 
 // bind records a type parameter at binder position i within the current
@@ -205,7 +218,7 @@ func (c *idctx) child() *idctx {
 	for k, v := range c.binders {
 		b[k] = v
 	}
-	return &idctx{seen: c.seen, binders: b}
+	return &idctx{seen: c.seen, binders: b, errp: c.errp}
 }
 
 func write(out *strings.Builder, t types.Type, c *idctx) {
@@ -358,14 +371,11 @@ func write(out *strings.Builder, t types.Type, c *idctx) {
 		// and interface{int} both reduce to {int}.
 		terms, comparable, err := interfaceTerms(u, c)
 		if err != nil {
-			markUnsupported(out, t)
+			c.fail(t)
+		} else if suffix, err := serializeTermset(terms, comparable, c); err != nil {
+			c.fail(t)
 		} else {
-			suffix, err := serializeTermset(terms, comparable, c)
-			if err != nil {
-				markUnsupported(out, t)
-			} else {
-				out.WriteString(suffix)
-			}
+			out.WriteString(suffix)
 		}
 		out.WriteString("}")
 		delete(c.seen, t)
@@ -377,7 +387,7 @@ func write(out *strings.Builder, t types.Type, c *idctx) {
 		if id, ok := c.binders[u]; ok {
 			out.WriteString(id)
 		} else {
-			markUnsupported(out, t)
+			c.fail(t)
 		}
 	case *types.Union:
 		// A bare constraint union (int | ~string | …): normalized —
@@ -399,31 +409,10 @@ func write(out *strings.Builder, t types.Type, c *idctx) {
 		out.WriteString(")")
 	default:
 		// Every well-formed type form is handled above. An unhandled form
-		// is a construction gap, not a spelling to guess: emit a poison
-		// marker that can never collide with a real identity and is
-		// detectable (typeid.HasUnsupported), rather than falling back to
-		// the ambiguous, non-package-qualified t.String() spelling.
-		out.WriteString(unsupportedMarker)
-		out.WriteString(t.String())
+		// has no exact identity: fail closed directly (no in-band marker),
+		// never a t.String() spelling that does not package-qualify.
+		c.fail(t)
 	}
-}
-
-// unsupportedMarker prefixes any identity that could not be built
-// exactly; it contains a NUL so it can never appear in a real spelling.
-// Canonical converts its presence into a returned error (the total
-// contract), so no caller consumes a non-canonical identity.
-const unsupportedMarker = "\x00!typeid-unsupported:"
-
-// markUnsupported records that an exact identity could not be built.
-func markUnsupported(out *strings.Builder, t types.Type) {
-	out.WriteString(unsupportedMarker)
-	out.WriteString(t.String())
-}
-
-// HasUnsupported reports whether a canonical identity was built over an
-// unsupported type form and is therefore not an exact identity.
-func HasUnsupported(id string) bool {
-	return strings.Contains(id, unsupportedMarker)
 }
 
 // writeTypeParams writes a type-parameter list by binder POSITION with
