@@ -188,3 +188,38 @@ func EmbeddedWriteThroughPointer() int {
 }
 `)
 }
+
+// A generic struct's field address must be keyed by the struct's origin,
+// so distinct instances have distinct field addresses (the address scan
+// sees an instantiated field object while class emission sees the generic
+// declaration — they must agree on the storage identity).
+func TestOracleGenericFieldAddress(t *testing.T) {
+	runOracle(t, `package fixture
+
+type Box[T any] struct {
+	X T
+}
+
+func DistinctGenericInstances() (bool, bool) {
+	a := &Box[int]{X: 5}
+	b := &Box[int]{X: 5}
+	return &a.X == &b.X, &a.X == &a.X
+}
+
+func GenericWriteThroughPointer() int {
+	box := &Box[int]{}
+	p := &box.X
+	*p = 42
+	return box.X
+}
+
+func TwoDistinctInstantiations() bool {
+	a := &Box[int]{X: 1}
+	b := &Box[string]{X: "x"}
+	_ = b
+	p := &a.X
+	*p = 9
+	return a.X == 9
+}
+`)
+}

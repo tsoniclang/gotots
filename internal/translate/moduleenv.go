@@ -92,7 +92,7 @@ func newModule(modulePath, pkgPath, pkgName string, unit ir.Scope, context *pack
 	module := emit.NewModule(pkgPath, pkgName, abiImports, specifiers)
 	for _, composite := range unit.BoxedComposites() {
 		module.BoxedComposites = append(module.BoxedComposites, emit.BoxedComposite{
-			Canon: composite.Canon, T: composite.T, EqMode: composite.EqMode, ArrayElemEq: composite.ArrayElemEq})
+			Canon: composite.Canon, T: composite.T, Eq: composite.Eq})
 	}
 	module.Withheld = func(pkg string) bool { _, is := withheld[pkg]; return is }
 	module.ExternMethods = externMethods

@@ -73,54 +73,66 @@ func (b *builder) resolveImplementerTokens(target *types.Interface, span Span) (
 // ifaceMembers resolves the closed implementer union of one interface
 // type from the whole-unit universe: only TYPE identities (spelling uses
 // erased type-only imports), cached per canonical interface identity.
-// memberEqMode classifies how two values of one interface member's exact
-// dynamic type compare under Go's interface equality — the per-member
-// operation the generated union equality narrows to (never an erased
-// payload). It returns the mode and, for "arrayEq", the element mode.
-func (b *builder) memberEqMode(named *types.Named, pointer, extern bool) (mode, elem string) {
+// memberEqPlan is the recursive equality plan of one interface member's
+// exact dynamic type (value or pointer flavor).
+func (b *builder) memberEqPlan(named *types.Named, pointer, extern bool) *EqPlan {
 	if pointer {
 		// A pointer dynamic value compares by identity (the boxed instance).
-		return "identity", ""
+		return &EqPlan{Kind: "identity"}
 	}
 	if extern {
 		if _, isStruct := named.Underlying().(*types.Struct); isStruct {
 			// A struct-underlying external value's comparability is unknown
 			// (we do not own its fields): fail closed rather than guess.
-			return "external", ""
+			return &EqPlan{Kind: "external"}
 		}
 		// A basic-underlying external value carrier compares by ===.
-		return "identity", ""
+		return &EqPlan{Kind: "identity"}
 	}
-	return b.underlyingEqMode(named)
+	return b.eqPlan(named)
 }
 
-// underlyingEqMode classifies a value type's equality by its underlying.
-func (b *builder) underlyingEqMode(t types.Type) (mode, elem string) {
+// eqPlan builds the recursive typed equality plan of a value type. It
+// descends ONLY into arrays: a struct compares through its own goEq$ and
+// an interface through its own union equality, so the recursion never
+// re-enters interface/struct resolution and is a finite tree.
+func (b *builder) eqPlan(t types.Type) *EqPlan {
+	if _, isPtr := types.Unalias(t).Underlying().(*types.Pointer); isPtr {
+		return &EqPlan{Kind: "identity"}
+	}
+	if named, ok := types.Unalias(t).(*types.Named); ok {
+		if pkg := named.Obj().Pkg(); pkg != nil && !b.unit.Owns(pkg.Path()) {
+			if _, isStruct := named.Underlying().(*types.Struct); isStruct {
+				return &EqPlan{Kind: "external"}
+			}
+			return &EqPlan{Kind: "identity"}
+		}
+	}
 	switch u := types.Unalias(t).Underlying().(type) {
 	case *types.Struct:
 		if b.generatesGoEq(t) {
-			return "goEq", ""
+			return &EqPlan{Kind: "goEq"}
 		}
-		return "uncomparable", ""
+		return &EqPlan{Kind: "uncomparable"}
 	case *types.Array:
 		if !types.Comparable(t) {
-			return "uncomparable", ""
+			return &EqPlan{Kind: "uncomparable"}
 		}
-		switch u.Elem().Underlying().(type) {
-		case *types.Struct:
-			return "arrayEq", "goEq"
-		case *types.Pointer, *types.Basic:
-			return "arrayEq", "identity"
+		return &EqPlan{Kind: "array", Elem: b.eqPlan(u.Elem())}
+	case *types.Interface:
+		// An interface array element compares through its own union
+		// equality (the element's canonical interface identity).
+		id, err := b.canonicalIfaceID(u)
+		if err != nil {
+			return &EqPlan{Kind: "uncomparable"}
 		}
-		// A deeper element kind (array of array, of interface) is a rare
-		// residual: fail closed rather than emit a wrong comparison.
-		return "uncomparable", ""
+		return &EqPlan{Kind: "iface", IfaceID: id}
 	case *types.Slice, *types.Map, *types.Signature:
 		// Go panics comparing these dynamic types inside an interface.
-		return "uncomparable", ""
+		return &EqPlan{Kind: "uncomparable"}
 	}
-	// A comparable basic / pointer / channel / unit carrier: ===.
-	return "identity", ""
+	// A comparable basic / channel / unit carrier: ===.
+	return &EqPlan{Kind: "identity"}
 }
 
 // generatesGoEq reports whether a struct type's generated class carries
@@ -172,12 +184,9 @@ func (b *builder) fieldEqComparable(ft types.Type) bool {
 	return false
 }
 
-// compositeEqMode classifies a boxed composite's empty-interface equality.
-func (b *builder) compositeEqMode(source types.Type) (mode, elem string) {
-	if _, isPtr := types.Unalias(source).Underlying().(*types.Pointer); isPtr {
-		return "identity", ""
-	}
-	return b.underlyingEqMode(source)
+// compositeEqPlan is a boxed composite's empty-interface equality plan.
+func (b *builder) compositeEqPlan(source types.Type) *EqPlan {
+	return b.eqPlan(source)
 }
 
 func (b *builder) ifaceMembers(iface *types.Interface, span Span) ([]IfaceMember, error) {
@@ -209,7 +218,7 @@ func (b *builder) ifaceMembers(iface *types.Interface, span Span) ([]IfaceMember
 				member.ExternCarrier = basicCarrier(basic)
 			}
 		}
-		member.EqMode, member.ArrayElemEq = b.memberEqMode(named, pointer, member.Extern)
+		member.Eq = b.memberEqPlan(named, pointer, member.Extern)
 		members = append(members, member)
 		return nil
 	}

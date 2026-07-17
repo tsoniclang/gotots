@@ -15,10 +15,9 @@ type ModuleImport struct {
 
 // BoxedComposite is one boxed composite type.
 type BoxedComposite struct {
-	Canon       string
-	T           ir.Type
-	EqMode      string
-	ArrayElemEq string
+	Canon string
+	T     ir.Type
+	Eq    *ir.EqPlan
 }
 
 // ExternMethod is one recorded external method: its source name (the

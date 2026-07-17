@@ -69,7 +69,7 @@ func BuildStruct(p *packages.Package, sourceDir string, unit Scope, spec *ast.Ty
 		if err != nil {
 			return nil, err
 		}
-		out.Fields = append(out.Fields, Var{Name: field.Name(), Type: fieldType, Cell: b.fieldIsCell(field, fieldType)})
+		out.Fields = append(out.Fields, Var{Name: field.Name(), Type: fieldType, Cell: b.fieldIsCell(named, field.Name(), fieldType)})
 	}
 	promoted, err := b.promotedDelegates(named, span)
 	if err != nil {
@@ -81,25 +81,68 @@ func BuildStruct(p *packages.Package, sourceDir string, unit Scope, spec *ast.Ty
 	return out, nil
 }
 
-// fieldIsCell reports whether a struct field is stored as a stable
-// per-instance cell: its address is taken somewhere in the unit AND its
-// type is a non-identity carrier (a scalar, pointer, map, slice,
-// interface, or function). Identity carriers — structs, arrays, external
-// handles — are their own stable address, so &x.f is already exact and
-// needs no cell.
-func (b *builder) fieldIsCell(field *types.Var, fieldType Type) bool {
-	return b.unit.FieldAddressTaken(field) && boxable(fieldType.Kind)
+// fieldStorageKey identifies one struct field's storage location by the
+// DECLARING struct's origin (uninstantiated generic) plus the field name.
+// This is stable across instantiations, so &Box[int].X and &Box[string].X
+// resolve to distinct keys yet the address scan (which sees an
+// instantiated field object) and class emission (which sees the generic
+// declaration) agree. An anonymous struct is non-generic, so its
+// structural spelling is a stable key.
+func fieldStorageKey(declaringStruct types.Type, fieldName string) string {
+	t := types.Unalias(declaringStruct)
+	if pointer, ok := t.(*types.Pointer); ok {
+		t = types.Unalias(pointer.Elem())
+	}
+	named, ok := t.(*types.Named)
+	if !ok {
+		return t.String() + "#" + fieldName
+	}
+	obj := named.Origin().Obj()
+	pkg := ""
+	if obj.Pkg() != nil {
+		pkg = obj.Pkg().Path()
+	}
+	return pkg + "." + obj.Name() + "#" + fieldName
+}
+
+// FieldStorageKeyOfSelection resolves the storage key of the field a
+// selection reaches, walking any embedded-field prefix to the declaring
+// struct (promotion). The pre-pass marks address-taken fields by this key.
+func FieldStorageKeyOfSelection(sel *types.Selection) (string, bool) {
+	if sel == nil || sel.Kind() != types.FieldVal {
+		return "", false
+	}
+	current := sel.Recv()
+	index := sel.Index()
+	for _, i := range index[:len(index)-1] {
+		u := types.Unalias(current)
+		if pointer, ok := u.Underlying().(*types.Pointer); ok {
+			u = types.Unalias(pointer.Elem())
+		}
+		st, ok := u.Underlying().(*types.Struct)
+		if !ok {
+			return "", false
+		}
+		current = st.Field(i).Type()
+	}
+	return fieldStorageKey(current, sel.Obj().Name()), true
+}
+
+// fieldIsCell reports whether a struct field (of the given declaring
+// struct) is stored as a stable per-instance cell: its address is taken
+// somewhere in the unit AND its type is a non-identity carrier (a scalar,
+// pointer, map, slice, interface, or function). Identity carriers —
+// structs, arrays, external handles — are their own stable address.
+func (b *builder) fieldIsCell(declaringStruct types.Type, fieldName string, fieldType Type) bool {
+	return b.unit.FieldAddressTaken(fieldStorageKey(declaringStruct, fieldName)) && boxable(fieldType.Kind)
 }
 
 // fieldCell reports whether a field-selection accesses a cell field —
 // the flag FieldLoad/FieldTarget/&f carry so the value read/write
 // unwraps the cell and the address is the cell itself.
 func (b *builder) fieldCell(selection *types.Selection, fieldType Type) bool {
-	if selection == nil {
-		return false
-	}
-	field, ok := selection.Obj().(*types.Var)
-	return ok && b.fieldIsCell(field, fieldType)
+	key, ok := FieldStorageKeyOfSelection(selection)
+	return ok && b.unit.FieldAddressTaken(key) && boxable(fieldType.Kind)
 }
 
 // promotedDelegates resolves every promoted method in the type's method
@@ -211,7 +254,7 @@ func (b *builder) chainFieldPath(base Expr, baseType types.Type, path []int, spa
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "promoted selection through " + out.Type().Go, Span: span}
 		}
 		b.use("fieldLoad")
-		out = &FieldLoad{X: out, Field: field.Name(), T: fieldType, Cell: b.fieldIsCell(field, fieldType)}
+		out = &FieldLoad{X: out, Field: field.Name(), T: fieldType, Cell: b.fieldIsCell(current, field.Name(), fieldType)}
 		current = field.Type()
 	}
 	return out, nil
@@ -292,7 +335,7 @@ func (b *builder) anonStructType(structType *types.Struct, spelled string, span 
 		if err != nil {
 			return Type{}, err
 		}
-		decl.Fields = append(decl.Fields, Var{Name: field.Name(), Type: fieldType, Cell: b.fieldIsCell(field, fieldType)})
+		decl.Fields = append(decl.Fields, Var{Name: field.Name(), Type: fieldType, Cell: b.fieldIsCell(structType, field.Name(), fieldType)})
 	}
 	decl.Comparable = b.structEqComparable(structType)
 	decl.KeyEncodable = b.structKeyEncodable(structType, span)

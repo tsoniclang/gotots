@@ -146,8 +146,7 @@ func (b *builder) boxIfaceValue(built Expr, source types.Type, expected Type, sp
 		// an exact union member (its payload type, no erasure). A
 		// composite that mentions a type parameter is per-instantiation
 		// and never a concrete boxed member.
-		mode, elem := b.compositeEqMode(source)
-		b.unit.AddBoxedComposite(rtti.Composite, built.Type(), mode, elem)
+		b.unit.AddBoxedComposite(rtti.Composite, built.Type(), b.compositeEqPlan(source))
 	}
 	// An external named type BOXED here joins the dynamic-type universe:
 	// this catches inferred external dynamic types (value := external.New())

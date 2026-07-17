@@ -171,9 +171,11 @@ type Scope struct {
 	// addressTakenFields is the whole-unit set of struct fields whose
 	// address is taken anywhere (&x.f). A non-identity field in this set
 	// is represented as one stable per-instance cell so &x.f is exact
-	// pointer identity — keyed by the field's interned *types.Var object,
-	// which is shared across packages and through promotion.
-	addressTakenFields map[*types.Var]bool
+	// pointer identity — keyed by the field's storage identity (the
+	// DECLARING struct's origin plus the field name), which is stable
+	// across generic instantiations (the address scan sees an instantiated
+	// field object while class emission sees the generic declaration's).
+	addressTakenFields map[string]bool
 }
 
 // ExternTypeObligation is one external named type's referenced contract
@@ -208,23 +210,24 @@ func NewScope(paths ...string) Scope {
 		externConcrete:     &[]*types.TypeName{},
 		boxedComposites:    map[string]*boxedComposite{},
 		ifaceMembers:       map[string][]IfaceMember{},
-		addressTakenFields: map[*types.Var]bool{},
+		addressTakenFields: map[string]bool{},
 	}
 }
 
-// MarkFieldAddressTaken records that the address of one struct field is
-// taken somewhere in the unit (the whole-program pre-pass calls this).
-func (s Scope) MarkFieldAddressTaken(field *types.Var) {
-	if field != nil {
-		s.addressTakenFields[field] = true
+// MarkFieldAddressTaken records that the address of the field with the
+// given storage key is taken somewhere in the unit (the pre-pass calls
+// this with FieldStorageKeyOfSelection).
+func (s Scope) MarkFieldAddressTaken(key string) {
+	if key != "" {
+		s.addressTakenFields[key] = true
 	}
 }
 
-// FieldAddressTaken reports whether the field's address is taken anywhere
-// in the unit — the condition (with a non-identity field type) for the
-// stable-cell field representation.
-func (s Scope) FieldAddressTaken(field *types.Var) bool {
-	return field != nil && s.addressTakenFields[field]
+// FieldAddressTaken reports whether the field with the given storage key
+// has its address taken anywhere in the unit — the condition (with a
+// non-identity field type) for the stable-cell field representation.
+func (s Scope) FieldAddressTaken(key string) bool {
+	return key != "" && s.addressTakenFields[key]
 }
 
 // Owns reports whether the package path is part of the unit.
@@ -490,18 +493,27 @@ type IfaceMember struct {
 	// carrier for basic-underlying external named types.
 	Extern        bool
 	ExternCarrier string
-	// EqMode is how two values of THIS member's exact payload compare
-	// under Go's interface equality — the per-member operation the
-	// generated union equality narrows to, so no payload is ever erased:
-	//   "identity"     → === (pointer identity; primitive/basic carriers)
-	//   "goEq"         → payload.goEq$(other) (comparable value structs)
-	//   "arrayEq"      → element-wise equality (comparable value arrays)
-	//   "uncomparable" → runtime panic "comparing uncomparable type X"
-	//   "external"     → fail closed (external value comparability unknown)
-	EqMode string
-	// ArrayElemEq, for EqMode "arrayEq", is how one element compares
-	// ("identity" or "goEq"); a deeper element kind fails closed at build.
-	ArrayElemEq string
+	// Eq is the recursive typed equality plan for THIS member's exact
+	// payload under Go's interface equality — the single operation the
+	// generated union equality narrows to, so no payload is ever erased.
+	Eq *EqPlan
+}
+
+// EqPlan is one recursive typed equality operation. It descends only into
+// arrays (a struct compares through its own goEq$, an interface through
+// its own union equality — neither re-enters interface resolution), so it
+// is a finite tree with no cycle:
+//
+//	"identity"     → === (pointer identity; primitive/basic carriers)
+//	"goEq"         → payload.goEq$(other) (comparable value structs)
+//	"array"        → element-wise via Elem (comparable value arrays)
+//	"iface"        → the element interface's union equality (IfaceID)
+//	"uncomparable" → runtime panic "comparing uncomparable type X"
+//	"external"     → fail closed (external value comparability unknown)
+type EqPlan struct {
+	Kind    string
+	Elem    *EqPlan // array element plan
+	IfaceID string  // "iface": the element interface's canonical union identity
 }
 
 type PromotedDelegate struct {

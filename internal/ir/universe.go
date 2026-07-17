@@ -39,26 +39,24 @@ func (s Scope) ExternConcreteTypes() []*types.TypeName { return *s.externConcret
 // exact payload type and how two of its values compare, so the
 // empty-interface equality narrows to an exact per-member operation.
 type boxedComposite struct {
-	T           Type
-	EqMode      string
-	ArrayElemEq string
+	T  Type
+	Eq *EqPlan
 }
 
 // AddBoxedComposite records one composite type boxed into an interface,
-// with the per-member equality mode its empty-interface comparison uses.
-func (s Scope) AddBoxedComposite(canon string, t Type, eqMode, arrayElemEq string) {
+// with the recursive equality plan its empty-interface comparison uses.
+func (s Scope) AddBoxedComposite(canon string, t Type, eq *EqPlan) {
 	if _, has := s.boxedComposites[canon]; !has {
-		s.boxedComposites[canon] = &boxedComposite{T: t, EqMode: eqMode, ArrayElemEq: arrayElemEq}
+		s.boxedComposites[canon] = &boxedComposite{T: t, Eq: eq}
 	}
 }
 
 // BoxedCompositeEntry is one boxed composite's exact payload plus its
-// equality mode.
+// equality plan.
 type BoxedCompositeEntry struct {
-	Canon       string
-	T           Type
-	EqMode      string
-	ArrayElemEq string
+	Canon string
+	T     Type
+	Eq    *EqPlan
 }
 
 // BoxedComposites returns the boxed-composite enumeration sorted by id.
@@ -71,7 +69,7 @@ func (s Scope) BoxedComposites() []BoxedCompositeEntry {
 	out := make([]BoxedCompositeEntry, 0, len(ids))
 	for _, id := range ids {
 		c := s.boxedComposites[id]
-		out = append(out, BoxedCompositeEntry{Canon: id, T: c.T, EqMode: c.EqMode, ArrayElemEq: c.ArrayElemEq})
+		out = append(out, BoxedCompositeEntry{Canon: id, T: c.T, Eq: c.Eq})
 	}
 	return out
 }

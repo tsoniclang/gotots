@@ -124,8 +124,8 @@ func collectAddressTakenFields(unit ir.Scope, pkgs []*packages.Package) {
 				if !ok || selection.Kind() != types.FieldVal {
 					return true
 				}
-				if field, ok := selection.Obj().(*types.Var); ok {
-					unit.MarkFieldAddressTaken(field)
+				if key, ok := ir.FieldStorageKeyOfSelection(selection); ok {
+					unit.MarkFieldAddressTaken(key)
 				}
 				return true
 			})
