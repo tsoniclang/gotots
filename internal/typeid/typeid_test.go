@@ -58,6 +58,23 @@ func TestAliasResolvesToTarget(t *testing.T) {
 	}
 }
 
+// TestGenericAliasCanonical: a generic alias is transparent — its own
+// type parameters bind position-indexed so it canonicalizes (never fails
+// closed on its free parameter), is alpha-equivalent to a same-shaped
+// generic alias from another package, and differs from a distinct shape.
+func TestGenericAliasCanonical(t *testing.T) {
+	p := pkgOf(t, "example.com/g", "package g\ntype Selector[T comparable] = func(o int) T")
+	id := canon(t, p.Scope().Lookup("Selector").Type())
+	q := pkgOf(t, "example.com/h", "package h\ntype Picker[U comparable] = func(o int) U")
+	if id2 := canon(t, q.Scope().Lookup("Picker").Type()); id != id2 {
+		t.Fatalf("alpha-equivalent generic aliases differ: %q vs %q", id, id2)
+	}
+	r := pkgOf(t, "example.com/i", "package i\ntype Other[T comparable] = func(o int) []T")
+	if id3 := canon(t, r.Scope().Lookup("Other").Type()); id == id3 {
+		t.Fatalf("distinct generic aliases collided: %q", id)
+	}
+}
+
 // TestPathQualification: same package NAME, different paths → distinct.
 func TestPathQualification(t *testing.T) {
 	a := pkgOf(t, "one/util", "package util\ntype T struct{ X int }")

@@ -25,6 +25,17 @@ import (
 func Canonical(t types.Type) (string, error) {
 	var out strings.Builder
 	c := newCtx()
+	// A top-level generic alias is transparent (aliases denote their
+	// aliased type), so its own type parameters bind position-indexed and
+	// alpha-equivalent before expansion — the aliased type's references to
+	// them are then canonical rather than free-and-fail-closed.
+	if alias, ok := t.(*types.Alias); ok {
+		if tp := alias.TypeParams(); tp != nil && tp.Len() > 0 {
+			for i := range tp.Len() {
+				c.bind(tp.At(i), i)
+			}
+		}
+	}
 	write(&out, t, c)
 	if *c.errp != nil {
 		return "", *c.errp

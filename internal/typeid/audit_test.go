@@ -169,7 +169,24 @@ func TestCorpusIdentityAudit(t *testing.T) {
 			}
 		}
 	}
-	t.Logf("splits=%d collisions=%d skipped(non-canonical)=%d", splits, collisions, skipped)
+	// The canonicalized denominator is reported separately from the
+	// discovered input count. Every discovered type must canonicalize
+	// (canonicalized + explicitly-excluded == discovered); there is no
+	// explicit-exclusion list, so a single silent skip fails the audit —
+	// an unresolved identity is never quietly dropped from the comparison.
+	// (distinct counts the interned type objects: identical types share
+	// one pointer, so distinct < discovered is ordinary type interning.)
+	discovered := len(typesList)
+	canonicalized := discovered - skipped
+	distinct := len(canonOf)
+	t.Logf("discovered=%d canonicalized=%d excluded=0 distinct=%d splits=%d collisions=%d skipped(non-canonical)=%d",
+		discovered, canonicalized, distinct, splits, collisions, skipped)
+	if skipped > 0 {
+		t.Fatalf("identity audit FAILED: %d types silently skipped (not canonicalized); every discovered type must resolve or be an explicit disposition", skipped)
+	}
+	if canonicalized != discovered {
+		t.Fatalf("identity audit FAILED: canonicalized %d != discovered %d", canonicalized, discovered)
+	}
 	if splits > 0 || collisions > 0 {
 		t.Fatalf("identity audit FAILED: %d splits, %d collisions", splits, collisions)
 	}
