@@ -53,22 +53,35 @@ accepted implementation-permitted behavior require a decision update.
 
 For each pinned TypeScript-Go revision:
 
-1. attest source and toolchain;
-2. apply the scope filter;
-3. rebuild selected package/declaration/body/operation/test census;
-4. diff canonical identities and pre-planning operation-class membership;
-5. detect added syntax, types, operations, directives, externals, and seams;
-6. run fixed-point planning;
-7. diff post-planning representation-class membership and plans;
-8. classify every addition as implemented, accepted-manual, external, or
+1. attest source, toolchain, prior immutable generated baseline, and current
+   editable mixed-source workspace;
+2. classify and extract manual AST units from verified post-format body hashes;
+3. apply the scope filter;
+4. rebuild selected package/declaration/body/operation/test census;
+5. diff canonical identities and pre-planning operation-class membership;
+6. detect added syntax, types, operations, directives, externals, and seams;
+7. run fixed-point planning;
+8. diff post-planning representation-class membership and plans;
+9. classify every addition as implemented, manual candidate, external, or
    unimplemented;
-9. regenerate into an empty staging root;
-10. run required gates; and
-11. publish only the declared completion level.
+10. regenerate the complete baseline into an empty staging root without
+    copying old generated source;
+11. structurally join and overlay valid manual bodies, regenerate imports, and
+    recompute the complete typed reachability graph;
+12. report current, placeholder, stale, missing, unreachable, orphaned,
+    automatically-lowerable, and invalid manual deltas;
+13. run required gates; and
+14. publish only the declared completion level.
 
 Added uses of an implemented class require no design review when machine proofs
 pass. A genuinely different class receives one class-level decision rather than
 site patches.
+
+Regeneration preserves manual bodies by canonical typed ownership, never by
+retaining old generated files. Unreachable and orphaned manual source remains
+untouched unless an explicit dry-run/apply prune is requested. A newly
+automatically lowerable manual body remains the sole implementation until an
+explicit identity-targeted reset replaces it.
 
 ## Diffusion Workflow
 
@@ -140,6 +153,8 @@ Every review message and pull request includes:
 - scope and completion level;
 - changed semantic classes;
 - generated/manual/unimplemented counts;
+- manual current/placeholder/stale/missing/unreachable/orphaned/
+  automatically-lowerable/invalid counts;
 - custom necessity decisions;
 - gates run and exact results;
 - deterministic report paths;
@@ -179,6 +194,7 @@ Selected-product completion additionally requires:
 - zero reachable unimplemented bodies;
 - zero unresolved reachable external stubs;
 - zero stale manual bodies;
+- zero reachable manual placeholders, missing bodies, or invalid manual joins;
 - every required extension seam assembled;
 - complete selected tests and compiler corpus;
 - deterministic regeneration;

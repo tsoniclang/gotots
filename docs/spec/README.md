@@ -43,7 +43,8 @@ GoToTS performs the following deterministic pipeline:
 6. choose the simplest statically proven representation for every value-flow
    region;
 7. lower to a typed TypeScript AST without semantic rediscovery;
-8. assemble generated, external, manual, and extension-owned inputs;
+8. reconcile the fresh generated baseline with automatically detected manual
+   bodies, external implementations, and extension-owned inputs;
 9. validate the complete staged artifact; and
 10. publish atomically.
 
@@ -75,7 +76,10 @@ reason, affected dependency closure, and required proof.
 An unimplemented unit:
 
 - is reported in machine coverage;
-- emits no runnable implementation or behavior-placeholder;
+- may have an exact typed throwing placeholder only in the explicitly
+  incomplete editable workspace;
+- emits no placeholder that is counted as runnable or admitted to a product
+  artifact;
 - prevents publication of every dependent product artifact;
 - does not prevent analysis or translation of independent units; and
 - cannot be counted as translated, manually implemented, externally bound, or

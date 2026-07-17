@@ -197,8 +197,9 @@ func TestSpecificationContractMarkers(t *testing.T) {
 			"Promise-returning TypeScript boundary",
 		},
 		"08-externals-manual-extensions.md": {
-			"There is no automatic promotion",
-			"Partial statements, expressions, line ranges, regex replacements",
+			"Generated Baselines And Body Hashes",
+			"Automatic Dependency And Reachability Graph",
+			"Reset, Acceptance And Pruning",
 			"Mid-Body Seams",
 		},
 		"09-representation-output.md": {

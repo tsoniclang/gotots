@@ -214,7 +214,11 @@ that required them.
 Per-body records include source semantic hash, IR hash, plan hash, canonical
 generated body-AST hash, canonical materialized-body artifact and hash,
 translation evidence stages with their evidence IDs, and source-map identity.
-Formatting does not change canonical AST identity.
+Every generated body additionally carries its immutable generated-baseline
+post-format text hash. Reconciliation records the current post-format body hash,
+derived generated/manual ownership, and nested-body ownership result. Formatting
+does not change canonical AST identity; the separate text hash is deliberately
+computed after pinned formatting so ownership compares deterministic bytes.
 
 An emitted module/file ID is present only when the module exists and contains
 the body. The record separately names whether that module is retained runnable,
@@ -228,9 +232,13 @@ The emitter prints a typed AST using canonical formatting. Import ordering,
 declaration ordering, helper allocation, string escaping, numeric literals,
 source maps, and manifest serialization are deterministic.
 
-Emission cannot read an accepted output tree. Inputs are the pin, profile,
-generated semantic artifacts, accepted manual bodies, external contracts, and
-extension seam data.
+Automatic emission cannot read or reuse an accepted output tree. Its inputs are
+the pin, profile, generated semantic artifacts, external contracts, and
+extension seam data. The preceding manual-reconciliation phase may read the
+attested prior generated baseline and current editable workspace only to
+classify and extract manual AST units. Those units are overlaid onto an
+independently generated fresh baseline; old generated bodies, helpers, imports,
+and declarations are never copied forward.
 
 ## Implementation-Permitted Behavior
 

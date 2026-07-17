@@ -13,7 +13,9 @@ Every run identifies:
 - TypeScript compiler, JavaScript runtime, module resolver, strict
   configuration, and generated-helper/runtime revisions and digests;
 - GoToTS implementation revision;
-- external contract, manual body, extension seam, and emulation manifests;
+- external contract, extension seam, and emulation inputs;
+- the current editable mixed-source workspace and its immutable prior
+  generated-baseline attestation for manual-body reconciliation;
 - schema and decision-registry versions; and
 - output and proof-format versions.
 
@@ -106,7 +108,7 @@ combinations are:
 | Declaration owner | Implementation state | Meaning |
 | --- | --- | --- |
 | generated-core | generated | automatic IR/lowering ownership; evidence stage reported separately |
-| generated-core | accepted-manual | reviewed complete structural body |
+| generated-core | accepted-manual | hash-detected complete structural body that passed applicable gates |
 | generated-core | unimplemented | recognized implementation withheld |
 | external-contract | no-source-body | typed external obligation |
 | extension-core-contract | separate-extension | generated typed seam |
@@ -166,12 +168,23 @@ The required bundle includes:
 - per-body translation evidence stages and their gate/artifact references;
 - representation plans;
 - unimplemented diagnostics;
+- generated-baseline/body-hash evidence and the derived manual status/delta
+  ledger;
 - body-materialization artifacts for every automatically lowered body;
 - generated artifact inventory;
 - test results; and
 - manifest hashes.
 
 ## Staged Generation
+
+Automatic translation always generates a complete new baseline under an empty
+staging root. It does not incrementally modify, copy, or consult old generated
+bodies for semantic decisions. Before generation, a separate reconciliation
+phase may read the attested prior baseline and current editable mixed-source
+workspace solely to identify manual bodies by the contract in
+`08-externals-manual-extensions.md`. Extracted manual AST units are overlaid
+only after the new baseline exists; imports and reachability are then derived
+again from the assembled typed AST.
 
 Generation writes only beneath a newly created staging root whose real path is
 contained by the configured output parent. Paths are canonical-encoded and
@@ -184,16 +197,18 @@ accepted product tree untouched.
 
 ## Unimplemented Publication Rule
 
-An unimplemented unit may appear in analysis and coverage reports. No runnable
-placeholder is emitted for an owned Go body. Any package or entry artifact whose
-dependency closure reaches the unit is withheld and named in the diagnostic.
-Independent closed packages may be emitted into an explicitly partial,
-non-product staging bundle whose manifest declares `complete: false`.
+An unimplemented unit may appear in analysis and coverage reports and as an
+exact typed throwing placeholder in the editable workspace. That placeholder
+is a completion surface, not a runnable implementation. Any package or entry
+artifact whose dependency closure reaches it is withheld and named in the
+diagnostic. Independent closed packages may be emitted into an explicitly
+partial, non-product staging bundle whose manifest declares `complete: false`.
 
-A partial bundle contains reports and IR plus either declaration-only output or
-runnable modules whose complete transitive implementation closure is closed. A
-package containing an omitted body is never emitted as a runnable module, and
-no import path may make a withheld implementation appear available.
+A partial bundle contains reports and IR plus the editable placeholder tree,
+declaration-only output, or runnable modules whose complete transitive
+implementation closure is closed. A package containing an unresolved
+placeholder or omitted body is never represented as a retained runnable
+module, and no import path may make that implementation appear available.
 
 Every automatically lowered body, including one in a withheld package, retains
 an analysis-only canonical TypeScript body AST or equivalent canonical body

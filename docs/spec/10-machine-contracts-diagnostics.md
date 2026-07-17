@@ -14,7 +14,7 @@ canonical encoding. Schemas are part of the product contract and include:
 - value-flow regions and representation constraints;
 - representation plans and necessity records;
 - external obligations and bindings;
-- manual body records;
+- derived manual body/reconciliation records;
 - extension seams;
 - test ledgers and results;
 - generated artifacts and source maps;
@@ -74,7 +74,7 @@ ledgers cover:
 - test entities;
 - external objects;
 - external representation ABIs and adapters;
-- manual bodies;
+- generated baselines and derived manual bodies;
 - extension seams;
 - regions and representation plans;
 - unimplemented units;
@@ -95,6 +95,8 @@ An implementation support record contains:
 - operation-class IDs;
 - dependency closure;
 - owner;
+- immutable generated-baseline body hash, current post-format body hash, and
+  automatically derived ownership/status;
 - canonical lowered-body AST and materialization artifact IDs, if generated;
 - each achieved translation evidence stage and its evidence IDs;
 - emitted module artifact IDs only when those artifacts exist;
@@ -106,13 +108,36 @@ Body ownership state and automatic operation-class support are separate
 ledgers. An unimplemented body record contains every unsupported operation-site
 ID, not only the first one. Each site record contains semantic class, source
 span, concise reason, missing accepted mechanism, and affected product roots.
-It never points to a runnable owned-body stub.
+It may point to an exact editable-workspace placeholder artifact, but never to
+a retained runnable owned-body stub.
 
 The verifier rejects a stage without its required evidence, a later stage whose
 predecessor is absent, a materialized body whose hash cannot be reconstructed,
 an emitted-module reference to an absent file, a body claimed by a module that
 does not contain its generated symbol, and a withheld body marked
 `module-retained`.
+
+## Manual Reconciliation Record
+
+Manual records are outputs derived from source and attested baselines, never
+user-authored registration inputs. For every generated or manual body they
+record:
+
+- canonical implementation ID and enclosing/nested ownership relation;
+- immutable baseline file/header/marker/body hashes;
+- current normalized file/header/marker/body hashes;
+- generated, manual, placeholder, stale, missing, unreachable, orphaned,
+  automatically-lowerable, or invalid status;
+- old/new source-signature, semantic-body, IR, plan, dependency, effect,
+  extension-seam, and proof hashes;
+- resolved static dependency and reachability edges;
+- applicable gate evidence and accepted-manual state; and
+- reset/prune eligibility with the exact current workspace hash.
+
+The schema rejects forged or self-consistent edited markers that disagree with
+the immutable baseline, duplicate body claims, ambiguous joins, parent/child
+ownership overlap, unresolved references, and any attempt to classify by name
+or raw text alone.
 
 ## Correctness Evidence Record
 

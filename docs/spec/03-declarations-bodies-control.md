@@ -184,14 +184,18 @@ values in Go order.
 
 If one semantic statement or expression class lacks lowering, the enclosing
 implementation is classified unimplemented with the exact operation record.
-The compiler continues analyzing independent implementations but emits no
-runnable body for the affected dependency closure.
+The compiler continues analyzing independent implementations and may emit an
+exact typed throwing placeholder into the editable workspace, but emits no
+retained runnable body for the affected dependency closure.
 
-Missing automatic lowering defaults to `unimplemented`. A current accepted
-complete-body record may separately change that unit's product ownership to
-`accepted-manual` under `08-externals-manual-extensions.md`. This does not mark
-the automatic semantic class implemented or inflate generated-class coverage.
-Automatic class support and complete-body ownership are separate machine facts.
+Missing automatic lowering defaults to `unimplemented`. Editing the placeholder
+or another generated body is detected automatically from its generated
+baseline and post-format body hash. A current complete body that passes every
+applicable gate may separately change that unit's product ownership to
+`accepted-manual` under `08-externals-manual-extensions.md`. No user-authored
+manifest or promotion record is involved. This does not mark the automatic
+semantic class implemented or inflate generated-class coverage. Automatic
+class support and complete-body ownership are separate machine facts.
 
 The body has one support state but retains one unsupported-operation record for
 every unsupported site and semantic class. Finding one unsupported operation

@@ -165,8 +165,9 @@ Package spelling alone never creates intrinsic status.
 Every selected implementation unit has exactly one support state:
 
 - `generated`: typed IR and a complete automatic lowering exist;
-- `accepted-manual`: typed IR is complete and one reviewed structural body
-  supplies the implementation;
+- `accepted-manual`: typed IR is complete, automatic hash/AST reconciliation
+  selected one manual body, and that body passed every applicable acceptance
+  gate;
 - `unimplemented`: semantics are recognized but no accepted implementation
   exists.
 
@@ -176,6 +177,13 @@ in `08-externals-manual-extensions.md`.
 Unimplemented is a valid development result, not product success. It permits
 the compiler to continue classifying independent work while withholding every
 artifact whose dependency closure reaches that unit.
+
+Manual detection is not user registration. An edited body is classified from
+the attested generated baseline, mandatory generated header, post-format body
+hash, and typed AST as specified in `08-externals-manual-extensions.md`. Until
+that body passes the applicable gates it remains unimplemented for product
+acceptance even though the regeneration report identifies it as a manual
+candidate.
 
 Support state is an implementation-ownership decision, not a completion or
 validation result. In particular, `generated` does not mean that a body is

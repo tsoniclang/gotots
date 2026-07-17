@@ -98,7 +98,7 @@ selected emulation module implements those same static exports. Opaque external
 values use generated branded types and can be inspected only through declared
 external operations.
 
-The translator-capability artifact emits static declarations and deterministic
+The editable translation workspace emits static declarations and deterministic
 stub implementations for unresolved external functions. A stub:
 
 - has the exact generated TypeScript signature;
@@ -107,8 +107,12 @@ stub implementations for unresolved external functions. A stub:
 - contains no fake return value or host-library substitution; and
 - is reported as unresolved.
 
-The selected product artifact replaces each reachable stub through a static
-binding manifest. Product publication rejects a reachable unresolved stub.
+An implementation may be supplied by editing that exact typed body in place;
+the post-format body-hash contract below then classifies it as manual. Product
+assembly derives its direct static import/call graph from typed source and
+selects that one implementation. There is no user-authored registration record,
+parallel external implementation registry, or runtime selection path. Product
+publication rejects a reachable unresolved stub.
 
 Variables and addressable external storage use typed get/set/location contracts
 only when required by source operations. Constants are emitted from exact Go
@@ -116,7 +120,7 @@ constant evidence.
 
 ## External Emulation Binding
 
-A binding identifies:
+A derived binding record identifies:
 
 - external contract identity and hash;
 - implementation module and export;
@@ -126,8 +130,12 @@ A binding identifies:
 - initialization requirements; and
 - semantic oracle evidence.
 
-Assembly imports the selected implementation directly. There is no runtime
-registry, name lookup, package fallback, or speculative host adaptation.
+The normal implementation workflow edits the generated typed throwing stub in
+place. That body may directly call a separately maintained typed emulation
+module; its import and binding record are derived from the resolved TypeScript
+AST. The developer writes no attachment manifest. Assembly imports the selected
+implementation directly. There is no runtime registry, name lookup, package
+fallback, or speculative host adaptation.
 
 A typed wrapper around erased dispatch is still erased dispatch and is
 forbidden. This is not an external binding:
@@ -171,70 +179,208 @@ effect.
 
 ## Manual Ownership Unit
 
-The only manual unit is a complete function/method body or explicit synthetic
-package-initializer body. Declarations, signatures, types, imports, module
-ownership, source maps, and seams remain generated.
+The smallest independently preserved manual unit is one complete executable
+body: function, method, constructor, getter, setter, function-valued
+initializer, function literal, or explicit synthetic package initializer. A
+manual edit to a statement or expression makes its containing body manual; it
+does not create a textual patch unit.
 
-Partial statements, expressions, line ranges, regex replacements, textual
-markers, and signature edits are not ownership units.
+Generated and manual bodies may coexist in the same file and in the same
+class. This is required for low-ceremony completion of isolated difficult
+bodies. One body still has exactly one implementation; a generated fallback
+and a manual implementation never coexist at runtime.
 
-## Manual Body Record
+Generated declarations, signatures, fields, source maps, extension seams, and
+module ownership remain generator-owned when they correspond to selected Go.
+Editing one of those is not a body override and fails structural reconciliation.
+Imports are regenerated from the resolved references of both generated and
+manual ASTs, so a developer does not maintain a second import manifest.
 
-Each accepted body records:
+A file without the mandatory generated-file header is manual source. Its
+declarations are not disposable generated output. When such a declaration is
+intended to satisfy a selected Go object, reconciliation must match it
+unambiguously to the newly generated canonical module/export and exact
+signature; otherwise it is a separate product/manual declaration or an error.
 
-- canonical Go implementation ID;
-- source signature hash;
-- source semantic-body hash;
-- semantic IR hash;
-- lowering-plan hash;
-- baseline generated-body hash or blocking-plan hash;
-- accepted canonical TypeScript body-AST hash;
-- dependency and effect hashes;
-- canonical declaration/helper references and import requests;
-- semantic-oracle and representation-verifier IDs;
-- owner and reason;
-- source and output profile hashes; and
-- acceptance revision.
+## Generated Baselines And Body Hashes
 
-The authoritative body artifact is a versioned canonical serialization of one
-typed TypeScript body AST. It is stored outside generated roots and keyed by
-canonical Go identity.
+Every generated file begins with the versioned generated-file header. Every
+independently owned generated body has an adjacent marker carrying:
 
-References inside that AST bind to canonical Go declarations, generated helper
-IDs, and explicit module requests. Allocated local/import spelling is resolved
-during assembly and is never stored as semantic identity.
+- canonical implementation ID;
+- marker schema version; and
+- lowercase SHA-256 of the exact body text after pinned deterministic
+  formatting.
 
-## Manual Promotion Workflow
+The body byte range begins at the opening `{` and ends after the matching `}`.
+It includes whitespace and comments inside that range and excludes the marker,
+signature, imports, and generated-file header. The formatter emits UTF-8 with
+LF line endings before hashes are computed. The generator first prints and
+formats the marker-free module, hashes each body range, inserts the markers,
+and verifies that marker insertion did not change any body range.
 
-The supported workflow is:
+For example, the generated baseline may contain:
 
-1. generate the declaration and baseline body or blocking diagnostic;
-2. allow a developer to edit the complete body in the assembled module for
-   review;
-3. parse and typecheck that module structurally;
-4. compare the observed canonical body hash with baseline and accepted hashes;
-5. explicitly promote the complete body;
-6. extract it into the authoritative body artifact with reviewed effects; and
-7. regenerate the module from Go inputs plus the accepted artifact.
+```ts
+// Code generated by GoToTS; generated bodies are identified by verified body hashes.
+// gotots:body v=1 id="pkg/math.Add" sha256="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+export function Add(left: int32, right: int32): int32 {
+  return left + right;
+}
+```
 
-Promotion requires a Go differential oracle for the complete body, structural
-verification against the representation plan, and class-level necessity for
-any custom mechanism used by the body. Manual ownership cannot bypass copy,
-nil, panic, boundary, or staticness rules.
+The immutable accepted baseline proves what marker and body hash the generator
+actually produced. A marker in the editable workspace is never trusted by
+itself. Changing the marker cannot disguise a body edit.
 
-There is no automatic promotion. An edited generated body without a matching
-accepted record is drift and blocks. Regeneration never relies on retained
-generated output.
+The baseline manifest also carries each complete generated-file content hash as
+a fast unchanged-file check. That file hash is never the ownership authority:
+when it differs, reconciliation parses a copy, applies the pinned formatter in
+memory, and computes each current body hash from the normalized body range. A
+formatting-only edit may therefore normalize back to generated ownership;
+semantic or comment changes inside a body remain visible.
 
-## Manual Drift
+Ownership is derived without a user-authored manifest:
 
-A manual body becomes stale when its source signature, source semantic body,
-IR, lowering plan, dependencies, effects, profile, extension seams, or accepted
-artifact changes. Staleness blocks the affected closure and reports every
-changed hash.
+- verified generated header plus a current body hash equal to the immutable
+  baseline marker means generated and disposable;
+- verified generated header plus a differing body hash means manual override;
+- verified generated header plus an absent marker means manual override;
+- no verified generated header means the file and its declarations are manual;
+- malformed, duplicate, wrong-identity, or baseline-inconsistent markers are
+  invalid and block rather than guessing.
 
-Formatting changes do not alter canonical AST hashes. Intentional semantic
-edits require explicit promotion.
+Every generated function-like body receives a marker, including nested
+function literals represented independently by the census. Reconciliation is
+structural and deepest-first. If an outer raw body hash changed only because a
+marked nested body changed, the nested body is the manual unit and the outer
+body remains generated. A change outside nested body ranges makes the outer
+body manual. This avoids overlapping ownership while retaining the required
+post-format raw hash for every body.
+
+The marker always records the accepted generated baseline hash, never a hash of
+the manual replacement. A manual edit therefore remains visibly divergent.
+Canonical TypeScript AST hashes remain separate semantic evidence; they do not
+replace the post-format ownership hash.
+
+## Throwing Placeholders
+
+When typed IR is complete but automatic lowering is unavailable, the editable
+workspace contains the exact generated declaration and a typed throwing body:
+
+```ts
+// gotots:body v=1 id="pkg/checker.solve" sha256="<generated-placeholder-hash>"
+export function solve(input: Input): Result {
+  throw new Error("GOTOTS_MANUAL_UNIMPLEMENTED");
+}
+```
+
+Unresolved external operations use
+`GOTOTS_EXTERNAL_UNIMPLEMENTED` instead. The placeholder has the exact static
+signature, is machine-counted, and cannot return a fabricated value. Replacing
+only the throw with ordinary typed code changes the post-format hash and is the
+complete act of creating a manual implementation. No JSON, annotation,
+registration call, dependency list, ownership declaration, or separate
+promotion command is required.
+
+A reachable placeholder is never a runnable product implementation. It may
+exist in an explicitly incomplete editable/analysis workspace; publication
+withholds its dependency closure until the body is implemented and accepted.
+
+## Automatic Manual Reconciliation
+
+Regeneration is structural and transactional:
+
+1. attest the immutable prior generated baseline and parse the current editable
+   workspace;
+2. classify body ownership from headers, baseline markers, and post-format body
+   hashes;
+3. extract changed manual AST units in memory with their resolved symbol,
+   dependency, effect, and extension-seam evidence;
+4. generate the new baseline from the new Go pin into an empty staging root;
+5. discard every old generated body rather than copying or adapting it;
+6. join each manual unit to the new canonical Go declaration and signature;
+7. overlay only unambiguous, structurally valid, reachable manual bodies;
+8. derive imports and dependency edges from the assembled typed AST;
+9. run all required structural, staticness, semantic, test, and performance
+   gates; and
+10. publish atomically.
+
+The old editable tree is never a semantic input to automatic translation. It is
+read only to recover manual ownership relative to the attested old baseline.
+No generated body, helper, import, or declaration survives because it happened
+to exist in that tree.
+
+## Automatic Dependency And Reachability Graph
+
+The developer writes TypeScript, not graph metadata. GoToTS derives the graph
+from typed Go IR, generated TypeScript AST, and manual TypeScript AST. It
+includes:
+
+- static imports, calls, constructors, fields, methods, and package init;
+- function values, closures, callbacks, deferred calls, and stored callables;
+- finite interface dispatch and generic instantiation targets;
+- external call-in/effect contracts and product/export roots;
+- product-extension seams and generated bridge calls; and
+- selected test roots.
+
+An edge is canonical object identity, not source spelling. A dynamic target is
+accepted only when whole-program typed analysis proves a finite complete set.
+An unresolved target is conservatively reachable or blocking; it is never
+discarded through a name or text heuristic.
+
+Manual code may call generated code, other manual code, or typed external
+contracts normally. Those relationships are discovered from resolved symbols.
+There is no parallel manual dependency file.
+
+## Manual Status And Regeneration Delta
+
+Each regenerated manual unit receives exactly one derived status:
+
+- `reachable-current` — joins the new declaration/signature and all evidence is
+  current;
+- `reachable-placeholder` — selected but still has a generated throwing body;
+- `reachable-stale` — joins structurally, but source body, semantic IR,
+  lowering plan, effects, extension seams, or proof inputs changed;
+- `reachable-missing` — a required implementation has neither automatic nor
+  manual behavior;
+- `unreachable` — no current selected root reaches it;
+- `orphaned` — its prior canonical Go declaration is absent from the current
+  pin or has no unambiguous new join;
+- `automatically-lowerable` — a manual body still overrides a body the current
+  translator can now generate; or
+- `invalid` — malformed marker, signature/declaration drift, unresolved static
+  reference, overlapping ownership, or failed validation.
+
+Reports list every status by canonical identity and show old/new source,
+signature, IR, plan, generated-baseline, manual-AST, dependency, effect, seam,
+and evidence hashes as applicable. These are generator-derived ledgers, not
+user-maintained inputs.
+
+`reachable-stale`, `reachable-missing`, `reachable-placeholder`, and `invalid`
+block affected product closure. `unreachable` and `orphaned` manual source is
+preserved by default, excluded from product assembly, and reported; it does not
+silently become generated or disappear.
+
+## Reset, Acceptance And Pruning
+
+When automatic lowering later supports a manually implemented body, the manual
+body remains the sole selected implementation. Regeneration reports
+`automatically-lowerable` but does not add a generated alternative. An explicit
+identity-targeted reset command may replace it with the newly generated body;
+the command shows a dry-run diff and requires the current manual hash to match
+the reviewed input. Reset changes ownership, not runtime selection.
+
+Manual acceptance requires the same strict typecheck, staticness, structural
+representation checks, Go differential oracles, selected tests, extension
+checks, and performance gates applicable to generated code. Passing those
+gates derives `accepted-manual`; it does not require a promotion file or mutate
+the generated baseline marker to resemble the manual body.
+
+An explicit prune command supports `--dry-run` and a separate apply mode for
+unreachable/orphaned manual units. It deletes only identities proven
+unreachable against the complete current graph and current workspace hash.
+Automatic regeneration never prunes manual source.
 
 ## Product Extensions
 
@@ -316,7 +462,8 @@ replace them.
 Independent verification proves:
 
 - every external reference resolves to one contract and selected binding state;
-- every manual body resolves to one current canonical artifact;
+- every manual body resolves to one current typed AST body and one derived
+  baseline/hash/ownership record;
 - every extension seam resolves to one typed assembly decision;
 - no unit has multiple ownership classes;
 - generated source contains no text patches or runtime owner selection; and
