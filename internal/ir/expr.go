@@ -167,7 +167,7 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 		// copy happens where the value is bound, never on the read path,
 		// so addressable chains (x.F.G = v, x.F.M()) stay in place.
 		b.use("fieldLoad")
-		return &FieldLoad{X: base, Field: n.Sel.Name, T: t}, nil
+		return &FieldLoad{X: base, Field: n.Sel.Name, T: t, Cell: b.fieldCell(selection, t)}, nil
 
 	case *ast.IndexExpr:
 		operand, err := b.buildExpr(n.X)

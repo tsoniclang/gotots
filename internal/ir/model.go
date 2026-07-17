@@ -168,6 +168,12 @@ type Scope struct {
 	// ifaceMembers caches each interface identity's resolved closed
 	// implementer union (typeOf recursion makes this hot).
 	ifaceMembers map[string][]IfaceMember
+	// addressTakenFields is the whole-unit set of struct fields whose
+	// address is taken anywhere (&x.f). A non-identity field in this set
+	// is represented as one stable per-instance cell so &x.f is exact
+	// pointer identity — keyed by the field's interned *types.Var object,
+	// which is shared across packages and through promotion.
+	addressTakenFields map[*types.Var]bool
 }
 
 // ExternTypeObligation is one external named type's referenced contract
@@ -189,18 +195,34 @@ func NewScope(paths ...string) Scope {
 		packages[path] = true
 	}
 	return Scope{
-		packages:        packages,
-		generics:        map[*types.Func][][]types.Type{},
-		externals:       map[*types.Func]bool{},
-		typeGenerics:    map[*types.TypeName][][]types.Type{},
-		anonStructs:     map[string]map[string]*Struct{},
-		externTypes:     map[string]*ExternTypeObligation{},
-		externVars:      map[string]*types.Var{},
-		concreteTypes:   &[]*types.TypeName{},
-		externConcrete:  &[]*types.TypeName{},
-		boxedComposites: map[string]*Type{},
-		ifaceMembers:    map[string][]IfaceMember{},
+		packages:           packages,
+		generics:           map[*types.Func][][]types.Type{},
+		externals:          map[*types.Func]bool{},
+		typeGenerics:       map[*types.TypeName][][]types.Type{},
+		anonStructs:        map[string]map[string]*Struct{},
+		externTypes:        map[string]*ExternTypeObligation{},
+		externVars:         map[string]*types.Var{},
+		concreteTypes:      &[]*types.TypeName{},
+		externConcrete:     &[]*types.TypeName{},
+		boxedComposites:    map[string]*Type{},
+		ifaceMembers:       map[string][]IfaceMember{},
+		addressTakenFields: map[*types.Var]bool{},
 	}
+}
+
+// MarkFieldAddressTaken records that the address of one struct field is
+// taken somewhere in the unit (the whole-program pre-pass calls this).
+func (s Scope) MarkFieldAddressTaken(field *types.Var) {
+	if field != nil {
+		s.addressTakenFields[field] = true
+	}
+}
+
+// FieldAddressTaken reports whether the field's address is taken anywhere
+// in the unit — the condition (with a non-identity field type) for the
+// stable-cell field representation.
+func (s Scope) FieldAddressTaken(field *types.Var) bool {
+	return field != nil && s.addressTakenFields[field]
 }
 
 // Owns reports whether the package path is part of the unit.
@@ -470,6 +492,10 @@ type Func struct {
 type Var struct {
 	Name string
 	Type Type
+	// Cell marks a struct field whose address is taken somewhere in the
+	// unit: it is stored as one stable per-instance GoCell<Type>, so &x.f
+	// is exact pointer identity. Only set on non-identity struct fields.
+	Cell bool
 }
 
 // Struct is one named struct type of the translated package, generated as

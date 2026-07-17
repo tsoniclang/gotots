@@ -26,6 +26,7 @@ type FieldTarget struct {
 	X     Expr
 	Field string
 	T     Type // field type
+	Cell  bool // stored as a stable per-instance cell (address-taken field)
 }
 
 // MapTarget assigns a map entry (nil-map assignment panics).

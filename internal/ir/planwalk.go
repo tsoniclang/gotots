@@ -157,6 +157,8 @@ func (s *slicePlanner) walkExpr(e Expr) {
 		s.walkExpr(n.X)
 	case *FieldLoad:
 		s.walkExpr(n.X)
+	case *FieldCellRef:
+		s.walkExpr(n.Base)
 	case *MapGet:
 		s.walkExpr(n.Map)
 		s.walkExpr(n.Key)

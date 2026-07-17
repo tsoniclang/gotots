@@ -546,6 +546,37 @@ func collectGenericInstances(unit ir.Scope, pkgs []*packages.Package) {
 			}
 		}
 	}
+	collectAddressTakenFields(unit, pkgs)
+}
+
+// collectAddressTakenFields records, across the whole unit, every struct
+// field whose address is taken (&x.f). This is inherently whole-program:
+// a field addressed in one body fixes that field's representation (a
+// stable per-instance cell) in every body, so the scan must complete
+// before any struct or body is built.
+func collectAddressTakenFields(unit ir.Scope, pkgs []*packages.Package) {
+	for _, p := range pkgs {
+		for _, file := range p.Syntax {
+			ast.Inspect(file, func(node ast.Node) bool {
+				unary, ok := node.(*ast.UnaryExpr)
+				if !ok || unary.Op != token.AND {
+					return true
+				}
+				selector, ok := ast.Unparen(unary.X).(*ast.SelectorExpr)
+				if !ok {
+					return true
+				}
+				selection, ok := p.TypesInfo.Selections[selector]
+				if !ok || selection.Kind() != types.FieldVal {
+					return true
+				}
+				if field, ok := selection.Obj().(*types.Var); ok {
+					unit.MarkFieldAddressTaken(field)
+				}
+				return true
+			})
+		}
+	}
 }
 
 // collectGenericInstances records every generic-function instantiation

@@ -347,7 +347,7 @@
       "specClause": "docs/spec/08-externals-manual-extensions.md"
     },
     {
-      "key": "fieldCell",
+      "key": "fieldCellRef",
       "state": "generated",
       "specClause": "docs/spec/04-types-values-pointers.md"
     },

@@ -147,14 +147,20 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		// A cell field's value is read through the stable cell (.v); its
+		// storage is one GoCell<T> so the field's address stays exact.
+		suffix := "." + n.Field
+		if n.Cell {
+			suffix += ".v"
+		}
 		if n.X.Type().Kind == ir.KindStruct {
-			return fmt.Sprintf("%s.%s", base, n.Field), nil
+			return base + suffix, nil
 		}
 		checked, err := p.nilCheckOf(base, n.X.Type())
 		if err != nil {
 			return "", err
 		}
-		return checked + "." + n.Field, nil
+		return checked + suffix, nil
 	case *ir.StructNew:
 		class, err := p.module.symbol(n.Pkg, n.TypeName)
 		if err != nil {
@@ -395,8 +401,8 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 	case *ir.AddrOf:
 		// The pointer to an addressable struct value is the instance.
 		return p.printExpr(n.X)
-	case *ir.FieldCell:
-		return p.printFieldCell(n)
+	case *ir.FieldCellRef:
+		return p.printFieldCellRef(n)
 	case *ir.Deref:
 		x, err := p.printExpr(n.X)
 		if err != nil {

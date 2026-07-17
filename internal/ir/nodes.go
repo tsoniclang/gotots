@@ -332,11 +332,14 @@ type MethodCall struct {
 	Results  []Type
 }
 
-// FieldLoad reads a struct field through a nil-checked pointer.
+// FieldLoad reads a struct field through a nil-checked pointer. Cell
+// marks a field stored as a stable per-instance cell (its address is
+// taken in the unit): the value read unwraps the cell.
 type FieldLoad struct {
 	X     Expr
 	Field string
 	T     Type
+	Cell  bool
 }
 
 // Closure is a function literal: a JS arrow function capturing enclosing
@@ -411,16 +414,13 @@ type Deref struct {
 	T Type // the pointee struct type
 }
 
-// FieldCell is &s.f on a struct field whose type is NOT an identity
-// carrier (a map, slice, scalar, pointer, interface, or function): the
-// pointer is a proxying cell that reads and writes the live field, so an
-// aliasing write through the pointer (the *p = make(...) lazy-init
-// idiom) mutates the very field. The struct base is evaluated exactly
-// once at the address-of; the cell closes over that single reference.
-type FieldCell struct {
+// FieldCellRef is &s.f on a struct field stored as a stable per-instance
+// cell (a non-identity field whose address is taken in the unit): the
+// pointer IS that cell, so repeated &s.f yields the same pointer and a
+// store through it (the *p = make(...) lazy-init idiom) mutates the field.
+type FieldCellRef struct {
 	Base  Expr   // the addressable struct base (a value or a pointer to one)
-	Field string // the Go field name accessed
-	Elem  Type   // the field's type (the pointee)
+	Field string // the Go field name whose cell is referenced
 	T     Type   // the pointer type (result)
 }
 
@@ -456,7 +456,7 @@ func (*StructCopy) expr()       {}
 func (*StructZero) expr()       {}
 func (*AddrOf) expr()           {}
 func (*Deref) expr()            {}
-func (*FieldCell) expr()        {}
+func (*FieldCellRef) expr()     {}
 func (*Closure) expr()          {}
 func (*FuncRef) expr()          {}
 func (*DynCall) expr()          {}
@@ -541,21 +541,21 @@ func (a *TypeAssert) Type() Type { return a.Target }
 var boolType = Type{Kind: KindBool, Go: "bool"}
 var intType = Type{Kind: KindInt, Go: "int"}
 
-func (f *FieldLoad) Type() Type  { return f.T }
-func (s *StructNew) Type() Type  { return s.T }
-func (s *StructCopy) Type() Type { return s.X.Type() }
-func (s *StructZero) Type() Type { return s.T }
-func (a *AddrOf) Type() Type     { return a.T }
-func (d *Deref) Type() Type      { return d.T }
-func (f *FieldCell) Type() Type  { return f.T }
-func (n *NilConst) Type() Type   { return n.T }
-func (i *IsNil) Type() Type      { return boolType }
-func (m *MapMake) Type() Type    { return m.T }
-func (m *MapFrom) Type() Type    { return m.T }
-func (m *MapGet) Type() Type     { return m.T }
-func (m *MapLookup) Type() Type  { return m.T }
-func (m *MapLen) Type() Type     { return intType }
-func (s *StringLen) Type() Type  { return intType }
+func (f *FieldLoad) Type() Type    { return f.T }
+func (s *StructNew) Type() Type    { return s.T }
+func (s *StructCopy) Type() Type   { return s.X.Type() }
+func (s *StructZero) Type() Type   { return s.T }
+func (a *AddrOf) Type() Type       { return a.T }
+func (d *Deref) Type() Type        { return d.T }
+func (f *FieldCellRef) Type() Type { return f.T }
+func (n *NilConst) Type() Type     { return n.T }
+func (i *IsNil) Type() Type        { return boolType }
+func (m *MapMake) Type() Type      { return m.T }
+func (m *MapFrom) Type() Type      { return m.T }
+func (m *MapGet) Type() Type       { return m.T }
+func (m *MapLookup) Type() Type    { return m.T }
+func (m *MapLen) Type() Type       { return intType }
+func (s *StringLen) Type() Type    { return intType }
 
 func (s *SliceLit) Type() Type         { return s.T }
 func (s *SliceMake) Type() Type        { return s.T }

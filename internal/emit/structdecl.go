@@ -29,13 +29,24 @@ func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct) er
 		if err != nil {
 			return fmt.Errorf("%s: %w", structDecl.ID, err)
 		}
-		p.line("%s: %s;", field.Name, spelled)
+		// An address-taken field is one stable per-instance cell; the
+		// declared field is GoCell<T> but the constructor still takes the
+		// plain value and wraps it, so every construction site is unchanged.
+		if field.Cell {
+			p.line("%s: gort$.GoCell<%s>;", field.Name, spelled)
+		} else {
+			p.line("%s: %s;", field.Name, spelled)
+		}
 		params = append(params, tsName(field.Name)+": "+spelled)
 	}
 	p.line("constructor(%s) {", strings.Join(params, ", "))
 	p.indent++
 	for _, field := range structDecl.Fields {
-		p.line("this.%s = %s;", field.Name, tsName(field.Name))
+		if field.Cell {
+			p.line("this.%s = { v: %s };", field.Name, tsName(field.Name))
+		} else {
+			p.line("this.%s = %s;", field.Name, tsName(field.Name))
+		}
 	}
 	p.indent--
 	p.line("}")
@@ -56,6 +67,13 @@ func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct) er
 func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 	clone := make([]string, 0, len(structDecl.Fields))
 	for _, field := range structDecl.Fields {
+		// A cell field is a non-identity carrier: the clone passes its held
+		// value, and the constructor wraps it in a FRESH cell — so the
+		// clone's field has its own distinct address, exactly Go's copy.
+		if field.Cell {
+			clone = append(clone, "this."+field.Name+".v")
+			continue
+		}
 		switch field.Type.Kind {
 		case ir.KindStruct:
 			clone = append(clone, "this."+field.Name+".goClone$()")
@@ -88,6 +106,12 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 	p.line("goSet$(other: %s): void {", self)
 	p.indent++
 	for _, field := range structDecl.Fields {
+		// A cell field keeps its stable storage under a whole-value store:
+		// only the held value is overwritten, so &this.f stays exact.
+		if field.Cell {
+			p.line("this.%s.v = other.%s.v;", field.Name, field.Name)
+			continue
+		}
 		switch field.Type.Kind {
 		case ir.KindStruct:
 			p.line("this.%s.goSet$(other.%s);", field.Name, field.Name)
@@ -153,7 +177,12 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 	if structDecl.Comparable {
 		comparisons := make([]string, 0, len(structDecl.Fields))
 		for _, field := range structDecl.Fields {
-			comparison, err := p.eqComponent("this."+field.Name, "other."+field.Name, field.Type)
+			this, other := "this."+field.Name, "other."+field.Name
+			if field.Cell {
+				this += ".v"
+				other += ".v"
+			}
+			comparison, err := p.eqComponent(this, other, field.Type)
 			if err != nil {
 				return err
 			}
@@ -176,7 +205,11 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 	if structDecl.KeyEncodable {
 		components := make([]string, 0, len(structDecl.Fields))
 		for _, field := range structDecl.Fields {
-			component, err := keyComponent("this."+field.Name, field.Type)
+			access := "this." + field.Name
+			if field.Cell {
+				access += ".v"
+			}
+			component, err := keyComponent(access, field.Type)
 			if err != nil {
 				return err
 			}

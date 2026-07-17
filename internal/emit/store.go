@@ -33,6 +33,10 @@ type stagedTarget struct {
 	// externSet, when set, is the typed goSet$ stub reference for an
 	// external-valued in-place store.
 	externSet string
+	// cell marks a field target stored as a stable per-instance cell: the
+	// value is read and written through the cell (.v), so the field keeps
+	// a stable address across the store.
+	cell bool
 }
 
 // externSetCallee spells the typed goSet$ stub reference when the
@@ -109,7 +113,7 @@ func (p *printer) stageCompoundTarget(target ir.Target) (stagedTarget, error) {
 		return stagedTarget{kind: "field", name: base, field: t.Field,
 			structValue: t.T.Kind == ir.KindStruct, externSet: mustExternSet(p, t.T),
 			nilCheckBase: t.X.Type().Kind != ir.KindStruct,
-			baseNilable:  t.X.Type()}, nil
+			baseNilable:  t.X.Type(), cell: t.Cell}, nil
 	case *ir.PointeeTarget:
 		pointer, err := p.operandSlot(t.X)
 		if err != nil {
@@ -189,7 +193,7 @@ func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
 			structValue: t.T.Kind == ir.KindStruct, arrayValue: setElem,
 			externSet:    mustExternSet(p, t.T),
 			nilCheckBase: t.X.Type().Kind != ir.KindStruct,
-			baseNilable:  t.X.Type()}, nil
+			baseNilable:  t.X.Type(), cell: t.Cell}, nil
 	case *ir.PointeeTarget:
 		pointer, err := p.printExpr(t.X)
 		if err != nil {
@@ -290,6 +294,9 @@ func (s stagedTarget) load(p *printer, operandT ir.Type) (string, error) {
 	case "boxed":
 		return s.name + ".v", nil
 	case "field":
+		if s.cell {
+			return base + "." + s.field + ".v", nil
+		}
 		return base + "." + s.field, nil
 	case "pointee":
 		return base + ".v", nil
@@ -335,6 +342,10 @@ func (s stagedTarget) store(p *printer, value string) error {
 		}
 	case "field":
 		switch {
+		case s.cell:
+			// A cell field keeps its stable storage: only the held value is
+			// overwritten, so a previously taken &s.f still observes the write.
+			p.line("%s.%s.v = %s;", base, s.field, value)
 		case s.structValue:
 			p.line("%s.%s.goSet$(%s);", base, s.field, value)
 		case s.arrayValue != "":
@@ -435,6 +446,8 @@ func (p *printer) printStore(target ir.Target, value string) error {
 			// A struct-value base cannot panic; the direct member store
 			// already evaluates base, then value, then stores.
 			switch {
+			case t.Cell:
+				p.line("%s.%s.v = %s;", base, t.Field, value)
 			case t.T.Kind == ir.KindStruct:
 				p.line("%s.%s.goSet$(%s);", base, t.Field, value)
 			case setElem != "":
@@ -457,6 +470,10 @@ func (p *printer) printStore(target ir.Target, value string) error {
 			return err
 		}
 		switch {
+		case t.Cell:
+			// A cell field keeps its stable storage: only the held value is
+			// overwritten, so a previously taken &s.f still observes the write.
+			p.line("%s.%s.v = %s;", checkedBase, t.Field, valueTemp)
 		case t.T.Kind == ir.KindStruct:
 			p.line("%s.%s.goSet$(%s);", checkedBase, t.Field, valueTemp)
 		case setElem != "":

@@ -1,49 +1,33 @@
 // Pointer and cell emission helpers: nil-checked reads of nilable
-// operands and the proxying field-cell that gives &s.f its aliasing
-// pointer when the field is not an identity carrier.
+// operands and the reference to a field's stable per-instance cell that
+// gives &s.f its exact aliasing pointer when the field is not an
+// identity carrier.
 package emit
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/tsoniclang/gotots/internal/ir"
 )
 
-// printFieldCell spells &s.f for a non-identity field as a proxying cell:
-// the struct base is evaluated once (nil-checked when it is a pointer,
-// exactly as Go panics on &nilptr.field) and captured, and a get/set
-// accessor pair — structurally a GoCell<Elem> — reads and writes the
-// live field, so a store through the pointer mutates the field.
-func (p *printer) printFieldCell(n *ir.FieldCell) (string, error) {
+// printFieldCellRef spells &s.f for a non-identity cell field: the value
+// is the field's stable per-instance cell itself (never a fresh proxy),
+// so repeated &s.f is the same pointer and a store through it mutates the
+// field. A pointer base is nil-checked, exactly as Go panics on
+// &nilptr.field.
+func (p *printer) printFieldCellRef(n *ir.FieldCellRef) (string, error) {
 	base, err := p.printExpr(n.Base)
 	if err != nil {
 		return "", err
 	}
-	var baseAccess, baseType string
 	if n.Base.Type().Kind == ir.KindStruct {
-		baseAccess = base
-		baseType, err = p.tsType(n.Base.Type())
-	} else {
-		if n.Base.Type().Elem == nil {
-			return "", fmt.Errorf("field cell base %q is not a pointer to a struct", n.Base.Type().Go)
-		}
-		baseAccess, err = p.nilCheckOf(base, n.Base.Type())
-		if err != nil {
-			return "", err
-		}
-		baseType, err = p.tsType(*n.Base.Type().Elem)
+		return base + "." + n.Field, nil
 	}
+	checked, err := p.nilCheckOf(base, n.Base.Type())
 	if err != nil {
 		return "", err
 	}
-	elemType, err := p.tsType(n.Elem)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf(
-		"((($b: %s): gort$.GoCell<%s> => ({ get v(): %s { return $b.%s; }, set v($x: %s) { $b.%s = $x; } }))(%s))",
-		baseType, elemType, elemType, n.Field, elemType, n.Field, baseAccess), nil
+	return checked + "." + n.Field, nil
 }
 
 // nilCheckOf spells a nil-checked read of a nilable-typed operand with an

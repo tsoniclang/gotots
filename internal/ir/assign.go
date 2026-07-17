@@ -73,7 +73,7 @@ func (b *builder) buildTarget(lhs ast.Expr) (Target, error) {
 			return nil, err
 		}
 		b.use("fieldStore")
-		return &FieldTarget{X: base, Field: n.Sel.Name, T: fieldType}, nil
+		return &FieldTarget{X: base, Field: n.Sel.Name, T: fieldType, Cell: b.fieldCell(selection, fieldType)}, nil
 
 	case *ast.IndexExpr:
 		operand, err := b.buildExpr(n.X)

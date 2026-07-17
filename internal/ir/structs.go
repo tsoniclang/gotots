@@ -69,7 +69,7 @@ func BuildStruct(p *packages.Package, sourceDir string, unit Scope, spec *ast.Ty
 		if err != nil {
 			return nil, err
 		}
-		out.Fields = append(out.Fields, Var{Name: field.Name(), Type: fieldType})
+		out.Fields = append(out.Fields, Var{Name: field.Name(), Type: fieldType, Cell: b.fieldIsCell(field, fieldType)})
 	}
 	promoted, err := b.promotedDelegates(named, span)
 	if err != nil {
@@ -79,6 +79,27 @@ func BuildStruct(p *packages.Package, sourceDir string, unit Scope, spec *ast.Ty
 	out.Comparable = b.structEqComparable(named)
 	out.KeyEncodable = b.structKeyEncodable(named, span)
 	return out, nil
+}
+
+// fieldIsCell reports whether a struct field is stored as a stable
+// per-instance cell: its address is taken somewhere in the unit AND its
+// type is a non-identity carrier (a scalar, pointer, map, slice,
+// interface, or function). Identity carriers — structs, arrays, external
+// handles — are their own stable address, so &x.f is already exact and
+// needs no cell.
+func (b *builder) fieldIsCell(field *types.Var, fieldType Type) bool {
+	return b.unit.FieldAddressTaken(field) && boxable(fieldType.Kind)
+}
+
+// fieldCell reports whether a field-selection accesses a cell field —
+// the flag FieldLoad/FieldTarget/&f carry so the value read/write
+// unwraps the cell and the address is the cell itself.
+func (b *builder) fieldCell(selection *types.Selection, fieldType Type) bool {
+	if selection == nil {
+		return false
+	}
+	field, ok := selection.Obj().(*types.Var)
+	return ok && b.fieldIsCell(field, fieldType)
 }
 
 // promotedDelegates resolves every promoted method in the type's method
@@ -190,7 +211,7 @@ func (b *builder) chainFieldPath(base Expr, baseType types.Type, path []int, spa
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "promoted selection through " + out.Type().Go, Span: span}
 		}
 		b.use("fieldLoad")
-		out = &FieldLoad{X: out, Field: field.Name(), T: fieldType}
+		out = &FieldLoad{X: out, Field: field.Name(), T: fieldType, Cell: b.fieldIsCell(field, fieldType)}
 		current = field.Type()
 	}
 	return out, nil
@@ -271,7 +292,7 @@ func (b *builder) anonStructType(structType *types.Struct, spelled string, span 
 		if err != nil {
 			return Type{}, err
 		}
-		decl.Fields = append(decl.Fields, Var{Name: field.Name(), Type: fieldType})
+		decl.Fields = append(decl.Fields, Var{Name: field.Name(), Type: fieldType, Cell: b.fieldIsCell(field, fieldType)})
 	}
 	decl.Comparable = b.structEqComparable(structType)
 	decl.KeyEncodable = b.structKeyEncodable(structType, span)
