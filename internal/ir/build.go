@@ -160,15 +160,18 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 		}
 		// A pointer receiver binds the class instance; a value receiver
 		// binds a clone on entry, so receiver mutations never reach the
-		// caller — Go's receiver copy exactly.
-		if recv.Name() == "" || recv.Name() == "_" {
-			return declarationSite(&Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "unnamed or blank receiver", Span: span})
+		// caller — Go's receiver copy exactly. An unnamed or blank receiver
+		// is never referenced in the body, so a generated placeholder name
+		// (unspellable in Go, hence collision-free) carries the position.
+		recvName := recv.Name()
+		if recvName == "" || recvName == "_" {
+			recvName = "_recv$"
 		}
 		recvType, err := b.typeOf(recv.Type(), span)
 		if err != nil {
 			return declarationSite(err)
 		}
-		function.Receiver = &Var{Name: recv.Name(), Type: recvType}
+		function.Receiver = &Var{Name: recvName, Type: recvType}
 	}
 
 	if b.boxed == nil {
@@ -179,16 +182,20 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 	params := signature.Params()
 	for i := range params.Len() {
 		parameter := params.At(i)
-		if parameter.Name() == "" || parameter.Name() == "_" {
-			return declarationSite(&Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "unnamed or blank parameter", Span: span})
+		// An unnamed or blank parameter is never referenced in the body; a
+		// position-indexed generated placeholder (unspellable in Go, hence
+		// collision-free) fills the JS parameter slot.
+		paramName := parameter.Name()
+		if paramName == "" || paramName == "_" {
+			paramName = fmt.Sprintf("_blank%d$", i)
 		}
 		t, err := b.typeOf(parameter.Type(), span)
 		if err != nil {
 			return declarationSite(err)
 		}
-		function.Params = append(function.Params, Var{Name: parameter.Name(), Type: t})
+		function.Params = append(function.Params, Var{Name: paramName, Type: t})
 		if b.boxed[parameter] && boxable(t.Kind) {
-			boxedParams = append(boxedParams, Var{Name: parameter.Name(), Type: t})
+			boxedParams = append(boxedParams, Var{Name: paramName, Type: t})
 		}
 	}
 	results := signature.Results()
