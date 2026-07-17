@@ -83,6 +83,13 @@ func runGate(args []string) error {
 	if *sourceDir == "" || *reportPath == "" {
 		return fmt.Errorf("--source and --report are required")
 	}
+	// Expose the pinned corpus checkout to the stage-1 unit suite, so the
+	// corpus-gated tests (probe/corpus classification join, zero-unclassified
+	// residual inventory) actually execute inside the gate rather than
+	// skipping — the classification is thereby consumed by the acceptance run.
+	if absSource, err := filepath.Abs(*sourceDir); err == nil {
+		os.Setenv("GOTOTS_CORPUS_DIR", absSource)
+	}
 
 	implementationRevision, err := runInRepo(*repoDir, "git", "rev-parse", "HEAD")
 	if err != nil {
