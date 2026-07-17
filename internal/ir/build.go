@@ -507,5 +507,5 @@ func (b *builder) buildStmt(stmt ast.Stmt) (Stmt, error) {
 	case *ast.SendStmt:
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "channel send statement", Span: span}
 	}
-	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: fmt.Sprintf("%T", stmt), Span: span}
+	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "unrecognized statement " + fmt.Sprintf("%T", stmt), Span: span}
 }

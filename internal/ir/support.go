@@ -78,6 +78,18 @@ var classPayloadPrefixes = []string{
 	"expression statement ", "assignment to ", "compound assignment to ",
 	"indexed compound assignment on ", "field assignment on ", "branch ",
 	"package-level ", "string constant with ",
+	// Additional payload-bearing constructs, so ClassOf normalizes every
+	// diagnostic to a closed class key with no free-text payload leaking in.
+	"assignment through ", "assignment token ", "call to a generic external method (",
+	"compound assignment on ", "equality between an interface and ", "equality plan for ",
+	"equality plan for external ", "full slice expression on ", "generic function type ",
+	"generic type instantiated with an unreviewed type argument (", "indexed assignment on ",
+	"new of ", "non-integral integer constant ", "pointer-receiver method call on ",
+	"promoted generic method (", "promoted method from a type outside the translated unit (",
+	"promoted selection through ", "promotion through a non-struct embedding (",
+	"promotion through an embedded pointer (", "promotion through an unnamed embedding (",
+	"runtime type identity of ", "unary operator ",
+	"unrecognized expression ", "unrecognized statement ",
 }
 
 // ClassConstructKeys returns the closed set of construct keys a normalized

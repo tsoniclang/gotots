@@ -336,7 +336,7 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 		}
 		return call, nil
 	}
-	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: fmt.Sprintf("%T", e), Span: span}
+	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "unrecognized expression " + fmt.Sprintf("%T", e), Span: span}
 }
 
 // buildExprAs builds an expression whose context expects a known type,

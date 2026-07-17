@@ -48,9 +48,10 @@ func TestClassifySiteClassifiesStructuredConcurrency(t *testing.T) {
 }
 
 func TestClassifySiteExactMatchNotSubstring(t *testing.T) {
-	// A free-text construct with no registered prefix is unclassified —
-	// never silently matched by a substring and defaulted.
-	category, _ := classifySite("GOTOTS_UNSUPPORTED_STATEMENT: return arity mismatch")
+	// A construct with no registered class key is unclassified — never
+	// silently matched by a substring and defaulted. (A newly added
+	// rejection reason that reaches here forces an explicit disposition.)
+	category, _ := classifySite("GOTOTS_UNSUPPORTED_STATEMENT: no such construct reason exists in the closed registry")
 	if category != catUnclassified {
 		t.Errorf("unregistered construct wrongly classified as %q", category)
 	}
