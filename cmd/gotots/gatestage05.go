@@ -194,13 +194,22 @@ func runSignatureCompletenessGate(firstRun *census.Result, corpusGenerated *tran
 		}
 		return "fail", defects, fmt.Errorf("initializer evidence failed the identity join")
 	}
-	return "pass", []string{
+	// What IS joined so far is real but PARTIAL, and it is agreement
+	// between two callers of the SAME typeid.Canonical, not independent
+	// structural verification of the emitted TypeScript against the Go
+	// declaration. "Declaration/signature/type completeness" is therefore
+	// not yet provable: this stage is BLOCKED until (a) every declaration
+	// class joins and (b) a generated-TS shape extractor compares the
+	// emitted declaration structurally with the Go declaration.
+	return "blocked", []string{
 		fmt.Sprintf("census production function/method denominator: %d", denominator),
-		fmt.Sprintf("signatures independently verified against the census spelling: %d", verified),
+		fmt.Sprintf("signatures joined against the census spelling: %d", verified),
 		fmt.Sprintf("explicit unimplemented records: %d", unimplementedCount),
 		fmt.Sprintf("orphan proofs: %d", orphans),
 		fmt.Sprintf("function literals joined by identity, parent, and body hash: %d (%d unimplemented)", litJoined, litUnimplemented),
 		fmt.Sprintf("variable initializers joined by identity and hash: %d (%d explicitly unimplemented)", initJoined, initBlocked),
+		"BLOCKED: only function signatures, function-literal bodies, and variable initializers are joined — named types, variable TYPES, constants, aliases, struct fields/tags/embedding, and interface methods/embeds are NOT verified (census records them in Shapes.* but this stage does not join them)",
+		"BLOCKED: the join proves census and translator AGREE (both derive identity from internal/typeid.Canonical) — it is not INDEPENDENT correctness; no generated TypeScript declaration is structurally compared with its Go declaration",
 	}, nil
 }
 

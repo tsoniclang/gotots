@@ -94,12 +94,14 @@ func TestStage05UnimplementedRecordAccounts(t *testing.T) {
 		t.Fatalf("orphan alongside unimplemented must still fail; got %q %v", status, details)
 	}
 	// With the orphan removed, the explicit unimplemented record fully
-	// accounts for the denominator: zero verified proofs is then the
-	// honest state, not a defect.
+	// accounts for the denominator: the join succeeds (no defect), but the
+	// stage is BLOCKED, not pass — it verifies only signatures/funclits/
+	// initializers and only by shared-typeid agreement, not independent
+	// structural TS-vs-Go comparison across every declaration class.
 	generated.Proofs = nil
 	status, details, _ = runSignatureCompletenessGate(first, generated)
-	if status != "pass" {
-		t.Fatalf("fully unimplemented denominator must pass; got %q %v", status, details)
+	if status != "blocked" {
+		t.Fatalf("fully unimplemented denominator with a successful join must block (not overclaim completeness); got %q %v", status, details)
 	}
 	// But a denominator with an unaccounted shape AND zero proofs is a
 	// disjoint evidence set and must fail.
