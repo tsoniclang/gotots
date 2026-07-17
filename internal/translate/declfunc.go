@@ -138,7 +138,7 @@ func receiverBase(recv *ast.FieldList) string {
 // enclosing unit's outcome — an unsupported site within the literal's
 // span, or a declaration-level rejection of the parent, is
 // unimplemented; everything else is generated.
-func packageFuncLits(p *packages.Package, sourceDir string, files []fileSource, ledger []BodySupport) []FuncLitSupport {
+func packageFuncLits(p *packages.Package, sourceDir string, files []fileSource, ledger []BodySupport) ([]FuncLitSupport, error) {
 	sitesByID := map[string][]ir.UnsupportedSite{}
 	stateByID := map[string]ir.SupportState{}
 	for _, support := range ledger {
@@ -170,7 +170,11 @@ func packageFuncLits(p *packages.Package, sourceDir string, files []fileSource, 
 						if !has {
 							state = ir.SupportUnimplemented
 						}
-						out = append(out, collectLits(p, f, value, id, state, sitesByID[id])...)
+						lits, err := collectLits(p, f, value, id, state, sitesByID[id])
+						if err != nil {
+							return nil, err
+						}
+						out = append(out, lits...)
 					}
 				}
 				continue
@@ -179,16 +183,21 @@ func packageFuncLits(p *packages.Package, sourceDir string, files []fileSource, 
 			if parentID == "" {
 				continue
 			}
-			out = append(out, collectLits(p, f, decl, parentID, parentState, parentSites)...)
+			lits, err := collectLits(p, f, decl, parentID, parentState, parentSites)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, lits...)
 		}
 	}
-	return out
+	return out, nil
 }
 
 // collectLits walks one attributed region for function literals with
 // exact source-span membership (offset containment, not line numbers).
-func collectLits(p *packages.Package, f fileSource, node ast.Node, parentID string, parentState ir.SupportState, parentSites []ir.UnsupportedSite) []FuncLitSupport {
+func collectLits(p *packages.Package, f fileSource, node ast.Node, parentID string, parentState ir.SupportState, parentSites []ir.UnsupportedSite) ([]FuncLitSupport, error) {
 	var out []FuncLitSupport
+	var litErr error
 	ast.Inspect(node, func(n ast.Node) bool {
 		lit, ok := n.(*ast.FuncLit)
 		if !ok {
@@ -202,11 +211,17 @@ func collectLits(p *packages.Package, f fileSource, node ast.Node, parentID stri
 		// by the literal and does not fail open to "generated".
 		startPos := p.Fset.Position(lit.Pos())
 		endPos := p.Fset.Position(lit.End())
-		bodyHash := ""
-		if startPos.Offset >= 0 && endPos.Offset <= len(f.source) && startPos.Offset < endPos.Offset {
-			digest := sha256.Sum256(f.source[startPos.Offset:endPos.Offset])
-			bodyHash = hex.EncodeToString(digest[:])
+		if startPos.Offset < 0 || endPos.Offset > len(f.source) || startPos.Offset >= endPos.Offset {
+			// A function literal always spans a non-empty, in-bounds range;
+			// an invalid span is a source/fileset mismatch and a hard error
+			// at the producer — invalid evidence must never be constructed.
+			if litErr == nil {
+				litErr = fmt.Errorf("funclit %s: invalid source span [%d,%d) over %d bytes", id, startPos.Offset, endPos.Offset, len(f.source))
+			}
+			return false
 		}
+		digest := sha256.Sum256(f.source[startPos.Offset:endPos.Offset])
+		bodyHash := hex.EncodeToString(digest[:])
 		state := "generated"
 		if parentState == ir.SupportUnimplemented {
 			state = "unimplemented"
@@ -235,7 +250,7 @@ func collectLits(p *packages.Package, f fileSource, node ast.Node, parentID stri
 		out = append(out, FuncLitSupport{ID: id, Parent: parentID, Package: p.PkgPath, BodyHash: bodyHash, State: state})
 		return true
 	})
-	return out
+	return out, litErr
 }
 
 // declOutcome names a declaration's canonical identity and support

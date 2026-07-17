@@ -103,20 +103,11 @@ func runTscGate(repoDir, profilePath, buildProfile, sourceDir string, report *Ga
 	if err != nil {
 		return "fail", nil, err
 	}
-	// ABI-scoped erasure findings are the REMAINING reviewed mechanism
-	// (equality's construction-bound payload flow and the helper
-	// supertype): they are reported and keep this stage blocked, never
-	// silently passed; anything in generated core fails outright.
-	var coreViolations []staticness.Violation
-	abiViolations := 0
-	for _, v := range astReport.Violations {
-		if strings.HasPrefix(v.Pattern, "abi:") {
-			abiViolations++
-			continue
-		}
-		coreViolations = append(coreViolations, v)
-	}
-	astReport.Violations = coreViolations
+	// EVERY detected staticness regression fails — there is no file-class
+	// (abi:) downgrade. An erased payload in the ABI's own modules is a
+	// defect exactly like one in generated core; an unfinished design
+	// prerequisite must carry explicit structural evidence, not a blanket
+	// waiver that converts detected erasure into "blocked".
 	if len(astReport.Violations) > 0 {
 		counts := staticness.Counts(astReport.Violations)
 		keys := make([]string, 0, len(counts))
@@ -208,7 +199,6 @@ func runTscGate(repoDir, profilePath, buildProfile, sourceDir string, report *Ga
 		fmt.Sprintf("withheld packages (honest unimplemented, not typechecked): %d", len(generated.Withheld)),
 	}
 	details = append(details,
-		fmt.Sprintf("BLOCKED: %d ABI erasure sites remain (equality's construction-bound payload flow; helper supertype) — reported, never passed over", abiViolations),
 		"BLOCKED: the per-invocation positive-disposition ledger is absent — the verifier rejects known erased forms but cannot yet certify every invocation (spec 11 staticness sweep)")
 	return "blocked", details, nil
 }

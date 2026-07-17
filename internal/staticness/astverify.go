@@ -175,12 +175,19 @@ for (const source of program.getSourceFiles()) {
     // of unknown/any, or an "as" cast recovering from a .v property —
     // each recovers a payload from an erased type (spec 06, ADR-0004).
     {
-      if (ts.isTypeReferenceNode(node) && ts.isQualifiedName(node.typeName) &&
-          node.typeName.right.text === "GoBox" &&
-          node.typeArguments && node.typeArguments.length >= 3) {
-        const payload = node.typeArguments[1];
-        if (payload.kind === ts.SyntaxKind.UnknownKeyword || payload.kind === ts.SyntaxKind.AnyKeyword) {
-          report(file, node, source, "erased-iface-payload");
+      if (ts.isTypeReferenceNode(node) && node.typeArguments && node.typeArguments.length >= 3) {
+        // GoBox appears QUALIFIED (goif dollar .GoBox) in generated
+        // modules and UNQUALIFIED in the ABI's own goiface.ts (the local
+        // GoAnyBox = GoBox of string, unknown, object). Both are detected
+        // so the ABI's own erased payload is never a blind spot.
+        let boxName = "";
+        if (ts.isQualifiedName(node.typeName)) boxName = node.typeName.right.text;
+        else if (ts.isIdentifier(node.typeName)) boxName = node.typeName.text;
+        if (boxName === "GoBox") {
+          const payload = node.typeArguments[1];
+          if (payload.kind === ts.SyntaxKind.UnknownKeyword || payload.kind === ts.SyntaxKind.AnyKeyword) {
+            report(file, node, source, "erased-iface-payload");
+          }
         }
       }
       if (ts.isAsExpression(node) && ts.isPropertyAccessExpression(node.expression) &&

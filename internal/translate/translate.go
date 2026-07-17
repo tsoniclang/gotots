@@ -487,7 +487,11 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 	out.Support = append(out.Support, ledger...)
 	// The function-literal ledger covers EVERY package — withheld ones
 	// included: analysis dispositions exist regardless of emission.
-	out.FuncLits = append(out.FuncLits, packageFuncLits(p, sourceDir, files, ledger)...)
+	lits, err := packageFuncLits(p, sourceDir, files, ledger)
+	if err != nil {
+		return err
+	}
+	out.FuncLits = append(out.FuncLits, lits...)
 	if unimplementedUnits > 0 {
 		out.Withheld[p.PkgPath] = fmt.Sprintf("%d unimplemented units", unimplementedUnits)
 		return nil
