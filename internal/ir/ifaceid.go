@@ -15,9 +15,11 @@ import (
 // canonicalTypeID is the path-qualified identity of one Go type: the
 // ONLY string used as generated dynamic-type identity. types.Type.String
 // qualifies by package NAME and can collide across packages sharing a
-// name; this cannot.
-func canonicalTypeID(t types.Type) (string, error) {
-	return typeid.Canonical(t)
+// name; this cannot. It renders within the builder's binder environment
+// so a type-parameter-bearing carrier (e.g. *K inside a generic method)
+// resolves instead of failing closed.
+func (b *builder) canonicalTypeID(t types.Type) (string, error) {
+	return b.canonical(t)
 }
 
 // canonicalIfaceID extends the path-qualified type string with each
@@ -25,8 +27,8 @@ func canonicalTypeID(t types.Type) (string, error) {
 // UNEXPORTED method names, so two structurally identical unexported
 // interfaces from different packages would collide (distinct Go types,
 // disjoint implementer sets).
-func canonicalIfaceID(iface *types.Interface) (string, error) {
-	id, err := canonicalTypeID(iface)
+func (b *builder) canonicalIfaceID(iface *types.Interface) (string, error) {
+	id, err := b.canonicalTypeID(iface)
 	if err != nil {
 		return "", err
 	}
@@ -47,7 +49,7 @@ func (b *builder) compositeRtti(t types.Type, span Span, externID string) (RttiR
 	if err != nil {
 		return RttiRef{}, err
 	}
-	composite, err := canonicalTypeID(t)
+	composite, err := b.canonicalTypeID(t)
 	if err != nil {
 		return RttiRef{}, err
 	}
@@ -161,7 +163,7 @@ func MethodKey(method *types.Func) (string, error) {
 	// collision-free, and a dispatch/method-set key must never conflate
 	// two distinct signatures. The key is an internal identity, so length
 	// does not matter.
-	signature, err := typeid.Canonical(method.Type())
+	signature, err := typeid.MethodCanonical(method)
 	if err != nil {
 		return "", err
 	}

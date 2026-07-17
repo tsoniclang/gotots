@@ -23,6 +23,13 @@ func (b *builder) admitGenericFunction(object *types.Func, span Span) ([]string,
 		for _, arg := range instance {
 			resolved, err := b.typeOf(arg, span)
 			if err != nil {
+				// A type argument that is (or contains) a free type parameter
+				// from the calling context has no exact identity here, but it
+				// is a valid generic-over-generic instantiation reviewed at
+				// the concrete outer site, and is never a struct VALUE.
+				if mentionsTypeParamType(arg) {
+					continue
+				}
 				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 					Construct: "generic function instantiated with an unreviewed type argument (" + arg.String() + ")", Span: span}
 			}

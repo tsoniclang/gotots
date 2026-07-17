@@ -5,6 +5,8 @@ import (
 	"go/types"
 	"sort"
 	"strings"
+
+	"github.com/tsoniclang/gotots/internal/typeid"
 )
 
 // The external declaration contract is the exact typed surface that owned
@@ -157,12 +159,25 @@ func objectShape(object types.Object, reference *contractRef) (ExternalObjectSha
 			shape.Name = qualified
 		}
 		signature := concrete.Type().(*types.Signature)
-		shape.Signature = ts(signature)
-		if recv := signature.Recv(); recv != nil {
-			shape.Receiver = ts(recv.Type())
+		sigID, err := typeid.DeclSignature(concrete)
+		if err != nil {
+			return shape, err
 		}
-		shape.Params = tupleParams(signature.Params(), &terr)
-		shape.Results = tupleParams(signature.Results(), &terr)
+		shape.Signature = sigID
+		// A method binds its receiver's type parameters; a free (possibly
+		// generic) function binds its own.
+		var fb *typeid.Binders
+		if signature.Recv() != nil {
+			fb, err = typeid.MethodBinders(concrete)
+			if err != nil {
+				return shape, err
+			}
+			shape.Receiver = btsFn(fb, &terr)(signature.Recv().Type())
+		} else {
+			fb = typeid.FuncBinders(signature)
+		}
+		shape.Params = tupleParamsIn(signature.Params(), fb, &terr)
+		shape.Results = tupleParamsIn(signature.Results(), fb, &terr)
 		shape.Variadic = signature.Variadic()
 	case *types.Var:
 		if concrete.IsField() {
@@ -186,11 +201,13 @@ func objectShape(object types.Object, reference *contractRef) (ExternalObjectSha
 			shape.Underlying = ts(types.Unalias(concrete.Type()))
 			break
 		}
-		shape.Underlying = ts(named.Underlying())
+		ob := typeid.OwnerBinders(named)
+		obts := btsFn(ob, &terr)
+		shape.Underlying = obts(named.Underlying())
 		if params := named.TypeParams(); params != nil {
 			for i := range params.Len() {
 				shape.TypeParams = append(shape.TypeParams,
-					params.At(i).Obj().Name()+" "+ts(params.At(i).Constraint()))
+					params.At(i).Obj().Name()+" "+obts(params.At(i).Constraint()))
 			}
 		}
 		for i := range named.NumMethods() {
@@ -203,9 +220,13 @@ func objectShape(object types.Object, reference *contractRef) (ExternalObjectSha
 			if recv := signature.Recv(); recv != nil {
 				_, pointerReceiver = recv.Type().(*types.Pointer)
 			}
+			msig, err := typeid.DeclSignature(method)
+			if err != nil {
+				return shape, err
+			}
 			shape.Methods = append(shape.Methods, MethodShape{
 				Name:            method.Name(),
-				Signature:       ts(signature),
+				Signature:       msig,
 				PointerReceiver: pointerReceiver,
 			})
 		}

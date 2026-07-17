@@ -248,17 +248,96 @@ func PutFn[T any](value T) {}
 	pkg := pkgOf(t, "p", src)
 	scope := pkg.Scope()
 	box := scope.Lookup("Box").Type().(*types.Named)
-	put := methodByName(t, box, "Put").Type()
-	id := canon(t, put)
+	put := methodByName(t, box, "Put")
+	id, err := MethodCanonical(put)
+	if err != nil {
+		t.Fatalf("MethodCanonical(Put): %v", err)
+	}
 	if contains(id, "recv(") {
 		t.Errorf("receiver leaked into method signature identity: %q", id)
 	}
-	// The method's callable signature references T by binder index, and a
-	// free generic function of the same shape should not accidentally
-	// share identity (the function DECLARES [T any]; the method does not).
-	fn := canon(t, scope.Lookup("PutFn").Type())
-	if id == fn {
-		t.Logf("method Put: %q", id)
-		t.Logf("func PutFn: %q", fn)
+	// A standalone Canonical of a method signature with free receiver
+	// parameters must FAIL closed — there is no global binder.
+	if _, err := Canonical(put.Type()); err == nil {
+		t.Errorf("Canonical of a method signature with free receiver params should fail closed")
+	}
+	// A free generic function's own type parameters ARE part of its
+	// callable identity (bound and constrained), so PutFn is well-formed.
+	if _, err := canonErr(scope.Lookup("PutFn").Type()); err != nil {
+		t.Errorf("free generic function identity failed: %v", err)
+	}
+}
+
+func canonErr(t types.Type) (string, error) { return Canonical(t) }
+
+// TestTypeSetAlgebra checks the reviewer's exact counterexamples: the
+// canonical identity must agree with go/types.Identical for constraint
+// type-set intersection, empty sets, and comparable filtering.
+func TestTypeSetAlgebra(t *testing.T) {
+	src := `package p
+type UnionIS   interface{ int | string }
+type IntersIS  interface{ int; string }
+type UnionThenInt interface{ int | string; int }
+type JustInt   interface{ int }
+type CmpInt    interface{ comparable; int }
+type EmptyA    interface{ int; string }
+type EmptyB    interface{ bool; float64 }
+type CmpTop    interface{ comparable }
+type EmptyIface interface{}
+type Tilde32   interface{ ~int32 }
+type TildeU32  interface{ ~uint32 }
+type MethodM   interface{ M() }
+type EmbedM    interface{ MethodM }
+`
+	pkg := pkgOf(t, "p", src)
+	scope := pkg.Scope()
+	u := func(name string) types.Type { return scope.Lookup(name).Type().Underlying() }
+	// (a, b, mustBeIdentical) — verified against go/types.Identical and asserted on Canonical.
+	cases := []struct {
+		a, b string
+	}{
+		{"UnionThenInt", "JustInt"}, // {int}∩{int,string}={int}
+		{"CmpInt", "JustInt"},       // comparable;int == int (int is comparable)
+		{"EmptyA", "EmptyB"},        // ∅ == ∅
+		{"EmbedM", "MethodM"},       // embedded method interface flattens
+	}
+	for _, c := range cases {
+		a, b := u(c.a), u(c.b)
+		if !types.Identical(a, b) {
+			t.Fatalf("premise: go/types says %s and %s differ", c.a, c.b)
+		}
+		if canon(t, a) != canon(t, b) {
+			t.Errorf("identical %s/%s got distinct identities:\n  %q\n  %q", c.a, c.b, canon(t, a), canon(t, b))
+		}
+	}
+	distinct := []struct{ a, b string }{
+		{"UnionIS", "IntersIS"},  // {int,string} != ∅
+		{"CmpTop", "EmptyIface"}, // comparable != interface{}
+		{"Tilde32", "TildeU32"},  // ~int32 != ~uint32
+		{"UnionIS", "JustInt"},   // {int,string} != {int}
+	}
+	for _, c := range distinct {
+		a, b := u(c.a), u(c.b)
+		if types.Identical(a, b) {
+			t.Fatalf("premise: go/types says %s and %s are identical", c.a, c.b)
+		}
+		if canon(t, a) == canon(t, b) {
+			t.Errorf("distinct %s/%s collapsed to identity: %q", c.a, c.b, canon(t, a))
+		}
+	}
+}
+
+// TestTupleArity: a one-element tuple must not collide with its element.
+func TestTupleArity(t *testing.T) {
+	src := `package p
+func One() int { return 0 }
+func Two() (int, int) { return 0, 0 }
+`
+	pkg := pkgOf(t, "p", src)
+	scope := pkg.Scope()
+	one := scope.Lookup("One").Type().(*types.Signature).Results()
+	elem := scope.Lookup("One").Type().(*types.Signature).Results().At(0).Type()
+	if canon(t, one) == canon(t, elem) {
+		t.Errorf("1-tuple serializes like its element: %q", canon(t, one))
 	}
 }

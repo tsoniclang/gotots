@@ -48,7 +48,7 @@ func translateFunc(p *packages.Package, sourceDir string, unit ir.Scope, relativ
 	}
 
 	object := p.TypesInfo.Defs[decl.Name].(*types.Func)
-	signatureText, err := typeid.Canonical(object.Type())
+	signatureText, err := typeid.DeclSignature(object)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -104,7 +104,13 @@ func translateFunc(p *packages.Package, sourceDir string, unit ir.Scope, relativ
 // erasedCarrier resolves the reviewed carrier of a non-struct named type
 // or alias declaration; a type outside the subset fails closed.
 func erasedCarrier(p *packages.Package, sourceDir string, unit ir.Scope, spec *ast.TypeSpec, object *types.TypeName) (string, ir.Type, error) {
-	t, err := ir.ResolveType(p, sourceDir, unit, object.Type(), spec.Pos())
+	// A generic named type's underlying references its own type
+	// parameters; bind them so the carrier resolves instead of failing.
+	var binders *typeid.Binders
+	if named, ok := object.Type().(*types.Named); ok {
+		binders = typeid.OwnerBinders(named)
+	}
+	t, err := ir.ResolveTypeIn(p, sourceDir, unit, object.Type(), spec.Pos(), binders)
 	if err != nil {
 		return "", ir.Type{}, err
 	}

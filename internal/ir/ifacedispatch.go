@@ -33,7 +33,7 @@ func (b *builder) resolveImplementerTokens(target *types.Interface, span Span) (
 		if err != nil {
 			return err
 		}
-		key, err := canonicalTypeID(t)
+		key, err := b.canonicalTypeID(t)
 		if err != nil {
 			return err
 		}
@@ -74,7 +74,7 @@ func (b *builder) resolveImplementerTokens(target *types.Interface, span Span) (
 // type from the whole-unit universe: only TYPE identities (spelling uses
 // erased type-only imports), cached per canonical interface identity.
 func (b *builder) ifaceMembers(iface *types.Interface, span Span) ([]IfaceMember, error) {
-	key, err := canonicalIfaceID(iface)
+	key, err := b.canonicalIfaceID(iface)
 	if err != nil {
 		return nil, err
 	}

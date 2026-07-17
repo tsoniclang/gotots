@@ -200,21 +200,38 @@ func shapeFunction(info *types.Info, d *ast.FuncDecl, id string, stats *fileStat
 	}
 	signature := object.Type().(*types.Signature)
 	var terr error
-	ts := tsFn(&terr)
+	sigID, err := typeid.DeclSignature(object)
+	if err != nil {
+		return err
+	}
+	// Component types (params/results/receiver/constraints) may reference
+	// the function's own OR its receiver's type parameters; bind them.
+	var binders *typeid.Binders
+	if signature.Recv() != nil {
+		mb, err := typeid.MethodBinders(object)
+		if err != nil {
+			return err
+		}
+		binders = mb
+	} else {
+		binders = typeid.FuncBinders(signature)
+	}
+	bts := btsFn(binders, &terr)
 	shape := FunctionShape{
 		ID:        id,
 		Variadic:  signature.Variadic(),
-		Signature: ts(signature),
+		Signature: sigID,
 	}
 	if recv := signature.Recv(); recv != nil {
-		shape.Receiver = ts(recv.Type())
+		shape.Receiver = bts(recv.Type())
 	}
-	shape.TypeParams = typeParamShapes(signature.TypeParams(), &terr)
+	shape.TypeParams = typeParamShapesIn(signature.TypeParams(), binders, &terr)
 	if shape.TypeParams == nil {
-		shape.TypeParams = typeParamShapes(signature.RecvTypeParams(), &terr)
+		shape.TypeParams = typeParamShapesIn(signature.RecvTypeParams(), binders, &terr)
 	}
-	shape.Params = tupleParams(signature.Params(), &terr)
-	shape.Results = tupleParams(signature.Results(), &terr)
+	shape.Params = tupleParamsIn(signature.Params(), binders, &terr)
+	shape.Results = tupleParamsIn(signature.Results(), binders, &terr)
+	_ = bts
 	if terr != nil {
 		return terr
 	}
@@ -272,11 +289,13 @@ func shapeType(info *types.Info, s *ast.TypeSpec, kind, id string, stats *fileSt
 	if err != nil {
 		return fmt.Errorf("declaration %s: %w", id, err)
 	}
+	binders := typeid.OwnerBinders(named)
+	bts := btsFn(binders, &terr)
 	shape := TypeShape{
 		ID:         id,
 		Kind:       kindName,
-		Underlying: ts(named.Underlying()),
-		TypeParams: typeParamShapes(named.TypeParams(), &terr),
+		Underlying: bts(named.Underlying()),
+		TypeParams: typeParamShapesIn(named.TypeParams(), binders, &terr),
 	}
 	switch underlying := named.Underlying().(type) {
 	case *types.Struct:
@@ -284,7 +303,7 @@ func shapeType(info *types.Info, s *ast.TypeSpec, kind, id string, stats *fileSt
 			field := underlying.Field(i)
 			shape.Fields = append(shape.Fields, FieldShape{
 				Name:     field.Name(),
-				Type:     ts(field.Type()),
+				Type:     bts(field.Type()),
 				Tag:      underlying.Tag(i),
 				Embedded: field.Embedded(),
 				Exported: field.Exported(),
@@ -293,9 +312,13 @@ func shapeType(info *types.Info, s *ast.TypeSpec, kind, id string, stats *fileSt
 	case *types.Interface:
 		for i := range underlying.NumExplicitMethods() {
 			method := underlying.ExplicitMethod(i)
+			isig, err := typeid.DeclSignature(method)
+			if err != nil {
+				return err
+			}
 			shape.InterfaceMethods = append(shape.InterfaceMethods, MethodShape{
 				Name:      method.Name(),
-				Signature: ts(method.Type()),
+				Signature: isig,
 			})
 		}
 		for i := range underlying.NumEmbeddeds() {
@@ -309,9 +332,13 @@ func shapeType(info *types.Info, s *ast.TypeSpec, kind, id string, stats *fileSt
 		if recv := signature.Recv(); recv != nil {
 			_, pointerReceiver = recv.Type().(*types.Pointer)
 		}
+		msig, err := typeid.DeclSignature(method)
+		if err != nil {
+			return err
+		}
 		shape.Methods = append(shape.Methods, MethodShape{
 			Name:            method.Name(),
-			Signature:       ts(signature),
+			Signature:       msig,
 			PointerReceiver: pointerReceiver,
 		})
 	}
@@ -320,6 +347,47 @@ func shapeType(info *types.Info, s *ast.TypeSpec, kind, id string, stats *fileSt
 	}
 	stats.typeShapes = append(stats.typeShapes, shape)
 	return nil
+}
+
+// btsFn is tsFn within a binder environment (for component types that
+// reference an enclosing generic declaration's type parameters).
+func btsFn(b *typeid.Binders, acc *error) func(types.Type) string {
+	return func(t types.Type) string {
+		s, err := b.Canonical(t)
+		if err != nil && *acc == nil {
+			*acc = err
+		}
+		return s
+	}
+}
+
+func typeParamShapesIn(list *types.TypeParamList, b *typeid.Binders, acc *error) []TypeParamShape {
+	if list == nil || list.Len() == 0 {
+		return nil
+	}
+	ts := btsFn(b, acc)
+	shapes := make([]TypeParamShape, 0, list.Len())
+	for i := range list.Len() {
+		parameter := list.At(i)
+		shapes = append(shapes, TypeParamShape{
+			Name:       parameter.Obj().Name(),
+			Constraint: ts(parameter.Constraint()),
+		})
+	}
+	return shapes
+}
+
+func tupleParamsIn(tuple *types.Tuple, b *typeid.Binders, acc *error) []Param {
+	if tuple == nil || tuple.Len() == 0 {
+		return nil
+	}
+	ts := btsFn(b, acc)
+	params := make([]Param, 0, tuple.Len())
+	for i := range tuple.Len() {
+		variable := tuple.At(i)
+		params = append(params, Param{Name: variable.Name(), Type: ts(variable.Type())})
+	}
+	return params
 }
 
 // tsFn returns a canonical-identity renderer that records the FIRST

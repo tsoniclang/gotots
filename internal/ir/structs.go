@@ -8,6 +8,8 @@ import (
 	"sort"
 
 	"golang.org/x/tools/go/packages"
+
+	"github.com/tsoniclang/gotots/internal/typeid"
 )
 
 // BuildStruct converts one named struct type declaration into IR: an
@@ -33,6 +35,7 @@ func BuildStruct(p *packages.Package, sourceDir string, unit Scope, spec *ast.Ty
 	if !ok {
 		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "alias declaration", Span: span}
 	}
+	b.binders = typeid.OwnerBinders(named)
 	var typeParams []string
 	if named.TypeParams() != nil && named.TypeParams().Len() > 0 {
 		names, err := b.admitGenericType(named, span)
@@ -216,6 +219,9 @@ func (b *builder) admitGenericType(named *types.Named, span Span) ([]string, err
 		for _, arg := range instance {
 			resolved, err := b.typeOf(arg, span)
 			if err != nil {
+				if mentionsTypeParamType(arg) {
+					continue
+				}
 				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 					Construct: "generic type instantiated with an unreviewed type argument (" + arg.String() + ")", Span: span}
 			}

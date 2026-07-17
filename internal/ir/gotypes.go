@@ -13,6 +13,14 @@ import (
 // a standalone entry to the builder's resolver for declaration-level
 // checks.
 func ResolveType(p *packages.Package, sourceDir string, unit Scope, t types.Type, pos token.Pos) (Type, error) {
+	return ResolveTypeIn(p, sourceDir, unit, t, pos, nil)
+}
+
+// ResolveTypeIn resolves a type within a type-parameter binder
+// environment (e.g. a generic external function's own parameters), so a
+// component type referencing those parameters canonicalizes rather than
+// failing closed.
+func ResolveTypeIn(p *packages.Package, sourceDir string, unit Scope, t types.Type, pos token.Pos, binders *typeid.Binders) (Type, error) {
 	b := &builder{
 		fset:       p.Fset,
 		info:       p.TypesInfo,
@@ -21,6 +29,7 @@ func ResolveType(p *packages.Package, sourceDir string, unit Scope, t types.Type
 		unit:       unit,
 		operations: map[string]bool{},
 		sites:      &[]UnsupportedSite{},
+		binders:    binders,
 	}
 	return b.typeOf(t, b.span(pos))
 }
@@ -39,8 +48,9 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 	}
 	if resolved.Canon == "" {
 		// Canonical is a total contract: an unhandled type form fails
-		// closed here rather than stamping a non-canonical identity.
-		canon, err := typeid.Canonical(t)
+		// closed. Component types referencing the declaration's type
+		// parameters canonicalize within the builder's binder environment.
+		canon, err := b.canonical(t)
 		if err != nil {
 			return Type{}, &Unsupported{Code: "GOTOTS_TYPE_UNSUPPORTED",
 				Construct: err.Error(), Span: span}
@@ -48,6 +58,16 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 		resolved.Canon = canon
 	}
 	return resolved, nil
+}
+
+// canonical renders a type's identity within the builder's binder
+// environment (the declaration's type parameters), or the empty
+// environment when the builder is not inside a generic declaration.
+func (b *builder) canonical(t types.Type) (string, error) {
+	if b.binders != nil {
+		return b.binders.Canonical(t)
+	}
+	return typeid.Canonical(t)
 }
 
 func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
@@ -228,7 +248,7 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 			return Type{}, err
 		}
 		out.IfaceMembers = members
-		ifaceID, err := canonicalIfaceID(u)
+		ifaceID, err := b.canonicalIfaceID(u)
 		if err != nil {
 			return Type{}, err
 		}

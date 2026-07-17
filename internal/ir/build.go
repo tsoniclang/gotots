@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/packages"
+
+	"github.com/tsoniclang/gotots/internal/typeid"
 )
 
 // builder carries the typed context for one function body.
@@ -23,6 +25,10 @@ type builder struct {
 	// closed.
 	unit       Scope
 	operations map[string]bool
+	// binders resolves the type parameters of the declaration being built
+	// (a generic function's own, or a generic type's), so component types
+	// referencing them canonicalize instead of failing closed.
+	binders *typeid.Binders
 	// sites collects every unsupported operation of the outermost body,
 	// shared with closure child builders so nested findings bubble up.
 	sites      *[]UnsupportedSite
@@ -96,6 +102,15 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 	// sites pack trailing arguments (or pass nil, or the spread slice
 	// itself), so the declaration needs no special shape.
 	signature := object.Type().(*types.Signature)
+	if signature.Recv() != nil {
+		mb, err := typeid.MethodBinders(object)
+		if err != nil {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: err.Error(), Span: span}
+		}
+		b.binders = mb
+	} else {
+		b.binders = typeid.FuncBinders(signature)
+	}
 
 	function := &Func{
 		ID:       id,

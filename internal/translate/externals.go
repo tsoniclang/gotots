@@ -18,6 +18,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/goid"
 	"github.com/tsoniclang/gotots/internal/ir"
+	"github.com/tsoniclang/gotots/internal/typeid"
 )
 
 // emitExternalStubs generates one typed stub module per external package
@@ -141,9 +142,10 @@ func stubFor(fn *types.Func, unit ir.Scope, context *packages.Package, sourceDir
 	for i := range typeParams.Len() {
 		stub.TypeParams = append(stub.TypeParams, typeParams.At(i).Obj().Name())
 	}
+	binders := typeid.FuncBinders(signature)
 	params := signature.Params()
 	for i := range params.Len() {
-		t, err := ir.ResolveType(context, sourceDir, unit, params.At(i).Type(), token.NoPos)
+		t, err := ir.ResolveTypeIn(context, sourceDir, unit, params.At(i).Type(), token.NoPos, binders)
 		if err != nil {
 			return emit.StubFunc{}, err
 		}
@@ -151,7 +153,7 @@ func stubFor(fn *types.Func, unit ir.Scope, context *packages.Package, sourceDir
 	}
 	results := signature.Results()
 	for i := range results.Len() {
-		t, err := ir.ResolveType(context, sourceDir, unit, results.At(i).Type(), token.NoPos)
+		t, err := ir.ResolveTypeIn(context, sourceDir, unit, results.At(i).Type(), token.NoPos, binders)
 		if err != nil {
 			return emit.StubFunc{}, err
 		}

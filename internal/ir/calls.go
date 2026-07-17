@@ -105,14 +105,16 @@ func (b *builder) buildExternalCall(n *ast.CallExpr, function *types.Func, signa
 	for _, sig := range check {
 		params := sig.Params()
 		for i := range params.Len() {
-			if _, err := b.typeOf(params.At(i).Type(), span); err != nil {
+			pt := params.At(i).Type()
+			if _, err := b.typeOf(pt, span); err != nil && !mentionsTypeParamType(pt) {
 				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
 					Construct: "call outside the translated unit (" + callee + ")", Span: span}
 			}
 		}
 		resultTuple := sig.Results()
 		for i := range resultTuple.Len() {
-			if _, err := b.typeOf(resultTuple.At(i).Type(), span); err != nil {
+			rt := resultTuple.At(i).Type()
+			if _, err := b.typeOf(rt, span); err != nil && !mentionsTypeParamType(rt) {
 				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
 					Construct: "call outside the translated unit (" + callee + ")", Span: span}
 			}

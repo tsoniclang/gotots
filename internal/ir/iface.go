@@ -33,7 +33,7 @@ func (b *builder) rttiFor(t types.Type, span Span) (RttiRef, error) {
 		if !b.unit.Owns(obj.Pkg().Path()) {
 			// An external named type: an interned rtti whose method
 			// dispatch routes through the external contracts.
-			composite, err := canonicalTypeID(t)
+			composite, err := b.canonicalTypeID(t)
 			if err != nil {
 				return RttiRef{}, err
 			}
