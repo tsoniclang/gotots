@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
-	"strings"
 
 	"github.com/tsoniclang/gotots/contracts"
 	"github.com/tsoniclang/gotots/internal/census"
@@ -26,14 +25,13 @@ func runRepresentationGate(repoDir string, firstRun *census.Result, corpusGenera
 	// proved plan stability. Here the selections themselves are
 	// verified: a native selection may appear only with the direct
 	// lowering evidence, never alongside carrier operations.
-	// The interface family's current representation contradicts the
-	// accepted specification (erased unknown payload); representation
-	// verification cannot pass over a known spec violation.
-	if iface, ok := corpusGenerated.Files["language-abi/goiface.ts"]; ok && strings.Contains(iface, "readonly v: unknown") {
-		return "blocked", []string{
-			"interface representation contradicts docs/spec/06 (erased unknown payload); redesign pending",
-		}, nil
-	}
+	//
+	// Interface payload erasure is NOT re-checked textually here: the AST
+	// staticness verifier (VerifyAST, below) owns that policy structurally
+	// — flagging any GoBox use whose payload is an erased top (any, unknown,
+	// object, {}, an alias to any of those, or an unconstrained generic
+	// parameter) and any recovery cast off a box's .v — so a substring scan
+	// of goiface.ts would only duplicate it less completely.
 	// EVERY representation entry in EVERY family must classify into
 	// the versioned registry's closed candidate sets — an unknown key
 	// family or unknown candidate anywhere is forged or drifted

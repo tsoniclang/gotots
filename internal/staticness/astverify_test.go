@@ -246,3 +246,72 @@ export type X = goif$.GoBox<"a", unknown, object>;
 		t.Errorf("the qualified goif$.GoBox<..., unknown, ...> was not detected as an erased payload")
 	}
 }
+
+// TestASTVerifierErasedPayloadBlindSpots proves the extended GoBox-payload
+// erasure check catches the top types the old any/unknown-only test
+// missed: the object keyword, the empty object literal {}, and an alias
+// resolving to any — while a concrete exact payload is NOT flagged.
+func TestASTVerifierErasedPayloadBlindSpots(t *testing.T) {
+	files := map[string]string{
+		"language-abi/goiface.ts": `
+export type GoBox<K extends string, V, M> = { readonly k: K; readonly v: V; readonly m: M };
+`,
+		"core/pkg/package.ts": `
+import * as goif$ from "../../language-abi/goiface.ts";
+type AliasAny = any;
+export type ObjPayload = goif$.GoBox<"a", object, Record<never, never>>;
+export type EmptyPayload = goif$.GoBox<"b", {}, Record<never, never>>;
+export type AliasPayload = goif$.GoBox<"c", AliasAny, Record<never, never>>;
+`,
+		"core/clean/package.ts": `
+import * as goif$ from "../../language-abi/goiface.ts";
+export interface Exact { readonly n: bigint }
+export type ConcretePayload = goif$.GoBox<"d", Exact, Record<never, never>>;
+`,
+	}
+	report, err := VerifyAST(files, typescriptDir(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	erasedFiles := map[string]int{}
+	for _, v := range report.Violations {
+		if v.Pattern == "erased-iface-payload" || v.Pattern == "abi:erased-iface-payload" {
+			erasedFiles[v.File]++
+		}
+	}
+	// object, {}, and alias-to-any — three erased payloads in the pkg file.
+	if erasedFiles["core/pkg/package.ts"] < 3 {
+		t.Errorf("expected object/{}/alias-any payloads all flagged; got %d in core/pkg: %+v",
+			erasedFiles["core/pkg/package.ts"], report.Violations)
+	}
+	// The concrete exact payload must NOT be flagged.
+	if erasedFiles["core/clean/package.ts"] != 0 {
+		t.Errorf("concrete exact payload wrongly flagged as erased: %+v", report.Violations)
+	}
+}
+
+// TestASTVerifierGenericPassthroughNotFlagged proves a GoBox<K, V, M>
+// whose payload is a bound type PARAMETER of the enclosing generic (the
+// box constructor and the type's own definition) is NOT flagged: V is the
+// exact payload at each instantiation, not an erased top. Erasure is
+// caught only at concrete instantiations (GoBox<"k", object, M>).
+func TestASTVerifierGenericPassthroughNotFlagged(t *testing.T) {
+	files := map[string]string{
+		"language-abi/goiface.ts": `
+export interface GoRtti { readonly d: string }
+export interface GoBox<K extends string, V, M> { readonly k: K; readonly r: GoRtti; readonly v: V; readonly m: M }
+export function goIfaceBox<K extends string, V, M>(k: K, r: GoRtti, v: V, m: M): GoBox<K, V, M> {
+  return { k, r, v, m };
+}
+`,
+	}
+	report, err := VerifyAST(files, typescriptDir(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, v := range report.Violations {
+		if v.Pattern == "erased-iface-payload" || v.Pattern == "abi:erased-iface-payload" {
+			t.Errorf("parametric passthrough GoBox<K, V, M> wrongly flagged as erased payload: %+v", v)
+		}
+	}
+}

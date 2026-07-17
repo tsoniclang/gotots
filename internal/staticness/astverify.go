@@ -119,6 +119,32 @@ function isFunctionTypeName(node) {
   return ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName) && node.typeName.text === "Function";
 }
 
+// isErasedPayloadType reports whether a GoBox payload type node is an
+// erased top type — one that carries no exact static shape. Beyond the
+// literal any/unknown keywords the old check caught, this also flags the
+// object keyword, the empty object literal {}, and any alias that resolves
+// to one of those tops (getTypeFromTypeNode follows aliases). A concrete
+// payload (a class/interface/struct object type, a union of exact members)
+// has TypeFlags.Object and is NOT flagged.
+//
+// A bare type PARAMETER payload is NOT flagged: GoBox<K, V, M> in the box
+// constructor and the type's own definition is legitimate parametric
+// machinery — V is bound to the EXACT payload at each instantiation, and a
+// genuinely erased instantiation (GoBox<"k", object, M>) is caught at that
+// use site by the checks below. There is no AST-level distinction between a
+// parametric passthrough and an "erased generic-top", so flagging the
+// parameter itself would reject the ABI's own generics.
+function isErasedPayloadType(typeNode) {
+  if (typeNode.kind === ts.SyntaxKind.AnyKeyword ||
+      typeNode.kind === ts.SyntaxKind.UnknownKeyword ||
+      typeNode.kind === ts.SyntaxKind.ObjectKeyword) return true;
+  if (ts.isTypeLiteralNode(typeNode) && typeNode.members.length === 0) return true; // {}
+  const t = checker.getTypeFromTypeNode(typeNode);
+  const f = t.getFlags();
+  if (f & ts.TypeFlags.Any || f & ts.TypeFlags.Unknown || f & ts.TypeFlags.NonPrimitive) return true;
+  return false;
+}
+
 for (const source of program.getSourceFiles()) {
   const file = source.fileName;
   if (!file.startsWith(root) || file.endsWith(".d.ts")) continue;
@@ -184,8 +210,7 @@ for (const source of program.getSourceFiles()) {
         if (ts.isQualifiedName(node.typeName)) boxName = node.typeName.right.text;
         else if (ts.isIdentifier(node.typeName)) boxName = node.typeName.text;
         if (boxName === "GoBox") {
-          const payload = node.typeArguments[1];
-          if (payload.kind === ts.SyntaxKind.UnknownKeyword || payload.kind === ts.SyntaxKind.AnyKeyword) {
+          if (isErasedPayloadType(node.typeArguments[1])) {
             report(file, node, source, "erased-iface-payload");
           }
         }
