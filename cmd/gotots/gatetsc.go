@@ -102,38 +102,50 @@ func runTscGate(repoDir, profilePath, buildProfile, sourceDir string, report *Ga
 	if err != nil {
 		return "fail", nil, err
 	}
-	// EVERY detected staticness regression fails — there is no file-class
-	// (abi:) downgrade. An erased payload in the ABI's own modules is a
-	// defect exactly like one in generated core; an unfinished design
-	// prerequisite must carry explicit structural evidence, not a blanket
-	// waiver that converts detected erasure into "blocked".
-	if len(astReport.Violations) > 0 {
-		counts := staticness.Counts(astReport.Violations)
-		keys := make([]string, 0, len(counts))
-		for key := range counts {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
-		details := make([]string, 0, len(keys)+8)
-		for _, key := range keys {
-			details = append(details, fmt.Sprintf("%s: %d", key, counts[key]))
-		}
-		for i, v := range astReport.Violations {
-			if i >= 8 {
-				details = append(details, fmt.Sprintf("... and %d more sites", len(astReport.Violations)-8))
-				break
+	// BOTH results are reported together when EITHER fails — an early
+	// return must never conceal the other result. EVERY detected staticness
+	// regression fails (no abi: file-class downgrade), and zero strict-tsc
+	// errors is REQUIRED (no waiver: the withholding fixed point makes the
+	// emitted set forward-dependency-closed).
+	astFail := len(astReport.Violations) > 0
+	tscFail := tscErr != nil
+	if astFail || tscFail {
+		var details []string
+		if astFail {
+			counts := staticness.Counts(astReport.Violations)
+			keys := make([]string, 0, len(counts))
+			for key := range counts {
+				keys = append(keys, key)
 			}
-			details = append(details, fmt.Sprintf("%s:%d %s", v.File, v.Line, v.Pattern))
+			sort.Strings(keys)
+			details = append(details, fmt.Sprintf("AST staticness: %d violations", len(astReport.Violations)))
+			for _, key := range keys {
+				details = append(details, fmt.Sprintf("  %s: %d", key, counts[key]))
+			}
+			for i, v := range astReport.Violations {
+				if i >= 6 {
+					details = append(details, fmt.Sprintf("  ... and %d more sites", len(astReport.Violations)-6))
+					break
+				}
+				details = append(details, fmt.Sprintf("  %s:%d %s", v.File, v.Line, v.Pattern))
+			}
+		} else {
+			details = append(details, "AST staticness: 0 violations")
 		}
-		return "fail", details, fmt.Errorf("AST staticness verifier found %d prohibited dispatch sites", len(astReport.Violations))
-	}
-	// Zero strict-tsc errors is REQUIRED, with no waiver: the withholding
-	// fixed point makes the emitted set forward-dependency-closed, so a
-	// retained module imports only retained modules and strict tsc must
-	// reach zero. Any error is a hard failure in emitted logic.
-	if tscErr != nil {
-		lines := splitLines(tscOut)
-		return "fail", lines, fmt.Errorf("strict typecheck rejected the generated output: %d diagnostics", len(lines))
+		if tscFail {
+			lines := splitLines(tscOut)
+			details = append(details, fmt.Sprintf("strict tsc: %d diagnostics", len(lines)))
+			for i, l := range lines {
+				if i >= 6 {
+					details = append(details, fmt.Sprintf("  ... and %d more", len(lines)-6))
+					break
+				}
+				details = append(details, "  "+l)
+			}
+		} else {
+			details = append(details, "strict tsc: 0 diagnostics")
+		}
+		return "fail", details, fmt.Errorf("gate 10: AST staticness=%d violations, strict tsc=%v", len(astReport.Violations), tscFail)
 	}
 	// (The former text check for "readonly v: unknown" is deleted: it was
 	// dead beneath the structural AST verifier above — which now catches

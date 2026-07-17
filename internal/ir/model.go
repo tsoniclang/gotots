@@ -168,11 +168,6 @@ type Scope struct {
 	// ifaceMembers caches each interface identity's resolved closed
 	// implementer union (typeOf recursion makes this hot).
 	ifaceMembers map[string][]IfaceMember
-	// importClosures maps each package path to the set of package paths
-	// it can reference (itself plus its transitive imports). A dynamic
-	// value can only reach a call from a package the caller imports, so
-	// interface dispatch is bounded to the caller's closure.
-	importClosures map[string]map[string]bool
 }
 
 // ExternTypeObligation is one external named type's referenced contract
@@ -205,7 +200,6 @@ func NewScope(paths ...string) Scope {
 		externConcrete:  &[]*types.TypeName{},
 		boxedComposites: map[string]*Type{},
 		ifaceMembers:    map[string][]IfaceMember{},
-		importClosures:  map[string]map[string]bool{},
 	}
 }
 
@@ -329,26 +323,6 @@ func (s Scope) IfaceMemberCache(key string) ([]IfaceMember, bool) {
 // SetIfaceMemberCache stores one interface identity's implementer union.
 func (s Scope) SetIfaceMemberCache(key string, members []IfaceMember) {
 	s.ifaceMembers[key] = members
-}
-
-// SetImportClosure records the set of package paths one package can
-// reference (itself plus its transitive imports).
-func (s Scope) SetImportClosure(pkg string, closure map[string]bool) {
-	s.importClosures[pkg] = closure
-}
-
-// CanReference reports whether package `from` can reference a value of a
-// type declared in package `target` — target is in from's import
-// closure. An unknown closure is permissive (no filtering evidence).
-func (s Scope) CanReference(from, target string) bool {
-	if from == target {
-		return true
-	}
-	closure, ok := s.importClosures[from]
-	if !ok {
-		return true
-	}
-	return closure[target]
 }
 
 // AddExternalVar records one external package variable the unit reads.
