@@ -17,7 +17,7 @@ import (
 // collectGenericInstances records every generic-function instantiation
 // across the unit: the closed-world evidence that admits generic
 // declarations.
-func collectGenericInstances(unit ir.Scope, pkgs []*packages.Package) {
+func collectGenericInstances(unit ir.Scope, pkgs []*packages.Package) error {
 	// The dynamic-type universe: every named type declared in an owned
 	// package, the closed-world set interface dispatch resolves over.
 	for _, p := range pkgs {
@@ -44,8 +44,11 @@ func collectGenericInstances(unit ir.Scope, pkgs []*packages.Package) {
 			}
 		}
 	}
-	collectAddressTakenFields(unit, pkgs)
+	if err := collectAddressTakenFields(unit, pkgs); err != nil {
+		return err
+	}
 	freezeExternUniverse(unit, pkgs)
+	return nil
 }
 
 // freezeExternUniverse records, before any interface union is resolved,
@@ -153,10 +156,14 @@ func freezeExternUniverse(unit ir.Scope, pkgs []*packages.Package) {
 // a field addressed in one body fixes that field's representation (a
 // stable per-instance cell) in every body, so the scan must complete
 // before any struct or body is built.
-func collectAddressTakenFields(unit ir.Scope, pkgs []*packages.Package) {
+func collectAddressTakenFields(unit ir.Scope, pkgs []*packages.Package) error {
+	var walkErr error
 	for _, p := range pkgs {
 		for _, file := range p.Syntax {
 			ast.Inspect(file, func(node ast.Node) bool {
+				if walkErr != nil {
+					return false
+				}
 				unary, ok := node.(*ast.UnaryExpr)
 				if !ok || unary.Op != token.AND {
 					return true
@@ -169,13 +176,22 @@ func collectAddressTakenFields(unit ir.Scope, pkgs []*packages.Package) {
 				if !ok || selection.Kind() != types.FieldVal {
 					return true
 				}
-				if key, ok := ir.FieldStorageKeyOfSelection(selection); ok {
+				key, ok, err := ir.FieldStorageKeyOfSelection(selection)
+				if err != nil {
+					walkErr = err
+					return false
+				}
+				if ok {
 					unit.MarkFieldAddressTaken(key)
 				}
 				return true
 			})
+			if walkErr != nil {
+				return walkErr
+			}
 		}
 	}
+	return nil
 }
 
 // collectGenericInstances records every generic-function instantiation

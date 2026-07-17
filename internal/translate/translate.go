@@ -47,7 +47,9 @@ func Packages(pkgs []*packages.Package, sourceDir string, options Options) (*Gen
 		paths = append(paths, p.PkgPath)
 	}
 	unit := ir.NewScope(paths...)
-	collectGenericInstances(unit, sorted)
+	if err := collectGenericInstances(unit, sorted); err != nil {
+		return nil, err
+	}
 
 	out := &Generated{
 		Files:     map[string]string{},

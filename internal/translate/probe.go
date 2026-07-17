@@ -267,7 +267,9 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 		}
 	}
 	unit := ir.NewScope(ownedPaths...)
-	collectGenericInstances(unit, ownedPackages)
+	if err := collectGenericInstances(unit, ownedPackages); err != nil {
+		return nil, err
+	}
 
 	for _, p := range loaded {
 		if !owned(p) {

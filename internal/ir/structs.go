@@ -69,7 +69,11 @@ func BuildStruct(p *packages.Package, sourceDir string, unit Scope, spec *ast.Ty
 		if err != nil {
 			return nil, err
 		}
-		out.Fields = append(out.Fields, Var{Name: field.Name(), Type: fieldType, Cell: b.fieldIsCell(named, field.Name(), fieldType)})
+		cell, err := b.fieldIsCell(named, field.Name(), fieldType)
+		if err != nil {
+			return nil, err
+		}
+		out.Fields = append(out.Fields, Var{Name: field.Name(), Type: fieldType, Cell: cell})
 	}
 	promoted, err := b.promotedDelegates(named, span)
 	if err != nil {
@@ -86,31 +90,42 @@ func BuildStruct(p *packages.Package, sourceDir string, unit Scope, spec *ast.Ty
 // This is stable across instantiations, so &Box[int].X and &Box[string].X
 // resolve to distinct keys yet the address scan (which sees an
 // instantiated field object) and class emission (which sees the generic
-// declaration) agree. An anonymous struct is non-generic, so its
-// structural spelling is a stable key.
-func fieldStorageKey(declaringStruct types.Type, fieldName string) string {
+// declaration) agree. An anonymous struct is keyed by its CANONICAL
+// identity (typeid.Canonical), which package-qualifies unexported field
+// names by import path — never t.String(), which conflates two
+// spelling-alike anon structs whose unexported fields come from different
+// packages (a storage-identity collision). A canonical failure (a free
+// type parameter in an anonymous struct) propagates so the address-taken
+// analysis fails closed rather than keying by spelling.
+func fieldStorageKey(declaringStruct types.Type, fieldName string) (string, error) {
 	t := types.Unalias(declaringStruct)
 	if pointer, ok := t.(*types.Pointer); ok {
 		t = types.Unalias(pointer.Elem())
 	}
 	named, ok := t.(*types.Named)
 	if !ok {
-		return t.String() + "#" + fieldName
+		canon, err := typeid.Canonical(t)
+		if err != nil {
+			return "", err
+		}
+		return canon + "#" + fieldName, nil
 	}
 	obj := named.Origin().Obj()
 	pkg := ""
 	if obj.Pkg() != nil {
 		pkg = obj.Pkg().Path()
 	}
-	return pkg + "." + obj.Name() + "#" + fieldName
+	return pkg + "." + obj.Name() + "#" + fieldName, nil
 }
 
 // FieldStorageKeyOfSelection resolves the storage key of the field a
 // selection reaches, walking any embedded-field prefix to the declaring
 // struct (promotion). The pre-pass marks address-taken fields by this key.
-func FieldStorageKeyOfSelection(sel *types.Selection) (string, bool) {
+// The bool reports whether the selection is a field access at all; a
+// non-nil error is a canonical-identity failure (fail closed).
+func FieldStorageKeyOfSelection(sel *types.Selection) (string, bool, error) {
 	if sel == nil || sel.Kind() != types.FieldVal {
-		return "", false
+		return "", false, nil
 	}
 	current := sel.Recv()
 	index := sel.Index()
@@ -121,11 +136,15 @@ func FieldStorageKeyOfSelection(sel *types.Selection) (string, bool) {
 		}
 		st, ok := u.Underlying().(*types.Struct)
 		if !ok {
-			return "", false
+			return "", false, nil
 		}
 		current = st.Field(i).Type()
 	}
-	return fieldStorageKey(current, sel.Obj().Name()), true
+	key, err := fieldStorageKey(current, sel.Obj().Name())
+	if err != nil {
+		return "", false, err
+	}
+	return key, true, nil
 }
 
 // fieldIsCell reports whether a struct field (of the given declaring
@@ -133,16 +152,29 @@ func FieldStorageKeyOfSelection(sel *types.Selection) (string, bool) {
 // somewhere in the unit AND its type is a non-identity carrier (a scalar,
 // pointer, map, slice, interface, or function). Identity carriers —
 // structs, arrays, external handles — are their own stable address.
-func (b *builder) fieldIsCell(declaringStruct types.Type, fieldName string, fieldType Type) bool {
-	return b.unit.FieldAddressTaken(fieldStorageKey(declaringStruct, fieldName)) && boxable(fieldType.Kind)
+func (b *builder) fieldIsCell(declaringStruct types.Type, fieldName string, fieldType Type) (bool, error) {
+	if !boxable(fieldType.Kind) {
+		return false, nil
+	}
+	key, err := fieldStorageKey(declaringStruct, fieldName)
+	if err != nil {
+		return false, err
+	}
+	return b.unit.FieldAddressTaken(key), nil
 }
 
 // fieldCell reports whether a field-selection accesses a cell field —
 // the flag FieldLoad/FieldTarget/&f carry so the value read/write
 // unwraps the cell and the address is the cell itself.
-func (b *builder) fieldCell(selection *types.Selection, fieldType Type) bool {
-	key, ok := FieldStorageKeyOfSelection(selection)
-	return ok && b.unit.FieldAddressTaken(key) && boxable(fieldType.Kind)
+func (b *builder) fieldCell(selection *types.Selection, fieldType Type) (bool, error) {
+	if !boxable(fieldType.Kind) {
+		return false, nil
+	}
+	key, ok, err := FieldStorageKeyOfSelection(selection)
+	if err != nil {
+		return false, err
+	}
+	return ok && b.unit.FieldAddressTaken(key), nil
 }
 
 // promotedDelegates resolves every promoted method in the type's method
@@ -254,7 +286,11 @@ func (b *builder) chainFieldPath(base Expr, baseType types.Type, path []int, spa
 			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "promoted selection through " + out.Type().Go, Span: span}
 		}
 		b.use("fieldLoad")
-		out = &FieldLoad{X: out, Field: field.Name(), T: fieldType, Cell: b.fieldIsCell(current, field.Name(), fieldType)}
+		cell, err := b.fieldIsCell(current, field.Name(), fieldType)
+		if err != nil {
+			return nil, err
+		}
+		out = &FieldLoad{X: out, Field: field.Name(), T: fieldType, Cell: cell}
 		current = field.Type()
 	}
 	return out, nil
@@ -335,7 +371,11 @@ func (b *builder) anonStructType(structType *types.Struct, spelled string, span 
 		if err != nil {
 			return Type{}, err
 		}
-		decl.Fields = append(decl.Fields, Var{Name: field.Name(), Type: fieldType, Cell: b.fieldIsCell(structType, field.Name(), fieldType)})
+		cell, err := b.fieldIsCell(structType, field.Name(), fieldType)
+		if err != nil {
+			return Type{}, err
+		}
+		decl.Fields = append(decl.Fields, Var{Name: field.Name(), Type: fieldType, Cell: cell})
 	}
 	decl.Comparable = b.structEqComparable(structType)
 	decl.KeyEncodable = b.structKeyEncodable(structType, span)
