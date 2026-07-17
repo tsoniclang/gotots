@@ -56,6 +56,11 @@ generated header is manual. Malformed, forged, duplicate, or ambiguous evidence
 blocks. Nested bodies reconcile structurally deepest-first so one edit has one
 owner.
 
+The file header applies only to declarations proven by the attested baseline.
+An unmarked developer-added helper function or class inside a generated file is
+manual source, remains graph-discovered without registration metadata, and is
+never discarded merely because its containing file is generated.
+
 GoToTS emits exact typed throwing placeholders for unavailable owned bodies and
 external operations. Replacing the throw with typed TypeScript is the entire
 manual implementation workflow. No user-authored JSON, registration,

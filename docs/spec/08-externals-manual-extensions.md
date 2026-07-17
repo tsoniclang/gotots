@@ -250,6 +250,16 @@ Ownership is derived without a user-authored manifest:
 - malformed, duplicate, wrong-identity, or baseline-inconsistent markers are
   invalid and block rather than guessing.
 
+The generated-file header does not make every unmarked declaration in that
+file disposable. A developer-added function, class, or other declaration that
+has no matching entry in the attested generated baseline is manual source; its
+function-like bodies likewise have no generated marker. It survives
+regeneration when the typed graph reaches it. It must not collide with or
+silently replace a selected Go declaration. If a current Go declaration could
+match it, structural reconciliation must establish one unambiguous exact
+identity/signature join or report it as orphaned/invalid rather than choosing
+by spelling.
+
 Every generated function-like body receives a marker, including nested
 function literals represented independently by the census. Reconciliation is
 structural and deepest-first. If an outer raw body hash changed only because a
