@@ -171,14 +171,9 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 
 	// Structs whose comparable fields all encode deterministically carry
 	// goKey$ — the injective canonical key for the keyed-map carrier.
-	encodable := true
-	for _, field := range structDecl.Fields {
-		if !ir.KeyEncodableField(field.Type) {
-			encodable = false
-			break
-		}
-	}
-	if encodable {
+	// KeyEncodable is the IR verdict (it descends into nested struct and
+	// array-of-struct fields, which the pure field predicate cannot).
+	if structDecl.KeyEncodable {
 		components := make([]string, 0, len(structDecl.Fields))
 		for _, field := range structDecl.Fields {
 			component, err := keyComponent("this."+field.Name, field.Type)
@@ -219,6 +214,12 @@ func keyComponent(access string, t ir.Type) (string, error) {
 			return "", err
 		}
 		return "gort$.goKeyArray(" + access + ", ($v) => " + elem + ")", nil
+	case t.Kind == ir.KindStruct:
+		// A nested key struct composes through its own goKey$ (guaranteed
+		// present: the IR admits the outer key only when every nested
+		// struct field is itself key-encodable). Wrapped so the nested
+		// encoding parses unambiguously inside the outer composition.
+		return `"{" + ` + access + `.goKey$() + "}"`, nil
 	case t.Kind.Integer():
 		return `"i" + String(` + access + `)`, nil
 	}

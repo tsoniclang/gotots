@@ -423,17 +423,42 @@ func (b *builder) structEqComparable(goType types.Type) bool {
 
 // structKeyEncodable reports whether a named struct key's fields are all
 // encodable, so its class carries goKey$ and the keyed-map carrier can
-// hold it.
+// hold it. A nested comparable struct field composes through the field
+// type's own goKey$, so the recursion descends into struct and
+// array-of-struct fields.
 func (b *builder) structKeyEncodable(keyType types.Type, span Span) bool {
 	structType, ok := types.Unalias(keyType).Underlying().(*types.Struct)
 	if !ok {
 		return false
 	}
 	for i := range structType.NumFields() {
-		fieldType, err := b.typeOf(structType.Field(i).Type(), span)
-		if err != nil || !KeyEncodableField(fieldType) {
+		if !b.keyEncodableFieldType(structType.Field(i).Type(), span) {
 			return false
 		}
 	}
 	return true
+}
+
+// keyEncodableFieldType reports whether one struct field's Go type
+// participates in the generated canonical key encoding. Scalars, byte
+// strings, pointers (identity), and unit encode directly; a nested named
+// struct encodes through its own goKey$ (recursion); a fixed array
+// encodes element-wise. Floats (NaN, signed zeros), interfaces, external
+// types, and maps/slices stay out — their Go equality is not injective
+// onto a deterministic string.
+func (b *builder) keyEncodableFieldType(goType types.Type, span Span) bool {
+	fieldIR, err := b.typeOf(goType, span)
+	if err != nil {
+		return false
+	}
+	switch fieldIR.Kind {
+	case KindStruct:
+		return b.structKeyEncodable(goType, span)
+	case KindArray:
+		if arr, ok := types.Unalias(goType).Underlying().(*types.Array); ok {
+			return b.keyEncodableFieldType(arr.Elem(), span)
+		}
+		return false
+	}
+	return KeyEncodableField(fieldIR)
 }

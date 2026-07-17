@@ -119,6 +119,93 @@ func NilKeyedMapWritePanics() int {
 `)
 }
 
+func TestOracleNestedStructMapKeys(t *testing.T) {
+	runOracle(t, `package fixture
+
+type span struct {
+	pos int32
+	end int32
+}
+
+type locKey struct {
+	file  string
+	loc   span
+}
+
+func NestedValueEquality() (int, int, bool) {
+	m := map[locKey]int{}
+	m[locKey{file: "a.go", loc: span{pos: 1, end: 2}}] = 10
+	m[locKey{file: "a.go", loc: span{pos: 1, end: 2}}] = 20
+	m[locKey{file: "a.go", loc: span{pos: 1, end: 3}}] = 30
+	m[locKey{file: "b.go", loc: span{pos: 1, end: 2}}] = 40
+	v, ok := m[locKey{file: "a.go", loc: span{pos: 1, end: 2}}]
+	return v, len(m), ok
+}
+
+func NestedInjectiveBoundary() int {
+	// The nested encoding must delimit so that moving a "|" across the
+	// nested-struct boundary never collides two distinct keys.
+	m := map[locKey]int{}
+	m[locKey{file: "x", loc: span{pos: 1, end: 23}}] = 1
+	m[locKey{file: "x", loc: span{pos: 12, end: 3}}] = 2
+	return len(m)
+}
+
+type ptrNode struct {
+	label string
+}
+
+type nestedPtrKey struct {
+	inner  span
+	target *ptrNode
+}
+
+func NestedPointerIdentity() (int, int, bool) {
+	first := &ptrNode{label: "a"}
+	second := &ptrNode{label: "a"}
+	m := map[nestedPtrKey]int{}
+	m[nestedPtrKey{inner: span{pos: 1}, target: first}] = 1
+	m[nestedPtrKey{inner: span{pos: 1}, target: second}] = 2
+	m[nestedPtrKey{inner: span{pos: 1}, target: first}] = 3
+	v, ok := m[nestedPtrKey{inner: span{pos: 1}, target: first}]
+	return len(m), v, ok
+}
+
+func NestedRangeRecovery() (int32, string) {
+	m := map[locKey]string{
+		{file: "a", loc: span{pos: 3, end: 4}}: "first",
+		{file: "b", loc: span{pos: 5, end: 6}}: "second",
+	}
+	var total int32
+	var got string
+	for k, v := range m {
+		total += k.loc.pos
+		if k.file == "b" {
+			got = v
+		}
+	}
+	return total, got
+}
+
+type doubleNested struct {
+	outer locKey
+	rank  int
+}
+
+func DoubleNestedEquality() (int, int) {
+	m := map[doubleNested]int{}
+	m[doubleNested{outer: locKey{file: "a", loc: span{pos: 1, end: 2}}, rank: 7}] = 1
+	m[doubleNested{outer: locKey{file: "a", loc: span{pos: 1, end: 2}}, rank: 7}] = 2
+	m[doubleNested{outer: locKey{file: "a", loc: span{pos: 1, end: 2}}, rank: 8}] = 3
+	sum := 0
+	for k := range m {
+		sum += k.rank
+	}
+	return len(m), sum
+}
+`)
+}
+
 func TestOracleTypeParamMapKeys(t *testing.T) {
 	runOracle(t, `package fixture
 

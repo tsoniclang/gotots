@@ -495,6 +495,10 @@ type Struct struct {
 	// equality: it carries goEq$, and interface equality over it never
 	// panics.
 	Comparable bool
+	// KeyEncodable marks a struct whose fields all encode injectively onto
+	// a deterministic string: it carries goKey$, so it can key a map and
+	// compose as a nested field of another key struct.
+	KeyEncodable bool
 }
 
 // PromotedDelegate is one promoted method in a struct's method set: the

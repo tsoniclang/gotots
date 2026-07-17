@@ -77,6 +77,7 @@ func BuildStruct(p *packages.Package, sourceDir string, unit Scope, spec *ast.Ty
 	}
 	out.Promoted = promoted
 	out.Comparable = b.structEqComparable(named)
+	out.KeyEncodable = b.structKeyEncodable(named, span)
 	return out, nil
 }
 
@@ -273,6 +274,7 @@ func (b *builder) anonStructType(structType *types.Struct, spelled string, span 
 		decl.Fields = append(decl.Fields, Var{Name: field.Name(), Type: fieldType})
 	}
 	decl.Comparable = b.structEqComparable(structType)
+	decl.KeyEncodable = b.structKeyEncodable(structType, span)
 	if err := b.unit.RegisterAnonStruct(b.pkgPath, decl); err != nil {
 		return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: err.Error(), Span: span}
 	}
