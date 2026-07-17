@@ -138,7 +138,16 @@ func shapeIdentity(shape ExternalObjectShape) string {
 		parts = append(parts, param)
 	}
 	for _, method := range shape.Methods {
-		parts = append(parts, method.Name, method.Signature)
+		// The COMPLETE method shape: the callable signature identity
+		// (correctly) excludes the receiver, so the pointer-vs-value
+		// receiver flavor is part of the contract identity separately —
+		// two types whose methods differ only in receiver flavor are
+		// distinct contracts and must not merge.
+		recv := "v"
+		if method.PointerReceiver {
+			recv = "p"
+		}
+		parts = append(parts, method.Name, recv, method.Signature)
 	}
 	return strings.Join(parts, "\x00")
 }

@@ -12,14 +12,16 @@ import (
 	"github.com/tsoniclang/gotots/internal/typeid"
 )
 
-// canonicalTypeID is the path-qualified identity of one Go type: the
-// ONLY string used as generated dynamic-type identity. types.Type.String
-// qualifies by package NAME and can collide across packages sharing a
-// name; this cannot. It renders within the builder's binder environment
-// so a type-parameter-bearing carrier (e.g. *K inside a generic method)
-// resolves instead of failing closed.
+// canonicalTypeID is the RUNTIME dynamic-type identity of one Go type:
+// the token an interface box carries and dispatch switches on. It is
+// deliberately NOT rendered within a binder environment — an open type
+// parameter has NO single runtime identity (Box[int] boxes []int,
+// Box[string] boxes []string), so a type mentioning a type parameter
+// FAILS CLOSED here rather than producing a shared, wrong token. (A
+// per-instantiation RTTI mechanism would specialize it; until then this
+// is fail-closed, and such bodies are unimplemented.)
 func (b *builder) canonicalTypeID(t types.Type) (string, error) {
-	return b.canonical(t)
+	return typeid.Canonical(t)
 }
 
 // canonicalIfaceID extends the path-qualified type string with each
@@ -51,7 +53,8 @@ func (b *builder) compositeRtti(t types.Type, span Span, externID string) (RttiR
 	}
 	composite, err := b.canonicalTypeID(t)
 	if err != nil {
-		return RttiRef{}, err
+		return RttiRef{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE",
+			Construct: "runtime type identity of " + t.String() + " (an open type parameter has no single runtime type)", Span: span}
 	}
 	out := RttiRef{Composite: composite, Display: displayOf(t), ExternID: externID}
 	if externID == "" {

@@ -239,10 +239,18 @@ func (b *builder) admitGenericType(named *types.Named, span Span) ([]string, err
 // module, structurally identical across packages (TypeScript's
 // structural classes keep cross-package values assignable).
 func (b *builder) anonStructType(structType *types.Struct, spelled string, span Span) (Type, error) {
-	// Package-path-qualified structural identity so anonymous shapes from
-	// different packages never collide, and the full digest so distinct
-	// shapes never coincide.
-	identity := types.TypeString(structType, func(p *types.Package) string { return p.Path() })
+	// The identity goes through the CANONICALIZER, which package-qualifies
+	// UNEXPORTED field names — so two struct{x int} shapes with unexported
+	// fields from different packages are distinct (Go's rule), while
+	// exported-field shapes remain structurally shared. types.TypeString
+	// does not qualify field names and would collide them. The full 256-bit
+	// digest is only the emitted NAME; the full canonical preimage is the
+	// identity, and RegisterAnonStruct rejects any digest collision between
+	// distinct preimages.
+	identity, err := b.canonical(structType)
+	if err != nil {
+		return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: err.Error(), Span: span}
+	}
 	digest := sha256.Sum256([]byte(identity))
 	name := "Anon$" + hex.EncodeToString(digest[:])
 	out := Type{Kind: KindStruct, Go: spelled, Named: name, Pkg: b.pkgPath}

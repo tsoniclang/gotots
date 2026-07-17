@@ -134,7 +134,9 @@ func collectDeclarations(p *packages.Package, file *ast.File, relativePath, scop
 			// declared in _test.go files (the toolchain's documented
 			// test-file rule), never to test-support production files.
 			if scopeName == "test" && d.Recv == nil && strings.HasSuffix(relativePath, "_test.go") {
-				recordTestFunction(info, d, id, relativePath, lineOf(d.Pos()), stats)
+				if err := recordTestFunction(info, d, id, relativePath, lineOf(d.Pos()), stats); err != nil {
+					return err
+				}
 			}
 		case *ast.GenDecl:
 			for _, spec := range d.Specs {

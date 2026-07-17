@@ -341,3 +341,20 @@ func Two() (int, int) { return 0, 0 }
 		t.Errorf("1-tuple serializes like its element: %q", canon(t, one))
 	}
 }
+
+// TestUnexportedFieldStructsPackageDistinct: two anonymous struct{x int}
+// with UNEXPORTED fields from different packages are distinct Go types
+// and must not share an identity; exported-field shapes coincide.
+func TestUnexportedFieldStructsPackageDistinct(t *testing.T) {
+	a := pkgOf(t, "a", "package a\ntype T struct{ x int }\n")
+	b := pkgOf(t, "b", "package b\ntype T struct{ x int }\n")
+	e1 := pkgOf(t, "c", "package c\ntype T struct{ X int }\n")
+	e2 := pkgOf(t, "d", "package d\ntype T struct{ X int }\n")
+	under := func(p *types.Package) types.Type { return p.Scope().Lookup("T").Type().Underlying() }
+	if canon(t, under(a)) == canon(t, under(b)) {
+		t.Errorf("unexported-field structs from different packages share identity: %q", canon(t, under(a)))
+	}
+	if canon(t, under(e1)) != canon(t, under(e2)) {
+		t.Errorf("exported-field structs from different packages should coincide: %q vs %q", canon(t, under(e1)), canon(t, under(e2)))
+	}
+}

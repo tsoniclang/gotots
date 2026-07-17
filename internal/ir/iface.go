@@ -35,7 +35,8 @@ func (b *builder) rttiFor(t types.Type, span Span) (RttiRef, error) {
 			// dispatch routes through the external contracts.
 			composite, err := b.canonicalTypeID(t)
 			if err != nil {
-				return RttiRef{}, err
+				return RttiRef{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE",
+					Construct: "runtime type identity of " + t.String() + " (an open type parameter has no single runtime type)", Span: span}
 			}
 			return RttiRef{Composite: composite, Display: displayOf(t),
 				ExternID: obj.Pkg().Path() + "." + obj.Name()}, nil
