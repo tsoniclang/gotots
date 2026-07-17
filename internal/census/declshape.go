@@ -18,7 +18,7 @@ import (
 // qualifier renders package identity as the canonical import path.
 func qualifier(p *types.Package) string { return p.Path() }
 
-func typeString(t types.Type) string { return typeid.Canonical(t) }
+func typeString(t types.Type) (string, error) { return typeid.Canonical(t) }
 
 // collectDeclarations walks one file's top-level declarations, producing
 // both the identity records and the exact typed shapes. Every declared
@@ -199,20 +199,25 @@ func shapeFunction(info *types.Info, d *ast.FuncDecl, id string, stats *fileStat
 		return fmt.Errorf("declaration %s has no typed definition", id)
 	}
 	signature := object.Type().(*types.Signature)
+	var terr error
+	ts := tsFn(&terr)
 	shape := FunctionShape{
 		ID:        id,
 		Variadic:  signature.Variadic(),
-		Signature: typeString(signature),
+		Signature: ts(signature),
 	}
 	if recv := signature.Recv(); recv != nil {
-		shape.Receiver = typeString(recv.Type())
+		shape.Receiver = ts(recv.Type())
 	}
-	shape.TypeParams = typeParamShapes(signature.TypeParams())
+	shape.TypeParams = typeParamShapes(signature.TypeParams(), &terr)
 	if shape.TypeParams == nil {
-		shape.TypeParams = typeParamShapes(signature.RecvTypeParams())
+		shape.TypeParams = typeParamShapes(signature.RecvTypeParams(), &terr)
 	}
-	shape.Params = tupleParams(signature.Params())
-	shape.Results = tupleParams(signature.Results())
+	shape.Params = tupleParams(signature.Params(), &terr)
+	shape.Results = tupleParams(signature.Results(), &terr)
+	if terr != nil {
+		return terr
+	}
 	stats.functionShapes = append(stats.functionShapes, shape)
 	return nil
 }
@@ -222,19 +227,25 @@ func shapeValue(info *types.Info, name *ast.Ident, kind, id, initializerHash str
 	if object == nil {
 		return fmt.Errorf("declaration %s has no typed definition", id)
 	}
+	var terr error
+	ts := tsFn(&terr)
 	if kind == "const" {
 		constant, ok := object.(*types.Const)
 		if !ok {
 			return fmt.Errorf("declaration %s is not a constant", id)
 		}
-		stats.constShapes = append(stats.constShapes, ConstShape{
-			ID:    id,
-			Type:  typeString(constant.Type()),
-			Value: constant.Val().ExactString(),
-		})
+		shape := ConstShape{ID: id, Type: ts(constant.Type()), Value: constant.Val().ExactString()}
+		if terr != nil {
+			return terr
+		}
+		stats.constShapes = append(stats.constShapes, shape)
 		return nil
 	}
-	stats.varShapes = append(stats.varShapes, VarShape{ID: id, Type: typeString(object.Type()), InitializerHash: initializerHash})
+	shape := VarShape{ID: id, Type: ts(object.Type()), InitializerHash: initializerHash}
+	if terr != nil {
+		return terr
+	}
+	stats.varShapes = append(stats.varShapes, shape)
 	return nil
 }
 
@@ -243,11 +254,14 @@ func shapeType(info *types.Info, s *ast.TypeSpec, kind, id string, stats *fileSt
 	if !ok {
 		return fmt.Errorf("declaration %s has no typed definition", id)
 	}
+	var terr error
+	ts := tsFn(&terr)
 	if kind == "alias" {
-		stats.aliasShapes = append(stats.aliasShapes, AliasShape{
-			ID:     id,
-			Target: typeString(types.Unalias(object.Type())),
-		})
+		shape := AliasShape{ID: id, Target: ts(types.Unalias(object.Type()))}
+		if terr != nil {
+			return terr
+		}
+		stats.aliasShapes = append(stats.aliasShapes, shape)
 		return nil
 	}
 	named, ok := object.Type().(*types.Named)
@@ -261,8 +275,8 @@ func shapeType(info *types.Info, s *ast.TypeSpec, kind, id string, stats *fileSt
 	shape := TypeShape{
 		ID:         id,
 		Kind:       kindName,
-		Underlying: typeString(named.Underlying()),
-		TypeParams: typeParamShapes(named.TypeParams()),
+		Underlying: ts(named.Underlying()),
+		TypeParams: typeParamShapes(named.TypeParams(), &terr),
 	}
 	switch underlying := named.Underlying().(type) {
 	case *types.Struct:
@@ -270,7 +284,7 @@ func shapeType(info *types.Info, s *ast.TypeSpec, kind, id string, stats *fileSt
 			field := underlying.Field(i)
 			shape.Fields = append(shape.Fields, FieldShape{
 				Name:     field.Name(),
-				Type:     typeString(field.Type()),
+				Type:     ts(field.Type()),
 				Tag:      underlying.Tag(i),
 				Embedded: field.Embedded(),
 				Exported: field.Exported(),
@@ -281,11 +295,11 @@ func shapeType(info *types.Info, s *ast.TypeSpec, kind, id string, stats *fileSt
 			method := underlying.ExplicitMethod(i)
 			shape.InterfaceMethods = append(shape.InterfaceMethods, MethodShape{
 				Name:      method.Name(),
-				Signature: typeString(method.Type()),
+				Signature: ts(method.Type()),
 			})
 		}
 		for i := range underlying.NumEmbeddeds() {
-			shape.InterfaceEmbeds = append(shape.InterfaceEmbeds, typeString(underlying.EmbeddedType(i)))
+			shape.InterfaceEmbeds = append(shape.InterfaceEmbeds, ts(underlying.EmbeddedType(i)))
 		}
 	}
 	for i := range named.NumMethods() {
@@ -297,37 +311,55 @@ func shapeType(info *types.Info, s *ast.TypeSpec, kind, id string, stats *fileSt
 		}
 		shape.Methods = append(shape.Methods, MethodShape{
 			Name:            method.Name(),
-			Signature:       typeString(signature),
+			Signature:       ts(signature),
 			PointerReceiver: pointerReceiver,
 		})
+	}
+	if terr != nil {
+		return terr
 	}
 	stats.typeShapes = append(stats.typeShapes, shape)
 	return nil
 }
 
-func typeParamShapes(list *types.TypeParamList) []TypeParamShape {
+// tsFn returns a canonical-identity renderer that records the FIRST
+// error into acc, so a shape builder can compose identities inline and
+// then fail closed — the poison-string dual contract is eliminated.
+func tsFn(acc *error) func(types.Type) string {
+	return func(t types.Type) string {
+		s, err := typeString(t)
+		if err != nil && *acc == nil {
+			*acc = err
+		}
+		return s
+	}
+}
+
+func typeParamShapes(list *types.TypeParamList, acc *error) []TypeParamShape {
 	if list == nil || list.Len() == 0 {
 		return nil
 	}
+	ts := tsFn(acc)
 	shapes := make([]TypeParamShape, 0, list.Len())
 	for i := range list.Len() {
 		parameter := list.At(i)
 		shapes = append(shapes, TypeParamShape{
 			Name:       parameter.Obj().Name(),
-			Constraint: typeString(parameter.Constraint()),
+			Constraint: ts(parameter.Constraint()),
 		})
 	}
 	return shapes
 }
 
-func tupleParams(tuple *types.Tuple) []Param {
+func tupleParams(tuple *types.Tuple, acc *error) []Param {
 	if tuple == nil || tuple.Len() == 0 {
 		return nil
 	}
+	ts := tsFn(acc)
 	params := make([]Param, 0, tuple.Len())
 	for i := range tuple.Len() {
 		variable := tuple.At(i)
-		params = append(params, Param{Name: variable.Name(), Type: typeString(variable.Type())})
+		params = append(params, Param{Name: variable.Name(), Type: ts(variable.Type())})
 	}
 	return params
 }

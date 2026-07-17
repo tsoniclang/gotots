@@ -17,11 +17,19 @@ import (
 	"strings"
 )
 
-// Canonical renders the canonical identity string.
-func Canonical(t types.Type) string {
+// Canonical renders the canonical identity string. It is a TOTAL
+// contract: an unhandled type form (no exact identity) returns an error
+// rather than a poisoned string, so no caller can consume a
+// non-canonical identity and the dual "string plus optional check"
+// contract is eliminated.
+func Canonical(t types.Type) (string, error) {
 	var out strings.Builder
 	write(&out, t, map[types.Type]bool{})
-	return out.String()
+	s := out.String()
+	if strings.Contains(s, unsupportedMarker) {
+		return "", fmt.Errorf("typeid: no exact canonical identity for type form %T (%s)", t, t.String())
+	}
+	return s, nil
 }
 
 func write(out *strings.Builder, t types.Type, seen map[types.Type]bool) {
@@ -85,13 +93,13 @@ func write(out *strings.Builder, t types.Type, seen map[types.Type]bool) {
 		// method-declaration shape (package + receiver + name + this
 		// callable signature), not in the callable signature itself.
 		//
-		// Type parameters and their CONSTRAINTS ARE part of identity
-		// (func F[T any] and func F[T comparable] differ), written by
-		// binder POSITION so alpha-equivalent declarations ([T any] and
-		// [U any]) coincide. A method's parameters come from its receiver
-		// (RecvTypeParams); a function's from TypeParams; the two are
-		// mutually exclusive.
-		writeTypeParams(out, u.RecvTypeParams(), seen)
+		// Only the SIGNATURE's OWN type parameters are part of callable
+		// identity (Go compares TypeParams(), params, results, variadic —
+		// predicates.go), written by binder POSITION so alpha-equivalent
+		// declarations ([T any] and [U any]) coincide. RecvTypeParams are
+		// NOT part of the callable signature: they belong to the receiver
+		// and are verified in the method-declaration shape. A generic
+		// method references them in its params, resolved by binder index.
 		writeTypeParams(out, u.TypeParams(), seen)
 		out.WriteString("func(")
 		params := u.Params()
@@ -150,32 +158,37 @@ func write(out *strings.Builder, t types.Type, seen map[types.Type]bool) {
 			return
 		}
 		seen[t] = true
+		// Interface identity is the NORMALIZED TYPE SET, not the syntax
+		// (Go: predicates.go compares typeSet.terms, comparable, and the
+		// full method set). So interface{Base} and interface{M()} coincide
+		// when Base is interface{M()}, and interface{~int|~string} equals
+		// interface{~string|~int}.
 		out.WriteString("interface{")
+		// The COMPLETE method set (NumMethods already includes embedded
+		// methods); Go sorts methods by name, but sort defensively.
+		methods := make([]string, 0, u.NumMethods())
 		for i := range u.NumMethods() {
+			method := u.Method(i)
+			var m strings.Builder
+			writeMemberName(&m, method.Name(), method.Exported(), method.Pkg())
+			write(&m, method.Type(), seen)
+			methods = append(methods, m.String())
+		}
+		sort.Strings(methods)
+		for i, m := range methods {
 			if i > 0 {
 				out.WriteString(";")
 			}
-			method := u.Method(i)
-			writeMemberName(out, method.Name(), method.Exported(), method.Pkg())
-			write(out, method.Type(), seen)
+			out.WriteString(m)
 		}
-		// The COMPLETE type set: embedded elements (constraint unions,
-		// ~terms, comparable, embedded interfaces) are part of identity, so
-		// a methodless constraint interface{ ~int32 | ~uint32 } does not
-		// collapse toward interface{}. Sorted by their canonical spelling
-		// so element order does not affect identity.
-		if n := u.NumEmbeddeds(); n > 0 {
-			terms := make([]string, 0, n)
-			for i := range n {
-				var term strings.Builder
-				write(&term, u.EmbeddedType(i), seen)
-				terms = append(terms, term.String())
-			}
-			sort.Strings(terms)
-			for _, term := range terms {
-				out.WriteString(";elem:")
-				out.WriteString(term)
-			}
+		// The type-set terms: embedded elements flattened to their terms
+		// (embedded method interfaces contribute methods above, not terms),
+		// unions expanded, each sorted and de-duplicated so syntactic order
+		// and embedding shape never change identity. `comparable` is a term.
+		terms := dedupeSorted(collectTerms(u, seen))
+		for _, term := range terms {
+			out.WriteString(";term:")
+			out.WriteString(term)
 		}
 		out.WriteString("}")
 		delete(seen, t)
@@ -184,19 +197,11 @@ func write(out *strings.Builder, t types.Type, seen map[types.Type]bool) {
 		// source name, so alpha-equivalent declarations coincide.
 		fmt.Fprintf(out, "$#%d", u.Index())
 	case *types.Union:
-		// A constraint union (int | ~string | …): each term path-qualified
-		// so terms from different packages never collide.
+		// A bare constraint union (int | ~string | …): normalized —
+		// sorted and de-duplicated — so syntactic order does not matter
+		// (union.go: terms are stored non-canonically).
 		out.WriteString("union{")
-		for i := range u.Len() {
-			if i > 0 {
-				out.WriteString("|")
-			}
-			term := u.Term(i)
-			if term.Tilde() {
-				out.WriteString("~")
-			}
-			write(out, term.Type(), seen)
-		}
+		out.WriteString(strings.Join(dedupeSorted(unionTerms(u, seen)), "|"))
 		out.WriteString("}")
 	case *types.Tuple:
 		for i := range u.Len() {
@@ -243,6 +248,79 @@ func writeTypeParams(out *strings.Builder, params *types.TypeParamList, seen map
 		write(out, params.At(i).Constraint(), seen)
 	}
 	out.WriteString("]")
+}
+
+// collectTerms flattens an interface's type-set restriction into its
+// terms. Embedded METHOD interfaces contribute no terms (their methods
+// are in the complete method set); embedded unions expand to their
+// terms; an embedded concrete type or `comparable` is itself a term.
+func collectTerms(iface *types.Interface, seen map[types.Type]bool) []string {
+	var terms []string
+	for i := range iface.NumEmbeddeds() {
+		terms = append(terms, termsOf(iface.EmbeddedType(i), seen)...)
+	}
+	return terms
+}
+
+// termsOf renders the type-set terms contributed by one embedded element.
+func termsOf(t types.Type, seen map[types.Type]bool) []string {
+	switch e := t.(type) {
+	case *types.Union:
+		return unionTerms(e, seen)
+	case *types.Interface:
+		return collectTerms(e, seen)
+	case *types.Named:
+		// `comparable` (universe) is a type-set restriction, a term. An
+		// embedded named INTERFACE contributes its terms (its methods are
+		// already in the complete method set); any other named type is a
+		// single-type restriction term.
+		if e.Obj().Pkg() == nil && e.Obj().Name() == "comparable" {
+			return []string{"comparable"}
+		}
+		if iface, ok := e.Underlying().(*types.Interface); ok {
+			return collectTerms(iface, seen)
+		}
+		return []string{canonicalString(t, seen)}
+	default:
+		return []string{canonicalString(t, seen)}
+	}
+}
+
+// unionTerms renders each union term with tilde approximation preserved.
+func unionTerms(u *types.Union, seen map[types.Type]bool) []string {
+	terms := make([]string, 0, u.Len())
+	for i := range u.Len() {
+		term := u.Term(i)
+		prefix := ""
+		if term.Tilde() {
+			prefix = "~"
+		}
+		terms = append(terms, prefix+canonicalString(term.Type(), seen))
+	}
+	return terms
+}
+
+// canonicalString renders one type to its canonical identity string.
+func canonicalString(t types.Type, seen map[types.Type]bool) string {
+	var b strings.Builder
+	write(&b, t, seen)
+	return b.String()
+}
+
+// dedupeSorted sorts and removes duplicate terms so element order and
+// repetition never affect identity.
+func dedupeSorted(in []string) []string {
+	if len(in) == 0 {
+		return in
+	}
+	sort.Strings(in)
+	out := in[:1]
+	for _, s := range in[1:] {
+		if s != out[len(out)-1] {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 // writeMemberName qualifies unexported member names with their declaring

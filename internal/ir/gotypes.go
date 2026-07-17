@@ -38,14 +38,14 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 		return resolved, err
 	}
 	if resolved.Canon == "" {
-		resolved.Canon = typeid.Canonical(t)
-	}
-	if typeid.HasUnsupported(resolved.Canon) {
-		// The canonical identity could not be built exactly (an unhandled
-		// type form). It is not a usable evidence-ledger key: fail closed
-		// rather than stamp a poisoned identity.
-		return Type{}, &Unsupported{Code: "GOTOTS_TYPE_UNSUPPORTED",
-			Construct: "type with no exact canonical identity: " + t.String(), Span: span}
+		// Canonical is a total contract: an unhandled type form fails
+		// closed here rather than stamping a non-canonical identity.
+		canon, err := typeid.Canonical(t)
+		if err != nil {
+			return Type{}, &Unsupported{Code: "GOTOTS_TYPE_UNSUPPORTED",
+				Construct: err.Error(), Span: span}
+		}
+		resolved.Canon = canon
 	}
 	return resolved, nil
 }
@@ -228,7 +228,11 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 			return Type{}, err
 		}
 		out.IfaceMembers = members
-		out.IfaceID = canonicalIfaceID(u)
+		ifaceID, err := canonicalIfaceID(u)
+		if err != nil {
+			return Type{}, err
+		}
+		out.IfaceID = ifaceID
 		out.IfaceEmpty = u.NumMethods() == 0
 		return out, nil
 

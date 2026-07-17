@@ -147,6 +147,8 @@ func objectShape(object types.Object, reference *contractRef) (ExternalObjectSha
 		ReferencedFromProduction: reference.Production,
 		ReferencedFromTest:       reference.Test,
 	}
+	var terr error
+	ts := tsFn(&terr)
 	switch concrete := object.(type) {
 	case *types.Func:
 		shape.Kind = "func"
@@ -155,12 +157,12 @@ func objectShape(object types.Object, reference *contractRef) (ExternalObjectSha
 			shape.Name = qualified
 		}
 		signature := concrete.Type().(*types.Signature)
-		shape.Signature = typeString(signature)
+		shape.Signature = ts(signature)
 		if recv := signature.Recv(); recv != nil {
-			shape.Receiver = typeString(recv.Type())
+			shape.Receiver = ts(recv.Type())
 		}
-		shape.Params = tupleParams(signature.Params())
-		shape.Results = tupleParams(signature.Results())
+		shape.Params = tupleParams(signature.Params(), &terr)
+		shape.Results = tupleParams(signature.Results(), &terr)
 		shape.Variadic = signature.Variadic()
 	case *types.Var:
 		if concrete.IsField() {
@@ -171,24 +173,24 @@ func objectShape(object types.Object, reference *contractRef) (ExternalObjectSha
 		} else {
 			shape.Kind = "var"
 		}
-		shape.Type = typeString(concrete.Type())
+		shape.Type = ts(concrete.Type())
 	case *types.Const:
 		shape.Kind = "const"
-		shape.Type = typeString(concrete.Type())
+		shape.Type = ts(concrete.Type())
 		shape.Value = concrete.Val().ExactString()
 	case *types.TypeName:
 		shape.Kind = "type"
 		named, ok := concrete.Type().(*types.Named)
 		if !ok {
 			// External aliases surface as their target type.
-			shape.Underlying = typeString(types.Unalias(concrete.Type()))
+			shape.Underlying = ts(types.Unalias(concrete.Type()))
 			break
 		}
-		shape.Underlying = typeString(named.Underlying())
+		shape.Underlying = ts(named.Underlying())
 		if params := named.TypeParams(); params != nil {
 			for i := range params.Len() {
 				shape.TypeParams = append(shape.TypeParams,
-					params.At(i).Obj().Name()+" "+typeString(params.At(i).Constraint()))
+					params.At(i).Obj().Name()+" "+ts(params.At(i).Constraint()))
 			}
 		}
 		for i := range named.NumMethods() {
@@ -203,12 +205,15 @@ func objectShape(object types.Object, reference *contractRef) (ExternalObjectSha
 			}
 			shape.Methods = append(shape.Methods, MethodShape{
 				Name:            method.Name(),
-				Signature:       typeString(signature),
+				Signature:       ts(signature),
 				PointerReceiver: pointerReceiver,
 			})
 		}
 	default:
 		return shape, fmt.Errorf("unreviewed external object class %T for %s", object, object.Name())
+	}
+	if terr != nil {
+		return shape, terr
 	}
 	return shape, nil
 }

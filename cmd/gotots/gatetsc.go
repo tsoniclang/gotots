@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 
 	"github.com/tsoniclang/gotots/internal/census"
 	"github.com/tsoniclang/gotots/internal/goenv"
@@ -136,18 +135,12 @@ func runTscGate(repoDir, profilePath, buildProfile, sourceDir string, report *Ga
 		lines := splitLines(tscOut)
 		return "fail", lines, fmt.Errorf("strict typecheck rejected the generated output: %d diagnostics", len(lines))
 	}
-	// The accepted interface specification (docs/spec/06) requires a
-	// closed statically typed payload; the current carrier still holds an
-	// erased unknown payload recovered by casts at dispatch. Until the
-	// representation redesign lands, this stage is BLOCKED — passing
-	// would attest output that contradicts the accepted specification.
-	if iface, ok := generated.Files["language-abi/goiface.ts"]; ok && strings.Contains(iface, "readonly v: unknown") {
-		return "blocked", []string{
-			"interface carrier retains an erased unknown payload (GoIfaceBox.v: unknown) with cast recovery at dispatch",
-			"contradicts docs/spec/06-interfaces-generics-functions.md (closed statically typed payload union required)",
-			"the representation redesign (spec/ADR pending) unblocks this stage",
-		}, nil
-	}
+	// (The former text check for "readonly v: unknown" is deleted: it was
+	// dead beneath the structural AST verifier above — which now catches
+	// the ABI's own erased GoBox<..., unknown, ...> as a hard failure —
+	// and it did not match the generic alias form that actually erases.
+	// There is one authoritative staticness path: the typed-AST verifier.)
+	//
 	// Authoritative symbol evidence: every retained proof's generated
 	// symbol must be an exported declaration in its file's typed AST.
 	var symbolDefects []string

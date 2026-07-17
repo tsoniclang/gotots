@@ -48,7 +48,10 @@ func translateFunc(p *packages.Package, sourceDir string, unit ir.Scope, relativ
 	}
 
 	object := p.TypesInfo.Defs[decl.Name].(*types.Func)
-	signatureText := typeid.Canonical(object.Type())
+	signatureText, err := typeid.Canonical(object.Type())
+	if err != nil {
+		return nil, nil, err
+	}
 	signatureDigest := sha256.Sum256([]byte(signatureText))
 
 	representations := map[string]string{}

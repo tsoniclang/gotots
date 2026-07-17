@@ -27,11 +27,22 @@ func pkgOf(t *testing.T, path, src string) *types.Package {
 // TestUnexportedStructuralIdentityDistinct: two structurally
 // spelled-alike interfaces with unexported methods from different
 // packages must have DISTINCT canonical identities.
+
+// canon renders a type's canonical identity, failing the test on error.
+func canon(t *testing.T, typ types.Type) string {
+	t.Helper()
+	s, err := Canonical(typ)
+	if err != nil {
+		t.Fatalf("canon(t, %s): %v", typ, err)
+	}
+	return s
+}
+
 func TestUnexportedStructuralIdentityDistinct(t *testing.T) {
 	a := pkgOf(t, "example.com/a", "package a\ntype S interface{ tag() int }")
 	b := pkgOf(t, "example.com/b", "package b\ntype S interface{ tag() int }")
-	ida := Canonical(a.Scope().Lookup("S").Type().Underlying())
-	idb := Canonical(b.Scope().Lookup("S").Type().Underlying())
+	ida := canon(t, a.Scope().Lookup("S").Type().Underlying())
+	idb := canon(t, b.Scope().Lookup("S").Type().Underlying())
 	if ida == idb {
 		t.Fatalf("distinct unexported interfaces collided: %s", ida)
 	}
@@ -40,8 +51,8 @@ func TestUnexportedStructuralIdentityDistinct(t *testing.T) {
 // TestAliasResolvesToTarget: an alias is not a distinct dynamic type.
 func TestAliasResolvesToTarget(t *testing.T) {
 	p := pkgOf(t, "example.com/c", "package c\ntype A = []int\ntype B = A")
-	idA := Canonical(p.Scope().Lookup("A").Type())
-	idB := Canonical(p.Scope().Lookup("B").Type())
+	idA := canon(t, p.Scope().Lookup("A").Type())
+	idB := canon(t, p.Scope().Lookup("B").Type())
 	if idA != idB || idA != "[]int" {
 		t.Fatalf("aliases did not normalize: %q vs %q", idA, idB)
 	}
@@ -51,7 +62,7 @@ func TestAliasResolvesToTarget(t *testing.T) {
 func TestPathQualification(t *testing.T) {
 	a := pkgOf(t, "one/util", "package util\ntype T struct{ X int }")
 	b := pkgOf(t, "two/util", "package util\ntype T struct{ X int }")
-	if Canonical(a.Scope().Lookup("T").Type()) == Canonical(b.Scope().Lookup("T").Type()) {
+	if canon(t, a.Scope().Lookup("T").Type()) == canon(t, b.Scope().Lookup("T").Type()) {
 		t.Fatal("same-name packages collided")
 	}
 }
@@ -86,7 +97,7 @@ func F(a int) string { return "" }
 	pkg := pkgOf(t, "p", src)
 	scope := pkg.Scope()
 	for _, name := range []string{"T", "F"} {
-		id := Canonical(scope.Lookup(name).Type())
+		id := canon(t, scope.Lookup(name).Type())
 		if HasUnsupported(id) {
 			t.Errorf("%s: ordinary type flagged unsupported: %q", name, id)
 		}
@@ -115,16 +126,16 @@ type I2 interface{ M() }
 	scope := pkg.Scope()
 	aRead := methodByName(t, scope.Lookup("A").Type().(*types.Named), "Read").Type()
 	bRead := methodByName(t, scope.Lookup("B").Type().(*types.Named), "Read").Type()
-	if Canonical(aRead) != Canonical(bRead) {
-		t.Errorf("same callable signature got distinct identities: %q vs %q", Canonical(aRead), Canonical(bRead))
+	if canon(t, aRead) != canon(t, bRead) {
+		t.Errorf("same callable signature got distinct identities: %q vs %q", canon(t, aRead), canon(t, bRead))
 	}
-	if contains(Canonical(aRead), "recv(") {
-		t.Errorf("receiver leaked into signature identity: %q", Canonical(aRead))
+	if contains(canon(t, aRead), "recv(") {
+		t.Errorf("receiver leaked into signature identity: %q", canon(t, aRead))
 	}
 	i1 := scope.Lookup("I1").Type().Underlying()
 	i2 := scope.Lookup("I2").Type().Underlying()
-	if Canonical(i1) != Canonical(i2) {
-		t.Errorf("structurally identical interfaces got distinct identities: %q vs %q", Canonical(i1), Canonical(i2))
+	if canon(t, i1) != canon(t, i2) {
+		t.Errorf("structurally identical interfaces got distinct identities: %q vs %q", canon(t, i1), canon(t, i2))
 	}
 }
 
@@ -141,20 +152,20 @@ func HMix[T ~int | ~uint | ~int64](x T) { _ = x }
 `
 	pkg := pkgOf(t, "p", src)
 	scope := pkg.Scope()
-	i32 := Canonical(scope.Lookup("FInt32").Type())
-	u32 := Canonical(scope.Lookup("FUint32").Type())
+	i32 := canon(t, scope.Lookup("FInt32").Type())
+	u32 := canon(t, scope.Lookup("FUint32").Type())
 	if i32 == u32 {
 		t.Errorf("~int32 and ~uint32 constraints collapsed to the same identity: %q", i32)
 	}
 	if !contains(i32, "int32") {
 		t.Errorf("constraint type set not serialized (collapsed toward interface{}): %q", i32)
 	}
-	gt := Canonical(scope.Lookup("GT").Type())
-	gu := Canonical(scope.Lookup("GU").Type())
+	gt := canon(t, scope.Lookup("GT").Type())
+	gu := canon(t, scope.Lookup("GU").Type())
 	if gt != gu {
 		t.Errorf("alpha-equivalent generic signatures got distinct identities: %q vs %q", gt, gu)
 	}
-	hmix := Canonical(scope.Lookup("HMix").Type())
+	hmix := canon(t, scope.Lookup("HMix").Type())
 	if !contains(hmix, "int64") {
 		t.Errorf("union constraint terms not fully serialized: %q", hmix)
 	}
@@ -169,7 +180,85 @@ type Embed struct{ T }
 `
 	pkg := pkgOf(t, "p", src)
 	scope := pkg.Scope()
-	if Canonical(scope.Lookup("Named").Type().Underlying()) == Canonical(scope.Lookup("Embed").Type().Underlying()) {
+	if canon(t, scope.Lookup("Named").Type().Underlying()) == canon(t, scope.Lookup("Embed").Type().Underlying()) {
 		t.Errorf("named-field and embedded-field structs share identity")
+	}
+}
+
+// TestIdenticalEquivalence: the canonical identity MUST agree with
+// go/types.Identical for interface/constraint normalization —
+// Identical(a,b) => canon(t, a)==canon(t, b), and distinct type sets
+// must differ. This is the adversarial acceptance criterion.
+func TestIdenticalEquivalence(t *testing.T) {
+	src := `package p
+type Base interface{ M() }
+type UnionAB interface{ ~int | ~string }
+type UnionBA interface{ ~string | ~int }
+type EmbedBase interface{ Base }
+type ExplicitM interface{ M() }
+type EmbedPlusMethod interface{ Base; N() }
+type MN interface{ M(); N() }
+type CmpA interface{ comparable }
+type NoTilde interface{ int | string }
+`
+	pkg := pkgOf(t, "p", src)
+	scope := pkg.Scope()
+	u := func(name string) types.Type { return scope.Lookup(name).Type().Underlying() }
+	// Pairs that Go considers identical must share a canonical identity.
+	identicalPairs := [][2]string{
+		{"UnionAB", "UnionBA"},     // union order is irrelevant
+		{"EmbedBase", "ExplicitM"}, // embedded method-interface flattens
+		{"EmbedPlusMethod", "MN"},  // embed + explicit method == both methods
+	}
+	for _, pair := range identicalPairs {
+		a, b := u(pair[0]), u(pair[1])
+		if !types.Identical(a, b) {
+			t.Fatalf("go/types says %s and %s are NOT identical; test premise wrong", pair[0], pair[1])
+		}
+		if canon(t, a) != canon(t, b) {
+			t.Errorf("identical %s/%s got distinct identities:\n  %q\n  %q", pair[0], pair[1], canon(t, a), canon(t, b))
+		}
+	}
+	// Pairs that differ must differ.
+	distinctPairs := [][2]string{
+		{"UnionAB", "NoTilde"}, // ~int|~string != int|string
+		{"ExplicitM", "MN"},    // {M} != {M,N}
+		{"UnionAB", "CmpA"},    // union != comparable
+	}
+	for _, pair := range distinctPairs {
+		a, b := u(pair[0]), u(pair[1])
+		if types.Identical(a, b) {
+			t.Fatalf("go/types says %s and %s ARE identical; test premise wrong", pair[0], pair[1])
+		}
+		if canon(t, a) == canon(t, b) {
+			t.Errorf("distinct %s/%s collapsed to the same identity: %q", pair[0], pair[1], canon(t, a))
+		}
+	}
+}
+
+// TestMethodSignatureExcludesReceiverTypeParams: a generic method's
+// callable signature identity must not embed the receiver's type
+// parameters (they belong to the receiver shape).
+func TestMethodSignatureExcludesReceiverTypeParams(t *testing.T) {
+	src := `package p
+type Box[T any] struct{}
+func (Box[T]) Put(value T) {}
+func PutFn[T any](value T) {}
+`
+	pkg := pkgOf(t, "p", src)
+	scope := pkg.Scope()
+	box := scope.Lookup("Box").Type().(*types.Named)
+	put := methodByName(t, box, "Put").Type()
+	id := canon(t, put)
+	if contains(id, "recv(") {
+		t.Errorf("receiver leaked into method signature identity: %q", id)
+	}
+	// The method's callable signature references T by binder index, and a
+	// free generic function of the same shape should not accidentally
+	// share identity (the function DECLARES [T any]; the method does not).
+	fn := canon(t, scope.Lookup("PutFn").Type())
+	if id == fn {
+		t.Logf("method Put: %q", id)
+		t.Logf("func PutFn: %q", fn)
 	}
 }

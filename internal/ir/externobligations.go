@@ -32,8 +32,14 @@ func (s Scope) AddExternalType(pkg, name string) *ExternTypeObligation {
 // closed rather than dropping a contract member.
 func (s Scope) AddExternalMethod(pkg, name string, method *types.Func) {
 	obligation := s.AddExternalType(pkg, name)
-	if prior, ok := obligation.Methods[method.Name()]; ok && MethodKey(prior) != MethodKey(method) {
-		obligation.NameCollisions = append(obligation.NameCollisions, method.Name())
+	if prior, ok := obligation.Methods[method.Name()]; ok {
+		priorKey, err1 := MethodKey(prior)
+		newKey, err2 := MethodKey(method)
+		if err1 != nil || err2 != nil || priorKey != newKey {
+			// Distinct (or un-keyable) methods under one spelling: flag so
+			// emission fails closed rather than silently overwriting.
+			obligation.NameCollisions = append(obligation.NameCollisions, method.Name())
+		}
 	}
 	obligation.Methods[method.Name()] = method
 }

@@ -33,7 +33,11 @@ func testFunctionKind(name string, signature *types.Signature) string {
 	}
 	paramType := ""
 	if signature.Params().Len() == 1 {
-		paramType = typeString(signature.Params().At(0).Type())
+		id, err := typeString(signature.Params().At(0).Type())
+		if err != nil {
+			return "" // an un-canonical parameter type is not a recognized test signature
+		}
+		paramType = id
 	} else if signature.Params().Len() != 0 {
 		return ""
 	}

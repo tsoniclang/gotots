@@ -208,3 +208,41 @@ export function f(b: goif$.GoBox<string, unknown, object>): unknown {
 		}
 	}
 }
+
+// TestASTVerifierCatchesLocalUnqualifiedGoBox isolates the ABI-erasure
+// class: the ABI's OWN goiface.ts declares GoAnyBox as an UNQUALIFIED
+// GoBox<..., unknown, ...>. That must be detected as erased-iface-payload
+// exactly like the qualified goif$.GoBox form in generated modules.
+func TestASTVerifierCatchesLocalUnqualifiedGoBox(t *testing.T) {
+	files := map[string]string{
+		"language-abi/goiface.ts": `
+export type GoBox<K extends string, V, M> = { readonly k: K; readonly v: V; readonly m: M };
+export type GoAnyBox = GoBox<string, unknown, object>;
+`,
+		"core/pkg/package.ts": `
+import * as goif$ from "../language-abi/goiface.js";
+export type X = goif$.GoBox<"a", unknown, object>;
+`,
+	}
+	report, err := VerifyAST(files, typescriptDir(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	local, qualified := 0, 0
+	for _, v := range report.Violations {
+		if v.Pattern != "erased-iface-payload" && v.Pattern != "abi:erased-iface-payload" {
+			continue
+		}
+		if v.File == "language-abi/goiface.ts" {
+			local++
+		} else {
+			qualified++
+		}
+	}
+	if local == 0 {
+		t.Errorf("the ABI's own unqualified GoBox<..., unknown, ...> was not detected as an erased payload")
+	}
+	if qualified == 0 {
+		t.Errorf("the qualified goif$.GoBox<..., unknown, ...> was not detected as an erased payload")
+	}
+}
