@@ -163,7 +163,11 @@ type Scope struct {
 	// boxedComposites records every composite type actually boxed
 	// anywhere in the unit (canonical id -> resolved type): the closed
 	// enumeration the empty-interface union spells as EXACT members, so
-	// composite assertions narrow without any cast.
+	// composite assertions narrow without any cast. This is a BUILD-PHASE
+	// observation log, distinct from the sealed named-type universe: it is
+	// appended only while bodies build (after the universe seals) and read
+	// only at emit (after every body is built), so it feeds no per-body
+	// cached union and can never stale one.
 	boxedComposites map[string]*boxedComposite
 	// ifaceMembers caches each interface identity's resolved closed
 	// implementer union (typeOf recursion makes this hot).
@@ -176,7 +180,27 @@ type Scope struct {
 	// across generic instantiations (the address scan sees an instantiated
 	// field object while class emission sees the generic declaration's).
 	addressTakenFields map[string]bool
+	// universeSealed is the closed-world dynamic-type universe's lifecycle
+	// flag (pointer-shared across Scope value copies). It is false while the
+	// pre-pass COLLECTS the named-type universe (concreteTypes,
+	// externConcrete) and true once SealUniverse finalizes it. After
+	// sealing, adding a named universe type is a construction defect and
+	// PANICS: interface unions resolve and cache only over the sealed
+	// universe, so a late named implementer could otherwise stale a cached
+	// union. Box-site composite observations (AddBoxedComposite) require the
+	// sealed phase, never mutate the sealed named universe, and are read only
+	// at emit.
+	universeSealed *bool
 }
+
+// SealUniverse finalizes the closed-world named-type universe: after this
+// the dynamic-type set is immutable and any AddConcreteType/AddExternConcrete
+// panics. It is called once, at the end of the whole-unit pre-pass, before
+// any body builds and any interface union resolves.
+func (s Scope) SealUniverse() { *s.universeSealed = true }
+
+// UniverseSealed reports whether the named-type universe is finalized.
+func (s Scope) UniverseSealed() bool { return *s.universeSealed }
 
 // ExternTypeObligation is one external named type's referenced contract
 // surface. Methods are held by canonical identity, never by bare name.
@@ -211,6 +235,7 @@ func NewScope(paths ...string) Scope {
 		boxedComposites:    map[string]*boxedComposite{},
 		ifaceMembers:       map[string][]IfaceMember{},
 		addressTakenFields: map[string]bool{},
+		universeSealed:     new(bool),
 	}
 }
 

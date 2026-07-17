@@ -48,6 +48,12 @@ func collectGenericInstances(unit ir.Scope, pkgs []*packages.Package) error {
 		return err
 	}
 	freezeExternUniverse(unit, pkgs)
+	// Every named-type-universe contributor has now run (owned concrete
+	// types, external freeze). Seal the universe: from here it is immutable,
+	// so every interface union resolves over the complete closed world and
+	// no later body can introduce an implementer a cached union already
+	// missed.
+	unit.SealUniverse()
 	return nil
 }
 

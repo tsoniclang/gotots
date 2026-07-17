@@ -12,8 +12,13 @@ import (
 
 // AddConcreteType records one named type in the unit's dynamic-type
 // universe (idempotent by object identity is not enforced; callers add
-// each once during the pre-pass).
+// each once during the pre-pass). It is a construction defect to add a
+// universe type after the universe is sealed — a late implementer could
+// stale an already-cached union — so this panics past finalization.
 func (s Scope) AddConcreteType(name *types.TypeName) {
+	if *s.universeSealed {
+		panic("ir: AddConcreteType after the dynamic-type universe was sealed")
+	}
 	*s.concreteTypes = append(*s.concreteTypes, name)
 }
 
@@ -25,8 +30,12 @@ func (s Scope) ConcreteTypes() []*types.TypeName { return *s.concreteTypes }
 // freeze, which sorts and de-duplicates its candidates by canonical
 // identity, so the universe is sealed once before any interface union is
 // resolved; the object-identity guard keeps the contract idempotent
-// regardless.
+// regardless. Adding an external universe type after sealing is a
+// construction defect and panics.
 func (s Scope) AddExternConcrete(name *types.TypeName) {
+	if *s.universeSealed {
+		panic("ir: AddExternConcrete after the dynamic-type universe was sealed")
+	}
 	for _, existing := range *s.externConcrete {
 		if existing == name {
 			return
@@ -48,7 +57,14 @@ type boxedComposite struct {
 
 // AddBoxedComposite records one composite type boxed into an interface,
 // with the recursive equality plan its empty-interface comparison uses.
+// This is a BUILD-PHASE observation (a box site), so it requires the sealed
+// universe — being observed before the pre-pass completes is a construction
+// defect. It never mutates the sealed named-type universe and is read only
+// at emit, so it feeds no cached union.
 func (s Scope) AddBoxedComposite(canon string, t Type, eq *EqPlan) {
+	if !*s.universeSealed {
+		panic("ir: AddBoxedComposite before the dynamic-type universe was sealed")
+	}
 	if _, has := s.boxedComposites[canon]; !has {
 		s.boxedComposites[canon] = &boxedComposite{T: t, Eq: eq}
 	}
@@ -84,6 +100,12 @@ func (s Scope) IfaceMemberCache(key string) ([]IfaceMember, bool) {
 }
 
 // SetIfaceMemberCache stores one interface identity's implementer union.
+// A union is a snapshot of the sealed dynamic-type universe: caching one
+// before the universe is sealed would capture an incomplete set, so this
+// panics if the universe is not yet finalized.
 func (s Scope) SetIfaceMemberCache(key string, members []IfaceMember) {
+	if !*s.universeSealed {
+		panic("ir: interface union resolved before the dynamic-type universe was sealed")
+	}
 	s.ifaceMembers[key] = members
 }
