@@ -22,10 +22,14 @@ func lookupSelection(set *types.MethodSet, pkg *types.Package, name string) *typ
 	return set.Lookup(pkg, name)
 }
 
-// resolveImplementerTokens computes the closed set of dynamic-type
-// tokens in the unit universe that satisfy the target interface: the
-// static membership set for an interface-to-interface assertion.
-func (b *builder) resolveImplementerTokens(target *types.Interface, span Span) ([]RttiRef, error) {
+// resolveImplementerTokens computes the closed set of dynamic-type tokens
+// for an interface-to-interface assertion x.(Target): the universe types
+// that satisfy the TARGET and are also possible dynamic types of the
+// SOURCE (they implement it). Intersecting with the source keeps the
+// assertion's literal checks within the source union's discriminants —
+// enumerating a target implementer absent from the source would compare
+// the source's k against a literal outside its type.
+func (b *builder) resolveImplementerTokens(source, target *types.Interface, span Span) ([]RttiRef, error) {
 	var tokens []RttiRef
 	seen := map[string]bool{}
 	add := func(t types.Type) error {
@@ -44,6 +48,11 @@ func (b *builder) resolveImplementerTokens(target *types.Interface, span Span) (
 		tokens = append(tokens, rtti)
 		return nil
 	}
+	// A non-empty source restricts the candidates to its own implementers;
+	// the empty interface admits every type, so it imposes no filter.
+	inSource := func(t types.Type) bool {
+		return source == nil || source.NumMethods() == 0 || types.Implements(t, source)
+	}
 	universe := append(append([]*types.TypeName{}, b.unit.ConcreteTypes()...), b.unit.ExternConcreteTypes()...)
 	for _, name := range universe {
 		named, ok := name.Type().(*types.Named)
@@ -56,13 +65,13 @@ func (b *builder) resolveImplementerTokens(target *types.Interface, span Span) (
 		if named.TypeParams() != nil && named.TypeParams().Len() > 0 {
 			continue
 		}
-		if types.Implements(named, target) {
+		if types.Implements(named, target) && inSource(named) {
 			if err := add(named); err != nil {
 				return nil, err
 			}
 		}
-		if types.Implements(types.NewPointer(named), target) {
-			if err := add(types.NewPointer(named)); err != nil {
+		if pointer := types.NewPointer(named); types.Implements(pointer, target) && inSource(pointer) {
+			if err := add(pointer); err != nil {
 				return nil, err
 			}
 		}

@@ -30,6 +30,15 @@ func (b *builder) rttiFor(t types.Type, span Span) (RttiRef, error) {
 			return RttiRef{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
 				Construct: "interface value of type " + t.String(), Span: span}
 		}
+		// Instantiated generic types (owned OR external) have
+		// per-instantiation dynamic identity; each closed instance is a
+		// distinct union member, which the current universe does not
+		// enumerate — so boxing one fails closed rather than emitting a box
+		// absent from every union (a separate exact-instantiation lowering).
+		if concrete.TypeArgs() != nil && concrete.TypeArgs().Len() > 0 {
+			return RttiRef{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+				Construct: "interface value of an instantiated generic type", Span: span}
+		}
 		if !b.unit.Owns(obj.Pkg().Path()) {
 			// An external named type: an interned rtti whose method
 			// dispatch routes through the external contracts.
@@ -40,13 +49,6 @@ func (b *builder) rttiFor(t types.Type, span Span) (RttiRef, error) {
 			}
 			return RttiRef{Composite: composite, Display: displayOf(t),
 				ExternID: obj.Pkg().Path() + "." + obj.Name()}, nil
-		}
-		if concrete.TypeArgs() != nil && concrete.TypeArgs().Len() > 0 {
-			// Instantiated generic types have per-instantiation identity;
-			// their interned rtti (with a dispatching method table) is a
-			// separate lowering.
-			return RttiRef{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
-				Construct: "interface value of an instantiated generic type", Span: span}
 		}
 		return RttiRef{Pkg: obj.Pkg().Path(), TypeName: obj.Name()}, nil
 
@@ -60,6 +62,12 @@ func (b *builder) rttiFor(t types.Type, span Span) (RttiRef, error) {
 		if obj.Pkg() == nil {
 			return RttiRef{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
 				Construct: "interface value of type " + t.String(), Span: span}
+		}
+		if named.TypeArgs() != nil && named.TypeArgs().Len() > 0 {
+			// A pointer to an instantiated generic (e.g. *atomic.Pointer[int]):
+			// same per-instantiation identity, fail closed until enumerated.
+			return RttiRef{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+				Construct: "interface value of an instantiated generic type", Span: span}
 		}
 		if !b.unit.Owns(obj.Pkg().Path()) {
 			return b.compositeRtti(t, span, obj.Pkg().Path()+"."+obj.Name())
@@ -109,7 +117,10 @@ func (b *builder) buildTypeAssert(n *ast.TypeAssertExpr, commaOk bool) (Expr, er
 		if err != nil {
 			return nil, err
 		}
-		implementers, err := b.resolveImplementerTokens(targetIface, span)
+		// The assertion narrows the SOURCE union: only types implementing
+		// both the source and the target are possible dynamic types here.
+		sourceIface, _ := b.info.Types[n.X].Type.Underlying().(*types.Interface)
+		implementers, err := b.resolveImplementerTokens(sourceIface, targetIface, span)
 		if err != nil {
 			return nil, err
 		}
