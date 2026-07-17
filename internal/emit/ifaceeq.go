@@ -13,7 +13,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/ir"
 )
 
-var identityPlan = &ir.EqPlan{Kind: "identity"}
+var identityPlan = &ir.EqPlan{Kind: ir.EqIdentity}
 
 // ifaceEqFn generates one union's equality function: Go's interface == by
 // exact per-member narrowing — no payload is ever recovered through an
@@ -67,40 +67,53 @@ func (p *printer) ifaceEqFn(t ir.Type, name string) string {
 
 // memberEqCase spells one switch case of a union equality: the second
 // `b.k === K` narrows b's payload to the same exact member (a.k === b.k
-// is already established), so the comparison touches only exact types.
-// An uncomparable or external dynamic type panics/fails-closed BEFORE any
-// value read; every other case applies the member's recursive plan.
+// is already established), so the comparison touches only exact types. An
+// uncomparable or external TOP-LEVEL dynamic type panics/fails-closed
+// BEFORE any value read, using the box's own exact runtime display (a.r.d);
+// every other case applies the member's recursive plan. A nil plan is a
+// construction-invariant violation (eqPlan returns plan-or-error), never a
+// silent === default.
 func memberEqCase(k string, plan *ir.EqPlan) string {
 	lit := fmt.Sprintf("%q", k)
 	if plan == nil {
-		plan = identityPlan
+		panic(fmt.Sprintf("emit: interface union member %q carries no equality plan", k))
 	}
 	switch plan.Kind {
-	case "uncomparable":
+	case ir.EqUncomparable:
 		return fmt.Sprintf("case %s: return goif$.goPanicUncomparable(a.r.d);", lit)
-	case "external":
+	case ir.EqExternal:
 		return fmt.Sprintf("case %s: return goif$.goPanicExternalEq(a.r.d);", lit)
 	}
 	return fmt.Sprintf("case %s: return b.k === %s ? %s : false;", lit, lit, emitEqPlan(plan, "a.v", "b.v"))
 }
 
-// emitEqPlan spells one recursive equality plan comparing a and b. Only
-// comparable plans reach here (uncomparable/external are handled before
-// any value read), so the recursion is total.
+// emitEqPlan spells one recursive equality plan comparing a and b. It is a
+// TOTAL switch over the closed EqKind set — there is no catch-all that
+// falls back to JavaScript ===. A nested uncomparable/external element
+// (e.g. an array of a comparable-external struct) fails closed at element
+// depth using the element type's static display. An EqInvalid or unhandled
+// variant is a compiler-internal defect and panics (fail closed at
+// generation), never emits wrong code.
 func emitEqPlan(plan *ir.EqPlan, a, b string) string {
 	if plan == nil {
-		return a + " === " + b
+		panic("emit: nil equality plan")
 	}
 	switch plan.Kind {
-	case "goEq":
+	case ir.EqIdentity:
+		return a + " === " + b
+	case ir.EqGoEq:
 		return a + ".goEq$(" + b + ")"
-	case "array":
+	case ir.EqArray:
 		return "gosl$.goArrayEqualWith(" + a + ", " + b + ", ($x, $y) => " + emitEqPlan(plan.Elem, "$x", "$y") + ")"
-	case "iface":
+	case ir.EqIface:
 		// An interface array element compares through its own union equality.
 		digest := sha256.Sum256([]byte(plan.IfaceID))
 		union := "Iface$" + hex.EncodeToString(digest[:6])
 		return union + "$eq(" + a + ", " + b + ")"
+	case ir.EqUncomparable:
+		return fmt.Sprintf("goif$.goPanicUncomparable(%q)", plan.Display)
+	case ir.EqExternal:
+		return fmt.Sprintf("goif$.goPanicExternalEq(%q)", plan.Display)
 	}
-	return a + " === " + b
+	panic(fmt.Sprintf("emit: unhandled EqKind %d", plan.Kind))
 }

@@ -83,18 +83,19 @@ func (b *builder) resolveImplementerTokens(source, target *types.Interface, span
 // type from the whole-unit universe: only TYPE identities (spelling uses
 // erased type-only imports), cached per canonical interface identity.
 // memberEqPlan is the recursive equality plan of one interface member's
-// exact dynamic type (value or pointer flavor).
-func (b *builder) memberEqPlan(named *types.Named, pointer, extern bool) *EqPlan {
+// exact dynamic type (value or pointer flavor). It returns a valid plan or
+// an explicit error — never a fabricated fallback.
+func (b *builder) memberEqPlan(named *types.Named, pointer, extern bool, span Span) (*EqPlan, error) {
 	if pointer {
 		// A pointer dynamic value compares by identity (the boxed instance).
-		return &EqPlan{Kind: "identity"}
+		return &EqPlan{Kind: EqIdentity}, nil
 	}
 	if extern {
 		if !types.Comparable(named) {
 			// Go PANICS comparing an uncomparable dynamic type (an external
 			// slice/map/func carrier, or a struct with such a field); emit
 			// its exact runtime message rather than the unimplemented marker.
-			return &EqPlan{Kind: "uncomparable"}
+			return &EqPlan{Kind: EqUncomparable, Display: displayOf(named)}, nil
 		}
 		switch named.Underlying().(type) {
 		case *types.Struct, *types.Array:
@@ -104,59 +105,75 @@ func (b *builder) memberEqPlan(named *types.Named, pointer, extern bool) *EqPlan
 			// equality) is not yet declared, so equality fails closed loudly
 			// at runtime rather than guessing === (wrong for distinct-but-equal
 			// instances).
-			return &EqPlan{Kind: "external"}
+			return &EqPlan{Kind: EqExternal, Display: displayOf(named)}, nil
 		}
 		// A comparable basic/pointer/channel external carrier compares by ===.
-		return &EqPlan{Kind: "identity"}
+		return &EqPlan{Kind: EqIdentity}, nil
 	}
-	return b.eqPlan(named)
+	return b.eqPlan(named, span)
 }
 
 // eqPlan builds the recursive typed equality plan of a value type. It
 // descends ONLY into arrays: a struct compares through its own goEq$ and
 // an interface through its own union equality, so the recursion never
-// re-enters interface/struct resolution and is a finite tree.
-func (b *builder) eqPlan(t types.Type) *EqPlan {
+// re-enters interface/struct resolution and is a finite tree. Construction
+// is TOTAL: every admissible type form yields an explicit variant, a
+// canonical-identity failure propagates unchanged (never masked as
+// "uncomparable"), and any unhandled form fails closed with an error
+// rather than a silent identity/=== default.
+func (b *builder) eqPlan(t types.Type, span Span) (*EqPlan, error) {
 	if _, isPtr := types.Unalias(t).Underlying().(*types.Pointer); isPtr {
-		return &EqPlan{Kind: "identity"}
+		return &EqPlan{Kind: EqIdentity}, nil
 	}
 	if named, ok := types.Unalias(t).(*types.Named); ok {
 		if pkg := named.Obj().Pkg(); pkg != nil && !b.unit.Owns(pkg.Path()) {
 			if !types.Comparable(named) {
-				return &EqPlan{Kind: "uncomparable"}
+				return &EqPlan{Kind: EqUncomparable, Display: displayOf(t)}, nil
 			}
 			switch named.Underlying().(type) {
 			case *types.Struct, *types.Array:
-				return &EqPlan{Kind: "external"}
+				return &EqPlan{Kind: EqExternal, Display: displayOf(t)}, nil
+			case *types.Basic, *types.Pointer, *types.Chan:
+				return &EqPlan{Kind: EqIdentity}, nil
 			}
-			return &EqPlan{Kind: "identity"}
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE",
+				Construct: "equality plan for external " + t.String(), Span: span}
 		}
 	}
 	switch u := types.Unalias(t).Underlying().(type) {
 	case *types.Struct:
 		if b.generatesGoEq(t) {
-			return &EqPlan{Kind: "goEq"}
+			return &EqPlan{Kind: EqGoEq}, nil
 		}
-		return &EqPlan{Kind: "uncomparable"}
+		return &EqPlan{Kind: EqUncomparable, Display: displayOf(t)}, nil
 	case *types.Array:
 		if !types.Comparable(t) {
-			return &EqPlan{Kind: "uncomparable"}
+			return &EqPlan{Kind: EqUncomparable, Display: displayOf(t)}, nil
 		}
-		return &EqPlan{Kind: "array", Elem: b.eqPlan(u.Elem())}
+		elem, err := b.eqPlan(u.Elem(), span)
+		if err != nil {
+			return nil, err
+		}
+		return &EqPlan{Kind: EqArray, Elem: elem}, nil
 	case *types.Interface:
 		// An interface array element compares through its own union
-		// equality (the element's canonical interface identity).
+		// equality (the element's canonical interface identity). A
+		// canonical-identity failure is a real construction error — it must
+		// propagate, never collapse into "uncomparable".
 		id, err := b.canonicalIfaceID(u)
 		if err != nil {
-			return &EqPlan{Kind: "uncomparable"}
+			return nil, err
 		}
-		return &EqPlan{Kind: "iface", IfaceID: id}
+		return &EqPlan{Kind: EqIface, IfaceID: id}, nil
 	case *types.Slice, *types.Map, *types.Signature:
 		// Go panics comparing these dynamic types inside an interface.
-		return &EqPlan{Kind: "uncomparable"}
+		return &EqPlan{Kind: EqUncomparable, Display: displayOf(t)}, nil
+	case *types.Basic, *types.Chan:
+		// A comparable basic / channel carrier compares by ===.
+		return &EqPlan{Kind: EqIdentity}, nil
 	}
-	// A comparable basic / channel / unit carrier: ===.
-	return &EqPlan{Kind: "identity"}
+	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE",
+		Construct: "equality plan for " + t.String(), Span: span}
 }
 
 // generatesGoEq reports whether a struct type's generated class carries
@@ -209,8 +226,8 @@ func (b *builder) fieldEqComparable(ft types.Type) bool {
 }
 
 // compositeEqPlan is a boxed composite's empty-interface equality plan.
-func (b *builder) compositeEqPlan(source types.Type) *EqPlan {
-	return b.eqPlan(source)
+func (b *builder) compositeEqPlan(source types.Type, span Span) (*EqPlan, error) {
+	return b.eqPlan(source, span)
 }
 
 func (b *builder) ifaceMembers(iface *types.Interface, span Span) ([]IfaceMember, error) {
@@ -242,7 +259,11 @@ func (b *builder) ifaceMembers(iface *types.Interface, span Span) ([]IfaceMember
 				member.ExternCarrier = basicCarrier(basic)
 			}
 		}
-		member.Eq = b.memberEqPlan(named, pointer, member.Extern)
+		plan, err := b.memberEqPlan(named, pointer, member.Extern, span)
+		if err != nil {
+			return err
+		}
+		member.Eq = plan
 		members = append(members, member)
 		return nil
 	}

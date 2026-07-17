@@ -146,7 +146,11 @@ func (b *builder) boxIfaceValue(built Expr, source types.Type, expected Type, sp
 		// an exact union member (its payload type, no erasure). A
 		// composite that mentions a type parameter is per-instantiation
 		// and never a concrete boxed member.
-		b.unit.AddBoxedComposite(rtti.Composite, built.Type(), b.compositeEqPlan(source))
+		plan, err := b.compositeEqPlan(source, span)
+		if err != nil {
+			return nil, err
+		}
+		b.unit.AddBoxedComposite(rtti.Composite, built.Type(), plan)
 	}
 	b.use("ifaceBox")
 	return &IfaceBox{X: b.bindStructValue(built), Rtti: rtti, T: expected}, nil

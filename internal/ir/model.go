@@ -499,21 +499,34 @@ type IfaceMember struct {
 	Eq *EqPlan
 }
 
-// EqPlan is one recursive typed equality operation. It descends only into
-// arrays (a struct compares through its own goEq$, an interface through
-// its own union equality — neither re-enters interface resolution), so it
-// is a finite tree with no cycle:
-//
-//	"identity"     → === (pointer identity; primitive/basic carriers)
-//	"goEq"         → payload.goEq$(other) (comparable value structs)
-//	"array"        → element-wise via Elem (comparable value arrays)
-//	"iface"        → the element interface's union equality (IfaceID)
-//	"uncomparable" → runtime panic "comparing uncomparable type X"
-//	"external"     → fail closed (external value comparability unknown)
+// EqKind is the CLOSED set of interface-equality plan variants. The zero
+// value EqInvalid is never a valid plan: plan construction returns an
+// explicit error rather than a fabricated fallback, and every emitter
+// handles every non-zero variant exhaustively — an EqInvalid or unhandled
+// variant fails closed (a compiler panic), never a silent JavaScript ===
+// or identity default.
+type EqKind int
+
+const (
+	EqInvalid      EqKind = iota // not a plan — a construction error was swallowed
+	EqIdentity                   // === on the exact primitive/pointer/channel carrier
+	EqGoEq                       // the comparable value struct's own goEq$ method
+	EqArray                      // element-wise over a comparable value array (Elem)
+	EqIface                      // the element interface's own union equality (IfaceID)
+	EqUncomparable               // Go PANICS comparing this dynamic type (Display)
+	EqExternal                   // comparable external struct/array, no stub equality yet (Display)
+)
+
+// EqPlan is one recursive typed equality operation over an exact dynamic
+// type. It descends only into arrays (a struct compares through its own
+// goEq$, an interface through its own union equality — neither re-enters
+// interface resolution), so it is a finite tree with no cycle. Construction
+// is total: `eqPlan` returns a valid plan or an explicit error.
 type EqPlan struct {
-	Kind    string
-	Elem    *EqPlan // array element plan
-	IfaceID string  // "iface": the element interface's canonical union identity
+	Kind    EqKind
+	Elem    *EqPlan // EqArray element plan
+	IfaceID string  // EqIface: the element interface's canonical union identity
+	Display string  // EqUncomparable / EqExternal: the Go type display for the panic
 }
 
 type PromotedDelegate struct {
