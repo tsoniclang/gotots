@@ -183,8 +183,7 @@ func (b *builder) fieldCell(selection *types.Selection, fieldType Type) (bool, e
 // generic declaring types) fails the declaration — an incomplete table
 // would silently mis-dispatch.
 func (b *builder) promotedDelegates(named *types.Named, span Span) ([]PromotedDelegate, error) {
-	seen := map[string]bool{}     // full package-qualified identity already emitted
-	byName := map[string]string{} // bare method name -> the identity that claimed it
+	seen := map[string]bool{} // full package-qualified identity already emitted
 	var out []PromotedDelegate
 	for _, methodSet := range []*types.MethodSet{
 		types.NewMethodSet(types.NewPointer(named)),
@@ -208,16 +207,6 @@ func (b *builder) promotedDelegates(named *types.Named, span Span) ([]PromotedDe
 				continue // the same method seen through both method sets
 			}
 			seen[identity] = true
-			if prior, taken := byName[method.Name()]; taken && prior != identity {
-				// Two DISTINCT promoted methods share a bare name (unexported
-				// methods from different packages). The vtable keys and the
-				// $r.m.<name> dispatch are bare-name, so keeping both would
-				// collide and mis-dispatch; fail closed rather than silently
-				// drop one delegate.
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
-					Construct: "promoted methods collide on name " + method.Name() + " from distinct packages", Span: span}
-			}
-			byName[method.Name()] = identity
 			if method.Pkg() == nil || !b.unit.Owns(method.Pkg().Path()) {
 				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 					Construct: "promoted method from a type outside the translated unit (" + method.Name() + ")", Span: span}
@@ -228,13 +217,16 @@ func (b *builder) promotedDelegates(named *types.Named, span Span) ([]PromotedDe
 					Construct: "promoted generic method (" + method.Name() + ")", Span: span}
 			}
 			_, pointerRecv := method.Type().(*types.Signature).Recv().Type().(*types.Pointer)
-			// Same-depth same-name embeddings promote NEITHER and different
-			// depths promote only the shallowest, so within ONE package a
-			// bare name is unambiguous — but unexported methods from
-			// different packages share a spelling yet are distinct, and the
-			// bare-name collision above rejects that case rather than
-			// mis-dispatching.
-			entry := PromotedDelegate{Name: method.Name(), Pkg: method.Pkg().Path(),
+			// The vtable property is the method's canonical SLOT, not its
+			// bare name: two same-spelled unexported methods promoted from
+			// different packages (both in Go's method set, each satisfying
+			// its own package's interface) get DISTINCT slots, so each
+			// dispatches to exactly its own method instead of colliding.
+			slot, err := MethodSlot(named, method)
+			if err != nil {
+				return nil, err
+			}
+			entry := PromotedDelegate{Name: method.Name(), Slot: slot, Pkg: method.Pkg().Path(),
 				ValueReceiver: !pointerRecv}
 			current := types.Type(named)
 			for _, index := range path[:len(path)-1] {

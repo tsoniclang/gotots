@@ -124,11 +124,17 @@ func (p *printer) vtableEntries(info RttiInfo) ([]string, []string, error) {
 		}
 		// Promoted adapters spell their exact parameters through the
 		// declaring method's generated function type (Parameters<> minus
-		// the receiver) — exact and erased-free.
+		// the receiver) — exact and erased-free. The property is the
+		// method's canonical SLOT (bare name unless two same-spelled
+		// unexported methods from different packages both promote).
+		slot := delegate.Slot
+		if slot == "" {
+			slot = delegate.Name
+		}
 		valueEntry := fmt.Sprintf("%s: ($r: %s, ...$a: goif$.DropFirst<Parameters<typeof %s>>) => %s(%s, ...$a)",
-			delegate.Name, self, target, target, chain)
+			slot, self, target, target, chain)
 		pointerEntry := fmt.Sprintf("%s: ($r: (%s | undefined), ...$a: goif$.DropFirst<Parameters<typeof %s>>) => %s(gort$.goNilCheck<%s>($r)%s, ...$a)",
-			delegate.Name, self, target, target, self, chainSuffix(delegate.Path))
+			slot, self, target, target, self, chainSuffix(delegate.Path))
 		if delegate.ValueReceiver {
 			valueSet = append(valueSet, valueEntry)
 		}

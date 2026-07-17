@@ -252,12 +252,19 @@ func (p *printer) printIfaceCall(n *ir.IfaceCall) (string, error) {
 	sub.line("switch ($r.k) {")
 	sub.indent++
 	for _, member := range p.retainedMembers(recvType) {
-		// Plain-name property dispatch is exact BY CONSTRUCTION: a member
-		// joins the union only through types.Implements, which enforces
-		// signature identity and unexported-method package identity, and
-		// Go permits one method per name per type — so within a narrowed
-		// member, the name selects exactly the interface's method.
-		call := "$r.m." + n.Display + "(" + joinComma(append([]string{"$r.v"}, argNames...)) + ")"
+		// Dispatch indexes the member's CANONICAL SLOT for this interface
+		// method (ir.MethodSlot), threaded through IfaceMember.Slots. Within
+		// a narrowed member the slot selects exactly the implementing method:
+		// membership is gated by types.Implements (signature and
+		// unexported-package identity), and where the member carries two
+		// same-bare-name methods from different packages the slot is
+		// disambiguated so each interface reaches its own method. The bare
+		// name is the slot in the common case, so output is unchanged there.
+		selector := member.Slots[n.Display]
+		if selector == "" {
+			selector = n.Display
+		}
+		call := "$r.m." + selector + "(" + joinComma(append([]string{"$r.v"}, argNames...)) + ")"
 		if result == "void" {
 			sub.line("case %q: %s; return;", member.K, call)
 		} else {

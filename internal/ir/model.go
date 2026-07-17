@@ -522,6 +522,12 @@ type IfaceMember struct {
 	// payload under Go's interface equality — the single operation the
 	// generated union equality narrows to, so no payload is ever erased.
 	Eq *EqPlan
+	// Slots maps each of the dispatching interface's method names to THIS
+	// member type's vtable selector for the method that implements it (see
+	// ir.MethodSlot). It is the bare name except where the member promotes
+	// two same-bare-name methods from different packages, so dispatch and
+	// the member's vtable always index the same canonical slot.
+	Slots map[string]string
 }
 
 // EqKind is the CLOSED set of interface-equality plan variants. The zero
@@ -555,7 +561,12 @@ type EqPlan struct {
 }
 
 type PromotedDelegate struct {
-	Name          string
+	Name string
+	// Slot is the vtable property name for this promoted method: the bare
+	// name, unless the promoting type carries two same-bare-name methods
+	// from different packages, in which case it is disambiguated by
+	// canonical identity (see ir.MethodSlot).
+	Slot          string
 	Path          []string // embedded field names, outermost first
 	Pkg           string
 	TypeName      string

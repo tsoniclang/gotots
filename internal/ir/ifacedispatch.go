@@ -264,6 +264,33 @@ func (b *builder) ifaceMembers(iface *types.Interface, span Span) ([]IfaceMember
 			return err
 		}
 		member.Eq = plan
+		// Per-interface-method dispatch selectors: the member's own vtable
+		// key for the method that implements each interface method. Bare in
+		// the common case; disambiguated where the member promotes
+		// same-bare-name methods from different packages (MethodSlot), so
+		// dispatch and the member's vtable index the same canonical slot.
+		set := types.NewMethodSet(named)
+		if pointer {
+			set = types.NewMethodSet(types.NewPointer(named))
+		}
+		slots := make(map[string]string, iface.NumMethods())
+		for i := range iface.NumMethods() {
+			m := iface.Method(i)
+			sel := lookupSelection(set, m.Pkg(), m.Name())
+			if sel == nil {
+				continue
+			}
+			impl, ok := sel.Obj().(*types.Func)
+			if !ok {
+				continue
+			}
+			slot, err := MethodSlot(named, impl)
+			if err != nil {
+				return err
+			}
+			slots[m.Name()] = slot
+		}
+		member.Slots = slots
 		members = append(members, member)
 		return nil
 	}

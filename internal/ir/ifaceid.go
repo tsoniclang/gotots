@@ -177,3 +177,35 @@ func MethodKey(method *types.Func) (string, error) {
 	}
 	return key + "|" + hex.EncodeToString(digest[:]), nil
 }
+
+// MethodSlot is the vtable property name and dispatch selector for one
+// method WITHIN a concrete type's dispatch surface. It is the bare method
+// name when that name is unique in the type's method set (the overwhelming
+// case, so generated dispatch stays readable and unchanged). When a type's
+// method set carries two DISTINCT methods of the same bare name — a type
+// promoting same-spelled unexported methods from two different packages,
+// which Go admits in the method set (each satisfies its own package's
+// interface) even though the selector expression x.m is ambiguous — the
+// slot is disambiguated by the method's canonical identity, so the two
+// slots are distinct and each interface dispatches to exactly its own
+// method. Both the vtable construction and the dispatch site derive the
+// selector through THIS function, so they always agree.
+func MethodSlot(named *types.Named, method *types.Func) (string, error) {
+	name := method.Name()
+	set := types.NewMethodSet(types.NewPointer(named))
+	collisions := 0
+	for i := range set.Len() {
+		if set.At(i).Obj().Name() == name {
+			collisions++
+		}
+	}
+	if collisions <= 1 {
+		return name, nil
+	}
+	key, err := MethodKey(method)
+	if err != nil {
+		return "", err
+	}
+	digest := sha256.Sum256([]byte(key))
+	return name + "$s" + hex.EncodeToString(digest[:4]), nil
+}
