@@ -226,8 +226,12 @@ func (b *builder) promotedDelegates(named *types.Named, span Span) ([]PromotedDe
 			if err != nil {
 				return nil, err
 			}
-			entry := PromotedDelegate{Name: method.Name(), Slot: slot, Pkg: method.Pkg().Path(),
-				ValueReceiver: !pointerRecv}
+			ident := ""
+			if key, err := MethodKey(method); err == nil {
+				ident = key
+			}
+			entry := PromotedDelegate{Name: method.Name(), Slot: slot, MethodIdent: ident,
+				Pkg: method.Pkg().Path(), ValueReceiver: !pointerRecv}
 			current := types.Type(named)
 			for _, index := range path[:len(path)-1] {
 				structType, ok := types.Unalias(current).Underlying().(*types.Struct)

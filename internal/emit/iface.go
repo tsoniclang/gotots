@@ -33,7 +33,11 @@ func (p *printer) rttiRef(r ir.RttiRef) (string, error) {
 		// external contract stubs directly. Comparability stays unknown.
 		names := make([]string, 0, len(p.module.ExternMethods[r.ExternID]))
 		for _, method := range p.module.ExternMethods[r.ExternID] {
-			names = append(names, fmt.Sprintf("%q", method.Name))
+			id := method.Key
+			if id == "" {
+				id = method.Name
+			}
+			names = append(names, fmt.Sprintf("%q", id))
 		}
 		sort.Strings(names)
 		return fmt.Sprintf("goif$.goRttiComposite(%q, { d: %q, ms: [%s], x: %q })", r.Composite, r.Display, strings.Join(names, ", "), r.ExternID), nil
@@ -84,22 +88,33 @@ func printRtti(out *strings.Builder, module *Module, info RttiInfo) error {
 	return nil
 }
 
-// methodDisplays spells the sorted method-name lists of the value and
-// pointer method sets — data used only for the missing-method
-// diagnostic of a failed interface assertion, never for dispatch.
+// methodDisplays spells the sorted method-IDENTITY lists of the value and
+// pointer method sets — each entry the method's canonical MethodKey (name,
+// unexported package, signature digest) — data used only for the
+// signature-aware missing-method diagnostic of a failed interface
+// assertion, never for dispatch. A method with no canonical identity (a
+// generic method) falls back to its bare name.
 func (info RttiInfo) methodDisplays() (string, string) {
 	valueSet := map[string]bool{}
 	pointerSet := map[string]bool{}
+	ident := func(key, name string) string {
+		if key != "" {
+			return key
+		}
+		return name
+	}
 	for _, method := range info.Methods {
-		pointerSet[method.Name] = true
+		id := ident(method.MethodIdent, method.Name)
+		pointerSet[id] = true
 		if !method.PointerReceiver {
-			valueSet[method.Name] = true
+			valueSet[id] = true
 		}
 	}
 	for _, delegate := range info.Promoted {
-		pointerSet[delegate.Name] = true
+		id := ident(delegate.MethodIdent, delegate.Name)
+		pointerSet[id] = true
 		if delegate.ValueReceiver {
-			valueSet[delegate.Name] = true
+			valueSet[id] = true
 		}
 	}
 	return methodList(valueSet), methodList(pointerSet)

@@ -120,6 +120,15 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 		Span:     span,
 		BodyHash: bodyHash,
 	}
+	if signature.Recv() != nil {
+		// A method's canonical dispatch identity, for the assertion
+		// diagnostic's signature-aware missing-method comparison. A generic
+		// method has no single exact identity; it leaves this empty and the
+		// diagnostic falls back to its name for that entry.
+		if key, err := MethodKey(object); err == nil {
+			function.MethodIdent = key
+		}
+	}
 	// A declaration-level finding makes the whole body unimplemented:
 	// its one site is recorded and the body is not built (its types are
 	// unavailable or its effects cannot be represented).

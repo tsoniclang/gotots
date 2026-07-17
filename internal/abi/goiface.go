@@ -66,11 +66,24 @@ export function goPanicConversionIface(i: IfaceToken | undefined, sourceDisplay:
   if (i === undefined) {
     throw new GoPanic("interface conversion: " + sourceDisplay + " is nil, not " + targetDisplay);
   }
+  // required and i.r.ms carry each method's canonical IDENTITY (MethodKey:
+  // name, unexported package, signature digest), so a method present by
+  // NAME but with the wrong SIGNATURE is reported missing exactly as Go
+  // does. The displayed name is the identity's leading name segment (before
+  // any "@package" or "|signature").
   let missing = "";
   const have = i.r.ms;
   if (have !== undefined) {
     for (const method of required) {
-      if (!have.includes(method)) { missing = ": missing method " + method; break; }
+      if (!have.includes(method)) {
+        let end = method.length;
+        const at = method.indexOf("@");
+        const bar = method.indexOf("|");
+        if (at >= 0) end = Math.min(end, at);
+        if (bar >= 0) end = Math.min(end, bar);
+        missing = ": missing method " + method.slice(0, end);
+        break;
+      }
     }
   }
   throw new GoPanic("interface conversion: " + i.r.d + " is not " + targetDisplay + missing);

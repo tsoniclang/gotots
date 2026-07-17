@@ -426,7 +426,12 @@ type Func struct {
 	Package  string
 	Name     string
 	Exported bool
-	Span     Span
+	// MethodIdent is the canonical dispatch identity (MethodKey) of a
+	// method — name, unexported package, and signature digest. It is empty
+	// for free functions. The interface-assertion diagnostic compares these
+	// so a wrong-signature method is reported "missing" exactly as Go does.
+	MethodIdent string
+	Span        Span
 	// TypeParams are the generic type parameter names, admitted under
 	// the unit's closed-world instantiation evidence.
 	TypeParams []string
@@ -566,7 +571,10 @@ type PromotedDelegate struct {
 	// name, unless the promoting type carries two same-bare-name methods
 	// from different packages, in which case it is disambiguated by
 	// canonical identity (see ir.MethodSlot).
-	Slot          string
+	Slot string
+	// MethodIdent is the promoted method's canonical dispatch identity
+	// (MethodKey), for the assertion diagnostic's signature-aware match.
+	MethodIdent   string
 	Path          []string // embedded field names, outermost first
 	Pkg           string
 	TypeName      string

@@ -129,9 +129,20 @@ func (b *builder) buildTypeAssert(n *ast.TypeAssertExpr, commaOk bool) (Expr, er
 		// predeclared and composite tokens the named-implementer sweep
 		// cannot enumerate.
 		universal := targetIface.NumMethods() == 0
+		// Required carries each target method's canonical identity (MethodKey:
+		// name, unexported package, signature digest), so the runtime
+		// diagnostic reports a wrong-SIGNATURE method as missing exactly as
+		// Go does — a name-only list cannot distinguish Convert(int)string
+		// from Convert(string)string. A generic target method (no single
+		// exact identity) falls back to its bare name.
 		required := make([]string, 0, targetIface.NumMethods())
 		for i := range targetIface.NumMethods() {
-			required = append(required, targetIface.Method(i).Name())
+			m := targetIface.Method(i)
+			key, err := MethodKey(m)
+			if err != nil {
+				key = m.Name()
+			}
+			required = append(required, key)
 		}
 		sort.Strings(required)
 		b.use("typeAssert:iface")

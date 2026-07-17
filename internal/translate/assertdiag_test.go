@@ -58,3 +58,25 @@ func MissingTwo() int {
 }
 `)
 }
+
+// A method present by NAME but with the WRONG SIGNATURE does not satisfy
+// the target interface; Go still reports "missing method Convert". The
+// diagnostic compares canonical method IDENTITIES (name + signature), not
+// names, so it reproduces Go's exact message rather than treating the
+// wrong-signature Convert as present.
+func TestOracleFailedAssertionWrongSignatureIsMissing(t *testing.T) {
+	runOracle(t, `package fixture
+
+type Wanted interface{ Convert(int) string }
+
+type Wrong struct{}
+
+func (Wrong) Convert(s string) string { return s }
+
+func FailedAssert() string {
+	var x any = Wrong{}
+	w := x.(Wanted)
+	return w.Convert(1)
+}
+`)
+}
