@@ -492,55 +492,6 @@ func (p *printer) printClosure(n *ir.Closure) (string, error) {
 	return "((" + strings.Join(params, ", ") + "): " + result + " => {\n" + sub.String() + closing + "})", nil
 }
 
-// printTupleAdapt spells a per-slot converted multi-result value: the
-// inner value evaluates once, each slot converts, and the converted
-// tuple is rebuilt in order.
-func (p *printer) printTupleAdapt(n *ir.TupleAdapt) (string, error) {
-	inner, err := p.printExpr(n.X)
-	if err != nil {
-		return "", err
-	}
-	converted := make([]string, len(n.Slots))
-	for i, slot := range n.Slots {
-		element := fmt.Sprintf("$t[%d]", i)
-		switch slot.Op {
-		case ir.TupleSlotBox:
-			rtti, err := p.rttiRef(slot.Rtti)
-			if err != nil {
-				return "", err
-			}
-			vtable, err := p.boxVtable(slot.Rtti)
-			if err != nil {
-				return "", err
-			}
-			converted[i] = fmt.Sprintf("goif$.goIfaceBox(%q, %s, %s, %s)", boxDiscriminant(slot.Rtti), rtti, element, vtable)
-		case ir.TupleSlotClone:
-			converted[i] = element + ".goClone$()"
-		default:
-			converted[i] = element
-		}
-	}
-	slotTypes := make([]string, len(n.SrcType))
-	resultTypes := make([]string, len(n.SrcType))
-	for i, t := range n.SrcType {
-		spelled, err := p.tsType(t)
-		if err != nil {
-			return "", err
-		}
-		slotTypes[i] = spelled
-		if n.Slots[i].Op == ir.TupleSlotBox {
-			target, err := p.tsType(n.Slots[i].Target)
-			if err != nil {
-				return "", err
-			}
-			resultTypes[i] = target
-		} else {
-			resultTypes[i] = spelled
-		}
-	}
-	return "((($t: readonly [" + joinComma(slotTypes) + "]): readonly [" + joinComma(resultTypes) + "] => [" + joinComma(converted) + "])(" + inner + "))", nil
-}
-
 func (p *printer) printArgs(args []ir.Expr) (string, error) {
 	parts := make([]string, len(args))
 	for i, arg := range args {
@@ -550,6 +501,14 @@ func (p *printer) printArgs(args []ir.Expr) (string, error) {
 				return "", err
 			}
 			parts[i] = "...(" + inner + ")"
+			continue
+		}
+		if spread, isSpread := arg.(*ir.TupleVariadicSpread); isSpread {
+			iife, err := p.printTupleVariadicSpread(spread)
+			if err != nil {
+				return "", err
+			}
+			parts[i] = "...(" + iife + ")"
 			continue
 		}
 		printed, err := p.printExpr(arg)

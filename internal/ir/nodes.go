@@ -116,6 +116,21 @@ type TupleSpread struct {
 	T Type
 }
 
+// TupleVariadicSpread is Go's f(g()) form where f ends in a variadic
+// parameter: the inner call's fixed-count leading results bind the
+// regular parameters and every remaining result is packed into the final
+// slice (the spec's "the return values that remain"). The inner value
+// evaluates exactly once, then the fixed slots forward positionally and
+// the rest form the variadic slice.
+type TupleVariadicSpread struct {
+	X         Expr   // the multi-result call, already per-slot adapted
+	SlotTypes []Type // the adapted result's slot types, in order
+	Fixed     int    // number of regular (non-variadic) parameters
+	Elem      Type   // the variadic element type
+	SliceType Type   // the variadic parameter's slice type
+	T         Type
+}
+
 // CompoundStmt is x op= y (and x++/x--): the target's operands stage
 // exactly once, the right-hand side evaluates, the staged location
 // loads, the operation applies, and the staged location stores — Go's
@@ -211,27 +226,28 @@ type TypeSwitchTarget struct {
 	Target Type
 }
 
-func (*Block) stmt()          {}
-func (*SwitchStmt) stmt()     {}
-func (*TypeSwitchStmt) stmt() {}
-func (*RangeSlice) stmt()     {}
-func (*RangeInt) stmt()       {}
-func (*TryFinally) stmt()     {}
-func (*MapDeleteStmt) stmt()  {}
-func (*MapClearStmt) stmt()   {}
-func (*PanicStmt) stmt()      {}
-func (*DeclStmt) stmt()       {}
-func (*AssignStmt) stmt()     {}
-func (*IfStmt) stmt()         {}
-func (*ForStmt) stmt()        {}
-func (*ReturnStmt) stmt()     {}
-func (*ExprStmt) stmt()       {}
-func (*BranchStmt) stmt()     {}
-func (*LabeledStmt) stmt()    {}
-func (*CompoundStmt) stmt()   {}
-func (*DeferPush) stmt()      {}
-func (*StmtSeq) stmt()        {}
-func (*TupleSpread) expr()    {}
+func (*Block) stmt()               {}
+func (*SwitchStmt) stmt()          {}
+func (*TypeSwitchStmt) stmt()      {}
+func (*RangeSlice) stmt()          {}
+func (*RangeInt) stmt()            {}
+func (*TryFinally) stmt()          {}
+func (*MapDeleteStmt) stmt()       {}
+func (*MapClearStmt) stmt()        {}
+func (*PanicStmt) stmt()           {}
+func (*DeclStmt) stmt()            {}
+func (*AssignStmt) stmt()          {}
+func (*IfStmt) stmt()              {}
+func (*ForStmt) stmt()             {}
+func (*ReturnStmt) stmt()          {}
+func (*ExprStmt) stmt()            {}
+func (*BranchStmt) stmt()          {}
+func (*LabeledStmt) stmt()         {}
+func (*CompoundStmt) stmt()        {}
+func (*DeferPush) stmt()           {}
+func (*StmtSeq) stmt()             {}
+func (*TupleSpread) expr()         {}
+func (*TupleVariadicSpread) expr() {}
 
 // Expr is one Go expression in IR form with its resolved type.
 type Expr interface {
@@ -551,4 +567,5 @@ func (s *SliceCopy) Type() Type        { return intType }
 func (s *SliceLen) Type() Type         { return intType }
 func (s *SliceCap) Type() Type         { return intType }
 
-func (t *TupleSpread) Type() Type { return t.T }
+func (t *TupleSpread) Type() Type         { return t.T }
+func (t *TupleVariadicSpread) Type() Type { return t.T }

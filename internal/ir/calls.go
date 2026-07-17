@@ -259,18 +259,19 @@ func (b *builder) buildCallArgsResults(n *ast.CallExpr, signature *types.Signatu
 	params := signature.Params()
 	if len(n.Args) == 1 && params.Len() > 1 {
 		innerCall, isCall := ast.Unparen(n.Args[0]).(*ast.CallExpr)
-		if _, isTuple := b.info.Types[n.Args[0]].Type.(*types.Tuple); isTuple && isCall {
-			if signature.Variadic() {
-				return &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "multi-result forwarding into a variadic call", Span: span}
-			}
+		if sourceTuple, isTuple := b.info.Types[n.Args[0]].Type.(*types.Tuple); isTuple && isCall {
 			// f(g()): the inner call's fresh results spread positionally,
 			// each slot undergoing the same assignability conversion an
-			// ordinary argument would.
+			// ordinary argument would. When f is variadic, the leading
+			// results bind the regular parameters and the rest form the
+			// final slice.
 			inner, err := b.buildAnyCall(innerCall)
 			if err != nil {
 				return err
 			}
-			sourceTuple, _ := b.info.Types[innerCall].Type.(*types.Tuple)
+			if signature.Variadic() {
+				return b.tupleVariadicSpread(inner, sourceTuple, signature, args, results, n, span)
+			}
 			targets := make([]types.Type, params.Len())
 			for i := range targets {
 				targets[i] = params.At(i).Type()
@@ -306,6 +307,55 @@ func (b *builder) buildCallArgsResults(n *ast.CallExpr, signature *types.Signatu
 		}
 		*args = append(*args, variadic)
 	}
+	return b.appendCallResults(n, signature, results)
+}
+
+// tupleVariadicSpread lowers f(g()) where f ends in a variadic
+// parameter: the leading results bind the regular parameters (each
+// converted like an ordinary argument) and every remaining result
+// converts to the variadic element type and packs into the final slice.
+func (b *builder) tupleVariadicSpread(inner Expr, sourceTuple *types.Tuple, signature *types.Signature, args *[]Expr, results *[]Type, n *ast.CallExpr, span Span) error {
+	params := signature.Params()
+	fixed := params.Len() - 1
+	if sourceTuple == nil || sourceTuple.Len() < fixed {
+		return &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "multi-result forwarding into a variadic call", Span: span}
+	}
+	sliceGo := params.At(fixed).Type()
+	sliceIR, err := b.typeOf(sliceGo, span)
+	if err != nil {
+		return err
+	}
+	slice, ok := types.Unalias(sliceGo).Underlying().(*types.Slice)
+	if !ok {
+		return &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "variadic parameter is not a slice", Span: span}
+	}
+	elemGo := slice.Elem()
+	elemIR, err := b.typeOf(elemGo, span)
+	if err != nil {
+		return err
+	}
+	targets := make([]types.Type, sourceTuple.Len())
+	for i := range targets {
+		if i < fixed {
+			targets[i] = params.At(i).Type()
+		} else {
+			targets[i] = elemGo
+		}
+	}
+	adapted, err := b.adaptTupleSlots(inner, sourceTuple, targets, span)
+	if err != nil {
+		return err
+	}
+	slotTypes := make([]Type, len(targets))
+	for i, target := range targets {
+		t, err := b.typeOf(target, span)
+		if err != nil {
+			return err
+		}
+		slotTypes[i] = t
+	}
+	b.use("tupleVariadicSpread")
+	*args = append(*args, &TupleVariadicSpread{X: adapted, SlotTypes: slotTypes, Fixed: fixed, Elem: elemIR, SliceType: sliceIR})
 	return b.appendCallResults(n, signature, results)
 }
 
