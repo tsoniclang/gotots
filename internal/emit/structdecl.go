@@ -382,7 +382,13 @@ func (p *printer) eqComponent(left, right string, t ir.Type) (string, error) {
 	case ir.KindStruct:
 		return left + ".goEq$(" + right + ")", nil
 	case ir.KindIface:
-		return "goif$.goIfaceEqual(" + left + ", " + right + ")", nil
+		// An interface field compares through its own exact union equality
+		// function (per-member narrowing), never an erased helper.
+		union, err := p.tsType(t)
+		if err != nil {
+			return "", err
+		}
+		return union + "$eq(" + left + ", " + right + ")", nil
 	case ir.KindArray:
 		elem, err := p.eqComponent("$x", "$y", *t.Elem)
 		if err != nil {

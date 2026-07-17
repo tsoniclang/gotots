@@ -15,8 +15,10 @@ type ModuleImport struct {
 
 // BoxedComposite is one boxed composite type.
 type BoxedComposite struct {
-	Canon string
-	T     ir.Type
+	Canon       string
+	T           ir.Type
+	EqMode      string
+	ArrayElemEq string
 }
 
 // ExternMethod is one recorded external method: its source name (the
@@ -69,6 +71,10 @@ type Module struct {
 	// collision between DISTINCT identities fails closed.
 	ifaceIdentity map[string]string
 	aliasOrder    []string
+	// ifaceEqFns holds each union's generated equality function (Go's
+	// interface == by exact per-member narrowing, no erased payload),
+	// keyed by alias name and emitted after the aliases.
+	ifaceEqFns map[string]string
 	// BoxedComposites is the unit's closed boxed-composite enumeration
 	// (canonical id + payload type), spelled as exact empty-interface
 	// union members.
@@ -127,6 +133,27 @@ func (m *Module) aliasLines() string {
 	for _, name := range m.aliasOrder {
 		out.WriteString(m.ifaceAliases[name])
 		out.WriteString("\n")
+	}
+	return out.String()
+}
+
+// RegisterIfaceEqFn records one union's generated equality function.
+func (m *Module) RegisterIfaceEqFn(name, declaration string) {
+	if m.ifaceEqFns == nil {
+		m.ifaceEqFns = map[string]string{}
+	}
+	m.ifaceEqFns[name] = declaration
+}
+
+// eqFnLines renders the per-union equality functions in alias order,
+// after the aliases they reference.
+func (m *Module) eqFnLines() string {
+	var out strings.Builder
+	for _, name := range m.aliasOrder {
+		if decl := m.ifaceEqFns[name]; decl != "" {
+			out.WriteString(decl)
+			out.WriteString("\n")
+		}
 	}
 	return out.String()
 }

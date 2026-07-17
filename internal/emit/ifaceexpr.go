@@ -83,7 +83,11 @@ func (p *printer) printIfaceExpr(e ir.Expr) (string, bool, error) {
 		if err != nil {
 			return "", true, err
 		}
-		call := "goif$.goIfaceEqual(" + left + ", " + right + ")"
+		union, err := p.tsType(n.Iface)
+		if err != nil {
+			return "", true, err
+		}
+		call := union + "$eq(" + left + ", " + right + ")"
 		if n.Negate {
 			return "(!" + call + ")", true, nil
 		}
@@ -97,21 +101,30 @@ func (p *printer) printIfaceExpr(e ir.Expr) (string, bool, error) {
 		if err != nil {
 			return "", true, err
 		}
-		rtti, err := p.rttiRef(n.Rtti)
+		ifaceType, err := p.tsType(n.Iface.Type())
 		if err != nil {
 			return "", true, err
 		}
-		helper := "goIfaceEqualPrim"
-		if n.Form == "via" {
-			helper = "goIfaceEqualVia"
+		concreteType, err := p.tsType(n.Concrete.Type())
+		if err != nil {
+			return "", true, err
 		}
+		// Inline narrowing, no erased helper: the interface value equals the
+		// concrete when its dynamic type IS the concrete type (its literal
+		// discriminant) and the exact narrowed payload compares — === for a
+		// primitive/pointer carrier, the type's own goEq$ for a comparable
+		// value struct. The staged arrow keeps Go's left-to-right order.
+		k := boxDiscriminant(n.Rtti)
+		valCmp := "$i.v === $c"
+		if n.Form == "via" {
+			valCmp = "$i.v.goEq$($c)"
+		}
+		cond := fmt.Sprintf("$i !== undefined && $i.k === %q && (%s)", k, valCmp)
 		var call string
 		if n.IfaceLeft {
-			call = fmt.Sprintf("goif$.%s(%s, %s, %s)", helper, iface, rtti, concrete)
+			call = fmt.Sprintf("(($i: %s, $c: %s) => %s)(%s, %s)", ifaceType, concreteType, cond, iface, concrete)
 		} else {
-			// The concrete operand is on the left: the staged arrow keeps
-			// Go's left-to-right evaluation.
-			call = fmt.Sprintf("(($c) => goif$.%s(%s, %s, $c))(%s)", helper, iface, rtti, concrete)
+			call = fmt.Sprintf("(($c: %s, $i: %s) => %s)(%s, %s)", concreteType, ifaceType, cond, concrete, iface)
 		}
 		if n.Negate {
 			return "(!" + call + ")", true, nil

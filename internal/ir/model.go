@@ -164,7 +164,7 @@ type Scope struct {
 	// anywhere in the unit (canonical id -> resolved type): the closed
 	// enumeration the empty-interface union spells as EXACT members, so
 	// composite assertions narrow without any cast.
-	boxedComposites map[string]*Type
+	boxedComposites map[string]*boxedComposite
 	// ifaceMembers caches each interface identity's resolved closed
 	// implementer union (typeOf recursion makes this hot).
 	ifaceMembers map[string][]IfaceMember
@@ -206,7 +206,7 @@ func NewScope(paths ...string) Scope {
 		externVars:         map[string]*types.Var{},
 		concreteTypes:      &[]*types.TypeName{},
 		externConcrete:     &[]*types.TypeName{},
-		boxedComposites:    map[string]*Type{},
+		boxedComposites:    map[string]*boxedComposite{},
 		ifaceMembers:       map[string][]IfaceMember{},
 		addressTakenFields: map[*types.Var]bool{},
 	}
@@ -307,33 +307,43 @@ func (s Scope) AddExternConcrete(name *types.TypeName) {
 // ExternConcreteTypes returns the referenced external named types.
 func (s Scope) ExternConcreteTypes() []*types.TypeName { return *s.externConcrete }
 
-// AddBoxedComposite records one composite type boxed into an interface.
-func (s Scope) AddBoxedComposite(canon string, t Type) {
+// boxedComposite records one composite boxed into an interface: its
+// exact payload type and how two of its values compare, so the
+// empty-interface equality narrows to an exact per-member operation.
+type boxedComposite struct {
+	T           Type
+	EqMode      string
+	ArrayElemEq string
+}
+
+// AddBoxedComposite records one composite type boxed into an interface,
+// with the per-member equality mode its empty-interface comparison uses.
+func (s Scope) AddBoxedComposite(canon string, t Type, eqMode, arrayElemEq string) {
 	if _, has := s.boxedComposites[canon]; !has {
-		copied := t
-		s.boxedComposites[canon] = &copied
+		s.boxedComposites[canon] = &boxedComposite{T: t, EqMode: eqMode, ArrayElemEq: arrayElemEq}
 	}
 }
 
+// BoxedCompositeEntry is one boxed composite's exact payload plus its
+// equality mode.
+type BoxedCompositeEntry struct {
+	Canon       string
+	T           Type
+	EqMode      string
+	ArrayElemEq string
+}
+
 // BoxedComposites returns the boxed-composite enumeration sorted by id.
-func (s Scope) BoxedComposites() []struct {
-	Canon string
-	T     Type
-} {
+func (s Scope) BoxedComposites() []BoxedCompositeEntry {
 	ids := make([]string, 0, len(s.boxedComposites))
 	for id := range s.boxedComposites {
 		ids = append(ids, id)
 	}
 	sort.Strings(ids)
-	out := make([]struct {
-		Canon string
-		T     Type
-	}, 0, len(ids))
+	out := make([]BoxedCompositeEntry, 0, len(ids))
 	for _, id := range ids {
-		out = append(out, struct {
-			Canon string
-			T     Type
-		}{id, *s.boxedComposites[id]})
+		c := s.boxedComposites[id]
+		out = append(out, BoxedCompositeEntry{Canon: id, T: c.T, EqMode: c.EqMode, ArrayElemEq: c.ArrayElemEq})
 	}
 	return out
 }
@@ -551,6 +561,18 @@ type IfaceMember struct {
 	// carrier for basic-underlying external named types.
 	Extern        bool
 	ExternCarrier string
+	// EqMode is how two values of THIS member's exact payload compare
+	// under Go's interface equality — the per-member operation the
+	// generated union equality narrows to, so no payload is ever erased:
+	//   "identity"     → === (pointer identity; primitive/basic carriers)
+	//   "goEq"         → payload.goEq$(other) (comparable value structs)
+	//   "arrayEq"      → element-wise equality (comparable value arrays)
+	//   "uncomparable" → runtime panic "comparing uncomparable type X"
+	//   "external"     → fail closed (external value comparability unknown)
+	EqMode string
+	// ArrayElemEq, for EqMode "arrayEq", is how one element compares
+	// ("identity" or "goEq"); a deeper element kind fails closed at build.
+	ArrayElemEq string
 }
 
 type PromotedDelegate struct {

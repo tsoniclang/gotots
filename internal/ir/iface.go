@@ -272,8 +272,12 @@ func (a *IfaceAssert) Type() Type {
 
 // IfaceEqual compares two interface values by Go's rule: equal dynamic
 // types and equal values (uncomparable dynamic types panic at runtime).
+// Iface is the SUPERTYPE interface both operands are assignable to — the
+// union whose generated equality function the comparison narrows over, so
+// both boxes are members of it.
 type IfaceEqual struct {
 	L, R   Expr
+	Iface  Type
 	Negate bool
 }
 
@@ -311,8 +315,18 @@ func (b *builder) buildIfaceEquality(n *ast.BinaryExpr, left, right Expr, span S
 		return nil, nil
 	}
 	if leftIface && rightIface {
+		// The comparison narrows over the supertype interface's union: both
+		// operands are assignable to it (Go requires == operands assignable),
+		// so both boxes are its members. When the right operand is assignable
+		// to the left but not vice versa, the left is the broader supertype.
+		union := left.Type()
+		leftGo, rightGo := b.info.Types[n.X].Type, b.info.Types[n.Y].Type
+		if leftGo != nil && rightGo != nil &&
+			types.AssignableTo(leftGo, rightGo) && !types.AssignableTo(rightGo, leftGo) {
+			union = right.Type()
+		}
 		b.use("ifaceEqual")
-		return &IfaceEqual{L: left, R: right, Negate: negate}, nil
+		return &IfaceEqual{L: left, R: right, Iface: union, Negate: negate}, nil
 	}
 	iface, concrete := left, right
 	concreteAST := n.Y
@@ -421,7 +435,8 @@ func (b *builder) adaptTupleSlots(inner Expr, sourceTuple *types.Tuple, targets 
 				if err != nil {
 					return nil, err
 				}
-				b.unit.AddBoxedComposite(rtti.Composite, sourceIR)
+				mode, elem := b.compositeEqMode(source)
+				b.unit.AddBoxedComposite(rtti.Composite, sourceIR, mode, elem)
 			}
 			b.registerBoxedExtern(source)
 			slots[i] = TupleSlot{Op: TupleSlotBox, Rtti: rtti, Target: targetIR}

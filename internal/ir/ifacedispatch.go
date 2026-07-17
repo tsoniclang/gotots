@@ -73,6 +73,113 @@ func (b *builder) resolveImplementerTokens(target *types.Interface, span Span) (
 // ifaceMembers resolves the closed implementer union of one interface
 // type from the whole-unit universe: only TYPE identities (spelling uses
 // erased type-only imports), cached per canonical interface identity.
+// memberEqMode classifies how two values of one interface member's exact
+// dynamic type compare under Go's interface equality — the per-member
+// operation the generated union equality narrows to (never an erased
+// payload). It returns the mode and, for "arrayEq", the element mode.
+func (b *builder) memberEqMode(named *types.Named, pointer, extern bool) (mode, elem string) {
+	if pointer {
+		// A pointer dynamic value compares by identity (the boxed instance).
+		return "identity", ""
+	}
+	if extern {
+		if _, isStruct := named.Underlying().(*types.Struct); isStruct {
+			// A struct-underlying external value's comparability is unknown
+			// (we do not own its fields): fail closed rather than guess.
+			return "external", ""
+		}
+		// A basic-underlying external value carrier compares by ===.
+		return "identity", ""
+	}
+	return b.underlyingEqMode(named)
+}
+
+// underlyingEqMode classifies a value type's equality by its underlying.
+func (b *builder) underlyingEqMode(t types.Type) (mode, elem string) {
+	switch u := types.Unalias(t).Underlying().(type) {
+	case *types.Struct:
+		if b.generatesGoEq(t) {
+			return "goEq", ""
+		}
+		return "uncomparable", ""
+	case *types.Array:
+		if !types.Comparable(t) {
+			return "uncomparable", ""
+		}
+		switch u.Elem().Underlying().(type) {
+		case *types.Struct:
+			return "arrayEq", "goEq"
+		case *types.Pointer, *types.Basic:
+			return "arrayEq", "identity"
+		}
+		// A deeper element kind (array of array, of interface) is a rare
+		// residual: fail closed rather than emit a wrong comparison.
+		return "uncomparable", ""
+	case *types.Slice, *types.Map, *types.Signature:
+		// Go panics comparing these dynamic types inside an interface.
+		return "uncomparable", ""
+	}
+	// A comparable basic / pointer / channel / unit carrier: ===.
+	return "identity", ""
+}
+
+// generatesGoEq reports whether a struct type's generated class carries
+// goEq$ — the SAME field admission as structEqComparable, but resolved
+// through go/types directly so it never re-enters typeOf/ifaceMembers
+// (that path recurses back here through interface fields). An owned
+// concrete struct whose every field is exact-equality-comparable
+// (scalars, pointers, unit, concrete interfaces, nested such structs, and
+// arrays of those) gets goEq$; an external, slice, map, or function field
+// keeps it out.
+func (b *builder) generatesGoEq(t types.Type) bool {
+	st, ok := types.Unalias(t).Underlying().(*types.Struct)
+	if !ok {
+		return false
+	}
+	for i := range st.NumFields() {
+		if !b.fieldEqComparable(st.Field(i).Type()) {
+			return false
+		}
+	}
+	return true
+}
+
+// fieldEqComparable is generatesGoEq's per-field predicate over go/types.
+func (b *builder) fieldEqComparable(ft types.Type) bool {
+	// An external named field (non-owned package) is excluded, exactly as
+	// structEqComparable excludes KindExternal.
+	if named, ok := types.Unalias(ft).(*types.Named); ok {
+		if pkg := named.Obj().Pkg(); pkg != nil && !b.unit.Owns(pkg.Path()) {
+			return false
+		}
+	}
+	switch u := types.Unalias(ft).Underlying().(type) {
+	case *types.Basic:
+		return u.Info()&types.IsUntyped == 0
+	case *types.Pointer:
+		return true
+	case *types.Interface:
+		// A concrete interface field (its equality may panic, exactly Go);
+		// a type-parameter constraint interface is instantiation-dependent
+		// and stays out.
+		_, isParam := types.Unalias(ft).(*types.TypeParam)
+		return !isParam
+	case *types.Array:
+		return b.fieldEqComparable(u.Elem())
+	case *types.Struct:
+		return b.generatesGoEq(ft)
+	}
+	return false
+}
+
+// compositeEqMode classifies a boxed composite's empty-interface equality.
+func (b *builder) compositeEqMode(source types.Type) (mode, elem string) {
+	if _, isPtr := types.Unalias(source).Underlying().(*types.Pointer); isPtr {
+		return "identity", ""
+	}
+	return b.underlyingEqMode(source)
+}
+
 func (b *builder) ifaceMembers(iface *types.Interface, span Span) ([]IfaceMember, error) {
 	key, err := b.canonicalIfaceID(iface)
 	if err != nil {
@@ -102,6 +209,7 @@ func (b *builder) ifaceMembers(iface *types.Interface, span Span) ([]IfaceMember
 				member.ExternCarrier = basicCarrier(basic)
 			}
 		}
+		member.EqMode, member.ArrayElemEq = b.memberEqMode(named, pointer, member.Extern)
 		members = append(members, member)
 		return nil
 	}

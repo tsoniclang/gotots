@@ -17,16 +17,14 @@ func (p *printer) rttiRef(r ir.RttiRef) (string, error) {
 	}
 	if r.Composite != "" {
 		if r.ExternID == "" {
+			// The rtti is a pure identity+display token; interface equality
+			// is generated inline per exact union member, never through the
+			// rtti, so it carries no comparability or equality function. A
+			// pointer composite keeps p (identity) for diagnostics parity.
 			fields := fmt.Sprintf("d: %q", r.Display)
-			switch r.CompositeEq {
-			case "uncomparable":
-				fields += ", c: false"
-			case "identity":
-				fields += ", c: true, p: true"
-			case "array-prim":
-				fields += ", c: true, e: ($a: unknown, $b: unknown) => gosl$.goArrayEqual($a as unknown[], $b as unknown[])"
+			if r.CompositeEq == "identity" {
+				fields += ", p: true"
 			}
-			// "unknown" omits c: equality over it fails closed.
 			return fmt.Sprintf("goif$.goRttiComposite(%q, { %s })", r.Composite, fields), nil
 		}
 		// An external named type's rtti is an identity token plus its
@@ -75,20 +73,13 @@ func printRtti(out *strings.Builder, module *Module, info RttiInfo) error {
 	p := &printer{out: out, module: module}
 	export := "export "
 	display := module.PkgName + "." + info.TypeName
-	eqSuffix := ""
-	if info.HasEq {
-		eqSuffix = fmt.Sprintf(", e: ($a: unknown, $b: unknown) => ($a as %s).goEq$($b as %s)", tsName(info.TypeName), tsName(info.TypeName))
-	}
-	comparable := "false"
-	if info.Comparable {
-		comparable = "true"
-	}
+	// The rtti is a pure identity+display+method-name token: interface
+	// equality is generated inline per exact union member, so the rtti
+	// carries no comparability flag and no equality function (no erasure).
 	valueMethods, pointerMethods := info.methodDisplays()
-	p.line("%sconst %s$rtti: goif$.GoRtti = { d: %q, c: %s, ms: %s%s };", export, info.TypeName, display, comparable, valueMethods, eqSuffix)
+	p.line("%sconst %s$rtti: goif$.GoRtti = { d: %q, ms: %s };", export, info.TypeName, display, valueMethods)
 	if info.Pointer {
-		// A pointer's dynamic type is always comparable (identity) and
-		// has no goEq$ of its own.
-		p.line("%sconst %s$rttiPtr: goif$.GoRtti = { d: %q, c: true, p: true, ms: %s };", export, info.TypeName, "*"+display, pointerMethods)
+		p.line("%sconst %s$rttiPtr: goif$.GoRtti = { d: %q, p: true, ms: %s };", export, info.TypeName, "*"+display, pointerMethods)
 	}
 	return nil
 }
@@ -444,6 +435,7 @@ func (p *printer) ifaceUnionAlias(t ir.Type) (string, error) {
 	}
 	declaration := "type " + name + " = " + strings.Join(members, " | ") + ";"
 	p.module.ifaceAliases[name] = declaration
+	p.module.RegisterIfaceEqFn(name, p.ifaceEqFn(t, name))
 	return name, nil
 }
 

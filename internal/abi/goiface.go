@@ -36,11 +36,6 @@ export interface GoRtti {
   // table — dispatch is a generated exhaustive token switch of direct
   // calls.
   readonly d: string;
-  // c states comparability: true (equality defined), false (Go panics),
-  // or absent (unknown — external contract — equality fails closed).
-  readonly c?: boolean;
-  // e is the exact equality of a comparable non-primitive value type.
-  readonly e?: (a: unknown, b: unknown) => boolean;
   // p marks a pointer type: its boxed values compare by identity.
   readonly p?: boolean;
   // ms is the type's sorted method-name list — data used only for the
@@ -55,21 +50,19 @@ export interface GoRtti {
 // rtti comparison stays object identity across every module.
 const compositeRttis = new Map<string, GoRtti>();
 
-// IfaceBox is the helper-facing shape of an interface box: the rtti token
-// r plus the payload v. Every generated interface position spells its
-// EXACT closed member union; this shape is used only by the finite
-// equality/assertion helpers below, which read the token r and compare
-// values through the type's OWN construction-bound equality (r.e) — the
-// payload is never a GoBox<...,unknown,...> and is never recovered into a
-// typed position. TypeScript cannot infer a single payload type from a
-// discriminated union argument, so a structural supertype (not a generic)
-// is used.
-type IfaceBox = { readonly r: GoRtti; readonly v: unknown };
+// IfaceToken is the diagnostic-facing shape of an interface box: the rtti
+// token r. This shape is used ONLY by the assertion-panic
+// diagnostic below, which reads the token's display and method-name data;
+// it never touches a payload, so no interface value is ever widened to an
+// erased payload type. Interface equality and dispatch are generated
+// inline per exact union member (per-member narrowing), not through any
+// payload-erasing helper.
+type IfaceToken = { readonly r: GoRtti };
 
 // goPanicConversionIface is Go's failed interface-to-interface
 // assertion panic: the dynamic type first, then the first missing
 // method (from the token's method-name data).
-export function goPanicConversionIface(i: IfaceBox | undefined, sourceDisplay: string, targetDisplay: string, required: readonly string[]): never {
+export function goPanicConversionIface(i: IfaceToken | undefined, sourceDisplay: string, targetDisplay: string, required: readonly string[]): never {
   if (i === undefined) {
     throw new GoPanic("interface conversion: " + sourceDisplay + " is nil, not " + targetDisplay);
   }
@@ -96,62 +89,37 @@ export function goIfaceBox<K extends string, V, M>(k: K, r: GoRtti, v: V, m: M):
   return { k, r, v, m };
 }
 
-
-export function goIfaceIs(i: IfaceBox | undefined, r: GoRtti): boolean {
-  return i !== undefined && i.r === r;
+// goPanicUncomparable is Go's panic when two interface values share an
+// uncomparable dynamic type: the exact runtime message, the type display
+// read from the box's own rtti token (never an erased payload).
+export function goPanicUncomparable(display: string): never {
+  throw new GoPanic("runtime error: comparing uncomparable type " + display);
 }
 
-// Interface equality by Go's rule: equal dynamic types, then equal
-// values by that type's own equality. Uncomparable dynamic types panic
-// with Go's exact message; unknown (external) comparability fails
-// closed rather than guessing. Generic over the boxes' exact member
-// types so no payload is erased.
-export function goIfaceEqual(a: IfaceBox | undefined, b: IfaceBox | undefined): boolean {
-  if (a === undefined || b === undefined) {
-    return a === b;
-  }
-  if (a.r !== b.r) {
-    return false;
-  }
-  return ifaceValueEqual(a.r, a.v, b.v);
+// goPanicExternalEq fails closed when an external value's comparability is
+// unknown (its fields are unreviewed): equality is not guessed.
+export function goPanicExternalEq(display: string): never {
+  throw new GoPanic("GOTOTS_EXTERNAL_UNIMPLEMENTED: equality of " + display);
 }
 
-// Interface-against-concrete equality with === value carriers.
-export function goIfaceEqualPrim(i: IfaceBox | undefined, r: GoRtti, v: unknown): boolean {
-  return i !== undefined && i.r === r && i.v === v;
-}
 
-// Interface-against-concrete equality through the dynamic type's own
-// exact equality (comparable structs and arrays); r.e is the type's
-// construction-bound equality.
-export function goIfaceEqualVia(i: IfaceBox | undefined, r: GoRtti, v: unknown): boolean {
-  return i !== undefined && i.r === r && r.e !== undefined && r.e(i.v, v);
-}
-
-function ifaceValueEqual(r: GoRtti, a: unknown, b: unknown): boolean {
-  if (r.c === false) {
-    throw new GoPanic("runtime error: comparing uncomparable type " + r.d);
-  }
-  if (r.c === undefined) {
-    throw new GoPanic("GOTOTS_EXTERNAL_UNIMPLEMENTED: equality of " + (r.x ?? r.d));
-  }
-  if (r.e !== undefined) {
-    return r.e(a, b);
-  }
-  // Comparable without a value equality: primitive carriers and pointer
-  // identities, both exact under ===.
-  return a === b;
-}
+// Interface equality (a == b) and interface-against-concrete equality
+// emit INLINE at the use site as a per-union equality function / literal
+// narrowing that touches only exact member payloads (=== for pointers and
+// primitive carriers, the type's own goEq$ for comparable value structs,
+// element-wise for comparable value arrays, an exact runtime panic for an
+// uncomparable dynamic type, and fail-closed for an external value): no
+// payload is ever recovered through an erased type, so no equality helper
+// over an unknown payload exists.
 
 // Assertions (x.(T), both panic and comma-ok forms) emit INLINE at the
 // use site as literal-discriminant narrowing that reads the exact member
 // payload with no cast (ADR-0004); no payload-recovering helper exists.
 
 function rtti(d: string): GoRtti {
-  // Every predeclared basic type is comparable, and === is its exact
-  // equality (floats keep NaN and signed-zero semantics). Predeclared
-  // types are methodless.
-  return { d, c: true, ms: [] };
+  // A predeclared basic type's rtti is a pure identity+display token;
+  // it is methodless, and its interface equality is generated inline.
+  return { d, ms: [] };
 }
 
 // Predeclared types' rttis (methodless).

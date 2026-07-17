@@ -235,7 +235,7 @@ func Package(module *Module, decls Decls) (string, error) {
 			p.line("%s();", initCall)
 		}
 	}
-	return module.importLines() + module.aliasLines() + body.String(), nil
+	return module.importLines() + module.aliasLines() + module.eqFnLines() + body.String(), nil
 }
 
 // printer carries per-function emission state and the module context.
