@@ -34,7 +34,7 @@ done:
 	}
 	for _, mention := range []string{
 		"channel type",        // make(chan int)
-		"ast.SelectStmt",      // select {}
+		"select statement",    // select {}
 		"keyed array literal", // [4]int{2: 1}
 		"branch goto",         // goto done
 	} {
@@ -61,7 +61,7 @@ func Unsupported() int {
 	if err == nil {
 		t.Fatal("expected the fixture package to be withheld")
 	}
-	if !strings.Contains(err.Error(), "ast.SelectStmt") {
+	if !strings.Contains(err.Error(), "select statement") {
 		t.Fatalf("expected the select site on record, got: %v", err)
 	}
 }

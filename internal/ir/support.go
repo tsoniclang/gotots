@@ -80,6 +80,20 @@ var classPayloadPrefixes = []string{
 	"package-level ", "string constant with ",
 }
 
+// ClassConstructKeys returns the closed set of construct keys a normalized
+// class can carry: the trimmed spelling of every registered payload prefix.
+// A class's construct portion (ClassOf's "CODE: <construct>") is exactly
+// one of these when the diagnostic matched a prefix; the inventory's site
+// classifier is a total function over this set, so no key is silently
+// defaulted.
+func ClassConstructKeys() []string {
+	keys := make([]string, len(classPayloadPrefixes))
+	for i, prefix := range classPayloadPrefixes {
+		keys[i] = strings.TrimSpace(prefix)
+	}
+	return keys
+}
+
 // ClassOf normalizes one diagnostic to its semantic-class key.
 func ClassOf(unsupported *Unsupported) string {
 	construct := unsupported.Construct

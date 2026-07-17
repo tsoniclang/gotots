@@ -487,6 +487,16 @@ func (b *builder) buildStmt(stmt ast.Stmt) (Stmt, error) {
 		}
 		b.use("label")
 		return &LabeledStmt{Label: n.Label.Name, Stmt: inner}, nil
+
+	case *ast.GoStmt:
+		// Concurrency statements carry a STRUCTURED construct (not the raw
+		// %T spelling) so the residual inventory classifies them under the
+		// single concurrency product policy, never a spelling match.
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "goroutine statement", Span: span}
+	case *ast.SelectStmt:
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "select statement", Span: span}
+	case *ast.SendStmt:
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "channel send statement", Span: span}
 	}
 	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: fmt.Sprintf("%T", stmt), Span: span}
 }

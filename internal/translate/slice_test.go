@@ -300,7 +300,7 @@ func TestFailClosedDiagnostics(t *testing.T) {
 			source: `package fixture
 func Case() { select {} }
 `,
-			code: "GOTOTS_UNSUPPORTED_STATEMENT", mention: "SelectStmt",
+			code: "GOTOTS_UNSUPPORTED_STATEMENT", mention: "select statement",
 		},
 		{
 			name: "goto",

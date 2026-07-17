@@ -100,35 +100,132 @@ type InventorySite struct {
 	Line      int    `json:"line"`
 }
 
-// classifySite maps one unsupported-site class to its disposition
-// category and the shared root abstraction that would clear the class.
-// The category names the KIND of solution required — a language lowering,
-// a representation-planning decision, an external typed contract, or a
-// product policy — so no repeated class is silently deferred to a manual
-// body. The default is a language lowering (an owned-code construct not
-// yet lowered), never an unexplained "miscellaneous" bucket.
+// disposition names the KIND of solution a class of unsupported site
+// requires and the shared root abstraction that would clear it.
+type disposition struct{ category, root string }
+
+// Disposition categories — the closed set the inventory reports.
+const (
+	catLanguageLowering  = "language-lowering"
+	catRepresentation    = "representation-planning"
+	catExternalContract  = "external-typed-contract"
+	catProductPolicy     = "product-policy"
+	catUnclassified      = "unclassified"
+	rootUnclassifiedNote = "UNCLASSIFIED: this construct has no reviewed disposition; classify it explicitly rather than defaulting it"
+)
+
+// Shared root abstractions each category's clearing work threads through.
+const (
+	rootLangType     = "type universe: reviewed lowering for the remaining named-type forms"
+	rootLangGenerics = "generic value semantics: per-instantiation copy operation threading"
+	rootLangConvert  = "type conversion: same-underlying and generic-parameter conversion lowering"
+	rootLangPointer  = "pointer cells: stable storage for the remaining address-taken locations"
+	rootLangDispatch = "interface dispatch: closed-union lowering for the remaining boxing/assertion forms"
+	rootLangDecl     = "local declarations: on-the-fly type-universe registration"
+	rootLangControl  = "control flow: reviewed lowering for the remaining statement forms"
+	rootLangBuiltin  = "builtin lowering: reviewed carrier operations for the remaining builtins"
+	rootRepresent    = "keyed-map: per-instantiation static key encoding (uniform keyed carrier)"
+	rootExternal     = "external contract surface: typed obligation/stub, never a manual caller body"
+	rootConcurrency  = "concurrency: one explicit TS-Go concurrency product policy"
+)
+
+// dispositionByConstruct is the TOTAL classification of the closed
+// construct-key set (ir.ClassConstructKeys). Every registered construct
+// maps to an explicitly reviewed category — there is no substring matching
+// and no catch-all default that would make an unreviewed class look like a
+// simple language lowering. A construct outside this map (a diagnostic
+// carrying free text with no registered prefix) classifies as
+// "unclassified", surfaced honestly rather than silently absorbed.
+var dispositionByConstruct = map[string]disposition{
+	// Named-type and value forms not yet lowered.
+	"non-basic type":          {catLanguageLowering, rootLangType},
+	"basic type":              {catLanguageLowering, rootLangType},
+	"interface type":          {catLanguageLowering, rootLangDispatch},
+	"array type":              {catLanguageLowering, rootLangType},
+	"struct type":             {catLanguageLowering, rootLangType},
+	"type":                    {catLanguageLowering, rootLangType},
+	"type parameter":          {catLanguageLowering, rootLangGenerics},
+	"constant of type":        {catLanguageLowering, rootLangType},
+	"zero value of":           {catLanguageLowering, rootLangType},
+	"nil of type":             {catLanguageLowering, rootLangType},
+	"interface value of type": {catLanguageLowering, rootLangDispatch},
+	"string constant with":    {catLanguageLowering, rootLangType},
+	"generic function instantiated with an unreviewed type argument": {catLanguageLowering, rootLangGenerics},
+	// Pointers.
+	"pointer to non-named type":  {catLanguageLowering, rootLangPointer},
+	"pointer to non-struct type": {catLanguageLowering, rootLangPointer},
+	"dereference of":             {catLanguageLowering, rootLangPointer},
+	"address of":                 {catLanguageLowering, rootLangPointer},
+	// Representation planning.
+	"map key type": {catRepresentation, rootRepresent},
+	// Concurrency — one product policy.
+	"channel type":           {catProductPolicy, rootConcurrency},
+	"goroutine statement":    {catProductPolicy, rootConcurrency},
+	"select statement":       {catProductPolicy, rootConcurrency},
+	"channel send statement": {catProductPolicy, rootConcurrency},
+	// External contract surfaces (references reaching outside the unit).
+	"pointer to type outside the translated unit:":    {catExternalContract, rootExternal},
+	"call outside the translated unit":                {catExternalContract, rootExternal},
+	"method call outside the translated unit":         {catExternalContract, rootExternal},
+	"method value outside the translated unit (":      {catExternalContract, rootExternal},
+	"method expression outside the translated unit (": {catExternalContract, rootExternal},
+	"field access on":                                 {catExternalContract, rootExternal},
+	"composite literal of":                            {catExternalContract, rootExternal},
+	"pointer-receiver method value on":                {catExternalContract, rootExternal},
+	// Selectors, calls, operators.
+	"identifier":         {catLanguageLowering, rootLangType},
+	"call of":            {catLanguageLowering, rootLangDispatch},
+	"index on":           {catLanguageLowering, rootLangType},
+	"nil comparison on":  {catLanguageLowering, rootLangDispatch},
+	"operator":           {catLanguageLowering, rootLangType},
+	"conversion from":    {catLanguageLowering, rootLangConvert},
+	"non-field selector": {catLanguageLowering, rootLangType},
+	"method call on":     {catLanguageLowering, rootLangDispatch},
+	"equality on":        {catLanguageLowering, rootLangDispatch},
+	"ordering on":        {catLanguageLowering, rootLangType},
+	"inc/dec of":         {catLanguageLowering, rootLangType},
+	// Builtins.
+	"len of":       {catLanguageLowering, rootLangBuiltin},
+	"cap of":       {catLanguageLowering, rootLangBuiltin},
+	"make of":      {catLanguageLowering, rootLangBuiltin},
+	"builtin":      {catLanguageLowering, rootLangBuiltin},
+	"clear of":     {catLanguageLowering, rootLangBuiltin},
+	"append to":    {catLanguageLowering, rootLangBuiltin},
+	"copy between": {catLanguageLowering, rootLangBuiltin},
+	"panic with":   {catLanguageLowering, rootLangControl},
+	// Slices and ranges.
+	"reslice of": {catLanguageLowering, rootLangType},
+	"range over": {catLanguageLowering, rootLangControl},
+	// Switches and assertions.
+	"switch tag of":     {catLanguageLowering, rootLangControl},
+	"switch case of":    {catLanguageLowering, rootLangControl},
+	"type assertion on": {catLanguageLowering, rootLangDispatch},
+	"type switch on":    {catLanguageLowering, rootLangDispatch},
+	// Statements and assignments.
+	"expression statement":           {catLanguageLowering, rootLangControl},
+	"assignment to":                  {catLanguageLowering, rootLangControl},
+	"compound assignment to":         {catLanguageLowering, rootLangControl},
+	"indexed compound assignment on": {catLanguageLowering, rootLangControl},
+	"field assignment on":            {catLanguageLowering, rootLangControl},
+	"branch":                         {catLanguageLowering, rootLangControl},
+	"package-level":                  {catLanguageLowering, rootLangDecl},
+}
+
+// classifySite maps one normalized unsupported-site class (ir.ClassOf's
+// "CODE: <construct>") to its reviewed disposition. It matches the
+// construct portion EXACTLY against the closed classification map — never
+// a substring — and returns "unclassified" for a construct outside the
+// map, so an unreviewed class is surfaced honestly instead of being
+// silently deferred to a language lowering.
 func classifySite(class string) (category, root string) {
-	switch {
-	case strings.Contains(class, "map key type"):
-		return "representation-planning", "keyed-map: per-instantiation static key encoding (uniform keyed carrier)"
-	case strings.Contains(class, "value-copy carrier") || strings.Contains(class, "instantiated with a struct value"):
-		return "language-lowering", "generic value semantics: per-instantiation copy operation threading"
-	case strings.Contains(class, "channel type") || strings.Contains(class, "*ast.GoStmt") ||
-		strings.Contains(class, "*ast.SelectStmt") || strings.Contains(class, "*ast.SendStmt") ||
-		strings.Contains(class, "builtin statement close") || strings.Contains(class, "builtin recover"):
-		return "product-policy", "concurrency: one explicit TS-Go concurrency product policy"
-	case strings.Contains(class, "outside the translated unit") || strings.Contains(class, "field access on") ||
-		strings.Contains(class, "composite literal of") || strings.Contains(class, "promoted selection through") ||
-		strings.Contains(class, "external"):
-		return "external-typed-contract", "external contract surface: typed obligation/stub, never a manual caller body"
-	case strings.Contains(class, "conversion from"):
-		return "language-lowering", "type conversion: same-underlying and generic-parameter conversion lowering"
-	case strings.Contains(class, "address of"):
-		return "language-lowering", "pointer cells: stable storage for the remaining address-taken locations"
-	case strings.Contains(class, "non-var declaration statement"):
-		return "language-lowering", "local type declarations: on-the-fly type-universe registration"
+	construct := class
+	if _, rest, found := strings.Cut(class, ": "); found {
+		construct = rest
 	}
-	return "language-lowering", "owned-code construct not yet lowered"
+	if d, ok := dispositionByConstruct[construct]; ok {
+		return d.category, d.root
+	}
+	return catUnclassified, rootUnclassifiedNote
 }
 
 // Probe loads the owned corpus under the profile and attempts IR building
