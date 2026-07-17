@@ -216,11 +216,12 @@ export function f(b: goif$.GoBox<string, unknown, object>): unknown {
 func TestASTVerifierCatchesLocalUnqualifiedGoBox(t *testing.T) {
 	files := map[string]string{
 		"language-abi/goiface.ts": `
-export type GoBox<K extends string, V, M> = { readonly k: K; readonly v: V; readonly m: M };
+export interface GoRtti { readonly d: string }
+export type GoBox<K extends string, V, M> = { readonly k: K; readonly r: GoRtti; readonly v: V; readonly m: M };
 export type GoAnyBox = GoBox<string, unknown, object>;
 `,
 		"core/pkg/package.ts": `
-import * as goif$ from "../language-abi/goiface.js";
+import * as goif$ from "../../language-abi/goiface.js";
 export type X = goif$.GoBox<"a", unknown, object>;
 `,
 	}
@@ -254,7 +255,8 @@ export type X = goif$.GoBox<"a", unknown, object>;
 func TestASTVerifierErasedPayloadBlindSpots(t *testing.T) {
 	files := map[string]string{
 		"language-abi/goiface.ts": `
-export type GoBox<K extends string, V, M> = { readonly k: K; readonly v: V; readonly m: M };
+export interface GoRtti { readonly d: string }
+export type GoBox<K extends string, V, M> = { readonly k: K; readonly r: GoRtti; readonly v: V; readonly m: M };
 `,
 		"core/pkg/package.ts": `
 import * as goif$ from "../../language-abi/goiface.ts";
@@ -287,6 +289,42 @@ export type ConcretePayload = goif$.GoBox<"d", Exact, Record<never, never>>;
 	// The concrete exact payload must NOT be flagged.
 	if erasedFiles["core/clean/package.ts"] != 0 {
 		t.Errorf("concrete exact payload wrongly flagged as erased: %+v", report.Violations)
+	}
+}
+
+// TestASTVerifierAliasHiddenErasedPayload proves the mandate's Phase-1.6
+// example is caught: a type alias to GoBox, instantiated with an erased
+// payload, whose surface name is NOT "GoBox". Detection resolves the type
+// structurally, so the alias layer cannot hide the erasure.
+func TestASTVerifierAliasHiddenErasedPayload(t *testing.T) {
+	files := map[string]string{
+		"language-abi/goiface.ts": `
+export interface GoRtti { readonly d: string }
+export type GoBox<K extends string, V, M> = { readonly k: K; readonly r: GoRtti; readonly v: V; readonly m: M };
+`,
+		"core/pkg/package.ts": `
+import * as goif$ from "../../language-abi/goiface.ts";
+type Methods = Record<never, never>;
+type Wrapped<V> = goif$.GoBox<"x", V, Methods>;
+export type Erased = Wrapped<object>;
+export interface Exact { readonly n: bigint }
+export type Fine = Wrapped<Exact>;
+`,
+	}
+	report, err := VerifyAST(files, typescriptDir(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	erased := 0
+	for _, v := range report.Violations {
+		if v.Pattern == "erased-iface-payload" || v.Pattern == "abi:erased-iface-payload" {
+			erased++
+		}
+	}
+	// Exactly the alias-hidden erased instantiation (Wrapped<object>); the
+	// concrete Wrapped<Exact> and the Wrapped<V> alias definition are fine.
+	if erased == 0 {
+		t.Errorf("alias-hidden erased payload (Wrapped<object>) not caught: %+v", report.Violations)
 	}
 }
 

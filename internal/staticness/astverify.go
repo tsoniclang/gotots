@@ -119,30 +119,46 @@ function isFunctionTypeName(node) {
   return ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName) && node.typeName.text === "Function";
 }
 
-// isErasedPayloadType reports whether a GoBox payload type node is an
-// erased top type — one that carries no exact static shape. Beyond the
-// literal any/unknown keywords the old check caught, this also flags the
-// object keyword, the empty object literal {}, and any alias that resolves
-// to one of those tops (getTypeFromTypeNode follows aliases). A concrete
-// payload (a class/interface/struct object type, a union of exact members)
-// has TypeFlags.Object and is NOT flagged.
-//
-// A bare type PARAMETER payload is NOT flagged: GoBox<K, V, M> in the box
-// constructor and the type's own definition is legitimate parametric
-// machinery — V is bound to the EXACT payload at each instantiation, and a
-// genuinely erased instantiation (GoBox<"k", object, M>) is caught at that
-// use site by the checks below. There is no AST-level distinction between a
-// parametric passthrough and an "erased generic-top", so flagging the
-// parameter itself would reject the ABI's own generics.
-function isErasedPayloadType(typeNode) {
-  if (typeNode.kind === ts.SyntaxKind.AnyKeyword ||
-      typeNode.kind === ts.SyntaxKind.UnknownKeyword ||
-      typeNode.kind === ts.SyntaxKind.ObjectKeyword) return true;
-  if (ts.isTypeLiteralNode(typeNode) && typeNode.members.length === 0) return true; // {}
-  const t = checker.getTypeFromTypeNode(typeNode);
+// isErasedType reports whether a RESOLVED type is an erased top: any,
+// unknown, the object keyword (NonPrimitive), or the empty object type {}
+// (an object type with no properties, no call/construct signatures, and no
+// index signatures). A concrete object type (with members) and a bare type
+// parameter are NOT erased.
+function isErasedType(t) {
+  if (!t) return false;
   const f = t.getFlags();
   if (f & ts.TypeFlags.Any || f & ts.TypeFlags.Unknown || f & ts.TypeFlags.NonPrimitive) return true;
+  if ((f & ts.TypeFlags.Object) &&
+      t.getProperties().length === 0 &&
+      checker.getSignaturesOfType(t, ts.SignatureKind.Call).length === 0 &&
+      checker.getSignaturesOfType(t, ts.SignatureKind.Construct).length === 0 &&
+      checker.getIndexInfosOfType(t).length === 0) {
+    return true; // {}
+  }
   return false;
+}
+
+// boxPayloadType returns the payload (v) type of a GoBox-shaped type
+// referenced by typeNode, or undefined if it is not a box. A box is
+// identified STRUCTURALLY — a resolved object type carrying exactly the
+// discriminated-box members k, r, v, m — so an ALIAS that resolves to a
+// GoBox (type Wrapped<V> = GoBox<"x", V, M>; Wrapped<object>) is detected
+// even though its surface name is not "GoBox". Resolving through the
+// checker (getTypeFromTypeNode) follows every alias and partial-application
+// layer, so no syntactic name match is relied upon.
+function boxPayloadType(typeNode) {
+  const t = checker.getTypeFromTypeNode(typeNode);
+  if (!t || (t.getFlags() & ts.TypeFlags.Object) === 0) return undefined;
+  const k = checker.getPropertyOfType(t, "k");
+  const r = checker.getPropertyOfType(t, "r");
+  const v = checker.getPropertyOfType(t, "v");
+  const m = checker.getPropertyOfType(t, "m");
+  if (!k || !r || !v || !m) return undefined;
+  // getTypeOfSymbol returns the INSTANTIATED property type (unknown/object)
+  // for a symbol drawn from an instantiated box, where
+  // getTypeOfSymbolAtLocation would re-resolve to the generic declaration's
+  // type parameter V.
+  return checker.getTypeOfSymbol(v);
 }
 
 for (const source of program.getSourceFiles()) {
@@ -197,22 +213,17 @@ for (const source of program.getSourceFiles()) {
     if (isFunctionTypeName(node)) {
       report(file, node, source, "erased-function-type");
     }
-    // Erased interface payload in generated CORE: a GoBox type argument
-    // of unknown/any, or an "as" cast recovering from a .v property —
-    // each recovers a payload from an erased type (spec 06, ADR-0004).
+    // Erased interface payload in generated CORE: a box (GoBox, OR any
+    // alias resolving to one) whose payload resolves to an erased top, or
+    // an "as" cast recovering from a .v property — each recovers a payload
+    // from an erased type (spec 06, ADR-0004). Detection is by RESOLVED
+    // type, so an alias such as Wrapped-of-object (type Wrapped V = GoBox
+    // of x,V,M) is caught even though its surface name is not GoBox.
     {
-      if (ts.isTypeReferenceNode(node) && node.typeArguments && node.typeArguments.length >= 3) {
-        // GoBox appears QUALIFIED (goif dollar .GoBox) in generated
-        // modules and UNQUALIFIED in the ABI's own goiface.ts (the local
-        // GoAnyBox = GoBox of string, unknown, object). Both are detected
-        // so the ABI's own erased payload is never a blind spot.
-        let boxName = "";
-        if (ts.isQualifiedName(node.typeName)) boxName = node.typeName.right.text;
-        else if (ts.isIdentifier(node.typeName)) boxName = node.typeName.text;
-        if (boxName === "GoBox") {
-          if (isErasedPayloadType(node.typeArguments[1])) {
-            report(file, node, source, "erased-iface-payload");
-          }
+      if (ts.isTypeReferenceNode(node)) {
+        const payload = boxPayloadType(node);
+        if (payload && isErasedType(payload)) {
+          report(file, node, source, "erased-iface-payload");
         }
       }
       if (ts.isAsExpression(node) && ts.isPropertyAccessExpression(node.expression) &&
