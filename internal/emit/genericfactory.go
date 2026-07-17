@@ -59,7 +59,15 @@ func (p *printer) eqOperation(t ir.Type) (string, error) {
 		}
 		return op, nil
 	case t.Kind == ir.KindIface:
-		return "goif$.goIfaceEqual", nil
+		// Wrap in an arrow with the EXACT union type so the generic
+		// goIfaceEqual monomorphizes here (its member type parameters are
+		// inferred from the concrete union) instead of being passed as a
+		// generic value, which does not unify with a comparator parameter.
+		spelled, err := p.tsType(t)
+		if err != nil {
+			return "", err
+		}
+		return "(($a: " + spelled + ", $b: " + spelled + ") => goif$.goIfaceEqual($a, $b))", nil
 	case t.Kind == ir.KindStruct:
 		spelled, err := p.tsType(t)
 		if err != nil {

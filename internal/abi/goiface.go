@@ -55,10 +55,21 @@ export interface GoRtti {
 // rtti comparison stays object identity across every module.
 const compositeRttis = new Map<string, GoRtti>();
 
+// IfaceBox is the helper-facing shape of an interface box: the rtti token
+// r plus the payload v. Every generated interface position spells its
+// EXACT closed member union; this shape is used only by the finite
+// equality/assertion helpers below, which read the token r and compare
+// values through the type's OWN construction-bound equality (r.e) — the
+// payload is never a GoBox<...,unknown,...> and is never recovered into a
+// typed position. TypeScript cannot infer a single payload type from a
+// discriminated union argument, so a structural supertype (not a generic)
+// is used.
+type IfaceBox = { readonly r: GoRtti; readonly v: unknown };
+
 // goPanicConversionIface is Go's failed interface-to-interface
 // assertion panic: the dynamic type first, then the first missing
 // method (from the token's method-name data).
-export function goPanicConversionIface(i: GoIface, sourceDisplay: string, targetDisplay: string, required: readonly string[]): never {
+export function goPanicConversionIface(i: IfaceBox | undefined, sourceDisplay: string, targetDisplay: string, required: readonly string[]): never {
   if (i === undefined) {
     throw new GoPanic("interface conversion: " + sourceDisplay + " is nil, not " + targetDisplay);
   }
@@ -81,30 +92,21 @@ export function goRttiComposite(key: string, rtti: GoRtti): GoRtti {
   return interned;
 }
 
-// GoAnyBox is the helper-facing supertype of every union member: the
-// helpers below read only the token r (equality, assertion membership)
-// and never recover the payload — construction-bound functions on the
-// token (r.e) and the member's own vtable are the only value readers.
-export type GoAnyBox = GoBox<string, unknown, object>;
-
-// GoIface is the nil-or-box helper-facing shape; generated interface
-// positions spell their exact closed member unions.
-export type GoIface = GoAnyBox | undefined;
-
 export function goIfaceBox<K extends string, V, M>(k: K, r: GoRtti, v: V, m: M): GoBox<K, V, M> {
   return { k, r, v, m };
 }
 
 
-export function goIfaceIs(i: GoIface, r: GoRtti): boolean {
+export function goIfaceIs(i: IfaceBox | undefined, r: GoRtti): boolean {
   return i !== undefined && i.r === r;
 }
 
 // Interface equality by Go's rule: equal dynamic types, then equal
 // values by that type's own equality. Uncomparable dynamic types panic
 // with Go's exact message; unknown (external) comparability fails
-// closed rather than guessing.
-export function goIfaceEqual(a: GoIface, b: GoIface): boolean {
+// closed rather than guessing. Generic over the boxes' exact member
+// types so no payload is erased.
+export function goIfaceEqual(a: IfaceBox | undefined, b: IfaceBox | undefined): boolean {
   if (a === undefined || b === undefined) {
     return a === b;
   }
@@ -115,14 +117,15 @@ export function goIfaceEqual(a: GoIface, b: GoIface): boolean {
 }
 
 // Interface-against-concrete equality with === value carriers.
-export function goIfaceEqualPrim(i: GoIface, r: GoRtti, v: unknown): boolean {
+export function goIfaceEqualPrim(i: IfaceBox | undefined, r: GoRtti, v: unknown): boolean {
   return i !== undefined && i.r === r && i.v === v;
 }
 
 // Interface-against-concrete equality through the dynamic type's own
-// exact equality (comparable structs and arrays).
-export function goIfaceEqualVia(i: GoIface, r: GoRtti, v: unknown): boolean {
-  return i !== undefined && i.r === r && (r.e as (a: unknown, b: unknown) => boolean)(i.v, v);
+// exact equality (comparable structs and arrays); r.e is the type's
+// construction-bound equality.
+export function goIfaceEqualVia(i: IfaceBox | undefined, r: GoRtti, v: unknown): boolean {
+  return i !== undefined && i.r === r && r.e !== undefined && r.e(i.v, v);
 }
 
 function ifaceValueEqual(r: GoRtti, a: unknown, b: unknown): boolean {
