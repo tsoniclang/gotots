@@ -95,6 +95,36 @@
     "vtable bundle or allocation cost exceeds the committed performance budget",
     "every region's dynamic-type set closes statically"
    ]
+  },
+  {
+   "id": "ADR-0005",
+   "path": "docs/decisions/0005-inline-manual-body-ownership.md",
+   "status": "accepted",
+   "owner": "gotots-maintainers",
+   "affectedSpecClauses": [
+    "docs/spec/08-externals-manual-extensions.md#generated-baselines-and-body-hashes",
+    "docs/spec/08-externals-manual-extensions.md#automatic-manual-reconciliation",
+    "docs/spec/08-externals-manual-extensions.md#automatic-dependency-and-reachability-graph",
+    "docs/spec/08-externals-manual-extensions.md#reset-acceptance-and-pruning",
+    "docs/spec/10-machine-contracts-diagnostics.md#manual-reconciliation-record",
+    "docs/spec/13-governance-upgrades.md#source-upgrade"
+   ],
+   "schemaOrAbiVersions": [
+    "manual-ownership-v1"
+   ],
+   "implementationRevision": "eabaabb",
+   "proofArtifacts": [
+    "docs/spec/08-externals-manual-extensions.md",
+    "docs/spec/10-machine-contracts-diagnostics.md",
+    "docs/spec/11-testing-acceptance.md",
+    "internal/policy/spec_test.go"
+   ],
+   "reopeningConditions": [
+    "a simpler exact mixed-file ownership mechanism removes metadata without retaining generated files",
+    "the pinned formatter cannot provide deterministic body ranges",
+    "measured reconciliation cost violates the accepted regeneration budget",
+    "a source upgrade proves canonical structural joining insufficient"
+   ]
   }
  ]
 }
