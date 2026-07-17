@@ -13,6 +13,7 @@ package typeid
 import (
 	"fmt"
 	"go/types"
+	"sort"
 	"strings"
 )
 
@@ -75,17 +76,21 @@ func write(out *strings.Builder, t types.Type, seen map[types.Type]bool) {
 			return
 		}
 		seen[t] = true
-		// The receiver is part of a method's identity: func (T) M and
-		// func (*T) M are DIFFERENT methods with different method sets, and
-		// must never share an identity.
-		if recv := u.Recv(); recv != nil {
-			out.WriteString("recv(")
-			write(out, recv.Type(), seen)
-			out.WriteString(")")
-		}
-		// Type parameters and their CONSTRAINTS are part of a generic
-		// signature's identity: func F[T any] and func F[T comparable]
-		// differ in what T admits and must not collide.
+		// The RECEIVER is NOT part of a signature's identity: Go ignores it
+		// when comparing signatures (go/types signature.go: "It is ignored
+		// when comparing signatures for identity"), and an abstract
+		// method's receiver is the ENCLOSING interface, so including it
+		// would give structurally identical interfaces (interface{M()})
+		// distinct identities. Receiver identity belongs in the
+		// method-declaration shape (package + receiver + name + this
+		// callable signature), not in the callable signature itself.
+		//
+		// Type parameters and their CONSTRAINTS ARE part of identity
+		// (func F[T any] and func F[T comparable] differ), written by
+		// binder POSITION so alpha-equivalent declarations ([T any] and
+		// [U any]) coincide. A method's parameters come from its receiver
+		// (RecvTypeParams); a function's from TypeParams; the two are
+		// mutually exclusive.
 		writeTypeParams(out, u.RecvTypeParams(), seen)
 		writeTypeParams(out, u.TypeParams(), seen)
 		out.WriteString("func(")
@@ -154,11 +159,30 @@ func write(out *strings.Builder, t types.Type, seen map[types.Type]bool) {
 			writeMemberName(out, method.Name(), method.Exported(), method.Pkg())
 			write(out, method.Type(), seen)
 		}
+		// The COMPLETE type set: embedded elements (constraint unions,
+		// ~terms, comparable, embedded interfaces) are part of identity, so
+		// a methodless constraint interface{ ~int32 | ~uint32 } does not
+		// collapse toward interface{}. Sorted by their canonical spelling
+		// so element order does not affect identity.
+		if n := u.NumEmbeddeds(); n > 0 {
+			terms := make([]string, 0, n)
+			for i := range n {
+				var term strings.Builder
+				write(&term, u.EmbeddedType(i), seen)
+				terms = append(terms, term.String())
+			}
+			sort.Strings(terms)
+			for _, term := range terms {
+				out.WriteString(";elem:")
+				out.WriteString(term)
+			}
+		}
 		out.WriteString("}")
 		delete(seen, t)
 	case *types.TypeParam:
-		out.WriteString("$")
-		out.WriteString(u.Obj().Name())
+		// A type parameter is identified by its BINDER POSITION, not its
+		// source name, so alpha-equivalent declarations coincide.
+		fmt.Fprintf(out, "$#%d", u.Index())
 	case *types.Union:
 		// A constraint union (int | ~string | …): each term path-qualified
 		// so terms from different packages never collide.
@@ -202,9 +226,10 @@ func HasUnsupported(id string) bool {
 	return strings.Contains(id, unsupportedMarker)
 }
 
-// writeTypeParams writes a type-parameter list with each parameter's
-// constraint, so two generic signatures that differ only in a constraint
-// have distinct identities.
+// writeTypeParams writes a type-parameter list by binder POSITION with
+// each parameter's complete constraint type set, so signatures that
+// differ only in a constraint have distinct identities while
+// alpha-equivalent renamings ([T any] vs [U any]) coincide.
 func writeTypeParams(out *strings.Builder, params *types.TypeParamList, seen map[types.Type]bool) {
 	if params == nil || params.Len() == 0 {
 		return
@@ -214,10 +239,8 @@ func writeTypeParams(out *strings.Builder, params *types.TypeParamList, seen map
 		if i > 0 {
 			out.WriteString(",")
 		}
-		param := params.At(i)
-		out.WriteString(param.Obj().Name())
-		out.WriteString(":")
-		write(out, param.Constraint(), seen)
+		fmt.Fprintf(out, "#%d:", i)
+		write(out, params.At(i).Constraint(), seen)
 	}
 	out.WriteString("]")
 }

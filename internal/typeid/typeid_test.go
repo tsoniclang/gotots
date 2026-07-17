@@ -56,41 +56,6 @@ func TestPathQualification(t *testing.T) {
 	}
 }
 
-// TestReviewerIdentityDistinctions covers the round-11 reviewer's exact
-// collision examples: each pair must have DISTINCT canonical identities.
-func TestReviewerIdentityDistinctions(t *testing.T) {
-	src := `package p
-type T struct{ x int }
-func (v T) M()  {}
-func (v *T) N() {}
-type Named struct{ F T }
-type Embed struct{ T }
-func FAny[A any](a A)               {}
-func FComparable[A comparable](a A) {}
-`
-	pkg := pkgOf(t, "p", src)
-	scope := pkg.Scope()
-	tType := scope.Lookup("T").Type().(*types.Named)
-	mSig := methodByName(t, tType, "M").Type()
-	nSig := methodByName(t, tType, "N").Type()
-	if Canonical(mSig) == Canonical(nSig) {
-		t.Errorf("value- and pointer-receiver methods share identity: %s", Canonical(mSig))
-	}
-	if !contains(Canonical(nSig), "recv(*") {
-		t.Errorf("pointer receiver not represented: %s", Canonical(nSig))
-	}
-	named := scope.Lookup("Named").Type().Underlying()
-	embed := scope.Lookup("Embed").Type().Underlying()
-	if Canonical(named) == Canonical(embed) {
-		t.Errorf("named-field and embedded-field structs share identity: %s", Canonical(named))
-	}
-	anySig := scope.Lookup("FAny").Type()
-	cmpSig := scope.Lookup("FComparable").Type()
-	if Canonical(anySig) == Canonical(cmpSig) {
-		t.Errorf("generic funcs with any vs comparable constraint share identity: %s", Canonical(anySig))
-	}
-}
-
 func methodByName(t *testing.T, named *types.Named, name string) *types.Func {
 	t.Helper()
 	for i := range named.NumMethods() {
@@ -128,5 +93,83 @@ func F(a int) string { return "" }
 	}
 	if !HasUnsupported("x" + unsupportedMarker + "y") {
 		t.Errorf("poisoned identity not detected")
+	}
+}
+
+// TestSignatureIgnoresReceiver: Go ignores the receiver when comparing
+// signatures for identity, and abstract methods carry the enclosing
+// interface as receiver. Structurally identical interfaces MUST share a
+// canonical identity, and two methods with the same callable signature
+// MUST share their signature identity (the receiver distinction lives in
+// the method-declaration shape, not the callable signature).
+func TestSignatureIgnoresReceiver(t *testing.T) {
+	src := `package p
+type A struct{}
+type B struct{}
+func (A) Read(x []byte) (int, error)  { return 0, nil }
+func (*B) Read(x []byte) (int, error) { return 0, nil }
+type I1 interface{ M() }
+type I2 interface{ M() }
+`
+	pkg := pkgOf(t, "p", src)
+	scope := pkg.Scope()
+	aRead := methodByName(t, scope.Lookup("A").Type().(*types.Named), "Read").Type()
+	bRead := methodByName(t, scope.Lookup("B").Type().(*types.Named), "Read").Type()
+	if Canonical(aRead) != Canonical(bRead) {
+		t.Errorf("same callable signature got distinct identities: %q vs %q", Canonical(aRead), Canonical(bRead))
+	}
+	if contains(Canonical(aRead), "recv(") {
+		t.Errorf("receiver leaked into signature identity: %q", Canonical(aRead))
+	}
+	i1 := scope.Lookup("I1").Type().Underlying()
+	i2 := scope.Lookup("I2").Type().Underlying()
+	if Canonical(i1) != Canonical(i2) {
+		t.Errorf("structurally identical interfaces got distinct identities: %q vs %q", Canonical(i1), Canonical(i2))
+	}
+}
+
+// TestConstraintCompletenessAndAlphaEquivalence: a methodless type-set
+// constraint must not collapse toward interface{}; differing tilde/union
+// constraints must differ; alpha-equivalent binders must coincide.
+func TestConstraintCompletenessAndAlphaEquivalence(t *testing.T) {
+	src := `package p
+func FInt32[T ~int32](x T)  { _ = x }
+func FUint32[T ~uint32](x T) { _ = x }
+func GT[T any](x T)  { _ = x }
+func GU[U any](x U)  { _ = x }
+func HMix[T ~int | ~uint | ~int64](x T) { _ = x }
+`
+	pkg := pkgOf(t, "p", src)
+	scope := pkg.Scope()
+	i32 := Canonical(scope.Lookup("FInt32").Type())
+	u32 := Canonical(scope.Lookup("FUint32").Type())
+	if i32 == u32 {
+		t.Errorf("~int32 and ~uint32 constraints collapsed to the same identity: %q", i32)
+	}
+	if !contains(i32, "int32") {
+		t.Errorf("constraint type set not serialized (collapsed toward interface{}): %q", i32)
+	}
+	gt := Canonical(scope.Lookup("GT").Type())
+	gu := Canonical(scope.Lookup("GU").Type())
+	if gt != gu {
+		t.Errorf("alpha-equivalent generic signatures got distinct identities: %q vs %q", gt, gu)
+	}
+	hmix := Canonical(scope.Lookup("HMix").Type())
+	if !contains(hmix, "int64") {
+		t.Errorf("union constraint terms not fully serialized: %q", hmix)
+	}
+}
+
+// TestEmbeddedFieldDistinct keeps the struct-embedding distinction.
+func TestEmbeddedFieldDistinct(t *testing.T) {
+	src := `package p
+type T struct{ x int }
+type Named struct{ F T }
+type Embed struct{ T }
+`
+	pkg := pkgOf(t, "p", src)
+	scope := pkg.Scope()
+	if Canonical(scope.Lookup("Named").Type().Underlying()) == Canonical(scope.Lookup("Embed").Type().Underlying()) {
+		t.Errorf("named-field and embedded-field structs share identity")
 	}
 }
