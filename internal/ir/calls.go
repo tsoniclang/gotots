@@ -257,7 +257,11 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 func (b *builder) buildCallArgsResults(n *ast.CallExpr, signature *types.Signature, args *[]Expr, results *[]Type) error {
 	span := b.span(n.Pos())
 	params := signature.Params()
-	if len(n.Args) == 1 && params.Len() > 1 {
+	// f(g()) forwards g's multi-value result: it applies whenever the sole
+	// argument is a multi-value call, including a pure variadic target
+	// (one variadic parameter, no fixed parameters) — the multi-value
+	// tuple type (never produced for a single result) is the real gate.
+	if len(n.Args) == 1 && (params.Len() > 1 || signature.Variadic()) {
 		innerCall, isCall := ast.Unparen(n.Args[0]).(*ast.CallExpr)
 		if sourceTuple, isTuple := b.info.Types[n.Args[0]].Type.(*types.Tuple); isTuple && isCall {
 			// f(g()): the inner call's fresh results spread positionally,

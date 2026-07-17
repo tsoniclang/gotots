@@ -100,6 +100,13 @@ func (p *printer) printTupleVariadicSpread(n *ir.TupleVariadicSpread) (string, e
 	for i := n.Fixed; i < len(n.SlotTypes); i++ {
 		rest = append(rest, fmt.Sprintf("$t[%d]", i))
 	}
-	elements = append(elements, "gosl$.goSliceFrom(["+joinComma(rest)+"])")
+	if len(rest) == 0 {
+		// No results remain for the variadic parameter: Go leaves it the
+		// nil slice (rest == nil), exactly as a call with no variadic
+		// arguments — never a fresh non-nil empty slice.
+		elements = append(elements, "undefined")
+	} else {
+		elements = append(elements, "gosl$.goSliceFrom(["+joinComma(rest)+"])")
+	}
 	return "((($t: readonly [" + joinComma(slotTypes) + "]): readonly [" + joinComma(resultTypes) + "] => [" + joinComma(elements) + "])(" + inner + "))", nil
 }
