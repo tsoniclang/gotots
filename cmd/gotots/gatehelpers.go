@@ -234,7 +234,36 @@ func reconcileDispositions(prof *profile.Profile, firstRun *census.Result, gener
 			unreconciled = append(unreconciled, decl.ID)
 		}
 	}
-	details := make([]string, 0, len(counts)+len(unreconciled)+4)
+	// Identity-level ledger reconciliation (no number is ADDED across
+	// ledgers; each is a partition of one identity set). The support
+	// ledger's unimplemented UNITS partition by declaration kind; every
+	// non-declaration unit (a blank import, which is an ordered effect and
+	// not a declaration) exactly explains the support ledger's excess over
+	// the unimplemented DECLARATION count. An unexplained delta fails.
+	supportUnimplByKind := map[string]int{}
+	supportUnimplTotal := 0
+	for _, b := range generated.Support {
+		if string(b.State) != "unimplemented" {
+			continue
+		}
+		supportUnimplTotal++
+		kind := "?"
+		if parts := strings.SplitN(b.ID, "::", 3); len(parts) >= 2 {
+			kind = parts[1]
+		}
+		supportUnimplByKind[kind]++
+	}
+	// Declaration-kind unimplemented units in the support ledger must equal
+	// the unimplemented DECLARATIONS the reconciliation counted; the
+	// difference is exactly the non-declaration (import) units.
+	nonDeclKinds := supportUnimplByKind["import"]
+	declKindUnimpl := supportUnimplTotal - nonDeclKinds
+	if declKindUnimpl != counts["unimplemented"] {
+		conflicts = append(conflicts, fmt.Sprintf(
+			"ledger reconciliation: support-ledger declaration-kind unimplemented %d != reconciled unimplemented declarations %d (unexplained delta)",
+			declKindUnimpl, counts["unimplemented"]))
+	}
+	details := make([]string, 0, len(counts)+len(unreconciled)+6)
 	keys := make([]string, 0, len(counts))
 	for key := range counts {
 		keys = append(keys, key)
@@ -243,6 +272,18 @@ func reconcileDispositions(prof *profile.Profile, firstRun *census.Result, gener
 	for _, key := range keys {
 		details = append(details, fmt.Sprintf("%s: %d", key, counts[key]))
 	}
+	kindKeys := make([]string, 0, len(supportUnimplByKind))
+	for k := range supportUnimplByKind {
+		kindKeys = append(kindKeys, k)
+	}
+	sort.Strings(kindKeys)
+	kindParts := make([]string, 0, len(kindKeys))
+	for _, k := range kindKeys {
+		kindParts = append(kindParts, fmt.Sprintf("%s=%d", k, supportUnimplByKind[k]))
+	}
+	details = append(details, fmt.Sprintf(
+		"ledger reconciliation: support-ledger unimplemented %d = declaration-kinds %d + non-declaration(import) %d; by kind [%s]",
+		supportUnimplTotal, declKindUnimpl, nonDeclKinds, strings.Join(kindParts, " ")))
 	// Honest evidence stages (spec 00): ir-admitted is not
 	// module-retained. Report both denominators explicitly.
 	emittedPackages := 0
