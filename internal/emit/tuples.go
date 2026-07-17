@@ -54,6 +54,26 @@ func (p *printer) tupleSlots(slots []ir.TupleSlot, srcTypes []ir.Type) (converte
 	return converted, slotTypes, resultTypes, nil
 }
 
+// spreadInner reports whether args is a single multi-result spread
+// argument (Go's f(g()) form, plain or variadic) and, if so, spells the
+// tuple expression it spreads. The staged-arrow call forms (dynamic and
+// interface calls) bind this once and spread it, so f(g()) lowers on
+// every call path, not only the ordinary printArgs one.
+func (p *printer) spreadInner(args []ir.Expr) (string, bool, error) {
+	if len(args) != 1 {
+		return "", false, nil
+	}
+	switch s := args[0].(type) {
+	case *ir.TupleSpread:
+		inner, err := p.printExpr(s.X)
+		return inner, true, err
+	case *ir.TupleVariadicSpread:
+		inner, err := p.printTupleVariadicSpread(s)
+		return inner, true, err
+	}
+	return "", false, nil
+}
+
 // printTupleAdapt spells a per-slot converted multi-result value: the
 // inner value evaluates once, each slot converts, and the converted
 // tuple is rebuilt in order.

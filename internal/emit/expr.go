@@ -275,13 +275,32 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if funcType.Sig == nil {
 			return "", fmt.Errorf("dynamic call without a function signature")
 		}
-		arrowParams := []string{}
-		callArgs := []string{}
-		passed := []string{fun}
 		spelledFun, err := p.tsType(funcType)
 		if err != nil {
 			return "", err
 		}
+		result, err := p.tsFuncResultType(n.Results)
+		if err != nil {
+			return "", err
+		}
+		// f(g()): the sole argument is a multi-result spread. The tuple
+		// evaluates once (inside the arrow, after the callee is bound, so
+		// operand-then-args order holds) and spreads into the call — the
+		// const infers its exact tuple type, and the nil-callee panic still
+		// follows argument evaluation, exactly Go.
+		if inner, isSpread, err := p.spreadInner(n.Args); err != nil {
+			return "", err
+		} else if isSpread {
+			ret := "return "
+			if result == "void" {
+				ret = ""
+			}
+			return fmt.Sprintf("((f$: %s): %s => { const t$ = %s; if (f$ === undefined) { gort$.goPanicNil(); } %sf$(...t$); })(%s)",
+				spelledFun, result, inner, ret, fun), nil
+		}
+		arrowParams := []string{}
+		callArgs := []string{}
+		passed := []string{fun}
 		arrowParams = append(arrowParams, "f$: "+spelledFun)
 		for i, argument := range n.Args {
 			printed, err := p.printExpr(argument)
@@ -296,10 +315,6 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			arrowParams = append(arrowParams, name+": "+spelled)
 			callArgs = append(callArgs, name)
 			passed = append(passed, printed)
-		}
-		result, err := p.tsFuncResultType(n.Results)
-		if err != nil {
-			return "", err
 		}
 		body := "if (f$ === undefined) { gort$.goPanicNil(); } return f$(" + joinComma(callArgs) + ");"
 		if result == "void" {

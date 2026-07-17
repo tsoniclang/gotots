@@ -200,20 +200,33 @@ func (p *printer) printIfaceCall(n *ir.IfaceCall) (string, error) {
 	}
 	params := []string{"$r: " + union}
 	passed := []string{recv}
-	argNames := make([]string, len(n.Args))
-	for i, arg := range n.Args {
-		printed, err := p.printExpr(arg)
-		if err != nil {
-			return "", err
+	// iface.M(g()): the sole argument is a multi-result spread — bind the
+	// tuple once (after the receiver, before the nil panic) and spread it
+	// into every narrowed dispatch, so f(g()) lowers on the interface call
+	// path too.
+	spreadTuple, isSpread, err := p.spreadInner(n.Args)
+	if err != nil {
+		return "", err
+	}
+	var argNames []string
+	if isSpread {
+		argNames = []string{"...$t"}
+	} else {
+		argNames = make([]string, len(n.Args))
+		for i, arg := range n.Args {
+			printed, err := p.printExpr(arg)
+			if err != nil {
+				return "", err
+			}
+			spelled, err := p.tsType(arg.Type())
+			if err != nil {
+				return "", err
+			}
+			name := fmt.Sprintf("$a%d", i)
+			params = append(params, name+": "+spelled)
+			passed = append(passed, printed)
+			argNames[i] = name
 		}
-		spelled, err := p.tsType(arg.Type())
-		if err != nil {
-			return "", err
-		}
-		name := fmt.Sprintf("$a%d", i)
-		params = append(params, name+": "+spelled)
-		passed = append(passed, printed)
-		argNames[i] = name
 	}
 	result, err := p.tsFuncResultType(n.Results)
 	if err != nil {
@@ -221,6 +234,9 @@ func (p *printer) printIfaceCall(n *ir.IfaceCall) (string, error) {
 	}
 	var body strings.Builder
 	sub := &printer{out: &body, module: p.module, indent: 0}
+	if isSpread {
+		sub.line("const $t = %s;", spreadTuple)
+	}
 	sub.line("if ($r === undefined) { gort$.goPanicNil(); }")
 	if len(p.retainedMembers(recvType)) == 0 {
 		// Every implementer is withheld: no value of this interface can

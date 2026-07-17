@@ -57,6 +57,14 @@ func (b *builder) buildTarget(lhs ast.Expr) (Target, error) {
 		if err != nil {
 			return nil, err
 		}
+		// (*p).f assigns through p exactly like p.f: keep the POINTER as the
+		// base so the nil dereference panics at the STORE (Go's two-phase
+		// assignment evaluates the right-hand side first, then carries out
+		// the store) — never eagerly at base evaluation, which would skip a
+		// side-effecting right-hand side.
+		if deref, ok := base.(*Deref); ok && deref.X.Type().Kind == KindPointer {
+			base = deref.X
+		}
 		if path := selection.Index(); len(path) > 1 {
 			// A promoted field target: the base chains through the
 			// embedded fields; the final segment is the stored field.

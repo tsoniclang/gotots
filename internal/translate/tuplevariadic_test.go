@@ -178,3 +178,50 @@ func PackedTwoStructs() int {
 }
 `)
 }
+
+// f(g()) must lower on EVERY call path — a function value (dynamic call)
+// and an interface method call, not only ordinary static calls.
+func TestOracleTupleVariadicCallPaths(t *testing.T) {
+	runOracle(t, `package fixture
+
+func sum(scale int, rest ...int) int {
+	total := 0
+	for _, v := range rest {
+		total += v
+	}
+	return total * scale
+}
+
+func three() (int, int, int) { return 2, 3, 4 }
+func pair() (int, int)       { return 1, 2 }
+
+func DynamicSpread() int {
+	f := sum
+	return f(three())
+}
+
+func DynamicEmptyTail() (int, bool) {
+	f := func(a, b int, rest ...int) (int, bool) { return len(rest), rest == nil }
+	return f(pair())
+}
+
+type Summer interface {
+	Sum(scale int, rest ...int) int
+}
+
+type impl struct{}
+
+func (impl) Sum(scale int, rest ...int) int {
+	total := 0
+	for _, v := range rest {
+		total += v
+	}
+	return total * scale
+}
+
+func InterfaceSpread() int {
+	var s Summer = impl{}
+	return s.Sum(three())
+}
+`)
+}
