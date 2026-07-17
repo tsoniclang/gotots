@@ -126,6 +126,23 @@ func OwnerBinders(owner *types.Named) *Binders {
 	return &Binders{c: c}
 }
 
+// AliasBinders binds a generic alias's OWN type parameters, so the
+// aliased (target) type's references to them canonicalize by binder
+// position (Foo[T] = Bar[T] resolves T as this alias's first parameter)
+// rather than as free-and-fail-closed. A non-generic alias yields
+// nil-safe empty binders.
+func AliasBinders(alias *types.Alias) *Binders {
+	c := newCtx()
+	if alias != nil {
+		if tp := alias.TypeParams(); tp != nil && tp.Len() > 0 {
+			for i := range tp.Len() {
+				c.bind(tp.At(i), i)
+			}
+		}
+	}
+	return &Binders{c: c}
+}
+
 // FuncBinders binds a signature's OWN type parameters (a generic
 // function), so its parameter/result component types canonicalize with
 // those parameters resolved by binder position.

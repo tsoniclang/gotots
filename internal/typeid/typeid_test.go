@@ -378,3 +378,41 @@ func TestUnexportedFieldStructsPackageDistinct(t *testing.T) {
 		t.Errorf("exported-field structs from different packages should coincide: %q vs %q", canon(t, under(e1)), canon(t, under(e2)))
 	}
 }
+
+// TestGenericAliasIdentity: a generic alias is transparent — Canonical of
+// the alias type itself binds its own type parameters and expands to the
+// aliased target (Foo[T] = Bar[T] → …Bar[$#0]). Handed the alias directly
+// it must NOT fail closed on the free parameter, and it must agree with a
+// use-site instantiation Foo[int] canonicalizing exactly as Bar[int].
+func TestGenericAliasIdentity(t *testing.T) {
+	pkg := pkgOf(t, "genalias", `package genalias
+type Bar[T any] struct{ v T }
+type Foo[T any] = Bar[T]
+var useInt Foo[int]
+var useBar Bar[int]
+`)
+	scope := pkg.Scope()
+	fooObj := scope.Lookup("Foo").(*types.TypeName)
+	if !fooObj.IsAlias() {
+		t.Fatal("Foo is not an alias")
+	}
+	// The alias declaration's transparent target, with its own parameter
+	// bound by position.
+	got := canon(t, fooObj.Type())
+	if want := "genalias.Bar[$#0]"; got != want {
+		t.Fatalf("generic alias target identity = %q, want %q", got, want)
+	}
+	// A use-site Foo[int] is identical to Bar[int].
+	useInt := canon(t, scope.Lookup("useInt").Type())
+	useBar := canon(t, scope.Lookup("useBar").Type())
+	if useInt != useBar {
+		t.Fatalf("Foo[int]=%q and Bar[int]=%q must coincide", useInt, useBar)
+	}
+
+	// AliasBinders exposes the same binding for component-type
+	// canonicalization; the alias's parameter must resolve, not fail.
+	binders := AliasBinders(fooObj.Type().(*types.Alias))
+	if _, err := binders.Canonical(fooObj.Type()); err != nil {
+		t.Fatalf("AliasBinders.Canonical(Foo): %v", err)
+	}
+}

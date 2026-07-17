@@ -276,7 +276,14 @@ func shapeType(info *types.Info, s *ast.TypeSpec, kind, id string, stats *fileSt
 	var terr error
 	ts := tsFn(&terr)
 	if kind == "alias" {
-		shape := AliasShape{ID: id, Target: ts(types.Unalias(object.Type()))}
+		// The alias DECLARATION identity is id (its own name); the Target is
+		// the transparent type it denotes. Canonical is handed the alias
+		// type itself — NOT a pre-unaliased type — so a GENERIC alias's own
+		// type parameters bind by position before the aliased type expands
+		// (Foo[T] = Bar[T] → Bar[$#0]); pre-unaliasing would leave those
+		// parameters free and fail closed. A non-generic alias unaliases
+		// internally to the same transparent target.
+		shape := AliasShape{ID: id, Target: ts(object.Type())}
 		if terr != nil {
 			return terr
 		}
