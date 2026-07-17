@@ -90,12 +90,23 @@ func (b *builder) memberEqPlan(named *types.Named, pointer, extern bool) *EqPlan
 		return &EqPlan{Kind: "identity"}
 	}
 	if extern {
-		if _, isStruct := named.Underlying().(*types.Struct); isStruct {
-			// A struct-underlying external value's comparability is unknown
-			// (we do not own its fields): fail closed rather than guess.
+		if !types.Comparable(named) {
+			// Go PANICS comparing an uncomparable dynamic type (an external
+			// slice/map/func carrier, or a struct with such a field); emit
+			// its exact runtime message rather than the unimplemented marker.
+			return &EqPlan{Kind: "uncomparable"}
+		}
+		switch named.Underlying().(type) {
+		case *types.Struct, *types.Array:
+			// A comparable external struct/array compares field- or
+			// element-wise in Go, but its TS value is an opaque handle whose
+			// contents we do not own: the completion contract (a stub-provided
+			// equality) is not yet declared, so equality fails closed loudly
+			// at runtime rather than guessing === (wrong for distinct-but-equal
+			// instances).
 			return &EqPlan{Kind: "external"}
 		}
-		// A basic-underlying external value carrier compares by ===.
+		// A comparable basic/pointer/channel external carrier compares by ===.
 		return &EqPlan{Kind: "identity"}
 	}
 	return b.eqPlan(named)
@@ -111,7 +122,11 @@ func (b *builder) eqPlan(t types.Type) *EqPlan {
 	}
 	if named, ok := types.Unalias(t).(*types.Named); ok {
 		if pkg := named.Obj().Pkg(); pkg != nil && !b.unit.Owns(pkg.Path()) {
-			if _, isStruct := named.Underlying().(*types.Struct); isStruct {
+			if !types.Comparable(named) {
+				return &EqPlan{Kind: "uncomparable"}
+			}
+			switch named.Underlying().(type) {
+			case *types.Struct, *types.Array:
 				return &EqPlan{Kind: "external"}
 			}
 			return &EqPlan{Kind: "identity"}
