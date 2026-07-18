@@ -409,29 +409,42 @@ func (p *printer) printArrayElemStore(array, index, value string, s stagedTarget
 // and field stores overwrite fields in place — Go writes the value's
 // memory, so every alias observes the store; struct slice elements go
 // through the bounds-checked in-place ABI store.
+// varStoreExpr renders a plain-variable store as a single expression,
+// dispatching on the carrier: a struct overwrites in place, a fixed array
+// overwrites every slot, an external value routes through its typed set
+// stub, and a scalar rebinds. It is the ONE store rendering shared by the
+// statement store (printStore) and the native for-header clause, so the
+// two can never diverge — an external value in particular stores in place
+// from both, keeping every existing pointer to it valid.
+func (p *printer) varStoreExpr(t ir.VarTarget, value string) (string, error) {
+	name := tsName(t.Name)
+	if t.T.Kind == ir.KindStruct {
+		return name + ".goSet$(" + value + ")", nil
+	}
+	if t.T.Kind == ir.KindArray {
+		setElem, err := p.arrayElemSet(*t.T.Elem)
+		if err != nil {
+			return "", err
+		}
+		return "gosl$.goArraySetAll(" + name + ", " + value + ", " + setElem + ")", nil
+	}
+	if callee := mustExternSet(p, t.T); callee != "" {
+		return callee + "(" + name + ", " + value + ")", nil
+	}
+	return name + " = " + value, nil
+}
+
 func (p *printer) printStore(target ir.Target, value string) error {
 	switch t := target.(type) {
 	case ir.BlankTarget:
 		p.line("void (%s);", value)
 		return nil
 	case ir.VarTarget:
-		if t.T.Kind == ir.KindStruct {
-			p.line("%s.goSet$(%s);", tsName(t.Name), value)
-			return nil
+		expr, err := p.varStoreExpr(t, value)
+		if err != nil {
+			return err
 		}
-		if t.T.Kind == ir.KindArray {
-			setElem, err := p.arrayElemSet(*t.T.Elem)
-			if err != nil {
-				return err
-			}
-			p.line("gosl$.goArraySetAll(%s, %s, %s);", tsName(t.Name), value, setElem)
-			return nil
-		}
-		if callee := mustExternSet(p, t.T); callee != "" {
-			p.line("%s(%s, %s);", callee, tsName(t.Name), value)
-			return nil
-		}
-		p.line("%s = %s;", tsName(t.Name), value)
+		p.line("%s;", expr)
 		return nil
 	case *ir.FieldTarget:
 		base, err := p.printExpr(t.X)

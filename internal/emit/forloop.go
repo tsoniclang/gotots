@@ -73,14 +73,7 @@ func (p *printer) forClauseable(stmt ir.Stmt, isInit bool) bool {
 		if n.Tuple != nil || len(n.Targets) != 1 {
 			return false
 		}
-		v, isVar := n.Targets[0].(ir.VarTarget)
-		if !isVar {
-			return false
-		}
-		if v.Pkg == "" && v.T.Kind == ir.KindSlice && p.slicePlans[v.Name] == "native-array" {
-			return false // printNativeSliceAssign form
-		}
-		return true
+		return p.nativeStorable(n.Targets[0])
 	case *ir.CompoundStmt:
 		switch n.Target.(type) {
 		case ir.VarTarget, ir.BoxedTarget:
@@ -89,6 +82,43 @@ func (p *printer) forClauseable(stmt ir.Stmt, isInit bool) bool {
 		return false
 	}
 	return false
+}
+
+// nativeStorable reports whether a target's store is a single expression
+// with no pre-evaluated operands, nil checks, or bounds panics — so it can
+// stand as a native for-header clause. Only a plain variable (not a
+// native-array local slice, whose whole-value store is a distinct
+// construction), a boxed cell, and a blank qualify; every field, pointee,
+// map, and slice element needs staged operands and is normalized. This is
+// the eligibility half of the store plan (which targets), kept separate
+// from the store-semantics half (how each carrier stores), which lives in
+// the shared varStoreExpr — so external is never a special case here.
+func (p *printer) nativeStorable(target ir.Target) bool {
+	switch t := target.(type) {
+	case ir.BlankTarget, ir.BoxedTarget:
+		return true
+	case ir.VarTarget:
+		if t.Pkg == "" && t.T.Kind == ir.KindSlice && p.slicePlans[t.Name] == "native-array" {
+			return false // printNativeSliceAssign form
+		}
+		return true
+	}
+	return false
+}
+
+// storeClauseExpr renders a native-storable target's store as a single
+// clause expression, reusing the shared varStoreExpr for variables so the
+// clause and the statement store are byte-identical by construction.
+func (p *printer) storeClauseExpr(target ir.Target, value string) (string, error) {
+	switch t := target.(type) {
+	case ir.BlankTarget:
+		return "void (" + value + ")", nil
+	case ir.BoxedTarget:
+		return t.Cell + ".v = " + value, nil
+	case ir.VarTarget:
+		return p.varStoreExpr(t, value)
+	}
+	return "", fmt.Errorf("assignment target %T not expressible in a for-loop clause", target)
 }
 
 // forClause renders an init/post statement as a for-header clause.
@@ -119,30 +149,19 @@ func (p *printer) forClause(stmt ir.Stmt, isInit bool) (string, error) {
 	case *ir.AssignStmt:
 		// Multi-result and parallel assignments are lowered by
 		// printForNormalized (which stages every target and stores after a
-		// single right-hand evaluation); forClause only renders a simple
-		// single variable target (guarded by forClauseable).
+		// single right-hand evaluation); forClause renders a single
+		// native-storable target (guarded by forClauseable) through the SAME
+		// store rendering as the statement store, so a native header can
+		// never diverge from the normalized form — an external value stores
+		// in place from both, never rebinds.
 		if n.Tuple != nil || len(n.Targets) != 1 {
 			return "", fmt.Errorf("assignment not expressible in this for-loop clause")
-		}
-		variable, isVar := n.Targets[0].(ir.VarTarget)
-		if !isVar {
-			return "", fmt.Errorf("non-variable assignment in a for-loop clause")
 		}
 		value, err := p.printExpr(n.Values[0])
 		if err != nil {
 			return "", err
 		}
-		if variable.T.Kind == ir.KindStruct {
-			return tsName(variable.Name) + ".goSet$(" + value + ")", nil
-		}
-		if variable.T.Kind == ir.KindArray {
-			setElem, err := p.arrayElemSet(*variable.T.Elem)
-			if err != nil {
-				return "", err
-			}
-			return "gosl$.goArraySetAll(" + tsName(variable.Name) + ", " + value + ", " + setElem + ")", nil
-		}
-		return tsName(variable.Name) + " = " + value, nil
+		return p.storeClauseExpr(n.Targets[0], value)
 	case *ir.CompoundStmt:
 		// Simple variable and cell targets evaluate once trivially, so
 		// the clause form needs no staging.
