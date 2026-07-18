@@ -62,6 +62,10 @@ func (p *printer) vtableEntries(info RttiInfo) ([]string, []string, error) {
 	methods := append([]*ir.Func{}, info.Methods...)
 	sort.Slice(methods, func(i, j int) bool { return methods[i].Name < methods[j].Name })
 	for _, method := range methods {
+		// The vtable PROPERTY is the method's canonical slot (never the bare
+		// name); the CALLEE symbol is the generated method function. An empty
+		// slot is a construction defect, not a spelling fallback.
+		slot := requireIdentity(method.Slot, "vtable slot for method "+method.Name)
 		callee := info.TypeName + "$" + method.Name
 		recvType := method.Receiver.Type
 		if !method.PointerReceiver {
@@ -70,7 +74,7 @@ func (p *printer) vtableEntries(info RttiInfo) ([]string, []string, error) {
 			if err != nil {
 				return nil, nil, err
 			}
-			entry, err := adapter(method.Name, method.Params, method.Results, callee, recvSpelled, "$r")
+			entry, err := adapter(slot, method.Params, method.Results, callee, recvSpelled, "$r")
 			if err != nil {
 				return nil, nil, err
 			}
@@ -92,7 +96,7 @@ func (p *printer) vtableEntries(info RttiInfo) ([]string, []string, error) {
 				cell := "gort$.GoCell<" + recvSpelled + ">"
 				chain = "gort$.goNilCheck<" + cell + ">($r).v"
 			}
-			entryPtr, err := adapter(method.Name, method.Params, method.Results, callee, ptrSpelled, chain)
+			entryPtr, err := adapter(slot, method.Params, method.Results, callee, ptrSpelled, chain)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -105,7 +109,7 @@ func (p *printer) vtableEntries(info RttiInfo) ([]string, []string, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		entry, err := adapter(method.Name, method.Params, method.Results, callee, recvSpelled, "$r")
+		entry, err := adapter(slot, method.Params, method.Results, callee, recvSpelled, "$r")
 		if err != nil {
 			return nil, nil, err
 		}
@@ -126,11 +130,9 @@ func (p *printer) vtableEntries(info RttiInfo) ([]string, []string, error) {
 		// declaring method's generated function type (Parameters<> minus
 		// the receiver) — exact and erased-free. The property is the
 		// method's canonical SLOT (bare name unless two same-spelled
-		// unexported methods from different packages both promote).
-		slot := delegate.Slot
-		if slot == "" {
-			slot = delegate.Name
-		}
+		// unexported methods from different packages both promote); an empty
+		// slot is a construction defect, not a spelling fallback.
+		slot := requireIdentity(delegate.Slot, "vtable slot for promoted method "+delegate.Name)
 		valueEntry := fmt.Sprintf("%s: ($r: %s, ...$a: goif$.DropFirst<Parameters<typeof %s>>) => %s(%s, ...$a)",
 			slot, self, target, target, chain)
 		pointerEntry := fmt.Sprintf("%s: ($r: (%s | undefined), ...$a: goif$.DropFirst<Parameters<typeof %s>>) => %s(gort$.goNilCheck<%s>($r)%s, ...$a)",

@@ -10,6 +10,19 @@ import (
 	"github.com/tsoniclang/gotots/internal/ir"
 )
 
+// requireIdentity is the single choke point every method-slot / method-key
+// emission passes through: a canonical dispatch identity is populated by
+// the IR builder (which fails a declaration closed on any MethodKey/slot
+// failure), so an empty value here is a construction-invariant violation
+// and panics at generation — it can NEVER silently become a bare-name
+// substitution.
+func requireIdentity(value, what string) string {
+	if value == "" {
+		panic("emit: " + what + " has no canonical identity")
+	}
+	return value
+}
+
 // rttiRef spells a reference to a concrete type's shared rtti object.
 func (p *printer) rttiRef(r ir.RttiRef) (string, error) {
 	if r.Predeclared != "" {
@@ -33,13 +46,7 @@ func (p *printer) rttiRef(r ir.RttiRef) (string, error) {
 		// external contract stubs directly. Comparability stays unknown.
 		names := make([]string, 0, len(p.module.ExternMethods[r.ExternID]))
 		for _, method := range p.module.ExternMethods[r.ExternID] {
-			// The canonical external MethodKey, always populated (external
-			// method obligations hard-error on a failing MethodKey); an empty
-			// key is a construction defect, never a bare-name fallback.
-			if method.Key == "" {
-				panic("emit: external method " + method.Name + " has no canonical identity for the assertion rtti")
-			}
-			names = append(names, fmt.Sprintf("%q", method.Key))
+			names = append(names, fmt.Sprintf("%q", requireIdentity(method.Key, "external method "+method.Name)))
 		}
 		sort.Strings(names)
 		return fmt.Sprintf("goif$.goRttiComposite(%q, { d: %q, ms: [%s], x: %q })", r.Composite, r.Display, strings.Join(names, ", "), r.ExternID), nil
@@ -94,8 +101,9 @@ func printRtti(out *strings.Builder, module *Module, info RttiInfo) error {
 // pointer method sets — each entry the method's canonical MethodKey (name,
 // unexported package, signature digest) — data used only for the
 // signature-aware missing-method diagnostic of a failed interface
-// assertion, never for dispatch. A method with no canonical identity (a
-// generic method) falls back to its bare name.
+// assertion, never for dispatch. Every identity is populated by the IR
+// builder (MethodKey is total); an empty one fails closed through
+// requireIdentity, never a bare-name fallback.
 func (info RttiInfo) methodDisplays() (string, string) {
 	valueSet := map[string]bool{}
 	pointerSet := map[string]bool{}
@@ -104,20 +112,14 @@ func (info RttiInfo) methodDisplays() (string, string) {
 	// not a bare-name fallback — a method with no canonical identity would
 	// have failed the declaration closed already.
 	for _, method := range info.Methods {
-		id := method.MethodIdent
-		if id == "" {
-			panic("emit: method " + method.Name + " has no canonical identity for the assertion rtti")
-		}
+		id := requireIdentity(method.MethodIdent, "method "+method.Name)
 		pointerSet[id] = true
 		if !method.PointerReceiver {
 			valueSet[id] = true
 		}
 	}
 	for _, delegate := range info.Promoted {
-		id := delegate.MethodIdent
-		if id == "" {
-			panic("emit: promoted method " + delegate.Name + " has no canonical identity for the assertion rtti")
-		}
+		id := requireIdentity(delegate.MethodIdent, "promoted method "+delegate.Name)
 		pointerSet[id] = true
 		if delegate.ValueReceiver {
 			valueSet[id] = true

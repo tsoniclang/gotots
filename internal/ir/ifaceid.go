@@ -190,6 +190,21 @@ func MethodKey(method *types.Func) (string, error) {
 // slots are distinct and each interface dispatches to exactly its own
 // method. Both the vtable construction and the dispatch site derive the
 // selector through THIS function, so they always agree.
+// methodReceiverNamed returns a method signature's receiver named type
+// (pointer unwrapped), or nil if the receiver is not a named type.
+func methodReceiverNamed(sig *types.Signature) *types.Named {
+	recv := sig.Recv()
+	if recv == nil {
+		return nil
+	}
+	t := types.Unalias(recv.Type())
+	if p, ok := t.(*types.Pointer); ok {
+		t = types.Unalias(p.Elem())
+	}
+	named, _ := t.(*types.Named)
+	return named
+}
+
 func MethodSlot(named *types.Named, method *types.Func) (string, error) {
 	name := method.Name()
 	set := types.NewMethodSet(types.NewPointer(named))

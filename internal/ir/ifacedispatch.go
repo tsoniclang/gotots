@@ -8,6 +8,7 @@
 package ir
 
 import (
+	"fmt"
 	"go/types"
 	"sort"
 )
@@ -278,11 +279,16 @@ func (b *builder) ifaceMembers(iface *types.Interface, span Span) ([]IfaceMember
 			m := iface.Method(i)
 			sel := lookupSelection(set, m.Pkg(), m.Name())
 			if sel == nil {
-				continue
+				// Membership was established by types.Implements, so the
+				// member MUST resolve every interface method; a missing
+				// selection is an invariant violation, not a slot to skip.
+				return fmt.Errorf("ir: interface member %s implements %s but has no selection for method %s",
+					named.Obj().Name(), key, m.Name())
 			}
 			impl, ok := sel.Obj().(*types.Func)
 			if !ok {
-				continue
+				return fmt.Errorf("ir: interface member %s selection for method %s is not a func (%T)",
+					named.Obj().Name(), m.Name(), sel.Obj())
 			}
 			slot, err := MethodSlot(named, impl)
 			if err != nil {

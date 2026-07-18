@@ -431,7 +431,13 @@ type Func struct {
 	// for free functions. The interface-assertion diagnostic compares these
 	// so a wrong-signature method is reported "missing" exactly as Go does.
 	MethodIdent string
-	Span        Span
+	// Slot is the method's vtable property name (ir.MethodSlot): the bare
+	// name when unique in the receiver's method set, disambiguated by
+	// canonical identity otherwise. It is empty for free functions. The
+	// vtable emits by Slot — never the bare Name — so dispatch and the
+	// vtable index the same canonical slot.
+	Slot string
+	Span Span
 	// TypeParams are the generic type parameter names, admitted under
 	// the unit's closed-world instantiation evidence.
 	TypeParams []string

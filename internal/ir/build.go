@@ -141,6 +141,17 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 				Construct: "method without canonical identity (" + object.Name() + ")", Span: span})
 		}
 		function.MethodIdent = key
+		// The vtable slot: the method's own receiver names its slot exactly as
+		// dispatch resolves it (ir.MethodSlot over the receiver's method set),
+		// so the vtable property is a canonical slot, never the bare name.
+		if recvNamed := methodReceiverNamed(signature); recvNamed != nil {
+			slot, err := MethodSlot(recvNamed, object)
+			if err != nil {
+				return declarationSite(&Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+					Construct: "method without canonical slot (" + object.Name() + ")", Span: span})
+			}
+			function.Slot = slot
+		}
 	}
 	if decl.Body == nil {
 		return declarationSite(&Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "bodyless function", Span: span})
