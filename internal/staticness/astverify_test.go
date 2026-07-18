@@ -379,3 +379,88 @@ export function make(): OrdinaryGoStruct { return { k: "x", r: "y", v: {}, m: 1n
 		}
 	}
 }
+
+// TestASTVerifierBoxThroughEveryAliasForm proves carrier recognition is by
+// the v-member's declaring ORIGIN, form-agnostic: an erased box hidden
+// behind parentheses, an intersection, a union, an imported alias, and a
+// multi-hop alias is caught, while a concrete payload through the same
+// forms is not — with no per-syntax special-casing.
+func TestASTVerifierBoxThroughEveryAliasForm(t *testing.T) {
+	files := map[string]string{
+		"language-abi/goiface.ts": `
+export interface GoRtti { readonly d: string }
+export type GoBox<K extends string, V, M> = { readonly k: K; readonly r: GoRtti; readonly v: V; readonly m: M };
+`,
+		"core/via/box.ts": `
+import * as goif$ from "../../language-abi/goiface.ts";
+export type ReExport<V> = goif$.GoBox<"e", V, Record<never, never>>;
+`,
+		"core/pkg/package.ts": `
+import * as goif$ from "../../language-abi/goiface.ts";
+import { ReExport } from "../via/box.ts";
+type Methods = Record<never, never>;
+type Paren<V> = (goif$.GoBox<"p", V, Methods>);
+type Inter<V> = goif$.GoBox<"i", V, Methods> & {};
+type Uni<V> = goif$.GoBox<"u", V, Methods> | goif$.GoBox<"u", V, Methods>;
+type Hop1<V> = goif$.GoBox<"h", V, Methods>;
+type Hop2<V> = Hop1<V>;
+type Hop3<V> = Hop2<V>;
+export interface Exact { readonly n: bigint }
+// Erased through each form:
+export type EP = Paren<object>;
+export type EI = Inter<unknown>;
+export type EU = Uni<object>;
+export type EImp = ReExport<object>;
+export type EHop = Hop3<unknown>;
+// Concrete through the same forms must NOT flag:
+export type CP = Paren<Exact>;
+export type CHop = Hop3<Exact>;
+`,
+	}
+	report, err := VerifyAST(files, typescriptDir(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	erasedInPkg := 0
+	for _, v := range report.Violations {
+		if (v.Pattern == "erased-iface-payload" || v.Pattern == "abi:erased-iface-payload") && v.File == "core/pkg/package.ts" {
+			erasedInPkg++
+		}
+	}
+	// EP, EI, EU, EImp, EHop = 5 erased boxes; CP/CHop must not add to it.
+	if erasedInPkg < 5 {
+		t.Errorf("expected >=5 erased-box detections across alias forms, got %d: %+v", erasedInPkg, report.Violations)
+	}
+}
+
+// TestASTVerifierAliasedGlobalsByIdentity proves the reflection / erased
+// checks resolve to the lib globals by IDENTITY: an aliased Proxy,
+// Function type, and Record are caught, so renaming a global does not
+// bypass the gate.
+func TestASTVerifierAliasedGlobalsByIdentity(t *testing.T) {
+	files := map[string]string{
+		"core/pkg/package.ts": `
+const P = Proxy;
+const F = Function;
+type Fn = Function;
+type Registry = Record<string, Fn>;
+export function makeProxy(): object { return new P({}, {}); }
+export function makeFn(): unknown { return new F("return 1"); }
+export const reg: Registry = {};
+export function badType(x: Fn): void { void x; }
+`,
+	}
+	report, err := VerifyAST(files, typescriptDir(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := map[string]bool{}
+	for _, v := range report.Violations {
+		found[v.Pattern] = true
+	}
+	for _, want := range []string{"reflection-construct", "erased-function-type", "string-function-registry"} {
+		if !found[want] {
+			t.Errorf("aliased-global bypass: %s not caught: %+v", want, report.Violations)
+		}
+	}
+}

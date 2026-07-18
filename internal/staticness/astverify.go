@@ -115,10 +115,6 @@ function declaringFile(symbol) {
   return decls[0].getSourceFile().fileName;
 }
 
-function isFunctionTypeName(node) {
-  return ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName) && node.typeName.text === "Function";
-}
-
 // isErasedType reports whether a RESOLVED type is an erased top: any,
 // unknown, the object keyword (NonPrimitive), or the empty object type {}
 // (an object type with no properties, no call/construct signatures, and no
@@ -157,45 +153,77 @@ for (const source of program.getSourceFiles()) {
   }
 }
 
-// symbolReachesBoxDecl follows an alias/type-alias chain from sym to the
-// GoBox or GoAnyBox declaration symbol (through import aliases and
-// type-alias targets), so a box hidden behind one or more aliases is
-// still identified by its resolved declaration — not by field names.
-function symbolReachesBoxDecl(sym) {
-  let s = sym;
-  const seen = new Set();
-  while (s && !seen.has(s)) {
-    seen.add(s);
-    if (s === goBoxDeclSymbol || s === goAnyBoxDeclSymbol) return true;
-    if (s.flags & ts.SymbolFlags.Alias) { s = checker.getAliasedSymbol(s); continue; }
-    const decl = s.declarations && s.declarations[0];
-    if (decl && ts.isTypeAliasDeclaration(decl) && decl.type && ts.isTypeReferenceNode(decl.type)) {
-      const nameNode = ts.isQualifiedName(decl.type.typeName) ? decl.type.typeName.right : decl.type.typeName;
-      s = checker.getSymbolAtLocation(nameNode);
-      continue;
+// isLibGlobal reports whether a resolved symbol is the ambient lib global
+// of the given name — recognized by RESOLVED DECLARATION ORIGIN, not
+// spelling: its name matches AND it is declared OUTSIDE the generated tree
+// (the TypeScript lib). An alias (const P = Proxy; type Fn = Function)
+// resolves to the same lib symbol and is caught; a coincidental same-name
+// declaration inside the generated tree resolves to a different symbol and
+// is not. (Computed-member invocation stays syntactic — it is inherently
+// syntactic, not an identity question.)
+function isLibGlobal(symbol, name) {
+  if (!symbol || symbol.getName() !== name) return false;
+  const f = declaringFile(symbol);
+  return !!f && !f.startsWith(root);
+}
+
+// resolvedTypeSymbol resolves a type reference's name to its origin symbol
+// (following import/local aliases).
+function resolvedTypeSymbol(typeNode) {
+  if (!ts.isTypeReferenceNode(typeNode)) return undefined;
+  const nameNode = ts.isQualifiedName(typeNode.typeName) ? typeNode.typeName.right : typeNode.typeName;
+  return resolveSymbol(nameNode);
+}
+
+// isFunctionType reports whether a type node is the lib Function type,
+// through any alias form: it resolves the TYPE semantically (following
+// import and type aliases) and compares the resolved type's symbol origin
+// to the lib Function — so type Fn = Function; x: Fn is caught.
+function isFunctionType(typeNode) {
+  if (!typeNode || !ts.isTypeNode(typeNode)) return false;
+  const t = checker.getTypeFromTypeNode(typeNode);
+  if (!t) return false;
+  return isLibGlobal(t.getSymbol(), "Function") || isLibGlobal(t.aliasSymbol, "Function");
+}
+
+// propertyDeclaredInBox reports whether a resolved property SYMBOL was
+// declared by the GoBox (or GoAnyBox) declaration. This is the ONE
+// authoritative, form-agnostic carrier test: the checker resolves the v
+// property semantically through EVERY generated type form — parentheses,
+// intersections, unions, imported and multi-hop aliases — so a box hidden
+// behind any of them is identified by the ORIGIN of its own v member, not
+// by matching alias syntax or member-name shape.
+function propertyDeclaredInBox(propSymbol) {
+  if (!propSymbol || !propSymbol.declarations) return false;
+  for (const d of propSymbol.declarations) {
+    let node = d.parent;
+    while (node) {
+      if (ts.isTypeAliasDeclaration(node) || ts.isInterfaceDeclaration(node)) {
+        const declSym = node.name ? checker.getSymbolAtLocation(node.name) : undefined;
+        return declSym === goBoxDeclSymbol || declSym === goAnyBoxDeclSymbol;
+      }
+      node = node.parent;
     }
-    break;
   }
   return false;
 }
 
-// isGoBoxType reports whether a RESOLVED type is a GoBox (or an alias
-// resolving to one), by DECLARATION identity of its alias/own symbol.
-function isGoBoxType(t) {
+// isBoxType reports whether a RESOLVED type is a box — its v member
+// originates in the GoBox declaration — regardless of the type form it
+// reached us through.
+function isBoxType(t) {
   if (!t) return false;
-  if (t.aliasSymbol && symbolReachesBoxDecl(t.aliasSymbol)) return true;
-  if (t.symbol && symbolReachesBoxDecl(t.symbol)) return true;
-  return false;
+  return propertyDeclaredInBox(checker.getPropertyOfType(t, "v"));
 }
 
 // boxPayloadType returns the payload (v) type of a box referenced by
-// typeNode, or undefined if it is not a box. Identity is by resolved
-// DECLARATION, so an ordinary {k,r,v,m} domain type is not a box.
+// typeNode, or undefined if it is not a box. Identity is by the v
+// member's declaring origin, so an ordinary {k,r,v,m} domain type is not a
+// box and a parenthesized / intersected / multi-hop-aliased box still is.
 function boxPayloadType(typeNode) {
   const t = checker.getTypeFromTypeNode(typeNode);
-  if (!isGoBoxType(t)) return undefined;
   const v = checker.getPropertyOfType(t, "v");
-  if (!v) return undefined;
+  if (!propertyDeclaredInBox(v)) return undefined;
   // getTypeOfSymbol returns the INSTANTIATED payload type (unknown/object),
   // where getTypeOfSymbolAtLocation would re-resolve to the parameter V.
   return checker.getTypeOfSymbol(v);
@@ -231,26 +259,34 @@ for (const source of program.getSourceFiles()) {
           report(file, node, source, "erased-dispatch-helper");
         }
         // Positive disposition: the callee's type must be a concrete
-        // callable — any/unknown/Function-typed callees are erased.
+        // callable. A callee with no call signature that is any/unknown (by
+        // FLAGS, not rendered text) or the lib Function type (by symbol
+        // identity) is erased dispatch. A Function-annotated callee is also
+        // caught at its type annotation (erased-function-type).
         const calleeType = checker.getTypeAtLocation(callee);
         const nonNull = calleeType.getNonNullableType();
         if (nonNull.getCallSignatures().length === 0 && !(nonNull.getFlags() & ts.TypeFlags.Never)) {
-          const display = checker.typeToString(nonNull);
-          if (display === "any" || display === "unknown" || display === "Function") {
+          const f = nonNull.getFlags();
+          const isFnGlobal = isLibGlobal(nonNull.getSymbol(), "Function") || isLibGlobal(nonNull.aliasSymbol, "Function");
+          if ((f & ts.TypeFlags.Any) || (f & ts.TypeFlags.Unknown) || isFnGlobal) {
             report(file, node, source, "erased-callee-type");
           }
         }
       }
     }
     if (ts.isNewExpression(node) && ts.isIdentifier(node.expression)) {
-      if (node.expression.text === "Proxy" || node.expression.text === "Function") {
+      const s = resolveSymbol(node.expression);
+      if (isLibGlobal(s, "Proxy") || isLibGlobal(s, "Function")) {
         report(file, node, source, "reflection-construct");
       }
     }
-    if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "Reflect") {
-      report(file, node, source, "reflection-construct");
+    if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression)) {
+      const s = resolveSymbol(node.expression);
+      if (isLibGlobal(s, "Reflect")) {
+        report(file, node, source, "reflection-construct");
+      }
     }
-    if (isFunctionTypeName(node)) {
+    if (isFunctionType(node)) {
       report(file, node, source, "erased-function-type");
     }
     // Erased interface payload in generated CORE: a box (GoBox, OR any
@@ -271,7 +307,7 @@ for (const source of program.getSourceFiles()) {
         // Recovering .v off a box: identify the box by RESOLVED declaration
         // identity, never by rendered type text containing "GoBox".
         const boxType = checker.getTypeAtLocation(node.expression.expression);
-        if (isGoBoxType(boxType)) {
+        if (isBoxType(boxType)) {
           report(file, node, source, "erased-payload-recovery-cast");
         }
       }
@@ -286,11 +322,15 @@ for (const source of program.getSourceFiles()) {
         }
       }
     }
-    if (ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName)) {
-      const name = node.typeName.text;
-      if ((name === "Record" || name === "Map") && node.typeArguments && node.typeArguments.length === 2) {
+    if (ts.isTypeReferenceNode(node) && node.typeArguments && node.typeArguments.length === 2) {
+      // A string-keyed function registry (Record<string, Function> or
+      // Map<string, Function>) — identified by the lib Record/Map symbol and
+      // the lib Function symbol, so an aliased Record/Map/Function is caught.
+      const container = resolvedTypeSymbol(node);
+      if (isLibGlobal(container, "Record") || isLibGlobal(container, "Map")) {
         const [k, v] = node.typeArguments;
-        if (k.kind === ts.SyntaxKind.StringKeyword && isFunctionTypeName(v)) {
+        const kt = checker.getTypeFromTypeNode(k);
+        if ((kt.getFlags() & ts.TypeFlags.String) && isFunctionType(v)) {
           report(file, node, source, "string-function-registry");
         }
       }
