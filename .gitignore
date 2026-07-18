@@ -1,3 +1,14 @@
+# Project-local analysis, scratch, and generated test work
+/.analysis/
+/.temp/
+/.tests/
+
+# Editor and operating-system state
+/.idea/
+/.vscode/
+.DS_Store
+Thumbs.db
+
 # Logs
 logs
 *.log
@@ -40,6 +51,10 @@ build/Release
 # Dependency directories
 node_modules/
 jspm_packages/
+
+# Go build and test artifacts
+*.test
+profile.cov
 
 # Snowpack dependency directory (https://snowpack.dev/)
 web_modules/
@@ -141,3 +156,6 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+.claude/
+/product/node_modules/
+/product/package-lock.json

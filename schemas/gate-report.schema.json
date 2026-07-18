@@ -1,0 +1,146 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "blocked": {
+      "type": "integer"
+    },
+    "expectedStages": {
+      "type": "integer"
+    },
+    "failed": {
+      "type": "integer"
+    },
+    "gates": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "details": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "name": {
+            "pattern": "nonempty",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pass",
+              "fail",
+              "blocked"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "status"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "inputs": {
+      "additionalProperties": false,
+      "properties": {
+        "buildProfile": {
+          "pattern": "nonempty",
+          "type": "string"
+        },
+        "decisionRegistrySha256": {
+          "pattern": "sha256-hex",
+          "type": "string"
+        },
+        "goExecutableSha256": {
+          "type": "string"
+        },
+        "goVersion": {
+          "type": "string"
+        },
+        "gorootSourceSha256": {
+          "type": "string"
+        },
+        "helperRuntimeSha256": {
+          "type": "string"
+        },
+        "implementationRevision": {
+          "pattern": "nonempty",
+          "type": "string"
+        },
+        "javascriptRuntime": {
+          "type": "string"
+        },
+        "missing": {
+          "items": {
+            "pattern": "nonempty",
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "moduleResolverPolicy": {
+          "type": "string"
+        },
+        "moduleResolverSha256": {
+          "type": "string"
+        },
+        "nodeExecutableSha256": {
+          "type": "string"
+        },
+        "profileSha256": {
+          "type": "string"
+        },
+        "sourceRevision": {
+          "type": "string"
+        },
+        "specificationManifestSha256": {
+          "pattern": "sha256-hex",
+          "type": "string"
+        },
+        "strictConfigSha256": {
+          "type": "string"
+        },
+        "typescriptCompiler": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "implementationRevision",
+        "specificationManifestSha256",
+        "decisionRegistrySha256",
+        "buildProfile",
+        "missing"
+      ],
+      "type": "object"
+    },
+    "missingStages": {
+      "type": "integer"
+    },
+    "passed": {
+      "type": "boolean"
+    },
+    "passedStages": {
+      "type": "integer"
+    },
+    "reportedStages": {
+      "type": "integer"
+    },
+    "schemaVersion": {
+      "type": "integer"
+    }
+  },
+  "required": [
+    "blocked",
+    "expectedStages",
+    "failed",
+    "gates",
+    "inputs",
+    "missingStages",
+    "passed",
+    "passedStages",
+    "reportedStages",
+    "schemaVersion"
+  ],
+  "type": "object"
+}

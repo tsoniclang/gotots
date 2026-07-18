@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "product": "tsts",
+  "goModule": "github.com/microsoft/typescript-go",
+  "pin": "../../pins/typescript-go.json",
+  "buildProfiles": [
+    {
+      "name": "linux-amd64",
+      "goos": "linux",
+      "goarch": "amd64",
+      "goamd64": "v1",
+      "cgoEnabled": false,
+      "tags": []
+    }
+  ],
+  "ownedRoots": [
+    "internal/ast",
+    "internal/astnav",
+    "internal/binder",
+    "internal/bundled",
+    "internal/checker",
+    "internal/collections",
+    "internal/compiler",
+    "internal/core",
+    "internal/debug",
+    "internal/diagnostics",
+    "internal/diagnosticwriter",
+    "internal/evaluator",
+    "internal/execute/incremental",
+    "internal/execute/tsc",
+    "internal/fswatch",
+    "internal/glob",
+    "internal/jsnum",
+    "internal/json",
+    "internal/jsonrpc",
+    "internal/locale",
+    "internal/module",
+    "internal/modulespecifiers",
+    "internal/nodebuilder",
+    "internal/outputpaths",
+    "internal/packagejson",
+    "internal/parser",
+    "internal/pprof",
+    "internal/printer",
+    "internal/pseudochecker",
+    "internal/repo",
+    "internal/scanner",
+    "internal/semver",
+    "internal/sourcemap",
+    "internal/stringutil",
+    "internal/symlinks",
+    "internal/tracing",
+    "internal/transformers",
+    "internal/tsoptions",
+    "internal/tspath",
+    "internal/vfs"
+  ],
+  "testOnlyRoots": [
+    "internal/testrunner",
+    "internal/testutil",
+    "internal/tsoptions/tsoptionstest",
+    "internal/vfs/vfstest"
+  ],
+  "outsideUniverseRoots": {
+    "lsp": [
+      "internal/lsp"
+    ],
+    "fourslash": [
+      "internal/fourslash"
+    ],
+    "editor-service": [
+      "internal/api",
+      "internal/format",
+      "internal/ls",
+      "internal/project",
+      "internal/testutil/autoimporttestutil",
+      "internal/testutil/lsptestutil",
+      "internal/testutil/projecttestutil"
+    ]
+  },
+  "toolingRoots": [
+    "_tools"
+  ],
+  "notes": [
+    "ownedRoots is the canonical package-root allowlist derived from the packages implemented by TSTS main a80a5da32ee5335928e44ee3fe9357fe1e51056e under packages/tsts/src/internal.",
+    "cmd/tsgo is deliberately not owned: at pin c78d39e7 it depends on internal/lsp, internal/ls, internal/project, internal/format, and internal/api, all hard-excluded. The product CLI surface is TSTS-owned assembly.",
+    "testOnlyRoots are owned test-support source: analyzed under the test scope, importable from test scope only. A production import of a test-only root is a contradiction.",
+    "internal/testutil/{autoimporttestutil,lsptestutil,projecttestutil} are hard-excluded carve-outs inside the testutil test-only root: they exist to support excluded LSP/project tests and their dependency closure reaches internal/lsp and internal/project.",
+    "editor-service exclusions follow the packet plus Porter exclusion records: internal/format and internal/api are recorded as outside the standalone compiler runtime port.",
+    "internal/execute (the tsc CLI driver, tsc.go/watcher.go) is unselected by ADR 0003: at pin c78d39e7 its tsc.go binds hard-excluded editor-service packages (internal/format, internal/ls/lsutil), and the TSTS product CLI is product-owned assembly that deliberately omits those paths. Its subpackages incremental/ and tsc/ remain owned; build/ (the tsc --build driver mode, whose tests run through the driver harness) and the harness tsctests/ follow the driver into unselected."
+  ]
+}
