@@ -54,9 +54,18 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 
 	case *ir.BranchStmt:
 		if n.Label != "" {
-			// Go's labeled loop/switch branches coincide exactly with JS
-			// labeled statements (yield-boundary crossings fail closed at
-			// build).
+			// A label targeting a normalized loop redirects to its
+			// while / body-block labels; otherwise Go's labeled
+			// loop/switch branches coincide exactly with JS labeled
+			// statements (yield-boundary crossings fail closed at build).
+			if ctx := p.normLabels[labelName(n.Label)]; ctx != nil {
+				if n.Tok == token.BREAK {
+					p.line("break %s;", ctx.breakLabel)
+				} else {
+					p.line("break %s;", ctx.contLabel)
+				}
+				return nil
+			}
 			if n.Tok == token.BREAK {
 				p.line("break %s;", labelName(n.Label))
 			} else {
@@ -64,16 +73,27 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 			}
 			return nil
 		}
-		// Inside a range-over-func body, break stops the iteration
-		// through the yield protocol and continue yields true; a nested
-		// loop or switch that owns the branch cleared the transform.
+		// A normalized loop owns the innermost break/continue and
+		// redirects to its labels so the post statement still runs.
+		// Otherwise, inside a range-over-func body, break stops the
+		// iteration through the yield protocol and continue yields true;
+		// a nested loop or switch that owns the branch cleared both
+		// transforms.
 		if n.Tok == token.BREAK {
+			if ctx := p.normBreak; ctx != nil {
+				p.line("break %s;", ctx.breakLabel)
+				return nil
+			}
 			if ctx := p.rangeBreak; ctx != nil {
 				p.line("%s = true;", ctx.doneVar)
 				p.line("return false;")
 				return nil
 			}
 			p.line("break;")
+			return nil
+		}
+		if ctx := p.normContinue; ctx != nil {
+			p.line("break %s;", ctx.contLabel)
 			return nil
 		}
 		if ctx := p.rangeContinue; ctx != nil {
@@ -346,178 +366,6 @@ func (p *printer) printIf(n *ir.IfStmt) error {
 		p.line("}")
 	}
 	return nil
-}
-
-// printFor emits the classic three-clause loop as a JS for header so that
-// continue still executes the post statement (a body-tail post would be
-// skipped by continue).
-func (p *printer) printFor(n *ir.ForStmt) error {
-	init, err := p.forClause(n.Init, true)
-	if err != nil {
-		return err
-	}
-	cond := ""
-	if n.Cond != nil {
-		cond, err = p.printExpr(n.Cond)
-		if err != nil {
-			return err
-		}
-	}
-	post, err := p.forClause(n.Post, false)
-	if err != nil {
-		return err
-	}
-	p.line("%sfor (%s; %s; %s) {", p.takeLoopLabel(), init, cond, post)
-	p.indent++
-	if err := p.printLoopBody(n.Body); err != nil {
-		return err
-	}
-	p.indent--
-	p.line("}")
-	return nil
-}
-
-// forClause renders an init/post statement as a for-header clause.
-func (p *printer) forClause(stmt ir.Stmt, isInit bool) (string, error) {
-	switch n := stmt.(type) {
-	case nil:
-		return "", nil
-	case *ir.DeclStmt:
-		if !isInit {
-			return "", fmt.Errorf("declaration not expressible in this for-loop clause")
-		}
-		if n.Tuple != nil {
-			// A multi-result initializer (call or comma-ok) destructures into
-			// the declared names, evaluating the single source expression
-			// exactly once — the classic `for a, b := f(); …` clause. A
-			// reused name would re-declare, so only a fresh declaration is a
-			// clause.
-			for _, reused := range n.Reused {
-				if reused {
-					return "", fmt.Errorf("declaration not expressible in this for-loop clause")
-				}
-			}
-			names := make([]string, len(n.Names))
-			types := make([]string, len(n.Names))
-			for i, name := range n.Names {
-				spelled, err := p.tsType(n.Types[i])
-				if err != nil {
-					return "", err
-				}
-				names[i] = tsName(name)
-				types[i] = spelled
-			}
-			tuple, err := p.printExpr(n.Tuple)
-			if err != nil {
-				return "", err
-			}
-			return fmt.Sprintf("let [%s]: [%s] = %s", joinComma(names), joinComma(types), tuple), nil
-		}
-		parts := make([]string, len(n.Names))
-		for i, name := range n.Names {
-			spelled, err := p.tsType(n.Types[i])
-			if err != nil {
-				return "", err
-			}
-			value, err := p.printExpr(n.Values[i])
-			if err != nil {
-				return "", err
-			}
-			parts[i] = fmt.Sprintf("%s: %s = %s", tsName(name), spelled, value)
-		}
-		return "let " + joinComma(parts), nil
-	case *ir.AssignStmt:
-		if n.Tuple != nil {
-			// A multi-result assignment (`a, b = f()`) destructures the single
-			// source into simple variable targets, evaluating f() once and
-			// storing both — exactly Go's semantics.
-			locs, ok := simpleClauseTargets(n.Targets)
-			if !ok {
-				return "", fmt.Errorf("assignment not expressible in this for-loop clause")
-			}
-			tuple, err := p.printExpr(n.Tuple)
-			if err != nil {
-				return "", err
-			}
-			return "[" + joinComma(locs) + "] = " + tuple, nil
-		}
-		if len(n.Targets) != 1 {
-			// A parallel assignment (`a, b = c, d`): destructure the
-			// right-hand tuple so every right side evaluates before any
-			// store, matching Go's two-phase rule (and a b,a swap).
-			locs, ok := simpleClauseTargets(n.Targets)
-			if !ok || len(n.Values) != len(n.Targets) {
-				return "", fmt.Errorf("assignment not expressible in this for-loop clause")
-			}
-			values := make([]string, len(n.Values))
-			for i, v := range n.Values {
-				printed, err := p.printExpr(v)
-				if err != nil {
-					return "", err
-				}
-				values[i] = printed
-			}
-			return "[" + joinComma(locs) + "] = [" + joinComma(values) + "]", nil
-		}
-		variable, isVar := n.Targets[0].(ir.VarTarget)
-		if !isVar {
-			return "", fmt.Errorf("non-variable assignment in a for-loop clause")
-		}
-		value, err := p.printExpr(n.Values[0])
-		if err != nil {
-			return "", err
-		}
-		if variable.T.Kind == ir.KindStruct {
-			return tsName(variable.Name) + ".goSet$(" + value + ")", nil
-		}
-		if variable.T.Kind == ir.KindArray {
-			setElem, err := p.arrayElemSet(*variable.T.Elem)
-			if err != nil {
-				return "", err
-			}
-			return "gosl$.goArraySetAll(" + tsName(variable.Name) + ", " + value + ", " + setElem + ")", nil
-		}
-		return tsName(variable.Name) + " = " + value, nil
-	case *ir.CompoundStmt:
-		// Simple variable and cell targets evaluate once trivially, so
-		// the clause form needs no staging.
-		var location string
-		switch target := n.Target.(type) {
-		case ir.VarTarget:
-			location = tsName(target.Name)
-		case ir.BoxedTarget:
-			location = target.Cell + ".v"
-		default:
-			return "", fmt.Errorf("compound target %T not expressible in a for-loop clause", n.Target)
-		}
-		rhs, err := p.printExpr(n.Rhs)
-		if err != nil {
-			return "", err
-		}
-		value, err := p.printBinaryOp(n.Op, location, rhs, n.OperandT, n.Rhs.Type().Kind)
-		if err != nil {
-			return "", err
-		}
-		return location + " = " + value, nil
-	}
-	return "", fmt.Errorf("statement %T not expressible in a for-loop clause", stmt)
-}
-
-// simpleClauseTargets returns the TS locations of a tuple / parallel
-// assignment's targets when EVERY target is a simple local scalar variable
-// — no value-copy carrier (struct/array, which needs a copy call), no
-// package binding, no pointer cell. Only such targets can be destructured
-// directly in a for-loop clause without staging into statements.
-func simpleClauseTargets(targets []ir.Target) ([]string, bool) {
-	locs := make([]string, len(targets))
-	for i, target := range targets {
-		v, ok := target.(ir.VarTarget)
-		if !ok || v.Pkg != "" || v.T.Kind == ir.KindStruct || v.T.Kind == ir.KindArray {
-			return nil, false
-		}
-		locs[i] = tsName(v.Name)
-	}
-	return locs, true
 }
 
 func (p *printer) printReturn(n *ir.ReturnStmt) error {

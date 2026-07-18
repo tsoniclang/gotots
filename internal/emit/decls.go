@@ -11,22 +11,26 @@ import (
 )
 
 // printLoopBody prints a nested loop's body: the loop owns break and
-// continue, so both range-over-func branch transforms clear.
+// continue, so both range-over-func and normalized-loop branch
+// transforms clear.
 func (p *printer) printLoopBody(block *ir.Block) error {
 	savedBreak, savedContinue := p.rangeBreak, p.rangeContinue
+	savedNormBreak, savedNormContinue := p.normBreak, p.normContinue
 	p.rangeBreak, p.rangeContinue = nil, nil
+	p.normBreak, p.normContinue = nil, nil
 	err := p.printBlockBody(block)
 	p.rangeBreak, p.rangeContinue = savedBreak, savedContinue
+	p.normBreak, p.normContinue = savedNormBreak, savedNormContinue
 	return err
 }
 
 // printSwitchClauseBody prints a switch clause body: the switch owns
 // break, but continue still targets the enclosing loop.
 func (p *printer) printSwitchClauseBody(block *ir.Block) error {
-	savedBreak := p.rangeBreak
-	p.rangeBreak = nil
+	savedBreak, savedNormBreak := p.rangeBreak, p.normBreak
+	p.rangeBreak, p.normBreak = nil, nil
 	err := p.printBlockBody(block)
-	p.rangeBreak = savedBreak
+	p.rangeBreak, p.normBreak = savedBreak, savedNormBreak
 	return err
 }
 

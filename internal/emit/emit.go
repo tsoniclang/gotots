@@ -275,6 +275,28 @@ type printer struct {
 	// slicePlans maps this body's slice-typed locals to their selected
 	// representation; "native-array" locals lower onto plain arrays.
 	slicePlans map[string]string
+	// normBreak / normContinue redirect break / continue when the
+	// innermost loop is a normalized for-loop (multi-result clause):
+	// break becomes `break brk$N` and continue becomes `break cont$N`
+	// so the post statement still runs. They mirror rangeBreak /
+	// rangeContinue: a nested loop clears both, a switch clears only
+	// normBreak (continue still targets the loop).
+	normBreak    *normLoopCtx
+	normContinue *normLoopCtx
+	// normLabels maps a normalized loop's Go label (spelled) to its
+	// context so a labeled break/continue targeting it redirects too.
+	normLabels map[string]*normLoopCtx
+	// loopSeq numbers normalized loops within this body for unique,
+	// deterministic break/continue labels.
+	loopSeq int
+}
+
+// normLoopCtx carries a normalized for-loop's redirect labels: break
+// exits the while (breakLabel) and continue exits the body block so the
+// post statement runs (contLabel).
+type normLoopCtx struct {
+	breakLabel string
+	contLabel  string
 }
 
 // nativeSlice reports whether the expression reads a local whose region
