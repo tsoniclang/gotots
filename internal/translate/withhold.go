@@ -5,7 +5,6 @@ package translate
 
 import (
 	"fmt"
-	"path"
 	"sort"
 	"strings"
 
@@ -132,10 +131,41 @@ func growWithheldByImports(out *Generated, sorted []*packages.Package) bool {
 		sort.Strings(sorted)
 		for _, importPath := range sorted {
 			if _, withheld := out.Withheld[importPath]; withheld {
+				// Publication withholding only: the materialized file is
+				// RETAINED for analysis (a withheld package is still
+				// independently typechecked and structurally verified). Only
+				// a NotMaterialized package emits no file at all.
 				out.Withheld[p.PkgPath] = "depends on withheld package " + importPath
-				corePath := path.Join("core", p.PkgPath, "package.ts")
-				delete(out.Files, corePath)
-				delete(out.Ownership, corePath)
+				changed = true
+				break
+			}
+		}
+	}
+	return changed
+}
+
+// growNotMaterializedByImports extends materialization blocking over the
+// unit's SOURCE import graph: a package that imports a package which cannot
+// produce analyzable TypeScript cannot produce it either — the import would
+// dangle. Computed over source imports (not emitted edges) because
+// declaration blockers are known before emission, so the emitters can skip
+// non-materializable packages on their first (only) pass.
+func growNotMaterializedByImports(out *Generated, sorted []*packages.Package) bool {
+	changed := false
+	for _, p := range sorted {
+		if _, blocked := out.NotMaterialized[p.PkgPath]; blocked {
+			continue
+		}
+		imports := make([]string, 0, len(p.Imports))
+		for importPath := range p.Imports {
+			imports = append(imports, importPath)
+		}
+		sort.Strings(imports)
+		for _, importPath := range imports {
+			if _, blocked := out.NotMaterialized[importPath]; blocked {
+				reason := "depends on non-materialized package " + importPath
+				out.NotMaterialized[p.PkgPath] = reason
+				out.Withheld[p.PkgPath] = reason
 				changed = true
 				break
 			}

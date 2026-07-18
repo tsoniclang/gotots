@@ -447,7 +447,7 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 	}
 	verified := make([]string, 0, len(result.PackagesIRDeclComplete))
 	for _, candidate := range result.PackagesIRDeclComplete {
-		throwaway := &Generated{Files: map[string]string{}, Ownership: map[string]string{}, Withheld: map[string]string{}}
+		throwaway := &Generated{Files: map[string]string{}, Ownership: map[string]string{}, Withheld: map[string]string{}, NotMaterialized: map[string]string{}}
 		var emitters []func() error
 		if err := translatePackage(throwaway, byPath[candidate], sourceDir, unit, Options{}, &emitters); err != nil {
 			result.PackagesBodyOnly = append(result.PackagesBodyOnly, candidate+": "+firstLine(err.Error()))

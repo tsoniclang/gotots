@@ -80,8 +80,20 @@ type Generated struct {
 	Proofs    []Proof
 	// Support is the per-unit implementation support ledger.
 	Support []BodySupport
-	// Withheld maps package path -> reason runnable output is withheld.
+	// Withheld maps package path -> reason runnable output is WITHHELD FROM
+	// PUBLICATION. A withheld package is still MATERIALIZED (its analyzable
+	// TypeScript is emitted and retained) unless it is also NotMaterialized;
+	// withholding governs the runnable product, not analysis output.
 	Withheld map[string]string
+	// NotMaterialized maps package path -> reason the package cannot produce
+	// analyzable TypeScript at all: a declaration-level blocker leaves a
+	// structural hole (a missing class or binding) that dependents
+	// reference, and this propagates transitively over imports. A
+	// NotMaterialized package emits no file; every other selected package is
+	// materialized (with typed throwing placeholders for its unimplemented
+	// bodies) so it can be independently typechecked and structurally
+	// verified even while publication-withheld.
+	NotMaterialized map[string]string
 	// FuncLits is the independent function-literal ledger: each literal's
 	// canonical identity with its own support disposition, derived from
 	// whether any unsupported site falls within the literal's span, and

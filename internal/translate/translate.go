@@ -54,9 +54,10 @@ func Packages(pkgs []*packages.Package, sourceDir string, options Options) (*Gen
 	}
 
 	out := &Generated{
-		Files:     map[string]string{},
-		Ownership: map[string]string{},
-		Withheld:  map[string]string{},
+		Files:           map[string]string{},
+		Ownership:       map[string]string{},
+		Withheld:        map[string]string{},
+		NotMaterialized: map[string]string{},
 	}
 	var emitters []func() error
 	for _, p := range sorted {
@@ -64,32 +65,33 @@ func Packages(pkgs []*packages.Package, sourceDir string, options Options) (*Gen
 			return nil, err
 		}
 	}
-	// The withholding closure is a fixed point over the REAL emitted
-	// imports (value, init, AND type-only), which are only known after a
-	// module renders. Each round: emit every retained package (filtering
-	// union members and references to already-withheld packages), then
-	// withhold, by ONE level, any package whose refreshed imports still
-	// reach a withheld package. Re-emission between levels drops the
-	// droppable (union-member) references before they can over-withhold,
-	// so only UNAVOIDABLE dependencies on withheld packages cascade. The
-	// loop converges because withholding grows monotonically and the
-	// retained set is finite.
-	for {
-		for _, emitPackage := range emitters {
-			if err := emitPackage(); err != nil {
-				return nil, err
-			}
-		}
-		if !growWithheldByImports(out, sorted) {
-			break
+	// Materialization cascade FIRST, over source imports (declaration
+	// blockers are known before emission): a package importing a
+	// non-materializable one cannot materialize either. The fixed point
+	// determines exactly which packages emit, so the emitters run once.
+	for growNotMaterializedByImports(out, sorted) {
+	}
+	// Materialize every eligible package (typed throwing placeholders for its
+	// unimplemented bodies). Emission is order-independent — every referenced
+	// class exists because materialization is closed under imports.
+	for _, emitPackage := range emitters {
+		if err := emitPackage(); err != nil {
+			return nil, err
 		}
 	}
 	if err := emitExternalStubs(out, unit, sorted[0], sourceDir, options); err != nil {
 		return nil, err
 	}
-	// Every retained module must import only retained modules: a dangling
-	// import into a withheld package is a closure defect, not tolerable
-	// output.
+	// Publication withholding is a SEPARATE fixed point over the real emitted
+	// import edges: a package with any unimplemented unit — or one importing
+	// a publication-withheld package — does not enter the runnable product.
+	// Its materialized file is RETAINED for analysis (never deleted).
+	for growWithheldByImports(out, sorted) {
+	}
+	// Every PUBLISHED (retained) module must import only published modules: a
+	// runnable product cannot depend on a withheld package. Materialized-but-
+	// withheld modules are excluded from this closure (they are analysis
+	// artifacts, not product).
 	if err := assertRetainedImportsResolve(out); err != nil {
 		return nil, err
 	}
@@ -165,6 +167,15 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 	var carrierTypes []emit.CarrierType
 	var ledger []BodySupport
 	unimplementedUnits := 0
+	// declBlockers counts DECLARATION-level rejections (a type, variable, or
+	// import whose shape could not be resolved). Unlike an unimplemented
+	// BODY — whose exact signature is still known, so it materializes as a
+	// typed throwing placeholder — a declaration blocker leaves a structural
+	// hole (a missing class or binding) that dependents reference, so the
+	// package cannot produce analyzable TypeScript at all. Materialization
+	// eligibility is gated on declBlockers; publication is gated on any
+	// unimplemented unit.
+	declBlockers := 0
 	declSite := func(id string, err error) bool {
 		unsupported, ok := ir.AsUnsupported(err)
 		if !ok {
@@ -175,6 +186,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 			Sites: []ir.UnsupportedSite{ir.SiteOf(unsupported)},
 		})
 		unimplementedUnits++
+		declBlockers++
 		return true
 	}
 	// The type checker's initialization order: each initialized variable
@@ -479,13 +491,18 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 				}
 			}
 			if function.Support == ir.SupportUnimplemented {
-				// Every unsupported site is on the record; no runnable body
-				// exists and the package's module is withheld below.
+				// Every unsupported site is on the record. The body still
+				// MATERIALIZES as a typed throwing placeholder: its exact
+				// signature typechecks so sibling and cross-package callers
+				// compile, while calling it fails closed. The package is
+				// publication-withheld below, but one unresolved body no
+				// longer prevents its siblings from being emitted and checked.
 				unimplementedUnits++
-				continue
+				function.Placeholder = true
+			} else {
+				proof.GeneratedFile = corePath
+				out.Proofs = append(out.Proofs, *proof)
 			}
-			proof.GeneratedFile = corePath
-			out.Proofs = append(out.Proofs, *proof)
 			if function.Receiver == nil {
 				functions = append(functions, function)
 				continue
@@ -509,9 +526,22 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 		return err
 	}
 	out.FuncLits = append(out.FuncLits, lits...)
-	if unimplementedUnits > 0 {
-		out.Withheld[p.PkgPath] = fmt.Sprintf("%d unimplemented units", unimplementedUnits)
+	if declBlockers > 0 {
+		// A declaration-level blocker leaves a structural hole (a missing
+		// class or binding) that dependents reference, so the package cannot
+		// produce analyzable TypeScript. It is neither materialized nor
+		// published; the transitive materialization cascade extends this to
+		// its dependents.
+		reason := fmt.Sprintf("%d declaration blockers", declBlockers)
+		out.NotMaterialized[p.PkgPath] = reason
+		out.Withheld[p.PkgPath] = reason
 		return nil
+	}
+	if unimplementedUnits > 0 {
+		// Every declaration resolved; the unimplemented BODIES materialize as
+		// typed throwing placeholders. The package is analyzable but withheld
+		// from the runnable product.
+		out.Withheld[p.PkgPath] = fmt.Sprintf("%d unimplemented bodies (materialized as placeholders)", unimplementedUnits)
 	}
 	if len(functions) == 0 && len(structs) == 0 && len(carrierMethods) == 0 && len(packageVars) == 0 {
 		// A package whose declarations are all compile-time (constants
@@ -520,11 +550,13 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 		return nil
 	}
 
-	// Emission is deferred until the complete withholding closure is
-	// known: union aliases must reference only retained classes, and a
-	// package withheld by the dependency cascade emits nothing.
+	// Materialize every package that is not structurally blocked. The
+	// materialization cascade (over source imports) runs before the emitters,
+	// so a package importing a NotMaterialized package emits nothing rather
+	// than a dangling reference. Publication withholding is computed
+	// separately, after emission, and does NOT remove the analyzable file.
 	*emitters = append(*emitters, func() error {
-		if _, withheld := out.Withheld[p.PkgPath]; withheld {
+		if _, blocked := out.NotMaterialized[p.PkgPath]; blocked {
 			return nil
 		}
 		return emitCorePackage(out, p, sourceDir, unit, options, corePath, files,
