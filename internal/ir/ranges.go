@@ -92,7 +92,7 @@ func (b *builder) buildRangeInt(n *ast.RangeStmt, operand Expr) (Stmt, error) {
 			return nil, err
 		}
 		if ident.Name != "_" {
-			out.Index = ident.Name
+			out.Index = b.bindNameOf(ident)
 		}
 	}
 	body, err := b.buildBreakableBody(n.Body)

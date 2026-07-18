@@ -180,10 +180,12 @@ func (b *builder) assignBindings(root ast.Node, typeParams []string) {
 	b.bind.allocate(seeds)
 }
 
-// assignTypeSwitchBinding registers a type switch's clause bindings: every
-// case clause has its own implicit variable (info.Implicits), but the
-// clauses are disjoint scopes that emit one shared name, so they share one
-// BindingID seeded from the guard spelling.
+// assignTypeSwitchBinding registers a type switch's clause bindings. In
+// `switch x := y.(type)` there is no single object x: each case clause has
+// its own implicit variable (info.Implicits), and the guard identifier may
+// have its own definition too. They are the same source name in disjoint
+// scopes and emit ONE shared name, so the guard variable and every clause
+// implicit share one BindingID.
 func (b *builder) assignTypeSwitchBinding(node *ast.TypeSwitchStmt) {
 	assign, ok := node.Assign.(*ast.AssignStmt)
 	if !ok {
@@ -194,21 +196,51 @@ func (b *builder) assignTypeSwitchBinding(node *ast.TypeSwitchStmt) {
 		return
 	}
 	id := noBinding
+	assign1 := func(v *types.Var) {
+		if v == nil {
+			return
+		}
+		if id == noBinding {
+			id = b.bind.newVar(v, bindIdent.Name)
+		} else {
+			b.bind.share(v, id)
+		}
+	}
+	if guardVar, ok := b.info.Defs[bindIdent].(*types.Var); ok {
+		assign1(guardVar)
+	}
 	for _, clauseStmt := range node.Body.List {
 		clause, ok := clauseStmt.(*ast.CaseClause)
 		if !ok {
 			continue
 		}
-		variable, ok := b.info.Implicits[clause].(*types.Var)
-		if !ok {
-			continue
-		}
-		if id == noBinding {
-			id = b.bind.newVar(variable, bindIdent.Name)
-		} else {
-			b.bind.share(variable, id)
+		if variable, ok := b.info.Implicits[clause].(*types.Var); ok {
+			assign1(variable)
 		}
 	}
+}
+
+// typeSwitchBindName returns the shared emission name of a type switch's
+// binding, resolved from a case clause's implicit variable — the object
+// every clause-body reference resolves to — so the declaration and the
+// references agree even when the guard identifier has no single canonical
+// object of its own.
+func (b *builder) typeSwitchBindName(node *ast.TypeSwitchStmt, fallback string) string {
+	if b.bind != nil {
+		for _, clauseStmt := range node.Body.List {
+			clause, ok := clauseStmt.(*ast.CaseClause)
+			if !ok {
+				continue
+			}
+			if variable, ok := b.info.Implicits[clause].(*types.Var); ok {
+				// The guard variable and clause implicits share one id, so a
+				// clause implicit resolves to the same name every clause-body
+				// reference uses.
+				return b.bindNameVar(variable, fallback)
+			}
+		}
+	}
+	return tsBinding(fallback)
 }
 
 // bindNameOf returns the allocated emission name for an identifier that

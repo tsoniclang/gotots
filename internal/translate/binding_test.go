@@ -146,6 +146,62 @@ func TypeSwitchShadow() int { return classify(21) + classify("abcd") }
 `)
 }
 
+func TestOracleRangeIntShadow(t *testing.T) {
+	// A range-over-int index shadows an outer range index of the same name
+	// (the glob shape). The RangeInt index declaration must use the same
+	// baked name its body references.
+	runOracle(t, `package fixture
+
+func RangeIntShadow() int {
+	total := 0
+	for i, x := range []int{10, 20} {
+		for i := range 3 {
+			total += i
+		}
+		total += i*100 + x
+	}
+	return total
+}
+`)
+}
+
+func TestOracleTypeSwitchBindShadowsOuter(t *testing.T) {
+	// The glob-package shape: a type-switch binding shadows an outer variable
+	// of the same name (switch elem := elem.(type)). The binding declaration
+	// and every clause-body reference must agree on the emission name, or the
+	// generated TS references an undeclared name (TS2552).
+	runOracle(t, `package fixture
+
+type element interface{ tag() int }
+type slash struct{}
+
+func (slash) tag() int { return 1 }
+
+type star struct{}
+
+func (star) tag() int { return 2 }
+
+func matchElems(elems []element) int {
+	var elem element
+	count := 0
+	for len(elems) > 0 {
+		elem, elems = elems[0], elems[1:]
+		switch elem := elem.(type) {
+		case slash:
+			count += elem.tag()
+		case star:
+			count += elem.tag() * 10
+		}
+	}
+	return count
+}
+
+func TypeSwitchBindShadow() int {
+	return matchElems([]element{slash{}, star{}, slash{}})
+}
+`)
+}
+
 func TestOraclePackageVarClosureShadow(t *testing.T) {
 	// A package-level variable initialized with a function literal whose
 	// body shadows its parameter: the initializer path must assign binding
