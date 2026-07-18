@@ -207,19 +207,15 @@ func (s Scope) UniverseSealed() bool { return *s.universeSealed }
 type ExternTypeObligation struct {
 	Pkg  string
 	Name string
-	// methods maps each referenced method's canonical MethodKey to its
-	// object: distinct methods (including same-spelled unexported methods
-	// from different packages) are distinct keys, so none overwrites
-	// another. The emitted symbol derives from the display name; a genuine
-	// display collision fails closed at emission (SortedMethods reports
-	// them so the stub builder can detect it).
-	methods map[string]*types.Func
-	// slots maps the same MethodKey to the method's canonical dispatch
-	// SLOT within the external type's method set (MethodSlot). The box
-	// vtable is keyed by this slot — the SAME selector interface dispatch
-	// uses (IfaceMember.Slots) — so a same-bare-name promotion never
-	// collapses two adapter entries onto one property or misses at dispatch.
-	slots map[string]string
+	// methods maps each referenced method's canonical MethodKey to its ONE
+	// atomic obligation record (key, dispatch slot, and object together, so
+	// they cannot drift). Distinct methods (including same-spelled
+	// unexported methods from different packages) are distinct keys, so none
+	// overwrites another. Every recorded method is representable —
+	// AddExternalMethod, the sole constructor, rejects the rest — so no
+	// consumer skips one. A genuine display collision fails closed at
+	// emission (Methods reports them so the stub builder can detect it).
+	methods map[string]ExternMethodObligation
 }
 
 // NewScope builds a unit scope over the given package paths.

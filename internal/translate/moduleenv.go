@@ -72,7 +72,7 @@ func newModule(modulePath, pkgPath, pkgName string, unit ir.Scope, context *pack
 			}
 			specifiers[obligation.Pkg] = specifier
 		}
-		entries := obligation.MethodKeys()
+		entries := obligation.Methods()
 		methods := make([]emit.ExternMethod, 0, len(entries))
 		for _, entry := range entries {
 			methods = append(methods, emit.ExternMethod{Name: entry.Method.Name(), Key: entry.Key, Slot: entry.Slot})
@@ -142,7 +142,12 @@ func newModule(modulePath, pkgPath, pkgName string, unit ir.Scope, context *pack
 
 // externAdapter spells one external method's typed vtable arrow.
 func externAdapter(module *emit.Module, unit ir.Scope, context *packages.Package, sourceDir string, obligation *ir.ExternTypeObligation, key string) (string, string, []string, error) {
-	method := obligation.MethodByKey(key)
+	entry, ok := obligation.MethodByKey(key)
+	if !ok {
+		return "", "", nil, fmt.Errorf("GOTOTS_EXTERNAL_UNSUPPORTED: external type %s.%s has no recorded method for key %s",
+			obligation.Pkg, obligation.Name, key)
+	}
+	method := entry.Method
 	name := method.Name()
 	signature := method.Type().(*types.Signature)
 	handle := ir.Type{Kind: ir.KindExternal, Go: obligation.Pkg + "." + obligation.Name, Named: obligation.Name, Pkg: obligation.Pkg}
@@ -212,7 +217,12 @@ func collectPkgRefs(t ir.Type, seen map[string]bool, out *[]string) {
 // externMethodRefs resolves one external method's signature and returns
 // the package paths it references, without touching the module.
 func externMethodRefs(unit ir.Scope, context *packages.Package, sourceDir string, obligation *ir.ExternTypeObligation, key string) ([]string, error) {
-	signature := obligation.MethodByKey(key).Type().(*types.Signature)
+	entry, ok := obligation.MethodByKey(key)
+	if !ok {
+		return nil, fmt.Errorf("GOTOTS_EXTERNAL_UNSUPPORTED: external type %s.%s has no recorded method for key %s",
+			obligation.Pkg, obligation.Name, key)
+	}
+	signature := entry.Method.Type().(*types.Signature)
 	var refs []string
 	seen := map[string]bool{}
 	add := func(goType types.Type) error {

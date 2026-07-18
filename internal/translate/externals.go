@@ -181,30 +181,20 @@ func externTypeMembers(obligation *ir.ExternTypeObligation, unit ir.Scope, conte
 	// since the identities are canonical) fail closed rather than one
 	// silently overwriting the other's export.
 	emittedSymbols := map[string]string{}
-	for _, method := range obligation.SortedMethods() {
+	// Every recorded method is representable and carries its own canonical
+	// key and slot (AddExternalMethod validated all three together), so this
+	// loop emits ONE stub per record — never re-deriving the key and never
+	// skipping a recorded method.
+	for _, entry := range obligation.Methods() {
+		method := entry.Method
 		name := method.Name()
 		signature := method.Type().(*types.Signature)
-		if signature.TypeParams() != nil && signature.TypeParams().Len() > 0 {
-			// A generic external method has no single exact stub
-			// signature; it is an unimplemented external contract member.
-			continue
-		}
-		if ir.SignatureMentionsTypeParam(signature) {
-			// A method whose signature references a type parameter (e.g.
-			// a method of an uninstantiated generic external type) cannot
-			// be spelled exactly; it is an unimplemented contract member.
-			continue
-		}
 		symbol := obligation.Name + "$" + name
-		methodKey, err := ir.MethodKey(method)
-		if err != nil {
-			return nil, fmt.Errorf("GOTOTS_EXTERNAL_UNSUPPORTED: external method %s.%s has no canonical identity: %w", obligation.Pkg, name, err)
-		}
-		if priorKey, seen := emittedSymbols[symbol]; seen && priorKey != methodKey {
+		if priorKey, seen := emittedSymbols[symbol]; seen && priorKey != entry.Key {
 			return nil, fmt.Errorf("GOTOTS_EXTERNAL_UNSUPPORTED: external type %s.%s has two distinct methods emitting symbol %s",
 				obligation.Pkg, obligation.Name, symbol)
 		}
-		emittedSymbols[symbol] = methodKey
+		emittedSymbols[symbol] = entry.Key
 		// The receiver arrives as the handle a caller holds: through a
 		// pointer it may be nil, and the implementation carries the
 		// concrete method's exact nil semantics.

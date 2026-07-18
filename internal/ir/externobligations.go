@@ -5,9 +5,22 @@
 package ir
 
 import (
+	"fmt"
 	"go/types"
 	"sort"
 )
+
+// ExternMethodObligation is the ONE authoritative record of a referenced
+// external method: its canonical identity key, its dispatch slot (== the
+// box-vtable property and IfaceMember.Slots selector), and its object. The
+// three are computed and validated together at the sole constructor
+// (AddExternalMethod), so they cannot drift and no consumer re-derives the
+// key or the slot from the bare method name.
+type ExternMethodObligation struct {
+	Key    string
+	Slot   string
+	Method *types.Func
+}
 
 // AddExternalFunc records one admitted external function contract.
 func (s Scope) AddExternalFunc(fn *types.Func) { s.externals[fn] = true }
@@ -20,26 +33,42 @@ func (s Scope) AddExternalType(pkg, name string) *ExternTypeObligation {
 	if !has {
 		obligation = &ExternTypeObligation{
 			Pkg: pkg, Name: name,
-			methods: map[string]*types.Func{},
-			slots:   map[string]string{},
+			methods: map[string]ExternMethodObligation{},
 		}
 		s.externTypes[id] = obligation
 	}
 	return obligation
 }
 
-// AddExternalMethod records one referenced method of the external type
-// `named`, keyed by its FULL canonical identity (MethodKey) — never its
-// bare Go name. Two distinct methods (e.g. same-spelled unexported methods
-// owned by different packages) are therefore distinct obligation members
-// with distinct keys; neither overwrites the other, and there is no
-// bare-name fallback. The method's canonical dispatch SLOT within `named`'s
-// method set is recorded alongside, so the box vtable keys by the SAME
-// selector interface dispatch uses. A method whose canonical identity or
-// slot cannot be resolved fails closed IMMEDIATELY: the error propagates
-// through this typed return and nothing is recorded — never an in-band
-// poison key deferred to a downstream rejection.
+// AddExternalMethod is the SOLE validating constructor of an external
+// method obligation. It records one referenced method of the external type
+// `named` as a single atomic record, keyed by its FULL canonical identity
+// (MethodKey) — never its bare Go name. It validates, together and up
+// front, everything a downstream consumer would otherwise have to re-check:
+//
+//   - REPRESENTABILITY: a generic external method (its own or its
+//     receiver's type parameters, or any type-parameter mention) has no
+//     single exact stub signature or dispatch adapter. It is rejected here,
+//     so the obligation set contains ONLY representable methods and no
+//     consumer can silently skip one.
+//   - IDENTITY and SLOT: the canonical key and the dispatch slot are
+//     computed once and stored on the record, so dispatch, the box vtable,
+//     and stub emission all read the SAME values.
+//
+// Any failure fails closed IMMEDIATELY: the error propagates through this
+// typed return and NOTHING is recorded — no in-band poison key, no partial
+// obligation, no downstream recovery.
 func (s Scope) AddExternalMethod(named *types.Named, method *types.Func) error {
+	signature, ok := method.Type().(*types.Signature)
+	if !ok {
+		return fmt.Errorf("ir: external method %s has no signature", method.Name())
+	}
+	if (signature.TypeParams() != nil && signature.TypeParams().Len() > 0) ||
+		(signature.RecvTypeParams() != nil && signature.RecvTypeParams().Len() > 0) ||
+		SignatureMentionsTypeParam(signature) {
+		return fmt.Errorf("ir: external method %s.%s is generic and not representable as an external obligation",
+			named.Obj().Pkg().Path(), method.Name())
+	}
 	key, err := MethodKey(method)
 	if err != nil {
 		return err
@@ -48,48 +77,31 @@ func (s Scope) AddExternalMethod(named *types.Named, method *types.Func) error {
 	if err != nil {
 		return err
 	}
-	obligation := s.AddExternalType(named.Obj().Pkg().Path(), named.Obj().Name())
-	obligation.methods[key] = method
-	obligation.slots[key] = slot
+	s.AddExternalType(named.Obj().Pkg().Path(), named.Obj().Name()).
+		methods[key] = ExternMethodObligation{Key: key, Slot: slot, Method: method}
 	return nil
 }
 
-// ExternMethodEntry pairs one external method with its canonical key and
-// dispatch slot — the join keys between dispatch, vtable, and stub
-// emission. Slot is the box-vtable property name (== IfaceMember.Slots),
-// so no consumer re-derives it from the bare method name.
-type ExternMethodEntry struct {
-	Key    string
-	Slot   string
-	Method *types.Func
+// MethodByKey returns the atomic obligation record for one canonical key.
+func (o *ExternTypeObligation) MethodByKey(key string) (ExternMethodObligation, bool) {
+	entry, ok := o.methods[key]
+	return entry, ok
 }
 
-// SortedMethods returns the type's referenced methods in deterministic
-// canonical-key order — each a distinct method identity.
-func (o *ExternTypeObligation) SortedMethods() []*types.Func {
-	out := make([]*types.Func, 0, len(o.methods))
-	for _, entry := range o.MethodKeys() {
-		out = append(out, entry.Method)
-	}
-	return out
-}
-
-// MethodByKey returns the method with the given canonical key, or nil.
-func (o *ExternTypeObligation) MethodByKey(key string) *types.Func {
-	return o.methods[key]
-}
-
-// MethodKeys returns each referenced method's canonical key alongside its
-// object, in deterministic (key-sorted) order.
-func (o *ExternTypeObligation) MethodKeys() []ExternMethodEntry {
+// Methods returns every recorded method obligation in deterministic
+// (canonical-key-sorted) order. Each record carries its key, slot, and
+// object together — the single join across dispatch, vtable, and stub
+// emission. Every recorded method is representable (AddExternalMethod
+// rejects the rest), so a consumer that emits one per record omits none.
+func (o *ExternTypeObligation) Methods() []ExternMethodObligation {
 	keys := make([]string, 0, len(o.methods))
 	for key := range o.methods {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-	out := make([]ExternMethodEntry, 0, len(keys))
+	out := make([]ExternMethodObligation, 0, len(keys))
 	for _, key := range keys {
-		out = append(out, ExternMethodEntry{Key: key, Slot: o.slots[key], Method: o.methods[key]})
+		out = append(out, o.methods[key])
 	}
 	return out
 }

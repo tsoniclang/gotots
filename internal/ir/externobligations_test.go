@@ -1,10 +1,31 @@
 package ir
 
 import (
+	"go/ast"
+	"go/importer"
+	"go/parser"
 	"go/token"
 	"go/types"
 	"testing"
 )
+
+// checkSource type-checks a single-file Go source and returns its package,
+// so tests can obtain REAL go/types objects (e.g. methods of generic types)
+// rather than fragile hand-built signatures.
+func checkSource(t *testing.T, src string) *types.Package {
+	t.Helper()
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "x.go", src, 0)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	conf := types.Config{Importer: importer.Default()}
+	pkg, err := conf.Check("example.com/x", fset, []*ast.File{file}, nil)
+	if err != nil {
+		t.Fatalf("typecheck: %v", err)
+	}
+	return pkg
+}
 
 // A method whose signature mentions a free type parameter has no exact
 // canonical identity: MethodKey (via typeid) fails closed. This is the
@@ -77,20 +98,56 @@ func TestAddExternalMethodRecordsByCanonicalKeyAndSlot(t *testing.T) {
 	if len(obligations) != 1 {
 		t.Fatalf("expected one external type obligation, got %d", len(obligations))
 	}
-	entries := obligations[0].MethodKeys()
+	entries := obligations[0].Methods()
 	if len(entries) != 1 {
 		t.Fatalf("expected one method entry, got %d", len(entries))
 	}
 	if entries[0].Key != key || entries[0].Method != good {
 		t.Fatal("method not recorded under its canonical key")
 	}
-	// The dispatch slot is carried, so emit keys the box vtable by the SAME
-	// selector interface dispatch uses — never re-derived from the bare name.
+	// The dispatch slot is carried on the SAME atomic record, so emit keys
+	// the box vtable by the SAME selector interface dispatch uses — never
+	// re-derived from the bare name, and it cannot drift from key/method.
 	if entries[0].Slot != wantSlot {
 		t.Fatalf("recorded slot %q; want the canonical dispatch slot %q", entries[0].Slot, wantSlot)
 	}
-	// And never under a bare-name or poison key.
-	if obligations[0].MethodByKey("M") != nil || obligations[0].MethodByKey("\x00unresolved\x00M") != nil {
-		t.Fatal("method must be keyed only by its full canonical identity")
+	// Looked up only by full canonical identity, never a bare-name/poison key.
+	if _, ok := obligations[0].MethodByKey(key); !ok {
+		t.Fatal("recorded method not retrievable by its canonical key")
+	}
+	if _, ok := obligations[0].MethodByKey("M"); ok {
+		t.Fatal("method retrievable by bare name")
+	}
+	if _, ok := obligations[0].MethodByKey("\x00unresolved\x00M"); ok {
+		t.Fatal("method retrievable by poison key")
+	}
+}
+
+// A method of a generic type (its signature mentions the receiver's type
+// parameter) is not representable as an external obligation — no single
+// exact stub/adapter. The sole constructor rejects it up front via the
+// representability check and records nothing, so no downstream consumer can
+// silently skip it. MethodKey for such a method resolves (the receiver
+// binds the parameter), proving representability — not an identity failure
+// — is the rejector.
+func TestAddExternalMethodRejectsMethodOfGenericType(t *testing.T) {
+	pkg := checkSource(t, "package x\ntype Box[T any] struct{ v T }\nfunc (b Box[T]) Get() T { return b.v }\n")
+	box := pkg.Scope().Lookup("Box").Type().(*types.Named)
+	if box.NumMethods() != 1 {
+		t.Fatalf("expected Box to have one method, got %d", box.NumMethods())
+	}
+	method := box.Method(0)
+
+	// MethodKey resolves (the receiver binds T), so representability — not an
+	// identity failure — is what rejects it.
+	if _, err := MethodKey(method); err != nil {
+		t.Fatalf("MethodKey should resolve for a method of a generic type: %v", err)
+	}
+	s := NewScope("example.com/owned")
+	if err := s.AddExternalMethod(box, method); err == nil {
+		t.Fatal("AddExternalMethod must reject a method of a generic type as unrepresentable")
+	}
+	if got := s.ExternalTypes(); len(got) != 0 {
+		t.Fatalf("a rejected method recorded %d obligations; must record nothing", len(got))
 	}
 }
