@@ -146,6 +146,24 @@ func TypeSwitchShadow() int { return classify(21) + classify("abcd") }
 `)
 }
 
+func TestOracleNestedShadowSlices(t *testing.T) {
+	// An inner slice shadows an outer slice: they are distinct regions with
+	// distinct representations, and the outer slice survives the inner one.
+	runOracle(t, `package fixture
+
+func NestedShadowSlices() int {
+	s := []int{1, 2, 3}
+	total := 0
+	for _, x := range s {
+		s := []int{x * 10}
+		s = append(s, x)
+		total += s[0] + s[1]
+	}
+	return total + len(s)
+}
+`)
+}
+
 func TestOracleClosureCaptureShadow(t *testing.T) {
 	// A closure captures the outer i; a later inner block re-declares i. The
 	// closure must keep reading the captured outer binding.

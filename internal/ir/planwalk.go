@@ -1,10 +1,12 @@
 // Slice-region analysis: every slice-typed local variable joins a
 // value-flow region; requirements accumulate from the operations the
 // body performs, and the planner selects each region's representation.
-// Shadowed names conservatively share a region (requirements only
-// grow, so over-merging is safe, never wrong). Any occurrence the walk
-// cannot prove local — calls, returns, fields, containers, captures,
-// boxed cells — escapes.
+// The region key is the variable's canonical unique binding name (the
+// builder resolved shadows to distinct names, e.g. s and s$1), so two
+// shadowing variables are DISTINCT regions and each keeps precise
+// requirements — never conflated by a shared spelling. Any occurrence
+// the walk cannot prove local — calls, returns, fields, containers,
+// captures, boxed cells — escapes.
 package ir
 
 import (
@@ -14,7 +16,7 @@ import (
 // slicePlanner accumulates one function body's slice regions.
 type slicePlanner struct {
 	planner *plan.Planner
-	regions map[string]int // local variable name -> region occurrence
+	regions map[string]int // canonical unique binding name -> region occurrence
 }
 
 // AnalyzeSlicePlans computes the representation of every slice-typed
