@@ -383,8 +383,35 @@ func (p *printer) forClause(stmt ir.Stmt, isInit bool) (string, error) {
 	case nil:
 		return "", nil
 	case *ir.DeclStmt:
-		if !isInit || n.Tuple != nil {
+		if !isInit {
 			return "", fmt.Errorf("declaration not expressible in this for-loop clause")
+		}
+		if n.Tuple != nil {
+			// A multi-result initializer (call or comma-ok) destructures into
+			// the declared names, evaluating the single source expression
+			// exactly once — the classic `for a, b := f(); …` clause. A
+			// reused name would re-declare, so only a fresh declaration is a
+			// clause.
+			for _, reused := range n.Reused {
+				if reused {
+					return "", fmt.Errorf("declaration not expressible in this for-loop clause")
+				}
+			}
+			names := make([]string, len(n.Names))
+			types := make([]string, len(n.Names))
+			for i, name := range n.Names {
+				spelled, err := p.tsType(n.Types[i])
+				if err != nil {
+					return "", err
+				}
+				names[i] = tsName(name)
+				types[i] = spelled
+			}
+			tuple, err := p.printExpr(n.Tuple)
+			if err != nil {
+				return "", err
+			}
+			return fmt.Sprintf("let [%s]: [%s] = %s", joinComma(names), joinComma(types), tuple), nil
 		}
 		parts := make([]string, len(n.Names))
 		for i, name := range n.Names {
@@ -400,8 +427,37 @@ func (p *printer) forClause(stmt ir.Stmt, isInit bool) (string, error) {
 		}
 		return "let " + joinComma(parts), nil
 	case *ir.AssignStmt:
-		if n.Tuple != nil || len(n.Targets) != 1 {
-			return "", fmt.Errorf("assignment not expressible in this for-loop clause")
+		if n.Tuple != nil {
+			// A multi-result assignment (`a, b = f()`) destructures the single
+			// source into simple variable targets, evaluating f() once and
+			// storing both — exactly Go's semantics.
+			locs, ok := simpleClauseTargets(n.Targets)
+			if !ok {
+				return "", fmt.Errorf("assignment not expressible in this for-loop clause")
+			}
+			tuple, err := p.printExpr(n.Tuple)
+			if err != nil {
+				return "", err
+			}
+			return "[" + joinComma(locs) + "] = " + tuple, nil
+		}
+		if len(n.Targets) != 1 {
+			// A parallel assignment (`a, b = c, d`): destructure the
+			// right-hand tuple so every right side evaluates before any
+			// store, matching Go's two-phase rule (and a b,a swap).
+			locs, ok := simpleClauseTargets(n.Targets)
+			if !ok || len(n.Values) != len(n.Targets) {
+				return "", fmt.Errorf("assignment not expressible in this for-loop clause")
+			}
+			values := make([]string, len(n.Values))
+			for i, v := range n.Values {
+				printed, err := p.printExpr(v)
+				if err != nil {
+					return "", err
+				}
+				values[i] = printed
+			}
+			return "[" + joinComma(locs) + "] = [" + joinComma(values) + "]", nil
 		}
 		variable, isVar := n.Targets[0].(ir.VarTarget)
 		if !isVar {
@@ -445,6 +501,23 @@ func (p *printer) forClause(stmt ir.Stmt, isInit bool) (string, error) {
 		return location + " = " + value, nil
 	}
 	return "", fmt.Errorf("statement %T not expressible in a for-loop clause", stmt)
+}
+
+// simpleClauseTargets returns the TS locations of a tuple / parallel
+// assignment's targets when EVERY target is a simple local scalar variable
+// — no value-copy carrier (struct/array, which needs a copy call), no
+// package binding, no pointer cell. Only such targets can be destructured
+// directly in a for-loop clause without staging into statements.
+func simpleClauseTargets(targets []ir.Target) ([]string, bool) {
+	locs := make([]string, len(targets))
+	for i, target := range targets {
+		v, ok := target.(ir.VarTarget)
+		if !ok || v.Pkg != "" || v.T.Kind == ir.KindStruct || v.T.Kind == ir.KindArray {
+			return nil, false
+		}
+		locs[i] = tsName(v.Name)
+	}
+	return locs, true
 }
 
 func (p *printer) printReturn(n *ir.ReturnStmt) error {
