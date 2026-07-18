@@ -115,6 +115,68 @@ func TestStage05UnimplementedRecordAccounts(t *testing.T) {
 	}
 }
 
+// censusWithConst builds a census result whose sole production declaration
+// is one constant shape.
+func censusWithConst(shape census.ConstShape) *census.Result {
+	return &census.Result{
+		Report: &census.Report{Declarations: []census.DeclarationRecord{
+			productionDecl(shape.ID, "p", "const")}},
+		Shapes: &census.DeclarationShapes{Constants: []census.ConstShape{shape}},
+	}
+}
+
+func TestStage05ConstMissingEvidenceFails(t *testing.T) {
+	first := censusWithConst(census.ConstShape{ID: "p::const::C", Type: "int", Value: "42"})
+	// A const with no ConstHash proof is unaccounted evidence.
+	status, details, _ := runSignatureCompletenessGate(first, &translate.Generated{})
+	if status != "fail" || !strings.Contains(strings.Join(details, "\n"), "no constant evidence") {
+		t.Fatalf("missing const evidence must fail; got %q %v", status, details)
+	}
+}
+
+func TestStage05ConstShapeDriftFails(t *testing.T) {
+	first := censusWithConst(census.ConstShape{ID: "p::const::C", Type: "int", Value: "42"})
+	// The translator hashed a DIFFERENT value (7): a value drift the join
+	// must catch even though the identity matches.
+	generated := &translate.Generated{Proofs: []translate.Proof{{
+		ID:        "p::const::C",
+		ConstHash: signatureHashOf(census.ConstShapeSignature(census.ConstShape{Type: "int", Value: "7"})),
+	}}}
+	status, details, _ := runSignatureCompletenessGate(first, generated)
+	if status != "fail" || !strings.Contains(strings.Join(details, "\n"), "constant shape drift") {
+		t.Fatalf("const shape drift must fail; got %q %v", status, details)
+	}
+}
+
+func TestStage05ConstOrphanProofFails(t *testing.T) {
+	first := censusWithConst(census.ConstShape{ID: "p::const::C", Type: "int", Value: "42"})
+	generated := &translate.Generated{Proofs: []translate.Proof{
+		{ID: "p::const::C", ConstHash: signatureHashOf(census.ConstShapeSignature(census.ConstShape{Type: "int", Value: "42"}))},
+		{ID: "p::const::Ghost", ConstHash: signatureHashOf(census.ConstShapeSignature(census.ConstShape{Type: "int", Value: "0"}))},
+	}}
+	status, details, _ := runSignatureCompletenessGate(first, generated)
+	if status != "fail" || !strings.Contains(strings.Join(details, "\n"), "orphan constant proof") {
+		t.Fatalf("orphan const proof must fail; got %q %v", status, details)
+	}
+}
+
+func TestStage05ConstJoinsThenBlocks(t *testing.T) {
+	first := censusWithConst(census.ConstShape{ID: "p::const::C", Type: "int", Value: "42"})
+	generated := &translate.Generated{Proofs: []translate.Proof{{
+		ID:        "p::const::C",
+		ConstHash: signatureHashOf(census.ConstShapeSignature(census.ConstShape{Type: "int", Value: "42"})),
+	}}}
+	// The constant joins cleanly, but the stage still BLOCKS: the remaining
+	// declaration classes and independent TS comparison are not yet done.
+	status, details, _ := runSignatureCompletenessGate(first, generated)
+	if status != "blocked" {
+		t.Fatalf("a clean const join must still block (join incomplete); got %q %v", status, details)
+	}
+	if !strings.Contains(strings.Join(details, "\n"), "constants joined by canonical type and exact value: 1") {
+		t.Fatalf("blocked details must report the const join count; got %v", details)
+	}
+}
+
 func TestReconcileDispositionsForgedEvidence(t *testing.T) {
 	first := censusWith([]census.DeclarationRecord{
 		productionDecl("p::func::F", "p", "func"),

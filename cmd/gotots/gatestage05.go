@@ -194,6 +194,48 @@ func runSignatureCompletenessGate(firstRun *census.Result, corpusGenerated *tran
 		}
 		return "fail", defects, fmt.Errorf("initializer evidence failed the identity join")
 	}
+	// Constants: every census constant shape must join to a translate const
+	// proof carrying the IDENTICAL declaration-shape hash (canonical type
+	// plus exact value), and no const proof may reference an identity absent
+	// from the census.
+	constHash := map[string]string{}
+	for _, proof := range corpusGenerated.Proofs {
+		if proof.ConstHash != "" {
+			constHash[proof.ID] = proof.ConstHash
+		}
+	}
+	constJoined := 0
+	for _, shape := range firstRun.Shapes.Constants {
+		if !production[shape.ID] {
+			continue
+		}
+		expected := signatureHashOf(census.ConstShapeSignature(shape))
+		got, has := constHash[shape.ID]
+		if !has {
+			defects = append(defects, "no constant evidence for census const "+shape.ID)
+			continue
+		}
+		if got != expected {
+			defects = append(defects, "constant shape drift at "+shape.ID)
+			continue
+		}
+		constJoined++
+	}
+	censusConstIDs := map[string]bool{}
+	for _, shape := range firstRun.Shapes.Constants {
+		censusConstIDs[shape.ID] = true
+	}
+	for id := range constHash {
+		if !censusConstIDs[id] {
+			defects = append(defects, "orphan constant proof (no census shape): "+id)
+		}
+	}
+	if len(defects) > 0 {
+		if len(defects) > 15 {
+			defects = defects[:15]
+		}
+		return "fail", defects, fmt.Errorf("constant shape ledger failed the identity join")
+	}
 	// What IS joined so far is real but PARTIAL, and it is agreement
 	// between two callers of the SAME typeid.Canonical, not independent
 	// structural verification of the emitted TypeScript against the Go
@@ -208,7 +250,8 @@ func runSignatureCompletenessGate(firstRun *census.Result, corpusGenerated *tran
 		fmt.Sprintf("orphan proofs: %d", orphans),
 		fmt.Sprintf("function literals joined by identity, parent, and body hash: %d (%d unimplemented)", litJoined, litUnimplemented),
 		fmt.Sprintf("variable initializers joined by identity and hash: %d (%d explicitly unimplemented)", initJoined, initBlocked),
-		"BLOCKED: only function signatures, function-literal bodies, and variable initializers are joined — named types, variable TYPES, constants, aliases, struct fields/tags/embedding, and interface methods/embeds are NOT verified (census records them in Shapes.* but this stage does not join them)",
+		fmt.Sprintf("constants joined by canonical type and exact value: %d", constJoined),
+		"BLOCKED: function signatures, function-literal bodies, variable initializers, and constants are joined — named types, variable TYPES, aliases, struct fields/tags/embedding, and interface methods/embeds are NOT yet verified (census records them in Shapes.* but this stage does not join them)",
 		"BLOCKED: the join proves census and translator AGREE (both derive identity from internal/typeid.Canonical) — it is not INDEPENDENT correctness; no generated TypeScript declaration is structurally compared with its Go declaration",
 	}, nil
 }

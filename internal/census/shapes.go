@@ -64,6 +64,17 @@ type ConstShape struct {
 	Value string `json:"value"`
 }
 
+// ConstShapeSignature is the canonical join string of a constant's
+// declaration shape — its canonical type and exact value. It is the ONE
+// definition of the constant-parity contract: the census gate hashes it
+// over its recorded shapes and the translator hashes it over the constant
+// it lowered, so a divergence in either the type or the value is a detected
+// defect. The NUL separator cannot appear in a type spelling or an exact
+// constant value, so distinct (type, value) pairs never alias.
+func ConstShapeSignature(s ConstShape) string {
+	return s.Type + "\x00" + s.Value
+}
+
 // VarShape is one package-level variable.
 type VarShape struct {
 	ID   string `json:"id"`

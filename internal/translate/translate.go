@@ -25,9 +25,11 @@ import (
 	"golang.org/x/tools/go/packages"
 
 	"github.com/tsoniclang/gotots/internal/abi"
+	"github.com/tsoniclang/gotots/internal/census"
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/goid"
 	"github.com/tsoniclang/gotots/internal/ir"
+	"github.com/tsoniclang/gotots/internal/typeid"
 )
 
 // Packages translates a set of loaded production packages as one unit:
@@ -400,11 +402,29 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 						if name.Name == "_" {
 							continue
 						}
+						// The constant's declaration-shape hash: the type the
+						// translator resolved and the exact folded value, joined
+						// against the census constant shape by stage 05. A
+						// constant whose type has no canonical identity fails
+						// closed rather than emitting hashless (unjoinable)
+						// evidence.
+						constObj, ok := p.TypesInfo.Defs[name].(*types.Const)
+						if !ok {
+							return fmt.Errorf("constant %s.%s has no typed definition", p.PkgPath, name.Name)
+						}
+						constType, err := typeid.Canonical(constObj.Type())
+						if err != nil {
+							return fmt.Errorf("constant %s.%s: %w", p.PkgPath, name.Name, err)
+						}
+						constSig := census.ConstShapeSignature(census.ConstShape{
+							Type: constType, Value: constObj.Val().ExactString()})
+						constDigest := sha256.Sum256([]byte(constSig))
 						out.Proofs = append(out.Proofs, Proof{
 							ID: goid.Value(p.PkgPath, "const", name.Name), SourceRevision: options.SourceRevision,
 							Package: p.PkgPath, File: f.relative,
 							LoweringPlan:    LoweringPlanV2,
 							Representations: map[string]string{"decl:" + name.Name: "const-folded-at-use"},
+							ConstHash:       hex.EncodeToString(constDigest[:]),
 							NoOutput:        true,
 						})
 					}

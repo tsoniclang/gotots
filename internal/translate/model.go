@@ -35,6 +35,11 @@ type Proof struct {
 	// InitHash is a package variable's initializer source hash — joined
 	// against the census's identity-bearing initializer evidence.
 	InitHash string `json:"initHash,omitempty"`
+	// ConstHash is a package constant's declaration-shape hash
+	// (census.ConstShapeSignature over the type the translator lowered and
+	// the exact folded value) — joined against the census constant shape so
+	// a constant's type or value cannot drift between the two pipelines.
+	ConstHash string `json:"constHash,omitempty"`
 	// EffectOnly marks the enumerated symbol-less retained forms: a
 	// blank variable's ordered initializer effect, emitted inside the
 	// module's initialization sequence with no named binding.
