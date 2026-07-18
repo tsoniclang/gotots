@@ -138,26 +138,66 @@ function isErasedType(t) {
   return false;
 }
 
-// boxPayloadType returns the payload (v) type of a GoBox-shaped type
-// referenced by typeNode, or undefined if it is not a box. A box is
-// identified STRUCTURALLY — a resolved object type carrying exactly the
-// discriminated-box members k, r, v, m — so an ALIAS that resolves to a
-// GoBox (type Wrapped<V> = GoBox<"x", V, M>; Wrapped<object>) is detected
-// even though its surface name is not "GoBox". Resolving through the
-// checker (getTypeFromTypeNode) follows every alias and partial-application
-// layer, so no syntactic name match is relied upon.
+// The GoBox / GoAnyBox DECLARATION symbols, resolved once from the ABI
+// module. A box is identified by DECLARATION IDENTITY (its resolved type
+// or alias chain reaches THIS declaration), never by member-name shape, so
+// an ordinary domain type that coincidentally has k/r/v/m members is not a
+// box, while an alias whose target is GoBox (Wrapped<V> = GoBox<"x",V,M>)
+// still is.
+let goBoxDeclSymbol, goAnyBoxDeclSymbol;
+for (const source of program.getSourceFiles()) {
+  const rel = path.relative(root, source.fileName).split(path.sep).join("/");
+  if (rel !== "language-abi/goiface.ts") continue;
+  for (const stmt of source.statements) {
+    if ((ts.isTypeAliasDeclaration(stmt) || ts.isInterfaceDeclaration(stmt)) && stmt.name) {
+      const sym = checker.getSymbolAtLocation(stmt.name);
+      if (stmt.name.text === "GoBox") goBoxDeclSymbol = sym;
+      else if (stmt.name.text === "GoAnyBox") goAnyBoxDeclSymbol = sym;
+    }
+  }
+}
+
+// symbolReachesBoxDecl follows an alias/type-alias chain from sym to the
+// GoBox or GoAnyBox declaration symbol (through import aliases and
+// type-alias targets), so a box hidden behind one or more aliases is
+// still identified by its resolved declaration — not by field names.
+function symbolReachesBoxDecl(sym) {
+  let s = sym;
+  const seen = new Set();
+  while (s && !seen.has(s)) {
+    seen.add(s);
+    if (s === goBoxDeclSymbol || s === goAnyBoxDeclSymbol) return true;
+    if (s.flags & ts.SymbolFlags.Alias) { s = checker.getAliasedSymbol(s); continue; }
+    const decl = s.declarations && s.declarations[0];
+    if (decl && ts.isTypeAliasDeclaration(decl) && decl.type && ts.isTypeReferenceNode(decl.type)) {
+      const nameNode = ts.isQualifiedName(decl.type.typeName) ? decl.type.typeName.right : decl.type.typeName;
+      s = checker.getSymbolAtLocation(nameNode);
+      continue;
+    }
+    break;
+  }
+  return false;
+}
+
+// isGoBoxType reports whether a RESOLVED type is a GoBox (or an alias
+// resolving to one), by DECLARATION identity of its alias/own symbol.
+function isGoBoxType(t) {
+  if (!t) return false;
+  if (t.aliasSymbol && symbolReachesBoxDecl(t.aliasSymbol)) return true;
+  if (t.symbol && symbolReachesBoxDecl(t.symbol)) return true;
+  return false;
+}
+
+// boxPayloadType returns the payload (v) type of a box referenced by
+// typeNode, or undefined if it is not a box. Identity is by resolved
+// DECLARATION, so an ordinary {k,r,v,m} domain type is not a box.
 function boxPayloadType(typeNode) {
   const t = checker.getTypeFromTypeNode(typeNode);
-  if (!t || (t.getFlags() & ts.TypeFlags.Object) === 0) return undefined;
-  const k = checker.getPropertyOfType(t, "k");
-  const r = checker.getPropertyOfType(t, "r");
+  if (!isGoBoxType(t)) return undefined;
   const v = checker.getPropertyOfType(t, "v");
-  const m = checker.getPropertyOfType(t, "m");
-  if (!k || !r || !v || !m) return undefined;
-  // getTypeOfSymbol returns the INSTANTIATED property type (unknown/object)
-  // for a symbol drawn from an instantiated box, where
-  // getTypeOfSymbolAtLocation would re-resolve to the generic declaration's
-  // type parameter V.
+  if (!v) return undefined;
+  // getTypeOfSymbol returns the INSTANTIATED payload type (unknown/object),
+  // where getTypeOfSymbolAtLocation would re-resolve to the parameter V.
   return checker.getTypeOfSymbol(v);
 }
 
@@ -228,14 +268,22 @@ for (const source of program.getSourceFiles()) {
       }
       if (ts.isAsExpression(node) && ts.isPropertyAccessExpression(node.expression) &&
           node.expression.name.text === "v") {
+        // Recovering .v off a box: identify the box by RESOLVED declaration
+        // identity, never by rendered type text containing "GoBox".
         const boxType = checker.getTypeAtLocation(node.expression.expression);
-        const display = checker.typeToString(boxType);
-        if (display.includes("GoBox") || display.includes("GoAnyBox")) {
+        if (isGoBoxType(boxType)) {
           report(file, node, source, "erased-payload-recovery-cast");
         }
       }
-      if (ts.isQualifiedName(node) && node.right.text === "GoAnyBox") {
-        report(file, node, source, "erased-anybox-in-core");
+      // A reference to the erased GoAnyBox alias in generated core: resolve
+      // the name to its declaration symbol and compare to the ABI's
+      // GoAnyBox declaration, not the spelling.
+      if (ts.isQualifiedName(node) && goAnyBoxDeclSymbol) {
+        let sym = checker.getSymbolAtLocation(node.right);
+        while (sym && (sym.flags & ts.SymbolFlags.Alias)) sym = checker.getAliasedSymbol(sym);
+        if (sym === goAnyBoxDeclSymbol) {
+          report(file, node, source, "erased-anybox-in-core");
+        }
       }
     }
     if (ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName)) {

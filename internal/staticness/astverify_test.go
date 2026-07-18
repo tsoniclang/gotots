@@ -353,3 +353,29 @@ export function goIfaceBox<K extends string, V, M>(k: K, r: GoRtti, v: V, m: M):
 		}
 	}
 }
+
+// TestASTVerifierOrdinaryCarrierNotFlagged proves a box is identified by
+// RESOLVED DECLARATION IDENTITY, not member-name shape: an ordinary domain
+// type that coincidentally carries k/r/v/m members (with r NOT GoRtti and
+// v: object) is NOT a GoBox and must not be flagged erased-iface-payload.
+func TestASTVerifierOrdinaryCarrierNotFlagged(t *testing.T) {
+	files := map[string]string{
+		"language-abi/goiface.ts": `
+export interface GoRtti { readonly d: string }
+export type GoBox<K extends string, V, M> = { readonly k: K; readonly r: GoRtti; readonly v: V; readonly m: M };
+`,
+		"core/pkg/package.ts": `
+export interface OrdinaryGoStruct { k: string; r: string; v: object; m: bigint }
+export function make(): OrdinaryGoStruct { return { k: "x", r: "y", v: {}, m: 1n }; }
+`,
+	}
+	report, err := VerifyAST(files, typescriptDir(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, v := range report.Violations {
+		if v.Pattern == "erased-iface-payload" || v.Pattern == "abi:erased-iface-payload" {
+			t.Errorf("ordinary {k,r,v,m} type wrongly flagged as an erased box: %+v", v)
+		}
+	}
+}
