@@ -33,11 +33,13 @@ func (p *printer) rttiRef(r ir.RttiRef) (string, error) {
 		// external contract stubs directly. Comparability stays unknown.
 		names := make([]string, 0, len(p.module.ExternMethods[r.ExternID]))
 		for _, method := range p.module.ExternMethods[r.ExternID] {
-			id := method.Key
-			if id == "" {
-				id = method.Name
+			// The canonical external MethodKey, always populated (external
+			// method obligations hard-error on a failing MethodKey); an empty
+			// key is a construction defect, never a bare-name fallback.
+			if method.Key == "" {
+				panic("emit: external method " + method.Name + " has no canonical identity for the assertion rtti")
 			}
-			names = append(names, fmt.Sprintf("%q", id))
+			names = append(names, fmt.Sprintf("%q", method.Key))
 		}
 		sort.Strings(names)
 		return fmt.Sprintf("goif$.goRttiComposite(%q, { d: %q, ms: [%s], x: %q })", r.Composite, r.Display, strings.Join(names, ", "), r.ExternID), nil
@@ -97,21 +99,25 @@ func printRtti(out *strings.Builder, module *Module, info RttiInfo) error {
 func (info RttiInfo) methodDisplays() (string, string) {
 	valueSet := map[string]bool{}
 	pointerSet := map[string]bool{}
-	ident := func(key, name string) string {
-		if key != "" {
-			return key
-		}
-		return name
-	}
+	// The identity is the canonical MethodKey, always populated by the IR
+	// builder (it is total). An empty MethodIdent is a construction defect,
+	// not a bare-name fallback — a method with no canonical identity would
+	// have failed the declaration closed already.
 	for _, method := range info.Methods {
-		id := ident(method.MethodIdent, method.Name)
+		id := method.MethodIdent
+		if id == "" {
+			panic("emit: method " + method.Name + " has no canonical identity for the assertion rtti")
+		}
 		pointerSet[id] = true
 		if !method.PointerReceiver {
 			valueSet[id] = true
 		}
 	}
 	for _, delegate := range info.Promoted {
-		id := ident(delegate.MethodIdent, delegate.Name)
+		id := delegate.MethodIdent
+		if id == "" {
+			panic("emit: promoted method " + delegate.Name + " has no canonical identity for the assertion rtti")
+		}
 		pointerSet[id] = true
 		if delegate.ValueReceiver {
 			valueSet[id] = true
@@ -360,6 +366,18 @@ func TypedAdapterType(module *Module, params []ir.Var, results []ir.Type) (strin
 	return fmt.Sprintf("(%s) => %s", joinComma(parts), result), nil
 }
 
+// ifaceAliasName is the union-alias name for one canonical interface
+// identity: the FULL digest of the identity, so distinct interfaces can
+// never collide onto one alias (a truncated prefix is not an injective
+// identity, and the alias name is an internal TS identifier so its length
+// is free). Both the alias declaration and every reference to a union's
+// equality function derive the name through this one function, so they
+// always agree.
+func ifaceAliasName(identity string) string {
+	digest := sha256.Sum256([]byte(identity))
+	return "Iface$" + hex.EncodeToString(digest[:])
+}
+
 // ifaceUnionAlias spells one interface type as its closed discriminated
 // union alias (ADR-0004): one GoBox member per implementer with exact
 // literal, payload, and vtable types, undefined for nil, and — for the
@@ -375,8 +393,7 @@ func (p *printer) ifaceUnionAlias(t ir.Type) (string, error) {
 		// identity is a construction defect, not a spelling to guess.
 		return "", fmt.Errorf("interface %q has no canonical identity", t.Go)
 	}
-	digest := sha256.Sum256([]byte(identity))
-	name := "Iface$" + hex.EncodeToString(digest[:6])
+	name := ifaceAliasName(identity)
 	if p.module == nil {
 		return name, nil
 	}

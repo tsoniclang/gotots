@@ -212,9 +212,10 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 			errTemp := p.temp()
 			p.line("const %s = %s;", errTemp, value)
 			format, err := p.printIfaceCall(&ir.IfaceCall{
-				Recv:    &ir.ParamRef{Name: errTemp, T: n.ErrorFormat.Recv.Type()},
-				Display: n.ErrorFormat.Display,
-				Results: n.ErrorFormat.Results,
+				Recv:      &ir.ParamRef{Name: errTemp, T: n.ErrorFormat.Recv.Type()},
+				Display:   n.ErrorFormat.Display,
+				MethodKey: n.ErrorFormat.MethodKey,
+				Results:   n.ErrorFormat.Results,
 			})
 			if err != nil {
 				return err

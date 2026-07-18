@@ -40,13 +40,16 @@ type IfaceBox struct {
 // a nil interface panics with Go's exact message.
 type IfaceCall struct {
 	Recv Expr
-	// Display is the method's source name: within a narrowed union
-	// member it is exact by construction (types.Implements gates
-	// membership with signature and unexported-package identity, and Go
-	// allows one method per name per type).
+	// Display is the method's source name (for readable diagnostics only).
 	Display string
-	Args    []Expr
-	Results []Type
+	// MethodKey is the interface method's canonical dispatch identity. The
+	// dispatch selector is looked up per union member by THIS key (each
+	// member's IfaceMember.Slots is keyed by the interface method's
+	// canonical identity, not its bare name), so a member that disambiguates
+	// two same-spelled methods dispatches to exactly its own slot.
+	MethodKey string
+	Args      []Expr
+	Results   []Type
 }
 
 // PromotionStep is one embedded-field hop in a promoted dispatch chain.

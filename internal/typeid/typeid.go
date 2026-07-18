@@ -54,20 +54,8 @@ func MethodCanonical(method *types.Func) (string, error) {
 		return "", fmt.Errorf("typeid: method %s has no signature", method.Name())
 	}
 	c := newCtx()
-	if rtp := sig.RecvTypeParams(); rtp != nil && rtp.Len() > 0 {
-		// A free receiver parameter is distinct PER OWNER even with an
-		// identical constraint (go/types: A[T any].F()T is not identical to
-		// B[U any].F()U), so it is bound to its owner's identity — never a
-		// bare index or its constraint (a method with no free parameter
-		// appearing, A.G() vs B.G(), stays identical). If the owner cannot
-		// be proven, identity fails closed.
-		owner := receiverOwnerID(sig)
-		if owner == "" {
-			return "", fmt.Errorf("typeid: method %s has receiver type parameters but no provable owner", method.Name())
-		}
-		for i := range rtp.Len() {
-			c.bindOwner(rtp.At(i), owner, i)
-		}
+	if err := bindReceiverTypeParams(sig, c); err != nil {
+		return "", err
 	}
 	var out strings.Builder
 	writeSignatureBody(&out, sig, c)
@@ -75,6 +63,53 @@ func MethodCanonical(method *types.Func) (string, error) {
 		return "", *c.errp
 	}
 	return out.String(), nil
+}
+
+// bindReceiverTypeParams binds a method signature's receiver type
+// parameters into c, so a method whose callable signature references them
+// canonicalizes by owner position instead of failing on a free parameter.
+// A free receiver parameter is distinct PER OWNER even with an identical
+// constraint (go/types: A[T any].F()T is not identical to B[U any].F()U),
+// so each is bound to its owner's identity. RecvTypeParams() is the direct
+// source for concrete generic-type methods; an ABSTRACT interface method
+// reports none, so its params — the enclosing generic interface's, which
+// appear free in M(T) — are recovered from the receiver's generic
+// *types.Named. This makes MethodCanonical TOTAL for generic interface
+// methods, so no consumer needs a bare-name fallback.
+func bindReceiverTypeParams(sig *types.Signature, c *idctx) error {
+	owner := receiverOwnerID(sig)
+	if rtp := sig.RecvTypeParams(); rtp != nil && rtp.Len() > 0 {
+		if owner == "" {
+			return fmt.Errorf("typeid: method has receiver type parameters but no provable owner")
+		}
+		for i := range rtp.Len() {
+			c.bindOwner(rtp.At(i), owner, i)
+		}
+		return nil
+	}
+	recv := sig.Recv()
+	if recv == nil {
+		return nil
+	}
+	t := recv.Type()
+	if p, ok := t.(*types.Pointer); ok {
+		t = p.Elem()
+	}
+	named, ok := types.Unalias(t).(*types.Named)
+	if !ok {
+		return nil
+	}
+	tp := named.TypeParams()
+	if tp == nil || tp.Len() == 0 {
+		return nil
+	}
+	if owner == "" {
+		return fmt.Errorf("typeid: method receiver %s has type parameters but no provable owner", named.Obj().Name())
+	}
+	for i := range tp.Len() {
+		c.bindOwner(tp.At(i), owner, i)
+	}
+	return nil
 }
 
 // receiverOwnerID is the canonical identity of the generic type that owns
@@ -166,14 +201,8 @@ func MethodBinders(fn *types.Func) (*Binders, error) {
 		return nil, fmt.Errorf("typeid: %s has no signature", fn.Name())
 	}
 	c := newCtx()
-	if rtp := sig.RecvTypeParams(); rtp != nil && rtp.Len() > 0 {
-		owner := receiverOwnerID(sig)
-		if owner == "" {
-			return nil, fmt.Errorf("typeid: method %s has receiver type parameters but no provable owner", fn.Name())
-		}
-		for i := range rtp.Len() {
-			c.bindOwner(rtp.At(i), owner, i)
-		}
+	if err := bindReceiverTypeParams(sig, c); err != nil {
+		return nil, err
 	}
 	return &Binders{c: c}, nil
 }

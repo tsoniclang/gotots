@@ -22,6 +22,9 @@ type MethodValue struct {
 	// Iface dispatches through the receiver union's closed member set at
 	// call time; a nil interface panics at evaluation.
 	Iface bool
+	// MethodKey is the interface method's canonical dispatch identity, set
+	// when Iface: the synthetic dispatch looks up each member's slot by it.
+	MethodKey string
 	// Results carries the method's result types for dynamic-dispatch
 	// casting when Iface is set.
 	Results []Type
@@ -63,6 +66,12 @@ func (b *builder) buildMethodValue(n *ast.SelectorExpr, selection *types.Selecti
 
 	if recv.Type().Kind == KindIface {
 		out.Iface = true
+		key, err := MethodKey(method)
+		if err != nil {
+			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+				Construct: "method value on " + recv.Type().Go + " (method without canonical identity)", Span: span}
+		}
+		out.MethodKey = key
 		results := signature.Results()
 		for i := range results.Len() {
 			result, err := b.typeOf(results.At(i).Type(), span)

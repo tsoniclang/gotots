@@ -288,7 +288,13 @@ func (b *builder) ifaceMembers(iface *types.Interface, span Span) ([]IfaceMember
 			if err != nil {
 				return err
 			}
-			slots[m.Name()] = slot
+			// Keyed by the interface method's CANONICAL identity (not its
+			// bare name), matching IfaceCall.MethodKey at the dispatch site.
+			key, err := MethodKey(m)
+			if err != nil {
+				return err
+			}
+			slots[key] = slot
 		}
 		member.Slots = slots
 		members = append(members, member)

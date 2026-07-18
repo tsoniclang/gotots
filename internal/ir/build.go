@@ -120,15 +120,6 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 		Span:     span,
 		BodyHash: bodyHash,
 	}
-	if signature.Recv() != nil {
-		// A method's canonical dispatch identity, for the assertion
-		// diagnostic's signature-aware missing-method comparison. A generic
-		// method has no single exact identity; it leaves this empty and the
-		// diagnostic falls back to its name for that entry.
-		if key, err := MethodKey(object); err == nil {
-			function.MethodIdent = key
-		}
-	}
 	// A declaration-level finding makes the whole body unimplemented:
 	// its one site is recorded and the body is not built (its types are
 	// unavailable or its effects cannot be represented).
@@ -137,6 +128,19 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 			return nil, err
 		}
 		return b.finalize(function), nil
+	}
+	if signature.Recv() != nil {
+		// A method's canonical dispatch identity, for the assertion
+		// diagnostic's signature-aware missing-method comparison. MethodKey
+		// is total (generic receivers and generic interface methods bind
+		// their type params), so a failure is a genuine defect: fail closed
+		// rather than substituting the bare method name.
+		key, err := MethodKey(object)
+		if err != nil {
+			return declarationSite(&Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+				Construct: "method without canonical identity (" + object.Name() + ")", Span: span})
+		}
+		function.MethodIdent = key
 	}
 	if decl.Body == nil {
 		return declarationSite(&Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "bodyless function", Span: span})

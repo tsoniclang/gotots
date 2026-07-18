@@ -44,10 +44,11 @@ func (p *printer) printMethodValue(n *ir.MethodValue) (string, error) {
 			argExprs[i] = &ir.ParamRef{Name: args[i], T: n.T.Sig.Params[i]}
 		}
 		synthetic := &ir.IfaceCall{
-			Recv:    &ir.ParamRef{Name: "$r", T: n.Recv.Type()},
-			Display: n.Method,
-			Args:    argExprs,
-			Results: n.Results,
+			Recv:      &ir.ParamRef{Name: "$r", T: n.Recv.Type()},
+			Display:   n.Method,
+			MethodKey: n.MethodKey,
+			Args:      argExprs,
+			Results:   n.Results,
 		}
 		call, err = p.printIfaceCall(synthetic)
 		if err != nil {

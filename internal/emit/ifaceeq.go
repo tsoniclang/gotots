@@ -5,8 +5,6 @@
 package emit
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -106,10 +104,10 @@ func emitEqPlan(plan *ir.EqPlan, a, b string) string {
 	case ir.EqArray:
 		return "gosl$.goArrayEqualWith(" + a + ", " + b + ", ($x, $y) => " + emitEqPlan(plan.Elem, "$x", "$y") + ")"
 	case ir.EqIface:
-		// An interface array element compares through its own union equality.
-		digest := sha256.Sum256([]byte(plan.IfaceID))
-		union := "Iface$" + hex.EncodeToString(digest[:6])
-		return union + "$eq(" + a + ", " + b + ")"
+		// An interface array element compares through its own union equality;
+		// the alias name derives from the SAME shared full-digest helper as
+		// the alias declaration, so the reference always resolves.
+		return ifaceAliasName(plan.IfaceID) + "$eq(" + a + ", " + b + ")"
 	case ir.EqUncomparable:
 		return fmt.Sprintf("goif$.goPanicUncomparable(%q)", plan.Display)
 	case ir.EqExternal:

@@ -206,6 +206,10 @@ func MethodSlot(named *types.Named, method *types.Func) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// The FULL digest of the canonical identity — a truncated prefix is not
+	// an injective identity, and the slot is an internal TS property name so
+	// its length is free. Distinct canonical methods therefore get distinct
+	// slots with no birthday collision.
 	digest := sha256.Sum256([]byte(key))
-	return name + "$s" + hex.EncodeToString(digest[:4]), nil
+	return name + "$s" + hex.EncodeToString(digest[:]), nil
 }

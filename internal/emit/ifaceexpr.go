@@ -253,16 +253,15 @@ func (p *printer) printIfaceCall(n *ir.IfaceCall) (string, error) {
 	sub.indent++
 	for _, member := range p.retainedMembers(recvType) {
 		// Dispatch indexes the member's CANONICAL SLOT for this interface
-		// method (ir.MethodSlot), threaded through IfaceMember.Slots. Within
-		// a narrowed member the slot selects exactly the implementing method:
-		// membership is gated by types.Implements (signature and
-		// unexported-package identity), and where the member carries two
-		// same-bare-name methods from different packages the slot is
-		// disambiguated so each interface reaches its own method. The bare
-		// name is the slot in the common case, so output is unchanged there.
-		selector := member.Slots[n.Display]
-		if selector == "" {
-			selector = n.Display
+		// method — IfaceMember.Slots is keyed by the interface method's
+		// canonical identity (ir.MethodKey) and holds the member's
+		// ir.MethodSlot for its implementing method. Membership is gated by
+		// types.Implements, so every retained member populates a slot for
+		// this method; a missing slot is a construction-invariant violation,
+		// NOT a bare-name fallback.
+		selector, ok := member.Slots[n.MethodKey]
+		if !ok {
+			panic("emit: interface member " + member.K + " has no dispatch slot for the called method")
 		}
 		call := "$r.m." + selector + "(" + joinComma(append([]string{"$r.v"}, argNames...)) + ")"
 		if result == "void" {

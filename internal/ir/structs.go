@@ -226,9 +226,10 @@ func (b *builder) promotedDelegates(named *types.Named, span Span) ([]PromotedDe
 			if err != nil {
 				return nil, err
 			}
-			ident := ""
-			if key, err := MethodKey(method); err == nil {
-				ident = key
+			ident, err := MethodKey(method)
+			if err != nil {
+				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+					Construct: "promoted method without canonical identity (" + method.Name() + ")", Span: span}
 			}
 			entry := PromotedDelegate{Name: method.Name(), Slot: slot, MethodIdent: ident,
 				Pkg: method.Pkg().Path(), ValueReceiver: !pointerRecv}

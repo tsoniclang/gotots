@@ -416,3 +416,26 @@ var useBar Bar[int]
 		t.Fatalf("AliasBinders.Canonical(Foo): %v", err)
 	}
 }
+
+// TestGenericInterfaceMethodCanonical: an abstract method of a generic
+// interface (M(T) where T is the interface's own type parameter) has a
+// TOTAL canonical identity — the enclosing interface's type params are
+// bound by owner position, so MethodCanonical never fails on the free T.
+// Distinct owners yield distinct identities.
+func TestGenericInterfaceMethodCanonical(t *testing.T) {
+	p := pkgOf(t, "example.com/p", "package p\ntype I[T any] interface{ M(T) }")
+	iface := p.Scope().Lookup("I").Type().Underlying().(*types.Interface)
+	got, err := MethodCanonical(iface.Method(0))
+	if err != nil {
+		t.Fatalf("MethodCanonical must be total for a generic interface method: %v", err)
+	}
+	if got != "func($example.com/p.I#0)" {
+		t.Fatalf("I[T].M(T) canonical = %q", got)
+	}
+	q := pkgOf(t, "example.com/q", "package q\ntype J[U any] interface{ M(U) }")
+	jf := q.Scope().Lookup("J").Type().Underlying().(*types.Interface)
+	got2, _ := MethodCanonical(jf.Method(0))
+	if got == got2 {
+		t.Fatalf("distinct-owner generic interface methods must differ: %q", got)
+	}
+}

@@ -86,7 +86,12 @@ func (b *builder) rttiFor(t types.Type, span Span) (RttiRef, error) {
 func (b *builder) buildIfaceMethodCall(n *ast.CallExpr, recv Expr, method *types.Func, selector *ast.SelectorExpr) (Expr, error) {
 	span := b.span(n.Pos())
 	signature := method.Type().(*types.Signature)
-	out := &IfaceCall{Recv: recv, Display: method.Name()}
+	key, err := MethodKey(method)
+	if err != nil {
+		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+			Construct: "method call on " + recv.Type().Go + " (method without canonical identity)", Span: span}
+	}
+	out := &IfaceCall{Recv: recv, Display: method.Name(), MethodKey: key}
 	if err := b.buildCallArgsResults(n, signature, &out.Args, &out.Results); err != nil {
 		return nil, err
 	}
@@ -140,7 +145,11 @@ func (b *builder) buildTypeAssert(n *ast.TypeAssertExpr, commaOk bool) (Expr, er
 			m := targetIface.Method(i)
 			key, err := MethodKey(m)
 			if err != nil {
-				key = m.Name()
+				// MethodKey is total (generic interface methods bind their
+				// owner's params); a failure means the assertion has no exact
+				// evidence — fail closed rather than substituting the bare name.
+				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+					Construct: "type assertion on " + operand.Type().Go + " (target method without canonical identity)", Span: span}
 			}
 			required = append(required, key)
 		}
