@@ -32,7 +32,7 @@ func (b *builder) buildTarget(lhs ast.Expr) (Target, error) {
 		}
 		variable, isVar := b.info.Uses[n].(*types.Var)
 		if !isVar {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "assignment to non-variable " + n.Name, Span: span}
+			return nil, &Unsupported{Kind: KindAssignmentToNonVariable, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "assignment to non-variable " + n.Name, Span: span}
 		}
 		t, err := b.typeOf(variable.Type(), span)
 		if err != nil {
@@ -51,7 +51,7 @@ func (b *builder) buildTarget(lhs ast.Expr) (Target, error) {
 	case *ast.SelectorExpr:
 		selection, ok := b.info.Selections[n]
 		if !ok || selection.Kind() != types.FieldVal {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "assignment to non-field selector", Span: span}
+			return nil, &Unsupported{Kind: KindAssignmentToNonFieldSelector, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "assignment to non-field selector", Span: span}
 		}
 		base, err := b.buildExpr(n.X)
 		if err != nil {
@@ -74,7 +74,7 @@ func (b *builder) buildTarget(lhs ast.Expr) (Target, error) {
 			}
 		}
 		if base.Type().Kind != KindPointer && base.Type().Kind != KindStruct {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "field assignment on " + base.Type().Go, Span: span}
+			return nil, &Unsupported{Kind: KindFieldAssignmentOn, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "field assignment on " + base.Type().Go, Span: span}
 		}
 		fieldType, err := b.typeOf(b.info.Types[lhs].Type, span)
 		if err != nil {
@@ -102,7 +102,7 @@ func (b *builder) buildTarget(lhs ast.Expr) (Target, error) {
 			return &MapTarget{Map: operand, Key: key}, nil
 		case KindSlice:
 			if operand.Type().Elem.Kind == KindExternal {
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "store into a slice of external values", Span: span}
+				return nil, &Unsupported{Kind: KindStoreIntoASliceOfExternalValues, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "store into a slice of external values", Span: span}
 			}
 			index, err := b.buildExpr(n.Index)
 			if err != nil {
@@ -112,7 +112,7 @@ func (b *builder) buildTarget(lhs ast.Expr) (Target, error) {
 			return &SliceTarget{X: operand, Index: index}, nil
 		case KindArray:
 			if operand.Type().Elem.Kind == KindExternal {
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "store into an array of external values", Span: span}
+				return nil, &Unsupported{Kind: KindStoreIntoAnArrayOfExternalValues, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "store into an array of external values", Span: span}
 			}
 			index, err := b.buildExpr(n.Index)
 			if err != nil {
@@ -121,7 +121,7 @@ func (b *builder) buildTarget(lhs ast.Expr) (Target, error) {
 			b.use("arrayStore")
 			return &ArrayTarget{X: operand, Index: index}, nil
 		}
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "indexed assignment on " + operand.Type().Go, Span: span}
+		return nil, &Unsupported{Kind: KindIndexedAssignmentOn, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "indexed assignment on " + operand.Type().Go, Span: span}
 
 	case *ast.StarExpr:
 		operand, err := b.buildExpr(n.X)
@@ -129,12 +129,12 @@ func (b *builder) buildTarget(lhs ast.Expr) (Target, error) {
 			return nil, err
 		}
 		if operand.Type().Kind != KindPointer {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "assignment through " + operand.Type().Go, Span: span}
+			return nil, &Unsupported{Kind: KindAssignmentThrough, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "assignment through " + operand.Type().Go, Span: span}
 		}
 		b.use("pointeeStore")
 		return &PointeeTarget{X: operand}, nil
 	}
-	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: fmt.Sprintf("assignment to %T", lhs), Span: span}
+	return nil, &Unsupported{Kind: KindAssignmentTo, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: fmt.Sprintf("assignment to %T", lhs), Span: span}
 }
 
 func (b *builder) buildAssign(n *ast.AssignStmt) (Stmt, error) {
@@ -169,7 +169,7 @@ func (b *builder) buildAssign(n *ast.AssignStmt) (Stmt, error) {
 		for i, lhs := range n.Lhs {
 			target, ok := lhs.(*ast.Ident)
 			if !ok {
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "short declaration of non-identifier", Span: span}
+				return nil, &Unsupported{Kind: KindShortDeclarationOfNonIdentifier, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "short declaration of non-identifier", Span: span}
 			}
 			if target.Name == "_" {
 				// A discarded slot: the value is still evaluated. Its type
@@ -188,7 +188,7 @@ func (b *builder) buildAssign(n *ast.AssignStmt) (Stmt, error) {
 				// new variable alongside it).
 				existing, isVar := b.info.Uses[target].(*types.Var)
 				if !isVar {
-					return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "short declaration reusing a non-variable", Span: span}
+					return nil, &Unsupported{Kind: KindShortDeclarationReusingANonVariable, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "short declaration reusing a non-variable", Span: span}
 				}
 				variable = existing
 			}
@@ -216,10 +216,10 @@ func (b *builder) buildAssign(n *ast.AssignStmt) (Stmt, error) {
 			// The non-tuple mixed form needs staged right-hand values (an
 			// existing name may feed a later slot); it stays out until that
 			// staging is reviewed.
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "short declaration reusing an existing variable without a tuple source", Span: span}
+			return nil, &Unsupported{Kind: KindShortDeclarationReusingAnExistingVariableWithoutATupleSource, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "short declaration reusing an existing variable without a tuple source", Span: span}
 		}
 		if len(n.Rhs) != len(n.Lhs) {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "short declaration arity mismatch", Span: span}
+			return nil, &Unsupported{Kind: KindShortDeclarationArityMismatch, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "short declaration arity mismatch", Span: span}
 		}
 		for i, rhs := range n.Rhs {
 			value, err := b.buildExprAs(rhs, out.Types[i])
@@ -246,7 +246,7 @@ func (b *builder) buildAssign(n *ast.AssignStmt) (Stmt, error) {
 			return out, nil
 		}
 		if len(n.Rhs) != len(n.Lhs) {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "assignment arity mismatch", Span: span}
+			return nil, &Unsupported{Kind: KindAssignmentArityMismatch, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "assignment arity mismatch", Span: span}
 		}
 		for i, rhs := range n.Rhs {
 			// A blank target has no type of its own; the value is built
@@ -272,7 +272,7 @@ func (b *builder) buildAssign(n *ast.AssignStmt) (Stmt, error) {
 		b.use("assign")
 		return out, nil
 	}
-	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "assignment token " + n.Tok.String(), Span: span}
+	return nil, &Unsupported{Kind: KindAssignmentToken, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "assignment token " + n.Tok.String(), Span: span}
 }
 
 // buildCompoundAssign lowers x op= y: the target's operands stage
@@ -280,7 +280,7 @@ func (b *builder) buildAssign(n *ast.AssignStmt) (Stmt, error) {
 func (b *builder) buildCompoundAssign(n *ast.AssignStmt, operator token.Token) (Stmt, error) {
 	span := b.span(n.Pos())
 	if len(n.Lhs) != 1 || len(n.Rhs) != 1 {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "compound assignment arity", Span: span}
+		return nil, &Unsupported{Kind: KindCompoundAssignmentArity, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "compound assignment arity", Span: span}
 	}
 	operandT, err := b.typeOf(b.info.Types[n.Lhs[0]].Type, span)
 	if err != nil {
@@ -294,7 +294,7 @@ func (b *builder) buildCompoundAssign(n *ast.AssignStmt, operator token.Token) (
 		return nil, err
 	}
 	if _, isBlank := target.(BlankTarget); isBlank {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "compound assignment to the blank identifier", Span: span}
+		return nil, &Unsupported{Kind: KindCompoundAssignmentToTheBlankIdentifier, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "compound assignment to the blank identifier", Span: span}
 	}
 	right, err := b.buildExprAs(n.Rhs[0], operandT)
 	if err != nil {
@@ -309,19 +309,19 @@ func (b *builder) buildCompoundAssign(n *ast.AssignStmt, operator token.Token) (
 func compoundOpAdmissible(operator token.Token, operand Type, span Span) error {
 	if operand.Kind == KindString {
 		if operator != token.ADD {
-			return &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "operator " + operator.String() + " on string", Span: span}
+			return &Unsupported{Kind: KindOperator, Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "operator " + operator.String() + " on string", Span: span}
 		}
 		return nil
 	}
 	if operand.Kind == KindFloat32 {
-		return &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "float32 arithmetic", Span: span}
+		return &Unsupported{Kind: KindFloat32Arithmetic, Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "float32 arithmetic", Span: span}
 	}
 	if !operand.Kind.Integer() && !operand.Kind.Float() {
-		return &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "compound assignment on " + operand.Go, Span: span}
+		return &Unsupported{Kind: KindCompoundAssignmentOn, Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "compound assignment on " + operand.Go, Span: span}
 	}
 	if operand.Kind.Float() && operator != token.ADD && operator != token.SUB &&
 		operator != token.MUL && operator != token.QUO {
-		return &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "operator " + operator.String() + " on " + operand.Go, Span: span}
+		return &Unsupported{Kind: KindOperator, Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "operator " + operator.String() + " on " + operand.Go, Span: span}
 	}
 	return nil
 }
@@ -347,12 +347,12 @@ func (b *builder) blankSlotType(n *ast.AssignStmt, index int, span Span) (Type, 
 		case *ast.TypeAssertExpr:
 			return b.typeOf(b.info.Types[rhs.Type].Type, span)
 		}
-		return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "blank slot in unrecognized tuple form", Span: span}
+		return Type{}, &Unsupported{Kind: KindBlankSlotInUnrecognizedTupleForm, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "blank slot in unrecognized tuple form", Span: span}
 	}
 	if index < len(n.Rhs) {
 		return b.typeOf(b.info.Types[n.Rhs[index]].Type, span)
 	}
-	return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "blank slot arity", Span: span}
+	return Type{}, &Unsupported{Kind: KindBlankSlotArity, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "blank slot arity", Span: span}
 }
 
 // tupleValue recognizes a single expression whose multiple values

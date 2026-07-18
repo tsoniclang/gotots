@@ -30,11 +30,11 @@ func (b *builder) admitGenericFunction(object *types.Func, span Span) ([]string,
 				if mentionsTypeParamType(arg) {
 					continue
 				}
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+				return nil, &Unsupported{Kind: KindGenericFunctionInstantiatedWithAnUnreviewedTypeArgument, Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 					Construct: "generic function instantiated with an unreviewed type argument (" + arg.String() + ")", Span: span}
 			}
 			if resolved.Kind == KindStruct {
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+				return nil, &Unsupported{Kind: KindGenericFunctionInstantiatedWithAStructValueCopySemanticsVaryPerInstantiation, Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 					Construct: "generic function instantiated with a struct value (copy semantics vary per instantiation)", Span: span}
 			}
 		}

@@ -182,7 +182,7 @@ func (b *builder) boxDeclaredNames(idents []ast.Expr, decl *DeclStmt, span Span)
 		return decl, nil
 	}
 	if decl.Tuple != nil {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "address of a tuple-bound variable", Span: span}
+		return nil, &Unsupported{Kind: KindAddressOfATupleBoundVariable, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "address of a tuple-bound variable", Span: span}
 	}
 	out := &StmtSeq{}
 	for i, name := range decl.Names {
@@ -209,7 +209,7 @@ func (b *builder) rejectBoxedBinding(ident *ast.Ident, construct string, span Sp
 		return nil
 	}
 	if _, isBoxed := b.boxedVar(ident); isBoxed {
-		return &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "address of " + construct, Span: span}
+		return &Unsupported{Kind: KindAddressOf, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "address of " + construct, Span: span}
 	}
 	return nil
 }

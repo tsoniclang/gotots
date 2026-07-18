@@ -74,6 +74,10 @@ type ProbeResult struct {
 	// body, carrying EVERY unsupported site (not only the first) with its
 	// classification — the exhaustive residual accounting.
 	UnimplementedUnits []UnitInventory `json:"unimplementedUnits"`
+	// kindByClass joins each class key (Kind.String()) back to its
+	// producer-owned Kind, so the class inventory dispositions by Kind
+	// rather than re-parsing the class string.
+	kindByClass map[string]ir.UnsupportedKind
 }
 
 // ClassRow is one unsupported class's residual-inventory summary.
@@ -129,190 +133,190 @@ const (
 	rootConcurrency  = "concurrency: one explicit TS-Go concurrency product policy"
 )
 
-// dispositionByConstruct is the TOTAL classification of the closed
-// construct-key set (ir.ClassConstructKeys). Every registered construct
-// maps to an explicitly reviewed category — there is no substring matching
-// and no catch-all default that would make an unreviewed class look like a
-// simple language lowering. A construct outside this map (a diagnostic
-// carrying free text with no registered prefix) classifies as
-// "unclassified", surfaced honestly rather than silently absorbed.
-var dispositionByConstruct = map[string]disposition{
-	// Named-type and value forms not yet lowered.
-	"non-basic type":          {catLanguageLowering, rootLangType},
-	"basic type":              {catLanguageLowering, rootLangType},
-	"interface type":          {catLanguageLowering, rootLangDispatch},
-	"array type":              {catLanguageLowering, rootLangType},
-	"struct type":             {catLanguageLowering, rootLangType},
-	"type":                    {catLanguageLowering, rootLangType},
-	"type parameter":          {catLanguageLowering, rootLangGenerics},
-	"constant of type":        {catLanguageLowering, rootLangType},
-	"zero value of":           {catLanguageLowering, rootLangType},
-	"nil of type":             {catLanguageLowering, rootLangType},
-	"interface value of type": {catLanguageLowering, rootLangDispatch},
-	"string constant with":    {catLanguageLowering, rootLangType},
-	"generic function instantiated with an unreviewed type argument": {catLanguageLowering, rootLangGenerics},
-	// Pointers.
-	"pointer to non-named type":  {catLanguageLowering, rootLangPointer},
-	"pointer to non-struct type": {catLanguageLowering, rootLangPointer},
-	"dereference of":             {catLanguageLowering, rootLangPointer},
-	"address of":                 {catLanguageLowering, rootLangPointer},
-	// Representation planning.
-	"map key type": {catRepresentation, rootRepresent},
-	// Concurrency — one product policy.
-	"channel type":           {catProductPolicy, rootConcurrency},
-	"goroutine statement":    {catProductPolicy, rootConcurrency},
-	"select statement":       {catProductPolicy, rootConcurrency},
-	"channel send statement": {catProductPolicy, rootConcurrency},
-	// External contract surfaces (references reaching outside the unit).
-	"pointer to type outside the translated unit:":    {catExternalContract, rootExternal},
-	"call outside the translated unit":                {catExternalContract, rootExternal},
-	"method call outside the translated unit":         {catExternalContract, rootExternal},
-	"method value outside the translated unit (":      {catExternalContract, rootExternal},
-	"method expression outside the translated unit (": {catExternalContract, rootExternal},
-	"field access on":                                 {catExternalContract, rootExternal},
-	"composite literal of":                            {catExternalContract, rootExternal},
-	"pointer-receiver method value on":                {catExternalContract, rootExternal},
-	// Selectors, calls, operators.
-	"identifier":         {catLanguageLowering, rootLangType},
-	"call of":            {catLanguageLowering, rootLangDispatch},
-	"index on":           {catLanguageLowering, rootLangType},
-	"nil comparison on":  {catLanguageLowering, rootLangDispatch},
-	"operator":           {catLanguageLowering, rootLangType},
-	"conversion from":    {catLanguageLowering, rootLangConvert},
-	"non-field selector": {catLanguageLowering, rootLangType},
-	"method call on":     {catLanguageLowering, rootLangDispatch},
-	"equality on":        {catLanguageLowering, rootLangDispatch},
-	"ordering on":        {catLanguageLowering, rootLangType},
-	"inc/dec of":         {catLanguageLowering, rootLangType},
-	// Builtins.
-	"len of":       {catLanguageLowering, rootLangBuiltin},
-	"cap of":       {catLanguageLowering, rootLangBuiltin},
-	"make of":      {catLanguageLowering, rootLangBuiltin},
-	"builtin":      {catLanguageLowering, rootLangBuiltin},
-	"clear of":     {catLanguageLowering, rootLangBuiltin},
-	"append to":    {catLanguageLowering, rootLangBuiltin},
-	"copy between": {catLanguageLowering, rootLangBuiltin},
-	"panic with":   {catLanguageLowering, rootLangControl},
-	// Slices and ranges.
-	"reslice of": {catLanguageLowering, rootLangType},
-	"range over": {catLanguageLowering, rootLangControl},
-	// Switches and assertions.
-	"switch tag of":     {catLanguageLowering, rootLangControl},
-	"switch case of":    {catLanguageLowering, rootLangControl},
-	"type assertion on": {catLanguageLowering, rootLangDispatch},
-	"type switch on":    {catLanguageLowering, rootLangDispatch},
-	// Statements and assignments.
-	"expression statement":           {catLanguageLowering, rootLangControl},
-	"assignment to":                  {catLanguageLowering, rootLangControl},
-	"compound assignment to":         {catLanguageLowering, rootLangControl},
-	"indexed compound assignment on": {catLanguageLowering, rootLangControl},
-	"field assignment on":            {catLanguageLowering, rootLangControl},
-	"branch":                         {catLanguageLowering, rootLangControl},
-	"package-level":                  {catLanguageLowering, rootLangDecl},
-	// Remaining reason keys — every construct the rejection sites can
-	// produce, so the classifier is TOTAL and no site defaults to
-	// unclassified. External-contract reasons carry the external root.
-	"alias declaration":                     {catLanguageLowering, rootLangType},
-	"append of fixed-array elements":        {catLanguageLowering, rootLangBuiltin},
-	"assignment arity mismatch":             {catLanguageLowering, rootLangControl},
-	"assignment through":                    {catLanguageLowering, rootLangControl},
-	"assignment token":                      {catLanguageLowering, rootLangControl},
-	"blank named result":                    {catLanguageLowering, rootLangType},
-	"blank slot arity":                      {catLanguageLowering, rootLangType},
-	"blank slot in unrecognized tuple form": {catLanguageLowering, rootLangType},
-	"blank struct field":                    {catLanguageLowering, rootLangType},
-	"blank variable declaration":            {catLanguageLowering, rootLangType},
-	"bodyless function":                     {catLanguageLowering, rootLangType},
-	"break inside a type switch clause":     {catLanguageLowering, rootLangControl},
-	"call to a generic external method (":   {catExternalContract, rootExternal},
-	"call without signature evidence":       {catLanguageLowering, rootLangType},
-	"compound assignment arity":             {catLanguageLowering, rootLangControl},
-	"compound assignment on":                {catLanguageLowering, rootLangControl},
-	"conversion as statement":               {catLanguageLowering, rootLangControl},
-	"copy of fixed-array elements":          {catLanguageLowering, rootLangBuiltin},
-	"defer below the function's top-level block (runs at function exit; needs the defer-stack lowering)": {catLanguageLowering, rootLangControl},
-	"defer in a function with named results (deferred result mutation)":                                  {catLanguageLowering, rootLangControl},
-	"deferred non-call expression":      {catLanguageLowering, rootLangControl},
-	"equality between an interface and": {catLanguageLowering, rootLangDispatch},
-	"equality plan for":                 {catLanguageLowering, rootLangDispatch},
-	"equality plan for external":        {catLanguageLowering, rootLangDispatch},
-	"expression without type evidence":  {catLanguageLowering, rootLangType},
-	"float32 arithmetic":                {catLanguageLowering, rootLangType},
-	"full slice expression on":          {catLanguageLowering, rootLangBuiltin},
-	"function without typed definition": {catLanguageLowering, rootLangType},
-	"generic call":                      {catLanguageLowering, rootLangGenerics},
-	"generic call instantiated with a value-copy carrier (copy semantics vary per instantiation)": {catLanguageLowering, rootLangGenerics},
-	"generic call without instantiation evidence":                                                 {catLanguageLowering, rootLangGenerics},
-	"generic external method call":                                                                {catExternalContract, rootExternal},
-	"generic function instantiated with a struct value (copy semantics vary per instantiation)":   {catLanguageLowering, rootLangGenerics},
-	"generic function type":     {catLanguageLowering, rootLangGenerics},
-	"generic method call":       {catLanguageLowering, rootLangGenerics},
-	"generic method expression": {catLanguageLowering, rootLangGenerics},
-	"generic method value":      {catLanguageLowering, rootLangGenerics},
-	"generic type instantiated with a value-copy carrier (copy semantics vary per instantiation)": {catLanguageLowering, rootLangGenerics},
-	"generic type instantiated with an unreviewed type argument (":                                {catExternalContract, rootExternal},
-	"indexed assignment on":                                                 {catLanguageLowering, rootLangType},
-	"interface method expression":                                           {catLanguageLowering, rootLangDispatch},
-	"interface value of an instantiated generic type":                       {catLanguageLowering, rootLangType},
-	"keyed array literal":                                                   {catLanguageLowering, rootLangType},
-	"keyed slice literal":                                                   {catLanguageLowering, rootLangType},
-	"label on a non-loop statement":                                         {catLanguageLowering, rootLangControl},
-	"label on a range-over-func loop":                                       {catLanguageLowering, rootLangControl},
-	"labeled branch inside a range-over-func body":                          {catLanguageLowering, rootLangControl},
-	"map literal without keys":                                              {catLanguageLowering, rootLangType},
-	"method call without signature evidence":                                {catLanguageLowering, rootLangDispatch},
-	"method expression on an unnamed receiver type":                         {catLanguageLowering, rootLangDispatch},
-	"method on unnamed receiver type":                                       {catLanguageLowering, rootLangType},
-	"method value (bind-time receiver capture)":                             {catLanguageLowering, rootLangDispatch},
-	"method value on an unnamed receiver type":                              {catLanguageLowering, rootLangDispatch},
-	"mixed keyed and positional literal":                                    {catLanguageLowering, rootLangType},
-	"multi-result call in expression position":                              {catLanguageLowering, rootLangControl},
-	"multi-result forwarding into a variadic call":                          {catLanguageLowering, rootLangControl},
-	"multi-value var initializer":                                           {catLanguageLowering, rootLangType},
-	"new of":                                                                {catLanguageLowering, rootLangBuiltin},
-	"non-integral integer constant":                                         {catLanguageLowering, rootLangType},
-	"non-struct named type":                                                 {catLanguageLowering, rootLangType},
-	"non-value var spec":                                                    {catLanguageLowering, rootLangType},
-	"non-var declaration statement":                                         {catLanguageLowering, rootLangControl},
-	"pointer-receiver method call on":                                       {catLanguageLowering, rootLangDispatch},
-	"promoted generic method (":                                             {catLanguageLowering, rootLangDispatch},
-	"promoted method from a type outside the translated unit (":             {catExternalContract, rootExternal},
-	"promoted selection through":                                            {catLanguageLowering, rootLangDispatch},
-	"promotion through a non-struct embedding (":                            {catLanguageLowering, rootLangDispatch},
-	"promotion through an embedded pointer (":                               {catLanguageLowering, rootLangDispatch},
-	"promotion through an unnamed embedding (":                              {catLanguageLowering, rootLangDispatch},
-	"range variable is not an identifier":                                   {catLanguageLowering, rootLangControl},
-	"range with assignment form":                                            {catLanguageLowering, rootLangControl},
-	"reference to a function outside the translated unit":                   {catExternalContract, rootExternal},
-	"return arity mismatch":                                                 {catLanguageLowering, rootLangControl},
-	"runtime type identity of":                                              {catExternalContract, rootExternal},
-	"short declaration arity mismatch":                                      {catLanguageLowering, rootLangControl},
-	"short declaration of non-identifier":                                   {catLanguageLowering, rootLangControl},
-	"short declaration reusing a non-variable":                              {catLanguageLowering, rootLangControl},
-	"short declaration reusing an existing variable without a tuple source": {catLanguageLowering, rootLangControl},
-	"store into a slice of external values":                                 {catExternalContract, rootExternal},
-	"store into an array of external values":                                {catExternalContract, rootExternal},
-	"two range variables over a one-value sequence":                         {catLanguageLowering, rootLangControl},
-	"unary operator":                                                        {catLanguageLowering, rootLangType},
-	"unrecognized expression":                                               {catLanguageLowering, rootLangType},
-	"unrecognized statement":                                                {catLanguageLowering, rootLangType},
-	"untyped nil outside a typed context":                                   {catLanguageLowering, rootLangType},
-	"var without typed definition":                                          {catLanguageLowering, rootLangType},
-	"variadic parameter is not a slice":                                     {catLanguageLowering, rootLangType},
+// dispositionByKind is the TOTAL classification of the closed
+// ir.UnsupportedKind enum. Every producer-owned kind maps to an
+// explicitly reviewed category and root abstraction — there is no
+// substring matching and no ordered-prefix shadow. A kind absent here
+// is caught by TestDispositionByKindTotal, never silently defaulted.
+var dispositionByKind = map[ir.UnsupportedKind]disposition{
+	ir.KindAddressOf:                               {catLanguageLowering, rootLangPointer},
+	ir.KindAddressOfALoopClauseVariable:            {catLanguageLowering, rootLangPointer},
+	ir.KindAddressOfANamedResult:                   {catLanguageLowering, rootLangPointer},
+	ir.KindAddressOfANonAddressableExpression:      {catLanguageLowering, rootLangPointer},
+	ir.KindAddressOfARangeVariable:                 {catLanguageLowering, rootLangPointer},
+	ir.KindAddressOfATupleBoundVariable:            {catLanguageLowering, rootLangPointer},
+	ir.KindAddressOfATypeSwitchVariable:            {catLanguageLowering, rootLangPointer},
+	ir.KindAliasDeclaration:                        {catLanguageLowering, rootLangType},
+	ir.KindAppendOfFixedArrayElements:              {catLanguageLowering, rootLangBuiltin},
+	ir.KindAppendTo:                                {catLanguageLowering, rootLangBuiltin},
+	ir.KindAssignmentArityMismatch:                 {catLanguageLowering, rootLangControl},
+	ir.KindAssignmentThrough:                       {catLanguageLowering, rootLangControl},
+	ir.KindAssignmentTo:                            {catLanguageLowering, rootLangControl},
+	ir.KindAssignmentToNonFieldSelector:            {catLanguageLowering, rootLangControl},
+	ir.KindAssignmentToNonVariable:                 {catLanguageLowering, rootLangControl},
+	ir.KindAssignmentToken:                         {catLanguageLowering, rootLangControl},
+	ir.KindBasicType:                               {catLanguageLowering, rootLangType},
+	ir.KindBlankImportInitSideEffects:              {catLanguageLowering, rootLangType},
+	ir.KindBlankNamedResult:                        {catLanguageLowering, rootLangType},
+	ir.KindBlankSlotArity:                          {catLanguageLowering, rootLangType},
+	ir.KindBlankSlotInUnrecognizedTupleForm:        {catLanguageLowering, rootLangType},
+	ir.KindBlankStructField:                        {catLanguageLowering, rootLangType},
+	ir.KindBlankVariableDeclaration:                {catLanguageLowering, rootLangType},
+	ir.KindBodylessFunction:                        {catLanguageLowering, rootLangType},
+	ir.KindBranch:                                  {catLanguageLowering, rootLangControl},
+	ir.KindBreakInsideATypeSwitchClause:            {catLanguageLowering, rootLangControl},
+	ir.KindBuiltin:                                 {catLanguageLowering, rootLangBuiltin},
+	ir.KindBuiltinStatement:                        {catLanguageLowering, rootLangBuiltin},
+	ir.KindCallOf:                                  {catLanguageLowering, rootLangDispatch},
+	ir.KindCallOutsideTheTranslatedUnit:            {catExternalContract, rootExternal},
+	ir.KindCallOutsideTheTranslatedUnitUnqualified: {catExternalContract, rootExternal},
+	ir.KindCallToAGenericExternalMethod:            {catExternalContract, rootExternal},
+	ir.KindCallWithoutSignatureEvidence:            {catLanguageLowering, rootLangType},
+	ir.KindCapOf:                                   {catLanguageLowering, rootLangBuiltin},
+	ir.KindChannelSendStatement:                    {catProductPolicy, rootConcurrency},
+	ir.KindChannelType:                             {catProductPolicy, rootConcurrency},
+	ir.KindClearOf:                                 {catLanguageLowering, rootLangBuiltin},
+	ir.KindCompositeLiteralOf:                      {catExternalContract, rootExternal},
+	ir.KindCompoundAssignmentArity:                 {catLanguageLowering, rootLangControl},
+	ir.KindCompoundAssignmentOn:                    {catLanguageLowering, rootLangControl},
+	ir.KindCompoundAssignmentToTheBlankIdentifier:  {catLanguageLowering, rootLangControl},
+	ir.KindConstantOfType:                          {catLanguageLowering, rootLangType},
+	ir.KindConversionAsStatement:                   {catLanguageLowering, rootLangControl},
+	ir.KindConversionFrom:                          {catLanguageLowering, rootLangConvert},
+	ir.KindConversionFromUntypedNilTo:              {catLanguageLowering, rootLangConvert},
+	ir.KindCopyBetween:                             {catLanguageLowering, rootLangBuiltin},
+	ir.KindCopyOfFixedArrayElements:                {catLanguageLowering, rootLangBuiltin},
+	ir.KindDeferBelowTheFunctionSTopLevelBlockRunsAtFunctionExitNeedsTheDeferStackLowering: {catLanguageLowering, rootLangControl},
+	ir.KindDeferInAFunctionWithNamedResultsDeferredResultMutation:                          {catLanguageLowering, rootLangControl},
+	ir.KindDeferredNonCallExpression:                                                       {catLanguageLowering, rootLangControl},
+	ir.KindDereferenceOf:                                                                   {catLanguageLowering, rootLangPointer},
+	ir.KindEqualityBetweenAnInterfaceAnd:                                                   {catLanguageLowering, rootLangDispatch},
+	ir.KindEqualityOn:                                                                      {catLanguageLowering, rootLangDispatch},
+	ir.KindEqualityOnArrayOf:                                                               {catLanguageLowering, rootLangDispatch},
+	ir.KindEqualityPlanFor:                                                                 {catLanguageLowering, rootLangDispatch},
+	ir.KindEqualityPlanForExternal:                                                         {catLanguageLowering, rootLangDispatch},
+	ir.KindExpressionStatement:                                                             {catLanguageLowering, rootLangControl},
+	ir.KindExpressionWithoutTypeEvidence:                                                   {catLanguageLowering, rootLangType},
+	ir.KindFieldAccessOn:                                                                   {catExternalContract, rootExternal},
+	ir.KindFieldAssignmentOn:                                                               {catLanguageLowering, rootLangControl},
+	ir.KindFloat32Arithmetic:                                                               {catLanguageLowering, rootLangType},
+	ir.KindFullSliceExpressionOn:                                                           {catLanguageLowering, rootLangBuiltin},
+	ir.KindFunctionWithoutTypedDefinition:                                                  {catLanguageLowering, rootLangType},
+	ir.KindGenericCall:                                                                     {catLanguageLowering, rootLangGenerics},
+	ir.KindGenericCallInstantiatedWithAValueCopyCarrierCopySemanticsVaryPerInstantiation: {catLanguageLowering, rootLangGenerics},
+	ir.KindGenericCallWithoutInstantiationEvidence:                                       {catLanguageLowering, rootLangGenerics},
+	ir.KindGenericExternalMethodCall:                                                     {catExternalContract, rootExternal},
+	ir.KindGenericFunctionInstantiatedWithAStructValueCopySemanticsVaryPerInstantiation:  {catLanguageLowering, rootLangGenerics},
+	ir.KindGenericFunctionInstantiatedWithAnUnreviewedTypeArgument:                       {catLanguageLowering, rootLangGenerics},
+	ir.KindGenericFunctionType:                                                           {catLanguageLowering, rootLangGenerics},
+	ir.KindGenericMethodCall:                                                             {catLanguageLowering, rootLangGenerics},
+	ir.KindGenericMethodExpression:                                                       {catLanguageLowering, rootLangGenerics},
+	ir.KindGenericMethodValue:                                                            {catLanguageLowering, rootLangGenerics},
+	ir.KindGenericTypeInstantiatedWithAValueCopyCarrierCopySemanticsVaryPerInstantiation: {catLanguageLowering, rootLangGenerics},
+	ir.KindGenericTypeInstantiatedWithAnUnreviewedTypeArgument:                           {catExternalContract, rootExternal},
+	ir.KindGoroutineStatement:                                                            {catProductPolicy, rootConcurrency},
+	ir.KindIdentifier:                                                                    {catLanguageLowering, rootLangType},
+	ir.KindIncDecOf:                                                                      {catLanguageLowering, rootLangType},
+	ir.KindIndexOn:                                                                       {catLanguageLowering, rootLangType},
+	ir.KindIndexedAssignmentOn:                                                           {catLanguageLowering, rootLangType},
+	ir.KindInterfaceMethodExpression:                                                     {catLanguageLowering, rootLangDispatch},
+	ir.KindInterfaceValueOfAnInstantiatedGenericType:                                     {catLanguageLowering, rootLangType},
+	ir.KindInterfaceValueOfType:                                                          {catLanguageLowering, rootLangDispatch},
+	ir.KindKeyedArrayLiteral:                                                             {catLanguageLowering, rootLangType},
+	ir.KindKeyedSliceLiteral:                                                             {catLanguageLowering, rootLangType},
+	ir.KindLabelOnANonLoopStatement:                                                      {catLanguageLowering, rootLangControl},
+	ir.KindLabelOnARangeOverFuncLoop:                                                     {catLanguageLowering, rootLangControl},
+	ir.KindLabeledBranchInsideARangeOverFuncBody:                                         {catLanguageLowering, rootLangControl},
+	ir.KindLenOf:                 {catLanguageLowering, rootLangBuiltin},
+	ir.KindMakeOf:                {catLanguageLowering, rootLangBuiltin},
+	ir.KindMapKeyType:            {catRepresentation, rootRepresent},
+	ir.KindMapLiteralWithoutKeys: {catLanguageLowering, rootLangType},
+	ir.KindMethodCallOn:          {catLanguageLowering, rootLangDispatch},
+	ir.KindMethodCallOutsideTheTranslatedUnitUnqualified:                {catExternalContract, rootExternal},
+	ir.KindMethodCallWithoutSignatureEvidence:                           {catLanguageLowering, rootLangDispatch},
+	ir.KindMethodExpressionOnAnUnnamedReceiverType:                      {catLanguageLowering, rootLangDispatch},
+	ir.KindMethodExpressionOutsideTheTranslatedUnit:                     {catExternalContract, rootExternal},
+	ir.KindMethodOnUnnamedReceiverType:                                  {catLanguageLowering, rootLangType},
+	ir.KindMethodValueBindTimeReceiverCapture:                           {catLanguageLowering, rootLangDispatch},
+	ir.KindMethodValueOn:                                                {catLanguageLowering, rootLangDispatch},
+	ir.KindMethodValueOnAnUnnamedReceiverType:                           {catLanguageLowering, rootLangDispatch},
+	ir.KindMethodValueOutsideTheTranslatedUnit:                          {catExternalContract, rootExternal},
+	ir.KindMethodWithoutCanonicalIdentity:                               {catLanguageLowering, rootLangType},
+	ir.KindMethodWithoutCanonicalSlot:                                   {catLanguageLowering, rootLangType},
+	ir.KindMixedKeyedAndPositionalLiteral:                               {catLanguageLowering, rootLangType},
+	ir.KindMultiResultCallInExpressionPosition:                          {catLanguageLowering, rootLangControl},
+	ir.KindMultiResultForwardingIntoAVariadicCall:                       {catLanguageLowering, rootLangControl},
+	ir.KindMultiValueVarInitializer:                                     {catLanguageLowering, rootLangType},
+	ir.KindNestedError:                                                  {catLanguageLowering, rootLangType},
+	ir.KindNewOf:                                                        {catLanguageLowering, rootLangBuiltin},
+	ir.KindNilComparisonOn:                                              {catLanguageLowering, rootLangDispatch},
+	ir.KindNilOfType:                                                    {catLanguageLowering, rootLangType},
+	ir.KindNonFieldSelector:                                             {catLanguageLowering, rootLangType},
+	ir.KindNonIntegralIntegerConstant:                                   {catLanguageLowering, rootLangType},
+	ir.KindNonStructNamedType:                                           {catLanguageLowering, rootLangType},
+	ir.KindNonValueVarSpec:                                              {catLanguageLowering, rootLangType},
+	ir.KindNonVarDeclarationStatement:                                   {catLanguageLowering, rootLangControl},
+	ir.KindOperator:                                                     {catLanguageLowering, rootLangType},
+	ir.KindOrderingOn:                                                   {catLanguageLowering, rootLangType},
+	ir.KindPackageLevel:                                                 {catLanguageLowering, rootLangDecl},
+	ir.KindPackageLevelMultiValueVarInitializer:                         {catLanguageLowering, rootLangDecl},
+	ir.KindPackageLevelMultiVariableInitializer:                         {catLanguageLowering, rootLangDecl},
+	ir.KindPanicWith:                                                    {catLanguageLowering, rootLangControl},
+	ir.KindPointerReceiverMethodCallOn:                                  {catLanguageLowering, rootLangDispatch},
+	ir.KindPointerReceiverMethodValueOn:                                 {catExternalContract, rootExternal},
+	ir.KindPointerToNonNamedType:                                        {catLanguageLowering, rootLangPointer},
+	ir.KindPointerToNonStructType:                                       {catLanguageLowering, rootLangPointer},
+	ir.KindPointerToTypeOutsideTheTranslatedUnit:                        {catExternalContract, rootExternal},
+	ir.KindPromotedGenericMethod:                                        {catLanguageLowering, rootLangDispatch},
+	ir.KindPromotedMethodFromATypeOutsideTheTranslatedUnit:              {catExternalContract, rootExternal},
+	ir.KindPromotedMethodWithoutCanonicalIdentity:                       {catLanguageLowering, rootLangType},
+	ir.KindPromotedSelectionThrough:                                     {catLanguageLowering, rootLangDispatch},
+	ir.KindPromotionThroughANonStructEmbedding:                          {catLanguageLowering, rootLangDispatch},
+	ir.KindPromotionThroughAnEmbeddedPointer:                            {catLanguageLowering, rootLangDispatch},
+	ir.KindPromotionThroughAnUnnamedEmbedding:                           {catLanguageLowering, rootLangDispatch},
+	ir.KindRangeOver:                                                    {catLanguageLowering, rootLangControl},
+	ir.KindRangeOverAnIntegerWithASecondVariable:                        {catLanguageLowering, rootLangControl},
+	ir.KindRangeVariableIsNotAnIdentifier:                               {catLanguageLowering, rootLangControl},
+	ir.KindRangeWithAssignmentForm:                                      {catLanguageLowering, rootLangControl},
+	ir.KindReferenceToAFunctionOutsideTheTranslatedUnit:                 {catExternalContract, rootExternal},
+	ir.KindResliceOf:                                                    {catLanguageLowering, rootLangType},
+	ir.KindReturnArityMismatch:                                          {catLanguageLowering, rootLangControl},
+	ir.KindRuntimeTypeIdentityOf:                                        {catExternalContract, rootExternal},
+	ir.KindSelectStatement:                                              {catProductPolicy, rootConcurrency},
+	ir.KindShortDeclarationArityMismatch:                                {catLanguageLowering, rootLangControl},
+	ir.KindShortDeclarationOfNonIdentifier:                              {catLanguageLowering, rootLangControl},
+	ir.KindShortDeclarationReusingANonVariable:                          {catLanguageLowering, rootLangControl},
+	ir.KindShortDeclarationReusingAnExistingVariableWithoutATupleSource: {catLanguageLowering, rootLangControl},
+	ir.KindStoreIntoASliceOfExternalValues:                              {catExternalContract, rootExternal},
+	ir.KindStoreIntoAnArrayOfExternalValues:                             {catExternalContract, rootExternal},
+	ir.KindStructType:                                                   {catLanguageLowering, rootLangType},
+	ir.KindSwitchCaseOf:                                                 {catLanguageLowering, rootLangControl},
+	ir.KindSwitchTagOf:                                                  {catLanguageLowering, rootLangControl},
+	ir.KindTwoRangeVariablesOverAOneValueSequence:                       {catLanguageLowering, rootLangControl},
+	ir.KindType:               {catLanguageLowering, rootLangType},
+	ir.KindTypeAssertionOn:    {catLanguageLowering, rootLangDispatch},
+	ir.KindTypeInCallPosition: {catLanguageLowering, rootLangType},
+	ir.KindTypeSwitchClauseWithAnInterfaceTypeMethodSetTest: {catLanguageLowering, rootLangType},
+	ir.KindTypeSwitchGuardForm:                              {catLanguageLowering, rootLangType},
+	ir.KindTypeSwitchOn:                                     {catLanguageLowering, rootLangDispatch},
+	ir.KindTypeWithoutTypedDefinition:                       {catLanguageLowering, rootLangType},
+	ir.KindUnaryOperator:                                    {catLanguageLowering, rootLangType},
+	ir.KindUnrecognizedExpression:                           {catLanguageLowering, rootLangType},
+	ir.KindUnrecognizedStatement:                            {catLanguageLowering, rootLangType},
+	ir.KindUntypedNilOutsideATypedContext:                   {catLanguageLowering, rootLangType},
+	ir.KindVarWithoutTypedDefinition:                        {catLanguageLowering, rootLangType},
+	ir.KindVariadicParameterIsNotASlice:                     {catLanguageLowering, rootLangType},
+	ir.KindZeroValueOf:                                      {catLanguageLowering, rootLangType},
 }
 
-// classifySite maps one normalized unsupported-site class (ir.ClassOf's
-// "CODE: <construct>") to its reviewed disposition. It matches the
-// construct portion EXACTLY against the closed classification map — never
-// a substring — and returns "unclassified" for a construct outside the
-// map, so an unreviewed class is surfaced honestly instead of being
-// silently deferred to a language lowering.
-func classifySite(class string) (category, root string) {
-	construct := class
-	if _, rest, found := strings.Cut(class, ": "); found {
-		construct = rest
-	}
-	if d, ok := dispositionByConstruct[construct]; ok {
+// classifySite maps one producer-owned kind to its reviewed disposition
+// via an exhaustive Kind-keyed table — never substring or ordered-prefix
+// matching on the diagnostic text (so "type switch on ..." can never be
+// read as the "type" family). A kind absent from the table classifies as
+// "unclassified", surfaced honestly rather than defaulted to a lowering;
+// TestDispositionByKindTotal proves the table is total over the enum.
+func classifySite(kind ir.UnsupportedKind) (category, root string) {
+	if d, ok := dispositionByKind[kind]; ok {
 		return d.category, d.root
 	}
 	return catUnclassified, rootUnclassifiedNote
@@ -336,6 +340,7 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 		PerPackage:         map[string]string{},
 		PackageBlockers:    map[string][]string{},
 		ExternalRefs:       map[string]int{},
+		kindByClass:        map[string]ir.UnsupportedKind{},
 	}
 	sort.Slice(loaded, func(i, j int) bool { return loaded[i].ID < loaded[j].ID })
 
@@ -397,7 +402,8 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 					for _, site := range function.Sites {
 						result.BlockerHistogram[site.Class]++
 						result.ConstructHistogram[site.Construct]++
-						category, _ := classifySite(site.Class)
+						result.kindByClass[site.Class] = site.Kind
+						category, _ := classifySite(site.Kind)
 						unitInv.Sites = append(unitInv.Sites, InventorySite{
 							Class: site.Class, Category: category, Construct: site.Construct,
 							File: site.Span.File, Line: site.Span.Line})
@@ -476,7 +482,7 @@ func buildClassInventory(result *ProbeResult) []ClassRow {
 	}
 	rows := make([]ClassRow, 0, len(result.BlockerHistogram))
 	for class, sites := range result.BlockerHistogram {
-		category, root := classifySite(class)
+		category, root := classifySite(result.kindByClass[class])
 		rows = append(rows, ClassRow{
 			Class: class, Category: category, Root: root,
 			Units: len(unitsByClass[class]), Sites: sites})

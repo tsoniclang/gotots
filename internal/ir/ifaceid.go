@@ -53,7 +53,7 @@ func (b *builder) compositeRtti(t types.Type, span Span, externID string) (RttiR
 	}
 	composite, err := b.canonicalTypeID(t)
 	if err != nil {
-		return RttiRef{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE",
+		return RttiRef{}, &Unsupported{Kind: KindRuntimeTypeIdentityOf, Code: "GOTOTS_UNSUPPORTED_TYPE",
 			Construct: "runtime type identity of " + t.String() + " (an open type parameter has no single runtime type)", Span: span}
 	}
 	out := RttiRef{Composite: composite, Display: displayOf(t), ExternID: externID}

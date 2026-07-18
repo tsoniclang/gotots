@@ -170,12 +170,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 		}
 		ledger = append(ledger, BodySupport{
 			ID: id, Package: p.PkgPath, State: ir.SupportUnimplemented,
-			Sites: []ir.UnsupportedSite{{
-				Code:      unsupported.Code,
-				Class:     ir.ClassOf(unsupported),
-				Construct: unsupported.Construct,
-				Span:      unsupported.Span,
-			}},
+			Sites: []ir.UnsupportedSite{ir.SiteOf(unsupported)},
 		})
 		unimplementedUnits++
 		return true
@@ -211,7 +206,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 					if importSpec.Name != nil && importSpec.Name.Name == "_" {
 						position := p.Fset.Position(spec.Pos())
 						declSite(goid.Repeatable(p.PkgPath, "import", "_", f.relative, position.Line, position.Column),
-							&ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+							&ir.Unsupported{Kind: ir.KindBlankImportInitSideEffects, Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 								Construct: "blank import (init side effects)", Span: spanOf(p, sourceDir, spec.Pos())})
 					}
 				}
@@ -224,7 +219,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 					}
 					object, hasDef := p.TypesInfo.Defs[typeSpec.Name].(*types.TypeName)
 					if !hasDef {
-						declSite(id, &ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+						declSite(id, &ir.Unsupported{Kind: ir.KindTypeWithoutTypedDefinition, Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 							Construct: "type without typed definition", Span: spanOf(p, sourceDir, spec.Pos())})
 						continue
 					}
@@ -287,7 +282,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 					if len(valueSpec.Values) != 0 && len(valueSpec.Values) != len(valueSpec.Names) {
 						position := p.Fset.Position(spec.Pos())
 						declSite(goid.Repeatable(p.PkgPath, "var", "multi", f.relative, position.Line, position.Column),
-							&ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+							&ir.Unsupported{Kind: ir.KindPackageLevelMultiValueVarInitializer, Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 								Construct: "package-level multi-value var initializer", Span: spanOf(p, sourceDir, spec.Pos())})
 						continue
 					}
@@ -299,12 +294,12 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 						}
 						object, hasDef := p.TypesInfo.Defs[name].(*types.Var)
 						if !hasDef {
-							declSite(variableID, &ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+							declSite(variableID, &ir.Unsupported{Kind: ir.KindVarWithoutTypedDefinition, Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 								Construct: "var without typed definition", Span: spanOf(p, sourceDir, name.Pos())})
 							continue
 						}
 						if multiInit[object] {
-							declSite(variableID, &ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+							declSite(variableID, &ir.Unsupported{Kind: ir.KindPackageLevelMultiVariableInitializer, Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 								Construct: "package-level multi-variable initializer", Span: spanOf(p, sourceDir, name.Pos())})
 							continue
 						}
@@ -417,7 +412,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 			default:
 				position := p.Fset.Position(d.Pos())
 				declSite(goid.Repeatable(p.PkgPath, "decl", d.Tok.String(), f.relative, position.Line, position.Column),
-					&ir.Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+					&ir.Unsupported{Kind: ir.KindPackageLevel, Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 						Construct: "package-level " + d.Tok.String() + " declaration", Span: spanOf(p, sourceDir, d.Pos())})
 			}
 		}

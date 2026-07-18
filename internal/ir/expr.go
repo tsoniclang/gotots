@@ -15,14 +15,14 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 	span := b.span(e.Pos())
 	tv, ok := b.info.Types[e]
 	if !ok {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "expression without type evidence", Span: span}
+		return nil, &Unsupported{Kind: KindExpressionWithoutTypeEvidence, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "expression without type evidence", Span: span}
 	}
 
 	// Untyped nil is only meaningful in a typed context (assignment,
 	// argument, field, return, map value) or a comparison; those callers
 	// use buildExprAs / the buildBinary intercept.
 	if tv.IsNil() {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "untyped nil outside a typed context", Span: span}
+		return nil, &Unsupported{Kind: KindUntypedNilOutsideATypedContext, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "untyped nil outside a typed context", Span: span}
 	}
 
 	// Exact constant folding: any expression the Go type checker evaluated
@@ -53,7 +53,7 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			out := &SliceLit{T: t}
 			for _, element := range n.Elts {
 				if _, isKeyed := element.(*ast.KeyValueExpr); isKeyed {
-					return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "keyed slice literal", Span: span}
+					return nil, &Unsupported{Kind: KindKeyedSliceLiteral, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "keyed slice literal", Span: span}
 				}
 				value, err := b.buildExprAs(element, *t.Elem)
 				if err != nil {
@@ -69,7 +69,7 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			for _, element := range n.Elts {
 				keyValue, ok := element.(*ast.KeyValueExpr)
 				if !ok {
-					return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "map literal without keys", Span: span}
+					return nil, &Unsupported{Kind: KindMapLiteralWithoutKeys, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "map literal without keys", Span: span}
 				}
 				key, err := b.buildExprAs(keyValue.Key, *t.Key)
 				if err != nil {
@@ -107,7 +107,7 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			b.use("externZero")
 			return &ExternZero{T: t}, nil
 		}
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "composite literal of " + t.Go, Span: span}
+		return nil, &Unsupported{Kind: KindCompositeLiteralOf, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "composite literal of " + t.Go, Span: span}
 
 	case *ast.FuncLit:
 		return b.buildClosure(n)
@@ -119,7 +119,7 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 		}
 		variable, ok := object.(*types.Var)
 		if !ok {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: fmt.Sprintf("identifier %q (%T)", n.Name, object), Span: span}
+			return nil, &Unsupported{Kind: KindIdentifier, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: fmt.Sprintf("identifier %q (%T)", n.Name, object), Span: span}
 		}
 		return b.buildVarRef(variable, n.Name, span)
 
@@ -137,7 +137,7 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 					}
 				}
 			}
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "non-field selector " + n.Sel.Name + " (no selection evidence)", Span: span}
+			return nil, &Unsupported{Kind: KindNonFieldSelector, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "non-field selector " + n.Sel.Name + " (no selection evidence)", Span: span}
 		}
 		if selection.Kind() == types.MethodVal {
 			return b.buildMethodValue(n, selection, tv.Type)
@@ -146,7 +146,7 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			return b.buildMethodExpr(n, selection, tv.Type)
 		}
 		if selection.Kind() != types.FieldVal {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "non-field selector " + n.Sel.Name, Span: span}
+			return nil, &Unsupported{Kind: KindNonFieldSelector, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "non-field selector " + n.Sel.Name, Span: span}
 		}
 		base, err := b.buildExpr(n.X)
 		if err != nil {
@@ -157,7 +157,7 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			return b.chainFieldPath(base, b.info.Types[n.X].Type, selection.Index(), span)
 		}
 		if base.Type().Kind != KindPointer && base.Type().Kind != KindStruct {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "field access on " + base.Type().Go, Span: span}
+			return nil, &Unsupported{Kind: KindFieldAccessOn, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "field access on " + base.Type().Go, Span: span}
 		}
 		t, err := b.typeOf(tv.Type, span)
 		if err != nil {
@@ -203,7 +203,7 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 		case KindString:
 			return b.buildStringIndex(operand, n.Index)
 		}
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "index on " + operand.Type().Go, Span: span}
+		return nil, &Unsupported{Kind: KindIndexOn, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "index on " + operand.Type().Go, Span: span}
 
 	case *ast.SliceExpr:
 		operand, err := b.buildExpr(n.X)
@@ -216,7 +216,7 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			// operand's tail. It is defined only over slices (Go forbids it
 			// on strings; array operands would need the array-view carrier).
 			if operand.Type().Kind != KindSlice {
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "full slice expression on " + operand.Type().Go, Span: span}
+				return nil, &Unsupported{Kind: KindFullSliceExpressionOn, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "full slice expression on " + operand.Type().Go, Span: span}
 			}
 			out := &SliceReslice{X: operand, T: operand.Type()}
 			if n.Low != nil {
@@ -254,7 +254,7 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			return b.buildStringSlice(operand, n)
 		}
 		if operand.Type().Kind != KindSlice {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "reslice of " + operand.Type().Go, Span: span}
+			return nil, &Unsupported{Kind: KindResliceOf, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "reslice of " + operand.Type().Go, Span: span}
 		}
 		out := &SliceReslice{X: operand, T: operand.Type()}
 		if n.Low != nil {
@@ -283,7 +283,7 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			return nil, err
 		}
 		if operand.Type().Kind != KindPointer || operand.Type().Elem == nil {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "dereference of " + operand.Type().Go, Span: span}
+			return nil, &Unsupported{Kind: KindDereferenceOf, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "dereference of " + operand.Type().Go, Span: span}
 		}
 		b.use("deref")
 		return &Deref{X: operand, T: *operand.Type().Elem}, nil
@@ -296,7 +296,7 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 
 	case *ast.CallExpr:
 		if tv.IsType() {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "type in call position", Span: span}
+			return nil, &Unsupported{Kind: KindTypeInCallPosition, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "type in call position", Span: span}
 		}
 		if convert, is := b.conversionTarget(n); is {
 			to, err := b.typeOf(convert, span)
@@ -306,7 +306,7 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			if argInfo, hasArg := b.info.Types[n.Args[0]]; hasArg && argInfo.IsNil() {
 				// T(nil): the typed nil of a nilable target.
 				if !to.Kind.Nilable() {
-					return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "conversion from untyped nil to " + to.Go, Span: span}
+					return nil, &Unsupported{Kind: KindConversionFromUntypedNilTo, Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "conversion from untyped nil to " + to.Go, Span: span}
 				}
 				b.use("convert")
 				return &NilConst{T: to}, nil
@@ -332,11 +332,11 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			return nil, err
 		}
 		if _, isTuple := b.info.Types[n].Type.(*types.Tuple); isTuple {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "multi-result call in expression position", Span: span}
+			return nil, &Unsupported{Kind: KindMultiResultCallInExpressionPosition, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "multi-result call in expression position", Span: span}
 		}
 		return call, nil
 	}
-	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "unrecognized expression " + fmt.Sprintf("%T", e), Span: span}
+	return nil, &Unsupported{Kind: KindUnrecognizedExpression, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "unrecognized expression " + fmt.Sprintf("%T", e), Span: span}
 }
 
 // buildExprAs builds an expression whose context expects a known type,
@@ -348,7 +348,7 @@ func (b *builder) buildExprAs(e ast.Expr, expected Type) (Expr, error) {
 			b.use("nil")
 			return &NilConst{T: expected}, nil
 		}
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "nil of type " + expected.Go, Span: b.span(e.Pos())}
+		return nil, &Unsupported{Kind: KindNilOfType, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "nil of type " + expected.Go, Span: b.span(e.Pos())}
 	}
 	built, err := b.buildExpr(e)
 	if err != nil {
@@ -447,7 +447,7 @@ func (b *builder) buildStructLit(lit *ast.CompositeLit, t Type) (Expr, error) {
 		_, keyed := lit.Elts[0].(*ast.KeyValueExpr)
 		for index, element := range lit.Elts {
 			if keyValue, isKeyed := element.(*ast.KeyValueExpr); isKeyed != keyed {
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "mixed keyed and positional literal", Span: span}
+				return nil, &Unsupported{Kind: KindMixedKeyedAndPositionalLiteral, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "mixed keyed and positional literal", Span: span}
 			} else if isKeyed {
 				name := keyValue.Key.(*ast.Ident).Name
 				expected, err := fieldIRType(fieldByName[name])
@@ -530,11 +530,11 @@ func constValue(v constant.Value, t Type, span Span) (string, error) {
 		return strconv.FormatFloat(f, 'g', -1, 64), nil
 	default:
 		if !t.Kind.Integer() {
-			return "", &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "constant of type " + t.Go, Span: span}
+			return "", &Unsupported{Kind: KindConstantOfType, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "constant of type " + t.Go, Span: span}
 		}
 		text := v.ExactString()
 		if _, ok := new(big.Int).SetString(text, 10); !ok {
-			return "", &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "non-integral integer constant " + text, Span: span}
+			return "", &Unsupported{Kind: KindNonIntegralIntegerConstant, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "non-integral integer constant " + text, Span: span}
 		}
 		return text, nil
 	}
@@ -562,5 +562,5 @@ func zeroValue(t Type, span Span) (Expr, error) {
 	case t.Kind.Integer(), t.Kind.Float():
 		return &Const{T: t, Value: "0"}, nil
 	}
-	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "zero value of " + t.Go, Span: span}
+	return nil, &Unsupported{Kind: KindZeroValueOf, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "zero value of " + t.Go, Span: span}
 }

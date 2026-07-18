@@ -137,7 +137,7 @@ func (b *builder) eqPlan(t types.Type, span Span) (*EqPlan, error) {
 			case *types.Basic, *types.Pointer, *types.Chan:
 				return &EqPlan{Kind: EqIdentity}, nil
 			}
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE",
+			return nil, &Unsupported{Kind: KindEqualityPlanForExternal, Code: "GOTOTS_UNSUPPORTED_TYPE",
 				Construct: "equality plan for external " + t.String(), Span: span}
 		}
 	}
@@ -173,7 +173,7 @@ func (b *builder) eqPlan(t types.Type, span Span) (*EqPlan, error) {
 		// A comparable basic / channel carrier compares by ===.
 		return &EqPlan{Kind: EqIdentity}, nil
 	}
-	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE",
+	return nil, &Unsupported{Kind: KindEqualityPlanFor, Code: "GOTOTS_UNSUPPORTED_TYPE",
 		Construct: "equality plan for " + t.String(), Span: span}
 }
 

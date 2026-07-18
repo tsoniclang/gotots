@@ -64,7 +64,7 @@ func (b *builder) buildRangeString(n *ast.RangeStmt, operand Expr) (Stmt, error)
 		}
 		ident, ok := e.(*ast.Ident)
 		if !ok {
-			return "", &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range variable is not an identifier", Span: span}
+			return "", &Unsupported{Kind: KindRangeVariableIsNotAnIdentifier, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range variable is not an identifier", Span: span}
 		}
 		if ident.Name == "_" {
 			return "", nil

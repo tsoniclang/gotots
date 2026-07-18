@@ -44,11 +44,11 @@ func (b *builder) buildMethodValue(n *ast.SelectorExpr, selection *types.Selecti
 		if method.Pkg() != nil {
 			callee = method.Pkg().Path() + "." + method.Name()
 		}
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method value outside the translated unit (" + callee + ")", Span: span}
+		return nil, &Unsupported{Kind: KindMethodValueOutsideTheTranslatedUnit, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method value outside the translated unit (" + callee + ")", Span: span}
 	}
 	signature := method.Type().(*types.Signature)
 	if signature.TypeParams() != nil || signature.RecvTypeParams() != nil {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic method value", Span: span}
+		return nil, &Unsupported{Kind: KindGenericMethodValue, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic method value", Span: span}
 	}
 	recv, err := b.buildExpr(n.X)
 	if err != nil {
@@ -68,7 +68,7 @@ func (b *builder) buildMethodValue(n *ast.SelectorExpr, selection *types.Selecti
 		out.Iface = true
 		key, err := MethodKey(method)
 		if err != nil {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+			return nil, &Unsupported{Kind: KindMethodValueOn, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
 				Construct: "method value on " + recv.Type().Go + " (method without canonical identity)", Span: span}
 		}
 		out.MethodKey = key
@@ -90,11 +90,11 @@ func (b *builder) buildMethodValue(n *ast.SelectorExpr, selection *types.Selecti
 		recvNamed, ok = types.Unalias(pointerType.Elem()).(*types.Named)
 	}
 	if !ok {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method value on an unnamed receiver type", Span: span}
+		return nil, &Unsupported{Kind: KindMethodValueOnAnUnnamedReceiverType, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method value on an unnamed receiver type", Span: span}
 	}
 	out.TypeName = recvNamed.Obj().Name()
 	if out.PointerRecv && recv.Type().Kind != KindPointer && recv.Type().Kind != KindStruct {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "pointer-receiver method value on " + recv.Type().Go, Span: span}
+		return nil, &Unsupported{Kind: KindPointerReceiverMethodValueOn, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "pointer-receiver method value on " + recv.Type().Go, Span: span}
 	}
 	// A value-receiver method value made through a pointer dereferences
 	// (and so nil-panics) at evaluation, then captures the copy.
@@ -116,21 +116,21 @@ func (b *builder) buildMethodExpr(n *ast.SelectorExpr, selection *types.Selectio
 		if method.Pkg() != nil {
 			callee = method.Pkg().Path() + "." + method.Name()
 		}
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method expression outside the translated unit (" + callee + ")", Span: span}
+		return nil, &Unsupported{Kind: KindMethodExpressionOutsideTheTranslatedUnit, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method expression outside the translated unit (" + callee + ")", Span: span}
 	}
 	signature := method.Type().(*types.Signature)
 	if signature.TypeParams() != nil || signature.RecvTypeParams() != nil {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic method expression", Span: span}
+		return nil, &Unsupported{Kind: KindGenericMethodExpression, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic method expression", Span: span}
 	}
 	if _, isIface := signature.Recv().Type().Underlying().(*types.Interface); isIface {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "interface method expression", Span: span}
+		return nil, &Unsupported{Kind: KindInterfaceMethodExpression, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "interface method expression", Span: span}
 	}
 	recvNamed, ok := types.Unalias(signature.Recv().Type()).(*types.Named)
 	if pointerType, isPointer := signature.Recv().Type().(*types.Pointer); isPointer {
 		recvNamed, ok = types.Unalias(pointerType.Elem()).(*types.Named)
 	}
 	if !ok {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method expression on an unnamed receiver type", Span: span}
+		return nil, &Unsupported{Kind: KindMethodExpressionOnAnUnnamedReceiverType, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method expression on an unnamed receiver type", Span: span}
 	}
 	t, err := b.typeOf(valueType, span)
 	if err != nil {

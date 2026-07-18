@@ -586,15 +586,3 @@ type PromotedDelegate struct {
 	TypeName      string
 	ValueReceiver bool
 }
-
-// Unsupported is the stable fail-closed diagnostic for a construct outside
-// the reviewed subset.
-type Unsupported struct {
-	Code      string // GOTOTS_UNSUPPORTED_{STATEMENT,EXPRESSION,TYPE,DECLARATION,OPERATION}
-	Construct string
-	Span      Span
-}
-
-func (u *Unsupported) Error() string {
-	return fmt.Sprintf("%s:\n%s at %s:%d:%d", u.Code, u.Construct, u.Span.File, u.Span.Line, u.Span.Col)
-}

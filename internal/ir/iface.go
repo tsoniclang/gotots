@@ -19,7 +19,7 @@ func (b *builder) rttiFor(t types.Type, span Span) (RttiRef, error) {
 		// are uint8 and int32, so names canonicalize by basic kind.
 		name, ok := predeclaredRttiName(concrete.Kind())
 		if !ok {
-			return RttiRef{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+			return RttiRef{}, &Unsupported{Kind: KindInterfaceValueOfType, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
 				Construct: "interface value of type " + t.String(), Span: span}
 		}
 		return RttiRef{Predeclared: name}, nil
@@ -27,7 +27,7 @@ func (b *builder) rttiFor(t types.Type, span Span) (RttiRef, error) {
 	case *types.Named:
 		obj := concrete.Obj()
 		if obj.Pkg() == nil {
-			return RttiRef{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+			return RttiRef{}, &Unsupported{Kind: KindInterfaceValueOfType, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
 				Construct: "interface value of type " + t.String(), Span: span}
 		}
 		// Instantiated generic types (owned OR external) have
@@ -36,7 +36,7 @@ func (b *builder) rttiFor(t types.Type, span Span) (RttiRef, error) {
 		// enumerate — so boxing one fails closed rather than emitting a box
 		// absent from every union (a separate exact-instantiation lowering).
 		if concrete.TypeArgs() != nil && concrete.TypeArgs().Len() > 0 {
-			return RttiRef{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+			return RttiRef{}, &Unsupported{Kind: KindInterfaceValueOfAnInstantiatedGenericType, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
 				Construct: "interface value of an instantiated generic type", Span: span}
 		}
 		if !b.unit.Owns(obj.Pkg().Path()) {
@@ -44,7 +44,7 @@ func (b *builder) rttiFor(t types.Type, span Span) (RttiRef, error) {
 			// dispatch routes through the external contracts.
 			composite, err := b.canonicalTypeID(t)
 			if err != nil {
-				return RttiRef{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE",
+				return RttiRef{}, &Unsupported{Kind: KindRuntimeTypeIdentityOf, Code: "GOTOTS_UNSUPPORTED_TYPE",
 					Construct: "runtime type identity of " + t.String() + " (an open type parameter has no single runtime type)", Span: span}
 			}
 			return RttiRef{Composite: composite, Display: displayOf(t),
@@ -60,13 +60,13 @@ func (b *builder) rttiFor(t types.Type, span Span) (RttiRef, error) {
 		}
 		obj := named.Obj()
 		if obj.Pkg() == nil {
-			return RttiRef{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+			return RttiRef{}, &Unsupported{Kind: KindInterfaceValueOfType, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
 				Construct: "interface value of type " + t.String(), Span: span}
 		}
 		if named.TypeArgs() != nil && named.TypeArgs().Len() > 0 {
 			// A pointer to an instantiated generic (e.g. *atomic.Pointer[int]):
 			// same per-instantiation identity, fail closed until enumerated.
-			return RttiRef{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+			return RttiRef{}, &Unsupported{Kind: KindInterfaceValueOfAnInstantiatedGenericType, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
 				Construct: "interface value of an instantiated generic type", Span: span}
 		}
 		if !b.unit.Owns(obj.Pkg().Path()) {
@@ -77,7 +77,7 @@ func (b *builder) rttiFor(t types.Type, span Span) (RttiRef, error) {
 	case *types.Slice, *types.Map, *types.Array, *types.Signature:
 		return b.compositeRtti(t, span, "")
 	}
-	return RttiRef{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+	return RttiRef{}, &Unsupported{Kind: KindInterfaceValueOfType, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
 		Construct: "interface value of type " + t.String(), Span: span}
 }
 
@@ -88,7 +88,7 @@ func (b *builder) buildIfaceMethodCall(n *ast.CallExpr, recv Expr, method *types
 	signature := method.Type().(*types.Signature)
 	key, err := MethodKey(method)
 	if err != nil {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+		return nil, &Unsupported{Kind: KindMethodCallOn, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
 			Construct: "method call on " + recv.Type().Go + " (method without canonical identity)", Span: span}
 	}
 	out := &IfaceCall{Recv: recv, Display: method.Name(), MethodKey: key}
@@ -112,7 +112,7 @@ func (b *builder) buildTypeAssert(n *ast.TypeAssertExpr, commaOk bool) (Expr, er
 		return nil, err
 	}
 	if operand.Type().Kind != KindIface {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "type assertion on " + operand.Type().Go, Span: span}
+		return nil, &Unsupported{Kind: KindTypeAssertionOn, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "type assertion on " + operand.Type().Go, Span: span}
 	}
 	targetGoType := b.info.Types[n.Type].Type
 	if targetIface, isIface := targetGoType.Underlying().(*types.Interface); isIface {
@@ -148,7 +148,7 @@ func (b *builder) buildTypeAssert(n *ast.TypeAssertExpr, commaOk bool) (Expr, er
 				// MethodKey is total (generic interface methods bind their
 				// owner's params); a failure means the assertion has no exact
 				// evidence — fail closed rather than substituting the bare name.
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+				return nil, &Unsupported{Kind: KindTypeAssertionOn, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
 					Construct: "type assertion on " + operand.Type().Go + " (target method without canonical identity)", Span: span}
 			}
 			required = append(required, key)
@@ -212,14 +212,14 @@ func (b *builder) buildTypeSwitch(n *ast.TypeSwitchStmt) (Stmt, error) {
 		}
 		assertion = guard.Rhs[0].(*ast.TypeAssertExpr)
 	default:
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "type switch guard form", Span: span}
+		return nil, &Unsupported{Kind: KindTypeSwitchGuardForm, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "type switch guard form", Span: span}
 	}
 	operand, err := b.buildExpr(assertion.X)
 	if err != nil {
 		return nil, err
 	}
 	if operand.Type().Kind != KindIface {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "type switch on " + operand.Type().Go, Span: span}
+		return nil, &Unsupported{Kind: KindTypeSwitchOn, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "type switch on " + operand.Type().Go, Span: span}
 	}
 	out.X = operand
 
@@ -230,7 +230,7 @@ func (b *builder) buildTypeSwitch(n *ast.TypeSwitchStmt) (Stmt, error) {
 			// cannot have its address taken: the plain binding is not a
 			// cell.
 			if implicit, ok := b.info.Implicits[clause].(*types.Var); ok && b.boxed[implicit] {
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT",
+				return nil, &Unsupported{Kind: KindAddressOfATypeSwitchVariable, Code: "GOTOTS_UNSUPPORTED_STATEMENT",
 					Construct: "address of a type-switch variable", Span: b.span(clause.Pos())}
 			}
 		}
@@ -242,7 +242,7 @@ func (b *builder) buildTypeSwitch(n *ast.TypeSwitchStmt) (Stmt, error) {
 			}
 			targetGoType := b.info.Types[expr].Type
 			if _, isIface := targetGoType.Underlying().(*types.Interface); isIface {
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT",
+				return nil, &Unsupported{Kind: KindTypeSwitchClauseWithAnInterfaceTypeMethodSetTest, Code: "GOTOTS_UNSUPPORTED_STATEMENT",
 					Construct: "type switch clause with an interface type (method-set test)", Span: b.span(expr.Pos())}
 			}
 			target, err := b.typeOf(targetGoType, b.span(expr.Pos()))
@@ -380,7 +380,7 @@ func (b *builder) buildIfaceEquality(n *ast.BinaryExpr, left, right Expr, span S
 		// The dynamic type's own generated equality (goEq$) compares.
 		form = "via"
 	default:
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION",
+		return nil, &Unsupported{Kind: KindEqualityBetweenAnInterfaceAnd, Code: "GOTOTS_UNSUPPORTED_OPERATION",
 			Construct: "equality between an interface and " + concrete.Type().Go, Span: span}
 	}
 	b.use("ifaceEqual")

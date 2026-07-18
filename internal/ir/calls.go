@@ -20,7 +20,7 @@ func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
 	if function, nameIdent := b.staticCallee(n.Fun); function != nil {
 		signature := function.Type().(*types.Signature)
 		if signature.Recv() != nil {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic call", Span: span}
+			return nil, &Unsupported{Kind: KindGenericCall, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic call", Span: span}
 		}
 		var typeArgs []Type
 		if signature.TypeParams() != nil {
@@ -29,11 +29,11 @@ func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
 			// arguments spell explicitly in the generated call.
 			instance, hasInstance := b.info.Instances[nameIdent]
 			if !hasInstance {
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic call without instantiation evidence", Span: span}
+				return nil, &Unsupported{Kind: KindGenericCallWithoutInstantiationEvidence, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic call without instantiation evidence", Span: span}
 			}
 			instantiated, ok := instance.Type.(*types.Signature)
 			if !ok {
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic call without instantiation evidence", Span: span}
+				return nil, &Unsupported{Kind: KindGenericCallWithoutInstantiationEvidence, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic call without instantiation evidence", Span: span}
 			}
 			signature = instantiated
 			for i := range instance.TypeArgs.Len() {
@@ -42,7 +42,7 @@ func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
 					return nil, err
 				}
 				if argType.Kind == KindStruct || argType.Kind == KindArray {
-					return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+					return nil, &Unsupported{Kind: KindGenericCallInstantiatedWithAValueCopyCarrierCopySemanticsVaryPerInstantiation, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
 						Construct: "generic call instantiated with a value-copy carrier (copy semantics vary per instantiation)", Span: span}
 				}
 				typeArgs = append(typeArgs, argType)
@@ -67,11 +67,11 @@ func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
 		return nil, err
 	}
 	if fun.Type().Kind != KindFunc {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "call of " + fun.Type().Go, Span: span}
+		return nil, &Unsupported{Kind: KindCallOf, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "call of " + fun.Type().Go, Span: span}
 	}
 	signature, ok := b.info.Types[ast.Unparen(n.Fun)].Type.Underlying().(*types.Signature)
 	if !ok {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "call without signature evidence", Span: span}
+		return nil, &Unsupported{Kind: KindCallWithoutSignatureEvidence, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "call without signature evidence", Span: span}
 	}
 	out := &DynCall{Fun: fun}
 	if err := b.buildCallArgsResults(n, signature, &out.Args, &out.Results); err != nil {
@@ -88,7 +88,7 @@ func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
 func (b *builder) buildExternalCall(n *ast.CallExpr, function *types.Func, signature *types.Signature, typeArgs []Type) (Expr, error) {
 	span := b.span(n.Pos())
 	if function.Pkg() == nil {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+		return nil, &Unsupported{Kind: KindCallOutsideTheTranslatedUnitUnqualified, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
 			Construct: "call outside the translated unit (unqualified)", Span: span}
 	}
 	callee := function.Pkg().Path() + "." + function.Name()
@@ -107,7 +107,7 @@ func (b *builder) buildExternalCall(n *ast.CallExpr, function *types.Func, signa
 		for i := range params.Len() {
 			pt := params.At(i).Type()
 			if _, err := b.typeOf(pt, span); err != nil && !mentionsTypeParamType(pt) {
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+				return nil, &Unsupported{Kind: KindCallOutsideTheTranslatedUnit, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
 					Construct: "call outside the translated unit (" + callee + ")", Span: span}
 			}
 		}
@@ -115,7 +115,7 @@ func (b *builder) buildExternalCall(n *ast.CallExpr, function *types.Func, signa
 		for i := range resultTuple.Len() {
 			rt := resultTuple.At(i).Type()
 			if _, err := b.typeOf(rt, span); err != nil && !mentionsTypeParamType(rt) {
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+				return nil, &Unsupported{Kind: KindCallOutsideTheTranslatedUnit, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
 					Construct: "call outside the translated unit (" + callee + ")", Span: span}
 			}
 		}
@@ -166,7 +166,7 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 	span := b.span(n.Pos())
 	method := selection.Obj().(*types.Func)
 	if method.Pkg() == nil {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method call outside the translated unit (unqualified)", Span: span}
+		return nil, &Unsupported{Kind: KindMethodCallOutsideTheTranslatedUnitUnqualified, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method call outside the translated unit (unqualified)", Span: span}
 	}
 	recv, err := b.buildExpr(selector.X)
 	if err != nil {
@@ -191,11 +191,11 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 	// generated function (a promoted call declares on the embedded type).
 	signature, ok := selection.Type().(*types.Signature)
 	if !ok {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method call without signature evidence", Span: span}
+		return nil, &Unsupported{Kind: KindMethodCallWithoutSignatureEvidence, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method call without signature evidence", Span: span}
 	}
 	declared := method.Type().(*types.Signature)
 	if signature.TypeParams() != nil || declared.TypeParams() != nil {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic method call", Span: span}
+		return nil, &Unsupported{Kind: KindGenericMethodCall, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic method call", Span: span}
 	}
 	// Receiver flavors are exact through the generated method function:
 	// a value receiver clones inside (the caller's instance is never
@@ -210,7 +210,7 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 		recvNamed, ok = types.Unalias(pointerType.Elem()).(*types.Named)
 	}
 	if !ok {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method on unnamed receiver type", Span: span}
+		return nil, &Unsupported{Kind: KindMethodOnUnnamedReceiverType, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method on unnamed receiver type", Span: span}
 	}
 	// A generic type's method call spells the receiver's instantiated
 	// type arguments, read off the (possibly promotion-chained) receiver.
@@ -235,7 +235,7 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 			}
 		}
 		if !replaced {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "pointer-receiver method call on " + recv.Type().Go, Span: span}
+			return nil, &Unsupported{Kind: KindPointerReceiverMethodCallOn, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "pointer-receiver method call on " + recv.Type().Go, Span: span}
 		}
 	}
 
@@ -322,7 +322,7 @@ func (b *builder) tupleVariadicSpread(inner Expr, sourceTuple *types.Tuple, sign
 	params := signature.Params()
 	fixed := params.Len() - 1
 	if sourceTuple == nil || sourceTuple.Len() < fixed {
-		return &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "multi-result forwarding into a variadic call", Span: span}
+		return &Unsupported{Kind: KindMultiResultForwardingIntoAVariadicCall, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "multi-result forwarding into a variadic call", Span: span}
 	}
 	sliceGo := params.At(fixed).Type()
 	sliceIR, err := b.typeOf(sliceGo, span)
@@ -331,7 +331,7 @@ func (b *builder) tupleVariadicSpread(inner Expr, sourceTuple *types.Tuple, sign
 	}
 	slice, ok := types.Unalias(sliceGo).Underlying().(*types.Slice)
 	if !ok {
-		return &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "variadic parameter is not a slice", Span: span}
+		return &Unsupported{Kind: KindVariadicParameterIsNotASlice, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "variadic parameter is not a slice", Span: span}
 	}
 	elemGo := slice.Elem()
 	elemIR, err := b.typeOf(elemGo, span)
@@ -436,6 +436,6 @@ func (b *builder) checkConversion(from, to Type, span Span) error {
 			return nil
 		}
 	}
-	return &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION",
+	return &Unsupported{Kind: KindConversionFrom, Code: "GOTOTS_UNSUPPORTED_OPERATION",
 		Construct: "conversion from " + from.Go + " to " + to.Go, Span: span}
 }

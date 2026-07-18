@@ -1,7 +1,5 @@
 package ir
 
-import "strings"
-
 // SupportState is the implementation support of one selected body.
 type SupportState string
 
@@ -18,10 +16,14 @@ const (
 // UnsupportedSite is one exact operation outside the reviewed subset,
 // recorded without stopping IR construction of the rest of the body.
 type UnsupportedSite struct {
-	Code      string `json:"code"`
-	Class     string `json:"class"`
-	Construct string `json:"construct"`
-	Span      Span   `json:"span"`
+	Code string `json:"code"`
+	// Kind is the producer-owned closed classification; Class is its stable
+	// string key (Kind.String()), kept for JSON/histogram display. The
+	// inventory dispositions by Kind, never by re-parsing Construct.
+	Kind      UnsupportedKind `json:"-"`
+	Class     string          `json:"class"`
+	Construct string          `json:"construct"`
+	Span      Span            `json:"span"`
 }
 
 // recordSite converts one Unsupported into a site record; every other
@@ -31,13 +33,20 @@ func (b *builder) recordSite(err error) bool {
 	if !ok {
 		return false
 	}
-	*b.sites = append(*b.sites, UnsupportedSite{
+	*b.sites = append(*b.sites, SiteOf(unsupported))
+	return true
+}
+
+// SiteOf projects one Unsupported diagnostic to its site record, carrying
+// the producer-owned Kind and its stable class key.
+func SiteOf(unsupported *Unsupported) UnsupportedSite {
+	return UnsupportedSite{
 		Code:      unsupported.Code,
-		Class:     ClassOf(unsupported),
+		Kind:      unsupported.Kind,
+		Class:     unsupported.Kind.String(),
 		Construct: unsupported.Construct,
 		Span:      unsupported.Span,
-	})
-	return true
+	}
 }
 
 // AsUnsupported unwraps an error chain to its Unsupported diagnostic.
@@ -53,69 +62,6 @@ func AsUnsupported(err error) (*Unsupported, bool) {
 		err = unwrapper.Unwrap()
 	}
 	return nil, false
-}
-
-// classPayloadPrefixes are the construct spellings that carry a per-site
-// payload after a stable class prefix; ClassOf strips the payload so a
-// class key names the semantic family, never a source location or type
-// spelling.
-var classPayloadPrefixes = []string{
-	"non-basic type ", "basic type ", "pointer to non-named type ",
-	"pointer to non-struct type ", "pointer to type outside the translated unit: ",
-	"interface type ", "array type ", "channel type ", "type parameter ",
-	"call outside the translated unit ", "method call outside the translated unit ",
-	"map key type ", "type ", "identifier ", "call of ", "field access on ",
-	"index on ", "nil comparison on ", "operator ", "conversion from ",
-	"non-field selector ", "method value outside the translated unit (",
-	"method expression outside the translated unit (", "pointer-receiver method value on ",
-	"len of ", "cap of ", "make of ", "builtin ", "constant of type ", "zero value of ",
-	"nil of type ", "equality on ", "ordering on ", "inc/dec of ",
-	"struct type ", "composite literal of ", "reslice of ", "range over ",
-	"dereference of ", "address of ", "method call on ", "clear of ",
-	"panic with ", "switch tag of ", "switch case of ", "type assertion on ",
-	"type switch on ", "append to ", "copy between ", "interface value of type ",
-	"generic function instantiated with an unreviewed type argument ",
-	"expression statement ", "assignment to ", "compound assignment to ",
-	"indexed compound assignment on ", "field assignment on ", "branch ",
-	"package-level ", "string constant with ",
-	// Additional payload-bearing constructs, so ClassOf normalizes every
-	// diagnostic to a closed class key with no free-text payload leaking in.
-	"assignment through ", "assignment token ", "call to a generic external method (",
-	"compound assignment on ", "equality between an interface and ", "equality plan for ",
-	"equality plan for external ", "full slice expression on ", "generic function type ",
-	"generic type instantiated with an unreviewed type argument (", "indexed assignment on ",
-	"new of ", "non-integral integer constant ", "pointer-receiver method call on ",
-	"promoted generic method (", "promoted method from a type outside the translated unit (",
-	"promoted selection through ", "promotion through a non-struct embedding (",
-	"promotion through an embedded pointer (", "promotion through an unnamed embedding (",
-	"runtime type identity of ", "unary operator ",
-	"unrecognized expression ", "unrecognized statement ",
-}
-
-// ClassConstructKeys returns the closed set of construct keys a normalized
-// class can carry: the trimmed spelling of every registered payload prefix.
-// A class's construct portion (ClassOf's "CODE: <construct>") is exactly
-// one of these when the diagnostic matched a prefix; the inventory's site
-// classifier is a total function over this set, so no key is silently
-// defaulted.
-func ClassConstructKeys() []string {
-	keys := make([]string, len(classPayloadPrefixes))
-	for i, prefix := range classPayloadPrefixes {
-		keys[i] = strings.TrimSpace(prefix)
-	}
-	return keys
-}
-
-// ClassOf normalizes one diagnostic to its semantic-class key.
-func ClassOf(unsupported *Unsupported) string {
-	construct := unsupported.Construct
-	for _, prefix := range classPayloadPrefixes {
-		if strings.HasPrefix(construct, prefix) {
-			construct = strings.TrimSpace(prefix)
-			break
-		}
-	}
-	return unsupported.Code + ": " + construct
 }
 
 // UnimplementedStmt marks one statement whose semantic class has no

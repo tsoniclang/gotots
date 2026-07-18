@@ -52,7 +52,7 @@ func (b *builder) typeOf(t types.Type, span Span) (Type, error) {
 		// parameters canonicalize within the builder's binder environment.
 		canon, err := b.canonical(t)
 		if err != nil {
-			return Type{}, &Unsupported{Code: "GOTOTS_TYPE_UNSUPPORTED",
+			return Type{}, &Unsupported{Kind: KindNestedError, Code: "GOTOTS_TYPE_UNSUPPORTED",
 				Construct: err.Error(), Span: span}
 		}
 		resolved.Canon = canon
@@ -72,7 +72,7 @@ func (b *builder) canonical(t types.Type) (string, error) {
 
 func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 	if t == nil {
-		return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "expression without type evidence", Span: span}
+		return Type{}, &Unsupported{Kind: KindExpressionWithoutTypeEvidence, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "expression without type evidence", Span: span}
 	}
 	spelled := t.String()
 
@@ -87,7 +87,7 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 	case *types.Basic:
 		kind, ok := basicKind(u)
 		if !ok {
-			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "basic type " + spelled, Span: span}
+			return Type{}, &Unsupported{Kind: KindBasicType, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "basic type " + spelled, Span: span}
 		}
 		return Type{Kind: kind, Go: spelled}, nil
 
@@ -95,7 +95,7 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 		if named, ok := types.Unalias(u.Elem()).(*types.Named); ok {
 			if _, isStruct := named.Underlying().(*types.Struct); isStruct {
 				if named.Obj().Pkg() == nil {
-					return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "pointer to type outside the translated unit: " + spelled, Span: span}
+					return Type{}, &Unsupported{Kind: KindPointerToTypeOutsideTheTranslatedUnit, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "pointer to type outside the translated unit: " + spelled, Span: span}
 				}
 				declaringPkg := named.Obj().Pkg().Path()
 				if !b.unit.Owns(declaringPkg) {
@@ -119,11 +119,11 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 					return Type{}, err
 				}
 				if !boxable(element.Kind) {
-					return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "pointer to non-struct type " + spelled, Span: span}
+					return Type{}, &Unsupported{Kind: KindPointerToNonStructType, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "pointer to non-struct type " + spelled, Span: span}
 				}
 				return Type{Kind: KindPointer, Go: spelled, Named: named.Obj().Name(), Pkg: named.Obj().Pkg().Path(), Elem: &element}, nil
 			}
-			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "pointer to non-struct type " + spelled, Span: span}
+			return Type{}, &Unsupported{Kind: KindPointerToNonStructType, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "pointer to non-struct type " + spelled, Span: span}
 		}
 		// A pointer to a non-named type: fixed arrays keep their carrier
 		// identity (the handle is the pointer); every other reviewed
@@ -134,7 +134,7 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 			return Type{}, err
 		}
 		if element.Kind == KindStruct || element.Kind == KindExternal || element.Kind == KindTypeParam {
-			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "pointer to non-named type " + spelled, Span: span}
+			return Type{}, &Unsupported{Kind: KindPointerToNonNamedType, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "pointer to non-named type " + spelled, Span: span}
 		}
 		return Type{Kind: KindPointer, Go: spelled, Elem: &element}, nil
 
@@ -160,7 +160,7 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 				}
 			}
 			if !admitted {
-				return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "map key type " + key.Go + " (Go key equality is not JS SameValueZero)", Span: span}
+				return Type{}, &Unsupported{Kind: KindMapKeyType, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "map key type " + key.Go + " (Go key equality is not JS SameValueZero)", Span: span}
 			}
 		}
 		value, err := b.typeOf(u.Elem(), span)
@@ -171,7 +171,7 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 
 	case *types.Signature:
 		if u.TypeParams() != nil || u.Recv() != nil {
-			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "generic function type " + spelled, Span: span}
+			return Type{}, &Unsupported{Kind: KindGenericFunctionType, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "generic function type " + spelled, Span: span}
 		}
 		// A variadic signature is exact through its carrier: the final
 		// parameter is the packed slice, and every call site packs (or
@@ -211,7 +211,7 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 				b.unit.AddExternalType(named.Obj().Pkg().Path(), named.Obj().Name())
 				return Type{Kind: KindExternal, Go: spelled, Named: named.Obj().Name(), Pkg: named.Obj().Pkg().Path()}, nil
 			}
-			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "struct type " + spelled, Span: span}
+			return Type{}, &Unsupported{Kind: KindStructType, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "struct type " + spelled, Span: span}
 		}
 		// Struct values are reviewed only behind pointers and receivers;
 		// the caller decides whether a bare struct kind is admissible.
@@ -269,10 +269,10 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 		return out, nil
 
 	case *types.Chan:
-		return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "channel type " + spelled, Span: span}
+		return Type{}, &Unsupported{Kind: KindChannelType, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "channel type " + spelled, Span: span}
 
 	}
-	return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "type " + spelled, Span: span}
+	return Type{}, &Unsupported{Kind: KindType, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "type " + spelled, Span: span}
 }
 
 func basicKind(basic *types.Basic) (Kind, bool) {

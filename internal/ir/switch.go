@@ -37,7 +37,7 @@ func (b *builder) buildSwitch(n *ast.SwitchStmt) (Stmt, error) {
 		tagType.Kind == KindPointer, tagType.Kind.Integer(), tagType.Kind.Float():
 		// Equality on these carriers is exact under JS case matching.
 	default:
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "switch tag of " + tagType.Go, Span: span}
+		return nil, &Unsupported{Kind: KindSwitchTagOf, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "switch tag of " + tagType.Go, Span: span}
 	}
 
 	for _, clauseStmt := range n.Body.List {
@@ -49,7 +49,7 @@ func (b *builder) buildSwitch(n *ast.SwitchStmt) (Stmt, error) {
 				return nil, err
 			}
 			if _, isNil := expr.(*NilConst); !isNil && expr.Type().Kind != tagType.Kind {
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT",
+				return nil, &Unsupported{Kind: KindSwitchCaseOf, Code: "GOTOTS_UNSUPPORTED_STATEMENT",
 					Construct: "switch case of " + expr.Type().Go + " against tag of " + tagType.Go, Span: b.span(value.Pos())}
 			}
 			built.Values = append(built.Values, expr)

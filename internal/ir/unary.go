@@ -57,7 +57,7 @@ func (b *builder) buildUnary(n *ast.UnaryExpr, resultType types.Type) (Expr, err
 				b.use("fieldCellRef")
 				return &FieldCellRef{Base: field.X, Field: field.Field, T: t}, nil
 			}
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "address of " + x.Type().Go, Span: span}
+			return nil, &Unsupported{Kind: KindAddressOf, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "address of " + x.Type().Go, Span: span}
 		}
 		switch x.(type) {
 		case *VarRef, *FieldLoad, *SliceGet, *Deref, *ArrayGet:
@@ -68,7 +68,7 @@ func (b *builder) buildUnary(n *ast.UnaryExpr, resultType types.Type) (Expr, err
 			b.use("addrOf")
 			return &AddrOf{X: x, T: t}, nil
 		}
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "address of a non-addressable expression", Span: span}
+		return nil, &Unsupported{Kind: KindAddressOfANonAddressableExpression, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "address of a non-addressable expression", Span: span}
 	case token.SUB, token.NOT, token.XOR, token.ADD:
 		x, err := b.buildExpr(n.X)
 		if err != nil {
@@ -84,7 +84,7 @@ func (b *builder) buildUnary(n *ast.UnaryExpr, resultType types.Type) (Expr, err
 		b.use("unary:" + n.Op.String())
 		return &Unary{Op: n.Op, X: x, T: t}, nil
 	}
-	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "unary operator " + n.Op.String(), Span: span}
+	return nil, &Unsupported{Kind: KindUnaryOperator, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "unary operator " + n.Op.String(), Span: span}
 }
 
 // buildStructNew lowers &T{...} into an ordered full-field allocation.
@@ -95,11 +95,11 @@ func (b *builder) buildStructNew(lit *ast.CompositeLit, resultType types.Type) (
 		return nil, err
 	}
 	if t.Kind != KindPointer {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "composite literal of " + t.Go, Span: span}
+		return nil, &Unsupported{Kind: KindCompositeLiteralOf, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "composite literal of " + t.Go, Span: span}
 	}
 	if t.Elem != nil && t.Elem.Kind == KindExternal {
 		if len(lit.Elts) != 0 {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "composite literal of " + t.Elem.Go, Span: span}
+			return nil, &Unsupported{Kind: KindCompositeLiteralOf, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "composite literal of " + t.Elem.Go, Span: span}
 		}
 		// &T{} of an external type: a fresh zero handle is the pointer.
 		b.use("externZero")

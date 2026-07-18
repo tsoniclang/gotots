@@ -56,7 +56,7 @@ func (b *builder) buildClosure(lit *ast.FuncLit) (Expr, error) {
 	for i := range results.Len() {
 		result := results.At(i)
 		if result.Name() == "_" {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "blank named result", Span: span}
+			return nil, &Unsupported{Kind: KindBlankNamedResult, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "blank named result", Span: span}
 		}
 		resultType, err := child.typeOf(result.Type(), span)
 		if err != nil {
@@ -89,11 +89,11 @@ func (b *builder) buildClosure(lit *ast.FuncLit) (Expr, error) {
 // unit as a first-class value.
 func (b *builder) buildFuncRef(function *types.Func, span Span) (Expr, error) {
 	if function.Pkg() == nil || !b.unit.Owns(function.Pkg().Path()) {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "reference to a function outside the translated unit", Span: span}
+		return nil, &Unsupported{Kind: KindReferenceToAFunctionOutsideTheTranslatedUnit, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "reference to a function outside the translated unit", Span: span}
 	}
 	signature := function.Type().(*types.Signature)
 	if signature.Recv() != nil {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method value (bind-time receiver capture)", Span: span}
+		return nil, &Unsupported{Kind: KindMethodValueBindTimeReceiverCapture, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method value (bind-time receiver capture)", Span: span}
 	}
 	t, err := b.typeOf(signature, span)
 	if err != nil {

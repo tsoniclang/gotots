@@ -29,11 +29,11 @@ func BuildStruct(p *packages.Package, sourceDir string, unit Scope, spec *ast.Ty
 	span := b.span(spec.Pos())
 	object, ok := b.info.Defs[spec.Name].(*types.TypeName)
 	if !ok {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "type without typed definition", Span: span}
+		return nil, &Unsupported{Kind: KindTypeWithoutTypedDefinition, Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "type without typed definition", Span: span}
 	}
 	named, ok := object.Type().(*types.Named)
 	if !ok {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "alias declaration", Span: span}
+		return nil, &Unsupported{Kind: KindAliasDeclaration, Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "alias declaration", Span: span}
 	}
 	b.binders = typeid.OwnerBinders(named)
 	var typeParams []string
@@ -47,7 +47,7 @@ func BuildStruct(p *packages.Package, sourceDir string, unit Scope, spec *ast.Ty
 	}
 	structType, ok := named.Underlying().(*types.Struct)
 	if !ok {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "non-struct named type", Span: span}
+		return nil, &Unsupported{Kind: KindNonStructNamedType, Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "non-struct named type", Span: span}
 	}
 
 	out := &Struct{
@@ -63,7 +63,7 @@ func BuildStruct(p *packages.Package, sourceDir string, unit Scope, spec *ast.Ty
 		// name; promotion resolves through selection index paths at every
 		// use site.
 		if field.Name() == "_" {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "blank struct field", Span: span}
+			return nil, &Unsupported{Kind: KindBlankStructField, Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "blank struct field", Span: span}
 		}
 		fieldType, err := b.typeOf(field.Type(), span)
 		if err != nil {
@@ -208,12 +208,12 @@ func (b *builder) promotedDelegates(named *types.Named, span Span) ([]PromotedDe
 			}
 			seen[identity] = true
 			if method.Pkg() == nil || !b.unit.Owns(method.Pkg().Path()) {
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+				return nil, &Unsupported{Kind: KindPromotedMethodFromATypeOutsideTheTranslatedUnit, Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 					Construct: "promoted method from a type outside the translated unit (" + method.Name() + ")", Span: span}
 			}
 			signature := method.Type().(*types.Signature)
 			if signature.TypeParams() != nil || signature.RecvTypeParams() != nil {
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+				return nil, &Unsupported{Kind: KindPromotedGenericMethod, Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 					Construct: "promoted generic method (" + method.Name() + ")", Span: span}
 			}
 			_, pointerRecv := method.Type().(*types.Signature).Recv().Type().(*types.Pointer)
@@ -228,7 +228,7 @@ func (b *builder) promotedDelegates(named *types.Named, span Span) ([]PromotedDe
 			}
 			ident, err := MethodKey(method)
 			if err != nil {
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+				return nil, &Unsupported{Kind: KindPromotedMethodWithoutCanonicalIdentity, Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 					Construct: "promoted method without canonical identity (" + method.Name() + ")", Span: span}
 			}
 			entry := PromotedDelegate{Name: method.Name(), Slot: slot, MethodIdent: ident,
@@ -237,12 +237,12 @@ func (b *builder) promotedDelegates(named *types.Named, span Span) ([]PromotedDe
 			for _, index := range path[:len(path)-1] {
 				structType, ok := types.Unalias(current).Underlying().(*types.Struct)
 				if !ok {
-					return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+					return nil, &Unsupported{Kind: KindPromotionThroughANonStructEmbedding, Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 						Construct: "promotion through a non-struct embedding (" + method.Name() + ")", Span: span}
 				}
 				field := structType.Field(index)
 				if _, isPointer := types.Unalias(field.Type()).Underlying().(*types.Pointer); isPointer {
-					return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+					return nil, &Unsupported{Kind: KindPromotionThroughAnEmbeddedPointer, Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 						Construct: "promotion through an embedded pointer (" + method.Name() + ")", Span: span}
 				}
 				entry.Path = append(entry.Path, field.Name())
@@ -250,7 +250,7 @@ func (b *builder) promotedDelegates(named *types.Named, span Span) ([]PromotedDe
 			}
 			recvNamed, ok := types.Unalias(current).(*types.Named)
 			if !ok {
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+				return nil, &Unsupported{Kind: KindPromotionThroughAnUnnamedEmbedding, Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 					Construct: "promotion through an unnamed embedding (" + method.Name() + ")", Span: span}
 			}
 			entry.TypeName = recvNamed.Obj().Name()
@@ -272,7 +272,7 @@ func (b *builder) chainFieldPath(base Expr, baseType types.Type, path []int, spa
 		}
 		structType, ok := types.Unalias(current).Underlying().(*types.Struct)
 		if !ok {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "promoted selection through " + current.String(), Span: span}
+			return nil, &Unsupported{Kind: KindPromotedSelectionThrough, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "promoted selection through " + current.String(), Span: span}
 		}
 		field := structType.Field(index)
 		fieldType, err := b.typeOf(field.Type(), span)
@@ -280,7 +280,7 @@ func (b *builder) chainFieldPath(base Expr, baseType types.Type, path []int, spa
 			return nil, err
 		}
 		if out.Type().Kind != KindPointer && out.Type().Kind != KindStruct {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "promoted selection through " + out.Type().Go, Span: span}
+			return nil, &Unsupported{Kind: KindPromotedSelectionThrough, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "promoted selection through " + out.Type().Go, Span: span}
 		}
 		b.use("fieldLoad")
 		cell, err := b.fieldIsCell(current, field.Name(), fieldType)
@@ -320,11 +320,11 @@ func (b *builder) admitGenericType(named *types.Named, span Span) ([]string, err
 				if mentionsTypeParamType(arg) {
 					continue
 				}
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+				return nil, &Unsupported{Kind: KindGenericTypeInstantiatedWithAnUnreviewedTypeArgument, Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 					Construct: "generic type instantiated with an unreviewed type argument (" + arg.String() + ")", Span: span}
 			}
 			if resolved.Kind == KindStruct || resolved.Kind == KindArray {
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+				return nil, &Unsupported{Kind: KindGenericTypeInstantiatedWithAValueCopyCarrierCopySemanticsVaryPerInstantiation, Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 					Construct: "generic type instantiated with a value-copy carrier (copy semantics vary per instantiation)", Span: span}
 			}
 		}
@@ -347,7 +347,7 @@ func (b *builder) anonStructType(structType *types.Struct, spelled string, span 
 	// distinct preimages.
 	identity, err := b.canonical(structType)
 	if err != nil {
-		return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: err.Error(), Span: span}
+		return Type{}, &Unsupported{Kind: KindNestedError, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: err.Error(), Span: span}
 	}
 	digest := sha256.Sum256([]byte(identity))
 	name := "Anon$" + hex.EncodeToString(digest[:])
@@ -362,7 +362,7 @@ func (b *builder) anonStructType(structType *types.Struct, spelled string, span 
 	for i := range structType.NumFields() {
 		field := structType.Field(i)
 		if field.Name() == "_" {
-			return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "struct type " + spelled + " (blank field)", Span: span}
+			return Type{}, &Unsupported{Kind: KindStructType, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "struct type " + spelled + " (blank field)", Span: span}
 		}
 		fieldType, err := b.typeOf(field.Type(), span)
 		if err != nil {
@@ -377,7 +377,7 @@ func (b *builder) anonStructType(structType *types.Struct, spelled string, span 
 	decl.Comparable = b.structEqComparable(structType)
 	decl.KeyEncodable = b.structKeyEncodable(structType, span)
 	if err := b.unit.RegisterAnonStruct(b.pkgPath, decl); err != nil {
-		return Type{}, &Unsupported{Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: err.Error(), Span: span}
+		return Type{}, &Unsupported{Kind: KindNestedError, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: err.Error(), Span: span}
 	}
 	return out, nil
 }

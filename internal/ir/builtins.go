@@ -40,7 +40,7 @@ func (b *builder) buildBuiltin(call *ast.CallExpr, builtin *types.Builtin, resul
 			b.use("len:array")
 			return &ArrayLenExpr{X: operand}, nil
 		}
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "len of " + operand.Type().Go, Span: span}
+		return nil, &Unsupported{Kind: KindLenOf, Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "len of " + operand.Type().Go, Span: span}
 	case "cap":
 		operand, err := b.buildExpr(call.Args[0])
 		if err != nil {
@@ -50,7 +50,7 @@ func (b *builder) buildBuiltin(call *ast.CallExpr, builtin *types.Builtin, resul
 			b.use("cap:slice")
 			return &SliceCap{X: operand}, nil
 		}
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "cap of " + operand.Type().Go, Span: span}
+		return nil, &Unsupported{Kind: KindCapOf, Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "cap of " + operand.Type().Go, Span: span}
 	case "copy":
 		dst, err := b.buildExpr(call.Args[0])
 		if err != nil {
@@ -61,12 +61,12 @@ func (b *builder) buildBuiltin(call *ast.CallExpr, builtin *types.Builtin, resul
 			return nil, err
 		}
 		if dst.Type().Kind != KindSlice || src.Type().Kind != KindSlice {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "copy between " + dst.Type().Go + " and " + src.Type().Go, Span: span}
+			return nil, &Unsupported{Kind: KindCopyBetween, Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "copy between " + dst.Type().Go + " and " + src.Type().Go, Span: span}
 		}
 		if dst.Type().Elem.Kind == KindArray {
 			// copy() overwrites each destination array's memory; the ABI
 			// struct copy path requires goSet$ carriers.
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "copy of fixed-array elements", Span: span}
+			return nil, &Unsupported{Kind: KindCopyOfFixedArrayElements, Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "copy of fixed-array elements", Span: span}
 		}
 		b.use("copy:slice")
 		return &SliceCopy{Dst: dst, Src: src}, nil
@@ -76,12 +76,12 @@ func (b *builder) buildBuiltin(call *ast.CallExpr, builtin *types.Builtin, resul
 			return nil, err
 		}
 		if operand.Type().Kind != KindSlice {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "append to " + operand.Type().Go, Span: span}
+			return nil, &Unsupported{Kind: KindAppendTo, Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "append to " + operand.Type().Go, Span: span}
 		}
 		if operand.Type().Elem.Kind == KindArray {
 			// Appended values must copy into the backing store; the ABI
 			// struct append path requires goClone$/goSet$ carriers.
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "append of fixed-array elements", Span: span}
+			return nil, &Unsupported{Kind: KindAppendOfFixedArrayElements, Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "append of fixed-array elements", Span: span}
 		}
 		if call.Ellipsis.IsValid() {
 			source, err := b.buildExprAs(call.Args[1], operand.Type())
@@ -136,7 +136,7 @@ func (b *builder) buildBuiltin(call *ast.CallExpr, builtin *types.Builtin, resul
 			b.use("makeSlice")
 			return out, nil
 		}
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "make of " + t.Go, Span: span}
+		return nil, &Unsupported{Kind: KindMakeOf, Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "make of " + t.Go, Span: span}
 	}
 	switch builtin.Name() {
 	case "min", "max":
@@ -145,10 +145,10 @@ func (b *builder) buildBuiltin(call *ast.CallExpr, builtin *types.Builtin, resul
 			return nil, err
 		}
 		if !t.Kind.Integer() && !t.Kind.Float() && t.Kind != KindString {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "builtin " + builtin.Name() + " over " + t.Go, Span: span}
+			return nil, &Unsupported{Kind: KindBuiltin, Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "builtin " + builtin.Name() + " over " + t.Go, Span: span}
 		}
 		if t.Kind == KindFloat32 {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "float32 arithmetic", Span: span}
+			return nil, &Unsupported{Kind: KindFloat32Arithmetic, Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "float32 arithmetic", Span: span}
 		}
 		out := &MinMax{Max: builtin.Name() == "max", T: t}
 		for _, arg := range call.Args {
@@ -166,7 +166,7 @@ func (b *builder) buildBuiltin(call *ast.CallExpr, builtin *types.Builtin, resul
 			return nil, err
 		}
 		if t.Kind != KindPointer || t.Elem == nil {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "new of " + t.Go, Span: span}
+			return nil, &Unsupported{Kind: KindNewOf, Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "new of " + t.Go, Span: span}
 		}
 		if t.Elem.Kind == KindStruct {
 			// new(T) for a named struct: the fresh zero instance is the
@@ -182,9 +182,9 @@ func (b *builder) buildBuiltin(call *ast.CallExpr, builtin *types.Builtin, resul
 			b.use("new:cell")
 			return &CellNew{Zero: zero, T: t}, nil
 		}
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "new of " + t.Go, Span: span}
+		return nil, &Unsupported{Kind: KindNewOf, Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "new of " + t.Go, Span: span}
 	}
-	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "builtin " + builtin.Name(), Span: span}
+	return nil, &Unsupported{Kind: KindBuiltin, Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "builtin " + builtin.Name(), Span: span}
 }
 
 // MinMax is the min/max builtin over ordered carriers: arguments
@@ -218,7 +218,7 @@ func (b *builder) buildClear(call *ast.CallExpr) (Stmt, error) {
 		return nil, err
 	}
 	if operand.Type().Kind != KindMap {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "clear of " + operand.Type().Go, Span: b.span(call.Pos())}
+		return nil, &Unsupported{Kind: KindClearOf, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "clear of " + operand.Type().Go, Span: b.span(call.Pos())}
 	}
 	b.use("mapClear")
 	return &MapClearStmt{Map: operand}, nil
@@ -270,7 +270,7 @@ func (b *builder) buildPanic(call *ast.CallExpr) (Stmt, error) {
 		return &PanicStmt{Value: boxed, ErrorFormat: format}, nil
 	}
 	if kind != KindString && kind != KindBool && !kind.Integer() {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "panic with " + value.Type().Go + " (formatting not reviewed)", Span: span}
+		return nil, &Unsupported{Kind: KindPanicWith, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "panic with " + value.Type().Go + " (formatting not reviewed)", Span: span}
 	}
 	b.use("panic")
 	return &PanicStmt{Value: value}, nil

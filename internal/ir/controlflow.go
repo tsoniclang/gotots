@@ -18,21 +18,21 @@ func (b *builder) buildDeclStmt(n *ast.DeclStmt) (Stmt, error) {
 		return &Block{}, nil
 	}
 	if !ok || decl.Tok != token.VAR {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "non-var declaration statement", Span: span}
+		return nil, &Unsupported{Kind: KindNonVarDeclarationStatement, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "non-var declaration statement", Span: span}
 	}
 	out := &DeclStmt{}
 	for _, spec := range decl.Specs {
 		value, ok := spec.(*ast.ValueSpec)
 		if !ok {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "non-value var spec", Span: span}
+			return nil, &Unsupported{Kind: KindNonValueVarSpec, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "non-value var spec", Span: span}
 		}
 		for i, name := range value.Names {
 			if name.Name == "_" {
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "blank variable declaration", Span: span}
+				return nil, &Unsupported{Kind: KindBlankVariableDeclaration, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "blank variable declaration", Span: span}
 			}
 			object := b.info.Defs[name]
 			if object == nil {
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "var without typed definition", Span: span}
+				return nil, &Unsupported{Kind: KindVarWithoutTypedDefinition, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "var without typed definition", Span: span}
 			}
 			t, err := b.typeOf(object.Type(), span)
 			if err != nil {
@@ -55,7 +55,7 @@ func (b *builder) buildDeclStmt(n *ast.DeclStmt) (Stmt, error) {
 			}
 		}
 		if len(value.Values) != 0 && len(value.Values) != len(value.Names) {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "multi-value var initializer", Span: span}
+			return nil, &Unsupported{Kind: KindMultiValueVarInitializer, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "multi-value var initializer", Span: span}
 		}
 	}
 	b.use("varDecl")
@@ -79,7 +79,7 @@ func (b *builder) buildIncDec(n *ast.IncDecStmt) (Stmt, error) {
 		return nil, err
 	}
 	if !operandT.Kind.Integer() && !operandT.Kind.Float() {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "inc/dec of " + operandT.Go, Span: span}
+		return nil, &Unsupported{Kind: KindIncDecOf, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "inc/dec of " + operandT.Go, Span: span}
 	}
 	target, err := b.buildTarget(n.X)
 	if err != nil {
@@ -133,7 +133,7 @@ func (b *builder) buildFor(n *ast.ForStmt) (Stmt, error) {
 		if _, isSeq := init.(*StmtSeq); isSeq {
 			// A boxed (address-taken) loop-clause variable has no
 			// expressible cell declaration inside the clause yet.
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "address of a loop-clause variable", Span: b.span(n.Pos())}
+			return nil, &Unsupported{Kind: KindAddressOfALoopClauseVariable, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "address of a loop-clause variable", Span: b.span(n.Pos())}
 		}
 		out.Init = init
 	}
@@ -197,7 +197,7 @@ func (b *builder) buildReturn(n *ast.ReturnStmt) (Stmt, error) {
 	out := &ReturnStmt{}
 	for i, result := range n.Results {
 		if i >= len(b.results) {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "return arity mismatch", Span: b.span(n.Pos())}
+			return nil, &Unsupported{Kind: KindReturnArityMismatch, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "return arity mismatch", Span: b.span(n.Pos())}
 		}
 		built, err := b.buildExprAs(result, b.results[i])
 		if err != nil {

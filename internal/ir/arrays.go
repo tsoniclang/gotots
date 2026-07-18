@@ -72,7 +72,7 @@ func (b *builder) buildArrayLit(lit *ast.CompositeLit, t Type) (Expr, error) {
 	out := &ArrayLit{T: t}
 	for _, element := range lit.Elts {
 		if _, isKeyed := element.(*ast.KeyValueExpr); isKeyed {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "keyed array literal", Span: span}
+			return nil, &Unsupported{Kind: KindKeyedArrayLiteral, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "keyed array literal", Span: span}
 		}
 		value, err := b.buildExprAs(element, *t.Elem)
 		if err != nil {
@@ -101,7 +101,7 @@ func (b *builder) buildArrayEqual(left, right Expr, op token.Token, span Span) (
 		if elem != nil {
 			elemGo = elem.Go
 		}
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "equality on array of " + elemGo, Span: span}
+		return nil, &Unsupported{Kind: KindEqualityOnArrayOf, Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "equality on array of " + elemGo, Span: span}
 	}
 	b.use("arrayEqual")
 	return &ArrayEqual{L: left, R: right, Negate: op == token.NEQ}, nil

@@ -96,7 +96,7 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 	span := b.span(decl.Pos())
 	object, ok := b.info.Defs[decl.Name].(*types.Func)
 	if !ok {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "function without typed definition", Span: span}
+		return nil, &Unsupported{Kind: KindFunctionWithoutTypedDefinition, Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "function without typed definition", Span: span}
 	}
 	// A variadic function's final parameter is exactly a slice: call
 	// sites pack trailing arguments (or pass nil, or the spread slice
@@ -105,7 +105,7 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 	if signature.Recv() != nil {
 		mb, err := typeid.MethodBinders(object)
 		if err != nil {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: err.Error(), Span: span}
+			return nil, &Unsupported{Kind: KindNestedError, Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: err.Error(), Span: span}
 		}
 		b.binders = mb
 	} else {
@@ -137,7 +137,7 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 		// rather than substituting the bare method name.
 		key, err := MethodKey(object)
 		if err != nil {
-			return declarationSite(&Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+			return declarationSite(&Unsupported{Kind: KindMethodWithoutCanonicalIdentity, Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 				Construct: "method without canonical identity (" + object.Name() + ")", Span: span})
 		}
 		function.MethodIdent = key
@@ -147,14 +147,14 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 		if recvNamed := methodReceiverNamed(signature); recvNamed != nil {
 			slot, err := MethodSlot(recvNamed, object)
 			if err != nil {
-				return declarationSite(&Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+				return declarationSite(&Unsupported{Kind: KindMethodWithoutCanonicalSlot, Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 					Construct: "method without canonical slot (" + object.Name() + ")", Span: span})
 			}
 			function.Slot = slot
 		}
 	}
 	if decl.Body == nil {
-		return declarationSite(&Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "bodyless function", Span: span})
+		return declarationSite(&Unsupported{Kind: KindBodylessFunction, Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "bodyless function", Span: span})
 	}
 	if decl.Type.TypeParams != nil {
 		names, err := b.admitGenericFunction(object, span)
@@ -226,7 +226,7 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 	for i := range results.Len() {
 		result := results.At(i)
 		if result.Name() == "_" {
-			return declarationSite(&Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "blank named result", Span: span})
+			return declarationSite(&Unsupported{Kind: KindBlankNamedResult, Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "blank named result", Span: span})
 		}
 		t, err := b.typeOf(result.Type(), span)
 		if err != nil {
@@ -237,7 +237,7 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 		b.resultGoTypes = append(b.resultGoTypes, result.Type())
 		if result.Name() != "" {
 			if result.Parent() != nil && b.namedResultAddressed(result) {
-				return declarationSite(&Unsupported{Code: "GOTOTS_UNSUPPORTED_DECLARATION",
+				return declarationSite(&Unsupported{Kind: KindAddressOfANamedResult, Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 					Construct: "address of a named result", Span: span})
 			}
 			b.namedResults = append(b.namedResults, Var{Name: result.Name(), Type: t})
@@ -307,7 +307,7 @@ func (b *builder) buildTopLevel(stmts []ast.Stmt) (*Block, error) {
 			// the return values are set; try/finally cannot express that
 			// visibility, so the combination fails closed. Accounting
 			// continues over the remaining statements.
-			b.recordSite(&Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT",
+			b.recordSite(&Unsupported{Kind: KindDeferInAFunctionWithNamedResultsDeferredResultMutation, Code: "GOTOTS_UNSUPPORTED_STATEMENT",
 				Construct: "defer in a function with named results (deferred result mutation)", Span: b.span(deferStmt.Pos())})
 			out.Stmts = append(out.Stmts, &UnimplementedStmt{Site: (*b.sites)[len(*b.sites)-1]})
 			continue
@@ -416,11 +416,11 @@ func (b *builder) buildStmt(stmt ast.Stmt) (Stmt, error) {
 
 	case *ast.DeferStmt:
 		if !b.useDeferStack {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT",
+			return nil, &Unsupported{Kind: KindDeferBelowTheFunctionSTopLevelBlockRunsAtFunctionExitNeedsTheDeferStackLowering, Code: "GOTOTS_UNSUPPORTED_STATEMENT",
 				Construct: "defer below the function's top-level block (runs at function exit; needs the defer-stack lowering)", Span: span}
 		}
 		if len(b.namedResults) > 0 {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT",
+			return nil, &Unsupported{Kind: KindDeferInAFunctionWithNamedResultsDeferredResultMutation, Code: "GOTOTS_UNSUPPORTED_STATEMENT",
 				Construct: "defer in a function with named results (deferred result mutation)", Span: span}
 		}
 		captures, deferredCall, err := b.buildDeferredCall(n)
@@ -433,10 +433,10 @@ func (b *builder) buildStmt(stmt ast.Stmt) (Stmt, error) {
 	case *ast.ExprStmt:
 		call, ok := n.X.(*ast.CallExpr)
 		if !ok {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: fmt.Sprintf("expression statement %T", n.X), Span: span}
+			return nil, &Unsupported{Kind: KindExpressionStatement, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: fmt.Sprintf("expression statement %T", n.X), Span: span}
 		}
 		if _, isConversion := b.conversionTarget(call); isConversion {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "conversion as statement", Span: span}
+			return nil, &Unsupported{Kind: KindConversionAsStatement, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "conversion as statement", Span: span}
 		}
 		if builtin, isBuiltin := b.builtinCallee(call); isBuiltin {
 			switch builtin.Name() {
@@ -455,7 +455,7 @@ func (b *builder) buildStmt(stmt ast.Stmt) (Stmt, error) {
 				b.use("exprStmt")
 				return &ExprStmt{Call: built}, nil
 			}
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "builtin statement " + builtin.Name(), Span: span}
+			return nil, &Unsupported{Kind: KindBuiltinStatement, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "builtin statement " + builtin.Name(), Span: span}
 		}
 		built, err := b.buildAnyCall(call)
 		if err != nil {
@@ -466,13 +466,13 @@ func (b *builder) buildStmt(stmt ast.Stmt) (Stmt, error) {
 
 	case *ast.BranchStmt:
 		if n.Tok != token.BREAK && n.Tok != token.CONTINUE {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "branch " + n.Tok.String(), Span: span}
+			return nil, &Unsupported{Kind: KindBranch, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "branch " + n.Tok.String(), Span: span}
 		}
 		label := ""
 		if n.Label != nil {
 			if b.rangeFuncDepth > 0 {
 				// A labeled branch cannot cross the yield-closure boundary.
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "labeled branch inside a range-over-func body", Span: span}
+				return nil, &Unsupported{Kind: KindLabeledBranchInsideARangeOverFuncBody, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "labeled branch inside a range-over-func body", Span: span}
 			}
 			label = n.Label.Name
 		}
@@ -480,7 +480,7 @@ func (b *builder) buildStmt(stmt ast.Stmt) (Stmt, error) {
 			// break exits the type switch: the if/else lowering routes it
 			// through the type switch's synthesized labeled block.
 			if len(b.typeSwitchLabels) == 0 {
-				return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "break inside a type switch clause", Span: span}
+				return nil, &Unsupported{Kind: KindBreakInsideATypeSwitchClause, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "break inside a type switch clause", Span: span}
 			}
 			slot := b.typeSwitchLabels[len(b.typeSwitchLabels)-1]
 			if *slot == "" {
@@ -498,7 +498,7 @@ func (b *builder) buildStmt(stmt ast.Stmt) (Stmt, error) {
 		default:
 			// Labels exist for branch targets; a label on any other
 			// statement implies goto, which stays out.
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "label on a non-loop statement", Span: span}
+			return nil, &Unsupported{Kind: KindLabelOnANonLoopStatement, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "label on a non-loop statement", Span: span}
 		}
 		inner, err := b.buildStmt(n.Stmt)
 		if err != nil {
@@ -507,7 +507,7 @@ func (b *builder) buildStmt(stmt ast.Stmt) (Stmt, error) {
 		if _, isRangeFunc := inner.(*RangeFunc); isRangeFunc {
 			// The sequence-call lowering is not a loop statement; its
 			// branches already fail closed inside the yield closure.
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "label on a range-over-func loop", Span: span}
+			return nil, &Unsupported{Kind: KindLabelOnARangeOverFuncLoop, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "label on a range-over-func loop", Span: span}
 		}
 		b.use("label")
 		return &LabeledStmt{Label: n.Label.Name, Stmt: inner}, nil
@@ -516,11 +516,11 @@ func (b *builder) buildStmt(stmt ast.Stmt) (Stmt, error) {
 		// Concurrency statements carry a STRUCTURED construct (not the raw
 		// %T spelling) so the residual inventory classifies them under the
 		// single concurrency product policy, never a spelling match.
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "goroutine statement", Span: span}
+		return nil, &Unsupported{Kind: KindGoroutineStatement, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "goroutine statement", Span: span}
 	case *ast.SelectStmt:
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "select statement", Span: span}
+		return nil, &Unsupported{Kind: KindSelectStatement, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "select statement", Span: span}
 	case *ast.SendStmt:
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "channel send statement", Span: span}
+		return nil, &Unsupported{Kind: KindChannelSendStatement, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "channel send statement", Span: span}
 	}
-	return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "unrecognized statement " + fmt.Sprintf("%T", stmt), Span: span}
+	return nil, &Unsupported{Kind: KindUnrecognizedStatement, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "unrecognized statement " + fmt.Sprintf("%T", stmt), Span: span}
 }

@@ -13,7 +13,7 @@ import (
 func (b *builder) buildRange(n *ast.RangeStmt) (Stmt, error) {
 	span := b.span(n.Pos())
 	if n.Tok != token.DEFINE && n.Tok != token.ILLEGAL {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range with assignment form", Span: span}
+		return nil, &Unsupported{Kind: KindRangeWithAssignmentForm, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range with assignment form", Span: span}
 	}
 	operand, err := b.buildExpr(n.X)
 	if err != nil {
@@ -41,7 +41,7 @@ func (b *builder) buildRange(n *ast.RangeStmt) (Stmt, error) {
 		return b.buildRangeFunc(n, operand)
 	}
 	if operand.Type().Kind != KindSlice {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range over " + operand.Type().Go, Span: span}
+		return nil, &Unsupported{Kind: KindRangeOver, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range over " + operand.Type().Go, Span: span}
 	}
 	out := &RangeSlice{X: operand, VarT: *operand.Type().Elem}
 	name := func(e ast.Expr) (string, error) {
@@ -50,13 +50,13 @@ func (b *builder) buildRange(n *ast.RangeStmt) (Stmt, error) {
 		}
 		ident, ok := e.(*ast.Ident)
 		if !ok {
-			return "", &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range variable is not an identifier", Span: span}
+			return "", &Unsupported{Kind: KindRangeVariableIsNotAnIdentifier, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range variable is not an identifier", Span: span}
 		}
 		if ident.Name == "_" {
 			return "", nil
 		}
 		if _, isBoxed := b.boxedVar(ident); isBoxed {
-			return "", &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "address of a range variable", Span: span}
+			return "", &Unsupported{Kind: KindAddressOfARangeVariable, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "address of a range variable", Span: span}
 		}
 		return ident.Name, nil
 	}
@@ -80,13 +80,13 @@ func (b *builder) buildRange(n *ast.RangeStmt) (Stmt, error) {
 func (b *builder) buildRangeInt(n *ast.RangeStmt, operand Expr) (Stmt, error) {
 	span := b.span(n.Pos())
 	if n.Value != nil {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range over an integer with a second variable", Span: span}
+		return nil, &Unsupported{Kind: KindRangeOverAnIntegerWithASecondVariable, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range over an integer with a second variable", Span: span}
 	}
 	out := &RangeInt{N: operand}
 	if n.Key != nil {
 		ident, ok := n.Key.(*ast.Ident)
 		if !ok {
-			return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range variable is not an identifier", Span: span}
+			return nil, &Unsupported{Kind: KindRangeVariableIsNotAnIdentifier, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range variable is not an identifier", Span: span}
 		}
 		if err := b.rejectBoxedBinding(ident, "a range variable", span); err != nil {
 			return nil, err
@@ -129,13 +129,13 @@ func (b *builder) buildRangeMap(n *ast.RangeStmt, operand Expr) (Stmt, error) {
 		}
 		ident, ok := e.(*ast.Ident)
 		if !ok {
-			return "", &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range variable is not an identifier", Span: span}
+			return "", &Unsupported{Kind: KindRangeVariableIsNotAnIdentifier, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range variable is not an identifier", Span: span}
 		}
 		if ident.Name == "_" {
 			return "", nil
 		}
 		if _, isBoxed := b.boxedVar(ident); isBoxed {
-			return "", &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "address of a range variable", Span: span}
+			return "", &Unsupported{Kind: KindAddressOfARangeVariable, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "address of a range variable", Span: span}
 		}
 		return ident.Name, nil
 	}
@@ -182,11 +182,11 @@ func (b *builder) buildRangeFunc(n *ast.RangeStmt, operand Expr) (Stmt, error) {
 	if sig == nil || len(sig.Params) != 1 || len(sig.Results) != 0 ||
 		sig.Params[0].Kind != KindFunc || sig.Params[0].Sig == nil ||
 		len(sig.Params[0].Sig.Results) != 1 || sig.Params[0].Sig.Results[0].Kind != KindBool {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range over " + operand.Type().Go, Span: span}
+		return nil, &Unsupported{Kind: KindRangeOver, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range over " + operand.Type().Go, Span: span}
 	}
 	yieldParams := sig.Params[0].Sig.Params
 	if len(yieldParams) != 1 && len(yieldParams) != 2 {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range over " + operand.Type().Go, Span: span}
+		return nil, &Unsupported{Kind: KindRangeOver, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range over " + operand.Type().Go, Span: span}
 	}
 	out := &RangeFunc{Seq: operand, KeyT: yieldParams[0], TwoVars: len(yieldParams) == 2, Results: b.results}
 	if out.TwoVars {
@@ -198,13 +198,13 @@ func (b *builder) buildRangeFunc(n *ast.RangeStmt, operand Expr) (Stmt, error) {
 		}
 		ident, ok := e.(*ast.Ident)
 		if !ok {
-			return "", &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range variable is not an identifier", Span: span}
+			return "", &Unsupported{Kind: KindRangeVariableIsNotAnIdentifier, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "range variable is not an identifier", Span: span}
 		}
 		if ident.Name == "_" {
 			return "", nil
 		}
 		if _, isBoxed := b.boxedVar(ident); isBoxed {
-			return "", &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "address of a range variable", Span: span}
+			return "", &Unsupported{Kind: KindAddressOfARangeVariable, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "address of a range variable", Span: span}
 		}
 		return ident.Name, nil
 	}
@@ -216,7 +216,7 @@ func (b *builder) buildRangeFunc(n *ast.RangeStmt, operand Expr) (Stmt, error) {
 		return nil, err
 	}
 	if out.Value != "" && !out.TwoVars {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "two range variables over a one-value sequence", Span: span}
+		return nil, &Unsupported{Kind: KindTwoRangeVariablesOverAOneValueSequence, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "two range variables over a one-value sequence", Span: span}
 	}
 	b.rangeFuncDepth++
 	body, err := b.buildBreakableBody(n.Body)

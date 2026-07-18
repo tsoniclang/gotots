@@ -59,20 +59,20 @@ func (b *builder) buildExternalMethodCall(n *ast.CallExpr, selector *ast.Selecto
 	span := b.span(n.Pos())
 	signature := method.Type().(*types.Signature)
 	if signature.TypeParams() != nil || signature.RecvTypeParams() != nil {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic external method call", Span: span}
+		return nil, &Unsupported{Kind: KindGenericExternalMethodCall, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic external method call", Span: span}
 	}
 	recvNamed, ok := types.Unalias(signature.Recv().Type()).(*types.Named)
 	if pointerType, isPointer := signature.Recv().Type().(*types.Pointer); isPointer {
 		recvNamed, ok = types.Unalias(pointerType.Elem()).(*types.Named)
 	}
 	if !ok || recvNamed.Obj().Pkg() == nil {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method call outside the translated unit (unqualified)", Span: span}
+		return nil, &Unsupported{Kind: KindMethodCallOutsideTheTranslatedUnitUnqualified, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method call outside the translated unit (unqualified)", Span: span}
 	}
 	_, pointerRecv := signature.Recv().Type().(*types.Pointer)
 	if (signature.TypeParams() != nil && signature.TypeParams().Len() > 0) ||
 		(signature.RecvTypeParams() != nil && signature.RecvTypeParams().Len() > 0) ||
 		SignatureMentionsTypeParam(signature) {
-		return nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+		return nil, &Unsupported{Kind: KindCallToAGenericExternalMethod, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
 			Construct: "call to a generic external method (" + method.Name() + ")", Span: span}
 	}
 	b.unit.AddExternalMethod(recvNamed.Obj().Pkg().Path(), recvNamed.Obj().Name(), method)

@@ -109,5 +109,5 @@ func (b *builder) buildDeferredCall(deferStmt *ast.DeferStmt) ([]Stmt, Expr, err
 		}
 		return captures, call, nil
 	}
-	return nil, nil, &Unsupported{Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "deferred non-call expression", Span: span}
+	return nil, nil, &Unsupported{Kind: KindDeferredNonCallExpression, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "deferred non-call expression", Span: span}
 }
