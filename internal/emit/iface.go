@@ -407,10 +407,22 @@ func (p *printer) ifaceUnionAlias(t ir.Type) (string, error) {
 		return name, nil
 	}
 	p.module.ifaceIdentity[name] = identity
-	// Reserve first: member payloads may mention this same interface
-	// (via method signatures they do not — payloads are concrete — but
-	// reservation keeps registration idempotent under recursion).
+	// Reserve the name and DEFER the definition. An external union member's
+	// vtable type is its adapter arrow type, which is only fully populated
+	// after newModule builds every external adapter. Spelling the definition
+	// eagerly here — e.g. while building an adapter type whose result IS this
+	// interface — would cache an incomplete Record<never,never> vtable that
+	// the idempotent registration then locks in. finalizeUnionAliases builds
+	// every reserved alias's definition once, after all adapter types exist.
 	p.module.RegisterIfaceAlias(name, "")
+	p.module.ifaceAliasTypes[name] = t
+	return name, nil
+}
+
+// buildUnionAliasDefinition spells one reserved union alias's declaration
+// from its interface type. It is called only after every external adapter
+// type is populated, so external members carry their exact vtable type.
+func (p *printer) buildUnionAliasDefinition(name string, t ir.Type) (string, error) {
 	members := []string{"undefined"}
 	for _, member := range p.retainedMembers(t) {
 		payload, err := p.memberPayload(member)
@@ -470,9 +482,30 @@ func (p *printer) ifaceUnionAlias(t ir.Type) (string, error) {
 		}
 	}
 	declaration := "type " + name + " = " + strings.Join(members, " | ") + ";"
-	p.module.ifaceAliases[name] = declaration
 	p.module.RegisterIfaceEqFn(name, p.ifaceEqFn(t, name))
-	return name, nil
+	return declaration, nil
+}
+
+// finalizeUnionAliases builds every reserved union alias's deferred
+// definition, after newModule has populated all external adapter types.
+// The index loop covers aliases newly reserved while building an earlier
+// one (an empty-interface member's boxed composite may denote a further
+// interface). A reserved name without a stored type is a construction defect.
+func finalizeUnionAliases(module *Module) error {
+	p := &printer{module: module}
+	for i := 0; i < len(module.aliasOrder); i++ {
+		name := module.aliasOrder[i]
+		t, ok := module.ifaceAliasTypes[name]
+		if !ok {
+			return fmt.Errorf("emit: union alias %s reserved without a stored interface type", name)
+		}
+		declaration, err := p.buildUnionAliasDefinition(name, t)
+		if err != nil {
+			return err
+		}
+		module.ifaceAliases[name] = declaration
+	}
+	return nil
 }
 
 // memberPayload spells one union member's payload by name: class

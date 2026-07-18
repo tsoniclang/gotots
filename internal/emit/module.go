@@ -74,6 +74,12 @@ type Module struct {
 	// collision between DISTINCT identities fails closed.
 	ifaceIdentity map[string]string
 	aliasOrder    []string
+	// ifaceAliasTypes maps alias name -> the interface type it denotes. The
+	// alias DEFINITION is deferred (built by finalizeUnionAliases after every
+	// external adapter type exists), so an external member's vtable type is
+	// never cached as an incomplete Record<never,never> while adapter types
+	// are still being built.
+	ifaceAliasTypes map[string]ir.Type
 	// ifaceEqFns holds each union's generated equality function (Go's
 	// interface == by exact per-member narrowing, no erased payload),
 	// keyed by alias name and emitted after the aliases.
@@ -214,7 +220,8 @@ func NewModule(pkg, pkgName string, abiImports ABIImports, specifiers map[string
 	}
 	return &Module{Pkg: pkg, PkgName: pkgName, ABI: abiImports, imports: imports,
 		used: map[string]bool{}, initEdges: map[string]bool{},
-		typeUsed: map[string]bool{}, ifaceAliases: map[string]string{}, ifaceIdentity: map[string]string{}}
+		typeUsed: map[string]bool{}, ifaceAliases: map[string]string{}, ifaceIdentity: map[string]string{},
+		ifaceAliasTypes: map[string]ir.Type{}}
 }
 
 // symbol spells a reference to a package-level symbol: unqualified within

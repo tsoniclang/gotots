@@ -235,6 +235,13 @@ func Package(module *Module, decls Decls) (string, error) {
 			p.line("%s();", initCall)
 		}
 	}
+	// Build every reserved union alias's deferred definition now: the body is
+	// fully spelled (all aliases reserved) and newModule has populated every
+	// external adapter type, so external members carry their exact vtable
+	// type rather than an incomplete Record<never,never>.
+	if err := finalizeUnionAliases(module); err != nil {
+		return "", err
+	}
 	return module.importLines() + module.aliasLines() + module.eqFnLines() + body.String(), nil
 }
 
