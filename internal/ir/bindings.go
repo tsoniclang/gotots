@@ -147,16 +147,17 @@ func tsBinding(name string) string {
 // clause bindings, which are disjoint scopes sharing one emission name).
 func (b *bindings) share(v *types.Var, id BindingID) { b.ids[v] = id }
 
-// assignBindings runs the deterministic pre-pass for one top-level
-// function: a single source-order walk of the whole declaration (nested
-// function literals included, so a captured outer variable already has its
-// id before any closure reads it) assigns each source *types.Var a
-// BindingID, then the allocator gives each id a unique emission name.
-// Type parameters seed the value namespace (their zero$X/eq$X factory
-// parameters are real emitted parameters).
-func (b *builder) assignBindings(decl *ast.FuncDecl, typeParams []string) {
+// assignBindings runs the deterministic pre-pass for one top-level scope
+// (a function declaration, or a package-level variable initializer that may
+// itself contain function literals): a single source-order walk of the
+// whole node (nested function literals included, so a captured outer
+// variable already has its id before any closure reads it) assigns each
+// source *types.Var a BindingID, then the allocator gives each id a unique
+// emission name. Type parameters seed the value namespace (their
+// zero$X/eq$X factory parameters are real emitted parameters).
+func (b *builder) assignBindings(root ast.Node, typeParams []string) {
 	b.bind = newBindings()
-	ast.Inspect(decl, func(n ast.Node) bool {
+	ast.Inspect(root, func(n ast.Node) bool {
 		switch node := n.(type) {
 		case *ast.TypeSwitchStmt:
 			b.assignTypeSwitchBinding(node)
@@ -218,9 +219,11 @@ func (b *builder) assignTypeSwitchBinding(node *ast.TypeSwitchStmt) {
 // keeps its escaped source spelling (those never participate in local
 // shadowing).
 func (b *builder) bindNameOf(ident *ast.Ident) string {
-	if variable := b.identVar(ident); variable != nil {
-		if id, ok := b.bind.idOf(variable); ok {
-			return b.bind.name(id)
+	if b.bind != nil {
+		if variable := b.identVar(ident); variable != nil {
+			if id, ok := b.bind.idOf(variable); ok {
+				return b.bind.name(id)
+			}
 		}
 	}
 	return tsBinding(ident.Name)
@@ -230,7 +233,7 @@ func (b *builder) bindNameOf(ident *ast.Ident) string {
 // *types.Var directly (receiver, parameter, and named-result sites hold
 // the object without an identifier at hand).
 func (b *builder) bindNameVar(variable *types.Var, fallback string) string {
-	if variable != nil {
+	if b.bind != nil && variable != nil {
 		if id, ok := b.bind.idOf(variable); ok {
 			return b.bind.name(id)
 		}

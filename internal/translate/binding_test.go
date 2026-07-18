@@ -146,6 +146,25 @@ func TypeSwitchShadow() int { return classify(21) + classify("abcd") }
 `)
 }
 
+func TestOraclePackageVarClosureShadow(t *testing.T) {
+	// A package-level variable initialized with a function literal whose
+	// body shadows its parameter: the initializer path must assign binding
+	// identities too, so the closure's locals get allocated names.
+	runOracle(t, `package fixture
+
+var handler = func(n int) int {
+	x := n
+	if n > 0 {
+		x := -n
+		return x
+	}
+	return x
+}
+
+func PackageVarClosureShadow() int { return handler(5) + handler(-3) }
+`)
+}
+
 func TestOracleNestedShadowSlices(t *testing.T) {
 	// An inner slice shadows an outer slice: they are distinct regions with
 	// distinct representations, and the outer slice survives the inner one.

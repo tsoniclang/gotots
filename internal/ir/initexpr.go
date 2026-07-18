@@ -27,5 +27,9 @@ func BuildPackageVarInit(p *packages.Package, sourceDir string, unit Scope, e as
 	if e == nil {
 		return zeroValue(expected, span)
 	}
+	// A package-level initializer may itself contain function literals with
+	// their own locals; assign canonical binding identities over the whole
+	// initializer so those bindings draw allocated names too.
+	b.assignBindings(e, nil)
 	return b.buildExprAs(e, expected)
 }
