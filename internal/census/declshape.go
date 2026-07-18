@@ -284,6 +284,14 @@ func shapeType(info *types.Info, s *ast.TypeSpec, kind, id string, stats *fileSt
 		// parameters free and fail closed. A non-generic alias unaliases
 		// internally to the same transparent target.
 		shape := AliasShape{ID: id, Target: ts(object.Type())}
+		// The DECLARATION domain: the alias's own type parameters and their
+		// constraints. Two generic aliases with the same transparent Target
+		// but different parameters/constraints are DISTINCT declarations even
+		// though their instantiated use-site targets coincide.
+		if alias, ok := object.Type().(*types.Alias); ok {
+			binders := typeid.AliasBinders(alias)
+			shape.TypeParams = typeParamShapesIn(alias.TypeParams(), binders, &terr)
+		}
 		if terr != nil {
 			return terr
 		}

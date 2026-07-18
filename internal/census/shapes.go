@@ -84,9 +84,17 @@ type FuncLitShape struct {
 }
 
 // AliasShape is one type alias and its target.
+// AliasShape is one type alias's DECLARATION evidence. ID is the alias's
+// own declaration identity (owner package + name). Target is the
+// transparent type it denotes (the use-site domain: two aliases with equal
+// targets share it). TypeParams carries the alias's own type parameters and
+// their constraints — the DECLARATION domain — so two generic aliases with
+// the same target but different parameters/constraints stay distinct even
+// though their instantiated use-site targets coincide.
 type AliasShape struct {
-	ID     string `json:"id"`
-	Target string `json:"target"`
+	ID         string           `json:"id"`
+	Target     string           `json:"target"`
+	TypeParams []TypeParamShape `json:"typeParams,omitempty"`
 }
 
 // DeclarationShapes is the complete typed declaration contract, published
