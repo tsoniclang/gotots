@@ -75,7 +75,7 @@ func newModule(modulePath, pkgPath, pkgName string, unit ir.Scope, context *pack
 		entries := obligation.MethodKeys()
 		methods := make([]emit.ExternMethod, 0, len(entries))
 		for _, entry := range entries {
-			methods = append(methods, emit.ExternMethod{Name: entry.Method.Name(), Key: entry.Key})
+			methods = append(methods, emit.ExternMethod{Name: entry.Method.Name(), Key: entry.Key, Slot: entry.Slot})
 		}
 		externMethods[obligation.Pkg+"."+obligation.Name] = methods
 	}

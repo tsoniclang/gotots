@@ -318,7 +318,8 @@ func (p *printer) boxVtable(r ir.RttiRef) (string, error) {
 			if method.Adapter == "" {
 				continue
 			}
-			entries = append(entries, method.Name+": "+method.Adapter)
+			slot := requireIdentity(method.Slot, "external vtable slot for "+method.Name)
+			entries = append(entries, slot+": "+method.Adapter)
 		}
 		return "{ " + joinComma(entries) + " }", nil
 	case r.Pointer:
@@ -423,7 +424,8 @@ func (p *printer) ifaceUnionAlias(t ir.Type) (string, error) {
 			entries := []string{}
 			for _, method := range p.module.ExternMethods[member.Pkg+"."+member.Type] {
 				if method.AdapterType != "" {
-					entries = append(entries, method.Name+": "+method.AdapterType)
+					slot := requireIdentity(method.Slot, "external vtable-type slot for "+method.Name)
+					entries = append(entries, slot+": "+method.AdapterType)
 				}
 			}
 			vtable = "{ " + joinComma(entries) + " }"

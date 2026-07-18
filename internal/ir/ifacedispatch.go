@@ -336,7 +336,14 @@ func (b *builder) ifaceMembers(iface *types.Interface, span Span) ([]IfaceMember
 		if !ok || (named.TypeParams() != nil && named.TypeParams().Len() > 0) {
 			continue
 		}
-		register := func(pointer bool) {
+		// register records each interface method as a stub obligation for
+		// this external implementer. It mirrors the fail-closed discipline of
+		// the owned-member `add` path: membership was established by
+		// types.Implements, so every interface method MUST resolve — a missing
+		// selection is an invariant violation, a generic satisfying signature
+		// is an unsupported external contract, and a canonical-identity
+		// failure propagates. None is a silently dropped obligation.
+		register := func(pointer bool) error {
 			var t types.Type = named
 			if pointer {
 				t = types.NewPointer(named)
@@ -346,27 +353,38 @@ func (b *builder) ifaceMembers(iface *types.Interface, span Span) ([]IfaceMember
 				method := iface.Method(i)
 				selection := lookupSelection(set, method.Pkg(), method.Name())
 				if selection == nil {
-					continue
+					return fmt.Errorf("ir: external member %s implements %s but has no selection for method %s",
+						named.Obj().Name(), key, method.Name())
 				}
 				fn := selection.Obj().(*types.Func)
 				sig := fn.Type().(*types.Signature)
 				if (sig.TypeParams() != nil && sig.TypeParams().Len() > 0) || SignatureMentionsTypeParam(sig) {
-					continue // no single exact adapter
+					// No single exact adapter over the stub export: fail closed
+					// for the using body rather than dropping the obligation.
+					return &Unsupported{Kind: KindGenericExternalMethodCall, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+						Construct: "generic external method call", Span: span}
 				}
-				b.unit.AddExternalMethod(named.Obj().Pkg().Path(), named.Obj().Name(), fn)
+				if err := b.unit.AddExternalMethod(named, fn); err != nil {
+					return err
+				}
 			}
+			return nil
 		}
 		if types.Implements(named, iface) {
 			if err := add(named, false); err != nil {
 				return nil, err
 			}
-			register(false)
+			if err := register(false); err != nil {
+				return nil, err
+			}
 		}
 		if types.Implements(types.NewPointer(named), iface) {
 			if err := add(named, true); err != nil {
 				return nil, err
 			}
-			register(true)
+			if err := register(true); err != nil {
+				return nil, err
+			}
 		}
 	}
 	sort.Slice(members, func(i, j int) bool { return members[i].K < members[j].K })

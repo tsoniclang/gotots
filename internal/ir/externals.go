@@ -75,7 +75,9 @@ func (b *builder) buildExternalMethodCall(n *ast.CallExpr, selector *ast.Selecto
 		return nil, &Unsupported{Kind: KindCallToAGenericExternalMethod, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
 			Construct: "call to a generic external method (" + method.Name() + ")", Span: span}
 	}
-	b.unit.AddExternalMethod(recvNamed.Obj().Pkg().Path(), recvNamed.Obj().Name(), method)
+	if err := b.unit.AddExternalMethod(recvNamed, method); err != nil {
+		return nil, err
+	}
 	out := &ExternalMethodCall{
 		Pkg:         recvNamed.Obj().Pkg().Path(),
 		TypeName:    recvNamed.Obj().Name(),

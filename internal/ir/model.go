@@ -214,6 +214,12 @@ type ExternTypeObligation struct {
 	// display collision fails closed at emission (SortedMethods reports
 	// them so the stub builder can detect it).
 	methods map[string]*types.Func
+	// slots maps the same MethodKey to the method's canonical dispatch
+	// SLOT within the external type's method set (MethodSlot). The box
+	// vtable is keyed by this slot — the SAME selector interface dispatch
+	// uses (IfaceMember.Slots) — so a same-bare-name promotion never
+	// collapses two adapter entries onto one property or misses at dispatch.
+	slots map[string]string
 }
 
 // NewScope builds a unit scope over the given package paths.

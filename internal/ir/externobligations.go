@@ -18,32 +18,49 @@ func (s Scope) AddExternalType(pkg, name string) *ExternTypeObligation {
 	id := pkg + "." + name
 	obligation, has := s.externTypes[id]
 	if !has {
-		obligation = &ExternTypeObligation{Pkg: pkg, Name: name, methods: map[string]*types.Func{}}
+		obligation = &ExternTypeObligation{
+			Pkg: pkg, Name: name,
+			methods: map[string]*types.Func{},
+			slots:   map[string]string{},
+		}
 		s.externTypes[id] = obligation
 	}
 	return obligation
 }
 
-// AddExternalMethod records one referenced method of an external type,
-// keyed by its FULL canonical identity (MethodKey) — never its bare Go
-// name. Two distinct methods (e.g. same-spelled unexported methods owned
-// by different packages) are therefore distinct obligation members with
-// distinct keys; neither overwrites the other, and there is no bare-name
-// fallback. A method whose identity cannot be resolved fails closed
-// through a poison key that emission rejects.
-func (s Scope) AddExternalMethod(pkg, name string, method *types.Func) {
-	obligation := s.AddExternalType(pkg, name)
+// AddExternalMethod records one referenced method of the external type
+// `named`, keyed by its FULL canonical identity (MethodKey) — never its
+// bare Go name. Two distinct methods (e.g. same-spelled unexported methods
+// owned by different packages) are therefore distinct obligation members
+// with distinct keys; neither overwrites the other, and there is no
+// bare-name fallback. The method's canonical dispatch SLOT within `named`'s
+// method set is recorded alongside, so the box vtable keys by the SAME
+// selector interface dispatch uses. A method whose canonical identity or
+// slot cannot be resolved fails closed IMMEDIATELY: the error propagates
+// through this typed return and nothing is recorded — never an in-band
+// poison key deferred to a downstream rejection.
+func (s Scope) AddExternalMethod(named *types.Named, method *types.Func) error {
 	key, err := MethodKey(method)
 	if err != nil {
-		key = "\x00unresolved\x00" + method.Name()
+		return err
 	}
+	slot, err := MethodSlot(named, method)
+	if err != nil {
+		return err
+	}
+	obligation := s.AddExternalType(named.Obj().Pkg().Path(), named.Obj().Name())
 	obligation.methods[key] = method
+	obligation.slots[key] = slot
+	return nil
 }
 
-// ExternMethodEntry pairs one external method with its canonical key —
-// the join key between dispatch, vtable, and stub emission.
+// ExternMethodEntry pairs one external method with its canonical key and
+// dispatch slot — the join keys between dispatch, vtable, and stub
+// emission. Slot is the box-vtable property name (== IfaceMember.Slots),
+// so no consumer re-derives it from the bare method name.
 type ExternMethodEntry struct {
 	Key    string
+	Slot   string
 	Method *types.Func
 }
 
@@ -72,7 +89,7 @@ func (o *ExternTypeObligation) MethodKeys() []ExternMethodEntry {
 	sort.Strings(keys)
 	out := make([]ExternMethodEntry, 0, len(keys))
 	for _, key := range keys {
-		out = append(out, ExternMethodEntry{Key: key, Method: o.methods[key]})
+		out = append(out, ExternMethodEntry{Key: key, Slot: o.slots[key], Method: o.methods[key]})
 	}
 	return out
 }

@@ -25,6 +25,10 @@ type BoxedComposite struct {
 type ExternMethod struct {
 	Name string
 	Key  string
+	// Slot is the canonical box-vtable property name (== IfaceMember.Slots),
+	// so a same-bare-name promotion keeps distinct adapter entries and
+	// dispatch resolves to the right one. Never the bare Go name.
+	Slot string
 	// Adapter is the pre-spelled exactly typed vtable arrow delegating
 	// to the stub export (built where the obligation's signature is
 	// known); AdapterType is its exact arrow TYPE for union-member

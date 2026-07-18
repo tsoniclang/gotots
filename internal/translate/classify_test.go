@@ -20,7 +20,16 @@ func TestDispositionByKindTotal(t *testing.T) {
 		catExternalContract: true,
 		catProductPolicy:    true,
 	}
-	for _, kind := range ir.AllUnsupportedKinds() {
+	all := ir.AllUnsupportedKinds()
+	// Exact-size pin: combined with the range membership loop below, this
+	// proves the table is total AND has no phantom entry. A kind added to
+	// the enum but omitted from dispositionByKind makes the sizes differ
+	// and classifySite return unclassified — it cannot evade this test.
+	if len(dispositionByKind) != len(all) {
+		t.Fatalf("dispositionByKind has %d entries; the enum has %d kinds — a kind is missing or extra",
+			len(dispositionByKind), len(all))
+	}
+	for _, kind := range all {
 		category, root := classifySite(kind)
 		if category == catUnclassified {
 			t.Errorf("kind %q (%d) has no reviewed disposition; add it to dispositionByKind", kind, kind)
