@@ -306,6 +306,15 @@ func printMethodFunction(out *strings.Builder, module *Module, className string,
 	p.slicePlans = method.SlicePlans
 	p.line("%sfunction %s$%s%s(%s): %s {", export, className, method.Name, generics, strings.Join(params, ", "), result)
 	p.indent++
+	if method.Placeholder {
+		// A materialized placeholder renders its exact signature and a
+		// fail-closed throw only — never the receiver preamble or the
+		// (absent or partial) real body.
+		p.printPlaceholderBody(method.ID)
+		p.indent--
+		p.line("}")
+		return nil
+	}
 	if len(method.TypeParams) > 0 {
 		p.zeroFactories = map[string]string{}
 		p.eqOps = map[string]string{}

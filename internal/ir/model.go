@@ -465,6 +465,13 @@ type Func struct {
 	// unsupported operation when the state is unimplemented.
 	Support SupportState
 	Sites   []UnsupportedSite
+	// Placeholder marks a body materialized as a typed throwing stub: its
+	// signature is exact and typechecks, but the body is a fail-closed
+	// goBodyUnimplemented call because at least one operation is outside the
+	// reviewed subset. The emitter renders the signature and the throw, not
+	// the (absent or partial) real body. A placeholder is materialized for
+	// ANALYSIS; its package stays publication-withheld.
+	Placeholder bool
 	// Operations is the sorted set of IR operation names the body uses,
 	// recorded in the proof chain.
 	Operations []string

@@ -331,12 +331,22 @@ func printFunc(out *strings.Builder, module *Module, function *ir.Func) error {
 			p.eqOps[param] = "eq$" + param
 		}
 	}
-	if err := p.printDeferWrappedBody(function.Body, function.UsesDeferStack); err != nil {
+	if function.Placeholder {
+		p.printPlaceholderBody(function.ID)
+	} else if err := p.printDeferWrappedBody(function.Body, function.UsesDeferStack); err != nil {
 		return fmt.Errorf("%s: %w", function.ID, err)
 	}
 	p.indent--
 	p.line("}")
 	return nil
+}
+
+// printPlaceholderBody emits the fail-closed body of a materialized
+// placeholder: a single call to the never-returning ABI helper, so the
+// declaration typechecks against any declared return type while calling it
+// fails closed with the body's exact identity.
+func (p *printer) printPlaceholderBody(id string) {
+	p.line("gort$.goBodyUnimplemented(%q);", id)
 }
 
 func (p *printer) functionSignature(function *ir.Func) (string, error) {

@@ -13,7 +13,7 @@ package abi
 import "fmt"
 
 // Version identifies the ABI contract carried in generated output.
-const Version = 23
+const Version = 24
 
 // Family is the static carrier family of an integer kind.
 type Family string
@@ -185,6 +185,16 @@ export function goMapClear<K, V>(m: GoMap<K, V>): void {
 // strings, canonical-range and bigint integers, and booleans.
 export function goPanicValue(value: string | number | bigint | boolean): never {
   throw new GoPanic(String(value));
+}
+
+// goBodyUnimplemented is the body of a materialized-but-not-yet-lowered
+// declaration: the signature is exact and typechecks, but the body has an
+// operation outside the reviewed subset, so calling it fails closed. It is
+// an ANALYSIS placeholder — the package is publication-withheld until the
+// body is genuinely lowered — never a silently wrong result. Returns never,
+// so a single call satisfies any declared return type.
+export function goBodyUnimplemented(id: string): never {
+  throw new GoPanic("GOTOTS_BODY_UNIMPLEMENTED: " + id);
 }
 
 // panic(err): the message is the error's dynamic Error() result — the
