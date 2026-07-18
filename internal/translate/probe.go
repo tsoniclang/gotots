@@ -19,9 +19,11 @@ import (
 )
 
 // ProbeResult measures how much of the real corpus the current reviewed
-// subset translates, and ranks exactly what blocks the rest. It is
-// diagnostic evidence for roadmap ordering — never authoritative
-// generation, which requires complete package coverage.
+// subset IR-admits (constructs typed IR for), and ranks exactly what
+// blocks the rest. It is diagnostic evidence for roadmap ordering — never
+// authoritative generation, which requires complete package coverage AND
+// executed emission. IR admission never implies emission, typechecking, or
+// usability.
 type ProbeResult struct {
 	// Diagnostic marks this report as a development probe, never
 	// acceptance evidence: it carries no body ledger or manifest and is
@@ -43,15 +45,17 @@ type ProbeResult struct {
 	// ConstructHistogram counts the raw (unnormalized) construct
 	// spellings, ranking the exact shapes inside each blocker class.
 	ConstructHistogram map[string]int `json:"constructHistogram"`
-	// PackagesFullyTranslated lists packages whose COMPLETE declaration
-	// set translates — verified by running the package translation, not
-	// just body IR construction.
-	PackagesFullyTranslated []string `json:"packagesFullyTranslated"`
+	// PackagesIRDeclComplete lists packages that are IR/declaration-complete
+	// CANDIDATES: every declaration (bodies plus declaration-level
+	// initializers/types/vars) constructed its typed IR. This is an ANALYSIS
+	// candidacy, NOT emission — the deferred emitters are not executed here,
+	// so these packages are not proven emitted, typechecked, or usable.
+	PackagesIRDeclComplete []string `json:"packagesIRDeclComplete"`
 	// PackagesBodyOnly lists packages where every body builds but a
 	// declaration-level construct (initializer, type, var) still blocks
-	// full translation, with the blocking diagnostic.
+	// IR/declaration completeness, with the blocking diagnostic.
 	PackagesBodyOnly []string `json:"packagesBodyOnly"`
-	// PerPackage maps package path -> translated/total.
+	// PerPackage maps package path -> ir-admitted/total bodies.
 	PerPackage map[string]string `json:"perPackage"`
 	// PackageBlockers lists, for packages close to full body coverage
 	// (at most three blocked bodies), each blocked body's sites — the
@@ -61,7 +65,7 @@ type ProbeResult struct {
 	// method (pkg.Name) — the evidence ranking emulation-layer priorities.
 	ExternalRefs map[string]int `json:"externalRefs"`
 	// PerBodyState maps each body's canonical identity to its probe
-	// classification ("generated" or "unimplemented"), the join key for
+	// classification ("ir-admitted" or "unimplemented"), the join key for
 	// reconciling probe results against corpus support ledgers.
 	PerBodyState map[string]string `json:"perBodyState"`
 	// ClassInventory summarizes every unsupported class blocking the
@@ -371,7 +375,7 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 			continue
 		}
 		result.Packages++
-		packageBodies, packageTranslated := 0, 0
+		packageBodies, packageIRAdmitted := 0, 0
 		var packageSites []string
 
 		for _, file := range p.Syntax {
@@ -416,21 +420,21 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 					result.UnimplementedUnits = append(result.UnimplementedUnits, unitInv)
 				} else {
 					result.IRAdmitted++
-					packageTranslated++
+					packageIRAdmitted++
 				}
 			}
 		}
 		if packageBodies > 0 {
-			result.PerPackage[p.PkgPath] = fmt.Sprintf("%d/%d", packageTranslated, packageBodies)
-			if packageTranslated == packageBodies {
-				result.PackagesFullyTranslated = append(result.PackagesFullyTranslated, p.PkgPath)
+			result.PerPackage[p.PkgPath] = fmt.Sprintf("%d/%d", packageIRAdmitted, packageBodies)
+			if packageIRAdmitted == packageBodies {
+				result.PackagesIRDeclComplete = append(result.PackagesIRDeclComplete, p.PkgPath)
 			}
-			if blocked := packageBodies - packageTranslated; blocked > 0 && blocked <= 3 {
+			if blocked := packageBodies - packageIRAdmitted; blocked > 0 && blocked <= 3 {
 				result.PackageBlockers[p.PkgPath] = packageSites
 			}
 		}
 	}
-	sort.Strings(result.PackagesFullyTranslated)
+	sort.Strings(result.PackagesIRDeclComplete)
 
 	// Body IR alone is not package translatability: initializers, type
 	// declarations, and package variables all count. Every candidate is
@@ -441,8 +445,8 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 			byPath[p.PkgPath] = p
 		}
 	}
-	verified := make([]string, 0, len(result.PackagesFullyTranslated))
-	for _, candidate := range result.PackagesFullyTranslated {
+	verified := make([]string, 0, len(result.PackagesIRDeclComplete))
+	for _, candidate := range result.PackagesIRDeclComplete {
 		throwaway := &Generated{Files: map[string]string{}, Ownership: map[string]string{}, Withheld: map[string]string{}}
 		var emitters []func() error
 		if err := translatePackage(throwaway, byPath[candidate], sourceDir, unit, Options{}, &emitters); err != nil {
@@ -462,7 +466,7 @@ func Probe(prof *profile.Profile, env []string, sourceDir string) (*ProbeResult,
 		}
 		verified = append(verified, candidate)
 	}
-	result.PackagesFullyTranslated = verified
+	result.PackagesIRDeclComplete = verified
 	result.ClassInventory = buildClassInventory(result)
 	return result, nil
 }

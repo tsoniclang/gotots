@@ -272,7 +272,7 @@ func (b *builder) finalize(function *Func) *Func {
 		function.Support = SupportUnimplemented
 		function.Body = nil
 	} else {
-		function.Support = SupportGenerated
+		function.Support = SupportIRAdmitted
 		function.SlicePlans = AnalyzeSlicePlans(function)
 	}
 	return function

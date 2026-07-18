@@ -221,7 +221,7 @@ func collectLits(p *packages.Package, f fileSource, node ast.Node, parentID stri
 		// The span covers the WHOLE literal — the func keyword, parameter
 		// and result lists, and the body — so a rejection anywhere in the
 		// signature (an unsupported parameter or result type) is contained
-		// by the literal and does not fail open to "generated".
+		// by the literal and does not fail open to "ir-admitted".
 		startPos := p.Fset.Position(lit.Pos())
 		endPos := p.Fset.Position(lit.End())
 		if startPos.Offset < 0 || endPos.Offset > len(f.source) || startPos.Offset >= endPos.Offset {
@@ -235,7 +235,7 @@ func collectLits(p *packages.Package, f fileSource, node ast.Node, parentID stri
 		}
 		digest := sha256.Sum256(f.source[startPos.Offset:endPos.Offset])
 		bodyHash := hex.EncodeToString(digest[:])
-		state := "generated"
+		state := string(ir.SupportIRAdmitted)
 		if parentState == ir.SupportUnimplemented {
 			state = "unimplemented"
 			// A parent with site records may still have literals outside
@@ -244,7 +244,7 @@ func collectLits(p *packages.Package, f fileSource, node ast.Node, parentID stri
 			// A parent with no sites (declaration-level rejection) blocks
 			// everything inside it.
 			if len(parentSites) > 0 {
-				state = "generated"
+				state = string(ir.SupportIRAdmitted)
 				for _, site := range parentSites {
 					if site.Span.File != f.relative {
 						continue

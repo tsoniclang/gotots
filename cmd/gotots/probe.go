@@ -63,7 +63,7 @@ func runTranslateProbe(args []string) error {
 		result.Bodies, result.IRAdmitted,
 		100*float64(result.IRAdmitted)/float64(result.Bodies), result.Blocked, result.Packages)
 	fmt.Println("NOTE: ir-admitted is not module-retained coverage; package withholding removes bodies from runnable output (see gate census).")
-	fmt.Printf("declaration-verified packages (ir stage, pre-withholding): %d %v\n", len(result.PackagesFullyTranslated), result.PackagesFullyTranslated)
+	fmt.Printf("IR/declaration-complete candidate packages (analysis only, deferred emitters NOT executed): %d %v\n", len(result.PackagesIRDeclComplete), result.PackagesIRDeclComplete)
 	type entry struct {
 		key   string
 		count int

@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/tsoniclang/gotots/internal/census"
+	"github.com/tsoniclang/gotots/internal/ir"
 	"github.com/tsoniclang/gotots/internal/profile"
 	"github.com/tsoniclang/gotots/internal/translate"
 )
@@ -162,15 +163,18 @@ func reconcileDispositions(prof *profile.Profile, firstRun *census.Result, gener
 		}
 	}
 	for _, proof := range generated.Proofs {
-		// A proof states "generated"; it must not contradict a
-		// recorded unimplemented support state for the same identity.
+		// A proof states the identity was LOWERED (IR-admitted, its typed IR
+		// constructed); it must not contradict a recorded unimplemented
+		// support state for the same identity. "Lowered" is an analysis
+		// disposition and makes no emission claim — the proof's own
+		// module-retention stage is verified separately above.
 		if prior, has := covered[proof.ID]; has {
-			if prior != "generated" {
-				conflicts = append(conflicts, fmt.Sprintf("%s: proof=generated vs support=%s", proof.ID, prior))
+			if prior != string(ir.SupportIRAdmitted) {
+				conflicts = append(conflicts, fmt.Sprintf("%s: proof=ir-admitted vs support=%s", proof.ID, prior))
 			}
 			continue
 		}
-		covered[proof.ID] = "generated"
+		covered[proof.ID] = string(ir.SupportIRAdmitted)
 	}
 	retention := map[string]string{}
 	for _, proof := range generated.Proofs {
@@ -293,7 +297,7 @@ func reconcileDispositions(prof *profile.Profile, firstRun *census.Result, gener
 		}
 	}
 	details = append(details,
-		fmt.Sprintf("evidence-stage ir-admitted (declarations disposed): %d", counts["generated"]+counts["accepted-manual"]),
+		fmt.Sprintf("evidence-stage ir-admitted (declarations disposed): %d", counts[string(ir.SupportIRAdmitted)]+counts["accepted-manual"]),
 		fmt.Sprintf("evidence-stage module-retained (disposed, in emitted packages): %d", counts["stage:module-retained"]),
 		fmt.Sprintf("evidence-stage module-retained-blocked (disposed, in withheld packages): %d", counts["stage:module-retained-blocked"]),
 		fmt.Sprintf("packages emitted (module-retained): %d", emittedPackages),

@@ -1,5 +1,5 @@
 // The probe/corpus classification join: both walks classify every
-// production body by the same canonical identity, and their generated /
+// production body by the same canonical identity, and their lowered /
 // unimplemented verdicts must agree one-to-one — no body may be
 // explained away as "different tools". Requires the pinned corpus
 // checkout, so it runs when GOTOTS_CORPUS_DIR is set (the gate's
@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/goenv"
+	"github.com/tsoniclang/gotots/internal/ir"
 	"github.com/tsoniclang/gotots/internal/pinning"
 	"github.com/tsoniclang/gotots/internal/profile"
 	"github.com/tsoniclang/gotots/internal/translate"
@@ -54,7 +55,7 @@ func TestProbeCorpusClassificationsJoinExactly(t *testing.T) {
 			t.Errorf("probe body %s has no corpus support record", id)
 			continue
 		}
-		if (probeState == "generated") != (corpus == "generated") {
+		if (probeState == string(ir.SupportIRAdmitted)) != (corpus == string(ir.SupportIRAdmitted)) {
 			t.Errorf("classification disagreement at %s: probe=%s corpus=%s", id, probeState, corpus)
 			continue
 		}

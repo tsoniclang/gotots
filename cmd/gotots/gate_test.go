@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/census"
+	"github.com/tsoniclang/gotots/internal/ir"
 	"github.com/tsoniclang/gotots/internal/translate"
 )
 
@@ -196,11 +197,11 @@ func TestReconcileDispositionsForgedEvidence(t *testing.T) {
 			g.Proofs = append(g.Proofs, g.Proofs[0])
 		}, "duplicate proof record"},
 		{"duplicate support", func(g *translate.Generated) {
-			g.Support = []translate.BodySupport{{ID: "x", State: "generated"}, {ID: "x", State: "generated"}}
+			g.Support = []translate.BodySupport{{ID: "x", State: ir.SupportIRAdmitted}, {ID: "x", State: ir.SupportIRAdmitted}}
 		}, "duplicate support record"},
-		{"conflicting states", func(g *translate.Generated) {
-			g.Support = []translate.BodySupport{{ID: "p::func::F", State: "unimplemented"}}
-		}, "proof=generated vs support"},
+		{"conflicting states (proof vs unimplemented)", func(g *translate.Generated) {
+			g.Support = []translate.BodySupport{{ID: "p::func::F", State: ir.SupportUnimplemented}}
+		}, "proof=ir-admitted vs support"},
 		{"phantom generated file", func(g *translate.Generated) {
 			g.Proofs[0].GeneratedFile = "core/p/absent.ts"
 		}, "phantom generated file"},

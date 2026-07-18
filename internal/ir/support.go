@@ -1,12 +1,19 @@
 package ir
 
-// SupportState is the implementation support of one selected body.
+// SupportState is the implementation support of one selected body. It
+// records how far the body advanced through the compiler's ANALYSIS,
+// never whether an artifact was emitted: "ir-admitted" means the complete
+// typed semantic IR was constructed (spec evidence stage `ir-admitted`),
+// NOT that any TypeScript body AST was lowered, emitted, typechecked, or
+// retained — those are later, separately-tracked evidence stages.
 type SupportState string
 
 const (
-	// SupportGenerated: the complete body lowered through the reviewed
-	// subset.
-	SupportGenerated SupportState = "generated"
+	// SupportIRAdmitted: the complete body constructed its typed semantic
+	// IR (the spec `ir-admitted` evidence stage). This is an ANALYSIS
+	// outcome; it makes no claim that the body was lowered to a TypeScript
+	// AST, emitted, typechecked, or published.
+	SupportIRAdmitted SupportState = "ir-admitted"
 	// SupportUnimplemented: at least one semantic operation has no
 	// accepted lowering; every such site is recorded and no runnable
 	// body is emitted.

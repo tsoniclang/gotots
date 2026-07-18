@@ -459,14 +459,14 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 				function.Name = fmt.Sprintf("init$%d", len(initCalls))
 				// The proof records the exact emitted symbol.
 				proof.GeneratedSymbol = function.Name
-				if function.Support == ir.SupportGenerated {
+				if function.Support == ir.SupportIRAdmitted {
 					initCalls = append(initCalls, function.Name)
 				}
 			}
 			ledger = append(ledger, BodySupport{
 				ID: function.ID, Package: p.PkgPath, State: function.Support, Sites: function.Sites,
 			})
-			if function.Support == ir.SupportGenerated {
+			if function.Support == ir.SupportIRAdmitted {
 				registry, err := supportRegistry()
 				if err != nil {
 					return err

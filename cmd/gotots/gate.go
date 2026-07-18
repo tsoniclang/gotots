@@ -390,7 +390,7 @@ func runGate(args []string) error {
 		states := map[string]int{}
 		for _, support := range corpusGenerated.Support {
 			switch support.State {
-			case ir.SupportGenerated, ir.SupportUnimplemented:
+			case ir.SupportIRAdmitted, ir.SupportUnimplemented:
 				states[string(support.State)]++
 			default:
 				return "fail", []string{support.ID}, fmt.Errorf("unit carries unreviewed support state %q", support.State)
@@ -402,8 +402,8 @@ func runGate(args []string) error {
 		details := []string{
 			fmt.Sprintf("ownership: core %d, language-abi %d, external-contracts %d",
 				ownership["generated-core"], ownership["generated-language-abi"], ownership["generated-external-contracts"]),
-			fmt.Sprintf("support: generated %d, unimplemented %d (every site on record)",
-				states["generated"], states["unimplemented"]),
+			fmt.Sprintf("support: ir-admitted (not emitted) %d, unimplemented %d (every site on record)",
+				states[string(ir.SupportIRAdmitted)], states[string(ir.SupportUnimplemented)]),
 			fmt.Sprintf("withheld packages: %d (transitive closure over dependents)", len(corpusGenerated.Withheld)),
 			"manual and extension ownership classes: none declared yet (no artifacts to verify)",
 		}
