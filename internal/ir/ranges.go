@@ -58,7 +58,7 @@ func (b *builder) buildRange(n *ast.RangeStmt) (Stmt, error) {
 		if _, isBoxed := b.boxedVar(ident); isBoxed {
 			return "", &Unsupported{Kind: KindAddressOfARangeVariable, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "address of a range variable", Span: span}
 		}
-		return ident.Name, nil
+		return b.bindNameOf(ident), nil
 	}
 	if out.Index, err = name(n.Key); err != nil {
 		return nil, err
@@ -137,7 +137,7 @@ func (b *builder) buildRangeMap(n *ast.RangeStmt, operand Expr) (Stmt, error) {
 		if _, isBoxed := b.boxedVar(ident); isBoxed {
 			return "", &Unsupported{Kind: KindAddressOfARangeVariable, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "address of a range variable", Span: span}
 		}
-		return ident.Name, nil
+		return b.bindNameOf(ident), nil
 	}
 	var err error
 	if out.Key, err = name(n.Key); err != nil {
@@ -206,7 +206,7 @@ func (b *builder) buildRangeFunc(n *ast.RangeStmt, operand Expr) (Stmt, error) {
 		if _, isBoxed := b.boxedVar(ident); isBoxed {
 			return "", &Unsupported{Kind: KindAddressOfARangeVariable, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "address of a range variable", Span: span}
 		}
-		return ident.Name, nil
+		return b.bindNameOf(ident), nil
 	}
 	var err error
 	if out.Key, err = name(n.Key); err != nil {

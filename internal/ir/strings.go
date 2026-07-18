@@ -69,7 +69,7 @@ func (b *builder) buildRangeString(n *ast.RangeStmt, operand Expr) (Stmt, error)
 		if ident.Name == "_" {
 			return "", nil
 		}
-		return ident.Name, nil
+		return b.bindNameOf(ident), nil
 	}
 	var err error
 	if out.Index, err = name(n.Key); err != nil {

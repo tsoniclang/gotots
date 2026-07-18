@@ -208,7 +208,7 @@ func (b *builder) buildTypeSwitch(n *ast.TypeSwitchStmt) (Stmt, error) {
 	case *ast.AssignStmt:
 		bind := guard.Lhs[0].(*ast.Ident)
 		if bind.Name != "_" {
-			out.Bind = bind.Name
+			out.Bind = b.bindNameOf(bind)
 		}
 		assertion = guard.Rhs[0].(*ast.TypeAssertExpr)
 	default:

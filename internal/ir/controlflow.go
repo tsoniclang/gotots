@@ -38,7 +38,7 @@ func (b *builder) buildDeclStmt(n *ast.DeclStmt) (Stmt, error) {
 			if err != nil {
 				return nil, err
 			}
-			out.Names = append(out.Names, name.Name)
+			out.Names = append(out.Names, b.bindNameOf(name))
 			out.Types = append(out.Types, t)
 			if i < len(value.Values) {
 				built, err := b.buildExprAs(value.Values[i], t)

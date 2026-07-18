@@ -386,9 +386,12 @@ func (b *builder) buildVarRef(variable *types.Var, name string, span Span) (Expr
 	}
 	if pkg == "" && b.boxed[variable] && boxable(t.Kind) {
 		b.use("boxedLoad")
-		return &BoxedLoad{Cell: cellName(name), T: t}, nil
+		return &BoxedLoad{Cell: cellName(b.bindNameVar(variable, name)), T: t}, nil
 	}
 	b.use("varRef")
+	if pkg == "" {
+		name = b.bindNameVar(variable, name)
+	}
 	return &VarRef{Name: name, Pkg: pkg, T: t}, nil
 }
 

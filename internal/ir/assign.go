@@ -40,13 +40,17 @@ func (b *builder) buildTarget(lhs ast.Expr) (Target, error) {
 		}
 		if _, isBoxed := b.boxedVar(n); isBoxed && boxable(t.Kind) {
 			b.use("boxedStore")
-			return BoxedTarget{Cell: cellName(n.Name), T: t}, nil
+			return BoxedTarget{Cell: cellName(b.bindNameOf(n)), T: t}, nil
 		}
 		pkg := ""
 		if variable.Pkg() != nil && variable.Parent() == variable.Pkg().Scope() {
 			pkg = variable.Pkg().Path()
 		}
-		return VarTarget{Name: n.Name, Pkg: pkg, T: t}, nil
+		name := n.Name
+		if pkg == "" {
+			name = b.bindNameOf(n)
+		}
+		return VarTarget{Name: name, Pkg: pkg, T: t}, nil
 
 	case *ast.SelectorExpr:
 		selection, ok := b.info.Selections[n]
@@ -196,7 +200,7 @@ func (b *builder) buildAssign(n *ast.AssignStmt) (Stmt, error) {
 			if err != nil {
 				return nil, err
 			}
-			out.Names = append(out.Names, target.Name)
+			out.Names = append(out.Names, b.bindNameOf(target))
 			out.Types = append(out.Types, t)
 			for len(out.Reused) < len(out.Names) {
 				out.Reused = append(out.Reused, false)

@@ -29,6 +29,7 @@ func (b *builder) buildClosure(lit *ast.FuncLit) (Expr, error) {
 		operations: b.operations,
 		sites:      b.sites,
 		boxed:      b.boxed,
+		bind:       b.bind,
 		genericObj: b.genericObj,
 		binders:    b.binders,
 	}
@@ -42,6 +43,8 @@ func (b *builder) buildClosure(lit *ast.FuncLit) (Expr, error) {
 			// A discarded parameter binds a synthetic name no Go source
 			// can spell or reference.
 			name = fmt.Sprintf("$discard%d", i)
+		} else {
+			name = child.bindNameVar(parameter, name)
 		}
 		parameterType, err := child.typeOf(parameter.Type(), span)
 		if err != nil {
@@ -62,11 +65,15 @@ func (b *builder) buildClosure(lit *ast.FuncLit) (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		out.Results = append(out.Results, Var{Name: result.Name(), Type: resultType})
+		resultName := result.Name()
+		if resultName != "" {
+			resultName = child.bindNameVar(result, resultName)
+		}
+		out.Results = append(out.Results, Var{Name: resultName, Type: resultType})
 		child.results = append(child.results, resultType)
 		child.resultGoTypes = append(child.resultGoTypes, result.Type())
 		if result.Name() != "" {
-			child.namedResults = append(child.namedResults, Var{Name: result.Name(), Type: resultType})
+			child.namedResults = append(child.namedResults, Var{Name: resultName, Type: resultType})
 		}
 	}
 

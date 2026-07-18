@@ -54,6 +54,11 @@ type builder struct {
 	// carriers among them live in mutable cells (shared with closure
 	// child builders — an inner &x may address an outer variable).
 	boxed map[*types.Var]bool
+	// bind is this top-level function's canonical binding-identity table
+	// and emission-name allocator (shared with closure child builders so
+	// captured variables resolve to their outer name and a closure's own
+	// bindings allocate from the same function-wide name space).
+	bind *bindings
 	// genericObj is the generic function being built, when there is one:
 	// type-parameter admissions (map keys) consult its closed-world
 	// instantiation evidence.
@@ -165,6 +170,13 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 		b.genericObj = object
 	}
 
+	// Canonical binding identity: one deterministic walk assigns every
+	// source binding an id and a unique emission name, so shadowing never
+	// collapses two objects to one identifier. It runs before the receiver,
+	// parameter, and result bindings are spelled so they draw allocated
+	// names.
+	b.assignBindings(decl, function.TypeParams)
+
 	if recv := signature.Recv(); recv != nil {
 		_, function.PointerReceiver = recv.Type().(*types.Pointer)
 		if recvParams := signature.RecvTypeParams(); recvParams != nil {
@@ -190,6 +202,8 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 		recvName := recv.Name()
 		if recvName == "" || recvName == "_" {
 			recvName = "_recv$"
+		} else {
+			recvName = b.bindNameVar(recv, recvName)
 		}
 		recvType, err := b.typeOf(recv.Type(), span)
 		if err != nil {
@@ -212,6 +226,8 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 		paramName := parameter.Name()
 		if paramName == "" || paramName == "_" {
 			paramName = fmt.Sprintf("_blank%d$", i)
+		} else {
+			paramName = b.bindNameVar(parameter, paramName)
 		}
 		t, err := b.typeOf(parameter.Type(), span)
 		if err != nil {
@@ -232,7 +248,11 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 		if err != nil {
 			return declarationSite(err)
 		}
-		function.Results = append(function.Results, Var{Name: result.Name(), Type: t})
+		resultName := result.Name()
+		if resultName != "" {
+			resultName = b.bindNameVar(result, resultName)
+		}
+		function.Results = append(function.Results, Var{Name: resultName, Type: t})
 		b.results = append(b.results, t)
 		b.resultGoTypes = append(b.resultGoTypes, result.Type())
 		if result.Name() != "" {
@@ -240,7 +260,7 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 				return declarationSite(&Unsupported{Kind: KindAddressOfANamedResult, Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 					Construct: "address of a named result", Span: span})
 			}
-			b.namedResults = append(b.namedResults, Var{Name: result.Name(), Type: t})
+			b.namedResults = append(b.namedResults, Var{Name: resultName, Type: t})
 		}
 	}
 

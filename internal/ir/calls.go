@@ -229,7 +229,7 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 		if ident, isIdent := ast.Unparen(selector.X).(*ast.Ident); isIdent && boxable(recv.Type().Kind) {
 			if _, isBoxed := b.boxedVar(ident); isBoxed {
 				elem := recv.Type()
-				recv = &BoxedRef{Cell: cellName(ident.Name),
+				recv = &BoxedRef{Cell: cellName(b.bindNameOf(ident)),
 					T: Type{Kind: KindPointer, Go: "*" + elem.Go, Named: recvNamed.Obj().Name(), Pkg: method.Pkg().Path(), Elem: &elem}}
 				replaced = true
 			}

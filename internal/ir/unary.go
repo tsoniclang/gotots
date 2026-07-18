@@ -30,7 +30,7 @@ func (b *builder) buildUnary(n *ast.UnaryExpr, resultType types.Type) (Expr, err
 						return nil, err
 					}
 					b.use("boxedRef")
-					return &BoxedRef{Cell: cellName(ident.Name), T: t}, nil
+					return &BoxedRef{Cell: cellName(b.bindNameOf(ident)), T: t}, nil
 				}
 			}
 		}
