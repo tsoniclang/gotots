@@ -366,16 +366,25 @@ func (b *builder) typeParamKeySupported(keyType types.Type, span Span) bool {
 	if len(instances) == 0 {
 		return false
 	}
+	concrete := 0
 	for _, instance := range instances {
 		if param.Index() >= len(instance) {
 			return false
 		}
-		bound, err := b.typeOf(instance[param.Index()], span)
+		arg := instance[param.Index()]
+		if mentionsTypeParamType(arg) {
+			// A free-parameter vector (an instantiation inside another
+			// generic): its concretizations are present in the closed
+			// evidence, so skipping it is sound.
+			continue
+		}
+		concrete++
+		bound, err := b.typeOf(arg, span)
 		if err != nil || !mapKeySupported(bound.Kind) {
 			return false
 		}
 	}
-	return true
+	return concrete > 0
 }
 
 // EqComparableField reports whether one field type participates in the
