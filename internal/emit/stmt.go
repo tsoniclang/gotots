@@ -164,7 +164,8 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		// print inside stageCompoundTarget BEFORE the RHS temp below.
 		var impure strings.Builder
 		operandPrinter := &printer{out: &impure, module: p.module, indent: p.indent,
-			temps: p.temps, zeroFactories: p.zeroFactories, slicePlans: p.slicePlans}
+			temps: p.temps, zeroFactories: p.zeroFactories, eqOps: p.eqOps,
+			cloneOps: p.cloneOps, setOps: p.setOps, slicePlans: p.slicePlans}
 		staged, err := operandPrinter.stageCompoundTarget(n.Target)
 		if err != nil {
 			return err

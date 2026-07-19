@@ -180,6 +180,10 @@ type Scope struct {
 	// across generic instantiations (the address scan sees an instantiated
 	// field object while class emission sees the generic declaration's).
 	addressTakenFields map[string]bool
+	// genericEdges are free-parameter instantiation edges (an
+	// instantiation inside a generic declaration whose arguments mention
+	// the outer parameters), closed by CloseGenericEvidence.
+	genericEdges *[]genericEdge
 	// universeSealed is the closed-world dynamic-type universe's lifecycle
 	// flag (pointer-shared across Scope value copies). It is false while the
 	// pre-pass COLLECTS the named-type universe (concreteTypes,
@@ -237,6 +241,7 @@ func NewScope(paths ...string) Scope {
 		boxedComposites:    map[string]*boxedComposite{},
 		ifaceMembers:       map[string][]IfaceMember{},
 		addressTakenFields: map[string]bool{},
+		genericEdges:       &[]genericEdge{},
 		universeSealed:     new(bool),
 	}
 }

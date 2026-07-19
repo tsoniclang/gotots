@@ -31,19 +31,45 @@ func collectGenericInstances(unit ir.Scope, pkgs []*packages.Package) error {
 		}
 	}
 	for _, p := range pkgs {
+		enclosing := genericDeclRanges(p)
 		for ident, instance := range p.TypesInfo.Instances {
 			args := make([]types.Type, 0, instance.TypeArgs.Len())
 			for i := range instance.TypeArgs.Len() {
 				args = append(args, instance.TypeArgs.At(i))
 			}
+			var inner types.Object
 			switch object := p.TypesInfo.Uses[ident].(type) {
 			case *types.Func:
 				unit.AddGenericInstance(object, args)
+				inner = object
 			case *types.TypeName:
 				unit.AddGenericTypeInstance(object, args)
+				inner = object
+			default:
+				continue
+			}
+			// A vector mentioning type parameters is a FREE-parameter
+			// instantiation inside an enclosing generic declaration: record
+			// the edge so the closure can derive its concretizations.
+			free := false
+			for _, arg := range args {
+				if ir.MentionsTypeParam(arg) {
+					free = true
+					break
+				}
+			}
+			if !free {
+				continue
+			}
+			if outer := enclosing.at(ident.Pos()); outer != nil {
+				unit.AddGenericEdge(outer, inner, args)
 			}
 		}
 	}
+	// Close the evidence under substitution BEFORE anything consults it:
+	// free-parameter vectors are then soundly skippable everywhere, their
+	// concretizations being present.
+	unit.CloseGenericEvidence()
 	if err := collectAddressTakenFields(unit, pkgs); err != nil {
 		return err
 	}
@@ -203,3 +229,70 @@ func collectAddressTakenFields(unit ir.Scope, pkgs []*packages.Package) error {
 // collectGenericInstances records every generic-function instantiation
 // across the unit: the closed-world evidence that admits generic
 // declarations.
+
+// genericRanges locates the generic declarations of one package by source
+// range, so an instantiation identifier resolves to its innermost
+// enclosing generic declaration (the owner of the free type parameters
+// its arguments mention).
+type genericRanges struct {
+	entries []genericRange
+}
+
+type genericRange struct {
+	pos, end token.Pos
+	obj      types.Object
+}
+
+// at returns the innermost generic declaration containing pos.
+func (g genericRanges) at(pos token.Pos) types.Object {
+	var best *genericRange
+	for i := range g.entries {
+		entry := &g.entries[i]
+		if pos < entry.pos || pos >= entry.end {
+			continue
+		}
+		if best == nil || (entry.pos >= best.pos && entry.end <= best.end) {
+			best = entry
+		}
+	}
+	if best == nil {
+		return nil
+	}
+	return best.obj
+}
+
+// genericDeclRanges collects every generic function declaration (own or
+// receiver type parameters) and generic type declaration of the package.
+func genericDeclRanges(p *packages.Package) genericRanges {
+	var out genericRanges
+	for _, file := range p.Syntax {
+		for _, decl := range file.Decls {
+			switch d := decl.(type) {
+			case *ast.FuncDecl:
+				object, ok := p.TypesInfo.Defs[d.Name].(*types.Func)
+				if !ok {
+					continue
+				}
+				signature := object.Type().(*types.Signature)
+				generic := signature.TypeParams() != nil && signature.TypeParams().Len() > 0
+				if recv := signature.RecvTypeParams(); recv != nil && recv.Len() > 0 {
+					generic = true
+				}
+				if generic {
+					out.entries = append(out.entries, genericRange{pos: d.Pos(), end: d.End(), obj: object})
+				}
+			case *ast.GenDecl:
+				for _, spec := range d.Specs {
+					typeSpec, ok := spec.(*ast.TypeSpec)
+					if !ok || typeSpec.TypeParams == nil || len(typeSpec.TypeParams.List) == 0 {
+						continue
+					}
+					if object, ok := p.TypesInfo.Defs[typeSpec.Name].(*types.TypeName); ok {
+						out.entries = append(out.entries, genericRange{pos: typeSpec.Pos(), end: typeSpec.End(), obj: object})
+					}
+				}
+			}
+		}
+	}
+	return out
+}

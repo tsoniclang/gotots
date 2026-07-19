@@ -158,7 +158,7 @@ func (b *builder) assignBindings(root ast.Node, typeParams []string) {
 	})
 	var seeds []string
 	for _, tp := range typeParams {
-		seeds = append(seeds, "zero$"+tp, "eq$"+tp)
+		seeds = append(seeds, "zero$"+tp, "eq$"+tp, "clone$"+tp, "set$"+tp)
 	}
 	b.bind.allocate(seeds)
 	// Fail closed if any local binding the type checker records is missing

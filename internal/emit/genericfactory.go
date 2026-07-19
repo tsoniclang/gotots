@@ -28,7 +28,113 @@ func (p *printer) zeroFactoryArgs(typeArgs []ir.Type) (string, error) {
 		}
 		parts = append(parts, eq)
 	}
+	for _, arg := range typeArgs {
+		clone, err := p.cloneOperation(arg)
+		if err != nil {
+			return "", err
+		}
+		parts = append(parts, clone)
+	}
+	for _, arg := range typeArgs {
+		set, err := p.setOperation(arg)
+		if err != nil {
+			return "", err
+		}
+		parts = append(parts, set)
+	}
 	return joinComma(parts), nil
+}
+
+// cloneOperation spells the TOTAL per-binding copy of one instantiation
+// type argument: the exact value copy for value-copy carriers (struct,
+// fixed array, external value), the in-scope clone$U for a nested type
+// parameter, and the identity arrow for every carrier whose assignment
+// already copies (scalars, strings, pointers, slices, maps, functions,
+// interfaces).
+func (p *printer) cloneOperation(t ir.Type) (string, error) {
+	switch {
+	case t.Kind == ir.KindIface && t.TypeParamName != "":
+		op, has := p.cloneOps[t.TypeParamName]
+		if !has {
+			return "", fmt.Errorf("no clone operation in scope for type parameter %q", t.TypeParamName)
+		}
+		return op, nil
+	case t.Kind == ir.KindStruct:
+		spelled, err := p.tsType(t)
+		if err != nil {
+			return "", err
+		}
+		return "(($v: " + spelled + ") => $v.goClone$())", nil
+	case t.Kind == ir.KindArray:
+		spelled, err := p.tsType(t)
+		if err != nil {
+			return "", err
+		}
+		cloneElem, err := p.arrayElemClone(*t.Elem)
+		if err != nil {
+			return "", err
+		}
+		return "(($v: " + spelled + ") => gosl$.goArrayClone($v, " + cloneElem + "))", nil
+	case t.Kind == ir.KindExternal:
+		spelled, err := p.tsType(t)
+		if err != nil {
+			return "", err
+		}
+		callee, err := p.module.symbol(t.Pkg, externCloneSymbol(t.Named))
+		if err != nil {
+			return "", err
+		}
+		return "(($v: " + spelled + ") => " + callee + "($v))", nil
+	}
+	spelled, err := p.tsType(t)
+	if err != nil {
+		return "", err
+	}
+	return "(($v: " + spelled + ") => $v)", nil
+}
+
+// setOperation spells the per-binding in-place overwrite of one
+// instantiation type argument, or "undefined" for every carrier whose
+// store is a plain slot assignment.
+func (p *printer) setOperation(t ir.Type) (string, error) {
+	switch {
+	case t.Kind == ir.KindIface && t.TypeParamName != "":
+		op, has := p.setOps[t.TypeParamName]
+		if !has {
+			return "", fmt.Errorf("no set operation in scope for type parameter %q", t.TypeParamName)
+		}
+		return op, nil
+	case t.Kind == ir.KindStruct:
+		spelled, err := p.tsType(t)
+		if err != nil {
+			return "", err
+		}
+		return "(($d: " + spelled + ", $s: " + spelled + ") => $d.goSet$($s))", nil
+	case t.Kind == ir.KindArray:
+		spelled, err := p.tsType(t)
+		if err != nil {
+			return "", err
+		}
+		setElem, err := p.arrayElemSet(*t.Elem)
+		if err != nil {
+			return "", err
+		}
+		return "(($d: " + spelled + ", $s: " + spelled + ") => gosl$.goArraySetAll($d, $s, " + setElem + "))", nil
+	case t.Kind == ir.KindExternal:
+		spelled, err := p.tsType(t)
+		if err != nil {
+			return "", err
+		}
+		callee, err := p.externSetCallee(t)
+		if err != nil {
+			return "", err
+		}
+		if callee == "" {
+			return "undefined", nil
+		}
+		return "(($d: " + spelled + ", $s: " + spelled + ") => " + callee + "($d, $s))", nil
+	}
+	return "undefined", nil
 }
 
 // zeroOnlyFactoryArgs spells the zero factories alone — generic class

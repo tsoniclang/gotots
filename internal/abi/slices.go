@@ -407,4 +407,110 @@ export function goSliceCopyStruct<T extends GoStructValue<T>>(dst: GoSliceValue<
   }
   return BigInt(count);
 }
+// ---- Type-parameter (factory-driven) element semantics. A generic body
+// receives per-type-parameter factories: clone (total; identity for
+// non-copy carriers) and set (undefined ⇢ the carrier stores by slot
+// assignment; a function ⇢ the carrier overwrites in place so element
+// aliases observe the store). These helpers are the single element-store
+// and copy semantics for []T / [N]T under a type parameter T, exactly
+// mirroring the struct forms above.
+
+// s[i] = v for a type-parameter element.
+export function goSliceSetWith<T>(s: GoSliceValue<T>, index: GoIndex, value: T, setElem: ((d: T, s: T) => void) | undefined): void {
+  const length = s === undefined ? 0 : s.length;
+  if (index < 0 || index >= length) panicIndex(index, length);
+  const slice = s as GoSlice<T>;
+  if (setElem === undefined) {
+    slice.backing[slice.offset + Number(index)] = value;
+  } else {
+    setElem(slice.backing[slice.offset + Number(index)] as T, value);
+  }
+}
+
+// a[i] = v for a type-parameter element of a fixed array.
+export function goArrayElemSetWith<T>(a: T[], index: GoIndex, value: T, setElem: ((d: T, s: T) => void) | undefined): void {
+  if (index < 0 || index >= a.length) panicIndex(index, a.length);
+  if (setElem === undefined) {
+    a[Number(index)] = value;
+  } else {
+    setElem(a[Number(index)] as T, value);
+  }
+}
+
+// append(s, values...) for type-parameter elements: reused-capacity slots
+// overwrite in place through setElem (element aliases observe the store),
+// growth clones old elements through cloneElem (Go copies values), and
+// the grown tail fills with distinct fresh zeros. The incoming values are
+// already fresh copies from their binding sites.
+export function goSliceAppendWith<T>(s: GoSliceValue<T>, values: T[], zero: () => T, cloneElem: (v: T) => T, setElem: ((d: T, s: T) => void) | undefined): GoSliceValue<T> {
+  if (values.length === 0) return s;
+  const length = s === undefined ? 0 : s.length;
+  const needed = length + values.length;
+  if (s !== undefined && needed <= s.capacity) {
+    for (let index = 0; index < values.length; index++) {
+      const at = s.offset + length + index;
+      const slot = s.backing[at] as T | undefined;
+      if (setElem === undefined || slot === undefined) {
+        s.backing[at] = values[index] as T;
+      } else {
+        setElem(slot, values[index] as T);
+      }
+    }
+    return new GoSlice(s.backing, s.offset, needed, s.capacity);
+  }
+  let capacity = s === undefined ? 0 : s.capacity;
+  if (capacity === 0) capacity = needed;
+  while (capacity < needed) {
+    capacity = capacity < 256 ? capacity * 2 : capacity + Math.trunc((capacity + 3 * 256) / 4);
+  }
+  const backing: T[] = new Array(capacity);
+  if (s !== undefined) {
+    for (let index = 0; index < length; index++) {
+      backing[index] = cloneElem(s.backing[s.offset + index] as T);
+    }
+  }
+  for (let index = 0; index < values.length; index++) {
+    backing[length + index] = values[index] as T;
+  }
+  for (let index = needed; index < capacity; index++) {
+    backing[index] = zero();
+  }
+  return new GoSlice(backing, 0, needed, capacity);
+}
+
+// append(s, source...) for type-parameter elements: source's current
+// elements are staged as copies first, so a self-append with capacity
+// reuse stays exact.
+export function goSliceAppendSliceWith<T>(s: GoSliceValue<T>, source: GoSliceValue<T>, zero: () => T, cloneElem: (v: T) => T, setElem: ((d: T, s: T) => void) | undefined): GoSliceValue<T> {
+  const values: T[] = [];
+  const length = source === undefined ? 0 : source.length;
+  for (let index = 0; index < length; index++) {
+    const src = source as GoSlice<T>;
+    values.push(cloneElem(src.backing[src.offset + index] as T));
+  }
+  return goSliceAppendWith(s, values, zero, cloneElem, setElem);
+}
+
+// copy(dst, src) for type-parameter elements: overlapping ranges stage
+// copies first (Go's memmove semantics), then store through the element
+// rule.
+export function goSliceCopyWith<T>(dst: GoSliceValue<T>, src: GoSliceValue<T>, cloneElem: (v: T) => T, setElem: ((d: T, s: T) => void) | undefined): bigint {
+  const dstLength = dst === undefined ? 0 : dst.length;
+  const srcLength = src === undefined ? 0 : src.length;
+  const count = dstLength < srcLength ? dstLength : srcLength;
+  const staged: T[] = [];
+  for (let index = 0; index < count; index++) {
+    const source = src as GoSlice<T>;
+    staged.push(cloneElem(source.backing[source.offset + index] as T));
+  }
+  for (let index = 0; index < count; index++) {
+    const destination = dst as GoSlice<T>;
+    if (setElem === undefined) {
+      destination.backing[destination.offset + index] = staged[index] as T;
+    } else {
+      setElem(destination.backing[destination.offset + index] as T, staged[index] as T);
+    }
+  }
+  return BigInt(count);
+}
 `

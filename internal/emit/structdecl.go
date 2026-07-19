@@ -295,6 +295,12 @@ func printMethodFunction(out *strings.Builder, module *Module, className string,
 	for _, param := range method.TypeParams {
 		params = append(params, "eq$"+param+": (a: "+param+", b: "+param+") => boolean")
 	}
+	for _, param := range method.TypeParams {
+		params = append(params, "clone$"+param+": (v: "+param+") => "+param)
+	}
+	for _, param := range method.TypeParams {
+		params = append(params, "set$"+param+": ((d: "+param+", s: "+param+") => void) | undefined")
+	}
 	result, err := p.tsResultType(method.Results)
 	if err != nil {
 		return fmt.Errorf("%s: %w", method.ID, err)
@@ -319,9 +325,13 @@ func printMethodFunction(out *strings.Builder, module *Module, className string,
 	if len(method.TypeParams) > 0 {
 		p.zeroFactories = map[string]string{}
 		p.eqOps = map[string]string{}
+		p.cloneOps = map[string]string{}
+		p.setOps = map[string]string{}
 		for _, param := range method.TypeParams {
 			p.zeroFactories[param] = "zero$" + param
 			p.eqOps[param] = "eq$" + param
+			p.cloneOps[param] = "clone$" + param
+			p.setOps[param] = "set$" + param
 		}
 	}
 	if structValueReceiver {

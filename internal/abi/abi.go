@@ -13,7 +13,7 @@ package abi
 import "fmt"
 
 // Version identifies the ABI contract carried in generated output.
-const Version = 24
+const Version = 25
 
 // Family is the static carrier family of an integer kind.
 type Family string
@@ -195,6 +195,25 @@ export function goPanicValue(value: string | number | bigint | boolean): never {
 // so a single call satisfies any declared return type.
 export function goBodyUnimplemented(id: string): never {
   throw new GoPanic("GOTOTS_BODY_UNIMPLEMENTED: " + id);
+}
+
+// goPtrParamSet is the pointee store through an identity-carrier *T under
+// a type parameter: the closed instantiation evidence proves every binding
+// is an identity carrier with an in-place set, so a missing set operation
+// here is a construction-invariant violation, never a silent rebind.
+export function goPtrParamSet<T>(p: T | undefined, v: T, setElem: ((d: T, s: T) => void) | undefined): void {
+  if (setElem === undefined) {
+    throw new GoPanic("GOTOTS_INVARIANT: identity pointee store without a set operation");
+  }
+  setElem(goNilCheck(p), v);
+}
+
+// goEqUnsupported spells the equality operation of a type-parameter
+// binding whose carrier is not comparable: Go's type system proves the
+// operation unreachable in any admitted body, so reaching it is a
+// construction-invariant violation.
+export function goEqUnsupported(): never {
+  throw new GoPanic("GOTOTS_INVARIANT: equality on a non-comparable type-parameter binding");
 }
 
 // panic(err): the message is the error's dynamic Error() result — the

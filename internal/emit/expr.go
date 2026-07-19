@@ -505,7 +505,9 @@ func (p *printer) printClosure(n *ir.Closure) (string, error) {
 		return "", err
 	}
 	var sub strings.Builder
-	subPrinter := &printer{out: &sub, module: p.module, indent: p.indent + 1, zeroFactories: p.zeroFactories, slicePlans: p.slicePlans}
+	subPrinter := &printer{out: &sub, module: p.module, indent: p.indent + 1,
+		zeroFactories: p.zeroFactories, eqOps: p.eqOps, cloneOps: p.cloneOps, setOps: p.setOps,
+		slicePlans: p.slicePlans}
 	if err := subPrinter.printDeferWrappedBody(n.Body, n.UsesDeferStack); err != nil {
 		return "", err
 	}

@@ -120,6 +120,12 @@ type printer struct {
 	// eqOps maps in-scope type parameters to their equality-operation
 	// parameter names while a generic body prints.
 	eqOps map[string]string
+	// cloneOps / setOps map in-scope type parameters to their copy-factory
+	// parameter names: clone$P is the TOTAL per-binding copy (identity for
+	// carriers without value-copy semantics) and set$P is the in-place
+	// overwrite (undefined for slot-assignment carriers).
+	cloneOps map[string]string
+	setOps   map[string]string
 	// slicePlans maps this body's slice-typed locals to their selected
 	// representation; "native-array" locals lower onto plain arrays.
 	slicePlans map[string]string
@@ -203,9 +209,13 @@ func printFunc(out *strings.Builder, module *Module, function *ir.Func) error {
 	if len(function.TypeParams) > 0 {
 		p.zeroFactories = map[string]string{}
 		p.eqOps = map[string]string{}
+		p.cloneOps = map[string]string{}
+		p.setOps = map[string]string{}
 		for _, param := range function.TypeParams {
 			p.zeroFactories[param] = "zero$" + param
 			p.eqOps[param] = "eq$" + param
+			p.cloneOps[param] = "clone$" + param
+			p.setOps[param] = "set$" + param
 		}
 	}
 	if function.Placeholder {
@@ -245,6 +255,15 @@ func (p *printer) functionSignature(function *ir.Func) (string, error) {
 	}
 	for _, param := range function.TypeParams {
 		params = append(params, "eq$"+param+": (a: "+param+", b: "+param+") => boolean")
+	}
+	// Factory protocol v2: the per-binding copy operations. clone$P is
+	// TOTAL (identity for carriers without value-copy semantics); set$P is
+	// undefined exactly when the carrier stores by slot assignment.
+	for _, param := range function.TypeParams {
+		params = append(params, "clone$"+param+": (v: "+param+") => "+param)
+	}
+	for _, param := range function.TypeParams {
+		params = append(params, "set$"+param+": ((d: "+param+", s: "+param+") => void) | undefined")
 	}
 	result, err := p.tsResultType(function.Results)
 	if err != nil {
