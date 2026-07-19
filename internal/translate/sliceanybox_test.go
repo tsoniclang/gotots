@@ -654,3 +654,31 @@ func ParamZeroDeref() int {
 }
 `)
 }
+
+func TestOracleClearSliceAndNamedConversions(t *testing.T) {
+	// clear(s) zeroes elements IN PLACE (aliases observe it); named
+	// same-underlying conversions (map and struct forms) are identity.
+	runOracle(t, `package fixture
+
+type scores map[string]int
+
+type point struct {
+	x int
+}
+
+type spot point
+
+func ClearSliceAndNamedConversions() int {
+	s := []int{5, 6, 7}
+	alias := s
+	clear(s)
+	m := scores{"a": 1}
+	plain := map[string]int(m)
+	plain["b"] = 2
+	back := scores(plain)
+	p := spot(point{x: 9})
+	q := point(p)
+	return alias[0]*1000 + len(back)*100 + p.x*10 + q.x
+}
+`)
+}

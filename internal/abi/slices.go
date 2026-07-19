@@ -37,6 +37,21 @@ function panicIndex(index: GoIndex, length: number): never {
   throw new GoPanic("runtime error: index out of range [" + String(index) + "] with length " + String(length));
 }
 
+// goSliceClearWith zeroes every element in place (Go's clear(s)):
+// value-copy carriers store through their set operation so aliases of
+// the elements observe the zeroing.
+export function goSliceClearWith<T>(s: GoSliceValue<T>, zero: () => T, set: ((d: T, s: T) => void) | undefined): void {
+  if (s === undefined) return;
+  const length = Number(goSliceLen(s));
+  for (let index = 0; index < length; index++) {
+    if (set === undefined) {
+      goSliceSet(s, BigInt(index), zero());
+    } else {
+      set(goSliceGet(s, BigInt(index)), zero());
+    }
+  }
+}
+
 export function goSliceFrom<T>(values: T[]): GoSlice<T> {
   return new GoSlice(values, 0, values.length, values.length);
 }

@@ -226,6 +226,29 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		p.line("gort$.%s(%s, %s);", p.mapHelper("goMapDelete", n.Map), mapExpr, key)
 		return nil
 
+	case *ir.SliceClearStmt:
+		x, err := p.printExpr(n.X)
+		if err != nil {
+			return err
+		}
+		zero, err := p.printExpr(n.Zero)
+		if err != nil {
+			return err
+		}
+		set := "undefined"
+		if n.X.Type().Elem != nil {
+			if s := p.paramSetOf(*n.X.Type().Elem); s != "" {
+				set = s
+			} else if n.X.Type().Elem.Kind == ir.KindStruct {
+				spelled, err := p.tsType(*n.X.Type().Elem)
+				if err != nil {
+					return err
+				}
+				set = "(($d: " + spelled + ", $s: " + spelled + ") => $d.goSet$($s))"
+			}
+		}
+		p.line("gosl$.goSliceClearWith(%s, () => %s, %s);", x, zero, set)
+		return nil
 	case *ir.MapClearStmt:
 		mapExpr, err := p.printExpr(n.Map)
 		if err != nil {

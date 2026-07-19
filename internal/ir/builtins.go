@@ -230,6 +230,15 @@ func (b *builder) buildClear(call *ast.CallExpr) (Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
+	if operand.Type().Kind == KindSlice {
+		// clear(s) zeroes every element IN PLACE (aliases observe it).
+		zero, err := zeroValue(*operand.Type().Elem, b.span(call.Pos()))
+		if err != nil {
+			return nil, err
+		}
+		b.use("sliceClear")
+		return &SliceClearStmt{X: operand, Zero: zero}, nil
+	}
 	if operand.Type().Kind != KindMap {
 		return nil, &Unsupported{Kind: KindClearOf, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "clear of " + operand.Type().Go, Span: b.span(call.Pos())}
 	}

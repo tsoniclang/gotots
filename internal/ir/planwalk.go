@@ -420,6 +420,8 @@ func (s *slicePlanner) walkStmt(stmt Stmt) {
 	case *MapDeleteStmt:
 		s.walkExpr(n.Map)
 		s.walkExpr(n.Key)
+	case *SliceClearStmt:
+		s.escapeIfSlice(n.X)
 	case *MapClearStmt:
 		s.walkExpr(n.Map)
 	case *PanicStmt:

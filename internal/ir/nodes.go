@@ -10,6 +10,14 @@ type Block struct {
 	Stmts []Stmt
 }
 
+// SliceClearStmt zeroes every slice element in place (clear(s)).
+type SliceClearStmt struct {
+	X    Expr
+	Zero Expr
+}
+
+func (*SliceClearStmt) stmt() {}
+
 // DeclStmt declares one or more variables with explicit initial values
 // (zero values are materialized during build, never implied).
 type DeclStmt struct {

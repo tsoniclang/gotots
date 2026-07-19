@@ -171,6 +171,11 @@ func (p *printer) printConvert(n *ir.Convert) (string, error) {
 	to := n.To.Kind
 
 	switch {
+	case from == to && (to == ir.KindMap || to == ir.KindSlice || to == ir.KindFunc ||
+		to == ir.KindChan || to == ir.KindStruct || to == ir.KindArray):
+		// Same-underlying named-form conversion: identity (bind sites
+		// carry Go's copy semantics).
+		return "(" + x + ")", nil
 	case from == ir.KindPointer && to == ir.KindPointer:
 		// Same-underlying named pointer conversion: the instance IS the
 		// value (the IR admits only structurally identical classes).

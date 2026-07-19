@@ -363,6 +363,17 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			if bridged, isBridge, err := b.buildExternOwnedConversion(x, to, b.info.Types[n.Args[0]].Type, convert, span); isBridge {
 				return bridged, err
 			}
+			if x.Type().Kind == to.Kind &&
+				types.Identical(types.Unalias(b.info.Types[n.Args[0]].Type).Underlying(), types.Unalias(convert).Underlying()) {
+				switch to.Kind {
+				case KindMap, KindSlice, KindFunc, KindChan, KindStruct, KindArray, KindPointer:
+					// Same-underlying conversion between named forms: the
+					// value IS the value (Go's conversion copies at BIND
+					// sites exactly as assignment does).
+					b.use("convert")
+					return &Convert{X: x, To: to}, nil
+				}
+			}
 			if x.Type().Kind == KindPointer && to.Kind == KindPointer &&
 				sameUnderlyingNamedPointers(b.info.Types[n.Args[0]].Type, convert) {
 				// Same-underlying owned pointer conversion (type
