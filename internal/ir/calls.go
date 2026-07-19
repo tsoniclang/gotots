@@ -177,9 +177,6 @@ func (b *builder) staticCallee(fun ast.Expr) (*types.Func, *ast.Ident) {
 func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, selection *types.Selection) (Expr, error) {
 	span := b.span(n.Pos())
 	method := selection.Obj().(*types.Func)
-	if method.Pkg() == nil {
-		return nil, &Unsupported{Kind: KindMethodCallOutsideTheTranslatedUnitUnqualified, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method call outside the translated unit (unqualified)", Span: span}
-	}
 	recv, err := b.buildExpr(selector.X)
 	if err != nil {
 		return nil, err
@@ -192,8 +189,12 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 	}
 	if recv.Type().Kind == KindIface {
 		// Interface dispatch resolves the closed dynamic-type set to an
-		// exhaustive token switch of direct calls.
+		// exhaustive token switch of direct calls (universe-scope
+		// interface methods — error.Error — included).
 		return b.buildIfaceMethodCall(n, recv, method, selector)
+	}
+	if method.Pkg() == nil {
+		return nil, &Unsupported{Kind: KindMethodCallOutsideTheTranslatedUnitUnqualified, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method call outside the translated unit (unqualified)", Span: span}
 	}
 	if !b.unit.Owns(method.Pkg().Path()) {
 		return b.buildExternalMethodCall(n, selector, method, recv)
