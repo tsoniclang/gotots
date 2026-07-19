@@ -78,16 +78,24 @@ entry, embedding entry, and externally callable product API root. Every exported
 selected declaration is a root unless a committed export-surface contract proves
 that its package is not published and names its complete internal callers.
 
-Reachability closes over package initialization, direct calls, method sets,
-function values, interface targets, callbacks passed to external code, manual
-bodies, extension seams, and external call-in contracts. A finite dynamic target
-set requires typed closed-world proof. An unknown call-in or target edge is
-conservative for effects and representation and is unimplemented when its
-implementation closure cannot be proven.
+Reachability begins from the complete candidate universe of fresh generated
+units, structurally valid manual units, external contracts, extension inputs,
+and selected tests. It closes to a deterministic fixed point over package
+initialization, direct calls, method sets, function values, interface targets,
+generic instantiations, callbacks passed to external code, manual bodies,
+extension seams, and external call-in contracts. Import presence alone is not
+runtime reachability.
 
-Every body omitted as unreachable has a machine record naming the roots, graph
-revision, exclusion proof, and verifier result. Source location, current CLI
-usage, and absence from one test run are never reachability proof.
+Every operation that can affect retention receives one typed edge disposition.
+A finite dynamic target set requires typed closed-world proof. An unknown
+call-in, target edge, or missing disposition is unimplemented and blocks a
+negative reachability proof; it never licenses omission or name-based recovery.
+
+Every body omitted as unreachable has a machine record naming the complete root
+set, candidate-universe and graph revisions, fixed-point result, exclusion
+proof, and verifier result. Every reached body has at least one canonical root
+witness path. Source location, current CLI usage, import absence, and absence
+from one test run are never reachability proof.
 
 ## Governing Invariants
 

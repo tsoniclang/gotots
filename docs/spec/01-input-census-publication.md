@@ -182,9 +182,11 @@ staging root. It does not incrementally modify, copy, or consult old generated
 bodies for semantic decisions. Before generation, a separate reconciliation
 phase may read the attested prior baseline and current editable mixed-source
 workspace solely to identify manual bodies by the contract in
-`08-externals-manual-extensions.md`. Extracted manual AST units are overlaid
-only after the new baseline exists; imports and reachability are then derived
-again from the assembled typed AST.
+`08-externals-manual-extensions.md`. After the new baseline exists, every valid
+manual AST unit participates in one complete candidate graph. Only units reached
+by the fixed-point traversal are overlaid; imports and final graph evidence are
+then regenerated from the assembled typed AST. Unknown graph edges block apply
+rather than preserving or removing source heuristically.
 
 Generation writes only beneath a newly created staging root whose real path is
 contained by the configured output parent. Paths are canonical-encoded and

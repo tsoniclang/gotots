@@ -3,6 +3,8 @@
 package translate
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"sync"
 
 	"github.com/tsoniclang/gotots/contracts"
@@ -39,6 +41,18 @@ type Proof struct {
 	// InitHash is a package variable's initializer source hash — joined
 	// against the census's identity-bearing initializer evidence.
 	InitHash string `json:"initHash,omitempty"`
+	// TypeShapeHash is a named type declaration's complete shape hash
+	// (census.TypeShapeSignature over the translator's own loaded type) —
+	// joined against the census type shape so kind, underlying, type
+	// parameters, fields, tags, embeds, interface methods, and declared
+	// methods cannot drift between the two pipelines.
+	TypeShapeHash string `json:"typeShapeHash,omitempty"`
+	// AliasShapeHash is a type alias declaration's shape hash
+	// (census.AliasShapeSignature over the translator's own loaded alias).
+	AliasShapeHash string `json:"aliasShapeHash,omitempty"`
+	// VarTypeHash is a package variable's declared-TYPE hash (sha256 of
+	// the canonical type spelling the translator lowered).
+	VarTypeHash string `json:"varTypeHash,omitempty"`
 	// ConstHash is a package constant's declaration-shape hash
 	// (census.ConstShapeSignature over the type the translator lowered and
 	// the exact folded value) — joined against the census constant shape so
@@ -150,3 +164,9 @@ const abiDir = "language-abi"
 // generated body whose operation census contains an unregistered class
 // fails the run — support is explicit, never implicit.
 var supportRegistry = sync.OnceValues(contracts.LoadRegistry)
+
+// shapeHash digests one canonical declaration-shape join string.
+func shapeHash(signature string) string {
+	digest := sha256.Sum256([]byte(signature))
+	return hex.EncodeToString(digest[:])
+}

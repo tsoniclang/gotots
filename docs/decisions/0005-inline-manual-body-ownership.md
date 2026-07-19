@@ -40,6 +40,9 @@ must not create a legacy fallback or runtime choice.
   syntax-fragile, cannot prove semantic identity, and create partial ownership.
 - Always overwrite and require manual changes to be reapplied: rejected because
   regeneration would destroy intentional maintained source.
+- Preserve unreachable manual source indefinitely or maintain a separate prune
+  workflow: rejected because it accumulates dead active source and creates a
+  second reachability/removal policy.
 
 ## Decision
 
@@ -59,7 +62,8 @@ owner.
 The file header applies only to declarations proven by the attested baseline.
 An unmarked developer-added helper function or class inside a generated file is
 manual source, remains graph-discovered without registration metadata, and is
-never discarded merely because its containing file is generated.
+never discarded merely because its containing file is generated. It is omitted
+only by complete current-graph proof that no root reaches it.
 
 GoToTS emits exact typed throwing placeholders for unavailable owned bodies and
 external operations. Replacing the throw with typed TypeScript is the entire
@@ -69,13 +73,24 @@ dependency list, promotion artifact, or runtime registry exists.
 Regeneration extracts manual AST bodies from the attested old baseline and
 editable workspace, creates a complete new generated baseline in an empty
 staging root, discards all old generated units, structurally overlays valid
-manual bodies, regenerates imports, and derives the complete typed dependency
-and reachability graph. It reports current, placeholder, stale, missing,
-unreachable, orphaned, automatically-lowerable, and invalid states.
+manual bodies reached by a complete fixed-point candidate graph, regenerates
+imports, and verifies the final typed dependency/reachability graph. Joining is
+by exact current canonical identity and generated signature; it never rewrites
+a body, guesses a rename/move, or adapts parameters. It reports current,
+placeholder, stale, missing, unreachable, orphaned, reachability-unknown,
+automatically-lowerable, and invalid states.
+
+Ownership is selected before graph expansion. A joined manual body is the sole
+candidate implementation and supplies its declaration's outgoing edges; the
+fresh generated body remains baseline/reset evidence only. A valid manual-only
+declaration participates by its own typed identity and is retained only when a
+root or another reached unit reaches it.
 
 Manual bodies remain the sole implementation until an explicit hash-guarded
-reset selects the new generated body. Unreachable/orphaned manual source is
-preserved by default and may be removed only by a separate dry-run/apply prune.
+reset selects the new generated body. The one regeneration dry-run/apply path
+omits proven unreachable/orphaned manual units from the new active tree. Unknown
+edges block apply. Removed source remains recoverable from the immutable prior
+bundle, identity/hash report, and version control; no legacy source path exists.
 
 ## Effects
 
@@ -95,9 +110,10 @@ preserved by default and may be removed only by a separate dry-run/apply prune.
 The separate promotion/artifact workflow is removed rather than supported in
 parallel. Implementation introduces `manual-ownership-v1`, generated headers,
 per-body markers, immutable baseline attestation, structural reconciliation,
-derived manual ledgers, reset, and prune as one contract. Existing generated
-trees without an attested baseline are not guessed to be generated; they are
-regenerated or treated as manual input and reconciled fail-closed.
+derived manual ledgers, reset, and graph-proven regeneration removal as one
+contract. Existing generated trees without an attested baseline are not guessed
+to be generated; they are regenerated or treated as manual input and reconciled
+fail-closed.
 
 The contract is accepted here before product support exists. Until every gate
 and mutation test in the governing specification is implemented, manual bodies
@@ -113,9 +129,10 @@ artifacts at the contract revision are
 `docs/spec/11-testing-acceptance.md`, and `internal/policy/spec_test.go`.
 
 Implementation acceptance additionally requires the positive, mutation,
-regeneration, source-upgrade, reachability, reset, prune, strict-typecheck,
-staticness, Go-differential, extension, and performance evidence enumerated by
-the specification. No current coverage percentage substitutes for those gates.
+regeneration, source-upgrade, fixed-point reachability, reset, removal,
+strict-typecheck, staticness, Go-differential, extension, and performance
+evidence enumerated by the specification. No current coverage percentage
+substitutes for those gates.
 
 ## Reconsider when
 

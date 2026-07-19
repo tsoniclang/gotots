@@ -66,22 +66,32 @@ For each pinned TypeScript-Go revision:
    unimplemented;
 10. regenerate the complete baseline into an empty staging root without
     copying old generated source;
-11. structurally join and overlay valid manual bodies, regenerate imports, and
-    recompute the complete typed reachability graph;
-12. report current, placeholder, stale, missing, unreachable, orphaned,
-    automatically-lowerable, and invalid manual deltas;
-13. run required gates; and
-14. publish only the declared completion level.
+11. structurally join valid manual candidates by exact current identity and
+    signature without rewriting their bodies;
+12. build the complete generated/manual/external/extension/test candidate graph
+    and traverse it from the complete current roots to a deterministic fixed
+    point;
+13. overlay only reached manual units, regenerate imports, and verify the final
+    graph;
+14. report current, placeholder, stale, missing, unreachable, orphaned,
+    reachability-unknown, automatically-lowerable, invalid, and planned-removal
+    manual deltas;
+15. run required gates; and
+16. publish only the declared completion level when apply inputs still match
+    the reviewed dry run.
 
 Added uses of an implemented class require no design review when machine proofs
 pass. A genuinely different class receives one class-level decision rather than
 site patches.
 
 Regeneration preserves manual bodies by canonical typed ownership, never by
-retaining old generated files. Unreachable and orphaned manual source remains
-untouched unless an explicit dry-run/apply prune is requested. A newly
-automatically lowerable manual body remains the sole implementation until an
-explicit identity-targeted reset replaces it.
+retaining old generated files. Proven unreachable and orphaned manual units are
+reported and omitted from the new active tree by the one regeneration
+dry-run/apply path; they remain recoverable from the prior immutable bundle,
+report, and version control. An incomplete graph blocks apply rather than
+retaining or deleting heuristically. A newly automatically lowerable manual
+body remains the sole implementation until an explicit identity-targeted reset
+replaces it.
 
 ## Diffusion Workflow
 
@@ -154,7 +164,7 @@ Every review message and pull request includes:
 - changed semantic classes;
 - generated/manual/unimplemented counts;
 - manual current/placeholder/stale/missing/unreachable/orphaned/
-  automatically-lowerable/invalid counts;
+  reachability-unknown/automatically-lowerable/invalid and removal counts;
 - custom necessity decisions;
 - gates run and exact results;
 - deterministic report paths;
@@ -195,6 +205,8 @@ Selected-product completion additionally requires:
 - zero unresolved reachable external stubs;
 - zero stale manual bodies;
 - zero reachable manual placeholders, missing bodies, or invalid manual joins;
+- zero reachability-unknown records and no proven unreachable/orphaned manual
+  source in the active regenerated tree;
 - every required extension seam assembled;
 - complete selected tests and compiler corpus;
 - deterministic regeneration;

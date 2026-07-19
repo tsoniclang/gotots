@@ -126,13 +126,18 @@ record:
 - canonical implementation ID and enclosing/nested ownership relation;
 - immutable baseline file/header/marker/body hashes;
 - current normalized file/header/marker/body hashes;
-- generated, manual, placeholder, stale, missing, unreachable, orphaned,
+- generated, reachable-current, reachable-placeholder, reachable-stale,
+  reachable-missing, unreachable, orphaned, reachability-unknown,
   automatically-lowerable, or invalid status;
 - old/new source-signature, semantic-body, IR, plan, dependency, effect,
   extension-seam, and proof hashes;
-- resolved static dependency and reachability edges;
+- complete root-set, candidate-universe, graph, and edge-disposition hashes;
+- resolved static dependency and reachability edges, fixed-point result, and
+  either canonical root witness paths or a verified exclusion proof;
+- every unresolved/dynamic-edge blocker that prevents a reachability result;
 - applicable gate evidence and accepted-manual state; and
-- reset/prune eligibility with the exact current workspace hash.
+- reset/removal eligibility with the exact current workspace, source pin,
+  profile, prior-baseline, and graph-input hashes.
 
 The schema rejects forged or self-consistent edited markers that disagree with
 the immutable baseline, duplicate body claims, ambiguous joins, parent/child
@@ -259,6 +264,7 @@ The following produce no affected product artifact:
 - custom mechanism without accepted necessity;
 - unresolved reachable external;
 - stale manual body;
+- incomplete, ambiguous, or nonconvergent reachability graph;
 - invalid extension seam;
 - strict TypeScript failure;
 - missing required test count; and

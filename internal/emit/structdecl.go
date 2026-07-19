@@ -167,13 +167,15 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 
 	// A generic class's zero needs one factory per type parameter: a
 	// bare-parameter field's zero depends on the instantiation.
-	savedFactories, savedClone, savedSet := p.zeroFactories, p.cloneOps, p.setOps
+	savedFactories, savedEqOps, savedClone, savedSet := p.zeroFactories, p.eqOps, p.cloneOps, p.setOps
 	if len(structDecl.TypeParams) > 0 {
 		p.zeroFactories = map[string]string{}
+		p.eqOps = map[string]string{}
 		p.cloneOps = map[string]string{}
 		p.setOps = map[string]string{}
 		for _, param := range structDecl.TypeParams {
 			p.zeroFactories[param] = "zero$" + param
+			p.eqOps[param] = "eq$" + param
 			p.cloneOps[param] = "clone$" + param
 			p.setOps[param] = "set$" + param
 		}
@@ -182,12 +184,12 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 	for _, field := range structDecl.Fields {
 		zero, err := p.zeroLiteral(field.Type)
 		if err != nil {
-			p.zeroFactories, p.cloneOps, p.setOps = savedFactories, savedClone, savedSet
+			p.zeroFactories, p.eqOps, p.cloneOps, p.setOps = savedFactories, savedEqOps, savedClone, savedSet
 			return err
 		}
 		zeros = append(zeros, zero)
 	}
-	p.zeroFactories, p.cloneOps, p.setOps = savedFactories, savedClone, savedSet
+	p.zeroFactories, p.eqOps, p.cloneOps, p.setOps = savedFactories, savedEqOps, savedClone, savedSet
 	if len(structDecl.TypeParams) > 0 {
 		factories := make([]string, 0, len(structDecl.TypeParams)*4)
 		for _, param := range structDecl.TypeParams {

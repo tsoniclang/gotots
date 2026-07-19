@@ -305,27 +305,46 @@ Regeneration is structural and transactional:
    workspace;
 2. classify body ownership from headers, baseline markers, and post-format body
    hashes;
-3. extract changed manual AST units in memory with their resolved symbol,
+3. extract all current manual AST units in memory with their resolved symbol,
    dependency, effect, and extension-seam evidence;
 4. generate the new baseline from the new Go pin into an empty staging root;
 5. discard every old generated body rather than copying or adapting it;
-6. join each manual unit to the new canonical Go declaration and signature;
-7. overlay only unambiguous, structurally valid, reachable manual bodies;
-8. derive imports and dependency edges from the assembled typed AST;
-9. run all required structural, staticness, semantic, test, and performance
+6. join each selected-Go manual unit to exactly one current canonical Go
+   declaration with the same exact generated signature;
+7. build the complete candidate dependency/reachability graph from the fresh
+   generated baseline, valid manual units, external contracts, and extension
+   inputs, and close it to a deterministic fixed point;
+8. overlay only unambiguous, structurally valid manual bodies reached by the
+   current roots;
+9. regenerate imports and verify the final artifact graph against the selected
+   candidate subgraph;
+10. produce a deterministic delta/removal plan bound to the exact workspace
+   hash;
+11. run all required structural, staticness, semantic, test, and performance
    gates; and
-10. publish atomically.
+12. publish atomically only when apply sees the same workspace hash as the
+    reviewed plan.
 
 The old editable tree is never a semantic input to automatic translation. It is
 read only to recover manual ownership relative to the attested old baseline.
 No generated body, helper, import, or declaration survives because it happened
 to exist in that tree.
 
+The join is identity reconciliation, not source-to-source migration. GoToTS
+does not rewrite an old manual body when the current declaration identity
+differs, infer identity continuity from spelling or paths, adapt parameters, or
+preserve a body because its text looks similar. An exact current
+identity/signature join keeps the body unchanged;
+signature drift makes it stale, and an absent identity makes it orphaned unless
+the declaration is independently valid and rooted manual product source.
+
 ## Automatic Dependency And Reachability Graph
 
-The developer writes TypeScript, not graph metadata. GoToTS derives the graph
-from typed Go IR, generated TypeScript AST, and manual TypeScript AST. It
-includes:
+The developer writes TypeScript, not graph metadata. GoToTS first forms one
+candidate universe from typed Go IR, the fresh generated TypeScript AST, every
+structurally valid manual TypeScript AST, external contracts, extension inputs,
+and selected tests. It then traverses the following typed edges from the
+declared roots until no node or edge is added:
 
 - static imports, calls, constructors, fields, methods, and package init;
 - function values, closures, callbacks, deferred calls, and stored callables;
@@ -334,21 +353,43 @@ includes:
 - product-extension seams and generated bridge calls; and
 - selected test roots.
 
-An edge is canonical object identity, not source spelling. A dynamic target is
-accepted only when whole-program typed analysis proves a finite complete set.
-An unresolved target is conservatively reachable or blocking; it is never
-discarded through a name or text heuristic.
+Ownership selection precedes outgoing-edge expansion. For an exactly joined
+manual body, that manual body is the sole candidate implementation and supplies
+the declaration's outgoing edges; its fresh generated body is ownership/reset
+evidence only, never an alternate executable path. A manual-only declaration
+has no generated counterpart and enters the active tree only when it is a root
+or the traversal reaches its typed identity.
+
+The graph distinguishes runtime, initialization, declaration/type, external,
+extension, and test edges where their retention effects differ. Imports alone
+are not proof of runtime reachability. Every operation that can add a target has
+one machine edge disposition, and every candidate node is reached or excluded
+by canonical object identity, never source spelling.
+
+A dynamic target is accepted only when whole-program typed analysis proves its
+finite complete set. An unresolved target, missing edge disposition, or
+nonconvergent expansion produces `reachability-unknown` and blocks application
+and publication. It never becomes a negative reachability proof, a guessed
+edge, or a reason to discard source.
 
 Manual code may call generated code, other manual code, or typed external
 contracts normally. Those relationships are discovered from resolved symbols.
 There is no parallel manual dependency file.
 
+For example, if a generated root calls a manual `compile`, which stores a manual
+`resolve` callback that reaches an external contract, fixed-point traversal
+retains both manual bodies and the external obligation. If a later Go pin
+removes every root and caller of `compile`, the same complete graph proves both
+manual bodies unreachable and omits them from the new active tree. Removing one
+import or observing that one test did not run proves neither result.
+
 ## Manual Status And Regeneration Delta
 
 Each regenerated manual unit receives exactly one derived status:
 
-- `reachable-current` — joins the new declaration/signature and all evidence is
-  current;
+- `reachable-current` — joins the new declaration/signature when it implements
+  selected Go, or is a valid reached manual-only declaration, and all evidence
+  is current;
 - `reachable-placeholder` — selected but still has a generated throwing body;
 - `reachable-stale` — joins structurally, but source body, semantic IR,
   lowering plan, effects, extension seams, or proof inputs changed;
@@ -356,7 +397,10 @@ Each regenerated manual unit receives exactly one derived status:
   manual behavior;
 - `unreachable` — no current selected root reaches it;
 - `orphaned` — its prior canonical Go declaration is absent from the current
-  pin or has no unambiguous new join;
+  pin or has no unambiguous new join, and it is not valid reached manual-only
+  product source;
+- `reachability-unknown` — graph construction cannot prove a complete finite
+  target/edge set, so neither retention nor removal is accepted;
 - `automatically-lowerable` — a manual body still overrides a body the current
   translator can now generate; or
 - `invalid` — malformed marker, signature/declaration drift, unresolved static
@@ -367,12 +411,15 @@ signature, IR, plan, generated-baseline, manual-AST, dependency, effect, seam,
 and evidence hashes as applicable. These are generator-derived ledgers, not
 user-maintained inputs.
 
-`reachable-stale`, `reachable-missing`, `reachable-placeholder`, and `invalid`
-block affected product closure. `unreachable` and `orphaned` manual source is
-preserved by default, excluded from product assembly, and reported; it does not
-silently become generated or disappear.
+`reachable-stale`, `reachable-missing`, `reachable-placeholder`,
+`reachability-unknown`, and `invalid` block affected product closure and
+regeneration apply. Proven `unreachable` and `orphaned` manual units appear in
+the reviewed removal plan and are omitted from the newly published active tree.
+They remain recoverable from the immutable prior accepted bundle, the
+identity/hash-bearing regeneration report, and version control; GoToTS does not
+maintain a hidden retained-source or graveyard path.
 
-## Reset, Acceptance And Pruning
+## Reset, Acceptance And Reachability Removal
 
 When automatic lowering later supports a manually implemented body, the manual
 body remains the sole selected implementation. Regeneration reports
@@ -387,10 +434,12 @@ checks, and performance gates applicable to generated code. Passing those
 gates derives `accepted-manual`; it does not require a promotion file or mutate
 the generated baseline marker to resemble the manual body.
 
-An explicit prune command supports `--dry-run` and a separate apply mode for
-unreachable/orphaned manual units. It deletes only identities proven
-unreachable against the complete current graph and current workspace hash.
-Automatic regeneration never prunes manual source.
+Regeneration owns removal directly; no separate prune workflow exists. Its dry
+run lists every proven unreachable/orphaned identity, source location, body
+hash, root set, graph revision, and exclusion proof. Apply omits exactly those
+units only when the workspace, prior baseline, source pin, profile, and graph
+inputs still match the reviewed hashes. Any ambiguity or newly observed edge
+invalidates the plan and leaves the current active tree untouched.
 
 ## Product Extensions
 

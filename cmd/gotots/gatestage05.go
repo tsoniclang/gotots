@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"github.com/tsoniclang/gotots/internal/census"
 	"github.com/tsoniclang/gotots/internal/translate"
@@ -236,13 +237,110 @@ func runSignatureCompletenessGate(firstRun *census.Result, corpusGenerated *tran
 		}
 		return "fail", defects, fmt.Errorf("constant shape ledger failed the identity join")
 	}
-	// What IS joined so far is real but PARTIAL, and it is agreement
-	// between two callers of the SAME typeid.Canonical, not independent
-	// structural verification of the emitted TypeScript against the Go
-	// declaration. "Declaration/signature/type completeness" is therefore
-	// not yet provable: this stage is BLOCKED until (a) every declaration
-	// class joins and (b) a generated-TS shape extractor compares the
-	// emitted declaration structurally with the Go declaration.
+	// Named types: every census type shape must join to a translate proof
+	// carrying the IDENTICAL complete-shape hash (kind, underlying, type
+	// params, fields/tags/embeds, interface methods/embeds, declared
+	// methods), or hold an explicit unimplemented record.
+	typeShapeHash := map[string]string{}
+	aliasShapeHash := map[string]string{}
+	varTypeHash := map[string]string{}
+	for _, proof := range corpusGenerated.Proofs {
+		if proof.TypeShapeHash != "" {
+			typeShapeHash[proof.ID] = proof.TypeShapeHash
+		}
+		if proof.AliasShapeHash != "" {
+			aliasShapeHash[proof.ID] = proof.AliasShapeHash
+		}
+		if proof.VarTypeHash != "" {
+			varTypeHash[proof.ID] = proof.VarTypeHash
+		}
+	}
+	typeJoined, typeUnimplemented := 0, 0
+	for _, shape := range firstRun.Shapes.Types {
+		if !production[shape.ID] {
+			continue
+		}
+		got, has := typeShapeHash[shape.ID]
+		if !has {
+			if state, hasState := supportState[shape.ID]; hasState && state == "unimplemented" {
+				typeUnimplemented++
+				continue
+			}
+			defects = append(defects, "no type-shape evidence for census type "+shape.ID)
+			continue
+		}
+		if got != signatureHashOf(census.TypeShapeSignature(shape)) {
+			defects = append(defects, "type shape drift at "+shape.ID)
+			continue
+		}
+		typeJoined++
+	}
+	for id := range typeShapeHash {
+		if !censusIDs[id] && !censusTypeID(firstRun, id) {
+			defects = append(defects, "orphan type-shape proof (no census shape): "+id)
+		}
+	}
+	// Aliases: identical target + own-type-parameter shape.
+	aliasJoined, aliasUnimplemented := 0, 0
+	for _, shape := range firstRun.Shapes.Aliases {
+		if !production[shape.ID] {
+			continue
+		}
+		got, has := aliasShapeHash[shape.ID]
+		if !has {
+			if state, hasState := supportState[shape.ID]; hasState && state == "unimplemented" {
+				aliasUnimplemented++
+				continue
+			}
+			defects = append(defects, "no alias-shape evidence for census alias "+shape.ID)
+			continue
+		}
+		if got != signatureHashOf(census.AliasShapeSignature(shape)) {
+			defects = append(defects, "alias shape drift at "+shape.ID)
+			continue
+		}
+		aliasJoined++
+	}
+	// Variable TYPES: identical canonical type spelling (the initializer
+	// join above already covers initializer identity).
+	varTypeJoined, varTypeUnimplemented := 0, 0
+	for _, shape := range firstRun.Shapes.Variables {
+		if !production[shape.ID] {
+			continue
+		}
+		got, has := varTypeHash[shape.ID]
+		if !has {
+			if varUnimplemented[shape.ID] {
+				varTypeUnimplemented++
+				continue
+			}
+			// Blank variables carry positional identities and no declared
+			// binding; their effect-only/no-output proofs dispose them in
+			// the census reconciliation stage.
+			if strings.Contains(shape.ID, "::var::_@") {
+				continue
+			}
+			defects = append(defects, "no variable-type evidence for census var "+shape.ID)
+			continue
+		}
+		if got != signatureHashOf(shape.Type) {
+			defects = append(defects, "variable type drift at "+shape.ID)
+			continue
+		}
+		varTypeJoined++
+	}
+	if len(defects) > 0 {
+		if len(defects) > 15 {
+			defects = defects[:15]
+		}
+		return "fail", defects, fmt.Errorf("type/alias/variable declaration shapes failed the identity join")
+	}
+	// What IS joined is agreement between the two pipelines' independent
+	// loads of the same pinned toolchain over every declaration class.
+	// The remaining build-out is INDEPENDENCE: a generated-TS shape
+	// extractor that parses the emitted declarations and compares them
+	// structurally with the Go declarations, never through the shared
+	// canonical renderer.
 	return "blocked", []string{
 		fmt.Sprintf("census production function/method denominator: %d", denominator),
 		fmt.Sprintf("signatures joined against the census spelling: %d", verified),
@@ -251,9 +349,27 @@ func runSignatureCompletenessGate(firstRun *census.Result, corpusGenerated *tran
 		fmt.Sprintf("function literals joined by identity, parent, and body hash: %d (%d unimplemented)", litJoined, litUnimplemented),
 		fmt.Sprintf("variable initializers joined by identity and hash: %d (%d explicitly unimplemented)", initJoined, initBlocked),
 		fmt.Sprintf("constants joined by canonical type and exact value: %d", constJoined),
-		"BLOCKED: function signatures, function-literal bodies, variable initializers, and constants are joined — named types, variable TYPES, aliases, struct fields/tags/embedding, and interface methods/embeds are NOT yet verified (census records them in Shapes.* but this stage does not join them)",
-		"BLOCKED: the join proves census and translator AGREE (both derive identity from internal/typeid.Canonical) — it is not INDEPENDENT correctness; no generated TypeScript declaration is structurally compared with its Go declaration",
+		fmt.Sprintf("named types joined by complete shape (fields/tags/embeds/methods): %d (%d explicitly unimplemented)", typeJoined, typeUnimplemented),
+		fmt.Sprintf("aliases joined by target and type parameters: %d (%d explicitly unimplemented)", aliasJoined, aliasUnimplemented),
+		fmt.Sprintf("variable declared types joined: %d (%d explicitly unimplemented)", varTypeJoined, varTypeUnimplemented),
+		"BLOCKED: the join proves census and translator AGREE over every declaration class — independence (a generated-TS shape extractor structurally comparing emitted declarations with Go declarations) is not yet built",
 	}, nil
+}
+
+// censusTypeID reports whether an identity names a census type or alias
+// shape.
+func censusTypeID(firstRun *census.Result, id string) bool {
+	for _, shape := range firstRun.Shapes.Types {
+		if shape.ID == id {
+			return true
+		}
+	}
+	for _, shape := range firstRun.Shapes.Aliases {
+		if shape.ID == id {
+			return true
+		}
+	}
+	return false
 }
 
 // signatureHashOf is the canonical signature digest stage 05 verifies.

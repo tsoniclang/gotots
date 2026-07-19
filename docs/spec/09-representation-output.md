@@ -236,9 +236,10 @@ Automatic emission cannot read or reuse an accepted output tree. Its inputs are
 the pin, profile, generated semantic artifacts, external contracts, and
 extension seam data. The preceding manual-reconciliation phase may read the
 attested prior generated baseline and current editable workspace only to
-classify and extract manual AST units. Those units are overlaid onto an
-independently generated fresh baseline; old generated bodies, helpers, imports,
-and declarations are never copied forward.
+classify and extract manual AST units. Those units participate in the complete
+candidate graph, and only reached units are overlaid onto an independently
+generated fresh baseline; old generated bodies, helpers, imports, and
+declarations are never copied forward.
 
 ## Implementation-Permitted Behavior
 

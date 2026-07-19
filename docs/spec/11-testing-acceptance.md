@@ -203,20 +203,32 @@ Fixtures exercise the complete mixed-source lifecycle:
 - deepest-first nested-body ownership without overlapping owners;
 - fresh empty-root generation followed by structural manual overlay;
 - no old generated body/import/helper surviving regeneration;
-- automatic static dependency and reachability derivation through direct calls,
-  function values, callbacks, finite interface/generic targets, init, externals,
-  extensions, and tests;
+- complete fixed-point reachability through direct calls, function values,
+  callbacks, finite interface/generic targets, init, externals, extensions, and
+  tests, including transitive manual helpers;
+- every retention-affecting operation receiving one typed edge disposition and
+  import-only evidence being insufficient;
 - current, placeholder, stale, missing, unreachable, orphaned,
-  automatically-lowerable, and invalid statuses;
+  reachability-unknown, automatically-lowerable, and invalid statuses;
 - source upgrades that add, change, move, or remove a manual body's Go object;
+- exact current-identity/signature joins without rename, move, parameter, or
+  body adaptation;
 - explicit reset with current-hash compare-and-swap semantics;
-- prune dry-run/apply preserving reachable source and rejecting a stale plan;
-  and
+- regeneration dry-run/apply retaining reachable manual source, omitting every
+  proven unreachable/orphaned unit, and rejecting a stale plan;
+- removal of all callers/roots causing a formerly reachable manual body and its
+  private manual helpers to disappear from the new active tree;
+- an unknown dynamic target, missing edge disposition, or nonconvergent graph
+  blocking removal and publication rather than guessing;
+- removed source remaining recoverable from the prior immutable bundle,
+  identity/hash report, and version control without a secondary retained-source
+  path; and
 - reachable unresolved manual/external placeholders blocking publication.
 
 Regeneration tests prove that manual source is preserved by ownership, not by
 copying whole old files. Generated output surrounding a manual body must update
-to the new baseline in the same run.
+to the new baseline in the same run. Mutation tests delete or forge graph edges,
+roots, candidates, and witness/exclusion records and require fail-closed results.
 
 ## Selected Go Tests
 
@@ -315,6 +327,8 @@ Every accepted run reports:
 - declarations, function/method bodies, function literals, synthetic
   initializers, and unsupported non-body declarations as separate denominators;
 - generated, manual, and unimplemented support states;
+- manual regeneration states, candidate/reached/excluded/unknown graph counts,
+  and planned/applied reachability removals;
 - every translation evidence stage from `00-authority-scope.md`;
 - directly incomplete, transitively withheld, retained runnable, and published
   package counts;

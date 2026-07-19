@@ -156,3 +156,37 @@ func ClosureAssignedNilSlice() int {
 }
 `)
 }
+
+func TestOracleGenericOverGenericZeroField(t *testing.T) {
+	// The CopyOnWriteSet shape: a generic struct whose field is ANOTHER
+	// generic instantiation over the outer parameter — its zero (inside
+	// goZero$) derives eq/clone/set factories for the nested instantiation
+	// from the outer scope's own factory parameters.
+	runOracle(t, `package fixture
+
+type inner[T any] struct {
+	val T
+	set bool
+}
+
+type outer[T any] struct {
+	in inner[T]
+}
+
+func (o *outer[T]) Put(v T) {
+	o.in = inner[T]{val: v, set: true}
+}
+
+func GenericOverGenericZeroField() int {
+	var o outer[int]
+	if o.in.set {
+		return -1
+	}
+	o.Put(41)
+	if !o.in.set {
+		return -2
+	}
+	return o.in.val + 1
+}
+`)
+}

@@ -199,9 +199,25 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 							// An alias erases to its target at every use and
 							// emits no declaration of its own.
 							aliasProof.NoOutput = true
+							aliasShape, err := census.DeriveAliasShape(object, id)
+							if err != nil {
+								if declSite(id, err) {
+									continue
+								}
+								return err
+							}
+							aliasProof.AliasShapeHash = shapeHash(census.AliasShapeSignature(aliasShape))
 						} else {
 							aliasProof.GeneratedFile = corePath
 							aliasProof.GeneratedSymbol = tsident.EscapeDeclared(typeSpec.Name.Name)
+							typeShape, err := census.DeriveTypeShape(object, id)
+							if err != nil {
+								if declSite(id, err) {
+									continue
+								}
+								return err
+							}
+							aliasProof.TypeShapeHash = shapeHash(census.TypeShapeSignature(typeShape))
 						}
 						out.Proofs = append(out.Proofs, aliasProof)
 						continue
@@ -215,12 +231,20 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 					}
 					structs[structDecl.Name] = structDecl
 					structOrder = append(structOrder, structDecl.Name)
+					structShape, err := census.DeriveTypeShape(object, id)
+					if err != nil {
+						if declSite(id, err) {
+							continue
+						}
+						return err
+					}
 					out.Proofs = append(out.Proofs, Proof{
 						ID: id, SourceRevision: options.SourceRevision,
 						Package: p.PkgPath, File: f.relative,
 						LoweringPlan:    LoweringPlanV2,
 						Representations: map[string]string{"decl:" + typeSpec.Name.Name: "class-direct-identity"},
 						GeneratedFile:   corePath, GeneratedSymbol: tsident.EscapeDeclared(structDecl.Name),
+						TypeShapeHash:   shapeHash(census.TypeShapeSignature(structShape)),
 					})
 				}
 			case token.VAR:

@@ -199,7 +199,9 @@ func TestSpecificationContractMarkers(t *testing.T) {
 		"08-externals-manual-extensions.md": {
 			"Generated Baselines And Body Hashes",
 			"Automatic Dependency And Reachability Graph",
-			"Reset, Acceptance And Pruning",
+			"Reset, Acceptance And Reachability Removal",
+			"reachability-unknown",
+			"Regeneration owns removal directly",
 			"Mid-Body Seams",
 		},
 		"09-representation-output.md": {

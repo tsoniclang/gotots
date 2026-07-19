@@ -44,7 +44,8 @@ GoToTS performs the following deterministic pipeline:
    region;
 7. lower to a typed TypeScript AST without semantic rediscovery;
 8. reconcile the fresh generated baseline with automatically detected manual
-   bodies, external implementations, and extension-owned inputs;
+   bodies, external implementations, and extension-owned inputs through one
+   complete fixed-point candidate graph, overlaying only reached units;
 9. validate the complete staged artifact; and
 10. publish atomically.
 
