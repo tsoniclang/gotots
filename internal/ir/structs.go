@@ -92,11 +92,8 @@ func BuildStruct(p *packages.Package, sourceDir string, unit Scope, spec *ast.Ty
 	out.Comparable = b.structEqComparable(named)
 	out.KeyEncodable = b.structKeyEncodable(named, span)
 	if named.TypeParams() != nil {
-		out.CaptureKey = out.KeyEncodable
 		for i := range named.TypeParams().Len() {
-			if b.unit.ParamRequiresSVZKey(named.Obj(), i) {
-				out.CaptureKey = true
-			}
+			out.KeyedParams = append(out.KeyedParams, b.unit.ParamRequiresKeyOp(named.Obj(), i))
 		}
 	}
 	return out, nil

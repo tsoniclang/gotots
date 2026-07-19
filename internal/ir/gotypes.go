@@ -239,11 +239,8 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 			Uncomparable: !b.structEqComparable(named),
 			KeyEncodable: b.structKeyEncodable(named, span)}
 		if named.TypeParams() != nil && named.TypeParams().Len() > 0 {
-			out.ClassCapturesKey = b.structKeyEncodable(named.Origin(), span)
 			for i := range named.TypeParams().Len() {
-				if b.unit.ParamRequiresSVZKey(named.Origin().Obj(), i) {
-					out.ClassCapturesKey = true
-				}
+				out.ClassKeyParams = append(out.ClassKeyParams, b.unit.ParamRequiresKeyOp(named.Origin().Obj(), i))
 			}
 		}
 		if named.TypeArgs() != nil {
@@ -278,11 +275,8 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 				}
 				out.TypeArgs = append(out.TypeArgs, arg)
 			}
-			out.ClassCapturesKey = b.structKeyEncodable(named, span)
 			for i := range named.TypeParams().Len() {
-				if b.unit.ParamRequiresSVZKey(named.Obj(), i) {
-					out.ClassCapturesKey = true
-				}
+				out.ClassKeyParams = append(out.ClassKeyParams, b.unit.ParamRequiresKeyOp(named.Obj(), i))
 			}
 		}
 		return out, nil

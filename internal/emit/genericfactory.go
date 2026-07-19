@@ -218,9 +218,9 @@ func (p *printer) setOperation(t ir.Type) (string, error) {
 // type argument — the trailing constructor arguments of every generic
 // class (captured at construction so goEq$/goClone$/goSet$ stay
 // source-shaped).
-func (p *printer) eqCloneSetFactoryArgs(typeArgs []ir.Type, captureKey bool) (string, error) {
+func (p *printer) eqCloneSetFactoryArgs(typeArgs []ir.Type, keyParams []bool) (string, error) {
 	parts := make([]string, 0, len(typeArgs)*4)
-	for _, arg := range typeArgs {
+	for i, arg := range typeArgs {
 		eq, err := p.eqOperation(arg)
 		if err != nil {
 			return "", err
@@ -234,7 +234,7 @@ func (p *printer) eqCloneSetFactoryArgs(typeArgs []ir.Type, captureKey bool) (st
 			return "", err
 		}
 		parts = append(parts, eq, clone, set)
-		if captureKey {
+		if i < len(keyParams) && keyParams[i] {
 			key, err := p.captureKeyOperation(arg)
 			if err != nil {
 				return "", err
@@ -390,7 +390,7 @@ func (p *printer) zeroLiteral(t ir.Type) (string, error) {
 				}
 				factories[i] = "() => " + zero
 			}
-			cloneSet, err := p.eqCloneSetFactoryArgs(t.TypeArgs, t.ClassCapturesKey)
+			cloneSet, err := p.eqCloneSetFactoryArgs(t.TypeArgs, t.ClassKeyParams)
 			if err != nil {
 				return "", err
 			}

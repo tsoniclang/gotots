@@ -121,10 +121,12 @@ type Type struct {
 	// keeps the direct Map carrier (so map values crossing the generic
 	// boundary into concrete SVZ contexts stay representation-identical).
 	EncodedParamKey bool
-	// ClassCapturesKey marks a struct instance whose GENERIC DECLARATION
-	// is key-encodable: its class captures key$P at construction (every
-	// construction site passes the per-binding key operation).
-	ClassCapturesKey bool
+	// ClassKeyParams marks, per type parameter of a generic struct
+	// instance's DECLARATION, whether its class captures key$P at that
+	// position (the requirement store's per-param verdict) — every
+	// construction site passes the per-binding key operation for exactly
+	// these positions.
+	ClassKeyParams []bool
 	// KeyEncodable marks a struct whose generated class carries goKey$
 	// (the canonical key encoding) — consumed by the per-binding key
 	// operation derivation.
@@ -217,6 +219,10 @@ type Scope struct {
 	// paramKeyReqs records, per generic declaration (by canonical key),
 	// which type parameters must bind SameValueZero key carriers.
 	paramKeyReqs map[string][]bool
+	// paramCaptureReqs is the SOFT level: the parameter's key$P is
+	// forwarded (a key-encodable class origin captures it) but no map is
+	// keyed by it — any Go-legal binding admits, the derivation is total.
+	paramCaptureReqs map[string][]bool
 	// universeSealed is the closed-world dynamic-type universe's lifecycle
 	// flag (pointer-shared across Scope value copies). It is false while the
 	// pre-pass COLLECTS the named-type universe (concreteTypes,
@@ -277,6 +283,7 @@ func NewScope(paths ...string) Scope {
 		addressTakenFields: map[string]bool{},
 		genericEdges:       &[]genericEdge{},
 		paramKeyReqs:       map[string][]bool{},
+		paramCaptureReqs:   map[string][]bool{},
 		universeSealed:     new(bool),
 	}
 }
@@ -488,10 +495,10 @@ type Struct struct {
 	// Promoted lists the embedded-field method promotions the rtti
 	// method table delegates through value-field chains.
 	Promoted []PromotedDelegate
-	// CaptureKey marks a generic struct whose class captures key$P at
-	// construction: it is key-encodable OR the requirement propagation
-	// recorded a key need on one of its parameters.
-	CaptureKey bool
+	// KeyedParams marks, per type parameter, whether the class captures
+	// key$P at that position — the requirement store's per-param verdict
+	// (a key-encodable origin requires every position).
+	KeyedParams []bool
 	// Comparable marks a struct whose fields all support exact generated
 	// equality: it carries goEq$, and interface equality over it never
 	// panics.

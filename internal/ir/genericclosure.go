@@ -274,6 +274,30 @@ func (s Scope) ParamRequiresSVZKey(obj types.Object, index int) bool {
 	return index < len(reqs) && reqs[index]
 }
 
+// RequireParamKeyCapture records the SOFT requirement: the declaration
+// forwards key$P (a key-encodable class capture) without keying a map by
+// it — any Go-legal binding admits.
+func (s Scope) RequireParamKeyCapture(obj types.Object, index int) {
+	key := objKey(obj)
+	reqs := s.paramCaptureReqs[key]
+	for len(reqs) <= index {
+		reqs = append(reqs, false)
+	}
+	reqs[index] = true
+	s.paramCaptureReqs[key] = reqs
+}
+
+// ParamRequiresKeyOp reports whether the declaration's i-th parameter
+// takes key$P in the factory protocol — the union of the HARD map-key
+// requirement and the SOFT capture requirement.
+func (s Scope) ParamRequiresKeyOp(obj types.Object, index int) bool {
+	if s.ParamRequiresSVZKey(obj, index) {
+		return true
+	}
+	reqs := s.paramCaptureReqs[objKey(obj)]
+	return index < len(reqs) && reqs[index]
+}
+
 // CollectParamKeyRequirements scans one generic declaration's shape for
 // map keys typed by its own parameters (fields, embedded types, method
 // signatures for a type; the full signature for a function) and records
@@ -283,6 +307,17 @@ func (s Scope) ParamRequiresSVZKey(obj types.Object, index int) bool {
 func (s Scope) CollectParamKeyRequirements(obj types.Object, params *types.TypeParamList, shape []types.Type) {
 	if params == nil || params.Len() == 0 {
 		return
+	}
+	// A generic STRUCT whose origin is structurally key-encodable carries
+	// goKey$ and captures key$P for every parameter: record the
+	// requirement on all of them, so the requirement store is the ONE
+	// source both the class capture mask and the call-side masks read.
+	if typeName, isType := obj.(*types.TypeName); isType {
+		if named, isNamed := typeName.Type().(*types.Named); isNamed && originStructKeyCapturing(named.Origin()) {
+			for i := range params.Len() {
+				s.RequireParamKeyCapture(obj, i)
+			}
+		}
 	}
 	index := map[*types.TypeParam]int{}
 	for i := range params.Len() {
@@ -325,23 +360,26 @@ func (s Scope) CollectParamKeyRequirements(obj types.Object, params *types.TypeP
 			walk(u.Results())
 		case *types.Named:
 			if args := u.TypeArgs(); args != nil {
-				keyCapturing := false
-				if _, isStruct := u.Origin().Underlying().(*types.Struct); isStruct && u.TypeParams() != nil && u.TypeParams().Len() > 0 {
-					// A KEY-CAPTURING generic class (its origin is a
-					// key-encodable struct) takes key$P at construction:
-					// binding one of OUR parameters to it propagates the
-					// key requirement (the enclosing declaration must take
-					// key$P to forward it).
-					keyCapturing = originStructKeyCapturing(u.Origin())
-				}
-				for i := range args.Len() {
-					if keyCapturing {
+				if u.TypeParams() != nil && u.TypeParams().Len() > 0 {
+					// A generic instantiation binding one of OUR parameters:
+					// record the edge so the requirement fixed point flows
+					// the callee's key requirements (its own map keys AND
+					// its capture mask) back to the binding parameter.
+					mentionsMine := false
+					argList := make([]types.Type, args.Len())
+					for i := range args.Len() {
+						argList[i] = args.At(i)
 						if p, ok := types.Unalias(args.At(i)).(*types.TypeParam); ok {
-							if j, mine := index[p]; mine {
-								s.RequireParamSVZKey(obj, j)
+							if _, mine := index[p]; mine {
+								mentionsMine = true
 							}
 						}
 					}
+					if mentionsMine {
+						s.AddGenericEdge(obj, u.Origin().Obj(), argList)
+					}
+				}
+				for i := range args.Len() {
 					walk(args.At(i))
 				}
 			}
@@ -371,7 +409,9 @@ func (s Scope) PropagateParamRequirements() {
 				continue
 			}
 			for j, arg := range edge.args {
-				if !s.ParamRequiresSVZKey(inner, j) {
+				hard := s.ParamRequiresSVZKey(inner, j)
+				soft := s.ParamRequiresKeyOp(inner, j)
+				if !hard && !soft {
 					continue
 				}
 				p, ok := types.Unalias(arg).(*types.TypeParam)
@@ -379,8 +419,15 @@ func (s Scope) PropagateParamRequirements() {
 					continue
 				}
 				for i := range params.Len() {
-					if params.At(i) == p && !s.ParamRequiresSVZKey(outer, i) {
+					if params.At(i) != p {
+						continue
+					}
+					if hard && !s.ParamRequiresSVZKey(outer, i) {
 						s.RequireParamSVZKey(outer, i)
+						changed = true
+					}
+					if soft && !s.ParamRequiresKeyOp(outer, i) {
+						s.RequireParamKeyCapture(outer, i)
 						changed = true
 					}
 				}

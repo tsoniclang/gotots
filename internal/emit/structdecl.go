@@ -44,14 +44,14 @@ func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct) er
 	// construction: clone$P/set$P fields keep goClone$/goSet$ zero-arg (the
 	// structural GoStructValue contract), while their behavior stays exact
 	// per instantiation.
-	for _, param := range structDecl.TypeParams {
+	for i, param := range structDecl.TypeParams {
 		p.line("eq$%s: (a: %s, b: %s) => boolean;", param, param, param)
 		p.line("clone$%s: (v: %s) => %s;", param, param, param)
 		p.line("set$%s: ((d: %s, s: %s) => void) | undefined;", param, param, param)
 		params = append(params, "eq$"+param+": (a: "+param+", b: "+param+") => boolean")
 		params = append(params, "clone$"+param+": (v: "+param+") => "+param)
 		params = append(params, "set$"+param+": ((d: "+param+", s: "+param+") => void) | undefined")
-		if structDecl.CaptureKey {
+		if structKeyed(structDecl, i) {
 			p.line("key$%s: (k: %s) => string;", param, param)
 			params = append(params, "key$"+param+": (k: "+param+") => string")
 		}
@@ -65,11 +65,11 @@ func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct) er
 			p.line("this.%s = %s;", field.Name, tsName(field.Name))
 		}
 	}
-	for _, param := range structDecl.TypeParams {
+	for i, param := range structDecl.TypeParams {
 		p.line("this.eq$%s = eq$%s;", param, param)
 		p.line("this.clone$%s = clone$%s;", param, param)
 		p.line("this.set$%s = set$%s;", param, param)
-		if structDecl.CaptureKey {
+		if structKeyed(structDecl, i) {
 			p.line("this.key$%s = key$%s;", param, param)
 		}
 	}
@@ -126,9 +126,9 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 	if len(structDecl.TypeParams) > 0 {
 		self += "<" + strings.Join(structDecl.TypeParams, ", ") + ">"
 	}
-	for _, param := range structDecl.TypeParams {
+	for i, param := range structDecl.TypeParams {
 		clone = append(clone, "this.eq$"+param, "this.clone$"+param, "this.set$"+param)
-		if structDecl.CaptureKey {
+		if structKeyed(structDecl, i) {
 			clone = append(clone, "this.key$"+param)
 		}
 	}
@@ -184,12 +184,14 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 		p.cloneOps = map[string]string{}
 		p.setOps = map[string]string{}
 		p.keyOps = map[string]string{}
-		for _, param := range structDecl.TypeParams {
+		for i, param := range structDecl.TypeParams {
 			p.zeroFactories[param] = "zero$" + param
 			p.eqOps[param] = "eq$" + param
 			p.cloneOps[param] = "clone$" + param
 			p.setOps[param] = "set$" + param
-			p.keyOps[param] = "key$" + param
+			if structKeyed(structDecl, i) {
+				p.keyOps[param] = "key$" + param
+			}
 		}
 	}
 	zeros := make([]string, 0, len(structDecl.Fields))
@@ -207,18 +209,18 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 		for _, param := range structDecl.TypeParams {
 			factories = append(factories, "zero$"+param+": () => "+param)
 		}
-		for _, param := range structDecl.TypeParams {
+		for i, param := range structDecl.TypeParams {
 			factories = append(factories, "eq$"+param+": (a: "+param+", b: "+param+") => boolean")
 			factories = append(factories, "clone$"+param+": (v: "+param+") => "+param)
 			factories = append(factories, "set$"+param+": ((d: "+param+", s: "+param+") => void) | undefined")
-			if structDecl.CaptureKey {
+			if structKeyed(structDecl, i) {
 				factories = append(factories, "key$"+param+": (k: "+param+") => string")
 			}
 		}
 		ctorArgs := append([]string{}, zeros...)
-		for _, param := range structDecl.TypeParams {
+		for i, param := range structDecl.TypeParams {
 			ctorArgs = append(ctorArgs, "eq$"+param, "clone$"+param, "set$"+param)
-			if structDecl.CaptureKey {
+			if structKeyed(structDecl, i) {
 				ctorArgs = append(ctorArgs, "key$"+param)
 			}
 		}
@@ -527,4 +529,9 @@ func (p *printer) eqComponent(left, right string, t ir.Type) (string, error) {
 		return fmt.Sprintf("gosl$.goArrayEqualWith(%s, %s, ($x: %s, $y: %s) => %s)", left, right, spelled, spelled, elem), nil
 	}
 	return "(" + left + " === " + right + ")", nil
+}
+
+// structKeyed reports whether the class captures key$P at position i.
+func structKeyed(structDecl *ir.Struct, i int) bool {
+	return i < len(structDecl.KeyedParams) && structDecl.KeyedParams[i]
 }
