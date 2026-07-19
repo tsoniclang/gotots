@@ -687,6 +687,11 @@
       "specClause": "docs/spec/collections-strings.md"
     },
     {
+      "key": "sliceSameSlot",
+      "state": "generated",
+      "specClause": "docs/spec/collections-strings.md"
+    },
+    {
       "key": "sliceStore",
       "state": "generated",
       "specClause": "docs/spec/collections-strings.md"

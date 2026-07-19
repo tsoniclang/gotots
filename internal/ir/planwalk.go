@@ -148,6 +148,13 @@ func (s *slicePlanner) walkExpr(e Expr) {
 		s.walkExpr(n.X)
 	case *ParamReprCast:
 		s.walkExpr(n.X)
+	case *SliceSlotEq:
+		// Slot identity observes backing-store sharing, so both slices
+		// must carry the view representation.
+		s.escapeIfSlice(n.A)
+		s.escapeIfSlice(n.B)
+		s.walkExpr(n.IA)
+		s.walkExpr(n.IB)
 	case *StringConvert:
 		// The string-conversion ABI reads the operand's carrier shape, so
 		// a []byte/[]rune source must not be a native array.

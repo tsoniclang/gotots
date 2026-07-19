@@ -63,6 +63,16 @@ type ParamReprCast struct {
 	T Type // the parameter's carrier type (TypeParamName set)
 }
 
+// SliceSlotEq is Go's element-address identity &a[ia] == &b[ib] over
+// slice operands: slot identity (same backing store, same absolute
+// index), decided without materializing an address carrier. Both
+// indexes bounds-check exactly as taking the addresses does.
+type SliceSlotEq struct {
+	A, IA  Expr
+	B, IB  Expr
+	Negate bool
+}
+
 // Call invokes a package-level function of the translated unit directly.
 // TypeArgs, when set, are the explicit type arguments of an instantiated
 // generic call.
@@ -289,6 +299,7 @@ func (*Unary) expr()            {}
 func (*Convert) expr()          {}
 func (*ParamReprView) expr()    {}
 func (*ParamReprCast) expr()    {}
+func (*SliceSlotEq) expr()      {}
 func (*Call) expr()             {}
 
 func (c *Const) Type() Type   { return c.T }
@@ -298,6 +309,7 @@ func (u *Unary) Type() Type   { return u.T }
 func (c *Convert) Type() Type       { return c.To }
 func (v *ParamReprView) Type() Type { return v.T }
 func (c *ParamReprCast) Type() Type { return c.T }
+func (*SliceSlotEq) Type() Type     { return Type{Kind: KindBool, Go: "bool"} }
 
 // Type of a call is its single result; multi-result calls are consumed
 // only through DeclStmt/AssignStmt/ReturnStmt tuple slots.

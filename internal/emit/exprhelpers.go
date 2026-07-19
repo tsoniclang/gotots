@@ -149,3 +149,53 @@ func callFamilyPtr(typeArgs []ir.Type, ptrParams []bool, familyPtrCell bool) boo
 	}
 	return false
 }
+
+// printParamReprView renders a representation-uniform parameter value
+// viewed at its carrier.
+func (p *printer) printParamReprView(n *ir.ParamReprView) (string, error) {
+	x, err := p.printExpr(n.X)
+	if err != nil {
+		return "", err
+	}
+	carrier, err := p.tsType(n.T)
+	if err != nil {
+		return "", err
+	}
+	return "(" + x + " as " + carrier + ")", nil
+}
+
+// printParamReprCast renders a carrier value viewed back as the exact
+// single-kind parameter it represents.
+func (p *printer) printParamReprCast(n *ir.ParamReprCast) (string, error) {
+	x, err := p.printExpr(n.X)
+	if err != nil {
+		return "", err
+	}
+	return "(" + x + " as " + n.T.TypeParamName + ")", nil
+}
+
+// printSliceSlotEq renders Go's element-address identity as the ABI
+// slot test.
+func (p *printer) printSliceSlotEq(n *ir.SliceSlotEq) (string, error) {
+	a, err := p.printExpr(n.A)
+	if err != nil {
+		return "", err
+	}
+	ia, err := p.printExpr(n.IA)
+	if err != nil {
+		return "", err
+	}
+	bs, err := p.printExpr(n.B)
+	if err != nil {
+		return "", err
+	}
+	ib, err := p.printExpr(n.IB)
+	if err != nil {
+		return "", err
+	}
+	test := "gosl$.goSliceSameSlot(" + a + ", " + ia + ", " + bs + ", " + ib + ")"
+	if n.Negate {
+		return "(!" + test + ")", nil
+	}
+	return test, nil
+}

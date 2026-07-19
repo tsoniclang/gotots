@@ -32,6 +32,12 @@ func (b *builder) buildBinary(n *ast.BinaryExpr, resultType types.Type) (Expr, e
 		}
 	}
 
+	if n.Op == token.EQL || n.Op == token.NEQ {
+		if aliased, matched, err := b.buildSliceSlotIdentity(n, span); matched {
+			return aliased, err
+		}
+	}
+
 	left, err := b.buildExpr(n.X)
 	if err != nil {
 		return nil, err
@@ -126,3 +132,64 @@ type StructEqual struct {
 
 func (*StructEqual) expr()        {}
 func (s *StructEqual) Type() Type { return boolType }
+
+// buildSliceSlotIdentity lowers &a[ia] == &b[ib] over slice operands to
+// slot identity. Struct-family elements keep the existing identity-
+// pointer path (their slots own their instances, so the comparisons
+// coincide); value-carrier elements have no address carrier to compare,
+// so the slot test is the exact lowering.
+func (b *builder) buildSliceSlotIdentity(n *ast.BinaryExpr, span Span) (Expr, bool, error) {
+	leftSlice, leftIndex, isLeft := b.addressedSliceElem(n.X)
+	rightSlice, rightIndex, isRight := b.addressedSliceElem(n.Y)
+	if !isLeft || !isRight {
+		return nil, false, nil
+	}
+	sliceT, err := b.typeOf(b.info.Types[leftSlice].Type, span)
+	if err != nil || sliceT.Elem == nil {
+		return nil, false, nil
+	}
+	switch sliceT.Elem.Kind {
+	case KindStruct, KindArray, KindExternal:
+		// Object-identity elements build through the normal path.
+		return nil, false, nil
+	}
+	a, err := b.buildExpr(leftSlice)
+	if err != nil {
+		return nil, true, err
+	}
+	ia, err := b.buildExpr(leftIndex)
+	if err != nil {
+		return nil, true, err
+	}
+	bSlice, err := b.buildExpr(rightSlice)
+	if err != nil {
+		return nil, true, err
+	}
+	ib, err := b.buildExpr(rightIndex)
+	if err != nil {
+		return nil, true, err
+	}
+	b.use("sliceSameSlot")
+	return &SliceSlotEq{A: a, IA: ia, B: bSlice, IB: ib, Negate: n.Op == token.NEQ}, true, nil
+}
+
+// addressedSliceElem matches the syntactic form &s[i] where s is
+// slice-typed by checker evidence.
+func (b *builder) addressedSliceElem(e ast.Expr) (ast.Expr, ast.Expr, bool) {
+	unary, isUnary := ast.Unparen(e).(*ast.UnaryExpr)
+	if !isUnary || unary.Op != token.AND {
+		return nil, nil, false
+	}
+	index, isIndex := ast.Unparen(unary.X).(*ast.IndexExpr)
+	if !isIndex {
+		return nil, nil, false
+	}
+	tv, ok := b.info.Types[index.X]
+	if !ok || tv.Type == nil {
+		return nil, nil, false
+	}
+	if _, isSlice := tv.Type.Underlying().(*types.Slice); !isSlice {
+		return nil, nil, false
+	}
+	return index.X, index.Index, true
+}

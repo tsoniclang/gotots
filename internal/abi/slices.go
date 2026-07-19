@@ -54,6 +54,20 @@ export function goSliceElemCell<T>(s: GoSliceValue<T>, index: GoIndex): GoCell<T
   };
 }
 
+// goSliceSameSlot is Go's element-address identity (&a[ia] == &b[ib]):
+// true exactly when both indexed slots are the same backing-store slot.
+// Each index bounds-checks against its own slice, exactly as taking the
+// address does.
+export function goSliceSameSlot<T>(a: GoSliceValue<T>, ia: GoIndex, b: GoSliceValue<T>, ib: GoIndex): boolean {
+  const lengthA = a === undefined ? 0 : a.length;
+  if (ia < 0 || ia >= lengthA) panicIndex(ia, lengthA);
+  const lengthB = b === undefined ? 0 : b.length;
+  if (ib < 0 || ib >= lengthB) panicIndex(ib, lengthB);
+  const sliceA = a as GoSlice<T>;
+  const sliceB = b as GoSlice<T>;
+  return sliceA.backing === sliceB.backing && sliceA.offset + Number(ia) === sliceB.offset + Number(ib);
+}
+
 // goSliceClearWith zeroes every element in place (Go's clear(s)):
 // value-copy carriers store through their set operation so aliases of
 // the elements observe the zeroing.
