@@ -182,11 +182,7 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 		if err != nil {
 			return Type{}, err
 		}
-		out := Type{Kind: KindMap, Go: spelled, Key: &key, Elem: &value}
-		if key.Kind == KindIface && key.TypeParamName != "" {
-			out.EncodedParamKey = b.paramKeyFamilyEncoded(u.Key(), span)
-		}
-		return out, nil
+		return Type{Kind: KindMap, Go: spelled, Key: &key, Elem: &value}, nil
 
 	case *types.Signature:
 		if u.TypeParams() != nil || u.Recv() != nil {
@@ -244,6 +240,10 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 		if named.TypeParams() != nil && named.TypeParams().Len() > 0 {
 			for i := range named.TypeParams().Len() {
 				out.ClassKeyParams = append(out.ClassKeyParams, b.unit.ParamRequiresKeyOp(named.Origin().Obj(), i))
+				out.HardKeyedParams = append(out.HardKeyedParams, b.unit.ParamRequiresSVZKey(named.Origin().Obj(), i))
+			}
+			if named.TypeArgs() != nil && named.TypeArgs().Len() > 0 {
+				out.MapFamilyEnc = b.instanceFamilyEnc(named)
 			}
 		}
 		if named.TypeArgs() != nil {
@@ -280,6 +280,7 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 			}
 			for i := range named.TypeParams().Len() {
 				out.ClassKeyParams = append(out.ClassKeyParams, b.unit.ParamRequiresKeyOp(named.Obj(), i))
+				out.HardKeyedParams = append(out.HardKeyedParams, b.unit.ParamRequiresSVZKey(named.Obj(), i))
 			}
 		}
 		return out, nil

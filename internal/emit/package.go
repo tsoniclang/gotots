@@ -110,9 +110,10 @@ func Package(module *Module, decls Decls) (string, []BodyOutcome, []BodyArtifact
 		sort.Slice(sortedMethods, func(i, j int) bool { return sortedMethods[i].Name < sortedMethods[j].Name })
 		for _, method := range sortedMethods {
 			body.WriteString("\n")
-			className := structDecl.Name
+			className := familyName(structDecl)
+			familyEnc := structDecl.FamilyEnc
 			err := emitTransactionalBody(&body, module, method, func(out *strings.Builder, frag *Module) error {
-				return printMethodFunction(out, frag, className, method)
+				return printMethodFunctionFamily(out, frag, className, method, familyEnc)
 			}, &outcomes, &artifacts)
 			if err != nil {
 				return "", nil, nil, err

@@ -223,7 +223,7 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 				return nil
 			}
 		}
-		p.line("gort$.%s(%s, %s);", mapHelper("goMapDelete", n.Map), mapExpr, key)
+		p.line("gort$.%s(%s, %s);", p.mapHelper("goMapDelete", n.Map), mapExpr, key)
 		return nil
 
 	case *ir.MapClearStmt:
@@ -231,7 +231,7 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		if err != nil {
 			return err
 		}
-		p.line("gort$.%s(%s);", mapHelper("goMapClear", n.Map), mapExpr)
+		p.line("gort$.%s(%s);", p.mapHelper("goMapClear", n.Map), mapExpr)
 		return nil
 
 	case *ir.PanicStmt:

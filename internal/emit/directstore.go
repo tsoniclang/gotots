@@ -118,7 +118,7 @@ func (p *printer) printStore(target ir.Target, value string) error {
 				return nil
 			}
 		}
-		p.line("gort$.%s(%s, %s, %s);", mapHelper("goMapSet", t.Map), mapExpr, key, value)
+		p.line("gort$.%s(%s, %s, %s);", p.mapHelper("goMapSet", t.Map), mapExpr, key, value)
 		return nil
 	case *ir.SliceTarget:
 		sliceExpr, err := p.printExpr(t.X)

@@ -89,6 +89,14 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			} else {
 				args += ", " + factories
 			}
+			if callFamilyEnc(n.TypeArgs, n.HardKeyed, p.familyEnc) {
+				// The encoded-family variant of a family-split callee.
+				renamed, err := p.module.symbol(n.Pkg, n.Callee+"$ek")
+				if err != nil {
+					return "", err
+				}
+				callee = renamed
+			}
 		}
 		return fmt.Sprintf("%s%s(%s)", callee, typeArgs, args), nil
 	case *ir.MethodCall:
@@ -100,7 +108,15 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		callee, err := p.module.symbol(n.Pkg, n.TypeName+"$"+n.Method)
+		methodClass := n.TypeName
+		recvT := n.Recv.Type()
+		if recvT.Kind == ir.KindPointer && recvT.Elem != nil {
+			recvT = *recvT.Elem
+		}
+		if recvT.MapFamilyEnc || (p.familyEnc && selfHardKeyedReference(recvT)) {
+			methodClass += "$ek"
+		}
+		callee, err := p.module.symbol(n.Pkg, methodClass+"$"+n.Method)
 		if err != nil {
 			return "", err
 		}
@@ -162,13 +178,17 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		}
 		return checked + suffix, nil
 	case *ir.StructNew:
-		class, err := p.module.symbol(n.Pkg, n.TypeName)
-		if err != nil {
-			return "", err
-		}
 		structT := n.T
 		if structT.Kind == ir.KindPointer && structT.Elem != nil {
 			structT = *structT.Elem
+		}
+		newClass := n.TypeName
+		if structT.MapFamilyEnc || (p.familyEnc && selfHardKeyedReference(structT)) {
+			newClass += "$ek"
+		}
+		class, err := p.module.symbol(n.Pkg, newClass)
+		if err != nil {
+			return "", err
 		}
 		if len(structT.TypeArgs) > 0 {
 			args := make([]string, len(structT.TypeArgs))
@@ -637,4 +657,24 @@ func generatedIdentifier(name string) bool {
 		}
 	}
 	return true
+}
+
+
+// callFamilyEnc reports whether a generic call binds any HARD map-keyed
+// position to a struct (or, inside an encoded-family emission, forwards
+// a bare parameter at a hard position) — selecting the callee's "$ek"
+// variant.
+func callFamilyEnc(typeArgs []ir.Type, hardKeyed []bool, familyEnc bool) bool {
+	for i, arg := range typeArgs {
+		if i >= len(hardKeyed) || !hardKeyed[i] {
+			continue
+		}
+		if arg.Kind == ir.KindStruct && arg.TypeParamName == "" {
+			return true
+		}
+		if familyEnc && arg.TypeParamName != "" {
+			return true
+		}
+	}
+	return false
 }

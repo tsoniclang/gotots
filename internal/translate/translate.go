@@ -60,6 +60,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 	// package's runnable output is withheld) without stopping analysis.
 	structs := map[string]*ir.Struct{}
 	var structOrder []string
+	var encVariants []string
 	var packageVars []emit.PackageVar
 	var carrierTypes []emit.CarrierType
 	var ledger []BodySupport
@@ -231,6 +232,11 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 					}
 					structs[structDecl.Name] = structDecl
 					structOrder = append(structOrder, structDecl.Name)
+					if namedType, isNamed := object.Type().(*types.Named); isNamed && ir.HasEncFamilyInstances(unit, namedType) {
+						// The "$ek" variant clones AFTER the walk (methods
+						// attach to the base declaration later).
+						encVariants = append(encVariants, structDecl.Name)
+					}
 					structShape, err := census.DeriveTypeShape(object, id)
 					if err != nil {
 						if declSite(id, err) {
@@ -499,6 +505,11 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 			}
 			if function.Receiver == nil {
 				functions = append(functions, function)
+				if fnObj, isFunc := p.TypesInfo.Defs[funcDecl.Name].(*types.Func); isFunc && ir.HasEncFamilyFuncInstances(unit, fnObj) {
+					encFn := *function
+					encFn.FamilyEnc = true
+					functions = append(functions, &encFn)
+				}
 				continue
 			}
 			owner := receiverBase(funcDecl.Recv)
@@ -565,6 +576,16 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 	// so a package importing a NotMaterialized package emits nothing rather
 	// than a dangling reference. Publication withholding is computed
 	// separately, after emission, and does NOT remove the analyzable file.
+	// Encoded-family variants: cloned now, with the fully attached method
+	// set, appended after the base declarations.
+	for _, name := range encVariants {
+		if base, has := structs[name]; has {
+			encClone := *base
+			encClone.FamilyEnc = true
+			structs[name+"$ek"] = &encClone
+			structOrder = append(structOrder, name+"$ek")
+		}
+	}
 	*emitters = append(*emitters, func() error {
 		if _, blocked := out.NotMaterialized[p.PkgPath]; blocked {
 			return nil

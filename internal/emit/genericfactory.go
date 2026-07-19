@@ -371,7 +371,11 @@ func (p *printer) zeroLiteral(t ir.Type) (string, error) {
 	case t.Kind.Nilable():
 		return "undefined", nil
 	case t.Kind == ir.KindStruct:
-		class, err := p.module.symbol(t.Pkg, t.Named)
+		zeroClass := t.Named
+		if t.MapFamilyEnc || (p.familyEnc && selfHardKeyedReference(t)) {
+			zeroClass += "$ek"
+		}
+		class, err := p.module.symbol(t.Pkg, zeroClass)
 		if err != nil {
 			return "", err
 		}

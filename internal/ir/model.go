@@ -115,6 +115,14 @@ type Type struct {
 	// factory over such a binding is provably unreachable (the type
 	// system rejects == wherever it could run), spelled fail-closed.
 	Uncomparable bool
+	// HardKeyedParams marks, per type parameter of a generic struct's
+	// declaration, the HARD map-key requirement (family variants split on
+	// these positions).
+	HardKeyedParams []bool
+	// MapFamilyEnc marks a generic-struct INSTANCE whose hard map-keyed
+	// binding is a struct: its class/method symbols take the "$ek"
+	// (encoded-family) variant.
+	MapFamilyEnc bool
 	// EncodedParamKey marks a PARAMETER-keyed map type whose enclosing
 	// declaration's closed evidence includes a struct binding: the map
 	// takes the encoded carrier with the key$P factory. SVZ-only evidence
@@ -470,6 +478,13 @@ type Func struct {
 	// KeyedParams marks, per type parameter, whether this declaration
 	// keys a map by it: the signature takes key$P exactly for these.
 	KeyedParams []bool
+	// HardKeyed marks, per type parameter, the HARD map-key requirement
+	// (family variants split on these positions).
+	HardKeyed []bool
+	// FamilyEnc marks this Func/Struct emission as the ENCODED key-family
+	// variant ("$ek"-suffixed symbols; parameter-keyed maps spell the
+	// encoded carrier).
+	FamilyEnc bool
 	// Receiver is set for methods: a pointer-to-struct parameter bound to
 	// the generated class instance.
 	Receiver *Var
@@ -537,6 +552,11 @@ type Struct struct {
 	// key$P at that position — the requirement store's per-param verdict
 	// (a key-encodable origin requires every position).
 	KeyedParams []bool
+	// HardKeyed marks, per type parameter, the HARD map-key requirement
+	// (family variants split on these). FamilyEnc marks the encoded
+	// emission variant.
+	HardKeyed []bool
+	FamilyEnc bool
 	// Comparable marks a struct whose fields all support exact generated
 	// equality: it carries goEq$, and interface equality over it never
 	// panics.

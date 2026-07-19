@@ -531,7 +531,11 @@ func (p *printer) instVtableValue(instType ir.Type, slots []ir.InstSlot, memberP
 		if err != nil {
 			return "", err
 		}
-		callee, err := p.module.symbol(instType.Pkg, instType.Named+"$"+slot.MethodName)
+		vtClass := instType.Named
+		if instType.MapFamilyEnc {
+			vtClass += "$ek"
+		}
+		callee, err := p.module.symbol(instType.Pkg, vtClass+"$"+slot.MethodName)
 		if err != nil {
 			return "", err
 		}

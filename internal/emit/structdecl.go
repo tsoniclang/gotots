@@ -16,13 +16,13 @@ import (
 // every field in declaration order (composite literals pass explicit
 // zeros for omitted fields, so construction is always total).
 func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct) error {
-	p := &printer{out: out, module: module}
+	p := &printer{out: out, module: module, familyEnc: structDecl.FamilyEnc}
 	export := "export "
 	generics := ""
 	if len(structDecl.TypeParams) > 0 {
 		generics = "<" + strings.Join(structDecl.TypeParams, ", ") + ">"
 	}
-	p.line("%sclass %s%s {", export, tsName(structDecl.Name), generics)
+	p.line("%sclass %s%s {", export, tsName(familyName(structDecl)), generics)
 	p.indent++
 	var params []string
 	for _, field := range structDecl.Fields {
@@ -122,7 +122,7 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 			clone = append(clone, "this."+field.Name)
 		}
 	}
-	self := tsName(structDecl.Name)
+	self := tsName(familyName(structDecl))
 	if len(structDecl.TypeParams) > 0 {
 		self += "<" + strings.Join(structDecl.TypeParams, ", ") + ">"
 	}
@@ -357,7 +357,14 @@ func (p *printer) keyComponent(access string, t ir.Type) (string, error) {
 // struct value receiver clones on entry, so the caller's instance never
 // mutates; scalar value receivers copy at the call like every JS value.
 func printMethodFunction(out *strings.Builder, module *Module, className string, method *ir.Func) error {
-	p := &printer{out: out, module: module}
+	return printMethodFunctionFamily(out, module, className, method, false)
+}
+
+// printMethodFunctionFamily emits one method variant: the encoded-family
+// emission spells parameter-keyed maps through the encoded carrier and
+// in-family self-references.
+func printMethodFunctionFamily(out *strings.Builder, module *Module, className string, method *ir.Func, familyEnc bool) error {
+	p := &printer{out: out, module: module, familyEnc: familyEnc}
 	recvSpelled, err := p.tsType(method.Receiver.Type)
 	if err != nil {
 		return fmt.Errorf("%s: %w", method.ID, err)
@@ -534,4 +541,14 @@ func (p *printer) eqComponent(left, right string, t ir.Type) (string, error) {
 // structKeyed reports whether the class captures key$P at position i.
 func structKeyed(structDecl *ir.Struct, i int) bool {
 	return i < len(structDecl.KeyedParams) && structDecl.KeyedParams[i]
+}
+
+
+// familyName is the emission variant's class name: the encoded-family
+// variant takes the "$ek" suffix.
+func familyName(structDecl *ir.Struct) string {
+	if structDecl.FamilyEnc {
+		return structDecl.Name + "$ek"
+	}
+	return structDecl.Name
 }

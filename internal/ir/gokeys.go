@@ -96,59 +96,83 @@ func (b *builder) typeParamKeySupported(keyType types.Type, span Span) bool {
 	return true
 }
 
-// paramKeyFamilyEncoded reports whether the enclosing generic
-// declaration's closed evidence binds this map-keyed parameter to any
-// admitted STRUCT — selecting the encoded carrier (key$P) for the
-// declaration's maps. SVZ-only evidence keeps the direct carrier.
-func (b *builder) paramKeyFamilyEncoded(keyType types.Type, span Span) bool {
-	param, ok := types.Unalias(keyType).(*types.TypeParam)
-	if !ok {
+// HasEncFamilyInstances reports whether the closed evidence instantiates
+// this generic struct with a struct binding at any HARD map-keyed
+// position — the "$ek" emission variant exists exactly then.
+func HasEncFamilyInstances(unit Scope, named *types.Named) bool {
+	obj := named.Origin().Obj()
+	hard := []int{}
+	if named.TypeParams() != nil {
+		for i := range named.TypeParams().Len() {
+			if unit.ParamRequiresSVZKey(obj, i) {
+				hard = append(hard, i)
+			}
+		}
+	}
+	if len(hard) == 0 {
 		return false
 	}
-	var instances [][]types.Type
-	switch {
-	case b.genericObj != nil:
-		signature := b.genericObj.Type().(*types.Signature)
-		if recvParams := signature.RecvTypeParams(); recvParams != nil {
-			if param.Index() >= recvParams.Len() ||
-				recvParams.At(param.Index()).Obj().Name() != param.Obj().Name() {
-				return false
+	for _, vector := range unit.GenericTypeInstances(obj) {
+		for _, index := range hard {
+			if index >= len(vector) || mentionsTypeParamType(vector[index]) {
+				continue
 			}
-			recv := signature.Recv().Type()
-			if pointer, isPointer := types.Unalias(recv).(*types.Pointer); isPointer {
-				recv = pointer.Elem()
+			if _, isStruct := types.Unalias(vector[index]).Underlying().(*types.Struct); isStruct {
+				return true
 			}
-			named, isNamed := types.Unalias(recv).(*types.Named)
-			if !isNamed {
-				return false
-			}
-			instances = b.unit.GenericTypeInstances(named.Obj())
-			break
 		}
-		if signature.TypeParams() == nil || param.Index() >= signature.TypeParams().Len() ||
-			signature.TypeParams().At(param.Index()) != param {
-			return false
-		}
-		instances = b.unit.GenericInstances(b.genericObj)
-	case b.genericTypeObj != nil:
-		typeParams := b.genericTypeObj.TypeParams()
-		if typeParams == nil || param.Index() >= typeParams.Len() ||
-			typeParams.At(param.Index()).Obj().Name() != param.Obj().Name() {
-			return false
-		}
-		instances = b.unit.GenericTypeInstances(b.genericTypeObj.Obj())
-	default:
+	}
+	return false
+}
+
+// HasEncFamilyFuncInstances reports whether the closed evidence
+// instantiates this generic FUNCTION with a struct binding at any HARD
+// map-keyed position — its "$ek" emission variant exists exactly then.
+func HasEncFamilyFuncInstances(unit Scope, fn *types.Func) bool {
+	signature, isSig := fn.Type().(*types.Signature)
+	if !isSig || signature.TypeParams() == nil {
 		return false
 	}
-	for _, instance := range instances {
-		if param.Index() >= len(instance) {
+	hard := []int{}
+	for i := range signature.TypeParams().Len() {
+		if unit.ParamRequiresSVZKey(fn, i) {
+			hard = append(hard, i)
+		}
+	}
+	if len(hard) == 0 {
+		return false
+	}
+	for _, vector := range unit.GenericInstances(fn) {
+		for _, index := range hard {
+			if index >= len(vector) || mentionsTypeParamType(vector[index]) {
+				continue
+			}
+			if _, isStruct := types.Unalias(vector[index]).Underlying().(*types.Struct); isStruct {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// instanceFamilyEnc reports whether a generic-struct INSTANCE binds any
+// HARD map-keyed parameter to a struct — selecting the encoded-family
+// ("$ek") class/method variant for this instance.
+func (b *builder) instanceFamilyEnc(named *types.Named) bool {
+	origin := named.Origin()
+	args := named.TypeArgs()
+	if args == nil {
+		return false
+	}
+	for i := range args.Len() {
+		if !b.unit.ParamRequiresSVZKey(origin.Obj(), i) {
 			continue
 		}
-		goArg := instance[param.Index()]
-		if mentionsTypeParamType(goArg) {
+		arg := args.At(i)
+		if mentionsTypeParamType(arg) {
 			continue
 		}
-		if _, isStruct := types.Unalias(goArg).Underlying().(*types.Struct); isStruct {
+		if _, isStruct := types.Unalias(arg).Underlying().(*types.Struct); isStruct {
 			return true
 		}
 	}

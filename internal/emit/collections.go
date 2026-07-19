@@ -44,7 +44,7 @@ func (p *printer) collectionExpr(e ir.Expr) (string, error) {
 			}
 			return "gort$.goKMapMake<" + key + ", " + value + ">(" + hint + ")", nil
 		}
-		if n.Type().Key != nil && n.Type().Key.Kind == ir.KindIface && (n.Type().Key.TypeParamName == "" || n.Type().EncodedParamKey) {
+		if n.Type().Key != nil && n.Type().Key.Kind == ir.KindIface && (n.Type().Key.TypeParamName == "" || p.familyEnc) {
 			key, err := p.tsType(*n.Type().Key)
 			if err != nil {
 				return "", err
@@ -108,7 +108,7 @@ func (p *printer) collectionExpr(e ir.Expr) (string, error) {
 			}
 			return "gort$.goFMapFrom<" + value + ">([" + joinComma(entries) + "])", nil
 		}
-		if n.T.Key.Kind == ir.KindIface && (n.T.Key.TypeParamName == "" || n.T.EncodedParamKey) {
+		if n.T.Key.Kind == ir.KindIface && (n.T.Key.TypeParamName == "" || p.familyEnc) {
 			encoder, err := p.ifaceKeyEncoder(n.T)
 			if err != nil {
 				return "", err
@@ -133,15 +133,15 @@ func (p *printer) collectionExpr(e ir.Expr) (string, error) {
 		}
 		return "gort$.goMapFrom<" + key + ", " + value + ">([" + joinComma(entries) + "])", nil
 	case *ir.MapGet:
-		return p.printMapAccess(mapHelper("goMapGet", n.Map), n.Map, n.Key, n.T)
+		return p.printMapAccess(p.mapHelper("goMapGet", n.Map), n.Map, n.Key, n.T)
 	case *ir.MapLookup:
-		return p.printMapAccess(mapHelper("goMapLookup", n.Map), n.Map, n.Key, n.T)
+		return p.printMapAccess(p.mapHelper("goMapLookup", n.Map), n.Map, n.Key, n.T)
 	case *ir.MapLen:
 		x, err := p.printExpr(n.X)
 		if err != nil {
 			return "", err
 		}
-		return "gort$." + mapHelper("goMapLen", n.X) + "(" + x + ")", nil
+		return "gort$." + p.mapHelper("goMapLen", n.X) + "(" + x + ")", nil
 	case *ir.StringLen:
 		x, err := p.printExpr(n.X)
 		if err != nil {
@@ -367,7 +367,7 @@ func (p *printer) collectionExpr(e ir.Expr) (string, error) {
 
 // mapHelper selects the plain or keyed carrier family for one map
 // operand by its key kind.
-func mapHelper(name string, mapExpr ir.Expr) string {
+func (p *printer) mapHelper(name string, mapExpr ir.Expr) string {
 	t := mapExpr.Type()
 	if t.Key != nil && t.Key.Kind == ir.KindStruct {
 		return "goKMap" + strings.TrimPrefix(name, "goMap")
@@ -375,7 +375,7 @@ func mapHelper(name string, mapExpr ir.Expr) string {
 	if t.Key != nil && t.Key.Kind.Float() {
 		return "goFMap" + strings.TrimPrefix(name, "goMap")
 	}
-	if t.Key != nil && t.Key.Kind == ir.KindIface && (t.Key.TypeParamName == "" || t.EncodedParamKey) {
+	if t.Key != nil && t.Key.Kind == ir.KindIface && (t.Key.TypeParamName == "" || p.familyEnc) {
 		return "goEMap" + strings.TrimPrefix(name, "goMap")
 	}
 	return name
@@ -393,7 +393,7 @@ func (p *printer) ifaceKeyEncoder(mapT ir.Type) (string, error) {
 		return "", nil
 	}
 	if keyT.TypeParamName != "" {
-		if !mapT.EncodedParamKey {
+		if !p.familyEnc {
 			return "", nil
 		}
 		// A bare-parameter key encodes through the instantiation's key

@@ -461,3 +461,58 @@ func PointerCarrierAdmissions() int {
 }
 `)
 }
+
+func TestOracleMixedFamilyGenericSet(t *testing.T) {
+	// The collections.Set shape with MIXED key families: scalar
+	// instantiations keep the direct SVZ carrier (their exported maps
+	// cross the generic boundary representation-identically) while a
+	// struct instantiation takes the "$ek" encoded-family variant — two
+	// exact emissions, one Go type per family everywhere.
+	runOracle(t, `package fixture
+
+type set[T comparable] struct {
+	m map[T]struct{}
+}
+
+func (s *set[T]) Add(v T) {
+	if s.m == nil {
+		s.m = map[T]struct{}{}
+	}
+	s.m[v] = struct{}{}
+}
+
+func (s *set[T]) Keys() map[T]struct{} {
+	out := map[T]struct{}{}
+	for k := range s.m {
+		out[k] = struct{}{}
+	}
+	return out
+}
+
+type pt struct {
+	x int
+	y int
+}
+
+func MixedFamilyGenericSet() int {
+	ss := &set[string]{}
+	ss.Add("a")
+	ss.Add("b")
+	ss.Add("a")
+	exported := ss.Keys()
+	if _, ok := exported["b"]; !ok {
+		return -1
+	}
+	direct := map[string]struct{}{"c": {}}
+	for k := range exported {
+		direct[k] = struct{}{}
+	}
+	sp := &set[pt]{}
+	sp.Add(pt{1, 2})
+	sp.Add(pt{1, 2})
+	sp.Add(pt{3, 4})
+	total := len(direct)*100 + len(sp.Keys())*10 + len(exported)
+	return total
+}
+`)
+}

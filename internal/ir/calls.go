@@ -64,6 +64,7 @@ func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
 		call := &Call{Pkg: function.Pkg().Path(), Callee: function.Name(), TypeArgs: typeArgs}
 		for i := range typeArgs {
 			call.KeyedParams = append(call.KeyedParams, b.unit.ParamRequiresKeyOp(function, i))
+			call.HardKeyed = append(call.HardKeyed, b.unit.ParamRequiresSVZKey(function, i))
 		}
 		if err := b.buildCallArgsResults(n, signature, &call.Args, &call.Results); err != nil {
 			return nil, err

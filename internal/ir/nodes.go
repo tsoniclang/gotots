@@ -307,6 +307,9 @@ type Call struct {
 	// declaration keys a map by it — exactly the parameters whose key$P
 	// operation the call passes (requirement-scoped, never universal).
 	KeyedParams []bool
+	// HardKeyed marks the HARD positions (the callee family-splits on
+	// these; a struct binding selects the "$ek" variant).
+	HardKeyed []bool
 	Args        []Expr
 	Results     []Type
 }

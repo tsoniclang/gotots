@@ -129,6 +129,10 @@ type printer struct {
 	// overwrite (undefined for slot-assignment carriers).
 	cloneOps map[string]string
 	keyOps   map[string]string
+	// familyEnc marks the ENCODED key-family emission variant: inside it,
+	// parameter-keyed maps spell the encoded carrier and self-references
+	// to the family-split class take the "$ek" symbols.
+	familyEnc bool
 	setOps   map[string]string
 	// slicePlans maps this body's slice-typed locals to their selected
 	// representation; "native-array" locals lower onto plain arrays.
@@ -197,7 +201,7 @@ func (p *printer) temp() string {
 }
 
 func printFunc(out *strings.Builder, module *Module, function *ir.Func) error {
-	p := &printer{out: out, module: module}
+	p := &printer{out: out, module: module, familyEnc: function.FamilyEnc}
 	signature, err := p.functionSignature(function)
 	if err != nil {
 		return fmt.Errorf("%s: %w", function.ID, err)
@@ -208,7 +212,11 @@ func printFunc(out *strings.Builder, module *Module, function *ir.Func) error {
 		generics = "<" + strings.Join(function.TypeParams, ", ") + ">"
 	}
 	p.slicePlans = function.SlicePlans
-	p.line("%sfunction %s%s%s {", export, tsName(function.Name), generics, signature)
+	emitName := function.Name
+	if function.FamilyEnc {
+		emitName += "$ek"
+	}
+	p.line("%sfunction %s%s%s {", export, tsName(emitName), generics, signature)
 	p.indent++
 	if len(function.TypeParams) > 0 {
 		p.zeroFactories = map[string]string{}
@@ -354,7 +362,11 @@ func (p *printer) tsType(t ir.Type) (string, error) {
 		}
 		return name + " | undefined", nil
 	case ir.KindStruct:
-		name, err := p.module.symbol(t.Pkg, t.Named)
+		className := t.Named
+		if t.MapFamilyEnc || (p.familyEnc && selfHardKeyedReference(t)) {
+			className += "$ek"
+		}
+		name, err := p.module.symbol(t.Pkg, className)
 		if err != nil {
 			return "", err
 		}
@@ -434,7 +446,7 @@ func (p *printer) tsType(t ir.Type) (string, error) {
 		if t.Key.Kind.Float() {
 			return "gort$.GoFMap<" + value + ">", nil
 		}
-		if t.Key.Kind == ir.KindIface && (t.Key.TypeParamName == "" || t.EncodedParamKey) {
+		if t.Key.Kind == ir.KindIface && (t.Key.TypeParamName == "" || p.familyEnc) {
 			// Concrete interface keys AND struct-evidence parameter keys
 			// share the encoded carrier; the encoder is the union $key or
 			// the instantiation's key$P respectively.
@@ -462,4 +474,28 @@ func (p *printer) tsResultType(results []ir.Var) (string, error) {
 		}
 		return "readonly [" + strings.Join(parts, ", ") + "]", nil
 	}
+}
+
+
+// selfHardKeyedReference reports whether a struct instance inside the
+// current declaration's scope references the family-split type with a
+// bare parameter at a HARD-keyed position (the "$ek" emission's
+// self-references stay in-family).
+func selfHardKeyedReference(t ir.Type) bool {
+	for i, arg := range t.TypeArgs {
+		if arg.TypeParamName != "" && i < len(t.HardKeyedParams) && t.HardKeyedParams[i] {
+			return true
+		}
+	}
+	return false
+}
+
+// anyTrue reports whether any mask position is set.
+func anyTrue(mask []bool) bool {
+	for _, set := range mask {
+		if set {
+			return true
+		}
+	}
+	return false
 }
