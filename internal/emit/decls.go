@@ -114,6 +114,13 @@ func (p *printer) printDecl(n *ir.DeclStmt) error {
 		if err != nil {
 			return err
 		}
+		if value == "undefined" && n.Types[i].Kind.Nilable() {
+			// A plain `= undefined` narrows the binding to the undefined
+			// literal, hiding closure assignments from later uses; the
+			// typed nil keeps the declared carrier type.
+			p.line("let %s: %s = gort$.goNil<%s>();", tsName(name), spelled, spelled)
+			continue
+		}
 		p.line("let %s: %s = %s;", tsName(name), spelled, value)
 	}
 	return nil

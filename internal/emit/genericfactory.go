@@ -137,12 +137,17 @@ func (p *printer) setOperation(t ir.Type) (string, error) {
 	return "undefined", nil
 }
 
-// cloneSetFactoryArgs spells the clone/set factory pair per type
-// argument — the trailing constructor arguments of every generic class
-// (captured at construction so goClone$/goSet$ stay zero-arg).
-func (p *printer) cloneSetFactoryArgs(typeArgs []ir.Type) (string, error) {
-	parts := make([]string, 0, len(typeArgs)*2)
+// eqCloneSetFactoryArgs spells the equality/clone/set factory triple per
+// type argument — the trailing constructor arguments of every generic
+// class (captured at construction so goEq$/goClone$/goSet$ stay
+// source-shaped).
+func (p *printer) eqCloneSetFactoryArgs(typeArgs []ir.Type) (string, error) {
+	parts := make([]string, 0, len(typeArgs)*3)
 	for _, arg := range typeArgs {
+		eq, err := p.eqOperation(arg)
+		if err != nil {
+			return "", err
+		}
 		clone, err := p.cloneOperation(arg)
 		if err != nil {
 			return "", err
@@ -151,7 +156,7 @@ func (p *printer) cloneSetFactoryArgs(typeArgs []ir.Type) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		parts = append(parts, clone, set)
+		parts = append(parts, eq, clone, set)
 	}
 	return joinComma(parts), nil
 }
@@ -203,6 +208,17 @@ func (p *printer) eqOperation(t ir.Type) (string, error) {
 		}
 		return "(($a: " + spelled + ", $b: " + spelled + ") => $a.goEq$($b))", nil
 	}
+	if t.Kind == ir.KindSlice || t.Kind == ir.KindMap || t.Kind == ir.KindFunc || t.Kind == ir.KindChan {
+		// Go's type system rejects == on this binding wherever it could
+		// run (slices, maps, functions, and channels never satisfy
+		// comparable), so the operation is provably unreachable: fail
+		// closed instead of an inexact reference ===.
+		spelled, err := p.tsType(t)
+		if err != nil {
+			return "", err
+		}
+		return "(($a: " + spelled + ", $b: " + spelled + ") => gort$.goEqUnsupported())", nil
+	}
 	spelled, err := p.tsType(t)
 	if err != nil {
 		return "", err
@@ -246,7 +262,7 @@ func (p *printer) zeroLiteral(t ir.Type) (string, error) {
 				}
 				factories[i] = "() => " + zero
 			}
-			cloneSet, err := p.cloneSetFactoryArgs(t.TypeArgs)
+			cloneSet, err := p.eqCloneSetFactoryArgs(t.TypeArgs)
 			if err != nil {
 				return "", err
 			}

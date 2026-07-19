@@ -73,14 +73,17 @@ export function goKeyFloat(v: number): string {
 }
 
 // goKeyScalar encodes one scalar key component by its carrier: floats
-// through the exact float rule (NaN freshness, -0 folding), every other
-// scalar by its canonical string. Injective within one member's fixed
-// carrier.
-export function goKeyScalar(v: string | number | bigint | boolean): string {
+// through the exact float rule (NaN freshness, -0 folding), strings
+// length-prefixed (injective under any outer composition), booleans and
+// bigints by canonical token. The parameter is open so generic classes
+// can pass a bare type-parameter value; a non-scalar binding is an
+// admission-invariant break, never a Go panic surface.
+export function goKeyScalar(v: unknown): string {
   if (typeof v === "number") return goKeyFloat(v);
   if (typeof v === "bigint") return "i" + String(v);
   if (typeof v === "boolean") return v ? "t" : "f";
-  return "s" + v;
+  if (typeof v === "string") return "s" + String(v.length) + ":" + v;
+  throw new Error("gotots invariant: non-scalar key binding");
 }
 
 // goKeyUnhashable is Go's exact runtime panic for an uncomparable dynamic

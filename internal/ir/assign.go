@@ -65,8 +65,11 @@ func (b *builder) buildTarget(lhs ast.Expr) (Target, error) {
 		// base so the nil dereference panics at the STORE (Go's two-phase
 		// assignment evaluates the right-hand side first, then carries out
 		// the store) — never eagerly at base evaluation, which would skip a
-		// side-effecting right-hand side.
-		if deref, ok := base.(*Deref); ok && deref.X.Type().Kind == KindPointer {
+		// side-effecting right-hand side. Only a deref LANDING ON the struct
+		// unwraps: through a pointer-to-pointer, (*p) is itself the pointer
+		// base (Go evaluates the outer indirection in phase one, and the
+		// store's implicit deref panics in phase two).
+		if deref, ok := base.(*Deref); ok && deref.X.Type().Kind == KindPointer && deref.T.Kind == KindStruct {
 			base = deref.X
 		}
 		if path := selection.Index(); len(path) > 1 {

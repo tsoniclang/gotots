@@ -178,10 +178,16 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 							return err
 						}
 						if !object.IsAlias() {
-							carrierTypes = append(carrierTypes, emit.CarrierType{
+							carrier := emit.CarrierType{
 								Name: typeSpec.Name.Name, Exported: typeSpec.Name.IsExported(),
 								Underlying: underlying,
-							})
+							}
+							if namedType, isNamed := object.Type().(*types.Named); isNamed && namedType.TypeParams() != nil {
+								for i := range namedType.TypeParams().Len() {
+									carrier.TypeParams = append(carrier.TypeParams, namedType.TypeParams().At(i).Obj().Name())
+								}
+							}
+							carrierTypes = append(carrierTypes, carrier)
 						}
 						aliasProof := Proof{
 							ID: id, SourceRevision: options.SourceRevision,

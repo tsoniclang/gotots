@@ -171,7 +171,11 @@ func Package(module *Module, decls Decls) (string, []BodyOutcome, []BodyArtifact
 		if err != nil {
 			return "", nil, nil, err
 		}
-		fmt.Fprintf(&body, "export type %s = %s;\n", tsName(carrier.Name), underlyingSpelled)
+		carrierGenerics := ""
+		if len(carrier.TypeParams) > 0 {
+			carrierGenerics = "<" + strings.Join(carrier.TypeParams, ", ") + ">"
+		}
+		fmt.Fprintf(&body, "export type %s%s = %s;\n", tsName(carrier.Name), carrierGenerics, underlyingSpelled)
 		// A named carrier's payload is a primitive: comparable directly,
 		// and its pointer type (a cell) boxes with its own rtti.
 		carrierInfo := RttiInfo{

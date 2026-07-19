@@ -225,11 +225,13 @@ func (p *printer) referencesWithheldType(t ir.Type) bool {
 				}
 			}
 		}
-		for _, member := range t.IfaceMembers {
-			if !member.Extern && member.Pkg != "" && p.module.Withheld(member.Pkg) {
-				return true
-			}
-		}
+		// An interface-typed component is SPELLED as the filtered local
+		// union alias, which already excludes withheld members
+		// (retainedMembers): the component's own pre-filter member list
+		// must not disqualify the enclosing type — asking it here dropped
+		// self-referential empty-interface composites ([]any) from the
+		// union whenever ANY corpus package was withheld, turning their
+		// asserts into statically-false panics.
 		return false
 	}
 	return walk(t)

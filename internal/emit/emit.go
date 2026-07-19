@@ -78,6 +78,9 @@ type CarrierType struct {
 	// declares `export type Name = <underlying>` so union members and
 	// signatures can reference the named carrier directly.
 	Underlying ir.Type
+	// TypeParams are a generic carrier's own type parameters, declared on
+	// the alias so a parameter-referencing underlying spells closed.
+	TypeParams []string
 }
 
 // Decls is the complete declaration set of one translated package.

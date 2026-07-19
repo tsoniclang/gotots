@@ -179,7 +179,7 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			}
 			class += "<" + joinComma(args) + ">"
 		}
-		factoryArgs, err := p.cloneSetFactoryArgs(structT.TypeArgs)
+		factoryArgs, err := p.eqCloneSetFactoryArgs(structT.TypeArgs)
 		if err != nil {
 			return "", err
 		}

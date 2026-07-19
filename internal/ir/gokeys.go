@@ -47,6 +47,27 @@ func (b *builder) typeParamKeySupported(keyType types.Type, span Span) bool {
 	switch {
 	case b.genericObj != nil:
 		signature := b.genericObj.Type().(*types.Signature)
+		if recvParams := signature.RecvTypeParams(); recvParams != nil {
+			// A method on a generic type: its in-scope parameters are the
+			// RECEIVER's (Go permits no method-own type parameters), and
+			// the identity evidence is the receiver type's closed
+			// instantiation set — exactly the set every concrete call
+			// resolves against.
+			if param.Index() >= recvParams.Len() ||
+				recvParams.At(param.Index()).Obj().Name() != param.Obj().Name() {
+				return false
+			}
+			recv := signature.Recv().Type()
+			if pointer, isPointer := types.Unalias(recv).(*types.Pointer); isPointer {
+				recv = pointer.Elem()
+			}
+			named, isNamed := types.Unalias(recv).(*types.Named)
+			if !isNamed {
+				return false
+			}
+			instances = b.unit.GenericTypeInstances(named.Obj())
+			break
+		}
 		if signature.TypeParams() == nil || param.Index() >= signature.TypeParams().Len() ||
 			signature.TypeParams().At(param.Index()) != param {
 			return false
@@ -83,10 +104,11 @@ func (b *builder) typeParamKeySupported(keyType types.Type, span Span) bool {
 func (b *builder) EqComparableField(t Type, goType types.Type) bool {
 	switch t.Kind {
 	case KindIface:
-		// A type-parameter field's equality is instantiation-dependent
-		// (=== for one instantiation, interface equality for another):
-		// the shared goEq$ body cannot be exact, so the struct stays out.
-		return t.TypeParamName == ""
+		// A bare type-parameter field compares through the eq$P operation
+		// the class captured at construction — exact per instantiation
+		// (goEqUnsupported for Go-illegal bindings). A concrete interface
+		// field compares through its union's exact equality.
+		return true
 	case KindString, KindBool, KindPointer, KindUnit, KindFloat32, KindFloat64:
 		return true
 	case KindArray:
@@ -153,12 +175,49 @@ func (b *builder) structKeyEncodable(keyType types.Type, span Span) bool {
 	}
 	b.keyEncodableInProgress[guard] = true
 	defer delete(b.keyEncodableInProgress, guard)
+	// An INSTANTIATED generic struct key must bind every bare-parameter
+	// field to the scalar family the generic class's goKey$ encodes
+	// exactly (goKeyScalar: strings, booleans, integers — floats stay out
+	// for NaN/signed-zero key semantics). The origin declaration says
+	// which fields are bare parameters; the instance says what they bound.
+	if named, isNamed := types.Unalias(keyType).(*types.Named); isNamed && named.TypeArgs() != nil && named.TypeArgs().Len() > 0 {
+		originStruct, isStruct := named.Origin().Underlying().(*types.Struct)
+		if !isStruct || originStruct.NumFields() != structType.NumFields() {
+			return false
+		}
+		for i := range structType.NumFields() {
+			if _, isParam := types.Unalias(originStruct.Field(i).Type()).(*types.TypeParam); isParam {
+				if !scalarKeyBinding(structType.Field(i).Type()) {
+					return false
+				}
+				continue
+			}
+			if !b.keyEncodableFieldType(structType.Field(i).Type(), span) {
+				return false
+			}
+		}
+		return true
+	}
 	for i := range structType.NumFields() {
 		if !b.keyEncodableFieldType(structType.Field(i).Type(), span) {
 			return false
 		}
 	}
 	return true
+}
+
+// scalarKeyBinding reports whether one instantiation binding of a
+// bare-parameter key field is inside goKeyScalar's exact family:
+// strings, booleans, and integers (floats' NaN and signed-zero key
+// semantics need goKeyFloat, which the shared generic encoding cannot
+// select per binding).
+func scalarKeyBinding(goType types.Type) bool {
+	basic, ok := types.Unalias(goType).Underlying().(*types.Basic)
+	if !ok {
+		return false
+	}
+	info := basic.Info()
+	return info&types.IsString != 0 || info&types.IsBoolean != 0 || info&types.IsInteger != 0
 }
 
 // keyEncodableFieldType reports whether one struct field's Go type
@@ -182,11 +241,15 @@ func (b *builder) keyEncodableFieldType(goType types.Type, span Span) bool {
 		}
 		return false
 	case KindIface:
+		if fieldIR.TypeParamName != "" {
+			// A bare type-parameter field encodes via goKeyScalar in the
+			// generic class's goKey$; the INSTANTIATION-side admission
+			// (structKeyEncodable's origin walk) restricts bindings to the
+			// scalar family that encoding is exact over.
+			return true
+		}
 		// An interface FIELD encodes through the union's generated $key
 		// (Go's dynamic-key equality) when every member is encodable.
-		if fieldIR.TypeParamName != "" {
-			return false
-		}
 		return b.ifaceKeyMembersEncodable(goType, span)
 	}
 	return KeyEncodableField(fieldIR)

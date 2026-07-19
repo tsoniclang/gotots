@@ -13,7 +13,7 @@ package abi
 import "fmt"
 
 // Version identifies the ABI contract carried in generated output.
-const Version = 25
+const Version = 26
 
 // Family is the static carrier family of an integer kind.
 type Family string
@@ -128,6 +128,16 @@ export function goPanicUnreachableType(display: string): never {
 // caller's subsequent statements unreachable.
 export function goIndirect<F>(f: F): F {
   return f;
+}
+
+// goNil is the typed nil initializer of a nilable local: the declared
+// carrier type flows through untouched, so control-flow analysis never
+// narrows the binding to the undefined literal — a narrowing that would
+// hide closure assignments from every later use (the classic tsc
+// callback-assignment blind spot) and collapse generic helper inference
+// to unknown.
+export function goNil<T>(): T {
+  return undefined as unknown as T;
 }
 
 export function goNilCheck<T>(x: T | undefined): T {
@@ -292,9 +302,15 @@ const keyIds = new WeakMap<object, string>();
 let keyIdCounter = 0;
 
 // goKeyId is the deterministic identity component of a pointer field:
-// object identity in insertion order, "u" for nil.
-export function goKeyId(x: object | undefined): string {
+// object identity in insertion order, "u" for nil. The parameter is open
+// so identity-carrier type parameters pass without narrowing; every
+// non-nil identity carrier is an object (struct, array, external
+// handle), so a primitive here is an admission-invariant break.
+export function goKeyId(x: unknown): string {
   if (x === undefined) return "u";
+  if (x === null || (typeof x !== "object" && typeof x !== "function")) {
+    throw new Error("gotots invariant: non-object identity key");
+  }
   let id = keyIds.get(x);
   if (id === undefined) {
     keyIdCounter++;

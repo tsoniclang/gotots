@@ -273,38 +273,64 @@ func shapeType(info *types.Info, s *ast.TypeSpec, kind, id string, stats *fileSt
 	if !ok {
 		return fmt.Errorf("declaration %s has no typed definition", id)
 	}
-	var terr error
-	ts := tsFn(&terr)
 	if kind == "alias" {
-		// The alias DECLARATION identity is id (its own name); the Target is
-		// the transparent type it denotes. Canonical is handed the alias
-		// type itself — NOT a pre-unaliased type — so a GENERIC alias's own
-		// type parameters bind by position before the aliased type expands
-		// (Foo[T] = Bar[T] → Bar[$#0]); pre-unaliasing would leave those
-		// parameters free and fail closed. A non-generic alias unaliases
-		// internally to the same transparent target.
-		shape := AliasShape{ID: id, Target: ts(object.Type())}
-		// The DECLARATION domain: the alias's own type parameters and their
-		// constraints. Two generic aliases with the same transparent Target
-		// but different parameters/constraints are DISTINCT declarations even
-		// though their instantiated use-site targets coincide.
-		if alias, ok := object.Type().(*types.Alias); ok {
-			binders := typeid.AliasBinders(alias)
-			shape.TypeParams = typeParamShapesIn(alias.TypeParams(), binders, &terr)
-		}
-		if terr != nil {
-			return terr
+		shape, err := DeriveAliasShape(object, id)
+		if err != nil {
+			return err
 		}
 		stats.aliasShapes = append(stats.aliasShapes, shape)
 		return nil
 	}
+	shape, err := DeriveTypeShape(object, id)
+	if err != nil {
+		return err
+	}
+	stats.typeShapes = append(stats.typeShapes, shape)
+	return nil
+}
+
+// DeriveAliasShape renders one alias declaration's exact typed shape from
+// its go/types object. It is the ONE derivation both pipelines apply — the
+// census over its own load and the translator over its own — so the
+// stage-05 join compares two independently loaded views of the same
+// declaration.
+func DeriveAliasShape(object *types.TypeName, id string) (AliasShape, error) {
+	var terr error
+	ts := tsFn(&terr)
+	// The alias DECLARATION identity is id (its own name); the Target is
+	// the transparent type it denotes. Canonical is handed the alias
+	// type itself — NOT a pre-unaliased type — so a GENERIC alias's own
+	// type parameters bind by position before the aliased type expands
+	// (Foo[T] = Bar[T] → Bar[$#0]); pre-unaliasing would leave those
+	// parameters free and fail closed. A non-generic alias unaliases
+	// internally to the same transparent target.
+	shape := AliasShape{ID: id, Target: ts(object.Type())}
+	// The DECLARATION domain: the alias's own type parameters and their
+	// constraints. Two generic aliases with the same transparent Target
+	// but different parameters/constraints are DISTINCT declarations even
+	// though their instantiated use-site targets coincide.
+	if alias, ok := object.Type().(*types.Alias); ok {
+		binders := typeid.AliasBinders(alias)
+		shape.TypeParams = typeParamShapesIn(alias.TypeParams(), binders, &terr)
+	}
+	if terr != nil {
+		return AliasShape{}, terr
+	}
+	return shape, nil
+}
+
+// DeriveTypeShape renders one named type declaration's exact typed shape
+// from its go/types object: the ONE derivation both pipelines apply.
+func DeriveTypeShape(object *types.TypeName, id string) (TypeShape, error) {
+	var terr error
+	ts := tsFn(&terr)
 	named, ok := object.Type().(*types.Named)
 	if !ok {
-		return fmt.Errorf("declaration %s is not a named type (%T)", id, object.Type())
+		return TypeShape{}, fmt.Errorf("declaration %s is not a named type (%T)", id, object.Type())
 	}
 	kindName, err := namedKind(named)
 	if err != nil {
-		return fmt.Errorf("declaration %s: %w", id, err)
+		return TypeShape{}, fmt.Errorf("declaration %s: %w", id, err)
 	}
 	binders := typeid.OwnerBinders(named)
 	bts := btsFn(binders, &terr)
@@ -331,7 +357,7 @@ func shapeType(info *types.Info, s *ast.TypeSpec, kind, id string, stats *fileSt
 			method := underlying.ExplicitMethod(i)
 			isig, err := typeid.DeclSignature(method)
 			if err != nil {
-				return err
+				return TypeShape{}, err
 			}
 			shape.InterfaceMethods = append(shape.InterfaceMethods, MethodShape{
 				Name:      method.Name(),
@@ -351,7 +377,7 @@ func shapeType(info *types.Info, s *ast.TypeSpec, kind, id string, stats *fileSt
 		}
 		msig, err := typeid.DeclSignature(method)
 		if err != nil {
-			return err
+			return TypeShape{}, err
 		}
 		shape.Methods = append(shape.Methods, MethodShape{
 			Name:            method.Name(),
@@ -360,10 +386,9 @@ func shapeType(info *types.Info, s *ast.TypeSpec, kind, id string, stats *fileSt
 		})
 	}
 	if terr != nil {
-		return terr
+		return TypeShape{}, terr
 	}
-	stats.typeShapes = append(stats.typeShapes, shape)
-	return nil
+	return shape, nil
 }
 
 // btsFn is tsFn within a binder environment (for component types that

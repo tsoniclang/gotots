@@ -34,7 +34,15 @@ func (p *printer) collectionExpr(e ir.Expr) (string, error) {
 			hint = printed
 		}
 		if n.Type().Key != nil && n.Type().Key.Kind == ir.KindStruct {
-			return "gort$.goKMapMake(" + hint + ")", nil
+			key, err := p.tsType(*n.Type().Key)
+			if err != nil {
+				return "", err
+			}
+			value, err := p.tsType(*n.Type().Elem)
+			if err != nil {
+				return "", err
+			}
+			return "gort$.goKMapMake<" + key + ", " + value + ">(" + hint + ")", nil
 		}
 		if n.Type().Key != nil && n.Type().Key.Kind == ir.KindIface && n.Type().Key.TypeParamName == "" {
 			key, err := p.tsType(*n.Type().Key)
@@ -83,17 +91,37 @@ func (p *printer) collectionExpr(e ir.Expr) (string, error) {
 			entries = append(entries, "["+key+", "+value+"]")
 		}
 		if n.T.Key.Kind == ir.KindStruct {
-			return "gort$.goKMapFrom([" + joinComma(entries) + "])", nil
+			key, err := p.tsType(*n.T.Key)
+			if err != nil {
+				return "", err
+			}
+			value, err := p.tsType(*n.T.Elem)
+			if err != nil {
+				return "", err
+			}
+			return "gort$.goKMapFrom<" + key + ", " + value + ">([" + joinComma(entries) + "])", nil
 		}
 		if n.T.Key.Kind.Float() {
-			return "gort$.goFMapFrom([" + joinComma(entries) + "])", nil
+			value, err := p.tsType(*n.T.Elem)
+			if err != nil {
+				return "", err
+			}
+			return "gort$.goFMapFrom<" + value + ">([" + joinComma(entries) + "])", nil
 		}
 		if n.T.Key.Kind == ir.KindIface && n.T.Key.TypeParamName == "" {
 			encoder, err := p.ifaceKeyEncoder(*n.T.Key)
 			if err != nil {
 				return "", err
 			}
-			return "gort$.goEMapFrom([" + joinComma(entries) + "], " + encoder + ")", nil
+			key, err := p.tsType(*n.T.Key)
+			if err != nil {
+				return "", err
+			}
+			value, err := p.tsType(*n.T.Elem)
+			if err != nil {
+				return "", err
+			}
+			return "gort$.goEMapFrom<" + key + ", " + value + ">([" + joinComma(entries) + "], " + encoder + ")", nil
 		}
 		key, err := p.tsType(*n.T.Key)
 		if err != nil {
@@ -180,7 +208,14 @@ func (p *printer) collectionExpr(e ir.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return "gosl$.goSliceFrom([" + values + "])", nil
+		// Explicit element type: an empty literal has nothing to infer
+		// from (never[]), and a union-element literal must not narrow to
+		// the members that happen to appear.
+		elem, err := p.tsType(*n.Type().Elem)
+		if err != nil {
+			return "", err
+		}
+		return "gosl$.goSliceFrom<" + elem + ">([" + values + "])", nil
 	case *ir.SliceMake:
 		length, err := p.printExpr(n.Length)
 		if err != nil {

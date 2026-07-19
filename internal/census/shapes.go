@@ -75,6 +75,73 @@ func ConstShapeSignature(s ConstShape) string {
 	return s.Type + "\x00" + s.Value
 }
 
+// TypeShapeSignature is the canonical join string of a named type's
+// complete declaration shape: kind, underlying, type parameters, struct
+// fields (name/type/tag/embedded), interface methods and embeds, and
+// declared methods. It is the ONE definition of the named-type parity
+// contract: the census gate hashes it over its recorded shapes and the
+// translator hashes it over the type it lowered, so any drift in a
+// field, tag, method signature, or embed is a detected defect. The NUL
+// and unit separators cannot appear in canonical type spellings, names,
+// or tags rendered by strconv-quoted framing below.
+func TypeShapeSignature(s TypeShape) string {
+	var b []byte
+	app := func(parts ...string) {
+		for _, p := range parts {
+			b = append(b, p...)
+			b = append(b, 0x00)
+		}
+		b = append(b, 0x1f)
+	}
+	app("kind", s.Kind)
+	app("underlying", s.Underlying)
+	for _, tp := range s.TypeParams {
+		app("typeparam", tp.Name, tp.Constraint)
+	}
+	for _, f := range s.Fields {
+		embedded, exported := "0", "0"
+		if f.Embedded {
+			embedded = "1"
+		}
+		if f.Exported {
+			exported = "1"
+		}
+		app("field", f.Name, f.Type, f.Tag, embedded, exported)
+	}
+	for _, m := range s.InterfaceMethods {
+		app("ifacemethod", m.Name, m.Signature)
+	}
+	for _, e := range s.InterfaceEmbeds {
+		app("ifaceembed", e)
+	}
+	for _, m := range s.Methods {
+		ptr := "0"
+		if m.PointerReceiver {
+			ptr = "1"
+		}
+		app("method", m.Name, m.Signature, ptr)
+	}
+	return string(b)
+}
+
+// AliasShapeSignature is the canonical join string of a type alias's
+// declaration shape: its transparent target and its own type parameters.
+func AliasShapeSignature(s AliasShape) string {
+	var b []byte
+	app := func(parts ...string) {
+		for _, p := range parts {
+			b = append(b, p...)
+			b = append(b, 0x00)
+		}
+		b = append(b, 0x1f)
+	}
+	app("target", s.Target)
+	for _, tp := range s.TypeParams {
+		app("typeparam", tp.Name, tp.Constraint)
+	}
+	return string(b)
+}
+
 // VarShape is one package-level variable.
 type VarShape struct {
 	ID   string `json:"id"`

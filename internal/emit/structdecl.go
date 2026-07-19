@@ -45,8 +45,10 @@ func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct) er
 	// structural GoStructValue contract), while their behavior stays exact
 	// per instantiation.
 	for _, param := range structDecl.TypeParams {
+		p.line("eq$%s: (a: %s, b: %s) => boolean;", param, param, param)
 		p.line("clone$%s: (v: %s) => %s;", param, param, param)
 		p.line("set$%s: ((d: %s, s: %s) => void) | undefined;", param, param, param)
+		params = append(params, "eq$"+param+": (a: "+param+", b: "+param+") => boolean")
 		params = append(params, "clone$"+param+": (v: "+param+") => "+param)
 		params = append(params, "set$"+param+": ((d: "+param+", s: "+param+") => void) | undefined")
 	}
@@ -60,6 +62,7 @@ func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct) er
 		}
 	}
 	for _, param := range structDecl.TypeParams {
+		p.line("this.eq$%s = eq$%s;", param, param)
 		p.line("this.clone$%s = clone$%s;", param, param)
 		p.line("this.set$%s = set$%s;", param, param)
 	}
@@ -117,7 +120,7 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 		self += "<" + strings.Join(structDecl.TypeParams, ", ") + ">"
 	}
 	for _, param := range structDecl.TypeParams {
-		clone = append(clone, "this.clone$"+param, "this.set$"+param)
+		clone = append(clone, "this.eq$"+param, "this.clone$"+param, "this.set$"+param)
 	}
 	p.line("goClone$(): %s {", self)
 	p.indent++
@@ -186,17 +189,18 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 	}
 	p.zeroFactories, p.cloneOps, p.setOps = savedFactories, savedClone, savedSet
 	if len(structDecl.TypeParams) > 0 {
-		factories := make([]string, 0, len(structDecl.TypeParams)*3)
+		factories := make([]string, 0, len(structDecl.TypeParams)*4)
 		for _, param := range structDecl.TypeParams {
 			factories = append(factories, "zero$"+param+": () => "+param)
 		}
 		for _, param := range structDecl.TypeParams {
+			factories = append(factories, "eq$"+param+": (a: "+param+", b: "+param+") => boolean")
 			factories = append(factories, "clone$"+param+": (v: "+param+") => "+param)
 			factories = append(factories, "set$"+param+": ((d: "+param+", s: "+param+") => void) | undefined")
 		}
 		ctorArgs := append([]string{}, zeros...)
 		for _, param := range structDecl.TypeParams {
-			ctorArgs = append(ctorArgs, "clone$"+param, "set$"+param)
+			ctorArgs = append(ctorArgs, "eq$"+param, "clone$"+param, "set$"+param)
 		}
 		p.line("static goZero$<%s>(%s): %s {", strings.Join(structDecl.TypeParams, ", "), strings.Join(factories, ", "), self)
 		p.indent++
@@ -215,6 +219,13 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 	// keep NaN and signed-zero semantics under ===; interface fields may
 	// panic, exactly Go).
 	if structDecl.Comparable {
+		savedEq := p.eqOps
+		if len(structDecl.TypeParams) > 0 {
+			p.eqOps = map[string]string{}
+			for _, param := range structDecl.TypeParams {
+				p.eqOps[param] = "this.eq$" + param
+			}
+		}
 		comparisons := make([]string, 0, len(structDecl.Fields))
 		for _, field := range structDecl.Fields {
 			this, other := "this."+field.Name, "other."+field.Name
@@ -224,6 +235,7 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 			}
 			comparison, err := p.eqComponent(this, other, field.Type)
 			if err != nil {
+				p.eqOps = savedEq
 				return err
 			}
 			comparisons = append(comparisons, comparison)
@@ -231,6 +243,7 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 		if len(comparisons) == 0 {
 			comparisons = append(comparisons, "true")
 		}
+		p.eqOps = savedEq
 		p.line("goEq$(other: %s): boolean {", self)
 		p.indent++
 		p.line("return %s;", strings.Join(comparisons, " && "))
@@ -297,6 +310,10 @@ func (p *printer) keyComponent(access string, t ir.Type) (string, error) {
 		return `"i" + ` + tsident.Global("String") + "(" + access + ")", nil
 	case t.Kind.Float():
 		return "gort$.goKeyFloat(" + access + ")", nil
+	case t.Kind == ir.KindIface && t.TypeParamName != "":
+		// A bare type-parameter field: the instantiation-side admission
+		// restricts bindings to goKeyScalar's exact scalar family.
+		return "gort$.goKeyScalar(" + access + ")", nil
 	case t.Kind == ir.KindIface && t.TypeParamName == "":
 		// The union's generated $key encoder carries Go's dynamic-key
 		// equality for the interface field.
@@ -448,6 +465,16 @@ func (p *printer) printDeferWrappedBody(body *ir.Block, usesDeferStack bool) err
 
 // eqComponent spells one field's exact equality comparison.
 func (p *printer) eqComponent(left, right string, t ir.Type) (string, error) {
+	if t.Kind == ir.KindIface && t.TypeParamName != "" {
+		// A bare type-parameter field compares through the equality
+		// operation in scope (the class's captured eq$P) — exact per
+		// instantiation.
+		op, has := p.eqOps[t.TypeParamName]
+		if !has {
+			return "", fmt.Errorf("no equality operation in scope for type parameter %q", t.TypeParamName)
+		}
+		return op + "(" + left + ", " + right + ")", nil
+	}
 	switch t.Kind {
 	case ir.KindStruct:
 		return left + ".goEq$(" + right + ")", nil

@@ -1,0 +1,158 @@
+package translate_test
+
+import "testing"
+
+func TestOracleSliceOfAnyBoxedIntoAny(t *testing.T) {
+	// The tsoptions CompilerOptionsValue shape: a []any value boxed INTO
+	// any and asserted back out — the empty-interface union must carry the
+	// self-referential "c:[]interface{}" member or the assert compiles to
+	// a statically-false panic and everything after it is unreachable.
+	runOracle(t, `package fixture
+
+func makeList() any {
+	list := []any{"a", 7}
+	return list
+}
+
+func SliceOfAnyRoundTrip() int {
+	v := makeList()
+	list, ok := v.([]any)
+	if !ok {
+		return -1
+	}
+	total := len(list) * 100
+	if s, isStr := list[0].(string); isStr && s == "a" {
+		total += 10
+	}
+	if n, isInt := list[1].(int); isInt && n == 7 {
+		total += 1
+	}
+	return total
+}
+`)
+}
+
+func TestOracleGenericStructEqAndKey(t *testing.T) {
+	// The packagejson.Expected shape: a generic struct with a bare-param
+	// field, compared with == (delegating to the captured eq$P) and used
+	// as a map key at a scalar instantiation (goKeyScalar component).
+	runOracle(t, `package fixture
+
+type Expected[T any] struct {
+	valid bool
+	Value T
+}
+
+type Header struct {
+	Name    Expected[string]
+	Version Expected[string]
+}
+
+func GenericStructEqAndKey() int {
+	a := Header{Name: Expected[string]{true, "x"}, Version: Expected[string]{true, "1"}}
+	b := Header{Name: Expected[string]{true, "x"}, Version: Expected[string]{true, "1"}}
+	c := Header{Name: Expected[string]{true, "y"}, Version: Expected[string]{true, "1"}}
+	total := 0
+	if a == b {
+		total += 100
+	}
+	if a == c {
+		total += 10000
+	}
+	m := map[Header]int{}
+	m[a] = 7
+	m[c] = 9
+	total += m[b] * 10
+	total += len(m)
+	return total
+}
+`)
+}
+
+func TestOracleGenericMethodPointerIdentity(t *testing.T) {
+	// The core.Arena shape: a METHOD on a generic type returning *T where
+	// every corpus binding of T is a struct — the receiver's closed
+	// instantiation evidence makes *T the identity carrier, so callers
+	// store the instance directly into identity-typed locals and fields.
+	runOracle(t, `package fixture
+
+type node struct{ v int }
+
+type holder[T any] struct {
+	cur *T
+}
+
+func (h *holder[T]) Put(p *T) {
+	h.cur = p
+}
+
+func (h *holder[T]) Get() *T {
+	return h.cur
+}
+
+func GenericMethodPointerIdentity() int {
+	h := &holder[node]{}
+	n := &node{v: 40}
+	h.Put(n)
+	got := h.Get()
+	got.v++
+	if h.Get() != n {
+		return -1
+	}
+	return n.v
+}
+`)
+}
+
+func TestOracleDoublePointerFieldStore(t *testing.T) {
+	// The printer.setTempFlags shape: a field store through an explicit
+	// deref of a pointer-to-pointer — (*scope).f keeps BOTH indirections
+	// (outer deref in phase one, the store's implicit deref in phase two).
+	runOracle(t, `package fixture
+
+type scope struct {
+	flags int
+}
+
+func set(pp **scope, v int) {
+	(*pp).flags = v
+}
+
+func DoublePointerFieldStore() int {
+	s := &scope{flags: 1}
+	pp := &s
+	set(pp, 41)
+	return s.flags + 1
+}
+`)
+}
+
+func TestOracleClosureAssignedNilSlice(t *testing.T) {
+	// The printer comment-collection shape: a nil-initialized slice local
+	// assigned ONLY inside a closure, then indexed after the call — the
+	// typed nil initializer keeps the declared carrier type so the later
+	// element access types exactly.
+	runOracle(t, `package fixture
+
+type item struct {
+	n int
+}
+
+func each(f func(int)) {
+	f(1)
+	f(2)
+}
+
+func ClosureAssignedNilSlice() int {
+	var items []item
+	each(func(v int) {
+		items = append(items, item{n: v * 10})
+	})
+	if len(items) == 0 {
+		return -1
+	}
+	first := items[0]
+	return first.n + items[1].n
+}
+`)
+}
