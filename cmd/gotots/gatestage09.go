@@ -64,7 +64,12 @@ func runStagedGenerationGate(repoDir, profilePath, buildProfile, sourceDir strin
 	// record) compares under source-root normalization — any other
 	// absolute path leaking into semantic evidence fails here.
 	relocated := filepath.Join(staging, "relocated-src")
-	if out, err := runInRepo(".", "cp", "-a", sourceDir, relocated); err != nil {
+	// Copy only what the census reads: exclude the checkout's package
+	// caches and scratch dirs (node_modules alone is multi-GB and
+	// exhausts the staging filesystem).
+	if out, err := runInRepo(".", "bash", "-c", fmt.Sprintf(
+		"mkdir -p %q && tar -C %q -cf - --exclude=./node_modules --exclude=./.git --exclude=./.temp --exclude='./.tmp-*' . | tar -C %q -xf -",
+		relocated, sourceDir, relocated)); err != nil {
 		return "fail", splitLines(out), fmt.Errorf("relocate checkout: %w", err)
 	}
 	relocatedRun, err := census.Run(prof, relocated, buildProfile)

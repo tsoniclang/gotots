@@ -29,13 +29,16 @@ var representationFamilies = map[string]map[string]bool{
 		"native-array-of-element-carrier": true,
 		"external-branded-handle":         true,
 		"type-parameter-instantiation":    true,
+		"opaque-channel-nilable(undefined)-never-constructible": true,
 	},
 	"declaration": {
-		"external-stub(typed-static, fail-closed)": true,
-		"blank-var(no-initializer, no output)":     true,
-		"ordered-effect(no binding)":               true,
-		"const-folded-at-use":                      true,
-		"class-direct-identity":                    true,
+		"external-stub(typed-static, fail-closed)":         true,
+		"blank-var(no-initializer, no output)":             true,
+		"ordered-effect(no binding)":                       true,
+		"const-folded-at-use":                              true,
+		"class-direct-identity":                            true,
+		"blank-import(embed: directive-only, no output)":   true,
+		"blank-import(owned: module init edge, no output)": true,
 	},
 }
 

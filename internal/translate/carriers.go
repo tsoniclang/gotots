@@ -48,6 +48,10 @@ func conservativeCarrier(t ir.Type) string {
 		return fmt.Sprintf("number-wrapped-%d", t.Kind.Bits())
 	case t.TypeParamName != "":
 		return "type-parameter-instantiation"
+	case t.Kind == ir.KindChan:
+		// The reviewed opaque channel TYPE carrier: declarations complete,
+		// nothing in emitted code constructs a non-nil value.
+		return "opaque-channel-nilable(undefined)-never-constructible"
 	}
 	// Every reviewed kind is named above; an unnamed kind is a
 	// contradiction the representation gate rejects.
