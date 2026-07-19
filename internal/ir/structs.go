@@ -249,12 +249,16 @@ func (b *builder) promotedDelegates(named *types.Named, span Span) ([]PromotedDe
 						Construct: "promotion through a non-struct embedding (" + method.Name() + ")", Span: span}
 				}
 				field := structType.Field(index)
-				if _, isPointer := types.Unalias(field.Type()).Underlying().(*types.Pointer); isPointer {
-					return nil, &Unsupported{Kind: KindPromotionThroughAnEmbeddedPointer, Code: "GOTOTS_UNSUPPORTED_DECLARATION",
-						Construct: "promotion through an embedded pointer (" + method.Name() + ")", Span: span}
-				}
+				// An embedded POINTER field delegates through Go's implicit
+				// dereference; the step records its pointedness so the
+				// emitted delegation nil-checks exactly there.
+				_, isPointer := types.Unalias(field.Type()).Underlying().(*types.Pointer)
 				entry.Path = append(entry.Path, field.Name())
+				entry.PathPointer = append(entry.PathPointer, isPointer)
 				current = field.Type()
+				if pointer, deref := types.Unalias(current).Underlying().(*types.Pointer); deref {
+					current = pointer.Elem()
+				}
 			}
 			recvNamed, ok := types.Unalias(current).(*types.Named)
 			if !ok {

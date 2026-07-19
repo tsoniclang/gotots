@@ -33,7 +33,7 @@ done:
 		t.Fatalf("expected a withheld diagnostic, got: %v", err)
 	}
 	for _, mention := range []string{
-		"channel type",        // make(chan int)
+		"make of chan",        // make(chan int) — the TYPE is an opaque carrier; the MAKE fails
 		"select statement",    // select {}
 		"keyed array literal", // [4]int{2: 1}
 		"branch goto",         // goto done

@@ -364,21 +364,9 @@ func Case() int {
 `,
 			code: "GOTOTS_UNSUPPORTED_TYPE", mention: "blank field",
 		},
-		{
-			name: "promotion through an embedded pointer",
-			source: `package fixture
-type Base struct{ N int }
-func (b *Base) Get() int { return b.N }
-type Outer struct{ *Base }
-func Case() int {
-	o := Outer{Base: &Base{N: 1}}
-	var v any = o
-	_ = v
-	return o.Get()
-}
-`,
-			code: "GOTOTS_UNSUPPORTED_DECLARATION", mention: "promotion through an embedded pointer",
-		},
+		// Promotion through an embedded pointer is exact now — the
+		// delegation nil-checks each pointer step (see
+		// TestOraclePromotionThroughEmbeddedPointer).
 		{
 			name: "float map key",
 			source: `package fixture

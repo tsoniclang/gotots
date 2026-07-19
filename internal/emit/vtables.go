@@ -122,10 +122,7 @@ func (p *printer) vtableEntries(info RttiInfo) ([]string, []string, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		chain := "$r"
-		for _, field := range delegate.Path {
-			chain += "." + field
-		}
+		chain := chainOver("$r", delegate)
 		// Promoted adapters spell their exact parameters through the
 		// declaring method's generated function type (Parameters<> minus
 		// the receiver) — exact and erased-free. The property is the
@@ -135,8 +132,8 @@ func (p *printer) vtableEntries(info RttiInfo) ([]string, []string, error) {
 		slot := requireIdentity(delegate.Slot, "vtable slot for promoted method "+delegate.Name)
 		valueEntry := fmt.Sprintf("%s: ($r: %s, ...$a: goif$.DropFirst<Parameters<typeof %s>>) => %s(%s, ...$a)",
 			slot, self, target, target, chain)
-		pointerEntry := fmt.Sprintf("%s: ($r: (%s | undefined), ...$a: goif$.DropFirst<Parameters<typeof %s>>) => %s(gort$.goNilCheck<%s>($r)%s, ...$a)",
-			slot, self, target, target, self, chainSuffix(delegate.Path))
+		pointerEntry := fmt.Sprintf("%s: ($r: (%s | undefined), ...$a: goif$.DropFirst<Parameters<typeof %s>>) => %s(%s, ...$a)",
+			slot, self, target, target, chainOver("gort$.goNilCheck<"+self+">($r)", delegate))
 		if delegate.ValueReceiver {
 			valueSet = append(valueSet, valueEntry)
 		}
@@ -145,11 +142,15 @@ func (p *printer) vtableEntries(info RttiInfo) ([]string, []string, error) {
 	return valueSet, pointerSet, nil
 }
 
-// chainSuffix spells the promoted field chain after a nil-checked base.
-func chainSuffix(path []string) string {
-	out := ""
-	for _, field := range path {
+// chainOver spells the promoted field chain over a base expression,
+// nil-checking each embedded-pointer step (Go's implicit dereference).
+func chainOver(base string, delegate ir.PromotedDelegate) string {
+	out := base
+	for i, field := range delegate.Path {
 		out += "." + field
+		if i < len(delegate.PathPointer) && delegate.PathPointer[i] {
+			out = "gort$.goNilCheck(" + out + ")"
+		}
 	}
 	return out
 }

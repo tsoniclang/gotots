@@ -282,7 +282,10 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 		return out, nil
 
 	case *types.Chan:
-		return Type{}, &Unsupported{Kind: KindChannelType, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "channel type " + spelled, Span: span}
+		// The TYPE position is representable (an opaque nilable handle no
+		// emitted code can construct); every channel OPERATION remains
+		// typed-unimplemented at its own site.
+		return Type{Kind: KindChan, Go: spelled}, nil
 
 	}
 	return Type{}, &Unsupported{Kind: KindType, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "type " + spelled, Span: span}

@@ -181,7 +181,7 @@ func Case() int {
 }
 `,
 			code:    "GOTOTS_UNSUPPORTED",
-			mention: "channel type",
+			mention: "make of chan",
 		},
 		{
 			name: "equality on external values",
@@ -197,17 +197,9 @@ func Case() bool {
 			code:    "GOTOTS_UNSUPPORTED_OPERATION",
 			mention: "equality on time.Time",
 		},
-		{
-			name: "blank import",
-			source: `package fixture
-
-import _ "oracle.fixture/helper"
-
-func Case() int { return 1 }
-`,
-			code:    "GOTOTS_UNSUPPORTED_DECLARATION",
-			mention: "blank import",
-		},
+		// A blank import of an OWNED package is exact: its init effects
+		// flow through the module's initialization edge; only an external
+		// target with real init effects stays fail-closed.
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

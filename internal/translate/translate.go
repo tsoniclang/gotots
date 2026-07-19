@@ -20,11 +20,11 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"golang.org/x/tools/go/packages"
 
-	"github.com/tsoniclang/gotots/internal/abi"
 	"github.com/tsoniclang/gotots/internal/census"
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/goid"
@@ -32,110 +32,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/tsident"
 	"github.com/tsoniclang/gotots/internal/typeid"
 )
-
-// Packages translates a set of loaded production packages as one unit:
-// named types, direct calls, and pointer-receiver method calls resolve
-// across every package in the set, and each package emits one module at
-// core/<pkgPath>/package.ts importing its co-generated dependencies.
-func Packages(pkgs []*packages.Package, sourceDir string, options Options) (*Generated, error) {
-	sorted := append([]*packages.Package{}, pkgs...)
-	sort.Slice(sorted, func(i, j int) bool { return sorted[i].PkgPath < sorted[j].PkgPath })
-	seen := map[string]bool{}
-	paths := make([]string, 0, len(sorted))
-	for _, p := range sorted {
-		if seen[p.PkgPath] {
-			return nil, fmt.Errorf("package %s appears twice in the translation unit", p.PkgPath)
-		}
-		seen[p.PkgPath] = true
-		paths = append(paths, p.PkgPath)
-	}
-	unit := ir.NewScope(paths...)
-	if err := collectGenericInstances(unit, sorted); err != nil {
-		return nil, err
-	}
-
-	out := &Generated{
-		Files:           map[string]string{},
-		Ownership:       map[string]string{},
-		Withheld:        map[string]string{},
-		NotMaterialized: map[string]string{},
-	}
-	var emitters []func() error
-	for _, p := range sorted {
-		if err := translatePackage(out, p, sourceDir, unit, options, &emitters); err != nil {
-			return nil, err
-		}
-	}
-	// Materialization cascade FIRST, over source imports (declaration
-	// blockers are known before emission): a package importing a
-	// non-materializable one cannot materialize either. The fixed point
-	// determines exactly which packages emit, so the emitters run once.
-	for growNotMaterializedByImports(out, sorted) {
-	}
-	// Materialize every eligible package (typed throwing placeholders for its
-	// unimplemented bodies). Emission is order-independent — every referenced
-	// class exists because materialization is closed under imports.
-	for _, emitPackage := range emitters {
-		if err := emitPackage(); err != nil {
-			return nil, err
-		}
-	}
-	if err := emitExternalStubs(out, unit, sorted[0], sourceDir, options); err != nil {
-		return nil, err
-	}
-	// Publication withholding is a SEPARATE fixed point over the real emitted
-	// import edges: a package with any unimplemented unit — or one importing
-	// a publication-withheld package — does not enter the runnable product.
-	// Its materialized file is RETAINED for analysis (never deleted).
-	for growWithheldByImports(out, sorted) {
-	}
-	// Every PUBLISHED (retained) module must import only published modules: a
-	// runnable product cannot depend on a withheld package. Materialized-but-
-	// withheld modules are excluded from this closure (they are analysis
-	// artifacts, not product).
-	if err := assertRetainedImportsResolve(out); err != nil {
-		return nil, err
-	}
-
-	abiFiles := abi.Files()
-	abiNames := make([]string, 0, len(abiFiles))
-	for name := range abiFiles {
-		abiNames = append(abiNames, name)
-	}
-	sort.Strings(abiNames)
-	for _, name := range abiNames {
-		abiPath := path.Join(abiDir, name)
-		content, err := emit.FileWithProvenance(emit.Provenance{
-			SchemaVersion:  1,
-			SourceRevision: options.SourceRevision,
-			ProfileHash:    options.ProfileHash,
-			AbiVersion:     abi.Version,
-			Path:           abiPath,
-		}, abiFiles[name])
-		if err != nil {
-			return nil, err
-		}
-		out.Files[abiPath] = content
-		out.Ownership[abiPath] = "generated-language-abi"
-	}
-
-	sort.Slice(out.Proofs, func(i, j int) bool { return out.Proofs[i].ID < out.Proofs[j].ID })
-	sort.Slice(out.Support, func(i, j int) bool { return out.Support[i].ID < out.Support[j].ID })
-	// The single final evidence pass: every file and proof now exists
-	// (core, ABI, external stubs), so stages finalize exactly once and
-	// invalid evidence is a build failure, not a normalization.
-	if err := finalizeEvidenceStages(out); err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// fileSource pairs one production file's AST with its exact source.
-type fileSource struct {
-	file     *ast.File
-	relative string
-	source   []byte
-}
 
 // translatePackage translates one unit package into its generated module.
 // Declarations are collected in two passes — types first, then functions
@@ -220,7 +116,37 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 					importSpec := spec.(*ast.ImportSpec)
 					if importSpec.Name != nil && importSpec.Name.Name == "_" {
 						position := p.Fset.Position(spec.Pos())
-						declSite(goid.Repeatable(p.PkgPath, "import", "_", f.relative, position.Line, position.Column),
+						importID := goid.Repeatable(p.PkgPath, "import", "_", f.relative, position.Line, position.Column)
+						importPath, _ := strconv.Unquote(importSpec.Path.Value)
+						if importPath == "embed" {
+							// The Go spec defines "embed" as directive-only: it
+							// declares no init effect at all (//go:embed
+							// semantics live on the embedded VARIABLES, which
+							// carry their own dispositions). The exact
+							// translation of the blank import is nothing.
+							out.Proofs = append(out.Proofs, Proof{
+								ID: importID, SourceRevision: options.SourceRevision,
+								Package: p.PkgPath, File: f.relative,
+								LoweringPlan:    LoweringPlanV2,
+								Representations: map[string]string{"decl:_": "blank-import(embed: directive-only, no output)"},
+								NoOutput:        true,
+							})
+							continue
+						}
+						if unit.Owns(importPath) {
+							// An owned target's init effects are carried by the
+							// module's initialization edge (every owned source
+							// import evaluates the imported module).
+							out.Proofs = append(out.Proofs, Proof{
+								ID: importID, SourceRevision: options.SourceRevision,
+								Package: p.PkgPath, File: f.relative,
+								LoweringPlan:    LoweringPlanV2,
+								Representations: map[string]string{"decl:_": "blank-import(owned: module init edge, no output)"},
+								NoOutput:        true,
+							})
+							continue
+						}
+						declSite(importID,
 							&ir.Unsupported{Kind: ir.KindBlankImportInitSideEffects, Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 								Construct: "blank import (init side effects)", Span: spanOf(p, sourceDir, spec.Pos())})
 					}
