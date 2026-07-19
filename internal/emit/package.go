@@ -107,6 +107,16 @@ func Package(module *Module, decls Decls) (string, []BodyOutcome, error) {
 				return "", nil, err
 			}
 		}
+		for _, delegate := range structDecl.Promoted {
+			if !delegate.IfaceField {
+				continue
+			}
+			body.WriteString("\n")
+			structT := ir.Type{Kind: ir.KindStruct, Go: structDecl.ID, Named: structDecl.Name, Pkg: module.Pkg}
+			if err := printIfaceDelegate(&body, module, structDecl.Name, structT, delegate); err != nil {
+				return "", nil, err
+			}
+		}
 		if len(structDecl.TypeParams) == 0 {
 			body.WriteString("\n")
 			info := RttiInfo{

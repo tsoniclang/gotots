@@ -267,3 +267,33 @@ func IdentityParamPointer() int {
 }
 `)
 }
+
+func TestOraclePromotedInterfaceMethod(t *testing.T) {
+	// The resolverHost shape: a struct embedding an INTERFACE — its
+	// promoted methods dispatch through the embedded value's dynamic type.
+	runOracle(t, `package fixture
+
+type host interface {
+	Dir() string
+}
+
+type hostA struct{ d string }
+
+func (h *hostA) Dir() string { return h.d }
+
+type hostB struct{}
+
+func (h *hostB) Dir() string { return "b" }
+
+type resolver struct {
+	host
+	tag int
+}
+
+func PromotedInterfaceMethod() string {
+	r := resolver{host: &hostA{d: "a"}, tag: 1}
+	s := resolver{host: &hostB{}}
+	return r.Dir() + s.Dir()
+}
+`)
+}

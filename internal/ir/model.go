@@ -567,4 +567,15 @@ type PromotedDelegate struct {
 	Pkg           string
 	TypeName      string
 	ValueReceiver bool
+	// IfaceField marks a method promoted from an embedded INTERFACE
+	// field: no static Type$Method function exists — the delegate emits
+	// as a generated function on the EMBEDDING type whose body dispatches
+	// through the field's interface value (the closed union switch).
+	IfaceField bool
+	// IfaceType / Params / Results carry the dispatch data for IfaceField
+	// delegates: the embedded interface's resolved type and the promoted
+	// method's exact signature.
+	IfaceType Type
+	Params    []Var
+	Results   []Type
 }

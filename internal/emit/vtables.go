@@ -118,9 +118,30 @@ func (p *printer) vtableEntries(info RttiInfo) ([]string, []string, error) {
 	promoted := append([]ir.PromotedDelegate{}, info.Promoted...)
 	sort.Slice(promoted, func(i, j int) bool { return promoted[i].Name < promoted[j].Name })
 	for _, delegate := range promoted {
-		target, err := p.module.symbol(delegate.Pkg, delegate.TypeName+"$"+delegate.Name)
+		targetType := delegate.TypeName
+		targetPkg := delegate.Pkg
+		if delegate.IfaceField {
+			// The delegate is a generated function ON THE EMBEDDING type
+			// (its body dispatches the embedded interface's closed union),
+			// taking the embedding receiver directly.
+			targetType = info.TypeName
+			targetPkg = p.module.Pkg
+		}
+		target, err := p.module.symbol(targetPkg, targetType+"$"+delegate.Name)
 		if err != nil {
 			return nil, nil, err
+		}
+		if delegate.IfaceField {
+			slot := requireIdentity(delegate.Slot, "vtable slot for promoted method "+delegate.Name)
+			valueEntry := fmt.Sprintf("%s: ($r: %s, ...$a: goif$.DropFirst<Parameters<typeof %s>>) => %s($r, ...$a)",
+				slot, self, target, target)
+			pointerEntry := fmt.Sprintf("%s: ($r: (%s | undefined), ...$a: goif$.DropFirst<Parameters<typeof %s>>) => %s(gort$.goNilCheck<%s>($r), ...$a)",
+				slot, self, target, target, self)
+			if delegate.ValueReceiver {
+				valueSet = append(valueSet, valueEntry)
+			}
+			pointerSet = append(pointerSet, pointerEntry)
+			continue
 		}
 		chain := chainOver("$r", delegate)
 		// Promoted adapters spell their exact parameters through the
@@ -153,4 +174,50 @@ func chainOver(base string, delegate ir.PromotedDelegate) string {
 		}
 	}
 	return out
+}
+
+// printIfaceDelegate emits the generated function of one method promoted
+// from an embedded INTERFACE field: it takes the embedding receiver and
+// dispatches through the field's closed union (the exhaustive member
+// switch), exactly Go's promoted interface-method call.
+func printIfaceDelegate(out *strings.Builder, module *Module, structName string, structT ir.Type, delegate ir.PromotedDelegate) error {
+	if len(delegate.Path) != 1 {
+		return fmt.Errorf("interface-field promotion with a multi-hop path is not yet reviewed (%s.%s)", structName, delegate.Name)
+	}
+	p := &printer{out: out, module: module}
+	params := []string{"$r: " + tsName(structName)}
+	var args []ir.Expr
+	for _, parameter := range delegate.Params {
+		spelled, err := p.tsType(parameter.Type)
+		if err != nil {
+			return err
+		}
+		params = append(params, parameter.Name+": "+spelled)
+		args = append(args, &ir.ParamRef{Name: parameter.Name, T: parameter.Type})
+	}
+	result, err := p.tsFuncResultType(delegate.Results)
+	if err != nil {
+		return err
+	}
+	p.line("export function %s$%s(%s): %s {", tsName(structName), delegate.Name, joinComma(params), result)
+	p.indent++
+	call := &ir.IfaceCall{
+		Recv:      &ir.FieldLoad{X: &ir.ParamRef{Name: "$r", T: structT}, Field: delegate.Path[0], T: delegate.IfaceType},
+		Display:   delegate.Name,
+		MethodKey: requireIdentity(delegate.MethodIdent, "promoted interface method "+delegate.Name),
+		Args:      args,
+		Results:   delegate.Results,
+	}
+	printed, err := p.printIfaceCall(call)
+	if err != nil {
+		return err
+	}
+	if len(delegate.Results) == 0 {
+		p.line("%s;", printed)
+	} else {
+		p.line("return %s;", printed)
+	}
+	p.indent--
+	p.line("}")
+	return nil
 }

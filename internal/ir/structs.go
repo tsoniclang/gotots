@@ -3,6 +3,7 @@ package ir
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"go/ast"
 	"go/types"
 	"sort"
@@ -266,6 +267,31 @@ func (b *builder) promotedDelegates(named *types.Named, span Span) ([]PromotedDe
 					Construct: "promotion through an unnamed embedding (" + method.Name() + ")", Span: span}
 			}
 			entry.TypeName = recvNamed.Obj().Name()
+			if _, isIface := recvNamed.Underlying().(*types.Interface); isIface {
+				// The method lives on an embedded INTERFACE value: the
+				// delegate dispatches through the field's closed union.
+				entry.IfaceField = true
+				ifaceIR, err := b.typeOf(recvNamed, span)
+				if err != nil {
+					return nil, err
+				}
+				entry.IfaceType = ifaceIR
+				signature := method.Type().(*types.Signature)
+				for i := range signature.Params().Len() {
+					t, err := b.typeOf(signature.Params().At(i).Type(), span)
+					if err != nil {
+						return nil, err
+					}
+					entry.Params = append(entry.Params, Var{Name: fmt.Sprintf("$a%d", i), Type: t})
+				}
+				for i := range signature.Results().Len() {
+					t, err := b.typeOf(signature.Results().At(i).Type(), span)
+					if err != nil {
+						return nil, err
+					}
+					entry.Results = append(entry.Results, t)
+				}
+			}
 			out = append(out, entry)
 		}
 	}

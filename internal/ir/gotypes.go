@@ -234,7 +234,11 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 		// Struct values are reviewed only behind pointers and receivers;
 		// the caller decides whether a bare struct kind is admissible.
 		out := Type{Kind: KindStruct, Go: spelled, Named: named.Obj().Name(), Pkg: named.Obj().Pkg().Path(),
-			Uncomparable: !types.Comparable(t)}
+			// Uncomparable tracks whether the CLASS carries goEq$ (the
+			// generated exact equality) — the emitted surface, which is
+			// stricter than Go's spec comparability. An eq factory over a
+			// binding without goEq$ fails closed loudly, never silently.
+			Uncomparable: !b.structEqComparable(named)}
 		if named.TypeArgs() != nil {
 			for i := range named.TypeArgs().Len() {
 				goArg := named.TypeArgs().At(i)
@@ -446,6 +450,18 @@ func (b *builder) structEqComparable(goType types.Type) bool {
 	if !ok {
 		return false
 	}
+	guard := "eq:" + goType.String()
+	if b.keyEncodableInProgress[guard] {
+		// COINDUCTIVE cycle (a struct reachable through its own fields):
+		// assuming comparable is self-consistent — pointer fields compare
+		// by identity, so value recursion terminates.
+		return true
+	}
+	if b.keyEncodableInProgress == nil {
+		b.keyEncodableInProgress = map[string]bool{}
+	}
+	b.keyEncodableInProgress[guard] = true
+	defer delete(b.keyEncodableInProgress, guard)
 	for i := range structType.NumFields() {
 		field := structType.Field(i)
 		fieldIR, err := b.typeOf(field.Type(), Span{})
