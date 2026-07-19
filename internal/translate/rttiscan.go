@@ -44,6 +44,21 @@ func collectParamRttiRequirements(unit ir.Scope, pkgs []*packages.Package) {
 			if owner == nil {
 				return
 			}
+			// A method on a generic type resolves its receiver parameters
+			// through the TYPE's object — the same identity every mask
+			// lookup (declRttiRequires, call-site threading) reads.
+			if fn, isFunc := owner.(*types.Func); isFunc {
+				signature := fn.Type().(*types.Signature)
+				if recvParams := signature.RecvTypeParams(); recvParams != nil && recvParams.Len() > 0 {
+					recv := signature.Recv().Type()
+					if pointer, isPointer := types.Unalias(recv).(*types.Pointer); isPointer {
+						recv = pointer.Elem()
+					}
+					if named, isNamed := types.Unalias(recv).(*types.Named); isNamed {
+						owner = named.Obj()
+					}
+				}
+			}
 			if index, mine := ownerParamIndex(owner, param); mine {
 				unit.RequireParamRtti(owner, index)
 			}
@@ -55,6 +70,13 @@ func collectParamRttiRequirements(unit ir.Scope, pkgs []*packages.Package) {
 			return nil
 		}
 		for _, file := range p.Syntax {
+			var funcLits []*ast.FuncLit
+			ast.Inspect(file, func(n ast.Node) bool {
+				if lit, isLit := n.(*ast.FuncLit); isLit {
+					funcLits = append(funcLits, lit)
+				}
+				return true
+			})
 			ast.Inspect(file, func(n ast.Node) bool {
 				switch n := n.(type) {
 				case *ast.AssignStmt:
@@ -73,13 +95,19 @@ func collectParamRttiRequirements(unit ir.Scope, pkgs []*packages.Package) {
 						require(n.Pos(), exprType(value), declared)
 					}
 				case *ast.ReturnStmt:
-					owner := ranges.at(n.Pos())
-					fn, isFunc := owner.(*types.Func)
-					if !isFunc {
-						return true
+					// The INNERMOST enclosing function's results type this
+					// return — a closure inside a generic declaration returns
+					// to its own signature (computeFn's func literal returns T
+					// into any).
+					var results *types.Tuple
+					if lit := innermostFuncLit(funcLits, n.Pos()); lit != nil {
+						if sig, isSig := exprType(lit).(*types.Signature); isSig {
+							results = sig.Results()
+						}
+					} else if fn, isFunc := ranges.at(n.Pos()).(*types.Func); isFunc {
+						results = fn.Type().(*types.Signature).Results()
 					}
-					results := fn.Type().(*types.Signature).Results()
-					if results.Len() != len(n.Results) {
+					if results == nil || results.Len() != len(n.Results) {
 						return true
 					}
 					for i, result := range n.Results {
@@ -160,6 +188,21 @@ func collectParamRttiRequirements(unit ir.Scope, pkgs []*packages.Package) {
 			})
 		}
 	}
+}
+
+// innermostFuncLit finds the innermost function literal enclosing a
+// position (nil when the position is directly in a declared function).
+func innermostFuncLit(lits []*ast.FuncLit, pos token.Pos) *ast.FuncLit {
+	var innermost *ast.FuncLit
+	for _, lit := range lits {
+		if pos < lit.Pos() || pos >= lit.End() {
+			continue
+		}
+		if innermost == nil || lit.Pos() > innermost.Pos() {
+			innermost = lit
+		}
+	}
+	return innermost
 }
 
 // ownerParamIndex resolves a type parameter's position among its owning

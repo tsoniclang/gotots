@@ -44,10 +44,10 @@ func (p *printer) printIfaceExpr(e ir.Expr) (string, bool, error) {
 		if err != nil {
 			return "", true, err
 		}
-		// The box composes from the binding's triple; its static type is
-		// generic, so the union membership the binding evidence guarantees
-		// is asserted through unknown.
-		return "(goif$.goIfaceBox(" + op + ".k, " + op + ".r, " + x + ", " + op + ".m) as unknown as " + spelled + ")", true, nil
+		// rt$P IS the binding's box operation; its static result is
+		// unknown, so the union membership the binding evidence
+		// guarantees is asserted through unknown.
+		return "(" + op + "(" + x + ") as " + spelled + ")", true, nil
 	case *ir.IfaceCall:
 		printed, err := p.printIfaceCall(n)
 		return printed, true, err

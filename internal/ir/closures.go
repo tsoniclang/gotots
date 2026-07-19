@@ -21,17 +21,18 @@ func (b *builder) buildClosure(lit *ast.FuncLit) (Expr, error) {
 	signature := b.info.Types[lit].Type.Underlying().(*types.Signature)
 
 	child := &builder{
-		fset:       b.fset,
-		info:       b.info,
-		pkgPath:    b.pkgPath,
-		sourceDir:  b.sourceDir,
-		unit:       b.unit,
-		operations: b.operations,
-		sites:      b.sites,
-		boxed:      b.boxed,
-		bind:       b.bind,
-		genericObj: b.genericObj,
-		binders:    b.binders,
+		fset:           b.fset,
+		info:           b.info,
+		pkgPath:        b.pkgPath,
+		sourceDir:      b.sourceDir,
+		unit:           b.unit,
+		operations:     b.operations,
+		sites:          b.sites,
+		boxed:          b.boxed,
+		bind:           b.bind,
+		genericObj:     b.genericObj,
+		genericTypeObj: b.genericTypeObj,
+		binders:        b.binders,
 	}
 	out := &Closure{T: t}
 	var boxedParams []Var

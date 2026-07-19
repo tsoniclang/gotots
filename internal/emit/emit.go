@@ -325,7 +325,7 @@ func (p *printer) functionSignature(function *ir.Func) (string, error) {
 			continue
 		}
 		if i < len(function.RttiParams) && function.RttiParams[i] {
-			params = append(params, "rt$"+param+": goif$.GoParamRtti")
+			params = append(params, "rt$"+param+": goif$.GoParamRtti<"+param+">")
 		}
 	}
 	result, err := p.tsResultType(function.Results)

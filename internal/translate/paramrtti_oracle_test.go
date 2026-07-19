@@ -64,6 +64,55 @@ func ParamRttiBoxing() int {
 `)
 }
 
+func TestOracleParamRttiMethodAndClosure(t *testing.T) {
+	// The ordered_map and showconfig shapes: a METHOD on a generic type
+	// boxes its receiver's parameter (the requirement lands on the TYPE
+	// object), and a closure inside a generic function returns T into
+	// its own any-typed result.
+	runOracle(t, `package fixture
+
+type holder[V any] struct {
+	items []V
+}
+
+func (h *holder[V]) boxed(index int) any {
+	return h.items[index]
+}
+
+func computeFn[T any](fn func(int) T) func(int) any {
+	return func(n int) any {
+		return fn(n)
+	}
+}
+
+func ParamRttiMethodAndClosure() int {
+	total := 0
+	h := &holder[string]{items: []string{"a", "b"}}
+	if s, ok := h.boxed(1).(string); ok && s == "b" {
+		total += 1
+	}
+	hi := &holder[int]{items: []int{9}}
+	if v, ok := hi.boxed(0).(int); ok && v == 9 {
+		total += 10
+	}
+	double := computeFn(func(n int) int { return n * 2 })
+	if v, ok := double(21).(int); ok && v == 42 {
+		total += 100
+	}
+	name := computeFn(func(n int) string {
+		if n > 0 {
+			return "pos"
+		}
+		return "neg"
+	})
+	if s, ok := name(1).(string); ok && s == "pos" {
+		total += 1000
+	}
+	return total
+}
+`)
+}
+
 func TestOracleParamRttiForwarding(t *testing.T) {
 	// A generic caller forwarding its own parameter into an
 	// rtti-required position passes its rt$P slot through (the

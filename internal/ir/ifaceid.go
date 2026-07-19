@@ -195,6 +195,12 @@ func (b *builder) callRttiSlot(goArg types.Type, argType Type, span Span) (Param
 		}
 		return ParamRttiArg{Forward: p.Obj().Name()}, nil
 	}
+	if _, isIface := types.Unalias(goArg).Underlying().(*types.Interface); isIface {
+		// An interface binding's values are already boxed: the box
+		// operation is the identity (Go's iface-to-iface conversion keeps
+		// the dynamic value).
+		return ParamRttiArg{Identity: true}, nil
+	}
 	if mentionsTypeParamType(goArg) {
 		// A composite mentioning a parameter (e.g. []Q) has no single
 		// runtime identity to pass.

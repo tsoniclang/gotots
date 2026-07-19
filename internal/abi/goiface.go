@@ -102,11 +102,14 @@ export function goIfaceBox<K extends string, V, M>(k: K, r: GoRtti, v: V, m: M):
   return { k, r, v, m };
 }
 
-// GoParamRtti is one generic binding's runtime identity: exactly the
-// non-payload part of the box a direct conversion of that binding would
-// compose. Declarations that box type-parameter VALUES into interfaces
-// take one rt$P slot per rtti-required parameter.
-export type GoParamRtti = { readonly k: string; readonly r: GoRtti; readonly m: unknown };
+// GoParamRtti is one generic binding's BOX OPERATION: exactly what a
+// direct interface conversion of that binding performs — the composed
+// box for concrete bindings, the identity for interface bindings (their
+// values are already boxed). Declarations that box type-parameter
+// VALUES into interfaces take one rt$P slot per rtti-required
+// parameter; the result type is unknown because the target union is the
+// box site's static assertion.
+export type GoParamRtti<V> = (v: V) => unknown;
 
 // goPanicUncomparable is Go's panic when two interface values share an
 // uncomparable dynamic type: the exact runtime message, the type display

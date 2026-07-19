@@ -58,6 +58,9 @@ type ParamIfaceBox struct {
 type ParamRttiArg struct {
 	Forward string
 	Rtti    *RttiRef
+	// Identity marks an interface-typed binding: its values are already
+	// boxed, so the binding's box operation is the identity.
+	Identity bool
 }
 
 // IfaceCall invokes an interface method through the box's method table;

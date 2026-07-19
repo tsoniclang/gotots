@@ -428,7 +428,7 @@ func printMethodFunctionVariant(out *strings.Builder, module *Module, className 
 			continue
 		}
 		if i < len(method.RttiParams) && method.RttiParams[i] {
-			params = append(params, "rt$"+param+": goif$.GoParamRtti")
+			params = append(params, "rt$"+param+": goif$.GoParamRtti<"+param+">")
 		}
 	}
 	result, err := p.tsResultType(method.Results)

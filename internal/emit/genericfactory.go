@@ -446,6 +446,11 @@ func (p *printer) rttiFactoryArgs(mask []bool, slots []ir.ParamRttiArg, erased [
 			parts = append(parts, op)
 			continue
 		}
+		if slot.Identity {
+			// An interface binding's values are already boxed.
+			parts = append(parts, "(($v: unknown) => $v)")
+			continue
+		}
 		if slot.Rtti == nil {
 			return "", fmt.Errorf("rtti-required position %d carries neither forward nor rtti", i)
 		}
@@ -457,7 +462,7 @@ func (p *printer) rttiFactoryArgs(mask []bool, slots []ir.ParamRttiArg, erased [
 		if err != nil {
 			return "", err
 		}
-		parts = append(parts, fmt.Sprintf("{ k: %q, r: %s, m: %s }", boxDiscriminant(*slot.Rtti), rtti, vtable))
+		parts = append(parts, fmt.Sprintf("(($v: unknown) => goif$.goIfaceBox(%q, %s, $v, %s))", boxDiscriminant(*slot.Rtti), rtti, vtable))
 	}
 	return strings.Join(parts, ", "), nil
 }
