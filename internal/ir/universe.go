@@ -61,6 +61,13 @@ type boxedComposite struct {
 // universe — being observed before the pre-pass completes is a construction
 // defect. It never mutates the sealed named-type universe and is read only
 // at emit, so it feeds no cached union.
+// AddValueBoxedNamed logs one named type's VALUE-form boxing.
+func (s Scope) AddValueBoxedNamed(k string) { s.valueBoxedNamed[k] = true }
+
+// ValueBoxedNamed reports whether a named type's value form is boxed
+// anywhere in the unit (complete only after every body has built).
+func (s Scope) ValueBoxedNamed(k string) bool { return s.valueBoxedNamed[k] }
+
 func (s Scope) AddBoxedComposite(canon string, t Type, eq *EqPlan) {
 	if !*s.universeSealed {
 		panic("ir: AddBoxedComposite before the dynamic-type universe was sealed")

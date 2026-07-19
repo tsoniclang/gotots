@@ -51,6 +51,10 @@ func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct) er
 		params = append(params, "eq$"+param+": (a: "+param+", b: "+param+") => boolean")
 		params = append(params, "clone$"+param+": (v: "+param+") => "+param)
 		params = append(params, "set$"+param+": ((d: "+param+", s: "+param+") => void) | undefined")
+		if structDecl.CaptureKey {
+			p.line("key$%s: (k: %s) => string;", param, param)
+			params = append(params, "key$"+param+": (k: "+param+") => string")
+		}
 	}
 	p.line("constructor(%s) {", strings.Join(params, ", "))
 	p.indent++
@@ -65,6 +69,9 @@ func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct) er
 		p.line("this.eq$%s = eq$%s;", param, param)
 		p.line("this.clone$%s = clone$%s;", param, param)
 		p.line("this.set$%s = set$%s;", param, param)
+		if structDecl.CaptureKey {
+			p.line("this.key$%s = key$%s;", param, param)
+		}
 	}
 	p.indent--
 	p.line("}")
@@ -121,6 +128,9 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 	}
 	for _, param := range structDecl.TypeParams {
 		clone = append(clone, "this.eq$"+param, "this.clone$"+param, "this.set$"+param)
+		if structDecl.CaptureKey {
+			clone = append(clone, "this.key$"+param)
+		}
 	}
 	p.line("goClone$(): %s {", self)
 	p.indent++
@@ -201,10 +211,16 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 			factories = append(factories, "eq$"+param+": (a: "+param+", b: "+param+") => boolean")
 			factories = append(factories, "clone$"+param+": (v: "+param+") => "+param)
 			factories = append(factories, "set$"+param+": ((d: "+param+", s: "+param+") => void) | undefined")
+			if structDecl.CaptureKey {
+				factories = append(factories, "key$"+param+": (k: "+param+") => string")
+			}
 		}
 		ctorArgs := append([]string{}, zeros...)
 		for _, param := range structDecl.TypeParams {
 			ctorArgs = append(ctorArgs, "eq$"+param, "clone$"+param, "set$"+param)
+			if structDecl.CaptureKey {
+				ctorArgs = append(ctorArgs, "key$"+param)
+			}
 		}
 		p.line("static goZero$<%s>(%s): %s {", strings.Join(structDecl.TypeParams, ", "), strings.Join(factories, ", "), self)
 		p.indent++
@@ -315,9 +331,9 @@ func (p *printer) keyComponent(access string, t ir.Type) (string, error) {
 	case t.Kind.Float():
 		return "gort$.goKeyFloat(" + access + ")", nil
 	case t.Kind == ir.KindIface && t.TypeParamName != "":
-		// A bare type-parameter field: the instantiation-side admission
-		// restricts bindings to goKeyScalar's exact scalar family.
-		return "gort$.goKeyScalar(" + access + ")", nil
+		// A bare type-parameter field encodes through the captured key
+		// operation — statically exact per instantiation.
+		return "this.key$" + t.TypeParamName + "(" + access + ")", nil
 	case t.Kind == ir.KindIface && t.TypeParamName == "":
 		// The union's generated $key encoder carries Go's dynamic-key
 		// equality for the interface field.
@@ -372,8 +388,10 @@ func printMethodFunction(out *strings.Builder, module *Module, className string,
 	for _, param := range method.TypeParams {
 		params = append(params, "set$"+param+": ((d: "+param+", s: "+param+") => void) | undefined")
 	}
-	for _, param := range method.TypeParams {
-		params = append(params, "key$"+param+": (k: "+param+") => string")
+	for i, param := range method.TypeParams {
+		if i < len(method.KeyedParams) && method.KeyedParams[i] {
+			params = append(params, "key$"+param+": (k: "+param+") => string")
+		}
 	}
 	result, err := p.tsResultType(method.Results)
 	if err != nil {
@@ -402,12 +420,14 @@ func printMethodFunction(out *strings.Builder, module *Module, className string,
 		p.cloneOps = map[string]string{}
 		p.setOps = map[string]string{}
 		p.keyOps = map[string]string{}
-		for _, param := range method.TypeParams {
+		for i, param := range method.TypeParams {
 			p.zeroFactories[param] = "zero$" + param
 			p.eqOps[param] = "eq$" + param
 			p.cloneOps[param] = "clone$" + param
 			p.setOps[param] = "set$" + param
-			p.keyOps[param] = "key$" + param
+			if i < len(method.KeyedParams) && method.KeyedParams[i] {
+				p.keyOps[param] = "key$" + param
+			}
 		}
 	}
 	if structValueReceiver {

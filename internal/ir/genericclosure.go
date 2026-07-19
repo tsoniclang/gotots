@@ -325,7 +325,23 @@ func (s Scope) CollectParamKeyRequirements(obj types.Object, params *types.TypeP
 			walk(u.Results())
 		case *types.Named:
 			if args := u.TypeArgs(); args != nil {
+				keyCapturing := false
+				if _, isStruct := u.Origin().Underlying().(*types.Struct); isStruct && u.TypeParams() != nil && u.TypeParams().Len() > 0 {
+					// A KEY-CAPTURING generic class (its origin is a
+					// key-encodable struct) takes key$P at construction:
+					// binding one of OUR parameters to it propagates the
+					// key requirement (the enclosing declaration must take
+					// key$P to forward it).
+					keyCapturing = originStructKeyCapturing(u.Origin())
+				}
 				for i := range args.Len() {
+					if keyCapturing {
+						if p, ok := types.Unalias(args.At(i)).(*types.TypeParam); ok {
+							if j, mine := index[p]; mine {
+								s.RequireParamSVZKey(obj, j)
+							}
+						}
+					}
 					walk(args.At(i))
 				}
 			}
@@ -378,4 +394,31 @@ func edgeTarget(e genericEdge) types.Object {
 		return e.innerFunc
 	}
 	return e.innerType
+}
+
+// originStructKeyCapturing is a STRUCTURAL key-encodability walk of a
+// generic origin struct (no builder context: bare parameters and
+// pointers admit; scalars admit; anything else conservatively requires
+// the key — over-requiring is safe, the operation derivation is total
+// over admitted bindings).
+func originStructKeyCapturing(origin *types.Named) bool {
+	structType, ok := origin.Underlying().(*types.Struct)
+	if !ok {
+		return false
+	}
+	for i := range structType.NumFields() {
+		ft := structType.Field(i).Type()
+		if _, isParam := types.Unalias(ft).(*types.TypeParam); isParam {
+			continue
+		}
+		if _, isPtr := types.Unalias(ft).Underlying().(*types.Pointer); isPtr {
+			continue
+		}
+		if basic, isBasic := types.Unalias(ft).Underlying().(*types.Basic); isBasic {
+			_ = basic
+			continue
+		}
+		return false
+	}
+	return true
 }

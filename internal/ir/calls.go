@@ -62,6 +62,9 @@ func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
 			return b.buildExternalCall(n, function, signature, typeArgs)
 		}
 		call := &Call{Pkg: function.Pkg().Path(), Callee: function.Name(), TypeArgs: typeArgs}
+		for i := range typeArgs {
+			call.KeyedParams = append(call.KeyedParams, b.unit.ParamRequiresSVZKey(function, i))
+		}
 		if err := b.buildCallArgsResults(n, signature, &call.Args, &call.Results); err != nil {
 			return nil, err
 		}
@@ -264,6 +267,9 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 		TypeArgs:    recvTypeArgs,
 		Recv:        recv,
 		Method:      method.Name(),
+	}
+	for i := range recvTypeArgs {
+		out.KeyedParams = append(out.KeyedParams, b.unit.ParamRequiresSVZKey(recvNamed.Origin().Obj(), i))
 	}
 	if err := b.buildCallArgsResults(n, signature, &out.Args, &out.Results); err != nil {
 		return nil, err

@@ -216,7 +216,7 @@ func runTscGate(repoDir, profilePath, buildProfile, sourceDir string, report *Ga
 		return "fail", details, fmt.Errorf("positive-disposition ledger is empty: no invocation was certified")
 	}
 	details = append(details,
-		fmt.Sprintf("positive-disposition ledger: %d invocations (direct-static %d, typed-function-value %d, constructor-static %d, unimplemented-blocking %d), %d member selections, %d typed index sites — zero undisposed",
-			ledger.Invocations(), ledger.DirectStatic, ledger.TypedFunctionValue, ledger.ConstructorStatic, ledger.UnimplementedBlocking, ledger.MemberSelection, ledger.TypedIndex))
+		fmt.Sprintf("positive-disposition ledger: %d invocations (direct-static %d, typed-function-value %d, constructor-static %d, unimplemented-blocking %d, translator-limit-claimed-unreachable %d), %d member selections, %d typed index sites — zero undisposed",
+			ledger.Invocations(), ledger.DirectStatic, ledger.TypedFunctionValue, ledger.ConstructorStatic, ledger.UnimplementedBlocking, ledger.TranslatorLimit, ledger.MemberSelection, ledger.TypedIndex))
 	return "pass", details, nil
 }

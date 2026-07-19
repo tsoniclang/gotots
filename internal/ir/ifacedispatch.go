@@ -263,6 +263,11 @@ func (b *builder) ifaceMembers(iface *types.Interface, span Span) ([]IfaceMember
 				member.ExternCarrier = basicCarrier(basic)
 			}
 		}
+		if !member.Extern && !isStruct {
+			if basic, isBasic := named.Underlying().(*types.Basic); isBasic {
+				member.ValueCarrier = basicCarrier(basic)
+			}
+		}
 		plan, err := b.memberEqPlan(named, pointer, member.Extern, span)
 		if err != nil {
 			return err

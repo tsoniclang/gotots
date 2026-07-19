@@ -238,6 +238,14 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 			// binding without goEq$ fails closed loudly, never silently.
 			Uncomparable: !b.structEqComparable(named),
 			KeyEncodable: b.structKeyEncodable(named, span)}
+		if named.TypeParams() != nil && named.TypeParams().Len() > 0 {
+			out.ClassCapturesKey = b.structKeyEncodable(named.Origin(), span)
+			for i := range named.TypeParams().Len() {
+				if b.unit.ParamRequiresSVZKey(named.Origin().Obj(), i) {
+					out.ClassCapturesKey = true
+				}
+			}
+		}
 		if named.TypeArgs() != nil {
 			for i := range named.TypeArgs().Len() {
 				goArg := named.TypeArgs().At(i)
@@ -269,6 +277,12 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 					return Type{}, err
 				}
 				out.TypeArgs = append(out.TypeArgs, arg)
+			}
+			out.ClassCapturesKey = b.structKeyEncodable(named, span)
+			for i := range named.TypeParams().Len() {
+				if b.unit.ParamRequiresSVZKey(named.Obj(), i) {
+					out.ClassCapturesKey = true
+				}
 			}
 		}
 		return out, nil

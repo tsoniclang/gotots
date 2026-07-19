@@ -42,11 +42,16 @@ type InvocationLedger struct {
 	MemberSelection       int `json:"memberSelection"`
 	TypedIndex            int `json:"typedIndex"`
 	UnimplementedBlocking int `json:"unimplementedBlocking"`
+	// TranslatorLimit counts machine-claimed-unreachable invariant stops
+	// (goKeyUnreachable): reported separately so translator-only behavior
+	// can never hide inside directStatic; the deleted goKeyOpaque and
+	// goKeyScalar helpers are BANNED symbols outright.
+	TranslatorLimit int `json:"translatorLimit"`
 }
 
 // Invocations is the total number of positively disposed call sites.
 func (l InvocationLedger) Invocations() int {
-	return l.DirectStatic + l.TypedFunctionValue + l.ConstructorStatic + l.UnimplementedBlocking
+	return l.DirectStatic + l.TypedFunctionValue + l.ConstructorStatic + l.UnimplementedBlocking + l.TranslatorLimit
 }
 
 // verifierScript walks every parsed source file. Prohibited structural
@@ -84,7 +89,7 @@ const checker = program.getTypeChecker();
 
 const violations = [];
 const ledger = { directStatic: 0, typedFunctionValue: 0, constructorStatic: 0,
-  memberSelection: 0, typedIndex: 0, unimplementedBlocking: 0 };
+  memberSelection: 0, typedIndex: 0, unimplementedBlocking: 0, translatorLimit: 0 };
 function skipParens(e) {
   while (ts.isParenthesizedExpression(e)) e = e.expression;
   return e;
@@ -105,7 +110,12 @@ const mechanismBySymbol = {
 };
 const bannedNames = new Set([
   "goIfaceCall", "goFuncInvoke", "goExternalCall", "goExternalRegister", "eval",
+  "goKeyOpaque", "goKeyScalar",
 ]);
+// Translator-limit invariant stops: allowed ONLY under machine-verified
+// unreachability claims (counted in their own ledger class so they can
+// never hide as ordinary static calls).
+const translatorLimitNames = new Set(["goKeyUnreachable"]);
 
 function report(file, node, source, pattern) {
   const { line } = source.getLineAndCharacterOfPosition(node.getStart(source));
@@ -308,7 +318,9 @@ for (const source of program.getSourceFiles()) {
         const dispositionName = nameNode ? resolveSymbol(nameNode) : undefined;
         const resolvedName = dispositionName ? dispositionName.getName() : "";
         const calleeType = checker.getTypeAtLocation(callee).getNonNullableType();
-        if (resolvedName === "goBodyUnimplemented" || resolvedName === "goExternalUnimplemented") {
+        if (translatorLimitNames.has(resolvedName)) {
+          ledger.translatorLimit++;
+        } else if (resolvedName === "goBodyUnimplemented" || resolvedName === "goExternalUnimplemented") {
           ledger.unimplementedBlocking++;
         } else if (ts.isArrowFunction(inner) || ts.isFunctionExpression(inner)) {
           ledger.directStatic++;

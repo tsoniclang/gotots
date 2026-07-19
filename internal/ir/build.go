@@ -179,6 +179,9 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 			return declarationSite(err)
 		}
 		function.TypeParams = names
+		for i := range names {
+			function.KeyedParams = append(function.KeyedParams, b.unit.ParamRequiresSVZKey(object, i))
+		}
 		b.genericObj = object
 	}
 
@@ -204,6 +207,9 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 			}
 			if named, isNamed := types.Unalias(recvType).(*types.Named); isNamed {
 				b.genericTypeObj = named
+				for i := range recvParams.Len() {
+					function.KeyedParams = append(function.KeyedParams, b.unit.ParamRequiresSVZKey(named.Obj(), i))
+				}
 			}
 		}
 		// A pointer receiver binds the class instance; a value receiver

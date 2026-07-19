@@ -269,7 +269,7 @@ func (p *printer) ifaceKeyFn(t ir.Type, name string) (string, error) {
 	}
 	b.WriteString("  switch ($v.k) {\n")
 	for _, member := range members {
-		component, err := memberKeyComponent(member)
+		component, err := p.memberKeyComponent(member)
 		if err != nil {
 			return "", err
 		}
@@ -277,10 +277,7 @@ func (p *printer) ifaceKeyFn(t ir.Type, name string) (string, error) {
 	}
 	if t.IfaceEmpty {
 		for _, member := range predeclaredMembers {
-			component := "gort$.goKeyScalar($v.v)"
-			if member.name == "float64" || member.name == "float32" {
-				component = "gort$.goKeyFloat($v.v)"
-			}
+			component := scalarKeyComponentFor(member.payload, "$v.v")
 			fmt.Fprintf(&b, "    case %q: return %q + %s;\n", "p:"+member.name, "p:"+member.name+"|", component)
 		}
 		for _, composite := range p.module.BoxedComposites {
@@ -297,34 +294,54 @@ func (p *printer) ifaceKeyFn(t ir.Type, name string) (string, error) {
 
 // memberKeyComponent spells one named member's key encoding: pointer
 // identity, the exact scalar carrier, or a key-encodable struct's goKey$.
-func memberKeyComponent(member ir.IfaceMember) (string, error) {
+func (p *printer) memberKeyComponent(member ir.IfaceMember) (string, error) {
 	switch {
 	case member.Pointer:
 		return "gort$.goKeyId($v.v)", nil
 	case member.Extern && member.ExternCarrier == "number":
 		return "gort$.goKeyFloat($v.v)", nil
 	case member.Extern && member.ExternCarrier != "":
-		return "gort$.goKeyScalar($v.v)", nil
+		return scalarKeyComponentFor(member.ExternCarrier, "$v.v"), nil
 	case member.Extern:
 		if member.Eq != nil && member.Eq.Kind == ir.EqUncomparable {
 			// Go's exact runtime behavior for hashing this dynamic type.
 			return fmt.Sprintf("gort$.goKeyUnhashable(%q)", member.Eq.Display), nil
 		}
-		// A comparable opaque handle: hashing its contents is not
-		// expressible over the handle — loud runtime fail-closed stop.
-		return fmt.Sprintf("gort$.goKeyOpaque(%q)", member.K), nil
+		// A comparable opaque handle: the claim (verified at finalize
+		// against the corpus-complete value-box log) is that no VALUE of
+		// this type is ever boxed, so the branch is machine-unreachable.
+		p.module.ClaimKeyUnreachable(member.K)
+		return fmt.Sprintf("gort$.goKeyUnreachable(%q)", member.K), nil
 	case member.Struct:
 		if !member.KeyEncodable {
 			if member.Eq != nil && member.Eq.Kind == ir.EqUncomparable {
 				return fmt.Sprintf("gort$.goKeyUnhashable(%q)", member.Eq.Display), nil
 			}
-			// Comparable in Go but without a generated encoding: loud
-			// runtime fail-closed stop, never a wrong identity encoding.
-			return fmt.Sprintf("gort$.goKeyOpaque(%q)", member.K), nil
+			// Comparable in Go but without a generated encoding: the
+			// machine-verified claim is that no VALUE of this type is
+			// ever boxed (finalize checks the corpus-complete log).
+			p.module.ClaimKeyUnreachable(member.K)
+			return fmt.Sprintf("gort$.goKeyUnreachable(%q)", member.K), nil
 		}
 		return "$v.v.goKey$()", nil
 	}
-	return "gort$.goKeyScalar($v.v)", nil
+	return scalarKeyComponentFor(member.ValueCarrier, "$v.v"), nil
+}
+
+// scalarKeyComponentFor selects the statically typed key encoder for a
+// known scalar carrier spelling.
+func scalarKeyComponentFor(carrier, access string) string {
+	switch carrier {
+	case "string":
+		return "gort$.goKeyString(" + access + ")"
+	case "boolean", "bool":
+		return "gort$.goKeyBool(" + access + ")"
+	case "number", "float64", "float32":
+		return "gort$.goKeyFloat(" + access + ")"
+	}
+	// Every remaining scalar carrier is an integer form (bigint or
+	// number-carried narrow int).
+	return "gort$.goKeyInt(" + access + ")"
 }
 
 // compositeKeyComponent spells one boxed composite's key: pointer
@@ -337,8 +354,25 @@ func compositeKeyComponent(composite BoxedComposite) string {
 		case ir.EqIdentity:
 			return prefix + "gort$.goKeyId($v.v)"
 		case ir.EqArray:
-			return prefix + "gort$.goKeyArray($v.v, gort$.goKeyScalar)"
+			return prefix + "gort$.goKeyArray($v.v, ($e) => " + scalarKeyComponentFor(compositeElemCarrier(composite), "$e") + ")"
 		}
 	}
 	return fmt.Sprintf("gort$.goKeyUnhashable(%q)", composite.T.Go)
+}
+
+// compositeElemCarrier names a primitive-array composite's element
+// carrier for the typed key encoder.
+func compositeElemCarrier(composite BoxedComposite) string {
+	if composite.T.Elem == nil {
+		return ""
+	}
+	switch {
+	case composite.T.Elem.Kind == ir.KindString:
+		return "string"
+	case composite.T.Elem.Kind == ir.KindBool:
+		return "boolean"
+	case composite.T.Elem.Kind.Float():
+		return "number"
+	}
+	return "int"
 }

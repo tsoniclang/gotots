@@ -98,6 +98,9 @@ type Module struct {
 	// (canonical id + payload type), spelled as exact empty-interface
 	// union members.
 	BoxedComposites []BoxedComposite
+	// KeyUnreachableClaims collects the member identities whose $key
+	// branches claim value-box unreachability (finalize-verified).
+	KeyUnreachableClaims map[string]bool
 	// Withheld reports packages whose modules are not in the bundle:
 	// union aliases exclude their classes (nothing of theirs can box at
 	// runtime — their code does not run) and never reference their
@@ -436,4 +439,18 @@ func sanitizeIdent(segment string) string {
 		}
 	}
 	return out.String()
+}
+
+// ClaimKeyUnreachable records one union $key encoder's machine claim
+// that the named member's VALUE form is never boxed — verified against
+// the corpus-complete value-box log after every body has built.
+func (m *Module) ClaimKeyUnreachable(memberK string) {
+	root := m
+	for root.parent != nil {
+		root = root.parent
+	}
+	if root.KeyUnreachableClaims == nil {
+		root.KeyUnreachableClaims = map[string]bool{}
+	}
+	root.KeyUnreachableClaims[memberK] = true
 }

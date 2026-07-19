@@ -68,6 +68,8 @@ type Proof struct {
 	NoOutput bool `json:"noOutput,omitempty"`
 }
 
+// KeyUnreachableClaims — see Generated.
+//
 // BodySupport is one implementation unit's support-state record: every
 // unsupported operation site is retained, and an unimplemented unit
 // never has an emitted body.
@@ -96,6 +98,11 @@ type Generated struct {
 	// Ownership maps every generated path to its ownership root.
 	Ownership map[string]string
 	Proofs    []Proof
+	// KeyUnreachableClaims are the union-$key member identities whose
+	// encoder branches claim value-box unreachability — verified against
+	// the corpus-complete value-box log at finalize (a violated claim is
+	// an emitter defect).
+	KeyUnreachableClaims map[string]bool
 	// Support is the per-unit implementation support ledger.
 	Support []BodySupport
 	// Withheld maps package path -> reason runnable output is WITHHELD FROM

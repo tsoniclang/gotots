@@ -13,7 +13,7 @@ package abi
 import "fmt"
 
 // Version identifies the ABI contract carried in generated output.
-const Version = 28
+const Version = 29
 
 // Family is the static carrier family of an integer kind.
 type Family string

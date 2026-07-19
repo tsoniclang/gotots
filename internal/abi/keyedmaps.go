@@ -72,28 +72,27 @@ export function goKeyFloat(v: number): string {
   return "f" + String(v);
 }
 
-// goKeyScalar encodes one scalar key component by its carrier: floats
-// through the exact float rule (NaN freshness, -0 folding), strings
-// length-prefixed (injective under any outer composition), booleans and
-// bigints by canonical token. The parameter is open so generic classes
-// can pass a bare type-parameter value; a non-scalar binding is an
-// admission-invariant break, never a Go panic surface.
-export function goKeyScalar(v: unknown): string {
-  if (typeof v === "number") return goKeyFloat(v);
-  if (typeof v === "bigint") return "i" + String(v);
-  if (typeof v === "boolean") return v ? "t" : "f";
-  if (typeof v === "string") return "s" + String(v.length) + ":" + v;
-  throw new Error("gotots invariant: non-scalar key binding");
+// Typed key-component encoders: one per statically known scalar
+// carrier — strings length-prefixed (injective under any composition),
+// integers by canonical token, booleans by t/f. Floats go through
+// goKeyFloat's exact NaN/signed-zero rule.
+export function goKeyString(v: string): string {
+  return "s" + String(v.length) + ":" + v;
+}
+export function goKeyInt(v: bigint | number): string {
+  return "i" + String(v);
+}
+export function goKeyBool(v: boolean): string {
+  return v ? "t" : "f";
 }
 
-// goKeyOpaque fails closed on a dynamic map key whose Go equality hashes
-// contents the representation does not expose (a comparable external
-// handle, or a comparable struct value without a generated key
-// encoding): encoding it would be silently wrong, so the reviewed
-// surface stops loudly instead. This is an invariant stop (plain
-// Error), never a Go panic surface.
-export function goKeyOpaque(display: string): never {
-  throw new Error("gotots: dynamic map key " + display + " is outside the reviewed key surface");
+// goKeyUnreachable is the machine-claimed invariant stop of a key
+// operation the admission chain proves uncallable (every keyed use of
+// the binding is statically rejected before emission): reaching it is a
+// compiler-invariant break, never Go semantics. Plain Error, never a Go
+// panic surface.
+export function goKeyUnreachable(display: string): never {
+  throw new Error("gotots invariant: statically unreachable key operation for " + display);
 }
 
 // goKeyUnhashable is Go's exact runtime panic for an uncomparable dynamic

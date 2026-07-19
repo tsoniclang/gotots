@@ -149,6 +149,11 @@ func (b *builder) boxIfaceValue(built Expr, source types.Type, expected Type, sp
 	if err != nil {
 		return nil, err
 	}
+	if rtti.Composite == "" && rtti.TypeName != "" && !rtti.Pointer {
+		// VALUE-form boxing of a named type: reachability evidence for
+		// union $key encoders' unreachability claims.
+		b.unit.AddValueBoxedNamed(rtti.Pkg + "." + rtti.TypeName)
+	}
 	if rtti.Composite != "" && rtti.ExternID == "" && !mentionsTypeParamType(source) {
 		// The boxed-composite enumeration: this exact composite becomes
 		// an exact union member (its payload type, no erasure). A

@@ -7,12 +7,13 @@ import (
 	"fmt"
 
 	"github.com/tsoniclang/gotots/internal/ir"
+	"github.com/tsoniclang/gotots/internal/tsident"
 )
 
 // zeroFactoryArgs spells one zero factory then one equality operation
 // per instantiated type argument, the trailing arguments of every
 // generic function and method call.
-func (p *printer) zeroFactoryArgs(typeArgs []ir.Type) (string, error) {
+func (p *printer) zeroFactoryArgs(typeArgs []ir.Type, keyedParams []bool) (string, error) {
 	parts := make([]string, 0, len(typeArgs)*2)
 	for _, arg := range typeArgs {
 		zero, err := p.zeroLiteral(arg)
@@ -42,7 +43,10 @@ func (p *printer) zeroFactoryArgs(typeArgs []ir.Type) (string, error) {
 		}
 		parts = append(parts, set)
 	}
-	for _, arg := range typeArgs {
+	for i, arg := range typeArgs {
+		if i >= len(keyedParams) || !keyedParams[i] {
+			continue
+		}
 		key, err := p.keyOperation(arg)
 		if err != nil {
 			return "", err
@@ -72,22 +76,25 @@ func (p *printer) keyOperation(t ir.Type) (string, error) {
 			return "", fmt.Errorf("no key operation in scope for type parameter %q", t.TypeParamName)
 		}
 		return op, nil
-	case t.Kind == ir.KindStruct:
-		if t.KeyEncodable {
-			return "(($k: " + spelled + ") => $k.goKey$())", nil
-		}
-		if t.Uncomparable {
-			return "((_: " + spelled + ") => gort$.goKeyUnhashable(" + fmt.Sprintf("%q", t.Go) + "))", nil
-		}
-		return "((_: " + spelled + ") => gort$.goKeyOpaque(" + fmt.Sprintf("%q", t.Go) + "))", nil
+	case t.Kind == ir.KindStruct && t.KeyEncodable:
+		return "(($k: " + spelled + ") => $k.goKey$())", nil
 	case t.Kind == ir.KindPointer:
 		return "(($k: " + spelled + ") => gort$.goKeyId($k))", nil
-	case t.Kind == ir.KindString, t.Kind == ir.KindBool, t.Kind == ir.KindUnit:
-		return "(($k: " + spelled + ") => gort$.goKeyScalar($k))", nil
-	case t.Kind.Integer(), t.Kind.Float():
-		return "(($k: " + spelled + ") => gort$.goKeyScalar($k))", nil
+	case t.Kind == ir.KindString:
+		return "(($k: " + spelled + ") => \"s\" + " + tsident.Global("String") + "($k.length) + \":\" + $k)", nil
+	case t.Kind == ir.KindBool:
+		return "(($k: " + spelled + ") => $k ? \"t\" : \"f\")", nil
+	case t.Kind == ir.KindUnit:
+		return "((_: " + spelled + ") => \"z\")", nil
+	case t.Kind.Integer():
+		return "(($k: " + spelled + ") => \"i\" + " + tsident.Global("String") + "($k))", nil
+	case t.Kind.Float():
+		return "(($k: " + spelled + ") => gort$.goKeyFloat($k))", nil
 	}
-	return "((_: " + spelled + ") => gort$.goKeyOpaque(" + fmt.Sprintf("%q", t.Go) + "))", nil
+	// The per-site key-family guard admits only the classes above for
+	// map-keying parameters: any other binding here is a compiler defect,
+	// never a runtime surface.
+	return "", fmt.Errorf("no key operation for binding %q of a map-keying type parameter", t.Go)
 }
 
 // cloneOperation spells the TOTAL per-binding copy of one instantiation
@@ -186,8 +193,8 @@ func (p *printer) setOperation(t ir.Type) (string, error) {
 // type argument — the trailing constructor arguments of every generic
 // class (captured at construction so goEq$/goClone$/goSet$ stay
 // source-shaped).
-func (p *printer) eqCloneSetFactoryArgs(typeArgs []ir.Type) (string, error) {
-	parts := make([]string, 0, len(typeArgs)*3)
+func (p *printer) eqCloneSetFactoryArgs(typeArgs []ir.Type, captureKey bool) (string, error) {
+	parts := make([]string, 0, len(typeArgs)*4)
 	for _, arg := range typeArgs {
 		eq, err := p.eqOperation(arg)
 		if err != nil {
@@ -202,8 +209,59 @@ func (p *printer) eqCloneSetFactoryArgs(typeArgs []ir.Type) (string, error) {
 			return "", err
 		}
 		parts = append(parts, eq, clone, set)
+		if captureKey {
+			key, err := p.captureKeyOperation(arg)
+			if err != nil {
+				return "", err
+			}
+			parts = append(parts, key)
+		}
 	}
 	return joinComma(parts), nil
+}
+
+// captureKeyOperation is keyOperation over EVERY Go-legal construction
+// binding of a key-capturing class: admitted bindings get the exact
+// encoder; an uncomparable binding carries Go's exact unhashable panic
+// (its goKey$ is Go-uncallable through maps); a comparable binding
+// outside the admitted family is UNREACHABLE by the map-key admission
+// chain (structKeyEncodable's origin walk rejects every keyed use), so
+// its operation is the machine-claimed invariant stop.
+func (p *printer) captureKeyOperation(t ir.Type) (string, error) {
+	if t.Kind == ir.KindStruct && !t.KeyEncodable {
+		spelled, err := p.tsType(t)
+		if err != nil {
+			return "", err
+		}
+		if t.Uncomparable {
+			return "((_: " + spelled + ") => gort$.goKeyUnhashable(" + fmt.Sprintf("%q", t.Go) + "))", nil
+		}
+		return "((_: " + spelled + ") => gort$.goKeyUnreachable(" + fmt.Sprintf("%q", t.Go) + "))", nil
+	}
+	if t.Kind == ir.KindSlice || t.Kind == ir.KindMap || t.Kind == ir.KindFunc || t.Kind == ir.KindChan {
+		spelled, err := p.tsType(t)
+		if err != nil {
+			return "", err
+		}
+		return "((_: " + spelled + ") => gort$.goKeyUnhashable(" + fmt.Sprintf("%q", t.Go) + "))", nil
+	}
+	if t.Kind == ir.KindIface && t.TypeParamName == "" {
+		// A concrete interface binding keys through its union's $key.
+		name, err := p.ifaceUnionAlias(t)
+		if err != nil {
+			return "", err
+		}
+		p.module.RequireIfaceKeyFn(name)
+		return name + "$key", nil
+	}
+	if t.Kind == ir.KindExternal {
+		spelled, err := p.tsType(t)
+		if err != nil {
+			return "", err
+		}
+		return "((_: " + spelled + ") => gort$.goKeyUnreachable(" + fmt.Sprintf("%q", t.Go) + "))", nil
+	}
+	return p.keyOperation(t)
 }
 
 // zeroOnlyFactoryArgs spells the zero factories alone — generic class
@@ -307,7 +365,7 @@ func (p *printer) zeroLiteral(t ir.Type) (string, error) {
 				}
 				factories[i] = "() => " + zero
 			}
-			cloneSet, err := p.eqCloneSetFactoryArgs(t.TypeArgs)
+			cloneSet, err := p.eqCloneSetFactoryArgs(t.TypeArgs, t.ClassCapturesKey)
 			if err != nil {
 				return "", err
 			}

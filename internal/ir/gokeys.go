@@ -309,6 +309,18 @@ func scalarKeyBinding(goType types.Type) bool {
 // types, and maps/slices stay out — their Go equality is not injective
 // onto a deterministic string.
 func (b *builder) keyEncodableFieldType(goType types.Type, span Span) bool {
+	if _, isParam := types.Unalias(goType).(*types.TypeParam); isParam {
+		// A bare type-parameter field encodes via the captured key$P —
+		// checked HERE (before typeOf) so the origin walk also resolves
+		// from outside the generic declaration's scope.
+		return true
+	}
+	if _, isPtr := types.Unalias(goType).Underlying().(*types.Pointer); isPtr {
+		// Every pointer field keys by object identity (goKeyId; the GoPtr
+		// carrier's both branches are object identities) — structural,
+		// so origin walks resolve param-mentioning pointers too.
+		return true
+	}
 	fieldIR, err := b.typeOf(goType, span)
 	if err != nil {
 		return false
@@ -383,7 +395,7 @@ func (b *builder) ifaceKeyMembersEncodable(goType types.Type, span Span) bool {
 			// A key-encodable struct composes through its goKey$; an
 			// UNCOMPARABLE one carries Go's exact unhashable panic; a
 			// comparable struct WITHOUT a generated encoding gets the loud
-			// runtime fail-closed stop (goKeyOpaque) — never a wrong
+			// runtime fail-closed stop (goKeyUnreachable, finalize-verified) — never a wrong
 			// identity encoding.
 		default:
 			// A named value carrier over a scalar: encodable by carrier.

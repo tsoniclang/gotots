@@ -59,6 +59,12 @@ func emitCorePackage(out *Generated, p *packages.Package, sourceDir string, unit
 		return nil
 	}
 	applyBodyOutcomes(out, p.PkgPath, outcomes)
+	for memberK := range module.KeyUnreachableClaims {
+		if out.KeyUnreachableClaims == nil {
+			out.KeyUnreachableClaims = map[string]bool{}
+		}
+		out.KeyUnreachableClaims[memberK] = true
+	}
 	// Retain every lowered body's canonical analysis artifact (spec 01):
 	// the exact fragment and its hash, withheld packages included. The
 	// .ts.txt extension keeps it out of every module and typecheck path.

@@ -111,6 +111,18 @@ func Packages(pkgs []*packages.Package, sourceDir string, options Options) (*Gen
 		out.Ownership[abiPath] = "generated-language-abi"
 	}
 
+	// Verify every union-$key unreachability claim against the now
+	// corpus-complete value-box log: a member claimed unreachable that IS
+	// value-boxed somewhere would make the invariant stop reachable — an
+	// emitter defect, never a shippable state.
+	for memberK := range out.KeyUnreachableClaims {
+		if unit.ValueBoxedNamed(memberK) {
+			out.EmitterDefects = append(out.EmitterDefects, EmitterDefect{
+				Package: "corpus", ID: memberK,
+				Err: "union $key claims value-box unreachability for " + memberK + " but its value form IS boxed (claim violated)",
+			})
+		}
+	}
 	sort.Slice(out.Proofs, func(i, j int) bool { return out.Proofs[i].ID < out.Proofs[j].ID })
 	sort.Slice(out.Support, func(i, j int) bool { return out.Support[i].ID < out.Support[j].ID })
 	// The single final evidence pass: every file and proof now exists

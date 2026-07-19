@@ -121,6 +121,10 @@ type Type struct {
 	// keeps the direct Map carrier (so map values crossing the generic
 	// boundary into concrete SVZ contexts stay representation-identical).
 	EncodedParamKey bool
+	// ClassCapturesKey marks a struct instance whose GENERIC DECLARATION
+	// is key-encodable: its class captures key$P at construction (every
+	// construction site passes the per-binding key operation).
+	ClassCapturesKey bool
 	// KeyEncodable marks a struct whose generated class carries goKey$
 	// (the canonical key encoding) — consumed by the per-binding key
 	// operation derivation.
@@ -190,6 +194,11 @@ type Scope struct {
 	// only at emit (after every body is built), so it feeds no per-body
 	// cached union and can never stale one.
 	boxedComposites map[string]*boxedComposite
+	// valueBoxedNamed logs every NAMED type whose VALUE form is boxed
+	// into an interface anywhere in the unit (pointer boxes excluded):
+	// the reachability evidence behind goKeyUnreachable claims in union
+	// $key encoders — verified corpus-complete at finalize.
+	valueBoxedNamed map[string]bool
 	// ifaceMembers caches each interface identity's resolved closed
 	// implementer union (typeOf recursion makes this hot).
 	ifaceMembers map[string][]IfaceMember
@@ -263,6 +272,7 @@ func NewScope(paths ...string) Scope {
 		concreteTypes:      &[]*types.TypeName{},
 		externConcrete:     &[]*types.TypeName{},
 		boxedComposites:    map[string]*boxedComposite{},
+		valueBoxedNamed:    map[string]bool{},
 		ifaceMembers:       map[string][]IfaceMember{},
 		addressTakenFields: map[string]bool{},
 		genericEdges:       &[]genericEdge{},
@@ -412,6 +422,9 @@ type Func struct {
 	// TypeParams are the generic type parameter names, admitted under
 	// the unit's closed-world instantiation evidence.
 	TypeParams []string
+	// KeyedParams marks, per type parameter, whether this declaration
+	// keys a map by it: the signature takes key$P exactly for these.
+	KeyedParams []bool
 	// Receiver is set for methods: a pointer-to-struct parameter bound to
 	// the generated class instance.
 	Receiver *Var
@@ -475,6 +488,10 @@ type Struct struct {
 	// Promoted lists the embedded-field method promotions the rtti
 	// method table delegates through value-field chains.
 	Promoted []PromotedDelegate
+	// CaptureKey marks a generic struct whose class captures key$P at
+	// construction: it is key-encodable OR the requirement propagation
+	// recorded a key need on one of its parameters.
+	CaptureKey bool
 	// Comparable marks a struct whose fields all support exact generated
 	// equality: it carries goEq$, and interface equality over it never
 	// panics.
@@ -507,6 +524,9 @@ type IfaceMember struct {
 	// carrier for basic-underlying external named types.
 	Extern        bool
 	ExternCarrier string
+	// ValueCarrier names an OWNED named scalar member's basic carrier
+	// (string/boolean/number/bigint) for the typed key encoder.
+	ValueCarrier string
 	// KeyEncodable marks a value-STRUCT member whose goKey$ encoding
 	// exists (map-key admission for interface keys consults it; other
 	// member classes derive keyability from their carrier).

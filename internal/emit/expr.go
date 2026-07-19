@@ -80,7 +80,7 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 				parts[i] = spelled
 			}
 			typeArgs = "<" + strings.Join(parts, ", ") + ">"
-			factories, err := p.zeroFactoryArgs(n.TypeArgs)
+			factories, err := p.zeroFactoryArgs(n.TypeArgs, n.KeyedParams)
 			if err != nil {
 				return "", err
 			}
@@ -112,7 +112,7 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 				}
 			}
 			callee += "<" + joinComma(parts) + ">"
-			factories, err := p.zeroFactoryArgs(n.TypeArgs)
+			factories, err := p.zeroFactoryArgs(n.TypeArgs, n.KeyedParams)
 			if err != nil {
 				return "", err
 			}
@@ -179,7 +179,7 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			}
 			class += "<" + joinComma(args) + ">"
 		}
-		factoryArgs, err := p.eqCloneSetFactoryArgs(structT.TypeArgs)
+		factoryArgs, err := p.eqCloneSetFactoryArgs(structT.TypeArgs, structT.ClassCapturesKey)
 		if err != nil {
 			return "", err
 		}

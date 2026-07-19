@@ -470,6 +470,9 @@ func (b *builder) adaptTupleSlots(inner Expr, sourceTuple *types.Tuple, targets 
 			// universe, or the empty-interface union would lack this exact
 			// member and the box (and any assert-back) would be statically
 			// invalid.
+			if rtti.Composite == "" && rtti.TypeName != "" && !rtti.Pointer {
+				b.unit.AddValueBoxedNamed(rtti.Pkg + "." + rtti.TypeName)
+			}
 			if rtti.Composite != "" && rtti.ExternID == "" && !mentionsTypeParamType(source) {
 				sourceIR, err := b.typeOf(source, span)
 				if err != nil {

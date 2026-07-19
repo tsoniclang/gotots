@@ -303,8 +303,12 @@ type Call struct {
 	Pkg      string // Go package path declaring the callee
 	Callee   string // generated symbol name
 	TypeArgs []Type
-	Args     []Expr
-	Results  []Type
+	// KeyedParams marks, per type parameter, whether the callee's
+	// declaration keys a map by it — exactly the parameters whose key$P
+	// operation the call passes (requirement-scoped, never universal).
+	KeyedParams []bool
+	Args        []Expr
+	Results     []Type
 }
 
 // ExternalCall invokes an external package-level function through its
@@ -330,10 +334,13 @@ type MethodCall struct {
 	// TypeArgs are the receiver's type arguments for methods of generic
 	// types, spelled explicitly so inference can never change types.
 	TypeArgs []Type
-	Recv     Expr
-	Method   string
-	Args     []Expr
-	Results  []Type
+	// KeyedParams marks, per receiver type parameter, whether the
+	// declaring type keys a map by it (requirement-scoped key$P).
+	KeyedParams []bool
+	Recv        Expr
+	Method      string
+	Args        []Expr
+	Results     []Type
 }
 
 // FieldLoad reads a struct field through a nil-checked pointer. Cell

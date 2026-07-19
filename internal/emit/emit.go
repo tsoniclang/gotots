@@ -216,12 +216,14 @@ func printFunc(out *strings.Builder, module *Module, function *ir.Func) error {
 		p.cloneOps = map[string]string{}
 		p.setOps = map[string]string{}
 		p.keyOps = map[string]string{}
-		for _, param := range function.TypeParams {
+		for i, param := range function.TypeParams {
 			p.zeroFactories[param] = "zero$" + param
 			p.eqOps[param] = "eq$" + param
 			p.cloneOps[param] = "clone$" + param
 			p.setOps[param] = "set$" + param
-			p.keyOps[param] = "key$" + param
+			if i < len(function.KeyedParams) && function.KeyedParams[i] {
+				p.keyOps[param] = "key$" + param
+			}
 		}
 	}
 	if function.Placeholder {
@@ -271,10 +273,12 @@ func (p *printer) functionSignature(function *ir.Func) (string, error) {
 	for _, param := range function.TypeParams {
 		params = append(params, "set$"+param+": ((d: "+param+", s: "+param+") => void) | undefined")
 	}
-	// key$P is the TOTAL per-binding map-key encoder (the encoded-map
-	// carrier's exactness per instantiation).
-	for _, param := range function.TypeParams {
-		params = append(params, "key$"+param+": (k: "+param+") => string")
+	// key$P is the per-binding map-key encoder, taken EXACTLY for the
+	// parameters this declaration keys a map by (requirement-scoped).
+	for i, param := range function.TypeParams {
+		if i < len(function.KeyedParams) && function.KeyedParams[i] {
+			params = append(params, "key$"+param+": (k: "+param+") => string")
+		}
 	}
 	result, err := p.tsResultType(function.Results)
 	if err != nil {
