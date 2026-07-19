@@ -11,6 +11,7 @@ package main
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/tsoniclang/gotots/internal/census"
 	"github.com/tsoniclang/gotots/internal/declparity"
@@ -70,16 +71,23 @@ func runDeclParityCheck(firstRun *census.Result, corpusGenerated *translate.Gene
 			defect("census function %s parsed as %s", shape.ID, decl.Kind)
 			continue
 		}
-		expected := len(shape.Params) + 5*len(shape.TypeParams)
+		valueParams := len(shape.Params)
 		if shape.Receiver != "" {
-			expected++
+			valueParams++
 		}
-		if decl.ParamCount != expected {
-			defect("parameter arity drift at %s: parsed %d, Go shape implies %d", shape.ID, decl.ParamCount, expected)
+		// The reviewed factory protocol, verified STRUCTURALLY from the
+		// parsed parameter names: after the value parameters, one
+		// zero$/eq$/clone$/set$ slot per DECLARED (surface) type
+		// parameter in declaration order, then the requirement-scoped
+		// key$ and rt$ groups over subsets of them. Surface parameters
+		// may be FEWER than the Go declaration's (core-typed parameters
+		// erase), never more.
+		if decl.TypeParams > len(shape.TypeParams) {
+			defect("type-parameter arity drift at %s: parsed %d, Go declares %d", shape.ID, decl.TypeParams, len(shape.TypeParams))
 			continue
 		}
-		if decl.TypeParams != len(shape.TypeParams) {
-			defect("type-parameter arity drift at %s: parsed %d, Go declares %d", shape.ID, decl.TypeParams, len(shape.TypeParams))
+		if problem := factoryProtocolDefect(decl, valueParams); problem != "" {
+			defect("factory-protocol drift at %s: %s", shape.ID, problem)
 			continue
 		}
 		verified++
@@ -174,4 +182,53 @@ func runDeclParityCheck(firstRun *census.Result, corpusGenerated *translate.Gene
 		verified++
 	}
 	return verified, defects, nil
+}
+
+// factoryProtocolDefect verifies a parsed generic function's trailing
+// parameters against the reviewed factory protocol using ONLY the
+// parsed structure: value parameters first, then zero$P eq$P clone$P
+// set$P for every surface type parameter (each group in type-parameter
+// order), then the requirement-scoped key$P and rt$P groups over
+// subsets in the same order. Returns "" when conformant.
+func factoryProtocolDefect(decl declparity.TSDecl, valueParams int) string {
+	if len(decl.ParamNames) != decl.ParamCount {
+		return fmt.Sprintf("parsed %d parameters but %d names", decl.ParamCount, len(decl.ParamNames))
+	}
+	if len(decl.ParamNames) < valueParams {
+		return fmt.Sprintf("parsed %d parameters, Go shape implies at least %d value parameters", len(decl.ParamNames), valueParams)
+	}
+	trailing := decl.ParamNames[valueParams:]
+	surface := decl.TypeParamNames
+	index := 0
+	for _, prefix := range []string{"zero$", "eq$", "clone$", "set$"} {
+		for _, param := range surface {
+			if index >= len(trailing) || trailing[index] != prefix+param {
+				got := "(absent)"
+				if index < len(trailing) {
+					got = trailing[index]
+				}
+				return fmt.Sprintf("expected %s%s at trailing slot %d, parsed %s", prefix, param, index, got)
+			}
+			index++
+		}
+	}
+	for _, prefix := range []string{"key$", "rt$"} {
+		// A subset of the surface parameters, in declaration order.
+		cursor := 0
+		for index < len(trailing) && strings.HasPrefix(trailing[index], prefix) {
+			name := strings.TrimPrefix(trailing[index], prefix)
+			for cursor < len(surface) && surface[cursor] != name {
+				cursor++
+			}
+			if cursor >= len(surface) {
+				return fmt.Sprintf("%s slot %q is not a declared type parameter in order", prefix, trailing[index])
+			}
+			cursor++
+			index++
+		}
+	}
+	if index != len(trailing) {
+		return fmt.Sprintf("unexpected trailing parameter %q at slot %d", trailing[index], index)
+	}
+	return ""
 }

@@ -18,10 +18,17 @@ import (
 type TSDecl struct {
 	Kind       string   `json:"kind"` // function | class | type | let | const
 	ParamCount int      `json:"paramCount,omitempty"`
+	// ParamNames are the declared parameter names in order ("?" for a
+	// non-identifier binding pattern) — the factory-protocol structure
+	// check reads the zero$/eq$/clone$/set$/key$/rt$ groups from these.
+	ParamNames []string `json:"paramNames,omitempty"`
 	Fields     []string `json:"fields,omitempty"`
 	Methods    []string `json:"methods,omitempty"`
 	TypeParams int      `json:"typeParams,omitempty"`
-	Exported   bool     `json:"exported"`
+	// TypeParamNames are the declared type-parameter names (bounds
+	// excluded).
+	TypeParamNames []string `json:"typeParamNames,omitempty"`
+	Exported       bool     `json:"exported"`
 }
 
 // Extract parses every given generated file with the pinned TypeScript
@@ -103,7 +110,9 @@ for (const rel of files) {
       decls[stmt.name.text] = {
         kind: "function",
         paramCount: stmt.parameters.length,
+        paramNames: stmt.parameters.map((p) => (ts.isIdentifier(p.name) ? p.name.text : "?")),
         typeParams: stmt.typeParameters ? stmt.typeParameters.length : 0,
+        typeParamNames: stmt.typeParameters ? stmt.typeParameters.map((tp) => tp.name.text) : [],
         exported: isExported(stmt),
       };
     } else if (ts.isClassDeclaration(stmt) && stmt.name) {
