@@ -41,6 +41,38 @@ func (s Scope) AddExternalType(pkg, name string) *ExternTypeObligation {
 	return obligation
 }
 
+// ExternTypeObligation is one external named type's referenced contract
+// surface. Methods are held by canonical identity, never by bare name.
+type ExternTypeObligation struct {
+	Pkg  string
+	Name string
+	// methods maps each referenced method's canonical MethodKey to its ONE
+	// atomic obligation record (key, dispatch slot, and object together, so
+	// they cannot drift). Distinct methods (including same-spelled
+	// unexported methods from different packages) are distinct keys, so none
+	// overwrites another. Every recorded method is representable —
+	// AddExternalMethod, the sole constructor, rejects the rest — so no
+	// consumer skips one. A genuine display collision fails closed at
+	// emission (Methods reports them so the stub builder can detect it).
+	methods map[string]ExternMethodObligation
+	// literalShapes maps each DISTINCT keyed-composite-literal field set
+	// (join of sorted field names) to its typed shape: one reviewed
+	// constructor stub obligation per shape.
+	literalShapes map[string]ExternLiteralShape
+	// fieldGets maps each referenced exported FIELD to its resolved type:
+	// one typed read stub per field.
+	fieldGets map[string]Type
+	// needsEq marks the value-equality ($eq$) stub obligation.
+	needsEq bool
+}
+
+// ExternLiteralShape is one keyed composite literal's typed constructor
+// obligation for an external struct type.
+type ExternLiteralShape struct {
+	Fields     []string
+	FieldTypes []Type
+}
+
 // AddLiteralShape records one keyed composite-literal constructor
 // obligation on the external type (deduplicated by the exact field set)
 // and returns its stub symbol.

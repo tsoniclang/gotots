@@ -543,7 +543,6 @@ func structKeyed(structDecl *ir.Struct, i int) bool {
 	return i < len(structDecl.KeyedParams) && structDecl.KeyedParams[i]
 }
 
-
 // familyName is the emission variant's class name: the encoded-family
 // variant takes the "$ek" suffix.
 func familyName(structDecl *ir.Struct) string {

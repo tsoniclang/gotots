@@ -133,7 +133,7 @@ type printer struct {
 	// parameter-keyed maps spell the encoded carrier and self-references
 	// to the family-split class take the "$ek" symbols.
 	familyEnc bool
-	setOps   map[string]string
+	setOps    map[string]string
 	// slicePlans maps this body's slice-typed locals to their selected
 	// representation; "native-array" locals lower onto plain arrays.
 	slicePlans map[string]string
@@ -475,7 +475,6 @@ func (p *printer) tsResultType(results []ir.Var) (string, error) {
 		return "readonly [" + strings.Join(parts, ", ") + "]", nil
 	}
 }
-
 
 // selfHardKeyedReference reports whether a struct instance inside the
 // current declaration's scope references the family-split type with a

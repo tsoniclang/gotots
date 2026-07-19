@@ -462,7 +462,6 @@ func TypedAdapterType(module *Module, params []ir.Var, results []ir.Type) (strin
 // equality function derive the name through this one function, so they
 // always agree.
 
-
 // instSlotRecv spells one instantiated slot's receiver parameter type —
 // the MEMBER's payload form (a pointer member's payload is nilable
 // identity; a value member's payload is the instance).

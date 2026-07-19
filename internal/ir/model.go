@@ -261,38 +261,6 @@ func (s Scope) SealUniverse() { *s.universeSealed = true }
 // UniverseSealed reports whether the named-type universe is finalized.
 func (s Scope) UniverseSealed() bool { return *s.universeSealed }
 
-// ExternTypeObligation is one external named type's referenced contract
-// surface. Methods are held by canonical identity, never by bare name.
-type ExternTypeObligation struct {
-	Pkg  string
-	Name string
-	// methods maps each referenced method's canonical MethodKey to its ONE
-	// atomic obligation record (key, dispatch slot, and object together, so
-	// they cannot drift). Distinct methods (including same-spelled
-	// unexported methods from different packages) are distinct keys, so none
-	// overwrites another. Every recorded method is representable —
-	// AddExternalMethod, the sole constructor, rejects the rest — so no
-	// consumer skips one. A genuine display collision fails closed at
-	// emission (Methods reports them so the stub builder can detect it).
-	methods map[string]ExternMethodObligation
-	// literalShapes maps each DISTINCT keyed-composite-literal field set
-	// (join of sorted field names) to its typed shape: one reviewed
-	// constructor stub obligation per shape.
-	literalShapes map[string]ExternLiteralShape
-	// fieldGets maps each referenced exported FIELD to its resolved type:
-	// one typed read stub per field.
-	fieldGets map[string]Type
-	// needsEq marks the value-equality ($eq$) stub obligation.
-	needsEq bool
-}
-
-// ExternLiteralShape is one keyed composite literal's typed constructor
-// obligation for an external struct type.
-type ExternLiteralShape struct {
-	Fields     []string
-	FieldTypes []Type
-}
-
 // NewScope builds a unit scope over the given package paths.
 func NewScope(paths ...string) Scope {
 	packages := make(map[string]bool, len(paths))
@@ -567,80 +535,6 @@ type Struct struct {
 	// a deterministic string: it carries goKey$, so it can key a map and
 	// compose as a nested field of another key struct.
 	KeyEncodable bool
-}
-
-// PromotedDelegate is one promoted method in a struct's method set: the
-// rtti table entry delegates through the embedded value fields to the
-// declaring type's generated method function.
-// IfaceMember is one branch of a closed interface union: the literal
-// discriminant, the payload's concrete type, and the vtable const's
-// location (the concrete type's own package).
-type IfaceMember struct {
-	K       string // "pkg.Type" or "*pkg.Type"
-	Pkg     string
-	Type    string
-	Pointer bool
-	// Struct distinguishes class payloads (identity carriers: the
-	// pointer IS the instance) from named value carriers (pointer = a
-	// cell). Payloads spell by NAME ONLY — no eager type resolution, so
-	// interface membership can never recurse through generic arguments.
-	Struct bool
-	// Extern marks an external implementer whose vtable is built inline
-	// over stub exports at box sites. ExternCarrier spells its payload
-	// class: "" (branded handle, struct-underlying) or the exact value
-	// carrier for basic-underlying external named types.
-	Extern        bool
-	ExternCarrier string
-	// ValueCarrier names an OWNED named scalar member's basic carrier
-	// (string/boolean/number/bigint) for the typed key encoder.
-	ValueCarrier string
-	// KeyEncodable marks a value-STRUCT member whose goKey$ encoding
-	// exists (map-key admission for interface keys consults it; other
-	// member classes derive keyability from their carrier).
-	KeyEncodable bool
-	// Eq is the recursive typed equality plan for THIS member's exact
-	// payload under Go's interface equality — the single operation the
-	// generated union equality narrows to, so no payload is ever erased.
-	Eq *EqPlan
-	// Slots maps each of the dispatching interface's method names to THIS
-	// member type's vtable selector for the method that implements it (see
-	// ir.MethodSlot). It is the bare name except where the member promotes
-	// two same-bare-name methods from different packages, so dispatch and
-	// the member's vtable always index the same canonical slot.
-	Slots map[string]string
-	// Composite, when set, marks an INSTANTIATED-GENERIC member: its box
-	// brand is "c:"+Composite (the interned composite rtti token), its
-	// payload spells InstType, and its vtable is built inline at box
-	// sites from InstSlots (the instantiated method surface).
-	Composite string
-	InstType  Type
-	InstSlots []InstSlot
-}
-
-// InstCandidate is one concrete generic instantiation from the closed
-// evidence, with its canonical identity precomputed.
-type InstCandidate struct {
-	Named *types.Named
-	Canon string
-}
-
-// instSlotsEntry caches one instantiation's full vtable surface.
-type instSlotsEntry struct {
-	slots []InstSlot
-	ok    bool
-}
-
-// InstSlot is one instantiated-generic member's vtable slot: the
-// generated generic function it dispatches to, with the instantiation's
-// exact types (factory derivations happen at emission from TypeArgs).
-type InstSlot struct {
-	Slot        string
-	MethodName  string
-	PointerRecv bool
-	TypeArgs    []Type
-	KeyedParams []bool
-	Params      []Type
-	Results     []Type
 }
 
 // EqKind is the CLOSED set of interface-equality plan variants. The zero

@@ -139,3 +139,18 @@ func (b *builder) buildExternalMethodCall(n *ast.CallExpr, selector *ast.Selecto
 	b.use("externMethodCall")
 	return out, nil
 }
+
+// GenericFuncValue is an implicitly instantiated generic function
+// referenced as a first-class value: emitted as an exactly typed arrow
+// (eta-expansion) closing over the instantiation's factory derivations.
+type GenericFuncValue struct {
+	Pkg         string
+	Name        string
+	TypeArgs    []Type
+	KeyedParams []bool
+	HardKeyed   []bool
+	T           Type // the instantiated KindFunc type
+}
+
+func (*GenericFuncValue) expr()        {}
+func (e *GenericFuncValue) Type() Type { return e.T }
