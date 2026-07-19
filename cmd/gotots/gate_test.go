@@ -205,12 +205,16 @@ func TestReconcileDispositionsForgedEvidence(t *testing.T) {
 		{"phantom generated file", func(g *translate.Generated) {
 			g.Proofs[0].GeneratedFile = "core/p/absent.ts"
 		}, "phantom generated file"},
-		{"retained inside withheld package", func(g *translate.Generated) {
+		{"retained inside non-materialized package", func(g *translate.Generated) {
+			// A merely publication-withheld package legitimately retains its
+			// bodies; only a package with NO analyzable file must not.
+			g.NotMaterialized = map[string]string{"p": "reason"}
 			g.Withheld = map[string]string{"p": "reason"}
-		}, "module-retained inside withheld package"},
-		{"unretained despite emitted package", func(g *translate.Generated) {
+			delete(g.Files, "core/p/package.ts")
+		}, "module-retained inside non-materialized package"},
+		{"unretained despite materialized package", func(g *translate.Generated) {
 			g.Proofs[0].ModuleRetained = false
-		}, "unretained despite an emitted package"},
+		}, "unretained despite a materialized package"},
 		{"no-output with generated file", func(g *translate.Generated) {
 			g.Proofs[0].ModuleRetained = false
 			g.Proofs[0].NoOutput = true
