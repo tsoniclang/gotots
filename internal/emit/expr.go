@@ -420,6 +420,41 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		return p.zeroLiteral(n.T)
 	case *ir.ExternZero:
 		return p.zeroLiteral(n.T)
+	case *ir.GenericFuncValue:
+		calleeName := n.Name
+		if callFamilyEnc(n.TypeArgs, n.HardKeyed, p.familyEnc) {
+			calleeName += "$ek"
+		}
+		callee, err := p.module.symbol(n.Pkg, calleeName)
+		if err != nil {
+			return "", err
+		}
+		typeArgs := make([]string, len(n.TypeArgs))
+		for i, arg := range n.TypeArgs {
+			if typeArgs[i], err = p.tsType(arg); err != nil {
+				return "", err
+			}
+		}
+		factories, err := p.zeroFactoryArgs(n.TypeArgs, n.KeyedParams)
+		if err != nil {
+			return "", err
+		}
+		params := make([]string, 0, len(n.T.Sig.Params))
+		args := make([]string, 0, len(n.T.Sig.Params))
+		for i, param := range n.T.Sig.Params {
+			spelled, err := p.tsType(param)
+			if err != nil {
+				return "", err
+			}
+			params = append(params, fmt.Sprintf("$a%d: %s", i, spelled))
+			args = append(args, fmt.Sprintf("$a%d", i))
+		}
+		if factories != "" {
+			args = append(args, factories)
+		}
+		// Eta-expansion: the instantiated generic as an exactly typed
+		// arrow closing over the instantiation's factory derivations.
+		return "((" + strings.Join(params, ", ") + ") => " + callee + "<" + strings.Join(typeArgs, ", ") + ">(" + strings.Join(args, ", ") + "))", nil
 	case *ir.ExternEqual:
 		left, err := p.printExpr(n.L)
 		if err != nil {

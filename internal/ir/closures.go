@@ -94,7 +94,7 @@ func (b *builder) buildClosure(lit *ast.FuncLit) (Expr, error) {
 
 // buildFuncRef references a package-level function of the translated
 // unit as a first-class value.
-func (b *builder) buildFuncRef(function *types.Func, span Span) (Expr, error) {
+func (b *builder) buildFuncRef(function *types.Func, ident *ast.Ident, span Span) (Expr, error) {
 	if function.Pkg() == nil {
 		return nil, &Unsupported{Kind: KindReferenceToAFunctionOutsideTheTranslatedUnit, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "reference to a function outside the translated unit", Span: span}
 	}
@@ -118,6 +118,42 @@ func (b *builder) buildFuncRef(function *types.Func, span Span) (Expr, error) {
 	signature := function.Type().(*types.Signature)
 	if signature.Recv() != nil {
 		return nil, &Unsupported{Kind: KindMethodValueBindTimeReceiverCapture, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "method value (bind-time receiver capture)", Span: span}
+	}
+	if signature.TypeParams() != nil && signature.TypeParams().Len() > 0 {
+		// An IMPLICITLY INSTANTIATED generic function referenced as a
+		// value (core.Identity as a callback): eta-expand — the value is
+		// an exactly typed arrow closing over the instantiation's factory
+		// derivations.
+		if ident == nil {
+			return nil, &Unsupported{Kind: KindReferenceToAFunctionOutsideTheTranslatedUnit, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "reference to a generic function without instantiation evidence", Span: span}
+		}
+		instance, hasInstance := b.info.Instances[ident]
+		if !hasInstance || instance.TypeArgs == nil || signature.Variadic() {
+			return nil, &Unsupported{Kind: KindReferenceToAFunctionOutsideTheTranslatedUnit, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "reference to a generic function without instantiation evidence", Span: span}
+		}
+		instantiated := instance.Type
+		if instantiated == nil {
+			return nil, &Unsupported{Kind: KindReferenceToAFunctionOutsideTheTranslatedUnit, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "reference to a generic function without instantiation evidence", Span: span}
+		}
+		t, err := b.typeOf(instantiated, span)
+		if err != nil {
+			return nil, err
+		}
+		out := &GenericFuncValue{Pkg: function.Pkg().Path(), Name: function.Name(), T: t}
+		for i := range instance.TypeArgs.Len() {
+			argIR, err := b.typeOf(instance.TypeArgs.At(i), span)
+			if err != nil {
+				return nil, err
+			}
+			out.TypeArgs = append(out.TypeArgs, argIR)
+			out.KeyedParams = append(out.KeyedParams, b.unit.ParamRequiresKeyOp(function, i))
+			out.HardKeyed = append(out.HardKeyed, b.unit.ParamRequiresSVZKey(function, i))
+		}
+		if !b.unit.Owns(function.Pkg().Path()) {
+			b.unit.AddExternalFunc(function)
+		}
+		b.use("genericFuncRef")
+		return out, nil
 	}
 	t, err := b.typeOf(signature, span)
 	if err != nil {

@@ -376,6 +376,21 @@ type FuncRef struct {
 	T    Type // the KindFunc type
 }
 
+// GenericFuncValue is an implicitly instantiated generic function
+// referenced as a first-class value: emitted as an exactly typed arrow
+// (eta-expansion) closing over the instantiation's factory derivations.
+type GenericFuncValue struct {
+	Pkg         string
+	Name        string
+	TypeArgs    []Type
+	KeyedParams []bool
+	HardKeyed   []bool
+	T           Type // the instantiated KindFunc type
+}
+
+func (*GenericFuncValue) expr()        {}
+func (e *GenericFuncValue) Type() Type { return e.T }
+
 // DynCall invokes a function value (a nil value panics at the call, as
 // in Go).
 type DynCall struct {

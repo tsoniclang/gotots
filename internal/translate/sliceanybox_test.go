@@ -516,3 +516,26 @@ func MixedFamilyGenericSet() int {
 }
 `)
 }
+
+func TestOracleGenericFuncValueReference(t *testing.T) {
+	// The core.Identity-as-callback shape: an implicitly instantiated
+	// generic function referenced as a first-class value eta-expands to
+	// an exactly typed arrow over the instantiation's derivations.
+	runOracle(t, `package fixture
+
+func identity[T any](t T) T {
+	return t
+}
+
+func apply(f func(int) int, v int) int {
+	return f(v)
+}
+
+func GenericFuncValueReference() int {
+	f := identity[int]
+	total := apply(f, 20)
+	total += apply(identity[int], 3)
+	return total
+}
+`)
+}

@@ -269,6 +269,8 @@ func (s *slicePlanner) walkExpr(e Expr) {
 		}
 	case *CellNew:
 		s.escapeIfSlice(n.Zero)
+	case *GenericFuncValue:
+		// A leaf: the arrow closes over factory derivations only.
 	case *Const, *NilConst, *FuncRef, *StructZero, *ExternZero, *ExternVar,
 		*ParamZero, *MapMake, *BoxedLoad, *BoxedRef:
 		// Leaves contribute nothing.

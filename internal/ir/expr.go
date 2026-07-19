@@ -118,7 +118,7 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 	case *ast.Ident:
 		object := b.info.Uses[n]
 		if function, isFunc := object.(*types.Func); isFunc {
-			return b.buildFuncRef(function, span)
+			return b.buildFuncRef(function, n, span)
 		}
 		variable, ok := object.(*types.Var)
 		if !ok {
@@ -133,7 +133,7 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			if base, isIdent := ast.Unparen(n.X).(*ast.Ident); isIdent {
 				if _, isPkg := b.info.Uses[base].(*types.PkgName); isPkg {
 					if function, isFunc := b.info.Uses[n.Sel].(*types.Func); isFunc {
-						return b.buildFuncRef(function, span)
+						return b.buildFuncRef(function, n.Sel, span)
 					}
 					if variable, isVar := b.info.Uses[n.Sel].(*types.Var); isVar {
 						return b.buildVarRef(variable, n.Sel.Name, span)
@@ -183,6 +183,19 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 		return &FieldLoad{X: base, Field: n.Sel.Name, T: t, Cell: cell}, nil
 
 	case *ast.IndexExpr:
+		// An EXPLICIT generic-function instantiation reference
+		// (identity[int] as a value): the base ident carries the
+		// instantiation evidence.
+		if baseIdent, isIdent := ast.Unparen(n.X).(*ast.Ident); isIdent {
+			if function, isFunc := b.info.Uses[baseIdent].(*types.Func); isFunc {
+				return b.buildFuncRef(function, baseIdent, span)
+			}
+		}
+		if selector, isSel := ast.Unparen(n.X).(*ast.SelectorExpr); isSel {
+			if function, isFunc := b.info.Uses[selector.Sel].(*types.Func); isFunc {
+				return b.buildFuncRef(function, selector.Sel, span)
+			}
+		}
 		operand, err := b.buildExpr(n.X)
 		if err != nil {
 			return nil, err

@@ -397,6 +397,11 @@
       "specClause": "docs/spec/interfaces-generics-functions.md"
     },
     {
+      "key": "genericFuncRef",
+      "state": "generated",
+      "specClause": "docs/spec/interfaces-generics-functions.md"
+    },
+    {
       "key": "if",
       "state": "generated",
       "specClause": "docs/spec/declarations-bodies-control.md"
