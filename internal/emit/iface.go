@@ -304,6 +304,11 @@ var predeclaredMembers = []struct{ name, payload string }{
 // object for methodless predeclared and composite types.
 func (p *printer) boxVtable(r ir.RttiRef) (string, error) {
 	switch {
+	case r.InstType != nil:
+		// An instantiated-generic box: the inline vtable over the
+		// generated generic functions with the instantiation's exact
+		// factory derivations.
+		return p.instVtableValue(*r.InstType, r.InstSlots, r.Pointer)
 	case r.Predeclared != "" || (r.Composite != "" && r.ExternID == ""):
 		return "{}", nil
 	case r.ExternID != "":
@@ -456,3 +461,127 @@ func TypedAdapterType(module *Module, params []ir.Var, results []ir.Type) (strin
 // is free). Both the alias declaration and every reference to a union's
 // equality function derive the name through this one function, so they
 // always agree.
+
+
+// instSlotRecv spells one instantiated slot's receiver parameter type —
+// the MEMBER's payload form (a pointer member's payload is nilable
+// identity; a value member's payload is the instance).
+func (p *printer) instSlotRecv(instType ir.Type, memberPointer bool) (string, error) {
+	instSpelled, err := p.tsType(instType)
+	if err != nil {
+		return "", err
+	}
+	if memberPointer {
+		return instSpelled + " | undefined", nil
+	}
+	return instSpelled, nil
+}
+
+// instSlotResult spells one instantiated slot's result type.
+func (p *printer) instSlotResult(slot ir.InstSlot) (string, error) {
+	switch len(slot.Results) {
+	case 0:
+		return "void", nil
+	case 1:
+		return p.tsType(slot.Results[0])
+	}
+	parts := make([]string, len(slot.Results))
+	for i, result := range slot.Results {
+		spelled, err := p.tsType(result)
+		if err != nil {
+			return "", err
+		}
+		parts[i] = spelled
+	}
+	return "readonly [" + joinComma(parts) + "]", nil
+}
+
+// instVtableValue spells the inline vtable OBJECT of one instantiated
+// generic: each slot is an exactly typed arrow dispatching to the
+// generated generic function with the instantiation's factory
+// derivations (the same derivations every direct call site passes).
+func (p *printer) instVtableValue(instType ir.Type, slots []ir.InstSlot, memberPointer bool) (string, error) {
+	instSpelled, err := p.tsType(instType)
+	if err != nil {
+		return "", err
+	}
+	entries := make([]string, 0, len(slots))
+	for _, slot := range slots {
+		recvSpelled, err := p.instSlotRecv(instType, memberPointer)
+		if err != nil {
+			return "", err
+		}
+		params := []string{"$r: " + recvSpelled}
+		// A VALUE-receiver method through a POINTER member derefs (nil
+		// panics, exactly Go); every other combination passes through.
+		recvArg := "$r"
+		if memberPointer && !slot.PointerRecv {
+			recvArg = "gort$.goNilCheck<" + instSpelled + ">($r)"
+		}
+		args := []string{recvArg}
+		for i, param := range slot.Params {
+			spelled, err := p.tsType(param)
+			if err != nil {
+				return "", err
+			}
+			params = append(params, fmt.Sprintf("$a%d: %s", i, spelled))
+			args = append(args, fmt.Sprintf("$a%d", i))
+		}
+		result, err := p.instSlotResult(slot)
+		if err != nil {
+			return "", err
+		}
+		callee, err := p.module.symbol(instType.Pkg, instType.Named+"$"+slot.MethodName)
+		if err != nil {
+			return "", err
+		}
+		typeArgs := make([]string, len(slot.TypeArgs))
+		for i, arg := range slot.TypeArgs {
+			if typeArgs[i], err = p.tsType(arg); err != nil {
+				return "", err
+			}
+		}
+		factories, err := p.zeroFactoryArgs(slot.TypeArgs, slot.KeyedParams)
+		if err != nil {
+			return "", err
+		}
+		call := callee + "<" + joinComma(typeArgs) + ">(" + joinComma(args)
+		if factories != "" {
+			call += ", " + factories
+		}
+		call += ")"
+		entries = append(entries, fmt.Sprintf("%s: (%s): %s => %s",
+			requireIdentity(slot.Slot, "instantiated vtable slot for "+slot.MethodName), strings.Join(params, ", "), result, call))
+	}
+	return "{ " + joinComma(entries) + " }", nil
+}
+
+// instVtableType spells the inline vtable TYPE of one instantiated
+// generic member (the union member's m surface).
+func (p *printer) instVtableType(instType ir.Type, slots []ir.InstSlot, memberPointer bool) (string, error) {
+	entries := make([]string, 0, len(slots))
+	for _, slot := range slots {
+		recvSpelled, err := p.instSlotRecv(instType, memberPointer)
+		if err != nil {
+			return "", err
+		}
+		params := []string{"$r: " + recvSpelled}
+		for i, param := range slot.Params {
+			spelled, err := p.tsType(param)
+			if err != nil {
+				return "", err
+			}
+			params = append(params, fmt.Sprintf("$a%d: %s", i, spelled))
+		}
+		result, err := p.instSlotResult(slot)
+		if err != nil {
+			return "", err
+		}
+		entries = append(entries, fmt.Sprintf("%s: (%s) => %s",
+			requireIdentity(slot.Slot, "instantiated vtable slot for "+slot.MethodName), strings.Join(params, ", "), result))
+	}
+	if len(entries) == 0 {
+		return "Record<never, never>", nil
+	}
+	return "{ " + joinComma(entries) + " }", nil
+}

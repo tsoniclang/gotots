@@ -345,6 +345,20 @@ func (s Scope) AddGenericTypeInstance(name *types.TypeName, typeArgs []types.Typ
 // generic named type.
 func (s Scope) GenericTypeInstances(name *types.TypeName) [][]types.Type { return s.typeGenerics[name] }
 
+// GenericTypeObjects returns every generic named type with recorded
+// instantiation evidence, sorted by canonical object identity so
+// enumeration order is deterministic.
+func (s Scope) GenericTypeObjects() []*types.TypeName {
+	out := make([]*types.TypeName, 0, len(s.typeGenerics))
+	for name := range s.typeGenerics {
+		out = append(out, name)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return objKey(out[i]) < objKey(out[j])
+	})
+	return out
+}
+
 // RegisterAnonStruct records one synthesized anonymous-struct class for
 // the package's module (idempotent per shape).
 func (s Scope) RegisterAnonStruct(pkg string, decl *Struct) error {
@@ -559,6 +573,26 @@ type IfaceMember struct {
 	// two same-bare-name methods from different packages, so dispatch and
 	// the member's vtable always index the same canonical slot.
 	Slots map[string]string
+	// Composite, when set, marks an INSTANTIATED-GENERIC member: its box
+	// brand is "c:"+Composite (the interned composite rtti token), its
+	// payload spells InstType, and its vtable is built inline at box
+	// sites from InstSlots (the instantiated method surface).
+	Composite string
+	InstType  Type
+	InstSlots []InstSlot
+}
+
+// InstSlot is one instantiated-generic member's vtable slot: the
+// generated generic function it dispatches to, with the instantiation's
+// exact types (factory derivations happen at emission from TypeArgs).
+type InstSlot struct {
+	Slot        string
+	MethodName  string
+	PointerRecv bool
+	TypeArgs    []Type
+	KeyedParams []bool
+	Params      []Type
+	Results     []Type
 }
 
 // EqKind is the CLOSED set of interface-equality plan variants. The zero

@@ -375,3 +375,54 @@ func GenericConstructsKeyCapturingClass() int {
 }
 `)
 }
+
+func TestOracleInstantiatedGenericInterfaceValue(t *testing.T) {
+	// The packagejson.Expected/TypeValidatedField shape: pointers to
+	// CONCRETE INSTANTIATIONS of a generic struct boxed into a non-empty
+	// interface — each instantiation is a composite-branded union member
+	// with an inline vtable over the generated generic functions.
+	runOracle(t, `package fixture
+
+type box[T any] struct {
+	val   T
+	valid bool
+}
+
+func (b *box[T]) IsValid() bool {
+	return b.valid
+}
+
+func (b *box[T]) Weight() int {
+	if b.valid {
+		return 2
+	}
+	return 1
+}
+
+type checker interface {
+	IsValid() bool
+	Weight() int
+}
+
+func InstantiatedGenericInterfaceValue() int {
+	a := &box[string]{val: "x", valid: true}
+	b := &box[int]{val: 7, valid: false}
+	var checks []checker
+	checks = append(checks, a, b)
+	total := 0
+	for _, c := range checks {
+		if c.IsValid() {
+			total += 100
+		}
+		total += c.Weight()
+	}
+	if sb, ok := checks[0].(*box[string]); ok && sb.val == "x" {
+		total += 1000
+	}
+	if _, ok := checks[1].(*box[string]); ok {
+		total += 100000
+	}
+	return total
+}
+`)
+}

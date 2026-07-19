@@ -30,14 +30,31 @@ func (b *builder) rttiFor(t types.Type, span Span) (RttiRef, error) {
 			return RttiRef{}, &Unsupported{Kind: KindInterfaceValueOfType, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
 				Construct: "interface value of type " + t.String(), Span: span}
 		}
-		// Instantiated generic types (owned OR external) have
-		// per-instantiation dynamic identity; each closed instance is a
-		// distinct union member, which the current universe does not
-		// enumerate — so boxing one fails closed rather than emitting a box
-		// absent from every union (a separate exact-instantiation lowering).
+		// An instantiated OWNED generic is a CONCRETE dynamic type: it
+		// joins unions as a composite-branded member (the closed
+		// instantiation evidence enumerates it) with an inline vtable
+		// over the generated generic functions. External instantiated
+		// generics stay fail-closed (their stubs are not per-instance).
 		if concrete.TypeArgs() != nil && concrete.TypeArgs().Len() > 0 {
-			return RttiRef{}, &Unsupported{Kind: KindInterfaceValueOfAnInstantiatedGenericType, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
-				Construct: "interface value of an instantiated generic type", Span: span}
+			if !b.unit.Owns(obj.Pkg().Path()) {
+				return RttiRef{}, &Unsupported{Kind: KindInterfaceValueOfAnInstantiatedGenericType, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+					Construct: "interface value of an instantiated external generic type", Span: span}
+			}
+			canon, err := b.canonicalTypeID(concrete)
+			if err != nil {
+				return RttiRef{}, &Unsupported{Kind: KindInterfaceValueOfAnInstantiatedGenericType, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+					Construct: "interface value of an instantiated generic type", Span: span}
+			}
+			instIR, err := b.typeOf(concrete, span)
+			if err != nil {
+				return RttiRef{}, err
+			}
+			slots, ok, err := b.instantiationSlots(concrete, false, span)
+			if err != nil || !ok {
+				return RttiRef{}, &Unsupported{Kind: KindInterfaceValueOfAnInstantiatedGenericType, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+					Construct: "interface value of an instantiated generic type (unrepresentable method surface)", Span: span}
+			}
+			return RttiRef{Composite: canon, Display: displayOf(t), InstType: &instIR, InstSlots: slots}, nil
 		}
 		if !b.unit.Owns(obj.Pkg().Path()) {
 			// An external named type: an interned rtti whose method
@@ -64,10 +81,27 @@ func (b *builder) rttiFor(t types.Type, span Span) (RttiRef, error) {
 				Construct: "interface value of type " + t.String(), Span: span}
 		}
 		if named.TypeArgs() != nil && named.TypeArgs().Len() > 0 {
-			// A pointer to an instantiated generic (e.g. *atomic.Pointer[int]):
-			// same per-instantiation identity, fail closed until enumerated.
-			return RttiRef{}, &Unsupported{Kind: KindInterfaceValueOfAnInstantiatedGenericType, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
-				Construct: "interface value of an instantiated generic type", Span: span}
+			if obj.Pkg() == nil || !b.unit.Owns(obj.Pkg().Path()) {
+				// A pointer to an instantiated EXTERNAL generic (e.g.
+				// *atomic.Pointer[int]): fail closed (no per-instance stub).
+				return RttiRef{}, &Unsupported{Kind: KindInterfaceValueOfAnInstantiatedGenericType, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+					Construct: "interface value of an instantiated external generic type", Span: span}
+			}
+			canon, err := b.canonicalTypeID(named)
+			if err != nil {
+				return RttiRef{}, &Unsupported{Kind: KindInterfaceValueOfAnInstantiatedGenericType, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+					Construct: "interface value of an instantiated generic type", Span: span}
+			}
+			instIR, err := b.typeOf(named, span)
+			if err != nil {
+				return RttiRef{}, err
+			}
+			slots, ok, err := b.instantiationSlots(named, true, span)
+			if err != nil || !ok {
+				return RttiRef{}, &Unsupported{Kind: KindInterfaceValueOfAnInstantiatedGenericType, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+					Construct: "interface value of an instantiated generic type (unrepresentable method surface)", Span: span}
+			}
+			return RttiRef{Composite: "*" + canon, Display: displayOf(t), Pointer: true, InstType: &instIR, InstSlots: slots}, nil
 		}
 		if !b.unit.Owns(obj.Pkg().Path()) {
 			ref, err := b.compositeRtti(t, span, obj.Pkg().Path()+"."+obj.Name())

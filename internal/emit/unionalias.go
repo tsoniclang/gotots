@@ -67,6 +67,14 @@ func (p *printer) buildUnionAliasDefinition(name string, t ir.Type) (string, err
 			return "", err
 		}
 		var vtable string
+		if member.Composite != "" {
+			vtable, err = p.instVtableType(member.InstType, member.InstSlots, member.Pointer)
+			if err != nil {
+				return "", err
+			}
+			members = append(members, fmt.Sprintf("goif$.GoBox<%q, %s, %s>", member.K, payload, vtable))
+			continue
+		}
 		if member.Extern {
 			// External implementers carry inline stub-adapter vtables;
 			// the member type is the exact structural adapter surface.
@@ -161,6 +169,23 @@ func finalizeUnionAliases(module *Module) error {
 // when boxed through a pointer); named value carriers box the value or
 // its cell; external handles are branded and nilable through pointers.
 func (p *printer) memberPayload(member ir.IfaceMember) (string, error) {
+	if member.Composite != "" {
+		// An instantiated-generic member: the payload IS the exact
+		// instance type (identity for pointer members over struct
+		// underlyings, the instance value otherwise — the spelling
+		// carries both).
+		base, err := p.tsType(member.InstType)
+		if err != nil {
+			return "", err
+		}
+		if member.Pointer && !member.Struct {
+			return "(gort$.GoCell<" + base + "> | undefined)", nil
+		}
+		if member.Pointer {
+			return "(" + base + " | undefined)", nil
+		}
+		return base, nil
+	}
 	if member.Extern {
 		if member.ExternCarrier != "" {
 			// Basic-underlying external named type: the payload is its
@@ -248,6 +273,9 @@ func (p *printer) retainedMembers(t ir.Type) []ir.IfaceMember {
 	out := make([]ir.IfaceMember, 0, len(t.IfaceMembers))
 	for _, member := range t.IfaceMembers {
 		if !member.Extern && p.module.Withheld(member.Pkg) {
+			continue
+		}
+		if member.Composite != "" && p.referencesWithheldType(member.InstType) {
 			continue
 		}
 		out = append(out, member)

@@ -14,6 +14,12 @@ type RttiRef struct {
 	Pkg      string
 	TypeName string
 	Pointer  bool
+	// InstType, when set, is the instantiated-generic member's exact
+	// payload type: box sites build the inline vtable from it.
+	InstType *Type
+	// InstSlots is the instantiation's FULL method-set vtable surface
+	// (matching what union member types spell).
+	InstSlots []InstSlot
 	// Composite is the canonical (path-qualified) type identity of a
 	// composite or external type, interned to one rtti object at
 	// runtime; Display is its runtime-message spelling; ExternID, when
