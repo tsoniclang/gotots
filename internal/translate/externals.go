@@ -174,6 +174,15 @@ func externTypeMembers(obligation *ir.ExternTypeObligation, unit ir.Scope, conte
 		{ID: typeID + ".goSet$", Name: obligation.Name + "$goSet$",
 			Params: []ir.Var{{Name: "dst", Type: handle}, {Name: "src", Type: handle}}},
 	}
+	if obligation.NeedsEq() {
+		boolType := ir.Type{Kind: ir.KindBool, Go: "bool"}
+		out = append(out, emit.StubMember{
+			ID:         typeID + "$eq$",
+			Name:       obligation.Name + "$eq$",
+			Params:     []ir.Var{{Name: "a", Type: handle}, {Name: "b", Type: handle}},
+			ResultType: &boolType,
+		})
+	}
 	// Every recorded exported-field READ obligation exports one typed
 	// fail-closed getter stub.
 	for _, fieldGet := range obligation.FieldGets() {

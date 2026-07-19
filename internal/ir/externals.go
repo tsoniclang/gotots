@@ -43,6 +43,18 @@ type ExternFieldRead struct {
 func (*ExternFieldRead) expr()        {}
 func (e *ExternFieldRead) Type() Type { return e.T }
 
+// ExternEqual compares two external struct values through the type's
+// typed $eq$ stub (Go's field-wise value equality, emulation-owned).
+type ExternEqual struct {
+	L, R     Expr
+	Pkg      string
+	TypeName string
+	Negate   bool
+}
+
+func (*ExternEqual) expr()        {}
+func (e *ExternEqual) Type() Type { return Type{Kind: KindBool, Go: "bool"} }
+
 // ExternToOwned converts an external struct value to the OWNED named
 // struct sharing its underlying: the class constructs from per-field
 // read stubs (declaration order).

@@ -70,6 +70,12 @@ func (o *ExternTypeObligation) LiteralShapes() []ExternLiteralShape {
 	return out
 }
 
+// RequireEq records the value-equality obligation ($eq$ stub member).
+func (o *ExternTypeObligation) RequireEq() { o.needsEq = true }
+
+// NeedsEq reports whether the $eq$ member is required.
+func (o *ExternTypeObligation) NeedsEq() bool { return o.needsEq }
+
 // AddFieldGet records one exported-field READ obligation on the
 // external type and returns its stub symbol.
 func (o *ExternTypeObligation) AddFieldGet(field string, fieldType Type) string {

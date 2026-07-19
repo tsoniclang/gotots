@@ -88,6 +88,17 @@ func (b *builder) buildBinary(n *ast.BinaryExpr, resultType types.Type) (Expr, e
 			b.use("structEqual")
 			return &StructEqual{L: left, R: right, Negate: n.Op == token.NEQ}, nil
 		}
+		if operand.Kind == KindExternal {
+			if _, isStruct := types.Unalias(b.info.Types[n.X].Type).Underlying().(*types.Struct); isStruct &&
+				types.Comparable(b.info.Types[n.X].Type) {
+				// A comparable external struct compares through its typed
+				// $eq$ stub (value semantics the emulation layer owns).
+				obligation := b.unit.AddExternalType(operand.Pkg, operand.Named)
+				obligation.RequireEq()
+				b.use("externEqual")
+				return &ExternEqual{L: left, R: right, Pkg: operand.Pkg, TypeName: operand.Named, Negate: n.Op == token.NEQ}, nil
+			}
+		}
 		if operand.Kind == KindMap || operand.Kind == KindStruct || operand.Kind == KindExternal {
 			return nil, &Unsupported{Kind: KindEqualityOn, Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "equality on " + operand.Go, Span: span}
 		}

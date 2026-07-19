@@ -282,6 +282,8 @@ type ExternTypeObligation struct {
 	// fieldGets maps each referenced exported FIELD to its resolved type:
 	// one typed read stub per field.
 	fieldGets map[string]Type
+	// needsEq marks the value-equality ($eq$) stub obligation.
+	needsEq bool
 }
 
 // ExternLiteralShape is one keyed composite literal's typed constructor

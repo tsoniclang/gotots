@@ -67,6 +67,14 @@ export function Point$get$Y$(v: Handle | undefined): bigint {
 export function Pt(x: bigint, y: bigint): Handle {
   return { X: x, Y: y } as Rep as Handle;
 }
+export function Point$eq$(a: Handle | undefined, b: Handle | undefined): boolean {
+  const ra = a as Rep | undefined;
+  const rb = b as Rep | undefined;
+  if (ra === undefined || rb === undefined) {
+    return ra === rb;
+  }
+  return ra.X === rb.X && ra.Y === rb.Y;
+}
 `,
 	"sync": `import { type GoExtern } from "../../language-abi/goextern.js";
 
@@ -332,7 +340,14 @@ func ExternOwnedUnderlyingConversions() int {
 	p := image.Pt(3, 4)
 	k := key(p)
 	back := image.Point(k)
-	return k.Sum()*100 + back.X*10 + p.Y
+	same := 0
+	if p == image.Pt(3, 4) {
+		same = 1
+	}
+	if p == image.Pt(9, 9) {
+		same += 100
+	}
+	return k.Sum()*1000 + back.X*100 + p.Y*10 + same
 }
 `)
 }

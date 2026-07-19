@@ -420,6 +420,24 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		return p.zeroLiteral(n.T)
 	case *ir.ExternZero:
 		return p.zeroLiteral(n.T)
+	case *ir.ExternEqual:
+		left, err := p.printExpr(n.L)
+		if err != nil {
+			return "", err
+		}
+		right, err := p.printExpr(n.R)
+		if err != nil {
+			return "", err
+		}
+		callee, err := p.module.symbol(n.Pkg, n.TypeName+"$eq$")
+		if err != nil {
+			return "", err
+		}
+		call := callee + "(" + left + ", " + right + ")"
+		if n.Negate {
+			return "(!" + call + ")", nil
+		}
+		return call, nil
 	case *ir.ExternFieldRead:
 		x, err := p.printExpr(n.X)
 		if err != nil {
