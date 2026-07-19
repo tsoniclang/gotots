@@ -99,7 +99,18 @@ func (b *builder) buildStructNew(lit *ast.CompositeLit, resultType types.Type) (
 	}
 	if t.Elem != nil && t.Elem.Kind == KindExternal {
 		if len(lit.Elts) != 0 {
-			return nil, &Unsupported{Kind: KindCompositeLiteralOf, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "composite literal of " + t.Elem.Go, Span: span}
+			// &T{...} of an external type: the constructed handle IS the
+			// pointer (object identity) — the keyed/positional constructor
+			// obligation covers it.
+			pointee, isPointee := types.Unalias(resultType).Underlying().(*types.Pointer)
+			if !isPointee {
+				return nil, &Unsupported{Kind: KindCompositeLiteralOf, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "composite literal of " + t.Elem.Go, Span: span}
+			}
+			built, err := b.buildExternLit(lit, *t.Elem, pointee.Elem(), span)
+			if err != nil {
+				return nil, err
+			}
+			return &AddrOf{X: built, T: t}, nil
 		}
 		// &T{} of an external type: a fresh zero handle is the pointer.
 		b.use("externZero")
