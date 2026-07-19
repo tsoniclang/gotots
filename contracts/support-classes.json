@@ -592,6 +592,11 @@
       "specClause": "docs/spec/interfaces-generics-functions.md"
     },
     {
+      "key": "paramZeroDeref",
+      "state": "generated",
+      "specClause": "docs/spec/interfaces-generics-functions.md"
+    },
+    {
       "key": "pointeeStore",
       "state": "generated",
       "specClause": "docs/spec/types-values-pointers.md"

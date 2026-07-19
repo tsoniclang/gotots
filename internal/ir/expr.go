@@ -316,6 +316,12 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			return nil, &Unsupported{Kind: KindDereferenceOf, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "dereference of " + operand.Type().Go, Span: span}
 		}
 		if operand.Type().Elem.Kind == KindIface && operand.Type().Elem.TypeParamName != "" {
+			if cell, isCell := operand.(*CellNew); isCell {
+				// The *new(T) zero idiom: each evaluation is a fresh zero
+				// of the binding — exactly the cell's zero expression.
+				b.use("paramZeroDeref")
+				return cell.Zero, nil
+			}
 			// The GoPtr carrier is opaque inside the generic body: reading
 			// through it needs a per-instantiation operation the protocol
 			// does not yet carry — fail closed to a typed placeholder.

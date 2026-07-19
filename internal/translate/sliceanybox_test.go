@@ -628,3 +628,29 @@ func AddressOfTupleBound() int {
 }
 `)
 }
+
+func TestOracleParamZeroDeref(t *testing.T) {
+	// The core.ElementOrNil shape: *new(T) is Go's zero-of-parameter
+	// idiom — each evaluation a fresh zero of the binding.
+	runOracle(t, `package fixture
+
+type rec struct {
+	n int
+}
+
+func elementOrNil[T any](slice []T, index int) T {
+	if index < len(slice) {
+		return slice[index]
+	}
+	return *new(T)
+}
+
+func ParamZeroDeref() int {
+	nums := []int{7, 8}
+	total := elementOrNil(nums, 1)*10 + elementOrNil(nums, 5)
+	r := elementOrNil([]rec{{n: 3}}, 9)
+	s := elementOrNil([]string{"x"}, 2)
+	return total*100 + r.n*10 + len(s)
+}
+`)
+}
