@@ -24,6 +24,9 @@ type DeclStmt struct {
 	// (Go permits existing names alongside at least one new one); nil
 	// means every name is new.
 	Reused []bool
+	// Boxed marks tuple-bound names whose address is taken: the emitter
+	// declares their stable cells directly off the tuple slot.
+	Boxed []bool
 }
 
 // AssignStmt stores values into existing locations. Go's two-phase rule is

@@ -182,7 +182,21 @@ func (b *builder) boxDeclaredNames(idents []ast.Expr, decl *DeclStmt, span Span)
 		return decl, nil
 	}
 	if decl.Tuple != nil {
-		return nil, &Unsupported{Kind: KindAddressOfATupleBoundVariable, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "address of a tuple-bound variable", Span: span}
+		// Tuple-bound addressed names: mark the slots — the emitter
+		// declares their stable cells directly off the tuple binding.
+		for i, lhs := range idents {
+			boxed := false
+			if ident, isIdent := lhs.(*ast.Ident); isIdent {
+				if variable, isBoxed := b.boxedVar(ident); isBoxed {
+					t, err := b.typeOf(variable.Type(), span)
+					if err == nil && boxable(t.Kind) && i < len(decl.Names) && decl.Names[i] != "_" {
+						boxed = true
+					}
+				}
+			}
+			decl.Boxed = append(decl.Boxed, boxed)
+		}
+		return decl, nil
 	}
 	out := &StmtSeq{}
 	for i, name := range decl.Names {

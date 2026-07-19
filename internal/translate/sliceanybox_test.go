@@ -607,3 +607,24 @@ func AnyKeyedGenericMap() int {
 }
 `)
 }
+
+func TestOracleAddressOfTupleBound(t *testing.T) {
+	// The tracing shape: a multi-result binding whose name is addressed —
+	// the stable cell declares off the tuple slot, aliasing exactly.
+	runOracle(t, `package fixture
+
+func two() (int, int) {
+	return 3, 4
+}
+
+func bump(p *int) {
+	*p += 10
+}
+
+func AddressOfTupleBound() int {
+	a, b := two()
+	bump(&b)
+	return a*100 + b
+}
+`)
+}

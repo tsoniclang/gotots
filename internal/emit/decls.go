@@ -64,6 +64,12 @@ func (p *printer) printDecl(n *ir.DeclStmt) error {
 			if err != nil {
 				return err
 			}
+			if i < len(n.Boxed) && n.Boxed[i] {
+				// An addressed tuple-bound name: its stable cell declares
+				// directly off the tuple slot.
+				p.line("const %s: gort$.GoCell<%s> = { v: %s[%d] };", tsName(name)+"$b", spelled, tuple, i)
+				continue
+			}
 			// A struct or array slot binds a value copy (a comma-ok
 			// lookup yields the stored instance).
 			if n.Types[i].Kind == ir.KindStruct {
