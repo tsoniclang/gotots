@@ -305,6 +305,13 @@ func (p *printer) tsType(t ir.Type) (string, error) {
 	case ir.KindUintptr:
 		return "goabi$.GoUintptr", nil
 	case ir.KindPointer:
+		if t.ParamPtrIdentity && t.Elem != nil {
+			element, err := p.tsType(*t.Elem)
+			if err != nil {
+				return "", err
+			}
+			return element + " | undefined", nil
+		}
 		if t.Elem != nil && t.Elem.Kind == ir.KindExternal {
 			element, err := p.tsType(*t.Elem)
 			if err != nil {

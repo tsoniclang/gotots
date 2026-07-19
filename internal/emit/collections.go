@@ -95,7 +95,15 @@ func (p *printer) collectionExpr(e ir.Expr) (string, error) {
 			}
 			return "gort$.goEMapFrom([" + joinComma(entries) + "], " + encoder + ")", nil
 		}
-		return "gort$.goMapFrom([" + joinComma(entries) + "])", nil
+		key, err := p.tsType(*n.T.Key)
+		if err != nil {
+			return "", err
+		}
+		value, err := p.tsType(*n.T.Elem)
+		if err != nil {
+			return "", err
+		}
+		return "gort$.goMapFrom<" + key + ", " + value + ">([" + joinComma(entries) + "])", nil
 	case *ir.MapGet:
 		return p.printMapAccess(mapHelper("goMapGet", n.Map), n.Map, n.Key, n.T)
 	case *ir.MapLookup:

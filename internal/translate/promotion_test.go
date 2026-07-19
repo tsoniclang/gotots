@@ -228,3 +228,42 @@ func AliasReceiverMethod() int {
 }
 `)
 }
+
+func TestOracleIdentityParamPointer(t *testing.T) {
+	// The LinkStore shape: a generic type holding map[K]*V where V's
+	// closed evidence is identity carriers only — the pointer IS the
+	// instance; mutation through the returned pointer is visible on the
+	// next Get, and pointer identity matches Go.
+	runOracle(t, `package fixture
+
+type links struct{ N int }
+
+type store[K comparable, V any] struct {
+	m map[K]*V
+}
+
+func (s *store[K, V]) Get(key K, fresh func() *V) *V {
+	if s.m == nil {
+		s.m = map[K]*V{}
+	}
+	if v, ok := s.m[key]; ok {
+		return v
+	}
+	v := fresh()
+	s.m[key] = v
+	return v
+}
+
+func IdentityParamPointer() int {
+	s := &store[string, links]{}
+	a := s.Get("x", func() *links { return &links{N: 1} })
+	a.N = 41
+	b := s.Get("x", func() *links { return &links{N: 9} })
+	same := 0
+	if a == b {
+		same = 1
+	}
+	return b.N*10 + same
+}
+`)
+}

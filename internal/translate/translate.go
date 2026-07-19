@@ -411,6 +411,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 	var functions []*ir.Func
 	var carrierMethods []emit.Method
 	var initCalls []string
+	blankFuncs := 0
 	for _, f := range files {
 		for _, decl := range f.file.Decls {
 			funcDecl, isFunc := decl.(*ast.FuncDecl)
@@ -428,6 +429,15 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 				if function.Support == ir.SupportIRAdmitted {
 					initCalls = append(initCalls, function.Name)
 				}
+			}
+			if funcDecl.Recv == nil && funcDecl.Name.Name == "_" {
+				// A blank function is uncallable in Go; its body still
+				// typechecks (stringer drift guards). It emits under a
+				// package-unique name, exactly like init functions —
+				// deterministic in file walk order.
+				function.Name = fmt.Sprintf("_$%d", blankFuncs)
+				blankFuncs++
+				proof.GeneratedSymbol = function.Name
 			}
 			ledger = append(ledger, BodySupport{
 				ID: function.ID, Package: p.PkgPath, State: function.Support, Sites: function.Sites,

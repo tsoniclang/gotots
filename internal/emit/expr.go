@@ -452,6 +452,10 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		if n.X.Type().ParamPtrIdentity {
+			// The identity-choice pointer IS the instance.
+			return checked, nil
+		}
 		switch n.T.Kind {
 		case ir.KindStruct, ir.KindArray, ir.KindExternal:
 			return checked, nil

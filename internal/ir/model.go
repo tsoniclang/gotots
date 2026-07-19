@@ -110,6 +110,11 @@ type Type struct {
 	Canon string
 	// IfaceEmpty marks the zero-method interface: universal membership.
 	IfaceEmpty bool
+	// ParamPtrIdentity marks a pointer-to-type-parameter whose closed
+	// instantiation evidence binds ONLY identity carriers (structs,
+	// arrays, externals): the pointer IS the instance (nilable), never a
+	// cell — so generic and concrete code agree on the representation.
+	ParamPtrIdentity bool
 	// Uncomparable marks a struct type Go's == rejects (slice, map, or
 	// function fields): its goEq$ is never generated, and an equality
 	// factory over such a binding is provably unreachable (the type

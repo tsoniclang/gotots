@@ -136,7 +136,13 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 		if element.Kind == KindStruct || element.Kind == KindExternal || element.Kind == KindTypeParam {
 			return Type{}, &Unsupported{Kind: KindPointerToNonNamedType, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "pointer to non-named type " + spelled, Span: span}
 		}
-		return Type{Kind: KindPointer, Go: spelled, Elem: &element}, nil
+		out := Type{Kind: KindPointer, Go: spelled, Elem: &element}
+		if element.Kind == KindIface && element.TypeParamName != "" {
+			// The per-declaration carrier choice for *T: identity when the
+			// closed evidence binds only identity carriers, else a cell.
+			out.ParamPtrIdentity = b.paramPtrIdentity(u.Elem(), span)
+		}
+		return out, nil
 
 	case *types.Slice:
 		element, err := b.typeOf(u.Elem(), span)
@@ -564,4 +570,54 @@ func (b *builder) ifaceKeyMembersEncodable(goType types.Type, span Span) bool {
 		}
 	}
 	return true
+}
+
+// paramPtrIdentity reports whether every CONCRETE binding of a type
+// parameter (in the enclosing generic declaration's closed evidence) is
+// an identity carrier — a struct, fixed array, or external value — so a
+// pointer to the parameter is the instance itself, exactly as in every
+// concrete instantiation. Mixed or scalar evidence keeps the cell form.
+func (b *builder) paramPtrIdentity(keyType types.Type, span Span) bool {
+	param, ok := types.Unalias(keyType).(*types.TypeParam)
+	if !ok {
+		return false
+	}
+	var instances [][]types.Type
+	switch {
+	case b.genericObj != nil:
+		signature := b.genericObj.Type().(*types.Signature)
+		if signature.TypeParams() == nil || param.Index() >= signature.TypeParams().Len() ||
+			signature.TypeParams().At(param.Index()) != param {
+			return false
+		}
+		instances = b.unit.GenericInstances(b.genericObj)
+	case b.genericTypeObj != nil:
+		typeParams := b.genericTypeObj.TypeParams()
+		if typeParams == nil || param.Index() >= typeParams.Len() ||
+			typeParams.At(param.Index()).Obj().Name() != param.Obj().Name() {
+			return false
+		}
+		instances = b.unit.GenericTypeInstances(b.genericTypeObj.Obj())
+	default:
+		return false
+	}
+	concrete := 0
+	for _, instance := range instances {
+		if param.Index() >= len(instance) {
+			return false
+		}
+		arg := instance[param.Index()]
+		if mentionsTypeParamType(arg) {
+			continue
+		}
+		concrete++
+		bound, err := b.typeOf(arg, span)
+		if err != nil {
+			return false
+		}
+		if bound.Kind != KindStruct && bound.Kind != KindArray && bound.Kind != KindExternal {
+			return false
+		}
+	}
+	return concrete > 0
 }
