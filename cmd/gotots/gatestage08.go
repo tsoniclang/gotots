@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/tsoniclang/gotots/contracts"
 	"github.com/tsoniclang/gotots/internal/census"
@@ -165,7 +167,59 @@ func runRepresentationGate(repoDir string, firstRun *census.Result, corpusGenera
 		fmt.Sprintf("representation entries per family (all registry-classified): %v", familyDetail),
 		fmt.Sprintf("custom mechanisms with verified necessity records (AST-derived): %v", present),
 	}
+	// Bind the necessity evidence to EXECUTED results: run the exact
+	// named oracle and mutation test functions and require every one to
+	// pass — prose or unexecuted names are not evidence.
+	evidenceTests := map[string]bool{}
+	for _, mechanism := range present {
+		record, _ := necessity.RecordFor(mechanism)
+		for _, test := range record.OracleTests {
+			evidenceTests[test] = true
+		}
+		for _, test := range record.MutationTests {
+			evidenceTests[test] = true
+		}
+	}
+	names := make([]string, 0, len(evidenceTests))
+	for name := range evidenceTests {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	if len(names) == 0 {
+		return "fail", details, fmt.Errorf("no necessity evidence tests to execute")
+	}
+	pattern := "^(" + strings.Join(names, "|") + ")$"
+	output, testErr := runInRepo(repoDir, "go", "test", "-count=1", "-json", "-run", pattern, "./...")
+	passed := map[string]bool{}
+	for _, line := range strings.Split(output, "\n") {
+		if line == "" {
+			continue
+		}
+		var event struct {
+			Action string `json:"Action"`
+			Test   string `json:"Test"`
+		}
+		if json.Unmarshal([]byte(line), &event) != nil {
+			continue
+		}
+		if event.Action == "pass" && event.Test != "" {
+			passed[event.Test] = true
+		}
+	}
+	var unexecuted []string
+	for _, name := range names {
+		if !passed[name] {
+			unexecuted = append(unexecuted, name)
+		}
+	}
+	if testErr != nil || len(unexecuted) > 0 {
+		if len(unexecuted) > 10 {
+			unexecuted = unexecuted[:10]
+		}
+		details = append(details, "necessity evidence not green when executed: "+strings.Join(unexecuted, ", "))
+		return "fail", details, fmt.Errorf("necessity evidence execution failed (%d tests not passing)", len(unexecuted))
+	}
 	details = append(details,
-		"BLOCKED: necessity evidence names committed tests but is not yet bound to executed results (requires the stage-11 test ledger)")
-	return "blocked", details, nil
+		fmt.Sprintf("necessity evidence EXECUTED: %d named test functions green across %d mechanisms", len(names), len(present)))
+	return "pass", details, nil
 }
