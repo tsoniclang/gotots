@@ -137,6 +137,25 @@ func (p *printer) setOperation(t ir.Type) (string, error) {
 	return "undefined", nil
 }
 
+// cloneSetFactoryArgs spells the clone/set factory pair per type
+// argument — the trailing constructor arguments of every generic class
+// (captured at construction so goClone$/goSet$ stay zero-arg).
+func (p *printer) cloneSetFactoryArgs(typeArgs []ir.Type) (string, error) {
+	parts := make([]string, 0, len(typeArgs)*2)
+	for _, arg := range typeArgs {
+		clone, err := p.cloneOperation(arg)
+		if err != nil {
+			return "", err
+		}
+		set, err := p.setOperation(arg)
+		if err != nil {
+			return "", err
+		}
+		parts = append(parts, clone, set)
+	}
+	return joinComma(parts), nil
+}
+
 // zeroOnlyFactoryArgs spells the zero factories alone — generic class
 // constructors and goZero$ take no equality operations.
 func (p *printer) zeroOnlyFactoryArgs(typeArgs []ir.Type) (string, error) {
@@ -222,7 +241,15 @@ func (p *printer) zeroLiteral(t ir.Type) (string, error) {
 				}
 				factories[i] = "() => " + zero
 			}
-			return class + ".goZero$<" + joinComma(args) + ">(" + joinComma(factories) + ")", nil
+			cloneSet, err := p.cloneSetFactoryArgs(t.TypeArgs)
+			if err != nil {
+				return "", err
+			}
+			all := joinComma(factories)
+			if cloneSet != "" {
+				all += ", " + cloneSet
+			}
+			return class + ".goZero$<" + joinComma(args) + ">(" + all + ")", nil
 		}
 		return class + ".goZero$()", nil
 	case t.Kind == ir.KindArray:

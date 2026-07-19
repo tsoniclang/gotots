@@ -134,3 +134,46 @@ func nan() float64 {
 }
 `)
 }
+
+func TestOracleGenericClassStructBinding(t *testing.T) {
+	// A generic TYPE instantiated with a struct: the class captures the
+	// binding's clone/set factories — whole-value copy of the generic
+	// struct keeps field instances independent; whole-value overwrite is
+	// observed through an alias.
+	runOracle(t, `package fixture
+
+type inner struct{ N int }
+
+type holder[T any] struct {
+	V T
+}
+
+func GenericClassStruct() int {
+	a := holder[inner]{V: inner{N: 1}}
+	b := a
+	b.V.N = 50
+	p := &a
+	p.V.N = 7
+	return a.V.N*100 + b.V.N
+}
+`)
+}
+
+func TestOracleGenericClassZero(t *testing.T) {
+	// The zero of a struct-instantiated generic class is fresh per field.
+	runOracle(t, `package fixture
+
+type leaf struct{ N int }
+
+type wrap[T any] struct {
+	A T
+	B T
+}
+
+func GenericClassZero() int {
+	var w wrap[leaf]
+	w.A.N = 9
+	return w.A.N*10 + w.B.N
+}
+`)
+}

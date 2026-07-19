@@ -40,6 +40,16 @@ func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct) er
 		}
 		params = append(params, tsName(field.Name)+": "+spelled)
 	}
+	// A generic class captures its instantiation's copy factories at
+	// construction: clone$P/set$P fields keep goClone$/goSet$ zero-arg (the
+	// structural GoStructValue contract), while their behavior stays exact
+	// per instantiation.
+	for _, param := range structDecl.TypeParams {
+		p.line("clone$%s: (v: %s) => %s;", param, param, param)
+		p.line("set$%s: ((d: %s, s: %s) => void) | undefined;", param, param, param)
+		params = append(params, "clone$"+param+": (v: "+param+") => "+param)
+		params = append(params, "set$"+param+": ((d: "+param+", s: "+param+") => void) | undefined")
+	}
 	p.line("constructor(%s) {", strings.Join(params, ", "))
 	p.indent++
 	for _, field := range structDecl.Fields {
@@ -48,6 +58,10 @@ func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct) er
 		} else {
 			p.line("this.%s = %s;", field.Name, tsName(field.Name))
 		}
+	}
+	for _, param := range structDecl.TypeParams {
+		p.line("this.clone$%s = clone$%s;", param, param)
+		p.line("this.set$%s = set$%s;", param, param)
 	}
 	p.indent--
 	p.line("}")
@@ -75,6 +89,10 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 			clone = append(clone, "this."+field.Name+".v")
 			continue
 		}
+		if field.Type.Kind == ir.KindIface && field.Type.TypeParamName != "" {
+			clone = append(clone, "this.clone$"+field.Type.TypeParamName+"(this."+field.Name+")")
+			continue
+		}
 		switch field.Type.Kind {
 		case ir.KindStruct:
 			clone = append(clone, "this."+field.Name+".goClone$()")
@@ -98,6 +116,9 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 	if len(structDecl.TypeParams) > 0 {
 		self += "<" + strings.Join(structDecl.TypeParams, ", ") + ">"
 	}
+	for _, param := range structDecl.TypeParams {
+		clone = append(clone, "this.clone$"+param, "this.set$"+param)
+	}
 	p.line("goClone$(): %s {", self)
 	p.indent++
 	p.line("return new %s(%s);", self, strings.Join(clone, ", "))
@@ -111,6 +132,12 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 		// only the held value is overwritten, so &this.f stays exact.
 		if field.Cell {
 			p.line("this.%s.v = other.%s.v;", field.Name, field.Name)
+			continue
+		}
+		if field.Type.Kind == ir.KindIface && field.Type.TypeParamName != "" {
+			param := field.Type.TypeParamName
+			p.line("if (this.set$%s === undefined) { this.%s = other.%s; } else { this.set$%s(this.%s, other.%s); }",
+				param, field.Name, field.Name, param, field.Name, field.Name)
 			continue
 		}
 		switch field.Type.Kind {
@@ -155,13 +182,21 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 	}
 	p.zeroFactories = savedFactories
 	if len(structDecl.TypeParams) > 0 {
-		factories := make([]string, 0, len(structDecl.TypeParams))
+		factories := make([]string, 0, len(structDecl.TypeParams)*3)
 		for _, param := range structDecl.TypeParams {
 			factories = append(factories, "zero$"+param+": () => "+param)
 		}
+		for _, param := range structDecl.TypeParams {
+			factories = append(factories, "clone$"+param+": (v: "+param+") => "+param)
+			factories = append(factories, "set$"+param+": ((d: "+param+", s: "+param+") => void) | undefined")
+		}
+		ctorArgs := append([]string{}, zeros...)
+		for _, param := range structDecl.TypeParams {
+			ctorArgs = append(ctorArgs, "clone$"+param, "set$"+param)
+		}
 		p.line("static goZero$<%s>(%s): %s {", strings.Join(structDecl.TypeParams, ", "), strings.Join(factories, ", "), self)
 		p.indent++
-		p.line("return new %s(%s);", self, strings.Join(zeros, ", "))
+		p.line("return new %s(%s);", self, strings.Join(ctorArgs, ", "))
 		p.indent--
 		p.line("}")
 	} else {

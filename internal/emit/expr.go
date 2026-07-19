@@ -179,10 +179,20 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			}
 			class += "<" + joinComma(args) + ">"
 		}
+		factoryArgs, err := p.cloneSetFactoryArgs(structT.TypeArgs)
+		if err != nil {
+			return "", err
+		}
 		if len(n.EvalOrder) == 0 {
 			args, err := p.printArgs(n.Args)
 			if err != nil {
 				return "", err
+			}
+			if factoryArgs != "" {
+				if args != "" {
+					args += ", "
+				}
+				args += factoryArgs
 			}
 			return fmt.Sprintf("new %s(%s)", class, args), nil
 		}
@@ -217,6 +227,9 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 				return "", err
 			}
 			ctorArgs[i] = printed
+		}
+		if factoryArgs != "" {
+			ctorArgs = append(ctorArgs, factoryArgs)
 		}
 		return fmt.Sprintf("((%s) => new %s(%s))(%s)",
 			strings.Join(params, ", "), class, strings.Join(ctorArgs, ", "), strings.Join(values, ", ")), nil

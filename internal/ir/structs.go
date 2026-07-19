@@ -63,6 +63,14 @@ func BuildStruct(p *packages.Package, sourceDir string, unit Scope, spec *ast.Ty
 		// name; promotion resolves through selection index paths at every
 		// use site.
 		if field.Name() == "_" {
+			// A blank field of a provably ZERO-SIZE type ([0]X arrays,
+			// empty structs — the noCopy vet-guard idiom, SyncMap's
+			// phantom type markers) occupies no storage and can never be
+			// referenced: it is a no-output field, skipped entirely in the
+			// generated class. Any other blank field stays fail-closed.
+			if zeroSizeType(field.Type()) {
+				continue
+			}
 			return nil, &Unsupported{Kind: KindBlankStructField, Code: "GOTOTS_UNSUPPORTED_DECLARATION", Construct: "blank struct field", Span: span}
 		}
 		fieldType, err := b.typeOf(field.Type(), span)
@@ -323,10 +331,9 @@ func (b *builder) admitGenericType(named *types.Named, span Span) ([]string, err
 				return nil, &Unsupported{Kind: KindGenericTypeInstantiatedWithAnUnreviewedTypeArgument, Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 					Construct: "generic type instantiated with an unreviewed type argument (" + arg.String() + ")", Span: span}
 			}
-			if resolved.Kind == KindStruct || resolved.Kind == KindArray {
-				return nil, &Unsupported{Kind: KindGenericTypeInstantiatedWithAValueCopyCarrierCopySemanticsVaryPerInstantiation, Code: "GOTOTS_UNSUPPORTED_DECLARATION",
-					Construct: "generic type instantiated with a value-copy carrier (copy semantics vary per instantiation)", Span: span}
-			}
+			// Value-copy carrier bindings are exact: the class captures
+			// its instantiation's clone/set factories at construction.
+			_ = resolved
 		}
 	}
 	return names, nil
@@ -380,4 +387,17 @@ func (b *builder) anonStructType(structType *types.Struct, spelled string, span 
 		return Type{}, &Unsupported{Kind: KindNestedError, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: err.Error(), Span: span}
 	}
 	return out, nil
+}
+
+// zeroSizeType reports whether a type is provably zero-size: a [0]X
+// array, or a struct (named or not) with no fields — the vet-only
+// noCopy/phantom-marker idioms a blank field legally carries.
+func zeroSizeType(t types.Type) bool {
+	switch u := t.Underlying().(type) {
+	case *types.Array:
+		return u.Len() == 0
+	case *types.Struct:
+		return u.NumFields() == 0
+	}
+	return false
 }
