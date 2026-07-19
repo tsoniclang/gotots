@@ -384,20 +384,35 @@ func printMethodFunctionFamily(out *strings.Builder, module *Module, className s
 		params = append(params, tsName(parameter.Name)+": "+spelled)
 	}
 	// The instantiation's zero and equality operations, mirroring
-	// generic function signatures.
-	for _, param := range method.TypeParams {
+	// generic function signatures (core-erased parameters drop out).
+	for i, param := range method.TypeParams {
+		if erasedAt(method.ErasedParams, i) {
+			continue
+		}
 		params = append(params, "zero$"+param+": () => "+param)
 	}
-	for _, param := range method.TypeParams {
+	for i, param := range method.TypeParams {
+		if erasedAt(method.ErasedParams, i) {
+			continue
+		}
 		params = append(params, "eq$"+param+": (a: "+param+", b: "+param+") => boolean")
 	}
-	for _, param := range method.TypeParams {
+	for i, param := range method.TypeParams {
+		if erasedAt(method.ErasedParams, i) {
+			continue
+		}
 		params = append(params, "clone$"+param+": (v: "+param+") => "+param)
 	}
-	for _, param := range method.TypeParams {
+	for i, param := range method.TypeParams {
+		if erasedAt(method.ErasedParams, i) {
+			continue
+		}
 		params = append(params, "set$"+param+": ((d: "+param+", s: "+param+") => void) | undefined")
 	}
 	for i, param := range method.TypeParams {
+		if erasedAt(method.ErasedParams, i) {
+			continue
+		}
 		if i < len(method.KeyedParams) && method.KeyedParams[i] {
 			params = append(params, "key$"+param+": (k: "+param+") => string")
 		}
@@ -408,8 +423,8 @@ func printMethodFunctionFamily(out *strings.Builder, module *Module, className s
 	}
 	export := "export "
 	generics := ""
-	if len(method.TypeParams) > 0 {
-		generics = "<" + strings.Join(method.TypeParams, ", ") + ">"
+	if surface := surfaceParams(method); len(surface) > 0 {
+		generics = "<" + strings.Join(surface, ", ") + ">"
 	}
 	p.slicePlans = method.SlicePlans
 	p.line("%sfunction %s$%s%s(%s): %s {", export, className, method.Name, generics, strings.Join(params, ", "), result)

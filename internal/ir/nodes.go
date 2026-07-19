@@ -313,6 +313,9 @@ type Call struct {
 	// HardKeyed marks the HARD positions (the callee family-splits on
 	// these; a struct binding selects the "$ek" variant).
 	HardKeyed []bool
+	// ErasedParams marks core-typed positions dropped from the emitted
+	// surface (no type argument, no factory group).
+	ErasedParams []bool
 	Args      []Expr
 	Results   []Type
 }
@@ -343,6 +346,9 @@ type MethodCall struct {
 	// KeyedParams marks, per receiver type parameter, whether the
 	// declaring type keys a map by it (requirement-scoped key$P).
 	KeyedParams []bool
+	// ErasedParams marks core-typed receiver positions dropped from the
+	// emitted surface.
+	ErasedParams []bool
 	Recv        Expr
 	Method      string
 	Args        []Expr

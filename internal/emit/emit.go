@@ -208,8 +208,8 @@ func printFunc(out *strings.Builder, module *Module, function *ir.Func) error {
 	}
 	export := "export "
 	generics := ""
-	if len(function.TypeParams) > 0 {
-		generics = "<" + strings.Join(function.TypeParams, ", ") + ">"
+	if surface := surfaceParams(function); len(surface) > 0 {
+		generics = "<" + strings.Join(surface, ", ") + ">"
 	}
 	p.slicePlans = function.SlicePlans
 	emitName := function.Name
@@ -266,24 +266,39 @@ func (p *printer) functionSignature(function *ir.Func) (string, error) {
 	// instantiation's exact zero and exact == (direct === for comparable
 	// scalars, interface equality with the uncomparable panic for
 	// interface instantiations).
-	for _, param := range function.TypeParams {
+	for i, param := range function.TypeParams {
+		if erasedAt(function.ErasedParams, i) {
+			continue
+		}
 		params = append(params, "zero$"+param+": () => "+param)
 	}
-	for _, param := range function.TypeParams {
+	for i, param := range function.TypeParams {
+		if erasedAt(function.ErasedParams, i) {
+			continue
+		}
 		params = append(params, "eq$"+param+": (a: "+param+", b: "+param+") => boolean")
 	}
 	// Factory protocol v2: the per-binding copy operations. clone$P is
 	// TOTAL (identity for carriers without value-copy semantics); set$P is
 	// undefined exactly when the carrier stores by slot assignment.
-	for _, param := range function.TypeParams {
+	for i, param := range function.TypeParams {
+		if erasedAt(function.ErasedParams, i) {
+			continue
+		}
 		params = append(params, "clone$"+param+": (v: "+param+") => "+param)
 	}
-	for _, param := range function.TypeParams {
+	for i, param := range function.TypeParams {
+		if erasedAt(function.ErasedParams, i) {
+			continue
+		}
 		params = append(params, "set$"+param+": ((d: "+param+", s: "+param+") => void) | undefined")
 	}
 	// key$P is the per-binding map-key encoder, taken EXACTLY for the
 	// parameters this declaration keys a map by (requirement-scoped).
 	for i, param := range function.TypeParams {
+		if erasedAt(function.ErasedParams, i) {
+			continue
+		}
 		if i < len(function.KeyedParams) && function.KeyedParams[i] {
 			params = append(params, "key$"+param+": (k: "+param+") => string")
 		}
@@ -497,4 +512,23 @@ func anyTrue(mask []bool) bool {
 		}
 	}
 	return false
+}
+
+
+// surfaceParams is the emitted generic-parameter list: core-typed
+// parameters erase to their carriers and drop out.
+func surfaceParams(function *ir.Func) []string {
+	out := make([]string, 0, len(function.TypeParams))
+	for i, param := range function.TypeParams {
+		if erasedAt(function.ErasedParams, i) {
+			continue
+		}
+		out = append(out, param)
+	}
+	return out
+}
+
+// erasedAt reads the erased mask defensively.
+func erasedAt(mask []bool, i int) bool {
+	return i < len(mask) && mask[i]
 }

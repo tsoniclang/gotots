@@ -241,3 +241,33 @@ func CopyStringAndUnitBox() int {
 }
 `)
 }
+
+func TestOracleCoreTypedParams(t *testing.T) {
+	// The core.BinarySearchUniqueFunc shape: S ~[]E erases to its slice
+	// carrier — len/index/range work directly; named-slice bindings share
+	// the carrier identically.
+	runOracle(t, `package fixture
+
+type ints []int
+
+func at[S ~[]E, E any](x S, i int) E {
+	return x[i]
+}
+
+func total[S ~[]E, E any](x S, f func(E) int) int {
+	n := 0
+	for i := 0; i < len(x); i++ {
+		n += f(at(x, i))
+	}
+	return n
+}
+
+func CoreTypedParams() int {
+	plain := []string{"a", "bb"}
+	named := ints{3, 4, 5}
+	a := total(plain, func(s string) int { return len(s) })
+	b := total(named, func(v int) int { return v })
+	return a*100 + b
+}
+`)
+}

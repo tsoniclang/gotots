@@ -77,6 +77,22 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 	spelled := t.String()
 
 	if param, isParam := types.Unalias(t).(*types.TypeParam); isParam {
+		if core := constraintCore(param); core != nil {
+			switch core.(type) {
+			case *types.Slice, *types.Map:
+				// A CORE-TYPED parameter (S ~[]E, M ~map[K]V): every
+				// binding shares the core carrier exactly — the parameter
+				// ERASES to it (no factory participation; slice/map
+				// derivations are kind-driven and total).
+				resolved, err := b.typeOf(core, span)
+				if err != nil {
+					return Type{}, err
+				}
+				resolved.Go = spelled
+				resolved.ErasedParamName = param.Obj().Name()
+				return resolved, nil
+			}
+		}
 		// A type parameter's underlying is its constraint interface; the
 		// carrier is the opaque interface kind, spelled by the parameter
 		// name so generic signatures stay generic.
@@ -372,4 +388,45 @@ func basicKind(basic *types.Basic) (Kind, bool) {
 		return KindFloat64, true
 	}
 	return KindInvalid, false
+}
+
+
+// constraintCore computes a type parameter's core type: the single
+// underlying every term of its constraint shares, or nil.
+func constraintCore(param *types.TypeParam) types.Type {
+	iface, ok := param.Constraint().Underlying().(*types.Interface)
+	if !ok {
+		return nil
+	}
+	var core types.Type
+	for i := range iface.NumEmbeddeds() {
+		union, isUnion := iface.EmbeddedType(i).(*types.Union)
+		if !isUnion {
+			continue
+		}
+		for t := range union.Len() {
+			u := union.Term(t).Type().Underlying()
+			if core == nil {
+				core = u
+			} else if !types.Identical(core, u) {
+				return nil
+			}
+		}
+	}
+	return core
+}
+
+
+// coreErasedParam reports whether a type parameter erases to its core
+// carrier (slice/map cores drop out of the emitted generic surface).
+func coreErasedParam(param *types.TypeParam) bool {
+	core := constraintCore(param)
+	if core == nil {
+		return false
+	}
+	switch core.(type) {
+	case *types.Slice, *types.Map:
+		return true
+	}
+	return false
 }

@@ -185,9 +185,11 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 			return declarationSite(err)
 		}
 		function.TypeParams = names
+		signature := object.Type().(*types.Signature)
 		for i := range names {
 			function.KeyedParams = append(function.KeyedParams, b.unit.ParamRequiresKeyOp(object, i))
 			function.HardKeyed = append(function.HardKeyed, b.unit.ParamRequiresSVZKey(object, i))
+			function.ErasedParams = append(function.ErasedParams, coreErasedParam(signature.TypeParams().At(i)))
 		}
 		b.genericObj = object
 	}
@@ -217,6 +219,7 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 				for i := range recvParams.Len() {
 					function.KeyedParams = append(function.KeyedParams, b.unit.ParamRequiresKeyOp(named.Obj(), i))
 					function.HardKeyed = append(function.HardKeyed, b.unit.ParamRequiresSVZKey(named.Obj(), i))
+					function.ErasedParams = append(function.ErasedParams, coreErasedParam(recvParams.At(i)))
 				}
 			}
 		}

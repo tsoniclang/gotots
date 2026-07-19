@@ -63,9 +63,11 @@ func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
 			return b.buildExternalCall(n, function, signature, typeArgs)
 		}
 		call := &Call{Pkg: function.Pkg().Path(), Callee: function.Name(), TypeArgs: typeArgs}
+		calleeSig := function.Type().(*types.Signature)
 		for i := range typeArgs {
 			call.KeyedParams = append(call.KeyedParams, b.unit.ParamRequiresKeyOp(function, i))
 			call.HardKeyed = append(call.HardKeyed, b.unit.ParamRequiresSVZKey(function, i))
+			call.ErasedParams = append(call.ErasedParams, calleeSig.TypeParams() != nil && i < calleeSig.TypeParams().Len() && coreErasedParam(calleeSig.TypeParams().At(i)))
 		}
 		if err := b.buildCallArgsResults(n, signature, &call.Args, &call.Results); err != nil {
 			return nil, err
@@ -261,8 +263,10 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 		Recv:        recv,
 		Method:      method.Name(),
 	}
+	recvTypeParams := recvNamed.Origin().TypeParams()
 	for i := range recvTypeArgs {
 		out.KeyedParams = append(out.KeyedParams, b.unit.ParamRequiresKeyOp(recvNamed.Origin().Obj(), i))
+		out.ErasedParams = append(out.ErasedParams, recvTypeParams != nil && i < recvTypeParams.Len() && coreErasedParam(recvTypeParams.At(i)))
 	}
 	if err := b.buildCallArgsResults(n, signature, &out.Args, &out.Results); err != nil {
 		return nil, err

@@ -71,16 +71,26 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		// and passes each argument's zero factory as trailing arguments.
 		typeArgs := ""
 		if len(n.TypeArgs) > 0 {
-			parts := make([]string, len(n.TypeArgs))
+			parts := make([]string, 0, len(n.TypeArgs))
+			surfaceArgs := make([]ir.Type, 0, len(n.TypeArgs))
+			surfaceKeyed := make([]bool, 0, len(n.TypeArgs))
 			for i, typeArg := range n.TypeArgs {
+				if erasedAt(n.ErasedParams, i) {
+					continue
+				}
 				spelled, err := p.tsType(typeArg)
 				if err != nil {
 					return "", err
 				}
-				parts[i] = spelled
+				parts = append(parts, spelled)
+				surfaceArgs = append(surfaceArgs, typeArg)
+				surfaceKeyed = append(surfaceKeyed, i < len(n.KeyedParams) && n.KeyedParams[i])
 			}
-			typeArgs = "<" + strings.Join(parts, ", ") + ">"
-			factories, err := p.zeroFactoryArgs(n.TypeArgs, n.KeyedParams)
+			typeArgs = ""
+			if len(parts) > 0 {
+				typeArgs = "<" + strings.Join(parts, ", ") + ">"
+			}
+			factories, err := p.zeroFactoryArgs(surfaceArgs, surfaceKeyed)
 			if err != nil {
 				return "", err
 			}
@@ -121,14 +131,25 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			return "", err
 		}
 		if len(n.TypeArgs) > 0 {
-			parts := make([]string, len(n.TypeArgs))
+			parts := make([]string, 0, len(n.TypeArgs))
+			surfaceArgs := make([]ir.Type, 0, len(n.TypeArgs))
+			surfaceKeyed := make([]bool, 0, len(n.TypeArgs))
 			for i, typeArg := range n.TypeArgs {
-				if parts[i], err = p.tsType(typeArg); err != nil {
+				if erasedAt(n.ErasedParams, i) {
+					continue
+				}
+				spelled, err := p.tsType(typeArg)
+				if err != nil {
 					return "", err
 				}
+				parts = append(parts, spelled)
+				surfaceArgs = append(surfaceArgs, typeArg)
+				surfaceKeyed = append(surfaceKeyed, i < len(n.KeyedParams) && n.KeyedParams[i])
 			}
-			callee += "<" + joinComma(parts) + ">"
-			factories, err := p.zeroFactoryArgs(n.TypeArgs, n.KeyedParams)
+			if len(parts) > 0 {
+				callee += "<" + joinComma(parts) + ">"
+			}
+			factories, err := p.zeroFactoryArgs(surfaceArgs, surfaceKeyed)
 			if err != nil {
 				return "", err
 			}

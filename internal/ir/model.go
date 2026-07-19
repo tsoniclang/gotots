@@ -115,6 +115,10 @@ type Type struct {
 	// factory over such a binding is provably unreachable (the type
 	// system rejects == wherever it could run), spelled fail-closed.
 	Uncomparable bool
+	// ErasedParamName names a CORE-TYPED parameter this carrier erased
+	// (S ~[]E): the emitted surface drops it from the generic list and
+	// its factory groups.
+	ErasedParamName string
 	// HardKeyedParams marks, per type parameter of a generic struct's
 	// declaration, the HARD map-key requirement (family variants split on
 	// these positions).
@@ -451,6 +455,9 @@ type Func struct {
 	// HardKeyed marks, per type parameter, the HARD map-key requirement
 	// (family variants split on these positions).
 	HardKeyed []bool
+	// ErasedParams marks CORE-TYPED parameters erased to their carriers
+	// (dropped from the emitted generic list and factory groups).
+	ErasedParams []bool
 	// FamilyEnc marks this Func/Struct emission as the ENCODED key-family
 	// variant ("$ek"-suffixed symbols; parameter-keyed maps spell the
 	// encoded carrier).
