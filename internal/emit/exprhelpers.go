@@ -118,3 +118,34 @@ func callFamilyEnc(typeArgs []ir.Type, hardKeyed []bool, familyEnc bool) bool {
 	}
 	return false
 }
+
+// selfPtrReference mirrors selfHardKeyedReference for the pointer axis.
+func selfPtrReference(t ir.Type) bool {
+	for i, arg := range t.TypeArgs {
+		if arg.TypeParamName != "" && i < len(t.PtrParams) && t.PtrParams[i] {
+			return true
+		}
+	}
+	return false
+}
+
+// callFamilyPtr reports whether a generic call binds any
+// pointer-required position to a NON-object carrier (or forwards a bare
+// parameter inside a "$pc" emission).
+func callFamilyPtr(typeArgs []ir.Type, ptrParams []bool, familyPtrCell bool) bool {
+	for i, arg := range typeArgs {
+		if i >= len(ptrParams) || !ptrParams[i] {
+			continue
+		}
+		if arg.TypeParamName != "" {
+			if familyPtrCell {
+				return true
+			}
+			continue
+		}
+		if arg.Kind != ir.KindStruct && arg.Kind != ir.KindArray {
+			return true
+		}
+	}
+	return false
+}

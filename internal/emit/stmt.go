@@ -184,9 +184,29 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		}
 		loadTemp := p.temp()
 		p.line("const %s = %s;", loadTemp, loaded)
-		value, err := p.printBinaryOp(n.Op, loadTemp, rhsTemp, n.OperandT, n.Rhs.Type().Kind)
+		operandT := n.OperandT
+		left, rightOperand := loadTemp, rhsTemp
+		rightKind := n.Rhs.Type().Kind
+		castTo := ""
+		if operandT.TypeParamName != "" && operandT.ParamRepr != nil {
+			// A representation-uniform parameter computes at its carrier;
+			// the result is viewed back as the parameter for the store.
+			operandT = *n.OperandT.ParamRepr
+			carrier, err := p.tsType(operandT)
+			if err != nil {
+				return err
+			}
+			left = "(" + loadTemp + " as " + carrier + ")"
+			rightOperand = "(" + rhsTemp + " as " + carrier + ")"
+			rightKind = operandT.Kind
+			castTo = n.OperandT.TypeParamName
+		}
+		value, err := p.printBinaryOp(n.Op, left, rightOperand, operandT, rightKind)
 		if err != nil {
 			return err
+		}
+		if castTo != "" {
+			value = "(" + value + " as " + castTo + ")"
 		}
 		return staged.store(p, value)
 

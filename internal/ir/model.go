@@ -158,6 +158,13 @@ type Type struct {
 	// TypeParamName, on a KindIface carrier, names the generic type
 	// parameter this type is; signatures spell it generically.
 	TypeParamName string
+	// ParamRepr, on a type-parameter carrier, is the representative
+	// basic type when every constraint term shares one representation
+	// carrier — kind-driven conversions OUT of the parameter are exact.
+	// ParamReprExact additionally means all terms share the exact KIND,
+	// admitting conversions INTO the parameter and compound operations.
+	ParamRepr      *Type
+	ParamReprExact bool
 	// TypeArgs are the type arguments of an instantiated generic named
 	// type (structs), spelling the class generically at every use.
 	TypeArgs []Type
@@ -297,6 +304,11 @@ type Func struct {
 	// the CELL-family ("$pc") emission variant.
 	PtrParams     []bool
 	FamilyPtrCell bool
+	// ReprParams holds, per type parameter, the representation-uniform
+	// basic type of its constraint (nil when not uniform): the emitted
+	// TS parameter is bounded by the carrier so representation views
+	// typecheck.
+	ReprParams []*Type
 	// FamilyEnc marks this Func/Struct emission as the ENCODED key-family
 	// variant ("$ek"-suffixed symbols; parameter-keyed maps spell the
 	// encoded carrier).

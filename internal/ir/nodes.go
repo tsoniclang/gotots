@@ -47,6 +47,22 @@ type Convert struct {
 	To Type
 }
 
+// ParamReprView reads a representation-uniform type-parameter value at
+// its carrier: every constraint term shares the representation, so the
+// view is the identity at runtime (a checked TS widening).
+type ParamReprView struct {
+	X Expr
+	T Type // the representative basic type
+}
+
+// ParamReprCast types a representative-carrier value as the parameter
+// it represents — the inverse view, admitted only for exact single-kind
+// constraints (the conversion into the parameter is one function).
+type ParamReprCast struct {
+	X Expr
+	T Type // the parameter's carrier type (TypeParamName set)
+}
+
 // Call invokes a package-level function of the translated unit directly.
 // TypeArgs, when set, are the explicit type arguments of an instantiated
 // generic call.
@@ -271,13 +287,17 @@ func (*VarRef) expr()           {}
 func (*Binary) expr()           {}
 func (*Unary) expr()            {}
 func (*Convert) expr()          {}
+func (*ParamReprView) expr()    {}
+func (*ParamReprCast) expr()    {}
 func (*Call) expr()             {}
 
 func (c *Const) Type() Type   { return c.T }
 func (v *VarRef) Type() Type  { return v.T }
 func (b *Binary) Type() Type  { return b.T }
 func (u *Unary) Type() Type   { return u.T }
-func (c *Convert) Type() Type { return c.To }
+func (c *Convert) Type() Type       { return c.To }
+func (v *ParamReprView) Type() Type { return v.T }
+func (c *ParamReprCast) Type() Type { return c.T }
 
 // Type of a call is its single result; multi-result calls are consumed
 // only through DeclStmt/AssignStmt/ReturnStmt tuple slots.

@@ -144,6 +144,10 @@ func (s *slicePlanner) walkExpr(e Expr) {
 		s.walkExpr(n.X)
 	case *Convert:
 		s.walkExpr(n.X)
+	case *ParamReprView:
+		s.walkExpr(n.X)
+	case *ParamReprCast:
+		s.walkExpr(n.X)
 	case *StringConvert:
 		// The string-conversion ABI reads the operand's carrier shape, so
 		// a []byte/[]rune source must not be a native array.

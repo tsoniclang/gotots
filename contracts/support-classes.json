@@ -587,6 +587,11 @@
       "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
+      "key": "param-repr",
+      "state": "generated",
+      "specClause": "docs/spec/types-values-pointers.md"
+    },
+    {
       "key": "paramCopy",
       "state": "generated",
       "specClause": "docs/spec/interfaces-generics-functions.md"

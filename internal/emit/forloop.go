@@ -75,6 +75,11 @@ func (p *printer) forClauseable(stmt ir.Stmt, isInit bool) bool {
 		}
 		return p.nativeStorable(n.Targets[0])
 	case *ir.CompoundStmt:
+		if n.OperandT.TypeParamName != "" {
+			// Representation-uniform parameters need the statement form's
+			// carrier views around the operation.
+			return false
+		}
 		switch n.Target.(type) {
 		case ir.VarTarget, ir.BoxedTarget:
 			return true

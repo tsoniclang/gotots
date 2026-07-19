@@ -57,6 +57,22 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		return p.printUnary(n)
 	case *ir.Convert:
 		return p.printConvert(n)
+	case *ir.ParamReprView:
+		x, err := p.printExpr(n.X)
+		if err != nil {
+			return "", err
+		}
+		carrier, err := p.tsType(n.T)
+		if err != nil {
+			return "", err
+		}
+		return "(" + x + " as " + carrier + ")", nil
+	case *ir.ParamReprCast:
+		x, err := p.printExpr(n.X)
+		if err != nil {
+			return "", err
+		}
+		return "(" + x + " as " + n.T.TypeParamName + ")", nil
 	case *ir.Call:
 		args, err := p.printArgs(n.Args)
 		if err != nil {
@@ -565,35 +581,3 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 
 // castResults types a dynamically dispatched call's unknown result with
 // an erasable cast.
-
-
-// selfPtrReference mirrors selfHardKeyedReference for the pointer axis.
-func selfPtrReference(t ir.Type) bool {
-	for i, arg := range t.TypeArgs {
-		if arg.TypeParamName != "" && i < len(t.PtrParams) && t.PtrParams[i] {
-			return true
-		}
-	}
-	return false
-}
-
-// callFamilyPtr reports whether a generic call binds any
-// pointer-required position to a NON-object carrier (or forwards a bare
-// parameter inside a "$pc" emission).
-func callFamilyPtr(typeArgs []ir.Type, ptrParams []bool, familyPtrCell bool) bool {
-	for i, arg := range typeArgs {
-		if i >= len(ptrParams) || !ptrParams[i] {
-			continue
-		}
-		if arg.TypeParamName != "" {
-			if familyPtrCell {
-				return true
-			}
-			continue
-		}
-		if arg.Kind != ir.KindStruct && arg.Kind != ir.KindArray {
-			return true
-		}
-	}
-	return false
-}

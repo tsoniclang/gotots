@@ -388,6 +388,30 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 				b.use("convert")
 				return &Convert{X: x, To: to}, nil
 			}
+			fromT := x.Type()
+			if to.TypeParamName != "" && to.ParamRepr != nil && to.ParamReprExact {
+				// Conversion INTO an exact-kind uniform parameter: convert
+				// to the representative, view the result as the parameter.
+				source := fromT
+				if source.TypeParamName != "" && source.ParamRepr != nil {
+					x = &ParamReprView{X: x, T: *source.ParamRepr}
+					source = *source.ParamRepr
+				}
+				if err := b.checkConversion(source, *to.ParamRepr, span); err != nil {
+					return nil, err
+				}
+				b.use("param-repr")
+				return &ParamReprCast{X: &Convert{X: x, To: *to.ParamRepr}, T: to}, nil
+			}
+			if fromT.TypeParamName != "" && fromT.ParamRepr != nil && to.TypeParamName == "" {
+				// Conversion OUT of a carrier-uniform parameter: the wrap is
+				// a function of the target alone on the shared carrier.
+				if err := b.checkConversion(*fromT.ParamRepr, to, span); err != nil {
+					return nil, err
+				}
+				b.use("param-repr")
+				return &Convert{X: &ParamReprView{X: x, T: *fromT.ParamRepr}, To: to}, nil
+			}
 			if err := b.checkConversion(x.Type(), to, span); err != nil {
 				return nil, err
 			}

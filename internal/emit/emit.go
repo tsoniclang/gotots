@@ -532,12 +532,19 @@ func anyTrue(mask []bool) bool {
 
 
 // surfaceParams is the emitted generic-parameter list: core-typed
-// parameters erase to their carriers and drop out.
+// parameters erase to their carriers and drop out, and representation-
+// uniform parameters carry their carrier bound so representation views
+// typecheck.
 func surfaceParams(function *ir.Func) []string {
 	out := make([]string, 0, len(function.TypeParams))
 	for i, param := range function.TypeParams {
 		if erasedAt(function.ErasedParams, i) {
 			continue
+		}
+		if i < len(function.ReprParams) && function.ReprParams[i] != nil {
+			if carrier, err := (&printer{}).tsType(*function.ReprParams[i]); err == nil {
+				param += " extends " + carrier
+			}
 		}
 		out = append(out, param)
 	}

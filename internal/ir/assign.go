@@ -329,6 +329,9 @@ func (b *builder) buildCompoundAssign(n *ast.AssignStmt, operator token.Token) (
 	if err != nil {
 		return nil, err
 	}
+	if operandT.TypeParamName != "" {
+		b.use("param-repr")
+	}
 	b.use("compoundAssign:" + operator.String())
 	return &CompoundStmt{Target: target, Op: operator, Rhs: right, OperandT: operandT}, nil
 }
@@ -336,6 +339,14 @@ func (b *builder) buildCompoundAssign(n *ast.AssignStmt, operator token.Token) (
 // compoundOpAdmissible mirrors the binary-operation review for the
 // compound forms.
 func compoundOpAdmissible(operator token.Token, operand Type, span Span) error {
+	if operand.TypeParamName != "" {
+		if operand.ParamRepr != nil && operand.ParamReprExact {
+			// An exact-kind uniform parameter computes at its carrier;
+			// the store views the result back as the parameter.
+			return compoundOpAdmissible(operator, *operand.ParamRepr, span)
+		}
+		return &Unsupported{Kind: KindCompoundAssignmentOn, Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "compound assignment on " + operand.Go, Span: span}
+	}
 	if operand.Kind == KindString {
 		if operator != token.ADD {
 			return &Unsupported{Kind: KindOperator, Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "operator " + operator.String() + " on string", Span: span}

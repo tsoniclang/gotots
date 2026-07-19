@@ -97,7 +97,15 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 		// A type parameter's underlying is its constraint interface; the
 		// carrier is the opaque interface kind, spelled by the parameter
 		// name so generic signatures stay generic.
-		return Type{Kind: KindIface, Go: spelled, TypeParamName: param.Obj().Name()}, nil
+		out := Type{Kind: KindIface, Go: spelled, TypeParamName: param.Obj().Name()}
+		if basic, exact, uniform := constraintUniformBasic(param); uniform {
+			repr, err := b.typeOf(basic, span)
+			if err == nil {
+				out.ParamRepr = &repr
+				out.ParamReprExact = exact
+			}
+		}
+		return out, nil
 	}
 
 	switch u := t.Underlying().(type) {
@@ -394,6 +402,76 @@ func basicKind(basic *types.Basic) (Kind, bool) {
 	return KindInvalid, false
 }
 
+
+// constraintUniformBasic classifies a type parameter whose constraint
+// terms are all basic types of ONE representation carrier: conversions
+// out of the parameter are then target-driven wraps on the shared
+// carrier, identical for every possible binding. The exact flag means
+// all terms share one KIND, so conversions INTO the parameter and
+// compound operations are also single static functions.
+func constraintUniformBasic(param *types.TypeParam) (*types.Basic, bool, bool) {
+	iface, ok := param.Constraint().Underlying().(*types.Interface)
+	if !ok {
+		return nil, false, false
+	}
+	var representative *types.Basic
+	var kinds []Kind
+	for i := range iface.NumEmbeddeds() {
+		union, isUnion := iface.EmbeddedType(i).(*types.Union)
+		if !isUnion {
+			continue
+		}
+		for t := range union.Len() {
+			basic, isBasic := union.Term(t).Type().Underlying().(*types.Basic)
+			if !isBasic {
+				return nil, false, false
+			}
+			kind, known := basicKind(basic)
+			if !known {
+				return nil, false, false
+			}
+			if representative == nil {
+				representative = basic
+			}
+			kinds = append(kinds, kind)
+		}
+	}
+	if representative == nil {
+		return nil, false, false
+	}
+	exact := true
+	for _, kind := range kinds[1:] {
+		if kind != kinds[0] {
+			exact = false
+		}
+	}
+	if !exact {
+		// Carrier-uniform only: every term an integer sharing the wide
+		// carrier class (number vs bigint) — Go's integer conversions
+		// are wraps of the mathematical value, a function of the TARGET
+		// alone on a shared carrier.
+		for _, kind := range kinds {
+			if !kind.Integer() || kind.Wide64() != kinds[0].Wide64() {
+				return nil, false, false
+			}
+		}
+	}
+	return representative, exact, true
+}
+
+// paramRepr resolves a type parameter's representation-uniform basic
+// carrier for declaration threading (nil when not uniform).
+func (b *builder) paramRepr(param *types.TypeParam, span Span) *Type {
+	basic, _, uniform := constraintUniformBasic(param)
+	if !uniform {
+		return nil
+	}
+	repr, err := b.typeOf(basic, span)
+	if err != nil {
+		return nil
+	}
+	return &repr
+}
 
 // constraintCore computes a type parameter's core type: the single
 // underlying every term of its constraint shares, or nil.
