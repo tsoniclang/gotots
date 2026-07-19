@@ -14,6 +14,15 @@ import (
 // each exports exactly the stub's typed symbols with Go-exact behavior,
 // mirroring the product's hand-maintained implementation layer.
 var externalImplementations = map[string]string{
+	"cmp": `export function Compare<T>(a: T, b: T, zero$T: () => T, eq$T: (a: T, b: T) => boolean, clone$T: (v: T) => T, set$T: ((d: T, s: T) => void) | undefined): bigint {
+  void zero$T; void eq$T; void clone$T; void set$T;
+  const x = a as unknown as number | bigint | string;
+  const y = b as unknown as number | bigint | string;
+  if (x < y) return -1n;
+  if (x > y) return 1n;
+  return 0n;
+}
+`,
 	"time": `import { type GoExtern } from "../../language-abi/goextern.js";
 
 type Handle = GoExtern<"time.Time">;
@@ -415,6 +424,34 @@ func ExternUnexportedFieldBridge() int {
 	}
 	round := wrap(unwrap(s))
 	if s == round {
+		total += 100
+	}
+	return total
+}
+`)
+}
+
+func TestOracleExternGenericFuncReference(t *testing.T) {
+	// The tsconfigparsing shape: cmp.Compare passed as a comparator —
+	// an EXTERNAL generic function referenced as a value eta-expands
+	// over its typed stub with the instantiation's factory derivations.
+	runExternalOracle(t, `package fixture
+
+import "cmp"
+
+func apply(f func(a, b int) int, a, b int) int {
+	return f(a, b)
+}
+
+func ExternGenericFuncRef() int {
+	total := 0
+	if apply(cmp.Compare, 3, 5) == -1 {
+		total += 1
+	}
+	if apply(cmp.Compare, 7, 7) == 0 {
+		total += 10
+	}
+	if apply(cmp.Compare[int], 9, 2) == 1 {
 		total += 100
 	}
 	return total

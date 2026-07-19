@@ -100,21 +100,24 @@ func (b *builder) buildFuncRef(function *types.Func, ident *ast.Ident, span Span
 		return nil, &Unsupported{Kind: KindReferenceToAFunctionOutsideTheTranslatedUnit, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "reference to a function outside the translated unit", Span: span}
 	}
 	if !b.unit.Owns(function.Pkg().Path()) {
-		// A NON-generic external function referenced as a value: the
-		// typed stub export IS the value (fail-closed until assembly).
-		// Generic references stay out — a bare reference cannot carry the
-		// stub's factory protocol.
+		// An external function referenced as a value: the typed stub
+		// export IS the value (fail-closed until assembly). A GENERIC
+		// external reference (cmp.Compare as a comparator) falls through
+		// to the shared eta-expansion below — the arrow closes over the
+		// instantiation's factory derivations and calls the generic stub.
 		signature, isSig := function.Type().(*types.Signature)
-		if !isSig || (signature.TypeParams() != nil && signature.TypeParams().Len() > 0) || signature.Recv() != nil {
+		if !isSig || signature.Recv() != nil {
 			return nil, &Unsupported{Kind: KindReferenceToAFunctionOutsideTheTranslatedUnit, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "reference to a function outside the translated unit", Span: span}
 		}
-		t, err := b.typeOf(signature, span)
-		if err != nil {
-			return nil, err
+		if signature.TypeParams() == nil || signature.TypeParams().Len() == 0 {
+			t, err := b.typeOf(signature, span)
+			if err != nil {
+				return nil, err
+			}
+			b.unit.AddExternalFunc(function)
+			b.use("externFuncRef")
+			return &FuncRef{Pkg: function.Pkg().Path(), Name: function.Name(), T: t}, nil
 		}
-		b.unit.AddExternalFunc(function)
-		b.use("externFuncRef")
-		return &FuncRef{Pkg: function.Pkg().Path(), Name: function.Name(), T: t}, nil
 	}
 	signature := function.Type().(*types.Signature)
 	if signature.Recv() != nil {
