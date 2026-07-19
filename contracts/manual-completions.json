@@ -1,0 +1,366 @@
+{
+  "schemaVersion": 1,
+  "dispositions": [
+    {
+      "body": "github.com/microsoft/typescript-go/internal/checker::method::tracedTypeAdapter.Display",
+      "class": "runtime-recover",
+      "resolution": "deferred",
+      "constructs": [
+        "builtin recover"
+      ],
+      "note": "recover-based panic tracing; the recover protocol is not lowered yet"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/collections::method::OrderedMap.UnmarshalJSONFrom",
+      "class": "deferred-protocol",
+      "resolution": "deferred",
+      "constructs": [
+        "runtime type identity of *K (an open type parameter has no single runtime type)",
+        "runtime type identity of *V (an open type parameter has no single runtime type)"
+      ],
+      "note": "per-instantiation runtime identity of parameterized composites / local types; the per-shape rtti protocol is not built yet"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/collections::method::SyncMap.Keys",
+      "class": "unsafe-memory",
+      "resolution": "deferred",
+      "constructs": [
+        "basic type unsafe.Pointer"
+      ],
+      "note": "sync.Map over unsafe.Pointer internals; the reviewed single-threaded Map-carrier implementation is planned"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/collections::method::SyncMap.Load",
+      "class": "unsafe-memory",
+      "resolution": "deferred",
+      "constructs": [
+        "basic type unsafe.Pointer"
+      ],
+      "note": "sync.Map over unsafe.Pointer internals; the reviewed single-threaded Map-carrier implementation is planned"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/collections::method::SyncMap.LoadOrStore",
+      "class": "unsafe-memory",
+      "resolution": "deferred",
+      "constructs": [
+        "basic type unsafe.Pointer"
+      ],
+      "note": "sync.Map over unsafe.Pointer internals; the reviewed single-threaded Map-carrier implementation is planned"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/collections::method::SyncMap.Range",
+      "class": "unsafe-memory",
+      "resolution": "deferred",
+      "constructs": [
+        "basic type unsafe.Pointer"
+      ],
+      "note": "sync.Map over unsafe.Pointer internals; the reviewed single-threaded Map-carrier implementation is planned"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/collections::method::SyncMap.ToMap",
+      "class": "unsafe-memory",
+      "resolution": "deferred",
+      "constructs": [
+        "basic type unsafe.Pointer"
+      ],
+      "note": "sync.Map over unsafe.Pointer internals; the reviewed single-threaded Map-carrier implementation is planned"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/core::func::BreadthFirstSearchParallelEx",
+      "class": "deferred-protocol",
+      "resolution": "deferred",
+      "constructs": [
+        "interface value of parameterized binding *github.com/microsoft/typescript-go/internal/core.breadthFirstSearchJob[N]",
+        "struct type github.com/microsoft/typescript-go/internal/core.result (typeid: no exact canonical identity for N)"
+      ],
+      "note": "per-instantiation runtime identity of parameterized composites / local types; the per-shape rtti protocol is not built yet"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/core::func::NewLimitedSemaphore",
+      "class": "concurrency",
+      "resolution": "product-policy",
+      "constructs": [
+        "expression statement *ast.UnaryExpr",
+        "make of chan struct{}"
+      ],
+      "note": "channel/goroutine concurrency is excluded from the single-threaded product; callers reach these only through excluded watch/parallel paths"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/core::method::BreadthFirstSearchLevel.Delete",
+      "class": "deferred-protocol",
+      "resolution": "deferred",
+      "constructs": [
+        "interface value of parameterized binding *github.com/microsoft/typescript-go/internal/core.breadthFirstSearchJob[N]"
+      ],
+      "note": "per-instantiation runtime identity of parameterized composites / local types; the per-shape rtti protocol is not built yet"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/core::method::BreadthFirstSearchLevel.Has",
+      "class": "deferred-protocol",
+      "resolution": "deferred",
+      "constructs": [
+        "interface value of parameterized binding *github.com/microsoft/typescript-go/internal/core.breadthFirstSearchJob[N]"
+      ],
+      "note": "per-instantiation runtime identity of parameterized composites / local types; the per-shape rtti protocol is not built yet"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/core::method::BreadthFirstSearchLevel.Range",
+      "class": "deferred-protocol",
+      "resolution": "deferred",
+      "constructs": [
+        "interface value of parameterized binding *github.com/microsoft/typescript-go/internal/core.breadthFirstSearchJob[N]"
+      ],
+      "note": "per-instantiation runtime identity of parameterized composites / local types; the per-shape rtti protocol is not built yet"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/core::method::LimitedSemaphore.Acquire",
+      "class": "concurrency",
+      "resolution": "product-policy",
+      "constructs": [
+        "channel send statement"
+      ],
+      "note": "channel/goroutine concurrency is excluded from the single-threaded product; callers reach these only through excluded watch/parallel paths"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/core::method::LimitedSemaphore.TryAcquire",
+      "class": "concurrency",
+      "resolution": "product-policy",
+      "constructs": [
+        "select statement"
+      ],
+      "note": "channel/goroutine concurrency is excluded from the single-threaded product; callers reach these only through excluded watch/parallel paths"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/core::method::ThrottleGroup.Go",
+      "class": "concurrency",
+      "resolution": "product-policy",
+      "constructs": [
+        "channel send statement",
+        "expression statement *ast.UnaryExpr"
+      ],
+      "note": "channel/goroutine concurrency is excluded from the single-threaded product; callers reach these only through excluded watch/parallel paths"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/fswatch::func::newDebounce",
+      "class": "platform-fswatch",
+      "resolution": "product-policy",
+      "constructs": [
+        "goroutine statement"
+      ],
+      "note": "native file watching (fanotify/inotify backends, goroutine pumps) is excluded from the single-threaded product; the host integration provides watch events"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/fswatch::func::newFanotifyBackend",
+      "class": "platform-fswatch",
+      "resolution": "product-policy",
+      "constructs": [
+        "make of chan struct{}"
+      ],
+      "note": "native file watching (fanotify/inotify backends, goroutine pumps) is excluded from the single-threaded product; the host integration provides watch events"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/fswatch::func::newInotifyBackend",
+      "class": "platform-fswatch",
+      "resolution": "product-policy",
+      "constructs": [
+        "make of chan struct{}"
+      ],
+      "note": "native file watching (fanotify/inotify backends, goroutine pumps) is excluded from the single-threaded product; the host integration provides watch events"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/fswatch::func::parseFanotifyDfidNames",
+      "class": "platform-fswatch",
+      "resolution": "product-policy",
+      "constructs": [
+        "promoted selection through encoding/binary.nativeEndian"
+      ],
+      "note": "native file watching (fanotify/inotify backends, goroutine pumps) is excluded from the single-threaded product; the host integration provides watch events"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/fswatch::func::parseFanotifyFidRecord",
+      "class": "platform-fswatch",
+      "resolution": "product-policy",
+      "constructs": [
+        "promoted selection through encoding/binary.nativeEndian"
+      ],
+      "note": "native file watching (fanotify/inotify backends, goroutine pumps) is excluded from the single-threaded product; the host integration provides watch events"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/fswatch::func::readDirEntries",
+      "class": "platform-fswatch",
+      "resolution": "product-policy",
+      "constructs": [
+        "basic type unsafe.Pointer"
+      ],
+      "note": "native file watching (fanotify/inotify backends, goroutine pumps) is excluded from the single-threaded product; the host integration provides watch events"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/fswatch::method::debounce.coalesceWait",
+      "class": "platform-fswatch",
+      "resolution": "product-policy",
+      "constructs": [
+        "select statement"
+      ],
+      "note": "native file watching (fanotify/inotify backends, goroutine pumps) is excluded from the single-threaded product; the host integration provides watch events"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/fswatch::method::debounce.latchReset",
+      "class": "platform-fswatch",
+      "resolution": "product-policy",
+      "constructs": [
+        "make of chan struct{}"
+      ],
+      "note": "native file watching (fanotify/inotify backends, goroutine pumps) is excluded from the single-threaded product; the host integration provides watch events"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/fswatch::method::debounce.latchWait",
+      "class": "platform-fswatch",
+      "resolution": "product-policy",
+      "constructs": [
+        "expression statement *ast.UnaryExpr"
+      ],
+      "note": "native file watching (fanotify/inotify backends, goroutine pumps) is excluded from the single-threaded product; the host integration provides watch events"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/fswatch::method::debounce.trigger",
+      "class": "platform-fswatch",
+      "resolution": "product-policy",
+      "constructs": [
+        "builtin statement close",
+        "make of chan struct{}"
+      ],
+      "note": "native file watching (fanotify/inotify backends, goroutine pumps) is excluded from the single-threaded product; the host integration provides watch events"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/fswatch::method::debounce.triggerChLocked",
+      "class": "platform-fswatch",
+      "resolution": "product-policy",
+      "constructs": [
+        "make of chan struct{}"
+      ],
+      "note": "native file watching (fanotify/inotify backends, goroutine pumps) is excluded from the single-threaded product; the host integration provides watch events"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/fswatch::method::debounce.waitChLocked",
+      "class": "platform-fswatch",
+      "resolution": "product-policy",
+      "constructs": [
+        "make of chan struct{}"
+      ],
+      "note": "native file watching (fanotify/inotify backends, goroutine pumps) is excluded from the single-threaded product; the host integration provides watch events"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/fswatch::method::fanotifyBackend.handleEvents",
+      "class": "platform-fswatch",
+      "resolution": "product-policy",
+      "constructs": [
+        "basic type unsafe.Pointer"
+      ],
+      "note": "native file watching (fanotify/inotify backends, goroutine pumps) is excluded from the single-threaded product; the host integration provides watch events"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/fswatch::method::fanotifyBackend.shutdown",
+      "class": "platform-fswatch",
+      "resolution": "product-policy",
+      "constructs": [
+        "expression statement *ast.UnaryExpr"
+      ],
+      "note": "native file watching (fanotify/inotify backends, goroutine pumps) is excluded from the single-threaded product; the host integration provides watch events"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/fswatch::method::fanotifyBackend.start",
+      "class": "platform-fswatch",
+      "resolution": "product-policy",
+      "constructs": [
+        "builtin statement close"
+      ],
+      "note": "native file watching (fanotify/inotify backends, goroutine pumps) is excluded from the single-threaded product; the host integration provides watch events"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/fswatch::method::inotifyBackend.handleEvents",
+      "class": "platform-fswatch",
+      "resolution": "product-policy",
+      "constructs": [
+        "basic type unsafe.Pointer"
+      ],
+      "note": "native file watching (fanotify/inotify backends, goroutine pumps) is excluded from the single-threaded product; the host integration provides watch events"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/fswatch::method::inotifyBackend.shutdown",
+      "class": "platform-fswatch",
+      "resolution": "product-policy",
+      "constructs": [
+        "expression statement *ast.UnaryExpr"
+      ],
+      "note": "native file watching (fanotify/inotify backends, goroutine pumps) is excluded from the single-threaded product; the host integration provides watch events"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/fswatch::method::inotifyBackend.start",
+      "class": "platform-fswatch",
+      "resolution": "product-policy",
+      "constructs": [
+        "builtin statement close"
+      ],
+      "note": "native file watching (fanotify/inotify backends, goroutine pumps) is excluded from the single-threaded product; the host integration provides watch events"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/fswatch::method::watcherBase.init",
+      "class": "platform-fswatch",
+      "resolution": "product-policy",
+      "constructs": [
+        "make of chan struct{}"
+      ],
+      "note": "native file watching (fanotify/inotify backends, goroutine pumps) is excluded from the single-threaded product; the host integration provides watch events"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/fswatch::method::watcherBase.notifyStarted",
+      "class": "platform-fswatch",
+      "resolution": "product-policy",
+      "constructs": [
+        "select statement"
+      ],
+      "note": "native file watching (fanotify/inotify backends, goroutine pumps) is excluded from the single-threaded product; the host integration provides watch events"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/fswatch::method::watcherBase.run",
+      "class": "platform-fswatch",
+      "resolution": "product-policy",
+      "constructs": [
+        "expression statement *ast.UnaryExpr",
+        "goroutine statement"
+      ],
+      "note": "native file watching (fanotify/inotify backends, goroutine pumps) is excluded from the single-threaded product; the host integration provides watch events"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/packagejson::func::unmarshalJSONValue",
+      "class": "deferred-protocol",
+      "resolution": "deferred",
+      "constructs": [
+        "interface value of an instantiated generic type",
+        "runtime type identity of *[]T (an open type parameter has no single runtime type)",
+        "runtime type identity of []T (an open type parameter has no single runtime type)"
+      ],
+      "note": "per-instantiation runtime identity of parameterized composites / local types; the per-shape rtti protocol is not built yet"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/packagejson::func::unmarshalJSONValueV2",
+      "class": "deferred-protocol",
+      "resolution": "deferred",
+      "constructs": [
+        "interface value of an instantiated generic type",
+        "runtime type identity of *T (an open type parameter has no single runtime type)",
+        "runtime type identity of []T (an open type parameter has no single runtime type)"
+      ],
+      "note": "per-instantiation runtime identity of parameterized composites / local types; the per-shape rtti protocol is not built yet"
+    },
+    {
+      "body": "github.com/microsoft/typescript-go/internal/packagejson::method::Expected.UnmarshalJSON",
+      "class": "deferred-protocol",
+      "resolution": "deferred",
+      "constructs": [
+        "runtime type identity of *T (an open type parameter has no single runtime type)"
+      ],
+      "note": "per-instantiation runtime identity of parameterized composites / local types; the per-shape rtti protocol is not built yet"
+    }
+  ]
+}

@@ -17,6 +17,8 @@ import (
 	"github.com/tsoniclang/gotots/internal/ir"
 	"github.com/tsoniclang/gotots/internal/profile"
 	"github.com/tsoniclang/gotots/internal/translate"
+
+	"github.com/tsoniclang/gotots/contracts"
 )
 
 func runInRepo(dir, name string, args ...string) (string, error) {
@@ -328,6 +330,41 @@ func reconcileDispositions(prof *profile.Profile, firstRun *census.Result, gener
 			tsModules, bodyArtifacts, bodyPlaceholders, externPlaceholders, translatorLimitStops, bannedKeyHelpers))
 	if bannedKeyHelpers > 0 {
 		conflicts = append(conflicts, fmt.Sprintf("%d banned key-helper occurrences (goKeyOpaque/goKeyScalar) in generated core", bannedKeyHelpers))
+	}
+	// The §C manual-completion contract: every unimplemented BODY carries
+	// exactly one reviewed disposition, with its exact blocker-construct
+	// set — an undisposed body, a stale entry, or blocker drift is a
+	// conflict.
+	completions, err := contracts.LoadManualCompletions()
+	if err != nil {
+		conflicts = append(conflicts, err.Error())
+	} else {
+		unimplementedBodies := map[string][]string{}
+		for _, s := range generated.Support {
+			if string(s.State) != "unimplemented" {
+				continue
+			}
+			constructSet := map[string]bool{}
+			for _, site := range s.Sites {
+				constructSet[site.Construct] = true
+			}
+			constructs := make([]string, 0, len(constructSet))
+			for construct := range constructSet {
+				constructs = append(constructs, construct)
+			}
+			sort.Strings(constructs)
+			unimplementedBodies[s.ID] = constructs
+		}
+		if err := completions.VerifyDispositions(unimplementedBodies); err != nil {
+			conflicts = append(conflicts, err.Error())
+		}
+		byResolution := map[string]int{}
+		for _, d := range completions.Dispositions {
+			byResolution[d.Resolution]++
+		}
+		details = append(details, fmt.Sprintf(
+			"manual-completion contract: %d unimplemented bodies disposed (%d accepted-manual, %d product-policy, %d deferred), 0 undisposed",
+			len(completions.Dispositions), byResolution["accepted-manual"], byResolution["product-policy"], byResolution["deferred"]))
 	}
 	details = append(details,
 		fmt.Sprintf("evidence-stage ir-admitted (declarations disposed): %d", counts[string(ir.SupportIRAdmitted)]+counts["accepted-manual"]),

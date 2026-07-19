@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tsoniclang/gotots/contracts"
 	"github.com/tsoniclang/gotots/internal/goenv"
 	"github.com/tsoniclang/gotots/internal/pinning"
 	"github.com/tsoniclang/gotots/internal/profile"
@@ -176,4 +177,91 @@ func TestDiagDispositionLedger(t *testing.T) {
 		}
 	}
 	fmt.Println("LEDGER-COUNTS:", counts)
+}
+
+func TestDiagUnimplementedBodies(t *testing.T) {
+	sourceDir := os.Getenv("GOTOTS_CORPUS_DIR")
+	if sourceDir == "" {
+		t.Skip("set GOTOTS_CORPUS_DIR")
+	}
+	prof, err := profile.Load("../../profiles/tsts/project.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	build, _ := prof.BuildProfileByName("linux-amd64")
+	resolved, err := pinning.VerifyToolchain(prof.Pin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	env := resolved.Environ(goenv.EnvOptions{GOOS: build.GOOS, GOARCH: build.GOARCH, GOAMD64: build.GOAMD64, GOARM64: build.GOARM64})
+	g, err := translate.Corpus(prof, env, sourceDir, translate.Options{SourceRevision: "diag", ProfileHash: "diag"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	count := 0
+	for _, s := range g.Support {
+		if s.State != "unimplemented" {
+			continue
+		}
+		count++
+		constructs := map[string]bool{}
+		for _, site := range s.Sites {
+			constructs[site.Construct] = true
+		}
+		keys := make([]string, 0, len(constructs))
+		for k := range constructs {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		fmt.Printf("BODY\t%s\t%s\n", s.ID, strings.Join(keys, " | "))
+	}
+	fmt.Printf("UNIMPLEMENTED BODIES: %d\n", count)
+}
+
+// TestManualCompletionContract verifies the §C contract against the
+// live corpus: every unimplemented body has exactly one reviewed
+// disposition with its exact blocker set (drift fails), no entry is
+// stale.
+func TestManualCompletionContract(t *testing.T) {
+	sourceDir := os.Getenv("GOTOTS_CORPUS_DIR")
+	if sourceDir == "" {
+		t.Skip("set GOTOTS_CORPUS_DIR")
+	}
+	prof, err := profile.Load("../../profiles/tsts/project.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	build, _ := prof.BuildProfileByName("linux-amd64")
+	resolved, err := pinning.VerifyToolchain(prof.Pin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	env := resolved.Environ(goenv.EnvOptions{GOOS: build.GOOS, GOARCH: build.GOARCH, GOAMD64: build.GOAMD64, GOARM64: build.GOARM64})
+	g, err := translate.Corpus(prof, env, sourceDir, translate.Options{SourceRevision: "diag", ProfileHash: "diag"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	completions, err := contracts.LoadManualCompletions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	unimplemented := map[string][]string{}
+	for _, s := range g.Support {
+		if s.State != "unimplemented" {
+			continue
+		}
+		set := map[string]bool{}
+		for _, site := range s.Sites {
+			set[site.Construct] = true
+		}
+		var constructs []string
+		for construct := range set {
+			constructs = append(constructs, construct)
+		}
+		sort.Strings(constructs)
+		unimplemented[s.ID] = constructs
+	}
+	if err := completions.VerifyDispositions(unimplemented); err != nil {
+		t.Fatal(err)
+	}
 }
