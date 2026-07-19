@@ -5,7 +5,6 @@ package ir
 
 import (
 	"go/types"
-	"os"
 )
 
 // mapKeySupported admits key kinds whose Go equality coincides with JS
@@ -97,6 +96,65 @@ func (b *builder) typeParamKeySupported(keyType types.Type, span Span) bool {
 	return true
 }
 
+// paramKeyFamilyEncoded reports whether the enclosing generic
+// declaration's closed evidence binds this map-keyed parameter to any
+// admitted STRUCT — selecting the encoded carrier (key$P) for the
+// declaration's maps. SVZ-only evidence keeps the direct carrier.
+func (b *builder) paramKeyFamilyEncoded(keyType types.Type, span Span) bool {
+	param, ok := types.Unalias(keyType).(*types.TypeParam)
+	if !ok {
+		return false
+	}
+	var instances [][]types.Type
+	switch {
+	case b.genericObj != nil:
+		signature := b.genericObj.Type().(*types.Signature)
+		if recvParams := signature.RecvTypeParams(); recvParams != nil {
+			if param.Index() >= recvParams.Len() ||
+				recvParams.At(param.Index()).Obj().Name() != param.Obj().Name() {
+				return false
+			}
+			recv := signature.Recv().Type()
+			if pointer, isPointer := types.Unalias(recv).(*types.Pointer); isPointer {
+				recv = pointer.Elem()
+			}
+			named, isNamed := types.Unalias(recv).(*types.Named)
+			if !isNamed {
+				return false
+			}
+			instances = b.unit.GenericTypeInstances(named.Obj())
+			break
+		}
+		if signature.TypeParams() == nil || param.Index() >= signature.TypeParams().Len() ||
+			signature.TypeParams().At(param.Index()) != param {
+			return false
+		}
+		instances = b.unit.GenericInstances(b.genericObj)
+	case b.genericTypeObj != nil:
+		typeParams := b.genericTypeObj.TypeParams()
+		if typeParams == nil || param.Index() >= typeParams.Len() ||
+			typeParams.At(param.Index()).Obj().Name() != param.Obj().Name() {
+			return false
+		}
+		instances = b.unit.GenericTypeInstances(b.genericTypeObj.Obj())
+	default:
+		return false
+	}
+	for _, instance := range instances {
+		if param.Index() >= len(instance) {
+			continue
+		}
+		goArg := instance[param.Index()]
+		if mentionsTypeParamType(goArg) {
+			continue
+		}
+		if _, isStruct := types.Unalias(goArg).Underlying().(*types.Struct); isStruct {
+			return true
+		}
+	}
+	return false
+}
+
 // EqComparableField reports whether one field type participates in the
 // generated exact equality (goEq$): direct === carriers (floats keep
 // NaN and signed-zero semantics under ===), nested comparable structs,
@@ -132,6 +190,9 @@ func (b *builder) structEqComparable(goType types.Type) bool {
 		return false
 	}
 	guard := "eq:" + goType.String()
+	if verdict, memoized := b.eqComparableMemo[guard]; memoized {
+		return verdict
+	}
 	if b.keyEncodableInProgress[guard] {
 		// COINDUCTIVE cycle (a struct reachable through its own fields):
 		// assuming comparable is self-consistent — pointer fields compare
@@ -143,14 +204,20 @@ func (b *builder) structEqComparable(goType types.Type) bool {
 	}
 	b.keyEncodableInProgress[guard] = true
 	defer delete(b.keyEncodableInProgress, guard)
+	verdict := true
 	for i := range structType.NumFields() {
 		field := structType.Field(i)
 		fieldIR, err := b.typeOf(field.Type(), Span{})
 		if err != nil || !b.EqComparableField(fieldIR, field.Type()) {
-			return false
+			verdict = false
+			break
 		}
 	}
-	return true
+	if b.eqComparableMemo == nil {
+		b.eqComparableMemo = map[string]bool{}
+	}
+	b.eqComparableMemo[guard] = verdict
+	return verdict
 }
 
 // structKeyEncodable reports whether a named struct key's fields are all
@@ -164,6 +231,9 @@ func (b *builder) structKeyEncodable(keyType types.Type, span Span) bool {
 		return false
 	}
 	guard := keyType.String()
+	if verdict, memoized := b.keyEncodableMemo[guard]; memoized {
+		return verdict
+	}
 	if b.keyEncodableInProgress[guard] {
 		// A cycle through member/field types: the definition is
 		// COINDUCTIVE (assuming encodable is self-consistent — value
@@ -176,6 +246,16 @@ func (b *builder) structKeyEncodable(keyType types.Type, span Span) bool {
 	}
 	b.keyEncodableInProgress[guard] = true
 	defer delete(b.keyEncodableInProgress, guard)
+	verdict := b.structKeyEncodableWalk(keyType, structType, span)
+	if b.keyEncodableMemo == nil {
+		b.keyEncodableMemo = map[string]bool{}
+	}
+	b.keyEncodableMemo[guard] = verdict
+	return verdict
+}
+
+// structKeyEncodableWalk is structKeyEncodable's uncached walk.
+func (b *builder) structKeyEncodableWalk(keyType types.Type, structType *types.Struct, span Span) bool {
 	// An INSTANTIATED generic struct key must bind every bare-parameter
 	// field to the scalar family the generic class's goKey$ encodes
 	// exactly (goKeyScalar: strings, booleans, integers — floats stay out
@@ -293,26 +373,18 @@ func (b *builder) ifaceKeyMembersEncodable(goType types.Type, span Span) bool {
 		case member.Pointer:
 		case member.Extern && member.ExternCarrier != "":
 		case member.Extern:
-			if member.Eq != nil && member.Eq.Kind == EqUncomparable {
-				// Go PANICS hashing this uncomparable dynamic type — the
-				// panic IS the exact encoding (as for uncomparable structs).
-				continue
-			}
-			// A COMPARABLE opaque handle value: Go would hash its contents,
-			// which the handle does not expose — no exact encoding.
-			if os.Getenv("GOTOTS_DEBUG_KEYS") != "" {
-				println("DEBUG comparable extern member", member.K, "in", goType.String())
-			}
-			return false
+			// An uncomparable extern dynamic key panics in Go — the panic
+			// IS the exact encoding. A COMPARABLE opaque handle would hash
+			// contents the handle does not expose: its component is a loud
+			// runtime fail-closed stop (goKeyExternOpaque), never a wrong
+			// identity encoding — the admission covers the members that
+			// can actually inhabit keys exactly.
 		case member.Struct:
-			if !member.KeyEncodable {
-				// An UNCOMPARABLE dynamic key panics in Go ("hash of
-				// unhashable type") — the panic IS the exact encoding; a
-				// comparable member without an encoding fails closed.
-				if member.Eq == nil || member.Eq.Kind != EqUncomparable {
-					return false
-				}
-			}
+			// A key-encodable struct composes through its goKey$; an
+			// UNCOMPARABLE one carries Go's exact unhashable panic; a
+			// comparable struct WITHOUT a generated encoding gets the loud
+			// runtime fail-closed stop (goKeyOpaque) — never a wrong
+			// identity encoding.
 		default:
 			// A named value carrier over a scalar: encodable by carrier.
 		}

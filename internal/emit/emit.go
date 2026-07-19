@@ -128,6 +128,7 @@ type printer struct {
 	// carriers without value-copy semantics) and set$P is the in-place
 	// overwrite (undefined for slot-assignment carriers).
 	cloneOps map[string]string
+	keyOps   map[string]string
 	setOps   map[string]string
 	// slicePlans maps this body's slice-typed locals to their selected
 	// representation; "native-array" locals lower onto plain arrays.
@@ -214,11 +215,13 @@ func printFunc(out *strings.Builder, module *Module, function *ir.Func) error {
 		p.eqOps = map[string]string{}
 		p.cloneOps = map[string]string{}
 		p.setOps = map[string]string{}
+		p.keyOps = map[string]string{}
 		for _, param := range function.TypeParams {
 			p.zeroFactories[param] = "zero$" + param
 			p.eqOps[param] = "eq$" + param
 			p.cloneOps[param] = "clone$" + param
 			p.setOps[param] = "set$" + param
+			p.keyOps[param] = "key$" + param
 		}
 	}
 	if function.Placeholder {
@@ -267,6 +270,11 @@ func (p *printer) functionSignature(function *ir.Func) (string, error) {
 	}
 	for _, param := range function.TypeParams {
 		params = append(params, "set$"+param+": ((d: "+param+", s: "+param+") => void) | undefined")
+	}
+	// key$P is the TOTAL per-binding map-key encoder (the encoded-map
+	// carrier's exactness per instantiation).
+	for _, param := range function.TypeParams {
+		params = append(params, "key$"+param+": (k: "+param+") => string")
 	}
 	result, err := p.tsResultType(function.Results)
 	if err != nil {
@@ -422,7 +430,10 @@ func (p *printer) tsType(t ir.Type) (string, error) {
 		if t.Key.Kind.Float() {
 			return "gort$.GoFMap<" + value + ">", nil
 		}
-		if t.Key.Kind == ir.KindIface && t.Key.TypeParamName == "" {
+		if t.Key.Kind == ir.KindIface && (t.Key.TypeParamName == "" || t.EncodedParamKey) {
+			// Concrete interface keys AND struct-evidence parameter keys
+			// share the encoded carrier; the encoder is the union $key or
+			// the instantiation's key$P respectively.
 			return "gort$.GoEMap<" + key + ", " + value + ">", nil
 		}
 		return "gort$.GoMap<" + key + ", " + value + ">", nil

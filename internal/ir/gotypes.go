@@ -179,7 +179,11 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 		if err != nil {
 			return Type{}, err
 		}
-		return Type{Kind: KindMap, Go: spelled, Key: &key, Elem: &value}, nil
+		out := Type{Kind: KindMap, Go: spelled, Key: &key, Elem: &value}
+		if key.Kind == KindIface && key.TypeParamName != "" {
+			out.EncodedParamKey = b.paramKeyFamilyEncoded(u.Key(), span)
+		}
+		return out, nil
 
 	case *types.Signature:
 		if u.TypeParams() != nil || u.Recv() != nil {
@@ -232,7 +236,8 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 			// generated exact equality) — the emitted surface, which is
 			// stricter than Go's spec comparability. An eq factory over a
 			// binding without goEq$ fails closed loudly, never silently.
-			Uncomparable: !b.structEqComparable(named)}
+			Uncomparable: !b.structEqComparable(named),
+			KeyEncodable: b.structKeyEncodable(named, span)}
 		if named.TypeArgs() != nil {
 			for i := range named.TypeArgs().Len() {
 				goArg := named.TypeArgs().At(i)
@@ -247,9 +252,10 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 				// A free (parameter-mentioning) argument is guarded at its
 				// own concrete sites.
 				if b.unit.ParamRequiresSVZKey(named.Origin().Obj(), i) &&
-					!mentionsTypeParamType(goArg) && !mapKeySupported(arg.Kind) {
+					!mentionsTypeParamType(goArg) && !mapKeySupported(arg.Kind) &&
+					!(arg.Kind == KindStruct && arg.KeyEncodable) {
 					return Type{}, &Unsupported{Kind: KindGenericInstantiationOutsideAdmittedKeyFamily, Code: "GOTOTS_UNSUPPORTED_TYPE",
-						Construct: "generic instantiation outside the admitted key family (" + spelled + ": " + goArg.String() + " is not a SameValueZero key)", Span: span}
+						Construct: "generic instantiation outside the admitted key family (" + spelled + ": " + goArg.String() + " is not an admitted map key)", Span: span}
 				}
 				out.TypeArgs = append(out.TypeArgs, arg)
 			}

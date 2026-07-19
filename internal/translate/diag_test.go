@@ -49,7 +49,7 @@ func TestDiagBlockers(t *testing.T) {
 		parts := strings.SplitN(s.ID, "::", 3)
 		if len(parts) >= 2 && parts[1] == "type" && strings.Contains(roots[s.Package], "declaration blockers") {
 			for _, site := range s.Sites {
-				fmt.Printf("TYPE %s :: %.110s @ %s:%d\n", s.ID[strings.LastIndex(s.ID, "internal/")+9:], site.Construct, site.Span.File, site.Span.Line)
+				fmt.Printf("TYPE %s :: %.240s @ %s:%d\n", s.ID[strings.LastIndex(s.ID, "internal/")+9:], site.Construct, site.Span.File, site.Span.Line)
 			}
 		}
 	}

@@ -59,6 +59,13 @@ type builder struct {
 	// encodability is being decided is a cycle, conservatively not
 	// encodable (fail closed).
 	keyEncodableInProgress map[string]bool
+	// keyEncodableMemo / eqComparableMemo cache COMPLETED verdicts of the
+	// two admission walks (they recurse through interface member sets, a
+	// quadratic blowup over the checker's type graph without caching).
+	// Only finished results are cached; in-progress cycles stay with the
+	// coinductive guard.
+	keyEncodableMemo map[string]bool
+	eqComparableMemo map[string]bool
 	// bind is this top-level function's canonical binding-identity table
 	// and emission-name allocator (shared with closure child builders so
 	// captured variables resolve to their outer name and a closure's own

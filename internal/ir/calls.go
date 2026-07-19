@@ -48,9 +48,10 @@ func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
 				// keys a map by.
 				goArg := instance.TypeArgs.At(i)
 				if b.unit.ParamRequiresSVZKey(function, i) &&
-					!mentionsTypeParamType(goArg) && !mapKeySupported(argType.Kind) {
+					!mentionsTypeParamType(goArg) && !mapKeySupported(argType.Kind) &&
+					!(argType.Kind == KindStruct && argType.KeyEncodable) {
 					return nil, &Unsupported{Kind: KindGenericInstantiationOutsideAdmittedKeyFamily, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
-						Construct: "generic instantiation outside the admitted key family (" + function.Name() + ": " + goArg.String() + " is not a SameValueZero key)", Span: span}
+						Construct: "generic instantiation outside the admitted key family (" + function.Name() + ": " + goArg.String() + " is not an admitted map key)", Span: span}
 				}
 				typeArgs = append(typeArgs, argType)
 			}

@@ -270,3 +270,62 @@ func CrossPackageGenericIdentity() int {
 		t.Fatalf("differential mismatch:\n--- go ---\n%s--- generated ---\n%s", result.GoOutput, result.TSOutput)
 	}
 }
+
+func TestOracleGenericStructKeyedSet(t *testing.T) {
+	// The collections.Set[NonExistentPropertyKey] shape: a generic map
+	// keyed by the type parameter, instantiated with a key-encodable
+	// STRUCT — the encoded carrier with the per-binding key$P factory
+	// keeps Go's value-key equality exact.
+	runOracle(t, `package fixture
+
+type pair struct {
+	a int
+	b string
+}
+
+type set[T comparable] struct {
+	m map[T]struct{}
+}
+
+func (s *set[T]) Add(v T) {
+	if s.m == nil {
+		s.m = map[T]struct{}{}
+	}
+	s.m[v] = struct{}{}
+}
+
+func (s *set[T]) Has(v T) bool {
+	_, ok := s.m[v]
+	return ok
+}
+
+func (s *set[T]) Len() int {
+	return len(s.m)
+}
+
+func GenericStructKeyedSet() int {
+	s := &set[pair]{}
+	s.Add(pair{1, "x"})
+	s.Add(pair{1, "x"})
+	s.Add(pair{2, "y"})
+	total := s.Len() * 100
+	if s.Has(pair{1, "x"}) {
+		total += 10
+	}
+	if s.Has(pair{3, "z"}) {
+		total += 1000
+	}
+	i := &set[int]{}
+	i.Add(7)
+	i.Add(7)
+	total += i.Len()
+	p := &set[*pair]{}
+	x := &pair{9, "q"}
+	p.Add(x)
+	p.Add(x)
+	p.Add(&pair{9, "q"})
+	total += p.Len() * 10000
+	return total
+}
+`)
+}

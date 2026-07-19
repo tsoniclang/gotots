@@ -44,7 +44,7 @@ func (p *printer) collectionExpr(e ir.Expr) (string, error) {
 			}
 			return "gort$.goKMapMake<" + key + ", " + value + ">(" + hint + ")", nil
 		}
-		if n.Type().Key != nil && n.Type().Key.Kind == ir.KindIface && n.Type().Key.TypeParamName == "" {
+		if n.Type().Key != nil && n.Type().Key.Kind == ir.KindIface && (n.Type().Key.TypeParamName == "" || n.Type().EncodedParamKey) {
 			key, err := p.tsType(*n.Type().Key)
 			if err != nil {
 				return "", err
@@ -108,8 +108,8 @@ func (p *printer) collectionExpr(e ir.Expr) (string, error) {
 			}
 			return "gort$.goFMapFrom<" + value + ">([" + joinComma(entries) + "])", nil
 		}
-		if n.T.Key.Kind == ir.KindIface && n.T.Key.TypeParamName == "" {
-			encoder, err := p.ifaceKeyEncoder(*n.T.Key)
+		if n.T.Key.Kind == ir.KindIface && (n.T.Key.TypeParamName == "" || n.T.EncodedParamKey) {
+			encoder, err := p.ifaceKeyEncoder(n.T)
 			if err != nil {
 				return "", err
 			}
@@ -375,7 +375,7 @@ func mapHelper(name string, mapExpr ir.Expr) string {
 	if t.Key != nil && t.Key.Kind.Float() {
 		return "goFMap" + strings.TrimPrefix(name, "goMap")
 	}
-	if t.Key != nil && t.Key.Kind == ir.KindIface && t.Key.TypeParamName == "" {
+	if t.Key != nil && t.Key.Kind == ir.KindIface && (t.Key.TypeParamName == "" || t.EncodedParamKey) {
 		return "goEMap" + strings.TrimPrefix(name, "goMap")
 	}
 	return name
@@ -384,9 +384,25 @@ func mapHelper(name string, mapExpr ir.Expr) string {
 // ifaceKeyEncoder returns the union $key encoder reference for an
 // interface-keyed map's key type (marking the requirement so the encoder
 // emits beside the union), or "" for every other key kind.
-func (p *printer) ifaceKeyEncoder(keyT ir.Type) (string, error) {
-	if keyT.Kind != ir.KindIface || keyT.TypeParamName != "" {
+func (p *printer) ifaceKeyEncoder(mapT ir.Type) (string, error) {
+	if mapT.Key == nil {
 		return "", nil
+	}
+	keyT := *mapT.Key
+	if keyT.Kind != ir.KindIface {
+		return "", nil
+	}
+	if keyT.TypeParamName != "" {
+		if !mapT.EncodedParamKey {
+			return "", nil
+		}
+		// A bare-parameter key encodes through the instantiation's key
+		// operation in scope (the key$P factory).
+		op, has := p.keyOps[keyT.TypeParamName]
+		if !has {
+			return "", fmt.Errorf("no key operation in scope for type parameter %q", keyT.TypeParamName)
+		}
+		return op, nil
 	}
 	name, err := p.ifaceUnionAlias(keyT)
 	if err != nil {
@@ -412,7 +428,7 @@ func (p *printer) printMapAccess(helper string, mapExpr, key ir.Expr, valueType 
 		return "", err
 	}
 	if mapExpr.Type().Key != nil {
-		encoder, err := p.ifaceKeyEncoder(*mapExpr.Type().Key)
+		encoder, err := p.ifaceKeyEncoder(mapExpr.Type())
 		if err != nil {
 			return "", err
 		}

@@ -86,6 +86,16 @@ export function goKeyScalar(v: unknown): string {
   throw new Error("gotots invariant: non-scalar key binding");
 }
 
+// goKeyOpaque fails closed on a dynamic map key whose Go equality hashes
+// contents the representation does not expose (a comparable external
+// handle, or a comparable struct value without a generated key
+// encoding): encoding it would be silently wrong, so the reviewed
+// surface stops loudly instead. This is an invariant stop (plain
+// Error), never a Go panic surface.
+export function goKeyOpaque(display: string): never {
+  throw new Error("gotots: dynamic map key " + display + " is outside the reviewed key surface");
+}
+
 // goKeyUnhashable is Go's exact runtime panic for an uncomparable dynamic
 // map key.
 export function goKeyUnhashable(display: string): never {

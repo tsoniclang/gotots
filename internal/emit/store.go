@@ -251,7 +251,7 @@ func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
 		}
 		keyTemp := p.temp()
 		p.line("const %s = %s;", keyTemp, key)
-		encoder, err := p.ifaceKeyEncoder(*t.Map.Type().Key)
+		encoder, err := p.ifaceKeyEncoder(t.Map.Type())
 		if err != nil {
 			return stagedTarget{}, err
 		}

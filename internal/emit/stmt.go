@@ -165,7 +165,7 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		var impure strings.Builder
 		operandPrinter := &printer{out: &impure, module: p.module, indent: p.indent,
 			temps: p.temps, zeroFactories: p.zeroFactories, eqOps: p.eqOps,
-			cloneOps: p.cloneOps, setOps: p.setOps, slicePlans: p.slicePlans}
+			cloneOps: p.cloneOps, setOps: p.setOps, keyOps: p.keyOps, slicePlans: p.slicePlans}
 		staged, err := operandPrinter.stageCompoundTarget(n.Target)
 		if err != nil {
 			return err
@@ -214,7 +214,7 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 			return err
 		}
 		if n.Map.Type().Key != nil {
-			encoder, err := p.ifaceKeyEncoder(*n.Map.Type().Key)
+			encoder, err := p.ifaceKeyEncoder(n.Map.Type())
 			if err != nil {
 				return err
 			}

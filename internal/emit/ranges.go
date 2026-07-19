@@ -101,7 +101,7 @@ func (p *printer) printRangeMap(n *ir.RangeMap) error {
 	}
 	keyed := n.X.Type().Key.Kind == ir.KindStruct
 	float := n.X.Type().Key.Kind.Float()
-	encoded := n.X.Type().Key.Kind == ir.KindIface && n.X.Type().Key.TypeParamName == ""
+	encoded := n.X.Type().Key.Kind == ir.KindIface && (n.X.Type().Key.TypeParamName == "" || n.X.Type().EncodedParamKey)
 	mapTemp := p.temp()
 	// The temp declares its full nilable map type so a provably nil
 	// operand (legal Go: range over a nil map iterates zero times) does

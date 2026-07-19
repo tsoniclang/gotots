@@ -167,29 +167,31 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 
 	// A generic class's zero needs one factory per type parameter: a
 	// bare-parameter field's zero depends on the instantiation.
-	savedFactories, savedEqOps, savedClone, savedSet := p.zeroFactories, p.eqOps, p.cloneOps, p.setOps
+	savedFactories, savedEqOps, savedClone, savedSet, savedKey := p.zeroFactories, p.eqOps, p.cloneOps, p.setOps, p.keyOps
 	if len(structDecl.TypeParams) > 0 {
 		p.zeroFactories = map[string]string{}
 		p.eqOps = map[string]string{}
 		p.cloneOps = map[string]string{}
 		p.setOps = map[string]string{}
+		p.keyOps = map[string]string{}
 		for _, param := range structDecl.TypeParams {
 			p.zeroFactories[param] = "zero$" + param
 			p.eqOps[param] = "eq$" + param
 			p.cloneOps[param] = "clone$" + param
 			p.setOps[param] = "set$" + param
+			p.keyOps[param] = "key$" + param
 		}
 	}
 	zeros := make([]string, 0, len(structDecl.Fields))
 	for _, field := range structDecl.Fields {
 		zero, err := p.zeroLiteral(field.Type)
 		if err != nil {
-			p.zeroFactories, p.eqOps, p.cloneOps, p.setOps = savedFactories, savedEqOps, savedClone, savedSet
+			p.zeroFactories, p.eqOps, p.cloneOps, p.setOps, p.keyOps = savedFactories, savedEqOps, savedClone, savedSet, savedKey
 			return err
 		}
 		zeros = append(zeros, zero)
 	}
-	p.zeroFactories, p.eqOps, p.cloneOps, p.setOps = savedFactories, savedEqOps, savedClone, savedSet
+	p.zeroFactories, p.eqOps, p.cloneOps, p.setOps, p.keyOps = savedFactories, savedEqOps, savedClone, savedSet, savedKey
 	if len(structDecl.TypeParams) > 0 {
 		factories := make([]string, 0, len(structDecl.TypeParams)*4)
 		for _, param := range structDecl.TypeParams {
@@ -370,6 +372,9 @@ func printMethodFunction(out *strings.Builder, module *Module, className string,
 	for _, param := range method.TypeParams {
 		params = append(params, "set$"+param+": ((d: "+param+", s: "+param+") => void) | undefined")
 	}
+	for _, param := range method.TypeParams {
+		params = append(params, "key$"+param+": (k: "+param+") => string")
+	}
 	result, err := p.tsResultType(method.Results)
 	if err != nil {
 		return fmt.Errorf("%s: %w", method.ID, err)
@@ -396,11 +401,13 @@ func printMethodFunction(out *strings.Builder, module *Module, className string,
 		p.eqOps = map[string]string{}
 		p.cloneOps = map[string]string{}
 		p.setOps = map[string]string{}
+		p.keyOps = map[string]string{}
 		for _, param := range method.TypeParams {
 			p.zeroFactories[param] = "zero$" + param
 			p.eqOps[param] = "eq$" + param
 			p.cloneOps[param] = "clone$" + param
 			p.setOps[param] = "set$" + param
+			p.keyOps[param] = "key$" + param
 		}
 	}
 	if structValueReceiver {

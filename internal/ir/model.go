@@ -115,6 +115,16 @@ type Type struct {
 	// factory over such a binding is provably unreachable (the type
 	// system rejects == wherever it could run), spelled fail-closed.
 	Uncomparable bool
+	// EncodedParamKey marks a PARAMETER-keyed map type whose enclosing
+	// declaration's closed evidence includes a struct binding: the map
+	// takes the encoded carrier with the key$P factory. SVZ-only evidence
+	// keeps the direct Map carrier (so map values crossing the generic
+	// boundary into concrete SVZ contexts stay representation-identical).
+	EncodedParamKey bool
+	// KeyEncodable marks a struct whose generated class carries goKey$
+	// (the canonical key encoding) — consumed by the per-binding key
+	// operation derivation.
+	KeyEncodable bool
 	// IfaceID is the interface's canonical path-qualified identity — the
 	// union alias digests THIS, never the name-qualified spelling.
 	IfaceID string

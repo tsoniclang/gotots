@@ -42,7 +42,52 @@ func (p *printer) zeroFactoryArgs(typeArgs []ir.Type) (string, error) {
 		}
 		parts = append(parts, set)
 	}
+	for _, arg := range typeArgs {
+		key, err := p.keyOperation(arg)
+		if err != nil {
+			return "", err
+		}
+		parts = append(parts, key)
+	}
 	return joinComma(parts), nil
+}
+
+// keyOperation spells the TOTAL per-binding map-key encoder of one
+// instantiation type argument: goKey$ for encodable structs, identity
+// for pointers, the scalar rule for SameValueZero scalars, the in-scope
+// key$U for a nested parameter, Go's exact unhashable panic for
+// uncomparable bindings, and the loud reviewed-surface stop for every
+// binding whose Go hash the representation cannot express. The per-site
+// key-family guard keeps the last two statically unreachable wherever a
+// map is actually keyed.
+func (p *printer) keyOperation(t ir.Type) (string, error) {
+	spelled, err := p.tsType(t)
+	if err != nil {
+		return "", err
+	}
+	switch {
+	case t.Kind == ir.KindIface && t.TypeParamName != "":
+		op, has := p.keyOps[t.TypeParamName]
+		if !has {
+			return "", fmt.Errorf("no key operation in scope for type parameter %q", t.TypeParamName)
+		}
+		return op, nil
+	case t.Kind == ir.KindStruct:
+		if t.KeyEncodable {
+			return "(($k: " + spelled + ") => $k.goKey$())", nil
+		}
+		if t.Uncomparable {
+			return "((_: " + spelled + ") => gort$.goKeyUnhashable(" + fmt.Sprintf("%q", t.Go) + "))", nil
+		}
+		return "((_: " + spelled + ") => gort$.goKeyOpaque(" + fmt.Sprintf("%q", t.Go) + "))", nil
+	case t.Kind == ir.KindPointer:
+		return "(($k: " + spelled + ") => gort$.goKeyId($k))", nil
+	case t.Kind == ir.KindString, t.Kind == ir.KindBool, t.Kind == ir.KindUnit:
+		return "(($k: " + spelled + ") => gort$.goKeyScalar($k))", nil
+	case t.Kind.Integer(), t.Kind.Float():
+		return "(($k: " + spelled + ") => gort$.goKeyScalar($k))", nil
+	}
+	return "((_: " + spelled + ") => gort$.goKeyOpaque(" + fmt.Sprintf("%q", t.Go) + "))", nil
 }
 
 // cloneOperation spells the TOTAL per-binding copy of one instantiation

@@ -310,13 +310,17 @@ func memberKeyComponent(member ir.IfaceMember) (string, error) {
 			// Go's exact runtime behavior for hashing this dynamic type.
 			return fmt.Sprintf("gort$.goKeyUnhashable(%q)", member.Eq.Display), nil
 		}
-		return "", fmt.Errorf("interface key member %s is an opaque external value (no exact encoding)", member.K)
+		// A comparable opaque handle: hashing its contents is not
+		// expressible over the handle — loud runtime fail-closed stop.
+		return fmt.Sprintf("gort$.goKeyOpaque(%q)", member.K), nil
 	case member.Struct:
 		if !member.KeyEncodable {
 			if member.Eq != nil && member.Eq.Kind == ir.EqUncomparable {
 				return fmt.Sprintf("gort$.goKeyUnhashable(%q)", member.Eq.Display), nil
 			}
-			return "", fmt.Errorf("interface key member %s is a struct without a key encoding", member.K)
+			// Comparable in Go but without a generated encoding: loud
+			// runtime fail-closed stop, never a wrong identity encoding.
+			return fmt.Sprintf("gort$.goKeyOpaque(%q)", member.K), nil
 		}
 		return "$v.v.goKey$()", nil
 	}

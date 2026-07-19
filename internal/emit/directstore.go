@@ -109,7 +109,7 @@ func (p *printer) printStore(target ir.Target, value string) error {
 			return err
 		}
 		if t.Map.Type().Key != nil {
-			encoder, err := p.ifaceKeyEncoder(*t.Map.Type().Key)
+			encoder, err := p.ifaceKeyEncoder(t.Map.Type())
 			if err != nil {
 				return err
 			}
