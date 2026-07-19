@@ -357,10 +357,26 @@ func (b *builder) buildExprAs(e ast.Expr, expected Type) (Expr, error) {
 	if expected.Kind == KindStruct || expected.Kind == KindArray || expected.Kind == KindExternal {
 		return b.bindStructValue(built), nil
 	}
+	if expected.Kind == KindIface && expected.TypeParamName != "" {
+		return b.bindParamValue(built, expected.TypeParamName), nil
+	}
 	if expected.Kind == KindIface {
 		return b.boxIfaceValue(built, b.info.Types[e].Type, expected, b.span(e.Pos()))
 	}
 	return built, nil
+}
+
+// bindParamValue inserts the per-binding value copy of a type-parameter
+// bind site: loads wrap in ParamCopy (the clone$P factory copies exactly
+// for value-copy carriers and is the identity otherwise); already-fresh
+// values — allocations, zeros, copies, call results — bind directly.
+func (b *builder) bindParamValue(e Expr, param string) Expr {
+	switch e.(type) {
+	case *StructNew, *StructZero, *StructCopy, *ParamCopy, *ParamZero, *Call, *MethodCall, *ArrayLit, *ExternZero, *ExternalMethodCall, *ExternalCall:
+		return e
+	}
+	b.use("paramCopy")
+	return &ParamCopy{X: e, Param: param}
 }
 
 // buildVarRef reads a variable. Package-level variables carry their

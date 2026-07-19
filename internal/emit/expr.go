@@ -344,6 +344,16 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			typeArgs = "<" + strings.Join(parts, ", ") + ">"
 		}
 		return fmt.Sprintf("%s%s(%s)", callee, typeArgs, args), nil
+	case *ir.ParamCopy:
+		x, err := p.printExpr(n.X)
+		if err != nil {
+			return "", err
+		}
+		op, has := p.cloneOps[n.Param]
+		if !has {
+			return "", fmt.Errorf("no clone operation in scope for type parameter %q", n.Param)
+		}
+		return op + "(" + x + ")", nil
 	case *ir.StructCopy:
 		x, err := p.printExpr(n.X)
 		if err != nil {

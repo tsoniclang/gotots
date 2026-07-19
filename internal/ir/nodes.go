@@ -404,6 +404,15 @@ type StructNew struct {
 // value-struct spine of one struct instance.
 type StructCopy struct{ X Expr }
 
+// ParamCopy is the value copy of a type-parameter binding at a bind
+// site: the emitter spells it through the in-scope clone$P factory, so a
+// value-copy carrier binding copies exactly and every other carrier is
+// the identity. Loads wrap; already-fresh values bind directly.
+type ParamCopy struct {
+	X     Expr
+	Param string
+}
+
 // AddrOf is &x on an addressable struct value: the pointer is the very
 // instance (whole-value stores are in place, so the alias stays exact).
 type AddrOf struct {
@@ -457,6 +466,7 @@ func (*MethodCall) expr()       {}
 func (*FieldLoad) expr()        {}
 func (*StructNew) expr()        {}
 func (*StructCopy) expr()       {}
+func (*ParamCopy) expr()        {}
 func (*StructZero) expr()       {}
 func (*AddrOf) expr()           {}
 func (*Deref) expr()            {}
@@ -548,6 +558,7 @@ var intType = Type{Kind: KindInt, Go: "int"}
 func (f *FieldLoad) Type() Type    { return f.T }
 func (s *StructNew) Type() Type    { return s.T }
 func (s *StructCopy) Type() Type   { return s.X.Type() }
+func (s *ParamCopy) Type() Type    { return s.X.Type() }
 func (s *StructZero) Type() Type   { return s.T }
 func (a *AddrOf) Type() Type       { return a.T }
 func (d *Deref) Type() Type        { return d.T }

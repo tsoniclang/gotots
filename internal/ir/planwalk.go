@@ -192,6 +192,8 @@ func (s *slicePlanner) walkExpr(e Expr) {
 		s.walkExpr(n.High)
 	case *StructCopy:
 		s.walkExpr(n.X)
+	case *ParamCopy:
+		s.walkExpr(n.X)
 	case *Deref:
 		s.walkExpr(n.X)
 	case *AddrOf:
