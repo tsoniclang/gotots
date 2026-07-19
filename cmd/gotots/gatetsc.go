@@ -93,7 +93,9 @@ func runTscGate(repoDir, profilePath, buildProfile, sourceDir string, report *Ga
 	// classifier; the emission set is made forward-dependency-closed by
 	// the withholding fixed point, so a retained module never imports a
 	// withheld one and strict tsc is REQUIRED to reach zero.
-	tscOut, tscErr := runInRepo(staging, "node", tscJs, "-p", ".")
+	// The full-corpus typecheck exceeds node's default old-space limit;
+	// the explicit ceiling keeps the run deterministic across hosts.
+	tscOut, tscErr := runInRepo(staging, "node", "--max-old-space-size=12288", tscJs, "-p", ".")
 	// The staticness verdict comes from the typed-AST verifier (the
 	// pinned TypeScript compiler parses every generated file and the AST
 	// is walked structurally), so aliases, multiline forms, and renamed

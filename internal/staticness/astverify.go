@@ -498,7 +498,9 @@ func VerifyAST(files map[string]string, typescriptModule string) (*ASTReport, er
 	if err != nil {
 		return nil, err
 	}
-	command := exec.Command(node, script, absTypescript, staging)
+	// The whole-program checker walk shares the full-corpus footprint;
+	// the explicit old-space ceiling keeps it deterministic across hosts.
+	command := exec.Command(node, "--max-old-space-size=12288", script, absTypescript, staging)
 	out, err := command.Output()
 	if err != nil {
 		detail := ""
