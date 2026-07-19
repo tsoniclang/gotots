@@ -255,6 +255,11 @@ func (s *slicePlanner) walkExpr(e Expr) {
 		s.walkExpr(n.R)
 	case *MethodValue:
 		s.escapeIfSlice(n.Recv)
+	case *ExternLit:
+		// Constructor arguments escape into the reviewed stub.
+		for _, value := range n.Values {
+			s.escapeIfSlice(value)
+		}
 	case *CellNew:
 		s.escapeIfSlice(n.Zero)
 	case *Const, *NilConst, *FuncRef, *StructZero, *ExternZero, *ExternVar,

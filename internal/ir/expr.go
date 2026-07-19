@@ -107,6 +107,9 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			b.use("externZero")
 			return &ExternZero{T: t}, nil
 		}
+		if t.Kind == KindExternal && len(n.Elts) > 0 {
+			return b.buildExternLit(n, t, tv.Type, span)
+		}
 		return nil, &Unsupported{Kind: KindCompositeLiteralOf, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "composite literal of " + t.Go, Span: span}
 
 	case *ast.FuncLit:
@@ -593,4 +596,53 @@ func zeroValue(t Type, span Span) (Expr, error) {
 		return &Const{T: t, Value: "0"}, nil
 	}
 	return nil, &Unsupported{Kind: KindZeroValueOf, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "zero value of " + t.Go, Span: span}
+}
+
+
+// buildExternLit lowers a KEYED composite literal of an external struct
+// type to its reviewed constructor stub: one typed obligation per
+// distinct field set, implemented by the emulation layer (fail-closed
+// until then). Positional or non-identifier keys stay outside the
+// reviewed surface.
+func (b *builder) buildExternLit(n *ast.CompositeLit, t Type, goType types.Type, span Span) (Expr, error) {
+	structType, isStruct := types.Unalias(goType).Underlying().(*types.Struct)
+	if !isStruct {
+		return nil, &Unsupported{Kind: KindCompositeLiteralOf, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "composite literal of " + t.Go, Span: span}
+	}
+	fieldTypeOf := map[string]types.Type{}
+	for i := range structType.NumFields() {
+		fieldTypeOf[structType.Field(i).Name()] = structType.Field(i).Type()
+	}
+	fields := make([]string, 0, len(n.Elts))
+	values := make([]Expr, 0, len(n.Elts))
+	var fieldTypes []Type
+	for _, element := range n.Elts {
+		kv, isKV := element.(*ast.KeyValueExpr)
+		if !isKV {
+			return nil, &Unsupported{Kind: KindCompositeLiteralOf, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "positional composite literal of external " + t.Go, Span: span}
+		}
+		key, isIdent := kv.Key.(*ast.Ident)
+		if !isIdent {
+			return nil, &Unsupported{Kind: KindCompositeLiteralOf, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "non-identifier key in composite literal of external " + t.Go, Span: span}
+		}
+		fieldGoType, has := fieldTypeOf[key.Name]
+		if !has {
+			return nil, &Unsupported{Kind: KindCompositeLiteralOf, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "unknown field " + key.Name + " in composite literal of external " + t.Go, Span: span}
+		}
+		fieldType, err := b.typeOf(fieldGoType, span)
+		if err != nil {
+			return nil, err
+		}
+		value, err := b.buildExprAs(kv.Value, fieldType)
+		if err != nil {
+			return nil, err
+		}
+		fields = append(fields, key.Name)
+		values = append(values, value)
+		fieldTypes = append(fieldTypes, fieldType)
+	}
+	obligation := b.unit.AddExternalType(t.Pkg, t.Named)
+	symbol := obligation.AddLiteralShape(fields, fieldTypes)
+	b.use("externLit")
+	return &ExternLit{T: t, Symbol: symbol, Values: values}, nil
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"go/types"
 	"sort"
+	"strings"
 )
 
 // ExternMethodObligation is the ONE authoritative record of a referenced
@@ -38,6 +39,35 @@ func (s Scope) AddExternalType(pkg, name string) *ExternTypeObligation {
 		s.externTypes[id] = obligation
 	}
 	return obligation
+}
+
+// AddLiteralShape records one keyed composite-literal constructor
+// obligation on the external type (deduplicated by the exact field set)
+// and returns its stub symbol.
+func (o *ExternTypeObligation) AddLiteralShape(fields []string, fieldTypes []Type) string {
+	key := strings.Join(fields, "$")
+	if o.literalShapes == nil {
+		o.literalShapes = map[string]ExternLiteralShape{}
+	}
+	if _, has := o.literalShapes[key]; !has {
+		o.literalShapes[key] = ExternLiteralShape{Fields: fields, FieldTypes: fieldTypes}
+	}
+	return o.Name + "$lit$" + key + "$"
+}
+
+// LiteralShapes returns the recorded constructor obligations sorted by
+// field-set key.
+func (o *ExternTypeObligation) LiteralShapes() []ExternLiteralShape {
+	keys := make([]string, 0, len(o.literalShapes))
+	for key := range o.literalShapes {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	out := make([]ExternLiteralShape, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, o.literalShapes[key])
+	}
+	return out
 }
 
 // AddExternalMethod is the SOLE validating constructor of an external

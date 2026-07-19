@@ -391,6 +391,16 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		return p.zeroLiteral(n.T)
 	case *ir.ExternZero:
 		return p.zeroLiteral(n.T)
+	case *ir.ExternLit:
+		callee, err := p.module.symbol(n.T.Pkg, n.Symbol)
+		if err != nil {
+			return "", err
+		}
+		args, err := p.printArgs(n.Values)
+		if err != nil {
+			return "", err
+		}
+		return callee + "(" + args + ")", nil
 	case *ir.ParamEqual:
 		left, err := p.printExpr(n.L)
 		if err != nil {

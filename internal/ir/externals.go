@@ -19,6 +19,18 @@ type ExternZero struct{ T Type }
 func (*ExternZero) expr()        {}
 func (e *ExternZero) Type() Type { return e.T }
 
+// ExternLit constructs an external struct value through its reviewed
+// keyed-literal constructor stub (one obligation per distinct field
+// set): a typed fail-closed contract the emulation layer implements.
+type ExternLit struct {
+	T      Type
+	Symbol string
+	Values []Expr
+}
+
+func (*ExternLit) expr()        {}
+func (e *ExternLit) Type() Type { return e.T }
+
 // ExternalMethodCall dispatches a method on an external receiver (the
 // handle itself, whatever its carrier kind) by canonical identity.
 type ExternalMethodCall struct {

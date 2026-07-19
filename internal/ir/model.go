@@ -259,6 +259,17 @@ type ExternTypeObligation struct {
 	// consumer skips one. A genuine display collision fails closed at
 	// emission (Methods reports them so the stub builder can detect it).
 	methods map[string]ExternMethodObligation
+	// literalShapes maps each DISTINCT keyed-composite-literal field set
+	// (join of sorted field names) to its typed shape: one reviewed
+	// constructor stub obligation per shape.
+	literalShapes map[string]ExternLiteralShape
+}
+
+// ExternLiteralShape is one keyed composite literal's typed constructor
+// obligation for an external struct type.
+type ExternLiteralShape struct {
+	Fields     []string
+	FieldTypes []Type
 }
 
 // NewScope builds a unit scope over the given package paths.

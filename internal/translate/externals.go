@@ -174,6 +174,20 @@ func externTypeMembers(obligation *ir.ExternTypeObligation, unit ir.Scope, conte
 		{ID: typeID + ".goSet$", Name: obligation.Name + "$goSet$",
 			Params: []ir.Var{{Name: "dst", Type: handle}, {Name: "src", Type: handle}}},
 	}
+	// Every recorded keyed-literal constructor obligation exports one
+	// typed fail-closed stub: the emulation layer supplies the reviewed
+	// construction.
+	for _, shape := range obligation.LiteralShapes() {
+		member := emit.StubMember{
+			ID:         typeID + "$lit$" + strings.Join(shape.Fields, "$"),
+			Name:       obligation.Name + "$lit$" + strings.Join(shape.Fields, "$") + "$",
+			ResultType: &handle,
+		}
+		for i, field := range shape.Fields {
+			member.Params = append(member.Params, ir.Var{Name: field, Type: shape.FieldTypes[i]})
+		}
+		out = append(out, member)
+	}
 	// Every referenced method (by canonical identity) contributes one stub
 	// export. The emitted symbol derives from the display spelling; two
 	// DISTINCT methods that would emit the same symbol (impossible for a

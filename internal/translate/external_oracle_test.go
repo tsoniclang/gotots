@@ -35,6 +35,50 @@ export function Args$get$(): GoSliceValue<string> {
   return Args;
 }
 `,
+	"sync": `import { type GoExtern } from "../../language-abi/goextern.js";
+
+// The reviewed sync.Pool implementation: Get() = New() and Put() =
+// no-op is EXACT (the Pool spec permits dropping every item at any
+// time). The representation is a mutable record behind the phantom
+// handle brand; Get's return-position type parameter resolves from the
+// caller's contextual type (the declared union), never a runtime cast
+// surface.
+type Handle = GoExtern<"sync.Pool">;
+type Rep = { New: (() => unknown) | undefined };
+
+export function Pool$goZero$(): Handle {
+  return { New: undefined } as Rep as Handle;
+}
+export function Pool$goClone$(v: Handle | undefined): Handle {
+  const rep = v as Rep | undefined;
+  return { New: rep === undefined ? undefined : rep.New } as Rep as Handle;
+}
+export function Pool$goSet$(dst: Handle | undefined, src: Handle | undefined): void {
+  const d = dst as Rep | undefined;
+  const s = src as Rep | undefined;
+  if (d !== undefined) {
+    d.New = s === undefined ? undefined : s.New;
+  }
+}
+export function Pool$lit$New$<T>(New: () => T): Handle {
+  return { New } as Rep as Handle;
+}
+export function Pool$Get<T>(p: unknown): T {
+  const cell = p as { v?: Handle | undefined } | Handle | undefined;
+  const handle = cell !== undefined && typeof cell === "object" && "v" in (cell as object)
+    ? (cell as { v?: Handle | undefined }).v
+    : (cell as Handle | undefined);
+  const rep = handle as Rep | undefined;
+  if (rep === undefined || rep.New === undefined) {
+    throw new Error("sync.Pool: Get on a pool without New");
+  }
+  return (rep.New as () => T)();
+}
+export function Pool$Put(p: unknown, v: unknown): void {
+  void p;
+  void v;
+}
+`,
 	"slices": `import { goSliceLen, goSliceGet, type GoSliceValue } from "../../language-abi/goslice.js";
 
 export function Contains<S, E>(s: GoSliceValue<E>, v: E): boolean {
@@ -146,6 +190,30 @@ import "os"
 
 func ExternVarRead() bool {
 	return len(os.Args) > 0
+}
+`)
+}
+
+func TestOracleExternPoolLiteral(t *testing.T) {
+	// The sync.Pool class: a keyed composite literal of an external
+	// struct lowers to its reviewed constructor stub; Get() = New() and
+	// Put() = no-op is semantically EXACT (the Pool spec permits dropping
+	// every item), so the assembled implementation reproduces Go.
+	runExternalOracle(t, `package fixture
+
+import "sync"
+
+var pool = sync.Pool{
+	New: func() any {
+		return 7
+	},
+}
+
+func ExternPoolLiteral() int {
+	v := pool.Get().(int)
+	pool.Put(v)
+	w := pool.Get().(int)
+	return v*10 + w
 }
 `)
 }
