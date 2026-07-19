@@ -598,7 +598,6 @@ func zeroValue(t Type, span Span) (Expr, error) {
 	return nil, &Unsupported{Kind: KindZeroValueOf, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "zero value of " + t.Go, Span: span}
 }
 
-
 // buildExternLit lowers a KEYED composite literal of an external struct
 // type to its reviewed constructor stub: one typed obligation per
 // distinct field set, implemented by the emulation layer (fail-closed

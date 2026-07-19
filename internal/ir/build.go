@@ -66,6 +66,12 @@ type builder struct {
 	// coinductive guard.
 	keyEncodableMemo map[string]bool
 	eqComparableMemo map[string]bool
+	// ifaceMembersInProgress guards the instantiated-member enumeration:
+	// resolving an instance's ir type can re-enter ifaceMembers for the
+	// same interface (a field's interface type); the nested computation
+	// returns the NAMED members only and is never cached, so the outer
+	// complete result is the one that lands in the cache.
+	ifaceMembersInProgress map[string]bool
 	// bind is this top-level function's canonical binding-identity table
 	// and emission-name allocator (shared with closure child builders so
 	// captured variables resolve to their outer name and a closure's own

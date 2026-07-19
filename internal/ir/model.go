@@ -204,6 +204,14 @@ type Scope struct {
 	// ifaceMembers caches each interface identity's resolved closed
 	// implementer union (typeOf recursion makes this hot).
 	ifaceMembers map[string][]IfaceMember
+	// instCandidates caches the corpus-wide concrete-instantiation
+	// candidate list (named instance + canonical id), computed once: the
+	// per-interface enumeration then only runs Implements over it.
+	instCandidates *[]InstCandidate
+	// instSlotsCache caches each instantiation's full vtable surface by
+	// canon+pointerness ("*"-prefixed) — typeOf over method signatures is
+	// the expensive part of member construction.
+	instSlotsCache map[string]instSlotsEntry
 	// addressTakenFields is the whole-unit set of struct fields whose
 	// address is taken anywhere (&x.f). A non-identity field in this set
 	// is represented as one stable per-instance cell so &x.f is exact
@@ -291,6 +299,8 @@ func NewScope(paths ...string) Scope {
 		boxedComposites:    map[string]*boxedComposite{},
 		valueBoxedNamed:    map[string]bool{},
 		ifaceMembers:       map[string][]IfaceMember{},
+		instCandidates:     new([]InstCandidate),
+		instSlotsCache:     map[string]instSlotsEntry{},
 		addressTakenFields: map[string]bool{},
 		genericEdges:       &[]genericEdge{},
 		paramKeyReqs:       map[string][]bool{},
@@ -580,6 +590,19 @@ type IfaceMember struct {
 	Composite string
 	InstType  Type
 	InstSlots []InstSlot
+}
+
+// InstCandidate is one concrete generic instantiation from the closed
+// evidence, with its canonical identity precomputed.
+type InstCandidate struct {
+	Named *types.Named
+	Canon string
+}
+
+// instSlotsEntry caches one instantiation's full vtable surface.
+type instSlotsEntry struct {
+	slots []InstSlot
+	ok    bool
 }
 
 // InstSlot is one instantiated-generic member's vtable slot: the

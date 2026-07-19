@@ -239,6 +239,20 @@ func (b *builder) ifaceMembers(iface *types.Interface, span Span) ([]IfaceMember
 	if cached, ok := b.unit.IfaceMemberCache(key); ok {
 		return cached, nil
 	}
+	nested := b.ifaceMembersInProgress[key]
+	if nested {
+		// Re-entered while resolving an instance type: serve (and cache)
+		// the NAMED members only; the outermost call computes and caches
+		// the complete union.
+		if cached, ok := b.unit.IfaceMemberCache("named-only:" + key); ok {
+			return cached, nil
+		}
+	}
+	if b.ifaceMembersInProgress == nil {
+		b.ifaceMembersInProgress = map[string]bool{}
+	}
+	b.ifaceMembersInProgress[key] = true
+	defer delete(b.ifaceMembersInProgress, key)
 	var members []IfaceMember
 	add := func(named *types.Named, pointer bool) error {
 		obj := named.Obj()
@@ -405,63 +419,37 @@ func (b *builder) ifaceMembers(iface *types.Interface, span Span) ([]IfaceMember
 			}
 		}
 	}
+	if nested {
+		// Re-entered while resolving an instance type: the NAMED members
+		// suffice for the nested spelling; the complete (cached) result
+		// is computed by the outermost call.
+		sort.Slice(members, func(i, j int) bool { return members[i].K < members[j].K })
+		b.unit.SetIfaceMemberCache("named-only:"+key, members)
+		return members, nil
+	}
 	// INSTANTIATED-GENERIC implementers: every concrete instantiation in
 	// the closed evidence whose (pointer) method set satisfies the
 	// interface joins the union as a composite-branded member with an
-	// inline vtable over the generic functions.
-	for _, typeName := range b.unit.GenericTypeObjects() {
-		if !b.unit.Owns(typeName.Pkg().Path()) {
-			continue
-		}
-		origin, isNamed := typeName.Type().(*types.Named)
-		if !isNamed {
-			continue
-		}
-		if _, isIface := origin.Underlying().(*types.Interface); isIface {
-			continue
-		}
-		seenVectors := map[string]bool{}
-		for _, vector := range b.unit.GenericTypeInstances(typeName) {
-			concrete := true
-			for _, arg := range vector {
-				if mentionsTypeParamType(arg) {
-					concrete = false
-					break
-				}
-			}
-			if !concrete || len(vector) == 0 {
-				continue
-			}
-			instType, err := types.Instantiate(nil, origin, vector, false)
+	// inline vtable over the generic functions. The candidate list and
+	// each instantiation's slot surface are corpus-level caches — the
+	// per-interface work is Implements plus member assembly only.
+	for _, candidate := range b.instantiationCandidates() {
+		if types.Implements(candidate.Named, iface) {
+			member, err := b.instantiatedMember(candidate.Named, candidate.Canon, false, iface, span)
 			if err != nil {
-				continue
+				return nil, err
 			}
-			instNamed, isNamed := instType.(*types.Named)
-			if !isNamed {
-				continue
+			if member != nil {
+				members = append(members, *member)
 			}
-			canon, err := b.canonicalTypeID(instNamed)
-			if err != nil || seenVectors[canon] {
-				continue
+		}
+		if types.Implements(types.NewPointer(candidate.Named), iface) {
+			member, err := b.instantiatedMember(candidate.Named, candidate.Canon, true, iface, span)
+			if err != nil {
+				return nil, err
 			}
-			seenVectors[canon] = true
-			if types.Implements(instNamed, iface) {
-				member, err := b.instantiatedMember(instNamed, canon, false, iface, span)
-				if err != nil {
-					return nil, err
-				}
-				if member != nil {
-					members = append(members, *member)
-				}
-			}
-			if types.Implements(types.NewPointer(instNamed), iface) {
-				member, err := b.instantiatedMember(instNamed, canon, true, iface, span)
-				if err != nil {
-					return nil, err
-				}
-				if member != nil {
-					members = append(members, *member)
-				}
+			if member != nil {
+				members = append(members, *member)
 			}
 		}
 	}
@@ -548,12 +536,87 @@ func (b *builder) instantiatedMember(instNamed *types.Named, canon string, point
 	return &member, nil
 }
 
+// instantiationCandidates returns the corpus-wide concrete-instantiation
+// candidates (computed once per unit).
+func (b *builder) instantiationCandidates() []InstCandidate {
+	cached := b.unit.CachedInstCandidates()
+	if cached != nil {
+		return *cached
+	}
+	out := []InstCandidate{}
+	for _, typeName := range b.unit.GenericTypeObjects() {
+		if !b.unit.Owns(typeName.Pkg().Path()) {
+			continue
+		}
+		origin, isNamed := typeName.Type().(*types.Named)
+		if !isNamed {
+			continue
+		}
+		if _, isIface := origin.Underlying().(*types.Interface); isIface {
+			continue
+		}
+		if origin.Obj().Pkg() != nil && types.NewMethodSet(types.NewPointer(origin)).Len() == 0 {
+			// No methods at all: never an implementer of a non-empty
+			// interface, and the empty interface takes instances through
+			// the boxed-composite log — skip the candidate outright.
+			continue
+		}
+		seenVectors := map[string]bool{}
+		for _, vector := range b.unit.GenericTypeInstances(typeName) {
+			concrete := true
+			for _, arg := range vector {
+				if mentionsTypeParamType(arg) {
+					concrete = false
+					break
+				}
+			}
+			if !concrete || len(vector) == 0 {
+				continue
+			}
+			instType, err := types.Instantiate(nil, origin, vector, false)
+			if err != nil {
+				continue
+			}
+			instNamed, isNamed := instType.(*types.Named)
+			if !isNamed {
+				continue
+			}
+			canon, err := b.canonicalTypeID(instNamed)
+			if err != nil || seenVectors[canon] {
+				continue
+			}
+			seenVectors[canon] = true
+			out = append(out, InstCandidate{Named: instNamed, Canon: canon})
+		}
+	}
+	b.unit.SetCachedInstCandidates(out)
+	return out
+}
+
 // instantiationSlots builds the FULL method-set vtable surface of one
 // concrete generic instantiation: each slot dispatches to the generated
 // generic function with the instantiation's exact types. ok=false when
 // any part of the surface is outside the reviewed subset (the caller
 // skips the member; boxing still fails closed at its own site).
 func (b *builder) instantiationSlots(instNamed *types.Named, pointer bool, span Span) ([]InstSlot, bool, error) {
+	cacheKey, cacheErr := b.canonicalTypeID(instNamed)
+	if cacheErr == nil {
+		if pointer {
+			cacheKey = "*" + cacheKey
+		}
+		if entry, hit := b.unit.CachedInstSlots(cacheKey); hit {
+			return entry.slots, entry.ok, nil
+		}
+		defer func() {}()
+	}
+	slots, ok, err := b.instantiationSlotsUncached(instNamed, pointer, span)
+	if cacheErr == nil && err == nil {
+		b.unit.SetCachedInstSlots(cacheKey, instSlotsEntry{slots: slots, ok: ok})
+	}
+	return slots, ok, err
+}
+
+func (b *builder) instantiationSlotsUncached(instNamed *types.Named, pointer bool, span Span) ([]InstSlot, bool, error) {
 	origin := instNamed.Origin()
 	keyedParams := make([]bool, 0, origin.TypeParams().Len())
 	for i := range origin.TypeParams().Len() {

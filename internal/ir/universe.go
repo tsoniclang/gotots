@@ -100,6 +100,34 @@ func (s Scope) BoxedComposites() []BoxedCompositeEntry {
 	return out
 }
 
+// CachedInstCandidates returns the corpus-wide instantiation candidate
+// list, or nil before the first computation.
+func (s Scope) CachedInstCandidates() *[]InstCandidate {
+	if s.instCandidates == nil || *s.instCandidates == nil {
+		return nil
+	}
+	return s.instCandidates
+}
+
+// SetCachedInstCandidates stores the candidate list once.
+func (s Scope) SetCachedInstCandidates(candidates []InstCandidate) {
+	if candidates == nil {
+		candidates = []InstCandidate{}
+	}
+	*s.instCandidates = candidates
+}
+
+// CachedInstSlots returns one instantiation's cached vtable surface.
+func (s Scope) CachedInstSlots(key string) (instSlotsEntry, bool) {
+	entry, hit := s.instSlotsCache[key]
+	return entry, hit
+}
+
+// SetCachedInstSlots stores one instantiation's vtable surface.
+func (s Scope) SetCachedInstSlots(key string, entry instSlotsEntry) {
+	s.instSlotsCache[key] = entry
+}
+
 // IfaceMemberCache returns a cached implementer union.
 func (s Scope) IfaceMemberCache(key string) ([]IfaceMember, bool) {
 	members, ok := s.ifaceMembers[key]
