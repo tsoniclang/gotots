@@ -75,14 +75,12 @@
       "internal/testutil/autoimporttestutil",
       "internal/testutil/lsptestutil",
       "internal/testutil/projecttestutil"
-    ],
-    "cli-driver": [
-      "internal/execute",
-      "internal/execute/build"
     ]
   },
   "toolingRoots": [
-    "_tools"
+    "_tools",
+    "internal/execute",
+    "internal/execute/build"
   ],
   "notes": [
     "ownedRoots is the canonical package-root allowlist derived from the packages implemented by TSTS main a80a5da32ee5335928e44ee3fe9357fe1e51056e under packages/tsts/src/internal.",
