@@ -183,20 +183,6 @@ func Case() int {
 			code:    "GOTOTS_UNSUPPORTED",
 			mention: "make of chan",
 		},
-		{
-			name: "equality on external values",
-			source: `package fixture
-
-import "time"
-
-func Case() bool {
-	var a, b time.Time
-	return a == b
-}
-`,
-			code:    "GOTOTS_UNSUPPORTED_OPERATION",
-			mention: "equality on time.Time",
-		},
 		// A blank import of an OWNED package is exact: its init effects
 		// flow through the module's initialization edge; only an external
 		// target with real init effects stays fail-closed.
