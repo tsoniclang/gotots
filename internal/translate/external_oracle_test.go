@@ -227,7 +227,6 @@ func Use() bool { return strings.HasPrefix("a", "b") }
 	}
 }
 
-
 func TestOracleExternalVarRead(t *testing.T) {
 	// The externVar class: an external package VARIABLE read through its
 	// typed stub. Only a deterministic derived value is compared (os.Args
@@ -265,7 +264,6 @@ func ExternPoolLiteral() int {
 }
 `)
 }
-
 
 func TestOracleExternalGenericValueCopyBinding(t *testing.T) {
 	// The checker slices.Contains-with-struct shape: an external generic

@@ -154,3 +154,11 @@ type GenericFuncValue struct {
 
 func (*GenericFuncValue) expr()        {}
 func (e *GenericFuncValue) Type() Type { return e.T }
+
+// SliceClearStmt zeroes every slice element in place (clear(s)).
+type SliceClearStmt struct {
+	X    Expr
+	Zero Expr
+}
+
+func (*SliceClearStmt) stmt() {}

@@ -250,7 +250,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 						LoweringPlan:    LoweringPlanV2,
 						Representations: map[string]string{"decl:" + typeSpec.Name.Name: "class-direct-identity"},
 						GeneratedFile:   corePath, GeneratedSymbol: tsident.EscapeDeclared(structDecl.Name),
-						TypeShapeHash:   shapeHash(census.TypeShapeSignature(structShape)),
+						TypeShapeHash: shapeHash(census.TypeShapeSignature(structShape)),
 					})
 				}
 			case token.VAR:
