@@ -3,7 +3,7 @@
 // structurally with the census's Go declaration shapes — never through
 // the shared canonical renderer. The prediction encodes only the
 // REVIEWED lowering contract (receiver-first parameter, the
-// zero/eq/clone/set factory quadruple per type parameter, blank
+// zero/eq/clone/set/key factory quintuple per type parameter, blank
 // zero-size fields as no-output, the eq/clone/set capture triple on
 // generic classes).
 package main
@@ -51,8 +51,8 @@ func runDeclParityCheck(firstRun *census.Result, corpusGenerated *translate.Gene
 	verified := 0
 
 	// Functions and methods: the declared parameter list is receiver
-	// (when present) + source parameters + the factory quadruple per type
-	// parameter.
+	// (when present) + source parameters + the factory quintuple per type
+	// parameter (zero/eq/clone/set/key).
 	for _, shape := range firstRun.Shapes.Functions {
 		if !production[shape.ID] {
 			continue
@@ -70,7 +70,7 @@ func runDeclParityCheck(firstRun *census.Result, corpusGenerated *translate.Gene
 			defect("census function %s parsed as %s", shape.ID, decl.Kind)
 			continue
 		}
-		expected := len(shape.Params) + 4*len(shape.TypeParams)
+		expected := len(shape.Params) + 5*len(shape.TypeParams)
 		if shape.Receiver != "" {
 			expected++
 		}
