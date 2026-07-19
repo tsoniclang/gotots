@@ -387,13 +387,18 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 							digest := sha256.Sum256(f.source[start:end])
 							varInitHash = hex.EncodeToString(digest[:])
 						}
+						varTypeSpelling, err := census.DeriveVarType(object)
+						if err != nil {
+							return fmt.Errorf("var %s.%s: %w", p.PkgPath, name.Name, err)
+						}
 						out.Proofs = append(out.Proofs, Proof{
 							ID: goid.Value(p.PkgPath, "var", name.Name), SourceRevision: options.SourceRevision,
 							Package: p.PkgPath, File: f.relative,
 							LoweringPlan:    LoweringPlanV2,
 							Representations: map[string]string{"decl:" + name.Name: "module-let(live-binding," + conservativeCarrier(t) + ")"},
 							GeneratedFile:   corePath, GeneratedSymbol: tsident.EscapeDeclared(name.Name),
-							InitHash: varInitHash,
+							InitHash:    varInitHash,
+							VarTypeHash: shapeHash(varTypeSpelling),
 						})
 					}
 				}

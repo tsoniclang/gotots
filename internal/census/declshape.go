@@ -507,3 +507,11 @@ func countStatements(body *ast.BlockStmt) int {
 	})
 	return count
 }
+
+// DeriveVarType renders one package variable's canonical declared-type
+// spelling from its go/types object — the ONE derivation both pipelines
+// apply, so the stage-05 variable-type join compares two independently
+// loaded views of the same declaration.
+func DeriveVarType(object types.Object) (string, error) {
+	return typeString(object.Type())
+}
