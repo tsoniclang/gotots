@@ -306,6 +306,10 @@ func memberKeyComponent(member ir.IfaceMember) (string, error) {
 	case member.Extern && member.ExternCarrier != "":
 		return "gort$.goKeyScalar($v.v)", nil
 	case member.Extern:
+		if member.Eq != nil && member.Eq.Kind == ir.EqUncomparable {
+			// Go's exact runtime behavior for hashing this dynamic type.
+			return fmt.Sprintf("gort$.goKeyUnhashable(%q)", member.Eq.Display), nil
+		}
 		return "", fmt.Errorf("interface key member %s is an opaque external value (no exact encoding)", member.K)
 	case member.Struct:
 		if !member.KeyEncodable {

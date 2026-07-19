@@ -13,7 +13,7 @@ package abi
 import "fmt"
 
 // Version identifies the ABI contract carried in generated output.
-const Version = 26
+const Version = 27
 
 // Family is the static carrier family of an integer kind.
 type Family string
@@ -91,6 +91,15 @@ type GoStrIndex = number | bigint;
 // interfaces, nested pointers). The cell is created where the address
 // is taken; undefined is the nil pointer.
 export type GoCell<T> = { v: T };
+
+// GoPtr is the pointer-to-type-parameter carrier: it resolves PER
+// INSTANTIATION to exactly the concrete pointer representation — the
+// instance itself for identity carriers (structs, arrays: objects), a
+// cell for value carriers (scalars, strings, and every nilable form).
+// The non-distributive [T] extends [object] keeps union-typed bindings
+// (pointers, interfaces, slices, maps — all nilable spellings) on the
+// cell branch as one piece.
+export type GoPtr<T> = [T] extends [object] ? T : GoCell<T>;
 
 // GoChanHandle is the opaque carrier of a channel TYPE position: no
 // emitted code can construct one (channel operations are outside the

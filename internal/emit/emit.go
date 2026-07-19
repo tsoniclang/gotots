@@ -308,12 +308,12 @@ func (p *printer) tsType(t ir.Type) (string, error) {
 	case ir.KindUintptr:
 		return "goabi$.GoUintptr", nil
 	case ir.KindPointer:
-		if t.ParamPtrIdentity && t.Elem != nil {
-			element, err := p.tsType(*t.Elem)
-			if err != nil {
-				return "", err
-			}
-			return element + " | undefined", nil
+		if t.Elem != nil && t.Elem.Kind == ir.KindIface && t.Elem.TypeParamName != "" {
+			// Pointer to a bare type parameter: the conditional carrier
+			// resolves to the exact concrete representation per
+			// instantiation (identity for object bindings, cell for value
+			// bindings) — one spelling, no per-declaration evidence.
+			return "(gort$.GoPtr<" + t.Elem.TypeParamName + "> | undefined)", nil
 		}
 		if t.Elem != nil && t.Elem.Kind == ir.KindExternal {
 			element, err := p.tsType(*t.Elem)

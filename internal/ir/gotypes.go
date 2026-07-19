@@ -136,13 +136,7 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 		if element.Kind == KindStruct || element.Kind == KindExternal || element.Kind == KindTypeParam {
 			return Type{}, &Unsupported{Kind: KindPointerToNonNamedType, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "pointer to non-named type " + spelled, Span: span}
 		}
-		out := Type{Kind: KindPointer, Go: spelled, Elem: &element}
-		if element.Kind == KindIface && element.TypeParamName != "" {
-			// The per-declaration carrier choice for *T: identity when the
-			// closed evidence binds only identity carriers, else a cell.
-			out.ParamPtrIdentity = b.paramPtrIdentity(u.Elem(), span)
-		}
-		return out, nil
+		return Type{Kind: KindPointer, Go: spelled, Elem: &element}, nil
 
 	case *types.Slice:
 		element, err := b.typeOf(u.Elem(), span)

@@ -178,16 +178,10 @@ func (p *printer) printStore(target ir.Target, value string) error {
 			return err
 		}
 		switch {
-		case t.X.Type().ParamPtrIdentity:
-			// The identity pointee stores in place through the binding's
-			// set operation (fail-closed when absent — evidence-proved).
-			set := "undefined"
-			if elem != nil {
-				if s := p.paramSetOf(*elem); s != "" {
-					set = s
-				}
-			}
-			p.line("gort$.goPtrParamSet(%s, %s, %s);", checkedPointer, valueTemp, set)
+		case elem != nil && elem.Kind == ir.KindIface && elem.TypeParamName != "":
+			// Unreachable by construction: the IR rejects pointee stores
+			// through a pointer-to-type-parameter.
+			return fmt.Errorf("pointee store through pointer-to-type-parameter reached emission")
 		case elem == nil || elem.Kind == ir.KindStruct:
 			p.line("%s.goSet$(%s);", checkedPointer, valueTemp)
 		case elem.Kind == ir.KindArray:

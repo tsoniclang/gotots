@@ -285,6 +285,12 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 		if operand.Type().Kind != KindPointer || operand.Type().Elem == nil {
 			return nil, &Unsupported{Kind: KindDereferenceOf, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "dereference of " + operand.Type().Go, Span: span}
 		}
+		if operand.Type().Elem.Kind == KindIface && operand.Type().Elem.TypeParamName != "" {
+			// The GoPtr carrier is opaque inside the generic body: reading
+			// through it needs a per-instantiation operation the protocol
+			// does not yet carry — fail closed to a typed placeholder.
+			return nil, &Unsupported{Kind: KindDereferenceOf, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "dereference of " + operand.Type().Go, Span: span}
+		}
 		b.use("deref")
 		return &Deref{X: operand, T: *operand.Type().Elem}, nil
 

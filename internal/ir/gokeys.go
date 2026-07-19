@@ -5,6 +5,7 @@ package ir
 
 import (
 	"go/types"
+	"os"
 )
 
 // mapKeySupported admits key kinds whose Go equality coincides with JS
@@ -292,7 +293,17 @@ func (b *builder) ifaceKeyMembersEncodable(goType types.Type, span Span) bool {
 		case member.Pointer:
 		case member.Extern && member.ExternCarrier != "":
 		case member.Extern:
-			return false // opaque handle value: no exact encoding
+			if member.Eq != nil && member.Eq.Kind == EqUncomparable {
+				// Go PANICS hashing this uncomparable dynamic type — the
+				// panic IS the exact encoding (as for uncomparable structs).
+				continue
+			}
+			// A COMPARABLE opaque handle value: Go would hash its contents,
+			// which the handle does not expose — no exact encoding.
+			if os.Getenv("GOTOTS_DEBUG_KEYS") != "" {
+				println("DEBUG comparable extern member", member.K, "in", goType.String())
+			}
+			return false
 		case member.Struct:
 			if !member.KeyEncodable {
 				// An UNCOMPARABLE dynamic key panics in Go ("hash of
@@ -307,54 +318,4 @@ func (b *builder) ifaceKeyMembersEncodable(goType types.Type, span Span) bool {
 		}
 	}
 	return true
-}
-
-// paramPtrIdentity reports whether every CONCRETE binding of a type
-// parameter (in the enclosing generic declaration's closed evidence) is
-// an identity carrier — a struct, fixed array, or external value — so a
-// pointer to the parameter is the instance itself, exactly as in every
-// concrete instantiation. Mixed or scalar evidence keeps the cell form.
-func (b *builder) paramPtrIdentity(keyType types.Type, span Span) bool {
-	param, ok := types.Unalias(keyType).(*types.TypeParam)
-	if !ok {
-		return false
-	}
-	var instances [][]types.Type
-	switch {
-	case b.genericObj != nil:
-		signature := b.genericObj.Type().(*types.Signature)
-		if signature.TypeParams() == nil || param.Index() >= signature.TypeParams().Len() ||
-			signature.TypeParams().At(param.Index()) != param {
-			return false
-		}
-		instances = b.unit.GenericInstances(b.genericObj)
-	case b.genericTypeObj != nil:
-		typeParams := b.genericTypeObj.TypeParams()
-		if typeParams == nil || param.Index() >= typeParams.Len() ||
-			typeParams.At(param.Index()).Obj().Name() != param.Obj().Name() {
-			return false
-		}
-		instances = b.unit.GenericTypeInstances(b.genericTypeObj.Obj())
-	default:
-		return false
-	}
-	concrete := 0
-	for _, instance := range instances {
-		if param.Index() >= len(instance) {
-			return false
-		}
-		arg := instance[param.Index()]
-		if mentionsTypeParamType(arg) {
-			continue
-		}
-		concrete++
-		bound, err := b.typeOf(arg, span)
-		if err != nil {
-			return false
-		}
-		if bound.Kind != KindStruct && bound.Kind != KindArray && bound.Kind != KindExternal {
-			return false
-		}
-	}
-	return concrete > 0
 }

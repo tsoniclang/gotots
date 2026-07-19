@@ -452,9 +452,11 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		if n.X.Type().ParamPtrIdentity {
-			// The identity-choice pointer IS the instance.
-			return checked, nil
+		if n.X.Type().Elem != nil && n.X.Type().Elem.Kind == ir.KindIface && n.X.Type().Elem.TypeParamName != "" {
+			// Unreachable by construction: the IR rejects dereference of a
+			// pointer-to-type-parameter (its representation is opaque
+			// inside the generic body).
+			return "", fmt.Errorf("dereference of pointer-to-type-parameter reached emission")
 		}
 		switch n.T.Kind {
 		case ir.KindStruct, ir.KindArray, ir.KindExternal:

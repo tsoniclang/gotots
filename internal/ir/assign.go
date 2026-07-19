@@ -138,6 +138,12 @@ func (b *builder) buildTarget(lhs ast.Expr) (Target, error) {
 		if operand.Type().Kind != KindPointer {
 			return nil, &Unsupported{Kind: KindAssignmentThrough, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "assignment through " + operand.Type().Go, Span: span}
 		}
+		if operand.Type().Elem != nil && operand.Type().Elem.Kind == KindIface && operand.Type().Elem.TypeParamName != "" {
+			// The GoPtr carrier is opaque inside the generic body: storing
+			// through it needs a per-instantiation operation the protocol
+			// does not yet carry — fail closed to a typed placeholder.
+			return nil, &Unsupported{Kind: KindAssignmentThrough, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "assignment through " + operand.Type().Go, Span: span}
+		}
 		b.use("pointeeStore")
 		return &PointeeTarget{X: operand}, nil
 	}

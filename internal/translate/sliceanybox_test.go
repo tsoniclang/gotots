@@ -1,6 +1,10 @@
 package translate_test
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/tsoniclang/gotots/internal/oracle"
+)
 
 func TestOracleSliceOfAnyBoxedIntoAny(t *testing.T) {
 	// The tsoptions CompilerOptionsValue shape: a []any value boxed INTO
@@ -218,4 +222,51 @@ func CompoundAssignAndBitOps() int {
 	return total*100 + z
 }
 `)
+}
+
+func TestOracleCrossPackageGenericMethodIdentity(t *testing.T) {
+	// The core.Arena shape ACROSS packages: the generic type lives in one
+	// package, every instantiation lives in ANOTHER — the receiver's
+	// closed instantiation evidence must span the whole corpus, not the
+	// declaring package.
+	result, err := oracle.Run(t.TempDir(), map[string]string{
+		"holder": `package holder
+
+type Holder[T any] struct {
+	cur *T
+}
+
+func (h *Holder[T]) Put(p *T) {
+	h.cur = p
+}
+
+func (h *Holder[T]) Get() *T {
+	return h.cur
+}
+`,
+		"fixture": `package fixture
+
+import "oracle.fixture/holder"
+
+type node struct{ v int }
+
+func CrossPackageGenericIdentity() int {
+	h := &holder.Holder[node]{}
+	n := &node{v: 40}
+	h.Put(n)
+	got := h.Get()
+	got.v++
+	if h.Get() != n {
+		return -1
+	}
+	return n.v
+}
+`,
+	})
+	if err != nil {
+		t.Fatalf("oracle: %v", err)
+	}
+	if !result.Match() {
+		t.Fatalf("differential mismatch:\n--- go ---\n%s--- generated ---\n%s", result.GoOutput, result.TSOutput)
+	}
 }
