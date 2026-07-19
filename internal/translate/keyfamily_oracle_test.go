@@ -276,10 +276,3 @@ func CoreTypedParams() int {
 func toUint[T ~uint32](v T) uint32 {
 	return uint32(v)
 }
-
-func NumericCoreParams() int {
-	f := combine([]flags{1, 2, 8}, flags(4))
-	return int(toUint(f))
-}
-`)
-}
