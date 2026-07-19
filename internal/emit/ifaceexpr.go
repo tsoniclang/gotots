@@ -40,6 +40,7 @@ func (p *printer) printIfaceExpr(e ir.Expr) (string, bool, error) {
 			return "", true, err
 		}
 		k := boxDiscriminant(n.Rtti)
+		possible := p.assertTokenPossible(n.X.Type(), k)
 		if n.CommaOk {
 			zero, err := p.zeroLiteral(n.Target)
 			if err != nil {
@@ -49,6 +50,13 @@ func (p *printer) printIfaceExpr(e ir.Expr) (string, bool, error) {
 			if err != nil {
 				return "", true, err
 			}
+			if !possible {
+				// The target's token is not a member of the operand's
+				// closed union (never boxed in the unit): the assertion is
+				// statically false — the operand still evaluates.
+				return fmt.Sprintf("(($i: %s): readonly [%s, boolean] => { void $i; return [%s, false]; })(%s)",
+					union, spelled, zero, x), true, nil
+			}
 			// Literal-discriminant narrowing: the true branch reads the
 			// member's EXACT payload — no cast, no helper.
 			return fmt.Sprintf("(($i: %s): readonly [%s, boolean] => ($i !== undefined && $i.k === %q ? [$i.v, true] : [%s, false]))(%s)",
@@ -57,6 +65,10 @@ func (p *printer) printIfaceExpr(e ir.Expr) (string, bool, error) {
 		result, err := p.tsType(n.Target)
 		if err != nil {
 			return "", true, err
+		}
+		if !possible {
+			return fmt.Sprintf("(($i: %s): %s => { gort$.goPanicConversion($i === undefined ? %q : $i.r.d, %q, %q); })(%s)",
+				union, result, "nil", n.SourceDisplay, n.TargetDisplay, x), true, nil
 		}
 		return fmt.Sprintf("(($i: %s): %s => { if ($i !== undefined && $i.k === %q) { return $i.v; } gort$.goPanicConversion($i === undefined ? %q : $i.r.d, %q, %q); })(%s)",
 			union, result, k, "nil", n.SourceDisplay, n.TargetDisplay, x), true, nil
@@ -285,4 +297,33 @@ func requiredList(required []string) string {
 		quoted[i] = fmt.Sprintf("%q", name)
 	}
 	return "[" + joinComma(quoted) + "]"
+}
+
+// assertTokenPossible reports whether a discriminant token is a member of
+// the operand union: a token outside the closed member set (a type never
+// boxed in the unit, or from a non-materialized package) can never exist
+// at runtime, so the assertion is statically false and its comparison
+// must not be emitted.
+func (p *printer) assertTokenPossible(unionT ir.Type, token string) bool {
+	for _, member := range p.retainedMembers(unionT) {
+		if member.K == token {
+			return true
+		}
+	}
+	if unionT.IfaceEmpty {
+		for _, member := range predeclaredMembers {
+			if "p:"+member.name == token {
+				return true
+			}
+		}
+		for _, composite := range p.module.BoxedComposites {
+			if p.referencesWithheldType(composite.T) {
+				continue
+			}
+			if "c:"+composite.Canon == token {
+				return true
+			}
+		}
+	}
+	return false
 }
