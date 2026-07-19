@@ -82,8 +82,9 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 			case *types.Slice, *types.Map:
 				// A CORE-TYPED parameter (S ~[]E, M ~map[K]V): every
 				// binding shares the core carrier exactly — the parameter
-				// ERASES to it (no factory participation; slice/map
-				// derivations are kind-driven and total).
+				// ERASES to it (kind-driven slice/map derivations are
+				// total). Numeric cores stay opaque: their erasure would
+				// reshape every numeric-generic signature (deferred).
 				resolved, err := b.typeOf(core, span)
 				if err != nil {
 					return Type{}, err
