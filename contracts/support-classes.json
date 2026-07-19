@@ -327,6 +327,11 @@
       "specClause": "docs/spec/externals-manual-extensions.md"
     },
     {
+      "key": "externFieldRead",
+      "state": "generated",
+      "specClause": "docs/spec/externals-manual-extensions.md"
+    },
+    {
       "key": "externFuncRef",
       "state": "generated",
       "specClause": "docs/spec/externals-manual-extensions.md"

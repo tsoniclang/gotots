@@ -159,6 +159,12 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			// A promoted field: chain through the embedded fields.
 			return b.chainFieldPath(base, b.info.Types[n.X].Type, selection.Index(), span)
 		}
+		if base.Type().Kind == KindExternal ||
+			(base.Type().Kind == KindPointer && base.Type().Elem != nil && base.Type().Elem.Kind == KindExternal) {
+			// An exported-field READ of an external struct value routes
+			// through a typed per-field stub obligation.
+			return b.buildExternFieldRead(base, n.Sel.Name, tv.Type, span)
+		}
 		if base.Type().Kind != KindPointer && base.Type().Kind != KindStruct {
 			return nil, &Unsupported{Kind: KindFieldAccessOn, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "field access on " + base.Type().Go, Span: span}
 		}
@@ -337,6 +343,9 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			}
 			if converted, isString := b.buildStringConversion(x, to); isString {
 				return converted, nil
+			}
+			if bridged, isBridge, err := b.buildExternOwnedConversion(x, to, b.info.Types[n.Args[0]].Type, convert, span); isBridge {
+				return bridged, err
 			}
 			if x.Type().Kind == KindPointer && to.Kind == KindPointer &&
 				sameUnderlyingNamedPointers(b.info.Types[n.Args[0]].Type, convert) {
@@ -685,4 +694,80 @@ func sameUnderlyingNamedPointers(fromGo, toGo types.Type) bool {
 		return false
 	}
 	return types.Identical(fromNamed.Underlying(), toNamed.Underlying())
+}
+
+
+// buildExternFieldRead lowers one exported-field read of an external
+// struct value (or pointer to one) to its typed stub obligation.
+func (b *builder) buildExternFieldRead(base Expr, field string, goType types.Type, span Span) (Expr, error) {
+	extern := base.Type()
+	if extern.Kind == KindPointer {
+		extern = *extern.Elem
+	}
+	fieldType, err := b.typeOf(goType, span)
+	if err != nil {
+		return nil, err
+	}
+	obligation := b.unit.AddExternalType(extern.Pkg, extern.Named)
+	symbol := obligation.AddFieldGet(field, fieldType)
+	b.use("externFieldRead")
+	return &ExternFieldRead{X: base, Symbol: symbol, Pkg: extern.Pkg, T: fieldType}, nil
+}
+
+
+// buildExternOwnedConversion bridges value conversions between an OWNED
+// named struct and an EXTERNAL named struct with IDENTICAL underlyings
+// (type CacheHashKey xxh3.Uint128): to the owned class via per-field
+// read stubs, to the external via the keyed-literal constructor stub —
+// both typed fail-closed obligations the emulation layer implements.
+func (b *builder) buildExternOwnedConversion(x Expr, to Type, fromGo, toGo types.Type, span Span) (Expr, bool, error) {
+	fromNamed, fromOK := types.Unalias(fromGo).(*types.Named)
+	toNamed, toOK := types.Unalias(toGo).(*types.Named)
+	if !fromOK || !toOK {
+		return nil, false, nil
+	}
+	structType, isStruct := fromNamed.Underlying().(*types.Struct)
+	if !isStruct || !types.Identical(fromNamed.Underlying(), toNamed.Underlying()) {
+		return nil, false, nil
+	}
+	switch {
+	case x.Type().Kind == KindExternal && to.Kind == KindStruct:
+		obligation := b.unit.AddExternalType(x.Type().Pkg, x.Type().Named)
+		out := &ExternToOwned{X: x, To: to}
+		for i := range structType.NumFields() {
+			field := structType.Field(i)
+			if !field.Exported() {
+				return nil, false, nil
+			}
+			fieldType, err := b.typeOf(field.Type(), span)
+			if err != nil {
+				return nil, true, err
+			}
+			out.FieldSymbols = append(out.FieldSymbols, obligation.AddFieldGet(field.Name(), fieldType))
+		}
+		b.use("externFieldRead")
+		return out, true, nil
+	case x.Type().Kind == KindStruct && to.Kind == KindExternal:
+		obligation := b.unit.AddExternalType(to.Pkg, to.Named)
+		fields := make([]string, 0, structType.NumFields())
+		var fieldTypes []Type
+		values := make([]Expr, 0, structType.NumFields())
+		for i := range structType.NumFields() {
+			field := structType.Field(i)
+			if !field.Exported() {
+				return nil, false, nil
+			}
+			fieldType, err := b.typeOf(field.Type(), span)
+			if err != nil {
+				return nil, true, err
+			}
+			fields = append(fields, field.Name())
+			fieldTypes = append(fieldTypes, fieldType)
+			values = append(values, &FieldLoad{X: x, Field: field.Name(), T: fieldType})
+		}
+		symbol := obligation.AddLiteralShape(fields, fieldTypes)
+		b.use("externLit")
+		return &ExternLit{T: to, Symbol: symbol, Values: values}, true, nil
+	}
+	return nil, false, nil
 }

@@ -172,12 +172,12 @@ func TestExternalValueFailClosedShapes(t *testing.T) {
 		mention string
 	}{
 		{
-			name: "field access on external value",
+			name: "field STORE into external value",
 			source: `package fixture
 import "go/token"
-func Case() int { var p token.Position; return p.Line }
+func Case() int { var p token.Position; p.Line = 3; return p.Line }
 `,
-			mention: "field access on",
+			mention: "assignment",
 		},
 		{
 			name: "store into slice of external values",

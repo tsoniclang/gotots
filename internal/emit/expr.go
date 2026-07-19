@@ -400,6 +400,39 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		return p.zeroLiteral(n.T)
 	case *ir.ExternZero:
 		return p.zeroLiteral(n.T)
+	case *ir.ExternFieldRead:
+		x, err := p.printExpr(n.X)
+		if err != nil {
+			return "", err
+		}
+		callee, err := p.module.symbol(n.Pkg, n.Symbol)
+		if err != nil {
+			return "", err
+		}
+		return callee + "(" + x + ")", nil
+	case *ir.ExternToOwned:
+		x, err := p.printExpr(n.X)
+		if err != nil {
+			return "", err
+		}
+		spelledX, err := p.tsType(n.X.Type())
+		if err != nil {
+			return "", err
+		}
+		class, err := p.module.symbol(n.To.Pkg, n.To.Named)
+		if err != nil {
+			return "", err
+		}
+		args := make([]string, 0, len(n.FieldSymbols))
+		for _, symbol := range n.FieldSymbols {
+			callee, err := p.module.symbol(n.X.Type().Pkg, symbol)
+			if err != nil {
+				return "", err
+			}
+			args = append(args, callee+"($x)")
+		}
+		// The operand evaluates ONCE (Go's conversion evaluation).
+		return "(($x: " + spelledX + ") => new " + class + "(" + joinComma(args) + "))(" + x + ")", nil
 	case *ir.ExternLit:
 		callee, err := p.module.symbol(n.T.Pkg, n.Symbol)
 		if err != nil {

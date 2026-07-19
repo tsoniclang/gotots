@@ -70,6 +70,36 @@ func (o *ExternTypeObligation) LiteralShapes() []ExternLiteralShape {
 	return out
 }
 
+// AddFieldGet records one exported-field READ obligation on the
+// external type and returns its stub symbol.
+func (o *ExternTypeObligation) AddFieldGet(field string, fieldType Type) string {
+	if o.fieldGets == nil {
+		o.fieldGets = map[string]Type{}
+	}
+	o.fieldGets[field] = fieldType
+	return o.Name + "$get$" + field + "$"
+}
+
+// FieldGets returns the recorded field-read obligations sorted by field.
+func (o *ExternTypeObligation) FieldGets() []ExternFieldGet {
+	fields := make([]string, 0, len(o.fieldGets))
+	for field := range o.fieldGets {
+		fields = append(fields, field)
+	}
+	sort.Strings(fields)
+	out := make([]ExternFieldGet, 0, len(fields))
+	for _, field := range fields {
+		out = append(out, ExternFieldGet{Field: field, Type: o.fieldGets[field]})
+	}
+	return out
+}
+
+// ExternFieldGet is one external field-read obligation.
+type ExternFieldGet struct {
+	Field string
+	Type  Type
+}
+
 // AddExternalMethod is the SOLE validating constructor of an external
 // method obligation. It records one referenced method of the external type
 // `named` as a single atomic record, keyed by its FULL canonical identity

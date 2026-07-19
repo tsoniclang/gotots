@@ -35,6 +35,39 @@ export function Args$get$(): GoSliceValue<string> {
   return Args;
 }
 `,
+	"image": `import { type GoExtern } from "../../language-abi/goextern.js";
+
+type Handle = GoExtern<"image.Point">;
+type Rep = { X: bigint; Y: bigint };
+
+export function Point$goZero$(): Handle {
+  return { X: 0n, Y: 0n } as Rep as Handle;
+}
+export function Point$goClone$(v: Handle | undefined): Handle {
+  const rep = v as Rep | undefined;
+  return { X: rep === undefined ? 0n : rep.X, Y: rep === undefined ? 0n : rep.Y } as Rep as Handle;
+}
+export function Point$goSet$(dst: Handle | undefined, src: Handle | undefined): void {
+  const d = dst as Rep | undefined;
+  const s = src as Rep | undefined;
+  if (d !== undefined && s !== undefined) {
+    d.X = s.X;
+    d.Y = s.Y;
+  }
+}
+export function Point$lit$X$Y$(X: bigint, Y: bigint): Handle {
+  return { X, Y } as Rep as Handle;
+}
+export function Point$get$X$(v: Handle | undefined): bigint {
+  return (v as Rep).X;
+}
+export function Point$get$Y$(v: Handle | undefined): bigint {
+  return (v as Rep).Y;
+}
+export function Pt(x: bigint, y: bigint): Handle {
+  return { X: x, Y: y } as Rep as Handle;
+}
+`,
 	"sync": `import { type GoExtern } from "../../language-abi/goextern.js";
 
 // The reviewed sync.Pool implementation: Get() = New() and Put() =
@@ -276,6 +309,30 @@ func ExternFuncReference() int {
 		total += 1000
 	}
 	return total
+}
+`)
+}
+
+func TestOracleExternOwnedUnderlyingConversions(t *testing.T) {
+	// The checker CacheHashKey/xxh3.Uint128 shape: an OWNED named struct
+	// over an EXTERNAL struct underlying, converted both ways — to the
+	// class via per-field read stubs, back via the keyed-literal
+	// constructor — plus a field read straight off the handle.
+	runExternalOracle(t, `package fixture
+
+import "image"
+
+type key image.Point
+
+func (k key) Sum() int {
+	return k.X + k.Y
+}
+
+func ExternOwnedUnderlyingConversions() int {
+	p := image.Pt(3, 4)
+	k := key(p)
+	back := image.Point(k)
+	return k.Sum()*100 + back.X*10 + p.Y
 }
 `)
 }

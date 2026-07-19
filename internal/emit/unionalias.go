@@ -353,7 +353,19 @@ func (p *printer) memberKeyComponent(member ir.IfaceMember) (string, error) {
 		}
 		return "$v.v.goKey$()", nil
 	}
-	return scalarKeyComponentFor(member.ValueCarrier, "$v.v"), nil
+	// A named value carrier: scalar carriers encode by their exact typed
+	// rule; an UNCOMPARABLE carrier (func/slice/map underlying) carries
+	// Go's exact unhashable panic; anything else is the machine-claimed
+	// unreachable stop (verified against the value-box log).
+	switch member.ValueCarrier {
+	case "string", "boolean", "bigint", "number":
+		return scalarKeyComponentFor(member.ValueCarrier, "$v.v"), nil
+	}
+	if member.Eq != nil && member.Eq.Kind == ir.EqUncomparable {
+		return fmt.Sprintf("gort$.goKeyUnhashable(%q)", member.Eq.Display), nil
+	}
+	p.module.ClaimKeyUnreachable(member.K)
+	return fmt.Sprintf("gort$.goKeyUnreachable(%q)", member.K), nil
 }
 
 // scalarKeyComponentFor selects the statically typed key encoder for a

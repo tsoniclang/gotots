@@ -255,6 +255,10 @@ func (s *slicePlanner) walkExpr(e Expr) {
 		s.walkExpr(n.R)
 	case *MethodValue:
 		s.escapeIfSlice(n.Recv)
+	case *ExternFieldRead:
+		s.escapeIfSlice(n.X)
+	case *ExternToOwned:
+		s.escapeIfSlice(n.X)
 	case *ExternLit:
 		// Constructor arguments escape into the reviewed stub.
 		for _, value := range n.Values {

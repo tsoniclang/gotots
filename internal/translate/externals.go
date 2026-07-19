@@ -174,6 +174,17 @@ func externTypeMembers(obligation *ir.ExternTypeObligation, unit ir.Scope, conte
 		{ID: typeID + ".goSet$", Name: obligation.Name + "$goSet$",
 			Params: []ir.Var{{Name: "dst", Type: handle}, {Name: "src", Type: handle}}},
 	}
+	// Every recorded exported-field READ obligation exports one typed
+	// fail-closed getter stub.
+	for _, fieldGet := range obligation.FieldGets() {
+		fieldType := fieldGet.Type
+		out = append(out, emit.StubMember{
+			ID:         typeID + "$get$" + fieldGet.Field,
+			Name:       obligation.Name + "$get$" + fieldGet.Field + "$",
+			Params:     []ir.Var{{Name: "v", Type: handle}},
+			ResultType: &fieldType,
+		})
+	}
 	// Every recorded keyed-literal constructor obligation exports one
 	// typed fail-closed stub: the emulation layer supplies the reviewed
 	// construction.

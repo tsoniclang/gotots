@@ -31,6 +31,30 @@ type ExternLit struct {
 func (*ExternLit) expr()        {}
 func (e *ExternLit) Type() Type { return e.T }
 
+// ExternFieldRead reads one exported field of an external struct value
+// through its typed stub (fail-closed until assembly).
+type ExternFieldRead struct {
+	X      Expr
+	Symbol string
+	Pkg    string
+	T      Type
+}
+
+func (*ExternFieldRead) expr()        {}
+func (e *ExternFieldRead) Type() Type { return e.T }
+
+// ExternToOwned converts an external struct value to the OWNED named
+// struct sharing its underlying: the class constructs from per-field
+// read stubs (declaration order).
+type ExternToOwned struct {
+	X            Expr
+	To           Type
+	FieldSymbols []string
+}
+
+func (*ExternToOwned) expr()        {}
+func (e *ExternToOwned) Type() Type { return e.To }
+
 // ExternalMethodCall dispatches a method on an external receiver (the
 // handle itself, whatever its carrier kind) by canonical identity.
 type ExternalMethodCall struct {

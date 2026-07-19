@@ -271,6 +271,9 @@ type ExternTypeObligation struct {
 	// (join of sorted field names) to its typed shape: one reviewed
 	// constructor stub obligation per shape.
 	literalShapes map[string]ExternLiteralShape
+	// fieldGets maps each referenced exported FIELD to its resolved type:
+	// one typed read stub per field.
+	fieldGets map[string]Type
 }
 
 // ExternLiteralShape is one keyed composite literal's typed constructor
