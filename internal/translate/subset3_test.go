@@ -1,7 +1,6 @@
 package translate_test
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/oracle"
@@ -361,7 +360,10 @@ func DeferredVariadic() int {
 `)
 }
 
-func TestNamedResultsWithDeferFailClosed(t *testing.T) {
+func TestNamedResultsWithDeferTranslate(t *testing.T) {
+	// The named-exit lowering admits defers in top-level named-results
+	// functions (deferred mutations reach the returned values — the
+	// differential oracle covers the semantics).
 	source := `package fixture
 
 func Case() (value int) {
@@ -372,12 +374,7 @@ func Case() (value int) {
 
 func helper() {}
 `
-	_, err := oracle.Run(t.TempDir(), map[string]string{"fixture": source})
-	if err == nil {
-		t.Fatalf("expected fail-closed diagnostic for defer with named results")
-	}
-	if !strings.Contains(err.Error(), "GOTOTS_UNSUPPORTED_STATEMENT") ||
-		!strings.Contains(err.Error(), "named results") {
-		t.Fatalf("expected named-results defer diagnostic, got: %v", err)
+	if _, err := oracle.Run(t.TempDir(), map[string]string{"fixture": source}); err != nil {
+		t.Fatalf("named-results defer should translate: %v", err)
 	}
 }

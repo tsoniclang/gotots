@@ -339,13 +339,16 @@ func Case() func(string) (int, error) { var sb strings.Builder; return sb.WriteS
 			code: "GOTOTS_UNSUPPORTED_EXPRESSION", mention: "method value outside the translated unit",
 		},
 		{
-			name: "nested defer with named results",
+			name: "closure defer with named results",
 			source: `package fixture
-func Case(enabled bool) (n int) {
-	if enabled {
-		defer helper()
+func Case(enabled bool) int {
+	f := func() (n int) {
+		if enabled {
+			defer helper()
+		}
+		return 1
 	}
-	return 1
+	return f()
 }
 func helper() {}
 `,
