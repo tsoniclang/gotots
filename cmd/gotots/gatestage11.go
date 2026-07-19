@@ -41,6 +41,13 @@ func runSemanticOracleGate(repoDir, reportPath string) (string, []string, error)
 	}
 
 	ledgerPath := strings.TrimSuffix(reportPath, filepath.Ext(reportPath)) + ".oracle-ledger.jsonl"
+	// The oracle tests run with each test package's own working
+	// directory: the ledger path must be absolute or every oracle.Run
+	// fails to open it.
+	ledgerPath, err = filepath.Abs(ledgerPath)
+	if err != nil {
+		return "fail", nil, err
+	}
 	if err := os.RemoveAll(ledgerPath); err != nil {
 		return "fail", nil, err
 	}

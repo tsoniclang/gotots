@@ -439,7 +439,6 @@ func (b *builder) ifaceKeyMembersEncodable(goType types.Type, span Span) bool {
 	return true
 }
 
-
 // objectFamilyBinding reports whether a binding's pointer representation
 // is the instance itself (structs, arrays, named struct instances).
 func objectFamilyBinding(arg types.Type) bool {
@@ -528,7 +527,6 @@ func HasPtrCellFuncInstances(unit Scope, fn *types.Func) bool {
 	}
 	return false
 }
-
 
 // declPtrRequires reports whether the CURRENT generic declaration takes
 // the pointer-family split on the named parameter.

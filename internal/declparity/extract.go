@@ -16,8 +16,8 @@ import (
 
 // TSDecl is one parsed top-level declaration of a generated module.
 type TSDecl struct {
-	Kind       string   `json:"kind"` // function | class | type | let | const
-	ParamCount int      `json:"paramCount,omitempty"`
+	Kind       string `json:"kind"` // function | class | type | let | const
+	ParamCount int    `json:"paramCount,omitempty"`
 	// ParamNames are the declared parameter names in order ("?" for a
 	// non-identifier binding pattern) — the factory-protocol structure
 	// check reads the zero$/eq$/clone$/set$/key$/rt$ groups from these.

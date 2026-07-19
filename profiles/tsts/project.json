@@ -26,7 +26,8 @@
     "internal/diagnostics",
     "internal/diagnosticwriter",
     "internal/evaluator",
-    "internal/execute",
+    "internal/execute/incremental",
+    "internal/execute/tsc",
     "internal/fswatch",
     "internal/glob",
     "internal/jsnum",
@@ -74,6 +75,10 @@
       "internal/testutil/autoimporttestutil",
       "internal/testutil/lsptestutil",
       "internal/testutil/projecttestutil"
+    ],
+    "cli-driver": [
+      "internal/execute",
+      "internal/execute/build"
     ]
   },
   "toolingRoots": [

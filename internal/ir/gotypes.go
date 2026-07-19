@@ -402,7 +402,6 @@ func basicKind(basic *types.Basic) (Kind, bool) {
 	return KindInvalid, false
 }
 
-
 // constraintUniformBasic classifies a type parameter whose constraint
 // terms are all basic types of ONE representation carrier: conversions
 // out of the parameter are then target-driven wraps on the shared
@@ -497,7 +496,6 @@ func constraintCore(param *types.TypeParam) types.Type {
 	}
 	return core
 }
-
 
 // coreErasedParam reports whether a type parameter erases to its core
 // carrier (slice/map cores drop out of the emitted generic surface).
