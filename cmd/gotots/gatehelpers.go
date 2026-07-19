@@ -304,6 +304,31 @@ func reconcileDispositions(prof *profile.Profile, firstRun *census.Result, gener
 			publishedPackages++
 		}
 	}
+	// Separate output denominators (never conflated with semantic
+	// completeness): modules vs analysis artifacts vs placeholder and
+	// translator-limit populations, each counted from the emitted text by
+	// its exact marker.
+	tsModules, bodyArtifacts := 0, 0
+	bodyPlaceholders, externPlaceholders, translatorLimitStops, bannedKeyHelpers := 0, 0, 0, 0
+	for path, content := range generated.Files {
+		switch generated.Ownership[path] {
+		case "generated-core":
+			tsModules++
+			bodyPlaceholders += strings.Count(content, "goBodyUnimplemented(")
+			translatorLimitStops += strings.Count(content, "goKeyUnreachable(")
+			bannedKeyHelpers += strings.Count(content, "goKeyOpaque(") + strings.Count(content, "goKeyScalar(")
+		case "generated-external-contracts":
+			externPlaceholders += strings.Count(content, "goExternalUnimplemented(")
+		case "analysis-body":
+			bodyArtifacts++
+		}
+	}
+	details = append(details,
+		fmt.Sprintf("output denominators: %d TS modules, %d per-body analysis artifacts, %d body placeholders, %d external stub placeholders, %d machine-claimed translator-limit stops (goKeyUnreachable; union claims finalize-verified against the value-box log), %d banned key helpers (must be 0)",
+			tsModules, bodyArtifacts, bodyPlaceholders, externPlaceholders, translatorLimitStops, bannedKeyHelpers))
+	if bannedKeyHelpers > 0 {
+		conflicts = append(conflicts, fmt.Sprintf("%d banned key-helper occurrences (goKeyOpaque/goKeyScalar) in generated core", bannedKeyHelpers))
+	}
 	details = append(details,
 		fmt.Sprintf("evidence-stage ir-admitted (declarations disposed): %d", counts[string(ir.SupportIRAdmitted)]+counts["accepted-manual"]),
 		fmt.Sprintf("evidence-stage module-retained (disposed, materialized artifact): %d", counts["stage:module-retained"]),
