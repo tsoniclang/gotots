@@ -151,7 +151,11 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 			return Type{}, err
 		}
 		if !mapKeySupported(key.Kind) {
-			admitted := key.Kind == KindStruct && b.structKeyEncodable(u.Key(), span)
+			// A FLOAT key carries Go's exact float-key semantics through the
+			// dedicated GoFMap carrier (NaN inserts fresh unretrievable
+			// entries; +0/-0 coincide).
+			admitted := key.Kind.Float()
+			admitted = admitted || key.Kind == KindStruct && b.structKeyEncodable(u.Key(), span)
 			if !admitted {
 				// A type-parameter key hides behind its constraint
 				// interface; the instantiation evidence decides it.

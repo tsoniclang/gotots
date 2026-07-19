@@ -66,3 +66,43 @@ func ChanFieldDeclares() int {
 }
 `)
 }
+
+func TestOracleFloatKeyedMap(t *testing.T) {
+	// Go float-key semantics exactly: NaN-keyed inserts are fresh,
+	// unretrievable, undeletable entries that still count and range;
+	// +0 and -0 are one key.
+	runOracle(t, `package fixture
+
+func nanv() float64 {
+	z := 0.0
+	return z / z
+}
+
+func negzero() float64 {
+	minus := -1.0
+	zero := 0.0
+	return zero * minus
+}
+
+func FloatKeyedMap() int {
+	m := map[float64]int{}
+	m[1.5] = 10
+	m[nanv()] = 20
+	m[nanv()] = 30
+	m[negzero()] = 40
+	m[0] = 50
+	total := len(m) * 1000
+	total += m[1.5]
+	if _, ok := m[nanv()]; ok {
+		total += 100000
+	}
+	delete(m, nanv())
+	total += len(m) * 10
+	sum := 0
+	for _, v := range m {
+		sum += v
+	}
+	return total + sum
+}
+`)
+}

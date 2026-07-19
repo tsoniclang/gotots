@@ -100,6 +100,7 @@ func (p *printer) printRangeMap(n *ir.RangeMap) error {
 		return err
 	}
 	keyed := n.X.Type().Key.Kind == ir.KindStruct
+	float := n.X.Type().Key.Kind.Float()
 	mapTemp := p.temp()
 	// The temp declares its full nilable map type so a provably nil
 	// operand (legal Go: range over a nil map iterates zero times) does
@@ -112,6 +113,8 @@ func (p *printer) printRangeMap(n *ir.RangeMap) error {
 	entry := p.temp()
 	if keyed {
 		p.line("%sfor (const %s of gort$.goKMapValues(%s)) {", p.takeLoopLabel(), entry, mapTemp)
+	} else if float {
+		p.line("%sfor (const %s of gort$.goFMapEntries(%s)) {", p.takeLoopLabel(), entry, mapTemp)
 	} else {
 		p.line("%sfor (const %s of gort$.goMapEntries(%s)) {", p.takeLoopLabel(), entry, mapTemp)
 	}

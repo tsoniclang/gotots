@@ -36,6 +36,13 @@ func (p *printer) collectionExpr(e ir.Expr) (string, error) {
 		if n.Type().Key != nil && n.Type().Key.Kind == ir.KindStruct {
 			return "gort$.goKMapMake(" + hint + ")", nil
 		}
+		if n.Type().Key != nil && n.Type().Key.Kind.Float() {
+			value, err := p.tsType(*n.Type().Elem)
+			if err != nil {
+				return "", err
+			}
+			return "gort$.goFMapMake<" + value + ">(" + hint + ")", nil
+		}
 		// Explicit type arguments: inference from a bare make has nothing
 		// to infer from in a generic context (Map<unknown, unknown>), so
 		// the exact key/value types always spell.
@@ -66,6 +73,9 @@ func (p *printer) collectionExpr(e ir.Expr) (string, error) {
 		}
 		if n.T.Key.Kind == ir.KindStruct {
 			return "gort$.goKMapFrom([" + joinComma(entries) + "])", nil
+		}
+		if n.T.Key.Kind.Float() {
+			return "gort$.goFMapFrom([" + joinComma(entries) + "])", nil
 		}
 		return "gort$.goMapFrom([" + joinComma(entries) + "])", nil
 	case *ir.MapGet:
@@ -300,6 +310,9 @@ func mapHelper(name string, mapExpr ir.Expr) string {
 	t := mapExpr.Type()
 	if t.Key != nil && t.Key.Kind == ir.KindStruct {
 		return "goKMap" + strings.TrimPrefix(name, "goMap")
+	}
+	if t.Key != nil && t.Key.Kind.Float() {
+		return "goFMap" + strings.TrimPrefix(name, "goMap")
 	}
 	return name
 }

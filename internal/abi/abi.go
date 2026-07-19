@@ -312,6 +312,70 @@ export function goKeyArray<T>(a: T[], encodeElem: (v: T) => string): string {
   return out + "]";
 }
 
+// Float-keyed maps carry Go's exact float-key semantics. The ONLY
+// divergence from JS SameValueZero is NaN: Go's NaN != NaN makes every
+// NaN-keyed insert a fresh, unretrievable, undeletable entry that still
+// counts and ranges. +0/-0 already coincide under SameValueZero.
+export type GoFMap<V> = { m: Map<number, V>; nan: V[] } | undefined;
+
+export function goFMapMake<V>(hint?: unknown): { m: Map<number, V>; nan: V[] } {
+  void hint;
+  return { m: new Map<number, V>(), nan: [] };
+}
+
+export function goFMapFrom<V>(entries: readonly (readonly [number, V])[]): { m: Map<number, V>; nan: V[] } {
+  const out = goFMapMake<V>();
+  for (const [key, value] of entries) {
+    if (Number.isNaN(key)) {
+      out.nan.push(value);
+    } else {
+      out.m.set(key, value);
+    }
+  }
+  return out;
+}
+
+export function goFMapGet<V>(fm: GoFMap<V>, key: number, zero: V): V {
+  if (fm === undefined || Number.isNaN(key) || !fm.m.has(key)) return zero;
+  return fm.m.get(key) as V;
+}
+
+export function goFMapLookup<V>(fm: GoFMap<V>, key: number, zero: V): readonly [V, boolean] {
+  if (fm === undefined || Number.isNaN(key) || !fm.m.has(key)) return [zero, false];
+  return [fm.m.get(key) as V, true];
+}
+
+export function goFMapSet<V>(fm: GoFMap<V>, key: number, value: V): void {
+  if (fm === undefined) goPanicNilMapWrite();
+  if (Number.isNaN(key)) {
+    fm.nan.push(value);
+  } else {
+    fm.m.set(key, value);
+  }
+}
+
+export function goFMapDelete<V>(fm: GoFMap<V>, key: number): void {
+  if (fm === undefined || Number.isNaN(key)) return;
+  fm.m.delete(key);
+}
+
+export function goFMapLen<V>(fm: GoFMap<V>): bigint {
+  return fm === undefined ? 0n : BigInt(fm.m.size + fm.nan.length);
+}
+
+export function goFMapEntries<V>(fm: GoFMap<V>): readonly (readonly [number, V])[] {
+  if (fm === undefined) return [];
+  const out: [number, V][] = Array.from(fm.m.entries());
+  for (const value of fm.nan) out.push([NaN, value]);
+  return out;
+}
+
+export function goFMapClear<V>(fm: GoFMap<V>): void {
+  if (fm === undefined) return;
+  fm.m.clear();
+  fm.nan.length = 0;
+}
+
 export function goKMapMake<K extends GoKeyed, V>(hint?: unknown): Map<string, [K, V]> {
   void hint;
   return new Map<string, [K, V]>();

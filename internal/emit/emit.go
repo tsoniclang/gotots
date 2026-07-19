@@ -409,6 +409,9 @@ func (p *printer) tsType(t ir.Type) (string, error) {
 		if t.Key.Kind == ir.KindStruct {
 			return "gort$.GoKeyedMap<" + key + ", " + value + ">", nil
 		}
+		if t.Key.Kind.Float() {
+			return "gort$.GoFMap<" + value + ">", nil
+		}
 		return "gort$.GoMap<" + key + ", " + value + ">", nil
 	}
 	return "", fmt.Errorf("no TypeScript spelling for IR type %q", t.Go)
