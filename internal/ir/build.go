@@ -90,6 +90,8 @@ type builder struct {
 	// rangeFuncDepth counts enclosing range-over-func bodies: labeled
 	// branches cannot cross the yield-closure boundary.
 	rangeFuncDepth int
+	// switchTagCount numbers synthesized array-switch tag locals.
+	switchTagCount int
 }
 
 func (b *builder) span(pos token.Pos) Span {

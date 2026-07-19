@@ -777,6 +777,11 @@
       "specClause": "docs/spec/types-values-pointers.md"
     },
     {
+      "key": "unsafe:stringFromBytes",
+      "state": "generated",
+      "specClause": "docs/spec/collections-strings.md"
+    },
+    {
       "key": "varDecl",
       "state": "generated",
       "specClause": "docs/spec/declarations-bodies-control.md"

@@ -91,6 +91,10 @@ func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
 		return call, nil
 	}
 
+	if converted, matched, err := b.buildUnsafeStringExact(n); matched {
+		return converted, err
+	}
+
 	// Dynamic: any callee expression of function type.
 	fun, err := b.buildExpr(n.Fun)
 	if err != nil {

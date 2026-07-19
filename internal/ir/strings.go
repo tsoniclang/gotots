@@ -9,6 +9,7 @@ package ir
 import (
 	"fmt"
 	"go/ast"
+	"go/types"
 )
 
 // StringIndex loads one byte (uint8) with Go's exact bounds panic.
@@ -166,4 +167,68 @@ func (b *builder) buildStringConversion(x Expr, to Type) (Expr, bool) {
 		return &StringConvert{Op: "toRunes", X: x, T: to}, true
 	}
 	return nil, false
+}
+
+// buildUnsafeStringExact admits the ONE reviewed unsafe.String form:
+// unsafe.String(&b[0], len(b)) with both operands reading the SAME
+// byte-slice binding. Go specifies the result as the string of those
+// len(b) bytes — exactly string(b); the unsafe form only avoids the
+// copy, which our string carrier performs regardless. Any other
+// unsafe.String shape fails closed.
+func (b *builder) buildUnsafeStringExact(n *ast.CallExpr) (Expr, bool, error) {
+	span := b.span(n.Pos())
+	sel, isSel := ast.Unparen(n.Fun).(*ast.SelectorExpr)
+	if !isSel {
+		return nil, false, nil
+	}
+	builtin, isBuiltin := b.info.Uses[sel.Sel].(*types.Builtin)
+	if !isBuiltin || builtin.Name() != "String" {
+		return nil, false, nil
+	}
+	reject := func() (Expr, bool, error) {
+		return nil, true, &Unsupported{Kind: KindNonFieldSelector, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+			Construct: "unsafe.String outside the reviewed exact form (&b[0], len(b))", Span: span}
+	}
+	if len(n.Args) != 2 {
+		return reject()
+	}
+	sliceExpr, indexExpr, isAddr := b.addressedSliceElem(n.Args[0])
+	if !isAddr {
+		return reject()
+	}
+	sliceIdent, isIdent := ast.Unparen(sliceExpr).(*ast.Ident)
+	if !isIdent {
+		return reject()
+	}
+	if indexValue, ok := b.info.Types[indexExpr]; !ok || indexValue.Value == nil || indexValue.Value.String() != "0" {
+		return reject()
+	}
+	lenCall, isCall := ast.Unparen(n.Args[1]).(*ast.CallExpr)
+	if !isCall || len(lenCall.Args) != 1 {
+		return reject()
+	}
+	if lenBuiltin, ok := b.info.Uses[identOf(lenCall.Fun)].(*types.Builtin); !ok || lenBuiltin.Name() != "len" {
+		return reject()
+	}
+	lenIdent, isLenIdent := ast.Unparen(lenCall.Args[0]).(*ast.Ident)
+	if !isLenIdent || b.info.ObjectOf(lenIdent) == nil ||
+		b.info.ObjectOf(lenIdent) != b.info.ObjectOf(sliceIdent) {
+		return reject()
+	}
+	slice, err := b.buildExpr(sliceExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	elem := slice.Type().Elem
+	if elem == nil || elem.Kind != KindUint8 {
+		return reject()
+	}
+	b.use("unsafe:stringFromBytes")
+	return &StringConvert{Op: "fromBytes", X: slice, T: Type{Kind: KindString, Go: "string"}}, true, nil
+}
+
+// identOf unwraps an identifier expression (nil when it is not one).
+func identOf(e ast.Expr) *ast.Ident {
+	ident, _ := ast.Unparen(e).(*ast.Ident)
+	return ident
 }
