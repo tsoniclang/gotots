@@ -128,35 +128,71 @@ func newModule(modulePath, pkgPath, pkgName string, unit ir.Scope, context *pack
 			module.ExternMethods[typeID] = kept
 			// Build adapters only for surviving members.
 			for i := range module.ExternMethods[typeID] {
-				adapter, adapterType, _, err := externAdapter(module, unit, context, sourceDir, obligation, module.ExternMethods[typeID][i].Key)
+				forms, _, err := externAdapter(module, unit, context, sourceDir, obligation, module.ExternMethods[typeID][i].Key)
 				if err != nil {
 					return nil, err
 				}
-				module.ExternMethods[typeID][i].Adapter = adapter
-				module.ExternMethods[typeID][i].AdapterType = adapterType
+				module.ExternMethods[typeID][i].Adapter = forms.Adapter
+				module.ExternMethods[typeID][i].AdapterType = forms.AdapterType
+				module.ExternMethods[typeID][i].AdapterPtr = forms.AdapterPtr
+				module.ExternMethods[typeID][i].AdapterPtrType = forms.AdapterPtrType
 			}
 		}
 	}
 	return module, nil
 }
 
-// externAdapter spells one external method's typed vtable arrow.
-func externAdapter(module *emit.Module, unit ir.Scope, context *packages.Package, sourceDir string, obligation *ir.ExternTypeObligation, key string) (string, string, []string, error) {
+// externBoxedValue resolves the boxed VALUE payload type of an external
+// named type — the single receiver rule shared with the union member
+// spelling: a basic-underlying external type boxes its exact value
+// carrier; every other external type boxes its branded handle. This is
+// the one place the decision lives, so the stub receiver, the vtable
+// adapters, and the union payloads can never diverge.
+func externBoxedValue(context *packages.Package, sourceDir string, unit ir.Scope, obligation *ir.ExternTypeObligation, method *types.Func) (ir.Type, bool, error) {
+	handle := ir.Type{Kind: ir.KindExternal, Go: obligation.Pkg + "." + obligation.Name, Named: obligation.Name, Pkg: obligation.Pkg}
+	recvType := method.Type().(*types.Signature).Recv().Type()
+	if pointer, isPointer := recvType.(*types.Pointer); isPointer {
+		recvType = pointer.Elem()
+	}
+	named, isNamed := types.Unalias(recvType).(*types.Named)
+	if !isNamed {
+		return handle, false, nil
+	}
+	basic, isBasic := named.Underlying().(*types.Basic)
+	if !isBasic {
+		return handle, false, nil
+	}
+	carrier, err := ir.ResolveType(context, sourceDir, unit, basic, token.NoPos)
+	if err != nil {
+		return ir.Type{}, false, err
+	}
+	carrier.Go = obligation.Pkg + "." + obligation.Name
+	carrier.Named = obligation.Name
+	carrier.Pkg = obligation.Pkg
+	return carrier, true, nil
+}
+
+// externAdapter spells one external method's typed vtable arrows: both
+// the value-member and pointer-member forms, from the one boxed-value
+// rule.
+func externAdapter(module *emit.Module, unit ir.Scope, context *packages.Package, sourceDir string, obligation *ir.ExternTypeObligation, key string) (emit.ExternAdapterForms, []string, error) {
 	entry, ok := obligation.MethodByKey(key)
 	if !ok {
-		return "", "", nil, fmt.Errorf("GOTOTS_EXTERNAL_UNSUPPORTED: external type %s.%s has no recorded method for key %s",
+		return emit.ExternAdapterForms{}, nil, fmt.Errorf("GOTOTS_EXTERNAL_UNSUPPORTED: external type %s.%s has no recorded method for key %s",
 			obligation.Pkg, obligation.Name, key)
 	}
 	method := entry.Method
 	name := method.Name()
 	signature := method.Type().(*types.Signature)
-	handle := ir.Type{Kind: ir.KindExternal, Go: obligation.Pkg + "." + obligation.Name, Named: obligation.Name, Pkg: obligation.Pkg}
-	recv := ir.Type{Kind: ir.KindPointer, Go: "*" + handle.Go, Named: obligation.Name, Pkg: obligation.Pkg, Elem: &handle}
-	params := []ir.Var{{Name: "recv", Type: recv}}
+	value, basicCarrier, err := externBoxedValue(context, sourceDir, unit, obligation, method)
+	if err != nil {
+		return emit.ExternAdapterForms{}, nil, err
+	}
+	var params []ir.Var
 	for i := range signature.Params().Len() {
 		t, err := ir.ResolveType(context, sourceDir, unit, signature.Params().At(i).Type(), token.NoPos)
 		if err != nil {
-			return "", "", nil, err
+			return emit.ExternAdapterForms{}, nil, err
 		}
 		params = append(params, ir.Var{Name: fmt.Sprintf("p%d", i), Type: t})
 	}
@@ -164,21 +200,17 @@ func externAdapter(module *emit.Module, unit ir.Scope, context *packages.Package
 	for i := range signature.Results().Len() {
 		t, err := ir.ResolveType(context, sourceDir, unit, signature.Results().At(i).Type(), token.NoPos)
 		if err != nil {
-			return "", "", nil, err
+			return emit.ExternAdapterForms{}, nil, err
 		}
 		results = append(results, t)
 	}
 	callee, err := module.Symbol(obligation.Pkg, emit.ExternMethodSymbol(obligation.Name, name))
 	if err != nil {
-		return "", "", nil, err
+		return emit.ExternAdapterForms{}, nil, err
 	}
-	adapter, err := emit.TypedAdapter(module, params, results, callee)
+	forms, err := emit.ExternAdapters(module, value, basicCarrier, params, results, callee)
 	if err != nil {
-		return "", "", nil, err
-	}
-	adapterType, err := emit.TypedAdapterType(module, params, results)
-	if err != nil {
-		return "", "", nil, err
+		return emit.ExternAdapterForms{}, nil, err
 	}
 	var refs []string
 	seen := map[string]bool{}
@@ -188,7 +220,7 @@ func externAdapter(module *emit.Module, unit ir.Scope, context *packages.Package
 	for _, r := range results {
 		collectPkgRefs(r, seen, &refs)
 	}
-	return adapter, adapterType, refs, nil
+	return forms, refs, nil
 }
 
 // collectPkgRefs gathers every package path an ir.Type references.

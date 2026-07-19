@@ -313,11 +313,15 @@ func (p *printer) boxVtable(r ir.RttiRef) (string, error) {
 		}
 		entries := make([]string, 0, len(methods))
 		for _, method := range methods {
-			if method.Adapter == "" {
+			adapter := method.Adapter
+			if r.Pointer {
+				adapter = method.AdapterPtr
+			}
+			if adapter == "" {
 				continue
 			}
 			slot := requireIdentity(method.Slot, "external vtable slot for "+method.Name)
-			entries = append(entries, slot+": "+method.Adapter)
+			entries = append(entries, slot+": "+adapter)
 		}
 		return "{ " + joinComma(entries) + " }", nil
 	case r.Pointer:
@@ -325,6 +329,84 @@ func (p *printer) boxVtable(r ir.RttiRef) (string, error) {
 	default:
 		return p.module.symbol(r.Pkg, r.TypeName+"$vtable")
 	}
+}
+
+// ExternAdapterForms carries one external method's two exactly typed
+// vtable arrows — the VALUE-member form and the POINTER-member form —
+// with their arrow types. The receiver's representation IS the union
+// member's boxed payload (the single rule memberPayload spells): a
+// basic-underlying external type boxes its value carrier and a pointer
+// member carries the value's cell, dereferenced with Go's nil panic
+// before the delegated call; every other external type boxes its branded
+// handle, nilable through a pointer.
+type ExternAdapterForms struct {
+	Adapter        string
+	AdapterType    string
+	AdapterPtr     string
+	AdapterPtrType string
+}
+
+// ExternAdapters builds both member forms of one external method's vtable
+// arrow. valueRecv is the boxed VALUE payload type (the basic carrier, or
+// the branded handle); basicCarrier selects the cell-deref pointer form.
+// params excludes the receiver; callee is the stub export.
+func ExternAdapters(module *Module, valueRecv ir.Type, basicCarrier bool, params []ir.Var, results []ir.Type, callee string) (ExternAdapterForms, error) {
+	forms := ExternAdapterForms{}
+	valueParams := append([]ir.Var{{Name: "recv", Type: valueRecv}}, params...)
+	var err error
+	if forms.Adapter, err = TypedAdapter(module, valueParams, results, callee); err != nil {
+		return forms, err
+	}
+	if forms.AdapterType, err = TypedAdapterType(module, valueParams, results); err != nil {
+		return forms, err
+	}
+	pointerRecv := ir.Type{Kind: ir.KindPointer, Go: "*" + valueRecv.Go, Named: valueRecv.Named, Pkg: valueRecv.Pkg, Elem: &valueRecv}
+	pointerParams := append([]ir.Var{{Name: "recv", Type: pointerRecv}}, params...)
+	if forms.AdapterPtrType, err = TypedAdapterType(module, pointerParams, results); err != nil {
+		return forms, err
+	}
+	if !basicCarrier {
+		// The handle is the value: the pointer member passes it through
+		// (nil reaches the implementation's exact nil semantics).
+		if forms.AdapterPtr, err = TypedAdapter(module, pointerParams, results, callee); err != nil {
+			return forms, err
+		}
+		return forms, nil
+	}
+	// A pointer member carries the value's cell: Go's implicit deref for a
+	// value-receiver call panics on nil, then the held value delegates.
+	forms.AdapterPtr, err = typedAdapterDeref(module, pointerParams, results, callee)
+	return forms, err
+}
+
+// typedAdapterDeref spells the pointer-member arrow of a basic-carrier
+// external method: the cell receiver nil-checks and dereferences before
+// the delegated call.
+func typedAdapterDeref(module *Module, params []ir.Var, results []ir.Type, callee string) (string, error) {
+	p := &printer{module: module}
+	parts := make([]string, 0, len(params))
+	names := make([]string, 0, len(params))
+	for i, param := range params {
+		spelled, err := p.tsType(param.Type)
+		if err != nil {
+			return "", err
+		}
+		name := fmt.Sprintf("$a%d", i)
+		parts = append(parts, name+": "+spelled)
+		if i == 0 {
+			checked, err := p.nilCheckOf(name, param.Type)
+			if err != nil {
+				return "", err
+			}
+			name = checked + ".v"
+		}
+		names = append(names, name)
+	}
+	result, err := p.tsFuncResultType(results)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("(%s): %s => %s(%s)", joinComma(parts), result, callee, joinComma(names)), nil
 }
 
 // TypedAdapter spells one exactly typed vtable arrow: the receiver and

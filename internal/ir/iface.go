@@ -70,7 +70,11 @@ func (b *builder) rttiFor(t types.Type, span Span) (RttiRef, error) {
 				Construct: "interface value of an instantiated generic type", Span: span}
 		}
 		if !b.unit.Owns(obj.Pkg().Path()) {
-			return b.compositeRtti(t, span, obj.Pkg().Path()+"."+obj.Name())
+			ref, err := b.compositeRtti(t, span, obj.Pkg().Path()+"."+obj.Name())
+			// Pointer selects the pointer-member vtable form (the boxed
+			// payload is nilable; a basic carrier arrives as its cell).
+			ref.Pointer = true
+			return ref, err
 		}
 		return RttiRef{Pkg: obj.Pkg().Path(), TypeName: obj.Name(), Pointer: true}, nil
 

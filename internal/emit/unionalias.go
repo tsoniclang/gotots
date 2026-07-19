@@ -72,9 +72,13 @@ func (p *printer) buildUnionAliasDefinition(name string, t ir.Type) (string, err
 			// the member type is the exact structural adapter surface.
 			entries := []string{}
 			for _, method := range p.module.ExternMethods[member.Pkg+"."+member.Type] {
-				if method.AdapterType != "" {
+				adapterType := method.AdapterType
+				if member.Pointer {
+					adapterType = method.AdapterPtrType
+				}
+				if adapterType != "" {
 					slot := requireIdentity(method.Slot, "external vtable-type slot for "+method.Name)
-					entries = append(entries, slot+": "+method.AdapterType)
+					entries = append(entries, slot+": "+adapterType)
 				}
 			}
 			vtable = "{ " + joinComma(entries) + " }"

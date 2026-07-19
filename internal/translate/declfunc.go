@@ -22,7 +22,7 @@ func translateFunc(p *packages.Package, sourceDir string, unit ir.Scope, relativ
 	id := goid.Func(p.PkgPath, name)
 	// The proof records the exact EMITTED symbol: a reserved spelling
 	// (NaN, in, ...) escapes with the same single policy the emitter uses.
-	generatedSymbol := tsident.Escape(name)
+	generatedSymbol := tsident.EscapeDeclared(name)
 	if decl.Recv != nil {
 		id = goid.Method(p.PkgPath, receiverBase(decl.Recv), name)
 		// The emitted method function spells Type$Method.

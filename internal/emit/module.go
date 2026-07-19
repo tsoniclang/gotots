@@ -35,6 +35,12 @@ type ExternMethod struct {
 	// spelling.
 	Adapter     string
 	AdapterType string
+	// AdapterPtr / AdapterPtrType are the POINTER-member forms: the
+	// receiver is the boxed pointer payload (the value's cell for a
+	// basic-carrier external, dereferenced with Go's nil panic; the
+	// nilable handle otherwise).
+	AdapterPtr     string
+	AdapterPtrType string
 }
 
 // ABIImports carries the language-ABI module specifiers for one module.

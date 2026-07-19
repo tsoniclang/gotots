@@ -195,10 +195,21 @@ func externTypeMembers(obligation *ir.ExternTypeObligation, unit ir.Scope, conte
 				obligation.Pkg, obligation.Name, symbol)
 		}
 		emittedSymbols[symbol] = entry.Key
-		// The receiver arrives as the handle a caller holds: through a
-		// pointer it may be nil, and the implementation carries the
-		// concrete method's exact nil semantics.
-		recvType := ir.Type{Kind: ir.KindPointer, Go: "*" + typeID, Named: obligation.Name, Pkg: obligation.Pkg, Elem: &handle}
+		// The receiver arrives as the boxed VALUE payload — the single
+		// external-value rule: a basic-underlying external type's method
+		// receives its exact value carrier (the adapters deref a pointer
+		// member's cell with Go's nil panic BEFORE the call); every other
+		// external type's method receives the handle, nilable through a
+		// pointer, with the implementation carrying the concrete method's
+		// exact nil semantics.
+		value, basicCarrier, err := externBoxedValue(context, sourceDir, unit, obligation, method)
+		if err != nil {
+			return nil, err
+		}
+		recvType := value
+		if !basicCarrier {
+			recvType = ir.Type{Kind: ir.KindPointer, Go: "*" + typeID, Named: obligation.Name, Pkg: obligation.Pkg, Elem: &handle}
+		}
 		member := emit.StubMember{
 			ID:     typeID + "." + name,
 			Name:   symbol,

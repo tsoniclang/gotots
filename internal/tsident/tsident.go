@@ -29,9 +29,33 @@ var reserved = map[string]bool{
 	"with": true, "yield": true,
 }
 
-// Escape returns the emission spelling of one source-named binding.
+// declSafe are the reserved names that ARE legal as module-scope
+// declarations and are never spelled bare by generated per-package code
+// (float NaN/Infinity lower through the ABI, host globals qualify through
+// globalThis): a Go package-level declaration with this spelling keeps its
+// name, and every qualified or same-module reference matches it. All
+// other reserved names stay escaped in every position — as keywords or
+// strict-mode restrictions they cannot be bindings at all (in, let,
+// eval...), or generated code depends on them unshadowed (undefined,
+// globalThis).
+var declSafe = map[string]bool{"NaN": true, "Infinity": true}
+
+// Escape returns the emission spelling of one source-named LOCAL binding:
+// every reserved or hazardous spelling gains the "$" suffix.
 func Escape(name string) string {
 	if reserved[name] {
+		return name + "$"
+	}
+	return name
+}
+
+// EscapeDeclared returns the emission spelling of a module-scope
+// declaration or a reference to one (package functions, types, variables,
+// struct names, and their qualified/same-module references — including
+// external stub exports, so the declaration and every reference agree by
+// construction).
+func EscapeDeclared(name string) string {
+	if reserved[name] && !declSafe[name] {
 		return name + "$"
 	}
 	return name
