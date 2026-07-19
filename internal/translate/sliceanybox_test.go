@@ -426,3 +426,38 @@ func InstantiatedGenericInterfaceValue() int {
 }
 `)
 }
+
+func TestOraclePointerCarrierAdmissions(t *testing.T) {
+	// Three admissions in one differential: pointer to a named ARRAY type
+	// (identity), pointer to a named scalar carrier through a cell, and
+	// the same-underlying owned pointer conversion (type Mutable Base).
+	runOracle(t, `package fixture
+
+type table [2]int
+
+type counter int
+
+type base struct {
+	n int
+}
+
+type mutable base
+
+func bump(c *counter) {
+	*c += 5
+}
+
+func PointerCarrierAdmissions() int {
+	var t table
+	pt := &t
+	pt[0] = 3
+	pt[1] = 4
+	var c counter = 10
+	bump(&c)
+	m := &mutable{n: 20}
+	b := (*base)(m)
+	b.n++
+	return t[0]*100 + t[1]*10 + int(c) + m.n*1000
+}
+`)
+}

@@ -95,8 +95,25 @@ func (b *builder) buildClosure(lit *ast.FuncLit) (Expr, error) {
 // buildFuncRef references a package-level function of the translated
 // unit as a first-class value.
 func (b *builder) buildFuncRef(function *types.Func, span Span) (Expr, error) {
-	if function.Pkg() == nil || !b.unit.Owns(function.Pkg().Path()) {
+	if function.Pkg() == nil {
 		return nil, &Unsupported{Kind: KindReferenceToAFunctionOutsideTheTranslatedUnit, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "reference to a function outside the translated unit", Span: span}
+	}
+	if !b.unit.Owns(function.Pkg().Path()) {
+		// A NON-generic external function referenced as a value: the
+		// typed stub export IS the value (fail-closed until assembly).
+		// Generic references stay out — a bare reference cannot carry the
+		// stub's factory protocol.
+		signature, isSig := function.Type().(*types.Signature)
+		if !isSig || (signature.TypeParams() != nil && signature.TypeParams().Len() > 0) || signature.Recv() != nil {
+			return nil, &Unsupported{Kind: KindReferenceToAFunctionOutsideTheTranslatedUnit, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "reference to a function outside the translated unit", Span: span}
+		}
+		t, err := b.typeOf(signature, span)
+		if err != nil {
+			return nil, err
+		}
+		b.unit.AddExternalFunc(function)
+		b.use("externFuncRef")
+		return &FuncRef{Pkg: function.Pkg().Path(), Name: function.Name(), T: t}, nil
 	}
 	signature := function.Type().(*types.Signature)
 	if signature.Recv() != nil {

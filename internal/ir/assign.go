@@ -127,6 +127,22 @@ func (b *builder) buildTarget(lhs ast.Expr) (Target, error) {
 			}
 			b.use("arrayStore")
 			return &ArrayTarget{X: operand, Index: index}, nil
+		case KindPointer:
+			if operand.Type().Elem != nil && operand.Type().Elem.Kind == KindArray {
+				elem := operand.Type().Elem
+				if elem.Elem.Kind == KindExternal {
+					return nil, &Unsupported{Kind: KindStoreIntoAnArrayOfExternalValues, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "store into an array of external values", Span: span}
+				}
+				// Go's implicit (*p)[i] = v: deref (nil panics), then the
+				// element store.
+				deref := &Deref{X: operand, T: *elem}
+				index, err := b.buildExpr(n.Index)
+				if err != nil {
+					return nil, err
+				}
+				b.use("arrayStore")
+				return &ArrayTarget{X: deref, Index: index}, nil
+			}
 		}
 		return nil, &Unsupported{Kind: KindIndexedAssignmentOn, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "indexed assignment on " + operand.Type().Go, Span: span}
 

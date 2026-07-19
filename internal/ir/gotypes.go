@@ -111,14 +111,17 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 				}
 				return Type{Kind: KindPointer, Go: spelled, Named: named.Obj().Name(), Pkg: declaringPkg, Elem: &element}, nil
 			}
-			if named.Obj().Pkg() != nil && b.unit.Owns(named.Obj().Pkg().Path()) {
-				// A pointer to an owned named carrier type: a mutable
-				// cell, with the name preserved for method dispatch.
+			if named.Obj().Pkg() != nil {
+				// A pointer to a named carrier type (owned or external —
+				// a non-struct external named erases to its value
+				// carrier): a named ARRAY keeps identity (the array IS
+				// the handle); every boxable carrier takes a mutable
+				// cell, the name preserved for method dispatch.
 				element, err := b.typeOf(named, span)
 				if err != nil {
 					return Type{}, err
 				}
-				if !boxable(element.Kind) {
+				if element.Kind != KindArray && !boxable(element.Kind) {
 					return Type{}, &Unsupported{Kind: KindPointerToNonStructType, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "pointer to non-struct type " + spelled, Span: span}
 				}
 				return Type{Kind: KindPointer, Go: spelled, Named: named.Obj().Name(), Pkg: named.Obj().Pkg().Path(), Elem: &element}, nil

@@ -253,3 +253,29 @@ func ExternalGenericValueCopyBinding() int {
 }
 `)
 }
+
+func TestOracleExternFuncReference(t *testing.T) {
+	// A NON-generic external function referenced as a first-class value:
+	// the typed stub export IS the value; the assembled implementation
+	// supplies the behavior.
+	runExternalOracle(t, `package fixture
+
+import "strings"
+
+func apply(f func(string, string) bool, a, b string) bool {
+	return f(a, b)
+}
+
+func ExternFuncReference() int {
+	check := strings.HasPrefix
+	total := 0
+	if check("gopher", "go") {
+		total += 10
+	}
+	if apply(strings.HasPrefix, "gopher", "x") {
+		total += 1000
+	}
+	return total
+}
+`)
+}

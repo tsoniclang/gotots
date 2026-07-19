@@ -171,6 +171,10 @@ func (p *printer) printConvert(n *ir.Convert) (string, error) {
 	to := n.To.Kind
 
 	switch {
+	case from == ir.KindPointer && to == ir.KindPointer:
+		// Same-underlying named pointer conversion: the instance IS the
+		// value (the IR admits only structurally identical classes).
+		return "(" + x + ")", nil
 	case from == to && (to == ir.KindString || to == ir.KindBool || to == ir.KindFloat64):
 		// Same-carrier conversion between named types: identity.
 		return "(" + x + ")", nil

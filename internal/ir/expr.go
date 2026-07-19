@@ -205,6 +205,17 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			return &ArrayGet{X: operand, Index: index, T: *operand.Type().Elem}, nil
 		case KindString:
 			return b.buildStringIndex(operand, n.Index)
+		case KindPointer:
+			if operand.Type().Elem != nil && operand.Type().Elem.Kind == KindArray {
+				// Go's implicit (*p)[i]: deref (nil panics), then index.
+				deref := &Deref{X: operand, T: *operand.Type().Elem}
+				index, err := b.buildExpr(n.Index)
+				if err != nil {
+					return nil, err
+				}
+				b.use("arrayGet")
+				return &ArrayGet{X: deref, Index: index, T: *deref.T.Elem}, nil
+			}
 		}
 		return nil, &Unsupported{Kind: KindIndexOn, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "index on " + operand.Type().Go, Span: span}
 
@@ -326,6 +337,14 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 			}
 			if converted, isString := b.buildStringConversion(x, to); isString {
 				return converted, nil
+			}
+			if x.Type().Kind == KindPointer && to.Kind == KindPointer &&
+				sameUnderlyingNamedPointers(b.info.Types[n.Args[0]].Type, convert) {
+				// Same-underlying owned pointer conversion (type
+				// MutableNode Node): the instance IS the value — identity
+				// at the carrier, the classes are structurally identical.
+				b.use("convert")
+				return &Convert{X: x, To: to}, nil
 			}
 			if err := b.checkConversion(x.Type(), to, span); err != nil {
 				return nil, err
@@ -644,4 +663,26 @@ func (b *builder) buildExternLit(n *ast.CompositeLit, t Type, goType types.Type,
 	symbol := obligation.AddLiteralShape(fields, fieldTypes)
 	b.use("externLit")
 	return &ExternLit{T: t, Symbol: symbol, Values: values}, nil
+}
+
+
+// sameUnderlyingNamedPointers reports whether two pointer types point to
+// named STRUCT types with IDENTICAL underlyings (type MutableNode Node):
+// their generated classes are field-for-field identical, so the
+// conversion is identity at the carrier.
+func sameUnderlyingNamedPointers(fromGo, toGo types.Type) bool {
+	fromPtr, fromOK := types.Unalias(fromGo).Underlying().(*types.Pointer)
+	toPtr, toOK := types.Unalias(toGo).Underlying().(*types.Pointer)
+	if !fromOK || !toOK {
+		return false
+	}
+	fromNamed, fromOK := types.Unalias(fromPtr.Elem()).(*types.Named)
+	toNamed, toOK := types.Unalias(toPtr.Elem()).(*types.Named)
+	if !fromOK || !toOK {
+		return false
+	}
+	if _, isStruct := fromNamed.Underlying().(*types.Struct); !isStruct {
+		return false
+	}
+	return types.Identical(fromNamed.Underlying(), toNamed.Underlying())
 }
