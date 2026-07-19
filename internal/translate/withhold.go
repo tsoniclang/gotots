@@ -41,11 +41,13 @@ func finalizeEvidenceStages(out *Generated) error {
 			defects = append(defects, proof.ID+": declared no-output yet references generated file "+proof.GeneratedFile)
 			continue
 		}
-		if _, withheld := out.Withheld[proof.Package]; withheld {
-			// The package's runnable module is withheld: the proof keeps
-			// its analysis identity, the reference is cleared because the
-			// file genuinely does not exist in the bundle, and the stage
-			// records the blockage.
+		if _, blocked := out.NotMaterialized[proof.Package]; blocked {
+			// The package produced no analyzable file at all: the proof
+			// keeps its analysis identity, the reference is cleared because
+			// the file genuinely does not exist, and the stage records the
+			// blockage. A merely publication-withheld package is NOT
+			// cleared — its materialized file exists and the proof retains
+			// file, symbol, and hash evidence.
 			proof.ModuleRetained = false
 			proof.GeneratedFile = ""
 			proof.GeneratedSymbol = ""
@@ -174,18 +176,31 @@ func growNotMaterializedByImports(out *Generated, sorted []*packages.Package) bo
 	return changed
 }
 
-// assertRetainedImportsResolve fails closed if any retained core module
-// imports a package that ended up withheld: the emitted output must be a
-// forward-dependency-closed set, so a dangling import is a closure
-// defect, never tolerable output.
+// assertRetainedImportsResolve fails closed on any dangling edge in the
+// two closures. PUBLICATION closure: a published module's runtime imports
+// (value + init) must all be published — the runnable product evaluates
+// them. ANALYSIS closure: EVERY materialized module's type-only imports
+// must be materialized — erased at runtime, they only need the analyzable
+// file to exist for typechecking.
 func assertRetainedImportsResolve(out *Generated) error {
 	for pkgPath, edges := range out.ModuleImports {
 		if _, withheld := out.Withheld[pkgPath]; withheld {
-			continue // the module was withheld; its file is gone
+			continue // not published; runtime edges impose nothing
 		}
 		for _, importPath := range edges {
 			if reason, withheld := out.Withheld[importPath]; withheld {
-				return fmt.Errorf("retained package %s imports withheld package %s (%s): forward closure incomplete",
+				return fmt.Errorf("published package %s imports withheld package %s (%s): runnable closure incomplete",
+					pkgPath, importPath, reason)
+			}
+		}
+	}
+	for pkgPath, edges := range out.ModuleTypeImports {
+		if _, blocked := out.NotMaterialized[pkgPath]; blocked {
+			continue
+		}
+		for _, importPath := range edges {
+			if reason, blocked := out.NotMaterialized[importPath]; blocked {
+				return fmt.Errorf("materialized package %s type-imports non-materialized package %s (%s): analysis closure incomplete",
 					pkgPath, importPath, reason)
 			}
 		}

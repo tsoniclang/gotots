@@ -166,12 +166,10 @@ func (m *Module) eqFnLines() string {
 }
 
 // CoGeneratedImports returns every co-generated package this module
-// actually imports in its emitted output: value symbol references
-// (including interface-dispatch branch targets), initialization edges,
-// AND type-only references. Every one is a real ESM import in the
-// emitted file — an `import type` of a withheld (absent) module fails
-// module resolution exactly like a value import — so all three are
-// dependency edges for the withholding closure.
+// references in its emitted output: value symbol references (including
+// interface-dispatch branch targets), initialization edges, AND type-only
+// references. All three need the referenced file to EXIST for analysis;
+// only the runtime subset (RuntimeImports) constrains publication.
 func (m *Module) CoGeneratedImports() []string {
 	seen := map[string]bool{}
 	for path := range m.used {
@@ -186,6 +184,49 @@ func (m *Module) CoGeneratedImports() []string {
 	out := make([]string, 0, len(seen))
 	for path := range seen {
 		out = append(out, path)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// RuntimeImports returns the co-generated packages this module needs AT
+// RUNTIME: value symbol references and initialization edges. Publication
+// withholding cascades over exactly these — a runnable module cannot
+// evaluate an import of a package that is not in the runnable product.
+func (m *Module) RuntimeImports() []string {
+	seen := map[string]bool{}
+	for path := range m.used {
+		seen[path] = true
+	}
+	for path := range m.initEdges {
+		seen[path] = true
+	}
+	out := make([]string, 0, len(seen))
+	for path := range seen {
+		out = append(out, path)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// TypeOnlyImports returns the co-generated packages referenced ONLY in
+// type positions: their imports emit as `import type`, fully erased by
+// compilation (ADR-0004), so they are ANALYSIS edges — the referenced
+// file must be MATERIALIZED for typechecking, but the package need not be
+// in the runnable product and publication does not cascade over them.
+func (m *Module) TypeOnlyImports() []string {
+	runtime := map[string]bool{}
+	for path := range m.used {
+		runtime[path] = true
+	}
+	for path := range m.initEdges {
+		runtime[path] = true
+	}
+	out := make([]string, 0, len(m.typeUsed))
+	for path := range m.typeUsed {
+		if !runtime[path] {
+			out = append(out, path)
+		}
 	}
 	sort.Strings(out)
 	return out

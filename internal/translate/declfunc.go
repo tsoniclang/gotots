@@ -13,13 +13,16 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/goid"
 	"github.com/tsoniclang/gotots/internal/ir"
+	"github.com/tsoniclang/gotots/internal/tsident"
 	"github.com/tsoniclang/gotots/internal/typeid"
 )
 
 func translateFunc(p *packages.Package, sourceDir string, unit ir.Scope, relativeFile string, source []byte, decl *ast.FuncDecl, options Options) (*ir.Func, *Proof, error) {
 	name := decl.Name.Name
 	id := goid.Func(p.PkgPath, name)
-	generatedSymbol := name
+	// The proof records the exact EMITTED symbol: a reserved spelling
+	// (NaN, in, ...) escapes with the same single policy the emitter uses.
+	generatedSymbol := tsident.Escape(name)
 	if decl.Recv != nil {
 		id = goid.Method(p.PkgPath, receiverBase(decl.Recv), name)
 		// The emitted method function spells Type$Method.

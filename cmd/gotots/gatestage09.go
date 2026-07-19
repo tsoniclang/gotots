@@ -97,11 +97,12 @@ func runStagedGenerationGate(repoDir, profilePath, buildProfile, sourceDir strin
 	// byte-identical files alone do not prove the evidence ledgers
 	// regenerated identically.
 	for name, pair := range map[string][2]any{
-		"proofs":        {corpusGenerated.Proofs, regenerated.Proofs},
-		"support":       {corpusGenerated.Support, regenerated.Support},
-		"ownership":     {corpusGenerated.Ownership, regenerated.Ownership},
-		"withheld":      {corpusGenerated.Withheld, regenerated.Withheld},
-		"moduleImports": {corpusGenerated.ModuleImports, regenerated.ModuleImports},
+		"proofs":            {corpusGenerated.Proofs, regenerated.Proofs},
+		"support":           {corpusGenerated.Support, regenerated.Support},
+		"ownership":         {corpusGenerated.Ownership, regenerated.Ownership},
+		"withheld":          {corpusGenerated.Withheld, regenerated.Withheld},
+		"moduleImports":     {corpusGenerated.ModuleImports, regenerated.ModuleImports},
+		"moduleTypeImports": {corpusGenerated.ModuleTypeImports, regenerated.ModuleTypeImports},
 	} {
 		firstJSON, err := json.Marshal(pair[0])
 		if err != nil {

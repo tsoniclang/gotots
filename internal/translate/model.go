@@ -100,10 +100,15 @@ type Generated struct {
 	// its withholding linkage through the parent's package.
 	FuncLits []FuncLitSupport
 	// ModuleImports maps each package path to the co-generated packages
-	// its emitted module actually imports (symbol references, including
-	// interface-dispatch branch targets, plus init edges). Withholding
-	// cascades over these real edges.
+	// its emitted module needs AT RUNTIME (value symbol references,
+	// including interface-dispatch branch targets, plus init edges).
+	// Publication withholding cascades over exactly these edges.
 	ModuleImports map[string][]string
+	// ModuleTypeImports maps each package path to its TYPE-ONLY imports:
+	// erased by compilation, they are analysis edges — the target must be
+	// materialized (its analyzable file exists) but need not be published,
+	// and publication never cascades over them.
+	ModuleTypeImports map[string][]string
 	// EmitterDefects records every body (or package) whose emission failed
 	// on a non-typed error: a compiler defect, never an ordinary
 	// unsupported disposition. A diagnostic placeholder keeps the file

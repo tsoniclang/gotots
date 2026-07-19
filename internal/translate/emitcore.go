@@ -25,7 +25,7 @@ func emitCorePackage(out *Generated, p *packages.Package, sourceDir string, unit
 	// The module's import environment is built after the declaration
 	// passes so external obligations discovered while building bodies
 	// resolve to their stub modules.
-	module, err := newModule(corePath, p.PkgPath, p.Types.Name(), unit, p, sourceDir, out.Withheld)
+	module, err := newModule(corePath, p.PkgPath, p.Types.Name(), unit, p, sourceDir, out.NotMaterialized)
 	if err != nil {
 		return err
 	}
@@ -72,7 +72,11 @@ func emitCorePackage(out *Generated, p *packages.Package, sourceDir string, unit
 	if out.ModuleImports == nil {
 		out.ModuleImports = map[string][]string{}
 	}
-	out.ModuleImports[p.PkgPath] = module.CoGeneratedImports()
+	if out.ModuleTypeImports == nil {
+		out.ModuleTypeImports = map[string][]string{}
+	}
+	out.ModuleImports[p.PkgPath] = module.RuntimeImports()
+	out.ModuleTypeImports[p.PkgPath] = module.TypeOnlyImports()
 	return nil
 }
 

@@ -29,6 +29,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/goid"
 	"github.com/tsoniclang/gotots/internal/ir"
+	"github.com/tsoniclang/gotots/internal/tsident"
 	"github.com/tsoniclang/gotots/internal/typeid"
 )
 
@@ -268,7 +269,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 							aliasProof.NoOutput = true
 						} else {
 							aliasProof.GeneratedFile = corePath
-							aliasProof.GeneratedSymbol = typeSpec.Name.Name
+							aliasProof.GeneratedSymbol = tsident.Escape(typeSpec.Name.Name)
 						}
 						out.Proofs = append(out.Proofs, aliasProof)
 						continue
@@ -287,7 +288,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 						Package: p.PkgPath, File: f.relative,
 						LoweringPlan:    LoweringPlanV2,
 						Representations: map[string]string{"decl:" + typeSpec.Name.Name: "class-direct-identity"},
-						GeneratedFile:   corePath, GeneratedSymbol: structDecl.Name,
+						GeneratedFile:   corePath, GeneratedSymbol: tsident.Escape(structDecl.Name),
 					})
 				}
 			case token.VAR:
@@ -425,7 +426,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 							Package: p.PkgPath, File: f.relative,
 							LoweringPlan:    LoweringPlanV2,
 							Representations: map[string]string{"decl:" + name.Name: "module-let(live-binding," + conservativeCarrier(t) + ")"},
-							GeneratedFile:   corePath, GeneratedSymbol: name.Name,
+							GeneratedFile:   corePath, GeneratedSymbol: tsident.Escape(name.Name),
 							InitHash: varInitHash,
 						})
 					}
@@ -497,7 +498,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 			if funcDecl.Recv == nil && funcDecl.Name.Name == "init" {
 				function.Name = fmt.Sprintf("init$%d", len(initCalls))
 				// The proof records the exact emitted symbol.
-				proof.GeneratedSymbol = function.Name
+				proof.GeneratedSymbol = tsident.Escape(function.Name)
 				if function.Support == ir.SupportIRAdmitted {
 					initCalls = append(initCalls, function.Name)
 				}
