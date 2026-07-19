@@ -433,7 +433,10 @@ func (b *builder) anonStructTypeWithIdentity(structType *types.Struct, spelled s
 		}
 		cell, err := b.fieldIsCell(structType, field.Name(), fieldType)
 		if err != nil {
-			return Type{}, err
+			// Fail CLOSED as a typed site (a raw canonical error here —
+			// e.g. a free type parameter in a local struct's field — must
+			// never abort the corpus).
+			return Type{}, &Unsupported{Kind: KindStructType, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "struct type " + spelled + " (" + err.Error() + ")", Span: span}
 		}
 		decl.Fields = append(decl.Fields, Var{Name: field.Name(), Type: fieldType, Cell: cell})
 	}

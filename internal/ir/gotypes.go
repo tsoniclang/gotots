@@ -229,6 +229,11 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 			return Type{}, &Unsupported{Kind: KindStructType, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "struct type " + spelled, Span: span}
 		}
 		if named.Obj().Parent() != named.Obj().Pkg().Scope() {
+			if mentionsTypeParamType(u) {
+				// A local struct capturing an enclosing generic's type
+				// parameters has per-instantiation shape: fail closed.
+				return Type{}, &Unsupported{Kind: KindStructType, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "local struct type capturing type parameters " + spelled, Span: span}
+			}
 			// A LOCAL named struct: no package-level declaration exists —
 			// its class synthesizes through the anonymous-struct pipeline
 			// (the NAMED canonical identity keeps distinct locals
