@@ -275,3 +275,41 @@ func CoreTypedParams() int {
 func toUint[T ~uint32](v T) uint32 {
 	return uint32(v)
 }
+
+func TestOraclePointerFamilySplit(t *testing.T) {
+	// The core.Arena shape: a generic declaration taking &s[i] of a
+	// parameter element splits on the binding's pointer form — the
+	// object family's pointer IS the element (mutations through it land
+	// in the backing store), while a scalar binding takes the "$pc"
+	// variant with slot-aliasing cells.
+	runOracle(t, `package fixture
+
+type node struct {
+	v int
+}
+
+type arena[T any] struct {
+	data []T
+}
+
+func (a *arena[T]) New() *T {
+	var zero T
+	a.data = append(a.data, zero)
+	return &a.data[len(a.data)-1]
+}
+
+func PointerFamilySplit() int {
+	an := &arena[node]{}
+	p := an.New()
+	p.v = 41
+	q := an.New()
+	q.v = 1
+	total := an.data[0].v + an.data[1].v
+	as := &arena[int]{}
+	ip := as.New()
+	*ip = 7
+	total += as.data[0]
+	return total
+}
+`)
+}

@@ -68,6 +68,7 @@ func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
 			call.KeyedParams = append(call.KeyedParams, b.unit.ParamRequiresKeyOp(function, i))
 			call.HardKeyed = append(call.HardKeyed, b.unit.ParamRequiresSVZKey(function, i))
 			call.ErasedParams = append(call.ErasedParams, calleeSig.TypeParams() != nil && i < calleeSig.TypeParams().Len() && coreErasedParam(calleeSig.TypeParams().At(i)))
+			call.PtrParams = append(call.PtrParams, b.unit.ParamRequiresPtr(function, i))
 		}
 		if err := b.buildCallArgsResults(n, signature, &call.Args, &call.Results); err != nil {
 			return nil, err
@@ -267,6 +268,7 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 	for i := range recvTypeArgs {
 		out.KeyedParams = append(out.KeyedParams, b.unit.ParamRequiresKeyOp(recvNamed.Origin().Obj(), i))
 		out.ErasedParams = append(out.ErasedParams, recvTypeParams != nil && i < recvTypeParams.Len() && coreErasedParam(recvTypeParams.At(i)))
+		out.PtrParams = append(out.PtrParams, b.unit.ParamRequiresPtr(recvNamed.Origin().Obj(), i))
 	}
 	if err := b.buildCallArgsResults(n, signature, &out.Args, &out.Results); err != nil {
 		return nil, err

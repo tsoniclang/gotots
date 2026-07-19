@@ -287,6 +287,25 @@ func (s Scope) RequireParamKeyCapture(obj types.Object, index int) {
 	s.paramCaptureReqs[key] = reqs
 }
 
+// RequireParamPtr records the pointer-family requirement: the
+// declaration's shape mentions *P, so its emission splits on the
+// binding's pointer representation (identity vs cell).
+func (s Scope) RequireParamPtr(obj types.Object, index int) {
+	key := objKey(obj)
+	reqs := s.paramPtrReqs[key]
+	for len(reqs) <= index {
+		reqs = append(reqs, false)
+	}
+	reqs[index] = true
+	s.paramPtrReqs[key] = reqs
+}
+
+// ParamRequiresPtr reports the pointer-family requirement.
+func (s Scope) ParamRequiresPtr(obj types.Object, index int) bool {
+	reqs := s.paramPtrReqs[objKey(obj)]
+	return index < len(reqs) && reqs[index]
+}
+
 // ParamRequiresKeyOp reports whether the declaration's i-th parameter
 // takes key$P in the factory protocol — the union of the HARD map-key
 // requirement and the SOFT capture requirement.
@@ -320,8 +339,19 @@ func (s Scope) CollectParamKeyRequirements(obj types.Object, params *types.TypeP
 		}
 	}
 	index := map[*types.TypeParam]int{}
+	nameIndex := map[string]int{}
 	for i := range params.Len() {
 		index[params.At(i)] = i
+		nameIndex[params.At(i).Obj().Name()] = i
+	}
+	indexOf := func(p *types.TypeParam) (int, bool) {
+		if i, mine := index[p]; mine {
+			return i, true
+		}
+		// A method signature's receiver parameters are DISTINCT objects
+		// from the type's own — same declaration, matched by name.
+		i, mine := nameIndex[p.Obj().Name()]
+		return i, mine
 	}
 	seen := map[types.Type]bool{}
 	var walk func(t types.Type)
@@ -333,13 +363,18 @@ func (s Scope) CollectParamKeyRequirements(obj types.Object, params *types.TypeP
 		switch u := types.Unalias(t).(type) {
 		case *types.Map:
 			if p, ok := types.Unalias(u.Key()).(*types.TypeParam); ok {
-				if i, mine := index[p]; mine {
+				if i, mine := indexOf(p); mine {
 					s.RequireParamSVZKey(obj, i)
 				}
 			}
 			walk(u.Key())
 			walk(u.Elem())
 		case *types.Pointer:
+			if p, ok := types.Unalias(u.Elem()).(*types.TypeParam); ok {
+				if i, mine := indexOf(p); mine {
+					s.RequireParamPtr(obj, i)
+				}
+			}
 			walk(u.Elem())
 		case *types.Slice:
 			walk(u.Elem())
@@ -411,7 +446,8 @@ func (s Scope) PropagateParamRequirements() {
 			for j, arg := range edge.args {
 				hard := s.ParamRequiresSVZKey(inner, j)
 				soft := s.ParamRequiresKeyOp(inner, j)
-				if !hard && !soft {
+				ptr := s.ParamRequiresPtr(inner, j)
+				if !hard && !soft && !ptr {
 					continue
 				}
 				p, ok := types.Unalias(arg).(*types.TypeParam)
@@ -428,6 +464,10 @@ func (s Scope) PropagateParamRequirements() {
 					}
 					if soft && !s.ParamRequiresKeyOp(outer, i) {
 						s.RequireParamKeyCapture(outer, i)
+						changed = true
+					}
+					if ptr && !s.ParamRequiresPtr(outer, i) {
+						s.RequireParamPtr(outer, i)
 						changed = true
 					}
 				}

@@ -133,6 +133,10 @@ type printer struct {
 	// parameter-keyed maps spell the encoded carrier and self-references
 	// to the family-split class take the "$ek" symbols.
 	familyEnc bool
+	// familyPtrCell marks the CELL pointer-family variant; ptrSplit marks
+	// any pointer-split emission (its *P spells the family's exact form).
+	familyPtrCell bool
+	ptrSplit      bool
 	setOps    map[string]string
 	// slicePlans maps this body's slice-typed locals to their selected
 	// representation; "native-array" locals lower onto plain arrays.
@@ -201,7 +205,8 @@ func (p *printer) temp() string {
 }
 
 func printFunc(out *strings.Builder, module *Module, function *ir.Func) error {
-	p := &printer{out: out, module: module, familyEnc: function.FamilyEnc}
+	p := &printer{out: out, module: module, familyEnc: function.FamilyEnc,
+		familyPtrCell: function.FamilyPtrCell, ptrSplit: anyTrue(function.PtrParams)}
 	signature, err := p.functionSignature(function)
 	if err != nil {
 		return fmt.Errorf("%s: %w", function.ID, err)
@@ -215,6 +220,9 @@ func printFunc(out *strings.Builder, module *Module, function *ir.Func) error {
 	emitName := function.Name
 	if function.FamilyEnc {
 		emitName += "$ek"
+	}
+	if function.FamilyPtrCell {
+		emitName += "$pc"
 	}
 	p.line("%sfunction %s%s%s {", export, tsName(emitName), generics, signature)
 	p.indent++
@@ -344,6 +352,14 @@ func (p *printer) tsType(t ir.Type) (string, error) {
 		return "goabi$.GoUintptr", nil
 	case ir.KindPointer:
 		if t.Elem != nil && t.Elem.Kind == ir.KindIface && t.Elem.TypeParamName != "" {
+			if p.ptrSplit {
+				// A pointer-split emission spells its family's exact form:
+				// the instance for the object family, a cell otherwise.
+				if p.familyPtrCell {
+					return "(gort$.GoCell<" + t.Elem.TypeParamName + "> | undefined)", nil
+				}
+				return "(" + t.Elem.TypeParamName + " | undefined)", nil
+			}
 			// Pointer to a bare type parameter: the conditional carrier
 			// resolves to the exact concrete representation per
 			// instantiation (identity for object bindings, cell for value

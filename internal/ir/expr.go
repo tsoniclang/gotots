@@ -322,6 +322,12 @@ func (b *builder) buildExpr(e ast.Expr) (Expr, error) {
 				b.use("paramZeroDeref")
 				return cell.Zero, nil
 			}
+			if b.declPtrRequires(operand.Type().Elem.TypeParamName) {
+				// A pointer-split declaration: each family emission derefs
+				// its exact form.
+				b.use("deref")
+				return &Deref{X: operand, T: *operand.Type().Elem}, nil
+			}
 			// The GoPtr carrier is opaque inside the generic body: reading
 			// through it needs a per-instantiation operation the protocol
 			// does not yet carry — fail closed to a typed placeholder.

@@ -57,6 +57,18 @@ func (b *builder) buildUnary(n *ast.UnaryExpr, resultType types.Type) (Expr, err
 				b.use("fieldCellRef")
 				return &FieldCellRef{Base: field.X, Field: field.Field, T: t}, nil
 			}
+			if get, isGet := x.(*SliceGet); isGet && get.T.Kind == KindIface && get.T.TypeParamName != "" &&
+				b.declPtrRequires(get.T.TypeParamName) {
+				// &s[i] of a parameter element inside a POINTER-SPLIT
+				// declaration: the object family's pointer IS the
+				// element; the cell family aliases the slot.
+				t, err := b.typeOf(resultType, span)
+				if err != nil {
+					return nil, err
+				}
+				b.use("ptrElem")
+				return &PtrElemRef{Slice: get.X, Index: get.Index, T: t}, nil
+			}
 			return nil, &Unsupported{Kind: KindAddressOf, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "address of " + x.Type().Go, Span: span}
 		}
 		switch x.(type) {

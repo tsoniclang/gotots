@@ -607,6 +607,11 @@
       "specClause": "docs/spec/types-values-pointers.md"
     },
     {
+      "key": "ptrElem",
+      "state": "generated",
+      "specClause": "docs/spec/interfaces-generics-functions.md"
+    },
+    {
       "key": "range:array",
       "state": "generated",
       "specClause": "docs/spec/collections-strings.md"

@@ -438,3 +438,128 @@ func (b *builder) ifaceKeyMembersEncodable(goType types.Type, span Span) bool {
 	}
 	return true
 }
+
+
+// objectFamilyBinding reports whether a binding's pointer representation
+// is the instance itself (structs, arrays, named struct instances).
+func objectFamilyBinding(arg types.Type) bool {
+	switch types.Unalias(arg).Underlying().(type) {
+	case *types.Struct, *types.Array:
+		return true
+	}
+	return false
+}
+
+// instanceFamilyPtrCell reports whether an instance binds any
+// pointer-required parameter to a NON-object carrier ("$pc" variant).
+func (b *builder) instanceFamilyPtrCell(named *types.Named) bool {
+	origin := named.Origin()
+	args := named.TypeArgs()
+	if args == nil {
+		return false
+	}
+	for i := range args.Len() {
+		if !b.unit.ParamRequiresPtr(origin.Obj(), i) {
+			continue
+		}
+		arg := args.At(i)
+		if mentionsTypeParamType(arg) {
+			continue
+		}
+		if !objectFamilyBinding(arg) {
+			return true
+		}
+	}
+	return false
+}
+
+// HasPtrCellInstances reports whether the evidence instantiates the
+// generic type with a non-object binding at a pointer-required position.
+func HasPtrCellInstances(unit Scope, named *types.Named) bool {
+	obj := named.Origin().Obj()
+	required := []int{}
+	if named.TypeParams() != nil {
+		for i := range named.TypeParams().Len() {
+			if unit.ParamRequiresPtr(obj, i) {
+				required = append(required, i)
+			}
+		}
+	}
+	if len(required) == 0 {
+		return false
+	}
+	for _, vector := range unit.GenericTypeInstances(obj) {
+		for _, index := range required {
+			if index >= len(vector) || mentionsTypeParamType(vector[index]) {
+				continue
+			}
+			if !objectFamilyBinding(vector[index]) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// HasPtrCellFuncInstances is HasPtrCellInstances for generic functions.
+func HasPtrCellFuncInstances(unit Scope, fn *types.Func) bool {
+	signature, isSig := fn.Type().(*types.Signature)
+	if !isSig || signature.TypeParams() == nil {
+		return false
+	}
+	required := []int{}
+	for i := range signature.TypeParams().Len() {
+		if unit.ParamRequiresPtr(fn, i) {
+			required = append(required, i)
+		}
+	}
+	if len(required) == 0 {
+		return false
+	}
+	for _, vector := range unit.GenericInstances(fn) {
+		for _, index := range required {
+			if index >= len(vector) || mentionsTypeParamType(vector[index]) {
+				continue
+			}
+			if !objectFamilyBinding(vector[index]) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+
+// declPtrRequires reports whether the CURRENT generic declaration takes
+// the pointer-family split on the named parameter.
+func (b *builder) declPtrRequires(paramName string) bool {
+	resolve := func(obj types.Object, params *types.TypeParamList) bool {
+		if params == nil {
+			return false
+		}
+		for i := range params.Len() {
+			if params.At(i).Obj().Name() == paramName && b.unit.ParamRequiresPtr(obj, i) {
+				return true
+			}
+		}
+		return false
+	}
+	if b.genericObj != nil {
+		signature := b.genericObj.Type().(*types.Signature)
+		if recvParams := signature.RecvTypeParams(); recvParams != nil {
+			recv := signature.Recv().Type()
+			if pointer, isPointer := types.Unalias(recv).(*types.Pointer); isPointer {
+				recv = pointer.Elem()
+			}
+			if named, isNamed := types.Unalias(recv).(*types.Named); isNamed {
+				return resolve(named.Obj(), recvParams)
+			}
+			return false
+		}
+		return resolve(b.genericObj, signature.TypeParams())
+	}
+	if b.genericTypeObj != nil {
+		return resolve(b.genericTypeObj.Obj(), b.genericTypeObj.TypeParams())
+	}
+	return false
+}

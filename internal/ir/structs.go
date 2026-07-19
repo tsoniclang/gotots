@@ -96,6 +96,7 @@ func BuildStruct(p *packages.Package, sourceDir string, unit Scope, spec *ast.Ty
 		for i := range named.TypeParams().Len() {
 			out.KeyedParams = append(out.KeyedParams, b.unit.ParamRequiresKeyOp(named.Obj(), i))
 			out.HardKeyed = append(out.HardKeyed, b.unit.ParamRequiresSVZKey(named.Obj(), i))
+			out.PtrParams = append(out.PtrParams, b.unit.ParamRequiresPtr(named.Obj(), i))
 		}
 	}
 	return out, nil

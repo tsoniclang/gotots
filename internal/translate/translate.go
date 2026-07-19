@@ -61,6 +61,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 	structs := map[string]*ir.Struct{}
 	var structOrder []string
 	var encVariants []string
+	var ptrVariants []string
 	var packageVars []emit.PackageVar
 	var carrierTypes []emit.CarrierType
 	var ledger []BodySupport
@@ -236,6 +237,9 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 						// The "$ek" variant clones AFTER the walk (methods
 						// attach to the base declaration later).
 						encVariants = append(encVariants, structDecl.Name)
+					}
+					if namedType, isNamed := object.Type().(*types.Named); isNamed && ir.HasPtrCellInstances(unit, namedType) {
+						ptrVariants = append(ptrVariants, structDecl.Name)
 					}
 					structShape, err := census.DeriveTypeShape(object, id)
 					if err != nil {
@@ -440,102 +444,11 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 		}
 	}
 
-	// Pass 2: functions and methods — attached to their receiver classes,
-	// or standalone for receivers erased to carriers. Package init
-	// functions take synthesized names and run at module evaluation in
-	// file order, after every variable initializer — exactly Go.
-	var functions []*ir.Func
-	var carrierMethods []emit.Method
-	var initCalls []string
-	blankFuncs := 0
-	for _, f := range files {
-		for _, decl := range f.file.Decls {
-			funcDecl, isFunc := decl.(*ast.FuncDecl)
-			if !isFunc {
-				continue
-			}
-			function, proof, err := translateFunc(p, sourceDir, unit, f.relative, f.source, funcDecl, options)
-			if err != nil {
-				return err
-			}
-			if funcDecl.Recv == nil && funcDecl.Name.Name == "init" {
-				function.Name = fmt.Sprintf("init$%d", len(initCalls))
-				// The proof records the exact emitted symbol.
-				proof.GeneratedSymbol = tsident.EscapeDeclared(function.Name)
-				if function.Support == ir.SupportIRAdmitted {
-					initCalls = append(initCalls, function.Name)
-				}
-			}
-			if funcDecl.Recv == nil && funcDecl.Name.Name == "_" {
-				// A blank function is uncallable in Go; its body still
-				// typechecks (stringer drift guards). It emits under a
-				// package-unique name, exactly like init functions —
-				// deterministic in file walk order.
-				function.Name = fmt.Sprintf("_$%d", blankFuncs)
-				blankFuncs++
-				proof.GeneratedSymbol = function.Name
-			}
-			ledger = append(ledger, BodySupport{
-				ID: function.ID, Package: p.PkgPath, State: function.Support, Sites: function.Sites,
-			})
-			if function.Support == ir.SupportIRAdmitted {
-				registry, err := supportRegistry()
-				if err != nil {
-					return err
-				}
-				for _, operation := range function.Operations {
-					if !registry.Generated(operation) {
-						return fmt.Errorf("GOTOTS_CENSUS_UNREGISTERED_CLASS:\ngenerated body %s uses operation class %q with no reviewed support decision in contracts/support-classes.json",
-							function.ID, operation)
-					}
-				}
-			}
-			if function.Support == ir.SupportUnimplemented {
-				// Every unsupported site is on the record. The body still
-				// MATERIALIZES as a typed throwing placeholder: its exact
-				// signature typechecks so sibling and cross-package callers
-				// compile, while calling it fails closed. The package is
-				// publication-withheld below, but one unresolved body no
-				// longer prevents its siblings from being emitted and checked.
-				unimplementedUnits++
-				function.Placeholder = true
-			} else {
-				proof.GeneratedFile = corePath
-				out.Proofs = append(out.Proofs, *proof)
-			}
-			if function.Receiver == nil {
-				functions = append(functions, function)
-				if fnObj, isFunc := p.TypesInfo.Defs[funcDecl.Name].(*types.Func); isFunc && ir.HasEncFamilyFuncInstances(unit, fnObj) {
-					encFn := *function
-					encFn.FamilyEnc = true
-					functions = append(functions, &encFn)
-				}
-				continue
-			}
-			owner := receiverBase(funcDecl.Recv)
-			// An ALIAS receiver spelling (type ImportAttributesNode = Node)
-			// must emit under the CANONICAL named type: every dispatch and
-			// call site resolves through go/types and spells Node$Method,
-			// so the declared function name must coincide.
-			if fnObj, ok := p.TypesInfo.Defs[funcDecl.Name].(*types.Func); ok {
-				recvType := fnObj.Type().(*types.Signature).Recv().Type()
-				if pointer, isPointer := recvType.(*types.Pointer); isPointer {
-					recvType = pointer.Elem()
-				}
-				if named, isNamed := types.Unalias(recvType).(*types.Named); isNamed {
-					owner = named.Obj().Name()
-				}
-			}
-			if owner == "" {
-				return fmt.Errorf("method %s has no named receiver type in package %s", function.Name, p.PkgPath)
-			}
-			if structDecl, ok := structs[owner]; ok {
-				structDecl.Methods = append(structDecl.Methods, function)
-				continue
-			}
-			carrierMethods = append(carrierMethods, emit.Method{TypeName: owner, Fn: function})
-		}
+	functions, carrierMethods, initCalls, ledger, bodyUnimplemented, err := translateFunctionsPass(out, p, sourceDir, unit, options, files, structs, corePath, ledger)
+	if err != nil {
+		return err
 	}
+	unimplementedUnits += bodyUnimplemented
 	out.Support = append(out.Support, ledger...)
 	// The function-literal ledger covers EVERY package — withheld ones
 	// included: analysis dispositions exist regardless of emission.
@@ -584,6 +497,14 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 			encClone.FamilyEnc = true
 			structs[name+"$ek"] = &encClone
 			structOrder = append(structOrder, name+"$ek")
+		}
+	}
+	for _, name := range ptrVariants {
+		if base, has := structs[name]; has {
+			ptrClone := *base
+			ptrClone.FamilyPtrCell = true
+			structs[name+"$pc"] = &ptrClone
+			structOrder = append(structOrder, name+"$pc")
 		}
 	}
 	*emitters = append(*emitters, func() error {

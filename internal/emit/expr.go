@@ -99,9 +99,15 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			} else {
 				args += ", " + factories
 			}
+			variant := n.Callee
 			if callFamilyEnc(n.TypeArgs, n.HardKeyed, p.familyEnc) {
-				// The encoded-family variant of a family-split callee.
-				renamed, err := p.module.symbol(n.Pkg, n.Callee+"$ek")
+				variant += "$ek"
+			}
+			if callFamilyPtr(n.TypeArgs, n.PtrParams, p.familyPtrCell) {
+				variant += "$pc"
+			}
+			if variant != n.Callee {
+				renamed, err := p.module.symbol(n.Pkg, variant)
 				if err != nil {
 					return "", err
 				}
@@ -125,6 +131,9 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		}
 		if recvT.MapFamilyEnc || (p.familyEnc && selfHardKeyedReference(recvT)) {
 			methodClass += "$ek"
+		}
+		if recvT.MapFamilyPtrCell || (p.familyPtrCell && selfPtrReference(recvT)) {
+			methodClass += "$pc"
 		}
 		callee, err := p.module.symbol(n.Pkg, methodClass+"$"+n.Method)
 		if err != nil {
@@ -206,6 +215,9 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		newClass := n.TypeName
 		if structT.MapFamilyEnc || (p.familyEnc && selfHardKeyedReference(structT)) {
 			newClass += "$ek"
+		}
+		if structT.MapFamilyPtrCell || (p.familyPtrCell && selfPtrReference(structT)) {
+			newClass += "$pc"
 		}
 		class, err := p.module.symbol(n.Pkg, newClass)
 		if err != nil {
@@ -441,7 +453,7 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		return p.zeroLiteral(n.T)
 	case *ir.ExternZero:
 		return p.zeroLiteral(n.T)
-	case *ir.GenericFuncValue, *ir.ExternEqual, *ir.ExternFieldRead, *ir.ExternToOwned, *ir.ExternLit:
+	case *ir.GenericFuncValue, *ir.ExternEqual, *ir.ExternFieldRead, *ir.ExternToOwned, *ir.ExternLit, *ir.PtrElemRef:
 		return p.printExternBridgeExpr(e)
 	case *ir.ParamEqual:
 		left, err := p.printExpr(n.L)
@@ -505,6 +517,13 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			return "", err
 		}
 		if n.X.Type().Elem != nil && n.X.Type().Elem.Kind == ir.KindIface && n.X.Type().Elem.TypeParamName != "" {
+			if p.ptrSplit {
+				if p.familyPtrCell {
+					return checked + ".v", nil
+				}
+				// The object family: the pointer IS the instance.
+				return checked, nil
+			}
 			// Unreachable by construction: the IR rejects dereference of a
 			// pointer-to-type-parameter (its representation is opaque
 			// inside the generic body).
@@ -546,3 +565,35 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 
 // castResults types a dynamically dispatched call's unknown result with
 // an erasable cast.
+
+
+// selfPtrReference mirrors selfHardKeyedReference for the pointer axis.
+func selfPtrReference(t ir.Type) bool {
+	for i, arg := range t.TypeArgs {
+		if arg.TypeParamName != "" && i < len(t.PtrParams) && t.PtrParams[i] {
+			return true
+		}
+	}
+	return false
+}
+
+// callFamilyPtr reports whether a generic call binds any
+// pointer-required position to a NON-object carrier (or forwards a bare
+// parameter inside a "$pc" emission).
+func callFamilyPtr(typeArgs []ir.Type, ptrParams []bool, familyPtrCell bool) bool {
+	for i, arg := range typeArgs {
+		if i >= len(ptrParams) || !ptrParams[i] {
+			continue
+		}
+		if arg.TypeParamName != "" {
+			if familyPtrCell {
+				return true
+			}
+			continue
+		}
+		if arg.Kind != ir.KindStruct && arg.Kind != ir.KindArray {
+			return true
+		}
+	}
+	return false
+}

@@ -270,9 +270,11 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 			for i := range named.TypeParams().Len() {
 				out.ClassKeyParams = append(out.ClassKeyParams, b.unit.ParamRequiresKeyOp(named.Origin().Obj(), i))
 				out.HardKeyedParams = append(out.HardKeyedParams, b.unit.ParamRequiresSVZKey(named.Origin().Obj(), i))
+				out.PtrParams = append(out.PtrParams, b.unit.ParamRequiresPtr(named.Origin().Obj(), i))
 			}
 			if named.TypeArgs() != nil && named.TypeArgs().Len() > 0 {
 				out.MapFamilyEnc = b.instanceFamilyEnc(named)
+				out.MapFamilyPtrCell = b.instanceFamilyPtrCell(named)
 			}
 		}
 		if named.TypeArgs() != nil {
@@ -311,6 +313,7 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 			for i := range named.TypeParams().Len() {
 				out.ClassKeyParams = append(out.ClassKeyParams, b.unit.ParamRequiresKeyOp(named.Obj(), i))
 				out.HardKeyedParams = append(out.HardKeyedParams, b.unit.ParamRequiresSVZKey(named.Obj(), i))
+				out.PtrParams = append(out.PtrParams, b.unit.ParamRequiresPtr(named.Obj(), i))
 			}
 		}
 		return out, nil

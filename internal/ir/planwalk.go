@@ -259,6 +259,8 @@ func (s *slicePlanner) walkExpr(e Expr) {
 		s.escapeIfSlice(n.X)
 	case *ExternToOwned:
 		s.escapeIfSlice(n.X)
+	case *PtrElemRef:
+		s.escapeIfSlice(n.Slice)
 	case *ExternEqual:
 		s.escapeIfSlice(n.L)
 		s.escapeIfSlice(n.R)

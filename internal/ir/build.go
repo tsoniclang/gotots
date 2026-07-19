@@ -190,6 +190,7 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 			function.KeyedParams = append(function.KeyedParams, b.unit.ParamRequiresKeyOp(object, i))
 			function.HardKeyed = append(function.HardKeyed, b.unit.ParamRequiresSVZKey(object, i))
 			function.ErasedParams = append(function.ErasedParams, coreErasedParam(signature.TypeParams().At(i)))
+			function.PtrParams = append(function.PtrParams, b.unit.ParamRequiresPtr(object, i))
 		}
 		b.genericObj = object
 	}
@@ -220,6 +221,7 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 					function.KeyedParams = append(function.KeyedParams, b.unit.ParamRequiresKeyOp(named.Obj(), i))
 					function.HardKeyed = append(function.HardKeyed, b.unit.ParamRequiresSVZKey(named.Obj(), i))
 					function.ErasedParams = append(function.ErasedParams, coreErasedParam(recvParams.At(i)))
+					function.PtrParams = append(function.PtrParams, b.unit.ParamRequiresPtr(named.Obj(), i))
 				}
 			}
 		}

@@ -109,6 +109,20 @@ func (p *printer) printExternBridgeExpr(e ir.Expr) (string, error) {
 			return "", err
 		}
 		return callee + "(" + args + ")", nil
+	case *ir.PtrElemRef:
+		s, err := p.printExpr(n.Slice)
+		if err != nil {
+			return "", err
+		}
+		index, err := p.printExpr(n.Index)
+		if err != nil {
+			return "", err
+		}
+		if p.familyPtrCell {
+			return "gosl$.goSliceElemCell(" + s + ", " + index + ")", nil
+		}
+		// The object family: the element IS the pointer.
+		return "gosl$.goSliceGet(" + s + ", " + index + ")", nil
 	}
 	return "", fmt.Errorf("unhandled extern-bridge expression %T", e)
 }

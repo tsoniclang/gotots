@@ -18,7 +18,7 @@
     "sha256": "7a4d36d04666ef79512486741dad04adb2883a4d565285237aad9162abc570fb"
   },
   "generatedHelperRuntime": {
-    "abiVersion": 30,
-    "sha256": "7461f03b273ef9570087d47124cad37c4e8bd15220ea7f5f20bae958bf58121a"
+    "abiVersion": 31,
+    "sha256": "4249d9a20d649a93af5818af828cf62af5062fb6fb9c22f7a8e73810d697d669"
   }
 }

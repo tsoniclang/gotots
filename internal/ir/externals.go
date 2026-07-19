@@ -162,3 +162,16 @@ type SliceClearStmt struct {
 }
 
 func (*SliceClearStmt) stmt() {}
+
+
+// PtrElemRef is &s[i] of a parameter element inside a pointer-split
+// declaration: the object family's pointer IS the element; the cell
+// family aliases the slot.
+type PtrElemRef struct {
+	Slice Expr
+	Index Expr
+	T     Type
+}
+
+func (*PtrElemRef) expr()        {}
+func (e *PtrElemRef) Type() Type { return e.T }

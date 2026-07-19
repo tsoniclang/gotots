@@ -16,7 +16,8 @@ import (
 // every field in declaration order (composite literals pass explicit
 // zeros for omitted fields, so construction is always total).
 func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct) error {
-	p := &printer{out: out, module: module, familyEnc: structDecl.FamilyEnc}
+	p := &printer{out: out, module: module, familyEnc: structDecl.FamilyEnc,
+		familyPtrCell: structDecl.FamilyPtrCell, ptrSplit: anyTrue(structDecl.PtrParams)}
 	export := "export "
 	generics := ""
 	if len(structDecl.TypeParams) > 0 {
@@ -364,7 +365,12 @@ func printMethodFunction(out *strings.Builder, module *Module, className string,
 // emission spells parameter-keyed maps through the encoded carrier and
 // in-family self-references.
 func printMethodFunctionFamily(out *strings.Builder, module *Module, className string, method *ir.Func, familyEnc bool) error {
-	p := &printer{out: out, module: module, familyEnc: familyEnc}
+	return printMethodFunctionVariant(out, module, className, method, familyEnc, false)
+}
+
+func printMethodFunctionVariant(out *strings.Builder, module *Module, className string, method *ir.Func, familyEnc, familyPtrCell bool) error {
+	p := &printer{out: out, module: module, familyEnc: familyEnc,
+		familyPtrCell: familyPtrCell, ptrSplit: anyTrue(method.PtrParams)}
 	recvSpelled, err := p.tsType(method.Receiver.Type)
 	if err != nil {
 		return fmt.Errorf("%s: %w", method.ID, err)
@@ -561,8 +567,12 @@ func structKeyed(structDecl *ir.Struct, i int) bool {
 // familyName is the emission variant's class name: the encoded-family
 // variant takes the "$ek" suffix.
 func familyName(structDecl *ir.Struct) string {
+	name := structDecl.Name
 	if structDecl.FamilyEnc {
-		return structDecl.Name + "$ek"
+		name += "$ek"
 	}
-	return structDecl.Name
+	if structDecl.FamilyPtrCell {
+		name += "$pc"
+	}
+	return name
 }

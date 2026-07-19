@@ -10,6 +10,7 @@ const gosliceSource = `// The exact Go slice carrier: backing array, offset, len
 // bigint); JS mixed comparisons are exact, and conversion to an array
 // offset happens only after the bounds proof.
 import { GoPanic } from "./gopanic.js";
+import { type GoCell } from "./goruntime.js";
 
 export class GoSlice<T> {
   backing: T[];
@@ -35,6 +36,22 @@ function panicIndex(index: GoIndex, length: number): never {
     throw new GoPanic("runtime error: index out of range [" + String(index) + "]");
   }
   throw new GoPanic("runtime error: index out of range [" + String(index) + "] with length " + String(length));
+}
+
+// goSliceElemCell is the aliasing cell over one slice slot: reads and
+// writes through the cell ARE reads and writes of the slot, exactly
+// &s[i] for value-carrier elements.
+export function goSliceElemCell<T>(s: GoSliceValue<T>, index: GoIndex): GoCell<T> {
+  const backing = s;
+  const at = index;
+  return {
+    get v(): T {
+      return goSliceGet(backing, at);
+    },
+    set v(value: T) {
+      goSliceSet(backing, at, value);
+    },
+  };
 }
 
 // goSliceClearWith zeroes every element in place (Go's clear(s)):

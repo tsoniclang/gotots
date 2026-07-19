@@ -112,8 +112,9 @@ func Package(module *Module, decls Decls) (string, []BodyOutcome, []BodyArtifact
 			body.WriteString("\n")
 			className := familyName(structDecl)
 			familyEnc := structDecl.FamilyEnc
+			familyPtr := structDecl.FamilyPtrCell
 			err := emitTransactionalBody(&body, module, method, func(out *strings.Builder, frag *Module) error {
-				return printMethodFunctionFamily(out, frag, className, method, familyEnc)
+				return printMethodFunctionVariant(out, frag, className, method, familyEnc, familyPtr)
 			}, &outcomes, &artifacts)
 			if err != nil {
 				return "", nil, nil, err
