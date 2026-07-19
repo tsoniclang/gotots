@@ -33,10 +33,11 @@ func (b *builder) admitGenericFunction(object *types.Func, span Span) ([]string,
 				return nil, &Unsupported{Kind: KindGenericFunctionInstantiatedWithAnUnreviewedTypeArgument, Code: "GOTOTS_UNSUPPORTED_DECLARATION",
 					Construct: "generic function instantiated with an unreviewed type argument (" + arg.String() + ")", Span: span}
 			}
-			if resolved.Kind == KindStruct {
-				return nil, &Unsupported{Kind: KindGenericFunctionInstantiatedWithAStructValueCopySemanticsVaryPerInstantiation, Code: "GOTOTS_UNSUPPORTED_DECLARATION",
-					Construct: "generic function instantiated with a struct value (copy semantics vary per instantiation)", Span: span}
-			}
+			// Value-copy carrier bindings (structs, arrays) are exact under
+			// the factory protocol: every instantiation site passes the
+			// binding's clone/set operations, so copy semantics are per-
+			// instantiation by construction.
+			_ = resolved
 		}
 	}
 	return names, nil

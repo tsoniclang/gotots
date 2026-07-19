@@ -160,6 +160,20 @@ func (b *builder) assignBindings(root ast.Node, typeParams []string) {
 	for _, tp := range typeParams {
 		seeds = append(seeds, "zero$"+tp, "eq$"+tp, "clone$"+tp, "set$"+tp)
 	}
+	// Package-scope declaration names share the module scope with every
+	// local binding: a local spelled like a same-package function, type,
+	// or variable would SHADOW it in the emitted module (Go resolves the
+	// package object wherever the local is not yet in scope — e.g. its own
+	// initializer — so the collision is real). Seed every package-scope
+	// name (in its emitted spelling) so such locals disambiguate.
+	for v := range b.bind.ids {
+		if v.Pkg() != nil {
+			for _, name := range v.Pkg().Scope().Names() {
+				seeds = append(seeds, tsident.EscapeDeclared(name))
+			}
+			break
+		}
+	}
 	b.bind.allocate(seeds)
 	// Fail closed if any local binding the type checker records is missing
 	// from the table (an omitted binding kind, never a silent fallback).

@@ -136,8 +136,10 @@ func CrossPackageGeneric() (string, int, int) {
 	}
 }
 
-func TestGenericStructInstantiationFailsClosed(t *testing.T) {
-	assertTranslateFails(t, `package fixture
+func TestGenericStructInstantiationCopies(t *testing.T) {
+	// Previously fail-closed; the factory protocol makes the struct
+	// binding exact — the bound copy is independent of the source literal.
+	runOracle(t, `package fixture
 
 type Point struct {
 	X int
@@ -149,7 +151,9 @@ func identity[T any](v T) T {
 
 func Case() int {
 	p := identity(Point{X: 1})
-	return p.X
+	q := p
+	q.X = 9
+	return p.X*10 + q.X
 }
-`, "GOTOTS_UNSUPPORTED_DECLARATION", "instantiated with a struct value")
+`)
 }
