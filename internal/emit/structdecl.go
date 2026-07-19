@@ -249,7 +249,7 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 			if field.Cell {
 				access += ".v"
 			}
-			component, err := keyComponent(access, field.Type)
+			component, err := p.keyComponent(access, field.Type)
 			if err != nil {
 				return err
 			}
@@ -271,7 +271,7 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 // component parses left to right unambiguously, so the composition is
 // injective (strings are length-prefixed; array lengths are fixed by
 // the type).
-func keyComponent(access string, t ir.Type) (string, error) {
+func (p *printer) keyComponent(access string, t ir.Type) (string, error) {
 	switch {
 	case t.Kind == ir.KindString:
 		return tsident.Global("String") + "(" + access + `.length) + ":" + ` + access, nil
@@ -282,7 +282,7 @@ func keyComponent(access string, t ir.Type) (string, error) {
 	case t.Kind == ir.KindUnit:
 		return `"z"`, nil
 	case t.Kind == ir.KindArray:
-		elem, err := keyComponent("$v", *t.Elem)
+		elem, err := p.keyComponent("$v", *t.Elem)
 		if err != nil {
 			return "", err
 		}
@@ -295,6 +295,17 @@ func keyComponent(access string, t ir.Type) (string, error) {
 		return `"{" + ` + access + `.goKey$() + "}"`, nil
 	case t.Kind.Integer():
 		return `"i" + ` + tsident.Global("String") + "(" + access + ")", nil
+	case t.Kind.Float():
+		return "gort$.goKeyFloat(" + access + ")", nil
+	case t.Kind == ir.KindIface && t.TypeParamName == "":
+		// The union's generated $key encoder carries Go's dynamic-key
+		// equality for the interface field.
+		name, err := p.ifaceUnionAlias(t)
+		if err != nil {
+			return "", err
+		}
+		p.module.RequireIfaceKeyFn(name)
+		return name + "$key(" + access + ")", nil
 	}
 	return "", fmt.Errorf("no key encoding for field type %q", t.Go)
 }

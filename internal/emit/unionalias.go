@@ -267,11 +267,68 @@ func (p *printer) ifaceKeyFn(t ir.Type, name string) (string, error) {
 	}
 	b.WriteString("  switch ($v.k) {\n")
 	for _, member := range members {
-		if !member.Pointer {
-			return "", fmt.Errorf("interface key union %s has non-pointer member %s (encoder not yet reviewed)", name, member.K)
+		component, err := memberKeyComponent(member)
+		if err != nil {
+			return "", err
 		}
-		fmt.Fprintf(&b, "    case %q: return %q + gort$.goKeyId($v.v);\n", member.K, member.K+"|")
+		fmt.Fprintf(&b, "    case %q: return %q + %s;\n", member.K, member.K+"|", component)
+	}
+	if t.IfaceEmpty {
+		for _, member := range predeclaredMembers {
+			component := "gort$.goKeyScalar($v.v)"
+			if member.name == "float64" || member.name == "float32" {
+				component = "gort$.goKeyFloat($v.v)"
+			}
+			fmt.Fprintf(&b, "    case %q: return %q + %s;\n", "p:"+member.name, "p:"+member.name+"|", component)
+		}
+		for _, composite := range p.module.BoxedComposites {
+			if p.referencesWithheldType(composite.T) {
+				continue
+			}
+			component := compositeKeyComponent(composite)
+			fmt.Fprintf(&b, "    case %q: return %s;\n", "c:"+composite.Canon, component)
+		}
 	}
 	b.WriteString("    default: return gort$.goPanicUnreachableType(\"key\");\n  }\n}\n")
 	return b.String(), nil
+}
+
+// memberKeyComponent spells one named member's key encoding: pointer
+// identity, the exact scalar carrier, or a key-encodable struct's goKey$.
+func memberKeyComponent(member ir.IfaceMember) (string, error) {
+	switch {
+	case member.Pointer:
+		return "gort$.goKeyId($v.v)", nil
+	case member.Extern && member.ExternCarrier == "number":
+		return "gort$.goKeyFloat($v.v)", nil
+	case member.Extern && member.ExternCarrier != "":
+		return "gort$.goKeyScalar($v.v)", nil
+	case member.Extern:
+		return "", fmt.Errorf("interface key member %s is an opaque external value (no exact encoding)", member.K)
+	case member.Struct:
+		if !member.KeyEncodable {
+			if member.Eq != nil && member.Eq.Kind == ir.EqUncomparable {
+				return fmt.Sprintf("gort$.goKeyUnhashable(%q)", member.Eq.Display), nil
+			}
+			return "", fmt.Errorf("interface key member %s is a struct without a key encoding", member.K)
+		}
+		return "$v.v.goKey$()", nil
+	}
+	return "gort$.goKeyScalar($v.v)", nil
+}
+
+// compositeKeyComponent spells one boxed composite's key: pointer
+// composites by identity, primitive arrays element-wise, and every
+// uncomparable composite through Go's exact unhashable panic.
+func compositeKeyComponent(composite BoxedComposite) string {
+	prefix := fmt.Sprintf("%q + ", "c:"+composite.Canon+"|")
+	if composite.Eq != nil {
+		switch composite.Eq.Kind {
+		case ir.EqIdentity:
+			return prefix + "gort$.goKeyId($v.v)"
+		case ir.EqArray:
+			return prefix + "gort$.goKeyArray($v.v, gort$.goKeyScalar)"
+		}
+	}
+	return fmt.Sprintf("gort$.goKeyUnhashable(%q)", composite.T.Go)
 }

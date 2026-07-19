@@ -162,7 +162,7 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 				// $key function encodes discriminant + goKeyId, exactly
 				// Go's (dynamic type, pointer) equality. Scalar/struct/
 				// handle members stay fail-closed pending their encoders.
-				admitted = b.ifaceKeyMembersPointerOnly(u.Key(), span)
+				admitted = b.ifaceKeyMembersEncodable(u.Key(), span)
 			}
 			if !admitted {
 				// A type-parameter key hides behind its constraint
@@ -360,7 +360,10 @@ func KeyEncodableField(t Type) bool {
 	case KindArray:
 		return KeyEncodableField(*t.Elem)
 	}
-	return t.Kind.Integer()
+	// Floats encode through the exact float-key rule: -0 folds onto +0
+	// and every NaN encode is a fresh token, so a NaN-field key is
+	// unretrievable — exactly Go.
+	return t.Kind.Integer() || t.Kind.Float()
 }
 
 // typeParamKeySupported admits a type-parameter map key when every
@@ -457,6 +460,19 @@ func (b *builder) structKeyEncodable(keyType types.Type, span Span) bool {
 	if !ok {
 		return false
 	}
+	guard := keyType.String()
+	if b.keyEncodableInProgress[guard] {
+		// A cycle through member/field types: the definition is
+		// COINDUCTIVE (assuming encodable is self-consistent — value
+		// recursion terminates because pointer members encode by
+		// identity), so the in-progress type counts as encodable.
+		return true
+	}
+	if b.keyEncodableInProgress == nil {
+		b.keyEncodableInProgress = map[string]bool{}
+	}
+	b.keyEncodableInProgress[guard] = true
+	defer delete(b.keyEncodableInProgress, guard)
 	for i := range structType.NumFields() {
 		if !b.keyEncodableFieldType(structType.Field(i).Type(), span) {
 			return false
@@ -485,25 +501,66 @@ func (b *builder) keyEncodableFieldType(goType types.Type, span Span) bool {
 			return b.keyEncodableFieldType(arr.Elem(), span)
 		}
 		return false
+	case KindIface:
+		// An interface FIELD encodes through the union's generated $key
+		// (Go's dynamic-key equality) when every member is encodable.
+		if fieldIR.TypeParamName != "" {
+			return false
+		}
+		return b.ifaceKeyMembersEncodable(goType, span)
 	}
 	return KeyEncodableField(fieldIR)
 }
 
-// ifaceKeyMembersPointerOnly reports whether every member of an interface
-// type used as a MAP KEY carries pointer-identity dynamics (the exactly
-// encodable subset; the empty interface's open member set stays out).
-func (b *builder) ifaceKeyMembersPointerOnly(goType types.Type, span Span) bool {
+// ifaceKeyMembersEncodable reports whether every member of an interface
+// type used as a MAP KEY is exactly encodable: pointer identity, a
+// scalar carrier (basic-underlying external types included), or a
+// key-encodable struct value. An external HANDLE value member (opaque,
+// compared by value in Go) has no exact encoding and fails closed. The
+// EMPTY interface additionally admits: predeclared members are scalars
+// and boxed composites either encode (identity/array-prim) or carry Go's
+// exact unhashable panic.
+func (b *builder) ifaceKeyMembersEncodable(goType types.Type, span Span) bool {
 	iface, ok := goType.Underlying().(*types.Interface)
-	if !ok || iface.NumMethods() == 0 {
+	if !ok {
 		return false
 	}
+	guard := "iface:" + goType.String()
+	if b.keyEncodableInProgress[guard] {
+		return true // coinductive: see structKeyEncodable
+	}
+	if b.keyEncodableInProgress == nil {
+		b.keyEncodableInProgress = map[string]bool{}
+	}
+	b.keyEncodableInProgress[guard] = true
+	defer delete(b.keyEncodableInProgress, guard)
 	members, err := b.ifaceMembers(iface, span)
-	if err != nil || len(members) == 0 {
+	if err != nil {
+		return false
+	}
+	if iface.NumMethods() == 0 {
+		// The empty interface: named members checked below; predeclared
+		// and composite members are always encodable-or-panicking.
+	} else if len(members) == 0 {
 		return false
 	}
 	for _, member := range members {
-		if !member.Pointer {
-			return false
+		switch {
+		case member.Pointer:
+		case member.Extern && member.ExternCarrier != "":
+		case member.Extern:
+			return false // opaque handle value: no exact encoding
+		case member.Struct:
+			if !member.KeyEncodable {
+				// An UNCOMPARABLE dynamic key panics in Go ("hash of
+				// unhashable type") — the panic IS the exact encoding; a
+				// comparable member without an encoding fails closed.
+				if member.Eq == nil || member.Eq.Kind != EqUncomparable {
+					return false
+				}
+			}
+		default:
+			// A named value carrier over a scalar: encodable by carrier.
 		}
 	}
 	return true

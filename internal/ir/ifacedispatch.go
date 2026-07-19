@@ -253,6 +253,9 @@ func (b *builder) ifaceMembers(iface *types.Interface, span Span) ([]IfaceMember
 			Struct: isStruct,
 			Extern: !b.unit.Owns(obj.Pkg().Path()),
 		}
+		if isStruct && !pointer {
+			member.KeyEncodable = b.structKeyEncodable(named, span)
+		}
 		if member.Extern && !isStruct {
 			// An external named type over a BASIC underlying boxes its
 			// value carrier, not a branded handle.

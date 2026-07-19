@@ -150,3 +150,60 @@ func IfaceKeyedMap() int {
 }
 `)
 }
+
+func TestOracleAnyKeyedMap(t *testing.T) {
+	// The fswatch.debounce shape: map[any]V — mixed dynamic keys (strings,
+	// ints, pointers) under Go's (dynamic type, value) equality; an
+	// uncomparable dynamic key panics exactly.
+	runOracle(t, `package fixture
+
+type tok struct{ n int }
+
+func (t *tok) N() int { return t.n }
+
+func AnyKeyedMap() int {
+	m := map[any]int{}
+	m["a"] = 1
+	m[7] = 2
+	p := &tok{n: 3}
+	m[p] = 3
+	total := len(m) * 100
+	total += m["a"] + m[7] + m[p]
+	if _, ok := m[8]; ok {
+		total += 10000
+	}
+	delete(m, 7)
+	return total + len(m)*10
+}
+`)
+}
+
+func TestOracleStructKeyWithAnyField(t *testing.T) {
+	// The checker EnumLiteralKey shape: a struct map key whose field is an
+	// interface — the union $key encoder composes into goKey$.
+	runOracle(t, `package fixture
+
+type sym struct{ id int }
+
+func (s *sym) ID() int { return s.id }
+
+type enumKey struct {
+	owner *sym
+	value any
+}
+
+func StructKeyWithAnyField() int {
+	a := &sym{id: 1}
+	m := map[enumKey]int{}
+	m[enumKey{owner: a, value: "x"}] = 5
+	m[enumKey{owner: a, value: 3}] = 7
+	total := len(m) * 100
+	total += m[enumKey{owner: a, value: "x"}]
+	total += m[enumKey{owner: a, value: 3}] * 10
+	if _, ok := m[enumKey{owner: a, value: "y"}]; ok {
+		total += 100000
+	}
+	return total
+}
+`)
+}

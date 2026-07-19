@@ -497,6 +497,10 @@ type IfaceMember struct {
 	// carrier for basic-underlying external named types.
 	Extern        bool
 	ExternCarrier string
+	// KeyEncodable marks a value-STRUCT member whose goKey$ encoding
+	// exists (map-key admission for interface keys consults it; other
+	// member classes derive keyability from their carrier).
+	KeyEncodable bool
 	// Eq is the recursive typed equality plan for THIS member's exact
 	// payload under Go's interface equality — the single operation the
 	// generated union equality narrows to, so no payload is ever erased.

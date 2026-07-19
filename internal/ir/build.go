@@ -54,6 +54,11 @@ type builder struct {
 	// carriers among them live in mutable cells (shared with closure
 	// child builders — an inner &x may address an outer variable).
 	boxed map[*types.Var]bool
+	// keyEncodableInProgress guards the mutually recursive struct/
+	// interface key-encodability resolution: a type reached while its own
+	// encodability is being decided is a cycle, conservatively not
+	// encodable (fail closed).
+	keyEncodableInProgress map[string]bool
 	// bind is this top-level function's canonical binding-identity table
 	// and emission-name allocator (shared with closure child builders so
 	// captured variables resolve to their outer name and a closure's own
