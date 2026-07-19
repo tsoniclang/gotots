@@ -27,12 +27,15 @@ type TSDecl struct {
 // Extract parses every given generated file with the pinned TypeScript
 // compiler and returns file → declared name → declaration structure.
 func Extract(files map[string]string, typescriptModule string) (map[string]map[string]TSDecl, error) {
+	if len(files) == 0 {
+		return map[string]map[string]TSDecl{}, nil
+	}
 	staging, err := os.MkdirTemp("", "gotots-declparity-")
 	if err != nil {
 		return nil, err
 	}
 	defer os.RemoveAll(staging)
-	var list []string
+	list := make([]string, 0, len(files))
 	for path, content := range files {
 		full := filepath.Join(staging, filepath.FromSlash(path))
 		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {

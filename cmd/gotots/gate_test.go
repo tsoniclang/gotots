@@ -28,11 +28,11 @@ func productionDecl(id, pkg, kind string) census.DeclarationRecord {
 func TestStage05MissingInputBlocks(t *testing.T) {
 	// The guard must run before any dereference (the audit's guard-order
 	// defect).
-	status, _, err := runSignatureCompletenessGate(nil, nil)
+	status, _, err := runSignatureCompletenessGate(nil, nil, ".")
 	if err != nil || status != "blocked" {
 		t.Fatalf("nil input: status=%q err=%v; want blocked", status, err)
 	}
-	status, _, _ = runSignatureCompletenessGate(&census.Result{}, &translate.Generated{})
+	status, _, _ = runSignatureCompletenessGate(&census.Result{}, &translate.Generated{}, ".")
 	if status != "blocked" {
 		t.Fatalf("missing shapes: status=%q; want blocked", status)
 	}
@@ -44,7 +44,7 @@ func TestStage05MissingProofFails(t *testing.T) {
 		[]census.FunctionShape{{ID: "p::func::F", Signature: "func F()"}},
 	)
 	generated := &translate.Generated{}
-	status, details, _ := runSignatureCompletenessGate(first, generated)
+	status, details, _ := runSignatureCompletenessGate(first, generated, ".")
 	if status != "fail" {
 		t.Fatalf("missing proof and empty proof set must fail; got %q %v", status, details)
 	}
@@ -59,7 +59,7 @@ func TestStage05OrphanProofFails(t *testing.T) {
 		{ID: "p::func::F", SignatureHash: signatureHashOf("func F()")},
 		{ID: "p::func::Ghost", SignatureHash: signatureHashOf("func Ghost()")},
 	}}
-	status, details, _ := runSignatureCompletenessGate(first, generated)
+	status, details, _ := runSignatureCompletenessGate(first, generated, ".")
 	if status != "fail" || !strings.Contains(strings.Join(details, "\n"), "orphan proof") {
 		t.Fatalf("orphan proof must fail; got %q %v", status, details)
 	}
@@ -73,7 +73,7 @@ func TestStage05SignatureDriftFails(t *testing.T) {
 	generated := &translate.Generated{Proofs: []translate.Proof{
 		{ID: "p::func::F", SignatureHash: signatureHashOf("func F(changed int)")},
 	}}
-	status, details, _ := runSignatureCompletenessGate(first, generated)
+	status, details, _ := runSignatureCompletenessGate(first, generated, ".")
 	if status != "fail" || !strings.Contains(strings.Join(details, "\n"), "signature drift") {
 		t.Fatalf("signature drift must fail; got %q %v", status, details)
 	}
@@ -90,19 +90,19 @@ func TestStage05UnimplementedRecordAccounts(t *testing.T) {
 	}
 	// The one production shape is unimplemented; the sole proof is an
 	// orphan and must still fail.
-	status, details, _ := runSignatureCompletenessGate(first, generated)
+	status, details, _ := runSignatureCompletenessGate(first, generated, ".")
 	if status != "fail" {
 		t.Fatalf("orphan alongside unimplemented must still fail; got %q %v", status, details)
 	}
 	// With the orphan removed, the explicit unimplemented record fully
 	// accounts for the denominator: the join succeeds (no defect), but the
-	// stage is BLOCKED, not pass — it verifies only signatures/funclits/
-	// initializers and only by shared-typeid agreement, not independent
-	// structural TS-vs-Go comparison across every declaration class.
+	// stage still FAILS CLOSED — nothing was module-retained, so the
+	// independent structural parity verified zero declarations and an
+	// empty parsed surface can never prove completeness.
 	generated.Proofs = nil
-	status, details, _ = runSignatureCompletenessGate(first, generated)
-	if status != "blocked" {
-		t.Fatalf("fully unimplemented denominator with a successful join must block (not overclaim completeness); got %q %v", status, details)
+	status, details, stageErr := runSignatureCompletenessGate(first, generated, "../..")
+	if status != "fail" || stageErr == nil || !strings.Contains(stageErr.Error(), "zero declarations") {
+		t.Fatalf("fully unimplemented denominator must fail closed on zero independent verification; got %q %v %v", status, details, stageErr)
 	}
 	// But a denominator with an unaccounted shape AND zero proofs is a
 	// disjoint evidence set and must fail.
@@ -110,7 +110,7 @@ func TestStage05UnimplementedRecordAccounts(t *testing.T) {
 		[]census.DeclarationRecord{productionDecl("p::func::F", "p", "func"), productionDecl("p::func::G", "p", "func")},
 		[]census.FunctionShape{{ID: "p::func::F", Signature: "func F()"}, {ID: "p::func::G", Signature: "func G()"}},
 	)
-	status, _, _ = runSignatureCompletenessGate(first2, generated)
+	status, _, _ = runSignatureCompletenessGate(first2, generated, ".")
 	if status != "fail" {
 		t.Fatalf("unaccounted shape with empty proofs must fail; got %q", status)
 	}
@@ -129,7 +129,7 @@ func censusWithConst(shape census.ConstShape) *census.Result {
 func TestStage05ConstMissingEvidenceFails(t *testing.T) {
 	first := censusWithConst(census.ConstShape{ID: "p::const::C", Type: "int", Value: "42"})
 	// A const with no ConstHash proof is unaccounted evidence.
-	status, details, _ := runSignatureCompletenessGate(first, &translate.Generated{})
+	status, details, _ := runSignatureCompletenessGate(first, &translate.Generated{}, ".")
 	if status != "fail" || !strings.Contains(strings.Join(details, "\n"), "no constant evidence") {
 		t.Fatalf("missing const evidence must fail; got %q %v", status, details)
 	}
@@ -143,7 +143,7 @@ func TestStage05ConstShapeDriftFails(t *testing.T) {
 		ID:        "p::const::C",
 		ConstHash: signatureHashOf(census.ConstShapeSignature(census.ConstShape{Type: "int", Value: "7"})),
 	}}}
-	status, details, _ := runSignatureCompletenessGate(first, generated)
+	status, details, _ := runSignatureCompletenessGate(first, generated, ".")
 	if status != "fail" || !strings.Contains(strings.Join(details, "\n"), "constant shape drift") {
 		t.Fatalf("const shape drift must fail; got %q %v", status, details)
 	}
@@ -155,7 +155,7 @@ func TestStage05ConstOrphanProofFails(t *testing.T) {
 		{ID: "p::const::C", ConstHash: signatureHashOf(census.ConstShapeSignature(census.ConstShape{Type: "int", Value: "42"}))},
 		{ID: "p::const::Ghost", ConstHash: signatureHashOf(census.ConstShapeSignature(census.ConstShape{Type: "int", Value: "0"}))},
 	}}
-	status, details, _ := runSignatureCompletenessGate(first, generated)
+	status, details, _ := runSignatureCompletenessGate(first, generated, ".")
 	if status != "fail" || !strings.Contains(strings.Join(details, "\n"), "orphan constant proof") {
 		t.Fatalf("orphan const proof must fail; got %q %v", status, details)
 	}
@@ -167,14 +167,12 @@ func TestStage05ConstJoinsThenBlocks(t *testing.T) {
 		ID:        "p::const::C",
 		ConstHash: signatureHashOf(census.ConstShapeSignature(census.ConstShape{Type: "int", Value: "42"})),
 	}}}
-	// The constant joins cleanly, but the stage still BLOCKS: the remaining
-	// declaration classes and independent TS comparison are not yet done.
-	status, details, _ := runSignatureCompletenessGate(first, generated)
-	if status != "blocked" {
-		t.Fatalf("a clean const join must still block (join incomplete); got %q %v", status, details)
-	}
-	if !strings.Contains(strings.Join(details, "\n"), "constants joined by canonical type and exact value: 1") {
-		t.Fatalf("blocked details must report the const join count; got %v", details)
+	// The constant joins cleanly, but with nothing module-retained the
+	// independent structural parity verifies zero declarations: the stage
+	// fails closed rather than passing on an empty parsed surface.
+	status, details, stageErr := runSignatureCompletenessGate(first, generated, "../..")
+	if status != "fail" || stageErr == nil || !strings.Contains(stageErr.Error(), "zero declarations") {
+		t.Fatalf("a clean const join with an empty parsed surface must fail closed; got %q %v %v", status, details, stageErr)
 	}
 }
 
