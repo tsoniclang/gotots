@@ -18,6 +18,10 @@ func (p *printer) printIfaceExpr(e ir.Expr) (string, bool, error) {
 		if err != nil {
 			return "", true, err
 		}
+		if n.X.Type().Kind == ir.KindUnit {
+			// The unit payload keeps its literal type through inference.
+			x = "(0 as 0)"
+		}
 		rtti, err := p.rttiRef(n.Rtti)
 		if err != nil {
 			return "", true, err

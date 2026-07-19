@@ -60,6 +60,13 @@ func (b *builder) buildBuiltin(call *ast.CallExpr, builtin *types.Builtin, resul
 		if err != nil {
 			return nil, err
 		}
+		if dst.Type().Kind == KindSlice && src.Type().Kind == KindString &&
+			dst.Type().Elem != nil && dst.Type().Elem.Kind == KindUint8 {
+			// copy([]byte, string): the source bytes are the string's
+			// exact UTF-8 bytes.
+			b.use("copy:stringBytes")
+			src = &StringConvert{Op: "toBytes", X: src, T: Type{Kind: KindSlice, Go: "[]byte", Elem: dst.Type().Elem}}
+		}
 		if dst.Type().Kind != KindSlice || src.Type().Kind != KindSlice {
 			return nil, &Unsupported{Kind: KindCopyBetween, Code: "GOTOTS_UNSUPPORTED_OPERATION", Construct: "copy between " + dst.Type().Go + " and " + src.Type().Go, Span: span}
 		}

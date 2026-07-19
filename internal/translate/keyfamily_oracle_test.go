@@ -223,3 +223,21 @@ func ClearSliceAndNamedConversions() int {
 }
 `)
 }
+
+func TestOracleCopyStringAndUnitBox(t *testing.T) {
+	// copy([]byte, string) copies the exact UTF-8 bytes; struct{}{} boxes
+	// as one interned composite member of the empty interface.
+	runOracle(t, `package fixture
+
+func CopyStringAndUnitBox() int {
+	buf := make([]byte, 5)
+	n := copy(buf, "héllo")
+	var v any = struct{}{}
+	unit := 0
+	if _, ok := v.(struct{}); ok {
+		unit = 1
+	}
+	return n*100 + int(buf[0])/10 + unit
+}
+`)
+}

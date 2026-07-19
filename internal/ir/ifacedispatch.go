@@ -143,6 +143,10 @@ func (b *builder) eqPlan(t types.Type, span Span) (*EqPlan, error) {
 	}
 	switch u := types.Unalias(t).Underlying().(type) {
 	case *types.Struct:
+		if u.NumFields() == 0 {
+			// The unit value: one value, one carrier (0) — identity.
+			return &EqPlan{Kind: EqIdentity}, nil
+		}
 		if b.generatesGoEq(t) {
 			return &EqPlan{Kind: EqGoEq}, nil
 		}

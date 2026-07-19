@@ -292,6 +292,11 @@
       "specClause": "docs/spec/collections-strings.md"
     },
     {
+      "key": "copy:stringBytes",
+      "state": "generated",
+      "specClause": "docs/spec/collections-strings.md"
+    },
+    {
       "key": "declTuple",
       "state": "generated",
       "specClause": "docs/spec/declarations-bodies-control.md"

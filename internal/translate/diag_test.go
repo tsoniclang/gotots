@@ -117,3 +117,63 @@ func TestDiagBodySites(t *testing.T) {
 		fmt.Printf("%5d  %s   [%s]\n", e.v.count, e.k, strings.Join(e.v.samples, " "))
 	}
 }
+
+// TestDiagDispositionLedger prints every remaining unsupported site with
+// its §C routing class (run with GOTOTS_CORPUS_DIR; output feeds the
+// manual-completion contract).
+func TestDiagDispositionLedger(t *testing.T) {
+	sourceDir := os.Getenv("GOTOTS_CORPUS_DIR")
+	if sourceDir == "" {
+		t.Skip("set GOTOTS_CORPUS_DIR")
+	}
+	prof, err := profile.Load("../../profiles/tsts/project.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	build, _ := prof.BuildProfileByName("linux-amd64")
+	resolved, err := pinning.VerifyToolchain(prof.Pin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	env := resolved.Environ(goenv.EnvOptions{GOOS: build.GOOS, GOARCH: build.GOARCH, GOAMD64: build.GOAMD64, GOARM64: build.GOARM64})
+	g, err := translate.Corpus(prof, env, sourceDir, translate.Options{SourceRevision: "diag", ProfileHash: "diag"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	route := func(construct, file string) string {
+		switch {
+		case strings.Contains(construct, "chan") || strings.Contains(construct, "goroutine") ||
+			strings.Contains(construct, "select") || strings.Contains(construct, "close") ||
+			strings.Contains(construct, "channel send"):
+			return "policy-concurrency"
+		case strings.Contains(construct, "unsafe"):
+			return "out-of-scope-unsafe"
+		case strings.Contains(construct, "reflect"):
+			return "out-of-scope-reflection"
+		case strings.Contains(file, "fswatch"):
+			return "policy-platform"
+		case strings.Contains(construct, "type-parameter boxing") ||
+			strings.Contains(construct, "runtime type identity of") ||
+			strings.Contains(construct, "address of T") ||
+			strings.Contains(construct, "compound assignment on T") ||
+			strings.Contains(construct, "conversion from T") ||
+			strings.Contains(construct, "conversion from float64 to T") ||
+			strings.Contains(construct, "capturing type parameters") ||
+			strings.Contains(construct, "typeid: no exact"):
+			return "deferred-protocol"
+		}
+		return "manual-candidate"
+	}
+	counts := map[string]int{}
+	for _, s := range g.Support {
+		if s.State != "unimplemented" {
+			continue
+		}
+		for _, site := range s.Sites {
+			r := route(site.Construct, site.Span.File)
+			counts[r]++
+			fmt.Printf("LEDGER %-24s %s :: %.100s @ %s:%d\n", r, s.ID[strings.LastIndex(s.ID, "internal/")+9:], site.Construct, site.Span.File, site.Span.Line)
+		}
+	}
+	fmt.Println("LEDGER-COUNTS:", counts)
+}

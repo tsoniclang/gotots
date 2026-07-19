@@ -12,6 +12,12 @@ import (
 // a predeclared basic type, a named type (struct or carrier), or a
 // pointer to a named struct. Every other dynamic type fails closed.
 func (b *builder) rttiFor(t types.Type, span Span) (RttiRef, error) {
+	if structType, isStruct := types.Unalias(t).Underlying().(*types.Struct); isStruct && structType.NumFields() == 0 {
+		if _, isNamed := types.Unalias(t).(*types.Named); !isNamed {
+			// The unit value struct{}{}: one interned composite member.
+			return RttiRef{Composite: "struct{}", Display: "struct {}"}, nil
+		}
+	}
 	switch concrete := types.Unalias(t).(type) {
 	case *types.Basic:
 		// Only true predeclared types reach here (named carriers are
