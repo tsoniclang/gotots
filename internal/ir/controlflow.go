@@ -17,6 +17,29 @@ func (b *builder) buildDeclStmt(n *ast.DeclStmt) (Stmt, error) {
 		b.use("localConst")
 		return &Block{}, nil
 	}
+	if ok && decl.Tok == token.TYPE {
+		// A LOCAL type declaration: local named structs synthesize
+		// module-level classes through the anonymous-struct pipeline
+		// (their canonical identities are distinct), and Go forbids
+		// methods on local types — the statement itself emits nothing.
+		// Resolvability is verified HERE so an unsupported local type
+		// fails at its declaration, not a later use.
+		for _, spec := range decl.Specs {
+			typeSpec, isType := spec.(*ast.TypeSpec)
+			if !isType {
+				return nil, &Unsupported{Kind: KindNonVarDeclarationStatement, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "non-var declaration statement", Span: span}
+			}
+			object, hasDef := b.info.Defs[typeSpec.Name].(*types.TypeName)
+			if !hasDef {
+				return nil, &Unsupported{Kind: KindNonVarDeclarationStatement, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "local type without typed definition", Span: span}
+			}
+			if _, err := b.typeOf(object.Type(), span); err != nil {
+				return nil, err
+			}
+		}
+		b.use("localType")
+		return &Block{}, nil
+	}
 	if !ok || decl.Tok != token.VAR {
 		return nil, &Unsupported{Kind: KindNonVarDeclarationStatement, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "non-var declaration statement", Span: span}
 	}

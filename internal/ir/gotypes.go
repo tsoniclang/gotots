@@ -228,6 +228,13 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 			}
 			return Type{}, &Unsupported{Kind: KindStructType, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: "struct type " + spelled, Span: span}
 		}
+		if named.Obj().Parent() != named.Obj().Pkg().Scope() {
+			// A LOCAL named struct: no package-level declaration exists —
+			// its class synthesizes through the anonymous-struct pipeline
+			// (the NAMED canonical identity keeps distinct locals
+			// distinct; Go forbids methods on local types).
+			return b.localNamedStructType(named, u, spelled, span)
+		}
 		// Struct values are reviewed only behind pointers and receivers;
 		// the caller decides whether a bare struct kind is admissible.
 		out := Type{Kind: KindStruct, Go: spelled, Named: named.Obj().Name(), Pkg: named.Obj().Pkg().Path(),

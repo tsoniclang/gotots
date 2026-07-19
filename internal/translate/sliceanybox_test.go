@@ -539,3 +539,33 @@ func GenericFuncValueReference() int {
 }
 `)
 }
+
+func TestOracleLocalTypeDeclaration(t *testing.T) {
+	// The checker GetResolvedSignatureForSignatureHelp shape: a LOCAL
+	// struct type declared inside a body — its class synthesizes at
+	// module level through the anonymous-struct pipeline; two same-named
+	// locals in different functions stay distinct.
+	runOracle(t, `package fixture
+
+func first() int {
+	type result struct {
+		a int
+		b int
+	}
+	r := result{a: 3, b: 4}
+	return r.a*10 + r.b
+}
+
+func second() int {
+	type result struct {
+		x string
+	}
+	r := result{x: "abcd"}
+	return len(r.x)
+}
+
+func LocalTypeDeclaration() int {
+	return first()*100 + second()
+}
+`)
+}

@@ -472,6 +472,11 @@
       "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
+      "key": "localType",
+      "state": "generated",
+      "specClause": "docs/spec/declarations-bodies-control.md"
+    },
+    {
       "key": "makeMap",
       "state": "generated",
       "specClause": "docs/spec/collections-strings.md"

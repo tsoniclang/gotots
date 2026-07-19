@@ -7,6 +7,7 @@ import (
 	"go/ast"
 	"go/types"
 	"sort"
+	"strconv"
 
 	"golang.org/x/tools/go/packages"
 
@@ -379,7 +380,18 @@ func (b *builder) admitGenericType(named *types.Named, span Span) ([]string, err
 // deterministic per canonical spelling, registered for the package's
 // module, structurally identical across packages (TypeScript's
 // structural classes keep cross-package values assignable).
+// localNamedStructType synthesizes a module-level class for a LOCAL
+// named struct through the anonymous-struct pipeline, keyed by the
+// NAMED type's canonical identity (distinct locals stay distinct).
+func (b *builder) localNamedStructType(named *types.Named, structType *types.Struct, spelled string, span Span) (Type, error) {
+	return b.anonStructTypeWithIdentity(structType, spelled, span, named)
+}
+
 func (b *builder) anonStructType(structType *types.Struct, spelled string, span Span) (Type, error) {
+	return b.anonStructTypeWithIdentity(structType, spelled, span, nil)
+}
+
+func (b *builder) anonStructTypeWithIdentity(structType *types.Struct, spelled string, span Span, named *types.Named) (Type, error) {
 	// The identity goes through the CANONICALIZER, which package-qualifies
 	// UNEXPORTED field names — so two struct{x int} shapes with unexported
 	// fields from different packages are distinct (Go's rule), while
@@ -391,6 +403,14 @@ func (b *builder) anonStructType(structType *types.Struct, spelled string, span 
 	identity, err := b.canonical(structType)
 	if err != nil {
 		return Type{}, &Unsupported{Kind: KindNestedError, Code: "GOTOTS_UNSUPPORTED_TYPE", Construct: err.Error(), Span: span}
+	}
+	if named != nil {
+		// A LOCAL named struct: Go gives each local declaration its own
+		// identity — the canonical spelling alone would collide same-named
+		// locals, so the declaration position joins the identity.
+		position := b.fset.Position(named.Obj().Pos())
+		identity = "local:" + named.Obj().Name() + "@" + position.Filename + ":" +
+			itoa(position.Line) + ":" + itoa(position.Column) + "|" + identity
 	}
 	digest := sha256.Sum256([]byte(identity))
 	name := "Anon$" + hex.EncodeToString(digest[:])
@@ -436,4 +456,8 @@ func zeroSizeType(t types.Type) bool {
 		return u.NumFields() == 0
 	}
 	return false
+}
+
+func itoa(v int) string {
+	return strconv.Itoa(v)
 }
