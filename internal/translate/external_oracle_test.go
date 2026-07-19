@@ -14,6 +14,40 @@ import (
 // each exports exactly the stub's typed symbols with Go-exact behavior,
 // mirroring the product's hand-maintained implementation layer.
 var externalImplementations = map[string]string{
+	"time": `import { type GoExtern } from "../../language-abi/goextern.js";
+
+type Handle = GoExtern<"time.Time">;
+type Loc = GoExtern<"time.Location"> | undefined;
+type Rep = { wall: bigint; ext: bigint; loc: Loc };
+
+export function Unix(sec: bigint, nsec: bigint): Handle {
+  return { wall: nsec, ext: sec, loc: undefined } as Rep as Handle;
+}
+
+export function Time$get$wall$(t: Handle): bigint {
+  return (t as Rep).wall;
+}
+
+export function Time$get$ext$(t: Handle): bigint {
+  return (t as Rep).ext;
+}
+
+export function Time$get$loc$(t: Handle): Loc {
+  return (t as Rep).loc;
+}
+
+export function Time$lit$wall$ext$loc$(wall: bigint, ext: bigint, loc: Loc): Handle {
+  return { wall, ext, loc } as Rep as Handle;
+}
+
+export function Time$goClone$(v: Handle | undefined): Handle {
+  const rep = v as Rep | undefined;
+  if (rep === undefined) {
+    return { wall: 0n, ext: 0n, loc: undefined } as Rep as Handle;
+  }
+  return { wall: rep.wall, ext: rep.ext, loc: rep.loc } as Rep as Handle;
+}
+`,
 	"strings": `import { type GoSliceValue } from "../../language-abi/goslice.js";
 
 export function HasPrefix(s: string, prefix: string): boolean {
@@ -346,6 +380,44 @@ func ExternOwnedUnderlyingConversions() int {
 		same += 100
 	}
 	return k.Sum()*1000 + back.X*100 + p.Y*10 + same
+}
+`)
+}
+
+func TestOracleExternUnexportedFieldBridge(t *testing.T) {
+	// The locale.Locale/language.Tag shape: an OWNED named type over an
+	// EXTERNAL struct underlying whose fields are UNEXPORTED — the
+	// conversion bridge reads and constructs through per-field emulation
+	// stubs regardless of exportedness (external semantics are the
+	// emulation layer's to own either way).
+	runExternalOracle(t, `package fixture
+
+import "time"
+
+type stamp time.Time
+
+func wrap(t time.Time) stamp {
+	return stamp(t)
+}
+
+func unwrap(s stamp) time.Time {
+	return time.Time(s)
+}
+
+func ExternUnexportedFieldBridge() int {
+	total := 0
+	s := wrap(time.Unix(1234, 0))
+	if s == wrap(time.Unix(1234, 0)) {
+		total += 1
+	}
+	if s != wrap(time.Unix(99, 0)) {
+		total += 10
+	}
+	round := wrap(unwrap(s))
+	if s == round {
+		total += 100
+	}
+	return total
 }
 `)
 }

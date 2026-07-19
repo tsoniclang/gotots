@@ -125,9 +125,11 @@ func (b *builder) buildExternFieldRead(base Expr, field string, goType types.Typ
 
 // buildExternOwnedConversion bridges value conversions between an OWNED
 // named struct and an EXTERNAL named struct with IDENTICAL underlyings
-// (type CacheHashKey xxh3.Uint128): to the owned class via per-field
-// read stubs, to the external via the keyed-literal constructor stub —
-// both typed fail-closed obligations the emulation layer implements.
+// (type CacheHashKey xxh3.Uint128, type Locale language.Tag): to the
+// owned class via per-field read stubs, to the external via the
+// keyed-literal constructor stub — both typed fail-closed obligations
+// the emulation layer implements (unexported fields included: external
+// semantics are the emulation layer's to own either way).
 func (b *builder) buildExternOwnedConversion(x Expr, to Type, fromGo, toGo types.Type, span Span) (Expr, bool, error) {
 	fromNamed, fromOK := types.Unalias(fromGo).(*types.Named)
 	toNamed, toOK := types.Unalias(toGo).(*types.Named)
@@ -144,9 +146,6 @@ func (b *builder) buildExternOwnedConversion(x Expr, to Type, fromGo, toGo types
 		out := &ExternToOwned{X: x, To: to}
 		for i := range structType.NumFields() {
 			field := structType.Field(i)
-			if !field.Exported() {
-				return nil, false, nil
-			}
 			fieldType, err := b.typeOf(field.Type(), span)
 			if err != nil {
 				return nil, true, err
@@ -162,9 +161,6 @@ func (b *builder) buildExternOwnedConversion(x Expr, to Type, fromGo, toGo types
 		values := make([]Expr, 0, structType.NumFields())
 		for i := range structType.NumFields() {
 			field := structType.Field(i)
-			if !field.Exported() {
-				return nil, false, nil
-			}
 			fieldType, err := b.typeOf(field.Type(), span)
 			if err != nil {
 				return nil, true, err
