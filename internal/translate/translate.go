@@ -497,10 +497,13 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 		// from the runnable product.
 		out.Withheld[p.PkgPath] = fmt.Sprintf("%d unimplemented bodies (materialized as placeholders)", unimplementedUnits)
 	}
-	if len(functions) == 0 && len(structs) == 0 && len(carrierMethods) == 0 && len(packageVars) == 0 {
+	if len(functions) == 0 && len(structs) == 0 && len(carrierMethods) == 0 && len(packageVars) == 0 &&
+		len(carrierTypes) == 0 && len(initCalls) == 0 {
 		// A package whose declarations are all compile-time (constants
 		// fold at use sites) emits an empty module: dependents reference
-		// no runtime symbol from it.
+		// no runtime symbol from it. A CARRIER TYPE (a named non-struct
+		// type with its rtti) or an init function is a runtime symbol and
+		// must emit — its proofs reference the module file.
 		return nil
 	}
 
