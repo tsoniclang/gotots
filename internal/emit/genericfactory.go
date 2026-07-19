@@ -91,10 +91,35 @@ func (p *printer) keyOperation(t ir.Type) (string, error) {
 	case t.Kind.Float():
 		return "(($k: " + spelled + ") => gort$.goKeyFloat($k))", nil
 	}
-	// The per-site key-family guard admits only the classes above for
-	// map-keying parameters: any other binding here is a compiler defect,
-	// never a runtime surface.
-	return "", fmt.Errorf("no key operation for binding %q of a map-keying type parameter", t.Go)
+	if t.Kind == ir.KindStruct {
+		if t.Uncomparable {
+			// Go's exact unhashable panic for this dynamic key.
+			return "((_: " + spelled + ") => gort$.goKeyUnhashable(" + fmt.Sprintf("%q", t.Go) + "))", nil
+		}
+		// A comparable-unencodable struct binding of a key-REQUIRED
+		// parameter: the per-site admission rejects every map actually
+		// keyed by it, so the operation is reachable only through
+		// requirement over-approximation (a decl that forwards key$P
+		// without keying) — the machine-claimed invariant stop.
+		return "((_: " + spelled + ") => gort$.goKeyUnreachable(" + fmt.Sprintf("%q", t.Go) + "))", nil
+	}
+	if t.Kind == ir.KindSlice || t.Kind == ir.KindMap || t.Kind == ir.KindFunc || t.Kind == ir.KindChan {
+		return "((_: " + spelled + ") => gort$.goKeyUnhashable(" + fmt.Sprintf("%q", t.Go) + "))", nil
+	}
+	if t.Kind == ir.KindIface {
+		name, err := p.ifaceUnionAlias(t)
+		if err != nil {
+			return "", err
+		}
+		p.module.RequireIfaceKeyFn(name)
+		return name + "$key", nil
+	}
+	// Every remaining binding kind (arrays, external handles, erased
+	// carriers) is outside the admitted key family: the per-site guard
+	// rejects every map actually keyed by it, so the operation is
+	// reachable only through requirement over-approximation — the
+	// machine-claimed invariant stop keeps the derivation TOTAL.
+	return "((_: " + spelled + ") => gort$.goKeyUnreachable(" + fmt.Sprintf("%q", t.Go) + "))", nil
 }
 
 // cloneOperation spells the TOTAL per-binding copy of one instantiation
