@@ -282,9 +282,24 @@ func runGate(args []string) error {
 		if universe.OutsideUniverseFiles == 0 && len(categories) == 0 {
 			details = append(details, "profile declares no outside-universe roots")
 		}
-		details = append(details,
-			"BLOCKED: ownedRoots is a hand-maintained allowlist; the selected closure is not yet independently derived from product entry points, so an unauthorized scope shrink would not be detected")
-		return "blocked", details, nil
+		// The INDEPENDENT derivation: recompute the closure from discovered
+		// product entry points and require exact coincidence with the
+		// declared scope policy.
+		prof, err := profile.Load(filepath.Join(*repoDir, filepath.FromSlash(*profilePath)))
+		if err != nil {
+			return "fail", details, err
+		}
+		build, err := prof.BuildProfileByName(*buildProfile)
+		if err != nil {
+			return "fail", details, err
+		}
+		resolved, err := pinning.VerifyToolchain(prof.Pin)
+		if err != nil {
+			return "fail", details, err
+		}
+		env := resolved.Environ(goenv.EnvOptions{GOOS: build.GOOS, GOARCH: build.GOARCH, GOAMD64: build.GOAMD64, GOARM64: build.GOARM64})
+		verdict, derivedDetails, err := runScopeClosureGate(prof, *sourceDir, env)
+		return verdict, append(details, derivedDetails...), err
 	})
 	run("04-census-denominator-reconciliation", func() (string, []string, error) {
 		if firstRun == nil {
