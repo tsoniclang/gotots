@@ -5,6 +5,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -55,6 +57,46 @@ func runStagedGenerationGate(repoDir, profilePath, buildProfile, sourceDir strin
 	}
 	if len(mismatches) > 0 {
 		return "fail", mismatches, fmt.Errorf("nondeterministic reports")
+	}
+	// RELOCATED-CHECKOUT reproducibility: the same census from a copy of
+	// the checkout at a different filesystem root must produce byte-
+	// identical SEMANTIC reports; environment.json (the machine-evidence
+	// record) compares under source-root normalization — any other
+	// absolute path leaking into semantic evidence fails here.
+	relocated := filepath.Join(staging, "relocated-src")
+	if out, err := runInRepo(".", "cp", "-a", sourceDir, relocated); err != nil {
+		return "fail", splitLines(out), fmt.Errorf("relocate checkout: %w", err)
+	}
+	relocatedRun, err := census.Run(prof, relocated, buildProfile)
+	if err != nil {
+		return "fail", nil, fmt.Errorf("relocated census: %w", err)
+	}
+	third := filepath.Join(staging, "run3")
+	if err := census.WriteReports(relocatedRun, third); err != nil {
+		return "fail", nil, err
+	}
+	absSource, err := filepath.Abs(sourceDir)
+	if err != nil {
+		return "fail", nil, err
+	}
+	var relocatedMismatches []string
+	for _, name := range []string{"inventory.json", "census.json", "declarations.json", "externals.json", "environment.json", "manifest.json"} {
+		firstBytes, err := os.ReadFile(filepath.Join(first, name))
+		if err != nil {
+			return "fail", nil, err
+		}
+		thirdBytes, err := os.ReadFile(filepath.Join(third, name))
+		if err != nil {
+			return "fail", nil, err
+		}
+		normalizedFirst := bytes.ReplaceAll(firstBytes, []byte(absSource), []byte("<sourceDir>"))
+		normalizedThird := bytes.ReplaceAll(thirdBytes, []byte(relocated), []byte("<sourceDir>"))
+		if !bytes.Equal(normalizedFirst, normalizedThird) {
+			relocatedMismatches = append(relocatedMismatches, name)
+		}
+	}
+	if len(relocatedMismatches) > 0 {
+		return "fail", relocatedMismatches, fmt.Errorf("relocated-checkout reports differ beyond the source root (machine-local paths inside semantic evidence)")
 	}
 	if _, err := census.VerifyBundle(first); err != nil {
 		return "fail", nil, err
@@ -191,8 +233,49 @@ func runStagedGenerationGate(repoDir, profilePath, buildProfile, sourceDir strin
 		"publication = immutable bundles + one atomic current-pointer rename; replacement leaves the previous bundle intact",
 		fmt.Sprintf("partial bundle: %d packages withheld as honest unimplemented", len(corpusGenerated.Withheld)),
 	}
-	details = append(details,
-		"BLOCKED: environment.json carries machine-local paths inside semantic evidence identity; relocated-checkout reproducibility is unproven",
-		"BLOCKED: body-materialization artifacts for withheld packages are not retained (spec 01)")
-	return "blocked", details, nil
+	// Per-body analysis artifacts (spec 01): every lowered function and
+	// method body — withheld packages included — retains its exact
+	// fragment under analysis/bodies/ with a matching recorded hash.
+	artifactCount, missing, hashMismatches := 0, 0, 0
+	for i := range corpusGenerated.Proofs {
+		proof := &corpusGenerated.Proofs[i]
+		if proof.LoweredHash == "" {
+			continue
+		}
+		artifactCount++
+		path := "analysis/bodies/" + proof.Package + "/" + sanitizedTail(proof.ID) + ".ts.txt"
+		found, has := corpusGenerated.Files[path]
+		if !has {
+			missing++
+			continue
+		}
+		digest := sha256.Sum256([]byte(found))
+		if hex.EncodeToString(digest[:]) != proof.LoweredHash {
+			hashMismatches++
+		}
+	}
+	details = append(details, fmt.Sprintf("per-body analysis artifacts: %d retained with recorded hashes", artifactCount))
+	if missing > 0 || hashMismatches > 0 {
+		return "fail", details, fmt.Errorf("body artifacts: %d missing, %d hash mismatches", missing, hashMismatches)
+	}
+	if artifactCount == 0 {
+		return "fail", details, fmt.Errorf("no per-body analysis artifacts retained")
+	}
+	details = append(details, "relocated-checkout reproducibility proven; per-body artifacts retained")
+	return "pass", details, nil
+}
+
+// sanitizedTail mirrors the translator's artifact file naming for one
+// body identity.
+func sanitizedTail(id string) string {
+	out := make([]rune, 0, len(id))
+	for _, r := range id {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '.', r == '-':
+			out = append(out, r)
+		default:
+			out = append(out, '_')
+		}
+	}
+	return string(out)
 }

@@ -427,7 +427,7 @@ func Value() (int32, string) {
 		t.Fatalf("proof record missing representations: %+v", proof)
 	}
 	for path, owner := range first.Ownership {
-		if owner != "generated-core" && owner != "generated-language-abi" {
+		if owner != "generated-core" && owner != "generated-language-abi" && owner != "analysis-body" {
 			t.Errorf("unexpected ownership %q for %s", owner, path)
 		}
 	}

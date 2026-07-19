@@ -394,7 +394,7 @@ func runGate(args []string) error {
 		ownership := map[string]int{}
 		for path, owner := range corpusGenerated.Ownership {
 			switch owner {
-			case "generated-core", "generated-language-abi", "generated-external-contracts":
+			case "generated-core", "generated-language-abi", "generated-external-contracts", "analysis-body":
 				ownership[owner]++
 			default:
 				return "fail", []string{path}, fmt.Errorf("file carries unreviewed ownership class %q", owner)

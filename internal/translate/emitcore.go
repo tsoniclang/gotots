@@ -4,6 +4,8 @@
 package translate
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/tsoniclang/gotots/internal/abi"
@@ -37,7 +39,7 @@ func emitCorePackage(out *Generated, p *packages.Package, sourceDir string, unit
 			module.RequireInitEdge(importPath)
 		}
 	}
-	body, outcomes, err := emit.Package(module, emit.Decls{
+	body, outcomes, artifacts, err := emit.Package(module, emit.Decls{
 		InitCalls:    initCalls,
 		Structs:      structList,
 		Methods:      carrierMethods,
@@ -57,6 +59,26 @@ func emitCorePackage(out *Generated, p *packages.Package, sourceDir string, unit
 		return nil
 	}
 	applyBodyOutcomes(out, p.PkgPath, outcomes)
+	// Retain every lowered body's canonical analysis artifact (spec 01):
+	// the exact fragment and its hash, withheld packages included. The
+	// .ts.txt extension keeps it out of every module and typecheck path.
+	hashes := make(map[string]string, len(artifacts))
+	for _, artifact := range artifacts {
+		digest := sha256.Sum256([]byte(artifact.Text))
+		hash := hex.EncodeToString(digest[:])
+		hashes[artifact.ID] = hash
+		artifactPath := "analysis/bodies/" + p.PkgPath + "/" + sanitizeArtifactName(artifact.ID) + ".ts.txt"
+		out.Files[artifactPath] = artifact.Text
+		out.Ownership[artifactPath] = "analysis-body"
+	}
+	for i := range out.Proofs {
+		if out.Proofs[i].Package != p.PkgPath {
+			continue
+		}
+		if hash, has := hashes[out.Proofs[i].ID]; has {
+			out.Proofs[i].LoweredHash = hash
+		}
+	}
 	coreContent, err := emit.FileWithProvenance(emit.Provenance{
 		SchemaVersion:  1,
 		SourceRevision: options.SourceRevision,
@@ -111,4 +133,20 @@ func applyBodyOutcomes(out *Generated, pkgPath string, outcomes []emit.BodyOutco
 			}
 		}
 	}
+}
+
+// sanitizeArtifactName spells one body identity as a file name: every
+// path-hostile rune folds to "_" (identities keep uniqueness through the
+// containing package directory plus the sanitized tail).
+func sanitizeArtifactName(id string) string {
+	out := make([]rune, 0, len(id))
+	for _, r := range id {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '.', r == '-':
+			out = append(out, r)
+		default:
+			out = append(out, '_')
+		}
+	}
+	return string(out)
 }

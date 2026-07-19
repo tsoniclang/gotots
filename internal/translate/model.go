@@ -32,6 +32,10 @@ type Proof struct {
 	// generated symbol exists in it — finalized once, after every proof
 	// and file exists.
 	ModuleRetained bool `json:"moduleRetained"`
+	// LoweredHash is the sha256 of the body's retained analysis artifact
+	// (the exact emitted fragment under analysis/bodies/, spec 01) —
+	// present for every lowered body, withheld packages included.
+	LoweredHash string `json:"loweredHash,omitempty"`
 	// InitHash is a package variable's initializer source hash — joined
 	// against the census's identity-bearing initializer evidence.
 	InitHash string `json:"initHash,omitempty"`
