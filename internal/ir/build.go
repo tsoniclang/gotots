@@ -92,6 +92,11 @@ type builder struct {
 	rangeFuncDepth int
 	// switchTagCount numbers synthesized array-switch tag locals.
 	switchTagCount int
+	// namedExit marks a TOP-LEVEL named-results function with defers:
+	// returns lower to named-local assignments plus a labeled exit, so
+	// deferred result mutations reach the trailing return. Closures
+	// never set it (the combination fails closed there).
+	namedExit bool
 }
 
 func (b *builder) span(pos token.Pos) Span {
@@ -302,6 +307,18 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 	}
 
 	b.useDeferStack = hasNestedDefer(decl.Body.List)
+	if len(b.namedResults) > 0 {
+		topLevelDefer := false
+		for _, stmt := range decl.Body.List {
+			if _, isDefer := stmt.(*ast.DeferStmt); isDefer {
+				topLevelDefer = true
+			}
+		}
+		if topLevelDefer || b.useDeferStack {
+			b.namedExit = true
+			function.NamedExit = true
+		}
+	}
 	body, err := b.buildTopLevel(decl.Body.List)
 	if err != nil {
 		return nil, err
@@ -359,11 +376,11 @@ func (b *builder) buildTopLevel(stmts []ast.Stmt) (*Block, error) {
 			continue
 		}
 
-		if len(b.namedResults) > 0 {
+		if len(b.namedResults) > 0 && !b.namedExit {
 			// A deferred call can observe and mutate named results after
-			// the return values are set; try/finally cannot express that
-			// visibility, so the combination fails closed. Accounting
-			// continues over the remaining statements.
+			// the return values are set; a CLOSURE's try/finally cannot
+			// express that visibility (only top-level functions take the
+			// named-exit lowering), so the combination fails closed.
 			b.recordSite(&Unsupported{Kind: KindDeferInAFunctionWithNamedResultsDeferredResultMutation, Code: "GOTOTS_UNSUPPORTED_STATEMENT",
 				Construct: "defer in a function with named results (deferred result mutation)", Span: b.span(deferStmt.Pos())})
 			out.Stmts = append(out.Stmts, &UnimplementedStmt{Site: (*b.sites)[len(*b.sites)-1]})
@@ -476,7 +493,7 @@ func (b *builder) buildStmt(stmt ast.Stmt) (Stmt, error) {
 			return nil, &Unsupported{Kind: KindDeferBelowTheFunctionSTopLevelBlockRunsAtFunctionExitNeedsTheDeferStackLowering, Code: "GOTOTS_UNSUPPORTED_STATEMENT",
 				Construct: "defer below the function's top-level block (runs at function exit; needs the defer-stack lowering)", Span: span}
 		}
-		if len(b.namedResults) > 0 {
+		if len(b.namedResults) > 0 && !b.namedExit {
 			return nil, &Unsupported{Kind: KindDeferInAFunctionWithNamedResultsDeferredResultMutation, Code: "GOTOTS_UNSUPPORTED_STATEMENT",
 				Construct: "defer in a function with named results (deferred result mutation)", Span: span}
 		}

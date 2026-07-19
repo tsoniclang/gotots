@@ -423,6 +423,13 @@ func (p *printer) printIf(n *ir.IfStmt) error {
 }
 
 func (p *printer) printReturn(n *ir.ReturnStmt) error {
+	if n.Exit {
+		// Named-exit lowering: the named locals are assigned; break out
+		// of the fn$ body label so deferred mutations reach the trailing
+		// return.
+		p.line("break fn$;")
+		return nil
+	}
 	if n.CallValue != nil {
 		call, err := p.printExpr(n.CallValue)
 		if err != nil {

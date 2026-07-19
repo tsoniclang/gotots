@@ -71,6 +71,11 @@ type ReturnStmt struct {
 	Values []Expr
 	// CallValue, when set, forwards a single multi-result call.
 	CallValue Expr
+	// Exit marks the named-exit lowering of a named-results function
+	// with defers: the named locals are already assigned, the statement
+	// breaks out of the fn$ body label, and the function's trailing
+	// return reads the locals AFTER every deferred mutation.
+	Exit bool
 }
 
 // ExprStmt evaluates a call for effect.

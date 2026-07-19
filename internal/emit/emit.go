@@ -251,7 +251,7 @@ func printFunc(out *strings.Builder, module *Module, function *ir.Func) error {
 	}
 	if function.Placeholder {
 		p.printPlaceholderBody(function.ID)
-	} else if err := p.printDeferWrappedBody(function.Body, function.UsesDeferStack); err != nil {
+	} else if err := p.printNamedExitBody(function); err != nil {
 		return fmt.Errorf("%s: %w", function.ID, err)
 	}
 	p.indent--

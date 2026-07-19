@@ -184,7 +184,18 @@ func (b *builder) buildFor(n *ast.ForStmt) (Stmt, error) {
 }
 
 func (b *builder) buildReturn(n *ast.ReturnStmt) (Stmt, error) {
+	if b.namedExit && b.rangeFuncDepth > 0 {
+		// The named-exit break cannot cross the yield-closure boundary.
+		return nil, &Unsupported{Kind: KindDeferInAFunctionWithNamedResultsDeferredResultMutation, Code: "GOTOTS_UNSUPPORTED_STATEMENT",
+			Construct: "defer in a function with named results (deferred result mutation)", Span: b.span(n.Pos())}
+	}
 	if len(n.Results) == 0 {
+		if b.namedExit {
+			// The named locals already hold the result values; the exit
+			// break lets deferred mutations reach the trailing return.
+			b.use("return")
+			return &ReturnStmt{Exit: true}, nil
+		}
 		out := &ReturnStmt{}
 		// A bare return in a function with named results returns their
 		// current values.
@@ -211,6 +222,15 @@ func (b *builder) buildReturn(n *ast.ReturnStmt) (Stmt, error) {
 							return nil, err
 						}
 						b.use("return")
+						if b.namedExit {
+							// Assign the forwarded results to the named
+							// locals, then exit.
+							assign := &AssignStmt{Tuple: adapted}
+							for _, result := range b.namedResults {
+								assign.Targets = append(assign.Targets, VarTarget{Name: result.Name})
+							}
+							return &StmtSeq{Stmts: []Stmt{assign, &ReturnStmt{Exit: true}}}, nil
+						}
 						return &ReturnStmt{CallValue: adapted}, nil
 					}
 				}
@@ -229,5 +249,15 @@ func (b *builder) buildReturn(n *ast.ReturnStmt) (Stmt, error) {
 		out.Values = append(out.Values, built)
 	}
 	b.use("return")
+	if b.namedExit {
+		// Assign the result values to the named locals (all values
+		// evaluate before any store), then exit: deferred mutations of
+		// the locals reach the trailing return.
+		assign := &AssignStmt{Values: out.Values}
+		for _, result := range b.namedResults {
+			assign.Targets = append(assign.Targets, VarTarget{Name: result.Name})
+		}
+		return &StmtSeq{Stmts: []Stmt{assign, &ReturnStmt{Exit: true}}}, nil
+	}
 	return out, nil
 }

@@ -482,11 +482,50 @@ func printMethodFunctionVariant(out *strings.Builder, module *Module, className 
 		}
 		p.line("const %s = gosl$.goArrayClone($recv, %s);", tsName(method.Receiver.Name), cloneElem)
 	}
-	if err := p.printDeferWrappedBody(method.Body, method.UsesDeferStack); err != nil {
+	if err := p.printNamedExitBody(method); err != nil {
 		return fmt.Errorf("%s: %w", method.ID, err)
 	}
 	p.indent--
 	p.line("}")
+	return nil
+}
+
+// printNamedExitBody prints a function's body with the named-exit
+// wrapper when it has one: the body runs inside a fn$ label (returns
+// lowered to breaks), and ONE trailing return reads the named locals
+// AFTER every deferred mutation.
+func (p *printer) printNamedExitBody(function *ir.Func) error {
+	if !function.NamedExit {
+		return p.printDeferWrappedBody(function.Body, function.UsesDeferStack)
+	}
+	// The body's leading statement is the named-results declaration
+	// (prepended at build): it hoists ABOVE the label so the trailing
+	// return still sees the locals.
+	body := function.Body
+	if len(body.Stmts) > 0 {
+		if decl, isDecl := body.Stmts[0].(*ir.DeclStmt); isDecl {
+			if err := p.printStmt(decl); err != nil {
+				return err
+			}
+			body = &ir.Block{Stmts: body.Stmts[1:]}
+		}
+	}
+	p.line("fn$: {")
+	p.indent++
+	if err := p.printDeferWrappedBody(body, function.UsesDeferStack); err != nil {
+		return err
+	}
+	p.indent--
+	p.line("}")
+	names := make([]string, 0, len(function.Results))
+	for _, result := range function.Results {
+		names = append(names, tsName(result.Name))
+	}
+	if len(names) == 1 {
+		p.line("return %s;", names[0])
+	} else {
+		p.line("return [%s];", strings.Join(names, ", "))
+	}
 	return nil
 }
 

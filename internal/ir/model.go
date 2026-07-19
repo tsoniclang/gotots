@@ -318,6 +318,10 @@ type Func struct {
 	// interfaces: the declaration takes rt$P (the binding's box triple),
 	// requirement-scoped exactly like key$P.
 	RttiParams []bool
+	// NamedExit marks a named-results function with defers: its body
+	// emits inside a fn$ label, returns break out, and one trailing
+	// return reads the named locals after every deferred mutation.
+	NamedExit bool
 	// FamilyEnc marks this Func/Struct emission as the ENCODED key-family
 	// variant ("$ek"-suffixed symbols; parameter-keyed maps spell the
 	// encoded carrier).
