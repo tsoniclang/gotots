@@ -159,3 +159,4 @@ vite.config.ts.timestamp-*
 .claude/
 /product/node_modules/
 /product/package-lock.json
+/gotots
