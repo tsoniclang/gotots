@@ -214,6 +214,9 @@ func (p *printer) collectionExpr(e ir.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		if clone := p.paramCloneOf(*n.T.Elem); clone != "" {
+			return "gosl$.goSliceAppendWith(" + x + ", [" + values + "], () => " + zero + ", " + clone + ", " + p.paramSetOf(*n.T.Elem) + ")", nil
+		}
 		if n.T.Elem.Kind == ir.KindStruct {
 			return "gosl$.goSliceAppendStruct(" + x + ", [" + values + "], () => " + zero + ")", nil
 		}
@@ -231,6 +234,11 @@ func (p *printer) collectionExpr(e ir.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		if n.T.Elem != nil {
+			if clone := p.paramCloneOf(*n.T.Elem); clone != "" {
+				return "gosl$.goSliceAppendSliceWith(" + x + ", " + source + ", () => " + zero + ", " + clone + ", " + p.paramSetOf(*n.T.Elem) + ")", nil
+			}
+		}
 		if n.T.Elem != nil && n.T.Elem.Kind == ir.KindStruct {
 			return "gosl$.goSliceAppendSliceStruct(" + x + ", " + source + ", () => " + zero + ")", nil
 		}
@@ -243,6 +251,11 @@ func (p *printer) collectionExpr(e ir.Expr) (string, error) {
 		src, err := p.printExpr(n.Src)
 		if err != nil {
 			return "", err
+		}
+		if n.Dst.Type().Elem != nil {
+			if clone := p.paramCloneOf(*n.Dst.Type().Elem); clone != "" {
+				return "gosl$.goSliceCopyWith(" + dst + ", " + src + ", " + clone + ", " + p.paramSetOf(*n.Dst.Type().Elem) + ")", nil
+			}
 		}
 		if n.Dst.Type().Elem != nil && n.Dst.Type().Elem.Kind == ir.KindStruct {
 			return "gosl$.goSliceCopyStruct(" + dst + ", " + src + ")", nil

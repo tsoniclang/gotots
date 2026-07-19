@@ -53,6 +53,10 @@ func (p *printer) printStore(target ir.Target, value string) error {
 			// A struct-value base cannot panic; the direct member store
 			// already evaluates base, then value, then stores.
 			switch {
+			case p.paramSetOf(t.T) != "":
+				set := p.paramSetOf(t.T)
+				p.line("if (%s === undefined) { %s.%s = %s; } else { %s(%s.%s, %s); }",
+					set, base, t.Field, value, set, base, t.Field, value)
 			case t.Cell:
 				p.line("%s.%s.v = %s;", base, t.Field, value)
 			case t.T.Kind == ir.KindStruct:
@@ -77,6 +81,10 @@ func (p *printer) printStore(target ir.Target, value string) error {
 			return err
 		}
 		switch {
+		case p.paramSetOf(t.T) != "":
+			set := p.paramSetOf(t.T)
+			p.line("if (%s === undefined) { %s.%s = %s; } else { %s(%s.%s, %s); }",
+				set, checkedBase, t.Field, valueTemp, set, checkedBase, t.Field, valueTemp)
 		case t.Cell:
 			// A cell field keeps its stable storage: only the held value is
 			// overwritten, so a previously taken &s.f still observes the write.
@@ -110,6 +118,10 @@ func (p *printer) printStore(target ir.Target, value string) error {
 		index, err := p.printExpr(t.Index)
 		if err != nil {
 			return err
+		}
+		if t.X.Type().Elem != nil && p.paramSetOf(*t.X.Type().Elem) != "" {
+			p.line("gosl$.goSliceSetWith(%s, %s, %s, %s);", sliceExpr, index, value, p.paramSetOf(*t.X.Type().Elem))
+			return nil
 		}
 		if t.X.Type().Elem != nil && t.X.Type().Elem.Kind == ir.KindStruct {
 			p.line("gosl$.goSliceSetStruct(%s, %s, %s);", sliceExpr, index, value)
@@ -190,6 +202,10 @@ func (p *printer) printStore(target ir.Target, value string) error {
 		// operands-then-store order.
 		valueTemp := p.temp()
 		p.line("const %s = %s;", valueTemp, value)
+		if set := p.paramSetOf(*t.X.Type().Elem); set != "" {
+			p.line("gosl$.goArrayElemSetWith(%s, %s, %s, %s);", arrayTemp, indexTemp, valueTemp, set)
+			return nil
+		}
 		staged := stagedTarget{structValue: t.X.Type().Elem.Kind == ir.KindStruct}
 		if staged.arrayValue, err = p.arrayValueCallback(*t.X.Type().Elem); err != nil {
 			return err

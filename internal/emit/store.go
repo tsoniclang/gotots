@@ -33,10 +33,33 @@ type stagedTarget struct {
 	// externSet, when set, is the typed goSet$ stub reference for an
 	// external-valued in-place store.
 	externSet string
+	// paramSet, when set, is the in-scope set$P parameter name of a
+	// type-parameter-typed store: the runtime value is undefined exactly
+	// when the binding's carrier stores by slot assignment, so the store
+	// dispatches on it.
+	paramSet string
 	// cell marks a field target stored as a stable per-instance cell: the
 	// value is read and written through the cell (.v), so the field keeps
 	// a stable address across the store.
 	cell bool
+}
+
+// paramSetOf returns the in-scope set$P parameter name when the stored
+// type is a type parameter, else "".
+func (p *printer) paramSetOf(t ir.Type) string {
+	if t.Kind == ir.KindIface && t.TypeParamName != "" {
+		return p.setOps[t.TypeParamName]
+	}
+	return ""
+}
+
+// paramCloneOf returns the in-scope clone$P parameter name when the type
+// is a type parameter, else "".
+func (p *printer) paramCloneOf(t ir.Type) string {
+	if t.Kind == ir.KindIface && t.TypeParamName != "" {
+		return p.cloneOps[t.TypeParamName]
+	}
+	return ""
 }
 
 // externSetCallee spells the typed goSet$ stub reference when the
@@ -191,7 +214,7 @@ func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
 		}
 		return stagedTarget{kind: "field", name: baseTemp, field: t.Field,
 			structValue: t.T.Kind == ir.KindStruct, arrayValue: setElem,
-			externSet:    mustExternSet(p, t.T),
+			externSet: mustExternSet(p, t.T), paramSet: p.paramSetOf(t.T),
 			nilCheckBase: t.X.Type().Kind != ir.KindStruct,
 			baseNilable:  t.X.Type(), cell: t.Cell}, nil
 	case *ir.PointeeTarget:
@@ -249,6 +272,9 @@ func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
 		}
 		staged := stagedTarget{kind: "slice", name: sliceTemp, keyTemp: indexTemp,
 			structValue: structElem, arrayValue: setElem}
+		if t.X.Type().Elem != nil {
+			staged.paramSet = p.paramSetOf(*t.X.Type().Elem)
+		}
 		if p.nativeSlice(t.X) {
 			staged.kind = "array"
 		}
@@ -267,7 +293,8 @@ func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
 		indexTemp := p.temp()
 		p.line("const %s = %s;", indexTemp, index)
 		staged := stagedTarget{kind: "array", name: arrayTemp, keyTemp: indexTemp,
-			structValue: t.X.Type().Elem.Kind == ir.KindStruct}
+			structValue: t.X.Type().Elem.Kind == ir.KindStruct,
+			paramSet:    p.paramSetOf(*t.X.Type().Elem)}
 		if staged.arrayValue, err = p.arrayValueCallback(*t.X.Type().Elem); err != nil {
 			return stagedTarget{}, err
 		}
@@ -342,6 +369,11 @@ func (s stagedTarget) store(p *printer, value string) error {
 		}
 	case "field":
 		switch {
+		case s.paramSet != "":
+			// A type-parameter field overwrites in place when the binding's
+			// carrier has an in-place set, else the slot assigns.
+			p.line("if (%s === undefined) { %s.%s = %s; } else { %s(%s.%s, %s); }",
+				s.paramSet, base, s.field, value, s.paramSet, base, s.field, value)
 		case s.cell:
 			// A cell field keeps its stable storage: only the held value is
 			// overwritten, so a previously taken &s.f still observes the write.
@@ -376,6 +408,8 @@ func (s stagedTarget) store(p *printer, value string) error {
 		}
 	case "slice":
 		switch {
+		case s.paramSet != "":
+			p.line("gosl$.goSliceSetWith(%s, %s, %s, %s);", s.name, s.keyTemp, value, s.paramSet)
 		case s.structValue:
 			p.line("gosl$.goSliceSetStruct(%s, %s, %s);", s.name, s.keyTemp, value)
 		case s.arrayValue != "":
@@ -384,6 +418,10 @@ func (s stagedTarget) store(p *printer, value string) error {
 			p.line("gosl$.goSliceSet(%s, %s, %s);", s.name, s.keyTemp, value)
 		}
 	case "array":
+		if s.paramSet != "" {
+			p.line("gosl$.goArrayElemSetWith(%s, %s, %s, %s);", s.name, s.keyTemp, value, s.paramSet)
+			return nil
+		}
 		p.printArrayElemStore(s.name, s.keyTemp, value, s)
 	}
 	return nil
