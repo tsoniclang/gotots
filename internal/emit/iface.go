@@ -232,13 +232,13 @@ func (p *printer) printTypeSwitch(n *ir.TypeSwitchStmt) error {
 // for a single concrete clause, the interface value otherwise — and
 // prints the body.
 func (p *printer) printTypeSwitchClause(n *ir.TypeSwitchStmt, clause *ir.TypeSwitchClause, boxTemp string) error {
-	if n.Bind != "" {
+	if clause.Bind != "" {
 		spelled, err := p.tsType(clause.BindType)
 		if err != nil {
 			return err
 		}
 		if clause.BindType.Kind == ir.KindIface {
-			p.line("let %s: %s = %s;", tsName(n.Bind), spelled, boxTemp)
+			p.line("let %s: %s = %s;", tsName(clause.Bind), spelled, boxTemp)
 		} else {
 			// The clause guard narrowed boxTemp to the member: .v is the
 			// exact payload — no recovery cast.
@@ -261,7 +261,7 @@ func (p *printer) printTypeSwitchClause(n *ir.TypeSwitchStmt, clause *ir.TypeSwi
 				}
 				value = fmt.Sprintf("%s(%s)", callee, value)
 			}
-			p.line("let %s: %s = %s;", tsName(n.Bind), spelled, value)
+			p.line("let %s: %s = %s;", tsName(clause.Bind), spelled, value)
 		}
 	}
 	return p.printSwitchClauseBody(clause.Body)

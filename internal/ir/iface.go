@@ -202,13 +202,14 @@ func (b *builder) buildTypeSwitch(n *ast.TypeSwitchStmt) (Stmt, error) {
 
 	// The guard is either `x.(type)` or `y := x.(type)`.
 	var assertion *ast.TypeAssertExpr
+	var guardIdent *ast.Ident
 	switch guard := n.Assign.(type) {
 	case *ast.ExprStmt:
 		assertion = guard.X.(*ast.TypeAssertExpr)
 	case *ast.AssignStmt:
 		bind := guard.Lhs[0].(*ast.Ident)
 		if bind.Name != "_" {
-			out.Bind = b.typeSwitchBindName(n, bind.Name)
+			guardIdent = bind
 		}
 		assertion = guard.Rhs[0].(*ast.TypeAssertExpr)
 	default:
@@ -225,16 +226,20 @@ func (b *builder) buildTypeSwitch(n *ast.TypeSwitchStmt) (Stmt, error) {
 
 	for _, clauseStmt := range n.Body.List {
 		clause := clauseStmt.(*ast.CaseClause)
-		if out.Bind != "" {
+		built := TypeSwitchClause{BindType: operand.Type()}
+		if guardIdent != nil {
 			// The clause's implicit binding variable (typed to the case)
 			// cannot have its address taken: the plain binding is not a
-			// cell.
-			if implicit, ok := b.info.Implicits[clause].(*types.Var); ok && b.boxed[implicit] {
-				return nil, &Unsupported{Kind: KindAddressOfATypeSwitchVariable, Code: "GOTOTS_UNSUPPORTED_STATEMENT",
-					Construct: "address of a type-switch variable", Span: b.span(clause.Pos())}
+			// cell. Each clause binds its own distinct object under its own
+			// canonical name.
+			if implicit, ok := b.typeSwitchClauseImplicit(clause); ok {
+				if b.boxed[implicit] {
+					return nil, &Unsupported{Kind: KindAddressOfATypeSwitchVariable, Code: "GOTOTS_UNSUPPORTED_STATEMENT",
+						Construct: "address of a type-switch variable", Span: b.span(clause.Pos())}
+				}
+				built.Bind = b.bindNameVar(implicit, guardIdent.Name)
 			}
 		}
-		built := TypeSwitchClause{BindType: operand.Type()}
 		for _, expr := range clause.List {
 			if tv, ok := b.info.Types[expr]; ok && tv.IsNil() {
 				built.Targets = append(built.Targets, TypeSwitchTarget{Nil: true})

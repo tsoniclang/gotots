@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/tsoniclang/gotots/internal/ir"
+	"github.com/tsoniclang/gotots/internal/tsident"
 )
 
 // printStruct emits one named struct as a class whose constructor takes
@@ -234,7 +235,7 @@ func printStructValueContract(p *printer, structDecl *ir.Struct) error {
 func keyComponent(access string, t ir.Type) (string, error) {
 	switch {
 	case t.Kind == ir.KindString:
-		return `String(` + access + `.length) + ":" + ` + access, nil
+		return tsident.Global("String") + "(" + access + `.length) + ":" + ` + access, nil
 	case t.Kind == ir.KindBool:
 		return `(` + access + ` ? "t" : "f")`, nil
 	case t.Kind == ir.KindPointer:
@@ -254,7 +255,7 @@ func keyComponent(access string, t ir.Type) (string, error) {
 		// encoding parses unambiguously inside the outer composition.
 		return `"{" + ` + access + `.goKey$() + "}"`, nil
 	case t.Kind.Integer():
-		return `"i" + String(` + access + `)`, nil
+		return `"i" + ` + tsident.Global("String") + "(" + access + ")", nil
 	}
 	return "", fmt.Errorf("no key encoding for field type %q", t.Go)
 }

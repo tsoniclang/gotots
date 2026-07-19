@@ -16,6 +16,8 @@ import (
 	"go/token"
 	"go/types"
 	"strconv"
+
+	"github.com/tsoniclang/gotots/internal/tsident"
 )
 
 // BindingID is a per-top-level-function ordinal identifying one binding.
@@ -114,38 +116,21 @@ func (b *bindings) allocate(reservedSeeds []string) {
 		b.used[cand+"$b"] = true // reserve the boxed-cell form
 		b.names[id] = cand
 	}
-}
-
-// reservedTSBindings are identifiers legal in Go but reserved or hazardous
-// as bindings in strict-mode ECMAScript modules (globals the generated
-// runtime relies on included). A binding whose source spelling is one of
-// these gains a "$" suffix; Go identifiers can never contain "$", so an
-// escaped name never collides with a source name.
-var reservedTSBindings = map[string]bool{
-	"arguments": true, "await": true, "catch": true, "class": true,
-	"debugger": true, "delete": true, "do": true, "enum": true,
-	"eval": true, "export": true, "extends": true, "false": true,
-	"finally": true, "function": true, "globalThis": true, "implements": true,
-	"in": true, "Infinity": true, "instanceof": true, "let": true,
-	"NaN": true, "new": true, "null": true, "private": true,
-	"protected": true, "public": true, "static": true, "super": true,
-	"this": true, "throw": true, "true": true, "try": true,
-	"typeof": true, "undefined": true, "void": true, "while": true,
-	"with": true, "yield": true,
-}
-
-// tsBinding folds a reserved/hazardous source spelling to its escaped
-// form; it is the identity for every ordinary Go identifier.
-func tsBinding(name string) string {
-	if reservedTSBindings[name] {
-		return name + "$"
+	// Machine invariant: alpha renaming is injective on names — every
+	// identity holds exactly one name and no two identities share one.
+	seen := make(map[string]BindingID, len(b.names))
+	for id, name := range b.names {
+		if prior, dup := seen[name]; dup {
+			panic(bindingInvariant("alpha name " + name + " assigned to two identities " +
+				strconv.Itoa(int(prior)) + " and " + strconv.Itoa(id)))
+		}
+		seen[name] = BindingID(id)
 	}
-	return name
 }
 
-// share maps one more source var onto an existing binding id (type-switch
-// clause bindings, which are disjoint scopes sharing one emission name).
-func (b *bindings) share(v *types.Var, id BindingID) { b.ids[v] = id }
+// tsBinding folds a reserved/hazardous source spelling to its escaped form
+// through the single authoritative identifier policy.
+func tsBinding(name string) string { return tsident.Escape(name) }
 
 // assignBindings runs the deterministic pre-pass for one top-level scope
 // (a function declaration, or a package-level variable initializer that may
@@ -162,14 +147,12 @@ func (b *builder) assignBindings(root ast.Node, typeParams []string) {
 		case *ast.TypeSwitchStmt:
 			b.assignTypeSwitchBinding(node)
 		case *ast.Ident:
-			variable, ok := b.info.Defs[node].(*types.Var)
-			if !ok || node.Name == "_" {
+			if node.Name == "_" {
 				return true
 			}
-			if variable.Pkg() != nil && variable.Parent() == variable.Pkg().Scope() {
-				return true // package-level variable: routed through module.symbol
+			if variable, ok := b.info.Defs[node].(*types.Var); ok && isLocalBinding(variable) {
+				b.bind.newVar(variable, node.Name)
 			}
-			b.bind.newVar(variable, node.Name)
 		}
 		return true
 	})
@@ -178,14 +161,18 @@ func (b *builder) assignBindings(root ast.Node, typeParams []string) {
 		seeds = append(seeds, "zero$"+tp, "eq$"+tp)
 	}
 	b.bind.allocate(seeds)
+	// Fail closed if any local binding the type checker records is missing
+	// from the table (an omitted binding kind, never a silent fallback).
+	b.validateBindings(root)
 }
 
 // assignTypeSwitchBinding registers a type switch's clause bindings. In
 // `switch x := y.(type)` there is no single object x: each case clause has
-// its own implicit variable (info.Implicits), and the guard identifier may
-// have its own definition too. They are the same source name in disjoint
-// scopes and emit ONE shared name, so the guard variable and every clause
-// implicit share one BindingID.
+// its own implicit variable (info.Implicits), a genuinely distinct Go
+// object in a disjoint scope. Each gets its OWN BindingID and unique name,
+// so the alpha renaming stays injective (one Go variable per identity) and
+// function-wide analyses never merge separate clause variables. The guard
+// identifier, if it has its own definition, is registered too.
 func (b *builder) assignTypeSwitchBinding(node *ast.TypeSwitchStmt) {
 	assign, ok := node.Assign.(*ast.AssignStmt)
 	if !ok {
@@ -195,19 +182,8 @@ func (b *builder) assignTypeSwitchBinding(node *ast.TypeSwitchStmt) {
 	if !ok || bindIdent.Name == "_" {
 		return
 	}
-	id := noBinding
-	assign1 := func(v *types.Var) {
-		if v == nil {
-			return
-		}
-		if id == noBinding {
-			id = b.bind.newVar(v, bindIdent.Name)
-		} else {
-			b.bind.share(v, id)
-		}
-	}
 	if guardVar, ok := b.info.Defs[bindIdent].(*types.Var); ok {
-		assign1(guardVar)
+		b.bind.newVar(guardVar, bindIdent.Name)
 	}
 	for _, clauseStmt := range node.Body.List {
 		clause, ok := clauseStmt.(*ast.CaseClause)
@@ -215,32 +191,16 @@ func (b *builder) assignTypeSwitchBinding(node *ast.TypeSwitchStmt) {
 			continue
 		}
 		if variable, ok := b.info.Implicits[clause].(*types.Var); ok {
-			assign1(variable)
+			b.bind.newVar(variable, bindIdent.Name)
 		}
 	}
 }
 
-// typeSwitchBindName returns the shared emission name of a type switch's
-// binding, resolved from a case clause's implicit variable — the object
-// every clause-body reference resolves to — so the declaration and the
-// references agree even when the guard identifier has no single canonical
-// object of its own.
-func (b *builder) typeSwitchBindName(node *ast.TypeSwitchStmt, fallback string) string {
-	if b.bind != nil {
-		for _, clauseStmt := range node.Body.List {
-			clause, ok := clauseStmt.(*ast.CaseClause)
-			if !ok {
-				continue
-			}
-			if variable, ok := b.info.Implicits[clause].(*types.Var); ok {
-				// The guard variable and clause implicits share one id, so a
-				// clause implicit resolves to the same name every clause-body
-				// reference uses.
-				return b.bindNameVar(variable, fallback)
-			}
-		}
-	}
-	return tsBinding(fallback)
+// typeSwitchClauseImplicit resolves one case clause's implicit binding
+// variable, when the switch has a guard.
+func (b *builder) typeSwitchClauseImplicit(clause *ast.CaseClause) (*types.Var, bool) {
+	variable, ok := b.info.Implicits[clause].(*types.Var)
+	return variable, ok
 }
 
 // bindNameOf returns the allocated emission name for an identifier that
@@ -251,26 +211,31 @@ func (b *builder) typeSwitchBindName(node *ast.TypeSwitchStmt, fallback string) 
 // keeps its escaped source spelling (those never participate in local
 // shadowing).
 func (b *builder) bindNameOf(ident *ast.Ident) string {
-	if b.bind != nil {
-		if variable := b.identVar(ident); variable != nil {
-			if id, ok := b.bind.idOf(variable); ok {
-				return b.bind.name(id)
-			}
-		}
+	variable := b.identVar(ident)
+	if variable == nil {
+		panic(bindingInvariant("identifier " + ident.Name + " resolves to no variable"))
 	}
-	return tsBinding(ident.Name)
+	return b.bindNameVar(variable, ident.Name)
 }
 
-// bindNameVar returns a binding's unique emission name from its
-// *types.Var directly (receiver, parameter, and named-result sites hold
-// the object without an identifier at hand).
-func (b *builder) bindNameVar(variable *types.Var, fallback string) string {
-	if b.bind != nil && variable != nil {
-		if id, ok := b.bind.idOf(variable); ok {
-			return b.bind.name(id)
-		}
+// bindNameVar returns a LOCAL binding's unique emission name from its
+// *types.Var directly (receiver, parameter, named-result, and type-switch
+// clause sites hold the object without an identifier at hand). It fails
+// closed: reaching it with no binding table, or with a variable the
+// deterministic prepass did not register, is a construction-invariant
+// violation (a compiler defect that could silently recreate the shadowing
+// bug), never a silent fall back to the raw source spelling. Callers must
+// classify package variables, blanks, fields, and non-variable
+// identifiers before reaching here.
+func (b *builder) bindNameVar(variable *types.Var, spelling string) string {
+	if b.bind == nil {
+		panic(bindingInvariant("binding " + spelling + " reached with no binding table (missing prepass)"))
 	}
-	return tsBinding(fallback)
+	id, ok := b.bind.idOf(variable)
+	if !ok {
+		panic(bindingInvariant("local binding " + spelling + " absent from the binding table"))
+	}
+	return b.bind.name(id)
 }
 
 // identVar resolves an identifier to the canonical *types.Var it defines
@@ -283,4 +248,62 @@ func (b *builder) identVar(ident *ast.Ident) *types.Var {
 		return variable
 	}
 	return nil
+}
+
+// bindingInvariant formats a fail-closed binding-invariant panic value: a
+// local binding the deterministic prepass must have registered is missing
+// or unclassified, so generation stops rather than risk a name collision.
+func bindingInvariant(detail string) string {
+	return "GOTOTS_BINDING_INVARIANT: " + detail
+}
+
+// isLocalBinding reports whether a *types.Var is a function-local binding
+// (a local, parameter, receiver, named result, range or type-switch
+// variable, or capture) — as opposed to a package-level variable or a
+// struct field — so validation and name allocation consider exactly the
+// objects the allocator owns.
+func isLocalBinding(v *types.Var) bool {
+	if v == nil || v.IsField() || v.Pkg() == nil {
+		return false
+	}
+	return v.Parent() != v.Pkg().Scope()
+}
+
+// validateBindings fails closed if any local binding the type checker
+// records for this scope — every Defs/Uses variable and every type-switch
+// clause implicit, captures included — is absent from the allocated table.
+// It makes an omitted binding kind an immediate invariant error instead of
+// a silent spelling fallback that could recreate the shadowing defect.
+func (b *builder) validateBindings(root ast.Node) {
+	assertRegistered := func(v *types.Var, where string) {
+		if !isLocalBinding(v) {
+			return
+		}
+		if _, ok := b.bind.idOf(v); !ok {
+			panic(bindingInvariant("local binding " + v.Name() + " (" + where + ") absent from the binding table"))
+		}
+	}
+	ast.Inspect(root, func(n ast.Node) bool {
+		switch node := n.(type) {
+		case *ast.Ident:
+			if node.Name == "_" {
+				return true
+			}
+			if v, ok := b.info.Defs[node].(*types.Var); ok {
+				assertRegistered(v, "def")
+			}
+			if v, ok := b.info.Uses[node].(*types.Var); ok {
+				assertRegistered(v, "use")
+			}
+		case *ast.TypeSwitchStmt:
+			for _, clauseStmt := range node.Body.List {
+				if clause, ok := clauseStmt.(*ast.CaseClause); ok {
+					if v, ok := b.info.Implicits[clause].(*types.Var); ok {
+						assertRegistered(v, "type-switch clause")
+					}
+				}
+			}
+		}
+		return true
+	})
 }

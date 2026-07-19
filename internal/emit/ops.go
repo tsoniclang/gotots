@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/abi"
 	"github.com/tsoniclang/gotots/internal/ir"
+	"github.com/tsoniclang/gotots/internal/tsident"
 )
 
 func printConst(n *ir.Const) (string, error) {
@@ -176,7 +177,9 @@ func (p *printer) printConvert(n *ir.Convert) (string, error) {
 
 	case to == ir.KindFloat64 && from.Integer():
 		if from.Wide64() {
-			return "Number(" + x + ")", nil
+			// globalThis-qualified so a source binding named Number cannot
+			// capture the host conversion.
+			return tsident.Global("Number") + "(" + x + ")", nil
 		}
 		return "(" + x + ")", nil
 

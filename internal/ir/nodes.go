@@ -201,7 +201,6 @@ type SwitchClause struct {
 // other clause binds the interface value itself.
 type TypeSwitchStmt struct {
 	Init    Stmt
-	Bind    string
 	X       Expr
 	Clauses []TypeSwitchClause
 	// BreakLabel, when set, names the labeled block a direct break
@@ -213,6 +212,11 @@ type TypeSwitchStmt struct {
 // the default clause; a target with Nil set matches the nil interface.
 type TypeSwitchClause struct {
 	Targets []TypeSwitchTarget
+	// Bind is this clause's own binding name ("" when the switch has no
+	// guard). Each clause's implicit variable is a DISTINCT Go object in a
+	// disjoint scope, so it carries its own canonical identity and unique
+	// name — the binding never conflates several clause variables.
+	Bind string
 	// BindType is the clause variable's type: the concrete target for a
 	// single-type clause, the switch operand's interface type otherwise.
 	BindType Type
