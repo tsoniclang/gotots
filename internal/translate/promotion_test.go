@@ -207,3 +207,24 @@ func StructKeyWithAnyField() int {
 }
 `)
 }
+
+func TestOracleAliasReceiverMethod(t *testing.T) {
+	// A method declared on an ALIAS of a named type emits under the
+	// canonical type name, coinciding with every call site.
+	runOracle(t, `package fixture
+
+type node struct{ n int }
+
+type aliasNode = node
+
+func (x *aliasNode) Bump() int {
+	x.n += 2
+	return x.n
+}
+
+func AliasReceiverMethod() int {
+	v := &node{n: 3}
+	return v.Bump() + v.n
+}
+`)
+}

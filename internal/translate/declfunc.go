@@ -25,8 +25,11 @@ func translateFunc(p *packages.Package, sourceDir string, unit ir.Scope, relativ
 	generatedSymbol := tsident.EscapeDeclared(name)
 	if decl.Recv != nil {
 		id = goid.Method(p.PkgPath, receiverBase(decl.Recv), name)
-		// The emitted method function spells Type$Method.
-		generatedSymbol = receiverBase(decl.Recv) + "$" + name
+		// The emitted method function spells Type$Method under the
+		// CANONICAL receiver type (an alias receiver resolves through the
+		// checker), coinciding with every dispatch and call site. The
+		// census identity keeps the source spelling.
+		generatedSymbol = canonicalReceiverBase(p, decl) + "$" + name
 	} else if goid.IsRepeatable("func", name) {
 		// init and blank functions repeat legally: their identities are
 		// position-qualified, exactly like the census records them.
@@ -294,4 +297,20 @@ func declOutcome(p *packages.Package, relativeFile string, decl ast.Decl, states
 		return id, state, sites[id]
 	}
 	return "", "", nil
+}
+
+// canonicalReceiverBase resolves the receiver's CANONICAL named type (an
+// alias spelling resolves through the checker); falls back to the source
+// spelling when the checker has no typed definition.
+func canonicalReceiverBase(p *packages.Package, decl *ast.FuncDecl) string {
+	if fnObj, ok := p.TypesInfo.Defs[decl.Name].(*types.Func); ok {
+		recvType := fnObj.Type().(*types.Signature).Recv().Type()
+		if pointer, isPointer := recvType.(*types.Pointer); isPointer {
+			recvType = pointer.Elem()
+		}
+		if named, isNamed := types.Unalias(recvType).(*types.Named); isNamed {
+			return named.Obj().Name()
+		}
+	}
+	return receiverBase(decl.Recv)
 }

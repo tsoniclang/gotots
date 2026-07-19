@@ -462,6 +462,19 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 				continue
 			}
 			owner := receiverBase(funcDecl.Recv)
+			// An ALIAS receiver spelling (type ImportAttributesNode = Node)
+			// must emit under the CANONICAL named type: every dispatch and
+			// call site resolves through go/types and spells Node$Method,
+			// so the declared function name must coincide.
+			if fnObj, ok := p.TypesInfo.Defs[funcDecl.Name].(*types.Func); ok {
+				recvType := fnObj.Type().(*types.Signature).Recv().Type()
+				if pointer, isPointer := recvType.(*types.Pointer); isPointer {
+					recvType = pointer.Elem()
+				}
+				if named, isNamed := types.Unalias(recvType).(*types.Named); isNamed {
+					owner = named.Obj().Name()
+				}
+			}
 			if owner == "" {
 				return fmt.Errorf("method %s has no named receiver type in package %s", function.Name, p.PkgPath)
 			}
