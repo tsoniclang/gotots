@@ -70,6 +70,12 @@ func collectGenericInstances(unit ir.Scope, pkgs []*packages.Package) error {
 	// free-parameter vectors are then soundly skippable everywhere, their
 	// concretizations being present.
 	unit.CloseGenericEvidence()
+	// Per-declaration type-parameter requirements: a generic declaration
+	// whose shape keys a map by its own parameter requires SVZ-key
+	// bindings; instantiation sites are guarded against the requirement,
+	// which propagates backwards over the free-parameter edges.
+	collectParamRequirements(unit, pkgs)
+	unit.PropagateParamRequirements()
 	if err := collectAddressTakenFields(unit, pkgs); err != nil {
 		return err
 	}
@@ -295,4 +301,59 @@ func genericDeclRanges(p *packages.Package) genericRanges {
 		}
 	}
 	return out
+}
+
+// collectParamRequirements scans every generic declaration's complete
+// shape — the named type's underlying and method signatures, a generic
+// function's signature AND every type used inside its body (locals
+// included, via the definitions the checker records within the
+// declaration's range) — for map keys typed by the declaration's own
+// parameters.
+func collectParamRequirements(unit ir.Scope, pkgs []*packages.Package) {
+	for _, p := range pkgs {
+		ranges := genericDeclRanges(p)
+		// Shape types per generic declaration object.
+		shapes := map[types.Object][]types.Type{}
+		for _, entry := range ranges.entries {
+			switch obj := entry.obj.(type) {
+			case *types.TypeName:
+				if named, ok := obj.Type().(*types.Named); ok {
+					shape := []types.Type{named.Underlying()}
+					for i := range named.NumMethods() {
+						shape = append(shape, named.Method(i).Type())
+					}
+					shapes[obj] = shape
+				}
+			case *types.Func:
+				shapes[obj] = []types.Type{obj.Type()}
+			}
+		}
+		// Local definitions inside a generic declaration's range extend its
+		// shape (a body-local map[P]V is as binding as a field).
+		for ident, def := range p.TypesInfo.Defs {
+			v, ok := def.(*types.Var)
+			if !ok {
+				continue
+			}
+			if outer := ranges.at(ident.Pos()); outer != nil {
+				shapes[outer] = append(shapes[outer], v.Type())
+			}
+		}
+		for obj, shape := range shapes {
+			var params *types.TypeParamList
+			switch o := obj.(type) {
+			case *types.TypeName:
+				if named, ok := o.Type().(*types.Named); ok {
+					params = named.TypeParams()
+				}
+			case *types.Func:
+				signature := o.Type().(*types.Signature)
+				params = signature.TypeParams()
+				if recv := signature.RecvTypeParams(); recv != nil && recv.Len() > 0 {
+					params = recv
+				}
+			}
+			unit.CollectParamKeyRequirements(obj, params, shape)
+		}
+	}
 }

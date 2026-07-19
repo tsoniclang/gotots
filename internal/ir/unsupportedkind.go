@@ -192,6 +192,7 @@ const (
 	KindTypeSwitchOn
 	KindTypeWithoutTypedDefinition
 	KindUnaryOperator
+	KindGenericInstantiationOutsideAdmittedKeyFamily
 	KindUnrecognizedExpression
 	KindUnrecognizedStatement
 	KindUntypedNilOutsideATypedContext
@@ -297,8 +298,9 @@ var kindName = map[UnsupportedKind]string{
 	KindLabelOnANonLoopStatement:                                                      "label on a non-loop statement",
 	KindLabelOnARangeOverFuncLoop:                                                     "label on a range-over-func loop",
 	KindLabeledBranchInsideARangeOverFuncBody:                                         "labeled branch inside a range-over-func body",
-	KindLenOf:                 "len of",
-	KindMakeOf:                "make of",
+	KindLenOf:  "len of",
+	KindMakeOf: "make of",
+	KindGenericInstantiationOutsideAdmittedKeyFamily: "generic instantiation outside the admitted key family",
 	KindMapKeyType:            "map key type",
 	KindMapLiteralWithoutKeys: "map literal without keys",
 	KindMethodCallOn:          "method call on",

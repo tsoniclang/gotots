@@ -36,6 +36,20 @@ func (p *printer) collectionExpr(e ir.Expr) (string, error) {
 		if n.Type().Key != nil && n.Type().Key.Kind == ir.KindStruct {
 			return "gort$.goKMapMake(" + hint + ")", nil
 		}
+		// Explicit type arguments: inference from a bare make has nothing
+		// to infer from in a generic context (Map<unknown, unknown>), so
+		// the exact key/value types always spell.
+		if n.Type().Key != nil && n.Type().Elem != nil {
+			key, err := p.tsType(*n.Type().Key)
+			if err != nil {
+				return "", err
+			}
+			value, err := p.tsType(*n.Type().Elem)
+			if err != nil {
+				return "", err
+			}
+			return "gort$.goMapMake<" + key + ", " + value + ">(" + hint + ")", nil
+		}
 		return "gort$.goMapMake(" + hint + ")", nil
 	case *ir.MapFrom:
 		var entries []string

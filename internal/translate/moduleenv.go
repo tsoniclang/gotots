@@ -223,8 +223,16 @@ func externAdapter(module *emit.Module, unit ir.Scope, context *packages.Package
 	return forms, refs, nil
 }
 
-// collectPkgRefs gathers every package path an ir.Type references.
+// collectPkgRefs gathers every package path an ir.Type's SPELLING
+// requires to exist. An interface position contributes nothing: it spells
+// as a locally-declared closed union whose members are FILTERED by
+// availability (a non-materialized implementer is excluded from the
+// spelled union and never imported), so an interface type can never make
+// a method unavailable.
 func collectPkgRefs(t ir.Type, seen map[string]bool, out *[]string) {
+	if t.Kind == ir.KindIface {
+		return
+	}
 	if t.Pkg != "" && !seen[t.Pkg] {
 		seen[t.Pkg] = true
 		*out = append(*out, t.Pkg)
@@ -237,12 +245,6 @@ func collectPkgRefs(t ir.Type, seen map[string]bool, out *[]string) {
 	}
 	for _, arg := range t.TypeArgs {
 		collectPkgRefs(arg, seen, out)
-	}
-	for _, member := range t.IfaceMembers {
-		if member.Pkg != "" && !seen[member.Pkg] {
-			seen[member.Pkg] = true
-			*out = append(*out, member.Pkg)
-		}
 	}
 }
 

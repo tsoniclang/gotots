@@ -196,6 +196,11 @@ func (p *printer) eqOperation(t ir.Type) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		if t.Uncomparable {
+			// Go's type system rejects == on this binding wherever it could
+			// run, so the operation is provably unreachable: fail closed.
+			return "(($a: " + spelled + ", $b: " + spelled + ") => gort$.goEqUnsupported())", nil
+		}
 		return "(($a: " + spelled + ", $b: " + spelled + ") => $a.goEq$($b))", nil
 	}
 	spelled, err := p.tsType(t)

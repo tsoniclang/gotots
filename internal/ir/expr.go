@@ -498,6 +498,11 @@ func (b *builder) buildStructLit(lit *ast.CompositeLit, t Type) (Expr, error) {
 	argIndexOf := map[string]int{}
 	for i := range structType.NumFields() {
 		field := structType.Field(i)
+		if field.Name() == "_" && zeroSizeType(field.Type()) {
+			// A no-output zero-size blank field is absent from the generated
+			// class; construction skips it too (a literal can never name it).
+			continue
+		}
 		if value, ok := provided[field.Name()]; ok {
 			argIndexOf[field.Name()] = len(out.Args)
 			out.Args = append(out.Args, value)

@@ -131,6 +131,14 @@ func predeclaredRttiName(kind types.BasicKind) (string, bool) {
 // a binding site. Interface-to-interface bindings pass the box through;
 // nil stays the nil interface; struct values are copied into the box.
 func (b *builder) boxIfaceValue(built Expr, source types.Type, expected Type, span Span) (Expr, error) {
+	if built.Type().Kind == KindIface && built.Type().TypeParamName != "" {
+		// A type-parameter VALUE is not an interface box: boxing T into a
+		// concrete union needs the binding's runtime type identity, which
+		// varies per instantiation. Fail closed (the body placeholders)
+		// rather than pass the raw value where a box is expected.
+		return nil, &Unsupported{Kind: KindInterfaceValueOfType, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+			Construct: "interface value of type " + source.String() + " (type-parameter boxing varies per instantiation)", Span: span}
+	}
 	if built.Type().Kind == KindIface {
 		return built, nil
 	}

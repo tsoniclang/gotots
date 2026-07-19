@@ -104,6 +104,11 @@ type Type struct {
 	Canon string
 	// IfaceEmpty marks the zero-method interface: universal membership.
 	IfaceEmpty bool
+	// Uncomparable marks a struct type Go's == rejects (slice, map, or
+	// function fields): its goEq$ is never generated, and an equality
+	// factory over such a binding is provably unreachable (the type
+	// system rejects == wherever it could run), spelled fail-closed.
+	Uncomparable bool
 	// IfaceID is the interface's canonical path-qualified identity — the
 	// union alias digests THIS, never the name-qualified spelling.
 	IfaceID string
@@ -184,6 +189,9 @@ type Scope struct {
 	// instantiation inside a generic declaration whose arguments mention
 	// the outer parameters), closed by CloseGenericEvidence.
 	genericEdges *[]genericEdge
+	// paramKeyReqs records, per generic declaration (by canonical key),
+	// which type parameters must bind SameValueZero key carriers.
+	paramKeyReqs map[string][]bool
 	// universeSealed is the closed-world dynamic-type universe's lifecycle
 	// flag (pointer-shared across Scope value copies). It is false while the
 	// pre-pass COLLECTS the named-type universe (concreteTypes,
@@ -242,6 +250,7 @@ func NewScope(paths ...string) Scope {
 		ifaceMembers:       map[string][]IfaceMember{},
 		addressTakenFields: map[string]bool{},
 		genericEdges:       &[]genericEdge{},
+		paramKeyReqs:       map[string][]bool{},
 		universeSealed:     new(bool),
 	}
 }

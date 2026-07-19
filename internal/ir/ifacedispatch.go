@@ -301,6 +301,16 @@ func (b *builder) ifaceMembers(iface *types.Interface, span Span) ([]IfaceMember
 				return err
 			}
 			slots[key] = slot
+			if member.Extern {
+				// An EXTERNAL member's vtable is built from its recorded
+				// obligation: every interface method the membership proves
+				// must be ON RECORD, or the vtable would lack the slot the
+				// dispatch just resolved. Registration is idempotent and
+				// validated by the sole constructor.
+				if err := b.unit.AddExternalMethod(named, impl); err != nil {
+					return err
+				}
+			}
 		}
 		member.Slots = slots
 		members = append(members, member)

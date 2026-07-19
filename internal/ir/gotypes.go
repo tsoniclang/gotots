@@ -215,12 +215,25 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 		}
 		// Struct values are reviewed only behind pointers and receivers;
 		// the caller decides whether a bare struct kind is admissible.
-		out := Type{Kind: KindStruct, Go: spelled, Named: named.Obj().Name(), Pkg: named.Obj().Pkg().Path()}
+		out := Type{Kind: KindStruct, Go: spelled, Named: named.Obj().Name(), Pkg: named.Obj().Pkg().Path(),
+			Uncomparable: !types.Comparable(t)}
 		if named.TypeArgs() != nil {
 			for i := range named.TypeArgs().Len() {
-				arg, err := b.typeOf(named.TypeArgs().At(i), span)
+				goArg := named.TypeArgs().At(i)
+				arg, err := b.typeOf(goArg, span)
 				if err != nil {
 					return Type{}, err
+				}
+				// The per-site key-family guard: a concrete binding of a
+				// parameter the declaration keys a map by must be a
+				// SameValueZero carrier — the declaration's GoMap carrier is
+				// exact for every instantiation that exists in emitted code.
+				// A free (parameter-mentioning) argument is guarded at its
+				// own concrete sites.
+				if b.unit.ParamRequiresSVZKey(named.Origin().Obj(), i) &&
+					!mentionsTypeParamType(goArg) && !mapKeySupported(arg.Kind) {
+					return Type{}, &Unsupported{Kind: KindGenericInstantiationOutsideAdmittedKeyFamily, Code: "GOTOTS_UNSUPPORTED_TYPE",
+						Construct: "generic instantiation outside the admitted key family (" + spelled + ": " + goArg.String() + " is not a SameValueZero key)", Span: span}
 				}
 				out.TypeArgs = append(out.TypeArgs, arg)
 			}
@@ -366,25 +379,14 @@ func (b *builder) typeParamKeySupported(keyType types.Type, span Span) bool {
 	if len(instances) == 0 {
 		return false
 	}
-	concrete := 0
-	for _, instance := range instances {
-		if param.Index() >= len(instance) {
-			return false
-		}
-		arg := instance[param.Index()]
-		if mentionsTypeParamType(arg) {
-			// A free-parameter vector (an instantiation inside another
-			// generic): its concretizations are present in the closed
-			// evidence, so skipping it is sound.
-			continue
-		}
-		concrete++
-		bound, err := b.typeOf(arg, span)
-		if err != nil || !mapKeySupported(bound.Kind) {
-			return false
-		}
-	}
-	return concrete > 0
+	// The declaration admits with the direct GoMap carrier: the prepass
+	// recorded the SVZ-key REQUIREMENT for this parameter, and every
+	// concrete instantiation site is guarded against it (a non-SVZ binding
+	// fails closed AT ITS SITE), so the carrier stays exact for every
+	// instantiation that exists in emitted code. The evidence is consulted
+	// only to confirm the requirement machinery covers this declaration.
+	_ = instances
+	return true
 }
 
 // EqComparableField reports whether one field type participates in the

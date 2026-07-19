@@ -244,3 +244,138 @@ func vectorKey(vector []types.Type) string {
 // MentionsTypeParam reports whether a type's structure references any
 // type parameter (the free-parameter test the prepass and closure share).
 func MentionsTypeParam(t types.Type) bool { return mentionsTypeParamType(t) }
+
+// --- Per-declaration type-parameter requirements ---------------------------
+//
+// A generic declaration whose shape uses map[P]V requires every CONCRETE
+// binding of P to be a SameValueZero key: the declaration then admits with
+// the direct GoMap carrier, and each instantiation SITE binding a non-SVZ
+// carrier fails closed (the guarded instantiation never exists in emitted
+// code, so the carrier stays exact for everything that does). Requirements
+// propagate backwards along free-parameter edges: an outer parameter
+// forwarded into a required position inherits the requirement.
+
+// RequireParamSVZKey records that the declaration's i-th type parameter
+// must bind a SameValueZero key carrier.
+func (s Scope) RequireParamSVZKey(obj types.Object, index int) {
+	key := objKey(obj)
+	reqs := s.paramKeyReqs[key]
+	for len(reqs) <= index {
+		reqs = append(reqs, false)
+	}
+	reqs[index] = true
+	s.paramKeyReqs[key] = reqs
+}
+
+// ParamRequiresSVZKey reports whether the declaration's i-th type
+// parameter requires a SameValueZero key binding.
+func (s Scope) ParamRequiresSVZKey(obj types.Object, index int) bool {
+	reqs := s.paramKeyReqs[objKey(obj)]
+	return index < len(reqs) && reqs[index]
+}
+
+// CollectParamKeyRequirements scans one generic declaration's shape for
+// map keys typed by its own parameters (fields, embedded types, method
+// signatures for a type; the full signature for a function) and records
+// the SVZ-key requirement per parameter. Local map declarations inside
+// generic function bodies are covered by the same walk over the
+// declaration's syntax types recorded by the caller.
+func (s Scope) CollectParamKeyRequirements(obj types.Object, params *types.TypeParamList, shape []types.Type) {
+	if params == nil || params.Len() == 0 {
+		return
+	}
+	index := map[*types.TypeParam]int{}
+	for i := range params.Len() {
+		index[params.At(i)] = i
+	}
+	seen := map[types.Type]bool{}
+	var walk func(t types.Type)
+	walk = func(t types.Type) {
+		if t == nil || seen[t] {
+			return
+		}
+		seen[t] = true
+		switch u := types.Unalias(t).(type) {
+		case *types.Map:
+			if p, ok := types.Unalias(u.Key()).(*types.TypeParam); ok {
+				if i, mine := index[p]; mine {
+					s.RequireParamSVZKey(obj, i)
+				}
+			}
+			walk(u.Key())
+			walk(u.Elem())
+		case *types.Pointer:
+			walk(u.Elem())
+		case *types.Slice:
+			walk(u.Elem())
+		case *types.Array:
+			walk(u.Elem())
+		case *types.Chan:
+			walk(u.Elem())
+		case *types.Struct:
+			for i := range u.NumFields() {
+				walk(u.Field(i).Type())
+			}
+		case *types.Tuple:
+			for i := range u.Len() {
+				walk(u.At(i).Type())
+			}
+		case *types.Signature:
+			walk(u.Params())
+			walk(u.Results())
+		case *types.Named:
+			if args := u.TypeArgs(); args != nil {
+				for i := range args.Len() {
+					walk(args.At(i))
+				}
+			}
+			if u.TypeParams() == nil || u.TypeParams().Len() == 0 {
+				walk(u.Underlying())
+			}
+		}
+	}
+	for _, t := range shape {
+		walk(t)
+	}
+}
+
+// PropagateParamRequirements closes the requirements backwards over the
+// free-parameter edges to a fixed point: an outer parameter bound into a
+// required inner position is itself required.
+func (s Scope) PropagateParamRequirements() {
+	edges := *s.genericEdges
+	sort.SliceStable(edges, func(i, j int) bool { return edgeKey(edges[i]) < edgeKey(edges[j]) })
+	for changed := true; changed; {
+		changed = false
+		for _, edge := range edges {
+			inner := edgeTarget(edge)
+			outer := edgeOuter(edge)
+			params := edge.outerParams()
+			if params == nil {
+				continue
+			}
+			for j, arg := range edge.args {
+				if !s.ParamRequiresSVZKey(inner, j) {
+					continue
+				}
+				p, ok := types.Unalias(arg).(*types.TypeParam)
+				if !ok {
+					continue
+				}
+				for i := range params.Len() {
+					if params.At(i) == p && !s.ParamRequiresSVZKey(outer, i) {
+						s.RequireParamSVZKey(outer, i)
+						changed = true
+					}
+				}
+			}
+		}
+	}
+}
+
+func edgeTarget(e genericEdge) types.Object {
+	if e.innerFunc != nil {
+		return e.innerFunc
+	}
+	return e.innerType
+}
