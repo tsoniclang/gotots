@@ -569,3 +569,41 @@ func LocalTypeDeclaration() int {
 }
 `)
 }
+
+func TestOracleAnyKeyedGenericMap(t *testing.T) {
+	// The tsc/help NewOrderedMapWithSizeHint[any, []string] shape: an
+	// INTERFACE binding of a hard map-keyed parameter joins the encoded
+	// family — the union $key encoder is the instantiation's key$P.
+	runOracle(t, `package fixture
+
+type dict[K comparable, V any] struct {
+	m map[K]V
+}
+
+func (d *dict[K, V]) Put(k K, v V) {
+	if d.m == nil {
+		d.m = map[K]V{}
+	}
+	d.m[k] = v
+}
+
+func (d *dict[K, V]) Get(k K) V {
+	return d.m[k]
+}
+
+func (d *dict[K, V]) Len() int {
+	return len(d.m)
+}
+
+func AnyKeyedGenericMap() int {
+	d := &dict[any, int]{}
+	d.Put("a", 1)
+	d.Put(7, 2)
+	d.Put("a", 3)
+	total := d.Len()*100 + d.Get("a")*10 + d.Get(7)
+	s := &dict[string, int]{}
+	s.Put("x", 9)
+	return total*10 + s.Get("x")
+}
+`)
+}

@@ -273,7 +273,8 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 				// own concrete sites.
 				if b.unit.ParamRequiresSVZKey(named.Origin().Obj(), i) &&
 					!mentionsTypeParamType(goArg) && !mapKeySupported(arg.Kind) &&
-					!(arg.Kind == KindStruct && arg.KeyEncodable) {
+					!(arg.Kind == KindStruct && arg.KeyEncodable) &&
+					!(arg.Kind == KindIface && b.ifaceKeyMembersEncodable(goArg, span)) {
 					return Type{}, &Unsupported{Kind: KindGenericInstantiationOutsideAdmittedKeyFamily, Code: "GOTOTS_UNSUPPORTED_TYPE",
 						Construct: "generic instantiation outside the admitted key family (" + spelled + ": " + goArg.String() + " is not an admitted map key)", Span: span}
 				}

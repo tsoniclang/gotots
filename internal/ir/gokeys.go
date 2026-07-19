@@ -96,6 +96,17 @@ func (b *builder) typeParamKeySupported(keyType types.Type, span Span) bool {
 	return true
 }
 
+// encFamilyBinding reports whether a concrete binding of a hard
+// map-keyed parameter takes the ENCODED carrier family: struct values
+// (goKey$) and interfaces (the union $key encoder).
+func encFamilyBinding(arg types.Type) bool {
+	switch types.Unalias(arg).Underlying().(type) {
+	case *types.Struct, *types.Interface:
+		return true
+	}
+	return false
+}
+
 // HasEncFamilyInstances reports whether the closed evidence instantiates
 // this generic struct with a struct binding at any HARD map-keyed
 // position — the "$ek" emission variant exists exactly then.
@@ -117,7 +128,7 @@ func HasEncFamilyInstances(unit Scope, named *types.Named) bool {
 			if index >= len(vector) || mentionsTypeParamType(vector[index]) {
 				continue
 			}
-			if _, isStruct := types.Unalias(vector[index]).Underlying().(*types.Struct); isStruct {
+			if encFamilyBinding(vector[index]) {
 				return true
 			}
 		}
@@ -147,7 +158,7 @@ func HasEncFamilyFuncInstances(unit Scope, fn *types.Func) bool {
 			if index >= len(vector) || mentionsTypeParamType(vector[index]) {
 				continue
 			}
-			if _, isStruct := types.Unalias(vector[index]).Underlying().(*types.Struct); isStruct {
+			if encFamilyBinding(vector[index]) {
 				return true
 			}
 		}
@@ -172,7 +183,7 @@ func (b *builder) instanceFamilyEnc(named *types.Named) bool {
 		if mentionsTypeParamType(arg) {
 			continue
 		}
-		if _, isStruct := types.Unalias(arg).Underlying().(*types.Struct); isStruct {
+		if encFamilyBinding(arg) {
 			return true
 		}
 	}
