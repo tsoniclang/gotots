@@ -28,6 +28,13 @@ export function Repeat(s: string, count: bigint): string {
   return String(i);
 }
 `,
+	"os": `import { goSliceFrom, type GoSliceValue } from "../../language-abi/goslice.js";
+
+const Args: GoSliceValue<string> = goSliceFrom(["fixture"]);
+export function Args$get$(): GoSliceValue<string> {
+  return Args;
+}
+`,
 	"slices": `import { goSliceLen, goSliceGet, type GoSliceValue } from "../../language-abi/goslice.js";
 
 export function Contains<S, E>(s: GoSliceValue<E>, v: E): boolean {
@@ -126,4 +133,19 @@ func Use() bool { return strings.HasPrefix("a", "b") }
 	if !strings.Contains(fixtureModule, `from "../../../external-stubs/strings/package.js";`) {
 		t.Fatalf("fixture module lacks the stub import:\n%s", fixtureModule)
 	}
+}
+
+
+func TestOracleExternalVarRead(t *testing.T) {
+	// The externVar class: an external package VARIABLE read through its
+	// typed stub. Only a deterministic derived value is compared (os.Args
+	// is non-empty in both hosts).
+	runExternalOracle(t, `package fixture
+
+import "os"
+
+func ExternVarRead() bool {
+	return len(os.Args) > 0
+}
+`)
 }

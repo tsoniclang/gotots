@@ -190,3 +190,32 @@ func GenericOverGenericZeroField() int {
 }
 `)
 }
+
+func TestOracleCompoundAssignAndBitOps(t *testing.T) {
+	// Registry-coverage oracle: the compound-assignment family (%=, &=,
+	// &^=, -=, /=, >>=, ^=), binary |, and non-constant len(array). One
+	// compound RHS mutates its own storage to pin Go's load-before-RHS
+	// evaluation order.
+	runOracle(t, `package fixture
+
+func arr() [4]int {
+	return [4]int{1, 2, 3, 4}
+}
+
+func CompoundAssignAndBitOps() int {
+	x := 0xF3
+	x %= 0x51
+	x &= 0x7E
+	x &^= 0x12
+	x -= 3
+	x /= 2
+	x >>= 1
+	x ^= 0x2C
+	y := 0x40 | x
+	total := y*1000 + len(arr())
+	z := 1
+	z -= func() int { z = 10; return 2 }()
+	return total*100 + z
+}
+`)
+}
