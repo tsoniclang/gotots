@@ -141,18 +141,23 @@ func reconcileDispositions(prof *profile.Profile, firstRun *census.Result, gener
 		}
 		proofSeen[proof.ID] = true
 		// Bidirectional stage verification of the proof's OWN claim:
-		// moduleRetained ⇔ package retained ∧ generated file exists (the
-		// generator's finalization already proved symbol presence; the
-		// gate re-derives the rest independently).
-		_, pkgWithheld := generated.Withheld[proof.Package]
+		// moduleRetained ⇔ package MATERIALIZED ∧ generated file exists
+		// (the generator's finalization already proved symbol presence; the
+		// gate re-derives the rest independently). A materialized-but-
+		// publication-withheld package legitimately retains its bodies —
+		// its analyzable file exists and is independently typechecked;
+		// publication is a separate, later selection. Only a package that
+		// produced no analyzable file (NotMaterialized) must not claim
+		// retention.
+		_, pkgBlocked := generated.NotMaterialized[proof.Package]
 		_, fileExists := generated.Files[proof.GeneratedFile]
 		switch {
-		case proof.ModuleRetained && pkgWithheld:
-			conflicts = append(conflicts, fmt.Sprintf("%s: claims module-retained inside withheld package %s", proof.ID, proof.Package))
+		case proof.ModuleRetained && pkgBlocked:
+			conflicts = append(conflicts, fmt.Sprintf("%s: claims module-retained inside non-materialized package %s", proof.ID, proof.Package))
 		case proof.ModuleRetained && (proof.GeneratedFile == "" || !fileExists):
 			conflicts = append(conflicts, fmt.Sprintf("%s: claims module-retained with no emitted file", proof.ID))
-		case !proof.ModuleRetained && !pkgWithheld && !proof.NoOutput:
-			conflicts = append(conflicts, fmt.Sprintf("%s: unretained despite an emitted package and no no-output disposition", proof.ID))
+		case !proof.ModuleRetained && !pkgBlocked && !proof.NoOutput:
+			conflicts = append(conflicts, fmt.Sprintf("%s: unretained despite a materialized package and no no-output disposition", proof.ID))
 		case proof.NoOutput && proof.GeneratedFile != "":
 			conflicts = append(conflicts, fmt.Sprintf("%s: no-output disposition with a generated file reference", proof.ID))
 		case proof.ModuleRetained && proof.GeneratedSymbol == "" && !proof.EffectOnly:
@@ -289,19 +294,26 @@ func reconcileDispositions(prof *profile.Profile, firstRun *census.Result, gener
 		"ledger reconciliation: support-ledger unimplemented %d = declaration-kinds %d + non-declaration(import) %d; by kind [%s]",
 		supportUnimplTotal, declKindUnimpl, nonDeclKinds, strings.Join(kindParts, " ")))
 	// Honest evidence stages (spec 00): ir-admitted is not
-	// module-retained. Report both denominators explicitly.
-	emittedPackages := 0
+	// module-retained. Report every denominator explicitly:
+	// MATERIALIZED (analyzable file exists, independently typechecked)
+	// versus PUBLISHED (in the runnable product) versus withheld.
+	publishedPackages, materializedPackages := 0, 0
 	for _, path := range ownedProductionPackages(firstRun) {
+		if _, blocked := generated.NotMaterialized[path]; !blocked {
+			materializedPackages++
+		}
 		if _, withheld := generated.Withheld[path]; !withheld {
-			emittedPackages++
+			publishedPackages++
 		}
 	}
 	details = append(details,
 		fmt.Sprintf("evidence-stage ir-admitted (declarations disposed): %d", counts[string(ir.SupportIRAdmitted)]+counts["accepted-manual"]),
-		fmt.Sprintf("evidence-stage module-retained (disposed, in emitted packages): %d", counts["stage:module-retained"]),
-		fmt.Sprintf("evidence-stage module-retained-blocked (disposed, in withheld packages): %d", counts["stage:module-retained-blocked"]),
-		fmt.Sprintf("packages emitted (module-retained): %d", emittedPackages),
-		fmt.Sprintf("packages withheld (honest unimplemented): %d", len(generated.Withheld)))
+		fmt.Sprintf("evidence-stage module-retained (disposed, materialized artifact): %d", counts["stage:module-retained"]),
+		fmt.Sprintf("evidence-stage module-retained-blocked (disposed, no materialized artifact): %d", counts["stage:module-retained-blocked"]),
+		fmt.Sprintf("packages materialized (analyzable, typechecked): %d", materializedPackages),
+		fmt.Sprintf("packages published (runnable product): %d", publishedPackages),
+		fmt.Sprintf("packages withheld from publication (honest unimplemented): %d", len(generated.Withheld)),
+		fmt.Sprintf("emitter defects: %d", len(generated.EmitterDefects)))
 	return counts, details, conflicts, unreconciled
 }
 
