@@ -37,7 +37,7 @@ func (p *printer) ifaceUnionAlias(t ir.Type) (string, error) {
 	if p.module == nil {
 		return name, nil
 	}
-	if prior, exists := p.module.ifaceIdentity[name]; exists {
+	if prior, exists := p.module.identityOf(name); exists {
 		if prior != identity {
 			return "", fmt.Errorf("interface alias digest collision: %q names both %q and %q", name, prior, identity)
 		}

@@ -98,6 +98,9 @@ type Module struct {
 	// reference survives — folded constants and type-only uses erase the
 	// reference but not the initialization dependency.
 	initEdges map[string]bool
+	// parent, when set, marks this module as a transactional overlay: reads
+	// consult the chain, writes stay here until Commit (overlay.go).
+	parent *Module
 }
 
 // Symbol exposes the module's qualified-symbol spelling.
@@ -120,7 +123,7 @@ func (m *Module) typeSymbol(pkg, name string) (string, error) {
 // RegisterIfaceAlias records one closed-union alias; returns whether it
 // was newly added.
 func (m *Module) RegisterIfaceAlias(name, declaration string) bool {
-	if _, exists := m.ifaceAliases[name]; exists {
+	if m.aliasReserved(name) {
 		return false
 	}
 	m.ifaceAliases[name] = declaration

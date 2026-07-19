@@ -373,3 +373,23 @@ func checkBinaryProvenance(binaryRevision, checkoutRevision string) error {
 	}
 	return nil
 }
+
+// emitterDefectDetails renders the emitter-defect hard-failure evidence:
+// any body or package whose emission failed on a non-typed error is a
+// compiler defect with its exact identity on record, and every gate that
+// consumes generated output fails while one exists.
+func emitterDefectDetails(generated *translate.Generated) ([]string, bool) {
+	if len(generated.EmitterDefects) == 0 {
+		return nil, false
+	}
+	details := make([]string, 0, len(generated.EmitterDefects)+1)
+	details = append(details, fmt.Sprintf("emitter defects: %d (hard failure)", len(generated.EmitterDefects)))
+	for i, defect := range generated.EmitterDefects {
+		if i >= 20 {
+			details = append(details, fmt.Sprintf("... and %d more", len(generated.EmitterDefects)-20))
+			break
+		}
+		details = append(details, "  "+defect.ID+": "+defect.Err)
+	}
+	return details, true
+}

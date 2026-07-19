@@ -346,11 +346,26 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 							initExpr = valueSpec.Values[i]
 						}
 						init, err := ir.BuildPackageVarInit(p, sourceDir, unit, initExpr, t, name.Pos())
+						placeholderVar := false
 						if err != nil {
-							if declSite(variableID, err) {
-								continue
+							// The variable's TYPE resolved; only its INITIALIZER
+							// is a recorded unsupported construct. The binding
+							// declares with its exact type and zero value and the
+							// initializer's order slot becomes a typed throwing
+							// placeholder — the declaration surface stays whole,
+							// so the package MATERIALIZES (publication-withheld)
+							// instead of structurally blocking its dependents.
+							unsupported, isTyped := ir.AsUnsupported(err)
+							if !isTyped {
+								return err
 							}
-							return err
+							ledger = append(ledger, BodySupport{
+								ID: variableID, Package: p.PkgPath, State: ir.SupportUnimplemented,
+								Sites: []ir.UnsupportedSite{ir.SiteOf(unsupported)},
+							})
+							unimplementedUnits++
+							placeholderVar = true
+							init = nil
 						}
 						order := -1
 						if position, has := initOrder[object]; has {
@@ -365,7 +380,13 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 							}
 							packageVars = append(packageVars, emit.PackageVar{
 								Name: "_", Type: t, Init: init, Order: order, Blank: true,
+								Placeholder: placeholderVar, PlaceholderID: variableID,
 							})
+							if placeholderVar {
+								// The unimplemented ledger entry IS the
+								// disposition; a placeholder never also proves.
+								continue
+							}
 							out.Proofs = append(out.Proofs, Proof{
 								ID: variableID, SourceRevision: options.SourceRevision,
 								Package: p.PkgPath, File: f.relative,
@@ -379,7 +400,13 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 						}
 						packageVars = append(packageVars, emit.PackageVar{
 							Name: name.Name, Type: t, Init: init, Exported: name.IsExported(), Order: order,
+							Placeholder: placeholderVar, PlaceholderID: variableID,
 						})
+						if placeholderVar {
+							// The unimplemented ledger entry IS the disposition;
+							// a placeholder never also proves.
+							continue
+						}
 						varInitHash := ""
 						if initExpr != nil {
 							start := p.Fset.Position(initExpr.Pos()).Offset

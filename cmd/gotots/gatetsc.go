@@ -58,6 +58,9 @@ func runTscGate(repoDir, profilePath, buildProfile, sourceDir string, report *Ga
 	if err != nil {
 		return "fail", nil, err
 	}
+	if details, failed := emitterDefectDetails(generated); failed {
+		return "fail", details, fmt.Errorf("%d emitter defects (compiler must be fixed; diagnostic placeholders are never acceptable output)", len(generated.EmitterDefects))
+	}
 	staging, err := os.MkdirTemp("", "gotots-tsc-")
 	if err != nil {
 		return "fail", nil, err

@@ -37,7 +37,7 @@ func emitCorePackage(out *Generated, p *packages.Package, sourceDir string, unit
 			module.RequireInitEdge(importPath)
 		}
 	}
-	body, err := emit.Package(module, emit.Decls{
+	body, outcomes, err := emit.Package(module, emit.Decls{
 		InitCalls:    initCalls,
 		Structs:      structList,
 		Methods:      carrierMethods,
@@ -46,8 +46,17 @@ func emitCorePackage(out *Generated, p *packages.Package, sourceDir string, unit
 		Functions:    functions,
 	})
 	if err != nil {
-		return err
+		// A declaration-level emission failure (struct/carrier/var/alias):
+		// the package cannot produce analyzable TypeScript. Record the
+		// defect — the acceptance gates hard-fail on it — and withhold the
+		// package honestly instead of aborting the whole corpus.
+		out.EmitterDefects = append(out.EmitterDefects, EmitterDefect{Package: p.PkgPath, ID: p.PkgPath, Err: err.Error()})
+		reason := "emitter defect (declaration-level)"
+		out.NotMaterialized[p.PkgPath] = reason
+		out.Withheld[p.PkgPath] = reason
+		return nil
 	}
+	applyBodyOutcomes(out, p.PkgPath, outcomes)
 	coreContent, err := emit.FileWithProvenance(emit.Provenance{
 		SchemaVersion:  1,
 		SourceRevision: options.SourceRevision,
@@ -65,4 +74,37 @@ func emitCorePackage(out *Generated, p *packages.Package, sourceDir string, unit
 	}
 	out.ModuleImports[p.PkgPath] = module.CoGeneratedImports()
 	return nil
+}
+
+// applyBodyOutcomes folds the emitter's typed per-body outcomes into the
+// evidence artifacts. A KnownUnsupported body reclassifies honestly from
+// IR-admitted to unimplemented (its typed site on record) and withholds
+// the package's runnable module — it materialized as a typed throwing
+// placeholder. An EmitterDefect is a compiler defect: the body carries a
+// diagnostic placeholder so siblings stay analyzable, the exact identity
+// is recorded, and the acceptance gates hard-fail while any defect exists.
+func applyBodyOutcomes(out *Generated, pkgPath string, outcomes []emit.BodyOutcome) {
+	for _, outcome := range outcomes {
+		switch outcome.Kind {
+		case emit.OutcomeKnownUnsupported:
+			for i := range out.Support {
+				if out.Support[i].ID != outcome.ID {
+					continue
+				}
+				out.Support[i].State = ir.SupportUnimplemented
+				if outcome.Site != nil {
+					out.Support[i].Sites = append(out.Support[i].Sites, *outcome.Site)
+				}
+				break
+			}
+			if _, withheld := out.Withheld[pkgPath]; !withheld {
+				out.Withheld[pkgPath] = "unimplemented body reclassified at emission (materialized as placeholder)"
+			}
+		case emit.OutcomeEmitterDefect:
+			out.EmitterDefects = append(out.EmitterDefects, EmitterDefect{Package: pkgPath, ID: outcome.ID, Err: outcome.Err})
+			if _, withheld := out.Withheld[pkgPath]; !withheld {
+				out.Withheld[pkgPath] = "emitter defect (diagnostic placeholder; compiler must be fixed)"
+			}
+		}
+	}
 }

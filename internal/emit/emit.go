@@ -60,6 +60,14 @@ type PackageVar struct {
 	// Blank marks a blank (_) variable: no binding declares, but the
 	// initializer still runs in order for its effects.
 	Blank bool
+	// Placeholder marks a variable whose INITIALIZER is a recorded
+	// unsupported construct: the binding still declares with its exact
+	// type and zero value (the declaration surface stays whole, so the
+	// package materializes and typechecks), and its initializer slot
+	// becomes a typed throwing call carrying PlaceholderID — running it
+	// fails closed, and the package is publication-withheld.
+	Placeholder   bool
+	PlaceholderID string
 }
 
 // CarrierType is one named non-struct type: erased to its carrier, it
@@ -93,7 +101,64 @@ type Decls struct {
 // the package identity, the language-ABI specifiers, and the
 // co-generated import environment; the body is printed first so only
 // referenced packages are imported.
-func Package(module *Module, decls Decls) (string, error) {
+// Body-emission outcomes form a CLOSED classification. Emitted bodies
+// produce no outcome record. KnownUnsupported arises ONLY from a typed,
+// producer-owned ir.Unsupported condition reaching emission: the body is
+// reclassified (IR-admitted -> unimplemented) and materializes as a typed
+// throwing placeholder. EmitterDefect is every other emission failure — an
+// unknown error, a missing lowering, an invariant violation — a compiler
+// defect that HARD-FAILS the acceptance gates; a diagnostic placeholder
+// keeps the file analyzable, but the defect disposition is never counted
+// as an ordinary placeholder and the gate stays failed until it is fixed.
+// Classification is by typed error identity (ir.AsUnsupported), never by
+// error-message text.
+const (
+	OutcomeKnownUnsupported = "known-unsupported"
+	OutcomeEmitterDefect    = "emitter-defect"
+)
+
+// BodyOutcome records one body whose emission did not complete normally.
+type BodyOutcome struct {
+	ID   string
+	Kind string // OutcomeKnownUnsupported | OutcomeEmitterDefect
+	Err  string
+	Site *ir.UnsupportedSite
+}
+
+// emitTransactionalBody prints one body through print into an overlay and
+// commits only on success. On failure it classifies the outcome, re-emits
+// the body as a typed throwing placeholder (signature-only — a fresh
+// overlay, so nothing of the failed attempt leaks), and records the
+// outcome. Only a placeholder that itself fails to emit aborts the
+// package (its signature is a declaration-level defect).
+func emitTransactionalBody(body *strings.Builder, module *Module, fn *ir.Func,
+	print func(*strings.Builder, *Module) error, outcomes *[]BodyOutcome) error {
+	fragment := module.Overlay()
+	var buf strings.Builder
+	err := print(&buf, fragment)
+	if err == nil {
+		fragment.Commit()
+		body.WriteString(buf.String())
+		return nil
+	}
+	outcome := BodyOutcome{ID: fn.ID, Kind: OutcomeEmitterDefect, Err: err.Error()}
+	if unsupported, ok := ir.AsUnsupported(err); ok {
+		site := ir.SiteOf(unsupported)
+		outcome = BodyOutcome{ID: fn.ID, Kind: OutcomeKnownUnsupported, Err: err.Error(), Site: &site}
+	}
+	fn.Placeholder = true
+	retry := module.Overlay()
+	var placeholder strings.Builder
+	if placeholderErr := print(&placeholder, retry); placeholderErr != nil {
+		return fmt.Errorf("%s: placeholder emission failed (%v) after body failure: %w", fn.ID, placeholderErr, err)
+	}
+	retry.Commit()
+	body.WriteString(placeholder.String())
+	*outcomes = append(*outcomes, outcome)
+	return nil
+}
+
+func Package(module *Module, decls Decls) (string, []BodyOutcome, error) {
 	sortedStructs := append([]*ir.Struct{}, decls.Structs...)
 	sort.Slice(sortedStructs, func(i, j int) bool { return sortedStructs[i].Name < sortedStructs[j].Name })
 	sortedMethodDecls := append([]Method{}, decls.Methods...)
@@ -107,17 +172,22 @@ func Package(module *Module, decls Decls) (string, error) {
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
 
 	var body strings.Builder
+	var outcomes []BodyOutcome
 	for _, structDecl := range sortedStructs {
 		body.WriteString("\n")
 		if err := printStruct(&body, module, structDecl); err != nil {
-			return "", err
+			return "", nil, err
 		}
 		sortedMethods := append([]*ir.Func{}, structDecl.Methods...)
 		sort.Slice(sortedMethods, func(i, j int) bool { return sortedMethods[i].Name < sortedMethods[j].Name })
 		for _, method := range sortedMethods {
 			body.WriteString("\n")
-			if err := printMethodFunction(&body, module, structDecl.Name, method); err != nil {
-				return "", err
+			className := structDecl.Name
+			err := emitTransactionalBody(&body, module, method, func(out *strings.Builder, frag *Module) error {
+				return printMethodFunction(out, frag, className, method)
+			}, &outcomes)
+			if err != nil {
+				return "", nil, err
 			}
 		}
 		if len(structDecl.TypeParams) == 0 {
@@ -128,17 +198,21 @@ func Package(module *Module, decls Decls) (string, error) {
 				Methods: structDecl.Methods, Promoted: structDecl.Promoted,
 			}
 			if err := printRtti(&body, module, info); err != nil {
-				return "", err
+				return "", nil, err
 			}
 			if err := printVtables(&body, module, info); err != nil {
-				return "", err
+				return "", nil, err
 			}
 		}
 	}
 	for _, method := range sortedMethodDecls {
 		body.WriteString("\n")
-		if err := printMethodFunction(&body, module, method.TypeName, method.Fn); err != nil {
-			return "", err
+		typeName, fn := method.TypeName, method.Fn
+		err := emitTransactionalBody(&body, module, fn, func(out *strings.Builder, frag *Module) error {
+			return printMethodFunction(out, frag, typeName, fn)
+		}, &outcomes)
+		if err != nil {
+			return "", nil, err
 		}
 	}
 	sortedCarriers := append([]CarrierType{}, decls.CarrierTypes...)
@@ -157,7 +231,7 @@ func Package(module *Module, decls Decls) (string, error) {
 		// reference the Go type name directly.
 		underlyingSpelled, err := (&printer{out: &body, module: module}).tsType(carrier.Underlying)
 		if err != nil {
-			return "", err
+			return "", nil, err
 		}
 		fmt.Fprintf(&body, "export type %s = %s;\n", tsName(carrier.Name), underlyingSpelled)
 		// A named carrier's payload is a primitive: comparable directly,
@@ -168,10 +242,10 @@ func Package(module *Module, decls Decls) (string, error) {
 			Methods: carrierMethods,
 		}
 		if err := printRtti(&body, module, carrierInfo); err != nil {
-			return "", err
+			return "", nil, err
 		}
 		if err := printVtables(&body, module, carrierInfo); err != nil {
-			return "", err
+			return "", nil, err
 		}
 	}
 	sortedVars := append([]PackageVar{}, decls.Vars...)
@@ -196,19 +270,23 @@ func Package(module *Module, decls Decls) (string, error) {
 		p := &printer{out: &body, module: module}
 		spelled, err := p.tsType(packageVar.Type)
 		if err != nil {
-			return "", err
+			return "", nil, err
 		}
 		zero, err := p.zeroLiteral(packageVar.Type)
 		if err != nil {
-			return "", err
+			return "", nil, err
 		}
 		export := "export "
 		p.line("%slet %s: %s = %s;", export, tsName(packageVar.Name), spelled, zero)
 	}
 	for _, function := range sorted {
 		body.WriteString("\n")
-		if err := printFunc(&body, module, function); err != nil {
-			return "", err
+		fn := function
+		err := emitTransactionalBody(&body, module, fn, func(out *strings.Builder, frag *Module) error {
+			return printFunc(out, frag, fn)
+		}, &outcomes)
+		if err != nil {
+			return "", nil, err
 		}
 	}
 	if maxOrder >= 0 || len(decls.InitCalls) > 0 {
@@ -219,16 +297,22 @@ func Package(module *Module, decls Decls) (string, error) {
 			if !has {
 				continue
 			}
+			if packageVar.Placeholder {
+				// The initializer is a recorded unsupported construct: its
+				// order slot fails closed with the exact body identity.
+				p.line("gort$.goBodyUnimplemented(%q);", packageVar.PlaceholderID)
+				continue
+			}
 			init, err := p.printExpr(packageVar.Init)
 			if err != nil {
-				return "", err
+				return "", nil, err
 			}
 			var target ir.Target = ir.VarTarget{Name: packageVar.Name, Pkg: module.Pkg, T: packageVar.Type}
 			if packageVar.Blank {
 				target = ir.BlankTarget{}
 			}
 			if err := p.printStore(target, init); err != nil {
-				return "", err
+				return "", nil, err
 			}
 		}
 		for _, initCall := range decls.InitCalls {
@@ -240,9 +324,9 @@ func Package(module *Module, decls Decls) (string, error) {
 	// external adapter type, so external members carry their exact vtable
 	// type rather than an incomplete Record<never,never>.
 	if err := finalizeUnionAliases(module); err != nil {
-		return "", err
+		return "", nil, err
 	}
-	return module.importLines() + module.aliasLines() + module.eqFnLines() + body.String(), nil
+	return module.importLines() + module.aliasLines() + module.eqFnLines() + body.String(), outcomes, nil
 }
 
 // printer carries per-function emission state and the module context.

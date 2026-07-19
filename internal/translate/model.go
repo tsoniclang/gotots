@@ -104,6 +104,20 @@ type Generated struct {
 	// interface-dispatch branch targets, plus init edges). Withholding
 	// cascades over these real edges.
 	ModuleImports map[string][]string
+	// EmitterDefects records every body (or package) whose emission failed
+	// on a non-typed error: a compiler defect, never an ordinary
+	// unsupported disposition. A diagnostic placeholder keeps the file
+	// analyzable, but the acceptance gates HARD-FAIL while any defect is
+	// on record — the honest state is "the compiler must be fixed", not a
+	// placeholder statistic.
+	EmitterDefects []EmitterDefect
+}
+
+// EmitterDefect is one emission failure with its exact identity.
+type EmitterDefect struct {
+	Package string `json:"package"`
+	ID      string `json:"id"`
+	Err     string `json:"error"`
 }
 
 // Options carries provenance inputs for product runs.

@@ -314,6 +314,9 @@ func runGate(args []string) error {
 			return "fail", nil, err
 		}
 		corpusGenerated = generated
+		if details, failed := emitterDefectDetails(generated); failed {
+			return "fail", details, fmt.Errorf("%d emitter defects (compiler must be fixed)", len(generated.EmitterDefects))
+		}
 		// Every production declaration of every owned package must hold a
 		// disposition: a support-ledger state, a generation proof, the
 		// fold-at-use constant rule, or its package's withholding.
