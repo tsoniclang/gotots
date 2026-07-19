@@ -353,7 +353,7 @@ func runGate(args []string) error {
 		return "pass", details, nil
 	})
 	run("05-declaration-signature-type-completeness", func() (string, []string, error) {
-		return runSignatureCompletenessGate(firstRun, corpusGenerated)
+		return runSignatureCompletenessGate(firstRun, corpusGenerated, *repoDir)
 	})
 	run("06-semantic-ir-operation-class-completeness", func() (string, []string, error) {
 		if corpusGenerated == nil {

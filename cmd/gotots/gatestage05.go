@@ -16,7 +16,7 @@ import (
 // function/method shape is independently verified against its proof
 // signature or an explicit unimplemented record, over the census
 // denominator, with orphan proofs rejected.
-func runSignatureCompletenessGate(firstRun *census.Result, corpusGenerated *translate.Generated) (string, []string, error) {
+func runSignatureCompletenessGate(firstRun *census.Result, corpusGenerated *translate.Generated, repoDir string) (string, []string, error) {
 	if firstRun == nil || firstRun.Shapes == nil || corpusGenerated == nil {
 		return "blocked", []string{"census shapes or corpus generation did not run"}, nil
 	}
@@ -335,13 +335,21 @@ func runSignatureCompletenessGate(firstRun *census.Result, corpusGenerated *tran
 		}
 		return "fail", defects, fmt.Errorf("type/alias/variable declaration shapes failed the identity join")
 	}
-	// What IS joined is agreement between the two pipelines' independent
-	// loads of the same pinned toolchain over every declaration class.
-	// The remaining build-out is INDEPENDENCE: a generated-TS shape
-	// extractor that parses the emitted declarations and compares them
-	// structurally with the Go declarations, never through the shared
+	// INDEPENDENCE: the emitted modules are parsed with the pinned
+	// compiler and every module-retained declaration's structure is
+	// compared with its census Go shape — never through the shared
 	// canonical renderer.
-	return "blocked", []string{
+	parityVerified, parityDefects, err := runDeclParityCheck(firstRun, corpusGenerated, repoDir)
+	if err != nil {
+		return "fail", nil, err
+	}
+	if len(parityDefects) > 0 {
+		return "fail", parityDefects, fmt.Errorf("%d declarations failed independent structural parity with their Go shapes", len(parityDefects))
+	}
+	if parityVerified == 0 {
+		return "fail", nil, fmt.Errorf("independent structural parity verified zero declarations: the parsed surface is empty or disjoint")
+	}
+	return "pass", []string{
 		fmt.Sprintf("census production function/method denominator: %d", denominator),
 		fmt.Sprintf("signatures joined against the census spelling: %d", verified),
 		fmt.Sprintf("explicit unimplemented records: %d", unimplementedCount),
@@ -352,7 +360,7 @@ func runSignatureCompletenessGate(firstRun *census.Result, corpusGenerated *tran
 		fmt.Sprintf("named types joined by complete shape (fields/tags/embeds/methods): %d (%d explicitly unimplemented)", typeJoined, typeUnimplemented),
 		fmt.Sprintf("aliases joined by target and type parameters: %d (%d explicitly unimplemented)", aliasJoined, aliasUnimplemented),
 		fmt.Sprintf("variable declared types joined: %d (%d explicitly unimplemented)", varTypeJoined, varTypeUnimplemented),
-		"BLOCKED: the join proves census and translator AGREE over every declaration class — independence (a generated-TS shape extractor structurally comparing emitted declarations with Go declarations) is not yet built",
+		fmt.Sprintf("independent structural parity (pinned-compiler parse vs Go shapes): %d declarations verified", parityVerified),
 	}, nil
 }
 
