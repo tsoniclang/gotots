@@ -272,7 +272,6 @@ func CoreTypedParams() int {
 `)
 }
 
-
 func toUint[T ~uint32](v T) uint32 {
 	return uint32(v)
 }
