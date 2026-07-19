@@ -55,6 +55,7 @@
     "internal/vfs"
   ],
   "testOnlyRoots": [
+    "internal/repo",
     "internal/testrunner",
     "internal/testutil",
     "internal/tsoptions/tsoptionstest",

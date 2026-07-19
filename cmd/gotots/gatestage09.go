@@ -68,7 +68,7 @@ func runStagedGenerationGate(repoDir, profilePath, buildProfile, sourceDir strin
 	// caches and scratch dirs (node_modules alone is multi-GB and
 	// exhausts the staging filesystem).
 	if out, err := runInRepo(".", "bash", "-c", fmt.Sprintf(
-		"mkdir -p %q && tar -C %q -cf - --exclude=./node_modules --exclude=./.git --exclude=./.temp --exclude='./.tmp-*' . | tar -C %q -xf -",
+		"mkdir -p %q && tar -C %q -cf - --exclude=./node_modules --exclude=./.git --exclude=./.temp --exclude='./.tmp-*' --exclude=./testdata --exclude=./_extension . | tar -C %q -xf -",
 		relocated, sourceDir, relocated)); err != nil {
 		return "fail", splitLines(out), fmt.Errorf("relocate checkout: %w", err)
 	}

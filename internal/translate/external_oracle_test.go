@@ -458,3 +458,26 @@ func ExternGenericFuncRef() int {
 }
 `)
 }
+
+func TestOracleNewExternZero(t *testing.T) {
+	// new(T) for an external struct: the fresh zero handle IS the
+	// pointer (external handles carry object identity), read through the
+	// per-field stubs.
+	runExternalOracle(t, `package fixture
+
+import "image"
+
+func NewExternZero() int {
+	p := new(image.Point)
+	total := 0
+	if p.X == 0 && p.Y == 0 {
+		total += 1
+	}
+	q := new(image.Point)
+	if q.Y == 0 {
+		total += 10
+	}
+	return total
+}
+`)
+}

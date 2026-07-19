@@ -188,8 +188,12 @@ func runGate(args []string) error {
 		}{
 			{name: "go", args: []string{"vet", "./..."}},
 			{name: "git", args: []string{"diff", "--check"}},
-			{name: "go", args: []string{"test", "-count=1", "./..."}},
-			{name: "go", args: []string{"test", "-count=1", "-race", "./..."}},
+			// The oracle suite spawns a node typecheck+execution per test and
+			// grows with the corpus; the race run multiplies that several
+			// times over — both take explicit generous timeouts instead of
+			// go test's default 600s.
+			{name: "go", args: []string{"test", "-count=1", "-timeout", "1800s", "./..."}},
+			{name: "go", args: []string{"test", "-count=1", "-race", "-timeout", "3600s", "./..."}},
 		} {
 			stepOut, stepErr := runInRepo(*repoDir, step.name, step.args...)
 			if stepErr != nil {

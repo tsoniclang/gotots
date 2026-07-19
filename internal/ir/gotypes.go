@@ -91,6 +91,16 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 				}
 				resolved.Go = spelled
 				resolved.ErasedParamName = param.Obj().Name()
+				// The DECLARED type's canonical identity (the parameter
+				// reference), not the core carrier's: the census derives
+				// carrier obligations from the declaration independently,
+				// and the proof ledger must join on the same key.
+				canon, canonErr := b.canonical(param)
+				if canonErr != nil {
+					return Type{}, &Unsupported{Kind: KindNestedError, Code: "GOTOTS_TYPE_UNSUPPORTED",
+						Construct: canonErr.Error(), Span: span}
+				}
+				resolved.Canon = canon
 				return resolved, nil
 			}
 		}
