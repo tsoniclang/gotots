@@ -189,7 +189,7 @@ independently checked.
 Each custom mechanism record includes:
 
 - mechanism kind and proof tier from the definition in
-  `09-representation-output.md`;
+  `representation-output.md`;
 - semantic class and mechanically generated site list;
 - minimized Go counterexample;
 - ordinary TypeScript candidate and observed mismatch;
@@ -271,7 +271,7 @@ The following produce no affected product artifact:
 - required performance regression.
 
 Independent packages may be emitted only in an explicitly incomplete analysis
-bundle as defined by `01-input-census-publication.md`.
+bundle as defined by `input-census-publication.md`.
 
 ## Static Scanners
 

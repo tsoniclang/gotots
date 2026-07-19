@@ -5,8 +5,8 @@ Status: accepted
 Owner: gotots-maintainers
 Implementation revision: `e56ed2e`
 Schema/ABI impact: `profile-schema-v1`
-Spec reference: `docs/spec/00-authority-scope.md` and
-`docs/spec/01-input-census-publication.md`
+Spec reference: `docs/spec/authority-scope.md` and
+`docs/spec/input-census-publication.md`
 
 ## Context
 

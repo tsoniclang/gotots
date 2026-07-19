@@ -14,7 +14,7 @@ import (
 )
 
 // MaxSourceFileLines is the normative limit from
-// docs/spec/13-governance-upgrades.md: no hand-maintained
+// docs/spec/governance-upgrades.md: no hand-maintained
 // implementation or test source file may exceed this many physical lines.
 const MaxSourceFileLines = 600
 

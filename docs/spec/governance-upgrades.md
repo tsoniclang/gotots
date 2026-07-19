@@ -134,6 +134,12 @@ physical lines per file. Files split by semantic responsibility into meaningful
 directories and names. Numeric shards, forwarding facades, and retained
 monoliths are not decomposition.
 
+Governing specification filenames describe semantic responsibility and never
+carry reading-order numbers. The ordered `files` array in `manifest.json` is the
+single ordering authority; the README index mirrors it and policy tests require
+exact agreement. Inserting or reordering a chapter changes that order without
+renaming unrelated files.
+
 The enforced limit is 600 physical lines per maintained file.
 
 Generated artifacts are split at semantic declaration/dependency boundaries.

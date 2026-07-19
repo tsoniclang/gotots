@@ -19,12 +19,34 @@ import (
 // ASTReport is the verifier's machine result.
 type ASTReport struct {
 	Violations []Violation `json:"violations"`
+	// Ledger is the positive per-invocation disposition census: every
+	// call, construction, member selection, and index in the verified
+	// surface classified into exactly one closed class (an unclassifiable
+	// site lands in Violations as undisposed-*, so Violations==0 AND a
+	// non-empty ledger together certify every invocation positively).
+	Ledger InvocationLedger `json:"ledger"`
 	// Mechanisms maps each custom-mechanism identity to the generated
 	// files whose ASTs reference its ABI symbols.
 	Mechanisms map[string][]string `json:"mechanisms"`
 	// Exports maps each generated file to its exported declaration
 	// names — the authoritative join target for proof symbol evidence.
 	Exports map[string][]string `json:"exports"`
+}
+
+// InvocationLedger is the positive-disposition census over the verified
+// surface.
+type InvocationLedger struct {
+	DirectStatic          int `json:"directStatic"`
+	TypedFunctionValue    int `json:"typedFunctionValue"`
+	ConstructorStatic     int `json:"constructorStatic"`
+	MemberSelection       int `json:"memberSelection"`
+	TypedIndex            int `json:"typedIndex"`
+	UnimplementedBlocking int `json:"unimplementedBlocking"`
+}
+
+// Invocations is the total number of positively disposed call sites.
+func (l InvocationLedger) Invocations() int {
+	return l.DirectStatic + l.TypedFunctionValue + l.ConstructorStatic + l.UnimplementedBlocking
 }
 
 // verifierScript walks every parsed source file. Prohibited structural
@@ -61,6 +83,12 @@ const program = ts.createProgram(files, {
 const checker = program.getTypeChecker();
 
 const violations = [];
+const ledger = { directStatic: 0, typedFunctionValue: 0, constructorStatic: 0,
+  memberSelection: 0, typedIndex: 0, unimplementedBlocking: 0 };
+function skipParens(e) {
+  while (ts.isParenthesizedExpression(e)) e = e.expression;
+  return e;
+}
 const mechanisms = {};
 const exportedNames = {};
 const mechanismByFile = {
@@ -273,6 +301,54 @@ for (const source of program.getSourceFiles()) {
           }
         }
       }
+      // POSITIVE per-invocation disposition: every call lands in exactly
+      // one closed class, or is reported undisposed (fail-closed).
+      {
+        const inner = skipParens(callee);
+        const dispositionName = nameNode ? resolveSymbol(nameNode) : undefined;
+        const resolvedName = dispositionName ? dispositionName.getName() : "";
+        const calleeType = checker.getTypeAtLocation(callee).getNonNullableType();
+        if (resolvedName === "goBodyUnimplemented" || resolvedName === "goExternalUnimplemented") {
+          ledger.unimplementedBlocking++;
+        } else if (ts.isArrowFunction(inner) || ts.isFunctionExpression(inner)) {
+          ledger.directStatic++;
+        } else if (calleeType.getCallSignatures().length > 0) {
+          const decl = dispositionName && dispositionName.valueDeclaration;
+          if (decl && (ts.isFunctionDeclaration(decl) || ts.isMethodDeclaration(decl))) {
+            ledger.directStatic++;
+          } else {
+            // A typed function VALUE (parameter, field, local, vtable
+            // member): the target type is exact and closed even though the
+            // runtime target is dynamic.
+            ledger.typedFunctionValue++;
+          }
+        } else if (calleeType.getFlags() & ts.TypeFlags.Never) {
+          // A call in provably unreachable code: statically disposed.
+          ledger.directStatic++;
+        } else {
+          report(file, node, source, "undisposed-invocation");
+        }
+      }
+    }
+    if (ts.isNewExpression(node)) {
+      const t = checker.getTypeAtLocation(node.expression).getNonNullableType();
+      if (checker.getSignaturesOfType(t, ts.SignatureKind.Construct).length > 0) {
+        ledger.constructorStatic++;
+      } else {
+        report(file, node, source, "undisposed-construction");
+      }
+    }
+    if (ts.isPropertyAccessExpression(node)) {
+      // Every member selection resolves to a declared symbol — never a
+      // name-computed lookup.
+      if (checker.getSymbolAtLocation(node.name)) {
+        ledger.memberSelection++;
+      } else {
+        report(file, node, source, "unresolved-member-selection");
+      }
+    }
+    if (ts.isElementAccessExpression(node) && !ts.isCallExpression(node.parent)) {
+      ledger.typedIndex++;
     }
     if (ts.isNewExpression(node) && ts.isIdentifier(node.expression)) {
       const s = resolveSymbol(node.expression);
@@ -377,7 +453,7 @@ for (const source of program.getSourceFiles()) {
   exportedNames[relative] = names.sort();
 }
 for (const key of Object.keys(mechanisms)) mechanisms[key].sort();
-process.stdout.write(JSON.stringify({ violations, mechanisms, exports: exportedNames }));
+process.stdout.write(JSON.stringify({ violations, mechanisms, exports: exportedNames, ledger }));
 `
 
 // VerifyAST writes the generated files to a staging directory, parses

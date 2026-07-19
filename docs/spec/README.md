@@ -12,20 +12,23 @@ historical translator behavior are evidence rather than authority.
 
 ## Reading Order
 
-1. `00-authority-scope.md`
-2. `01-input-census-publication.md`
-3. `02-compiler-semantic-ir.md`
-4. `03-declarations-bodies-control.md`
-5. `04-types-values-pointers.md`
-6. `05-collections-strings.md`
-7. `06-interfaces-generics-functions.md`
-8. `07-packages-concurrency.md`
-9. `08-externals-manual-extensions.md`
-10. `09-representation-output.md`
-11. `10-machine-contracts-diagnostics.md`
-12. `11-testing-acceptance.md`
-13. `12-performance.md`
-14. `13-governance-upgrades.md`
+The ordered `files` array in `manifest.json` is the sole reading-order
+authority. This human index mirrors that array and is verified against it.
+
+1. `authority-scope.md`
+2. `input-census-publication.md`
+3. `compiler-semantic-ir.md`
+4. `declarations-bodies-control.md`
+5. `types-values-pointers.md`
+6. `collections-strings.md`
+7. `interfaces-generics-functions.md`
+8. `packages-concurrency.md`
+9. `externals-manual-extensions.md`
+10. `representation-output.md`
+11. `machine-contracts-diagnostics.md`
+12. `testing-acceptance.md`
+13. `performance.md`
+14. `governance-upgrades.md`
 
 All documents are normative. A narrower example cannot weaken a general rule.
 Definitions in an earlier document govern later documents unless the later

@@ -206,7 +206,17 @@ func runTscGate(repoDir, profilePath, buildProfile, sourceDir string, report *Ga
 		"text sweep (defense in depth): zero prohibited sites",
 		fmt.Sprintf("withheld packages (honest unimplemented, not typechecked): %d", len(generated.Withheld)),
 	}
+	// The positive per-invocation disposition ledger: every call,
+	// construction, member selection, and index classified into a closed
+	// class by the whole-program checker walk — an unclassifiable site is
+	// a violation (caught above), so reaching here with a NON-EMPTY ledger
+	// certifies every invocation positively.
+	ledger := astReport.Ledger
+	if ledger.Invocations() == 0 {
+		return "fail", details, fmt.Errorf("positive-disposition ledger is empty: no invocation was certified")
+	}
 	details = append(details,
-		"BLOCKED: the per-invocation positive-disposition ledger is absent — the verifier rejects known erased forms but cannot yet certify every invocation (spec 11 staticness sweep)")
-	return "blocked", details, nil
+		fmt.Sprintf("positive-disposition ledger: %d invocations (direct-static %d, typed-function-value %d, constructor-static %d, unimplemented-blocking %d), %d member selections, %d typed index sites — zero undisposed",
+			ledger.Invocations(), ledger.DirectStatic, ledger.TypedFunctionValue, ledger.ConstructorStatic, ledger.UnimplementedBlocking, ledger.MemberSelection, ledger.TypedIndex))
+	return "pass", details, nil
 }

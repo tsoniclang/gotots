@@ -45,6 +45,9 @@ func TestCanonicalSpecificationPresent(t *testing.T) {
 		if filepath.Base(name) != name || !strings.HasSuffix(name, ".md") {
 			t.Errorf("manifest entry %q must be one Markdown basename", name)
 		}
+		if name != "README.md" && len(name) > 0 && name[0] >= '0' && name[0] <= '9' {
+			t.Errorf("manifest entry %q must use a semantic filename without an ordering prefix", name)
+		}
 	}
 
 	entries, err := os.ReadDir(specDir)
@@ -102,11 +105,11 @@ func TestCanonicalSpecificationReferencesResolve(t *testing.T) {
 	root := repositoryRoot(t)
 	specDir := filepath.Join(root, "docs", "spec")
 	manifest := readSpecificationManifest(t, specDir)
-	reference := regexp.MustCompile("`((?:[0-9][^`/]*)|README)\\.md`")
+	reference := regexp.MustCompile("`([A-Za-z0-9][A-Za-z0-9._-]*\\.md)`")
 	for _, name := range manifest.Files {
 		content := readSpecFile(t, specDir, name)
 		for _, match := range reference.FindAllStringSubmatch(content, -1) {
-			target := match[1] + ".md"
+			target := match[1]
 			if _, err := os.Stat(filepath.Join(specDir, target)); err != nil {
 				t.Errorf("%s references missing canonical spec %s", name, target)
 			}
@@ -156,47 +159,47 @@ func TestSpecificationContractMarkers(t *testing.T) {
 			"Honest Incompleteness",
 			"One Implementation",
 		},
-		"00-authority-scope.md": {
+		"authority-scope.md": {
 			"completely outside",
 			"Simplest Exact Output",
 			"unimplemented",
 		},
-		"01-input-census-publication.md": {
+		"input-census-publication.md": {
 			"Attest Before Execute",
 			"Scope Filter Before Census",
 			"Unimplemented Publication Rule",
 		},
-		"02-compiler-semantic-ir.md": {
+		"compiler-semantic-ir.md": {
 			"The body IR describes Go semantics, not JavaScript syntax",
 			"Constraint Propagation",
 			"Emission consumes this plan without semantic rediscovery",
 		},
-		"03-declarations-bodies-control.md": {
+		"declarations-bodies-control.md": {
 			"readonly tuple ABI",
 			"GoPanic<P>",
 			"Unimplemented Bodies",
 		},
-		"04-types-values-pointers.md": {
+		"types-values-pointers.md": {
 			"Numeric Callable ABI",
 			"canonical nil storage",
 			"storage-root identity",
 		},
-		"05-collections-strings.md": {
+		"collections-strings.md": {
 			"Slice Representation Candidates",
 			"Map Representation Candidates",
 			"String Representation Candidates",
 		},
-		"06-interfaces-generics-functions.md": {
+		"interfaces-generics-functions.md": {
 			"Interface Representation Candidates",
 			"Generic Lowering Candidates",
 			"statically typed readonly tuple",
 		},
-		"07-packages-concurrency.md": {
+		"packages-concurrency.md": {
 			"Concurrency Lowering Candidates",
 			"uninitialized/running/done",
 			"Promise-returning TypeScript boundary",
 		},
-		"08-externals-manual-extensions.md": {
+		"externals-manual-extensions.md": {
 			"Generated Baselines And Body Hashes",
 			"Automatic Dependency And Reachability Graph",
 			"Reset, Acceptance And Reachability Removal",
@@ -204,27 +207,27 @@ func TestSpecificationContractMarkers(t *testing.T) {
 			"Regeneration owns removal directly",
 			"Mid-Body Seams",
 		},
-		"09-representation-output.md": {
+		"representation-output.md": {
 			"Custom-Mechanism Necessity",
 			"simplest ordinary TypeScript",
 			"uses no LLM",
 		},
-		"10-machine-contracts-diagnostics.md": {
+		"machine-contracts-diagnostics.md": {
 			"No LLM Dependency",
 			"Necessity Record",
 			"GOTOTS_UNIMPLEMENTED_*",
 		},
-		"11-testing-acceptance.md": {
+		"testing-acceptance.md": {
 			"Semantic-Class Oracles",
 			"Unimplemented Tests",
 			"Compiler Differential",
 		},
-		"12-performance.md": {
+		"performance.md": {
 			"Default Budget Matrix",
 			"at least forty independent measured samples",
 			"Asymptotic complexity",
 		},
-		"13-governance-upgrades.md": {
+		"governance-upgrades.md": {
 			"Diffusion Workflow",
 			"600 physical lines",
 			"one active feature branch",

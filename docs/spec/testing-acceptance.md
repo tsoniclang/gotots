@@ -329,7 +329,7 @@ Every accepted run reports:
 - generated, manual, and unimplemented support states;
 - manual regeneration states, candidate/reached/excluded/unknown graph counts,
   and planned/applied reachability removals;
-- every translation evidence stage from `00-authority-scope.md`;
+- every translation evidence stage from `authority-scope.md`;
 - directly incomplete, transitively withheld, retained runnable, and published
   package counts;
 - operation classes and sites;

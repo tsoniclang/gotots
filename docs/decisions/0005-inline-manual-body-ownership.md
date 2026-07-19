@@ -5,9 +5,9 @@ Status: accepted
 Owner: gotots-maintainers
 Implementation revision: `eabaabb`
 Schema/ABI impact: `manual-ownership-v1`
-Spec reference: `docs/spec/08-externals-manual-extensions.md`,
-`docs/spec/10-machine-contracts-diagnostics.md`, and
-`docs/spec/13-governance-upgrades.md`
+Spec reference: `docs/spec/externals-manual-extensions.md`,
+`docs/spec/machine-contracts-diagnostics.md`, and
+`docs/spec/governance-upgrades.md`
 Registry entry: `docs/decisions/registry.json#ADR-0005`
 
 ## Context
@@ -124,9 +124,9 @@ product completion.
 
 Registry entry: `docs/decisions/registry.json#ADR-0005`. Governing proof
 artifacts at the contract revision are
-`docs/spec/08-externals-manual-extensions.md`,
-`docs/spec/10-machine-contracts-diagnostics.md`,
-`docs/spec/11-testing-acceptance.md`, and `internal/policy/spec_test.go`.
+`docs/spec/externals-manual-extensions.md`,
+`docs/spec/machine-contracts-diagnostics.md`,
+`docs/spec/testing-acceptance.md`, and `internal/policy/spec_test.go`.
 
 Implementation acceptance additionally requires the positive, mutation,
 regeneration, source-upgrade, fixed-point reachability, reset, removal,

@@ -5,14 +5,14 @@ Status: accepted
 Owner: gotots-maintainers
 Implementation revision: `e04d202`
 Schema/ABI impact: `abi-v16`
-Spec reference: `docs/spec/06-interfaces-generics-functions.md`
+Spec reference: `docs/spec/interfaces-generics-functions.md`
 Registry entry: `docs/decisions/registry.json#ADR-0004`
 
 ## Context
 
 The interface carrier held an erased payload (`GoIfaceBox.v: unknown`)
 recovered by casts at every dispatch, assertion, and equality site. The
-specification (06-interfaces-generics-functions.md, Dynamic Type
+specification (interfaces-generics-functions.md, Dynamic Type
 Identity) requires a closed, statically typed payload with no erased
 recovery, exact value/pointer method sets, exhaustive statically typed
 branches, exact typed nil, and complete external participation. Two

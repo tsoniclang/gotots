@@ -180,7 +180,7 @@ Every selected implementation unit has exactly one support state:
   exists.
 
 External declarations and extension seams use separate ownership states defined
-in `08-externals-manual-extensions.md`.
+in `externals-manual-extensions.md`.
 
 Unimplemented is a valid development result, not product success. It permits
 the compiler to continue classifying independent work while withholding every
@@ -188,7 +188,7 @@ artifact whose dependency closure reaches that unit.
 
 Manual detection is not user registration. An edited body is classified from
 the attested generated baseline, mandatory generated header, post-format body
-hash, and typed AST as specified in `08-externals-manual-extensions.md`. Until
+hash, and typed AST as specified in `externals-manual-extensions.md`. Until
 that body passes the applicable gates it remains unimplemented for product
 acceptance even though the regeneration report identifies it as a manual
 candidate.

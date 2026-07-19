@@ -174,6 +174,42 @@ export const viaTypedProperty = record.M(2n);
 	if files := report.Mechanisms["slice-carrier"]; len(files) != 1 {
 		t.Errorf("slice-carrier mechanism not derived from identifiers: %+v", report.Mechanisms)
 	}
+	// The positive-disposition ledger classifies every invocation: the two
+	// gosl$ calls and BigInt resolve to function declarations
+	// (direct-static), record.M is a typed function value, GoSlice
+	// construction is constructor-static, and every member selection
+	// resolves. Nothing is undisposed (that would be a violation above).
+	ledger := report.Ledger
+	if ledger.Invocations() == 0 || ledger.DirectStatic == 0 || ledger.TypedFunctionValue == 0 || ledger.ConstructorStatic == 0 {
+		t.Errorf("positive ledger incomplete: %+v", ledger)
+	}
+	if ledger.MemberSelection == 0 {
+		t.Errorf("member selections not counted: %+v", ledger)
+	}
+}
+
+func TestASTVerifierLedgerCountsUnimplemented(t *testing.T) {
+	files := map[string]string{
+		"language-abi/goruntime.ts": `
+export function goBodyUnimplemented(id: string): never { throw new Error(id); }
+`,
+		"core/pkg/package.ts": `
+import * as gort$ from "../../language-abi/goruntime.js";
+export function pending(): bigint {
+  gort$.goBodyUnimplemented("pkg::func::pending");
+}
+`,
+	}
+	report, err := VerifyAST(files, typescriptDir(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Violations) != 0 {
+		t.Errorf("placeholder flagged: %+v", report.Violations)
+	}
+	if report.Ledger.UnimplementedBlocking != 1 {
+		t.Errorf("unimplemented-blocking not counted: %+v", report.Ledger)
+	}
 }
 
 // TestASTVerifierErasedPayloadInCore proves the structural checks catch

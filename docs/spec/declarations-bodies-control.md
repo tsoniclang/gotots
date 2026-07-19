@@ -26,7 +26,7 @@ recorded. Source names never select runtime behavior.
 
 Function, method, class-like, interface, constraint, constant, variable, and
 type shapes are captured completely. Multiple results use the product-wide
-readonly tuple ABI defined in `06-interfaces-generics-functions.md`. Variadic
+readonly tuple ABI defined in `interfaces-generics-functions.md`. Variadic
 parameters remain distinguishable from ordinary slices.
 
 An external or manual implementation never changes a generated signature.
@@ -192,7 +192,7 @@ Missing automatic lowering defaults to `unimplemented`. Editing the placeholder
 or another generated body is detected automatically from its generated
 baseline and post-format body hash. A current complete body that passes every
 applicable gate may separately change that unit's product ownership to
-`accepted-manual` under `08-externals-manual-extensions.md`. No user-authored
+`accepted-manual` under `externals-manual-extensions.md`. No user-authored
 manifest or promotion record is involved. This does not mark the automatic
 semantic class implemented or inflate generated-class coverage. Automatic
 class support and complete-body ownership are separate machine facts.

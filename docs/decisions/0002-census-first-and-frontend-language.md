@@ -5,9 +5,9 @@ Status: accepted
 Owner: gotots-maintainers
 Implementation revision: `f7f2aea`
 Schema/ABI impact: `census-schema-v4`, `profile-schema-v1`
-Spec reference: `docs/spec/00-authority-scope.md`,
-`docs/spec/01-input-census-publication.md`, and
-`docs/spec/02-compiler-semantic-ir.md`
+Spec reference: `docs/spec/authority-scope.md`,
+`docs/spec/input-census-publication.md`, and
+`docs/spec/compiler-semantic-ir.md`
 
 ## Context
 

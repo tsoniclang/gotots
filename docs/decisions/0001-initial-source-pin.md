@@ -5,8 +5,8 @@ Status: accepted
 Owner: gotots-maintainers
 Implementation revision: `58f4d8b`
 Schema/ABI impact: `pin-schema-v3`
-Spec reference: `docs/spec/01-input-census-publication.md` and
-`docs/spec/13-governance-upgrades.md`
+Spec reference: `docs/spec/input-census-publication.md` and
+`docs/spec/governance-upgrades.md`
 
 ## Context
 

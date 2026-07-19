@@ -98,7 +98,7 @@ Candidate strategies are:
 4. unimplemented.
 
 Accepted manual ownership and external runtime binding are ownership choices,
-not representation candidates; they follow `08-externals-manual-extensions.md`.
+not representation candidates; they follow `externals-manual-extensions.md`.
 Direct, localized, and scheduler strategies may be incomparable and therefore
 declare exact capability predicates and deterministic cost ordering.
 
@@ -144,7 +144,7 @@ A shared scheduler is accepted only with evidence that:
 - the scheduler covers the complete may-block closure;
 - channel, select, panic, defer, and package-exit behavior are oracle-proven;
 - no-extension hot paths pay more than a static absence check; and
-- allocation, latency, and throughput meet `12-performance.md`.
+- allocation, latency, and throughput meet `performance.md`.
 
 Until that evidence exists, affected classes may remain manual or
 unimplemented. Coverage pressure alone is not justification.

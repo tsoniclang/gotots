@@ -123,7 +123,7 @@ translation candidates, synthetic initializers, declaration-only objects,
 generated toolchain units, and selected tests are separate classes.
 
 For selected function and method bodies, every run reports identity-bearing
-counts for each translation evidence stage from `00-authority-scope.md`. It
+counts for each translation evidence stage from `authority-scope.md`. It
 also reports separately:
 
 - selected packages;
@@ -182,7 +182,7 @@ staging root. It does not incrementally modify, copy, or consult old generated
 bodies for semantic decisions. Before generation, a separate reconciliation
 phase may read the attested prior baseline and current editable mixed-source
 workspace solely to identify manual bodies by the contract in
-`08-externals-manual-extensions.md`. After the new baseline exists, every valid
+`externals-manual-extensions.md`. After the new baseline exists, every valid
 manual AST unit participates in one complete candidate graph. Only units reached
 by the fixed-point traversal are overlaid; imports and final graph evidence are
 then regenerated from the assembled typed AST. Unknown graph edges block apply

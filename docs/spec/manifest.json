@@ -3,19 +3,19 @@
   "authority": "docs/spec",
   "files": [
     "README.md",
-    "00-authority-scope.md",
-    "01-input-census-publication.md",
-    "02-compiler-semantic-ir.md",
-    "03-declarations-bodies-control.md",
-    "04-types-values-pointers.md",
-    "05-collections-strings.md",
-    "06-interfaces-generics-functions.md",
-    "07-packages-concurrency.md",
-    "08-externals-manual-extensions.md",
-    "09-representation-output.md",
-    "10-machine-contracts-diagnostics.md",
-    "11-testing-acceptance.md",
-    "12-performance.md",
-    "13-governance-upgrades.md"
+    "authority-scope.md",
+    "input-census-publication.md",
+    "compiler-semantic-ir.md",
+    "declarations-bodies-control.md",
+    "types-values-pointers.md",
+    "collections-strings.md",
+    "interfaces-generics-functions.md",
+    "packages-concurrency.md",
+    "externals-manual-extensions.md",
+    "representation-output.md",
+    "machine-contracts-diagnostics.md",
+    "testing-acceptance.md",
+    "performance.md",
+    "governance-upgrades.md"
   ]
 }
