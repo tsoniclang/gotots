@@ -192,6 +192,7 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 			function.ErasedParams = append(function.ErasedParams, coreErasedParam(signature.TypeParams().At(i)))
 			function.PtrParams = append(function.PtrParams, b.unit.ParamRequiresPtr(object, i))
 			function.ReprParams = append(function.ReprParams, b.paramRepr(signature.TypeParams().At(i), span))
+			function.RttiParams = append(function.RttiParams, b.unit.ParamRequiresRtti(object, i))
 		}
 		b.genericObj = object
 	}
@@ -224,6 +225,7 @@ func BuildFunc(p *packages.Package, sourceDir string, unit Scope, decl *ast.Func
 					function.ErasedParams = append(function.ErasedParams, coreErasedParam(recvParams.At(i)))
 					function.PtrParams = append(function.PtrParams, b.unit.ParamRequiresPtr(named.Obj(), i))
 					function.ReprParams = append(function.ReprParams, b.paramRepr(recvParams.At(i), span))
+					function.RttiParams = append(function.RttiParams, b.unit.ParamRequiresRtti(named.Obj(), i))
 				}
 			}
 		}

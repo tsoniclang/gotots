@@ -45,6 +45,7 @@ func NewScope(paths ...string) Scope {
 		paramKeyReqs:       map[string][]bool{},
 		paramCaptureReqs:   map[string][]bool{},
 		paramPtrReqs:       map[string][]bool{},
+		paramRttiReqs:      map[string][]bool{},
 		universeSealed:     new(bool),
 	}
 }

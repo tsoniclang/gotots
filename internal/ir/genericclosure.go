@@ -306,6 +306,25 @@ func (s Scope) ParamRequiresPtr(obj types.Object, index int) bool {
 	return index < len(reqs) && reqs[index]
 }
 
+// RequireParamRtti records the runtime-identity requirement: the
+// declaration's body boxes P values into interfaces, so it takes rt$P
+// (the binding's box triple) in the factory protocol.
+func (s Scope) RequireParamRtti(obj types.Object, index int) {
+	key := objKey(obj)
+	reqs := s.paramRttiReqs[key]
+	for len(reqs) <= index {
+		reqs = append(reqs, false)
+	}
+	reqs[index] = true
+	s.paramRttiReqs[key] = reqs
+}
+
+// ParamRequiresRtti reports the runtime-identity requirement.
+func (s Scope) ParamRequiresRtti(obj types.Object, index int) bool {
+	reqs := s.paramRttiReqs[objKey(obj)]
+	return index < len(reqs) && reqs[index]
+}
+
 // ParamRequiresKeyOp reports whether the declaration's i-th parameter
 // takes key$P in the factory protocol — the union of the HARD map-key
 // requirement and the SOFT capture requirement.
@@ -447,7 +466,8 @@ func (s Scope) PropagateParamRequirements() {
 				hard := s.ParamRequiresSVZKey(inner, j)
 				soft := s.ParamRequiresKeyOp(inner, j)
 				ptr := s.ParamRequiresPtr(inner, j)
-				if !hard && !soft && !ptr {
+				rtti := s.ParamRequiresRtti(inner, j)
+				if !hard && !soft && !ptr && !rtti {
 					continue
 				}
 				p, ok := types.Unalias(arg).(*types.TypeParam)
@@ -468,6 +488,10 @@ func (s Scope) PropagateParamRequirements() {
 					}
 					if ptr && !s.ParamRequiresPtr(outer, i) {
 						s.RequireParamPtr(outer, i)
+						changed = true
+					}
+					if rtti && !s.ParamRequiresRtti(outer, i) {
+						s.RequireParamRtti(outer, i)
 						changed = true
 					}
 				}

@@ -93,8 +93,13 @@ type Call struct {
 	// PtrParams marks the pointer-family positions (a non-object binding
 	// selects the "$pc" variant).
 	PtrParams []bool
-	Args      []Expr
-	Results   []Type
+	// RttiParams marks the rtti-required positions; RttiArgs carries,
+	// parallel to TypeArgs, each required position's box triple (a
+	// concrete binding's rtti or a forwarded rt$Q).
+	RttiParams []bool
+	RttiArgs   []ParamRttiArg
+	Args       []Expr
+	Results    []Type
 }
 
 // ExternalCall invokes an external package-level function through its
@@ -128,10 +133,14 @@ type MethodCall struct {
 	ErasedParams []bool
 	// PtrParams marks the receiver's pointer-family positions.
 	PtrParams []bool
-	Recv      Expr
-	Method    string
-	Args      []Expr
-	Results   []Type
+	// RttiParams marks the receiver's rtti-required positions; RttiArgs
+	// carries each required position's box triple.
+	RttiParams []bool
+	RttiArgs   []ParamRttiArg
+	Recv       Expr
+	Method     string
+	Args       []Expr
+	Results    []Type
 }
 
 // FieldLoad reads a struct field through a nil-checked pointer. Cell
@@ -274,6 +283,7 @@ func (*FuncRef) expr()          {}
 func (*DynCall) expr()          {}
 func (*ExternalCall) expr()     {}
 func (*IfaceBox) expr()         {}
+func (*ParamIfaceBox) expr()    {}
 func (*IfaceCall) expr()        {}
 func (*TypeAssert) expr()       {}
 func (*NilConst) expr()         {}
@@ -302,10 +312,10 @@ func (*ParamReprCast) expr()    {}
 func (*SliceSlotEq) expr()      {}
 func (*Call) expr()             {}
 
-func (c *Const) Type() Type   { return c.T }
-func (v *VarRef) Type() Type  { return v.T }
-func (b *Binary) Type() Type  { return b.T }
-func (u *Unary) Type() Type   { return u.T }
+func (c *Const) Type() Type         { return c.T }
+func (v *VarRef) Type() Type        { return v.T }
+func (b *Binary) Type() Type        { return b.T }
+func (u *Unary) Type() Type         { return u.T }
 func (c *Convert) Type() Type       { return c.To }
 func (v *ParamReprView) Type() Type { return v.T }
 func (c *ParamReprCast) Type() Type { return c.T }
@@ -327,9 +337,10 @@ func (m *MethodCall) Type() Type {
 	return Type{}
 }
 
-func (c *Closure) Type() Type  { return c.T }
-func (f *FuncRef) Type() Type  { return f.T }
-func (b *IfaceBox) Type() Type { return b.T }
+func (c *Closure) Type() Type       { return c.T }
+func (f *FuncRef) Type() Type       { return f.T }
+func (b *IfaceBox) Type() Type      { return b.T }
+func (b *ParamIfaceBox) Type() Type { return b.T }
 
 func (d *DynCall) Type() Type {
 	if len(d.Results) == 1 {

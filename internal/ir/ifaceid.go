@@ -132,10 +132,15 @@ func predeclaredRttiName(kind types.BasicKind) (string, bool) {
 // nil stays the nil interface; struct values are copied into the box.
 func (b *builder) boxIfaceValue(built Expr, source types.Type, expected Type, span Span) (Expr, error) {
 	if built.Type().Kind == KindIface && built.Type().TypeParamName != "" {
-		// A type-parameter VALUE is not an interface box: boxing T into a
-		// concrete union needs the binding's runtime type identity, which
-		// varies per instantiation. Fail closed (the body placeholders)
-		// rather than pass the raw value where a box is expected.
+		// A type-parameter VALUE boxes with the BINDING'S runtime type
+		// identity: the declaration takes rt$P (requirement-scoped, set by
+		// the prepass body scan) and each call site passes the binding's
+		// box triple. A box site the scan did not cover fails closed.
+		param := built.Type().TypeParamName
+		if b.declRttiRequires(param) {
+			b.use("param-rtti")
+			return &ParamIfaceBox{X: b.bindParamValue(built, param), Param: param, T: expected}, nil
+		}
 		return nil, &Unsupported{Kind: KindInterfaceValueOfType, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
 			Construct: "interface value of type " + source.String() + " (type-parameter boxing varies per instantiation)", Span: span}
 	}
@@ -149,24 +154,61 @@ func (b *builder) boxIfaceValue(built Expr, source types.Type, expected Type, sp
 	if err != nil {
 		return nil, err
 	}
-	if rtti.Composite == "" && rtti.TypeName != "" && !rtti.Pointer {
-		// VALUE-form boxing of a named type: reachability evidence for
-		// union $key encoders' unreachability claims.
-		b.unit.AddValueBoxedNamed(rtti.Pkg + "." + rtti.TypeName)
-	}
-	if rtti.Composite != "" && rtti.ExternID == "" && !mentionsTypeParamType(source) {
-		// The boxed-composite enumeration: this exact composite becomes
-		// an exact union member (its payload type, no erasure). A
-		// composite that mentions a type parameter is per-instantiation
-		// and never a concrete boxed member.
-		plan, err := b.compositeEqPlan(source, span)
-		if err != nil {
-			return nil, err
-		}
-		b.unit.AddBoxedComposite(rtti.Composite, built.Type(), plan)
+	if err := b.recordBoxEvidence(rtti, built.Type(), source, span); err != nil {
+		return nil, err
 	}
 	b.use("ifaceBox")
 	return &IfaceBox{X: b.bindStructValue(built), Rtti: rtti, T: expected}, nil
+}
+
+// recordBoxEvidence feeds the union-member evidence for one boxed
+// concrete type: value-form named boxes are reachability evidence for
+// union $key encoders' unreachability claims, and boxed composites
+// become exact union members. Call sites binding an rtti-required
+// parameter record the SAME evidence for their binding — the box the
+// generic body performs is a box of that binding.
+func (b *builder) recordBoxEvidence(rtti RttiRef, payload Type, source types.Type, span Span) error {
+	if rtti.Composite == "" && rtti.TypeName != "" && !rtti.Pointer {
+		b.unit.AddValueBoxedNamed(rtti.Pkg + "." + rtti.TypeName)
+	}
+	if rtti.Composite != "" && rtti.ExternID == "" && !mentionsTypeParamType(source) {
+		// A composite that mentions a type parameter is per-instantiation
+		// and never a concrete boxed member.
+		plan, err := b.compositeEqPlan(source, span)
+		if err != nil {
+			return err
+		}
+		b.unit.AddBoxedComposite(rtti.Composite, payload, plan)
+	}
+	return nil
+}
+
+// callRttiSlot resolves one call-site rt$P slot for an rtti-required
+// position: a forwarded rt$Q when the binding is the caller's own
+// parameter (the requirement propagation guarantees the caller takes
+// it), else the concrete binding's rtti with its box evidence recorded.
+func (b *builder) callRttiSlot(goArg types.Type, argType Type, span Span) (ParamRttiArg, error) {
+	if p, isParam := types.Unalias(goArg).(*types.TypeParam); isParam {
+		if !b.declRttiRequires(p.Obj().Name()) {
+			return ParamRttiArg{}, &Unsupported{Kind: KindInterfaceValueOfType, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+				Construct: "interface value of type " + p.Obj().Name() + " (rtti forwarding outside the propagated requirement)", Span: span}
+		}
+		return ParamRttiArg{Forward: p.Obj().Name()}, nil
+	}
+	if mentionsTypeParamType(goArg) {
+		// A composite mentioning a parameter (e.g. []Q) has no single
+		// runtime identity to pass.
+		return ParamRttiArg{}, &Unsupported{Kind: KindInterfaceValueOfType, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+			Construct: "interface value of parameterized binding " + goArg.String(), Span: span}
+	}
+	rtti, err := b.rttiFor(goArg, span)
+	if err != nil {
+		return ParamRttiArg{}, err
+	}
+	if err := b.recordBoxEvidence(rtti, argType, goArg, span); err != nil {
+		return ParamRttiArg{}, err
+	}
+	return ParamRttiArg{Rtti: &rtti}, nil
 }
 
 // MethodKey is the canonical dynamic-dispatch identity of one method:

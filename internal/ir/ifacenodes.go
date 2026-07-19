@@ -42,6 +42,24 @@ type IfaceBox struct {
 	T    Type // the interface type
 }
 
+// ParamIfaceBox boxes a bare type-parameter value into an interface
+// with the binding's runtime identity — the rt$P factory triple the
+// declaration takes for exactly its rtti-required parameters.
+type ParamIfaceBox struct {
+	X     Expr
+	Param string
+	T     Type // the interface type
+}
+
+// ParamRttiArg is one call-site rt$P slot of an instantiated generic
+// call: a concrete binding's rtti reference, a forwarded rt$Q of the
+// caller's own parameter, or empty when the position is not
+// rtti-required.
+type ParamRttiArg struct {
+	Forward string
+	Rtti    *RttiRef
+}
+
 // IfaceCall invokes an interface method through the box's method table;
 // a nil interface panics with Go's exact message.
 type IfaceCall struct {

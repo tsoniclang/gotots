@@ -75,6 +75,7 @@ func collectGenericInstances(unit ir.Scope, pkgs []*packages.Package) error {
 	// bindings; instantiation sites are guarded against the requirement,
 	// which propagates backwards over the free-parameter edges.
 	collectParamRequirements(unit, pkgs)
+	collectParamRttiRequirements(unit, pkgs)
 	unit.PropagateParamRequirements()
 	if err := collectAddressTakenFields(unit, pkgs); err != nil {
 		return err

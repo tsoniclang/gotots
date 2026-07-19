@@ -23,6 +23,8 @@ func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
 			return nil, &Unsupported{Kind: KindGenericCall, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "generic call", Span: span}
 		}
 		var typeArgs []Type
+		var rttiParams []bool
+		var rttiArgs []ParamRttiArg
 		if signature.TypeParams() != nil {
 			// An instantiated generic call: the checker's substituted
 			// signature types the arguments and results, and the type
@@ -54,6 +56,17 @@ func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
 					return nil, &Unsupported{Kind: KindGenericInstantiationOutsideAdmittedKeyFamily, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
 						Construct: "generic instantiation outside the admitted key family (" + function.Name() + ": " + goArg.String() + " is not an admitted map key)", Span: span}
 				}
+				required := b.unit.ParamRequiresRtti(function, i)
+				rttiParams = append(rttiParams, required)
+				if required {
+					slot, err := b.callRttiSlot(goArg, argType, span)
+					if err != nil {
+						return nil, err
+					}
+					rttiArgs = append(rttiArgs, slot)
+				} else {
+					rttiArgs = append(rttiArgs, ParamRttiArg{})
+				}
 				typeArgs = append(typeArgs, argType)
 			}
 			b.use("genericCall")
@@ -62,7 +75,8 @@ func (b *builder) buildAnyCall(n *ast.CallExpr) (Expr, error) {
 		if function.Pkg() == nil || !b.unit.Owns(function.Pkg().Path()) {
 			return b.buildExternalCall(n, function, signature, typeArgs)
 		}
-		call := &Call{Pkg: function.Pkg().Path(), Callee: function.Name(), TypeArgs: typeArgs}
+		call := &Call{Pkg: function.Pkg().Path(), Callee: function.Name(), TypeArgs: typeArgs,
+			RttiParams: rttiParams, RttiArgs: rttiArgs}
 		calleeSig := function.Type().(*types.Signature)
 		for i := range typeArgs {
 			call.KeyedParams = append(call.KeyedParams, b.unit.ParamRequiresKeyOp(function, i))
@@ -265,10 +279,26 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 		Method:      method.Name(),
 	}
 	recvTypeParams := recvNamed.Origin().TypeParams()
+	recvGoArgs := recvNamed.TypeArgs()
 	for i := range recvTypeArgs {
 		out.KeyedParams = append(out.KeyedParams, b.unit.ParamRequiresKeyOp(recvNamed.Origin().Obj(), i))
 		out.ErasedParams = append(out.ErasedParams, recvTypeParams != nil && i < recvTypeParams.Len() && coreErasedParam(recvTypeParams.At(i)))
 		out.PtrParams = append(out.PtrParams, b.unit.ParamRequiresPtr(recvNamed.Origin().Obj(), i))
+		required := b.unit.ParamRequiresRtti(recvNamed.Origin().Obj(), i)
+		out.RttiParams = append(out.RttiParams, required)
+		if !required {
+			out.RttiArgs = append(out.RttiArgs, ParamRttiArg{})
+			continue
+		}
+		if recvGoArgs == nil || i >= recvGoArgs.Len() {
+			return nil, &Unsupported{Kind: KindInterfaceValueOfType, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
+				Construct: "interface value of receiver parameter without binding evidence", Span: span}
+		}
+		slot, err := b.callRttiSlot(recvGoArgs.At(i), recvTypeArgs[i], span)
+		if err != nil {
+			return nil, err
+		}
+		out.RttiArgs = append(out.RttiArgs, slot)
 	}
 	if err := b.buildCallArgsResults(n, signature, &out.Args, &out.Results); err != nil {
 		return nil, err

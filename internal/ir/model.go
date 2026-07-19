@@ -253,6 +253,11 @@ type Scope struct {
 	// paramPtrReqs marks parameters whose declarations take addresses
 	// into or read through *P — the pointer-family split axis.
 	paramPtrReqs map[string][]bool
+	// paramRttiReqs marks parameters whose declaration bodies need the
+	// binding's runtime type identity (interface boxing of P values):
+	// the declaration takes rt$P (the box triple) in the factory
+	// protocol, requirement-scoped exactly like key$P.
+	paramRttiReqs map[string][]bool
 	// paramCaptureReqs is the SOFT level: the parameter's key$P is
 	// forwarded (a key-encodable class origin captures it) but no map is
 	// keyed by it — any Go-legal binding admits, the derivation is total.
@@ -309,6 +314,10 @@ type Func struct {
 	// TS parameter is bounded by the carrier so representation views
 	// typecheck.
 	ReprParams []*Type
+	// RttiParams marks parameters whose body boxes P values into
+	// interfaces: the declaration takes rt$P (the binding's box triple),
+	// requirement-scoped exactly like key$P.
+	RttiParams []bool
 	// FamilyEnc marks this Func/Struct emission as the ENCODED key-family
 	// variant ("$ek"-suffixed symbols; parameter-keyed maps spell the
 	// encoded carrier).

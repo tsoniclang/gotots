@@ -423,6 +423,14 @@ func printMethodFunctionVariant(out *strings.Builder, module *Module, className 
 			params = append(params, "key$"+param+": (k: "+param+") => string")
 		}
 	}
+	for i, param := range method.TypeParams {
+		if erasedAt(method.ErasedParams, i) {
+			continue
+		}
+		if i < len(method.RttiParams) && method.RttiParams[i] {
+			params = append(params, "rt$"+param+": goif$.GoParamRtti")
+		}
+	}
 	result, err := p.tsResultType(method.Results)
 	if err != nil {
 		return fmt.Errorf("%s: %w", method.ID, err)
@@ -450,6 +458,7 @@ func printMethodFunctionVariant(out *strings.Builder, module *Module, className 
 		p.cloneOps = map[string]string{}
 		p.setOps = map[string]string{}
 		p.keyOps = map[string]string{}
+		p.rttiOps = map[string]string{}
 		for i, param := range method.TypeParams {
 			p.zeroFactories[param] = "zero$" + param
 			p.eqOps[param] = "eq$" + param
@@ -457,6 +466,9 @@ func printMethodFunctionVariant(out *strings.Builder, module *Module, className 
 			p.setOps[param] = "set$" + param
 			if i < len(method.KeyedParams) && method.KeyedParams[i] {
 				p.keyOps[param] = "key$" + param
+			}
+			if i < len(method.RttiParams) && method.RttiParams[i] {
+				p.rttiOps[param] = "rt$" + param
 			}
 		}
 	}

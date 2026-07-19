@@ -129,6 +129,9 @@ type printer struct {
 	// overwrite (undefined for slot-assignment carriers).
 	cloneOps map[string]string
 	keyOps   map[string]string
+	// rttiOps maps rtti-required in-scope type parameters to their rt$P
+	// slot names (the binding's box triple).
+	rttiOps map[string]string
 	// familyEnc marks the ENCODED key-family emission variant: inside it,
 	// parameter-keyed maps spell the encoded carrier and self-references
 	// to the family-split class take the "$ek" symbols.
@@ -137,7 +140,7 @@ type printer struct {
 	// any pointer-split emission (its *P spells the family's exact form).
 	familyPtrCell bool
 	ptrSplit      bool
-	setOps    map[string]string
+	setOps        map[string]string
 	// slicePlans maps this body's slice-typed locals to their selected
 	// representation; "native-array" locals lower onto plain arrays.
 	slicePlans map[string]string
@@ -232,6 +235,7 @@ func printFunc(out *strings.Builder, module *Module, function *ir.Func) error {
 		p.cloneOps = map[string]string{}
 		p.setOps = map[string]string{}
 		p.keyOps = map[string]string{}
+		p.rttiOps = map[string]string{}
 		for i, param := range function.TypeParams {
 			p.zeroFactories[param] = "zero$" + param
 			p.eqOps[param] = "eq$" + param
@@ -239,6 +243,9 @@ func printFunc(out *strings.Builder, module *Module, function *ir.Func) error {
 			p.setOps[param] = "set$" + param
 			if i < len(function.KeyedParams) && function.KeyedParams[i] {
 				p.keyOps[param] = "key$" + param
+			}
+			if i < len(function.RttiParams) && function.RttiParams[i] {
+				p.rttiOps[param] = "rt$" + param
 			}
 		}
 	}
@@ -309,6 +316,16 @@ func (p *printer) functionSignature(function *ir.Func) (string, error) {
 		}
 		if i < len(function.KeyedParams) && function.KeyedParams[i] {
 			params = append(params, "key$"+param+": (k: "+param+") => string")
+		}
+	}
+	// rt$P is the binding's box triple (discriminant, rtti, vtable),
+	// taken EXACTLY for the parameters the body boxes into interfaces.
+	for i, param := range function.TypeParams {
+		if erasedAt(function.ErasedParams, i) {
+			continue
+		}
+		if i < len(function.RttiParams) && function.RttiParams[i] {
+			params = append(params, "rt$"+param+": goif$.GoParamRtti")
 		}
 	}
 	result, err := p.tsResultType(function.Results)
@@ -529,7 +546,6 @@ func anyTrue(mask []bool) bool {
 	}
 	return false
 }
-
 
 // surfaceParams is the emitted generic-parameter list: core-typed
 // parameters erase to their carriers and drop out, and representation-

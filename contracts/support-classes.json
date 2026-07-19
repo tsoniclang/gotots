@@ -592,6 +592,11 @@
       "specClause": "docs/spec/types-values-pointers.md"
     },
     {
+      "key": "param-rtti",
+      "state": "generated",
+      "specClause": "docs/spec/interfaces-generics-functions.md"
+    },
+    {
       "key": "paramCopy",
       "state": "generated",
       "specClause": "docs/spec/interfaces-generics-functions.md"

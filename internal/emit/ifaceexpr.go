@@ -31,6 +31,23 @@ func (p *printer) printIfaceExpr(e ir.Expr) (string, bool, error) {
 			return "", true, err
 		}
 		return fmt.Sprintf("goif$.goIfaceBox(%q, %s, %s, %s)", boxDiscriminant(n.Rtti), rtti, x, vtable), true, nil
+	case *ir.ParamIfaceBox:
+		x, err := p.printExpr(n.X)
+		if err != nil {
+			return "", true, err
+		}
+		op, has := p.rttiOps[n.Param]
+		if !has {
+			return "", true, fmt.Errorf("no rt$ operation in scope for parameter %s", n.Param)
+		}
+		spelled, err := p.tsType(n.T)
+		if err != nil {
+			return "", true, err
+		}
+		// The box composes from the binding's triple; its static type is
+		// generic, so the union membership the binding evidence guarantees
+		// is asserted through unknown.
+		return "(goif$.goIfaceBox(" + op + ".k, " + op + ".r, " + x + ", " + op + ".m) as unknown as " + spelled + ")", true, nil
 	case *ir.IfaceCall:
 		printed, err := p.printIfaceCall(n)
 		return printed, true, err

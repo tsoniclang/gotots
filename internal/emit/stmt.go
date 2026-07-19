@@ -165,7 +165,7 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		var impure strings.Builder
 		operandPrinter := &printer{out: &impure, module: p.module, indent: p.indent,
 			temps: p.temps, zeroFactories: p.zeroFactories, eqOps: p.eqOps,
-			cloneOps: p.cloneOps, setOps: p.setOps, keyOps: p.keyOps, slicePlans: p.slicePlans}
+			cloneOps: p.cloneOps, setOps: p.setOps, keyOps: p.keyOps, rttiOps: p.rttiOps, slicePlans: p.slicePlans}
 		staged, err := operandPrinter.stageCompoundTarget(n.Target)
 		if err != nil {
 			return err

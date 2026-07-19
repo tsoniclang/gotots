@@ -5,6 +5,7 @@ package emit
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/tsoniclang/gotots/internal/ir"
 	"github.com/tsoniclang/gotots/internal/tsident"
@@ -421,4 +422,42 @@ func (p *printer) zeroLiteral(t ir.Type) (string, error) {
 		return "0", nil
 	}
 	return "", fmt.Errorf("no zero literal for type %q", t.Go)
+}
+
+// rttiFactoryArgs composes the call-site rt$P slots for the callee's
+// rtti-required positions: a forwarded rt$Q of the caller's own
+// parameter, or the concrete binding's box triple (discriminant, rtti,
+// vtable — exactly what a direct box of the binding composes).
+func (p *printer) rttiFactoryArgs(mask []bool, slots []ir.ParamRttiArg, erased []bool) (string, error) {
+	var parts []string
+	for i, required := range mask {
+		if !required || erasedAt(erased, i) {
+			continue
+		}
+		if i >= len(slots) {
+			return "", fmt.Errorf("rtti-required position %d has no call slot", i)
+		}
+		slot := slots[i]
+		if slot.Forward != "" {
+			op, has := p.rttiOps[slot.Forward]
+			if !has {
+				return "", fmt.Errorf("no rt$ operation in scope for parameter %s", slot.Forward)
+			}
+			parts = append(parts, op)
+			continue
+		}
+		if slot.Rtti == nil {
+			return "", fmt.Errorf("rtti-required position %d carries neither forward nor rtti", i)
+		}
+		rtti, err := p.rttiRef(*slot.Rtti)
+		if err != nil {
+			return "", err
+		}
+		vtable, err := p.boxVtable(*slot.Rtti)
+		if err != nil {
+			return "", err
+		}
+		parts = append(parts, fmt.Sprintf("{ k: %q, r: %s, m: %s }", boxDiscriminant(*slot.Rtti), rtti, vtable))
+	}
+	return strings.Join(parts, ", "), nil
 }

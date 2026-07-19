@@ -533,12 +533,25 @@ func HasPtrCellFuncInstances(unit Scope, fn *types.Func) bool {
 // declPtrRequires reports whether the CURRENT generic declaration takes
 // the pointer-family split on the named parameter.
 func (b *builder) declPtrRequires(paramName string) bool {
+	return b.declParamRequires(paramName, b.unit.ParamRequiresPtr)
+}
+
+// declRttiRequires reports whether the CURRENT generic declaration
+// takes rt$P (the runtime-identity triple) on the named parameter.
+func (b *builder) declRttiRequires(paramName string) bool {
+	return b.declParamRequires(paramName, b.unit.ParamRequiresRtti)
+}
+
+// declParamRequires resolves the named parameter against the current
+// generic declaration (a method resolves through its receiver's origin)
+// and reads the given requirement level.
+func (b *builder) declParamRequires(paramName string, requires func(types.Object, int) bool) bool {
 	resolve := func(obj types.Object, params *types.TypeParamList) bool {
 		if params == nil {
 			return false
 		}
 		for i := range params.Len() {
-			if params.At(i).Obj().Name() == paramName && b.unit.ParamRequiresPtr(obj, i) {
+			if params.At(i).Obj().Name() == paramName && requires(obj, i) {
 				return true
 			}
 		}

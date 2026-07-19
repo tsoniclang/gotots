@@ -100,6 +100,13 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			if err != nil {
 				return "", err
 			}
+			rttiSlots, err := p.rttiFactoryArgs(n.RttiParams, n.RttiArgs, n.ErasedParams)
+			if err != nil {
+				return "", err
+			}
+			if rttiSlots != "" {
+				factories += ", " + rttiSlots
+			}
 			if args == "" {
 				args = factories
 			} else {
@@ -167,6 +174,13 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			factories, err := p.zeroFactoryArgs(surfaceArgs, surfaceKeyed)
 			if err != nil {
 				return "", err
+			}
+			rttiSlots, err := p.rttiFactoryArgs(n.RttiParams, n.RttiArgs, n.ErasedParams)
+			if err != nil {
+				return "", err
+			}
+			if rttiSlots != "" {
+				factories += ", " + rttiSlots
 			}
 			if args == "" {
 				args = factories

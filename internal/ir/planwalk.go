@@ -217,6 +217,8 @@ func (s *slicePlanner) walkExpr(e Expr) {
 		s.walkExpr(n.X)
 	case *TupleVariadicSpread:
 		s.walkExpr(n.X)
+	case *ParamIfaceBox:
+		s.walkExpr(n.X)
 	case *IfaceBox:
 		s.escapeIfSlice(n.X)
 	case *IfaceEqual:
