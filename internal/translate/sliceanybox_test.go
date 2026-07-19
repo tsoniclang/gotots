@@ -329,3 +329,49 @@ func GenericStructKeyedSet() int {
 }
 `)
 }
+
+func TestOracleGenericConstructsKeyCapturingClass(t *testing.T) {
+	// The collections.GroupBy shape: a generic function constructs a
+	// key-capturing generic class binding its OWN parameters — the hard
+	// map-key requirement flows through the instantiation edge to the
+	// function's K (guarded bindings), while V stays soft-free.
+	runOracle(t, `package fixture
+
+type multi[K comparable, V any] struct {
+	m map[K][]V
+}
+
+func (s *multi[K, V]) Add(key K, value V) {
+	if s.m == nil {
+		s.m = map[K][]V{}
+	}
+	s.m[key] = append(s.m[key], value)
+}
+
+func (s *multi[K, V]) Count(key K) int {
+	return len(s.m[key])
+}
+
+type pair struct {
+	a int
+	b string
+}
+
+func groupBy[K comparable, V any](items []V, id func(V) K) *multi[K, V] {
+	m := &multi[K, V]{}
+	for _, item := range items {
+		m.Add(id(item), item)
+	}
+	return m
+}
+
+func GenericConstructsKeyCapturingClass() int {
+	byLen := groupBy([]string{"a", "bb", "cc", "ddd"}, func(s string) int { return len(s) })
+	total := byLen.Count(2) * 100
+	byKey := groupBy([]int{1, 2, 3, 4, 5}, func(n int) pair { return pair{a: n % 2, b: "x"} })
+	total += byKey.Count(pair{a: 1, b: "x"}) * 10
+	total += byKey.Count(pair{a: 0, b: "x"})
+	return total
+}
+`)
+}
