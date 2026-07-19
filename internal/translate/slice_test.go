@@ -367,17 +367,8 @@ func Case() int {
 		// Promotion through an embedded pointer is exact now — the
 		// delegation nil-checks each pointer step (see
 		// TestOraclePromotionThroughEmbeddedPointer).
-		{
-			name: "float map key",
-			source: `package fixture
-func Case() int32 {
-	m := make(map[float64]int32)
-	m[1.5] = 1
-	return m[1.5]
-}
-`,
-			code: "GOTOTS_UNSUPPORTED_TYPE", mention: "map key type float64",
-		},
+		// Float map keys are exact now (GoFMap carrier; see
+		// TestOracleFloatKeyedMap).
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

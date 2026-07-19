@@ -412,6 +412,9 @@ func (p *printer) tsType(t ir.Type) (string, error) {
 		if t.Key.Kind.Float() {
 			return "gort$.GoFMap<" + value + ">", nil
 		}
+		if t.Key.Kind == ir.KindIface && t.Key.TypeParamName == "" {
+			return "gort$.GoEMap<" + key + ", " + value + ">", nil
+		}
 		return "gort$.GoMap<" + key + ", " + value + ">", nil
 	}
 	return "", fmt.Errorf("no TypeScript spelling for IR type %q", t.Go)

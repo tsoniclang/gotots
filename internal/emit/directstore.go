@@ -108,6 +108,16 @@ func (p *printer) printStore(target ir.Target, value string) error {
 		if err != nil {
 			return err
 		}
+		if t.Map.Type().Key != nil {
+			encoder, err := p.ifaceKeyEncoder(*t.Map.Type().Key)
+			if err != nil {
+				return err
+			}
+			if encoder != "" {
+				p.line("gort$.goEMapSet(%s, %s, %s, %s);", mapExpr, key, value, encoder)
+				return nil
+			}
+		}
 		p.line("gort$.%s(%s, %s, %s);", mapHelper("goMapSet", t.Map), mapExpr, key, value)
 		return nil
 	case *ir.SliceTarget:

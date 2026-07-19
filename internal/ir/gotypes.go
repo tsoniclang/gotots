@@ -156,6 +156,14 @@ func (b *builder) typeOfInner(t types.Type, span Span) (Type, error) {
 			// entries; +0/-0 coincide).
 			admitted := key.Kind.Float()
 			admitted = admitted || key.Kind == KindStruct && b.structKeyEncodable(u.Key(), span)
+			if !admitted && key.Kind == KindIface {
+				// An INTERFACE key admits when every retained member's
+				// dynamic key is pointer identity: the union's generated
+				// $key function encodes discriminant + goKeyId, exactly
+				// Go's (dynamic type, pointer) equality. Scalar/struct/
+				// handle members stay fail-closed pending their encoders.
+				admitted = b.ifaceKeyMembersPointerOnly(u.Key(), span)
+			}
 			if !admitted {
 				// A type-parameter key hides behind its constraint
 				// interface; the instantiation evidence decides it.
@@ -479,4 +487,24 @@ func (b *builder) keyEncodableFieldType(goType types.Type, span Span) bool {
 		return false
 	}
 	return KeyEncodableField(fieldIR)
+}
+
+// ifaceKeyMembersPointerOnly reports whether every member of an interface
+// type used as a MAP KEY carries pointer-identity dynamics (the exactly
+// encodable subset; the empty interface's open member set stays out).
+func (b *builder) ifaceKeyMembersPointerOnly(goType types.Type, span Span) bool {
+	iface, ok := goType.Underlying().(*types.Interface)
+	if !ok || iface.NumMethods() == 0 {
+		return false
+	}
+	members, err := b.ifaceMembers(iface, span)
+	if err != nil || len(members) == 0 {
+		return false
+	}
+	for _, member := range members {
+		if !member.Pointer {
+			return false
+		}
+	}
+	return true
 }

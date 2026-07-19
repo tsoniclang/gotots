@@ -26,6 +26,7 @@ func (m *Module) Overlay() *Module {
 		ifaceIdentity:   map[string]string{},
 		ifaceAliasTypes: map[string]ir.Type{},
 		ifaceEqFns:      map[string]string{},
+		ifaceKeyFns:     map[string]bool{},
 		initEdges:       map[string]bool{},
 		BoxedComposites: m.BoxedComposites,
 		Withheld:        m.Withheld,
@@ -55,6 +56,9 @@ func (m *Module) Commit() {
 	}
 	for name, decl := range m.ifaceEqFns {
 		p.RegisterIfaceEqFn(name, decl)
+	}
+	for name := range m.ifaceKeyFns {
+		p.RequireIfaceKeyFn(name)
 	}
 }
 

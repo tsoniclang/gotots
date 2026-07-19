@@ -124,6 +124,13 @@ func (p *printer) buildUnionAliasDefinition(name string, t ir.Type) (string, err
 	}
 	declaration := "type " + name + " = " + strings.Join(members, " | ") + ";"
 	p.module.RegisterIfaceEqFn(name, p.ifaceEqFn(t, name))
+	if p.module.ifaceKeyRequired(name) {
+		keyFn, err := p.ifaceKeyFn(t, name)
+		if err != nil {
+			return "", err
+		}
+		p.module.RegisterIfaceEqFn(name+"$key", keyFn)
+	}
 	return declaration, nil
 }
 
@@ -244,4 +251,27 @@ func (p *printer) retainedMembers(t ir.Type) []ir.IfaceMember {
 		out = append(out, member)
 	}
 	return out
+}
+
+// ifaceKeyFn generates one union's map-key encoder for the admitted
+// pointer-member subset: discriminant + pointer identity, exactly Go's
+// (dynamic type, pointer) key equality. The nil interface is its own key.
+func (p *printer) ifaceKeyFn(t ir.Type, name string) (string, error) {
+	var b strings.Builder
+	fmt.Fprintf(&b, "export function %s$key($v: %s): string {\n", name, name)
+	b.WriteString("  if ($v === undefined) return \"n\";\n")
+	members := p.retainedMembers(t)
+	if len(members) == 0 {
+		b.WriteString("  return gort$.goPanicUnreachableType(\"key\");\n}\n")
+		return b.String(), nil
+	}
+	b.WriteString("  switch ($v.k) {\n")
+	for _, member := range members {
+		if !member.Pointer {
+			return "", fmt.Errorf("interface key union %s has non-pointer member %s (encoder not yet reviewed)", name, member.K)
+		}
+		fmt.Fprintf(&b, "    case %q: return %q + gort$.goKeyId($v.v);\n", member.K, member.K+"|")
+	}
+	b.WriteString("    default: return gort$.goPanicUnreachableType(\"key\");\n  }\n}\n")
+	return b.String(), nil
 }

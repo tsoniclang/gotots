@@ -90,6 +90,10 @@ type Module struct {
 	// interface == by exact per-member narrowing, no erased payload),
 	// keyed by alias name and emitted after the aliases.
 	ifaceEqFns map[string]string
+	// ifaceKeyFns marks unions whose generated $key encoder a map
+	// operation referenced; finalizeUnionAliases emits each marked
+	// union's encoder beside its equality function.
+	ifaceKeyFns map[string]bool
 	// BoxedComposites is the unit's closed boxed-composite enumeration
 	// (canonical id + payload type), spelled as exact empty-interface
 	// union members.
@@ -150,6 +154,25 @@ func (m *Module) aliasLines() string {
 	return out.String()
 }
 
+// RequireIfaceKeyFn marks a union's $key encoder as referenced.
+func (m *Module) RequireIfaceKeyFn(name string) {
+	if m.ifaceKeyFns == nil {
+		m.ifaceKeyFns = map[string]bool{}
+	}
+	m.ifaceKeyFns[name] = true
+}
+
+// ifaceKeyRequired reports whether a union's $key encoder is referenced
+// anywhere in the overlay chain.
+func (m *Module) ifaceKeyRequired(name string) bool {
+	for cur := m; cur != nil; cur = cur.parent {
+		if cur.ifaceKeyFns[name] {
+			return true
+		}
+	}
+	return false
+}
+
 // RegisterIfaceEqFn records one union's generated equality function.
 func (m *Module) RegisterIfaceEqFn(name, declaration string) {
 	if m.ifaceEqFns == nil {
@@ -164,6 +187,11 @@ func (m *Module) eqFnLines() string {
 	var out strings.Builder
 	for _, name := range m.aliasOrder {
 		if decl := m.ifaceEqFns[name]; decl != "" {
+			out.WriteString(decl)
+			out.WriteString("\n")
+		}
+		// The union's map-key encoder, when a map operation required it.
+		if decl := m.ifaceEqFns[name+"$key"]; decl != "" {
 			out.WriteString(decl)
 			out.WriteString("\n")
 		}

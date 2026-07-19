@@ -311,6 +311,7 @@ export function goKeyArray<T>(a: T[], encodeElem: (v: T) => string): string {
   for (let i = 0; i < a.length; i++) out += encodeElem(a[i] as T) + "|";
   return out + "]";
 }
+` + keyedMapsSource + `
 
 // Float-keyed maps carry Go's exact float-key semantics. The ONLY
 // divergence from JS SameValueZero is NaN: Go's NaN != NaN makes every
@@ -376,48 +377,6 @@ export function goFMapClear<V>(fm: GoFMap<V>): void {
   fm.nan.length = 0;
 }
 
-export function goKMapMake<K extends GoKeyed, V>(hint?: unknown): Map<string, [K, V]> {
-  void hint;
-  return new Map<string, [K, V]>();
-}
-
-export function goKMapFrom<K extends GoKeyed, V>(entries: readonly (readonly [K, V])[]): Map<string, [K, V]> {
-  const out = new Map<string, [K, V]>();
-  for (const [key, value] of entries) {
-    out.set(key.goKey$(), [key, value]);
-  }
-  return out;
-}
-
-export function goKMapGet<K extends GoKeyed, V>(m: GoKeyedMap<K, V>, key: K, zero: V): V {
-  if (m === undefined) return zero;
-  const entry = m.get(key.goKey$());
-  return entry === undefined ? zero : entry[1];
-}
-
-export function goKMapLookup<K extends GoKeyed, V>(m: GoKeyedMap<K, V>, key: K, zero: V): [V, boolean] {
-  if (m === undefined) return [zero, false];
-  const entry = m.get(key.goKey$());
-  return entry === undefined ? [zero, false] : [entry[1], true];
-}
-
-export function goKMapSet<K extends GoKeyed, V>(m: GoKeyedMap<K, V>, key: K, value: V): void {
-  if (m === undefined) goPanicNilMapWrite();
-  (m as Map<string, [K, V]>).set(key.goKey$(), [key, value]);
-}
-
-export function goKMapDelete<K extends GoKeyed, V>(m: GoKeyedMap<K, V>, key: K): void {
-  if (m !== undefined) m.delete(key.goKey$());
-}
-
-export function goKMapValues<K extends GoKeyed, V>(m: GoKeyedMap<K, V>): readonly (readonly [K, V])[] {
-  if (m === undefined) return [];
-  return Array.from(m.values());
-}
-
-export function goKMapClear<K extends GoKeyed, V>(m: GoKeyedMap<K, V>): void {
-  if (m !== undefined) m.clear();
-}
 
 export function goKMapLen<K extends GoKeyed, V>(m: GoKeyedMap<K, V>): bigint {
   return m === undefined ? 0n : BigInt(m.size);

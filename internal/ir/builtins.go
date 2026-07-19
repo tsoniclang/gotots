@@ -204,7 +204,14 @@ func (b *builder) buildMapDelete(call *ast.CallExpr) (Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	key, err := b.buildExpr(call.Args[1])
+	// The key binds AT the map's key type (an interface key boxes; a
+	// struct key copies) — delete's key conversion is an assignment
+	// context in Go.
+	keyType := mapExpr.Type().Key
+	if keyType == nil {
+		return nil, &Unsupported{Kind: KindMapLiteralWithoutKeys, Code: "GOTOTS_UNSUPPORTED_STATEMENT", Construct: "delete on a non-map operand", Span: b.span(call.Pos())}
+	}
+	key, err := b.buildExprAs(call.Args[1], *keyType)
 	if err != nil {
 		return nil, err
 	}

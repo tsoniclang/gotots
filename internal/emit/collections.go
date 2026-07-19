@@ -36,6 +36,17 @@ func (p *printer) collectionExpr(e ir.Expr) (string, error) {
 		if n.Type().Key != nil && n.Type().Key.Kind == ir.KindStruct {
 			return "gort$.goKMapMake(" + hint + ")", nil
 		}
+		if n.Type().Key != nil && n.Type().Key.Kind == ir.KindIface && n.Type().Key.TypeParamName == "" {
+			key, err := p.tsType(*n.Type().Key)
+			if err != nil {
+				return "", err
+			}
+			value, err := p.tsType(*n.Type().Elem)
+			if err != nil {
+				return "", err
+			}
+			return "gort$.goEMapMake<" + key + ", " + value + ">(" + hint + ")", nil
+		}
 		if n.Type().Key != nil && n.Type().Key.Kind.Float() {
 			value, err := p.tsType(*n.Type().Elem)
 			if err != nil {
@@ -76,6 +87,13 @@ func (p *printer) collectionExpr(e ir.Expr) (string, error) {
 		}
 		if n.T.Key.Kind.Float() {
 			return "gort$.goFMapFrom([" + joinComma(entries) + "])", nil
+		}
+		if n.T.Key.Kind == ir.KindIface && n.T.Key.TypeParamName == "" {
+			encoder, err := p.ifaceKeyEncoder(*n.T.Key)
+			if err != nil {
+				return "", err
+			}
+			return "gort$.goEMapFrom([" + joinComma(entries) + "], " + encoder + ")", nil
 		}
 		return "gort$.goMapFrom([" + joinComma(entries) + "])", nil
 	case *ir.MapGet:
@@ -314,7 +332,25 @@ func mapHelper(name string, mapExpr ir.Expr) string {
 	if t.Key != nil && t.Key.Kind.Float() {
 		return "goFMap" + strings.TrimPrefix(name, "goMap")
 	}
+	if t.Key != nil && t.Key.Kind == ir.KindIface && t.Key.TypeParamName == "" {
+		return "goEMap" + strings.TrimPrefix(name, "goMap")
+	}
 	return name
+}
+
+// ifaceKeyEncoder returns the union $key encoder reference for an
+// interface-keyed map's key type (marking the requirement so the encoder
+// emits beside the union), or "" for every other key kind.
+func (p *printer) ifaceKeyEncoder(keyT ir.Type) (string, error) {
+	if keyT.Kind != ir.KindIface || keyT.TypeParamName != "" {
+		return "", nil
+	}
+	name, err := p.ifaceUnionAlias(keyT)
+	if err != nil {
+		return "", err
+	}
+	p.module.RequireIfaceKeyFn(name)
+	return name + "$key", nil
 }
 
 // printMapAccess emits a map read with the exact zero value of the map's
@@ -331,6 +367,15 @@ func (p *printer) printMapAccess(helper string, mapExpr, key ir.Expr, valueType 
 	zero, err := p.zeroLiteral(valueType)
 	if err != nil {
 		return "", err
+	}
+	if mapExpr.Type().Key != nil {
+		encoder, err := p.ifaceKeyEncoder(*mapExpr.Type().Key)
+		if err != nil {
+			return "", err
+		}
+		if encoder != "" {
+			return "gort$." + helper + "(" + m + ", " + k + ", " + zero + ", " + encoder + ")", nil
+		}
 	}
 	return "gort$." + helper + "(" + m + ", " + k + ", " + zero + ")", nil
 }

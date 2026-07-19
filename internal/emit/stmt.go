@@ -213,6 +213,16 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		if err != nil {
 			return err
 		}
+		if n.Map.Type().Key != nil {
+			encoder, err := p.ifaceKeyEncoder(*n.Map.Type().Key)
+			if err != nil {
+				return err
+			}
+			if encoder != "" {
+				p.line("gort$.goEMapDelete(%s, %s, %s);", mapExpr, key, encoder)
+				return nil
+			}
+		}
 		p.line("gort$.%s(%s, %s);", mapHelper("goMapDelete", n.Map), mapExpr, key)
 		return nil
 

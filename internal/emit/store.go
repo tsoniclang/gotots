@@ -28,8 +28,11 @@ type stagedTarget struct {
 	// (defeats literal-undefined narrowing on provably nil operands).
 	nilCheckBase bool
 	baseNilable  ir.Type
-	// keyedMap routes the store through the composite-key carrier.
-	keyedMap bool
+	// keyedMap routes the store through the composite-key carrier;
+	// keyEncoder, when set, is the interface-key union's $key encoder
+	// reference (the encoded-map carrier).
+	keyedMap   bool
+	keyEncoder string
 	// externSet, when set, is the typed goSet$ stub reference for an
 	// external-valued in-place store.
 	externSet string
@@ -248,8 +251,12 @@ func (p *printer) stageTarget(target ir.Target) (stagedTarget, error) {
 		}
 		keyTemp := p.temp()
 		p.line("const %s = %s;", keyTemp, key)
+		encoder, err := p.ifaceKeyEncoder(*t.Map.Type().Key)
+		if err != nil {
+			return stagedTarget{}, err
+		}
 		return stagedTarget{kind: "map", name: mapTemp, keyTemp: keyTemp,
-			keyedMap: t.Map.Type().Key.Kind == ir.KindStruct}, nil
+			keyedMap: t.Map.Type().Key.Kind == ir.KindStruct, keyEncoder: encoder}, nil
 	case *ir.SliceTarget:
 		sliceExpr, err := p.printExpr(t.X)
 		if err != nil {
@@ -401,9 +408,12 @@ func (s stagedTarget) store(p *printer, value string) error {
 	case "boxed":
 		p.line("%s.v = %s;", s.name, value)
 	case "map":
-		if s.keyedMap {
+		switch {
+		case s.keyEncoder != "":
+			p.line("gort$.goEMapSet(%s, %s, %s, %s);", s.name, s.keyTemp, value, s.keyEncoder)
+		case s.keyedMap:
 			p.line("gort$.goKMapSet(%s, %s, %s);", s.name, s.keyTemp, value)
-		} else {
+		default:
 			p.line("gort$.goMapSet(%s, %s, %s);", s.name, s.keyTemp, value)
 		}
 	case "slice":
