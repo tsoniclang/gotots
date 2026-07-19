@@ -78,6 +78,22 @@ func printStubFunc(out *strings.Builder, module *Module, fn StubFunc) error {
 	generics := ""
 	if len(fn.TypeParams) > 0 {
 		generics = "<" + strings.Join(fn.TypeParams, ", ") + ">"
+		// A generic external contract carries the factory quadruple per
+		// type parameter — the same per-binding operations owned generic
+		// signatures take — so implementations reproduce Go's value-copy
+		// semantics for every binding.
+		for _, param := range fn.TypeParams {
+			params = append(params, "zero$"+param+": () => "+param)
+		}
+		for _, param := range fn.TypeParams {
+			params = append(params, "eq$"+param+": (a: "+param+", b: "+param+") => boolean")
+		}
+		for _, param := range fn.TypeParams {
+			params = append(params, "clone$"+param+": (v: "+param+") => "+param)
+		}
+		for _, param := range fn.TypeParams {
+			params = append(params, "set$"+param+": ((d: "+param+", s: "+param+") => void) | undefined")
+		}
 	}
 
 	_ = names

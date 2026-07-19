@@ -355,6 +355,15 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 				parts[i] = spelled
 			}
 			typeArgs = "<" + strings.Join(parts, ", ") + ">"
+			factories, err := p.zeroFactoryArgs(n.TypeArgs, nil)
+			if err != nil {
+				return "", err
+			}
+			if args == "" {
+				args = factories
+			} else {
+				args += ", " + factories
+			}
 		}
 		return fmt.Sprintf("%s%s(%s)", callee, typeArgs, args), nil
 	case *ir.ParamCopy:

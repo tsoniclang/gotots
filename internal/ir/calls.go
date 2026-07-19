@@ -103,16 +103,6 @@ func (b *builder) buildExternalCall(n *ast.CallExpr, function *types.Func, signa
 			Construct: "call outside the translated unit (unqualified)", Span: span}
 	}
 	callee := function.Pkg().Path() + "." + function.Name()
-	// An external generic callee's stub carries no factory protocol, so a
-	// value-copy carrier binding cannot delegate its copy semantics: the
-	// rejection stays HERE (relocated from the unit-owned path, which
-	// passes the binding's clone/set operations).
-	for _, argType := range typeArgs {
-		if argType.Kind == KindStruct || argType.Kind == KindArray {
-			return nil, &Unsupported{Kind: KindGenericCallInstantiatedWithAValueCopyCarrierCopySemanticsVaryPerInstantiation, Code: "GOTOTS_UNSUPPORTED_EXPRESSION",
-				Construct: "generic call instantiated with a value-copy carrier (copy semantics vary per instantiation)", Span: span}
-		}
-	}
 
 	// The whole signature must resolve in the reviewed type set — the
 	// stub's contract cannot be typed otherwise. For generics both the

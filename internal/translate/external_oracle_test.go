@@ -81,10 +81,17 @@ export function Pool$Put(p: unknown, v: unknown): void {
 `,
 	"slices": `import { goSliceLen, goSliceGet, type GoSliceValue } from "../../language-abi/goslice.js";
 
-export function Contains<S, E>(s: GoSliceValue<E>, v: E): boolean {
+export function Contains<S, E>(
+  s: GoSliceValue<E>, v: E,
+  zero$S: () => S, zero$E: () => E,
+  eq$S: (a: S, b: S) => boolean, eq$E: (a: E, b: E) => boolean,
+  clone$S: (v: S) => S, clone$E: (v: E) => E,
+  set$S: ((d: S, s: S) => void) | undefined, set$E: ((d: E, s: E) => void) | undefined,
+): boolean {
+  void zero$S; void zero$E; void eq$S; void clone$S; void clone$E; void set$S; void set$E;
   const length = Number(goSliceLen(s));
   for (let index = 0; index < length; index++) {
-    if (goSliceGet(s, BigInt(index)) === v) {
+    if (eq$E(goSliceGet(s, BigInt(index)), v)) {
       return true;
     }
   }
@@ -214,6 +221,35 @@ func ExternPoolLiteral() int {
 	pool.Put(v)
 	w := pool.Get().(int)
 	return v*10 + w
+}
+`)
+}
+
+
+func TestOracleExternalGenericValueCopyBinding(t *testing.T) {
+	// The checker slices.Contains-with-struct shape: an external generic
+	// call bound to a value-copy carrier — the stub contract carries the
+	// factory quadruple, so the reviewed implementation reproduces Go's
+	// per-binding equality and copy semantics exactly.
+	runExternalOracle(t, `package fixture
+
+import "slices"
+
+type key struct {
+	a int
+	b string
+}
+
+func ExternalGenericValueCopyBinding() int {
+	items := []key{{1, "x"}, {2, "y"}}
+	total := 0
+	if slices.Contains(items, key{2, "y"}) {
+		total += 100
+	}
+	if slices.Contains(items, key{2, "z"}) {
+		total += 10000
+	}
+	return total
 }
 `)
 }
