@@ -69,11 +69,9 @@ func ownedProductionPackages(run *census.Result) []string {
 }
 
 // blockExecutionStages records the execution, differential, product,
-// performance, upgrade, and publication gates (11-18) as blocked: they
+// performance, upgrade, and publication gates (12-18) as blocked: they
 // require runtime and product infrastructure beyond static output.
 func blockExecutionStages(blocked func(string, string)) {
-	blocked("11-semantic-oracles",
-		"ordered static-output prerequisites are incomplete; local oracle tests run under gate 01 only")
 	blocked("12-generated-packages-selected-tests",
 		"complete generated-package build and translated-test gate not implemented")
 	blocked("13-no-extension-tsgo-differential",

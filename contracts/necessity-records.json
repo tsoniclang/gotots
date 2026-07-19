@@ -6,7 +6,7 @@
       "kind": "representation-carrier",
       "proofTier": "aliasing-identity",
       "semanticClass": "slice",
-      "specClause": "docs/spec/05-collections-strings.md",
+      "specClause": "docs/spec/collections-strings.md",
       "siteClasses": [
         "sliceLit",
         "sliceMake",
@@ -56,7 +56,7 @@
       "kind": "indirection-cell",
       "proofTier": "aliasing-identity",
       "semanticClass": "pointer",
-      "specClause": "docs/spec/04-types-values-pointers.md",
+      "specClause": "docs/spec/types-values-pointers.md",
       "siteClasses": [
         "addrOf",
         "boxedStore",
@@ -102,7 +102,7 @@
       "kind": "dispatch",
       "proofTier": "dynamic-type",
       "semanticClass": "interface",
-      "specClause": "docs/spec/06-interfaces-generics-functions.md",
+      "specClause": "docs/spec/interfaces-generics-functions.md",
       "siteClasses": [
         "ifaceBox",
         "ifaceCall",
@@ -157,7 +157,7 @@
       "kind": "representation-carrier",
       "proofTier": "aliasing-identity",
       "semanticClass": "map",
-      "specClause": "docs/spec/05-collections-strings.md",
+      "specClause": "docs/spec/collections-strings.md",
       "siteClasses": [
         "mapMake",
         "mapGet",

@@ -4,732 +4,732 @@
     {
       "key": "addrOf",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "append",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "append:spread",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "arrayCopy",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "arrayEqual",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "arrayGet",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "arrayLiteral",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "arraySliceView",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "arrayStore",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "assign",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "assignTuple",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "binary:!=",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "binary:%",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "binary:&",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "binary:&&",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "binary:&^",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "binary:*",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "binary:+",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "binary:-",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "binary:/",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "binary:<",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "binary:<<",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "binary:<=",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "binary:==",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "binary:>",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "binary:>=",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "binary:>>",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "binary:^",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "binary:|",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "binary:||",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "boxedDecl",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "boxedLoad",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "boxedRef",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "boxedStore",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "branch:break",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "branch:continue",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "call",
       "state": "generated",
-      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+      "specClause": "docs/spec/interfaces-generics-functions.md"
     },
     {
       "key": "cap:slice",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "closure",
       "state": "generated",
-      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+      "specClause": "docs/spec/interfaces-generics-functions.md"
     },
     {
       "key": "compoundAssign:%",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "compoundAssign:&",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "compoundAssign:&^",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "compoundAssign:*",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "compoundAssign:+",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "compoundAssign:-",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "compoundAssign:/",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "compoundAssign:<<",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "compoundAssign:>>",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "compoundAssign:^",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "compoundAssign:|",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "const",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "convert",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "convert:bytesToString",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "convert:runeToString",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "convert:runesToString",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "convert:stringToBytes",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "convert:stringToRunes",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "copy:slice",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "declTuple",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "defer",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "defer:stack",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "deref",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "dynCall",
       "state": "generated",
-      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+      "specClause": "docs/spec/interfaces-generics-functions.md"
     },
     {
       "key": "exprStmt",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "externCopy",
       "state": "generated",
-      "specClause": "docs/spec/08-externals-manual-extensions.md"
+      "specClause": "docs/spec/externals-manual-extensions.md"
     },
     {
       "key": "externMethodCall",
       "state": "generated",
-      "specClause": "docs/spec/08-externals-manual-extensions.md"
+      "specClause": "docs/spec/externals-manual-extensions.md"
     },
     {
       "key": "externVar",
       "state": "generated",
-      "specClause": "docs/spec/08-externals-manual-extensions.md"
+      "specClause": "docs/spec/externals-manual-extensions.md"
     },
     {
       "key": "externZero",
       "state": "generated",
-      "specClause": "docs/spec/08-externals-manual-extensions.md"
+      "specClause": "docs/spec/externals-manual-extensions.md"
     },
     {
       "key": "externalCall",
       "state": "generated",
-      "specClause": "docs/spec/08-externals-manual-extensions.md"
+      "specClause": "docs/spec/externals-manual-extensions.md"
     },
     {
       "key": "fieldCellRef",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "fieldLoad",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "fieldStore",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "for",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "funcRef",
       "state": "generated",
-      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+      "specClause": "docs/spec/interfaces-generics-functions.md"
     },
     {
       "key": "genericCall",
       "state": "generated",
-      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+      "specClause": "docs/spec/interfaces-generics-functions.md"
     },
     {
       "key": "if",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "ifaceBox",
       "state": "generated",
-      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+      "specClause": "docs/spec/interfaces-generics-functions.md"
     },
     {
       "key": "ifaceCall",
       "state": "generated",
-      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+      "specClause": "docs/spec/interfaces-generics-functions.md"
     },
     {
       "key": "ifaceEqual",
       "state": "generated",
-      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+      "specClause": "docs/spec/interfaces-generics-functions.md"
     },
     {
       "key": "ifaceMethodValue",
       "state": "generated",
-      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+      "specClause": "docs/spec/interfaces-generics-functions.md"
     },
     {
       "key": "incDec",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "index:string",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "isNil",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "label",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "len:array",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "len:map",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "len:slice",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "len:string",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "localConst",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "makeMap",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "makeSlice",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "mapClear",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "mapCommaOk",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "mapDelete",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "mapGet",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "mapLiteral",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "mapStore",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "max",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "methodCall",
       "state": "generated",
-      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+      "specClause": "docs/spec/interfaces-generics-functions.md"
     },
     {
       "key": "methodExpr",
       "state": "generated",
-      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+      "specClause": "docs/spec/interfaces-generics-functions.md"
     },
     {
       "key": "methodExpr:derefAdapter",
       "state": "generated",
-      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+      "specClause": "docs/spec/interfaces-generics-functions.md"
     },
     {
       "key": "methodValue",
       "state": "generated",
-      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+      "specClause": "docs/spec/interfaces-generics-functions.md"
     },
     {
       "key": "min",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "namedResults",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "new:cell",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "new:struct",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "nil",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "panic",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "panic:error",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "paramCopy",
       "state": "generated",
-      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+      "specClause": "docs/spec/interfaces-generics-functions.md"
     },
     {
       "key": "paramEqual",
       "state": "generated",
-      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+      "specClause": "docs/spec/interfaces-generics-functions.md"
     },
     {
       "key": "pointeeStore",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "range:array",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "range:func",
       "state": "generated",
-      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+      "specClause": "docs/spec/interfaces-generics-functions.md"
     },
     {
       "key": "range:int",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "range:map",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "range:slice",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "range:string",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "reslice",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "reslice3",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "reslice:string",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "return",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "shortDecl",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "sliceGet",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "sliceLiteral",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "sliceStore",
       "state": "generated",
-      "specClause": "docs/spec/05-collections-strings.md"
+      "specClause": "docs/spec/collections-strings.md"
     },
     {
       "key": "structCopy",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "structEqual",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "structLitStaged",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "structNew",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "switch",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "tupleAdapt",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "tupleSpread",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "tupleVariadicSpread",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "typeAssert",
       "state": "generated",
-      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+      "specClause": "docs/spec/interfaces-generics-functions.md"
     },
     {
       "key": "typeAssert:iface",
       "state": "generated",
-      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+      "specClause": "docs/spec/interfaces-generics-functions.md"
     },
     {
       "key": "typeSwitch",
       "state": "generated",
-      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+      "specClause": "docs/spec/interfaces-generics-functions.md"
     },
     {
       "key": "unary:!",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "unary:-",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "unary:^",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "unitLiteral",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "varDecl",
       "state": "generated",
-      "specClause": "docs/spec/03-declarations-bodies-control.md"
+      "specClause": "docs/spec/declarations-bodies-control.md"
     },
     {
       "key": "varRef",
       "state": "generated",
-      "specClause": "docs/spec/04-types-values-pointers.md"
+      "specClause": "docs/spec/types-values-pointers.md"
     },
     {
       "key": "variadic:empty",
       "state": "generated",
-      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+      "specClause": "docs/spec/interfaces-generics-functions.md"
     },
     {
       "key": "variadic:pack",
       "state": "generated",
-      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+      "specClause": "docs/spec/interfaces-generics-functions.md"
     },
     {
       "key": "variadic:spread",
       "state": "generated",
-      "specClause": "docs/spec/06-interfaces-generics-functions.md"
+      "specClause": "docs/spec/interfaces-generics-functions.md"
     }
   ]
 }

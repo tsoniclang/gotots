@@ -29,7 +29,7 @@ type GateResult struct {
 }
 
 // GateReport is the machine-readable full-gate outcome over the
-// ordered stages in docs/spec/11-testing-acceptance.md. Passed means
+// ordered stages in docs/spec/testing-acceptance.md. Passed means
 // complete: every gate passes. Blocked gates name their missing
 // subsystem — the contract is never silently narrowed to the
 // implemented subset.
@@ -435,6 +435,9 @@ func runGate(args []string) error {
 	})
 	run("10-strict-typescript-staticness", func() (string, []string, error) {
 		return runTscGate(*repoDir, *profilePath, *buildProfile, *sourceDir, report, productPin, firstRun)
+	})
+	run("11-semantic-oracles", func() (string, []string, error) {
+		return runSemanticOracleGate(*repoDir, *reportPath)
 	})
 	blockExecutionStages(blocked)
 

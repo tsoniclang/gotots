@@ -12,6 +12,9 @@ package oracle
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"go/types"
 	"os"
@@ -259,7 +262,70 @@ func RunAssembled(workDir string, packageSources map[string]string, implementati
 	if err != nil {
 		return nil, err
 	}
-	return &Result{GoOutput: goOutput, TSOutput: tsOutput, Cases: len(cases)}, nil
+	result := &Result{GoOutput: goOutput, TSOutput: tsOutput, Cases: len(cases)}
+	if ledgerPath := os.Getenv("GOTOTS_ORACLE_LEDGER"); ledgerPath != "" {
+		if err := appendLedgerEntry(ledgerPath, packageSources, generated, result); err != nil {
+			return nil, fmt.Errorf("oracle ledger: %w", err)
+		}
+	}
+	return result, nil
+}
+
+// LedgerEntry records one executed oracle: the fixture's identity (its
+// exact source hash — the oracle revision), the operation classes its
+// translated bodies exercised (from the translation proofs, never
+// hand-declared), the case count, and the differential verdict.
+type LedgerEntry struct {
+	FixtureSha256 string   `json:"fixtureSha256"`
+	Classes       []string `json:"classes"`
+	Cases         int      `json:"cases"`
+	Match         bool     `json:"match"`
+}
+
+// appendLedgerEntry appends one JSON line to the ledger file. Oracle
+// tests run sequentially within a package; O_APPEND single-write keeps
+// cross-package runs safe too.
+func appendLedgerEntry(path string, packageSources map[string]string, generated *translate.Generated, result *Result) error {
+	sourceNames := make([]string, 0, len(packageSources))
+	for name := range packageSources {
+		sourceNames = append(sourceNames, name)
+	}
+	sort.Strings(sourceNames)
+	digest := sha256.New()
+	for _, name := range sourceNames {
+		digest.Write([]byte(name))
+		digest.Write([]byte{0})
+		digest.Write([]byte(packageSources[name]))
+		digest.Write([]byte{0})
+	}
+	classSet := map[string]bool{}
+	for _, proof := range generated.Proofs {
+		for _, operation := range proof.Operations {
+			classSet[operation] = true
+		}
+	}
+	classes := make([]string, 0, len(classSet))
+	for class := range classSet {
+		classes = append(classes, class)
+	}
+	sort.Strings(classes)
+	entry := LedgerEntry{
+		FixtureSha256: hex.EncodeToString(digest.Sum(nil)),
+		Classes:       classes,
+		Cases:         result.Cases,
+		Match:         result.Match(),
+	}
+	line, err := json.Marshal(entry)
+	if err != nil {
+		return err
+	}
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	_, err = file.Write(append(line, '\n'))
+	return err
 }
 
 // fixtureCase is one exported zero-parameter function with the formatting

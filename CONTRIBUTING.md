@@ -39,7 +39,7 @@ with meaningful filenames — never `part1`/`helpers2` shards or forwarding
 facades, and never keep the original monolith as a compatibility path.
 This is enforced repository-wide by `internal/policy`
 (`TestRepositoryFileSizes`); see
-`docs/spec/13-governance-upgrades.md`.
+`docs/spec/governance-upgrades.md`.
 
 ## Workflow
 
@@ -49,7 +49,7 @@ This is enforced repository-wide by `internal/policy`
 - Before every commit: `test -z "$(git ls-files -z -co --exclude-standard -- '*.go' | xargs -0 -r gofmt -l)"`, `go vet ./...`,
   `go test -count=1 ./...`, and `git diff --check` must all pass; before
   every push additionally `go test -count=1 -race ./...`.
-- Follow the ordered gates in `docs/spec/11-testing-acceptance.md`; a later
+- Follow the ordered gates in `docs/spec/testing-acceptance.md`; a later
   product suite never substitutes for an earlier completeness proof.
 - Add a source-linked Go input, typed decision, generated TypeScript shape,
   semantic oracle, and staticness/performance evidence for each semantic

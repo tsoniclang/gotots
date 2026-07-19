@@ -1,4 +1,4 @@
-// Necessity records (docs/spec/10-machine-contracts-diagnostics.md): one
+// Necessity records (docs/spec/machine-contracts-diagnostics.md): one
 // machine-checked record per custom runtime mechanism — a representation
 // carrier, indirection cell, dispatch, or boundary adapter — each with a
 // minimized counterexample, the ordinary-TypeScript mismatch, the

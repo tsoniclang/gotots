@@ -65,7 +65,7 @@ runtime output uses the simplest representation proven exact for each region.
 ## Validation
 
 The complete process is normative in
-`docs/spec/11-testing-acceptance.md`. Local checkpoints run formatting,
+`docs/spec/testing-acceptance.md`. Local checkpoints run formatting,
 vetting, unit/fixture tests, and diff checks; pushes additionally run the race
 suite. Product acceptance adds exact census/disposition proof, declaration and
 body verification, Go semantic oracles, strict generated-TypeScript checks,
