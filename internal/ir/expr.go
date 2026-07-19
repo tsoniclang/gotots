@@ -643,10 +643,38 @@ func (b *builder) buildExternLit(n *ast.CompositeLit, t Type, goType types.Type,
 	fields := make([]string, 0, len(n.Elts))
 	values := make([]Expr, 0, len(n.Elts))
 	var fieldTypes []Type
+	if len(n.Elts) > 0 {
+		if _, isKV := n.Elts[0].(*ast.KeyValueExpr); !isKV {
+			// POSITIONAL form: Go requires every field, in declaration
+			// order — the constructor obligation covers the full field
+			// set.
+			if len(n.Elts) != structType.NumFields() {
+				return nil, &Unsupported{Kind: KindCompositeLiteralOf, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "partial positional composite literal of external " + t.Go, Span: span}
+			}
+			for i, element := range n.Elts {
+				field := structType.Field(i)
+				fieldType, err := b.typeOf(field.Type(), span)
+				if err != nil {
+					return nil, err
+				}
+				value, err := b.buildExprAs(element, fieldType)
+				if err != nil {
+					return nil, err
+				}
+				fields = append(fields, field.Name())
+				values = append(values, value)
+				fieldTypes = append(fieldTypes, fieldType)
+			}
+			obligation := b.unit.AddExternalType(t.Pkg, t.Named)
+			symbol := obligation.AddLiteralShape(fields, fieldTypes)
+			b.use("externLit")
+			return &ExternLit{T: t, Symbol: symbol, Values: values}, nil
+		}
+	}
 	for _, element := range n.Elts {
 		kv, isKV := element.(*ast.KeyValueExpr)
 		if !isKV {
-			return nil, &Unsupported{Kind: KindCompositeLiteralOf, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "positional composite literal of external " + t.Go, Span: span}
+			return nil, &Unsupported{Kind: KindCompositeLiteralOf, Code: "GOTOTS_UNSUPPORTED_EXPRESSION", Construct: "mixed composite literal of external " + t.Go, Span: span}
 		}
 		key, isIdent := kv.Key.(*ast.Ident)
 		if !isIdent {

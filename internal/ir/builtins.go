@@ -174,6 +174,12 @@ func (b *builder) buildBuiltin(call *ast.CallExpr, builtin *types.Builtin, resul
 			b.use("new:struct")
 			return &AddrOf{X: &StructZero{T: *t.Elem}, T: t}, nil
 		}
+		if t.Elem.Kind == KindExternal {
+			// new(T) for an external struct: a fresh zero handle IS the
+			// pointer (external handles have object identity).
+			b.use("new:extern")
+			return &AddrOf{X: &ExternZero{T: *t.Elem}, T: t}, nil
+		}
 		if boxable(t.Elem.Kind) {
 			zero, err := zeroValue(*t.Elem, span)
 			if err != nil {

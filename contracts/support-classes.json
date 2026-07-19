@@ -542,6 +542,11 @@
       "specClause": "docs/spec/types-values-pointers.md"
     },
     {
+      "key": "new:extern",
+      "state": "generated",
+      "specClause": "docs/spec/externals-manual-extensions.md"
+    },
+    {
       "key": "new:struct",
       "state": "generated",
       "specClause": "docs/spec/types-values-pointers.md"
