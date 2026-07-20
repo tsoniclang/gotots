@@ -48,13 +48,13 @@
   {
    "fixtureId": "A5",
    "goBytes": 59,
-   "generatedBytes": 162,
+   "generatedBytes": 127,
    "verdict": "ordinary",
    "status": "authored",
    "handPortBytes": 47,
    "handPortTokens": 16,
    "handPortRatio": 0.8,
-   "generatedRatio": 2.75
+   "generatedRatio": 2.15
   },
   {
    "fixtureId": "B1",
@@ -70,13 +70,13 @@
   {
    "fixtureId": "B2",
    "goBytes": 131,
-   "generatedBytes": 578,
+   "generatedBytes": 556,
    "verdict": "exception",
    "status": "authored",
    "handPortBytes": 173,
    "handPortTokens": 44,
    "handPortRatio": 1.32,
-   "generatedRatio": 4.41
+   "generatedRatio": 4.24
   },
   {
    "fixtureId": "B3",
@@ -92,24 +92,24 @@
   {
    "fixtureId": "B4",
    "goBytes": 1335,
-   "generatedBytes": 3563,
+   "generatedBytes": 3730,
    "verdict": "exception",
    "status": "authored",
    "handPortBytes": 1618,
    "handPortTokens": 400,
    "handPortRatio": 1.21,
-   "generatedRatio": 2.67
+   "generatedRatio": 2.79
   },
   {
    "fixtureId": "B5",
    "goBytes": 164,
-   "generatedBytes": 612,
+   "generatedBytes": 578,
    "verdict": "exception",
    "status": "authored",
    "handPortBytes": 180,
    "handPortTokens": 31,
    "handPortRatio": 1.1,
-   "generatedRatio": 3.73
+   "generatedRatio": 3.52
   },
   {
    "fixtureId": "B6",
@@ -136,13 +136,13 @@
   {
    "fixtureId": "B8",
    "goBytes": 350,
-   "generatedBytes": 3581,
+   "generatedBytes": 3592,
    "verdict": "exception",
    "status": "authored",
    "handPortBytes": 395,
    "handPortTokens": 97,
    "handPortRatio": 1.13,
-   "generatedRatio": 10.23
+   "generatedRatio": 10.26
   },
   {
    "fixtureId": "B9",
@@ -158,13 +158,13 @@
   {
    "fixtureId": "B10",
    "goBytes": 770,
-   "generatedBytes": 207,
+   "generatedBytes": 147,
    "verdict": "manual-required",
    "status": "authored",
    "handPortBytes": 815,
    "handPortTokens": 87,
    "handPortRatio": 1.06,
-   "generatedRatio": 0.27
+   "generatedRatio": 0.19
   },
   {
    "fixtureId": "B11",
@@ -268,13 +268,13 @@
   {
    "fixtureId": "D2",
    "goBytes": 22750,
-   "generatedBytes": 74715,
+   "generatedBytes": 75606,
    "verdict": "ordinary",
    "status": "authored",
    "handPortBytes": 23251,
    "handPortTokens": 3653,
    "handPortRatio": 1.02,
-   "generatedRatio": 3.28
+   "generatedRatio": 3.32
   },
   {
    "fixtureId": "D3",
@@ -290,24 +290,24 @@
   {
    "fixtureId": "D4",
    "goBytes": 16712,
-   "generatedBytes": 57585,
+   "generatedBytes": 58207,
    "verdict": "ordinary",
    "status": "authored",
    "handPortBytes": 16697,
    "handPortTokens": 2935,
    "handPortRatio": 1,
-   "generatedRatio": 3.45
+   "generatedRatio": 3.48
   },
   {
    "fixtureId": "D5",
    "goBytes": 36737,
-   "generatedBytes": 45872,
+   "generatedBytes": 48798,
    "verdict": "ordinary",
    "status": "authored",
    "handPortBytes": 41033,
    "handPortTokens": 5512,
    "handPortRatio": 1.12,
-   "generatedRatio": 1.25
+   "generatedRatio": 1.33
   }
  ],
  "summary": {

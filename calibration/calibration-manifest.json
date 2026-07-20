@@ -117,9 +117,9 @@
     "github.com/microsoft/typescript-go/internal/core::method::TextRange.Len/default"
    ],
    "baselineArtifactSha256": [
-    "07e263ab56992b96933beee8b089ef17053a56410f810db6232293abb0b9dac3"
+    "afe7edfe165caef2e4691fa47e6284c04f78167aee46b9599a4bc4a1489de907"
    ],
-   "baselineArtifactBytes": 162,
+   "baselineArtifactBytes": 127,
    "candidateVerdict": "ordinary",
    "handPortOwner": "implementing-agent",
    "independentReviewer": "jeswin (independent review pending)",
@@ -166,9 +166,9 @@
     "github.com/microsoft/typescript-go/internal/vfs/osvfs::method::osFS.ReadFile/default"
    ],
    "baselineArtifactSha256": [
-    "f9b29696189b4ab41b37ef552f0ae1a60514af0ade18ccda94b2a82ccac6d42e"
+    "697eee7d54348a0ff3d9a0a5c1c9f30468f7da2d38f23b26f059e65c36ac603a"
    ],
-   "baselineArtifactBytes": 578,
+   "baselineArtifactBytes": 556,
    "candidateVerdict": "exception",
    "handPortOwner": "implementing-agent",
    "independentReviewer": "jeswin (independent review pending)",
@@ -214,9 +214,9 @@
     "github.com/microsoft/typescript-go/internal/scanner::method::Scanner.scanString/default"
    ],
    "baselineArtifactSha256": [
-    "6ee0d8374520f10a67114ed2de6e44b74bcfb1013dbb154910ec01aed6a48b36"
+    "ecbdf7ec8563ab9ec7cade8185b5453a43e3500b42ed7615bc16f98d05a8faf3"
    ],
-   "baselineArtifactBytes": 3563,
+   "baselineArtifactBytes": 3730,
    "candidateVerdict": "exception",
    "handPortOwner": "implementing-agent",
    "independentReviewer": "jeswin (independent review pending)",
@@ -238,9 +238,9 @@
     "github.com/microsoft/typescript-go/internal/printer::method::NameGenerator.getScope/default"
    ],
    "baselineArtifactSha256": [
-    "2a098228f30c01a84eab8b9a7352674f395529e72bf82e201bba8b5637d7d28e"
+    "3d2106522115847d05878ee325d6973a41e98012480a0a13fe9b34850cfa8bf3"
    ],
-   "baselineArtifactBytes": 612,
+   "baselineArtifactBytes": 578,
    "candidateVerdict": "exception",
    "handPortOwner": "implementing-agent",
    "independentReviewer": "jeswin (independent review pending)",
@@ -315,9 +315,9 @@
     "github.com/microsoft/typescript-go/internal/sourcemap::method::Generator.Base64DataURL/default"
    ],
    "baselineArtifactSha256": [
-    "d9a992890d047c247cc57bd3c049b267496da2d4fd8d9a006b6dbce9e56a199b"
+    "a4fa494d34a3871c068e8037283ecf176fc108cbf6ee61760f1acd14ceb99309"
    ],
-   "baselineArtifactBytes": 3581,
+   "baselineArtifactBytes": 3592,
    "candidateVerdict": "exception",
    "handPortOwner": "implementing-agent",
    "independentReviewer": "jeswin (independent review pending)",
@@ -356,9 +356,9 @@
     "github.com/microsoft/typescript-go/internal/checker::method::tracedTypeAdapter.Display/default"
    ],
    "baselineArtifactSha256": [
-    "44238f625ddb4b1561681dd7ad1a897cc6fa7e4cf87bfe21814f8e1881fa9094"
+    "21205f7346e765d3283ed3824247361dabbaa012331ee7de11471b5730a6bbee"
    ],
-   "baselineArtifactBytes": 207,
+   "baselineArtifactBytes": 147,
    "candidateVerdict": "manual-required",
    "handPortOwner": "implementing-agent",
    "independentReviewer": "jeswin (independent review pending)",
@@ -619,9 +619,9 @@
     "github.com/microsoft/typescript-go/internal/compiler::method::Program.verifyCompilerOptions/default"
    ],
    "baselineArtifactSha256": [
-    "4b8ca5c4df7f8e272e4cf43fd14d810c6b84b9e7ccfbda8664a99606b69a02de"
+    "1b0c273dba3640a3f736dd9685947eb14a8b44b7ffe658b9b6b1f7aa9e678809"
    ],
-   "baselineArtifactBytes": 74715,
+   "baselineArtifactBytes": 75606,
    "candidateVerdict": "ordinary",
    "handPortOwner": "implementing-agent",
    "independentReviewer": "jeswin (independent review pending)",
@@ -668,9 +668,9 @@
     "github.com/microsoft/typescript-go/internal/checker::func::NewChecker/default"
    ],
    "baselineArtifactSha256": [
-    "a0c0ba53e311ec694b01a500dd41ad4de2434a2d4d8bea1b2960d70dd85193a9"
+    "e1afa692357e2b3340e712ee6779267ef9b6cd63bef3bc7bc7f837680e143f7b"
    ],
-   "baselineArtifactBytes": 57585,
+   "baselineArtifactBytes": 58207,
    "candidateVerdict": "ordinary",
    "handPortOwner": "implementing-agent",
    "independentReviewer": "jeswin (independent review pending)",
@@ -692,9 +692,9 @@
     "github.com/microsoft/typescript-go/internal/checker::method::Relater.structuredTypeRelatedToWorker/default"
    ],
    "baselineArtifactSha256": [
-    "cc512c99627378c7bd938ed0ff3af106af56a46ca1d97624fa1e918d35da543c"
+    "be4c1717c3b9c0bfee6b94643fae72d33b9061765c9d9376e608eaa9a3cd0f9f"
    ],
-   "baselineArtifactBytes": 45872,
+   "baselineArtifactBytes": 48798,
    "candidateVerdict": "ordinary",
    "handPortOwner": "implementing-agent",
    "independentReviewer": "jeswin (independent review pending)",
