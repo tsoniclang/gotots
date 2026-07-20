@@ -221,6 +221,13 @@ func basicFixtureProfile() map[string]any {
 	}
 	return map[string]any{
 		"product": "fixture",
+		"productSurface": map[string]any{
+			"roots": []any{map[string]any{
+				"kind": "public-api-set", "id": "fixture.api.selected-exports",
+				"selector": "all-selected-exports",
+				"decision": "FIXTURE", "reason": "census fixture",
+			}},
+		},
 		"sourceUniverse": map[string]any{
 			"packageRules": []any{
 				rule("selected", "selected", []string{"a", "b.test", "c"}, []string{}, "product-source"),

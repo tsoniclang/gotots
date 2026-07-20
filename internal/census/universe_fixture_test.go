@@ -282,6 +282,7 @@ func TestProfileFieldsHaveFixtureDispositions(t *testing.T) {
 		"pin":            "fixtureutil_test.go writeFixtureConfig + attestation fixtures",
 		"buildProfiles":  "TestBuildProfileSelectsFiles",
 		"sourceUniverse": "basicFixtureProfile rules exercise selected/test-only/outside/tooling dispositions; TestUnclassifiedPackagePartitionAndEdge covers total-classification defects; internal/profile rules_test.go covers override/ambiguity/containment",
+		"productSurface": "basicFixtureProfile carries the mandatory public-api-set root; internal/profile product_test.go covers kind/binding/selector/duplicate validation",
 		"notes":          "documentation-only field, no behavior",
 	}
 	for _, field := range profileJSONFields(t) {

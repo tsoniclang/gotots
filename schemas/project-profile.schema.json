@@ -178,6 +178,66 @@
     "packageRules"
    ],
    "type": "object"
+  },
+  "productSurface": {
+   "type": "object",
+   "required": [
+    "roots"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "roots": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "required": [
+       "kind",
+       "id",
+       "decision",
+       "reason"
+      ],
+      "additionalProperties": false,
+      "properties": {
+       "kind": {
+        "enum": [
+         "public-api-set",
+         "assembly-entry",
+         "extension-entry",
+         "external-call-in",
+         "selected-test-entry",
+         "registration-entry"
+        ],
+        "type": "string"
+       },
+       "id": {
+        "type": "string",
+        "pattern": "nonempty"
+       },
+       "selector": {
+        "enum": [
+         "all-selected-exports"
+        ],
+        "type": "string"
+       },
+       "bindings": {
+        "type": "array",
+        "items": {
+         "type": "string",
+         "pattern": "nonempty"
+        }
+       },
+       "decision": {
+        "type": "string",
+        "pattern": "nonempty"
+       },
+       "reason": {
+        "type": "string",
+        "pattern": "nonempty"
+       }
+      }
+     }
+    }
+   }
   }
  },
  "required": [
@@ -186,7 +246,8 @@
   "goModule",
   "pin",
   "buildProfiles",
-  "sourceUniverse"
+  "sourceUniverse",
+  "productSurface"
  ],
  "type": "object"
 }

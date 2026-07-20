@@ -40,6 +40,9 @@ type Profile struct {
 	// every in-checkout package classifies through exactly one winning
 	// rule (explicit override edges; no array-order or prefix authority).
 	SourceUniverse SourceUniverse `json:"sourceUniverse"`
+	// ProductSurface is the second identity domain: semantic product
+	// roots bound to current implementations (root-contract.md).
+	ProductSurface ProductSurface `json:"productSurface"`
 	Notes          []string       `json:"notes"`
 
 	// Pin is resolved from PinPath at load time.
@@ -73,6 +76,9 @@ func Load(profilePath string) (*Profile, error) {
 	}
 	if p.GoModule == "" || len(p.SourceUniverse.PackageRules) == 0 || len(p.BuildProfiles) == 0 || p.PinPath == "" {
 		return nil, fmt.Errorf("profile %s: goModule, pin, sourceUniverse.packageRules, and buildProfiles are required", profilePath)
+	}
+	if err := p.ProductSurface.Validate(); err != nil {
+		return nil, fmt.Errorf("profile %s: %w", profilePath, err)
 	}
 	if err := p.validate(); err != nil {
 		return nil, fmt.Errorf("profile %s: %w", profilePath, err)

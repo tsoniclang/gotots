@@ -199,6 +199,22 @@ func runScopeClosureGate(prof *profile.Profile, sourceDir string, env []string) 
 			probe.Root, len(probeRoots), len(probeClosure), unclassified))
 	}
 
+	// 4. Product-surface policy completeness: the loaded profile carries
+	// a validated surface (Load fails closed without one); the gate
+	// reports the root inventory so policy shrinkage is visible.
+	apiRoots, concreteRoots := 0, 0
+	for _, root := range prof.ProductSurface.Roots {
+		if root.Kind == "public-api-set" {
+			apiRoots++
+		} else {
+			concreteRoots++
+		}
+	}
+	if apiRoots == 0 {
+		failures = append(failures, "product surface has no public-api-set root")
+	}
+	details = append(details, fmt.Sprintf("product surface: %d public-api-set + %d concrete bound roots", apiRoots, concreteRoots))
+
 	if len(failures) > 0 {
 		sort.Strings(failures)
 		return "fail", append(details, failures...), fmt.Errorf("%d scope-contract defects", len(failures))
