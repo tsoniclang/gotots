@@ -16,7 +16,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/abi"
 	"github.com/tsoniclang/gotots/internal/emit"
-	"github.com/tsoniclang/gotots/internal/goid"
 	"github.com/tsoniclang/gotots/internal/ir"
 	"github.com/tsoniclang/gotots/internal/typeid"
 )
@@ -91,8 +90,11 @@ func emitExternalStubs(out *Generated, unit ir.Scope, context *packages.Package,
 				return err
 			}
 			stubs = append(stubs, stub)
+			// The proof carries the OBLIGATION identity — the boundary
+			// registry key thrown by the stub body — never a fabricated
+			// declaration-style ID for a non-declaration.
 			out.Proofs = append(out.Proofs, Proof{
-				ID: goid.Func(external, fn.Name()), SourceRevision: options.SourceRevision,
+				ID: stub.ID, SourceRevision: options.SourceRevision,
 				Package:         external,
 				LoweringPlan:    LoweringPlanV2,
 				Representations: map[string]string{"decl:" + fn.Name(): "external-stub(typed-static, fail-closed)"},
@@ -103,7 +105,7 @@ func emitExternalStubs(out *Generated, unit ir.Scope, context *packages.Package,
 		sort.Slice(members, func(i, j int) bool { return members[i].Name < members[j].Name })
 		for _, member := range members {
 			out.Proofs = append(out.Proofs, Proof{
-				ID: goid.Value(external, "extern-member", member.Name), SourceRevision: options.SourceRevision,
+				ID: member.ID, SourceRevision: options.SourceRevision,
 				Package:         external,
 				LoweringPlan:    LoweringPlanV2,
 				Representations: map[string]string{"decl:" + member.Name: "external-stub(typed-static, fail-closed)"},

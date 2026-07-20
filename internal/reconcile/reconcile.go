@@ -265,17 +265,25 @@ func Build(head string, run *census.Result, generated *translate.Generated) *Rep
 	externThrowing := multiset{}
 	externDirect := multiset{}
 	externObligations := multiset{}
+	supportDefinitionCopies := multiset{}
 	for _, record := range generated.ExternSymbols {
-		externSymbols.add(record.Symbol)
+		qualified := record.Module + "::" + record.Symbol
+		externSymbols.add(qualified)
 		if record.Obligation == "" {
-			externDirect.add(record.Symbol)
+			externDirect.add(qualified)
+			// Cross-module copies of one support definition (union
+			// equality/key encoders re-emitted per module) are the
+			// measured alias-duplication class: typed evidence here,
+			// deleted by the interface-ownership wave.
+			supportDefinitionCopies.add(record.Symbol)
 		} else {
-			externThrowing.add(record.Symbol)
+			externThrowing.add(qualified)
 			externObligations.add(record.Obligation)
 		}
 	}
 	out.recordDuplicates("extern-symbols", externSymbols)
 	out.recordDuplicates("extern-obligations", externObligations)
+	out.recordDuplicates("extern-support-definition-copies", supportDefinitionCopies)
 
 	// --- extern obligation contract: stub proofs (typed records whose
 	// generated file the ownership ledger marks external) ---
@@ -380,10 +388,22 @@ func Build(head string, run *census.Result, generated *translate.Generated) *Rep
 	// support record is untracked emission; extra placeholder copies of
 	// one record are the variant re-emissions (typed above) and stay
 	// visible here as surplus.
-	out.Joins = append(out.Joins, joinSets("unimplemented-bodies-vs-placeholder-emissions",
+	placeholderJoin := joinSets("unimplemented-bodies-vs-placeholder-emissions",
 		"support-unimplemented-bodies", "emission-body-placeholders", supportUnimplementedBodies, bodyPlaceholderEmissions,
 		"unimplemented body without a placeholder emission (package not materialized or missing event)",
-		"body-placeholder emission without an unimplemented support record", false, true))
+		"body-placeholder emission without an unimplemented support record", false, true)
+	// Surplus placeholder copies whose SOURCE identity has an
+	// unimplemented record are family-variant implementations (distinct
+	// ADR-0010 keys, listed in variantReemissions): explained evidence,
+	// not unknown-emission defects. Only a placeholder for an identity
+	// with NO record at all stays a defect.
+	for i, delta := range placeholderJoin.OnlyRight {
+		if supportUnimplementedBodies[delta.ID] > 0 {
+			placeholderJoin.OnlyRight[i].Defect = false
+			placeholderJoin.OnlyRight[i].Disposition = "family-variant implementation copy of a recorded unimplemented body (see variantReemissions)"
+		}
+	}
+	out.Joins = append(out.Joins, placeholderJoin)
 	// Join: unimplemented initializer support vs initializer-placeholder
 	// emissions.
 	out.Joins = append(out.Joins, joinSets("unimplemented-initializers-vs-placeholder-emissions",

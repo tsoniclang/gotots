@@ -35,7 +35,7 @@ func classify(path string) (string, bool) {
 // digest.
 func TestEmptyClassIsPresent(t *testing.T) {
 	dir := tree(t, map[string]string{"core/a.ts": "a"})
-	report, err := Build(dir, classes(), classify, map[string]string{"pin": "x"}, nil)
+	report, err := Build(dir, classes(), classify, nil, map[string]string{"pin": "x"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestEmptyClassIsPresent(t *testing.T) {
 // MUTATION (omitted file): an unattributed file fails the build.
 func TestUnattributedFileFails(t *testing.T) {
 	dir := tree(t, map[string]string{"core/a.ts": "a", "stray.txt": "x"})
-	if _, err := Build(dir, classes(), classify, nil, nil); err == nil {
+	if _, err := Build(dir, classes(), classify, nil, nil, nil); err == nil {
 		t.Fatal("unattributed file must fail closed")
 	}
 }
@@ -65,7 +65,7 @@ func TestUnattributedFileFails(t *testing.T) {
 func TestUndeclaredClassFails(t *testing.T) {
 	dir := tree(t, map[string]string{"core/a.ts": "a"})
 	bad := func(string) (string, bool) { return "rogue", true }
-	if _, err := Build(dir, classes(), bad, nil, nil); err == nil {
+	if _, err := Build(dir, classes(), bad, nil, nil, nil); err == nil {
 		t.Fatal("undeclared class must fail closed")
 	}
 }
@@ -73,11 +73,11 @@ func TestUndeclaredClassFails(t *testing.T) {
 // MUTATION (path relocation): moving a file to another class changes
 // both class digests and reports exact per-file differences.
 func TestRelocationIsVisibleInDiff(t *testing.T) {
-	before, err := Build(tree(t, map[string]string{"core/a.ts": "a", "extern/b.ts": "b"}), classes(), classify, nil, nil)
+	before, err := Build(tree(t, map[string]string{"core/a.ts": "a", "extern/b.ts": "b"}), classes(), classify, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	after, err := Build(tree(t, map[string]string{"core/a.ts": "a", "core/b.ts": "b"}), classes(), classify, nil, nil)
+	after, err := Build(tree(t, map[string]string{"core/a.ts": "a", "core/b.ts": "b"}), classes(), classify, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,11 +98,11 @@ func TestRelocationIsVisibleInDiff(t *testing.T) {
 
 // MUTATION (content change): a hash change is a per-file difference.
 func TestHashChangeIsVisibleInDiff(t *testing.T) {
-	before, err := Build(tree(t, map[string]string{"core/a.ts": "a"}), classes(), classify, nil, nil)
+	before, err := Build(tree(t, map[string]string{"core/a.ts": "a"}), classes(), classify, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	after, err := Build(tree(t, map[string]string{"core/a.ts": "CHANGED"}), classes(), classify, nil, nil)
+	after, err := Build(tree(t, map[string]string{"core/a.ts": "CHANGED"}), classes(), classify, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,11 +116,11 @@ func TestHashChangeIsVisibleInDiff(t *testing.T) {
 // semantic/environment split is preserved.
 func TestReproducibleAndSplitIdentity(t *testing.T) {
 	files := map[string]string{"core/a.ts": "a", "maps/a.map": "m"}
-	one, err := Build(tree(t, files), classes(), classify, map[string]string{"pin": "p"}, map[string]string{"host": "local"})
+	one, err := Build(tree(t, files), classes(), classify, nil, map[string]string{"pin": "p"}, map[string]string{"host": "local"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	two, err := Build(tree(t, files), classes(), classify, map[string]string{"pin": "p"}, map[string]string{"host": "other"})
+	two, err := Build(tree(t, files), classes(), classify, nil, map[string]string{"pin": "p"}, map[string]string{"host": "other"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,6 +134,23 @@ func TestReproducibleAndSplitIdentity(t *testing.T) {
 	for i := range one.Classes {
 		if one.Classes[i].Sha256 != two.Classes[i].Sha256 {
 			t.Fatal("environment leaked into class identity")
+		}
+	}
+}
+
+// A skipped subtree never reaches the classifier and never counts as
+// unattributed.
+func TestSkipDirExcludesSubtree(t *testing.T) {
+	dir := tree(t, map[string]string{"core/a.ts": "a", ".git/objects/xx": "blob"})
+	report, err := Build(dir, classes(), classify, func(d string) bool { return d == ".git" }, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range report.Classes {
+		for _, f := range c.Files {
+			if f.Path == ".git/objects/xx" {
+				t.Fatal("skipped file was classified")
+			}
 		}
 	}
 }

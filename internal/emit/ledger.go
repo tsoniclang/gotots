@@ -51,6 +51,10 @@ func specializationKey(familyEnc, familyPtrCell bool) string {
 // (union equality/key encoders, promoted delegates) carries none and is
 // a direct implementation.
 type ExternSymbolRecord struct {
+	// Module is the owning module's package path: symbol identity is
+	// Module + "::" + Symbol (Abs in math and Abs in path are distinct
+	// symbols, never duplicates).
+	Module string
 	Symbol string
 	// Obligation is the external obligation identity thrown by the stub
 	// body, empty for directly implemented support definitions.
@@ -62,7 +66,7 @@ func (m *Module) recordEmission(id string, kind EmissionKind, implementation str
 }
 
 func (m *Module) recordExternSymbol(symbol, obligation string) {
-	m.externSymbols = append(m.externSymbols, ExternSymbolRecord{Symbol: symbol, Obligation: obligation})
+	m.externSymbols = append(m.externSymbols, ExternSymbolRecord{Module: m.Pkg, Symbol: symbol, Obligation: obligation})
 }
 
 // Emissions exposes the module's emission events in emission order.

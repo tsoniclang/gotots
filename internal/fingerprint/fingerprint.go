@@ -52,11 +52,16 @@ type Report struct {
 // leaves the file unattributed, which fails the build.
 type Classifier func(path string) (class string, ok bool)
 
+// SkipDir excludes a directory subtree from the walk entirely (VCS
+// state, dependency caches). Exclusion is an explicit declaration, not
+// an attribution: skipped trees never reach the classifier.
+type SkipDir func(relativeDir string) bool
+
 // Build walks root, classifies every regular file, and produces the
 // report. declaredClasses fixes the class universe: a classifier
 // answer outside it, a duplicate path, or an unattributed file fails
 // closed.
-func Build(root string, declaredClasses []string, classify Classifier, semantic, environment map[string]string) (*Report, error) {
+func Build(root string, declaredClasses []string, classify Classifier, skip SkipDir, semantic, environment map[string]string) (*Report, error) {
 	declared := map[string]bool{}
 	for _, name := range declaredClasses {
 		if declared[name] {
@@ -70,14 +75,17 @@ func Build(root string, declaredClasses []string, classify Classifier, semantic,
 		if err != nil {
 			return err
 		}
-		if entry.IsDir() {
-			return nil
-		}
 		relative, err := filepath.Rel(root, path)
 		if err != nil {
 			return err
 		}
 		relative = filepath.ToSlash(relative)
+		if entry.IsDir() {
+			if skip != nil && relative != "." && skip(relative) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
 		if seen[relative] {
 			return fmt.Errorf("duplicate path %s", relative)
 		}

@@ -339,3 +339,26 @@ func TestRenderCarriesDenominatorsAndJoins(t *testing.T) {
 		}
 	}
 }
+
+// A surplus placeholder copy of a RECORDED unimplemented body is an
+// explained family variant, never a defect; a placeholder for an
+// unknown identity stays one.
+func TestVariantCopiesAreExplainedNotDefects(t *testing.T) {
+	run, generated := fixture()
+	generated.Support[1].State = "unimplemented"
+	generated.Emissions = []emit.EmissionEvent{
+		{ID: "p::func::A", Kind: emit.EmissionBody, Implementation: "default"},
+		{ID: "p::func::B", Kind: emit.EmissionBodyPlaceholder, Implementation: "default"},
+		{ID: "p::func::B", Kind: emit.EmissionBodyPlaceholder, Implementation: "map-key-encoded"},
+	}
+	generated.Proofs = generated.Proofs[:1]
+	report := Build("head", run, generated)
+	for _, d := range report.Defects() {
+		if d.ID == "p::func::B" {
+			t.Fatalf("explained variant copy must not defect: %v", d)
+		}
+	}
+	if len(report.VariantReemissions) != 1 {
+		t.Fatalf("variant reemissions = %+v", report.VariantReemissions)
+	}
+}
