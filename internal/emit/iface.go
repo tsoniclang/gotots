@@ -548,6 +548,13 @@ func (p *printer) instVtableValue(instType ir.Type, slots []ir.InstSlot, memberP
 		if err != nil {
 			return "", err
 		}
+		rttiSlots, err := p.rttiFactoryArgs(slot.RttiParams, slot.RttiArgs, nil)
+		if err != nil {
+			return "", err
+		}
+		if rttiSlots != "" {
+			factories += ", " + rttiSlots
+		}
 		call := callee + "<" + joinComma(typeArgs) + ">(" + joinComma(args)
 		if factories != "" {
 			call += ", " + factories

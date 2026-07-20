@@ -76,6 +76,12 @@ type InstSlot struct {
 	PointerRecv bool
 	TypeArgs    []Type
 	KeyedParams []bool
-	Params      []Type
-	Results     []Type
+	// RttiParams marks the declaring type's rtti-required positions;
+	// RttiArgs carries each required position's box operation for THIS
+	// instantiation (concrete bindings only — an instantiated member is
+	// never a free-parameter vector).
+	RttiParams []bool
+	RttiArgs   []ParamRttiArg
+	Params     []Type
+	Results    []Type
 }

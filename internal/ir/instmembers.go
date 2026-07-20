@@ -180,6 +180,21 @@ func (b *builder) instantiationSlotsUncached(instNamed *types.Named, pointer boo
 		}
 		typeArgs = append(typeArgs, argIR)
 	}
+	rttiParams := make([]bool, 0, len(typeArgs))
+	rttiArgs := make([]ParamRttiArg, 0, len(typeArgs))
+	for i := range typeArgs {
+		required := b.unit.ParamRequiresRtti(origin.Obj(), i)
+		rttiParams = append(rttiParams, required)
+		if !required {
+			rttiArgs = append(rttiArgs, ParamRttiArg{})
+			continue
+		}
+		slot, err := b.callRttiSlot(instNamed.TypeArgs().At(i), typeArgs[i], span)
+		if err != nil {
+			return nil, false, nil
+		}
+		rttiArgs = append(rttiArgs, slot)
+	}
 	var set *types.MethodSet
 	if pointer {
 		set = types.NewMethodSet(types.NewPointer(instNamed))
@@ -211,6 +226,8 @@ func (b *builder) instantiationSlotsUncached(instNamed *types.Named, pointer boo
 			MethodName:  impl.Name(),
 			TypeArgs:    typeArgs,
 			KeyedParams: keyedParams,
+			RttiParams:  rttiParams,
+			RttiArgs:    rttiArgs,
 		}
 		if recv := signature.Recv(); recv != nil {
 			_, instSlot.PointerRecv = recv.Type().(*types.Pointer)
