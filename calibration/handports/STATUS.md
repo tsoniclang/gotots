@@ -1,7 +1,7 @@
 # Hand-Port Status
 
 Authored Go-first with the current generated bodies hidden (contract
-step 2): A1-A5, B1-B15, C1-C3, D1, D3 — 25 of 28. Measurements are
+step 2): ALL 28 OF 28 (A1-A5, B1-B15, C1-C3, D1-D5). Measurements are
 produced mechanically by `gotots-calibrate -measure` (joins the derived
 manifest to this directory, strips reviewer headers, writes
 `calibration/measurements.json` with named denominators).
@@ -24,12 +24,16 @@ Notes on the non-obvious rows:
   manifest span (2,153 cases, fail-closed case-count check), ratio 1.05
   versus the baseline's 1.20. Never excerpt-only.
 
-Pending, with reasons:
-- D2 / D4 / D5 (22.7 / 16.7 / 36.7 KB Go bodies: verifyCompilerOptions,
-  NewChecker, structuredTypeRelatedToWorker): full manual authoring
-  queued; each requires hours of faithful porting and its own review
-  session. Their baseline generated ratios (3.28 / 3.45 / 1.25) are
-  already measured in the manifest.
+The high-byte tail is fully authored:
+- D4 (NewChecker, 16.7 KB): 1.00x — the mechanical constructor ports
+  byte-for-byte (Maps for Go maps, .bind for method values).
+- D2 (verifyCompilerOptions, 22.7 KB): 1.02x — closure-heavy
+  validation, memoized arrows and rest parameters.
+- D5 (structuredTypeRelatedToWorker, 36.7 KB): 1.12x — the relation
+  engine's structural core; tagless switches become if/else chains and
+  the two-result closure returns a tuple.
+- Corpus-wide: 423,161 hand-port bytes over 400,491 Go bytes = 1.057x
+  including every exception-class and high-byte fixture.
 
 The differential-execution harness (strict typecheck + Go-versus-TS
 event oracle per fixture) deliberately FOLLOWS the independent review:

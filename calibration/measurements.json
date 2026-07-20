@@ -270,7 +270,10 @@
    "goBytes": 22750,
    "generatedBytes": 74715,
    "verdict": "ordinary",
-   "status": "pending",
+   "status": "authored",
+   "handPortBytes": 23251,
+   "handPortTokens": 3653,
+   "handPortRatio": 1.02,
    "generatedRatio": 3.28
   },
   {
@@ -289,7 +292,10 @@
    "goBytes": 16712,
    "generatedBytes": 57585,
    "verdict": "ordinary",
-   "status": "pending",
+   "status": "authored",
+   "handPortBytes": 16697,
+   "handPortTokens": 2935,
+   "handPortRatio": 1,
    "generatedRatio": 3.45
   },
   {
@@ -297,21 +303,20 @@
    "goBytes": 36737,
    "generatedBytes": 45872,
    "verdict": "ordinary",
-   "status": "pending",
+   "status": "authored",
+   "handPortBytes": 41033,
+   "handPortTokens": 5512,
+   "handPortRatio": 1.12,
    "generatedRatio": 1.25
   }
  ],
  "summary": {
   "fixturesTotal": 28,
-  "fixturesAuthored": 25,
-  "fixturesPending": [
-   "D2",
-   "D4",
-   "D5"
-  ],
-  "ordinaryHandPortMedianRatio": 1.04,
+  "fixturesAuthored": 28,
+  "fixturesPending": null,
+  "ordinaryHandPortMedianRatio": 1.03,
   "ordinaryHandPortMedianDenominator": "authored ordinary-verdict fixtures, hand-port bytes over manifest Go span bytes",
-  "authoredHandPortBytes": 342180,
-  "authoredGoBytes": 324292
+  "authoredHandPortBytes": 423161,
+  "authoredGoBytes": 400491
  }
 }
