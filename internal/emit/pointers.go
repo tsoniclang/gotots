@@ -40,18 +40,15 @@ func (p *printer) nilCheckOf(expr string, nilable ir.Type) (string, error) {
 	if p.memberReceiver != "" && expr == p.memberReceiver {
 		return expr, nil
 	}
-	// Tier B: a bare identifier already checked in this straight-line
-	// region is dominator-proven non-nil; the evidence-backed assertion
-	// form carries the proof without a second runtime check (Go panics
-	// once, at the first dereference).
+	// Tier B: a bare identifier already dereferenced on a dominating
+	// path is proven non-nil; the evidence-backed assertion form
+	// carries the proof without a second runtime check (Go panics once,
+	// at the first dereference).
 	if isBareIdent(expr) {
-		if p.checkedNilables[expr] {
+		if p.nilChecked(expr) {
 			return expr + "!", nil
 		}
-		if p.checkedNilables == nil {
-			p.checkedNilables = map[string]bool{}
-		}
-		p.checkedNilables[expr] = true
+		p.markNilChecked(expr)
 	}
 	if nilable.Kind == ir.KindIface && nilable.TypeParamName == "" {
 		union, err := p.tsType(nilable)
@@ -88,9 +85,42 @@ func isBareIdent(expr string) bool {
 	return true
 }
 
-// resetNilRegion ends the current straight-line region: compound
-// constructs, assignments, and closure boundaries invalidate the
-// dominator proof conservatively.
-func (p *printer) resetNilRegion() {
-	p.checkedNilables = nil
+// nilChecked reports whether a bare identifier is proven non-nil in
+// any enclosing frame.
+func (p *printer) nilChecked(id string) bool {
+	for _, frame := range p.nilScopes {
+		if frame[id] {
+			return true
+		}
+	}
+	return false
+}
+
+// markNilChecked records the identifier as dereferenced in the current
+// (innermost) frame.
+func (p *printer) markNilChecked(id string) {
+	if len(p.nilScopes) == 0 {
+		p.nilScopes = []map[string]bool{{}}
+	}
+	p.nilScopes[len(p.nilScopes)-1][id] = true
+}
+
+// invalidateNil drops an identifier's proof from every frame: a
+// reassignment can make it nil again.
+func (p *printer) invalidateNil(id string) {
+	for _, frame := range p.nilScopes {
+		delete(frame, id)
+	}
+}
+
+// pushNilScope / popNilScope bracket a conditional branch or loop body,
+// so a deref inside never leaks its proof past the construct.
+func (p *printer) pushNilScope() {
+	p.nilScopes = append(p.nilScopes, map[string]bool{})
+}
+
+func (p *printer) popNilScope() {
+	if len(p.nilScopes) > 0 {
+		p.nilScopes = p.nilScopes[:len(p.nilScopes)-1]
+	}
 }

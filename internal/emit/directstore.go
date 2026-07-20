@@ -34,6 +34,11 @@ func (p *printer) printStore(target ir.Target, value string) error {
 		p.line("void (%s);", value)
 		return nil
 	case ir.VarTarget:
+		// A local reassignment can make a checked nilable nil again:
+		// its dominator proof no longer holds past this point.
+		if t.Pkg == "" {
+			p.invalidateNil(tsName(t.Name))
+		}
 		expr, err := p.varStoreExpr(t, value)
 		if err != nil {
 			return err

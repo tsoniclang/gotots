@@ -108,12 +108,15 @@ type printer struct {
 	// ordinary class member: its TS type is non-optional, so its
 	// dereferences never check (tier-A elision).
 	memberReceiver string
-	// checkedNilables tracks bare-identifier nilables already checked
-	// in the CURRENT straight-line region: a dominated later
-	// dereference spells the evidence-backed x! form instead of a
-	// second runtime check. Every compound construct, assignment, and
-	// sub-printer boundary resets the region (conservative).
-	checkedNilables map[string]bool
+	// nilScopes is the dominator stack of checked bare-identifier
+	// nilables: a deref records the identifier in the current block
+	// frame; a later deref dominated by it (same or nested frame) spells
+	// the evidence-backed x! form instead of a second runtime check.
+	// Conditional branches push/pop a frame, so a check inside a branch
+	// never leaks past it; reassigning an identifier invalidates it in
+	// every frame. Go panics once at the first dereference, so a
+	// dominated later dereference is provably non-nil.
+	nilScopes []map[string]bool
 	// rangeBreak, when set, transforms break inside a range-over-func
 	// body into the yield protocol; nested loops and switches (which own
 	// their own break) clear it.

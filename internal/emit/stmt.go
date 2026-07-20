@@ -9,6 +9,11 @@ import (
 )
 
 func (p *printer) printBlockBody(block *ir.Block) error {
+	// Every block is a dominator frame: checks recorded inside a
+	// conditional branch or loop body never leak past it, while checks
+	// in an enclosing block remain visible in nested blocks.
+	p.pushNilScope()
+	defer p.popNilScope()
 	for _, stmt := range block.Stmts {
 		if err := p.printStmt(stmt); err != nil {
 			return err
@@ -33,15 +38,12 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		return p.printDecl(n)
 
 	case *ir.AssignStmt:
-		p.resetNilRegion()
 		return p.printAssign(n)
 
 	case *ir.IfStmt:
-		p.resetNilRegion()
 		return p.printIf(n)
 
 	case *ir.ForStmt:
-		p.resetNilRegion()
 		return p.printFor(n)
 
 	case *ir.ReturnStmt:
@@ -56,7 +58,6 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		return nil
 
 	case *ir.BranchStmt:
-		p.resetNilRegion()
 		if n.Label != "" {
 			// A label targeting a normalized loop redirects to its
 			// while / body-block labels; otherwise Go's labeled
@@ -108,14 +109,12 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		return nil
 
 	case *ir.LabeledStmt:
-		p.resetNilRegion()
 		p.pendingLoopLabel = labelName(n.Label)
 		err := p.printStmt(n.Stmt)
 		p.pendingLoopLabel = ""
 		return err
 
 	case *ir.TryFinally:
-		p.resetNilRegion()
 		p.line("try {")
 		p.indent++
 		if err := p.printBlockBody(n.Body); err != nil {
@@ -132,19 +131,15 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		return nil
 
 	case *ir.RangeSlice:
-		p.resetNilRegion()
 		return p.printRangeSlice(n)
 
 	case *ir.RangeString:
-		p.resetNilRegion()
 		return p.printRangeString(n)
 
 	case *ir.RangeMap:
-		p.resetNilRegion()
 		return p.printRangeMap(n)
 
 	case *ir.RangeFunc:
-		p.resetNilRegion()
 		return p.printRangeFunc(n)
 
 	case *ir.StmtSeq:
@@ -168,7 +163,6 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		return nil
 
 	case *ir.CompoundStmt:
-		p.resetNilRegion()
 		// gc's order: impure target operands (calls) evaluate first at
 		// their lexical position; then the RHS; then the pure container /
 		// base / pointer is read; then the store. Impure operand temps
@@ -222,7 +216,6 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		return staged.store(p, value)
 
 	case *ir.DeferPush:
-		p.resetNilRegion()
 		call, err := p.printExpr(n.Call)
 		if err != nil {
 			return err
@@ -231,11 +224,9 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 		return nil
 
 	case *ir.SwitchStmt:
-		p.resetNilRegion()
 		return p.printSwitch(n)
 
 	case *ir.TypeSwitchStmt:
-		p.resetNilRegion()
 		return p.printTypeSwitch(n)
 
 	case *ir.MapDeleteStmt:

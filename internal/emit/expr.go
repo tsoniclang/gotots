@@ -164,7 +164,7 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if len(n.TypeArgs) == 0 && methodClass == n.TypeName {
 			emission := p.module.MethodEmissionFor(goid.Method(n.Pkg, n.TypeName, n.Method))
 			receiverProven := n.Recv.Type().Kind != ir.KindPointer ||
-				(p.memberReceiver != "" && recv == p.memberReceiver) || p.checkedNilables[recv]
+				(p.memberReceiver != "" && recv == p.memberReceiver) || p.nilChecked(recv)
 			switch {
 			case emission == plan.MethodOrdinaryNilChecked:
 				receiver := recv
@@ -180,7 +180,7 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 				// The delegate member: source-shaped at proven sites,
 				// forwarding to the single free-function body.
 				suffix := ""
-				if p.checkedNilables[recv] && n.Recv.Type().Kind == ir.KindPointer {
+				if p.nilChecked(recv) && n.Recv.Type().Kind == ir.KindPointer {
 					suffix = "!"
 				}
 				return recv + suffix + "." + tsName(n.Method) + "(" + args + ")", nil
