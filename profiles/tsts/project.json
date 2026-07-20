@@ -369,6 +369,28 @@
     "selector": "all-selected-exports",
     "decision": "TSTS-PRODUCT-SURFACE",
     "reason": "every exported declaration of every selected package is externally callable until an explicit committed API contract narrows it; internal reachability alone cannot narrow the public API"
+   },
+   {
+    "kind": "assembly-entry",
+    "id": "tsts.product.cli",
+    "bindings": [
+     "github.com/microsoft/typescript-go/internal/tsoptions::func::ParseCommandLine/default",
+     "github.com/microsoft/typescript-go/internal/tsoptions::func::ParseBuildCommandLine/default",
+     "github.com/microsoft/typescript-go/internal/tsoptions::func::GetParsedCommandLineOfConfigFile/default",
+     "github.com/microsoft/typescript-go/internal/tsoptions::func::ConvertToTSConfig/default"
+    ],
+    "decision": "TSTS-PRODUCT-SURFACE",
+    "reason": "the TSTS-owned CLI driver (src/cli -> src/cmd/tsgo/main -> src/internal/execute/tsc.ts, manual per ADR-0003) invokes these generated boundary implementations; bindings verified against the implementation-artifact ledger"
+   },
+   {
+    "kind": "assembly-entry",
+    "id": "tsts.product.embedding",
+    "bindings": [
+     "github.com/microsoft/typescript-go/internal/tsoptions::func::ParseCommandLine/default",
+     "github.com/microsoft/typescript-go/internal/tsoptions::func::GetParsedCommandLineOfConfigFile/default"
+    ],
+    "decision": "TSTS-PRODUCT-SURFACE",
+    "reason": "the TSTS embedding services (src/services, src/index.ts exports) enter the generated compiler through these implementations; the wide export surface itself is rooted by tsts.api.selected-exports"
    }
   ]
  }
