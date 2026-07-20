@@ -104,6 +104,16 @@ type printer struct {
 	module *Module
 	indent int
 	temps  int
+	// memberReceiver is the this-bound receiver local inside an
+	// ordinary class member: its TS type is non-optional, so its
+	// dereferences never check (tier-A elision).
+	memberReceiver string
+	// checkedNilables tracks bare-identifier nilables already checked
+	// in the CURRENT straight-line region: a dominated later
+	// dereference spells the evidence-backed x! form instead of a
+	// second runtime check. Every compound construct, assignment, and
+	// sub-printer boundary resets the region (conservative).
+	checkedNilables map[string]bool
 	// rangeBreak, when set, transforms break inside a range-over-func
 	// body into the yield protocol; nested loops and switches (which own
 	// their own break) clear it.

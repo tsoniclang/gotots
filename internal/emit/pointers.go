@@ -35,6 +35,24 @@ func (p *printer) printFieldCellRef(n *ir.FieldCellRef) (string, error) {
 // a provably nil operand (legal Go that panics at runtime) cannot
 // collapse the result type.
 func (p *printer) nilCheckOf(expr string, nilable ir.Type) (string, error) {
+	// Tier A: the member receiver is this-bound and non-optional — a
+	// check would be dead code on a non-nullable type.
+	if p.memberReceiver != "" && expr == p.memberReceiver {
+		return expr, nil
+	}
+	// Tier B: a bare identifier already checked in this straight-line
+	// region is dominator-proven non-nil; the evidence-backed assertion
+	// form carries the proof without a second runtime check (Go panics
+	// once, at the first dereference).
+	if isBareIdent(expr) {
+		if p.checkedNilables[expr] {
+			return expr + "!", nil
+		}
+		if p.checkedNilables == nil {
+			p.checkedNilables = map[string]bool{}
+		}
+		p.checkedNilables[expr] = true
+	}
 	if nilable.Kind == ir.KindIface && nilable.TypeParamName == "" {
 		union, err := p.tsType(nilable)
 		if err != nil {
@@ -50,4 +68,29 @@ func (p *printer) nilCheckOf(expr string, nilable ir.Type) (string, error) {
 		return "gort$.goNilCheck<" + inner + ">(" + expr + ")", nil
 	}
 	return "gort$.goNilCheck(" + expr + ")", nil
+}
+
+// isBareIdent reports whether a printed expression is a single
+// identifier (the only spelling the straight-line dominator tracker
+// may key on).
+func isBareIdent(expr string) bool {
+	if expr == "" {
+		return false
+	}
+	for i, r := range expr {
+		switch {
+		case r == '_' || r == '$' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z':
+		case i > 0 && r >= '0' && r <= '9':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// resetNilRegion ends the current straight-line region: compound
+// constructs, assignments, and closure boundaries invalidate the
+// dominator proof conservatively.
+func (p *printer) resetNilRegion() {
+	p.checkedNilables = nil
 }

@@ -134,6 +134,9 @@ func printMethodMember(out *strings.Builder, module *Module, method *ir.Func) er
 		} else {
 			p.line("const %s = this;", tsName(name))
 		}
+		// The receiver local is this-bound: non-optional by type, so
+		// its dereferences never check (tier-A elision).
+		p.memberReceiver = tsName(name)
 	}
 	if err := p.printNamedExitBody(method); err != nil {
 		return fmt.Errorf("%s: %w", method.ID, err)

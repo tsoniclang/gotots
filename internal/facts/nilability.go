@@ -267,9 +267,20 @@ func (a *nilabilityWalk) expr(expr ast.Expr) status {
 	case *ast.UnaryExpr:
 		return a.expr(e.X)
 	case *ast.CallExpr:
-		// recv.Method(...) dereferences the receiver to dispatch.
-		if selector, ok := e.Fun.(*ast.SelectorExpr); ok && a.isReceiver(selector.X) {
-			return stProved
+		// The callee expression evaluates FIRST: p.writer.Write(...)
+		// dereferences the receiver in the callee chain before any
+		// argument or the call itself. recv.Method(...) dispatch is a
+		// dereference, and so is any receiver selection inside the
+		// callee expression.
+		if selector, ok := e.Fun.(*ast.SelectorExpr); ok {
+			if a.isReceiver(selector.X) {
+				return stProved
+			}
+			if result := a.expr(selector.X); result != stContinue {
+				return result
+			}
+		} else if result := a.expr(e.Fun); result != stContinue {
+			return result
 		}
 		// Arguments evaluate before the call; a dereference inside an
 		// argument still proves. The call itself is observable.

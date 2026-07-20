@@ -154,7 +154,11 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 			p.module.MethodEmissionFor(goid.Method(n.Pkg, n.TypeName, n.Method)) == plan.MethodOrdinaryNilChecked {
 			receiver := recv
 			if n.Recv.Type().Kind == ir.KindPointer {
-				receiver = "gort$.goNilCheck(" + recv + ")"
+				checked, err := p.nilCheckOf(recv, n.Recv.Type())
+				if err != nil {
+					return "", err
+				}
+				receiver = checked
 			}
 			return receiver + "." + tsName(n.Method) + "(" + args + ")", nil
 		}
