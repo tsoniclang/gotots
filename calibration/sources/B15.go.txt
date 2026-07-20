@@ -1,0 +1,8 @@
+func Capture() (int, int) {
+	c := &counter{n: 1}
+	value := c.Value // receiver captured NOW
+	c = &counter{n: 100}
+	_ = c
+	first := value()
+	return first, first // both read the original receiver
+}

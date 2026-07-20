@@ -1,0 +1,11 @@
+func Describe(useTypedNil bool) (string, bool) {
+	var d describer
+	if useTypedNil {
+		var n *node
+		d = n
+	}
+	if d == nil {
+		return "nil-interface", false
+	}
+	return d.describe(), true
+}

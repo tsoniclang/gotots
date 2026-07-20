@@ -13,11 +13,11 @@
    "schemaOrAbiVersions": [
     "pin-schema-v3"
    ],
+   "implementationStatus": "implemented",
    "implementationRevision": "58f4d8b",
    "proofArtifacts": [
     "pins/typescript-go.json",
-    "internal/pinning",
-    "internal/census/attestation_fixture_test.go"
+    "internal/pinning"
    ],
    "reopeningConditions": [
     "the product selects another TS-Go revision",
@@ -38,6 +38,7 @@
     "census-schema-v4",
     "profile-schema-v1"
    ],
+   "implementationStatus": "implemented",
    "implementationRevision": "f7f2aea",
    "proofArtifacts": [
     "profiles/tsts/project.json",
@@ -61,6 +62,7 @@
    "schemaOrAbiVersions": [
     "profile-schema-v1"
    ],
+   "implementationStatus": "implemented",
    "implementationRevision": "e56ed2e",
    "proofArtifacts": [
     "profiles/tsts/project.json",
@@ -84,6 +86,7 @@
    "schemaOrAbiVersions": [
     "abi-v16"
    ],
+   "implementationStatus": "implemented",
    "implementationRevision": "e04d202",
    "proofArtifacts": [
     "contracts/necessity-records.json",
@@ -112,11 +115,12 @@
    "schemaOrAbiVersions": [
     "manual-ownership-v1"
    ],
+   "implementationStatus": "implemented",
    "implementationRevision": "eabaabb",
    "proofArtifacts": [
-    "docs/spec/externals-manual-extensions.md",
-    "docs/spec/machine-contracts-diagnostics.md",
-    "docs/spec/testing-acceptance.md",
+    "docs/spec/08-externals-manual-extensions.md",
+    "docs/spec/10-machine-contracts-diagnostics.md",
+    "docs/spec/11-testing-acceptance.md",
     "internal/policy/spec_test.go"
    ],
    "reopeningConditions": [
@@ -124,6 +128,121 @@
     "the pinned formatter cannot provide deterministic body ranges",
     "measured reconciliation cost violates the accepted regeneration budget",
     "a source upgrade proves canonical structural joining insufficient"
+   ]
+  },
+  {
+   "id": "ADR-0006",
+   "path": "docs/decisions/0006-nil-receiver-equivalence.md",
+   "status": "accepted",
+   "owner": "gotots-maintainers",
+   "affectedSpecClauses": [
+    "docs/spec/interfaces-generics-functions.md#method-sets-and-calls",
+    "docs/spec/interfaces-generics-functions.md#typed-nil"
+   ],
+   "schemaOrAbiVersions": [
+    "lowering-plan-v1"
+   ],
+   "implementationStatus": "planned",
+   "decisionRevision": "65810f5",
+   "reopeningConditions": [
+    "a corpus method makes the equivalence proof conditions statically undecidable",
+    "differential execution finds a panic-timing divergence in a proven site"
+   ]
+  },
+  {
+   "id": "ADR-0007",
+   "path": "docs/decisions/0007-generic-specialization-policy.md",
+   "status": "accepted",
+   "owner": "gotots-maintainers",
+   "affectedSpecClauses": [
+    "docs/spec/interfaces-generics-functions.md#generic-lowering-candidates",
+    "docs/spec/interfaces-generics-functions.md#generic-operations",
+    "docs/spec/interfaces-generics-functions.md#specialization-identity"
+   ],
+   "schemaOrAbiVersions": [
+    "lowering-plan-v1"
+   ],
+   "implementationStatus": "planned",
+   "decisionRevision": "65810f5",
+   "reopeningConditions": [
+    "a binding family's specializations exceed the byte or performance budget that a measured factored core would meet"
+   ]
+  },
+  {
+   "id": "ADR-0008",
+   "path": "docs/decisions/0008-interface-artifact-ownership.md",
+   "status": "accepted",
+   "owner": "gotots-maintainers",
+   "affectedSpecClauses": [
+    "docs/spec/interfaces-generics-functions.md#interface-representation-candidates",
+    "docs/spec/interfaces-generics-functions.md#dynamic-type-identity",
+    "docs/spec/representation-output.md#module-and-file-layout"
+   ],
+   "schemaOrAbiVersions": [
+    "lowering-plan-v1"
+   ],
+   "implementationStatus": "planned",
+   "decisionRevision": "65810f5",
+   "reopeningConditions": [
+    "an ESM initialization-order counterexample the conversion-edge placement rules cannot express"
+   ]
+  },
+  {
+   "id": "ADR-0009",
+   "path": "docs/decisions/0009-module-layout.md",
+   "status": "accepted",
+   "owner": "gotots-maintainers",
+   "affectedSpecClauses": [
+    "docs/spec/representation-output.md#module-and-file-layout",
+    "docs/spec/representation-output.md#deterministic-emission",
+    "docs/spec/packages-concurrency.md#generated-module-partition"
+   ],
+   "schemaOrAbiVersions": [
+    "module-layout-v2"
+   ],
+   "implementationStatus": "planned",
+   "decisionRevision": "65810f5",
+   "reopeningConditions": [
+    "stage-16 checker-performance evidence shows the mirrored layout exceeds the committed typecheck budget"
+   ]
+  },
+  {
+   "id": "ADR-0010",
+   "path": "docs/decisions/0010-implementation-identity.md",
+   "status": "accepted",
+   "owner": "gotots-maintainers",
+   "affectedSpecClauses": [
+    "docs/spec/representation-output.md#generated-naming",
+    "docs/spec/machine-contracts-diagnostics.md#identity-bearing-ledgers",
+    "docs/spec/interfaces-generics-functions.md#specialization-identity"
+   ],
+   "schemaOrAbiVersions": [
+    "implementation-identity-v1"
+   ],
+   "implementationStatus": "planned",
+   "decisionRevision": "65810f5",
+   "reopeningConditions": [
+    "a source upgrade produces binding families the identity grammar cannot name",
+    "deterministic shortened-name derivation collides beyond what rejection can resolve"
+   ]
+  },
+  {
+   "id": "ADR-0011",
+   "path": "docs/decisions/0011-denominator-and-attribution-schema.md",
+   "status": "accepted",
+   "owner": "gotots-maintainers",
+   "affectedSpecClauses": [
+    "docs/spec/input-census-publication.md#denominator-reconciliation",
+    "docs/spec/input-census-publication.md#support-and-ownership-accounting",
+    "docs/spec/representation-output.md#representation-report"
+   ],
+   "schemaOrAbiVersions": [
+    "reconciliation-report-v1"
+   ],
+   "implementationStatus": "planned",
+   "decisionRevision": "65810f5",
+   "reopeningConditions": [
+    "a new output class appears that no existing attribution category honestly covers"
    ]
   }
  ]

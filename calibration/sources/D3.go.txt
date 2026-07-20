@@ -1,0 +1,17 @@
+func AssertNever(member any, message ...any) {
+	var msg string
+	if len(message) == 0 {
+		msg = "Illegal value:"
+	} else {
+		msg = fmt.Sprint(message...)
+	}
+	var detail string
+	if m, ok := member.(interface{ KindString() string }); ok {
+		detail = m.KindString()
+	} else if m, ok := member.(fmt.Stringer); ok {
+		detail = m.String()
+	} else {
+		detail = fmt.Sprintf("%v", member)
+	}
+	Fail(fmt.Sprintf("%s %s", msg, detail))
+}

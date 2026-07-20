@@ -1,0 +1,11 @@
+// Set sets a key-value pair in the map.
+func (m *OrderedMap[K, V]) Set(key K, value V) {
+	if m.mp == nil {
+		m.mp = make(map[K]V)
+	}
+
+	if _, ok := m.mp[key]; !ok {
+		m.keys = append(m.keys, key)
+	}
+	m.mp[key] = value
+}

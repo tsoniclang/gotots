@@ -1,0 +1,4 @@
+func (vfs *osFS) ReadFile(path string) (contents string, ok bool) {
+	defer readSema.Acquire()()
+	return vfs.common.ReadFile(path)
+}

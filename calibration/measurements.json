@@ -1,0 +1,317 @@
+{
+ "schemaVersion": 1,
+ "fixtures": [
+  {
+   "fixtureId": "A1",
+   "goBytes": 286,
+   "generatedBytes": 1006,
+   "verdict": "ordinary",
+   "status": "authored",
+   "handPortBytes": 294,
+   "handPortTokens": 56,
+   "handPortRatio": 1.03,
+   "generatedRatio": 3.52
+  },
+  {
+   "fixtureId": "A2",
+   "goBytes": 55,
+   "generatedBytes": 86,
+   "verdict": "ordinary",
+   "status": "authored",
+   "handPortBytes": 57,
+   "handPortTokens": 16,
+   "handPortRatio": 1.04,
+   "generatedRatio": 1.56
+  },
+  {
+   "fixtureId": "A3",
+   "goBytes": 41,
+   "generatedBytes": 175,
+   "verdict": "ordinary",
+   "status": "authored",
+   "handPortBytes": 53,
+   "handPortTokens": 18,
+   "handPortRatio": 1.29,
+   "generatedRatio": 4.27
+  },
+  {
+   "fixtureId": "A4",
+   "goBytes": 315,
+   "generatedBytes": 259,
+   "verdict": "ordinary",
+   "status": "authored",
+   "handPortBytes": 128,
+   "handPortTokens": 35,
+   "handPortRatio": 0.41,
+   "generatedRatio": 0.82
+  },
+  {
+   "fixtureId": "A5",
+   "goBytes": 59,
+   "generatedBytes": 162,
+   "verdict": "ordinary",
+   "status": "authored",
+   "handPortBytes": 47,
+   "handPortTokens": 16,
+   "handPortRatio": 0.8,
+   "generatedRatio": 2.75
+  },
+  {
+   "fixtureId": "B1",
+   "goBytes": 174,
+   "generatedBytes": 673,
+   "verdict": "exception",
+   "status": "authored",
+   "handPortBytes": 198,
+   "handPortTokens": 73,
+   "handPortRatio": 1.14,
+   "generatedRatio": 3.87
+  },
+  {
+   "fixtureId": "B2",
+   "goBytes": 131,
+   "generatedBytes": 578,
+   "verdict": "exception",
+   "status": "authored",
+   "handPortBytes": 173,
+   "handPortTokens": 44,
+   "handPortRatio": 1.32,
+   "generatedRatio": 4.41
+  },
+  {
+   "fixtureId": "B3",
+   "goBytes": 125,
+   "generatedBytes": 372,
+   "verdict": "exception",
+   "status": "authored",
+   "handPortBytes": 170,
+   "handPortTokens": 66,
+   "handPortRatio": 1.36,
+   "generatedRatio": 2.98
+  },
+  {
+   "fixtureId": "B4",
+   "goBytes": 1335,
+   "generatedBytes": 3563,
+   "verdict": "exception",
+   "status": "authored",
+   "handPortBytes": 1618,
+   "handPortTokens": 400,
+   "handPortRatio": 1.21,
+   "generatedRatio": 2.67
+  },
+  {
+   "fixtureId": "B5",
+   "goBytes": 164,
+   "generatedBytes": 612,
+   "verdict": "exception",
+   "status": "authored",
+   "handPortBytes": 180,
+   "handPortTokens": 31,
+   "handPortRatio": 1.1,
+   "generatedRatio": 3.73
+  },
+  {
+   "fixtureId": "B6",
+   "goBytes": 219,
+   "generatedBytes": 1065,
+   "verdict": "exception",
+   "status": "authored",
+   "handPortBytes": 205,
+   "handPortTokens": 77,
+   "handPortRatio": 0.94,
+   "generatedRatio": 4.86
+  },
+  {
+   "fixtureId": "B7",
+   "goBytes": 99,
+   "generatedBytes": 427,
+   "verdict": "exception",
+   "status": "authored",
+   "handPortBytes": 141,
+   "handPortTokens": 47,
+   "handPortRatio": 1.42,
+   "generatedRatio": 4.31
+  },
+  {
+   "fixtureId": "B8",
+   "goBytes": 350,
+   "generatedBytes": 3581,
+   "verdict": "exception",
+   "status": "authored",
+   "handPortBytes": 395,
+   "handPortTokens": 97,
+   "handPortRatio": 1.13,
+   "generatedRatio": 10.23
+  },
+  {
+   "fixtureId": "B9",
+   "goBytes": 83,
+   "generatedBytes": 0,
+   "verdict": "exception",
+   "status": "authored",
+   "handPortBytes": 112,
+   "handPortTokens": 46,
+   "handPortRatio": 1.35,
+   "generatedRatio": 0
+  },
+  {
+   "fixtureId": "B10",
+   "goBytes": 770,
+   "generatedBytes": 207,
+   "verdict": "exception",
+   "status": "authored",
+   "handPortBytes": 815,
+   "handPortTokens": 87,
+   "handPortRatio": 1.06,
+   "generatedRatio": 0.27
+  },
+  {
+   "fixtureId": "B11",
+   "goBytes": 190,
+   "generatedBytes": 932,
+   "verdict": "exception",
+   "status": "authored",
+   "handPortBytes": 293,
+   "handPortTokens": 99,
+   "handPortRatio": 1.54,
+   "generatedRatio": 4.91
+  },
+  {
+   "fixtureId": "B12",
+   "goBytes": 160,
+   "generatedBytes": 476,
+   "verdict": "exception",
+   "status": "authored",
+   "handPortBytes": 228,
+   "handPortTokens": 67,
+   "handPortRatio": 1.43,
+   "generatedRatio": 2.98
+  },
+  {
+   "fixtureId": "B13",
+   "goBytes": 60,
+   "generatedBytes": 83,
+   "verdict": "exception",
+   "status": "authored",
+   "handPortBytes": 45,
+   "handPortTokens": 7,
+   "handPortRatio": 0.75,
+   "generatedRatio": 1.38
+  },
+  {
+   "fixtureId": "B14",
+   "goBytes": 187,
+   "generatedBytes": 0,
+   "verdict": "exception",
+   "status": "authored",
+   "handPortBytes": 312,
+   "handPortTokens": 79,
+   "handPortRatio": 1.67,
+   "generatedRatio": 0
+  },
+  {
+   "fixtureId": "B15",
+   "goBytes": 196,
+   "generatedBytes": 0,
+   "verdict": "exception",
+   "status": "authored",
+   "handPortBytes": 229,
+   "handPortTokens": 66,
+   "handPortRatio": 1.17,
+   "generatedRatio": 0
+  },
+  {
+   "fixtureId": "C1",
+   "goBytes": 219,
+   "generatedBytes": 1065,
+   "verdict": "specialized",
+   "status": "authored",
+   "handPortBytes": 59,
+   "handPortTokens": 25,
+   "handPortRatio": 0.27,
+   "generatedRatio": 4.86
+  },
+  {
+   "fixtureId": "C2",
+   "goBytes": 353,
+   "generatedBytes": 270,
+   "verdict": "specialized",
+   "status": "authored",
+   "handPortBytes": 311,
+   "handPortTokens": 78,
+   "handPortRatio": 0.88,
+   "generatedRatio": 0.76
+  },
+  {
+   "fixtureId": "C3",
+   "goBytes": 190,
+   "generatedBytes": 932,
+   "verdict": "specialized",
+   "status": "authored",
+   "handPortBytes": 171,
+   "handPortTokens": 57,
+   "handPortRatio": 0.9,
+   "generatedRatio": 4.91
+  },
+  {
+   "fixtureId": "D1",
+   "goBytes": 318107,
+   "generatedBytes": 380623,
+   "verdict": "ordinary",
+   "status": "authored",
+   "handPortBytes": 335367,
+   "handPortTokens": 12942,
+   "handPortRatio": 1.05,
+   "generatedRatio": 1.2
+  },
+  {
+   "fixtureId": "D2",
+   "goBytes": 22750,
+   "generatedBytes": 74715,
+   "verdict": "ordinary",
+   "status": "pending",
+   "generatedRatio": 3.28
+  },
+  {
+   "fixtureId": "D3",
+   "goBytes": 424,
+   "generatedBytes": 59612,
+   "verdict": "exception",
+   "status": "authored",
+   "handPortBytes": 579,
+   "handPortTokens": 153,
+   "handPortRatio": 1.37,
+   "generatedRatio": 140.59
+  },
+  {
+   "fixtureId": "D4",
+   "goBytes": 16712,
+   "generatedBytes": 57585,
+   "verdict": "ordinary",
+   "status": "pending",
+   "generatedRatio": 3.45
+  },
+  {
+   "fixtureId": "D5",
+   "goBytes": 36737,
+   "generatedBytes": 45872,
+   "verdict": "ordinary",
+   "status": "pending",
+   "generatedRatio": 1.25
+  }
+ ],
+ "summary": {
+  "fixturesTotal": 28,
+  "fixturesAuthored": 25,
+  "fixturesPending": [
+   "D2",
+   "D4",
+   "D5"
+  ],
+  "ordinaryHandPortMedianRatio": 1.04,
+  "ordinaryHandPortMedianDenominator": "authored ordinary-verdict fixtures, hand-port bytes over manifest Go span bytes",
+  "authoredHandPortBytes": 342180,
+  "authoredGoBytes": 324292
+ }
+}

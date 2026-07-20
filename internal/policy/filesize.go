@@ -29,6 +29,10 @@ var skippedDirs = map[string]bool{
 	".tests":       true,
 	"node_modules": true,
 	"testdata":     true,
+	// The calibration corpus (hand ports, extracted Go spans, derived
+	// manifests) is measurement input/evidence sized by its source
+	// spans; its implementation lives in internal/calibration.
+	"calibration": true,
 }
 
 // sourceExtensions are Go files consumed by Go-specific gates such as gofmt.

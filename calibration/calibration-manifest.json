@@ -1,0 +1,668 @@
+{
+ "schemaVersion": 1,
+ "sourceRevision": "pinned-tsgo",
+ "fixtures": [
+  {
+   "fixtureId": "A1",
+   "origin": "tsgo",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "github.com/microsoft/typescript-go/internal/scanner::method::regExpParser.getSpellingSuggestionForUnicodePropertyValue",
+   "sourceFile": "internal/scanner/regexp.go",
+   "startByte": 30323,
+   "endByte": 30609,
+   "sourceBodySha256": "1dddf9fef11a78ea59480baef3442b0bf3b3db6857c275ae5fd8efb0c6a986b2",
+   "semanticFamilies": [
+    "ordinary-call-chain",
+    "generic-call"
+   ],
+   "baselineImplementationIds": [
+    "github.com/microsoft/typescript-go/internal/scanner::method::regExpParser.getSpellingSuggestionForUnicodePropertyValue/default"
+   ],
+   "baselineArtifactSha256": [
+    "dcd1220455f705d52c1eb2b4a49ccefbf00bd382df1c2a56014bc99fbb8592ae"
+   ],
+   "baselineArtifactBytes": 1006,
+   "candidateVerdict": "ordinary",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 286
+  },
+  {
+   "fixtureId": "A2",
+   "origin": "tsgo",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "github.com/microsoft/typescript-go/internal/core::method::Tristate.IsTrue",
+   "sourceFile": "internal/core/tristate.go",
+   "startByte": 271,
+   "endByte": 326,
+   "sourceBodySha256": "9056bb5488ffe3e6338984fb54bf198a1caa86bb27a35820e5066b7e440ece6d",
+   "semanticFamilies": [
+    "ordinary-method"
+   ],
+   "baselineImplementationIds": [
+    "github.com/microsoft/typescript-go/internal/core::method::Tristate.IsTrue/default"
+   ],
+   "baselineArtifactSha256": [
+    "c6b4d11cbaf008783a7385dba042ad034f0660610a0ba4c60d1c71463cde2a7e"
+   ],
+   "baselineArtifactBytes": 86,
+   "candidateVerdict": "ordinary",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 55
+  },
+  {
+   "fixtureId": "A3",
+   "origin": "tsgo",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "github.com/microsoft/typescript-go/internal/core::func::Identity",
+   "sourceFile": "internal/core/core.go",
+   "startByte": 15243,
+   "endByte": 15284,
+   "sourceBodySha256": "bdc7acbb68cc890934c83f6ca3882e180a015191d70c30e92cb618c30e1cba0f",
+   "semanticFamilies": [
+    "parametric-generic"
+   ],
+   "baselineImplementationIds": [
+    "github.com/microsoft/typescript-go/internal/core::func::Identity/default"
+   ],
+   "baselineArtifactSha256": [
+    "14cfebcaa0c718523447cc4af01abc0949e4428e8a485e395f0cd783b9f55200"
+   ],
+   "baselineArtifactBytes": 175,
+   "candidateVerdict": "ordinary",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 41
+  },
+  {
+   "fixtureId": "A4",
+   "origin": "tsgo",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "github.com/microsoft/typescript-go/internal/core::func::IfElse",
+   "sourceFile": "internal/core/core.go",
+   "startByte": 7163,
+   "endByte": 7478,
+   "sourceBodySha256": "cec017e5b6da30b5a33b993868ab2210869d7072bc45577dbfd2375fe2d81c00",
+   "semanticFamilies": [
+    "parametric-generic",
+    "control-flow"
+   ],
+   "baselineImplementationIds": [
+    "github.com/microsoft/typescript-go/internal/core::func::IfElse/default"
+   ],
+   "baselineArtifactSha256": [
+    "a85eca7c20129e34eb39c06be1759de7f78ceb75523a09ded3005eaa39f585e6"
+   ],
+   "baselineArtifactBytes": 259,
+   "candidateVerdict": "ordinary",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 315
+  },
+  {
+   "fixtureId": "A5",
+   "origin": "tsgo",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "github.com/microsoft/typescript-go/internal/core::method::TextRange.Len",
+   "sourceFile": "internal/core/text.go",
+   "startByte": 421,
+   "endByte": 480,
+   "sourceBodySha256": "8de02b9c76f2e9f93839cccad80eed15491b7d18c806ba9b9bba0259eb0f6abe",
+   "semanticFamilies": [
+    "ordinary-method",
+    "direct-fields"
+   ],
+   "baselineImplementationIds": [
+    "github.com/microsoft/typescript-go/internal/core::method::TextRange.Len/default"
+   ],
+   "baselineArtifactSha256": [
+    "07e263ab56992b96933beee8b089ef17053a56410f810db6232293abb0b9dac3"
+   ],
+   "baselineArtifactBytes": 162,
+   "candidateVerdict": "ordinary",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 59
+  },
+  {
+   "fixtureId": "B1",
+   "origin": "tsgo",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "github.com/microsoft/typescript-go/internal/checker::func::hashWrite32",
+   "sourceFile": "internal/checker/checker.go",
+   "startByte": 816336,
+   "endByte": 816510,
+   "sourceBodySha256": "81ac35fd316cde3ab5be8ba82c488c0f7445ca47f50251c56cc8a22681eb6c67",
+   "semanticFamilies": [
+    "width-arithmetic"
+   ],
+   "baselineImplementationIds": [
+    "github.com/microsoft/typescript-go/internal/checker::func::hashWrite32/default"
+   ],
+   "baselineArtifactSha256": [
+    "ef0e69620c8e578fb7f0513ca2f13191839625ff606d5344dc05114c23b40a7e"
+   ],
+   "baselineArtifactBytes": 673,
+   "candidateVerdict": "exception",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 174
+  },
+  {
+   "fixtureId": "B2",
+   "origin": "tsgo",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "github.com/microsoft/typescript-go/internal/vfs/osvfs::method::osFS.ReadFile",
+   "sourceFile": "internal/vfs/osvfs/os.go",
+   "startByte": 2271,
+   "endByte": 2402,
+   "sourceBodySha256": "4eba651864cbe16fda835fcd3bf9b0bb648b2359406ea1ad800c24c0003c5143",
+   "semanticFamilies": [
+    "defer-named-results",
+    "external-contract"
+   ],
+   "baselineImplementationIds": [
+    "github.com/microsoft/typescript-go/internal/vfs/osvfs::method::osFS.ReadFile/default"
+   ],
+   "baselineArtifactSha256": [
+    "f9b29696189b4ab41b37ef552f0ae1a60514af0ade18ccda94b2a82ccac6d42e"
+   ],
+   "baselineArtifactBytes": 578,
+   "candidateVerdict": "exception",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 131
+  },
+  {
+   "fixtureId": "B3",
+   "origin": "tsgo",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "github.com/microsoft/typescript-go/internal/core::func::Same",
+   "sourceFile": "internal/core/core.go",
+   "startByte": 3458,
+   "endByte": 3583,
+   "sourceBodySha256": "da146fdfeb165e0857073d4cd27e75d5ed6e0296d1e7065608e9c572afad393b",
+   "semanticFamilies": [
+    "slice-backing-identity"
+   ],
+   "baselineImplementationIds": [
+    "github.com/microsoft/typescript-go/internal/core::func::Same/default"
+   ],
+   "baselineArtifactSha256": [
+    "4840aa1bf3162d34deb264c31669043b415ab84d5e5f2efa948424bda61fa16d"
+   ],
+   "baselineArtifactBytes": 372,
+   "candidateVerdict": "exception",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 125
+  },
+  {
+   "fixtureId": "B4",
+   "origin": "tsgo",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "github.com/microsoft/typescript-go/internal/scanner::method::Scanner.scanString",
+   "sourceFile": "internal/scanner/scanner.go",
+   "startByte": 44707,
+   "endByte": 46042,
+   "sourceBodySha256": "268789d2dc08439d0d3560ec49920aa899ac98df2e43dd3260bf8b1ab4dfd49d",
+   "semanticFamilies": [
+    "byte-string"
+   ],
+   "baselineImplementationIds": [
+    "github.com/microsoft/typescript-go/internal/scanner::method::Scanner.scanString/default"
+   ],
+   "baselineArtifactSha256": [
+    "6ee0d8374520f10a67114ed2de6e44b74bcfb1013dbb154910ec01aed6a48b36"
+   ],
+   "baselineArtifactBytes": 3563,
+   "candidateVerdict": "exception",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 1335
+  },
+  {
+   "fixtureId": "B5",
+   "origin": "tsgo",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "github.com/microsoft/typescript-go/internal/printer::method::NameGenerator.getScope",
+   "sourceFile": "internal/printer/namegenerator.go",
+   "startByte": 2591,
+   "endByte": 2755,
+   "sourceBodySha256": "0afa79218e1dea3841d46ed1aec1b72d5890f45a881a2466848557b41a747e07",
+   "semanticFamilies": [
+    "address-taken-field"
+   ],
+   "baselineImplementationIds": [
+    "github.com/microsoft/typescript-go/internal/printer::method::NameGenerator.getScope/default"
+   ],
+   "baselineArtifactSha256": [
+    "2a098228f30c01a84eab8b9a7352674f395529e72bf82e201bba8b5637d7d28e"
+   ],
+   "baselineArtifactBytes": 612,
+   "candidateVerdict": "exception",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 164
+  },
+  {
+   "fixtureId": "B6",
+   "origin": "tsgo",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "github.com/microsoft/typescript-go/internal/collections::method::OrderedMap.Set",
+   "sourceFile": "internal/collections/ordered_map.go",
+   "startByte": 1283,
+   "endByte": 1502,
+   "sourceBodySha256": "15e5523286d88861622c010516ffe2e0597fe5416402673760e266026cdbbd35",
+   "semanticFamilies": [
+    "structural-map-key"
+   ],
+   "baselineImplementationIds": [
+    "github.com/microsoft/typescript-go/internal/collections::method::OrderedMap.Set/default"
+   ],
+   "baselineArtifactSha256": [
+    "ccf0e1892774deb74aed2f822e0090d7915da344824ec06010d0f7e1b4143ea7"
+   ],
+   "baselineArtifactBytes": 1065,
+   "candidateVerdict": "exception",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 219
+  },
+  {
+   "fixtureId": "B7",
+   "origin": "tsgo",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "github.com/microsoft/typescript-go/internal/collections::method::Set.Has",
+   "sourceFile": "internal/collections/set.go",
+   "startByte": 299,
+   "endByte": 398,
+   "sourceBodySha256": "621e0839f3d151ce13a1b39eb24bca0779681da3366aa400e116f1dc0add232d",
+   "semanticFamilies": [
+    "nil-receiver"
+   ],
+   "baselineImplementationIds": [
+    "github.com/microsoft/typescript-go/internal/collections::method::Set.Has/default"
+   ],
+   "baselineArtifactSha256": [
+    "b77a44767b36a8ce0e75f1ed7dc2502d7e969a00a0d786b3c701cf4beab08b4d"
+   ],
+   "baselineArtifactBytes": 427,
+   "candidateVerdict": "exception",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 99
+  },
+  {
+   "fixtureId": "B8",
+   "origin": "tsgo",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "github.com/microsoft/typescript-go/internal/sourcemap::method::Generator.Base64DataURL",
+   "sourceFile": "internal/sourcemap/generator.go",
+   "startByte": 11248,
+   "endByte": 11598,
+   "sourceBodySha256": "f089cbed2cc3d1b40b436e644adec3e7118e7d07a21ec58052282e339712f778",
+   "semanticFamilies": [
+    "interface-conversion",
+    "external-contract"
+   ],
+   "baselineImplementationIds": [
+    "github.com/microsoft/typescript-go/internal/sourcemap::method::Generator.Base64DataURL/default"
+   ],
+   "baselineArtifactSha256": [
+    "d9a992890d047c247cc57bd3c049b267496da2d4fd8d9a006b6dbce9e56a199b"
+   ],
+   "baselineArtifactBytes": 3581,
+   "candidateVerdict": "exception",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 350
+  },
+  {
+   "fixtureId": "B9",
+   "origin": "neutral-oracle",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "neutral/value-receiver-copy",
+   "sourceFile": "calibration/neutral/value_receiver_copy.go",
+   "startByte": 174,
+   "endByte": 257,
+   "sourceBodySha256": "a96ec35a8c809af8aedf7b69846e1de9d591a285b149ceae82d2410f7f209a5a",
+   "semanticFamilies": [
+    "value-copy"
+   ],
+   "candidateVerdict": "exception",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 83
+  },
+  {
+   "fixtureId": "B10",
+   "origin": "tsgo",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "github.com/microsoft/typescript-go/internal/checker::method::tracedTypeAdapter.Display",
+   "sourceFile": "internal/checker/tracer.go",
+   "startByte": 7836,
+   "endByte": 8606,
+   "sourceBodySha256": "62ab02ae850abccf669f210faa85286c420aae55e6a74a5a7ee37652c5eaa37b",
+   "semanticFamilies": [
+    "defer-recover-panic"
+   ],
+   "baselineImplementationIds": [
+    "github.com/microsoft/typescript-go/internal/checker::method::tracedTypeAdapter.Display/default"
+   ],
+   "baselineArtifactSha256": [
+    "44238f625ddb4b1561681dd7ad1a897cc6fa7e4cf87bfe21814f8e1881fa9094"
+   ],
+   "baselineArtifactBytes": 207,
+   "candidateVerdict": "exception",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 770
+  },
+  {
+   "fixtureId": "B11",
+   "origin": "tsgo",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "github.com/microsoft/typescript-go/internal/core::func::Map",
+   "sourceFile": "internal/core/core.go",
+   "startByte": 1436,
+   "endByte": 1626,
+   "sourceBodySha256": "ba690cea4f9eed8b34e7e510b6f117ed22996db2014032c4bca519b7ee2e5a14",
+   "semanticFamilies": [
+    "nil-vs-empty-slice",
+    "generic-zero"
+   ],
+   "baselineImplementationIds": [
+    "github.com/microsoft/typescript-go/internal/core::func::Map/default"
+   ],
+   "baselineArtifactSha256": [
+    "76ea94b8f4d887d83f1185dcb004e2b9e7f5d8dae2b7a4e3cf369e40d761fb2e"
+   ],
+   "baselineArtifactBytes": 932,
+   "candidateVerdict": "exception",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 190
+  },
+  {
+   "fixtureId": "B12",
+   "origin": "tsgo",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "github.com/microsoft/typescript-go/internal/core::func::Memoize",
+   "sourceFile": "internal/core/core.go",
+   "startByte": 7001,
+   "endByte": 7161,
+   "sourceBodySha256": "e27c5e42f809a8be53f7688bfe7f52e90f361d9c8299d6cd201293d4e930f6f9",
+   "semanticFamilies": [
+    "closure-capture",
+    "generic-zero"
+   ],
+   "baselineImplementationIds": [
+    "github.com/microsoft/typescript-go/internal/core::func::Memoize/default"
+   ],
+   "baselineArtifactSha256": [
+    "d69e569f23c549221fc6e86401f57377f0693817beea1efca39191785b5ba50e"
+   ],
+   "baselineArtifactBytes": 476,
+   "candidateVerdict": "exception",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 160
+  },
+  {
+   "fixtureId": "B13",
+   "origin": "tsgo",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "github.com/microsoft/typescript-go/internal/parser::func::init@internal/parser/jsdoc.go:13:6",
+   "sourceFile": "internal/parser/jsdoc.go",
+   "startByte": 271,
+   "endByte": 331,
+   "sourceBodySha256": "96bfb6b01644ae8c4357bfbcdc48104efcf247c2ce7785580737940d751be6d3",
+   "semanticFamilies": [
+    "package-init"
+   ],
+   "baselineImplementationIds": [
+    "github.com/microsoft/typescript-go/internal/parser::func::init@internal/parser/jsdoc.go:13:6/default"
+   ],
+   "baselineArtifactSha256": [
+    "98a5fd306a5af5ff91c7de334b2389b5641e70fd888edb6d5d999c7c47a9ff71"
+   ],
+   "baselineArtifactBytes": 83,
+   "candidateVerdict": "exception",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 60
+  },
+  {
+   "fixtureId": "B14",
+   "origin": "neutral-oracle",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "neutral/typed-nil-interface",
+   "sourceFile": "calibration/neutral/typed_nil_interface.go",
+   "startByte": 294,
+   "endByte": 481,
+   "sourceBodySha256": "61ce6571baf27aa6d2ba647d09c2403f9827d74af086f17fccb847b59dcd4f1e",
+   "semanticFamilies": [
+    "typed-nil-interface"
+   ],
+   "candidateVerdict": "exception",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 187
+  },
+  {
+   "fixtureId": "B15",
+   "origin": "neutral-oracle",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "neutral/method-value-evaluation",
+   "sourceFile": "calibration/neutral/method_value_evaluation.go",
+   "startByte": 195,
+   "endByte": 391,
+   "sourceBodySha256": "e6baf87eb7fcccfbfbc7bf2602af32b93e303b7364f3a390d4fbecda99fae7a2",
+   "semanticFamilies": [
+    "method-value"
+   ],
+   "candidateVerdict": "exception",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 196
+  },
+  {
+   "fixtureId": "C1",
+   "origin": "tsgo",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "github.com/microsoft/typescript-go/internal/collections::method::OrderedMap.Set",
+   "sourceFile": "internal/collections/ordered_map.go",
+   "startByte": 1283,
+   "endByte": 1502,
+   "sourceBodySha256": "15e5523286d88861622c010516ffe2e0597fe5416402673760e266026cdbbd35",
+   "semanticFamilies": [
+    "specialization-decision",
+    "structural-map-key"
+   ],
+   "baselineImplementationIds": [
+    "github.com/microsoft/typescript-go/internal/collections::method::OrderedMap.Set/default"
+   ],
+   "baselineArtifactSha256": [
+    "ccf0e1892774deb74aed2f822e0090d7915da344824ec06010d0f7e1b4143ea7"
+   ],
+   "baselineArtifactBytes": 1065,
+   "candidateVerdict": "specialized",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 219
+  },
+  {
+   "fixtureId": "C2",
+   "origin": "tsgo",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "github.com/microsoft/typescript-go/internal/core::func::OrElse",
+   "sourceFile": "internal/core/core.go",
+   "startByte": 7480,
+   "endByte": 7833,
+   "sourceBodySha256": "5b445f4c84806300e07361084602eae08328f0c089d0da4472d77758b9a58049",
+   "semanticFamilies": [
+    "specialization-decision",
+    "comparable-generic"
+   ],
+   "baselineImplementationIds": [
+    "github.com/microsoft/typescript-go/internal/core::func::OrElse/default"
+   ],
+   "baselineArtifactSha256": [
+    "e72f787255450f83e9903069f39f46abc219ef3da6f6b482b4a813128d753b17"
+   ],
+   "baselineArtifactBytes": 270,
+   "candidateVerdict": "specialized",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 353
+  },
+  {
+   "fixtureId": "C3",
+   "origin": "tsgo",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "github.com/microsoft/typescript-go/internal/core::func::Map",
+   "sourceFile": "internal/core/core.go",
+   "startByte": 1436,
+   "endByte": 1626,
+   "sourceBodySha256": "ba690cea4f9eed8b34e7e510b6f117ed22996db2014032c4bca519b7ee2e5a14",
+   "semanticFamilies": [
+    "specialization-decision",
+    "value-copy"
+   ],
+   "baselineImplementationIds": [
+    "github.com/microsoft/typescript-go/internal/core::func::Map/default"
+   ],
+   "baselineArtifactSha256": [
+    "76ea94b8f4d887d83f1185dcb004e2b9e7f5d8dae2b7a4e3cf369e40d761fb2e"
+   ],
+   "baselineArtifactBytes": 932,
+   "candidateVerdict": "specialized",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 190
+  },
+  {
+   "fixtureId": "D1",
+   "origin": "tsgo",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "github.com/microsoft/typescript-go/internal/diagnostics::func::keyToMessage",
+   "sourceFile": "internal/diagnostics/diagnostics_generated.go",
+   "startByte": 580490,
+   "endByte": 898597,
+   "sourceBodySha256": "6236021c16cc33f16ded6dce36199cbb61de40121ef7e3d19884203010f8b3c7",
+   "semanticFamilies": [
+    "high-byte-tail"
+   ],
+   "baselineImplementationIds": [
+    "github.com/microsoft/typescript-go/internal/diagnostics::func::keyToMessage/default"
+   ],
+   "baselineArtifactSha256": [
+    "dc4068c7e2251f3c599879992d54f2f1e946a2d3709da8e585c9ba266736abaf"
+   ],
+   "baselineArtifactBytes": 380623,
+   "candidateVerdict": "ordinary",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 318107
+  },
+  {
+   "fixtureId": "D2",
+   "origin": "tsgo",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "github.com/microsoft/typescript-go/internal/compiler::method::Program.verifyCompilerOptions",
+   "sourceFile": "internal/compiler/program.go",
+   "startByte": 29383,
+   "endByte": 52133,
+   "sourceBodySha256": "8780c2769ed53f2c10ecb5c57e28af33217ecf10a8d939a80c9113a8e0b70f53",
+   "semanticFamilies": [
+    "high-byte-tail"
+   ],
+   "baselineImplementationIds": [
+    "github.com/microsoft/typescript-go/internal/compiler::method::Program.verifyCompilerOptions/default"
+   ],
+   "baselineArtifactSha256": [
+    "4b8ca5c4df7f8e272e4cf43fd14d810c6b84b9e7ccfbda8664a99606b69a02de"
+   ],
+   "baselineArtifactBytes": 74715,
+   "candidateVerdict": "ordinary",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 22750
+  },
+  {
+   "fixtureId": "D3",
+   "origin": "tsgo",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "github.com/microsoft/typescript-go/internal/debug::func::AssertNever",
+   "sourceFile": "internal/debug/debug.go",
+   "startByte": 474,
+   "endByte": 898,
+   "sourceBodySha256": "3395c4b6f054453577fe9b62c02cb293dc001e5f23a3fe29d4507b063a2f83a3",
+   "semanticFamilies": [
+    "high-byte-tail",
+    "interface-formatting"
+   ],
+   "baselineImplementationIds": [
+    "github.com/microsoft/typescript-go/internal/debug::func::AssertNever/default"
+   ],
+   "baselineArtifactSha256": [
+    "7b98f9e431eb9589b2486100b4e7b15b57e3800cf47587e75f52e95e9b4736d7"
+   ],
+   "baselineArtifactBytes": 59612,
+   "candidateVerdict": "exception",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 424
+  },
+  {
+   "fixtureId": "D4",
+   "origin": "tsgo",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "github.com/microsoft/typescript-go/internal/checker::func::NewChecker",
+   "sourceFile": "internal/checker/checker.go",
+   "startByte": 45739,
+   "endByte": 62451,
+   "sourceBodySha256": "37d382becbfb1cb007b80c562c56e0dfb71ed323fbdee13d3fd8ce9f8cbce836",
+   "semanticFamilies": [
+    "high-byte-tail"
+   ],
+   "baselineImplementationIds": [
+    "github.com/microsoft/typescript-go/internal/checker::func::NewChecker/default"
+   ],
+   "baselineArtifactSha256": [
+    "a0c0ba53e311ec694b01a500dd41ad4de2434a2d4d8bea1b2960d70dd85193a9"
+   ],
+   "baselineArtifactBytes": 57585,
+   "candidateVerdict": "ordinary",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 16712
+  },
+  {
+   "fixtureId": "D5",
+   "origin": "tsgo",
+   "sourceRevision": "pinned-tsgo",
+   "sourceIdentity": "github.com/microsoft/typescript-go/internal/checker::method::Relater.structuredTypeRelatedToWorker",
+   "sourceFile": "internal/checker/relater.go",
+   "startByte": 143594,
+   "endByte": 180331,
+   "sourceBodySha256": "69cd06be944f139eb8ed7f9ce0c9a6b62bebd7a45759718d10efbbbd5c8f84af",
+   "semanticFamilies": [
+    "high-byte-tail"
+   ],
+   "baselineImplementationIds": [
+    "github.com/microsoft/typescript-go/internal/checker::method::Relater.structuredTypeRelatedToWorker/default"
+   ],
+   "baselineArtifactSha256": [
+    "cc512c99627378c7bd938ed0ff3af106af56a46ca1d97624fa1e918d35da543c"
+   ],
+   "baselineArtifactBytes": 45872,
+   "candidateVerdict": "ordinary",
+   "handPortOwner": "implementing-agent",
+   "independentReviewer": "jeswin (independent review pending)",
+   "goBytes": 36737
+  }
+ ]
+}

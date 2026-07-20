@@ -1,0 +1,5 @@
+func (p Point) Move(dx int, dy int) int {
+	p.X += dx
+	p.Y += dy
+	return p.X + p.Y
+}

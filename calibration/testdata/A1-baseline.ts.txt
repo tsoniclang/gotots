@@ -1,0 +1,7 @@
+export function regExpParser$getSpellingSuggestionForUnicodePropertyValue(p: regExpParser | undefined, propertyName: string, value: string): string {
+  let values: collections$.Set<string> | undefined = gort$.goMapGet(valuesOfNonBinaryUnicodeProperties, propertyName, undefined);
+  if ((values === undefined)) {
+    return "";
+  }
+  return core$.GetSpellingSuggestionForStrings(value, maps$.Keys<gort$.GoMap<string, 0>, string, 0>(collections$.Set$Keys<string>(values, () => "", (($a: string, $b: string) => $a === $b), (($v: string) => $v), undefined, (($k: string) => "s" + globalThis.String($k.length) + ":" + $k), (($v: unknown) => goif$.goIfaceBox("p:string", goif$.goRtti$string, $v, {}))), () => undefined, () => "", () => 0, (($a: gort$.GoMap<string, 0>, $b: gort$.GoMap<string, 0>) => gort$.goEqUnsupported()), (($a: string, $b: string) => $a === $b), (($a: 0, $b: 0) => $a === $b), (($v: gort$.GoMap<string, 0>) => $v), (($v: string) => $v), (($v: 0) => $v), undefined, undefined, undefined));
+}

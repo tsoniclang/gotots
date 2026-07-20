@@ -1,0 +1,7 @@
+func (s *Set[T]) Has(key T) bool {
+	if s == nil {
+		return false
+	}
+	_, ok := s.M[key]
+	return ok
+}

@@ -1,0 +1,7 @@
+func (p *regExpParser) getSpellingSuggestionForUnicodePropertyValue(propertyName string, value string) string {
+	values := valuesOfNonBinaryUnicodeProperties[propertyName]
+	if values == nil {
+		return ""
+	}
+	return core.GetSpellingSuggestionForStrings(value, maps.Keys(values.Keys()))
+}

@@ -1,0 +1,11 @@
+func (gen *Generator) Base64DataURL() string {
+	const prefix = "data:application/json;base64,"
+	data := gen.bytes()
+	var sb strings.Builder
+	sb.Grow(len(prefix) + base64.StdEncoding.EncodedLen(len(data)))
+	sb.WriteString(prefix)
+	encoder := base64.NewEncoder(base64.StdEncoding, &sb)
+	_, _ = encoder.Write(data)
+	encoder.Close()
+	return sb.String()
+}

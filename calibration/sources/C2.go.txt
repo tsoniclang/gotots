@@ -1,0 +1,8 @@
+// Returns value if value is not the zero value of T; Otherwise, returns defaultValue. OrElse should only be used when
+// defaultValue is constant or precomputed as its argument will be evaluated regardless as to the content of value.
+func OrElse[T comparable](value T, defaultValue T) T {
+	if value != *new(T) {
+		return value
+	}
+	return defaultValue
+}

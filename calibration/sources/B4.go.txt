@@ -1,0 +1,51 @@
+func (s *Scanner) scanString(jsxAttributeString bool) string {
+	quote := s.char()
+	if quote == '\'' {
+		s.tokenFlags |= ast.TokenFlagsSingleQuote
+	}
+	s.pos++
+	// Fast path for simple strings without escape sequences.
+	strLen := strings.IndexByte(s.text[s.pos:], byte(quote))
+	if strLen == 0 {
+		s.pos++
+		return ""
+	}
+	if strLen > 0 {
+		str := s.text[s.pos : s.pos+strLen]
+		if jsxAttributeString ||
+			strings.IndexByte(str, '\\') < 0 && strings.IndexByte(str, '\r') < 0 && strings.IndexByte(str, '\n') < 0 {
+			s.pos += strLen + 1
+			return str
+		}
+	}
+	var sb strings.Builder
+	start := s.pos
+	for {
+		ch := s.char()
+		if ch < 0 {
+			sb.WriteString(s.text[start:s.pos])
+			s.tokenFlags |= ast.TokenFlagsUnterminated
+			s.error(diagnostics.Unterminated_string_literal)
+			break
+		}
+		if ch == quote {
+			sb.WriteString(s.text[start:s.pos])
+			s.pos++
+			break
+		}
+		if ch == '\\' && !jsxAttributeString {
+			sb.WriteString(s.text[start:s.pos])
+			sb.WriteString(s.scanEscapeSequence(EscapeSequenceScanningFlagsString | EscapeSequenceScanningFlagsReportErrors))
+			start = s.pos
+			continue
+		}
+		if (ch == '\n' || ch == '\r') && !jsxAttributeString {
+			sb.WriteString(s.text[start:s.pos])
+			s.tokenFlags |= ast.TokenFlagsUnterminated
+			s.error(diagnostics.Unterminated_string_literal)
+			break
+		}
+		s.pos++
+	}
+	return sb.String()
+}

@@ -1,0 +1,3 @@
+func (g *NameGenerator) getScope(privateName bool) **nameGenerationScope {
+	return core.IfElse(privateName, &g.privateNameGenerationScope, &g.nameGenerationScope)
+}
