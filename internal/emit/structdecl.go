@@ -6,6 +6,7 @@ package emit
 
 import (
 	"fmt"
+	"go/token"
 	"strings"
 
 	"github.com/tsoniclang/gotots/internal/ir"
@@ -102,6 +103,23 @@ func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct,
 	for _, method := range delegateMethods {
 		if err := printMethodDelegate(p, structDecl, method); err != nil {
 			return err
+		}
+	}
+	// Promoted methods delegate through the embedded chain ONCE, at the
+	// class, so call sites keep Go's source shape (outer.M(...)).
+	if len(structDecl.TypeParams) == 0 && !structDecl.FamilyEnc && !structDecl.FamilyPtrCell {
+		for _, delegate := range structDecl.Promoted {
+			if delegate.IfaceField {
+				continue // embedded-interface delegates already emit as functions
+			}
+			if delegate.Slot != delegate.Name || !token.IsExported(delegate.Name) {
+				// Cross-package unexported promotions can collide on one
+				// bare name; they keep the chain form at call sites.
+				continue
+			}
+			if err := printPromotedMemberDelegate(p, delegate); err != nil {
+				return err
+			}
 		}
 	}
 	p.indent--
@@ -650,4 +668,23 @@ func familyName(structDecl *ir.Struct) string {
 		name += "$pc"
 	}
 	return name
+}
+
+// printPromotedMemberDelegate emits one promoted method as a one-line
+// member owning the embedded chain: each embedded-pointer hop derefs
+// with Go's nil panic, and the final step calls the declaring class's
+// member (every non-generic struct method is a member or a delegate).
+func printPromotedMemberDelegate(p *printer, delegate ir.PromotedDelegate) error {
+	chain := chainOver("this", delegate)
+	member := tsName(delegate.Name)
+	declClass, err := p.module.typeSymbol(delegate.Pkg, delegate.TypeName)
+	if err != nil {
+		return err
+	}
+	p.line("%s(...$a: Parameters<%s[%q]>): ReturnType<%s[%q]> {", member, declClass, member, declClass, member)
+	p.indent++
+	p.line("return %s.%s(...$a);", chain, member)
+	p.indent--
+	p.line("}")
+	return nil
 }

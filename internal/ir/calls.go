@@ -204,10 +204,15 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 		return nil, err
 	}
 	// A promoted method's receiver is the embedded field the selection
-	// path names.
-	recv, err = b.chainPromotedReceiver(recv, b.info.Types[selector.X].Type, selection, span)
-	if err != nil {
-		return nil, err
+	// path names. When BOTH the outer and the declaring types are
+	// non-generic unit structs, the call keeps its SOURCE shape: the
+	// outer class's promoted delegate member owns the chain once.
+	promotedOuter := promotedSourceShape(b, selector, selection)
+	if promotedOuter == nil {
+		recv, err = b.chainPromotedReceiver(recv, b.info.Types[selector.X].Type, selection, span)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if recv.Type().Kind == KindIface {
 		// Interface dispatch resolves the closed dynamic-type set to an
@@ -281,6 +286,11 @@ func (b *builder) buildMethodCall(n *ast.CallExpr, selector *ast.SelectorExpr, s
 		TypeArgs:    recvTypeArgs,
 		Recv:        recv,
 		Method:      method.Name(),
+	}
+	if promotedOuter != nil {
+		out.Pkg = promotedOuter.Obj().Pkg().Path()
+		out.TypeName = promotedOuter.Obj().Name()
+		out.Promoted = true
 	}
 	recvTypeParams := recvNamed.Origin().TypeParams()
 	recvGoArgs := recvNamed.TypeArgs()
@@ -495,4 +505,47 @@ func (b *builder) checkConversion(from, to Type, span Span) error {
 	}
 	return &Unsupported{Kind: KindConversionFrom, Code: "GOTOTS_UNSUPPORTED_OPERATION",
 		Construct: "conversion from " + from.Go + " to " + to.Go, Span: span}
+}
+
+// promotedSourceShape decides whether a promoted call keeps its source
+// shape: the OUTER receiver type and the DECLARING type must both be
+// non-generic named structs of the unit, so the outer class's promoted
+// delegate member is guaranteed to exist.
+func promotedSourceShape(b *builder, selector *ast.SelectorExpr, selection *types.Selection) *types.Named {
+	if len(selection.Index()) <= 1 {
+		return nil
+	}
+	outerType := b.info.Types[selector.X].Type
+	if pointer, isPointer := outerType.(*types.Pointer); isPointer {
+		outerType = pointer.Elem()
+	}
+	outer, ok := types.Unalias(outerType).(*types.Named)
+	if !ok || outer.TypeParams() != nil || outer.Obj().Pkg() == nil || !b.unit.Owns(outer.Obj().Pkg().Path()) {
+		return nil
+	}
+	if _, isStruct := outer.Underlying().(*types.Struct); !isStruct {
+		return nil
+	}
+	method, ok := selection.Obj().(*types.Func)
+	if !ok {
+		return nil
+	}
+	if !method.Exported() {
+		// Two same-bare-named unexported methods from different packages
+		// may both promote onto one outer type; a single member cannot
+		// represent both, so unexported promotions keep the chain form.
+		return nil
+	}
+	declaredRecv := method.Type().(*types.Signature).Recv().Type()
+	if pointer, isPointer := declaredRecv.(*types.Pointer); isPointer {
+		declaredRecv = pointer.Elem()
+	}
+	inner, ok := types.Unalias(declaredRecv).(*types.Named)
+	if !ok || inner.TypeParams() != nil {
+		return nil
+	}
+	if _, isStruct := inner.Underlying().(*types.Struct); !isStruct {
+		return nil
+	}
+	return outer
 }

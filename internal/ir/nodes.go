@@ -139,8 +139,12 @@ type MethodCall struct {
 	RttiArgs   []ParamRttiArg
 	Recv       Expr
 	Method     string
-	Args       []Expr
-	Results    []Type
+	// Promoted keeps a promoted-method call in its SOURCE shape: Recv is
+	// the OUTER value and TypeName/Pkg name the OUTER type, whose class
+	// carries the promoted delegate member owning the embedded chain.
+	Promoted bool
+	Args     []Expr
+	Results  []Type
 }
 
 // FieldLoad reads a struct field through a nil-checked pointer. Cell

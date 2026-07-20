@@ -150,6 +150,17 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if recvT.MapFamilyPtrCell || (p.familyPtrCell && selfPtrReference(recvT)) {
 			methodClass += "$pc"
 		}
+		if n.Promoted {
+			receiver := recv
+			if n.Recv.Type().Kind == ir.KindPointer {
+				checked, err := p.nilCheckOf(recv, n.Recv.Type())
+				if err != nil {
+					return "", err
+				}
+				receiver = checked
+			}
+			return receiver + "." + tsName(n.Method) + "(" + args + ")", nil
+		}
 		if len(n.TypeArgs) == 0 && methodClass == n.TypeName {
 			emission := p.module.MethodEmissionFor(goid.Method(n.Pkg, n.TypeName, n.Method))
 			receiverProven := n.Recv.Type().Kind != ir.KindPointer ||

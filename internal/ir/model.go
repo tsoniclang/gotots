@@ -445,6 +445,10 @@ type EqPlan struct {
 	Display string  // EqUncomparable / EqExternal: the Go type display for the panic
 }
 
+// Promoted on MethodCall marks a promoted-method call kept in its
+// SOURCE shape: the receiver is the OUTER value and the outer class's
+// promoted delegate member owns the embedded chain (once), instead of
+// the chain being lowered into every call site.
 type PromotedDelegate struct {
 	Name string
 	// Slot is the vtable property name for this promoted method: the bare
