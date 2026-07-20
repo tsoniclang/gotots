@@ -150,17 +150,30 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if recvT.MapFamilyPtrCell || (p.familyPtrCell && selfPtrReference(recvT)) {
 			methodClass += "$pc"
 		}
-		if len(n.TypeArgs) == 0 &&
-			p.module.MethodEmissionFor(goid.Method(n.Pkg, n.TypeName, n.Method)) == plan.MethodOrdinaryNilChecked {
-			receiver := recv
-			if n.Recv.Type().Kind == ir.KindPointer {
-				checked, err := p.nilCheckOf(recv, n.Recv.Type())
-				if err != nil {
-					return "", err
+		if len(n.TypeArgs) == 0 && methodClass == n.TypeName {
+			emission := p.module.MethodEmissionFor(goid.Method(n.Pkg, n.TypeName, n.Method))
+			receiverProven := n.Recv.Type().Kind != ir.KindPointer ||
+				(p.memberReceiver != "" && recv == p.memberReceiver) || p.checkedNilables[recv]
+			switch {
+			case emission == plan.MethodOrdinaryNilChecked:
+				receiver := recv
+				if n.Recv.Type().Kind == ir.KindPointer {
+					checked, err := p.nilCheckOf(recv, n.Recv.Type())
+					if err != nil {
+						return "", err
+					}
+					receiver = checked
 				}
-				receiver = checked
+				return receiver + "." + tsName(n.Method) + "(" + args + ")", nil
+			case emission == plan.MethodFreeFunctionException && receiverProven:
+				// The delegate member: source-shaped at proven sites,
+				// forwarding to the single free-function body.
+				suffix := ""
+				if p.checkedNilables[recv] && n.Recv.Type().Kind == ir.KindPointer {
+					suffix = "!"
+				}
+				return recv + suffix + "." + tsName(n.Method) + "(" + args + ")", nil
 			}
-			return receiver + "." + tsName(n.Method) + "(" + args + ")", nil
 		}
 		callee, err := p.module.symbol(n.Pkg, methodClass+"$"+n.Method)
 		if err != nil {

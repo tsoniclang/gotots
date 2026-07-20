@@ -80,10 +80,12 @@ func Packages(pkgs []*packages.Package, sourceDir string, options Options) (*Gen
 	factStore.Seal()
 	planBuilder := plan.NewImplBuilder()
 	methods := make([]implid.ID, 0, len(out.NilabilityFacts))
+	delegateEligible := make(map[string]bool, len(out.NilabilityFacts))
 	for _, fact := range out.NilabilityFacts {
 		methods = append(methods, implid.MustNew(fact.ID, "default"))
+		delegateEligible[fact.ID] = !fact.GenericReceiver && !fact.CarrierReceiver
 	}
-	if err := plan.BuildMethodPlans(planBuilder, factStore, methods); err != nil {
+	if err := plan.BuildMethodPlans(planBuilder, factStore, methods, delegateEligible); err != nil {
 		return nil, err
 	}
 	out.MethodPlans = planBuilder.Build()

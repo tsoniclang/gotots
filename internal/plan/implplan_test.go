@@ -56,7 +56,7 @@ func TestMethodPlanningFromSealedFacts(t *testing.T) {
 		implid.MustNew("p::method::T::Tolerant", "default"),
 		implid.MustNew("p::method::T::Unproven", "default"),
 	}
-	if err := BuildMethodPlans(builder, store, methods); err != nil {
+	if err := BuildMethodPlans(builder, store, methods, map[string]bool{"p::method::T::Proven": true, "p::method::T::Tolerant": true, "p::method::T::Unproven": true}); err != nil {
 		t.Fatal(err)
 	}
 	plans := builder.Build()
@@ -73,7 +73,7 @@ func TestMethodPlanningFromSealedFacts(t *testing.T) {
 		t.Fatalf("unproven = %+v", unproven)
 	}
 	// Missing fact fails closed.
-	if err := BuildMethodPlans(NewImplBuilder(), store, []implid.ID{implid.MustNew("p::method::T::Ghost", "default")}); err == nil {
+	if err := BuildMethodPlans(NewImplBuilder(), store, []implid.ID{implid.MustNew("p::method::T::Ghost", "default")}, nil); err == nil {
 		t.Fatal("missing fact must fail closed")
 	}
 }

@@ -42,10 +42,17 @@ const (
 type MethodEmission string
 
 const (
-	MethodEmissionNotAMethod    MethodEmission = ""
-	MethodOrdinary              MethodEmission = "ordinary"
-	MethodOrdinaryNilChecked    MethodEmission = "ordinary-nil-checked"
+	MethodEmissionNotAMethod MethodEmission = ""
+	MethodOrdinary           MethodEmission = "ordinary"
+	MethodOrdinaryNilChecked MethodEmission = "ordinary-nil-checked"
+	// MethodFreeFunctionException: the body stays a free function and
+	// the class carries a one-line delegate member, so proven-receiver
+	// sites stay source-shaped.
 	MethodFreeFunctionException MethodEmission = "free-function-exception"
+	// MethodFreeFunctionNoDelegate: no class exists to delegate from
+	// (carrier receivers) or membership rides a later wave (generic
+	// receivers) — every site calls the free function.
+	MethodFreeFunctionNoDelegate MethodEmission = "free-function-no-delegate"
 )
 
 // ImplementationPlan is one implementation's complete decision.

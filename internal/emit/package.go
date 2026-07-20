@@ -115,15 +115,19 @@ func Package(module *Module, decls Decls) (string, []BodyOutcome, []BodyArtifact
 		body.WriteString("\n")
 		sortedMethods := append([]*ir.Func{}, structDecl.Methods...)
 		sort.Slice(sortedMethods, func(i, j int) bool { return sortedMethods[i].Name < sortedMethods[j].Name })
-		var memberMethods, freeMethods []*ir.Func
+		var memberMethods, freeMethods, delegateMethods []*ir.Func
 		for _, method := range sortedMethods {
 			if module.MethodEmissionFor(methodPlanKey(method)) == plan.MethodOrdinaryNilChecked {
 				memberMethods = append(memberMethods, method)
 			} else {
 				freeMethods = append(freeMethods, method)
+				if len(structDecl.TypeParams) == 0 && len(method.TypeParams) == 0 &&
+					!structDecl.FamilyEnc && !structDecl.FamilyPtrCell && !method.Placeholder {
+					delegateMethods = append(delegateMethods, method)
+				}
 			}
 		}
-		if err := printStruct(&body, module, structDecl, memberMethods, &outcomes, &artifacts); err != nil {
+		if err := printStruct(&body, module, structDecl, memberMethods, delegateMethods, &outcomes, &artifacts); err != nil {
 			return "", nil, nil, err
 		}
 		for _, method := range freeMethods {

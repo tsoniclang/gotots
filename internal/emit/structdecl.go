@@ -16,7 +16,7 @@ import (
 // every field in declaration order (composite literals pass explicit
 // zeros for omitted fields, so construction is always total).
 func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct,
-	memberMethods []*ir.Func, outcomes *[]BodyOutcome, artifacts *[]BodyArtifact) error {
+	memberMethods, delegateMethods []*ir.Func, outcomes *[]BodyOutcome, artifacts *[]BodyArtifact) error {
 	p := &printer{out: out, module: module, familyEnc: structDecl.FamilyEnc,
 		familyPtrCell: structDecl.FamilyPtrCell, ptrSplit: anyTrue(structDecl.PtrParams)}
 	export := "export "
@@ -93,6 +93,51 @@ func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct,
 		if err != nil {
 			return err
 		}
+	}
+	// Exception-lowered methods (nil-transparent accessors, late-deref
+	// bodies) keep their single body as the free function; the class
+	// carries a one-line DELEGATE member so every call site with a
+	// proven receiver stays source-shaped. A delegate is a reference,
+	// not a second definition.
+	for _, method := range delegateMethods {
+		if err := printMethodDelegate(p, structDecl, method); err != nil {
+			return err
+		}
+	}
+	p.indent--
+	p.line("}")
+	return nil
+}
+
+// printMethodDelegate emits the one-line member forwarding to the
+// method's free-function body.
+func printMethodDelegate(p *printer, structDecl *ir.Struct, method *ir.Func) error {
+	params := make([]string, 0, len(method.Params))
+	names := make([]string, 0, len(method.Params))
+	for i, parameter := range method.Params {
+		spelled, err := p.tsType(parameter.Type)
+		if err != nil {
+			return fmt.Errorf("%s: %w", method.ID, err)
+		}
+		name := tsName(parameter.Name)
+		if parameter.Name == "" || parameter.Name == "_" {
+			name = fmt.Sprintf("$p%d", i)
+		}
+		params = append(params, name+": "+spelled)
+		names = append(names, name)
+	}
+	result, err := p.tsResultType(method.Results)
+	if err != nil {
+		return fmt.Errorf("%s: %w", method.ID, err)
+	}
+	callee := tsName(familyName(structDecl)) + "$" + method.Name
+	operands := append([]string{"this"}, names...)
+	p.line("%s(%s): %s {", tsName(method.Name), strings.Join(params, ", "), result)
+	p.indent++
+	if result == "void" {
+		p.line("%s(%s);", callee, strings.Join(operands, ", "))
+	} else {
+		p.line("return %s(%s);", callee, strings.Join(operands, ", "))
 	}
 	p.indent--
 	p.line("}")

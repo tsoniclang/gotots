@@ -32,15 +32,18 @@ func PlanMethodEmission(fact facts.ReceiverNilability) MethodEmission {
 // BuildMethodPlans derives one ImplementationPlan per method
 // implementation from the sealed fact store. Methods missing a fact
 // fail closed (the producer must be total over methods).
-func BuildMethodPlans(builder *ImplBuilder, store *facts.Store, methods []implid.ID) error {
+func BuildMethodPlans(builder *ImplBuilder, store *facts.Store, methods []implid.ID, delegateEligible map[string]bool) error {
 	for _, id := range methods {
 		fact, ok := store.ReceiverNilability(id.Source)
 		if !ok {
 			return &MissingFactError{Source: id.Source}
 		}
 		emission := PlanMethodEmission(fact)
+		if emission == MethodFreeFunctionException && !delegateEligible[id.Source] {
+			emission = MethodFreeFunctionNoDelegate
+		}
 		p := ImplementationPlan{ID: id, Form: FormParametric, MethodEmission: emission}
-		if emission == MethodFreeFunctionException {
+		if emission == MethodFreeFunctionException || emission == MethodFreeFunctionNoDelegate {
 			p.Form = FormException
 			reason := "adr-0006: receiver-nilability proof did not establish entry equivalence"
 			if fact.ToleratesNil {
