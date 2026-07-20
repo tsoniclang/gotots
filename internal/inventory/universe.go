@@ -35,24 +35,19 @@ func reconcileUniverse(prof *profile.Profile, tree *pinning.Tree, modulePackages
 	universe.OutsideUniverse = map[string]int{}
 	classMembers := map[string][]string{}
 
-	underAny := func(filePath string, roots []string) bool {
-		for _, root := range roots {
-			if filePath == root || strings.HasPrefix(filePath, root+"/") {
-				return true
-			}
+	// A file classifies through its directory's winning schema-2 rule;
+	// files whose directory matches no rule fall through to the
+	// non-package handling below (repo-root metadata, docs, ...).
+	fileRule := func(filePath string) (profile.PackageDisposition, string, bool) {
+		rule, err := prof.SourceUniverse.Classify(path.Dir(filePath))
+		if err != nil {
+			return "", "", false
 		}
-		return false
+		return rule.Disposition, rule.Category, true
 	}
 	outsideCategory := func(filePath string) (string, bool) {
-		categories := make([]string, 0, len(prof.OutsideUniverseRoots))
-		for category := range prof.OutsideUniverseRoots {
-			categories = append(categories, category)
-		}
-		sort.Strings(categories)
-		for _, category := range categories {
-			if underAny(filePath, prof.OutsideUniverseRoots[category]) {
-				return category, true
-			}
+		if disposition, category, ok := fileRule(filePath); ok && disposition == profile.DispositionOutside {
+			return category, true
 		}
 		return "", false
 	}
@@ -79,8 +74,16 @@ func reconcileUniverse(prof *profile.Profile, tree *pinning.Tree, modulePackages
 			universe.ModuleMetadata = append(universe.ModuleMetadata, filePath)
 			classMembers["module-metadata"] = append(classMembers["module-metadata"], filePath)
 			continue
-		case underAny(filePath, prof.ToolingRoots):
+		case func() bool {
+			disposition, _, ok := fileRule(filePath)
+			return ok && disposition == profile.DispositionTooling
+		}():
 			class = "tooling"
+		case func() bool {
+			disposition, _, ok := fileRule(filePath)
+			return ok && disposition == profile.DispositionPolicyExcluded
+		}():
+			class = "product-policy-excluded"
 		case hasSegment(filePath, "testdata"):
 			// The go toolchain's documented rule: testdata directories are
 			// never part of any package.

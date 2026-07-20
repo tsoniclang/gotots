@@ -65,11 +65,9 @@ func Run(prof *profile.Profile, sourceDir string, buildProfileName string) (*Res
 		SchemaVersion: 4,
 		Product:       prof.Product,
 		Profile: ProfileAttestation{
-			Hash:                 prof.Hash,
-			OwnedRoots:           prof.OwnedRoots,
-			TestOnlyRoots:        prof.TestOnlyRoots,
-			OutsideUniverseRoots: prof.OutsideUniverseRoots,
-			ToolingRoots:         prof.ToolingRoots,
+			Hash:         prof.Hash,
+			PackageRules: prof.SourceUniverse.PackageRules,
+			DriftProbes:  prof.SourceUniverse.DriftProbes,
 		},
 		BuildProfile: *build,
 		Pin:          *prof.Pin,
@@ -146,8 +144,12 @@ func fillPartition(inv *inventory.Inventory, report *Report) {
 			report.Partition.Owned++
 		case profile.ClassTestOnly:
 			report.Partition.TestOnly++
-		case profile.ClassUnselected:
-			report.Partition.Unselected++
+		case profile.ClassPolicyExcluded:
+			report.Partition.PolicyExcluded++
+		case profile.ClassTooling:
+			report.Partition.Tooling++
+		case profile.ClassUnclassified:
+			report.Partition.Unclassified++
 		}
 	}
 	for _, pkg := range inv.External {

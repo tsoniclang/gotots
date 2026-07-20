@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "product": "tsts",
   "goModule": "github.com/microsoft/typescript-go",
   "pin": "../../pins/typescript-go.json",
@@ -13,76 +13,6 @@
       "tags": []
     }
   ],
-  "ownedRoots": [
-    "internal/ast",
-    "internal/astnav",
-    "internal/binder",
-    "internal/bundled",
-    "internal/checker",
-    "internal/collections",
-    "internal/compiler",
-    "internal/core",
-    "internal/debug",
-    "internal/diagnostics",
-    "internal/diagnosticwriter",
-    "internal/evaluator",
-    "internal/execute/incremental",
-    "internal/execute/tsc",
-    "internal/fswatch",
-    "internal/glob",
-    "internal/jsnum",
-    "internal/json",
-    "internal/jsonrpc",
-    "internal/locale",
-    "internal/module",
-    "internal/modulespecifiers",
-    "internal/nodebuilder",
-    "internal/outputpaths",
-    "internal/packagejson",
-    "internal/parser",
-    "internal/pprof",
-    "internal/printer",
-    "internal/pseudochecker",
-    "internal/scanner",
-    "internal/semver",
-    "internal/sourcemap",
-    "internal/stringutil",
-    "internal/symlinks",
-    "internal/tracing",
-    "internal/transformers",
-    "internal/tsoptions",
-    "internal/tspath",
-    "internal/vfs"
-  ],
-  "testOnlyRoots": [
-    "internal/repo",
-    "internal/testrunner",
-    "internal/testutil",
-    "internal/tsoptions/tsoptionstest",
-    "internal/vfs/vfstest"
-  ],
-  "outsideUniverseRoots": {
-    "lsp": [
-      "internal/lsp"
-    ],
-    "fourslash": [
-      "internal/fourslash"
-    ],
-    "editor-service": [
-      "internal/api",
-      "internal/format",
-      "internal/ls",
-      "internal/project",
-      "internal/testutil/autoimporttestutil",
-      "internal/testutil/lsptestutil",
-      "internal/testutil/projecttestutil"
-    ]
-  },
-  "toolingRoots": [
-    "_tools",
-    "internal/execute",
-    "internal/execute/build"
-  ],
   "notes": [
     "ownedRoots is the canonical package-root allowlist derived from the packages implemented by TSTS main a80a5da32ee5335928e44ee3fe9357fe1e51056e under packages/tsts/src/internal.",
     "cmd/tsgo is deliberately not owned: at pin c78d39e7 it depends on internal/lsp, internal/ls, internal/project, internal/format, and internal/api, all hard-excluded. The product CLI surface is TSTS-owned assembly.",
@@ -90,5 +20,345 @@
     "internal/testutil/{autoimporttestutil,lsptestutil,projecttestutil} are hard-excluded carve-outs inside the testutil test-only root: they exist to support excluded LSP/project tests and their dependency closure reaches internal/lsp and internal/project.",
     "editor-service exclusions follow the packet plus Porter exclusion records: internal/format and internal/api are recorded as outside the standalone compiler runtime port.",
     "internal/execute (the tsc CLI driver, tsc.go/watcher.go) is unselected by ADR 0003: at pin c78d39e7 its tsc.go binds hard-excluded editor-service packages (internal/format, internal/ls/lsutil), and the TSTS product CLI is product-owned assembly that deliberately omits those paths. Its subpackages incremental/ and tsc/ remain owned; build/ (the tsc --build driver mode, whose tests run through the driver harness) and the harness tsctests/ follow the driver into unselected."
-  ]
+  ],
+  "sourceUniverse": {
+    "packageRules": [
+      {
+        "id": "selected-product-source",
+        "disposition": "selected",
+        "selectors": [
+          {
+            "kind": "subtree",
+            "root": "internal/ast"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/astnav"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/binder"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/bundled"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/checker"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/collections"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/compiler"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/core"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/debug"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/diagnostics"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/diagnosticwriter"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/evaluator"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/fswatch"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/glob"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/jsnum"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/json"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/jsonrpc"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/locale"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/module"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/modulespecifiers"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/nodebuilder"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/outputpaths"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/packagejson"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/parser"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/pprof"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/printer"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/pseudochecker"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/scanner"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/semver"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/sourcemap"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/stringutil"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/symlinks"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/tracing"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/transformers"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/tsoptions"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/tspath"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/vfs"
+          }
+        ],
+        "overrides": [],
+        "category": "product-source",
+        "decision": "TSTS-PRODUCT-SURFACE",
+        "reason": "selected standalone compiler implementation packages"
+      },
+      {
+        "id": "excluded-execute-driver",
+        "disposition": "product-policy-excluded",
+        "selectors": [
+          {
+            "kind": "subtree",
+            "root": "internal/execute"
+          }
+        ],
+        "overrides": [],
+        "category": "upstream-driver",
+        "decision": "ADR-0003",
+        "reason": "TSTS owns its product driver; the upstream execute driver, its build mode, and its tests are excluded"
+      },
+      {
+        "id": "selected-execute-libraries",
+        "disposition": "selected",
+        "selectors": [
+          {
+            "kind": "subtree",
+            "root": "internal/execute/incremental"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/execute/tsc"
+          }
+        ],
+        "overrides": [
+          "excluded-execute-driver"
+        ],
+        "category": "product-source",
+        "decision": "ADR-0003",
+        "reason": "selected reusable compiler libraries carved out of the excluded driver"
+      },
+      {
+        "id": "test-support",
+        "disposition": "test-only",
+        "selectors": [
+          {
+            "kind": "subtree",
+            "root": "internal/repo"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/testrunner"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/testutil"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/tsoptions/tsoptionstest"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/vfs/vfstest"
+          }
+        ],
+        "overrides": [
+          "selected-product-source"
+        ],
+        "category": "portable-test-support",
+        "decision": "TSTS-TEST-SCOPE",
+        "reason": "test-only source, including test packages nested inside selected subtrees; forbidden from the production closure"
+      },
+      {
+        "id": "excluded-editor-test-support",
+        "disposition": "outside-universe",
+        "selectors": [
+          {
+            "kind": "subtree",
+            "root": "internal/testutil/autoimporttestutil"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/testutil/lsptestutil"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/testutil/projecttestutil"
+          }
+        ],
+        "overrides": [
+          "test-support"
+        ],
+        "category": "editor-service",
+        "decision": "TSTS-SCOPE-EXCLUSION",
+        "reason": "supports excluded LSP/editor product families"
+      },
+      {
+        "id": "outside-editor-service",
+        "disposition": "outside-universe",
+        "selectors": [
+          {
+            "kind": "subtree",
+            "root": "internal/api"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/format"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/ls"
+          },
+          {
+            "kind": "subtree",
+            "root": "internal/project"
+          }
+        ],
+        "overrides": [],
+        "category": "editor-service",
+        "decision": "TSTS-SCOPE-EXCLUSION",
+        "reason": "excluded product family: editor-service"
+      },
+      {
+        "id": "outside-fourslash",
+        "disposition": "outside-universe",
+        "selectors": [
+          {
+            "kind": "subtree",
+            "root": "internal/fourslash"
+          }
+        ],
+        "overrides": [],
+        "category": "fourslash",
+        "decision": "TSTS-SCOPE-EXCLUSION",
+        "reason": "excluded product family: fourslash"
+      },
+      {
+        "id": "outside-lsp",
+        "disposition": "outside-universe",
+        "selectors": [
+          {
+            "kind": "subtree",
+            "root": "internal/lsp"
+          }
+        ],
+        "overrides": [],
+        "category": "lsp",
+        "decision": "TSTS-SCOPE-EXCLUSION",
+        "reason": "excluded product family: lsp"
+      },
+      {
+        "id": "outside-upstream-commands",
+        "disposition": "outside-universe",
+        "selectors": [
+          {
+            "kind": "subtree",
+            "root": "cmd"
+          }
+        ],
+        "overrides": [],
+        "category": "upstream-commands",
+        "decision": "TSTS-SCOPE-EXCLUSION",
+        "reason": "upstream command mains; drift probes only, never product roots"
+      },
+      {
+        "id": "generator-tooling",
+        "disposition": "tooling",
+        "selectors": [
+          {
+            "kind": "subtree",
+            "root": "_tools"
+          }
+        ],
+        "overrides": [],
+        "category": "build-tooling",
+        "decision": "TSTS-TOOLING",
+        "reason": "generator/tool source trees"
+      }
+    ],
+    "driftProbes": [
+      {
+        "kind": "upstream-main-closures",
+        "root": "cmd"
+      }
+    ]
+  }
 }

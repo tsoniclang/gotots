@@ -153,11 +153,15 @@ func newScopeReport() *ScopeReport {
 
 // PartitionCounts summarizes the complete pass-1 partition.
 type PartitionCounts struct {
-	Owned       int `json:"owned"`
-	TestOnly    int `json:"ownedTestSupport"`
-	Unselected  int `json:"unselected"`
-	ExternalStd int `json:"externalStd"`
-	ExternalMod int `json:"externalModule"`
+	Owned          int `json:"owned"`
+	TestOnly       int `json:"ownedTestSupport"`
+	PolicyExcluded int `json:"productPolicyExcluded"`
+	Tooling        int `json:"tooling"`
+	// Unclassified counts module packages no rule matched — always a
+	// census blocker under total classification, never a silent bucket.
+	Unclassified int `json:"unclassified,omitempty"`
+	ExternalStd  int `json:"externalStd"`
+	ExternalMod  int `json:"externalModule"`
 	// Product externals reachable from owned production/test scope; the
 	// remainder is reachable only through excluded or unselected source.
 	ExternalProductClosure int `json:"externalProductClosure"`
@@ -167,11 +171,11 @@ type PartitionCounts struct {
 // census: the profile file's content hash plus the resolved scope roots,
 // so two bundles from different boundaries are always distinguishable.
 type ProfileAttestation struct {
-	Hash                 string              `json:"hash"`
-	OwnedRoots           []string            `json:"ownedRoots"`
-	TestOnlyRoots        []string            `json:"testOnlyRoots,omitempty"`
-	OutsideUniverseRoots map[string][]string `json:"outsideUniverseRoots,omitempty"`
-	ToolingRoots         []string            `json:"toolingRoots,omitempty"`
+	Hash string `json:"hash"`
+	// PackageRules is the complete schema-2 source-universe contract the
+	// census classified under; DriftProbes are its evidence-only probes.
+	PackageRules []profile.PackageRule `json:"packageRules"`
+	DriftProbes  []profile.DriftProbe  `json:"driftProbes,omitempty"`
 }
 
 // Report is the deterministic census output. It contains no machine paths;

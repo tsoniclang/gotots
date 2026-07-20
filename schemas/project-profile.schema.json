@@ -1,113 +1,192 @@
 {
-  "additionalProperties": false,
-  "properties": {
-    "buildProfiles": {
-      "items": {
-        "additionalProperties": false,
-        "properties": {
-          "cgoEnabled": {
-            "type": "boolean"
-          },
-          "goamd64": {
-            "type": "string"
-          },
-          "goarch": {
-            "pattern": "nonempty",
-            "type": "string"
-          },
-          "goarm64": {
-            "type": "string"
-          },
-          "goos": {
-            "pattern": "nonempty",
-            "type": "string"
-          },
-          "name": {
-            "pattern": "nonempty",
-            "type": "string"
-          },
-          "tags": {
-            "items": {
-              "pattern": "nonempty",
-              "type": "string"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "name",
-          "goos",
-          "goarch",
-          "cgoEnabled",
-          "tags"
-        ],
-        "type": "object"
-      },
-      "minItems": 1,
-      "type": "array"
-    },
-    "goModule": {
+ "additionalProperties": false,
+ "properties": {
+  "buildProfiles": {
+   "items": {
+    "additionalProperties": false,
+    "properties": {
+     "cgoEnabled": {
+      "type": "boolean"
+     },
+     "goamd64": {
+      "type": "string"
+     },
+     "goarch": {
       "pattern": "nonempty",
       "type": "string"
-    },
-    "notes": {
+     },
+     "goarm64": {
+      "type": "string"
+     },
+     "goos": {
+      "pattern": "nonempty",
+      "type": "string"
+     },
+     "name": {
+      "pattern": "nonempty",
+      "type": "string"
+     },
+     "tags": {
       "items": {
-        "type": "string"
+       "pattern": "nonempty",
+       "type": "string"
       },
       "type": "array"
+     }
     },
-    "outsideUniverseRoots": {
-      "mapValues": {
+    "required": [
+     "name",
+     "goos",
+     "goarch",
+     "cgoEnabled",
+     "tags"
+    ],
+    "type": "object"
+   },
+   "minItems": 1,
+   "type": "array"
+  },
+  "goModule": {
+   "pattern": "nonempty",
+   "type": "string"
+  },
+  "notes": {
+   "items": {
+    "type": "string"
+   },
+   "type": "array"
+  },
+  "pin": {
+   "pattern": "nonempty",
+   "type": "string"
+  },
+  "product": {
+   "pattern": "nonempty",
+   "type": "string"
+  },
+  "schemaVersion": {
+   "type": "integer"
+  },
+  "sourceUniverse": {
+   "additionalProperties": false,
+   "properties": {
+    "driftProbes": {
+     "items": {
+      "additionalProperties": false,
+      "properties": {
+       "kind": {
+        "enum": [
+         "upstream-main-closures"
+        ],
+        "type": "string"
+       },
+       "root": {
+        "pattern": "nonempty",
+        "type": "string"
+       }
+      },
+      "required": [
+       "kind",
+       "root"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "packageRules": {
+     "items": {
+      "additionalProperties": false,
+      "properties": {
+       "category": {
+        "pattern": "nonempty",
+        "type": "string"
+       },
+       "decision": {
+        "pattern": "nonempty",
+        "type": "string"
+       },
+       "disposition": {
+        "enum": [
+         "selected",
+         "test-only",
+         "outside-universe",
+         "tooling",
+         "product-policy-excluded"
+        ],
+        "type": "string"
+       },
+       "id": {
+        "pattern": "nonempty",
+        "type": "string"
+       },
+       "overrides": {
         "items": {
-          "pattern": "nonempty",
-          "type": "string"
+         "pattern": "nonempty",
+         "type": "string"
+        },
+        "type": "array"
+       },
+       "reason": {
+        "pattern": "nonempty",
+        "type": "string"
+       },
+       "selectors": {
+        "items": {
+         "additionalProperties": false,
+         "properties": {
+          "kind": {
+           "enum": [
+            "exact",
+            "subtree"
+           ],
+           "type": "string"
+          },
+          "package": {
+           "pattern": "nonempty",
+           "type": "string"
+          },
+          "root": {
+           "pattern": "nonempty",
+           "type": "string"
+          }
+         },
+         "required": [
+          "kind"
+         ],
+         "type": "object"
         },
         "minItems": 1,
         "type": "array"
+       }
       },
+      "required": [
+       "id",
+       "disposition",
+       "selectors",
+       "overrides",
+       "category",
+       "decision",
+       "reason"
+      ],
       "type": "object"
-    },
-    "ownedRoots": {
-      "items": {
-        "pattern": "nonempty",
-        "type": "string"
-      },
-      "minItems": 1,
-      "type": "array"
-    },
-    "pin": {
-      "pattern": "nonempty",
-      "type": "string"
-    },
-    "product": {
-      "pattern": "nonempty",
-      "type": "string"
-    },
-    "schemaVersion": {
-      "type": "integer"
-    },
-    "testOnlyRoots": {
-      "items": {
-        "pattern": "nonempty",
-        "type": "string"
-      },
-      "type": "array"
-    },
-    "toolingRoots": {
-      "items": {
-        "pattern": "nonempty",
-        "type": "string"
-      },
-      "type": "array"
+     },
+     "minItems": 1,
+     "type": "array"
     }
-  },
-  "required": [
-    "schemaVersion",
-    "product",
-    "goModule",
-    "pin",
-    "buildProfiles",
-    "ownedRoots"
-  ],
-  "type": "object"
+   },
+   "required": [
+    "packageRules"
+   ],
+   "type": "object"
+  }
+ },
+ "required": [
+  "schemaVersion",
+  "product",
+  "goModule",
+  "pin",
+  "buildProfiles",
+  "sourceUniverse"
+ ],
+ "type": "object"
 }

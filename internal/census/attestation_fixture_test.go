@@ -66,9 +66,15 @@ func Use() int { return lib.Value }
 	}
 	dir, revision := writeFixtureRepo(t, files)
 	prof := writeFixtureConfig(t, revision, map[string]any{
-		"product":              "fixture",
-		"ownedRoots":           []string{"a"},
-		"outsideUniverseRoots": map[string]any{},
+		"product": "fixture",
+		"sourceUniverse": map[string]any{
+			"packageRules": []any{map[string]any{
+				"id": "selected", "disposition": "selected",
+				"selectors": []any{map[string]any{"kind": "subtree", "root": "a"}},
+				"overrides": []any{}, "category": "product-source",
+				"decision": "FIXTURE", "reason": "census fixture",
+			}},
+		},
 	})
 
 	_, err := Run(prof, dir, "fixture")

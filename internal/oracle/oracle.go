@@ -121,12 +121,12 @@ func Translate(workDir string, packageSources map[string]string) (*translate.Gen
 	if err := os.WriteFile(filepath.Join(workDir, "go.mod"), []byte("module oracle.fixture\n\ngo 1.26\n"), 0o644); err != nil {
 		return nil, nil, err
 	}
-	ownedRoots := make([]string, 0, len(packageSources))
+	fixtureDirs := make([]string, 0, len(packageSources))
 	for dir := range packageSources {
-		ownedRoots = append(ownedRoots, dir)
+		fixtureDirs = append(fixtureDirs, dir)
 	}
-	sort.Strings(ownedRoots)
-	for _, dir := range ownedRoots {
+	sort.Strings(fixtureDirs)
+	for _, dir := range fixtureDirs {
 		if err := os.MkdirAll(filepath.Join(workDir, dir), 0o755); err != nil {
 			return nil, nil, err
 		}
@@ -136,9 +136,18 @@ func Translate(workDir string, packageSources map[string]string) (*translate.Gen
 		}
 	}
 
+	selectors := make([]profile.PackageSelector, 0, len(fixtureDirs))
+	for _, dir := range fixtureDirs {
+		selectors = append(selectors, profile.PackageSelector{Kind: "subtree", Root: dir})
+	}
 	prof := &profile.Profile{
-		GoModule:   "oracle.fixture",
-		OwnedRoots: ownedRoots,
+		SchemaVersion: 2,
+		GoModule:      "oracle.fixture",
+		SourceUniverse: profile.SourceUniverse{PackageRules: []profile.PackageRule{{
+			ID: "oracle-fixture", Disposition: profile.DispositionSelected,
+			Selectors: selectors, Overrides: []string{},
+			Category: "oracle-fixture", Decision: "ORACLE", Reason: "differential fixture packages",
+		}}},
 	}
 	hostEnv, err := hostEnviron(resolved)
 	if err != nil {

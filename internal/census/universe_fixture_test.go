@@ -120,10 +120,11 @@ func TestGeneratedFileMarkerIsPositional(t *testing.T) {
 	}
 }
 
-// TestUnselectedPackagePartitionAndEdge proves module packages outside
-// every profile root stay in the partition as unselected and that owned
-// imports of them are contradictions.
-func TestUnselectedPackagePartitionAndEdge(t *testing.T) {
+// TestUnclassifiedPackagePartitionAndEdge proves module packages
+// matching no rule are counted as coverage defects and that selected
+// imports of them are contradictions — total classification has no
+// silent bucket.
+func TestUnclassifiedPackagePartitionAndEdge(t *testing.T) {
 	files := basicFixtureFiles()
 	files["stray/stray.go"] = "package stray\n\nconst V = 1\n"
 	files["a/uses_stray.go"] = "package a\n\nimport \"example.com/fix/stray\"\n\nfunc UsesStray() int { return stray.V }\n"
@@ -134,12 +135,12 @@ func TestUnselectedPackagePartitionAndEdge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("census: %v", err)
 	}
-	if result.Report.Partition.Unselected != 1 {
-		t.Errorf("expected 1 unselected package, got %d", result.Report.Partition.Unselected)
+	if result.Report.Partition.Unclassified != 1 {
+		t.Errorf("expected 1 unclassified package, got %d", result.Report.Partition.Unclassified)
 	}
 	found := false
 	for _, edge := range result.Report.Contradictions {
-		if edge.To == "example.com/fix/stray" && edge.Class == "unselected" && edge.Scope == "production" {
+		if edge.To == "example.com/fix/stray" && edge.Class == "unclassified" && edge.Scope == "production" {
 			found = true
 		}
 	}
@@ -151,7 +152,7 @@ func TestUnselectedPackagePartitionAndEdge(t *testing.T) {
 			return
 		}
 	}
-	t.Errorf("unselected contradiction not surfaced as blocker: %v", result.Report.Blockers)
+	t.Errorf("unclassified contradiction not surfaced as blocker: %v", result.Report.Blockers)
 }
 
 // TestBuildProfileSelectsFiles proves build-profile identity changes file
@@ -275,16 +276,13 @@ func TestPublicationIgnoresForeignStaging(t *testing.T) {
 // without extending the fixture matrix fails this gate.
 func TestProfileFieldsHaveFixtureDispositions(t *testing.T) {
 	dispositions := map[string]string{
-		"schemaVersion":        "fixtureutil_test.go writeFixtureConfig",
-		"product":              "fixtureutil_test.go writeFixtureConfig",
-		"goModule":             "fixtureutil_test.go writeFixtureConfig",
-		"pin":                  "fixtureutil_test.go writeFixtureConfig + attestation fixtures",
-		"buildProfiles":        "TestBuildProfileSelectsFiles",
-		"ownedRoots":           "TestCensusFixture partition assertions",
-		"testOnlyRoots":        "TestCensusFixture support-scope assertions",
-		"outsideUniverseRoots": "TestCensusFixture pre-census filtering and TestScopeDependencyOutside rejection",
-		"toolingRoots":         "TestCensusFixture universe assertions",
-		"notes":                "documentation-only field, no behavior",
+		"schemaVersion":  "fixtureutil_test.go writeFixtureConfig",
+		"product":        "fixtureutil_test.go writeFixtureConfig",
+		"goModule":       "fixtureutil_test.go writeFixtureConfig",
+		"pin":            "fixtureutil_test.go writeFixtureConfig + attestation fixtures",
+		"buildProfiles":  "TestBuildProfileSelectsFiles",
+		"sourceUniverse": "basicFixtureProfile rules exercise selected/test-only/outside/tooling dispositions; TestUnclassifiedPackagePartitionAndEdge covers total-classification defects; internal/profile rules_test.go covers override/ambiguity/containment",
+		"notes":          "documentation-only field, no behavior",
 	}
 	for _, field := range profileJSONFields(t) {
 		if _, reviewed := dispositions[field]; !reviewed {

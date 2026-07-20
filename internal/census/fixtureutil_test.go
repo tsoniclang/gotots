@@ -101,7 +101,7 @@ func writeFixtureConfig(t *testing.T, revision string, prof map[string]any) *pro
 		t.Fatal(err)
 	}
 
-	prof["schemaVersion"] = 1
+	prof["schemaVersion"] = 2
 	prof["goModule"] = "example.com/fix"
 	prof["pin"] = "pin.json"
 	build := map[string]any{
@@ -208,13 +208,26 @@ func Touch() { _ = http.MethodGet }
 }
 
 func basicFixtureProfile() map[string]any {
+	rule := func(id, disposition string, roots []string, overrides []string, category string) map[string]any {
+		selectors := make([]any, 0, len(roots))
+		for _, root := range roots {
+			selectors = append(selectors, map[string]any{"kind": "subtree", "root": root})
+		}
+		return map[string]any{
+			"id": id, "disposition": disposition, "selectors": selectors,
+			"overrides": overrides, "category": category,
+			"decision": "FIXTURE", "reason": "census fixture",
+		}
+	}
 	return map[string]any{
-		"product":       "fixture",
-		"ownedRoots":    []string{"a", "b.test", "c"},
-		"testOnlyRoots": []string{"support"},
-		"outsideUniverseRoots": map[string]any{
-			"editor-service": []string{"ex"},
+		"product": "fixture",
+		"sourceUniverse": map[string]any{
+			"packageRules": []any{
+				rule("selected", "selected", []string{"a", "b.test", "c"}, []string{}, "product-source"),
+				rule("test-support", "test-only", []string{"support"}, []string{}, "portable-test-support"),
+				rule("outside-editor", "outside-universe", []string{"ex"}, []string{}, "editor-service"),
+				rule("tooling", "tooling", []string{"_tools"}, []string{}, "build-tooling"),
+			},
 		},
-		"toolingRoots": []string{"_tools"},
 	}
 }

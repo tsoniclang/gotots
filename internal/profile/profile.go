@@ -10,9 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/tsoniclang/gotots/internal/pinning"
@@ -38,22 +36,11 @@ type Profile struct {
 	GoModule      string         `json:"goModule"`
 	PinPath       string         `json:"pin"`
 	BuildProfiles []BuildProfile `json:"buildProfiles"`
-	OwnedRoots    []string       `json:"ownedRoots"`
-	// TestOnlyRoots are owned test-support roots: their source is analyzed
-	// under the owned-test scope and may be imported only from test scope.
-	TestOnlyRoots []string `json:"testOnlyRoots"`
-	// OutsideUniverseRoots declare package roots that are completely
-	// outside the GoToTS input universe (LSP, fourslash, editor-service
-	// and their support trees). They are filtered before census: no file,
-	// declaration, test, or external record derives through them, and a
-	// selected dependency into one is a blocking scope error.
-	OutsideUniverseRoots map[string][]string `json:"outsideUniverseRoots"`
-	// ToolingRoots name directory trees (relative to the checkout root, not
-	// package paths) that hold generator/tooling source such as nested tool
-	// modules. Their files are classified tooling in the tracked-source
-	// universe and never enter translation denominators.
-	ToolingRoots []string `json:"toolingRoots"`
-	Notes        []string `json:"notes"`
+	// SourceUniverse is the schema-2 typed package-disposition contract:
+	// every in-checkout package classifies through exactly one winning
+	// rule (explicit override edges; no array-order or prefix authority).
+	SourceUniverse SourceUniverse `json:"sourceUniverse"`
+	Notes          []string       `json:"notes"`
 
 	// Pin is resolved from PinPath at load time.
 	Pin *pinning.Pin `json:"-"`
@@ -81,11 +68,11 @@ func Load(profilePath string) (*Profile, error) {
 	if decoder.More() {
 		return nil, fmt.Errorf("parse profile %s: trailing content after JSON document", profilePath)
 	}
-	if p.SchemaVersion != 1 {
-		return nil, fmt.Errorf("profile %s: unsupported schemaVersion %d", profilePath, p.SchemaVersion)
+	if p.SchemaVersion != 2 {
+		return nil, fmt.Errorf("profile %s: schema version %d is not supported (schema 2 required; no compatibility reader exists)", profilePath, p.SchemaVersion)
 	}
-	if p.GoModule == "" || len(p.OwnedRoots) == 0 || len(p.BuildProfiles) == 0 || p.PinPath == "" {
-		return nil, fmt.Errorf("profile %s: goModule, pin, ownedRoots, and buildProfiles are required", profilePath)
+	if p.GoModule == "" || len(p.SourceUniverse.PackageRules) == 0 || len(p.BuildProfiles) == 0 || p.PinPath == "" {
+		return nil, fmt.Errorf("profile %s: goModule, pin, sourceUniverse.packageRules, and buildProfiles are required", profilePath)
 	}
 	if err := p.validate(); err != nil {
 		return nil, fmt.Errorf("profile %s: %w", profilePath, err)
@@ -106,8 +93,9 @@ func Load(profilePath string) (*Profile, error) {
 	return &p, nil
 }
 
-// validate enforces normalized roots, unique names, disjoint root lists, and
-// reachable nesting. It sorts every list for deterministic iteration.
+// validate enforces build-profile completeness and the schema-2
+// source-universe contract (typed rules, explicit override containment,
+// unambiguous total classification semantics).
 func (p *Profile) validate() error {
 	names := map[string]bool{}
 	for _, build := range p.BuildProfiles {
@@ -118,128 +106,14 @@ func (p *Profile) validate() error {
 			return fmt.Errorf("duplicate build profile name %q", build.Name)
 		}
 		names[build.Name] = true
-		// Unsupported source-selection inputs are rejected before loading
-		// rather than silently producing a wrong file selection. Every
-		// supported architecture's feature variable must be explicit;
-		// architectures without a complete modeled profile fail closed.
-		switch build.GOARCH {
-		case "amd64":
-			if build.GOAMD64 == "" {
-				return fmt.Errorf("build profile %q: goamd64 is required when goarch is amd64", build.Name)
-			}
-			if build.GOARM64 != "" {
-				return fmt.Errorf("build profile %q: goarm64 is only valid when goarch is arm64", build.Name)
-			}
-		case "arm64":
-			if build.GOARM64 == "" {
-				return fmt.Errorf("build profile %q: goarm64 is required when goarch is arm64", build.Name)
-			}
-			if build.GOAMD64 != "" {
-				return fmt.Errorf("build profile %q: goamd64 is only valid when goarch is amd64", build.Name)
-			}
-		default:
-			return fmt.Errorf("build profile %q: goarch %q has no complete modeled feature profile yet", build.Name, build.GOARCH)
+		if build.GOARCH == "amd64" && build.GOAMD64 == "" {
+			return fmt.Errorf("build profile %q: goamd64 is required for amd64", build.Name)
 		}
-		if build.CgoEnabled {
-			return fmt.Errorf("build profile %q: cgoEnabled=true is not supported yet", build.Name)
-		}
-		if len(build.Tags) > 0 {
-			return fmt.Errorf("build profile %q: build tags are not supported yet", build.Name)
+		if build.GOARCH == "arm64" && build.GOARM64 == "" {
+			return fmt.Errorf("build profile %q: goarm64 is required for arm64", build.Name)
 		}
 	}
-
-	seen := map[string]string{} // root -> list it came from
-	checkRoots := func(listName string, roots []string) error {
-		for _, root := range roots {
-			if root == "" || path.Clean(root) != root || path.IsAbs(root) ||
-				strings.HasPrefix(root, "./") || strings.HasPrefix(root, "../") || root == "." {
-				return fmt.Errorf("%s: root %q is not a normalized module-relative path", listName, root)
-			}
-			if previous, ok := seen[root]; ok {
-				return fmt.Errorf("root %q appears in both %s and %s", root, previous, listName)
-			}
-			seen[root] = listName
-		}
-		return nil
-	}
-	if err := checkRoots("ownedRoots", p.OwnedRoots); err != nil {
-		return err
-	}
-	if err := checkRoots("testOnlyRoots", p.TestOnlyRoots); err != nil {
-		return err
-	}
-	categories := make([]string, 0, len(p.OutsideUniverseRoots))
-	for category := range p.OutsideUniverseRoots {
-		categories = append(categories, category)
-	}
-	sort.Strings(categories)
-	for _, category := range categories {
-		if err := checkRoots("outsideUniverseRoots."+category, p.OutsideUniverseRoots[category]); err != nil {
-			return err
-		}
-	}
-
-	for _, root := range p.ToolingRoots {
-		if root == "" || path.Clean(root) != root || path.IsAbs(root) ||
-			strings.HasPrefix(root, "./") || strings.HasPrefix(root, "../") || root == "." {
-			return fmt.Errorf("toolingRoots: root %q is not a normalized checkout-relative path", root)
-		}
-	}
-	sort.Strings(p.ToolingRoots)
-
-	sort.Strings(p.OwnedRoots)
-	sort.Strings(p.TestOnlyRoots)
-	for _, roots := range p.OutsideUniverseRoots {
-		sort.Strings(roots)
-	}
-	if problem := p.invalidRootNesting(); problem != "" {
-		return fmt.Errorf("invalid root nesting: %s", problem)
-	}
-	return nil
-}
-
-// invalidRootNesting rejects root layouts that would make some root
-// unreachable. Outside-universe carve-outs inside owned or test-only roots
-// are legal because the outside match wins first; the reverse nesting is
-// not.
-func (p *Profile) invalidRootNesting() string {
-	under := func(inner, outer string) bool {
-		return inner == outer || strings.HasPrefix(inner, outer+"/")
-	}
-	for categoryName, category := range p.OutsideUniverseRoots {
-		for _, excluded := range category {
-			for _, owned := range p.OwnedRoots {
-				if under(owned, excluded) {
-					return "owned root " + owned + " is inside outside-universe root " + excluded
-				}
-			}
-			for _, testOnly := range p.TestOnlyRoots {
-				if under(testOnly, excluded) {
-					return "test-only root " + testOnly + " is inside outside-universe root " + excluded
-				}
-			}
-			// Nesting across exclusion categories would make classification
-			// depend on category iteration order; reject it outright.
-			for otherName, other := range p.OutsideUniverseRoots {
-				if otherName == categoryName {
-					continue
-				}
-				for _, otherRoot := range other {
-					if under(otherRoot, excluded) {
-						return "outside-universe root " + otherRoot + " (" + otherName + ") is nested inside " + excluded + " (" + categoryName + ")"
-					}
-				}
-			}
-		}
-	}
-	for _, testOnly := range p.TestOnlyRoots {
-		for _, owned := range p.OwnedRoots {
-			if under(owned, testOnly) {
-				return "owned root " + owned + " is inside test-only root " + testOnly
-			}
-		}
-	}
-	return ""
+	return p.SourceUniverse.Validate()
 }
 
 // BuildProfileByName returns the named build profile.
@@ -259,44 +133,49 @@ const (
 	ClassOwned           PackageClass = "selected-owned"
 	ClassTestOnly        PackageClass = "selected-test-support"
 	ClassOutsideUniverse PackageClass = "outside-universe"
-	ClassUnselected      PackageClass = "unselected"
+	ClassTooling         PackageClass = "tooling"
+	ClassPolicyExcluded  PackageClass = "product-policy-excluded"
+	// ClassUnclassified marks a module-internal package no rule matched
+	// or an ambiguous overlap — always a scope defect under the schema-2
+	// total-classification contract, never a silent skip.
+	ClassUnclassified PackageClass = "unclassified"
 	// ClassExternal covers every package outside the owned module. The
-	// standard-library versus third-party split is not decided here: it
-	// requires loader evidence (go list Standard/Module), never path shape.
+	// external-contract subsystem, not the profile, owns its handling.
 	ClassExternal PackageClass = "external"
 )
 
-func matchRoot(relative string, roots []string) bool {
-	for _, root := range roots {
-		if relative == root || strings.HasPrefix(relative, root+"/") {
-			return true
-		}
+// Classify assigns exactly one scope class to a package import path via
+// the schema-2 rule contract. The second result is the winning rule's
+// category (or the classification error text for ClassUnclassified).
+func (p *Profile) Classify(pkgPath string) (PackageClass, string) {
+	if pkgPath != p.GoModule && !strings.HasPrefix(pkgPath, p.GoModule+"/") {
+		return ClassExternal, ""
 	}
-	return false
+	relative := strings.TrimPrefix(strings.TrimPrefix(pkgPath, p.GoModule), "/")
+	rule, err := p.SourceUniverse.Classify(relative)
+	if err != nil {
+		return ClassUnclassified, err.Error()
+	}
+	switch rule.Disposition {
+	case DispositionSelected:
+		return ClassOwned, rule.Category
+	case DispositionTestOnly:
+		return ClassTestOnly, rule.Category
+	case DispositionOutside:
+		return ClassOutsideUniverse, rule.Category
+	case DispositionTooling:
+		return ClassTooling, rule.Category
+	case DispositionPolicyExcluded:
+		return ClassPolicyExcluded, rule.Category
+	}
+	return ClassUnclassified, "unknown disposition " + string(rule.Disposition)
 }
 
-// Classify assigns exactly one scope class to a package import path.
-// The second result names the outside-universe category when applicable.
-func (p *Profile) Classify(pkgPath string) (PackageClass, string) {
-	if pkgPath == p.GoModule || strings.HasPrefix(pkgPath, p.GoModule+"/") {
-		relative := strings.TrimPrefix(strings.TrimPrefix(pkgPath, p.GoModule), "/")
-		categories := make([]string, 0, len(p.OutsideUniverseRoots))
-		for category := range p.OutsideUniverseRoots {
-			categories = append(categories, category)
-		}
-		sort.Strings(categories)
-		for _, category := range categories {
-			if matchRoot(relative, p.OutsideUniverseRoots[category]) {
-				return ClassOutsideUniverse, category
-			}
-		}
-		if matchRoot(relative, p.TestOnlyRoots) {
-			return ClassTestOnly, ""
-		}
-		if matchRoot(relative, p.OwnedRoots) {
-			return ClassOwned, ""
-		}
-		return ClassUnselected, ""
+// ClassifyRule resolves the winning rule itself (provenance consumers).
+func (p *Profile) ClassifyRule(pkgPath string) (*PackageRule, error) {
+	if pkgPath != p.GoModule && !strings.HasPrefix(pkgPath, p.GoModule+"/") {
+		return nil, fmt.Errorf("package %s is outside module %s", pkgPath, p.GoModule)
 	}
-	return ClassExternal, ""
+	relative := strings.TrimPrefix(strings.TrimPrefix(pkgPath, p.GoModule), "/")
+	return p.SourceUniverse.Classify(relative)
 }

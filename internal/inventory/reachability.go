@@ -45,7 +45,7 @@ func attributeReachability(prof *profile.Profile, modulePackages map[string]*Mod
 			seedExternals(pkg.Imports, &testSeeds)
 			seedExternals(pkg.TestImports, &testSeeds)
 			seedExternals(pkg.XTestImports, &testSeeds)
-		case profile.ClassUnselected:
+		case profile.ClassPolicyExcluded, profile.ClassTooling, profile.ClassUnclassified:
 			seedExternals(pkg.Imports, &excludedSeeds)
 			seedExternals(pkg.TestImports, &excludedSeeds)
 			seedExternals(pkg.XTestImports, &excludedSeeds)

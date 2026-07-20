@@ -258,10 +258,20 @@ func recordImports(prof *profile.Profile, externalIndex map[string]*inventory.Ex
 			// see such an edge; reaching here is a filter defect.
 			return fmt.Errorf("GOTOTS_SCOPE_DEPENDENCY_OUTSIDE:\n%s (%s) imports outside-universe package %s (%s)",
 				owner, scopeName, importPath, category)
-		case profile.ClassUnselected:
+		case profile.ClassPolicyExcluded, profile.ClassTooling:
+			// Contract rule 10: no selected source imports policy-excluded
+			// or tooling packages. Recorded as a contradiction edge — the
+			// census completes as non-authoritative evidence and gate 02
+			// fails on the blocker.
 			*edges = append(*edges, Edge{
 				From: owner, File: relative, To: importPath,
-				Class: "unselected", Scope: scopeName,
+				Class: string(importClass), Scope: scopeName,
+			})
+		case profile.ClassUnclassified:
+			// Total-classification defect: the package matched no rule.
+			*edges = append(*edges, Edge{
+				From: owner, File: relative, To: importPath,
+				Class: "unclassified", Scope: scopeName,
 			})
 		case profile.ClassTestOnly:
 			if !isTestScope {

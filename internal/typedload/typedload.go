@@ -22,12 +22,8 @@ import (
 // boundary. Without it, syntax and type information are produced for the
 // root packages only; dependencies are consumed as compiled export data.
 func Load(prof *profile.Profile, env []string, sourceDir string) ([]*packages.Package, error) {
-	patternRoots := append(append([]string{}, prof.OwnedRoots...), prof.TestOnlyRoots...)
-	sort.Strings(patternRoots)
-	patterns := make([]string, 0, len(patternRoots))
-	for _, root := range patternRoots {
-		patterns = append(patterns, "./"+root+"/...")
-	}
+	patterns := append(prof.SourceUniverse.SelectedLoadPatterns(), prof.SourceUniverse.TestOnlyLoadPatterns()...)
+	sort.Strings(patterns)
 
 	config := &packages.Config{
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles |
