@@ -20,6 +20,7 @@ import (
 func translateFunc(p *packages.Package, sourceDir string, unit ir.Scope, relativeFile string, source []byte, decl *ast.FuncDecl, options Options) (*ir.Func, *Proof, error) {
 	name := decl.Name.Name
 	id := goid.Func(p.PkgPath, name)
+	planKey := ""
 	// The proof records the exact EMITTED symbol: a reserved spelling
 	// (NaN, in, ...) escapes with the same single policy the emitter uses.
 	generatedSymbol := tsident.EscapeDeclared(name)
@@ -30,6 +31,7 @@ func translateFunc(p *packages.Package, sourceDir string, unit ir.Scope, relativ
 		// checker), coinciding with every dispatch and call site. The
 		// census identity keeps the source spelling.
 		generatedSymbol = canonicalReceiverBase(p, decl) + "$" + name
+		planKey = goid.Method(p.PkgPath, canonicalReceiverBase(p, decl), name)
 	} else if goid.IsRepeatable("func", name) {
 		// init and blank functions repeat legally: their identities are
 		// position-qualified, exactly like the census records them.
@@ -49,6 +51,9 @@ func translateFunc(p *packages.Package, sourceDir string, unit ir.Scope, relativ
 	}
 
 	function, err := ir.BuildFunc(p, sourceDir, unit, decl, id, bodyHash)
+	if function != nil {
+		function.PlanKey = planKey
+	}
 	if err != nil {
 		return nil, nil, err
 	}

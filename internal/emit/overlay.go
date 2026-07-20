@@ -16,6 +16,7 @@ import "github.com/tsoniclang/gotots/internal/ir"
 func (m *Module) Overlay() *Module {
 	return &Module{
 		Pkg:             m.Pkg,
+		MethodPlans:     m.MethodPlans,
 		PkgName:         m.PkgName,
 		ABI:             m.ABI,
 		ExternMethods:   m.ExternMethods,

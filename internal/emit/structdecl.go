@@ -15,7 +15,8 @@ import (
 // printStruct emits one named struct as a class whose constructor takes
 // every field in declaration order (composite literals pass explicit
 // zeros for omitted fields, so construction is always total).
-func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct) error {
+func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct,
+	memberMethods []*ir.Func, outcomes *[]BodyOutcome, artifacts *[]BodyArtifact) error {
 	p := &printer{out: out, module: module, familyEnc: structDecl.FamilyEnc,
 		familyPtrCell: structDecl.FamilyPtrCell, ptrSplit: anyTrue(structDecl.PtrParams)}
 	export := "export "
@@ -78,6 +79,64 @@ func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct) er
 	p.line("}")
 	if err := printStructValueContract(p, structDecl); err != nil {
 		return fmt.Errorf("%s: %w", structDecl.ID, err)
+	}
+	// ADR-0006-proven methods are ordinary class members: the receiver
+	// binds to `this` in a one-line prologue and the body prints
+	// unchanged. Each member emits transactionally with its own
+	// artifact and emission event, exactly like a free-function body.
+	for _, method := range memberMethods {
+		out.WriteString("\n")
+		m := method
+		err := emitTransactionalBody(out, module, m, "default", func(o *strings.Builder, frag *Module) error {
+			return printMethodMember(o, frag, m)
+		}, outcomes, artifacts)
+		if err != nil {
+			return err
+		}
+	}
+	p.indent--
+	p.line("}")
+	return nil
+}
+
+// printMethodMember emits one proven method as an ordinary class
+// member. Only non-generic struct receivers reach here (the planner
+// keeps generic and carrier receivers on the exception lowering), so
+// no operation factories are in scope.
+func printMethodMember(out *strings.Builder, module *Module, method *ir.Func) error {
+	p := &printer{out: out, module: module}
+	p.indent = 1
+	params := make([]string, 0, len(method.Params))
+	for _, parameter := range method.Params {
+		spelled, err := p.tsType(parameter.Type)
+		if err != nil {
+			return fmt.Errorf("%s: %w", method.ID, err)
+		}
+		params = append(params, tsName(parameter.Name)+": "+spelled)
+	}
+	result, err := p.tsResultType(method.Results)
+	if err != nil {
+		return fmt.Errorf("%s: %w", method.ID, err)
+	}
+	p.slicePlans = method.SlicePlans
+	p.line("%s(%s): %s {", tsName(method.Name), strings.Join(params, ", "), result)
+	p.indent++
+	if method.Placeholder {
+		p.printPlaceholderBody(method.ID)
+		p.indent--
+		p.line("}")
+		return nil
+	}
+	if name := method.Receiver.Name; name != "" && name != "_" {
+		if method.Receiver.Type.Kind == ir.KindStruct {
+			// Value receiver: the method operates on a copy, exactly Go.
+			p.line("const %s = this.goClone$();", tsName(name))
+		} else {
+			p.line("const %s = this;", tsName(name))
+		}
+	}
+	if err := p.printNamedExitBody(method); err != nil {
+		return fmt.Errorf("%s: %w", method.ID, err)
 	}
 	p.indent--
 	p.line("}")

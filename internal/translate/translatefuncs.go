@@ -56,16 +56,35 @@ func translateFunctionsPass(out *Generated, p *packages.Package, sourceDir strin
 				proof.GeneratedSymbol = function.Name
 			}
 			if funcDecl.Recv != nil {
+				recvField := funcDecl.Recv.List[0]
 				recvName := ""
-				if len(funcDecl.Recv.List[0].Names) > 0 {
-					recvName = funcDecl.Recv.List[0].Names[0].Name
+				if len(recvField.Names) > 0 {
+					recvName = recvField.Names[0].Name
 				}
-				_, pointerReceiver := funcDecl.Recv.List[0].Type.(*ast.StarExpr)
+				_, pointerReceiver := recvField.Type.(*ast.StarExpr)
 				fact := facts.AnalyzeReceiverNilability(recvName, pointerReceiver, funcDecl.Body)
+				carrier := false
+				if fnObj := p.TypesInfo.Defs[funcDecl.Name]; fnObj != nil {
+					if signature, ok := fnObj.Type().(*types.Signature); ok && signature.Recv() != nil {
+						recvType := signature.Recv().Type()
+						if pointer, ok := recvType.(*types.Pointer); ok {
+							recvType = pointer.Elem()
+						}
+						_, isStruct := recvType.Underlying().(*types.Struct)
+						carrier = !isStruct
+					}
+				}
+				planKey := function.PlanKey
+				if planKey == "" {
+					planKey = function.ID
+				}
 				out.NilabilityFacts = append(out.NilabilityFacts, NilabilityFact{
-					ID:                function.ID,
+					ID:                planKey,
+					CensusID:          function.ID,
 					EquivalentAtEntry: fact.EquivalentAtEntry,
 					ToleratesNil:      fact.ToleratesNil,
+					GenericReceiver:   receiverIsGeneric(recvField.Type),
+					CarrierReceiver:   carrier,
 				})
 			}
 			ledger = append(ledger, BodySupport{
@@ -135,4 +154,21 @@ func translateFunctionsPass(out *Generated, p *packages.Package, sourceDir strin
 		}
 	}
 	return functions, carrierMethods, initCalls, ledger, unimplementedUnits, nil
+}
+
+// receiverIsGeneric reports whether the receiver type expression names
+// a generic type (T[K] / T[K, V]).
+func receiverIsGeneric(expr ast.Expr) bool {
+	for {
+		switch e := expr.(type) {
+		case *ast.StarExpr:
+			expr = e.X
+		case *ast.ParenExpr:
+			expr = e.X
+		case *ast.IndexExpr, *ast.IndexListExpr:
+			return true
+		default:
+			return false
+		}
+	}
 }

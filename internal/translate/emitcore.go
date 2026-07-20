@@ -33,6 +33,7 @@ func emitCorePackage(out *Generated, p *packages.Package, sourceDir string, unit
 	if err != nil {
 		return err
 	}
+	module.MethodPlans = out.MethodPlans
 	// Every co-generated package this package imports is an
 	// initialization edge: its module must evaluate even when constant
 	// folding or type-only use erased every symbol reference.

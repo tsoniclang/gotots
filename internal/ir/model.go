@@ -281,6 +281,10 @@ type Func struct {
 	Package  string
 	Name     string
 	Exported bool
+	// PlanKey is the method's CANONICAL implementation-plan identity
+	// (alias receivers resolve to the canonical type), matching every
+	// call-site consult. The census ID keeps the source spelling.
+	PlanKey string
 	// MethodIdent is the canonical dispatch identity (MethodKey) of a
 	// method — name, unexported package, and signature digest. It is empty
 	// for free functions. The interface-assertion diagnostic compares these

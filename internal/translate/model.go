@@ -10,6 +10,7 @@ import (
 
 	"github.com/tsoniclang/gotots/contracts"
 	"github.com/tsoniclang/gotots/internal/ir"
+	"github.com/tsoniclang/gotots/internal/plan"
 )
 
 // Proof is the translation proof record of one declaration.
@@ -102,9 +103,21 @@ type ImplementationArtifact struct {
 // NilabilityFact is one method's ADR-0006 analysis result, recorded by
 // the producer during translation and persisted as a dump ledger.
 type NilabilityFact struct {
+	// ID is the CANONICAL plan key (alias receivers resolved);
+	// CensusID keeps the source spelling for census/proof joins.
 	ID                string `json:"id"`
+	CensusID          string `json:"censusId"`
 	EquivalentAtEntry bool   `json:"equivalentAtEntry"`
 	ToleratesNil      bool   `json:"toleratesNil"`
+	// GenericReceiver marks methods of generic types: their ordinary
+	// class-member emission rides the generic ownership wave (step 19)
+	// and the planner keeps them on the exception lowering until then.
+	GenericReceiver bool `json:"genericReceiver"`
+	// CarrierReceiver marks methods whose receiver is a named
+	// non-struct type (a carrier): no class exists to member them, so
+	// they keep the free-function lowering until the carrier ownership
+	// wave.
+	CarrierReceiver bool `json:"carrierReceiver"`
 }
 
 // ModuleDisposition is one selected package's typed module outcome,
@@ -155,6 +168,11 @@ type Generated struct {
 	ImplementationArtifacts []ImplementationArtifact
 	// NilabilityFacts is the per-method ADR-0006 fact ledger.
 	NilabilityFacts []NilabilityFact
+	// MethodPlans is the frozen implementation-plan store the emitters
+	// consume (built from sealed facts after translation, before
+	// emission; never serialized — the plan decisions surface through
+	// the emission ledgers).
+	MethodPlans *plan.ImplStore `json:"-"`
 	// ModuleDispositions is the typed per-package module outcome: every
 	// selected package records exactly one of emitted-runtime,
 	// no-runtime-output, or not-materialized. No consumer may infer a

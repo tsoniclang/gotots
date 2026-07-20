@@ -10,6 +10,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/implid"
 	"github.com/tsoniclang/gotots/internal/ir"
+	"github.com/tsoniclang/gotots/internal/plan"
 )
 
 // Package prints one translated package into a single TypeScript module:
@@ -112,12 +113,20 @@ func Package(module *Module, decls Decls) (string, []BodyOutcome, []BodyArtifact
 	var artifacts []BodyArtifact
 	for _, structDecl := range sortedStructs {
 		body.WriteString("\n")
-		if err := printStruct(&body, module, structDecl); err != nil {
-			return "", nil, nil, err
-		}
 		sortedMethods := append([]*ir.Func{}, structDecl.Methods...)
 		sort.Slice(sortedMethods, func(i, j int) bool { return sortedMethods[i].Name < sortedMethods[j].Name })
+		var memberMethods, freeMethods []*ir.Func
 		for _, method := range sortedMethods {
+			if module.MethodEmissionFor(methodPlanKey(method)) == plan.MethodOrdinaryNilChecked {
+				memberMethods = append(memberMethods, method)
+			} else {
+				freeMethods = append(freeMethods, method)
+			}
+		}
+		if err := printStruct(&body, module, structDecl, memberMethods, &outcomes, &artifacts); err != nil {
+			return "", nil, nil, err
+		}
+		for _, method := range freeMethods {
 			body.WriteString("\n")
 			className := familyName(structDecl)
 			familyEnc := structDecl.FamilyEnc

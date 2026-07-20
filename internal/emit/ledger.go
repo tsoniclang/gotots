@@ -5,6 +5,12 @@
 // identity is a visible defect, never collapsed by a set).
 package emit
 
+import (
+	"github.com/tsoniclang/gotots/internal/implid"
+	"github.com/tsoniclang/gotots/internal/ir"
+	"github.com/tsoniclang/gotots/internal/plan"
+)
+
 // EmissionKind classifies one emission event in a generated module.
 type EmissionKind string
 
@@ -85,4 +91,30 @@ func (m *Module) emissionsSince(from int, id string, kind EmissionKind) bool {
 		}
 	}
 	return false
+}
+
+// MethodEmissionFor consults the frozen plan store for one method's
+// ADR-0006 emission decision. A nil store (unit fixtures) is the
+// zero-proof state: every method takes the conservative exception
+// lowering, exactly as an all-unproven analysis would decide. A
+// PRESENT store missing a method is a planner-totality defect.
+func (m *Module) MethodEmissionFor(sourceID string) plan.MethodEmission {
+	if m.MethodPlans == nil {
+		return plan.MethodFreeFunctionException
+	}
+	p, ok := m.MethodPlans.Get(implid.MustNew(sourceID, "default"))
+	if !ok {
+		panic("emit: method " + sourceID + " has no implementation plan (planner must be total over methods)")
+	}
+	return p.MethodEmission
+}
+
+// methodPlanKey is the canonical plan-consult key of one method: the
+// alias-resolved PlanKey when the builder recorded one, else the
+// declaration ID (fixtures construct Funcs directly).
+func methodPlanKey(method *ir.Func) string {
+	if method.PlanKey != "" {
+		return method.PlanKey
+	}
+	return method.ID
 }

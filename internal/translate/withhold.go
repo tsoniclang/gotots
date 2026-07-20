@@ -81,6 +81,27 @@ func finalizeEvidenceStages(out *Generated) error {
 // The acceptance gate additionally joins proofs to the typed-AST export
 // list (the authoritative check).
 func symbolPresent(content, symbol string) bool {
+	// A class-qualified symbol (Type.member) is a class MEMBER: the
+	// class declaration must exist and an indented member definition
+	// must open inside the file.
+	if class, member, qualified := strings.Cut(symbol, "."); qualified {
+		if !symbolPresent(content, class) {
+			return false
+		}
+		for _, line := range strings.Split(content, "\n") {
+			trimmed := strings.TrimLeft(line, " ")
+			if trimmed == line {
+				continue // top level: not a member line
+			}
+			if rest, has := strings.CutPrefix(trimmed, member); has && rest != "" {
+				switch rest[0] {
+				case '(', '<':
+					return true
+				}
+			}
+		}
+		return false
+	}
 	for _, line := range strings.Split(content, "\n") {
 		rest, ok := strings.CutPrefix(line, "export ")
 		if !ok {

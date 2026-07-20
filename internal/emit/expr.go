@@ -5,7 +5,9 @@ import (
 	"strings"
 
 	"github.com/tsoniclang/gotots/internal/abi"
+	"github.com/tsoniclang/gotots/internal/goid"
 	"github.com/tsoniclang/gotots/internal/ir"
+	"github.com/tsoniclang/gotots/internal/plan"
 )
 
 // family maps an IR integer kind to its ABI carrier family.
@@ -147,6 +149,14 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		}
 		if recvT.MapFamilyPtrCell || (p.familyPtrCell && selfPtrReference(recvT)) {
 			methodClass += "$pc"
+		}
+		if len(n.TypeArgs) == 0 &&
+			p.module.MethodEmissionFor(goid.Method(n.Pkg, n.TypeName, n.Method)) == plan.MethodOrdinaryNilChecked {
+			receiver := recv
+			if n.Recv.Type().Kind == ir.KindPointer {
+				receiver = "gort$.goNilCheck(" + recv + ")"
+			}
+			return receiver + "." + tsName(n.Method) + "(" + args + ")", nil
 		}
 		callee, err := p.module.symbol(n.Pkg, methodClass+"$"+n.Method)
 		if err != nil {
@@ -311,6 +321,40 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 	case *ir.MethodValue:
 		return p.printMethodValue(n)
 	case *ir.FuncRef:
+		// A method expression referencing an ordinary class member has
+		// no free-function symbol: the reference is a receiver-first
+		// adapter arrow built from the expression's own function type.
+		if dollar := strings.Index(n.Name, "$"); dollar > 0 && n.T.Kind == ir.KindFunc && n.T.Sig != nil && len(n.T.Sig.Params) > 0 {
+			typeName, member := n.Name[:dollar], n.Name[dollar+1:]
+			if p.module.MethodEmissionFor(goid.Method(n.Pkg, typeName, member)) == plan.MethodOrdinaryNilChecked {
+				recvType := n.T.Sig.Params[0]
+				recvSpelled, err := p.tsType(recvType)
+				if err != nil {
+					return "", err
+				}
+				params := []string{"$r: " + recvSpelled}
+				names := []string{}
+				for i, param := range n.T.Sig.Params[1:] {
+					spelled, err := p.tsType(param)
+					if err != nil {
+						return "", err
+					}
+					name := fmt.Sprintf("$a%d", i)
+					params = append(params, name+": "+spelled)
+					names = append(names, name)
+				}
+				result, err := p.tsFuncResultType(n.T.Sig.Results)
+				if err != nil {
+					return "", err
+				}
+				receiver := "$r"
+				if recvType.Kind == ir.KindPointer {
+					receiver = "gort$.goNilCheck($r)"
+				}
+				return fmt.Sprintf("((%s): %s => %s.%s(%s))",
+					joinComma(params), result, receiver, tsName(member), joinComma(names)), nil
+			}
+		}
 		return p.module.symbol(n.Pkg, n.Name)
 	case *ir.MethodExprAdapter:
 		callee, err := p.module.symbol(n.Pkg, n.Method)
@@ -341,6 +385,13 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		checkedRecv, err := p.nilCheckOf("$r$", ir.Type{Kind: ir.KindPointer, Elem: &n.RecvValue})
 		if err != nil {
 			return "", err
+		}
+		if typeName := n.RecvValue.Named; typeName != "" {
+			if member, isMethod := strings.CutPrefix(n.Method, typeName+"$"); isMethod &&
+				p.module.MethodEmissionFor(goid.Method(n.Pkg, typeName, member)) == plan.MethodOrdinaryNilChecked {
+				return fmt.Sprintf("(%s): %s => %s.%s(%s)",
+					joinComma(params), result, checkedRecv, tsName(member), joinComma(names)), nil
+			}
 		}
 		operands := append([]string{checkedRecv}, names...)
 		return fmt.Sprintf("(%s): %s => %s(%s)",

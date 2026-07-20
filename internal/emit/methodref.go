@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/tsoniclang/gotots/internal/goid"
 	"github.com/tsoniclang/gotots/internal/ir"
+	"github.com/tsoniclang/gotots/internal/plan"
 )
 
 func (p *printer) printMethodValue(n *ir.MethodValue) (string, error) {
@@ -54,6 +56,12 @@ func (p *printer) printMethodValue(n *ir.MethodValue) (string, error) {
 		if err != nil {
 			return "", err
 		}
+	} else if p.module.MethodEmissionFor(goid.Method(n.Pkg, n.TypeName, n.Method)) == plan.MethodOrdinaryNilChecked {
+		receiver := "$r"
+		if n.Recv.Type().Kind == ir.KindPointer {
+			receiver = "gort$.goNilCheck($r)"
+		}
+		call = receiver + "." + tsName(n.Method) + "(" + joinComma(args) + ")"
 	} else {
 		callee, err := p.module.symbol(n.Pkg, n.TypeName+"$"+n.Method)
 		if err != nil {

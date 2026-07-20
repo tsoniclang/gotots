@@ -10,6 +10,8 @@
 // them.
 package goid
 
+import "go/types"
+
 import "fmt"
 
 // Func is the identity of a package-level function.
@@ -49,4 +51,24 @@ func IsRepeatable(kind, name string) bool {
 		return true
 	}
 	return kind == "func" && name == "init"
+}
+
+// CanonicalReceiver resolves a method's receiver base name through the
+// TYPE OBJECT — aliases resolve to the canonical named type, so one
+// method has one identity regardless of how a declaration spells its
+// receiver. The syntactic spelling is never identity.
+func CanonicalReceiver(method *types.Func) string {
+	signature, ok := method.Type().(*types.Signature)
+	if !ok || signature.Recv() == nil {
+		return ""
+	}
+	t := signature.Recv().Type()
+	if pointer, isPointer := t.(*types.Pointer); isPointer {
+		t = pointer.Elem()
+	}
+	named, ok := types.Unalias(t).(*types.Named)
+	if !ok {
+		return ""
+	}
+	return named.Obj().Name()
 }

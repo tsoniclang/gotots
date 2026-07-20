@@ -22,7 +22,12 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/abi"
 	"github.com/tsoniclang/gotots/internal/emit"
+	"github.com/tsoniclang/gotots/internal/facts"
+	"github.com/tsoniclang/gotots/internal/implid"
 	"github.com/tsoniclang/gotots/internal/ir"
+	"github.com/tsoniclang/gotots/internal/plan"
+	"github.com/tsoniclang/gotots/internal/tsident"
+	"strings"
 )
 
 // Packages translates a set of loaded production packages as one unit:
@@ -58,6 +63,61 @@ func Packages(pkgs []*packages.Package, sourceDir string, options Options) (*Gen
 			return nil, err
 		}
 	}
+	// The pipeline boundary: translation is complete, so the whole-
+	// program facts seal and the plans freeze BEFORE any emitter runs.
+	factStore := facts.New()
+	for _, fact := range out.NilabilityFacts {
+		f := facts.ReceiverNilability{EquivalentAtEntry: fact.EquivalentAtEntry, ToleratesNil: fact.ToleratesNil}
+		if fact.GenericReceiver || fact.CarrierReceiver {
+			// Generic-container methods ride the generic ownership wave
+			// (step 19) and carrier-receiver methods the carrier wave:
+			// withhold the entry-equivalence proof so the planner keeps
+			// them on the exception lowering.
+			f = facts.ReceiverNilability{ToleratesNil: fact.ToleratesNil}
+		}
+		factStore.PutReceiverNilability(fact.ID, f)
+	}
+	factStore.Seal()
+	planBuilder := plan.NewImplBuilder()
+	methods := make([]implid.ID, 0, len(out.NilabilityFacts))
+	for _, fact := range out.NilabilityFacts {
+		methods = append(methods, implid.MustNew(fact.ID, "default"))
+	}
+	if err := plan.BuildMethodPlans(planBuilder, factStore, methods); err != nil {
+		return nil, err
+	}
+	out.MethodPlans = planBuilder.Build()
+	// The plan owns each method's emitted symbol: proofs of
+	// ordinary-planned methods record the class-member spelling instead
+	// of the legacy free-function symbol.
+	planKeyByCensus := make(map[string]string, len(out.NilabilityFacts))
+	for _, fact := range out.NilabilityFacts {
+		planKeyByCensus[fact.CensusID] = fact.ID
+	}
+	for i := range out.Proofs {
+		planKey, isMethod := planKeyByCensus[out.Proofs[i].ID]
+		if !isMethod {
+			continue
+		}
+		id := planKey
+		p, ok := out.MethodPlans.Get(implid.MustNew(id, "default"))
+		if !ok || p.MethodEmission != plan.MethodOrdinaryNilChecked {
+			continue
+		}
+		symbol := id
+		if last := strings.LastIndex(symbol, "::"); last >= 0 {
+			symbol = symbol[last+2:]
+		}
+		// Class-qualified member evidence: Type.member, each segment in
+		// its emitted spelling.
+		if dot := strings.LastIndex(symbol, "."); dot >= 0 {
+			symbol = tsident.EscapeDeclared(symbol[:dot]) + "." + tsident.EscapeDeclared(symbol[dot+1:])
+		} else {
+			symbol = tsident.EscapeDeclared(symbol)
+		}
+		out.Proofs[i].GeneratedSymbol = symbol
+	}
+
 	// Materialization cascade FIRST, over source imports (declaration
 	// blockers are known before emission): a package importing a
 	// non-materializable one cannot materialize either. The fixed point

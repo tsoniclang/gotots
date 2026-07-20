@@ -8,7 +8,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/tsoniclang/gotots/internal/goid"
 	"github.com/tsoniclang/gotots/internal/ir"
+	"github.com/tsoniclang/gotots/internal/plan"
 )
 
 // printVtables emits the type's shared dispatch tables: one const per
@@ -35,7 +37,10 @@ func printVtables(out *strings.Builder, module *Module, info RttiInfo) error {
 // vtableEntries spells the adapters of both flavors.
 func (p *printer) vtableEntries(info RttiInfo) ([]string, []string, error) {
 	self := tsName(info.TypeName)
-	adapter := func(methodName string, params []ir.Var, resultVars []ir.Var, callee string, recvSpelling string, chain string) (string, error) {
+	// memberOf: "" spells the legacy free-function adapter; a member
+	// name spells the ordinary class-member call on the chained
+	// receiver (the ADR-0006 form).
+	adapter := func(methodName string, params []ir.Var, resultVars []ir.Var, callee string, recvSpelling string, chain string, memberOf string) (string, error) {
 		results := make([]ir.Type, len(resultVars))
 		for i, r := range resultVars {
 			results[i] = r.Type
@@ -55,6 +60,9 @@ func (p *printer) vtableEntries(info RttiInfo) ([]string, []string, error) {
 		if err != nil {
 			return "", err
 		}
+		if memberOf != "" {
+			return fmt.Sprintf("%s: (%s): %s => %s.%s(%s)", methodName, joinComma(parts), result, chain, memberOf, joinComma(names)), nil
+		}
 		operands := append([]string{chain}, names...)
 		return fmt.Sprintf("%s: (%s): %s => %s(%s)", methodName, joinComma(parts), result, callee, joinComma(operands)), nil
 	}
@@ -67,6 +75,10 @@ func (p *printer) vtableEntries(info RttiInfo) ([]string, []string, error) {
 		// slot is a construction defect, not a spelling fallback.
 		slot := requireIdentity(method.Slot, "vtable slot for method "+method.Name)
 		callee := info.TypeName + "$" + method.Name
+		memberOf := ""
+		if p.module.MethodEmissionFor(methodPlanKey(method)) == plan.MethodOrdinaryNilChecked {
+			memberOf = tsName(method.Name)
+		}
 		recvType := method.Receiver.Type
 		if !method.PointerReceiver {
 			// Value flavor: the payload is the receiver value exactly.
@@ -74,7 +86,7 @@ func (p *printer) vtableEntries(info RttiInfo) ([]string, []string, error) {
 			if err != nil {
 				return nil, nil, err
 			}
-			entry, err := adapter(slot, method.Params, method.Results, callee, recvSpelled, "$r")
+			entry, err := adapter(slot, method.Params, method.Results, callee, recvSpelled, "$r", memberOf)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -96,7 +108,7 @@ func (p *printer) vtableEntries(info RttiInfo) ([]string, []string, error) {
 				cell := "gort$.GoCell<" + recvSpelled + ">"
 				chain = "gort$.goNilCheck<" + cell + ">($r).v"
 			}
-			entryPtr, err := adapter(slot, method.Params, method.Results, callee, ptrSpelled, chain)
+			entryPtr, err := adapter(slot, method.Params, method.Results, callee, ptrSpelled, chain, memberOf)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -104,12 +116,18 @@ func (p *printer) vtableEntries(info RttiInfo) ([]string, []string, error) {
 			continue
 		}
 		// Pointer receiver: the generated function takes the pointer
-		// carrier itself; Go runs it on nil (body derefs panic).
+		// carrier itself; Go runs it on nil (body derefs panic). The
+		// MEMBER form guards at the call — the ADR-0006-proven
+		// equivalent of that first in-body dereference.
 		recvSpelled, err := p.tsType(recvType)
 		if err != nil {
 			return nil, nil, err
 		}
-		entry, err := adapter(slot, method.Params, method.Results, callee, recvSpelled, "$r")
+		chain := "$r"
+		if memberOf != "" {
+			chain = "gort$.goNilCheck($r)"
+		}
+		entry, err := adapter(slot, method.Params, method.Results, callee, recvSpelled, chain, memberOf)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -151,6 +169,25 @@ func (p *printer) vtableEntries(info RttiInfo) ([]string, []string, error) {
 		// unexported methods from different packages both promote); an empty
 		// slot is a construction defect, not a spelling fallback.
 		slot := requireIdentity(delegate.Slot, "vtable slot for promoted method "+delegate.Name)
+		if p.module.MethodEmissionFor(goid.Method(targetPkg, targetType, delegate.Name)) == plan.MethodOrdinaryNilChecked {
+			// The declaring method is an ordinary class member: the
+			// adapter calls member-shaped and types its parameters
+			// through the class member itself.
+			declClass, err := p.module.typeSymbol(targetPkg, targetType)
+			if err != nil {
+				return nil, nil, err
+			}
+			member := tsName(delegate.Name)
+			valueEntry := fmt.Sprintf("%s: ($r: %s, ...$a: Parameters<%s[%q]>) => %s.%s(...$a)",
+				slot, self, declClass, member, chain, member)
+			pointerEntry := fmt.Sprintf("%s: ($r: (%s | undefined), ...$a: Parameters<%s[%q]>) => %s.%s(...$a)",
+				slot, self, declClass, member, chainOver("gort$.goNilCheck<"+self+">($r)", delegate), member)
+			if delegate.ValueReceiver {
+				valueSet = append(valueSet, valueEntry)
+			}
+			pointerSet = append(pointerSet, pointerEntry)
+			continue
+		}
 		valueEntry := fmt.Sprintf("%s: ($r: %s, ...$a: goif$.DropFirst<Parameters<typeof %s>>) => %s(%s, ...$a)",
 			slot, self, target, target, chain)
 		pointerEntry := fmt.Sprintf("%s: ($r: (%s | undefined), ...$a: goif$.DropFirst<Parameters<typeof %s>>) => %s(%s, ...$a)",

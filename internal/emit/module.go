@@ -3,6 +3,7 @@ package emit
 import (
 	"fmt"
 	"github.com/tsoniclang/gotots/internal/ir"
+	"github.com/tsoniclang/gotots/internal/plan"
 	"sort"
 	"strings"
 )
@@ -111,6 +112,10 @@ type Module struct {
 	// reference survives — folded constants and type-only uses erase the
 	// reference but not the initialization dependency.
 	initEdges map[string]bool
+	// MethodPlans is the frozen implementation-plan store (nil only in
+	// unit fixtures, which then take the conservative exception path
+	// for every method — identical to an all-unproven analysis).
+	MethodPlans *plan.ImplStore
 	// emissions and externSymbols are the module-owned emission ledger
 	// (ledger.go): appended at print sites, merged by overlay Commit.
 	emissions     []EmissionEvent
