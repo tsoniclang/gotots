@@ -6,6 +6,7 @@ package translate
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/tsoniclang/gotots/internal/abi"
@@ -56,6 +57,8 @@ func emitCorePackage(out *Generated, p *packages.Package, sourceDir string, unit
 		reason := "emitter defect (declaration-level)"
 		out.NotMaterialized[p.PkgPath] = reason
 		out.Withheld[p.PkgPath] = reason
+		out.ModuleDispositions = append(out.ModuleDispositions,
+			ModuleDisposition{Package: p.PkgPath, State: "not-materialized", Reason: reason})
 		return nil
 	}
 	applyBodyOutcomes(out, p.PkgPath, outcomes)
@@ -72,16 +75,27 @@ func emitCorePackage(out *Generated, p *packages.Package, sourceDir string, unit
 	for _, artifact := range artifacts {
 		digest := sha256.Sum256([]byte(artifact.Text))
 		hash := hex.EncodeToString(digest[:])
-		hashes[artifact.ID] = hash
-		artifactPath := "analysis/bodies/" + p.PkgPath + "/" + sanitizeArtifactName(artifact.ID) + ".ts.txt"
+		if _, taken := hashes[artifact.ImplementationID]; taken {
+			// ADR-0010: one implementation owns one artifact and hash.
+			// A second write is a collision — generation fails, it never
+			// overwrites.
+			return fmt.Errorf("implementation artifact collision: %s emitted twice in %s", artifact.ImplementationID, p.PkgPath)
+		}
+		hashes[artifact.ImplementationID] = hash
+		artifactPath := "analysis/bodies/" + p.PkgPath + "/" + sanitizeArtifactName(artifact.ImplementationID) + ".ts.txt"
+		if _, taken := out.Files[artifactPath]; taken {
+			return fmt.Errorf("artifact path collision: %s (non-injective identity spelling)", artifactPath)
+		}
 		out.Files[artifactPath] = artifact.Text
 		out.Ownership[artifactPath] = "analysis-body"
+		out.ImplementationArtifacts = append(out.ImplementationArtifacts,
+			ImplementationArtifact{ImplementationID: artifact.ImplementationID, SourceID: artifact.ID, Package: p.PkgPath, Sha256: hash})
 	}
 	for i := range out.Proofs {
 		if out.Proofs[i].Package != p.PkgPath {
 			continue
 		}
-		if hash, has := hashes[out.Proofs[i].ID]; has {
+		if hash, has := hashes[out.Proofs[i].ID+"/default"]; has {
 			out.Proofs[i].LoweredHash = hash
 		}
 	}
@@ -97,6 +111,9 @@ func emitCorePackage(out *Generated, p *packages.Package, sourceDir string, unit
 	}
 	out.Files[corePath] = coreContent
 	out.Ownership[corePath] = "generated-core"
+	out.Emissions = append(out.Emissions, module.Emissions()...)
+	out.ModuleDispositions = append(out.ModuleDispositions,
+		ModuleDisposition{Package: p.PkgPath, State: "emitted-runtime", Module: corePath})
 	if out.ModuleImports == nil {
 		out.ModuleImports = map[string][]string{}
 	}

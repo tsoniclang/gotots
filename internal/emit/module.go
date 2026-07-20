@@ -111,6 +111,10 @@ type Module struct {
 	// reference survives — folded constants and type-only uses erase the
 	// reference but not the initialization dependency.
 	initEdges map[string]bool
+	// emissions and externSymbols are the module-owned emission ledger
+	// (ledger.go): appended at print sites, merged by overlay Commit.
+	emissions     []EmissionEvent
+	externSymbols []ExternSymbolRecord
 	// parent, when set, marks this module as a transactional overlay: reads
 	// consult the chain, writes stay here until Commit (overlay.go).
 	parent *Module

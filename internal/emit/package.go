@@ -46,8 +46,12 @@ type BodyOutcome struct {
 // exact emitted fragment (spec 01) — never a module, never imported or
 // executed — retained for EVERY lowered body, withheld packages included.
 type BodyArtifact struct {
-	ID   string
-	Text string
+	ID string
+	// ImplementationID = ID + "/" + specialization key (ADR-0010): the
+	// artifact/hash owner. Two artifacts with one ImplementationID are
+	// a collision and fail generation.
+	ImplementationID string
+	Text             string
 }
 
 // emitTransactionalBody prints one body through print into an overlay and
@@ -56,15 +60,19 @@ type BodyArtifact struct {
 // overlay, so nothing of the failed attempt leaks), and records the
 // outcome. Only a placeholder that itself fails to emit aborts the
 // package (its signature is a declaration-level defect).
-func emitTransactionalBody(body *strings.Builder, module *Module, fn *ir.Func,
+func emitTransactionalBody(body *strings.Builder, module *Module, fn *ir.Func, specKey string,
 	print func(*strings.Builder, *Module) error, outcomes *[]BodyOutcome, artifacts *[]BodyArtifact) error {
 	fragment := module.Overlay()
 	var buf strings.Builder
+	before := len(module.emissions)
 	err := print(&buf, fragment)
 	if err == nil {
 		fragment.Commit()
+		if !module.emissionsSince(before, fn.ID, EmissionBodyPlaceholder) {
+			module.recordEmission(fn.ID, EmissionBody, specKey)
+		}
 		body.WriteString(buf.String())
-		*artifacts = append(*artifacts, BodyArtifact{ID: fn.ID, Text: buf.String()})
+		*artifacts = append(*artifacts, BodyArtifact{ID: fn.ID, ImplementationID: fn.ID + "/" + specKey, Text: buf.String()})
 		return nil
 	}
 	outcome := BodyOutcome{ID: fn.ID, Kind: OutcomeEmitterDefect, Err: err.Error()}
@@ -80,7 +88,7 @@ func emitTransactionalBody(body *strings.Builder, module *Module, fn *ir.Func,
 	}
 	retry.Commit()
 	body.WriteString(placeholder.String())
-	*artifacts = append(*artifacts, BodyArtifact{ID: fn.ID, Text: placeholder.String()})
+	*artifacts = append(*artifacts, BodyArtifact{ID: fn.ID, ImplementationID: fn.ID + "/" + specKey, Text: placeholder.String()})
 	*outcomes = append(*outcomes, outcome)
 	return nil
 }
@@ -113,7 +121,7 @@ func Package(module *Module, decls Decls) (string, []BodyOutcome, []BodyArtifact
 			className := familyName(structDecl)
 			familyEnc := structDecl.FamilyEnc
 			familyPtr := structDecl.FamilyPtrCell
-			err := emitTransactionalBody(&body, module, method, func(out *strings.Builder, frag *Module) error {
+			err := emitTransactionalBody(&body, module, method, specializationKey(familyEnc || method.FamilyEnc, familyPtr || method.FamilyPtrCell), func(out *strings.Builder, frag *Module) error {
 				return printMethodFunctionVariant(out, frag, className, method, familyEnc, familyPtr)
 			}, &outcomes, &artifacts)
 			if err != nil {
@@ -148,7 +156,7 @@ func Package(module *Module, decls Decls) (string, []BodyOutcome, []BodyArtifact
 	for _, method := range sortedMethodDecls {
 		body.WriteString("\n")
 		typeName, fn := method.TypeName, method.Fn
-		err := emitTransactionalBody(&body, module, fn, func(out *strings.Builder, frag *Module) error {
+		err := emitTransactionalBody(&body, module, fn, specializationKey(fn.FamilyEnc, fn.FamilyPtrCell), func(out *strings.Builder, frag *Module) error {
 			return printMethodFunction(out, frag, typeName, fn)
 		}, &outcomes, &artifacts)
 		if err != nil {
@@ -226,7 +234,7 @@ func Package(module *Module, decls Decls) (string, []BodyOutcome, []BodyArtifact
 	for _, function := range sorted {
 		body.WriteString("\n")
 		fn := function
-		err := emitTransactionalBody(&body, module, fn, func(out *strings.Builder, frag *Module) error {
+		err := emitTransactionalBody(&body, module, fn, specializationKey(fn.FamilyEnc, fn.FamilyPtrCell), func(out *strings.Builder, frag *Module) error {
 			return printFunc(out, frag, fn)
 		}, &outcomes, &artifacts)
 		if err != nil {
@@ -244,9 +252,11 @@ func Package(module *Module, decls Decls) (string, []BodyOutcome, []BodyArtifact
 			if packageVar.Placeholder {
 				// The initializer is a recorded unsupported construct: its
 				// order slot fails closed with the exact body identity.
-				p.line("gort$.goBodyUnimplemented(%q);", packageVar.PlaceholderID)
+				module.recordEmission(packageVar.ID, EmissionInitializerPlaceholder, "default")
+				p.line("gort$.goBodyUnimplemented(%q);", packageVar.ID)
 				continue
 			}
+			module.recordEmission(packageVar.ID, EmissionInitializer, "default")
 			init, err := p.printExpr(packageVar.Init)
 			if err != nil {
 				return "", nil, nil, err

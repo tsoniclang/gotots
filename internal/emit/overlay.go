@@ -39,6 +39,8 @@ func (m *Module) Overlay() *Module {
 // emitted alias block stays deterministic).
 func (m *Module) Commit() {
 	p := m.parent
+	p.emissions = append(p.emissions, m.emissions...)
+	p.externSymbols = append(p.externSymbols, m.externSymbols...)
 	for pkg := range m.used {
 		p.used[pkg] = true
 	}

@@ -199,6 +199,7 @@ func printIfaceDelegate(out *strings.Builder, module *Module, structName string,
 	if err != nil {
 		return err
 	}
+	p.module.recordExternSymbol(tsName(structName)+"$"+delegate.Name, "")
 	p.line("export function %s$%s(%s): %s {", tsName(structName), delegate.Name, joinComma(params), result)
 	p.indent++
 	call := &ir.IfaceCall{

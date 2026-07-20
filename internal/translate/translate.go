@@ -81,7 +81,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 			return false
 		}
 		ledger = append(ledger, BodySupport{
-			ID: id, Package: p.PkgPath, State: ir.SupportUnimplemented,
+			ID: id, Package: p.PkgPath, Kind: "declaration", State: ir.SupportUnimplemented,
 			Sites: []ir.UnsupportedSite{ir.SiteOf(unsupported)},
 		})
 		unimplementedUnits++
@@ -327,7 +327,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 								return err
 							}
 							ledger = append(ledger, BodySupport{
-								ID: variableID, Package: p.PkgPath, State: ir.SupportUnimplemented,
+								ID: variableID, Package: p.PkgPath, Kind: "initializer", State: ir.SupportUnimplemented,
 								Sites: []ir.UnsupportedSite{ir.SiteOf(unsupported)},
 							})
 							unimplementedUnits++
@@ -347,7 +347,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 							}
 							packageVars = append(packageVars, emit.PackageVar{
 								Name: "_", Type: t, Init: init, Order: order, Blank: true,
-								Placeholder: placeholderVar, PlaceholderID: variableID,
+								Placeholder: placeholderVar, ID: variableID,
 							})
 							if placeholderVar {
 								// The unimplemented ledger entry IS the
@@ -367,7 +367,7 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 						}
 						packageVars = append(packageVars, emit.PackageVar{
 							Name: name.Name, Type: t, Init: init, Exported: name.IsExported(), Order: order,
-							Placeholder: placeholderVar, PlaceholderID: variableID,
+							Placeholder: placeholderVar, ID: variableID,
 						})
 						if placeholderVar {
 							// The unimplemented ledger entry IS the disposition;
@@ -482,10 +482,14 @@ func translatePackage(out *Generated, p *packages.Package, sourceDir string, uni
 	if len(functions) == 0 && len(structs) == 0 && len(carrierMethods) == 0 && len(packageVars) == 0 &&
 		len(carrierTypes) == 0 && len(initCalls) == 0 {
 		// A package whose declarations are all compile-time (constants
-		// fold at use sites) emits an empty module: dependents reference
-		// no runtime symbol from it. A CARRIER TYPE (a named non-struct
+		// fold at use sites) emits no module: dependents reference no
+		// runtime symbol from it. A CARRIER TYPE (a named non-struct
 		// type with its rtti) or an init function is a runtime symbol and
-		// must emit — its proofs reference the module file.
+		// must emit — its proofs reference the module file. The typed
+		// disposition is recorded here, at the decision site.
+		out.ModuleDispositions = append(out.ModuleDispositions,
+			ModuleDisposition{Package: p.PkgPath, State: "no-runtime-output",
+				Reason: "all declarations are compile-time; constants fold at use sites"})
 		return nil
 	}
 

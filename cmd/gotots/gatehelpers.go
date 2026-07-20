@@ -19,6 +19,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/translate"
 
 	"github.com/tsoniclang/gotots/contracts"
+	"github.com/tsoniclang/gotots/internal/reconcile"
 )
 
 func runInRepo(dir, name string, args ...string) (string, error) {
@@ -331,6 +332,20 @@ func reconcileDispositions(prof *profile.Profile, firstRun *census.Result, gener
 	if bannedKeyHelpers > 0 {
 		conflicts = append(conflicts, fmt.Sprintf("%d banned key-helper occurrences (goKeyOpaque/goKeyScalar) in generated core", bannedKeyHelpers))
 	}
+	// The canonical identity-join reconciliation: every count carries a
+	// named denominator, every join delta a disposition; a reconciliation
+	// defect (an identity on one side without an explaining disposition)
+	// is a conflict.
+	// The head identity is bound by the enclosing gate report; the
+	// identity join itself is revision-agnostic.
+	identityReport := reconcile.Build("", firstRun, generated)
+	for _, defect := range identityReport.Defects() {
+		conflicts = append(conflicts, "identity reconciliation: "+defect.ID+" — "+defect.Disposition)
+	}
+	for _, denominator := range identityReport.Denominators {
+		details = append(details, "denominator "+denominator.Name+": "+fmt.Sprintf("%d", denominator.Count)+" ("+denominator.Definition+")")
+	}
+
 	// The §C manual-completion contract: every unimplemented BODY carries
 	// exactly one reviewed disposition, with its exact blocker-construct
 	// set — an undisposed body, a stale entry, or blocker drift is a

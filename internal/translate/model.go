@@ -5,6 +5,7 @@ package translate
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"github.com/tsoniclang/gotots/internal/emit"
 	"sync"
 
 	"github.com/tsoniclang/gotots/contracts"
@@ -74,10 +75,35 @@ type Proof struct {
 // unsupported operation site is retained, and an unimplemented unit
 // never has an emitted body.
 type BodySupport struct {
-	ID      string               `json:"id"`
-	Package string               `json:"package"`
-	State   ir.SupportState      `json:"state"`
-	Sites   []ir.UnsupportedSite `json:"sites,omitempty"`
+	ID      string `json:"id"`
+	Package string `json:"package"`
+	// Kind is the typed entity class of this record: "body" for
+	// function/method bodies, "initializer" for package-variable
+	// initializers, "declaration" for declaration-level blockers.
+	// Producers set it; no consumer may infer it from ID spelling.
+	Kind  string               `json:"kind"`
+	State ir.SupportState      `json:"state"`
+	Sites []ir.UnsupportedSite `json:"sites,omitempty"`
+}
+
+// ImplementationArtifact is one implementation's artifact record
+// (ADR-0010): exactly one per ImplementationID, hard-failed on
+// duplicates at emission.
+type ImplementationArtifact struct {
+	ImplementationID string `json:"implementationId"`
+	SourceID         string `json:"sourceId"`
+	Package          string `json:"package"`
+	Sha256           string `json:"sha256"`
+}
+
+// ModuleDisposition is one selected package's typed module outcome,
+// recorded by the emission driver at the decision site.
+type ModuleDisposition struct {
+	Package string `json:"package"`
+	// State: "emitted-runtime" | "no-runtime-output" | "not-materialized".
+	State  string `json:"state"`
+	Module string `json:"module,omitempty"`
+	Reason string `json:"reason,omitempty"`
 }
 
 // FuncLitSupport is one function literal's independent disposition.
@@ -105,6 +131,22 @@ type Generated struct {
 	KeyUnreachableClaims map[string]bool
 	// Support is the per-unit implementation support ledger.
 	Support []BodySupport
+	// Emissions is the emitter-owned emission-event ledger, collected
+	// from every module in emission order: one event per emitted body,
+	// placeholder, or initializer slot. Multiplicity is evidence.
+	Emissions []emit.EmissionEvent
+	// ExternSymbols is the emitter-owned exported-symbol ledger of
+	// external-contract modules: stub symbols carry their thrown
+	// obligation identity; support definitions carry none.
+	ExternSymbols []emit.ExternSymbolRecord
+	// ImplementationArtifacts is the one-artifact-per-implementation
+	// ledger (ADR-0010); duplicates fail generation.
+	ImplementationArtifacts []ImplementationArtifact
+	// ModuleDispositions is the typed per-package module outcome: every
+	// selected package records exactly one of emitted-runtime,
+	// no-runtime-output, or not-materialized. No consumer may infer a
+	// package's module state from file presence.
+	ModuleDispositions []ModuleDisposition
 	// Withheld maps package path -> reason runnable output is WITHHELD FROM
 	// PUBLICATION. A withheld package is still MATERIALIZED (its analyzable
 	// TypeScript is emitted and retained) unless it is also NotMaterialized;

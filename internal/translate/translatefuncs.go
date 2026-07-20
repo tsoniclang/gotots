@@ -55,7 +55,7 @@ func translateFunctionsPass(out *Generated, p *packages.Package, sourceDir strin
 				proof.GeneratedSymbol = function.Name
 			}
 			ledger = append(ledger, BodySupport{
-				ID: function.ID, Package: p.PkgPath, State: function.Support, Sites: function.Sites,
+				ID: function.ID, Package: p.PkgPath, Kind: "body", State: function.Support, Sites: function.Sites,
 			})
 			if function.Support == ir.SupportIRAdmitted {
 				registry, err := supportRegistry()

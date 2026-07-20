@@ -63,10 +63,12 @@ type PackageVar struct {
 	// unsupported construct: the binding still declares with its exact
 	// type and zero value (the declaration surface stays whole, so the
 	// package materializes and typechecks), and its initializer slot
-	// becomes a typed throwing call carrying PlaceholderID — running it
+	// becomes a typed throwing call carrying ID — running it
 	// fails closed, and the package is publication-withheld.
-	Placeholder   bool
-	PlaceholderID string
+	Placeholder bool
+	// ID is the variable's canonical declaration identity, recorded on
+	// every initializer emission event and spelled in placeholder slots.
+	ID string
 }
 
 // CarrierType is one named non-struct type: erased to its carrier, it
@@ -264,6 +266,7 @@ func printFunc(out *strings.Builder, module *Module, function *ir.Func) error {
 // declaration typechecks against any declared return type while calling it
 // fails closed with the body's exact identity.
 func (p *printer) printPlaceholderBody(id string) {
+	p.module.recordEmission(id, EmissionBodyPlaceholder, specializationKey(p.familyEnc, p.familyPtrCell))
 	p.line("gort$.goBodyUnimplemented(%q);", id)
 }
 

@@ -126,6 +126,7 @@ func emitExternalStubs(out *Generated, unit ir.Scope, context *packages.Package,
 		}
 		out.Files[stubPath] = content
 		out.Ownership[stubPath] = "generated-external-contracts"
+		out.ExternSymbols = append(out.ExternSymbols, module.ExternSymbols()...)
 	}
 	return nil
 }

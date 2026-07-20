@@ -97,6 +97,7 @@ func printStubFunc(out *strings.Builder, module *Module, fn StubFunc) error {
 	}
 
 	_ = names
+	module.recordExternSymbol(fn.Name, fn.ID)
 	p.line("export function %s%s(%s): %s {", fn.Name, generics, strings.Join(params, ", "), result)
 	p.indent++
 	// The stub is the typed contract with no behavior: it fails closed
@@ -143,6 +144,7 @@ func printStubMember(out *strings.Builder, module *Module, member StubMember) er
 	if err != nil {
 		return fmt.Errorf("%s: %w", member.ID, err)
 	}
+	module.recordExternSymbol(member.Name, member.ID)
 	p.line("export function %s(%s): %s {", member.Name, strings.Join(params, ", "), result)
 	p.indent++
 	p.line("return goext$.goExternalUnimplemented(%q);", member.ID)

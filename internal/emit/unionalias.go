@@ -288,6 +288,7 @@ func (p *printer) retainedMembers(t ir.Type) []ir.IfaceMember {
 // (dynamic type, pointer) key equality. The nil interface is its own key.
 func (p *printer) ifaceKeyFn(t ir.Type, name string) (string, error) {
 	var b strings.Builder
+	p.module.recordExternSymbol(name+"$key", "")
 	fmt.Fprintf(&b, "export function %s$key($v: %s): string {\n", name, name)
 	b.WriteString("  if ($v === undefined) return \"n\";\n")
 	members := p.retainedMembers(t)

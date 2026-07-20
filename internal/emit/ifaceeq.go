@@ -40,6 +40,7 @@ func (p *printer) ifaceEqFn(t ir.Type, name string) string {
 		}
 	}
 	var b strings.Builder
+	p.module.recordExternSymbol(name+"$eq", "")
 	fmt.Fprintf(&b, "export function %s$eq(a: %s, b: %s): boolean {\n", name, name, name)
 	if len(cases) == 0 {
 		// A union with no retained members admits only the nil interface:
