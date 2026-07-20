@@ -23,8 +23,12 @@ func fixture() (*census.Result, *translate.Generated) {
 			{ID: "p::func::B", Package: "p", Kind: "body", State: "ir-admitted"},
 		},
 		Emissions: []emit.EmissionEvent{
-			{ID: "p::func::A", Kind: emit.EmissionBody},
-			{ID: "p::func::B", Kind: emit.EmissionBody},
+			{ID: "p::func::A", Kind: emit.EmissionBody, Implementation: "default"},
+			{ID: "p::func::B", Kind: emit.EmissionBody, Implementation: "default"},
+		},
+		ImplementationArtifacts: []translate.ImplementationArtifact{
+			{ImplementationID: "p::func::A/default", SourceID: "p::func::A", Package: "p", Sha256: "h1"},
+			{ImplementationID: "p::func::B/default", SourceID: "p::func::B", Package: "p", Sha256: "h2"},
 		},
 		Proofs: []translate.Proof{
 			{ID: "p::func::A", Package: "p", GeneratedFile: "core/p/package.ts", LoweredHash: "h1"},
@@ -266,6 +270,7 @@ func TestNotMaterializedCarriesDisposition(t *testing.T) {
 	generated.Emissions = nil
 	generated.Proofs = nil
 	generated.ModuleDispositions = nil
+	generated.ImplementationArtifacts = nil
 	delete(generated.Files, "core/p/package.ts")
 	delete(generated.Ownership, "core/p/package.ts")
 	generated.NotMaterialized["p"] = "2 declaration blockers"
@@ -350,6 +355,11 @@ func TestVariantCopiesAreExplainedNotDefects(t *testing.T) {
 		{ID: "p::func::A", Kind: emit.EmissionBody, Implementation: "default"},
 		{ID: "p::func::B", Kind: emit.EmissionBodyPlaceholder, Implementation: "default"},
 		{ID: "p::func::B", Kind: emit.EmissionBodyPlaceholder, Implementation: "map-key-encoded"},
+	}
+	generated.ImplementationArtifacts = []translate.ImplementationArtifact{
+		{ImplementationID: "p::func::A/default", SourceID: "p::func::A", Package: "p", Sha256: "h1"},
+		{ImplementationID: "p::func::B/default", SourceID: "p::func::B", Package: "p", Sha256: "h2"},
+		{ImplementationID: "p::func::B/map-key-encoded", SourceID: "p::func::B", Package: "p", Sha256: "h3"},
 	}
 	generated.Proofs = generated.Proofs[:1]
 	report := Build("head", run, generated)

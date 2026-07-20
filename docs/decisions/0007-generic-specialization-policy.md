@@ -3,7 +3,8 @@
 Date: 2026-07-20
 Status: accepted
 Owner: gotots-maintainers
-Decision revision: `65810f5` (reviewed evidence baseline)
+Decision revision: `50ea69f` (the commit recording these decisions;
+measurement evidence binds to baseline `65810f5`)
 Implementation status: planned
 Schema/ABI impact: `lowering-plan-v1`
 Spec reference: `docs/spec/interfaces-generics-functions.md`

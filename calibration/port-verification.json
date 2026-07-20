@@ -1,0 +1,254 @@
+[
+ {
+  "fixtureId": "A1",
+  "wrappedAsMethod": true,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "A2",
+  "wrappedAsMethod": true,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "A3",
+  "wrappedAsMethod": false,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "A4",
+  "wrappedAsMethod": false,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "A5",
+  "wrappedAsMethod": true,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "B1",
+  "wrappedAsMethod": false,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "B10",
+  "wrappedAsMethod": true,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "B11",
+  "wrappedAsMethod": false,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "B12",
+  "wrappedAsMethod": false,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "B13",
+  "wrappedAsMethod": false,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "B14",
+  "wrappedAsMethod": false,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "B15",
+  "wrappedAsMethod": false,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "B2",
+  "wrappedAsMethod": true,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "B3",
+  "wrappedAsMethod": false,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "B4",
+  "wrappedAsMethod": true,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "B5",
+  "wrappedAsMethod": true,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "B6",
+  "wrappedAsMethod": true,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "B7",
+  "wrappedAsMethod": false,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "B8",
+  "wrappedAsMethod": true,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "B9",
+  "wrappedAsMethod": true,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "C1",
+  "wrappedAsMethod": true,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "C2",
+  "wrappedAsMethod": false,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "C3",
+  "wrappedAsMethod": false,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "D1",
+  "wrappedAsMethod": false,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "D2",
+  "wrappedAsMethod": true,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "D3",
+  "wrappedAsMethod": false,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "D4",
+  "wrappedAsMethod": false,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ },
+ {
+  "fixtureId": "D5",
+  "wrappedAsMethod": true,
+  "parseClean": true,
+  "pending": [
+   "strict-typecheck",
+   "differential-execution"
+  ]
+ }
+]

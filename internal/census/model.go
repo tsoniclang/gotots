@@ -34,17 +34,21 @@ import (
 // Package is the semantic Go package identity (a black-box test file keeps
 // its p_test identity); Owner is the package whose scope owns it.
 type DeclarationRecord struct {
-	ID         string `json:"id"`
-	Package    string `json:"package"`
-	Owner      string `json:"owner,omitempty"` // set when different from Package
-	File       string `json:"file"`            // module-relative
-	Kind       string `json:"kind"`            // func|method|type|alias|const|var
-	Name       string `json:"name"`
-	Receiver   string `json:"receiver,omitempty"` // methods: base type name
-	Exported   bool   `json:"exported"`
-	Scope      string `json:"scope"` // production|test
-	StartLine  int    `json:"startLine"`
-	EndLine    int    `json:"endLine"`
+	ID        string `json:"id"`
+	Package   string `json:"package"`
+	Owner     string `json:"owner,omitempty"` // set when different from Package
+	File      string `json:"file"`            // module-relative
+	Kind      string `json:"kind"`            // func|method|type|alias|const|var
+	Name      string `json:"name"`
+	Receiver  string `json:"receiver,omitempty"` // methods: base type name
+	Exported  bool   `json:"exported"`
+	Scope     string `json:"scope"` // production|test
+	StartLine int    `json:"startLine"`
+	EndLine   int    `json:"endLine"`
+	// StartByte/EndByte are the declaration's exact byte offsets in File
+	// — the SAME byte domain the size gates divide by (ADR-0011).
+	StartByte  int    `json:"startByte"`
+	EndByte    int    `json:"endByte"`
 	HasBody    bool   `json:"hasBody,omitempty"`
 	Statements int    `json:"statements,omitempty"`
 	BodySha256 string `json:"bodySha256,omitempty"`

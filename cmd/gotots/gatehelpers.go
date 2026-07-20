@@ -119,6 +119,25 @@ var acceptanceStageNames = []string{
 // records, conflicting states, phantom generated-file references), and
 // computes the per-declaration evidence-stage counts (module-retained
 // versus module-retained-blocked) — the valid per-body stage join.
+// verifyProductRootBindings joins every concrete product-root binding
+// against the current implementation-artifact ledger: a stale or
+// orphan binding is a conflict, never a warning.
+func verifyProductRootBindings(prof *profile.Profile, generated *translate.Generated) []string {
+	current := make(map[string]bool, len(generated.ImplementationArtifacts))
+	for _, artifact := range generated.ImplementationArtifacts {
+		current[artifact.ImplementationID] = true
+	}
+	var conflicts []string
+	for _, root := range prof.ProductSurface.Roots {
+		for _, binding := range root.Bindings {
+			if !current[binding] {
+				conflicts = append(conflicts, fmt.Sprintf("product root %s binds %s, which is not a current implementation", root.ID, binding))
+			}
+		}
+	}
+	return conflicts
+}
+
 func reconcileDispositions(prof *profile.Profile, firstRun *census.Result, generated *translate.Generated) (map[string]int, []string, []string, []string) {
 	covered := map[string]string{}
 	var conflicts []string
@@ -342,6 +361,7 @@ func reconcileDispositions(prof *profile.Profile, firstRun *census.Result, gener
 	for _, defect := range identityReport.Defects() {
 		conflicts = append(conflicts, "identity reconciliation: "+defect.ID+" — "+defect.Disposition)
 	}
+	conflicts = append(conflicts, verifyProductRootBindings(prof, generated)...)
 	for _, denominator := range identityReport.Denominators {
 		details = append(details, "denominator "+denominator.Name+": "+fmt.Sprintf("%d", denominator.Count)+" ("+denominator.Definition+")")
 	}

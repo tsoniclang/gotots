@@ -143,7 +143,7 @@
     "lowering-plan-v1"
    ],
    "implementationStatus": "planned",
-   "decisionRevision": "65810f5",
+   "decisionRevision": "50ea69f",
    "reopeningConditions": [
     "a corpus method makes the equivalence proof conditions statically undecidable",
     "differential execution finds a panic-timing divergence in a proven site"
@@ -163,7 +163,7 @@
     "lowering-plan-v1"
    ],
    "implementationStatus": "planned",
-   "decisionRevision": "65810f5",
+   "decisionRevision": "50ea69f",
    "reopeningConditions": [
     "a binding family's specializations exceed the byte or performance budget that a measured factored core would meet"
    ]
@@ -182,7 +182,7 @@
     "lowering-plan-v1"
    ],
    "implementationStatus": "planned",
-   "decisionRevision": "65810f5",
+   "decisionRevision": "50ea69f",
    "reopeningConditions": [
     "an ESM initialization-order counterexample the conversion-edge placement rules cannot express"
    ]
@@ -201,7 +201,7 @@
     "module-layout-v2"
    ],
    "implementationStatus": "planned",
-   "decisionRevision": "65810f5",
+   "decisionRevision": "50ea69f",
    "reopeningConditions": [
     "stage-16 checker-performance evidence shows the mirrored layout exceeds the committed typecheck budget"
    ]
@@ -220,7 +220,7 @@
     "implementation-identity-v1"
    ],
    "implementationStatus": "planned",
-   "decisionRevision": "65810f5",
+   "decisionRevision": "50ea69f",
    "reopeningConditions": [
     "a source upgrade produces binding families the identity grammar cannot name",
     "deterministic shortened-name derivation collides beyond what rejection can resolve"
@@ -240,7 +240,7 @@
     "reconciliation-report-v1"
    ],
    "implementationStatus": "planned",
-   "decisionRevision": "65810f5",
+   "decisionRevision": "50ea69f",
    "reopeningConditions": [
     "a new output class appears that no existing attribution category honestly covers"
    ]

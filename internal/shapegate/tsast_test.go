@@ -30,11 +30,17 @@ func TestTypedASTShapeFacts(t *testing.T) {
 	one := filepath.Join(dir, "one.ts")
 	two := filepath.Join(dir, "two.ts")
 	os.WriteFile(one, []byte(`export type U = { k: 1 } | undefined;
+declare function Keys(p: unknown): string;
+declare const points: unknown, zero$T: unknown, eq$T: unknown;
 export function Shared(x: string): string { return Keys(points, zero$T, eq$T); }
 `), 0o644)
 	os.WriteFile(two, []byte(`export type U = { k: 1 } | undefined;
 export function Shared(x: string): string { return Keys(points); }
 class Box { m(a: number): void {} }
+declare function Keys(p: unknown): string;
+declare const points: unknown;
+const evade = Keys;
+export const evaded = evade(points, 1, 2);
 `), 0o644)
 	shapes, err := ExtractShapes(node, tsDir, []string{one, two})
 	if err != nil {
@@ -45,10 +51,11 @@ class Box { m(a: number): void {} }
 		t.Fatalf("duplicate join missed: %v", dups)
 	}
 	// Keys has source arity 1; the call in one.ts carries two hidden
-	// operation arguments.
+	// operation arguments, and the const-bound alias call in two.ts
+	// resolves through the checker — evasion is impossible.
 	surplus := CallArgSurplus(shapes, "Keys", 1)
-	if len(surplus) != 1 || surplus[0].Args != 3 {
-		t.Fatalf("hidden-argument join = %+v", surplus)
+	if len(surplus) != 2 {
+		t.Fatalf("hidden-argument join must catch the direct AND aliased call: %+v", surplus)
 	}
 	// Methods and classes are visible declarations.
 	var sawMethod bool

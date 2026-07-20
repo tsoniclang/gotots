@@ -16,6 +16,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/census"
 	"github.com/tsoniclang/gotots/internal/emit"
+	"github.com/tsoniclang/gotots/internal/implid"
 	"github.com/tsoniclang/gotots/internal/translate"
 )
 
@@ -311,10 +312,32 @@ func Build(head string, run *census.Result, generated *translate.Generated) *Rep
 
 	// --- implementation artifacts (ADR-0010 one-to-one ledger) ---
 	implementationArtifacts := multiset{}
+	malformedIDs := []Delta{}
 	for _, artifact := range generated.ImplementationArtifacts {
+		if _, err := implid.Parse(artifact.ImplementationID); err != nil {
+			malformedIDs = append(malformedIDs, Delta{ID: artifact.ImplementationID,
+				Disposition: "malformed implementation identity: " + err.Error(), Defect: true})
+			continue
+		}
 		implementationArtifacts.add(artifact.ImplementationID)
 	}
 	out.recordDuplicates("implementation-artifacts", implementationArtifacts)
+
+	// Emitted implementations, composed through the identity owner: every
+	// body or placeholder emission event names exactly one implementation.
+	emittedImplementations := multiset{}
+	for _, event := range generated.Emissions {
+		if event.Kind != emit.EmissionBody && event.Kind != emit.EmissionBodyPlaceholder {
+			continue
+		}
+		composed, err := implid.New(event.ID, event.Implementation)
+		if err != nil {
+			malformedIDs = append(malformedIDs, Delta{ID: event.ID,
+				Disposition: "emission event with malformed implementation key: " + err.Error(), Defect: true})
+			continue
+		}
+		emittedImplementations.add(composed.String())
+	}
 
 	// --- module dispositions (typed; cascade-blocked packages carry
 	// their typed reason in NotMaterialized) ---
@@ -378,6 +401,7 @@ func Build(head string, run *census.Result, generated *translate.Generated) *Rep
 	den("extern-obligation-proofs", externProofObligations.total(), "proof records whose generated file is an external-contract module")
 	den("module-dispositions", dispositionByPackage.total(), "typed per-package module dispositions")
 	den("implementation-artifacts", implementationArtifacts.total(), "per-implementation artifact records (ADR-0010)")
+	den("emitted-implementations", emittedImplementations.total(), "implementation identities composed from body/placeholder emission events")
 
 	// Join: census bodies vs body support records.
 	out.Joins = append(out.Joins, joinSets("bodies-vs-body-support",
@@ -425,6 +449,19 @@ func Build(head string, run *census.Result, generated *translate.Generated) *Rep
 	out.Joins = append(out.Joins, joinSets("lowered-proofs-vs-body-emissions",
 		"proofs-with-lowered-hash", "emission-bodies-and-placeholders", proofsWithLoweredHash, bodyEmissionAll,
 		"proof with a lowered hash but no emission event", "body emission event without a lowered-hash proof (placeholder, effect slot, or artifact-identity collision)", true, false))
+	// Join: emitted implementations vs artifact implementations — the
+	// EXACT ADR-0010 multiset join: zero missing, duplicate, or orphan
+	// implementation identities.
+	out.Joins = append(out.Joins, joinSets("implementations-vs-artifacts",
+		"emitted-implementations", "implementation-artifacts", emittedImplementations, implementationArtifacts,
+		"implementation emitted without an artifact record", "artifact record without an emission event", true, true))
+	if len(malformedIDs) > 0 {
+		j := Join{Name: "implementation-identity-wellformedness", Left: "implementation-spellings", Right: "implid-grammar"}
+		j.OnlyLeft = malformedIDs
+		sortDeltas(j.OnlyLeft)
+		out.Joins = append(out.Joins, j)
+	}
+
 	// Join: census packages vs typed module dispositions.
 	out.Joins = append(out.Joins, joinSets("packages-vs-module-dispositions",
 		"census-owned-production-packages", "module-dispositions", censusPackages, dispositionByPackage,

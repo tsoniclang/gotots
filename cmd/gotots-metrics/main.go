@@ -48,6 +48,9 @@ type report struct {
 	CategoryBytes    map[string]int  `json:"categoryBytes"`
 	UnattributedByte int             `json:"unattributedBytes"`
 	StopTheLine      []string        `json:"stopTheLine,omitempty"`
+	// DimensionsPending names required battery dimensions this tool
+	// does not yet measure — absence of a number is never silence.
+	DimensionsPending []string `json:"dimensionsPending"`
 }
 
 func fail(err error) {
@@ -63,31 +66,6 @@ func readLedger(dumpDir, name string, out any) {
 	if err := json.Unmarshal(data, out); err != nil {
 		fail(fmt.Errorf("%s: %w", name, err))
 	}
-}
-
-// lineSpanBytes slices the exact byte length of a line range in a
-// corpus file (1-based inclusive lines, as census records them).
-func lineSpanBytes(content []byte, startLine, endLine int) int {
-	line := 1
-	start := -1
-	for offset := 0; offset <= len(content); offset++ {
-		if line == startLine && start < 0 {
-			start = offset
-		}
-		if offset == len(content) {
-			if start < 0 {
-				return 0
-			}
-			return len(content) - start
-		}
-		if content[offset] == '\n' {
-			if line == endLine {
-				return offset + 1 - start
-			}
-			line++
-		}
-	}
-	return 0
 }
 
 func percentile(sorted []float64, p float64) float64 {
@@ -130,9 +108,8 @@ func main() {
 		implementationsBySource[artifact.SourceID]++
 	}
 
-	// Go bytes per production body: exact corpus line-span slices.
-	fileCache := map[string][]byte{}
-	out := &report{SchemaVersion: 1, CategoryBytes: map[string]int{}}
+	out := &report{SchemaVersion: 1, CategoryBytes: map[string]int{},
+		DimensionsPending: []string{"tokens", "ast-nodes", "call-width", "tsc-rss", "tsc-time", "runtime"}}
 	var expansions []bodyExpansion
 	for _, decl := range declarations {
 		if decl.Scope != "production" || (decl.Kind != "func" && decl.Kind != "method") || !decl.HasBody {
@@ -143,18 +120,11 @@ func main() {
 			out.BodiesUnjoined = append(out.BodiesUnjoined, decl.ID)
 			continue
 		}
-		content, cached := fileCache[decl.File]
-		if !cached {
-			data, err := os.ReadFile(filepath.Join(corpusDir, filepath.FromSlash(decl.File)))
-			if err != nil {
-				fail(err)
-			}
-			fileCache[decl.File] = data
-			content = data
-		}
-		goBytes := lineSpanBytes(content, decl.StartLine, decl.EndLine)
-		if goBytes == 0 {
-			out.BodiesUnjoined = append(out.BodiesUnjoined, decl.ID+" (zero-byte span)")
+		// Exact byte spans recorded by the census producer — never a
+		// line approximation.
+		goBytes := decl.EndByte - decl.StartByte
+		if goBytes <= 0 {
+			out.BodiesUnjoined = append(out.BodiesUnjoined, decl.ID+" (no byte span recorded)")
 			continue
 		}
 		expansions = append(expansions, bodyExpansion{
@@ -191,11 +161,38 @@ func main() {
 	}
 	out.Top20ByBytes = byBytes
 
-	// Definition duplication: cross-module support-definition copies.
+	// Definition duplication, class 1: cross-module support-definition
+	// copies from the typed extern-symbol ledger.
 	copies := map[string]int{}
 	for _, record := range externSymbols {
 		if record.Obligation == "" {
 			copies[record.Symbol]++
+		}
+	}
+	// Definition duplication, class 2: AST-authoritative cross-module
+	// joins over every generated core module through the pinned
+	// compiler (functions, classes, AND type aliases — the measured
+	// 42.4% class). Env-selectable because parsing the largest modules
+	// is itself a heavy step of this heavy tool.
+	if os.Getenv("GOTOTS_METRICS_AST") != "" {
+		node := os.Getenv("GOTOTS_NODE")
+		if node == "" {
+			node = "node"
+		}
+		tsDir := os.Getenv("GOTOTS_TSC_DIR")
+		if tsDir == "" {
+			tsDir = "product/node_modules/typescript"
+		}
+		coreModules, err := filepath.Glob(filepath.Join(dumpDir, "core", "*", "package.ts"))
+		if err != nil {
+			fail(err)
+		}
+		shapes, err := shapegate.ExtractShapes(node, tsDir, coreModules)
+		if err != nil {
+			fail(fmt.Errorf("AST duplication pass: %w", err))
+		}
+		for identity, files := range shapegate.DuplicateDefinitions(shapes) {
+			copies[identity] = len(files)
 		}
 	}
 	out.DuplicatedDefs = map[string]int{}
@@ -268,6 +265,12 @@ func main() {
 	if err := encoder.Encode(out); err != nil {
 		fail(err)
 	}
-	fmt.Fprintf(os.Stderr, "bodies=%d median=%.2f p90=%.2f p95=%.2f p99=%.2f max=%.2f stop-the-line=%d dup-defs=%d unattributed=%d\n",
-		out.BodiesJoined, out.Median, out.P90, out.P95, out.P99, out.Max, len(out.StopTheLine), len(out.DuplicatedDefs), out.UnattributedByte)
+	fmt.Fprintf(os.Stderr, "bodies=%d median=%.2f p90=%.2f p95=%.2f p99=%.2f max=%.2f stop-the-line=%d dup-defs=%d unattributed=%d unjoined=%d\n",
+		out.BodiesJoined, out.Median, out.P90, out.P95, out.P99, out.Max, len(out.StopTheLine), len(out.DuplicatedDefs), out.UnattributedByte, len(out.BodiesUnjoined))
+	// The battery is a GATE: stop-the-line conditions, unattributed
+	// bytes, or unjoined bodies exit nonzero — reporting without
+	// failing is the exact anti-pattern the enforcement verdict bans.
+	if len(out.StopTheLine) > 0 || out.UnattributedByte > 0 || len(out.BodiesUnjoined) > 0 {
+		os.Exit(2)
+	}
 }

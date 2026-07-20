@@ -11,6 +11,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/abi"
 	"github.com/tsoniclang/gotots/internal/emit"
+	"github.com/tsoniclang/gotots/internal/implid"
 	"github.com/tsoniclang/gotots/internal/ir"
 )
 
@@ -92,11 +93,21 @@ func emitCorePackage(out *Generated, p *packages.Package, sourceDir string, unit
 			ImplementationArtifact{ImplementationID: artifact.ImplementationID, SourceID: artifact.ID,
 				Package: p.PkgPath, ArtifactPath: artifactPath, Sha256: hash})
 	}
+	defaultHashes := make(map[string]string)
+	for spelled, hash := range hashes {
+		parsed, err := implid.Parse(spelled)
+		if err != nil {
+			return fmt.Errorf("artifact identity: %w", err)
+		}
+		if parsed.Key == "default" {
+			defaultHashes[parsed.Source] = hash
+		}
+	}
 	for i := range out.Proofs {
 		if out.Proofs[i].Package != p.PkgPath {
 			continue
 		}
-		if hash, has := hashes[out.Proofs[i].ID+"/default"]; has {
+		if hash, has := defaultHashes[out.Proofs[i].ID]; has {
 			out.Proofs[i].LoweredHash = hash
 		}
 	}

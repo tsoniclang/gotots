@@ -28,6 +28,7 @@ func collectDeclarations(p *packages.Package, file *ast.File, relativePath, scop
 	fset := p.Fset
 	pkgPath := p.PkgPath
 	lineOf := func(pos token.Pos) int { return fset.Position(pos).Line }
+	offsetOf := func(pos token.Pos) int { return fset.Position(pos).Offset }
 	colOf := func(pos token.Pos) int { return fset.Position(pos).Column }
 
 	// Every function literal in production scope is an independent
@@ -77,6 +78,8 @@ func collectDeclarations(p *packages.Package, file *ast.File, relativePath, scop
 			Scope:     scopeName,
 			StartLine: lineOf(node.Pos()),
 			EndLine:   lineOf(node.End()),
+			StartByte: offsetOf(node.Pos()),
+			EndByte:   offsetOf(node.End()),
 		}
 		if owner != pkgPath {
 			declaration.Owner = owner

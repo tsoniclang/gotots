@@ -1,6 +1,10 @@
 package profile
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/tsoniclang/gotots/internal/implid"
+)
 
 // ProductSurface is the second identity domain of the root contract:
 // semantic product roots bound to current implementations. It is
@@ -74,8 +78,11 @@ func (s *ProductSurface) Validate() error {
 			return fmt.Errorf("product root %s (%s): a concrete root must bind to at least one current ImplementationID", root.ID, root.Kind)
 		}
 		for _, binding := range root.Bindings {
-			if binding == "" {
-				return fmt.Errorf("product root %s: empty binding", root.ID)
+			// Structural validation through the identity owner; the join
+			// against the CURRENT implementation-artifact ledger happens
+			// in the gate, where a generation is in hand.
+			if _, err := implid.Parse(binding); err != nil {
+				return fmt.Errorf("product root %s: %w", root.ID, err)
 			}
 		}
 	}

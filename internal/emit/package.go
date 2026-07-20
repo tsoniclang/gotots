@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/tsoniclang/gotots/internal/implid"
 	"github.com/tsoniclang/gotots/internal/ir"
 )
 
@@ -72,7 +73,7 @@ func emitTransactionalBody(body *strings.Builder, module *Module, fn *ir.Func, s
 			module.recordEmission(fn.ID, EmissionBody, specKey)
 		}
 		body.WriteString(buf.String())
-		*artifacts = append(*artifacts, BodyArtifact{ID: fn.ID, ImplementationID: fn.ID + "/" + specKey, Text: buf.String()})
+		*artifacts = append(*artifacts, BodyArtifact{ID: fn.ID, ImplementationID: implid.MustNew(fn.ID, specKey).String(), Text: buf.String()})
 		return nil
 	}
 	outcome := BodyOutcome{ID: fn.ID, Kind: OutcomeEmitterDefect, Err: err.Error()}
@@ -88,7 +89,7 @@ func emitTransactionalBody(body *strings.Builder, module *Module, fn *ir.Func, s
 	}
 	retry.Commit()
 	body.WriteString(placeholder.String())
-	*artifacts = append(*artifacts, BodyArtifact{ID: fn.ID, ImplementationID: fn.ID + "/" + specKey, Text: placeholder.String()})
+	*artifacts = append(*artifacts, BodyArtifact{ID: fn.ID, ImplementationID: implid.MustNew(fn.ID, specKey).String(), Text: placeholder.String()})
 	*outcomes = append(*outcomes, outcome)
 	return nil
 }

@@ -35,8 +35,14 @@ type Declaration struct {
 
 type CallFact struct {
 	Callee string `json:"callee"`
-	Args   int    `json:"args"`
-	Line   int    `json:"line"`
+	// ResolvedName/File/Line identify the callee's ORIGINAL declaration
+	// through the TypeChecker — aliases and const-bound references
+	// resolve here and cannot evade the joins.
+	ResolvedName string `json:"resolvedName"`
+	ResolvedFile string `json:"resolvedFile"`
+	ResolvedLine int    `json:"resolvedLine"`
+	Args         int    `json:"args"`
+	Line         int    `json:"line"`
 }
 
 type AliasFact struct {
@@ -115,7 +121,7 @@ func CallArgSurplus(shapes []FileShape, callee string, sourceArity int) []CallFa
 	var out []CallFact
 	for _, shape := range shapes {
 		for _, call := range shape.Calls {
-			if call.Callee == callee && call.Args > sourceArity {
+			if call.ResolvedName == callee && call.Args > sourceArity {
 				out = append(out, call)
 			}
 		}
