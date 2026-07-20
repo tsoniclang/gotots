@@ -99,6 +99,14 @@ type ImplementationArtifact struct {
 	Sha256       string `json:"sha256"`
 }
 
+// NilabilityFact is one method's ADR-0006 analysis result, recorded by
+// the producer during translation and persisted as a dump ledger.
+type NilabilityFact struct {
+	ID                string `json:"id"`
+	EquivalentAtEntry bool   `json:"equivalentAtEntry"`
+	ToleratesNil      bool   `json:"toleratesNil"`
+}
+
 // ModuleDisposition is one selected package's typed module outcome,
 // recorded by the emission driver at the decision site.
 type ModuleDisposition struct {
@@ -145,6 +153,8 @@ type Generated struct {
 	// ImplementationArtifacts is the one-artifact-per-implementation
 	// ledger (ADR-0010); duplicates fail generation.
 	ImplementationArtifacts []ImplementationArtifact
+	// NilabilityFacts is the per-method ADR-0006 fact ledger.
+	NilabilityFacts []NilabilityFact
 	// ModuleDispositions is the typed per-package module outcome: every
 	// selected package records exactly one of emitted-runtime,
 	// no-runtime-output, or not-materialized. No consumer may infer a

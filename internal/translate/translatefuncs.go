@@ -12,6 +12,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit"
+	"github.com/tsoniclang/gotots/internal/facts"
 	"github.com/tsoniclang/gotots/internal/ir"
 	"github.com/tsoniclang/gotots/internal/tsident"
 
@@ -53,6 +54,19 @@ func translateFunctionsPass(out *Generated, p *packages.Package, sourceDir strin
 				function.Name = fmt.Sprintf("_$%d", blankFuncs)
 				blankFuncs++
 				proof.GeneratedSymbol = function.Name
+			}
+			if funcDecl.Recv != nil {
+				recvName := ""
+				if len(funcDecl.Recv.List[0].Names) > 0 {
+					recvName = funcDecl.Recv.List[0].Names[0].Name
+				}
+				_, pointerReceiver := funcDecl.Recv.List[0].Type.(*ast.StarExpr)
+				fact := facts.AnalyzeReceiverNilability(recvName, pointerReceiver, funcDecl.Body)
+				out.NilabilityFacts = append(out.NilabilityFacts, NilabilityFact{
+					ID:                function.ID,
+					EquivalentAtEntry: fact.EquivalentAtEntry,
+					ToleratesNil:      fact.ToleratesNil,
+				})
 			}
 			ledger = append(ledger, BodySupport{
 				ID: function.ID, Package: p.PkgPath, Kind: "body", State: function.Support, Sites: function.Sites,

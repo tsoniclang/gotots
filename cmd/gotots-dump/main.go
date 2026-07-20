@@ -78,6 +78,7 @@ func main() {
 	// The typed producer ledgers: the offline join surface.
 	ledgers := map[string]any{
 		"declarations.json":             run.Report.Declarations,
+		"nilability-facts.json":         g.NilabilityFacts,
 		"implementation-artifacts.json": g.ImplementationArtifacts,
 		"emissions.json":                g.Emissions,
 		"extern-symbols.json":           g.ExternSymbols,
