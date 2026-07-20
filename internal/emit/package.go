@@ -122,7 +122,11 @@ func Package(module *Module, decls Decls) (string, []BodyOutcome, []BodyArtifact
 			} else {
 				freeMethods = append(freeMethods, method)
 				if len(structDecl.TypeParams) == 0 && len(method.TypeParams) == 0 &&
-					!structDecl.FamilyEnc && !structDecl.FamilyPtrCell && !method.Placeholder {
+					!structDecl.FamilyEnc && !structDecl.FamilyPtrCell {
+					// A placeholder method still gets a delegate: it
+					// forwards to the free-function throwing placeholder,
+					// so proven-receiver call sites stay source-shaped and
+					// fail closed exactly like the free form.
 					delegateMethods = append(delegateMethods, method)
 				}
 			}

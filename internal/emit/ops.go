@@ -31,6 +31,24 @@ func (p *printer) printBinary(n *ir.Binary) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// An integer equality against a constant would narrow the mutable
+	// operand to that literal for the rest of the block (a TS
+	// control-flow artifact, not Go semantics — Go re-reads the field
+	// after a mutating call). Casting the constant operand to the Go
+	// integer type keeps the comparison at `number`, so no literal
+	// narrowing occurs. Exact: it compares two int values, as Go does.
+	if (n.Op == token.EQL || n.Op == token.NEQ) && n.L.Type().Kind.Integer() {
+		spelled, err := p.tsType(n.L.Type())
+		if err != nil {
+			return "", err
+		}
+		if _, ok := n.R.(*ir.Const); ok {
+			right = "(" + right + " as " + spelled + ")"
+		}
+		if _, ok := n.L.(*ir.Const); ok {
+			left = "(" + left + " as " + spelled + ")"
+		}
+	}
 	return p.printBinaryOp(n.Op, left, right, n.L.Type(), n.R.Type().Kind)
 }
 
@@ -177,9 +195,17 @@ func (p *printer) printConvert(n *ir.Convert) (string, error) {
 		// carry Go's copy semantics).
 		return "(" + x + ")", nil
 	case from == ir.KindPointer && to == ir.KindPointer:
-		// Same-underlying named pointer conversion: the instance IS the
-		// value (the IR admits only structurally identical classes).
-		return "(" + x + ")", nil
+		// Same-underlying named pointer conversion (e.g. ast.Node <->
+		// ast.MutableNode): the instance IS the value at runtime, but
+		// the two named classes are distinct TS types, so the identity
+		// carries an explicit cast to the target's spelling. The IR
+		// admits only structurally identical classes, so the cast is
+		// always sound.
+		toSpelled, err := p.tsType(n.To)
+		if err != nil {
+			return "", err
+		}
+		return "(" + x + " as " + toSpelled + ")", nil
 	case from == to && (to == ir.KindString || to == ir.KindBool || to == ir.KindFloat64):
 		// Same-carrier conversion between named types: identity.
 		return "(" + x + ")", nil
