@@ -31,7 +31,17 @@ type Seed struct {
 	RecvType         string   `json:"recvType,omitempty"`
 	DeclLine         int      `json:"declLine,omitempty"` // repeatable decls (init)
 	SemanticFamilies []string `json:"semanticFamilies"`
-	CandidateVerdict string   `json:"candidateVerdict"` // ordinary | specialized | exception
+	CandidateVerdict string   `json:"candidateVerdict"` // ordinary | specialized | exception | manual-required
+	// CallSites anchor instantiation-sensitive fixtures (class C) to
+	// exact corpus call expressions; Derive resolves the spans.
+	CallSites []SeedCallSite `json:"callSites,omitempty"`
+}
+
+// SeedCallSite is one reviewed call-site anchor (file + line only —
+// the exact expression span is derived, never declared).
+type SeedCallSite struct {
+	File string `json:"file"`
+	Line int    `json:"line"`
 }
 
 // Seeds is the checked selection document.
@@ -56,9 +66,13 @@ type Fixture struct {
 	BaselineArtifactSha256  []string `json:"baselineArtifactSha256,omitempty"`
 	BaselineArtifactBytes   int      `json:"baselineArtifactBytes,omitempty"`
 	CandidateVerdict        string   `json:"candidateVerdict"`
-	HandPortOwner           string   `json:"handPortOwner"`
-	IndependentReviewer     string   `json:"independentReviewer"`
-	GoBytes                 int      `json:"goBytes"`
+	// CallSites are the resolved instantiation records for class-C
+	// fixtures: exact call-expression spans and hashes plus the
+	// enclosing declaration.
+	CallSites           []CallSiteRecord `json:"callSites,omitempty"`
+	HandPortOwner       string           `json:"handPortOwner"`
+	IndependentReviewer string           `json:"independentReviewer"`
+	GoBytes             int              `json:"goBytes"`
 }
 
 // Manifest is the derived, revision-bound calibration manifest.
@@ -124,17 +138,114 @@ func recvTypeName(expr ast.Expr) string {
 	return ""
 }
 
-// artifactPath resolves a source identity to its analysis-artifact path
-// inside a generation dump (the current sanitizer's naming).
-func artifactPath(dumpDir, identity string) string {
-	pkg := identity[:strings.Index(identity, "::")]
-	sanitized := strings.NewReplacer("/", "_", "::", "__", ":", "_", "@", "_").Replace(identity)
-	return filepath.Join(dumpDir, "analysis", "bodies", filepath.FromSlash(pkg), sanitized+".ts.txt")
-}
-
 // Derive builds the manifest from seeds, the pinned corpus, and a
 // baseline generation dump. repoDir anchors neutral fixture files.
+// CallSiteRecord is one resolved call-site span.
+type CallSiteRecord struct {
+	File          string `json:"file"`
+	Line          int    `json:"line"`
+	StartByte     int    `json:"startByte"`
+	EndByte       int    `json:"endByte"`
+	Sha256        string `json:"sha256"`
+	EnclosingDecl string `json:"enclosingDecl"`
+}
+
+// resolveCallSite finds the call expression that STARTS on the anchored
+// line and records its exact span, hash, and enclosing declaration.
+// Zero or several starting calls on that line fail closed: the anchor
+// must be unambiguous.
+func resolveCallSite(corpusDir string, site SeedCallSite) (CallSiteRecord, error) {
+	full := filepath.Join(corpusDir, filepath.FromSlash(site.File))
+	data, err := os.ReadFile(full)
+	if err != nil {
+		return CallSiteRecord{}, err
+	}
+	fset := token.NewFileSet()
+	parsed, err := parser.ParseFile(fset, full, data, parser.ParseComments)
+	if err != nil {
+		return CallSiteRecord{}, err
+	}
+	var matches []*ast.CallExpr
+	var enclosing []string
+	ast.Inspect(parsed, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		if fset.Position(call.Pos()).Line == site.Line {
+			matches = append(matches, call)
+			name := ""
+			for _, decl := range parsed.Decls {
+				if fn, ok := decl.(*ast.FuncDecl); ok && fn.Pos() <= call.Pos() && call.End() <= fn.End() {
+					name = fn.Name.Name
+				}
+			}
+			enclosing = append(enclosing, name)
+		}
+		return true
+	})
+	// Keep only OUTERMOST calls starting on the line (an argument list
+	// often contains nested calls on the same line).
+	outer := make([]*ast.CallExpr, 0, len(matches))
+	outerNames := make([]string, 0, len(matches))
+	for i, call := range matches {
+		contained := false
+		for j, other := range matches {
+			if i != j && other.Pos() <= call.Pos() && call.End() <= other.End() {
+				contained = true
+			}
+		}
+		if !contained {
+			outer = append(outer, call)
+			outerNames = append(outerNames, enclosing[i])
+		}
+	}
+	if len(outer) != 1 {
+		return CallSiteRecord{}, fmt.Errorf("call-site anchor %s:%d matches %d outermost calls; must be exactly 1", site.File, site.Line, len(outer))
+	}
+	start := fset.Position(outer[0].Pos()).Offset
+	end := fset.Position(outer[0].End()).Offset
+	digest := sha256.Sum256(data[start:end])
+	return CallSiteRecord{
+		File: site.File, Line: site.Line, StartByte: start, EndByte: end,
+		Sha256: hex.EncodeToString(digest[:]), EnclosingDecl: outerNames[0],
+	}, nil
+}
+
+// LedgerArtifact mirrors the dump ledger record (translate owns the
+// producer; this is the read-side shape).
+type LedgerArtifact struct {
+	ImplementationID string `json:"implementationId"`
+	SourceID         string `json:"sourceId"`
+	Package          string `json:"package"`
+	ArtifactPath     string `json:"artifactPath"`
+	Sha256           string `json:"sha256"`
+}
+
+func loadArtifactLedger(dumpDir string) (map[string][]LedgerArtifact, error) {
+	if dumpDir == "" {
+		return nil, nil
+	}
+	data, err := os.ReadFile(filepath.Join(dumpDir, "ledgers", "implementation-artifacts.json"))
+	if err != nil {
+		return nil, fmt.Errorf("implementation-artifact ledger: %w", err)
+	}
+	var records []LedgerArtifact
+	if err := json.Unmarshal(data, &records); err != nil {
+		return nil, err
+	}
+	out := map[string][]LedgerArtifact{}
+	for _, record := range records {
+		out[record.SourceID] = append(out[record.SourceID], record)
+	}
+	return out, nil
+}
+
 func Derive(seeds *Seeds, corpusDir, repoDir, dumpDir, owner, reviewer string) (*Manifest, error) {
+	artifactLedger, err := loadArtifactLedger(dumpDir)
+	if err != nil {
+		return nil, err
+	}
 	out := &Manifest{SchemaVersion: SchemaVersion, SourceRevision: seeds.SourceRevision}
 	for _, seed := range seeds.Seeds {
 		base := corpusDir
@@ -170,16 +281,36 @@ func Derive(seeds *Seeds, corpusDir, repoDir, dumpDir, owner, reviewer string) (
 			IndependentReviewer: reviewer,
 			GoBytes:             end - start,
 		}
-		if seed.Origin == "tsgo" && dumpDir != "" {
-			path := artifactPath(dumpDir, seed.SourceIdentity)
-			artifact, err := os.ReadFile(path)
+		for _, site := range seed.CallSites {
+			record, err := resolveCallSite(corpusDir, site)
 			if err != nil {
-				return nil, fmt.Errorf("fixture %s: baseline artifact: %w", seed.FixtureID, err)
+				return nil, fmt.Errorf("fixture %s: %w", seed.FixtureID, err)
 			}
-			artifactDigest := sha256.Sum256(artifact)
-			fixture.BaselineImplementations = []string{seed.SourceIdentity + "/default"}
-			fixture.BaselineArtifactSha256 = []string{hex.EncodeToString(artifactDigest[:])}
-			fixture.BaselineArtifactBytes = len(artifact)
+			fixture.CallSites = append(fixture.CallSites, record)
+		}
+		if seed.Origin == "tsgo" && dumpDir != "" {
+			// Join through the dump's implementation-artifact ledger:
+			// every recorded implementation of this source identity, its
+			// recorded hash verified against the artifact file's actual
+			// bytes. No identity or path is fabricated here.
+			records := artifactLedger[seed.SourceIdentity]
+			if len(records) == 0 {
+				return nil, fmt.Errorf("fixture %s: no implementation artifact recorded for %s", seed.FixtureID, seed.SourceIdentity)
+			}
+			for _, record := range records {
+				artifact, err := os.ReadFile(filepath.Join(dumpDir, filepath.FromSlash(record.ArtifactPath)))
+				if err != nil {
+					return nil, fmt.Errorf("fixture %s: ledger artifact: %w", seed.FixtureID, err)
+				}
+				artifactDigest := hex.EncodeToString(func() []byte { d := sha256.Sum256(artifact); return d[:] }())
+				if artifactDigest != record.Sha256 {
+					return nil, fmt.Errorf("fixture %s: artifact %s hash %s disagrees with ledger %s",
+						seed.FixtureID, record.ArtifactPath, artifactDigest[:12], record.Sha256[:12])
+				}
+				fixture.BaselineImplementations = append(fixture.BaselineImplementations, record.ImplementationID)
+				fixture.BaselineArtifactSha256 = append(fixture.BaselineArtifactSha256, record.Sha256)
+				fixture.BaselineArtifactBytes += len(artifact)
+			}
 		}
 		out.Fixtures = append(out.Fixtures, fixture)
 	}

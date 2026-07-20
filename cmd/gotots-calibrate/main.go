@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/tsoniclang/gotots/internal/calibration"
+	"github.com/tsoniclang/gotots/internal/profile"
 )
 
 func main() {
@@ -21,6 +22,15 @@ func main() {
 	seeds, err := calibration.Load("calibration/seeds.json")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	prof, err := profile.Load("profiles/tsts/project.json")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if seeds.SourceRevision != prof.Pin.Revision {
+		fmt.Fprintf(os.Stderr, "seeds sourceRevision %q disagrees with the pinned revision %q\n", seeds.SourceRevision, prof.Pin.Revision)
 		os.Exit(1)
 	}
 	manifest, err := calibration.Derive(seeds,

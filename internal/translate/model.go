@@ -93,7 +93,10 @@ type ImplementationArtifact struct {
 	ImplementationID string `json:"implementationId"`
 	SourceID         string `json:"sourceId"`
 	Package          string `json:"package"`
-	Sha256           string `json:"sha256"`
+	// ArtifactPath is the dump-relative analysis artifact file — the
+	// one spelling, recorded by the writer that owns the sanitizer.
+	ArtifactPath string `json:"artifactPath"`
+	Sha256       string `json:"sha256"`
 }
 
 // ModuleDisposition is one selected package's typed module outcome,

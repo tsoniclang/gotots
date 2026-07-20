@@ -89,7 +89,8 @@ func emitCorePackage(out *Generated, p *packages.Package, sourceDir string, unit
 		out.Files[artifactPath] = artifact.Text
 		out.Ownership[artifactPath] = "analysis-body"
 		out.ImplementationArtifacts = append(out.ImplementationArtifacts,
-			ImplementationArtifact{ImplementationID: artifact.ImplementationID, SourceID: artifact.ID, Package: p.PkgPath, Sha256: hash})
+			ImplementationArtifact{ImplementationID: artifact.ImplementationID, SourceID: artifact.ID,
+				Package: p.PkgPath, ArtifactPath: artifactPath, Sha256: hash})
 	}
 	for i := range out.Proofs {
 		if out.Proofs[i].Package != p.PkgPath {
