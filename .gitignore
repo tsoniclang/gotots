@@ -160,3 +160,8 @@ vite.config.ts.timestamp-*
 /product/node_modules/
 /product/package-lock.json
 /gotots
+gotots-calibrate
+gotots-dump
+gotots-metrics
+gotots-fingerprint
+gotots-reconcile
