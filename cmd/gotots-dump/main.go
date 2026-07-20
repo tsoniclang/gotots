@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/tsoniclang/gotots/internal/census"
 	"github.com/tsoniclang/gotots/internal/goenv"
 	"github.com/tsoniclang/gotots/internal/pinning"
 	"github.com/tsoniclang/gotots/internal/profile"
@@ -53,6 +54,11 @@ func main() {
 		os.Exit(1)
 	}
 	env := resolved.Environ(goenv.EnvOptions{GOOS: build.GOOS, GOARCH: build.GOARCH, GOAMD64: build.GOAMD64, GOARM64: build.GOARM64})
+	run, err := census.Run(prof, sourceDir, "linux-amd64")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 	g, err := translate.Corpus(prof, env, sourceDir, translate.Options{SourceRevision: prof.Pin.Revision, ProfileHash: prof.Hash})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -71,6 +77,7 @@ func main() {
 	}
 	// The typed producer ledgers: the offline join surface.
 	ledgers := map[string]any{
+		"declarations.json":             run.Report.Declarations,
 		"implementation-artifacts.json": g.ImplementationArtifacts,
 		"emissions.json":                g.Emissions,
 		"extern-symbols.json":           g.ExternSymbols,
