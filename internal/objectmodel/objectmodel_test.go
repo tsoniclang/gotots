@@ -51,6 +51,10 @@ func (b *Block) Name() *Node { return nil }
 func (b *Block) NodeKind() int { return 3 }
 func (f *FunctionTypeNode) Name() *Node { return nil }
 func (f *FunctionTypeNode) NodeKind() int { return 4 }
+func (node *NodeDefault) Name() *Node { return nil }
+func (node *NodeDefault) NodeKind() int { return 0 }
+func (b *NodeBase) Loc() int { return 0 }
+func (e *ExprBase) IsExpr() bool { return true }
 `
 
 func TestRecognitionBySelfReference(t *testing.T) {
