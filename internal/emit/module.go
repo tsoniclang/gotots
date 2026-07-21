@@ -3,6 +3,7 @@ package emit
 import (
 	"fmt"
 	"github.com/tsoniclang/gotots/internal/ir"
+	"github.com/tsoniclang/gotots/internal/objectmodel"
 	"github.com/tsoniclang/gotots/internal/plan"
 	"sort"
 	"strings"
@@ -125,6 +126,15 @@ type Module struct {
 	// through goifc$; the interfaces module OWNS the definitions. Nil
 	// in unit fixtures, which then keep the legacy per-module emission.
 	Interfaces *IfaceArtifacts
+	// ObjectModel is the sealed whole-program object-model recovery
+	// (ADR-0012): for every struct in an object-model family it names the
+	// native inheritance spine (emitted as `extends`), the secondary
+	// components, and each method's disposition, so family classes emit as
+	// native TypeScript classes with O(1) virtual dispatch instead of
+	// boxed vtables and exhaustive per-call switches. Nil in unit fixtures
+	// and whenever the unit has no recognized family, which then keep the
+	// flat-class representation unchanged.
+	ObjectModel *objectmodel.Plan
 	// ownsInterfaces marks the canonical interfaces module itself,
 	// which emits the definitions locally and does not self-qualify.
 	ownsInterfaces bool

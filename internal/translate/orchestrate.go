@@ -57,6 +57,10 @@ func Packages(pkgs []*packages.Package, sourceDir string, options Options) (*Gen
 		Withheld:        map[string]string{},
 		NotMaterialized: map[string]string{},
 		IfaceArtifacts:  emit.NewIfaceArtifacts(),
+		// The object model is recovered once from the whole-unit named-type
+		// set and sealed before any body builds — an immutable plan the
+		// class/method/dispatch emitters consume (ADR-0012).
+		ObjectModel: buildObjectModel(sorted),
 	}
 	var emitters []func() error
 	for _, p := range sorted {

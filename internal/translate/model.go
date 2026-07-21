@@ -10,6 +10,7 @@ import (
 
 	"github.com/tsoniclang/gotots/contracts"
 	"github.com/tsoniclang/gotots/internal/ir"
+	"github.com/tsoniclang/gotots/internal/objectmodel"
 	"github.com/tsoniclang/gotots/internal/plan"
 )
 
@@ -177,6 +178,12 @@ type Generated struct {
 	// emission; never serialized — the plan decisions surface through
 	// the emission ledgers).
 	MethodPlans *plan.ImplStore `json:"-"`
+	// ObjectModel is the sealed object-model recovery (ADR-0012), built
+	// from the unit's named types after translation and before emission.
+	// The class/method/dispatch emitters consume it; family classes emit
+	// as native `extends` hierarchies. Never serialized — the recovery's
+	// decisions surface through the emitted class shapes.
+	ObjectModel *objectmodel.Plan `json:"-"`
 	// ModuleDispositions is the typed per-package module outcome: every
 	// selected package records exactly one of emitted-runtime,
 	// no-runtime-output, or not-materialized. No consumer may infer a
