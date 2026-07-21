@@ -24,13 +24,17 @@ func fixturePackageSource(t *testing.T, fixture string) string {
 	if err != nil {
 		t.Fatalf("translate: %v", err)
 	}
+	var combined strings.Builder
 	for path, src := range gen.Files {
-		if strings.HasSuffix(path, "oracle.fixture/fixture/package.ts") {
-			return src
+		if strings.HasSuffix(path, "oracle.fixture/fixture/package.ts") ||
+			strings.HasSuffix(path, "interfaces/package.ts") {
+			combined.WriteString(src)
 		}
 	}
-	t.Fatal("fixture package.ts not found in generated output")
-	return ""
+	if combined.Len() == 0 {
+		t.Fatal("fixture package.ts not found in generated output")
+	}
+	return combined.String()
 }
 
 func TestUncomparableExternalInterfaceEqPanics(t *testing.T) {

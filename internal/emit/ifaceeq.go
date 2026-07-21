@@ -26,17 +26,17 @@ var identityPlan = &ir.EqPlan{Kind: ir.EqIdentity}
 func (p *printer) ifaceEqFn(t ir.Type, name string) string {
 	var cases []string
 	for _, member := range p.retainedMembers(t) {
-		cases = append(cases, memberEqCase(member.K, member.Eq))
+		cases = append(cases, memberEqCase(member.K, member.Eq, p.module.ifaceArtifactRef))
 	}
 	if t.IfaceEmpty {
 		for _, member := range predeclaredMembers {
-			cases = append(cases, memberEqCase("p:"+member.name, identityPlan))
+			cases = append(cases, memberEqCase("p:"+member.name, identityPlan, p.module.ifaceArtifactRef))
 		}
 		for _, composite := range p.module.BoxedComposites {
 			if p.referencesWithheldType(composite.T) {
 				continue
 			}
-			cases = append(cases, memberEqCase("c:"+composite.Canon, composite.Eq))
+			cases = append(cases, memberEqCase("c:"+composite.Canon, composite.Eq, p.module.ifaceArtifactRef))
 		}
 	}
 	var b strings.Builder
@@ -72,7 +72,7 @@ func (p *printer) ifaceEqFn(t ir.Type, name string) string {
 // every other case applies the member's recursive plan. A nil plan is a
 // construction-invariant violation (eqPlan returns plan-or-error), never a
 // silent === default.
-func memberEqCase(k string, plan *ir.EqPlan) string {
+func memberEqCase(k string, plan *ir.EqPlan, ref func(string) string) string {
 	lit := fmt.Sprintf("%q", k)
 	if plan == nil {
 		panic(fmt.Sprintf("emit: interface union member %q carries no equality plan", k))
@@ -83,7 +83,7 @@ func memberEqCase(k string, plan *ir.EqPlan) string {
 	case ir.EqExternal:
 		return fmt.Sprintf("case %s: return goif$.goPanicExternalEq(a.r.d);", lit)
 	}
-	return fmt.Sprintf("case %s: return b.k === %s ? %s : false;", lit, lit, emitEqPlan(plan, "a.v", "b.v"))
+	return fmt.Sprintf("case %s: return b.k === %s ? %s : false;", lit, lit, emitEqPlan(plan, "a.v", "b.v", ref))
 }
 
 // emitEqPlan spells one recursive equality plan comparing a and b. It is a
@@ -93,7 +93,7 @@ func memberEqCase(k string, plan *ir.EqPlan) string {
 // depth using the element type's static display. An EqInvalid or unhandled
 // variant is a compiler-internal defect and panics (fail closed at
 // generation), never emits wrong code.
-func emitEqPlan(plan *ir.EqPlan, a, b string) string {
+func emitEqPlan(plan *ir.EqPlan, a, b string, ref func(string) string) string {
 	if plan == nil {
 		panic("emit: nil equality plan")
 	}
@@ -103,12 +103,12 @@ func emitEqPlan(plan *ir.EqPlan, a, b string) string {
 	case ir.EqGoEq:
 		return a + ".goEq$(" + b + ")"
 	case ir.EqArray:
-		return "gosl$.goArrayEqualWith(" + a + ", " + b + ", ($x, $y) => " + emitEqPlan(plan.Elem, "$x", "$y") + ")"
+		return "gosl$.goArrayEqualWith(" + a + ", " + b + ", ($x, $y) => " + emitEqPlan(plan.Elem, "$x", "$y", ref) + ")"
 	case ir.EqIface:
 		// An interface array element compares through its own union equality;
 		// the alias name derives from the SAME shared full-digest helper as
 		// the alias declaration, so the reference always resolves.
-		return ifaceAliasName(plan.IfaceID) + "$eq(" + a + ", " + b + ")"
+		return ref(ifaceAliasName(plan.IfaceID)+"$eq") + "(" + a + ", " + b + ")"
 	case ir.EqUncomparable:
 		return fmt.Sprintf("goif$.goPanicUncomparable(%q)", plan.Display)
 	case ir.EqExternal:

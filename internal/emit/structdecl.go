@@ -465,12 +465,12 @@ func (p *printer) keyComponent(access string, t ir.Type) (string, error) {
 	case t.Kind == ir.KindIface && t.TypeParamName == "":
 		// The union's generated $key encoder carries Go's dynamic-key
 		// equality for the interface field.
-		name, err := p.ifaceUnionAlias(t)
-		if err != nil {
+		if _, err := p.ifaceUnionAlias(t); err != nil {
 			return "", err
 		}
-		p.module.RequireIfaceKeyFn(name)
-		return name + "$key(" + access + ")", nil
+		bare := ifaceAliasName(t.IfaceID)
+		p.module.RequireIfaceKey(bare)
+		return p.module.ifaceArtifactRef(bare+"$key") + "(" + access + ")", nil
 	}
 	return "", fmt.Errorf("no key encoding for field type %q", t.Go)
 }

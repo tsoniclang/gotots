@@ -29,7 +29,7 @@ func emitCorePackage(out *Generated, p *packages.Package, sourceDir string, unit
 	// The module's import environment is built after the declaration
 	// passes so external obligations discovered while building bodies
 	// resolve to their stub modules.
-	module, err := newModule(corePath, p.PkgPath, p.Types.Name(), unit, p, sourceDir, out.NotMaterialized)
+	module, err := newModule(corePath, p.PkgPath, p.Types.Name(), unit, p, sourceDir, out.NotMaterialized, out.IfaceArtifacts, false)
 	if err != nil {
 		return err
 	}

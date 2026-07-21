@@ -49,6 +49,9 @@ func StubModule(module *Module, funcs []StubFunc, members []StubMember) (string,
 	}
 	// Build every reserved union alias's deferred definition after all
 	// external adapter types exist (see finalizeUnionAliases).
+	if module.Interfaces != nil && !module.ownsInterfaces {
+		return module.importLines() + body.String(), nil
+	}
 	if err := finalizeUnionAliases(module); err != nil {
 		return "", err
 	}

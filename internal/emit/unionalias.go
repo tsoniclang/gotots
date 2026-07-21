@@ -37,6 +37,20 @@ func (p *printer) ifaceUnionAlias(t ir.Type) (string, error) {
 	if p.module == nil {
 		return name, nil
 	}
+	// Canonical ownership (ADR-0008): the union registers in the
+	// unit-shared registry and every consumer references it through
+	// goifc$; only the interfaces module itself defines it. Unit
+	// fixtures without a registry keep the legacy per-module path.
+	if p.module.Interfaces != nil {
+		if err := p.module.Interfaces.Register(name, identity, t); err != nil {
+			return "", err
+		}
+		if p.module.ownsInterfaces {
+			return name, nil
+		}
+		p.module.usesInterfaces = true
+		return "goifc$." + name, nil
+	}
 	if prior, exists := p.module.identityOf(name); exists {
 		if prior != identity {
 			return "", fmt.Errorf("interface alias digest collision: %q names both %q and %q", name, prior, identity)
@@ -130,7 +144,7 @@ func (p *printer) buildUnionAliasDefinition(name string, t ir.Type) (string, err
 			members = append(members, fmt.Sprintf("goif$.GoBox<%q, %s, Record<never, never>>", "c:"+composite.Canon, payload))
 		}
 	}
-	declaration := "type " + name + " = " + strings.Join(members, " | ") + ";"
+	declaration := "export type " + name + " = " + strings.Join(members, " | ") + ";"
 	p.module.RegisterIfaceEqFn(name, p.ifaceEqFn(t, name))
 	if p.module.ifaceKeyRequired(name) {
 		keyFn, err := p.ifaceKeyFn(t, name)

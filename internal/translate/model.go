@@ -168,6 +168,10 @@ type Generated struct {
 	ImplementationArtifacts []ImplementationArtifact
 	// NilabilityFacts is the per-method ADR-0006 fact ledger.
 	NilabilityFacts []NilabilityFact
+	// IfaceArtifacts is the unit-shared canonical interface-artifact
+	// registry (ADR-0008); every core/extern module references it, the
+	// interfaces module owns the definitions.
+	IfaceArtifacts *emit.IfaceArtifacts
 	// MethodPlans is the frozen implementation-plan store the emitters
 	// consume (built from sealed facts after translation, before
 	// emission; never serialized — the plan decisions surface through
@@ -239,6 +243,10 @@ const LoweringPlanV2 = "representation-fixedpoint-v2"
 
 // abiDir is the bundle directory of the language-ABI modules.
 const abiDir = "language-abi"
+
+// interfacesDir is the bundle directory of the canonical
+// interface-artifacts module (ADR-0008).
+const interfacesDir = "interfaces"
 
 // supportRegistry is the reviewed semantic-class support registry; a
 // generated body whose operation census contains an unregistered class

@@ -79,7 +79,7 @@ func emitExternalStubs(out *Generated, unit ir.Scope, context *packages.Package,
 		if goName == "" {
 			goName = path.Base(external)
 		}
-		module, err := newModule(stubPath, external, goName, unit, context, sourceDir, out.NotMaterialized)
+		module, err := newModule(stubPath, external, goName, unit, context, sourceDir, out.NotMaterialized, out.IfaceArtifacts, false)
 		if err != nil {
 			return err
 		}
@@ -271,4 +271,36 @@ func externTypeMembers(obligation *ir.ExternTypeObligation, unit ir.Scope, conte
 		out = append(out, member)
 	}
 	return out, nil
+}
+
+// emitInterfacesModule renders the canonical interface-artifacts module
+// (ADR-0008) once, owning every registered union's type, equality
+// function, and key encoder.
+func emitInterfacesModule(out *Generated, unit ir.Scope, context *packages.Package, sourceDir string, options Options) error {
+	if len(out.IfaceArtifacts.Names()) == 0 {
+		return nil
+	}
+	modulePath := path.Join(interfacesDir, "package.ts")
+	module, err := newModule(modulePath, interfacesDir, interfacesDir, unit, context, sourceDir, out.NotMaterialized, out.IfaceArtifacts, true)
+	if err != nil {
+		return err
+	}
+	body, err := emit.InterfacesContent(module)
+	if err != nil {
+		return err
+	}
+	content, err := emit.FileWithProvenance(emit.Provenance{
+		SchemaVersion:  1,
+		SourceRevision: options.SourceRevision,
+		ProfileHash:    options.ProfileHash,
+		AbiVersion:     abi.Version,
+		Path:           modulePath,
+	}, body)
+	if err != nil {
+		return err
+	}
+	out.Files[modulePath] = content
+	out.Ownership[modulePath] = "generated-interface-artifacts"
+	out.ExternSymbols = append(out.ExternSymbols, module.ExternSymbols()...)
+	return nil
 }

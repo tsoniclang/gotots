@@ -51,6 +51,10 @@ type ABIImports struct {
 	Slice   string
 	Iface   string
 	Extern  string
+	// Interfaces is the canonical interface-artifacts module specifier
+	// (ADR-0008), imported as goifc$. Empty in the interfaces module
+	// itself and in unit fixtures without one.
+	Interfaces string
 }
 
 // Module is the emission context of one generated package module: its Go
@@ -116,6 +120,17 @@ type Module struct {
 	// unit fixtures, which then take the conservative exception path
 	// for every method — identical to an all-unproven analysis).
 	MethodPlans *plan.ImplStore
+	// Interfaces is the unit-shared canonical interface-artifact
+	// registry (ADR-0008). A module references union types/eq/key
+	// through goifc$; the interfaces module OWNS the definitions. Nil
+	// in unit fixtures, which then keep the legacy per-module emission.
+	Interfaces *IfaceArtifacts
+	// ownsInterfaces marks the canonical interfaces module itself,
+	// which emits the definitions locally and does not self-qualify.
+	ownsInterfaces bool
+	// usesInterfaces records that this module referenced a canonical
+	// union artifact through goifc$, so its import is emitted.
+	usesInterfaces bool
 	// emissions and externSymbols are the module-owned emission ledger
 	// (ledger.go): appended at print sites, merged by overlay Commit.
 	emissions     []EmissionEvent
@@ -314,6 +329,32 @@ func NewModule(pkg, pkgName string, abiImports ABIImports, specifiers map[string
 		ifaceAliasTypes: map[string]ir.Type{}}
 }
 
+// ifaceArtifactRef spells a reference to a canonical interface artifact
+// (union name, its $eq, or its $key): unqualified inside the interfaces
+// module, goifc$-qualified from every consumer, and bare in a unit
+// fixture without a shared registry (legacy per-module emission).
+func (m *Module) ifaceArtifactRef(symbol string) string {
+	if m.Interfaces == nil || m.ownsInterfaces {
+		return symbol
+	}
+	m.usesInterfaces = true
+	return "goifc$." + symbol
+}
+
+// MarkOwnsInterfaces designates this module as the canonical interface
+// artifacts owner: its union references are unqualified and it emits
+// the definitions.
+func (m *Module) MarkOwnsInterfaces() { m.ownsInterfaces = true }
+
+// RequireIfaceKey marks a canonical union's key encoder as needed.
+func (m *Module) RequireIfaceKey(name string) {
+	if m.Interfaces != nil {
+		m.Interfaces.RequireKey(name)
+		return
+	}
+	m.RequireIfaceKeyFn(name)
+}
+
 // symbol spells a reference to a package-level symbol: unqualified within
 // the module's own package, alias-qualified (recording the import) for
 // every other co-generated package.
@@ -339,6 +380,9 @@ func (m *Module) importLines() string {
 	fmt.Fprintf(&out, "import * as gosl$ from %q;\n", m.ABI.Slice)
 	fmt.Fprintf(&out, "import * as goif$ from %q;\n", m.ABI.Iface)
 	fmt.Fprintf(&out, "import * as goext$ from %q;\n", m.ABI.Extern)
+	if m.ABI.Interfaces != "" && !m.ownsInterfaces && m.usesInterfaces {
+		fmt.Fprintf(&out, "import * as goifc$ from %q;\n", m.ABI.Interfaces)
+	}
 	emit := map[string]bool{}
 	for path := range m.used {
 		emit[path] = true

@@ -19,7 +19,7 @@ import (
 // newModule builds the emission context of one generated module: the
 // language-ABI specifiers plus one specifier per co-generated package,
 // all relative to the module's own directory.
-func newModule(modulePath, pkgPath, pkgName string, unit ir.Scope, context *packages.Package, sourceDir string, withheld map[string]string) (*emit.Module, error) {
+func newModule(modulePath, pkgPath, pkgName string, unit ir.Scope, context *packages.Package, sourceDir string, withheld map[string]string, ifaceArtifacts *emit.IfaceArtifacts, ownsInterfaces bool) (*emit.Module, error) {
 	fromDir := path.Dir(modulePath)
 	abiImports := emit.ABIImports{}
 	for _, entry := range []struct {
@@ -89,7 +89,19 @@ func newModule(modulePath, pkgPath, pkgName string, unit ir.Scope, context *pack
 			specifiers[pkg] = specifier
 		}
 	}
+	interfacesSpecifier, err := relativeImport(fromDir, path.Join(interfacesDir, "package.js"))
+	if err != nil {
+		return nil, err
+	}
+	abiImports.Interfaces = interfacesSpecifier
 	module := emit.NewModule(pkgPath, pkgName, abiImports, specifiers)
+	// The interface registry and owner flag MUST be set before the
+	// external method adapter types are built below, since those spell
+	// union types and must qualify (or, in the owner, stay bare).
+	module.Interfaces = ifaceArtifacts
+	if ownsInterfaces {
+		module.MarkOwnsInterfaces()
+	}
 	for _, composite := range unit.BoxedComposites() {
 		module.BoxedComposites = append(module.BoxedComposites, emit.BoxedComposite{
 			Canon: composite.Canon, T: composite.T, Eq: composite.Eq})

@@ -56,6 +56,7 @@ func Packages(pkgs []*packages.Package, sourceDir string, options Options) (*Gen
 		Ownership:       map[string]string{},
 		Withheld:        map[string]string{},
 		NotMaterialized: map[string]string{},
+		IfaceArtifacts:  emit.NewIfaceArtifacts(),
 	}
 	var emitters []func() error
 	for _, p := range sorted {
@@ -135,6 +136,12 @@ func Packages(pkgs []*packages.Package, sourceDir string, options Options) (*Gen
 		}
 	}
 	if err := emitExternalStubs(out, unit, sorted[0], sourceDir, options); err != nil {
+		return nil, err
+	}
+	// The canonical interface-artifacts module (ADR-0008): every union
+	// registered by a consumer is defined here exactly once. Built after
+	// all consumers so the registry is complete.
+	if err := emitInterfacesModule(out, unit, sorted[0], sourceDir, options); err != nil {
 		return nil, err
 	}
 	// Publication withholding is a SEPARATE fixed point over the real emitted

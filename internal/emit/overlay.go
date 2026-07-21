@@ -17,6 +17,8 @@ func (m *Module) Overlay() *Module {
 	return &Module{
 		Pkg:             m.Pkg,
 		MethodPlans:     m.MethodPlans,
+		Interfaces:      m.Interfaces,
+		ownsInterfaces:  m.ownsInterfaces,
 		PkgName:         m.PkgName,
 		ABI:             m.ABI,
 		ExternMethods:   m.ExternMethods,
@@ -40,6 +42,9 @@ func (m *Module) Overlay() *Module {
 // emitted alias block stays deterministic).
 func (m *Module) Commit() {
 	p := m.parent
+	if m.usesInterfaces {
+		p.usesInterfaces = true
+	}
 	p.emissions = append(p.emissions, m.emissions...)
 	p.externSymbols = append(p.externSymbols, m.externSymbols...)
 	for pkg := range m.used {

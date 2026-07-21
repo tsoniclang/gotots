@@ -28,7 +28,7 @@ func TestEmitEqPlanIsTotalOverClosedKindSet(t *testing.T) {
 		{"nested-external", &ir.EqPlan{Kind: ir.EqArray, Elem: &ir.EqPlan{Kind: ir.EqExternal, Display: "time.Time"}}, "goPanicExternalEq(\"time.Time\")"},
 	}
 	for _, c := range cases {
-		got := emitEqPlan(c.plan, "A", "B")
+		got := emitEqPlan(c.plan, "A", "B", func(s string) string { return s })
 		if !strings.Contains(got, c.want) {
 			t.Errorf("%s: emitEqPlan = %q, want substring %q", c.name, got, c.want)
 		}
@@ -44,7 +44,7 @@ func TestEmitEqPlanPanicsOnInvalidKind(t *testing.T) {
 			t.Fatal("emitEqPlan must panic on EqInvalid, not emit a === fallback")
 		}
 	}()
-	_ = emitEqPlan(&ir.EqPlan{Kind: ir.EqInvalid}, "A", "B")
+	_ = emitEqPlan(&ir.EqPlan{Kind: ir.EqInvalid}, "A", "B", func(s string) string { return s })
 }
 
 func TestMemberEqCasePanicsOnNilPlan(t *testing.T) {
@@ -53,5 +53,5 @@ func TestMemberEqCasePanicsOnNilPlan(t *testing.T) {
 			t.Fatal("memberEqCase must panic on a nil plan, not default to identity")
 		}
 	}()
-	_ = memberEqCase("pkg.T", nil)
+	_ = memberEqCase("pkg.T", nil, func(s string) string { return s })
 }

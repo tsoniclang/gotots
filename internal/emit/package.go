@@ -295,6 +295,11 @@ func Package(module *Module, decls Decls) (string, []BodyOutcome, []BodyArtifact
 	// fully spelled (all aliases reserved) and newModule has populated every
 	// external adapter type, so external members carry their exact vtable
 	// type rather than an incomplete Record<never,never>.
+	if module.Interfaces != nil && !module.ownsInterfaces {
+		// Canonical ownership: this consumer references union artifacts
+		// through goifc$; only the interfaces module defines them.
+		return module.importLines() + body.String(), outcomes, artifacts, nil
+	}
 	if err := finalizeUnionAliases(module); err != nil {
 		return "", nil, nil, err
 	}

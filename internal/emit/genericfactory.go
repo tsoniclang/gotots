@@ -108,12 +108,12 @@ func (p *printer) keyOperation(t ir.Type) (string, error) {
 		return "((_: " + spelled + ") => gort$.goKeyUnhashable(" + fmt.Sprintf("%q", t.Go) + "))", nil
 	}
 	if t.Kind == ir.KindIface {
-		name, err := p.ifaceUnionAlias(t)
-		if err != nil {
+		if _, err := p.ifaceUnionAlias(t); err != nil {
 			return "", err
 		}
-		p.module.RequireIfaceKeyFn(name)
-		return name + "$key", nil
+		bare := ifaceAliasName(t.IfaceID)
+		p.module.RequireIfaceKey(bare)
+		return p.module.ifaceArtifactRef(bare + "$key"), nil
 	}
 	// Every remaining binding kind (arrays, external handles, erased
 	// carriers) is outside the admitted key family: the per-site guard
@@ -273,12 +273,12 @@ func (p *printer) captureKeyOperation(t ir.Type) (string, error) {
 	}
 	if t.Kind == ir.KindIface && t.TypeParamName == "" {
 		// A concrete interface binding keys through its union's $key.
-		name, err := p.ifaceUnionAlias(t)
-		if err != nil {
+		if _, err := p.ifaceUnionAlias(t); err != nil {
 			return "", err
 		}
-		p.module.RequireIfaceKeyFn(name)
-		return name + "$key", nil
+		bare := ifaceAliasName(t.IfaceID)
+		p.module.RequireIfaceKey(bare)
+		return p.module.ifaceArtifactRef(bare + "$key"), nil
 	}
 	if t.Kind == ir.KindExternal {
 		spelled, err := p.tsType(t)

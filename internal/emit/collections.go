@@ -404,12 +404,12 @@ func (p *printer) ifaceKeyEncoder(mapT ir.Type) (string, error) {
 		}
 		return op, nil
 	}
-	name, err := p.ifaceUnionAlias(keyT)
-	if err != nil {
+	if _, err := p.ifaceUnionAlias(keyT); err != nil {
 		return "", err
 	}
-	p.module.RequireIfaceKeyFn(name)
-	return name + "$key", nil
+	bare := ifaceAliasName(keyT.IfaceID)
+	p.module.RequireIfaceKey(bare)
+	return p.module.ifaceArtifactRef(bare + "$key"), nil
 }
 
 // printMapAccess emits a map read with the exact zero value of the map's
