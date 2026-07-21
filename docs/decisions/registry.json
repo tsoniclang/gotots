@@ -244,6 +244,25 @@
    "reopeningConditions": [
     "a new output class appears that no existing attribution category honestly covers"
    ]
+  },
+  {
+   "id": "ADR-0012",
+   "path": "docs/decisions/0012-object-model-plan.md",
+   "status": "accepted",
+   "owner": "gotots-maintainers",
+   "affectedSpecClauses": [
+    "docs/spec/interfaces-generics-functions.md#interface-representation-candidates",
+    "docs/spec/interfaces-generics-functions.md#method-sets-and-calls",
+    "docs/spec/representation-output.md#module-and-file-layout"
+   ],
+   "schemaOrAbiVersions": [
+    "object-model-plan-v1"
+   ],
+   "implementationStatus": "planned",
+   "decisionRevision": "acbd833",
+   "reopeningConditions": [
+    "a virtual-contract family has no single primary spine the plan can express (genuine observable diamonds)"
+   ]
   }
  ]
 }
