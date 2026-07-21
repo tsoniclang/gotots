@@ -36,13 +36,6 @@ type familyClass struct {
 	// members every ancestor carries. A method whose name is here overrides an
 	// inherited member and needs the `override` modifier (noImplicitOverride).
 	baseMembers map[string]bool
-	// concrete is true when every virtual-contract method is provided on this
-	// class's spine — the class can be instantiated (`new`). A class that
-	// still leaves a contract method abstract emits as `abstract class`.
-	concrete bool
-	// concreteAncestor is true when some strict ancestor is already concrete
-	// (so this class's static goZero$ overrides the ancestor's).
-	concreteAncestor bool
 }
 
 // spineLevel is one ancestor class with the own fields it contributes to
@@ -181,47 +174,7 @@ func resolveFamilyClass(plan *objectmodel.Plan, canon string, structDecl *ir.Str
 		})
 	}
 	fc.baseMembers = computeBaseMembers(fc)
-	computeConcreteness(plan, fc, canon)
 	return fc, true
-}
-
-// computeConcreteness walks the class's spine root-first, accumulating the
-// contract methods provided (declared or overridden) at each level. A class
-// is concrete once every contract method has been provided on its spine; the
-// first concrete class on the spine can be instantiated, and every concrete
-// class below it overrides the inherited static zero.
-func computeConcreteness(plan *objectmodel.Plan, fc *familyClass, canon string) {
-	spine := make([]string, 0, len(fc.ancestors)+1)
-	for _, level := range fc.ancestors {
-		spine = append(spine, level.canon)
-	}
-	spine = append(spine, canon)
-
-	covered := map[string]bool{}
-	concretePerClass := make([]bool, len(spine))
-	for i, c := range spine {
-		cls, _ := plan.Class(c)
-		for name, disp := range cls.Methods {
-			if disp == objectmodel.MethodDeclared || disp == objectmodel.MethodOverride {
-				covered[name] = true
-			}
-		}
-		all := true
-		for _, m := range fc.family.ContractMethods {
-			if !covered[m] {
-				all = false
-				break
-			}
-		}
-		concretePerClass[i] = all
-	}
-	fc.concrete = concretePerClass[len(spine)-1]
-	for i := 0; i < len(spine)-1; i++ {
-		if concretePerClass[i] {
-			fc.concreteAncestor = true
-			break
-		}
-	}
 }
 
 // computeBaseMembers collects every member name reachable on the primary
@@ -349,13 +302,11 @@ func familyDepth(m *Module, name string) (int, bool) {
 func printFamilyClass(out *strings.Builder, module *Module, fc *familyClass,
 	memberMethods, delegateMethods []*ir.Func, outcomes *[]BodyOutcome, artifacts *[]BodyArtifact) error {
 	p := &printer{out: out, module: module}
-	header := "export "
-	if !fc.concrete {
-		// A class that still leaves a contract method abstract cannot be
-		// instantiated.
-		header += "abstract "
-	}
-	header += "class " + tsName(fc.structDecl.Name)
+	// A family class is emitted concrete with an exact zero-state: Go structs
+	// are constructed and zeroed, so the class must be instantiable. Contract
+	// methods the class does not provide dispatch to the zero value's nil
+	// interface (a panic), exactly as Go's `n.data.M()` on a zero node does.
+	header := "export class " + tsName(fc.structDecl.Name)
 	if !fc.class.Root {
 		header += " extends " + tsName(fc.class.Primary.BaseType)
 	}
@@ -381,7 +332,7 @@ func printFamilyClass(out *strings.Builder, module *Module, fc *familyClass,
 		return err
 	}
 	if fc.class.Root {
-		if err := printFamilyAbstractContract(p, fc, memberMethods); err != nil {
+		if err := printFamilyContractZeroState(p, fc, memberMethods); err != nil {
 			return err
 		}
 	}
@@ -469,28 +420,13 @@ func printFamilyConstructor(p *printer, fc *familyClass) error {
 	return nil
 }
 
-// printFamilyValueContract emits the spine-aware value semantics. A class
-// that cannot be instantiated (still abstract) only DECLARES the contract at
-// the root — `abstract goClone$(): Root` / `abstract goSet$(other: Root)` —
-// and every concrete class implements it over the transitive own fields with
-// a covariant self return, plus a static zero. Node value semantics
-// (goEq$/goKey$) are never emitted: nodes are non-comparable reference types
-// (the arena passes goEqUnsupported).
+// printFamilyValueContract emits the spine-aware value semantics over the
+// transitive own fields with a covariant self return: goClone$ / goSet$ and a
+// static goZero$. Every family class is concrete, so a non-root class always
+// overrides the inherited contract. goEq$/goKey$ are emitted only when the
+// concrete type is comparable / key-encodable (below).
 func printFamilyValueContract(p *printer, fc *familyClass) error {
 	self := tsName(fc.structDecl.Name)
-	if !fc.concrete {
-		// The root owns the abstract declaration; intermediate abstracts
-		// inherit it. A pointer receiver keeps the parameter widen-safe.
-		if fc.class.Root {
-			p.line("abstract goClone$(): %s;", self)
-			p.line("abstract goSet$(other: %s): void;", self)
-		}
-		return nil
-	}
-
-	// A concrete class implements the contract. Non-root classes override the
-	// inherited (abstract or concrete) goClone$/goSet$; a static goZero$
-	// overrides only when an ancestor is already concrete.
 	override := ""
 	if !fc.class.Root {
 		override = "override "
@@ -529,15 +465,61 @@ func printFamilyValueContract(p *printer, fc *familyClass) error {
 		}
 		zeros = append(zeros, zero)
 	}
-	staticOverride := ""
-	if fc.concreteAncestor {
-		staticOverride = "override "
-	}
-	p.line("static %sgoZero$(): %s {", staticOverride, self)
+	p.line("static %sgoZero$(): %s {", override, self)
 	p.indent++
 	p.line("return new %s(%s);", self, strings.Join(zeros, ", "))
 	p.indent--
 	p.line("}")
+
+	// A comparable / key-encodable family type carries goEq$ / goKey$ over
+	// its transitive own fields, so it can compare and key exactly like the
+	// flat value struct. Comparability is monotone down the spine, so a
+	// non-root class overrides the inherited operation.
+	if fc.structDecl.Comparable {
+		comparisons := make([]string, 0, len(fields))
+		for _, field := range fields {
+			this, other := "this."+field.Name, "other."+field.Name
+			if field.Cell {
+				this += ".v"
+				other += ".v"
+			}
+			cmp, err := p.eqComponent(this, other, field.Type)
+			if err != nil {
+				return err
+			}
+			comparisons = append(comparisons, cmp)
+		}
+		if len(comparisons) == 0 {
+			comparisons = append(comparisons, "true")
+		}
+		p.line("%sgoEq$(other: %s): boolean {", override, self)
+		p.indent++
+		p.line("return %s;", strings.Join(comparisons, " && "))
+		p.indent--
+		p.line("}")
+	}
+	if fc.structDecl.KeyEncodable {
+		components := make([]string, 0, len(fields))
+		for _, field := range fields {
+			access := "this." + field.Name
+			if field.Cell {
+				access += ".v"
+			}
+			comp, err := p.keyComponent(access, field.Type)
+			if err != nil {
+				return err
+			}
+			components = append(components, comp)
+		}
+		if len(components) == 0 {
+			components = append(components, `"z"`)
+		}
+		p.line("%sgoKey$(): string {", override)
+		p.indent++
+		p.line("return %s;", strings.Join(components, ` + "|" + `))
+		p.indent--
+		p.line("}")
+	}
 	return nil
 }
 
@@ -598,13 +580,13 @@ func (p *printer) familyFieldSet(field ir.Var) error {
 	return nil
 }
 
-// printFamilyAbstractContract emits an abstract declaration for each
-// virtual-contract method the implementers own (a trampoline removed from
-// the root), so the root's dispatch resolves virtually through `this`. A
-// contract method the root itself provides concretely (a default the
-// subclasses inherit) is emitted as an ordinary member, not abstract, and
-// is skipped here.
-func printFamilyAbstractContract(p *printer, fc *familyClass, memberMethods []*ir.Func) error {
+// printFamilyContractZeroState emits, on the root, a concrete zero-state
+// body for every virtual-contract method the root does not itself provide.
+// On a zero value the self-interface is nil, so `n.data.M()` panics; the
+// root class reproduces that exactly (concrete subclasses override with the
+// real behavior). This keeps the root instantiable — Go structs are zeroed
+// and constructed — instead of an abstract class.
+func printFamilyContractZeroState(p *printer, fc *familyClass, memberMethods []*ir.Func) error {
 	for _, name := range fc.family.ContractMethods {
 		if fc.rootDeclaresConcrete(name) {
 			continue
@@ -625,7 +607,11 @@ func printFamilyAbstractContract(p *printer, fc *familyClass, memberMethods []*i
 		if err != nil {
 			return fmt.Errorf("%s: %w", fc.structDecl.ID, err)
 		}
-		p.line("abstract %s(%s): %s;", tsName(name), strings.Join(params, ", "), result)
+		p.line("%s(%s): %s {", tsName(name), strings.Join(params, ", "), result)
+		p.indent++
+		p.line("gort$.goPanicNil();")
+		p.indent--
+		p.line("}")
 	}
 	return nil
 }

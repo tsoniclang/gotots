@@ -325,6 +325,14 @@ func placeClasses(iface *types.Named, ifaceType *types.Interface, root *types.Na
 		classSet[m] = true
 		collectSpine(m, root, classSet)
 	}
+	// A class that redeclares an ancestor field name (Go depth-shadowing with
+	// a different type, e.g. fanotifyBackend.subscriptions over
+	// watcherBase.subscriptions) is not expressible as a TypeScript `extends`
+	// hierarchy — the field cannot be both types. Block the whole family (it
+	// keeps its flat composition form) rather than mix representations.
+	if shadow := shadowingField(classSet, root); shadow != "" {
+		return nil, nil, "field shadowing not expressible as extends: " + shadow
+	}
 	contract := map[string]bool{}
 	for i := 0; i < ifaceType.NumMethods(); i++ {
 		contract[ifaceType.Method(i).Name()] = true
@@ -383,6 +391,39 @@ func placeClasses(iface *types.Named, ifaceType *types.Interface, root *types.Na
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Canon < out[j].Canon })
 	return out, collisions, ""
+}
+
+// shadowingField returns a non-empty field name when some class in the set
+// declares a non-embedded field whose name also appears (non-embedded) on a
+// value-embedding ancestor on its primary spine — Go depth-shadowing that a
+// TypeScript `extends` hierarchy cannot express.
+func shadowingField(classSet map[*types.Named]bool, root *types.Named) string {
+	for s := range classSet {
+		if s == root {
+			continue
+		}
+		ancestorFields := map[string]bool{}
+		for base := primaryBaseNamed(s, root); base != nil; base = primaryBaseNamed(base, root) {
+			strukt, ok := base.Underlying().(*types.Struct)
+			if ok {
+				for i := 0; i < strukt.NumFields(); i++ {
+					if f := strukt.Field(i); !f.Embedded() {
+						ancestorFields[f.Name()] = true
+					}
+				}
+			}
+			if base == root {
+				break
+			}
+		}
+		strukt := s.Underlying().(*types.Struct)
+		for i := 0; i < strukt.NumFields(); i++ {
+			if f := strukt.Field(i); !f.Embedded() && ancestorFields[f.Name()] {
+				return s.Obj().Name() + "." + f.Name()
+			}
+		}
+	}
+	return ""
 }
 
 // collectSpine adds every struct on a value-embedding path from `from`
