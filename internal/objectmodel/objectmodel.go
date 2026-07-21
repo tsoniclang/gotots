@@ -6,10 +6,13 @@
 // TypeScript classes and O(1) virtual dispatch instead of nested
 // forwarding chains, boxed vtables, and exhaustive per-call switches.
 //
-// The analysis is a sealed whole-program product: it reads the typed
-// universe once and yields an immutable plan. A struct that does not
-// belong to a provable object-model family is absent from the plan and
-// keeps its current representation.
+// Recognition is by typed facts — a virtual-contract interface I is an
+// object-model contract only when a ROOT struct declares a
+// self-reference field of type I and the concrete implementers of I
+// embed that root — never by a member count. Primary-spine selection
+// reproduces Go's own field/method selection (minimum promotion depth;
+// equal depth is ambiguous and fails closed). A family that cannot
+// place every member atomically is blocked whole, never mixed.
 package objectmodel
 
 import (
@@ -19,53 +22,44 @@ import (
 
 // Plan is the immutable object-model result for one translation unit.
 type Plan struct {
-	// classes maps a named struct's canonical identity to its class
-	// shape (primary base, secondary components, virtual role).
-	classes map[string]Class
-	// families maps a virtual-contract interface identity to its
-	// family (root type + members).
+	classes  map[string]Class
 	families map[string]Family
+	blocked  map[string]string
+}
+
+// EmbeddedEdge models one embedded field exactly (ADR-0012 4.2).
+type EmbeddedEdge struct {
+	Field       string
+	BaseType    string
+	BaseCanon   string
+	Pointer     bool
+	Index       int
+	DepthToRoot int
 }
 
 // Class is one struct's recovered class shape.
 type Class struct {
-	// Name is the struct's own type name.
-	Name string
-	// PrimaryBase is the embedded field name whose type is this class's
-	// superclass (`extends PrimaryBase`); empty for a family root.
-	PrimaryBase string
-	// PrimaryBaseType is the superclass's type name (empty for a root).
-	PrimaryBaseType string
-	// Secondary lists the other embedded named-struct fields, kept as
-	// owned components with forwarding accessors.
-	Secondary []string
-	// Root marks the family root class (owns the virtual contract; has
-	// no primary base within the family).
-	Root bool
+	Name       string
+	Canon      string
+	Primary    EmbeddedEdge
+	HasPrimary bool
+	Secondary  []EmbeddedEdge
+	Root       bool
+	Family     string
 }
 
 // Family is one virtual-contract interface's recovered hierarchy.
 type Family struct {
-	// Interface is the virtual-contract interface's type name.
-	Interface string
-	// RootType is the common type every member embeds transitively —
-	// the base class of the family hierarchy.
-	RootType string
-	// Members are the concrete implementer type names, sorted.
-	Members []string
-	// Unplaced are members with more than one embedded base reaching
-	// the root (genuine multiple inheritance): they keep their current
-	// representation, and dispatch to them falls back to the union path.
-	Unplaced []string
+	Interface      string
+	InterfaceCanon string
+	RootType       string
+	RootCanon      string
+	SelfField      string
+	Members        []string
 }
 
-// Class returns a struct's recovered shape, if it belongs to a family.
-func (p *Plan) Class(identity string) (Class, bool) {
-	c, ok := p.classes[identity]
-	return c, ok
-}
+func (p *Plan) Class(canon string) (Class, bool) { c, ok := p.classes[canon]; return c, ok }
 
-// Families returns every recovered family's interface identity, sorted.
 func (p *Plan) Families() []string {
 	out := make([]string, 0, len(p.families))
 	for id := range p.families {
@@ -75,29 +69,38 @@ func (p *Plan) Families() []string {
 	return out
 }
 
-// Family returns one family by interface identity.
-func (p *Plan) Family(interfaceIdentity string) (Family, bool) {
-	f, ok := p.families[interfaceIdentity]
+func (p *Plan) Family(interfaceCanon string) (Family, bool) {
+	f, ok := p.families[interfaceCanon]
 	return f, ok
 }
 
-// embeddedBases returns the named-struct types a struct embeds directly,
-// in Go field order (an embedded field is anonymous and named by its
-// type). Pointer-embedded bases are included (Go promotes through them).
-func embeddedBases(named *types.Named) []*types.Named {
+// Blocked returns recognized-but-unplaceable families and their reasons.
+func (p *Plan) Blocked() map[string]string { return p.blocked }
+
+type edge struct {
+	base    *types.Named
+	pointer bool
+	index   int
+}
+
+// embeddedEdges returns a struct's embedded named-struct edges in field
+// order, distinguishing pointer from value embedding.
+func embeddedEdges(named *types.Named) []edge {
 	strukt, ok := named.Underlying().(*types.Struct)
 	if !ok {
 		return nil
 	}
-	var bases []*types.Named
+	var out []edge
 	for i := 0; i < strukt.NumFields(); i++ {
 		field := strukt.Field(i)
 		if !field.Embedded() {
 			continue
 		}
 		t := field.Type()
-		if pointer, isPointer := t.(*types.Pointer); isPointer {
-			t = pointer.Elem()
+		pointer := false
+		if p, isPointer := t.(*types.Pointer); isPointer {
+			t = p.Elem()
+			pointer = true
 		}
 		base, isNamed := types.Unalias(t).(*types.Named)
 		if !isNamed {
@@ -106,44 +109,48 @@ func embeddedBases(named *types.Named) []*types.Named {
 		if _, isStruct := base.Underlying().(*types.Struct); !isStruct {
 			continue
 		}
-		bases = append(bases, base)
+		out = append(out, edge{base, pointer, i})
 	}
-	return bases
+	return out
 }
 
-// embedsTransitively reports whether `from` reaches `target` by any
-// chain of embedded bases (target included as itself).
-func embedsTransitively(from, target *types.Named, cache map[*types.Named]map[*types.Named]bool) bool {
-	if from == target {
-		return true
+// depthToRoot returns the minimum number of VALUE-embedding steps from
+// `from` to `root` (0 when equal), or -1 when unreachable by value
+// embedding. A pointer-embedded step carries no object identity and is
+// not part of the inheritance spine.
+func depthToRoot(from, root *types.Named, memo map[*types.Named]int) int {
+	if from == root {
+		return 0
 	}
-	if seen, ok := cache[from]; ok {
-		if reaches, done := seen[target]; done {
-			return reaches
+	if d, ok := memo[from]; ok {
+		return d
+	}
+	memo[from] = -1
+	best := -1
+	for _, e := range embeddedEdges(from) {
+		if e.pointer {
+			continue
+		}
+		if d := depthToRoot(e.base, root, memo); d >= 0 {
+			if best < 0 || d+1 < best {
+				best = d + 1
+			}
 		}
 	}
-	if cache[from] == nil {
-		cache[from] = map[*types.Named]bool{}
-	}
-	// Provisionally false to break embedding cycles (Go forbids them,
-	// but the walk stays total either way).
-	cache[from][target] = false
-	for _, base := range embeddedBases(from) {
-		if embedsTransitively(base, target, cache) {
-			cache[from][target] = true
-			return true
-		}
-	}
-	return false
+	memo[from] = best
+	return best
 }
 
-// Analyze recovers the object model from the unit's named types. A
-// virtual-contract family is an interface with a broad closed
-// implementer set whose members all embed a single common root struct
-// through a unique primary spine; only such families enter the plan.
+func canonical(n *types.Named) string {
+	if n.Obj().Pkg() == nil {
+		return n.Obj().Name()
+	}
+	return n.Obj().Pkg().Path() + "." + n.Obj().Name()
+}
+
+// Analyze recovers the object model from the unit's named types.
 func Analyze(named []*types.Named) *Plan {
-	plan := &Plan{classes: map[string]Class{}, families: map[string]Family{}}
-	cache := map[*types.Named]map[*types.Named]bool{}
+	plan := &Plan{classes: map[string]Class{}, families: map[string]Family{}, blocked: map[string]string{}}
 
 	var structs, interfaces []*types.Named
 	for _, n := range named {
@@ -160,154 +167,202 @@ func Analyze(named []*types.Named) *Plan {
 		if ifaceType.NumMethods() == 0 {
 			continue
 		}
-		// Members: structs whose pointer implements the interface.
-		var members []*types.Named
-		for _, s := range structs {
-			if types.Implements(types.NewPointer(s), ifaceType) {
-				members = append(members, s)
-			}
-		}
-		if len(members) < 3 {
-			// Too small to be an object-model family; ordinary dispatch.
-			continue
-		}
-		root := commonRoot(members, cache)
+		// Recognition (4.1): the ROOT is the struct that declares a
+		// self-reference field of this interface AND is value-embedded
+		// by the interface's implementers. Cast-view aliases (a defined
+		// type over the root that shares the field) are not embedded by
+		// implementers and so are not selected.
+		root, selfField := selfReferenceRoot(iface, ifaceType, structs)
 		if root == nil {
 			continue
 		}
-		family := buildFamily(iface, root, members, cache)
-		if family == nil {
+		var members []*types.Named
+		for _, s := range structs {
+			if s == root {
+				continue
+			}
+			if types.Implements(types.NewPointer(s), ifaceType) && depthToRoot(s, root, map[*types.Named]int{}) >= 0 {
+				members = append(members, s)
+			}
+		}
+		if len(members) == 0 {
 			continue
 		}
-		plan.families[canonical(iface)] = family.Family
-		// Record every class on the spine (members and intermediates).
-		for _, class := range family.classes {
-			plan.classes[canonical(class.self)] = class.Class
+		fam := Family{
+			Interface: iface.Obj().Name(), InterfaceCanon: canonical(iface),
+			RootType: root.Obj().Name(), RootCanon: canonical(root), SelfField: selfField,
+		}
+		classes, reason := placeClasses(root, members)
+		if reason != "" {
+			// 4.5: no mixed family — block the whole family.
+			plan.blocked[canonical(iface)] = reason
+			continue
+		}
+		for _, m := range members {
+			fam.Members = append(fam.Members, m.Obj().Name())
+		}
+		sort.Strings(fam.Members)
+		plan.families[canonical(iface)] = fam
+		for _, c := range classes {
+			c.Family = canonical(iface)
+			if prior, exists := plan.classes[c.Canon]; exists && prior.Family != c.Family {
+				// 4.4: reject overlapping families with incompatible
+				// plans rather than silently overwriting.
+				plan.blocked[canonical(iface)] = "class " + c.Canon + " belongs to two families"
+				delete(plan.families, canonical(iface))
+				break
+			}
+			plan.classes[c.Canon] = c
 		}
 	}
 	return plan
 }
 
-// commonRoot returns the unique struct every member embeds transitively
-// that itself embeds no other common-embedded struct (the spine sink),
-// or nil if there is no single such root.
-func commonRoot(members []*types.Named, cache map[*types.Named]map[*types.Named]bool) *types.Named {
-	// Candidate set: types embedded transitively by the FIRST member.
-	var candidates []*types.Named
-	collectEmbedded(members[0], &candidates, map[*types.Named]bool{})
-	// Keep only those embedded by EVERY member.
-	var common []*types.Named
-	for _, cand := range candidates {
-		all := true
-		for _, m := range members[1:] {
-			if !embedsTransitively(m, cand, cache) {
-				all = false
-				break
-			}
-		}
-		if all {
-			common = append(common, cand)
-		}
+// selfReferenceRoot finds the struct that declares a field of exactly
+// the interface type (the object-model self-reference) AND is embedded
+// by the interface's implementers — never a cast-view alias that shares
+// the field but is embedded by no implementer.
+func selfReferenceRoot(iface *types.Named, ifaceType *types.Interface, structs []*types.Named) (*types.Named, string) {
+	type candidate struct {
+		root  *types.Named
+		field string
 	}
-	// Root = the common candidate that embeds no OTHER common candidate.
-	var roots []*types.Named
-	for _, cand := range common {
-		sink := true
-		for _, other := range common {
-			if other != cand && embedsTransitively(cand, other, cache) {
-				sink = false
-				break
-			}
-		}
-		if sink {
-			roots = append(roots, cand)
-		}
-	}
-	if len(roots) != 1 {
-		return nil
-	}
-	return roots[0]
-}
-
-// collectEmbedded gathers all structs a type embeds transitively.
-func collectEmbedded(from *types.Named, out *[]*types.Named, seen map[*types.Named]bool) {
-	for _, base := range embeddedBases(from) {
-		if seen[base] {
-			continue
-		}
-		seen[base] = true
-		*out = append(*out, base)
-		collectEmbedded(base, out, seen)
-	}
-}
-
-type spineClass struct {
-	self *types.Named
-	Class
-}
-
-// buildFamily proves the primary spine for every struct that embeds the
-// root, failing (nil) if any struct has more than one embedded base
-// reaching the root (genuine multiple inheritance the plan cannot
-// express).
-func buildFamily(iface, root *types.Named, members []*types.Named, cache map[*types.Named]map[*types.Named]bool) *family {
-	// The class set: root plus every struct transitively embedding it
-	// that also appears on some member's spine.
-	classSet := map[*types.Named]bool{root: true}
-	for _, m := range members {
-		var chain []*types.Named
-		collectEmbedded(m, &chain, map[*types.Named]bool{})
-		classSet[m] = true
-		for _, c := range chain {
-			if embedsTransitively(c, root, cache) {
-				classSet[c] = true
-			}
-		}
-	}
-	out := &family{Family: Family{Interface: iface.Obj().Name(), RootType: root.Obj().Name()}}
-	for s := range classSet {
-		var primary []*types.Named
-		var secondary []string
-		if s != root {
-			for _, base := range embeddedBases(s) {
-				if embedsTransitively(base, root, cache) {
-					primary = append(primary, base)
-				} else {
-					secondary = append(secondary, base.Obj().Name())
-				}
-			}
-			if len(primary) != 1 {
-				// More than one embedded base reaches the root (genuine
-				// multiple inheritance) or none does: no single spine.
-				// The struct keeps its current representation; it is
-				// unplaced, not fatal to the family.
-				out.Unplaced = append(out.Unplaced, s.Obj().Name())
+	var candidates []candidate
+	for _, s := range structs {
+		strukt := s.Underlying().(*types.Struct)
+		for i := 0; i < strukt.NumFields(); i++ {
+			field := strukt.Field(i)
+			if field.Embedded() {
 				continue
 			}
+			named, isNamed := types.Unalias(field.Type()).(*types.Named)
+			if isNamed && named == iface {
+				candidates = append(candidates, candidate{s, field.Name()})
+				break
+			}
 		}
-		class := Class{Name: s.Obj().Name(), Secondary: secondary, Root: s == root}
-		if len(primary) == 1 {
-			class.PrimaryBase = primary[0].Obj().Name()
-			class.PrimaryBaseType = primary[0].Obj().Name()
-		}
-		sort.Strings(class.Secondary)
-		out.classes = append(out.classes, spineClass{self: s, Class: class})
 	}
+	// Select the candidate value-embedded by the most implementers; a
+	// cast-view alias is embedded by none.
+	var best *types.Named
+	var bestField string
+	bestCount := 0
+	for _, c := range candidates {
+		count := 0
+		for _, s := range structs {
+			if s != c.root && types.Implements(types.NewPointer(s), ifaceType) &&
+				depthToRoot(s, c.root, map[*types.Named]int{}) >= 0 {
+				count++
+			}
+		}
+		if count > bestCount {
+			best, bestField, bestCount = c.root, c.field, count
+		}
+	}
+	return best, bestField
+}
+
+// placeClasses builds the class plan for the root and every struct that
+// value-embeds it, selecting each class's primary base by Go's minimum
+// promotion depth. An equal-depth tie (genuine ambiguity) returns a
+// non-empty reason so the family blocks (4.5).
+func placeClasses(root *types.Named, members []*types.Named) ([]Class, string) {
+	// Class set: root plus every struct on some member's value-embedding
+	// spine to root.
+	classSet := map[*types.Named]bool{root: true}
 	for _, m := range members {
-		out.Members = append(out.Members, m.Obj().Name())
+		classSet[m] = true
+		collectSpine(m, root, classSet)
 	}
-	sort.Strings(out.Members)
-	return out
+	var out []Class
+	for s := range classSet {
+		class := Class{Name: s.Obj().Name(), Canon: canonical(s), Root: s == root}
+		if s != root {
+			primary, secondary, reason := selectPrimary(s, root)
+			if reason != "" {
+				return nil, s.Obj().Name() + ": " + reason
+			}
+			class.Primary = primary
+			class.HasPrimary = true
+			class.Secondary = secondary
+		} else {
+			// The root's own embedded bases (if any) are components.
+			for _, e := range embeddedEdges(s) {
+				class.Secondary = append(class.Secondary, edgeOf(e, root))
+			}
+		}
+		out = append(out, class)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Canon < out[j].Canon })
+	return out, ""
 }
 
-type family struct {
-	Family
-	classes []spineClass
+// collectSpine adds every struct on a value-embedding path from `from`
+// to `root` into the set.
+func collectSpine(from, root *types.Named, set map[*types.Named]bool) {
+	for _, e := range embeddedEdges(from) {
+		if e.pointer {
+			continue
+		}
+		if depthToRoot(e.base, root, map[*types.Named]int{}) >= 0 {
+			if !set[e.base] {
+				set[e.base] = true
+				collectSpine(e.base, root, set)
+			}
+		}
+	}
 }
 
-func canonical(n *types.Named) string {
-	if n.Obj().Pkg() == nil {
-		return n.Obj().Name()
+// selectPrimary picks the value-embedded base with the unique minimum
+// promotion depth to the root as the superclass; all other embedded
+// bases become secondary components. An equal-depth tie among
+// root-reaching value bases is genuine ambiguity.
+func selectPrimary(s, root *types.Named) (EmbeddedEdge, []EmbeddedEdge, string) {
+	var candidates []edge
+	var others []edge
+	for _, e := range embeddedEdges(s) {
+		reaches := !e.pointer && depthToRoot(e.base, root, map[*types.Named]int{}) >= 0
+		if reaches {
+			candidates = append(candidates, e)
+		} else {
+			others = append(others, e)
+		}
 	}
-	return n.Obj().Pkg().Path() + "." + n.Obj().Name()
+	if len(candidates) == 0 {
+		return EmbeddedEdge{}, nil, "no value-embedded base reaches the root"
+	}
+	// Minimum depth wins; equal minimum is ambiguous.
+	best := candidates[0]
+	bestDepth := depthToRoot(best.base, root, map[*types.Named]int{})
+	tie := false
+	for _, e := range candidates[1:] {
+		d := depthToRoot(e.base, root, map[*types.Named]int{})
+		switch {
+		case d < bestDepth:
+			best, bestDepth, tie = e, d, false
+		case d == bestDepth:
+			tie = true
+		}
+	}
+	if tie {
+		return EmbeddedEdge{}, nil, "ambiguous equal-depth primary bases (genuine diamond)"
+	}
+	secondary := make([]EmbeddedEdge, 0, len(candidates)+len(others)-1)
+	for _, e := range candidates {
+		if e.base != best.base {
+			secondary = append(secondary, edgeOf(e, root))
+		}
+	}
+	for _, e := range others {
+		secondary = append(secondary, edgeOf(e, root))
+	}
+	sort.Slice(secondary, func(i, j int) bool { return secondary[i].BaseCanon < secondary[j].BaseCanon })
+	return edgeOf(best, root), secondary, ""
+}
+
+func edgeOf(e edge, root *types.Named) EmbeddedEdge {
+	return EmbeddedEdge{
+		Field: e.base.Obj().Name(), BaseType: e.base.Obj().Name(), BaseCanon: canonical(e.base),
+		Pointer: e.pointer, Index: e.index, DepthToRoot: depthToRoot(e.base, root, map[*types.Named]int{}),
+	}
 }

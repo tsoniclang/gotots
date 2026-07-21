@@ -9,15 +9,14 @@ import (
 	"testing"
 )
 
-func analyzeSrc(t *testing.T, src string) *Plan {
+func analyze(t *testing.T, src string) *Plan {
 	t.Helper()
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, "m.go", src, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	conf := types.Config{Importer: importer.Default()}
-	pkg, err := conf.Check("m", fset, []*ast.File{file}, nil)
+	pkg, err := (&types.Config{Importer: importer.Default()}).Check("m", fset, []*ast.File{file}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,68 +31,127 @@ func analyzeSrc(t *testing.T, src string) *Plan {
 	return Analyze(named)
 }
 
-// The AST shape: a spine Node <- NodeDefault <- NodeBase <- ExprBase,
-// concrete leaves embedding the spine plus a secondary capability base.
-func TestRecoversSpineAndSecondary(t *testing.T) {
-	plan := analyzeSrc(t, `package m
-type nodeData interface { Name() *Node; Kind() int }
-type Node struct { data nodeData }
+const astShape = `package m
+type nodeData interface { Name() *Node; NodeKind() int }
+type Node struct { Kind int; data nodeData }
 type NodeDefault struct { Node }
 type NodeBase struct { NodeDefault }
 type ExprBase struct { NodeBase }
+type TypeNodeBase struct { NodeBase }
 type FlowBase struct { flow int }
 type Identifier struct { ExprBase; FlowBase; Text string }
-type Binary struct { ExprBase; Op int }
 type Block struct { NodeBase; Stmts int }
+type FuncOrCtorBase struct { TypeNodeBase; mods int }
+type FunctionTypeNode struct { TypeNodeBase; FuncOrCtorBase }
 func (n *Node) Name() *Node { return n.data.Name() }
-func (n *Node) Kind() int { return n.data.Kind() }
+func (n *Node) NodeKind() int { return n.data.NodeKind() }
 func (i *Identifier) Name() *Node { return &i.Node }
-func (i *Identifier) Kind() int { return 1 }
-func (b *Binary) Name() *Node { return nil }
-func (b *Binary) Kind() int { return 2 }
+func (i *Identifier) NodeKind() int { return 1 }
 func (b *Block) Name() *Node { return nil }
-func (b *Block) Kind() int { return 3 }
-`)
+func (b *Block) NodeKind() int { return 3 }
+func (f *FunctionTypeNode) Name() *Node { return nil }
+func (f *FunctionTypeNode) NodeKind() int { return 4 }
+`
+
+func TestRecognitionBySelfReference(t *testing.T) {
+	plan := analyze(t, astShape)
 	fams := plan.Families()
 	if len(fams) != 1 {
-		t.Fatalf("expected one family, got %v", fams)
+		t.Fatalf("families = %v (blocked=%v)", fams, plan.Blocked())
 	}
 	fam, _ := plan.Family(fams[0])
-	if fam.RootType != "Node" {
-		t.Fatalf("root = %q; want Node", fam.RootType)
-	}
-	id, ok := plan.Class("m.Identifier")
-	if !ok || id.PrimaryBaseType != "ExprBase" {
-		t.Fatalf("Identifier primary base = %+v; want ExprBase", id)
-	}
-	if len(id.Secondary) != 1 || id.Secondary[0] != "FlowBase" {
-		t.Fatalf("Identifier secondary = %v; want [FlowBase]", id.Secondary)
-	}
-	root, _ := plan.Class("m.Node")
-	if !root.Root || root.PrimaryBase != "" {
-		t.Fatalf("Node should be a root with no primary base: %+v", root)
-	}
-	expr, _ := plan.Class("m.ExprBase")
-	if expr.PrimaryBaseType != "NodeBase" {
-		t.Fatalf("ExprBase primary = %q; want NodeBase", expr.PrimaryBaseType)
+	if fam.RootType != "Node" || fam.SelfField != "data" {
+		t.Fatalf("family = %+v; want root Node, selfField data", fam)
 	}
 }
 
-// Genuine multiple inheritance (two embedded bases both reaching the
-// root) is not expressible as a single spine → the family is skipped.
-func TestMultipleSpinesSkipped(t *testing.T) {
-	plan := analyzeSrc(t, `package m
+func TestPrimaryAndSecondary(t *testing.T) {
+	plan := analyze(t, astShape)
+	id, ok := plan.Class("m.Identifier")
+	if !ok || id.Primary.BaseType != "ExprBase" {
+		t.Fatalf("Identifier primary = %+v; want ExprBase", id.Primary)
+	}
+	if len(id.Secondary) != 1 || id.Secondary[0].BaseType != "FlowBase" {
+		t.Fatalf("Identifier secondary = %+v; want [FlowBase]", id.Secondary)
+	}
+}
+
+// The shallow-path case: FunctionTypeNode embeds TypeNodeBase (depth to
+// root D) AND FuncOrCtorBase (which nests TypeNodeBase, depth D+1). Go
+// selects the shallower TypeNodeBase; it is placeable, not a diamond.
+func TestShallowPathDominance(t *testing.T) {
+	plan := analyze(t, astShape)
+	f, ok := plan.Class("m.FunctionTypeNode")
+	if !ok {
+		t.Fatalf("FunctionTypeNode not placed (blocked=%v)", plan.Blocked())
+	}
+	if f.Primary.BaseType != "TypeNodeBase" {
+		t.Fatalf("primary = %q; want TypeNodeBase (shallower path)", f.Primary.BaseType)
+	}
+	if len(f.Secondary) != 1 || f.Secondary[0].BaseType != "FuncOrCtorBase" {
+		t.Fatalf("secondary = %+v; want [FuncOrCtorBase]", f.Secondary)
+	}
+}
+
+// Genuine equal-depth ambiguity blocks the whole family (4.5).
+func TestEqualDepthAmbiguityBlocks(t *testing.T) {
+	plan := analyze(t, `package m
 type I interface { M() int }
-type Root struct { x int }
+type Root struct { data I }
 type A struct { Root }
 type B struct { Root }
 type Diamond struct { A; B }
 type P struct { Root; p int }
-type Q struct { Root; q int }
-func (r *Root) M() int { return 0 }
+func (r *Root) M() int { return r.data.M() }
+func (d *Diamond) M() int { return 1 }
+func (p *P) M() int { return 2 }
 `)
-	// Diamond embeds A and B, both reaching Root → no single spine.
-	if _, ok := plan.Class("m.Diamond"); ok {
-		t.Fatal("diamond multiple inheritance must not be planned")
+	if len(plan.Families()) != 0 {
+		t.Fatalf("equal-depth diamond must block the family; got %v", plan.Families())
+	}
+	if len(plan.Blocked()) == 0 {
+		t.Fatal("expected a blocked family with a reason")
+	}
+}
+
+// Pointer embedding is not value embedding: a *Base is a component, not
+// a superclass (a nil embedded pointer cannot be a JS superclass).
+func TestPointerEmbeddingIsComponent(t *testing.T) {
+	plan := analyze(t, `package m
+type I interface { M() int }
+type Root struct { data I }
+type Base struct { Root }
+type Ptr struct { *Base; x int }
+type Val struct { Base; y int }
+func (r *Root) M() int { return r.data.M() }
+func (b *Base) M() int { return 0 }
+func (p *Ptr) M() int { return 1 }
+func (v *Val) M() int { return 2 }
+`)
+	// Ptr embeds *Base (pointer) — no value path to Root → not placeable
+	// via the spine, so the family blocks rather than treating *Base as
+	// a superclass.
+	if _, ok := plan.Class("m.Ptr"); ok {
+		if c, _ := plan.Class("m.Ptr"); c.HasPrimary {
+			t.Fatal("pointer-embedded base must not become a superclass")
+		}
+	}
+}
+
+// A coincidental interface whose implementers merely share an embedded
+// struct, with NO self-reference root, is not an object-model family.
+func TestCoincidentalInterfaceNotAFamily(t *testing.T) {
+	plan := analyze(t, `package m
+type Stringer interface { String() string }
+type Base struct { x int }
+type A struct { Base }
+type B struct { Base }
+type C struct { Base }
+func (a A) String() string { return "a" }
+func (b B) String() string { return "b" }
+func (c C) String() string { return "c" }
+`)
+	if len(plan.Families()) != 0 {
+		t.Fatalf("coincidental interface must not be a family; got %v", plan.Families())
 	}
 }
