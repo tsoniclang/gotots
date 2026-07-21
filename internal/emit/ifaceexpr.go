@@ -14,6 +14,13 @@ import (
 func (p *printer) printIfaceExpr(e ir.Expr) (string, bool, error) {
 	switch n := e.(type) {
 	case *ir.IfaceBox:
+		// Object-model (ADR-0012): boxing a node into its own self-interface
+		// is a no-op — the value already IS the native class hierarchy, so no
+		// GoBox is constructed.
+		if _, ok := p.selfFamilyUnionRoot(n.T); ok {
+			printed, err := p.printExpr(n.X)
+			return printed, true, err
+		}
 		x, err := p.printExpr(n.X)
 		if err != nil {
 			return "", true, err
@@ -52,11 +59,13 @@ func (p *printer) printIfaceExpr(e ir.Expr) (string, bool, error) {
 		printed, err := p.printIfaceCall(n)
 		return printed, true, err
 	case *ir.TypeAssert:
-		// Object-model self-reference assertion (ADR-0012): `x.data.(*T)`
-		// narrows the concrete node `x` itself — `x instanceof T` — since the
-		// node IS its own data, instead of a boxed discriminant check.
-		if fl, ok := n.X.(*ir.FieldLoad); ok && p.module.isFamilySelfRef(fl.X.Type(), fl.Field) {
-			if s, handled, err := p.printFamilySelfRefAssert(fl.X, n); handled || err != nil {
+		// Object-model assertion (ADR-0012): asserting a concrete type from a
+		// self-family interface value narrows the node itself with
+		// `instanceof`, since the value IS a native class. Covers `x.data.(*T)`
+		// (the self-reference read collapses to the node) and any
+		// self-interface value.
+		if _, ok := p.selfFamilyUnionRoot(n.X.Type()); ok {
+			if s, handled, err := p.printFamilySelfRefAssert(n.X, n); handled || err != nil {
 				return s, true, err
 			}
 		}
@@ -233,13 +242,27 @@ func (p *printer) printIfaceExpr(e ir.Expr) (string, bool, error) {
 // self-reference dispatch: the concrete node's own virtual method,
 // resolved by native inheritance. A nilable base keeps the deref check so
 // a nil family value panics exactly as the nil-interface dispatch did.
-func (p *printer) printFamilyVirtualCall(base ir.Expr, n *ir.IfaceCall) (string, error) {
-	recv, err := p.printExpr(base)
-	if err != nil {
-		return "", err
-	}
-	if base.Type().Kind == ir.KindPointer {
-		recv = "gort$.goNilCheck(" + recv + ")"
+func (p *printer) printFamilyVirtualCall(n *ir.IfaceCall) (string, error) {
+	// The receiver is the concrete node: a self-reference read (`x.data`)
+	// collapses to `x` (nil-checked at the deref); any other self-interface
+	// value is the node directly (nil-checked — a nil interface dispatch
+	// panics).
+	var recv string
+	if fl, ok := n.Recv.(*ir.FieldLoad); ok && p.module.isFamilySelfRef(fl.X.Type(), fl.Field) {
+		base, err := p.printExpr(fl.X)
+		if err != nil {
+			return "", err
+		}
+		if fl.X.Type().Kind == ir.KindPointer {
+			base = "gort$.goNilCheck(" + base + ")"
+		}
+		recv = base
+	} else {
+		base, err := p.printExpr(n.Recv)
+		if err != nil {
+			return "", err
+		}
+		recv = "gort$.goNilCheck(" + base + ")"
 	}
 	spreadTuple, isSpread, err := p.spreadInner(n.Args)
 	if err != nil {
@@ -322,12 +345,13 @@ func (p *printer) familyAssertClass(target ir.Type) (string, bool) {
 }
 
 func (p *printer) printIfaceCall(n *ir.IfaceCall) (string, error) {
-	// Object-model virtual dispatch (ADR-0012): `x.data.Method()` where
-	// `data` is a family self-reference collapses to native virtual
-	// dispatch `x.Method()` — the concrete node IS its own data, so the
-	// boxed per-implementer switch is unnecessary.
-	if fl, ok := n.Recv.(*ir.FieldLoad); ok && p.module.isFamilySelfRef(fl.X.Type(), fl.Field) {
-		return p.printFamilyVirtualCall(fl.X, n)
+	// Object-model virtual dispatch (ADR-0012): a self-family interface value
+	// IS the native class hierarchy, so a method call on it is an ordinary
+	// virtual call `recv.Method()` — no boxed per-implementer switch. This
+	// covers `x.data.M()` (self-reference read) and any value of the
+	// self-interface type (parameter, local, field).
+	if _, ok := p.selfFamilyUnionRoot(n.Recv.Type()); ok {
+		return p.printFamilyVirtualCall(n)
 	}
 	recv, err := p.printExpr(n.Recv)
 	if err != nil {

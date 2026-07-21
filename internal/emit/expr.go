@@ -150,11 +150,34 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if recvT.MapFamilyPtrCell || (p.familyPtrCell && selfPtrReference(recvT)) {
 			methodClass += "$pc"
 		}
-		// A family accessor renamed to avoid a field collision is called by
-		// its renamed member name (the definition renames identically).
-		member := tsName(n.Method)
-		if _, _, ok := p.module.familyClassAndFamily(recvT); ok {
-			member = p.module.familyMemberName(n.Method)
+		// Object-model dispatch (ADR-0012): a self-interface contract method
+		// dispatches virtually (a native class method); every other family
+		// method is an ordinary Go method with STATIC dispatch through the
+		// owner's free function (Go binds promoted methods to their declaring
+		// type, not the runtime type).
+		if _, _, isFam := p.module.familyClassAndFamily(recvT); isFam {
+			if p.module.isFamilyContractMethod(recvT, n.Method) {
+				receiver := recv
+				if n.Recv.Type().Kind == ir.KindPointer {
+					checked, err := p.nilCheckOf(recv, n.Recv.Type())
+					if err != nil {
+						return "", err
+					}
+					receiver = checked
+				}
+				return receiver + "." + tsName(n.Method) + "(" + args + ")", nil
+			}
+			if ownerPkg, ownerName, ok := p.module.familyMethodOwner(recvT, n.Method); ok {
+				callee, err := p.module.symbol(ownerPkg, ownerName+"$"+n.Method)
+				if err != nil {
+					return "", err
+				}
+				operands := recv
+				if args != "" {
+					operands += ", " + args
+				}
+				return callee + "(" + operands + ")", nil
+			}
 		}
 		if n.Promoted {
 			receiver := recv
@@ -165,7 +188,7 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 				}
 				receiver = checked
 			}
-			return receiver + "." + member + "(" + args + ")", nil
+			return receiver + "." + tsName(n.Method) + "(" + args + ")", nil
 		}
 		if len(n.TypeArgs) == 0 && methodClass == n.TypeName {
 			emission := p.module.MethodEmissionFor(goid.Method(n.Pkg, n.TypeName, n.Method))
@@ -181,7 +204,7 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 					}
 					receiver = checked
 				}
-				return receiver + "." + member + "(" + args + ")", nil
+				return receiver + "." + tsName(n.Method) + "(" + args + ")", nil
 			case emission == plan.MethodFreeFunctionException && receiverProven:
 				// The delegate member: source-shaped at proven sites,
 				// forwarding to the single free-function body.
@@ -189,7 +212,7 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 				if p.nilChecked(recv) && n.Recv.Type().Kind == ir.KindPointer {
 					suffix = "!"
 				}
-				return recv + suffix + "." + member + "(" + args + ")", nil
+				return recv + suffix + "." + tsName(n.Method) + "(" + args + ")", nil
 			}
 		}
 		callee, err := p.module.symbol(n.Pkg, methodClass+"$"+n.Method)
@@ -253,6 +276,20 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		}
 		return fmt.Sprintf("%s(%s, %s)", callee, recv, args), nil
 	case *ir.FieldLoad:
+		// Object-model self-reference read (ADR-0012): `x.data` reads the
+		// concrete node's own self-interface, which IS the node — collapse to
+		// `x`. The self-interface type is the class hierarchy, so the read is
+		// well typed.
+		if p.module.isFamilySelfRef(n.X.Type(), n.Field) {
+			base, err := p.printExpr(n.X)
+			if err != nil {
+				return "", err
+			}
+			if n.X.Type().Kind == ir.KindPointer {
+				return "gort$.goNilCheck(" + base + ")", nil
+			}
+			return base, nil
+		}
 		// Object-model spine collapse (ADR-0012): selecting the primary
 		// embedded base of a family class is inherited access — the base IS
 		// the object under native inheritance — so the hop disappears. A

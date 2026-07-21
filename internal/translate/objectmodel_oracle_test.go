@@ -37,6 +37,14 @@ func (n *Node) Name() string     { return n.data.Name() }
 func (n *Node) describe() string { return "node" }
 func (n *Node) Position() int    { return n.Pos }
 
+// ORDINARY (non-contract) methods: helperVal is overridden by a subclass,
+// callHelper (inherited) calls it. Go binds n.helperVal() STATICALLY to
+// *Node (the receiver's resolved type), so callHelper always returns the
+// base value even for a subclass — TS virtual dispatch would wrongly pick
+// the override.
+func (n *Node) helperVal() int  { return 10 }
+func (n *Node) callHelper() int { return n.helperVal() }
+
 type NodeBase struct{ Node }
 
 func (b *NodeBase) Kind() int    { return 0 }
@@ -75,6 +83,10 @@ func (l *NumericLiteral) Kind() int { return 2 }
 
 // NumericLiteral does NOT override Name(): it inherits NodeBase's "".
 
+// NumericLiteral overrides the ordinary helperVal — but callHelper
+// (inherited from Node) must still see Node.helperVal (static dispatch).
+func (l *NumericLiteral) helperVal() int { return 20 }
+
 func newNumericLiteral(value int, pos int) *Node {
 	lit := &NumericLiteral{Value: value}
 	lit.Pos = pos
@@ -88,6 +100,7 @@ func NodeKindOf(n *Node) int                      { return n.Kind() }
 func NodeNameOf(n *Node) string                   { return n.Name() }
 func NodePositionOf(n *Node) int                  { return n.Position() }
 func NodeDescribeOf(n *Node) string               { return n.describe() }
+func NodeCallHelperOf(n *Node) int                { return n.callHelper() }
 `
 
 // familyDriverSource is a fixture package exercising the family through
@@ -126,6 +139,14 @@ func RootDefaultDescribe() (string, string) {
 	// inherits it.
 	return family.NodeDescribeOf(family.MakeIdentifier("a", 0)),
 		family.NodeDescribeOf(family.MakeNumericLiteral(1, 0))
+}
+
+func StaticOrdinaryDispatch() (int, int) {
+	// callHelper (inherited from Node) calls helperVal STATICALLY: both an
+	// Identifier (no override) and a NumericLiteral (override) must return
+	// Node.helperVal == 10, never the NumericLiteral override (20).
+	return family.NodeCallHelperOf(family.MakeIdentifier("a", 0)),
+		family.NodeCallHelperOf(family.MakeNumericLiteral(1, 0))
 }
 `
 

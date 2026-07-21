@@ -10,7 +10,6 @@ package emit
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/tsoniclang/gotots/internal/ir"
@@ -97,6 +96,99 @@ func (m *Module) familyClassAndFamily(baseType ir.Type) (objectmodel.Class, obje
 		return objectmodel.Class{}, objectmodel.Family{}, false
 	}
 	return class, family, true
+}
+
+// selfFamilyUnionRoot reports whether every retained member of a union is a
+// class of ONE object-model family (so the union is that family's native
+// class hierarchy), returning the root class symbol. A mixed or non-family
+// union is a normal boxed union.
+func (p *printer) selfFamilyUnionRoot(t ir.Type) (string, bool) {
+	if p.module.ObjectModel == nil {
+		return "", false
+	}
+	members := p.retainedMembers(t)
+	if len(members) == 0 {
+		return "", false
+	}
+	familyID, rootPkg, rootName := "", "", ""
+	for _, member := range members {
+		class, ok := p.module.ObjectModel.Class(member.Pkg + "." + member.Type)
+		if !ok {
+			return "", false
+		}
+		if familyID == "" {
+			familyID = class.Family
+			fam, ok := p.module.ObjectModel.Family(class.Family)
+			if !ok {
+				return "", false
+			}
+			dot := strings.LastIndex(fam.RootCanon, ".")
+			if dot < 0 {
+				return "", false
+			}
+			rootPkg, rootName = fam.RootCanon[:dot], fam.RootType
+		} else if class.Family != familyID {
+			return "", false
+		}
+	}
+	sym, err := p.module.typeSymbol(rootPkg, rootName)
+	if err != nil {
+		return "", false
+	}
+	return sym, true
+}
+
+// isFamilyContractMethod reports whether methodName is a virtual self-
+// interface contract method of the receiver's family. Only contract methods
+// dispatch virtually (Go dispatches them through the interface); every other
+// family method is an ordinary Go method with STATIC dispatch.
+func (m *Module) isFamilyContractMethod(recvType ir.Type, methodName string) bool {
+	_, family, ok := m.familyClassAndFamily(recvType)
+	if !ok {
+		return false
+	}
+	for _, cm := range family.ContractMethods {
+		if cm == methodName {
+			return true
+		}
+	}
+	return false
+}
+
+// isFamilyInheritedMethod reports whether a family method is promoted through
+// the PRIMARY spine (native inheritance: the receiver IS-A the owner) rather
+// than delegated through a secondary component field.
+func (m *Module) isFamilyInheritedMethod(recvType ir.Type, methodName string) bool {
+	class, _, ok := m.familyClassAndFamily(recvType)
+	return ok && class.Methods[methodName] == objectmodel.MethodInherited
+}
+
+// familyMethodOwner resolves the class that DECLARES an ordinary family
+// method — Go's static method selection (the shallowest declaration on the
+// receiver's primary spine) — returning its package and type name. Uses the
+// unit-wide plan dispositions, so it works from any consuming module.
+func (m *Module) familyMethodOwner(recvType ir.Type, methodName string) (pkg, name string, ok bool) {
+	canon, has := familyNamedCanon(recvType)
+	if !has || m.ObjectModel == nil {
+		return "", "", false
+	}
+	for cur := canon; ; {
+		c, exists := m.ObjectModel.Class(cur)
+		if !exists {
+			return "", "", false
+		}
+		if d := c.Methods[methodName]; d == objectmodel.MethodDeclared || d == objectmodel.MethodOverride {
+			dot := strings.LastIndex(cur, ".")
+			if dot < 0 {
+				return "", "", false
+			}
+			return cur[:dot], cur[dot+1:], true
+		}
+		if !c.HasPrimary {
+			return "", "", false
+		}
+		cur = c.Primary.BaseCanon
+	}
 }
 
 // isFamilySelfRef reports whether X.field selects a family self-reference
@@ -356,31 +448,12 @@ func printFamilyClass(out *strings.Builder, module *Module, fc *familyClass,
 			return err
 		}
 	}
-	// Exception-lowered declared methods keep their free-function body; the
-	// class carries a one-line delegate so proven-receiver call sites stay
-	// source-shaped. Trampolines removed to the abstract contract emit no
-	// delegate.
-	for _, method := range delegateMethods {
-		if fc.isTrampolineRemoved(method.Name) {
-			continue
-		}
-		if err := printMethodDelegate(p, fc.structDecl, method, fc.methodModifier(method.Name)); err != nil {
-			return err
-		}
-	}
-	// Secondary-component promotions delegate through the owned component
-	// field; primary-spine promotions are inherited natively (omitted).
-	for _, delegate := range fc.structDecl.Promoted {
-		if fc.isInheritedPromotion(delegate.Name) {
-			continue
-		}
-		if delegate.IfaceField {
-			continue
-		}
-		if err := printPromotedMemberDelegate(p, delegate, fc.methodModifier(delegate.Name)); err != nil {
-			return err
-		}
-	}
+	// Ordinary (non-contract) family methods are NOT class members: they are
+	// static free functions (emitted by Package), and their call sites bind
+	// to the declaring type. Only self-interface contract methods above are
+	// virtual members, so Go's static method selection is preserved and the
+	// promoted forwarding delegates disappear.
+	_ = delegateMethods
 
 	p.indent--
 	p.line("}")
@@ -719,40 +792,3 @@ func memberCanon(fc *familyClass, member string) string {
 	return prefix + member
 }
 
-// familyVtableEntries builds the boxed-dispatch adapters for a family
-// class. Under native inheritance every method — declared, overridden,
-// inherited, or component-delegated — is a class member reachable as
-// `$r.<name>(...)`, so each vtable entry is a direct member call keyed by
-// the method's canonical slot, with no promoted forwarding chain and no
-// displaced free-function call. The box machinery is preserved (a node
-// still boxes into interfaces other than its own contract); only the
-// adapter shape becomes native. Parameters type through the class member
-// itself (`Parameters<Self["member"]>`), which resolves inherited members.
-func (p *printer) familyVtableEntries(info RttiInfo) ([]string, []string, error) {
-	self := tsName(info.TypeName)
-	var valueSet, pointerSet []string
-	add := func(slot, member string, valueReceiver bool) {
-		value := fmt.Sprintf("%s: ($r: %s, ...$a: Parameters<%s[%q]>) => $r.%s(...$a)",
-			slot, self, self, member, member)
-		pointer := fmt.Sprintf("%s: ($r: (%s | undefined), ...$a: Parameters<%s[%q]>) => gort$.goNilCheck<%s>($r).%s(...$a)",
-			slot, self, self, member, self, member)
-		if valueReceiver {
-			valueSet = append(valueSet, value)
-		}
-		pointerSet = append(pointerSet, pointer)
-	}
-
-	methods := append([]*ir.Func{}, info.Methods...)
-	sort.Slice(methods, func(i, j int) bool { return methods[i].Name < methods[j].Name })
-	for _, method := range methods {
-		slot := requireIdentity(method.Slot, "vtable slot for method "+method.Name)
-		add(slot, p.module.familyMemberName(method.Name), !method.PointerReceiver)
-	}
-	promoted := append([]ir.PromotedDelegate{}, info.Promoted...)
-	sort.Slice(promoted, func(i, j int) bool { return promoted[i].Name < promoted[j].Name })
-	for _, delegate := range promoted {
-		slot := requireIdentity(delegate.Slot, "vtable slot for promoted method "+delegate.Name)
-		add(slot, p.module.familyMemberName(delegate.Name), delegate.ValueReceiver)
-	}
-	return valueSet, pointerSet, nil
-}

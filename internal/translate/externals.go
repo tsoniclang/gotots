@@ -285,6 +285,9 @@ func emitInterfacesModule(out *Generated, unit ir.Scope, context *packages.Packa
 	if err != nil {
 		return err
 	}
+	// The interfaces module consumes the object model so a self-family union
+	// spells as its native class hierarchy rather than a boxed union.
+	module.ObjectModel = out.ObjectModel
 	body, err := emit.InterfacesContent(module)
 	if err != nil {
 		return err

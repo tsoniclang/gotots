@@ -107,20 +107,39 @@ func Packages(pkgs []*packages.Package, sourceDir string, options Options) (*Gen
 			continue
 		}
 		id := planKey
+		sym := id
+		if last := strings.LastIndex(sym, "::"); last >= 0 {
+			sym = sym[last+2:]
+		}
+		dot := strings.LastIndex(sym, ".")
+		// Object-model families (ADR-0012): a self-interface contract method
+		// is a virtual class member (Type.method); every other family method
+		// is a static free function (Type$method, the default symbol). This
+		// disposition is by contract membership, not nilability.
+		if dot >= 0 && out.ObjectModel != nil {
+			typeName, methodName := sym[:dot], sym[dot+1:]
+			if class, isFam := out.ObjectModel.Class(out.Proofs[i].Package + "." + typeName); isFam {
+				fam, _ := out.ObjectModel.Family(class.Family)
+				for _, cm := range fam.ContractMethods {
+					if cm == methodName {
+						out.Proofs[i].GeneratedSymbol = tsident.EscapeDeclared(typeName) + "." + tsident.EscapeDeclared(methodName)
+						break
+					}
+				}
+				continue
+			}
+		}
 		p, ok := out.MethodPlans.Get(implid.MustNew(id, "default"))
 		if !ok || p.MethodEmission != plan.MethodOrdinaryNilChecked {
 			continue
 		}
-		symbol := id
-		if last := strings.LastIndex(symbol, "::"); last >= 0 {
-			symbol = symbol[last+2:]
-		}
 		// Class-qualified member evidence: Type.member, each segment in
 		// its emitted spelling.
-		if dot := strings.LastIndex(symbol, "."); dot >= 0 {
-			symbol = tsident.EscapeDeclared(symbol[:dot]) + "." + tsident.EscapeDeclared(symbol[dot+1:])
+		symbol := sym
+		if dot >= 0 {
+			symbol = tsident.EscapeDeclared(sym[:dot]) + "." + tsident.EscapeDeclared(sym[dot+1:])
 		} else {
-			symbol = tsident.EscapeDeclared(symbol)
+			symbol = tsident.EscapeDeclared(sym)
 		}
 		out.Proofs[i].GeneratedSymbol = symbol
 	}

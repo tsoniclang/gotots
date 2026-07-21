@@ -137,8 +137,23 @@ func Package(module *Module, decls Decls) (string, []BodyOutcome, []BodyArtifact
 		body.WriteString("\n")
 		sortedMethods := append([]*ir.Func{}, structDecl.Methods...)
 		sort.Slice(sortedMethods, func(i, j int) bool { return sortedMethods[i].Name < sortedMethods[j].Name })
+		// Object-model families (ADR-0012): only self-interface CONTRACT
+		// methods are virtual class members; every other family method is an
+		// ordinary Go method emitted as a static free function (no delegate),
+		// so promoted calls bind to their declaring type, not the runtime
+		// type. Non-family structs keep the nilability-based member/free split.
+		familyStructType := ir.Type{Kind: ir.KindStruct, Named: structDecl.Name, Pkg: module.Pkg}
+		isFam := module.isFamilyClass(structDecl.Name)
 		var memberMethods, freeMethods, delegateMethods []*ir.Func
 		for _, method := range sortedMethods {
+			if isFam {
+				if module.isFamilyContractMethod(familyStructType, method.Name) {
+					memberMethods = append(memberMethods, method)
+				} else {
+					freeMethods = append(freeMethods, method)
+				}
+				continue
+			}
 			if module.MethodEmissionFor(methodPlanKey(method)) == plan.MethodOrdinaryNilChecked {
 				memberMethods = append(memberMethods, method)
 			} else {
@@ -188,6 +203,11 @@ func Package(module *Module, decls Decls) (string, []BodyOutcome, []BodyArtifact
 			if err := printRtti(&body, module, info); err != nil {
 				return "", nil, nil, err
 			}
+			// The self-interface dispatch is virtual and every other family
+			// method is a static free function, so the vtable adapters route
+			// accordingly (see vtableEntries). Full elimination of the
+			// per-concrete vtable in favor of minimal per-conversion adapters
+			// follows (ADR-0012).
 			if err := printVtables(&body, module, info); err != nil {
 				return "", nil, nil, err
 			}

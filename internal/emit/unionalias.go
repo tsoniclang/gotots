@@ -74,6 +74,12 @@ func (p *printer) ifaceUnionAlias(t ir.Type) (string, error) {
 // from its interface type. It is called only after every external adapter
 // type is populated, so external members carry their exact vtable type.
 func (p *printer) buildUnionAliasDefinition(name string, t ir.Type) (string, error) {
+	// A self-family union (ADR-0012) — every retained member is a class of
+	// one object-model family — IS the native class hierarchy, so it spells
+	// as the family root, not a boxed union of per-concrete vtables.
+	if root, ok := p.selfFamilyUnionRoot(t); ok {
+		return fmt.Sprintf("export type %s = %s | undefined;\n", name, root), nil
+	}
 	members := []string{"undefined"}
 	for _, member := range p.retainedMembers(t) {
 		payload, err := p.memberPayload(member)

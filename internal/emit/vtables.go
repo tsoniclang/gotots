@@ -36,13 +36,13 @@ func printVtables(out *strings.Builder, module *Module, info RttiInfo) error {
 
 // vtableEntries spells the adapters of both flavors.
 func (p *printer) vtableEntries(info RttiInfo) ([]string, []string, error) {
-	// Object-model family class: every method is a native class member, so
-	// the boxed-dispatch adapters call members directly rather than through
-	// promoted forwarding chains (ADR-0012).
-	if p.module.isFamilyClass(info.TypeName) {
-		return p.familyVtableEntries(info)
-	}
 	self := tsName(info.TypeName)
+	// Object-model families (ADR-0012): a boxed adapter calls a self-interface
+	// CONTRACT method as a virtual member; every other family method is an
+	// ordinary Go method reached through its static free function — exactly
+	// the disposition ordinary dispatch uses, so there is one representation.
+	familyType := ir.Type{Kind: ir.KindStruct, Named: info.TypeName, Pkg: p.module.Pkg}
+	isFam := p.module.isFamilyClass(info.TypeName)
 	// memberOf: "" spells the legacy free-function adapter; a member
 	// name spells the ordinary class-member call on the chained
 	// receiver (the ADR-0006 form).
@@ -82,7 +82,11 @@ func (p *printer) vtableEntries(info RttiInfo) ([]string, []string, error) {
 		slot := requireIdentity(method.Slot, "vtable slot for method "+method.Name)
 		callee := info.TypeName + "$" + method.Name
 		memberOf := ""
-		if p.module.MethodEmissionFor(methodPlanKey(method)) == plan.MethodOrdinaryNilChecked {
+		if isFam {
+			if p.module.isFamilyContractMethod(familyType, method.Name) {
+				memberOf = tsName(method.Name)
+			}
+		} else if p.module.MethodEmissionFor(methodPlanKey(method)) == plan.MethodOrdinaryNilChecked {
 			memberOf = tsName(method.Name)
 		}
 		recvType := method.Receiver.Type
@@ -166,6 +170,39 @@ func (p *printer) vtableEntries(info RttiInfo) ([]string, []string, error) {
 			}
 			pointerSet = append(pointerSet, pointerEntry)
 			continue
+		}
+		if isFam {
+			slot := requireIdentity(delegate.Slot, "vtable slot for promoted method "+delegate.Name)
+			// A promoted self-interface CONTRACT method is virtual — inherited
+			// natively — so it dispatches through the member on $r.
+			if p.module.isFamilyContractMethod(familyType, delegate.Name) {
+				member := tsName(delegate.Name)
+				valueEntry := fmt.Sprintf("%s: ($r: %s, ...$a: Parameters<%s[%q]>) => $r.%s(...$a)",
+					slot, self, self, member, member)
+				pointerEntry := fmt.Sprintf("%s: ($r: (%s | undefined), ...$a: Parameters<%s[%q]>) => gort$.goNilCheck<%s>($r).%s(...$a)",
+					slot, self, self, member, self, member)
+				if delegate.ValueReceiver {
+					valueSet = append(valueSet, valueEntry)
+				}
+				pointerSet = append(pointerSet, pointerEntry)
+				continue
+			}
+			// An ordinary method promoted through the PRIMARY spine binds to
+			// its declaring type's static free function with $r as the
+			// receiver (IS-A the owner via extends). A secondary-component
+			// delegation falls through to the component's own dispatch (its
+			// method may be a member or a free function of the component type).
+			if p.module.isFamilyInheritedMethod(familyType, delegate.Name) {
+				valueEntry := fmt.Sprintf("%s: ($r: %s, ...$a: goif$.DropFirst<Parameters<typeof %s>>) => %s($r, ...$a)",
+					slot, self, target, target)
+				pointerEntry := fmt.Sprintf("%s: ($r: (%s | undefined), ...$a: goif$.DropFirst<Parameters<typeof %s>>) => %s(gort$.goNilCheck<%s>($r), ...$a)",
+					slot, self, target, target, self)
+				if delegate.ValueReceiver {
+					valueSet = append(valueSet, valueEntry)
+				}
+				pointerSet = append(pointerSet, pointerEntry)
+				continue
+			}
 		}
 		chain := chainOver("$r", delegate)
 		// Promoted adapters spell their exact parameters through the
