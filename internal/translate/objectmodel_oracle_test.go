@@ -17,9 +17,14 @@ import (
 // and shape oracle for the ADR-0012 native-class cutover.
 const familyFixtureSource = `package family
 
+// The contract methods share their names with the root trampolines
+// (Kind/Name), exactly as the corpus nodeData does — the collapse must not
+// recurse. describe() is a default declared ONLY on the root (no
+// implementer overrides it), the watcherBase-style default pattern.
 type nodeData interface {
-	kind() int
-	name() string
+	Kind() int
+	Name() string
+	describe() string
 }
 
 type Node struct {
@@ -27,14 +32,15 @@ type Node struct {
 	Pos  int
 }
 
-func (n *Node) Kind() int    { return n.data.kind() }
-func (n *Node) Name() string { return n.data.name() }
-func (n *Node) Position() int { return n.Pos }
+func (n *Node) Kind() int        { return n.data.Kind() }
+func (n *Node) Name() string     { return n.data.Name() }
+func (n *Node) describe() string { return "node" }
+func (n *Node) Position() int    { return n.Pos }
 
 type NodeBase struct{ Node }
 
-func (b *NodeBase) kind() int    { return 0 }
-func (b *NodeBase) name() string { return "" }
+func (b *NodeBase) Kind() int    { return 0 }
+func (b *NodeBase) Name() string { return "" }
 
 type ExprBase struct{ NodeBase }
 
@@ -50,8 +56,8 @@ type Identifier struct {
 	Text string
 }
 
-func (i *Identifier) kind() int    { return 1 }
-func (i *Identifier) name() string { return i.Text }
+func (i *Identifier) Kind() int    { return 1 }
+func (i *Identifier) Name() string { return i.Text }
 
 func newIdentifier(text string, pos int) *Node {
 	id := &Identifier{Text: text}
@@ -65,8 +71,9 @@ type NumericLiteral struct {
 	Value int
 }
 
-func (l *NumericLiteral) kind() int    { return 2 }
-func (l *NumericLiteral) name() string { return "num" }
+func (l *NumericLiteral) Kind() int { return 2 }
+
+// NumericLiteral does NOT override Name(): it inherits NodeBase's "".
 
 func newNumericLiteral(value int, pos int) *Node {
 	lit := &NumericLiteral{Value: value}
@@ -80,6 +87,7 @@ func MakeNumericLiteral(value int, pos int) *Node { return newNumericLiteral(val
 func NodeKindOf(n *Node) int                      { return n.Kind() }
 func NodeNameOf(n *Node) string                   { return n.Name() }
 func NodePositionOf(n *Node) int                  { return n.Position() }
+func NodeDescribeOf(n *Node) string               { return n.describe() }
 `
 
 // familyDriverSource is a fixture package exercising the family through
@@ -102,7 +110,8 @@ func IdentifierPosition() int {
 	return family.NodePositionOf(family.MakeIdentifier("y", 42))
 }
 
-func LiteralKindAndName() (int, string) {
+func LiteralKindAndInheritedName() (int, string) {
+	// NumericLiteral inherits NodeBase's default Name() == "".
 	n := family.MakeNumericLiteral(7, 3)
 	return family.NodeKindOf(n), family.NodeNameOf(n)
 }
@@ -110,6 +119,13 @@ func LiteralKindAndName() (int, string) {
 func VirtualDispatchAcrossKinds() (int, int) {
 	return family.NodeKindOf(family.MakeIdentifier("a", 0)),
 		family.NodeKindOf(family.MakeNumericLiteral(9, 0))
+}
+
+func RootDefaultDescribe() (string, string) {
+	// describe() is a default declared only on the root; every node
+	// inherits it.
+	return family.NodeDescribeOf(family.MakeIdentifier("a", 0)),
+		family.NodeDescribeOf(family.MakeNumericLiteral(1, 0))
 }
 `
 

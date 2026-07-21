@@ -18,6 +18,8 @@ func (m *Module) Overlay() *Module {
 		Pkg:             m.Pkg,
 		MethodPlans:     m.MethodPlans,
 		Interfaces:      m.Interfaces,
+		ObjectModel:     m.ObjectModel,
+		StructsByCanon:  m.StructsByCanon,
 		ownsInterfaces:  m.ownsInterfaces,
 		PkgName:         m.PkgName,
 		ABI:             m.ABI,

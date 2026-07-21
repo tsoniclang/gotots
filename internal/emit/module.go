@@ -135,6 +135,12 @@ type Module struct {
 	// and whenever the unit has no recognized family, which then keep the
 	// flat-class representation unchanged.
 	ObjectModel *objectmodel.Plan
+	// StructsByCanon indexes the module's own structs by canonical name
+	// (`Pkg + "." + Name`), so object-model emission can walk the
+	// inheritance spine and resolve contract signatures / transitive
+	// fields at any emit site (dispatch, field-read collapse, construction,
+	// vtable adapters). Populated by Package before body emission.
+	StructsByCanon map[string]*ir.Struct
 	// ownsInterfaces marks the canonical interfaces module itself,
 	// which emits the definitions locally and does not self-qualify.
 	ownsInterfaces bool

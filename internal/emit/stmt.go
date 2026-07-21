@@ -313,6 +313,13 @@ func (p *printer) printStmt(stmt ir.Stmt) error {
 
 func (p *printer) printAssign(n *ir.AssignStmt) error {
 	if n.Tuple == nil && len(n.Targets) == 1 {
+		// Object-model self-reference collapse (ADR-0012): `n.data = n`
+		// wires a family self-reference field that no longer exists — the
+		// concrete node IS its own data — so the store is dropped. The RHS
+		// is the receiver value (side-effect-free), so suppression is exact.
+		if ft, ok := n.Targets[0].(*ir.FieldTarget); ok && p.module.isFamilySelfRef(ft.X.Type(), ft.Field) {
+			return nil
+		}
 		if variable, isVar := n.Targets[0].(ir.VarTarget); isVar && variable.Pkg == "" &&
 			variable.T.Kind == ir.KindSlice && p.slicePlans[variable.Name] == "native-array" {
 			return p.printNativeSliceAssign(variable, n.Values[0])

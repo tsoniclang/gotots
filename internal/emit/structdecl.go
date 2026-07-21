@@ -17,7 +17,15 @@ import (
 // every field in declaration order (composite literals pass explicit
 // zeros for omitted fields, so construction is always total).
 func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct,
-	memberMethods, delegateMethods []*ir.Func, outcomes *[]BodyOutcome, artifacts *[]BodyArtifact) error {
+	memberMethods, delegateMethods []*ir.Func, structsByCanon map[string]*ir.Struct,
+	outcomes *[]BodyOutcome, artifacts *[]BodyArtifact) error {
+	// Object-model family recovery (ADR-0012): a placed family struct emits
+	// as a native class on its inheritance spine instead of the flat
+	// embedded-field shape.
+	canon := module.Pkg + "." + structDecl.Name
+	if fc, ok := resolveFamilyClass(module.ObjectModel, canon, structDecl, structsByCanon); ok {
+		return printFamilyClass(out, module, fc, memberMethods, delegateMethods, outcomes, artifacts)
+	}
 	p := &printer{out: out, module: module, familyEnc: structDecl.FamilyEnc,
 		familyPtrCell: structDecl.FamilyPtrCell, ptrSplit: anyTrue(structDecl.PtrParams)}
 	export := "export "
@@ -89,7 +97,7 @@ func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct,
 		out.WriteString("\n")
 		m := method
 		err := emitTransactionalBody(out, module, m, "default", func(o *strings.Builder, frag *Module) error {
-			return printMethodMember(o, frag, m)
+			return printMethodMember(o, frag, m, "")
 		}, outcomes, artifacts)
 		if err != nil {
 			return err
@@ -101,7 +109,7 @@ func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct,
 	// proven receiver stays source-shaped. A delegate is a reference,
 	// not a second definition.
 	for _, method := range delegateMethods {
-		if err := printMethodDelegate(p, structDecl, method); err != nil {
+		if err := printMethodDelegate(p, structDecl, method, ""); err != nil {
 			return err
 		}
 	}
@@ -117,7 +125,7 @@ func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct,
 				// bare name; they keep the chain form at call sites.
 				continue
 			}
-			if err := printPromotedMemberDelegate(p, delegate); err != nil {
+			if err := printPromotedMemberDelegate(p, delegate, ""); err != nil {
 				return err
 			}
 		}
@@ -128,8 +136,9 @@ func printStruct(out *strings.Builder, module *Module, structDecl *ir.Struct,
 }
 
 // printMethodDelegate emits the one-line member forwarding to the
-// method's free-function body.
-func printMethodDelegate(p *printer, structDecl *ir.Struct, method *ir.Func) error {
+// method's free-function body. modifiers prefixes the member (e.g.
+// "override " for a family class overriding an inherited member).
+func printMethodDelegate(p *printer, structDecl *ir.Struct, method *ir.Func, modifiers string) error {
 	params := make([]string, 0, len(method.Params))
 	names := make([]string, 0, len(method.Params))
 	for i, parameter := range method.Params {
@@ -150,7 +159,7 @@ func printMethodDelegate(p *printer, structDecl *ir.Struct, method *ir.Func) err
 	}
 	callee := tsName(familyName(structDecl)) + "$" + method.Name
 	operands := append([]string{"this"}, names...)
-	p.line("%s(%s): %s {", tsName(method.Name), strings.Join(params, ", "), result)
+	p.line("%s%s(%s): %s {", modifiers, tsName(method.Name), strings.Join(params, ", "), result)
 	p.indent++
 	if result == "void" {
 		p.line("%s(%s);", callee, strings.Join(operands, ", "))
@@ -166,7 +175,7 @@ func printMethodDelegate(p *printer, structDecl *ir.Struct, method *ir.Func) err
 // member. Only non-generic struct receivers reach here (the planner
 // keeps generic and carrier receivers on the exception lowering), so
 // no operation factories are in scope.
-func printMethodMember(out *strings.Builder, module *Module, method *ir.Func) error {
+func printMethodMember(out *strings.Builder, module *Module, method *ir.Func, modifiers string) error {
 	p := &printer{out: out, module: module}
 	p.indent = 1
 	params := make([]string, 0, len(method.Params))
@@ -182,7 +191,13 @@ func printMethodMember(out *strings.Builder, module *Module, method *ir.Func) er
 		return fmt.Errorf("%s: %w", method.ID, err)
 	}
 	p.slicePlans = method.SlicePlans
-	p.line("%s(%s): %s {", tsName(method.Name), strings.Join(params, ", "), result)
+	// A family accessor whose name collides with a concrete field is renamed
+	// (the field shadows it in Go); call sites rename identically.
+	member := tsName(method.Name)
+	if _, _, ok := module.familyClassAndFamily(method.Receiver.Type); ok {
+		member = module.familyMemberName(method.Name)
+	}
+	p.line("%s%s(%s): %s {", modifiers, member, strings.Join(params, ", "), result)
 	p.indent++
 	if method.Placeholder {
 		p.printPlaceholderBody(method.ID)
@@ -674,14 +689,14 @@ func familyName(structDecl *ir.Struct) string {
 // member owning the embedded chain: each embedded-pointer hop derefs
 // with Go's nil panic, and the final step calls the declaring class's
 // member (every non-generic struct method is a member or a delegate).
-func printPromotedMemberDelegate(p *printer, delegate ir.PromotedDelegate) error {
+func printPromotedMemberDelegate(p *printer, delegate ir.PromotedDelegate, modifiers string) error {
 	chain := chainOver("this", delegate)
 	member := tsName(delegate.Name)
 	declClass, err := p.module.typeSymbol(delegate.Pkg, delegate.TypeName)
 	if err != nil {
 		return err
 	}
-	p.line("%s(...$a: Parameters<%s[%q]>): ReturnType<%s[%q]> {", member, declClass, member, declClass, member)
+	p.line("%s%s(...$a: Parameters<%s[%q]>): ReturnType<%s[%q]> {", modifiers, member, declClass, member, declClass, member)
 	p.indent++
 	p.line("return %s.%s(...$a);", chain, member)
 	p.indent--

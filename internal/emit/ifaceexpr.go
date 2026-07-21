@@ -52,6 +52,14 @@ func (p *printer) printIfaceExpr(e ir.Expr) (string, bool, error) {
 		printed, err := p.printIfaceCall(n)
 		return printed, true, err
 	case *ir.TypeAssert:
+		// Object-model self-reference assertion (ADR-0012): `x.data.(*T)`
+		// narrows the concrete node `x` itself — `x instanceof T` — since the
+		// node IS its own data, instead of a boxed discriminant check.
+		if fl, ok := n.X.(*ir.FieldLoad); ok && p.module.isFamilySelfRef(fl.X.Type(), fl.Field) {
+			if s, handled, err := p.printFamilySelfRefAssert(fl.X, n); handled || err != nil {
+				return s, true, err
+			}
+		}
 		x, err := p.printExpr(n.X)
 		if err != nil {
 			return "", true, err
@@ -221,7 +229,106 @@ func (p *printer) printIfaceExpr(e ir.Expr) (string, bool, error) {
 // so the payload and vtable are exactly typed — no cast, no erased
 // recovery, no value import of any implementer. A nil interface panics
 // first, exactly Go.
+// printFamilyVirtualCall emits `base.Method(args)` for an object-model
+// self-reference dispatch: the concrete node's own virtual method,
+// resolved by native inheritance. A nilable base keeps the deref check so
+// a nil family value panics exactly as the nil-interface dispatch did.
+func (p *printer) printFamilyVirtualCall(base ir.Expr, n *ir.IfaceCall) (string, error) {
+	recv, err := p.printExpr(base)
+	if err != nil {
+		return "", err
+	}
+	if base.Type().Kind == ir.KindPointer {
+		recv = "gort$.goNilCheck(" + recv + ")"
+	}
+	spreadTuple, isSpread, err := p.spreadInner(n.Args)
+	if err != nil {
+		return "", err
+	}
+	var args string
+	if isSpread {
+		args = "...(" + spreadTuple + ")"
+	} else {
+		parts := make([]string, len(n.Args))
+		for i, arg := range n.Args {
+			printed, err := p.printExpr(arg)
+			if err != nil {
+				return "", err
+			}
+			parts[i] = printed
+		}
+		args = joinComma(parts)
+	}
+	return recv + "." + tsName(n.Display) + "(" + args + ")", nil
+}
+
+// printFamilySelfRefAssert emits `x.data.(*T)` as an instanceof narrowing
+// on the concrete node `x`. Returns handled=false when the target is not a
+// concrete class (e.g. an interface-to-interface assertion), so the caller
+// falls back. `base` is the family value (the FieldLoad's X).
+func (p *printer) printFamilySelfRefAssert(base ir.Expr, n *ir.TypeAssert) (string, bool, error) {
+	class, ok := p.familyAssertClass(n.Target)
+	if !ok {
+		return "", false, nil
+	}
+	x, err := p.printExpr(base)
+	if err != nil {
+		return "", true, err
+	}
+	xType, err := p.tsType(base.Type())
+	if err != nil {
+		return "", true, err
+	}
+	if n.CommaOk {
+		spelled, err := p.tsType(n.Target)
+		if err != nil {
+			return "", true, err
+		}
+		zero, err := p.zeroLiteral(n.Target)
+		if err != nil {
+			return "", true, err
+		}
+		return fmt.Sprintf("(($v: %s): readonly [%s, boolean] => ($v instanceof %s ? [$v, true] : [%s, false]))(%s)",
+			xType, spelled, class, zero, x), true, nil
+	}
+	result, err := p.tsType(n.Target)
+	if err != nil {
+		return "", true, err
+	}
+	// The narrowed value is returned directly; a miss panics with the exact
+	// conversion category (the dynamic type name is unavailable without RTTI,
+	// so the nil case is exact and the mismatch case best-effort — these
+	// assertions do not fail in Kind-checked call sites).
+	return fmt.Sprintf("(($v: %s): %s => { if ($v instanceof %s) { return $v; } gort$.goPanicConversion($v === undefined ? %q : %q, %q, %q); })(%s)",
+		xType, result, class, "nil", n.TargetDisplay, n.SourceDisplay, n.TargetDisplay, x), true, nil
+}
+
+// familyAssertClass returns the TypeScript class symbol to instanceof-check
+// for a type assertion target (a pointer-to-struct or struct concrete
+// type), and whether the target is such a class.
+func (p *printer) familyAssertClass(target ir.Type) (string, bool) {
+	t := target
+	if t.Kind == ir.KindPointer && t.Elem != nil {
+		t = *t.Elem
+	}
+	if t.Kind != ir.KindStruct || t.Named == "" {
+		return "", false
+	}
+	sym, err := p.module.symbol(t.Pkg, t.Named)
+	if err != nil {
+		return "", false
+	}
+	return sym, true
+}
+
 func (p *printer) printIfaceCall(n *ir.IfaceCall) (string, error) {
+	// Object-model virtual dispatch (ADR-0012): `x.data.Method()` where
+	// `data` is a family self-reference collapses to native virtual
+	// dispatch `x.Method()` — the concrete node IS its own data, so the
+	// boxed per-implementer switch is unnecessary.
+	if fl, ok := n.Recv.(*ir.FieldLoad); ok && p.module.isFamilySelfRef(fl.X.Type(), fl.Field) {
+		return p.printFamilyVirtualCall(fl.X, n)
+	}
 	recv, err := p.printExpr(n.Recv)
 	if err != nil {
 		return "", err

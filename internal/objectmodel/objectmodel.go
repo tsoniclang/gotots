@@ -25,7 +25,17 @@ type Plan struct {
 	classes  map[string]Class
 	families map[string]Family
 	blocked  map[string]string
+	// collisions are member names that are BOTH a method and a field within
+	// some family — a Kind-switch accessor (Node.PropertyName()) shadowed by
+	// a concrete field (BindingElement.PropertyName). Go resolves the field
+	// by depth; native inheritance cannot, so the method is renamed. Unit-
+	// wide so every consuming module renames consistently.
+	collisions map[string]bool
 }
+
+// AccessorCollisions returns the unit-wide set of accessor method names that
+// collide with a family field and are therefore renamed at emission.
+func (p *Plan) AccessorCollisions() map[string]bool { return p.collisions }
 
 // EmbeddedEdge models one embedded field exactly (ADR-0012 4.2).
 type EmbeddedEdge struct {
@@ -182,7 +192,7 @@ func canonical(n *types.Named) string {
 
 // Analyze recovers the object model from the unit's named types.
 func Analyze(named []*types.Named) *Plan {
-	plan := &Plan{classes: map[string]Class{}, families: map[string]Family{}, blocked: map[string]string{}}
+	plan := &Plan{classes: map[string]Class{}, families: map[string]Family{}, blocked: map[string]string{}, collisions: map[string]bool{}}
 
 	var structs, interfaces []*types.Named
 	for _, n := range named {
@@ -230,11 +240,14 @@ func Analyze(named []*types.Named) *Plan {
 			RootType: root.Obj().Name(), RootCanon: canonical(root), SelfField: selfField,
 			ContractMethods: contractMethods,
 		}
-		classes, reason := placeClasses(iface, ifaceType, root, members)
+		classes, collisions, reason := placeClasses(iface, ifaceType, root, members)
 		if reason != "" {
 			// 4.5: no mixed family — block the whole family.
 			plan.blocked[canonical(iface)] = reason
 			continue
+		}
+		for name := range collisions {
+			plan.collisions[name] = true
 		}
 		for _, m := range members {
 			fam.Members = append(fam.Members, m.Obj().Name())
@@ -304,7 +317,7 @@ func selfReferenceRoot(iface *types.Named, ifaceType *types.Interface, structs [
 // value-embeds it, selecting each class's primary base by Go's minimum
 // promotion depth. An equal-depth tie (genuine ambiguity) returns a
 // non-empty reason so the family blocks (4.5).
-func placeClasses(iface *types.Named, ifaceType *types.Interface, root *types.Named, members []*types.Named) ([]Class, string) {
+func placeClasses(iface *types.Named, ifaceType *types.Interface, root *types.Named, members []*types.Named) ([]Class, map[string]bool, string) {
 	// Class set: root plus every struct on some member's value-embedding
 	// spine to root.
 	classSet := map[*types.Named]bool{root: true}
@@ -316,13 +329,45 @@ func placeClasses(iface *types.Named, ifaceType *types.Interface, root *types.Na
 	for i := 0; i < ifaceType.NumMethods(); i++ {
 		contract[ifaceType.Method(i).Name()] = true
 	}
+	// Accessor collisions: a method name that is also a field name somewhere
+	// in the family (excluding the virtual contract, which the field would
+	// not shadow). The method is renamed at emission.
+	familyMethods, familyFields := map[string]bool{}, map[string]bool{}
+	for s := range classSet {
+		for name := range declaredMethods(s) {
+			familyMethods[name] = true
+		}
+		strukt := s.Underlying().(*types.Struct)
+		for i := 0; i < strukt.NumFields(); i++ {
+			familyFields[strukt.Field(i).Name()] = true
+		}
+	}
+	collisions := map[string]bool{}
+	for name := range familyMethods {
+		if familyFields[name] && !contract[name] {
+			collisions[name] = true
+		}
+	}
+	// Method names some implementer (any non-root class) declares directly.
+	// A root contract method these provide is a trampoline removed to an
+	// abstract declaration (the implementers own the real bodies); one only
+	// the root declares is a concrete default the subclasses inherit.
+	implementerMethods := map[string]bool{}
+	for s := range classSet {
+		if s == root {
+			continue
+		}
+		for name := range declaredMethods(s) {
+			implementerMethods[name] = true
+		}
+	}
 	var out []Class
 	for s := range classSet {
 		class := Class{Name: s.Obj().Name(), Canon: canonical(s), Root: s == root}
 		if s != root {
 			primary, secondary, reason := selectPrimary(s, root)
 			if reason != "" {
-				return nil, s.Obj().Name() + ": " + reason
+				return nil, nil, s.Obj().Name() + ": " + reason
 			}
 			class.Primary = primary
 			class.HasPrimary = true
@@ -333,11 +378,11 @@ func placeClasses(iface *types.Named, ifaceType *types.Interface, root *types.Na
 				class.Secondary = append(class.Secondary, edgeOf(e, root))
 			}
 		}
-		class.Methods = methodDispositions(s, root, contract, &class)
+		class.Methods = methodDispositions(s, root, contract, implementerMethods, &class)
 		out = append(out, class)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Canon < out[j].Canon })
-	return out, ""
+	return out, collisions, ""
 }
 
 // collectSpine adds every struct on a value-embedding path from `from`
@@ -425,13 +470,17 @@ func declaredMethods(named *types.Named) map[string]bool {
 // a directly-declared method is declared or (if an ancestor has it)
 // override; a method promoted through the primary base is inherited;
 // through a secondary component it is component-delegated.
-func methodDispositions(s, root *types.Named, contract map[string]bool, class *Class) map[string]MethodDisposition {
+func methodDispositions(s, root *types.Named, contract, implementerMethods map[string]bool, class *Class) map[string]MethodDisposition {
 	out := map[string]MethodDisposition{}
 	own := declaredMethods(s)
 
 	if class.Root {
 		for name := range own {
-			if contract[name] {
+			// A contract method some implementer also declares is a
+			// trampoline (the implementers own the real bodies) removed to an
+			// abstract declaration; a contract method only the root declares
+			// is a concrete default the subclasses inherit.
+			if contract[name] && implementerMethods[name] {
 				out[name] = MethodTrampolineRemoved
 			} else {
 				out[name] = MethodDeclared

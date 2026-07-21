@@ -36,6 +36,12 @@ func printVtables(out *strings.Builder, module *Module, info RttiInfo) error {
 
 // vtableEntries spells the adapters of both flavors.
 func (p *printer) vtableEntries(info RttiInfo) ([]string, []string, error) {
+	// Object-model family class: every method is a native class member, so
+	// the boxed-dispatch adapters call members directly rather than through
+	// promoted forwarding chains (ADR-0012).
+	if p.module.isFamilyClass(info.TypeName) {
+		return p.familyVtableEntries(info)
+	}
 	self := tsName(info.TypeName)
 	// memberOf: "" spells the legacy free-function adapter; a member
 	// name spells the ordinary class-member call on the chained

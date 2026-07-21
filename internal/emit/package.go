@@ -108,6 +108,28 @@ func Package(module *Module, decls Decls) (string, []BodyOutcome, []BodyArtifact
 	sorted := append([]*ir.Func{}, decls.Functions...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
 
+	// Index the package's structs by canonical name so object-model
+	// emission can walk the inheritance spine at any emit site.
+	structsByCanon := make(map[string]*ir.Struct, len(sortedStructs))
+	for _, s := range sortedStructs {
+		structsByCanon[module.Pkg+"."+s.Name] = s
+	}
+	module.StructsByCanon = structsByCanon
+	// TypeScript classes are not hoisted for `extends`, so a family class
+	// must be emitted after its primary base. Order family classes
+	// root-first (by spine depth); non-family classes keep name order.
+	sort.SliceStable(sortedStructs, func(i, j int) bool {
+		di, oki := familyDepth(module, sortedStructs[i].Name)
+		dj, okj := familyDepth(module, sortedStructs[j].Name)
+		if oki != okj {
+			return oki // family classes precede non-family
+		}
+		if oki && di != dj {
+			return di < dj
+		}
+		return sortedStructs[i].Name < sortedStructs[j].Name
+	})
+
 	var body strings.Builder
 	var outcomes []BodyOutcome
 	var artifacts []BodyArtifact
@@ -131,7 +153,7 @@ func Package(module *Module, decls Decls) (string, []BodyOutcome, []BodyArtifact
 				}
 			}
 		}
-		if err := printStruct(&body, module, structDecl, memberMethods, delegateMethods, &outcomes, &artifacts); err != nil {
+		if err := printStruct(&body, module, structDecl, memberMethods, delegateMethods, structsByCanon, &outcomes, &artifacts); err != nil {
 			return "", nil, nil, err
 		}
 		for _, method := range freeMethods {

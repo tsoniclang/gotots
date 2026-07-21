@@ -93,10 +93,29 @@ func symbolPresent(content, symbol string) bool {
 			if trimmed == line {
 				continue // top level: not a member line
 			}
+			// Strip member modifiers so `override X(`, `abstract X(`, and
+			// `static override X(` still match the member name.
+			for {
+				stripped := trimmed
+				for _, mod := range []string{"override ", "abstract ", "static ", "readonly "} {
+					stripped = strings.TrimPrefix(stripped, mod)
+				}
+				if stripped == trimmed {
+					break
+				}
+				trimmed = stripped
+			}
 			if rest, has := strings.CutPrefix(trimmed, member); has && rest != "" {
 				switch rest[0] {
 				case '(', '<':
 					return true
+				case '$':
+					// An object-model accessor renamed to avoid a field
+					// collision (member$) — the method is present under its
+					// suffixed name.
+					if len(rest) > 1 && (rest[1] == '(' || rest[1] == '<') {
+						return true
+					}
 				}
 			}
 		}
@@ -107,7 +126,7 @@ func symbolPresent(content, symbol string) bool {
 		if !ok {
 			continue
 		}
-		for _, keyword := range []string{"function ", "const ", "class ", "type ", "let "} {
+		for _, keyword := range []string{"function ", "const ", "class ", "abstract class ", "type ", "let "} {
 			body, has := strings.CutPrefix(rest, keyword)
 			if !has {
 				continue

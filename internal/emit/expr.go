@@ -150,6 +150,12 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		if recvT.MapFamilyPtrCell || (p.familyPtrCell && selfPtrReference(recvT)) {
 			methodClass += "$pc"
 		}
+		// A family accessor renamed to avoid a field collision is called by
+		// its renamed member name (the definition renames identically).
+		member := tsName(n.Method)
+		if _, _, ok := p.module.familyClassAndFamily(recvT); ok {
+			member = p.module.familyMemberName(n.Method)
+		}
 		if n.Promoted {
 			receiver := recv
 			if n.Recv.Type().Kind == ir.KindPointer {
@@ -159,7 +165,7 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 				}
 				receiver = checked
 			}
-			return receiver + "." + tsName(n.Method) + "(" + args + ")", nil
+			return receiver + "." + member + "(" + args + ")", nil
 		}
 		if len(n.TypeArgs) == 0 && methodClass == n.TypeName {
 			emission := p.module.MethodEmissionFor(goid.Method(n.Pkg, n.TypeName, n.Method))
@@ -175,7 +181,7 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 					}
 					receiver = checked
 				}
-				return receiver + "." + tsName(n.Method) + "(" + args + ")", nil
+				return receiver + "." + member + "(" + args + ")", nil
 			case emission == plan.MethodFreeFunctionException && receiverProven:
 				// The delegate member: source-shaped at proven sites,
 				// forwarding to the single free-function body.
@@ -183,7 +189,7 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 				if p.nilChecked(recv) && n.Recv.Type().Kind == ir.KindPointer {
 					suffix = "!"
 				}
-				return recv + suffix + "." + tsName(n.Method) + "(" + args + ")", nil
+				return recv + suffix + "." + member + "(" + args + ")", nil
 			}
 		}
 		callee, err := p.module.symbol(n.Pkg, methodClass+"$"+n.Method)
@@ -247,6 +253,21 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		}
 		return fmt.Sprintf("%s(%s, %s)", callee, recv, args), nil
 	case *ir.FieldLoad:
+		// Object-model spine collapse (ADR-0012): selecting the primary
+		// embedded base of a family class is inherited access — the base IS
+		// the object under native inheritance — so the hop disappears. A
+		// nilable base keeps exactly one deref check; recursion collapses the
+		// whole `x.ExprBase.NodeBase.Node` chain to `x`.
+		if p.module.isFamilyPrimaryHop(n.X.Type(), n.Field) {
+			base, err := p.printExpr(n.X)
+			if err != nil {
+				return "", err
+			}
+			if n.X.Type().Kind == ir.KindPointer {
+				return "gort$.goNilCheck(" + base + ")", nil
+			}
+			return base, nil
+		}
 		base, err := p.printExpr(n.X)
 		if err != nil {
 			return "", err
@@ -280,6 +301,13 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 		class, err := p.module.symbol(n.Pkg, newClass)
 		if err != nil {
 			return "", err
+		}
+		// Object-model construction (ADR-0012): a family class has a
+		// flattened total constructor over its transitive own fields, so a
+		// composite literal's field-ordered args are reshaped into that
+		// order (provided values by name, zeros for inherited/omitted).
+		if fc, ok := p.module.familyClassOf(structT.Named); ok {
+			return p.printFamilyStructNew(fc, n, class)
 		}
 		if len(structT.TypeArgs) > 0 {
 			args := make([]string, len(structT.TypeArgs))
