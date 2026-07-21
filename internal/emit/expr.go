@@ -407,8 +407,18 @@ func (p *printer) printExpr(e ir.Expr) (string, error) {
 				if recvType.Kind == ir.KindPointer {
 					receiver = "gort$.goNilCheck($r)"
 				}
+				// A family accessor renamed to avoid a field collision is
+				// called by its renamed member name.
+				memberName := tsName(member)
+				familyRecv := recvType
+				if familyRecv.Kind == ir.KindPointer && familyRecv.Elem != nil {
+					familyRecv = *familyRecv.Elem
+				}
+				if _, _, ok := p.module.familyClassAndFamily(familyRecv); ok {
+					memberName = p.module.familyMemberName(member)
+				}
 				return fmt.Sprintf("((%s): %s => %s.%s(%s))",
-					joinComma(params), result, receiver, tsName(member), joinComma(names)), nil
+					joinComma(params), result, receiver, memberName, joinComma(names)), nil
 			}
 		}
 		return p.module.symbol(n.Pkg, n.Name)

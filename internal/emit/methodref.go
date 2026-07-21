@@ -61,7 +61,17 @@ func (p *printer) printMethodValue(n *ir.MethodValue) (string, error) {
 		if n.Recv.Type().Kind == ir.KindPointer {
 			receiver = "gort$.goNilCheck($r)"
 		}
-		call = receiver + "." + tsName(n.Method) + "(" + joinComma(args) + ")"
+		// A family accessor renamed to avoid a field collision is bound by
+		// its renamed member name.
+		member := tsName(n.Method)
+		recvT := n.Recv.Type()
+		if recvT.Kind == ir.KindPointer && recvT.Elem != nil {
+			recvT = *recvT.Elem
+		}
+		if _, _, ok := p.module.familyClassAndFamily(recvT); ok {
+			member = p.module.familyMemberName(n.Method)
+		}
+		call = receiver + "." + member + "(" + joinComma(args) + ")"
 	} else {
 		callee, err := p.module.symbol(n.Pkg, n.TypeName+"$"+n.Method)
 		if err != nil {
