@@ -155,3 +155,40 @@ func (c C) String() string { return "c" }
 		t.Fatalf("coincidental interface must not be a family; got %v", plan.Families())
 	}
 }
+
+// Method dispositions: root contract methods become abstract
+// trampolines-removed; the base default class declares/overrides them;
+// a concrete leaf inherits the spine, overrides its own, and delegates
+// a secondary-component method.
+func TestMethodDispositions(t *testing.T) {
+	plan := analyze(t, astShape)
+	node, _ := plan.Class("m.Node")
+	if node.Methods["Name"] != MethodTrampolineRemoved || node.Methods["NodeKind"] != MethodTrampolineRemoved {
+		t.Fatalf("Node contract methods must be trampoline-removed: %v", node.Methods)
+	}
+	nd, _ := plan.Class("m.NodeDefault")
+	if nd.Methods["Name"] != MethodOverride {
+		t.Fatalf("NodeDefault should override Name (default impl): %v", nd.Methods["Name"])
+	}
+	id, _ := plan.Class("m.Identifier")
+	if id.Methods["Name"] != MethodOverride {
+		t.Fatalf("Identifier.Name should be override: %v", id.Methods["Name"])
+	}
+	// Methods promoted through the primary spine are inherited (emit
+	// nothing), never forwarding members.
+	inherited := 0
+	for _, d := range id.Methods {
+		if d == MethodInherited {
+			inherited++
+		}
+	}
+	if inherited == 0 {
+		t.Fatalf("Identifier must inherit promoted spine methods: %v", id.Methods)
+	}
+	// Every method has exactly one disposition (completeness).
+	for name, d := range id.Methods {
+		if d == "" {
+			t.Fatalf("method %s has no disposition", name)
+		}
+	}
+}

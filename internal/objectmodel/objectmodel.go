@@ -37,6 +37,27 @@ type EmbeddedEdge struct {
 	DepthToRoot int
 }
 
+// MethodDisposition is one method's translation approach on one class
+// (ADR-0012 4.4 / receiver decision 5).
+type MethodDisposition string
+
+const (
+	// MethodDeclared: a body declared on this class (no ancestor has it).
+	MethodDeclared MethodDisposition = "declared"
+	// MethodOverride: a body redefining an ancestor's method.
+	MethodOverride MethodDisposition = "override"
+	// MethodInherited: promoted through the primary base — emit nothing,
+	// native inheritance carries it.
+	MethodInherited MethodDisposition = "inherited"
+	// MethodTrampolineRemoved: a root contract method that only
+	// dispatches to the self-reference (Node.Name(){return n.data.Name()})
+	// — it becomes the abstract virtual method, no body.
+	MethodTrampolineRemoved MethodDisposition = "trampoline-removed"
+	// MethodComponentDelegated: promoted through a secondary component —
+	// emit a one-line forwarding accessor to the component.
+	MethodComponentDelegated MethodDisposition = "component-delegated"
+)
+
 // Class is one struct's recovered class shape.
 type Class struct {
 	Name       string
@@ -46,6 +67,10 @@ type Class struct {
 	Secondary  []EmbeddedEdge
 	Root       bool
 	Family     string
+	// Methods is every method reachable on this class keyed by name,
+	// with its translation disposition. Complete by construction: a
+	// method with no disposition is a planner defect.
+	Methods map[string]MethodDisposition
 }
 
 // Family is one virtual-contract interface's recovered hierarchy.
@@ -192,7 +217,7 @@ func Analyze(named []*types.Named) *Plan {
 			Interface: iface.Obj().Name(), InterfaceCanon: canonical(iface),
 			RootType: root.Obj().Name(), RootCanon: canonical(root), SelfField: selfField,
 		}
-		classes, reason := placeClasses(root, members)
+		classes, reason := placeClasses(iface, ifaceType, root, members)
 		if reason != "" {
 			// 4.5: no mixed family — block the whole family.
 			plan.blocked[canonical(iface)] = reason
@@ -266,13 +291,17 @@ func selfReferenceRoot(iface *types.Named, ifaceType *types.Interface, structs [
 // value-embeds it, selecting each class's primary base by Go's minimum
 // promotion depth. An equal-depth tie (genuine ambiguity) returns a
 // non-empty reason so the family blocks (4.5).
-func placeClasses(root *types.Named, members []*types.Named) ([]Class, string) {
+func placeClasses(iface *types.Named, ifaceType *types.Interface, root *types.Named, members []*types.Named) ([]Class, string) {
 	// Class set: root plus every struct on some member's value-embedding
 	// spine to root.
 	classSet := map[*types.Named]bool{root: true}
 	for _, m := range members {
 		classSet[m] = true
 		collectSpine(m, root, classSet)
+	}
+	contract := map[string]bool{}
+	for i := 0; i < ifaceType.NumMethods(); i++ {
+		contract[ifaceType.Method(i).Name()] = true
 	}
 	var out []Class
 	for s := range classSet {
@@ -291,6 +320,7 @@ func placeClasses(root *types.Named, members []*types.Named) ([]Class, string) {
 				class.Secondary = append(class.Secondary, edgeOf(e, root))
 			}
 		}
+		class.Methods = methodDispositions(s, root, contract, &class)
 		out = append(out, class)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Canon < out[j].Canon })
@@ -365,4 +395,116 @@ func edgeOf(e edge, root *types.Named) EmbeddedEdge {
 		Field: e.base.Obj().Name(), BaseType: e.base.Obj().Name(), BaseCanon: canonical(e.base),
 		Pointer: e.pointer, Index: e.index, DepthToRoot: depthToRoot(e.base, root, map[*types.Named]int{}),
 	}
+}
+
+// declaredMethods returns the method names a named type declares
+// directly (value or pointer receiver), not promoted.
+func declaredMethods(named *types.Named) map[string]bool {
+	out := map[string]bool{}
+	for i := 0; i < named.NumMethods(); i++ {
+		out[named.Method(i).Name()] = true
+	}
+	return out
+}
+
+// methodDispositions assigns every reachable method its translation
+// approach: root contract methods are trampolines removed to abstract;
+// a directly-declared method is declared or (if an ancestor has it)
+// override; a method promoted through the primary base is inherited;
+// through a secondary component it is component-delegated.
+func methodDispositions(s, root *types.Named, contract map[string]bool, class *Class) map[string]MethodDisposition {
+	out := map[string]MethodDisposition{}
+	own := declaredMethods(s)
+
+	if class.Root {
+		for name := range own {
+			if contract[name] {
+				out[name] = MethodTrampolineRemoved
+			} else {
+				out[name] = MethodDeclared
+			}
+		}
+		return out
+	}
+
+	// Ancestor declared-method names along the primary spine.
+	ancestor := map[string]bool{}
+	for base := primaryBaseNamed(s, root); base != nil; base = primaryBaseNamed(base, root) {
+		for n := range declaredMethods(base) {
+			ancestor[n] = true
+		}
+		if base == root {
+			break
+		}
+	}
+	for name := range own {
+		if ancestor[name] {
+			out[name] = MethodOverride
+		} else {
+			out[name] = MethodDeclared
+		}
+	}
+	// Promoted methods: inherited through the primary spine, delegated
+	// through a secondary component.
+	mset := types.NewMethodSet(types.NewPointer(s))
+	for i := 0; i < mset.Len(); i++ {
+		sel := mset.At(i)
+		name := sel.Obj().Name()
+		if _, done := out[name]; done {
+			continue
+		}
+		if promotedThroughPrimary(s, root, sel.Index()) {
+			out[name] = MethodInherited
+		} else {
+			out[name] = MethodComponentDelegated
+		}
+	}
+	return out
+}
+
+// primaryBaseNamed returns the value-embedded base of s selected as its
+// primary superclass (minimum depth to root), or nil.
+func primaryBaseNamed(s, root *types.Named) *types.Named {
+	if s == root {
+		return nil
+	}
+	var best *types.Named
+	bestDepth := -1
+	for _, e := range embeddedEdges(s) {
+		if e.pointer {
+			continue
+		}
+		d := depthToRoot(e.base, root, map[*types.Named]int{})
+		if d < 0 {
+			continue
+		}
+		if bestDepth < 0 || d < bestDepth {
+			best, bestDepth = e.base, d
+		}
+	}
+	return best
+}
+
+// promotedThroughPrimary reports whether a selection index path enters
+// through the struct's primary base field.
+func promotedThroughPrimary(s, root *types.Named, index []int) bool {
+	if len(index) == 0 {
+		return true
+	}
+	primary := primaryBaseNamed(s, root)
+	if primary == nil {
+		return false
+	}
+	edges := embeddedEdges(s)
+	first := index[0]
+	if first < 0 || first >= s.Underlying().(*types.Struct).NumFields() {
+		return false
+	}
+	// index[0] is a field index of s; match it to the primary base's edge.
+	for _, e := range edges {
+		if e.index == first {
+			return e.base == primary
+		}
+	}
+	return false
 }
