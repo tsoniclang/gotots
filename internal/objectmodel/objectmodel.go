@@ -81,6 +81,13 @@ type Family struct {
 	RootCanon      string
 	SelfField      string
 	Members        []string
+	// ContractMethods are the virtual-contract interface's method names,
+	// sorted. The root class emits an abstract declaration for each (its
+	// concrete subclasses implement them), so the root's trampoline
+	// methods dispatch virtually through `this` after the self-reference
+	// collapses. The declared signature is resolved at emission from any
+	// implementer's method of the same name.
+	ContractMethods []string
 }
 
 func (p *Plan) Class(canon string) (Class, bool) { c, ok := p.classes[canon]; return c, ok }
@@ -213,9 +220,15 @@ func Analyze(named []*types.Named) *Plan {
 		if len(members) == 0 {
 			continue
 		}
+		contractMethods := make([]string, 0, ifaceType.NumMethods())
+		for i := 0; i < ifaceType.NumMethods(); i++ {
+			contractMethods = append(contractMethods, ifaceType.Method(i).Name())
+		}
+		sort.Strings(contractMethods)
 		fam := Family{
 			Interface: iface.Obj().Name(), InterfaceCanon: canonical(iface),
 			RootType: root.Obj().Name(), RootCanon: canonical(root), SelfField: selfField,
+			ContractMethods: contractMethods,
 		}
 		classes, reason := placeClasses(iface, ifaceType, root, members)
 		if reason != "" {

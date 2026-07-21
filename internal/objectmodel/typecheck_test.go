@@ -79,6 +79,11 @@ func (i *Ident) name() string { return i.Text }
 	if fam.RootType != "Node" || fam.SelfField != "data" {
 		t.Fatalf("family root/self = %q/%q, want Node/data", fam.RootType, fam.SelfField)
 	}
+	// The contract method (name) is exposed for the root's synthesized
+	// abstract declaration.
+	if len(fam.ContractMethods) != 1 || fam.ContractMethods[0] != "name" {
+		t.Fatalf("contract methods = %v, want [name]", fam.ContractMethods)
+	}
 
 	ident, ok := plan.Class("p.Ident")
 	if !ok {
