@@ -1,0 +1,13 @@
+# Agent working state
+/.claude/
+
+# Project-local analysis, scratch, and generated test work
+/.analysis/
+/.temp/
+/.tests/
+
+# Editor and operating-system state
+/.idea/
+/.vscode/
+.DS_Store
+Thumbs.db
