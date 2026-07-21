@@ -57,14 +57,21 @@ func runInspect(args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	printInventory(stdout, inventory)
-	return nil
+	return printInventory(stdout, inventory)
 }
 
-func printInventory(stdout io.Writer, inventory analyze.Inventory) {
-	fmt.Fprintf(stdout, "constructs in %s:\n", inventory.Path)
-	for _, occurrence := range inventory.Occurrences {
-		fmt.Fprintf(stdout, "  %-16s %-12s %d\n",
-			occurrence.Kind, occurrence.Kind.Category(), occurrence.Count)
+// printInventory renders the per-kind projection of the inventory. Write errors
+// propagate rather than being discarded, so a failing writer fails the command.
+func printInventory(stdout io.Writer, inventory analyze.Inventory) error {
+	if _, err := fmt.Fprintf(stdout, "constructs in %s (%d occurrences):\n",
+		inventory.Path, len(inventory.Occurrences)); err != nil {
+		return err
 	}
+	for _, count := range inventory.CountsByKind() {
+		if _, err := fmt.Fprintf(stdout, "  %-16s %-12s %d\n",
+			count.Kind, count.Kind.Category(), count.Count); err != nil {
+			return err
+		}
+	}
+	return nil
 }

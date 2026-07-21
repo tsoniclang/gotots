@@ -1,64 +1,69 @@
 package analyze
 
 import (
-	"go/ast"
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/language/catalog"
-	"github.com/tsoniclang/gotots/internal/source"
 )
 
-// Occurrence is one catalog Kind with the number of times it was observed.
-type Occurrence struct {
-	Kind  catalog.Kind
-	Count int
+// Position is one source point: 1-based line and column plus 0-based byte
+// offset, all derived from the toolchain file set.
+type Position struct {
+	Line   int
+	Column int
+	Offset int
 }
 
-// Inventory is the pure, AST-free result of a construct inspection: the file
-// inspected and every catalog Kind it contains, sorted by kind name. It carries
-// no go/ast type so downstream layers can consume it without importing the
-// toolchain AST.
+// Span is the half-open source range of one occurrence.
+type Span struct {
+	Filename string
+	Start    Position
+	End      Position
+}
+
+// OccurrenceID is the canonical identity of one construct occurrence, derived
+// from its span and kind so it is independent of traversal order and stable
+// across runs.
+type OccurrenceID string
+
+// Occurrence is one classified construct instance in a source file: its
+// canonical identity, catalog kind, span, and the identity of its enclosing
+// occurrence (empty for the root file). This per-occurrence record is the
+// authoritative inventory; counts are a projection of it.
+type Occurrence struct {
+	ID     OccurrenceID
+	Kind   catalog.Kind
+	Parent OccurrenceID
+	Span   Span
+}
+
+// Inventory is the authoritative construct inventory of one file: every
+// occurrence in parent-directed pre-order.
 type Inventory struct {
 	Path        string
 	Occurrences []Occurrence
 }
 
-// InspectConstructs parses one Go file and inventories the catalog constructs
-// it contains. It fails closed: any node the catalog does not recognize aborts
-// the inspection with the classification error rather than being skipped.
-func InspectConstructs(path string) (Inventory, error) {
-	_, file, err := source.ParseGoFile(path)
-	if err != nil {
-		return Inventory{}, err
-	}
-	return inventoryFile(path, file)
+// KindCount is one projected count for the report surface.
+type KindCount struct {
+	Kind  catalog.Kind
+	Count int
 }
 
-// inventoryFile walks a parsed file and counts every construct by catalog Kind.
-func inventoryFile(path string, file *ast.File) (Inventory, error) {
+// CountsByKind projects the authoritative occurrences into per-kind counts,
+// sorted by kind name. Counts are derived here; they are never the source of
+// truth.
+func (inv Inventory) CountsByKind() []KindCount {
 	counts := map[catalog.Kind]int{}
-	var classifyErr error
-	ast.Inspect(file, func(n ast.Node) bool {
-		if n == nil || classifyErr != nil {
-			return false
-		}
-		kind, err := Classify(n)
-		if err != nil {
-			classifyErr = err
-			return false
-		}
-		counts[kind]++
-		return true
-	})
-	if classifyErr != nil {
-		return Inventory{}, classifyErr
+	for _, occurrence := range inv.Occurrences {
+		counts[occurrence.Kind]++
 	}
-	occurrences := make([]Occurrence, 0, len(counts))
+	projected := make([]KindCount, 0, len(counts))
 	for kind, count := range counts {
-		occurrences = append(occurrences, Occurrence{Kind: kind, Count: count})
+		projected = append(projected, KindCount{Kind: kind, Count: count})
 	}
-	sort.Slice(occurrences, func(i, j int) bool {
-		return occurrences[i].Kind.Name() < occurrences[j].Kind.Name()
+	sort.Slice(projected, func(i, j int) bool {
+		return projected[i].Kind.Name() < projected[j].Kind.Name()
 	})
-	return Inventory{Path: path, Occurrences: occurrences}, nil
+	return projected
 }

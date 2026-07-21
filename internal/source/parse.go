@@ -1,6 +1,7 @@
 // Package source owns workspace loading and toolchain parsing. It is one of
 // two packages (with internal/language/analyze) permitted to import go/ast and
-// go/token; downstream layers consume its typed results, never the raw AST.
+// go/token; downstream layers consume its typed File artifact rather than
+// reparsing paths themselves.
 package source
 
 import (
@@ -9,14 +10,23 @@ import (
 	"go/token"
 )
 
-// ParseGoFile parses a single Go source file into its AST using the standard
-// toolchain parser, retaining comments. Parse errors are returned typed by the
-// parser and never downgraded into a partial tree.
-func ParseGoFile(path string) (*token.FileSet, *ast.File, error) {
+// File is the typed result of loading one Go source file: its path, the
+// position information, and the parsed syntax. Analysis consumes this artifact;
+// the orchestrating compiler holds it opaquely and never reparses.
+type File struct {
+	Path   string
+	Fset   *token.FileSet
+	Syntax *ast.File
+}
+
+// Load parses a single Go source file, retaining comments. Parse errors are
+// returned typed by the toolchain parser and never downgraded into a partial
+// tree.
+func Load(path string) (*File, error) {
 	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
+	syntax, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return fset, file, nil
+	return &File{Path: path, Fset: fset, Syntax: syntax}, nil
 }

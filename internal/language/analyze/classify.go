@@ -24,12 +24,14 @@ func (e *UnknownConstructError) Error() string {
 }
 
 // Classify maps one concrete go/ast node to its catalog Kind. It is total over
-// the constructs the toolchain parser produces for the selected Go version and
-// fails closed on any unrecognized node with an UnknownConstructError. There is
-// no default classification and no textual fallback.
+// every concrete type implementing ast.Node in the selected Go toolchain
+// (proven by TestClassifyIsToolchainBijection) and fails closed on any
+// unrecognized node with an UnknownConstructError. There is no default
+// classification and no textual fallback.
 //
-// ast.Package is intentionally absent: it is deprecated and never produced by
-// go/parser.ParseFile, so encountering one is an unknown construct.
+// ast.Package is deprecated and ast.Directive is produced only by
+// ParseDirective, so neither appears in a file-parse tree; both are classified
+// for total reconciliation and carry their catalog disposition.
 func Classify(n ast.Node) (catalog.Kind, error) {
 	switch n.(type) {
 	case *ast.BadExpr:
@@ -147,6 +149,10 @@ func Classify(n ast.Node) (catalog.Kind, error) {
 		return catalog.KindField, nil
 	case *ast.FieldList:
 		return catalog.KindFieldList, nil
+	case *ast.Directive:
+		return catalog.KindDirective, nil
+	case *ast.Package:
+		return catalog.KindPackage, nil
 	}
 	return catalog.KindInvalid, &UnknownConstructError{GoType: fmt.Sprintf("%T", n)}
 }

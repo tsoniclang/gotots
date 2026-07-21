@@ -1,6 +1,7 @@
 // Package catalog is the closed, target-independent catalog of Go language
 // constructs for the selected Go toolchain. It names every grammatical form
-// with a stable enum identity and a validated descriptor.
+// with a stable enum identity, a grammatical category, and a support
+// disposition.
 //
 // The catalog is authoritative Go code, not parallel hand-maintained JSON. It
 // imports no go/ast, go/types, or target package: the binding from concrete
@@ -11,165 +12,176 @@ package catalog
 
 import "fmt"
 
-// Kind is the stable identity of one Go grammatical construct form. The zero
-// value KindInvalid is never a valid construct; numKinds is the terminal
-// sentinel that sizes the descriptor table so an added enumerator without a
-// descriptor, or a stray value past the end, fails construction and tests.
+// Kind is the stable identity of one Go grammatical construct form. Values are
+// explicit and permanent: a Kind's integer identity never changes, new kinds
+// take the next free value, and TestKindIDsArePinned freezes the whole mapping
+// so an insertion or reordering that shifts an identity fails.
 type Kind uint16
 
+// Explicit, permanent construct identities. Do not renumber; append only.
 const (
-	KindInvalid Kind = iota
+	KindInvalid Kind = 0
 
 	// Expressions.
-	KindBadExpr
-	KindIdent
-	KindEllipsis
-	KindBasicLit
-	KindFuncLit
-	KindCompositeLit
-	KindParenExpr
-	KindSelectorExpr
-	KindIndexExpr
-	KindIndexListExpr
-	KindSliceExpr
-	KindTypeAssertExpr
-	KindCallExpr
-	KindStarExpr
-	KindUnaryExpr
-	KindBinaryExpr
-	KindKeyValueExpr
+	KindBadExpr        Kind = 1
+	KindIdent          Kind = 2
+	KindEllipsis       Kind = 3
+	KindBasicLit       Kind = 4
+	KindFuncLit        Kind = 5
+	KindCompositeLit   Kind = 6
+	KindParenExpr      Kind = 7
+	KindSelectorExpr   Kind = 8
+	KindIndexExpr      Kind = 9
+	KindIndexListExpr  Kind = 10
+	KindSliceExpr      Kind = 11
+	KindTypeAssertExpr Kind = 12
+	KindCallExpr       Kind = 13
+	KindStarExpr       Kind = 14
+	KindUnaryExpr      Kind = 15
+	KindBinaryExpr     Kind = 16
+	KindKeyValueExpr   Kind = 17
 
 	// Type expressions.
-	KindArrayType
-	KindStructType
-	KindFuncType
-	KindInterfaceType
-	KindMapType
-	KindChanType
+	KindArrayType     Kind = 18
+	KindStructType    Kind = 19
+	KindFuncType      Kind = 20
+	KindInterfaceType Kind = 21
+	KindMapType       Kind = 22
+	KindChanType      Kind = 23
 
 	// Statements.
-	KindBadStmt
-	KindDeclStmt
-	KindEmptyStmt
-	KindLabeledStmt
-	KindExprStmt
-	KindSendStmt
-	KindIncDecStmt
-	KindAssignStmt
-	KindGoStmt
-	KindDeferStmt
-	KindReturnStmt
-	KindBranchStmt
-	KindBlockStmt
-	KindIfStmt
-	KindCaseClause
-	KindSwitchStmt
-	KindTypeSwitchStmt
-	KindCommClause
-	KindSelectStmt
-	KindForStmt
-	KindRangeStmt
+	KindBadStmt        Kind = 24
+	KindDeclStmt       Kind = 25
+	KindEmptyStmt      Kind = 26
+	KindLabeledStmt    Kind = 27
+	KindExprStmt       Kind = 28
+	KindSendStmt       Kind = 29
+	KindIncDecStmt     Kind = 30
+	KindAssignStmt     Kind = 31
+	KindGoStmt         Kind = 32
+	KindDeferStmt      Kind = 33
+	KindReturnStmt     Kind = 34
+	KindBranchStmt     Kind = 35
+	KindBlockStmt      Kind = 36
+	KindIfStmt         Kind = 37
+	KindCaseClause     Kind = 38
+	KindSwitchStmt     Kind = 39
+	KindTypeSwitchStmt Kind = 40
+	KindCommClause     Kind = 41
+	KindSelectStmt     Kind = 42
+	KindForStmt        Kind = 43
+	KindRangeStmt      Kind = 44
 
 	// Declarations.
-	KindBadDecl
-	KindGenDecl
-	KindFuncDecl
+	KindBadDecl  Kind = 45
+	KindGenDecl  Kind = 46
+	KindFuncDecl Kind = 47
 
 	// Specifications.
-	KindImportSpec
-	KindValueSpec
-	KindTypeSpec
+	KindImportSpec Kind = 48
+	KindValueSpec  Kind = 49
+	KindTypeSpec   Kind = 50
 
 	// Structural nodes.
-	KindFile
-	KindComment
-	KindCommentGroup
-	KindField
-	KindFieldList
+	KindFile         Kind = 51
+	KindComment      Kind = 52
+	KindCommentGroup Kind = 53
+	KindField        Kind = 54
+	KindFieldList    Kind = 55
+	KindDirective    Kind = 56
+	KindPackage      Kind = 57
 
-	// numKinds is the terminal sentinel. It must remain last.
-	numKinds
+	// kindCount is the highest assigned identity. Appended kinds increment it;
+	// it sizes the descriptor table so a Kind added past the end fails to
+	// compile until the table grows.
+	kindCount = 57
 )
 
 // descriptor is the growing per-kind record. This slice of the catalog carries
-// the stable name and grammatical category; later phases extend it with
-// applicable roles, required typed evidence, produced semantic operation, and
-// allowed support dispositions, each behind its own closed enum.
+// the stable name, grammatical category, and support disposition; later phases
+// extend it with applicable roles, required typed evidence, and produced
+// semantic operation, each behind its own closed enum.
 type descriptor struct {
-	name     string
-	category Category
+	name        string
+	category    Category
+	disposition Disposition
 }
 
-// descriptors is an exact-size table indexed by Kind. A fixed array length of
-// numKinds means a Kind added past the current end fails to compile, and a
-// Kind added without a descriptor here leaves a zero-value (empty-name) entry
-// that TestKindTableIsTotal rejects.
-var descriptors = [numKinds]descriptor{
-	KindBadExpr:        {"BadExpr", CategoryExpression},
-	KindIdent:          {"Ident", CategoryExpression},
-	KindEllipsis:       {"Ellipsis", CategoryExpression},
-	KindBasicLit:       {"BasicLit", CategoryExpression},
-	KindFuncLit:        {"FuncLit", CategoryExpression},
-	KindCompositeLit:   {"CompositeLit", CategoryExpression},
-	KindParenExpr:      {"ParenExpr", CategoryExpression},
-	KindSelectorExpr:   {"SelectorExpr", CategoryExpression},
-	KindIndexExpr:      {"IndexExpr", CategoryExpression},
-	KindIndexListExpr:  {"IndexListExpr", CategoryExpression},
-	KindSliceExpr:      {"SliceExpr", CategoryExpression},
-	KindTypeAssertExpr: {"TypeAssertExpr", CategoryExpression},
-	KindCallExpr:       {"CallExpr", CategoryExpression},
-	KindStarExpr:       {"StarExpr", CategoryExpression},
-	KindUnaryExpr:      {"UnaryExpr", CategoryExpression},
-	KindBinaryExpr:     {"BinaryExpr", CategoryExpression},
-	KindKeyValueExpr:   {"KeyValueExpr", CategoryExpression},
+// descriptors is an exact-size table indexed by Kind. Its fixed length means a
+// Kind added past the current end fails to compile, and a Kind added without a
+// descriptor here leaves a zero-value (empty-name) entry that
+// TestKindTableIsTotal rejects.
+var descriptors = [kindCount + 1]descriptor{
+	KindBadExpr:        {"BadExpr", CategoryExpression, DispositionActive},
+	KindIdent:          {"Ident", CategoryExpression, DispositionActive},
+	KindEllipsis:       {"Ellipsis", CategoryExpression, DispositionActive},
+	KindBasicLit:       {"BasicLit", CategoryExpression, DispositionActive},
+	KindFuncLit:        {"FuncLit", CategoryExpression, DispositionActive},
+	KindCompositeLit:   {"CompositeLit", CategoryExpression, DispositionActive},
+	KindParenExpr:      {"ParenExpr", CategoryExpression, DispositionActive},
+	KindSelectorExpr:   {"SelectorExpr", CategoryExpression, DispositionActive},
+	KindIndexExpr:      {"IndexExpr", CategoryExpression, DispositionActive},
+	KindIndexListExpr:  {"IndexListExpr", CategoryExpression, DispositionActive},
+	KindSliceExpr:      {"SliceExpr", CategoryExpression, DispositionActive},
+	KindTypeAssertExpr: {"TypeAssertExpr", CategoryExpression, DispositionActive},
+	KindCallExpr:       {"CallExpr", CategoryExpression, DispositionActive},
+	KindStarExpr:       {"StarExpr", CategoryExpression, DispositionActive},
+	KindUnaryExpr:      {"UnaryExpr", CategoryExpression, DispositionActive},
+	KindBinaryExpr:     {"BinaryExpr", CategoryExpression, DispositionActive},
+	KindKeyValueExpr:   {"KeyValueExpr", CategoryExpression, DispositionActive},
 
-	KindArrayType:     {"ArrayType", CategoryType},
-	KindStructType:    {"StructType", CategoryType},
-	KindFuncType:      {"FuncType", CategoryType},
-	KindInterfaceType: {"InterfaceType", CategoryType},
-	KindMapType:       {"MapType", CategoryType},
-	KindChanType:      {"ChanType", CategoryType},
+	KindArrayType:     {"ArrayType", CategoryType, DispositionActive},
+	KindStructType:    {"StructType", CategoryType, DispositionActive},
+	KindFuncType:      {"FuncType", CategoryType, DispositionActive},
+	KindInterfaceType: {"InterfaceType", CategoryType, DispositionActive},
+	KindMapType:       {"MapType", CategoryType, DispositionActive},
+	KindChanType:      {"ChanType", CategoryType, DispositionActive},
 
-	KindBadStmt:        {"BadStmt", CategoryStatement},
-	KindDeclStmt:       {"DeclStmt", CategoryStatement},
-	KindEmptyStmt:      {"EmptyStmt", CategoryStatement},
-	KindLabeledStmt:    {"LabeledStmt", CategoryStatement},
-	KindExprStmt:       {"ExprStmt", CategoryStatement},
-	KindSendStmt:       {"SendStmt", CategoryStatement},
-	KindIncDecStmt:     {"IncDecStmt", CategoryStatement},
-	KindAssignStmt:     {"AssignStmt", CategoryStatement},
-	KindGoStmt:         {"GoStmt", CategoryStatement},
-	KindDeferStmt:      {"DeferStmt", CategoryStatement},
-	KindReturnStmt:     {"ReturnStmt", CategoryStatement},
-	KindBranchStmt:     {"BranchStmt", CategoryStatement},
-	KindBlockStmt:      {"BlockStmt", CategoryStatement},
-	KindIfStmt:         {"IfStmt", CategoryStatement},
-	KindCaseClause:     {"CaseClause", CategoryStatement},
-	KindSwitchStmt:     {"SwitchStmt", CategoryStatement},
-	KindTypeSwitchStmt: {"TypeSwitchStmt", CategoryStatement},
-	KindCommClause:     {"CommClause", CategoryStatement},
-	KindSelectStmt:     {"SelectStmt", CategoryStatement},
-	KindForStmt:        {"ForStmt", CategoryStatement},
-	KindRangeStmt:      {"RangeStmt", CategoryStatement},
+	KindBadStmt:        {"BadStmt", CategoryStatement, DispositionActive},
+	KindDeclStmt:       {"DeclStmt", CategoryStatement, DispositionActive},
+	KindEmptyStmt:      {"EmptyStmt", CategoryStatement, DispositionActive},
+	KindLabeledStmt:    {"LabeledStmt", CategoryStatement, DispositionActive},
+	KindExprStmt:       {"ExprStmt", CategoryStatement, DispositionActive},
+	KindSendStmt:       {"SendStmt", CategoryStatement, DispositionActive},
+	KindIncDecStmt:     {"IncDecStmt", CategoryStatement, DispositionActive},
+	KindAssignStmt:     {"AssignStmt", CategoryStatement, DispositionActive},
+	KindGoStmt:         {"GoStmt", CategoryStatement, DispositionActive},
+	KindDeferStmt:      {"DeferStmt", CategoryStatement, DispositionActive},
+	KindReturnStmt:     {"ReturnStmt", CategoryStatement, DispositionActive},
+	KindBranchStmt:     {"BranchStmt", CategoryStatement, DispositionActive},
+	KindBlockStmt:      {"BlockStmt", CategoryStatement, DispositionActive},
+	KindIfStmt:         {"IfStmt", CategoryStatement, DispositionActive},
+	KindCaseClause:     {"CaseClause", CategoryStatement, DispositionActive},
+	KindSwitchStmt:     {"SwitchStmt", CategoryStatement, DispositionActive},
+	KindTypeSwitchStmt: {"TypeSwitchStmt", CategoryStatement, DispositionActive},
+	KindCommClause:     {"CommClause", CategoryStatement, DispositionActive},
+	KindSelectStmt:     {"SelectStmt", CategoryStatement, DispositionActive},
+	KindForStmt:        {"ForStmt", CategoryStatement, DispositionActive},
+	KindRangeStmt:      {"RangeStmt", CategoryStatement, DispositionActive},
 
-	KindBadDecl:  {"BadDecl", CategoryDeclaration},
-	KindGenDecl:  {"GenDecl", CategoryDeclaration},
-	KindFuncDecl: {"FuncDecl", CategoryDeclaration},
+	KindBadDecl:  {"BadDecl", CategoryDeclaration, DispositionActive},
+	KindGenDecl:  {"GenDecl", CategoryDeclaration, DispositionActive},
+	KindFuncDecl: {"FuncDecl", CategoryDeclaration, DispositionActive},
 
-	KindImportSpec: {"ImportSpec", CategorySpec},
-	KindValueSpec:  {"ValueSpec", CategorySpec},
-	KindTypeSpec:   {"TypeSpec", CategorySpec},
+	KindImportSpec: {"ImportSpec", CategorySpec, DispositionActive},
+	KindValueSpec:  {"ValueSpec", CategorySpec, DispositionActive},
+	KindTypeSpec:   {"TypeSpec", CategorySpec, DispositionActive},
 
-	KindFile:         {"File", CategoryStructural},
-	KindComment:      {"Comment", CategoryStructural},
-	KindCommentGroup: {"CommentGroup", CategoryStructural},
-	KindField:        {"Field", CategoryStructural},
-	KindFieldList:    {"FieldList", CategoryStructural},
+	KindFile:         {"File", CategoryStructural, DispositionActive},
+	KindComment:      {"Comment", CategoryStructural, DispositionActive},
+	KindCommentGroup: {"CommentGroup", CategoryStructural, DispositionActive},
+	KindField:        {"Field", CategoryStructural, DispositionActive},
+	KindFieldList:    {"FieldList", CategoryStructural, DispositionActive},
+	KindDirective:    {"Directive", CategoryStructural, DispositionActive},
+	// ast.Package is deprecated in the toolchain and never produced by a file
+	// parse; it is cataloged for total reconciliation but carries a deprecated
+	// disposition so a later phase can reject rather than translate it.
+	KindPackage: {"Package", CategoryStructural, DispositionDeprecated},
 }
 
-// Valid reports whether k names a construct in the catalog. KindInvalid and
-// the terminal sentinel are not valid.
-func (k Kind) Valid() bool { return k > KindInvalid && k < numKinds }
+// Valid reports whether k names a construct in the catalog. KindInvalid and any
+// value past kindCount are not valid.
+func (k Kind) Valid() bool { return k >= 1 && k <= kindCount }
 
 // Name returns the stable descriptive name of the construct, or "" if k is not
 // a valid Kind.
@@ -189,6 +201,15 @@ func (k Kind) Category() Category {
 	return descriptors[k].category
 }
 
+// Disposition returns the support disposition of the construct, or
+// DispositionInvalid if k is not a valid Kind.
+func (k Kind) Disposition() Disposition {
+	if !k.Valid() {
+		return DispositionInvalid
+	}
+	return descriptors[k].disposition
+}
+
 // String renders k for diagnostics.
 func (k Kind) String() string {
 	if name := k.Name(); name != "" {
@@ -197,13 +218,12 @@ func (k Kind) String() string {
 	return fmt.Sprintf("catalog.Kind(%d)", uint16(k))
 }
 
-// All returns every valid Kind in enumeration order. Iterating All is the one
-// way consumers walk the catalog; it never includes KindInvalid or the
-// terminal sentinel.
+// All returns every valid Kind in ascending identity order. Iterating All is
+// the one way consumers walk the catalog; it never includes KindInvalid.
 func All() []Kind {
-	kinds := make([]Kind, 0, int(numKinds)-1)
-	for k := KindInvalid + 1; k < numKinds; k++ {
-		kinds = append(kinds, k)
+	kinds := make([]Kind, 0, kindCount)
+	for id := 1; id <= kindCount; id++ {
+		kinds = append(kinds, Kind(id))
 	}
 	return kinds
 }
