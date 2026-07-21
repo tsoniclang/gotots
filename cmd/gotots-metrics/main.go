@@ -223,6 +223,8 @@ func main() {
 			category = "generated-external-contracts"
 		case strings.HasPrefix(relative, "language-abi/"):
 			category = "generated-abi"
+		case strings.HasPrefix(relative, "interfaces/"):
+			category = "generated-interface-artifacts"
 		case strings.HasPrefix(relative, "analysis/"):
 			category = "analysis-artifacts"
 		case strings.HasPrefix(relative, "ledgers/"):

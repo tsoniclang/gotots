@@ -146,7 +146,11 @@ func (p *printer) buildUnionAliasDefinition(name string, t ir.Type) (string, err
 	}
 	declaration := "export type " + name + " = " + strings.Join(members, " | ") + ";"
 	p.module.RegisterIfaceEqFn(name, p.ifaceEqFn(t, name))
-	if p.module.ifaceKeyRequired(name) {
+	keyNeeded := p.module.ifaceKeyRequired(name)
+	if p.module.Interfaces != nil && p.module.Interfaces.KeyRequired(name) {
+		keyNeeded = true
+	}
+	if keyNeeded {
 		keyFn, err := p.ifaceKeyFn(t, name)
 		if err != nil {
 			return "", err
