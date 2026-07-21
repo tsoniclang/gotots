@@ -1,0 +1,58 @@
+package main
+
+import (
+	"bytes"
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+const sample = `package p
+
+func F(x int) int { return x + 1 }
+`
+
+// TestRunInspectConstructs proves the supported path produces an inventory.
+func TestRunInspectConstructs(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sample.go")
+	if err := os.WriteFile(path, []byte(sample), 0o644); err != nil {
+		t.Fatalf("write sample: %v", err)
+	}
+	var out bytes.Buffer
+	if err := run([]string{"inspect", "constructs", path}, &out); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if !strings.Contains(out.String(), "FuncDecl") {
+		t.Errorf("inventory output missing FuncDecl:\n%s", out.String())
+	}
+}
+
+// TestRunFailsClosed proves every unsupported invocation returns a typed
+// UnsupportedCommandError rather than doing partial work.
+func TestRunFailsClosed(t *testing.T) {
+	cases := [][]string{
+		{},
+		{"generate"},
+		{"inspect"},
+		{"inspect", "constructs"},
+		{"inspect", "types", "x.go"},
+	}
+	for _, args := range cases {
+		var out bytes.Buffer
+		err := run(args, &out)
+		if err == nil {
+			t.Errorf("run(%q) succeeded, want fail-closed error", args)
+			continue
+		}
+		var unsupported *UnsupportedCommandError
+		if !errors.As(err, &unsupported) {
+			t.Errorf("run(%q) error = %T, want *UnsupportedCommandError", args, err)
+		}
+		if out.Len() != 0 {
+			t.Errorf("run(%q) wrote output on failure: %q", args, out.String())
+		}
+	}
+}
