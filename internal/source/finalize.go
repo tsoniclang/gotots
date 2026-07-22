@@ -281,15 +281,10 @@ func retainUnits(u *Universe, loaded *LoadedPackage, file *LoadedFile, depths ma
 		if file.syntax != nil {
 			retained.Decl = nodeOf[unit.id]
 			retained.Boundaries = boundaryOf[unit.id]
-		} else {
-			for _, checked := range loaded.checkedDecls {
-				if checked.origin == unit.id {
-					retained.Decl = checked.node
-					retained.FromCheckedView = true
-					retained.CheckedSpan = checked.span
-					break
-				}
-			}
+		} else if counterpart, ok := loaded.checkedNodes[unit.id]; ok {
+			retained.Decl = counterpart.node
+			retained.FromCheckedView = true
+			retained.CheckedSpan = counterpart.span
 		}
 		if retained.Decl == nil {
 			return nil, &LoadError{Dir: u.request.Dir, Reason: "no retainable declaration for full-semantic unit " + unit.id.String()}

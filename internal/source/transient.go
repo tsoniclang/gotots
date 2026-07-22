@@ -28,13 +28,24 @@ type LoadedPackage struct {
 	types           *types.Package
 	typesInfo       *types.Info
 	// cgo evidence (transient): checked-view decls outside the owner root,
-	// joined by //line origin evidence at census time.
+	// joined by the exact origin graph at census time.
 	checkedDecls []checkedDecl
 	synthetics   []SyntheticUnit
 	mappings     []CheckedUnitMapping
+	// checkedNodes maps each cgo-original unit to its exact checked-view
+	// counterpart (transient; retention and the C-dependence derivation
+	// consume it).
+	checkedNodes map[identity.SourceUnitID]checkedCounterpart
 	// implicitUnits are the package's unspelled implicit executable units,
 	// censused with typed catalog identities before scope selection.
 	implicitUnits []identity.ImplicitUnitID
+}
+
+// checkedCounterpart is one origin unit's exact checked-view counterpart node
+// and its span in checked-view coordinates.
+type checkedCounterpart struct {
+	node ast.Node
+	span Span
 }
 
 // ID is the package's canonical identity.
@@ -90,14 +101,12 @@ func (f *LoadedFile) ID() identity.FileID { return f.id }
 // Units is the censused total unit ledger of the file.
 func (f *LoadedFile) Units() []SourceUnit { return append([]SourceUnit(nil), f.units...) }
 
-// checkedDecl is one top-level declaration in a cgo checked-view file,
-// carrying its origin classification.
+// checkedDecl is one top-level declaration in a cgo checked-view file. Its
+// origin unit (or synthetic identity) and C-dependence are derived by
+// resolveCgo from //line and type evidence — never stored as classification
+// here.
 type checkedDecl struct {
-	node     ast.Node
-	name     string
-	origin   identity.SourceUnitID // zero for synthetic decls
-	span     Span                  // span within the checked view
-	fromFile string                // checked file display path (transient only)
+	node ast.Node
 }
 
 // Universe is the TRANSIENT resolved source universe: the complete typed

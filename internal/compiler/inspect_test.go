@@ -5,8 +5,10 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
+	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/analyze"
 	"github.com/tsoniclang/gotots/internal/scope"
 	"github.com/tsoniclang/gotots/internal/source"
@@ -201,61 +203,111 @@ func TestImportCoherencePositiveProof(t *testing.T) {
 	}
 }
 
+// cgoPipelineFixture: main (directly C-dependent), pure (shadowing local type
+// C, not C-dependent), and hasLit (whose OWN body never touches C but whose
+// nested literal does). It proves per-unit C-dependence derived from typed
+// evidence, not spelling.
+const cgoPipelineFixture = "package main\n\n/*\n#include <stdlib.h>\n*/\nimport \"C\"\n\n" +
+	"func main() {\n\tC.free(nil)\n}\n\n" +
+	"func pure() int {\n\ttype C struct{ f int }\n\tlocal := C{f: 41}\n\treturn local.f + 1\n}\n\n" +
+	"func hasLit() {\n\tf := func() { C.free(nil) }\n\t_ = f\n}\n"
+
 // TestCgoThroughPublicPipeline proves a cgo program runs the COMPLETE public
-// pipeline: mixed same-file units (C-dependent external boundary + pure
-// full-semantic through the checked view), shadowing local C, and origin
-// mappings — never a loader/verifier closure disagreement.
+// pipeline with C-dependence derived from authoritative typed evidence: a
+// directly C-dependent unit is external-boundary, a shadowing local type C
+// never classifies, a function whose own body is C-free stays full-semantic
+// even when its nested literal touches C (per-unit exactness), and the origin
+// graph plus collision-free synthetics are present and relocation-stable.
 func TestCgoThroughPublicPipeline(t *testing.T) {
-	dir := t.TempDir()
-	files := map[string]string{
-		"go.mod":  "module cgo.example/pipeline\n\ngo 1.26\n",
-		"main.go": "package main\n\n/*\n#include <stdlib.h>\n*/\nimport \"C\"\n\nfunc main() {\n\tC.free(nil)\n}\n\nfunc pure() int {\n\ttype C struct{ f int }\n\tlocal := C{f: 41}\n\treturn local.f + 1\n}\n",
-	}
-	for rel, content := range files {
-		if err := os.WriteFile(filepath.Join(dir, rel), []byte(content), 0o644); err != nil {
+	load := func(t *testing.T) (*Inspection, *source.Package) {
+		dir := t.TempDir()
+		for rel, content := range map[string]string{
+			"go.mod":  "module cgo.example/pipeline\n\ngo 1.26\n",
+			"main.go": cgoPipelineFixture,
+		} {
+			if err := os.WriteFile(filepath.Join(dir, rel), []byte(content), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		req := source.Request{Dir: dir, ProviderContract: scope.DefaultContractID, Env: []string{"CGO_ENABLED=1"}}
+		artifact, err := AuditCatalog(req)
+		if err != nil {
+			t.Skipf("cgo unavailable: %v", err)
+		}
+		manifestPath := filepath.Join(t.TempDir(), "manifest.json")
+		if err := analyze.WriteAuditArtifact(artifact, manifestPath); err != nil {
 			t.Fatal(err)
 		}
+		req.AuditArtifact = manifestPath
+		req.AuditArtifactDigest = artifact.ArtifactDigest
+		inspection, err := InspectConstructs(req)
+		if err != nil {
+			t.Fatalf("cgo consumption pipeline: %v", err)
+		}
+		var mainPkg *source.Package
+		for _, pkg := range inspection.Workspace().Packages() {
+			if pkg.ID().ImportPath() == "cgo.example/pipeline" {
+				mainPkg = pkg
+			}
+		}
+		if mainPkg == nil {
+			t.Fatal("cgo package missing")
+		}
+		return inspection, mainPkg
 	}
-	cgoReq := source.Request{
-		Dir: dir, ProviderContract: scope.DefaultContractID,
-		Env: []string{"CGO_ENABLED=1"},
+
+	inspection, mainPkg := load(t)
+	byName := map[string]source.SourceUnit{}
+	for _, unit := range mainPkg.Units() {
+		byName[unit.Name()] = unit
 	}
-	artifact, err := AuditCatalog(cgoReq)
-	if err != nil {
-		t.Skipf("cgo unavailable: %v", err)
+	if got := byName["main"].Depth(); got != source.DepthExternalBoundary {
+		t.Errorf("C-dependent main depth = %s, want external-boundary", got)
 	}
-	manifestPath := filepath.Join(t.TempDir(), "manifest.json")
-	if err := analyze.WriteAuditArtifact(artifact, manifestPath); err != nil {
-		t.Fatal(err)
+	if got := byName["pure"].Depth(); got != source.DepthFullSemantic {
+		t.Errorf("pure (shadowing local C) depth = %s, want full-semantic", got)
 	}
-	cgoReq.AuditArtifact = manifestPath
-	cgoReq.AuditArtifactDigest = artifact.ArtifactDigest
-	inspection, err := InspectConstructs(cgoReq)
-	if err != nil {
-		t.Fatalf("cgo consumption pipeline: %v", err)
+	// hasLit's own body never touches C — full-semantic — while its nested
+	// literal, which calls C.free, is the C-dependent external boundary.
+	if got := byName["hasLit"].Depth(); got != source.DepthFullSemantic {
+		t.Errorf("hasLit (own body C-free) depth = %s, want full-semantic", got)
 	}
-	var mainPkg *source.Package
-	for _, pkg := range inspection.Workspace().Packages() {
-		if pkg.ID().ImportPath() == "cgo.example/pipeline" {
-			mainPkg = pkg
+	litCDependent := false
+	for name, unit := range byName {
+		if unit.Kind() == identity.UnitFuncLitBody && strings.HasPrefix(name, "hasLit$lit") {
+			if unit.Depth() == source.DepthExternalBoundary {
+				litCDependent = true
+			}
 		}
 	}
-	if mainPkg == nil {
-		t.Fatal("cgo package missing")
-	}
-	depths := map[string]source.EvidenceDepth{}
-	for _, unit := range mainPkg.Units() {
-		depths[unit.Name()] = unit.Depth()
-	}
-	if depths["main"] != source.DepthExternalBoundary {
-		t.Errorf("C-dependent main depth = %s, want external-boundary", depths["main"])
-	}
-	// pure declares a LOCAL type C — the shadowing name never classifies.
-	if depths["pure"] != source.DepthFullSemantic {
-		t.Errorf("pure (with shadowing local C) depth = %s, want full-semantic", depths["pure"])
+	if !litCDependent {
+		t.Error("the nested literal calling C.free was not classified C-dependent")
 	}
 	if len(mainPkg.CheckedUnitMappings()) == 0 || len(mainPkg.SyntheticUnits()) == 0 {
 		t.Error("cgo origin mappings/synthetic units missing")
+	}
+	// Synthetic identities are canonical (real declared cgo names, never "decl")
+	// and relocation-stable (identical across a fresh checkout directory).
+	syntheticNames := func(pkg *source.Package) map[string]bool {
+		set := map[string]bool{}
+		for _, s := range pkg.SyntheticUnits() {
+			if s.Name() == "decl" || s.Name() == "" {
+				t.Errorf("non-canonical synthetic name %q", s.Name())
+			}
+			set[s.Name()] = true
+		}
+		return set
+	}
+	first := syntheticNames(mainPkg)
+	_, secondPkg := load(t)
+	second := syntheticNames(secondPkg)
+	if len(first) != len(second) {
+		t.Errorf("synthetic set not relocation-stable: %d vs %d names", len(first), len(second))
+	}
+	for name := range first {
+		if !second[name] {
+			t.Errorf("synthetic %s absent after relocation — identity depends on a temporary path", name)
+		}
 	}
 	// The pure unit's interior occurrences are inventoried via the checked view.
 	pureInventoried := false

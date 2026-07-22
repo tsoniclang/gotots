@@ -61,7 +61,7 @@ func VerifyUnitCensus(ws *source.Workspace, req source.Request, contract scope.P
 			return fail(err.Error())
 		}
 		for _, file := range pkg.Files() {
-			derived, err := deriveUnits(file, req.Overlay, mode, loadArtifact)
+			derived, importsC, err := deriveUnits(file, req.Overlay, mode, loadArtifact)
 			if err != nil {
 				return fail(err.Error())
 			}
@@ -75,9 +75,20 @@ func VerifyUnitCensus(ws *source.Workspace, req source.Request, contract scope.P
 				if got.Hash().String() != expected.hash {
 					mismatches = append(mismatches, "unit "+expected.id.String()+" hash diverges")
 				}
+				// A file that does not import "C" can hold no C-dependent unit;
+				// this the verifier confirms independently (import presence,
+				// not a scope walk). For cgo files the per-unit fact is derived
+				// and cross-checked authoritatively in source.
+				expectedCDep := got.CDependent()
+				if !importsC {
+					if got.CDependent() {
+						mismatches = append(mismatches, "non-cgo unit "+expected.id.String()+" marked C-dependent")
+					}
+					expectedCDep = false
+				}
 				expectedDepth, err := contract.UnitDepth(scope.UnitQuery{
 					Unit: expected.id, Package: pkg.ID(), OwnerClass: pkg.ID().Owner().Class(),
-					Disposition: pkg.Disposition(), Kind: expected.id.Kind(), CDependent: expected.cDependent,
+					Disposition: pkg.Disposition(), Kind: expected.id.Kind(), CDependent: expectedCDep,
 				})
 				if err != nil {
 					return fail(err.Error())
@@ -148,30 +159,33 @@ func joinImplicitUnits(pkg *source.Package, contract scope.ProviderContract) []s
 	return mismatches
 }
 
-// derivedUnit is one independently derived census record.
+// derivedUnit is one independently derived census record. C-dependence is not
+// re-derived here: it comes from authoritative type evidence in source (with
+// its own dual cross-check), not from a spelling walk.
 type derivedUnit struct {
-	id         identity.SourceUnitID
-	hash       string
-	cDependent bool
+	id   identity.SourceUnitID
+	hash string
 }
 
 // deriveUnits re-parses one file's selected bytes and derives its unit census
 // with the verifier's own walk: top-level units always; interior literals by
 // its own recursive walk for recursive-mode files, or through its own decode
-// of the request's manifest artifact for manifest-mode files.
-func deriveUnits(file *source.File, overlay map[string][]byte, mode source.CensusMode, loadArtifact func() (*analyze.AuditArtifact, error)) ([]derivedUnit, error) {
+// of the request's manifest artifact for manifest-mode files. It also reports
+// whether the file imports the "C" pseudo-package (import presence only — the
+// per-unit C-dependence fact is source-owned).
+func deriveUnits(file *source.File, overlay map[string][]byte, mode source.CensusMode, loadArtifact func() (*analyze.AuditArtifact, error)) ([]derivedUnit, bool, error) {
 	raw, overlaid := overlay[file.Path()]
 	if !overlaid {
 		var err error
 		raw, err = os.ReadFile(file.Path())
 		if err != nil {
-			return nil, fmt.Errorf("%s: unreadable: %v", file.ID(), err)
+			return nil, false, fmt.Errorf("%s: unreadable: %v", file.ID(), err)
 		}
 	}
 	fset := token.NewFileSet()
 	syntax, err := parser.ParseFile(fset, file.Path(), raw, parser.SkipObjectResolution)
 	if err != nil {
-		return nil, fmt.Errorf("%s: unparsable: %v", file.ID(), err)
+		return nil, false, fmt.Errorf("%s: unparsable: %v", file.ID(), err)
 	}
 	importsC := false
 	for _, imported := range syntax.Imports {
@@ -180,7 +194,7 @@ func deriveUnits(file *source.File, overlay map[string][]byte, mode source.Censu
 		}
 	}
 	var out []derivedUnit
-	record := func(node ast.Node, kind identity.UnitKind, cDependent bool) error {
+	record := func(node ast.Node, kind identity.UnitKind) error {
 		start := fset.PositionFor(node.Pos(), false).Offset
 		end := fset.PositionFor(node.End(), false).Offset
 		spanID, err := identity.NewSpanID(file.ID(), start, end)
@@ -194,21 +208,17 @@ func deriveUnits(file *source.File, overlay map[string][]byte, mode source.Censu
 		if end > len(raw) {
 			return fmt.Errorf("%s: span exceeds bytes", unitID)
 		}
-		out = append(out, derivedUnit{
-			id:         unitID,
-			hash:       fmt.Sprintf("%x", sha256.Sum256(raw[start:end])),
-			cDependent: cDependent,
-		})
+		out = append(out, derivedUnit{id: unitID, hash: fmt.Sprintf("%x", sha256.Sum256(raw[start:end]))})
 		return nil
 	}
-	recordLits := func(root ast.Node, parentCDependent bool) error {
+	recordLits := func(root ast.Node) error {
 		var walkErr error
 		ast.Inspect(root, func(n ast.Node) bool {
 			if walkErr != nil {
 				return false
 			}
 			if lit, ok := n.(*ast.FuncLit); ok {
-				walkErr = record(lit, identity.UnitFuncLitBody, parentCDependent || (importsC && usesC(lit)))
+				walkErr = record(lit, identity.UnitFuncLitBody)
 			}
 			return walkErr == nil
 		})
@@ -224,13 +234,12 @@ func deriveUnits(file *source.File, overlay map[string][]byte, mode source.Censu
 				kind = identity.UnitBodylessDecl
 				node = decl
 			}
-			parentC := importsC && usesC(decl)
-			if err := record(node, kind, parentC); err != nil {
-				return nil, err
+			if err := record(node, kind); err != nil {
+				return nil, false, err
 			}
 			if recursive && decl.Body != nil {
-				if err := recordLits(decl.Body, parentC); err != nil {
-					return nil, err
+				if err := recordLits(decl.Body); err != nil {
+					return nil, false, err
 				}
 			}
 		case *ast.GenDecl:
@@ -242,13 +251,12 @@ func deriveUnits(file *source.File, overlay map[string][]byte, mode source.Censu
 				if !ok || len(value.Values) == 0 {
 					continue
 				}
-				parentC := importsC && usesC(value)
-				if err := record(value, identity.UnitVarInitializer, parentC); err != nil {
-					return nil, err
+				if err := record(value, identity.UnitVarInitializer); err != nil {
+					return nil, false, err
 				}
 				if recursive {
-					if err := recordLits(value, parentC); err != nil {
-						return nil, err
+					if err := recordLits(value); err != nil {
+						return nil, false, err
 					}
 				}
 			}
@@ -257,11 +265,11 @@ func deriveUnits(file *source.File, overlay map[string][]byte, mode source.Censu
 	if mode == source.CensusManifest {
 		interiors, err := deriveManifestInteriors(file, raw, loadArtifact)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		out = append(out, interiors...)
 	}
-	return out, nil
+	return out, importsC, nil
 }
 
 // deriveManifestInteriors joins one manifest-mode file's interior units
@@ -307,107 +315,9 @@ func deriveManifestInteriors(file *source.File, raw []byte, loadArtifact func() 
 			return nil, fmt.Errorf("%s: manifest unit %s exceeds bytes", file.ID(), unit.Unit)
 		}
 		out = append(out, derivedUnit{
-			id:         unitID,
-			hash:       fmt.Sprintf("%x", sha256.Sum256(raw[unit.Start:unit.End])),
-			cDependent: unit.CDependent,
+			id:   unitID,
+			hash: fmt.Sprintf("%x", sha256.Sum256(raw[unit.Start:unit.End])),
 		})
 	}
 	return out, nil
-}
-
-// usesC is the verifier's own scope-aware C-reference walk (independent
-// implementation of the same language rule: a selector base C counts only
-// when no enclosing binding shadows the "C" import).
-func usesC(node ast.Node) bool {
-	type frame struct {
-		node     ast.Node
-		shadowed bool
-	}
-	stack := []frame{{node: node, shadowed: false}}
-	for len(stack) > 0 {
-		top := stack[len(stack)-1]
-		stack = stack[:len(stack)-1]
-		shadowed := top.shadowed
-		switch n := top.node.(type) {
-		case nil:
-			continue
-		case *ast.FuncDecl:
-			inner := shadowed || fieldListBindsC(n.Recv) || fieldListBindsC(n.Type.Params) || fieldListBindsC(n.Type.Results)
-			if n.Body != nil {
-				stack = append(stack, frame{n.Body, inner})
-			}
-			stack = append(stack, frame{n.Type, shadowed})
-		case *ast.FuncLit:
-			inner := shadowed || fieldListBindsC(n.Type.Params) || fieldListBindsC(n.Type.Results)
-			stack = append(stack, frame{n.Body, inner})
-		case *ast.BlockStmt:
-			blockShadowed := shadowed
-			for _, stmt := range n.List {
-				if stmtBindsC(stmt) {
-					blockShadowed = true
-				}
-				stack = append(stack, frame{stmt, blockShadowed})
-			}
-		case *ast.SelectorExpr:
-			if base, ok := n.X.(*ast.Ident); ok && base.Name == "C" && !shadowed {
-				return true
-			}
-			stack = append(stack, frame{n.X, shadowed})
-		default:
-			parent := top.node
-			ast.Inspect(parent, func(child ast.Node) bool {
-				if child == nil || child == parent {
-					return child == parent
-				}
-				stack = append(stack, frame{child, shadowed})
-				return false
-			})
-		}
-	}
-	return false
-}
-
-func fieldListBindsC(fields *ast.FieldList) bool {
-	if fields == nil {
-		return false
-	}
-	for _, field := range fields.List {
-		for _, name := range field.Names {
-			if name.Name == "C" {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func stmtBindsC(stmt ast.Stmt) bool {
-	switch stmt := stmt.(type) {
-	case *ast.AssignStmt:
-		if stmt.Tok == token.DEFINE {
-			for _, lhs := range stmt.Lhs {
-				if ident, ok := lhs.(*ast.Ident); ok && ident.Name == "C" {
-					return true
-				}
-			}
-		}
-	case *ast.DeclStmt:
-		if decl, ok := stmt.Decl.(*ast.GenDecl); ok {
-			for _, spec := range decl.Specs {
-				switch spec := spec.(type) {
-				case *ast.ValueSpec:
-					for _, name := range spec.Names {
-						if name.Name == "C" {
-							return true
-						}
-					}
-				case *ast.TypeSpec:
-					if spec.Name.Name == "C" {
-						return true
-					}
-				}
-			}
-		}
-	}
-	return false
 }

@@ -347,7 +347,7 @@ func (c *classifier) attachInputs(out *LoadedPackage, pkg *packages.Package, own
 			// //line evidence; the checked path is transient acquisition data.
 			if syntax := syntaxByPath[compiled]; syntax != nil {
 				for _, decl := range syntax.Decls {
-					out.checkedDecls = append(out.checkedDecls, checkedDecl{node: decl, fromFile: compiled})
+					out.checkedDecls = append(out.checkedDecls, checkedDecl{node: decl})
 				}
 			}
 		}
