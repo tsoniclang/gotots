@@ -42,6 +42,17 @@ func (s siteKey) String() string {
 	return fmt.Sprintf("{owner=%s occ=%s edge=%s child=%s ord=%d anchor=%s}", s.owner, s.occ, s.edge, s.child, s.ordinal, s.anchor)
 }
 
+// defKey is one implementation definition, keyed by unit identity and pinned
+// kind — the exact definition identity the provider graph carries as its
+// topology authority. It is derived independently from re-parsed source and
+// exact-multiset-joined against the artifact's embedded definitions.
+type defKey struct {
+	unit string
+	kind uint8
+}
+
+func (k defKey) String() string { return fmt.Sprintf("{unit=%s kind=%d}", k.unit, k.kind) }
+
 // verifyReferenceConservation independently extracts every application
 // implementation site from re-parsed selected source and exact-multiset-joins
 // the site set against the inventory's references. A missing, duplicate,
@@ -92,12 +103,12 @@ func verifyReferenceConservation(pkg *source.Package, refs []analyze.Implementat
 	// Independently derived sites whose enclosing region is built.
 	derived := map[siteKey]int{}
 	for _, file := range pkg.Files() {
-		sites, err := deriveSites(file, overlay)
+		d, err := deriveSites(file, overlay)
 		if err != nil {
 			problems = append(problems, err.Error())
 			continue
 		}
-		for _, s := range sites {
+		for _, s := range d.sites {
 			if builtRegion(s.owner) {
 				derived[s]++
 			}
@@ -141,6 +152,12 @@ func VerifyProviderGraph(ws *source.Workspace, files []analyze.AuditFile, overla
 			problems = append(problems, "audited file "+record.File+" absent from finalized workspace")
 			continue
 		}
+		d, err := deriveSites(file, overlay)
+		if err != nil {
+			problems = append(problems, err.Error())
+			continue
+		}
+		// Reference multiset join.
 		embedded := map[siteKey]int{}
 		for _, ref := range record.References {
 			embedded[siteKey{
@@ -148,13 +165,8 @@ func VerifyProviderGraph(ws *source.Workspace, files []analyze.AuditFile, overla
 				child: ref.Child, ordinal: ref.Ordinal, anchor: ref.Anchor,
 			}]++
 		}
-		sites, err := deriveSites(file, overlay)
-		if err != nil {
-			problems = append(problems, err.Error())
-			continue
-		}
 		derived := map[siteKey]int{}
-		for _, s := range sites {
+		for _, s := range d.sites {
 			derived[s]++
 		}
 		for key, n := range derived {
@@ -165,6 +177,25 @@ func VerifyProviderGraph(ws *source.Workspace, files []analyze.AuditFile, overla
 		for key, n := range embedded {
 			if derived[key] != n {
 				problems = append(problems, fmt.Sprintf("%s: artifact reference %s x%d, derived %d", record.File, key, n, derived[key]))
+			}
+		}
+		// Definition multiset join (the graph's topology authority).
+		embeddedDefs := map[defKey]int{}
+		for _, def := range record.Definitions {
+			embeddedDefs[defKey{unit: def.Unit, kind: def.Kind}]++
+		}
+		derivedDefs := map[defKey]int{}
+		for _, k := range d.defs {
+			derivedDefs[k]++
+		}
+		for key, n := range derivedDefs {
+			if embeddedDefs[key] != n {
+				problems = append(problems, fmt.Sprintf("%s: derived definition %s x%d, artifact has %d", record.File, key, n, embeddedDefs[key]))
+			}
+		}
+		for key, n := range embeddedDefs {
+			if derivedDefs[key] != n {
+				problems = append(problems, fmt.Sprintf("%s: artifact definition %s x%d, derived %d", record.File, key, n, derivedDefs[key]))
 			}
 		}
 	}
@@ -180,7 +211,7 @@ func VerifyProviderGraph(ws *source.Workspace, files []analyze.AuditFile, overla
 // literal, and initialized value spec. A cgo original (no re-derivable
 // checked-view topology from source alone) contributes no sites here; its
 // references are certified through the source origin cross-check.
-func deriveSites(file *source.File, overlay map[string][]byte) ([]siteKey, error) {
+func deriveSites(file *source.File, overlay map[string][]byte) (*siteDeriver, error) {
 	raw, overlaid := overlay[file.Path()]
 	if !overlaid {
 		var err error
@@ -194,20 +225,21 @@ func deriveSites(file *source.File, overlay map[string][]byte) ([]siteKey, error
 	if err != nil {
 		return nil, fmt.Errorf("%s: unparsable: %v", file.ID(), err)
 	}
-	if file.CgoOriginal() {
-		return nil, nil
-	}
 	d := &siteDeriver{fset: fset, fileID: file.ID(), ordinals: map[string]int{}}
+	if file.CgoOriginal() {
+		return d, nil // no re-derivable checked-view topology from source alone
+	}
 	d.walk(syntax, nil, "", "decl:"+file.ID().String())
-	return d.sites, d.err
+	return d, d.err
 }
 
 // siteDeriver walks one file tracking the enclosing region owner and emits a
-// site at each unit boundary.
+// site (and the child's definition) at each unit boundary.
 type siteDeriver struct {
 	fset     *token.FileSet
 	fileID   identity.FileID
 	sites    []siteKey
+	defs     []defKey
 	ordinals map[string]int // owner -> next ordinal
 	err      error
 }
@@ -229,6 +261,7 @@ func (d *siteDeriver) walk(node ast.Node, parent ast.Node, field, owner string) 
 			ordinal: d.ordinals[owner],
 			anchor:  unitID.Span().String(),
 		})
+		d.defs = append(d.defs, defKey{unit: unitID.String(), kind: uint8(unitID.Kind())})
 		d.ordinals[owner]++
 		childOwner = "unit:" + unitID.String() // this unit's own body region
 	}
