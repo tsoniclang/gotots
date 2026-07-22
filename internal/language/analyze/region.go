@@ -78,13 +78,16 @@ func (o RegionOwner) String() string {
 }
 
 // ImplementationDefinition is one implementation unit's definition: its typed
-// identity, kind, and evidence depth. A full-semantic unit owns a retained
-// body region; a non-full unit is a contract with zero body occurrences.
+// identity, kind, declaration contract, and evidence depth. A full-semantic
+// unit owns a retained body region; a non-full unit is a contract with zero
+// body occurrences. The contract is the typed obligation the unit's parent
+// retains at its edge even when the body is excised.
 type ImplementationDefinition struct {
-	unit  UnitRef
-	kind  identity.UnitKind
-	depth source.EvidenceDepth
-	full  bool
+	unit     UnitRef
+	kind     identity.UnitKind
+	contract Contract
+	depth    source.EvidenceDepth
+	full     bool
 }
 
 // Unit is the definition's typed unit reference.
@@ -92,6 +95,9 @@ func (d ImplementationDefinition) Unit() UnitRef { return d.unit }
 
 // Kind is the unit kind.
 func (d ImplementationDefinition) Kind() identity.UnitKind { return d.kind }
+
+// Contract is the unit's declaration contract.
+func (d ImplementationDefinition) Contract() Contract { return d.contract }
 
 // Depth is the selected evidence depth.
 func (d ImplementationDefinition) Depth() source.EvidenceDepth { return d.depth }
@@ -101,18 +107,24 @@ func (d ImplementationDefinition) Full() bool { return d.full }
 
 // ImplementationRef is a nested implementation reference recorded at the exact
 // grammatical edge where a parent region contains a child unit. It preserves
-// the parent's operation without retaining a raw parent-to-child body pointer.
+// the parent's operation and the child's declaration contract without retaining
+// a raw parent-to-child body pointer, so an excised non-full child never
+// removes the contract from its parent.
 type ImplementationRef struct {
 	parent    RegionOwner
 	parentOcc identity.OccurrenceID
 	edge      catalog.Edge
 	child     UnitRef
+	contract  Contract
 	anchor    identity.SpanID
 	ordinal   int
 }
 
 // Parent is the enclosing region owner.
 func (r ImplementationRef) Parent() RegionOwner { return r.parent }
+
+// Contract is the child's declaration contract the parent retains at this edge.
+func (r ImplementationRef) Contract() Contract { return r.contract }
 
 // ParentOccurrence is the enclosing occurrence the reference hangs from.
 func (r ImplementationRef) ParentOccurrence() identity.OccurrenceID { return r.parentOcc }

@@ -30,16 +30,17 @@ var kindByName = func() map[string]catalog.Kind {
 // derived independently from re-parsed source and exact-multiset-joined against
 // the inventory's references.
 type siteKey struct {
-	owner   string // "decl:<fileID>" or "unit:<unitID>"
-	occ     string // parent occurrence identity
-	edge    string // "<ParentKind>.<Field>"
-	child   string // child unit identity
-	ordinal int
-	anchor  string // child root span identity
+	owner    string // "decl:<fileID>" or "unit:<unitID>"
+	occ      string // parent occurrence identity
+	edge     string // "<ParentKind>.<Field>"
+	child    string // child unit identity
+	contract uint8  // child declaration contract
+	ordinal  int
+	anchor   string // child root span identity
 }
 
 func (s siteKey) String() string {
-	return fmt.Sprintf("{owner=%s occ=%s edge=%s child=%s ord=%d anchor=%s}", s.owner, s.occ, s.edge, s.child, s.ordinal, s.anchor)
+	return fmt.Sprintf("{owner=%s occ=%s edge=%s child=%s contract=%d ord=%d anchor=%s}", s.owner, s.occ, s.edge, s.child, s.contract, s.ordinal, s.anchor)
 }
 
 // defKey is one implementation definition, keyed by unit identity and pinned
@@ -47,11 +48,14 @@ func (s siteKey) String() string {
 // topology authority. It is derived independently from re-parsed source and
 // exact-multiset-joined against the artifact's embedded definitions.
 type defKey struct {
-	unit string
-	kind uint8
+	unit     string
+	kind     uint8
+	contract uint8
 }
 
-func (k defKey) String() string { return fmt.Sprintf("{unit=%s kind=%d}", k.unit, k.kind) }
+func (k defKey) String() string {
+	return fmt.Sprintf("{unit=%s kind=%d contract=%d}", k.unit, k.kind, k.contract)
+}
 
 // verifyReferenceConservation independently extracts every application
 // implementation site from re-parsed selected source and exact-multiset-joins
@@ -97,7 +101,7 @@ func verifyReferenceConservation(pkg *source.Package, refs []analyze.Implementat
 		}
 		inventory[siteKey{
 			owner: ref.Parent().String(), occ: ref.ParentOccurrence().String(), edge: ref.Edge().String(),
-			child: ref.Child().String(), ordinal: ref.Ordinal(), anchor: ref.Anchor().String(),
+			child: ref.Child().String(), contract: uint8(ref.Contract()), ordinal: ref.Ordinal(), anchor: ref.Anchor().String(),
 		}]++
 	}
 	// Independently derived sites whose enclosing region is built.
@@ -162,7 +166,7 @@ func VerifyProviderGraph(ws *source.Workspace, files []analyze.AuditFile, overla
 		for _, ref := range record.References {
 			embedded[siteKey{
 				owner: ref.Parent, occ: ref.Occ, edge: ref.Edge,
-				child: ref.Child, ordinal: ref.Ordinal, anchor: ref.Anchor,
+				child: ref.Child, contract: ref.Contract, ordinal: ref.Ordinal, anchor: ref.Anchor,
 			}]++
 		}
 		derived := map[siteKey]int{}
@@ -182,7 +186,7 @@ func VerifyProviderGraph(ws *source.Workspace, files []analyze.AuditFile, overla
 		// Definition multiset join (the graph's topology authority).
 		embeddedDefs := map[defKey]int{}
 		for _, def := range record.Definitions {
-			embeddedDefs[defKey{unit: def.Unit, kind: def.Kind}]++
+			embeddedDefs[defKey{unit: def.Unit, kind: def.Kind, contract: def.Contract}]++
 		}
 		derivedDefs := map[defKey]int{}
 		for _, k := range d.defs {
@@ -253,15 +257,21 @@ func (d *siteDeriver) walk(node ast.Node, parent ast.Node, field, owner string) 
 	}
 	childOwner := owner
 	if unitID, ok := d.unitBoundary(parent, field, node, owner); ok {
+		contract, err := analyze.ContractForKind(unitID.Kind())
+		if err != nil {
+			d.err = err
+			return
+		}
 		d.sites = append(d.sites, siteKey{
-			owner:   owner,
-			occ:     d.parentOcc(parent),
-			edge:    astKind(parent) + "." + field,
-			child:   unitID.String(),
-			ordinal: d.ordinals[owner],
-			anchor:  unitID.Span().String(),
+			owner:    owner,
+			occ:      d.parentOcc(parent),
+			edge:     astKind(parent) + "." + field,
+			child:    unitID.String(),
+			contract: uint8(contract),
+			ordinal:  d.ordinals[owner],
+			anchor:   unitID.Span().String(),
 		})
-		d.defs = append(d.defs, defKey{unit: unitID.String(), kind: uint8(unitID.Kind())})
+		d.defs = append(d.defs, defKey{unit: unitID.String(), kind: uint8(unitID.Kind()), contract: uint8(contract)})
 		d.ordinals[owner]++
 		childOwner = "unit:" + unitID.String() // this unit's own body region
 	}

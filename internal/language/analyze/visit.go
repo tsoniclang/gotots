@@ -53,11 +53,16 @@ type visitContext struct {
 func (b *builder) visit(n ast.Node, parentIdx int, edge catalog.Edge, ctx visitContext) error {
 	if parentIdx >= 0 {
 		if child, ok := b.boundaries[n]; ok {
+			contract, err := ContractForKind(child.Kind())
+			if err != nil {
+				return newResolutionError(0, b.file, b.physicalSpan(n), err.Error())
+			}
 			b.references = append(b.references, ImplementationRef{
 				parent:    b.owner,
 				parentOcc: b.occurrences[parentIdx].id,
 				edge:      edge,
 				child:     SourceUnitRef(child),
+				contract:  contract,
 				anchor:    child.Span(),
 				ordinal:   len(b.references),
 			})

@@ -47,8 +47,12 @@ func Analyze(universe *source.Universe, depths map[identity.SourceUnitID]source.
 				if !ok {
 					return nil, source.RetentionProjection{}, newResolutionError(0, file.ID(), Span{}, "unit "+unit.ID().String()+" has no selected depth")
 				}
+				contract, err := ContractForKind(unit.Kind())
+				if err != nil {
+					return nil, source.RetentionProjection{}, newResolutionError(0, file.ID(), Span{}, err.Error())
+				}
 				pkgInv.definitions = append(pkgInv.definitions, ImplementationDefinition{
-					unit: SourceUnitRef(unit.ID()), kind: unit.Kind(), depth: depth,
+					unit: SourceUnitRef(unit.ID()), kind: unit.Kind(), contract: contract, depth: depth,
 					full: depth == source.DepthFullSemantic,
 				})
 			}
@@ -125,7 +129,8 @@ func Analyze(universe *source.Universe, depths map[identity.SourceUnitID]source.
 				return nil, source.RetentionProjection{}, newResolutionError(0, identity.FileID{}, Span{}, "implicit unit "+implicit.String()+" has no selected depth")
 			}
 			pkgInv.definitions = append(pkgInv.definitions, ImplementationDefinition{
-				unit: ImplicitUnitRef(implicit), kind: identity.UnitImplicitExecutable, depth: depth,
+				unit: ImplicitUnitRef(implicit), kind: identity.UnitImplicitExecutable,
+				contract: ContractCatalogOwner, depth: depth,
 				full: depth == source.DepthFullSemantic,
 			})
 			if depth == source.DepthFullSemantic {
@@ -178,8 +183,12 @@ func ExtractProviderGraph(universe *source.Universe) (map[string]FileGraph, erro
 			}
 			g.References = append(g.References, decl.references...)
 			for _, unit := range file.Units() {
+				contract, err := ContractForKind(unit.Kind())
+				if err != nil {
+					return nil, err
+				}
 				g.Definitions = append(g.Definitions, ImplementationDefinition{
-					unit: SourceUnitRef(unit.ID()), kind: unit.Kind(),
+					unit: SourceUnitRef(unit.ID()), kind: unit.Kind(), contract: contract,
 					depth: source.DepthDeclarationContract, full: false,
 				})
 				root, ok := file.UnitRootNode(unit.ID())

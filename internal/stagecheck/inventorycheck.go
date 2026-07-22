@@ -78,6 +78,11 @@ func VerifyInventory(req source.Request, ws *source.Workspace, inv *analyze.Work
 			if d.Kind() != unit.Kind() {
 				problems = append(problems, "unit "+id+" definition kind "+d.Kind().String()+" != census "+unit.Kind().String())
 			}
+			if want, err := analyze.ContractForKind(unit.Kind()); err != nil {
+				problems = append(problems, "unit "+id+": "+err.Error())
+			} else if d.Contract() != want {
+				problems = append(problems, "unit "+id+" definition contract "+d.Contract().String()+" != "+want.String()+" for kind "+unit.Kind().String())
+			}
 			if d.Depth() != unit.Depth() {
 				problems = append(problems, fmt.Sprintf("unit %s definition depth %s != census %s", id, d.Depth(), unit.Depth()))
 			}
@@ -124,14 +129,25 @@ func VerifyInventory(req source.Request, ws *source.Workspace, inv *analyze.Work
 			}
 		}
 
-		// Reference <-> child-definition join.
+		// Reference <-> child-definition join, including the retained contract:
+		// the reference must carry the child's declaration contract so an
+		// excised non-full child never drops the contract from its parent.
 		for _, ref := range pkgInv.References() {
 			child := ref.Child().String()
-			if _, ok := defs[child]; !ok {
+			childDef, ok := defs[child]
+			if !ok {
 				problems = append(problems, "reference names undefined child unit "+child)
 			}
 			if !ref.Edge().Valid() {
 				problems = append(problems, "reference to "+child+" has an invalid edge")
+			}
+			if ok && ref.Contract() != childDef.Contract() {
+				problems = append(problems, "reference to "+child+" retains contract "+ref.Contract().String()+" != child definition "+childDef.Contract().String())
+			}
+			if want, err := analyze.ContractForKind(ref.Child().Kind()); err != nil {
+				problems = append(problems, "reference to "+child+": "+err.Error())
+			} else if ref.Contract() != want {
+				problems = append(problems, "reference to "+child+" retains contract "+ref.Contract().String()+" != "+want.String()+" for kind "+ref.Child().Kind().String())
 			}
 		}
 		// Exact site<->reference conservation: independently derive every

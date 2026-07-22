@@ -25,7 +25,7 @@ import (
 )
 
 // AuditArtifactVersion is the audit artifact schema version.
-const AuditArtifactVersion = 4
+const AuditArtifactVersion = 5
 
 // ManifestUnit is one provider-owned unit's manifest record: identity
 // components, selected-span content address, display name, and typed cgo
@@ -42,23 +42,26 @@ type ManifestUnit struct {
 }
 
 // ManifestDefinition is one provider unit's definition in the artifact graph:
-// its canonical identity and kind. Definitions are the census projection's
-// authority — the flat unit list derives from them.
+// its canonical identity, kind, and declaration contract. Definitions are the
+// census projection's authority — the flat unit list derives from them.
 type ManifestDefinition struct {
-	Unit string `json:"unit"`
-	Kind uint8  `json:"kind"`
+	Unit     string `json:"unit"`
+	Kind     uint8  `json:"kind"`
+	Contract uint8  `json:"contract"`
 }
 
 // ManifestReference is one nested implementation reference in the artifact
 // graph: the parent owner, the enclosing occurrence, the child unit, the exact
-// grammatical edge, the source anchor, and the source ordinal.
+// grammatical edge, the child's declaration contract, the source anchor, and
+// the source ordinal.
 type ManifestReference struct {
-	Parent  string `json:"parent"`  // "decl:<fileID>" or "unit:<unitID>"
-	Occ     string `json:"occ"`     // parent occurrence identity
-	Child   string `json:"child"`   // child unit identity
-	Edge    string `json:"edge"`    // grammatical edge
-	Ordinal int    `json:"ordinal"` // source order within the parent region
-	Anchor  string `json:"anchor"`  // child root span identity
+	Parent   string `json:"parent"`   // "decl:<fileID>" or "unit:<unitID>"
+	Occ      string `json:"occ"`      // parent occurrence identity
+	Child    string `json:"child"`    // child unit identity
+	Edge     string `json:"edge"`     // grammatical edge
+	Contract uint8  `json:"contract"` // child declaration contract
+	Ordinal  int    `json:"ordinal"`  // source order within the parent region
+	Anchor   string `json:"anchor"`   // child root span identity
 }
 
 // AuditFile is one audited file's content-addressed record: the identity is
@@ -140,10 +143,10 @@ func (a *AuditArtifact) canonicalDigest() string {
 			fmt.Fprintf(&b, "~%s~%d~%d~%d~%s~%s~%t", unit.Unit, unit.Kind, unit.Start, unit.End, unit.Name, unit.Hash, unit.CDependent)
 		}
 		for _, def := range file.Definitions {
-			fmt.Fprintf(&b, "@%s~%d", def.Unit, def.Kind)
+			fmt.Fprintf(&b, "@%s~%d~%d", def.Unit, def.Kind, def.Contract)
 		}
 		for _, ref := range file.References {
-			fmt.Fprintf(&b, ">%s~%s~%s~%s~%d~%s", ref.Parent, ref.Occ, ref.Child, ref.Edge, ref.Ordinal, ref.Anchor)
+			fmt.Fprintf(&b, ">%s~%s~%s~%s~%d~%d~%s", ref.Parent, ref.Occ, ref.Child, ref.Edge, ref.Contract, ref.Ordinal, ref.Anchor)
 		}
 	}
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(b.String())))
@@ -196,17 +199,18 @@ func AuditCatalog(ws *source.Workspace, meta AuditMeta, overlay map[string][]byt
 func embedGraph(record *AuditFile, g FileGraph) {
 	for _, def := range g.Definitions {
 		record.Definitions = append(record.Definitions, ManifestDefinition{
-			Unit: def.Unit().String(), Kind: uint8(def.Kind()),
+			Unit: def.Unit().String(), Kind: uint8(def.Kind()), Contract: uint8(def.Contract()),
 		})
 	}
 	for _, ref := range g.References {
 		record.References = append(record.References, ManifestReference{
-			Parent:  ref.Parent().String(),
-			Occ:     ref.ParentOccurrence().String(),
-			Child:   ref.Child().String(),
-			Edge:    ref.Edge().String(),
-			Ordinal: ref.Ordinal(),
-			Anchor:  ref.Anchor().String(),
+			Parent:   ref.Parent().String(),
+			Occ:      ref.ParentOccurrence().String(),
+			Child:    ref.Child().String(),
+			Edge:     ref.Edge().String(),
+			Contract: uint8(ref.Contract()),
+			Ordinal:  ref.Ordinal(),
+			Anchor:   ref.Anchor().String(),
 		})
 	}
 }
