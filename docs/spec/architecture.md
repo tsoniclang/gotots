@@ -55,6 +55,60 @@ packages, and prior generated baselines used for reconciliation are
 fingerprinted before compilation. Machine-local paths never enter semantic
 identity.
 
+## Resolved Package Universe
+
+The workspace loader resolves the complete transitive package closure under the
+exact selected Go binary, workspace, build flags, environment, tags, and
+overlays. Every package has one constructor-validated record whose independent
+facts are:
+
+| Fact | Closed values | Authority |
+|---|---|---|
+| package owner | `module(ModuleID)`, `standard-library`, `toolchain`, `language-pseudo` | semantic identity domain |
+| provenance | `workspace-module`, `module-dependency`, `standard-library`, `toolchain-package`, `language-pseudo` | resolved `go list` package/module metadata and pattern membership |
+| acquisition | workspace, module cache, vendor, local replacement, `GOROOT` | resolved build inputs |
+| language disposition | ordinary source, built-in universe, `unsafe` intrinsic, cgo pseudo-package | selected Go language/toolchain contract |
+
+Module-backed package identity contains the declared module path and selected
+module version, not its checkout, cache, vendor, or replacement directory.
+Standard-library and other toolchain packages do not have Go module metadata;
+they use reserved typed owner identities rather than a fabricated module or a
+`GOROOT` path. The exact toolchain and standard-library contents remain bound by
+input fingerprints and contract hashes, so relocation preserves identity while
+a toolchain upgrade produces explicit structural deltas.
+
+Provenance is derived only from the selected Go command's resolved metadata and
+authoritative pattern sets. Standard-library provenance means membership in
+`go list std` under the exact build request; `Standard` and `Goroot` remain
+supporting facts but cannot alone distinguish the standard set from toolchain
+commands. Other inputs include `Module.Main`, module version/replacement,
+vendor selection, and `go list cmd` membership where applicable. Rules based
+on a dotless import path, path prefix, `Module == nil`, or physical containment
+under an assumed `GOROOT` are forbidden. A local replacement remains a module
+dependency with local-replacement acquisition; an overlay changes selected
+bytes and fingerprints, not package identity or provenance.
+
+`builtin` contributes the predeclared universe and emits no package module.
+`unsafe` is a standard package whose intrinsic operations receive explicit
+semantic dispositions. Import `"C"` is a cgo pseudo-package whose obligations
+must be planned explicitly. Neither special case turns an importing package
+into an external package.
+
+Package, declaration, and type analysis treats ordinary workspace, dependency,
+standard-library, and toolchain source uniformly. Body selection remains an
+explicit per-implementation disposition: standard-library behavior is manually
+completed, source-available module behavior is ordinarily automatic, and
+intrinsic/external cases remain exact obligations. Every excluded body has that
+typed disposition; package provenance cannot silently omit occurrences or
+replace per-implementation ownership.
+
+The compiler-supported catalog version, selected toolchain version, each
+module's `go` directive, and the effective language version of each source file
+are separate facts. Every occurrence uses the effective file version reported
+by typed toolchain evidence, including file-specific version effects. A
+workspace-wide maximum, lexical version comparison, or catalog maximum cannot
+admit a construct in a file governed by an older language version.
+
 ## Complete Go Construct Catalog
 
 The selected Go version has one machine-readable catalog containing:

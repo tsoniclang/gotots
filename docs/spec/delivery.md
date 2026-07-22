@@ -80,7 +80,14 @@ Required exit evidence:
   reconcile exactly;
 - context-resolution roles and variants are enumerated;
 - implicit operations are cataloged;
-- `gotots inspect constructs` reports a small arbitrary module;
+- `gotots inspect constructs` reports two unrelated multi-module projects and
+  their complete dependency closures;
+- package owner, provenance, acquisition, and language disposition exact-join
+  independent selected-toolchain metadata, including standard-library,
+  dependency, replacement, `unsafe`, and pseudo-package cases;
+- compiler capability, selected toolchain, module directive, and effective
+  per-file language versions remain distinct, with version-gated occurrences
+  verified against their own file versions;
 - an injected unknown form fails; and
 - no target or acceptance-corpus package is imported.
 
@@ -93,6 +100,11 @@ Required exit evidence:
 
 - every selected occurrence has one typed semantic operation or unsupported
   record;
+- module, standard-library, and toolchain package identities are constructor-
+  validated without machine paths or fabricated module ownership;
+- ordinary package semantics are independent of provenance; semantic records
+  carry the resolved package identity/provenance but contain no output path or
+  implementation-owner decision, which belongs to later planning;
 - shadowing, scopes, generic binders, method identity, and source spans are
   exact;
 - context fixtures cover call/conversion, map/receive/assert comma-ok,
@@ -125,8 +137,14 @@ Required exit evidence:
 - calibration fixtures match reviewed hand-port AST shape;
 - ordinary calls have no hidden semantic arguments;
 - receiver methods remain methods;
+- native, checked-thunk, and explicit-receiver method plans pass nil,
+  evaluation-order, value-copy, exact-selection, and interface-dispatch
+  differential/mutation fixtures;
+- generated method values and expressions use typed lambdas/functions with no
+  `call`, `apply`, `bind`, or prototype invocation;
 - no TypeScript text is generated outside the formatter;
-- full output parses and strict-typechecks; and
+- full output parses, strict-typechecks, and passes the Tsonic target-subset
+  checker; and
 - size/shape gates run before expanding coverage.
 
 ### Phase: Representations And Dynamic Semantics
@@ -312,6 +330,8 @@ artifacts.
 - Planning is whole-program, immutable, total, and independently checked.
 - Ordinary generated TypeScript is direct, class/method shaped where exact,
   strict, ESM, and near the reviewed hand-port size.
+- GoToTS translated from its own Go source compiles through Tsonic without a
+  JavaScript-only dynamic-invocation escape path.
 - All nonordinary output has local typed necessity and cost evidence.
 - Runtime definitions are minimal and singular.
 - Standard-library APIs are toolchain-derived and reachable behavior is

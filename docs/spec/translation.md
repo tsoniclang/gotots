@@ -34,7 +34,9 @@ The machine catalog is exhaustive; this table defines its required domains.
 | Implicit behavior | zeroing, copying, assignment conversion, receiver adjustment, promotion, boxing, initialization, evaluation sequence, panic timing |
 
 Version-specific syntax and built-ins carry explicit minimum/maximum Go
-versions. Directives and toolchain extensions receive typed dispositions;
+versions. The catalog version describes compiler capability, not permission for
+every input file; occurrence admission uses that file's effective language
+version. Directives and toolchain extensions receive typed dispositions;
 unknown directives cannot silently disappear.
 
 The command `gotots inspect constructs` must report, by canonical occurrence
@@ -184,9 +186,93 @@ export class Counter {
 counter.Add(2n);
 ```
 
-The receiver is not passed as a hidden first argument. Pointer receiver nil
-behavior and value-receiver copying are planned at the call/body boundary. A
-class does not erase Go value semantics; copies still occur where Go requires
+The semantic method has one body and an explicit receiver binding. The atomic
+method plan chooses exactly one receiver-entry form:
+
+| Entry form | Required shape | Selected only when |
+|---|---|---|
+| native instance | one class method containing the body | ordinary instance invocation is exact |
+| checked invocation thunk | class method owns the body; one typed function checks the explicit receiver and invokes it | nil must panic without entering the body and virtual invocation is exact |
+| explicit receiver body with facade | one typed function owns the body; one class method delegates `this` to it | nil may enter the body, exact concrete selection must bypass target virtual dispatch, or an explicit-receiver manual/external contract requires it |
+
+These are planned representations, not emitter retries. Unknown receiver or
+dispatch behavior selects the explicit form or remains unsupported; it never
+guesses the native form. Value-receiver copying is an orthogonal entry plan and
+occurs before the body unless a complete non-observability proof permits
+elision.
+
+An ordinary proven-non-nil call remains source shaped:
+
+```ts
+counter.Add(2n);
+```
+
+When a pointer receiver must panic on nil, a checked invocation thunk preserves
+Go argument evaluation before method-body panic:
+
+```go
+func (animal *Animal) Rename(name string) { animal.name = name }
+
+animal.Rename(makeName())
+```
+
+```ts
+function Animal$Rename$invoke(
+  animal: Animal | undefined,
+  name: string,
+): void {
+  if (animal === undefined) goPanicNil();
+  animal.Rename(name);
+}
+
+Animal$Rename$invoke(animal, makeName());
+```
+
+Function-call argument evaluation completes before the thunk body checks the
+receiver. Direct property access on a nil receiver would fail too early and is
+not equivalent.
+
+When nil is observable inside the Go body, the explicit receiver function is
+the sole body owner and the class method is only the dynamic-dispatch facade:
+
+```go
+func (animal *Animal) Speak() string {
+    if animal == nil { return "<nil>" }
+    return animal.name
+}
+```
+
+```ts
+function Animal$Speak$body(animal: Animal | undefined): string {
+  if (animal === undefined) return "<nil>";
+  return animal.name;
+}
+
+class Animal {
+  Speak(): string {
+    return Animal$Speak$body(this);
+  }
+}
+```
+
+Exact concrete selection uses the canonical receiver body when target
+inheritance could otherwise dispatch to an override; interface selection uses
+the facade dynamically:
+
+```ts
+Animal$Speak$body(animal); // exact concrete Go MethodID
+speaker.Speak();           // dynamic Go interface slot
+```
+
+Method expressions and method values use ordinary typed functions or lambdas
+that call the planned entry and preserve receiver-capture timing. Generated
+code never uses `.call`, `.apply`, `.bind`, prototype lookup, or prototype
+mutation. Names of body functions, thunks, and facades derive from canonical
+method identity, and every non-native artifact has typed necessity and cost
+evidence. The ordinary method class must produce no thunk or body-function
+indirection.
+
+A class does not erase Go value semantics; copies still occur where Go requires
 them.
 
 Go embedding means composition, not automatically TypeScript inheritance.

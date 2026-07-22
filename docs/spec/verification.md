@@ -69,14 +69,14 @@ fail / 0 blocked` at one exact input and implementation revision.
 |---|---|
 | 01 Input integrity | clean source/compiler trees, exact tool/config fingerprints, focused/full Go tests, bounded runner health |
 | 02 Language catalog | selected Go grammar/tokens/built-ins reconciled; every occurrence and role classified; unknown count zero |
-| 03 Scope closure | every package has one disposition; every root/edge has provenance; selected closure complete |
+| 03 Scope closure | complete package closure exact-joins independent toolchain metadata; every package has one owner/provenance/acquisition/disposition; every root/edge has provenance |
 | 04 Identity and census | source/semantic/implementation/artifact multisets join exactly; collisions, overwrites, and unexplained deltas zero |
 | 05 Independent parity | independently parsed generated declarations and operation shapes match typed Go source for every class |
 | 06 Plan totality | all facts sealed; every selected operation has one validated plan or explicit blocking state; necessity records complete |
 | 07 Artifact ownership | implementations, generated AST units, files, definitions, markers, hashes, and provenance join one-to-one |
 | 08 Staticness | no erased recovery, dynamic semantic lookup, unsafe casts, unplanned dispatch, or undeclared target operation |
 | 09 Regeneration and graph | two clean generations match; manual reconciliation, complete reachability, relocation, and atomic replacement pass |
-| 10 Strict TypeScript | every materialized runtime, stdlib, external, generated, manual, and extension module parses/resolves/typechecks together |
+| 10 Strict TypeScript | every materialized runtime, stdlib, external, generated, manual, and extension module parses/resolves/typechecks together and satisfies the Tsonic target subset |
 | 11 Semantic-class oracles | every implemented operation class passes Go-vs-TS differential, property, boundary, and mutation tests |
 | 12 Implementation execution | every reachable implementation and required interaction has retained execution evidence; selected Go tests reconciled |
 | 13 Project differential | complete generated applications match Go on output, diagnostics, state, panic, files, and allowed nondeterminism |
@@ -89,6 +89,50 @@ fail / 0 blocked` at one exact input and implementation revision.
 A gate cannot return pass because its prerequisite is missing. It returns
 blocked with the exact missing identity set. A classifier or allowlist cannot
 turn TypeScript errors or missing evidence into blocked; errors fail.
+
+## Package-Universe And Provenance Proof
+
+The production loader's complete package set is independently exact-joined by
+canonical package identity against `go list -deps -json` executed with the same
+Go binary, working files, overlays, flags, environment, and roots. Separate
+`go list std` and `go list cmd` runs provide authoritative set membership. The
+verifier independently derives and compares those memberships, `Standard`,
+`Goroot`, module path/version, `Main`, replacement, vendor selection, compiled
+files, imports, and package errors. Counts without both one-sided identity
+lists are not proof.
+
+Fixtures include, in one verified closure:
+
+- workspace packages from two `go.work` modules;
+- a normal versioned dependency, a vendored dependency, and a local
+  replacement whose physical directory resembles workspace source;
+- a dotless third-party module path, proving spelling does not imply standard;
+- standard-library and non-standard `GOROOT` packages;
+- `builtin`, `unsafe`, and cgo dispositions; and
+- overlays plus relocated workspace, module cache, and `GOROOT` roots.
+
+The fixture matrix also contains two workspace modules with different `go`
+directives and files with different effective language versions. It proves that
+each version-gated occurrence is admitted or rejected against its own file
+version, while the compiler catalog maximum and selected toolchain version
+remain separate evidence.
+
+The join proves that relocation and acquisition changes do not alter semantic
+identity, while module-version and source-contract changes produce the exact
+expected deltas. Output-routing tests then prove standard declarations occur
+once under `gostdlib`, source-available dependencies occur under the ordinary
+mirrored tree, pseudo-packages do not become ordinary modules, and only exact
+external obligations enter an external contract root.
+
+Required mutations flip `std`-set or `Goroot` evidence, treat `Module == nil` as
+an error, classify by import spelling, misclassify a `cmd` package as standard
+library, relabel a local replacement as a workspace module, omit a transitive
+dependency, route a standard declaration into product output, and duplicate
+`gostdlib` per application. Gates 03, 04, 07, or 09 must fail with the exact
+affected identities.
+Replacing per-file language versions with a workspace maximum, comparing Go
+versions lexically, or using the catalog maximum as source permission must fail
+Gate 02 with the affected occurrence identities.
 
 ## Construct And Semantic-Class Oracles
 
@@ -114,6 +158,17 @@ Mutation tests intentionally break the lowering, plan edge, copy, identity,
 hash, dispatch target, or verifier and require the relevant gate to fail. A
 test that has never failed under a representative mutation is not accepted as
 proof of its claimed defect class.
+
+Method-plan fixtures cover native non-nil calls, nil-panic calls with
+effectful arguments, nil-observing pointer receivers, value receivers with
+observable copies, exact concrete selection across a planned class hierarchy,
+dynamic interface dispatch, promoted methods, generic receiver types, method
+expressions, method values, and manual/external bodies. Oracles compare result,
+side-effect order, receiver capture, selected MethodID, panic category, and
+panic timing. Mutations remove the thunk, move its nil check before argument
+evaluation, replace an exact body call with virtual dispatch, remove a value
+copy, or generate an unnecessary ordinary-method adapter; semantic or shape
+gates must fail.
 
 ## Independent Structural Verification
 
@@ -147,6 +202,9 @@ rejects:
   diagnostic suppression;
 - reflection, source-name dispatch, string-selected members, dynamic imports
   used for semantic choice, or host-shape probing;
+- invocation through `Function.prototype.call`, `apply`, or `bind`, and
+  prototype lookup/manipulation used for method semantics; this is checked by
+  resolved symbol identity rather than property-name text;
 - erased function invocation or universal operation registries;
 - per-call exhaustive interface implementer switches;
 - hidden generic operation arguments without a local plan obligation;
@@ -259,7 +317,9 @@ Broad searches and architecture tests prove:
 Representative mutations add a corpus-name branch, omit a catalog variant,
 forge a manual hash, remove a dynamic reachability edge, duplicate a
 definition, erase an interface payload, and emit an oversized per-target
-switch. The appropriate gate must fail each mutation.
+switch. Package-universe mutations include import-spelling classification,
+module-less standard rejection, acquisition/provenance conflation, and omitted
+dependency closure. The appropriate gate must fail each mutation.
 
 ## Evidence And Attestation
 

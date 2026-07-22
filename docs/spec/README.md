@@ -27,6 +27,12 @@ workspace, a selected Go toolchain/build configuration, roots, and explicit
 environment contracts, it must produce deterministic, readable, strict ESM
 TypeScript with Go-equivalent observable behavior.
 
+Generated core TypeScript is also a Tsonic compilation input. It must remain in
+the statically compilable Tsonic subset; JavaScript dynamic-invocation or
+prototype mechanisms are not an intermediate escape hatch. The final bootstrap
+includes translating GoToTS itself and compiling that generated TypeScript with
+Tsonic.
+
 Microsoft's `typescript-go` repository is the first large acceptance corpus.
 It is not a language authority, compiler dependency, privileged profile, or
 source of lowering rules. A fix discovered through that corpus must be reduced
@@ -88,8 +94,13 @@ owners:
 - the existing customer-facing extension architecture owns separately
   supplied product behavior through finalized typed evidence.
 
-Source-available third-party Go dependencies are ordinary selected Go source,
-not external stubs merely because they are outside the root module.
+All ordinary imported packages have the same Go language semantics. Package
+provenance is a separate resolved fact used for identity, output routing, and
+implementation ownership; it never changes construct interpretation.
+Source-available third-party dependencies are ordinary selected Go source, not
+external stubs merely because they are outside the root module. Standard-library
+membership comes only from the selected toolchain's package metadata, never
+from import-path spelling or a filesystem-prefix test.
 
 ## Binding Vocabulary
 
@@ -102,6 +113,12 @@ not external stubs merely because they are outside the root module.
   package initialization.
 - **source identity:** stable identity for a package, declaration, binding,
   type, construct occurrence, or source span.
+- **package provenance:** the toolchain-resolved class `workspace-module`,
+  `module-dependency`, `standard-library`, `toolchain-package`, or
+  `language-pseudo`; it is not an implementation policy.
+- **source acquisition:** where selected bytes came from—workspace, module
+  cache, vendor tree, local replacement, or `GOROOT`—plus applied overlays.
+  Acquisition never substitutes for provenance or semantic identity.
 - **implementation identity:** stable identity for one concrete emitted or
   manual implementation, including generic or representation specialization.
 - **semantic model:** the minimum target-independent representation needed to
@@ -161,6 +178,10 @@ reopens the owning abstraction.
 - Definitions are owned once. References may repeat.
 - Ordinary Go calls remain ordinary TypeScript calls; hidden semantic
   arguments require local typed necessity evidence and are never the default.
+- Generated code never invokes through `Function.prototype.call`, `apply`, or
+  `bind`, and never uses prototype lookup/manipulation to recover Go method
+  semantics. Method adapters are ordinary statically typed functions or
+  lambdas selected by a closed plan.
 - Generated output is source-shaped and cost-bounded from the first construct,
   not optimized after semantic completion.
 - Generated and manual declarations may coexist in one file; ownership is per

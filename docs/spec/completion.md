@@ -41,14 +41,23 @@ on every value or call.
 ## Manually Ported Go Standard Library
 
 GoToTS does not hand-maintain a parallel description of the standard-library
-API. For the selected Go toolchain it loads declarations from `GOROOT`, assigns
-canonical Go identities, and generates strict TypeScript declarations and
-typed throwing placeholders into one reusable `gostdlib` workspace.
+API. For the selected Go toolchain it selects the authoritative `go list std`
+package set, loads those declarations from that toolchain's `GOROOT`, assigns
+canonical standard-library identities, and generates strict TypeScript
+declarations and typed throwing placeholders into one reusable `gostdlib`
+workspace. A module-less package is not rejected or guessed to be standard:
+`std`-set membership plus the toolchain's `Standard` and `Goroot` facts
+distinguish standard library, other toolchain source, and invalid input.
 
 Behavior is manually implemented against those generated contracts. Generated
 and manual units may coexist in each source-mirrored standard-library file.
 Applications import canonical `gostdlib` modules; a standard-library
 definition is not copied into every generated application.
+Standard-library declaration and type source participates in ordinary semantic
+analysis, but standard-library provenance assigns its executable bodies to the
+manual `gostdlib` contract rather than silently attempting ordinary automatic
+body lowering. Each selected body therefore has an explicit placeholder,
+accepted manual implementation, or blocking disposition.
 
 Example source declaration:
 
@@ -111,6 +120,48 @@ canonical source ownership remains singular.
 A Go toolchain upgrade regenerates declarations and reports signature,
 availability, and reachability changes. It never silently adapts an old manual
 body through overloads or wrappers.
+
+## Package Routing And Physical Layout
+
+Relative output layout is fixed even when the owning roots are configured at
+different physical locations:
+
+```text
+<editable-product>/src/<module-import-path>/<go-source-file>.ts
+<gostdlib-root>/src/<standard-import-path>/<go-source-file>.ts
+<runtime-root>/src/<semantic-family>.ts
+<external-root>/<contract-id>/src/<contract-module>.ts
+
+<machine-root>/baselines/<generation>/...   generated-only, immutable
+<machine-root>/staging/<run>/...            fresh generation plus overlay
+<machine-root>/evidence/<generation>/...    identities, hashes, and graphs
+<publication-root>/<generation>/...         reachable, immutable product
+```
+
+For example:
+
+```text
+$GOROOT/src/os/file.go
+  -> <gostdlib-root>/src/os/file.ts
+
+github.com/acme/log/log.go from a module dependency
+  -> <editable-product>/src/github.com/acme/log/log.ts
+```
+
+Workspace modules, source-available module dependencies, and selected
+source-available toolchain packages use the ordinary source-mirrored product
+tree. Standard-library packages use the canonical reusable `gostdlib` root.
+Unavailable-source contracts own modules under the external root. A host-owned
+operation declared inside a source-available package keeps its declaration in
+the source-mirrored module; only its implementation obligation is externally
+owned.
+
+The routing decision consumes typed package provenance and implementation
+ownership. It is never inferred from the output directory. There are no
+`.generated.ts`/`.manual.ts` pairs, per-function stub files, or attachment JSON.
+All selected declarations from one Go source file share its mirrored TypeScript
+file by default, while generated and manual ownership remains per declaration
+or body.
 
 ## Generated And Manual Units In One File
 
