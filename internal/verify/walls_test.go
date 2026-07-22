@@ -116,7 +116,7 @@ func TestWallGateSeesTheTree(t *testing.T) {
 	}
 	for _, required := range []string{
 		"internal/identity", "internal/language/catalog", "internal/language/analyze",
-		"internal/source", "internal/stagecheck", "internal/compiler", "cmd/gotots",
+		"internal/source", "internal/scope", "internal/stagecheck", "internal/compiler", "cmd/gotots",
 	} {
 		if !seen[required] {
 			t.Errorf("wall gate did not observe package %s; the walk is incomplete", required)
@@ -179,6 +179,7 @@ var layerRank = map[string]int{
 	"internal/identity":         5,
 	"internal/language/catalog": 10,
 	"internal/source":           30,
+	"internal/scope":            35,
 	"internal/language/analyze": 40,
 	"internal/stagecheck":       60,
 	"internal/compiler":         80,

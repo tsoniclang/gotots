@@ -9,8 +9,22 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/language/analyze"
+	"github.com/tsoniclang/gotots/internal/scope"
 	"github.com/tsoniclang/gotots/internal/source"
 )
+
+// loadFinalized runs the full source pipeline under the default contract.
+func loadFinalized(req source.Request) (*source.Workspace, error) {
+	universe, err := source.LoadUniverse(req)
+	if err != nil {
+		return nil, err
+	}
+	selection, err := scope.Select(universe, scope.DefaultContract())
+	if err != nil {
+		return nil, err
+	}
+	return source.Finalize(universe, selection.Depths())
+}
 
 func writeModule(t *testing.T, files map[string]string) string {
 	t.Helper()
@@ -46,7 +60,7 @@ var moduleB = map[string]string{
 func TestVerifiersPassOnConsistentPipeline(t *testing.T) {
 	dir := writeModule(t, moduleA)
 	req := source.Request{Dir: dir}
-	ws, err := source.LoadWorkspace(req)
+	ws, err := loadFinalized(req)
 	if err != nil {
 		t.Fatalf("LoadWorkspace: %v", err)
 	}
@@ -68,7 +82,7 @@ func TestVerifiersPassOnConsistentPipeline(t *testing.T) {
 func TestSourceUniverseVerifierIsIndependent(t *testing.T) {
 	dirA := writeModule(t, moduleA)
 	dirB := writeModule(t, moduleB)
-	wsA, err := source.LoadWorkspace(source.Request{Dir: dirA})
+	wsA, err := loadFinalized(source.Request{Dir: dirA})
 	if err != nil {
 		t.Fatalf("LoadWorkspace: %v", err)
 	}
@@ -87,11 +101,11 @@ func TestSourceUniverseVerifierIsIndependent(t *testing.T) {
 func TestSyntaxInventoryVerifierIsIndependent(t *testing.T) {
 	dirA := writeModule(t, moduleA)
 	dirB := writeModule(t, moduleB)
-	wsA, err := source.LoadWorkspace(source.Request{Dir: dirA})
+	wsA, err := loadFinalized(source.Request{Dir: dirA})
 	if err != nil {
 		t.Fatalf("LoadWorkspace A: %v", err)
 	}
-	wsB, err := source.LoadWorkspace(source.Request{Dir: dirB})
+	wsB, err := loadFinalized(source.Request{Dir: dirB})
 	if err != nil {
 		t.Fatalf("LoadWorkspace B: %v", err)
 	}
@@ -128,7 +142,7 @@ func TestVerifierUsesSelectedToolchain(t *testing.T) {
 		t.Fatalf("write wrapper: %v", err)
 	}
 	req := source.Request{Dir: dir, GoBinary: wrapper}
-	ws, err := source.LoadWorkspace(req)
+	ws, err := loadFinalized(req)
 	if err != nil {
 		t.Fatalf("LoadWorkspace: %v", err)
 	}
@@ -164,7 +178,7 @@ func TestSourceUniverseVerifierHonorsOverlay(t *testing.T) {
 	req := source.Request{Dir: dir, Overlay: map[string][]byte{
 		filepath.Join(dir, "a.go"): []byte("package a\n\nfunc Fixed() int { return 1 }\n"),
 	}}
-	ws, err := source.LoadWorkspace(req)
+	ws, err := loadFinalized(req)
 	if err != nil {
 		t.Fatalf("LoadWorkspace: %v", err)
 	}

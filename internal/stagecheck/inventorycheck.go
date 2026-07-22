@@ -33,34 +33,50 @@ func VerifySyntaxInventory(ws *source.Workspace, inv *analyze.WorkspaceInventory
 	fail := func(reason string) error {
 		return &VerificationError{Stage: "syntax-inventory", Reason: reason}
 	}
-	files := map[string]*source.File{}
+	// Expected retained roots: whole files with FullSyntax evidence, plus the
+	// retained unit declarations of mixed files — exactly the full-semantic
+	// scope, joined by identity.
+	type expectedRoot struct {
+		file *source.File
+		node ast.Node // file tree or retained decl subtree
+	}
+	expected := map[string]expectedRoot{}
 	for _, pkg := range ws.Packages() {
 		for _, file := range pkg.Files() {
-			if file.Syntax() != nil {
-				files[file.ID().String()] = file
+			switch evidence := file.Evidence().(type) {
+			case source.FullSyntax:
+				expected[file.ID().String()] = expectedRoot{file: file, node: evidence.Syntax}
+			case source.MixedUnits:
+				for _, retained := range evidence.Retained {
+					expected[retained.Unit.String()] = expectedRoot{file: file, node: retained.Decl}
+				}
 			}
 		}
 	}
 	verified := 0
 	for _, pkg := range inv.Packages() {
 		for _, fileInv := range pkg.Files() {
-			file, ok := files[fileInv.File().String()]
-			if !ok {
-				return fail("orphan inventory: no workspace file " + fileInv.File().String())
+			key := fileInv.File().String()
+			if !fileInv.RootUnit().IsZero() {
+				key = fileInv.RootUnit().String()
 			}
-			if err := verifyFileInventory(file, fileInv); err != nil {
+			root, ok := expected[key]
+			if !ok {
+				return fail("orphan inventory: no retained evidence for " + key)
+			}
+			if err := verifyInventoryWalk(root.file, root.node, fileInv); err != nil {
 				return err
 			}
 			verified++
 		}
 	}
-	if verified != len(files) {
-		return fail(fmt.Sprintf("dropped input: workspace has %d files, inventory covers %d", len(files), verified))
+	if verified != len(expected) {
+		return fail(fmt.Sprintf("dropped input: retained evidence has %d roots, inventory covers %d", len(expected), verified))
 	}
 	return nil
 }
 
-func verifyFileInventory(file *source.File, inv *analyze.FileInventory) error {
+func verifyInventoryWalk(file *source.File, root ast.Node, inv *analyze.FileInventory) error {
 	fail := func(reason string) error {
 		return &VerificationError{Stage: "syntax-inventory", Reason: inv.File().String() + ": " + reason}
 	}
@@ -72,7 +88,7 @@ func verifyFileInventory(file *source.File, inv *analyze.FileInventory) error {
 	}
 	var walk []expectation
 	var stack []int
-	ast.Inspect(file.Syntax(), func(n ast.Node) bool {
+	ast.Inspect(root, func(n ast.Node) bool {
 		if n == nil {
 			stack = stack[:len(stack)-1]
 			return false

@@ -11,6 +11,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/catalog"
+	"github.com/tsoniclang/gotots/internal/scope"
 	"github.com/tsoniclang/gotots/internal/source"
 )
 
@@ -201,6 +202,19 @@ End:
 }
 `
 
+// loadFinalized runs the full source pipeline under the default contract.
+func loadFinalized(req source.Request) (*source.Workspace, error) {
+	universe, err := source.LoadUniverse(req)
+	if err != nil {
+		return nil, err
+	}
+	selection, err := scope.Select(universe, scope.DefaultContract())
+	if err != nil {
+		return nil, err
+	}
+	return source.Finalize(universe, selection.Depths())
+}
+
 var (
 	fixtureOnce sync.Once
 	fixtureDir  string
@@ -226,7 +240,7 @@ func fixture(t *testing.T) (*source.Workspace, *WorkspaceInventory) {
 				return
 			}
 		}
-		fixtureWS, fixtureErr = source.LoadWorkspace(source.Request{Dir: fixtureDir})
+		fixtureWS, fixtureErr = loadFinalized(source.Request{Dir: fixtureDir})
 		if fixtureErr != nil {
 			return
 		}
@@ -257,6 +271,10 @@ func fixtureFile(t *testing.T) (*source.File, *FileInventory) {
 // and exact parent edge — not counts.
 func TestBuildInventoryExactJoinsIndependentWalk(t *testing.T) {
 	file, inv := fixtureFile(t)
+	syntax, hasFull := file.FullSyntax()
+	if !hasFull {
+		t.Fatal("fixture file lacks full-syntax evidence")
+	}
 	type expectation struct {
 		goType string
 		start  int
@@ -265,7 +283,7 @@ func TestBuildInventoryExactJoinsIndependentWalk(t *testing.T) {
 	}
 	var walk []expectation
 	var stack []int
-	ast.Inspect(file.Syntax(), func(n ast.Node) bool {
+	ast.Inspect(syntax, func(n ast.Node) bool {
 		if n == nil {
 			stack = stack[:len(stack)-1]
 			return false
@@ -358,7 +376,7 @@ func TestOccurrenceIdentityIsMachineIndependent(t *testing.T) {
 				t.Fatalf("write: %v", err)
 			}
 		}
-		ws, err := source.LoadWorkspace(source.Request{Dir: dir})
+		ws, err := loadFinalized(source.Request{Dir: dir})
 		if err != nil {
 			t.Fatalf("LoadWorkspace: %v", err)
 		}
@@ -400,7 +418,7 @@ func TestDisplayIsSeparateFromIdentity(t *testing.T) {
 			t.Fatalf("write: %v", err)
 		}
 	}
-	ws, err := source.LoadWorkspace(source.Request{Dir: dir})
+	ws, err := loadFinalized(source.Request{Dir: dir})
 	if err != nil {
 		t.Fatalf("LoadWorkspace: %v", err)
 	}

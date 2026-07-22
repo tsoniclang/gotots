@@ -8,20 +8,25 @@ package compiler
 
 import (
 	"github.com/tsoniclang/gotots/internal/language/analyze"
+	"github.com/tsoniclang/gotots/internal/scope"
 	"github.com/tsoniclang/gotots/internal/source"
 	"github.com/tsoniclang/gotots/internal/stagecheck"
 )
 
-// Inspection is the verified result of one inspect run: the resolved source
-// universe (identity, provenance, acquisition, versions for the complete
-// closure) and the construct inventory of the selected packages.
+// Inspection is the verified result of one inspect run: the finalized source
+// universe (identity, provenance, acquisition, versions, evidence-depth
+// partition) and the construct inventory of the full-semantic scope.
 type Inspection struct {
 	workspace *source.Workspace
+	selection *scope.Selection
 	inventory *analyze.WorkspaceInventory
 }
 
-// Workspace is the resolved source universe.
+// Workspace is the finalized source universe.
 func (i *Inspection) Workspace() *source.Workspace { return i.workspace }
+
+// Selection is the scope phase's immutable evidence-depth selection.
+func (i *Inspection) Selection() *scope.Selection { return i.selection }
 
 // Inventory is the verified construct inventory.
 func (i *Inspection) Inventory() *analyze.WorkspaceInventory { return i.inventory }
@@ -29,12 +34,22 @@ func (i *Inspection) Inventory() *analyze.WorkspaceInventory { return i.inventor
 // InspectConstructs resolves a compilation request into a verified
 // whole-workspace construct inventory:
 //
-//	request -> SourceUniverse -> [verify] -> SyntaxInventory -> [verify] -> report
+//	request -> LoadUniverse -> scope.Select(contract) -> Finalize
+//	        -> [verify universe] -> inventory (full-semantic scope)
+//	        -> [verify inventory] -> report
 //
 // A failed stage verifier blocks every downstream stage; there is no partial
 // or unverified artifact.
 func InspectConstructs(req source.Request) (*Inspection, error) {
-	ws, err := source.LoadWorkspace(req)
+	universe, err := source.LoadUniverse(req)
+	if err != nil {
+		return nil, err
+	}
+	selection, err := scope.Select(universe, scope.DefaultContract())
+	if err != nil {
+		return nil, err
+	}
+	ws, err := source.Finalize(universe, selection.Depths())
 	if err != nil {
 		return nil, err
 	}
@@ -48,5 +63,5 @@ func InspectConstructs(req source.Request) (*Inspection, error) {
 	if err := stagecheck.VerifySyntaxInventory(ws, inventory); err != nil {
 		return nil, err
 	}
-	return &Inspection{workspace: ws, inventory: inventory}, nil
+	return &Inspection{workspace: ws, selection: selection, inventory: inventory}, nil
 }

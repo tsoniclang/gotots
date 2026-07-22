@@ -99,7 +99,7 @@ func TestUnknownGoDirectiveFailsClosed(t *testing.T) {
 			t.Fatalf("write: %v", err)
 		}
 	}
-	ws, err := source.LoadWorkspace(source.Request{Dir: dir})
+	ws, err := loadFinalized(source.Request{Dir: dir})
 	if err != nil {
 		t.Fatalf("LoadWorkspace: %v", err)
 	}

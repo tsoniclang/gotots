@@ -16,8 +16,12 @@ import (
 // file's complete comment set (File.Comments indexes every group, including
 // doc comments).
 func scanDirectives(b *builder, file *source.File) ([]DirectiveRecord, error) {
+	syntax, ok := file.FullSyntax()
+	if !ok {
+		return nil, nil
+	}
 	var records []DirectiveRecord
-	for _, group := range file.Syntax().Comments {
+	for _, group := range syntax.Comments {
 		for _, comment := range group.List {
 			record, ok, err := b.directiveOf(comment)
 			if err != nil {

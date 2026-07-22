@@ -1,16 +1,28 @@
-package source
+package source_test
 
 import (
-	"go/parser"
-	"go/token"
-	"go/types"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/tsoniclang/gotots/internal/identity"
+	"github.com/tsoniclang/gotots/internal/scope"
+	"github.com/tsoniclang/gotots/internal/source"
 )
+
+// finalizeLoad runs the full source pipeline: transient load, default-contract
+// scope selection, finalization.
+func finalizeLoad(req source.Request) (*source.Workspace, error) {
+	universe, err := source.LoadUniverse(req)
+	if err != nil {
+		return nil, err
+	}
+	selection, err := scope.Select(universe, scope.DefaultContract())
+	if err != nil {
+		return nil, err
+	}
+	return source.Finalize(universe, selection.Depths())
+}
 
 // writeTree writes a file tree under dir.
 func writeTree(t *testing.T, dir string, files map[string]string) {
@@ -26,7 +38,7 @@ func writeTree(t *testing.T, dir string, files map[string]string) {
 	}
 }
 
-func findPackage(t *testing.T, ws *Workspace, importPath string) *Package {
+func findPackage(t *testing.T, ws *source.Workspace, importPath string) *source.Package {
 	t.Helper()
 	for _, pkg := range ws.Packages() {
 		if pkg.ID().ImportPath() == importPath {
@@ -46,7 +58,7 @@ func TestLoadWorkspaceSingleModule(t *testing.T) {
 		"main.go":     "package main\n\nfunc main() { _ = add(1, 2) }\n\nfunc add(a, b int) int { return a + b }\n",
 		"pkg/util.go": "package pkg\n\nfunc Twice(x int) int { return 2 * x }\n",
 	})
-	ws, err := LoadWorkspace(Request{Dir: dir})
+	ws, err := finalizeLoad(source.Request{Dir: dir})
 	if err != nil {
 		t.Fatalf("LoadWorkspace: %v", err)
 	}
@@ -58,7 +70,7 @@ func TestLoadWorkspaceSingleModule(t *testing.T) {
 	}
 	var ids []string
 	for _, pkg := range ws.Roots() {
-		if pkg.Provenance() != ProvenanceWorkspaceModule || pkg.Acquisition() != AcquisitionWorkspace {
+		if pkg.Provenance() != source.ProvenanceWorkspaceModule || pkg.Acquisition() != source.AcquisitionWorkspace {
 			t.Errorf("%s provenance/acquisition = %s/%s", pkg.ID(), pkg.Provenance(), pkg.Acquisition())
 		}
 		if pkg.ModuleGoVersion() != "1.26" {
@@ -66,8 +78,8 @@ func TestLoadWorkspaceSingleModule(t *testing.T) {
 		}
 		for _, file := range pkg.Files() {
 			ids = append(ids, file.ID().String())
-			if file.Syntax() == nil {
-				t.Errorf("%s: selected file missing syntax", file.ID())
+			if _, full := file.FullSyntax(); !full {
+				t.Errorf("%s: workspace-module file lacks full-syntax evidence", file.ID())
 			}
 			if file.EffectiveGoVersion() == "" {
 				t.Errorf("%s: no effective language version", file.ID())
@@ -95,29 +107,29 @@ func TestUniverseClosureAndProvenance(t *testing.T) {
 		"localdep/go.mod": "module dotlessdep/lib\n\ngo 1.24\n",
 		"localdep/lib.go": "package lib\n\nfunc Answer() int { return 42 }\n",
 	})
-	req := Request{Dir: dir, Env: []string{"GOFLAGS=-mod=mod", "GOPROXY=off"}}
-	ws, err := LoadWorkspace(req)
+	req := source.Request{Dir: dir, Env: []string{"GOFLAGS=-mod=mod", "GOPROXY=off"}}
+	ws, err := finalizeLoad(req)
 	if err != nil {
 		t.Fatalf("LoadWorkspace: %v", err)
 	}
 	fmtPkg := findPackage(t, ws, "fmt")
-	if fmtPkg.ID().Owner().String() != "std" || fmtPkg.Provenance() != ProvenanceStandardLibrary ||
-		fmtPkg.Acquisition() != AcquisitionGOROOT || fmtPkg.RequestedRoot() {
+	if fmtPkg.ID().Owner().String() != "std" || fmtPkg.Provenance() != source.ProvenanceStandardLibrary ||
+		fmtPkg.Acquisition() != source.AcquisitionGOROOT || fmtPkg.RequestedRoot() {
 		t.Errorf("fmt: %s %s %s root=%v", fmtPkg.ID(), fmtPkg.Provenance(), fmtPkg.Acquisition(), fmtPkg.RequestedRoot())
 	}
 	unsafePkg := findPackage(t, ws, "unsafe")
-	if unsafePkg.Disposition() != DispositionUnsafeIntrinsic || unsafePkg.Provenance() != ProvenanceStandardLibrary {
+	if unsafePkg.Disposition() != source.DispositionUnsafeIntrinsic || unsafePkg.Provenance() != source.ProvenanceStandardLibrary {
 		t.Errorf("unsafe: disposition=%s provenance=%s", unsafePkg.Disposition(), unsafePkg.Provenance())
 	}
 	sync := findPackage(t, ws, "golang.org/x/sync/errgroup")
 	if sync.ID().Owner().String() != "mod=golang.org/x/sync@v0.21.0" {
 		t.Errorf("x/sync owner = %s", sync.ID().Owner())
 	}
-	if sync.Provenance() != ProvenanceModuleDependency || sync.Acquisition() != AcquisitionModuleCache {
+	if sync.Provenance() != source.ProvenanceModuleDependency || sync.Acquisition() != source.AcquisitionModuleCache {
 		t.Errorf("x/sync provenance/acquisition = %s/%s", sync.Provenance(), sync.Acquisition())
 	}
 	dotless := findPackage(t, ws, "dotlessdep/lib")
-	if dotless.Provenance() != ProvenanceModuleDependency || dotless.Acquisition() != AcquisitionLocalReplacement {
+	if dotless.Provenance() != source.ProvenanceModuleDependency || dotless.Acquisition() != source.AcquisitionLocalReplacement {
 		t.Errorf("dotless replacement provenance/acquisition = %s/%s (spelling must not classify)",
 			dotless.Provenance(), dotless.Acquisition())
 	}
@@ -171,12 +183,12 @@ func TestVendoredDependency(t *testing.T) {
 		"vendor/modules.txt":           "# dotlessdep/lib v1.0.0\n## explicit; go 1.24\ndotlessdep/lib\n",
 		"vendor/dotlessdep/lib/lib.go": "package lib\n\nfunc Answer() int { return 42 }\n",
 	})
-	ws, err := LoadWorkspace(Request{Dir: dir})
+	ws, err := finalizeLoad(source.Request{Dir: dir})
 	if err != nil {
 		t.Fatalf("LoadWorkspace: %v", err)
 	}
 	dotless := findPackage(t, ws, "dotlessdep/lib")
-	if dotless.Provenance() != ProvenanceModuleDependency || dotless.Acquisition() != AcquisitionVendor {
+	if dotless.Provenance() != source.ProvenanceModuleDependency || dotless.Acquisition() != source.AcquisitionVendor {
 		t.Errorf("vendored dep provenance/acquisition = %s/%s", dotless.Provenance(), dotless.Acquisition())
 	}
 	if got := dotless.Files()[0].ID().String(); got != "mod=dotlessdep/lib@v1.0.0::lib.go" {
@@ -190,23 +202,42 @@ func TestVendoredDependency(t *testing.T) {
 func TestStdBuiltinAndToolchainRoots(t *testing.T) {
 	dir := t.TempDir()
 	writeTree(t, dir, map[string]string{"go.mod": "module roots.example/m\n\ngo 1.26\n", "m.go": "package m\n"})
-	ws, err := LoadWorkspace(Request{Dir: dir, Patterns: []string{"fmt", "builtin", "cmd/addr2line"}})
+	ws, err := finalizeLoad(source.Request{Dir: dir, Patterns: []string{"fmt", "builtin", "cmd/addr2line"}})
 	if err != nil {
 		t.Fatalf("LoadWorkspace: %v", err)
 	}
 	fmtPkg := findPackage(t, ws, "fmt")
-	if !fmtPkg.RequestedRoot() || fmtPkg.Types() == nil || len(fmtPkg.Files()) == 0 || fmtPkg.Files()[0].Syntax() == nil {
-		t.Error("fmt root did not load with syntax and types")
+	if !fmtPkg.RequestedRoot() || fmtPkg.Types() == nil || len(fmtPkg.Files()) == 0 {
+		t.Error("fmt root did not load with types and files")
+	}
+	// Under the default provider contract, std bodies are gostdlib-owned:
+	// declaration-contract evidence, no retained syntax, boundaries present.
+	for _, file := range fmtPkg.Files() {
+		if _, full := file.FullSyntax(); full {
+			t.Errorf("std file %s retains full syntax under the default contract", file.ID())
+		}
+	}
+	stdUnits := fmtPkg.Units()
+	if len(stdUnits) == 0 {
+		t.Error("std package has no censused unit boundaries")
+	}
+	for _, unit := range stdUnits {
+		if unit.Depth() != source.DepthDeclarationContract {
+			t.Errorf("std unit %s depth = %s, want declaration-contract", unit.ID(), unit.Depth())
+		}
+		if unit.Hash().IsZero() {
+			t.Errorf("std unit %s lacks a source-span hash", unit.ID())
+		}
 	}
 	if fmtPkg.ID().String() != "std::fmt" {
 		t.Errorf("fmt id = %s", fmtPkg.ID())
 	}
 	builtin := findPackage(t, ws, "builtin")
-	if builtin.ID().Owner().String() != "lang" || builtin.Disposition() != DispositionBuiltinUniverse {
+	if builtin.ID().Owner().String() != "lang" || builtin.Disposition() != source.DispositionBuiltinUniverse {
 		t.Errorf("builtin owner/disposition = %s/%s", builtin.ID().Owner(), builtin.Disposition())
 	}
 	tool := findPackage(t, ws, "cmd/addr2line")
-	if tool.ID().Owner().String() != "toolchain" || tool.Provenance() != ProvenanceToolchainPackage {
+	if tool.ID().Owner().String() != "toolchain" || tool.Provenance() != source.ProvenanceToolchainPackage {
 		t.Errorf("cmd/addr2line owner/provenance = %s/%s", tool.ID().Owner(), tool.Provenance())
 	}
 	var typeless []string
@@ -217,75 +248,6 @@ func TestStdBuiltinAndToolchainRoots(t *testing.T) {
 	}
 	if len(typeless) != 0 {
 		t.Errorf("closure records without type evidence (only lang::builtin may lack it): %v", typeless)
-	}
-}
-
-// TestPackageRecordConstructorRejectsIncoherence proves finishPackage is a
-// validating construction gate: incoherent owner/provenance/acquisition/
-// disposition combinations and selected records without evidence never enter
-// a workspace.
-func TestPackageRecordConstructorRejectsIncoherence(t *testing.T) {
-	module, err := identity.NewModuleID("gate.example/m", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	owner, err := identity.NewModuleOwner(module)
-	if err != nil {
-		t.Fatal(err)
-	}
-	modPkg, err := identity.NewPackageID(owner, "gate.example/m")
-	if err != nil {
-		t.Fatal(err)
-	}
-	stdPkg, err := identity.NewPackageID(identity.StandardLibraryOwner(), "fmt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	cases := []struct {
-		name   string
-		record *Package
-	}{
-		{"zero identity", &Package{provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource}},
-		{"invalid disposition (zero)", &Package{id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace}},
-		{"std owner with workspace provenance", &Package{id: stdPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource}},
-		{"module owner with goroot acquisition", &Package{id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionGOROOT, disposition: DispositionOrdinarySource}},
-		{"dependency with workspace acquisition", &Package{id: modPkg, provenance: ProvenanceModuleDependency, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource}},
-		{"std owner with module go directive", &Package{id: stdPkg, provenance: ProvenanceStandardLibrary, acquisition: AcquisitionGOROOT, disposition: DispositionOrdinarySource, moduleGoVersion: "1.26"}},
-		{"selected without type evidence", &Package{id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource, requestedRoot: true}},
-	}
-	for _, c := range cases {
-		ws := &Workspace{}
-		if err := ws.admit(c.record); err == nil {
-			t.Errorf("%s: admitted into the workspace", c.name)
-		}
-		if len(ws.Packages()) != 0 {
-			t.Errorf("%s: rejected record still entered the workspace", c.name)
-		}
-	}
-	// The valid case carries genuine evidence — a typeless record is never
-	// a valid fixture.
-	fset := token.NewFileSet()
-	syntax, err := parser.ParseFile(fset, "m.go", "package m\n\nfunc F() {}\n", parser.SkipObjectResolution)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fileID, err := identity.NewFileID(owner, "m.go")
-	if err != nil {
-		t.Fatal(err)
-	}
-	ws := &Workspace{}
-	valid := &Package{
-		id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace,
-		disposition: DispositionOrdinarySource,
-		types:       types.NewPackage("gate.example/m", "m"),
-		typesInfo:   &types.Info{},
-		files:       []*File{{path: "m.go", id: fileID, fset: fset, syntax: syntax}},
-	}
-	if err := ws.admit(valid); err != nil {
-		t.Errorf("coherent evidenced record rejected: %v", err)
-	}
-	if len(ws.Packages()) != 1 {
-		t.Error("coherent evidenced record not admitted")
 	}
 }
 
@@ -303,7 +265,7 @@ func TestPerFileEffectiveVersions(t *testing.T) {
 		"new/go.mod":   "module ver.example/new\n\ngo 1.26\n",
 		"new/n.go":     "package new\n\nfunc N() int { return 3 }\n",
 	})
-	ws, err := LoadWorkspace(Request{Dir: dir, Patterns: []string{"ver.example/old/...", "ver.example/new/..."}})
+	ws, err := finalizeLoad(source.Request{Dir: dir, Patterns: []string{"ver.example/old/...", "ver.example/new/..."}})
 	if err != nil {
 		t.Fatalf("LoadWorkspace: %v", err)
 	}
@@ -339,16 +301,26 @@ func TestCgoViewDifferenceIsModeled(t *testing.T) {
 		"main.go": "package main\n\n/*\n#include <stdlib.h>\n*/\nimport \"C\"\n\nfunc main() { C.free(nil) }\n",
 		"pure.go": "package main\n\nfunc pure() int { return 1 }\n",
 	})
-	ws, err := LoadWorkspace(Request{Dir: dir, Env: []string{"CGO_ENABLED=1"}})
+	ws, err := finalizeLoad(source.Request{Dir: dir, Env: []string{"CGO_ENABLED=1"}})
 	if err != nil {
 		t.Skipf("cgo unavailable in this environment: %v", err)
 	}
 	main := findPackage(t, ws, "cgo.example/m")
-	if !main.CheckedViewDiffers() {
-		t.Error("cgo package does not record its checked-view difference")
+	// The checked view is modeled through origin-joined mappings and typed
+	// synthetic units — never raw checked paths.
+	if len(main.CheckedUnitMappings()) == 0 {
+		t.Error("cgo package records no origin-joined checked-unit mappings")
 	}
-	if len(main.CheckedView()) == 0 {
-		t.Error("cgo checked-view files not recorded")
+	if len(main.SyntheticUnits()) == 0 {
+		t.Error("cgo package records no typed synthetic checked units")
+	}
+	for _, unit := range main.Units() {
+		if unit.CDependent() && unit.Depth() != source.DepthExternalBoundary {
+			t.Errorf("C-dependent unit %s depth = %s, want external-boundary", unit.ID(), unit.Depth())
+		}
+		if !unit.CDependent() && unit.Depth() != source.DepthFullSemantic {
+			t.Errorf("pure unit %s depth = %s, want full-semantic", unit.ID(), unit.Depth())
+		}
 	}
 	ids := map[string]bool{}
 	for _, file := range main.Files() {
@@ -379,7 +351,7 @@ func TestRelocatedWorkspaceAndCache(t *testing.T) {
 	load := func(env []string) []string {
 		dir := t.TempDir()
 		writeTree(t, dir, content)
-		ws, err := LoadWorkspace(Request{Dir: dir, Env: env})
+		ws, err := finalizeLoad(source.Request{Dir: dir, Env: env})
 		if err != nil {
 			t.Fatalf("LoadWorkspace: %v", err)
 		}
@@ -425,7 +397,7 @@ func TestLoadWorkspaceFailsClosed(t *testing.T) {
 		"go.mod":  "module example.com/broken\n\ngo 1.26\n",
 		"main.go": "package main\n\nfunc main() {",
 	})
-	if _, err := LoadWorkspace(Request{Dir: broken}); err == nil {
+	if _, err := finalizeLoad(source.Request{Dir: broken}); err == nil {
 		t.Error("parse-broken module loaded")
 	}
 	typeBroken := t.TempDir()
@@ -433,12 +405,12 @@ func TestLoadWorkspaceFailsClosed(t *testing.T) {
 		"go.mod":  "module example.com/typebroken\n\ngo 1.26\n",
 		"main.go": "package main\n\nfunc main() { var x int = \"s\"; _ = x }\n",
 	})
-	if _, err := LoadWorkspace(Request{Dir: typeBroken}); err == nil {
+	if _, err := finalizeLoad(source.Request{Dir: typeBroken}); err == nil {
 		t.Error("type-broken module loaded")
 	}
 	empty := t.TempDir()
 	writeTree(t, empty, map[string]string{"go.mod": "module example.com/empty\n\ngo 1.26\n"})
-	if _, err := LoadWorkspace(Request{Dir: empty}); err == nil {
+	if _, err := finalizeLoad(source.Request{Dir: empty}); err == nil {
 		t.Error("empty module loaded")
 	}
 }
@@ -454,7 +426,7 @@ func TestLoadWorkspaceRejectsModuleCollision(t *testing.T) {
 		"y/go.mod": "module clash.example/m\n\ngo 1.26\n",
 		"y/y.go":   "package y\n\nfunc Y() {}\n",
 	})
-	if _, err := LoadWorkspace(Request{Dir: dir, Patterns: []string{"clash.example/m/..."}}); err == nil {
+	if _, err := finalizeLoad(source.Request{Dir: dir, Patterns: []string{"clash.example/m/..."}}); err == nil {
 		t.Fatal("workspace with colliding module identities loaded")
 	}
 }
@@ -470,7 +442,7 @@ func TestLoadWorkspaceOverlay(t *testing.T) {
 	overlay := map[string][]byte{
 		filepath.Join(dir, "a.go"): []byte("package a\n\nfunc Fixed() int { return 1 }\n"),
 	}
-	ws, err := LoadWorkspace(Request{Dir: dir, Overlay: overlay})
+	ws, err := finalizeLoad(source.Request{Dir: dir, Overlay: overlay})
 	if err != nil {
 		t.Fatalf("LoadWorkspace with overlay: %v", err)
 	}
@@ -478,7 +450,7 @@ func TestLoadWorkspaceOverlay(t *testing.T) {
 	if pkg.Types().Scope().Lookup("Fixed") == nil {
 		t.Error("overlay content not used")
 	}
-	if pkg.Provenance() != ProvenanceWorkspaceModule {
+	if pkg.Provenance() != source.ProvenanceWorkspaceModule {
 		t.Errorf("overlay changed provenance: %s", pkg.Provenance())
 	}
 }

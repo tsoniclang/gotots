@@ -122,8 +122,36 @@ type FileInventory struct {
 	path               string
 	file               identity.FileID
 	effectiveGoVersion string
+	rootUnit           identity.SourceUnitID // set for unit-rooted inventories
 	occurrences        []Occurrence
 	directives         []DirectiveRecord
+}
+
+// newUnitInventory validates a unit-rooted inventory of one retained
+// full-semantic unit in a mixed file: the root occurrence must be parentless
+// and lie within the unit's span; all other invariants match file
+// inventories.
+func newUnitInventory(path string, file identity.FileID, effectiveGoVersion string, unit identity.SourceUnitID, occurrences []Occurrence) (*FileInventory, error) {
+	if len(occurrences) == 0 {
+		return nil, newResolutionError(0, file, Span{}, "unit inventory has no occurrences")
+	}
+	root := occurrences[0]
+	if !root.parent.IsZero() || root.edge != catalog.Edge(0) {
+		return nil, newResolutionError(root.kind, file, root.span, "unit inventory root must be parentless")
+	}
+	// The retained root either equals the unit span (initializer specs) or
+	// contains it (a FuncDecl containing its body span). Anything else leaks
+	// evidence outside the unit.
+	containsUnit := root.span.Start.Offset <= unit.Span().Start() && unit.Span().End() <= root.span.End.Offset
+	if !containsUnit {
+		return nil, newResolutionError(root.kind, file, root.span, "unit inventory root does not cover its unit span")
+	}
+	inv, err := validateInventoryBody(path, file, effectiveGoVersion, occurrences, nil)
+	if err != nil {
+		return nil, err
+	}
+	inv.rootUnit = unit
+	return inv, nil
 }
 
 // newFileInventory validates the artifact invariants: a File root with no
@@ -140,6 +168,11 @@ func newFileInventory(path string, file identity.FileID, effectiveGoVersion stri
 	if root.kind != catalog.KindFile || !root.parent.IsZero() || root.edge != catalog.Edge(0) {
 		return nil, newResolutionError(root.kind, file, root.span, "artifact root must be a parentless File occurrence")
 	}
+	return validateInventoryBody(path, file, effectiveGoVersion, occurrences, directives)
+}
+
+// validateInventoryBody enforces the shared inventory invariants.
+func validateInventoryBody(path string, file identity.FileID, effectiveGoVersion string, occurrences []Occurrence, directives []DirectiveRecord) (*FileInventory, error) {
 	seen := make(map[identity.OccurrenceID]int, len(occurrences))
 	kindsByID := make(map[identity.OccurrenceID]catalog.Kind, len(occurrences))
 	for i, occurrence := range occurrences {
@@ -208,6 +241,10 @@ func (inv *FileInventory) File() identity.FileID { return inv.file }
 // toolchain evidence; it governs construct admission for this file's
 // occurrences. There is no workspace-wide version.
 func (inv *FileInventory) EffectiveGoVersion() string { return inv.effectiveGoVersion }
+
+// RootUnit is the retained unit identity for unit-rooted inventories of mixed
+// files; zero for whole-file inventories.
+func (inv *FileInventory) RootUnit() identity.SourceUnitID { return inv.rootUnit }
 
 // Occurrences is the pre-ordered authoritative occurrence list. Callers must
 // not mutate it.

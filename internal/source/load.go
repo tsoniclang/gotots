@@ -35,7 +35,12 @@ const loadMode = packages.NeedName |
 // LoadWorkspace resolves one compilation request into the typed universe. It
 // fails closed on any package error, type error, identity collision, or
 // unclassifiable package; there is no partial universe.
-func LoadWorkspace(req Request) (*Workspace, error) {
+// LoadUniverse resolves one compilation request into the transient typed
+// universe (one coherent go/types graph, complete unit census, cgo origin
+// evidence). Evidence-depth selection and retention happen downstream in the
+// scope phase and Finalize; the loader never performs retention by mutating
+// records and never assigns depth.
+func LoadUniverse(req Request) (*Universe, error) {
 	patterns := req.Patterns
 	if len(patterns) == 0 {
 		patterns = []string{"./..."}
@@ -82,7 +87,7 @@ func LoadWorkspace(req Request) (*Workspace, error) {
 		req: req, toolchain: toolchain, stdSet: stdSet, cmdSet: cmdSet,
 		moduleDirs: map[identity.ModuleID]string{},
 	}
-	ws := &Workspace{fset: fset, toolchain: toolchain}
+	universe := &Universe{fset: fset, toolchain: toolchain, request: req}
 	seen := map[identity.PackageID]bool{}
 	var walkErr error
 	packages.Visit(loaded, nil, func(pkg *packages.Package) {
@@ -106,20 +111,23 @@ func LoadWorkspace(req Request) (*Workspace, error) {
 			return
 		}
 		seen[record.id] = true
-		if err := ws.admit(record); err != nil {
-			walkErr = err
-			return
+		universe.packages = append(universe.packages, record)
+		if record.requestedRoot {
+			universe.roots = append(universe.roots, record)
 		}
 	})
 	if walkErr != nil {
 		return nil, walkErr
 	}
-	if len(ws.roots) == 0 {
+	if len(universe.roots) == 0 {
 		return nil, &LoadError{Dir: req.Dir, Reason: "no requested roots after classification"}
 	}
-	sort.Slice(ws.packages, func(i, j int) bool { return ws.packages[i].id.String() < ws.packages[j].id.String() })
-	sort.Slice(ws.roots, func(i, j int) bool { return ws.roots[i].id.String() < ws.roots[j].id.String() })
-	return ws, nil
+	sort.Slice(universe.packages, func(i, j int) bool { return universe.packages[i].id.String() < universe.packages[j].id.String() })
+	sort.Slice(universe.roots, func(i, j int) bool { return universe.roots[i].id.String() < universe.roots[j].id.String() })
+	if err := censusUniverse(universe); err != nil {
+		return nil, err
+	}
+	return universe, nil
 }
 
 // resolveToolchain resolves the exact selected go binary and its fingerprint,
@@ -205,8 +213,8 @@ type classifier struct {
 	moduleDirs map[identity.ModuleID]string
 }
 
-func (c *classifier) record(pkg *packages.Package, isRoot bool, fset *token.FileSet) (*Package, error) {
-	out := &Package{requestedRoot: isRoot, disposition: DispositionOrdinarySource}
+func (c *classifier) record(pkg *packages.Package, isRoot bool, fset *token.FileSet) (*LoadedPackage, error) {
+	out := &LoadedPackage{requestedRoot: isRoot, disposition: DispositionOrdinarySource}
 	var owner identity.Owner
 	var relBase string
 	switch {
@@ -290,16 +298,16 @@ func (c *classifier) record(pkg *packages.Package, isRoot bool, fset *token.File
 // packages, non-Go inputs, and embed files/patterns. The loader never aborts a
 // cgo-importing package; the view difference is recorded and later semantic
 // planning assigns per-body external obligations.
-func (c *classifier) attachInputs(out *Package, pkg *packages.Package, owner identity.Owner, relBase string, fset *token.FileSet) error {
+func (c *classifier) attachInputs(out *LoadedPackage, pkg *packages.Package, owner identity.Owner, relBase string, fset *token.FileSet) error {
 	if pkg.PkgPath == "builtin" {
 		for _, goFile := range pkg.GoFiles {
 			fileID, err := c.fileIDFor(owner, relBase, goFile)
 			if err != nil {
 				return err
 			}
-			out.files = append(out.files, &File{path: goFile, id: fileID})
+			out.files = append(out.files, &LoadedFile{path: goFile, id: fileID})
 		}
-		sortFiles(out.files)
+		sortLoadedFiles(out.files)
 		return nil
 	}
 	out.types, out.typesInfo = pkg.Types, pkg.TypesInfo
@@ -312,10 +320,17 @@ func (c *classifier) attachInputs(out *Package, pkg *packages.Package, owner ide
 			syntaxByPath[pkg.CompiledGoFiles[i]] = syntax
 		}
 	}
+	cgoTransformed := false
 	for _, compiled := range pkg.CompiledGoFiles {
 		if rel, err := filepath.Rel(relBase, compiled); err != nil || strings.HasPrefix(rel, "..") {
-			out.checkedView = append(out.checkedView, compiled)
-			out.checkedViewDiffers = true
+			cgoTransformed = true
+			// Checked-view decls are joined to origins at census time via
+			// //line evidence; the checked path is transient acquisition data.
+			if syntax := syntaxByPath[compiled]; syntax != nil {
+				for _, decl := range syntax.Decls {
+					out.checkedDecls = append(out.checkedDecls, checkedDecl{node: decl, fromFile: compiled})
+				}
+			}
 		}
 	}
 	for _, goFile := range pkg.GoFiles {
@@ -323,7 +338,10 @@ func (c *classifier) attachInputs(out *Package, pkg *packages.Package, owner ide
 		if err != nil {
 			return err
 		}
-		file := &File{path: goFile, id: fileID}
+		file := &LoadedFile{path: goFile, id: fileID}
+		if _, isOverlaid := c.req.Overlay[goFile]; isOverlaid {
+			file.overlaid = true
+		}
 		if syntax, checked := syntaxByPath[goFile]; checked {
 			file.fset = fset
 			file.syntax = syntax
@@ -333,17 +351,19 @@ func (c *classifier) attachInputs(out *Package, pkg *packages.Package, owner ide
 			if file.effectiveVersion == "" && pkg.Module != nil && pkg.Module.GoVersion != "" {
 				file.effectiveVersion = "go" + pkg.Module.GoVersion
 			}
-		} else if out.disposition == DispositionOrdinarySource && !out.checkedViewDiffers {
+		} else if out.disposition == DispositionOrdinarySource && !cgoTransformed {
 			// A source file may lack checked syntax only when its checked
 			// form genuinely lives in a differing checked view (cgo). A
 			// missing-syntax file without that corroboration is a defect,
 			// never a silent metadata downgrade.
 			return &LoadError{Dir: c.req.Dir, Reason: fileID.String() +
 				": file has no checked syntax and the package has no checked-view difference"}
+		} else {
+			file.cgoOriginal = true
 		}
 		out.files = append(out.files, file)
 	}
-	sortFiles(out.files)
+	sortLoadedFiles(out.files)
 	for _, other := range pkg.OtherFiles {
 		out.otherFiles = append(out.otherFiles, c.ownerRel(relBase, other))
 	}

@@ -190,21 +190,21 @@ func (w *Workspace) Roots() []*Package { return w.roots }
 // syntax and type information; dependency packages carry identity, provenance,
 // acquisition, version, and file facts.
 type Package struct {
-	id                 identity.PackageID
-	provenance         Provenance
-	acquisition        Acquisition
-	disposition        LanguageDisposition
-	moduleGoVersion    string // module `go` directive; empty for reserved owners
-	requestedRoot      bool
-	imports            []string // imported package paths, sorted
-	files              []*File  // identity-bearing source Go files
-	otherFiles         []string // non-Go inputs (C/asm/etc.), owner-relative
-	embedFiles         []string // resolved //go:embed inputs, owner-relative
-	embedPatterns      []string // declared //go:embed patterns
-	checkedView        []string // cgo checked-view files outside the owner root
-	checkedViewDiffers bool     // the checked view differs from source (cgo)
-	types              *types.Package
-	typesInfo          *types.Info
+	id              identity.PackageID
+	provenance      Provenance
+	acquisition     Acquisition
+	disposition     LanguageDisposition
+	moduleGoVersion string // module `go` directive; empty for reserved owners
+	requestedRoot   bool
+	imports         []string // imported package paths, sorted
+	files           []*File  // identity-bearing source Go files
+	otherFiles      []string // non-Go inputs (C/asm/etc.), owner-relative
+	embedFiles      []string // resolved //go:embed inputs, owner-relative
+	embedPatterns   []string // declared //go:embed patterns
+	mappings        []CheckedUnitMapping
+	synthetics      []SyntheticUnit
+	types           *types.Package
+	typesInfo       *types.Info // uniform-full: checker's Info; mixed: filtered; else nil
 }
 
 // admit is the single gate into a workspace: it validates the record and
@@ -283,7 +283,7 @@ func finishPackage(p *Package) (*Package, error) {
 			return fail("unsafe intrinsic record lacks type evidence")
 		}
 	default:
-		if p.types == nil || p.typesInfo == nil {
+		if p.types == nil {
 			return fail("source record lacks type evidence")
 		}
 		if p.types.Path() != p.id.ImportPath() {
@@ -292,10 +292,52 @@ func finishPackage(p *Package) (*Package, error) {
 		if len(p.files) == 0 {
 			return fail("source record has no files")
 		}
+		anyFull := false
 		for _, file := range p.files {
-			if file.Syntax() == nil && !p.checkedViewDiffers {
-				return fail("file " + file.ID().String() + " lacks checked syntax")
+			for _, unit := range file.units {
+				if !unit.depth.Valid() {
+					return fail("unit " + unit.id.String() + " has no selected evidence depth")
+				}
+				if unit.depth == DepthFullSemantic {
+					anyFull = true
+				}
 			}
+			// Structural evidence must match the file's unit depths.
+			switch evidence := file.evidence.(type) {
+			case FullSyntax:
+				if evidence.Syntax == nil {
+					return fail("file " + file.ID().String() + " full-syntax evidence without a tree")
+				}
+				for _, unit := range file.units {
+					if unit.depth != DepthFullSemantic {
+						return fail("file " + file.ID().String() + " retains full syntax over non-full unit " + unit.id.String())
+					}
+				}
+			case MixedUnits:
+				retained := map[identity.SourceUnitID]bool{}
+				for _, r := range evidence.Retained {
+					retained[r.Unit] = true
+				}
+				for _, unit := range file.units {
+					if (unit.depth == DepthFullSemantic) != retained[unit.id] {
+						return fail("file " + file.ID().String() + " retention diverges from depth for " + unit.id.String())
+					}
+				}
+			case ContractOnly:
+				for _, unit := range file.units {
+					if unit.depth == DepthFullSemantic {
+						return fail("file " + file.ID().String() + " drops full-semantic unit " + unit.id.String())
+					}
+				}
+			default:
+				return fail("file " + file.ID().String() + " has no structural evidence state")
+			}
+		}
+		if anyFull && p.typesInfo == nil {
+			return fail("full-semantic units without type information")
+		}
+		if !anyFull && p.typesInfo != nil {
+			return fail("retained type information without any full-semantic unit")
 		}
 	}
 	return p, nil
@@ -320,12 +362,14 @@ func (p *Package) ModuleGoVersion() string { return p.moduleGoVersion }
 // RequestedRoot reports whether the package was a requested root.
 func (p *Package) RequestedRoot() bool { return p.requestedRoot }
 
-// SourceBearing reports whether the package carries checked syntax for
-// analysis (the builtin pseudo-package and unsafe intrinsic do not).
-func (p *Package) SourceBearing() bool {
+// RetainsFullSemantic reports whether any unit of the package is
+// full-semantic (and therefore contributes retained occurrences).
+func (p *Package) RetainsFullSemantic() bool {
 	for _, file := range p.files {
-		if file.syntax != nil {
-			return true
+		for _, unit := range file.units {
+			if unit.depth == DepthFullSemantic {
+				return true
+			}
 		}
 	}
 	return false
@@ -348,14 +392,26 @@ func (p *Package) EmbedFiles() []string { return append([]string(nil), p.embedFi
 // EmbedPatterns are the declared //go:embed patterns (immutable copy).
 func (p *Package) EmbedPatterns() []string { return append([]string(nil), p.embedPatterns...) }
 
-// CheckedView lists cgo checked-view files outside the owner root (immutable
-// copy); CheckedViewDiffers reports whether the checked view differs from the
-// source view. Per-body external obligations are assigned by later planning.
-func (p *Package) CheckedView() []string { return append([]string(nil), p.checkedView...) }
+// CheckedUnitMappings joins source-derived checked declarations to their
+// origin units (immutable copy). Checked paths never appear.
+func (p *Package) CheckedUnitMappings() []CheckedUnitMapping {
+	return append([]CheckedUnitMapping(nil), p.mappings...)
+}
 
-// CheckedViewDiffers reports whether the package's checked view differs from
-// its source view (cgo preprocessing).
-func (p *Package) CheckedViewDiffers() bool { return p.checkedViewDiffers }
+// SyntheticUnits are the package-synthetic checked declarations with typed
+// origin-derived identities (immutable copy).
+func (p *Package) SyntheticUnits() []SyntheticUnit {
+	return append([]SyntheticUnit(nil), p.synthetics...)
+}
+
+// Units enumerates the package's censused units with selected depths.
+func (p *Package) Units() []SourceUnit {
+	var out []SourceUnit
+	for _, file := range p.files {
+		out = append(out, file.units...)
+	}
+	return out
+}
 
 // Types is the package's type evidence: the fully checked package for
 // selected roots, and the toolchain's export-data declaration types for
@@ -372,8 +428,11 @@ type File struct {
 	path             string
 	id               identity.FileID
 	fset             *token.FileSet
-	syntax           *ast.File
+	evidence         FileEvidence
 	effectiveVersion string
+	overlaid         bool
+	cgoOriginal      bool
+	units            []SourceUnit
 }
 
 // Path is the OS path the file was loaded from, for display only.
@@ -385,8 +444,29 @@ func (f *File) ID() identity.FileID { return f.id }
 // Fset carries the file's position information (selected files only).
 func (f *File) Fset() *token.FileSet { return f.fset }
 
-// Syntax is the parsed file; nil for dependency metadata records.
-func (f *File) Syntax() *ast.File { return f.syntax }
+// Evidence is the file's sealed structural evidence state.
+func (f *File) Evidence() FileEvidence { return f.evidence }
+
+// FullSyntax returns the complete checked tree when — and only when — every
+// unit of the file is full-semantic.
+func (f *File) FullSyntax() (*ast.File, bool) {
+	full, ok := f.evidence.(FullSyntax)
+	if !ok {
+		return nil, false
+	}
+	return full.Syntax, true
+}
+
+// Units is the file's total censused unit ledger with selected depths
+// (immutable copy).
+func (f *File) Units() []SourceUnit { return append([]SourceUnit(nil), f.units...) }
+
+// Overlaid reports whether the file's selected bytes came from an overlay.
+func (f *File) Overlaid() bool { return f.overlaid }
+
+// CgoOriginal reports whether the file's checked view lives in cgo
+// transformed output.
+func (f *File) CgoOriginal() bool { return f.cgoOriginal }
 
 // EffectiveGoVersion is the file's effective language version from typed
 // toolchain evidence (go/types file-version tracking); it governs construct
