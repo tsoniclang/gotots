@@ -40,7 +40,7 @@ func TestRunInspectConstructs(t *testing.T) {
 		"goVersion=go1.26",
 		"kind=FuncDecl",
 		"edge=File.Decls role=declaration",
-		"denominators: selectedPackages=",
+		"denominators: sourcePackages=",
 		"unknownConstructs=0",
 	} {
 		if !strings.Contains(rendered, needle) {

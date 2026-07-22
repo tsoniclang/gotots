@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"go/build/constraint"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -35,14 +36,26 @@ func (e *VerificationError) Error() string {
 // Standard and Goroot are corroborating facts; std/cmd set membership is the
 // authoritative classification input.
 type goListPackage struct {
-	ImportPath string
-	Dir        string
-	Standard   bool
-	Goroot     bool
-	DepOnly    bool
-	GoFiles    []string
-	Imports    []string
-	Module     *struct {
+	ImportPath    string
+	Dir           string
+	Standard      bool
+	Goroot        bool
+	DepOnly       bool
+	GoFiles       []string
+	CgoFiles      []string
+	CFiles        []string
+	CXXFiles      []string
+	MFiles        []string
+	HFiles        []string
+	FFiles        []string
+	SFiles        []string
+	SwigFiles     []string
+	SwigCXXFiles  []string
+	SysoFiles     []string
+	EmbedFiles    []string
+	EmbedPatterns []string
+	Imports       []string
+	Module        *struct {
 		Path      string
 		Version   string
 		Main      bool
@@ -56,11 +69,28 @@ type goListPackage struct {
 	}
 }
 
+func (p *goListPackage) otherFiles() []string {
+	var out []string
+	for _, group := range [][]string{p.CFiles, p.CXXFiles, p.MFiles, p.HFiles, p.FFiles, p.SFiles, p.SwigFiles, p.SwigCXXFiles, p.SysoFiles} {
+		out = append(out, group...)
+	}
+	return out
+}
+
 // universeExpectation is one independently derived package expectation.
 type universeExpectation struct {
-	provenance  source.Provenance
-	acquisition source.Acquisition
-	files       map[string]bool
+	root          bool
+	cgoSources    map[string]bool
+	provenance    source.Provenance
+	acquisition   source.Acquisition
+	disposition   source.LanguageDisposition
+	moduleGo      string
+	files         map[string]bool
+	otherFiles    map[string]bool
+	embedFiles    map[string]bool
+	embedPatterns map[string]bool
+	relBase       string
+	moduleGoRaw   string
 }
 
 // VerifySourceUniverse independently reconciles the loaded universe against
@@ -150,7 +180,7 @@ func VerifySourceUniverse(ws *source.Workspace, req source.Request) error {
 		if !reachable[path] {
 			continue
 		}
-		if len(pkg.GoFiles) == 0 && pkg.ImportPath != "unsafe" {
+		if len(pkg.GoFiles) == 0 && len(pkg.CgoFiles) == 0 && pkg.ImportPath != "unsafe" {
 			continue
 		}
 		expectation, id, err := deriveExpectation(pkg, stdSet, cmdSet, ws.Toolchain().GOROOT(), req.Dir)
@@ -173,22 +203,29 @@ func VerifySourceUniverse(ws *source.Workspace, req source.Request) error {
 			continue
 		}
 		matched[id] = true
+		if pkg.RequestedRoot() != expectation.root {
+			mismatches = append(mismatches, fmt.Sprintf("%s root=%v vs independent %v", id, pkg.RequestedRoot(), expectation.root))
+		}
 		if pkg.Provenance() != expectation.provenance {
 			mismatches = append(mismatches, fmt.Sprintf("%s provenance %s vs independent %s", id, pkg.Provenance(), expectation.provenance))
 		}
 		if pkg.Acquisition() != expectation.acquisition {
 			mismatches = append(mismatches, fmt.Sprintf("%s acquisition %s vs independent %s", id, pkg.Acquisition(), expectation.acquisition))
 		}
-		for _, file := range pkg.Files() {
-			if !expectation.files[file.ID().String()] {
-				mismatches = append(mismatches, fmt.Sprintf("%s holds file %s the toolchain does not name", id, file.ID()))
-			}
-			delete(expectation.files, file.ID().String())
+		if pkg.Disposition() != expectation.disposition {
+			mismatches = append(mismatches, fmt.Sprintf("%s disposition %s vs independent %s", id, pkg.Disposition(), expectation.disposition))
 		}
-		for missing := range expectation.files {
-			mismatches = append(mismatches, fmt.Sprintf("%s misses toolchain file %s", id, missing))
+		if pkg.ModuleGoVersion() != expectation.moduleGo {
+			mismatches = append(mismatches, fmt.Sprintf("%s module go %q vs independent %q", id, pkg.ModuleGoVersion(), expectation.moduleGo))
 		}
+		mismatches = append(mismatches, joinSet(id, "file", fileIDSet(pkg), expectation.files)...)
+		mismatches = append(mismatches, joinSet(id, "other-file", stringSet(pkg.OtherFiles()), expectation.otherFiles)...)
+		mismatches = append(mismatches, joinSet(id, "embed-file", stringSet(pkg.EmbedFiles()), expectation.embedFiles)...)
+		mismatches = append(mismatches, joinSet(id, "embed-pattern", stringSet(pkg.EmbedPatterns()), expectation.embedPatterns)...)
+		mismatches = append(mismatches, verifyEvidenceState(pkg, expectation)...)
+		mismatches = append(mismatches, verifyFileVersions(pkg, expectation)...)
 	}
+	mismatches = append(mismatches, verifyTypeGraphCoherence(ws)...)
 	var dropped []string
 	for id := range expected {
 		if !matched[id] {
@@ -205,17 +242,164 @@ func VerifySourceUniverse(ws *source.Workspace, req source.Request) error {
 	return nil
 }
 
+func stringSet(values []string) map[string]bool {
+	set := map[string]bool{}
+	for _, v := range values {
+		set[v] = true
+	}
+	return set
+}
+
+func fileIDSet(pkg *source.Package) map[string]bool {
+	set := map[string]bool{}
+	for _, file := range pkg.Files() {
+		set[file.ID().String()] = true
+	}
+	return set
+}
+
+// joinSet exact-joins one input-file class, reporting both one-sided lists.
+func joinSet(id, class string, got, want map[string]bool) []string {
+	var out []string
+	for member := range got {
+		if !want[member] {
+			out = append(out, fmt.Sprintf("%s holds %s %s the toolchain does not name", id, class, member))
+		}
+	}
+	for member := range want {
+		if !got[member] {
+			out = append(out, fmt.Sprintf("%s misses toolchain %s %s", id, class, member))
+		}
+	}
+	return out
+}
+
+// verifyEvidenceState checks the source/type evidence a package's disposition
+// requires is present — for every package, not only roots.
+func verifyEvidenceState(pkg *source.Package, expectation *universeExpectation) []string {
+	id := pkg.ID().String()
+	switch expectation.disposition {
+	case source.DispositionBuiltinUniverse:
+		return nil
+	case source.DispositionUnsafeIntrinsic:
+		if pkg.Types() == nil {
+			return []string{id + " unsafe record lacks type evidence"}
+		}
+		return nil
+	}
+	var out []string
+	if pkg.Types() == nil || pkg.TypesInfo() == nil {
+		out = append(out, id+" lacks type evidence")
+	}
+	if expectation.disposition == source.DispositionOrdinarySource {
+		for _, file := range pkg.Files() {
+			if file.Syntax() == nil && !expectation.cgoSources[file.ID().String()] {
+				out = append(out, id+" file "+file.ID().String()+" lacks checked syntax and is not a toolchain-named cgo source")
+			}
+		}
+	}
+	return out
+}
+
+// verifyFileVersions independently derives each file's effective language
+// version from the module go directive plus the file's raw //go:build
+// constraint (parsed with go/build/constraint, not the producer's evidence)
+// and joins it against the producer's per-file version.
+func verifyFileVersions(pkg *source.Package, expectation *universeExpectation) []string {
+	var out []string
+	moduleVersion := ""
+	if expectation.moduleGo != "" {
+		moduleVersion = "go" + expectation.moduleGo
+	}
+	for _, file := range pkg.Files() {
+		if file.Syntax() == nil {
+			continue
+		}
+		expected := moduleVersion
+		if fromConstraint := fileConstraintVersion(file.Path()); fromConstraint != "" {
+			expected = fromConstraint
+		}
+		if expected == "" {
+			continue // reserved owners carry no module directive
+		}
+		if got := file.EffectiveGoVersion(); got != expected {
+			out = append(out, fmt.Sprintf("%s effective version %q vs independent %q", file.ID(), got, expected))
+		}
+	}
+	return out
+}
+
+// fileConstraintVersion extracts the go-version bound of a file's //go:build
+// line from raw bytes, independent of the producer's parse.
+func fileConstraintVersion(path string) string {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(raw), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "package ") {
+			break
+		}
+		if !constraint.IsGoBuild(trimmed) {
+			continue
+		}
+		expr, err := constraint.Parse(trimmed)
+		if err != nil {
+			return ""
+		}
+		return constraint.GoVersion(expr)
+	}
+	return ""
+}
+
+// verifyTypeGraphCoherence proves every import edge resolves to the identical
+// *types.Package object stored on the imported record: one coherent go/types
+// graph, never mixed loads.
+func verifyTypeGraphCoherence(ws *source.Workspace) []string {
+	byPath := map[string]*source.Package{}
+	for _, pkg := range ws.Packages() {
+		byPath[pkg.ID().ImportPath()] = pkg
+	}
+	var out []string
+	for _, pkg := range ws.Packages() {
+		if pkg.Types() == nil {
+			continue
+		}
+		for _, imported := range pkg.Types().Imports() {
+			record, tracked := byPath[imported.Path()]
+			if !tracked || record.Types() == nil {
+				continue
+			}
+			if record.Types() != imported {
+				out = append(out, fmt.Sprintf("type-graph incoherence: %s imports %s as a distinct types.Package object",
+					pkg.ID(), imported.Path()))
+			}
+		}
+	}
+	return out
+}
+
 // deriveExpectation independently classifies one go list record. std/cmd set
 // membership is authoritative; Standard/Goroot corroborate; spelling never
 // classifies.
 func deriveExpectation(pkg *goListPackage, stdSet, cmdSet map[string]bool, goroot, workspaceDir string) (*universeExpectation, string, error) {
-	out := &universeExpectation{files: map[string]bool{}}
+	out := &universeExpectation{
+		root: !pkg.DepOnly, disposition: source.DispositionOrdinarySource,
+		files: map[string]bool{}, otherFiles: map[string]bool{},
+		embedFiles: map[string]bool{}, embedPatterns: map[string]bool{},
+		cgoSources: map[string]bool{},
+	}
+	if pkg.Module != nil {
+		out.moduleGo = pkg.Module.GoVersion
+	}
 	var owner identity.Owner
 	var relBase string
 	switch {
 	case pkg.ImportPath == "builtin":
 		owner = identity.LanguagePseudoOwner()
-		out.provenance, out.acquisition = source.ProvenanceLanguagePseudo, source.AcquisitionGOROOT
+		out.provenance, out.acquisition, out.disposition = source.ProvenanceLanguagePseudo, source.AcquisitionGOROOT, source.DispositionBuiltinUniverse
+		out.moduleGo = ""
 		relBase = filepath.Join(goroot, "src")
 	case stdSet[pkg.ImportPath]:
 		if !pkg.Standard || !pkg.Goroot {
@@ -223,10 +407,15 @@ func deriveExpectation(pkg *goListPackage, stdSet, cmdSet map[string]bool, goroo
 		}
 		owner = identity.StandardLibraryOwner()
 		out.provenance, out.acquisition = source.ProvenanceStandardLibrary, source.AcquisitionGOROOT
+		if pkg.ImportPath == "unsafe" {
+			out.disposition = source.DispositionUnsafeIntrinsic
+		}
+		out.moduleGo = ""
 		relBase = filepath.Join(goroot, "src")
 	case cmdSet[pkg.ImportPath] || (pkg.Goroot && pkg.Module == nil):
 		owner = identity.ToolchainOwner()
 		out.provenance, out.acquisition = source.ProvenanceToolchainPackage, source.AcquisitionGOROOT
+		out.moduleGo = ""
 		relBase = filepath.Join(goroot, "src")
 	case pkg.Module != nil:
 		moduleDir := pkg.Module.Dir
@@ -276,7 +465,7 @@ func deriveExpectation(pkg *goListPackage, stdSet, cmdSet map[string]bool, goroo
 	if err != nil {
 		return nil, "", err
 	}
-	for _, goFile := range pkg.GoFiles {
+	for _, goFile := range append(append([]string{}, pkg.GoFiles...), pkg.CgoFiles...) {
 		rel, err := filepath.Rel(relBase, filepath.Join(pkg.Dir, goFile))
 		if err != nil || strings.HasPrefix(rel, "..") {
 			return nil, "", fmt.Errorf("%s: file %s outside owner root", pkg.ImportPath, goFile)
@@ -287,7 +476,38 @@ func deriveExpectation(pkg *goListPackage, stdSet, cmdSet map[string]bool, goroo
 		}
 		out.files[fileID.String()] = true
 	}
+	for _, cgoFile := range pkg.CgoFiles {
+		rel, err := filepath.Rel(relBase, filepath.Join(pkg.Dir, cgoFile))
+		if err == nil && !strings.HasPrefix(rel, "..") {
+			if fileID, err := identity.NewFileID(owner, filepath.ToSlash(rel)); err == nil {
+				out.cgoSources[fileID.String()] = true
+			}
+		}
+	}
+	for _, other := range pkg.otherFiles() {
+		out.otherFiles[ownerRelOrRaw(relBase, filepath.Join(pkg.Dir, other))] = true
+	}
+	for _, embed := range pkg.EmbedFiles {
+		out.embedFiles[ownerRelOrRaw(relBase, absOrJoin(pkg.Dir, embed))] = true
+	}
+	for _, pattern := range pkg.EmbedPatterns {
+		out.embedPatterns[pattern] = true
+	}
 	return out, packageID.String(), nil
+}
+
+func ownerRelOrRaw(relBase, path string) string {
+	if rel, err := filepath.Rel(relBase, path); err == nil && !strings.HasPrefix(rel, "..") {
+		return filepath.ToSlash(rel)
+	}
+	return path
+}
+
+func absOrJoin(dir, path string) string {
+	if filepath.IsAbs(path) {
+		return path
+	}
+	return filepath.Join(dir, path)
 }
 
 func under(path, root string) bool {

@@ -89,7 +89,7 @@ func (b *builder) variantOf(i int, n ast.Node, info *types.Info) (catalog.Varian
 		if !ok {
 			return unresolved("composite literal has no type evidence")
 		}
-		switch types.Unalias(tv.Type).Underlying().(type) {
+		switch aggregateShape(tv.Type).(type) {
 		case *types.Struct:
 			return catalog.VariantLitStruct, nil
 		case *types.Array:
@@ -109,7 +109,7 @@ func (b *builder) variantOf(i int, n ast.Node, info *types.Info) (catalog.Varian
 		if !ok {
 			return unresolved("enclosing literal has no type evidence")
 		}
-		switch types.Unalias(tv.Type).Underlying().(type) {
+		switch aggregateShape(tv.Type).(type) {
 		case *types.Struct:
 			return catalog.VariantKeyFieldName, nil
 		case *types.Map:
@@ -181,7 +181,7 @@ func (b *builder) indexVariant(i int, x ast.Expr, n *ast.IndexExpr, info *types.
 		return catalog.VariantInvalid, newResolutionError(b.occurrences[i].kind, b.file, b.occurrences[i].span,
 			"index operand has no type evidence")
 	}
-	if _, isMap := types.Unalias(tv.Type).Underlying().(*types.Map); isMap {
+	if _, isMap := coreOf(tv.Type).(*types.Map); isMap {
 		if b.commaOkContext(i) {
 			return catalog.VariantMapLookupCommaOk, nil
 		}
@@ -221,11 +221,11 @@ func (b *builder) rangeVariant(i int, n *ast.RangeStmt, info *types.Info) (catal
 		return catalog.VariantInvalid, newResolutionError(b.occurrences[i].kind, b.file, b.occurrences[i].span,
 			"range operand has no type evidence")
 	}
-	switch t := types.Unalias(types.Default(tv.Type)).Underlying().(type) {
+	switch t := coreOf(types.Default(tv.Type)).(type) {
 	case *types.Array:
 		return catalog.VariantRangeArray, nil
 	case *types.Pointer:
-		if _, toArray := types.Unalias(t.Elem()).Underlying().(*types.Array); toArray {
+		if _, toArray := coreOf(t.Elem()).(*types.Array); toArray {
 			return catalog.VariantRangePointerToArray, nil
 		}
 	case *types.Slice:
@@ -260,6 +260,69 @@ func (b *builder) commaOkContext(i int) bool {
 		return len(parent.Names) == 2 && len(parent.Values) == 1 && parent.Values[0] == self
 	}
 	return false
+}
+
+// aggregateShape resolves the effective aggregate shape of a composite
+// literal type: alias-free underlying, resolving type-parameter core types and
+// unwrapping one pointer level (a []*T literal's elements are implicit &T{}).
+func aggregateShape(t types.Type) types.Type {
+	u := coreOf(t)
+	if pointer, ok := u.(*types.Pointer); ok {
+		u = coreOf(pointer.Elem())
+	}
+	return u
+}
+
+// coreOf is the alias-free underlying of t, resolving a type parameter to the
+// single core type of its constraint's type set when one exists.
+func coreOf(t types.Type) types.Type {
+	if tp, ok := types.Unalias(t).(*types.TypeParam); ok {
+		if core := constraintCore(tp); core != nil {
+			return core
+		}
+	}
+	return types.Unalias(t).Underlying()
+}
+
+// constraintCore computes the single common underlying type of a constraint's
+// type set, or nil when the set is empty or mixed.
+func constraintCore(tp *types.TypeParam) types.Type {
+	iface, ok := types.Unalias(tp.Constraint()).Underlying().(*types.Interface)
+	if !ok {
+		return nil
+	}
+	var core types.Type
+	ok = true
+	var visit func(t types.Type)
+	visit = func(t types.Type) {
+		if !ok {
+			return
+		}
+		switch t := types.Unalias(t).(type) {
+		case *types.Union:
+			for i := 0; i < t.Len(); i++ {
+				visit(t.Term(i).Type())
+			}
+		case *types.Interface:
+			for i := 0; i < t.NumEmbeddeds(); i++ {
+				visit(t.EmbeddedType(i))
+			}
+		default:
+			u := types.Unalias(t).Underlying()
+			if core == nil {
+				core = u
+			} else if !types.Identical(core, u) {
+				ok = false
+			}
+		}
+	}
+	for i := 0; i < iface.NumEmbeddeds(); i++ {
+		visit(iface.EmbeddedType(i))
+	}
+	if !ok {
+		return nil
+	}
+	return core
 }
 
 // calleeIdent unwraps the identifier a callee/index base resolves through:

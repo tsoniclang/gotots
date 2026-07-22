@@ -96,8 +96,8 @@ func printInspection(stdout io.Writer, inspection *compiler.Inspection) error {
 	ownerCounts := map[string]int{}
 	for _, pkg := range ws.Packages() {
 		ownerCounts[pkg.ID().Owner().Class().String()]++
-		if err := p("universe %s provenance=%s acquisition=%s disposition=%s moduleGo=%s selected=%v\n",
-			pkg.ID(), pkg.Provenance(), pkg.Acquisition(), pkg.Disposition(), pkg.ModuleGoVersion(), pkg.Selected()); err != nil {
+		if err := p("universe %s provenance=%s acquisition=%s disposition=%s moduleGo=%s root=%v\n",
+			pkg.ID(), pkg.Provenance(), pkg.Acquisition(), pkg.Disposition(), pkg.ModuleGoVersion(), pkg.RequestedRoot()); err != nil {
 			return err
 		}
 	}
@@ -142,6 +142,6 @@ func printInspection(stdout io.Writer, inspection *compiler.Inspection) error {
 		ownerCounts["toolchain"], ownerCounts["language-pseudo"]); err != nil {
 		return err
 	}
-	return p("denominators: selectedPackages=%d files=%d occurrences=%d directives=%d variantBearing=%d implicitOps=%d unknownConstructs=0 unknownDirectives=0\n",
+	return p("denominators: sourcePackages=%d files=%d occurrences=%d directives=%d variantBearing=%d implicitOps=%d unknownConstructs=0 unknownDirectives=0\n",
 		d.Packages, d.Files, d.Occurrences, d.Directives, d.VariantBearing, d.ImplicitOps)
 }

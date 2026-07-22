@@ -28,8 +28,11 @@ func writeModule(t *testing.T, files map[string]string) string {
 }
 
 var moduleA = map[string]string{
-	"go.mod":   "module check.example/a\n\ngo 1.26\n",
-	"a.go":     "package a\n\nimport \"fmt\"\n\nfunc A(x int) int { return x + 1 }\n\nfunc Show(x int) string { return fmt.Sprint(x) }\n",
+	"go.mod":   "module check.example/a\n\ngo 1.24\n",
+	"a.go":     "package a\n\nimport (\n\t\"embed\"\n\t\"fmt\"\n\t\"unsafe\"\n)\n\n//go:embed note.txt\nvar Note embed.FS\n\nfunc A(x int) int { return x + int(unsafe.Sizeof(0)) }\n\nfunc Show(x int) string { return fmt.Sprint(x) }\n",
+	"newer.go": "//go:build go1.26\n\npackage a\n\nfunc Newer() int { return 2 }\n",
+	"asm.s":    "// reference assembly input (no symbols)\n",
+	"note.txt": "embedded note\n",
 	"sub/b.go": "package sub\n\nconst B = 2\n",
 }
 

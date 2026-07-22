@@ -16,26 +16,21 @@ import (
 	"github.com/tsoniclang/gotots/internal/identity"
 )
 
-// rootMode loads the requested roots with syntax and complete type
-// information (imports satisfied from export data).
-const rootMode = packages.NeedName |
+// loadMode is the single load configuration: requested roots AND their
+// complete dependency closure resolve in one packages.Load invocation, so
+// every package belongs to one coherent go/types object graph. There is no
+// second load and no metadata-now/hydrate-later route.
+const loadMode = packages.NeedName |
 	packages.NeedFiles |
 	packages.NeedCompiledGoFiles |
 	packages.NeedImports |
+	packages.NeedDeps |
 	packages.NeedModule |
 	packages.NeedSyntax |
 	packages.NeedTypes |
-	packages.NeedTypesInfo
-
-// closureMode resolves the complete transitive package closure with
-// declaration-level type evidence for every node (toolchain export data;
-// no dependency syntax).
-const closureMode = packages.NeedName |
-	packages.NeedFiles |
-	packages.NeedImports |
-	packages.NeedDeps |
-	packages.NeedModule |
-	packages.NeedTypes
+	packages.NeedTypesInfo |
+	packages.NeedEmbedFiles |
+	packages.NeedEmbedPatterns
 
 // LoadWorkspace resolves one compilation request into the typed universe. It
 // fails closed on any package error, type error, identity collision, or
@@ -59,44 +54,28 @@ func LoadWorkspace(req Request) (*Workspace, error) {
 		return nil, err
 	}
 	fset := token.NewFileSet()
-	baseConfig := func(mode packages.LoadMode) *packages.Config {
-		return &packages.Config{
-			Mode: mode,
-			Dir:  req.Dir,
-			Fset: fset,
-			ParseFile: func(fset *token.FileSet, filename string, src []byte) (*ast.File, error) {
-				return parser.ParseFile(fset, filename, src, parser.ParseComments|parser.SkipObjectResolution)
-			},
-			Overlay:    req.Overlay,
-			BuildFlags: req.BuildFlags,
-			Env:        env,
-		}
+	cfg := &packages.Config{
+		Mode: loadMode,
+		Dir:  req.Dir,
+		Fset: fset,
+		ParseFile: func(fset *token.FileSet, filename string, src []byte) (*ast.File, error) {
+			return parser.ParseFile(fset, filename, src, parser.ParseComments|parser.SkipObjectResolution)
+		},
+		Overlay:    req.Overlay,
+		BuildFlags: req.BuildFlags,
+		Env:        env,
 	}
-	roots, err := packages.Load(baseConfig(rootMode), patterns...)
+	loaded, err := packages.Load(cfg, patterns...)
 	if err != nil {
-		return nil, &LoadError{Dir: req.Dir, Reason: "root load failed: " + err.Error()}
+		return nil, &LoadError{Dir: req.Dir, Reason: "load failed: " + err.Error()}
 	}
-	closure, err := packages.Load(baseConfig(closureMode), patterns...)
-	if err != nil {
-		return nil, &LoadError{Dir: req.Dir, Reason: "closure load failed: " + err.Error()}
+	requested := map[string]bool{}
+	for _, pkg := range loaded {
+		if len(pkg.GoFiles) > 0 || len(pkg.CompiledGoFiles) > 0 || pkg.PkgPath == "unsafe" {
+			requested[pkg.PkgPath] = true
+		}
 	}
-	rootByPath := map[string]*packages.Package{}
-	for _, pkg := range roots {
-		if pkg.PkgPath == "builtin" {
-			// The builtin pseudo-package redeclares the predeclared universe
-			// and can never be type-checked as ordinary source; it joins the
-			// closure as a language-pseudo metadata record only.
-			continue
-		}
-		if len(pkg.Errors) > 0 {
-			return nil, &LoadError{Dir: req.Dir, Reason: pkg.PkgPath + ": " + pkg.Errors[0].Error()}
-		}
-		if len(pkg.CompiledGoFiles) == 0 && len(pkg.GoFiles) == 0 {
-			continue
-		}
-		rootByPath[pkg.PkgPath] = pkg
-	}
-	if len(rootByPath) == 0 {
+	if len(requested) == 0 {
 		return nil, &LoadError{Dir: req.Dir, Reason: "no Go source packages matched " + strings.Join(patterns, " ")}
 	}
 	classifier := &classifier{
@@ -106,7 +85,7 @@ func LoadWorkspace(req Request) (*Workspace, error) {
 	ws := &Workspace{fset: fset, toolchain: toolchain}
 	seen := map[identity.PackageID]bool{}
 	var walkErr error
-	packages.Visit(closure, nil, func(pkg *packages.Package) {
+	packages.Visit(loaded, nil, func(pkg *packages.Package) {
 		if walkErr != nil {
 			return
 		}
@@ -117,14 +96,10 @@ func LoadWorkspace(req Request) (*Workspace, error) {
 		if len(pkg.GoFiles) == 0 && len(pkg.CompiledGoFiles) == 0 && pkg.PkgPath != "unsafe" {
 			return
 		}
-		root := rootByPath[pkg.PkgPath]
-		record, err := classifier.record(pkg, root, fset)
+		record, err := classifier.record(pkg, requested[pkg.PkgPath], fset)
 		if err != nil {
 			walkErr = err
 			return
-		}
-		if record.types == nil && pkg.PkgPath != "builtin" {
-			record.types = pkg.Types
 		}
 		if seen[record.id] {
 			walkErr = &LoadError{Dir: req.Dir, Reason: "duplicate package identity " + record.id.String()}
@@ -139,17 +114,19 @@ func LoadWorkspace(req Request) (*Workspace, error) {
 	if walkErr != nil {
 		return nil, walkErr
 	}
-	if len(ws.selected) == 0 {
-		return nil, &LoadError{Dir: req.Dir, Reason: "no selected packages after classification"}
+	if len(ws.roots) == 0 {
+		return nil, &LoadError{Dir: req.Dir, Reason: "no requested roots after classification"}
 	}
 	sort.Slice(ws.packages, func(i, j int) bool { return ws.packages[i].id.String() < ws.packages[j].id.String() })
-	sort.Slice(ws.selected, func(i, j int) bool { return ws.selected[i].id.String() < ws.selected[j].id.String() })
+	sort.Slice(ws.roots, func(i, j int) bool { return ws.roots[i].id.String() < ws.roots[j].id.String() })
 	return ws, nil
 }
 
 // resolveToolchain resolves the exact selected go binary and its fingerprint,
-// and produces the environment (with PATH pinned to that binary) shared by the
-// loader and every downstream toolchain execution.
+// and produces the environment shared by the loader and every toolchain
+// execution. The go/packages driver resolves "go" from PATH; a shim directory
+// whose "go" entry links to the exact selected binary guarantees the driver
+// invokes it even when the selected filename is not "go".
 func resolveToolchain(req Request) (Toolchain, []string, func(), error) {
 	noop := func() {}
 	binary := req.GoBinary
@@ -164,9 +141,6 @@ func resolveToolchain(req Request) (Toolchain, []string, func(), error) {
 	if err != nil {
 		return Toolchain{}, nil, noop, &LoadError{Dir: req.Dir, Reason: "toolchain path unresolvable: " + err.Error()}
 	}
-	// The go/packages driver resolves "go" from PATH. A shim directory whose
-	// "go" entry links to the exact selected binary guarantees the driver
-	// invokes it even when the selected filename is not "go".
 	shimDir, err := os.MkdirTemp("", "gotots-toolchain-*")
 	if err != nil {
 		return Toolchain{}, nil, noop, &LoadError{Dir: req.Dir, Reason: "toolchain shim: " + err.Error()}
@@ -231,8 +205,8 @@ type classifier struct {
 	moduleDirs map[identity.ModuleID]string
 }
 
-func (c *classifier) record(pkg *packages.Package, root *packages.Package, fset *token.FileSet) (*Package, error) {
-	out := &Package{selected: root != nil, disposition: DispositionOrdinarySource}
+func (c *classifier) record(pkg *packages.Package, isRoot bool, fset *token.FileSet) (*Package, error) {
+	out := &Package{requestedRoot: isRoot, disposition: DispositionOrdinarySource}
 	var owner identity.Owner
 	var relBase string
 	switch {
@@ -293,9 +267,6 @@ func (c *classifier) record(pkg *packages.Package, root *packages.Package, fset 
 		}
 		relBase = moduleDir
 		if relBase == "" {
-			// Vendored modules report no module directory; files live under
-			// the workspace vendor tree and stay identified module-relative
-			// through the vendor path suffix.
 			relBase = vendorBase(pkg, c.req.Dir)
 		}
 	default:
@@ -308,59 +279,108 @@ func (c *classifier) record(pkg *packages.Package, root *packages.Package, fset 
 	}
 	out.id = packageID
 	out.imports = importPaths(pkg)
-	if root != nil {
-		if err := c.attachSelected(out, root, owner, relBase, fset); err != nil {
-			return nil, err
-		}
-		return out, nil
+	if err := c.attachInputs(out, pkg, owner, relBase, fset); err != nil {
+		return nil, err
 	}
-	for _, goFile := range pkg.GoFiles {
-		fileID, err := c.fileIDFor(owner, relBase, goFile, pkg)
-		if err != nil {
-			return nil, err
-		}
-		out.files = append(out.files, &File{path: goFile, id: fileID})
-	}
-	sort.Slice(out.files, func(i, j int) bool { return out.files[i].id.Rel() < out.files[j].id.Rel() })
 	return out, nil
 }
 
-// attachSelected joins the syntax/type-bearing root package onto the record.
-func (c *classifier) attachSelected(out *Package, root *packages.Package, owner identity.Owner, relBase string, fset *token.FileSet) error {
-	if root.Types == nil || root.TypesInfo == nil {
-		return &LoadError{Dir: c.req.Dir, Reason: root.PkgPath + ": type information missing"}
+// attachInputs models the package's complete inputs: identity-bearing source
+// Go files with their checked syntax, the checked-view difference for cgo
+// packages, non-Go inputs, and embed files/patterns. The loader never aborts a
+// cgo-importing package; the view difference is recorded and later semantic
+// planning assigns per-body external obligations.
+func (c *classifier) attachInputs(out *Package, pkg *packages.Package, owner identity.Owner, relBase string, fset *token.FileSet) error {
+	if pkg.PkgPath == "builtin" {
+		for _, goFile := range pkg.GoFiles {
+			fileID, err := c.fileIDFor(owner, relBase, goFile)
+			if err != nil {
+				return err
+			}
+			out.files = append(out.files, &File{path: goFile, id: fileID})
+		}
+		sortFiles(out.files)
+		return nil
 	}
-	out.types, out.typesInfo = root.Types, root.TypesInfo
-	if len(root.Syntax) != len(root.CompiledGoFiles) {
-		return &CgoUnsupportedError{ImportPath: root.PkgPath}
+	out.types, out.typesInfo = pkg.Types, pkg.TypesInfo
+	// Checked syntax aligns with CompiledGoFiles. Compiled files under the
+	// owner root are ordinary source; compiled files outside it are the cgo
+	// checked view.
+	syntaxByPath := map[string]*ast.File{}
+	for i, syntax := range pkg.Syntax {
+		if i < len(pkg.CompiledGoFiles) {
+			syntaxByPath[pkg.CompiledGoFiles[i]] = syntax
+		}
 	}
-	for i, syntax := range root.Syntax {
-		osPath := root.CompiledGoFiles[i]
-		fileID, err := c.fileIDFor(owner, relBase, osPath, root)
+	for _, compiled := range pkg.CompiledGoFiles {
+		if rel, err := filepath.Rel(relBase, compiled); err != nil || strings.HasPrefix(rel, "..") {
+			out.checkedView = append(out.checkedView, compiled)
+			out.checkedViewDiffers = true
+		}
+	}
+	for _, goFile := range pkg.GoFiles {
+		fileID, err := c.fileIDFor(owner, relBase, goFile)
 		if err != nil {
-			// A compiled file outside the owner root is cgo/generated
-			// intermediate output: an explicit disposition.
-			return &CgoUnsupportedError{ImportPath: root.PkgPath}
+			return err
 		}
-		effective := root.TypesInfo.FileVersions[syntax]
-		if effective == "" && root.Module != nil {
-			effective = "go" + root.Module.GoVersion
+		file := &File{path: goFile, id: fileID}
+		if syntax, checked := syntaxByPath[goFile]; checked {
+			file.fset = fset
+			file.syntax = syntax
+			if pkg.TypesInfo != nil {
+				file.effectiveVersion = pkg.TypesInfo.FileVersions[syntax]
+			}
+			if file.effectiveVersion == "" && pkg.Module != nil && pkg.Module.GoVersion != "" {
+				file.effectiveVersion = "go" + pkg.Module.GoVersion
+			}
+		} else if out.disposition == DispositionOrdinarySource && !out.checkedViewDiffers {
+			// A source file may lack checked syntax only when its checked
+			// form genuinely lives in a differing checked view (cgo). A
+			// missing-syntax file without that corroboration is a defect,
+			// never a silent metadata downgrade.
+			return &LoadError{Dir: c.req.Dir, Reason: fileID.String() +
+				": file has no checked syntax and the package has no checked-view difference"}
 		}
-		out.files = append(out.files, &File{
-			path: osPath, id: fileID, fset: fset, syntax: syntax, effectiveVersion: effective,
-		})
+		out.files = append(out.files, file)
 	}
-	sort.Slice(out.files, func(i, j int) bool { return out.files[i].id.Rel() < out.files[j].id.Rel() })
+	sortFiles(out.files)
+	for _, other := range pkg.OtherFiles {
+		out.otherFiles = append(out.otherFiles, c.ownerRel(relBase, other))
+	}
+	sort.Strings(out.otherFiles)
+	for _, embed := range pkg.EmbedFiles {
+		out.embedFiles = append(out.embedFiles, c.ownerRel(relBase, embed))
+	}
+	sort.Strings(out.embedFiles)
+	// x/tools absolutizes embed patterns; restore the declared package-dir-
+	// relative spelling.
+	for _, pattern := range pkg.EmbedPatterns {
+		out.embedPatterns = append(out.embedPatterns, c.ownerRel(pkg.Dir, pattern))
+	}
+	sort.Strings(out.embedPatterns)
 	return nil
 }
 
+// ownerRel renders an input path owner-relative when possible, keeping the
+// raw path otherwise (display only; never an identity).
+func (c *classifier) ownerRel(relBase, path string) string {
+	if rel, err := filepath.Rel(relBase, path); err == nil && !strings.HasPrefix(rel, "..") {
+		return filepath.ToSlash(rel)
+	}
+	return path
+}
+
 // fileIDFor derives one file's owner-relative identity.
-func (c *classifier) fileIDFor(owner identity.Owner, relBase, osPath string, pkg *packages.Package) (identity.FileID, error) {
+func (c *classifier) fileIDFor(owner identity.Owner, relBase, osPath string) (identity.FileID, error) {
 	rel, err := filepath.Rel(relBase, osPath)
 	if err != nil || strings.HasPrefix(rel, "..") {
 		return identity.FileID{}, &LoadError{Dir: c.req.Dir, Reason: osPath + ": file lies outside its owner root " + relBase}
 	}
 	return identity.NewFileID(owner, filepath.ToSlash(rel))
+}
+
+func sortFiles(files []*File) {
+	sort.Slice(files, func(i, j int) bool { return files[i].id.Rel() < files[j].id.Rel() })
 }
 
 // vendoredDir reports whether the package's files live under the workspace

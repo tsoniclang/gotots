@@ -50,17 +50,6 @@ func (e *LoadError) Error() string {
 	return fmt.Sprintf("GOTOTS_SOURCE_LOAD: %s: %s", e.Dir, e.Reason)
 }
 
-// CgoUnsupportedError is the typed disposition of a selected root package that
-// requires cgo preprocessing: an explicit unsupported disposition, never a
-// silent omission or a generic path failure.
-type CgoUnsupportedError struct {
-	ImportPath string
-}
-
-func (e *CgoUnsupportedError) Error() string {
-	return fmt.Sprintf("GOTOTS_CGO_UNSUPPORTED: selected package %s requires cgo preprocessing; cgo bodies are an explicit external obligation, not ordinary source", e.ImportPath)
-}
-
 // Provenance is the closed toolchain-resolved package class.
 type Provenance uint8
 
@@ -180,7 +169,7 @@ type Workspace struct {
 	fset      *token.FileSet
 	toolchain Toolchain
 	packages  []*Package // complete closure, deterministic identity order
-	selected  []*Package // the requested root packages, syntax-bearing
+	roots     []*Package // the requested root packages
 }
 
 // Fset carries position information for every loaded file.
@@ -192,23 +181,30 @@ func (w *Workspace) Toolchain() Toolchain { return w.toolchain }
 // Packages is the complete package closure in deterministic order.
 func (w *Workspace) Packages() []*Package { return w.packages }
 
-// Selected are the requested root packages (syntax- and type-bearing).
-func (w *Workspace) Selected() []*Package { return w.selected }
+// Roots are the requested root packages. Analysis covers the complete
+// source-bearing closure, not only the roots; roots exist for reporting and
+// reachability anchoring.
+func (w *Workspace) Roots() []*Package { return w.roots }
 
 // Package is one resolved package of the closure. Selected packages carry
 // syntax and type information; dependency packages carry identity, provenance,
 // acquisition, version, and file facts.
 type Package struct {
-	id              identity.PackageID
-	provenance      Provenance
-	acquisition     Acquisition
-	disposition     LanguageDisposition
-	moduleGoVersion string // module `go` directive; empty for reserved owners
-	selected        bool
-	imports         []string // imported package paths, sorted
-	files           []*File
-	types           *types.Package
-	typesInfo       *types.Info
+	id                 identity.PackageID
+	provenance         Provenance
+	acquisition        Acquisition
+	disposition        LanguageDisposition
+	moduleGoVersion    string // module `go` directive; empty for reserved owners
+	requestedRoot      bool
+	imports            []string // imported package paths, sorted
+	files              []*File  // identity-bearing source Go files
+	otherFiles         []string // non-Go inputs (C/asm/etc.), owner-relative
+	embedFiles         []string // resolved //go:embed inputs, owner-relative
+	embedPatterns      []string // declared //go:embed patterns
+	checkedView        []string // cgo checked-view files outside the owner root
+	checkedViewDiffers bool     // the checked view differs from source (cgo)
+	types              *types.Package
+	typesInfo          *types.Info
 }
 
 // admit is the single gate into a workspace: it validates the record and
@@ -221,8 +217,8 @@ func (w *Workspace) admit(record *Package) error {
 		return err
 	}
 	w.packages = append(w.packages, validated)
-	if validated.selected {
-		w.selected = append(w.selected, validated)
+	if validated.requestedRoot {
+		w.roots = append(w.roots, validated)
 	}
 	return nil
 }
@@ -277,13 +273,28 @@ func finishPackage(p *Package) (*Package, error) {
 	if owner != identity.OwnerModule && p.moduleGoVersion != "" {
 		return fail("reserved owner carries a module go directive")
 	}
-	if p.selected {
+	// Evidence is required wherever the disposition requires it — for every
+	// package in the closure, not only requested roots.
+	switch p.disposition {
+	case DispositionBuiltinUniverse:
+		// metadata-only pseudo-package: no type or syntax evidence exists
+	case DispositionUnsafeIntrinsic:
+		if p.types == nil {
+			return fail("unsafe intrinsic record lacks type evidence")
+		}
+	default:
 		if p.types == nil || p.typesInfo == nil {
-			return fail("selected record lacks type evidence")
+			return fail("source record lacks type evidence")
+		}
+		if p.types.Path() != p.id.ImportPath() {
+			return fail("type-graph package path " + p.types.Path() + " diverges from identity")
+		}
+		if len(p.files) == 0 {
+			return fail("source record has no files")
 		}
 		for _, file := range p.files {
-			if file.Syntax() == nil {
-				return fail("selected record file " + file.ID().String() + " lacks syntax")
+			if file.Syntax() == nil && !p.checkedViewDiffers {
+				return fail("file " + file.ID().String() + " lacks checked syntax")
 			}
 		}
 	}
@@ -306,15 +317,45 @@ func (p *Package) Disposition() LanguageDisposition { return p.disposition }
 // owners. It is a module fact, never a per-file permission.
 func (p *Package) ModuleGoVersion() string { return p.moduleGoVersion }
 
-// Selected reports whether the package was a requested root.
-func (p *Package) Selected() bool { return p.selected }
+// RequestedRoot reports whether the package was a requested root.
+func (p *Package) RequestedRoot() bool { return p.requestedRoot }
 
-// Imports are the imported package paths, sorted.
-func (p *Package) Imports() []string { return p.imports }
+// SourceBearing reports whether the package carries checked syntax for
+// analysis (the builtin pseudo-package and unsafe intrinsic do not).
+func (p *Package) SourceBearing() bool {
+	for _, file := range p.files {
+		if file.syntax != nil {
+			return true
+		}
+	}
+	return false
+}
 
-// Files are the package's files in deterministic order. Selected packages
-// carry parsed syntax; dependency records carry identity and path only.
+// Imports are the imported package paths, sorted (immutable copy).
+func (p *Package) Imports() []string { return append([]string(nil), p.imports...) }
+
+// Files are the package's identity-bearing source Go files in deterministic
+// order. Every source-bearing package's files carry checked syntax; a file
+// without syntax belongs to a cgo checked-view difference.
 func (p *Package) Files() []*File { return p.files }
+
+// OtherFiles are the package's non-Go inputs (immutable copy).
+func (p *Package) OtherFiles() []string { return append([]string(nil), p.otherFiles...) }
+
+// EmbedFiles are the resolved //go:embed inputs (immutable copy).
+func (p *Package) EmbedFiles() []string { return append([]string(nil), p.embedFiles...) }
+
+// EmbedPatterns are the declared //go:embed patterns (immutable copy).
+func (p *Package) EmbedPatterns() []string { return append([]string(nil), p.embedPatterns...) }
+
+// CheckedView lists cgo checked-view files outside the owner root (immutable
+// copy); CheckedViewDiffers reports whether the checked view differs from the
+// source view. Per-body external obligations are assigned by later planning.
+func (p *Package) CheckedView() []string { return append([]string(nil), p.checkedView...) }
+
+// CheckedViewDiffers reports whether the package's checked view differs from
+// its source view (cgo preprocessing).
+func (p *Package) CheckedViewDiffers() bool { return p.checkedViewDiffers }
 
 // Types is the package's type evidence: the fully checked package for
 // selected roots, and the toolchain's export-data declaration types for

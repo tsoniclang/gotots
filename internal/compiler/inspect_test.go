@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -84,5 +85,105 @@ func TestInspectSelfModule(t *testing.T) {
 	d := inspection.Inventory().Denominators()
 	if d.Packages < 7 || d.Occurrences < 5000 {
 		t.Errorf("implausible self-inspection denominators %+v", d)
+	}
+}
+
+// TestImportCoherencePositiveProof is the reviewer-mandated positive proof:
+// for a root importing dep.Box, (1) the importer's types.Package.Imports()
+// entry and the dependency record share the identical *types.Package object;
+// (2) the selector's use object is the exact declaration object in the
+// dependency scope; (3) the dependency body appears in the inventory; and
+// (4) relocation preserves canonical identities.
+func TestImportCoherencePositiveProof(t *testing.T) {
+	content := map[string]string{
+		"go.mod":     "module coherent.example/app\n\ngo 1.26\n",
+		"app.go":     "package app\n\nimport \"coherent.example/app/dep\"\n\nvar V dep.Box\n\nfunc Use() int { return V.Size() }\n",
+		"dep/dep.go": "package dep\n\n// Box is the dependency declaration.\ntype Box struct{ N int }\n\nfunc (b Box) Size() int { return b.N }\n",
+	}
+	load := func() (*Inspection, string) {
+		dir := t.TempDir()
+		for rel, data := range content {
+			path := filepath.Join(dir, filepath.FromSlash(rel))
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		inspection, err := InspectConstructs(source.Request{Dir: dir, Patterns: []string{"coherent.example/app"}})
+		if err != nil {
+			t.Fatalf("InspectConstructs: %v", err)
+		}
+		return inspection, dir
+	}
+	inspection, _ := load()
+	var app, dep *source.Package
+	for _, pkg := range inspection.Workspace().Packages() {
+		switch pkg.ID().ImportPath() {
+		case "coherent.example/app":
+			app = pkg
+		case "coherent.example/app/dep":
+			dep = pkg
+		}
+	}
+	if app == nil || dep == nil {
+		t.Fatal("app or dep missing from the universe")
+	}
+	if app.RequestedRoot() == dep.RequestedRoot() {
+		t.Errorf("root separation lost: app root=%v dep root=%v", app.RequestedRoot(), dep.RequestedRoot())
+	}
+	// (1) One coherent go/types object graph.
+	sameObject := false
+	for _, imported := range app.Types().Imports() {
+		if imported.Path() == "coherent.example/app/dep" {
+			sameObject = imported == dep.Types()
+		}
+	}
+	if !sameObject {
+		t.Error("importer and dependency record hold distinct *types.Package objects")
+	}
+	// (2) The selector use is the exact declaration object in the dep scope.
+	boxDecl := dep.Types().Scope().Lookup("Box")
+	if boxDecl == nil {
+		t.Fatal("Box not in dependency scope")
+	}
+	usedAsBox := false
+	for _, used := range app.TypesInfo().Uses {
+		if used == boxDecl {
+			usedAsBox = true
+		}
+	}
+	if !usedAsBox {
+		t.Error("app's dep.Box use does not resolve to the exact dependency declaration object")
+	}
+	// (3) The dependency body is inventoried (whole-closure analysis).
+	depInventoried := false
+	for _, pkg := range inspection.Inventory().Packages() {
+		if pkg.ID().ImportPath() == "coherent.example/app/dep" && len(pkg.Files()) == 1 {
+			depInventoried = len(pkg.Files()[0].Occurrences()) > 0
+		}
+	}
+	if !depInventoried {
+		t.Error("dependency body missing from the inventory")
+	}
+	// (4) Relocation preserves canonical identities.
+	second, _ := load()
+	first := map[string]bool{}
+	for _, pkg := range inspection.Inventory().Packages() {
+		for _, file := range pkg.Files() {
+			for _, occurrence := range file.Occurrences() {
+				first[occurrence.ID().String()] = true
+			}
+		}
+	}
+	for _, pkg := range second.Inventory().Packages() {
+		for _, file := range pkg.Files() {
+			for _, occurrence := range file.Occurrences() {
+				if !first[occurrence.ID().String()] {
+					t.Fatalf("relocated occurrence %s not in first load", occurrence.ID())
+				}
+			}
+		}
 	}
 }

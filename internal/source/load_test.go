@@ -1,7 +1,9 @@
 package source
 
 import (
-	"errors"
+	"go/parser"
+	"go/token"
+	"go/types"
 	"os"
 	"path/filepath"
 	"strings"
@@ -48,14 +50,14 @@ func TestLoadWorkspaceSingleModule(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadWorkspace: %v", err)
 	}
-	if len(ws.Selected()) != 2 {
-		t.Fatalf("selected %d packages, want 2", len(ws.Selected()))
+	if len(ws.Roots()) != 2 {
+		t.Fatalf("selected %d packages, want 2", len(ws.Roots()))
 	}
 	if ws.Toolchain().Binary() == "" || ws.Toolchain().Version() == "" || ws.Toolchain().GOROOT() == "" {
 		t.Errorf("toolchain not resolved: %+v", ws.Toolchain())
 	}
 	var ids []string
-	for _, pkg := range ws.Selected() {
+	for _, pkg := range ws.Roots() {
 		if pkg.Provenance() != ProvenanceWorkspaceModule || pkg.Acquisition() != AcquisitionWorkspace {
 			t.Errorf("%s provenance/acquisition = %s/%s", pkg.ID(), pkg.Provenance(), pkg.Acquisition())
 		}
@@ -100,8 +102,8 @@ func TestUniverseClosureAndProvenance(t *testing.T) {
 	}
 	fmtPkg := findPackage(t, ws, "fmt")
 	if fmtPkg.ID().Owner().String() != "std" || fmtPkg.Provenance() != ProvenanceStandardLibrary ||
-		fmtPkg.Acquisition() != AcquisitionGOROOT || fmtPkg.Selected() {
-		t.Errorf("fmt: %s %s %s selected=%v", fmtPkg.ID(), fmtPkg.Provenance(), fmtPkg.Acquisition(), fmtPkg.Selected())
+		fmtPkg.Acquisition() != AcquisitionGOROOT || fmtPkg.RequestedRoot() {
+		t.Errorf("fmt: %s %s %s root=%v", fmtPkg.ID(), fmtPkg.Provenance(), fmtPkg.Acquisition(), fmtPkg.RequestedRoot())
 	}
 	unsafePkg := findPackage(t, ws, "unsafe")
 	if unsafePkg.Disposition() != DispositionUnsafeIntrinsic || unsafePkg.Provenance() != ProvenanceStandardLibrary {
@@ -193,7 +195,7 @@ func TestStdBuiltinAndToolchainRoots(t *testing.T) {
 		t.Fatalf("LoadWorkspace: %v", err)
 	}
 	fmtPkg := findPackage(t, ws, "fmt")
-	if !fmtPkg.Selected() || fmtPkg.Types() == nil || len(fmtPkg.Files()) == 0 || fmtPkg.Files()[0].Syntax() == nil {
+	if !fmtPkg.RequestedRoot() || fmtPkg.Types() == nil || len(fmtPkg.Files()) == 0 || fmtPkg.Files()[0].Syntax() == nil {
 		t.Error("fmt root did not load with syntax and types")
 	}
 	if fmtPkg.ID().String() != "std::fmt" {
@@ -249,7 +251,7 @@ func TestPackageRecordConstructorRejectsIncoherence(t *testing.T) {
 		{"module owner with goroot acquisition", &Package{id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionGOROOT, disposition: DispositionOrdinarySource}},
 		{"dependency with workspace acquisition", &Package{id: modPkg, provenance: ProvenanceModuleDependency, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource}},
 		{"std owner with module go directive", &Package{id: stdPkg, provenance: ProvenanceStandardLibrary, acquisition: AcquisitionGOROOT, disposition: DispositionOrdinarySource, moduleGoVersion: "1.26"}},
-		{"selected without type evidence", &Package{id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource, selected: true}},
+		{"selected without type evidence", &Package{id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource, requestedRoot: true}},
 	}
 	for _, c := range cases {
 		ws := &Workspace{}
@@ -260,13 +262,30 @@ func TestPackageRecordConstructorRejectsIncoherence(t *testing.T) {
 			t.Errorf("%s: rejected record still entered the workspace", c.name)
 		}
 	}
+	// The valid case carries genuine evidence — a typeless record is never
+	// a valid fixture.
+	fset := token.NewFileSet()
+	syntax, err := parser.ParseFile(fset, "m.go", "package m\n\nfunc F() {}\n", parser.SkipObjectResolution)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fileID, err := identity.NewFileID(owner, "m.go")
+	if err != nil {
+		t.Fatal(err)
+	}
 	ws := &Workspace{}
-	valid := &Package{id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource}
+	valid := &Package{
+		id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace,
+		disposition: DispositionOrdinarySource,
+		types:       types.NewPackage("gate.example/m", "m"),
+		typesInfo:   &types.Info{},
+		files:       []*File{{path: "m.go", id: fileID, fset: fset, syntax: syntax}},
+	}
 	if err := ws.admit(valid); err != nil {
-		t.Errorf("coherent record rejected: %v", err)
+		t.Errorf("coherent evidenced record rejected: %v", err)
 	}
 	if len(ws.Packages()) != 1 {
-		t.Error("coherent record not admitted")
+		t.Error("coherent evidenced record not admitted")
 	}
 }
 
@@ -290,7 +309,7 @@ func TestPerFileEffectiveVersions(t *testing.T) {
 	}
 	versions := map[string]string{}
 	moduleDirectives := map[string]string{}
-	for _, pkg := range ws.Selected() {
+	for _, pkg := range ws.Roots() {
 		moduleDirectives[pkg.ID().Owner().Module().Path()] = pkg.ModuleGoVersion()
 		for _, file := range pkg.Files() {
 			versions[file.ID().Rel()] = file.EffectiveGoVersion()
@@ -310,25 +329,33 @@ func TestPerFileEffectiveVersions(t *testing.T) {
 	}
 }
 
-// TestCgoRootIsExplicitDisposition proves a selected cgo package fails with
-// the typed cgo disposition, never a silent omission or generic path error.
-func TestCgoRootIsExplicitDisposition(t *testing.T) {
+// TestCgoViewDifferenceIsModeled proves a cgo package does not abort the
+// loader: the source files keep owner identity, the checked-view difference
+// is recorded explicitly, and per-body obligations remain for later planning.
+func TestCgoViewDifferenceIsModeled(t *testing.T) {
 	dir := t.TempDir()
 	writeTree(t, dir, map[string]string{
 		"go.mod":  "module cgo.example/m\n\ngo 1.26\n",
 		"main.go": "package main\n\n/*\n#include <stdlib.h>\n*/\nimport \"C\"\n\nfunc main() { C.free(nil) }\n",
+		"pure.go": "package main\n\nfunc pure() int { return 1 }\n",
 	})
-	_, err := LoadWorkspace(Request{Dir: dir, Env: []string{"CGO_ENABLED=1"}})
-	if err == nil {
-		t.Fatal("cgo root loaded silently")
+	ws, err := LoadWorkspace(Request{Dir: dir, Env: []string{"CGO_ENABLED=1"}})
+	if err != nil {
+		t.Skipf("cgo unavailable in this environment: %v", err)
 	}
-	var cgoErr *CgoUnsupportedError
-	if !errors.As(err, &cgoErr) {
-		// Environments without a C toolchain surface the toolchain's own
-		// package error instead — still fail-closed, but assert it names cgo.
-		if !strings.Contains(err.Error(), "cgo") && !strings.Contains(err.Error(), "C ") {
-			t.Fatalf("cgo rejection unclear: %v", err)
-		}
+	main := findPackage(t, ws, "cgo.example/m")
+	if !main.CheckedViewDiffers() {
+		t.Error("cgo package does not record its checked-view difference")
+	}
+	if len(main.CheckedView()) == 0 {
+		t.Error("cgo checked-view files not recorded")
+	}
+	ids := map[string]bool{}
+	for _, file := range main.Files() {
+		ids[file.ID().String()] = true
+	}
+	if !ids["mod=cgo.example/m::main.go"] || !ids["mod=cgo.example/m::pure.go"] {
+		t.Errorf("cgo source files lost owner identity: %v", ids)
 	}
 }
 
@@ -447,7 +474,7 @@ func TestLoadWorkspaceOverlay(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadWorkspace with overlay: %v", err)
 	}
-	pkg := ws.Selected()[0]
+	pkg := ws.Roots()[0]
 	if pkg.Types().Scope().Lookup("Fixed") == nil {
 		t.Error("overlay content not used")
 	}

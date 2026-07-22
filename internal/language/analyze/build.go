@@ -25,14 +25,22 @@ func BuildFileInventory(pkg *source.Package, file *source.File) (*FileInventory,
 }
 
 // BuildWorkspaceInventory produces the immutable whole-workspace inventory
-// artifact over the selected packages of a loaded source universe. Dependency
-// closure records remain source facts; the inventory covers the requested
-// roots.
+// artifact over every source-bearing package of the closure: requested roots,
+// source-available module dependencies, and standard-library source alike.
+// Executable-body ownership (gostdlib, externals) is assigned by later
+// planning; analysis never skips a package by provenance. Files without
+// checked syntax (cgo view differences) are input facts, not inventory rows.
 func BuildWorkspaceInventory(ws *source.Workspace) (*WorkspaceInventory, error) {
 	out := &WorkspaceInventory{version: InventoryArtifactVersion}
-	for _, pkg := range ws.Selected() {
+	for _, pkg := range ws.Packages() {
+		if !pkg.SourceBearing() {
+			continue
+		}
 		pkgInventory := &PackageInventory{id: pkg.ID()}
 		for _, file := range pkg.Files() {
+			if file.Syntax() == nil {
+				continue
+			}
 			fileInventory, err := BuildFileInventory(pkg, file)
 			if err != nil {
 				return nil, err

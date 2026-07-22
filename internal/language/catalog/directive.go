@@ -93,9 +93,11 @@ const (
 	DirectiveGoCgoUnsafeArgs      DirectiveKind = 27
 	DirectiveGoNotinheap          DirectiveKind = 28
 	DirectiveGoFix                DirectiveKind = 29
+	DirectiveGoWasmImport         DirectiveKind = 30
+	DirectiveGoWasmExport         DirectiveKind = 31
 
 	// directiveCount is the highest assigned identity; append-only.
-	directiveCount = 29
+	directiveCount = 31
 )
 
 type directiveDescriptor struct {
@@ -134,6 +136,8 @@ var directiveTable = [directiveCount + 1]directiveDescriptor{
 	DirectiveGoCgoUnsafeArgs:      {"cgo_unsafe_args", DirectiveExternalObligation},
 	DirectiveGoNotinheap:          {"notinheap", DirectiveUnsupportedPragma},
 	DirectiveGoFix:                {"fix", DirectiveToolingOnly},
+	DirectiveGoWasmImport:         {"wasmimport", DirectiveExternalObligation},
+	DirectiveGoWasmExport:         {"wasmexport", DirectiveExternalObligation},
 }
 
 // Valid reports whether k names a directive member.
