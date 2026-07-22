@@ -44,6 +44,23 @@ total implementation-unit census. This prevents loader provenance, parser
 availability, or retention mechanics from becoming an implementation-policy
 surrogate.
 
+The Stage-1 package seam is strict. `internal/source` owns selected bytes, the
+single transient AST/checker graph, source identities, the bounded pre-scope
+implementation-unit census, and final severing. It does not classify catalog
+kinds, bind catalog edges or roles, resolve lexical tokens, or manufacture
+occurrence records. `internal/language/analyze` owns the one parent-directed
+catalog traversal and produces implementation references, body-region
+occurrences, variants, and inventory-owned implicit operations. The compiler
+orchestrates that traversal synchronously after scope selection and before
+source finalization, then source finalization consumes only a constructor-
+validated retention/evidence projection derived from that traversal. No raw
+`ast.Node`, mutable `types.Info`, `types.Scope`, `types.Object`, selection, or
+expression can survive in the finalized Stage-1 API; downstream access is by
+canonical identity through narrow read-only facts. This ordering does not
+authorize a second traversal: source census remains a bounded implementation-
+boundary census, while construct topology has exactly one producer in the
+language-analysis layer.
+
 ## Input Contract
 
 A compilation request contains:

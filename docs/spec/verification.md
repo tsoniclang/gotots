@@ -221,6 +221,15 @@ non-cubic region/reference construction. The independent structural-origin
 extractor is implemented separately from the producer and shares none of its
 critical enumeration or semantic helpers.
 
+An architecture mutation that moves catalog classification, edge/role/token
+binding, or occurrence construction into `internal/source` must fail. A second
+mutation that makes language analysis retain raw syntax or mutable checker
+objects after source finalization must fail. The positive gate proves the
+pipeline order `load -> scope -> one transient catalog traversal -> source
+finalization -> independent verification`, proves source performs only its
+bounded pre-scope unit census, and exact-joins the traversal's opaque retention
+projection to the finalized occurrence/definition/reference artifact.
+
 The finalized cost/attestation gate fails closed in the certification
 environment: a portable unit suite may omit the expensive isolated run, but the
 phase-exit attestation gate may not silently skip it, and it binds the exact

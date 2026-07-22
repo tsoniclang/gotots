@@ -115,6 +115,11 @@ Required exit evidence:
 - provider and audit manifests carry the implementation definition/reference
   graph, and ordinary compilation exact-joins it without rescanning provider
   interiors; and
+- the source layer owns transient syntax/checker lifetime and bounded unit
+  census only, while the language-analysis layer is the sole producer of
+  catalog classification, edges, roles, tokens, occurrences, and
+  implementation-reference topology; architecture gates reject either owner
+  importing or recreating the other's semantic responsibility; and
 - finalized application artifacts expose one region/reference API at every depth,
   retain no non-full body AST or body-indexed `types.Info` reachable from a
   parent, and hold no separate uniform-full/mixed consumer path; and
