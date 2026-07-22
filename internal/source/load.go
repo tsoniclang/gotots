@@ -133,6 +133,9 @@ func LoadUniverse(req Request, policy AcquisitionPolicy, manifest UnitManifest) 
 	if err := censusUniverse(universe); err != nil {
 		return nil, err
 	}
+	if err := universe.CheckTypeGraphCoherence(); err != nil {
+		return nil, err
+	}
 	return universe, nil
 }
 

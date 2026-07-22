@@ -248,7 +248,6 @@ type Package struct {
 	synthetics      []SyntheticUnit
 	implicitUnits   []ImplicitUnit
 	types           *types.Package
-	typesInfo       *types.Info // uniform-full: checker's Info; mixed: filtered; else nil
 }
 
 // ImplicitUnit is one finalized unspelled implicit executable unit: its typed
@@ -444,15 +443,12 @@ func (p *Package) Units() []SourceUnit {
 	return out
 }
 
-// Types is the package's type evidence: the fully checked package for
-// selected roots, and the toolchain's export-data declaration types for
-// dependency and standard-library records.
-func (p *Package) Types() *types.Package { return p.types }
-
-// TypesInfo is the finalized read-only type-information view; nil when the
-// package retains no full-semantic units. The mutable checker maps are never
-// exposed.
-func (p *Package) TypesInfo() *TypeInfoView { return newTypeInfoView(p.typesInfo) }
+// HasTypeEvidence reports whether the package carries checked type evidence.
+// The raw *types.Package / *types.Info are never exposed by the finalized API:
+// mutable checker objects, scopes, selections, and expressions do not survive
+// finalization. The one checker graph is queried only transiently, during the
+// analyze traversal, through source's narrow capability.
+func (p *Package) HasTypeEvidence() bool { return p.types != nil }
 
 // File is one resolved source file: canonical identity, effective language
 // version, selected-byte digest, and its unit ledger with selected depths. The

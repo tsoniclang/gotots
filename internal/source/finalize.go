@@ -116,18 +116,6 @@ func Finalize(u *Universe, depths map[identity.SourceUnitID]EvidenceDepth, impli
 // AST or body-indexed syntax is retained; the shared declaration type graph is
 // carried for later phases.
 func finalizePackage(loaded *LoadedPackage, depths map[identity.SourceUnitID]EvidenceDepth) *Package {
-	// Body-indexed type information is retained only for packages with a
-	// full-semantic unit; a declaration-contract package keeps the shared
-	// declaration type graph but no body-indexed info. (The read-only
-	// capability boundary narrows this further downstream.)
-	anyFull := false
-	for _, file := range loaded.files {
-		for _, unit := range file.units {
-			if depths[unit.id] == DepthFullSemantic {
-				anyFull = true
-			}
-		}
-	}
 	out := &Package{
 		id: loaded.id, provenance: loaded.provenance, acquisition: loaded.acquisition,
 		disposition: loaded.disposition, moduleGoVersion: loaded.moduleGoVersion,
@@ -139,9 +127,6 @@ func finalizePackage(loaded *LoadedPackage, depths map[identity.SourceUnitID]Evi
 		types:         loaded.types,
 		mappings:      append([]CheckedUnitMapping(nil), loaded.mappings...),
 		synthetics:    append([]SyntheticUnit(nil), loaded.synthetics...),
-	}
-	if anyFull {
-		out.typesInfo = loaded.typesInfo
 	}
 	for _, loadedFile := range loaded.files {
 		file := &File{

@@ -237,7 +237,6 @@ func VerifySourceUniverse(ws *source.Workspace, req source.Request) error {
 		mismatches = append(mismatches, verifyEvidenceState(pkg, expectation)...)
 		mismatches = append(mismatches, verifyFileVersions(pkg, expectation, req.Overlay, ws.Toolchain().GOROOT())...)
 	}
-	mismatches = append(mismatches, verifyTypeGraphCoherence(ws)...)
 	var dropped []string
 	for id := range expected {
 		if !matched[id] {
@@ -294,13 +293,13 @@ func verifyEvidenceState(pkg *source.Package, expectation *universeExpectation) 
 	case source.DispositionBuiltinUniverse:
 		return nil
 	case source.DispositionUnsafeIntrinsic:
-		if pkg.Types() == nil {
+		if !pkg.HasTypeEvidence() {
 			return []string{id + " unsafe record lacks type evidence"}
 		}
 		return nil
 	}
 	var out []string
-	if pkg.Types() == nil {
+	if !pkg.HasTypeEvidence() {
 		out = append(out, id+" lacks type evidence")
 	}
 	if expectation.disposition == source.DispositionOrdinarySource {
@@ -394,33 +393,6 @@ func fileConstraintVersion(path string, overlay map[string][]byte) string {
 		return constraint.GoVersion(expr)
 	}
 	return ""
-}
-
-// verifyTypeGraphCoherence proves every import edge resolves to the identical
-// *types.Package object stored on the imported record: one coherent go/types
-// graph, never mixed loads.
-func verifyTypeGraphCoherence(ws *source.Workspace) []string {
-	byPath := map[string]*source.Package{}
-	for _, pkg := range ws.Packages() {
-		byPath[pkg.ID().ImportPath()] = pkg
-	}
-	var out []string
-	for _, pkg := range ws.Packages() {
-		if pkg.Types() == nil {
-			continue
-		}
-		for _, imported := range pkg.Types().Imports() {
-			record, tracked := byPath[imported.Path()]
-			if !tracked || record.Types() == nil {
-				continue
-			}
-			if record.Types() != imported {
-				out = append(out, fmt.Sprintf("type-graph incoherence: %s imports %s as a distinct types.Package object",
-					pkg.ID(), imported.Path()))
-			}
-		}
-	}
-	return out
 }
 
 func under(path, root string) bool {

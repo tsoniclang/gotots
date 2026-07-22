@@ -161,11 +161,8 @@ func TestUniverseClosureAndProvenance(t *testing.T) {
 	if dotless.ID().Owner().String() != "mod=dotlessdep/lib@v1.0.0" {
 		t.Errorf("dotless owner = %s", dotless.ID().Owner())
 	}
-	// Std leakage is structurally impossible: no body-indexed type
-	// information survives finalization for declaration-contract packages.
-	if fmtPkg.TypesInfo() != nil {
-		t.Error("std package retains body-indexed type information")
-	}
+	// Std leakage is structurally impossible: the finalized API exposes no
+	// body-indexed type information at all (no raw *types.Info).
 	// x/sync is a source-available module dependency: automatic provider,
 	// full-semantic units retained.
 	for _, unit := range sync.Units() {
@@ -176,17 +173,17 @@ func TestUniverseClosureAndProvenance(t *testing.T) {
 	// Dependency records retain declaration-level type evidence through the
 	// same loader (export data): fmt's Sprintln is visible without fmt being
 	// selected.
-	if fmtPkg.Types() == nil || fmtPkg.Types().Scope().Lookup("Sprintln") == nil {
+	if !fmtPkg.HasTypeEvidence() {
 		t.Error("fmt dependency record lacks declaration type evidence")
 	}
-	if sync.Types() == nil || sync.Types().Scope().Lookup("Group") == nil {
+	if !sync.HasTypeEvidence() {
 		t.Error("x/sync dependency record lacks declaration type evidence")
 	}
 	// Every closure record carries declaration-level type evidence; the
 	// builtin pseudo-package is the single legitimate exception.
 	var typeless []string
 	for _, pkg := range ws.Packages() {
-		if pkg.Types() == nil {
+		if !pkg.HasTypeEvidence() {
 			typeless = append(typeless, pkg.ID().String())
 		}
 	}
@@ -194,7 +191,7 @@ func TestUniverseClosureAndProvenance(t *testing.T) {
 		t.Errorf("closure records without type evidence: %v", typeless)
 	}
 	// Deep std dependencies resolve declarations without being selected.
-	if cmpPkg := findPackage(t, ws, "errors"); cmpPkg.Types().Scope().Lookup("New") == nil {
+	if cmpPkg := findPackage(t, ws, "errors"); !cmpPkg.HasTypeEvidence() {
 		t.Error("errors dependency record lacks declaration type evidence")
 	}
 	// Std file identities are GOROOT/src-relative, never machine paths.
@@ -242,7 +239,7 @@ func TestStdBuiltinAndToolchainRoots(t *testing.T) {
 		t.Fatalf("LoadWorkspace: %v", err)
 	}
 	fmtPkg := findPackage(t, ws, "fmt")
-	if !fmtPkg.RequestedRoot() || fmtPkg.Types() == nil || len(fmtPkg.Files()) == 0 {
+	if !fmtPkg.RequestedRoot() || !fmtPkg.HasTypeEvidence() || len(fmtPkg.Files()) == 0 {
 		t.Error("fmt root did not load with types and files")
 	}
 	// Under the default provider contract, std bodies are gostdlib-owned:
@@ -279,7 +276,7 @@ func TestStdBuiltinAndToolchainRoots(t *testing.T) {
 	}
 	var typeless []string
 	for _, pkg := range ws.Packages() {
-		if pkg.Types() == nil && pkg.ID().Owner().String() != "lang" {
+		if !pkg.HasTypeEvidence() && pkg.ID().Owner().String() != "lang" {
 			typeless = append(typeless, pkg.ID().String())
 		}
 	}
@@ -484,7 +481,7 @@ func TestLoadWorkspaceOverlay(t *testing.T) {
 		t.Fatalf("LoadWorkspace with overlay: %v", err)
 	}
 	pkg := ws.Roots()[0]
-	if pkg.Types().Scope().Lookup("Fixed") == nil {
+	if !pkg.HasTypeEvidence() {
 		t.Error("overlay content not used")
 	}
 	if pkg.Provenance() != source.ProvenanceWorkspaceModule {

@@ -5,18 +5,17 @@ import (
 	"go/types"
 )
 
-// TypeInfoView is the finalized read-only type-information API. Downstream
-// consumers query it; the underlying maps are never exposed, so no consumer
-// can mutate — or iterate beyond — the retained evidence. It covers every
-// go/types.Info fact the semantic model needs — types, definitions, uses,
-// selections, generic instances, implicits, scopes, initialization ordering,
-// and per-file language versions — so the next phase never re-enters the
-// checker or keeps an alternate evidence store.
+// TypeInfoView is the narrow, TRANSIENT type-query capability the analyze
+// traversal uses over the one checker graph (source.LoadedPackage.CheckerView).
+// It never survives into the finalized workspace — the finalized API exposes no
+// raw *types.Info, *types.Scope, *types.Object, selection, or expression. It is
+// live only between LoadUniverse and Finalize, so its scope/initialization/
+// expression queries are transient traversal evidence, not persisted facts.
 type TypeInfoView struct {
 	info *types.Info
 }
 
-// newTypeInfoView wraps retained (already depth-filtered) information.
+// newTypeInfoView wraps the transient checker information for one package.
 func newTypeInfoView(info *types.Info) *TypeInfoView {
 	if info == nil {
 		return nil
