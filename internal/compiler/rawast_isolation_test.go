@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"go/ast"
 	"reflect"
 	"strings"
 	"testing"
@@ -8,6 +9,13 @@ import (
 	"github.com/tsoniclang/gotots/internal/scope"
 	"github.com/tsoniclang/gotots/internal/source"
 )
+
+// rawChildAccessor is the control: a type that "restores the raw child pointer"
+// by exposing an ast.Node through the finalized surface. The walker must detect
+// it, proving the isolation check is not vacuously green.
+type rawChildAccessor struct{}
+
+func (rawChildAccessor) Child() ast.Node { return nil }
 
 // TestFinalizedSurfaceExposesNoRawAST mechanically proves the "restore raw
 // child pointer" mutation is structurally impossible through the finalized
@@ -67,23 +75,35 @@ func TestFinalizedSurfaceExposesNoRawAST(t *testing.T) {
 
 	w := &rawASTWalker{visited: map[reflect.Type]bool{}, seenType: map[reflect.Type]bool{}}
 	for _, seed := range seeds {
-		w.walkMethods(t, seed)
+		w.walkMethods(seed)
 	}
 	if w.methods == 0 {
 		t.Fatal("no exported methods were exercised — the surface enumeration is empty")
 	}
-	t.Logf("mechanically inspected %d exported finalized methods for raw-AST return types", w.methods)
+	for _, v := range w.violations {
+		t.Errorf("finalized surface exposes raw AST: %s", v)
+	}
+
+	// Control: the walker must DETECT a type that restores the raw child
+	// pointer, so the clean result above is not vacuous.
+	control := &rawASTWalker{visited: map[reflect.Type]bool{}, seenType: map[reflect.Type]bool{}}
+	control.walkMethods(reflect.TypeOf(rawChildAccessor{}))
+	if len(control.violations) == 0 {
+		t.Fatal("the raw-AST walker failed to detect a control accessor that returns ast.Node — the check is vacuous")
+	}
+	t.Logf("mechanically inspected %d exported finalized methods; control detection confirmed", w.methods)
 }
 
 type rawASTWalker struct {
-	visited  map[reflect.Type]bool
-	seenType map[reflect.Type]bool
-	methods  int
+	visited    map[reflect.Type]bool
+	seenType   map[reflect.Type]bool
+	methods    int
+	violations []string
 }
 
 // walkMethods checks every exported method's return types on typ, once per
 // distinct type.
-func (w *rawASTWalker) walkMethods(t *testing.T, typ reflect.Type) {
+func (w *rawASTWalker) walkMethods(typ reflect.Type) {
 	if w.seenType[typ] {
 		return
 	}
@@ -95,41 +115,41 @@ func (w *rawASTWalker) walkMethods(t *testing.T, typ reflect.Type) {
 		}
 		w.methods++
 		for out := 0; out < method.Type.NumOut(); out++ {
-			w.assertNoRawAST(t, method.Type.Out(out), typ.String()+"."+method.Name)
+			w.checkNoRawAST(method.Type.Out(out), typ.String()+"."+method.Name)
 		}
 	}
 }
 
-// assertNoRawAST fails if typ reaches a go/ast or go/types type through
-// pointers, containers, or exported struct fields.
-func (w *rawASTWalker) assertNoRawAST(t *testing.T, typ reflect.Type, path string) {
+// checkNoRawAST records a violation if typ reaches a go/ast or go/types type
+// through pointers, containers, or exported struct fields.
+func (w *rawASTWalker) checkNoRawAST(typ reflect.Type, path string) {
 	if typ == nil || w.visited[typ] {
 		return
 	}
 	w.visited[typ] = true
 	if pkg := typ.PkgPath(); pkg == "go/ast" || pkg == "go/types" {
-		t.Errorf("%s reaches raw %s type %s — a raw AST/type node is exposed through the finalized surface", path, pkg, typ.String())
+		w.violations = append(w.violations, path+" reaches raw "+pkg+" type "+typ.String())
 		return
 	}
 	switch typ.Kind() {
 	case reflect.Pointer, reflect.Slice, reflect.Array, reflect.Chan:
-		w.assertNoRawAST(t, typ.Elem(), path)
+		w.checkNoRawAST(typ.Elem(), path)
 	case reflect.Map:
-		w.assertNoRawAST(t, typ.Key(), path)
-		w.assertNoRawAST(t, typ.Elem(), path)
+		w.checkNoRawAST(typ.Key(), path)
+		w.checkNoRawAST(typ.Elem(), path)
 	case reflect.Struct:
 		for i := 0; i < typ.NumField(); i++ {
 			field := typ.Field(i)
 			if !field.IsExported() {
 				continue
 			}
-			w.assertNoRawAST(t, field.Type, path+"."+field.Name)
+			w.checkNoRawAST(field.Type, path+"."+field.Name)
 		}
 	case reflect.Interface:
 		// An interface from go/ast (e.g. ast.Node) is caught by PkgPath above;
 		// an empty interface reaches nothing statically.
 		if strings.Contains(typ.String(), "ast.") || strings.Contains(typ.String(), "types.") {
-			t.Errorf("%s returns interface %s", path, typ.String())
+			w.violations = append(w.violations, path+" returns interface "+typ.String())
 		}
 	}
 }
