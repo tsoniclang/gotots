@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"go/ast"
 
+	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/catalog"
 )
 
@@ -142,5 +143,5 @@ func Classify(n ast.Node) (catalog.Kind, error) {
 	case *ast.Package:
 		return catalog.KindPackage, nil
 	}
-	return catalog.KindInvalid, &UnknownConstructError{GoType: fmt.Sprintf("%T", n)}
+	return catalog.KindInvalid, newUnknownConstructError(fmt.Sprintf("%T", n), identity.FileID{}, Span{})
 }

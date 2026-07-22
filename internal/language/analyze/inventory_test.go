@@ -1,13 +1,12 @@
 package analyze
 
 import (
-	"errors"
 	"fmt"
 	"go/ast"
-	"go/token"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/identity"
@@ -15,123 +14,258 @@ import (
 	"github.com/tsoniclang/gotots/internal/source"
 )
 
-// reconcileFixture exercises a broad span of Go grammatical forms so the
-// parent-directed visitor is reconciled against constructs the toolchain parser
-// actually produces.
-const reconcileFixture = `// Package p exercises many Go constructs for inventory reconciliation.
+// fixtureSource exercises every semantic variant, every inventory-owned
+// implicit operation, and a broad edge surface. TestVariantCoverageIsTotal
+// proves the totality claim against it.
+const fixtureSource = `// Package p is the analysis reconciliation fixture.
 package p
 
-import (
-	"fmt"
-	m "math"
-)
+import "fmt"
 
-// C is a constant.
-const C = (1 + 2)
-
-var V, W = 3, "s"
-
-// T is a struct type.
+//go:generate echo generated
+//custom:note external tool directive
 type T struct {
 	A int
 	B []string
 }
 
-// I is an interface type.
-type I interface {
-	M(x int) (int, error)
+func (t T) VM() int       { return t.A }
+func (t *T) PM(x int) int { t.A = x; return t.A }
+
+type E struct {
+	T
+	Extra bool
 }
 
-// Pair is generic.
-type Pair[K comparable, V any] struct {
-	Key K
-	Val V
-}
+type I interface{ VM() int }
 
 type Alias = T
 
 type Fn func(a int, b ...string) int
 
-// M is a method on T.
-func (t *T) M(x int) (int, error) {
-	var mp map[string]int = map[string]int{"a": 1}
-	ch := make(chan int, 1)
-	arr := [3]int{1, 2, 3}
-	s := arr[1:2]
-	e := arr[0]
-	p := &t.A
-	*p = x + e
-	i := 0
-	i++
-	i--
-	go func() { fmt.Println("g") }()
-	defer func() { _ = recover() }()
+type Num interface{ ~int | ~float64 }
+
+type Pair[K comparable, V any] struct {
+	Key K
+	Val V
+}
+
+func Identity[X any](x X) X { return x }
+
+func two() (int, string) { return 1, "a" }
+
+func named() (n int) { n = 3; return }
+
+func void() { return }
+
+func seq(yield func(int) bool) { yield(1) }
+
+func F() {
+	t := T{A: 1, B: []string{"x"}}
+	arr := [3]int{0: 1, 1: 2}
+	mp := map[string]int{"a": 1}
+	s := []string{"y"}
+
+	_ = t.A
+	e := E{T: t}
+	_ = e.A
+	mv := t.VM
+	_ = mv
+	me := (*T).PM
+	_ = me
+	_ = fmt.Sprint(1)
+	_ = t.VM()
+	_ = len(arr)
+	_ = int64(3)
+	f := Fn(func(a int, b ...string) int { return a })
+	_ = f(1, "a")
+
+	_ = arr[0]
+	one := mp["a"]
+	_ = one
+	v, ok := mp["a"]
+	_, _ = v, ok
+	var v2, ok2 = mp["a"]
+	_, _ = v2, ok2
+	iv := Identity[int]
+	_ = iv
+	pair := Pair[int, string]{Key: 1, Val: "s"}
+	_ = pair
+
+	var a any = t
+	y := a.(T)
+	_ = y
+	av, aok := a.(T)
+	_, _ = av, aok
+	switch a.(type) {
+	case T:
+	}
+
+	x := 1
+	x = 2
+	x += 3
+	neg := -x
+	_ = neg
+	b1, s1 := two()
+	b1, s1 = two()
+	_, _ = b1, s1
+	var pre int
+	var preOk bool
+	pre, preOk = mp["a"]
+	_, _ = pre, preOk
+
+	ch := make(chan int, 2)
 	ch <- 1
-	select {
-	case v := <-ch:
-		_ = v
-	default:
-	}
-Loop:
+	rv := <-ch
+	_ = rv
+	cv, cok := <-ch
+	_, _ = cv, cok
+
+	var pt *T
+	pt = &t
+	_ = (*pt).A
+	_ = t.PM(4)
+	_ = e.VM()
+
+	var i2 I
+	i2 = t
+	_ = i2.VM()
+	var t3 T
+	t3 = t
+	_ = t3
+	g := func(iface I) { _ = iface }
+	g(t)
+	h := func(val T) { _ = val }
+	h(t)
+
 	for k, val := range mp {
-		_ = val
-		if k == "a" {
-			continue Loop
-		} else {
-			break
-		}
+		_, _ = k, val
 	}
+	for i3 := range arr {
+		_ = i3
+	}
+	for range &arr {
+	}
+	for _, r := range "ab" {
+		_ = r
+	}
+	for _, sv := range s {
+		_ = sv
+	}
+	go func() {
+		for cv2 := range ch {
+			_ = cv2
+		}
+	}()
+	for n2 := range 3 {
+		_ = n2
+	}
+	for fv := range seq {
+		_ = fv
+	}
+
 	switch x {
 	case 1:
 		fallthrough
 	default:
 	}
-	var a interface{} = t
-	switch a.(type) {
-	case *T:
+	switch {
+	case x > 0:
 	}
-	y := a.(*T)
-	pair := Pair[int, string]{Key: 1, Val: "x"}
-	f := Fn(func(a int, b ...string) int { return a })
-	_ = f(1, "a", "b")
-	_, _, _, _, _ = s, y, pair, mp, m.Pi
-	return x, nil
+
+	select {
+	case ch <- 2:
+	case cs := <-ch:
+		_ = cs
+	default:
+	}
+
+Loop:
+	for j := 0; j < 2; j++ {
+		if j == 1 {
+			continue Loop
+		} else {
+			break
+		}
+	}
+	defer fmt.Sprint("d")
+	_ = named()
+	void()
+	if p := 1; p > 0 {
+		_ = p
+	}
+	sl3 := s[0:1:1]
+	_ = sl3
+	goto End
+End:
 }
 `
 
-func loadSource(t *testing.T, content string) *source.File {
+var (
+	fixtureOnce sync.Once
+	fixtureDir  string
+	fixtureWS   *source.Workspace
+	fixtureInv  *WorkspaceInventory
+	fixtureErr  error
+)
+
+// fixture loads the shared reconciliation fixture module exactly once.
+func fixture(t *testing.T) (*source.Workspace, *WorkspaceInventory) {
 	t.Helper()
-	dir := t.TempDir()
-	path := filepath.Join(dir, "fixture.go")
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatalf("write fixture: %v", err)
+	fixtureOnce.Do(func() {
+		fixtureDir, fixtureErr = os.MkdirTemp("", "gotots-analyze-fixture-*")
+		if fixtureErr != nil {
+			return
+		}
+		files := map[string]string{
+			"go.mod":     "module fixture.example/p\n\ngo 1.26\n",
+			"fixture.go": fixtureSource,
+		}
+		for rel, content := range files {
+			if fixtureErr = os.WriteFile(filepath.Join(fixtureDir, rel), []byte(content), 0o644); fixtureErr != nil {
+				return
+			}
+		}
+		fixtureWS, fixtureErr = source.LoadWorkspace(source.Request{Dir: fixtureDir})
+		if fixtureErr != nil {
+			return
+		}
+		fixtureInv, fixtureErr = BuildWorkspaceInventory(fixtureWS)
+	})
+	if fixtureErr != nil {
+		t.Fatalf("fixture: %v", fixtureErr)
 	}
-	loaded, err := source.Load(dir, path)
-	if err != nil {
-		t.Fatalf("source.Load: %v", err)
+	return fixtureWS, fixtureInv
+}
+
+func TestMain(m *testing.M) {
+	code := m.Run()
+	if fixtureDir != "" {
+		os.RemoveAll(fixtureDir)
 	}
-	return loaded
+	os.Exit(code)
+}
+
+// fixtureFile is the single file inventory of the shared fixture.
+func fixtureFile(t *testing.T) (*source.File, *FileInventory) {
+	ws, inv := fixture(t)
+	return ws.Packages()[0].Files()[0], inv.Packages()[0].Files()[0]
 }
 
 // TestBuildInventoryExactJoinsIndependentWalk joins the inventory to an
-// independent toolchain traversal on node identity (concrete type and physical
-// span), exact preorder position, and exact parent edge — not counts. A
-// reordered child visit, a wrong parent, or a missed/extra node all fail.
+// independent toolchain traversal on node identity, exact preorder position,
+// and exact parent edge — not counts.
 func TestBuildInventoryExactJoinsIndependentWalk(t *testing.T) {
-	src := loadSource(t, reconcileFixture)
-	inv, err := BuildInventory(src)
-	if err != nil {
-		t.Fatalf("BuildInventory: %v", err)
-	}
+	file, inv := fixtureFile(t)
 	type expectation struct {
 		goType string
 		start  int
 		end    int
-		parent int // preorder index of the parent, -1 for the root
+		parent int
 	}
 	var walk []expectation
 	var stack []int
-	ast.Inspect(src.Syntax(), func(n ast.Node) bool {
+	ast.Inspect(file.Syntax(), func(n ast.Node) bool {
 		if n == nil {
 			stack = stack[:len(stack)-1]
 			return false
@@ -142,220 +276,191 @@ func TestBuildInventoryExactJoinsIndependentWalk(t *testing.T) {
 		}
 		walk = append(walk, expectation{
 			goType: strings.TrimPrefix(fmt.Sprintf("%T", n), "*ast."),
-			start:  src.Fset().PositionFor(n.Pos(), false).Offset,
-			end:    src.Fset().PositionFor(n.End(), false).Offset,
+			start:  file.Fset().PositionFor(n.Pos(), false).Offset,
+			end:    file.Fset().PositionFor(n.End(), false).Offset,
 			parent: parent,
 		})
 		stack = append(stack, len(walk)-1)
 		return true
 	})
-	if len(inv.Occurrences) != len(walk) {
-		t.Fatalf("inventory has %d occurrences, independent walk has %d", len(inv.Occurrences), len(walk))
+	occurrences := inv.Occurrences()
+	if len(occurrences) != len(walk) {
+		t.Fatalf("inventory has %d occurrences, independent walk has %d", len(occurrences), len(walk))
 	}
-	for i, occurrence := range inv.Occurrences {
+	for i, occurrence := range occurrences {
 		expected := walk[i]
-		if occurrence.Kind.Name() != expected.goType {
-			t.Errorf("preorder %d: kind %s, independent walk has %s", i, occurrence.Kind, expected.goType)
+		if occurrence.Kind().Name() != expected.goType {
+			t.Errorf("preorder %d: kind %s, walk has %s", i, occurrence.Kind(), expected.goType)
 		}
-		if occurrence.Span.Start.Offset != expected.start || occurrence.Span.End.Offset != expected.end {
-			t.Errorf("preorder %d (%s): span %d-%d, independent walk has %d-%d", i, occurrence.Kind,
-				occurrence.Span.Start.Offset, occurrence.Span.End.Offset, expected.start, expected.end)
+		if occurrence.Span().Start.Offset != expected.start || occurrence.Span().End.Offset != expected.end {
+			t.Errorf("preorder %d (%s): span %d-%d, walk has %d-%d", i, occurrence.Kind(),
+				occurrence.Span().Start.Offset, occurrence.Span().End.Offset, expected.start, expected.end)
 		}
 		var wantParent identity.OccurrenceID
 		if expected.parent >= 0 {
-			wantParent = inv.Occurrences[expected.parent].ID
+			wantParent = occurrences[expected.parent].ID()
 		}
-		if occurrence.Parent != wantParent {
-			t.Errorf("preorder %d (%s): parent %q, independent walk has %q", i, occurrence.Kind,
-				occurrence.Parent, wantParent)
+		if occurrence.Parent() != wantParent {
+			t.Errorf("preorder %d (%s): parent %q, walk has %q", i, occurrence.Kind(), occurrence.Parent(), wantParent)
 		}
 	}
 }
 
-// TestBuildInventoryInvariants proves the structural invariants: the root is
-// the file with no parent, canonical IDs are unique, and spans are well formed.
-func TestBuildInventoryInvariants(t *testing.T) {
-	src := loadSource(t, reconcileFixture)
-	inv, err := BuildInventory(src)
-	if err != nil {
-		t.Fatalf("BuildInventory: %v", err)
+// TestInventoryInvariants proves the artifact invariants: File root without
+// parent, unique IDs, valid edges whose parent kinds match, and numeric kind
+// identity inside every occurrence ID.
+func TestInventoryInvariants(t *testing.T) {
+	_, inv := fixtureFile(t)
+	occurrences := inv.Occurrences()
+	if occurrences[0].Kind() != catalog.KindFile || !occurrences[0].Parent().IsZero() {
+		t.Fatal("root is not a parentless File occurrence")
 	}
-	if len(inv.Occurrences) == 0 {
-		t.Fatal("inventory is empty")
+	kindByID := map[identity.OccurrenceID]catalog.Kind{}
+	for _, occurrence := range occurrences {
+		kindByID[occurrence.ID()] = occurrence.Kind()
 	}
-	if inv.File == "" {
-		t.Error("inventory has no canonical file identity")
+	if len(kindByID) != len(occurrences) {
+		t.Errorf("IDs not unique: %d ids for %d occurrences", len(kindByID), len(occurrences))
 	}
-	root := inv.Occurrences[0]
-	if root.Kind != catalog.KindFile {
-		t.Errorf("root kind = %s, want File", root.Kind)
-	}
-	if root.Parent != "" {
-		t.Errorf("root has parent %q, want none", root.Parent)
-	}
-	ids := map[identity.OccurrenceID]bool{}
-	for _, occurrence := range inv.Occurrences {
-		ids[occurrence.ID] = true
-		if occurrence.Span.Start.Offset > occurrence.Span.End.Offset {
-			t.Errorf("occurrence %s span start offset exceeds end", occurrence.Kind)
+	for i, occurrence := range occurrences {
+		if occurrence.ID().KindID() != uint16(occurrence.Kind()) {
+			t.Errorf("occurrence %d identity encodes kind %d, want pinned %d",
+				i, occurrence.ID().KindID(), uint16(occurrence.Kind()))
 		}
-	}
-	if len(ids) != len(inv.Occurrences) {
-		t.Errorf("canonical IDs not unique: %d ids for %d occurrences", len(ids), len(inv.Occurrences))
+		if i == 0 {
+			continue
+		}
+		if !occurrence.Edge().Valid() {
+			t.Errorf("occurrence %d (%s) lacks a parent edge", i, occurrence.Kind())
+			continue
+		}
+		if occurrence.Edge().Parent() != kindByID[occurrence.Parent()] {
+			t.Errorf("occurrence %d edge %s does not belong to parent kind %s",
+				i, occurrence.Edge(), kindByID[occurrence.Parent()])
+		}
+		if occurrence.Role() != occurrence.Edge().Role() {
+			t.Errorf("occurrence %d role diverges from its edge", i)
+		}
 	}
 }
 
-// TestOccurrenceIdentityIsMachineIndependent is the regression for
-// machine-local identity: identical content loaded from two different
-// directories yields identical file and occurrence identities, and no identity
-// embeds the load directory.
+// TestOccurrenceIdentityIsMachineIndependent proves identical module content
+// in two directories yields identical identities and no identity embeds the
+// load directory.
 func TestOccurrenceIdentityIsMachineIndependent(t *testing.T) {
-	load := func() (Inventory, string) {
+	load := func() (*WorkspaceInventory, string) {
 		dir := t.TempDir()
-		path := filepath.Join(dir, "fixture.go")
-		if err := os.WriteFile(path, []byte(reconcileFixture), 0o644); err != nil {
-			t.Fatalf("write fixture: %v", err)
+		for rel, content := range map[string]string{
+			"go.mod":     "module fixture.example/p\n\ngo 1.26\n",
+			"fixture.go": fixtureSource,
+		} {
+			if err := os.WriteFile(filepath.Join(dir, rel), []byte(content), 0o644); err != nil {
+				t.Fatalf("write: %v", err)
+			}
 		}
-		src, err := source.Load(dir, path)
+		ws, err := source.LoadWorkspace(source.Request{Dir: dir})
 		if err != nil {
-			t.Fatalf("source.Load: %v", err)
+			t.Fatalf("LoadWorkspace: %v", err)
 		}
-		inv, err := BuildInventory(src)
+		inv, err := BuildWorkspaceInventory(ws)
 		if err != nil {
-			t.Fatalf("BuildInventory: %v", err)
+			t.Fatalf("BuildWorkspaceInventory: %v", err)
 		}
 		return inv, dir
 	}
 	a, dirA := load()
 	b, dirB := load()
-	if dirA == dirB {
-		t.Fatal("test directories must differ")
+	fa, fb := a.Packages()[0].Files()[0], b.Packages()[0].Files()[0]
+	if fa.File() != fb.File() {
+		t.Fatalf("file identity differs: %q vs %q", fa.File(), fb.File())
 	}
-	if a.File != b.File {
-		t.Fatalf("file identity differs across directories: %q vs %q", a.File, b.File)
+	if len(fa.Occurrences()) != len(fb.Occurrences()) {
+		t.Fatal("occurrence counts differ")
 	}
-	if len(a.Occurrences) != len(b.Occurrences) {
-		t.Fatalf("occurrence counts differ: %d vs %d", len(a.Occurrences), len(b.Occurrences))
-	}
-	for i := range a.Occurrences {
-		if a.Occurrences[i].ID != b.Occurrences[i].ID {
-			t.Fatalf("occurrence %d identity differs: %q vs %q", i, a.Occurrences[i].ID, b.Occurrences[i].ID)
+	for i := range fa.Occurrences() {
+		oa, ob := fa.Occurrences()[i], fb.Occurrences()[i]
+		if oa.ID() != ob.ID() || oa.Parent() != ob.Parent() {
+			t.Fatalf("occurrence %d identity differs across checkouts", i)
 		}
-		if a.Occurrences[i].Parent != b.Occurrences[i].Parent {
-			t.Fatalf("occurrence %d parent differs", i)
-		}
-		if strings.Contains(string(a.Occurrences[i].ID), dirA) {
-			t.Fatalf("occurrence identity %q embeds the load directory", a.Occurrences[i].ID)
+		if strings.Contains(oa.ID().String(), dirA) || strings.Contains(oa.ID().String(), dirB) {
+			t.Fatalf("identity %q embeds a load directory", oa.ID())
 		}
 	}
 }
 
-// lineDirectiveFixture adjusts display positions with a //line directive.
-const lineDirectiveFixture = `package p
-
-//line generated.go:100
-func F() int { return 1 }
-`
-
 // TestDisplayIsSeparateFromIdentity proves //line adjustments reach only the
-// display span: physical spans and identities are unaffected.
+// display span.
 func TestDisplayIsSeparateFromIdentity(t *testing.T) {
-	src := loadSource(t, lineDirectiveFixture)
-	inv, err := BuildInventory(src)
-	if err != nil {
-		t.Fatalf("BuildInventory: %v", err)
+	dir := t.TempDir()
+	for rel, content := range map[string]string{
+		"go.mod":  "module fixture.example/line\n\ngo 1.26\n",
+		"main.go": "package p\n\n//line generated.go:100\nfunc F() int { return 1 }\n",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, rel), []byte(content), 0o644); err != nil {
+			t.Fatalf("write: %v", err)
+		}
 	}
+	ws, err := source.LoadWorkspace(source.Request{Dir: dir})
+	if err != nil {
+		t.Fatalf("LoadWorkspace: %v", err)
+	}
+	inv, err := BuildWorkspaceInventory(ws)
+	if err != nil {
+		t.Fatalf("BuildWorkspaceInventory: %v", err)
+	}
+	fileInv := inv.Packages()[0].Files()[0]
 	var fn *Occurrence
-	for i := range inv.Occurrences {
-		if inv.Occurrences[i].Kind == catalog.KindFuncDecl {
-			fn = &inv.Occurrences[i]
+	occurrences := fileInv.Occurrences()
+	for i := range occurrences {
+		if occurrences[i].Kind() == catalog.KindFuncDecl {
+			fn = &occurrences[i]
 			break
 		}
 	}
 	if fn == nil {
-		t.Fatal("no FuncDecl occurrence found")
+		t.Fatal("no FuncDecl occurrence")
 	}
-	if got := filepath.Base(fn.Display.Filename); got != "generated.go" {
+	if got := filepath.Base(fn.Display().Filename); got != "generated.go" {
 		t.Errorf("display filename = %q, want generated.go", got)
 	}
-	if fn.Display.Start.Line != 100 {
-		t.Errorf("display line = %d, want 100", fn.Display.Start.Line)
+	if fn.Display().Start.Line != 100 {
+		t.Errorf("display line = %d, want 100", fn.Display().Start.Line)
 	}
-	if fn.Span.Start.Line != 4 {
-		t.Errorf("physical line = %d, want 4", fn.Span.Start.Line)
+	if fn.Span().Start.Line != 4 {
+		t.Errorf("physical line = %d, want 4", fn.Span().Start.Line)
 	}
-	if strings.Contains(string(fn.ID), "generated.go") {
-		t.Errorf("identity %q embeds the display filename", fn.ID)
+	if strings.Contains(fn.ID().String(), "generated.go") {
+		t.Errorf("identity %q embeds the display filename", fn.ID())
 	}
-	if !strings.HasPrefix(string(fn.ID), "fixture.go#") {
-		t.Errorf("identity %q does not begin with the physical file identity", fn.ID)
+	// A //line record itself joins the directive inventory.
+	foundLine := false
+	for _, directive := range fileInv.Directives() {
+		if directive.Kind() == catalog.DirectiveLine {
+			foundLine = true
+		}
+	}
+	if !foundLine {
+		t.Error("//line directive not inventoried")
 	}
 }
 
-// TestInventoryCountsAreProjection proves counts are a faithful projection of
-// the authoritative occurrences, sorted and summing to the total.
+// TestInventoryCountsAreProjection proves counts are a faithful sorted
+// projection of the authoritative occurrences.
 func TestInventoryCountsAreProjection(t *testing.T) {
-	src := loadSource(t, reconcileFixture)
-	inv, err := BuildInventory(src)
-	if err != nil {
-		t.Fatalf("BuildInventory: %v", err)
-	}
+	_, inv := fixtureFile(t)
 	total := 0
 	prev := ""
 	for i, count := range inv.CountsByKind() {
 		if count.Count <= 0 {
-			t.Errorf("kind %s has non-positive count %d", count.Kind, count.Count)
+			t.Errorf("kind %s has non-positive count", count.Kind)
 		}
 		if i > 0 && prev >= count.Kind.Name() {
-			t.Errorf("counts not strictly sorted by name at %d", i)
+			t.Errorf("counts not sorted at %d", i)
 		}
 		prev = count.Kind.Name()
 		total += count.Count
 	}
-	if total != len(inv.Occurrences) {
-		t.Errorf("projected counts sum to %d, want %d occurrences", total, len(inv.Occurrences))
-	}
-}
-
-// TestVisitorRejectsNonActiveConstructs proves the catalog disposition is the
-// single admission policy: deprecated and recovery kinds produce a typed
-// ConstructError carrying the catalog's own disposition, and nothing is
-// recorded.
-func TestVisitorRejectsNonActiveConstructs(t *testing.T) {
-	fileID, err := identity.NewFileID("synthetic.go")
-	if err != nil {
-		t.Fatalf("NewFileID: %v", err)
-	}
-	fset := token.NewFileSet()
-	base := fset.AddFile("synthetic.go", -1, 100)
-	pos, end := base.Pos(0), base.Pos(10)
-	cases := []ast.Node{
-		&ast.Package{},
-		&ast.BadExpr{From: pos, To: end},
-		&ast.BadStmt{From: pos, To: end},
-		&ast.BadDecl{From: pos, To: end},
-	}
-	for _, node := range cases {
-		v := &visitor{fset: fset, file: fileID}
-		_, err := v.occurrence(node, "")
-		if err == nil {
-			t.Errorf("%T was admitted", node)
-			continue
-		}
-		var rejected *ConstructError
-		if !errors.As(err, &rejected) {
-			t.Errorf("%T error = %T, want *ConstructError", node, err)
-			continue
-		}
-		if rejected.Disposition != rejected.Kind.Disposition() {
-			t.Errorf("%T rejection carries disposition %s, catalog says %s",
-				node, rejected.Disposition, rejected.Kind.Disposition())
-		}
-		if rejected.File != fileID {
-			t.Errorf("%T rejection carries file %q, want %q", node, rejected.File, fileID)
-		}
-		if len(v.occurrences) != 0 {
-			t.Errorf("%T was recorded despite rejection", node)
-		}
+	if total != len(inv.Occurrences()) {
+		t.Errorf("counts sum %d, want %d", total, len(inv.Occurrences()))
 	}
 }

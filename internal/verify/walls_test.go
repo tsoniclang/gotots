@@ -6,6 +6,8 @@ import (
 	"io/fs"
 	"path/filepath"
 	"runtime"
+	"sort"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -13,7 +15,7 @@ import (
 const modulePath = "github.com/tsoniclang/gotots"
 
 // pkgInfo is one production package: its module-relative directory and the
-// deduplicated set of import paths across its non-test files.
+// deduplicated, sorted set of import paths across its non-test files.
 type pkgInfo struct {
 	dir     string
 	imports []string
@@ -31,8 +33,9 @@ func repoRoot(t *testing.T) string {
 }
 
 // productPackages walks the entire module tree and returns every production
-// (non-test) package with its imports. Walking the whole tree — not a fixed
-// list of directories — means a leaking package added anywhere is still gated.
+// (non-test) package with its imports, in deterministic order. Import paths
+// are decoded as Go string literals (strconv.Unquote), never trimmed
+// textually, so raw-string imports cannot bypass the walls.
 func productPackages(t *testing.T) []pkgInfo {
 	t.Helper()
 	root := repoRoot(t)
@@ -63,22 +66,44 @@ func productPackages(t *testing.T) []pkgInfo {
 			byDir[dir] = map[string]bool{}
 		}
 		for _, spec := range file.Imports {
-			byDir[dir][strings.Trim(spec.Path.Value, `"`)] = true
+			decoded, uerr := strconv.Unquote(spec.Path.Value)
+			if uerr != nil {
+				t.Errorf("%s: undecodable import literal %s: %v", path, spec.Path.Value, uerr)
+				continue
+			}
+			byDir[dir][decoded] = true
 		}
 		return nil
 	})
 	if err != nil {
 		t.Fatalf("walk module tree: %v", err)
 	}
-	pkgs := make([]pkgInfo, 0, len(byDir))
-	for dir, set := range byDir {
-		imports := make([]string, 0, len(set))
-		for imp := range set {
+	dirs := make([]string, 0, len(byDir))
+	for dir := range byDir {
+		dirs = append(dirs, dir)
+	}
+	sort.Strings(dirs)
+	pkgs := make([]pkgInfo, 0, len(dirs))
+	for _, dir := range dirs {
+		imports := make([]string, 0, len(byDir[dir]))
+		for imp := range byDir[dir] {
 			imports = append(imports, imp)
 		}
+		sort.Strings(imports)
 		pkgs = append(pkgs, pkgInfo{dir: dir, imports: imports})
 	}
 	return pkgs
+}
+
+// hasSegment reports whether one exact path segment equals name — exact
+// segment-boundary matching, never substring matching.
+func hasSegment(importPath, name string) bool {
+	for _, segment := range strings.Split(importPath, "/") {
+		if segment == name {
+			return true
+		}
+	}
+	return false
 }
 
 // TestWallGateSeesTheTree self-checks the gate: if the walk found no packages
@@ -89,31 +114,36 @@ func TestWallGateSeesTheTree(t *testing.T) {
 	for _, p := range pkgs {
 		seen[p.dir] = true
 	}
-	for _, required := range []string{"internal/language/catalog", "internal/language/analyze", "internal/source", "internal/compiler", "cmd/gotots"} {
+	for _, required := range []string{
+		"internal/identity", "internal/language/catalog", "internal/language/analyze",
+		"internal/source", "internal/stagecheck", "internal/compiler", "cmd/gotots",
+	} {
 		if !seen[required] {
 			t.Errorf("wall gate did not observe package %s; the walk is incomplete", required)
 		}
 	}
 }
 
-// TestASTImportsAreWalled (Rule 3) proves go/ast and go/types are imported only
-// by internal/source and internal/language/analyze, anywhere in the tree.
+// TestASTImportsAreWalled (Rule 3) proves go/ast and go/types are imported
+// only by the two analysis owners and the independent stage verifiers
+// (which require toolchain extraction that bypasses the producers).
 func TestASTImportsAreWalled(t *testing.T) {
 	allowed := map[string]bool{
 		"internal/source":           true,
 		"internal/language/analyze": true,
+		"internal/stagecheck":       true,
 	}
 	for _, p := range productPackages(t) {
 		for _, imp := range p.imports {
 			if (imp == "go/ast" || imp == "go/types") && !allowed[p.dir] {
-				t.Errorf("Rule 3: %s imports %s; only internal/source and internal/language/analyze may", p.dir, imp)
+				t.Errorf("Rule 3: %s imports %s; only source, analyze, and stagecheck may", p.dir, imp)
 			}
 		}
 	}
 }
 
 // TestVerifyIsNotImportedByProduction (Rule 6) proves no production package
-// imports the verification layer.
+// imports the gate layer.
 func TestVerifyIsNotImportedByProduction(t *testing.T) {
 	verifyPkg := modulePath + "/internal/verify"
 	for _, p := range productPackages(t) {
@@ -122,19 +152,20 @@ func TestVerifyIsNotImportedByProduction(t *testing.T) {
 		}
 		for _, imp := range p.imports {
 			if imp == verifyPkg {
-				t.Errorf("Rule 6: %s imports the verification layer", p.dir)
+				t.Errorf("Rule 6: %s imports the verification gate layer", p.dir)
 			}
 		}
 	}
 }
 
-// TestNoCorpusOrIntegrationImports (Rule 2) proves no production package imports
-// the acceptance corpus or integration harness.
+// TestNoCorpusOrIntegrationImports (Rule 2) proves no production package
+// imports the acceptance corpus or integration harness, by exact segment.
 func TestNoCorpusOrIntegrationImports(t *testing.T) {
 	integrationPrefix := modulePath + "/integration"
 	for _, p := range productPackages(t) {
 		for _, imp := range p.imports {
-			if strings.HasPrefix(imp, integrationPrefix) || strings.Contains(imp, "typescript-go") {
+			if imp == integrationPrefix || strings.HasPrefix(imp, integrationPrefix+"/") ||
+				hasSegment(imp, "typescript-go") {
 				t.Errorf("Rule 2: %s imports acceptance/integration path %s", p.dir, imp)
 			}
 		}
@@ -143,13 +174,13 @@ func TestNoCorpusOrIntegrationImports(t *testing.T) {
 
 // layerRank is the total layer registry: every production package has exactly
 // one declared layer, and an import edge must go from a higher rank to a
-// strictly lower one (Rule 1). TestLayerRegistryIsTotal fails on any package
-// missing from — or stale in — this registry; nothing is skipped.
+// strictly lower one (Rule 1).
 var layerRank = map[string]int{
 	"internal/identity":         5,
 	"internal/language/catalog": 10,
 	"internal/source":           30,
 	"internal/language/analyze": 40,
+	"internal/stagecheck":       60,
 	"internal/compiler":         80,
 	"cmd/gotots":                90,
 	"internal/verify":           100,
@@ -157,8 +188,7 @@ var layerRank = map[string]int{
 
 // TestLayerRegistryIsTotal proves the registry and the module's production
 // packages join exactly: an unranked package fails (the wall cannot be
-// bypassed by omission), and a stale registry entry fails (the registry cannot
-// drift from the tree).
+// bypassed by omission), and a stale registry entry fails.
 func TestLayerRegistryIsTotal(t *testing.T) {
 	seen := map[string]bool{}
 	for _, p := range productPackages(t) {

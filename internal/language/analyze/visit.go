@@ -4,71 +4,147 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"reflect"
 
 	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/catalog"
-	"github.com/tsoniclang/gotots/internal/source"
 )
 
-// BuildInventory produces the authoritative construct inventory of a loaded
-// source file using a parent-directed recursive descent: each parent dispatches
-// on its own concrete type and visits every child edge, passing itself as the
-// parent. A child never inspects its parent to recover meaning. A
-// classification or admission failure aborts the inventory (fail closed).
-func BuildInventory(src *source.File) (Inventory, error) {
-	v := &visitor{fset: src.Fset(), file: src.ID()}
-	if _, err := v.occurrence(src.Syntax(), ""); err != nil {
-		return Inventory{}, err
-	}
-	return Inventory{Path: src.Path(), File: src.ID(), Occurrences: v.occurrences}, nil
-}
-
-type visitor struct {
+// builder accumulates one file's occurrence records during the catalog-driven
+// traversal. The edge catalog is the single owner of child-edge knowledge: the
+// traversal reflects over exactly the cataloged edges in pinned order and
+// holds no private edge table. nodes/parentIdx run parallel to occurrences so
+// the resolvers can consult typed context without re-walking.
+type builder struct {
 	fset        *token.FileSet
 	file        identity.FileID
 	occurrences []Occurrence
+	nodes       []ast.Node
+	parentIdx   []int
+	index       map[ast.Node]int
 }
 
-// occurrence records n with parent as its enclosing occurrence, then descends
-// into n's children with n as their parent. The catalog disposition is the
-// single admission policy: the switch is exhaustive and holds no per-kind
-// special case.
-func (v *visitor) occurrence(n ast.Node, parent identity.OccurrenceID) (identity.OccurrenceID, error) {
+// visit records n (hanging from parentIdx across edge) and descends into its
+// cataloged child edges. The catalog disposition is the single admission
+// policy: the switch is exhaustive and holds no per-kind special case.
+func (b *builder) visit(n ast.Node, parentIdx int, edge catalog.Edge) error {
 	kind, err := Classify(n)
 	if err != nil {
 		if unknown, ok := err.(*UnknownConstructError); ok {
-			unknown.File = v.file
-			unknown.Span = v.physicalSpan(n)
+			return newUnknownConstructError(unknown.GoType(), b.file, b.physicalSpan(n))
 		}
-		return "", err
+		return err
 	}
-	span := v.physicalSpan(n)
+	span := b.physicalSpan(n)
+	parentID := identity.OccurrenceID{}
+	if parentIdx >= 0 {
+		parentID = b.occurrences[parentIdx].id
+	}
 	switch disposition := kind.Disposition(); disposition {
 	case catalog.DispositionActive:
 		// admissible
 	case catalog.DispositionDeprecated, catalog.DispositionRecovery:
-		return "", &ConstructError{Kind: kind, Disposition: disposition, File: v.file, Span: span}
+		return newConstructError(kind, disposition, b.file, span, parentID, edge)
 	default:
-		return "", &ConstructError{Kind: kind, Disposition: catalog.DispositionInvalid, File: v.file, Span: span}
+		return newConstructError(kind, catalog.DispositionInvalid, b.file, span, parentID, edge)
 	}
-	id, err := identity.NewOccurrenceID(v.file, span.Start.Offset, span.End.Offset, kind.Name())
+	spanID, err := identity.NewSpanID(b.file, span.Start.Offset, span.End.Offset)
 	if err != nil {
-		return "", err
+		return err
 	}
-	v.occurrences = append(v.occurrences, Occurrence{
-		ID: id, Kind: kind, Parent: parent, Span: span, Display: v.displaySpan(n),
+	id, err := identity.NewOccurrenceID(spanID, uint16(kind))
+	if err != nil {
+		return err
+	}
+	tokenKind, err := b.tokenEvidence(n, kind, span)
+	if err != nil {
+		return err
+	}
+	b.occurrences = append(b.occurrences, Occurrence{
+		id: id, kind: kind, parent: parentID, edge: edge,
+		span: span, display: b.displaySpan(n), token: tokenKind,
 	})
-	if err := v.children(n, id); err != nil {
-		return "", err
+	b.nodes = append(b.nodes, n)
+	b.parentIdx = append(b.parentIdx, parentIdx)
+	selfIdx := len(b.occurrences) - 1
+	if b.index == nil {
+		b.index = map[ast.Node]int{}
 	}
-	return id, nil
+	b.index[n] = selfIdx
+
+	value := reflect.ValueOf(n).Elem()
+	for _, childEdge := range catalog.EdgesOf(kind) {
+		field := value.FieldByName(childEdge.Field())
+		if !field.IsValid() {
+			return newTraversalDefectError(childEdge, fmt.Sprintf("%T", n), b.file, "cataloged field missing from toolchain struct")
+		}
+		if childEdge.IsList() {
+			for i := 0; i < field.Len(); i++ {
+				if err := b.visitValue(field.Index(i), selfIdx, childEdge, n); err != nil {
+					return err
+				}
+			}
+			continue
+		}
+		if err := b.visitValue(field, selfIdx, childEdge, n); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// visitValue descends into one child slot; a nil pointer or interface is a
+// genuinely absent optional edge.
+func (b *builder) visitValue(v reflect.Value, parentIdx int, edge catalog.Edge, parent ast.Node) error {
+	switch v.Kind() {
+	case reflect.Interface, reflect.Pointer:
+		if v.IsNil() {
+			return nil
+		}
+	default:
+		return newTraversalDefectError(edge, fmt.Sprintf("%T", parent), b.file, "cataloged field is not a node slot")
+	}
+	child, ok := v.Interface().(ast.Node)
+	if !ok {
+		return newTraversalDefectError(edge, fmt.Sprintf("%T", parent), b.file, "cataloged field value is not an ast.Node")
+	}
+	return b.visit(child, parentIdx, edge)
+}
+
+// tokenEvidence binds the lexical token evidence of token-bearing kinds
+// through the token catalog; an unmapped toolchain token fails closed.
+func (b *builder) tokenEvidence(n ast.Node, kind catalog.Kind, span Span) (catalog.TokenKind, error) {
+	var tok token.Token
+	switch n := n.(type) {
+	case *ast.BinaryExpr:
+		tok = n.Op
+	case *ast.UnaryExpr:
+		tok = n.Op
+	case *ast.AssignStmt:
+		tok = n.Tok
+	case *ast.IncDecStmt:
+		tok = n.Tok
+	case *ast.BranchStmt:
+		tok = n.Tok
+	case *ast.GenDecl:
+		tok = n.Tok
+	case *ast.BasicLit:
+		tok = n.Kind
+	default:
+		return 0, nil
+	}
+	bound := catalog.TokenBySpelling(tok.String())
+	if !bound.Valid() {
+		return 0, newResolutionError(kind, b.file, span, "toolchain token "+tok.String()+" is not in the token catalog")
+	}
+	return bound, nil
 }
 
 // physicalSpan measures n with //line directives ignored; these offsets enter
 // the canonical identity.
-func (v *visitor) physicalSpan(n ast.Node) Span {
-	start := v.fset.PositionFor(n.Pos(), false)
-	end := v.fset.PositionFor(n.End(), false)
+func (b *builder) physicalSpan(n ast.Node) Span {
+	start := b.fset.PositionFor(n.Pos(), false)
+	end := b.fset.PositionFor(n.End(), false)
 	return Span{
 		Start: Position{Line: start.Line, Column: start.Column, Offset: start.Offset},
 		End:   Position{Line: end.Line, Column: end.Column, Offset: end.Offset},
@@ -76,9 +152,9 @@ func (v *visitor) physicalSpan(n ast.Node) Span {
 }
 
 // displaySpan measures n with //line directives applied, for diagnostics only.
-func (v *visitor) displaySpan(n ast.Node) DisplaySpan {
-	start := v.fset.Position(n.Pos())
-	end := v.fset.Position(n.End())
+func (b *builder) displaySpan(n ast.Node) DisplaySpan {
+	start := b.fset.Position(n.Pos())
+	end := b.fset.Position(n.End())
 	return DisplaySpan{
 		Filename: start.Filename,
 		Start:    Position{Line: start.Line, Column: start.Column, Offset: start.Offset},
@@ -86,394 +162,26 @@ func (v *visitor) displaySpan(n ast.Node) DisplaySpan {
 	}
 }
 
-// node descends into one required child.
-func (v *visitor) node(n ast.Node, parent identity.OccurrenceID) error {
-	_, err := v.occurrence(n, parent)
-	return err
-}
-
-func (v *visitor) exprs(list []ast.Expr, parent identity.OccurrenceID) error {
-	for _, x := range list {
-		if err := v.node(x, parent); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (v *visitor) stmts(list []ast.Stmt, parent identity.OccurrenceID) error {
-	for _, s := range list {
-		if err := v.node(s, parent); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (v *visitor) idents(list []*ast.Ident, parent identity.OccurrenceID) error {
-	for _, ident := range list {
-		if err := v.node(ident, parent); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (v *visitor) specs(list []ast.Spec, parent identity.OccurrenceID) error {
-	for _, spec := range list {
-		if err := v.node(spec, parent); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (v *visitor) decls(list []ast.Decl, parent identity.OccurrenceID) error {
-	for _, decl := range list {
-		if err := v.node(decl, parent); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (v *visitor) fields(list []*ast.Field, parent identity.OccurrenceID) error {
-	for _, field := range list {
-		if err := v.node(field, parent); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (v *visitor) comments(list []*ast.Comment, parent identity.OccurrenceID) error {
-	for _, comment := range list {
-		if err := v.node(comment, parent); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// children visits every child edge of n in source order, mirroring the
-// toolchain's own child enumeration; TestBuildInventoryExactJoinsIndependentWalk
-// reconciles node set, order, and parent edges against an independent walk.
-// Non-admissible kinds (Bad*, Package) never reach here — the disposition
-// policy in occurrence rejects them first — so a type reaching the default arm
-// is a fail-closed coverage defect.
-func (v *visitor) children(n ast.Node, id identity.OccurrenceID) error {
-	switch n := n.(type) {
-	case *ast.Comment, *ast.Ident, *ast.BasicLit, *ast.EmptyStmt, *ast.Directive:
-		return nil // leaves
-	case *ast.CommentGroup:
-		return v.comments(n.List, id)
-	case *ast.Field:
-		if err := v.optional(n.Doc, id); err != nil {
-			return err
-		}
-		if err := v.idents(n.Names, id); err != nil {
-			return err
-		}
-		if err := v.optionalExpr(n.Type, id); err != nil {
-			return err
-		}
-		if err := v.optionalBasicLit(n.Tag, id); err != nil {
-			return err
-		}
-		return v.optional(n.Comment, id)
-	case *ast.FieldList:
-		return v.fields(n.List, id)
-	case *ast.Ellipsis:
-		return v.optionalExpr(n.Elt, id)
-	case *ast.FuncLit:
-		if err := v.node(n.Type, id); err != nil {
-			return err
-		}
-		return v.node(n.Body, id)
-	case *ast.CompositeLit:
-		if err := v.optionalExpr(n.Type, id); err != nil {
-			return err
-		}
-		return v.exprs(n.Elts, id)
-	case *ast.ParenExpr:
-		return v.node(n.X, id)
-	case *ast.SelectorExpr:
-		if err := v.node(n.X, id); err != nil {
-			return err
-		}
-		return v.node(n.Sel, id)
-	case *ast.IndexExpr:
-		if err := v.node(n.X, id); err != nil {
-			return err
-		}
-		return v.node(n.Index, id)
-	case *ast.IndexListExpr:
-		if err := v.node(n.X, id); err != nil {
-			return err
-		}
-		return v.exprs(n.Indices, id)
-	case *ast.SliceExpr:
-		if err := v.node(n.X, id); err != nil {
-			return err
-		}
-		if err := v.optionalExpr(n.Low, id); err != nil {
-			return err
-		}
-		if err := v.optionalExpr(n.High, id); err != nil {
-			return err
-		}
-		return v.optionalExpr(n.Max, id)
-	case *ast.TypeAssertExpr:
-		if err := v.node(n.X, id); err != nil {
-			return err
-		}
-		return v.optionalExpr(n.Type, id)
-	case *ast.CallExpr:
-		if err := v.node(n.Fun, id); err != nil {
-			return err
-		}
-		return v.exprs(n.Args, id)
-	case *ast.StarExpr:
-		return v.node(n.X, id)
-	case *ast.UnaryExpr:
-		return v.node(n.X, id)
-	case *ast.BinaryExpr:
-		if err := v.node(n.X, id); err != nil {
-			return err
-		}
-		return v.node(n.Y, id)
-	case *ast.KeyValueExpr:
-		if err := v.node(n.Key, id); err != nil {
-			return err
-		}
-		return v.node(n.Value, id)
-	case *ast.ArrayType:
-		if err := v.optionalExpr(n.Len, id); err != nil {
-			return err
-		}
-		return v.node(n.Elt, id)
-	case *ast.StructType:
-		return v.node(n.Fields, id)
-	case *ast.FuncType:
-		if err := v.optionalFieldList(n.TypeParams, id); err != nil {
-			return err
-		}
-		if err := v.optionalFieldList(n.Params, id); err != nil {
-			return err
-		}
-		return v.optionalFieldList(n.Results, id)
-	case *ast.InterfaceType:
-		return v.node(n.Methods, id)
-	case *ast.MapType:
-		if err := v.node(n.Key, id); err != nil {
-			return err
-		}
-		return v.node(n.Value, id)
-	case *ast.ChanType:
-		return v.node(n.Value, id)
-	case *ast.DeclStmt:
-		return v.node(n.Decl, id)
-	case *ast.LabeledStmt:
-		if err := v.node(n.Label, id); err != nil {
-			return err
-		}
-		return v.node(n.Stmt, id)
-	case *ast.ExprStmt:
-		return v.node(n.X, id)
-	case *ast.SendStmt:
-		if err := v.node(n.Chan, id); err != nil {
-			return err
-		}
-		return v.node(n.Value, id)
-	case *ast.IncDecStmt:
-		return v.node(n.X, id)
-	case *ast.AssignStmt:
-		if err := v.exprs(n.Lhs, id); err != nil {
-			return err
-		}
-		return v.exprs(n.Rhs, id)
-	case *ast.GoStmt:
-		return v.node(n.Call, id)
-	case *ast.DeferStmt:
-		return v.node(n.Call, id)
-	case *ast.ReturnStmt:
-		return v.exprs(n.Results, id)
-	case *ast.BranchStmt:
-		return v.optionalIdent(n.Label, id)
-	case *ast.BlockStmt:
-		return v.stmts(n.List, id)
-	case *ast.IfStmt:
-		if err := v.optionalStmt(n.Init, id); err != nil {
-			return err
-		}
-		if err := v.node(n.Cond, id); err != nil {
-			return err
-		}
-		if err := v.node(n.Body, id); err != nil {
-			return err
-		}
-		return v.optionalStmt(n.Else, id)
-	case *ast.CaseClause:
-		if err := v.exprs(n.List, id); err != nil {
-			return err
-		}
-		return v.stmts(n.Body, id)
-	case *ast.SwitchStmt:
-		if err := v.optionalStmt(n.Init, id); err != nil {
-			return err
-		}
-		if err := v.optionalExpr(n.Tag, id); err != nil {
-			return err
-		}
-		return v.node(n.Body, id)
-	case *ast.TypeSwitchStmt:
-		if err := v.optionalStmt(n.Init, id); err != nil {
-			return err
-		}
-		if err := v.node(n.Assign, id); err != nil {
-			return err
-		}
-		return v.node(n.Body, id)
-	case *ast.CommClause:
-		if err := v.optionalStmt(n.Comm, id); err != nil {
-			return err
-		}
-		return v.stmts(n.Body, id)
-	case *ast.SelectStmt:
-		return v.node(n.Body, id)
-	case *ast.ForStmt:
-		if err := v.optionalStmt(n.Init, id); err != nil {
-			return err
-		}
-		if err := v.optionalExpr(n.Cond, id); err != nil {
-			return err
-		}
-		if err := v.optionalStmt(n.Post, id); err != nil {
-			return err
-		}
-		return v.node(n.Body, id)
-	case *ast.RangeStmt:
-		if err := v.optionalExpr(n.Key, id); err != nil {
-			return err
-		}
-		if err := v.optionalExpr(n.Value, id); err != nil {
-			return err
-		}
-		if err := v.node(n.X, id); err != nil {
-			return err
-		}
-		return v.node(n.Body, id)
-	case *ast.ImportSpec:
-		if err := v.optional(n.Doc, id); err != nil {
-			return err
-		}
-		if err := v.optionalIdent(n.Name, id); err != nil {
-			return err
-		}
-		if err := v.node(n.Path, id); err != nil {
-			return err
-		}
-		return v.optional(n.Comment, id)
-	case *ast.ValueSpec:
-		if err := v.optional(n.Doc, id); err != nil {
-			return err
-		}
-		if err := v.idents(n.Names, id); err != nil {
-			return err
-		}
-		if err := v.optionalExpr(n.Type, id); err != nil {
-			return err
-		}
-		if err := v.exprs(n.Values, id); err != nil {
-			return err
-		}
-		return v.optional(n.Comment, id)
-	case *ast.TypeSpec:
-		if err := v.optional(n.Doc, id); err != nil {
-			return err
-		}
-		if err := v.node(n.Name, id); err != nil {
-			return err
-		}
-		if err := v.optionalFieldList(n.TypeParams, id); err != nil {
-			return err
-		}
-		if err := v.node(n.Type, id); err != nil {
-			return err
-		}
-		return v.optional(n.Comment, id)
-	case *ast.GenDecl:
-		if err := v.optional(n.Doc, id); err != nil {
-			return err
-		}
-		return v.specs(n.Specs, id)
-	case *ast.FuncDecl:
-		if err := v.optional(n.Doc, id); err != nil {
-			return err
-		}
-		if err := v.optionalFieldList(n.Recv, id); err != nil {
-			return err
-		}
-		if err := v.node(n.Name, id); err != nil {
-			return err
-		}
-		if err := v.node(n.Type, id); err != nil {
-			return err
-		}
-		return v.optionalStmt(n.Body, id)
-	case *ast.File:
-		if err := v.optional(n.Doc, id); err != nil {
-			return err
-		}
-		if err := v.node(n.Name, id); err != nil {
-			return err
-		}
-		return v.decls(n.Decls, id)
-	default:
-		return &UnvisitedConstructError{GoType: fmt.Sprintf("%T", n), File: v.file}
-	}
-}
-
-// The optional* helpers descend only into a present child; a nil concrete
-// pointer is a genuinely absent edge, never a node.
-func (v *visitor) optional(c *ast.CommentGroup, parent identity.OccurrenceID) error {
-	if c == nil {
+// parentNode is the enclosing syntax node of the occurrence at index i, or nil
+// at the root.
+func (b *builder) parentNode(i int) ast.Node {
+	p := b.parentIdx[i]
+	if p < 0 {
 		return nil
 	}
-	return v.node(c, parent)
+	return b.nodes[p]
 }
 
-func (v *visitor) optionalIdent(ident *ast.Ident, parent identity.OccurrenceID) error {
-	if ident == nil {
-		return nil
+// enclosingFunc walks up from index i to the nearest function declaration or
+// literal and returns its type, or nil when outside any function.
+func (b *builder) enclosingFunc(i int) *ast.FuncType {
+	for p := b.parentIdx[i]; p >= 0; p = b.parentIdx[p] {
+		switch fn := b.nodes[p].(type) {
+		case *ast.FuncDecl:
+			return fn.Type
+		case *ast.FuncLit:
+			return fn.Type
+		}
 	}
-	return v.node(ident, parent)
-}
-
-func (v *visitor) optionalBasicLit(lit *ast.BasicLit, parent identity.OccurrenceID) error {
-	if lit == nil {
-		return nil
-	}
-	return v.node(lit, parent)
-}
-
-func (v *visitor) optionalFieldList(list *ast.FieldList, parent identity.OccurrenceID) error {
-	if list == nil {
-		return nil
-	}
-	return v.node(list, parent)
-}
-
-func (v *visitor) optionalExpr(x ast.Expr, parent identity.OccurrenceID) error {
-	if x == nil {
-		return nil
-	}
-	return v.node(x, parent)
-}
-
-func (v *visitor) optionalStmt(s ast.Stmt, parent identity.OccurrenceID) error {
-	if s == nil {
-		return nil
-	}
-	return v.node(s, parent)
+	return nil
 }

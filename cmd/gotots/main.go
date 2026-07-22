@@ -11,12 +11,16 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/compiler"
 	"github.com/tsoniclang/gotots/internal/language/analyze"
+	"github.com/tsoniclang/gotots/internal/source"
 )
 
 const usage = `usage: gotots <command> [args]
 
 commands:
-  inspect constructs <file>   report the catalog constructs in a Go source file`
+  inspect constructs [-dir <dir>] [pattern ...]
+      report canonical construct occurrences, roles, variants, implicit
+      operations, directives, and exact denominators for the selected
+      workspace packages (default pattern ./...)`
 
 // UnsupportedCommandError reports a command line the binary does not implement.
 // It is the CLI-level typed error; its string is rendered only here.
@@ -50,28 +54,76 @@ func run(args []string, stdout io.Writer) error {
 }
 
 func runInspect(args []string, stdout io.Writer) error {
-	if len(args) != 2 || args[0] != "constructs" {
+	if len(args) == 0 || args[0] != "constructs" {
 		return &UnsupportedCommandError{Command: strings.TrimSpace("inspect " + strings.Join(args, " "))}
 	}
-	inventory, err := compiler.InspectConstructs(args[1])
+	request := source.Request{Dir: "."}
+	rest := args[1:]
+	var patterns []string
+	for i := 0; i < len(rest); i++ {
+		switch {
+		case rest[i] == "-dir":
+			if i+1 >= len(rest) {
+				return &UnsupportedCommandError{Command: "inspect constructs -dir (missing directory)"}
+			}
+			i++
+			request.Dir = rest[i]
+		case strings.HasPrefix(rest[i], "-"):
+			return &UnsupportedCommandError{Command: "inspect constructs " + rest[i]}
+		default:
+			patterns = append(patterns, rest[i])
+		}
+	}
+	request.Patterns = patterns
+	inventory, err := compiler.InspectConstructs(request)
 	if err != nil {
 		return err
 	}
 	return printInventory(stdout, inventory)
 }
 
-// printInventory renders the per-kind projection of the inventory. Write errors
-// propagate rather than being discarded, so a failing writer fails the command.
-func printInventory(stdout io.Writer, inventory analyze.Inventory) error {
-	if _, err := fmt.Fprintf(stdout, "constructs in %s (%d occurrences):\n",
-		inventory.Path, len(inventory.Occurrences)); err != nil {
+// printInventory renders the canonical occurrence records and the exact
+// denominators. Write errors propagate; a failing writer fails the command.
+func printInventory(stdout io.Writer, inventory *analyze.WorkspaceInventory) error {
+	p := func(format string, args ...any) error {
+		_, err := fmt.Fprintf(stdout, format, args...)
 		return err
 	}
-	for _, count := range inventory.CountsByKind() {
-		if _, err := fmt.Fprintf(stdout, "  %-16s %-12s %d\n",
-			count.Kind, count.Kind.Category(), count.Count); err != nil {
+	for _, pkg := range inventory.Packages() {
+		if err := p("package %s\n", pkg.ID()); err != nil {
 			return err
 		}
+		for _, file := range pkg.Files() {
+			if err := p("  file %s\n", file.File()); err != nil {
+				return err
+			}
+			for _, occurrence := range file.Occurrences() {
+				line := fmt.Sprintf("    %s kind=%s", occurrence.ID(), occurrence.Kind())
+				if occurrence.Edge().Valid() {
+					line += fmt.Sprintf(" edge=%s role=%s", occurrence.Edge(), occurrence.Role())
+				}
+				if occurrence.Token().Valid() {
+					line += " token=" + occurrence.Token().String()
+				}
+				if occurrence.Variant() != 0 {
+					line += " variant=" + occurrence.Variant().String()
+				}
+				for _, op := range occurrence.Implicit() {
+					line += " implicit=" + op.String()
+				}
+				if err := p("%s\n", line); err != nil {
+					return err
+				}
+			}
+			for _, directive := range file.Directives() {
+				if err := p("    directive %s tool=%s name=%s disposition=%s\n",
+					directive.Kind(), directive.Tool(), directive.Name(), directive.Kind().Disposition()); err != nil {
+					return err
+				}
+			}
+		}
 	}
-	return nil
+	d := inventory.Denominators()
+	return p("denominators: goVersion=%s packages=%d files=%d occurrences=%d directives=%d variantBearing=%d implicitOps=%d unknownConstructs=0 unknownDirectives=0\n",
+		inventory.GoVersion(), d.Packages, d.Files, d.Occurrences, d.Directives, d.VariantBearing, d.ImplicitOps)
 }
