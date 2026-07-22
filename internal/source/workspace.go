@@ -386,14 +386,19 @@ func (p *Package) ModuleGoVersion() string { return p.moduleGoVersion }
 // RequestedRoot reports whether the package was a requested root.
 func (p *Package) RequestedRoot() bool { return p.requestedRoot }
 
-// RetainsFullSemantic reports whether any unit of the package is
-// full-semantic (and therefore contributes retained occurrences).
+// RetainsFullSemantic reports whether any unit of the package — source or
+// implicit — is full-semantic (and therefore contributes retained evidence).
 func (p *Package) RetainsFullSemantic() bool {
 	for _, file := range p.files {
 		for _, unit := range file.units {
 			if unit.depth == DepthFullSemantic {
 				return true
 			}
+		}
+	}
+	for _, implicit := range p.implicitUnits {
+		if implicit.depth == DepthFullSemantic {
+			return true
 		}
 	}
 	return false

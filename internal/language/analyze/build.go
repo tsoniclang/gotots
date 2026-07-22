@@ -33,7 +33,7 @@ func Analyze(universe *source.Universe, depths map[identity.SourceUnitID]source.
 		// the region model; contract-depth provider packages are audited
 		// separately and contribute no application occurrences, even when the
 		// audit's recursive census gave their files traversable syntax.
-		if !packageHasFullUnit(pkg, depths) {
+		if !packageHasFullUnit(pkg, depths, implicitDepths) {
 			continue
 		}
 		view := pkg.CheckerView()
@@ -143,14 +143,19 @@ func Analyze(universe *source.Universe, depths map[identity.SourceUnitID]source.
 	return out, projection, nil
 }
 
-// packageHasFullUnit reports whether any of the package's units is
-// full-semantic under the selection.
-func packageHasFullUnit(pkg *source.LoadedPackage, depths map[identity.SourceUnitID]source.EvidenceDepth) bool {
+// packageHasFullUnit reports whether any of the package's units — source or
+// implicit — is full-semantic under the selection.
+func packageHasFullUnit(pkg *source.LoadedPackage, depths map[identity.SourceUnitID]source.EvidenceDepth, implicitDepths map[identity.ImplicitUnitID]source.EvidenceDepth) bool {
 	for _, file := range pkg.Files() {
 		for _, unit := range file.Units() {
 			if depths[unit.ID()] == source.DepthFullSemantic {
 				return true
 			}
+		}
+	}
+	for _, implicit := range pkg.ImplicitUnits() {
+		if implicitDepths[implicit] == source.DepthFullSemantic {
+			return true
 		}
 	}
 	return false

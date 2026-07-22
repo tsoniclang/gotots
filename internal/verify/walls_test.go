@@ -143,6 +143,25 @@ func TestASTImportsAreWalled(t *testing.T) {
 	}
 }
 
+// TestSourceDoesNotOwnCatalogClassification (Stage-1 seam) proves the language
+// classification owner is analyze, not source: internal/source must not import
+// the construct catalog, even though the layer rank would permit it. Moving
+// catalog classification/edge/token work into source is an architecture
+// violation this gate rejects.
+func TestSourceDoesNotOwnCatalogClassification(t *testing.T) {
+	catalogPkg := modulePath + "/internal/language/catalog"
+	for _, p := range productPackages(t) {
+		if p.dir != "internal/source" {
+			continue
+		}
+		for _, imp := range p.imports {
+			if imp == catalogPkg {
+				t.Errorf("Stage-1 seam: internal/source imports %s; catalog classification is owned by internal/language/analyze", imp)
+			}
+		}
+	}
+}
+
 // TestVerifyIsNotImportedByProduction (Rule 6) proves no production package
 // imports the gate layer.
 func TestVerifyIsNotImportedByProduction(t *testing.T) {
