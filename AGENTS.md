@@ -48,7 +48,11 @@ defined by the specification.
 - Whole-program facts seal before one total immutable plan is built.
 - Lowering consumes semantic operations plus their plans and makes no semantic
   or representation decisions.
-- Definitions are owned once; references may repeat.
+- Definitions are owned once; references may repeat. Each implementation-bearing
+  construct has one typed definition owning an isolated body region and one
+  typed reference at its enclosing grammatical edge. An excluded body is
+  unreachable through the finalized parent API; a raw parent node plus a
+  boundary list, a traversal flag, or consumer-controlled skipping is forbidden.
 - One implementation path exists. No fallback, old/new flag, retry with
   changed semantics, compatibility reader, or parallel state survives.
 - No semantic recovery through `any`, `unknown`, unchecked casts, reflection,
@@ -61,6 +65,17 @@ defined by the specification.
 - Reachability traverses generated, manual, runtime, stdlib, external,
   extension, initialization, callback, generic, and dynamic-dispatch edges.
 - Extensions consume finalized selected evidence and never re-enter analysis.
+
+## Spec-Adequacy Gate
+
+No phase or shared abstraction enters implementation until its governing
+specification defines its closed input classes, authoritative owner, exact
+output schema, lifecycle and mutability boundary, context/containment rules,
+conservation law, downstream contract, superseded-path deletion list, positive
+and adversarial source examples, independent verifier and mutations, and
+size/memory/time bounds. Terms such as "unit," "boundary," "exact,"
+"immutable," and "independent" are not acceptance criteria unless their
+observable representation and failure cases are defined.
 
 ## Product Quality Is Correctness
 

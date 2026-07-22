@@ -112,8 +112,18 @@ Required exit evidence:
   bodies during ordinary compilation; and
 - the audit exact-joins selected-byte, build-configuration, provider-contract,
   toolchain, catalog, per-file count, and aggregate-count evidence; and
-- finalized application artifacts retain no non-full body AST or body-indexed
-  `types.Info` references; and
+- provider and audit manifests carry the implementation definition/reference
+  graph, and ordinary compilation exact-joins it without rescanning provider
+  interiors; and
+- finalized application artifacts expose one region/reference API at every depth,
+  retain no non-full body AST or body-indexed `types.Info` reachable from a
+  parent, and hold no separate uniform-full/mixed consumer path; and
+- the conservation joins hold — sites to references, unit identities to
+  definitions, full units to body-region occurrences, and non-full units to
+  zero-body contracts — and region/reference construction is non-cubic; and
+- ordinary consumption authority comes from an independently selected certified
+  digest, and audit certification binds the overlay/build-input projection that
+  can change audited membership or selected bytes; and
 - package count, retained occurrences, elapsed time, and peak RSS have reviewed
   absolute and parent-delta bounds for ordinary application compilation.
 

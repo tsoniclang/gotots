@@ -199,6 +199,33 @@ an audit row, changing overlays/build tags, or changing the selected provider
 contract must also fail. Gates 02, 03, or 16 fail with exact identities and the
 cost delta.
 
+The executable-region/reference model has its own blocking fixture matrix and
+mutation battery. The fixtures cover: outer full with nested body non-full;
+outer non-full with nested body full, including a captured binding declared in
+the excluded parent; both full and both non-full; three-level nesting and two
+literals on one source line; literals inside package initializers; a parent
+without `C` use with a nested child that uses `C` and the inverse; `C` in a
+literal signature, a shadowing local named `C`, and mixed pure/C-dependent units
+in one cgo file; and missing, duplicate, extra, ambiguous, relocated, and
+overlaid cgo origins and synthetics. For outer-full/child-non-full the artifact
+is inspected to prove simultaneously that the parent references the child
+exactly once, the child definition exists exactly once, the child interior
+occurrence count is zero, and a generic traversal from the parent cannot reach
+the child body. Required mutations restore a raw child pointer, omit or
+mis-parent a reference, duplicate a definition, change edge role or order,
+expose backing storage, replace object identity with the spelling `C`, omit or
+duplicate a cgo origin, and compare only synthetic names; each fails at its
+owning gate with exact identities and one-sided differences. A wide
+nested-literal fixture and the isolated cost harness demonstrate bounded,
+non-cubic region/reference construction. The independent structural-origin
+extractor is implemented separately from the producer and shares none of its
+critical enumeration or semantic helpers.
+
+The finalized cost/attestation gate fails closed in the certification
+environment: a portable unit suite may omit the expensive isolated run, but the
+phase-exit attestation gate may not silently skip it, and it binds the exact
+source, toolchain, environment, and fixture revisions it measured.
+
 Generic context classification also has an independent type-semantics matrix.
 It covers normalized unions and intersections, tilde terms, empty and mixed
 type sets, named types with equal underlying types, and directional-channel

@@ -160,6 +160,63 @@ source; ordinary application compilation does not rescan provider-owned standard
 library bodies. Construct inventory may link occurrences to these units; it may
 not create units for the first time after scope selection.
 
+Every implementation-bearing Go construct has exactly one typed implementation
+definition and exactly one typed reference at its enclosing grammatical
+location. The definition owns the construct's body region; the reference records
+where a parent construct grammatically contains a child implementation.
+
+| Go form | Contract owner | Implementation definition | Enclosing reference |
+| --- | --- | --- | --- |
+| Function/method declaration | declaration/signature | function-body unit | declaration-to-body edge |
+| Function literal | callable/signature | function-literal-body unit | expression edge in enclosing unit |
+| Package ValueSpec with values | names/type declaration | ordered initializer unit | package-initialization edge |
+| Bodyless declaration | declaration/signature | unresolved obligation | declaration-to-obligation edge |
+| Implicit executable work | catalog/type owner | implicit unit | owning catalog operation |
+
+The finalized artifact contains, per unit, an implementation definition (unit
+identity, kind, contract, depth, and — for a full-semantic unit — an isolated
+body region) and, per grammatically nested implementation, an implementation
+reference in its enclosing owner (parent-owner identity that is a declaration,
+unit, or implicit-unit identity; child unit identity; source anchor; grammatical
+edge; parent-assigned role; and source ordinal). Struct names are implementation
+choices; these facts and invariants are not. Definitions are owned once;
+references may repeat.
+
+A full-semantic unit's body region is the exact occurrence set of its own body,
+excluding every nested unit's interior. A nested implementation with a non-full
+body remains a typed reference in its full parent — preserving the parent's
+function-value or initializer operation at the exact edge — while contributing
+zero interior body occurrences. A full child inside a non-full parent retains
+its callable contract, binder and type evidence, and its own body region
+without retaining or rescanning the excluded parent. Stage 1 retains the exact
+object and binder evidence a later capture analysis consumes; Stage 1 performs
+no capture planning.
+
+An excluded body is unreachable through the finalized parent API. The finalized
+artifact exposes one region/reference API for every unit at every depth. It does
+not expose a raw parent syntax node paired with a boundary list, a
+respect-boundaries traversal flag, consumer-controlled skipping, exported slices
+containing raw retained nodes, or separate semantic paths for uniform-full and
+mixed files. An all-full file may use an internal storage optimization, but every
+consumer uses the one region/reference API. Parent/child ownership is recorded
+during the single parent-directed catalog traversal from the exact AST edge and
+role; spans and hashes prove identity and content but never rediscover topology,
+and region/reference construction is linear or O(nodes log nodes), never
+quadratic or cubic in unit count.
+
+Finalization and its independent verifier enforce a conservation law by exact
+joins: implementation sites join implementation-reference records; censused unit
+identities join implementation-definition records; full-semantic units join
+retained body-region occurrence sets; and non-full units join
+contracts/boundaries with zero retained body occurrences and no reachable body
+syntax or type-information key. An implementation site is the closed union of
+explicit executable AST edges, bodyless obligations, and catalog-owned implicit
+operations. Every reference preserves source order, parent-assigned role, source
+anchor, and child identity. No construct is dropped, duplicated, or later
+inferred from spelling or span containment. Provider and audit manifests carry
+this definition/reference graph — not a flat unit list — so ordinary
+compilation exact-joins it without rescanning provider interiors.
+
 Requested roots, resolved import closure, full-semantic source set,
 declaration-contract set, and later product reachability are different sets with
 different identities and denominators. Root status is only a reachability
@@ -179,12 +236,26 @@ No source file or body disappears because its checked view differs.
 
 Cgo correspondence comes from selected-toolchain output facts and source
 position/line-directive evidence. Basename conventions and declaration-name
-matching are not semantic joins. Package-synthetic checked declarations such as
-cgo-generated types and call adapters receive explicit typed identities and
-external/intrinsic boundaries; they are never ignored as unmatched extras.
-C-dependence is resolved from checked semantic/toolchain evidence, not from an
-identifier spelled `C`, a checked temporary filename, or another source-text
-heuristic.
+matching are not semantic joins. Each source definition and reference maps to
+its checked counterpart by selected-toolchain origin evidence with exact kind
+agreement and exact-one cardinality; when column evidence is absent, a same-line
+relation is valid only if the candidate set is exactly one, and otherwise fails
+as ambiguous. Package-synthetic checked declarations such as cgo-generated types
+and call adapters receive explicit typed identities — package, name, and role —
+and external/intrinsic boundaries; they are never ignored as unmatched extras,
+and identity joins compare the complete package/name/role tuple, never the name
+alone. C-dependence is resolved from checked semantic/toolchain object identity,
+not from an identifier spelled `C`, a checked temporary filename, or another
+source-text heuristic. C-dependence is computed over the unit definition — its
+callable or initializer contract and its own executable region — and is never
+inherited merely because a nested child uses `C`.
+
+The independent structural-origin verifier is a separately implemented
+extractor. It does not invoke the producer's critical enumeration or semantic
+helpers; a cross-check that shares the producer's origin enumeration, synthetic
+classification, or object-use walk is an invariant check, not an independent
+derivation. Structural origins are verified by that separate extractor, and
+semantic C-dependence is proven through selected-Go fixtures and mutations.
 
 Syntax and body-indexed `types.Info` for non-full depths may exist transiently
 inside the authoritative semantic load. After contracts, boundaries, and
@@ -199,10 +270,20 @@ evidence are different validated types. A mutable `syntax = nil` plus a
 body is full-semantic, is a forbidden dual state. Mixed files expose only the
 per-unit syntax/type evidence their depths permit.
 
-Finalized artifacts are immutable at their Go API boundary. Slice and map
-accessors return copies or read-only query views; evidence variants do not expose
-mutable backing collections. Body-indexed type information is selected by exact
-retained AST/object identity, never by unqualified byte offsets that can collide
+Finalized artifacts are immutable by observable capability, not by convention.
+Owned slices and maps return isolated values; no API can reach excluded syntax;
+mutable toolchain objects such as scopes and expressions are hidden behind
+narrow read-only query views or an enforced internal capability wall; mutation
+methods are forbidden outside the authoritative owner; and scopes, initialization
+order, file versions, implicits, selections, generic instances, definitions,
+uses, and types all come from one region-filtered evidence owner. Initialization
+evidence references canonical units and occurrences rather than leaking excluded
+raw expressions. A shallow reflection check over seeded accessors is supporting
+evidence, not proof of transitive isolation: the immutability gate must also
+prove no finalized path reaches an excluded body, that nested collections and
+evidence variants expose no backing storage, and that narrow views expose no
+mutable toolchain object. Body-indexed type information is selected by exact
+retained region identity, never by unqualified byte offsets that can collide
 between files. A mutable `*types.Info` map is not a downstream artifact API.
 
 Catalog-coverage scans over the complete Go toolchain or a large corpus are
@@ -224,6 +305,16 @@ Verification rejects duplicate records, incorrect per-file or aggregate counts,
 changed bytes under an unchanged identity, and any one-sided membership delta.
 These comparisons use input hashes already captured by source resolution, so
 ordinary compilation does not rescan audited bodies.
+
+An artifact's self-digest proves integrity only: a tampered-then-resealed
+artifact carries a valid self-digest. Ordinary consumption gains authority from
+an independently selected certified digest bound on the request, never from the
+artifact's own seal, so a resealed omission or flipped evidence field fails
+consumption. Audit certification binds the overlay and build-input projection
+that can change audited membership or audited selected bytes; per-file
+selected-byte joins carry the overlay proof, so an application-only overlay that
+does not change any audited file's selected bytes must not invalidate a reusable
+toolchain artifact.
 
 The compiler-supported catalog version, selected toolchain version, each
 module's `go` directive, and the effective language version of each source file
