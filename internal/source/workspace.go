@@ -191,13 +191,14 @@ func (w *Workspace) Fset() *token.FileSet { return w.fset }
 // Toolchain is the resolved selected toolchain.
 func (w *Workspace) Toolchain() Toolchain { return w.toolchain }
 
-// Packages is the complete package closure in deterministic order.
-func (w *Workspace) Packages() []*Package { return w.packages }
+// Packages is the complete package closure in deterministic order (immutable
+// copy of the collection).
+func (w *Workspace) Packages() []*Package { return append([]*Package(nil), w.packages...) }
 
-// Roots are the requested root packages. Analysis covers the complete
-// source-bearing closure, not only the roots; roots exist for reporting and
-// reachability anchoring.
-func (w *Workspace) Roots() []*Package { return w.roots }
+// Roots are the requested root packages (immutable copy). Analysis covers
+// the depth-selected closure, not only the roots; roots exist for reporting
+// and reachability anchoring.
+func (w *Workspace) Roots() []*Package { return append([]*Package(nil), w.roots...) }
 
 // Package is one resolved package of the closure. Selected packages carry
 // syntax and type information; dependency packages carry identity, provenance,
