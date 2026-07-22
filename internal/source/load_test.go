@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/tsoniclang/gotots/internal/identity"
 )
 
 // writeTree writes a file tree under dir.
@@ -131,6 +133,21 @@ func TestUniverseClosureAndProvenance(t *testing.T) {
 	if sync.Types() == nil || sync.Types().Scope().Lookup("Group") == nil {
 		t.Error("x/sync dependency record lacks declaration type evidence")
 	}
+	// Every closure record carries declaration-level type evidence; the
+	// builtin pseudo-package is the single legitimate exception.
+	var typeless []string
+	for _, pkg := range ws.Packages() {
+		if pkg.Types() == nil {
+			typeless = append(typeless, pkg.ID().String())
+		}
+	}
+	if len(typeless) != 0 {
+		t.Errorf("closure records without type evidence: %v", typeless)
+	}
+	// Deep std dependencies resolve declarations without being selected.
+	if cmpPkg := findPackage(t, ws, "errors"); cmpPkg.Types().Scope().Lookup("New") == nil {
+		t.Error("errors dependency record lacks declaration type evidence")
+	}
 	// Std file identities are GOROOT/src-relative, never machine paths.
 	for _, file := range fmtPkg.Files() {
 		if !strings.HasPrefix(file.ID().String(), "std::fmt/") {
@@ -189,6 +206,67 @@ func TestStdBuiltinAndToolchainRoots(t *testing.T) {
 	tool := findPackage(t, ws, "cmd/addr2line")
 	if tool.ID().Owner().String() != "toolchain" || tool.Provenance() != ProvenanceToolchainPackage {
 		t.Errorf("cmd/addr2line owner/provenance = %s/%s", tool.ID().Owner(), tool.Provenance())
+	}
+	var typeless []string
+	for _, pkg := range ws.Packages() {
+		if pkg.Types() == nil && pkg.ID().Owner().String() != "lang" {
+			typeless = append(typeless, pkg.ID().String())
+		}
+	}
+	if len(typeless) != 0 {
+		t.Errorf("closure records without type evidence (only lang::builtin may lack it): %v", typeless)
+	}
+}
+
+// TestPackageRecordConstructorRejectsIncoherence proves finishPackage is a
+// validating construction gate: incoherent owner/provenance/acquisition/
+// disposition combinations and selected records without evidence never enter
+// a workspace.
+func TestPackageRecordConstructorRejectsIncoherence(t *testing.T) {
+	module, err := identity.NewModuleID("gate.example/m", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner, err := identity.NewModuleOwner(module)
+	if err != nil {
+		t.Fatal(err)
+	}
+	modPkg, err := identity.NewPackageID(owner, "gate.example/m")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdPkg, err := identity.NewPackageID(identity.StandardLibraryOwner(), "fmt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name   string
+		record *Package
+	}{
+		{"zero identity", &Package{provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource}},
+		{"invalid disposition (zero)", &Package{id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace}},
+		{"std owner with workspace provenance", &Package{id: stdPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource}},
+		{"module owner with goroot acquisition", &Package{id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionGOROOT, disposition: DispositionOrdinarySource}},
+		{"dependency with workspace acquisition", &Package{id: modPkg, provenance: ProvenanceModuleDependency, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource}},
+		{"std owner with module go directive", &Package{id: stdPkg, provenance: ProvenanceStandardLibrary, acquisition: AcquisitionGOROOT, disposition: DispositionOrdinarySource, moduleGoVersion: "1.26"}},
+		{"selected without type evidence", &Package{id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource, selected: true}},
+	}
+	for _, c := range cases {
+		ws := &Workspace{}
+		if err := ws.admit(c.record); err == nil {
+			t.Errorf("%s: admitted into the workspace", c.name)
+		}
+		if len(ws.Packages()) != 0 {
+			t.Errorf("%s: rejected record still entered the workspace", c.name)
+		}
+	}
+	ws := &Workspace{}
+	valid := &Package{id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource}
+	if err := ws.admit(valid); err != nil {
+		t.Errorf("coherent record rejected: %v", err)
+	}
+	if len(ws.Packages()) != 1 {
+		t.Error("coherent record not admitted")
 	}
 }
 

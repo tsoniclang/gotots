@@ -5,7 +5,6 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -28,12 +27,15 @@ const rootMode = packages.NeedName |
 	packages.NeedTypes |
 	packages.NeedTypesInfo
 
-// closureMode resolves the complete transitive package closure metadata.
+// closureMode resolves the complete transitive package closure with
+// declaration-level type evidence for every node (toolchain export data;
+// no dependency syntax).
 const closureMode = packages.NeedName |
 	packages.NeedFiles |
 	packages.NeedImports |
 	packages.NeedDeps |
-	packages.NeedModule
+	packages.NeedModule |
+	packages.NeedTypes
 
 // LoadWorkspace resolves one compilation request into the typed universe. It
 // fails closed on any package error, type error, identity collision, or
@@ -108,7 +110,7 @@ func LoadWorkspace(req Request) (*Workspace, error) {
 		if walkErr != nil {
 			return
 		}
-		if len(pkg.Errors) > 0 {
+		if len(pkg.Errors) > 0 && pkg.PkgPath != "builtin" {
 			walkErr = &LoadError{Dir: req.Dir, Reason: pkg.PkgPath + ": " + pkg.Errors[0].Error()}
 			return
 		}
@@ -121,14 +123,17 @@ func LoadWorkspace(req Request) (*Workspace, error) {
 			walkErr = err
 			return
 		}
+		if record.types == nil && pkg.PkgPath != "builtin" {
+			record.types = pkg.Types
+		}
 		if seen[record.id] {
 			walkErr = &LoadError{Dir: req.Dir, Reason: "duplicate package identity " + record.id.String()}
 			return
 		}
 		seen[record.id] = true
-		ws.packages = append(ws.packages, record)
-		if record.selected {
-			ws.selected = append(ws.selected, record)
+		if err := ws.admit(record); err != nil {
+			walkErr = err
+			return
 		}
 	})
 	if walkErr != nil {
@@ -136,29 +141,6 @@ func LoadWorkspace(req Request) (*Workspace, error) {
 	}
 	if len(ws.selected) == 0 {
 		return nil, &LoadError{Dir: req.Dir, Reason: "no selected packages after classification"}
-	}
-	// Source-available dependencies and standard-library declarations retain
-	// downstream type evidence through this same loader: dependency records
-	// carry the toolchain's export-data types; full syntax and Info load when
-	// a package is selected as a root.
-	depTypes := map[string]*types.Package{}
-	var collect func(tp *types.Package)
-	collect = func(tp *types.Package) {
-		if tp == nil || depTypes[tp.Path()] != nil {
-			return
-		}
-		depTypes[tp.Path()] = tp
-		for _, imported := range tp.Imports() {
-			collect(imported)
-		}
-	}
-	for _, root := range rootByPath {
-		collect(root.Types)
-	}
-	for _, record := range ws.packages {
-		if record.types == nil {
-			record.types = depTypes[record.id.ImportPath()]
-		}
 	}
 	sort.Slice(ws.packages, func(i, j int) bool { return ws.packages[i].id.String() < ws.packages[j].id.String() })
 	sort.Slice(ws.selected, func(i, j int) bool { return ws.selected[i].id.String() < ws.selected[j].id.String() })

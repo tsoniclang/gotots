@@ -211,6 +211,85 @@ type Package struct {
 	typesInfo       *types.Info
 }
 
+// admit is the single gate into a workspace: it validates the record and
+// appends it. There is no other append site, so an unadmitted record is
+// absent from the universe — a dropped input the source-universe verifier
+// reports — never silently present unvalidated.
+func (w *Workspace) admit(record *Package) error {
+	validated, err := finishPackage(record)
+	if err != nil {
+		return err
+	}
+	w.packages = append(w.packages, validated)
+	if validated.selected {
+		w.selected = append(w.selected, validated)
+	}
+	return nil
+}
+
+// finishPackage is the validating constructor of a Package record: it rejects
+// incoherent owner/provenance/acquisition/disposition combinations and
+// selected records without complete syntax/type evidence.
+func finishPackage(p *Package) (*Package, error) {
+	fail := func(reason string) (*Package, error) {
+		return nil, &LoadError{Dir: "", Reason: "invalid package record " + p.id.String() + ": " + reason}
+	}
+	if p.id.IsZero() {
+		return fail("zero identity")
+	}
+	if !p.provenance.Valid() {
+		return fail("invalid provenance")
+	}
+	if !p.acquisition.Valid() {
+		return fail("invalid acquisition")
+	}
+	if !p.disposition.Valid() {
+		return fail("invalid language disposition")
+	}
+	owner := p.id.Owner().Class()
+	coherent := map[identity.OwnerClass][]Provenance{
+		identity.OwnerModule:          {ProvenanceWorkspaceModule, ProvenanceModuleDependency},
+		identity.OwnerStandardLibrary: {ProvenanceStandardLibrary},
+		identity.OwnerToolchain:       {ProvenanceToolchainPackage},
+		identity.OwnerLanguagePseudo:  {ProvenanceLanguagePseudo},
+	}
+	provenanceOK := false
+	for _, allowed := range coherent[owner] {
+		provenanceOK = provenanceOK || p.provenance == allowed
+	}
+	if !provenanceOK {
+		return fail("owner " + owner.String() + " incoherent with provenance " + p.provenance.String())
+	}
+	switch p.provenance {
+	case ProvenanceWorkspaceModule:
+		if p.acquisition != AcquisitionWorkspace {
+			return fail("workspace module with acquisition " + p.acquisition.String())
+		}
+	case ProvenanceModuleDependency:
+		if p.acquisition == AcquisitionWorkspace || p.acquisition == AcquisitionGOROOT {
+			return fail("module dependency with acquisition " + p.acquisition.String())
+		}
+	default:
+		if p.acquisition != AcquisitionGOROOT {
+			return fail("reserved owner with acquisition " + p.acquisition.String())
+		}
+	}
+	if owner != identity.OwnerModule && p.moduleGoVersion != "" {
+		return fail("reserved owner carries a module go directive")
+	}
+	if p.selected {
+		if p.types == nil || p.typesInfo == nil {
+			return fail("selected record lacks type evidence")
+		}
+		for _, file := range p.files {
+			if file.Syntax() == nil {
+				return fail("selected record file " + file.ID().String() + " lacks syntax")
+			}
+		}
+	}
+	return p, nil
+}
+
 // ID is the package's canonical identity.
 func (p *Package) ID() identity.PackageID { return p.id }
 
