@@ -18,9 +18,9 @@ import (
 // in the fixture inventory, and every variant-bearing occurrence resolved.
 // A deleted resolver arm or catalog member fails here.
 func TestVariantCoverageIsTotal(t *testing.T) {
-	_, inv := fixtureFile(t)
+	_, inv := fixture(t)
 	observed := map[catalog.Variant]int{}
-	for _, occurrence := range inv.Occurrences() {
+	for _, occurrence := range allOccurrences(inv) {
 		if catalog.VariantBearing(occurrence.Kind()) && !occurrence.Variant().Valid() {
 			t.Errorf("variant-bearing %s at %s unresolved", occurrence.Kind(), occurrence.ID())
 		}
@@ -37,9 +37,9 @@ func TestVariantCoverageIsTotal(t *testing.T) {
 // operation is detected at least once in the fixture, and no semantic-model-
 // owned member is produced by the inventory.
 func TestImplicitOperationCoverage(t *testing.T) {
-	_, inv := fixtureFile(t)
+	_, inv := fixture(t)
 	observed := map[catalog.ImplicitOp]int{}
-	for _, occurrence := range inv.Occurrences() {
+	for _, occurrence := range allOccurrences(inv) {
 		for _, op := range occurrence.Implicit() {
 			observed[op]++
 		}
@@ -99,11 +99,7 @@ func TestUnknownGoDirectiveFailsClosed(t *testing.T) {
 			t.Fatalf("write: %v", err)
 		}
 	}
-	ws, err := loadFinalized(source.Request{Dir: dir})
-	if err != nil {
-		t.Fatalf("LoadWorkspace: %v", err)
-	}
-	_, err = BuildWorkspaceInventory(ws)
+	_, _, err := analyzePipeline(source.Request{Dir: dir})
 	if err == nil {
 		t.Fatal("unknown go directive was admitted")
 	}
@@ -159,7 +155,7 @@ func TestVisitorRejectsNonActiveConstructs(t *testing.T) {
 	}
 	for _, node := range cases {
 		b := &builder{fset: fset, file: fileID}
-		err := b.visit(node, -1, 0)
+		err := b.visit(node, -1, 0, visitContext{})
 		if err == nil {
 			t.Errorf("%T was admitted", node)
 			continue

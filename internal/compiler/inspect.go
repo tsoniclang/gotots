@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/analyze"
 	"github.com/tsoniclang/gotots/internal/scope"
 	"github.com/tsoniclang/gotots/internal/source"
@@ -77,7 +78,14 @@ func InspectConstructs(req source.Request) (*Inspection, error) {
 	if err != nil {
 		return nil, err
 	}
-	ws, err := source.Finalize(universe, selection.Depths(), selection.ImplicitDepths())
+	// The analyze traversal runs on the transient checker graph, after scope
+	// selection and before source finalization; source finalization then
+	// consumes only the traversal's opaque retention projection.
+	inventory, projection, err := analyze.Analyze(universe, selection.Depths(), selection.ImplicitDepths())
+	if err != nil {
+		return nil, err
+	}
+	ws, err := source.Finalize(universe, selection.Depths(), selection.ImplicitDepths(), projection)
 	if err != nil {
 		return nil, err
 	}
@@ -92,11 +100,7 @@ func InspectConstructs(req source.Request) (*Inspection, error) {
 			return nil, err
 		}
 	}
-	inventory, err := analyze.BuildWorkspaceInventory(ws)
-	if err != nil {
-		return nil, err
-	}
-	if err := stagecheck.VerifySyntaxInventory(ws, inventory); err != nil {
+	if err := stagecheck.VerifyInventory(req, ws, inventory); err != nil {
 		return nil, err
 	}
 	return &Inspection{workspace: ws, selection: selection, inventory: inventory}, nil
@@ -145,7 +149,14 @@ func AuditCatalog(req source.Request) (*analyze.AuditArtifact, error) {
 	if err != nil {
 		return nil, err
 	}
-	ws, err := source.Finalize(universe, selection.Depths(), selection.ImplicitDepths())
+	// The audit is a streaming gate run, not an application build: it does not
+	// retain the region model. The retention projection is the selection's own
+	// full-unit membership (the seal), so finalization stays a lifecycle seal.
+	projection, err := selectionProjection(selection)
+	if err != nil {
+		return nil, err
+	}
+	ws, err := source.Finalize(universe, selection.Depths(), selection.ImplicitDepths(), projection)
 	if err != nil {
 		return nil, err
 	}
@@ -156,6 +167,25 @@ func AuditCatalog(req source.Request) (*analyze.AuditArtifact, error) {
 		return nil, err
 	}
 	return analyze.AuditCatalog(ws, auditMeta(req, contract), req.Overlay, ordinaryPolicy)
+}
+
+// selectionProjection builds the retention projection directly from the scope
+// selection's full-unit membership, for gate runs that do not build the region
+// model.
+func selectionProjection(selection *scope.Selection) (source.RetentionProjection, error) {
+	var fullUnits []identity.SourceUnitID
+	for _, unit := range selection.Units() {
+		if unit.Depth == source.DepthFullSemantic {
+			fullUnits = append(fullUnits, unit.Unit)
+		}
+	}
+	var fullImplicit []identity.ImplicitUnitID
+	for _, unit := range selection.ImplicitUnits() {
+		if unit.Depth == source.DepthFullSemantic {
+			fullImplicit = append(fullImplicit, unit.Unit)
+		}
+	}
+	return source.NewRetentionProjection(fullUnits, fullImplicit)
 }
 
 // auditMeta binds an audit artifact to the request's production context.
@@ -226,7 +256,11 @@ func AuditVerify(req source.Request, path string) error {
 	if err != nil {
 		return err
 	}
-	ws, err := source.Finalize(universe, selection.Depths(), selection.ImplicitDepths())
+	projection, err := selectionProjection(selection)
+	if err != nil {
+		return err
+	}
+	ws, err := source.Finalize(universe, selection.Depths(), selection.ImplicitDepths(), projection)
 	if err != nil {
 		return err
 	}

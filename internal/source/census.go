@@ -79,6 +79,23 @@ func censusFile(u *Universe, pkg *LoadedPackage, file *LoadedFile) error {
 	// the request's verified content-addressed manifest below. Either way the
 	// pre-scope ledger is total, including every nested function literal.
 	recursive := file.censusMode == CensusRecursive
+	// Recursively-censused files are the ones the analyze traversal walks:
+	// record the traversal syntax and, per unit, its root node from the exact
+	// AST edge (never span containment).
+	if recursive {
+		// The analyze traversal walks the file's own checked syntax (keyed to
+		// the checker graph). Cgo originals have no own checked syntax; their
+		// checked-counterpart traversal is wired by the cgo origin graph.
+		file.traversalSyntax = file.syntax
+		file.traversalFset = file.fset
+		file.unitRoots = map[ast.Node]identity.SourceUnitID{}
+		file.unitSignatures = map[identity.SourceUnitID]*ast.FuncType{}
+	}
+	rootAt := func(node ast.Node, id identity.SourceUnitID) {
+		if file.unitRoots != nil {
+			file.unitRoots[node] = id
+		}
+	}
 	for _, decl := range syntax.Decls {
 		switch decl := decl.(type) {
 		case *ast.FuncDecl:
@@ -95,6 +112,10 @@ func censusFile(u *Universe, pkg *LoadedPackage, file *LoadedFile) error {
 				return err
 			}
 			file.units = append(file.units, unit)
+			rootAt(spanNode, unit.id)
+			if recursive && decl.Body != nil && decl.Type != nil {
+				file.unitSignatures[unit.id] = decl.Type
+			}
 			if recursive && decl.Body != nil {
 				if err := censusFuncLits(u, file, fset, decl.Body, funcDisplayName(decl), raw); err != nil {
 					return err
@@ -114,6 +135,7 @@ func censusFile(u *Universe, pkg *LoadedPackage, file *LoadedFile) error {
 					return err
 				}
 				file.units = append(file.units, unit)
+				rootAt(value, unit.id)
 				if recursive {
 					if err := censusFuncLits(u, file, fset, value, specDisplayName(value), raw); err != nil {
 						return err
@@ -189,6 +211,9 @@ func censusFuncLits(u *Universe, file *LoadedFile, fset *token.FileSet, root ast
 			return false
 		}
 		file.units = append(file.units, unit)
+		if file.unitRoots != nil {
+			file.unitRoots[lit] = unit.id
+		}
 		return true // literals nest; keep descending
 	})
 	return walkErr

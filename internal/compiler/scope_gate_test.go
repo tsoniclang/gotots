@@ -8,53 +8,49 @@ import (
 	"github.com/tsoniclang/gotots/internal/source"
 )
 
-// TestRetainedScopeExactJoin is the scope/cost gate's deterministic half:
-// the retained inventory exact-joins the derived full-semantic evidence set
-// (both one-sided checks), no declaration-contract file contributes a row,
-// and the retained-occurrence count sits inside the reviewed budget frozen
-// from three isolated clean runs (webshop 469 retained at calibration;
-// budget leaves headroom for fixture growth, never for a scope-class
-// regression: the pre-partition value was 598,836).
+// TestRetainedScopeExactJoin is the scope/cost gate's deterministic half: the
+// region model exact-joins the finalized full-semantic unit set — every full
+// unit owns exactly one body region and every body region roots at a full
+// unit (both one-sided checks) — no declaration-contract unit contributes a
+// region, and the retained-occurrence count sits inside the reviewed budget.
 func TestRetainedScopeExactJoin(t *testing.T) {
 	dir := filepath.Join(repoRoot(t), "testdata", "projects", "webshop")
 	inspection, err := InspectConstructs(withManifest(t, source.Request{Dir: dir, ProviderContract: scope.DefaultContractID}))
 	if err != nil {
 		t.Fatalf("InspectConstructs: %v", err)
 	}
-	expected := map[string]bool{}
+	// Independent expected set: full-semantic units from the finalized census.
+	full := map[string]bool{}
 	for _, pkg := range inspection.Workspace().Packages() {
-		for _, file := range pkg.Files() {
-			switch evidence := file.Evidence().(type) {
-			case source.FullSyntax:
-				expected[file.ID().String()] = true
-			case source.MixedUnits:
-				for _, retained := range evidence.Retained {
-					expected[retained.Unit.String()] = true
+		for _, p := range pkg.Files() {
+			for _, unit := range p.Units() {
+				if unit.Depth() == source.DepthFullSemantic {
+					full[unit.ID().String()] = true
 				}
 			}
 		}
 	}
 	retained := 0
-	got := map[string]bool{}
+	bodyRegions := map[string]bool{}
 	for _, pkg := range inspection.Inventory().Packages() {
-		for _, file := range pkg.Files() {
-			key := file.File().String()
-			if !file.RootUnit().IsZero() {
-				key = file.RootUnit().String()
+		for _, region := range pkg.Files() {
+			retained += len(region.Occurrences())
+			if region.RootUnit().IsZero() {
+				continue // file declaration region
 			}
-			if !expected[key] {
-				t.Errorf("inventory row %s has no full-semantic evidence", key)
+			key := region.RootUnit().String()
+			if !full[key] {
+				t.Errorf("body region %s has no full-semantic unit", key)
 			}
-			got[key] = true
-			retained += len(file.Occurrences())
+			bodyRegions[key] = true
 		}
 	}
-	for key := range expected {
-		if !got[key] {
-			t.Errorf("full-semantic evidence %s missing from the inventory", key)
+	for key := range full {
+		if !bodyRegions[key] {
+			t.Errorf("full-semantic unit %s has no body region", key)
 		}
 	}
-	const retainedBudget = 2000 // calibrated: 469 retained; pre-partition class was 598,836
+	const retainedBudget = 3000 // webshop region model; a scope-class regression is orders larger
 	if retained > retainedBudget {
 		t.Errorf("retained occurrences %d exceed the reviewed budget %d — scope-class regression", retained, retainedBudget)
 	}

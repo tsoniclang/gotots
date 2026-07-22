@@ -9,15 +9,13 @@ import (
 	"strings"
 
 	"github.com/tsoniclang/gotots/internal/language/catalog"
-	"github.com/tsoniclang/gotots/internal/source"
 )
 
 // scanDirectives inventories the comment directives of one file. It scans the
 // file's complete comment set (File.Comments indexes every group, including
 // doc comments).
-func scanDirectives(b *builder, file *source.File) ([]DirectiveRecord, error) {
-	syntax, ok := file.FullSyntax()
-	if !ok {
+func scanDirectives(b *builder, syntax *ast.File) ([]DirectiveRecord, error) {
+	if syntax == nil {
 		return nil, nil
 	}
 	var records []DirectiveRecord

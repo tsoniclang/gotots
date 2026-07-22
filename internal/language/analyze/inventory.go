@@ -282,18 +282,35 @@ func (inv *FileInventory) CountsByKind() []KindCount {
 	return projected
 }
 
-// PackageInventory is the immutable inventory of one package.
+// PackageInventory is the immutable inventory of one package: its region
+// inventories (one declaration region per file plus one body region per
+// full-semantic unit), its implementation definitions, and the nested
+// implementation references that connect regions.
 type PackageInventory struct {
-	id    identity.PackageID
-	files []*FileInventory
+	id          identity.PackageID
+	files       []*FileInventory
+	definitions []ImplementationDefinition
+	references  []ImplementationRef
 }
 
 // ID is the package identity.
 func (p *PackageInventory) ID() identity.PackageID { return p.id }
 
-// Files are the per-file inventories in deterministic order (immutable copy).
+// Files are the per-region inventories in deterministic order (immutable copy).
 func (p *PackageInventory) Files() []*FileInventory {
 	return append([]*FileInventory(nil), p.files...)
+}
+
+// Definitions are the package's implementation-unit definitions (immutable
+// copy). Every censused unit has exactly one.
+func (p *PackageInventory) Definitions() []ImplementationDefinition {
+	return append([]ImplementationDefinition(nil), p.definitions...)
+}
+
+// References are the package's nested implementation references (immutable
+// copy), each recorded at the exact grammatical edge during traversal.
+func (p *PackageInventory) References() []ImplementationRef {
+	return append([]ImplementationRef(nil), p.references...)
 }
 
 // WorkspaceInventory is the immutable whole-workspace inventory artifact.

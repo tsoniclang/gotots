@@ -59,10 +59,11 @@ func TestPackageRecordConstructorRejectsIncoherence(t *testing.T) {
 		hash:  sha256.Sum256([]byte(src[bodyStart:bodyEnd])),
 		depth: DepthFullSemantic,
 	}
-	evidencedFile := func(depth EvidenceDepth, evidence FileEvidence) *File {
+	_ = syntax
+	unitFile := func(depth EvidenceDepth) *File {
 		unit := fullUnit
 		unit.depth = depth
-		return &File{path: "m.go", id: fileID, fset: fset, evidence: evidence, units: []SourceUnit{unit}}
+		return &File{path: "m.go", id: fileID, units: []SourceUnit{unit}}
 	}
 	tp := types.NewPackage("gate.example/m", "m")
 	cases := []struct {
@@ -76,21 +77,13 @@ func TestPackageRecordConstructorRejectsIncoherence(t *testing.T) {
 		{"dependency with workspace acquisition", &Package{id: modPkg, provenance: ProvenanceModuleDependency, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource}},
 		{"std owner with module go directive", &Package{id: stdPkg, provenance: ProvenanceStandardLibrary, acquisition: AcquisitionGOROOT, disposition: DispositionOrdinarySource, moduleGoVersion: "1.26"}},
 		{"source record without types", &Package{id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource,
-			files: []*File{evidencedFile(DepthFullSemantic, FullSyntax{Syntax: syntax})}}},
-		{"full unit without type information", &Package{id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource,
-			types: tp, files: []*File{evidencedFile(DepthFullSemantic, FullSyntax{Syntax: syntax})}}},
+			files: []*File{unitFile(DepthFullSemantic)}, implicitUnits: []ImplicitUnit{{id: mustImplicit(t, modPkg), depth: DepthFullSemantic}}}},
 		{"unselected depth", &Package{id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource,
-			types: tp, typesInfo: &types.Info{}, files: []*File{evidencedFile(DepthInvalid, FullSyntax{Syntax: syntax})}}},
-		{"full syntax retained over non-full unit", &Package{id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource,
-			types: tp, files: []*File{evidencedFile(DepthDeclarationContract, FullSyntax{Syntax: syntax})}}},
-		{"contract file dropping a full unit", &Package{id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource,
-			types: tp, typesInfo: &types.Info{}, files: []*File{evidencedFile(DepthFullSemantic, ContractOnly{})}}},
-		{"type info without any full unit", &Package{id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource,
-			types: tp, typesInfo: &types.Info{}, files: []*File{evidencedFile(DepthDeclarationContract, ContractOnly{})}}},
+			types: tp, files: []*File{unitFile(DepthInvalid)}, implicitUnits: []ImplicitUnit{{id: mustImplicit(t, modPkg), depth: DepthFullSemantic}}}},
 		{"ordinary package without implicit initialization unit", &Package{id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource,
-			types: tp, typesInfo: &types.Info{}, files: []*File{evidencedFile(DepthFullSemantic, FullSyntax{Syntax: syntax})}}},
+			types: tp, files: []*File{unitFile(DepthFullSemantic)}}},
 		{"implicit unit without selected depth", &Package{id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource,
-			types: tp, typesInfo: &types.Info{}, files: []*File{evidencedFile(DepthFullSemantic, FullSyntax{Syntax: syntax})},
+			types: tp, files: []*File{unitFile(DepthFullSemantic)},
 			implicitUnits: []ImplicitUnit{{id: mustImplicit(t, modPkg)}}}},
 	}
 	for _, c := range cases {
@@ -105,8 +98,8 @@ func TestPackageRecordConstructorRejectsIncoherence(t *testing.T) {
 	ws := &Workspace{}
 	valid := &Package{
 		id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace,
-		disposition: DispositionOrdinarySource, types: tp, typesInfo: &types.Info{},
-		files:         []*File{evidencedFile(DepthFullSemantic, FullSyntax{Syntax: syntax})},
+		disposition: DispositionOrdinarySource, types: tp,
+		files:         []*File{unitFile(DepthFullSemantic)},
 		implicitUnits: []ImplicitUnit{{id: mustImplicit(t, modPkg), depth: DepthFullSemantic}},
 	}
 	if err := ws.admit(valid); err != nil {

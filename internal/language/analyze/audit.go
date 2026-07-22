@@ -183,15 +183,23 @@ func boundMeta(ws *source.Workspace, meta AuditMeta) AuditMeta {
 
 // auditMember is the single membership rule shared by the audit producer and
 // the artifact verifier: every file of a provider-owned (manifest-mode)
-// package — its manifest must exist regardless of depth outcome — and every
-// finalized file whose evidence is not full syntax (declaration-contract,
-// external-boundary, and mixed files' source view) for catalog coverage.
+// package, and every non-full file (declaration-contract, external-boundary,
+// and mixed files that carry at least one non-full unit) is audited for
+// catalog coverage. An all-full file with units is part of the application
+// model, not the audit closure.
 func auditMember(file *source.File, mode source.CensusMode) bool {
 	if mode == source.CensusManifest {
 		return true
 	}
-	_, full := file.Evidence().(source.FullSyntax)
-	return !full
+	hasFull := false
+	for _, unit := range file.Units() {
+		if unit.Depth() == source.DepthFullSemantic {
+			hasFull = true
+		} else {
+			return true // a non-full unit places the file in the audit closure
+		}
+	}
+	return !hasFull
 }
 
 // auditFile reads one file's exact selected bytes, verifies them against the

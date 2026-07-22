@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"go/types"
 	"reflect"
 
 	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/catalog"
+	"github.com/tsoniclang/gotots/internal/source"
 )
 
 // builder accumulates one file's occurrence records during the catalog-driven
@@ -18,24 +20,49 @@ import (
 type builder struct {
 	fset        *token.FileSet
 	file        identity.FileID
+	owner       RegionOwner
+	info        *source.TypeInfoView
 	occurrences []Occurrence
 	nodes       []ast.Node
-	parentIdx   []int
+	contexts    []visitContext // parent-assigned context, parallel to occurrences
 	index       map[ast.Node]int
-	// boundaries are nested-unit root nodes that bound this region: the
-	// traversal records nothing for them and does not descend, so a nested
-	// unit's interior is unreachable through its parent's inventory.
-	boundaries map[ast.Node]bool
+	// boundaries maps each nested-unit root node to its unit identity. At a
+	// boundary the traversal records a typed implementation reference and does
+	// not descend, so the child body is absent from this region — the parent
+	// keeps the operation as a reference, never a raw child pointer.
+	boundaries map[ast.Node]identity.SourceUnitID
+	references []ImplementationRef
 }
 
-// visit records n (hanging from parentIdx across edge) and descends into its
-// cataloged child edges. The catalog disposition is the single admission
-// policy: the switch is exhaustive and holds no per-kind special case.
-func (b *builder) visit(n ast.Node, parentIdx int, edge catalog.Edge) error {
-	if b.boundaries[n] {
-		// A nested unit's root: its region is inventoried independently, so
-		// this parent records neither the boundary node nor its interior.
-		return nil
+// visitContext is the grammatical context a parent visitor assigns to a child
+// during descent. The child records the assigned context; it never inspects
+// its parent afterward. All context is parent-directed: one owner supplies the
+// role.
+type visitContext struct {
+	commaOk       bool          // the child is the single value of a two-target binding
+	compositeType types.Type    // the enclosing composite literal's aggregate shape
+	signature     *ast.FuncType // the enclosing function signature (for return forms)
+	varDecl       bool          // the child spec belongs to a `var` declaration
+}
+
+// visit records n (hanging from parentIdx across edge, with parent-assigned
+// context ctx) and descends into its cataloged child edges, assigning each
+// child its context. At a nested-unit boundary it records a typed
+// implementation reference and does not descend, so the child body is absent
+// from this region.
+func (b *builder) visit(n ast.Node, parentIdx int, edge catalog.Edge, ctx visitContext) error {
+	if parentIdx >= 0 {
+		if child, ok := b.boundaries[n]; ok {
+			b.references = append(b.references, ImplementationRef{
+				parent:    b.owner,
+				parentOcc: b.occurrences[parentIdx].id,
+				edge:      edge,
+				child:     SourceUnitRef(child),
+				anchor:    child.Span(),
+				ordinal:   len(b.references),
+			})
+			return nil
+		}
 	}
 	kind, err := Classify(n)
 	if err != nil {
@@ -74,7 +101,7 @@ func (b *builder) visit(n ast.Node, parentIdx int, edge catalog.Edge) error {
 		span: span, display: b.displaySpan(n), token: tokenKind,
 	})
 	b.nodes = append(b.nodes, n)
-	b.parentIdx = append(b.parentIdx, parentIdx)
+	b.contexts = append(b.contexts, ctx)
 	selfIdx := len(b.occurrences) - 1
 	if b.index == nil {
 		b.index = map[ast.Node]int{}
@@ -89,13 +116,13 @@ func (b *builder) visit(n ast.Node, parentIdx int, edge catalog.Edge) error {
 		}
 		if childEdge.IsList() {
 			for i := 0; i < field.Len(); i++ {
-				if err := b.visitValue(field.Index(i), selfIdx, childEdge, n); err != nil {
+				if err := b.visitValue(field.Index(i), selfIdx, childEdge, n, kind, ctx, i, field.Len()); err != nil {
 					return err
 				}
 			}
 			continue
 		}
-		if err := b.visitValue(field, selfIdx, childEdge, n); err != nil {
+		if err := b.visitValue(field, selfIdx, childEdge, n, kind, ctx, 0, 1); err != nil {
 			return err
 		}
 	}
@@ -103,8 +130,8 @@ func (b *builder) visit(n ast.Node, parentIdx int, edge catalog.Edge) error {
 }
 
 // visitValue descends into one child slot; a nil pointer or interface is a
-// genuinely absent optional edge.
-func (b *builder) visitValue(v reflect.Value, parentIdx int, edge catalog.Edge, parent ast.Node) error {
+// genuinely absent optional edge. The parent assigns the child's context here.
+func (b *builder) visitValue(v reflect.Value, parentIdx int, edge catalog.Edge, parent ast.Node, parentKind catalog.Kind, parentCtx visitContext, index, count int) error {
 	switch v.Kind() {
 	case reflect.Interface, reflect.Pointer:
 		if v.IsNil() {
@@ -117,7 +144,41 @@ func (b *builder) visitValue(v reflect.Value, parentIdx int, edge catalog.Edge, 
 	if !ok {
 		return newTraversalDefectError(edge, fmt.Sprintf("%T", parent), b.file, "cataloged field value is not an ast.Node")
 	}
-	return b.visit(child, parentIdx, edge)
+	return b.visit(child, parentIdx, edge, b.childContext(parent, parentKind, edge, child, parentCtx, index, count))
+}
+
+// childContext is the parent-directed context assignment: the parent visitor
+// decides its child's grammatical role from its own structure. The child never
+// inspects the parent afterward.
+func (b *builder) childContext(parent ast.Node, parentKind catalog.Kind, edge catalog.Edge, child ast.Node, ctx visitContext, index, count int) visitContext {
+	// Signature and composite-type context flow down unchanged unless a new
+	// enclosing owner overrides them; comma-ok and var-decl are single-edge.
+	out := visitContext{signature: ctx.signature, compositeType: ctx.compositeType}
+	switch p := parent.(type) {
+	case *ast.FuncLit:
+		if edge.Field() == "Body" {
+			out.signature = p.Type
+		}
+	case *ast.AssignStmt:
+		if edge.Field() == "Rhs" && len(p.Lhs) == 2 && len(p.Rhs) == 1 {
+			out.commaOk = true
+		}
+	case *ast.ValueSpec:
+		if edge.Field() == "Values" && len(p.Names) == 2 && len(p.Values) == 1 {
+			out.commaOk = true
+		}
+	case *ast.GenDecl:
+		if edge.Field() == "Specs" && p.Tok == token.VAR {
+			out.varDecl = true
+		}
+	case *ast.CompositeLit:
+		if edge.Field() == "Elts" {
+			if tv, ok := b.info.TypeOf(p); ok {
+				out.compositeType = aggregateShape(tv.Type)
+			}
+		}
+	}
+	return out
 }
 
 // tokenEvidence binds the lexical token evidence of token-bearing kinds
@@ -169,28 +230,4 @@ func (b *builder) displaySpan(n ast.Node) DisplaySpan {
 		Start:    Position{Line: start.Line, Column: start.Column, Offset: start.Offset},
 		End:      Position{Line: end.Line, Column: end.Column, Offset: end.Offset},
 	}
-}
-
-// parentNode is the enclosing syntax node of the occurrence at index i, or nil
-// at the root.
-func (b *builder) parentNode(i int) ast.Node {
-	p := b.parentIdx[i]
-	if p < 0 {
-		return nil
-	}
-	return b.nodes[p]
-}
-
-// enclosingFunc walks up from index i to the nearest function declaration or
-// literal and returns its type, or nil when outside any function.
-func (b *builder) enclosingFunc(i int) *ast.FuncType {
-	for p := b.parentIdx[i]; p >= 0; p = b.parentIdx[p] {
-		switch fn := b.nodes[p].(type) {
-		case *ast.FuncDecl:
-			return fn.Type
-		case *ast.FuncLit:
-			return fn.Type
-		}
-	}
-	return nil
 }

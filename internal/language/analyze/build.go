@@ -3,106 +3,155 @@ package analyze
 import (
 	"go/ast"
 
+	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/source"
 )
 
-// nodeSet indexes a retained unit's boundary nodes for the traversal.
-func nodeSet(nodes []ast.Node) map[ast.Node]bool {
-	if len(nodes) == 0 {
-		return nil
-	}
-	set := make(map[ast.Node]bool, len(nodes))
-	for _, n := range nodes {
-		set[n] = true
-	}
-	return set
-}
-
-// BuildFileInventory produces the immutable inventory artifact of one loaded
-// file: catalog-driven traversal, variant resolution, implicit-operation
-// detection, and directive inventory, then constructor validation. Any failure
-// aborts the artifact (fail closed).
-func BuildFileInventory(pkg *source.Package, file *source.File) (*FileInventory, error) {
-	syntax, ok := file.FullSyntax()
-	if !ok {
-		return nil, newResolutionError(0, file.ID(), Span{}, "inventory requires full-syntax evidence")
-	}
-	b := &builder{fset: file.Fset(), file: file.ID()}
-	if err := b.visit(syntax, -1, 0); err != nil {
-		return nil, err
-	}
-	if err := resolveVariants(b, pkg.TypesInfo()); err != nil {
-		return nil, err
-	}
-	detectImplicit(b, pkg.TypesInfo())
-	directives, err := scanDirectives(b, file)
-	if err != nil {
-		return nil, err
-	}
-	return newFileInventory(file.Path(), file.ID(), file.EffectiveGoVersion(), b.occurrences, directives)
-}
-
-// BuildWorkspaceInventory produces the immutable inventory artifact over
-// exactly the full-semantic scope of the finalized universe: whole files
-// whose every unit is full-semantic, and the retained unit subtrees of mixed
-// files. Declaration-contract, external-boundary, and intrinsic evidence
-// contributes boundary records in the source artifact, never interior
-// occurrences; the retention decision is the scope phase's, never made here.
-func BuildWorkspaceInventory(ws *source.Workspace) (*WorkspaceInventory, error) {
+// Analyze is the single parent-directed catalog traversal over the transient
+// checker graph. It runs after scope selection and before source finalization,
+// and is the sole producer of catalog classification, edges, roles, tokens,
+// occurrences, variants, implicit operations, implementation definitions, and
+// references. Source never classifies constructs; the traversal queries the one
+// checker graph through source's narrow transient capability.
+//
+// For every ordinary-source file it builds one declaration region (rooted at
+// the file, stopping at each body edge with a typed reference) and, for every
+// full-semantic unit, one body region (rooted at the unit, stopping at nested
+// units). A non-full unit is a definition with no body region: its parent keeps
+// the reference; its interior contributes zero occurrences and no reachable
+// body node.
+func Analyze(universe *source.Universe, depths map[identity.SourceUnitID]source.EvidenceDepth, implicitDepths map[identity.ImplicitUnitID]source.EvidenceDepth) (*WorkspaceInventory, source.RetentionProjection, error) {
 	out := &WorkspaceInventory{version: InventoryArtifactVersion}
-	for _, pkg := range ws.Packages() {
-		if !pkg.RetainsFullSemantic() {
+	var fullUnits []identity.SourceUnitID
+	var fullImplicit []identity.ImplicitUnitID
+	for _, pkg := range universe.Packages() {
+		if pkg.Disposition() != source.DispositionOrdinarySource {
 			continue
 		}
-		pkgInventory := &PackageInventory{id: pkg.ID()}
+		// Only application packages (with at least one full-semantic unit) enter
+		// the region model; contract-depth provider packages are audited
+		// separately and contribute no application occurrences, even when the
+		// audit's recursive census gave their files traversable syntax.
+		if !packageHasFullUnit(pkg, depths) {
+			continue
+		}
+		view := pkg.CheckerView()
+		pkgInv := &PackageInventory{id: pkg.ID()}
+		hasRegion := false
 		for _, file := range pkg.Files() {
-			switch evidence := file.Evidence().(type) {
-			case source.FullSyntax:
-				fileInventory, err := BuildFileInventory(pkg, file)
+			syntax := file.Syntax()
+			if syntax == nil {
+				continue // provider-owned / manifest file: no body regions
+			}
+			hasRegion = true
+			boundaries := file.UnitBoundaries()
+			fset := file.TraversalFset()
+
+			// Declaration region: file-rooted, stops at every body edge.
+			decl := &builder{fset: fset, file: file.ID(), owner: FileDeclarationOwner(file.ID()), info: view, boundaries: boundaries}
+			if err := decl.visit(syntax, -1, 0, visitContext{}); err != nil {
+				return nil, source.RetentionProjection{}, err
+			}
+			if err := resolveVariants(decl); err != nil {
+				return nil, source.RetentionProjection{}, err
+			}
+			detectImplicit(decl)
+			directives, err := scanDirectives(decl, syntax)
+			if err != nil {
+				return nil, source.RetentionProjection{}, err
+			}
+			declRegion, err := newFileInventory(file.Path(), file.ID(), file.EffectiveGoVersion(), decl.occurrences, directives)
+			if err != nil {
+				return nil, source.RetentionProjection{}, err
+			}
+			pkgInv.files = append(pkgInv.files, declRegion)
+			pkgInv.references = append(pkgInv.references, decl.references...)
+
+			// Body regions: one per full-semantic unit in the file.
+			for _, unit := range file.Units() {
+				depth, ok := depths[unit.ID()]
+				if !ok {
+					return nil, source.RetentionProjection{}, newResolutionError(0, file.ID(), Span{}, "unit "+unit.ID().String()+" has no selected depth")
+				}
+				pkgInv.definitions = append(pkgInv.definitions, ImplementationDefinition{
+					unit: SourceUnitRef(unit.ID()), kind: unit.Kind(), depth: depth,
+					full: depth == source.DepthFullSemantic,
+				})
+				if depth != source.DepthFullSemantic {
+					continue
+				}
+				root, ok := file.UnitRootNode(unit.ID())
+				if !ok {
+					return nil, source.RetentionProjection{}, newResolutionError(0, file.ID(), Span{}, "full unit "+unit.ID().String()+" has no root node")
+				}
+				region, refs, err := buildBodyRegion(file, view, boundaries, unit, root)
 				if err != nil {
-					return nil, err
+					return nil, source.RetentionProjection{}, err
 				}
-				pkgInventory.files = append(pkgInventory.files, fileInventory)
-			case source.MixedUnits:
-				for _, retained := range evidence.Retained {
-					unitInventory, err := buildUnitInventory(pkg, file, retained)
-					if err != nil {
-						return nil, err
-					}
-					pkgInventory.files = append(pkgInventory.files, unitInventory)
-				}
-			case source.ContractOnly:
-				// boundary-only evidence; no interior occurrences
+				pkgInv.files = append(pkgInv.files, region)
+				pkgInv.references = append(pkgInv.references, refs...)
+				fullUnits = append(fullUnits, unit.ID())
 			}
 		}
-		if len(pkgInventory.files) > 0 {
-			out.packages = append(out.packages, pkgInventory)
+		for _, implicit := range pkg.ImplicitUnits() {
+			depth, ok := implicitDepths[implicit]
+			if !ok {
+				return nil, source.RetentionProjection{}, newResolutionError(0, identity.FileID{}, Span{}, "implicit unit "+implicit.String()+" has no selected depth")
+			}
+			pkgInv.definitions = append(pkgInv.definitions, ImplementationDefinition{
+				unit: ImplicitUnitRef(implicit), kind: identity.UnitImplicitExecutable, depth: depth,
+				full: depth == source.DepthFullSemantic,
+			})
+			if depth == source.DepthFullSemantic {
+				fullImplicit = append(fullImplicit, implicit)
+			}
+		}
+		if hasRegion || len(pkgInv.definitions) > 0 {
+			out.packages = append(out.packages, pkgInv)
 		}
 	}
-	return out, nil
+	projection, err := source.NewRetentionProjection(fullUnits, fullImplicit)
+	if err != nil {
+		return nil, source.RetentionProjection{}, err
+	}
+	return out, projection, nil
 }
 
-// buildUnitInventory inventories one retained full-semantic unit region of a
-// mixed file, rooted at its exact node with its nested units as structural
-// boundaries.
-func buildUnitInventory(pkg *source.Package, file *source.File, retained source.RetainedUnit) (*FileInventory, error) {
-	b := &builder{fset: file.Fset(), file: file.ID(), boundaries: nodeSet(retained.Boundaries)}
-	if err := b.visit(retained.Decl, -1, 0); err != nil {
-		return nil, err
-	}
-	if err := resolveVariants(b, pkg.TypesInfo()); err != nil {
-		return nil, err
-	}
-	detectImplicit(b, pkg.TypesInfo())
-	rootSpan := Span{
-		Start: Position{Offset: retained.Unit.Span().Start()},
-		End:   Position{Offset: retained.Unit.Span().End()},
-	}
-	if retained.FromCheckedView {
-		rootSpan = Span{
-			Start: Position{Offset: retained.CheckedSpan.Start.Offset},
-			End:   Position{Offset: retained.CheckedSpan.End.Offset},
+// packageHasFullUnit reports whether any of the package's units is
+// full-semantic under the selection.
+func packageHasFullUnit(pkg *source.LoadedPackage, depths map[identity.SourceUnitID]source.EvidenceDepth) bool {
+	for _, file := range pkg.Files() {
+		for _, unit := range file.Units() {
+			if depths[unit.ID()] == source.DepthFullSemantic {
+				return true
+			}
 		}
 	}
-	return newUnitInventory(file.Path(), file.ID(), file.EffectiveGoVersion(), retained.Unit, rootSpan, b.occurrences)
+	return false
+}
+
+// buildBodyRegion builds one full-semantic unit's body region rooted at its
+// own node, with nested units as reference boundaries and the parent-supplied
+// signature for return resolution.
+func buildBodyRegion(file *source.LoadedFile, view *source.TypeInfoView, boundaries map[ast.Node]identity.SourceUnitID, unit source.SourceUnit, root ast.Node) (*FileInventory, []ImplementationRef, error) {
+	b := &builder{
+		fset: file.TraversalFset(), file: file.ID(),
+		owner: UnitOwner(SourceUnitRef(unit.ID())), info: view, boundaries: boundaries,
+	}
+	if err := b.visit(root, -1, 0, visitContext{signature: file.UnitSignature(unit.ID())}); err != nil {
+		return nil, nil, err
+	}
+	if err := resolveVariants(b); err != nil {
+		return nil, nil, err
+	}
+	detectImplicit(b)
+	rootSpan := Span{
+		Start: Position{Offset: unit.Span().Start.Offset},
+		End:   Position{Offset: unit.Span().End.Offset},
+	}
+	region, err := newUnitInventory(file.Path(), file.ID(), file.EffectiveGoVersion(), unit.ID(), rootSpan, b.occurrences)
+	if err != nil {
+		return nil, nil, err
+	}
+	return region, b.references, nil
 }

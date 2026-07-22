@@ -3,6 +3,8 @@ package analyze
 import (
 	"fmt"
 	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"strings"
@@ -214,20 +216,48 @@ End:
 
 // loadFinalized runs the full source pipeline under the default contract.
 func loadFinalized(req source.Request) (*source.Workspace, error) {
+	ws, _, err := analyzePipeline(req)
+	return ws, err
+}
+
+// analyzePipeline runs the full pipeline and returns both the finalized
+// workspace and the analyze region/reference inventory.
+func analyzePipeline(req source.Request) (*source.Workspace, *WorkspaceInventory, error) {
 	contract := mustContract()
 	policy, err := contract.AuditAcquisitionPolicy()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	universe, err := source.LoadUniverse(req, policy, source.UnitManifest{})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	selection, err := scope.Select(universe, contract)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return source.Finalize(universe, selection.Depths(), selection.ImplicitDepths())
+	inv, projection, err := Analyze(universe, selection.Depths(), selection.ImplicitDepths())
+	if err != nil {
+		return nil, nil, err
+	}
+	ws, err := source.Finalize(universe, selection.Depths(), selection.ImplicitDepths(), projection)
+	if err != nil {
+		return nil, nil, err
+	}
+	return ws, inv, nil
+}
+
+// allOccurrences returns the union of every region's occurrences across the
+// package inventory — the region model partitions occurrences, so the union is
+// the whole-file occurrence set.
+func allOccurrences(inv *WorkspaceInventory) []Occurrence {
+	var out []Occurrence
+	for _, pkg := range inv.Packages() {
+		for _, region := range pkg.Files() {
+			out = append(out, region.Occurrences()...)
+		}
+	}
+	return out
 }
 
 var (
@@ -255,11 +285,7 @@ func fixture(t *testing.T) (*source.Workspace, *WorkspaceInventory) {
 				return
 			}
 		}
-		fixtureWS, fixtureErr = loadFinalized(source.Request{Dir: fixtureDir})
-		if fixtureErr != nil {
-			return
-		}
-		fixtureInv, fixtureErr = BuildWorkspaceInventory(fixtureWS)
+		fixtureWS, fixtureInv, fixtureErr = analyzePipeline(source.Request{Dir: fixtureDir})
 	})
 	if fixtureErr != nil {
 		t.Fatalf("fixture: %v", fixtureErr)
@@ -281,60 +307,49 @@ func fixtureFile(t *testing.T) (*source.File, *FileInventory) {
 	return ws.Packages()[0].Files()[0], inv.Packages()[0].Files()[0]
 }
 
-// TestBuildInventoryExactJoinsIndependentWalk joins the inventory to an
-// independent toolchain traversal on node identity, exact preorder position,
-// and exact parent edge — not counts.
+// TestBuildInventoryExactJoinsIndependentWalk joins the region model to an
+// independent toolchain traversal on node identity: the union of every region's
+// occurrences is exactly the set of catalog-classified nodes in the file (each
+// node in exactly one region), joined by (kind, span) — a different walker
+// (ast.Inspect) than the catalog-driven producer.
 func TestBuildInventoryExactJoinsIndependentWalk(t *testing.T) {
-	file, inv := fixtureFile(t)
-	syntax, hasFull := file.FullSyntax()
-	if !hasFull {
-		t.Fatal("fixture file lacks full-syntax evidence")
+	_, inv := fixture(t)
+	fset := token.NewFileSet()
+	syntax, err := parser.ParseFile(fset, "fixture.go", fixtureSource, parser.ParseComments|parser.SkipObjectResolution)
+	if err != nil {
+		t.Fatal(err)
 	}
-	type expectation struct {
-		goType string
-		start  int
-		end    int
-		parent int
+	type node struct {
+		kind       string
+		start, end int
 	}
-	var walk []expectation
-	var stack []int
+	independent := map[node]int{}
 	ast.Inspect(syntax, func(n ast.Node) bool {
 		if n == nil {
-			stack = stack[:len(stack)-1]
 			return false
 		}
-		parent := -1
-		if len(stack) > 0 {
-			parent = stack[len(stack)-1]
+		if _, err := Classify(n); err != nil {
+			return true // comments and other non-cataloged nodes
 		}
-		walk = append(walk, expectation{
-			goType: strings.TrimPrefix(fmt.Sprintf("%T", n), "*ast."),
-			start:  file.Fset().PositionFor(n.Pos(), false).Offset,
-			end:    file.Fset().PositionFor(n.End(), false).Offset,
-			parent: parent,
-		})
-		stack = append(stack, len(walk)-1)
+		independent[node{
+			strings.TrimPrefix(fmt.Sprintf("%T", n), "*ast."),
+			fset.PositionFor(n.Pos(), false).Offset,
+			fset.PositionFor(n.End(), false).Offset,
+		}]++
 		return true
 	})
-	occurrences := inv.Occurrences()
-	if len(occurrences) != len(walk) {
-		t.Fatalf("inventory has %d occurrences, independent walk has %d", len(occurrences), len(walk))
+	produced := map[node]int{}
+	for _, occ := range allOccurrences(inv) {
+		produced[node{occ.Kind().Name(), occ.Span().Start.Offset, occ.Span().End.Offset}]++
 	}
-	for i, occurrence := range occurrences {
-		expected := walk[i]
-		if occurrence.Kind().Name() != expected.goType {
-			t.Errorf("preorder %d: kind %s, walk has %s", i, occurrence.Kind(), expected.goType)
+	for n, c := range independent {
+		if produced[n] != c {
+			t.Errorf("node %+v: produced %d, independent walk %d", n, produced[n], c)
 		}
-		if occurrence.Span().Start.Offset != expected.start || occurrence.Span().End.Offset != expected.end {
-			t.Errorf("preorder %d (%s): span %d-%d, walk has %d-%d", i, occurrence.Kind(),
-				occurrence.Span().Start.Offset, occurrence.Span().End.Offset, expected.start, expected.end)
-		}
-		var wantParent identity.OccurrenceID
-		if expected.parent >= 0 {
-			wantParent = occurrences[expected.parent].ID()
-		}
-		if occurrence.Parent() != wantParent {
-			t.Errorf("preorder %d (%s): parent %q, walk has %q", i, occurrence.Kind(), occurrence.Parent(), wantParent)
+	}
+	for n, c := range produced {
+		if independent[n] != c {
+			t.Errorf("node %+v produced %d times has no independent match", n, c)
 		}
 	}
 }
@@ -391,13 +406,9 @@ func TestOccurrenceIdentityIsMachineIndependent(t *testing.T) {
 				t.Fatalf("write: %v", err)
 			}
 		}
-		ws, err := loadFinalized(source.Request{Dir: dir})
+		_, inv, err := analyzePipeline(source.Request{Dir: dir})
 		if err != nil {
-			t.Fatalf("LoadWorkspace: %v", err)
-		}
-		inv, err := BuildWorkspaceInventory(ws)
-		if err != nil {
-			t.Fatalf("BuildWorkspaceInventory: %v", err)
+			t.Fatalf("pipeline: %v", err)
 		}
 		return inv, dir
 	}
@@ -433,13 +444,9 @@ func TestDisplayIsSeparateFromIdentity(t *testing.T) {
 			t.Fatalf("write: %v", err)
 		}
 	}
-	ws, err := loadFinalized(source.Request{Dir: dir})
+	_, inv, err := analyzePipeline(source.Request{Dir: dir})
 	if err != nil {
-		t.Fatalf("LoadWorkspace: %v", err)
-	}
-	inv, err := BuildWorkspaceInventory(ws)
-	if err != nil {
-		t.Fatalf("BuildWorkspaceInventory: %v", err)
+		t.Fatalf("pipeline: %v", err)
 	}
 	fileInv := inv.Packages()[0].Files()[0]
 	var fn *Occurrence

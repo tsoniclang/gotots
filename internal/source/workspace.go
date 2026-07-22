@@ -12,7 +12,6 @@ package source
 
 import (
 	"fmt"
-	"go/ast"
 	"go/token"
 	"go/types"
 
@@ -350,52 +349,12 @@ func finishPackage(p *Package) (*Package, error) {
 		if len(p.files) == 0 {
 			return fail("source record has no files")
 		}
-		anyFull := false
 		for _, file := range p.files {
 			for _, unit := range file.units {
 				if !unit.depth.Valid() {
 					return fail("unit " + unit.id.String() + " has no selected evidence depth")
 				}
-				if unit.depth == DepthFullSemantic {
-					anyFull = true
-				}
 			}
-			// Structural evidence must match the file's unit depths.
-			switch evidence := file.evidence.(type) {
-			case FullSyntax:
-				if evidence.Syntax == nil {
-					return fail("file " + file.ID().String() + " full-syntax evidence without a tree")
-				}
-				for _, unit := range file.units {
-					if unit.depth != DepthFullSemantic {
-						return fail("file " + file.ID().String() + " retains full syntax over non-full unit " + unit.id.String())
-					}
-				}
-			case MixedUnits:
-				retained := map[identity.SourceUnitID]bool{}
-				for _, r := range evidence.Retained {
-					retained[r.Unit] = true
-				}
-				for _, unit := range file.units {
-					if (unit.depth == DepthFullSemantic) != retained[unit.id] {
-						return fail("file " + file.ID().String() + " retention diverges from depth for " + unit.id.String())
-					}
-				}
-			case ContractOnly:
-				for _, unit := range file.units {
-					if unit.depth == DepthFullSemantic {
-						return fail("file " + file.ID().String() + " drops full-semantic unit " + unit.id.String())
-					}
-				}
-			default:
-				return fail("file " + file.ID().String() + " has no structural evidence state")
-			}
-		}
-		if anyFull && p.typesInfo == nil {
-			return fail("full-semantic units without type information")
-		}
-		if !anyFull && p.typesInfo != nil {
-			return fail("retained type information without any full-semantic unit")
 		}
 		for _, implicit := range p.implicitUnits {
 			if !implicit.depth.Valid() {
@@ -495,14 +454,13 @@ func (p *Package) Types() *types.Package { return p.types }
 // exposed.
 func (p *Package) TypesInfo() *TypeInfoView { return newTypeInfoView(p.typesInfo) }
 
-// File is one resolved source file. Selected packages' files carry parsed
-// syntax and an effective language version; dependency files carry identity
-// and display path only.
+// File is one resolved source file: canonical identity, effective language
+// version, selected-byte digest, and its unit ledger with selected depths. The
+// finalized file exposes no raw AST — construct occurrences live in the
+// analyze region/reference inventory, keyed by canonical identity.
 type File struct {
 	path             string
 	id               identity.FileID
-	fset             *token.FileSet
-	evidence         FileEvidence
 	effectiveVersion string
 	overlaid         bool
 	cgoOriginal      bool
@@ -515,22 +473,6 @@ func (f *File) Path() string { return f.path }
 
 // ID is the canonical owner-relative identity of the file.
 func (f *File) ID() identity.FileID { return f.id }
-
-// Fset carries the file's position information (selected files only).
-func (f *File) Fset() *token.FileSet { return f.fset }
-
-// Evidence is the file's sealed structural evidence state.
-func (f *File) Evidence() FileEvidence { return f.evidence }
-
-// FullSyntax returns the complete checked tree when — and only when — every
-// unit of the file is full-semantic.
-func (f *File) FullSyntax() (*ast.File, bool) {
-	full, ok := f.evidence.(FullSyntax)
-	if !ok {
-		return nil, false
-	}
-	return full.Syntax, true
-}
 
 // Units is the file's total censused unit ledger with selected depths
 // (immutable copy).

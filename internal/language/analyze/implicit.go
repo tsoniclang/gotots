@@ -6,21 +6,23 @@ package analyze
 
 import (
 	"go/ast"
-	"go/token"
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/language/catalog"
 	"github.com/tsoniclang/gotots/internal/source"
 )
 
-// detectImplicit attaches inventory-owned implicit operations.
-func detectImplicit(b *builder, info *source.TypeInfoView) {
+// detectImplicit attaches inventory-owned implicit operations from typed
+// evidence plus the parent-assigned context recorded during traversal.
+func detectImplicit(b *builder) {
+	info := b.info
 	for i, n := range b.nodes {
+		ctx := b.contexts[i]
 		switch n := n.(type) {
 		case *ast.ValueSpec:
 			// Zeroing: a var binding without initializer takes the type's
-			// zero value implicitly.
-			if decl, ok := b.parentNode(i).(*ast.GenDecl); ok && decl.Tok == token.VAR && len(n.Values) == 0 {
+			// zero value implicitly (the parent GenDecl supplied var context).
+			if ctx.varDecl && len(n.Values) == 0 {
 				b.attach(i, catalog.ImplicitZeroing)
 			}
 			// Typed var initializers cross the declared-type boundary.

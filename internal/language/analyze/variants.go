@@ -10,13 +10,13 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/language/catalog"
 	"github.com/tsoniclang/gotots/internal/language/typeset"
-	"github.com/tsoniclang/gotots/internal/source"
 )
 
-// resolveVariants assigns the semantic variant of every occurrence.
-func resolveVariants(b *builder, info *source.TypeInfoView) error {
+// resolveVariants assigns the semantic variant of every occurrence from typed
+// evidence plus the parent-assigned context recorded during traversal.
+func resolveVariants(b *builder) error {
 	for i, n := range b.nodes {
-		variant, err := b.variantOf(i, n, info)
+		variant, err := b.variantOf(i, n, b.contexts[i])
 		if err != nil {
 			return err
 		}
@@ -25,9 +25,10 @@ func resolveVariants(b *builder, info *source.TypeInfoView) error {
 	return nil
 }
 
-// variantOf resolves one occurrence. Kinds without a variant axis resolve to
-// VariantNone.
-func (b *builder) variantOf(i int, n ast.Node, info *source.TypeInfoView) (catalog.Variant, error) {
+// variantOf resolves one occurrence from typed evidence and its parent-assigned
+// context. Kinds without a variant axis resolve to VariantNone.
+func (b *builder) variantOf(i int, n ast.Node, ctx visitContext) (catalog.Variant, error) {
+	info := b.info
 	unresolved := func(reason string) (catalog.Variant, error) {
 		return catalog.VariantInvalid, newResolutionError(b.occurrences[i].kind, b.file, b.occurrences[i].span, reason)
 	}
@@ -50,14 +51,14 @@ func (b *builder) variantOf(i int, n ast.Node, info *source.TypeInfoView) (catal
 		}
 		return catalog.VariantCallFunction, nil
 	case *ast.IndexExpr:
-		return b.indexVariant(i, n.X, n, info)
+		return b.indexVariant(i, n.X, n, ctx)
 	case *ast.IndexListExpr:
 		return catalog.VariantGenericInstantiation, nil
 	case *ast.TypeAssertExpr:
 		if n.Type == nil {
 			return catalog.VariantTypeSwitchGuard, nil
 		}
-		if b.commaOkContext(i) {
+		if ctx.commaOk {
 			return catalog.VariantAssertCommaOk, nil
 		}
 		return catalog.VariantAssertValue, nil
@@ -110,15 +111,10 @@ func (b *builder) variantOf(i int, n ast.Node, info *source.TypeInfoView) (catal
 		}
 		return unresolved("composite literal over unsupported underlying type")
 	case *ast.KeyValueExpr:
-		lit, ok := b.parentNode(i).(*ast.CompositeLit)
-		if !ok {
-			return unresolved("key-value element outside a composite literal")
+		if ctx.compositeType == nil {
+			return unresolved("key-value element outside a typed composite literal")
 		}
-		tv, ok := info.TypeOf(lit)
-		if !ok {
-			return unresolved("enclosing literal has no type evidence")
-		}
-		switch aggregateShape(tv.Type).(type) {
+		switch ctx.compositeType.(type) {
 		case *types.Struct:
 			return catalog.VariantKeyFieldName, nil
 		case *types.Map:
@@ -131,7 +127,7 @@ func (b *builder) variantOf(i int, n ast.Node, info *source.TypeInfoView) (catal
 		if n.Op != token.ARROW {
 			return catalog.VariantNone, nil
 		}
-		if b.commaOkContext(i) {
+		if ctx.commaOk {
 			return catalog.VariantReceiveCommaOk, nil
 		}
 		return catalog.VariantReceiveValue, nil
@@ -144,12 +140,12 @@ func (b *builder) variantOf(i int, n ast.Node, info *source.TypeInfoView) (catal
 		if len(n.Results) > 0 {
 			return catalog.VariantReturnValues, nil
 		}
-		if fn := b.enclosingFunc(i); fn != nil && fn.Results != nil && fn.Results.NumFields() > 0 {
+		if fn := ctx.signature; fn != nil && fn.Results != nil && fn.Results.NumFields() > 0 {
 			return catalog.VariantReturnBare, nil
 		}
 		return catalog.VariantReturnVoid, nil
 	case *ast.RangeStmt:
-		return b.rangeVariant(i, n, info)
+		return b.rangeVariant(i, n, ctx)
 	case *ast.SwitchStmt:
 		if n.Tag != nil {
 			return catalog.VariantSwitchExpression, nil
@@ -176,7 +172,8 @@ func (b *builder) variantOf(i int, n ast.Node, info *source.TypeInfoView) (catal
 
 // indexVariant distinguishes generic instantiation, map lookups, and element
 // indexing for one IndexExpr.
-func (b *builder) indexVariant(i int, x ast.Expr, n *ast.IndexExpr, info *source.TypeInfoView) (catalog.Variant, error) {
+func (b *builder) indexVariant(i int, x ast.Expr, n *ast.IndexExpr, ctx visitContext) (catalog.Variant, error) {
+	info := b.info
 	if tv, ok := info.TypeOf(n); ok && tv.IsType() {
 		return catalog.VariantGenericInstantiation, nil
 	}
@@ -191,7 +188,7 @@ func (b *builder) indexVariant(i int, x ast.Expr, n *ast.IndexExpr, info *source
 			"index operand has no type evidence")
 	}
 	if _, isMap := coreOf(tv.Type).(*types.Map); isMap {
-		if b.commaOkContext(i) {
+		if ctx.commaOk {
 			return catalog.VariantMapLookupCommaOk, nil
 		}
 		return catalog.VariantMapLookupValue, nil
@@ -224,7 +221,9 @@ func (b *builder) assignVariant(n *ast.AssignStmt) catalog.Variant {
 }
 
 // rangeVariant resolves the range operand class.
-func (b *builder) rangeVariant(i int, n *ast.RangeStmt, info *source.TypeInfoView) (catalog.Variant, error) {
+func (b *builder) rangeVariant(i int, n *ast.RangeStmt, ctx visitContext) (catalog.Variant, error) {
+	info := b.info
+	_ = ctx
 	tv, ok := info.TypeOf(n.X)
 	if !ok {
 		return catalog.VariantInvalid, newResolutionError(b.occurrences[i].kind, b.file, b.occurrences[i].span,
@@ -255,20 +254,6 @@ func (b *builder) rangeVariant(i int, n *ast.RangeStmt, info *source.TypeInfoVie
 	}
 	return catalog.VariantInvalid, newResolutionError(b.occurrences[i].kind, b.file, b.occurrences[i].span,
 		"range operand over unsupported type")
-}
-
-// commaOkContext reports whether the occurrence at index i is the single RHS
-// of a two-target assignment or the single initializer of a two-name var
-// binding — the comma-ok forms.
-func (b *builder) commaOkContext(i int) bool {
-	self := b.nodes[i]
-	switch parent := b.parentNode(i).(type) {
-	case *ast.AssignStmt:
-		return len(parent.Lhs) == 2 && len(parent.Rhs) == 1 && parent.Rhs[0] == self
-	case *ast.ValueSpec:
-		return len(parent.Names) == 2 && len(parent.Values) == 1 && parent.Values[0] == self
-	}
-	return false
 }
 
 // aggregateShape resolves the effective aggregate shape of a composite

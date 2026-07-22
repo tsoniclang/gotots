@@ -303,26 +303,10 @@ func verifyEvidenceState(pkg *source.Package, expectation *universeExpectation) 
 	if pkg.Types() == nil {
 		out = append(out, id+" lacks type evidence")
 	}
-	// Body-indexed type information follows the evidence-depth partition:
-	// present exactly when the package retains full-semantic units.
-	if pkg.RetainsFullSemantic() && pkg.TypesInfo() == nil {
-		out = append(out, id+" retains full-semantic units without type information")
-	}
-	if !pkg.RetainsFullSemantic() && pkg.TypesInfo() != nil {
-		out = append(out, id+" retains type information without full-semantic units")
-	}
 	if expectation.disposition == source.DispositionOrdinarySource {
 		for _, file := range pkg.Files() {
-			if _, hasFull := file.FullSyntax(); hasFull {
-				continue
-			}
-			if _, mixed := file.Evidence().(source.MixedUnits); mixed {
-				continue
-			}
-			// ContractOnly is valid for non-full depths and cgo originals;
-			// a full-semantic unit inside a ContractOnly file is caught by
-			// admission. Here we require only that cgo originals are
-			// toolchain-named.
+			// A cgo original claims a checked-view difference; the toolchain
+			// must name it.
 			if file.CgoOriginal() && !expectation.cgoSources[file.ID().String()] {
 				out = append(out, id+" file "+file.ID().String()+" claims a cgo view difference the toolchain does not name")
 			}

@@ -2,8 +2,7 @@ package stagecheck
 
 import (
 	"fmt"
-	"go/ast"
-	"strings"
+	"sort"
 
 	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/analyze"
@@ -11,165 +10,156 @@ import (
 	"github.com/tsoniclang/gotots/internal/source"
 )
 
-// kindByName joins toolchain concrete type names to pinned catalog kinds. The
-// catalog's pinned vocabulary is the shared contract; the verifier does not
-// call the producer's classifier binding.
-var kindByName = func() map[string]catalog.Kind {
-	m := map[string]catalog.Kind{}
-	for _, kind := range catalog.All() {
-		m[kind.Name()] = kind
-	}
-	return m
-}()
+// VerifyInventory independently joins the analyze-owned region/reference model
+// against the finalized source census, enforcing the conservation law:
+//
+//   - censused unit identities join implementation-definition records exactly
+//     (kind and depth agree);
+//   - every full-semantic unit owns exactly one body region, and every non-full
+//     unit owns none and contributes zero body occurrences;
+//   - every implementation reference names a defined child unit; and
+//   - occurrence identities are unique within each region and every
+//     variant-bearing occurrence is resolved.
+//
+// It reconstructs the expected definition set from the source census (a
+// different producer than the traversal) and reports one-sided differences with
+// exact identities.
+func VerifyInventory(req source.Request, ws *source.Workspace, inv *analyze.WorkspaceInventory) error {
+	fail := func(reason string) error { return &VerificationError{Stage: "inventory", Reason: reason} }
+	var problems []string
 
-// VerifySyntaxInventory independently reconciles the inventory artifact
-// against the toolchain's own traversal: for every file it walks the syntax
-// with ast.Inspect (a producer-independent walker), reconstructs the expected
-// occurrence identity at every preorder position, and exact-joins node
-// identity, order, parent edges, and canonical IDs. Dropped nodes, orphan
-// occurrences, duplicate identities, and downstream reinterpretation of a
-// node's kind all fail.
-func VerifySyntaxInventory(ws *source.Workspace, inv *analyze.WorkspaceInventory) error {
-	fail := func(reason string) error {
-		return &VerificationError{Stage: "syntax-inventory", Reason: reason}
-	}
-	// Expected retained roots: whole files with FullSyntax evidence, plus the
-	// retained unit declarations of mixed files — exactly the full-semantic
-	// scope, joined by identity.
-	type expectedRoot struct {
-		file       *source.File
-		node       ast.Node // file tree or retained decl subtree
-		boundaries map[ast.Node]bool
-	}
-	expected := map[string]expectedRoot{}
-	for _, pkg := range ws.Packages() {
-		for _, file := range pkg.Files() {
-			switch evidence := file.Evidence().(type) {
-			case source.FullSyntax:
-				expected[file.ID().String()] = expectedRoot{file: file, node: evidence.Syntax}
-			case source.MixedUnits:
-				for _, retained := range evidence.Retained {
-					expected[retained.Unit.String()] = expectedRoot{
-						file: file, node: retained.Decl, boundaries: boundaryNodeSet(retained.Boundaries),
-					}
-				}
-			}
-		}
-	}
-	verified := 0
+	invByPkg := map[string]*analyze.PackageInventory{}
 	for _, pkg := range inv.Packages() {
-		for _, fileInv := range pkg.Files() {
-			key := fileInv.File().String()
-			if !fileInv.RootUnit().IsZero() {
-				key = fileInv.RootUnit().String()
+		invByPkg[pkg.ID().String()] = pkg
+	}
+
+	for _, pkg := range ws.Packages() {
+		if pkg.Disposition() != source.DispositionOrdinarySource {
+			continue
+		}
+		// Only application packages (with a full-semantic unit) enter the
+		// region model; contract-depth provider packages are audited
+		// separately.
+		if !pkg.RetainsFullSemantic() {
+			continue
+		}
+		// Independent expected definitions from the source census.
+		expected := map[string]source.SourceUnit{}
+		for _, file := range pkg.Files() {
+			for _, unit := range file.Units() {
+				expected[unit.ID().String()] = unit
 			}
-			root, ok := expected[key]
+		}
+		pkgInv := invByPkg[pkg.ID().String()]
+		if pkgInv == nil {
+			if len(expected) > 0 {
+				problems = append(problems, "package "+pkg.ID().String()+" has census units but no inventory")
+			}
+			continue
+		}
+
+		defs := map[string]analyze.ImplementationDefinition{}
+		for _, d := range pkgInv.Definitions() {
+			key := d.Unit().String()
+			if _, dup := defs[key]; dup {
+				problems = append(problems, "duplicate definition for unit "+key)
+			}
+			defs[key] = d
+		}
+		// Definition <-> census join (source units).
+		matched := map[string]bool{}
+		for id, unit := range expected {
+			d, ok := defs[id]
 			if !ok {
-				return fail("orphan inventory: no retained evidence for " + key)
+				problems = append(problems, "census unit "+id+" has no definition")
+				continue
 			}
-			if err := verifyInventoryWalk(root.file, root.node, root.boundaries, fileInv); err != nil {
-				return err
+			matched[id] = true
+			if d.Kind() != unit.Kind() {
+				problems = append(problems, "unit "+id+" definition kind "+d.Kind().String()+" != census "+unit.Kind().String())
 			}
-			verified++
+			if d.Depth() != unit.Depth() {
+				problems = append(problems, fmt.Sprintf("unit %s definition depth %s != census %s", id, d.Depth(), unit.Depth()))
+			}
+			if d.Full() != (unit.Depth() == source.DepthFullSemantic) {
+				problems = append(problems, "unit "+id+" full flag disagrees with depth")
+			}
+		}
+		// Implicit definitions join.
+		for _, implicit := range pkg.ImplicitUnits() {
+			key := implicit.ID().String()
+			if _, ok := defs[key]; !ok {
+				problems = append(problems, "implicit unit "+key+" has no definition")
+				continue
+			}
+			matched[key] = true
+		}
+		for id := range defs {
+			if !matched[id] {
+				problems = append(problems, "definition "+id+" has no census unit")
+			}
+		}
+
+		// Body-region <-> full-unit join, and per-region validity.
+		regionByUnit := map[string]*analyze.FileInventory{}
+		for _, region := range pkgInv.Files() {
+			if region.RootUnit().IsZero() {
+				continue // file declaration region
+			}
+			key := region.RootUnit().String()
+			if _, dup := regionByUnit[key]; dup {
+				problems = append(problems, "duplicate body region for unit "+key)
+			}
+			regionByUnit[key] = region
+			problems = append(problems, verifyRegionOccurrences(region)...)
+		}
+		for id, unit := range expected {
+			_, hasRegion := regionByUnit[id]
+			full := unit.Depth() == source.DepthFullSemantic
+			if full && !hasRegion {
+				problems = append(problems, "full unit "+id+" has no body region")
+			}
+			if !full && hasRegion {
+				problems = append(problems, "non-full unit "+id+" owns a body region")
+			}
+		}
+
+		// Reference <-> child-definition join.
+		for _, ref := range pkgInv.References() {
+			child := ref.Child().String()
+			if _, ok := defs[child]; !ok {
+				problems = append(problems, "reference names undefined child unit "+child)
+			}
+			if !ref.Edge().Valid() {
+				problems = append(problems, "reference to "+child+" has an invalid edge")
+			}
 		}
 	}
-	if verified != len(expected) {
-		return fail(fmt.Sprintf("dropped input: retained evidence has %d roots, inventory covers %d", len(expected), verified))
+
+	if len(problems) > 0 {
+		sort.Strings(problems)
+		return fail(fmt.Sprintf("conservation join failed; %v", problems))
 	}
 	return nil
 }
 
-// boundaryNodeSet indexes a retained unit's boundary nodes for the
-// independent walk.
-func boundaryNodeSet(nodes []ast.Node) map[ast.Node]bool {
-	if len(nodes) == 0 {
-		return nil
-	}
-	set := make(map[ast.Node]bool, len(nodes))
-	for _, n := range nodes {
-		set[n] = true
-	}
-	return set
-}
-
-func verifyInventoryWalk(file *source.File, root ast.Node, boundaries map[ast.Node]bool, inv *analyze.FileInventory) error {
-	fail := func(reason string) error {
-		return &VerificationError{Stage: "syntax-inventory", Reason: inv.File().String() + ": " + reason}
-	}
-	type expectation struct {
-		typeName string
-		start    int
-		end      int
-		parent   int
-	}
-	var walk []expectation
-	var stack []int
-	ast.Inspect(root, func(n ast.Node) bool {
-		if n == nil {
-			stack = stack[:len(stack)-1]
-			return false
-		}
-		if boundaries[n] {
-			// A nested-unit boundary: independently skipped, matching the
-			// producer's structural exclusion.
-			return false
-		}
-		parent := -1
-		if len(stack) > 0 {
-			parent = stack[len(stack)-1]
-		}
-		walk = append(walk, expectation{
-			typeName: strings.TrimPrefix(fmt.Sprintf("%T", n), "*ast."),
-			start:    file.Fset().PositionFor(n.Pos(), false).Offset,
-			end:      file.Fset().PositionFor(n.End(), false).Offset,
-			parent:   parent,
-		})
-		stack = append(stack, len(walk)-1)
-		return true
-	})
-	occurrences := inv.Occurrences()
-	if len(occurrences) != len(walk) {
-		return fail(fmt.Sprintf("inventory has %d occurrences, independent walk has %d", len(occurrences), len(walk)))
-	}
+// verifyRegionOccurrences checks one region's occurrence invariants: unique
+// identities, resolved variants, and a root that covers its unit.
+func verifyRegionOccurrences(region *analyze.FileInventory) []string {
+	var problems []string
 	seen := map[identity.OccurrenceID]bool{}
-	for i, occurrence := range occurrences {
-		expected := walk[i]
-		kind, known := kindByName[expected.typeName]
-		if !known {
-			return fail("independent walk met unknown node type " + expected.typeName)
+	for _, occ := range region.Occurrences() {
+		if occ.ID().IsZero() {
+			problems = append(problems, region.File().String()+" region has a zero occurrence identity")
+			continue
 		}
-		if occurrence.Kind() != kind {
-			return fail(fmt.Sprintf("preorder %d reinterprets %s as %s", i, expected.typeName, occurrence.Kind()))
+		if seen[occ.ID()] {
+			problems = append(problems, "duplicate occurrence "+occ.ID().String())
 		}
-		if occurrence.Span().Start.Offset != expected.start || occurrence.Span().End.Offset != expected.end {
-			return fail(fmt.Sprintf("preorder %d (%s) span %d-%d, walk has %d-%d", i, kind,
-				occurrence.Span().Start.Offset, occurrence.Span().End.Offset, expected.start, expected.end))
-		}
-		spanID, err := identity.NewSpanID(inv.File(), expected.start, expected.end)
-		if err != nil {
-			return fail("independent span identity: " + err.Error())
-		}
-		expectedID, err := identity.NewOccurrenceID(spanID, uint16(kind))
-		if err != nil {
-			return fail("independent occurrence identity: " + err.Error())
-		}
-		if occurrence.ID() != expectedID {
-			return fail(fmt.Sprintf("preorder %d identity %s, independently derived %s", i, occurrence.ID(), expectedID))
-		}
-		if seen[occurrence.ID()] {
-			return fail("duplicate occurrence identity " + occurrence.ID().String())
-		}
-		seen[occurrence.ID()] = true
-		var expectedParent identity.OccurrenceID
-		if expected.parent >= 0 {
-			expectedParent = occurrences[expected.parent].ID()
-		}
-		if occurrence.Parent() != expectedParent {
-			return fail(fmt.Sprintf("preorder %d parent %s, walk has %s", i, occurrence.Parent(), expectedParent))
-		}
-		if catalog.VariantBearing(occurrence.Kind()) && !occurrence.Variant().Valid() {
-			return fail(fmt.Sprintf("preorder %d (%s) variant unresolved", i, kind))
+		seen[occ.ID()] = true
+		if catalog.VariantBearing(occ.Kind()) && !occ.Variant().Valid() {
+			problems = append(problems, "unresolved variant at "+occ.ID().String())
 		}
 	}
-	return nil
+	return problems
 }

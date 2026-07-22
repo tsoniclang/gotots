@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/identity"
+	"github.com/tsoniclang/gotots/internal/language/analyze"
 	"github.com/tsoniclang/gotots/internal/scope"
 	"github.com/tsoniclang/gotots/internal/source"
 )
@@ -37,7 +38,11 @@ func finalizeLoad(req source.Request) (*source.Workspace, error) {
 	if err != nil {
 		return nil, err
 	}
-	return source.Finalize(universe, selection.Depths(), selection.ImplicitDepths())
+	_, projection, err := analyze.Analyze(universe, selection.Depths(), selection.ImplicitDepths())
+	if err != nil {
+		return nil, err
+	}
+	return source.Finalize(universe, selection.Depths(), selection.ImplicitDepths(), projection)
 }
 
 // writeTree writes a file tree under dir.
@@ -94,8 +99,10 @@ func TestLoadWorkspaceSingleModule(t *testing.T) {
 		}
 		for _, file := range pkg.Files() {
 			ids = append(ids, file.ID().String())
-			if _, full := file.FullSyntax(); !full {
-				t.Errorf("%s: workspace-module file lacks full-syntax evidence", file.ID())
+			for _, unit := range file.Units() {
+				if unit.Depth() != source.DepthFullSemantic {
+					t.Errorf("%s: workspace-module unit %s is not full-semantic", file.ID(), unit.ID())
+				}
 			}
 			if file.EffectiveGoVersion() == "" {
 				t.Errorf("%s: no effective language version", file.ID())
@@ -241,8 +248,10 @@ func TestStdBuiltinAndToolchainRoots(t *testing.T) {
 	// Under the default provider contract, std bodies are gostdlib-owned:
 	// declaration-contract evidence, no retained syntax, boundaries present.
 	for _, file := range fmtPkg.Files() {
-		if _, full := file.FullSyntax(); full {
-			t.Errorf("std file %s retains full syntax under the default contract", file.ID())
+		for _, unit := range file.Units() {
+			if unit.Depth() == source.DepthFullSemantic {
+				t.Errorf("std file %s retains a full-semantic unit under the default contract", file.ID())
+			}
 		}
 	}
 	stdUnits := fmtPkg.Units()
@@ -505,7 +514,11 @@ func TestImplicitLedgerTotality(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	complete, err := source.Finalize(universe, selection.Depths(), selection.ImplicitDepths())
+	_, projection, err := analyze.Analyze(universe, selection.Depths(), selection.ImplicitDepths())
+	if err != nil {
+		t.Fatal(err)
+	}
+	complete, err := source.Finalize(universe, selection.Depths(), selection.ImplicitDepths(), projection)
 	if err != nil {
 		t.Fatalf("complete selection rejected: %v", err)
 	}
@@ -521,7 +534,7 @@ func TestImplicitLedgerTotality(t *testing.T) {
 		delete(removed, id)
 		break
 	}
-	if _, err := source.Finalize(universe, selection.Depths(), removed); err == nil {
+	if _, err := source.Finalize(universe, selection.Depths(), removed, projection); err == nil {
 		t.Error("finalization accepted a selection missing one implicit unit")
 	}
 	extra := selection.ImplicitDepths()
@@ -542,7 +555,7 @@ func TestImplicitLedgerTotality(t *testing.T) {
 		t.Fatal(err)
 	}
 	extra[ghost] = source.DepthFullSemantic
-	if _, err := source.Finalize(universe, selection.Depths(), extra); err == nil {
+	if _, err := source.Finalize(universe, selection.Depths(), extra, projection); err == nil {
 		t.Error("finalization accepted a fabricated implicit unit")
 	}
 }

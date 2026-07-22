@@ -74,6 +74,12 @@ func (p *LoadedPackage) ImplicitUnits() []identity.ImplicitUnitID {
 	return append([]identity.ImplicitUnitID(nil), p.implicitUnits...)
 }
 
+// CheckerView is the narrow, transient type-query capability the analyze
+// traversal uses over the one checker graph. It is source-owned and never
+// survives into the finalized workspace; the finalized API exposes only
+// identity-keyed immutable facts.
+func (p *LoadedPackage) CheckerView() *TypeInfoView { return newTypeInfoView(p.typesInfo) }
+
 // Types is the package's node in the one coherent type graph.
 func (p *LoadedPackage) Types() *types.Package { return p.types }
 
@@ -90,6 +96,60 @@ type LoadedFile struct {
 	censusMode       CensusMode // contract-derived unit acquisition, resolved before load
 	byteDigest       SourceSpanHash
 	units            []SourceUnit
+	// unitRoots maps each unit's root syntax node to its identity, recorded
+	// during census from the exact AST edge (never span containment). The
+	// analyze traversal consumes it to detect child-implementation boundaries.
+	// For cgo originals the roots are the checked-view counterpart nodes.
+	unitRoots map[ast.Node]identity.SourceUnitID
+	// unitSignatures carries each function-body unit's declaration signature so
+	// the body region (rooted at the body, with the signature owned by the file
+	// declaration region) can still resolve return forms. Function-literal
+	// signatures are in-region and absent here.
+	unitSignatures map[identity.SourceUnitID]*ast.FuncType
+	// traversalSyntax is the syntax the analyze traversal walks: the file's own
+	// checked syntax, or (for cgo originals) the shared origin-graph tree.
+	traversalSyntax *ast.File
+	traversalFset   *token.FileSet
+}
+
+// Syntax is the file's checked syntax for the transient analyze traversal;
+// nil for intrinsic/metadata files with no census.
+func (f *LoadedFile) Syntax() *ast.File { return f.traversalSyntax }
+
+// TraversalFset is the file set the traversal syntax is measured in.
+func (f *LoadedFile) TraversalFset() *token.FileSet { return f.traversalFset }
+
+// UnitRootAt returns the unit a syntax node roots, recorded from the exact AST
+// edge during census.
+func (f *LoadedFile) UnitRootAt(node ast.Node) (identity.SourceUnitID, bool) {
+	id, ok := f.unitRoots[node]
+	return id, ok
+}
+
+// UnitBoundaries is the transient node->unit map the analyze traversal uses to
+// detect child-implementation boundaries (fresh copy).
+func (f *LoadedFile) UnitBoundaries() map[ast.Node]identity.SourceUnitID {
+	out := make(map[ast.Node]identity.SourceUnitID, len(f.unitRoots))
+	for node, id := range f.unitRoots {
+		out[node] = id
+	}
+	return out
+}
+
+// UnitRootNode returns the root syntax node of one unit in this file.
+func (f *LoadedFile) UnitRootNode(id identity.SourceUnitID) (ast.Node, bool) {
+	for node, unit := range f.unitRoots {
+		if unit == id {
+			return node, true
+		}
+	}
+	return nil, false
+}
+
+// UnitSignature returns a function-body unit's declaration signature (the body
+// region needs it to resolve return forms); nil for other unit kinds.
+func (f *LoadedFile) UnitSignature(id identity.SourceUnitID) *ast.FuncType {
+	return f.unitSignatures[id]
 }
 
 // Path is the display path.
@@ -100,6 +160,9 @@ func (f *LoadedFile) ID() identity.FileID { return f.id }
 
 // Units is the censused total unit ledger of the file.
 func (f *LoadedFile) Units() []SourceUnit { return append([]SourceUnit(nil), f.units...) }
+
+// EffectiveGoVersion is the file's effective language version.
+func (f *LoadedFile) EffectiveGoVersion() string { return f.effectiveVersion }
 
 // checkedDecl is one top-level declaration in a cgo checked-view file. Its
 // origin unit (or synthetic identity) and C-dependence are derived by

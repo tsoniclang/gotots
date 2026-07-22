@@ -38,7 +38,11 @@ func loadFinalized(req source.Request) (*source.Workspace, error) {
 	if err != nil {
 		return nil, err
 	}
-	return source.Finalize(universe, selection.Depths(), selection.ImplicitDepths())
+	_, projection, err := analyze.Analyze(universe, selection.Depths(), selection.ImplicitDepths())
+	if err != nil {
+		return nil, err
+	}
+	return source.Finalize(universe, selection.Depths(), selection.ImplicitDepths(), projection)
 }
 
 func writeModule(t *testing.T, files map[string]string) string {
@@ -82,13 +86,32 @@ func TestVerifiersPassOnConsistentPipeline(t *testing.T) {
 	if err := VerifySourceUniverse(ws, req); err != nil {
 		t.Fatalf("VerifySourceUniverse rejected a consistent universe: %v", err)
 	}
-	inv, err := analyze.BuildWorkspaceInventory(ws)
+	inv, err := inventoryOf(req)
 	if err != nil {
-		t.Fatalf("BuildWorkspaceInventory: %v", err)
+		t.Fatalf("Analyze: %v", err)
 	}
-	if err := VerifySyntaxInventory(ws, inv); err != nil {
-		t.Fatalf("VerifySyntaxInventory rejected a consistent inventory: %v", err)
+	if err := VerifyInventory(req, ws, inv); err != nil {
+		t.Fatalf("VerifyInventory rejected a consistent inventory: %v", err)
 	}
+}
+
+// inventoryOf runs the analyze traversal for one request.
+func inventoryOf(req source.Request) (*analyze.WorkspaceInventory, error) {
+	contract := mustContract()
+	policy, err := contract.AuditAcquisitionPolicy()
+	if err != nil {
+		return nil, err
+	}
+	universe, err := source.LoadUniverse(req, policy, source.UnitManifest{})
+	if err != nil {
+		return nil, err
+	}
+	selection, err := scope.Select(universe, contract)
+	if err != nil {
+		return nil, err
+	}
+	inv, _, err := analyze.Analyze(universe, selection.Depths(), selection.ImplicitDepths())
+	return inv, err
 }
 
 // TestSourceUniverseVerifierIsIndependent is the mutation proof: a workspace
@@ -124,11 +147,12 @@ func TestSyntaxInventoryVerifierIsIndependent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadWorkspace B: %v", err)
 	}
-	invA, err := analyze.BuildWorkspaceInventory(wsA)
+	_ = wsA
+	invA, err := inventoryOf(source.Request{Dir: dirA})
 	if err != nil {
-		t.Fatalf("BuildWorkspaceInventory: %v", err)
+		t.Fatalf("Analyze: %v", err)
 	}
-	err = VerifySyntaxInventory(wsB, invA)
+	err = VerifyInventory(source.Request{Dir: dirB}, wsB, invA)
 	if err == nil {
 		t.Fatal("verifier accepted an inventory against a different workspace")
 	}
