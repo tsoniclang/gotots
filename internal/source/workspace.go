@@ -431,8 +431,10 @@ func (p *Package) Units() []SourceUnit {
 // dependency and standard-library records.
 func (p *Package) Types() *types.Package { return p.types }
 
-// TypesInfo is the package's type information (selected packages only).
-func (p *Package) TypesInfo() *types.Info { return p.typesInfo }
+// TypesInfo is the finalized read-only type-information view; nil when the
+// package retains no full-semantic units. The mutable checker maps are never
+// exposed.
+func (p *Package) TypesInfo() *TypeInfoView { return newTypeInfoView(p.typesInfo) }
 
 // File is one resolved source file. Selected packages' files carry parsed
 // syntax and an effective language version; dependency files carry identity

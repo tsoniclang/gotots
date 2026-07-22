@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"go/ast"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -151,10 +152,19 @@ func TestImportCoherencePositiveProof(t *testing.T) {
 		t.Fatal("Box not in dependency scope")
 	}
 	usedAsBox := false
-	for _, used := range app.TypesInfo().Uses {
-		if used == boxDecl {
-			usedAsBox = true
+	for _, file := range app.Files() {
+		syntax, full := file.FullSyntax()
+		if !full {
+			continue
 		}
+		ast.Inspect(syntax, func(n ast.Node) bool {
+			if sel, ok := n.(*ast.SelectorExpr); ok && sel.Sel.Name == "Box" {
+				if used, ok := app.TypesInfo().UseOf(sel.Sel); ok && used == boxDecl {
+					usedAsBox = true
+				}
+			}
+			return true
+		})
 	}
 	if !usedAsBox {
 		t.Error("app's dep.Box use does not resolve to the exact dependency declaration object")

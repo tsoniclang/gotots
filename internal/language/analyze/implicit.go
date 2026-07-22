@@ -10,10 +10,11 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/language/catalog"
+	"github.com/tsoniclang/gotots/internal/source"
 )
 
 // detectImplicit attaches inventory-owned implicit operations.
-func detectImplicit(b *builder, info *types.Info) {
+func detectImplicit(b *builder, info *source.TypeInfoView) {
 	for i, n := range b.nodes {
 		switch n := n.(type) {
 		case *ast.ValueSpec:
@@ -30,7 +31,7 @@ func detectImplicit(b *builder, info *types.Info) {
 				}
 			}
 		case *ast.SelectorExpr:
-			if selection, ok := info.Selections[n]; ok {
+			if selection, ok := info.SelectionOf(n); ok {
 				if len(selection.Index()) > 1 {
 					b.attach(i, catalog.ImplicitMethodPromotion)
 				}
@@ -64,8 +65,8 @@ func detectImplicit(b *builder, info *types.Info) {
 // markCallBoundaries attaches conversion/copy evidence to call arguments
 // crossing into parameter types. Conversions and builtin calls are excluded —
 // their operand semantics belong to their own variants.
-func (b *builder) markCallBoundaries(n *ast.CallExpr, info *types.Info) {
-	tv, ok := info.Types[n.Fun]
+func (b *builder) markCallBoundaries(n *ast.CallExpr, info *source.TypeInfoView) {
+	tv, ok := info.TypeOf(n.Fun)
 	if !ok || tv.IsType() {
 		return
 	}
@@ -98,11 +99,11 @@ func (b *builder) markCallBoundaries(n *ast.CallExpr, info *types.Info) {
 
 // markBoundary attaches interface-conversion or value-copy evidence to the
 // operand occurrence when the typed boundary requires it.
-func (b *builder) markBoundary(target types.Type, operand ast.Expr, info *types.Info) {
+func (b *builder) markBoundary(target types.Type, operand ast.Expr, info *source.TypeInfoView) {
 	if target == nil {
 		return
 	}
-	operandTV, ok := info.Types[operand]
+	operandTV, ok := info.TypeOf(operand)
 	if !ok || operandTV.Type == nil {
 		return
 	}
@@ -144,8 +145,8 @@ func (b *builder) indexOf(n ast.Node) int {
 
 // typeOf is the type evidence of one expression, nil for the blank identifier
 // and untyped targets.
-func typeOf(info *types.Info, x ast.Expr) types.Type {
-	if tv, ok := info.Types[x]; ok {
+func typeOf(info *source.TypeInfoView, x ast.Expr) types.Type {
+	if tv, ok := info.TypeOf(x); ok {
 		return tv.Type
 	}
 	return nil

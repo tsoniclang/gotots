@@ -10,10 +10,11 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/language/catalog"
 	"github.com/tsoniclang/gotots/internal/language/typeset"
+	"github.com/tsoniclang/gotots/internal/source"
 )
 
 // resolveVariants assigns the semantic variant of every occurrence.
-func resolveVariants(b *builder, info *types.Info) error {
+func resolveVariants(b *builder, info *source.TypeInfoView) error {
 	for i, n := range b.nodes {
 		variant, err := b.variantOf(i, n, info)
 		if err != nil {
@@ -26,22 +27,24 @@ func resolveVariants(b *builder, info *types.Info) error {
 
 // variantOf resolves one occurrence. Kinds without a variant axis resolve to
 // VariantNone.
-func (b *builder) variantOf(i int, n ast.Node, info *types.Info) (catalog.Variant, error) {
+func (b *builder) variantOf(i int, n ast.Node, info *source.TypeInfoView) (catalog.Variant, error) {
 	unresolved := func(reason string) (catalog.Variant, error) {
 		return catalog.VariantInvalid, newResolutionError(b.occurrences[i].kind, b.file, b.occurrences[i].span, reason)
 	}
 	switch n := n.(type) {
 	case *ast.CallExpr:
-		if tv, ok := info.Types[n.Fun]; ok && tv.IsType() {
+		if tv, ok := info.TypeOf(n.Fun); ok && tv.IsType() {
 			return catalog.VariantConversion, nil
 		}
 		if callee := calleeIdent(n.Fun); callee != nil {
-			if _, isBuiltin := info.Uses[callee].(*types.Builtin); isBuiltin {
-				return catalog.VariantCallBuiltin, nil
+			if used, ok := info.UseOf(callee); ok {
+				if _, isBuiltin := used.(*types.Builtin); isBuiltin {
+					return catalog.VariantCallBuiltin, nil
+				}
 			}
 		}
 		if sel, ok := ast.Unparen(n.Fun).(*ast.SelectorExpr); ok {
-			if selection, ok := info.Selections[sel]; ok && selection.Kind() == types.MethodVal {
+			if selection, ok := info.SelectionOf(sel); ok && selection.Kind() == types.MethodVal {
 				return catalog.VariantCallMethod, nil
 			}
 		}
@@ -59,7 +62,7 @@ func (b *builder) variantOf(i int, n ast.Node, info *types.Info) (catalog.Varian
 		}
 		return catalog.VariantAssertValue, nil
 	case *ast.SelectorExpr:
-		if selection, ok := info.Selections[n]; ok {
+		if selection, ok := info.SelectionOf(n); ok {
 			switch selection.Kind() {
 			case types.MethodVal:
 				return catalog.VariantSelectMethodValue, nil
@@ -73,20 +76,25 @@ func (b *builder) variantOf(i int, n ast.Node, info *types.Info) (catalog.Varian
 			}
 		}
 		if base, ok := ast.Unparen(n.X).(*ast.Ident); ok {
-			if _, isPkg := info.Uses[base].(*types.PkgName); isPkg {
-				return catalog.VariantSelectPackageMember, nil
+			if used, ok := info.UseOf(base); ok {
+				if _, isPkg := used.(*types.PkgName); isPkg {
+					return catalog.VariantSelectPackageMember, nil
+				}
 			}
 		}
 		// Qualified type references and method expressions on named types
 		// resolve through Uses of the selected identifier.
-		if info.Uses[n.Sel] != nil || info.Defs[n.Sel] != nil {
+		if _, used := info.UseOf(n.Sel); used {
+			return catalog.VariantSelectPackageMember, nil
+		}
+		if _, defined := info.DefOf(n.Sel); defined {
 			return catalog.VariantSelectPackageMember, nil
 		}
 		return unresolved("selector has no selection, package, or use evidence")
 	case *ast.AssignStmt:
 		return b.assignVariant(n), nil
 	case *ast.CompositeLit:
-		tv, ok := info.Types[n]
+		tv, ok := info.TypeOf(n)
 		if !ok {
 			return unresolved("composite literal has no type evidence")
 		}
@@ -106,7 +114,7 @@ func (b *builder) variantOf(i int, n ast.Node, info *types.Info) (catalog.Varian
 		if !ok {
 			return unresolved("key-value element outside a composite literal")
 		}
-		tv, ok := info.Types[lit]
+		tv, ok := info.TypeOf(lit)
 		if !ok {
 			return unresolved("enclosing literal has no type evidence")
 		}
@@ -128,7 +136,7 @@ func (b *builder) variantOf(i int, n ast.Node, info *types.Info) (catalog.Varian
 		}
 		return catalog.VariantReceiveValue, nil
 	case *ast.StarExpr:
-		if tv, ok := info.Types[n]; ok && tv.IsType() {
+		if tv, ok := info.TypeOf(n); ok && tv.IsType() {
 			return catalog.VariantStarPointerType, nil
 		}
 		return catalog.VariantStarDereference, nil
@@ -168,16 +176,16 @@ func (b *builder) variantOf(i int, n ast.Node, info *types.Info) (catalog.Varian
 
 // indexVariant distinguishes generic instantiation, map lookups, and element
 // indexing for one IndexExpr.
-func (b *builder) indexVariant(i int, x ast.Expr, n *ast.IndexExpr, info *types.Info) (catalog.Variant, error) {
-	if tv, ok := info.Types[n]; ok && tv.IsType() {
+func (b *builder) indexVariant(i int, x ast.Expr, n *ast.IndexExpr, info *source.TypeInfoView) (catalog.Variant, error) {
+	if tv, ok := info.TypeOf(n); ok && tv.IsType() {
 		return catalog.VariantGenericInstantiation, nil
 	}
 	if callee := calleeIdent(x); callee != nil {
-		if _, instantiated := info.Instances[callee]; instantiated {
+		if _, instantiated := info.InstanceOf(callee); instantiated {
 			return catalog.VariantGenericInstantiation, nil
 		}
 	}
-	tv, ok := info.Types[x]
+	tv, ok := info.TypeOf(x)
 	if !ok {
 		return catalog.VariantInvalid, newResolutionError(b.occurrences[i].kind, b.file, b.occurrences[i].span,
 			"index operand has no type evidence")
@@ -216,8 +224,8 @@ func (b *builder) assignVariant(n *ast.AssignStmt) catalog.Variant {
 }
 
 // rangeVariant resolves the range operand class.
-func (b *builder) rangeVariant(i int, n *ast.RangeStmt, info *types.Info) (catalog.Variant, error) {
-	tv, ok := info.Types[n.X]
+func (b *builder) rangeVariant(i int, n *ast.RangeStmt, info *source.TypeInfoView) (catalog.Variant, error) {
+	tv, ok := info.TypeOf(n.X)
 	if !ok {
 		return catalog.VariantInvalid, newResolutionError(b.occurrences[i].kind, b.file, b.occurrences[i].span,
 			"range operand has no type evidence")
