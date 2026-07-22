@@ -132,6 +132,46 @@ duplicate owners, fallback identities, stale generated code, obsolete tests,
 and broken documentation references. Mutation-prove every gate's claimed
 failure class.
 
+## Review Forward Motion
+
+Every review, checkpoint assessment, implementation mandate, and handoff must
+move the project by a substantial dependency-ordered unit rather than create a
+fix-one-finding-and-return supervision loop.
+
+The reviewer must:
+
+1. List the current findings first, with evidence, severity, truth owner, and
+   required correction.
+2. State whether the correction set is **foundational/massive** or **bounded**.
+   A finding is foundational/massive only when it invalidates a shared semantic
+   owner, identity domain, schema, phase boundary, or active architecture such
+   that downstream work would be unsound or likely discarded, or when a
+   stop-the-line condition prevents safe continuation.
+3. If the findings are bounded, include the current corrections and normally
+   the next two to four substantial dependency-ordered outcomes in the same
+   task list. If the project is close to completion, include every remaining
+   outcome through final acceptance instead.
+4. If the findings are foundational/massive, define the complete atomic
+   replacement and its exit proof, plus the exact downstream restart boundary;
+   do not pad the mandate with work that would build on the invalid foundation.
+
+A substantial outcome is an end-to-end capability, architectural replacement,
+phase exit, or product milestone with its owner, migrated consumers, superseded
+path deletion, artifact inspection, independent tests, mutation proof, and
+applicable gates. A file edit, helper, local reproduction, isolated test, or
+single diagnostic reduction is not a substantial outcome.
+
+Implementers proceed through the combined task list without asking for
+confirmation between items. They stop and re-plan only when a genuinely new
+foundational/massive issue, unavailable external prerequisite, or required user
+product decision makes the remaining plan unsafe. A checkpoint that reports
+only bounded current fixes while leaving the already-known next substantial
+work for another approval cycle is incomplete.
+
+Batching never weakens WCBUBWHB, atomic replacement, evidence, or stop-the-line
+requirements. Outcomes must remain cohesive and dependency-ordered; unrelated
+work must not be bundled merely to make a checkpoint appear larger.
+
 ## Repository Safety
 
 - Never force-push or delete remote branches/tags.
