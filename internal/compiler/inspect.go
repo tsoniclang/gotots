@@ -65,3 +65,31 @@ func InspectConstructs(req source.Request) (*Inspection, error) {
 	}
 	return &Inspection{workspace: ws, selection: selection, inventory: inventory}, nil
 }
+
+// AuditCatalog resolves the request and produces the versioned catalog-audit
+// artifact over the non-full closure (a toolchain-contract gate run, not part
+// of ordinary compilation).
+func AuditCatalog(req source.Request) (*analyze.AuditArtifact, error) {
+	universe, err := source.LoadUniverse(req)
+	if err != nil {
+		return nil, err
+	}
+	selection, err := scope.Select(universe, scope.DefaultContract())
+	if err != nil {
+		return nil, err
+	}
+	ws, err := source.Finalize(universe, selection.Depths())
+	if err != nil {
+		return nil, err
+	}
+	if err := stagecheck.VerifySourceUniverse(ws, req); err != nil {
+		return nil, err
+	}
+	return analyze.AuditCatalog(ws)
+}
+
+// VerifyAuditArtifact exact-joins a stored audit artifact against one
+// inspection's universe.
+func VerifyAuditArtifact(inspection *Inspection, path string) error {
+	return analyze.VerifyAuditArtifact(inspection.workspace, path)
+}
