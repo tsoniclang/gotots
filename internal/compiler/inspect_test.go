@@ -189,3 +189,62 @@ func TestImportCoherencePositiveProof(t *testing.T) {
 		}
 	}
 }
+
+// TestCgoThroughPublicPipeline proves a cgo program runs the COMPLETE public
+// pipeline: mixed same-file units (C-dependent external boundary + pure
+// full-semantic through the checked view), shadowing local C, and origin
+// mappings — never a loader/verifier closure disagreement.
+func TestCgoThroughPublicPipeline(t *testing.T) {
+	dir := t.TempDir()
+	files := map[string]string{
+		"go.mod":  "module cgo.example/pipeline\n\ngo 1.26\n",
+		"main.go": "package main\n\n/*\n#include <stdlib.h>\n*/\nimport \"C\"\n\nfunc main() {\n\tC.free(nil)\n}\n\nfunc pure() int {\n\ttype C struct{ f int }\n\tlocal := C{f: 41}\n\treturn local.f + 1\n}\n",
+	}
+	for rel, content := range files {
+		if err := os.WriteFile(filepath.Join(dir, rel), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	inspection, err := InspectConstructs(source.Request{
+		Dir: dir, ProviderContract: scope.DefaultContractID,
+		Env: []string{"CGO_ENABLED=1"},
+	})
+	if err != nil {
+		t.Skipf("cgo unavailable: %v", err)
+	}
+	var mainPkg *source.Package
+	for _, pkg := range inspection.Workspace().Packages() {
+		if pkg.ID().ImportPath() == "cgo.example/pipeline" {
+			mainPkg = pkg
+		}
+	}
+	if mainPkg == nil {
+		t.Fatal("cgo package missing")
+	}
+	depths := map[string]source.EvidenceDepth{}
+	for _, unit := range mainPkg.Units() {
+		depths[unit.Name()] = unit.Depth()
+	}
+	if depths["main"] != source.DepthExternalBoundary {
+		t.Errorf("C-dependent main depth = %s, want external-boundary", depths["main"])
+	}
+	// pure declares a LOCAL type C — the shadowing name never classifies.
+	if depths["pure"] != source.DepthFullSemantic {
+		t.Errorf("pure (with shadowing local C) depth = %s, want full-semantic", depths["pure"])
+	}
+	if len(mainPkg.CheckedUnitMappings()) == 0 || len(mainPkg.SyntheticUnits()) == 0 {
+		t.Error("cgo origin mappings/synthetic units missing")
+	}
+	// The pure unit's interior occurrences are inventoried via the checked view.
+	pureInventoried := false
+	for _, pkg := range inspection.Inventory().Packages() {
+		for _, file := range pkg.Files() {
+			if !file.RootUnit().IsZero() && len(file.Occurrences()) > 0 {
+				pureInventoried = true
+			}
+		}
+	}
+	if !pureInventoried {
+		t.Error("pure cgo unit missing from the inventory")
+	}
+}

@@ -79,5 +79,15 @@ func buildUnitInventory(pkg *source.Package, file *source.File, retained source.
 		return nil, err
 	}
 	detectImplicit(b, pkg.TypesInfo())
-	return newUnitInventory(file.Path(), file.ID(), file.EffectiveGoVersion(), retained.Unit, b.occurrences)
+	rootSpan := Span{
+		Start: Position{Offset: retained.Unit.Span().Start()},
+		End:   Position{Offset: retained.Unit.Span().End()},
+	}
+	if retained.FromCheckedView {
+		rootSpan = Span{
+			Start: Position{Offset: retained.CheckedSpan.Start.Offset},
+			End:   Position{Offset: retained.CheckedSpan.End.Offset},
+		}
+	}
+	return newUnitInventory(file.Path(), file.ID(), file.EffectiveGoVersion(), retained.Unit, rootSpan, b.occurrences)
 }

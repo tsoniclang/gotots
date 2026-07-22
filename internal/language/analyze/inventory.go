@@ -131,7 +131,7 @@ type FileInventory struct {
 // full-semantic unit in a mixed file: the root occurrence must be parentless
 // and lie within the unit's span; all other invariants match file
 // inventories.
-func newUnitInventory(path string, file identity.FileID, effectiveGoVersion string, unit identity.SourceUnitID, occurrences []Occurrence) (*FileInventory, error) {
+func newUnitInventory(path string, file identity.FileID, effectiveGoVersion string, unit identity.SourceUnitID, rootSpan Span, occurrences []Occurrence) (*FileInventory, error) {
 	if len(occurrences) == 0 {
 		return nil, newResolutionError(0, file, Span{}, "unit inventory has no occurrences")
 	}
@@ -139,10 +139,10 @@ func newUnitInventory(path string, file identity.FileID, effectiveGoVersion stri
 	if !root.parent.IsZero() || root.edge != catalog.Edge(0) {
 		return nil, newResolutionError(root.kind, file, root.span, "unit inventory root must be parentless")
 	}
-	// The retained root either equals the unit span (initializer specs) or
-	// contains it (a FuncDecl containing its body span). Anything else leaks
-	// evidence outside the unit.
-	containsUnit := root.span.Start.Offset <= unit.Span().Start() && unit.Span().End() <= root.span.End.Offset
+	// The retained root either equals the expected span (initializer specs,
+	// checked-view declarations) or contains it (a FuncDecl containing its
+	// body span). Anything else leaks evidence outside the unit.
+	containsUnit := root.span.Start.Offset <= rootSpan.Start.Offset && rootSpan.End.Offset <= root.span.End.Offset
 	if !containsUnit {
 		return nil, newResolutionError(root.kind, file, root.span, "unit inventory root does not cover its unit span")
 	}

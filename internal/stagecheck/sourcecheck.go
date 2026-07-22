@@ -41,6 +41,7 @@ type goListPackage struct {
 	Standard      bool
 	Goroot        bool
 	DepOnly       bool
+	Deps          []string
 	GoFiles       []string
 	CgoFiles      []string
 	CFiles        []string
@@ -163,10 +164,21 @@ func VerifySourceUniverse(ws *source.Workspace, req source.Request) error {
 			return
 		}
 		reachable[path] = true
-		if record, ok := records[path]; ok {
-			for _, imported := range record.Imports {
-				visit(imported)
+		record, ok := records[path]
+		if !ok {
+			return
+		}
+		for _, imported := range record.Imports {
+			if imported == "C" {
+				// Import "C" expands to the cgo compile dependencies; the
+				// exact toolchain statement of that expansion is this
+				// package's Deps closure.
+				for _, dep := range record.Deps {
+					visit(dep)
+				}
+				continue
 			}
+			visit(imported)
 		}
 	}
 	for _, path := range order {

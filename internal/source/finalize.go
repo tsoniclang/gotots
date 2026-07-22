@@ -34,10 +34,16 @@ type MixedUnits struct{ Retained []RetainedUnit }
 
 func (MixedUnits) fileEvidence() {}
 
-// RetainedUnit is one full-semantic unit's retained declaration subtree.
+// RetainedUnit is one full-semantic unit's retained declaration subtree. For
+// cgo originals the subtree comes from the checked view; CheckedSpan then
+// carries the declaration's span in checked-view coordinates (the origin
+// mapping's evidence), and occurrence positions resolve through the shared
+// file set whose //line handling maps display positions back to the original.
 type RetainedUnit struct {
-	Unit identity.SourceUnitID
-	Decl ast.Node
+	Unit            identity.SourceUnitID
+	Decl            ast.Node
+	FromCheckedView bool
+	CheckedSpan     Span
 }
 
 // Finalize consumes the transient universe plus the scope phase's immutable
@@ -92,8 +98,14 @@ func finalizePackage(u *Universe, loaded *LoadedPackage, depths map[identity.Sou
 	var fullSpans []Span
 	allFull, anyFull := true, false
 	for _, loadedFile := range loaded.files {
+		fset := loadedFile.fset
+		if fset == nil {
+			// Cgo originals resolve retained checked-view positions through
+			// the shared file set (//line evidence maps display back here).
+			fset = u.fset
+		}
 		file := &File{
-			path: loadedFile.path, id: loadedFile.id, fset: loadedFile.fset,
+			path: loadedFile.path, id: loadedFile.id, fset: fset,
 			effectiveVersion: loadedFile.effectiveVersion,
 			overlaid:         loadedFile.overlaid, cgoOriginal: loadedFile.cgoOriginal,
 			byteDigest: loadedFile.byteDigest,
@@ -179,21 +191,23 @@ func retainUnits(u *Universe, loaded *LoadedPackage, file *LoadedFile, depths ma
 		if depths[unit.id] != DepthFullSemantic {
 			continue
 		}
-		var decl ast.Node
+		retained := RetainedUnit{Unit: unit.id}
 		if file.syntax != nil {
-			decl = unitNodeAt(file.syntax, file.fset, unit)
+			retained.Decl = unitNodeAt(file.syntax, file.fset, unit)
 		} else {
 			for _, checked := range loaded.checkedDecls {
 				if checked.origin == unit.id {
-					decl = checked.node
+					retained.Decl = checked.node
+					retained.FromCheckedView = true
+					retained.CheckedSpan = checked.span
 					break
 				}
 			}
 		}
-		if decl == nil {
+		if retained.Decl == nil {
 			return nil, &LoadError{Dir: u.request.Dir, Reason: "no retainable declaration for full-semantic unit " + unit.id.String()}
 		}
-		out = append(out, RetainedUnit{Unit: unit.id, Decl: decl})
+		out = append(out, retained)
 	}
 	return out, nil
 }
