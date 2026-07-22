@@ -122,6 +122,15 @@ func TestUniverseClosureAndProvenance(t *testing.T) {
 	if dotless.ID().Owner().String() != "mod=dotlessdep/lib@v1.0.0" {
 		t.Errorf("dotless owner = %s", dotless.ID().Owner())
 	}
+	// Dependency records retain declaration-level type evidence through the
+	// same loader (export data): fmt's Sprintln is visible without fmt being
+	// selected.
+	if fmtPkg.Types() == nil || fmtPkg.Types().Scope().Lookup("Sprintln") == nil {
+		t.Error("fmt dependency record lacks declaration type evidence")
+	}
+	if sync.Types() == nil || sync.Types().Scope().Lookup("Group") == nil {
+		t.Error("x/sync dependency record lacks declaration type evidence")
+	}
 	// Std file identities are GOROOT/src-relative, never machine paths.
 	for _, file := range fmtPkg.Files() {
 		if !strings.HasPrefix(file.ID().String(), "std::fmt/") {

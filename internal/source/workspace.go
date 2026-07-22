@@ -129,7 +129,8 @@ func (a Acquisition) String() string {
 type LanguageDisposition uint8
 
 const (
-	DispositionOrdinarySource LanguageDisposition = iota
+	LanguageDispositionInvalid LanguageDisposition = iota
+	DispositionOrdinarySource
 	DispositionBuiltinUniverse
 	DispositionUnsafeIntrinsic
 	DispositionCgoPseudo
@@ -142,9 +143,15 @@ var languageDispositionNames = [numLanguageDispositions]string{
 	DispositionUnsafeIntrinsic: "unsafe-intrinsic", DispositionCgoPseudo: "cgo-pseudo",
 }
 
+// Valid reports whether d names a language disposition; the zero value is
+// invalid so an unclassified package cannot masquerade as ordinary source.
+func (d LanguageDisposition) Valid() bool {
+	return d > LanguageDispositionInvalid && d < numLanguageDispositions
+}
+
 // String renders d for reports.
 func (d LanguageDisposition) String() string {
-	if d < numLanguageDispositions {
+	if d.Valid() {
 		return languageDispositionNames[d]
 	}
 	return fmt.Sprintf("source.LanguageDisposition(%d)", uint8(d))
@@ -230,7 +237,9 @@ func (p *Package) Imports() []string { return p.imports }
 // carry parsed syntax; dependency records carry identity and path only.
 func (p *Package) Files() []*File { return p.files }
 
-// Types is the type-checked package (selected packages only).
+// Types is the package's type evidence: the fully checked package for
+// selected roots, and the toolchain's export-data declaration types for
+// dependency and standard-library records.
 func (p *Package) Types() *types.Package { return p.types }
 
 // TypesInfo is the package's type information (selected packages only).

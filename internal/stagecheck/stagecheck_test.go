@@ -117,7 +117,9 @@ func TestVerifierUsesSelectedToolchain(t *testing.T) {
 	}
 	dir := writeModule(t, moduleA)
 	logFile := filepath.Join(t.TempDir(), "invocations.log")
-	wrapper := filepath.Join(t.TempDir(), "go")
+	// The selected binary is deliberately NOT named "go": the loader's shim
+	// must still route the go/packages driver through it.
+	wrapper := filepath.Join(t.TempDir(), "custom-toolchain.sh")
 	script := "#!/bin/sh\necho \"$@\" >> " + logFile + "\nexec " + real + " \"$@\"\n"
 	if err := os.WriteFile(wrapper, []byte(script), 0o755); err != nil {
 		t.Fatalf("write wrapper: %v", err)
@@ -141,6 +143,11 @@ func TestVerifierUsesSelectedToolchain(t *testing.T) {
 		if !strings.Contains(string(logged), needle) {
 			t.Errorf("selected toolchain never ran %q; log:\n%s", needle, logged)
 		}
+	}
+	// The go/packages driver itself must have gone through the selected
+	// binary (multiple list invocations beyond the three direct ones).
+	if strings.Count(string(logged), "list") < 4 {
+		t.Errorf("go/packages driver bypassed the selected toolchain; log:\n%s", logged)
 	}
 }
 

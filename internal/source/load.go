@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -42,10 +43,11 @@ func LoadWorkspace(req Request) (*Workspace, error) {
 	if len(patterns) == 0 {
 		patterns = []string{"./..."}
 	}
-	toolchain, env, err := resolveToolchain(req)
+	toolchain, env, cleanupShim, err := resolveToolchain(req)
 	if err != nil {
 		return nil, err
 	}
+	defer cleanupShim()
 	stdSet, err := listPatternSet(toolchain, env, req.Dir, "std")
 	if err != nil {
 		return nil, err
@@ -135,6 +137,29 @@ func LoadWorkspace(req Request) (*Workspace, error) {
 	if len(ws.selected) == 0 {
 		return nil, &LoadError{Dir: req.Dir, Reason: "no selected packages after classification"}
 	}
+	// Source-available dependencies and standard-library declarations retain
+	// downstream type evidence through this same loader: dependency records
+	// carry the toolchain's export-data types; full syntax and Info load when
+	// a package is selected as a root.
+	depTypes := map[string]*types.Package{}
+	var collect func(tp *types.Package)
+	collect = func(tp *types.Package) {
+		if tp == nil || depTypes[tp.Path()] != nil {
+			return
+		}
+		depTypes[tp.Path()] = tp
+		for _, imported := range tp.Imports() {
+			collect(imported)
+		}
+	}
+	for _, root := range rootByPath {
+		collect(root.Types)
+	}
+	for _, record := range ws.packages {
+		if record.types == nil {
+			record.types = depTypes[record.id.ImportPath()]
+		}
+	}
 	sort.Slice(ws.packages, func(i, j int) bool { return ws.packages[i].id.String() < ws.packages[j].id.String() })
 	sort.Slice(ws.selected, func(i, j int) bool { return ws.selected[i].id.String() < ws.selected[j].id.String() })
 	return ws, nil
@@ -143,30 +168,45 @@ func LoadWorkspace(req Request) (*Workspace, error) {
 // resolveToolchain resolves the exact selected go binary and its fingerprint,
 // and produces the environment (with PATH pinned to that binary) shared by the
 // loader and every downstream toolchain execution.
-func resolveToolchain(req Request) (Toolchain, []string, error) {
+func resolveToolchain(req Request) (Toolchain, []string, func(), error) {
+	noop := func() {}
 	binary := req.GoBinary
 	if binary == "" {
 		resolved, err := exec.LookPath("go")
 		if err != nil {
-			return Toolchain{}, nil, &LoadError{Dir: req.Dir, Reason: "no go binary selected or on PATH: " + err.Error()}
+			return Toolchain{}, nil, noop, &LoadError{Dir: req.Dir, Reason: "no go binary selected or on PATH: " + err.Error()}
 		}
 		binary = resolved
 	}
 	absolute, err := filepath.Abs(binary)
 	if err != nil {
-		return Toolchain{}, nil, &LoadError{Dir: req.Dir, Reason: "toolchain path unresolvable: " + err.Error()}
+		return Toolchain{}, nil, noop, &LoadError{Dir: req.Dir, Reason: "toolchain path unresolvable: " + err.Error()}
+	}
+	// The go/packages driver resolves "go" from PATH. A shim directory whose
+	// "go" entry links to the exact selected binary guarantees the driver
+	// invokes it even when the selected filename is not "go".
+	shimDir, err := os.MkdirTemp("", "gotots-toolchain-*")
+	if err != nil {
+		return Toolchain{}, nil, noop, &LoadError{Dir: req.Dir, Reason: "toolchain shim: " + err.Error()}
+	}
+	cleanup := func() { os.RemoveAll(shimDir) }
+	if err := os.Symlink(absolute, filepath.Join(shimDir, "go")); err != nil {
+		cleanup()
+		return Toolchain{}, nil, noop, &LoadError{Dir: req.Dir, Reason: "toolchain shim: " + err.Error()}
 	}
 	env := append(os.Environ(), req.Env...)
-	env = append(env, "PATH="+filepath.Dir(absolute)+string(os.PathListSeparator)+os.Getenv("PATH"))
+	env = append(env, "PATH="+shimDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	out, err := runGo(absolute, env, req.Dir, "env", "GOROOT", "GOVERSION")
 	if err != nil {
-		return Toolchain{}, nil, &LoadError{Dir: req.Dir, Reason: "toolchain fingerprint failed: " + err.Error()}
+		cleanup()
+		return Toolchain{}, nil, noop, &LoadError{Dir: req.Dir, Reason: "toolchain fingerprint failed: " + err.Error()}
 	}
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	if len(lines) != 2 {
-		return Toolchain{}, nil, &LoadError{Dir: req.Dir, Reason: "toolchain fingerprint output malformed"}
+		cleanup()
+		return Toolchain{}, nil, noop, &LoadError{Dir: req.Dir, Reason: "toolchain fingerprint output malformed"}
 	}
-	return Toolchain{binary: absolute, goroot: strings.TrimSpace(lines[0]), version: strings.TrimSpace(lines[1])}, env, nil
+	return Toolchain{binary: absolute, goroot: strings.TrimSpace(lines[0]), version: strings.TrimSpace(lines[1])}, env, cleanup, nil
 }
 
 // listPatternSet resolves one authoritative toolchain pattern set (std, cmd)
@@ -210,7 +250,7 @@ type classifier struct {
 }
 
 func (c *classifier) record(pkg *packages.Package, root *packages.Package, fset *token.FileSet) (*Package, error) {
-	out := &Package{selected: root != nil}
+	out := &Package{selected: root != nil, disposition: DispositionOrdinarySource}
 	var owner identity.Owner
 	var relBase string
 	switch {
@@ -225,9 +265,9 @@ func (c *classifier) record(pkg *packages.Package, root *packages.Package, fset 
 			out.disposition = DispositionUnsafeIntrinsic
 		}
 		relBase = filepath.Join(c.toolchain.goroot, "src")
-	case c.cmdSet[pkg.PkgPath] || strings.HasPrefix(pkg.PkgPath, "cmd/") && pkg.Module == nil:
-		// cmd-set membership is authoritative; internal toolchain packages
-		// reachable only from cmd roots share the toolchain owner.
+	case c.cmdSet[pkg.PkgPath]:
+		// cmd-set membership is authoritative and includes the toolchain's
+		// internal libraries; no path-prefix rule participates.
 		owner = identity.ToolchainOwner()
 		out.provenance, out.acquisition = ProvenanceToolchainPackage, AcquisitionGOROOT
 		relBase = filepath.Join(c.toolchain.goroot, "src")
