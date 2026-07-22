@@ -138,6 +138,18 @@ func TestUniverseClosureAndProvenance(t *testing.T) {
 	if dotless.ID().Owner().String() != "mod=dotlessdep/lib@v1.0.0" {
 		t.Errorf("dotless owner = %s", dotless.ID().Owner())
 	}
+	// Std leakage is structurally impossible: no body-indexed type
+	// information survives finalization for declaration-contract packages.
+	if fmtPkg.TypesInfo() != nil {
+		t.Error("std package retains body-indexed type information")
+	}
+	// x/sync is a source-available module dependency: automatic provider,
+	// full-semantic units retained.
+	for _, unit := range sync.Units() {
+		if unit.Depth() != source.DepthFullSemantic {
+			t.Errorf("module-dependency unit %s depth = %s, want full-semantic", unit.ID(), unit.Depth())
+		}
+	}
 	// Dependency records retain declaration-level type evidence through the
 	// same loader (export data): fmt's Sprintln is visible without fmt being
 	// selected.
