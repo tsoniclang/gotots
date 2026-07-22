@@ -223,7 +223,7 @@ func VerifySourceUniverse(ws *source.Workspace, req source.Request) error {
 		mismatches = append(mismatches, joinSet(id, "embed-file", stringSet(pkg.EmbedFiles()), expectation.embedFiles)...)
 		mismatches = append(mismatches, joinSet(id, "embed-pattern", stringSet(pkg.EmbedPatterns()), expectation.embedPatterns)...)
 		mismatches = append(mismatches, verifyEvidenceState(pkg, expectation)...)
-		mismatches = append(mismatches, verifyFileVersions(pkg, expectation)...)
+		mismatches = append(mismatches, verifyFileVersions(pkg, expectation, req.Overlay, ws.Toolchain().GOROOT())...)
 	}
 	mismatches = append(mismatches, verifyTypeGraphCoherence(ws)...)
 	var dropped []string
@@ -323,22 +323,31 @@ func verifyEvidenceState(pkg *source.Package, expectation *universeExpectation) 
 // version from the module go directive plus the file's raw //go:build
 // constraint (parsed with go/build/constraint, not the producer's evidence)
 // and joins it against the producer's per-file version.
-func verifyFileVersions(pkg *source.Package, expectation *universeExpectation) []string {
+func verifyFileVersions(pkg *source.Package, expectation *universeExpectation, overlay map[string][]byte, goroot string) []string {
 	var out []string
-	moduleVersion := ""
+	base := ""
 	if expectation.moduleGo != "" {
-		moduleVersion = "go" + expectation.moduleGo
+		base = "go" + expectation.moduleGo
+	}
+	if base == "" {
+		switch pkg.ID().Owner().Class() {
+		case identity.OwnerStandardLibrary, identity.OwnerToolchain:
+			// Reserved owners' base version is the GOROOT source go.mod
+			// directive — read independently from raw bytes.
+			base = gorootGoDirective(goroot)
+		}
 	}
 	for _, file := range pkg.Files() {
-		if _, hasFull := file.FullSyntax(); !hasFull {
+		if file.EffectiveGoVersion() == "" {
+			// cgo originals and intrinsic files carry no checked version.
 			continue
 		}
-		expected := moduleVersion
-		if fromConstraint := fileConstraintVersion(file.Path()); fromConstraint != "" {
+		expected := base
+		if fromConstraint := fileConstraintVersion(file.Path(), overlay); fromConstraint != "" {
 			expected = fromConstraint
 		}
 		if expected == "" {
-			continue // reserved owners carry no module directive
+			continue
 		}
 		if got := file.EffectiveGoVersion(); got != expected {
 			out = append(out, fmt.Sprintf("%s effective version %q vs independent %q", file.ID(), got, expected))
@@ -347,12 +356,32 @@ func verifyFileVersions(pkg *source.Package, expectation *universeExpectation) [
 	return out
 }
 
-// fileConstraintVersion extracts the go-version bound of a file's //go:build
-// line from raw bytes, independent of the producer's parse.
-func fileConstraintVersion(path string) string {
-	raw, err := os.ReadFile(path)
+// gorootGoDirective reads the go directive of GOROOT/src/go.mod from raw
+// bytes, independent of the producer.
+func gorootGoDirective(goroot string) string {
+	raw, err := os.ReadFile(filepath.Join(goroot, "src", "go.mod"))
 	if err != nil {
 		return ""
+	}
+	for _, line := range strings.Split(string(raw), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if version, found := strings.CutPrefix(trimmed, "go "); found {
+			return "go" + strings.TrimSpace(version)
+		}
+	}
+	return ""
+}
+
+// fileConstraintVersion extracts the go-version bound of a file's //go:build
+// line from raw bytes, independent of the producer's parse.
+func fileConstraintVersion(path string, overlay map[string][]byte) string {
+	raw, overlaid := overlay[path]
+	if !overlaid {
+		var err error
+		raw, err = os.ReadFile(path)
+		if err != nil {
+			return ""
+		}
 	}
 	for _, line := range strings.Split(string(raw), "\n") {
 		trimmed := strings.TrimSpace(line)

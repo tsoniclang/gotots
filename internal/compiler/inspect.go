@@ -56,6 +56,9 @@ func InspectConstructs(req source.Request) (*Inspection, error) {
 	if err := stagecheck.VerifySourceUniverse(ws, req); err != nil {
 		return nil, err
 	}
+	if err := stagecheck.VerifyUnitCensus(ws, req, scope.DefaultContract()); err != nil {
+		return nil, err
+	}
 	inventory, err := analyze.BuildWorkspaceInventory(ws)
 	if err != nil {
 		return nil, err

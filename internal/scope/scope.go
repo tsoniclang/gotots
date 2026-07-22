@@ -145,6 +145,52 @@ func (s *Selection) Depths() map[identity.SourceUnitID]source.EvidenceDepth {
 	return out
 }
 
+// UnitProvider is the contract's own per-unit policy evaluation: it consumes
+// the owner class, package disposition, unit kind, and per-unit cgo evidence
+// and answers the binding. Producer and verifier both ask the contract — the
+// data is the single policy owner; their independence lies in deriving the
+// inputs separately.
+func (c ProviderContract) UnitProvider(ownerClass identity.OwnerClass, disposition source.LanguageDisposition, kind identity.UnitKind, cDependent bool) (Provider, error) {
+	var binding Provider
+	switch disposition {
+	case source.DispositionBuiltinUniverse, source.DispositionUnsafeIntrinsic:
+		binding = c.intrinsicProvider
+	default:
+		switch ownerClass {
+		case identity.OwnerModule:
+			binding = c.moduleProvider
+		case identity.OwnerStandardLibrary:
+			binding = c.stdProvider
+		case identity.OwnerToolchain:
+			binding = c.toolchainProvider
+		case identity.OwnerLanguagePseudo:
+			binding = c.intrinsicProvider
+		default:
+			return ProviderInvalid, &SelectionError{Reason: "no contract binding for owner class " + ownerClass.String()}
+		}
+	}
+	if cDependent {
+		binding = c.cDependentProvider
+	}
+	if kind == identity.UnitBodylessDecl && binding == ProviderAutomaticTranslation {
+		binding = c.bodylessAutomatic
+	}
+	return binding, nil
+}
+
+// UnitDepth answers the evidence depth the contract implies for one unit.
+func (c ProviderContract) UnitDepth(ownerClass identity.OwnerClass, disposition source.LanguageDisposition, kind identity.UnitKind, cDependent bool) (source.EvidenceDepth, error) {
+	provider, err := c.UnitProvider(ownerClass, disposition, kind, cDependent)
+	if err != nil {
+		return source.DepthInvalid, err
+	}
+	depth := depthOf(provider)
+	if !depth.Valid() {
+		return source.DepthInvalid, &SelectionError{Reason: "no valid depth for provider " + provider.String()}
+	}
+	return depth, nil
+}
+
 // Select produces the immutable evidence-depth selection for every censused
 // unit of the universe under the given contract. The selection is total and
 // disjoint by construction: exactly one record per unit.
@@ -157,19 +203,11 @@ func Select(u *source.Universe, contract ProviderContract) (*Selection, error) {
 		depths:              map[identity.SourceUnitID]source.EvidenceDepth{},
 	}
 	for _, pkg := range u.Packages() {
-		binding, err := bindingFor(contract, pkg)
-		if err != nil {
-			return nil, err
-		}
 		for _, file := range pkg.Files() {
 			for _, unit := range file.Units() {
-				provider := binding
-				// Per-unit evidence rules, from the contract:
-				if unit.CDependent() {
-					provider = contract.cDependentProvider
-				}
-				if unit.Kind() == identity.UnitBodylessDecl && provider == ProviderAutomaticTranslation {
-					provider = contract.bodylessAutomatic
+				provider, err := contract.UnitProvider(pkg.ID().Owner().Class(), pkg.Disposition(), unit.Kind(), unit.CDependent())
+				if err != nil {
+					return nil, err
 				}
 				depth := depthOf(provider)
 				if !depth.Valid() {
@@ -185,23 +223,4 @@ func Select(u *source.Universe, contract ProviderContract) (*Selection, error) {
 	}
 	sort.Slice(out.units, func(i, j int) bool { return out.units[i].Unit.String() < out.units[j].Unit.String() })
 	return out, nil
-}
-
-// bindingFor resolves the contract's owner-class binding for one package.
-func bindingFor(contract ProviderContract, pkg *source.LoadedPackage) (Provider, error) {
-	switch pkg.Disposition() {
-	case source.DispositionBuiltinUniverse, source.DispositionUnsafeIntrinsic:
-		return contract.intrinsicProvider, nil
-	}
-	switch pkg.ID().Owner().Class() {
-	case identity.OwnerModule:
-		return contract.moduleProvider, nil
-	case identity.OwnerStandardLibrary:
-		return contract.stdProvider, nil
-	case identity.OwnerToolchain:
-		return contract.toolchainProvider, nil
-	case identity.OwnerLanguagePseudo:
-		return contract.intrinsicProvider, nil
-	}
-	return ProviderInvalid, &SelectionError{Reason: pkg.ID().String() + ": no contract binding for owner class"}
 }
