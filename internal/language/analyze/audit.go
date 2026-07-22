@@ -25,11 +25,12 @@ import (
 )
 
 // AuditArtifactVersion is the audit artifact schema version.
-const AuditArtifactVersion = 3
+const AuditArtifactVersion = 4
 
 // ManifestUnit is one provider-owned unit's manifest record: identity
 // components, selected-span content address, display name, and typed cgo
-// evidence, captured from the production census.
+// evidence, captured from the production census. It is a derived census
+// projection of the definition/reference graph, never the topology authority.
 type ManifestUnit struct {
 	Unit       string `json:"unit"` // canonical SourceUnitID string
 	Kind       uint8  `json:"kind"` // pinned identity.UnitKind value
@@ -40,16 +41,38 @@ type ManifestUnit struct {
 	CDependent bool   `json:"cDependent,omitempty"`
 }
 
+// ManifestDefinition is one provider unit's definition in the artifact graph:
+// its canonical identity and kind. Definitions are the census projection's
+// authority — the flat unit list derives from them.
+type ManifestDefinition struct {
+	Unit string `json:"unit"`
+	Kind uint8  `json:"kind"`
+}
+
+// ManifestReference is one nested implementation reference in the artifact
+// graph: the parent owner, the enclosing occurrence, the child unit, the exact
+// grammatical edge, the source anchor, and the source ordinal.
+type ManifestReference struct {
+	Parent  string `json:"parent"`  // "decl:<fileID>" or "unit:<unitID>"
+	Occ     string `json:"occ"`     // parent occurrence identity
+	Child   string `json:"child"`   // child unit identity
+	Edge    string `json:"edge"`    // grammatical edge
+	Ordinal int    `json:"ordinal"` // source order within the parent region
+	Anchor  string `json:"anchor"`  // child root span identity
+}
+
 // AuditFile is one audited file's content-addressed record: the identity is
 // bound to the selected-byte digest captured during resolution, with exact
 // per-file evidence and the complete provider unit manifest (top-level and
 // interior units).
 type AuditFile struct {
-	File        string         `json:"file"`   // canonical FileID string
-	Digest      string         `json:"digest"` // sha256 of selected bytes
-	Occurrences int            `json:"occurrences"`
-	Directives  int            `json:"directives"`
-	Units       []ManifestUnit `json:"units,omitempty"`
+	File        string               `json:"file"`   // canonical FileID string
+	Digest      string               `json:"digest"` // sha256 of selected bytes
+	Occurrences int                  `json:"occurrences"`
+	Directives  int                  `json:"directives"`
+	Units       []ManifestUnit       `json:"units,omitempty"`
+	Definitions []ManifestDefinition `json:"definitions,omitempty"`
+	References  []ManifestReference  `json:"references,omitempty"`
 }
 
 // AuditMeta binds the artifact to its complete production context: the
@@ -116,6 +139,12 @@ func (a *AuditArtifact) canonicalDigest() string {
 		for _, unit := range file.Units {
 			fmt.Fprintf(&b, "~%s~%d~%d~%d~%s~%s~%t", unit.Unit, unit.Kind, unit.Start, unit.End, unit.Name, unit.Hash, unit.CDependent)
 		}
+		for _, def := range file.Definitions {
+			fmt.Fprintf(&b, "@%s~%d", def.Unit, def.Kind)
+		}
+		for _, ref := range file.References {
+			fmt.Fprintf(&b, ">%s~%s~%s~%s~%d~%s", ref.Parent, ref.Occ, ref.Child, ref.Edge, ref.Ordinal, ref.Anchor)
+		}
 	}
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(b.String())))
 }
@@ -131,7 +160,7 @@ func (e *AuditError) Error() string { return "GOTOTS_CATALOG_AUDIT: " + e.Reason
 // acquisition policy, so every file's census — including provider interiors —
 // is complete and enters the manifest. Any unknown construct or unknown go
 // directive fails closed with its identity.
-func AuditCatalog(ws *source.Workspace, meta AuditMeta, overlay map[string][]byte, ordinary source.AcquisitionPolicy) (*AuditArtifact, error) {
+func AuditCatalog(ws *source.Workspace, meta AuditMeta, overlay map[string][]byte, ordinary source.AcquisitionPolicy, graph map[string]FileGraph) (*AuditArtifact, error) {
 	meta = boundMeta(ws, meta)
 	artifact := &AuditArtifact{
 		SchemaVersion: AuditArtifactVersion,
@@ -150,6 +179,7 @@ func AuditCatalog(ws *source.Workspace, meta AuditMeta, overlay map[string][]byt
 			if err != nil {
 				return nil, err
 			}
+			embedGraph(&record, graph[file.ID().String()])
 			artifact.Files = append(artifact.Files, record)
 			artifact.Occurrences += record.Occurrences
 			artifact.Directives += record.Directives
@@ -158,6 +188,27 @@ func AuditCatalog(ws *source.Workspace, meta AuditMeta, overlay map[string][]byt
 	sort.Slice(artifact.Files, func(i, j int) bool { return artifact.Files[i].File < artifact.Files[j].File })
 	artifact.seal()
 	return artifact, nil
+}
+
+// embedGraph serializes one file's definition/reference graph into its audit
+// record. Definitions are the topology authority; the flat unit list is the
+// derived census projection.
+func embedGraph(record *AuditFile, g FileGraph) {
+	for _, def := range g.Definitions {
+		record.Definitions = append(record.Definitions, ManifestDefinition{
+			Unit: def.Unit().String(), Kind: uint8(def.Kind()),
+		})
+	}
+	for _, ref := range g.References {
+		record.References = append(record.References, ManifestReference{
+			Parent:  ref.Parent().String(),
+			Occ:     ref.ParentOccurrence().String(),
+			Child:   ref.Child().String(),
+			Edge:    ref.Edge().String(),
+			Ordinal: ref.Ordinal(),
+			Anchor:  ref.Anchor().String(),
+		})
+	}
 }
 
 // seal stamps the canonical self-digest. Sealing is producer-owned: only the

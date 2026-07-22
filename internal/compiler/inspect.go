@@ -166,7 +166,14 @@ func AuditCatalog(req source.Request) (*analyze.AuditArtifact, error) {
 	if err := stagecheck.VerifyUnitCensus(ws, req, contract, auditPolicy); err != nil {
 		return nil, err
 	}
-	return analyze.AuditCatalog(ws, auditMeta(req, contract), req.Overlay, ordinaryPolicy)
+	// The audit is the provider-graph producer: extract each file's
+	// definition/reference topology from the transient universe and embed it,
+	// so ordinary compilation exact-joins the certified graph.
+	graph, err := analyze.ExtractProviderGraph(universe)
+	if err != nil {
+		return nil, err
+	}
+	return analyze.AuditCatalog(ws, auditMeta(req, contract), req.Overlay, ordinaryPolicy, graph)
 }
 
 // selectionProjection builds the retention projection directly from the scope

@@ -143,6 +143,61 @@ func Analyze(universe *source.Universe, depths map[identity.SourceUnitID]source.
 	return out, projection, nil
 }
 
+// FileGraph is one file's provider definition/reference graph: the topology
+// authority the audit artifact carries so ordinary compilation exact-joins it
+// without rescanning provider interiors. It is depth-independent structure
+// (the extraction treats every unit as having a body region to recover its
+// nested references); the flat unit list is a derived projection of Definitions.
+type FileGraph struct {
+	Definitions []ImplementationDefinition
+	References  []ImplementationRef
+}
+
+// ExtractProviderGraph derives the definition/reference graph of every
+// ordinary-source file with traversal syntax, treating every unit as having a
+// body region so nested references are recovered. It retains no occurrences —
+// only the topology — so it stays bounded per file. This is the audit
+// producer's provider-graph extraction; graph ownership is here, not in source.
+func ExtractProviderGraph(universe *source.Universe) (map[string]FileGraph, error) {
+	out := map[string]FileGraph{}
+	for _, pkg := range universe.Packages() {
+		if pkg.Disposition() != source.DispositionOrdinarySource {
+			continue
+		}
+		view := pkg.CheckerView()
+		for _, file := range pkg.Files() {
+			syntax := file.Syntax()
+			if syntax == nil {
+				continue
+			}
+			boundaries := file.UnitBoundaries()
+			g := FileGraph{}
+			decl := &builder{fset: file.TraversalFset(), file: file.ID(), owner: FileDeclarationOwner(file.ID()), info: view, boundaries: boundaries}
+			if err := decl.visit(syntax, -1, 0, visitContext{}); err != nil {
+				return nil, err
+			}
+			g.References = append(g.References, decl.references...)
+			for _, unit := range file.Units() {
+				g.Definitions = append(g.Definitions, ImplementationDefinition{
+					unit: SourceUnitRef(unit.ID()), kind: unit.Kind(),
+					depth: source.DepthDeclarationContract, full: false,
+				})
+				root, ok := file.UnitRootNode(unit.ID())
+				if !ok {
+					continue // manifest-supplied interior with no local root node
+				}
+				b := &builder{fset: file.TraversalFset(), file: file.ID(), owner: UnitOwner(SourceUnitRef(unit.ID())), info: view, boundaries: boundaries}
+				if err := b.visit(root, -1, 0, visitContext{signature: file.UnitSignature(unit.ID())}); err != nil {
+					return nil, err
+				}
+				g.References = append(g.References, b.references...)
+			}
+			out[file.ID().String()] = g
+		}
+	}
+	return out, nil
+}
+
 // packageHasFullUnit reports whether any of the package's units — source or
 // implicit — is full-semantic under the selection.
 func packageHasFullUnit(pkg *source.LoadedPackage, depths map[identity.SourceUnitID]source.EvidenceDepth, implicitDepths map[identity.ImplicitUnitID]source.EvidenceDepth) bool {
