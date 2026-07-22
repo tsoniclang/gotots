@@ -430,7 +430,8 @@ func deriveExpectation(pkg *goListPackage, stdSet, cmdSet map[string]bool, goroo
 		}
 		out.moduleGo = ""
 		relBase = filepath.Join(goroot, "src")
-	case cmdSet[pkg.ImportPath] || (pkg.Goroot && pkg.Module == nil):
+	case cmdSet[pkg.ImportPath]:
+		// cmd-set membership is authoritative; there is no GOROOT fallback.
 		owner = identity.ToolchainOwner()
 		out.provenance, out.acquisition = source.ProvenanceToolchainPackage, source.AcquisitionGOROOT
 		out.moduleGo = ""

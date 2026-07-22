@@ -131,6 +131,7 @@ func TestASTImportsAreWalled(t *testing.T) {
 	allowed := map[string]bool{
 		"internal/source":           true,
 		"internal/language/analyze": true,
+		"internal/language/typeset": true,
 		"internal/stagecheck":       true,
 	}
 	for _, p := range productPackages(t) {
@@ -179,6 +180,7 @@ var layerRank = map[string]int{
 	"internal/identity":         5,
 	"internal/language/catalog": 10,
 	"internal/source":           30,
+	"internal/language/typeset": 32,
 	"internal/scope":            35,
 	"internal/language/analyze": 40,
 	"internal/stagecheck":       60,
