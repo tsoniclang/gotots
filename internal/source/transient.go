@@ -74,6 +74,24 @@ func (p *LoadedPackage) ImplicitUnits() []identity.ImplicitUnitID {
 	return append([]identity.ImplicitUnitID(nil), p.implicitUnits...)
 }
 
+// CgoCounterparts maps each cgo-original unit's checked-view counterpart node
+// to its identity (transient; the analyze traversal walks the counterparts,
+// which carry type evidence, and detects nested boundaries through this map).
+func (p *LoadedPackage) CgoCounterparts() map[ast.Node]identity.SourceUnitID {
+	out := make(map[ast.Node]identity.SourceUnitID, len(p.checkedNodes))
+	for id, cp := range p.checkedNodes {
+		out[cp.node] = id
+	}
+	return out
+}
+
+// CgoCounterpartNode returns one cgo unit's checked-view counterpart node and
+// its checked-view span.
+func (p *LoadedPackage) CgoCounterpartNode(id identity.SourceUnitID) (ast.Node, Span, bool) {
+	cp, ok := p.checkedNodes[id]
+	return cp.node, cp.span, ok
+}
+
 // CheckerView is the narrow, transient type-query capability the analyze
 // traversal uses over the one checker graph. It is source-owned and never
 // survives into the finalized workspace; the finalized API exposes only
@@ -163,6 +181,10 @@ func (f *LoadedFile) Units() []SourceUnit { return append([]SourceUnit(nil), f.u
 
 // EffectiveGoVersion is the file's effective language version.
 func (f *LoadedFile) EffectiveGoVersion() string { return f.effectiveVersion }
+
+// CgoOriginal reports whether the file's checked view lives in cgo-transformed
+// output (so its full units are inventoried through checked counterparts).
+func (f *LoadedFile) CgoOriginal() bool { return f.cgoOriginal }
 
 // checkedDecl is one top-level declaration in a cgo checked-view file. Its
 // origin unit (or synthetic identity) and C-dependence are derived by

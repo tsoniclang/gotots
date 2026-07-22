@@ -218,7 +218,6 @@ const cgoPipelineFixture = "package main\n\n/*\n#include <stdlib.h>\n*/\nimport 
 // even when its nested literal touches C (per-unit exactness), and the origin
 // graph plus collision-free synthetics are present and relocation-stable.
 func TestCgoThroughPublicPipeline(t *testing.T) {
-	t.Skip("cgo checked-counterpart region traversal is wired in the cgo fix-forward step (Outcome 3)")
 	load := func(t *testing.T) (*Inspection, *source.Package) {
 		dir := t.TempDir()
 		for rel, content := range map[string]string{
