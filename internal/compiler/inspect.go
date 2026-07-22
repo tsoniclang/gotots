@@ -173,7 +173,17 @@ func AuditCatalog(req source.Request) (*analyze.AuditArtifact, error) {
 	if err != nil {
 		return nil, err
 	}
-	return analyze.AuditCatalog(ws, auditMeta(req, contract), req.Overlay, ordinaryPolicy, graph)
+	artifact, err := analyze.AuditCatalog(ws, auditMeta(req, contract), req.Overlay, ordinaryPolicy, graph)
+	if err != nil {
+		return nil, err
+	}
+	// Certify the embedded provider graph independently before the artifact's
+	// digest is trusted: re-derive every audited file's site set from source and
+	// exact-join it against the embedded references.
+	if err := stagecheck.VerifyProviderGraph(ws, artifact.Files, req.Overlay); err != nil {
+		return nil, err
+	}
+	return artifact, nil
 }
 
 // selectionProjection builds the retention projection directly from the scope

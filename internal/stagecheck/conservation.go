@@ -117,6 +117,64 @@ func verifyReferenceConservation(pkg *source.Package, refs []analyze.Implementat
 	return problems
 }
 
+// VerifyProviderGraph certifies the provider definition/reference graph at
+// artifact production: for every audited file it independently re-derives the
+// complete site set from re-parsed selected source (the same reflection field
+// walk, a different producer than the analyze extraction) and exact-multiset-
+// joins it against the references embedded in the produced artifact. A
+// fabricated, omitted, reordered, or mutated provider reference fails here,
+// before the artifact's digest is trusted, so ordinary consumption can rely on
+// the externally certified digest without rescanning provider interiors. Every
+// provider unit is treated as owning a body region, so no built-region filter
+// applies — the full topology is compared.
+func VerifyProviderGraph(ws *source.Workspace, files []analyze.AuditFile, overlay map[string][]byte) error {
+	fileByID := map[string]*source.File{}
+	for _, pkg := range ws.Packages() {
+		for _, file := range pkg.Files() {
+			fileByID[file.ID().String()] = file
+		}
+	}
+	var problems []string
+	for _, record := range files {
+		file := fileByID[record.File]
+		if file == nil {
+			problems = append(problems, "audited file "+record.File+" absent from finalized workspace")
+			continue
+		}
+		embedded := map[siteKey]int{}
+		for _, ref := range record.References {
+			embedded[siteKey{
+				owner: ref.Parent, occ: ref.Occ, edge: ref.Edge,
+				child: ref.Child, ordinal: ref.Ordinal, anchor: ref.Anchor,
+			}]++
+		}
+		sites, err := deriveSites(file, overlay)
+		if err != nil {
+			problems = append(problems, err.Error())
+			continue
+		}
+		derived := map[siteKey]int{}
+		for _, s := range sites {
+			derived[s]++
+		}
+		for key, n := range derived {
+			if embedded[key] != n {
+				problems = append(problems, fmt.Sprintf("%s: derived reference %s x%d, artifact has %d", record.File, key, n, embedded[key]))
+			}
+		}
+		for key, n := range embedded {
+			if derived[key] != n {
+				problems = append(problems, fmt.Sprintf("%s: artifact reference %s x%d, derived %d", record.File, key, n, derived[key]))
+			}
+		}
+	}
+	if len(problems) > 0 {
+		sort.Strings(problems)
+		return &VerificationError{Stage: "provider-graph", Reason: fmt.Sprintf("certification join failed; %v", problems)}
+	}
+	return nil
+}
+
 // deriveSites re-parses one file's selected bytes and independently derives its
 // implementation sites: the enclosing edge of every function body, function
 // literal, and initialized value spec. A cgo original (no re-derivable
