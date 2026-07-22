@@ -112,7 +112,9 @@ type descriptor struct {
 // descriptor here leaves a zero-value (empty-name) entry that
 // TestKindTableIsTotal rejects.
 var descriptors = [kindCount + 1]descriptor{
-	KindBadExpr:        {"BadExpr", CategoryExpression, DispositionActive},
+	// Bad* are parser error-recovery forms: cataloged for total toolchain
+	// reconciliation, never admissible in an admitted tree.
+	KindBadExpr:        {"BadExpr", CategoryExpression, DispositionRecovery},
 	KindIdent:          {"Ident", CategoryExpression, DispositionActive},
 	KindEllipsis:       {"Ellipsis", CategoryExpression, DispositionActive},
 	KindBasicLit:       {"BasicLit", CategoryExpression, DispositionActive},
@@ -137,7 +139,7 @@ var descriptors = [kindCount + 1]descriptor{
 	KindMapType:       {"MapType", CategoryType, DispositionActive},
 	KindChanType:      {"ChanType", CategoryType, DispositionActive},
 
-	KindBadStmt:        {"BadStmt", CategoryStatement, DispositionActive},
+	KindBadStmt:        {"BadStmt", CategoryStatement, DispositionRecovery},
 	KindDeclStmt:       {"DeclStmt", CategoryStatement, DispositionActive},
 	KindEmptyStmt:      {"EmptyStmt", CategoryStatement, DispositionActive},
 	KindLabeledStmt:    {"LabeledStmt", CategoryStatement, DispositionActive},
@@ -159,7 +161,7 @@ var descriptors = [kindCount + 1]descriptor{
 	KindForStmt:        {"ForStmt", CategoryStatement, DispositionActive},
 	KindRangeStmt:      {"RangeStmt", CategoryStatement, DispositionActive},
 
-	KindBadDecl:  {"BadDecl", CategoryDeclaration, DispositionActive},
+	KindBadDecl:  {"BadDecl", CategoryDeclaration, DispositionRecovery},
 	KindGenDecl:  {"GenDecl", CategoryDeclaration, DispositionActive},
 	KindFuncDecl: {"FuncDecl", CategoryDeclaration, DispositionActive},
 

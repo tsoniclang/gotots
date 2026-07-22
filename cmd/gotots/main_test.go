@@ -9,6 +9,30 @@ import (
 	"testing"
 )
 
+// failingWriter fails every write, standing in for a broken output sink.
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) {
+	return 0, errors.New("output sink failed")
+}
+
+// TestRunPropagatesWriterFailure proves rendering fails closed: a failing
+// writer surfaces its error from run instead of being discarded.
+func TestRunPropagatesWriterFailure(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sample.go")
+	if err := os.WriteFile(path, []byte(sample), 0o644); err != nil {
+		t.Fatalf("write sample: %v", err)
+	}
+	err := run([]string{"inspect", "constructs", path}, failingWriter{})
+	if err == nil {
+		t.Fatal("run succeeded with a failing writer")
+	}
+	if !strings.Contains(err.Error(), "output sink failed") {
+		t.Fatalf("run error = %v, want the writer's failure", err)
+	}
+}
+
 const sample = `package p
 
 func F(x int) int { return x + 1 }

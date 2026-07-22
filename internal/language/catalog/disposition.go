@@ -2,9 +2,10 @@ package catalog
 
 import "fmt"
 
-// Disposition is the closed support disposition of a construct Kind: whether
-// the catalog treats it as an active form to translate or a deprecated form a
-// later phase must reject. The zero value DispositionInvalid is never valid;
+// Disposition is the closed admission policy of a construct Kind. It is the
+// single authoritative owner of whether an inventoried occurrence of the kind
+// is admissible: consumers switch exhaustively on it and never hardcode a
+// per-kind rejection. The zero value DispositionInvalid is never valid;
 // numDispositions is the terminal sentinel.
 type Disposition uint8
 
@@ -15,6 +16,10 @@ const (
 	// DispositionDeprecated is a construct retained only for total toolchain
 	// reconciliation; encountering one in real input is a rejected form.
 	DispositionDeprecated
+	// DispositionRecovery is a parser error-recovery construct (Bad*). It
+	// exists only in trees produced by failed parses, which the loader already
+	// rejects; encountering one in an admitted tree is a rejected form.
+	DispositionRecovery
 
 	// numDispositions is the terminal sentinel. It must remain last.
 	numDispositions
@@ -23,6 +28,7 @@ const (
 var dispositionNames = [numDispositions]string{
 	DispositionActive:     "active",
 	DispositionDeprecated: "deprecated",
+	DispositionRecovery:   "recovery",
 }
 
 // Valid reports whether d names a disposition in the catalog.

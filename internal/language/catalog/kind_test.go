@@ -96,8 +96,9 @@ func TestCategoryClosed(t *testing.T) {
 	}
 }
 
-// TestDispositionClosed proves the disposition enum is closed and named, and
-// that ast.Package is the deprecated form.
+// TestDispositionClosed proves the disposition enum is closed and named, that
+// ast.Package is the deprecated form, and that the parser recovery forms carry
+// the recovery disposition.
 func TestDispositionClosed(t *testing.T) {
 	for d := DispositionInvalid + 1; d < numDispositions; d++ {
 		if !d.Valid() || dispositionNames[d] == "" {
@@ -112,5 +113,10 @@ func TestDispositionClosed(t *testing.T) {
 	}
 	if KindDirective.Disposition() != DispositionActive {
 		t.Errorf("KindDirective disposition = %s, want active", KindDirective.Disposition())
+	}
+	for _, recovery := range []Kind{KindBadExpr, KindBadStmt, KindBadDecl} {
+		if recovery.Disposition() != DispositionRecovery {
+			t.Errorf("%s disposition = %s, want recovery", recovery, recovery.Disposition())
+		}
 	}
 }

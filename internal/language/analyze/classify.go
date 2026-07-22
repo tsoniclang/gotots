@@ -11,18 +11,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/language/catalog"
 )
 
-// UnknownConstructError reports a concrete syntax node with no catalog Kind.
-// Classification fails closed: an unrecognized form is a typed error, never a
-// default or best-effort classification.
-type UnknownConstructError struct {
-	// GoType is the concrete go/ast node type that has no catalog identity.
-	GoType string
-}
-
-func (e *UnknownConstructError) Error() string {
-	return fmt.Sprintf("GOTOTS_UNKNOWN_CONSTRUCT: no catalog kind for go/ast node %s", e.GoType)
-}
-
 // Classify maps one concrete go/ast node to its catalog Kind. It is total over
 // every concrete type implementing ast.Node in the selected Go toolchain
 // (proven by TestClassifyIsToolchainBijection) and fails closed on any

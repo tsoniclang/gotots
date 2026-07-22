@@ -141,10 +141,12 @@ func TestNoCorpusOrIntegrationImports(t *testing.T) {
 	}
 }
 
-// layerRank ranks the packages that exist so far. An import edge must go from a
-// higher rank to a strictly lower one; equal-or-reverse edges are layering
-// violations (Rule 1). Unranked packages are skipped until they are placed.
+// layerRank is the total layer registry: every production package has exactly
+// one declared layer, and an import edge must go from a higher rank to a
+// strictly lower one (Rule 1). TestLayerRegistryIsTotal fails on any package
+// missing from — or stale in — this registry; nothing is skipped.
 var layerRank = map[string]int{
+	"internal/identity":         5,
 	"internal/language/catalog": 10,
 	"internal/source":           30,
 	"internal/language/analyze": 40,
@@ -153,12 +155,33 @@ var layerRank = map[string]int{
 	"internal/verify":           100,
 }
 
+// TestLayerRegistryIsTotal proves the registry and the module's production
+// packages join exactly: an unranked package fails (the wall cannot be
+// bypassed by omission), and a stale registry entry fails (the registry cannot
+// drift from the tree).
+func TestLayerRegistryIsTotal(t *testing.T) {
+	seen := map[string]bool{}
+	for _, p := range productPackages(t) {
+		seen[p.dir] = true
+		if _, ranked := layerRank[p.dir]; !ranked {
+			t.Errorf("Rule 1: production package %s has no declared layer; every package must be ranked", p.dir)
+		}
+	}
+	for dir := range layerRank {
+		if !seen[dir] {
+			t.Errorf("layer registry names %s, which does not exist; delete the stale entry", dir)
+		}
+	}
+}
+
 // TestNoReverseLayerImports (Rule 1) proves lower layers never import higher
-// ones. It covers every internal edge between two ranked packages.
+// ones, over every internal edge. An unranked importer or import target is
+// itself a failure — the check never skips a package.
 func TestNoReverseLayerImports(t *testing.T) {
 	for _, p := range productPackages(t) {
 		importerRank, ranked := layerRank[p.dir]
 		if !ranked {
+			t.Errorf("Rule 1: %s is not in the layer registry", p.dir)
 			continue
 		}
 		for _, imp := range p.imports {
@@ -168,6 +191,7 @@ func TestNoReverseLayerImports(t *testing.T) {
 			importedDir := strings.TrimPrefix(imp, modulePath+"/")
 			importedRank, ranked := layerRank[importedDir]
 			if !ranked {
+				t.Errorf("Rule 1: %s imports unranked package %s", p.dir, importedDir)
 				continue
 			}
 			if importerRank <= importedRank {
