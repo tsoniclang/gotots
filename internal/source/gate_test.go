@@ -87,6 +87,11 @@ func TestPackageRecordConstructorRejectsIncoherence(t *testing.T) {
 			types: tp, typesInfo: &types.Info{}, files: []*File{evidencedFile(DepthFullSemantic, ContractOnly{})}}},
 		{"type info without any full unit", &Package{id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource,
 			types: tp, typesInfo: &types.Info{}, files: []*File{evidencedFile(DepthDeclarationContract, ContractOnly{})}}},
+		{"ordinary package without implicit initialization unit", &Package{id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource,
+			types: tp, typesInfo: &types.Info{}, files: []*File{evidencedFile(DepthFullSemantic, FullSyntax{Syntax: syntax})}}},
+		{"implicit unit without selected depth", &Package{id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource,
+			types: tp, typesInfo: &types.Info{}, files: []*File{evidencedFile(DepthFullSemantic, FullSyntax{Syntax: syntax})},
+			implicitUnits: []ImplicitUnit{{id: mustImplicit(t, modPkg)}}}},
 	}
 	for _, c := range cases {
 		ws := &Workspace{}
@@ -101,7 +106,8 @@ func TestPackageRecordConstructorRejectsIncoherence(t *testing.T) {
 	valid := &Package{
 		id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace,
 		disposition: DispositionOrdinarySource, types: tp, typesInfo: &types.Info{},
-		files: []*File{evidencedFile(DepthFullSemantic, FullSyntax{Syntax: syntax})},
+		files:         []*File{evidencedFile(DepthFullSemantic, FullSyntax{Syntax: syntax})},
+		implicitUnits: []ImplicitUnit{{id: mustImplicit(t, modPkg), depth: DepthFullSemantic}},
 	}
 	if err := ws.admit(valid); err != nil {
 		t.Errorf("coherent evidenced record rejected: %v", err)
@@ -109,4 +115,13 @@ func TestPackageRecordConstructorRejectsIncoherence(t *testing.T) {
 	if len(ws.Packages()) != 1 {
 		t.Error("coherent evidenced record not admitted")
 	}
+}
+
+func mustImplicit(t *testing.T, pkg identity.PackageID) identity.ImplicitUnitID {
+	t.Helper()
+	id, err := identity.NewImplicitUnitID(pkg, identity.ImplicitOpPackageInit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return id
 }

@@ -1,12 +1,15 @@
 // Catalog-coverage audit: a versioned, fingerprinted gate artifact proving
 // the construct catalog is total over the non-full-semantic closure (standard
-// library and other contract-depth source) for one exact toolchain contract.
-// The audit STREAMS: each file is parsed, classified fail-closed, counted,
-// and dropped — it never enlarges a compilation's retained semantic model.
-// Ordinary compilation verifies and consumes the artifact; it does not rescan.
+// library and other contract-depth source) for one exact toolchain contract,
+// and carrying the provider unit manifest ordinary compilation consumes. The
+// audit STREAMS: each file's selected bytes are read, digest-verified,
+// parsed, classified fail-closed, counted, and dropped — it never enlarges a
+// compilation's retained semantic model. Ordinary compilation verifies and
+// consumes the artifact; it does not rescan provider interiors.
 package analyze
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -22,17 +25,25 @@ import (
 )
 
 // AuditArtifactVersion is the audit artifact schema version.
-const AuditArtifactVersion = 2
+const AuditArtifactVersion = 3
 
-// ManifestUnit is one provider-owned unit's manifest record.
+// ManifestUnit is one provider-owned unit's manifest record: identity
+// components, selected-span content address, display name, and typed cgo
+// evidence, captured from the production census.
 type ManifestUnit struct {
-	Unit string `json:"unit"` // canonical SourceUnitID string
-	Hash string `json:"hash"` // SourceSpanHash hex
+	Unit       string `json:"unit"` // canonical SourceUnitID string
+	Kind       uint8  `json:"kind"` // pinned identity.UnitKind value
+	Start      int    `json:"start"`
+	End        int    `json:"end"`
+	Name       string `json:"name,omitempty"` // display only
+	Hash       string `json:"hash"`           // SourceSpanHash hex
+	CDependent bool   `json:"cDependent,omitempty"`
 }
 
 // AuditFile is one audited file's content-addressed record: the identity is
 // bound to the selected-byte digest captured during resolution, with exact
-// per-file evidence and the provider unit manifest.
+// per-file evidence and the complete provider unit manifest (top-level and
+// interior units).
 type AuditFile struct {
 	File        string         `json:"file"`   // canonical FileID string
 	Digest      string         `json:"digest"` // sha256 of selected bytes
@@ -41,23 +52,46 @@ type AuditFile struct {
 	Units       []ManifestUnit `json:"units,omitempty"`
 }
 
-// AuditMeta binds the artifact to its complete production context.
+// AuditMeta binds the artifact to its complete production context: the
+// selected toolchain binary and its resolved build-selection environment, the
+// catalog, and the provider contract. BuildFlags and OverlayDigest record the
+// production request's own selection inputs; they are sealed provenance,
+// while cross-request consumption exactness rests on the per-file
+// selected-byte digests.
 type AuditMeta struct {
-	ToolchainVersion    string `json:"toolchainVersion"`
-	GOOS                string `json:"goos"`
-	GOARCH              string `json:"goarch"`
-	CatalogVersion      string `json:"catalogVersion"`
-	CatalogDigest       string `json:"catalogDigest"`
-	ContractID          string `json:"contractID"`
-	ContractFingerprint string `json:"contractFingerprint"`
-	BuildFlags          string `json:"buildFlags"`
-	OverlayDigest       string `json:"overlayDigest"`
+	ToolchainVersion      string `json:"toolchainVersion"`
+	ToolchainBinaryDigest string `json:"toolchainBinaryDigest"`
+	GOOS                  string `json:"goos"`
+	GOARCH                string `json:"goarch"`
+	Experiments           string `json:"experiments"`
+	GoFlags               string `json:"goflags"`
+	CgoEnabled            string `json:"cgoEnabled"`
+	CatalogVersion        string `json:"catalogVersion"`
+	CatalogDigest         string `json:"catalogDigest"`
+	ContractID            string `json:"contractID"`
+	ContractFingerprint   string `json:"contractFingerprint"`
+	BuildFlags            string `json:"buildFlags"`
+	OverlayDigest         string `json:"overlayDigest"`
 }
 
-// AuditArtifact is the content-addressed catalog-coverage artifact: exact
-// per-file evidence bound to selected-byte digests and the complete
-// production context, sealed by a canonical artifact digest. Consumers
-// exact-join everything; counts are never trusted without content binding.
+// contextEqual compares the consumption-binding context: toolchain identity,
+// the complete build-selection environment including build flags, catalog
+// structure, and provider contract. The artifact is produced per build
+// configuration (spec: toolchain audit runs per selected contract and build
+// configuration). Only OverlayDigest is production provenance: an overlay
+// that actually changes selected bytes is caught exactly by the per-file
+// digest joins, while an unrelated module-file overlay never invalidates the
+// toolchain artifact.
+func contextEqual(a, b AuditMeta) bool {
+	a.OverlayDigest, b.OverlayDigest = "", ""
+	return a == b
+}
+
+// AuditArtifact is the content-addressed catalog-coverage and unit-manifest
+// artifact: exact per-file evidence bound to selected-byte digests and the
+// complete production context, sealed by a canonical artifact digest.
+// Consumers exact-join everything; counts are never trusted without content
+// binding.
 type AuditArtifact struct {
 	SchemaVersion  int         `json:"schemaVersion"`
 	Meta           AuditMeta   `json:"meta"`
@@ -68,18 +102,19 @@ type AuditArtifact struct {
 }
 
 // canonicalDigest computes the artifact's canonical self-digest over the
-// complete content (meta, every record, aggregates).
+// complete content (meta, every record and unit, aggregates).
 func (a *AuditArtifact) canonicalDigest() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "v%d|%s|%s|%s|%s|%s|%s|%s|%s|%s|%d|%d",
-		a.SchemaVersion, a.Meta.ToolchainVersion, a.Meta.GOOS, a.Meta.GOARCH,
+	fmt.Fprintf(&b, "v%d|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%d|%d",
+		a.SchemaVersion, a.Meta.ToolchainVersion, a.Meta.ToolchainBinaryDigest,
+		a.Meta.GOOS, a.Meta.GOARCH, a.Meta.Experiments, a.Meta.GoFlags, a.Meta.CgoEnabled,
 		a.Meta.CatalogVersion, a.Meta.CatalogDigest, a.Meta.ContractID,
 		a.Meta.ContractFingerprint, a.Meta.BuildFlags, a.Meta.OverlayDigest,
 		a.Occurrences, a.Directives)
 	for _, file := range a.Files {
 		fmt.Fprintf(&b, "|%s#%s#%d#%d", file.File, file.Digest, file.Occurrences, file.Directives)
 		for _, unit := range file.Units {
-			fmt.Fprintf(&b, "~%s~%s", unit.Unit, unit.Hash)
+			fmt.Fprintf(&b, "~%s~%d~%d~%d~%s~%s~%t", unit.Unit, unit.Kind, unit.Start, unit.End, unit.Name, unit.Hash, unit.CDependent)
 		}
 	}
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(b.String())))
@@ -92,24 +127,26 @@ func (e *AuditError) Error() string { return "GOTOTS_CATALOG_AUDIT: " + e.Reason
 
 // AuditCatalog streams the catalog-coverage audit over every non-full file of
 // the finalized universe (declaration-contract and external-boundary source,
-// including cgo originals). Any unknown construct or unknown go directive
-// fails closed with its identity.
-func AuditCatalog(ws *source.Workspace, meta AuditMeta) (*AuditArtifact, error) {
-	meta.ToolchainVersion = ws.Toolchain().Version()
-	meta.GOOS = ws.Toolchain().GOOS()
-	meta.GOARCH = ws.Toolchain().GOARCH()
-	meta.CatalogVersion = catalog.SelectedGoVersion
-	meta.CatalogDigest = catalog.StructureDigest()
+// including cgo originals). The universe must come from the manifest-producing
+// acquisition policy, so every file's census — including provider interiors —
+// is complete and enters the manifest. Any unknown construct or unknown go
+// directive fails closed with its identity.
+func AuditCatalog(ws *source.Workspace, meta AuditMeta, overlay map[string][]byte, ordinary source.AcquisitionPolicy) (*AuditArtifact, error) {
+	meta = boundMeta(ws, meta)
 	artifact := &AuditArtifact{
 		SchemaVersion: AuditArtifactVersion,
 		Meta:          meta,
 	}
 	for _, pkg := range ws.Packages() {
+		mode, err := ordinary.ModeFor(pkg.ID())
+		if err != nil {
+			return nil, &AuditError{Reason: err.Error()}
+		}
 		for _, file := range pkg.Files() {
-			if !auditMember(file) {
+			if !auditMember(file, mode) {
 				continue
 			}
-			record, err := auditFile(file)
+			record, err := auditFile(file, overlay)
 			if err != nil {
 				return nil, err
 			}
@@ -119,28 +156,71 @@ func AuditCatalog(ws *source.Workspace, meta AuditMeta) (*AuditArtifact, error) 
 		}
 	}
 	sort.Slice(artifact.Files, func(i, j int) bool { return artifact.Files[i].File < artifact.Files[j].File })
-	artifact.ArtifactDigest = artifact.canonicalDigest()
+	artifact.Seal()
 	return artifact, nil
 }
 
+// Seal stamps the canonical self-digest. It is the single sealing operation;
+// an artifact whose content changes after sealing fails verification until
+// resealed, and resealing never bypasses the universe joins.
+func (a *AuditArtifact) Seal() { a.ArtifactDigest = a.canonicalDigest() }
+
+// boundMeta stamps the workspace-resolved toolchain and catalog facts into
+// the metadata.
+func boundMeta(ws *source.Workspace, meta AuditMeta) AuditMeta {
+	toolchain := ws.Toolchain()
+	meta.ToolchainVersion = toolchain.Version()
+	meta.ToolchainBinaryDigest = toolchain.BinaryDigest()
+	meta.GOOS = toolchain.GOOS()
+	meta.GOARCH = toolchain.GOARCH()
+	meta.Experiments = toolchain.Experiments()
+	meta.GoFlags = toolchain.GoFlags()
+	meta.CgoEnabled = toolchain.CgoEnabled()
+	meta.CatalogVersion = catalog.SelectedGoVersion
+	meta.CatalogDigest = catalog.StructureDigest()
+	return meta
+}
+
 // auditMember is the single membership rule shared by the audit producer and
-// the artifact verifier: every finalized file whose evidence is not full
-// syntax (declaration-contract, external-boundary, and mixed files' source
-// view) is audited for catalog coverage.
-func auditMember(file *source.File) bool {
+// the artifact verifier: every file of a provider-owned (manifest-mode)
+// package — its manifest must exist regardless of depth outcome — and every
+// finalized file whose evidence is not full syntax (declaration-contract,
+// external-boundary, and mixed files' source view) for catalog coverage.
+func auditMember(file *source.File, mode source.CensusMode) bool {
+	if mode == source.CensusManifest {
+		return true
+	}
 	_, full := file.Evidence().(source.FullSyntax)
 	return !full
 }
 
-// auditFile parses one file transiently, classifies every node and directive
-// fail-closed, counts, and drops the tree.
-func auditFile(file *source.File) (AuditFile, error) {
+// auditFile reads one file's exact selected bytes, verifies them against the
+// resolution-captured digest, parses and classifies every node and directive
+// fail-closed, counts, records the file's complete unit manifest, and drops
+// the tree.
+func auditFile(file *source.File, overlay map[string][]byte) (AuditFile, error) {
 	record := AuditFile{File: file.ID().String(), Digest: file.ByteDigest().String()}
 	for _, unit := range file.Units() {
-		record.Units = append(record.Units, ManifestUnit{Unit: unit.ID().String(), Hash: unit.Hash().String()})
+		record.Units = append(record.Units, ManifestUnit{
+			Unit:       unit.ID().String(),
+			Kind:       uint8(unit.Kind()),
+			Start:      unit.Span().Start.Offset,
+			End:        unit.Span().End.Offset,
+			Name:       unit.Name(),
+			Hash:       unit.Hash().String(),
+			CDependent: unit.CDependent(),
+		})
+	}
+	raw, err := source.SelectedFileBytes(file.Path(), overlay)
+	if err != nil {
+		return record, &AuditError{Reason: file.ID().String() + ": selected bytes unreadable: " + err.Error()}
+	}
+	if digest := fmt.Sprintf("%x", sha256.Sum256(raw)); digest != file.ByteDigest().String() {
+		return record, &AuditError{Reason: file.ID().String() + ": selected bytes drifted since resolution: " +
+			digest + " vs " + file.ByteDigest().String()}
 	}
 	fset := token.NewFileSet()
-	syntax, err := parser.ParseFile(fset, file.Path(), nil, parser.ParseComments|parser.SkipObjectResolution)
+	syntax, err := parser.ParseFile(fset, file.Path(), raw, parser.ParseComments|parser.SkipObjectResolution)
 	if err != nil {
 		return record, &AuditError{Reason: file.ID().String() + ": unparsable: " + err.Error()}
 	}
@@ -184,54 +264,73 @@ func WriteAuditArtifact(artifact *AuditArtifact, path string) error {
 	return os.WriteFile(path, append(encoded, '\n'), 0o644)
 }
 
-// VerifyAuditArtifact exact-joins a stored artifact against the current
-// universe: schema, complete production context (toolchain, GOOS/GOARCH,
-// catalog structure, provider contract, build flags, overlays), the sealed
-// artifact digest, per-file selected-byte digests (from resolution-captured
-// hashes — no rescan), aggregate/sum consistency, duplicate rejection, and
-// the exact membership set with both one-sided lists.
-func VerifyAuditArtifact(ws *source.Workspace, meta AuditMeta, path string) error {
+// DecodeAuditArtifact reads one stored artifact and verifies every
+// artifact-internal invariant: schema version, the sealed canonical digest,
+// duplicate-record rejection, and aggregate/sum consistency. Workspace joins
+// happen separately — nothing here consults the current universe.
+func DecodeAuditArtifact(path string) (*AuditArtifact, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return &AuditError{Reason: "artifact unreadable: " + err.Error()}
+		return nil, &AuditError{Reason: "artifact unreadable: " + err.Error()}
 	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
 	var artifact AuditArtifact
-	if err := json.Unmarshal(raw, &artifact); err != nil {
-		return &AuditError{Reason: "artifact undecodable: " + err.Error()}
+	if err := decoder.Decode(&artifact); err != nil {
+		return nil, &AuditError{Reason: "artifact undecodable: " + err.Error()}
 	}
 	if artifact.SchemaVersion != AuditArtifactVersion {
-		return &AuditError{Reason: "artifact schema version mismatch"}
+		return nil, &AuditError{Reason: "artifact schema version mismatch"}
 	}
 	if artifact.ArtifactDigest != artifact.canonicalDigest() {
-		return &AuditError{Reason: "artifact digest mismatch: content was altered after production"}
-	}
-	meta.ToolchainVersion = ws.Toolchain().Version()
-	meta.GOOS = ws.Toolchain().GOOS()
-	meta.GOARCH = ws.Toolchain().GOARCH()
-	meta.CatalogVersion = catalog.SelectedGoVersion
-	meta.CatalogDigest = catalog.StructureDigest()
-	if artifact.Meta != meta {
-		return &AuditError{Reason: fmt.Sprintf("artifact context %+v does not match request context %+v", artifact.Meta, meta)}
+		return nil, &AuditError{Reason: "artifact digest mismatch: content was altered after production"}
 	}
 	sumOccurrences, sumDirectives := 0, 0
-	audited := map[string]AuditFile{}
+	seen := map[string]bool{}
 	for _, file := range artifact.Files {
-		if _, dup := audited[file.File]; dup {
-			return &AuditError{Reason: "duplicate audit record " + file.File}
+		if seen[file.File] {
+			return nil, &AuditError{Reason: "duplicate audit record " + file.File}
 		}
-		audited[file.File] = file
+		seen[file.File] = true
 		sumOccurrences += file.Occurrences
 		sumDirectives += file.Directives
 	}
 	if sumOccurrences != artifact.Occurrences || sumDirectives != artifact.Directives {
-		return &AuditError{Reason: fmt.Sprintf("aggregate counts %d/%d diverge from per-file sums %d/%d",
+		return nil, &AuditError{Reason: fmt.Sprintf("aggregate counts %d/%d diverge from per-file sums %d/%d",
 			artifact.Occurrences, artifact.Directives, sumOccurrences, sumDirectives)}
+	}
+	return &artifact, nil
+}
+
+// VerifyAuditContext exact-joins a decoded artifact's production context
+// against the current workspace and request context.
+func VerifyAuditContext(ws *source.Workspace, meta AuditMeta, artifact *AuditArtifact) error {
+	meta = boundMeta(ws, meta)
+	if !contextEqual(artifact.Meta, meta) {
+		return &AuditError{Reason: fmt.Sprintf("artifact context %+v does not match request context %+v", artifact.Meta, meta)}
+	}
+	return nil
+}
+
+// VerifyAuditCoverage exact-joins a decoded artifact's file membership
+// against the current universe: the audited set and the universe's non-full
+// set must be identical, with per-file selected-byte digests equal. Both
+// one-sided lists and the drift list are reported. This is the gate check run
+// against the artifact's own production patterns; ordinary consumption of a
+// wider artifact joins through the census instead.
+func VerifyAuditCoverage(ws *source.Workspace, artifact *AuditArtifact, ordinary source.AcquisitionPolicy) error {
+	audited := map[string]AuditFile{}
+	for _, file := range artifact.Files {
+		audited[file.File] = file
 	}
 	var missing, extra, drifted []string
 	current := map[string]bool{}
 	for _, pkg := range ws.Packages() {
+		mode, err := ordinary.ModeFor(pkg.ID())
+		if err != nil {
+			return &AuditError{Reason: err.Error()}
+		}
 		for _, file := range pkg.Files() {
-			if !auditMember(file) {
+			if !auditMember(file, mode) {
 				continue
 			}
 			id := file.ID().String()
@@ -244,6 +343,7 @@ func VerifyAuditArtifact(ws *source.Workspace, meta AuditMeta, path string) erro
 			if record.Digest != file.ByteDigest().String() {
 				drifted = append(drifted, id)
 			}
+			drifted = append(drifted, joinUnitManifest(file, record)...)
 		}
 	}
 	for id := range audited {
@@ -259,6 +359,56 @@ func VerifyAuditArtifact(ws *source.Workspace, meta AuditMeta, path string) erro
 			" stale=" + join(extra) + " byte-drift=" + join(drifted)}
 	}
 	return nil
+}
+
+// VerifyAuditArtifact is the complete gate verification of a stored artifact
+// against one universe: internal invariants, production context, and exact
+// bidirectional membership.
+func VerifyAuditArtifact(ws *source.Workspace, meta AuditMeta, path string, ordinary source.AcquisitionPolicy) error {
+	artifact, err := DecodeAuditArtifact(path)
+	if err != nil {
+		return err
+	}
+	if err := VerifyAuditContext(ws, meta, artifact); err != nil {
+		return err
+	}
+	return VerifyAuditCoverage(ws, artifact, ordinary)
+}
+
+// joinUnitManifest exact-joins one file's manifest unit records against the
+// finalized census, both ways: identity, hash, and cgo evidence. Against a
+// recursively censused (gate) universe this proves the manifest total; a
+// consumption universe derives its provider interiors from the manifest, so
+// the join is exact there by construction.
+func joinUnitManifest(file *source.File, record AuditFile) []string {
+	var bad []string
+	recorded := map[string]ManifestUnit{}
+	for _, unit := range record.Units {
+		if _, dup := recorded[unit.Unit]; dup {
+			bad = append(bad, record.File+" duplicate manifest unit "+unit.Unit)
+			continue
+		}
+		recorded[unit.Unit] = unit
+	}
+	seen := map[string]bool{}
+	for _, unit := range file.Units() {
+		id := unit.ID().String()
+		seen[id] = true
+		manifest, exists := recorded[id]
+		if !exists {
+			bad = append(bad, record.File+" manifest omits unit "+id)
+			continue
+		}
+		if manifest.Hash != unit.Hash().String() || manifest.CDependent != unit.CDependent() {
+			bad = append(bad, record.File+" manifest unit "+id+" evidence diverges")
+		}
+	}
+	for id := range recorded {
+		if !seen[id] {
+			bad = append(bad, record.File+" manifest holds unit "+id+" the census does not")
+		}
+	}
+	return bad
 }
 
 func join(values []string) string {

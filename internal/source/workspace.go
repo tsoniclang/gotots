@@ -43,6 +43,11 @@ type Request struct {
 	Env []string
 	// BuildFlags are extra flags passed to the underlying go tool.
 	BuildFlags []string
+	// AuditArtifact is the path of the produced catalog-audit/unit-manifest
+	// artifact ordinary compilation consumes and verifies. It is required
+	// whenever the closure contains provider-owned (manifest-mode) files;
+	// there is no optional acceptance.
+	AuditArtifact string
 }
 
 // LoadError is the typed failure of resolving a compilation request.
@@ -151,18 +156,36 @@ func (d LanguageDisposition) String() string {
 	return fmt.Sprintf("source.LanguageDisposition(%d)", uint8(d))
 }
 
-// Toolchain is the resolved selected toolchain: the exact binary, its version
-// fingerprint, and its GOROOT (an acquisition root, never part of identity).
+// Toolchain is the resolved selected toolchain: the exact binary with its
+// content digest, its version fingerprint, its GOROOT (an acquisition root,
+// never part of identity), and the complete resolved build-selection
+// environment (GOOS/GOARCH/GOEXPERIMENT/GOFLAGS/CGO_ENABLED).
 type Toolchain struct {
-	binary  string
-	version string
-	goroot  string
-	goos    string
-	goarch  string
+	binary       string
+	binaryDigest string
+	version      string
+	goroot       string
+	goos         string
+	goarch       string
+	experiments  string
+	goflags      string
+	cgoEnabled   string
 }
 
 // Binary is the resolved absolute path of the selected go binary.
 func (t Toolchain) Binary() string { return t.binary }
+
+// BinaryDigest is the sha256 of the selected go binary's bytes.
+func (t Toolchain) BinaryDigest() string { return t.binaryDigest }
+
+// Experiments is the resolved GOEXPERIMENT selection.
+func (t Toolchain) Experiments() string { return t.experiments }
+
+// GoFlags is the resolved GOFLAGS selection.
+func (t Toolchain) GoFlags() string { return t.goflags }
+
+// CgoEnabled is the resolved CGO_ENABLED selection.
+func (t Toolchain) CgoEnabled() string { return t.cgoEnabled }
 
 // Version is the toolchain version fingerprint (go env GOVERSION).
 func (t Toolchain) Version() string { return t.version }
@@ -217,9 +240,23 @@ type Package struct {
 	embedPatterns   []string // declared //go:embed patterns
 	mappings        []CheckedUnitMapping
 	synthetics      []SyntheticUnit
+	implicitUnits   []ImplicitUnit
 	types           *types.Package
 	typesInfo       *types.Info // uniform-full: checker's Info; mixed: filtered; else nil
 }
+
+// ImplicitUnit is one finalized unspelled implicit executable unit: its typed
+// catalog identity plus its selected evidence depth.
+type ImplicitUnit struct {
+	id    identity.ImplicitUnitID
+	depth EvidenceDepth
+}
+
+// ID is the implicit unit's canonical identity.
+func (i ImplicitUnit) ID() identity.ImplicitUnitID { return i.id }
+
+// Depth is the scope-selected evidence depth.
+func (i ImplicitUnit) Depth() EvidenceDepth { return i.depth }
 
 // admit is the single gate into a workspace: it validates the record and
 // appends it. There is no other append site, so an unadmitted record is
@@ -353,6 +390,14 @@ func finishPackage(p *Package) (*Package, error) {
 		if !anyFull && p.typesInfo != nil {
 			return fail("retained type information without any full-semantic unit")
 		}
+		for _, implicit := range p.implicitUnits {
+			if !implicit.depth.Valid() {
+				return fail("implicit unit " + implicit.id.String() + " has no selected evidence depth")
+			}
+		}
+		if p.disposition == DispositionOrdinarySource && len(p.implicitUnits) == 0 {
+			return fail("ordinary package carries no implicit initialization unit")
+		}
 	}
 	return p, nil
 }
@@ -416,6 +461,12 @@ func (p *Package) CheckedUnitMappings() []CheckedUnitMapping {
 // origin-derived identities (immutable copy).
 func (p *Package) SyntheticUnits() []SyntheticUnit {
 	return append([]SyntheticUnit(nil), p.synthetics...)
+}
+
+// ImplicitUnits are the package's finalized implicit executable units with
+// selected depths (immutable copy).
+func (p *Package) ImplicitUnits() []ImplicitUnit {
+	return append([]ImplicitUnit(nil), p.implicitUnits...)
 }
 
 // Units enumerates the package's censused units with selected depths.

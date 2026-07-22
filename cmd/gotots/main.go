@@ -11,21 +11,27 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/compiler"
 	"github.com/tsoniclang/gotots/internal/language/analyze"
-	"github.com/tsoniclang/gotots/internal/scope"
 	"github.com/tsoniclang/gotots/internal/source"
 )
 
 const usage = `usage: gotots <command> [args]
 
 commands:
-  inspect constructs [-dir <dir>] [-audit <artifact>] [pattern ...]
+  inspect constructs -contract <id|artifact> [-dir <dir>] [-manifest <artifact>] [pattern ...]
       report canonical construct occurrences, evidence-depth partition,
       directives, and exact denominators for the selected workspace
-      (default pattern ./...); with -audit, exact-join the stored
-      catalog-audit artifact
-  audit catalog [-dir <dir>] -o <artifact> [pattern ...]
-      run the streaming catalog-coverage audit over the non-full closure
-      and write the versioned, fingerprinted gate artifact`
+      (default pattern ./...). The request selects its provider contract
+      explicitly; -manifest selects the produced audit/unit-manifest
+      artifact, which is required whenever the closure contains
+      provider-owned files
+  audit catalog -contract <id|artifact> -o <artifact> [-dir <dir>] [pattern ...]
+      run the manifest-producing streaming catalog-coverage audit and
+      write the versioned, fingerprinted gate artifact (run with the
+      toolchain patterns "std cmd" to produce the complete selected-
+      toolchain artifact)
+  audit verify -contract <id|artifact> -a <artifact> [-dir <dir>] [pattern ...]
+      exact-join a stored artifact bidirectionally against a freshly
+      resolved universe of the same patterns (the gate coverage check)`
 
 // UnsupportedCommandError reports a command line the binary does not implement.
 // It is the CLI-level typed error; its string is rendered only here.
@@ -60,88 +66,91 @@ func run(args []string, stdout io.Writer) error {
 	}
 }
 
+// parseCommon collects the flags every command shares. The provider contract
+// is an explicit request selection — there is no implicit default.
+type commonFlags struct {
+	request  source.Request
+	patterns []string
+}
+
+func parseCommon(command string, rest []string, extra map[string]*string) (commonFlags, error) {
+	out := commonFlags{request: source.Request{Dir: "."}}
+	for i := 0; i < len(rest); i++ {
+		if target, known := extra[rest[i]]; known {
+			if i+1 >= len(rest) {
+				return out, &UnsupportedCommandError{Command: command + " " + rest[i] + " (missing value)"}
+			}
+			i++
+			*target = rest[i]
+			continue
+		}
+		switch {
+		case rest[i] == "-dir":
+			if i+1 >= len(rest) {
+				return out, &UnsupportedCommandError{Command: command + " -dir (missing directory)"}
+			}
+			i++
+			out.request.Dir = rest[i]
+		case rest[i] == "-contract":
+			if i+1 >= len(rest) {
+				return out, &UnsupportedCommandError{Command: command + " -contract (missing selection)"}
+			}
+			i++
+			out.request.ProviderContract = rest[i]
+		case strings.HasPrefix(rest[i], "-"):
+			return out, &UnsupportedCommandError{Command: command + " " + rest[i]}
+		default:
+			out.patterns = append(out.patterns, rest[i])
+		}
+	}
+	out.request.Patterns = out.patterns
+	return out, nil
+}
+
 func runInspect(args []string, stdout io.Writer) error {
 	if len(args) == 0 || args[0] != "constructs" {
 		return &UnsupportedCommandError{Command: strings.TrimSpace("inspect " + strings.Join(args, " "))}
 	}
-	request := source.Request{Dir: ".", ProviderContract: scope.DefaultContractID}
-	auditPath := ""
-	rest := args[1:]
-	var patterns []string
-	for i := 0; i < len(rest); i++ {
-		switch {
-		case rest[i] == "-dir":
-			if i+1 >= len(rest) {
-				return &UnsupportedCommandError{Command: "inspect constructs -dir (missing directory)"}
-			}
-			i++
-			request.Dir = rest[i]
-		case rest[i] == "-audit":
-			if i+1 >= len(rest) {
-				return &UnsupportedCommandError{Command: "inspect constructs -audit (missing artifact)"}
-			}
-			i++
-			auditPath = rest[i]
-		case rest[i] == "-contract":
-			if i+1 >= len(rest) {
-				return &UnsupportedCommandError{Command: "inspect constructs -contract (missing identity)"}
-			}
-			i++
-			request.ProviderContract = rest[i]
-		case strings.HasPrefix(rest[i], "-"):
-			return &UnsupportedCommandError{Command: "inspect constructs " + rest[i]}
-		default:
-			patterns = append(patterns, rest[i])
-		}
-	}
-	request.Patterns = patterns
-	inspection, err := compiler.InspectConstructs(request)
+	manifestPath := ""
+	common, err := parseCommon("inspect constructs", args[1:], map[string]*string{"-manifest": &manifestPath})
 	if err != nil {
 		return err
 	}
-	auditState := "absent"
-	if auditPath != "" {
-		if err := compiler.VerifyAuditArtifact(inspection, request, auditPath); err != nil {
-			return err
-		}
-		auditState = "verified"
+	common.request.AuditArtifact = manifestPath
+	inspection, err := compiler.InspectConstructs(common.request)
+	if err != nil {
+		return err
 	}
-	return printInspection(stdout, inspection, auditState)
+	manifestState := "none"
+	if manifestPath != "" {
+		manifestState = "consumed"
+	}
+	return printInspection(stdout, inspection, manifestState)
 }
 
 func runAudit(args []string, stdout io.Writer) error {
-	if len(args) == 0 || args[0] != "catalog" {
-		return &UnsupportedCommandError{Command: strings.TrimSpace("audit " + strings.Join(args, " "))}
+	if len(args) == 0 {
+		return &UnsupportedCommandError{Command: "audit"}
 	}
-	request := source.Request{Dir: ".", ProviderContract: scope.DefaultContractID}
+	switch args[0] {
+	case "catalog":
+		return runAuditCatalog(args[1:], stdout)
+	case "verify":
+		return runAuditVerify(args[1:], stdout)
+	}
+	return &UnsupportedCommandError{Command: strings.TrimSpace("audit " + strings.Join(args, " "))}
+}
+
+func runAuditCatalog(rest []string, stdout io.Writer) error {
 	out := ""
-	rest := args[1:]
-	var patterns []string
-	for i := 0; i < len(rest); i++ {
-		switch {
-		case rest[i] == "-dir":
-			if i+1 >= len(rest) {
-				return &UnsupportedCommandError{Command: "audit catalog -dir (missing directory)"}
-			}
-			i++
-			request.Dir = rest[i]
-		case rest[i] == "-o":
-			if i+1 >= len(rest) {
-				return &UnsupportedCommandError{Command: "audit catalog -o (missing artifact path)"}
-			}
-			i++
-			out = rest[i]
-		case strings.HasPrefix(rest[i], "-"):
-			return &UnsupportedCommandError{Command: "audit catalog " + rest[i]}
-		default:
-			patterns = append(patterns, rest[i])
-		}
+	common, err := parseCommon("audit catalog", rest, map[string]*string{"-o": &out})
+	if err != nil {
+		return err
 	}
 	if out == "" {
 		return &UnsupportedCommandError{Command: "audit catalog (missing -o artifact path)"}
 	}
-	request.Patterns = patterns
-	artifact, err := compiler.AuditCatalog(request)
+	artifact, err := compiler.AuditCatalog(common.request)
 	if err != nil {
 		return err
 	}
@@ -153,16 +162,36 @@ func runAudit(args []string, stdout io.Writer) error {
 	return err
 }
 
+func runAuditVerify(rest []string, stdout io.Writer) error {
+	artifactPath := ""
+	common, err := parseCommon("audit verify", rest, map[string]*string{"-a": &artifactPath})
+	if err != nil {
+		return err
+	}
+	if artifactPath == "" {
+		return &UnsupportedCommandError{Command: "audit verify (missing -a artifact path)"}
+	}
+	// The coverage gate independently re-derives every provider interior
+	// (recursive policy) and joins the artifact bidirectionally, including
+	// per-file unit manifests.
+	if err := compiler.AuditVerify(common.request, artifactPath); err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(stdout, "audit verify: artifact %s exact-joins the independently derived universe\n", artifactPath)
+	return err
+}
+
 // printInspection renders the resolved universe, the canonical occurrence
 // records, and the exact denominators. Write errors propagate; a failing
 // writer fails the command.
-func printInspection(stdout io.Writer, inspection *compiler.Inspection, auditState string) error {
+func printInspection(stdout io.Writer, inspection *compiler.Inspection, manifestState string) error {
 	p := func(format string, args ...any) error {
 		_, err := fmt.Fprintf(stdout, format, args...)
 		return err
 	}
 	ws := inspection.Workspace()
-	if err := p("toolchain %s (%s)\n", ws.Toolchain().Version(), ws.Toolchain().Binary()); err != nil {
+	if err := p("toolchain %s (%s) binaryDigest=%s\n",
+		ws.Toolchain().Version(), ws.Toolchain().Binary(), ws.Toolchain().BinaryDigest()[:12]); err != nil {
 		return err
 	}
 	if err := p("contract %s fingerprint=%s\n",
@@ -213,14 +242,16 @@ func printInspection(stdout io.Writer, inspection *compiler.Inspection, auditSta
 		}
 	}
 	depthCounts := map[string]int{}
+	implicitCount := 0
 	for _, pkg := range ws.Packages() {
 		for _, unit := range pkg.Units() {
 			depthCounts[unit.Depth().String()]++
 		}
+		implicitCount += len(pkg.ImplicitUnits())
 	}
-	if err := p("depths: fullSemantic=%d declarationContract=%d externalBoundary=%d intrinsic=%d\n",
+	if err := p("depths: fullSemantic=%d declarationContract=%d externalBoundary=%d intrinsic=%d implicitUnits=%d\n",
 		depthCounts["full-semantic"], depthCounts["declaration-contract"],
-		depthCounts["external-boundary"], depthCounts["intrinsic"]); err != nil {
+		depthCounts["external-boundary"], depthCounts["intrinsic"], implicitCount); err != nil {
 		return err
 	}
 	d := inventory.Denominators()
@@ -229,6 +260,6 @@ func printInspection(stdout io.Writer, inspection *compiler.Inspection, auditSta
 		ownerCounts["toolchain"], ownerCounts["language-pseudo"]); err != nil {
 		return err
 	}
-	return p("denominators: sourcePackages=%d files=%d occurrences=%d directives=%d variantBearing=%d implicitOps=%d unknownConstructs=0 unknownDirectives=0 auditArtifact=%s\n",
-		d.Packages, d.Files, d.Occurrences, d.Directives, d.VariantBearing, d.ImplicitOps, auditState)
+	return p("denominators: sourcePackages=%d files=%d occurrences=%d directives=%d variantBearing=%d implicitOps=%d unknownConstructs=0 unknownDirectives=0 manifest=%s\n",
+		d.Packages, d.Files, d.Occurrences, d.Directives, d.VariantBearing, d.ImplicitOps, manifestState)
 }

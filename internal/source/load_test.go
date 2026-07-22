@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/scope"
 	"github.com/tsoniclang/gotots/internal/source"
 )
@@ -23,15 +24,20 @@ func mustContract() scope.ProviderContract {
 // finalizeLoad runs the full source pipeline: transient load, default-contract
 // scope selection, finalization.
 func finalizeLoad(req source.Request) (*source.Workspace, error) {
-	universe, err := source.LoadUniverse(req)
+	contract := mustContract()
+	policy, err := contract.AuditAcquisitionPolicy()
 	if err != nil {
 		return nil, err
 	}
-	selection, err := scope.Select(universe, mustContract())
+	universe, err := source.LoadUniverse(req, policy, source.UnitManifest{})
 	if err != nil {
 		return nil, err
 	}
-	return source.Finalize(universe, selection.Depths())
+	selection, err := scope.Select(universe, contract)
+	if err != nil {
+		return nil, err
+	}
+	return source.Finalize(universe, selection.Depths(), selection.ImplicitDepths())
 }
 
 // writeTree writes a file tree under dir.
@@ -474,5 +480,69 @@ func TestLoadWorkspaceOverlay(t *testing.T) {
 	}
 	if pkg.Provenance() != source.ProvenanceWorkspaceModule {
 		t.Errorf("overlay changed provenance: %s", pkg.Provenance())
+	}
+}
+
+// TestImplicitLedgerTotality proves the implicit-unit selection is total:
+// removing one implicit unit's selection, or fabricating an extra one, fails
+// finalization closed.
+func TestImplicitLedgerTotality(t *testing.T) {
+	dir := t.TempDir()
+	writeTree(t, dir, map[string]string{
+		"go.mod":  "module implicit.example/m\n\ngo 1.26\n",
+		"main.go": "package m\n\nvar V = 41\n\nfunc F() int { return V + 1 }\n",
+	})
+	contract := mustContract()
+	policy, err := contract.AuditAcquisitionPolicy()
+	if err != nil {
+		t.Fatal(err)
+	}
+	universe, err := source.LoadUniverse(source.Request{Dir: dir}, policy, source.UnitManifest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	selection, err := scope.Select(universe, contract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	complete, err := source.Finalize(universe, selection.Depths(), selection.ImplicitDepths())
+	if err != nil {
+		t.Fatalf("complete selection rejected: %v", err)
+	}
+	implicitTotal := 0
+	for _, pkg := range complete.Packages() {
+		implicitTotal += len(pkg.ImplicitUnits())
+	}
+	if implicitTotal == 0 {
+		t.Fatal("no implicit units finalized")
+	}
+	removed := selection.ImplicitDepths()
+	for id := range removed {
+		delete(removed, id)
+		break
+	}
+	if _, err := source.Finalize(universe, selection.Depths(), removed); err == nil {
+		t.Error("finalization accepted a selection missing one implicit unit")
+	}
+	extra := selection.ImplicitDepths()
+	ghostModule, err := identity.NewModuleID("ghost.example/g", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ghostOwner, err := identity.NewModuleOwner(ghostModule)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ghostPkg, err := identity.NewPackageID(ghostOwner, "ghost.example/g")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ghost, err := identity.NewImplicitUnitID(ghostPkg, identity.ImplicitOpPackageInit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	extra[ghost] = source.DepthFullSemantic
+	if _, err := source.Finalize(universe, selection.Depths(), extra); err == nil {
+		t.Error("finalization accepted a fabricated implicit unit")
 	}
 }

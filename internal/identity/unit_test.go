@@ -38,3 +38,36 @@ func TestUnitKindIDsArePinned(t *testing.T) {
 		t.Error("implicit-executable accepted a fabricated source span")
 	}
 }
+
+// TestImplicitUnitOpIDsArePinned pins the implicit-operation identities
+// permanently; renumbering is an artifact-compatibility break.
+func TestImplicitUnitOpIDsArePinned(t *testing.T) {
+	if uint8(ImplicitOpPackageInit) != 1 {
+		t.Errorf("ImplicitOpPackageInit = %d, want pinned 1", uint8(ImplicitOpPackageInit))
+	}
+	module, err := NewModuleID("pin.example/m", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner, err := NewModuleOwner(module)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pkg, err := NewPackageID(owner, "pin.example/m")
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := NewImplicitUnitID(pkg, ImplicitOpPackageInit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if id.String() != "mod=pin.example/m::pin.example/m#implicit/package-init" {
+		t.Errorf("canonical form = %s", id.String())
+	}
+	if _, err := NewImplicitUnitID(pkg, ImplicitUnitOp(99)); err == nil {
+		t.Error("invalid implicit op accepted")
+	}
+	if _, err := NewImplicitUnitID(PackageID{}, ImplicitOpPackageInit); err == nil {
+		t.Error("zero package accepted")
+	}
+}

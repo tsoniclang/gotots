@@ -49,11 +49,12 @@ type RetainedUnit struct {
 }
 
 // Finalize consumes the transient universe plus the scope phase's immutable
-// per-unit evidence-depth selection and produces the finalized Workspace:
-// structural per-file evidence, per-unit filtered type information, and
-// depth-aware validated admission. The selection must be total over the
-// census — every censused unit selected exactly once, no extras.
-func Finalize(u *Universe, depths map[identity.SourceUnitID]EvidenceDepth) (*Workspace, error) {
+// per-unit evidence-depth selection (explicit and implicit) and produces the
+// finalized Workspace: structural per-file evidence, per-unit filtered type
+// information, and depth-aware validated admission. The selection must be
+// total over the census — every censused unit selected exactly once, no
+// extras.
+func Finalize(u *Universe, depths map[identity.SourceUnitID]EvidenceDepth, implicitDepths map[identity.ImplicitUnitID]EvidenceDepth) (*Workspace, error) {
 	failScope := func(reason string) (*Workspace, error) {
 		return nil, &LoadError{Dir: u.request.Dir, Reason: "scope selection invalid: " + reason}
 	}
@@ -64,11 +65,26 @@ func Finalize(u *Universe, depths map[identity.SourceUnitID]EvidenceDepth) (*Wor
 		}
 		remaining[id] = true
 	}
+	remainingImplicit := make(map[identity.ImplicitUnitID]bool, len(implicitDepths))
+	for id, depth := range implicitDepths {
+		if !depth.Valid() {
+			return failScope(id.String() + " has invalid depth")
+		}
+		remainingImplicit[id] = true
+	}
 	ws := &Workspace{fset: u.fset, toolchain: u.toolchain}
 	for _, loaded := range u.packages {
 		record, err := finalizePackage(u, loaded, depths, remaining)
 		if err != nil {
 			return nil, err
+		}
+		for _, implicit := range loaded.implicitUnits {
+			depth, selected := implicitDepths[implicit]
+			if !selected {
+				return failScope("selection missing implicit unit " + implicit.String())
+			}
+			delete(remainingImplicit, implicit)
+			record.implicitUnits = append(record.implicitUnits, ImplicitUnit{id: implicit, depth: depth})
 		}
 		if err := ws.admit(record); err != nil {
 			return nil, err
@@ -76,6 +92,9 @@ func Finalize(u *Universe, depths map[identity.SourceUnitID]EvidenceDepth) (*Wor
 	}
 	for id := range remaining {
 		return failScope("selection names unknown unit " + id.String())
+	}
+	for id := range remainingImplicit {
+		return failScope("selection names unknown implicit unit " + id.String())
 	}
 	sort.Slice(ws.packages, func(i, j int) bool { return ws.packages[i].id.String() < ws.packages[j].id.String() })
 	sort.Slice(ws.roots, func(i, j int) bool { return ws.roots[i].id.String() < ws.roots[j].id.String() })

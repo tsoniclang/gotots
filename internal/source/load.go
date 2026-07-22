@@ -2,6 +2,8 @@ package source
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -32,15 +34,19 @@ const loadMode = packages.NeedName |
 	packages.NeedEmbedFiles |
 	packages.NeedEmbedPatterns
 
-// LoadWorkspace resolves one compilation request into the typed universe. It
-// fails closed on any package error, type error, identity collision, or
-// unclassifiable package; there is no partial universe.
 // LoadUniverse resolves one compilation request into the transient typed
 // universe (one coherent go/types graph, complete unit census, cgo origin
-// evidence). Evidence-depth selection and retention happen downstream in the
-// scope phase and Finalize; the loader never performs retention by mutating
-// records and never assigns depth.
-func LoadUniverse(req Request) (*Universe, error) {
+// evidence). It fails closed on any package error, type error, identity
+// collision, or unclassifiable package; there is no partial universe.
+//
+// The acquisition policy is contract-derived data resolved BEFORE this call;
+// the loader itself makes no policy decision. The manifest supplies verified
+// provider unit evidence for manifest-mode files; the zero manifest supplies
+// nothing, so a manifest-mode file fails closed without a produced artifact.
+// Evidence-depth selection and retention happen downstream in the scope phase
+// and Finalize; the loader never performs retention by mutating records and
+// never assigns depth.
+func LoadUniverse(req Request, policy AcquisitionPolicy, manifest UnitManifest) (*Universe, error) {
 	patterns := req.Patterns
 	if len(patterns) == 0 {
 		patterns = []string{"./..."}
@@ -84,10 +90,10 @@ func LoadUniverse(req Request) (*Universe, error) {
 		return nil, &LoadError{Dir: req.Dir, Reason: "no Go source packages matched " + strings.Join(patterns, " ")}
 	}
 	classifier := &classifier{
-		req: req, toolchain: toolchain, stdSet: stdSet, cmdSet: cmdSet,
+		req: req, policy: policy, toolchain: toolchain, stdSet: stdSet, cmdSet: cmdSet,
 		moduleDirs: map[identity.ModuleID]string{},
 	}
-	universe := &Universe{fset: fset, toolchain: toolchain, request: req}
+	universe := &Universe{fset: fset, toolchain: toolchain, request: req, manifest: manifest}
 	seen := map[identity.PackageID]bool{}
 	var walkErr error
 	packages.Visit(loaded, nil, func(pkg *packages.Package) {
@@ -160,19 +166,28 @@ func resolveToolchain(req Request) (Toolchain, []string, func(), error) {
 	}
 	env := append(os.Environ(), req.Env...)
 	env = append(env, "PATH="+shimDir+string(os.PathListSeparator)+os.Getenv("PATH"))
-	out, err := runGo(absolute, env, req.Dir, "env", "GOROOT", "GOVERSION", "GOOS", "GOARCH")
+	out, err := runGo(absolute, env, req.Dir, "env",
+		"GOROOT", "GOVERSION", "GOOS", "GOARCH", "GOEXPERIMENT", "GOFLAGS", "CGO_ENABLED")
 	if err != nil {
 		cleanup()
 		return Toolchain{}, nil, noop, &LoadError{Dir: req.Dir, Reason: "toolchain fingerprint failed: " + err.Error()}
 	}
-	lines := strings.Split(strings.TrimSpace(out), "\n")
-	if len(lines) != 4 {
+	lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
+	if len(lines) != 7 {
 		cleanup()
 		return Toolchain{}, nil, noop, &LoadError{Dir: req.Dir, Reason: "toolchain fingerprint output malformed"}
 	}
+	binaryBytes, err := os.ReadFile(absolute)
+	if err != nil {
+		cleanup()
+		return Toolchain{}, nil, noop, &LoadError{Dir: req.Dir, Reason: "toolchain binary unreadable: " + err.Error()}
+	}
 	return Toolchain{
-		binary: absolute, goroot: strings.TrimSpace(lines[0]), version: strings.TrimSpace(lines[1]),
+		binary: absolute, binaryDigest: fmt.Sprintf("%x", sha256.Sum256(binaryBytes)),
+		goroot: strings.TrimSpace(lines[0]), version: strings.TrimSpace(lines[1]),
 		goos: strings.TrimSpace(lines[2]), goarch: strings.TrimSpace(lines[3]),
+		experiments: strings.TrimSpace(lines[4]), goflags: strings.TrimSpace(lines[5]),
+		cgoEnabled: strings.TrimSpace(lines[6]),
 	}, env, cleanup, nil
 }
 
@@ -210,6 +225,7 @@ func runGo(binary string, env []string, dir string, args ...string) (string, err
 // spelling, path prefixes, and Module==nil are never classification rules.
 type classifier struct {
 	req        Request
+	policy     AcquisitionPolicy
 	toolchain  Toolchain
 	stdSet     map[string]bool
 	cmdSet     map[string]bool
@@ -342,7 +358,11 @@ func (c *classifier) attachInputs(out *LoadedPackage, pkg *packages.Package, own
 			return err
 		}
 		file := &LoadedFile{path: goFile, id: fileID}
-		file.recursiveCensus = owner.Class() == identity.OwnerModule
+		mode, err := c.policy.ModeFor(out.id)
+		if err != nil {
+			return err
+		}
+		file.censusMode = mode
 		if _, isOverlaid := c.req.Overlay[goFile]; isOverlaid {
 			file.overlaid = true
 		}

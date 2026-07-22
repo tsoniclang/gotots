@@ -214,15 +214,20 @@ End:
 
 // loadFinalized runs the full source pipeline under the default contract.
 func loadFinalized(req source.Request) (*source.Workspace, error) {
-	universe, err := source.LoadUniverse(req)
+	contract := mustContract()
+	policy, err := contract.AuditAcquisitionPolicy()
 	if err != nil {
 		return nil, err
 	}
-	selection, err := scope.Select(universe, mustContract())
+	universe, err := source.LoadUniverse(req, policy, source.UnitManifest{})
 	if err != nil {
 		return nil, err
 	}
-	return source.Finalize(universe, selection.Depths())
+	selection, err := scope.Select(universe, contract)
+	if err != nil {
+		return nil, err
+	}
+	return source.Finalize(universe, selection.Depths(), selection.ImplicitDepths())
 }
 
 var (

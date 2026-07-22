@@ -39,18 +39,37 @@ func (i *Inspection) Inventory() *analyze.WorkspaceInventory { return i.inventor
 // InspectConstructs resolves a compilation request into a verified
 // whole-workspace construct inventory:
 //
-//	request -> LoadUniverse -> scope.Select(contract) -> Finalize
-//	        -> [verify universe] -> inventory (full-semantic scope)
+//	request -> ResolveContract -> [decode audit/manifest artifact]
+//	        -> LoadUniverse(policy, manifest) -> scope.Select(contract)
+//	        -> Finalize -> [verify universe] -> [verify unit census]
+//	        -> [verify audit context] -> inventory (full-semantic scope)
 //	        -> [verify inventory] -> report
 //
-// A failed stage verifier blocks every downstream stage; there is no partial
-// or unverified artifact.
+// The contract resolves before any policy-dependent census or acquisition
+// decision. A failed stage verifier blocks every downstream stage; there is
+// no partial or unverified artifact.
 func InspectConstructs(req source.Request) (*Inspection, error) {
-	universe, err := source.LoadUniverse(req)
+	contract, err := scope.ResolveContract(req.ProviderContract, req.ProviderContractDigest)
 	if err != nil {
 		return nil, err
 	}
-	contract, err := scope.ResolveContract(req.ProviderContract, req.ProviderContractDigest)
+	policy, err := contract.AcquisitionPolicy()
+	if err != nil {
+		return nil, err
+	}
+	var artifact *analyze.AuditArtifact
+	manifest := source.UnitManifest{}
+	if req.AuditArtifact != "" {
+		artifact, err = analyze.DecodeAuditArtifact(req.AuditArtifact)
+		if err != nil {
+			return nil, err
+		}
+		manifest, err = manifestFromArtifact(artifact)
+		if err != nil {
+			return nil, err
+		}
+	}
+	universe, err := source.LoadUniverse(req, policy, manifest)
 	if err != nil {
 		return nil, err
 	}
@@ -58,15 +77,20 @@ func InspectConstructs(req source.Request) (*Inspection, error) {
 	if err != nil {
 		return nil, err
 	}
-	ws, err := source.Finalize(universe, selection.Depths())
+	ws, err := source.Finalize(universe, selection.Depths(), selection.ImplicitDepths())
 	if err != nil {
 		return nil, err
 	}
 	if err := stagecheck.VerifySourceUniverse(ws, req); err != nil {
 		return nil, err
 	}
-	if err := stagecheck.VerifyUnitCensus(ws, req, contract); err != nil {
+	if err := stagecheck.VerifyUnitCensus(ws, req, contract, policy); err != nil {
 		return nil, err
+	}
+	if artifact != nil {
+		if err := analyze.VerifyAuditContext(ws, auditMeta(req, contract), artifact); err != nil {
+			return nil, err
+		}
 	}
 	inventory, err := analyze.BuildWorkspaceInventory(ws)
 	if err != nil {
@@ -78,15 +102,42 @@ func InspectConstructs(req source.Request) (*Inspection, error) {
 	return &Inspection{workspace: ws, selection: selection, inventory: inventory}, nil
 }
 
-// AuditCatalog resolves the request and produces the versioned catalog-audit
-// artifact over the non-full closure (a toolchain-contract gate run, not part
-// of ordinary compilation).
+// manifestFromArtifact converts a decoded audit artifact's per-file records
+// into the loader's unit-manifest input.
+func manifestFromArtifact(artifact *analyze.AuditArtifact) (source.UnitManifest, error) {
+	files := make(map[string]source.ManifestFileRecord, len(artifact.Files))
+	for _, file := range artifact.Files {
+		record := source.ManifestFileRecord{Digest: file.Digest}
+		for _, unit := range file.Units {
+			record.Units = append(record.Units, source.ManifestUnitRecord{
+				Unit: unit.Unit, Kind: unit.Kind, Start: unit.Start, End: unit.End,
+				Name: unit.Name, Hash: unit.Hash, CDependent: unit.CDependent,
+			})
+		}
+		files[file.File] = record
+	}
+	return source.NewUnitManifest(files)
+}
+
+// AuditCatalog resolves the request under the manifest-producing acquisition
+// policy (every file censused recursively) and produces the versioned
+// catalog-audit and unit-manifest artifact over the non-full closure. This is
+// the toolchain-contract gate run — the producer of the artifact ordinary
+// compilation consumes.
 func AuditCatalog(req source.Request) (*analyze.AuditArtifact, error) {
-	universe, err := source.LoadUniverse(req)
+	contract, err := scope.ResolveContract(req.ProviderContract, req.ProviderContractDigest)
 	if err != nil {
 		return nil, err
 	}
-	contract, err := scope.ResolveContract(req.ProviderContract, req.ProviderContractDigest)
+	auditPolicy, err := contract.AuditAcquisitionPolicy()
+	if err != nil {
+		return nil, err
+	}
+	ordinaryPolicy, err := contract.AcquisitionPolicy()
+	if err != nil {
+		return nil, err
+	}
+	universe, err := source.LoadUniverse(req, auditPolicy, source.UnitManifest{})
 	if err != nil {
 		return nil, err
 	}
@@ -94,14 +145,17 @@ func AuditCatalog(req source.Request) (*analyze.AuditArtifact, error) {
 	if err != nil {
 		return nil, err
 	}
-	ws, err := source.Finalize(universe, selection.Depths())
+	ws, err := source.Finalize(universe, selection.Depths(), selection.ImplicitDepths())
 	if err != nil {
 		return nil, err
 	}
 	if err := stagecheck.VerifySourceUniverse(ws, req); err != nil {
 		return nil, err
 	}
-	return analyze.AuditCatalog(ws, auditMeta(req, contract))
+	if err := stagecheck.VerifyUnitCensus(ws, req, contract, auditPolicy); err != nil {
+		return nil, err
+	}
+	return analyze.AuditCatalog(ws, auditMeta(req, contract), req.Overlay, ordinaryPolicy)
 }
 
 // auditMeta binds an audit artifact to the request's production context.
@@ -131,12 +185,50 @@ func overlayDigest(overlay map[string][]byte) string {
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
-// VerifyAuditArtifact exact-joins a stored audit artifact against one
-// inspection's universe and request context.
+// VerifyAuditArtifact is the verification of a stored artifact against one
+// inspection's universe and request context: internal invariants, production
+// context, and exact membership with per-file digest and unit joins.
 func VerifyAuditArtifact(inspection *Inspection, req source.Request, path string) error {
 	contract, err := scope.ResolveContract(req.ProviderContract, req.ProviderContractDigest)
 	if err != nil {
 		return err
 	}
-	return analyze.VerifyAuditArtifact(inspection.workspace, auditMeta(req, contract), path)
+	ordinary, err := contract.AcquisitionPolicy()
+	if err != nil {
+		return err
+	}
+	return analyze.VerifyAuditArtifact(inspection.workspace, auditMeta(req, contract), path, ordinary)
+}
+
+// AuditVerify is the gate coverage check: it resolves the request's universe
+// afresh under the manifest-producing (recursive) policy — so every provider
+// interior is independently derived — and exact-joins the stored artifact
+// bidirectionally, including per-file unit manifests. A manifest that omits,
+// fabricates, or mutates one unit fails here even when correctly sealed.
+func AuditVerify(req source.Request, path string) error {
+	contract, err := scope.ResolveContract(req.ProviderContract, req.ProviderContractDigest)
+	if err != nil {
+		return err
+	}
+	auditPolicy, err := contract.AuditAcquisitionPolicy()
+	if err != nil {
+		return err
+	}
+	ordinaryPolicy, err := contract.AcquisitionPolicy()
+	if err != nil {
+		return err
+	}
+	universe, err := source.LoadUniverse(req, auditPolicy, source.UnitManifest{})
+	if err != nil {
+		return err
+	}
+	selection, err := scope.Select(universe, contract)
+	if err != nil {
+		return err
+	}
+	ws, err := source.Finalize(universe, selection.Depths(), selection.ImplicitDepths())
+	if err != nil {
+		return err
+	}
+	return analyze.VerifyAuditArtifact(ws, auditMeta(req, contract), path, ordinaryPolicy)
 }

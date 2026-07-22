@@ -17,7 +17,7 @@ import (
 // regression: the pre-partition value was 598,836).
 func TestRetainedScopeExactJoin(t *testing.T) {
 	dir := filepath.Join(repoRoot(t), "testdata", "projects", "webshop")
-	inspection, err := InspectConstructs(source.Request{Dir: dir, ProviderContract: scope.DefaultContractID})
+	inspection, err := InspectConstructs(withManifest(t, source.Request{Dir: dir, ProviderContract: scope.DefaultContractID}))
 	if err != nil {
 		t.Fatalf("InspectConstructs: %v", err)
 	}

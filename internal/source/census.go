@@ -27,6 +27,15 @@ func censusUniverse(u *Universe) error {
 		if err := joinCheckedDecls(u, pkg); err != nil {
 			return err
 		}
+		if pkg.disposition == DispositionOrdinarySource {
+			// Every ordinary package carries its implicit initialization unit
+			// in the pre-scope ledger with a typed catalog identity.
+			implicit, err := identity.NewImplicitUnitID(pkg.id, identity.ImplicitOpPackageInit)
+			if err != nil {
+				return err
+			}
+			pkg.implicitUnits = append(pkg.implicitUnits, implicit)
+		}
 	}
 	return nil
 }
@@ -68,11 +77,12 @@ func censusFile(u *Universe, pkg *LoadedPackage, file *LoadedFile) error {
 			importsC = true
 		}
 	}
-	// Provider-owned non-full source uses a bounded top-level census (its
-	// interior units come from the provider's content-addressed manifest);
-	// source-selected module files are censused recursively so the pre-scope
-	// ledger is total, including every nested function literal.
-	recursive := file.recursiveCensus
+	// The census mode is contract-derived acquisition data resolved before
+	// the load: recursive-mode files census interiors locally; manifest-mode
+	// files use a bounded top-level census and join their interior units from
+	// the request's verified content-addressed manifest below. Either way the
+	// pre-scope ledger is total, including every nested function literal.
+	recursive := file.censusMode == CensusRecursive
 	for _, decl := range syntax.Decls {
 		switch decl := decl.(type) {
 		case *ast.FuncDecl:
@@ -117,6 +127,19 @@ func censusFile(u *Universe, pkg *LoadedPackage, file *LoadedFile) error {
 				}
 			}
 		}
+	}
+	if file.censusMode == CensusManifest {
+		record, supplied := u.manifest.fileRecord(file.id)
+		if !supplied {
+			return &LoadError{Dir: u.request.Dir, Reason: file.id.String() +
+				": provider-owned file requires a unit-manifest record and the request supplies none" +
+				" (produce the toolchain audit artifact and select it on the request)"}
+		}
+		interiors, err := joinManifestUnits(u, file, record, raw)
+		if err != nil {
+			return err
+		}
+		file.units = append(file.units, interiors...)
 	}
 	sort.Slice(file.units, func(i, j int) bool {
 		return file.units[i].span.Start.Offset < file.units[j].span.Start.Offset
@@ -380,6 +403,14 @@ func declDisplayName(node ast.Node) string {
 		}
 	}
 	return "decl"
+}
+
+// SelectedFileBytes reads a file's selected bytes, honoring request overlays.
+// It is the single owner of selected-byte access; producers and verifiers that
+// must parse exactly what resolution selected read through it, never the disk
+// path directly.
+func SelectedFileBytes(path string, overlay map[string][]byte) ([]byte, error) {
+	return fileBytes(path, overlay)
 }
 
 // fileBytes reads a file's selected bytes, honoring overlays.

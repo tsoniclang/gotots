@@ -44,8 +44,17 @@ func TestIsolatedCostGate(t *testing.T) {
 	}
 	pattern := regexp.MustCompile(`wall=([0-9.]+) rss=([0-9]+)`)
 	for name, b := range budgets {
+		// Produce the manifest artifact once per corpus (the gate run), then
+		// measure the ordinary consuming compilation in isolation.
+		manifest := filepath.Join(t.TempDir(), name+"-manifest.json")
+		produce := exec.Command(binary, "audit", "catalog", "-contract", "default@v1", "-dir", b.dir, "-o", manifest)
+		produce.Env = os.Environ()
+		if out, err := produce.CombinedOutput(); err != nil {
+			t.Fatalf("%s manifest production: %v\n%s", name, err, out)
+		}
 		for sample := 1; sample <= 3; sample++ {
-			cmd := exec.Command(timeBinary, "-f", "wall=%e rss=%M", binary, "inspect", "constructs", "-dir", b.dir)
+			cmd := exec.Command(timeBinary, "-f", "wall=%e rss=%M", binary,
+				"inspect", "constructs", "-contract", "default@v1", "-manifest", manifest, "-dir", b.dir)
 			cmd.Env = os.Environ()
 			out, err := cmd.CombinedOutput()
 			if err != nil {

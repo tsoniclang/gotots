@@ -28,7 +28,7 @@ func writeSampleModule(t *testing.T) string {
 func TestRunInspectConstructs(t *testing.T) {
 	dir := writeSampleModule(t)
 	var out bytes.Buffer
-	if err := run([]string{"inspect", "constructs", "-dir", dir}, &out); err != nil {
+	if err := run([]string{"inspect", "constructs", "-contract", "default@v1", "-dir", dir}, &out); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 	rendered := out.String()
@@ -77,6 +77,23 @@ func TestRunFailsClosed(t *testing.T) {
 	}
 }
 
+// TestRunRequiresExplicitContract proves the CLI never installs a default
+// provider contract: an inspect or audit invocation without -contract fails
+// with the typed selection error.
+func TestRunRequiresExplicitContract(t *testing.T) {
+	dir := writeSampleModule(t)
+	for _, args := range [][]string{
+		{"inspect", "constructs", "-dir", dir},
+		{"audit", "catalog", "-dir", dir, "-o", filepath.Join(dir, "a.json")},
+	} {
+		var out bytes.Buffer
+		err := run(args, &out)
+		if err == nil || !strings.Contains(err.Error(), "selects no provider contract") {
+			t.Errorf("run(%q) = %v, want typed no-contract selection failure", args, err)
+		}
+	}
+}
+
 // failingWriter fails every write, standing in for a broken output sink.
 type failingWriter struct{}
 
@@ -88,7 +105,7 @@ func (failingWriter) Write([]byte) (int, error) {
 // writer surfaces its error from run instead of being discarded.
 func TestRunPropagatesWriterFailure(t *testing.T) {
 	dir := writeSampleModule(t)
-	err := run([]string{"inspect", "constructs", "-dir", dir}, failingWriter{})
+	err := run([]string{"inspect", "constructs", "-contract", "default@v1", "-dir", dir}, failingWriter{})
 	if err == nil {
 		t.Fatal("run succeeded with a failing writer")
 	}

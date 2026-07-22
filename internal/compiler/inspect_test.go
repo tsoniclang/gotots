@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/tsoniclang/gotots/internal/language/analyze"
 	"github.com/tsoniclang/gotots/internal/scope"
 	"github.com/tsoniclang/gotots/internal/source"
 )
@@ -28,7 +29,7 @@ func TestInspectUnrelatedProjects(t *testing.T) {
 	root := repoRoot(t)
 	for _, project := range []string{"webshop", "textindex"} {
 		dir := filepath.Join(root, "testdata", "projects", project)
-		inspection, err := InspectConstructs(source.Request{Dir: dir, ProviderContract: scope.DefaultContractID})
+		inspection, err := InspectConstructs(withManifest(t, source.Request{Dir: dir, ProviderContract: scope.DefaultContractID}))
 		if err != nil {
 			t.Fatalf("%s: %v", project, err)
 		}
@@ -59,11 +60,11 @@ func TestInspectUnrelatedProjects(t *testing.T) {
 // paths.
 func TestInspectMultiModuleWorkspace(t *testing.T) {
 	dir := filepath.Join(repoRoot(t), "testdata", "workspaces", "dual")
-	inspection, err := InspectConstructs(source.Request{
+	inspection, err := InspectConstructs(withManifest(t, source.Request{
 		Dir:              dir,
 		ProviderContract: scope.DefaultContractID,
 		Patterns:         []string{"dual.example/a/...", "dual.example/b/..."},
-	})
+	}))
 	if err != nil {
 		t.Fatalf("InspectConstructs: %v", err)
 	}
@@ -81,7 +82,7 @@ func TestInspectMultiModuleWorkspace(t *testing.T) {
 // TestInspectSelfModule proves the pipeline runs over a real multi-package
 // module: this repository itself.
 func TestInspectSelfModule(t *testing.T) {
-	inspection, err := InspectConstructs(source.Request{Dir: repoRoot(t), ProviderContract: scope.DefaultContractID})
+	inspection, err := InspectConstructs(withManifest(t, source.Request{Dir: repoRoot(t), ProviderContract: scope.DefaultContractID}))
 	if err != nil {
 		t.Fatalf("self-inspection: %v", err)
 	}
@@ -114,7 +115,7 @@ func TestImportCoherencePositiveProof(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		inspection, err := InspectConstructs(source.Request{Dir: dir, ProviderContract: scope.DefaultContractID, Patterns: []string{"coherent.example/app"}})
+		inspection, err := InspectConstructs(withManifest(t, source.Request{Dir: dir, ProviderContract: scope.DefaultContractID, Patterns: []string{"coherent.example/app"}}))
 		if err != nil {
 			t.Fatalf("InspectConstructs: %v", err)
 		}
@@ -215,12 +216,22 @@ func TestCgoThroughPublicPipeline(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	inspection, err := InspectConstructs(source.Request{
+	cgoReq := source.Request{
 		Dir: dir, ProviderContract: scope.DefaultContractID,
 		Env: []string{"CGO_ENABLED=1"},
-	})
+	}
+	artifact, err := AuditCatalog(cgoReq)
 	if err != nil {
 		t.Skipf("cgo unavailable: %v", err)
+	}
+	manifestPath := filepath.Join(t.TempDir(), "manifest.json")
+	if err := analyze.WriteAuditArtifact(artifact, manifestPath); err != nil {
+		t.Fatal(err)
+	}
+	cgoReq.AuditArtifact = manifestPath
+	inspection, err := InspectConstructs(cgoReq)
+	if err != nil {
+		t.Fatalf("cgo consumption pipeline: %v", err)
 	}
 	var mainPkg *source.Package
 	for _, pkg := range inspection.Workspace().Packages() {

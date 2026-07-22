@@ -32,6 +32,9 @@ type LoadedPackage struct {
 	checkedDecls []checkedDecl
 	synthetics   []SyntheticUnit
 	mappings     []CheckedUnitMapping
+	// implicitUnits are the package's unspelled implicit executable units,
+	// censused with typed catalog identities before scope selection.
+	implicitUnits []identity.ImplicitUnitID
 }
 
 // ID is the package's canonical identity.
@@ -55,6 +58,11 @@ func (p *LoadedPackage) RequestedRoot() bool { return p.requestedRoot }
 // Files are the transient per-file records.
 func (p *LoadedPackage) Files() []*LoadedFile { return append([]*LoadedFile(nil), p.files...) }
 
+// ImplicitUnits are the package's censused implicit executable units.
+func (p *LoadedPackage) ImplicitUnits() []identity.ImplicitUnitID {
+	return append([]identity.ImplicitUnitID(nil), p.implicitUnits...)
+}
+
 // Types is the package's node in the one coherent type graph.
 func (p *LoadedPackage) Types() *types.Package { return p.types }
 
@@ -67,8 +75,8 @@ type LoadedFile struct {
 	syntax           *ast.File // nil only for cgo originals and intrinsics
 	effectiveVersion string
 	overlaid         bool
-	cgoOriginal      bool // checked view lives in transformed files
-	recursiveCensus  bool // source-selected files census nested literals
+	cgoOriginal      bool       // checked view lives in transformed files
+	censusMode       CensusMode // contract-derived unit acquisition, resolved before load
 	byteDigest       SourceSpanHash
 	units            []SourceUnit
 }
@@ -103,6 +111,7 @@ type Universe struct {
 	packages  []*LoadedPackage
 	roots     []*LoadedPackage
 	request   Request
+	manifest  UnitManifest // request-supplied provider unit manifest
 }
 
 // Fset carries position information.
