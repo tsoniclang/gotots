@@ -392,9 +392,9 @@ func (p *Package) RetainsFullSemantic() bool {
 func (p *Package) Imports() []string { return append([]string(nil), p.imports...) }
 
 // Files are the package's identity-bearing source Go files in deterministic
-// order. Every source-bearing package's files carry checked syntax; a file
-// without syntax belongs to a cgo checked-view difference.
-func (p *Package) Files() []*File { return p.files }
+// order (immutable copy of the collection; File records are themselves
+// accessor-only).
+func (p *Package) Files() []*File { return append([]*File(nil), p.files...) }
 
 // OtherFiles are the package's non-Go inputs (immutable copy).
 func (p *Package) OtherFiles() []string { return append([]string(nil), p.otherFiles...) }

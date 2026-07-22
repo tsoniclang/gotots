@@ -60,10 +60,10 @@ func (h SourceSpanHash) String() string { return fmt.Sprintf("%x", h[:]) }
 // SourceUnit is one censused implementation unit of a source file: canonical
 // identity, display name, physical span, selected-input hash, per-unit cgo
 // evidence, and — after scope selection — its evidence depth. The census is
-// total over the closed identity.UnitKind vocabulary: function/method bodies,
-// package-level initializers (one per ValueSpec), and bodyless declarations
-// with implementation obligations. Function-literal and implicit units are
-// added by construct inventory inside full-semantic bodies.
+// total over the closed identity.UnitKind vocabulary — function/method
+// bodies, recursively censused function literals, package-level initializers
+// (one per ValueSpec), and bodyless declarations with implementation
+// obligations — BEFORE scope selection; nothing creates missing units later.
 type SourceUnit struct {
 	id         identity.SourceUnitID
 	name       string // display only, never identity
@@ -110,25 +110,71 @@ type Span struct {
 	End   Position
 }
 
+// SyntheticRole is the closed role class of a cgo-synthetic checked
+// declaration, derived from the declaration's own kind — never from a file
+// path or name spelling.
+type SyntheticRole uint8
+
+const (
+	SyntheticRoleInvalid SyntheticRole = iota
+	// SyntheticAdapter: a synthetic function/call adapter.
+	SyntheticAdapter
+	// SyntheticTypeDecl: a synthetic type declaration.
+	SyntheticTypeDecl
+	// SyntheticData: a synthetic variable/constant declaration.
+	SyntheticData
+
+	numSyntheticRoles
+)
+
+var syntheticRoleNames = [numSyntheticRoles]string{
+	SyntheticAdapter: "adapter", SyntheticTypeDecl: "type", SyntheticData: "data",
+}
+
+// Valid reports whether r names a synthetic role.
+func (r SyntheticRole) Valid() bool { return r > SyntheticRoleInvalid && r < numSyntheticRoles }
+
+// String renders r for reports.
+func (r SyntheticRole) String() string {
+	if r.Valid() {
+		return syntheticRoleNames[r]
+	}
+	return fmt.Sprintf("source.SyntheticRole(%d)", uint8(r))
+}
+
 // SyntheticUnit is one package-synthetic checked declaration produced by cgo
-// preprocessing (for example _cgo_gotypes.go types and call adapters). It has
-// a stable origin-derived identity — package identity plus declared name plus
-// role — never a temporary path. Synthetic units are typed external/intrinsic
-// evidence; they are never ignored.
+// preprocessing. Its constructor-validated identity is the owning package
+// plus the declared scope name plus the closed role — never a temporary path
+// or display spelling. Synthetic units are typed external/intrinsic evidence;
+// they are never ignored.
 type SyntheticUnit struct {
 	pkg  identity.PackageID
 	name string
-	role string // e.g. "cgo-type", "cgo-adapter"
+	role SyntheticRole
+}
+
+// NewSyntheticUnit validates one synthetic-unit identity.
+func NewSyntheticUnit(pkg identity.PackageID, name string, role SyntheticRole) (SyntheticUnit, error) {
+	if pkg.IsZero() {
+		return SyntheticUnit{}, &LoadError{Reason: "synthetic unit requires a package identity"}
+	}
+	if name == "" {
+		return SyntheticUnit{}, &LoadError{Reason: "synthetic unit requires its declared scope name"}
+	}
+	if !role.Valid() {
+		return SyntheticUnit{}, &LoadError{Reason: "synthetic unit requires a valid role"}
+	}
+	return SyntheticUnit{pkg: pkg, name: name, role: role}, nil
 }
 
 // Pkg is the owning package identity.
 func (s SyntheticUnit) Pkg() identity.PackageID { return s.pkg }
 
-// Name is the declared name in the checked view.
+// Name is the declared name in the checked package scope.
 func (s SyntheticUnit) Name() string { return s.name }
 
-// Role is the synthetic role class.
-func (s SyntheticUnit) Role() string { return s.role }
+// Role is the closed synthetic role class.
+func (s SyntheticUnit) Role() SyntheticRole { return s.role }
 
 // CheckedUnitMapping joins one source-derived checked declaration back to its
 // original source unit through toolchain line-directive evidence. Checked

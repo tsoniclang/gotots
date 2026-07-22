@@ -81,9 +81,11 @@ func (o Occurrence) Token() catalog.TokenKind { return o.token }
 // variant axis.
 func (o Occurrence) Variant() catalog.Variant { return o.variant }
 
-// Implicit is the detected implicit-operation evidence (inventory-owned
-// members only; the semantic model owns the rest).
-func (o Occurrence) Implicit() []catalog.ImplicitOp { return o.implicit }
+// Implicit is the detected implicit-operation evidence (immutable copy;
+// inventory-owned members only — the semantic model owns the rest).
+func (o Occurrence) Implicit() []catalog.ImplicitOp {
+	return append([]catalog.ImplicitOp(nil), o.implicit...)
+}
 
 // DirectiveRecord is one inventoried comment directive.
 type DirectiveRecord struct {
@@ -246,13 +248,16 @@ func (inv *FileInventory) EffectiveGoVersion() string { return inv.effectiveGoVe
 // files; zero for whole-file inventories.
 func (inv *FileInventory) RootUnit() identity.SourceUnitID { return inv.rootUnit }
 
-// Occurrences is the pre-ordered authoritative occurrence list. Callers must
-// not mutate it.
-func (inv *FileInventory) Occurrences() []Occurrence { return inv.occurrences }
+// Occurrences is the pre-ordered authoritative occurrence list (immutable
+// copy of the collection).
+func (inv *FileInventory) Occurrences() []Occurrence {
+	return append([]Occurrence(nil), inv.occurrences...)
+}
 
-// Directives is the inventoried comment-directive list. Callers must not
-// mutate it.
-func (inv *FileInventory) Directives() []DirectiveRecord { return inv.directives }
+// Directives is the inventoried comment-directive list (immutable copy).
+func (inv *FileInventory) Directives() []DirectiveRecord {
+	return append([]DirectiveRecord(nil), inv.directives...)
+}
 
 // KindCount is one projected per-kind count for the report surface.
 type KindCount struct {
@@ -286,8 +291,10 @@ type PackageInventory struct {
 // ID is the package identity.
 func (p *PackageInventory) ID() identity.PackageID { return p.id }
 
-// Files are the per-file inventories in deterministic order.
-func (p *PackageInventory) Files() []*FileInventory { return p.files }
+// Files are the per-file inventories in deterministic order (immutable copy).
+func (p *PackageInventory) Files() []*FileInventory {
+	return append([]*FileInventory(nil), p.files...)
+}
 
 // WorkspaceInventory is the immutable whole-workspace inventory artifact.
 type WorkspaceInventory struct {
@@ -298,8 +305,11 @@ type WorkspaceInventory struct {
 // Version is the artifact schema version.
 func (w *WorkspaceInventory) Version() int { return w.version }
 
-// Packages are the per-package inventories in deterministic order.
-func (w *WorkspaceInventory) Packages() []*PackageInventory { return w.packages }
+// Packages are the per-package inventories in deterministic order (immutable
+// copy).
+func (w *WorkspaceInventory) Packages() []*PackageInventory {
+	return append([]*PackageInventory(nil), w.packages...)
+}
 
 // Denominators are the exact whole-workspace counts every report names.
 type Denominators struct {

@@ -180,12 +180,21 @@ func joinCheckedDecls(u *Universe, pkg *LoadedPackage) error {
 			continue
 		}
 		// No origin in user source: a package-synthetic checked declaration.
-		// It receives a typed origin-derived identity; it is never ignored.
-		role := "cgo-adapter"
-		if strings.Contains(decl.fromFile, "_cgo_gotypes") {
-			role = "cgo-type"
+		// Its role derives from the declaration's own kind — never a path.
+		role := SyntheticAdapter
+		if generic, isGen := decl.node.(*ast.GenDecl); isGen {
+			role = SyntheticData
+			for _, spec := range generic.Specs {
+				if _, isType := spec.(*ast.TypeSpec); isType {
+					role = SyntheticTypeDecl
+				}
+			}
 		}
-		pkg.synthetics = append(pkg.synthetics, SyntheticUnit{pkg: pkg.id, name: decl.name, role: role})
+		synthetic, err := NewSyntheticUnit(pkg.id, decl.name, role)
+		if err != nil {
+			return err
+		}
+		pkg.synthetics = append(pkg.synthetics, synthetic)
 	}
 	return nil
 }

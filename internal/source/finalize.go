@@ -9,6 +9,8 @@ import (
 	"github.com/tsoniclang/gotots/internal/identity"
 )
 
+var _ token.Pos // positions resolve through the shared file set
+
 // FileEvidence is the sealed structural evidence state of one finalized file.
 // The variant IS the state: there is no severed flag and no nil-plus-flag
 // dual representation.
@@ -95,7 +97,6 @@ func finalizePackage(u *Universe, loaded *LoadedPackage, depths map[identity.Sou
 		mappings:      append([]CheckedUnitMapping(nil), loaded.mappings...),
 		synthetics:    append([]SyntheticUnit(nil), loaded.synthetics...),
 	}
-	var fullSpans []Span
 	allFull, anyFull := true, false
 	for _, loadedFile := range loaded.files {
 		fset := loadedFile.fset
@@ -121,7 +122,6 @@ func finalizePackage(u *Universe, loaded *LoadedPackage, depths map[identity.Sou
 			file.units = append(file.units, unit)
 			if depth == DepthFullSemantic {
 				fileAnyFull, anyFull = true, true
-				fullSpans = append(fullSpans, unit.span)
 			} else {
 				fileAllFull, allFull = false, false
 			}
@@ -165,9 +165,36 @@ func finalizePackage(u *Universe, loaded *LoadedPackage, depths map[identity.Sou
 	case anyFull && allFull && loaded.typesInfo != nil:
 		out.typesInfo = loaded.typesInfo
 	case anyFull && loaded.typesInfo != nil:
-		out.typesInfo = filterInfo(loaded.typesInfo, u.fset, fullSpans)
+		out.typesInfo = filterInfoByMembership(loaded.typesInfo, retainedNodes(out.files))
 	}
 	return out, nil
+}
+
+// retainedNodes collects the exact AST node set of every retained
+// full-semantic subtree in the package: complete trees of uniform-full files
+// plus the retained unit subtrees of mixed files. Nothing outside this set —
+// no non-full body — can key a retained Info entry.
+func retainedNodes(files []*File) map[ast.Node]bool {
+	members := map[ast.Node]bool{}
+	collect := func(root ast.Node) {
+		ast.Inspect(root, func(n ast.Node) bool {
+			if n != nil {
+				members[n] = true
+			}
+			return true
+		})
+	}
+	for _, file := range files {
+		switch evidence := file.evidence.(type) {
+		case FullSyntax:
+			collect(evidence.Syntax)
+		case MixedUnits:
+			for _, retained := range evidence.Retained {
+				collect(retained.Decl)
+			}
+		}
+	}
+	return members
 }
 
 // packageRetainsFull reports whether any unit of the package is full-semantic.
@@ -241,19 +268,11 @@ func unitNodeAt(file *ast.File, fset *token.FileSet, unit SourceUnit) ast.Node {
 	return nil
 }
 
-// filterInfo copies exactly the type-information entries whose positions lie
-// within full-semantic unit spans; nothing else survives, so no retained
-// Info key can reference a non-full body.
-func filterInfo(info *types.Info, fset *token.FileSet, spans []Span) *types.Info {
-	within := func(pos token.Pos) bool {
-		offset := fset.PositionFor(pos, false).Offset
-		for _, span := range spans {
-			if span.Start.Offset <= offset && offset < span.End.Offset {
-				return true
-			}
-		}
-		return false
-	}
+// filterInfoByMembership copies exactly the type-information entries whose
+// keys are members of retained full-semantic subtrees — exact AST identity,
+// never byte offsets that different files could share. No retained Info key
+// can reference a non-full body.
+func filterInfoByMembership(info *types.Info, members map[ast.Node]bool) *types.Info {
 	out := &types.Info{
 		Types: map[ast.Expr]types.TypeAndValue{}, Defs: map[*ast.Ident]types.Object{},
 		Uses: map[*ast.Ident]types.Object{}, Selections: map[*ast.SelectorExpr]*types.Selection{},
@@ -261,32 +280,32 @@ func filterInfo(info *types.Info, fset *token.FileSet, spans []Span) *types.Info
 		FileVersions: map[*ast.File]string{},
 	}
 	for key, value := range info.Types {
-		if within(key.Pos()) {
+		if members[key] {
 			out.Types[key] = value
 		}
 	}
 	for key, value := range info.Defs {
-		if within(key.Pos()) {
+		if members[key] {
 			out.Defs[key] = value
 		}
 	}
 	for key, value := range info.Uses {
-		if within(key.Pos()) {
+		if members[key] {
 			out.Uses[key] = value
 		}
 	}
 	for key, value := range info.Selections {
-		if within(key.Pos()) {
+		if members[key] {
 			out.Selections[key] = value
 		}
 	}
 	for key, value := range info.Implicits {
-		if within(key.Pos()) {
+		if members[key] {
 			out.Implicits[key] = value
 		}
 	}
 	for key, value := range info.Instances {
-		if within(key.Pos()) {
+		if members[key] {
 			out.Instances[key] = value
 		}
 	}
