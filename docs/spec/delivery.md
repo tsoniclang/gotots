@@ -80,16 +80,31 @@ Required exit evidence:
   reconcile exactly;
 - context-resolution roles and variants are enumerated;
 - implicit operations are cataloged;
-- `gotots inspect constructs` reports two unrelated multi-module projects and
-  their complete dependency closures;
+- `gotots inspect constructs` reports two unrelated multi-module projects,
+  exact resolved closures, and disjoint full-semantic, declaration-contract,
+  external-boundary, and intrinsic evidence sets;
+- retained occurrence artifacts cover exactly the full-semantic set; every
+  declaration-contract or external body has one boundary record and zero
+  unexplained interior occurrences;
+- every executable body/initializer belongs to exactly one evidence depth,
+  while files and packages may aggregate several depths without a default;
 - package owner, provenance, acquisition, and language disposition exact-join
   independent selected-toolchain metadata, including standard-library,
   dependency, replacement, `unsafe`, and pseudo-package cases;
+- every Go, non-Go, embed, overlay, and checked-view input has a stable typed
+  identity separate from its acquisition path, and relocated inputs preserve
+  those identities;
 - compiler capability, selected toolchain, module directive, and effective
   per-file language versions remain distinct, with version-gated occurrences
   verified against their own file versions;
 - an injected unknown form fails; and
-- no target or acceptance-corpus package is imported.
+- no target or acceptance-corpus package is imported;
+- complete-toolchain catalog coverage runs as a separate streaming audit and
+  cannot enlarge normal compilation scope; and
+- finalized application artifacts retain no non-full body AST or body-indexed
+  `types.Info` references; and
+- package count, retained occurrences, elapsed time, and peak RSS have reviewed
+  absolute and parent-delta bounds for ordinary application compilation.
 
 ### Phase: Typed Frontend And Semantic Model
 
@@ -98,8 +113,8 @@ visitors, and the target-independent semantic records.
 
 Required exit evidence:
 
-- every selected occurrence has one typed semantic operation or unsupported
-  record;
+- every full-semantic occurrence has one typed semantic operation or
+  unsupported record, and every non-full body has one exact boundary record;
 - module, standard-library, and toolchain package identities are constructor-
   validated without machine paths or fabricated module ownership;
 - ordinary package semantics are independent of provenance; semantic records
@@ -276,6 +291,20 @@ The team executes the dependency order continuously without requesting
 approval for routine next steps. It pauses only for a genuine product decision
 not settled by this specification, a destructive remote operation, or an
 external credential/environment blocker.
+
+Before any review, correction, or implementation directive is sent, its author
+performs the separate Directive Review Gate defined in repository governance.
+The reviewed message binds an exact revision and one active phase, classifies
+each item as current or deferred, compares itself with the prior directive,
+states any supersession explicitly, checks literal implementer consequences and
+cost, and exposes one frozen endpoint. Later-phase roadmap items cannot become
+active merely to make a checkpoint larger. A directive that fails this review
+is revised before transmission.
+
+An accepted directive remains frozen until its endpoint. New reproducible
+evidence may amend the smallest affected portion only after another Directive
+Review Gate; unaffected criteria and later-phase boundaries remain unchanged.
+This review protocol is the control against fix-review-expand loops.
 
 Checkpoint reports are concise and exact. They include:
 

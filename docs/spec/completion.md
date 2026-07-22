@@ -58,6 +58,10 @@ analysis, but standard-library provenance assigns its executable bodies to the
 manual `gostdlib` contract rather than silently attempting ordinary automatic
 body lowering. Each selected body therefore has an explicit placeholder,
 accepted manual implementation, or blocking disposition.
+Application compilation consumes those declaration contracts and body
+boundaries; it does not retain or semantically traverse the original Go body
+interiors again. Full standard-library source scanning belongs to the separate
+versioned `gostdlib` generation/upgrade workflow and catalog-audit evidence.
 
 Example source declaration:
 

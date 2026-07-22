@@ -17,7 +17,7 @@ workspace, target policy, and explicit environment contracts.
 | Phase | Input | Sole output | Forbidden responsibility |
 |---|---|---|---|
 | Workspace load | Go workspace, toolchain, build config | typed package universe | target decisions |
-| Construct inventory | syntax and `go/types` evidence | exhaustive occurrences | lowering |
+| Construct inventory | scope-partitioned syntax and `go/types` evidence | exhaustive selected occurrences and boundary records | lowering |
 | Semantic analysis | occurrences plus grammatical roles | Go semantic model | TypeScript shape |
 | Whole-program analysis | complete semantic model | sealed facts | emission |
 | Planning | semantic model plus facts | immutable total `ProgramPlan` | source rediscovery |
@@ -54,6 +54,13 @@ All input files, tool versions, configurations, external contracts, extension
 packages, and prior generated baselines used for reconciliation are
 fingerprinted before compilation. Machine-local paths never enter semantic
 identity.
+
+Every Go, non-Go, embed, overlay, and checked-view input has a constructor-
+validated owner-relative identity distinct from its acquisition/display path.
+Generated cgo checked files are identified by their exact source-to-checked
+relation, never by a temporary-directory spelling. Raw absolute paths may be
+used to read bytes during loading, but cannot be join keys or survive in a
+portable semantic artifact.
 
 ## Resolved Package Universe
 
@@ -94,13 +101,52 @@ semantic dispositions. Import `"C"` is a cgo pseudo-package whose obligations
 must be planned explicitly. Neither special case turns an importing package
 into an external package.
 
-Package, declaration, and type analysis treats ordinary workspace, dependency,
-standard-library, and toolchain source uniformly. Body selection remains an
-explicit per-implementation disposition: standard-library behavior is manually
-completed, source-available module behavior is ordinarily automatic, and
-intrinsic/external cases remain exact obligations. Every excluded body has that
-typed disposition; package provenance cannot silently omit occurrences or
-replace per-implementation ownership.
+Go semantics are uniform across provenance, but resolving a package does not
+authorize full retained analysis of every body in that package. The source
+artifact assigns every executable implementation unit—function or method body,
+initializer, and equivalent implicit body—one closed evidence depth:
+
+| Evidence depth | Retained evidence | Typical members |
+|---|---|---|
+| `full-semantic` | declarations, checked syntax, contextual occurrences, and body boundaries | workspace and source-available module implementations selected for automatic translation |
+| `declaration-contract` | complete declarations/types plus initializer/body identity, span, and hash boundaries; no interior executable occurrences | standard-library behavior supplied by `gostdlib`, and other manual environment contracts |
+| `external-boundary` | source declaration/body boundary, checked-view mapping where available, and a typed unresolved obligation | exact cgo/native/host-owned implementations |
+| `intrinsic` | typed language/toolchain contract with no ordinary source body | `builtin`, `unsafe`, and other genuine intrinsics |
+
+Declarations and input files retain their own identity/type/mapping records;
+package and file containers may contain implementation units at several depths
+and therefore have no inferred package-wide depth. The four implementation
+sets are disjoint and total by canonical unit identity.
+
+Requested roots, resolved import closure, full-semantic source set,
+declaration-contract set, and later product reachability are different sets with
+different identities and denominators. Root status is only a reachability
+witness. Package provenance alone does not choose a TypeScript representation,
+but the selected environment contract may bound analysis depth when a Go body
+is not an implementation candidate.
+
+All depths share one coherent `go/types` universe. Source-available module
+dependencies selected for automatic translation receive full-semantic evidence.
+During application compilation, standard-library declarations participate in
+typing but standard-library Go body interiors do not enter the application
+occurrence model; generating or upgrading the reusable `gostdlib` workspace is
+a separate versioned compilation. Original cgo source and its checked view are
+kept as distinct, joined artifacts: unaffected checked bodies may remain
+full-semantic, while an exact C-dependent body becomes an external boundary.
+No source file or body disappears because its checked view differs.
+
+Syntax and body-indexed `types.Info` for non-full depths may exist transiently
+inside the authoritative semantic load. After contracts, boundaries, and
+mappings are extracted, the finalized source artifact severs those references
+and retains only the shared declaration type graph and the evidence permitted
+by its depth. Loader lifetime cannot silently turn resolution evidence into
+retained application semantics.
+
+Catalog-coverage scans over the complete Go toolchain or a large corpus are
+separate streaming verification workloads. They may prove catalog coverage but
+must not enlarge a normal compilation's retained semantic model. Resolution
+closure, catalog-audit closure, semantic-analysis scope, and implementation
+reachability must never be conflated.
 
 The compiler-supported catalog version, selected toolchain version, each
 module's `go` directive, and the effective language version of each source file
@@ -201,6 +247,14 @@ result := T(value)
 Identical syntax can mean a call or conversion. Selection comes from the
 resolved `go/types.Object` and `TypeAndValue`, producing `Call` or `Convert`.
 Name capitalization, argument count, and source text have no authority.
+
+Operations defined over type sets—core type, structural terms, assignability,
+method sets, comparability, and constraint satisfaction—belong to one exact
+toolchain-semantic service. Construct visitors consume its typed result. They
+must not embed local approximations of union flattening, interface intersection,
+tilde terms, or channel-direction rules merely to classify a newly encountered
+generic construct. The service is differential-tested against accepted and
+rejected programs under the selected Go toolchain.
 
 ## Target-Independent Semantic Model
 

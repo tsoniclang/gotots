@@ -68,8 +68,8 @@ fail / 0 blocked` at one exact input and implementation revision.
 | Gate | Required positive evidence |
 |---|---|
 | 01 Input integrity | clean source/compiler trees, exact tool/config fingerprints, focused/full Go tests, bounded runner health |
-| 02 Language catalog | selected Go grammar/tokens/built-ins reconciled; every occurrence and role classified; unknown count zero |
-| 03 Scope closure | complete package closure exact-joins independent toolchain metadata; every package has one owner/provenance/acquisition/disposition; every root/edge has provenance |
+| 02 Language catalog | selected Go grammar/tokens/built-ins reconciled; every full-semantic occurrence and every non-full body boundary classified; unknown count zero |
+| 03 Scope closure | complete package closure and evidence-depth partition exact-join independent toolchain/environment metadata; every package/root/edge/body has one disposition |
 | 04 Identity and census | source/semantic/implementation/artifact multisets join exactly; collisions, overwrites, and unexplained deltas zero |
 | 05 Independent parity | independently parsed generated declarations and operation shapes match typed Go source for every class |
 | 06 Plan totality | all facts sealed; every selected operation has one validated plan or explicit blocking state; necessity records complete |
@@ -100,6 +100,13 @@ verifier independently derives and compares those memberships, `Standard`,
 `Goroot`, module path/version, `Main`, replacement, vendor selection, compiled
 files, imports, and package errors. Counts without both one-sided identity
 lists are not proof.
+
+One compilation owns one coherent `go/types` graph. For every import edge, the
+importer's package/type objects exact-join the imported package record; mixing
+objects from separate loader calls fails. The resolved package closure is then
+partitioned independently into requested roots, full-semantic source,
+declaration contracts, external boundaries, and intrinsics. These sets are
+never inferred from which files happened to be parsed or traversed.
 
 Fixtures include, in one verified closure:
 
@@ -133,6 +140,50 @@ affected identities.
 Replacing per-file language versions with a workspace maximum, comparing Go
 versions lexically, or using the catalog maximum as source permission must fail
 Gate 02 with the affected occurrence identities.
+
+## Analysis-Scope And Cost Proof
+
+The scope verifier exact-joins every executable body, initializer, and implicit
+implementation unit to one evidence depth. It separately joins every source
+file and declaration to its identity/type/mapping record; files and packages
+may aggregate several depths and cannot supply a default. It proves:
+
+- workspace and selected source-available module bodies intended for automatic
+  translation have full checked syntax and conserved occurrence identities;
+- standard-library bodies used through the reusable `gostdlib` contract retain
+  declaration and body-boundary evidence but contribute no application-body
+  occurrences;
+- original cgo source, checked syntax, and external boundaries join without a
+  skipped file or whole-package downgrade;
+- Go, non-Go, embed, overlay, and checked-view inputs join by stable typed
+  identity rather than raw acquisition path, including after workspace,
+  module-cache, and temporary checked-view relocation;
+- finalized artifacts expose no syntax or body-indexed `types.Info` for
+  declaration-contract, external-boundary, or intrinsic bodies;
+- catalog-audit occurrences are stored in audit evidence, never in the product
+  semantic artifact; and
+- resolved-closure, evidence-depth, occurrence, and eventual reachability
+  denominators are reported separately.
+
+For two ordinary projects and the self-host project, the gate records package,
+file, declaration, body-boundary, and retained-occurrence counts plus elapsed
+time and peak RSS. Any material increase without a corresponding change in the
+full-semantic source set and typed necessity fails before semantic-model work.
+Aggregate package growth cannot hide a largest-package or standard-library-body
+scope explosion.
+
+Required mutations analyze a standard-library body as an application body,
+drop a source-available dependency body, retain catalog-audit occurrences in
+the product model, omit a cgo source/boundary mapping, use a relocated raw path
+as an input identity, retain a non-full body AST, or merge requested roots with
+the semantic set. Gates 02, 03, or 16 must fail with exact identities and the
+cost delta.
+
+Generic context classification also has an independent type-semantics matrix.
+It covers normalized unions and intersections, tilde terms, empty and mixed
+type sets, named types with equal underlying types, and directional-channel
+core-type rules. Replacing the one semantic service with a construct-local
+flatten/sort/deduplicate approximation must fail the matrix.
 
 ## Construct And Semantic-Class Oracles
 
