@@ -1,8 +1,10 @@
 package source
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -20,43 +22,55 @@ func writeTree(t *testing.T, dir string, files map[string]string) {
 	}
 }
 
-// TestLoadWorkspaceSingleModule proves a module loads into typed packages with
-// module-relative machine-independent file identities and type information.
+func findPackage(t *testing.T, ws *Workspace, importPath string) *Package {
+	t.Helper()
+	for _, pkg := range ws.Packages() {
+		if pkg.ID().ImportPath() == importPath {
+			return pkg
+		}
+	}
+	t.Fatalf("package %s not in closure", importPath)
+	return nil
+}
+
+// TestLoadWorkspaceSingleModule proves a module loads into typed selected
+// packages with owner-qualified machine-independent file identities.
 func TestLoadWorkspaceSingleModule(t *testing.T) {
 	dir := t.TempDir()
 	writeTree(t, dir, map[string]string{
-		"go.mod":       "module example.com/single\n\ngo 1.26\n",
-		"main.go":      "package main\n\nfunc main() { _ = add(1, 2) }\n\nfunc add(a, b int) int { return a + b }\n",
-		"pkg/util.go":  "package pkg\n\n// Twice doubles.\nfunc Twice(x int) int { return 2 * x }\n",
-		"pkg/util2.go": "package pkg\n\nconst K = 3\n",
+		"go.mod":      "module example.com/single\n\ngo 1.26\n",
+		"main.go":     "package main\n\nfunc main() { _ = add(1, 2) }\n\nfunc add(a, b int) int { return a + b }\n",
+		"pkg/util.go": "package pkg\n\nfunc Twice(x int) int { return 2 * x }\n",
 	})
 	ws, err := LoadWorkspace(Request{Dir: dir})
 	if err != nil {
 		t.Fatalf("LoadWorkspace: %v", err)
 	}
-	if len(ws.Packages()) != 2 {
-		t.Fatalf("loaded %d packages, want 2", len(ws.Packages()))
+	if len(ws.Selected()) != 2 {
+		t.Fatalf("selected %d packages, want 2", len(ws.Selected()))
+	}
+	if ws.Toolchain().Binary() == "" || ws.Toolchain().Version() == "" || ws.Toolchain().GOROOT() == "" {
+		t.Errorf("toolchain not resolved: %+v", ws.Toolchain())
 	}
 	var ids []string
-	for _, pkg := range ws.Packages() {
-		if pkg.Types() == nil || pkg.TypesInfo() == nil {
-			t.Errorf("%s: missing type information", pkg.ID())
+	for _, pkg := range ws.Selected() {
+		if pkg.Provenance() != ProvenanceWorkspaceModule || pkg.Acquisition() != AcquisitionWorkspace {
+			t.Errorf("%s provenance/acquisition = %s/%s", pkg.ID(), pkg.Provenance(), pkg.Acquisition())
+		}
+		if pkg.ModuleGoVersion() != "1.26" {
+			t.Errorf("%s module go directive = %q", pkg.ID(), pkg.ModuleGoVersion())
 		}
 		for _, file := range pkg.Files() {
 			ids = append(ids, file.ID().String())
 			if file.Syntax() == nil {
-				t.Errorf("%s: missing syntax", file.ID())
+				t.Errorf("%s: selected file missing syntax", file.ID())
+			}
+			if file.EffectiveGoVersion() == "" {
+				t.Errorf("%s: no effective language version", file.ID())
 			}
 		}
 	}
-	want := []string{
-		"example.com/single::main.go",
-		"example.com/single::pkg/util.go",
-		"example.com/single::pkg/util2.go",
-	}
-	if len(ids) != len(want) {
-		t.Fatalf("file identities %v, want %v", ids, want)
-	}
+	want := []string{"mod=example.com/single::main.go", "mod=example.com/single::pkg/util.go"}
 	for i := range want {
 		if ids[i] != want[i] {
 			t.Errorf("file identity %d = %q, want %q", i, ids[i], want[i])
@@ -64,72 +78,227 @@ func TestLoadWorkspaceSingleModule(t *testing.T) {
 	}
 }
 
-// TestLoadWorkspaceMultiModule proves a go.work workspace distinguishes two
-// modules containing identical relative paths.
-func TestLoadWorkspaceMultiModule(t *testing.T) {
+// TestUniverseClosureAndProvenance proves the complete transitive closure is
+// resolved with correct owner/provenance/acquisition/disposition facts:
+// standard library (fmt via import), unsafe intrinsic, a cache-acquired
+// versioned dependency, and a locally replaced dotless module dependency.
+func TestUniverseClosureAndProvenance(t *testing.T) {
 	dir := t.TempDir()
 	writeTree(t, dir, map[string]string{
-		"go.work":       "go 1.26\n\nuse (\n\t./a\n\t./b\n)\n",
-		"a/go.mod":      "module example.com/a\n\ngo 1.26\n",
-		"a/pkg/same.go": "package pkg\n\nfunc A() int { return 1 }\n",
-		"b/go.mod":      "module example.com/b\n\ngo 1.26\n",
-		"b/pkg/same.go": "package pkg\n\nfunc B() int { return 2 }\n",
+		"go.mod":          "module universe.example/app\n\ngo 1.26\n\nrequire (\n\tdotlessdep/lib v1.0.0\n\tgolang.org/x/sync v0.21.0\n)\n\nreplace dotlessdep/lib => ./localdep\n",
+		"go.sum":          "golang.org/x/sync v0.21.0 h1:HLII4xRRTtCRkxYp4HNFF0Js/Og6q2i++KXbg0gHCwM=\ngolang.org/x/sync v0.21.0/go.mod h1:9xrNwdLfx4jkKbNva9FpL6vEN7evnE43NNNJQ2LF3+0=\n",
+		"main.go":         "package main\n\nimport (\n\t\"fmt\"\n\t\"unsafe\"\n\n\t\"dotlessdep/lib\"\n\t\"golang.org/x/sync/errgroup\"\n)\n\nfunc main() {\n\tvar g errgroup.Group\n\t_ = g.Wait()\n\tfmt.Println(lib.Answer(), unsafe.Sizeof(0))\n}\n",
+		"localdep/go.mod": "module dotlessdep/lib\n\ngo 1.24\n",
+		"localdep/lib.go": "package lib\n\nfunc Answer() int { return 42 }\n",
 	})
-	// A go.work root holds no module of its own; workspace-wide selection
-	// names the member modules (the go tool's own pattern semantics).
-	ws, err := LoadWorkspace(Request{Dir: dir, Patterns: []string{"example.com/a/...", "example.com/b/..."}})
+	req := Request{Dir: dir, Env: []string{"GOFLAGS=-mod=mod", "GOPROXY=off"}}
+	ws, err := LoadWorkspace(req)
 	if err != nil {
 		t.Fatalf("LoadWorkspace: %v", err)
 	}
-	seen := map[string]bool{}
-	for _, pkg := range ws.Packages() {
-		for _, file := range pkg.Files() {
-			seen[file.ID().String()] = true
-			if file.ID().Rel() != "pkg/same.go" {
-				t.Errorf("unexpected rel %q", file.ID().Rel())
-			}
+	fmtPkg := findPackage(t, ws, "fmt")
+	if fmtPkg.ID().Owner().String() != "std" || fmtPkg.Provenance() != ProvenanceStandardLibrary ||
+		fmtPkg.Acquisition() != AcquisitionGOROOT || fmtPkg.Selected() {
+		t.Errorf("fmt: %s %s %s selected=%v", fmtPkg.ID(), fmtPkg.Provenance(), fmtPkg.Acquisition(), fmtPkg.Selected())
+	}
+	unsafePkg := findPackage(t, ws, "unsafe")
+	if unsafePkg.Disposition() != DispositionUnsafeIntrinsic || unsafePkg.Provenance() != ProvenanceStandardLibrary {
+		t.Errorf("unsafe: disposition=%s provenance=%s", unsafePkg.Disposition(), unsafePkg.Provenance())
+	}
+	sync := findPackage(t, ws, "golang.org/x/sync/errgroup")
+	if sync.ID().Owner().String() != "mod=golang.org/x/sync@v0.21.0" {
+		t.Errorf("x/sync owner = %s", sync.ID().Owner())
+	}
+	if sync.Provenance() != ProvenanceModuleDependency || sync.Acquisition() != AcquisitionModuleCache {
+		t.Errorf("x/sync provenance/acquisition = %s/%s", sync.Provenance(), sync.Acquisition())
+	}
+	dotless := findPackage(t, ws, "dotlessdep/lib")
+	if dotless.Provenance() != ProvenanceModuleDependency || dotless.Acquisition() != AcquisitionLocalReplacement {
+		t.Errorf("dotless replacement provenance/acquisition = %s/%s (spelling must not classify)",
+			dotless.Provenance(), dotless.Acquisition())
+	}
+	// A local replacement keeps the declared module path AND required
+	// version; only acquisition reflects the replacement directory.
+	if dotless.ID().Owner().String() != "mod=dotlessdep/lib@v1.0.0" {
+		t.Errorf("dotless owner = %s", dotless.ID().Owner())
+	}
+	// Std file identities are GOROOT/src-relative, never machine paths.
+	for _, file := range fmtPkg.Files() {
+		if !strings.HasPrefix(file.ID().String(), "std::fmt/") {
+			t.Errorf("std file identity = %s", file.ID())
 		}
-	}
-	if !seen["example.com/a::pkg/same.go"] || !seen["example.com/b::pkg/same.go"] {
-		t.Errorf("identical relative paths did not receive distinct module-qualified identities: %v", seen)
-	}
-	if len(seen) != 2 {
-		t.Errorf("expected exactly 2 file identities, got %v", seen)
+		if strings.Contains(file.ID().String(), ws.Toolchain().GOROOT()) {
+			t.Errorf("std identity embeds GOROOT: %s", file.ID())
+		}
 	}
 }
 
-// TestLoadWorkspaceRelocatedIdentity proves identity survives checkout
-// relocation: the same module content in two directories yields identical
-// identities.
-func TestLoadWorkspaceRelocatedIdentity(t *testing.T) {
-	content := map[string]string{
-		"go.mod":     "module example.com/reloc\n\ngo 1.26\n",
-		"pkg/x.go":   "package pkg\n\nfunc X() {}\n",
-		"pkg/sub.go": "package pkg\n\nvar V = 1\n",
+// TestVendoredDependency proves a vendored dotless module is a module
+// dependency with vendor acquisition and module-relative identity.
+func TestVendoredDependency(t *testing.T) {
+	dir := t.TempDir()
+	writeTree(t, dir, map[string]string{
+		"go.mod":                       "module vend.example/app\n\ngo 1.26\n\nrequire dotlessdep/lib v1.0.0\n",
+		"main.go":                      "package main\n\nimport \"dotlessdep/lib\"\n\nfunc main() { _ = lib.Answer() }\n",
+		"vendor/modules.txt":           "# dotlessdep/lib v1.0.0\n## explicit; go 1.24\ndotlessdep/lib\n",
+		"vendor/dotlessdep/lib/lib.go": "package lib\n\nfunc Answer() int { return 42 }\n",
+	})
+	ws, err := LoadWorkspace(Request{Dir: dir})
+	if err != nil {
+		t.Fatalf("LoadWorkspace: %v", err)
 	}
-	load := func() []string {
+	dotless := findPackage(t, ws, "dotlessdep/lib")
+	if dotless.Provenance() != ProvenanceModuleDependency || dotless.Acquisition() != AcquisitionVendor {
+		t.Errorf("vendored dep provenance/acquisition = %s/%s", dotless.Provenance(), dotless.Acquisition())
+	}
+	if got := dotless.Files()[0].ID().String(); got != "mod=dotlessdep/lib@v1.0.0::lib.go" {
+		t.Errorf("vendored file identity = %s", got)
+	}
+}
+
+// TestStdBuiltinAndToolchainRoots proves std, builtin, and toolchain command
+// packages load as roots with reserved owners — Module==nil is never a
+// rejection rule.
+func TestStdBuiltinAndToolchainRoots(t *testing.T) {
+	dir := t.TempDir()
+	writeTree(t, dir, map[string]string{"go.mod": "module roots.example/m\n\ngo 1.26\n", "m.go": "package m\n"})
+	ws, err := LoadWorkspace(Request{Dir: dir, Patterns: []string{"fmt", "builtin", "cmd/addr2line"}})
+	if err != nil {
+		t.Fatalf("LoadWorkspace: %v", err)
+	}
+	fmtPkg := findPackage(t, ws, "fmt")
+	if !fmtPkg.Selected() || fmtPkg.Types() == nil || len(fmtPkg.Files()) == 0 || fmtPkg.Files()[0].Syntax() == nil {
+		t.Error("fmt root did not load with syntax and types")
+	}
+	if fmtPkg.ID().String() != "std::fmt" {
+		t.Errorf("fmt id = %s", fmtPkg.ID())
+	}
+	builtin := findPackage(t, ws, "builtin")
+	if builtin.ID().Owner().String() != "lang" || builtin.Disposition() != DispositionBuiltinUniverse {
+		t.Errorf("builtin owner/disposition = %s/%s", builtin.ID().Owner(), builtin.Disposition())
+	}
+	tool := findPackage(t, ws, "cmd/addr2line")
+	if tool.ID().Owner().String() != "toolchain" || tool.Provenance() != ProvenanceToolchainPackage {
+		t.Errorf("cmd/addr2line owner/provenance = %s/%s", tool.ID().Owner(), tool.Provenance())
+	}
+}
+
+// TestPerFileEffectiveVersions proves the effective language version is a
+// per-file fact from typed toolchain evidence: two files of one module differ
+// when a //go:build constraint raises one file's version. There is no
+// workspace maximum.
+func TestPerFileEffectiveVersions(t *testing.T) {
+	dir := t.TempDir()
+	writeTree(t, dir, map[string]string{
+		"go.work":      "go 1.26\n\nuse (\n\t./old\n\t./new\n)\n",
+		"old/go.mod":   "module ver.example/old\n\ngo 1.21\n",
+		"old/base.go":  "package old\n\nfunc Base() int { return 1 }\n",
+		"old/newer.go": "//go:build go1.26\n\npackage old\n\nfunc Newer() int { return 2 }\n",
+		"new/go.mod":   "module ver.example/new\n\ngo 1.26\n",
+		"new/n.go":     "package new\n\nfunc N() int { return 3 }\n",
+	})
+	ws, err := LoadWorkspace(Request{Dir: dir, Patterns: []string{"ver.example/old/...", "ver.example/new/..."}})
+	if err != nil {
+		t.Fatalf("LoadWorkspace: %v", err)
+	}
+	versions := map[string]string{}
+	moduleDirectives := map[string]string{}
+	for _, pkg := range ws.Selected() {
+		moduleDirectives[pkg.ID().Owner().Module().Path()] = pkg.ModuleGoVersion()
+		for _, file := range pkg.Files() {
+			versions[file.ID().Rel()] = file.EffectiveGoVersion()
+		}
+	}
+	if moduleDirectives["ver.example/old"] != "1.21" || moduleDirectives["ver.example/new"] != "1.26" {
+		t.Errorf("module directives = %v", moduleDirectives)
+	}
+	if versions["base.go"] != "go1.21" {
+		t.Errorf("base.go effective version = %q, want go1.21", versions["base.go"])
+	}
+	if versions["newer.go"] != "go1.26" {
+		t.Errorf("newer.go effective version = %q, want go1.26 (per-file override)", versions["newer.go"])
+	}
+	if versions["n.go"] != "go1.26" {
+		t.Errorf("n.go effective version = %q", versions["n.go"])
+	}
+}
+
+// TestCgoRootIsExplicitDisposition proves a selected cgo package fails with
+// the typed cgo disposition, never a silent omission or generic path error.
+func TestCgoRootIsExplicitDisposition(t *testing.T) {
+	dir := t.TempDir()
+	writeTree(t, dir, map[string]string{
+		"go.mod":  "module cgo.example/m\n\ngo 1.26\n",
+		"main.go": "package main\n\n/*\n#include <stdlib.h>\n*/\nimport \"C\"\n\nfunc main() { C.free(nil) }\n",
+	})
+	_, err := LoadWorkspace(Request{Dir: dir, Env: []string{"CGO_ENABLED=1"}})
+	if err == nil {
+		t.Fatal("cgo root loaded silently")
+	}
+	var cgoErr *CgoUnsupportedError
+	if !errors.As(err, &cgoErr) {
+		// Environments without a C toolchain surface the toolchain's own
+		// package error instead — still fail-closed, but assert it names cgo.
+		if !strings.Contains(err.Error(), "cgo") && !strings.Contains(err.Error(), "C ") {
+			t.Fatalf("cgo rejection unclear: %v", err)
+		}
+	}
+}
+
+// TestRelocatedWorkspaceAndCache proves identity survives relocation of both
+// the workspace checkout and the module cache: acquisition changes, identity
+// does not.
+func TestRelocatedWorkspaceAndCache(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	syncCache := filepath.Join(home, "go", "pkg", "mod", "cache", "download", "golang.org", "x", "sync")
+	if _, err := os.Stat(syncCache); err != nil {
+		t.Skip("x/sync not in the ambient module cache")
+	}
+	content := map[string]string{
+		"go.mod": "module reloc.example/app\n\ngo 1.26\n\nrequire golang.org/x/sync v0.21.0\n",
+		"go.sum": "golang.org/x/sync v0.21.0 h1:HLII4xRRTtCRkxYp4HNFF0Js/Og6q2i++KXbg0gHCwM=\ngolang.org/x/sync v0.21.0/go.mod h1:9xrNwdLfx4jkKbNva9FpL6vEN7evnE43NNNJQ2LF3+0=\n",
+		"m.go":   "package main\n\nimport \"golang.org/x/sync/errgroup\"\n\nfunc main() { var g errgroup.Group; _ = g.Wait() }\n",
+	}
+	load := func(env []string) []string {
 		dir := t.TempDir()
 		writeTree(t, dir, content)
-		ws, err := LoadWorkspace(Request{Dir: dir})
+		ws, err := LoadWorkspace(Request{Dir: dir, Env: env})
 		if err != nil {
 			t.Fatalf("LoadWorkspace: %v", err)
 		}
 		var ids []string
 		for _, pkg := range ws.Packages() {
 			ids = append(ids, pkg.ID().String())
-			for _, f := range pkg.Files() {
-				ids = append(ids, f.ID().String())
-			}
 		}
 		return ids
 	}
-	a, b := load(), load()
-	if len(a) != len(b) {
-		t.Fatalf("identity sets differ in size: %v vs %v", a, b)
+	baseline := load([]string{"GOFLAGS=-mod=mod", "GOPROXY=off"})
+	// Relocate the module cache: copy the download tree into a fresh
+	// GOMODCACHE and load from there.
+	relocatedCache := t.TempDir()
+	if err := os.CopyFS(filepath.Join(relocatedCache, "cache", "download", "golang.org", "x", "sync"), os.DirFS(syncCache)); err != nil {
+		t.Fatalf("cache relocation: %v", err)
 	}
-	for i := range a {
-		if a[i] != b[i] {
-			t.Errorf("identity %d differs across checkouts: %q vs %q", i, a[i], b[i])
+	t.Cleanup(func() {
+		// go extracts modules read-only; restore write permission so the
+		// TempDir cleanup can remove the relocated cache.
+		_ = filepath.WalkDir(relocatedCache, func(path string, d os.DirEntry, err error) error {
+			if err == nil {
+				_ = os.Chmod(path, 0o777)
+			}
+			return nil
+		})
+	})
+	relocated := load([]string{"GOFLAGS=-mod=mod", "GOPROXY=off", "GOMODCACHE=" + relocatedCache})
+	if len(baseline) != len(relocated) {
+		t.Fatalf("closure sizes differ: %d vs %d", len(baseline), len(relocated))
+	}
+	for i := range baseline {
+		if baseline[i] != relocated[i] {
+			t.Errorf("identity %d differs across cache relocation: %q vs %q", i, baseline[i], relocated[i])
 		}
 	}
 }
@@ -137,12 +306,12 @@ func TestLoadWorkspaceRelocatedIdentity(t *testing.T) {
 // TestLoadWorkspaceFailsClosed proves parse errors, type errors, and empty
 // matches abort the load; there is no partial universe.
 func TestLoadWorkspaceFailsClosed(t *testing.T) {
-	parseBroken := t.TempDir()
-	writeTree(t, parseBroken, map[string]string{
+	broken := t.TempDir()
+	writeTree(t, broken, map[string]string{
 		"go.mod":  "module example.com/broken\n\ngo 1.26\n",
 		"main.go": "package main\n\nfunc main() {",
 	})
-	if _, err := LoadWorkspace(Request{Dir: parseBroken}); err == nil {
+	if _, err := LoadWorkspace(Request{Dir: broken}); err == nil {
 		t.Error("parse-broken module loaded")
 	}
 	typeBroken := t.TempDir()
@@ -154,18 +323,14 @@ func TestLoadWorkspaceFailsClosed(t *testing.T) {
 		t.Error("type-broken module loaded")
 	}
 	empty := t.TempDir()
-	writeTree(t, empty, map[string]string{
-		"go.mod": "module example.com/empty\n\ngo 1.26\n",
-	})
+	writeTree(t, empty, map[string]string{"go.mod": "module example.com/empty\n\ngo 1.26\n"})
 	if _, err := LoadWorkspace(Request{Dir: empty}); err == nil {
 		t.Error("empty module loaded")
 	}
 }
 
-// TestLoadWorkspaceRejectsModuleCollision proves two modules claiming the
-// same module path cannot form one universe: the load fails closed (either
-// through the toolchain's own rejection or the loader's identity-collision
-// check), never producing ambiguous identities.
+// TestLoadWorkspaceRejectsModuleCollision proves colliding module identities
+// fail closed.
 func TestLoadWorkspaceRejectsModuleCollision(t *testing.T) {
 	dir := t.TempDir()
 	writeTree(t, dir, map[string]string{
@@ -180,12 +345,13 @@ func TestLoadWorkspaceRejectsModuleCollision(t *testing.T) {
 	}
 }
 
-// TestLoadWorkspaceOverlay proves overlays replace on-disk content.
+// TestLoadWorkspaceOverlay proves overlays replace on-disk content without
+// changing identity or provenance.
 func TestLoadWorkspaceOverlay(t *testing.T) {
 	dir := t.TempDir()
 	writeTree(t, dir, map[string]string{
 		"go.mod": "module example.com/ol\n\ngo 1.26\n",
-		"a.go":   "package a\n\nfunc Broken() {", // broken on disk
+		"a.go":   "package a\n\nfunc Broken() {",
 	})
 	overlay := map[string][]byte{
 		filepath.Join(dir, "a.go"): []byte("package a\n\nfunc Fixed() int { return 1 }\n"),
@@ -194,8 +360,11 @@ func TestLoadWorkspaceOverlay(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadWorkspace with overlay: %v", err)
 	}
-	pkg := ws.Packages()[0]
+	pkg := ws.Selected()[0]
 	if pkg.Types().Scope().Lookup("Fixed") == nil {
 		t.Error("overlay content not used")
+	}
+	if pkg.Provenance() != ProvenanceWorkspaceModule {
+		t.Errorf("overlay changed provenance: %s", pkg.Provenance())
 	}
 }

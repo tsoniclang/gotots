@@ -21,14 +21,16 @@ func BuildFileInventory(pkg *source.Package, file *source.File) (*FileInventory,
 	if err != nil {
 		return nil, err
 	}
-	return newFileInventory(file.Path(), file.ID(), b.occurrences, directives)
+	return newFileInventory(file.Path(), file.ID(), file.EffectiveGoVersion(), b.occurrences, directives)
 }
 
 // BuildWorkspaceInventory produces the immutable whole-workspace inventory
-// artifact over a loaded source universe.
+// artifact over the selected packages of a loaded source universe. Dependency
+// closure records remain source facts; the inventory covers the requested
+// roots.
 func BuildWorkspaceInventory(ws *source.Workspace) (*WorkspaceInventory, error) {
-	out := &WorkspaceInventory{version: InventoryArtifactVersion, goVersion: ws.GoVersion()}
-	for _, pkg := range ws.Packages() {
+	out := &WorkspaceInventory{version: InventoryArtifactVersion}
+	for _, pkg := range ws.Selected() {
 		pkgInventory := &PackageInventory{id: pkg.ID()}
 		for _, file := range pkg.Files() {
 			fileInventory, err := BuildFileInventory(pkg, file)

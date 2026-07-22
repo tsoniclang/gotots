@@ -34,7 +34,7 @@ func VerifySyntaxInventory(ws *source.Workspace, inv *analyze.WorkspaceInventory
 		return &VerificationError{Stage: "syntax-inventory", Reason: reason}
 	}
 	files := map[string]*source.File{}
-	for _, pkg := range ws.Packages() {
+	for _, pkg := range ws.Selected() {
 		for _, file := range pkg.Files() {
 			files[file.ID().String()] = file
 		}

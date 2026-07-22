@@ -3,7 +3,9 @@ package stagecheck
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/language/analyze"
@@ -27,7 +29,7 @@ func writeModule(t *testing.T, files map[string]string) string {
 
 var moduleA = map[string]string{
 	"go.mod":   "module check.example/a\n\ngo 1.26\n",
-	"a.go":     "package a\n\nfunc A(x int) int { return x + 1 }\n",
+	"a.go":     "package a\n\nimport \"fmt\"\n\nfunc A(x int) int { return x + 1 }\n\nfunc Show(x int) string { return fmt.Sprint(x) }\n",
 	"sub/b.go": "package sub\n\nconst B = 2\n",
 }
 
@@ -101,6 +103,44 @@ func TestSyntaxInventoryVerifierIsIndependent(t *testing.T) {
 	var verification *VerificationError
 	if !errors.As(err, &verification) {
 		t.Fatalf("error = %T, want *VerificationError", err)
+	}
+}
+
+// TestVerifierUsesSelectedToolchain proves the loader and verifier execute
+// the exact selected binary, never an ambient `go` re-resolution: a logging
+// wrapper is selected, and both the loader's pattern-set runs and the
+// verifier's -deps join appear in its invocation log.
+func TestVerifierUsesSelectedToolchain(t *testing.T) {
+	real, err := exec.LookPath("go")
+	if err != nil {
+		t.Skip("no go binary")
+	}
+	dir := writeModule(t, moduleA)
+	logFile := filepath.Join(t.TempDir(), "invocations.log")
+	wrapper := filepath.Join(t.TempDir(), "go")
+	script := "#!/bin/sh\necho \"$@\" >> " + logFile + "\nexec " + real + " \"$@\"\n"
+	if err := os.WriteFile(wrapper, []byte(script), 0o755); err != nil {
+		t.Fatalf("write wrapper: %v", err)
+	}
+	req := source.Request{Dir: dir, GoBinary: wrapper}
+	ws, err := source.LoadWorkspace(req)
+	if err != nil {
+		t.Fatalf("LoadWorkspace: %v", err)
+	}
+	if ws.Toolchain().Binary() != wrapper {
+		t.Fatalf("toolchain binary = %s, want wrapper", ws.Toolchain().Binary())
+	}
+	if err := VerifySourceUniverse(ws, req); err != nil {
+		t.Fatalf("VerifySourceUniverse: %v", err)
+	}
+	logged, err := os.ReadFile(logFile)
+	if err != nil {
+		t.Fatalf("read log: %v", err)
+	}
+	for _, needle := range []string{"list std", "list cmd", "list -deps -json"} {
+		if !strings.Contains(string(logged), needle) {
+			t.Errorf("selected toolchain never ran %q; log:\n%s", needle, logged)
+		}
 	}
 }
 

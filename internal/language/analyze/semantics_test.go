@@ -179,11 +179,15 @@ func TestVisitorRejectsNonActiveConstructs(t *testing.T) {
 	}
 }
 
-func mustModuleID(t *testing.T) identity.ModuleID {
+func mustModuleID(t *testing.T) identity.Owner {
 	t.Helper()
 	m, err := identity.NewModuleID("fixture.example/synthetic", "")
 	if err != nil {
 		t.Fatalf("NewModuleID: %v", err)
 	}
-	return m
+	owner, err := identity.NewModuleOwner(m)
+	if err != nil {
+		t.Fatalf("NewModuleOwner: %v", err)
+	}
+	return owner
 }

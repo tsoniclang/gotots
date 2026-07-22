@@ -118,17 +118,18 @@ func (d DirectiveRecord) Display() DisplaySpan { return d.display }
 // constructed only through newFileInventory, which enforces the artifact
 // invariants.
 type FileInventory struct {
-	version     int
-	path        string
-	file        identity.FileID
-	occurrences []Occurrence
-	directives  []DirectiveRecord
+	version            int
+	path               string
+	file               identity.FileID
+	effectiveGoVersion string
+	occurrences        []Occurrence
+	directives         []DirectiveRecord
 }
 
 // newFileInventory validates the artifact invariants: a File root with no
 // parent/edge, unique canonical identities, parents preceding children,
 // edge parents matching, and total variant resolution.
-func newFileInventory(path string, file identity.FileID, occurrences []Occurrence, directives []DirectiveRecord) (*FileInventory, error) {
+func newFileInventory(path string, file identity.FileID, effectiveGoVersion string, occurrences []Occurrence, directives []DirectiveRecord) (*FileInventory, error) {
 	if file.IsZero() {
 		return nil, &identity.Error{Identity: "file", Value: path, Reason: "inventory requires a non-zero file identity"}
 	}
@@ -177,7 +178,8 @@ func newFileInventory(path string, file identity.FileID, occurrences []Occurrenc
 	}
 	return &FileInventory{
 		version: InventoryArtifactVersion, path: path, file: file,
-		occurrences: occurrences, directives: directives,
+		effectiveGoVersion: effectiveGoVersion,
+		occurrences:        occurrences, directives: directives,
 	}, nil
 }
 
@@ -201,6 +203,11 @@ func (inv *FileInventory) Path() string { return inv.path }
 
 // File is the canonical file identity.
 func (inv *FileInventory) File() identity.FileID { return inv.file }
+
+// EffectiveGoVersion is the file's effective language version from typed
+// toolchain evidence; it governs construct admission for this file's
+// occurrences. There is no workspace-wide version.
+func (inv *FileInventory) EffectiveGoVersion() string { return inv.effectiveGoVersion }
 
 // Occurrences is the pre-ordered authoritative occurrence list. Callers must
 // not mutate it.
@@ -247,16 +254,12 @@ func (p *PackageInventory) Files() []*FileInventory { return p.files }
 
 // WorkspaceInventory is the immutable whole-workspace inventory artifact.
 type WorkspaceInventory struct {
-	version   int
-	goVersion string
-	packages  []*PackageInventory
+	version  int
+	packages []*PackageInventory
 }
 
 // Version is the artifact schema version.
 func (w *WorkspaceInventory) Version() int { return w.version }
-
-// GoVersion is the selected language version of the workspace.
-func (w *WorkspaceInventory) GoVersion() string { return w.goVersion }
 
 // Packages are the per-package inventories in deterministic order.
 func (w *WorkspaceInventory) Packages() []*PackageInventory { return w.packages }

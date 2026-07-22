@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/tsoniclang/gotots/internal/compiler"
-	"github.com/tsoniclang/gotots/internal/language/analyze"
 	"github.com/tsoniclang/gotots/internal/source"
 )
 
@@ -75,26 +74,40 @@ func runInspect(args []string, stdout io.Writer) error {
 		}
 	}
 	request.Patterns = patterns
-	inventory, err := compiler.InspectConstructs(request)
+	inspection, err := compiler.InspectConstructs(request)
 	if err != nil {
 		return err
 	}
-	return printInventory(stdout, inventory)
+	return printInspection(stdout, inspection)
 }
 
-// printInventory renders the canonical occurrence records and the exact
-// denominators. Write errors propagate; a failing writer fails the command.
-func printInventory(stdout io.Writer, inventory *analyze.WorkspaceInventory) error {
+// printInspection renders the resolved universe, the canonical occurrence
+// records, and the exact denominators. Write errors propagate; a failing
+// writer fails the command.
+func printInspection(stdout io.Writer, inspection *compiler.Inspection) error {
 	p := func(format string, args ...any) error {
 		_, err := fmt.Fprintf(stdout, format, args...)
 		return err
 	}
+	ws := inspection.Workspace()
+	if err := p("toolchain %s (%s)\n", ws.Toolchain().Version(), ws.Toolchain().Binary()); err != nil {
+		return err
+	}
+	ownerCounts := map[string]int{}
+	for _, pkg := range ws.Packages() {
+		ownerCounts[pkg.ID().Owner().Class().String()]++
+		if err := p("universe %s provenance=%s acquisition=%s disposition=%s moduleGo=%s selected=%v\n",
+			pkg.ID(), pkg.Provenance(), pkg.Acquisition(), pkg.Disposition(), pkg.ModuleGoVersion(), pkg.Selected()); err != nil {
+			return err
+		}
+	}
+	inventory := inspection.Inventory()
 	for _, pkg := range inventory.Packages() {
 		if err := p("package %s\n", pkg.ID()); err != nil {
 			return err
 		}
 		for _, file := range pkg.Files() {
-			if err := p("  file %s\n", file.File()); err != nil {
+			if err := p("  file %s goVersion=%s\n", file.File(), file.EffectiveGoVersion()); err != nil {
 				return err
 			}
 			for _, occurrence := range file.Occurrences() {
@@ -124,6 +137,11 @@ func printInventory(stdout io.Writer, inventory *analyze.WorkspaceInventory) err
 		}
 	}
 	d := inventory.Denominators()
-	return p("denominators: goVersion=%s packages=%d files=%d occurrences=%d directives=%d variantBearing=%d implicitOps=%d unknownConstructs=0 unknownDirectives=0\n",
-		inventory.GoVersion(), d.Packages, d.Files, d.Occurrences, d.Directives, d.VariantBearing, d.ImplicitOps)
+	if err := p("universe: closurePackages=%d moduleOwned=%d std=%d toolchain=%d languagePseudo=%d\n",
+		len(ws.Packages()), ownerCounts["module"], ownerCounts["standard-library"],
+		ownerCounts["toolchain"], ownerCounts["language-pseudo"]); err != nil {
+		return err
+	}
+	return p("denominators: selectedPackages=%d files=%d occurrences=%d directives=%d variantBearing=%d implicitOps=%d unknownConstructs=0 unknownDirectives=0\n",
+		d.Packages, d.Files, d.Occurrences, d.Directives, d.VariantBearing, d.ImplicitOps)
 }

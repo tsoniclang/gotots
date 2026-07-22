@@ -86,86 +86,92 @@ func (m ModuleID) String() string {
 	return m.path + "@" + m.version
 }
 
-// PackageID is the semantic identity of one package: its module plus its full
-// import path, which must lie inside the module.
+// PackageID is the semantic identity of one package: its owner plus its full
+// import path. A module-owned import path must lie inside its module; the
+// reserved owners admit any valid toolchain import path.
 type PackageID struct {
-	module     ModuleID
+	owner      Owner
 	importPath string
 }
 
-// NewPackageID validates a package import path against its owning module.
-func NewPackageID(module ModuleID, importPath string) (PackageID, error) {
+// NewPackageID validates a package import path against its owner.
+func NewPackageID(owner Owner, importPath string) (PackageID, error) {
 	fail := func(reason string) (PackageID, error) {
 		return PackageID{}, &Error{Identity: "package", Value: importPath, Reason: reason}
 	}
 	switch {
-	case module.IsZero():
-		return fail("owning module identity must not be zero")
+	case owner.IsZero():
+		return fail("owner identity must not be zero")
 	case importPath == "":
 		return fail("import path must not be empty")
 	case hasReserved(importPath) || strings.Contains(importPath, "::"):
 		return fail("import path contains a reserved character")
-	case importPath != module.path && !strings.HasPrefix(importPath, module.path+"/"):
-		return fail("import path lies outside module " + module.path)
 	}
-	return PackageID{module: module, importPath: importPath}, nil
+	if owner.Class() == OwnerModule {
+		module := owner.Module()
+		if importPath != module.path && !strings.HasPrefix(importPath, module.path+"/") {
+			return fail("import path lies outside module " + module.path)
+		}
+	}
+	return PackageID{owner: owner, importPath: importPath}, nil
 }
 
 // IsZero reports whether p is the invalid zero identity.
 func (p PackageID) IsZero() bool { return p == PackageID{} }
 
-// Module is the owning module identity.
-func (p PackageID) Module() ModuleID { return p.module }
+// Owner is the owning identity.
+func (p PackageID) Owner() Owner { return p.owner }
 
 // ImportPath is the package's full import path.
 func (p PackageID) ImportPath() string { return p.importPath }
 
-// String is the canonical serialization: module::importPath.
-func (p PackageID) String() string { return p.module.String() + "::" + p.importPath }
+// String is the canonical serialization: owner::importPath.
+func (p PackageID) String() string { return p.owner.String() + "::" + p.importPath }
 
-// FileID is the canonical identity of one source file: its owning module plus
-// its module-relative slash path. Workspace layout and machine paths never
+// FileID is the canonical identity of one source file: its owner plus its
+// owner-relative slash path (module-relative for module owners, GOROOT/src-
+// relative for the reserved owners). Workspace layout and machine paths never
 // appear.
 type FileID struct {
-	module ModuleID
-	rel    string
+	owner Owner
+	rel   string
 }
 
-// NewFileID validates a module-relative path into a FileID.
-func NewFileID(module ModuleID, moduleRel string) (FileID, error) {
+// NewFileID validates an owner-relative path into a FileID.
+func NewFileID(owner Owner, rel string) (FileID, error) {
 	fail := func(reason string) (FileID, error) {
-		return FileID{}, &Error{Identity: "file", Value: moduleRel, Reason: reason}
+		return FileID{}, &Error{Identity: "file", Value: rel, Reason: reason}
 	}
 	switch {
-	case module.IsZero():
-		return fail("owning module identity must not be zero")
-	case moduleRel == "" || moduleRel == ".":
-		return fail("module-relative path must name a file")
-	case strings.Contains(moduleRel, `\`):
-		return fail("module-relative path must be slash-separated")
-	case strings.HasPrefix(moduleRel, "/"):
-		return fail("module-relative path must be relative")
-	case hasReserved(moduleRel) || strings.Contains(moduleRel, "::"):
-		return fail("module-relative path contains a reserved character")
-	case strings.HasSuffix(moduleRel, "/") || strings.Contains(moduleRel, "//"):
-		return fail("module-relative path must be a cleaned file path")
-	case pathHasDotSegment(moduleRel):
-		return fail("module-relative path must not contain '.' or '..' segments")
+	case owner.IsZero():
+		return fail("owner identity must not be zero")
+	case rel == "" || rel == ".":
+		return fail("owner-relative path must name a file")
+	case strings.Contains(rel, `\`):
+		return fail("owner-relative path must be slash-separated")
+	case strings.HasPrefix(rel, "/"):
+		return fail("owner-relative path must be relative")
+	case hasReserved(rel) || strings.Contains(rel, "::"):
+		return fail("owner-relative path contains a reserved character")
+	case strings.HasSuffix(rel, "/") || strings.Contains(rel, "//"):
+		return fail("owner-relative path must be a cleaned file path")
+	case pathHasDotSegment(rel):
+		return fail("owner-relative path must not contain '.' or '..' segments")
 	}
-	return FileID{module: module, rel: moduleRel}, nil
+	return FileID{owner: owner, rel: rel}, nil
 }
 
 // IsZero reports whether f is the invalid zero identity.
 func (f FileID) IsZero() bool { return f == FileID{} }
 
-// Module is the owning module identity.
-func (f FileID) Module() ModuleID { return f.module }
+// Owner is the owning identity.
+func (f FileID) Owner() Owner { return f.owner }
 
-// Rel is the module-relative slash path.
+// Rel is the owner-relative slash path.
 func (f FileID) Rel() string { return f.rel }
 
-// String is the canonical serialization: module::rel.
-func (f FileID) String() string { return f.module.String() + "::" + f.rel }
+// String is the canonical serialization: owner::rel.
+func (f FileID) String() string { return f.owner.String() + "::" + f.rel }
 
 // SpanID is the identity of one physical byte range in a file, measured with
 // //line directives ignored.

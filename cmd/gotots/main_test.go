@@ -33,11 +33,14 @@ func TestRunInspectConstructs(t *testing.T) {
 	}
 	rendered := out.String()
 	for _, needle := range []string{
-		"package cli.example/sample::cli.example/sample",
-		"cli.example/sample::main.go#",
+		"toolchain go1.26",
+		"universe mod=cli.example/sample::cli.example/sample provenance=workspace-module acquisition=workspace",
+		"package mod=cli.example/sample::cli.example/sample",
+		"mod=cli.example/sample::main.go#",
+		"goVersion=go1.26",
 		"kind=FuncDecl",
 		"edge=File.Decls role=declaration",
-		"denominators: goVersion=",
+		"denominators: selectedPackages=",
 		"unknownConstructs=0",
 	} {
 		if !strings.Contains(rendered, needle) {

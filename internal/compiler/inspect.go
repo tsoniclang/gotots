@@ -12,6 +12,20 @@ import (
 	"github.com/tsoniclang/gotots/internal/stagecheck"
 )
 
+// Inspection is the verified result of one inspect run: the resolved source
+// universe (identity, provenance, acquisition, versions for the complete
+// closure) and the construct inventory of the selected packages.
+type Inspection struct {
+	workspace *source.Workspace
+	inventory *analyze.WorkspaceInventory
+}
+
+// Workspace is the resolved source universe.
+func (i *Inspection) Workspace() *source.Workspace { return i.workspace }
+
+// Inventory is the verified construct inventory.
+func (i *Inspection) Inventory() *analyze.WorkspaceInventory { return i.inventory }
+
 // InspectConstructs resolves a compilation request into a verified
 // whole-workspace construct inventory:
 //
@@ -19,7 +33,7 @@ import (
 //
 // A failed stage verifier blocks every downstream stage; there is no partial
 // or unverified artifact.
-func InspectConstructs(req source.Request) (*analyze.WorkspaceInventory, error) {
+func InspectConstructs(req source.Request) (*Inspection, error) {
 	ws, err := source.LoadWorkspace(req)
 	if err != nil {
 		return nil, err
@@ -34,5 +48,5 @@ func InspectConstructs(req source.Request) (*analyze.WorkspaceInventory, error) 
 	if err := stagecheck.VerifySyntaxInventory(ws, inventory); err != nil {
 		return nil, err
 	}
-	return inventory, nil
+	return &Inspection{workspace: ws, inventory: inventory}, nil
 }
