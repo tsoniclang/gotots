@@ -1,4 +1,4 @@
-// Package typeset is the general exact Go type-semantics owner: normalized
+// Package typesemantics is the general exact Go type-semantics owner: normalized
 // type-set and core-type behavior for constraints and type parameters. It is
 // the single authority — construct-local flatten/sort/deduplicate
 // approximations are forbidden and mutation-tested against its differential
