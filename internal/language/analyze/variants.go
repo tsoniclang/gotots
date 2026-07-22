@@ -9,7 +9,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/language/catalog"
-	"github.com/tsoniclang/gotots/internal/language/typeset"
+	"github.com/tsoniclang/gotots/internal/language/typesemantics"
 )
 
 // resolveVariants assigns the semantic variant of every occurrence from typed
@@ -271,7 +271,7 @@ func aggregateShape(t types.Type) types.Type {
 // core resolves to its alias-free underlying for shape dispatch (callers'
 // closed switches fail closed on unsupported shapes).
 func coreOf(t types.Type) types.Type {
-	if core, ok := typeset.Core(t); ok {
+	if core, ok := typesemantics.Core(t); ok {
 		return core
 	}
 	return types.Unalias(t).Underlying()

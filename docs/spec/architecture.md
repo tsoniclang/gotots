@@ -61,6 +61,20 @@ authorize a second traversal: source census remains a bounded implementation-
 boundary census, while construct topology has exactly one producer in the
 language-analysis layer.
 
+The transient checker graph and its evidence are Stage-1's, and their lifetime
+is defined exactly. The one checker graph is live from workspace load through
+finalization; Stage 2 (the semantic model) consumes that same transient graph
+and materializes its canonical, identity-keyed semantic facts BEFORE source
+finalization severs it. There is no finalized raw type-fact API and no second
+checker: the semantic model reads the transient graph in place, exactly as the
+analyze traversal does, and emits identity-keyed facts. The inspect-only
+pipeline ends after Stage 1, so it may finalize immediately, with no semantic
+materialization step. A finalized artifact never carries a mutable checker
+object for a later phase to consult. An occurrence of an identifier is not, by
+itself, proof of a resolved binding, capture, or object identity; captured-
+binding and object facts are materialized by the semantic model from the
+checker graph, never inferred from an occurrence's presence.
+
 ## Input Contract
 
 A compilation request contains:
@@ -232,7 +246,14 @@ operations. Every reference preserves source order, parent-assigned role, source
 anchor, and child identity. No construct is dropped, duplicated, or later
 inferred from spelling or span containment. Provider and audit manifests carry
 this definition/reference graph — not a flat unit list — so ordinary
-compilation exact-joins it without rescanning provider interiors.
+compilation exact-joins it without rescanning provider interiors. A flat unit
+list may exist only as a derived census projection of that graph, never as the
+topology authority: the graph is the source of truth, and any flat list is
+reconstructible from it. At provider-artifact production the graph is
+independently extracted and certified; ordinary consumption trusts only the
+externally certified digest plus its own exact census and selection joins, and
+graph ownership stays in the language-analysis layer — the source layer, which
+owns bytes and census, never imports the catalog to build it.
 
 Requested roots, resolved import closure, full-semantic source set,
 declaration-contract set, and later product reachability are different sets with
@@ -591,7 +612,12 @@ internal/identity/           canonical source/type/operation/implementation IDs
 internal/language/catalog/   closed Go construct catalog
 internal/language/typesemantics/ exact shared Go type-set/core-type operations
 internal/language/semantic/  target-independent semantic records
-internal/language/analyze/   context-aware typed visitors
+internal/language/analyze/   parent-directed catalog traversal: occurrences,
+                             variants, implicit operations, and the
+                             implementation definition/reference graph
+internal/stagecheck/         blocking in-pipeline independent stage joins,
+                             run synchronously between phases; distinct from
+                             internal/verify offline/certification gates
 internal/analysis/           sealed whole-program facts
 internal/plan/               immutable representation/implementation plan
 internal/typescript/ast/     typed target nodes

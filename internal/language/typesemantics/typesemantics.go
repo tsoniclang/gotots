@@ -3,7 +3,7 @@
 // the single authority — construct-local flatten/sort/deduplicate
 // approximations are forbidden and mutation-tested against its differential
 // matrix.
-package typeset
+package typesemantics
 
 import "go/types"
 

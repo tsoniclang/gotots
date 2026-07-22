@@ -129,10 +129,10 @@ func TestWallGateSeesTheTree(t *testing.T) {
 // (which require toolchain extraction that bypasses the producers).
 func TestASTImportsAreWalled(t *testing.T) {
 	allowed := map[string]bool{
-		"internal/source":           true,
-		"internal/language/analyze": true,
-		"internal/language/typeset": true,
-		"internal/stagecheck":       true,
+		"internal/source":                 true,
+		"internal/language/analyze":       true,
+		"internal/language/typesemantics": true,
+		"internal/stagecheck":             true,
 	}
 	for _, p := range productPackages(t) {
 		for _, imp := range p.imports {
@@ -196,16 +196,16 @@ func TestNoCorpusOrIntegrationImports(t *testing.T) {
 // one declared layer, and an import edge must go from a higher rank to a
 // strictly lower one (Rule 1).
 var layerRank = map[string]int{
-	"internal/identity":         5,
-	"internal/language/catalog": 10,
-	"internal/source":           30,
-	"internal/language/typeset": 32,
-	"internal/scope":            35,
-	"internal/language/analyze": 40,
-	"internal/stagecheck":       60,
-	"internal/compiler":         80,
-	"cmd/gotots":                90,
-	"internal/verify":           100,
+	"internal/identity":               5,
+	"internal/language/catalog":       10,
+	"internal/source":                 30,
+	"internal/language/typesemantics": 32,
+	"internal/scope":                  35,
+	"internal/language/analyze":       40,
+	"internal/stagecheck":             60,
+	"internal/compiler":               80,
+	"cmd/gotots":                      90,
+	"internal/verify":                 100,
 }
 
 // TestLayerRegistryIsTotal proves the registry and the module's production

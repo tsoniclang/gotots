@@ -191,8 +191,11 @@ func TestRegionCertificationChildFullOuterNonFull(t *testing.T) {
 			t.Errorf("child region occurrence %s escapes the nested literal span (reaches the excluded parent)", occ.ID())
 		}
 	}
-	// The captured binding `base` is resolvable in the child body: the region
-	// carries a use of it (an Ident occurrence within the child).
+	// The child region is non-empty and structurally isolated. Whether the
+	// binding `base` is captured from the excluded parent is a semantic-model
+	// fact materialized from the checker graph in Stage 2 — an occurrence's
+	// presence alone does not prove capture identity, so Stage 1 asserts only
+	// that the child's own body region exists and is isolated.
 	if len(region.Occurrences()) == 0 {
 		t.Error("child region has no occurrences")
 	}

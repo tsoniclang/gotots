@@ -1,4 +1,4 @@
-package typeset
+package typesemantics
 
 import (
 	"go/ast"
