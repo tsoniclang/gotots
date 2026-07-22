@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
-	"strings"
 
 	"github.com/tsoniclang/gotots/internal/identity"
 )
@@ -68,9 +67,13 @@ func decodeRule(r ruleArtifact) (ContractRule, error) {
 	}
 	switch r.Bind {
 	case "unit":
-		return NewExactUnitRule(r.Unit, condition, provider)
+		ref, err := identity.ParseUnitRef(r.Unit)
+		if err != nil {
+			return ContractRule{}, err
+		}
+		return NewExactUnitRule(ref, condition, provider)
 	case "package":
-		pkg, err := parsePackageArtifact(r.Package)
+		pkg, err := identity.ParsePackageID(r.Package)
 		if err != nil {
 			return ContractRule{}, err
 		}
@@ -113,44 +116,4 @@ func ownerClassByName(name string) (identity.OwnerClass, error) {
 		}
 	}
 	return 0, &SelectionError{Reason: "contract rule declares unknown namespace " + name}
-}
-
-// parsePackageArtifact reconstructs a package identity from its canonical
-// serialization through the identity constructors: the reserved-owner prefixes
-// and the mod= owner form are the exact canonical forms identity renders.
-func parsePackageArtifact(canonical string) (identity.PackageID, error) {
-	fail := func() (identity.PackageID, error) {
-		return identity.PackageID{}, &SelectionError{Reason: "contract rule package identity " + canonical + " is not canonical"}
-	}
-	sep := strings.Index(canonical, "::")
-	if sep < 0 {
-		return fail()
-	}
-	ownerPart, importPath := canonical[:sep], canonical[sep+2:]
-	var owner identity.Owner
-	switch {
-	case ownerPart == "std":
-		owner = identity.StandardLibraryOwner()
-	case ownerPart == "toolchain":
-		owner = identity.ToolchainOwner()
-	case ownerPart == "lang":
-		owner = identity.LanguagePseudoOwner()
-	case strings.HasPrefix(ownerPart, "mod="):
-		spec := ownerPart[len("mod="):]
-		path, version := spec, ""
-		if at := strings.Index(spec, "@"); at >= 0 {
-			path, version = spec[:at], spec[at+1:]
-		}
-		module, err := identity.NewModuleID(path, version)
-		if err != nil {
-			return identity.PackageID{}, err
-		}
-		owner, err = identity.NewModuleOwner(module)
-		if err != nil {
-			return identity.PackageID{}, err
-		}
-	default:
-		return fail()
-	}
-	return identity.NewPackageID(owner, importPath)
 }

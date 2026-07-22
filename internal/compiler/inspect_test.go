@@ -229,6 +229,7 @@ func TestCgoThroughPublicPipeline(t *testing.T) {
 		t.Fatal(err)
 	}
 	cgoReq.AuditArtifact = manifestPath
+	cgoReq.AuditArtifactDigest = artifact.ArtifactDigest
 	inspection, err := InspectConstructs(cgoReq)
 	if err != nil {
 		t.Fatalf("cgo consumption pipeline: %v", err)

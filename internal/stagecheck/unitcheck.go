@@ -38,7 +38,7 @@ func VerifyUnitCensus(ws *source.Workspace, req source.Request, contract scope.P
 		if req.AuditArtifact == "" {
 			return nil, fmt.Errorf("manifest-mode file present but the request selects no audit artifact")
 		}
-		decoded, err := analyze.DecodeAuditArtifact(req.AuditArtifact)
+		decoded, err := analyze.DecodeAuditArtifactBound(req.AuditArtifact, req.AuditArtifactDigest)
 		if err != nil {
 			return nil, err
 		}

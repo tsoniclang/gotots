@@ -36,14 +36,21 @@ type MixedUnits struct{ Retained []RetainedUnit }
 
 func (MixedUnits) fileEvidence() {}
 
-// RetainedUnit is one full-semantic unit's retained declaration subtree. For
-// cgo originals the subtree comes from the checked view; CheckedSpan then
+// RetainedUnit is one full-semantic unit's retained declaration subtree rooted
+// at the unit's own exact node (the FuncDecl of a func/bodyless unit, the
+// FuncLit of a literal unit, the ValueSpec of an initializer). Boundaries are
+// the unit's DIRECT nested units' root nodes: they are structural holes in
+// this region — excluded from both the retained type-information membership and
+// the inventory walk, so a nested unit's body is unreachable through its
+// parent and every implementation body is an independently traversable region.
+// For cgo originals the subtree comes from the checked view; CheckedSpan then
 // carries the declaration's span in checked-view coordinates (the origin
 // mapping's evidence), and occurrence positions resolve through the shared
 // file set whose //line handling maps display positions back to the original.
 type RetainedUnit struct {
 	Unit            identity.SourceUnitID
 	Decl            ast.Node
+	Boundaries      []ast.Node
 	FromCheckedView bool
 	CheckedSpan     Span
 }
@@ -191,29 +198,51 @@ func finalizePackage(u *Universe, loaded *LoadedPackage, depths map[identity.Sou
 
 // retainedNodes collects the exact AST node set of every retained
 // full-semantic subtree in the package: complete trees of uniform-full files
-// plus the retained unit subtrees of mixed files. Nothing outside this set —
-// no non-full body — can key a retained Info entry.
+// plus the retained unit subtrees of mixed files, each excluding its nested
+// units' subtrees at their boundaries. Nothing outside this set — no non-full
+// body, and no full nested unit's interior (which is a member under its own
+// region instead) — can key a retained Info entry.
 func retainedNodes(files []*File) map[ast.Node]bool {
 	members := map[ast.Node]bool{}
-	collect := func(root ast.Node) {
-		ast.Inspect(root, func(n ast.Node) bool {
-			if n != nil {
-				members[n] = true
-			}
-			return true
-		})
-	}
 	for _, file := range files {
 		switch evidence := file.evidence.(type) {
 		case FullSyntax:
-			collect(evidence.Syntax)
+			collectExcluding(evidence.Syntax, nil, members)
 		case MixedUnits:
 			for _, retained := range evidence.Retained {
-				collect(retained.Decl)
+				collectExcluding(retained.Decl, boundarySet(retained.Boundaries), members)
 			}
 		}
 	}
 	return members
+}
+
+// boundarySet indexes a retained unit's boundary nodes for membership tests.
+func boundarySet(boundaries []ast.Node) map[ast.Node]bool {
+	if len(boundaries) == 0 {
+		return nil
+	}
+	set := make(map[ast.Node]bool, len(boundaries))
+	for _, n := range boundaries {
+		set[n] = true
+	}
+	return set
+}
+
+// collectExcluding adds every node of root's subtree to members, halting at
+// (and excluding) each boundary node so a nested unit's interior never enters
+// its parent's membership.
+func collectExcluding(root ast.Node, boundaries map[ast.Node]bool, members map[ast.Node]bool) {
+	ast.Inspect(root, func(n ast.Node) bool {
+		if n == nil {
+			return false
+		}
+		if boundaries[n] {
+			return false
+		}
+		members[n] = true
+		return true
+	})
 }
 
 // packageRetainsFull reports whether any unit of the package is full-semantic.
@@ -228,10 +257,21 @@ func packageRetainsFull(loaded *LoadedPackage, depths map[identity.SourceUnitID]
 	return false
 }
 
-// retainUnits collects the full-semantic units' declaration subtrees of one
-// mixed file. For cgo originals the retained subtree comes from the checked
-// view through the origin mapping.
+// retainUnits collects the full-semantic units' retained regions of one mixed
+// file: each rooted at the unit's exact node with its direct nested units as
+// structural boundaries. For cgo originals the retained subtree comes from the
+// checked view through the origin mapping (nested-unit exactness there rides on
+// the origin graph and carries no boundaries yet).
 func retainUnits(u *Universe, loaded *LoadedPackage, file *LoadedFile, depths map[identity.SourceUnitID]EvidenceDepth) ([]RetainedUnit, error) {
+	var nodeOf map[identity.SourceUnitID]ast.Node
+	var boundaryOf map[identity.SourceUnitID][]ast.Node
+	if file.syntax != nil {
+		var err error
+		nodeOf, boundaryOf, err = unitTopology(u, file)
+		if err != nil {
+			return nil, err
+		}
+	}
 	var out []RetainedUnit
 	for _, unit := range file.units {
 		if depths[unit.id] != DepthFullSemantic {
@@ -239,7 +279,8 @@ func retainUnits(u *Universe, loaded *LoadedPackage, file *LoadedFile, depths ma
 		}
 		retained := RetainedUnit{Unit: unit.id}
 		if file.syntax != nil {
-			retained.Decl = unitNodeAt(file.syntax, file.fset, unit)
+			retained.Decl = nodeOf[unit.id]
+			retained.Boundaries = boundaryOf[unit.id]
 		} else {
 			for _, checked := range loaded.checkedDecls {
 				if checked.origin == unit.id {
@@ -258,33 +299,82 @@ func retainUnits(u *Universe, loaded *LoadedPackage, file *LoadedFile, depths ma
 	return out, nil
 }
 
-// unitNodeAt finds the tight retainable node of one unit: the FuncDecl whose
-// body is the unit, or the exact ValueSpec — never a wider GenDecl that would
-// retain sibling non-full specs.
-func unitNodeAt(file *ast.File, fset *token.FileSet, unit SourceUnit) ast.Node {
-	span := unit.span
-	within := func(n ast.Node) bool {
-		start := fset.PositionFor(n.Pos(), false).Offset
-		end := fset.PositionFor(n.End(), false).Offset
-		return start <= span.Start.Offset && span.End.Offset <= end
+// unitTopology maps every censused unit of one file to its exact root node and
+// its direct nested units' root nodes (its structural boundaries). Nested
+// units are function literals; a unit's direct children are the units it
+// contains with no intervening unit. Nesting is decided by physical span
+// containment — never by walking order.
+func unitTopology(u *Universe, file *LoadedFile) (map[identity.SourceUnitID]ast.Node, map[identity.SourceUnitID][]ast.Node, error) {
+	type spanKey struct{ start, end int }
+	funcBody := map[spanKey]ast.Node{} // body span -> *ast.FuncDecl
+	bodyless := map[spanKey]ast.Node{} // decl span -> *ast.FuncDecl
+	litBody := map[spanKey]ast.Node{}  // funclit span -> *ast.FuncLit
+	valueSpec := map[spanKey]ast.Node{}
+	keyOf := func(n ast.Node) spanKey {
+		return spanKey{file.fset.PositionFor(n.Pos(), false).Offset, file.fset.PositionFor(n.End(), false).Offset}
 	}
-	for _, decl := range file.Decls {
-		if !within(decl) {
-			continue
+	ast.Inspect(file.syntax, func(n ast.Node) bool {
+		switch n := n.(type) {
+		case *ast.FuncDecl:
+			if n.Body != nil {
+				funcBody[keyOf(n.Body)] = n
+			} else {
+				bodyless[keyOf(n)] = n
+			}
+		case *ast.FuncLit:
+			litBody[keyOf(n)] = n
+		case *ast.ValueSpec:
+			valueSpec[keyOf(n)] = n
 		}
-		if generic, ok := decl.(*ast.GenDecl); ok {
-			for _, spec := range generic.Specs {
-				specStart := fset.PositionFor(spec.Pos(), false).Offset
-				specEnd := fset.PositionFor(spec.End(), false).Offset
-				if specStart == span.Start.Offset && specEnd == span.End.Offset {
-					return spec
+		return true
+	})
+	nodeOf := make(map[identity.SourceUnitID]ast.Node, len(file.units))
+	for _, unit := range file.units {
+		k := spanKey{unit.span.Start.Offset, unit.span.End.Offset}
+		var node ast.Node
+		switch unit.id.Kind() {
+		case identity.UnitFuncBody:
+			node = funcBody[k]
+		case identity.UnitBodylessDecl:
+			node = bodyless[k]
+		case identity.UnitFuncLitBody:
+			node = litBody[k]
+		case identity.UnitVarInitializer:
+			node = valueSpec[k]
+		}
+		if node == nil {
+			return nil, nil, &LoadError{Dir: u.request.Dir, Reason: "no exact syntax node for unit " + unit.id.String()}
+		}
+		nodeOf[unit.id] = node
+	}
+	contains := func(a, b SourceUnit) bool {
+		if a.span.Start.Offset == b.span.Start.Offset && a.span.End.Offset == b.span.End.Offset {
+			return false
+		}
+		return a.span.Start.Offset <= b.span.Start.Offset && b.span.End.Offset <= a.span.End.Offset
+	}
+	boundaryOf := map[identity.SourceUnitID][]ast.Node{}
+	for _, parent := range file.units {
+		for _, child := range file.units {
+			if !contains(parent, child) {
+				continue
+			}
+			direct := true
+			for _, mid := range file.units {
+				if mid.id == parent.id || mid.id == child.id {
+					continue
+				}
+				if contains(parent, mid) && contains(mid, child) {
+					direct = false
+					break
 				}
 			}
-			continue
+			if direct {
+				boundaryOf[parent.id] = append(boundaryOf[parent.id], nodeOf[child.id])
+			}
 		}
-		return decl
 	}
-	return nil
+	return nodeOf, boundaryOf, nil
 }
 
 // filterInfoByMembership copies exactly the type-information entries whose

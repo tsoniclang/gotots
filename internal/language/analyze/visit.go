@@ -22,12 +22,21 @@ type builder struct {
 	nodes       []ast.Node
 	parentIdx   []int
 	index       map[ast.Node]int
+	// boundaries are nested-unit root nodes that bound this region: the
+	// traversal records nothing for them and does not descend, so a nested
+	// unit's interior is unreachable through its parent's inventory.
+	boundaries map[ast.Node]bool
 }
 
 // visit records n (hanging from parentIdx across edge) and descends into its
 // cataloged child edges. The catalog disposition is the single admission
 // policy: the switch is exhaustive and holds no per-kind special case.
 func (b *builder) visit(n ast.Node, parentIdx int, edge catalog.Edge) error {
+	if b.boundaries[n] {
+		// A nested unit's root: its region is inventoried independently, so
+		// this parent records neither the boundary node nor its interior.
+		return nil
+	}
 	kind, err := Classify(n)
 	if err != nil {
 		if unknown, ok := err.(*UnknownConstructError); ok {

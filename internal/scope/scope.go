@@ -152,19 +152,21 @@ func (c EvidenceCondition) String() string {
 // rule binds. Rules are pure data with a canonical identity.
 type ContractRule struct {
 	selector  BindingSelector
-	unit      string // canonical unit identity (SelectorExactUnit)
-	pkg       string // canonical package identity (SelectorExactPackage)
+	unitRef   identity.UnitRef // typed discriminated unit identity (SelectorExactUnit)
+	pkg       string           // canonical package identity (SelectorExactPackage)
 	namespace identity.OwnerClass
 	condition EvidenceCondition
 	provider  Provider
 }
 
-// NewExactUnitRule binds one exact unit identity (source-spanned or implicit).
-func NewExactUnitRule(unit string, condition EvidenceCondition, provider Provider) (ContractRule, error) {
-	if unit == "" {
-		return ContractRule{}, &SelectionError{Reason: "exact-unit rule requires a canonical unit identity"}
+// NewExactUnitRule binds one exact typed unit reference (source-spanned or
+// implicit). Raw strings never enter a rule; artifact decoding reconstructs
+// the reference through the identity parsers.
+func NewExactUnitRule(unit identity.UnitRef, condition EvidenceCondition, provider Provider) (ContractRule, error) {
+	if unit.IsZero() {
+		return ContractRule{}, &SelectionError{Reason: "exact-unit rule requires a typed unit reference"}
 	}
-	return finishRule(ContractRule{selector: SelectorExactUnit, unit: unit, condition: condition, provider: provider})
+	return finishRule(ContractRule{selector: SelectorExactUnit, unitRef: unit, condition: condition, provider: provider})
 }
 
 // NewExactPackageRule binds every unit of one exact package identity.
@@ -200,7 +202,7 @@ func (r ContractRule) ID() string {
 	target := ""
 	switch r.selector {
 	case SelectorExactUnit:
-		target = "unit:" + r.unit
+		target = "unit:" + r.unitRef.String()
 	case SelectorExactPackage:
 		target = "package:" + r.pkg
 	case SelectorNamespace:
@@ -261,7 +263,7 @@ func (q UnitQuery) unitString() string {
 func (r ContractRule) matches(q UnitQuery) bool {
 	switch r.selector {
 	case SelectorExactUnit:
-		if r.unit != q.unitString() {
+		if r.unitRef.Source() != q.Unit || r.unitRef.Implicit() != q.Implicit {
 			return false
 		}
 	case SelectorExactPackage:
@@ -332,7 +334,7 @@ func finishedRuleID(r ContractRule) string {
 	}
 	switch r.selector {
 	case SelectorExactUnit:
-		if r.unit == "" {
+		if r.unitRef.IsZero() {
 			return ""
 		}
 	case SelectorExactPackage:
@@ -407,30 +409,42 @@ var contractRegistry = map[string]func() (ProviderContract, error){
 	DefaultContractID: defaultContractV1,
 }
 
-// ResolveContract resolves the request-selected contract: a built-in registry
-// identity, or the path of a versioned contract-artifact file. When a digest
-// is supplied it must match the resolved artifact's fingerprint. An empty
-// selection is a typed error — there is no silent default.
-func ResolveContract(selection, digest string) (ProviderContract, error) {
-	if selection == "" {
+// ResolveContract resolves the request-selected contract by IDENTITY. The
+// artifact path is separate acquisition data: empty means the built-in
+// registry; otherwise the artifact file is decoded and must declare exactly
+// the requested identity — an unknown identity never silently becomes a path
+// lookup. When a digest is supplied it must match the resolved artifact's
+// fingerprint. An empty identity selection is a typed error — there is no
+// silent default.
+func ResolveContract(id, digest, artifactPath string) (ProviderContract, error) {
+	if id == "" {
 		return ProviderContract{}, &SelectionError{Reason: "the compilation request selects no provider contract"}
 	}
 	var contract ProviderContract
-	if build, known := contractRegistry[selection]; known {
+	if artifactPath == "" {
+		build, known := contractRegistry[id]
+		if !known {
+			return ProviderContract{}, &SelectionError{Reason: "unknown provider contract " + id +
+				" (built-in registry; artifact acquisition is a separate request field)"}
+		}
 		built, err := build()
 		if err != nil {
 			return ProviderContract{}, err
 		}
 		contract = built
 	} else {
-		loaded, err := loadContractArtifact(selection)
+		loaded, err := loadContractArtifact(artifactPath)
 		if err != nil {
 			return ProviderContract{}, err
+		}
+		if loaded.ID() != id {
+			return ProviderContract{}, &SelectionError{Reason: "contract artifact " + artifactPath +
+				" declares identity " + loaded.ID() + ", request selects " + id}
 		}
 		contract = loaded
 	}
 	if digest != "" && digest != contract.Fingerprint() {
-		return ProviderContract{}, &SelectionError{Reason: "provider contract " + selection +
+		return ProviderContract{}, &SelectionError{Reason: "provider contract " + id +
 			" digest mismatch: request " + digest + " vs artifact " + contract.Fingerprint()}
 	}
 	return contract, nil

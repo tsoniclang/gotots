@@ -17,21 +17,26 @@ import (
 const usage = `usage: gotots <command> [args]
 
 commands:
-  inspect constructs -contract <id|artifact> [-dir <dir>] [-manifest <artifact>] [pattern ...]
+  inspect constructs -contract <id> [-contract-artifact <path>] [-dir <dir>]
+                     [-manifest <artifact> -manifest-digest <hex>] [pattern ...]
       report canonical construct occurrences, evidence-depth partition,
       directives, and exact denominators for the selected workspace
       (default pattern ./...). The request selects its provider contract
-      explicitly; -manifest selects the produced audit/unit-manifest
-      artifact, which is required whenever the closure contains
-      provider-owned files
-  audit catalog -contract <id|artifact> -o <artifact> [-dir <dir>] [pattern ...]
+      by identity (-contract-artifact supplies file acquisition for that
+      identity); -manifest selects the produced audit/unit-manifest
+      artifact with its certified digest — required whenever the closure
+      contains provider-owned files
+  audit catalog -contract <id> [-contract-artifact <path>] -o <artifact>
+                [-dir <dir>] [pattern ...]
       run the manifest-producing streaming catalog-coverage audit and
-      write the versioned, fingerprinted gate artifact (run with the
-      toolchain patterns "std cmd" to produce the complete selected-
-      toolchain artifact)
-  audit verify -contract <id|artifact> -a <artifact> [-dir <dir>] [pattern ...]
-      exact-join a stored artifact bidirectionally against a freshly
-      resolved universe of the same patterns (the gate coverage check)`
+      write the versioned, fingerprinted gate artifact plus its certified
+      digest (run with the toolchain patterns "std cmd" to produce the
+      complete selected-toolchain artifact)
+  audit verify -contract <id> [-contract-artifact <path>] -a <artifact>
+               [-dir <dir>] [pattern ...]
+      exact-join a stored artifact bidirectionally against a freshly and
+      recursively re-derived universe of the same patterns (the
+      certification gate)`
 
 // UnsupportedCommandError reports a command line the binary does not implement.
 // It is the CLI-level typed error; its string is rendered only here.
@@ -93,10 +98,16 @@ func parseCommon(command string, rest []string, extra map[string]*string) (commo
 			out.request.Dir = rest[i]
 		case rest[i] == "-contract":
 			if i+1 >= len(rest) {
-				return out, &UnsupportedCommandError{Command: command + " -contract (missing selection)"}
+				return out, &UnsupportedCommandError{Command: command + " -contract (missing identity)"}
 			}
 			i++
 			out.request.ProviderContract = rest[i]
+		case rest[i] == "-contract-artifact":
+			if i+1 >= len(rest) {
+				return out, &UnsupportedCommandError{Command: command + " -contract-artifact (missing path)"}
+			}
+			i++
+			out.request.ProviderContractArtifact = rest[i]
 		case strings.HasPrefix(rest[i], "-"):
 			return out, &UnsupportedCommandError{Command: command + " " + rest[i]}
 		default:
@@ -111,12 +122,15 @@ func runInspect(args []string, stdout io.Writer) error {
 	if len(args) == 0 || args[0] != "constructs" {
 		return &UnsupportedCommandError{Command: strings.TrimSpace("inspect " + strings.Join(args, " "))}
 	}
-	manifestPath := ""
-	common, err := parseCommon("inspect constructs", args[1:], map[string]*string{"-manifest": &manifestPath})
+	manifestPath, manifestDigest := "", ""
+	common, err := parseCommon("inspect constructs", args[1:], map[string]*string{
+		"-manifest": &manifestPath, "-manifest-digest": &manifestDigest,
+	})
 	if err != nil {
 		return err
 	}
 	common.request.AuditArtifact = manifestPath
+	common.request.AuditArtifactDigest = manifestDigest
 	inspection, err := compiler.InspectConstructs(common.request)
 	if err != nil {
 		return err
@@ -157,8 +171,13 @@ func runAuditCatalog(rest []string, stdout io.Writer) error {
 	if err := analyze.WriteAuditArtifact(artifact, out); err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(stdout, "catalog audit: toolchain=%s catalog=%s files=%d occurrences=%d directives=%d unknown=0 digest=%s -> %s\n",
-		artifact.Meta.ToolchainVersion, artifact.Meta.CatalogVersion, len(artifact.Files), artifact.Occurrences, artifact.Directives, artifact.ArtifactDigest[:12], out)
+	if _, err := fmt.Fprintf(stdout, "catalog audit: toolchain=%s catalog=%s files=%d occurrences=%d directives=%d unknown=0 -> %s\n",
+		artifact.Meta.ToolchainVersion, artifact.Meta.CatalogVersion, len(artifact.Files), artifact.Occurrences, artifact.Directives, out); err != nil {
+		return err
+	}
+	// The certified digest is the consumer's external binding; print it in
+	// full so the consuming request can select it exactly.
+	_, err = fmt.Fprintf(stdout, "certifiedDigest=%s\n", artifact.ArtifactDigest)
 	return err
 }
 

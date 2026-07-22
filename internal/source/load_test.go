@@ -14,7 +14,7 @@ import (
 // mustContract resolves the default contract artifact (the test's request
 // selection).
 func mustContract() scope.ProviderContract {
-	contract, err := scope.ResolveContract(scope.DefaultContractID, "")
+	contract, err := scope.ResolveContract(scope.DefaultContractID, "", "")
 	if err != nil {
 		panic(err)
 	}

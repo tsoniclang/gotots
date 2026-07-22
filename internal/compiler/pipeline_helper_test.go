@@ -23,5 +23,6 @@ func withManifest(t *testing.T, req source.Request) source.Request {
 		t.Fatal(err)
 	}
 	req.AuditArtifact = path
+	req.AuditArtifactDigest = artifact.ArtifactDigest
 	return req
 }

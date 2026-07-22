@@ -41,20 +41,20 @@ var witnessFixture = map[string]string{
 // typed, digest mismatch fails, and every unit selection records the exact
 // rule that bound it.
 func TestRequestSelectedContractAndWitnesses(t *testing.T) {
-	if _, err := scope.ResolveContract("", ""); err == nil {
+	if _, err := scope.ResolveContract("", "", ""); err == nil {
 		t.Error("empty contract selection resolved")
 	}
-	if _, err := scope.ResolveContract("nonexistent@v9", ""); err == nil {
+	if _, err := scope.ResolveContract("nonexistent@v9", "", ""); err == nil {
 		t.Error("unknown contract resolved")
 	}
-	contract, err := scope.ResolveContract(scope.DefaultContractID, "")
+	contract, err := scope.ResolveContract(scope.DefaultContractID, "", "")
 	if err != nil {
 		t.Fatalf("default contract: %v", err)
 	}
-	if _, err := scope.ResolveContract(scope.DefaultContractID, "deadbeef"); err == nil {
+	if _, err := scope.ResolveContract(scope.DefaultContractID, "deadbeef", ""); err == nil {
 		t.Error("digest mismatch resolved")
 	}
-	if _, err := scope.ResolveContract(scope.DefaultContractID, contract.Fingerprint()); err != nil {
+	if _, err := scope.ResolveContract(scope.DefaultContractID, contract.Fingerprint(), ""); err != nil {
 		t.Errorf("matching digest rejected: %v", err)
 	}
 	universe := loadFixture(t, contract, witnessFixture)
@@ -105,7 +105,7 @@ func TestRequestSelectedContractAndWitnesses(t *testing.T) {
 // exact-package and exact-unit rules take precedence over namespace rules
 // independent of declaration order.
 func TestContractsAreDataNotProvenance(t *testing.T) {
-	defaultContract, err := scope.ResolveContract(scope.DefaultContractID, "")
+	defaultContract, err := scope.ResolveContract(scope.DefaultContractID, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,11 @@ func TestContractsAreDataNotProvenance(t *testing.T) {
 		mustRule(scope.NewNamespaceRule(identity.OwnerToolchain, scope.ConditionAlways, scope.ProviderToolchainSource)),
 		mustRule(scope.NewNamespaceRule(identity.OwnerLanguagePseudo, scope.ConditionAlways, scope.ProviderLanguageIntrinsic)),
 	}
-	exact := mustRule(scope.NewExactUnitRule(moduleUnit.String(), scope.ConditionAlways, scope.ProviderAutomaticTranslation))
+	moduleRef, err := identity.NewSourceUnitRef(moduleUnit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	exact := mustRule(scope.NewExactUnitRule(moduleRef, scope.ConditionAlways, scope.ProviderAutomaticTranslation))
 	for _, order := range [][]scope.ContractRule{
 		append(append([]scope.ContractRule(nil), base...), exact),
 		append([]scope.ContractRule{exact}, base...),
@@ -208,12 +212,20 @@ func TestAmbiguityAndStaleRulesFailClosed(t *testing.T) {
 		t.Errorf("same-tier disagreement did not fail as ambiguity: %v", err)
 	}
 	// Runtime: an exact rule naming a unit outside the universe.
-	defaultContract, err := scope.ResolveContract(scope.DefaultContractID, "")
+	defaultContract, err := scope.ResolveContract(scope.DefaultContractID, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	universe := loadFixture(t, defaultContract, witnessFixture)
-	stale := mustRule(scope.NewExactUnitRule("mod=ghost.example::ghost.example#0-1/func-body", scope.ConditionAlways, scope.ProviderGostdlib))
+	if _, err := identity.ParseUnitRef("mod=ghost.example/g::ghost.example/g::ghost.go#0-1/func-body"); err == nil {
+		t.Fatal("noncanonical unit serialization parsed")
+	}
+	ghostUnit := mustGhostUnit(t)
+	ghostRef, err := identity.NewSourceUnitRef(ghostUnit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stale := mustRule(scope.NewExactUnitRule(ghostRef, scope.ConditionAlways, scope.ProviderGostdlib))
 	staleContract, err := scope.NewProviderContract("stale@v1", append(defaultRules(t), stale))
 	if err != nil {
 		t.Fatal(err)
@@ -225,11 +237,36 @@ func TestAmbiguityAndStaleRulesFailClosed(t *testing.T) {
 
 func defaultRules(t *testing.T) []scope.ContractRule {
 	t.Helper()
-	contract, err := scope.ResolveContract(scope.DefaultContractID, "")
+	contract, err := scope.ResolveContract(scope.DefaultContractID, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	return contract.Rules()
+}
+
+func mustGhostUnit(t *testing.T) identity.SourceUnitID {
+	t.Helper()
+	module, err := identity.NewModuleID("ghost.example/g", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner, err := identity.NewModuleOwner(module)
+	if err != nil {
+		t.Fatal(err)
+	}
+	file, err := identity.NewFileID(owner, "ghost.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	span, err := identity.NewSpanID(file, 0, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unit, err := identity.NewSourceUnitID(span, identity.UnitFuncBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return unit
 }
 
 func mustUnit(t *testing.T) identity.SourceUnitID {
@@ -285,26 +322,74 @@ func TestContractArtifactFile(t *testing.T) {
 	if err := os.WriteFile(path, []byte(artifact), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	contract, err := scope.ResolveContract(path, "")
+	contract, err := scope.ResolveContract("filecontract@v1", "", path)
 	if err != nil {
 		t.Fatalf("artifact contract: %v", err)
 	}
 	if contract.ID() != "filecontract@v1" || len(contract.Rules()) != 3 {
 		t.Errorf("artifact decoded to %s with %d rules", contract.ID(), len(contract.Rules()))
 	}
-	if _, err := scope.ResolveContract(path, contract.Fingerprint()); err != nil {
+	if _, err := scope.ResolveContract("filecontract@v1", contract.Fingerprint(), path); err != nil {
 		t.Errorf("matching artifact digest rejected: %v", err)
 	}
-	if _, err := scope.ResolveContract(path, "beef"); err == nil {
+	if _, err := scope.ResolveContract("filecontract@v1", "beef", path); err == nil {
 		t.Error("artifact digest mismatch resolved")
+	}
+	// Identity and acquisition are SEPARATE: the artifact must declare the
+	// selected identity, and an unknown identity never becomes a path lookup.
+	if _, err := scope.ResolveContract("otheridentity@v1", "", path); err == nil {
+		t.Error("artifact accepted under a different selected identity")
+	}
+	if _, err := scope.ResolveContract(path, "", ""); err == nil {
+		t.Error("a path-shaped identity resolved without artifact acquisition")
 	}
 	bad := strings.Replace(artifact, "gostdlib", "stdlib-magic", 1)
 	badPath := filepath.Join(dir, "bad.json")
 	if err := os.WriteFile(badPath, []byte(bad), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := scope.ResolveContract(badPath, ""); err == nil {
+	if _, err := scope.ResolveContract("filecontract@v1", "", badPath); err == nil {
 		t.Error("unknown provider spelling decoded")
+	}
+	// Malformed and noncanonical unit selectors fail through the identity
+	// parsers.
+	for _, selector := range []string{
+		"garbage",
+		"mod=x.example/m::x.example/m#9-3/func-body",
+		"mod=x.example/m::x.example/m#1-9/bogus-kind",
+		"mod=x.example/m::x.example/m#implicit/bogus-op",
+		"std::errors#implicit/package-init ",
+	} {
+		unitArtifact := `{
+ "id": "unitsel@v1",
+ "version": 2,
+ "rules": [
+  {"bind": "unit", "unit": "` + selector + `", "condition": "always", "provider": "gostdlib"}
+ ]
+}`
+		unitPath := filepath.Join(dir, "unitsel.json")
+		if err := os.WriteFile(unitPath, []byte(unitArtifact), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := scope.ResolveContract("unitsel@v1", "", unitPath); err == nil {
+			t.Errorf("malformed unit selector %q decoded", selector)
+		}
+	}
+	// A well-formed implicit selector decodes through the typed parser.
+	implicitArtifact := `{
+ "id": "implicitsel@v1",
+ "version": 2,
+ "rules": [
+  {"bind": "namespace", "namespace": "standard-library", "condition": "always", "provider": "gostdlib"},
+  {"bind": "unit", "unit": "std::errors#implicit/package-init", "condition": "always", "provider": "toolchain-source"}
+ ]
+}`
+	implicitPath := filepath.Join(dir, "implicitsel.json")
+	if err := os.WriteFile(implicitPath, []byte(implicitArtifact), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := scope.ResolveContract("implicitsel@v1", "", implicitPath); err != nil {
+		t.Errorf("typed implicit unit selector rejected: %v", err)
 	}
 }
 
@@ -313,7 +398,7 @@ func TestContractArtifactFile(t *testing.T) {
 // the manifest, exact-package rules override, the audit policy is recursive
 // everywhere, and an uncovered class fails closed.
 func TestAcquisitionPolicyFromContract(t *testing.T) {
-	contract, err := scope.ResolveContract(scope.DefaultContractID, "")
+	contract, err := scope.ResolveContract(scope.DefaultContractID, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}

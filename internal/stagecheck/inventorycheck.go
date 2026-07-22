@@ -37,8 +37,9 @@ func VerifySyntaxInventory(ws *source.Workspace, inv *analyze.WorkspaceInventory
 	// retained unit declarations of mixed files — exactly the full-semantic
 	// scope, joined by identity.
 	type expectedRoot struct {
-		file *source.File
-		node ast.Node // file tree or retained decl subtree
+		file       *source.File
+		node       ast.Node // file tree or retained decl subtree
+		boundaries map[ast.Node]bool
 	}
 	expected := map[string]expectedRoot{}
 	for _, pkg := range ws.Packages() {
@@ -48,7 +49,9 @@ func VerifySyntaxInventory(ws *source.Workspace, inv *analyze.WorkspaceInventory
 				expected[file.ID().String()] = expectedRoot{file: file, node: evidence.Syntax}
 			case source.MixedUnits:
 				for _, retained := range evidence.Retained {
-					expected[retained.Unit.String()] = expectedRoot{file: file, node: retained.Decl}
+					expected[retained.Unit.String()] = expectedRoot{
+						file: file, node: retained.Decl, boundaries: boundaryNodeSet(retained.Boundaries),
+					}
 				}
 			}
 		}
@@ -64,7 +67,7 @@ func VerifySyntaxInventory(ws *source.Workspace, inv *analyze.WorkspaceInventory
 			if !ok {
 				return fail("orphan inventory: no retained evidence for " + key)
 			}
-			if err := verifyInventoryWalk(root.file, root.node, fileInv); err != nil {
+			if err := verifyInventoryWalk(root.file, root.node, root.boundaries, fileInv); err != nil {
 				return err
 			}
 			verified++
@@ -76,7 +79,20 @@ func VerifySyntaxInventory(ws *source.Workspace, inv *analyze.WorkspaceInventory
 	return nil
 }
 
-func verifyInventoryWalk(file *source.File, root ast.Node, inv *analyze.FileInventory) error {
+// boundaryNodeSet indexes a retained unit's boundary nodes for the
+// independent walk.
+func boundaryNodeSet(nodes []ast.Node) map[ast.Node]bool {
+	if len(nodes) == 0 {
+		return nil
+	}
+	set := make(map[ast.Node]bool, len(nodes))
+	for _, n := range nodes {
+		set[n] = true
+	}
+	return set
+}
+
+func verifyInventoryWalk(file *source.File, root ast.Node, boundaries map[ast.Node]bool, inv *analyze.FileInventory) error {
 	fail := func(reason string) error {
 		return &VerificationError{Stage: "syntax-inventory", Reason: inv.File().String() + ": " + reason}
 	}
@@ -91,6 +107,11 @@ func verifyInventoryWalk(file *source.File, root ast.Node, inv *analyze.FileInve
 	ast.Inspect(root, func(n ast.Node) bool {
 		if n == nil {
 			stack = stack[:len(stack)-1]
+			return false
+		}
+		if boundaries[n] {
+			// A nested-unit boundary: independently skipped, matching the
+			// producer's structural exclusion.
 			return false
 		}
 		parent := -1

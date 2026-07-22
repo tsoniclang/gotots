@@ -175,7 +175,9 @@ func newSourceUnit(u *Universe, file *LoadedFile, fset *token.FileSet, node ast.
 
 // joinCheckedDecls joins each checked-view declaration to its origin unit via
 // //line display evidence, or records it as a typed synthetic unit. Basename
-// and declaration-name matching never participate.
+// and declaration-name matching never participate. (The exact ambiguity-
+// rejecting origin graph is Outcome 2; this first-line join is its current
+// placeholder.)
 func joinCheckedDecls(u *Universe, pkg *LoadedPackage) error {
 	if len(pkg.checkedDecls) == 0 {
 		return nil

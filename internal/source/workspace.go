@@ -31,11 +31,15 @@ type Request struct {
 	// from PATH once and records the resolution — the same binary drives the
 	// loader and every verifier.
 	GoBinary string
-	// ProviderContract selects the versioned provider-contract artifact by
-	// identity; the compiler never assumes a default. ProviderContractDigest,
-	// when set, must match the resolved artifact's fingerprint.
-	ProviderContract       string
-	ProviderContractDigest string
+	// ProviderContract selects the versioned provider contract by IDENTITY;
+	// the compiler never assumes a default. ProviderContractDigest, when set,
+	// must match the resolved contract's fingerprint. ProviderContractArtifact
+	// is separate acquisition data: the path of a contract-artifact file that
+	// must declare exactly the selected identity; empty means the built-in
+	// registry.
+	ProviderContract         string
+	ProviderContractDigest   string
+	ProviderContractArtifact string
 	// Overlay maps OS file paths to replacement contents.
 	Overlay map[string][]byte
 	// Env is extra environment (build configuration) appended to the ambient
@@ -46,8 +50,11 @@ type Request struct {
 	// AuditArtifact is the path of the produced catalog-audit/unit-manifest
 	// artifact ordinary compilation consumes and verifies. It is required
 	// whenever the closure contains provider-owned (manifest-mode) files;
-	// there is no optional acceptance.
-	AuditArtifact string
+	// there is no optional acceptance. AuditArtifactDigest is the certified
+	// content digest the gate run attested; the artifact's authority comes
+	// from this external binding, never from its own seal.
+	AuditArtifact       string
+	AuditArtifactDigest string
 }
 
 // LoadError is the typed failure of resolving a compilation request.

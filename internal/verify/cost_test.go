@@ -49,12 +49,18 @@ func TestIsolatedCostGate(t *testing.T) {
 		manifest := filepath.Join(t.TempDir(), name+"-manifest.json")
 		produce := exec.Command(binary, "audit", "catalog", "-contract", "default@v1", "-dir", b.dir, "-o", manifest)
 		produce.Env = os.Environ()
-		if out, err := produce.CombinedOutput(); err != nil {
-			t.Fatalf("%s manifest production: %v\n%s", name, err, out)
+		produceOut, err := produce.CombinedOutput()
+		if err != nil {
+			t.Fatalf("%s manifest production: %v\n%s", name, err, produceOut)
+		}
+		digestMatch := regexp.MustCompile(`certifiedDigest=([0-9a-f]{64})`).FindStringSubmatch(string(produceOut))
+		if digestMatch == nil {
+			t.Fatalf("%s: no certified digest in production output:\n%s", name, produceOut)
 		}
 		for sample := 1; sample <= 3; sample++ {
 			cmd := exec.Command(timeBinary, "-f", "wall=%e rss=%M", binary,
-				"inspect", "constructs", "-contract", "default@v1", "-manifest", manifest, "-dir", b.dir)
+				"inspect", "constructs", "-contract", "default@v1",
+				"-manifest", manifest, "-manifest-digest", digestMatch[1], "-dir", b.dir)
 			cmd.Env = os.Environ()
 			out, err := cmd.CombinedOutput()
 			if err != nil {

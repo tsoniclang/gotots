@@ -1,8 +1,22 @@
 package analyze
 
 import (
+	"go/ast"
+
 	"github.com/tsoniclang/gotots/internal/source"
 )
+
+// nodeSet indexes a retained unit's boundary nodes for the traversal.
+func nodeSet(nodes []ast.Node) map[ast.Node]bool {
+	if len(nodes) == 0 {
+		return nil
+	}
+	set := make(map[ast.Node]bool, len(nodes))
+	for _, n := range nodes {
+		set[n] = true
+	}
+	return set
+}
 
 // BuildFileInventory produces the immutable inventory artifact of one loaded
 // file: catalog-driven traversal, variant resolution, implicit-operation
@@ -68,10 +82,11 @@ func BuildWorkspaceInventory(ws *source.Workspace) (*WorkspaceInventory, error) 
 	return out, nil
 }
 
-// buildUnitInventory inventories one retained full-semantic unit subtree of a
-// mixed file, rooted at its declaration.
+// buildUnitInventory inventories one retained full-semantic unit region of a
+// mixed file, rooted at its exact node with its nested units as structural
+// boundaries.
 func buildUnitInventory(pkg *source.Package, file *source.File, retained source.RetainedUnit) (*FileInventory, error) {
-	b := &builder{fset: file.Fset(), file: file.ID()}
+	b := &builder{fset: file.Fset(), file: file.ID(), boundaries: nodeSet(retained.Boundaries)}
 	if err := b.visit(retained.Decl, -1, 0); err != nil {
 		return nil, err
 	}

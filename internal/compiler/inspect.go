@@ -49,7 +49,7 @@ func (i *Inspection) Inventory() *analyze.WorkspaceInventory { return i.inventor
 // decision. A failed stage verifier blocks every downstream stage; there is
 // no partial or unverified artifact.
 func InspectConstructs(req source.Request) (*Inspection, error) {
-	contract, err := scope.ResolveContract(req.ProviderContract, req.ProviderContractDigest)
+	contract, err := scope.ResolveContract(req.ProviderContract, req.ProviderContractDigest, req.ProviderContractArtifact)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +60,7 @@ func InspectConstructs(req source.Request) (*Inspection, error) {
 	var artifact *analyze.AuditArtifact
 	manifest := source.UnitManifest{}
 	if req.AuditArtifact != "" {
-		artifact, err = analyze.DecodeAuditArtifact(req.AuditArtifact)
+		artifact, err = analyze.DecodeAuditArtifactBound(req.AuditArtifact, req.AuditArtifactDigest)
 		if err != nil {
 			return nil, err
 		}
@@ -125,7 +125,7 @@ func manifestFromArtifact(artifact *analyze.AuditArtifact) (source.UnitManifest,
 // the toolchain-contract gate run — the producer of the artifact ordinary
 // compilation consumes.
 func AuditCatalog(req source.Request) (*analyze.AuditArtifact, error) {
-	contract, err := scope.ResolveContract(req.ProviderContract, req.ProviderContractDigest)
+	contract, err := scope.ResolveContract(req.ProviderContract, req.ProviderContractDigest, req.ProviderContractArtifact)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +189,7 @@ func overlayDigest(overlay map[string][]byte) string {
 // inspection's universe and request context: internal invariants, production
 // context, and exact membership with per-file digest and unit joins.
 func VerifyAuditArtifact(inspection *Inspection, req source.Request, path string) error {
-	contract, err := scope.ResolveContract(req.ProviderContract, req.ProviderContractDigest)
+	contract, err := scope.ResolveContract(req.ProviderContract, req.ProviderContractDigest, req.ProviderContractArtifact)
 	if err != nil {
 		return err
 	}
@@ -206,7 +206,7 @@ func VerifyAuditArtifact(inspection *Inspection, req source.Request, path string
 // bidirectionally, including per-file unit manifests. A manifest that omits,
 // fabricates, or mutates one unit fails here even when correctly sealed.
 func AuditVerify(req source.Request, path string) error {
-	contract, err := scope.ResolveContract(req.ProviderContract, req.ProviderContractDigest)
+	contract, err := scope.ResolveContract(req.ProviderContract, req.ProviderContractDigest, req.ProviderContractArtifact)
 	if err != nil {
 		return err
 	}

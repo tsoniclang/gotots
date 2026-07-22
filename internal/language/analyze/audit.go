@@ -156,14 +156,14 @@ func AuditCatalog(ws *source.Workspace, meta AuditMeta, overlay map[string][]byt
 		}
 	}
 	sort.Slice(artifact.Files, func(i, j int) bool { return artifact.Files[i].File < artifact.Files[j].File })
-	artifact.Seal()
+	artifact.seal()
 	return artifact, nil
 }
 
-// Seal stamps the canonical self-digest. It is the single sealing operation;
-// an artifact whose content changes after sealing fails verification until
-// resealed, and resealing never bypasses the universe joins.
-func (a *AuditArtifact) Seal() { a.ArtifactDigest = a.canonicalDigest() }
+// seal stamps the canonical self-digest. Sealing is producer-owned: only the
+// audit producer seals, and consumers bind to the certified digest the gate
+// run reported — a resealed artifact never gains authority from its own seal.
+func (a *AuditArtifact) seal() { a.ArtifactDigest = a.canonicalDigest() }
 
 // boundMeta stamps the workspace-resolved toolchain and catalog facts into
 // the metadata.
@@ -264,11 +264,32 @@ func WriteAuditArtifact(artifact *AuditArtifact, path string) error {
 	return os.WriteFile(path, append(encoded, '\n'), 0o644)
 }
 
-// DecodeAuditArtifact reads one stored artifact and verifies every
-// artifact-internal invariant: schema version, the sealed canonical digest,
-// duplicate-record rejection, and aggregate/sum consistency. Workspace joins
-// happen separately — nothing here consults the current universe.
+// DecodeAuditArtifactBound reads one stored artifact for ordinary
+// consumption. Authority is EXTERNAL: the recomputed content digest must
+// equal the certified digest the request binds (the gate run's attested
+// output) — before and independent of the artifact's own seal, so a resealed
+// tamper (omitted interior, flipped evidence) never enters compilation.
+func DecodeAuditArtifactBound(path, certifiedDigest string) (*AuditArtifact, error) {
+	if certifiedDigest == "" {
+		return nil, &AuditError{Reason: "the request supplies a manifest artifact without its certified digest"}
+	}
+	artifact, err := decodeAuditArtifact(path, certifiedDigest)
+	if err != nil {
+		return nil, err
+	}
+	return artifact, nil
+}
+
+// DecodeAuditArtifact reads one stored artifact for gate verification, which
+// re-derives the complete universe independently instead of trusting a
+// certified digest. Every artifact-internal invariant is verified: schema
+// version, the sealed canonical digest, duplicate-record rejection, and
+// aggregate/sum consistency.
 func DecodeAuditArtifact(path string) (*AuditArtifact, error) {
+	return decodeAuditArtifact(path, "")
+}
+
+func decodeAuditArtifact(path, certifiedDigest string) (*AuditArtifact, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, &AuditError{Reason: "artifact unreadable: " + err.Error()}
@@ -281,7 +302,12 @@ func DecodeAuditArtifact(path string) (*AuditArtifact, error) {
 	if artifact.SchemaVersion != AuditArtifactVersion {
 		return nil, &AuditError{Reason: "artifact schema version mismatch"}
 	}
-	if artifact.ArtifactDigest != artifact.canonicalDigest() {
+	content := artifact.canonicalDigest()
+	if certifiedDigest != "" && content != certifiedDigest {
+		return nil, &AuditError{Reason: "artifact content digest " + content +
+			" does not match the request-bound certified digest " + certifiedDigest}
+	}
+	if artifact.ArtifactDigest != content {
 		return nil, &AuditError{Reason: "artifact digest mismatch: content was altered after production"}
 	}
 	sumOccurrences, sumDirectives := 0, 0
