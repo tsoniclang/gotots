@@ -139,6 +139,27 @@ are inputs, never the policy. No function may assign depth from provenance or
 file state alone, even when the initial profile happens to assign every unit in
 a package or file alike.
 
+The compilation request selects the provider-contract artifact and records its
+canonical digest. The compiler may not construct an implicit built-in contract.
+Contract resolution is total and evidence-producing: an exact unit binding, an
+exact package binding, or an explicitly declared provider-owned namespace rule
+must identify the selected provider, otherwise selection fails. Broad rules are
+contract data, not compiled provenance defaults. In particular, standard-library
+ownership by `gostdlib` does not imply that toolchain packages have the same
+provider. The selection ledger records the contract digest and the binding rule
+that selected every unit.
+
+Implementation-unit kind IDs are explicit and permanently pinned. Source-spanned
+units use physical source identity; unspelled implicit units use a separate typed
+identity containing their semantic owner and catalog operation, never a zero or
+fabricated source span and never a display name. The pre-scope unit ledger
+includes nested function literals as well as top-level bodies, initializers, and
+bodyless obligations. It may derive local source units by a bounded syntax walk
+and consume content-addressed provider/audit unit manifests for non-translated
+source; ordinary application compilation does not rescan provider-owned standard
+library bodies. Construct inventory may link occurrences to these units; it may
+not create units for the first time after scope selection.
+
 Requested roots, resolved import closure, full-semantic source set,
 declaration-contract set, and later product reachability are different sets with
 different identities and denominators. Root status is only a reachability
@@ -161,6 +182,9 @@ position/line-directive evidence. Basename conventions and declaration-name
 matching are not semantic joins. Package-synthetic checked declarations such as
 cgo-generated types and call adapters receive explicit typed identities and
 external/intrinsic boundaries; they are never ignored as unmatched extras.
+C-dependence is resolved from checked semantic/toolchain evidence, not from an
+identifier spelled `C`, a checked temporary filename, or another source-text
+heuristic.
 
 Syntax and body-indexed `types.Info` for non-full depths may exist transiently
 inside the authoritative semantic load. After contracts, boundaries, and
@@ -175,6 +199,12 @@ evidence are different validated types. A mutable `syntax = nil` plus a
 body is full-semantic, is a forbidden dual state. Mixed files expose only the
 per-unit syntax/type evidence their depths permit.
 
+Finalized artifacts are immutable at their Go API boundary. Slice and map
+accessors return copies or read-only query views; evidence variants do not expose
+mutable backing collections. Body-indexed type information is selected by exact
+retained AST/object identity, never by unqualified byte offsets that can collide
+between files. A mutable `*types.Info` map is not a downstream artifact API.
+
 Catalog-coverage scans over the complete Go toolchain or a large corpus are
 separate streaming verification workloads. They may prove catalog coverage but
 must not enlarge a normal compilation's retained semantic model. Resolution
@@ -186,6 +216,14 @@ the selected Go contract, build configuration, and contract upgrades. Ordinary
 application compilation verifies and consumes that audit artifact; it does not
 reparse and walk every non-translated standard-library body on every
 invocation. Audit membership is an exact identity set, not a lower-bound count.
+Each audit record binds its `FileID` to the selected-byte digest and its exact
+occurrence/directive evidence. The artifact also binds the provider contract,
+catalog structure, selected toolchain binary/source contract, overlays, and all
+build-selection inputs such as GOOS, GOARCH, experiments, tags, and build flags.
+Verification rejects duplicate records, incorrect per-file or aggregate counts,
+changed bytes under an unchanged identity, and any one-sided membership delta.
+These comparisons use input hashes already captured by source resolution, so
+ordinary compilation does not rescan audited bodies.
 
 The compiler-supported catalog version, selected toolchain version, each
 module's `go` directive, and the effective language version of each source file

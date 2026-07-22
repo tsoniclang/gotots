@@ -189,6 +189,14 @@ prerequisite, or an unresolved product decision. Any amendment must pass this
 gate again and explicitly replace the smallest affected portion. Reviewers do
 not reopen accepted work without new evidence.
 
+## Outward Response Format
+
+Print the complete, copy/paste-ready message to the implementation team in the
+response itself. Do not substitute a reviewer summary, file path, or instruction
+to read another artifact for the team message. If a separate note to the user is
+necessary, place it first, then print a `Message to Team` header followed by the
+full team message. When no separate note is needed, output only the team message.
+
 ## Repository Safety
 
 - Never force-push or delete remote branches/tags.

@@ -91,6 +91,11 @@ Required exit evidence:
 - the implementation-unit census includes function/method bodies, function
   literals, package initializers, bodyless implementation obligations, and
   implicit executable units;
+- unit-kind IDs and implicit-unit identities are pinned, and the complete unit
+  census exists before provider selection rather than being extended later by
+  construct inventory;
+- the compilation request selects one digest-bound provider contract, and every
+  unit records the exact contract rule that selected its provider and depth;
 - package owner, provenance, acquisition, and language disposition exact-join
   independent selected-toolchain metadata, including standard-library,
   dependency, replacement, `unsafe`, and pseudo-package cases;
@@ -105,6 +110,8 @@ Required exit evidence:
 - complete-toolchain catalog coverage runs as a separate streaming audit and
   produces a versioned artifact consumed without rescanning standard-library
   bodies during ordinary compilation; and
+- the audit exact-joins selected-byte, build-configuration, provider-contract,
+  toolchain, catalog, per-file count, and aggregate-count evidence; and
 - finalized application artifacts retain no non-full body AST or body-indexed
   `types.Info` references; and
 - package count, retained occurrences, elapsed time, and peak RSS have reviewed

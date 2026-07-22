@@ -157,6 +157,9 @@ may aggregate several depths and cannot supply a default. It proves:
   skipped file or whole-package downgrade;
 - cgo joins use toolchain position/origin evidence, include package-synthetic
   checked declarations, and contain no basename/name-matching fallback;
+- a complete cgo package runs through the public compilation pipeline, including
+  source-universe verification, unit census, mixed-unit inventory, and semantic
+  evidence lookup; loader-only acceptance is not proof;
 - Go, non-Go, embed, overlay, and checked-view inputs join by stable typed
   identity rather than raw acquisition path, including after workspace,
   module-cache, and temporary checked-view relocation;
@@ -186,15 +189,24 @@ Required mutations analyze a standard-library body as an application body,
 drop a source-available dependency body, retain catalog-audit occurrences in
 the product model, omit a cgo source/boundary mapping, use a relocated raw path
 as an input identity, ignore a cgo-synthetic declaration, restore basename or
-declaration-name matching, retain a non-full body AST, assign depth from a file
-or provenance default, or merge requested roots with the semantic set. Gates
-02, 03, or 16 must fail with exact identities and the cost delta.
+declaration-name matching, classify a shadowing local identifier named `C` as
+cgo, retain a non-full body AST, filter `types.Info` by file-ambiguous offsets,
+assign depth from a file/provenance default or hard-coded default contract, omit
+a nested function-literal or implicit unit, renumber a unit kind, mutate an
+artifact through an accessor, or merge requested roots with the semantic set.
+Mutating audited bytes under the same `FileID`, zeroing audit counts, duplicating
+an audit row, changing overlays/build tags, or changing the selected provider
+contract must also fail. Gates 02, 03, or 16 fail with exact identities and the
+cost delta.
 
 Generic context classification also has an independent type-semantics matrix.
 It covers normalized unions and intersections, tilde terms, empty and mixed
 type sets, named types with equal underlying types, and directional-channel
 core-type rules. Replacing the one semantic service with a construct-local
 flatten/sort/deduplicate approximation must fail the matrix.
+At minimum the matrix includes a nontrivial intersection such as
+`interface{ int|string; int|bool }`, whose type set and core type are `int`;
+concatenating the two unions is a known-invalid approximation.
 
 ## Construct And Semantic-Class Oracles
 
