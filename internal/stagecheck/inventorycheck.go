@@ -134,6 +134,9 @@ func VerifyInventory(req source.Request, ws *source.Workspace, inv *analyze.Work
 				problems = append(problems, "reference to "+child+" has an invalid edge")
 			}
 		}
+		// Exact site<->reference conservation: independently derive every
+		// implementation site from re-parsed source and exact-multiset-join.
+		problems = append(problems, verifyReferenceConservation(pkg, pkgInv.References(), req.Overlay)...)
 	}
 
 	if len(problems) > 0 {
