@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/tsoniclang/gotots/internal/scope"
 	"github.com/tsoniclang/gotots/internal/source"
 )
 
@@ -26,7 +27,7 @@ func TestInspectUnrelatedProjects(t *testing.T) {
 	root := repoRoot(t)
 	for _, project := range []string{"webshop", "textindex"} {
 		dir := filepath.Join(root, "testdata", "projects", project)
-		inspection, err := InspectConstructs(source.Request{Dir: dir})
+		inspection, err := InspectConstructs(source.Request{Dir: dir, ProviderContract: scope.DefaultContractID})
 		if err != nil {
 			t.Fatalf("%s: %v", project, err)
 		}
@@ -58,8 +59,9 @@ func TestInspectUnrelatedProjects(t *testing.T) {
 func TestInspectMultiModuleWorkspace(t *testing.T) {
 	dir := filepath.Join(repoRoot(t), "testdata", "workspaces", "dual")
 	inspection, err := InspectConstructs(source.Request{
-		Dir:      dir,
-		Patterns: []string{"dual.example/a/...", "dual.example/b/..."},
+		Dir:              dir,
+		ProviderContract: scope.DefaultContractID,
+		Patterns:         []string{"dual.example/a/...", "dual.example/b/..."},
 	})
 	if err != nil {
 		t.Fatalf("InspectConstructs: %v", err)
@@ -78,7 +80,7 @@ func TestInspectMultiModuleWorkspace(t *testing.T) {
 // TestInspectSelfModule proves the pipeline runs over a real multi-package
 // module: this repository itself.
 func TestInspectSelfModule(t *testing.T) {
-	inspection, err := InspectConstructs(source.Request{Dir: repoRoot(t)})
+	inspection, err := InspectConstructs(source.Request{Dir: repoRoot(t), ProviderContract: scope.DefaultContractID})
 	if err != nil {
 		t.Fatalf("self-inspection: %v", err)
 	}
@@ -111,7 +113,7 @@ func TestImportCoherencePositiveProof(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		inspection, err := InspectConstructs(source.Request{Dir: dir, Patterns: []string{"coherent.example/app"}})
+		inspection, err := InspectConstructs(source.Request{Dir: dir, ProviderContract: scope.DefaultContractID, Patterns: []string{"coherent.example/app"}})
 		if err != nil {
 			t.Fatalf("InspectConstructs: %v", err)
 		}

@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/tsoniclang/gotots/internal/scope"
 	"github.com/tsoniclang/gotots/internal/source"
 )
 
@@ -16,7 +17,7 @@ import (
 // regression: the pre-partition value was 598,836).
 func TestRetainedScopeExactJoin(t *testing.T) {
 	dir := filepath.Join(repoRoot(t), "testdata", "projects", "webshop")
-	inspection, err := InspectConstructs(source.Request{Dir: dir})
+	inspection, err := InspectConstructs(source.Request{Dir: dir, ProviderContract: scope.DefaultContractID})
 	if err != nil {
 		t.Fatalf("InspectConstructs: %v", err)
 	}

@@ -7,6 +7,11 @@
 package compiler
 
 import (
+	"crypto/sha256"
+	"fmt"
+	"sort"
+	"strings"
+
 	"github.com/tsoniclang/gotots/internal/language/analyze"
 	"github.com/tsoniclang/gotots/internal/scope"
 	"github.com/tsoniclang/gotots/internal/source"
@@ -45,7 +50,11 @@ func InspectConstructs(req source.Request) (*Inspection, error) {
 	if err != nil {
 		return nil, err
 	}
-	selection, err := scope.Select(universe, scope.DefaultContract())
+	contract, err := scope.ResolveContract(req.ProviderContract, req.ProviderContractDigest)
+	if err != nil {
+		return nil, err
+	}
+	selection, err := scope.Select(universe, contract)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +65,7 @@ func InspectConstructs(req source.Request) (*Inspection, error) {
 	if err := stagecheck.VerifySourceUniverse(ws, req); err != nil {
 		return nil, err
 	}
-	if err := stagecheck.VerifyUnitCensus(ws, req, scope.DefaultContract()); err != nil {
+	if err := stagecheck.VerifyUnitCensus(ws, req, contract); err != nil {
 		return nil, err
 	}
 	inventory, err := analyze.BuildWorkspaceInventory(ws)
@@ -77,7 +86,11 @@ func AuditCatalog(req source.Request) (*analyze.AuditArtifact, error) {
 	if err != nil {
 		return nil, err
 	}
-	selection, err := scope.Select(universe, scope.DefaultContract())
+	contract, err := scope.ResolveContract(req.ProviderContract, req.ProviderContractDigest)
+	if err != nil {
+		return nil, err
+	}
+	selection, err := scope.Select(universe, contract)
 	if err != nil {
 		return nil, err
 	}
@@ -88,11 +101,42 @@ func AuditCatalog(req source.Request) (*analyze.AuditArtifact, error) {
 	if err := stagecheck.VerifySourceUniverse(ws, req); err != nil {
 		return nil, err
 	}
-	return analyze.AuditCatalog(ws)
+	return analyze.AuditCatalog(ws, auditMeta(req, contract))
+}
+
+// auditMeta binds an audit artifact to the request's production context.
+func auditMeta(req source.Request, contract scope.ProviderContract) analyze.AuditMeta {
+	return analyze.AuditMeta{
+		ContractID:          contract.ID(),
+		ContractFingerprint: contract.Fingerprint(),
+		BuildFlags:          strings.Join(req.BuildFlags, " "),
+		OverlayDigest:       overlayDigest(req.Overlay),
+	}
+}
+
+// overlayDigest canonically digests the request overlays.
+func overlayDigest(overlay map[string][]byte) string {
+	if len(overlay) == 0 {
+		return ""
+	}
+	paths := make([]string, 0, len(overlay))
+	for path := range overlay {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	h := sha256.New()
+	for _, path := range paths {
+		fmt.Fprintf(h, "%s=%x|", path, sha256.Sum256(overlay[path]))
+	}
+	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
 // VerifyAuditArtifact exact-joins a stored audit artifact against one
-// inspection's universe.
-func VerifyAuditArtifact(inspection *Inspection, path string) error {
-	return analyze.VerifyAuditArtifact(inspection.workspace, path)
+// inspection's universe and request context.
+func VerifyAuditArtifact(inspection *Inspection, req source.Request, path string) error {
+	contract, err := scope.ResolveContract(req.ProviderContract, req.ProviderContractDigest)
+	if err != nil {
+		return err
+	}
+	return analyze.VerifyAuditArtifact(inspection.workspace, auditMeta(req, contract), path)
 }

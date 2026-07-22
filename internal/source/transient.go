@@ -68,6 +68,8 @@ type LoadedFile struct {
 	effectiveVersion string
 	overlaid         bool
 	cgoOriginal      bool // checked view lives in transformed files
+	recursiveCensus  bool // source-selected files census nested literals
+	byteDigest       SourceSpanHash
 	units            []SourceUnit
 }
 

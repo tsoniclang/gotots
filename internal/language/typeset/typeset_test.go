@@ -253,3 +253,91 @@ func Merged[C chan int | <-chan int](c C) {}
 		t.Fatalf("foil approximation agrees with the owner on the channel corpus (owner ok=%v core=%v); the matrix does not distinguish them", ownerOK, ownerCore)
 	}
 }
+
+// TestIntersectionAlgebra proves exact union/intersection algebra through
+// toolchain-accepted operations: A∩B over overlapping unions yields the
+// shared term's core; disjoint intersections and empty sets have none.
+func TestIntersectionAlgebra(t *testing.T) {
+	pkg, info, err := typecheck(t, `package m
+
+type A interface{ int | string }
+type B interface{ int | bool }
+type C interface{ A; B }
+
+func F[T C](x T) T { return x + 1 }
+`)
+	if err != nil {
+		t.Fatalf("toolchain accepts x+1 under C=A∧B (core int): %v", err)
+	}
+	core, ok := Core(typeParamOf(t, pkg, "F"))
+	if !ok {
+		t.Fatal("intersection A∧B has no core")
+	}
+	if basic, isBasic := core.(*types.Basic); !isBasic || basic.Kind() != types.Int {
+		t.Fatalf("core = %v, want int", core)
+	}
+	_ = info
+	// Disjoint intersection: empty set; the toolchain rejects instantiation.
+	disjoint, _, err := typecheck(t, `package m
+
+type A interface{ string }
+type B interface{ int }
+type C interface{ A; B }
+
+func F[T C](x T) T { return x }
+`)
+	if err != nil {
+		t.Fatalf("declaration with empty type set is legal: %v", err)
+	}
+	if _, ok := Core(typeParamOf(t, disjoint, "F")); ok {
+		t.Error("disjoint intersection produced a core type")
+	}
+	if _, _, err := typecheck(t, `package m
+
+type A interface{ string }
+type B interface{ int }
+type C interface{ A; B }
+
+func F[T C](x T) T { return x }
+
+var _ = F[int]
+`); err == nil {
+		t.Error("toolchain instantiated an empty type set")
+	}
+	// Tilde∩specific: ~int ∧ (int|string) = {int}, core int; and the
+	// operation range-over is accepted... use + with int result.
+	tilde, _, err := typecheck(t, `package m
+
+type A interface{ ~int }
+type B interface{ int | string }
+type C interface{ A; B }
+
+func F[T C](x T) T { return x + 1 }
+`)
+	if err != nil {
+		t.Fatalf("tilde∩union program rejected: %v", err)
+	}
+	core, ok = Core(typeParamOf(t, tilde, "F"))
+	if !ok || core.(*types.Basic).Kind() != types.Int {
+		t.Errorf("tilde∩union core = %v ok=%v, want int", core, ok)
+	}
+	// Directional channels through intersection: (chan int | <-chan int) ∧ ~chan int...
+	chans, _, err := typecheck(t, `package m
+
+type A interface{ chan int | <-chan int }
+type B interface{ chan int | <-chan int | chan<- int }
+type C interface{ A; B }
+
+func F[T C](c T) int { return <-c }
+`)
+	if err != nil {
+		t.Fatalf("channel intersection receive rejected: %v", err)
+	}
+	core, ok = Core(typeParamOf(t, chans, "F"))
+	if !ok {
+		t.Fatal("channel intersection has no core")
+	}
+	if channel, isChan := core.(*types.Chan); !isChan || channel.Dir() != types.RecvOnly {
+		t.Errorf("channel intersection core = %v, want <-chan int", core)
+	}
+}

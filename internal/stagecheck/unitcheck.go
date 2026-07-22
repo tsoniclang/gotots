@@ -36,8 +36,9 @@ func VerifyUnitCensus(ws *source.Workspace, req source.Request, contract scope.P
 			producer[unit.ID()] = unit
 		}
 		matched := map[identity.SourceUnitID]bool{}
+		recursive := pkg.ID().Owner().Class() == identity.OwnerModule
 		for _, file := range pkg.Files() {
-			derived, err := deriveUnits(file, req.Overlay)
+			derived, err := deriveUnits(file, req.Overlay, recursive)
 			if err != nil {
 				return fail(err.Error())
 			}
@@ -83,7 +84,7 @@ type derivedUnit struct {
 
 // deriveUnits re-parses one file's selected bytes and derives its top-level
 // unit census with the verifier's own walk.
-func deriveUnits(file *source.File, overlay map[string][]byte) ([]derivedUnit, error) {
+func deriveUnits(file *source.File, overlay map[string][]byte, recursive bool) ([]derivedUnit, error) {
 	raw, overlaid := overlay[file.Path()]
 	if !overlaid {
 		var err error
@@ -125,6 +126,19 @@ func deriveUnits(file *source.File, overlay map[string][]byte) ([]derivedUnit, e
 		})
 		return nil
 	}
+	recordLits := func(root ast.Node, parentCDependent bool) error {
+		var walkErr error
+		ast.Inspect(root, func(n ast.Node) bool {
+			if walkErr != nil {
+				return false
+			}
+			if lit, ok := n.(*ast.FuncLit); ok {
+				walkErr = record(lit, identity.UnitFuncLitBody, parentCDependent || (importsC && usesC(lit)))
+			}
+			return walkErr == nil
+		})
+		return walkErr
+	}
 	for _, decl := range syntax.Decls {
 		switch decl := decl.(type) {
 		case *ast.FuncDecl:
@@ -134,8 +148,14 @@ func deriveUnits(file *source.File, overlay map[string][]byte) ([]derivedUnit, e
 				kind = identity.UnitBodylessDecl
 				node = decl
 			}
-			if err := record(node, kind, importsC && usesC(decl)); err != nil {
+			parentC := importsC && usesC(decl)
+			if err := record(node, kind, parentC); err != nil {
 				return nil, err
+			}
+			if recursive && decl.Body != nil {
+				if err := recordLits(decl.Body, parentC); err != nil {
+					return nil, err
+				}
 			}
 		case *ast.GenDecl:
 			if decl.Tok != token.VAR {
@@ -146,8 +166,14 @@ func deriveUnits(file *source.File, overlay map[string][]byte) ([]derivedUnit, e
 				if !ok || len(value.Values) == 0 {
 					continue
 				}
-				if err := record(value, identity.UnitVarInitializer, importsC && usesC(value)); err != nil {
+				parentC := importsC && usesC(value)
+				if err := record(value, identity.UnitVarInitializer, parentC); err != nil {
 					return nil, err
+				}
+				if recursive {
+					if err := recordLits(value, parentC); err != nil {
+						return nil, err
+					}
 				}
 			}
 		}
@@ -155,16 +181,99 @@ func deriveUnits(file *source.File, overlay map[string][]byte) ([]derivedUnit, e
 	return out, nil
 }
 
-// usesC is the verifier's own C-reference walk.
+// usesC is the verifier's own scope-aware C-reference walk (independent
+// implementation of the same language rule: a selector base C counts only
+// when no enclosing binding shadows the "C" import).
 func usesC(node ast.Node) bool {
-	found := false
-	ast.Inspect(node, func(n ast.Node) bool {
-		if selector, ok := n.(*ast.SelectorExpr); ok {
-			if base, ok := selector.X.(*ast.Ident); ok && base.Name == "C" {
-				found = true
+	type frame struct {
+		node     ast.Node
+		shadowed bool
+	}
+	stack := []frame{{node: node, shadowed: false}}
+	for len(stack) > 0 {
+		top := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		shadowed := top.shadowed
+		switch n := top.node.(type) {
+		case nil:
+			continue
+		case *ast.FuncDecl:
+			inner := shadowed || fieldListBindsC(n.Recv) || fieldListBindsC(n.Type.Params) || fieldListBindsC(n.Type.Results)
+			if n.Body != nil {
+				stack = append(stack, frame{n.Body, inner})
+			}
+			stack = append(stack, frame{n.Type, shadowed})
+		case *ast.FuncLit:
+			inner := shadowed || fieldListBindsC(n.Type.Params) || fieldListBindsC(n.Type.Results)
+			stack = append(stack, frame{n.Body, inner})
+		case *ast.BlockStmt:
+			blockShadowed := shadowed
+			for _, stmt := range n.List {
+				if stmtBindsC(stmt) {
+					blockShadowed = true
+				}
+				stack = append(stack, frame{stmt, blockShadowed})
+			}
+		case *ast.SelectorExpr:
+			if base, ok := n.X.(*ast.Ident); ok && base.Name == "C" && !shadowed {
+				return true
+			}
+			stack = append(stack, frame{n.X, shadowed})
+		default:
+			parent := top.node
+			ast.Inspect(parent, func(child ast.Node) bool {
+				if child == nil || child == parent {
+					return child == parent
+				}
+				stack = append(stack, frame{child, shadowed})
+				return false
+			})
+		}
+	}
+	return false
+}
+
+func fieldListBindsC(fields *ast.FieldList) bool {
+	if fields == nil {
+		return false
+	}
+	for _, field := range fields.List {
+		for _, name := range field.Names {
+			if name.Name == "C" {
+				return true
 			}
 		}
-		return !found
-	})
-	return found
+	}
+	return false
+}
+
+func stmtBindsC(stmt ast.Stmt) bool {
+	switch stmt := stmt.(type) {
+	case *ast.AssignStmt:
+		if stmt.Tok == token.DEFINE {
+			for _, lhs := range stmt.Lhs {
+				if ident, ok := lhs.(*ast.Ident); ok && ident.Name == "C" {
+					return true
+				}
+			}
+		}
+	case *ast.DeclStmt:
+		if decl, ok := stmt.Decl.(*ast.GenDecl); ok {
+			for _, spec := range decl.Specs {
+				switch spec := spec.(type) {
+				case *ast.ValueSpec:
+					for _, name := range spec.Names {
+						if name.Name == "C" {
+							return true
+						}
+					}
+				case *ast.TypeSpec:
+					if spec.Name.Name == "C" {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
 }

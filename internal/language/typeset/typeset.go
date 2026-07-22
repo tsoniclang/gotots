@@ -29,7 +29,24 @@ func Core(t types.Type) (types.Type, bool) {
 	return u, true
 }
 
-// constraintCore resolves a type parameter's constraint type set.
+// term is one normalized structural type-set term: a specific type, or a
+// tilde term admitting every type with the given underlying.
+type term struct {
+	typ   types.Type
+	tilde bool
+}
+
+// termSet is a normalized structural type set: nil terms with universe=true
+// is the universe (an interface without structural terms); universe=false
+// with no terms is the empty set.
+type termSet struct {
+	universe bool
+	terms    []term
+}
+
+// constraintCore resolves a type parameter's constraint through exact
+// normalized union/intersection algebra and computes the core type of the
+// resulting term set.
 func constraintCore(tp *types.TypeParam) (types.Type, bool) {
 	constraint := tp.Constraint()
 	if constraint == nil {
@@ -39,17 +56,112 @@ func constraintCore(tp *types.TypeParam) (types.Type, bool) {
 	if !ok {
 		return nil, false
 	}
-	terms, ok := typeSetTerms(iface)
-	if !ok || len(terms) == 0 {
-		// An empty term list means an unconstrained (any-like) interface —
-		// no structural terms, hence no core type.
+	set, ok := interfaceTermSet(iface)
+	if !ok || set.universe || len(set.terms) == 0 {
 		return nil, false
 	}
-	// Single common underlying type across every term.
+	return coreOfTerms(set.terms)
+}
+
+// interfaceTermSet computes an interface's structural term set: the
+// INTERSECTION of its embedded elements' sets (methods restrict membership
+// but never the structural terms).
+func interfaceTermSet(iface *types.Interface) (termSet, bool) {
+	result := termSet{universe: true}
+	for i := 0; i < iface.NumEmbeddeds(); i++ {
+		element, ok := elementTermSet(iface.EmbeddedType(i))
+		if !ok {
+			return termSet{}, false
+		}
+		result = intersect(result, element)
+	}
+	return result, true
+}
+
+// elementTermSet computes one embedded element's term set: a union is the
+// UNION of its terms; an embedded interface is its own intersected set; a
+// specific type is a single-term set.
+func elementTermSet(embedded types.Type) (termSet, bool) {
+	switch e := types.Unalias(embedded).(type) {
+	case *types.Union:
+		set := termSet{}
+		for j := 0; j < e.Len(); j++ {
+			t := e.Term(j)
+			set.terms = append(set.terms, term{typ: types.Unalias(t.Type()), tilde: t.Tilde()})
+		}
+		return set, true
+	case *types.Interface:
+		return interfaceTermSet(e)
+	default:
+		if nested, isIface := types.Unalias(embedded).Underlying().(*types.Interface); isIface {
+			return interfaceTermSet(nested)
+		}
+		return termSet{terms: []term{{typ: types.Unalias(embedded)}}}, true
+	}
+}
+
+// intersect computes the exact intersection of two term sets per the Go
+// specification's term-intersection rules.
+func intersect(a, b termSet) termSet {
+	if a.universe {
+		return b
+	}
+	if b.universe {
+		return a
+	}
+	out := termSet{}
+	for _, left := range a.terms {
+		for _, right := range b.terms {
+			if merged, ok := intersectTerms(left, right); ok {
+				out.terms = appendTermDedup(out.terms, merged)
+			}
+		}
+	}
+	return out
+}
+
+// intersectTerms intersects two terms: specific∩specific needs identity;
+// specific∩tilde needs matching underlying (result specific); tilde∩tilde
+// needs identical underlying (result tilde).
+func intersectTerms(a, b term) (term, bool) {
+	switch {
+	case !a.tilde && !b.tilde:
+		if types.Identical(a.typ, b.typ) {
+			return a, true
+		}
+	case a.tilde && b.tilde:
+		if types.Identical(a.typ.Underlying(), b.typ.Underlying()) {
+			return a, true
+		}
+	case a.tilde:
+		if types.Identical(b.typ.Underlying(), a.typ.Underlying()) {
+			return b, true
+		}
+	default:
+		if types.Identical(a.typ.Underlying(), b.typ.Underlying()) {
+			return a, true
+		}
+	}
+	return term{}, false
+}
+
+func appendTermDedup(terms []term, t term) []term {
+	for _, existing := range terms {
+		if existing.tilde == t.tilde && types.Identical(existing.typ, t.typ) {
+			return terms
+		}
+	}
+	return append(terms, t)
+}
+
+// coreOfTerms computes the core type of a normalized non-empty term set:
+// one common underlying type, or the channel merge with the most restrictive
+// shared direction.
+func coreOfTerms(terms []term) (types.Type, bool) {
 	var common types.Type
 	commonOK := true
-	for _, term := range terms {
-		u := types.Unalias(term).Underlying()
+	for _, t := range terms {
+		u := t.typ.Underlying()
 		if common == nil {
 			common = u
 		} else if !types.Identical(common, u) {
@@ -59,11 +171,10 @@ func constraintCore(tp *types.TypeParam) (types.Type, bool) {
 	if commonOK {
 		return common, true
 	}
-	// Channel merge: identical element type, compatible directions.
 	var elem types.Type
 	direction := types.SendRecv
-	for _, term := range terms {
-		channel, ok := types.Unalias(term).Underlying().(*types.Chan)
+	for _, t := range terms {
+		channel, ok := t.typ.Underlying().(*types.Chan)
 		if !ok {
 			return nil, false
 		}
@@ -74,54 +185,10 @@ func constraintCore(tp *types.TypeParam) (types.Type, bool) {
 		}
 		if channel.Dir() != types.SendRecv {
 			if direction != types.SendRecv && direction != channel.Dir() {
-				return nil, false // conflicting directional members
+				return nil, false
 			}
 			direction = channel.Dir()
 		}
 	}
 	return types.NewChan(direction, elem), true
-}
-
-// typeSetTerms flattens an interface's structural type-set terms: unions,
-// embedded interfaces (intersection), and tilde terms (which contribute their
-// underlying type to core-type computation). A term list is invalid (ok=false)
-// when an embedded form is not resolvable structurally.
-func typeSetTerms(iface *types.Interface) ([]types.Type, bool) {
-	var terms []types.Type
-	for i := 0; i < iface.NumEmbeddeds(); i++ {
-		embedded := iface.EmbeddedType(i)
-		switch e := types.Unalias(embedded).(type) {
-		case *types.Union:
-			for j := 0; j < e.Len(); j++ {
-				term := e.Term(j)
-				if term.Tilde() {
-					// ~T contributes underlying(T) to the core computation.
-					terms = append(terms, types.Unalias(term.Type()).Underlying())
-				} else {
-					terms = append(terms, term.Type())
-				}
-			}
-		case *types.Interface:
-			// Intersection: embedded interface terms constrain further. Core
-			// type of an intersection is computed over the combined terms; an
-			// embedded empty interface adds nothing.
-			nested, ok := typeSetTerms(e)
-			if !ok {
-				return nil, false
-			}
-			terms = append(terms, nested...)
-		default:
-			// A named/specific embedded type is a single-term constraint.
-			if _, isIface := types.Unalias(embedded).Underlying().(*types.Interface); isIface {
-				nested, ok := typeSetTerms(types.Unalias(embedded).Underlying().(*types.Interface))
-				if !ok {
-					return nil, false
-				}
-				terms = append(terms, nested...)
-				continue
-			}
-			terms = append(terms, embedded)
-		}
-	}
-	return terms, true
 }

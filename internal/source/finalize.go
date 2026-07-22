@@ -96,6 +96,7 @@ func finalizePackage(u *Universe, loaded *LoadedPackage, depths map[identity.Sou
 			path: loadedFile.path, id: loadedFile.id, fset: loadedFile.fset,
 			effectiveVersion: loadedFile.effectiveVersion,
 			overlaid:         loadedFile.overlaid, cgoOriginal: loadedFile.cgoOriginal,
+			byteDigest: loadedFile.byteDigest,
 		}
 		fileAllFull, fileAnyFull := true, false
 		for _, unit := range loadedFile.units {

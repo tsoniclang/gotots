@@ -24,8 +24,12 @@ const (
 	// ProviderAutomaticTranslation: the compiler translates the Go body.
 	ProviderAutomaticTranslation
 	// ProviderGostdlib: behavior is supplied by the reusable manually
-	// completed gostdlib workspace.
+	// completed gostdlib workspace. Owns standard-library units only.
 	ProviderGostdlib
+	// ProviderToolchainSource: selected-toolchain command source retained at
+	// declaration contract depth — a distinct owner; gostdlib never silently
+	// classifies toolchain packages.
+	ProviderToolchainSource
 	// ProviderExternalObligation: behavior is an exact external contract.
 	ProviderExternalObligation
 	// ProviderLanguageIntrinsic: behavior is the language/toolchain contract.
@@ -36,6 +40,7 @@ const (
 
 var providerNames = [numProviders]string{
 	ProviderAutomaticTranslation: "automatic-translation", ProviderGostdlib: "gostdlib",
+	ProviderToolchainSource:    "toolchain-source",
 	ProviderExternalObligation: "external-obligation", ProviderLanguageIntrinsic: "language-intrinsic",
 }
 
@@ -55,7 +60,7 @@ func depthOf(p Provider) source.EvidenceDepth {
 	switch p {
 	case ProviderAutomaticTranslation:
 		return source.DepthFullSemantic
-	case ProviderGostdlib:
+	case ProviderGostdlib, ProviderToolchainSource:
 		return source.DepthDeclarationContract
 	case ProviderExternalObligation:
 		return source.DepthExternalBoundary
@@ -73,6 +78,7 @@ const ContractVersion = 1
 // per-unit evidence rules; the contract is data, and its fingerprint binds
 // the selection it produced.
 type ProviderContract struct {
+	id      string
 	version int
 	// bindings by owner class of the unit's package.
 	moduleProvider    Provider
@@ -87,28 +93,96 @@ type ProviderContract struct {
 	bodylessAutomatic Provider
 }
 
-// DefaultContract is the initial explicit binding: source-available module
-// units translate automatically; standard-library and toolchain units are
-// gostdlib-owned; intrinsic packages are language-owned; C-dependent units
-// and bodyless automatic units are external obligations.
-func DefaultContract() ProviderContract {
+// DefaultContractID names the initial explicit contract artifact. A request
+// selects a contract by identity; the compiler never assumes one.
+const DefaultContractID = "default@v1"
+
+// defaultContractV1 is the registry's default@v1 artifact: source-available
+// module units translate automatically; standard-library units are
+// gostdlib-owned; toolchain command source is the distinct toolchain-source
+// owner; intrinsic packages are language-owned; C-dependent units and
+// bodyless automatic units are external obligations.
+func defaultContractV1() ProviderContract {
 	return ProviderContract{
+		id:                 DefaultContractID,
 		version:            ContractVersion,
 		moduleProvider:     ProviderAutomaticTranslation,
 		stdProvider:        ProviderGostdlib,
-		toolchainProvider:  ProviderGostdlib,
+		toolchainProvider:  ProviderToolchainSource,
 		intrinsicProvider:  ProviderLanguageIntrinsic,
 		cDependentProvider: ProviderExternalObligation,
 		bodylessAutomatic:  ProviderExternalObligation,
 	}
 }
 
+// contractRegistry is the closed versioned contract-artifact registry.
+var contractRegistry = map[string]func() ProviderContract{
+	DefaultContractID: defaultContractV1,
+}
+
+// ResolveContract resolves the request-selected contract artifact by identity
+// and, when a digest is supplied, verifies it. An empty identity is a typed
+// error — there is no silent default.
+func ResolveContract(id, digest string) (ProviderContract, error) {
+	if id == "" {
+		return ProviderContract{}, &SelectionError{Reason: "the compilation request selects no provider contract"}
+	}
+	build, known := contractRegistry[id]
+	if !known {
+		return ProviderContract{}, &SelectionError{Reason: "unknown provider contract " + id}
+	}
+	contract := build()
+	if digest != "" && digest != contract.Fingerprint() {
+		return ProviderContract{}, &SelectionError{Reason: "provider contract " + id +
+			" digest mismatch: request " + digest + " vs artifact " + contract.Fingerprint()}
+	}
+	return contract, nil
+}
+
+// ID is the contract artifact identity.
+func (c ProviderContract) ID() string { return c.id }
+
 // Fingerprint is the contract's canonical fingerprint.
 func (c ProviderContract) Fingerprint() string {
-	canonical := fmt.Sprintf("v%d|module=%s|std=%s|toolchain=%s|intrinsic=%s|cdep=%s|bodyless=%s",
-		c.version, c.moduleProvider, c.stdProvider, c.toolchainProvider,
+	canonical := fmt.Sprintf("%s|v%d|module=%s|std=%s|toolchain=%s|intrinsic=%s|cdep=%s|bodyless=%s",
+		c.id, c.version, c.moduleProvider, c.stdProvider, c.toolchainProvider,
 		c.intrinsicProvider, c.cDependentProvider, c.bodylessAutomatic)
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(canonical)))
+}
+
+// BindingRule is the closed vocabulary of how one unit was bound.
+type BindingRule uint8
+
+const (
+	RuleInvalid BindingRule = iota
+	// RuleOwnerNamespace: the owner-class namespace binding applied.
+	RuleOwnerNamespace
+	// RuleUnitEvidence: per-unit evidence (C-dependence, bodylessness)
+	// overrode the namespace binding.
+	RuleUnitEvidence
+
+	numBindingRules
+)
+
+var bindingRuleNames = [numBindingRules]string{
+	RuleOwnerNamespace: "owner-namespace", RuleUnitEvidence: "unit-evidence",
+}
+
+// Valid reports whether r names a binding rule.
+func (r BindingRule) Valid() bool { return r > RuleInvalid && r < numBindingRules }
+
+// String renders r for reports.
+func (r BindingRule) String() string {
+	if r.Valid() {
+		return bindingRuleNames[r]
+	}
+	return fmt.Sprintf("scope.BindingRule(%d)", uint8(r))
+}
+
+// BindingWitness records exactly which rule bound one unit.
+type BindingWitness struct {
+	Rule   BindingRule
+	Detail string // e.g. "owner-class:standard-library", "c-dependent"
 }
 
 // SelectionError is the typed failure of scope selection.
@@ -121,14 +195,19 @@ type UnitSelection struct {
 	Unit     identity.SourceUnitID
 	Provider Provider
 	Depth    source.EvidenceDepth
+	Witness  BindingWitness
 }
 
 // Selection is the immutable, total per-unit evidence-depth selection.
 type Selection struct {
+	contractID          string
 	contractFingerprint string
 	units               []UnitSelection
 	depths              map[identity.SourceUnitID]source.EvidenceDepth
 }
+
+// ContractID is the identity of the request-selected contract artifact.
+func (s *Selection) ContractID() string { return s.contractID }
 
 // ContractFingerprint binds the selection to the contract that produced it.
 func (s *Selection) ContractFingerprint() string { return s.contractFingerprint }
@@ -150,11 +229,13 @@ func (s *Selection) Depths() map[identity.SourceUnitID]source.EvidenceDepth {
 // and answers the binding. Producer and verifier both ask the contract — the
 // data is the single policy owner; their independence lies in deriving the
 // inputs separately.
-func (c ProviderContract) UnitProvider(ownerClass identity.OwnerClass, disposition source.LanguageDisposition, kind identity.UnitKind, cDependent bool) (Provider, error) {
+func (c ProviderContract) UnitProvider(ownerClass identity.OwnerClass, disposition source.LanguageDisposition, kind identity.UnitKind, cDependent bool) (Provider, BindingWitness, error) {
 	var binding Provider
+	witness := BindingWitness{Rule: RuleOwnerNamespace}
 	switch disposition {
 	case source.DispositionBuiltinUniverse, source.DispositionUnsafeIntrinsic:
 		binding = c.intrinsicProvider
+		witness.Detail = "disposition:" + disposition.String()
 	default:
 		switch ownerClass {
 		case identity.OwnerModule:
@@ -166,21 +247,24 @@ func (c ProviderContract) UnitProvider(ownerClass identity.OwnerClass, dispositi
 		case identity.OwnerLanguagePseudo:
 			binding = c.intrinsicProvider
 		default:
-			return ProviderInvalid, &SelectionError{Reason: "no contract binding for owner class " + ownerClass.String()}
+			return ProviderInvalid, BindingWitness{}, &SelectionError{Reason: "no contract binding for owner class " + ownerClass.String()}
 		}
+		witness.Detail = "owner-class:" + ownerClass.String()
 	}
 	if cDependent {
 		binding = c.cDependentProvider
+		witness = BindingWitness{Rule: RuleUnitEvidence, Detail: "c-dependent"}
 	}
 	if kind == identity.UnitBodylessDecl && binding == ProviderAutomaticTranslation {
 		binding = c.bodylessAutomatic
+		witness = BindingWitness{Rule: RuleUnitEvidence, Detail: "bodyless-automatic"}
 	}
-	return binding, nil
+	return binding, witness, nil
 }
 
 // UnitDepth answers the evidence depth the contract implies for one unit.
 func (c ProviderContract) UnitDepth(ownerClass identity.OwnerClass, disposition source.LanguageDisposition, kind identity.UnitKind, cDependent bool) (source.EvidenceDepth, error) {
-	provider, err := c.UnitProvider(ownerClass, disposition, kind, cDependent)
+	provider, _, err := c.UnitProvider(ownerClass, disposition, kind, cDependent)
 	if err != nil {
 		return source.DepthInvalid, err
 	}
@@ -199,13 +283,14 @@ func Select(u *source.Universe, contract ProviderContract) (*Selection, error) {
 		return nil, &SelectionError{Reason: fmt.Sprintf("contract version %d unsupported", contract.version)}
 	}
 	out := &Selection{
+		contractID:          contract.id,
 		contractFingerprint: contract.Fingerprint(),
 		depths:              map[identity.SourceUnitID]source.EvidenceDepth{},
 	}
 	for _, pkg := range u.Packages() {
 		for _, file := range pkg.Files() {
 			for _, unit := range file.Units() {
-				provider, err := contract.UnitProvider(pkg.ID().Owner().Class(), pkg.Disposition(), unit.Kind(), unit.CDependent())
+				provider, witness, err := contract.UnitProvider(pkg.ID().Owner().Class(), pkg.Disposition(), unit.Kind(), unit.CDependent())
 				if err != nil {
 					return nil, err
 				}
@@ -217,7 +302,7 @@ func Select(u *source.Universe, contract ProviderContract) (*Selection, error) {
 					return nil, &SelectionError{Reason: "duplicate selection for unit " + unit.ID().String()}
 				}
 				out.depths[unit.ID()] = depth
-				out.units = append(out.units, UnitSelection{Unit: unit.ID(), Provider: provider, Depth: depth})
+				out.units = append(out.units, UnitSelection{Unit: unit.ID(), Provider: provider, Depth: depth, Witness: witness})
 			}
 		}
 	}

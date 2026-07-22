@@ -11,6 +11,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/compiler"
 	"github.com/tsoniclang/gotots/internal/language/analyze"
+	"github.com/tsoniclang/gotots/internal/scope"
 	"github.com/tsoniclang/gotots/internal/source"
 )
 
@@ -63,7 +64,7 @@ func runInspect(args []string, stdout io.Writer) error {
 	if len(args) == 0 || args[0] != "constructs" {
 		return &UnsupportedCommandError{Command: strings.TrimSpace("inspect " + strings.Join(args, " "))}
 	}
-	request := source.Request{Dir: "."}
+	request := source.Request{Dir: ".", ProviderContract: scope.DefaultContractID}
 	auditPath := ""
 	rest := args[1:]
 	var patterns []string
@@ -81,6 +82,12 @@ func runInspect(args []string, stdout io.Writer) error {
 			}
 			i++
 			auditPath = rest[i]
+		case rest[i] == "-contract":
+			if i+1 >= len(rest) {
+				return &UnsupportedCommandError{Command: "inspect constructs -contract (missing identity)"}
+			}
+			i++
+			request.ProviderContract = rest[i]
 		case strings.HasPrefix(rest[i], "-"):
 			return &UnsupportedCommandError{Command: "inspect constructs " + rest[i]}
 		default:
@@ -94,7 +101,7 @@ func runInspect(args []string, stdout io.Writer) error {
 	}
 	auditState := "absent"
 	if auditPath != "" {
-		if err := compiler.VerifyAuditArtifact(inspection, auditPath); err != nil {
+		if err := compiler.VerifyAuditArtifact(inspection, request, auditPath); err != nil {
 			return err
 		}
 		auditState = "verified"
@@ -106,7 +113,7 @@ func runAudit(args []string, stdout io.Writer) error {
 	if len(args) == 0 || args[0] != "catalog" {
 		return &UnsupportedCommandError{Command: strings.TrimSpace("audit " + strings.Join(args, " "))}
 	}
-	request := source.Request{Dir: "."}
+	request := source.Request{Dir: ".", ProviderContract: scope.DefaultContractID}
 	out := ""
 	rest := args[1:]
 	var patterns []string
@@ -141,8 +148,8 @@ func runAudit(args []string, stdout io.Writer) error {
 	if err := analyze.WriteAuditArtifact(artifact, out); err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(stdout, "catalog audit: toolchain=%s catalog=%s files=%d occurrences=%d directives=%d unknown=0 -> %s\n",
-		artifact.ToolchainVersion, artifact.CatalogVersion, len(artifact.Files), artifact.Occurrences, artifact.Directives, out)
+	_, err = fmt.Fprintf(stdout, "catalog audit: toolchain=%s catalog=%s files=%d occurrences=%d directives=%d unknown=0 digest=%s -> %s\n",
+		artifact.Meta.ToolchainVersion, artifact.Meta.CatalogVersion, len(artifact.Files), artifact.Occurrences, artifact.Directives, artifact.ArtifactDigest[:12], out)
 	return err
 }
 
@@ -156,6 +163,10 @@ func printInspection(stdout io.Writer, inspection *compiler.Inspection, auditSta
 	}
 	ws := inspection.Workspace()
 	if err := p("toolchain %s (%s)\n", ws.Toolchain().Version(), ws.Toolchain().Binary()); err != nil {
+		return err
+	}
+	if err := p("contract %s fingerprint=%s\n",
+		inspection.Selection().ContractID(), inspection.Selection().ContractFingerprint()); err != nil {
 		return err
 	}
 	ownerCounts := map[string]int{}

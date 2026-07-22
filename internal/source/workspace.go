@@ -31,6 +31,11 @@ type Request struct {
 	// from PATH once and records the resolution — the same binary drives the
 	// loader and every verifier.
 	GoBinary string
+	// ProviderContract selects the versioned provider-contract artifact by
+	// identity; the compiler never assumes a default. ProviderContractDigest,
+	// when set, must match the resolved artifact's fingerprint.
+	ProviderContract       string
+	ProviderContractDigest string
 	// Overlay maps OS file paths to replacement contents.
 	Overlay map[string][]byte
 	// Env is extra environment (build configuration) appended to the ambient
@@ -152,6 +157,8 @@ type Toolchain struct {
 	binary  string
 	version string
 	goroot  string
+	goos    string
+	goarch  string
 }
 
 // Binary is the resolved absolute path of the selected go binary.
@@ -162,6 +169,12 @@ func (t Toolchain) Version() string { return t.version }
 
 // GOROOT is the toolchain's GOROOT directory.
 func (t Toolchain) GOROOT() string { return t.goroot }
+
+// GOOS is the selected target operating system.
+func (t Toolchain) GOOS() string { return t.goos }
+
+// GOARCH is the selected target architecture.
+func (t Toolchain) GOARCH() string { return t.goarch }
 
 // Workspace is the typed universe one request resolves to: the complete
 // transitive package closure under the selected toolchain.
@@ -432,6 +445,7 @@ type File struct {
 	effectiveVersion string
 	overlaid         bool
 	cgoOriginal      bool
+	byteDigest       SourceSpanHash // sha256 of the file's selected bytes
 	units            []SourceUnit
 }
 
@@ -467,6 +481,10 @@ func (f *File) Overlaid() bool { return f.overlaid }
 // CgoOriginal reports whether the file's checked view lives in cgo
 // transformed output.
 func (f *File) CgoOriginal() bool { return f.cgoOriginal }
+
+// ByteDigest is the sha256 of the file's selected bytes, captured during
+// resolution — consumers never rescan to verify content addressing.
+func (f *File) ByteDigest() SourceSpanHash { return f.byteDigest }
 
 // EffectiveGoVersion is the file's effective language version from typed
 // toolchain evidence (go/types file-version tracking); it governs construct

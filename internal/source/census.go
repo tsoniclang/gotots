@@ -2,6 +2,7 @@ package source
 
 import (
 	"crypto/sha256"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -34,6 +35,9 @@ func censusUniverse(u *Universe) error {
 // path) are parsed transiently for the census; the transient tree is dropped
 // before return.
 func censusFile(u *Universe, pkg *LoadedPackage, file *LoadedFile) error {
+	if raw, err := fileBytes(file.path, u.request.Overlay); err == nil {
+		file.byteDigest = sha256.Sum256(raw)
+	}
 	if pkg.disposition == DispositionBuiltinUniverse || pkg.disposition == DispositionUnsafeIntrinsic {
 		return nil // intrinsic contracts carry no censused source units
 	}
@@ -56,14 +60,19 @@ func censusFile(u *Universe, pkg *LoadedPackage, file *LoadedFile) error {
 		return &LoadError{Dir: u.request.Dir, Reason: file.id.String() + ": source bytes unreadable: " + err.Error()}
 	}
 	// C-dependence is per-unit cgo evidence: it exists only inside files that
-	// import the "C" pseudo-package. An ordinary identifier named C never
-	// classifies.
+	// import the "C" pseudo-package, and only for selector bases that
+	// actually resolve to that import (a shadowing local C never classifies).
 	importsC := false
 	for _, imported := range syntax.Imports {
 		if imported.Path != nil && imported.Path.Value == `"C"` {
 			importsC = true
 		}
 	}
+	// Provider-owned non-full source uses a bounded top-level census (its
+	// interior units come from the provider's content-addressed manifest);
+	// source-selected module files are censused recursively so the pre-scope
+	// ledger is total, including every nested function literal.
+	recursive := file.recursiveCensus
 	for _, decl := range syntax.Decls {
 		switch decl := decl.(type) {
 		case *ast.FuncDecl:
@@ -81,6 +90,11 @@ func censusFile(u *Universe, pkg *LoadedPackage, file *LoadedFile) error {
 			}
 			unit.cDependent = importsC && referencesC(decl)
 			file.units = append(file.units, unit)
+			if recursive && decl.Body != nil {
+				if err := censusFuncLits(u, file, fset, decl.Body, funcDisplayName(decl), importsC, unit.cDependent, raw); err != nil {
+					return err
+				}
+			}
 		case *ast.GenDecl:
 			if decl.Tok.String() != "var" {
 				continue
@@ -96,6 +110,11 @@ func censusFile(u *Universe, pkg *LoadedPackage, file *LoadedFile) error {
 				}
 				unit.cDependent = importsC && referencesC(value)
 				file.units = append(file.units, unit)
+				if recursive {
+					if err := censusFuncLits(u, file, fset, value, specDisplayName(value), importsC, unit.cDependent, raw); err != nil {
+						return err
+					}
+				}
 			}
 		}
 	}
@@ -182,20 +201,132 @@ func findOriginUnit(units []*SourceUnit, line int) *SourceUnit {
 	return nil
 }
 
+// censusFuncLits recursively censuses every function literal inside one
+// top-level unit, in source order; the pre-scope ledger is total.
+// A literal nested within a C-dependent parent executes in that external
+// context and inherits its dependence.
+func censusFuncLits(u *Universe, file *LoadedFile, fset *token.FileSet, root ast.Node, parentName string, importsC, parentCDependent bool, raw []byte) error {
+	var walkErr error
+	index := 0
+	ast.Inspect(root, func(n ast.Node) bool {
+		if walkErr != nil {
+			return false
+		}
+		lit, ok := n.(*ast.FuncLit)
+		if !ok {
+			return true
+		}
+		index++
+		unit, err := newSourceUnit(u, file, fset, lit, identity.UnitFuncLitBody,
+			fmt.Sprintf("%s$lit%d", parentName, index), raw)
+		if err != nil {
+			walkErr = err
+			return false
+		}
+		unit.cDependent = parentCDependent || (importsC && referencesC(lit))
+		file.units = append(file.units, unit)
+		return true // literals nest; keep descending
+	})
+	return walkErr
+}
+
 // referencesC reports whether the subtree references the cgo "C"
-// pseudo-package (per-unit evidence; conservatively syntactic).
+// pseudo-package: a selector whose base identifier spells C and is not
+// shadowed by any enclosing local binding (parameter, receiver, or local
+// declaration) between the reference and the file scope.
 func referencesC(node ast.Node) bool {
 	found := false
-	ast.Inspect(node, func(n ast.Node) bool {
-		if selector, ok := n.(*ast.SelectorExpr); ok {
-			if base, ok := selector.X.(*ast.Ident); ok && base.Name == "C" {
+	var walk func(n ast.Node, shadowed bool)
+	walk = func(n ast.Node, shadowed bool) {
+		if n == nil || found {
+			return
+		}
+		switch n := n.(type) {
+		case *ast.FuncDecl:
+			walk(n.Type, shadowed)
+			if n.Body != nil {
+				walk(n.Body, shadowed || bindsC(n.Recv) || bindsC(n.Type.Params) || bindsC(n.Type.Results))
+			}
+			return
+		case *ast.FuncLit:
+			walk(n.Body, shadowed || bindsC(n.Type.Params) || bindsC(n.Type.Results))
+			return
+		case *ast.BlockStmt:
+			blockShadowed := shadowed
+			for _, stmt := range n.List {
+				if declaresC(stmt) {
+					blockShadowed = true
+				}
+				walk(stmt, blockShadowed)
+			}
+			return
+		case *ast.SelectorExpr:
+			if base, ok := n.X.(*ast.Ident); ok && base.Name == "C" && !shadowed {
 				found = true
-				return false
+				return
+			}
+			walk(n.X, shadowed)
+			return
+		}
+		// Generic descent preserving the current shadow state.
+		ast.Inspect(n, func(child ast.Node) bool {
+			if child == nil || child == n || found {
+				return child == n && !found
+			}
+			walk(child, shadowed)
+			return false
+		})
+	}
+	walk(node, false)
+	return found
+}
+
+// bindsC reports whether a field list declares an identifier C.
+func bindsC(fields *ast.FieldList) bool {
+	if fields == nil {
+		return false
+	}
+	for _, field := range fields.List {
+		for _, name := range field.Names {
+			if name.Name == "C" {
+				return true
 			}
 		}
-		return !found
-	})
-	return found
+	}
+	return false
+}
+
+// declaresC reports whether a statement introduces a binding named C into the
+// enclosing block scope.
+func declaresC(stmt ast.Stmt) bool {
+	switch stmt := stmt.(type) {
+	case *ast.AssignStmt:
+		if stmt.Tok.String() == ":=" {
+			for _, lhs := range stmt.Lhs {
+				if ident, ok := lhs.(*ast.Ident); ok && ident.Name == "C" {
+					return true
+				}
+			}
+		}
+	case *ast.DeclStmt:
+		if decl, ok := stmt.Decl.(*ast.GenDecl); ok {
+			for _, spec := range decl.Specs {
+				switch spec := spec.(type) {
+				case *ast.ValueSpec:
+					for _, name := range spec.Names {
+						if name.Name == "C" {
+							return true
+						}
+					}
+				case *ast.TypeSpec:
+					if spec.Name.Name == "C" {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
 }
 
 func funcDisplayName(decl *ast.FuncDecl) string {

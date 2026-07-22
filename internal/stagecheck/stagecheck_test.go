@@ -13,13 +13,23 @@ import (
 	"github.com/tsoniclang/gotots/internal/source"
 )
 
+// mustContract resolves the default contract artifact (the test's request
+// selection).
+func mustContract() scope.ProviderContract {
+	contract, err := scope.ResolveContract(scope.DefaultContractID, "")
+	if err != nil {
+		panic(err)
+	}
+	return contract
+}
+
 // loadFinalized runs the full source pipeline under the default contract.
 func loadFinalized(req source.Request) (*source.Workspace, error) {
 	universe, err := source.LoadUniverse(req)
 	if err != nil {
 		return nil, err
 	}
-	selection, err := scope.Select(universe, scope.DefaultContract())
+	selection, err := scope.Select(universe, mustContract())
 	if err != nil {
 		return nil, err
 	}

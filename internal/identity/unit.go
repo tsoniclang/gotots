@@ -13,26 +13,28 @@ import "fmt"
 // count initializers differently.
 type UnitKind uint8
 
+// Explicit, permanent unit-kind identities. Do not renumber; append only.
 const (
-	UnitInvalid UnitKind = iota
+	UnitInvalid UnitKind = 0
 	// UnitFuncBody: a function or method declaration with a Go body.
-	UnitFuncBody
-	// UnitFuncLitBody: a function literal's body, when independently
-	// inventoried by construct analysis inside a full-semantic body.
-	UnitFuncLitBody
+	UnitFuncBody UnitKind = 1
+	// UnitFuncLitBody: a function literal, censused recursively BEFORE scope
+	// selection — the pre-scope ledger is total; construct inventory never
+	// creates missing units later.
+	UnitFuncLitBody UnitKind = 2
 	// UnitVarInitializer: one package-level ValueSpec with initializer
 	// expressions.
-	UnitVarInitializer
+	UnitVarInitializer UnitKind = 3
 	// UnitBodylessDecl: a function/method declaration with no Go body — an
 	// implementation obligation satisfied by assembly, linkname, wasm, or an
 	// external contract. Its span is the declaration span.
-	UnitBodylessDecl
-	// UnitImplicitExecutable: a catalog-owned implicit executable unit (for
-	// example implicit package initialization ordering effects) with no
-	// spelled body of its own.
-	UnitImplicitExecutable
+	UnitBodylessDecl UnitKind = 4
+	// UnitImplicitExecutable: catalog-owned implicit executable work. Its
+	// identity is the owning catalog/typed contract, never a fabricated
+	// source span; it does not construct a SourceUnitID.
+	UnitImplicitExecutable UnitKind = 5
 
-	numUnitKinds
+	numUnitKinds = 6
 )
 
 var unitKindNames = [numUnitKinds]string{
@@ -67,6 +69,10 @@ func NewSourceUnitID(span SpanID, kind UnitKind) (SourceUnitID, error) {
 	}
 	if !kind.Valid() {
 		return SourceUnitID{}, &Error{Identity: "source-unit", Value: span.String(), Reason: "unit kind must be valid"}
+	}
+	if kind == UnitImplicitExecutable {
+		return SourceUnitID{}, &Error{Identity: "source-unit", Value: span.String(),
+			Reason: "implicit executable work carries a typed catalog identity, never a fabricated source span"}
 	}
 	return SourceUnitID{span: span, kind: kind}, nil
 }

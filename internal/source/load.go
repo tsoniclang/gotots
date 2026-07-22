@@ -160,17 +160,20 @@ func resolveToolchain(req Request) (Toolchain, []string, func(), error) {
 	}
 	env := append(os.Environ(), req.Env...)
 	env = append(env, "PATH="+shimDir+string(os.PathListSeparator)+os.Getenv("PATH"))
-	out, err := runGo(absolute, env, req.Dir, "env", "GOROOT", "GOVERSION")
+	out, err := runGo(absolute, env, req.Dir, "env", "GOROOT", "GOVERSION", "GOOS", "GOARCH")
 	if err != nil {
 		cleanup()
 		return Toolchain{}, nil, noop, &LoadError{Dir: req.Dir, Reason: "toolchain fingerprint failed: " + err.Error()}
 	}
 	lines := strings.Split(strings.TrimSpace(out), "\n")
-	if len(lines) != 2 {
+	if len(lines) != 4 {
 		cleanup()
 		return Toolchain{}, nil, noop, &LoadError{Dir: req.Dir, Reason: "toolchain fingerprint output malformed"}
 	}
-	return Toolchain{binary: absolute, goroot: strings.TrimSpace(lines[0]), version: strings.TrimSpace(lines[1])}, env, cleanup, nil
+	return Toolchain{
+		binary: absolute, goroot: strings.TrimSpace(lines[0]), version: strings.TrimSpace(lines[1]),
+		goos: strings.TrimSpace(lines[2]), goarch: strings.TrimSpace(lines[3]),
+	}, env, cleanup, nil
 }
 
 // listPatternSet resolves one authoritative toolchain pattern set (std, cmd)
@@ -339,6 +342,7 @@ func (c *classifier) attachInputs(out *LoadedPackage, pkg *packages.Package, own
 			return err
 		}
 		file := &LoadedFile{path: goFile, id: fileID}
+		file.recursiveCensus = owner.Class() == identity.OwnerModule
 		if _, isOverlaid := c.req.Overlay[goFile]; isOverlaid {
 			file.overlaid = true
 		}

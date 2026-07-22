@@ -15,6 +15,16 @@ import (
 	"github.com/tsoniclang/gotots/internal/source"
 )
 
+// mustContract resolves the default contract artifact (the test's request
+// selection).
+func mustContract() scope.ProviderContract {
+	contract, err := scope.ResolveContract(scope.DefaultContractID, "")
+	if err != nil {
+		panic(err)
+	}
+	return contract
+}
+
 // fixtureSource exercises every semantic variant, every inventory-owned
 // implicit operation, and a broad edge surface. TestVariantCoverageIsTotal
 // proves the totality claim against it.
@@ -208,7 +218,7 @@ func loadFinalized(req source.Request) (*source.Workspace, error) {
 	if err != nil {
 		return nil, err
 	}
-	selection, err := scope.Select(universe, scope.DefaultContract())
+	selection, err := scope.Select(universe, mustContract())
 	if err != nil {
 		return nil, err
 	}
