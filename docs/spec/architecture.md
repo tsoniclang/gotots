@@ -17,7 +17,8 @@ workspace, target policy, and explicit environment contracts.
 | Phase | Input | Sole output | Forbidden responsibility |
 |---|---|---|---|
 | Workspace load | Go workspace, toolchain, build config | typed package universe | target decisions |
-| Construct inventory | scope-partitioned syntax and `go/types` evidence | exhaustive selected occurrences and boundary records | lowering |
+| Analysis scope | typed package universe plus environment/provider contract | immutable per-unit evidence-depth selection | provenance defaults or lowering |
+| Construct inventory | scoped syntax and `go/types` evidence | exhaustive selected occurrences and boundary records | scope selection or lowering |
 | Semantic analysis | occurrences plus grammatical roles | Go semantic model | TypeScript shape |
 | Whole-program analysis | complete semantic model | sealed facts | emission |
 | Planning | semantic model plus facts | immutable total `ProgramPlan` | source rediscovery |
@@ -31,6 +32,17 @@ workspace, target policy, and explicit environment contracts.
 Each phase consumes a complete typed artifact. A later phase cannot call an
 earlier analyzer to fill a missing fact. Errors propagate immediately and do
 not create partial records that consumers might interpret as valid.
+
+Workspace loading inventories canonical top-level declaration, initializer,
+body, and bodyless-implementation boundaries plus their source/checked evidence
+without deciding who implements them. The separate analysis-scope phase owns
+evidence-depth selection. Construct inventory expands full-semantic interiors;
+versioned provider-contract artifacts supply any independently owned units
+inside non-full bodies without rescanning them per application, while the
+catalog audit independently proves language coverage. Their exact union is the
+total implementation-unit census. This prevents loader provenance, parser
+availability, or retention mechanics from becoming an implementation-policy
+surrogate.
 
 ## Input Contract
 
@@ -104,7 +116,9 @@ into an external package.
 Go semantics are uniform across provenance, but resolving a package does not
 authorize full retained analysis of every body in that package. The source
 artifact assigns every executable implementation unit—function or method body,
-initializer, and equivalent implicit body—one closed evidence depth:
+function-literal body, package initializer, source declaration whose
+implementation has no Go body, and equivalent implicit body—one closed
+evidence depth:
 
 | Evidence depth | Retained evidence | Typical members |
 |---|---|---|
@@ -117,6 +131,13 @@ Declarations and input files retain their own identity/type/mapping records;
 package and file containers may contain implementation units at several depths
 and therefore have no inferred package-wide depth. The four implementation
 sets are disjoint and total by canonical unit identity.
+
+Depth selection consumes the canonical implementation identity, selected
+environment/provider contract, package facts, and exact per-unit source or
+checked-view evidence. Package provenance and a file-wide cgo/transformed bit
+are inputs, never the policy. No function may assign depth from provenance or
+file state alone, even when the initial profile happens to assign every unit in
+a package or file alike.
 
 Requested roots, resolved import closure, full-semantic source set,
 declaration-contract set, and later product reachability are different sets with
@@ -135,6 +156,12 @@ kept as distinct, joined artifacts: unaffected checked bodies may remain
 full-semantic, while an exact C-dependent body becomes an external boundary.
 No source file or body disappears because its checked view differs.
 
+Cgo correspondence comes from selected-toolchain output facts and source
+position/line-directive evidence. Basename conventions and declaration-name
+matching are not semantic joins. Package-synthetic checked declarations such as
+cgo-generated types and call adapters receive explicit typed identities and
+external/intrinsic boundaries; they are never ignored as unmatched extras.
+
 Syntax and body-indexed `types.Info` for non-full depths may exist transiently
 inside the authoritative semantic load. After contracts, boundaries, and
 mappings are extracted, the finalized source artifact severs those references
@@ -142,11 +169,23 @@ and retains only the shared declaration type graph and the evidence permitted
 by its depth. Loader lifetime cannot silently turn resolution evidence into
 retained application semantics.
 
+This lifecycle is structural: transient loaded evidence and finalized source
+evidence are different validated types. A mutable `syntax = nil` plus a
+`severed` flag, or an unfiltered package-wide `types.Info` retained because one
+body is full-semantic, is a forbidden dual state. Mixed files expose only the
+per-unit syntax/type evidence their depths permit.
+
 Catalog-coverage scans over the complete Go toolchain or a large corpus are
 separate streaming verification workloads. They may prove catalog coverage but
 must not enlarge a normal compilation's retained semantic model. Resolution
 closure, catalog-audit closure, semantic-analysis scope, and implementation
 reachability must never be conflated.
+
+The complete-toolchain audit is a versioned, fingerprinted gate/command run for
+the selected Go contract, build configuration, and contract upgrades. Ordinary
+application compilation verifies and consumes that audit artifact; it does not
+reparse and walk every non-translated standard-library body on every
+invocation. Audit membership is an exact identity set, not a lower-bound count.
 
 The compiler-supported catalog version, selected toolchain version, each
 module's `go` directive, and the effective language version of each source file
@@ -367,8 +406,9 @@ The intended package dependency direction is:
 
 ```text
 identity + language/catalog
-        <- language/semantic
-        <- source/load + language/analyze
+        <- language/type-semantics + source/load
+        <- source/scope
+        <- language/semantic + language/analyze
         <- whole-program analysis
         <- plan
 semantic + plan -> typescript/lower -> typescript/ast -> typescript/format
@@ -382,8 +422,10 @@ Architecture tests enforce:
 
 - no reverse imports across this graph;
 - no corpus/integration imports from production packages;
-- no `go/ast` or `go/types` imports outside `internal/source` and
-  `internal/language/analyze`;
+- no `go/ast` imports outside `internal/source`, `internal/language/analyze`,
+  and independent stage verification;
+- no `go/types` imports outside those owners and the exact
+  `internal/language/typesemantics` service;
 - no source or project-profile imports below planning;
 - no TypeScript string construction outside the formatter;
 - no production import of verification packages; and
@@ -397,9 +439,11 @@ directories:
 ```text
 cmd/gotots/                  CLI wiring only
 internal/compiler/           phase orchestration
-internal/source/             workspace, toolchain, profile, inventory
+internal/source/             workspace, toolchain, inputs, source-unit census
+internal/scope/              environment/provider selection and evidence depth
 internal/identity/           canonical source/type/operation/implementation IDs
 internal/language/catalog/   closed Go construct catalog
+internal/language/typesemantics/ exact shared Go type-set/core-type operations
 internal/language/semantic/  target-independent semantic records
 internal/language/analyze/   context-aware typed visitors
 internal/analysis/           sealed whole-program facts

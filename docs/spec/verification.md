@@ -155,13 +155,16 @@ may aggregate several depths and cannot supply a default. It proves:
   occurrences;
 - original cgo source, checked syntax, and external boundaries join without a
   skipped file or whole-package downgrade;
+- cgo joins use toolchain position/origin evidence, include package-synthetic
+  checked declarations, and contain no basename/name-matching fallback;
 - Go, non-Go, embed, overlay, and checked-view inputs join by stable typed
   identity rather than raw acquisition path, including after workspace,
   module-cache, and temporary checked-view relocation;
 - finalized artifacts expose no syntax or body-indexed `types.Info` for
   declaration-contract, external-boundary, or intrinsic bodies;
 - catalog-audit occurrences are stored in audit evidence, never in the product
-  semantic artifact; and
+  semantic artifact, and the exact fingerprinted audit set is consumed without
+  rescanning non-translated standard-library bodies per application; and
 - resolved-closure, evidence-depth, occurrence, and eventual reachability
   denominators are reported separately.
 
@@ -172,12 +175,20 @@ full-semantic source set and typed necessity fails before semantic-model work.
 Aggregate package growth cannot hide a largest-package or standard-library-body
 scope explosion.
 
+Semantic scope counts are deterministic unit/gate assertions. Time, peak RSS,
+and retained-heap measurements run in isolated subprocesses with exact
+toolchain/environment fingerprints, forced lifecycle completion, and repeated
+samples; they are not absolute `HeapAlloc` assertions embedded in `go test` or
+measured under `-race`. Every audit/retention set exact-joins expected
+identities—sampling and `>=` bounds are not completeness evidence.
+
 Required mutations analyze a standard-library body as an application body,
 drop a source-available dependency body, retain catalog-audit occurrences in
 the product model, omit a cgo source/boundary mapping, use a relocated raw path
-as an input identity, retain a non-full body AST, or merge requested roots with
-the semantic set. Gates 02, 03, or 16 must fail with exact identities and the
-cost delta.
+as an input identity, ignore a cgo-synthetic declaration, restore basename or
+declaration-name matching, retain a non-full body AST, assign depth from a file
+or provenance default, or merge requested roots with the semantic set. Gates
+02, 03, or 16 must fail with exact identities and the cost delta.
 
 Generic context classification also has an independent type-semantics matrix.
 It covers normalized unions and intersections, tilde terms, empty and mixed

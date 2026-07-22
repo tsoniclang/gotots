@@ -48,7 +48,9 @@ completion mode; it must never be reported as translated or publishable.
 
 ```text
 selected Go workspace and toolchain
-        -> complete construct and context inventory
+        -> coherent resolved package/source-unit universe
+        -> explicit environment/provider evidence-depth selection
+        -> complete selected construct and context inventory
         -> typed, target-independent Go semantic model
         -> sealed whole-program facts
         -> one immutable TypeScript representation plan

@@ -88,6 +88,9 @@ Required exit evidence:
   unexplained interior occurrences;
 - every executable body/initializer belongs to exactly one evidence depth,
   while files and packages may aggregate several depths without a default;
+- the implementation-unit census includes function/method bodies, function
+  literals, package initializers, bodyless implementation obligations, and
+  implicit executable units;
 - package owner, provenance, acquisition, and language disposition exact-join
   independent selected-toolchain metadata, including standard-library,
   dependency, replacement, `unsafe`, and pseudo-package cases;
@@ -100,7 +103,8 @@ Required exit evidence:
 - an injected unknown form fails; and
 - no target or acceptance-corpus package is imported;
 - complete-toolchain catalog coverage runs as a separate streaming audit and
-  cannot enlarge normal compilation scope; and
+  produces a versioned artifact consumed without rescanning standard-library
+  bodies during ordinary compilation; and
 - finalized application artifacts retain no non-full body AST or body-indexed
   `types.Info` references; and
 - package count, retained occurrences, elapsed time, and peak RSS have reviewed
