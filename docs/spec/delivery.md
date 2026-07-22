@@ -134,8 +134,10 @@ Required exit evidence:
 
 ### Phase: Typed Frontend And Semantic Model
 
-Implement canonical identities, workspace loading, parent-assigned contextual
-visitors, and the target-independent semantic records.
+Consume Stage-1's canonical identities, workspace loading, and parent-assigned
+contextual visitors; add the target-independent semantic records and typed
+operations by reading the transient checker graph before finalization. This
+phase does not rebuild identities, loading, or the Stage-1 visitors.
 
 Required exit evidence:
 

@@ -54,12 +54,24 @@ occurrences, variants, and inventory-owned implicit operations. The compiler
 orchestrates that traversal synchronously after scope selection and before
 source finalization, then source finalization consumes only a constructor-
 validated retention/evidence projection derived from that traversal. No raw
-`ast.Node`, mutable `types.Info`, `types.Scope`, `types.Object`, selection, or
-expression can survive in the finalized Stage-1 API; downstream access is by
-canonical identity through narrow read-only facts. This ordering does not
-authorize a second traversal: source census remains a bounded implementation-
-boundary census, while construct topology has exactly one producer in the
-language-analysis layer.
+`ast.Node`, `types.Package`, mutable `types.Info`, `types.Scope`,
+`types.Object`, `token.FileSet`, selection, or expression can survive in the
+finalized Stage-1 API; downstream access is by canonical identity through narrow
+read-only facts. Finalization actively severs transient syntax and checker
+access: the finalized artifact holds no field and exposes no accessor that
+reaches a `go/ast`, `go/types`, or mutable `go/token` object, and transient
+graph access after finalization is structurally impossible, not merely
+discouraged. This ordering does not authorize a second traversal: source census
+remains a bounded implementation-boundary census, while construct topology has
+exactly one producer in the language-analysis layer.
+
+Stage 1 owns syntax inventory, the implementation definition/reference topology,
+declaration contracts, scope selection, and the finalized structural artifacts.
+Stage 2 (the semantic model) consumes Stage-1's canonical identities, workspace
+loading, and parent-assigned contextual visitors, and reads the same transient
+checker graph before finalization to add binding, object, capture, and
+type-semantic facts; it does not rebuild loading, identities, or Stage-1
+visitors, and it never reintroduces a finalized checker.
 
 The transient checker graph and its evidence are Stage-1's, and their lifetime
 is defined exactly. The one checker graph is live from workspace load through
@@ -218,10 +230,12 @@ excluding every nested unit's interior. A nested implementation with a non-full
 body remains a typed reference in its full parent — preserving the parent's
 function-value or initializer operation at the exact edge — while contributing
 zero interior body occurrences. A full child inside a non-full parent retains
-its callable contract, binder and type evidence, and its own body region
-without retaining or rescanning the excluded parent. Stage 1 retains the exact
-object and binder evidence a later capture analysis consumes; Stage 1 performs
-no capture planning.
+its callable contract and its own body region without retaining or rescanning
+the excluded parent. The exact object and binder evidence a later capture
+analysis consumes lives in the transient checker graph, which the semantic model
+reads before finalization severs it; the finalized Stage-1 artifact retains only
+structural definitions, references, contracts, and regions, never a materialized
+object or binder fact. Stage 1 performs no capture planning.
 
 An excluded body is unreachable through the finalized parent API. The finalized
 artifact exposes one region/reference API for every unit at every depth. It does

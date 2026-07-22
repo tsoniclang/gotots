@@ -75,9 +75,12 @@ func Finalize(u *Universe, depths map[identity.SourceUnitID]EvidenceDepth, impli
 		}
 		remainingImplicit[id] = true
 	}
-	ws := &Workspace{fset: u.fset, toolchain: u.toolchain}
+	ws := &Workspace{toolchain: u.toolchain}
 	for _, loaded := range u.packages {
-		record := finalizePackage(loaded, depths)
+		record, err := finalizePackage(loaded)
+		if err != nil {
+			return nil, err
+		}
 		for _, implicit := range loaded.implicitUnits {
 			depth, selected := implicitDepths[implicit]
 			if !selected {
@@ -113,20 +116,25 @@ func Finalize(u *Universe, depths map[identity.SourceUnitID]EvidenceDepth, impli
 
 // finalizePackage builds one finalized package record: identity, provenance,
 // acquisition, versions, unit boundaries, and cgo mappings/synthetics. No raw
-// AST or body-indexed syntax is retained; the shared declaration type graph is
-// carried for later phases.
-func finalizePackage(loaded *LoadedPackage, depths map[identity.SourceUnitID]EvidenceDepth) *Package {
+// AST, checker package, or body-indexed syntax is retained; the transient type
+// graph is validated here (path agreement) and reduced to a boolean
+// type-evidence fact, then dropped.
+func finalizePackage(loaded *LoadedPackage) (*Package, error) {
+	if loaded.types != nil && loaded.types.Path() != loaded.id.ImportPath() {
+		return nil, &LoadError{Reason: "type-graph package path " + loaded.types.Path() +
+			" diverges from identity " + loaded.id.String()}
+	}
 	out := &Package{
 		id: loaded.id, provenance: loaded.provenance, acquisition: loaded.acquisition,
 		disposition: loaded.disposition, moduleGoVersion: loaded.moduleGoVersion,
-		requestedRoot: loaded.requestedRoot,
-		imports:       append([]string(nil), loaded.imports...),
-		otherFiles:    append([]string(nil), loaded.otherFiles...),
-		embedFiles:    append([]string(nil), loaded.embedFiles...),
-		embedPatterns: append([]string(nil), loaded.embedPatterns...),
-		types:         loaded.types,
-		mappings:      append([]CheckedUnitMapping(nil), loaded.mappings...),
-		synthetics:    append([]SyntheticUnit(nil), loaded.synthetics...),
+		requestedRoot:   loaded.requestedRoot,
+		imports:         append([]string(nil), loaded.imports...),
+		otherFiles:      append([]string(nil), loaded.otherFiles...),
+		embedFiles:      append([]string(nil), loaded.embedFiles...),
+		embedPatterns:   append([]string(nil), loaded.embedPatterns...),
+		hasTypeEvidence: loaded.types != nil,
+		mappings:        append([]CheckedUnitMapping(nil), loaded.mappings...),
+		synthetics:      append([]SyntheticUnit(nil), loaded.synthetics...),
 	}
 	for _, loadedFile := range loaded.files {
 		file := &File{
@@ -139,5 +147,5 @@ func finalizePackage(loaded *LoadedPackage, depths map[identity.SourceUnitID]Evi
 		out.files = append(out.files, file)
 	}
 	sort.Slice(out.files, func(i, j int) bool { return out.files[i].id.Rel() < out.files[j].id.Rel() })
-	return out
+	return out, nil
 }

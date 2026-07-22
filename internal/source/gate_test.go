@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/identity"
@@ -65,7 +64,6 @@ func TestPackageRecordConstructorRejectsIncoherence(t *testing.T) {
 		unit.depth = depth
 		return &File{path: "m.go", id: fileID, units: []SourceUnit{unit}}
 	}
-	tp := types.NewPackage("gate.example/m", "m")
 	cases := []struct {
 		name   string
 		record *Package
@@ -79,11 +77,11 @@ func TestPackageRecordConstructorRejectsIncoherence(t *testing.T) {
 		{"source record without types", &Package{id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource,
 			files: []*File{unitFile(DepthFullSemantic)}, implicitUnits: []ImplicitUnit{{id: mustImplicit(t, modPkg), depth: DepthFullSemantic}}}},
 		{"unselected depth", &Package{id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource,
-			types: tp, files: []*File{unitFile(DepthInvalid)}, implicitUnits: []ImplicitUnit{{id: mustImplicit(t, modPkg), depth: DepthFullSemantic}}}},
+			hasTypeEvidence: true, files: []*File{unitFile(DepthInvalid)}, implicitUnits: []ImplicitUnit{{id: mustImplicit(t, modPkg), depth: DepthFullSemantic}}}},
 		{"ordinary package without implicit initialization unit", &Package{id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource,
-			types: tp, files: []*File{unitFile(DepthFullSemantic)}}},
+			hasTypeEvidence: true, files: []*File{unitFile(DepthFullSemantic)}}},
 		{"implicit unit without selected depth", &Package{id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace, disposition: DispositionOrdinarySource,
-			types: tp, files: []*File{unitFile(DepthFullSemantic)},
+			hasTypeEvidence: true, files: []*File{unitFile(DepthFullSemantic)},
 			implicitUnits: []ImplicitUnit{{id: mustImplicit(t, modPkg)}}}},
 	}
 	for _, c := range cases {
@@ -98,7 +96,7 @@ func TestPackageRecordConstructorRejectsIncoherence(t *testing.T) {
 	ws := &Workspace{}
 	valid := &Package{
 		id: modPkg, provenance: ProvenanceWorkspaceModule, acquisition: AcquisitionWorkspace,
-		disposition: DispositionOrdinarySource, types: tp,
+		disposition: DispositionOrdinarySource, hasTypeEvidence: true,
 		files:         []*File{unitFile(DepthFullSemantic)},
 		implicitUnits: []ImplicitUnit{{id: mustImplicit(t, modPkg), depth: DepthFullSemantic}},
 	}

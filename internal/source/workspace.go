@@ -12,8 +12,6 @@ package source
 
 import (
 	"fmt"
-	"go/token"
-	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/identity"
 )
@@ -206,16 +204,15 @@ func (t Toolchain) GOOS() string { return t.goos }
 func (t Toolchain) GOARCH() string { return t.goarch }
 
 // Workspace is the typed universe one request resolves to: the complete
-// transitive package closure under the selected toolchain.
+// transitive package closure under the selected toolchain. Finalization severs
+// the transient syntax/checker lifetime: the finalized Workspace holds no
+// FileSet, checker package, or AST, so transient graph access after
+// finalization is structurally impossible.
 type Workspace struct {
-	fset      *token.FileSet
 	toolchain Toolchain
 	packages  []*Package // complete closure, deterministic identity order
 	roots     []*Package // the requested root packages
 }
-
-// Fset carries position information for every loaded file.
-func (w *Workspace) Fset() *token.FileSet { return w.fset }
 
 // Toolchain is the resolved selected toolchain.
 func (w *Workspace) Toolchain() Toolchain { return w.toolchain }
@@ -247,7 +244,8 @@ type Package struct {
 	mappings        []CheckedUnitMapping
 	synthetics      []SyntheticUnit
 	implicitUnits   []ImplicitUnit
-	types           *types.Package
+	hasTypeEvidence bool // validated presence of checked type evidence; the
+	// checker package itself is transient and never stored on the finalized record
 }
 
 // ImplicitUnit is one finalized unspelled implicit executable unit: its typed
@@ -335,15 +333,12 @@ func finishPackage(p *Package) (*Package, error) {
 	case DispositionBuiltinUniverse:
 		// metadata-only pseudo-package: no type or syntax evidence exists
 	case DispositionUnsafeIntrinsic:
-		if p.types == nil {
+		if !p.hasTypeEvidence {
 			return fail("unsafe intrinsic record lacks type evidence")
 		}
 	default:
-		if p.types == nil {
+		if !p.hasTypeEvidence {
 			return fail("source record lacks type evidence")
-		}
-		if p.types.Path() != p.id.ImportPath() {
-			return fail("type-graph package path " + p.types.Path() + " diverges from identity")
 		}
 		if len(p.files) == 0 {
 			return fail("source record has no files")
@@ -449,11 +444,12 @@ func (p *Package) Units() []SourceUnit {
 }
 
 // HasTypeEvidence reports whether the package carries checked type evidence.
-// The raw *types.Package / *types.Info are never exposed by the finalized API:
-// mutable checker objects, scopes, selections, and expressions do not survive
-// finalization. The one checker graph is queried only transiently, during the
-// analyze traversal, through source's narrow capability.
-func (p *Package) HasTypeEvidence() bool { return p.types != nil }
+// It is a validated boolean fact, not a stored checker object: the raw
+// *types.Package / *types.Info are never retained or exposed by the finalized
+// API — mutable checker objects, scopes, selections, and expressions do not
+// survive finalization. The one checker graph is queried only transiently,
+// during the analyze traversal, through source's narrow capability.
+func (p *Package) HasTypeEvidence() bool { return p.hasTypeEvidence }
 
 // File is one resolved source file: canonical identity, effective language
 // version, selected-byte digest, and its unit ledger with selected depths. The

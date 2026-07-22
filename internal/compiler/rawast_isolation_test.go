@@ -127,7 +127,7 @@ func (w *rawASTWalker) checkNoRawAST(typ reflect.Type, path string) {
 		return
 	}
 	w.visited[typ] = true
-	if pkg := typ.PkgPath(); pkg == "go/ast" || pkg == "go/types" {
+	if pkg := typ.PkgPath(); pkg == "go/ast" || pkg == "go/types" || pkg == "go/token" {
 		w.violations = append(w.violations, path+" reaches raw "+pkg+" type "+typ.String())
 		return
 	}
@@ -148,8 +148,28 @@ func (w *rawASTWalker) checkNoRawAST(typ reflect.Type, path string) {
 	case reflect.Interface:
 		// An interface from go/ast (e.g. ast.Node) is caught by PkgPath above;
 		// an empty interface reaches nothing statically.
-		if strings.Contains(typ.String(), "ast.") || strings.Contains(typ.String(), "types.") {
+		if strings.Contains(typ.String(), "ast.") || strings.Contains(typ.String(), "types.") || strings.Contains(typ.String(), "token.") {
 			w.violations = append(w.violations, path+" returns interface "+typ.String())
+		}
+	}
+}
+
+// TestFinalizationSeversTransientGraph is the lifecycle gate: after finalization
+// the finalized surface offers no route back to the transient checker graph.
+// The workspace and package types must not carry a FileSet, checker package, or
+// type-info accessor by name, so a later phase cannot re-consult the checker
+// through a finalized artifact.
+func TestFinalizationSeversTransientGraph(t *testing.T) {
+	banned := map[reflect.Type][]string{
+		reflect.TypeOf(&source.Workspace{}): {"Fset", "Types", "TypesInfo", "Universe", "Checker"},
+		reflect.TypeOf(&source.Package{}):   {"Types", "TypesInfo", "Fset", "Syntax", "Checker", "Info"},
+		reflect.TypeOf(&source.File{}):      {"Syntax", "Fset", "AST", "TypesInfo"},
+	}
+	for typ, names := range banned {
+		for _, name := range names {
+			if _, ok := typ.MethodByName(name); ok {
+				t.Errorf("%s exposes %s() — finalization did not sever transient graph access", typ, name)
+			}
 		}
 	}
 }

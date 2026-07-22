@@ -149,6 +149,14 @@ func AuditCatalog(req source.Request) (*analyze.AuditArtifact, error) {
 	if err != nil {
 		return nil, err
 	}
+	// The audit is the provider-graph producer: extract each file's
+	// definition/reference topology from the TRANSIENT universe BEFORE
+	// finalization severs the checker graph, so ordinary compilation exact-joins
+	// the certified graph.
+	graph, err := analyze.ExtractProviderGraph(universe)
+	if err != nil {
+		return nil, err
+	}
 	// The audit is a streaming gate run, not an application build: it does not
 	// retain the region model. The retention projection is the selection's own
 	// full-unit membership (the seal), so finalization stays a lifecycle seal.
@@ -164,13 +172,6 @@ func AuditCatalog(req source.Request) (*analyze.AuditArtifact, error) {
 		return nil, err
 	}
 	if err := stagecheck.VerifyUnitCensus(ws, req, contract, auditPolicy); err != nil {
-		return nil, err
-	}
-	// The audit is the provider-graph producer: extract each file's
-	// definition/reference topology from the transient universe and embed it,
-	// so ordinary compilation exact-joins the certified graph.
-	graph, err := analyze.ExtractProviderGraph(universe)
-	if err != nil {
 		return nil, err
 	}
 	artifact, err := analyze.AuditCatalog(ws, auditMeta(req, contract), req.Overlay, ordinaryPolicy, graph)
