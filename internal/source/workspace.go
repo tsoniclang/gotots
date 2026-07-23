@@ -44,14 +44,15 @@ type Request struct {
 	Env []string
 	// BuildFlags are extra flags passed to the underlying go tool.
 	BuildFlags []string
-	// AuditArtifact is the path of the produced catalog-audit/unit-manifest
-	// artifact ordinary compilation consumes and verifies. It is required
-	// whenever the closure contains provider-owned (manifest-mode) files;
-	// there is no optional acceptance. AuditArtifactDigest is the certified
-	// content digest the gate run attested; the artifact's authority comes
-	// from this external binding, never from its own seal.
-	AuditArtifact       string
-	AuditArtifactDigest string
+	// ProviderStructureArtifact and ProviderSemanticArtifact are the separate
+	// certified provider authorities selected by ordinary compilation. Both
+	// are required whenever the source plan selects provider-owned evidence.
+	// Their externally selected digests, not their internal seals, establish
+	// authority.
+	ProviderStructureArtifact string
+	ProviderStructureDigest   string
+	ProviderSemanticArtifact  string
+	ProviderSemanticDigest    string
 }
 
 // LoadError is the typed failure of resolving a compilation request.

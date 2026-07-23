@@ -255,9 +255,10 @@ Required exit evidence:
   exact structural coverage target naming its owning declaration/type fact
   rather than a generic fallback;
 - definition semantics preserve the exact declaration cardinality and order:
-  one declaration for function/method and bodyless definitions, zero for
-  literals and implicit definitions, one-or-more for a multi-name package
-  initializer, and one for a typed synthetic definition; synthetic adapters
+  one declaration for ordinary function/method and bodyless definitions, zero
+  for `func _()`, `func init()`, literals, and implicit definitions, zero-or-more for a
+  multi-name package initializer after blank names are removed (including zero
+  for `var _ = f()`), and one for a typed synthetic definition; synthetic adapters
   require a signature while synthetic type/data definitions forbid one;
   evidence depth and provider class are never encoded as semantic forms;
 - every full-semantic executable region is completely resolved; every
@@ -271,6 +272,15 @@ Required exit evidence:
 - predeclared declaration payloads are owned once by the `builtin` language
   pseudo-package, exact-joined to the pinned catalog and `types.Universe`, and
   are referenced rather than copied by ordinary packages;
+- predeclared and `unsafe` builtin declarations use their closed catalog
+  identities rather than a fabricated ordinary signature; every builtin call
+  retains its exact call-site semantic evidence, and the selected toolchain's
+  `unsafe` builtin set exact-joins the append-only catalog;
+- each type parameter is canonically owned by one generic declaration or
+  declaration-less definition plus binder role and ordinal; local lexical
+  bindings reference that type identity, while imported export-data and
+  instantiated checker forms materialize without foreign syntax, a fabricated
+  local binding, or checker-object identity;
 - ordinary package semantics are independent of provenance; semantic records
   carry the resolved package identity/provenance but contain no output path or
   implementation-owner decision, which belongs to later planning;

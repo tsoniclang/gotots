@@ -168,11 +168,13 @@ func TestProviderArtifactSelectionFailsClosed(t *testing.T) {
 	for name, arguments := range map[string][]string{
 		"path-without-digest": {
 			"inspect", "constructs", "-contract", "portable@v1",
-			"-dir", project, "-provider", "provider.gotots",
+			"-dir", project,
+			"-provider-structure", "provider.structure.gotots",
 		},
 		"digest-without-path": {
 			"inspect", "constructs", "-contract", "portable@v1",
-			"-dir", project, "-provider-digest", strings.Repeat("0", 64),
+			"-dir", project,
+			"-provider-structure-digest", strings.Repeat("0", 64),
 		},
 	} {
 		t.Run(name, func(t *testing.T) {

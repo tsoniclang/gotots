@@ -405,7 +405,9 @@ func independentSyntheticDescriptors(
 		for _, spec := range typed.Specs {
 			switch declaration := spec.(type) {
 			case *ast.TypeSpec:
-				if typed.Tok == token.TYPE && declaration.Name != nil {
+				if typed.Tok == token.TYPE &&
+					declaration.Name != nil &&
+					declaration.Name.Name != "_" {
 					out = append(out, independentSyntheticDescriptor{
 						name: declaration.Name.Name,
 						role: identity.SyntheticDefinitionType,

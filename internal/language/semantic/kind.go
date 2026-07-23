@@ -69,11 +69,13 @@ const (
 	StructuralBlankIdentifier
 	StructuralDeclarationEnvelope
 	StructuralDefinitionReference
+	StructuralCompileTimeExpression
+	StructuralIntrinsicContract
 )
 
 func (kind StructuralDisposition) Valid() bool {
 	return kind >= StructuralDocumentation &&
-		kind <= StructuralDefinitionReference
+		kind <= StructuralIntrinsicContract
 }
 
 type DefinitionComponentKind uint8
@@ -103,13 +105,12 @@ const (
 	DefinitionFormInitializer
 	DefinitionFormBodyless
 	DefinitionFormImplicit
-	DefinitionFormExternal
-	DefinitionFormIntrinsic
+	DefinitionFormSynthetic
 )
 
 func (kind DefinitionForm) Valid() bool {
 	return kind >= DefinitionFormCallable &&
-		kind <= DefinitionFormIntrinsic
+		kind <= DefinitionFormSynthetic
 }
 
 type ValueMode uint8
@@ -158,11 +159,12 @@ const (
 	PlaceSliceElement
 	PlacePointerDereference
 	PlaceBlank
+	PlaceMapElement
 )
 
 func (kind PlaceKind) Valid() bool {
 	return kind >= PlaceNone &&
-		kind <= PlaceBlank
+		kind <= PlaceMapElement
 }
 
 type OperationKind uint16
@@ -170,6 +172,7 @@ type OperationKind uint16
 const (
 	OperationInvalid OperationKind = iota
 	OperationLiteral
+	OperationParenthesized
 	OperationLoad
 	OperationStore
 	OperationDeclare
@@ -234,6 +237,7 @@ func (kind OperationKind) String() string {
 
 var operationKindNames = [operationKindCount + 1]string{
 	OperationLiteral:               "literal",
+	OperationParenthesized:         "parenthesized",
 	OperationLoad:                  "load",
 	OperationStore:                 "store",
 	OperationDeclare:               "declare",
@@ -315,9 +319,10 @@ const (
 	UnsupportedExternalBoundary
 	UnsupportedIntrinsicBoundary
 	UnsupportedExplicitContract
+	UnsupportedCheckedViewTransform
 )
 
 func (reason UnsupportedReason) Valid() bool {
 	return reason >= UnsupportedExternalBoundary &&
-		reason <= UnsupportedExplicitContract
+		reason <= UnsupportedCheckedViewTransform
 }

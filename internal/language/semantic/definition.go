@@ -14,13 +14,12 @@ type DefinitionSemanticsSpec struct {
 	Authority  Authority
 	Name       string
 
-	Declaration  identity.SemanticDeclarationID
-	Signature    identity.SemanticTypeID
-	Receiver     identity.SemanticBindingID
-	Bindings     []identity.SemanticBindingID
-	Types        []identity.SemanticTypeID
-	Initializers []identity.OperationID
-	Implicit     identity.ImplicitDefinitionOp
+	Declarations       []identity.SemanticDeclarationID
+	Signature          identity.SemanticTypeID
+	Receiver           identity.SemanticBindingID
+	Bindings           []identity.SemanticBindingID
+	InitializerEntries []identity.OccurrenceID
+	Implicit           identity.ImplicitDefinitionOp
 }
 
 type DefinitionSemantics struct {
@@ -34,10 +33,21 @@ func NewDefinitionSemantics(
 	if spec.Definition.IsZero() ||
 		spec.Package.IsZero() ||
 		!spec.Form.Valid() ||
-		!spec.Authority.Valid() {
+		!spec.Authority.Valid() ||
+		spec.Name == "" {
 		return DefinitionSemantics{}, fmt.Errorf(
-			"definition semantics requires identity, package, form, and authority",
+			"definition semantics requires identity, package, form, authority, and name",
 		)
+	}
+	seenDeclarations := map[identity.SemanticDeclarationID]bool{}
+	for _, declaration := range spec.Declarations {
+		if declaration.IsZero() || seenDeclarations[declaration] {
+			return DefinitionSemantics{}, fmt.Errorf(
+				"definition %s has invalid declaration set",
+				spec.Definition,
+			)
+		}
+		seenDeclarations[declaration] = true
 	}
 	seenBindings := map[identity.SemanticBindingID]bool{}
 	for _, binding := range spec.Bindings {
@@ -49,23 +59,15 @@ func NewDefinitionSemantics(
 		}
 		seenBindings[binding] = true
 	}
-	seenTypes := map[identity.SemanticTypeID]bool{}
-	for _, typeID := range spec.Types {
-		if typeID.IsZero() || seenTypes[typeID] {
-			return DefinitionSemantics{}, fmt.Errorf(
-				"definition %s has invalid declared type set",
-				spec.Definition,
-			)
-		}
-		seenTypes[typeID] = true
-	}
-	seenInitializers := map[identity.OperationID]bool{}
-	for _, initializer := range spec.Initializers {
+	seenInitializers := map[identity.OccurrenceID]bool{}
+	for _, initializer := range spec.InitializerEntries {
 		if initializer.IsZero() ||
-			initializer.Definition() != spec.Definition ||
+			(!spec.Definition.File().IsZero() &&
+				initializer.Span().File() !=
+					spec.Definition.File()) ||
 			seenInitializers[initializer] {
 			return DefinitionSemantics{}, fmt.Errorf(
-				"definition %s has invalid initializer operations",
+				"definition %s has invalid initializer entries",
 				spec.Definition,
 			)
 		}
@@ -81,27 +83,38 @@ func validateDefinitionForm(
 	spec DefinitionSemanticsSpec,
 ) error {
 	hasCallable := !spec.Signature.IsZero()
-	hasInitializers := len(spec.Initializers) != 0
+	hasInitializers := len(spec.InitializerEntries) != 0
 	hasImplicit := spec.Implicit.Valid()
+	if err := validateDefinitionIdentityForm(spec); err != nil {
+		return err
+	}
 	switch spec.Form {
 	case DefinitionFormCallable:
-		if !hasCallable || hasImplicit {
+		if !hasCallable ||
+			hasInitializers ||
+			hasImplicit {
 			return fmt.Errorf(
 				"callable definition %s lacks callable semantics",
 				spec.Definition,
 			)
 		}
 	case DefinitionFormInitializer:
-		if hasCallable || hasImplicit {
+		if hasCallable ||
+			hasImplicit ||
+			!hasInitializers {
 			return fmt.Errorf(
 				"initializer definition %s has incompatible semantics",
 				spec.Definition,
 			)
 		}
 	case DefinitionFormBodyless:
-		if !hasCallable ||
+		builtinContract := len(spec.Declarations) == 1 &&
+			spec.Declarations[0].Class() ==
+				identity.SemanticObjectBuiltin
+		if hasCallable == builtinContract ||
 			hasInitializers ||
-			hasImplicit {
+			hasImplicit ||
+			len(spec.Declarations) != 1 {
 			return fmt.Errorf(
 				"bodyless definition %s has incompatible semantics",
 				spec.Definition,
@@ -110,16 +123,27 @@ func validateDefinitionForm(
 	case DefinitionFormImplicit:
 		if !hasImplicit ||
 			hasCallable ||
-			hasInitializers {
+			hasInitializers ||
+			len(spec.Declarations) != 0 {
 			return fmt.Errorf(
 				"implicit definition %s lacks implicit meaning",
 				spec.Definition,
 			)
 		}
-	case DefinitionFormExternal, DefinitionFormIntrinsic:
-		if hasInitializers {
+	case DefinitionFormSynthetic:
+		if hasInitializers ||
+			hasImplicit ||
+			len(spec.Declarations) != 1 {
 			return fmt.Errorf(
-				"boundary definition %s carries initializer operations",
+				"synthetic definition %s has incompatible semantics",
+				spec.Definition,
+			)
+		}
+		adapter := spec.Definition.SyntheticRole() ==
+			identity.SyntheticDefinitionAdapter
+		if adapter != hasCallable {
+			return fmt.Errorf(
+				"synthetic definition %s signature disagrees with role",
 				spec.Definition,
 			)
 		}
@@ -127,17 +151,61 @@ func validateDefinitionForm(
 	return nil
 }
 
+func validateDefinitionIdentityForm(
+	spec DefinitionSemanticsSpec,
+) error {
+	var wantForm DefinitionForm
+	wantDeclarations := -1
+	switch spec.Definition.Kind() {
+	case identity.DefinitionFuncDecl:
+		wantForm = DefinitionFormCallable
+		if spec.Name == "_" || spec.Name == "init" {
+			wantDeclarations = 0
+		} else {
+			wantDeclarations = 1
+		}
+	case identity.DefinitionFuncLit:
+		wantForm = DefinitionFormCallable
+		wantDeclarations = 0
+	case identity.DefinitionPackageInitializer:
+		wantForm = DefinitionFormInitializer
+	case identity.DefinitionBodylessDecl:
+		wantForm = DefinitionFormBodyless
+		wantDeclarations = 1
+	case identity.DefinitionImplicit:
+		switch {
+		case spec.Definition.ImplicitOp().Valid():
+			wantForm = DefinitionFormImplicit
+			wantDeclarations = 0
+		case spec.Definition.SyntheticRole().Valid():
+			wantForm = DefinitionFormSynthetic
+			wantDeclarations = 1
+		}
+	}
+	if wantForm == DefinitionFormInvalid ||
+		spec.Form != wantForm ||
+		(wantDeclarations >= 0 &&
+			len(spec.Declarations) != wantDeclarations) {
+		return fmt.Errorf(
+			"definition %s form/declaration cardinality disagrees with identity",
+			spec.Definition,
+		)
+	}
+	return nil
+}
+
 func cloneDefinitionSemanticsSpec(
 	spec DefinitionSemanticsSpec,
 ) DefinitionSemanticsSpec {
+	spec.Declarations = append(
+		[]identity.SemanticDeclarationID(nil),
+		spec.Declarations...,
+	)
 	spec.Bindings = append(
 		[]identity.SemanticBindingID(nil), spec.Bindings...,
 	)
-	spec.Types = append(
-		[]identity.SemanticTypeID(nil), spec.Types...,
-	)
-	spec.Initializers = append(
-		[]identity.OperationID(nil), spec.Initializers...,
+	spec.InitializerEntries = append(
+		[]identity.OccurrenceID(nil), spec.InitializerEntries...,
 	)
 	return spec
 }
@@ -158,14 +226,73 @@ func (record DefinitionSemantics) Spec() DefinitionSemanticsSpec {
 	return cloneDefinitionSemanticsSpec(record.spec)
 }
 
+type StructuralEvidence struct {
+	disposition StructuralDisposition
+	declaration identity.SemanticDeclarationID
+	typeID      identity.SemanticTypeID
+}
+
+func NewStructuralEvidence(
+	disposition StructuralDisposition,
+	declaration identity.SemanticDeclarationID,
+	typeID identity.SemanticTypeID,
+) (StructuralEvidence, error) {
+	if !disposition.Valid() {
+		return StructuralEvidence{}, fmt.Errorf(
+			"structural evidence requires a closed disposition",
+		)
+	}
+	hasDeclaration := !declaration.IsZero()
+	hasType := !typeID.IsZero()
+	if disposition == StructuralCompileTimeExpression {
+		if hasDeclaration == hasType {
+			return StructuralEvidence{}, fmt.Errorf(
+				"compile-time expression requires exactly one coverage target",
+			)
+		}
+	} else if hasDeclaration || hasType {
+		return StructuralEvidence{}, fmt.Errorf(
+			"non-expression structural evidence carries coverage",
+		)
+	}
+	return StructuralEvidence{
+		disposition: disposition,
+		declaration: declaration,
+		typeID:      typeID,
+	}, nil
+}
+
+func (record StructuralEvidence) Valid() bool {
+	if !record.disposition.Valid() {
+		return false
+	}
+	hasDeclaration := !record.declaration.IsZero()
+	hasType := !record.typeID.IsZero()
+	if record.disposition == StructuralCompileTimeExpression {
+		return hasDeclaration != hasType
+	}
+	return !hasDeclaration && !hasType
+}
+
+func (record StructuralEvidence) Disposition() StructuralDisposition {
+	return record.disposition
+}
+func (record StructuralEvidence) Declaration() identity.SemanticDeclarationID {
+	return record.declaration
+}
+func (record StructuralEvidence) Type() identity.SemanticTypeID {
+	return record.typeID
+}
+
 type OccurrenceResolution struct {
 	occurrence  identity.OccurrenceID
 	owner       identity.DefinitionID
 	syntax      catalog.Kind
 	role        catalog.Role
 	variant     catalog.Variant
+	domain      catalog.ResolutionDomain
 	kind        ResolutionKind
-	structural  StructuralDisposition
+	structural  StructuralEvidence
 	component   DefinitionComponentKind
 	definition  identity.DefinitionID
 	declaration identity.SemanticDeclarationID
@@ -181,8 +308,9 @@ type ResolutionSpec struct {
 	Syntax      catalog.Kind
 	Role        catalog.Role
 	Variant     catalog.Variant
+	Domain      catalog.ResolutionDomain
 	Kind        ResolutionKind
-	Structural  StructuralDisposition
+	Structural  StructuralEvidence
 	Component   DefinitionComponentKind
 	Definition  identity.DefinitionID
 	Declaration identity.SemanticDeclarationID
@@ -200,6 +328,7 @@ func NewOccurrenceResolution(
 		spec.Occurrence.KindID() != uint16(spec.Syntax) ||
 		(spec.Role != catalog.RoleInvalid && !spec.Role.Valid()) ||
 		!spec.Variant.Valid() ||
+		!spec.Domain.Valid() ||
 		!spec.Kind.Valid() {
 		return OccurrenceResolution{}, fmt.Errorf(
 			"occurrence resolution requires identity, syntax, variant, and kind",
@@ -262,18 +391,28 @@ func NewOccurrenceResolution(
 		)
 	}
 	class := resolutionCatalogClass(spec.Kind)
-	if !catalog.AllowsResolution(
-		spec.Syntax, spec.Role, spec.Variant, class,
-	) {
+	allowed := catalog.AllowsResolution(
+		spec.Syntax, spec.Role, spec.Variant, spec.Domain, class,
+	)
+	if spec.Kind == ResolutionStructuralOnly &&
+		spec.Structural.Disposition() ==
+			StructuralIntrinsicContract {
+		allowed = catalog.AllowsIntrinsicContract(
+			spec.Syntax, spec.Role, spec.Domain,
+		)
+	}
+	if !allowed {
 		return OccurrenceResolution{}, fmt.Errorf(
-			"catalog rejects %s resolution for %s role=%s variant=%s",
+			"catalog rejects %s resolution for %s role=%s variant=%s domain=%s at %s",
 			spec.Kind, spec.Syntax, spec.Role, spec.Variant,
+			spec.Domain, spec.Occurrence,
 		)
 	}
 	return OccurrenceResolution{
 		occurrence: spec.Occurrence, owner: spec.Owner,
 		syntax: spec.Syntax, role: spec.Role, variant: spec.Variant,
-		kind: spec.Kind, structural: spec.Structural,
+		domain: spec.Domain,
+		kind:   spec.Kind, structural: spec.Structural,
 		component: spec.Component, definition: spec.Definition,
 		declaration: spec.Declaration, binding: spec.Binding,
 		typeID: spec.Type, operation: spec.Operation,
@@ -296,10 +435,13 @@ func (record OccurrenceResolution) Role() catalog.Role {
 func (record OccurrenceResolution) Variant() catalog.Variant {
 	return record.variant
 }
+func (record OccurrenceResolution) Domain() catalog.ResolutionDomain {
+	return record.domain
+}
 func (record OccurrenceResolution) Kind() ResolutionKind {
 	return record.kind
 }
-func (record OccurrenceResolution) Structural() StructuralDisposition {
+func (record OccurrenceResolution) Structural() StructuralEvidence {
 	return record.structural
 }
 func (record OccurrenceResolution) Component() DefinitionComponentKind {

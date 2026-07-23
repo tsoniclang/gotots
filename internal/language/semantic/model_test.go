@@ -97,13 +97,15 @@ func TestSemanticPackageIsImmutableAndResolutionConserved(
 	}
 	definition, err := NewDefinitionSemantics(
 		DefinitionSemanticsSpec{
-			Definition:  fixture.definition,
-			Package:     fixture.pkg,
-			Form:        DefinitionFormCallable,
-			Authority:   fixture.authority,
-			Name:        "F",
-			Declaration: declarationID,
-			Signature:   signature.ID(),
+			Definition: fixture.definition,
+			Package:    fixture.pkg,
+			Form:       DefinitionFormCallable,
+			Authority:  fixture.authority,
+			Name:       "F",
+			Declarations: []identity.SemanticDeclarationID{
+				declarationID,
+			},
+			Signature: signature.ID(),
 		},
 	)
 	if err != nil {
@@ -117,8 +119,6 @@ func TestSemanticPackageIsImmutableAndResolutionConserved(
 	}
 	operation, err := NewOperation(OperationSpec{
 		ID:         operationID,
-		Definition: fixture.definition,
-		Occurrence: fixture.body,
 		Kind:       OperationLiteral,
 		Syntax:     catalog.KindBasicLit,
 		Variant:    catalog.VariantNone,
@@ -139,6 +139,7 @@ func TestSemanticPackageIsImmutableAndResolutionConserved(
 		Syntax:     catalog.KindBasicLit,
 		Role:       catalog.RoleReturnValue,
 		Variant:    catalog.VariantNone,
+		Domain:     catalog.ResolutionDomainExecutable,
 		Kind:       ResolutionOperation,
 		Operation:  operationID,
 	})
@@ -147,6 +148,7 @@ func TestSemanticPackageIsImmutableAndResolutionConserved(
 	}
 	pkg, err := NewPackage(PackageInput{
 		ID:           fixture.pkg,
+		Provenance:   ProvenanceWorkspaceModule,
 		Definitions:  []DefinitionSemantics{definition},
 		Resolutions:  []OccurrenceResolution{resolution},
 		Declarations: []Declaration{declaration},
@@ -164,9 +166,22 @@ func TestSemanticPackageIsImmutableAndResolutionConserved(
 	if err != nil {
 		t.Fatal(err)
 	}
-	packages := model.Packages()
-	packages[0] = Package{}
-	if model.Packages()[0].ID() != fixture.pkg {
+	var visited []Package
+	if err := model.VisitPackages(func(pkg Package) error {
+		visited = append(visited, pkg)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	visited[0] = Package{}
+	var revisited Package
+	if err := model.VisitPackages(func(pkg Package) error {
+		revisited = pkg
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if revisited.ID() != fixture.pkg {
 		t.Fatal("model exposed mutable package storage")
 	}
 	resolutions := pkg.Resolutions()
@@ -210,6 +225,7 @@ func TestResolutionRejectsMismatchedOperationOwner(t *testing.T) {
 		Syntax:     catalog.KindBasicLit,
 		Role:       catalog.RoleReturnValue,
 		Variant:    catalog.VariantNone,
+		Domain:     catalog.ResolutionDomainExecutable,
 		Kind:       ResolutionOperation,
 		Operation:  operation,
 	}); err == nil {

@@ -118,16 +118,23 @@ func usesC() int { return int(C.value()) }
 	request.ProviderContractDigest = selected.Fingerprint()
 	request.ProviderContractArtifact =
 		writeContractArtifact(t, selected)
-	providerPath := filepath.Join(
-		t.TempDir(),
-		"conditional-provider.gotots",
+	output := t.TempDir()
+	structurePath := filepath.Join(
+		output, "conditional-provider.structure.gotots",
 	)
-	provider, err := AuditCatalog(request, providerPath)
+	semanticPath := filepath.Join(
+		output, "conditional-provider.semantic.gotots",
+	)
+	provider, err := AuditCatalog(
+		request, structurePath, semanticPath,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	request.AuditArtifact = providerPath
-	request.AuditArtifactDigest = provider.Digest
+	request.ProviderStructureArtifact = structurePath
+	request.ProviderStructureDigest = provider.Structure.Digest
+	request.ProviderSemanticArtifact = semanticPath
+	request.ProviderSemanticDigest = provider.Semantic.Digest
 	inspection, err := InspectConstructs(request)
 	if err != nil {
 		t.Fatal(err)

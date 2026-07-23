@@ -14,7 +14,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/source"
 )
 
-func TestProviderRequestedFactOmissionFailsConsumption(t *testing.T) {
+func TestProviderFactMutationInvalidatesBoundSemanticArtifact(t *testing.T) {
 	project := writeProviderFixture(
 		t,
 		"example.com/provider-fact",
@@ -24,24 +24,30 @@ func TestProviderRequestedFactOmissionFailsConsumption(t *testing.T) {
 		Dir: project, Patterns: []string{"."},
 		ProviderContract: contract.DefaultID,
 	}
-	originalPath := filepath.Join(t.TempDir(), "provider.gotots")
-	result, err := AuditCatalog(request, originalPath)
+	output := t.TempDir()
+	structurePath := filepath.Join(output, "provider.structure.gotots")
+	semanticPath := filepath.Join(output, "provider.semantic.gotots")
+	result, err := AuditCatalog(request, structurePath, semanticPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	mutatedPath, digest := omitOneProviderFact(
 		t,
-		originalPath,
+		structurePath,
 	)
-	request.AuditArtifact = mutatedPath
-	request.AuditArtifactDigest = digest
+	request.ProviderStructureArtifact = mutatedPath
+	request.ProviderStructureDigest = digest
+	request.ProviderSemanticArtifact = semanticPath
+	request.ProviderSemanticDigest = result.Semantic.Digest
 	_, err = InspectConstructs(request)
 	if err == nil ||
-		(!strings.Contains(err.Error(), "requested fact") &&
-			!strings.Contains(err.Error(), "fact-set join failed")) {
+		!strings.Contains(
+			err.Error(),
+			"semantic provider artifact context mismatch",
+		) {
 		t.Fatalf("provider fact omission error = %v", err)
 	}
-	if digest == result.Digest {
+	if digest == result.Structure.Digest {
 		t.Fatal("provider mutation retained the original container digest")
 	}
 }

@@ -23,6 +23,39 @@ func (class ResolutionClass) Valid() bool {
 		class <= resolutionClassCount
 }
 
+// ResolutionDomain is the one retained-region class in which an occurrence
+// is interpreted. It distinguishes declaration/header compile-time syntax
+// from executable syntax without asking a child to inspect its parent.
+type ResolutionDomain uint8
+
+const (
+	ResolutionDomainInvalid ResolutionDomain = iota
+	ResolutionDomainOwner
+	ResolutionDomainHeader
+	ResolutionDomainBoundary
+	ResolutionDomainExecutable
+)
+
+func (domain ResolutionDomain) Valid() bool {
+	return domain >= ResolutionDomainOwner &&
+		domain <= ResolutionDomainExecutable
+}
+
+func (domain ResolutionDomain) String() string {
+	switch domain {
+	case ResolutionDomainOwner:
+		return "owner"
+	case ResolutionDomainHeader:
+		return "header"
+	case ResolutionDomainBoundary:
+		return "boundary"
+	case ResolutionDomainExecutable:
+		return "executable"
+	default:
+		return "invalid"
+	}
+}
+
 type resolutionMask uint8
 
 func resolutionClasses(classes ...ResolutionClass) resolutionMask {
@@ -81,8 +114,14 @@ var resolutionByKind = [kindCount + 1]resolutionMask{
 		ResolutionClassType,
 		ResolutionClassOperation,
 	),
-	KindUnaryExpr:    resolutionClasses(ResolutionClassOperation),
-	KindBinaryExpr:   resolutionClasses(ResolutionClassOperation),
+	KindUnaryExpr: resolutionClasses(
+		ResolutionClassType,
+		ResolutionClassOperation,
+	),
+	KindBinaryExpr: resolutionClasses(
+		ResolutionClassType,
+		ResolutionClassOperation,
+	),
 	KindKeyValueExpr: resolutionClasses(ResolutionClassOperation),
 
 	KindArrayType:     resolutionClasses(ResolutionClassType),
@@ -146,20 +185,129 @@ var resolutionByKind = [kindCount + 1]resolutionMask{
 	KindPackage:   resolutionClasses(ResolutionClassUnsupported),
 }
 
+var compileTimeStructuralByKind = [kindCount + 1]bool{
+	KindIdent:         true,
+	KindEllipsis:      true,
+	KindBasicLit:      true,
+	KindCompositeLit:  true,
+	KindParenExpr:     true,
+	KindSelectorExpr:  true,
+	KindIndexExpr:     true,
+	KindIndexListExpr: true,
+	KindCallExpr:      true,
+	KindUnaryExpr:     true,
+	KindBinaryExpr:    true,
+	KindKeyValueExpr:  true,
+	KindArrayType:     true,
+	KindStructType:    true,
+	KindFuncType:      true,
+	KindInterfaceType: true,
+	KindMapType:       true,
+	KindChanType:      true,
+}
+
+// AllowsCompileTimeStructural reports whether one syntax kind may be
+// represented by positive declaration/type coverage in a non-executable
+// domain. It is the sole catalog owner of this closed exception.
+func AllowsCompileTimeStructural(kind Kind) bool {
+	return kind.Valid() && compileTimeStructuralByKind[kind]
+}
+
+func AllowsIntrinsicContract(
+	kind Kind,
+	role Role,
+	domain ResolutionDomain,
+) bool {
+	if !kind.Valid() ||
+		kind.Disposition() != DispositionActive ||
+		domain != ResolutionDomainHeader ||
+		(role != RoleInvalid && !role.Valid()) {
+		return false
+	}
+	if AllowsCompileTimeStructural(kind) {
+		return true
+	}
+	mask := resolutionMaskFor(kind, role)
+	return mask.has(ResolutionClassStructural) ||
+		mask.has(ResolutionClassDefinitionComponent) ||
+		mask.has(ResolutionClassDeclaration) ||
+		mask.has(ResolutionClassBinding) ||
+		mask.has(ResolutionClassType)
+}
+
 // AllowsResolution reports whether class is legal for one exact
 // kind/role/variant combination. Invalid combinations fail closed.
 func AllowsResolution(
 	kind Kind,
 	role Role,
 	variant Variant,
+	domain ResolutionDomain,
 	class ResolutionClass,
 ) bool {
 	if !kind.Valid() ||
 		(role != RoleInvalid && !role.Valid()) ||
-		!VariantAllowed(kind, variant) ||
+		!domain.Valid() ||
 		!class.Valid() {
 		return false
 	}
+	variantAllowed := VariantAllowed(kind, variant)
+	if class == ResolutionClassStructural &&
+		domain != ResolutionDomainExecutable &&
+		variant == VariantNone &&
+		AllowsCompileTimeStructural(kind) {
+		variantAllowed = true
+	}
+	if class == ResolutionClassUnsupported &&
+		domain == ResolutionDomainExecutable &&
+		variant == VariantNone &&
+		kind.Disposition() == DispositionActive {
+		variantAllowed = true
+	}
+	if !variantAllowed {
+		return false
+	}
+	if domain == ResolutionDomainBoundary {
+		return class == ResolutionClassDefinitionComponent ||
+			(class == ResolutionClassUnsupported &&
+				resolutionMaskFor(kind, role).has(class))
+	}
+	if class == ResolutionClassStructural &&
+		domain == ResolutionDomainOwner &&
+		kind.Disposition() == DispositionActive {
+		return true
+	}
+	if class == ResolutionClassOperation {
+		return domain == ResolutionDomainExecutable &&
+			resolutionMaskFor(kind, role).has(class)
+	}
+	if class == ResolutionClassUnsupported &&
+		domain == ResolutionDomainExecutable &&
+		kind.Disposition() == DispositionActive {
+		return true
+	}
+	if class == ResolutionClassStructural &&
+		(domain == ResolutionDomainOwner ||
+			domain == ResolutionDomainHeader) &&
+		compileTimeStructuralByKind[kind] {
+		return true
+	}
+	mask := resolutionMaskFor(kind, role)
+	if kind == KindIdent &&
+		domain != ResolutionDomainExecutable &&
+		mask.has(ResolutionClassOperation) {
+		mask &^= 1 << ResolutionClassOperation
+		mask |= resolutionClasses(
+			ResolutionClassDeclaration,
+			ResolutionClassBinding,
+		)
+	}
+	return mask.has(class)
+}
+
+func resolutionMaskFor(
+	kind Kind,
+	role Role,
+) resolutionMask {
 	mask := resolutionByKind[kind]
 	if kind == KindIdent {
 		mask = identifierResolution(role)
@@ -167,7 +315,7 @@ func AllowsResolution(
 	if kind == KindBasicLit && role == RoleImportPath {
 		mask = resolutionClasses(ResolutionClassStructural)
 	}
-	return mask.has(class)
+	return mask
 }
 
 func identifierResolution(role Role) resolutionMask {
@@ -194,12 +342,32 @@ func identifierResolution(role Role) resolutionMask {
 		RoleRangeKey,
 		RoleRangeValue:
 		return resolutionClasses(
+			ResolutionClassDefinitionComponent,
 			ResolutionClassDeclaration,
 			ResolutionClassBinding,
 			ResolutionClassStructural,
 		)
 	case RoleLabelReference:
 		return resolutionClasses(ResolutionClassBinding)
+	case RoleCallee:
+		return resolutionClasses(
+			ResolutionClassType,
+			ResolutionClassOperation,
+		)
+	case RoleOperand,
+		RoleLeftOperand,
+		RoleRightOperand,
+		RoleIndexedOperand:
+		return resolutionClasses(
+			ResolutionClassType,
+			ResolutionClassOperation,
+		)
+	case RoleIndex:
+		return resolutionClasses(
+			ResolutionClassBinding,
+			ResolutionClassType,
+			ResolutionClassOperation,
+		)
 	case RoleSelectedName:
 		return resolutionClasses(
 			ResolutionClassDeclaration,

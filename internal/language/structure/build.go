@@ -75,7 +75,10 @@ func build(
 		version:  ArtifactVersion,
 		provider: artifact,
 	}
-	index := newTransientIndex(universe)
+	index, err := newTransientIndex(universe)
+	if err != nil {
+		return nil, nil, err
+	}
 	for _, loadedPackage := range universe.Packages() {
 		if selectedPackages != nil &&
 			!selectedPackages[loadedPackage.ID()] {

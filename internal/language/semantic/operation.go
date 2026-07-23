@@ -8,14 +8,12 @@ import (
 )
 
 type OperationSpec struct {
-	ID         identity.OperationID
-	Definition identity.DefinitionID
-	Occurrence identity.OccurrenceID
-	Kind       OperationKind
-	Syntax     catalog.Kind
-	Variant    catalog.Variant
-	Role       catalog.Role
-	Token      catalog.TokenKind
+	ID      identity.OperationID
+	Kind    OperationKind
+	Syntax  catalog.Kind
+	Variant catalog.Variant
+	Role    catalog.Role
+	Token   catalog.TokenKind
 
 	Mode         ValueMode
 	Arity        ResultArity
@@ -30,10 +28,11 @@ type OperationSpec struct {
 	Selection    Selection
 	Instance     Instance
 
-	Operands    []identity.OccurrenceID
-	Definitions []identity.DefinitionID
-	Implicit    []ImplicitOperation
-	Control     identity.SemanticBindingID
+	Operands      []identity.OccurrenceID
+	Definitions   []identity.DefinitionID
+	Implicit      []ImplicitOperation
+	ControlTarget identity.OperationID
+	Label         identity.SemanticBindingID
 }
 
 type Operation struct {
@@ -43,15 +42,7 @@ type Operation struct {
 func NewOperation(spec OperationSpec) (Operation, error) {
 	spec = cloneOperationSpec(spec)
 	if spec.ID.IsZero() ||
-		spec.Definition.IsZero() ||
-		spec.Occurrence.IsZero() ||
-		spec.ID.Definition() != spec.Definition ||
-		spec.ID.Occurrence() != spec.Occurrence ||
 		!spec.Kind.Valid() ||
-		!spec.Syntax.Valid() ||
-		!spec.Variant.Valid() ||
-		!spec.Role.Valid() ||
-		(spec.Token != catalog.TokenInvalid && !spec.Token.Valid()) ||
 		!spec.Mode.Valid() ||
 		!spec.Arity.Valid() ||
 		!spec.Place.Valid() ||
@@ -60,10 +51,14 @@ func NewOperation(spec OperationSpec) (Operation, error) {
 			"operation %s has invalid required fields", spec.ID,
 		)
 	}
+	if err := validateOperationOrigin(spec); err != nil {
+		return Operation{}, err
+	}
 	if spec.Mode == ValueModePlace {
 		if spec.Place == PlaceNone ||
 			!spec.Assignable ||
-			spec.ResultType.IsZero() {
+			(spec.Place != PlaceBlank &&
+				spec.ResultType.IsZero()) {
 			return Operation{}, fmt.Errorf(
 				"place operation %s lacks place semantics", spec.ID,
 			)
@@ -73,16 +68,29 @@ func NewOperation(spec OperationSpec) (Operation, error) {
 			"non-place operation %s carries place class", spec.ID,
 		)
 	}
-	if operationNeedsResultType(spec.Mode) != !spec.ResultType.IsZero() {
+	needsResultType := operationNeedsResultType(spec.Mode)
+	if spec.Mode == ValueModePlace &&
+		spec.Place == PlaceBlank {
+		needsResultType = false
+	}
+	if needsResultType != !spec.ResultType.IsZero() {
 		return Operation{}, fmt.Errorf(
 			"operation %s result type disagrees with value mode",
 			spec.ID,
 		)
 	}
 	if !spec.Constant.IsZero() &&
-		spec.Kind != OperationLiteral {
+		(spec.Mode != ValueModeValue &&
+			spec.Mode != ValueModePlace) {
 		return Operation{}, fmt.Errorf(
-			"non-literal operation %s carries constant", spec.ID,
+			"non-value operation %s carries constant", spec.ID,
+		)
+	}
+	if !spec.ControlTarget.IsZero() &&
+		spec.ControlTarget.Definition() != spec.ID.Definition() {
+		return Operation{}, fmt.Errorf(
+			"operation %s has cross-definition control target",
+			spec.ID,
 		)
 	}
 	if !spec.Selection.IsZero() {
@@ -123,18 +131,56 @@ func NewOperation(spec OperationSpec) (Operation, error) {
 		}
 		seenDefinitions[definition] = true
 	}
-	seenImplicit := map[catalog.ImplicitOp]bool{}
+	type implicitKey struct {
+		kind    catalog.ImplicitOp
+		site    identity.OccurrenceID
+		ordinal int
+	}
+	seenImplicit := map[implicitKey]bool{}
 	for _, implicit := range spec.Implicit {
+		key := implicitKey{
+			kind: implicit.Kind(), site: implicit.Site(),
+			ordinal: implicit.Ordinal(),
+		}
 		if !implicit.Kind().Valid() ||
-			seenImplicit[implicit.Kind()] {
+			seenImplicit[key] {
 			return Operation{}, fmt.Errorf(
 				"operation %s has invalid implicit operations",
 				spec.ID,
 			)
 		}
-		seenImplicit[implicit.Kind()] = true
+		seenImplicit[key] = true
 	}
 	return Operation{spec: spec}, nil
+}
+
+func validateOperationOrigin(spec OperationSpec) error {
+	if spec.ID.Source() {
+		if !spec.Syntax.Valid() ||
+			spec.ID.Occurrence().KindID() != uint16(spec.Syntax) ||
+			!spec.Variant.Valid() ||
+			!spec.Role.Valid() ||
+			(spec.Token != catalog.TokenInvalid &&
+				!spec.Token.Valid()) {
+			return fmt.Errorf(
+				"source operation %s has invalid source origin",
+				spec.ID,
+			)
+		}
+		return nil
+	}
+	if !spec.ID.ImplicitOp().Valid() ||
+		spec.Kind != OperationPackageInitialization ||
+		spec.Syntax != catalog.KindInvalid ||
+		spec.Variant != catalog.VariantInvalid ||
+		spec.Role != catalog.RoleInvalid ||
+		spec.Token != catalog.TokenInvalid {
+		return fmt.Errorf(
+			"implicit operation %s has source-shaped origin fields",
+			spec.ID,
+		)
+	}
+	return nil
 }
 
 func operationNeedsResultType(mode ValueMode) bool {
@@ -166,10 +212,10 @@ func (operation Operation) ID() identity.OperationID {
 	return operation.spec.ID
 }
 func (operation Operation) Definition() identity.DefinitionID {
-	return operation.spec.Definition
+	return operation.spec.ID.Definition()
 }
 func (operation Operation) Occurrence() identity.OccurrenceID {
-	return operation.spec.Occurrence
+	return operation.spec.ID.Occurrence()
 }
 func (operation Operation) Kind() OperationKind {
 	return operation.spec.Kind

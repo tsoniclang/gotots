@@ -134,10 +134,39 @@ func NewDeclaration(
 	if id.IsZero() ||
 		!class.Valid() ||
 		name == "" ||
-		typeID.IsZero() ||
 		!authority.Valid() {
 		return Declaration{}, fmt.Errorf(
-			"declaration requires identity, class, name, type, and authority",
+			"declaration requires identity, class, name, and authority",
+		)
+	}
+	if id.Class() != class {
+		return Declaration{}, fmt.Errorf(
+			"declaration class disagrees with identity",
+		)
+	}
+	switch id.Form() {
+	case identity.SemanticDeclarationPackageObject:
+		if id.Package() != pkg || id.Name() != name {
+			return Declaration{}, fmt.Errorf(
+				"package declaration disagrees with identity",
+			)
+		}
+	case identity.SemanticDeclarationMember:
+		if id.Name() != name {
+			return Declaration{}, fmt.Errorf(
+				"member declaration disagrees with identity",
+			)
+		}
+	case identity.SemanticDeclarationOccurrence:
+		if id.Name() != name || id.Occurrence() != source {
+			return Declaration{}, fmt.Errorf(
+				"local declaration disagrees with identity",
+			)
+		}
+	case identity.SemanticDeclarationPredeclared:
+	default:
+		return Declaration{}, fmt.Errorf(
+			"declaration identity has invalid form",
 		)
 	}
 	if class == identity.SemanticObjectConstant {
@@ -149,6 +178,12 @@ func NewDeclaration(
 	} else if !constant.IsZero() {
 		return Declaration{}, fmt.Errorf(
 			"non-constant declaration carries a constant value",
+		)
+	}
+	intrinsicBuiltin := class == identity.SemanticObjectBuiltin
+	if intrinsicBuiltin != typeID.IsZero() {
+		return Declaration{}, fmt.Errorf(
+			"builtin declaration must omit an ordinary type and every other declaration must carry one",
 		)
 	}
 	if id.Form() != identity.SemanticDeclarationPredeclared &&
@@ -204,7 +239,6 @@ func NewBinding(
 	if id.IsZero() ||
 		pkg.IsZero() ||
 		!role.Valid() ||
-		typeID.IsZero() ||
 		!authority.Valid() {
 		return Binding{}, fmt.Errorf(
 			"binding requires identity, package, role, type, and authority",
@@ -213,6 +247,13 @@ func NewBinding(
 	if id.Role() != role {
 		return Binding{}, fmt.Errorf(
 			"binding role disagrees with identity",
+		)
+	}
+	typeless := role == identity.SemanticBindingImport ||
+		role == identity.SemanticBindingLabel
+	if typeless == !typeID.IsZero() {
+		return Binding{}, fmt.Errorf(
+			"binding type presence disagrees with role",
 		)
 	}
 	if source.IsZero() != id.Declaration().IsZero() ||
@@ -397,28 +438,39 @@ func (instance Instance) Signature() identity.SemanticTypeID {
 }
 
 type ImplicitOperation struct {
-	kind   catalog.ImplicitOp
-	source identity.SemanticTypeID
-	target identity.SemanticTypeID
+	kind    catalog.ImplicitOp
+	site    identity.OccurrenceID
+	ordinal int
+	source  identity.SemanticTypeID
+	target  identity.SemanticTypeID
 }
 
 func NewImplicitOperation(
 	kind catalog.ImplicitOp,
+	site identity.OccurrenceID,
+	ordinal int,
 	source identity.SemanticTypeID,
 	target identity.SemanticTypeID,
 ) (ImplicitOperation, error) {
-	if !kind.Valid() {
+	if !kind.Valid() || site.IsZero() || ordinal < 0 {
 		return ImplicitOperation{}, fmt.Errorf(
-			"implicit operation requires catalog kind",
+			"implicit operation requires kind, site, and ordinal",
 		)
 	}
 	return ImplicitOperation{
-		kind: kind, source: source, target: target,
+		kind: kind, site: site, ordinal: ordinal,
+		source: source, target: target,
 	}, nil
 }
 
 func (operation ImplicitOperation) Kind() catalog.ImplicitOp {
 	return operation.kind
+}
+func (operation ImplicitOperation) Site() identity.OccurrenceID {
+	return operation.site
+}
+func (operation ImplicitOperation) Ordinal() int {
+	return operation.ordinal
 }
 func (operation ImplicitOperation) Source() identity.SemanticTypeID {
 	return operation.source

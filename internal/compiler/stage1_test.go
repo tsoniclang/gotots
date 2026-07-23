@@ -157,43 +157,72 @@ TEXT ·Read(SB), NOSPLIT, $0-48
 
 func TestProviderArtifactAuditVerifyAndRelocatedConsumption(t *testing.T) {
 	first := writeProviderFixture(t, "example.com/first", "first")
-	path := filepath.Join(t.TempDir(), "provider.gotots")
+	output := t.TempDir()
+	structurePath := filepath.Join(output, "provider.structure.gotots")
+	semanticPath := filepath.Join(output, "provider.semantic.gotots")
 	request := source.Request{
 		Dir: first, Patterns: []string{"."},
 		ProviderContract: contract.DefaultID,
 	}
-	result, err := AuditCatalog(request, path)
+	result, err := AuditCatalog(
+		request, structurePath, semanticPath,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Digest == "" || result.EncodedBytes <= 0 ||
-		result.PackageContexts == 0 ||
-		result.Files == 0 ||
-		result.Definitions == 0 ||
-		result.LargestShardBytes == 0 ||
-		result.LargestPackageRecords == 0 ||
-		len(result.LargestPackages()) == 0 ||
-		len(result.LargestPackages()) > 20 ||
-		len(result.LargestHeaders()) == 0 ||
-		len(result.LargestHeaders()) > 20 {
+	if result.Structure.Digest == "" ||
+		result.Structure.EncodedBytes <= 0 ||
+		result.Structure.PackageContexts == 0 ||
+		result.Structure.Files == 0 ||
+		result.Structure.Definitions == 0 ||
+		result.Structure.LargestShardBytes == 0 ||
+		result.Structure.LargestPackageRecords == 0 ||
+		len(result.Structure.LargestPackages()) == 0 ||
+		len(result.Structure.LargestPackages()) > 20 ||
+		len(result.Structure.LargestHeaders()) == 0 ||
+		len(result.Structure.LargestHeaders()) > 20 ||
+		result.Semantic.Digest == "" ||
+		result.Semantic.EncodedBytes <= 0 ||
+		result.Semantic.Packages == 0 ||
+		result.Semantic.Definitions == 0 ||
+		result.Semantic.LargestShardBytes == 0 ||
+		result.Semantic.LargestPackageRecords == 0 {
 		t.Fatalf("provider result is vacuous: %+v", result)
 	}
-	stat, err := os.Stat(path)
+	stat, err := os.Stat(structurePath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stat.Size() != result.EncodedBytes {
-		t.Fatalf("provider size=%d, reported=%d", stat.Size(), result.EncodedBytes)
+	if stat.Size() != result.Structure.EncodedBytes {
+		t.Fatalf(
+			"provider structure size=%d, reported=%d",
+			stat.Size(), result.Structure.EncodedBytes,
+		)
 	}
-	if err := AuditVerify(request, path); err != nil {
+	semanticStat, err := os.Stat(semanticPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if semanticStat.Size() != result.Semantic.EncodedBytes {
+		t.Fatalf(
+			"provider semantic size=%d, reported=%d",
+			semanticStat.Size(), result.Semantic.EncodedBytes,
+		)
+	}
+	if err := AuditVerify(
+		request, structurePath, semanticPath,
+	); err != nil {
 		t.Fatal(err)
 	}
 
 	second := writeProviderFixture(t, "example.com/second", "second")
 	inspection, err := InspectConstructs(source.Request{
 		Dir: second, Patterns: []string{"."},
-		ProviderContract: contract.DefaultID,
-		AuditArtifact:    path, AuditArtifactDigest: result.Digest,
+		ProviderContract:          contract.DefaultID,
+		ProviderStructureArtifact: structurePath,
+		ProviderStructureDigest:   result.Structure.Digest,
+		ProviderSemanticArtifact:  semanticPath,
+		ProviderSemanticDigest:    result.Semantic.Digest,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -224,9 +253,9 @@ func TestProviderArtifactAuditVerifyAndRelocatedConsumption(t *testing.T) {
 		)
 	}
 
-	t.Chdir(filepath.Dir(path))
+	t.Chdir(filepath.Dir(structurePath))
 	artifact, err := structure.DecodeProviderArtifact(
-		filepath.Base(path), result.Digest,
+		filepath.Base(structurePath), result.Structure.Digest,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -246,7 +275,9 @@ func TestProviderArtifactAuditVerifyAndRelocatedConsumption(t *testing.T) {
 	if _, _, present, err := artifact.FileGraph(fileID); err != nil || !present {
 		t.Fatalf("lazy graph after cwd change: present=%t err=%v", present, err)
 	}
-	assertProviderTamperRejected(t, path, result.Digest)
+	assertProviderTamperRejected(
+		t, structurePath, result.Structure.Digest,
+	)
 }
 
 func TestCgoSelectionFactsAreScopeExact(t *testing.T) {
@@ -290,13 +321,19 @@ func main() { _, _, _, _, _, _ = pure(), shadow(), external(), parent(), cParent
 		ProviderContract: contract.DefaultID,
 		Env:              []string{"CGO_ENABLED=1"},
 	}
-	providerPath := filepath.Join(t.TempDir(), "cgo-provider.gotots")
-	provider, err := AuditCatalog(request, providerPath)
+	output := t.TempDir()
+	structurePath := filepath.Join(output, "cgo-provider.structure.gotots")
+	semanticPath := filepath.Join(output, "cgo-provider.semantic.gotots")
+	provider, err := AuditCatalog(
+		request, structurePath, semanticPath,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	request.AuditArtifact = providerPath
-	request.AuditArtifactDigest = provider.Digest
+	request.ProviderStructureArtifact = structurePath
+	request.ProviderStructureDigest = provider.Structure.Digest
+	request.ProviderSemanticArtifact = semanticPath
+	request.ProviderSemanticDigest = provider.Semantic.Digest
 	inspection, err := InspectConstructs(request)
 	if err != nil {
 		t.Fatal(err)

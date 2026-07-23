@@ -119,6 +119,7 @@ func TestWallGateSeesTheTree(t *testing.T) {
 		"internal/identity",
 		"internal/language/catalog",
 		"internal/language/executable",
+		"internal/language/frontend",
 		"internal/language/semantic",
 		"internal/language/selectionfacts",
 		"internal/language/structure",
@@ -146,6 +147,7 @@ func TestToolchainObjectImportsAreWalled(t *testing.T) {
 			"internal/language/structure":      true,
 			"internal/language/selectionfacts": true,
 			"internal/language/executable":     true,
+			"internal/language/frontend":       true,
 			"internal/stagecheck":              true,
 		},
 		"go/types": {
@@ -153,12 +155,14 @@ func TestToolchainObjectImportsAreWalled(t *testing.T) {
 			"internal/language/structure":      true,
 			"internal/language/selectionfacts": true,
 			"internal/language/typesemantics":  true,
+			"internal/language/frontend":       true,
 			"internal/stagecheck":              true,
 		},
 		"go/token": {
 			"internal/source":              true,
 			"internal/language/structure":  true,
 			"internal/language/executable": true,
+			"internal/language/frontend":   true,
 			"internal/stagecheck":          true,
 		},
 	}
@@ -240,6 +244,7 @@ var layerRank = map[string]int{
 	"internal/scope":                   50,
 	"internal/language/executable":     55,
 	"internal/language/semantic":       58,
+	"internal/language/frontend":       60,
 	"internal/stagecheck":              70,
 	"internal/compiler":                80,
 	"cmd/gotots":                       90,

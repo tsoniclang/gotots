@@ -103,6 +103,7 @@ type LoadedFile struct {
 	syntax           *ast.File // nil only for cgo originals and intrinsics
 	physicalFset     *token.FileSet
 	physicalSyntax   *ast.File
+	checkerFile      *token.File
 	selectedBytes    []byte
 	effectiveVersion string
 	overlaid         bool
@@ -144,6 +145,19 @@ func (f *LoadedFile) EffectiveGoVersion() string { return f.effectiveVersion }
 // CgoOriginal reports whether the file's checked view lives in cgo-transformed
 // output (so its full units are inventoried through checked counterparts).
 func (f *LoadedFile) CgoOriginal() bool { return f.cgoOriginal }
+
+// CheckerFileIdentities returns the transient exact mapping from checker token
+// files to canonical source files. It contains no acquisition path and is
+// severed with the checker graph.
+func (p *LoadedPackage) CheckerFileIdentities() map[*token.File]identity.FileID {
+	out := map[*token.File]identity.FileID{}
+	for _, file := range p.files {
+		if file.checkerFile != nil {
+			out[file.checkerFile] = file.id
+		}
+	}
+	return out
+}
 
 // checkedDecl is one top-level declaration in a cgo checked-view file. Its
 // origin unit (or synthetic identity) and C-dependence are derived by

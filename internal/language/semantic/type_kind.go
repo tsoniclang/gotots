@@ -79,6 +79,19 @@ func (direction ChannelDirection) Valid() bool {
 		direction <= ChannelReceiveOnly
 }
 
+type TypeSetKind uint8
+
+const (
+	TypeSetInvalid TypeSetKind = iota
+	TypeSetUniverse
+	TypeSetFinite
+	TypeSetEmpty
+)
+
+func (kind TypeSetKind) Valid() bool {
+	return kind >= TypeSetUniverse && kind <= TypeSetEmpty
+}
+
 func (kind TypeKind) String() string {
 	if !kind.Valid() {
 		return fmt.Sprintf("semantic.TypeKind(%d)", uint8(kind))

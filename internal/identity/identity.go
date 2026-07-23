@@ -126,7 +126,12 @@ func (p PackageID) Owner() Owner { return p.owner }
 func (p PackageID) ImportPath() string { return p.importPath }
 
 // String is the canonical serialization: owner::importPath.
-func (p PackageID) String() string { return p.owner.String() + "::" + p.importPath }
+func (p PackageID) String() string {
+	if p.IsZero() {
+		return ""
+	}
+	return p.owner.String() + "::" + p.importPath
+}
 
 // FileID is the canonical identity of one source file: its owner plus its
 // owner-relative slash path (module-relative for module owners, GOROOT/src-
@@ -171,7 +176,12 @@ func (f FileID) Owner() Owner { return f.owner }
 func (f FileID) Rel() string { return f.rel }
 
 // String is the canonical serialization: owner::rel.
-func (f FileID) String() string { return f.owner.String() + "::" + f.rel }
+func (f FileID) String() string {
+	if f.IsZero() {
+		return ""
+	}
+	return f.owner.String() + "::" + f.rel
+}
 
 // SpanID is the identity of one physical byte range in a file, measured with
 // //line directives ignored.
@@ -212,6 +222,9 @@ func (s SpanID) End() int { return s.end }
 
 // String is the canonical serialization: file#start-end.
 func (s SpanID) String() string {
+	if s.IsZero() {
+		return ""
+	}
 	return fmt.Sprintf("%s#%d-%d", s.file.String(), s.start, s.end)
 }
 

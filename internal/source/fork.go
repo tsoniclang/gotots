@@ -77,6 +77,7 @@ func cloneLoadedPackageMetadata(
 		cloned := *file
 		cloned.fset = nil
 		cloned.syntax = nil
+		cloned.checkerFile = nil
 		cloned.physicalFset = nil
 		cloned.physicalSyntax = nil
 		cloned.selectedBytes = nil

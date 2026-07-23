@@ -17,10 +17,15 @@ const usage = `usage: gotots <command> [args]
 
 commands:
   inspect constructs -contract <id> [-contract-artifact <path>] [-dir <dir>]
-                     [-provider <artifact> -provider-digest <hex>] [pattern ...]
-  audit catalog -contract <id> [-contract-artifact <path>] -o <artifact>
+                     [-provider-structure <artifact>
+                      -provider-structure-digest <hex>
+                      -provider-semantics <artifact>
+                      -provider-semantics-digest <hex>] [pattern ...]
+  audit catalog -contract <id> [-contract-artifact <path>]
+                -structure <artifact> -semantics <artifact>
                 [-dir <dir>] [pattern ...]
-  audit verify -contract <id> [-contract-artifact <path>] -a <artifact>
+  audit verify -contract <id> [-contract-artifact <path>]
+               -structure <artifact> -semantics <artifact>
                [-dir <dir>] [pattern ...]`
 
 type UnsupportedCommandError struct{ Command string }
@@ -135,21 +140,27 @@ func runInspect(arguments []string, stdout io.Writer) error {
 			),
 		}
 	}
-	providerPath := ""
-	providerDigest := ""
+	structurePath := ""
+	structureDigest := ""
+	semanticPath := ""
+	semanticDigest := ""
 	common, err := parseCommon(
 		"inspect constructs",
 		arguments[1:],
 		map[string]*string{
-			"-provider":        &providerPath,
-			"-provider-digest": &providerDigest,
+			"-provider-structure":        &structurePath,
+			"-provider-structure-digest": &structureDigest,
+			"-provider-semantics":        &semanticPath,
+			"-provider-semantics-digest": &semanticDigest,
 		},
 	)
 	if err != nil {
 		return err
 	}
-	common.request.AuditArtifact = providerPath
-	common.request.AuditArtifactDigest = providerDigest
+	common.request.ProviderStructureArtifact = structurePath
+	common.request.ProviderStructureDigest = structureDigest
+	common.request.ProviderSemanticArtifact = semanticPath
+	common.request.ProviderSemanticDigest = semanticDigest
 	inspection, err := compiler.InspectConstructs(common.request)
 	if err != nil {
 		return err
@@ -176,44 +187,64 @@ func runAudit(arguments []string, stdout io.Writer) error {
 }
 
 func runAuditCatalog(arguments []string, stdout io.Writer) error {
-	output := ""
+	structureOutput := ""
+	semanticOutput := ""
 	common, err := parseCommon(
 		"audit catalog",
 		arguments,
-		map[string]*string{"-o": &output},
+		map[string]*string{
+			"-structure": &structureOutput,
+			"-semantics": &semanticOutput,
+		},
 	)
 	if err != nil {
 		return err
 	}
-	if output == "" {
+	if structureOutput == "" || semanticOutput == "" {
 		return &UnsupportedCommandError{
-			Command: "audit catalog (missing -o)",
+			Command: "audit catalog (missing -structure or -semantics)",
 		}
 	}
-	result, err := compiler.AuditCatalog(common.request, output)
+	result, err := compiler.AuditCatalog(
+		common.request, structureOutput, semanticOutput,
+	)
 	if err != nil {
 		return err
 	}
 	_, err = fmt.Fprintf(
 		stdout,
-		"provider audit: packageContexts=%d files=%d syntheticPackages=%d definitions=%d headerOccurrences=%d boundaryEntries=%d facts=%d largestShardBytes=%d largestPackageRecords=%d encodedBytes=%d unknown=0 -> %s\ncertifiedDigest=%s\n",
-		result.PackageContexts,
-		result.Files,
-		result.SyntheticPackages,
-		result.Definitions,
-		result.HeaderOccurrences,
-		result.BoundaryEntries,
-		result.Facts,
-		result.LargestShardBytes,
-		result.LargestPackageRecords,
-		result.EncodedBytes,
-		output,
-		result.Digest,
+		"provider structure: packageContexts=%d files=%d syntheticPackages=%d definitions=%d headerOccurrences=%d boundaryEntries=%d facts=%d largestShardBytes=%d largestPackageRecords=%d encodedBytes=%d unknown=0 -> %s\ndigest=%s\nprovider semantics: packages=%d definitions=%d resolutions=%d declarations=%d bindings=%d types=%d operations=%d unsupported=%d typeClosureDuplicates=%d largestShardBytes=%d largestPackageRecords=%d encodedBytes=%d -> %s\ndigest=%s\n",
+		result.Structure.PackageContexts,
+		result.Structure.Files,
+		result.Structure.SyntheticPackages,
+		result.Structure.Definitions,
+		result.Structure.HeaderOccurrences,
+		result.Structure.BoundaryEntries,
+		result.Structure.Facts,
+		result.Structure.LargestShardBytes,
+		result.Structure.LargestPackageRecords,
+		result.Structure.EncodedBytes,
+		structureOutput,
+		result.Structure.Digest,
+		result.Semantic.Packages,
+		result.Semantic.Definitions,
+		result.Semantic.Resolutions,
+		result.Semantic.Declarations,
+		result.Semantic.Bindings,
+		result.Semantic.Types,
+		result.Semantic.Operations,
+		result.Semantic.Unsupported,
+		result.Semantic.TypeClosureDuplicates,
+		result.Semantic.LargestShardBytes,
+		result.Semantic.LargestPackageRecords,
+		result.Semantic.EncodedBytes,
+		semanticOutput,
+		result.Semantic.Digest,
 	)
 	if err != nil {
 		return err
 	}
-	for index, record := range result.LargestPackages() {
+	for index, record := range result.Structure.LargestPackages() {
 		if _, err := fmt.Fprintf(
 			stdout,
 			"provider-production-tail rank=%d package=%s bytes=%d records=%d\n",
@@ -225,7 +256,7 @@ func runAuditCatalog(arguments []string, stdout io.Writer) error {
 			return err
 		}
 	}
-	for index, record := range result.LargestHeaders() {
+	for index, record := range result.Structure.LargestHeaders() {
 		if _, err := fmt.Fprintf(
 			stdout,
 			"provider-header-tail rank=%d header=%s encodedBytes=%d occurrences=%d\n",
@@ -241,29 +272,34 @@ func runAuditCatalog(arguments []string, stdout io.Writer) error {
 }
 
 func runAuditVerify(arguments []string, stdout io.Writer) error {
-	artifactPath := ""
+	structurePath := ""
+	semanticPath := ""
 	common, err := parseCommon(
 		"audit verify",
 		arguments,
-		map[string]*string{"-a": &artifactPath},
+		map[string]*string{
+			"-structure": &structurePath,
+			"-semantics": &semanticPath,
+		},
 	)
 	if err != nil {
 		return err
 	}
-	if artifactPath == "" {
+	if structurePath == "" || semanticPath == "" {
 		return &UnsupportedCommandError{
-			Command: "audit verify (missing -a)",
+			Command: "audit verify (missing -structure or -semantics)",
 		}
 	}
 	if err := compiler.AuditVerify(
-		common.request, artifactPath,
+		common.request, structurePath, semanticPath,
 	); err != nil {
 		return err
 	}
 	_, err = fmt.Fprintf(
 		stdout,
-		"audit verify: %s exact-joins independent Stage-1 derivation\n",
-		artifactPath,
+		"audit verify: structure=%s semantics=%s exact-join independent Stage-1 and Stage-2 derivations\n",
+		structurePath,
+		semanticPath,
 	)
 	return err
 }

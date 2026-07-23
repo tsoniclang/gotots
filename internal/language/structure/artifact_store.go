@@ -90,19 +90,18 @@ func DecodeProviderArtifact(
 	if err != nil {
 		return nil, fmt.Errorf("provider artifact stat failed: %w", err)
 	}
-	if expectedDigest != "" {
-		hash := sha256.New()
-		if _, err := io.Copy(hash, file); err != nil {
-			return nil, fmt.Errorf("provider artifact digest failed: %w", err)
-		}
-		if fmt.Sprintf("%x", hash.Sum(nil)) != expectedDigest {
-			return nil, providerArtifactError(
-				"artifact file digest does not match selected evidence",
-			)
-		}
-		if _, err := file.Seek(0, io.SeekStart); err != nil {
-			return nil, fmt.Errorf("provider artifact rewind failed: %w", err)
-		}
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return nil, fmt.Errorf("provider artifact digest failed: %w", err)
+	}
+	digest := fmt.Sprintf("%x", hash.Sum(nil))
+	if expectedDigest != "" && digest != expectedDigest {
+		return nil, providerArtifactError(
+			"artifact file digest does not match selected evidence",
+		)
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return nil, fmt.Errorf("provider artifact rewind failed: %w", err)
 	}
 	manifest, manifestBytes, err := readProviderManifest(file, stat.Size())
 	if err != nil {
@@ -112,6 +111,7 @@ func DecodeProviderArtifact(
 	if err != nil {
 		return nil, err
 	}
+	artifact.digest = digest
 	artifact.storage = &providerStorage{
 		path:      absolutePath,
 		shards:    map[identity.PackageID]providerShard{},

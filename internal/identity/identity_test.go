@@ -200,3 +200,15 @@ func TestSpanAndOccurrenceIDs(t *testing.T) {
 		t.Errorf("zero kind error = %T, want *identity.Error", err)
 	}
 }
+
+func TestZeroCompositeIdentitiesHaveNoSerialization(t *testing.T) {
+	if got := (PackageID{}).String(); got != "" {
+		t.Fatalf("zero package serialization = %q", got)
+	}
+	if got := (FileID{}).String(); got != "" {
+		t.Fatalf("zero file serialization = %q", got)
+	}
+	if got := (SpanID{}).String(); got != "" {
+		t.Fatalf("zero span serialization = %q", got)
+	}
+}

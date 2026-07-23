@@ -9,6 +9,7 @@ import (
 
 type PackageInput struct {
 	ID            identity.PackageID
+	Provenance    PackageProvenance
 	Definitions   []DefinitionSemantics
 	Resolutions   []OccurrenceResolution
 	Declarations  []Declaration
@@ -21,6 +22,7 @@ type PackageInput struct {
 
 type Package struct {
 	id            identity.PackageID
+	provenance    PackageProvenance
 	definitions   []DefinitionSemantics
 	resolutions   []OccurrenceResolution
 	declarations  []Declaration
@@ -37,8 +39,13 @@ func NewPackage(input PackageInput) (Package, error) {
 			"semantic package requires package identity",
 		)
 	}
+	if !input.Provenance.Valid() {
+		return Package{}, fmt.Errorf(
+			"semantic package requires closed provenance",
+		)
+	}
 	out := Package{
-		id: input.ID,
+		id: input.ID, provenance: input.Provenance,
 		definitions: append(
 			[]DefinitionSemantics(nil), input.Definitions...,
 		),
@@ -68,6 +75,9 @@ func NewPackage(input PackageInput) (Package, error) {
 }
 
 func (pkg Package) ID() identity.PackageID { return pkg.id }
+func (pkg Package) Provenance() PackageProvenance {
+	return pkg.provenance
+}
 func (pkg Package) Definitions() []DefinitionSemantics {
 	return append([]DefinitionSemantics(nil), pkg.definitions...)
 }
@@ -128,156 +138,10 @@ func (pkg *Package) sort() {
 	})
 }
 
-func validatePackage(pkg Package) error {
-	definitions := map[identity.DefinitionID]bool{}
-	for _, record := range pkg.definitions {
-		if record.Package() != pkg.id ||
-			definitions[record.Definition()] {
-			return fmt.Errorf(
-				"semantic package %s has invalid definition %s",
-				pkg.id, record.Definition(),
-			)
-		}
-		definitions[record.Definition()] = true
-	}
-	declarations := map[identity.SemanticDeclarationID]bool{}
-	for _, record := range pkg.declarations {
-		if record.ID().IsZero() ||
-			declarations[record.ID()] {
-			return fmt.Errorf(
-				"semantic package %s has duplicate declaration %s",
-				pkg.id, record.ID(),
-			)
-		}
-		declarations[record.ID()] = true
-	}
-	bindings := map[identity.SemanticBindingID]bool{}
-	for _, record := range pkg.bindings {
-		if record.Package() != pkg.id ||
-			(!record.Definition().IsZero() &&
-				!definitions[record.Definition()]) ||
-			bindings[record.ID()] {
-			return fmt.Errorf(
-				"semantic package %s has invalid binding %s",
-				pkg.id, record.ID(),
-			)
-		}
-		bindings[record.ID()] = true
-	}
-	types := map[identity.SemanticTypeID]string{}
-	for _, record := range pkg.types {
-		if existing, duplicate := types[record.ID()]; duplicate {
-			if existing != record.Canonical() {
-				return fmt.Errorf(
-					"semantic package %s has type collision %s",
-					pkg.id, record.ID(),
-				)
-			}
-			return fmt.Errorf(
-				"semantic package %s duplicates type %s",
-				pkg.id, record.ID(),
-			)
-		}
-		types[record.ID()] = record.Canonical()
-	}
-	witnesses := map[identity.SemanticTypeID]bool{}
-	for _, record := range pkg.typeWitnesses {
-		if record.Package() != pkg.id ||
-			types[record.Type()] == "" ||
-			witnesses[record.Type()] {
-			return fmt.Errorf(
-				"semantic package %s has invalid type witness %s",
-				pkg.id, record.Type(),
-			)
-		}
-		witnesses[record.Type()] = true
-	}
-	if len(witnesses) != len(types) {
-		return fmt.Errorf(
-			"semantic package %s has %d types and %d witnesses",
-			pkg.id, len(types), len(witnesses),
-		)
-	}
-	operations := map[identity.OperationID]bool{}
-	for _, record := range pkg.operations {
-		if !definitions[record.Definition()] ||
-			operations[record.ID()] {
-			return fmt.Errorf(
-				"semantic package %s has invalid operation %s",
-				pkg.id, record.ID(),
-			)
-		}
-		operations[record.ID()] = true
-	}
-	unsupported := map[identity.UnsupportedID]bool{}
-	for _, record := range pkg.unsupported {
-		if !definitions[record.ID().Definition()] ||
-			unsupported[record.ID()] {
-			return fmt.Errorf(
-				"semantic package %s has invalid unsupported record %s",
-				pkg.id, record.ID(),
-			)
-		}
-		unsupported[record.ID()] = true
-	}
-	resolutions := map[identity.OccurrenceID]bool{}
-	for _, record := range pkg.resolutions {
-		if resolutions[record.Occurrence()] {
-			return fmt.Errorf(
-				"semantic package %s has duplicate resolution %s",
-				pkg.id, record.Occurrence(),
-			)
-		}
-		resolutions[record.Occurrence()] = true
-		switch record.Kind() {
-		case ResolutionDefinitionComponent:
-			if !definitions[record.Definition()] {
-				return fmt.Errorf(
-					"resolution %s names absent definition",
-					record.Occurrence(),
-				)
-			}
-		case ResolutionDeclaration:
-			if !declarations[record.Declaration()] {
-				return fmt.Errorf(
-					"resolution %s names absent declaration",
-					record.Occurrence(),
-				)
-			}
-		case ResolutionBinding:
-			if !bindings[record.Binding()] {
-				return fmt.Errorf(
-					"resolution %s names absent binding",
-					record.Occurrence(),
-				)
-			}
-		case ResolutionOperation:
-			if !operations[record.Operation()] {
-				return fmt.Errorf(
-					"resolution %s names absent operation",
-					record.Occurrence(),
-				)
-			}
-		case ResolutionUnsupported:
-			if !unsupported[record.Unsupported()] {
-				return fmt.Errorf(
-					"resolution %s names absent unsupported record",
-					record.Occurrence(),
-				)
-			}
-		}
-	}
-	if err := validateTypeRecords(pkg.types, types); err != nil {
-		return err
-	}
-	if err := validateTypeClosure([]Package{pkg}, types); err != nil {
-		return err
-	}
-	return nil
-}
-
 type Model struct {
-	packages []Package
+	packages    []Package
+	projections []packageProjection
+	provider    *ProviderArtifact
 }
 
 func NewModel(packages []Package) (*Model, error) {
@@ -347,50 +211,126 @@ func NewModel(packages []Package) (*Model, error) {
 			seenTypes[record.ID()] = record.Canonical()
 		}
 	}
+	for _, pkg := range out.packages {
+		for _, record := range pkg.Resolutions() {
+			var declaration identity.SemanticDeclarationID
+			switch record.Kind() {
+			case ResolutionDeclaration:
+				declaration = record.Declaration()
+			case ResolutionStructuralOnly:
+				declaration = record.Structural().Declaration()
+			}
+			if !declaration.IsZero() {
+				if _, present := seenDeclarations[declaration]; !present {
+					return nil, fmt.Errorf(
+						"semantic resolution %s references absent declaration %s",
+						record.Occurrence(), declaration,
+					)
+				}
+			}
+		}
+	}
 	return out, nil
 }
 
-func (model *Model) Packages() []Package {
-	return append([]Package(nil), model.packages...)
+func (model *Model) PackageCount() int {
+	if model == nil {
+		return 0
+	}
+	if len(model.projections) != 0 {
+		return len(model.projections)
+	}
+	return len(model.packages)
+}
+
+func (model *Model) VisitPackage(
+	packageID identity.PackageID,
+	visit func(Package) error,
+) error {
+	if model == nil || packageID.IsZero() || visit == nil {
+		return fmt.Errorf(
+			"semantic model package visit requires model, package, and visitor",
+		)
+	}
+	if len(model.projections) == 0 {
+		index := sort.Search(len(model.packages), func(index int) bool {
+			return model.packages[index].ID().String() >=
+				packageID.String()
+		})
+		if index == len(model.packages) ||
+			model.packages[index].ID() != packageID {
+			return fmt.Errorf(
+				"semantic model package %s is absent", packageID,
+			)
+		}
+		return visit(model.packages[index])
+	}
+	index := sort.Search(len(model.projections), func(index int) bool {
+		return model.projections[index].id.String() >=
+			packageID.String()
+	})
+	if index == len(model.projections) ||
+		model.projections[index].id != packageID {
+		return fmt.Errorf(
+			"semantic model package %s is absent", packageID,
+		)
+	}
+	projection := model.projections[index]
+	if !projection.certified {
+		pkg, err := projection.completeLocal()
+		if err != nil {
+			return err
+		}
+		return visit(pkg)
+	}
+	return model.provider.VisitPackage(
+		projection.id,
+		func(provider Package) error {
+			pkg, err := projection.merge(provider)
+			if err != nil {
+				return err
+			}
+			return visit(pkg)
+		},
+	)
+}
+
+func (model *Model) VisitPackages(
+	visit func(Package) error,
+) error {
+	if model == nil || visit == nil {
+		return fmt.Errorf(
+			"semantic model package visit requires model and visitor",
+		)
+	}
+	if len(model.projections) == 0 {
+		for _, pkg := range model.packages {
+			if err := visit(pkg); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	for _, projection := range model.projections {
+		if err := model.VisitPackage(projection.id, visit); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (model *Model) ProviderReadStats() ProviderReadStats {
+	if model == nil || model.provider == nil {
+		return ProviderReadStats{}
+	}
+	return model.provider.ReadStats()
 }
 func validateTypeRecords(
 	records []Type,
 	types map[identity.SemanticTypeID]string,
 ) error {
 	for _, record := range records {
-		spec := record.Spec()
-		var references []identity.SemanticTypeID
-		references = append(references, spec.Arguments...)
-		references = append(
-			references,
-			spec.Underlying,
-			spec.Target,
-			spec.Constraint,
-			spec.Element,
-			spec.Key,
-			spec.Signature.Receiver,
-		)
-		references = append(
-			references, spec.Signature.TypeParameters...,
-		)
-		references = append(
-			references, spec.Signature.Parameters...,
-		)
-		references = append(
-			references, spec.Signature.Results...,
-		)
-		for _, field := range spec.Fields {
-			references = append(references, field.Type)
-		}
-		for _, method := range spec.Methods {
-			references = append(references, method.Signature)
-		}
-		references = append(references, spec.Embeddeds...)
-		for _, term := range spec.Terms {
-			references = append(references, term.Type)
-		}
-		references = append(references, spec.Elements...)
-		for _, reference := range references {
+		for _, reference := range referencedTypeIDs(record) {
 			if reference.IsZero() {
 				continue
 			}
@@ -432,13 +372,6 @@ func validateTypeClosure(
 			); err != nil {
 				return err
 			}
-			for _, typeID := range spec.Types {
-				if err := require(
-					record.Definition().String(), typeID,
-				); err != nil {
-					return err
-				}
-			}
 		}
 		for _, record := range pkg.Declarations() {
 			if err := require(
@@ -470,6 +403,12 @@ func validateTypeClosure(
 		for _, record := range pkg.Resolutions() {
 			if err := require(
 				record.Occurrence().String(), record.Type(),
+			); err != nil {
+				return err
+			}
+			if err := require(
+				record.Occurrence().String(),
+				record.Structural().Type(),
 			); err != nil {
 				return err
 			}

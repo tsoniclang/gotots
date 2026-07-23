@@ -15,6 +15,7 @@ const ProviderArtifactVersion = 11
 // mutated after admission.
 type ProviderArtifact struct {
 	version               int
+	digest                string
 	toolchainFingerprint  string
 	catalogFingerprint    string
 	buildFlagsFingerprint string
@@ -31,6 +32,13 @@ type ProviderArtifact struct {
 	factsByPackage        map[identity.PackageID][]CertifiedFact
 	factCount             int
 	storage               *providerStorage
+}
+
+func (a *ProviderArtifact) Digest() string {
+	if a == nil {
+		return ""
+	}
+	return a.digest
 }
 
 func (a *ProviderArtifact) FileCount() int {

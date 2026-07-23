@@ -83,6 +83,7 @@ func clearTransientEvidence(universe *Universe) {
 		for _, file := range loaded.files {
 			file.fset = nil
 			file.syntax = nil
+			file.checkerFile = nil
 			file.physicalFset = nil
 			file.physicalSyntax = nil
 			file.selectedBytes = nil

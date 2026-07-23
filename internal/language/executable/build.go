@@ -106,9 +106,13 @@ func buildRegion(
 		definitionAt: definitionAt,
 		current:      definition.ID(),
 		graph:        graph,
+		index:        index,
 		inventory:    inventory,
 		work:         work,
 		region:       &region,
+	}
+	if _, checked := index.CheckedDefinitionNode(definition.ID()); checked {
+		builder.checked = true
 	}
 	boundary, present := graph.ResidentBoundary(definition.ID())
 	if !present {
@@ -167,9 +171,11 @@ type regionBuilder struct {
 	definitionAt map[identity.OccurrenceID]identity.DefinitionID
 	current      identity.DefinitionID
 	graph        *structure.Graph
+	index        *structure.TransientIndex
 	inventory    *Inventory
 	work         *Work
 	region       *Region
+	checked      bool
 }
 
 func (b *regionBuilder) visit(
@@ -183,6 +189,20 @@ func (b *regionBuilder) visit(
 		return err
 	}
 	if err := b.recordOccurrence(occurrence); err != nil {
+		return err
+	}
+	checkerNode := node
+	if b.checked {
+		var present bool
+		checkerNode, present = b.index.CheckedCounterpart(node)
+		if !present {
+			checkerNode = node
+			b.index.MarkCheckedUnmapped(occurrence.ID())
+		}
+	}
+	if err := b.index.BindExecutableOccurrence(
+		occurrence.ID(), checkerNode,
+	); err != nil {
 		return err
 	}
 	b.region.members = append(b.region.members, occurrence.ID())

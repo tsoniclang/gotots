@@ -810,13 +810,20 @@ pretending every implementation definition owns one name:
 
 | Stage-1 definition class | Semantic form | Owned declaration IDs |
 |---|---|---:|
-| function or method declaration | callable | exactly one |
+| ordinary function or method declaration | callable | exactly one |
+| blank function declaration (`func _()`) | callable | zero; it has a signature and body but introduces no package declaration |
+| package initializer function (`func init()`) | callable | zero; each source definition is independently owned and no `init` package binding exists |
 | function literal | callable | zero |
-| package `var` initializer (`var a, b = f()`) | initializer | one or more, in source name order |
+| package `var` initializer (`var a, b = f()`) | initializer | zero or more non-blank declarations, in source name order; `var _ = f()` retains evaluation but declares nothing |
 | bodyless function/method obligation | bodyless | exactly one |
 | cataloged implicit definition | implicit | zero |
 | package-synthetic cgo adapter | synthetic | exactly one and one callable signature |
 | package-synthetic cgo type/data | synthetic | exactly one and no callable signature |
+
+The declaration-name occurrence of `func init()` resolves to the owning
+definition's name component, not to a fabricated declaration. Its body,
+signature, source identity, and package-initialization reachability remain
+independently conserved.
 
 Evidence depth and provider selection are not semantic forms. In particular,
 `external` and `intrinsic` cannot appear as `DefinitionSemantics` forms; the
@@ -904,7 +911,7 @@ Semantic identities are constructor-only and machine independent:
   collision check.
 
 A type descriptor preserves basic kind; alias versus defined nominal owner;
-generic binder and arguments; array length; channel direction; signature
+generic owner, binder role, ordinal, and arguments; array length; channel direction; signature
 receiver, receiver type parameters, function type parameters, parameters,
 results, and variadic state; struct field order, names, embeds, tags, and
 package visibility; interface method names, declaring packages, signatures,
@@ -914,10 +921,93 @@ closed state—`universe`, `finite(terms)`, or `empty`—because an empty term s
 cannot distinguish the universe from the empty set. Method descriptors contain
 semantic method components rather than a member identity that points back to
 the type being hashed, so anonymous interfaces have no circular identity
-construction. Named, alias, and type-parameter references terminate structural
+construction. Their callable signature excludes the receiver and receiver type
+parameters because the containing method descriptor already owns that
+relationship; declared method definitions retain receiver binding and receiver
+type separately. Named, alias, and type-parameter references terminate structural
 recursion at their nominal identity. No identity uses a pointer address, acquisition path,
 `Type.String()`, source spelling without semantic owner, truncated digest, or
 fallback poison value.
+
+Type-parameter identity is owned by the generic language declaration, not by a
+checker object or a lexical-binding record. Its closed owner is either the
+canonical `SemanticDeclarationID` of an ordinary generic type/function/method
+or the canonical `DefinitionID` of a source definition that intentionally has
+no declaration (for example a legal blank-named generic function). The owner is
+combined with a closed binder role (`type`, `callable`, or `receiver`) and the
+zero-based source ordinal. Thus the `T` in:
+
+```go
+package dep
+
+type Pointer[T any] struct{ value *T }
+
+func (pointer *Pointer[T]) Load() *T { return pointer.value }
+```
+
+has stable identities derivable from `dep.Pointer` and `dep.Pointer.Load`
+without retaining `dep` syntax in an importing package. The lexical
+`SemanticBindingID` for a locally spelled `T` remains a separate binding fact
+whose type is that canonical type-parameter `SemanticTypeID`; it is never the
+type's identity owner.
+
+This separation is required for export-data and instantiated-checker forms.
+For example:
+
+```go
+package app
+
+import "dep"
+
+var current dep.Pointer[int]
+```
+
+may expose cloned `go/types.TypeParam` objects with no parent scope while the
+`app` shard builds its complete canonical type closure. The frontend joins
+such transient objects to the origin declaration, binder role, and ordinal.
+Object addresses, `token.Pos`, parent-scope presence, and the spelling `T` are
+corroborating lookup evidence only and never enter semantic identity. A
+foreign generic type never requires a fabricated local binding or foreign
+source hydration.
+
+`go/types.Builtin` is not an ordinary callable declaration: both predeclared
+functions (for example `append`) and package `unsafe` intrinsics (for example
+`unsafe.Offsetof`) have call-site-specific semantics and no single valid
+checker signature. Their declaration record therefore carries a closed
+catalog-backed builtin identity and no `SemanticTypeID`. Every ordinary
+declaration still requires exactly one canonical type. A builtin call operation
+carries the exact call-site result, operands, expected type, and builtin
+declaration reference. The complete real package `unsafe` surface
+(`Pointer` plus its builtins) is exact-joined bidirectionally against one pinned
+append-only member catalog carrying each member's type-or-builtin class.
+Documentary-only `ArbitraryType`/`IntegerType` declarations are excluded;
+neither source spelling nor their documentary signatures may be treated as
+semantic types.
+The non-root header occurrences inside those documentary declarations resolve
+through the closed `IntrinsicContract` structural disposition. They preserve
+the Stage-1 definition/header topology but carry no fabricated checker type;
+the cataloged builtin declaration and each call site's operation evidence are
+the semantic contract.
+
+Go checker maps that intentionally attach both a definition and a use to one
+identifier are represented by their language-defined primary resolution, while
+the companion fact remains owned by its declaration/type record. In
+`struct { T }`, `struct { *T }`, or an embedded qualified/generic type, the
+defining identifier resolves to the embedded type and the field declaration is
+owned separately. In `func (p *Pair[A, B]) M()`, each receiver
+index resolves to its newly declared receiver type-parameter binding and the
+receiver signature references that parameter type. Any other simultaneous
+definition/use pair fails closed.
+
+Instantiated checker objects are references, not new declarations. A generic
+method object canonicalizes through `types.Func.Origin`; an instantiated struct
+field canonicalizes through the original named owner and exact field ordinal.
+All instantiations therefore reference one method/field declaration identity.
+Pointer inequality between checker objects is never treated as semantic
+duplication, while unequal origins or ordinals remain hard collisions.
+Receiver type-parameter checker aliases exact-join through their canonical
+defining `OccurrenceID`; an object pointer or scope parent is never an identity
+component.
 
 ### Context And Operation Records
 

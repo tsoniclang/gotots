@@ -125,7 +125,6 @@ func NewPackageDeclarationID(
 	if class == SemanticObjectPackage ||
 		class == SemanticObjectField ||
 		class == SemanticObjectMethod ||
-		class == SemanticObjectBuiltin ||
 		class == SemanticObjectNil {
 		return SemanticDeclarationID{}, &Error{
 			Identity: "semantic-declaration",
@@ -432,26 +431,54 @@ func (id SemanticBindingID) String() string {
 	)
 }
 
-// OperationID identifies the one semantic operation owned by a source
-// occurrence in one implementation definition.
+// OperationID identifies either the one semantic operation owned by a source
+// occurrence or one unspelled operation of an implicit definition.
 type OperationID struct {
 	definition DefinitionID
 	occurrence OccurrenceID
+	implicit   ImplicitDefinitionOp
+	ordinal    int
 }
 
 func NewOperationID(
 	definition DefinitionID,
 	occurrence OccurrenceID,
 ) (OperationID, error) {
-	if definition.IsZero() || occurrence.IsZero() {
+	if definition.IsZero() ||
+		occurrence.IsZero() ||
+		definition.Kind() == DefinitionImplicit ||
+		definition.File() != occurrence.Span().File() {
 		return OperationID{}, &Error{
 			Identity: "operation",
-			Reason:   "operation requires definition and occurrence",
+			Reason:   "source operation requires same-file source definition and occurrence",
 		}
 	}
 	return OperationID{
 		definition: definition,
 		occurrence: occurrence,
+	}, nil
+}
+
+func NewImplicitOperationID(
+	definition DefinitionID,
+	operation ImplicitDefinitionOp,
+	ordinal int,
+) (OperationID, error) {
+	if definition.IsZero() ||
+		definition.Kind() != DefinitionImplicit ||
+		definition.ImplicitOp() != operation ||
+		!operation.Valid() ||
+		ordinal < 0 {
+		return OperationID{}, &Error{
+			Identity: "operation",
+			Value:    definition.String(),
+			Reason:   "implicit operation requires matching implicit definition, operation, and ordinal",
+		}
+	}
+	return OperationID{
+		definition: definition,
+		implicit:   operation,
+		ordinal:    ordinal,
 	}, nil
 }
 
@@ -462,9 +489,22 @@ func (id OperationID) Definition() DefinitionID {
 func (id OperationID) Occurrence() OccurrenceID {
 	return id.occurrence
 }
+func (id OperationID) ImplicitOp() ImplicitDefinitionOp {
+	return id.implicit
+}
+func (id OperationID) Ordinal() int { return id.ordinal }
+func (id OperationID) Source() bool {
+	return !id.occurrence.IsZero()
+}
 func (id OperationID) String() string {
 	if id.IsZero() {
 		return ""
+	}
+	if id.implicit.Valid() {
+		return fmt.Sprintf(
+			"%s#operation/implicit/%s/%d",
+			id.definition, id.implicit, id.ordinal,
+		)
 	}
 	return id.definition.String() + "#operation/" +
 		id.occurrence.String()

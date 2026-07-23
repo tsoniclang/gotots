@@ -46,7 +46,7 @@ type TypeSpec struct {
 
 	Basic       BasicKind
 	Declaration identity.SemanticDeclarationID
-	Binding     identity.SemanticBindingID
+	Parameter   TypeParameterOwner
 	Arguments   []identity.SemanticTypeID
 	Underlying  identity.SemanticTypeID
 	Target      identity.SemanticTypeID
@@ -60,6 +60,7 @@ type TypeSpec struct {
 	Methods     []TypeMethod
 	Embeddeds   []identity.SemanticTypeID
 	Terms       []TypeTerm
+	TypeSet     TypeSetKind
 	Comparable  bool
 	Elements    []identity.SemanticTypeID
 }
@@ -88,33 +89,23 @@ func NewType(spec TypeSpec) (Type, error) {
 	}, nil
 }
 
-// NominalTypeID returns the identity available before a named, alias, or type
-// parameter descriptor's recursively referenced content is built.
+// NominalTypeID returns the identity available before a named or alias
+// descriptor's recursively referenced content is built.
 func NominalTypeID(
 	kind TypeKind,
 	declaration identity.SemanticDeclarationID,
-	binding identity.SemanticBindingID,
 	arguments []identity.SemanticTypeID,
 ) (identity.SemanticTypeID, error) {
 	spec := TypeSpec{
 		Kind:        kind,
 		Declaration: declaration,
-		Binding:     binding,
 		Arguments:   append([]identity.SemanticTypeID(nil), arguments...),
 	}
 	switch kind {
 	case TypeNamed, TypeAlias:
-		if declaration.IsZero() || !binding.IsZero() {
+		if declaration.IsZero() {
 			return identity.SemanticTypeID{}, fmt.Errorf(
 				"%s nominal identity requires declaration only", kind,
-			)
-		}
-	case TypeParameter:
-		if binding.IsZero() ||
-			!declaration.IsZero() ||
-			len(arguments) != 0 {
-			return identity.SemanticTypeID{}, fmt.Errorf(
-				"type-parameter identity requires binding only",
 			)
 		}
 	default:
@@ -122,6 +113,20 @@ func NominalTypeID(
 			"%s is not nominal", kind,
 		)
 	}
+	key := encodeTypeIdentity(spec)
+	digest := sha256.Sum256([]byte(key))
+	return identity.NewSemanticTypeID(fmt.Sprintf("%x", digest[:]))
+}
+
+func TypeParameterTypeID(
+	owner TypeParameterOwner,
+) (identity.SemanticTypeID, error) {
+	if owner.IsZero() {
+		return identity.SemanticTypeID{}, fmt.Errorf(
+			"type-parameter identity requires canonical owner",
+		)
+	}
+	spec := TypeSpec{Kind: TypeParameter, Parameter: owner}
 	key := encodeTypeIdentity(spec)
 	digest := sha256.Sum256([]byte(key))
 	return identity.NewSemanticTypeID(fmt.Sprintf("%x", digest[:]))
@@ -193,9 +198,9 @@ func validateTypeSpec(spec TypeSpec) error {
 			)
 		}
 	case TypeParameter:
-		if spec.Binding.IsZero() || spec.Constraint.IsZero() {
+		if spec.Parameter.IsZero() || spec.Constraint.IsZero() {
 			return fmt.Errorf(
-				"type parameter requires binding and constraint",
+				"type parameter requires canonical owner and constraint",
 			)
 		}
 	case TypePointer, TypeSlice:
@@ -239,6 +244,13 @@ func validateTypeSpec(spec TypeSpec) error {
 	case TypeInterface:
 		if err := validateMethods(spec.Methods); err != nil {
 			return err
+		}
+		if !spec.TypeSet.Valid() ||
+			(spec.TypeSet == TypeSetFinite) !=
+				(len(spec.Terms) != 0) {
+			return fmt.Errorf(
+				"interface has invalid normalized type set",
+			)
 		}
 		for _, embedded := range spec.Embeddeds {
 			if embedded.IsZero() {
@@ -312,7 +324,7 @@ func validateTypeMembers(spec TypeSpec) error {
 	case TypeAlias:
 		fields = allowed("declaration", "arguments", "target")
 	case TypeParameter:
-		fields = allowed("binding", "constraint")
+		fields = allowed("parameter", "constraint")
 	case TypePointer, TypeSlice:
 		fields = allowed("element")
 	case TypeArray:
@@ -327,7 +339,8 @@ func validateTypeMembers(spec TypeSpec) error {
 		fields = allowed("fields")
 	case TypeInterface:
 		fields = allowed(
-			"methods", "embeddeds", "terms", "comparable",
+			"methods", "embeddeds", "terms", "type-set",
+			"comparable",
 		)
 	case TypeTuple:
 		fields = allowed("elements")
@@ -339,7 +352,7 @@ func validateTypeMembers(spec TypeSpec) error {
 	present := map[string]bool{
 		"basic":       spec.Basic != BasicInvalid,
 		"declaration": !spec.Declaration.IsZero(),
-		"binding":     !spec.Binding.IsZero(),
+		"parameter":   !spec.Parameter.IsZero(),
 		"arguments":   len(spec.Arguments) != 0,
 		"underlying":  !spec.Underlying.IsZero(),
 		"target":      !spec.Target.IsZero(),
@@ -353,6 +366,7 @@ func validateTypeMembers(spec TypeSpec) error {
 		"methods":     len(spec.Methods) != 0,
 		"embeddeds":   len(spec.Embeddeds) != 0,
 		"terms":       len(spec.Terms) != 0,
+		"type-set":    spec.TypeSet != TypeSetInvalid,
 		"comparable":  spec.Comparable,
 		"elements":    len(spec.Elements) != 0,
 	}
@@ -418,7 +432,7 @@ func encodeTypeIdentity(spec TypeSpec) string {
 		writePart(&out, spec.Declaration.String())
 		writeTypeIDs(&out, spec.Arguments)
 	case TypeParameter:
-		writePart(&out, spec.Binding.String())
+		writePart(&out, spec.Parameter.String())
 	default:
 		writePart(&out, encodeTypeSpec(spec))
 	}
@@ -431,7 +445,7 @@ func encodeTypeSpec(spec TypeSpec) string {
 	writeInt(&out, int64(spec.Kind))
 	writeInt(&out, int64(spec.Basic))
 	writePart(&out, spec.Declaration.String())
-	writePart(&out, spec.Binding.String())
+	writePart(&out, spec.Parameter.String())
 	writeTypeIDs(&out, spec.Arguments)
 	writePart(&out, spec.Underlying.String())
 	writePart(&out, spec.Target.String())
@@ -469,6 +483,7 @@ func encodeTypeSpec(spec TypeSpec) string {
 		writePart(&out, term.Type.String())
 	}
 	writeBool(&out, spec.Comparable)
+	writeInt(&out, int64(spec.TypeSet))
 	writeTypeIDs(&out, spec.Elements)
 	return out.String()
 }

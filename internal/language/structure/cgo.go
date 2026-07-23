@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/identity"
+	"github.com/tsoniclang/gotots/internal/language/catalog"
 	"github.com/tsoniclang/gotots/internal/source"
 )
 
@@ -22,6 +23,13 @@ type checkedCandidate struct {
 	root ast.Node
 	join ast.Node
 	kind identity.DefinitionKind
+}
+
+type declarationOriginKey struct {
+	file   string
+	line   int
+	column int
+	kind   catalog.Kind
 }
 
 func attachCgo(
@@ -47,6 +55,11 @@ func attachCgo(
 	}
 	if len(filesByPath) == 0 {
 		return fmt.Errorf("package %s has checked declarations but no cgo originals", loaded.ID())
+	}
+	if err := bindCheckedDeclarationCounterparts(
+		universe, checked, filesByPath, index,
+	); err != nil {
+		return err
 	}
 	origins := map[originKey][]identity.DefinitionID{}
 	for _, definition := range graph.Definitions() {
@@ -81,6 +94,7 @@ func attachCgo(
 				universe.Fset(),
 				declaration,
 				graph,
+				index,
 				synthetic,
 				work,
 			); err != nil {
@@ -103,6 +117,14 @@ func attachCgo(
 			}
 			matched[definition] = true
 			index.checked[definition] = candidate.root
+			if err := index.bindCheckedCounterparts(
+				index.definitions[definition], candidate.root,
+			); err != nil {
+				return fmt.Errorf(
+					"cgo definition %s checked correspondence: %w",
+					definition, err,
+				)
+			}
 			checkedDigest, err := checkedNodeDigest(
 				universe.Fset(), candidate.root,
 			)
@@ -139,6 +161,80 @@ func attachCgo(
 			return graph.files[fileIndex].mappings[i].definition.String() <
 				graph.files[fileIndex].mappings[j].definition.String()
 		})
+	}
+	return nil
+}
+
+func bindCheckedDeclarationCounterparts(
+	universe *source.Universe,
+	checked []ast.Node,
+	filesByPath map[string]*source.LoadedFile,
+	index *TransientIndex,
+) error {
+	originals := map[declarationOriginKey][]ast.Node{}
+	for _, file := range filesByPath {
+		syntax := file.PhysicalSyntax()
+		fset := file.PhysicalFileSet()
+		if syntax == nil || fset == nil {
+			return fmt.Errorf(
+				"cgo file %s has no physical declaration view",
+				file.ID(),
+			)
+		}
+		for _, declaration := range syntax.Decls {
+			kind, err := Classify(declaration)
+			if err != nil {
+				return err
+			}
+			position := fset.PositionFor(declaration.Pos(), false)
+			key := declarationOriginKey{
+				file: position.Filename, line: position.Line,
+				column: position.Column, kind: kind,
+			}
+			originals[key] = append(originals[key], declaration)
+		}
+	}
+	for _, declaration := range checked {
+		position := universe.Fset().Position(declaration.Pos())
+		if filesByPath[position.Filename] == nil {
+			continue
+		}
+		kind, err := Classify(declaration)
+		if err != nil {
+			return err
+		}
+		key := declarationOriginKey{
+			file: position.Filename, line: position.Line,
+			column: position.Column, kind: kind,
+		}
+		candidates := originals[key]
+		if len(candidates) == 0 {
+			for candidateKey, nodes := range originals {
+				if candidateKey.file == key.file &&
+					candidateKey.line == key.line &&
+					candidateKey.kind == key.kind {
+					candidates = append(candidates, nodes...)
+				}
+			}
+		}
+		if len(candidates) == 0 {
+			continue
+		}
+		if len(candidates) != 1 {
+			return fmt.Errorf(
+				"cgo declaration origin %s:%d:%d kind %s resolves %d declarations",
+				key.file, key.line, key.column, key.kind,
+				len(candidates),
+			)
+		}
+		if err := index.bindCheckedCounterparts(
+			candidates[0], declaration,
+		); err != nil {
+			return fmt.Errorf(
+				"cgo declaration correspondence at %s:%d:%d: %w",
+				key.file, key.line, key.column, err,
+			)
+		}
 	}
 	return nil
 }
@@ -241,6 +337,7 @@ func addSyntheticDeclaration(
 	fset *token.FileSet,
 	declaration ast.Node,
 	graph *PackageGraph,
+	index *TransientIndex,
 	seen map[string]bool,
 	work *Work,
 ) error {
@@ -253,6 +350,7 @@ func addSyntheticDeclaration(
 			return fmt.Errorf("duplicate cgo synthetic definition %s", definitionID)
 		}
 		seen[definitionID.String()] = true
+		index.synthetic[definitionID] = descriptor.node
 		ownerID, err := SyntheticOwner(pkg, SyntheticOwnerCgoGenerated)
 		if err != nil {
 			return err
@@ -334,7 +432,9 @@ func syntheticDescriptors(
 		switch node.Tok {
 		case token.TYPE:
 			for _, spec := range node.Specs {
-				if named, ok := spec.(*ast.TypeSpec); ok && named.Name != nil {
+				if named, ok := spec.(*ast.TypeSpec); ok &&
+					named.Name != nil &&
+					named.Name.Name != "_" {
 					out = append(out, syntheticDescriptor{
 						name: named.Name.Name,
 						role: identity.SyntheticDefinitionType,

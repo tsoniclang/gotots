@@ -54,6 +54,9 @@ func buildFile(
 		index:       index,
 	}
 	index.files[file.ID()] = file
+	if err := index.bindCheckedFile(file); err != nil {
+		return FileGraph{}, err
+	}
 	root, err := builder.makeOccurrence(
 		syntax, identity.OccurrenceID{}, catalog.EdgeInvalid, 0,
 	)
@@ -436,6 +439,9 @@ func (b *fileBuilder) makeOccurrence(
 	}
 	id, err := identity.NewOccurrenceID(spanID, uint16(kind))
 	if err != nil {
+		return Occurrence{}, err
+	}
+	if err := b.index.bindStructuralOccurrence(id, node); err != nil {
 		return Occurrence{}, err
 	}
 	lexical, err := tokenEvidence(node)

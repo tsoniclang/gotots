@@ -372,11 +372,57 @@ domains, and proves every `StructuralCompileTimeExpression` is covered by the
 exact declaration or canonical type ID carried in its structural payload rather
 than admitted by a generic expression fallback. It separately exact-joins the
 one `builtin` pseudo-package's predeclared declaration payloads against both the
-pinned catalog and `types.Universe`. When checker and certified provider evidence both exist,
+pinned catalog and `types.Universe`. The same gate exact-joins every real
+member of `go/types.Unsafe`—including `Pointer`—against the pinned unsafe-member
+catalog and its declared type-or-builtin class, while proving documentary-only
+names do not enter the semantic model. Mutations that admit an unknown unsafe
+member, omit `Pointer`, attach an ordinary type to any builtin declaration,
+omit call-site type evidence, or use the
+documentary `ArbitraryType` signature as a semantic type fail at the catalog,
+intrinsic-header, semantic-constructor, or operation-conservation owner. Every
+non-root documentary-header occurrence exact-joins to the closed
+`IntrinsicContract` structural disposition. When checker and certified provider evidence both exist,
 it independently compares them and proves only the contract-selected authority
 entered the model. Missing, duplicate, wrong-domain,
 structural-only-without-catalog-disposition, and dual-authority records fail
 with exact identities.
+
+The declaration-cardinality matrix includes `func _() { ... }` and every
+`func init()`: each retains one callable definition and exact signature/body
+semantics but zero declaration records. Mutating either to an ordinary name
+without adding its declaration, conflating multiple `init` definitions, or
+fabricating a non-binding package declaration fails the definition/package
+join.
+It also includes `var _ = f()` and mixed blank/non-blank package initializers:
+all value entries remain ordered and executable, while declaration records
+exact-join only the non-blank names.
+
+Dual checker-map fixtures cover embedded fields and generic receiver type
+parameters. Swapping the embedded field to its field declaration, swapping a
+receiver type parameter to the generic type's original binder, or accepting an
+uncataloged definition/use pair fails the independent resolution join.
+
+Generic-object fixtures instantiate the same method and field at multiple type
+arguments and exact-join every reference to one origin declaration. Mutating
+method-origin canonicalization or field-owner/ordinal canonicalization produces
+a duplicate declaration or wrong-reference failure.
+
+Generic-binder fixtures separately cover type, callable, and receiver
+parameters; multiple parameters; local lexical uses; imported generic
+functions; and an importing package that mentions an instantiated foreign
+generic type while only export data for the foreign package is resident. The
+foreign fixture includes the equivalent of `dep.Pointer[T]`,
+`(*Pointer[T]).Load() *T`, and `var current dep.Pointer[int]`. Every
+type-parameter descriptor exact-joins to one canonical declaration/definition,
+binder role, and ordinal. Mutations that key a type parameter by
+`SemanticBindingID`, checker-object address, `token.Pos`, parent scope, or name;
+conflate a receiver binder with its named type's binder; or require foreign
+syntax fail at the identity/materialization gate.
+
+Recursive interface fixtures prove method-set signatures omit their back-edge
+to the containing receiver while declared method semantics retain it. Restoring
+the receiver in a method descriptor must fail the cycle/identity gate rather
+than being accepted through a recursion cutoff.
 
 Every catalog class has focused source fixtures covering its context matrix.
 Oracles compile and execute the same fixture with Go and generated TypeScript

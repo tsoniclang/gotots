@@ -58,11 +58,36 @@ func TestResolutionAndVariantTablesAreTotal(t *testing.T) {
 	}
 }
 
+func TestIntrinsicContractAdmitsOnlyHeaderTypeStructure(t *testing.T) {
+	if !AllowsIntrinsicContract(
+		KindStarExpr,
+		RoleTypeExpression,
+		ResolutionDomainHeader,
+	) {
+		t.Fatal("intrinsic contract rejected pointer type syntax")
+	}
+	if AllowsIntrinsicContract(
+		KindAssignStmt,
+		RoleStatement,
+		ResolutionDomainHeader,
+	) {
+		t.Fatal("intrinsic contract admitted statement syntax")
+	}
+	if AllowsIntrinsicContract(
+		KindStarExpr,
+		RoleTypeExpression,
+		ResolutionDomainExecutable,
+	) {
+		t.Fatal("intrinsic contract admitted executable domain")
+	}
+}
+
 func TestIdentifierResolutionUsesParentAssignedRole(t *testing.T) {
 	if !AllowsResolution(
 		KindIdent,
 		RoleTypeExpression,
 		VariantNone,
+		ResolutionDomainHeader,
 		ResolutionClassType,
 	) {
 		t.Fatal("type-expression identifier cannot resolve as a type")
@@ -71,6 +96,7 @@ func TestIdentifierResolutionUsesParentAssignedRole(t *testing.T) {
 		KindIdent,
 		RoleTypeExpression,
 		VariantNone,
+		ResolutionDomainHeader,
 		ResolutionClassOperation,
 	) {
 		t.Fatal("type-expression identifier can resolve as an operation")
@@ -79,8 +105,103 @@ func TestIdentifierResolutionUsesParentAssignedRole(t *testing.T) {
 		KindIdent,
 		RoleAssignedValue,
 		VariantNone,
+		ResolutionDomainExecutable,
 		ResolutionClassOperation,
 	) {
 		t.Fatal("value identifier cannot resolve as an operation")
+	}
+	for _, class := range []ResolutionClass{
+		ResolutionClassType,
+		ResolutionClassOperation,
+	} {
+		if !AllowsResolution(
+			KindIdent,
+			RoleOperand,
+			VariantNone,
+			ResolutionDomainExecutable,
+			class,
+		) {
+			t.Fatalf(
+				"operand identifier rejects context-selected %v",
+				class,
+			)
+		}
+	}
+}
+
+func TestTypeSetUnionBinaryExpressionResolvesAsType(t *testing.T) {
+	if !AllowsResolution(
+		KindBinaryExpr,
+		RoleTypeExpression,
+		VariantNone,
+		ResolutionDomainHeader,
+		ResolutionClassType,
+	) {
+		t.Fatal("type-set union binary expression cannot resolve as a type")
+	}
+	if !AllowsResolution(
+		KindUnaryExpr,
+		RoleLeftOperand,
+		VariantNone,
+		ResolutionDomainHeader,
+		ResolutionClassType,
+	) {
+		t.Fatal("type-set approximation unary expression cannot resolve as a type")
+	}
+	if !AllowsResolution(
+		KindBinaryExpr,
+		RoleOperand,
+		VariantNone,
+		ResolutionDomainExecutable,
+		ResolutionClassOperation,
+	) {
+		t.Fatal("ordinary binary expression cannot resolve as an operation")
+	}
+	for _, role := range []Role{
+		RoleLeftOperand,
+		RoleRightOperand,
+		RoleIndexedOperand,
+	} {
+		if !AllowsResolution(
+			KindIdent,
+			role,
+			VariantNone,
+			ResolutionDomainHeader,
+			ResolutionClassType,
+		) {
+			t.Fatalf("type-set %s cannot resolve as a type", role)
+		}
+		if !AllowsResolution(
+			KindIdent,
+			role,
+			VariantNone,
+			ResolutionDomainExecutable,
+			ResolutionClassOperation,
+		) {
+			t.Fatalf("ordinary %s cannot resolve as an operation", role)
+		}
+	}
+	for _, class := range []ResolutionClass{
+		ResolutionClassBinding,
+		ResolutionClassType,
+	} {
+		if !AllowsResolution(
+			KindIdent,
+			RoleIndex,
+			VariantNone,
+			ResolutionDomainHeader,
+			class,
+		) {
+			t.Fatalf("generic index rejects context-selected %v", class)
+		}
+	}
+	if !AllowsResolution(
+		KindIdent,
+		RoleIndex,
+		VariantNone,
+		ResolutionDomainExecutable,
+		ResolutionClassOperation,
+	) {
+		t.Fatal("executable index rejects context-selected operation")
 	}
 }
