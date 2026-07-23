@@ -48,15 +48,19 @@ completion mode; it must never be reported as translated or publishable.
 
 ```text
 selected Go workspace and toolchain
-        -> coherent resolved package/source-unit universe
-        -> explicit environment/provider evidence-depth selection
-        -> complete selected construct and context inventory
+        -> coherent resolved package/file/byte universe
+        -> request-bound local/certified structural-source plan
+        -> complete depth-independent
+           owner/containment/definition/site/header/boundary graph
+        -> closed preselection facts
+        -> explicit per-definition provider/evidence-depth selection
+        -> complete full-semantic executable occurrence/role inventory
         -> typed, target-independent Go semantic model
-        -> sealed whole-program facts
+        -> sealed whole-program facts and semantic reachability
         -> one immutable TypeScript representation plan
         -> typed TypeScript AST
         -> generated/manual reconciliation
-        -> complete dependency and reachability graph
+        -> complete post-assembly implementation reachability graph
         -> strict verification and atomic publication
 ```
 
@@ -121,8 +125,45 @@ from import-path spelling or a filesystem-prefix test.
 - **source acquisition:** where selected bytes came from—workspace, module
   cache, vendor tree, local replacement, or `GOROOT`—plus applied overlays.
   Acquisition never substitutes for provenance or semantic identity.
-- **implementation identity:** stable identity for one concrete emitted or
-  manual implementation, including generic or representation specialization.
+- **structural-source plan:** the request-bound per-file choice of local syntax
+  or a certified provider graph from which Stage 1 derives definitions. It is
+  policy owned by `internal/scope/sourceplan`, not a physical
+  source-acquisition fact or a definition-depth decision.
+- **implementation definition:** one source-spanned or typed implicit Go
+  construct with independently selectable implementation ownership: a function
+  or method declaration, function literal, package initializer, bodyless
+  obligation, or cataloged implicit implementation. Value copying, zeroing,
+  boxing, promotion, and other implicit semantics inside an existing definition
+  are operations in that definition, not additional definitions.
+- **owner region:** one structural root for a selected source file or canonical
+  synthetic semantic owner. A source-file region owns package/import/type/
+  non-implementation declaration structure and stops at every implementation
+  definition site.
+- **definition identity (`DefinitionID`):** revision-bound identity for one
+  implementation definition, anchored to its construct root or typed implicit
+  owner rather than to whichever executable evidence is retained.
+- **definition site:** the definition's one source-containment edge or typed
+  implicit-owner edge. A source site references a complete path in the file's
+  normalized sparse containment graph; it does not copy that path. It is not a
+  call, use, or reachability reference.
+- **header region:** the definition root and its ordered non-executable
+  construct occurrences, excluding its execution boundary and every nested
+  definition interior.
+- **execution boundary:** the closed definition-owned description of executable
+  entries: one block, ordered initializer expressions, a bodyless obligation,
+  or a typed implicit operation. Its identity and content digest are separate
+  from the definition and header.
+- **executable region:** the ordered contextual occurrence graph reachable from
+  a source execution boundary, or the typed operation graph of a cataloged
+  implicit implementation, excluding nested definition interiors. It is
+  materialized only when evidence depth is `full-semantic`.
+- **definition selection:** the separate request-bound provider, evidence depth,
+  rule, and witness chosen for one `DefinitionID`. Selection is not a field of
+  the depth-independent structural graph.
+- **implementation identity (`ImplementationID`):** stable identity for one
+  concrete planned, emitted, or manual implementation. One `DefinitionID` may
+  produce multiple `ImplementationID`s through generic or representation
+  specialization; the two identity domains are never interchangeable.
 - **semantic model:** the minimum target-independent representation needed to
   state exact Go operations and effects. It is not emitted TypeScript.
 - **fact:** a whole-program truth derived once from the semantic model.
@@ -164,8 +205,10 @@ reopens the owning abstraction.
 ## Non-Negotiable Invariants
 
 - One semantic fact has one authoritative producer and one typed identity.
-- Every Go construct occurrence has exactly one contextual semantic
-  disposition; unknown and unclassified are hard failures.
+- Every encountered/audited Go construct occurrence has exactly one catalog
+  classification and support disposition. Every retained owner/header/
+  executable occurrence has exactly one contextual `OccurrenceResolution`;
+  unknown, unclassified, and silently omitted are hard failures.
 - Parents assign grammatical roles to child constructs; children do not infer
   meaning by inspecting parents or source text.
 - Whole-program facts are sealed before planning; planning is total and
@@ -177,7 +220,9 @@ reopens the owning abstraction.
 - No semantic value is recovered through `any`, `unknown`, unchecked casts,
   reflection, spelling lookup, source-text scanning, or dynamic host-shape
   inspection.
-- Definitions are owned once. References may repeat.
+- Every implementation definition is owned once and has exactly one definition
+  site. Later semantic, call, dispatch, initialization, and reachability
+  references may repeat; none substitutes for the definition site.
 - Ordinary Go calls remain ordinary TypeScript calls; hidden semantic
   arguments require local typed necessity evidence and are never the default.
 - Generated code never invokes through `Function.prototype.call`, `apply`, or
@@ -202,8 +247,8 @@ reopens the owning abstraction.
 
 ## Honest Support States
 
-Each selected declaration, initializer, function literal, and body has exactly
-one current state:
+Each selected concrete `ImplementationID` has exactly one current support
+state:
 
 - `automatic`: completely generated by a proven lowering;
 - `manual`: implemented by accepted manual TypeScript;
@@ -212,6 +257,11 @@ one current state:
 - `placeholder`: typed but unresolved and therefore publication-blocking; or
 - `unsupported`: analysis can identify the exact construct but no permitted
   materialization exists.
+
+Before planning creates concrete implementations, a `DefinitionID` carries only
+its exact analysis/provider disposition; it does not borrow a final support
+state from one future specialization. One definition may produce several
+concrete implementations, and their states are reported separately.
 
 These states are separate from processing stages such as inventoried,
 semantically analyzed, planned, emitted, typechecked, executed, and certified.

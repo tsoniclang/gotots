@@ -138,174 +138,82 @@ func ParseOccurrenceID(s string) (OccurrenceID, error) {
 	return occ, nil
 }
 
-// ParseSourceUnitID reconstructs a source-unit identity from
-// owner::rel#start-end/kind.
-func ParseSourceUnitID(s string) (SourceUnitID, error) {
-	fail := func(reason string) (SourceUnitID, error) {
-		return SourceUnitID{}, &Error{Identity: "source-unit", Value: s, Reason: reason}
+// ParseDefinitionID reconstructs either a source construct-root definition or
+// a typed implicit definition from its canonical serialization.
+func ParseDefinitionID(s string) (DefinitionID, error) {
+	fail := func(reason string) (DefinitionID, error) {
+		return DefinitionID{}, &Error{Identity: "definition", Value: s, Reason: reason}
 	}
-	hash := strings.Index(s, "#")
-	if hash < 0 {
-		return fail("not a canonical source-unit serialization")
-	}
-	filePart, rest := s[:hash], s[hash+1:]
-	slash := strings.LastIndex(rest, "/")
-	if slash < 0 {
-		return fail("missing unit kind")
-	}
-	spanPart, kindName := rest[:slash], rest[slash+1:]
-	kind := UnitInvalid
-	for k := UnitKind(1); k.Valid(); k++ {
-		if k.String() == kindName {
-			kind = k
+	if marker := strings.LastIndex(s, "#definition/"); marker >= 0 {
+		pkg, err := ParsePackageID(s[:marker])
+		if err != nil {
+			return DefinitionID{}, err
 		}
+		name := s[marker+len("#definition/"):]
+		op := ImplicitDefinitionInvalid
+		for candidate := ImplicitDefinitionOp(1); candidate.Valid(); candidate++ {
+			if candidate.String() == name {
+				op = candidate
+				break
+			}
+		}
+		if !op.Valid() {
+			return fail("unknown implicit definition operation " + name)
+		}
+		id, err := NewImplicitDefinitionID(pkg, op)
+		if err != nil {
+			return DefinitionID{}, err
+		}
+		if id.String() != s {
+			return fail("serialization is not canonical")
+		}
+		return id, nil
 	}
-	if kind == UnitInvalid {
-		return fail("unknown unit kind " + kindName)
+	if marker := strings.LastIndex(s, "#synthetic/"); marker >= 0 {
+		pkg, err := ParsePackageID(s[:marker])
+		if err != nil {
+			return DefinitionID{}, err
+		}
+		payload := s[marker+len("#synthetic/"):]
+		slash := strings.Index(payload, "/")
+		if slash < 0 {
+			return fail("synthetic definition lacks role/name separation")
+		}
+		roleName, name := payload[:slash], payload[slash+1:]
+		role := SyntheticDefinitionInvalid
+		for candidate := SyntheticDefinitionRole(1); candidate.Valid(); candidate++ {
+			if candidate.String() == roleName {
+				role = candidate
+				break
+			}
+		}
+		id, err := NewSyntheticDefinitionID(pkg, role, name)
+		if err != nil {
+			return DefinitionID{}, err
+		}
+		if id.String() != s {
+			return fail("serialization is not canonical")
+		}
+		return id, nil
 	}
-	dash := strings.Index(spanPart, "-")
-	if dash < 0 {
-		return fail("malformed span")
-	}
-	start, err := strconv.Atoi(spanPart[:dash])
-	if err != nil {
-		return fail("malformed span start")
-	}
-	end, err := strconv.Atoi(spanPart[dash+1:])
-	if err != nil {
-		return fail("malformed span end")
-	}
-	sep := strings.Index(filePart, "::")
-	if sep < 0 {
-		return fail("missing file identity")
-	}
-	owner, err := ParseOwner(filePart[:sep])
-	if err != nil {
-		return SourceUnitID{}, err
-	}
-	file, err := NewFileID(owner, filePart[sep+2:])
-	if err != nil {
-		return SourceUnitID{}, err
-	}
-	span, err := NewSpanID(file, start, end)
-	if err != nil {
-		return SourceUnitID{}, err
-	}
-	unit, err := NewSourceUnitID(span, kind)
-	if err != nil {
-		return SourceUnitID{}, err
-	}
-	if unit.String() != s {
-		return fail("serialization is not canonical")
-	}
-	return unit, nil
-}
-
-// implicitMarker separates the owning package from the implicit operation in
-// the canonical implicit-unit serialization.
-const implicitMarker = "#implicit/"
-
-// ParseImplicitUnitID reconstructs an implicit-unit identity from
-// package#implicit/op.
-func ParseImplicitUnitID(s string) (ImplicitUnitID, error) {
-	fail := func(reason string) (ImplicitUnitID, error) {
-		return ImplicitUnitID{}, &Error{Identity: "implicit-unit", Value: s, Reason: reason}
-	}
-	marker := strings.Index(s, implicitMarker)
+	marker := strings.LastIndex(s, "/D")
 	if marker < 0 {
-		return fail("not a canonical implicit-unit serialization")
+		return fail("not a canonical definition serialization")
 	}
-	pkg, err := ParsePackageID(s[:marker])
+	root, err := ParseOccurrenceID(s[:marker])
 	if err != nil {
-		return ImplicitUnitID{}, err
+		return DefinitionID{}, err
 	}
-	opName := s[marker+len(implicitMarker):]
-	op := ImplicitOpInvalid
-	for o := ImplicitUnitOp(1); o.Valid(); o++ {
-		if o.String() == opName {
-			op = o
-		}
-	}
-	if op == ImplicitOpInvalid {
-		return fail("unknown implicit operation " + opName)
-	}
-	id, err := NewImplicitUnitID(pkg, op)
+	kindValue, err := strconv.ParseUint(s[marker+2:], 10, 8)
 	if err != nil {
-		return ImplicitUnitID{}, err
+		return fail("malformed definition kind")
+	}
+	id, err := NewSourceDefinitionID(root, DefinitionKind(kindValue))
+	if err != nil {
+		return DefinitionID{}, err
 	}
 	if id.String() != s {
 		return fail("serialization is not canonical")
 	}
 	return id, nil
-}
-
-// UnitRef is the closed discriminated reference to one implementation unit:
-// exactly one of a source-spanned unit or an implicit unit. It exists so
-// consumers that address "a unit" (contract rules, ledgers) carry a typed
-// identity, never a raw string.
-type UnitRef struct {
-	source   SourceUnitID
-	implicit ImplicitUnitID
-}
-
-// NewSourceUnitRef references one source-spanned unit.
-func NewSourceUnitRef(unit SourceUnitID) (UnitRef, error) {
-	if unit.IsZero() {
-		return UnitRef{}, &Error{Identity: "unit-ref", Value: "", Reason: "source unit must not be zero"}
-	}
-	return UnitRef{source: unit}, nil
-}
-
-// NewImplicitUnitRef references one implicit unit.
-func NewImplicitUnitRef(unit ImplicitUnitID) (UnitRef, error) {
-	if unit.IsZero() {
-		return UnitRef{}, &Error{Identity: "unit-ref", Value: "", Reason: "implicit unit must not be zero"}
-	}
-	return UnitRef{implicit: unit}, nil
-}
-
-// ParseUnitRef reconstructs a unit reference from either canonical unit
-// serialization, discriminating on the implicit marker.
-func ParseUnitRef(s string) (UnitRef, error) {
-	if strings.Contains(s, implicitMarker) {
-		implicit, err := ParseImplicitUnitID(s)
-		if err != nil {
-			return UnitRef{}, err
-		}
-		return NewImplicitUnitRef(implicit)
-	}
-	source, err := ParseSourceUnitID(s)
-	if err != nil {
-		return UnitRef{}, err
-	}
-	return NewSourceUnitRef(source)
-}
-
-// IsZero reports whether r references nothing.
-func (r UnitRef) IsZero() bool { return r == UnitRef{} }
-
-// Kind is the referenced unit's kind (implicit-executable for implicit units).
-func (r UnitRef) Kind() UnitKind {
-	if !r.source.IsZero() {
-		return r.source.Kind()
-	}
-	return UnitImplicitExecutable
-}
-
-// Source is the referenced source unit; zero when the reference is implicit.
-func (r UnitRef) Source() SourceUnitID { return r.source }
-
-// Implicit is the referenced implicit unit; zero when the reference is
-// source-spanned.
-func (r UnitRef) Implicit() ImplicitUnitID { return r.implicit }
-
-// String is the referenced unit's canonical serialization.
-func (r UnitRef) String() string {
-	if !r.source.IsZero() {
-		return r.source.String()
-	}
-	if !r.implicit.IsZero() {
-		return r.implicit.String()
-	}
-	return ""
 }

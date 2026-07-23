@@ -15,7 +15,46 @@ func StructureDigest() string {
 		parts = append(parts, fmt.Sprintf("kind:%d=%s:%s:%s", uint16(kind), kind.Name(), kind.Category(), kind.Disposition()))
 	}
 	for _, edge := range AllEdges() {
-		parts = append(parts, fmt.Sprintf("edge:%d=%s:%s:%v", uint16(edge), edge.Name(), edge.Role(), edge.IsList()))
+		parts = append(parts, fmt.Sprintf(
+			"edge:%d=%s:%s:%v:%v",
+			uint16(edge),
+			edge.Name(),
+			edge.Role(),
+			edge.IsList(),
+			edge.DefinitionEntry(),
+		))
+	}
+	for _, kind := range All() {
+		for _, scope := range []DefinitionScope{
+			DefinitionScopePackage,
+			DefinitionScopeExecutable,
+		} {
+			for _, declaration := range []TokenKind{
+				TokenInvalid, TokenCONST, TokenIMPORT, TokenTYPE, TokenVAR,
+			} {
+				context, err := NewDefinitionContext(scope, declaration)
+				if err != nil {
+					panic(err)
+				}
+				for _, hasEntry := range []bool{false, true} {
+					definition, present, err := DefinitionKind(
+						kind, context, hasEntry,
+					)
+					if err != nil {
+						panic(err)
+					}
+					parts = append(parts, fmt.Sprintf(
+						"definition:%d:%d:%d:%t=%d:%t",
+						uint16(kind),
+						uint8(scope),
+						uint16(declaration),
+						hasEntry,
+						uint8(definition),
+						present,
+					))
+				}
+			}
+		}
 	}
 	for _, role := range AllRoles() {
 		parts = append(parts, fmt.Sprintf("role:%d=%s", uint16(role), role.String()))

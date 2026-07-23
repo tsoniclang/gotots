@@ -1,0 +1,290 @@
+package stagecheck
+
+import (
+	"github.com/tsoniclang/gotots/internal/identity"
+	"github.com/tsoniclang/gotots/internal/language/selectionfacts"
+	"github.com/tsoniclang/gotots/internal/language/structure"
+	"github.com/tsoniclang/gotots/internal/scope/contract"
+	"github.com/tsoniclang/gotots/internal/scope/sourceplan"
+	"github.com/tsoniclang/gotots/internal/source"
+)
+
+// VerifyProviderManifest exact-joins the disk-backed manifest to the complete
+// provider-production plan without loading any package shard.
+func VerifyProviderManifest(
+	universe *source.Universe,
+	selected contract.Contract,
+	plan *sourceplan.Plan,
+	artifact *structure.ProviderArtifact,
+) error {
+	if err := structure.VerifyProviderArtifactContext(
+		artifact, universe, selected,
+	); err != nil {
+		return providerManifestError(err.Error())
+	}
+	files, synthetic, contexts, packages, err :=
+		expectedProviderSets(universe, plan, identity.PackageID{})
+	if err != nil {
+		return err
+	}
+	problems := newProblemSet()
+	joinStringSets(
+		"provider file", artifact.FileIDs(), files, problems,
+	)
+	joinStringSets(
+		"provider synthetic package",
+		artifact.PackageIDs(),
+		synthetic,
+		problems,
+	)
+	joinStringSets(
+		"provider package context",
+		artifact.ContextPackageIDs(),
+		contexts,
+		problems,
+	)
+	for packageText := range contexts {
+		packageID, err := identity.ParsePackageID(packageText)
+		if err != nil {
+			return err
+		}
+		actual, present := artifact.PackageInputDigest(packageID)
+		if !present {
+			continue
+		}
+		if actual != independentProviderInputFingerprint(
+			packages[packageID],
+		) {
+			problems.add(
+				"provider package input mismatch " + packageText,
+			)
+		}
+	}
+	if !problems.empty() {
+		return providerManifestError(
+			problems.summary("manifest exact join failed"),
+		)
+	}
+	return nil
+}
+
+// VerifyProducedProviderPackageArtifact exact-joins one package shard to its
+// independently verified local Stage-1 graph and selection facts.
+func VerifyProducedProviderPackageArtifact(
+	universe *source.Universe,
+	selected contract.Contract,
+	plan *sourceplan.Plan,
+	packageID identity.PackageID,
+	graph *structure.Graph,
+	facts *selectionfacts.Artifact,
+	artifact *structure.ProviderArtifact,
+) error {
+	if err := structure.VerifyProviderArtifactContext(
+		artifact, universe, selected,
+	); err != nil {
+		return providerManifestError(err.Error())
+	}
+	files, synthetic, contexts, packages, err :=
+		expectedProviderSets(universe, plan, packageID)
+	if err != nil {
+		return err
+	}
+	problems := newProblemSet()
+	joinStringSets(
+		"provider file",
+		artifact.PackageFileIDs(packageID),
+		files,
+		problems,
+	)
+	actualSynthetic := map[string]bool{}
+	if artifact.HasSyntheticPackage(packageID) {
+		actualSynthetic[packageID.String()] = true
+	}
+	joinStringSets(
+		"provider synthetic package",
+		actualSynthetic,
+		synthetic,
+		problems,
+	)
+	actualContext := map[string]bool{}
+	if _, present := artifact.PackageInputDigest(packageID); present {
+		actualContext[packageID.String()] = true
+	}
+	joinStringSets(
+		"provider package context",
+		actualContext,
+		contexts,
+		problems,
+	)
+	actualDigest, present := artifact.PackageInputDigest(packageID)
+	if !present ||
+		actualDigest != independentProviderInputFingerprint(
+			packages[packageID],
+		) {
+		problems.add(
+			"provider package input mismatch " + packageID.String(),
+		)
+	}
+	graphPackages := graph.Packages()
+	if len(graphPackages) != 1 ||
+		graphPackages[0].ID() != packageID {
+		problems.add(
+			"local graph is not exactly " + packageID.String(),
+		)
+	} else {
+		localFiles := map[identity.FileID]structure.FileGraph{}
+		for _, file := range graphPackages[0].Files() {
+			localFiles[file.Owner().ID().File()] = file
+		}
+		for fileText := range files {
+			fileID, parseErr := identity.ParseFileID(fileText)
+			if parseErr != nil {
+				return parseErr
+			}
+			stored, _, found, loadErr := artifact.FileGraph(fileID)
+			if loadErr != nil {
+				return loadErr
+			}
+			if !found {
+				continue
+			}
+			if err := compareLedgers(
+				"provider-package-file",
+				ledgerForFile(stored),
+				ledgerForFile(localFiles[fileID]),
+			); err != nil {
+				problems.add(err.Error())
+			}
+		}
+		if synthetic[packageID.String()] {
+			stored, found, loadErr :=
+				artifact.SyntheticPackageGraph(packageID)
+			if loadErr != nil {
+				return loadErr
+			}
+			if found {
+				if err := compareLedgers(
+					"provider-package-synthetic",
+					syntheticLedger(stored),
+					syntheticLedger(graphPackages[0]),
+				); err != nil {
+					problems.add(err.Error())
+				}
+			}
+		}
+	}
+	expectedFacts := map[string]int{}
+	for _, fact := range facts.CertifiedFacts() {
+		definition := fact.Definition()
+		if files[definition.File().String()] ||
+			(definition.SyntheticRole().Valid() &&
+				synthetic[packageID.String()]) {
+			expectedFacts[certifiedFactKey(fact)]++
+		}
+	}
+	actualFacts := map[string]int{}
+	storedFacts, err := artifact.CertifiedFactsForPackage(packageID)
+	if err != nil {
+		return err
+	}
+	for _, fact := range storedFacts {
+		actualFacts[certifiedFactKey(fact)]++
+	}
+	joinProviderFactCounts(expectedFacts, actualFacts, problems)
+	if !problems.empty() {
+		return providerManifestError(
+			problems.summary("package shard exact join failed"),
+		)
+	}
+	return nil
+}
+
+func expectedProviderSets(
+	universe *source.Universe,
+	plan *sourceplan.Plan,
+	only identity.PackageID,
+) (
+	map[string]bool,
+	map[string]bool,
+	map[string]bool,
+	map[identity.PackageID]*source.LoadedPackage,
+	error,
+) {
+	if universe == nil || plan == nil ||
+		plan.Purpose() != sourceplan.PurposeProviderProduction {
+		return nil, nil, nil, nil, providerManifestError(
+			"provider-production plan is absent",
+		)
+	}
+	packages := map[identity.PackageID]*source.LoadedPackage{}
+	filePackages := map[identity.FileID]identity.PackageID{}
+	for _, pkg := range universe.Packages() {
+		packages[pkg.ID()] = pkg
+		for _, file := range pkg.Files() {
+			filePackages[file.ID()] = pkg.ID()
+		}
+	}
+	files := map[string]bool{}
+	synthetic := map[string]bool{}
+	contexts := map[string]bool{}
+	for _, decision := range plan.Files() {
+		if decision.Kind() != sourceplan.KindCertifiedGraph {
+			continue
+		}
+		packageID := filePackages[decision.ID()]
+		if packageID.IsZero() {
+			return nil, nil, nil, nil, providerManifestError(
+				"provider plan file has no package " +
+					decision.ID().String(),
+			)
+		}
+		if !only.IsZero() && packageID != only {
+			continue
+		}
+		files[decision.ID().String()] = true
+		contexts[packageID.String()] = true
+	}
+	for _, decision := range plan.SyntheticOwners() {
+		if decision.Kind() != sourceplan.KindCertifiedGraph ||
+			(!only.IsZero() && decision.Package() != only) {
+			continue
+		}
+		synthetic[decision.Package().String()] = true
+		contexts[decision.Package().String()] = true
+	}
+	if !only.IsZero() && !contexts[only.String()] {
+		return nil, nil, nil, nil, providerManifestError(
+			"package has no certified provider records " + only.String(),
+		)
+	}
+	return files, synthetic, contexts, packages, nil
+}
+
+func joinProviderFactCounts(
+	expected map[string]int,
+	actual map[string]int,
+	problems *problemSet,
+) {
+	for record, count := range expected {
+		if actual[record] != count {
+			problems.addf(
+				"provider fact expected %s x%d, actual x%d",
+				record, count, actual[record],
+			)
+		}
+	}
+	for record, count := range actual {
+		if expected[record] != count {
+			problems.addf(
+				"provider fact actual %s x%d, expected x%d",
+				record, count, expected[record],
+			)
+		}
+	}
+}
+
+func providerManifestError(reason string) error {
+	return &VerificationError{
+		Stage: "provider-artifact", Reason: reason,
+	}
+}

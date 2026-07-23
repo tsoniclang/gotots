@@ -2,7 +2,9 @@
 package stagecheck
 
 import (
+	"crypto/sha256"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -13,12 +15,23 @@ import (
 // deriveExpectation independently classifies one go list record. std/cmd set
 // membership is authoritative; Standard/Goroot corroborate; spelling never
 // classifies.
-func deriveExpectation(pkg *goListPackage, stdSet, cmdSet map[string]bool, goroot, workspaceDir string) (*universeExpectation, string, error) {
+func deriveExpectation(
+	pkg *goListPackage,
+	stdSet, cmdSet map[string]bool,
+	goroot, workspaceDir string,
+	overlay map[string][]byte,
+) (*universeExpectation, string, error) {
 	out := &universeExpectation{
 		root: !pkg.DepOnly, disposition: source.DispositionOrdinarySource,
-		files: map[string]bool{}, otherFiles: map[string]bool{},
-		embedFiles: map[string]bool{}, embedPatterns: map[string]bool{},
+		files: map[string]bool{}, filePaths: map[string]string{},
+		inputs: map[string]bool{}, embedPatterns: map[string]bool{},
+		imports:    map[string]bool{},
 		cgoSources: map[string]bool{},
+	}
+	for _, imported := range pkg.Imports {
+		if imported != "C" {
+			out.imports[imported] = true
+		}
 	}
 	if pkg.Module != nil {
 		out.moduleGo = pkg.Module.GoVersion
@@ -97,7 +110,8 @@ func deriveExpectation(pkg *goListPackage, stdSet, cmdSet map[string]bool, goroo
 		return nil, "", err
 	}
 	for _, goFile := range append(append([]string{}, pkg.GoFiles...), pkg.CgoFiles...) {
-		rel, err := filepath.Rel(relBase, filepath.Join(pkg.Dir, goFile))
+		absolute := absOrJoin(pkg.Dir, goFile)
+		rel, err := filepath.Rel(relBase, absolute)
 		if err != nil || strings.HasPrefix(rel, "..") {
 			return nil, "", fmt.Errorf("%s: file %s outside owner root", pkg.ImportPath, goFile)
 		}
@@ -106,20 +120,75 @@ func deriveExpectation(pkg *goListPackage, stdSet, cmdSet map[string]bool, goroo
 			return nil, "", err
 		}
 		out.files[fileID.String()] = true
+		out.filePaths[fileID.String()] = absolute
+	}
+	sourcePaths := map[string]bool{}
+	for _, path := range append(
+		append([]string{}, pkg.GoFiles...), pkg.CgoFiles...,
+	) {
+		sourcePaths[filepath.Clean(absOrJoin(pkg.Dir, path))] = true
+	}
+	compiledPaths := map[string]bool{}
+	for _, path := range pkg.CompiledGoFiles {
+		compiledPaths[filepath.Clean(absOrJoin(pkg.Dir, path))] = true
+	}
+	if out.disposition == source.DispositionOrdinarySource {
+		for path := range sourcePaths {
+			out.checkedView = out.checkedView || !compiledPaths[path]
+		}
+		for path := range compiledPaths {
+			out.checkedView = out.checkedView || !sourcePaths[path]
+		}
 	}
 	for _, cgoFile := range pkg.CgoFiles {
-		rel, err := filepath.Rel(relBase, filepath.Join(pkg.Dir, cgoFile))
+		rel, err := filepath.Rel(relBase, absOrJoin(pkg.Dir, cgoFile))
 		if err == nil && !strings.HasPrefix(rel, "..") {
 			if fileID, err := identity.NewFileID(owner, filepath.ToSlash(rel)); err == nil {
 				out.cgoSources[fileID.String()] = true
 			}
 		}
 	}
-	for _, other := range pkg.otherFiles() {
-		out.otherFiles[ownerRelOrRaw(relBase, filepath.Join(pkg.Dir, other))] = true
+	inputGroups := []struct {
+		kind  source.InputKind
+		files []string
+	}{
+		{source.InputC, pkg.CFiles},
+		{source.InputCXX, pkg.CXXFiles},
+		{source.InputObjectiveC, pkg.MFiles},
+		{source.InputHeader, pkg.HFiles},
+		{source.InputFortran, pkg.FFiles},
+		{source.InputAssembly, pkg.SFiles},
+		{source.InputSWIG, pkg.SwigFiles},
+		{source.InputSWIGCXX, pkg.SwigCXXFiles},
+		{source.InputSyso, pkg.SysoFiles},
+	}
+	for _, group := range inputGroups {
+		for _, input := range group.files {
+			if err := addExpectedInput(
+				out,
+				owner,
+				relBase,
+				pkg.Dir,
+				input,
+				group.kind,
+				overlay,
+			); err != nil {
+				return nil, "", err
+			}
+		}
 	}
 	for _, embed := range pkg.EmbedFiles {
-		out.embedFiles[ownerRelOrRaw(relBase, absOrJoin(pkg.Dir, embed))] = true
+		if err := addExpectedInput(
+			out,
+			owner,
+			relBase,
+			pkg.Dir,
+			embed,
+			source.InputEmbed,
+			overlay,
+		); err != nil {
+			return nil, "", err
+		}
 	}
 	for _, pattern := range pkg.EmbedPatterns {
 		out.embedPatterns[pattern] = true
@@ -127,11 +196,42 @@ func deriveExpectation(pkg *goListPackage, stdSet, cmdSet map[string]bool, goroo
 	return out, packageID.String(), nil
 }
 
-func ownerRelOrRaw(relBase, path string) string {
-	if rel, err := filepath.Rel(relBase, path); err == nil && !strings.HasPrefix(rel, "..") {
-		return filepath.ToSlash(rel)
+func addExpectedInput(
+	out *universeExpectation,
+	owner identity.Owner,
+	relBase string,
+	packageDir string,
+	path string,
+	kind source.InputKind,
+	overlay map[string][]byte,
+) error {
+	path = absOrJoin(packageDir, path)
+	rel, err := filepath.Rel(relBase, path)
+	if err != nil || rel == ".." ||
+		strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("supplemental input %s lies outside owner root", path)
 	}
-	return path
+	id, err := identity.NewFileID(owner, filepath.ToSlash(rel))
+	if err != nil {
+		return err
+	}
+	raw, overlaid := overlay[path]
+	if !overlaid {
+		raw, err = os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf(
+				"supplemental input %s unreadable: %w", id, err,
+			)
+		}
+	}
+	key := fmt.Sprintf(
+		"%s|%s|%x|%t", kind, id, sha256.Sum256(raw), overlaid,
+	)
+	if out.inputs[key] {
+		return fmt.Errorf("duplicate supplemental input %s", id)
+	}
+	out.inputs[key] = true
+	return nil
 }
 
 func absOrJoin(dir, path string) string {

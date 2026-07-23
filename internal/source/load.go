@@ -1,14 +1,9 @@
 package source
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"fmt"
-	"go/ast"
-	"go/parser"
-	"go/token"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -18,44 +13,30 @@ import (
 	"github.com/tsoniclang/gotots/internal/identity"
 )
 
-// loadMode is the single load configuration: requested roots AND their
-// complete dependency closure resolve in one packages.Load invocation, so
-// every package belongs to one coherent go/types object graph. There is no
-// second load and no metadata-now/hydrate-later route.
-const loadMode = packages.NeedName |
+// resolutionMode acquires the complete import closure and physical inputs
+// without parsing or typechecking dependency interiors. It is the sole
+// pre-planning load.
+const resolutionMode = packages.NeedName |
 	packages.NeedFiles |
 	packages.NeedCompiledGoFiles |
 	packages.NeedImports |
 	packages.NeedDeps |
 	packages.NeedModule |
-	packages.NeedSyntax |
-	packages.NeedTypes |
-	packages.NeedTypesInfo |
 	packages.NeedEmbedFiles |
 	packages.NeedEmbedPatterns
 
-// LoadUniverse resolves one compilation request into the transient typed
-// universe (one coherent go/types graph, complete unit census, cgo origin
-// evidence). It fails closed on any package error, type error, identity
-// collision, or unclassifiable package; there is no partial universe.
-//
-// The acquisition policy is contract-derived data resolved BEFORE this call;
-// the loader itself makes no policy decision. The manifest supplies verified
-// provider unit evidence for manifest-mode files; the zero manifest supplies
-// nothing, so a manifest-mode file fails closed without a produced artifact.
-// Evidence-depth selection and retention happen downstream in the scope phase
-// and Finalize; the loader never performs retention by mutating records and
-// never assigns depth.
-func LoadUniverse(req Request, policy AcquisitionPolicy, manifest UnitManifest) (*Universe, error) {
-	patterns := req.Patterns
-	if len(patterns) == 0 {
-		patterns = []string{"./..."}
-	}
+// ResolveUniverse resolves one compilation request into a complete immutable-
+// identity metadata closure. It intentionally produces no AST or checker
+// graph: structural-source planning must run before semantic hydration.
+func ResolveUniverse(req Request) (*Universe, error) {
+	req = cloneRequest(req)
+	patterns := requestPatterns(req)
 	toolchain, env, cleanupShim, err := resolveToolchain(req)
 	if err != nil {
 		return nil, err
 	}
 	defer cleanupShim()
+	req.GoBinary = toolchain.binary
 	stdSet, err := listPatternSet(toolchain, env, req.Dir, "std")
 	if err != nil {
 		return nil, err
@@ -64,36 +45,37 @@ func LoadUniverse(req Request, policy AcquisitionPolicy, manifest UnitManifest) 
 	if err != nil {
 		return nil, err
 	}
-	fset := token.NewFileSet()
-	cfg := &packages.Config{
-		Mode: loadMode,
-		Dir:  req.Dir,
-		Fset: fset,
-		ParseFile: func(fset *token.FileSet, filename string, src []byte) (*ast.File, error) {
-			return parser.ParseFile(fset, filename, src, parser.ParseComments|parser.SkipObjectResolution)
-		},
+	loaded, err := packages.Load(&packages.Config{
+		Mode:       resolutionMode,
+		Dir:        req.Dir,
 		Overlay:    req.Overlay,
 		BuildFlags: req.BuildFlags,
 		Env:        env,
-	}
-	loaded, err := packages.Load(cfg, patterns...)
+	}, patterns...)
 	if err != nil {
-		return nil, &LoadError{Dir: req.Dir, Reason: "load failed: " + err.Error()}
+		return nil, &LoadError{
+			Dir: req.Dir, Reason: "metadata resolution failed: " + err.Error(),
+		}
 	}
 	requested := map[string]bool{}
 	for _, pkg := range loaded {
-		if len(pkg.GoFiles) > 0 || len(pkg.CompiledGoFiles) > 0 || pkg.PkgPath == "unsafe" {
+		if packageHasInputs(pkg) {
 			requested[pkg.PkgPath] = true
 		}
 	}
 	if len(requested) == 0 {
-		return nil, &LoadError{Dir: req.Dir, Reason: "no Go source packages matched " + strings.Join(patterns, " ")}
+		return nil, &LoadError{
+			Dir: req.Dir,
+			Reason: "no Go source packages matched " +
+				strings.Join(patterns, " "),
+		}
 	}
 	classifier := &classifier{
-		req: req, policy: policy, toolchain: toolchain, stdSet: stdSet, cmdSet: cmdSet,
+		req: req, toolchain: toolchain, stdSet: stdSet, cmdSet: cmdSet,
 		moduleDirs: map[identity.ModuleID]string{},
+		gorootGo:   readGoDirective(filepath.Join(toolchain.goroot, "src", "go.mod")),
 	}
-	universe := &Universe{fset: fset, toolchain: toolchain, request: req, manifest: manifest}
+	universe := &Universe{toolchain: toolchain, request: req}
 	seen := map[identity.PackageID]bool{}
 	var walkErr error
 	packages.Visit(loaded, nil, func(pkg *packages.Package) {
@@ -101,19 +83,27 @@ func LoadUniverse(req Request, policy AcquisitionPolicy, manifest UnitManifest) 
 			return
 		}
 		if len(pkg.Errors) > 0 && pkg.PkgPath != "builtin" {
-			walkErr = &LoadError{Dir: req.Dir, Reason: pkg.PkgPath + ": " + pkg.Errors[0].Error()}
+			walkErr = &LoadError{
+				Dir:    req.Dir,
+				Reason: pkg.PkgPath + ": " + pkg.Errors[0].Error(),
+			}
 			return
 		}
-		if len(pkg.GoFiles) == 0 && len(pkg.CompiledGoFiles) == 0 && pkg.PkgPath != "unsafe" {
+		if !packageHasInputs(pkg) {
 			return
 		}
-		record, err := classifier.record(pkg, requested[pkg.PkgPath], fset)
-		if err != nil {
-			walkErr = err
+		record, recordErr := classifier.record(
+			pkg, requested[pkg.PkgPath],
+		)
+		if recordErr != nil {
+			walkErr = recordErr
 			return
 		}
 		if seen[record.id] {
-			walkErr = &LoadError{Dir: req.Dir, Reason: "duplicate package identity " + record.id.String()}
+			walkErr = &LoadError{
+				Dir:    req.Dir,
+				Reason: "duplicate package identity " + record.id.String(),
+			}
 			return
 		}
 		seen[record.id] = true
@@ -126,101 +116,46 @@ func LoadUniverse(req Request, policy AcquisitionPolicy, manifest UnitManifest) 
 		return nil, walkErr
 	}
 	if len(universe.roots) == 0 {
-		return nil, &LoadError{Dir: req.Dir, Reason: "no requested roots after classification"}
+		return nil, &LoadError{
+			Dir: req.Dir, Reason: "no requested roots after classification",
+		}
 	}
-	sort.Slice(universe.packages, func(i, j int) bool { return universe.packages[i].id.String() < universe.packages[j].id.String() })
-	sort.Slice(universe.roots, func(i, j int) bool { return universe.roots[i].id.String() < universe.roots[j].id.String() })
-	if err := censusUniverse(universe); err != nil {
-		return nil, err
-	}
-	if err := universe.CheckTypeGraphCoherence(); err != nil {
-		return nil, err
-	}
+	sort.Slice(universe.packages, func(i, j int) bool {
+		return universe.packages[i].id.String() <
+			universe.packages[j].id.String()
+	})
+	sort.Slice(universe.roots, func(i, j int) bool {
+		return universe.roots[i].id.String() <
+			universe.roots[j].id.String()
+	})
 	return universe, nil
 }
 
-// resolveToolchain resolves the exact selected go binary and its fingerprint,
-// and produces the environment shared by the loader and every toolchain
-// execution. The go/packages driver resolves "go" from PATH; a shim directory
-// whose "go" entry links to the exact selected binary guarantees the driver
-// invokes it even when the selected filename is not "go".
-func resolveToolchain(req Request) (Toolchain, []string, func(), error) {
-	noop := func() {}
-	binary := req.GoBinary
-	if binary == "" {
-		resolved, err := exec.LookPath("go")
-		if err != nil {
-			return Toolchain{}, nil, noop, &LoadError{Dir: req.Dir, Reason: "no go binary selected or on PATH: " + err.Error()}
-		}
-		binary = resolved
+func requestPatterns(req Request) []string {
+	if len(req.Patterns) == 0 {
+		return []string{"./..."}
 	}
-	absolute, err := filepath.Abs(binary)
-	if err != nil {
-		return Toolchain{}, nil, noop, &LoadError{Dir: req.Dir, Reason: "toolchain path unresolvable: " + err.Error()}
-	}
-	shimDir, err := os.MkdirTemp("", "gotots-toolchain-*")
-	if err != nil {
-		return Toolchain{}, nil, noop, &LoadError{Dir: req.Dir, Reason: "toolchain shim: " + err.Error()}
-	}
-	cleanup := func() { os.RemoveAll(shimDir) }
-	if err := os.Symlink(absolute, filepath.Join(shimDir, "go")); err != nil {
-		cleanup()
-		return Toolchain{}, nil, noop, &LoadError{Dir: req.Dir, Reason: "toolchain shim: " + err.Error()}
-	}
-	env := append(os.Environ(), req.Env...)
-	env = append(env, "PATH="+shimDir+string(os.PathListSeparator)+os.Getenv("PATH"))
-	out, err := runGo(absolute, env, req.Dir, "env",
-		"GOROOT", "GOVERSION", "GOOS", "GOARCH", "GOEXPERIMENT", "GOFLAGS", "CGO_ENABLED")
-	if err != nil {
-		cleanup()
-		return Toolchain{}, nil, noop, &LoadError{Dir: req.Dir, Reason: "toolchain fingerprint failed: " + err.Error()}
-	}
-	lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
-	if len(lines) != 7 {
-		cleanup()
-		return Toolchain{}, nil, noop, &LoadError{Dir: req.Dir, Reason: "toolchain fingerprint output malformed"}
-	}
-	binaryBytes, err := os.ReadFile(absolute)
-	if err != nil {
-		cleanup()
-		return Toolchain{}, nil, noop, &LoadError{Dir: req.Dir, Reason: "toolchain binary unreadable: " + err.Error()}
-	}
-	return Toolchain{
-		binary: absolute, binaryDigest: fmt.Sprintf("%x", sha256.Sum256(binaryBytes)),
-		goroot: strings.TrimSpace(lines[0]), version: strings.TrimSpace(lines[1]),
-		goos: strings.TrimSpace(lines[2]), goarch: strings.TrimSpace(lines[3]),
-		experiments: strings.TrimSpace(lines[4]), goflags: strings.TrimSpace(lines[5]),
-		cgoEnabled: strings.TrimSpace(lines[6]),
-	}, env, cleanup, nil
+	return append([]string(nil), req.Patterns...)
 }
 
-// listPatternSet resolves one authoritative toolchain pattern set (std, cmd)
-// under the selected binary.
-func listPatternSet(toolchain Toolchain, env []string, dir, pattern string) (map[string]bool, error) {
-	out, err := runGo(toolchain.binary, env, dir, "list", pattern)
-	if err != nil {
-		return nil, &LoadError{Dir: dir, Reason: "go list " + pattern + " failed: " + err.Error()}
-	}
-	set := map[string]bool{}
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-		if line != "" {
-			set[line] = true
+func cloneRequest(req Request) Request {
+	req.Patterns = append([]string(nil), req.Patterns...)
+	req.BuildFlags = append([]string(nil), req.BuildFlags...)
+	req.Env = append([]string(nil), req.Env...)
+	if req.Overlay != nil {
+		overlay := make(map[string][]byte, len(req.Overlay))
+		for path, content := range req.Overlay {
+			overlay[path] = append([]byte(nil), content...)
 		}
+		req.Overlay = overlay
 	}
-	return set, nil
+	return req
 }
 
-// runGo executes the selected go binary.
-func runGo(binary string, env []string, dir string, args ...string) (string, error) {
-	cmd := exec.Command(binary, args...)
-	cmd.Dir = dir
-	cmd.Env = env
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	if err := cmd.Run(); err != nil {
-		return "", &LoadError{Dir: dir, Reason: strings.Join(args, " ") + ": " + err.Error() + ": " + stderr.String()}
-	}
-	return stdout.String(), nil
+func packageHasInputs(pkg *packages.Package) bool {
+	return len(pkg.GoFiles) > 0 ||
+		len(pkg.CompiledGoFiles) > 0 ||
+		pkg.PkgPath == "unsafe"
 }
 
 // classifier assigns each closure package its owner, provenance, acquisition,
@@ -228,80 +163,24 @@ func runGo(binary string, env []string, dir string, args ...string) (string, err
 // spelling, path prefixes, and Module==nil are never classification rules.
 type classifier struct {
 	req        Request
-	policy     AcquisitionPolicy
 	toolchain  Toolchain
 	stdSet     map[string]bool
 	cmdSet     map[string]bool
 	moduleDirs map[identity.ModuleID]string
+	gorootGo   string
 }
 
-func (c *classifier) record(pkg *packages.Package, isRoot bool, fset *token.FileSet) (*LoadedPackage, error) {
-	out := &LoadedPackage{requestedRoot: isRoot, disposition: DispositionOrdinarySource}
-	var owner identity.Owner
-	var relBase string
-	switch {
-	case pkg.PkgPath == "builtin":
-		owner = identity.LanguagePseudoOwner()
-		out.provenance, out.acquisition, out.disposition = ProvenanceLanguagePseudo, AcquisitionGOROOT, DispositionBuiltinUniverse
-		relBase = filepath.Join(c.toolchain.goroot, "src")
-	case c.stdSet[pkg.PkgPath]:
-		owner = identity.StandardLibraryOwner()
-		out.provenance, out.acquisition = ProvenanceStandardLibrary, AcquisitionGOROOT
-		if pkg.PkgPath == "unsafe" {
-			out.disposition = DispositionUnsafeIntrinsic
-		}
-		relBase = filepath.Join(c.toolchain.goroot, "src")
-	case c.cmdSet[pkg.PkgPath]:
-		// cmd-set membership is authoritative and includes the toolchain's
-		// internal libraries; no path-prefix rule participates.
-		owner = identity.ToolchainOwner()
-		out.provenance, out.acquisition = ProvenanceToolchainPackage, AcquisitionGOROOT
-		relBase = filepath.Join(c.toolchain.goroot, "src")
-	case pkg.Module != nil:
-		moduleDir := pkg.Module.Dir
-		if pkg.Module.Replace != nil && pkg.Module.Replace.Dir != "" {
-			moduleDir = pkg.Module.Replace.Dir
-		}
-		version := pkg.Module.Version
-		if pkg.Module.Main {
-			version = ""
-		}
-		moduleID, err := identity.NewModuleID(pkg.Module.Path, version)
-		if err != nil {
-			return nil, err
-		}
-		if prior, dup := c.moduleDirs[moduleID]; dup && prior != moduleDir && moduleDir != "" && prior != "" {
-			return nil, &LoadError{Dir: c.req.Dir, Reason: "module identity collision: " + moduleID.String() +
-				" resolves to both " + prior + " and " + moduleDir}
-		}
-		if moduleDir != "" {
-			c.moduleDirs[moduleID] = moduleDir
-		}
-		owner, err = identity.NewModuleOwner(moduleID)
-		if err != nil {
-			return nil, err
-		}
-		out.moduleGoVersion = pkg.Module.GoVersion
-		if pkg.Module.Main {
-			out.provenance, out.acquisition = ProvenanceWorkspaceModule, AcquisitionWorkspace
-		} else {
-			out.provenance = ProvenanceModuleDependency
-			switch {
-			case pkg.Module.Replace != nil && pkg.Module.Replace.Version == "":
-				out.acquisition = AcquisitionLocalReplacement
-			case moduleDir == "" || vendoredDir(pkg, c.req.Dir):
-				out.acquisition = AcquisitionVendor
-			default:
-				out.acquisition = AcquisitionModuleCache
-			}
-		}
-		relBase = moduleDir
-		if relBase == "" {
-			relBase = vendorBase(pkg, c.req.Dir)
-		}
-	default:
-		return nil, &LoadError{Dir: c.req.Dir, Reason: pkg.PkgPath +
-			": package is neither module-owned nor in the selected toolchain's std/cmd sets"}
+func (c *classifier) record(
+	pkg *packages.Package,
+	isRoot bool,
+) (*LoadedPackage, error) {
+	out := &LoadedPackage{
+		requestedRoot: isRoot,
+		disposition:   DispositionOrdinarySource,
+	}
+	owner, relBase, err := c.classifyPackage(pkg, out)
+	if err != nil {
+		return nil, err
 	}
 	packageID, err := identity.NewPackageID(owner, pkg.PkgPath)
 	if err != nil {
@@ -309,49 +188,123 @@ func (c *classifier) record(pkg *packages.Package, isRoot bool, fset *token.File
 	}
 	out.id = packageID
 	out.imports = importPaths(pkg)
-	if err := c.attachInputs(out, pkg, owner, relBase, fset); err != nil {
+	if err := c.attachMetadata(out, pkg, owner, relBase); err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// attachInputs models the package's complete inputs: identity-bearing source
-// Go files with their checked syntax, the checked-view difference for cgo
-// packages, non-Go inputs, and embed files/patterns. The loader never aborts a
-// cgo-importing package; the view difference is recorded and later semantic
-// planning assigns per-body external obligations.
-func (c *classifier) attachInputs(out *LoadedPackage, pkg *packages.Package, owner identity.Owner, relBase string, fset *token.FileSet) error {
-	if pkg.PkgPath == "builtin" {
-		for _, goFile := range pkg.GoFiles {
-			fileID, err := c.fileIDFor(owner, relBase, goFile)
-			if err != nil {
-				return err
-			}
-			out.files = append(out.files, &LoadedFile{path: goFile, id: fileID})
+func (c *classifier) classifyPackage(
+	pkg *packages.Package,
+	out *LoadedPackage,
+) (identity.Owner, string, error) {
+	switch {
+	case pkg.PkgPath == "builtin":
+		out.provenance = ProvenanceLanguagePseudo
+		out.acquisition = AcquisitionGOROOT
+		out.disposition = DispositionBuiltinUniverse
+		return identity.LanguagePseudoOwner(),
+			filepath.Join(c.toolchain.goroot, "src"), nil
+	case c.stdSet[pkg.PkgPath]:
+		out.provenance = ProvenanceStandardLibrary
+		out.acquisition = AcquisitionGOROOT
+		if pkg.PkgPath == "unsafe" {
+			out.disposition = DispositionUnsafeIntrinsic
 		}
-		sortLoadedFiles(out.files)
-		return nil
-	}
-	out.types, out.typesInfo = pkg.Types, pkg.TypesInfo
-	// Checked syntax aligns with CompiledGoFiles. Compiled files under the
-	// owner root are ordinary source; compiled files outside it are the cgo
-	// checked view.
-	syntaxByPath := map[string]*ast.File{}
-	for i, syntax := range pkg.Syntax {
-		if i < len(pkg.CompiledGoFiles) {
-			syntaxByPath[pkg.CompiledGoFiles[i]] = syntax
+		return identity.StandardLibraryOwner(),
+			filepath.Join(c.toolchain.goroot, "src"), nil
+	case c.cmdSet[pkg.PkgPath]:
+		out.provenance = ProvenanceToolchainPackage
+		out.acquisition = AcquisitionGOROOT
+		return identity.ToolchainOwner(),
+			filepath.Join(c.toolchain.goroot, "src"), nil
+	case pkg.Module != nil:
+		return c.classifyModule(pkg, out)
+	default:
+		return identity.Owner{}, "", &LoadError{
+			Dir: c.req.Dir,
+			Reason: pkg.PkgPath +
+				": package is neither module-owned nor in the selected " +
+				"toolchain's std/cmd sets",
 		}
 	}
-	cgoTransformed := false
-	for _, compiled := range pkg.CompiledGoFiles {
-		if rel, err := filepath.Rel(relBase, compiled); err != nil || strings.HasPrefix(rel, "..") {
-			cgoTransformed = true
-			// Checked-view decls are joined to origins at census time via
-			// //line evidence; the checked path is transient acquisition data.
-			if syntax := syntaxByPath[compiled]; syntax != nil {
-				for _, decl := range syntax.Decls {
-					out.checkedDecls = append(out.checkedDecls, checkedDecl{node: decl})
-				}
+}
+
+func (c *classifier) classifyModule(
+	pkg *packages.Package,
+	out *LoadedPackage,
+) (identity.Owner, string, error) {
+	moduleDir := pkg.Module.Dir
+	if pkg.Module.Replace != nil && pkg.Module.Replace.Dir != "" {
+		moduleDir = pkg.Module.Replace.Dir
+	}
+	version := pkg.Module.Version
+	if pkg.Module.Main {
+		version = ""
+	}
+	moduleID, err := identity.NewModuleID(pkg.Module.Path, version)
+	if err != nil {
+		return identity.Owner{}, "", err
+	}
+	if prior, duplicate := c.moduleDirs[moduleID]; duplicate &&
+		prior != moduleDir && moduleDir != "" && prior != "" {
+		return identity.Owner{}, "", &LoadError{
+			Dir: c.req.Dir,
+			Reason: "module identity collision: " + moduleID.String() +
+				" resolves to both " + prior + " and " + moduleDir,
+		}
+	}
+	if moduleDir != "" {
+		c.moduleDirs[moduleID] = moduleDir
+	}
+	owner, err := identity.NewModuleOwner(moduleID)
+	if err != nil {
+		return identity.Owner{}, "", err
+	}
+	out.moduleGoVersion = pkg.Module.GoVersion
+	if pkg.Module.Main {
+		out.provenance = ProvenanceWorkspaceModule
+		out.acquisition = AcquisitionWorkspace
+	} else {
+		out.provenance = ProvenanceModuleDependency
+		switch {
+		case pkg.Module.Replace != nil && pkg.Module.Replace.Version == "":
+			out.acquisition = AcquisitionLocalReplacement
+		case moduleDir == "" || vendoredDir(pkg, c.req.Dir):
+			out.acquisition = AcquisitionVendor
+		default:
+			out.acquisition = AcquisitionModuleCache
+		}
+	}
+	if moduleDir == "" {
+		moduleDir = vendorBase(pkg, c.req.Dir)
+	}
+	return owner, moduleDir, nil
+}
+
+func (c *classifier) attachMetadata(
+	out *LoadedPackage,
+	pkg *packages.Package,
+	owner identity.Owner,
+	relBase string,
+) error {
+	sourcePaths := map[string]bool{}
+	compiledPaths := map[string]bool{}
+	for _, path := range pkg.GoFiles {
+		sourcePaths[filepath.Clean(path)] = true
+	}
+	for _, path := range pkg.CompiledGoFiles {
+		clean := filepath.Clean(path)
+		compiledPaths[clean] = true
+		if out.disposition == DispositionOrdinarySource &&
+			!sourcePaths[clean] {
+			out.hasCheckedView = true
+		}
+	}
+	if out.disposition == DispositionOrdinarySource {
+		for sourcePath := range sourcePaths {
+			if !compiledPaths[sourcePath] {
+				out.hasCheckedView = true
 			}
 		}
 	}
@@ -360,78 +313,200 @@ func (c *classifier) attachInputs(out *LoadedPackage, pkg *packages.Package, own
 		if err != nil {
 			return err
 		}
-		file := &LoadedFile{path: goFile, id: fileID}
-		mode, err := c.policy.ModeFor(out.id)
+		raw, err := fileBytes(goFile, c.req.Overlay)
 		if err != nil {
-			return err
-		}
-		file.censusMode = mode
-		if _, isOverlaid := c.req.Overlay[goFile]; isOverlaid {
-			file.overlaid = true
-		}
-		if syntax, checked := syntaxByPath[goFile]; checked {
-			file.fset = fset
-			file.syntax = syntax
-			if pkg.TypesInfo != nil {
-				file.effectiveVersion = pkg.TypesInfo.FileVersions[syntax]
+			return &LoadError{
+				Dir: c.req.Dir,
+				Reason: fileID.String() +
+					": selected source bytes unreadable: " + err.Error(),
 			}
-			if file.effectiveVersion == "" && pkg.Module != nil && pkg.Module.GoVersion != "" {
-				file.effectiveVersion = "go" + pkg.Module.GoVersion
-			}
-		} else if out.disposition == DispositionOrdinarySource && !cgoTransformed {
-			// A source file may lack checked syntax only when its checked
-			// form genuinely lives in a differing checked view (cgo). A
-			// missing-syntax file without that corroboration is a defect,
-			// never a silent metadata downgrade.
-			return &LoadError{Dir: c.req.Dir, Reason: fileID.String() +
-				": file has no checked syntax and the package has no checked-view difference"}
-		} else {
-			file.cgoOriginal = true
 		}
-		out.files = append(out.files, file)
+		version, err := effectiveGoVersion(
+			raw, c.baseGoVersion(out),
+		)
+		if err != nil {
+			return &LoadError{
+				Dir: c.req.Dir,
+				Reason: fileID.String() +
+					": effective Go version: " + err.Error(),
+			}
+		}
+		_, overlaid := c.req.Overlay[goFile]
+		out.files = append(out.files, &LoadedFile{
+			path: goFile, id: fileID,
+			effectiveVersion: version,
+			overlaid:         overlaid,
+			cgoOriginal: out.disposition ==
+				DispositionOrdinarySource &&
+				out.hasCheckedView &&
+				!compiledPaths[filepath.Clean(goFile)],
+			byteDigest: sha256.Sum256(raw),
+		})
 	}
 	sortLoadedFiles(out.files)
 	for _, other := range pkg.OtherFiles {
-		out.otherFiles = append(out.otherFiles, c.ownerRel(relBase, other))
+		kind, err := inputKindForPath(other)
+		if err != nil {
+			return &LoadError{
+				Dir:    c.req.Dir,
+				Reason: out.id.String() + ": " + err.Error(),
+			}
+		}
+		if err := c.attachInput(
+			out, owner, relBase, pkg.Dir, other, kind,
+		); err != nil {
+			return err
+		}
 	}
-	sort.Strings(out.otherFiles)
 	for _, embed := range pkg.EmbedFiles {
-		out.embedFiles = append(out.embedFiles, c.ownerRel(relBase, embed))
+		if err := c.attachInput(
+			out, owner, relBase, pkg.Dir, embed, InputEmbed,
+		); err != nil {
+			return err
+		}
 	}
-	sort.Strings(out.embedFiles)
-	// x/tools absolutizes embed patterns; restore the declared package-dir-
-	// relative spelling.
+	sort.Slice(out.inputs, func(i, j int) bool {
+		return out.inputs[i].id.String() <
+			out.inputs[j].id.String()
+	})
+	for index := 1; index < len(out.inputs); index++ {
+		if out.inputs[index-1].id == out.inputs[index].id {
+			return &LoadError{
+				Dir: c.req.Dir,
+				Reason: out.id.String() +
+					": supplemental input has multiple semantic classes " +
+					out.inputs[index].id.String(),
+			}
+		}
+	}
 	for _, pattern := range pkg.EmbedPatterns {
-		out.embedPatterns = append(out.embedPatterns, c.ownerRel(pkg.Dir, pattern))
+		out.embedPatterns = append(
+			out.embedPatterns, packageRelative(pkg.Dir, pattern),
+		)
 	}
 	sort.Strings(out.embedPatterns)
 	return nil
 }
 
-// ownerRel renders an input path owner-relative when possible, keeping the
-// raw path otherwise (display only; never an identity).
-func (c *classifier) ownerRel(relBase, path string) string {
-	if rel, err := filepath.Rel(relBase, path); err == nil && !strings.HasPrefix(rel, "..") {
+func packageRelative(base, path string) string {
+	if rel, err := filepath.Rel(base, path); err == nil &&
+		!pathEscapes(rel) {
 		return filepath.ToSlash(rel)
 	}
 	return path
 }
 
-// fileIDFor derives one file's owner-relative identity.
-func (c *classifier) fileIDFor(owner identity.Owner, relBase, osPath string) (identity.FileID, error) {
+func (c *classifier) attachInput(
+	out *LoadedPackage,
+	owner identity.Owner,
+	relBase string,
+	packageDir string,
+	path string,
+	kind InputKind,
+) error {
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(packageDir, path)
+	}
+	id, err := c.fileIDFor(owner, relBase, path)
+	if err != nil {
+		return err
+	}
+	raw, err := fileBytes(path, c.req.Overlay)
+	if err != nil {
+		return &LoadError{
+			Dir: c.req.Dir,
+			Reason: id.String() +
+				": supplemental input unreadable: " + err.Error(),
+		}
+	}
+	_, overlaid := c.req.Overlay[path]
+	out.inputs = append(out.inputs, loadedInput{
+		path: path, id: id, kind: kind,
+		byteDigest: sha256.Sum256(raw), overlaid: overlaid,
+	})
+	return nil
+}
+
+func inputKindForPath(path string) (InputKind, error) {
+	switch filepath.Ext(path) {
+	case ".c":
+		return InputC, nil
+	case ".cc", ".cpp", ".cxx":
+		return InputCXX, nil
+	case ".m":
+		return InputObjectiveC, nil
+	case ".h", ".hh", ".hpp", ".hxx":
+		return InputHeader, nil
+	case ".f", ".F", ".for", ".f90":
+		return InputFortran, nil
+	case ".s", ".S", ".sx":
+		return InputAssembly, nil
+	case ".swig":
+		return InputSWIG, nil
+	case ".swigcxx":
+		return InputSWIGCXX, nil
+	case ".syso":
+		return InputSyso, nil
+	default:
+		return InputInvalid, fmt.Errorf(
+			"selected toolchain input %s has no closed input kind",
+			path,
+		)
+	}
+}
+
+func (c *classifier) baseGoVersion(pkg *LoadedPackage) string {
+	if pkg.moduleGoVersion != "" {
+		return "go" + pkg.moduleGoVersion
+	}
+	switch pkg.id.Owner().Class() {
+	case identity.OwnerStandardLibrary, identity.OwnerToolchain:
+		return c.gorootGo
+	default:
+		return ""
+	}
+}
+
+func fileBytes(path string, overlay map[string][]byte) ([]byte, error) {
+	if content, overlaid := overlay[path]; overlaid {
+		return append([]byte(nil), content...), nil
+	}
+	return os.ReadFile(path)
+}
+
+func sortLoadedFiles(files []*LoadedFile) {
+	sort.Slice(files, func(left, right int) bool {
+		return files[left].id.Rel() < files[right].id.Rel()
+	})
+}
+
+func (c *classifier) fileIDFor(
+	owner identity.Owner,
+	relBase string,
+	osPath string,
+) (identity.FileID, error) {
 	rel, err := filepath.Rel(relBase, osPath)
-	if err != nil || strings.HasPrefix(rel, "..") {
-		return identity.FileID{}, &LoadError{Dir: c.req.Dir, Reason: osPath + ": file lies outside its owner root " + relBase}
+	if err != nil || pathEscapes(rel) {
+		return identity.FileID{}, &LoadError{
+			Dir: c.req.Dir,
+			Reason: osPath +
+				": file lies outside its owner root " + relBase,
+		}
 	}
 	return identity.NewFileID(owner, filepath.ToSlash(rel))
 }
 
-func sortFiles(files []*File) {
-	sort.Slice(files, func(i, j int) bool { return files[i].id.Rel() < files[j].id.Rel() })
+func pathEscapes(rel string) bool {
+	return rel == ".." ||
+		strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
-// vendoredDir reports whether the package's files live under the workspace
-// vendor tree (an acquisition fact derived from resolved build inputs).
+func sortFiles(files []*File) {
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].id.Rel() < files[j].id.Rel()
+	})
+}
+
 func vendoredDir(pkg *packages.Package, workspaceDir string) bool {
 	if len(pkg.GoFiles) == 0 {
 		return false
@@ -441,25 +516,22 @@ func vendoredDir(pkg *packages.Package, workspaceDir string) bool {
 		return false
 	}
 	rel = filepath.ToSlash(rel)
-	return strings.HasPrefix(rel, "vendor/") || strings.Contains(rel, "/vendor/")
+	return strings.HasPrefix(rel, "vendor/") ||
+		strings.Contains(rel, "/vendor/")
 }
 
-// vendorBase resolves the identity base of a vendored module: the vendor
-// subtree named by the module path, so vendored files keep module-relative
-// identities.
 func vendorBase(pkg *packages.Package, workspaceDir string) string {
 	if len(pkg.GoFiles) == 0 || pkg.Module == nil {
 		return workspaceDir
 	}
 	dir := filepath.Dir(pkg.GoFiles[0])
 	marker := filepath.FromSlash("vendor/" + pkg.Module.Path)
-	if idx := strings.Index(dir, marker); idx >= 0 {
-		return dir[:idx+len(marker)]
+	if index := strings.Index(dir, marker); index >= 0 {
+		return dir[:index+len(marker)]
 	}
 	return workspaceDir
 }
 
-// importPaths lists the package's imports, sorted.
 func importPaths(pkg *packages.Package) []string {
 	out := make([]string, 0, len(pkg.Imports))
 	for path := range pkg.Imports {
@@ -467,4 +539,34 @@ func importPaths(pkg *packages.Package) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+func fileByID(
+	universe *Universe,
+) map[identity.FileID]*LoadedFile {
+	out := map[identity.FileID]*LoadedFile{}
+	for _, pkg := range universe.packages {
+		for _, file := range pkg.files {
+			out[file.id] = file
+		}
+	}
+	return out
+}
+
+func packageForFile(
+	universe *Universe,
+) map[identity.FileID]*LoadedPackage {
+	out := map[identity.FileID]*LoadedPackage{}
+	for _, pkg := range universe.packages {
+		for _, file := range pkg.files {
+			out[file.id] = pkg
+		}
+	}
+	return out
+}
+
+func invalidHydration(reason string, args ...any) error {
+	return &LoadError{
+		Reason: "semantic hydration: " + fmt.Sprintf(reason, args...),
+	}
 }

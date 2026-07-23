@@ -8,11 +8,11 @@ import (
 	"github.com/tsoniclang/gotots/internal/identity"
 )
 
-// LoadedPackage is the TRANSIENT per-package artifact of the authoritative
-// semantic load. It may hold syntax and package-wide types.Info for every
-// file regardless of eventual evidence depth; it exists only between
-// LoadUniverse and Finalize and must never be retained as application
-// evidence. The finalized Package is a different validated type.
+// LoadedPackage is the transient package record shared by metadata resolution
+// and the one selective semantic hydration. Resolution fills stable
+// acquisition facts only. Hydration attaches one coherent go/types node and,
+// only for source-plan-local packages, syntax and types.Info. The finalized
+// Package is a different validated type.
 type LoadedPackage struct {
 	id              identity.PackageID
 	provenance      Provenance
@@ -22,30 +22,15 @@ type LoadedPackage struct {
 	requestedRoot   bool
 	imports         []string
 	files           []*LoadedFile
-	otherFiles      []string
-	embedFiles      []string
+	inputs          []loadedInput
 	embedPatterns   []string
 	types           *types.Package
 	typesInfo       *types.Info
-	// cgo evidence (transient): checked-view decls outside the owner root,
-	// joined by the exact origin graph at census time.
+	hasCheckedView  bool
+	// checkedDecls are cgo-transformed declarations outside the source owner
+	// root. Language structure owns their definition/origin interpretation;
+	// source records only the checked syntax acquisition.
 	checkedDecls []checkedDecl
-	synthetics   []SyntheticUnit
-	mappings     []CheckedUnitMapping
-	// checkedNodes maps each cgo-original unit to its exact checked-view
-	// counterpart (transient; retention and the C-dependence derivation
-	// consume it).
-	checkedNodes map[identity.SourceUnitID]checkedCounterpart
-	// implicitUnits are the package's unspelled implicit executable units,
-	// censused with typed catalog identities before scope selection.
-	implicitUnits []identity.ImplicitUnitID
-}
-
-// checkedCounterpart is one origin unit's exact checked-view counterpart node
-// and its span in checked-view coordinates.
-type checkedCounterpart struct {
-	node ast.Node
-	span Span
 }
 
 // ID is the package's canonical identity.
@@ -66,30 +51,26 @@ func (p *LoadedPackage) ModuleGoVersion() string { return p.moduleGoVersion }
 // RequestedRoot reports whether the package was a requested root.
 func (p *LoadedPackage) RequestedRoot() bool { return p.requestedRoot }
 
+// Imports returns the canonical direct import-path set resolved by the
+// selected toolchain.
+func (p *LoadedPackage) Imports() []string {
+	return append([]string(nil), p.imports...)
+}
+
 // Files are the transient per-file records.
 func (p *LoadedPackage) Files() []*LoadedFile { return append([]*LoadedFile(nil), p.files...) }
 
-// ImplicitUnits are the package's censused implicit executable units.
-func (p *LoadedPackage) ImplicitUnits() []identity.ImplicitUnitID {
-	return append([]identity.ImplicitUnitID(nil), p.implicitUnits...)
-}
-
-// CgoCounterparts maps each cgo-original unit's checked-view counterpart node
-// to its identity (transient; the analyze traversal walks the counterparts,
-// which carry type evidence, and detects nested boundaries through this map).
-func (p *LoadedPackage) CgoCounterparts() map[ast.Node]identity.SourceUnitID {
-	out := make(map[ast.Node]identity.SourceUnitID, len(p.checkedNodes))
-	for id, cp := range p.checkedNodes {
-		out[cp.node] = id
+// Inputs returns canonical supplemental input evidence without acquisition
+// paths.
+func (p *LoadedPackage) Inputs() []Input {
+	out := make([]Input, 0, len(p.inputs))
+	for _, input := range p.inputs {
+		out = append(out, Input{
+			id: input.id, kind: input.kind, byteDigest: input.byteDigest,
+			overlaid: input.overlaid,
+		})
 	}
 	return out
-}
-
-// CgoCounterpartNode returns one cgo unit's checked-view counterpart node and
-// its checked-view span.
-func (p *LoadedPackage) CgoCounterpartNode(id identity.SourceUnitID) (ast.Node, Span, bool) {
-	cp, ok := p.checkedNodes[id]
-	return cp.node, cp.span, ok
 }
 
 // CheckerView is the narrow, transient type-query capability the analyze
@@ -101,83 +82,61 @@ func (p *LoadedPackage) CheckerView() *TypeInfoView { return newTypeInfoView(p.t
 // Types is the package's node in the one coherent type graph.
 func (p *LoadedPackage) Types() *types.Package { return p.types }
 
-// LoadedFile is the TRANSIENT per-file artifact: identity plus parsed syntax
-// for whatever the toolchain checked, plus the total top-level unit census.
+// HasCheckedView reports whether the selected toolchain replaces at least one
+// physical source file with generated checked syntax, as cgo does. This is
+// metadata-resolution evidence and is available before hydration.
+func (p *LoadedPackage) HasCheckedView() bool { return p.hasCheckedView }
+
+// EmbedPatterns returns the selected package-relative embed patterns.
+func (p *LoadedPackage) EmbedPatterns() []string {
+	return append([]string(nil), p.embedPatterns...)
+}
+
+// LoadedFile is the transient per-file artifact. Resolution owns identity,
+// selected-byte digest, version, and checked-view classification. Selective
+// hydration adds bytes and syntax only when the source plan selects this file
+// locally.
 type LoadedFile struct {
 	path             string
 	id               identity.FileID
 	fset             *token.FileSet
 	syntax           *ast.File // nil only for cgo originals and intrinsics
+	physicalFset     *token.FileSet
+	physicalSyntax   *ast.File
+	selectedBytes    []byte
 	effectiveVersion string
 	overlaid         bool
-	cgoOriginal      bool       // checked view lives in transformed files
-	censusMode       CensusMode // contract-derived unit acquisition, resolved before load
+	cgoOriginal      bool // checked view lives in transformed files
 	byteDigest       SourceSpanHash
-	units            []SourceUnit
-	// unitRoots maps each unit's root syntax node to its identity, recorded
-	// during census from the exact AST edge (never span containment). The
-	// analyze traversal consumes it to detect child-implementation boundaries.
-	// For cgo originals the roots are the checked-view counterpart nodes.
-	unitRoots map[ast.Node]identity.SourceUnitID
-	// unitSignatures carries each function-body unit's declaration signature so
-	// the body region (rooted at the body, with the signature owned by the file
-	// declaration region) can still resolve return forms. Function-literal
-	// signatures are in-region and absent here.
-	unitSignatures map[identity.SourceUnitID]*ast.FuncType
-	// traversalSyntax is the syntax the analyze traversal walks: the file's own
-	// checked syntax, or (for cgo originals) the shared origin-graph tree.
-	traversalSyntax *ast.File
-	traversalFset   *token.FileSet
 }
 
-// Syntax is the file's checked syntax for the transient analyze traversal;
-// nil for intrinsic/metadata files with no census.
-func (f *LoadedFile) Syntax() *ast.File { return f.traversalSyntax }
+// PhysicalSyntax is the selected source syntax measured in physical source
+// coordinates. It is transient and may be consumed only by the Stage-1
+// structure/executable owners before finalization.
+func (f *LoadedFile) PhysicalSyntax() *ast.File { return f.physicalSyntax }
 
-// TraversalFset is the file set the traversal syntax is measured in.
-func (f *LoadedFile) TraversalFset() *token.FileSet { return f.traversalFset }
+// PhysicalFileSet measures PhysicalSyntax.
+func (f *LoadedFile) PhysicalFileSet() *token.FileSet { return f.physicalFset }
 
-// UnitRootAt returns the unit a syntax node roots, recorded from the exact AST
-// edge during census.
-func (f *LoadedFile) UnitRootAt(node ast.Node) (identity.SourceUnitID, bool) {
-	id, ok := f.unitRoots[node]
-	return id, ok
+// CheckedSyntax is the toolchain-checked syntax for this exact source file.
+// Cgo originals return nil because their checked form is represented by the
+// package's checked declarations.
+func (f *LoadedFile) CheckedSyntax() *ast.File { return f.syntax }
+
+// SelectedBytes returns a copy of the exact overlay-aware source bytes for a
+// locally hydrated file. Certified files deliberately return nil.
+func (f *LoadedFile) SelectedBytes() []byte {
+	return append([]byte(nil), f.selectedBytes...)
 }
 
-// UnitBoundaries is the transient node->unit map the analyze traversal uses to
-// detect child-implementation boundaries (fresh copy).
-func (f *LoadedFile) UnitBoundaries() map[ast.Node]identity.SourceUnitID {
-	out := make(map[ast.Node]identity.SourceUnitID, len(f.unitRoots))
-	for node, id := range f.unitRoots {
-		out[node] = id
-	}
-	return out
-}
-
-// UnitRootNode returns the root syntax node of one unit in this file.
-func (f *LoadedFile) UnitRootNode(id identity.SourceUnitID) (ast.Node, bool) {
-	for node, unit := range f.unitRoots {
-		if unit == id {
-			return node, true
-		}
-	}
-	return nil, false
-}
-
-// UnitSignature returns a function-body unit's declaration signature (the body
-// region needs it to resolve return forms); nil for other unit kinds.
-func (f *LoadedFile) UnitSignature(id identity.SourceUnitID) *ast.FuncType {
-	return f.unitSignatures[id]
-}
+// ByteDigest is the sha256 of SelectedBytes captured during resolution.
+func (f *LoadedFile) ByteDigest() SourceSpanHash { return f.byteDigest }
 
 // Path is the display path.
 func (f *LoadedFile) Path() string { return f.path }
 
 // ID is the canonical file identity.
 func (f *LoadedFile) ID() identity.FileID { return f.id }
-
-// Units is the censused total unit ledger of the file.
-func (f *LoadedFile) Units() []SourceUnit { return append([]SourceUnit(nil), f.units...) }
 
 // EffectiveGoVersion is the file's effective language version.
 func (f *LoadedFile) EffectiveGoVersion() string { return f.effectiveVersion }
@@ -194,21 +153,42 @@ type checkedDecl struct {
 	node ast.Node
 }
 
-// Universe is the TRANSIENT resolved source universe: the complete typed
-// closure with census, cgo origin evidence, and full syntax/Info. Its only
-// consumers are the analysis-scope phase (which selects evidence depths) and
-// Finalize (which builds the retained Workspace). Holding a Universe beyond
-// finalization is a defect.
-type Universe struct {
-	fset      *token.FileSet
-	toolchain Toolchain
-	packages  []*LoadedPackage
-	roots     []*LoadedPackage
-	request   Request
-	manifest  UnitManifest // request-supplied provider unit manifest
+type loadedInput struct {
+	path       string
+	id         identity.FileID
+	kind       InputKind
+	byteDigest SourceSpanHash
+	overlaid   bool
 }
 
-// Fset carries position information.
+// CheckedDeclarations returns the transient cgo checked-view declarations.
+// The slice is copied; nodes remain owned by the one transient source graph.
+func (p *LoadedPackage) CheckedDeclarations() []ast.Node {
+	out := make([]ast.Node, len(p.checkedDecls))
+	for index := range p.checkedDecls {
+		out[index] = p.checkedDecls[index].node
+	}
+	return out
+}
+
+// Universe is the transient source universe. ResolveUniverse first constructs
+// the complete metadata closure without parsing dependency interiors.
+// HydrateUniverse then creates the one checker graph required by the local
+// structural-source decisions. Holding a Universe beyond finalization is a
+// defect.
+type Universe struct {
+	fset            *token.FileSet
+	toolchain       Toolchain
+	packages        []*LoadedPackage
+	roots           []*LoadedPackage
+	request         Request
+	hydrationOwners map[identity.PackageID]bool
+	hydrated        bool
+	finalized       bool
+}
+
+// Fset carries position information for the selective semantic hydration. It
+// is nil before hydration.
 func (u *Universe) Fset() *token.FileSet { return u.fset }
 
 // Toolchain is the resolved selected toolchain.
@@ -220,16 +200,16 @@ func (u *Universe) Packages() []*LoadedPackage { return append([]*LoadedPackage(
 // Roots are the requested root packages.
 func (u *Universe) Roots() []*LoadedPackage { return append([]*LoadedPackage(nil), u.roots...) }
 
-// Request is the originating compilation request.
-func (u *Universe) Request() Request { return u.request }
+// Request is the normalized originating compilation request.
+func (u *Universe) Request() Request { return cloneRequest(u.request) }
 
-// Units enumerates the complete unit census of the universe.
-func (u *Universe) Units() []SourceUnit {
-	var out []SourceUnit
-	for _, pkg := range u.packages {
-		for _, file := range pkg.files {
-			out = append(out, file.units...)
-		}
-	}
-	return out
+// Hydrated reports whether the sole selective semantic load has completed.
+func (u *Universe) Hydrated() bool {
+	return u != nil && u.hydrated && !u.finalized
+}
+
+// Finalized reports whether Finalize has actively severed all transient
+// syntax, source-byte, and checker references.
+func (u *Universe) Finalized() bool {
+	return u != nil && u.finalized
 }

@@ -9,8 +9,9 @@ import (
 // traversal uses over the one checker graph (source.LoadedPackage.CheckerView).
 // It never survives into the finalized workspace — the finalized API exposes no
 // raw *types.Info, *types.Scope, *types.Object, selection, or expression. It is
-// live only between LoadUniverse and Finalize, so its scope/initialization/
-// expression queries are transient traversal evidence, not persisted facts.
+// live only between HydrateUniverse and Finalize, so its
+// scope/initialization/expression queries are transient traversal evidence,
+// not persisted facts.
 type TypeInfoView struct {
 	info *types.Info
 }

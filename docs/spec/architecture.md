@@ -16,16 +16,19 @@ workspace, target policy, and explicit environment contracts.
 
 | Phase | Input | Sole output | Forbidden responsibility |
 |---|---|---|---|
-| Workspace load | Go workspace, toolchain, build config | typed package universe | target decisions |
-| Analysis scope | typed package universe plus environment/provider contract | immutable per-unit evidence-depth selection | provenance defaults or lowering |
-| Construct inventory | scoped syntax and `go/types` evidence | exhaustive selected occurrences and boundary records | scope selection or lowering |
-| Semantic analysis | occurrences plus grammatical roles | Go semantic model | TypeScript shape |
-| Whole-program analysis | complete semantic model | sealed facts | emission |
-| Planning | semantic model plus facts | immutable total `ProgramPlan` | source rediscovery |
+| Workspace resolution | Go workspace, toolchain, build config | typed package/file/byte universe plus provider-artifact availability | provider choice or target decisions |
+| Structural-source planning | resolved universe plus environment/provider contract | validated per-file local-syntax-or-certified-provider plan | physical acquisition facts, evidence-depth choice, or semantics |
+| Definition inventory | acquired local syntax plus certified provider graphs | complete depth-independent owner/containment/definition/site/header/boundary graph | evidence-depth choice or semantic typing |
+| Selection-fact materialization | definition graph, closed fact requests, transient checker evidence or certified provider facts | immutable identity-keyed facts needed solely by conditional selection rules | provider/depth choice or general semantic lowering |
+| Analysis scope | definition graph, selection facts, environment/provider contract | immutable per-definition provider/depth selection | fact rediscovery, provenance defaults, or lowering |
+| Executable inventory | definition graph, selection, transient syntax evidence | exhaustive full-semantic executable occurrences and parent-assigned grammatical roles | `go/types` interpretation or target decisions |
+| Typed frontend | definition graph, executable occurrences, selection facts, and transient checker/certified semantic evidence | Go semantic model | TypeScript shape |
+| Whole-program analysis | complete semantic model plus explicit product/API/test/reflection/extension roots | sealed facts including semantic reachability and root witnesses | emission |
+| Planning | semantically reachable model plus sealed facts | immutable total `ProgramPlan` | planning unreachable definitions or source rediscovery |
 | TS lowering | semantic model plus `ProgramPlan` | typed TypeScript AST | semantic decisions |
 | Baseline formatting | typed TS AST | canonical generated files | manual preservation |
 | Completion | new baseline plus prior editable AST | reconciled mixed AST | guessing ownership |
-| Reachability | full current implementation graph | retained product graph | text search |
+| Implementation reachability | full generated/manual/runtime/stdlib/external/extension graph | retained product graph and root/non-reachability witnesses | text search or semantic-graph substitution |
 | Verification | sources, models, plans, artifacts | gate evidence | repairing output |
 | Publication | verified staged root | atomic current product | partial replacement |
 
@@ -33,53 +36,78 @@ Each phase consumes a complete typed artifact. A later phase cannot call an
 earlier analyzer to fill a missing fact. Errors propagate immediately and do
 not create partial records that consumers might interpret as valid.
 
-Workspace loading inventories canonical top-level declaration, initializer,
-body, and bodyless-implementation boundaries plus their source/checked evidence
-without deciding who implements them. The separate analysis-scope phase owns
-evidence-depth selection. Construct inventory expands full-semantic interiors;
-versioned provider-contract artifacts supply any independently owned units
-inside non-full bodies without rescanning them per application, while the
-catalog audit independently proves language coverage. Their exact union is the
-total implementation-unit census. This prevents loader provenance, parser
-availability, or retention mechanics from becoming an implementation-policy
-surrogate.
+Workspace resolution identifies selected packages, files, bytes, checker
+inputs, and certified provider artifacts without classifying implementation
+structure. Scope policy next yields a conservative, validated per-file
+structural-source plan. Language structure analysis then derives
+the complete depth-independent
+owner/containment/definition/site/header/boundary graph from
+exactly one local-or-certified source per file. Analysis scope binds every
+definition to provider/depth using separately materialized selection facts,
+after which executable inventory expands only full-semantic interiors. No later
+phase may discover an additional definition.
+The catalog audit independently proves language coverage without forcing
+provider body retention. This prevents loader provenance, parser availability,
+or retention mechanics from becoming implementation policy.
 
-The Stage-1 package seam is strict. `internal/source` owns selected bytes, the
-single transient AST/checker graph, source identities, the bounded pre-scope
-implementation-unit census, and final severing. It does not classify catalog
-kinds, bind catalog edges or roles, resolve lexical tokens, or manufacture
-occurrence records. `internal/language/analyze` owns the one parent-directed
-catalog traversal and produces implementation references, body-region
-occurrences, variants, and inventory-owned implicit operations. The compiler
-orchestrates that traversal synchronously after scope selection and before
-source finalization, then source finalization consumes only a constructor-
-validated retention/evidence projection derived from that traversal. No raw
-`ast.Node`, `types.Package`, mutable `types.Info`, `types.Scope`,
+The Stage-1 package seam is strict. `internal/source` owns selected bytes,
+physical source-acquisition facts, the single transient AST/checker graph,
+source identities, and final severing. It does not classify catalog kinds, bind catalog edges or
+roles, resolve lexical tokens, enumerate definitions, or manufacture
+occurrence/header/site records. `internal/scope/contract` owns the closed,
+versioned provider/rule/selection-fact-request schema and validation, but no
+source or definition state. `internal/scope/sourceplan` owns only the
+pre-graph structural-source plan and cannot import the definition graph or
+choose evidence depth. `internal/language/structure` owns the depth-independent
+structural pass and produces the definition graph.
+`internal/language/selectionfacts` owns the closed request-driven semantic facts
+needed before selection; every such fact is produced once and later reused by
+the frontend. `internal/scope` owns only per-definition provider/depth
+selection. `internal/language/executable` owns the later parent-directed
+structural pass and produces full-semantic occurrences plus grammatical roles,
+without interpreting `go/types`. `internal/language/frontend` alone resolves
+typed variants, bindings, declaration semantics, and implicit semantic
+operations. These owners consume the one catalog authority; none owns a private
+edge/variant table or recreates another owner's artifact.
+
+The compiler orchestrates
+`resolve -> plan structural sources -> build definition graph -> materialize
+selection facts -> select depth -> inventory executable regions -> materialize
+semantics -> finalize`.
+The structural pass visits each locally acquired syntax node at most once and
+provider graph production streams the same responsibility per file. The
+executable pass visits each selected full-semantic executable occurrence at
+most once. Selection-fact extraction visits only declared finite candidate
+definitions and accounts for every probe/edge in the production work ledger.
+Purpose-specific bounded passes are preferable to a duplicate source-owned
+census or a depth-dependent topology pass; no pass may recreate another's
+artifact.
+
+No raw `ast.Node`, `types.Package`, mutable `types.Info`, `types.Scope`,
 `types.Object`, `token.FileSet`, selection, or expression can survive in the
-finalized Stage-1 API; downstream access is by canonical identity through narrow
-read-only facts. Finalization actively severs transient syntax and checker
-access: the finalized artifact holds no field and exposes no accessor that
-reaches a `go/ast`, `go/types`, or mutable `go/token` object, and transient
+finalized Stage-1 API; downstream access is by canonical identity through
+narrow read-only facts. Finalization actively severs transient syntax and
+checker access: the finalized artifact holds no field and exposes no accessor
+that reaches a `go/ast`, `go/types`, or mutable `go/token` object, and transient
 graph access after finalization is structurally impossible, not merely
-discouraged. This ordering does not authorize a second traversal: source census
-remains a bounded implementation-boundary census, while construct topology has
-exactly one producer in the language-analysis layer.
+discouraged.
 
-Stage 1 owns syntax inventory, the implementation definition/reference topology,
-declaration contracts, scope selection, and the finalized structural artifacts.
-Stage 2 (the semantic model) consumes Stage-1's canonical identities, workspace
-loading, and parent-assigned contextual visitors, and reads the same transient
-checker graph before finalization to add binding, object, capture, and
-type-semantic facts; it does not rebuild loading, identities, or Stage-1
-visitors, and it never reintroduces a finalized checker.
+Stage 1 owns syntax inventory, owner regions, definition identities and sites,
+header regions, execution boundaries, scope/acquisition selection, and
+finalized structural artifacts. Stage 2 consumes those exact records and reads the same transient
+checker graph before finalization to materialize target-independent declaration
+semantics, bindings, objects, captures, types, and executable operations. It
+does not rebuild loading, identities, Stage-1 visitors, or structural regions,
+and it never reintroduces a finalized checker.
 
-The transient checker graph and its evidence are Stage-1's, and their lifetime
-is defined exactly. The one checker graph is live from workspace load through
-finalization; Stage 2 (the semantic model) consumes that same transient graph
-and materializes its canonical, identity-keyed semantic facts BEFORE source
-finalization severs it. There is no finalized raw type-fact API and no second
-checker: the semantic model reads the transient graph in place, exactly as the
-analyze traversal does, and emits identity-keyed facts. The inspect-only
+The transient checker graph's lifetime is owned by `internal/source` and is
+defined exactly. The one checker graph is live from workspace load through
+finalization. Selection-fact materialization reads it through a narrow
+request-bound view; Stage 2 consumes that same graph and the already-materialized
+selection facts, then materializes its canonical, identity-keyed semantic facts
+BEFORE source finalization severs it. There is no finalized raw type-fact API
+and no second checker: the typed frontend reads the transient graph in place and
+emits identity-keyed facts. The inspect-only
 pipeline ends after Stage 1, so it may finalize immediately, with no semantic
 materialization step. A finalized artifact never carries a mutable checker
 object for a later phase to consult. An occurrence of an identifier is not, by
@@ -157,117 +185,298 @@ must be planned explicitly. Neither special case turns an importing package
 into an external package.
 
 Go semantics are uniform across provenance, but resolving a package does not
-authorize full retained analysis of every body in that package. The source
-artifact assigns every executable implementation unit—function or method body,
-function-literal body, package initializer, source declaration whose
-implementation has no Go body, and equivalent implicit body—one closed
-evidence depth:
+authorize retained analysis of every executable interior. Stage 1 treats
+implementation structure and executable evidence as orthogonal:
+
+```text
+depth-independent definition graph
+    = owner region
+    + normalized sparse containment graph
+    + implementation definition
+    + exactly one definition site
+    + exactly one header region
+    + exactly one execution boundary
+
+request-bound scope overlay
+    = exactly one definition selection per implementation definition
+
+depth-dependent executable evidence
+    = exactly one executable region only when depth is full-semantic
+```
+
+An **implementation definition** is one function or method declaration,
+function literal, package-level `ValueSpec` with initializer expressions,
+bodyless implementation obligation, or cataloged implicit implementation with
+independent provider, depth, and implementation ownership. Ordinary implicit
+semantics inside another definition—copying, zeroing, boxing, promotion,
+conversion, dispatch, and similar operations—remain semantic operations within
+that definition and never become definitions. Local initializers likewise remain
+executable occurrences in their enclosing definition; only package-level
+`ValueSpec` initializers own definitions.
+A bodyless obligation is a bodyless `FuncDecl` or an exact environment contract
+that requires a concrete implementation. Interface method fields and function
+types are declaration contracts, not implementation definitions.
+
+Its `DefinitionID` is anchored to the construct root or typed implicit owner.
+For a source definition it contains the canonical `FileID` and construct-root
+occurrence identity, so an exact selector identifies the containing file
+without loading the body. It never reuses a body block, initializer expression,
+or other execution entry as the definition identity. It is revision-bound
+source evidence, distinct from the later `ImplementationID` of a concrete
+planned/emitted specialization.
+
+Every definition receives one closed evidence depth through its separate
+`DefinitionSelection`:
 
 | Evidence depth | Retained evidence | Typical members |
 |---|---|---|
-| `full-semantic` | declarations, checked syntax, contextual occurrences, and body boundaries | workspace and source-available module implementations selected for automatic translation |
-| `declaration-contract` | complete declarations/types plus initializer/body identity, span, and hash boundaries; no interior executable occurrences | standard-library behavior supplied by `gostdlib`, and other manual environment contracts |
-| `external-boundary` | source declaration/body boundary, checked-view mapping where available, and a typed unresolved obligation | exact cgo/native/host-owned implementations |
-| `intrinsic` | typed language/toolchain contract with no ordinary source body | `builtin`, `unsafe`, and other genuine intrinsics |
+| `full-semantic` | definition, site, header, execution boundary, checked contextual executable region | workspace and source-available module definitions selected for automatic translation |
+| `declaration-contract` | definition, site, complete header, execution boundary spans/hashes, no executable occurrences | standard-library behavior supplied by `gostdlib` and other manual environment contracts |
+| `external-boundary` | definition, site, complete available header, execution boundary, checked-view mapping where available, typed unresolved obligation | exact cgo/native/host-owned definitions |
+| `intrinsic` | typed definition/site/header owner and intrinsic operation descriptor, no ordinary source executable region | `builtin`, `unsafe`, and genuine language/toolchain intrinsics |
 
-Declarations and input files retain their own identity/type/mapping records;
-package and file containers may contain implementation units at several depths
-and therefore have no inferred package-wide depth. The four implementation
-sets are disjoint and total by canonical unit identity.
+Definition kind and evidence depth form a validated closed compatibility
+matrix. A source declaration/literal/initializer may be full only with complete
+recursive checked evidence. A cataloged implicit implementation may be full
+only with an exact typed implicit executable graph. A bodyless obligation
+cannot be full-semantic merely because a provider exists; it remains a
+declaration/external boundary until a later concrete manual or external
+`ImplementationID` satisfies it. Intrinsic depth is valid only for cataloged
+language/toolchain semantics. Every invalid pair fails selection.
 
-Depth selection consumes the canonical implementation identity, selected
-environment/provider contract, package facts, and exact per-unit source or
-checked-view evidence. Package provenance and a file-wide cgo/transformed bit
-are inputs, never the policy. No function may assign depth from provenance or
-file state alone, even when the initial profile happens to assign every unit in
-a package or file alike.
+Files and packages may aggregate definitions at several depths and therefore
+have no inferred depth. The four sets are disjoint and total by `DefinitionID`.
+Package provenance and a file-wide transformed/cgo bit are inputs, never the
+policy. No function may assign depth from provenance, package, or file state
+alone even when one profile happens to select every definition alike.
 
-The compilation request selects the provider-contract artifact and records its
-canonical digest. The compiler may not construct an implicit built-in contract.
-Contract resolution is total and evidence-producing: an exact unit binding, an
-exact package binding, or an explicitly declared provider-owned namespace rule
-must identify the selected provider, otherwise selection fails. Broad rules are
-contract data, not compiled provenance defaults. In particular, standard-library
-ownership by `gostdlib` does not imply that toolchain packages have the same
-provider. The selection ledger records the contract digest and the binding rule
-that selected every unit.
+The compilation request selects a provider contract and certified artifacts and
+records their canonical digests. Before definition inventory, the compiler
+derives structural-source requirements from **every** exact-definition,
+package, namespace, and conditional rule:
 
-Implementation-unit kind IDs are explicit and permanently pinned. Source-spanned
-units use physical source identity; unspelled implicit units use a separate typed
-identity containing their semantic owner and catalog operation, never a zero or
-fabricated source span and never a display name. The pre-scope unit ledger
-includes nested function literals as well as top-level bodies, initializers, and
-bodyless obligations. It may derive local source units by a bounded syntax walk
-and consume content-addressed provider/audit unit manifests for non-translated
-source; ordinary application compilation does not rescan provider-owned standard
-library bodies. Construct inventory may link occurrences to these units; it may
-not create units for the first time after scope selection.
+- an exact-definition rule identifies its containing file directly;
+- a package or namespace rule contributes all matching files;
+- a conditional rule declares the evidence it consumes and a sound finite
+  candidate file/definition set supplied by its selector or certified graph;
+  its predicate consumes only closed `SelectionFactKind`s owned by
+  `internal/language/selectionfacts`, never an arbitrary callback; if
+  any candidate can become `full-semantic`, its containing file is recursively
+  available; and
+- a rule whose full-semantic candidate set cannot be determined without the
+  evidence it is supposed to acquire is invalid and fails contract validation.
 
-Every implementation-bearing Go construct has exactly one typed implementation
-definition and exactly one typed reference at its enclosing grammatical
-location. The definition owns the construct's body region; the reference records
-where a parent construct grammatically contains a child implementation.
+The structural-source plan is the union of those requirements. It neither
+silently widens every provider package nor ignores a narrower override.
 
-| Go form | Contract owner | Implementation definition | Enclosing reference |
-| --- | --- | --- | --- |
-| Function/method declaration | declaration/signature | function-body unit | declaration-to-body edge |
-| Function literal | callable/signature | function-literal-body unit | expression edge in enclosing unit |
-| Package ValueSpec with values | names/type declaration | ordered initializer unit | package-initialization edge |
-| Bodyless declaration | declaration/signature | unresolved obligation | declaration-to-obligation edge |
-| Implicit executable work | catalog/type owner | implicit unit | owning catalog operation |
+Definition inventory then produces the complete pre-scope definition graph.
+Its definitions are the authoritative **definition census**; any flat census is
+a derived projection. Closed, permanently pinned definition-kind IDs cover all
+five definition forms above. Each source definition carries its `DefinitionID`,
+kind, file, construct-root anchor, header, and execution-boundary variant; an
+implicit definition carries its typed semantic owner and catalog operation,
+never a fabricated source span or display name. Local structural traversal or a
+content-addressed provider graph supplies each file. Executable inventory may
+link occurrences to these definitions; it may never create one.
 
-The finalized artifact contains, per unit, an implementation definition (unit
-identity, kind, contract, depth, and — for a full-semantic unit — an isolated
-body region) and, per grammatically nested implementation, an implementation
-reference in its enclosing owner (parent-owner identity that is a declaration,
-unit, or implicit-unit identity; child unit identity; source anchor; grammatical
-edge; parent-assigned role; and source ordinal). Struct names are implementation
-choices; these facts and invariants are not. Definitions are owned once;
-references may repeat.
+Before scope binding, the selection-fact owner materializes exactly the
+requested facts for the declared finite candidate set from the one checker
+graph or a certified provider fact artifact. Every fact has a closed kind,
+canonical `SelectionFactID`, typed payload, producer/evidence digest, and exact
+consumer rule set. Facts are immutable and become input to Stage 2; the
+frontend may consume but never rediscover them.
 
-A full-semantic unit's body region is the exact occurrence set of its own body,
-excluding every nested unit's interior. A nested implementation with a non-full
-body remains a typed reference in its full parent — preserving the parent's
-function-value or initializer operation at the exact edge — while contributing
-zero interior body occurrences. A full child inside a non-full parent retains
-its callable contract and its own body region without retaining or rescanning
-the excluded parent. The exact object and binder evidence a later capture
-analysis consumes lives in the transient checker graph, which the semantic model
-reads before finalization severs it; the finalized Stage-1 artifact retains only
-structural definitions, references, contracts, and regions, never a materialized
-object or binder fact. Stage 1 performs no capture planning.
+Analysis scope finally binds every censused definition. Contract resolution is
+total and evidence-producing: an exact-definition binding, exact-package
+binding, declared owner-namespace rule, or declared conditional rule identifies
+the provider and depth of every definition. Broad rules are contract data, not
+compiled provenance defaults. The selection ledger records the contract digest,
+selected provider/depth, rule identity, and exact selection-fact witnesses for
+every definition. A selected full-semantic definition lacking recursive
+source/checker evidence fails before executable inventory; a valid advertised
+rule cannot fail later as a retention mismatch.
 
-An excluded body is unreachable through the finalized parent API. The finalized
-artifact exposes one region/reference API for every unit at every depth. It does
-not expose a raw parent syntax node paired with a boundary list, a
-respect-boundaries traversal flag, consumer-controlled skipping, exported slices
-containing raw retained nodes, or separate semantic paths for uniform-full and
-mixed files. An all-full file may use an internal storage optimization, but every
-consumer uses the one region/reference API. Parent/child ownership is recorded
-during the single parent-directed catalog traversal from the exact AST edge and
-role; spans and hashes prove identity and content but never rediscover topology,
-and region/reference construction is linear or O(nodes log nodes), never
-quadratic or cubic in unit count.
+The depth-independent structural graph and separate scope overlay contain these
+exact records:
 
-Finalization and its independent verifier enforce a conservation law by exact
-joins: implementation sites join implementation-reference records; censused unit
-identities join implementation-definition records; full-semantic units join
-retained body-region occurrence sets; and non-full units join
-contracts/boundaries with zero retained body occurrences and no reachable body
-syntax or type-information key. An implementation site is the closed union of
-explicit executable AST edges, bodyless obligations, and catalog-owned implicit
-operations. Every reference preserves source order, parent-assigned role, source
-anchor, and child identity. No construct is dropped, duplicated, or later
-inferred from spelling or span containment. Provider and audit manifests carry
-this definition/reference graph — not a flat unit list — so ordinary
-compilation exact-joins it without rescanning provider interiors. A flat unit
-list may exist only as a derived census projection of that graph, never as the
-topology authority: the graph is the source of truth, and any flat list is
-reconstructible from it. At provider-artifact production the graph is
-independently extracted and certified; ordinary consumption trusts only the
-externally certified digest plus its own exact census and selection joins, and
-graph ownership stays in the language-analysis layer — the source layer, which
-owns bytes and census, never imports the catalog to build it.
+| Record | Required payload and cardinality |
+|---|---|
+| `OccurrenceStore` | one canonical immutable payload per retained `OccurrenceID`: kind, actual grammatical parent, catalog edge, parent-assigned role, ordinal, physical span, display span, and lexical token evidence; Stage-1 structural and executable stores are disjoint and exact-union to this one namespace |
+| `OwnerRegion` | exactly one closed `SourceFileRegion` per selected source file or typed `SyntheticOwnerRegion` per canonical synthetic semantic owner; a source region references every ordinary structural occurrence outside implementation definitions and its one containment graph, but never copies occurrence payload |
+| `ContainmentGraph` | exactly one immutable parent-linked sparse graph per source-file region; it stores only the canonical occurrence identities needed to connect source definition sites to their nearest owner/boundary, and contains no copied occurrence facts or unrelated excluded-body occurrence |
+| `ImplementationDefinition` | one `DefinitionID`, pinned kind, owning source file or synthetic owner, `HeaderRegionID`, and `ExecutionBoundaryID`; no provider or evidence-depth field |
+| `DefinitionSite` | exactly one closed `SourceContainmentSite` or `SyntheticOwnerSite`; a source site carries its owning region/definition and terminal construct-root occurrence identity, whose parent chain through the canonical occurrence store and containment-anchor identity set is complete and rooted |
+| `HeaderRegion` | exactly one immutable ordered list of canonical occurrence identities rooted at the definition and containing every cataloged non-executable edge, with no executable-entry or nested-definition interior |
+| `ExecutionBoundary` | exactly one closed variant: block entry, ordered initializer-expression entries, bodyless obligation, or typed implicit operation; source entries reference canonical occurrence identities and carry only their independent entry content hashes |
+| `DefinitionSelection` | exactly one per `DefinitionID`, in the scope overlay rather than the structural graph: provider, evidence depth, contract/rule identity, and evidence witness |
+| `ExecutableRegion` | zero or one closed `SourceExecutableRegion` or `ImplicitExecutableRegion`; required exactly for every full-semantic definition and forbidden for every non-full definition; source regions contain ordered occurrence-identity membership and definition references, while their additional occurrence store is disjoint from the structural store |
+
+Header and execution content addresses are independent. A header digest covers
+only canonical header kinds/edges/roles/order/tokens and exact header byte
+ranges;
+it excludes executable-entry bytes and any diagnostic full-construct extent
+whose only change comes from executable content. Each source execution entry
+has its own digest, and ordered multi-entry boundaries have a separate combined
+digest. A body-only edit therefore changes execution evidence without
+masquerading as a header change.
+
+Header byte ranges are construct-defined and closed: a function declaration or
+literal uses its exact prefix ending immediately before the body block; a
+bodyless declaration uses its complete declaration; and a package initializer
+uses the `ValueSpec` prefix ending immediately before its first value. Expression
+bytes, separators between values, and nested-definition bodies are not smuggled
+into a header digest through a full-root span. Header occurrence membership and
+header byte ranges are independently joined.
+
+`DefinitionSite` is structural containment, not a general semantic reference.
+For source definitions the referenced containment path begins at the nearest
+owner region or enclosing definition boundary and ends at the construct root.
+Paths are normalized: shared prefixes and anchors are stored once and recovered
+through the canonical occurrence store's parent links, never copied into each
+site. The containment graph records only anchor membership. The same path
+exists at every evidence depth. When an anchor is also a full executable
+occurrence, both relations reference the same canonical payload. No kind,
+parent, edge, role, order, token, span, or content fact is duplicated.
+Later binding, call, dispatch, initialization, and reachability references are
+separate relations and may repeat. A package initializer's source site remains
+the `ValueSpec`'s grammatical `GenDecl.Specs` location; package-initialization
+ordering is a separate typed operation edge and never replaces that site.
+When a cataloged implicit package-initialization coordinator is represented as
+its own definition, it owns only ordering and invocation edges. Each
+`ValueSpec` definition remains the sole owner of its initializer evaluation and
+stores.
+
+The construct partition is generic and closed:
+
+| Definition form | Header region | Execution boundary |
+|---|---|---|
+| function/method declaration | `FuncDecl` root plus docs/directives, receiver, name, type parameters, parameters, and results; excludes `Body` | one `Body` block |
+| function literal | `FuncLit` root plus its function type, parameters, and results; excludes `Body` | one `Body` block |
+| package initializer | `ValueSpec` root plus docs/comments, names, and optional declared type; excludes `Values` | ordered `Values` expression roots, preserving arity and order |
+| bodyless declaration | complete declaration/signature header | typed bodyless obligation; no source executable entries |
+| implicit implementation | exact catalog/type owner descriptor with independent implementation ownership | typed implicit execution boundary and, when full-semantic, typed implicit executable graph |
+
+This table is derived from the catalog's executable-entry classification, not a
+second hand-maintained AST edge list. A new Go construct cannot enter the model
+until the catalog classifies every child edge as header, execution entry,
+nested definition site, or ordinary executable child. Unknown classification
+fails before artifact construction.
+
+Definition classification is parent-directed and context-complete. Its closed
+query includes lexical scope, parent construct/edge, and any declaration token
+or class needed to distinguish equal child node shapes. For example, these two
+`ValueSpec` nodes are not the same implementation class:
+
+```go
+const Answer = 42 // compile-time declaration; no package-initializer definition
+var Answer = 42   // package initializer; one implementation definition
+```
+
+The parent `GenDecl` supplies `const` versus `var` to the catalog. The
+`ValueSpec` never inspects its parent or source text, and a classifier that uses
+only `KindValueSpec + hasValues` is invalid.
+
+For example:
+
+```go
+var Transform = func(x int) int {
+    step := func(y int) int { return y + 1 }
+    return step(x)
+}
+```
+
+Stage 1 records three definitions: the `ValueSpec` initializer, the outer
+`FuncLit`, and the inner `FuncLit`. The outer literal's site path begins at the
+initializer boundary's first `Values` entry. The inner literal's site path
+begins at the outer literal's block boundary and ends through the assignment's
+right-hand edge. The local binding `step` is not another implementation
+definition. If the outer literal is declaration-contract while an exact rule
+selects the inner literal full-semantic, all three definitions/sites/headers/
+boundaries remain, the outer literal has no executable region, and the inner
+literal has exactly one. No excluded parent AST is needed to find or analyze
+the selected child.
+
+Occurrence ownership is singular. A source-file owner region owns ordinary
+non-definition structure and stops at each definition site. Every definition
+header owns its non-executable occurrences. A full executable region owns only
+the occurrences reachable from its execution entries and stops at nested
+definition sites. Header occurrences and executable occurrences never overlap
+or duplicate records. Sparse-containment anchors are relation records, not a
+second occurrence payload. A site inside an excluded parent executable region
+remains independently retained; its validity never depends on the parent's
+executable region being materialized.
+
+The owner-region/site relation forms a rooted acyclic forest: every source
+definition is reachable exactly once from its source-file region, every
+synthetic definition exactly once from its synthetic owner, and every nested
+definition exactly once through its immediate enclosing definition. No orphan,
+second parent, containment cycle, or span-derived parent is permitted.
+
+For each file the production definition graph has exactly one authority:
+locally extracted recursive source or the independently certified provider
+artifact. A local acquisition upgrade may use the provider artifact as
+corroboration, but the two graphs are exact-joined and only one enters the
+finalized inventory. Selection is by file/definition identity, never by whether
+a package has any full-semantic definition. Mixed packages and mixed files are
+ordinary.
+
+The exact object, binder, type, and capture evidence consumed by Stage 2 remains
+in the one transient checker graph until semantic materialization. Stage 1
+retains syntax structure only; a header region is not a semantic signature.
+Stage 2 produces the canonical definition semantics and binding facts before
+finalization severs checker access. No Stage-1 enum or string label may stand in
+for either the header occurrence graph or Stage-2 semantic facts.
+
+An excluded executable interior is unreachable through the finalized API. All
+definitions use the same owner/containment/definition/site/header/boundary API
+at every depth; no
+raw parent syntax plus boundary list, respect-boundaries flag,
+consumer-controlled skipping, exported raw-node slice, or uniform-full/mixed
+consumer split exists. Internal storage optimizations are permitted only when
+the public artifact and all consumers remain identical.
+
+Finalization and independent verification enforce these exact multiset joins:
+
+1. selected source files and synthetic owners to owner regions, exactly
+   one-to-one;
+2. source-file regions to normalized containment graphs, exactly one-to-one,
+   with every source site resolving one complete path and every retained anchor
+   used;
+3. pre-scope census identities to implementation definitions;
+4. definitions to definition sites, exactly one-to-one, and all sites to one
+   rooted acyclic containment forest;
+5. definitions to header regions, exactly one-to-one;
+6. catalog-derived header occurrences to header-region occurrences;
+7. definitions to execution boundaries, exactly one-to-one;
+8. definitions to definition selections, exactly one-to-one;
+9. full definitions to executable regions and their exact source or typed
+   implicit operation sets;
+10. non-full definitions to zero executable occurrences and no reachable body
+   syntax/type-information key; and
+11. local or certified provider graphs to the one finalized graph.
+
+No join filters owner regions, sites, headers, or boundaries by evidence depth.
+Spans and hashes prove identity/content but never rediscover topology. Provider
+and audit manifests carry the complete
+owner/containment/definition/site/header/boundary graph; a flat definition
+list may exist only as a derived census projection reconstructible from that
+graph. At provider-artifact production the graph is independently extracted and
+certified. Ordinary consumption trusts only the request-bound certified digest
+plus its own census/selection joins and does not rescan provider interiors.
+Graph ownership stays in `internal/language/structure`; source owns selected
+bytes, physical source-acquisition facts, and transient evidence lifetime and never
+imports the catalog to build or census definitions.
+
+Construction has an explicit cost model. The production work ledger counts
+every scalable operation class: catalog edge inspection, definition-boundary
+lookup/probe, record append, identity join/probe, and deterministic sort
+comparison. Total work and storage are
+`O(nodes + edges + definitions + sites + unique containment anchors + header
+occurrences + retained executable occurrences)`, plus `O(n log n)` only for
+named deterministic sorts.
+A per-node counter that ignores work performed inside the visit is not evidence.
+No definition performs a linear scan over all definitions, boundaries, or
+occurrences; quadratic and cubic construction are forbidden.
 
 Requested roots, resolved import closure, full-semantic source set,
 declaration-contract set, and later product reachability are different sets with
@@ -288,19 +497,27 @@ No source file or body disappears because its checked view differs.
 
 Cgo correspondence comes from selected-toolchain output facts and source
 position/line-directive evidence. Basename conventions and declaration-name
-matching are not semantic joins. Each source definition and reference maps to
-its checked counterpart by selected-toolchain origin evidence with exact kind
-agreement and exact-one cardinality; when column evidence is absent, a same-line
-relation is valid only if the candidate set is exactly one, and otherwise fails
-as ambiguous. Package-synthetic checked declarations such as cgo-generated types
-and call adapters receive explicit typed identities — package, name, and role —
-and external/intrinsic boundaries; they are never ignored as unmatched extras,
-and identity joins compare the complete package/name/role tuple, never the name
-alone. C-dependence is resolved from checked semantic/toolchain object identity,
-not from an identifier spelled `C`, a checked temporary filename, or another
-source-text heuristic. C-dependence is computed over the unit definition — its
-callable or initializer contract and its own executable region — and is never
-inherited merely because a nested child uses `C`.
+matching are not semantic joins. Each source definition, site, header, and
+execution boundary maps to its checked counterpart by selected-toolchain origin
+evidence with exact kind agreement and exact-one cardinality; when column
+evidence is absent, a same-line relation is valid only if the candidate set is
+exactly one and otherwise fails as ambiguous. Package-synthetic checked
+declarations such as cgo-generated types and call adapters receive explicit
+typed `DefinitionID`s, implicit-owner sites, headers, and external/intrinsic
+boundaries; they are never ignored as unmatched extras, and identity joins
+compare the complete package/name/role tuple, never the name alone.
+C-dependence is resolved from checked semantic/toolchain object identity, not
+from an identifier spelled `C`, a checked temporary filename, or another
+source-text heuristic. It is computed over one definition's header and
+execution boundary/region and is never inherited merely because a nested
+definition uses `C`.
+
+Ownership is singular: `internal/source` records raw selected-toolchain
+source/checked/origin evidence without classifying it;
+`internal/language/structure` builds the exact structural correspondence;
+`internal/language/selectionfacts` produces the closed per-definition
+C-dependence fact; and `internal/scope` only consumes that fact. None may repeat
+another layer's derivation.
 
 The independent structural-origin verifier is a separately implemented
 extractor. It does not invoke the producer's critical enumeration or semantic
@@ -310,17 +527,17 @@ derivation. Structural origins are verified by that separate extractor, and
 semantic C-dependence is proven through selected-Go fixtures and mutations.
 
 Syntax and body-indexed `types.Info` for non-full depths may exist transiently
-inside the authoritative semantic load. After contracts, boundaries, and
-mappings are extracted, the finalized source artifact severs those references
-and retains only the shared declaration type graph and the evidence permitted
-by its depth. Loader lifetime cannot silently turn resolution evidence into
-retained application semantics.
+inside the authoritative semantic load. After definition sites, headers,
+execution boundaries, semantic facts, and checked mappings are extracted, the
+finalized source artifact severs those references and retains only immutable
+identity-keyed artifacts permitted by the selected depth. Loader lifetime
+cannot silently turn resolution evidence into retained application semantics.
 
 This lifecycle is structural: transient loaded evidence and finalized source
 evidence are different validated types. A mutable `syntax = nil` plus a
 `severed` flag, or an unfiltered package-wide `types.Info` retained because one
 body is full-semantic, is a forbidden dual state. Mixed files expose only the
-per-unit syntax/type evidence their depths permit.
+per-definition syntax/type evidence their depths permit.
 
 Finalized artifacts are immutable by observable capability, not by convention.
 Owned slices and maps return isolated values; no API can reach excluded syntax;
@@ -328,9 +545,10 @@ mutable toolchain objects such as scopes and expressions are hidden behind
 narrow read-only query views or an enforced internal capability wall; mutation
 methods are forbidden outside the authoritative owner; and scopes, initialization
 order, file versions, implicits, selections, generic instances, definitions,
-uses, and types all come from one region-filtered evidence owner. Initialization
-evidence references canonical units and occurrences rather than leaking excluded
-raw expressions. A shallow reflection check over seeded accessors is supporting
+uses, and types all come from one definition/executable-region-filtered evidence
+owner. Initialization evidence references canonical definitions and occurrences
+rather than leaking excluded raw expressions. A shallow reflection check over
+seeded accessors is supporting
 evidence, not proof of transitive isolation: the immutability gate must also
 prove no finalized path reaches an excluded body, that nested collections and
 evidence variants expose no backing storage, and that narrow views expose no
@@ -377,35 +595,40 @@ admit a construct in a file governed by an older language version.
 
 ## Complete Go Construct Catalog
 
-The selected Go version has one machine-readable catalog containing:
+The selected Go version has one machine-readable language registry composed of
+separate closed catalogs, not one Cartesian-product enum:
 
-1. every grammar/syntax form represented by `go/ast` and `go/token`;
-2. every context-dependent semantic variant exposed by `go/types.Info`;
-3. all predeclared identifiers and built-ins; and
-4. implicit operations such as zeroing, copying, receiver adjustment, method
+1. syntax/node kinds;
+2. parent-to-child edges, grammatical roles, and traversal order;
+3. lexical tokens and token predicates;
+4. context-dependent semantic variants exposed by `go/types.Info`;
+5. predeclared identifiers and built-ins;
+6. directives and versioned language features; and
+7. implicit operations such as zeroing, copying, receiver adjustment, method
    promotion, interface conversion, initialization, and panic boundaries.
 
-The catalog is authoritative Go code, not parallel JSON maintained by hand.
-Generated reports may render it. Tests reconcile it against the selected
-toolchain's concrete AST node types, token set, built-in universe, and Go
-language-version features.
+Each fact has one domain owner. An occurrence exact-joins the applicable domain
+records by identity; no domain copies another domain's values and no combined
+mega-kind becomes a second authority. The registry is authoritative Go code,
+not parallel JSON maintained by hand. Generated reports may render it. Tests
+reconcile each domain independently against the selected toolchain's concrete
+AST node types and node-bearing fields, token set/predicates, built-in universe,
+directives, and Go language-version features.
 
-Every catalog kind has:
+Every entry has an explicit permanently pinned ID, descriptive name, version/
+disposition metadata, and domain-appropriate evidence. Syntax and edge entries
+define allowed roles and traversal; semantic variants and implicit operations
+define required typed evidence and produced semantic outcomes; all have focused
+positive, negative, and mutation fixtures.
 
-- a stable enum value and descriptive name;
-- applicable grammatical roles;
-- required typed evidence;
-- produced semantic operation;
-- allowed support dispositions; and
-- focused positive, negative, and mutation fixtures.
-
-A terminal enum sentinel and exact-size tables make omitted kinds fail tests.
-There is no default `other`, textual prefix classifier, or generic recursive
-fallback.
+Terminal sentinels, exact-size tables, and bidirectional reconciliation make an
+omitted or extra entry fail. There is no default `other`, textual prefix
+classifier, unvisited exported node-bearing field, private traversal table, or
+generic recursive fallback.
 
 ## Context-Aware Construct Analysis
 
-The semantic unit is:
+The typed-frontend input for one occurrence is:
 
 ```text
 syntax node
@@ -415,10 +638,11 @@ syntax node
   + exact go/types evidence
 ```
 
-The analyzer uses controlled recursive descent. An exhaustive dispatcher sends
-each concrete construct to one construct-family visitor. The parent visitor
-assigns the role for every child edge. A child visitor must not inspect its
-parent, source spelling, or emitted context to infer meaning.
+Stage 1 uses controlled recursive descent to assign grammatical roles from
+parents to children. Stage 2 dispatches each retained occurrence to one
+construct-family semantic resolver using that recorded role and the one checker
+graph. A resolver must not inspect its parent, source spelling, or emitted
+context to infer meaning.
 
 Required role families include:
 
@@ -500,6 +724,31 @@ The model states Go behavior, not target mechanisms. It may say
 `CopyValue(TypeID)`, `InterfaceConvert`, or `MapLookup`; it cannot say
 `emitClass`, `useBigInt`, `callHelper`, or contain TypeScript text.
 
+Every Stage-1 definition has exactly one target-independent
+`DefinitionSemantics` record keyed by `DefinitionID`. It materializes the
+definition's receiver/signature, declared names and types, bodyless obligation,
+initializer contract, or implicit-operation meaning from exactly one semantic
+authority: the coherent transient checker graph or an independently certified
+provider semantic contract. Full-semantic definitions additionally materialize
+semantic operations for their source or typed implicit executable region. A
+header region is syntax evidence and cannot substitute for
+`DefinitionSemantics`; conversely Stage 2 does not rebuild header topology.
+Each record carries a closed `CheckerAuthority` or
+`CertifiedProviderAuthority` witness and its input digest. When both sources are
+available they may be exact-joined as corroboration, but only the authority
+selected by the contract enters the semantic model.
+
+Every retained Stage-1 occurrence in an owner, header, or executable region has
+exactly one `OccurrenceResolution`. Its closed variants are
+`StructuralOnly(DispositionID)`, `DefinitionComponent(DefinitionID,
+ComponentKind)`, `Declaration(SemanticDeclarationID)`,
+`Binding(SemanticBindingID)`, `Type(SemanticTypeID)`,
+`Operation(OperationID)`, and `Unsupported(UnsupportedID)`. The catalog declares
+which variants are legal for each kind/role/semantic variant. A structural-only
+disposition is positive typed evidence, not an absent row. Semantic records may
+refer to other semantic IDs, but they cannot silently consume an occurrence
+owned by another resolution or leave an occurrence unresolved.
+
 ## Whole-Program Facts
 
 Analyses run over the complete selected model and produce one sealed fact set:
@@ -522,10 +771,27 @@ post-seal mutation is an invariant failure. Unknown facts select an explicit
 unsupported disposition unless a declared conservative representation is
 itself exact.
 
+Semantic reachability is sealed before planning. It starts from explicit
+executable, public API, selected test, reflection, and extension semantic roots
+and traverses typed call, initialization, function-value, generic
+instantiation, interface/dynamic, registration, and external-contract edges.
+Every reachable semantic definition/operation has a root witness; every
+unreachable one has an exact exclusion explanation. A conservative edge is
+allowed only when its typed observation class makes that edge exact. Planning
+and lowering receive only this reachable semantic set—“emit the selected
+closure and prune later” is forbidden.
+
+Post-completion implementation reachability remains separate. It traverses the
+actual generated/manual/runtime/standard-library/external/extension artifacts,
+validates that every semantic reachability edge was materialized, discovers
+implementation-only helper/adapter/initialization edges, reports orphan manual
+work, and determines publication/pruning. Neither graph substitutes for the
+other.
+
 ## Immutable Program Plan
 
 Planning chooses the simplest exact representation after all facts are sealed.
-`ProgramPlan` is atomic: every selected declaration and operation receives a
+`ProgramPlan` is atomic: every semantically reachable declaration and operation receives a
 complete validated plan or an error. It includes:
 
 - type/storage/zero/copy/equality/key plans;
@@ -586,10 +852,14 @@ recorded. Package-wide monoliths are not the default.
 The intended package dependency direction is:
 
 ```text
-identity + language/catalog
-        <- language/type-semantics + source/load
-        <- source/scope
-        <- language/semantic + language/analyze
+identity + language/catalog + language/typesemantics + scope/contract
+        + language/semantic schemas + source/load
+        <- scope/sourceplan
+        <- language/structure
+        <- language/selectionfacts
+        <- scope
+        <- language/executable
+        <- language/frontend
         <- whole-program analysis
         <- plan
 semantic + plan -> typescript/lower -> typescript/ast -> typescript/format
@@ -603,10 +873,13 @@ Architecture tests enforce:
 
 - no reverse imports across this graph;
 - no corpus/integration imports from production packages;
-- no `go/ast` imports outside `internal/source`, `internal/language/analyze`,
-  and independent stage verification;
-- no `go/types` imports outside those owners and the exact
-  `internal/language/typesemantics` service;
+- no `go/ast` imports outside `internal/source`,
+  `internal/language/structure`, `internal/language/selectionfacts`,
+  `internal/language/executable`, `internal/language/frontend`, and independent
+  stage verification;
+- no `go/types` imports outside `internal/source`,
+  `internal/language/selectionfacts`, `internal/language/frontend`, independent
+  stage verification, and the exact `internal/language/typesemantics` service;
 - no source or project-profile imports below planning;
 - no TypeScript string construction outside the formatter;
 - no production import of verification packages; and
@@ -620,15 +893,30 @@ directories:
 ```text
 cmd/gotots/                  CLI wiring only
 internal/compiler/           phase orchestration
-internal/source/             workspace, toolchain, inputs, source-unit census
-internal/scope/              environment/provider selection and evidence depth
-internal/identity/           canonical source/type/operation/implementation IDs
+internal/source/             workspace, toolchain, selected inputs, transient
+                             syntax/checker lifetime, final severing
+internal/scope/contract/     closed versioned provider/rule/fact-request
+                             schema and validation; no source/graph state
+internal/scope/sourceplan/   request-bound local/certified structural-source
+                             planning; no definition-graph dependency
+internal/scope/              per-definition provider/depth selection
+internal/identity/           canonical source/definition/type/operation/
+                             implementation IDs
 internal/language/catalog/   closed Go construct catalog
+internal/language/structure/ immutable Stage-1 schema and depth-independent
+                             owner/containment/definition/site/header/boundary
+                             graph
+                             producer
+internal/language/selectionfacts/ closed request-bound preselection semantic
+                             facts, produced once and reused by Stage 2
 internal/language/typesemantics/ exact shared Go type-set/core-type operations
 internal/language/semantic/  target-independent semantic records
-internal/language/analyze/   parent-directed catalog traversal: occurrences,
-                             variants, implicit operations, and the
-                             implementation definition/reference graph
+internal/language/executable/ parent-directed full-executable structural
+                             traversal: occurrences, grammatical roles, and
+                             executable regions; no go/types interpretation
+internal/language/frontend/  sole checker-to-semantic materializer: definition
+                             semantics, occurrence resolutions, variants,
+                             bindings, types, and implicit operations
 internal/stagecheck/         blocking in-pipeline independent stage joins,
                              run synchronously between phases; distinct from
                              internal/verify offline/certification gates

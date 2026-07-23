@@ -1,151 +1,130 @@
 package source
 
-import (
-	"sort"
+import "sort"
 
-	"github.com/tsoniclang/gotots/internal/identity"
-)
-
-// RetentionProjection is the opaque, constructor-validated attestation the
-// analyze traversal hands to finalization. It carries only canonical
-// membership — which units the traversal retained as full-semantic body
-// regions — never kinds, edges, roles, tokens, or reference topology. Source
-// consumes it as a lifecycle seal and conservation check, not as a second
-// analyzer.
-type RetentionProjection struct {
-	fullUnits    map[identity.SourceUnitID]bool
-	fullImplicit map[identity.ImplicitUnitID]bool
+// Finalize validates immutable acquisition evidence and severs the one
+// transient syntax/checker graph. Structural, selection, executable, and
+// semantic artifacts are separate outputs and are never copied into source.
+func Finalize(universe *Universe) (*Workspace, error) {
+	return finalize(universe, true)
 }
 
-// NewRetentionProjection validates the traversal's retained-unit attestation.
-func NewRetentionProjection(fullUnits []identity.SourceUnitID, fullImplicit []identity.ImplicitUnitID) (RetentionProjection, error) {
-	p := RetentionProjection{
-		fullUnits:    make(map[identity.SourceUnitID]bool, len(fullUnits)),
-		fullImplicit: make(map[identity.ImplicitUnitID]bool, len(fullImplicit)),
-	}
-	for _, id := range fullUnits {
-		if id.IsZero() {
-			return RetentionProjection{}, &LoadError{Reason: "retention projection names a zero unit"}
-		}
-		p.fullUnits[id] = true
-	}
-	for _, id := range fullImplicit {
-		if id.IsZero() {
-			return RetentionProjection{}, &LoadError{Reason: "retention projection names a zero implicit unit"}
-		}
-		p.fullImplicit[id] = true
-	}
-	return p, nil
+// FinalizeResolved seals a metadata-only provider-audit universe. Individual
+// package hydration forks must already have been discarded; this route never
+// fabricates a semantic-hydration state on the base universe.
+func FinalizeResolved(universe *Universe) (*Workspace, error) {
+	return finalize(universe, false)
 }
 
-// Finalize consumes the transient universe, the scope phase's per-unit
-// evidence-depth selection, and the analyze traversal's retention projection,
-// and produces the finalized Workspace: identity, provenance, acquisition,
-// versions, and the per-unit depth partition. It severs the transient
-// syntax/checker lifetime — the finalized artifact exposes no raw AST.
-//
-// The projection is the seal: every full-semantic unit in the selection must
-// be attested by the traversal and vice versa, so the depth partition and the
-// retained body regions are conserved exactly.
-func Finalize(u *Universe, depths map[identity.SourceUnitID]EvidenceDepth, implicitDepths map[identity.ImplicitUnitID]EvidenceDepth, projection RetentionProjection) (*Workspace, error) {
-	failScope := func(reason string) (*Workspace, error) {
-		return nil, &LoadError{Dir: u.request.Dir, Reason: "scope selection invalid: " + reason}
-	}
-	remaining := make(map[identity.SourceUnitID]bool, len(depths))
-	for id, depth := range depths {
-		if !depth.Valid() {
-			return failScope(id.String() + " has invalid depth")
-		}
-		remaining[id] = true
-		// Conservation: the traversal's full attestation must equal the
-		// selection's full set.
-		if (depth == DepthFullSemantic) != projection.fullUnits[id] {
-			return failScope("retention projection disagrees with selection on unit " + id.String())
+func finalize(
+	universe *Universe,
+	requireHydration bool,
+) (*Workspace, error) {
+	if universe == nil {
+		return nil, &LoadError{
+			Reason: "source finalization requires a universe",
 		}
 	}
-	for id := range projection.fullUnits {
-		if !remaining[id] {
-			return failScope("retention projection names unselected unit " + id.String())
+	if universe.finalized {
+		return nil, &LoadError{
+			Reason: "source universe is already finalized",
 		}
 	}
-	remainingImplicit := make(map[identity.ImplicitUnitID]bool, len(implicitDepths))
-	for id, depth := range implicitDepths {
-		if !depth.Valid() {
-			return failScope(id.String() + " has invalid depth")
+	if requireHydration && !universe.hydrated {
+		return nil, &LoadError{
+			Reason: "source finalization requires semantic hydration",
 		}
-		remainingImplicit[id] = true
 	}
-	ws := &Workspace{toolchain: u.toolchain}
-	for _, loaded := range u.packages {
+	if !requireHydration && universe.hydrated {
+		return nil, &LoadError{
+			Reason: "resolved-only finalization received hydrated evidence",
+		}
+	}
+	workspace := &Workspace{
+		toolchain:             universe.toolchain,
+		resolutionFingerprint: universe.ResolutionFingerprint(),
+	}
+	for _, loaded := range universe.packages {
 		record, err := finalizePackage(loaded)
 		if err != nil {
 			return nil, err
 		}
-		for _, implicit := range loaded.implicitUnits {
-			depth, selected := implicitDepths[implicit]
-			if !selected {
-				return failScope("selection missing implicit unit " + implicit.String())
-			}
-			delete(remainingImplicit, implicit)
-			record.implicitUnits = append(record.implicitUnits, ImplicitUnit{id: implicit, depth: depth})
-		}
-		for _, file := range record.files {
-			for i := range file.units {
-				depth, selected := depths[file.units[i].id]
-				if !selected {
-					return nil, &LoadError{Dir: u.request.Dir, Reason: "scope selection missing unit " + file.units[i].id.String()}
-				}
-				delete(remaining, file.units[i].id)
-				file.units[i].depth = depth
-			}
-		}
-		if err := ws.admit(record); err != nil {
+		if err := workspace.admit(record); err != nil {
 			return nil, err
 		}
 	}
-	for id := range remaining {
-		return failScope("selection names unknown unit " + id.String())
+	sort.Slice(workspace.packages, func(i, j int) bool {
+		return workspace.packages[i].id.String() < workspace.packages[j].id.String()
+	})
+	sort.Slice(workspace.roots, func(i, j int) bool {
+		return workspace.roots[i].id.String() < workspace.roots[j].id.String()
+	})
+	if universe.hydrated {
+		severTransientGraph(universe)
+	} else {
+		universe.finalized = true
 	}
-	for id := range remainingImplicit {
-		return failScope("selection names unknown implicit unit " + id.String())
-	}
-	sort.Slice(ws.packages, func(i, j int) bool { return ws.packages[i].id.String() < ws.packages[j].id.String() })
-	sort.Slice(ws.roots, func(i, j int) bool { return ws.roots[i].id.String() < ws.roots[j].id.String() })
-	return ws, nil
+	return workspace, nil
 }
 
-// finalizePackage builds one finalized package record: identity, provenance,
-// acquisition, versions, unit boundaries, and cgo mappings/synthetics. No raw
-// AST, checker package, or body-indexed syntax is retained; the transient type
-// graph is validated here (path agreement) and reduced to a boolean
-// type-evidence fact, then dropped.
+func severTransientGraph(universe *Universe) {
+	clearTransientEvidence(universe)
+	universe.finalized = true
+}
+
+func clearTransientEvidence(universe *Universe) {
+	for _, loaded := range universe.packages {
+		if !universe.hydrationOwners[loaded.id] {
+			continue
+		}
+		loaded.types = nil
+		loaded.typesInfo = nil
+		loaded.checkedDecls = nil
+		for _, file := range loaded.files {
+			file.fset = nil
+			file.syntax = nil
+			file.physicalFset = nil
+			file.physicalSyntax = nil
+			file.selectedBytes = nil
+		}
+	}
+	universe.fset = nil
+	universe.hydrationOwners = nil
+	universe.hydrated = false
+}
+
 func finalizePackage(loaded *LoadedPackage) (*Package, error) {
 	if loaded.types != nil && loaded.types.Path() != loaded.id.ImportPath() {
-		return nil, &LoadError{Reason: "type-graph package path " + loaded.types.Path() +
-			" diverges from identity " + loaded.id.String()}
+		return nil, &LoadError{Reason: "type graph path disagrees with package identity"}
 	}
-	out := &Package{
-		id: loaded.id, provenance: loaded.provenance, acquisition: loaded.acquisition,
-		disposition: loaded.disposition, moduleGoVersion: loaded.moduleGoVersion,
-		requestedRoot:   loaded.requestedRoot,
-		imports:         append([]string(nil), loaded.imports...),
-		otherFiles:      append([]string(nil), loaded.otherFiles...),
-		embedFiles:      append([]string(nil), loaded.embedFiles...),
-		embedPatterns:   append([]string(nil), loaded.embedPatterns...),
-		hasTypeEvidence: loaded.types != nil,
-		mappings:        append([]CheckedUnitMapping(nil), loaded.mappings...),
-		synthetics:      append([]SyntheticUnit(nil), loaded.synthetics...),
+	record := &Package{
+		id: loaded.id, provenance: loaded.provenance,
+		acquisition: loaded.acquisition, disposition: loaded.disposition,
+		moduleGoVersion: loaded.moduleGoVersion, requestedRoot: loaded.requestedRoot,
+		imports:        append([]string(nil), loaded.imports...),
+		embedPatterns:  append([]string(nil), loaded.embedPatterns...),
+		hasCheckedView: loaded.hasCheckedView,
+	}
+	for _, input := range loaded.inputs {
+		record.inputs = append(record.inputs, Input{
+			id: input.id, kind: input.kind, byteDigest: input.byteDigest,
+			overlaid: input.overlaid,
+		})
 	}
 	for _, loadedFile := range loaded.files {
-		file := &File{
-			path: loadedFile.path, id: loadedFile.id,
+		record.files = append(record.files, &File{
+			id:               loadedFile.id,
 			effectiveVersion: loadedFile.effectiveVersion,
 			overlaid:         loadedFile.overlaid, cgoOriginal: loadedFile.cgoOriginal,
 			byteDigest: loadedFile.byteDigest,
-			units:      append([]SourceUnit(nil), loadedFile.units...),
-		}
-		out.files = append(out.files, file)
+		})
 	}
-	sort.Slice(out.files, func(i, j int) bool { return out.files[i].id.Rel() < out.files[j].id.Rel() })
-	return out, nil
+	sort.Slice(record.files, func(i, j int) bool {
+		return record.files[i].id.Rel() < record.files[j].id.Rel()
+	})
+	sort.Slice(record.inputs, func(i, j int) bool {
+		return record.inputs[i].id.String() <
+			record.inputs[j].id.String()
+	})
+	return record, nil
 }

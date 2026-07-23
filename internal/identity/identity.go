@@ -246,5 +246,8 @@ func (o OccurrenceID) KindID() uint16 { return o.kind }
 
 // String is the canonical serialization: file#start-end/K<kindID>.
 func (o OccurrenceID) String() string {
+	if o.IsZero() {
+		return ""
+	}
 	return fmt.Sprintf("%s/K%d", o.span.String(), o.kind)
 }

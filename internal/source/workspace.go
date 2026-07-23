@@ -1,11 +1,11 @@
 // Package source owns the resolved source universe: it turns a compilation
 // request (go.work/go.mod, selected toolchain, patterns, overlays, build
-// configuration) into the complete transitive package closure with typed,
-// validated identity, provenance, acquisition, language-disposition, version,
-// file, and type facts. It is one of two production packages (with
-// internal/language/analyze) permitted to import go/ast and go/types.
+// configuration) into the complete transitive package closure with validated
+// identity, provenance, acquisition, language-disposition, version, and file
+// facts.
 //
-// Source owns identity, provenance, acquisition, files, types, and versions.
+// Source owns identity, provenance, acquisition, files, bytes, transient
+// checker lifetime, and versions.
 // Output paths and implementation ownership belong to later planning and are
 // deliberately absent here.
 package source
@@ -136,14 +136,13 @@ const (
 	DispositionOrdinarySource
 	DispositionBuiltinUniverse
 	DispositionUnsafeIntrinsic
-	DispositionCgoPseudo
 
 	numLanguageDispositions
 )
 
 var languageDispositionNames = [numLanguageDispositions]string{
 	DispositionOrdinarySource: "ordinary-source", DispositionBuiltinUniverse: "builtin-universe",
-	DispositionUnsafeIntrinsic: "unsafe-intrinsic", DispositionCgoPseudo: "cgo-pseudo",
+	DispositionUnsafeIntrinsic: "unsafe-intrinsic",
 }
 
 // Valid reports whether d names a language disposition; the zero value is
@@ -165,15 +164,16 @@ func (d LanguageDisposition) String() string {
 // never part of identity), and the complete resolved build-selection
 // environment (GOOS/GOARCH/GOEXPERIMENT/GOFLAGS/CGO_ENABLED).
 type Toolchain struct {
-	binary       string
-	binaryDigest string
-	version      string
-	goroot       string
-	goos         string
-	goarch       string
-	experiments  string
-	goflags      string
-	cgoEnabled   string
+	binary            string
+	binaryDigest      string
+	version           string
+	goroot            string
+	goos              string
+	goarch            string
+	experiments       string
+	goflags           string
+	cgoEnabled        string
+	buildConfigDigest string
 }
 
 // Binary is the resolved absolute path of the selected go binary.
@@ -191,6 +191,13 @@ func (t Toolchain) GoFlags() string { return t.goflags }
 // CgoEnabled is the resolved CGO_ENABLED selection.
 func (t Toolchain) CgoEnabled() string { return t.cgoEnabled }
 
+// BuildConfigurationDigest binds every target/compiler/cgo configuration
+// value that can change selected or checked Go source while excluding
+// acquisition/cache paths.
+func (t Toolchain) BuildConfigurationDigest() string {
+	return t.buildConfigDigest
+}
+
 // Version is the toolchain version fingerprint (go env GOVERSION).
 func (t Toolchain) Version() string { return t.version }
 
@@ -203,73 +210,54 @@ func (t Toolchain) GOOS() string { return t.goos }
 // GOARCH is the selected target architecture.
 func (t Toolchain) GOARCH() string { return t.goarch }
 
-// Workspace is the typed universe one request resolves to: the complete
-// transitive package closure under the selected toolchain. Finalization severs
-// the transient syntax/checker lifetime: the finalized Workspace holds no
-// FileSet, checker package, or AST, so transient graph access after
-// finalization is structurally impossible.
+// Workspace is the finalized source-acquisition universe. Definition,
+// selection, and executable artifacts remain separate phase outputs.
 type Workspace struct {
-	toolchain Toolchain
-	packages  []*Package // complete closure, deterministic identity order
-	roots     []*Package // the requested root packages
+	toolchain             Toolchain
+	resolutionFingerprint string
+	packages              []*Package
+	packagesByID          map[identity.PackageID]*Package
+	roots                 []*Package
 }
 
-// Toolchain is the resolved selected toolchain.
 func (w *Workspace) Toolchain() Toolchain { return w.toolchain }
-
-// Packages is the complete package closure in deterministic order (immutable
-// copy of the collection).
-func (w *Workspace) Packages() []*Package { return append([]*Package(nil), w.packages...) }
-
-// Roots are the requested root packages (immutable copy). Analysis covers
-// the depth-selected closure, not only the roots; roots exist for reporting
-// and reachability anchoring.
+func (w *Workspace) Packages() []*Package {
+	return append([]*Package(nil), w.packages...)
+}
 func (w *Workspace) Roots() []*Package { return append([]*Package(nil), w.roots...) }
+func (w *Workspace) ResolutionFingerprint() string {
+	return w.resolutionFingerprint
+}
 
-// Package is one resolved package of the closure. Selected packages carry
-// syntax and type information; dependency packages carry identity, provenance,
-// acquisition, version, and file facts.
+// Package is immutable physical/acquisition evidence only.
 type Package struct {
 	id              identity.PackageID
 	provenance      Provenance
 	acquisition     Acquisition
 	disposition     LanguageDisposition
-	moduleGoVersion string // module `go` directive; empty for reserved owners
+	moduleGoVersion string
 	requestedRoot   bool
-	imports         []string // imported package paths, sorted
-	files           []*File  // identity-bearing source Go files
-	otherFiles      []string // non-Go inputs (C/asm/etc.), owner-relative
-	embedFiles      []string // resolved //go:embed inputs, owner-relative
-	embedPatterns   []string // declared //go:embed patterns
-	mappings        []CheckedUnitMapping
-	synthetics      []SyntheticUnit
-	implicitUnits   []ImplicitUnit
-	hasTypeEvidence bool // validated presence of checked type evidence; the
-	// checker package itself is transient and never stored on the finalized record
+	imports         []string
+	files           []*File
+	inputs          []Input
+	embedPatterns   []string
+	hasCheckedView  bool
 }
 
-// ImplicitUnit is one finalized unspelled implicit executable unit: its typed
-// catalog identity plus its selected evidence depth.
-type ImplicitUnit struct {
-	id    identity.ImplicitUnitID
-	depth EvidenceDepth
-}
-
-// ID is the implicit unit's canonical identity.
-func (i ImplicitUnit) ID() identity.ImplicitUnitID { return i.id }
-
-// Depth is the scope-selected evidence depth.
-func (i ImplicitUnit) Depth() EvidenceDepth { return i.depth }
-
-// admit is the single gate into a workspace: it validates the record and
-// appends it. There is no other append site, so an unadmitted record is
-// absent from the universe — a dropped input the source-universe verifier
-// reports — never silently present unvalidated.
 func (w *Workspace) admit(record *Package) error {
 	validated, err := finishPackage(record)
 	if err != nil {
 		return err
 	}
+	if w.packagesByID == nil {
+		w.packagesByID = map[identity.PackageID]*Package{}
+	}
+	if _, duplicate := w.packagesByID[validated.id]; duplicate {
+		return &LoadError{
+			Reason: "duplicate package identity " + validated.id.String(),
+		}
+	}
+	w.packagesByID[validated.id] = validated
 	w.packages = append(w.packages, validated)
 	if validated.requestedRoot {
 		w.roots = append(w.roots, validated)
@@ -277,217 +265,213 @@ func (w *Workspace) admit(record *Package) error {
 	return nil
 }
 
-// finishPackage is the validating constructor of a Package record: it rejects
-// incoherent owner/provenance/acquisition/disposition combinations and
-// selected records without complete syntax/type evidence.
 func finishPackage(p *Package) (*Package, error) {
 	fail := func(reason string) (*Package, error) {
-		return nil, &LoadError{Dir: "", Reason: "invalid package record " + p.id.String() + ": " + reason}
+		return nil, &LoadError{Reason: "invalid package " + p.id.String() + ": " + reason}
 	}
-	if p.id.IsZero() {
-		return fail("zero identity")
+	if p.id.IsZero() || !p.provenance.Valid() || !p.acquisition.Valid() ||
+		!p.disposition.Valid() {
+		return fail("identity, provenance, acquisition, or disposition is invalid")
 	}
-	if !p.provenance.Valid() {
-		return fail("invalid provenance")
-	}
-	if !p.acquisition.Valid() {
-		return fail("invalid acquisition")
-	}
-	if !p.disposition.Valid() {
-		return fail("invalid language disposition")
-	}
-	owner := p.id.Owner().Class()
 	coherent := map[identity.OwnerClass][]Provenance{
 		identity.OwnerModule:          {ProvenanceWorkspaceModule, ProvenanceModuleDependency},
 		identity.OwnerStandardLibrary: {ProvenanceStandardLibrary},
 		identity.OwnerToolchain:       {ProvenanceToolchainPackage},
 		identity.OwnerLanguagePseudo:  {ProvenanceLanguagePseudo},
 	}
-	provenanceOK := false
-	for _, allowed := range coherent[owner] {
-		provenanceOK = provenanceOK || p.provenance == allowed
+	validProvenance := false
+	for _, allowed := range coherent[p.id.Owner().Class()] {
+		validProvenance = validProvenance || p.provenance == allowed
 	}
-	if !provenanceOK {
-		return fail("owner " + owner.String() + " incoherent with provenance " + p.provenance.String())
+	if !validProvenance {
+		return fail("owner and provenance disagree")
 	}
-	switch p.provenance {
-	case ProvenanceWorkspaceModule:
-		if p.acquisition != AcquisitionWorkspace {
-			return fail("workspace module with acquisition " + p.acquisition.String())
-		}
-	case ProvenanceModuleDependency:
-		if p.acquisition == AcquisitionWorkspace || p.acquisition == AcquisitionGOROOT {
-			return fail("module dependency with acquisition " + p.acquisition.String())
-		}
-	default:
-		if p.acquisition != AcquisitionGOROOT {
-			return fail("reserved owner with acquisition " + p.acquisition.String())
-		}
+	if p.provenance == ProvenanceWorkspaceModule && p.acquisition != AcquisitionWorkspace {
+		return fail("workspace module is not workspace-acquired")
 	}
-	if owner != identity.OwnerModule && p.moduleGoVersion != "" {
+	if p.provenance == ProvenanceModuleDependency &&
+		(p.acquisition == AcquisitionWorkspace || p.acquisition == AcquisitionGOROOT) {
+		return fail("module dependency has impossible acquisition")
+	}
+	if p.id.Owner().Class() != identity.OwnerModule &&
+		p.acquisition != AcquisitionGOROOT {
+		return fail("reserved owner is not GOROOT-acquired")
+	}
+	if p.id.Owner().Class() != identity.OwnerModule && p.moduleGoVersion != "" {
 		return fail("reserved owner carries a module go directive")
 	}
-	// Evidence is required wherever the disposition requires it — for every
-	// package in the closure, not only requested roots.
 	switch p.disposition {
 	case DispositionBuiltinUniverse:
-		// metadata-only pseudo-package: no type or syntax evidence exists
+		if p.id.Owner().Class() != identity.OwnerLanguagePseudo ||
+			p.id.ImportPath() != "builtin" {
+			return fail("builtin disposition has the wrong identity")
+		}
 	case DispositionUnsafeIntrinsic:
-		if !p.hasTypeEvidence {
-			return fail("unsafe intrinsic record lacks type evidence")
+		if p.id.Owner().Class() != identity.OwnerStandardLibrary ||
+			p.id.ImportPath() != "unsafe" {
+			return fail("unsafe disposition has the wrong identity")
 		}
-	default:
-		if !p.hasTypeEvidence {
-			return fail("source record lacks type evidence")
+	case DispositionOrdinarySource:
+		if p.id.ImportPath() == "builtin" || p.id.ImportPath() == "unsafe" {
+			return fail("intrinsic package has ordinary disposition")
 		}
-		if len(p.files) == 0 {
-			return fail("source record has no files")
+	}
+	if p.disposition != DispositionBuiltinUniverse && len(p.files) == 0 {
+		return fail("source package has no files")
+	}
+	if p.hasCheckedView && p.disposition != DispositionOrdinarySource {
+		return fail("non-ordinary package claims a checked source view")
+	}
+	if !strictlySortedUnique(p.imports) ||
+		!strictlySortedUnique(p.embedPatterns) {
+		return fail("imports or embed patterns are not canonical")
+	}
+	for _, imported := range p.imports {
+		if imported == "" {
+			return fail("imports contain an invalid semantic edge")
 		}
-		for _, file := range p.files {
-			for _, unit := range file.units {
-				if !unit.depth.Valid() {
-					return fail("unit " + unit.id.String() + " has no selected evidence depth")
-				}
-			}
+	}
+	seenFiles := map[identity.FileID]bool{}
+	previousFile := ""
+	for _, file := range p.files {
+		if file == nil ||
+			file.id.IsZero() ||
+			file.id.Owner() != p.id.Owner() ||
+			file.byteDigest.IsZero() ||
+			seenFiles[file.id] ||
+			(previousFile != "" && file.id.String() <= previousFile) {
+			return fail("source file is invalid, duplicated, or noncanonical")
 		}
-		for _, implicit := range p.implicitUnits {
-			if !implicit.depth.Valid() {
-				return fail("implicit unit " + implicit.id.String() + " has no selected evidence depth")
-			}
+		if file.effectiveVersion == "" &&
+			!file.cgoOriginal &&
+			p.disposition != DispositionUnsafeIntrinsic {
+			return fail("checked Go file lacks an effective language version")
 		}
-		if p.disposition == DispositionOrdinarySource && len(p.implicitUnits) == 0 {
-			return fail("ordinary package carries no implicit initialization unit")
+		seenFiles[file.id] = true
+		previousFile = file.id.String()
+	}
+	for _, file := range p.files {
+		if file.cgoOriginal && !p.hasCheckedView {
+			return fail("cgo source exists without a checked package view")
 		}
+	}
+	previousInput := ""
+	for _, input := range p.inputs {
+		if input.id.IsZero() ||
+			input.id.Owner() != p.id.Owner() ||
+			!input.kind.Valid() ||
+			input.byteDigest.IsZero() ||
+			seenFiles[input.id] ||
+			(previousInput != "" && input.id.String() <= previousInput) {
+			return fail(
+				"supplemental input is invalid, colliding, or noncanonical",
+			)
+		}
+		seenFiles[input.id] = true
+		previousInput = input.id.String()
 	}
 	return p, nil
 }
 
-// ID is the package's canonical identity.
-func (p *Package) ID() identity.PackageID { return p.id }
+func strictlySortedUnique(values []string) bool {
+	for index, value := range values {
+		if value == "" || (index > 0 && value <= values[index-1]) {
+			return false
+		}
+	}
+	return true
+}
 
-// Provenance is the resolved toolchain provenance class.
-func (p *Package) Provenance() Provenance { return p.provenance }
-
-// Acquisition is where the selected bytes came from.
-func (p *Package) Acquisition() Acquisition { return p.acquisition }
-
-// Disposition is the language/toolchain contract class.
+func (p *Package) ID() identity.PackageID           { return p.id }
+func (p *Package) Provenance() Provenance           { return p.provenance }
+func (p *Package) Acquisition() Acquisition         { return p.acquisition }
 func (p *Package) Disposition() LanguageDisposition { return p.disposition }
-
-// ModuleGoVersion is the owning module's go directive; empty for reserved
-// owners. It is a module fact, never a per-file permission.
-func (p *Package) ModuleGoVersion() string { return p.moduleGoVersion }
-
-// RequestedRoot reports whether the package was a requested root.
-func (p *Package) RequestedRoot() bool { return p.requestedRoot }
-
-// RetainsFullSemantic reports whether any unit of the package — source or
-// implicit — is full-semantic (and therefore contributes retained evidence).
-func (p *Package) RetainsFullSemantic() bool {
-	for _, file := range p.files {
-		for _, unit := range file.units {
-			if unit.depth == DepthFullSemantic {
-				return true
-			}
-		}
-	}
-	for _, implicit := range p.implicitUnits {
-		if implicit.depth == DepthFullSemantic {
-			return true
-		}
-	}
-	return false
+func (p *Package) ModuleGoVersion() string          { return p.moduleGoVersion }
+func (p *Package) RequestedRoot() bool              { return p.requestedRoot }
+func (p *Package) Imports() []string                { return append([]string(nil), p.imports...) }
+func (p *Package) Files() []*File                   { return append([]*File(nil), p.files...) }
+func (p *Package) Inputs() []Input                  { return append([]Input(nil), p.inputs...) }
+func (p *Package) EmbedPatterns() []string {
+	return append([]string(nil), p.embedPatterns...)
 }
+func (p *Package) HasCheckedView() bool { return p.hasCheckedView }
 
-// Imports are the imported package paths, sorted (immutable copy).
-func (p *Package) Imports() []string { return append([]string(nil), p.imports...) }
-
-// Files are the package's identity-bearing source Go files in deterministic
-// order (immutable copy of the collection; File records are themselves
-// accessor-only).
-func (p *Package) Files() []*File { return append([]*File(nil), p.files...) }
-
-// OtherFiles are the package's non-Go inputs (immutable copy).
-func (p *Package) OtherFiles() []string { return append([]string(nil), p.otherFiles...) }
-
-// EmbedFiles are the resolved //go:embed inputs (immutable copy).
-func (p *Package) EmbedFiles() []string { return append([]string(nil), p.embedFiles...) }
-
-// EmbedPatterns are the declared //go:embed patterns (immutable copy).
-func (p *Package) EmbedPatterns() []string { return append([]string(nil), p.embedPatterns...) }
-
-// CheckedUnitMappings joins source-derived checked declarations to their
-// origin units (immutable copy). Checked paths never appear.
-func (p *Package) CheckedUnitMappings() []CheckedUnitMapping {
-	return append([]CheckedUnitMapping(nil), p.mappings...)
-}
-
-// SyntheticUnits are the package-synthetic checked declarations with typed
-// origin-derived identities (immutable copy).
-func (p *Package) SyntheticUnits() []SyntheticUnit {
-	return append([]SyntheticUnit(nil), p.synthetics...)
-}
-
-// ImplicitUnits are the package's finalized implicit executable units with
-// selected depths (immutable copy).
-func (p *Package) ImplicitUnits() []ImplicitUnit {
-	return append([]ImplicitUnit(nil), p.implicitUnits...)
-}
-
-// Units enumerates the package's censused units with selected depths.
-func (p *Package) Units() []SourceUnit {
-	var out []SourceUnit
-	for _, file := range p.files {
-		out = append(out, file.units...)
-	}
-	return out
-}
-
-// HasTypeEvidence reports whether the package carries checked type evidence.
-// It is a validated boolean fact, not a stored checker object: the raw
-// *types.Package / *types.Info are never retained or exposed by the finalized
-// API — mutable checker objects, scopes, selections, and expressions do not
-// survive finalization. The one checker graph is queried only transiently,
-// during the analyze traversal, through source's narrow capability.
-func (p *Package) HasTypeEvidence() bool { return p.hasTypeEvidence }
-
-// File is one resolved source file: canonical identity, effective language
-// version, selected-byte digest, and its unit ledger with selected depths. The
-// finalized file exposes no raw AST — construct occurrences live in the
-// analyze region/reference inventory, keyed by canonical identity.
+// File is immutable selected-file evidence with no AST or definition state.
 type File struct {
-	path             string
 	id               identity.FileID
 	effectiveVersion string
 	overlaid         bool
 	cgoOriginal      bool
-	byteDigest       SourceSpanHash // sha256 of the file's selected bytes
-	units            []SourceUnit
+	byteDigest       SourceSpanHash
 }
 
-// Path is the OS path the file was loaded from, for display only.
-func (f *File) Path() string { return f.path }
-
-// ID is the canonical owner-relative identity of the file.
-func (f *File) ID() identity.FileID { return f.id }
-
-// Units is the file's total censused unit ledger with selected depths
-// (immutable copy).
-func (f *File) Units() []SourceUnit { return append([]SourceUnit(nil), f.units...) }
-
-// Overlaid reports whether the file's selected bytes came from an overlay.
-func (f *File) Overlaid() bool { return f.overlaid }
-
-// CgoOriginal reports whether the file's checked view lives in cgo
-// transformed output.
-func (f *File) CgoOriginal() bool { return f.cgoOriginal }
-
-// ByteDigest is the sha256 of the file's selected bytes, captured during
-// resolution — consumers never rescan to verify content addressing.
+func (f *File) ID() identity.FileID        { return f.id }
+func (f *File) Overlaid() bool             { return f.overlaid }
+func (f *File) CgoOriginal() bool          { return f.cgoOriginal }
 func (f *File) ByteDigest() SourceSpanHash { return f.byteDigest }
-
-// EffectiveGoVersion is the file's effective language version from typed
-// toolchain evidence (go/types file-version tracking); it governs construct
-// admission for occurrences in this file. Empty for dependency metadata
-// records.
 func (f *File) EffectiveGoVersion() string { return f.effectiveVersion }
+
+// InputKind is the closed class of non-Go bytes that can affect package
+// checking, cgo transformation, embedding, or generated provider evidence.
+type InputKind uint8
+
+const (
+	InputInvalid InputKind = iota
+	InputC
+	InputCXX
+	InputObjectiveC
+	InputHeader
+	InputFortran
+	InputAssembly
+	InputSWIG
+	InputSWIGCXX
+	InputSyso
+	InputEmbed
+
+	numInputKinds
+)
+
+func (k InputKind) Valid() bool {
+	return k > InputInvalid && k < numInputKinds
+}
+
+func (k InputKind) String() string {
+	switch k {
+	case InputC:
+		return "c"
+	case InputCXX:
+		return "cxx"
+	case InputObjectiveC:
+		return "objective-c"
+	case InputHeader:
+		return "header"
+	case InputFortran:
+		return "fortran"
+	case InputAssembly:
+		return "assembly"
+	case InputSWIG:
+		return "swig"
+	case InputSWIGCXX:
+		return "swig-cxx"
+	case InputSyso:
+		return "syso"
+	case InputEmbed:
+		return "embed"
+	default:
+		return fmt.Sprintf("source.InputKind(%d)", uint8(k))
+	}
+}
+
+// Input is one canonical supplemental source input. Acquisition paths never
+// survive finalization.
+type Input struct {
+	id         identity.FileID
+	kind       InputKind
+	byteDigest SourceSpanHash
+	overlaid   bool
+}
+
+func (i Input) ID() identity.FileID        { return i.id }
+func (i Input) Kind() InputKind            { return i.kind }
+func (i Input) ByteDigest() SourceSpanHash { return i.byteDigest }
+func (i Input) Overlaid() bool             { return i.overlaid }

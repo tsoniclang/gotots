@@ -46,13 +46,27 @@ defined by the specification.
   source text to infer meaning.
 - The semantic model is target-independent.
 - Whole-program facts seal before one total immutable plan is built.
+- Semantic reachability seals before planning and excludes unreachable
+  definitions from planning/lowering. Post-completion implementation
+  reachability is a separate graph; neither substitutes for the other.
 - Lowering consumes semantic operations plus their plans and makes no semantic
   or representation decisions.
-- Definitions are owned once; references may repeat. Each implementation-bearing
-  construct has one typed definition owning an isolated body region and one
-  typed reference at its enclosing grammatical edge. An excluded body is
-  unreachable through the finalized parent API; a raw parent node plus a
-  boundary list, a traversal flag, or consumer-controlled skipping is forbidden.
+- Every selected source file or synthetic semantic owner has one `OwnerRegion`.
+  Every grammatical `OccurrenceID` has one canonical immutable occurrence
+  payload. Regions, headers, boundaries, containment paths, and executable
+  regions reference that payload; they never copy kind, parent, edge, role,
+  order, token, or span facts into a second record.
+  Every implementation-bearing Go construct has one `DefinitionID`, exactly one
+  `DefinitionSite` referencing a complete path in the normalized sparse
+  containment graph, exactly one `HeaderRegion`, exactly one
+  `ExecutionBoundary`, and a separate `DefinitionSelection`. An
+  `ExecutableRegion` exists exactly for every full-semantic definition. The
+  owner/containment/definition/site/header/boundary facts are depth-independent
+  and owned once; later semantic/call/dispatch/reachability references may
+  repeat.
+  An excluded executable interior is unreachable through the finalized API; a
+  raw parent node plus boundaries, traversal flag, or consumer skipping is
+  forbidden.
 - One implementation path exists. No fallback, old/new flag, retry with
   changed semantics, compatibility reader, or parallel state survives.
 - No semantic recovery through `any`, `unknown`, unchecked casts, reflection,
@@ -76,6 +90,54 @@ and adversarial source examples, independent verifier and mutations, and
 size/memory/time bounds. Terms such as "unit," "boundary," "exact,"
 "immutable," and "independent" are not acceptance criteria unless their
 observable representation and failure cases are defined.
+
+The gate challenges the words with degenerate implementations. A discriminator
+enum is not its payload; a span is not topology; a hash is not authority; counts
+are not identity joins; a synthetic foil is not a mutation of production work;
+and one increment per visitor does not measure work hidden inside that visit.
+If the trivial substitute can satisfy the prose, the specification is
+inadequate and must be replaced before code begins.
+
+## No-Compromise Design Review
+
+Before changing governing authority or activating a phase, perform a separate
+design-only WCBUBWHB review. The design may proceed only when there is no known
+architectural compromise against correctness, genericity, scalability,
+staticness, source shape, ownership, lifecycle, verification, or bounded cost.
+Schedule pressure, current code shape, and edit size are not design inputs.
+
+The review must:
+
+1. decompose the domain into orthogonal facts and forbid one field, identity,
+   enum, digest, or switch from standing for two facts;
+2. give every relation an exact cardinality and distinguish containment,
+   semantic use, execution order, ownership, and reachability;
+3. exercise the cross-product of construct kinds, evidence depths, local versus
+   certified sources, explicit versus implicit forms, parent/child selections,
+   and transformed/checked views;
+4. prove that a future construct extends one closed algebra/catalog rather than
+   adding a parallel case table;
+5. define independent derivation and mutations against the real production
+   owner, not shared helpers or synthetic demonstrations;
+6. state asymptotic work/storage and all source-size, typecheck, memory, and
+   runtime consequences before implementation;
+7. identify every existing schema/producer/consumer/test/comment that the clean
+   design deletes; and
+8. reread literal compliance adversarially and reject any wording that permits
+   an empty payload, duplicate owner, depth-selected topology, or unmeasured
+   work.
+
+Accepted specification changes replace ambiguous or contradictory text; they
+do not append a second interpretation. Implementation reports must re-run this
+review against actual artifacts before phase exit. A newly discovered ambiguity
+reopens authority first, not a local patch.
+
+When a review exposes inadequate governing design, freeze dependent
+implementation, correct `docs/spec/` atomically, perform an independent
+specification-adequacy pass, and only then issue one replacement directive bound
+to that reviewed authority revision. Never ask an implementer to infer missing
+architecture from review prose, continue code while authority is changing, or
+implement a “temporary” bridge to the intended design.
 
 ## Product Quality Is Correctness
 
@@ -121,9 +183,14 @@ generic finalized-evidence boundary. No textual patching or checker re-entry.
   subsystem or preserve it behind a facade.
 - Use validating constructors and closed enums. Errors are typed; error strings
   never select behavior.
+- Parent-directed construct classification carries every semantic context fact
+  required by the catalog, including declaration token/class. A child node kind
+  alone may not decide whether it is an implementation definition.
 - Do not create `v2`, `legacy`, `compat`, `fallback`, `util`, `utils`,
   `helper`, `helpers`, or `misc` packages/files.
-- Keep maintained files semantically focused and below 600 physical lines.
+- Keep maintained non-generated implementation files semantically focused and
+  below 600 physical lines. The fixed six-file governing specification is
+  bounded by responsibility rather than this code-file line limit.
 - Use descriptive filenames, not numeric shards.
 - Generate TypeScript only through the typed target AST and one formatter.
 - Use `apply_patch` for file edits.

@@ -4,9 +4,11 @@
 
 Every expressible Go form is represented in the language catalog before the
 compiler claims support for a Go version. Each occurrence is resolved from
-syntax plus typed context into one semantic operation. A translation is then
-selected from whole-program evidence, never from source spelling or the first
-corpus that exercised it.
+syntax plus typed context into exactly one closed `OccurrenceResolution`;
+semantically executable forms own a typed operation, while structural,
+declaration, binding, and type forms own their corresponding explicit semantic
+record. A translation is then selected from whole-program evidence, never from
+source spelling or the first corpus that exercised it.
 
 The default output is the TypeScript a careful human would write while
 preserving Go behavior. Stronger machinery is local to the observation that
@@ -427,9 +429,13 @@ Function values and method values retain exact receiver capture and nil
 behavior. Closures capture binding/storage identities, not source names. An
 escaping captured scalar uses a shared cell only when required.
 
-Function literals receive their own source and implementation identities.
-Evidence spans cover the complete literal, including parameters and results;
-invalid spans fail evidence production.
+Each function literal receives a Stage-1 `DefinitionID` anchored to the
+`FuncLit` root, one definition site, a header region containing its callable
+shape, and a separate block execution boundary. Evidence anchors cover the
+complete literal while header digests exclude executable bytes; invalid
+identity/span relations fail evidence production. Later planning may derive one
+or more concrete `ImplementationID`s, but never reuses the body span as either
+identity.
 
 ## Control, Defer, Panic, And Concurrency
 

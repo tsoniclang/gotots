@@ -20,11 +20,31 @@ Evidence from two components sharing the same canonicalizer or plan builder is
 not independent proof. A verifier must derive its observed side from final
 artifacts using a different parser/extractor and join by canonical identity.
 
+## Specification-Adequacy Proof
+
+Before implementation of a phase or shared cross-phase artifact, Gate 01
+requires a revision-bound design attestation against the No-Compromise Design
+Gate. The attestation identifies the exact governing paragraphs and records the
+closed inputs, owner, schema/variants/cardinalities, lifecycle, orthogonal
+concerns, conservation joins, downstream consumers, examples, mutations,
+complexity/cost bounds, and deletion set. Missing evidence fails; it cannot be
+reported as a future implementation detail.
+
+The adequacy review is adversarial. It attempts to satisfy the prose with a
+discriminator-only record, zero/empty payload, shared identity for two
+orthogonal facts, count-only comparison, depth- or provenance-selected
+topology, synthetic complexity counter, and verifier sharing the producer's
+critical derivation. If any such substitute can pass literally, authority is
+replaced before implementation. A phase-exit review repeats this check against
+actual artifacts so code cannot reveal that the accepted schema had a second
+meaning.
+
 ## What It Means To Validate A Body
 
 Every reachable implementation has an `ImplementationID` and a ledger joining:
 
-- source declaration/body and exact span;
+- source `DefinitionID`, definition site/header, execution boundary, and exact
+  source spans;
 - construct occurrences and semantic operations;
 - whole-program facts consumed;
 - immutable plan records;
@@ -68,14 +88,14 @@ fail / 0 blocked` at one exact input and implementation revision.
 | Gate | Required positive evidence |
 |---|---|
 | 01 Input integrity | clean source/compiler trees, exact tool/config fingerprints, focused/full Go tests, bounded runner health |
-| 02 Language catalog | selected Go grammar/tokens/built-ins reconciled; every full-semantic occurrence and every non-full body boundary classified; unknown count zero |
-| 03 Scope closure | complete package closure and evidence-depth partition exact-join independent toolchain/environment metadata; every package/root/edge/body has one disposition |
-| 04 Identity and census | source/semantic/implementation/artifact multisets join exactly; collisions, overwrites, and unexplained deltas zero |
-| 05 Independent parity | independently parsed generated declarations and operation shapes match typed Go source for every class |
-| 06 Plan totality | all facts sealed; every selected operation has one validated plan or explicit blocking state; necessity records complete |
+| 02 Language catalog | selected Go grammar/tokens/built-ins and edge classes reconcile; every definition/header/full executable occurrence/non-full boundary classified; unknown count zero |
+| 03 Scope closure | complete package closure, structural-source plan, and per-definition evidence-depth partition exact-join independent toolchain/environment/provider metadata |
+| 04 Identity and census | owner/containment regions, definitions, sites, headers, boundaries, selections, and executable regions plus later semantic/implementation/artifact multisets join exactly; collisions, overwrites, and unexplained deltas zero |
+| 05 Independent parity | independently derived definition semantics and occurrence resolutions match typed Go evidence; later independently parsed generated declarations and operation shapes match those records |
+| 06 Plan totality | all facts and semantic reachability sealed; every reachable operation has one validated plan or explicit blocking state, no unreachable definition is planned, and necessity records are complete |
 | 07 Artifact ownership | implementations, generated AST units, files, definitions, markers, hashes, and provenance join one-to-one |
 | 08 Staticness | no erased recovery, dynamic semantic lookup, unsafe casts, unplanned dispatch, or undeclared target operation |
-| 09 Regeneration and graph | two clean generations match; manual reconciliation, complete reachability, relocation, and atomic replacement pass |
+| 09 Regeneration and graph | two clean generations match; semantic reachability exact-joins planned implementations, and post-completion implementation reachability, manual reconciliation, relocation, and atomic replacement pass |
 | 10 Strict TypeScript | every materialized runtime, stdlib, external, generated, manual, and extension module parses/resolves/typechecks together and satisfies the Tsonic target subset |
 | 11 Semantic-class oracles | every implemented operation class passes Go-vs-TS differential, property, boundary, and mutation tests |
 | 12 Implementation execution | every reachable implementation and required interaction has retained execution evidence; selected Go tests reconciled |
@@ -143,97 +163,168 @@ Gate 02 with the affected occurrence identities.
 
 ## Analysis-Scope And Cost Proof
 
-The scope verifier exact-joins every executable body, initializer, and implicit
-implementation unit to one evidence depth. It separately joins every source
-file and declaration to its identity/type/mapping record; files and packages
-may aggregate several depths and cannot supply a default. It proves:
+The scope verifier exact-joins every `DefinitionID` to one provider/depth
+selection and independently verifies the structural-source plan implied by
+every exact-definition, exact-package, namespace, and conditional rule. It
+separately joins every source file and definition to identity/type/mapping
+evidence; files and packages may aggregate several depths and cannot supply a
+default.
 
-- workspace and selected source-available module bodies intended for automatic
-  translation have full checked syntax and conserved occurrence identities;
-- standard-library bodies used through the reusable `gostdlib` contract retain
-  declaration and body-boundary evidence but contribute no application-body
+Every conditional rule exact-joins its declared finite candidate set and
+requested `SelectionFactKind`s to one identity-keyed selection-fact artifact.
+The verifier proves scope consumes only those facts, the typed frontend reuses
+the same fact IDs, and no second producer or arbitrary predicate callback
+exists.
+
+The definition-graph verifier independently derives, by canonical identity:
+
+1. every source-file/synthetic owner region and source-file containment graph;
+2. every canonical structural/executable occurrence payload, with the two
+   stores disjoint and their exact union equal to all region membership;
+3. every definition and its one source/synthetic site, normalized complete
+   containment path, and unique rooted-forest parent;
+4. every used-once containment anchor and absence of copied occurrence/path
+   records;
+5. every header membership identity and its canonical parent, edge, role,
+   token, ordinal, and exact header byte-range digest;
+6. every execution-boundary variant and ordered entry identity/hash;
+7. every definition selection;
+8. every full-semantic source or implicit executable-region operation;
+9. the absence of executable occurrences and reachable body syntax/type keys
+   for every non-full definition; and
+10. the selected local-or-certified graph authority of every file.
+
+It exact-multiset-joins each class separately with both one-sided identity lists.
+A header discriminator, definition count, or shared digest is not structural
+evidence.
+
+The combined scope/structure proof establishes:
+
+- workspace and selected source-available module definitions intended for
+  automatic translation have recursive checked evidence and conserved
+  executable occurrences;
+- standard-library definitions used through `gostdlib` retain exact sites,
+  headers, and boundaries but contribute no application executable
   occurrences;
-- original cgo source, checked syntax, and external boundaries join without a
-  skipped file or whole-package downgrade;
+- an exact-definition automatic override inside a provider-owned namespace
+  upgrades precisely its containing file and succeeds end to end;
+- a conditional automatic rule acquires its complete declared candidate set or
+  is rejected before loading; no selected full definition reaches a later
+  retention mismatch;
+- each file's production graph comes from local structural extraction or the
+  certified provider artifact, never package-wide full-status selection or a
+  merge of two authorities;
+- original cgo definitions/sites/headers/boundaries, checked counterparts, and
+  external boundaries join without a skipped definition or whole-package
+  downgrade;
 - cgo joins use toolchain position/origin evidence, include package-synthetic
-  checked declarations, and contain no basename/name-matching fallback;
-- a complete cgo package runs through the public compilation pipeline, including
-  source-universe verification, unit census, mixed-unit inventory, and semantic
-  evidence lookup; loader-only acceptance is not proof;
+  definitions, and contain no basename/name-matching fallback;
+- a complete cgo package runs through the public pipeline, including source
+  verification, structural-source planning, definition graph, mixed-depth
+  executable inventory, and semantic evidence lookup; loader-only acceptance is
+  not proof;
 - Go, non-Go, embed, overlay, and checked-view inputs join by stable typed
-  identity rather than raw acquisition path, including after workspace,
-  module-cache, and temporary checked-view relocation;
-- finalized artifacts expose no syntax or body-indexed `types.Info` for
-  declaration-contract, external-boundary, or intrinsic bodies;
-- catalog-audit occurrences are stored in audit evidence, never in the product
-  semantic artifact, and the exact fingerprinted audit set is consumed without
-  rescanning non-translated standard-library bodies per application; and
-- resolved-closure, evidence-depth, occurrence, and eventual reachability
-  denominators are reported separately.
+  identity rather than raw acquisition path, including after relocation;
+- finalized artifacts expose no raw syntax/checker object and no body-indexed
+  evidence for non-full definitions;
+- catalog-audit occurrences remain audit evidence rather than product
+  executable occurrences, and certified provider structures are consumed
+  without rescanning non-translated bodies; and
+- package closure, structural-source planning, definition depth, header
+  occurrences, executable occurrences, and eventual reachability remain
+  separate denominators.
+
+The mandatory fixture matrix covers:
+
+- function/method declaration, function literal, multi-name typed package
+  initializer, bodyless obligation, and implicit work;
+- package `const` and package `var` declarations with the same `ValueSpec`
+  shape, proving parent declaration class is part of the catalog query;
+- every valid definition-kind/evidence-depth pair and representative invalid
+  pairs, including bodyless-as-full and implicit-full-without-operation-graph;
+- two same-kind definitions with different headers, proving a kind enum cannot
+  stand in for header evidence;
+- paired body-only and header-only edits proving the header and execution
+  content-address domains do not contaminate one another;
+- outer full/child non-full, outer non-full/child full with a captured binding
+  declared in the excluded parent, both full, and both non-full;
+- three-level nesting, two literals on one line, literals inside package
+  initializers, and ordered multi-expression initializers;
+- a package containing both locally extracted and certified files;
+- provider namespace plus exact-definition automatic override and every
+  conditional-acquisition outcome;
+- a parent without `C` use and C-dependent child, the inverse, `C` in a literal
+  signature, a shadowing local named `C`, and mixed pure/C-dependent definitions
+  in one cgo file; and
+- missing, duplicate, extra, ambiguous, relocated, and overlaid cgo origins and
+  synthetics.
+
+Every mixed-depth artifact is inspected for one definition, one site and
+containment path, one header, one boundary, one selection, and the expected
+zero/one executable region for both parent and child. The child site remains
+present even when its parent executable region is absent. A generic traversal
+from a finalized non-full definition cannot reach its body.
+
+Required mutations omit or duplicate an owner/containment graph,
+definition/site/header/boundary/selection; orphan, reparent, or cycle a site;
+truncate its containment path; copy a shared path prefix into every site; swap a
+header parameter, result, `ValueSpec` name/type, edge, role, or order; anchor a
+definition to its body entry; include executable bytes in the header digest or
+header bytes in an execution digest; drop the child site only in the
+outer-non-full/child-full case; restore package-wide provider filtering; ignore
+an exact-definition or conditional structural-source rule; merge local and
+provider records; expose backing storage or raw syntax; assign depth from
+provenance or file state; replace cgo object identity with spelling;
+omit/duplicate a cgo origin; compare only synthetic names; duplicate one
+occurrence payload across structural and executable stores; or classify a
+package `const` `ValueSpec` as an initializer definition. Each fails its owning
+gate with exact one-sided identities.
+
+Construction complexity is verified against the production work ledger, whose
+closed operation classes are catalog-edge inspections, boundary/containment-map
+lookups/probes, record appends, join/probe operations, and deterministic sort
+comparisons. Wide and deeply nested definition fixtures vary nodes,
+definitions, unique path anchors, headers, and executable occurrences
+independently. Work/storage must follow the architecture's linear equation,
+with only named sort work following
+`O(n log n)`. A mutation replaces a real constant/logarithmic boundary lookup
+with a counted linear scan in the production structural pass; the production
+gate—not a separate foil—must fail. A second production mutation materializes
+full copied paths per site and must violate the storage/work bound. Wall time
+and RSS are corroboration, not the asymptotic proof.
 
 For two ordinary projects and the self-host project, the gate records package,
-file, declaration, body-boundary, and retained-occurrence counts plus elapsed
-time and peak RSS. Any material increase without a corresponding change in the
-full-semantic source set and typed necessity fails before semantic-model work.
-Aggregate package growth cannot hide a largest-package or standard-library-body
-scope explosion.
+file, definition, site, header occurrence, boundary, retained executable
+occurrence, provider artifact byte, and production-work counts plus elapsed time
+and peak RSS. It reports the twenty largest header/provider records. Any
+material increase without corresponding selected structure and typed necessity
+fails before semantic-model work; aggregate improvement cannot hide a
+largest-package/provider explosion.
 
-Semantic scope counts are deterministic unit/gate assertions. Time, peak RSS,
-and retained-heap measurements run in isolated subprocesses with exact
+Deterministic identity/work assertions run in-process. Time, peak RSS, and
+retained-heap measurements run in isolated subprocesses with exact
 toolchain/environment fingerprints, forced lifecycle completion, and repeated
-samples; they are not absolute `HeapAlloc` assertions embedded in `go test` or
-measured under `-race`. Every audit/retention set exact-joins expected
-identities—sampling and `>=` bounds are not completeness evidence.
+samples; they are not absolute `HeapAlloc` assertions under `-race`. Every
+audit/retention set exact-joins expected identities—sampling and `>=` bounds are
+not completeness evidence.
 
-Required mutations analyze a standard-library body as an application body,
-drop a source-available dependency body, retain catalog-audit occurrences in
-the product model, omit a cgo source/boundary mapping, use a relocated raw path
-as an input identity, ignore a cgo-synthetic declaration, restore basename or
-declaration-name matching, classify a shadowing local identifier named `C` as
-cgo, retain a non-full body AST, filter `types.Info` by file-ambiguous offsets,
-assign depth from a file/provenance default or hard-coded default contract, omit
-a nested function-literal or implicit unit, renumber a unit kind, mutate an
-artifact through an accessor, or merge requested roots with the semantic set.
-Mutating audited bytes under the same `FileID`, zeroing audit counts, duplicating
-an audit row, changing overlays/build tags, or changing the selected provider
-contract must also fail. Gates 02, 03, or 16 fail with exact identities and the
-cost delta.
-
-The executable-region/reference model has its own blocking fixture matrix and
-mutation battery. The fixtures cover: outer full with nested body non-full;
-outer non-full with nested body full, including a captured binding declared in
-the excluded parent; both full and both non-full; three-level nesting and two
-literals on one source line; literals inside package initializers; a parent
-without `C` use with a nested child that uses `C` and the inverse; `C` in a
-literal signature, a shadowing local named `C`, and mixed pure/C-dependent units
-in one cgo file; and missing, duplicate, extra, ambiguous, relocated, and
-overlaid cgo origins and synthetics. For outer-full/child-non-full the artifact
-is inspected to prove simultaneously that the parent references the child
-exactly once, the child definition exists exactly once, the child interior
-occurrence count is zero, and a generic traversal from the parent cannot reach
-the child body. Required mutations restore a raw child pointer, omit or
-mis-parent a reference, duplicate a definition, change edge role or order,
-expose backing storage, replace object identity with the spelling `C`, omit or
-duplicate a cgo origin, and compare only synthetic names; each fails at its
-owning gate with exact identities and one-sided differences. A wide
-nested-literal fixture and the isolated cost harness demonstrate bounded,
-non-cubic region/reference construction. The independent structural-origin
-extractor is implemented separately from the producer and shares none of its
-critical enumeration or semantic helpers.
-
-An architecture mutation that moves catalog classification, edge/role/token
-binding, or occurrence construction into `internal/source` must fail. A second
-mutation that makes language analysis retain raw syntax or mutable checker
-objects after source finalization must fail. The positive gate proves the
-pipeline order `load -> scope -> one transient catalog traversal -> source
-finalization -> independent verification`, proves source performs only its
-bounded pre-scope unit census, and exact-joins the traversal's opaque retention
-projection to the finalized occurrence/definition/reference artifact.
+Architecture mutations moving structural classification into `internal/source`,
+putting source/graph state or policy execution in `internal/scope/contract`,
+making `internal/scope/sourceplan` import the definition graph or select depth,
+making `internal/language/structure` choose evidence depth, adding an arbitrary
+conditional callback or second selection-fact producer, making `internal/scope`
+rebuild structural/semantic evidence, making executable inventory interpret
+`go/types` or rebuild definitions/headers, making the typed frontend rediscover
+roles/selection facts, or retaining raw syntax/checker objects after
+finalization must fail. The positive gate proves the exact order
+`resolve -> plan structural sources -> definition graph -> selection facts ->
+select depth -> executable inventory -> semantic materialization ->
+finalization -> independent verification` and non-overlap of all owners.
 
 The finalized cost/attestation gate fails closed in the certification
 environment: a portable unit suite may omit the expensive isolated run, but the
 phase-exit attestation gate may not silently skip it, and it binds the exact
-source, toolchain, environment, and fixture revisions it measured.
+source, toolchain, provider, environment, and fixture revisions measured.
 
 Generic context classification also has an independent type-semantics matrix.
 It covers normalized unions and intersections, tilde terms, empty and mixed
@@ -245,6 +336,14 @@ At minimum the matrix includes a nontrivial intersection such as
 concatenating the two unions is a known-invalid approximation.
 
 ## Construct And Semantic-Class Oracles
+
+The typed-frontend verifier exact-joins every `DefinitionID` to one
+`DefinitionSemantics` and closed semantic-authority witness, and every retained
+occurrence to one legal `OccurrenceResolution`. When checker and certified
+provider evidence both exist, it independently compares them and proves only
+the contract-selected authority entered the model. Missing, duplicate,
+structural-only-without-catalog-disposition, and dual-authority records fail
+with exact identities.
 
 Every catalog class has focused source fixtures covering its context matrix.
 Oracles compile and execute the same fixture with Go and generated TypeScript
@@ -364,9 +463,13 @@ aggregate.
 
 ## Mandatory Cost Metrics
 
-Every generated-surface checkpoint records absolute values and parent deltas
-for:
+Every materially affected checkpoint records absolute values and parent deltas
+for applicable measures:
 
+- Stage-1 owner/containment regions, definitions, sites/unique path anchors,
+  header occurrences,
+  execution boundaries, selections, executable occurrences, provider/audit
+  bytes, production work, and twenty largest structural records;
 - selected Go and generated bytes, tokens, and AST nodes;
 - generated/Go and generated/hand-port ratios;
 - per-body median, p90, p95, p99, and maximum expansion;
@@ -420,6 +523,9 @@ Broad searches and architecture tests prove:
   remains reachable after replacement;
 - no duplicate source of identities, semantic kinds, plans, hashes, or graph
   edges exists;
+- no body-entry-based `DefinitionID`, enum-only header surrogate,
+  depth-filtered definition site, source-owned definition census,
+  package-fullness graph switch, or unsupported provider selector survives;
 - no raw TypeScript generation occurs outside the target formatter;
 - no manual JSON attachment or generated-file preservation exists; and
 - no stale test/comment documents a deleted behavior as current.

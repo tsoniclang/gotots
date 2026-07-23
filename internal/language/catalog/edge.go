@@ -6,7 +6,8 @@ import "fmt"
 // grammar: a node-bearing field of one construct kind. Values are explicit and
 // permanent; TestEdgeIDsArePinned freezes the mapping. The per-kind edge order
 // is the source visit order, and the traversal is driven by this catalog — the
-// visitor holds no private edge knowledge.
+// visitor holds no private edge knowledge. Definition and execution-entry
+// classification are catalog-owned in structure.go.
 type Edge uint16
 
 // edgeDescriptor is one edge's record: owning parent kind, the toolchain
@@ -122,5 +123,6 @@ func ExcludedFields() []ExcludedField {
 		{KindFile, "Imports", "derived index of the import specs owned by GenDecl edges"},
 		{KindFile, "Unresolved", "deprecated toolchain resolution artifact"},
 		{KindFile, "Comments", "comment index; groups attach through Doc/Comment edges, directives through the directive inventory"},
+		{KindPackage, "Files", "deprecated package aggregate rejected before structural traversal"},
 	}
 }

@@ -54,14 +54,16 @@ and manual units may coexist in each source-mirrored standard-library file.
 Applications import canonical `gostdlib` modules; a standard-library
 definition is not copied into every generated application.
 Standard-library declaration and type source participates in ordinary semantic
-analysis, but standard-library provenance assigns its executable bodies to the
-manual `gostdlib` contract rather than silently attempting ordinary automatic
-body lowering. Each selected body therefore has an explicit placeholder,
-accepted manual implementation, or blocking disposition.
-Application compilation consumes those declaration contracts and body
-boundaries; it does not retain or semantically traverse the original Go body
-interiors again. Full standard-library source scanning belongs to the separate
-versioned `gostdlib` generation/upgrade workflow and catalog-audit evidence.
+analysis. The request-selected provider contract—not provenance—binds each
+standard-library definition to `gostdlib` declaration-contract evidence rather
+than silently attempting ordinary automatic body lowering. Each selected
+concrete implementation derived from that definition therefore has an explicit
+placeholder, accepted manual implementation, or blocking disposition.
+Application compilation consumes its
+Stage-1 header/boundary and Stage-2 `DefinitionSemantics`; it does not retain or
+semantically traverse the original Go executable interior again. Full
+standard-library source scanning belongs to the separate versioned `gostdlib`
+generation/upgrade workflow and catalog-audit evidence.
 
 Example source declaration:
 
@@ -179,8 +181,15 @@ applies to the smallest independently replaceable unit:
 - wholly generated declaration without a body; or
 - wholly manual declaration.
 
-Every generated unit has a mandatory marker containing source identity,
-implementation identity, generated-contract hash, and generated-body hash.
+Stage-1 `DefinitionID`, Stage-2 `DefinitionSemantics`, and concrete
+`ImplementationID` remain distinct. A definition may produce multiple concrete
+implementations through specialization, and each concrete implementation owns
+its own generated/manual state. The generated TypeScript contract hash is a
+target-shape fact derived after planning; it is not the Stage-1 header-region
+digest or a substitute for semantic definition facts.
+
+Every generated unit has a mandatory marker containing source `DefinitionID`,
+concrete `ImplementationID`, generated-contract hash, and generated-body hash.
 Every generated executable body has its own body hash. A generated class shell
 and its generated methods are independently owned; editing one method does not
 freeze the rest of the class.

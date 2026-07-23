@@ -50,6 +50,44 @@ manual registries, prefix classifiers, gate waivers, and corpus-specific plans
 are not foundations. Their behavior may become a test; their architecture is
 deleted.
 
+## No-Compromise Design Gate
+
+No phase, shared abstraction, or cross-phase artifact enters implementation
+until a design-only WCBUBWHB review records **no known architectural
+compromise** against the mission. “No known compromise” is falsifiable design
+closure, not a claim that defects are impossible. The review fails unless the
+governing specification defines:
+
+1. every closed input class and authoritative producer;
+2. each identity domain and its stability/lifecycle boundary;
+3. every output record, field, closed variant, and relation cardinality;
+4. which concerns are orthogonal and therefore forbidden from sharing one
+   field, enum, span, digest, or selection switch;
+5. context, containment, ownership, and ordering for every source form;
+6. exact conservation equations and independently derived joins;
+7. positive, boundary, cross-product, and adversarial examples;
+8. mutations that fail the real production owner rather than a synthetic foil;
+9. asymptotic work/storage plus source-size, memory, typecheck, and runtime
+   bounds; and
+10. the superseded schema, producer/consumer paths, tests, and prose deleted by
+    the replacement.
+
+An architectural noun is not specified by a name. A discriminator enum is not
+the payload it classifies; a span is not topology; a hash is not authority; a
+passing count is not an identity join; one increment per visitor is not total
+work; and an API described as immutable or independent must define what is
+unreachable and what evidence is separately derived. If a trivial placeholder
+can satisfy the literal words while omitting the intended information, the
+specification fails this gate.
+
+The review exercises the complete cross-product of representation-independent
+dimensions before implementation—for example explicit/implicit definitions,
+all evidence depths, local/certified structural sources, source/checked cgo
+views, parent/child depth combinations, and source-spanned/bodyless forms.
+Accepted authority is replaced atomically rather than amended with a second
+meaning of an existing term. Implementation begins only after the specification
+itself passes this gate.
+
 ## Atomic Replacement Policy
 
 Development occurs on one feature branch, but production has one path:
@@ -83,19 +121,43 @@ Required exit evidence:
 - `gotots inspect constructs` reports two unrelated multi-module projects,
   exact resolved closures, and disjoint full-semantic, declaration-contract,
   external-boundary, and intrinsic evidence sets;
-- retained occurrence artifacts cover exactly the full-semantic set; every
-  declaration-contract or external body has one boundary record and zero
-  unexplained interior occurrences;
-- every executable body/initializer belongs to exactly one evidence depth,
-  while files and packages may aggregate several depths without a default;
-- the implementation-unit census includes function/method bodies, function
-  literals, package initializers, bodyless implementation obligations, and
-  implicit executable units;
-- unit-kind IDs and implicit-unit identities are pinned, and the complete unit
-  census exists before provider selection rather than being extended later by
-  construct inventory;
+- definition kinds and identity constructors are pinned; the complete
+  definition census includes function/method declarations, function literals,
+  package initializers, bodyless obligations, and implicit executable work
+  before evidence-depth selection;
+- each selected source file/synthetic owner has exactly one owner region; each
+  source-file region has one normalized sparse containment graph; and each
+  definition has exactly one site, header region, execution boundary, and
+  separate definition selection;
+  every retained occurrence identity has exactly one canonical payload, and
+  owner/header/boundary/containment/executable relations reference it rather
+  than copying context fields;
+  source definitions use construct-root `DefinitionID`s rather than body-entry
+  identities, and later concrete `ImplementationID`s remain a separate domain;
+- header and execution content addresses are disjoint: body-only edits preserve
+  header digests, while header-only edits preserve execution-entry digests;
+- the catalog classifies every child edge as header, execution entry, nested
+  definition site, or ordinary executable child, with no second edge table;
+  parent-directed definition classification includes declaration class/token,
+  so package `const` and `var` `ValueSpec` nodes cannot collapse into the same
+  implementation disposition;
+- header occurrences exist once at every depth; retained source occurrences or
+  typed implicit operations cover exactly full-semantic definitions, while
+  declaration-contract and external definitions retain exact boundaries and
+  zero executable occurrences;
+- files and packages may aggregate several definition depths without a default;
+- definition-kind/evidence-depth compatibility exact-joins the closed matrix;
+  bodyless obligations cannot masquerade as full semantic bodies and implicit
+  full definitions require an exact typed executable graph;
 - the compilation request selects one digest-bound provider contract, and every
-  unit records the exact contract rule that selected its provider and depth;
+  definition records the exact rule/evidence selecting its provider and depth;
+- conditional rules consume only closed identity-keyed selection facts from one
+  producer over declared finite candidate sets; those facts are reused by Stage
+  2 and never recomputed by scope or the typed frontend;
+- structural-source planning is the validated union of exact-definition,
+  exact-package, namespace, and conditional rule requirements; every possible
+  full-semantic candidate has recursive evidence before executable inventory,
+  and circular/unbounded conditional acquisition fails contract validation;
 - package owner, provenance, acquisition, and language disposition exact-join
   independent selected-toolchain metadata, including standard-library,
   dependency, replacement, `unsafe`, and pseudo-package cases;
@@ -105,44 +167,81 @@ Required exit evidence:
 - compiler capability, selected toolchain, module directive, and effective
   per-file language versions remain distinct, with version-gated occurrences
   verified against their own file versions;
-- an injected unknown form fails; and
+- an injected unknown form fails;
 - no target or acceptance-corpus package is imported;
 - complete-toolchain catalog coverage runs as a separate streaming audit and
   produces a versioned artifact consumed without rescanning standard-library
-  bodies during ordinary compilation; and
+  bodies during ordinary compilation;
 - the audit exact-joins selected-byte, build-configuration, provider-contract,
-  toolchain, catalog, per-file count, and aggregate-count evidence; and
-- provider and audit manifests carry the implementation definition/reference
-  graph, and ordinary compilation exact-joins it without rescanning provider
-  interiors; and
-- the source layer owns transient syntax/checker lifetime and bounded unit
-  census only, while the language-analysis layer is the sole producer of
-  catalog classification, edges, roles, tokens, occurrences, and
-  implementation-reference topology; architecture gates reject either owner
-  importing or recreating the other's semantic responsibility; and
-- finalized application artifacts expose one region/reference API at every depth,
-  retain no non-full body AST or body-indexed `types.Info` reachable from a
-  parent, and hold no separate uniform-full/mixed consumer path; and
-- the conservation joins hold — sites to references, unit identities to
-  definitions, full units to body-region occurrences, and non-full units to
-  zero-body contracts — and region/reference construction is non-cubic; and
+  toolchain, catalog, per-file count, and aggregate-count evidence;
+- provider and audit manifests carry the complete
+  owner/containment/definition/site/header/boundary graph; each file uses
+  exactly one local or certified production graph, and ordinary compilation
+  consumes it without rescanning provider interiors;
+- source owns bytes/acquisition/transient checker lifetime,
+  `internal/scope/contract` solely owns the closed provider/rule/fact-request
+  schema,
+  `internal/scope/sourceplan` solely owns the pre-graph local/certified plan,
+  `internal/language/structure` solely owns the depth-independent definition
+  graph, `internal/language/selectionfacts` solely owns closed preselection
+  facts, `internal/scope` solely owns per-definition selection,
+  `internal/language/executable` solely owns full executable occurrence/role
+  expansion, and `internal/language/frontend` solely owns typed semantic
+  resolution; architecture gates reject ownership leakage or private
+  edge/variant tables;
+- finalized artifacts expose one
+  owner/containment/definition/site/header/boundary API at every depth plus
+  exactly one executable region per full definition, retain no non-full body
+  AST or body-indexed `types.Info`, and hold no uniform-full/mixed consumer
+  split;
+- exact joins prove source/synthetic owners↔owner regions,
+  source-file regions↔normalized containment graphs and sites↔complete paths,
+  census↔definitions, definitions↔sites and rooted acyclic containment,
+  definitions↔headers, catalog header occurrences↔header regions,
+  definitions↔boundaries, definitions↔selections, full
+  definitions↔source-or-implicit executable regions, non-full definitions↔zero
+  executable occurrences, and local/certified graph parity;
+- the outer-full/child-non-full and outer-non-full/child-full matrices both
+  preserve each definition and site exactly once while retaining executable
+  occurrences only for the selected full definition;
+- production work/storage satisfy the architecture's linear bound plus only
+  named `O(n log n)` sorts; a counted linear-scan mutation in a real production
+  lookup and a copied-per-site-path mutation both fail the gate;
 - ordinary consumption authority comes from an independently selected certified
   digest, and audit certification binds the overlay/build-input projection that
   can change audited membership or selected bytes; and
-- package count, retained occurrences, elapsed time, and peak RSS have reviewed
-  absolute and parent-delta bounds for ordinary application compilation.
+- package, definition, site, header occurrence, boundary, executable
+  occurrence, provider-artifact byte, construction-work, elapsed-time, and peak
+  RSS measures have reviewed absolute and parent-delta bounds, including the
+  twenty largest header/provider artifacts.
 
 ### Phase: Typed Frontend And Semantic Model
 
-Consume Stage-1's canonical identities, workspace loading, and parent-assigned
-contextual visitors; add the target-independent semantic records and typed
-operations by reading the transient checker graph before finalization. This
-phase does not rebuild identities, loading, or the Stage-1 visitors.
+Consume Stage-1's definition graph, full executable occurrences, and
+parent-assigned grammatical roles; materialize target-independent definition
+semantics and executable operations from the one transient checker graph or one
+certified provider semantic authority, reusing preselection facts, before
+finalization. This phase does not rebuild loading, owner/containment structure,
+definition identities, sites, headers, boundaries, selections, preselection
+facts, or Stage-1 visitors.
 
 Required exit evidence:
 
-- every full-semantic occurrence has one typed semantic operation or
-  unsupported record, and every non-full body has one exact boundary record;
+- every definition has exactly one `DefinitionSemantics` record from the
+  transient checker graph or one certified provider semantic authority,
+  with a closed authority witness/input digest and covering its
+  receiver/signature, declared names/types, initializer/bodyless obligation, or
+  implicit-operation meaning;
+- when checker and provider semantic evidence both exist they exact-join as
+  corroboration and exactly one selected authority enters the model;
+- every retained owner/header/executable occurrence has exactly one legal
+  `OccurrenceResolution` (`StructuralOnly`, definition component, declaration,
+  binding, type, operation, or explicit unsupported), and no occurrence is
+  silently consumed or omitted;
+- every full-semantic executable region is completely resolved; every
+  semantically executable occurrence resolves to an operation or explicit
+  unsupported record, catalog-authorized structural-only occurrences remain
+  explicit, and every non-full definition has zero executable operations;
 - module, standard-library, and toolchain package identities are constructor-
   validated without machine paths or fabricated module ownership;
 - ordinary package semantics are independent of provenance; semantic records
@@ -163,6 +262,13 @@ analyses and one immutable `ProgramPlan`.
 Required exit evidence:
 
 - each fact has one owner and seals before use;
+- semantic reachability starts from explicit executable/API/test/reflection/
+  extension roots, records exact root/exclusion witnesses, and exact-joins every
+  typed call/initialization/function-value/generic/dynamic/registration/external
+  edge before planning;
+- planning and lowering consume only the semantically reachable set; a mutation
+  that plans the whole selected package closure fails size, identity, and
+  reachability gates;
 - plan records are total and atomic;
 - no emitter decision or post-plan mutation exists;
 - ordinary examples select direct plans;
