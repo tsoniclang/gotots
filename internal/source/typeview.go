@@ -5,11 +5,11 @@ import (
 	"go/types"
 )
 
-// TypeInfoView is the narrow, TRANSIENT type-query capability the analyze
-// traversal uses over the one checker graph (source.LoadedPackage.CheckerView).
-// It never survives into the finalized workspace — the finalized API exposes no
-// raw *types.Info, *types.Scope, *types.Object, selection, or expression. It is
-// live only between HydrateUniverse and Finalize, so its
+// TypeInfoView is the narrow, TRANSIENT type-query capability Stage analyses
+// use over the one checker graph (source.LoadedPackage.CheckerView). It never
+// survives into the finalized workspace — the finalized API exposes no raw
+// *types.Info, *types.Scope, *types.Object, selection, or expression. It is live
+// only between HydrateUniverse and Finalize, so its
 // scope/initialization/expression queries are transient traversal evidence,
 // not persisted facts.
 type TypeInfoView struct {

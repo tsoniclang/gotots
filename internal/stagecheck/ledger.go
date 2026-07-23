@@ -93,24 +93,22 @@ func compareLedgers(stage string, actual, expected *structuralLedger) error {
 	}
 }
 
-func ledgerForGraph(graph *structure.Graph) *structuralLedger {
+func ledgerForPackage(pkg structure.PackageGraph) *structuralLedger {
 	ledger := newStructuralLedger()
-	for _, pkg := range graph.Packages() {
-		for _, file := range pkg.Files() {
-			addFileGraph(ledger, file)
-		}
-		for _, owner := range pkg.SyntheticOwners() {
-			ledger.add("owner", owner.ID().String())
-		}
-		addDefinitionRecords(
-			ledger,
-			pkg.Definitions(),
-			pkg.Sites(),
-			pkg.Headers(),
-			pkg.Boundaries(),
-			true,
-		)
+	for _, file := range pkg.Files() {
+		addFileGraph(ledger, file)
 	}
+	for _, owner := range pkg.SyntheticOwners() {
+		ledger.add("owner", owner.ID().String())
+	}
+	addDefinitionRecords(
+		ledger,
+		pkg.Definitions(),
+		pkg.Sites(),
+		pkg.Headers(),
+		pkg.Boundaries(),
+		true,
+	)
 	return ledger
 }
 

@@ -311,13 +311,17 @@ func (b *fileBuilder) addDefinition(
 }
 
 func (b *fileBuilder) ensurePath(path []pathStep) error {
-	for _, step := range path {
+	firstNew := 0
+	for index := len(path) - 1; index >= 0; index-- {
+		b.work.IdentityProbes++
+		if b.anchors[path[index].occurrence.id] {
+			firstNew = index + 1
+			break
+		}
+	}
+	for _, step := range path[firstNew:] {
 		if err := b.recordOccurrence(step.occurrence); err != nil {
 			return err
-		}
-		if b.anchors[step.occurrence.id] {
-			b.work.IdentityProbes++
-			continue
 		}
 		b.anchors[step.occurrence.id] = true
 		b.anchorOrder = append(

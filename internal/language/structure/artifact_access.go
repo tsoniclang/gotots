@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sort"
 
 	"github.com/tsoniclang/gotots/internal/identity"
 )
@@ -26,8 +25,10 @@ func (a *ProviderArtifact) packageArtifact(
 	}
 	a.storage.mu.Lock()
 	defer a.storage.mu.Unlock()
-	if loaded := a.storage.loaded[packageID]; loaded != nil {
-		return loaded, nil
+	if a.storage.loadedPackage == packageID &&
+		a.storage.loadedArtifact != nil {
+		a.storage.cacheHits++
+		return a.storage.loadedArtifact, nil
 	}
 	shard, present := a.storage.shards[packageID]
 	if !present {
@@ -63,7 +64,9 @@ func (a *ProviderArtifact) packageArtifact(
 	if err := validateLoadedShard(packageID, shard, decoded); err != nil {
 		return nil, err
 	}
-	a.storage.loaded[packageID] = decoded
+	recordProviderProjection(a.storage, packageID, shard, decoded)
+	a.storage.loadedPackage = packageID
+	a.storage.loadedArtifact = decoded
 	return decoded, nil
 }
 
@@ -75,8 +78,12 @@ func validateLoadedShard(
 	if len(decoded.packageDigests) != 1 ||
 		decoded.packageDigests[packageID] != shard.inputDigest ||
 		decoded.syntheticPackages[packageID] != shard.synthetic ||
-		len(decoded.factsByID) != shard.factCount ||
-		len(decoded.filePackages) != len(shard.files) {
+		decoded.factCount != 0 ||
+		len(decoded.filePackages) != len(shard.files) ||
+		!sameProviderPackageCensus(
+			decoded.packageCensus[packageID],
+			shard.census,
+		) {
 		return providerArtifactError(
 			"package shard manifest mismatch " + packageID.String(),
 		)
@@ -85,14 +92,6 @@ func validateLoadedShard(
 		if decoded.filePackages[file] != packageID {
 			return providerArtifactError(
 				"package shard omits manifest file " + file.String(),
-			)
-		}
-	}
-	for id := range decoded.factsByID {
-		if decoded.packageForDefinition(id.definition) != packageID {
-			return providerArtifactError(
-				"package shard contains a foreign selection fact " +
-					id.definition.String(),
 			)
 		}
 	}
@@ -108,33 +107,16 @@ func (a *ProviderArtifact) packageForDefinition(
 	return definition.Package()
 }
 
-// CertifiedFactsForPackage returns one isolated canonical package projection.
-// It never loads an unrelated provider shard.
+// CertifiedFactsForPackage returns the manifest-resident facts for one
+// package. Detailed structural shards do not duplicate these records.
 func (a *ProviderArtifact) CertifiedFactsForPackage(
 	packageID identity.PackageID,
-) (
-	[]CertifiedFact,
-	error,
-) {
+) []CertifiedFact {
 	if a == nil {
-		return nil, nil
+		return nil
 	}
-	shard, err := a.packageArtifact(packageID)
-	if err != nil {
-		return nil, err
-	}
-	var out []CertifiedFact
-	for id, fact := range shard.factsByID {
-		if shard.packageForDefinition(id.definition) == packageID {
-			out = append(out, fact)
-		}
-	}
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].definition != out[j].definition {
-			return out[i].definition.String() <
-				out[j].definition.String()
-		}
-		return out[i].kind < out[j].kind
-	})
-	return out, nil
+	return append(
+		[]CertifiedFact(nil),
+		a.factsByPackage[packageID]...,
+	)
 }

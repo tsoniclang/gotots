@@ -30,10 +30,8 @@ func verifySelectionFactValues(
 			cgoFiles[file.ID()] = file.CgoOriginal()
 		}
 	}
-	for _, pkg := range graph.Packages() {
-		for _, definition := range pkg.Definitions() {
-			definitionPackage[definition.ID()] = pkg.ID()
-		}
+	for _, record := range graph.DefinitionCensus() {
+		definitionPackage[record.ID()] = record.Package()
 	}
 	cgoData := map[identity.PackageID]*independentCgoFacts{}
 	evidence, err := deriveIndependentFactEvidence(universe, graph)

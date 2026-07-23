@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/tsoniclang/gotots/internal/identity"
-	"github.com/tsoniclang/gotots/internal/scope/contract"
 )
 
 const (
@@ -369,12 +368,26 @@ func (a *ProviderArtifact) PackageFileIDs(
 	if a == nil {
 		return out
 	}
-	for file, owner := range a.filePackages {
-		if owner == pkg {
-			out[file.String()] = true
-		}
+	for _, file := range a.packageFiles[pkg] {
+		out[file.String()] = true
 	}
 	return out
+}
+
+func (a *ProviderArtifact) HasPackageFile(
+	pkg identity.PackageID,
+	file identity.FileID,
+) bool {
+	return a != nil && a.filePackages[file] == pkg
+}
+
+func (a *ProviderArtifact) PackageFileCount(
+	pkg identity.PackageID,
+) int {
+	if a == nil {
+		return 0
+	}
+	return len(a.packageFiles[pkg])
 }
 
 func (a *ProviderArtifact) HasSyntheticPackage(
@@ -407,9 +420,9 @@ func orderedCertifiedFacts(
 	if a == nil {
 		return nil
 	}
-	out := make([]CertifiedFact, 0, len(a.factsByID))
-	for _, fact := range a.factsByID {
-		out = append(out, fact)
+	out := make([]CertifiedFact, 0, a.factCount)
+	for _, facts := range a.factsByPackage {
+		out = append(out, facts...)
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].definition != out[j].definition {
@@ -419,23 +432,6 @@ func orderedCertifiedFacts(
 		return out[i].kind < out[j].kind
 	})
 	return out
-}
-
-func (a *ProviderArtifact) SelectionFact(
-	definition identity.DefinitionID,
-	kind contract.SelectionFactKind,
-) (CertifiedFact, bool, error) {
-	if a == nil {
-		return CertifiedFact{}, false, nil
-	}
-	shard, err := a.packageArtifact(a.packageForDefinition(definition))
-	if err != nil {
-		return CertifiedFact{}, false, err
-	}
-	fact, ok := shard.factsByID[certifiedFactID{
-		definition: definition, kind: kind,
-	}]
-	return fact, ok, nil
 }
 
 func (a *ProviderArtifact) SyntheticPackageGraph(

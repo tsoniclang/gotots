@@ -8,7 +8,7 @@ import (
 )
 
 // ProviderArtifactVersion is the certified structural-graph schema version.
-const ProviderArtifactVersion = 9
+const ProviderArtifactVersion = 11
 
 // ProviderArtifact is an immutable, request-bound certified structural graph.
 // Wire records and lookup indexes are private so validated evidence cannot be
@@ -23,11 +23,13 @@ type ProviderArtifact struct {
 	fileDigests           map[identity.FileID]string
 	fileGraphs            map[identity.FileID]FileGraph
 	filePackages          map[identity.FileID]identity.PackageID
+	packageFiles          map[identity.PackageID][]identity.FileID
 	packageDigests        map[identity.PackageID]string
 	packageGraphs         map[identity.PackageID]PackageGraph
+	packageCensus         map[identity.PackageID]ProviderPackageCensus
 	syntheticPackages     map[identity.PackageID]bool
-	factsByID             map[certifiedFactID]CertifiedFact
-	manifestFacts         int
+	factsByPackage        map[identity.PackageID][]CertifiedFact
+	factCount             int
 	storage               *providerStorage
 }
 
@@ -56,13 +58,7 @@ func (a *ProviderArtifact) FactCount() int {
 	if a == nil {
 		return 0
 	}
-	if a.storage != nil {
-		return a.storage.factCount
-	}
-	if a.manifestFacts != 0 {
-		return a.manifestFacts
-	}
-	return len(a.factsByID)
+	return a.factCount
 }
 
 // CertifiedFact is one immutable provider-produced selection fact.
@@ -111,9 +107,9 @@ type certifiedFactID struct {
 	kind       contract.SelectionFactKind
 }
 
-// providerContextRecord is the first record of the canonical gzip-compressed
-// JSON-lines transport. File/package/fact records follow in canonical order so
-// encoding and admission are bounded to one record at a time.
+// providerContextRecord is the first record of each canonical package shard.
+// File/package/fact records follow in canonical order so encoding and admission
+// are bounded to one record at a time.
 type providerContextRecord struct {
 	Version               int    `json:"version"`
 	ToolchainFingerprint  string `json:"toolchainFingerprint"`
@@ -139,31 +135,39 @@ type providerManifest struct {
 }
 
 type providerManifestPackage struct {
-	Package     string   `json:"package"`
-	InputDigest string   `json:"inputDigest"`
-	Files       []string `json:"files"`
-	Synthetic   bool     `json:"synthetic"`
-	FactCount   int      `json:"factCount"`
-	ShardBytes  int64    `json:"shardBytes"`
-	ShardDigest string   `json:"shardDigest"`
+	Package           string         `json:"package"`
+	InputDigest       string         `json:"inputDigest"`
+	Files             []string       `json:"files"`
+	Synthetic         bool           `json:"synthetic"`
+	Definitions       []string       `json:"definitions,omitempty"`
+	HeaderOccurrences int            `json:"headerOccurrences"`
+	BoundaryEntries   int            `json:"boundaryEntries"`
+	Facts             []artifactFact `json:"selectionFacts,omitempty"`
+	ShardBytes        int64          `json:"shardBytes"`
+	ShardDigest       string         `json:"shardDigest"`
 }
 
 type providerShard struct {
 	offset      int64
 	bytes       int64
 	digest      string
-	factCount   int
 	synthetic   bool
 	files       []identity.FileID
 	inputDigest string
+	census      ProviderPackageCensus
 }
 
 type providerStorage struct {
-	mu        sync.Mutex
-	path      string
-	shards    map[identity.PackageID]providerShard
-	loaded    map[identity.PackageID]*ProviderArtifact
-	factCount int
+	mu             sync.Mutex
+	path           string
+	shards         map[identity.PackageID]providerShard
+	loadedPackage  identity.PackageID
+	loadedArtifact *ProviderArtifact
+	shardLoads     int
+	cacheHits      int
+	maxResident    int
+	projected      map[identity.PackageID]ProviderPackageSize
+	largestHeaders []HeaderArtifactSize
 }
 
 type artifactFact struct {

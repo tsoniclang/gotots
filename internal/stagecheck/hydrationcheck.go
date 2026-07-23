@@ -75,9 +75,14 @@ func verifyHydrationExpected(
 	expectedFiles map[identity.FileID]bool,
 	expectedSynthetic map[identity.PackageID]bool,
 ) error {
-	if universe == nil || !universe.Hydrated() ||
-		universe.Fset() == nil {
+	if universe == nil || !universe.Hydrated() {
 		return hydrationError("universe is not selectively hydrated")
+	}
+	if (len(expectedFiles) != 0 || len(expectedSynthetic) != 0) &&
+		universe.Fset() == nil {
+		return hydrationError(
+			"non-empty semantic hydration has no file set",
+		)
 	}
 	expectedChecker := map[identity.PackageID]bool{}
 	problems := newProblemSet()

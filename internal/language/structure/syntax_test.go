@@ -18,6 +18,11 @@ type nodeCase struct {
 	kind catalog.Kind
 }
 
+type unknownNode struct{}
+
+func (unknownNode) Pos() token.Pos { return 1 }
+func (unknownNode) End() token.Pos { return 2 }
+
 var nodeCases = []nodeCase{
 	{(*ast.BadExpr)(nil), catalog.KindBadExpr},
 	{(*ast.Ident)(nil), catalog.KindIdent},
@@ -107,6 +112,16 @@ func TestClassifierExactJoinsToolchainNodeUniverse(t *testing.T) {
 		if _, present := kinds[kind]; !present {
 			t.Errorf("catalog kind %s has no classifier case", kind)
 		}
+	}
+}
+
+func TestClassifierRejectsInjectedUnknownNode(t *testing.T) {
+	if kind, err := Classify(unknownNode{}); err == nil || kind.Valid() {
+		t.Fatalf(
+			"injected unknown node classified as %s with error %v",
+			kind,
+			err,
+		)
 	}
 }
 

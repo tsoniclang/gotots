@@ -43,9 +43,17 @@ func ProduceProviderPackageArtifact(
 			"provider package %s is absent from source", packageID,
 		)
 	}
-	graphPackages := graph.Packages()
-	if len(graphPackages) != 1 ||
-		graphPackages[0].ID() != packageID {
+	var graphPackage PackageGraph
+	packageCount := 0
+	if err := graph.VisitPackages(func(pkg PackageGraph) error {
+		packageCount++
+		graphPackage = pkg
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	if packageCount != 1 ||
+		graphPackage.ID() != packageID {
 		return nil, fmt.Errorf(
 			"provider package graph is not exactly %s", packageID,
 		)
@@ -64,14 +72,14 @@ func ProduceProviderPackageArtifact(
 		return nil, err
 	}
 	fileGraphs := map[identity.FileID]FileGraph{}
-	for _, fileGraph := range graphPackages[0].Files() {
+	for _, fileGraph := range graphPackage.Files() {
 		fileGraphs[fileGraph.Owner().ID().File()] = fileGraph
 	}
 	record := artifactPackage{Package: packageID.String()}
 	syntheticCertified := false
 	if decision, present := plan.SyntheticFor(packageID); present &&
 		decision.Kind() == sourceplan.KindCertifiedGraph {
-		record = encodeSyntheticPackage(graphPackages[0])
+		record = encodeSyntheticPackage(graphPackage)
 		syntheticCertified = true
 	}
 	record.InputDigest = loaded.ProviderInputFingerprint()

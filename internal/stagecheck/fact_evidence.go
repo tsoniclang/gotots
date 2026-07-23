@@ -54,7 +54,9 @@ func deriveIndependentFactEvidence(
 		sort.Strings(parts)
 		out.packages[pkg.ID()] = independentFactDigest(parts...)
 	}
-	for _, pkg := range graph.Packages() {
+	if err := graph.VisitResidentPackages(func(
+		pkg structure.PackageGraph,
+	) error {
 		headers := map[identity.DefinitionID]string{}
 		boundaries := map[identity.DefinitionID]string{}
 		mappings := map[identity.DefinitionID]string{}
@@ -75,23 +77,18 @@ func deriveIndependentFactEvidence(
 			)
 		}
 		for _, definition := range pkg.Definitions() {
-			header := headers[definition.ID()]
-			boundary := boundaries[definition.ID()]
-			if header == "" || boundary == "" {
-				return nil, fmt.Errorf(
-					"independent fact evidence lacks structural record %s",
-					definition.ID(),
-				)
-			}
 			out.definitions[definition.ID()] =
 				independentDefinitionEvidence{
 					pkg:      pkg.ID(),
 					fileHash: fileHashes[definition.ID().File()],
-					header:   header,
-					boundary: boundary,
+					header:   headers[definition.ID()],
+					boundary: boundaries[definition.ID()],
 					mapping:  mappings[definition.ID()],
 				}
 		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 	return out, nil
 }

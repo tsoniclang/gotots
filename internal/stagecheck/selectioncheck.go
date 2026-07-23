@@ -15,24 +15,44 @@ func verifySelections(
 	facts *selectionfacts.Artifact,
 	selections *scope.DefinitionSelections,
 	selected contract.Contract,
+	selectedPackages map[identity.PackageID]bool,
 ) error {
 	dispositions := map[identity.PackageID]source.LanguageDisposition{}
-	definitions := map[identity.DefinitionID]structure.ImplementationDefinition{}
+	definitions := map[identity.DefinitionID]bool{}
 	packages := map[identity.DefinitionID]identity.PackageID{}
 	for _, pkg := range universe.Packages() {
 		dispositions[pkg.ID()] = pkg.Disposition()
 	}
-	for _, pkg := range graph.Packages() {
-		for _, definition := range pkg.Definitions() {
-			if _, duplicate := definitions[definition.ID()]; duplicate {
-				return &VerificationError{
-					Stage:  "definition-selection",
-					Reason: "duplicate definition " + definition.ID().String(),
-				}
+	for _, indexed := range graph.DefinitionCensus() {
+		definition := indexed.ID()
+		if definitions[definition] {
+			return &VerificationError{
+				Stage:  "definition-selection",
+				Reason: "duplicate definition " + definition.String(),
 			}
-			definitions[definition.ID()] = definition
-			packages[definition.ID()] = pkg.ID()
 		}
+		definitions[definition] = true
+		packages[definition] = indexed.Package()
+	}
+	exactProblems := newProblemSet()
+	for _, rule := range selected.Rules() {
+		if rule.Selector() != contract.SelectorExactDefinition {
+			continue
+		}
+		target := rule.Definition()
+		if selectedPackages != nil &&
+			!selectedPackages[target.Package()] {
+			continue
+		}
+		if !definitions[target] {
+			exactProblems.add("missing exact-rule target " + target.String())
+		}
+	}
+	if err := exactProblems.verificationError(
+		"definition-selection",
+		"exact-rule target join failed",
+	); err != nil {
+		return err
 	}
 	actualFacts := map[selectionfacts.ID]selectionfacts.Fact{}
 	for _, fact := range facts.Facts() {
@@ -89,7 +109,7 @@ func verifySelections(
 		records[record.Definition()] = record
 	}
 	problems := newProblemSet()
-	for definitionID, definition := range definitions {
+	for definitionID := range definitions {
 		record, present := records[definitionID]
 		if !present {
 			problems.add("missing " + definitionID.String())
@@ -127,7 +147,7 @@ func verifySelections(
 				"selection payload mismatch " + definitionID.String(),
 			)
 		}
-		if definition.Kind() == identity.DefinitionBodylessDecl &&
+		if definitionID.Kind() == identity.DefinitionBodylessDecl &&
 			record.Depth() == contract.DepthFullSemantic {
 			problems.add(
 				"bodyless definition selected full " + definitionID.String(),

@@ -76,54 +76,57 @@ func SelectDefinitions(
 	out := &DefinitionSelections{
 		byID: map[identity.DefinitionID]*DefinitionSelection{},
 	}
-	firedExact := map[string]bool{}
-	for _, packageGraph := range graph.Packages() {
-		disposition, present := dispositions[packageGraph.ID()]
+	definitionCount := 0
+	for _, indexed := range graph.DefinitionCensus() {
+		packageID := indexed.Package()
+		definition := indexed.ID()
+		disposition, present := dispositions[packageID]
 		if !present {
-			return nil, fmt.Errorf("scope package %s is absent from source universe", packageGraph.ID())
+			return nil, fmt.Errorf(
+				"scope package %s is absent from source universe",
+				packageID,
+			)
 		}
-		for _, definition := range packageGraph.Definitions() {
-			values := map[providercontract.SelectionFactKind]bool{}
-			var factIDs []selectionfacts.ID
-			for _, kind := range selected.RequestedFacts(definition.ID(), packageGraph.ID()) {
-				value, exists := facts.Value(definition.ID(), kind)
-				if !exists {
-					return nil, fmt.Errorf(
-						"definition %s lacks requested selection fact %s",
-						definition.ID(), kind,
-					)
-				}
-				values[kind] = value
-				id, _ := selectionfacts.NewID(definition.ID(), kind)
-				factIDs = append(factIDs, id)
+		definitionCount++
+		values := map[providercontract.SelectionFactKind]bool{}
+		var factIDs []selectionfacts.ID
+		for _, kind := range selected.RequestedFacts(
+			definition, packageID,
+		) {
+			value, exists := facts.Value(definition, kind)
+			if !exists {
+				return nil, fmt.Errorf(
+					"definition %s lacks requested selection fact %s",
+					definition, kind,
+				)
 			}
-			provider, witness, err := selected.Bind(providercontract.Query{
-				Definition: definition.ID(),
-				Package:    packageGraph.ID(),
-				Intrinsic:  disposition == source.DispositionUnsafeIntrinsic,
-				Facts:      values,
-			})
-			if err != nil {
-				return nil, err
-			}
-			depth := provider.Depth()
-			if err := validateCompatibility(definition, depth); err != nil {
-				return nil, err
-			}
-			record := DefinitionSelection{
-				definition: definition.ID(), provider: provider, depth: depth,
-				contractID: selected.ID(), contractFingerprint: selected.Fingerprint(),
-				witness: witness, facts: factIDs,
-			}
-			out.records = append(out.records, record)
-			firedExact[witness.RuleID] = true
+			values[kind] = value
+			id, _ := selectionfacts.NewID(definition, kind)
+			factIDs = append(factIDs, id)
 		}
-	}
-	for _, rule := range selected.Rules() {
-		if rule.Selector() == providercontract.SelectorExactDefinition &&
-			!firedExact[rule.ID()] {
-			return nil, fmt.Errorf("stale exact-definition rule %s", rule.ID())
+		provider, witness, err := selected.Bind(providercontract.Query{
+			Definition: definition,
+			Package:    packageID,
+			Intrinsic:  disposition == source.DispositionUnsafeIntrinsic,
+			Facts:      values,
+		})
+		if err != nil {
+			return nil, err
 		}
+		depth := provider.Depth()
+		if err := validateCompatibility(
+			definition,
+			depth,
+			disposition,
+		); err != nil {
+			return nil, err
+		}
+		record := DefinitionSelection{
+			definition: definition, provider: provider, depth: depth,
+			contractID: selected.ID(), contractFingerprint: selected.Fingerprint(),
+			witness: witness, facts: factIDs,
+		}
+		out.records = append(out.records, record)
 	}
 	sort.Slice(out.records, func(i, j int) bool {
 		return out.records[i].definition.String() < out.records[j].definition.String()
@@ -137,31 +140,57 @@ func SelectDefinitions(
 		}
 		out.byID[record.definition] = record
 	}
-	if len(out.records) != len(graph.Definitions()) {
+	if len(out.records) != definitionCount {
 		return nil, fmt.Errorf(
 			"selection cardinality %d does not match definition cardinality %d",
-			len(out.records), len(graph.Definitions()),
+			len(out.records), definitionCount,
 		)
 	}
 	return out, nil
 }
 
 func validateCompatibility(
-	definition structure.ImplementationDefinition,
+	definition identity.DefinitionID,
 	depth providercontract.EvidenceDepth,
+	disposition source.LanguageDisposition,
 ) error {
-	if !depth.Valid() {
-		return fmt.Errorf("definition %s has invalid evidence depth", definition.ID())
+	if definition.IsZero() ||
+		!definition.Kind().Valid() ||
+		!depth.Valid() ||
+		!disposition.Valid() {
+		return fmt.Errorf(
+			"definition compatibility requires valid identity, depth, and disposition",
+		)
+	}
+	intrinsicDisposition :=
+		disposition == source.DispositionBuiltinUniverse ||
+			disposition == source.DispositionUnsafeIntrinsic
+	if depth == providercontract.DepthIntrinsic {
+		if !intrinsicDisposition ||
+			definition.SyntheticRole().Valid() {
+			return fmt.Errorf(
+				"definition %s cannot use intrinsic evidence",
+				definition,
+			)
+		}
+		return nil
+	}
+	if intrinsicDisposition {
+		return fmt.Errorf(
+			"intrinsic definition %s cannot use %s evidence",
+			definition,
+			depth,
+		)
 	}
 	switch definition.Kind() {
 	case identity.DefinitionBodylessDecl:
 		if depth == providercontract.DepthFullSemantic {
-			return fmt.Errorf("bodyless definition %s cannot be full-semantic", definition.ID())
+			return fmt.Errorf("bodyless definition %s cannot be full-semantic", definition)
 		}
 	case identity.DefinitionImplicit:
-		if definition.ID().SyntheticRole().Valid() &&
+		if definition.SyntheticRole().Valid() &&
 			depth != providercontract.DepthExternalBoundary {
-			return fmt.Errorf("synthetic definition %s must be external-boundary", definition.ID())
+			return fmt.Errorf("synthetic definition %s must be external-boundary", definition)
 		}
 	}
 	return nil

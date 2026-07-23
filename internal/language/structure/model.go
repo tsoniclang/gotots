@@ -482,45 +482,63 @@ type Work struct {
 	SortComparisons int
 }
 
-// Graph is the immutable whole-universe structural artifact.
+type certifiedFileProjection struct {
+	id         identity.FileID
+	byteDigest string
+}
+
+type packageProjection struct {
+	id                 identity.PackageID
+	certifiedFiles     []certifiedFileProjection
+	certifiedSynthetic bool
+}
+
+// Graph is the immutable logical whole-universe structural artifact. Locally
+// extracted package records are resident. Certified records remain in their
+// content-addressed provider artifact and are projected one package at a time.
 type Graph struct {
-	version       int
-	packages      []PackageGraph
-	occurrenceIDs []identity.OccurrenceID
-	byOccurrence  map[identity.OccurrenceID]*Occurrence
-	definitionIDs []identity.DefinitionID
-	byDefinition  map[identity.DefinitionID]*ImplementationDefinition
-	byBoundary    map[identity.DefinitionID]*ExecutionBoundary
-	work          Work
+	version           int
+	packages          []PackageGraph
+	projections       []packageProjection
+	provider          *ProviderArtifact
+	definitions       []DefinitionCensusRecord
+	definitionByID    map[identity.DefinitionID]*DefinitionCensusRecord
+	headerOccurrences int
+	boundaryEntries   int
+	occurrenceIDs     []identity.OccurrenceID
+	byOccurrence      map[identity.OccurrenceID]*Occurrence
+	definitionIDs     []identity.DefinitionID
+	byDefinition      map[identity.DefinitionID]*ImplementationDefinition
+	byBoundary        map[identity.DefinitionID]*ExecutionBoundary
+	work              Work
 }
 
 func (g *Graph) Version() int { return g.version }
-func (g *Graph) Packages() []PackageGraph {
-	return append([]PackageGraph(nil), g.packages...)
-}
-func (g *Graph) Work() Work { return g.work }
-func (g *Graph) Occurrences() []Occurrence {
+func (g *Graph) Work() Work   { return g.work }
+func (g *Graph) residentOccurrences() []Occurrence {
 	out := make([]Occurrence, 0, len(g.occurrenceIDs))
 	for _, id := range g.occurrenceIDs {
 		out = append(out, *g.byOccurrence[id])
 	}
 	return out
 }
-func (g *Graph) Occurrence(id identity.OccurrenceID) (Occurrence, bool) {
+func (g *Graph) residentOccurrence(
+	id identity.OccurrenceID,
+) (Occurrence, bool) {
 	occurrence, ok := g.byOccurrence[id]
 	if !ok {
 		return Occurrence{}, false
 	}
 	return *occurrence, true
 }
-func (g *Graph) Definitions() []ImplementationDefinition {
+func (g *Graph) residentDefinitions() []ImplementationDefinition {
 	out := make([]ImplementationDefinition, 0, len(g.definitionIDs))
 	for _, id := range g.definitionIDs {
 		out = append(out, *g.byDefinition[id])
 	}
 	return out
 }
-func (g *Graph) Definition(
+func (g *Graph) residentDefinition(
 	id identity.DefinitionID,
 ) (ImplementationDefinition, bool) {
 	definition, ok := g.byDefinition[id]
@@ -529,7 +547,7 @@ func (g *Graph) Definition(
 	}
 	return *definition, true
 }
-func (g *Graph) Boundary(
+func (g *Graph) residentBoundary(
 	id identity.DefinitionID,
 ) (ExecutionBoundary, bool) {
 	boundary, ok := g.byBoundary[id]

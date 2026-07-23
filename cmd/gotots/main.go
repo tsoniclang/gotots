@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/tsoniclang/gotots/internal/compiler"
+	"github.com/tsoniclang/gotots/internal/scope/contract"
 	"github.com/tsoniclang/gotots/internal/scope/sourceplan"
 	"github.com/tsoniclang/gotots/internal/source"
 )
@@ -195,16 +196,48 @@ func runAuditCatalog(arguments []string, stdout io.Writer) error {
 	}
 	_, err = fmt.Fprintf(
 		stdout,
-		"provider audit: packageContexts=%d files=%d syntheticPackages=%d facts=%d encodedBytes=%d unknown=0 -> %s\ncertifiedDigest=%s\n",
+		"provider audit: packageContexts=%d files=%d syntheticPackages=%d definitions=%d headerOccurrences=%d boundaryEntries=%d facts=%d largestShardBytes=%d largestPackageRecords=%d encodedBytes=%d unknown=0 -> %s\ncertifiedDigest=%s\n",
 		result.PackageContexts,
 		result.Files,
 		result.SyntheticPackages,
+		result.Definitions,
+		result.HeaderOccurrences,
+		result.BoundaryEntries,
 		result.Facts,
+		result.LargestShardBytes,
+		result.LargestPackageRecords,
 		result.EncodedBytes,
 		output,
 		result.Digest,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	for index, record := range result.LargestPackages() {
+		if _, err := fmt.Fprintf(
+			stdout,
+			"provider-production-tail rank=%d package=%s bytes=%d records=%d\n",
+			index+1,
+			record.Package,
+			record.Bytes,
+			record.Records,
+		); err != nil {
+			return err
+		}
+	}
+	for index, record := range result.LargestHeaders() {
+		if _, err := fmt.Fprintf(
+			stdout,
+			"provider-header-tail rank=%d header=%s encodedBytes=%d occurrences=%d\n",
+			index+1,
+			record.Header,
+			record.EncodedBytes,
+			record.Occurrences,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func runAuditVerify(arguments []string, stdout io.Writer) error {
@@ -270,33 +303,63 @@ func printInspection(
 	selections := inspection.Selections()
 	executableInventory := inspection.Executable()
 	definitionCount := 0
+	fullSemanticDefinitions := 0
+	declarationContractDefinitions := 0
+	externalBoundaryDefinitions := 0
+	intrinsicDefinitions := 0
 	headerOccurrences := 0
 	boundaryEntries := 0
-	for _, pkg := range inspection.Structure().Packages() {
-		for _, definition := range pkg.Definitions() {
-			definitionCount++
-			_, selected := selections.For(definition.ID())
-			if !selected {
-				return fmt.Errorf(
-					"verified inspection lost selection %s",
-					definition.ID(),
-				)
-			}
-		}
-		for _, header := range pkg.Headers() {
-			headerOccurrences += len(header.Members())
-		}
-		for _, boundary := range pkg.Boundaries() {
-			boundaryEntries += len(boundary.Entries())
+	for _, record := range inspection.Structure().DefinitionCensus() {
+		definition := record.ID()
+		definitionCount++
+		if _, selected := selections.For(definition); !selected {
+			return fmt.Errorf(
+				"verified inspection lost selection %s",
+				definition,
+			)
 		}
 	}
+	for _, selection := range selections.Records() {
+		switch selection.Depth() {
+		case contract.DepthFullSemantic:
+			fullSemanticDefinitions++
+		case contract.DepthDeclarationContract:
+			declarationContractDefinitions++
+		case contract.DepthExternalBoundary:
+			externalBoundaryDefinitions++
+		case contract.DepthIntrinsic:
+			intrinsicDefinitions++
+		default:
+			return fmt.Errorf(
+				"verified inspection has invalid evidence depth %s",
+				selection.Depth(),
+			)
+		}
+	}
+	if fullSemanticDefinitions+
+		declarationContractDefinitions+
+		externalBoundaryDefinitions+
+		intrinsicDefinitions != definitionCount {
+		return fmt.Errorf(
+			"verified inspection evidence-depth partition is %d/%d",
+			fullSemanticDefinitions+
+				declarationContractDefinitions+
+				externalBoundaryDefinitions+
+				intrinsicDefinitions,
+			definitionCount,
+		)
+	}
+	headerOccurrences = inspection.Structure().HeaderOccurrenceCount()
+	boundaryEntries = inspection.Structure().BoundaryEntryCount()
+	provider := inspection.Structure().ProviderManifestStats()
+	projection := inspection.Structure().ProviderProjectionStats()
 	executableOccurrences := 0
 	for _, region := range executableInventory.Regions() {
 		executableOccurrences += len(region.Members())
 	}
 	hydration := inspection.Hydration()
-	return print(
-		"denominators: closurePackages=%d structuralFiles=%d localAuthorityFiles=%d certifiedAuthorityFiles=%d hydratedPackages=%d localSyntaxFiles=%d localSyntaxBytes=%d checkedViewPackages=%d definitions=%d selections=%d headers=%d headerOccurrences=%d boundaries=%d boundaryEntries=%d executableRegions=%d executableOccurrences=%d selectionFacts=%d unknownConstructs=0 unknownDirectives=0\n",
+	if err := print(
+		"denominators: closurePackages=%d structuralFiles=%d localAuthorityFiles=%d certifiedAuthorityFiles=%d hydratedPackages=%d localSyntaxFiles=%d localSyntaxBytes=%d checkedViewPackages=%d definitions=%d residentDefinitions=%d selections=%d fullSemanticDefinitions=%d declarationContractDefinitions=%d externalBoundaryDefinitions=%d intrinsicDefinitions=%d headers=%d headerOccurrences=%d boundaries=%d boundaryEntries=%d residentOccurrences=%d executableRegions=%d executableOccurrences=%d selectionFacts=%d providerPackages=%d providerFiles=%d providerDefinitions=%d providerFacts=%d largestProviderShardBytes=%d largestManifestPackageRecords=%d providerShardLoads=%d providerCacheHits=%d maxProviderPackagesResident=%d largestProjectedPackageBytes=%d largestProjectedPackageRecords=%d unknownConstructs=0 unknownDirectives=0\n",
 		len(workspace.Packages()),
 		len(inspection.SourcePlan().Files()),
 		localSourceFiles,
@@ -306,13 +369,66 @@ func printInspection(
 		hydration.LocalBytes,
 		hydration.CheckedPackages,
 		definitionCount,
+		len(inspection.Structure().ResidentDefinitions()),
 		len(selections.Records()),
+		fullSemanticDefinitions,
+		declarationContractDefinitions,
+		externalBoundaryDefinitions,
+		intrinsicDefinitions,
 		definitionCount,
 		headerOccurrences,
 		definitionCount,
 		boundaryEntries,
+		len(inspection.Structure().ResidentOccurrences()),
 		len(executableInventory.Regions()),
 		executableOccurrences,
 		len(inspection.SelectionFacts().Facts()),
-	)
+		provider.PackageContexts,
+		provider.Files,
+		provider.Definitions,
+		provider.SelectionFacts,
+		provider.LargestShardBytes,
+		provider.LargestPackageRecords,
+		projection.ShardLoads,
+		projection.CacheHits,
+		projection.MaxResidentPackages,
+		projection.LargestPackageBytes,
+		projection.LargestPackageRecords,
+	); err != nil {
+		return err
+	}
+	for index, record := range provider.LargestShards() {
+		if err := print(
+			"provider-manifest-tail rank=%d package=%s bytes=%d records=%d\n",
+			index+1,
+			record.Package,
+			record.Bytes,
+			record.Records,
+		); err != nil {
+			return err
+		}
+	}
+	for index, record := range projection.LargestPackages() {
+		if err := print(
+			"provider-projection-tail rank=%d package=%s bytes=%d records=%d\n",
+			index+1,
+			record.Package,
+			record.Bytes,
+			record.Records,
+		); err != nil {
+			return err
+		}
+	}
+	for index, record := range inspection.Structure().LargestHeaderArtifacts() {
+		if err := print(
+			"header-tail rank=%d header=%s encodedBytes=%d occurrences=%d\n",
+			index+1,
+			record.Header,
+			record.EncodedBytes,
+			record.Occurrences,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
 }

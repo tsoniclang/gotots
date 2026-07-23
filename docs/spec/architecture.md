@@ -236,13 +236,23 @@ Every definition receives one closed evidence depth through its separate
 | `intrinsic` | typed definition/site/header owner and intrinsic operation descriptor, no ordinary source executable region | `builtin`, `unsafe`, and genuine language/toolchain intrinsics |
 
 Definition kind and evidence depth form a validated closed compatibility
-matrix. A source declaration/literal/initializer may be full only with complete
-recursive checked evidence. A cataloged implicit implementation may be full
-only with an exact typed implicit executable graph. A bodyless obligation
-cannot be full-semantic merely because a provider exists; it remains a
-declaration/external boundary until a later concrete manual or external
-`ImplementationID` satisfies it. Intrinsic depth is valid only for cataloged
-language/toolchain semantics. Every invalid pair fails selection.
+matrix:
+
+| Definition class | Ordinary-source depths | Intrinsic-package depths |
+|---|---|---|
+| bodyful function/method declaration, function literal, package initializer | `full-semantic`, `declaration-contract`, or `external-boundary` | `intrinsic` only |
+| bodyless implementation obligation | `declaration-contract` or `external-boundary` | `intrinsic` only |
+| cataloged implicit implementation | `full-semantic`, `declaration-contract`, or `external-boundary` | `intrinsic` only |
+| package-synthetic checked/external adapter | `external-boundary` only | none |
+
+Invalid dispositions and depths reject every definition. An intrinsic package
+cannot be rebound to a non-intrinsic provider, and an ordinary package cannot be
+rebound to intrinsic depth. A source declaration/literal/initializer may be
+full only with complete recursive checked evidence. A cataloged implicit
+implementation may be full only with an exact typed implicit executable graph.
+A bodyless obligation cannot be full-semantic merely because a provider exists;
+it remains a declaration/external boundary until a later concrete manual or
+external `ImplementationID` satisfies it. Every invalid pair fails selection.
 
 Files and packages may aggregate definitions at several depths and therefore
 have no inferred depth. The four sets are disjoint and total by `DefinitionID`.

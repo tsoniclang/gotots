@@ -1,6 +1,8 @@
 package stagecheck
 
 import (
+	"fmt"
+
 	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/selectionfacts"
 	"github.com/tsoniclang/gotots/internal/language/structure"
@@ -47,6 +49,11 @@ func VerifyProviderManifest(
 		packageID, err := identity.ParsePackageID(packageText)
 		if err != nil {
 			return err
+		}
+		if _, present := artifact.PackageCensus(packageID); !present {
+			problems.add(
+				"provider package census missing " + packageText,
+			)
 		}
 		actual, present := artifact.PackageInputDigest(packageID)
 		if !present {
@@ -125,15 +132,39 @@ func VerifyProducedProviderPackageArtifact(
 			"provider package input mismatch " + packageID.String(),
 		)
 	}
-	graphPackages := graph.Packages()
-	if len(graphPackages) != 1 ||
-		graphPackages[0].ID() != packageID {
+	var graphPackage structure.PackageGraph
+	packageCount := 0
+	if visitErr := graph.VisitPackages(
+		func(pkg structure.PackageGraph) error {
+			packageCount++
+			graphPackage = pkg
+			return nil
+		},
+	); visitErr != nil {
+		return visitErr
+	}
+	if packageCount != 1 ||
+		graphPackage.ID() != packageID {
 		problems.add(
 			"local graph is not exactly " + packageID.String(),
 		)
 	} else {
+		census, present := artifact.PackageCensus(packageID)
+		if !present {
+			problems.add(
+				"provider package census missing " +
+					packageID.String(),
+			)
+		} else if err := compareProviderPackageCensus(
+			graphPackage,
+			files,
+			synthetic[packageID.String()],
+			census,
+		); err != nil {
+			problems.add(err.Error())
+		}
 		localFiles := map[identity.FileID]structure.FileGraph{}
-		for _, file := range graphPackages[0].Files() {
+		for _, file := range graphPackage.Files() {
 			localFiles[file.Owner().ID().File()] = file
 		}
 		for fileText := range files {
@@ -166,7 +197,7 @@ func VerifyProducedProviderPackageArtifact(
 				if err := compareLedgers(
 					"provider-package-synthetic",
 					syntheticLedger(stored),
-					syntheticLedger(graphPackages[0]),
+					syntheticLedger(graphPackage),
 				); err != nil {
 					problems.add(err.Error())
 				}
@@ -183,10 +214,7 @@ func VerifyProducedProviderPackageArtifact(
 		}
 	}
 	actualFacts := map[string]int{}
-	storedFacts, err := artifact.CertifiedFactsForPackage(packageID)
-	if err != nil {
-		return err
-	}
+	storedFacts := artifact.CertifiedFactsForPackage(packageID)
 	for _, fact := range storedFacts {
 		actualFacts[certifiedFactKey(fact)]++
 	}
@@ -197,6 +225,95 @@ func VerifyProducedProviderPackageArtifact(
 		)
 	}
 	return nil
+}
+
+func compareProviderPackageCensus(
+	pkg structure.PackageGraph,
+	files map[string]bool,
+	includeSynthetic bool,
+	actual structure.ProviderPackageCensus,
+) error {
+	expectedDefinitions := newStructuralLedger()
+	headerOccurrences := 0
+	boundaryEntries := 0
+	for _, file := range pkg.Files() {
+		if !files[file.Owner().ID().File().String()] {
+			continue
+		}
+		for _, definition := range file.Definitions() {
+			expectedDefinitions.add(
+				"provider-definition-census",
+				providerCensusIdentity(pkg.ID(), definition.ID()),
+			)
+		}
+		for _, header := range file.Headers() {
+			headerOccurrences += len(header.Members())
+		}
+		for _, boundary := range file.Boundaries() {
+			boundaryEntries += len(boundary.Entries())
+		}
+	}
+	if includeSynthetic {
+		for _, definition := range pkg.Definitions() {
+			if definition.ID().SyntheticRole().Valid() {
+				expectedDefinitions.add(
+					"provider-definition-census",
+					providerCensusIdentity(
+						pkg.ID(),
+						definition.ID(),
+					),
+				)
+			}
+		}
+		for _, header := range pkg.Headers() {
+			if header.ID().Definition().SyntheticRole().Valid() {
+				headerOccurrences += len(header.Members())
+			}
+		}
+		for _, boundary := range pkg.Boundaries() {
+			if boundary.ID().Definition().SyntheticRole().Valid() {
+				boundaryEntries += len(boundary.Entries())
+			}
+		}
+	}
+	actualDefinitions := newStructuralLedger()
+	for _, definition := range actual.Definitions() {
+		actualDefinitions.add(
+			"provider-definition-census",
+			providerCensusIdentity(actual.Package(), definition),
+		)
+	}
+	if err := compareLedgers(
+		"provider-definition-census",
+		actualDefinitions,
+		expectedDefinitions,
+	); err != nil {
+		return err
+	}
+	if actual.Package() != pkg.ID() ||
+		actual.HeaderOccurrenceCount() != headerOccurrences ||
+		actual.BoundaryEntryCount() != boundaryEntries {
+		return &VerificationError{
+			Stage: "provider-definition-census",
+			Reason: fmt.Sprintf(
+				"package/count mismatch package=%s/%s headers=%d/%d boundaries=%d/%d",
+				actual.Package(),
+				pkg.ID(),
+				actual.HeaderOccurrenceCount(),
+				headerOccurrences,
+				actual.BoundaryEntryCount(),
+				boundaryEntries,
+			),
+		}
+	}
+	return nil
+}
+
+func providerCensusIdentity(
+	pkg identity.PackageID,
+	definition identity.DefinitionID,
+) string {
+	return pkg.String() + "|" + definition.String()
 }
 
 func expectedProviderSets(

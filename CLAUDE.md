@@ -204,6 +204,14 @@ TypeScript and broader suites. Only the coordinator runs heavy whole-product
 jobs; never stack them. Use bounded concurrency, disk-backed staging, memory
 preflight, and resumable breadcrumbs.
 
+Every heavy test, whole-repository test, cost run, cgo run, or test that can
+launch another compiler/toolchain must run as one process group with a timeout,
+bounded worker concurrency, a language-runtime memory limit, and an
+OS-enforced address-space or memory ceiling. Capture output in `.temp/` and
+print only bounded summaries. After an OOM, preserve the failed-run evidence,
+identify the exact child process and fixture, and redesign the trigger before
+rerunning; never retry the same path uncapped.
+
 Reports name exact identities, denominators, processing stages, gate states,
 and parent deltas. IR-admitted, emitted, typechecked, executed, and certified
 are distinct. “Complete” requires the specification's exact endpoint:

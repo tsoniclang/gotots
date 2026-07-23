@@ -22,7 +22,13 @@ func Validate(
 	definitions := map[identity.DefinitionID]structure.ImplementationDefinition{}
 	sites := map[identity.DefinitionID]structure.DefinitionSite{}
 	boundaries := map[identity.DefinitionID]structure.ExecutionBoundary{}
-	for _, pkg := range graph.Packages() {
+	census := map[identity.DefinitionID]bool{}
+	for _, record := range graph.DefinitionCensus() {
+		census[record.ID()] = true
+	}
+	if err := graph.VisitResidentPackages(func(
+		pkg structure.PackageGraph,
+	) error {
 		for _, definition := range pkg.Definitions() {
 			definitions[definition.ID()] = definition
 		}
@@ -32,13 +38,24 @@ func Validate(
 		for _, boundary := range pkg.Boundaries() {
 			boundaries[boundary.ID().Definition()] = boundary
 		}
+		return nil
+	}); err != nil {
+		return err
 	}
 	if err := validateInventoryIndexes(inventory); err != nil {
 		return err
 	}
+	for id := range inventory.byOccurrence {
+		if _, duplicated := graph.ResidentOccurrence(id); duplicated {
+			return fmt.Errorf(
+				"occurrence %s is duplicated across structural and executable stores",
+				id,
+			)
+		}
+	}
 	full := map[identity.DefinitionID]bool{}
 	for _, selection := range selections.Records() {
-		if _, present := definitions[selection.Definition()]; !present {
+		if !census[selection.Definition()] {
 			return fmt.Errorf(
 				"selection names absent definition %s",
 				selection.Definition(),
@@ -48,10 +65,10 @@ func Validate(
 			full[selection.Definition()] = true
 		}
 	}
-	if len(selections.Records()) != len(definitions) {
+	if len(selections.Records()) != len(census) {
 		return fmt.Errorf(
 			"selection/definition cardinality is %d/%d",
-			len(selections.Records()), len(definitions),
+			len(selections.Records()), len(census),
 		)
 	}
 	memberOwner := map[identity.OccurrenceID]identity.DefinitionID{}
@@ -233,7 +250,7 @@ func validateRegion(
 				region.id, reference.child,
 			)
 		}
-		root, found := graph.Occurrence(child.ID().Root())
+		root, found := graph.ResidentOccurrence(child.ID().Root())
 		if !found ||
 			root.Parent() != reference.parent ||
 			root.Edge() != reference.edge ||
@@ -282,7 +299,7 @@ func executableOccurrence(
 	inventory *Inventory,
 	id identity.OccurrenceID,
 ) (structure.Occurrence, bool) {
-	if occurrence, present := graph.Occurrence(id); present {
+	if occurrence, present := graph.ResidentOccurrence(id); present {
 		return occurrence, true
 	}
 	return inventory.AdditionalOccurrence(id)

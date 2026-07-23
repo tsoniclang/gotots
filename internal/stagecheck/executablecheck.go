@@ -41,7 +41,9 @@ func executableLedger(
 	actual := newStructuralLedger()
 	additional := map[identity.OccurrenceID]structure.Occurrence{}
 	for _, occurrence := range inventory.AdditionalOccurrences() {
-		if _, structural := graph.Occurrence(occurrence.ID()); structural {
+		if _, structural := graph.ResidentOccurrence(
+			occurrence.ID(),
+		); structural {
 			return nil, &VerificationError{
 				Stage: "executable-region",
 				Reason: "additional occurrence duplicates structural payload " +
@@ -74,7 +76,7 @@ func executableLedger(
 				}
 			}
 			memberSet[member] = true
-			if _, present := graph.Occurrence(member); !present {
+			if _, present := graph.ResidentOccurrence(member); !present {
 				if _, present = additional[member]; !present {
 					return nil, &VerificationError{
 						Stage: "executable-region",
@@ -134,7 +136,7 @@ func deriveExecutableLedger(
 	derivedFiles := map[identity.FileID]*derivedFile{}
 	definitionNodes := map[identity.DefinitionID]ast.Node{}
 	definitionAt := map[identity.OccurrenceID]identity.DefinitionID{}
-	for _, definition := range graph.Definitions() {
+	for _, definition := range graph.ResidentDefinitions() {
 		if !definition.ID().Root().IsZero() {
 			definitionAt[definition.ID().Root()] = definition.ID()
 		}
@@ -204,7 +206,9 @@ func deriveExecutableLedger(
 		if err != nil {
 			return nil, err
 		}
-		root, present := graph.Occurrence(selection.Definition().Root())
+		root, present := graph.ResidentOccurrence(
+			selection.Definition().Root(),
+		)
 		if !present {
 			return nil, fmt.Errorf(
 				"definition root %s is absent", selection.Definition().Root(),
@@ -302,7 +306,9 @@ func (b *independentExecutableBuilder) visit(
 	if err != nil {
 		return err
 	}
-	if structural, present := b.graph.Occurrence(occurrence.id); present {
+	if structural, present := b.graph.ResidentOccurrence(
+		occurrence.id,
+	); present {
 		if occurrenceKey(structural) != occurrence.key() {
 			return fmt.Errorf(
 				"independent executable occurrence %s conflicts with structure",

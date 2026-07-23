@@ -13,6 +13,7 @@ import (
 type providerAdmission struct {
 	artifact    *ProviderArtifact
 	definitions map[identity.DefinitionID]bool
+	facts       map[certifiedFactID]bool
 }
 
 func newProviderAdmission(
@@ -32,12 +33,15 @@ func newProviderAdmission(
 			fileDigests:           map[identity.FileID]string{},
 			fileGraphs:            map[identity.FileID]FileGraph{},
 			filePackages:          map[identity.FileID]identity.PackageID{},
+			packageFiles:          map[identity.PackageID][]identity.FileID{},
 			packageDigests:        map[identity.PackageID]string{},
 			packageGraphs:         map[identity.PackageID]PackageGraph{},
+			packageCensus:         map[identity.PackageID]ProviderPackageCensus{},
 			syntheticPackages:     map[identity.PackageID]bool{},
-			factsByID:             map[certifiedFactID]CertifiedFact{},
+			factsByPackage:        map[identity.PackageID][]CertifiedFact{},
 		},
 		definitions: map[identity.DefinitionID]bool{},
+		facts:       map[certifiedFactID]bool{},
 	}, nil
 }
 
@@ -132,6 +136,10 @@ func (a *providerAdmission) addPackage(
 			)
 		}
 		a.artifact.filePackages[file] = pkg
+		a.artifact.packageFiles[pkg] = append(
+			a.artifact.packageFiles[pkg],
+			file,
+		)
 	}
 	if len(record.Definitions) == 0 {
 		if len(record.Owners) != 0 ||
@@ -186,23 +194,92 @@ func (a *providerAdmission) addFact(record artifactFact) error {
 				definition.String(),
 		)
 	}
-	if _, duplicate := a.artifact.factsByID[id]; duplicate {
+	if a.facts[id] {
 		return providerArtifactError(
 			"artifact duplicates selection fact " +
 				definition.String() + "/" + kind.String(),
 		)
 	}
-	a.artifact.factsByID[id] = fact
+	packageID := a.artifact.packageForDefinition(definition)
+	if packageID.IsZero() {
+		return providerArtifactError(
+			"selection fact has no package " + definition.String(),
+		)
+	}
+	a.facts[id] = true
+	a.artifact.factsByPackage[packageID] = append(
+		a.artifact.factsByPackage[packageID],
+		fact,
+	)
+	a.artifact.factCount++
 	return nil
 }
 
 func (a *providerAdmission) finish() (*ProviderArtifact, error) {
+	if len(a.artifact.packageDigests) != 1 {
+		return nil, providerArtifactError(
+			"provider shard must contain exactly one package context",
+		)
+	}
 	if len(a.artifact.filePackages) != len(a.artifact.fileGraphs) {
 		return nil, providerArtifactError(
 			"one or more files have no package context",
 		)
 	}
+	if err := sealProviderPackageCensus(a.artifact); err != nil {
+		return nil, err
+	}
+	pkg, err := admittedProviderPackage(a.artifact)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateCompletePackage(pkg); err != nil {
+		return nil, providerArtifactError(
+			"package graph is structurally invalid: " + err.Error(),
+		)
+	}
 	return a.artifact, nil
+}
+
+func admittedProviderPackage(
+	artifact *ProviderArtifact,
+) (PackageGraph, error) {
+	var packageID identity.PackageID
+	for candidate := range artifact.packageDigests {
+		packageID = candidate
+	}
+	pkg := PackageGraph{id: packageID}
+	for _, fileID := range artifact.packageFiles[packageID] {
+		file, present := artifact.fileGraphs[fileID]
+		if !present {
+			return PackageGraph{}, providerArtifactError(
+				"provider package omits file graph " + fileID.String(),
+			)
+		}
+		pkg.files = append(pkg.files, file)
+	}
+	if synthetic, present := artifact.packageGraphs[packageID]; present {
+		pkg.synthetic = append(pkg.synthetic, synthetic.synthetic...)
+		pkg.ownedDefinitions = append(
+			pkg.ownedDefinitions,
+			synthetic.ownedDefinitions...,
+		)
+		pkg.ownedSites = append(pkg.ownedSites, synthetic.ownedSites...)
+		pkg.ownedHeaders = append(
+			pkg.ownedHeaders,
+			synthetic.ownedHeaders...,
+		)
+		pkg.ownedBoundaries = append(
+			pkg.ownedBoundaries,
+			synthetic.ownedBoundaries...,
+		)
+	}
+	if len(pkg.files) == 0 && len(pkg.synthetic) == 0 {
+		return PackageGraph{}, providerArtifactError(
+			"provider package has no structural owner " + packageID.String(),
+		)
+	}
+	return pkg, nil
 }
 
 func validSHA256(value string) bool {
@@ -241,8 +318,11 @@ func admitProviderManifest(
 			!validSHA256(entry.InputDigest) ||
 			!validSHA256(entry.ShardDigest) ||
 			entry.ShardBytes <= 0 ||
-			entry.FactCount < 0 ||
+			entry.HeaderOccurrences < 0 ||
+			entry.BoundaryEntries < 0 ||
 			(len(entry.Files) == 0 && entry.Files != nil) ||
+			(len(entry.Definitions) == 0 && entry.Definitions != nil) ||
+			(len(entry.Facts) == 0 && entry.Facts != nil) ||
 			(len(entry.Files) == 0 && !entry.Synthetic) ||
 			!sort.StringsAreSorted(entry.Files) {
 			return nil, nil, providerArtifactError(
@@ -281,10 +361,113 @@ func admitProviderManifest(
 				)
 			}
 			artifact.filePackages[fileID] = packageID
+			artifact.packageFiles[packageID] = append(
+				artifact.packageFiles[packageID],
+				fileID,
+			)
 			record.files = append(record.files, fileID)
 			previousFile = fileText
 		}
-		artifact.manifestFacts += entry.FactCount
+		definitions := make(
+			[]identity.DefinitionID,
+			0,
+			len(entry.Definitions),
+		)
+		previousDefinition := ""
+		for _, definitionText := range entry.Definitions {
+			if definitionText <= previousDefinition {
+				return nil, nil, providerArtifactError(
+					"provider manifest definitions are noncanonical",
+				)
+			}
+			definition, err := identity.ParseDefinitionID(
+				definitionText,
+			)
+			if err != nil {
+				return nil, nil, err
+			}
+			belongs := !definition.File().IsZero() &&
+				artifact.filePackages[definition.File()] == packageID
+			if definition.SyntheticRole().Valid() {
+				belongs = definition.Package() == packageID &&
+					entry.Synthetic
+			}
+			if !belongs {
+				return nil, nil, providerArtifactError(
+					"provider manifest definition has no package authority " +
+						definition.String(),
+				)
+			}
+			if admission.definitions[definition] {
+				return nil, nil, providerArtifactError(
+					"provider manifest duplicates definition " +
+						definition.String(),
+				)
+			}
+			admission.definitions[definition] = true
+			definitions = append(definitions, definition)
+			previousDefinition = definitionText
+		}
+		census, err := newProviderPackageCensus(
+			packageID,
+			definitions,
+			entry.HeaderOccurrences,
+			entry.BoundaryEntries,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		artifact.packageCensus[packageID] = census
+		previousFact := ""
+		for _, encoded := range entry.Facts {
+			definition, err := identity.ParseDefinitionID(
+				encoded.Definition,
+			)
+			if err != nil {
+				return nil, nil, err
+			}
+			kind := contract.SelectionFactKind(encoded.Kind)
+			fact, err := NewCertifiedFact(
+				definition,
+				kind,
+				encoded.Value,
+				encoded.ProducerDigest,
+				encoded.EvidenceDigest,
+			)
+			if err != nil {
+				return nil, nil, err
+			}
+			key := fmt.Sprintf(
+				"%s/%03d", definition, uint8(kind),
+			)
+			if key <= previousFact {
+				return nil, nil, providerArtifactError(
+					"provider manifest facts are noncanonical",
+				)
+			}
+			previousFact = key
+			if !admission.definitions[definition] {
+				return nil, nil, providerArtifactError(
+					"provider manifest fact has no definition " +
+						definition.String(),
+				)
+			}
+			id := certifiedFactID{
+				definition: definition,
+				kind:       kind,
+			}
+			if admission.facts[id] {
+				return nil, nil, providerArtifactError(
+					"provider manifest duplicates fact " + key,
+				)
+			}
+			admission.facts[id] = true
+			artifact.factsByPackage[packageID] = append(
+				artifact.factsByPackage[packageID],
+				fact,
+			)
+			artifact.factCount++
+		}
 		admitted = append(admitted, record)
 		previousPackage = entry.Package
 	}

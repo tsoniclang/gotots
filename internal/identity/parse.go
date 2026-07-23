@@ -29,7 +29,18 @@ func ParseOwner(s string) (Owner, error) {
 		if err != nil {
 			return Owner{}, err
 		}
-		return NewModuleOwner(module)
+		owner, err := NewModuleOwner(module)
+		if err != nil {
+			return Owner{}, err
+		}
+		if owner.String() != s {
+			return Owner{}, &Error{
+				Identity: "owner",
+				Value:    s,
+				Reason:   "serialization is not canonical",
+			}
+		}
+		return owner, nil
 	}
 	return Owner{}, &Error{Identity: "owner", Value: s, Reason: "not a canonical owner serialization"}
 }

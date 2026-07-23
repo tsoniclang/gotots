@@ -24,7 +24,7 @@ func Build(
 	}
 	definitions := map[identity.DefinitionID]structure.ImplementationDefinition{}
 	definitionAt := map[identity.OccurrenceID]identity.DefinitionID{}
-	for _, definition := range graph.Definitions() {
+	for _, definition := range graph.ResidentDefinitions() {
 		definitions[definition.ID()] = definition
 		if !definition.ID().Root().IsZero() {
 			definitionAt[definition.ID().Root()] = definition.ID()
@@ -110,7 +110,7 @@ func buildRegion(
 		work:         work,
 		region:       &region,
 	}
-	boundary, present := graph.Boundary(definition.ID())
+	boundary, present := graph.ResidentBoundary(definition.ID())
 	if !present {
 		return Region{}, fmt.Errorf(
 			"full definition %s has no execution boundary", definition.ID(),
@@ -126,7 +126,7 @@ func buildRegion(
 	}
 	for entryIndex, entry := range entries {
 		entryNode := entryNodes[entryIndex]
-		entryOccurrence, present := graph.Occurrence(entry.ID())
+		entryOccurrence, present := graph.ResidentOccurrence(entry.ID())
 		if !present {
 			return Region{}, fmt.Errorf(
 				"boundary entry %s has no structural occurrence", entry.ID(),
@@ -287,7 +287,9 @@ func (b *regionBuilder) recordOccurrence(
 	occurrence structure.Occurrence,
 ) error {
 	b.work.JoinProbes++
-	if structural, present := b.graph.Occurrence(occurrence.ID()); present {
+	if structural, present := b.graph.ResidentOccurrence(
+		occurrence.ID(),
+	); present {
 		if structural != occurrence {
 			return fmt.Errorf(
 				"executable occurrence %s conflicts with structural payload",

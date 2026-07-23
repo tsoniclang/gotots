@@ -113,8 +113,9 @@ func DecodeProviderArtifact(
 		return nil, err
 	}
 	artifact.storage = &providerStorage{
-		path: absolutePath, shards: map[identity.PackageID]providerShard{},
-		loaded: map[identity.PackageID]*ProviderArtifact{},
+		path:      absolutePath,
+		shards:    map[identity.PackageID]providerShard{},
+		projected: map[identity.PackageID]ProviderPackageSize{},
 	}
 	offset := int64(providerContainerHeaderBytes) + manifestBytes
 	for _, record := range admitted {
@@ -126,11 +127,11 @@ func DecodeProviderArtifact(
 		}
 		artifact.storage.shards[record.id] = providerShard{
 			offset: offset, bytes: entry.ShardBytes,
-			digest: entry.ShardDigest, factCount: entry.FactCount,
+			digest:    entry.ShardDigest,
 			synthetic: entry.Synthetic, files: record.files,
 			inputDigest: entry.InputDigest,
+			census:      artifact.packageCensus[record.id],
 		}
-		artifact.storage.factCount += entry.FactCount
 		offset += entry.ShardBytes
 	}
 	if offset != stat.Size() {

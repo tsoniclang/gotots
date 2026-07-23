@@ -18,12 +18,27 @@ import (
 // ProviderWriteResult reports exact physical and logical artifact
 // denominators after atomic publication.
 type ProviderWriteResult struct {
-	Digest            string
-	EncodedBytes      int64
-	PackageContexts   int
-	Files             int
-	SyntheticPackages int
-	Facts             int
+	Digest                string
+	EncodedBytes          int64
+	PackageContexts       int
+	Files                 int
+	SyntheticPackages     int
+	Definitions           int
+	HeaderOccurrences     int
+	BoundaryEntries       int
+	Facts                 int
+	LargestShardBytes     int64
+	LargestPackageRecords int
+	largestPackages       []ProviderPackageSize
+	largestHeaders        []HeaderArtifactSize
+}
+
+func (r ProviderWriteResult) LargestPackages() []ProviderPackageSize {
+	return append([]ProviderPackageSize(nil), r.largestPackages...)
+}
+
+func (r ProviderWriteResult) LargestHeaders() []HeaderArtifactSize {
+	return append([]HeaderArtifactSize(nil), r.largestHeaders...)
 }
 
 // ProviderArtifactWriter owns one disk-backed package-sharded publication.
@@ -103,8 +118,11 @@ func (w *ProviderArtifactWriter) Append(
 		return fmt.Errorf("provider shard offset: %w", err)
 	}
 	shardHash := sha256.New()
+	shardArtifact := *artifact
+	shardArtifact.factsByPackage = map[identity.PackageID][]CertifiedFact{}
+	shardArtifact.factCount = 0
 	if err := encodeProviderArtifact(
-		io.MultiWriter(w.spool, shardHash), artifact,
+		io.MultiWriter(w.spool, shardHash), &shardArtifact,
 	); err != nil {
 		return err
 	}
@@ -116,9 +134,31 @@ func (w *ProviderArtifactWriter) Append(
 		Package:     packageID.String(),
 		InputDigest: artifact.packageDigests[packageID],
 		Synthetic:   artifact.syntheticPackages[packageID],
-		FactCount:   artifact.FactCount(),
 		ShardBytes:  end - start,
 		ShardDigest: fmt.Sprintf("%x", shardHash.Sum(nil)),
+	}
+	census, present := artifact.PackageCensus(packageID)
+	if !present {
+		return providerArtifactError(
+			"provider shard has no definition census",
+		)
+	}
+	for _, definition := range census.Definitions() {
+		entry.Definitions = append(
+			entry.Definitions,
+			definition.String(),
+		)
+	}
+	entry.HeaderOccurrences = census.HeaderOccurrenceCount()
+	entry.BoundaryEntries = census.BoundaryEntryCount()
+	for _, fact := range orderedCertifiedFacts(artifact) {
+		entry.Facts = append(entry.Facts, artifactFact{
+			Definition:     fact.definition.String(),
+			Kind:           uint8(fact.kind),
+			Value:          fact.value,
+			ProducerDigest: fact.producerDigest,
+			EvidenceDigest: fact.evidenceDigest,
+		})
 	}
 	for file, owner := range artifact.filePackages {
 		if owner != packageID {
@@ -136,7 +176,29 @@ func (w *ProviderArtifactWriter) Append(
 	if entry.Synthetic {
 		w.result.SyntheticPackages++
 	}
-	w.result.Facts += entry.FactCount
+	w.result.Definitions += len(entry.Definitions)
+	w.result.HeaderOccurrences += entry.HeaderOccurrences
+	w.result.BoundaryEntries += entry.BoundaryEntries
+	w.result.Facts += len(entry.Facts)
+	if entry.ShardBytes > w.result.LargestShardBytes {
+		w.result.LargestShardBytes = entry.ShardBytes
+	}
+	records := providerDetailedRecordCount(artifact)
+	if records > w.result.LargestPackageRecords {
+		w.result.LargestPackageRecords = records
+	}
+	w.result.largestPackages = append(
+		w.result.largestPackages,
+		ProviderPackageSize{
+			Package: packageID,
+			Bytes:   entry.ShardBytes,
+			Records: records,
+		},
+	)
+	w.result.largestHeaders = mergeHeaderArtifactSizes(
+		w.result.largestHeaders,
+		providerHeaderArtifactSizes(artifact),
+	)
 	return nil
 }
 
@@ -167,6 +229,11 @@ func (w *ProviderArtifactWriter) Finish() (
 	}
 	w.result.Digest = digest
 	w.result.EncodedBytes = encodedBytes
+	sortProviderPackageSizes(w.result.largestPackages)
+	if len(w.result.largestPackages) > providerTailLimit {
+		w.result.largestPackages =
+			w.result.largestPackages[:providerTailLimit]
+	}
 	w.closed = true
 	_ = w.spool.Close()
 	_ = os.Remove(w.spoolPath)

@@ -344,6 +344,13 @@ The finalized cost/attestation gate fails closed in the certification
 environment: a portable unit suite may omit the expensive isolated run, but the
 phase-exit attestation gate may not silently skip it, and it binds the exact
 source, toolchain, provider, environment, and fixture revisions measured.
+Every certification command that can launch another compiler or toolchain runs
+as one process group with a timeout plus forced-kill grace period, bounded
+concurrency, a language-runtime memory limit, and an OS-enforced address-space
+or memory ceiling. Output is disk-backed under `.temp/` with a bounded rendered
+summary. OOM, timeout, and semantic failure remain distinct retained evidence;
+an OOM is never retried uncapped, and a pathological fixture is redesigned
+before rerun without weakening the semantic or asymptotic mutation it proves.
 
 Generic context classification also has an independent type-semantics matrix.
 It covers normalized unions and intersections, tilde terms, empty and mixed

@@ -55,7 +55,9 @@ func buildEvidenceIndex(
 		sort.Strings(packageParts)
 		out.packages[pkg.ID()] = digest(packageParts...)
 	}
-	for _, pkg := range graph.Packages() {
+	if err := graph.VisitResidentPackages(func(
+		pkg structure.PackageGraph,
+	) error {
 		headers := map[identity.DefinitionID]string{}
 		boundaries := map[identity.DefinitionID]string{}
 		mappings := map[identity.DefinitionID]string{}
@@ -76,13 +78,6 @@ func buildEvidenceIndex(
 			)
 		}
 		for _, definition := range pkg.Definitions() {
-			if headers[definition.ID()] == "" ||
-				boundaries[definition.ID()] == "" {
-				return nil, fmt.Errorf(
-					"definition %s lacks structural fact evidence",
-					definition.ID(),
-				)
-			}
 			out.definitions[definition.ID()] = definitionEvidence{
 				pkg:      pkg.ID(),
 				fileHash: fileHashes[definition.ID().File()],
@@ -91,6 +86,9 @@ func buildEvidenceIndex(
 				mapping:  mappings[definition.ID()],
 			}
 		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 	return out, nil
 }

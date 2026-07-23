@@ -7,9 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/language/catalog"
 )
 
-// Validate enforces the closed Stage-1 structural schema, canonical occurrence
-// ownership, rooted containment, and exact record cardinalities.
-func Validate(graph *Graph) error {
+func validateCompleteGraph(graph *Graph) error {
 	if graph == nil || graph.version != ArtifactVersion {
 		return fmt.Errorf("invalid structural artifact version")
 	}

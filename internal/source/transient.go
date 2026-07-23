@@ -73,10 +73,10 @@ func (p *LoadedPackage) Inputs() []Input {
 	return out
 }
 
-// CheckerView is the narrow, transient type-query capability the analyze
-// traversal uses over the one checker graph. It is source-owned and never
-// survives into the finalized workspace; the finalized API exposes only
-// identity-keyed immutable facts.
+// CheckerView is the narrow type-query capability Stage-1 fact/cgo extraction
+// and the Stage-2 frontend use over the one transient checker graph. It is
+// source-owned and never survives into the finalized workspace; the finalized
+// API exposes only identity-keyed immutable facts.
 func (p *LoadedPackage) CheckerView() *TypeInfoView { return newTypeInfoView(p.typesInfo) }
 
 // Types is the package's node in the one coherent type graph.

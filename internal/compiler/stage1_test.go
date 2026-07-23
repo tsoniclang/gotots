@@ -49,7 +49,7 @@ TEXT ·Read(SB), NOSPLIT, $0-48
 		t.Fatal(err)
 	}
 	graph := inspection.Structure()
-	definitions := graph.Definitions()
+	definitions := graph.ResidentDefinitions()
 	if len(definitions) != 6 {
 		t.Fatalf("definitions = %d, want 6", len(definitions))
 	}
@@ -112,7 +112,7 @@ TEXT ·Read(SB), NOSPLIT, $0-48
 
 	roles := map[catalog.Role]int{}
 	seen := map[identity.OccurrenceID]structure.Occurrence{}
-	for _, occurrence := range graph.Occurrences() {
+	for _, occurrence := range graph.ResidentOccurrences() {
 		seen[occurrence.ID()] = occurrence
 		if occurrence.Edge().Valid() {
 			roles[occurrence.Role()]++
@@ -167,7 +167,15 @@ func TestProviderArtifactAuditVerifyAndRelocatedConsumption(t *testing.T) {
 		t.Fatal(err)
 	}
 	if result.Digest == "" || result.EncodedBytes <= 0 ||
-		result.PackageContexts == 0 || result.Files == 0 {
+		result.PackageContexts == 0 ||
+		result.Files == 0 ||
+		result.Definitions == 0 ||
+		result.LargestShardBytes == 0 ||
+		result.LargestPackageRecords == 0 ||
+		len(result.LargestPackages()) == 0 ||
+		len(result.LargestPackages()) > 20 ||
+		len(result.LargestHeaders()) == 0 ||
+		len(result.LargestHeaders()) > 20 {
 		t.Fatalf("provider result is vacuous: %+v", result)
 	}
 	stat, err := os.Stat(path)
@@ -197,6 +205,23 @@ func TestProviderArtifactAuditVerifyAndRelocatedConsumption(t *testing.T) {
 	}
 	if len(inspection.Workspace().Packages()) <= 1 {
 		t.Fatal("provider fixture has no imported closure")
+	}
+	manifestStats := inspection.Structure().ProviderManifestStats()
+	projectionStats := inspection.Structure().ProviderProjectionStats()
+	if manifestStats.PackageContexts <= 1 ||
+		projectionStats.ShardLoads != manifestStats.PackageContexts ||
+		projectionStats.ProjectedPackages != manifestStats.PackageContexts ||
+		projectionStats.MaxResidentPackages != 1 ||
+		projectionStats.CacheHits == 0 ||
+		projectionStats.LargestPackageBytes == 0 ||
+		projectionStats.LargestPackageRecords == 0 ||
+		len(inspection.Structure().LargestHeaderArtifacts()) == 0 ||
+		len(inspection.Structure().LargestHeaderArtifacts()) > 20 {
+		t.Fatalf(
+			"provider manifest/projection stats = %+v / %+v",
+			manifestStats,
+			projectionStats,
+		)
 	}
 
 	t.Chdir(filepath.Dir(path))
@@ -255,18 +280,29 @@ func cParent() func() int {
 	_ = C.int(1)
 	return func() int { return 5 }
 }
-func main() { _, _, _, _, _ = pure(), shadow(), external(), parent(), cParent() }
+func signature() func(C.int) int {
+	return func(value C.int) int { return int(value) }
+}
+func main() { _, _, _, _, _, _ = pure(), shadow(), external(), parent(), cParent(), signature() }
 `)
 	request := source.Request{
 		Dir: dir, Patterns: []string{"."},
 		ProviderContract: contract.DefaultID,
+		Env:              []string{"CGO_ENABLED=1"},
 	}
-	base, err := source.ResolveUniverse(request)
+	providerPath := filepath.Join(t.TempDir(), "cgo-provider.gotots")
+	provider, err := AuditCatalog(request, providerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.AuditArtifact = providerPath
+	request.AuditArtifactDigest = provider.Digest
+	inspection, err := InspectConstructs(request)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var packageID identity.PackageID
-	for _, pkg := range base.Packages() {
+	for _, pkg := range inspection.Workspace().Packages() {
 		if pkg.RequestedRoot() {
 			packageID = pkg.ID()
 			break
@@ -275,17 +311,15 @@ func main() { _, _, _, _, _ = pure(), shadow(), external(), parent(), cParent() 
 	if packageID.IsZero() {
 		t.Fatal("cgo fixture has no root package")
 	}
-	derived, err := deriveProviderPackage(
-		request, base, mustDefaultContract(t), packageID,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer derived.discard()
 
 	definitions := map[identity.DefinitionID]structure.ImplementationDefinition{}
 	sites := map[identity.DefinitionID]structure.DefinitionSite{}
-	for _, pkg := range derived.graph.Packages() {
+	if err := inspection.Structure().VisitPackages(func(
+		pkg structure.PackageGraph,
+	) error {
+		if pkg.ID() != packageID {
+			return nil
+		}
 		for _, definition := range pkg.Definitions() {
 			definitions[definition.ID()] = definition
 		}
@@ -295,14 +329,21 @@ func main() { _, _, _, _, _ = pure(), shadow(), external(), parent(), cParent() 
 		if len(pkg.CheckedMappings()) == 0 {
 			t.Error("cgo package has no checked-definition mappings")
 		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
 	}
 	expected := map[string]bool{
 		"pure": false, "shadow": false, "external": true,
-		"parent": false, "cParent": true, "main": false,
+		"parent": false, "cParent": true, "signature": true,
+		"main":                   false,
 		"package initialization": false,
 	}
+	literalExpected := map[string]bool{
+		"parent": true, "cParent": false, "signature": true,
+	}
 	for id, definition := range definitions {
-		value, present := derived.facts.Value(
+		value, present := inspection.SelectionFacts().Value(
 			id, contract.SelectionFactCDependent,
 		)
 		if !present {
@@ -316,7 +357,11 @@ func main() { _, _, _, _, _ = pure(), shadow(), external(), parent(), cParent() 
 			}
 		case definition.Name() == "func literal":
 			parent := definitions[sites[id].ParentDefinition()].Name()
-			want := parent == "parent"
+			want, known := literalExpected[parent]
+			if !known {
+				t.Errorf("literal has unexpected parent %q", parent)
+				continue
+			}
 			if value != want {
 				t.Errorf("literal below %s C-dependent=%t, want %t", parent, value, want)
 			}
@@ -335,12 +380,22 @@ func findSite(
 	definition identity.DefinitionID,
 ) structure.DefinitionSite {
 	t.Helper()
-	for _, pkg := range graph.Packages() {
+	var found structure.DefinitionSite
+	if err := graph.VisitPackages(func(
+		pkg structure.PackageGraph,
+	) error {
 		for _, site := range pkg.Sites() {
 			if site.Definition() == definition {
-				return site
+				found = site
+				return nil
 			}
 		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !found.Definition().IsZero() {
+		return found
 	}
 	t.Fatalf("definition %s has no site", definition)
 	return structure.DefinitionSite{}
@@ -371,15 +426,6 @@ func writeProviderFixture(t *testing.T, module, marker string) string {
 		"package main\n\nimport \"errors\"\n\nfunc main() { _ = errors.New(\""+marker+"\") }\n",
 	)
 	return dir
-}
-
-func mustDefaultContract(t *testing.T) contract.Contract {
-	t.Helper()
-	selected, err := contract.Default()
-	if err != nil {
-		t.Fatal(err)
-	}
-	return selected
 }
 
 func assertProviderTamperRejected(

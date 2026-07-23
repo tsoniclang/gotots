@@ -71,7 +71,10 @@ func build(
 			"structure build requires the selectively hydrated universe",
 		)
 	}
-	graph := &Graph{version: ArtifactVersion}
+	graph := &Graph{
+		version:  ArtifactVersion,
+		provider: artifact,
+	}
 	index := newTransientIndex(universe)
 	for _, loadedPackage := range universe.Packages() {
 		if selectedPackages != nil &&
@@ -83,6 +86,7 @@ func build(
 			continue
 		}
 		pkg := PackageGraph{id: loadedPackage.ID()}
+		projection := packageProjection{id: loadedPackage.ID()}
 		localCgo := false
 		for _, file := range loadedPackage.Files() {
 			decision := sourceplan.KindLocalSyntax
@@ -97,13 +101,22 @@ func build(
 			}
 			switch decision {
 			case sourceplan.KindCertifiedGraph:
-				certified, err := certifiedFileGraph(
-					artifact, file,
-				)
-				if err != nil {
-					return nil, nil, err
+				if artifact == nil ||
+					!artifact.HasPackageFile(
+						loadedPackage.ID(),
+						file.ID(),
+					) {
+					return nil, nil, fmt.Errorf(
+						"provider graph omits %s", file.ID(),
+					)
 				}
-				appendFileGraph(&pkg, certified)
+				projection.certifiedFiles = append(
+					projection.certifiedFiles,
+					certifiedFileProjection{
+						id:         file.ID(),
+						byteDigest: file.ByteDigest().String(),
+					},
+				)
 			case sourceplan.KindLocalSyntax:
 				syntax := file.PhysicalSyntax()
 				if syntax == nil {
@@ -125,12 +138,14 @@ func build(
 				)
 			}
 		}
-		localSynthetic, err := attachCertifiedSynthetic(
-			plan, artifact, &pkg,
-		)
+		localSynthetic, certifiedSynthetic, err :=
+			structuralSyntheticSource(
+				plan, artifact, loadedPackage.ID(),
+			)
 		if err != nil {
 			return nil, nil, err
 		}
+		projection.certifiedSynthetic = certifiedSynthetic
 		if localCgo || plan == nil {
 			if err := attachCgo(
 				universe,
@@ -152,90 +167,53 @@ func build(
 			return nil, nil, err
 		}
 		graph.packages = append(graph.packages, pkg)
+		graph.projections = append(graph.projections, projection)
 	}
 	if selectedPackages != nil &&
-		len(graph.packages) != len(selectedPackages) {
+		len(graph.projections) != len(selectedPackages) {
 		return nil, nil, fmt.Errorf(
 			"package graph selection resolved %d of %d packages",
-			len(graph.packages), len(selectedPackages),
+			len(graph.projections), len(selectedPackages),
 		)
 	}
-	sortPackageGraphs(graph.packages, &graph.work)
+	sortGraphPackages(graph)
 	if err := sealGraph(graph); err != nil {
+		return nil, nil, err
+	}
+	if err := sealDefinitionCensus(graph); err != nil {
+		return nil, nil, err
+	}
+	if err := Validate(graph); err != nil {
 		return nil, nil, err
 	}
 	return graph, index, nil
 }
 
-func certifiedFileGraph(
-	artifact *ProviderArtifact,
-	file *source.LoadedFile,
-) (FileGraph, error) {
-	if artifact == nil {
-		return FileGraph{}, fmt.Errorf(
-			"certified file %s has no artifact", file.ID(),
-		)
-	}
-	certified, digest, found, err := artifact.FileGraph(file.ID())
-	if err != nil {
-		return FileGraph{}, err
-	}
-	if !found {
-		return FileGraph{}, fmt.Errorf(
-			"provider artifact omits %s", file.ID(),
-		)
-	}
-	if digest != file.ByteDigest().String() {
-		return FileGraph{}, fmt.Errorf(
-			"provider graph byte digest drift for %s", file.ID(),
-		)
-	}
-	return certified, nil
-}
-
-func attachCertifiedSynthetic(
+func structuralSyntheticSource(
 	plan *sourceplan.Plan,
 	artifact *ProviderArtifact,
-	pkg *PackageGraph,
-) (bool, error) {
+	pkg identity.PackageID,
+) (bool, bool, error) {
 	if plan == nil {
-		return true, nil
+		return true, false, nil
 	}
-	decision, planned := plan.SyntheticFor(pkg.id)
+	decision, planned := plan.SyntheticFor(pkg)
 	if !planned {
-		return false, nil
+		return false, false, nil
 	}
 	switch decision.Kind() {
 	case sourceplan.KindLocalSyntax:
-		return true, nil
+		return true, false, nil
 	case sourceplan.KindCertifiedGraph:
-		if artifact == nil {
-			return false, fmt.Errorf(
-				"certified synthetic owner %s has no artifact", pkg.id,
+		if artifact == nil || !artifact.HasSyntheticPackage(pkg) {
+			return false, false, fmt.Errorf(
+				"certified synthetic owner %s has no artifact", pkg,
 			)
 		}
-		synthetic, present, err := artifact.SyntheticPackageGraph(pkg.id)
-		if err != nil {
-			return false, err
-		}
-		if !present {
-			return false, fmt.Errorf(
-				"provider artifact omits synthetic owner %s", pkg.id,
-			)
-		}
-		pkg.synthetic = append(pkg.synthetic, synthetic.synthetic...)
-		pkg.ownedDefinitions = append(
-			pkg.ownedDefinitions, synthetic.ownedDefinitions...,
-		)
-		pkg.ownedSites = append(pkg.ownedSites, synthetic.ownedSites...)
-		pkg.ownedHeaders = append(pkg.ownedHeaders, synthetic.ownedHeaders...)
-		pkg.ownedBoundaries = append(
-			pkg.ownedBoundaries, synthetic.ownedBoundaries...,
-		)
-		return false, nil
+		return false, true, nil
 	default:
-		return false, fmt.Errorf(
-			"invalid synthetic source decision for %s", pkg.id,
+		return false, false, fmt.Errorf(
+			"invalid synthetic source decision for %s", pkg,
 		)
 	}
 }
@@ -288,6 +266,28 @@ func addPackageInitialization(pkg *PackageGraph, work *Work) error {
 	})
 	work.RecordAppends += 5
 	return nil
+}
+
+func sortGraphPackages(graph *Graph) {
+	type entry struct {
+		pkg        PackageGraph
+		projection packageProjection
+	}
+	entries := make([]entry, len(graph.packages))
+	for index := range graph.packages {
+		entries[index] = entry{
+			pkg:        graph.packages[index],
+			projection: graph.projections[index],
+		}
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		graph.work.SortComparisons++
+		return entries[i].pkg.id.String() < entries[j].pkg.id.String()
+	})
+	for index := range entries {
+		graph.packages[index] = entries[index].pkg
+		graph.projections[index] = entries[index].projection
+	}
 }
 
 func sealGraph(graph *Graph) error {
@@ -359,7 +359,7 @@ func sealGraph(graph *Graph) error {
 		return graph.definitionIDs[i].String() <
 			graph.definitionIDs[j].String()
 	})
-	return Validate(graph)
+	return nil
 }
 
 func indexDefinition(

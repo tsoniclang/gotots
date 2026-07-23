@@ -141,64 +141,103 @@ func materialize(
 	for _, pkg := range universe.Packages() {
 		loadedPackages[pkg.ID()] = pkg
 	}
-	for _, packageGraph := range graph.Packages() {
-		loaded := loadedPackages[packageGraph.ID()]
-		if loaded == nil {
-			return nil, fmt.Errorf("definition package %s is absent from source universe", packageGraph.ID())
+	var currentPackage identity.PackageID
+	var loaded *source.LoadedPackage
+	var syntheticObjects map[types.Object]bool
+	certifiedFacts := map[ID]structure.CertifiedFact{}
+	for _, indexed := range graph.DefinitionCensus() {
+		packageID := indexed.Package()
+		definitionID := indexed.ID()
+		if packageID != currentPackage {
+			currentPackage = packageID
+			loaded = loadedPackages[packageID]
+			if loaded == nil {
+				return nil, fmt.Errorf(
+					"definition package %s is absent from source universe",
+					packageID,
+				)
+			}
+			certifiedFacts = map[ID]structure.CertifiedFact{}
+			if certified != nil {
+				if _, present := certified.PackageInputDigest(
+					packageID,
+				); present {
+					records := certified.CertifiedFactsForPackage(
+						packageID,
+					)
+					for _, record := range records {
+						id, err := NewID(record.Definition(), record.Kind())
+						if err != nil {
+							return nil, err
+						}
+						if _, duplicate := certifiedFacts[id]; duplicate {
+							return nil, fmt.Errorf(
+								"duplicate certified selection fact %s",
+								id,
+							)
+						}
+						certifiedFacts[id] = record
+					}
+				}
+			}
+			syntheticObjects = cgoSyntheticObjects(universe, loaded)
 		}
-		syntheticObjects := cgoSyntheticObjects(universe, loaded)
-		for _, definition := range packageGraph.Definitions() {
-			for _, kind := range selected.RequestedFacts(definition.ID(), packageGraph.ID()) {
-				id, _ := NewID(definition.ID(), kind)
-				value, evidenceDigest, producer := false, "", ""
-				certifiedAuthority, err := factUsesCertifiedAuthority(
-					plan, definition.ID(), packageGraph.ID(), audit,
+		for _, kind := range selected.RequestedFacts(
+			definitionID, packageID,
+		) {
+			id, _ := NewID(definitionID, kind)
+			value, evidenceDigest, producer := false, "", ""
+			certifiedAuthority, err := factUsesCertifiedAuthority(
+				plan, definitionID, packageID, audit,
+			)
+			if err != nil {
+				return nil, err
+			}
+			if certifiedAuthority {
+				stored, present := certifiedFacts[id]
+				if !present {
+					return nil, fmt.Errorf(
+						"certified definition %s lacks requested fact %s",
+						definitionID, kind,
+					)
+				}
+				value = stored.Value()
+				evidenceDigest = stored.EvidenceDigest()
+				producer = stored.ProducerDigest()
+			} else {
+				definition, present := graph.ResidentDefinition(
+					definitionID,
+				)
+				if !present {
+					return nil, fmt.Errorf(
+						"local selection fact has no resident definition %s",
+						definitionID,
+					)
+				}
+				value, err = materializeOne(
+					kind, definition, loaded, index, syntheticObjects,
 				)
 				if err != nil {
 					return nil, err
 				}
-				if certifiedAuthority {
-					stored, present, err := certifiedFact(
-						certified, definition.ID(), kind,
-					)
-					if err != nil {
-						return nil, err
-					}
-					if !present {
-						return nil, fmt.Errorf(
-							"certified definition %s lacks requested fact %s",
-							definition.ID(), kind,
-						)
-					}
-					value = stored.Value()
-					evidenceDigest = stored.EvidenceDigest()
-					producer = stored.ProducerDigest()
-				} else {
-					value, err = materializeOne(
-						kind, definition, loaded, index, syntheticObjects,
-					)
-					if err != nil {
-						return nil, err
-					}
-					producer = producerDigest(
-						universe,
-						universe.Toolchain().BinaryDigest(),
-						kind.String(),
-					)
-					evidenceDigest, err = evidence.digest(
-						definition.ID(), kind, value,
-					)
-					if err != nil {
-						return nil, err
-					}
+				producer = producerDigest(
+					universe,
+					universe.Toolchain().BinaryDigest(),
+					kind.String(),
+				)
+				evidenceDigest, err = evidence.digest(
+					definitionID, kind, value,
+				)
+				if err != nil {
+					return nil, err
 				}
-				fact := Fact{
-					id: id, value: value,
-					producerDigest: producer,
-					evidenceDigest: evidenceDigest,
-				}
-				out.facts = append(out.facts, fact)
 			}
+			fact := Fact{
+				id: id, value: value,
+				producerDigest: producer,
+				evidenceDigest: evidenceDigest,
+			}
+			out.facts = append(out.facts, fact)
 		}
 	}
 	sort.Slice(out.facts, func(i, j int) bool {
@@ -249,17 +288,6 @@ func factUsesCertifiedAuthority(
 		)
 	}
 	return decision.Kind() == sourceplan.KindCertifiedGraph, nil
-}
-
-func certifiedFact(
-	artifact *structure.ProviderArtifact,
-	definition identity.DefinitionID,
-	kind contract.SelectionFactKind,
-) (structure.CertifiedFact, bool, error) {
-	if artifact == nil {
-		return structure.CertifiedFact{}, false, nil
-	}
-	return artifact.SelectionFact(definition, kind)
 }
 
 // CertifiedFacts projects the immutable fact artifact into provider transport

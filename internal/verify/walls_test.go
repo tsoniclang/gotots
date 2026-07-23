@@ -4,6 +4,7 @@ import (
 	"go/parser"
 	"go/token"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -115,8 +116,19 @@ func TestWallGateSeesTheTree(t *testing.T) {
 		seen[p.dir] = true
 	}
 	for _, required := range []string{
-		"internal/identity", "internal/language/catalog", "internal/language/analyze",
-		"internal/source", "internal/scope", "internal/stagecheck", "internal/compiler", "cmd/gotots",
+		"internal/identity",
+		"internal/language/catalog",
+		"internal/language/executable",
+		"internal/language/selectionfacts",
+		"internal/language/structure",
+		"internal/language/typesemantics",
+		"internal/scope",
+		"internal/scope/contract",
+		"internal/scope/sourceplan",
+		"internal/source",
+		"internal/stagecheck",
+		"internal/compiler",
+		"cmd/gotots",
 	} {
 		if !seen[required] {
 			t.Errorf("wall gate did not observe package %s; the walk is incomplete", required)
@@ -124,30 +136,47 @@ func TestWallGateSeesTheTree(t *testing.T) {
 	}
 }
 
-// TestASTImportsAreWalled (Rule 3) proves go/ast and go/types are imported
-// only by the two analysis owners and the independent stage verifiers
-// (which require toolchain extraction that bypasses the producers).
-func TestASTImportsAreWalled(t *testing.T) {
-	allowed := map[string]bool{
-		"internal/source":                 true,
-		"internal/language/analyze":       true,
-		"internal/language/typesemantics": true,
-		"internal/stagecheck":             true,
+// TestToolchainObjectImportsAreWalled proves transient syntax/checker imports
+// occur only in their explicit Stage-1 owners and the independent verifier.
+func TestToolchainObjectImportsAreWalled(t *testing.T) {
+	allowed := map[string]map[string]bool{
+		"go/ast": {
+			"internal/source":                  true,
+			"internal/language/structure":      true,
+			"internal/language/selectionfacts": true,
+			"internal/language/executable":     true,
+			"internal/stagecheck":              true,
+		},
+		"go/types": {
+			"internal/source":                  true,
+			"internal/language/structure":      true,
+			"internal/language/selectionfacts": true,
+			"internal/language/typesemantics":  true,
+			"internal/stagecheck":              true,
+		},
+		"go/token": {
+			"internal/source":              true,
+			"internal/language/structure":  true,
+			"internal/language/executable": true,
+			"internal/stagecheck":          true,
+		},
 	}
 	for _, p := range productPackages(t) {
 		for _, imp := range p.imports {
-			if (imp == "go/ast" || imp == "go/types") && !allowed[p.dir] {
-				t.Errorf("Rule 3: %s imports %s; only source, analyze, and stagecheck may", p.dir, imp)
+			permitted, controlled := allowed[imp]
+			if controlled && !permitted[p.dir] {
+				t.Errorf(
+					"toolchain-object wall: %s imports %s without owning that capability",
+					p.dir,
+					imp,
+				)
 			}
 		}
 	}
 }
 
-// TestSourceDoesNotOwnCatalogClassification (Stage-1 seam) proves the language
-// classification owner is analyze, not source: internal/source must not import
-// the construct catalog, even though the layer rank would permit it. Moving
-// catalog classification/edge/token work into source is an architecture
-// violation this gate rejects.
+// TestSourceDoesNotOwnCatalogClassification proves source owns acquisition and
+// transient lifetime, not language classification.
 func TestSourceDoesNotOwnCatalogClassification(t *testing.T) {
 	catalogPkg := modulePath + "/internal/language/catalog"
 	for _, p := range productPackages(t) {
@@ -156,7 +185,10 @@ func TestSourceDoesNotOwnCatalogClassification(t *testing.T) {
 		}
 		for _, imp := range p.imports {
 			if imp == catalogPkg {
-				t.Errorf("Stage-1 seam: internal/source imports %s; catalog classification is owned by internal/language/analyze", imp)
+				t.Errorf(
+					"Stage-1 seam: internal/source imports %s; classification belongs to language/structure",
+					imp,
+				)
 			}
 		}
 	}
@@ -196,16 +228,20 @@ func TestNoCorpusOrIntegrationImports(t *testing.T) {
 // one declared layer, and an import edge must go from a higher rank to a
 // strictly lower one (Rule 1).
 var layerRank = map[string]int{
-	"internal/identity":               5,
-	"internal/language/catalog":       10,
-	"internal/source":                 30,
-	"internal/language/typesemantics": 32,
-	"internal/scope":                  35,
-	"internal/language/analyze":       40,
-	"internal/stagecheck":             60,
-	"internal/compiler":               80,
-	"cmd/gotots":                      90,
-	"internal/verify":                 100,
+	"internal/identity":                5,
+	"internal/language/catalog":        10,
+	"internal/source":                  20,
+	"internal/scope/contract":          25,
+	"internal/language/typesemantics":  25,
+	"internal/scope/sourceplan":        30,
+	"internal/language/structure":      40,
+	"internal/language/selectionfacts": 45,
+	"internal/scope":                   50,
+	"internal/language/executable":     55,
+	"internal/stagecheck":              70,
+	"internal/compiler":                80,
+	"cmd/gotots":                       90,
+	"internal/verify":                  100,
 }
 
 // TestLayerRegistryIsTotal proves the registry and the module's production
@@ -252,4 +288,119 @@ func TestNoReverseLayerImports(t *testing.T) {
 			}
 		}
 	}
+}
+
+// TestSupersededStage1ArchitectureIsAbsent rejects the prior mixed-unit,
+// source-owned semantic inventory and recursive dependency hydration. These
+// names identify deleted abstractions, not compatibility vocabulary.
+func TestSupersededStage1ArchitectureIsAbsent(t *testing.T) {
+	banned := []string{
+		"MixedUnits",
+		"RetainedUnit",
+		"FullSyntax",
+		"unitTopology",
+		"filterInfoByMembership",
+	}
+	for _, file := range productionGoFiles(t) {
+		raw, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, spelling := range banned {
+			if strings.Contains(string(raw), spelling) {
+				t.Errorf(
+					"superseded Stage-1 spelling %q remains in %s",
+					spelling,
+					file,
+				)
+			}
+		}
+	}
+	if _, err := os.Stat(
+		filepath.Join(repoRoot(t), "internal", "language", "analyze"),
+	); !os.IsNotExist(err) {
+		t.Error("superseded internal/language/analyze package remains")
+	}
+	hydration, err := os.ReadFile(
+		filepath.Join(repoRoot(t), "internal", "source", "hydrate.go"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(hydration), "packages.NeedDeps") {
+		t.Error("semantic hydration recursively requests dependency interiors")
+	}
+}
+
+// TestNoGenericProductionBuckets prevents responsibilities from escaping the
+// declared package graph through an unowned utility layer.
+func TestNoGenericProductionBuckets(t *testing.T) {
+	for _, p := range productPackages(t) {
+		base := filepath.Base(p.dir)
+		switch base {
+		case "util", "utils", "helper", "helpers", "misc", "common", "v2":
+			t.Errorf("production package %s is an unowned generic bucket", p.dir)
+		}
+	}
+}
+
+// TestProductionFilesStayResponsibilitySized enforces the repository's
+// non-generated 600-line ownership limit.
+func TestProductionFilesStayResponsibilitySized(t *testing.T) {
+	for _, path := range productionGoFiles(t) {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		lines := 0
+		if len(raw) != 0 {
+			lines = 1 + strings.Count(string(raw), "\n")
+			if raw[len(raw)-1] == '\n' {
+				lines--
+			}
+		}
+		if lines > 600 {
+			t.Errorf(
+				"%s has %d lines; split responsibility before 600",
+				path,
+				lines,
+			)
+		}
+	}
+}
+
+func productionGoFiles(t *testing.T) []string {
+	t.Helper()
+	root := repoRoot(t)
+	var files []string
+	err := filepath.WalkDir(root, func(
+		path string,
+		entry fs.DirEntry,
+		walkErr error,
+	) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			name := entry.Name()
+			if path != root &&
+				(strings.HasPrefix(name, ".") ||
+					name == "testdata" ||
+					name == "vendor" ||
+					name == "node_modules") {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if strings.HasSuffix(path, ".go") &&
+			!strings.HasSuffix(path, "_test.go") {
+			files = append(files, path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk production Go files: %v", err)
+	}
+	sort.Strings(files)
+	return files
 }
