@@ -1045,6 +1045,32 @@ plus its recorded Stage-1 grammatical role and checker evidence. A child never
 walks to or scans its parent, and a later lowering never recomputes the
 decision.
 
+Stage 2 uses separate fixed linear passes because context assignment, checker-
+object indexing, binding/capture extraction, and semantic resolution are
+different relations with different owners. Each named pass visits a retained
+occurrence at most once; it may use only constant-time or amortized indexed
+scope/containment probes. The production work ledger counts input admission,
+child-edge assignment, context assignment, object evidence, implicit bindings,
+intrinsic evidence, captures, resolution, containment construction/probes,
+member-type visits, scope probes, and record construction separately. Canonical
+sort inputs and containment storage are separate counters. Combining these
+relations into one stateful mega-visitor, hiding a scan inside one counted
+visit, or reporting output records as construction work is forbidden.
+
+For example, in:
+
+```go
+func Outer(value int) func() int {
+	return func() int { return value }
+}
+```
+
+the context pass assigns the literal and identifier roles, the object pass
+joins the identifier to the parameter object, the capture pass records the
+literal definition as a capturer, and the resolution pass materializes the
+operations. Each pass sees each retained occurrence once; capture containment
+is an indexed probe rather than a walk from the literal back to `Outer`.
+
 One semantic operation record has exactly one closed origin:
 `SourceOperation(OccurrenceID, kind, role, variant, token, span)` or
 `ImplicitOperation(ImplicitDefinitionOp, ordinal)`. Source-origin fields are

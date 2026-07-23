@@ -487,7 +487,12 @@ local production and certified-provider production/consumption separately,
 reports the twenty largest semantic packages, definitions, operations, and
 type records, and enforces:
 
-- one frontend visit per retained local occurrence;
+- one visit per retained local occurrence by each closed, separately reported
+  linear pass—context, object evidence, implicit binding, capture, and
+  resolution—with no hidden peer, scope, definition, or ancestry scan;
+- constant-time or amortized indexed containment and lexical-scope probes,
+  linear containment storage, and a fixed total work coefficient over
+  occurrences plus semantic records;
 - only named `O(n log n)` canonical sorts;
 - local detail plus one projected provider package, never all provider
   semantic shards, as the ordinary residency bound;

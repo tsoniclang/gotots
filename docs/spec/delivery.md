@@ -308,7 +308,8 @@ Required exit evidence:
 - canonical type/declaration/binding/operation identities remain identical
   across relocated workspaces, relocated module caches, local checker
   production, and certified-provider consumption; and
-- measured construction is linear plus named canonical sorts, and reports
+- measured construction uses the closed named-pass ledger, is linear with a
+  fixed coefficient plus named canonical sorts, and reports
   definitions, resolutions, declarations, bindings, types, operations,
   unsupported records, artifact bytes, largest shards/records, wall time, and
   peak RSS with parent deltas and top-twenty tails.
