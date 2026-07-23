@@ -1,154 +1,434 @@
-// Command gotots is the project-focused Go-to-TypeScript compiler for TSTS.
-//
-// Current subcommands:
-//
-//	census        verify the source pin and produce the typed source census
-//	gate          run every applicable acceptance layer and write a report
-//	translate-probe report translation coverage and diagnostics without claiming acceptance
-//	toolchain-id  print the resolved toolchain identity for pinning
+// Command gotots is the single fail-closed GoToTS binary.
 package main
 
 import (
-	"encoding/json"
-	"flag"
 	"fmt"
+	"io"
 	"os"
-	"sort"
+	"strings"
 
-	"github.com/tsoniclang/gotots/internal/census"
-	"github.com/tsoniclang/gotots/internal/goenv"
-	"github.com/tsoniclang/gotots/internal/pinning"
-	"github.com/tsoniclang/gotots/internal/profile"
+	"github.com/tsoniclang/gotots/internal/compiler"
+	"github.com/tsoniclang/gotots/internal/scope/contract"
+	"github.com/tsoniclang/gotots/internal/scope/sourceplan"
+	"github.com/tsoniclang/gotots/internal/source"
 )
 
+const usage = `usage: gotots <command> [args]
+
+commands:
+  inspect constructs -contract <id> [-contract-artifact <path>] [-dir <dir>]
+                     [-provider <artifact> -provider-digest <hex>] [pattern ...]
+  audit catalog -contract <id> [-contract-artifact <path>] -o <artifact>
+                [-dir <dir>] [pattern ...]
+  audit verify -contract <id> [-contract-artifact <path>] -a <artifact>
+               [-dir <dir>] [pattern ...]`
+
+type UnsupportedCommandError struct{ Command string }
+
+func (e *UnsupportedCommandError) Error() string {
+	return fmt.Sprintf(
+		"GOTOTS_UNSUPPORTED_COMMAND: %q is not supported\n\n%s",
+		e.Command,
+		usage,
+	)
+}
+
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: gotots <census|gate|translate-probe|toolchain-id> [flags]")
-		os.Exit(2)
-	}
-	var err error
-	switch os.Args[1] {
-	case "census":
-		err = runCensus(os.Args[2:])
-	case "toolchain-id":
-		err = runToolchainID()
-	case "gate":
-		err = runGate(os.Args[2:])
-	case "translate-probe":
-		err = runTranslateProbe(os.Args[2:])
-	default:
-		fmt.Fprintf(os.Stderr, "unknown subcommand %q\n", os.Args[1])
-		os.Exit(2)
-	}
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "gotots %s: %v\n", os.Args[1], err)
+	if err := run(os.Args[1:], os.Stdout); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-// runToolchainID measures the local toolchain identity so its digests can be
-// reviewed and recorded in a pin file. This is the bootstrap path: it runs
-// before any pin exists and therefore executes the ambient go command
-// unverified. Census verification never uses this path.
-func runToolchainID() error {
-	goExecutable, err := goenv.Locate()
+func run(args []string, stdout io.Writer) error {
+	if len(args) == 0 {
+		return &UnsupportedCommandError{}
+	}
+	switch args[0] {
+	case "inspect":
+		return runInspect(args[1:], stdout)
+	case "audit":
+		return runAudit(args[1:], stdout)
+	default:
+		return &UnsupportedCommandError{
+			Command: strings.Join(args, " "),
+		}
+	}
+}
+
+type commonFlags struct {
+	request  source.Request
+	patterns []string
+}
+
+func parseCommon(
+	command string,
+	arguments []string,
+	extra map[string]*string,
+) (commonFlags, error) {
+	out := commonFlags{request: source.Request{Dir: "."}}
+	for index := 0; index < len(arguments); index++ {
+		argument := arguments[index]
+		if target, known := extra[argument]; known {
+			if index+1 >= len(arguments) {
+				return out, &UnsupportedCommandError{
+					Command: command + " " + argument + " (missing value)",
+				}
+			}
+			index++
+			*target = arguments[index]
+			continue
+		}
+		switch argument {
+		case "-dir":
+			if index+1 >= len(arguments) {
+				return out, &UnsupportedCommandError{
+					Command: command + " -dir (missing value)",
+				}
+			}
+			index++
+			out.request.Dir = arguments[index]
+		case "-contract":
+			if index+1 >= len(arguments) {
+				return out, &UnsupportedCommandError{
+					Command: command + " -contract (missing value)",
+				}
+			}
+			index++
+			out.request.ProviderContract = arguments[index]
+		case "-contract-digest":
+			if index+1 >= len(arguments) {
+				return out, &UnsupportedCommandError{
+					Command: command +
+						" -contract-digest (missing value)",
+				}
+			}
+			index++
+			out.request.ProviderContractDigest = arguments[index]
+		case "-contract-artifact":
+			if index+1 >= len(arguments) {
+				return out, &UnsupportedCommandError{
+					Command: command +
+						" -contract-artifact (missing value)",
+				}
+			}
+			index++
+			out.request.ProviderContractArtifact = arguments[index]
+		default:
+			if strings.HasPrefix(argument, "-") {
+				return out, &UnsupportedCommandError{
+					Command: command + " " + argument,
+				}
+			}
+			out.patterns = append(out.patterns, argument)
+		}
+	}
+	out.request.Patterns = append([]string(nil), out.patterns...)
+	return out, nil
+}
+
+func runInspect(arguments []string, stdout io.Writer) error {
+	if len(arguments) == 0 || arguments[0] != "constructs" {
+		return &UnsupportedCommandError{
+			Command: strings.TrimSpace(
+				"inspect " + strings.Join(arguments, " "),
+			),
+		}
+	}
+	providerPath := ""
+	providerDigest := ""
+	common, err := parseCommon(
+		"inspect constructs",
+		arguments[1:],
+		map[string]*string{
+			"-provider":        &providerPath,
+			"-provider-digest": &providerDigest,
+		},
+	)
 	if err != nil {
 		return err
 	}
-	resolved, err := goenv.Bootstrap(goExecutable)
+	common.request.AuditArtifact = providerPath
+	common.request.AuditArtifactDigest = providerDigest
+	inspection, err := compiler.InspectConstructs(common.request)
 	if err != nil {
 		return err
 	}
-	identity, err := pinning.ToolchainIdentity(resolved)
+	return printInspection(stdout, inspection)
+}
+
+func runAudit(arguments []string, stdout io.Writer) error {
+	if len(arguments) == 0 {
+		return &UnsupportedCommandError{Command: "audit"}
+	}
+	switch arguments[0] {
+	case "catalog":
+		return runAuditCatalog(arguments[1:], stdout)
+	case "verify":
+		return runAuditVerify(arguments[1:], stdout)
+	default:
+		return &UnsupportedCommandError{
+			Command: strings.TrimSpace(
+				"audit " + strings.Join(arguments, " "),
+			),
+		}
+	}
+}
+
+func runAuditCatalog(arguments []string, stdout io.Writer) error {
+	output := ""
+	common, err := parseCommon(
+		"audit catalog",
+		arguments,
+		map[string]*string{"-o": &output},
+	)
 	if err != nil {
 		return err
 	}
-	data, err := json.MarshalIndent(identity, "", "  ")
+	if output == "" {
+		return &UnsupportedCommandError{
+			Command: "audit catalog (missing -o)",
+		}
+	}
+	result, err := compiler.AuditCatalog(common.request, output)
 	if err != nil {
 		return err
 	}
-	fmt.Println(string(data))
+	_, err = fmt.Fprintf(
+		stdout,
+		"provider audit: packageContexts=%d files=%d syntheticPackages=%d definitions=%d headerOccurrences=%d boundaryEntries=%d facts=%d largestShardBytes=%d largestPackageRecords=%d encodedBytes=%d unknown=0 -> %s\ncertifiedDigest=%s\n",
+		result.PackageContexts,
+		result.Files,
+		result.SyntheticPackages,
+		result.Definitions,
+		result.HeaderOccurrences,
+		result.BoundaryEntries,
+		result.Facts,
+		result.LargestShardBytes,
+		result.LargestPackageRecords,
+		result.EncodedBytes,
+		output,
+		result.Digest,
+	)
+	if err != nil {
+		return err
+	}
+	for index, record := range result.LargestPackages() {
+		if _, err := fmt.Fprintf(
+			stdout,
+			"provider-production-tail rank=%d package=%s bytes=%d records=%d\n",
+			index+1,
+			record.Package,
+			record.Bytes,
+			record.Records,
+		); err != nil {
+			return err
+		}
+	}
+	for index, record := range result.LargestHeaders() {
+		if _, err := fmt.Fprintf(
+			stdout,
+			"provider-header-tail rank=%d header=%s encodedBytes=%d occurrences=%d\n",
+			index+1,
+			record.Header,
+			record.EncodedBytes,
+			record.Occurrences,
+		); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
-func runCensus(args []string) error {
-	flags := flag.NewFlagSet("census", flag.ExitOnError)
-	profilePath := flags.String("profile", "profiles/tsts/project.json", "project profile path")
-	sourceDir := flags.String("source", "", "path to the pinned source checkout (required)")
-	buildProfile := flags.String("build-profile", "linux-amd64", "build profile name from the project profile")
-	outDir := flags.String("out", "", "report output directory (required)")
-	if err := flags.Parse(args); err != nil {
-		return err
-	}
-	if *sourceDir == "" || *outDir == "" {
-		return fmt.Errorf("--source and --out are required")
-	}
-
-	prof, err := profile.Load(*profilePath)
+func runAuditVerify(arguments []string, stdout io.Writer) error {
+	artifactPath := ""
+	common, err := parseCommon(
+		"audit verify",
+		arguments,
+		map[string]*string{"-a": &artifactPath},
+	)
 	if err != nil {
 		return err
 	}
-	result, err := census.Run(prof, *sourceDir, *buildProfile)
-	if err != nil {
+	if artifactPath == "" {
+		return &UnsupportedCommandError{
+			Command: "audit verify (missing -a)",
+		}
+	}
+	if err := compiler.AuditVerify(
+		common.request, artifactPath,
+	); err != nil {
 		return err
 	}
-	if err := census.WriteReports(result, *outDir); err != nil {
-		return err
-	}
-	printSummary(result.Report)
-	return nil
+	_, err = fmt.Fprintf(
+		stdout,
+		"audit verify: %s exact-joins independent Stage-1 derivation\n",
+		artifactPath,
+	)
+	return err
 }
 
-func printSummary(r *census.Report) {
-	fmt.Printf("pin        %s @ %s (%s)\n", r.Pin.GoModule, r.Pin.Revision[:12], r.Source.ToolchainVersion)
-	fmt.Printf("clean      before-load=%v after-load=%v\n", r.Source.CleanBeforeLoad, r.Source.CleanAfterLoad)
-	fmt.Printf("partition  owned=%d test-support=%d unselected=%d external-std=%d external-module=%d\n",
-		r.Partition.Owned, r.Partition.TestOnly,
-		r.Partition.Unselected, r.Partition.ExternalStd, r.Partition.ExternalMod)
-	fmt.Printf("records    files=%d declarations=%d directives=%d rare-constructs=%d\n",
-		len(r.Files), len(r.Declarations), len(r.Directives), len(r.RareConstructs))
-	fmt.Printf("production packages=%d files=%d lines=%d\n", r.Production.Packages, r.Production.Files, r.Production.Lines)
-	fmt.Printf("           funcs=%d methods=%d bodyless=%d bodies=%d statements=%d\n",
-		r.Production.Declarations.Functions, r.Production.Declarations.Methods,
-		r.Production.Declarations.BodylessFunctions, r.Production.Bodies, r.Production.Statements)
-	fmt.Printf("           types=%d aliases=%d consts=%d vars=%d\n",
-		r.Production.Declarations.NamedTypes, r.Production.Declarations.Aliases,
-		r.Production.Declarations.Constants, r.Production.Declarations.Variables)
-	fmt.Printf("test       packages=%d files=%d lines=%d bodies=%d statements=%d\n",
-		r.Test.Packages, r.Test.Files, r.Test.Lines, r.Test.Bodies, r.Test.Statements)
-
-	printMap := func(label string, m map[string]int) {
-		keys := make([]string, 0, len(m))
-		for k := range m {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		fmt.Printf("%s:\n", label)
-		for _, k := range keys {
-			fmt.Printf("  %-24s %d\n", k, m[k])
+func printInspection(
+	stdout io.Writer,
+	inspection *compiler.Inspection,
+) error {
+	print := func(format string, arguments ...any) error {
+		_, err := fmt.Fprintf(stdout, format, arguments...)
+		return err
+	}
+	workspace := inspection.Workspace()
+	if err := print(
+		"toolchain %s digest=%s config=%s\n",
+		workspace.Toolchain().Version(),
+		workspace.Toolchain().BinaryDigest()[:12],
+		workspace.Toolchain().BuildConfigurationDigest()[:12],
+	); err != nil {
+		return err
+	}
+	localSourceFiles := 0
+	certifiedSourceFiles := 0
+	for _, decision := range inspection.SourcePlan().Files() {
+		switch decision.Kind() {
+		case sourceplan.KindLocalSyntax:
+			localSourceFiles++
+		case sourceplan.KindCertifiedGraph:
+			certifiedSourceFiles++
+		default:
+			return fmt.Errorf(
+				"verified inspection has invalid source authority %s",
+				decision.Kind(),
+			)
 		}
 	}
-	printMap("production constructs", r.Production.Constructs)
-	printMap("production builtins", r.Production.Builtins)
-	printMap("production range operands", r.Production.RangeOperands)
-	printMap("production index operands", r.Production.IndexOperands)
-	printMap("production directives", r.Production.Directives)
-
-	unknownDirectives := 0
-	for _, d := range r.Directives {
-		if !d.Known {
-			unknownDirectives++
-			fmt.Printf("  UNKNOWN directive %s at %s:%d\n", d.Directive, d.File, d.Line)
+	selections := inspection.Selections()
+	executableInventory := inspection.Executable()
+	definitionCount := 0
+	fullSemanticDefinitions := 0
+	declarationContractDefinitions := 0
+	externalBoundaryDefinitions := 0
+	intrinsicDefinitions := 0
+	headerOccurrences := 0
+	boundaryEntries := 0
+	for _, record := range inspection.Structure().DefinitionCensus() {
+		definition := record.ID()
+		definitionCount++
+		if _, selected := selections.For(definition); !selected {
+			return fmt.Errorf(
+				"verified inspection lost selection %s",
+				definition,
+			)
 		}
 	}
-	fmt.Printf("unknown directives: %d\n", unknownDirectives)
-	fmt.Printf("external packages (direct): %d\n", len(r.External))
-	fmt.Printf("contradiction edges: %d\n", len(r.Contradictions))
-	for _, e := range r.Contradictions {
-		category := e.Class
-		if e.Category != "" {
-			category += ":" + e.Category
+	for _, selection := range selections.Records() {
+		switch selection.Depth() {
+		case contract.DepthFullSemantic:
+			fullSemanticDefinitions++
+		case contract.DepthDeclarationContract:
+			declarationContractDefinitions++
+		case contract.DepthExternalBoundary:
+			externalBoundaryDefinitions++
+		case contract.DepthIntrinsic:
+			intrinsicDefinitions++
+		default:
+			return fmt.Errorf(
+				"verified inspection has invalid evidence depth %s",
+				selection.Depth(),
+			)
 		}
-		fmt.Printf("  [%s] %s -> %s (%s) at %s\n", e.Scope, e.From, e.To, category, e.File)
 	}
+	if fullSemanticDefinitions+
+		declarationContractDefinitions+
+		externalBoundaryDefinitions+
+		intrinsicDefinitions != definitionCount {
+		return fmt.Errorf(
+			"verified inspection evidence-depth partition is %d/%d",
+			fullSemanticDefinitions+
+				declarationContractDefinitions+
+				externalBoundaryDefinitions+
+				intrinsicDefinitions,
+			definitionCount,
+		)
+	}
+	headerOccurrences = inspection.Structure().HeaderOccurrenceCount()
+	boundaryEntries = inspection.Structure().BoundaryEntryCount()
+	provider := inspection.Structure().ProviderManifestStats()
+	projection := inspection.Structure().ProviderProjectionStats()
+	executableOccurrences := 0
+	for _, region := range executableInventory.Regions() {
+		executableOccurrences += len(region.Members())
+	}
+	hydration := inspection.Hydration()
+	if err := print(
+		"denominators: closurePackages=%d structuralFiles=%d localAuthorityFiles=%d certifiedAuthorityFiles=%d hydratedPackages=%d localSyntaxFiles=%d localSyntaxBytes=%d checkedViewPackages=%d definitions=%d residentDefinitions=%d selections=%d fullSemanticDefinitions=%d declarationContractDefinitions=%d externalBoundaryDefinitions=%d intrinsicDefinitions=%d headers=%d headerOccurrences=%d boundaries=%d boundaryEntries=%d residentOccurrences=%d executableRegions=%d executableOccurrences=%d selectionFacts=%d providerPackages=%d providerFiles=%d providerDefinitions=%d providerFacts=%d largestProviderShardBytes=%d largestManifestPackageRecords=%d providerShardLoads=%d providerCacheHits=%d maxProviderPackagesResident=%d largestProjectedPackageBytes=%d largestProjectedPackageRecords=%d unknownConstructs=0 unknownDirectives=0\n",
+		len(workspace.Packages()),
+		len(inspection.SourcePlan().Files()),
+		localSourceFiles,
+		certifiedSourceFiles,
+		hydration.SemanticPackages,
+		hydration.LocalFiles,
+		hydration.LocalBytes,
+		hydration.CheckedPackages,
+		definitionCount,
+		len(inspection.Structure().ResidentDefinitions()),
+		len(selections.Records()),
+		fullSemanticDefinitions,
+		declarationContractDefinitions,
+		externalBoundaryDefinitions,
+		intrinsicDefinitions,
+		definitionCount,
+		headerOccurrences,
+		definitionCount,
+		boundaryEntries,
+		len(inspection.Structure().ResidentOccurrences()),
+		len(executableInventory.Regions()),
+		executableOccurrences,
+		len(inspection.SelectionFacts().Facts()),
+		provider.PackageContexts,
+		provider.Files,
+		provider.Definitions,
+		provider.SelectionFacts,
+		provider.LargestShardBytes,
+		provider.LargestPackageRecords,
+		projection.ShardLoads,
+		projection.CacheHits,
+		projection.MaxResidentPackages,
+		projection.LargestPackageBytes,
+		projection.LargestPackageRecords,
+	); err != nil {
+		return err
+	}
+	for index, record := range provider.LargestShards() {
+		if err := print(
+			"provider-manifest-tail rank=%d package=%s bytes=%d records=%d\n",
+			index+1,
+			record.Package,
+			record.Bytes,
+			record.Records,
+		); err != nil {
+			return err
+		}
+	}
+	for index, record := range projection.LargestPackages() {
+		if err := print(
+			"provider-projection-tail rank=%d package=%s bytes=%d records=%d\n",
+			index+1,
+			record.Package,
+			record.Bytes,
+			record.Records,
+		); err != nil {
+			return err
+		}
+	}
+	for index, record := range inspection.Structure().LargestHeaderArtifacts() {
+		if err := print(
+			"header-tail rank=%d header=%s encodedBytes=%d occurrences=%d\n",
+			index+1,
+			record.Header,
+			record.EncodedBytes,
+			record.Occurrences,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
 }
