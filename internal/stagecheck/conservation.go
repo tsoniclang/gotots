@@ -81,8 +81,11 @@ func verifyReferenceConservation(pkg *source.Package, refs []analyze.Implementat
 		return len(owner) > 5 && owner[:5] == "decl:" || fullOwner[owner]
 	}
 	// Cgo references come from the checked view and cannot be reproduced by a
-	// source re-parse; they are certified through the source origin cross-check,
-	// so they are excluded from this source-derived join (both sides).
+	// source re-parse (the origin file spells `import "C"`). They are NOT exempt
+	// from conservation: analyze.VerifyCgoReferences independently derives the
+	// checked-view cgo reference topology and exact-joins it. They are only
+	// excluded from THIS source-derived join, which structurally cannot produce
+	// them.
 	cgoFile := map[string]bool{}
 	for _, file := range pkg.Files() {
 		if file.CgoOriginal() {

@@ -85,6 +85,12 @@ func InspectConstructs(req source.Request) (*Inspection, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Cgo reference topology is conserved on the checked view — not exempted:
+	// independently re-derive it while the checked ASTs are live, before
+	// finalization severs them.
+	if err := analyze.VerifyCgoReferences(universe, inventory); err != nil {
+		return nil, err
+	}
 	ws, err := source.Finalize(universe, selection.Depths(), selection.ImplicitDepths(), projection)
 	if err != nil {
 		return nil, err
