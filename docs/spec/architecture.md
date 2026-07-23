@@ -871,9 +871,12 @@ type closure and per-type authority witnesses needed to validate that package
 in isolation. Canonically equal type values may therefore occur in more than
 one package shard; declarations and definitions may not. The artifact reports
 this type-closure duplication explicitly. A shard cannot carry Stage-1
-topology or TypeScript decisions. A corrupt shard remains invalid after an
-attacker recomputes both its shard digest and outer artifact digest because
-admission revalidates every typed relationship.
+topology or TypeScript decisions. When a shard is projected, typed admission
+revalidates every relationship, so corrupt detail remains invalid even if its
+shard and outer artifact digests were recomputed. Ordinary manifest admission
+does not claim to detect replacement of both artifact content and the
+independently selected trusted digest; that is replacement of the authority,
+not corruption under an admitted authority.
 
 The ordinary Stage-2 verifier exact-joins the semantic model's package,
 provenance, selected-authority, definition, and declaration censuses to the

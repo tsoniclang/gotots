@@ -467,10 +467,10 @@ removes a compile-time expression's structural coverage target, duplicates a
 predeclared declaration into an ordinary package, admits an operation in a
 boundary domain, fabricates an occurrence for package initialization, collapses
 two same-kind per-operand implicit effects, removes a required implicit operation,
-injects a target-specific field, admits a provider shard whose internal
-relationships are corrupt after all outer digests are recomputed, and restores
-an AST/checker accessor after finalization. Each mutation must fail at its
-owning boundary with exact identities.
+injects a target-specific field, projects a provider shard whose internal
+relationships are corrupt after all artifact digests are recomputed, and
+restores an AST/checker accessor after finalization. Each mutation must fail at
+its owning boundary with exact identities.
 
 Independent Stage-2 verification uses the same selected toolchain but not the
 frontend resolver. It re-queries the one live checker graph through a separate
