@@ -48,12 +48,14 @@ func TestSemanticIdentitiesAreConstructorValidated(t *testing.T) {
 		t.Fatal("method was accepted as a package declaration")
 	}
 	member, err := NewMemberDeclarationID(
-		typeID, SemanticObjectField, "Value", 2,
+		typeID, pkg, SemanticObjectField, "value", 2,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if member.OwnerType() != typeID || member.Ordinal() != 2 {
+	if member.OwnerType() != typeID ||
+		member.MemberPackage() != pkg ||
+		member.Ordinal() != 2 {
 		t.Fatalf("unexpected member identity %s", member)
 	}
 }

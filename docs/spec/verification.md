@@ -398,7 +398,10 @@ The Stage-2 mutation matrix runs against production admission and conservation
 paths. It removes a definition semantic record, duplicates an occurrence
 resolution, changes a parent-assigned arity, swaps ordered operands, conflates
 two shadowed bindings, substitutes an alias with its underlying defined type,
-changes a method-selection index, removes a required implicit operation,
+conflates file-scoped and definition-scoped bindings, drops the declaring
+package from two same-spelled unexported members, introduces a circular
+anonymous-interface method identity, changes a method-selection index, removes
+a required implicit operation,
 injects a target-specific field, admits a provider shard whose internal
 relationships are corrupt after all outer digests are recomputed, and restores
 an AST/checker accessor after finalization. Each mutation must fail at its

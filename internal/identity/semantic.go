@@ -3,6 +3,8 @@ package identity
 import (
 	"encoding/hex"
 	"fmt"
+	"unicode"
+	"unicode/utf8"
 )
 
 // SemanticTypeID identifies one complete canonical Go type descriptor by its
@@ -90,6 +92,7 @@ const (
 	SemanticDeclarationPackageObject
 	SemanticDeclarationMember
 	SemanticDeclarationPredeclared
+	SemanticDeclarationOccurrence
 )
 
 // SemanticDeclarationID is the canonical identity of a package declaration,
@@ -98,10 +101,13 @@ type SemanticDeclarationID struct {
 	form        SemanticDeclarationForm
 	pkg         PackageID
 	ownerType   SemanticTypeID
+	memberPkg   PackageID
 	class       SemanticObjectClass
 	name        string
 	ordinal     int
 	predeclared uint16
+	owner       OccurrenceID
+	occurrence  OccurrenceID
 }
 
 func NewPackageDeclarationID(
@@ -116,7 +122,8 @@ func NewPackageDeclarationID(
 			Reason:   "package declaration requires package, closed class, and canonical name",
 		}
 	}
-	if class == SemanticObjectField ||
+	if class == SemanticObjectPackage ||
+		class == SemanticObjectField ||
 		class == SemanticObjectMethod ||
 		class == SemanticObjectBuiltin ||
 		class == SemanticObjectNil {
@@ -136,28 +143,47 @@ func NewPackageDeclarationID(
 
 func NewMemberDeclarationID(
 	owner SemanticTypeID,
+	pkg PackageID,
 	class SemanticObjectClass,
 	name string,
 	ordinal int,
 ) (SemanticDeclarationID, error) {
+	exported := semanticNameExported(name)
 	if owner.IsZero() ||
 		(class != SemanticObjectField && class != SemanticObjectMethod) ||
 		name == "" ||
 		hasReserved(name) ||
-		ordinal < 0 {
+		ordinal < 0 ||
+		(!exported && pkg.IsZero()) {
 		return SemanticDeclarationID{}, &Error{
 			Identity: "semantic-declaration",
 			Value:    name,
-			Reason:   "member declaration requires owner type, field/method class, canonical name, and ordinal",
+			Reason:   "member declaration requires owner type, unexported-member package, field/method class, canonical name, and ordinal",
 		}
+	}
+	if class == SemanticObjectMethod && ordinal != 0 {
+		return SemanticDeclarationID{}, &Error{
+			Identity: "semantic-declaration",
+			Value:    name,
+			Reason:   "method identity is receiver type plus name and has no positional ordinal",
+		}
+	}
+	if exported {
+		pkg = PackageID{}
 	}
 	return SemanticDeclarationID{
 		form:      SemanticDeclarationMember,
 		ownerType: owner,
+		memberPkg: pkg,
 		class:     class,
 		name:      name,
 		ordinal:   ordinal,
 	}, nil
+}
+
+func semanticNameExported(name string) bool {
+	first, _ := utf8.DecodeRuneInString(name)
+	return first != utf8.RuneError && unicode.IsUpper(first)
 }
 
 func NewPredeclaredDeclarationID(
@@ -182,6 +208,45 @@ func NewPredeclaredDeclarationID(
 	}, nil
 }
 
+func NewOccurrenceDeclarationID(
+	owner OccurrenceID,
+	occurrence OccurrenceID,
+	class SemanticObjectClass,
+	name string,
+	ordinal int,
+) (SemanticDeclarationID, error) {
+	if owner.IsZero() ||
+		occurrence.IsZero() ||
+		owner.Span().File() != occurrence.Span().File() ||
+		!class.Valid() ||
+		name == "" ||
+		hasReserved(name) ||
+		ordinal < 0 {
+		return SemanticDeclarationID{}, &Error{
+			Identity: "semantic-declaration",
+			Value:    name,
+			Reason:   "occurrence declaration requires same-file owner/declaration, closed class, canonical name, and ordinal",
+		}
+	}
+	if class != SemanticObjectConstant &&
+		class != SemanticObjectType &&
+		class != SemanticObjectAlias {
+		return SemanticDeclarationID{}, &Error{
+			Identity: "semantic-declaration",
+			Value:    name,
+			Reason:   "object class is not an occurrence declaration class",
+		}
+	}
+	return SemanticDeclarationID{
+		form:       SemanticDeclarationOccurrence,
+		class:      class,
+		name:       name,
+		ordinal:    ordinal,
+		owner:      owner,
+		occurrence: occurrence,
+	}, nil
+}
+
 func (id SemanticDeclarationID) IsZero() bool {
 	return id == SemanticDeclarationID{}
 }
@@ -193,6 +258,9 @@ func (id SemanticDeclarationID) Package() PackageID {
 }
 func (id SemanticDeclarationID) OwnerType() SemanticTypeID {
 	return id.ownerType
+}
+func (id SemanticDeclarationID) MemberPackage() PackageID {
+	return id.memberPkg
 }
 func (id SemanticDeclarationID) Class() SemanticObjectClass {
 	return id.class
@@ -206,6 +274,12 @@ func (id SemanticDeclarationID) Ordinal() int {
 func (id SemanticDeclarationID) Predeclared() uint16 {
 	return id.predeclared
 }
+func (id SemanticDeclarationID) OwnerOccurrence() OccurrenceID {
+	return id.owner
+}
+func (id SemanticDeclarationID) Occurrence() OccurrenceID {
+	return id.occurrence
+}
 func (id SemanticDeclarationID) String() string {
 	switch id.form {
 	case SemanticDeclarationPackageObject:
@@ -214,14 +288,29 @@ func (id SemanticDeclarationID) String() string {
 			id.pkg, id.class, id.name,
 		)
 	case SemanticDeclarationMember:
+		namespace := "exported"
+		if !id.memberPkg.IsZero() {
+			namespace = id.memberPkg.String()
+		}
+		if id.class == SemanticObjectMethod {
+			return fmt.Sprintf(
+				"%s#member/%s/%s/%s",
+				id.ownerType, namespace, id.class, id.name,
+			)
+		}
 		return fmt.Sprintf(
-			"%s#member/%s/%d/%s",
-			id.ownerType, id.class, id.ordinal, id.name,
+			"%s#member/%s/%s/%d/%s",
+			id.ownerType, namespace, id.class, id.ordinal, id.name,
 		)
 	case SemanticDeclarationPredeclared:
 		return fmt.Sprintf(
 			"lang#predeclared/%d/%s",
 			id.predeclared, id.class,
+		)
+	case SemanticDeclarationOccurrence:
+		return fmt.Sprintf(
+			"%s#local-declaration/%s/%d/%s/%s",
+			id.owner, id.class, id.ordinal, id.name, id.occurrence,
 		)
 	default:
 		return ""

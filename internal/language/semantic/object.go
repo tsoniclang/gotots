@@ -180,6 +180,7 @@ func (record Declaration) Authority() Authority          { return record.authori
 
 type Binding struct {
 	id         identity.SemanticBindingID
+	pkg        identity.PackageID
 	definition identity.DefinitionID
 	role       identity.SemanticBindingRole
 	name       string
@@ -191,6 +192,7 @@ type Binding struct {
 
 func NewBinding(
 	id identity.SemanticBindingID,
+	pkg identity.PackageID,
 	definition identity.DefinitionID,
 	role identity.SemanticBindingRole,
 	name string,
@@ -200,12 +202,12 @@ func NewBinding(
 	authority Authority,
 ) (Binding, error) {
 	if id.IsZero() ||
-		definition.IsZero() ||
+		pkg.IsZero() ||
 		!role.Valid() ||
 		typeID.IsZero() ||
 		!authority.Valid() {
 		return Binding{}, fmt.Errorf(
-			"binding requires identity, definition, role, type, and authority",
+			"binding requires identity, package, role, type, and authority",
 		)
 	}
 	if id.Role() != role {
@@ -213,7 +215,18 @@ func NewBinding(
 			"binding role disagrees with identity",
 		)
 	}
+	if source.IsZero() != id.Declaration().IsZero() ||
+		(!source.IsZero() && source != id.Declaration()) {
+		return Binding{}, fmt.Errorf(
+			"binding source disagrees with identity",
+		)
+	}
 	seen := map[identity.DefinitionID]bool{}
+	if definition.IsZero() && len(captures) != 0 {
+		return Binding{}, fmt.Errorf(
+			"non-executable binding cannot carry capture owners",
+		)
+	}
 	for _, capture := range captures {
 		if capture.IsZero() || seen[capture] {
 			return Binding{}, fmt.Errorf(
@@ -223,7 +236,7 @@ func NewBinding(
 		seen[capture] = true
 	}
 	return Binding{
-		id: id, definition: definition, role: role, name: name,
+		id: id, pkg: pkg, definition: definition, role: role, name: name,
 		typeID: typeID, source: source,
 		captures:  append([]identity.DefinitionID(nil), captures...),
 		authority: authority,
@@ -232,6 +245,9 @@ func NewBinding(
 
 func (record Binding) ID() identity.SemanticBindingID {
 	return record.id
+}
+func (record Binding) Package() identity.PackageID {
+	return record.pkg
 }
 func (record Binding) Definition() identity.DefinitionID {
 	return record.definition
@@ -246,6 +262,40 @@ func (record Binding) CapturedBy() []identity.DefinitionID {
 	return append([]identity.DefinitionID(nil), record.captures...)
 }
 func (record Binding) Authority() Authority { return record.authority }
+
+// TypeWitness binds one canonical type descriptor to the exact semantic
+// authority that materialized it for one package. Type descriptors are pure
+// values and may be shared; authority remains an explicit package relation.
+type TypeWitness struct {
+	pkg       identity.PackageID
+	typeID    identity.SemanticTypeID
+	authority Authority
+}
+
+func NewTypeWitness(
+	pkg identity.PackageID,
+	typeID identity.SemanticTypeID,
+	authority Authority,
+) (TypeWitness, error) {
+	if pkg.IsZero() || typeID.IsZero() || !authority.Valid() {
+		return TypeWitness{}, fmt.Errorf(
+			"type witness requires package, type, and authority",
+		)
+	}
+	return TypeWitness{
+		pkg: pkg, typeID: typeID, authority: authority,
+	}, nil
+}
+
+func (record TypeWitness) Package() identity.PackageID {
+	return record.pkg
+}
+func (record TypeWitness) Type() identity.SemanticTypeID {
+	return record.typeID
+}
+func (record TypeWitness) Authority() Authority {
+	return record.authority
+}
 
 type Selection struct {
 	kind     SelectionKind

@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"strconv"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/tsoniclang/gotots/internal/identity"
 )
@@ -19,9 +21,10 @@ type TypeField struct {
 }
 
 type TypeMethod struct {
-	Declaration identity.SemanticDeclarationID
-	Signature   identity.SemanticTypeID
-	Ordinal     int
+	Name      string
+	Package   identity.PackageID
+	Signature identity.SemanticTypeID
+	Ordinal   int
 }
 
 type TypeTerm struct {
@@ -30,11 +33,12 @@ type TypeTerm struct {
 }
 
 type Signature struct {
-	Receiver       identity.SemanticTypeID
-	TypeParameters []identity.SemanticTypeID
-	Parameters     []identity.SemanticTypeID
-	Results        []identity.SemanticTypeID
-	Variadic       bool
+	Receiver               identity.SemanticTypeID
+	ReceiverTypeParameters []identity.SemanticTypeID
+	TypeParameters         []identity.SemanticTypeID
+	Parameters             []identity.SemanticTypeID
+	Results                []identity.SemanticTypeID
+	Variadic               bool
 }
 
 type TypeSpec struct {
@@ -136,6 +140,10 @@ func cloneTypeSpec(spec TypeSpec) TypeSpec {
 		[]identity.SemanticTypeID(nil),
 		spec.Signature.TypeParameters...,
 	)
+	spec.Signature.ReceiverTypeParameters = append(
+		[]identity.SemanticTypeID(nil),
+		spec.Signature.ReceiverTypeParameters...,
+	)
 	spec.Signature.Parameters = append(
 		[]identity.SemanticTypeID(nil),
 		spec.Signature.Parameters...,
@@ -174,6 +182,9 @@ func validateTypeSpec(spec TypeSpec) error {
 			return fmt.Errorf(
 				"named type requires declaration and underlying type",
 			)
+		}
+		if err := validateMethods(spec.Methods); err != nil {
+			return err
 		}
 	case TypeAlias:
 		if spec.Declaration.IsZero() || spec.Target.IsZero() {
@@ -215,6 +226,10 @@ func validateTypeSpec(spec TypeSpec) error {
 		for index, field := range spec.Fields {
 			if field.Name == "" ||
 				field.Type.IsZero() ||
+				(!semanticNameExported(field.Name) &&
+					field.Package.IsZero()) ||
+				(semanticNameExported(field.Name) &&
+					!field.Package.IsZero()) ||
 				field.Ordinal != index {
 				return fmt.Errorf(
 					"struct field %d is not canonical", index,
@@ -222,14 +237,8 @@ func validateTypeSpec(spec TypeSpec) error {
 			}
 		}
 	case TypeInterface:
-		for index, method := range spec.Methods {
-			if method.Declaration.IsZero() ||
-				method.Signature.IsZero() ||
-				method.Ordinal != index {
-				return fmt.Errorf(
-					"interface method %d is not canonical", index,
-				)
-			}
+		if err := validateMethods(spec.Methods); err != nil {
+			return err
 		}
 		for _, embedded := range spec.Embeddeds {
 			if embedded.IsZero() {
@@ -260,6 +269,28 @@ func validateTypeSpec(spec TypeSpec) error {
 		}
 	}
 	return nil
+}
+
+func validateMethods(methods []TypeMethod) error {
+	for index, method := range methods {
+		if method.Name == "" ||
+			(!semanticNameExported(method.Name) &&
+				method.Package.IsZero()) ||
+			(semanticNameExported(method.Name) &&
+				!method.Package.IsZero()) ||
+			method.Signature.IsZero() ||
+			method.Ordinal != index {
+			return fmt.Errorf(
+				"type method %d is not canonical", index,
+			)
+		}
+	}
+	return nil
+}
+
+func semanticNameExported(name string) bool {
+	first, _ := utf8.DecodeRuneInString(name)
+	return first != utf8.RuneError && unicode.IsUpper(first)
 }
 
 func validateTypeMembers(spec TypeSpec) error {
@@ -338,6 +369,7 @@ func validateTypeMembers(spec TypeSpec) error {
 
 func signaturePresent(signature Signature) bool {
 	return !signature.Receiver.IsZero() ||
+		len(signature.ReceiverTypeParameters) != 0 ||
 		len(signature.TypeParameters) != 0 ||
 		len(signature.Parameters) != 0 ||
 		len(signature.Results) != 0 ||
@@ -345,6 +377,13 @@ func signaturePresent(signature Signature) bool {
 }
 
 func validateSignature(signature Signature) error {
+	for _, typeID := range signature.ReceiverTypeParameters {
+		if typeID.IsZero() {
+			return fmt.Errorf(
+				"signature has zero receiver type parameter",
+			)
+		}
+	}
 	for _, typeID := range signature.TypeParameters {
 		if typeID.IsZero() {
 			return fmt.Errorf(
@@ -402,6 +441,7 @@ func encodeTypeSpec(spec TypeSpec) string {
 	writeInt(&out, spec.Length)
 	writeInt(&out, int64(spec.Direction))
 	writePart(&out, spec.Signature.Receiver.String())
+	writeTypeIDs(&out, spec.Signature.ReceiverTypeParameters)
 	writeTypeIDs(&out, spec.Signature.TypeParameters)
 	writeTypeIDs(&out, spec.Signature.Parameters)
 	writeTypeIDs(&out, spec.Signature.Results)
@@ -417,7 +457,8 @@ func encodeTypeSpec(spec TypeSpec) string {
 	}
 	writeInt(&out, int64(len(spec.Methods)))
 	for _, method := range spec.Methods {
-		writePart(&out, method.Declaration.String())
+		writePart(&out, method.Name)
+		writePart(&out, method.Package.String())
 		writePart(&out, method.Signature.String())
 		writeInt(&out, int64(method.Ordinal))
 	}

@@ -8,23 +8,27 @@ import (
 )
 
 type PackageInput struct {
-	ID           identity.PackageID
-	Definitions  []DefinitionSemantics
-	Resolutions  []OccurrenceResolution
-	Declarations []Declaration
-	Bindings     []Binding
-	Operations   []Operation
-	Unsupported  []Unsupported
+	ID            identity.PackageID
+	Definitions   []DefinitionSemantics
+	Resolutions   []OccurrenceResolution
+	Declarations  []Declaration
+	Bindings      []Binding
+	Types         []Type
+	TypeWitnesses []TypeWitness
+	Operations    []Operation
+	Unsupported   []Unsupported
 }
 
 type Package struct {
-	id           identity.PackageID
-	definitions  []DefinitionSemantics
-	resolutions  []OccurrenceResolution
-	declarations []Declaration
-	bindings     []Binding
-	operations   []Operation
-	unsupported  []Unsupported
+	id            identity.PackageID
+	definitions   []DefinitionSemantics
+	resolutions   []OccurrenceResolution
+	declarations  []Declaration
+	bindings      []Binding
+	types         []Type
+	typeWitnesses []TypeWitness
+	operations    []Operation
+	unsupported   []Unsupported
 }
 
 func NewPackage(input PackageInput) (Package, error) {
@@ -45,6 +49,10 @@ func NewPackage(input PackageInput) (Package, error) {
 			[]Declaration(nil), input.Declarations...,
 		),
 		bindings: append([]Binding(nil), input.Bindings...),
+		types:    append([]Type(nil), input.Types...),
+		typeWitnesses: append(
+			[]TypeWitness(nil), input.TypeWitnesses...,
+		),
 		operations: append(
 			[]Operation(nil), input.Operations...,
 		),
@@ -72,6 +80,12 @@ func (pkg Package) Declarations() []Declaration {
 func (pkg Package) Bindings() []Binding {
 	return append([]Binding(nil), pkg.bindings...)
 }
+func (pkg Package) Types() []Type {
+	return append([]Type(nil), pkg.types...)
+}
+func (pkg Package) TypeWitnesses() []TypeWitness {
+	return append([]TypeWitness(nil), pkg.typeWitnesses...)
+}
 func (pkg Package) Operations() []Operation {
 	return append([]Operation(nil), pkg.operations...)
 }
@@ -95,6 +109,14 @@ func (pkg *Package) sort() {
 	sort.Slice(pkg.bindings, func(left, right int) bool {
 		return pkg.bindings[left].ID().String() <
 			pkg.bindings[right].ID().String()
+	})
+	sort.Slice(pkg.types, func(left, right int) bool {
+		return pkg.types[left].ID().String() <
+			pkg.types[right].ID().String()
+	})
+	sort.Slice(pkg.typeWitnesses, func(left, right int) bool {
+		return pkg.typeWitnesses[left].Type().String() <
+			pkg.typeWitnesses[right].Type().String()
 	})
 	sort.Slice(pkg.operations, func(left, right int) bool {
 		return pkg.operations[left].ID().String() <
@@ -131,7 +153,9 @@ func validatePackage(pkg Package) error {
 	}
 	bindings := map[identity.SemanticBindingID]bool{}
 	for _, record := range pkg.bindings {
-		if !definitions[record.Definition()] ||
+		if record.Package() != pkg.id ||
+			(!record.Definition().IsZero() &&
+				!definitions[record.Definition()]) ||
 			bindings[record.ID()] {
 			return fmt.Errorf(
 				"semantic package %s has invalid binding %s",
@@ -139,6 +163,40 @@ func validatePackage(pkg Package) error {
 			)
 		}
 		bindings[record.ID()] = true
+	}
+	types := map[identity.SemanticTypeID]string{}
+	for _, record := range pkg.types {
+		if existing, duplicate := types[record.ID()]; duplicate {
+			if existing != record.Canonical() {
+				return fmt.Errorf(
+					"semantic package %s has type collision %s",
+					pkg.id, record.ID(),
+				)
+			}
+			return fmt.Errorf(
+				"semantic package %s duplicates type %s",
+				pkg.id, record.ID(),
+			)
+		}
+		types[record.ID()] = record.Canonical()
+	}
+	witnesses := map[identity.SemanticTypeID]bool{}
+	for _, record := range pkg.typeWitnesses {
+		if record.Package() != pkg.id ||
+			types[record.Type()] == "" ||
+			witnesses[record.Type()] {
+			return fmt.Errorf(
+				"semantic package %s has invalid type witness %s",
+				pkg.id, record.Type(),
+			)
+		}
+		witnesses[record.Type()] = true
+	}
+	if len(witnesses) != len(types) {
+		return fmt.Errorf(
+			"semantic package %s has %d types and %d witnesses",
+			pkg.id, len(types), len(witnesses),
+		)
 	}
 	operations := map[identity.OperationID]bool{}
 	for _, record := range pkg.operations {
@@ -209,31 +267,33 @@ func validatePackage(pkg Package) error {
 			}
 		}
 	}
+	if err := validateTypeRecords(pkg.types, types); err != nil {
+		return err
+	}
+	if err := validateTypeClosure([]Package{pkg}, types); err != nil {
+		return err
+	}
 	return nil
 }
 
 type Model struct {
 	packages []Package
-	types    []Type
 }
 
-func NewModel(
-	packages []Package,
-	types []Type,
-) (*Model, error) {
+func NewModel(packages []Package) (*Model, error) {
 	out := &Model{
 		packages: append([]Package(nil), packages...),
-		types:    append([]Type(nil), types...),
 	}
 	sort.Slice(out.packages, func(left, right int) bool {
 		return out.packages[left].ID().String() <
 			out.packages[right].ID().String()
 	})
-	sort.Slice(out.types, func(left, right int) bool {
-		return out.types[left].ID().String() <
-			out.types[right].ID().String()
-	})
 	seenPackages := map[identity.PackageID]bool{}
+	seenDefinitions := map[identity.DefinitionID]identity.PackageID{}
+	seenDeclarations := map[identity.SemanticDeclarationID]identity.PackageID{}
+	seenBindings := map[identity.SemanticBindingID]identity.PackageID{}
+	seenOperations := map[identity.OperationID]identity.PackageID{}
+	seenTypes := map[identity.SemanticTypeID]string{}
 	for _, pkg := range out.packages {
 		if seenPackages[pkg.ID()] {
 			return nil, fmt.Errorf(
@@ -241,26 +301,51 @@ func NewModel(
 			)
 		}
 		seenPackages[pkg.ID()] = true
-	}
-	seenTypes := map[identity.SemanticTypeID]string{}
-	for _, record := range out.types {
-		if existing, present := seenTypes[record.ID()]; present {
-			if existing != record.Canonical() {
+		for _, record := range pkg.Definitions() {
+			if owner, duplicate := seenDefinitions[record.Definition()]; duplicate {
+				return nil, fmt.Errorf(
+					"semantic definition %s is owned by %s and %s",
+					record.Definition(), owner, pkg.ID(),
+				)
+			}
+			seenDefinitions[record.Definition()] = pkg.ID()
+		}
+		for _, record := range pkg.Declarations() {
+			if owner, duplicate := seenDeclarations[record.ID()]; duplicate {
+				return nil, fmt.Errorf(
+					"semantic declaration %s is owned by %s and %s",
+					record.ID(), owner, pkg.ID(),
+				)
+			}
+			seenDeclarations[record.ID()] = pkg.ID()
+		}
+		for _, record := range pkg.Bindings() {
+			if owner, duplicate := seenBindings[record.ID()]; duplicate {
+				return nil, fmt.Errorf(
+					"semantic binding %s is owned by %s and %s",
+					record.ID(), owner, pkg.ID(),
+				)
+			}
+			seenBindings[record.ID()] = pkg.ID()
+		}
+		for _, record := range pkg.Operations() {
+			if owner, duplicate := seenOperations[record.ID()]; duplicate {
+				return nil, fmt.Errorf(
+					"semantic operation %s is owned by %s and %s",
+					record.ID(), owner, pkg.ID(),
+				)
+			}
+			seenOperations[record.ID()] = pkg.ID()
+		}
+		for _, record := range pkg.Types() {
+			if canonical, present := seenTypes[record.ID()]; present &&
+				canonical != record.Canonical() {
 				return nil, fmt.Errorf(
 					"semantic type collision %s", record.ID(),
 				)
 			}
-			return nil, fmt.Errorf(
-				"duplicate semantic type %s", record.ID(),
-			)
+			seenTypes[record.ID()] = record.Canonical()
 		}
-		seenTypes[record.ID()] = record.Canonical()
-	}
-	if err := validateTypeRecords(out.types, seenTypes); err != nil {
-		return nil, err
-	}
-	if err := validateTypeClosure(out.packages, seenTypes); err != nil {
-		return nil, err
 	}
 	return out, nil
 }
@@ -268,10 +353,6 @@ func NewModel(
 func (model *Model) Packages() []Package {
 	return append([]Package(nil), model.packages...)
 }
-func (model *Model) Types() []Type {
-	return append([]Type(nil), model.types...)
-}
-
 func validateTypeRecords(
 	records []Type,
 	types map[identity.SemanticTypeID]string,

@@ -150,15 +150,17 @@ func TestSemanticPackageIsImmutableAndResolutionConserved(
 		Definitions:  []DefinitionSemantics{definition},
 		Resolutions:  []OccurrenceResolution{resolution},
 		Declarations: []Declaration{declaration},
-		Operations:   []Operation{operation},
+		Types:        []Type{basic, signature},
+		TypeWitnesses: []TypeWitness{
+			mustTypeWitness(t, fixture.pkg, basic.ID(), fixture.authority),
+			mustTypeWitness(t, fixture.pkg, signature.ID(), fixture.authority),
+		},
+		Operations: []Operation{operation},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	model, err := NewModel(
-		[]Package{pkg},
-		[]Type{basic, signature},
-	)
+	model, err := NewModel([]Package{pkg})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,6 +174,20 @@ func TestSemanticPackageIsImmutableAndResolutionConserved(
 	if pkg.Resolutions()[0].Occurrence() != fixture.body {
 		t.Fatal("package exposed mutable resolution storage")
 	}
+}
+
+func mustTypeWitness(
+	t *testing.T,
+	pkg identity.PackageID,
+	typeID identity.SemanticTypeID,
+	authority Authority,
+) TypeWitness {
+	t.Helper()
+	record, err := NewTypeWitness(pkg, typeID, authority)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return record
 }
 
 func TestResolutionRejectsMismatchedOperationOwner(t *testing.T) {

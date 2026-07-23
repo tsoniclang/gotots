@@ -66,8 +66,10 @@ the frontend. `internal/scope` owns only per-definition provider/depth
 selection. `internal/language/executable` owns the later parent-directed
 structural pass and produces full-semantic occurrences plus grammatical roles,
 without interpreting `go/types`. `internal/language/frontend` alone resolves
-typed variants, bindings, declaration semantics, and implicit semantic
-operations. These owners consume the one catalog authority; none owns a private
+typed variants, bindings, declaration semantics, and all implicit semantic
+operations. Stage 1 catalogs those implicit-operation classes and their
+required evidence but produces none of their occurrences. These owners consume
+the one catalog authority; none owns a private
 edge/variant table or recreates another owner's artifact.
 
 The compiler orchestrates
@@ -810,17 +812,22 @@ provider bodies during ordinary compilation would defeat bounded acquisition.
 The semantic artifact therefore binds the exact structural-artifact digest,
 provider-contract fingerprint, selected toolchain/configuration, and package
 input digests. It is package-sharded. Its resident manifest contains package
-membership, exact definition identities, record counts, and shard admission
-digests, but no declaration, type, binding, or operation detail.
+membership, exact definition and owned-declaration identity censuses, record
+counts, and shard admission digests, but no declaration payload, type,
+binding, or operation detail.
 
 Ordinary compilation keeps local semantic records resident and projects at
 most one certified semantic package at a time. Admission validates the whole
 package shard before exposing any record. A semantic shard contains exactly
-the package's `DefinitionSemantics`, `OccurrenceResolution`, declarations,
-bindings, types, operations, unsupported records, and authority evidence. It
-cannot carry Stage-1 topology or TypeScript decisions. A corrupt shard remains
-invalid after an attacker recomputes both its shard digest and outer artifact
-digest because admission revalidates every typed relationship.
+the package-owned `DefinitionSemantics`, `OccurrenceResolution`, declarations,
+bindings, operations, and unsupported records, plus the complete canonical
+type closure and per-type authority witnesses needed to validate that package
+in isolation. Canonically equal type values may therefore occur in more than
+one package shard; declarations and definitions may not. The artifact reports
+this type-closure duplication explicitly. A shard cannot carry Stage-1
+topology or TypeScript decisions. A corrupt shard remains invalid after an
+attacker recomputes both its shard digest and outer artifact digest because
+admission revalidates every typed relationship.
 
 When the structural-source plan selects local syntax, the semantic authority
 is the one transient checker graph and the record carries
@@ -838,11 +845,17 @@ Semantic identities are constructor-only and machine independent:
 
 - package-scope declarations use canonical package identity, closed object
   class, declared name, and generic owner;
-- local bindings and labels use owning `DefinitionID`, defining
-  `OccurrenceID`, closed binding role, and ordinal;
-- unnamed receiver, parameter, result, and implicit bindings use owning
-  `DefinitionID`, closed role, and ordinal rather than spelling or
+- lexical bindings and labels use the exact Stage-1 occurrence that introduces
+  their Go scope, their defining `OccurrenceID` when spelled, a closed binding
+  role, and an ordinal. The scope occurrence is a file, definition root,
+  signature, block, clause, or other cataloged scope owner; it is never a
+  `go/types.Scope` pointer or reconstructed source path;
+- unnamed receiver, parameter, result, and implicit bindings use that same
+  scope occurrence, closed role, and ordinal rather than spelling or
   `token.Pos`;
+- field and method identities include the canonical declaring package as well
+  as owner type and name, so unexported members from different packages never
+  conflate; field order is identity evidence, while method order is not;
 - predeclared objects use the pinned predeclared-catalog identity;
 - operations use the owning occurrence plus a closed operation class; and
 - types use a complete canonical descriptor with a full digest and
@@ -850,11 +863,15 @@ Semantic identities are constructor-only and machine independent:
 
 A type descriptor preserves basic kind; alias versus defined nominal owner;
 generic binder and arguments; array length; channel direction; signature
-receiver/parameters/results/variadic state; struct field order, names, embeds,
-tags, and package visibility; interface methods, embeds, comparability, and
-normalized terms; and every recursively referenced type identity. Named,
-alias, and type-parameter references terminate structural recursion at their
-nominal identity. No identity uses a pointer address, acquisition path,
+receiver, receiver type parameters, function type parameters, parameters,
+results, and variadic state; struct field order, names, embeds, tags, and
+package visibility; interface method names, declaring packages, signatures,
+embeds, comparability, and normalized terms; and every recursively referenced
+type identity. Method descriptors contain semantic method components rather
+than a member identity that points back to the type being hashed, so anonymous
+interfaces have no circular identity construction. Named, alias, and
+type-parameter references terminate structural recursion at their nominal
+identity. No identity uses a pointer address, acquisition path,
 `Type.String()`, source spelling without semantic owner, truncated digest, or
 fallback poison value.
 
