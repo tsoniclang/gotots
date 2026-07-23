@@ -1,0 +1,191 @@
+package semantic
+
+import (
+	"fmt"
+
+	"github.com/tsoniclang/gotots/internal/identity"
+	"github.com/tsoniclang/gotots/internal/language/catalog"
+)
+
+type OperationSpec struct {
+	ID         identity.OperationID
+	Definition identity.DefinitionID
+	Occurrence identity.OccurrenceID
+	Kind       OperationKind
+	Syntax     catalog.Kind
+	Variant    catalog.Variant
+	Role       catalog.Role
+	Token      catalog.TokenKind
+
+	Mode         ValueMode
+	Arity        ResultArity
+	Place        PlaceKind
+	ResultType   identity.SemanticTypeID
+	ExpectedType identity.SemanticTypeID
+	Addressable  bool
+	Assignable   bool
+	HasOk        bool
+	Constant     Constant
+	Object       ObjectReference
+	Selection    Selection
+	Instance     Instance
+
+	Operands    []identity.OccurrenceID
+	Definitions []identity.DefinitionID
+	Implicit    []ImplicitOperation
+	Control     identity.SemanticBindingID
+}
+
+type Operation struct {
+	spec OperationSpec
+}
+
+func NewOperation(spec OperationSpec) (Operation, error) {
+	spec = cloneOperationSpec(spec)
+	if spec.ID.IsZero() ||
+		spec.Definition.IsZero() ||
+		spec.Occurrence.IsZero() ||
+		spec.ID.Definition() != spec.Definition ||
+		spec.ID.Occurrence() != spec.Occurrence ||
+		!spec.Kind.Valid() ||
+		!spec.Syntax.Valid() ||
+		!spec.Variant.Valid() ||
+		!spec.Role.Valid() ||
+		(spec.Token != catalog.TokenInvalid && !spec.Token.Valid()) ||
+		!spec.Mode.Valid() ||
+		!spec.Arity.Valid() ||
+		!spec.Place.Valid() ||
+		!spec.Object.Valid() {
+		return Operation{}, fmt.Errorf(
+			"operation %s has invalid required fields", spec.ID,
+		)
+	}
+	if spec.Mode == ValueModePlace {
+		if spec.Place == PlaceNone ||
+			!spec.Assignable ||
+			spec.ResultType.IsZero() {
+			return Operation{}, fmt.Errorf(
+				"place operation %s lacks place semantics", spec.ID,
+			)
+		}
+	} else if spec.Place != PlaceNone {
+		return Operation{}, fmt.Errorf(
+			"non-place operation %s carries place class", spec.ID,
+		)
+	}
+	if operationNeedsResultType(spec.Mode) != !spec.ResultType.IsZero() {
+		return Operation{}, fmt.Errorf(
+			"operation %s result type disagrees with value mode",
+			spec.ID,
+		)
+	}
+	if !spec.Constant.IsZero() &&
+		spec.Kind != OperationLiteral {
+		return Operation{}, fmt.Errorf(
+			"non-literal operation %s carries constant", spec.ID,
+		)
+	}
+	if !spec.Selection.IsZero() {
+		switch spec.Kind {
+		case OperationFieldSelect,
+			OperationMethodValue,
+			OperationMethodExpression:
+		default:
+			return Operation{}, fmt.Errorf(
+				"operation %s carries an inapplicable selection",
+				spec.ID,
+			)
+		}
+	}
+	if !spec.Instance.IsZero() &&
+		spec.Kind != OperationGenericInstantiate &&
+		spec.Kind != OperationCall {
+		return Operation{}, fmt.Errorf(
+			"operation %s carries an inapplicable generic instance",
+			spec.ID,
+		)
+	}
+	seenOperands := map[identity.OccurrenceID]bool{}
+	for _, operand := range spec.Operands {
+		if operand.IsZero() || seenOperands[operand] {
+			return Operation{}, fmt.Errorf(
+				"operation %s has invalid ordered operands", spec.ID,
+			)
+		}
+		seenOperands[operand] = true
+	}
+	seenDefinitions := map[identity.DefinitionID]bool{}
+	for _, definition := range spec.Definitions {
+		if definition.IsZero() || seenDefinitions[definition] {
+			return Operation{}, fmt.Errorf(
+				"operation %s has invalid nested definitions", spec.ID,
+			)
+		}
+		seenDefinitions[definition] = true
+	}
+	seenImplicit := map[catalog.ImplicitOp]bool{}
+	for _, implicit := range spec.Implicit {
+		if !implicit.Kind().Valid() ||
+			seenImplicit[implicit.Kind()] {
+			return Operation{}, fmt.Errorf(
+				"operation %s has invalid implicit operations",
+				spec.ID,
+			)
+		}
+		seenImplicit[implicit.Kind()] = true
+	}
+	return Operation{spec: spec}, nil
+}
+
+func operationNeedsResultType(mode ValueMode) bool {
+	switch mode {
+	case ValueModeValue,
+		ValueModeType,
+		ValueModeTuple,
+		ValueModePlace:
+		return true
+	default:
+		return false
+	}
+}
+
+func cloneOperationSpec(spec OperationSpec) OperationSpec {
+	spec.Operands = append(
+		[]identity.OccurrenceID(nil), spec.Operands...,
+	)
+	spec.Definitions = append(
+		[]identity.DefinitionID(nil), spec.Definitions...,
+	)
+	spec.Implicit = append(
+		[]ImplicitOperation(nil), spec.Implicit...,
+	)
+	return spec
+}
+
+func (operation Operation) ID() identity.OperationID {
+	return operation.spec.ID
+}
+func (operation Operation) Definition() identity.DefinitionID {
+	return operation.spec.Definition
+}
+func (operation Operation) Occurrence() identity.OccurrenceID {
+	return operation.spec.Occurrence
+}
+func (operation Operation) Kind() OperationKind {
+	return operation.spec.Kind
+}
+func (operation Operation) Syntax() catalog.Kind {
+	return operation.spec.Syntax
+}
+func (operation Operation) Variant() catalog.Variant {
+	return operation.spec.Variant
+}
+func (operation Operation) Role() catalog.Role {
+	return operation.spec.Role
+}
+func (operation Operation) Token() catalog.TokenKind {
+	return operation.spec.Token
+}
+func (operation Operation) Spec() OperationSpec {
+	return cloneOperationSpec(operation.spec)
+}

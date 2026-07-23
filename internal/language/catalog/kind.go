@@ -212,6 +212,15 @@ func (k Kind) Disposition() Disposition {
 	return descriptors[k].disposition
 }
 
+// AllKinds returns every catalog kind in ascending pinned identity order.
+func AllKinds() []Kind {
+	out := make([]Kind, 0, kindCount)
+	for id := 1; id <= kindCount; id++ {
+		out = append(out, Kind(id))
+	}
+	return out
+}
+
 // String renders k for diagnostics.
 func (k Kind) String() string {
 	if name := k.Name(); name != "" {
