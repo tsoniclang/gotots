@@ -387,6 +387,16 @@ entered the model. Missing, duplicate, wrong-domain,
 structural-only-without-catalog-disposition, and dual-authority records fail
 with exact identities.
 
+The type-switch matrix includes zero, one, multiple, and default clauses.
+For `switch value := input.(type)`, verification independently proves that the
+guard identifier has no definition/use object, that its parent assignment is
+the exact type-switch guard shape, and that each case-local
+`Info.Implicits` object maps to a distinct source-less binding owned by that
+case scope. A mutation that restores `types.Object.Pos` source recovery must
+fail because the distinct case objects would collapse onto the one guard
+occurrence; changing the guard to an ordinary short declaration while
+retaining `TypeSwitchBindingAnchor` must also fail.
+
 The declaration-cardinality matrix includes `func _() { ... }` and every
 `func init()`: each retains one callable definition and exact signature/body
 semantics but zero declaration records. Mutating either to an ordinary name

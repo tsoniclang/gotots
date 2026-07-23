@@ -930,6 +930,30 @@ Semantic identities are constructor-only and machine independent:
 - types use a complete canonical descriptor with a full digest and
   collision check.
 
+Type-switch variables preserve Go's case-local checker semantics:
+
+```go
+switch value := input.(type) {
+case int:
+	return value
+case string:
+	return len(value)
+}
+```
+
+The guard identifier has no `go/types.Info.Defs` or `Uses` object. It resolves
+once as a `TypeSwitchBindingAnchor` structural disposition. Each `CaseClause`
+owns one distinct implicit `SemanticBindingID` obtained from
+`go/types.Info.Implicits`, with the case clause as scope owner, no fabricated
+declaring occurrence, the checker-provided name and case-specific type, and
+ordinary uses resolving to that case's binding. One guard spelling may
+therefore anchor zero or more bindings but may never be treated as one
+declaration occurrence shared by multiple checker objects. Resolving an
+unindexed checker object through `types.Object.Pos`, identifier spelling, or a
+position-to-source lookup is forbidden; explicit definitions come from
+`Info.Defs`, implicit definitions come from `Info.Implicits`, and absent
+evidence fails closed.
+
 A canonical declaration payload does not own one privileged source occurrence.
 Source declaration sites are the `OccurrenceResolution` records that resolve
 to it. This distinction is required because equal unnamed structural types may
