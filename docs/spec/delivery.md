@@ -286,6 +286,13 @@ Required exit evidence:
   implementation-owner decision, which belongs to later planning;
 - shadowing, scopes, generic binders, method identity, and source spans are
   exact;
+- any nested definition whose enclosing definition is non-full can consume
+  exact enclosing local type/alias/constant declarations for its required
+  definition semantics, and a full nested definition can additionally consume
+  exact enclosing lexical bindings, through direct `Info.Defs` plus Stage-1
+  transient occurrence/scope/definition anchors; only the required semantic
+  closure is emitted, stable ordinals include omitted siblings, and the
+  excluded parent contributes zero executable operations and no finalized AST;
 - repeated spellings of an equal unnamed structural type exact-join their
   declaration occurrences to one canonical member declaration without
   selecting one spelling as the declaration payload's source;

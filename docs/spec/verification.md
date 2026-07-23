@@ -402,6 +402,24 @@ check separately proves that `. (type)` has the closed type-switch-guard
 variant, no value/result type, and exactly the interface operand; fabricating
 the asserted case type as its result must fail.
 
+The mixed-depth lexical-closure matrix first keeps a nested literal and its
+enclosing definition declaration-contract, then selects only the nested
+literal full-semantic.
+The excluded parent declares at least two same-class local types or constants
+before the selected child, and at least two local variables of which the child
+captures only the later one. The child signature mentions one local type.
+At both depths the local type required by the child signature is present; only
+at full-semantic depth is the used enclosing variable present as a captured
+binding. Verification independently exact-joins each required
+declaration/binding to its direct `Info.Defs` identifier, Stage-1 transient
+occurrence, checker scope, enclosing definition, stable all-sibling ordinal,
+type, and capture edge. It also proves the parent has zero semantic operations
+and its excluded occurrences have no `OccurrenceResolution`. Mutations that recover through
+`types.Object.Pos`, omit an unselected ordinal predecessor, assign the binding
+to the child definition, materialize every excluded-parent local, or require
+the parent executable region must fail at the identity, closure, projection,
+or cost owner.
+
 The declaration-cardinality matrix includes `func _() { ... }` and every
 `func init()`: each retains one callable definition and exact signature/body
 semantics but zero declaration records. Mutating either to an ordinary name

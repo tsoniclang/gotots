@@ -930,6 +930,44 @@ Semantic identities are constructor-only and machine independent:
 - types use a complete canonical descriptor with a full digest and
   collision check.
 
+Mixed-depth lexical support is an explicit transient semantic-closure rule,
+not a reason to retain an excluded executable region. Every nested definition,
+including a non-full definition whose semantic payload is signature-only, may
+refer to a binding, local type, alias, or constant declared in an enclosing
+non-full definition:
+
+```go
+func outer() {
+	type score struct{ value int }
+	base := score{value: 1}
+	use := func(delta score) int { return base.value + delta.value }
+	_ = use
+}
+```
+
+At declaration-contract depth, Stage 2 materializes the canonical `score`
+declaration required by `use`'s signature but no operations or captured
+binding. If only `use` is full-semantic, it additionally materializes the
+captured `base` binding from the one checker graph.
+Their source identities come only from the direct `Info.Defs` identifier
+association exact-joined to the occurrence identity already assigned by the
+Stage-1 transient traversal; their lexical-scope and enclosing-definition
+owners come from those same transient structural facts. Stage 2 may index
+these facts once and emit only the declarations and bindings in the selected
+semantic closure. It must not walk the excluded parent region, recover a
+source through `types.Object.Pos`, infer by spelling, promote the parent to
+full-semantic, emit parent operations, or retain the parent AST after
+finalization. Stable ordinals are computed against the complete direct
+checker-definition set for the owning scope even when only one sibling enters
+the selected semantic closure.
+
+The independently implemented Stage-2 verifier builds its own direct
+`Info.Defs`-to-transient-occurrence and checker-scope joins and compares the
+resulting declaration/binding identities, owner definitions, types, and
+capture edges. The frontend and verifier may share the checker graph and
+constructor-only identity types; they may not share a reverse-position index,
+semantic resolver, or fallback lookup.
+
 Type-switch variables preserve Go's case-local checker semantics:
 
 ```go
