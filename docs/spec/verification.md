@@ -387,8 +387,10 @@ entered the model. Missing, duplicate, wrong-domain,
 structural-only-without-catalog-disposition, and dual-authority records fail
 with exact identities.
 
-The type-switch matrix includes zero, one, multiple, and default clauses.
-For `switch value := input.(type)`, verification independently proves that the
+The type-switch matrix includes a zero-clause guard without a binding plus
+named guards with one, multiple, and default clauses. (A named zero-clause
+guard is invalid Go because its case-local variable cannot be used.) For
+`switch value := input.(type)`, verification independently proves that the
 guard identifier has no definition/use object, that its parent assignment is
 the exact type-switch guard shape, and that each case-local
 `Info.Implicits` object maps to a distinct source-less binding owned by that
