@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/language/analyze"
+	"github.com/tsoniclang/gotots/internal/language/catalog"
 	"github.com/tsoniclang/gotots/internal/scope"
 	"github.com/tsoniclang/gotots/internal/source"
 	"github.com/tsoniclang/gotots/internal/stagecheck"
@@ -131,10 +132,32 @@ func TestProviderGraphMutationsFailAtGate(t *testing.T) {
 	})
 
 	t.Run("change edge role", func(t *testing.T) {
+		// Role is not a stored field: it is a pure function of the edge owned by
+		// the single catalog truth owner (edge.Role()). Mutating the edge to one
+		// the catalog assigns a DIFFERENT role therefore changes the role, and the
+		// join — which keys on the edge — conserves the role transitively.
 		m := cloneRecord(base)
 		realEdge := m.References[0].Edge
-		m.References[0].Edge = "CallExpr.Fun"
-		verifyFails(t, m, "edge=CallExpr.Fun", "edge="+realEdge)
+		realCatalogEdge, err := catalog.EdgeByName(realEdge)
+		if err != nil {
+			t.Fatalf("real edge %q not in the catalog: %v", realEdge, err)
+		}
+		var target catalog.Edge
+		for _, e := range catalog.AllEdges() {
+			if e.Role() != realCatalogEdge.Role() {
+				target = e
+				break
+			}
+		}
+		if target == 0 {
+			t.Fatal("no catalog edge with a differing role")
+		}
+		if target.Role() == realCatalogEdge.Role() {
+			t.Fatal("catalog assigns the same role to a supposedly differing edge")
+		}
+		t.Logf("catalog: edge %q has role %s; edge %q has role %s", realEdge, realCatalogEdge.Role(), target.String(), target.Role())
+		m.References[0].Edge = target.String()
+		verifyFails(t, m, "edge="+target.String(), "edge="+realEdge)
 	})
 
 	t.Run("change order", func(t *testing.T) {
@@ -159,12 +182,14 @@ func TestProviderGraphMutationsFailAtGate(t *testing.T) {
 		)
 	})
 
-	t.Run("expose backing storage", func(t *testing.T) {
+	t.Run("fabricate definition", func(t *testing.T) {
 		m := cloneRecord(base)
-		// A fabricated definition — backing storage surfaced as a spurious unit —
-		// has no independent derivation from source.
+		// A fabricated definition has no independent derivation from source.
+		// (The distinct "expose backing storage" mutation — returning a live
+		// slice/map through the finalized surface — is proved end-to-end by the
+		// isolation gate, TestFinalizedAccessorIsolationIsTotal.)
 		m.Definitions = append(m.Definitions, analyze.ManifestDefinition{
-			Unit: "mut.example/m::backing-storage#0-0/func-body", Kind: 1,
+			Unit: "mut.example/m::backing-storage#0-0/func-body", Kind: 1, Contract: 1,
 		})
 		verifyFails(t,
 			m,

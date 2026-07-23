@@ -32,6 +32,10 @@ type builder struct {
 	// keeps the operation as a reference, never a raw child pointer.
 	boundaries map[ast.Node]identity.SourceUnitID
 	references []ImplementationRef
+	// ops accumulates the traversal's construction operations (one per visited
+	// node) across every region builder, so cost is measured as actual work, not
+	// output cardinality. Nil in builders whose cost is not measured.
+	ops *int
 }
 
 // visitContext is the grammatical context a parent visitor assigns to a child
@@ -51,6 +55,9 @@ type visitContext struct {
 // implementation reference and does not descend, so the child body is absent
 // from this region.
 func (b *builder) visit(n ast.Node, parentIdx int, edge catalog.Edge, ctx visitContext) error {
+	if b.ops != nil {
+		*b.ops++ // one construction operation per visited node (linear-work witness)
+	}
 	if parentIdx >= 0 {
 		if child, ok := b.boundaries[n]; ok {
 			contract, err := ContractForKind(child.Kind())

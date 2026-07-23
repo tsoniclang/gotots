@@ -23,6 +23,7 @@ import (
 // body node.
 func Analyze(universe *source.Universe, depths map[identity.SourceUnitID]source.EvidenceDepth, implicitDepths map[identity.ImplicitUnitID]source.EvidenceDepth) (*WorkspaceInventory, source.RetentionProjection, error) {
 	out := &WorkspaceInventory{version: InventoryArtifactVersion}
+	ops := new(int) // total traversal construction operations (linear-work witness)
 	var fullUnits []identity.SourceUnitID
 	var fullImplicit []identity.ImplicitUnitID
 	for _, pkg := range universe.Packages() {
@@ -65,7 +66,7 @@ func Analyze(universe *source.Universe, depths map[identity.SourceUnitID]source.
 				hasRegion = true
 				boundaries := file.UnitBoundaries()
 				fset := file.TraversalFset()
-				decl := &builder{fset: fset, file: file.ID(), owner: FileDeclarationOwner(file.ID()), info: view, boundaries: boundaries}
+				decl := &builder{fset: fset, file: file.ID(), owner: FileDeclarationOwner(file.ID()), info: view, boundaries: boundaries, ops: ops}
 				if err := decl.visit(syntax, -1, 0, visitContext{}); err != nil {
 					return nil, source.RetentionProjection{}, err
 				}
@@ -91,7 +92,7 @@ func Analyze(universe *source.Universe, depths map[identity.SourceUnitID]source.
 					if !ok {
 						return nil, source.RetentionProjection{}, newResolutionError(0, file.ID(), Span{}, "full unit "+unit.ID().String()+" has no root node")
 					}
-					region, refs, err := buildBodyRegion(file, view, boundaries, unit, root)
+					region, refs, err := buildBodyRegion(file, view, boundaries, unit, root, ops)
 					if err != nil {
 						return nil, source.RetentionProjection{}, err
 					}
@@ -113,7 +114,7 @@ func Analyze(universe *source.Universe, depths map[identity.SourceUnitID]source.
 						return nil, source.RetentionProjection{}, newResolutionError(0, file.ID(), Span{}, "full cgo unit "+unit.ID().String()+" has no checked counterpart")
 					}
 					hasRegion = true
-					region, refs, err := buildCgoBodyRegion(file, view, universe.Fset(), cgoBoundaries, unit, node, span)
+					region, refs, err := buildCgoBodyRegion(file, view, universe.Fset(), cgoBoundaries, unit, node, span, ops)
 					if err != nil {
 						return nil, source.RetentionProjection{}, err
 					}
@@ -145,6 +146,7 @@ func Analyze(universe *source.Universe, depths map[identity.SourceUnitID]source.
 			out.packages = append(out.packages, pkgInv)
 		}
 	}
+	out.traversalOps = *ops
 	projection, err := source.NewRetentionProjection(fullUnits, fullImplicit)
 	if err != nil {
 		return nil, source.RetentionProjection{}, err
@@ -232,10 +234,10 @@ func packageHasFullUnit(pkg *source.LoadedPackage, depths map[identity.SourceUni
 // buildBodyRegion builds one full-semantic unit's body region rooted at its
 // own node, with nested units as reference boundaries and the parent-supplied
 // signature for return resolution.
-func buildBodyRegion(file *source.LoadedFile, view *source.TypeInfoView, boundaries map[ast.Node]identity.SourceUnitID, unit source.SourceUnit, root ast.Node) (*FileInventory, []ImplementationRef, error) {
+func buildBodyRegion(file *source.LoadedFile, view *source.TypeInfoView, boundaries map[ast.Node]identity.SourceUnitID, unit source.SourceUnit, root ast.Node, ops *int) (*FileInventory, []ImplementationRef, error) {
 	b := &builder{
 		fset: file.TraversalFset(), file: file.ID(),
-		owner: UnitOwner(SourceUnitRef(unit.ID())), info: view, boundaries: boundaries,
+		owner: UnitOwner(SourceUnitRef(unit.ID())), info: view, boundaries: boundaries, ops: ops,
 	}
 	if err := b.visit(root, -1, 0, visitContext{signature: file.UnitSignature(unit.ID())}); err != nil {
 		return nil, nil, err
@@ -260,10 +262,10 @@ func buildBodyRegion(file *source.LoadedFile, view *source.TypeInfoView, boundar
 // spans are checked-view coordinates (the counterpart carries the type
 // evidence); the region roots at the original unit identity through the origin
 // mapping's checked span.
-func buildCgoBodyRegion(file *source.LoadedFile, view *source.TypeInfoView, checkedFset *token.FileSet, boundaries map[ast.Node]identity.SourceUnitID, unit source.SourceUnit, node ast.Node, checkedSpan source.Span) (*FileInventory, []ImplementationRef, error) {
+func buildCgoBodyRegion(file *source.LoadedFile, view *source.TypeInfoView, checkedFset *token.FileSet, boundaries map[ast.Node]identity.SourceUnitID, unit source.SourceUnit, node ast.Node, checkedSpan source.Span, ops *int) (*FileInventory, []ImplementationRef, error) {
 	b := &builder{
 		fset: checkedFset, file: file.ID(),
-		owner: UnitOwner(SourceUnitRef(unit.ID())), info: view, boundaries: boundaries,
+		owner: UnitOwner(SourceUnitRef(unit.ID())), info: view, boundaries: boundaries, ops: ops,
 	}
 	if err := b.visit(node, -1, 0, visitContext{}); err != nil {
 		return nil, nil, err

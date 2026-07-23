@@ -315,12 +315,20 @@ func (p *PackageInventory) References() []ImplementationRef {
 
 // WorkspaceInventory is the immutable whole-workspace inventory artifact.
 type WorkspaceInventory struct {
-	version  int
-	packages []*PackageInventory
+	version      int
+	packages     []*PackageInventory
+	traversalOps int
 }
 
 // Version is the artifact schema version.
 func (w *WorkspaceInventory) Version() int { return w.version }
+
+// TraversalOperations is the total number of construction operations the
+// single parent-directed traversal performed — one per visited node across
+// every region builder. It is the actual work the traversal did, distinct from
+// the output cardinality (occurrences/references), so a quadratic implementation
+// producing the same output is distinguishable by this count.
+func (w *WorkspaceInventory) TraversalOperations() int { return w.traversalOps }
 
 // Packages are the per-package inventories in deterministic order (immutable
 // copy).

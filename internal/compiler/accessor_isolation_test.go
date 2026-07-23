@@ -86,6 +86,73 @@ func TestFinalizedAccessorIsolationIsTotal(t *testing.T) {
 }
 
 // checkAccessorIsolation invokes every zero-arg slice/map-returning method of
+// leakyBackingStorage is the negative control: its accessor returns the LIVE
+// backing slice (no defensive copy), so mutating one caller's result corrupts
+// the next — exactly the backing-storage exposure the isolation gate must catch.
+type leakyBackingStorage struct{ items []int }
+
+// Items exposes the backing slice directly — the leak.
+func (l *leakyBackingStorage) Items() []int { return l.items }
+
+// isolatedBackingStorage is the positive control: it defensively copies.
+type isolatedBackingStorage struct{ items []int }
+
+// Items returns an isolated copy.
+func (l *isolatedBackingStorage) Items() []int { return append([]int(nil), l.items...) }
+
+// TestBackingStorageExposureIsCaught proves the isolation methodology is not
+// vacuous: a genuine live-slice accessor is flagged, while a copying accessor is
+// not. It exercises the exact mutate-and-recheck logic the total gate applies.
+func TestBackingStorageExposureIsCaught(t *testing.T) {
+	leakViolations := collectIsolationViolations(reflect.ValueOf(&leakyBackingStorage{items: []int{1, 2, 3}}))
+	if len(leakViolations) == 0 {
+		t.Fatal("live backing-storage accessor was NOT caught — the isolation gate is vacuous")
+	}
+	t.Logf("caught backing-storage exposure: %v", leakViolations)
+	okViolations := collectIsolationViolations(reflect.ValueOf(&isolatedBackingStorage{items: []int{1, 2, 3}}))
+	if len(okViolations) != 0 {
+		t.Errorf("copying accessor was wrongly flagged: %v", okViolations)
+	}
+}
+
+// collectIsolationViolations runs the isolation check on v and returns the
+// violation messages instead of failing, so a negative control can assert the
+// check fires.
+func collectIsolationViolations(v reflect.Value) []string {
+	var violations []string
+	typ := v.Type()
+	label := strings.TrimPrefix(typ.String(), "*")
+	for i := 0; i < typ.NumMethod(); i++ {
+		method := typ.Method(i)
+		if !method.IsExported() || method.Type.NumIn() != 1 || method.Type.NumOut() != 1 {
+			continue
+		}
+		out := method.Type.Out(0)
+		if out.Kind() != reflect.Slice {
+			continue
+		}
+		name := label + "." + method.Name
+		first := v.Method(i).Call(nil)[0]
+		second := v.Method(i).Call(nil)[0]
+		if first.Len() == 0 {
+			continue
+		}
+		before := second.Len()
+		elem := first.Index(0)
+		if elem.IsZero() || !elem.CanSet() {
+			continue
+		}
+		elem.Set(reflect.Zero(elem.Type()))
+		after := v.Method(i).Call(nil)[0]
+		if after.Len() > 0 && after.Index(0).IsZero() {
+			violations = append(violations, name+": element leaked from a shared backing array")
+		} else if after.Len() != before {
+			violations = append(violations, name+": length changed via a shared backing array")
+		}
+	}
+	return violations
+}
+
 // v twice, tampers with the first result, and asserts the second is
 // unaffected.
 func checkAccessorIsolation(t *testing.T, v reflect.Value, exercised map[string]int, seenType map[reflect.Type]bool) {

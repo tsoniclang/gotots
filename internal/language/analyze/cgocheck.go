@@ -81,6 +81,15 @@ func VerifyCgoReferences(universe *source.Universe, inv *WorkspaceInventory) err
 				cgoUnit[unit.ID()] = true
 			}
 		}
+		// Full cgo units own a body region (RootUnit set); only those are walked
+		// by the producer, so only those are independently derived here — a
+		// non-full cgo unit contributes no body region and no reference.
+		hasBodyRegion := map[identity.SourceUnitID]bool{}
+		for _, region := range pkgInv.Files() {
+			if root := region.RootUnit(); !root.IsZero() {
+				hasBodyRegion[root] = true
+			}
+		}
 		// Producer cgo references: those whose parent owner is a cgo unit body.
 		producer := map[cgoRefKey]int{}
 		for _, ref := range pkgInv.References() {
@@ -104,9 +113,12 @@ func VerifyCgoReferences(universe *source.Universe, inv *WorkspaceInventory) err
 				continue
 			}
 			for _, unit := range file.Units() {
+				if !hasBodyRegion[unit.ID()] {
+					continue // non-full cgo unit: no body region, no references
+				}
 				node, _, ok := pkg.CgoCounterpartNode(unit.ID())
 				if !ok {
-					continue // non-full cgo unit: no counterpart body region
+					continue
 				}
 				d := &cgoRefDeriver{
 					fset: universe.Fset(), file: unit.ID().Span().File(),
