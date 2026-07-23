@@ -365,9 +365,16 @@ concatenating the two unions is a known-invalid approximation.
 
 The typed-frontend verifier exact-joins every `DefinitionID` to one
 `DefinitionSemantics` and closed semantic-authority witness, and every retained
-occurrence to one legal `OccurrenceResolution`. When checker and certified
-provider evidence both exist, it independently compares them and proves only
-the contract-selected authority entered the model. Missing, duplicate,
+occurrence to one legal `OccurrenceResolution` in its independently derived
+owner/header/boundary/executable domain. It verifies exact declaration
+cardinality/order per definition class, rejects operations outside executable
+domains, and proves every `StructuralCompileTimeExpression` is covered by the
+exact declaration or canonical type ID carried in its structural payload rather
+than admitted by a generic expression fallback. It separately exact-joins the
+one `builtin` pseudo-package's predeclared declaration payloads against both the
+pinned catalog and `types.Universe`. When checker and certified provider evidence both exist,
+it independently compares them and proves only the contract-selected authority
+entered the model. Missing, duplicate, wrong-domain,
 structural-only-without-catalog-disposition, and dual-authority records fail
 with exact identities.
 
@@ -400,8 +407,12 @@ resolution, changes a parent-assigned arity, swaps ordered operands, conflates
 two shadowed bindings, substitutes an alias with its underlying defined type,
 conflates file-scoped and definition-scoped bindings, drops the declaring
 package from two same-spelled unexported members, introduces a circular
-anonymous-interface method identity, changes a method-selection index, removes
-a required implicit operation,
+anonymous-interface method identity, conflates universal and empty interface
+type sets, changes a method-selection index, changes a multi-name initializer's
+declaration order, replaces a branch's control target with its label binding,
+removes a compile-time expression's structural coverage target, duplicates a
+predeclared declaration into an ordinary package, admits an operation in a
+boundary domain, removes a required implicit operation,
 injects a target-specific field, admits a provider shard whose internal
 relationships are corrupt after all outer digests are recomputed, and restores
 an AST/checker accessor after finalization. Each mutation must fail at its

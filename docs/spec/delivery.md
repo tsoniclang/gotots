@@ -246,21 +246,37 @@ Required exit evidence:
   implicit-operation meaning;
 - when checker and provider semantic evidence both exist they exact-join as
   corroboration and exactly one selected authority enters the model;
-- every retained owner/header/executable occurrence has exactly one legal
+- every retained owner/header/boundary/executable occurrence has exactly one
+  closed resolution domain and exactly one legal
   `OccurrenceResolution` (`StructuralOnly`, definition component, declaration,
   binding, type, operation, or explicit unsupported), and no occurrence is
-  silently consumed or omitted;
+  silently consumed or omitted; operations occur only in executable domains,
+  while non-executable compile-time syntax is positively accounted for by its
+  exact structural coverage target naming its owning declaration/type fact
+  rather than a generic fallback;
+- definition semantics preserve the exact declaration cardinality and order:
+  one declaration for function/method and bodyless definitions, zero for
+  literals and implicit definitions, one-or-more for a multi-name package
+  initializer, and one for a typed synthetic definition; synthetic adapters
+  require a signature while synthetic type/data definitions forbid one;
+  evidence depth and provider class are never encoded as semantic forms;
 - every full-semantic executable region is completely resolved; every
   semantically executable occurrence resolves to an operation or explicit
   unsupported record, catalog-authorized structural-only occurrences remain
   explicit, and every non-full definition has zero executable operations;
 - module, standard-library, and toolchain package identities are constructor-
   validated without machine paths or fabricated module ownership;
+- predeclared declaration payloads are owned once by the `builtin` language
+  pseudo-package, exact-joined to the pinned catalog and `types.Universe`, and
+  are referenced rather than copied by ordinary packages;
 - ordinary package semantics are independent of provenance; semantic records
   carry the resolved package identity/provenance but contain no output path or
   implementation-owner decision, which belongs to later planning;
 - shadowing, scopes, generic binders, method identity, and source spans are
   exact;
+- interface type sets distinguish universe, finite normalized terms, and empty,
+  and branch records distinguish an exact same-definition control-target
+  operation from an optional label binding;
 - context fixtures cover call/conversion, map/receive/assert comma-ok,
   selectors, assignments, composite literals, and range;
 - semantic records are immutable and constructor-validated; and

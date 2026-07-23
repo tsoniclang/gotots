@@ -781,16 +781,48 @@ Each record carries a closed `CheckerAuthority` or
 available they may be exact-joined as corroboration, but only the authority
 selected by the contract enters the semantic model.
 
-Every retained Stage-1 occurrence in an owner, header, or executable region has
-exactly one `OccurrenceResolution`. Its closed variants are
+Every retained Stage-1 occurrence has exactly one semantic resolution domain:
+`owner`, `header`, `boundary`, or `executable`. Region membership is not copied
+into the occurrence payload. If one canonical occurrence is referenced by more
+than one Stage-1 relation, its resolution domain is selected by the closed
+precedence `executable > boundary > header > owner`: a full definition's entry
+is executable, the same entry of a non-full definition is a boundary, and
+header/owner syntax never masquerades as an executable operation. Every such
+occurrence has exactly one `OccurrenceResolution`. Its closed variants are
 `StructuralOnly(DispositionID)`, `DefinitionComponent(DefinitionID,
 ComponentKind)`, `Declaration(SemanticDeclarationID)`,
 `Binding(SemanticBindingID)`, `Type(SemanticTypeID)`,
 `Operation(OperationID)`, and `Unsupported(UnsupportedID)`. The catalog declares
-which variants are legal for each kind/role/semantic variant. A structural-only
-disposition is positive typed evidence, not an absent row. Semantic records may
-refer to other semantic IDs, but they cannot silently consume an occurrence
-owned by another resolution or leave an occurrence unresolved.
+which variants are legal for each kind/role/semantic variant and resolution
+domain. `Operation` is legal only in the executable domain. A non-executable
+constant/type expression may be `StructuralCompileTimeExpression` only when its
+structural payload names exactly one covering `SemanticDeclarationID` or
+`SemanticTypeID` whose canonical record conserves the expression's meaning;
+this is positive typed evidence, never a generic fallback for an unclassified
+expression. Other structural dispositions carry no coverage target. Boundary
+entries resolve as exact definition components or explicit unsupported
+records. Semantic records may refer to other semantic IDs, but they cannot
+silently consume an occurrence owned by another resolution or leave an
+occurrence unresolved.
+
+`DefinitionSemantics` preserves declaration multiplicity and order rather than
+pretending every implementation definition owns one name:
+
+| Stage-1 definition class | Semantic form | Owned declaration IDs |
+|---|---|---:|
+| function or method declaration | callable | exactly one |
+| function literal | callable | zero |
+| package `var` initializer (`var a, b = f()`) | initializer | one or more, in source name order |
+| bodyless function/method obligation | bodyless | exactly one |
+| cataloged implicit definition | implicit | zero |
+| package-synthetic cgo adapter | synthetic | exactly one and one callable signature |
+| package-synthetic cgo type/data | synthetic | exactly one and no callable signature |
+
+Evidence depth and provider selection are not semantic forms. In particular,
+`external` and `intrinsic` cannot appear as `DefinitionSemantics` forms; the
+Stage-1 `DefinitionSelection` and the semantic authority witness already own
+those independent facts. Declaration records own declared value/type facts, so
+`DefinitionSemantics` does not duplicate a second unordered declared-type set.
 
 ### Stage-2 Artifact And Authority Boundary
 
@@ -839,6 +871,13 @@ certified definitions, independently derived checker and provider records for
 the overlapping definitions must be equal after authority is removed; the
 source plan still selects exactly one authority per definition.
 
+The toolchain `builtin` pseudo-package is the sole semantic owner of
+predeclared declaration payloads. Ordinary package shards may reference their
+pinned catalog identities and canonical types, but never duplicate predeclared
+declarations. The language pseudo-package is materialized once from the
+catalog exact-joined to `types.Universe`; it is not inferred from identifier
+spelling.
+
 ### Canonical Semantic Identities
 
 Semantic identities are constructor-only and machine independent:
@@ -867,11 +906,13 @@ receiver, receiver type parameters, function type parameters, parameters,
 results, and variadic state; struct field order, names, embeds, tags, and
 package visibility; interface method names, declaring packages, signatures,
 embeds, comparability, and normalized terms; and every recursively referenced
-type identity. Method descriptors contain semantic method components rather
-than a member identity that points back to the type being hashed, so anonymous
-interfaces have no circular identity construction. Named, alias, and
-type-parameter references terminate structural recursion at their nominal
-identity. No identity uses a pointer address, acquisition path,
+type identity. An interface's normalized structural type set has an explicit
+closed state—`universe`, `finite(terms)`, or `empty`—because an empty term slice
+cannot distinguish the universe from the empty set. Method descriptors contain
+semantic method components rather than a member identity that points back to
+the type being hashed, so anonymous interfaces have no circular identity
+construction. Named, alias, and type-parameter references terminate structural
+recursion at their nominal identity. No identity uses a pointer address, acquisition path,
 `Type.String()`, source spelling without semantic owner, truncated digest, or
 fallback poison value.
 
@@ -902,8 +943,10 @@ One semantic operation record contains, as applicable:
 - receiver adjustment, promotion, copy, conversion, interface, boxing,
   initialization, panic-boundary, and other cataloged implicit operations;
   and
-- exact control, label, branch, range, switch, select, defer, panic, and
-  recovery relationships where applicable.
+- exact control, branch, range, switch, select, defer, panic, and recovery
+  relationships where applicable. A branch's structural target is an
+  `OperationID` in the same definition; its optional spelled label is a
+  separate `SemanticBindingID`. One field never stands for both relations.
 
 These fields state Go meaning only. An operation cannot contain a helper name,
 TypeScript node, representation choice, output path, runtime dictionary,
@@ -915,10 +958,12 @@ The following are blocking exact joins, performed package by package so
 provider scale cannot force whole-artifact residency:
 
 1. every Stage-1 `DefinitionID` ↔ one `DefinitionSemantics`;
-2. every retained owner/header/executable occurrence ↔ one legal
+2. every retained owner/header/boundary/executable occurrence ↔ one legal
    `OccurrenceResolution`;
-3. every resolution reference ↔ one declaration, binding, type, operation, or
-   unsupported record in the same logical model;
+3. every resolution reference and structural coverage target ↔ one
+   declaration, binding, type, operation, or unsupported record in the same
+   logical model, including predeclared declarations in the one language
+   pseudo-package;
 4. every full-semantic executable region ↔ complete operation/explicit-
    unsupported coverage, while every non-full definition ↔ zero executable
    operations;
