@@ -952,7 +952,11 @@ declaration occurrence shared by multiple checker objects. Resolving an
 unindexed checker object through `types.Object.Pos`, identifier spelling, or a
 position-to-source lookup is forbidden; explicit definitions come from
 `Info.Defs`, implicit definitions come from `Info.Implicits`, and absent
-evidence fails closed.
+evidence fails closed. The guard's `input.(type)` occurrence is one
+`OperationTypeAssert` with `VariantTypeSwitchGuard`, `ValueModeNone`,
+`ResultArityZero`, no fabricated result type or object, and exactly the
+interface operand occurrence; the enclosing `OperationTypeSwitch` owns control
+dispatch.
 
 A canonical declaration payload does not own one privileged source occurrence.
 Source declaration sites are the `OccurrenceResolution` records that resolve

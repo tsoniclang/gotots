@@ -397,7 +397,10 @@ the exact type-switch guard shape, and that each case-local
 case scope. A mutation that restores `types.Object.Pos` source recovery must
 fail because the distinct case objects would collapse onto the one guard
 occurrence; changing the guard to an ordinary short declaration while
-retaining `TypeSwitchBindingAnchor` must also fail.
+retaining `TypeSwitchBindingAnchor` must also fail. The independent operation
+check separately proves that `. (type)` has the closed type-switch-guard
+variant, no value/result type, and exactly the interface operand; fabricating
+the asserted case type as its result must fail.
 
 The declaration-cardinality matrix includes `func _() { ... }` and every
 `func init()`: each retains one callable definition and exact signature/body
