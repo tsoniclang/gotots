@@ -1,61 +1,6 @@
 package semantic
 
-import (
-	"encoding/json"
-	"fmt"
-
-	"github.com/tsoniclang/gotots/internal/identity"
-)
-
-func encodeProviderShard(pkg Package) ([]byte, providerShard, error) {
-	shard := providerShard{
-		Version:    ProviderArtifactVersion,
-		Package:    pkg.ID().String(),
-		Provenance: uint8(pkg.Provenance()),
-	}
-	for _, record := range pkg.Definitions() {
-		shard.Definitions = append(
-			shard.Definitions, encodeDefinition(record),
-		)
-	}
-	for _, record := range pkg.Resolutions() {
-		shard.Resolutions = append(
-			shard.Resolutions, encodeResolution(record),
-		)
-	}
-	for _, record := range pkg.Declarations() {
-		shard.Declarations = append(
-			shard.Declarations, encodeDeclaration(record),
-		)
-	}
-	for _, record := range pkg.Bindings() {
-		shard.Bindings = append(
-			shard.Bindings, encodeBinding(record),
-		)
-	}
-	for _, record := range pkg.Types() {
-		shard.Types = append(
-			shard.Types, encodeType(record),
-		)
-	}
-	for _, record := range pkg.Operations() {
-		shard.Operations = append(
-			shard.Operations, encodeOperation(record),
-		)
-	}
-	for _, record := range pkg.Unsupported() {
-		shard.Unsupported = append(
-			shard.Unsupported, encodeUnsupported(record),
-		)
-	}
-	encoded, err := json.Marshal(shard)
-	if err != nil {
-		return nil, providerShard{}, fmt.Errorf(
-			"semantic provider shard encoding failed: %w", err,
-		)
-	}
-	return encoded, shard, nil
-}
+import "github.com/tsoniclang/gotots/internal/identity"
 
 func encodeDefinition(record DefinitionSemantics) wireDefinition {
 	spec := record.Spec()

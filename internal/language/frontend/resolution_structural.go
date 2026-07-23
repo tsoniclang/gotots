@@ -158,7 +158,10 @@ func (builder *packageBuilder) unsupportedResolution(
 		return semantic.OccurrenceResolution{},
 			semantic.OperationInvalid, err
 	}
-	builder.unsupported = append(builder.unsupported, unsupported)
+	if err := builder.draft.AddUnsupported(unsupported); err != nil {
+		return semantic.OccurrenceResolution{},
+			semantic.OperationInvalid, err
+	}
 	resolution, err := semantic.NewOccurrenceResolution(
 		builder.resolutionSpec(
 			record, variant, semantic.ResolutionUnsupported,
@@ -242,10 +245,9 @@ func (builder *packageBuilder) admitResolution(
 	resolution semantic.OccurrenceResolution,
 ) error {
 	id := resolution.Occurrence()
-	if _, duplicate := builder.resolutionByOccurrence[id]; duplicate {
+	if _, duplicate := builder.resolvedOccurrences[id]; duplicate {
 		return fmt.Errorf("duplicate semantic resolution %s", id)
 	}
-	builder.resolutionByOccurrence[id] = resolution
-	builder.resolutions = append(builder.resolutions, resolution)
-	return nil
+	builder.resolvedOccurrences[id] = struct{}{}
+	return builder.draft.AddResolution(resolution)
 }

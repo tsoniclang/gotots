@@ -129,6 +129,38 @@ func TestIdentifierResolutionUsesParentAssignedRole(t *testing.T) {
 	}
 }
 
+func TestRangeIdentifiersRetainExecutableMeaning(t *testing.T) {
+	for _, role := range []Role{
+		RoleRangeKey,
+		RoleRangeValue,
+	} {
+		if !AllowsResolution(
+			KindIdent,
+			role,
+			VariantNone,
+			ResolutionDomainExecutable,
+			ResolutionClassOperation,
+		) {
+			t.Fatalf(
+				"%s identifier cannot resolve as an executable operation",
+				role,
+			)
+		}
+		if !AllowsResolution(
+			KindIdent,
+			role,
+			VariantNone,
+			ResolutionDomainHeader,
+			ResolutionClassBinding,
+		) {
+			t.Fatalf(
+				"%s identifier lost its binding contract",
+				role,
+			)
+		}
+	}
+}
+
 func TestTypeSetUnionBinaryExpressionResolvesAsType(t *testing.T) {
 	if !AllowsResolution(
 		KindBinaryExpr,

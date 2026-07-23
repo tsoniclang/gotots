@@ -20,8 +20,9 @@ import (
 // ProviderWriteResult reports the separately encoded structural and semantic
 // provider authorities produced by one bounded package-at-a-time derivation.
 type ProviderWriteResult struct {
-	Structure structure.ProviderWriteResult
-	Semantic  semantic.ProviderWriteResult
+	Structure    structure.ProviderWriteResult
+	Semantic     semantic.ProviderWriteResult
+	SemanticWork frontend.Work
 }
 
 // AuditCatalog derives provider structural and semantic artifacts from the
@@ -66,6 +67,7 @@ func AuditCatalog(
 		return ProviderWriteResult{}, err
 	}
 	defer semanticWriter.Abort()
+	semanticWork := frontend.Work{}
 	for _, packageID := range packageIDs {
 		derived, err := deriveProviderPackage(
 			req, universe, selected, packageID,
@@ -73,7 +75,7 @@ func AuditCatalog(
 		if err != nil {
 			return ProviderWriteResult{}, err
 		}
-		structureShard, semanticPackage, err :=
+		structureShard, semanticPackage, packageWork, err :=
 			auditProviderPackage(
 				selected, plan, packageID, derived,
 			)
@@ -87,6 +89,7 @@ func AuditCatalog(
 		if err := semanticWriter.Append(semanticPackage); err != nil {
 			return ProviderWriteResult{}, err
 		}
+		semanticWork = semanticWork.Plus(packageWork)
 	}
 	manifest, err := structureWriter.ManifestArtifact()
 	if err != nil {
@@ -115,8 +118,9 @@ func AuditCatalog(
 		return ProviderWriteResult{}, err
 	}
 	return ProviderWriteResult{
-		Structure: structureResult,
-		Semantic:  semanticResult,
+		Structure:    structureResult,
+		Semantic:     semanticResult,
+		SemanticWork: semanticWork,
 	}, nil
 }
 
@@ -207,6 +211,7 @@ func auditProviderPackage(
 ) (
 	*structure.ProviderArtifact,
 	semantic.Package,
+	frontend.Work,
 	error,
 ) {
 	artifact, err := structure.ProduceProviderPackageArtifact(
@@ -218,7 +223,7 @@ func auditProviderPackage(
 		derived.facts.CertifiedFacts(),
 	)
 	if err != nil {
-		return nil, semantic.Package{}, err
+		return nil, semantic.Package{}, frontend.Work{}, err
 	}
 	if err := stagecheck.VerifyProducedProviderPackageArtifact(
 		derived.universe,
@@ -229,9 +234,9 @@ func auditProviderPackage(
 		derived.facts,
 		artifact,
 	); err != nil {
-		return nil, semantic.Package{}, err
+		return nil, semantic.Package{}, frontend.Work{}, err
 	}
-	semanticPackage, _, err := frontend.MaterializeProviderPackage(
+	semanticPackage, work, err := frontend.MaterializeProviderPackage(
 		derived.universe,
 		derived.graph,
 		derived.index,
@@ -241,9 +246,9 @@ func auditProviderPackage(
 		plan,
 	)
 	if err != nil {
-		return nil, semantic.Package{}, err
+		return nil, semantic.Package{}, frontend.Work{}, err
 	}
-	return artifact, semanticPackage, nil
+	return artifact, semanticPackage, work, nil
 }
 
 func verifyProviderPackage(
@@ -369,7 +374,16 @@ func deriveProviderPackage(
 }
 
 func (d *providerPackageDerivation) discard() {
-	source.DiscardHydratedUniverse(d.universe)
+	if d == nil {
+		return
+	}
+	_ = source.DiscardHydratedUniverse(d.universe)
+	d.universe = nil
+	d.graph = nil
+	d.index = nil
+	d.facts = nil
+	d.selections = nil
+	d.executable = nil
 }
 
 func providerPackageIDs(

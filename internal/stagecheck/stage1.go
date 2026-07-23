@@ -178,78 +178,13 @@ func verifyDefinitionGraphPackages(
 	certified *structure.ProviderArtifact,
 	selectedPackages map[identity.PackageID]bool,
 ) error {
-	expectedPackages := map[identity.PackageID]bool{}
-	for _, pkg := range universe.Packages() {
-		if selectedPackages != nil && !selectedPackages[pkg.ID()] {
-			continue
-		}
-		if pkg.Disposition() == source.DispositionOrdinarySource ||
-			pkg.Disposition() == source.DispositionUnsafeIntrinsic {
-			expectedPackages[pkg.ID()] = true
-		}
-	}
-	actualPackages := map[identity.PackageID]bool{}
-	censusByPackage := map[identity.PackageID][]structure.DefinitionCensusRecord{}
-	for _, record := range graph.DefinitionCensus() {
-		censusByPackage[record.Package()] = append(
-			censusByPackage[record.Package()],
-			record,
-		)
-	}
-	problems := newProblemSet()
-	if err := graph.VisitPackages(func(
-		pkg structure.PackageGraph,
-	) error {
-		if actualPackages[pkg.ID()] {
-			problems.add("duplicate package|" + pkg.ID().String())
-		}
-		actualPackages[pkg.ID()] = true
-		if !expectedPackages[pkg.ID()] {
-			problems.add("unexpected package|" + pkg.ID().String())
-		}
-		if err := compareDefinitionCensus(
-			pkg, censusByPackage[pkg.ID()],
-		); err != nil {
-			return err
-		}
-		delete(censusByPackage, pkg.ID())
-		expected, err := deriveExpectedGraph(
-			universe,
-			plan,
-			certified,
-			map[identity.PackageID]bool{pkg.ID(): true},
-		)
-		if err != nil {
-			return &VerificationError{
-				Stage:  "definition-graph-independent",
-				Reason: pkg.ID().String() + ": " + err.Error(),
-			}
-		}
-		return compareLedgers(
-			"definition-graph/"+pkg.ID().String(),
-			ledgerForPackage(pkg),
-			expected,
-		)
-	}); err != nil {
-		return err
-	}
-	for packageID := range expectedPackages {
-		if !actualPackages[packageID] {
-			problems.add("missing package|" + packageID.String())
-		}
-	}
-	for packageID := range censusByPackage {
-		problems.add(
-			"indexed package without graph|" + packageID.String(),
-		)
-	}
-	if !problems.empty() {
-		return problems.verificationError(
-			"definition-graph",
-			"package-set exact join failed",
-		)
-	}
-	return nil
+	return verifyDefinitionGraphPackagesBounded(
+		universe,
+		plan,
+		graph,
+		certified,
+		selectedPackages,
+	)
 }
 
 // VerifyFinalizedStage1 proves the final artifact graph has no reachable raw

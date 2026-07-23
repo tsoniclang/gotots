@@ -21,6 +21,7 @@ type occurrenceContext struct {
 	bindingRole       identity.SemanticBindingRole
 	declaration       catalog.TokenKind
 	selectedObject    types.Object
+	selectedSelection *types.Selection
 	coverageObject    types.Object
 	coverageType      types.Type
 	zeroValue         bool
@@ -33,7 +34,10 @@ type contextIndex struct {
 	byOccurrence map[identity.OccurrenceID]occurrenceContext
 }
 
-func buildContexts(input *packageInput) (*contextIndex, error) {
+func buildContexts(
+	input *packageInput,
+	work *Work,
+) (*contextIndex, error) {
 	out := &contextIndex{
 		byOccurrence: map[identity.OccurrenceID]occurrenceContext{},
 	}
@@ -102,6 +106,7 @@ func buildContexts(input *packageInput) (*contextIndex, error) {
 			}
 		}
 		out.byOccurrence[id] = context
+		work.ContextAssignments++
 		delete(visiting, id)
 		for _, child := range record.children {
 			if err := assign(child); err != nil {
@@ -188,6 +193,7 @@ func childContext(
 	case *ast.SelectorExpr:
 		if role == catalog.RoleSelectedName {
 			context.selectedObject = selectorObject(view, node)
+			context.selectedSelection, _ = view.SelectionOf(node)
 		}
 	case *ast.CallExpr:
 		assignCallContext(

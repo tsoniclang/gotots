@@ -193,6 +193,39 @@ func TestProviderArtifactAuditVerifyAndRelocatedConsumption(t *testing.T) {
 		result.Semantic.LargestPackageRecords == 0 {
 		t.Fatalf("provider result is vacuous: %+v", result)
 	}
+	productionMetrics := result.Semantic.Metrics()
+	if productionMetrics.Packages() != result.Semantic.Packages ||
+		productionMetrics.Definitions() != result.Semantic.Definitions ||
+		productionMetrics.Resolutions() != result.Semantic.Resolutions ||
+		productionMetrics.EncodedBytes() <= 0 ||
+		len(productionMetrics.LargestPackages()) == 0 ||
+		len(productionMetrics.LargestPackages()) > 20 ||
+		len(productionMetrics.LargestDefinitions()) !=
+			minimumInt(productionMetrics.Definitions(), 20) ||
+		len(productionMetrics.LargestOperations()) !=
+			minimumInt(productionMetrics.Operations(), 20) ||
+		len(productionMetrics.LargestTypes()) !=
+			minimumInt(productionMetrics.Types(), 20) {
+		t.Fatalf(
+			"provider semantic metrics disagree with production: %+v",
+			productionMetrics,
+		)
+	}
+	productionWork := result.SemanticWork
+	if productionWork.Packages != result.Semantic.Packages ||
+		productionWork.InputOccurrences == 0 ||
+		productionWork.ContextAssignments !=
+			productionWork.InputOccurrences ||
+		productionWork.ResolutionVisits !=
+			productionWork.InputOccurrences ||
+		productionWork.OccurrenceResolutions !=
+			productionWork.InputOccurrences ||
+		productionWork.LinearOperations() == 0 {
+		t.Fatalf(
+			"provider semantic work is not conserved: %+v",
+			productionWork,
+		)
+	}
 	stat, err := os.Stat(structurePath)
 	if err != nil {
 		t.Fatal(err)
@@ -241,19 +274,47 @@ func TestProviderArtifactAuditVerifyAndRelocatedConsumption(t *testing.T) {
 	}
 	manifestStats := inspection.Structure().ProviderManifestStats()
 	projectionStats := inspection.Structure().ProviderProjectionStats()
+	assertBoundedProviderAuthorities(
+		t, inspection, manifestStats,
+	)
 	if manifestStats.PackageContexts <= 1 ||
-		projectionStats.ShardLoads != manifestStats.PackageContexts ||
-		projectionStats.ProjectedPackages != manifestStats.PackageContexts ||
-		projectionStats.MaxResidentPackages != 1 ||
-		projectionStats.CacheHits == 0 ||
-		projectionStats.LargestPackageBytes == 0 ||
-		projectionStats.LargestPackageRecords == 0 ||
+		len(manifestStats.LargestShards()) == 0 ||
+		projectionStats.ShardLoads != 0 ||
+		projectionStats.ProjectedPackages != 0 ||
+		projectionStats.MaxResidentPackages != 0 ||
+		projectionStats.CacheHits != 0 ||
+		projectionStats.LargestPackageBytes != 0 ||
+		projectionStats.LargestPackageRecords != 0 ||
 		len(inspection.Structure().LargestHeaderArtifacts()) == 0 ||
 		len(inspection.Structure().LargestHeaderArtifacts()) > 20 {
 		t.Fatalf(
 			"provider manifest/projection stats = %+v / %+v",
 			manifestStats,
 			projectionStats,
+		)
+	}
+	localMetrics := inspection.SemanticMetrics()
+	semanticRead := inspection.Semantic().ProviderReadStats()
+	providerMetrics := inspection.Semantic().ProviderManifestMetrics()
+	consumedMetrics := semanticRead.Metrics()
+	semanticProjection := inspection.Semantic().ProjectionStats()
+	if localMetrics.Packages() == 0 ||
+		localMetrics.Definitions() == 0 ||
+		providerMetrics.Packages() != result.Semantic.Packages ||
+		semanticProjection.CertifiedPackages != providerMetrics.Packages() ||
+		semanticProjection.MixedPackages != 0 ||
+		consumedMetrics.Packages() != 0 ||
+		semanticRead.ShardLoads != 0 ||
+		semanticRead.MaxProviderPackagesResident != 0 ||
+		len(providerMetrics.LargestPackages()) == 0 ||
+		len(providerMetrics.LargestPackages()) > 20 {
+		t.Fatalf(
+			"semantic production/manifest/consumption metrics local=%+v provider=%+v consumed=%+v projections=%+v reads=%+v",
+			localMetrics,
+			providerMetrics,
+			consumedMetrics,
+			semanticProjection,
+			semanticRead,
 		)
 	}
 
@@ -282,6 +343,13 @@ func TestProviderArtifactAuditVerifyAndRelocatedConsumption(t *testing.T) {
 	assertProviderTamperRejected(
 		t, structurePath, result.Structure.Digest,
 	)
+}
+
+func minimumInt(left int, right int) int {
+	if left < right {
+		return left
+	}
+	return right
 }
 
 func TestCgoSelectionFactsAreScopeExact(t *testing.T) {

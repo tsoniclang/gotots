@@ -384,20 +384,6 @@ func mustBindingReference(
 	return reference
 }
 
-func (verifier *checkerSemanticVerifier) verifyOperationObject(
-	node ast.Node,
-	reference semantic.ObjectReference,
-) error {
-	object := independentOperationObject(verifier.view, node)
-	if object == nil {
-		if reference.Kind() != semantic.ObjectReferenceNone {
-			return fmt.Errorf("semantic object exists without checker object")
-		}
-		return nil
-	}
-	return verifier.verifyObjectReference(reference, object)
-}
-
 func (verifier *checkerSemanticVerifier) verifyObjectReference(
 	reference semantic.ObjectReference,
 	object types.Object,
@@ -529,6 +515,15 @@ func (verifier *checkerSemanticVerifier) verifyDeclarationIdentity(
 					"predeclared identity differs for %s", object.Name(),
 				)
 			}
+		}
+		return nil
+	}
+	if expected := verifier.types.localDeclarations[object]; !expected.IsZero() {
+		if record.ID() != expected {
+			return fmt.Errorf(
+				"local declaration identity differs for %s: semantic=%s checker=%s",
+				object.Name(), record.ID(), expected,
+			)
 		}
 		return nil
 	}

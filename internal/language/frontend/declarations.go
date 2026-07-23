@@ -62,6 +62,21 @@ func (index *objectIndex) declarationID(
 			"semantic declaration requires checker object",
 		)
 	}
+	if memberObject(object) &&
+		len(index.memberOwnerRelations[object]) > 1 {
+		var owners []string
+		for _, owner := range index.memberOwnerRelations[object] {
+			owners = append(
+				owners, types.TypeString(owner, nil),
+			)
+		}
+		return identity.SemanticDeclarationID{}, fmt.Errorf(
+			"semantic member %s has %d owners %v; contextual declaration identity required",
+			object.Name(),
+			len(index.memberOwnerRelations[object]),
+			owners,
+		)
+	}
 	object = index.canonicalDeclarationObject(object)
 	if existing := index.declarationIDs[object]; !existing.IsZero() {
 		return existing, nil
@@ -109,6 +124,14 @@ func (index *objectIndex) declarationID(
 	if err != nil {
 		return identity.SemanticDeclarationID{}, err
 	}
+	return index.admitDeclarationID(object, id, true)
+}
+
+func (index *objectIndex) admitDeclarationID(
+	object types.Object,
+	id identity.SemanticDeclarationID,
+	cacheByObject bool,
+) (identity.SemanticDeclarationID, error) {
 	if existing := index.declarationByID[id]; existing != nil &&
 		existing != object {
 		if !equivalentDeclarationObjects(existing, object) {
@@ -118,17 +141,25 @@ func (index *objectIndex) declarationID(
 				existing,
 				existing.Name(),
 				existing.Pos(),
-				types.TypeString(index.memberOwners[existing], nil),
+				memberOwnerDescription(
+					index.memberOwnerRelations[existing],
+				),
 				object,
 				object.Name(),
 				object.Pos(),
-				types.TypeString(index.memberOwners[object], nil),
+				memberOwnerDescription(
+					index.memberOwnerRelations[object],
+				),
 			)
 		}
-		index.declarationIDs[object] = id
+		if cacheByObject {
+			index.declarationIDs[object] = id
+		}
 		return id, nil
 	}
-	index.declarationIDs[object] = id
+	if cacheByObject {
+		index.declarationIDs[object] = id
+	}
 	index.declarationByID[id] = object
 	if err := index.registerDeclarationTypeParameters(
 		object, id,
@@ -161,42 +192,6 @@ func equivalentDeclarationObjects(
 	return true
 }
 
-func (index *objectIndex) canonicalDeclarationObject(
-	object types.Object,
-) types.Object {
-	if function, ok := object.(*types.Func); ok {
-		return function.Origin()
-	}
-	field, ok := object.(*types.Var)
-	if !ok || !field.IsField() {
-		return object
-	}
-	owner := index.memberOwners[field]
-	for {
-		pointer, pointerOwner := owner.(*types.Pointer)
-		if !pointerOwner {
-			break
-		}
-		owner = pointer.Elem()
-	}
-	named, namedOwner := owner.(*types.Named)
-	if !namedOwner || named.Origin() == named {
-		return object
-	}
-	ordinal, err := index.fieldOrdinal(field)
-	if err != nil {
-		return object
-	}
-	origin := named.Origin()
-	structure, ok := origin.Underlying().(*types.Struct)
-	if !ok || ordinal >= structure.NumFields() {
-		return object
-	}
-	originField := structure.Field(ordinal)
-	index.memberOwners[originField] = origin
-	return originField
-}
-
 func (index *objectIndex) memberDeclarationID(
 	object types.Object,
 	class identity.SemanticObjectClass,
@@ -214,43 +209,20 @@ func (index *objectIndex) memberDeclarationID(
 	}
 	ordinal := 0
 	if class == identity.SemanticObjectField {
-		ordinal, err = index.fieldOrdinal(object)
+		owners := index.memberOwnerRelations[object]
+		if len(owners) != 1 {
+			return identity.SemanticDeclarationID{}, fmt.Errorf(
+				"field %s has %d owners; contextual owner required",
+				object.Name(), len(owners),
+			)
+		}
+		ordinal, err = memberOrdinal(object, owners[0])
 		if err != nil {
 			return identity.SemanticDeclarationID{}, err
 		}
 	}
 	return identity.NewMemberDeclarationID(
 		owner, memberPackage, class, object.Name(), ordinal,
-	)
-}
-
-func (index *objectIndex) fieldOrdinal(
-	object types.Object,
-) (int, error) {
-	owner := index.memberOwners[object]
-	for {
-		pointer, ok := owner.(*types.Pointer)
-		if !ok {
-			break
-		}
-		owner = pointer.Elem()
-	}
-	if named, ok := owner.(*types.Named); ok {
-		owner = named.Underlying()
-	}
-	structure, ok := owner.(*types.Struct)
-	if !ok {
-		return 0, fmt.Errorf(
-			"field %s has non-struct owner %T", object.Name(), owner,
-		)
-	}
-	for ordinal := 0; ordinal < structure.NumFields(); ordinal++ {
-		if structure.Field(ordinal) == object {
-			return ordinal, nil
-		}
-	}
-	return 0, fmt.Errorf(
-		"field %s is absent from its declaring struct", object.Name(),
 	)
 }
 
@@ -407,10 +379,18 @@ func (index *objectIndex) discoverOwnedDeclarations() error {
 				return err
 			}
 		}
-		for object := range index.memberOwners {
+		for object, owners := range index.memberOwnerRelations {
 			if object.Pkg() == nil {
-				if _, err := index.declarationID(object); err != nil {
-					return err
+				for _, owner := range owners {
+					ordinal, err := memberOrdinal(object, owner)
+					if err != nil {
+						return err
+					}
+					if _, err := index.declarationIDForMemberOwner(
+						object, owner, ordinal,
+					); err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -434,19 +414,17 @@ func (index *objectIndex) discoverOwnedDeclarations() error {
 			return err
 		}
 	}
-	for object := range index.memberOwners {
-		if object.Pkg() == nil {
-			continue
-		}
-		pkg, err := index.packageID(object.Pkg())
-		if err != nil {
-			return err
-		}
-		if pkg != index.input.id {
-			continue
-		}
-		if _, err := index.declarationID(object); err != nil {
-			return err
+	for object, owners := range index.memberOwnerRelations {
+		for _, owner := range owners {
+			ordinal, err := memberOrdinal(object, owner)
+			if err != nil {
+				return err
+			}
+			if _, err := index.declarationIDForMemberOwner(
+				object, owner, ordinal,
+			); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -456,6 +434,9 @@ func (index *objectIndex) ownsDeclaration(
 	object types.Object,
 	id identity.SemanticDeclarationID,
 ) bool {
+	if owner, present := index.declarationOwnerPackage[id]; present {
+		return owner == index.input.id
+	}
 	if id.Form() == identity.SemanticDeclarationPredeclared {
 		return index.input.provenance ==
 			semantic.ProvenanceLanguagePseudo &&
@@ -485,7 +466,10 @@ func (index *objectIndex) declarationRecord(
 		return semantic.Declaration{}, err
 	}
 	pkg := index.input.id
-	if id.Form() != identity.SemanticDeclarationPredeclared {
+	if owner, present :=
+		index.declarationOwnerPackage[id]; present {
+		pkg = owner
+	} else if id.Form() != identity.SemanticDeclarationPredeclared {
 		if object.Pkg() != nil {
 			pkg, err = index.packageID(object.Pkg())
 			if err != nil {

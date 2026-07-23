@@ -32,10 +32,9 @@ func validatePackage(pkg Package) error {
 	}
 	for _, record := range pkg.definitions {
 		for _, declaration := range record.Spec().Declarations {
-			if declarationIsPackageOwned(declaration, pkg.id) &&
-				!declarations[declaration] {
+			if !declarations[declaration] {
 				return fmt.Errorf(
-					"definition %s names absent declaration %s",
+					"definition %s references absent semantic declaration %s",
 					record.Definition(), declaration,
 				)
 			}
@@ -43,12 +42,22 @@ func validatePackage(pkg Package) error {
 	}
 	bindings := map[identity.SemanticBindingID]bool{}
 	for _, record := range pkg.bindings {
-		if record.Package() != pkg.id ||
-			(!record.Definition().IsZero() &&
-				!definitions[record.Definition()]) ||
-			bindings[record.ID()] {
+		if record.Package() != pkg.id {
 			return fmt.Errorf(
-				"semantic package %s has invalid binding %s",
+				"semantic package %s does not own binding %s",
+				pkg.id, record.ID(),
+			)
+		}
+		if !record.Definition().IsZero() &&
+			!definitions[record.Definition()] {
+			return fmt.Errorf(
+				"semantic binding %s references absent definition %s",
+				record.ID(), record.Definition(),
+			)
+		}
+		if bindings[record.ID()] {
+			return fmt.Errorf(
+				"semantic package %s duplicates binding %s",
 				pkg.id, record.ID(),
 			)
 		}
@@ -90,10 +99,15 @@ func validatePackage(pkg Package) error {
 	}
 	operations := map[identity.OperationID]bool{}
 	for _, record := range pkg.operations {
-		if !definitions[record.Definition()] ||
-			operations[record.ID()] {
+		if !definitions[record.Definition()] {
 			return fmt.Errorf(
-				"semantic package %s has invalid operation %s",
+				"semantic operation %s references absent definition %s",
+				record.ID(), record.Definition(),
+			)
+		}
+		if operations[record.ID()] {
+			return fmt.Errorf(
+				"semantic package %s duplicates operation %s",
 				pkg.id, record.ID(),
 			)
 		}

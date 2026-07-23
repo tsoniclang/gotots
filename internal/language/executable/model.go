@@ -85,7 +85,7 @@ type Inventory struct {
 	regionIDs     []identity.DefinitionID
 	byID          map[identity.DefinitionID]Region
 	additionalIDs []identity.OccurrenceID
-	byOccurrence  map[identity.OccurrenceID]structure.Occurrence
+	byOccurrence  map[identity.OccurrenceID]*structure.Occurrence
 	work          Work
 }
 
@@ -101,9 +101,25 @@ func (i *Inventory) AdditionalOccurrences() []structure.Occurrence {
 		[]structure.Occurrence, 0, len(i.additionalIDs),
 	)
 	for _, id := range i.additionalIDs {
-		out = append(out, i.byOccurrence[id])
+		out = append(out, *i.byOccurrence[id])
 	}
 	return out
+}
+func (i *Inventory) AdditionalOccurrenceRefs() (
+	[]structure.OccurrenceRef,
+	error,
+) {
+	out := make(
+		[]structure.OccurrenceRef, 0, len(i.additionalIDs),
+	)
+	for _, id := range i.additionalIDs {
+		reference, err := structure.NewOccurrenceRef(i.byOccurrence[id])
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, reference)
+	}
+	return out, nil
 }
 func (i *Inventory) Work() Work { return i.work }
 func (i *Inventory) For(
@@ -116,7 +132,10 @@ func (i *Inventory) AdditionalOccurrence(
 	id identity.OccurrenceID,
 ) (structure.Occurrence, bool) {
 	occurrence, ok := i.byOccurrence[id]
-	return occurrence, ok
+	if !ok {
+		return structure.Occurrence{}, false
+	}
+	return *occurrence, true
 }
 
 func (i *Inventory) sort() {

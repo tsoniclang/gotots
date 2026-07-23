@@ -14,10 +14,28 @@ import (
 
 const stage2ContextMatrix = `package matrix
 
-import "unsafe"
+import (
+	"example.com/stage2/left"
+	_ "example.com/stage2/right"
+	"unsafe"
+)
 
 type Number int
 type Alias = Number
+
+type Universal interface{}
+type Empty interface {
+	int
+	string
+}
+
+type Recursive interface {
+	Next() interface {
+		Parent() Recursive
+	}
+}
+
+type Fixed [1 + 1]int
 
 type Box[T any] struct {
 	Value T
@@ -25,26 +43,45 @@ type Box[T any] struct {
 
 func (box Box[T]) Get() T { return box.Value }
 
+type Embedded struct {
+	Nested int
+}
+
+type EmbeddedBox struct {
+	Embedded
+}
+
 func Identity[T any](value T) T { return value }
 
 var First, _ = pair()
 var _, _ = pair()
+var Left, Right = pair()
+var AliasValue Alias
+var External = left.Product{SKU: "external"}
 
 func init() { First++ }
 
 func pair() (int, int) { return 1, 2 }
+
+func ExternalCode() string { return External.Code() }
 
 func Matrix(
 	values map[string]int,
 	input any,
 	channel <-chan int,
 	box Box[int],
+	embedded EmbeddedBox,
 ) (int, bool) {
 	value, mapOK := values["key"]
+	if _, exists := values["missing"]; exists {
+		value++
+	}
 	received, channelOK := <-channel
 	asserted, assertOK := input.(int)
 	converted := Number(value)
+	aliasConverted := Alias(value)
 	field := box.Value
+	promoted := embedded.Nested
 	methodValue := box.Get
 	methodExpression := Box[int].Get
 	generic := Identity[int](value)
@@ -63,6 +100,25 @@ loop:
 			break loop
 		}
 	}
+	for key, item := range values {
+		value += len(key) + item
+		break
+	}
+	var key string
+	var item int
+	_, item = pair()
+	for key, item = range values {
+		value += len(key) + item
+		break
+	}
+	for _, item := range values {
+		value += item
+		break
+	}
+	for key, _ := range values {
+		value += len(key)
+		break
+	}
 	switch asserted {
 	case 1:
 		value++
@@ -71,8 +127,27 @@ loop:
 	}
 	return int(converted) + field + methodValue() +
 		methodExpression(box) + received + pointer.Value +
+		int(aliasConverted) + promoted +
 		int(unsafe.Sizeof(structValue)),
 		mapOK && channelOK && assertOK
+}
+
+func Shadow(value int) int {
+	result := value
+	if result > 0 {
+		value := result + 1
+		result += value
+	}
+	return result + value
+}
+
+func FileScoped(value int) uintptr {
+	return unsafe.Sizeof(value)
+}
+
+func DefinitionScoped() int {
+	unsafe := 1
+	return unsafe
 }
 
 func Copies(
@@ -196,7 +271,7 @@ func TestStage2ContextMatrixAndSemanticConservation(t *testing.T) {
 	}
 	sort.Ints(initializerCardinalities)
 	if initDefinitions != 1 ||
-		fmt.Sprint(initializerCardinalities) != "[0 1]" {
+		fmt.Sprint(initializerCardinalities) != "[0 1 1 2]" {
 		t.Fatalf(
 			"init definitions=%d initializer declaration cardinalities=%v",
 			initDefinitions, initializerCardinalities,
@@ -204,11 +279,34 @@ func TestStage2ContextMatrixAndSemanticConservation(t *testing.T) {
 	}
 
 	work := inspection.SemanticWork()
-	if work.ContextAssignments != work.OccurrenceResolutions ||
-		work.ContextAssignments == 0 ||
+	totalOperations := 0
+	totalUnsupported := 0
+	if err := inspection.Semantic().VisitPackages(
+		func(candidate semantic.Package) error {
+			totalOperations += len(candidate.Operations())
+			totalUnsupported += len(candidate.Unsupported())
+			return nil
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if work.InputOccurrences == 0 ||
+		work.ContextAssignments != work.InputOccurrences ||
+		work.ObjectOccurrenceVisits != work.InputOccurrences ||
+		work.ImplicitBindingVisits != work.InputOccurrences ||
+		work.CaptureOccurrenceVisits != work.InputOccurrences ||
+		work.ResolutionVisits != work.InputOccurrences ||
+		work.OccurrenceResolutions != work.InputOccurrences ||
 		work.OperationConstructions !=
-			len(operations)+len(pkg.Unsupported()) {
+			totalOperations+totalUnsupported {
 		t.Fatalf("semantic work is not conserved: %+v", work)
+	}
+	if work.DefinitionContainmentVisits !=
+		2*work.DefinitionContainmentEntries ||
+		work.DefinitionContainmentEdges >
+			work.DefinitionContainmentEntries ||
+		work.LinearOperations() == 0 {
+		t.Fatalf("semantic containment work is not bounded: %+v", work)
 	}
 }
 
@@ -297,14 +395,7 @@ func TestStage2SemanticIdentitiesSurviveWorkspaceRelocation(t *testing.T) {
 
 func inspectStage2Fixture(t *testing.T) *Inspection {
 	t.Helper()
-	directory := t.TempDir()
-	writeCompilerFile(
-		t,
-		directory,
-		"go.mod",
-		"module example.com/stage2\n\ngo 1.26.0\n",
-	)
-	writeCompilerFile(t, directory, "matrix.go", stage2ContextMatrix)
+	directory := writeStage2Project(t)
 	inspection, err := InspectConstructs(source.Request{
 		Dir: directory, Patterns: []string{"."},
 		ProviderContract: contract.DefaultID,
@@ -313,6 +404,31 @@ func inspectStage2Fixture(t *testing.T) *Inspection {
 		t.Fatal(err)
 	}
 	return inspection
+}
+
+func writeStage2Project(t *testing.T) string {
+	t.Helper()
+	directory := t.TempDir()
+	writeCompilerFile(
+		t,
+		directory,
+		"go.mod",
+		"module example.com/stage2\n\ngo 1.26.0\n",
+	)
+	writeCompilerFile(t, directory, "matrix.go", stage2ContextMatrix)
+	writeCompilerFile(
+		t,
+		directory,
+		"left/left.go",
+		"package left\n\ntype Local interface { hidden() }\n\ntype Product struct { SKU string }\n\nfunc (product Product) Code() string { return product.SKU }\n",
+	)
+	writeCompilerFile(
+		t,
+		directory,
+		"right/right.go",
+		"package right\n\ntype Local interface { hidden() }\n",
+	)
+	return directory
 }
 
 func semanticPackageByImportPath(

@@ -30,22 +30,35 @@ type objectIndex struct {
 	objectBySource          map[identity.OccurrenceID]types.Object
 	definitionByObject      map[types.Object]identity.DefinitionID
 	scopeOwners             map[*types.Scope]identity.OccurrenceID
-	memberOwners            map[types.Object]types.Type
+	memberOwnerRelations    map[types.Object][]types.Type
 	bindingByObject         map[types.Object]*bindingCandidate
 	bindingBySource         map[identity.OccurrenceID]*bindingCandidate
 	declarationIDs          map[types.Object]identity.SemanticDeclarationID
 	declarationByID         map[identity.SemanticDeclarationID]types.Object
+	declarationOwnerPackage map[identity.SemanticDeclarationID]identity.PackageID
 	localOrdinals           map[types.Object]int
 	bindingIDs              map[*bindingCandidate]identity.SemanticBindingID
 	typeParameterOwners     map[*types.TypeParam]semantic.TypeParameterOwner
 	typeParameterByLocation map[typeParameterLocation]semantic.TypeParameterOwner
 	typeBuilder             *typeBuilder
+	memberVisits            map[memberVisit]bool
+	scopeByOccurrence       map[identity.OccurrenceID]identity.OccurrenceID
+	scopeOccurrenceResolved map[identity.OccurrenceID]bool
+	checkerScopeOwner       map[*types.Scope]identity.OccurrenceID
+	checkerScopeResolved    map[*types.Scope]bool
+	work                    *Work
+}
+
+type memberVisit struct {
+	typ     types.Type
+	nominal types.Type
 }
 
 func buildObjectIndex(
 	stage *stageInput,
 	input *packageInput,
 	contexts *contextIndex,
+	work *Work,
 ) (*objectIndex, error) {
 	out := &objectIndex{
 		input: input, contexts: contexts,
@@ -55,15 +68,22 @@ func buildObjectIndex(
 		objectBySource:          map[identity.OccurrenceID]types.Object{},
 		definitionByObject:      map[types.Object]identity.DefinitionID{},
 		scopeOwners:             map[*types.Scope]identity.OccurrenceID{},
-		memberOwners:            map[types.Object]types.Type{},
+		memberOwnerRelations:    map[types.Object][]types.Type{},
 		bindingByObject:         map[types.Object]*bindingCandidate{},
 		bindingBySource:         map[identity.OccurrenceID]*bindingCandidate{},
 		declarationIDs:          map[types.Object]identity.SemanticDeclarationID{},
 		declarationByID:         map[identity.SemanticDeclarationID]types.Object{},
+		declarationOwnerPackage: map[identity.SemanticDeclarationID]identity.PackageID{},
 		localOrdinals:           map[types.Object]int{},
 		bindingIDs:              map[*bindingCandidate]identity.SemanticBindingID{},
 		typeParameterOwners:     map[*types.TypeParam]semantic.TypeParameterOwner{},
 		typeParameterByLocation: map[typeParameterLocation]semantic.TypeParameterOwner{},
+		memberVisits:            map[memberVisit]bool{},
+		scopeByOccurrence:       map[identity.OccurrenceID]identity.OccurrenceID{},
+		scopeOccurrenceResolved: map[identity.OccurrenceID]bool{},
+		checkerScopeOwner:       map[*types.Scope]identity.OccurrenceID{},
+		checkerScopeResolved:    map[*types.Scope]bool{},
+		work:                    work,
 	}
 	for _, loaded := range stage.universe.Packages() {
 		path := loaded.ID().ImportPath()
@@ -99,15 +119,16 @@ func buildObjectIndex(
 	for _, name := range scope.Names() {
 		object := scope.Lookup(name)
 		if object != nil {
-			out.indexMembers(object.Type(), nil, map[types.Type]bool{})
+			out.indexMembers(object.Type(), nil)
 		}
 	}
 	for _, occurrenceID := range input.order {
+		work.ObjectOccurrenceVisits++
 		record := input.occurrences[occurrenceID]
 		if selector, ok := record.node.(*ast.SelectorExpr); ok {
 			if selection, present := view.SelectionOf(selector); present {
 				out.indexMembers(
-					selection.Recv(), nil, map[types.Type]bool{},
+					selection.Recv(), nil,
 				)
 			}
 		}
@@ -169,7 +190,7 @@ func buildObjectIndex(
 		}
 		if expression, ok := record.node.(ast.Expr); ok {
 			if value, present := view.TypeOf(expression); present {
-				out.indexMembers(value.Type, nil, map[types.Type]bool{})
+				out.indexMembers(value.Type, nil)
 			}
 		}
 	}

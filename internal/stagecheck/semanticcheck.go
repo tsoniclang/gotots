@@ -72,10 +72,26 @@ func VerifyStage2(
 			),
 		)
 	}
+	authority, mixedPackages, err :=
+		verifySemanticAuthorityProjections(
+			model, expected, loaded, plan,
+		)
+	if err != nil {
+		return err
+	}
+	semanticBefore := model.ProviderReadStats()
+	if semanticBefore.ShardLoads != 0 ||
+		semanticBefore.MaxProviderPackagesResident != 0 {
+		return semanticVerificationError(
+			"provider-residency",
+			"semantic provider detail was opened before Stage-2 verification",
+		)
+	}
 	packageIDs := sortedSemanticPackages(expected)
-	if err := verifySemanticModelClosure(
+	owners, err := censusSemanticOwners(
 		model, provider, packageIDs,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 	expectations := map[identity.PackageID]semanticPackageExpectation{}
@@ -120,6 +136,7 @@ func VerifyStage2(
 		)
 	}
 	visited := 0
+	expectedVisits := 0
 	for _, packageID := range packageIDs {
 		expectation, present := expectations[packageID]
 		if !present {
@@ -128,10 +145,22 @@ func VerifyStage2(
 				"resident package projection is absent for "+packageID.String(),
 			)
 		}
+		projection := authority[packageID]
+		if !projection.HasLocalAuthority() {
+			continue
+		}
+		expectedVisits++
 		err := model.VisitPackage(
 			packageID,
 			func(actual semantic.Package) error {
 				visited++
+				if err := verifySemanticPackageClosure(
+					actual, owners,
+				); err != nil {
+					return semanticVerificationError(
+						"closure", err.Error(),
+					)
+				}
 				return verifySemanticPackage(
 					expectation,
 					expected[packageID],
@@ -158,16 +187,25 @@ func VerifyStage2(
 			),
 		)
 	}
-	if visited != len(expected) {
+	if visited != expectedVisits {
 		return semanticVerificationError(
 			"model",
 			fmt.Sprintf(
 				"visited %d packages, expected %d",
-				visited, len(expected),
+				visited, expectedVisits,
 			),
 		)
 	}
 	stats := model.ProviderReadStats()
+	if stats.ShardLoads != mixedPackages {
+		return semanticVerificationError(
+			"provider-residency",
+			fmt.Sprintf(
+				"opened %d semantic provider shards, expected %d mixed projections",
+				stats.ShardLoads, mixedPackages,
+			),
+		)
+	}
 	if stats.MaxProviderPackagesResident > 1 {
 		return semanticVerificationError(
 			"provider-residency",

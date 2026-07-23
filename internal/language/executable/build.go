@@ -20,7 +20,7 @@ func Build(
 ) (*Inventory, error) {
 	out := &Inventory{
 		byID:         map[identity.DefinitionID]Region{},
-		byOccurrence: map[identity.OccurrenceID]structure.Occurrence{},
+		byOccurrence: map[identity.OccurrenceID]*structure.Occurrence{},
 	}
 	definitions := map[identity.DefinitionID]structure.ImplementationDefinition{}
 	definitionAt := map[identity.OccurrenceID]identity.DefinitionID{}
@@ -320,7 +320,7 @@ func (b *regionBuilder) recordOccurrence(
 	}
 	b.work.IdentityProbes++
 	if existing, present := b.inventory.byOccurrence[occurrence.ID()]; present {
-		if existing != occurrence {
+		if *existing != occurrence {
 			return fmt.Errorf(
 				"executable occurrence %s has conflicting payloads",
 				occurrence.ID(),
@@ -328,7 +328,8 @@ func (b *regionBuilder) recordOccurrence(
 		}
 		return nil
 	}
-	b.inventory.byOccurrence[occurrence.ID()] = occurrence
+	stored := occurrence
+	b.inventory.byOccurrence[occurrence.ID()] = &stored
 	b.inventory.additionalIDs = append(
 		b.inventory.additionalIDs, occurrence.ID(),
 	)

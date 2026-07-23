@@ -43,7 +43,7 @@ func TestCanonicalOccurrencePayloadCannotCrossStores(t *testing.T) {
 	if duplicated.ID().IsZero() {
 		t.Fatal("fixture has no structurally owned executable member")
 	}
-	inventory.byOccurrence[duplicated.ID()] = duplicated
+	inventory.byOccurrence[duplicated.ID()] = &duplicated
 	inventory.additionalIDs = append(
 		inventory.additionalIDs,
 		duplicated.ID(),

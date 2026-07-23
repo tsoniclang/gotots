@@ -18,15 +18,16 @@ import (
 
 // Inspection is the immutable verified Stage-1 result.
 type Inspection struct {
-	workspace    *source.Workspace
-	plan         *sourceplan.Plan
-	graph        *structure.Graph
-	facts        *selectionfacts.Artifact
-	selections   *scope.DefinitionSelections
-	executable   *executable.Inventory
-	semantic     *semantic.Model
-	semanticWork frontend.Work
-	hydration    source.HydrationStats
+	workspace       *source.Workspace
+	plan            *sourceplan.Plan
+	graph           *structure.Graph
+	facts           *selectionfacts.Artifact
+	selections      *scope.DefinitionSelections
+	executable      *executable.Inventory
+	semantic        *semantic.Model
+	semanticWork    frontend.Work
+	semanticMetrics semantic.Metrics
+	hydration       source.HydrationStats
 }
 
 func (i *Inspection) Workspace() *source.Workspace             { return i.workspace }
@@ -37,7 +38,10 @@ func (i *Inspection) Selections() *scope.DefinitionSelections  { return i.select
 func (i *Inspection) Executable() *executable.Inventory        { return i.executable }
 func (i *Inspection) Semantic() *semantic.Model                { return i.semantic }
 func (i *Inspection) SemanticWork() frontend.Work              { return i.semanticWork }
-func (i *Inspection) Hydration() source.HydrationStats         { return i.hydration }
+func (i *Inspection) SemanticMetrics() semantic.Metrics {
+	return i.semanticMetrics
+}
+func (i *Inspection) Hydration() source.HydrationStats { return i.hydration }
 
 // InspectConstructs executes the sole ordinary Stage-1 route:
 //
@@ -187,8 +191,9 @@ func InspectConstructs(req source.Request) (*Inspection, error) {
 	return &Inspection{
 		workspace: workspace, plan: plan, graph: graph, facts: facts,
 		selections: selections, executable: executableInventory,
-		semantic:     semanticResult.Model(),
-		semanticWork: semanticResult.Work(),
-		hydration:    hydrationStats,
+		semantic:        semanticResult.Model(),
+		semanticWork:    semanticResult.Work(),
+		semanticMetrics: semanticResult.Metrics(),
+		hydration:       hydrationStats,
 	}, nil
 }

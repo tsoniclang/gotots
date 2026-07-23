@@ -15,6 +15,28 @@ func deriveExpectedGraph(
 	artifact *structure.ProviderArtifact,
 	selectedPackages map[identity.PackageID]bool,
 ) (*structuralLedger, error) {
+	return deriveExpectedGraphAuthority(
+		universe, plan, artifact, selectedPackages, true,
+	)
+}
+
+func deriveExpectedResidentGraph(
+	universe *source.Universe,
+	plan *sourceplan.Plan,
+	selectedPackages map[identity.PackageID]bool,
+) (*structuralLedger, error) {
+	return deriveExpectedGraphAuthority(
+		universe, plan, nil, selectedPackages, false,
+	)
+}
+
+func deriveExpectedGraphAuthority(
+	universe *source.Universe,
+	plan *sourceplan.Plan,
+	artifact *structure.ProviderArtifact,
+	selectedPackages map[identity.PackageID]bool,
+	includeCertified bool,
+) (*structuralLedger, error) {
 	expected := newStructuralLedger()
 	loadedByPackage := map[identity.PackageID]*source.LoadedPackage{}
 	derivedByPackage := map[identity.PackageID]map[identity.FileID]*derivedFile{}
@@ -49,6 +71,9 @@ func deriveExpectedGraph(
 				derivedByPackage[pkg.ID()][file.ID()] = derived
 				expected.merge(derived.ledger)
 			case sourceplan.KindCertifiedGraph:
+				if !includeCertified {
+					continue
+				}
 				if artifact == nil {
 					return nil, fmt.Errorf(
 						"independent certified file %s lacks artifact",
@@ -85,7 +110,8 @@ func deriveExpectedGraph(
 		localSynthetic := !planned ||
 			synthetic.Kind() == sourceplan.KindLocalSyntax
 		if planned &&
-			synthetic.Kind() == sourceplan.KindCertifiedGraph {
+			synthetic.Kind() == sourceplan.KindCertifiedGraph &&
+			includeCertified {
 			if artifact == nil {
 				return nil, fmt.Errorf(
 					"independent synthetic owner %s lacks artifact", pkgID,

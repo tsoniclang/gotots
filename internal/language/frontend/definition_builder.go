@@ -34,7 +34,9 @@ func (builder *packageBuilder) buildDefinitions() error {
 				definition.ID(), err,
 			)
 		}
-		builder.definitions = append(builder.definitions, record)
+		if err := builder.draft.AddDefinition(record); err != nil {
+			return err
+		}
 	}
 	return nil
 }

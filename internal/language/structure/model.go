@@ -403,6 +403,15 @@ func (g FileGraph) Owner() OwnerRegion { return g.owner }
 func (g FileGraph) Occurrences() []Occurrence {
 	return append([]Occurrence(nil), g.occurrences...)
 }
+func (g FileGraph) OccurrenceRefs() []OccurrenceRef {
+	out := make([]OccurrenceRef, 0, len(g.occurrences))
+	for index := range g.occurrences {
+		out = append(out, OccurrenceRef{
+			occurrence: &g.occurrences[index],
+		})
+	}
+	return out
+}
 func (g FileGraph) Containment() ContainmentGraph { return g.containment }
 func (g FileGraph) Definitions() []ImplementationDefinition {
 	return append([]ImplementationDefinition(nil), g.definitions...)

@@ -138,13 +138,15 @@ func (builder *typeBuilder) namedMethods(
 ) ([]semantic.TypeMethod, error) {
 	out := make([]semantic.TypeMethod, 0, named.NumMethods())
 	for index := 0; index < named.NumMethods(); index++ {
-		method, err := builder.methodDescriptor(
-			named.Method(index),
+		method := named.Method(index)
+		builder.objects.admitMemberOwner(method, named)
+		descriptor, err := builder.methodDescriptor(
+			method,
 		)
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, method)
+		out = append(out, descriptor)
 	}
 	sortMethods(out)
 	return out, nil

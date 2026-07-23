@@ -73,8 +73,7 @@ func (builder *packageBuilder) buildPackageInitialization(
 	if err != nil {
 		return err
 	}
-	builder.operations = append(builder.operations, operation)
-	return nil
+	return builder.draft.AddOperation(operation)
 }
 
 func (builder *packageBuilder) packageInitializationSequence() (

@@ -27,6 +27,7 @@ type checkerTypeVerifier struct {
 	parameterOwners    map[*types.TypeParam]checkerTypeParameterOwner
 	parameterLocations map[checkerTypeParameterLocation]checkerTypeParameterOwner
 	parameterConflict  string
+	localDeclarations  map[types.Object]identity.SemanticDeclarationID
 }
 
 func newCheckerTypeVerifier(
@@ -44,6 +45,7 @@ func newCheckerTypeVerifier(
 		verified:           map[checkerTypePair]bool{},
 		parameterOwners:    map[*types.TypeParam]checkerTypeParameterOwner{},
 		parameterLocations: map[checkerTypeParameterLocation]checkerTypeParameterOwner{},
+		localDeclarations:  map[types.Object]identity.SemanticDeclarationID{},
 	}
 	for _, record := range actual.Types() {
 		out.types[record.ID()] = record
@@ -247,6 +249,17 @@ func (verifier *checkerTypeVerifier) verifyNominalDeclaration(
 			expected != id {
 			return fmt.Errorf(
 				"predeclared nominal declaration differs: %s vs %s",
+				id, expected,
+			)
+		}
+		return nil
+	}
+	if !independentPackageDeclarationObject(object) {
+		expected := verifier.localDeclarations[object]
+		if expected.IsZero() || expected != id ||
+			expected.Class() != class {
+			return fmt.Errorf(
+				"local nominal declaration differs: %s vs %s",
 				id, expected,
 			)
 		}

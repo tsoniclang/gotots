@@ -22,14 +22,28 @@ func (builder *typeBuilder) memberPackage(
 func (builder *typeBuilder) memberOwnerID(
 	object types.Object,
 ) (identity.SemanticTypeID, error) {
-	owner := builder.objects.memberOwners[object]
+	owners := builder.objects.memberOwnerRelations[object]
+	if len(owners) != 1 {
+		return identity.SemanticTypeID{}, fmt.Errorf(
+			"member %s (%T, type=%s, package=%v, position=%d) has %d declaring owner types; contextual owner required",
+			object.Name(),
+			object,
+			types.TypeString(object.Type(), nil),
+			object.Pkg(),
+			object.Pos(),
+			len(owners),
+		)
+	}
+	return builder.memberOwnerTypeID(owners[0])
+}
+
+func (builder *typeBuilder) memberOwnerTypeID(
+	owner types.Type,
+) (identity.SemanticTypeID, error) {
 	if owner == nil {
-		if function, ok := object.(*types.Func); ok {
-			signature, _ := function.Type().(*types.Signature)
-			if signature != nil && signature.Recv() != nil {
-				owner = signature.Recv().Type()
-			}
-		}
+		return identity.SemanticTypeID{}, fmt.Errorf(
+			"semantic member owner type is absent",
+		)
 	}
 	for {
 		pointer, ok := owner.(*types.Pointer)
@@ -53,7 +67,7 @@ func (builder *typeBuilder) memberOwnerID(
 	}
 	if owner == nil {
 		return identity.SemanticTypeID{}, fmt.Errorf(
-			"member %s has no declaring owner type", object.Name(),
+			"semantic member has no declaring owner type",
 		)
 	}
 	return builder.build(owner)

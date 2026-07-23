@@ -76,11 +76,12 @@ func (verifier *checkerSemanticVerifier) verifyBindings() error {
 	}
 	if len(expected) != len(verifier.bindings) {
 		return fmt.Errorf(
-			"bindings checker-derived=%d semantic=%d; missing=%v extra=%v",
+			"bindings checker-derived=%d semantic=%d; missing=%v extra=%v; missing-details=%v",
 			len(expected),
 			len(verifier.bindings),
 			bindingIdentityDifference(expected, verifier.bindings),
 			semanticBindingIdentityDifference(verifier.bindings, expected),
+			missingBindingDetails(expected, verifier.bindings),
 		)
 	}
 	for id, candidate := range expected {
@@ -101,11 +102,19 @@ func (verifier *checkerSemanticVerifier) independentBindingCandidates() (
 	[]*checkerBindingCandidate,
 	error,
 ) {
-	scopeOwners, err := verifier.independentScopeOwners()
-	if err != nil {
-		return nil, err
+	scopeOwners := verifier.scopeOwners
+	if scopeOwners == nil {
+		var err error
+		scopeOwners, err = verifier.independentScopeOwners()
+		if err != nil {
+			return nil, err
+		}
+		verifier.scopeOwners = scopeOwners
 	}
 	objects := map[types.Object]identity.OccurrenceID{}
+	for object, source := range verifier.sourceByObject {
+		objects[object] = source
+	}
 	implicit := map[types.Object]*checkerBindingCandidate{}
 	for _, occurrenceID := range verifier.expected.order {
 		node, present := verifier.index.OccurrenceNode(occurrenceID)
@@ -175,6 +184,9 @@ func (verifier *checkerSemanticVerifier) independentBindingCandidates() (
 		len(objects)+len(implicit),
 	)
 	for object, source := range objects {
+		if !independentLexicalBinding(object) {
+			continue
+		}
 		role := verifier.independentBindingRole(object, source)
 		if !role.Valid() {
 			return nil, fmt.Errorf(
@@ -288,10 +300,10 @@ func (verifier *checkerSemanticVerifier) independentBindingScope(
 	source identity.OccurrenceID,
 	scopeOwners map[*types.Scope]identity.OccurrenceID,
 ) (identity.OccurrenceID, error) {
-	for current := object.Parent(); current != nil; current = current.Parent() {
-		if owner := scopeOwners[current]; !owner.IsZero() {
-			return owner, nil
-		}
+	if owner := verifier.independentCheckerScopeOwner(
+		object.Parent(), scopeOwners,
+	); !owner.IsZero() {
+		return owner, nil
 	}
 	return verifier.independentScopeForOccurrence(
 		source, scopeOwners,
@@ -302,8 +314,25 @@ func (verifier *checkerSemanticVerifier) independentScopeForOccurrence(
 	occurrenceID identity.OccurrenceID,
 	scopeOwners map[*types.Scope]identity.OccurrenceID,
 ) (identity.OccurrenceID, error) {
+	if verifier.scopeOccurrenceResolved[occurrenceID] {
+		scope := verifier.scopeByOccurrence[occurrenceID]
+		if scope.IsZero() {
+			return identity.OccurrenceID{}, fmt.Errorf(
+				"binding anchor %s has no canonical scope",
+				occurrenceID,
+			)
+		}
+		return scope, nil
+	}
+	var path []identity.OccurrenceID
 	current := occurrenceID
+	scopeOwner := identity.OccurrenceID{}
 	for !current.IsZero() {
+		if verifier.scopeOccurrenceResolved[current] {
+			scopeOwner = verifier.scopeByOccurrence[current]
+			break
+		}
+		path = append(path, current)
 		occurrence, present := verifier.expected.occurrences[current]
 		if !present {
 			break
@@ -311,39 +340,59 @@ func (verifier *checkerSemanticVerifier) independentScopeForOccurrence(
 		node, nodePresent := verifier.index.OccurrenceNode(current)
 		if nodePresent {
 			if scope, scopePresent := verifier.view.ScopeOf(node); scopePresent && scopeOwners[scope] == current {
-				return current, nil
+				scopeOwner = current
+				break
 			}
 		}
 		if catalog.LexicalScope(occurrence.Kind()) ==
 			catalog.LexicalScopeAlways {
-			return current, nil
+			scopeOwner = current
+			break
 		}
 		current = occurrence.Parent()
 	}
-	node, present := verifier.index.OccurrenceNode(occurrenceID)
-	if !present {
-		return identity.OccurrenceID{}, fmt.Errorf(
-			"binding anchor %s has no transient node", occurrenceID,
-		)
+	for _, member := range path {
+		verifier.scopeOccurrenceResolved[member] = true
+		verifier.scopeByOccurrence[member] = scopeOwner
 	}
-	best := identity.OccurrenceID{}
-	bestWidth := int(^uint(0) >> 1)
-	for scope, owner := range scopeOwners {
-		if !scope.Contains(node.Pos()) {
-			continue
-		}
-		width := owner.Span().End() - owner.Span().Start()
-		if width < bestWidth {
-			best = owner
-			bestWidth = width
-		}
-	}
-	if best.IsZero() {
+	if scopeOwner.IsZero() {
 		return identity.OccurrenceID{}, fmt.Errorf(
 			"binding anchor %s has no canonical scope", occurrenceID,
 		)
 	}
-	return best, nil
+	return scopeOwner, nil
+}
+
+func (verifier *checkerSemanticVerifier) independentCheckerScopeOwner(
+	scope *types.Scope,
+	scopeOwners map[*types.Scope]identity.OccurrenceID,
+) identity.OccurrenceID {
+	if scope == nil {
+		return identity.OccurrenceID{}
+	}
+	if verifier.checkerScopeResolved[scope] {
+		return verifier.checkerScopeOwner[scope]
+	}
+	var path []*types.Scope
+	current := scope
+	owner := identity.OccurrenceID{}
+	for current != nil {
+		if verifier.checkerScopeResolved[current] {
+			owner = verifier.checkerScopeOwner[current]
+			break
+		}
+		path = append(path, current)
+		if direct := scopeOwners[current]; !direct.IsZero() {
+			owner = direct
+			break
+		}
+		current = current.Parent()
+	}
+	for _, member := range path {
+		verifier.checkerScopeResolved[member] = true
+		verifier.checkerScopeOwner[member] = owner
+	}
+	return owner
 }
 
 func (verifier *checkerSemanticVerifier) independentBindingRole(

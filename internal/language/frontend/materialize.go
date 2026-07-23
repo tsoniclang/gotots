@@ -15,23 +15,17 @@ import (
 	"github.com/tsoniclang/gotots/internal/source"
 )
 
-type Work struct {
-	Packages               int
-	ContextAssignments     int
-	OccurrenceResolutions  int
-	TypeConstructions      int
-	ObjectConstructions    int
-	OperationConstructions int
-	SortInputs             int
-}
-
 type Result struct {
-	model *semantic.Model
-	work  Work
+	model   *semantic.Model
+	work    Work
+	metrics semantic.Metrics
 }
 
 func (result *Result) Model() *semantic.Model { return result.model }
 func (result *Result) Work() Work             { return result.work }
+func (result *Result) Metrics() semantic.Metrics {
+	return result.metrics
+}
 
 func Materialize(
 	universe *source.Universe,
@@ -67,12 +61,15 @@ func Materialize(
 			)
 		}
 		packages[pkg.ID()] = pkg
-		work.ContextAssignments += packageWork.ContextAssignments
-		work.OccurrenceResolutions += packageWork.OccurrenceResolutions
-		work.TypeConstructions += packageWork.TypeConstructions
-		work.ObjectConstructions += packageWork.ObjectConstructions
-		work.OperationConstructions += packageWork.OperationConstructions
-		work.SortInputs += packageWork.SortInputs
+		work.merge(packageWork)
+	}
+	localPackages := make([]semantic.Package, 0, len(packages))
+	for _, pkg := range packages {
+		localPackages = append(localPackages, pkg)
+	}
+	metrics, err := semantic.MeasurePackages(localPackages)
+	if err != nil {
+		return nil, err
 	}
 	projections, err := buildPackageProjections(
 		stage, packages,
@@ -80,12 +77,13 @@ func Materialize(
 	if err != nil {
 		return nil, err
 	}
-	work.Packages = len(projections)
 	model, err := semantic.NewProjectedModel(projections, provider)
 	if err != nil {
 		return nil, err
 	}
-	return &Result{model: model, work: work}, nil
+	return &Result{
+		model: model, work: work, metrics: metrics,
+	}, nil
 }
 
 func MaterializeProviderPackage(
@@ -296,40 +294,49 @@ func localPackageProjection(
 }
 
 type packageBuilder struct {
-	input                  *packageInput
-	contexts               *contextIndex
-	objects                *objectIndex
-	types                  *typeBuilder
-	resolutions            []semantic.OccurrenceResolution
-	operations             []semantic.Operation
-	unsupported            []semantic.Unsupported
-	definitions            []semantic.DefinitionSemantics
-	operationByOccurrence  map[identity.OccurrenceID]identity.OperationID
-	variantByOccurrence    map[identity.OccurrenceID]catalog.Variant
-	resolutionByOccurrence map[identity.OccurrenceID]semantic.OccurrenceResolution
-	definitionByRoot       map[identity.OccurrenceID]identity.DefinitionID
-	work                   Work
+	input                 *packageInput
+	contexts              *contextIndex
+	objects               *objectIndex
+	types                 *typeBuilder
+	draft                 *semantic.PackageDraft
+	operationByOccurrence map[identity.OccurrenceID]identity.OperationID
+	variantByOccurrence   map[identity.OccurrenceID]catalog.Variant
+	resolvedOccurrences   map[identity.OccurrenceID]struct{}
+	definitionByRoot      map[identity.OccurrenceID]identity.DefinitionID
 }
 
 func materializePackage(
 	stage *stageInput,
 	input *packageInput,
 ) (semantic.Package, Work, error) {
-	contexts, err := buildContexts(input)
+	work := input.work
+	work.Packages = 1
+	contexts, err := buildContexts(input, &work)
 	if err != nil {
 		return semantic.Package{}, Work{}, err
 	}
-	objects, err := buildObjectIndex(stage, input, contexts)
+	objects, err := buildObjectIndex(
+		stage, input, contexts, &work,
+	)
+	if err != nil {
+		return semantic.Package{}, Work{}, err
+	}
+	draft, err := semantic.NewPackageDraft(
+		input.id,
+		input.provenance,
+		packageDraftCapacity(input, objects),
+	)
 	if err != nil {
 		return semantic.Package{}, Work{}, err
 	}
 	builder := &packageBuilder{
 		input: input, contexts: contexts, objects: objects,
-		types:                  objects.typeBuilder,
-		operationByOccurrence:  map[identity.OccurrenceID]identity.OperationID{},
-		variantByOccurrence:    map[identity.OccurrenceID]catalog.Variant{},
-		resolutionByOccurrence: map[identity.OccurrenceID]semantic.OccurrenceResolution{},
-		definitionByRoot:       map[identity.OccurrenceID]identity.DefinitionID{},
+		types:                 objects.typeBuilder,
+		draft:                 draft,
+		operationByOccurrence: map[identity.OccurrenceID]identity.OperationID{},
+		variantByOccurrence:   map[identity.OccurrenceID]catalog.Variant{},
+		resolvedOccurrences:   map[identity.OccurrenceID]struct{}{},
+		definitionByRoot:      map[identity.OccurrenceID]identity.DefinitionID{},
 	}
 	for definition := range input.definitions {
 		if !definition.Root().IsZero() {
@@ -354,7 +361,6 @@ func materializePackage(
 		return semantic.Package{}, Work{}, err
 	}
 	types := builder.types.recordsSorted()
-	witnesses := make([]semantic.TypeWitness, 0, len(types))
 	for _, record := range types {
 		witness, err := semantic.NewTypeWitness(
 			input.id, record.ID(), input.authority,
@@ -362,43 +368,69 @@ func materializePackage(
 		if err != nil {
 			return semantic.Package{}, Work{}, err
 		}
-		witnesses = append(witnesses, witness)
+		if err := draft.AddType(record, witness); err != nil {
+			return semantic.Package{}, Work{}, err
+		}
 	}
-	packageInput := semantic.PackageInput{
-		ID: input.id, Provenance: input.provenance,
-		Definitions:   builder.definitions,
-		Resolutions:   builder.resolutions,
-		Declarations:  declarations,
-		Bindings:      bindings,
-		Types:         types,
-		TypeWitnesses: witnesses,
-		Operations:    builder.operations,
-		Unsupported:   builder.unsupported,
+	for _, declaration := range declarations {
+		if err := draft.AddDeclaration(declaration); err != nil {
+			return semantic.Package{}, Work{}, err
+		}
 	}
-	packageInput, err = semantic.FinalizePackageTypePool(packageInput)
-	if err != nil {
-		return semantic.Package{}, Work{}, fmt.Errorf(
-			"finalize semantic type closure for %s: %w",
-			input.id, err,
-		)
+	for _, binding := range bindings {
+		if err := draft.AddBinding(binding); err != nil {
+			return semantic.Package{}, Work{}, err
+		}
 	}
-	pkg, err := semantic.NewPackage(packageInput)
+	resolutionCount := draft.ResolutionCount()
+	operationCount := draft.OperationCount()
+	unsupportedCount := draft.UnsupportedCount()
+	pkg, err := draft.SealProducer()
 	if err != nil {
 		return semantic.Package{}, Work{}, fmt.Errorf(
 			"materialize semantic package %s: %w", input.id, err,
 		)
 	}
-	builder.work.ContextAssignments = len(contexts.byOccurrence)
-	builder.work.OccurrenceResolutions = len(builder.resolutions)
-	builder.work.TypeConstructions = builder.types.work
-	builder.work.ObjectConstructions =
+	if work.ContextAssignments != len(contexts.byOccurrence) {
+		return semantic.Package{}, Work{}, fmt.Errorf(
+			"semantic context work=%d, contexts=%d",
+			work.ContextAssignments,
+			len(contexts.byOccurrence),
+		)
+	}
+	work.OccurrenceResolutions = resolutionCount
+	work.TypeConstructions = builder.types.work
+	work.ObjectConstructions =
 		len(declarations) + len(bindings)
-	builder.work.OperationConstructions =
-		len(builder.operations) + len(builder.unsupported)
-	builder.work.SortInputs =
+	work.OperationConstructions =
+		operationCount + unsupportedCount
+	work.CanonicalSortInputs +=
 		len(types) + len(declarations) + len(bindings) +
-			len(builder.operations) + len(builder.resolutions)
-	return pkg, builder.work, nil
+			operationCount + resolutionCount
+	return pkg, work, nil
+}
+
+func packageDraftCapacity(
+	input *packageInput,
+	objects *objectIndex,
+) semantic.PackageCapacity {
+	capacity := semantic.PackageCapacity{
+		Definitions: len(input.definitions),
+		Resolutions: len(input.order),
+		Bindings:    len(objects.bindingIDs),
+	}
+	for _, occurrence := range input.occurrences {
+		if occurrence.domain ==
+			catalog.ResolutionDomainExecutable {
+			capacity.Operations++
+		}
+		if occurrence.checkedUnmapped ||
+			occurrence.occurrence.Kind().Disposition() !=
+				catalog.DispositionActive {
+			capacity.Unsupported++
+		}
+	}
+	return capacity
 }
 
 func sortedDefinitions(

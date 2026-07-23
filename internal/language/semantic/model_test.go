@@ -165,6 +165,27 @@ func TestSemanticPackageIsImmutableAndResolutionConserved(
 	if err != nil {
 		t.Fatal(err)
 	}
+	projections := model.AuthorityProjections()
+	if len(projections) != 1 ||
+		projections[0].ID() != fixture.pkg ||
+		!projections[0].HasLocalAuthority() ||
+		projections[0].HasCertifiedAuthority() ||
+		len(projections[0].ExpectedDefinitions()) != 1 {
+		t.Fatalf("semantic authority projections = %+v", projections)
+	}
+	definitions := projections[0].ExpectedDefinitions()
+	definitions[0] = identity.DefinitionID{}
+	if model.AuthorityProjections()[0].
+		ExpectedDefinitions()[0] != fixture.definition {
+		t.Fatal("semantic authority projection exposed mutable census")
+	}
+	stats := model.ProjectionStats()
+	if stats.Packages != 1 ||
+		stats.LocalPackages != 1 ||
+		stats.CertifiedPackages != 0 ||
+		stats.MixedPackages != 0 {
+		t.Fatalf("semantic projection stats = %+v", stats)
+	}
 	var visited []Package
 	if err := model.VisitPackages(func(pkg Package) error {
 		visited = append(visited, pkg)

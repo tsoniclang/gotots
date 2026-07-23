@@ -338,7 +338,14 @@ func identifierResolution(role Role) resolutionMask {
 		RoleLabelDeclaration,
 		RoleReceiver,
 		RoleParameters,
-		RoleResults,
+		RoleResults:
+		return resolutionClasses(
+			ResolutionClassDefinitionComponent,
+			ResolutionClassDeclaration,
+			ResolutionClassBinding,
+			ResolutionClassStructural,
+		)
+	case
 		RoleRangeKey,
 		RoleRangeValue:
 		return resolutionClasses(
@@ -346,6 +353,7 @@ func identifierResolution(role Role) resolutionMask {
 			ResolutionClassDeclaration,
 			ResolutionClassBinding,
 			ResolutionClassStructural,
+			ResolutionClassOperation,
 		)
 	case RoleLabelReference:
 		return resolutionClasses(ResolutionClassBinding)

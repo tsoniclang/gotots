@@ -337,6 +337,17 @@ func (builder *packageBuilder) operationObject(
 		identifier.Name == "_" {
 		return semantic.NoObjectReference(), nil
 	}
+	if selection := operationCheckerSelection(
+		builder.input.loaded.CheckerView(),
+		item.record.node,
+	); selection != nil {
+		declaration, err :=
+			builder.objects.declarationIDForSelection(selection)
+		if err != nil {
+			return semantic.ObjectReference{}, err
+		}
+		return semantic.DeclarationReference(declaration)
+	}
 	object := operationCheckerObject(
 		builder.input.loaded.CheckerView(), item.record.node,
 	)
@@ -344,6 +355,34 @@ func (builder *packageBuilder) operationObject(
 		return semantic.NoObjectReference(), nil
 	}
 	return builder.objects.objectReference(object)
+}
+
+func operationCheckerSelection(
+	view checkerExpressionView,
+	node ast.Node,
+) *types.Selection {
+	var expression ast.Expr
+	switch node := node.(type) {
+	case *ast.CallExpr:
+		expression = node.Fun
+	case ast.Expr:
+		expression = node
+	default:
+		return nil
+	}
+	for {
+		switch current := ast.Unparen(expression).(type) {
+		case *ast.SelectorExpr:
+			selection, _ := view.SelectionOf(current)
+			return selection
+		case *ast.IndexExpr:
+			expression = current.X
+		case *ast.IndexListExpr:
+			expression = current.X
+		default:
+			return nil
+		}
+	}
 }
 
 func operationCheckerObject(
@@ -419,9 +458,10 @@ func (builder *packageBuilder) operationSelection(
 	if err != nil {
 		return semantic.Selection{}, err
 	}
-	declaration, err := builder.objects.declarationID(
-		checkerSelection.Obj(),
-	)
+	declaration, err :=
+		builder.objects.declarationIDForSelection(
+			checkerSelection,
+		)
 	if err != nil {
 		return semantic.Selection{}, err
 	}

@@ -10,30 +10,30 @@ import (
 	"github.com/tsoniclang/gotots/internal/language/catalog"
 )
 
-func decodeProviderShard(
+func decodeProviderShardWithWire(
 	encoded []byte,
 	authority Authority,
-) (Package, error) {
+) (Package, providerShard, error) {
 	var shard providerShard
 	decoder := json.NewDecoder(bytes.NewReader(encoded))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&shard); err != nil {
-		return Package{}, fmt.Errorf(
+		return Package{}, providerShard{}, fmt.Errorf(
 			"semantic provider shard decode failed: %w", err,
 		)
 	}
 	if err := requireJSONEnd(decoder); err != nil {
-		return Package{}, err
+		return Package{}, providerShard{}, err
 	}
 	if shard.Version != ProviderArtifactVersion {
-		return Package{}, fmt.Errorf(
+		return Package{}, providerShard{}, fmt.Errorf(
 			"semantic provider shard version %d is unsupported",
 			shard.Version,
 		)
 	}
 	pkg, err := identity.ParsePackageID(shard.Package)
 	if err != nil {
-		return Package{}, err
+		return Package{}, providerShard{}, err
 	}
 	input := PackageInput{
 		ID: pkg, Provenance: PackageProvenance(shard.Provenance),
@@ -41,58 +41,59 @@ func decodeProviderShard(
 	for _, encoded := range shard.Definitions {
 		record, err := decodeDefinition(encoded, authority)
 		if err != nil {
-			return Package{}, err
+			return Package{}, providerShard{}, err
 		}
 		input.Definitions = append(input.Definitions, record)
 	}
 	for _, encoded := range shard.Resolutions {
 		record, err := decodeResolution(encoded)
 		if err != nil {
-			return Package{}, err
+			return Package{}, providerShard{}, err
 		}
 		input.Resolutions = append(input.Resolutions, record)
 	}
 	for _, encoded := range shard.Declarations {
 		record, err := decodeDeclaration(encoded, authority)
 		if err != nil {
-			return Package{}, err
+			return Package{}, providerShard{}, err
 		}
 		input.Declarations = append(input.Declarations, record)
 	}
 	for _, encoded := range shard.Bindings {
 		record, err := decodeBinding(encoded, authority)
 		if err != nil {
-			return Package{}, err
+			return Package{}, providerShard{}, err
 		}
 		input.Bindings = append(input.Bindings, record)
 	}
 	for _, encoded := range shard.Types {
 		record, err := decodeType(encoded)
 		if err != nil {
-			return Package{}, err
+			return Package{}, providerShard{}, err
 		}
 		input.Types = append(input.Types, record)
 		witness, err := NewTypeWitness(pkg, record.ID(), authority)
 		if err != nil {
-			return Package{}, err
+			return Package{}, providerShard{}, err
 		}
 		input.TypeWitnesses = append(input.TypeWitnesses, witness)
 	}
 	for _, encoded := range shard.Operations {
 		record, err := decodeOperation(encoded)
 		if err != nil {
-			return Package{}, err
+			return Package{}, providerShard{}, err
 		}
 		input.Operations = append(input.Operations, record)
 	}
 	for _, encoded := range shard.Unsupported {
 		record, err := decodeUnsupported(encoded, authority)
 		if err != nil {
-			return Package{}, err
+			return Package{}, providerShard{}, err
 		}
 		input.Unsupported = append(input.Unsupported, record)
 	}
-	return NewPackage(input)
+	decoded, err := NewPackage(input)
+	return decoded, shard, err
 }
 
 func decodeDefinition(
@@ -404,7 +405,10 @@ func decodeType(encoded wireType) (Type, error) {
 	}
 	record, err := NewType(spec)
 	if err != nil {
-		return Type{}, err
+		return Type{}, fmt.Errorf(
+			"semantic provider type %s: %w",
+			encoded.ID, err,
+		)
 	}
 	if record.ID().String() != encoded.ID {
 		return Type{}, fmt.Errorf(

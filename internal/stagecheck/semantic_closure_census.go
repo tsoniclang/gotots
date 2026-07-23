@@ -12,33 +12,6 @@ type semanticOwnerCensus struct {
 	declarations map[identity.SemanticDeclarationID]identity.PackageID
 }
 
-func verifySemanticModelClosure(
-	model *semantic.Model,
-	provider *semantic.ProviderArtifact,
-	packageIDs []identity.PackageID,
-) error {
-	owners, err := censusSemanticOwners(
-		model, provider, packageIDs,
-	)
-	if err != nil {
-		return semanticVerificationError("closure", err.Error())
-	}
-	for _, packageID := range packageIDs {
-		err := model.VisitPackage(
-			packageID,
-			func(pkg semantic.Package) error {
-				return verifySemanticPackageClosure(pkg, owners)
-			},
-		)
-		if err != nil {
-			return semanticVerificationError(
-				"closure", err.Error(),
-			)
-		}
-	}
-	return nil
-}
-
 func censusSemanticOwners(
 	model *semantic.Model,
 	provider *semantic.ProviderArtifact,

@@ -38,20 +38,27 @@ type ProviderPackageContext struct {
 type ProviderReadStats struct {
 	ShardLoads                  int
 	MaxProviderPackagesResident int
+	metrics                     Metrics
+}
+
+func (stats ProviderReadStats) Metrics() Metrics {
+	return stats.metrics.clone()
 }
 
 type ProviderArtifact struct {
-	path       string
-	digest     string
-	context    providerContext
-	manifest   []providerManifestPackage
-	byPackage  map[identity.PackageID]int
-	shardBase  int64
-	fileBytes  int64
-	projection sync.Mutex
-	mu         sync.Mutex
-	stats      ProviderReadStats
-	resident   int
+	path            string
+	digest          string
+	context         providerContext
+	manifest        []providerManifestPackage
+	manifestMetrics Metrics
+	byPackage       map[identity.PackageID]int
+	shardBase       int64
+	fileBytes       int64
+	projection      sync.Mutex
+	mu              sync.Mutex
+	stats           ProviderReadStats
+	resident        int
+	measured        map[identity.PackageID]bool
 }
 
 func DecodeProviderArtifact(
@@ -125,11 +132,18 @@ func DecodeProviderArtifact(
 			[]providerManifestPackage(nil), manifest.Packages...,
 		),
 		byPackage: map[identity.PackageID]int{},
+		measured:  map[identity.PackageID]bool{},
 		shardBase: int64(providerArtifactHeaderBytes) +
 			int64(manifestBytes),
 		fileBytes: info.Size(),
 	}
 	if err := artifact.validateManifest(); err != nil {
+		return nil, err
+	}
+	artifact.manifestMetrics, err = measureProviderManifest(
+		artifact.manifest,
+	)
+	if err != nil {
 		return nil, err
 	}
 	return artifact, nil
@@ -378,13 +392,25 @@ func (artifact *ProviderArtifact) VisitPackage(
 	if err != nil {
 		return err
 	}
-	pkg, err := decodeProviderShard(encoded, authority)
+	pkg, _, err := decodeProviderShardWithWire(
+		encoded, authority,
+	)
 	if err != nil {
-		return err
+		return fmt.Errorf(
+			"semantic provider package %s: %w",
+			entry.Package, err,
+		)
 	}
 	if err := validateProjectedPackage(pkg, entry); err != nil {
 		return err
 	}
+	var packageMetrics Metrics
+	if err := packageMetrics.addMeasuredPackage(
+		pkg, int64(len(encoded)),
+	); err != nil {
+		return err
+	}
+	artifact.recordPackageMetrics(pkg.ID(), packageMetrics)
 	return visit(pkg)
 }
 
@@ -406,35 +432,48 @@ func (artifact *ProviderArtifact) endProjection() {
 	artifact.resident--
 }
 
+func (artifact *ProviderArtifact) recordPackageMetrics(
+	packageID identity.PackageID,
+	metrics Metrics,
+) {
+	artifact.mu.Lock()
+	defer artifact.mu.Unlock()
+	if artifact.measured[packageID] {
+		return
+	}
+	artifact.measured[packageID] = true
+	artifact.stats.metrics.merge(metrics)
+}
+
 func validateProjectedPackage(
 	pkg Package,
 	entry providerManifestPackage,
 ) error {
 	if pkg.ID().String() != entry.Package ||
 		uint8(pkg.Provenance()) != entry.Provenance ||
-		len(pkg.Definitions()) != entry.DefinitionCount ||
-		len(pkg.Resolutions()) != entry.ResolutionCount ||
-		len(pkg.Declarations()) != entry.DeclarationCount ||
-		len(pkg.Bindings()) != entry.BindingCount ||
-		len(pkg.Types()) != entry.TypeCount ||
-		len(pkg.Operations()) != entry.OperationCount ||
-		len(pkg.Unsupported()) != entry.UnsupportedCount {
+		len(pkg.definitions) != entry.DefinitionCount ||
+		len(pkg.resolutions) != entry.ResolutionCount ||
+		len(pkg.declarations) != entry.DeclarationCount ||
+		len(pkg.bindings) != entry.BindingCount ||
+		len(pkg.types) != entry.TypeCount ||
+		len(pkg.operations) != entry.OperationCount ||
+		len(pkg.unsupported) != entry.UnsupportedCount {
 		return &artifactError{
 			reason: "semantic provider shard disagrees with manifest",
 		}
 	}
 	definitions := make(
-		[]string, 0, len(pkg.Definitions()),
+		[]string, 0, len(pkg.definitions),
 	)
-	for _, record := range pkg.Definitions() {
+	for _, record := range pkg.definitions {
 		definitions = append(
 			definitions, record.Definition().String(),
 		)
 	}
 	declarations := make(
-		[]string, 0, len(pkg.Declarations()),
+		[]string, 0, len(pkg.declarations),
 	)
-	for _, record := range pkg.Declarations() {
+	for _, record := range pkg.declarations {
 		declarations = append(
 			declarations, record.ID().String(),
 		)
@@ -456,7 +495,16 @@ func (artifact *ProviderArtifact) ReadStats() ProviderReadStats {
 	}
 	artifact.mu.Lock()
 	defer artifact.mu.Unlock()
-	return artifact.stats
+	stats := artifact.stats
+	stats.metrics = stats.metrics.clone()
+	return stats
+}
+
+func (artifact *ProviderArtifact) ManifestMetrics() Metrics {
+	if artifact == nil {
+		return Metrics{}
+	}
+	return artifact.manifestMetrics.clone()
 }
 
 func equalStrings(left, right []string) bool {

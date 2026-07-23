@@ -41,6 +41,11 @@ type ProviderWriteResult struct {
 	TypeClosureDuplicates int
 	LargestShardBytes     int64
 	LargestPackageRecords int
+	metrics               Metrics
+}
+
+func (result ProviderWriteResult) Metrics() Metrics {
+	return result.metrics.clone()
 }
 
 type ProviderArtifactWriter struct {
@@ -52,6 +57,7 @@ type ProviderArtifactWriter struct {
 	previous   string
 	closed     bool
 	result     ProviderWriteResult
+	metrics    Metrics
 	typeOwners map[identity.SemanticTypeID]int
 }
 
@@ -115,18 +121,27 @@ func (writer *ProviderArtifactWriter) Append(pkg Package) error {
 			reason: "semantic package checker context disagrees with writer",
 		}
 	}
-	encoded, shard, err := encodeProviderShard(pkg)
-	if err != nil {
-		return err
-	}
 	offset, err := writer.spool.Seek(0, io.SeekCurrent)
 	if err != nil {
 		return err
 	}
-	if _, err := writer.spool.Write(encoded); err != nil {
+	hash := sha256.New()
+	encodedBytes, err := writeProviderShard(
+		io.MultiWriter(writer.spool, hash), pkg,
+	)
+	if err != nil {
+		_ = writer.spool.Truncate(offset)
+		_, _ = writer.spool.Seek(offset, io.SeekStart)
 		return err
 	}
-	digest := sha256.Sum256(encoded)
+	var packageMetrics Metrics
+	if err := packageMetrics.addMeasuredPackage(
+		pkg, encodedBytes,
+	); err != nil {
+		_ = writer.spool.Truncate(offset)
+		_, _ = writer.spool.Seek(offset, io.SeekStart)
+		return err
+	}
 	entry := providerManifestPackage{
 		Package:          pkg.ID().String(),
 		Provenance:       uint8(pkg.Provenance()),
@@ -134,22 +149,22 @@ func (writer *ProviderArtifactWriter) Append(pkg Package) error {
 		Structure:        authority.StructureDigest(),
 		Selection:        authority.SelectionDigest(),
 		ShardOffset:      offset,
-		ShardBytes:       int64(len(encoded)),
-		ShardDigest:      fmt.Sprintf("%x", digest[:]),
-		DefinitionCount:  len(shard.Definitions),
-		ResolutionCount:  len(shard.Resolutions),
-		DeclarationCount: len(shard.Declarations),
-		BindingCount:     len(shard.Bindings),
-		TypeCount:        len(shard.Types),
-		OperationCount:   len(shard.Operations),
-		UnsupportedCount: len(shard.Unsupported),
+		ShardBytes:       encodedBytes,
+		ShardDigest:      fmt.Sprintf("%x", hash.Sum(nil)),
+		DefinitionCount:  len(pkg.definitions),
+		ResolutionCount:  len(pkg.resolutions),
+		DeclarationCount: len(pkg.declarations),
+		BindingCount:     len(pkg.bindings),
+		TypeCount:        len(pkg.types),
+		OperationCount:   len(pkg.operations),
+		UnsupportedCount: len(pkg.unsupported),
 	}
-	for _, definition := range pkg.Definitions() {
+	for _, definition := range pkg.definitions {
 		entry.Definitions = append(
 			entry.Definitions, definition.Definition().String(),
 		)
 	}
-	for _, declaration := range pkg.Declarations() {
+	for _, declaration := range pkg.declarations {
 		entry.Declarations = append(
 			entry.Declarations, declaration.ID().String(),
 		)
@@ -160,22 +175,8 @@ func (writer *ProviderArtifactWriter) Append(pkg Package) error {
 		writer.manifest.Packages, entry,
 	)
 	writer.previous = pkg.ID().String()
-	writer.result.Packages++
-	writer.result.Definitions += entry.DefinitionCount
-	writer.result.Resolutions += entry.ResolutionCount
-	writer.result.Declarations += entry.DeclarationCount
-	writer.result.Bindings += entry.BindingCount
-	writer.result.Types += entry.TypeCount
-	writer.result.Operations += entry.OperationCount
-	writer.result.Unsupported += entry.UnsupportedCount
-	if entry.ShardBytes > writer.result.LargestShardBytes {
-		writer.result.LargestShardBytes = entry.ShardBytes
-	}
-	records := providerManifestRecordCount(entry)
-	if records > writer.result.LargestPackageRecords {
-		writer.result.LargestPackageRecords = records
-	}
-	for _, record := range pkg.Types() {
+	writer.metrics.merge(packageMetrics)
+	for _, record := range pkg.types {
 		writer.typeOwners[record.ID()]++
 	}
 	return nil
@@ -258,6 +259,21 @@ func (writer *ProviderArtifactWriter) Finish(
 			writer.result.TypeClosureDuplicates += count - 1
 		}
 	}
+	writer.result.Packages = writer.metrics.Packages()
+	writer.result.Definitions = writer.metrics.Definitions()
+	writer.result.Resolutions = writer.metrics.Resolutions()
+	writer.result.Declarations = writer.metrics.Declarations()
+	writer.result.Bindings = writer.metrics.Bindings()
+	writer.result.Types = writer.metrics.Types()
+	writer.result.Operations = writer.metrics.Operations()
+	writer.result.Unsupported = writer.metrics.Unsupported()
+	writer.result.metrics = writer.metrics.clone()
+	if packages := writer.metrics.LargestPackages(); len(packages) != 0 {
+		writer.result.LargestShardBytes =
+			packages[0].EncodedBytes
+	}
+	writer.result.LargestPackageRecords =
+		writer.metrics.LargestPackageRecords()
 	writer.closed = true
 	_ = writer.spool.Close()
 	_ = os.Remove(writer.spoolPath)
@@ -296,27 +312,27 @@ func checkerPackageAuthority(pkg Package) (Authority, error) {
 		}
 		return nil
 	}
-	for _, record := range pkg.Definitions() {
+	for _, record := range pkg.definitions {
 		if err := admit(record.Authority()); err != nil {
 			return Authority{}, err
 		}
 	}
-	for _, record := range pkg.Declarations() {
+	for _, record := range pkg.declarations {
 		if err := admit(record.Authority()); err != nil {
 			return Authority{}, err
 		}
 	}
-	for _, record := range pkg.Bindings() {
+	for _, record := range pkg.bindings {
 		if err := admit(record.Authority()); err != nil {
 			return Authority{}, err
 		}
 	}
-	for _, record := range pkg.TypeWitnesses() {
+	for _, record := range pkg.typeWitnesses {
 		if err := admit(record.Authority()); err != nil {
 			return Authority{}, err
 		}
 	}
-	for _, record := range pkg.Unsupported() {
+	for _, record := range pkg.unsupported {
 		if err := admit(record.Authority()); err != nil {
 			return Authority{}, err
 		}
@@ -327,16 +343,4 @@ func checkerPackageAuthority(pkg Package) (Authority, error) {
 		}
 	}
 	return selected, nil
-}
-
-func providerManifestRecordCount(
-	entry providerManifestPackage,
-) int {
-	return entry.DefinitionCount +
-		entry.ResolutionCount +
-		entry.DeclarationCount +
-		entry.BindingCount +
-		entry.TypeCount +
-		entry.OperationCount +
-		entry.UnsupportedCount
 }

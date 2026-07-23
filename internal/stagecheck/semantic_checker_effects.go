@@ -477,16 +477,10 @@ func (verifier *checkerSemanticVerifier) independentPackageInitialization() (
 			if variable.Name() == "_" {
 				continue
 			}
-			occurrence, err := verifier.index.IdentifierOccurrence(
-				variable.Pos(), variable.Name(),
-			)
-			if err != nil {
-				return nil, nil, nil, err
-			}
-			definition := verifier.expected.owners[occurrence]
+			definition := verifier.definitionByObject[variable]
 			if definition.IsZero() {
 				return nil, nil, nil, fmt.Errorf(
-					"initializer variable %s has no definition",
+					"initializer variable %s has no canonical definition",
 					variable.Name(),
 				)
 			}
@@ -535,24 +529,19 @@ func (verifier *checkerSemanticVerifier) independentPackageInitialization() (
 		occurrence identity.OccurrenceID
 	}
 	var zeroes []zeroCandidate
-	checkerPackage := verifier.expected.loaded.Types()
-	if checkerPackage != nil {
-		scope := checkerPackage.Scope()
-		for _, name := range scope.Names() {
-			variable, ok := scope.Lookup(name).(*types.Var)
-			if !ok || initialized[variable] {
-				continue
-			}
-			occurrence, err := verifier.index.IdentifierOccurrence(
-				variable.Pos(), variable.Name(),
-			)
-			if err != nil {
-				continue
-			}
-			zeroes = append(zeroes, zeroCandidate{
-				variable: variable, occurrence: occurrence,
-			})
+	for object, occurrence := range verifier.sourceByObject {
+		variable, ok := object.(*types.Var)
+		if !ok ||
+			variable.IsField() ||
+			variable.Pkg() != verifier.expected.loaded.Types() ||
+			variable.Parent() != variable.Pkg().Scope() ||
+			initialized[variable] ||
+			occurrence.IsZero() {
+			continue
 		}
+		zeroes = append(zeroes, zeroCandidate{
+			variable: variable, occurrence: occurrence,
+		})
 	}
 	sort.Slice(zeroes, func(left, right int) bool {
 		return zeroes[left].occurrence.String() <

@@ -9,6 +9,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/catalog"
 	"github.com/tsoniclang/gotots/internal/language/semantic"
+	"github.com/tsoniclang/gotots/internal/language/structure"
 	"github.com/tsoniclang/gotots/internal/source"
 )
 
@@ -32,6 +33,15 @@ func (verifier *checkerSemanticVerifier) verifyDeclarationReferenceIdentity(
 			return fmt.Errorf(
 				"predeclared declaration identity differs for %s",
 				object.Name(),
+			)
+		}
+		return nil
+	}
+	if expected := verifier.types.localDeclarations[object]; !expected.IsZero() {
+		if id != expected {
+			return fmt.Errorf(
+				"local declaration identity differs for %s: semantic=%s checker=%s",
+				object.Name(), id, expected,
 			)
 		}
 		return nil
@@ -130,7 +140,6 @@ func (verifier *checkerSemanticVerifier) verifyCheckerSelectionDeclaration(
 	if function, ok := object.(*types.Func); ok {
 		object = function.Origin()
 	}
-	class := independentObjectClass(object)
 	owner, err := independentSelectionOwner(checker)
 	if err != nil {
 		return err
@@ -138,6 +147,28 @@ func (verifier *checkerSemanticVerifier) verifyCheckerSelectionDeclaration(
 	if err := verifier.types.verify(id.OwnerType(), owner); err != nil {
 		return fmt.Errorf("selection owner: %w", err)
 	}
+	return verifier.verifyMemberDeclarationIdentity(
+		id, object, owner, selectionMemberOrdinal(checker),
+	)
+}
+
+func selectionMemberOrdinal(checker *types.Selection) int {
+	if _, field := checker.Obj().(*types.Var); !field {
+		return 0
+	}
+	index := checker.Index()
+	return index[len(index)-1]
+}
+
+func (
+	verifier *checkerSemanticVerifier,
+) verifyMemberDeclarationIdentity(
+	id identity.SemanticDeclarationID,
+	object types.Object,
+	owner types.Type,
+	ordinal int,
+) error {
+	class := independentObjectClass(object)
 	var pkg identity.PackageID
 	if !object.Exported() {
 		if object.Pkg() == nil {
@@ -147,11 +178,6 @@ func (verifier *checkerSemanticVerifier) verifyCheckerSelectionDeclaration(
 			)
 		}
 		pkg = verifier.types.packageByPath[object.Pkg().Path()]
-	}
-	ordinal := 0
-	if class == identity.SemanticObjectField {
-		index := checker.Index()
-		ordinal = index[len(index)-1]
 	}
 	expected, err := identity.NewMemberDeclarationID(
 		id.OwnerType(), pkg, class, object.Name(), ordinal,
@@ -163,6 +189,85 @@ func (verifier *checkerSemanticVerifier) verifyCheckerSelectionDeclaration(
 		)
 	}
 	return nil
+}
+
+func (
+	verifier *checkerSemanticVerifier,
+) verifyCompositeFieldReference(
+	occurrence structure.Occurrence,
+	id identity.SemanticDeclarationID,
+	object types.Object,
+) (bool, error) {
+	if occurrence.Role() != catalog.RoleElementKey {
+		return false, nil
+	}
+	field, fieldObject := object.(*types.Var)
+	if !fieldObject || !field.IsField() {
+		return false, nil
+	}
+	keyValueOccurrence, present :=
+		verifier.expected.occurrences[occurrence.Parent()]
+	if !present ||
+		keyValueOccurrence.Kind() != catalog.KindKeyValueExpr {
+		return false, nil
+	}
+	compositeOccurrence, present :=
+		verifier.expected.occurrences[keyValueOccurrence.Parent()]
+	if !present ||
+		compositeOccurrence.Kind() != catalog.KindCompositeLit {
+		return false, nil
+	}
+	node, present := verifier.index.OccurrenceNode(
+		compositeOccurrence.ID(),
+	)
+	composite, compositeNode := node.(*ast.CompositeLit)
+	if !present || !compositeNode {
+		return true, fmt.Errorf(
+			"composite field %s has no owning literal",
+			id,
+		)
+	}
+	value, present := verifier.view.TypeOf(composite)
+	if !present || value.Type == nil {
+		return true, fmt.Errorf(
+			"composite field %s has no checker type",
+			id,
+		)
+	}
+	owner := stripCheckerPointer(value.Type)
+	underlying, structType := types.Unalias(owner).
+		Underlying().(*types.Struct)
+	if !structType {
+		return true, fmt.Errorf(
+			"composite field %s owner is not a struct",
+			id,
+		)
+	}
+	ordinal := -1
+	for index := 0; index < underlying.NumFields(); index++ {
+		if underlying.Field(index) == field {
+			ordinal = index
+			break
+		}
+	}
+	if ordinal < 0 {
+		return true, fmt.Errorf(
+			"composite field %s is absent from checker owner",
+			id,
+		)
+	}
+	if named, namedOwner := owner.(*types.Named); namedOwner {
+		owner = named.Origin()
+	}
+	if err := verifier.types.verify(id.OwnerType(), owner); err != nil {
+		return true, fmt.Errorf(
+			"composite field %s owner: %w",
+			id, err,
+		)
+	}
+	return true, verifier.verifyMemberDeclarationIdentity(
+		id, field, owner, ordinal,
+	)
 }
 
 func independentSelectionOwner(
@@ -309,6 +414,76 @@ func independentOperationObject(
 	default:
 		return independentCheckerObject(view, node)
 	}
+}
+
+func (verifier *checkerSemanticVerifier) verifyOperationObject(
+	occurrence structure.Occurrence,
+	node ast.Node,
+	reference semantic.ObjectReference,
+) error {
+	if identifier, blank := node.(*ast.Ident); blank &&
+		identifier.Name == "_" {
+		if reference.Kind() != semantic.ObjectReferenceNone {
+			return fmt.Errorf(
+				"blank identifier %s carries semantic object",
+				occurrence.ID(),
+			)
+		}
+		return nil
+	}
+	object := independentOperationObject(verifier.view, node)
+	if object == nil {
+		if reference.Kind() != semantic.ObjectReferenceNone {
+			return fmt.Errorf("semantic object exists without checker object")
+		}
+		return nil
+	}
+	if reference.Kind() ==
+		semantic.ObjectReferenceDeclaration &&
+		reference.Declaration().Form() ==
+			identity.SemanticDeclarationMember {
+		if selection := independentOperationSelection(
+			verifier.view, node,
+		); selection != nil {
+			return verifier.verifyCheckerSelectionDeclaration(
+				reference.Declaration(), selection,
+			)
+		}
+		handled, err := verifier.verifyCompositeFieldReference(
+			occurrence, reference.Declaration(), object,
+		)
+		if handled {
+			return err
+		}
+	}
+	return verifier.verifyObjectReference(reference, object)
+}
+
+func independentOperationSelection(
+	view *source.TypeInfoView,
+	node ast.Node,
+) *types.Selection {
+	var expression ast.Expr
+	switch typed := node.(type) {
+	case *ast.CallExpr:
+		expression = typed.Fun
+	case ast.Expr:
+		expression = typed
+	}
+	for expression != nil {
+		switch typed := ast.Unparen(expression).(type) {
+		case *ast.SelectorExpr:
+			selection, _ := view.SelectionOf(typed)
+			return selection
+		case *ast.IndexExpr:
+			expression = typed.X
+		case *ast.IndexListExpr:
+			expression = typed.X
+		default:
+			return nil
+		}
+	}
+	return nil
 }
 
 func independentExpressionObject(

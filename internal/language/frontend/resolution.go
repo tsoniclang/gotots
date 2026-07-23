@@ -20,6 +20,7 @@ type pendingOperation struct {
 func (builder *packageBuilder) resolveOccurrences() error {
 	pending := make([]pendingOperation, 0)
 	for _, occurrenceID := range builder.input.order {
+		builder.objects.work.ResolutionVisits++
 		record := builder.input.occurrences[occurrenceID]
 		context := builder.contexts.byOccurrence[occurrenceID]
 		variant := catalog.VariantNone
@@ -67,7 +68,9 @@ func (builder *packageBuilder) resolveOccurrences() error {
 		if err != nil {
 			return err
 		}
-		builder.operations = append(builder.operations, operation)
+		if err := builder.draft.AddOperation(operation); err != nil {
+			return err
+		}
 		resolution, err := semantic.NewOccurrenceResolution(
 			builder.resolutionSpec(
 				item.record, item.variant,
@@ -81,11 +84,11 @@ func (builder *packageBuilder) resolveOccurrences() error {
 			return err
 		}
 	}
-	if len(builder.resolutions) != len(builder.input.occurrences) {
+	if builder.draft.ResolutionCount() != len(builder.input.occurrences) {
 		return fmt.Errorf(
 			"semantic package %s resolved %d of %d occurrences",
 			builder.input.id,
-			len(builder.resolutions),
+			builder.draft.ResolutionCount(),
 			len(builder.input.occurrences),
 		)
 	}
@@ -275,7 +278,10 @@ func (builder *packageBuilder) checkedViewUnsupported(
 		return semantic.OccurrenceResolution{},
 			semantic.OperationInvalid, err
 	}
-	builder.unsupported = append(builder.unsupported, unsupported)
+	if err := builder.draft.AddUnsupported(unsupported); err != nil {
+		return semantic.OccurrenceResolution{},
+			semantic.OperationInvalid, err
+	}
 	resolution, err := semantic.NewOccurrenceResolution(
 		builder.resolutionSpec(
 			record, variant, semantic.ResolutionUnsupported,
@@ -359,7 +365,30 @@ func (builder *packageBuilder) objectResolution(
 		)
 		return resolution, true, err
 	}
-	declaration, err := builder.objects.declarationID(object)
+	var declaration identity.SemanticDeclarationID
+	var err error
+	if context.selectedSelection != nil &&
+		record.occurrence.Role() == catalog.RoleSelectedName {
+		declaration, err =
+			builder.objects.declarationIDForSelection(
+				context.selectedSelection,
+			)
+	} else if memberObject(object) &&
+		len(builder.objects.memberOwnerRelations[object]) > 1 &&
+		context.coverageType != nil {
+		owner := originMemberOwner(context.coverageType)
+		ordinal, ordinalErr := memberOrdinal(object, owner)
+		if ordinalErr != nil {
+			return semantic.OccurrenceResolution{}, true,
+				ordinalErr
+		}
+		declaration, err =
+			builder.objects.declarationIDForMemberOwner(
+				object, owner, ordinal,
+			)
+	} else {
+		declaration, err = builder.objects.declarationID(object)
+	}
 	if err != nil {
 		return semantic.OccurrenceResolution{}, true, err
 	}

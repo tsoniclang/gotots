@@ -107,11 +107,10 @@ func (verifier *checkerSemanticVerifier) definitionContains(
 	outer identity.DefinitionID,
 	inner identity.DefinitionID,
 ) bool {
-	for current := inner; !current.IsZero(); {
-		if current == outer {
-			return true
-		}
-		current = verifier.expected.parents[current]
-	}
-	return false
+	outerInterval, outerPresent := verifier.containment[outer]
+	innerInterval, innerPresent := verifier.containment[inner]
+	return outerPresent &&
+		innerPresent &&
+		outerInterval.enter <= innerInterval.enter &&
+		innerInterval.leave <= outerInterval.leave
 }

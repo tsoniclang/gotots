@@ -213,7 +213,7 @@ func runAuditCatalog(arguments []string, stdout io.Writer) error {
 	}
 	_, err = fmt.Fprintf(
 		stdout,
-		"provider structure: packageContexts=%d files=%d syntheticPackages=%d definitions=%d headerOccurrences=%d boundaryEntries=%d facts=%d largestShardBytes=%d largestPackageRecords=%d encodedBytes=%d unknown=0 -> %s\ndigest=%s\nprovider semantics: packages=%d definitions=%d resolutions=%d declarations=%d bindings=%d types=%d operations=%d unsupported=%d typeClosureDuplicates=%d largestShardBytes=%d largestPackageRecords=%d encodedBytes=%d -> %s\ndigest=%s\n",
+		"provider structure: packageContexts=%d files=%d syntheticPackages=%d definitions=%d headerOccurrences=%d boundaryEntries=%d facts=%d largestShardBytes=%d largestPackageRecords=%d encodedBytes=%d unknown=0 -> %s\nstructureDigest=%s\nprovider semantics: packages=%d definitions=%d resolutions=%d declarations=%d bindings=%d types=%d operations=%d unsupported=%d typeClosureDuplicates=%d largestShardBytes=%d largestPackageRecords=%d encodedBytes=%d -> %s\nsemanticDigest=%s\n",
 		result.Structure.PackageContexts,
 		result.Structure.Files,
 		result.Structure.SyntheticPackages,
@@ -268,7 +268,16 @@ func runAuditCatalog(arguments []string, stdout io.Writer) error {
 			return err
 		}
 	}
-	return nil
+	if err := printSemanticMetrics(
+		stdout,
+		"provider-production",
+		result.Semantic.Metrics(),
+	); err != nil {
+		return err
+	}
+	return printSemanticWork(
+		stdout, "provider-production", result.SemanticWork,
+	)
 }
 
 func runAuditVerify(arguments []string, stdout io.Writer) error {
@@ -430,6 +439,44 @@ func printInspection(
 		projection.MaxResidentPackages,
 		projection.LargestPackageBytes,
 		projection.LargestPackageRecords,
+	); err != nil {
+		return err
+	}
+	if err := printSemanticMetrics(
+		stdout, "local-production",
+		inspection.SemanticMetrics(),
+	); err != nil {
+		return err
+	}
+	if err := printSemanticWork(
+		stdout, "local-production",
+		inspection.SemanticWork(),
+	); err != nil {
+		return err
+	}
+	if err := printSemanticMetrics(
+		stdout,
+		"provider-manifest",
+		inspection.Semantic().ProviderManifestMetrics(),
+	); err != nil {
+		return err
+	}
+	if err := printSemanticMetrics(
+		stdout,
+		"provider-consumption",
+		inspection.Semantic().ProviderReadStats().Metrics(),
+	); err != nil {
+		return err
+	}
+	semanticRead := inspection.Semantic().ProviderReadStats()
+	semanticProjection := inspection.Semantic().ProjectionStats()
+	if err := print(
+		"semantic-provider-consumption-residency: packages=%d certifiedPackages=%d mixedPackages=%d shardLoads=%d maxResidentPackages=%d\n",
+		semanticProjection.Packages,
+		semanticProjection.CertifiedPackages,
+		semanticProjection.MixedPackages,
+		semanticRead.ShardLoads,
+		semanticRead.MaxProviderPackagesResident,
 	); err != nil {
 		return err
 	}

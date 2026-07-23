@@ -17,6 +17,7 @@ func (index *objectIndex) createBindingCandidates() error {
 		objects[object] = true
 	}
 	for _, occurrenceID := range index.input.order {
+		index.work.ImplicitBindingVisits++
 		record := index.input.occurrences[occurrenceID]
 		object, implicit := index.input.loaded.CheckerView().
 			ImplicitOf(record.node)
@@ -206,10 +207,8 @@ func (index *objectIndex) bindingScope(
 	source identity.OccurrenceID,
 ) (identity.OccurrenceID, error) {
 	if scope := object.Parent(); scope != nil {
-		for current := scope; current != nil; current = current.Parent() {
-			if owner := index.scopeOwners[current]; !owner.IsZero() {
-				return owner, nil
-			}
+		if owner := index.ownerOfCheckerScope(scope); !owner.IsZero() {
+			return owner, nil
 		}
 	}
 	if !source.IsZero() {
@@ -232,8 +231,26 @@ func (index *objectIndex) bindingScope(
 func (index *objectIndex) scopeForOccurrence(
 	occurrence identity.OccurrenceID,
 ) (identity.OccurrenceID, error) {
+	if index.scopeOccurrenceResolved[occurrence] {
+		scope := index.scopeByOccurrence[occurrence]
+		if scope.IsZero() {
+			return identity.OccurrenceID{}, fmt.Errorf(
+				"occurrence %s has no canonical lexical scope owner",
+				occurrence,
+			)
+		}
+		return scope, nil
+	}
+	var path []identity.OccurrenceID
 	current := occurrence
+	scopeOwner := identity.OccurrenceID{}
 	for !current.IsZero() {
+		index.work.OccurrenceScopeProbes++
+		if index.scopeOccurrenceResolved[current] {
+			scopeOwner = index.scopeByOccurrence[current]
+			break
+		}
+		path = append(path, current)
 		record := index.input.occurrences[current]
 		if record == nil {
 			break
@@ -241,34 +258,59 @@ func (index *objectIndex) scopeForOccurrence(
 		if scope, present := index.input.loaded.CheckerView().
 			ScopeOf(record.node); present &&
 			index.scopeOwners[scope] == current {
-			return current, nil
+			scopeOwner = current
+			break
 		}
 		if catalog.LexicalScope(record.occurrence.Kind()) ==
 			catalog.LexicalScopeAlways {
-			return current, nil
+			scopeOwner = current
+			break
 		}
 		current = record.occurrence.Parent()
 	}
-	node := index.input.occurrences[occurrence].node
-	best := identity.OccurrenceID{}
-	bestWidth := int(^uint(0) >> 1)
-	for scope, owner := range index.scopeOwners {
-		if !scope.Contains(node.Pos()) {
-			continue
-		}
-		width := owner.Span().End() - owner.Span().Start()
-		if width < bestWidth {
-			best = owner
-			bestWidth = width
-		}
+	for _, member := range path {
+		index.scopeOccurrenceResolved[member] = true
+		index.scopeByOccurrence[member] = scopeOwner
 	}
-	if !best.IsZero() {
-		return best, nil
+	if !scopeOwner.IsZero() {
+		return scopeOwner, nil
 	}
 	return identity.OccurrenceID{}, fmt.Errorf(
 		"occurrence %s has no canonical lexical scope owner",
 		occurrence,
 	)
+}
+
+func (index *objectIndex) ownerOfCheckerScope(
+	scope *types.Scope,
+) identity.OccurrenceID {
+	if scope == nil {
+		return identity.OccurrenceID{}
+	}
+	if index.checkerScopeResolved[scope] {
+		return index.checkerScopeOwner[scope]
+	}
+	var path []*types.Scope
+	current := scope
+	owner := identity.OccurrenceID{}
+	for current != nil {
+		index.work.CheckerScopeProbes++
+		if index.checkerScopeResolved[current] {
+			owner = index.checkerScopeOwner[current]
+			break
+		}
+		path = append(path, current)
+		if direct := index.scopeOwners[current]; !direct.IsZero() {
+			owner = direct
+			break
+		}
+		current = current.Parent()
+	}
+	for _, member := range path {
+		index.checkerScopeResolved[member] = true
+		index.checkerScopeOwner[member] = owner
+	}
+	return owner
 }
 
 func (index *objectIndex) isBinding(object types.Object) bool {
@@ -311,35 +353,38 @@ func (index *objectIndex) bindingRole(
 func (index *objectIndex) indexMembers(
 	typ types.Type,
 	nominal types.Type,
-	seen map[types.Type]bool,
 ) {
-	if typ == nil || seen[typ] {
+	visit := memberVisit{typ: typ, nominal: nominal}
+	if typ == nil || index.memberVisits[visit] {
 		return
 	}
-	seen[typ] = true
+	index.memberVisits[visit] = true
+	index.work.MemberTypeVisits++
 	switch typed := typ.(type) {
 	case *types.Named:
 		owner := types.Type(typed)
 		for methodIndex := 0; methodIndex < typed.NumMethods(); methodIndex++ {
-			index.memberOwners[typed.Method(methodIndex)] = owner
+			index.admitMemberOwner(
+				typed.Method(methodIndex), owner,
+			)
 		}
-		index.indexMembers(typed.Underlying(), owner, seen)
+		index.indexMembers(typed.Underlying(), owner)
 		for argument := 0; argument < typed.TypeArgs().Len(); argument++ {
-			index.indexMembers(typed.TypeArgs().At(argument), nil, seen)
+			index.indexMembers(typed.TypeArgs().At(argument), nil)
 		}
 	case *types.Alias:
-		index.indexMembers(types.Unalias(typed), nil, seen)
+		index.indexMembers(types.Unalias(typed), nil)
 	case *types.Pointer:
-		index.indexMembers(typed.Elem(), nominal, seen)
+		index.indexMembers(typed.Elem(), nominal)
 	case *types.Array:
-		index.indexMembers(typed.Elem(), nil, seen)
+		index.indexMembers(typed.Elem(), nil)
 	case *types.Slice:
-		index.indexMembers(typed.Elem(), nil, seen)
+		index.indexMembers(typed.Elem(), nil)
 	case *types.Map:
-		index.indexMembers(typed.Key(), nil, seen)
-		index.indexMembers(typed.Elem(), nil, seen)
+		index.indexMembers(typed.Key(), nil)
+		index.indexMembers(typed.Elem(), nil)
 	case *types.Chan:
-		index.indexMembers(typed.Elem(), nil, seen)
+		index.indexMembers(typed.Elem(), nil)
 	case *types.Struct:
 		owner := nominal
 		if owner == nil {
@@ -347,8 +392,8 @@ func (index *objectIndex) indexMembers(
 		}
 		for fieldIndex := 0; fieldIndex < typed.NumFields(); fieldIndex++ {
 			field := typed.Field(fieldIndex)
-			index.memberOwners[field] = owner
-			index.indexMembers(field.Type(), nil, seen)
+			index.admitMemberOwner(field, owner)
+			index.indexMembers(field.Type(), nil)
 		}
 	case *types.Interface:
 		owner := nominal
@@ -358,40 +403,104 @@ func (index *objectIndex) indexMembers(
 		typed.Complete()
 		for methodIndex := 0; methodIndex < typed.NumExplicitMethods(); methodIndex++ {
 			method := typed.ExplicitMethod(methodIndex)
-			if _, known := index.memberOwners[method]; !known {
-				index.memberOwners[method] = owner
-			}
-			index.indexMembers(method.Type(), nil, seen)
+			index.admitMemberOwner(method, owner)
+			index.indexMembers(method.Type(), nil)
 		}
 		for embedded := 0; embedded < typed.NumEmbeddeds(); embedded++ {
-			index.indexMembers(typed.EmbeddedType(embedded), nil, seen)
+			index.indexMembers(typed.EmbeddedType(embedded), nil)
 		}
 	case *types.Signature:
 		if typed.Recv() != nil {
-			index.indexMembers(typed.Recv().Type(), nil, seen)
+			index.indexMembers(typed.Recv().Type(), nil)
 		}
-		index.indexTuple(typed.Params(), seen)
-		index.indexTuple(typed.Results(), seen)
+		index.indexTuple(typed.Params())
+		index.indexTuple(typed.Results())
 	case *types.Tuple:
-		index.indexTuple(typed, seen)
+		index.indexTuple(typed)
 	case *types.TypeParam:
-		index.indexMembers(typed.Constraint(), nil, seen)
+		index.indexMembers(typed.Constraint(), nil)
 	case *types.Union:
 		for term := 0; term < typed.Len(); term++ {
-			index.indexMembers(typed.Term(term).Type(), nil, seen)
+			index.indexMembers(typed.Term(term).Type(), nil)
 		}
 	}
 }
 
+func (index *objectIndex) admitMemberOwner(
+	member types.Object,
+	owner types.Type,
+) {
+	if function, ok := member.(*types.Func); ok {
+		member = function.Origin()
+	}
+	owner = originMemberOwner(owner)
+	owners := index.memberOwnerRelations[member]
+	candidateNominal := nominalMemberOwner(owner)
+	if candidateNominal {
+		retained := owners[:0]
+		for _, existing := range owners {
+			if !nominalMemberOwner(existing) &&
+				types.Identical(
+					existing.Underlying(),
+					owner.Underlying(),
+				) {
+				continue
+			}
+			retained = append(retained, existing)
+		}
+		owners = retained
+	} else {
+		for _, existing := range owners {
+			if nominalMemberOwner(existing) &&
+				types.Identical(
+					existing.Underlying(),
+					owner.Underlying(),
+				) {
+				return
+			}
+		}
+	}
+	for _, existing := range owners {
+		if types.Identical(existing, owner) {
+			return
+		}
+	}
+	index.memberOwnerRelations[member] = append(owners, owner)
+}
+
+func nominalMemberOwner(typ types.Type) bool {
+	typ = stripMemberOwnerPointer(typ)
+	_, named := typ.(*types.Named)
+	return named
+}
+
+func originMemberOwner(typ types.Type) types.Type {
+	unwrapped := stripMemberOwnerPointer(typ)
+	if named, ok := unwrapped.(*types.Named); ok {
+		return named.Origin()
+	}
+	return unwrapped
+}
+
+func stripMemberOwnerPointer(typ types.Type) types.Type {
+	for {
+		pointer, ok := typ.(*types.Pointer)
+		if !ok {
+			break
+		}
+		typ = pointer.Elem()
+	}
+	return typ
+}
+
 func (index *objectIndex) indexTuple(
 	tuple *types.Tuple,
-	seen map[types.Type]bool,
 ) {
 	if tuple == nil {
 		return
 	}
 	for element := 0; element < tuple.Len(); element++ {
-		index.indexMembers(tuple.At(element).Type(), nil, seen)
+		index.indexMembers(tuple.At(element).Type(), nil)
 	}
 }
 

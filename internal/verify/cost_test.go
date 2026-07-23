@@ -3,26 +3,25 @@ package verify
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"regexp"
-	"strconv"
-	"strings"
 	"testing"
 )
 
-const stage1CertificationEnvironment = "GOTOTS_CERTIFY_STAGE1"
+const stage2CertificationEnvironment = "GOTOTS_CERTIFY_STAGE2"
 
-type stage1CostBudget struct {
-	name                  string
-	directory             string
-	auditWallSeconds      float64
-	auditPeakRSSKiB       int
-	inspectWallSeconds    float64
-	inspectPeakRSSKiB     int
-	artifactBytes         int64
-	largestShardBytes     int64
-	largestPackageRecords int
+type stage2CostBudget struct {
+	name                           string
+	directory                      string
+	auditWallSeconds               float64
+	auditPeakRSSKiB                int
+	inspectWallSeconds             float64
+	inspectPeakRSSKiB              int
+	structureArtifactBytes         int64
+	semanticArtifactBytes          int64
+	largestStructureShardBytes     int64
+	largestSemanticShardBytes      int64
+	largestStructurePackageRecords int
+	largestSemanticPackageRecords  int
 }
 
 type processMeasurement struct {
@@ -31,21 +30,23 @@ type processMeasurement struct {
 	output      string
 }
 
-func TestIsolatedStage1CostGate(t *testing.T) {
-	if os.Getenv(stage1CertificationEnvironment) != "1" {
+func TestIsolatedStage2CostGate(t *testing.T) {
+	if os.Getenv(stage2CertificationEnvironment) != "1" {
 		t.Skip(
-			"set GOTOTS_CERTIFY_STAGE1=1 for the fail-closed phase-exit cost gate",
+			"set GOTOTS_CERTIFY_STAGE2=1 for the fail-closed phase-exit cost gate",
 		)
 	}
+	setsidBinary := requiredCostTool(t, "setsid")
 	timeBinary := requiredCostTool(t, "/usr/bin/time")
 	timeoutBinary := requiredCostTool(t, "timeout")
 	prlimitBinary := requiredCostTool(t, "prlimit")
 	root := repoRoot(t)
-	binary := filepath.Join(t.TempDir(), "gotots-stage1-gate")
+	binary := filepath.Join(t.TempDir(), "gotots-stage2-gate")
 	runBoundedCostCommand(
 		t,
 		"build",
 		root,
+		setsidBinary,
 		prlimitBinary,
 		timeoutBinary,
 		120,
@@ -56,7 +57,7 @@ func TestIsolatedStage1CostGate(t *testing.T) {
 		"./cmd/gotots",
 	)
 
-	budgets := []stage1CostBudget{
+	budgets := []stage2CostBudget{
 		{
 			name: "webshop",
 			directory: filepath.Join(
@@ -65,13 +66,16 @@ func TestIsolatedStage1CostGate(t *testing.T) {
 				"projects",
 				"webshop",
 			),
-			auditWallSeconds:      25,
-			auditPeakRSSKiB:       700 * 1024,
-			inspectWallSeconds:    5,
-			inspectPeakRSSKiB:     350 * 1024,
-			artifactBytes:         12 * 1024 * 1024,
-			largestShardBytes:     4 * 1024 * 1024,
-			largestPackageRecords: 180000,
+			auditWallSeconds:               25,
+			auditPeakRSSKiB:                700 * 1024,
+			inspectWallSeconds:             5,
+			inspectPeakRSSKiB:              350 * 1024,
+			structureArtifactBytes:         12 * 1024 * 1024,
+			semanticArtifactBytes:          64 * 1024 * 1024,
+			largestStructureShardBytes:     4 * 1024 * 1024,
+			largestSemanticShardBytes:      32 * 1024 * 1024,
+			largestStructurePackageRecords: 180000,
+			largestSemanticPackageRecords:  180000,
 		},
 		{
 			name: "textindex",
@@ -81,31 +85,38 @@ func TestIsolatedStage1CostGate(t *testing.T) {
 				"projects",
 				"textindex",
 			),
-			auditWallSeconds:      25,
-			auditPeakRSSKiB:       700 * 1024,
-			inspectWallSeconds:    5,
-			inspectPeakRSSKiB:     350 * 1024,
-			artifactBytes:         12 * 1024 * 1024,
-			largestShardBytes:     4 * 1024 * 1024,
-			largestPackageRecords: 180000,
+			auditWallSeconds:               25,
+			auditPeakRSSKiB:                700 * 1024,
+			inspectWallSeconds:             5,
+			inspectPeakRSSKiB:              350 * 1024,
+			structureArtifactBytes:         12 * 1024 * 1024,
+			semanticArtifactBytes:          64 * 1024 * 1024,
+			largestStructureShardBytes:     4 * 1024 * 1024,
+			largestSemanticShardBytes:      32 * 1024 * 1024,
+			largestStructurePackageRecords: 180000,
+			largestSemanticPackageRecords:  180000,
 		},
 		{
-			name:                  "self",
-			directory:             root,
-			auditWallSeconds:      40,
-			auditPeakRSSKiB:       700 * 1024,
-			inspectWallSeconds:    20,
-			inspectPeakRSSKiB:     900 * 1024,
-			artifactBytes:         20 * 1024 * 1024,
-			largestShardBytes:     4 * 1024 * 1024,
-			largestPackageRecords: 180000,
+			name:                           "self",
+			directory:                      root,
+			auditWallSeconds:               40,
+			auditPeakRSSKiB:                700 * 1024,
+			inspectWallSeconds:             20,
+			inspectPeakRSSKiB:              900 * 1024,
+			structureArtifactBytes:         20 * 1024 * 1024,
+			semanticArtifactBytes:          128 * 1024 * 1024,
+			largestStructureShardBytes:     4 * 1024 * 1024,
+			largestSemanticShardBytes:      64 * 1024 * 1024,
+			largestStructurePackageRecords: 180000,
+			largestSemanticPackageRecords:  300000,
 		},
 	}
 	for _, budget := range budgets {
 		t.Run(budget.name, func(t *testing.T) {
-			runStage1CostCorpus(
+			runStage2CostCorpus(
 				t,
 				binary,
+				setsidBinary,
 				timeBinary,
 				timeoutBinary,
 				prlimitBinary,
@@ -115,28 +126,32 @@ func TestIsolatedStage1CostGate(t *testing.T) {
 	}
 }
 
-func runStage1CostCorpus(
+func runStage2CostCorpus(
 	t *testing.T,
 	binary string,
+	setsidBinary string,
 	timeBinary string,
 	timeoutBinary string,
 	prlimitBinary string,
-	budget stage1CostBudget,
+	budget stage2CostBudget,
 ) {
 	t.Helper()
-	var certifiedDigest string
-	var encodedBytes int64
-	var largestShardBytes int64
-	var largestPackageRecords int
+	var certified stage2ArtifactMeasurement
 	for sample := 1; sample <= 3; sample++ {
-		artifact := filepath.Join(
-			t.TempDir(),
-			fmt.Sprintf("%s-%d.gotots", budget.name, sample),
+		artifactDirectory := t.TempDir()
+		structureArtifact := filepath.Join(
+			artifactDirectory,
+			fmt.Sprintf("%s-%d.structure.gotots", budget.name, sample),
+		)
+		semanticArtifact := filepath.Join(
+			artifactDirectory,
+			fmt.Sprintf("%s-%d.semantic.gotots", budget.name, sample),
 		)
 		measurement := measureBoundedCostCommand(
 			t,
 			fmt.Sprintf("%s-audit-%d", budget.name, sample),
 			rootForCostDirectory(t, budget.directory),
+			setsidBinary,
 			timeBinary,
 			prlimitBinary,
 			timeoutBinary,
@@ -148,8 +163,10 @@ func runStage1CostCorpus(
 			"portable@v1",
 			"-dir",
 			budget.directory,
-			"-o",
-			artifact,
+			"-structure",
+			structureArtifact,
+			"-semantics",
+			semanticArtifact,
 		)
 		assertMeasurement(
 			t,
@@ -159,35 +176,18 @@ func runStage1CostCorpus(
 			budget.auditWallSeconds,
 			budget.auditPeakRSSKiB,
 		)
-		digest := parseTextField(
-			t,
-			measurement.output,
-			`certifiedDigest=([0-9a-f]{64})`,
-		)
-		sampleBytes := parseInt64Field(
-			t,
-			measurement.output,
-			`encodedBytes=([0-9]+)`,
-		)
-		sampleShardBytes := parseInt64Field(
-			t,
-			measurement.output,
-			`largestShardBytes=([0-9]+)`,
-		)
-		samplePackageRecords := parseIntField(
-			t,
-			measurement.output,
-			`largestPackageRecords=([0-9]+)`,
+		current := parseStage2ArtifactMeasurement(
+			t, measurement.output,
 		)
 		packageContexts := parseIntField(
 			t,
 			measurement.output,
-			`packageContexts=([0-9]+)`,
+			`(?m)^provider structure: packageContexts=([0-9]+)`,
 		)
-		definitions := parseIntField(
+		structureDefinitions := parseIntField(
 			t,
 			measurement.output,
-			`definitions=([0-9]+)`,
+			`(?m)^provider structure: [^\n]*definitions=([0-9]+)`,
 		)
 		assertTailLineCount(
 			t,
@@ -199,35 +199,40 @@ func runStage1CostCorpus(
 			t,
 			measurement.output,
 			"provider-header-tail ",
-			minimum(definitions, 20),
+			minimum(structureDefinitions, 20),
 		)
-		if sampleBytes > budget.artifactBytes ||
-			sampleShardBytes > budget.largestShardBytes ||
-			samplePackageRecords > budget.largestPackageRecords {
+		assertSemanticMetricTails(
+			t, measurement.output, "provider-production",
+		)
+		assertSemanticWorkOutput(
+			t, measurement.output, "provider-production",
+		)
+		if current.structureBytes >
+			budget.structureArtifactBytes ||
+			current.semanticBytes >
+				budget.semanticArtifactBytes ||
+			current.structureShardBytes >
+				budget.largestStructureShardBytes ||
+			current.semanticShardBytes >
+				budget.largestSemanticShardBytes ||
+			current.structureRecords >
+				budget.largestStructurePackageRecords ||
+			current.semanticRecords >
+				budget.largestSemanticPackageRecords {
 			t.Fatalf(
-				"%s audit sample %d artifact=%d shard=%d records=%d exceeds budgets %d/%d/%d",
+				"%s audit sample %d exceeds artifact/shard/record budgets: %+v budget=%+v",
 				budget.name,
 				sample,
-				sampleBytes,
-				sampleShardBytes,
-				samplePackageRecords,
-				budget.artifactBytes,
-				budget.largestShardBytes,
-				budget.largestPackageRecords,
+				current,
+				budget,
 			)
 		}
 		if sample == 1 {
-			certifiedDigest = digest
-			encodedBytes = sampleBytes
-			largestShardBytes = sampleShardBytes
-			largestPackageRecords = samplePackageRecords
-		} else if digest != certifiedDigest ||
-			sampleBytes != encodedBytes ||
-			sampleShardBytes != largestShardBytes ||
-			samplePackageRecords != largestPackageRecords {
+			certified = current
+		} else if current != certified {
 			t.Fatalf(
-				"%s provider production is nondeterministic",
-				budget.name,
+				"%s provider production is nondeterministic: first=%+v current=%+v",
+				budget.name, certified, current,
 			)
 		}
 		if sample == 3 {
@@ -240,6 +245,7 @@ func runStage1CostCorpus(
 						inspectSample,
 					),
 					rootForCostDirectory(t, budget.directory),
+					setsidBinary,
 					timeBinary,
 					prlimitBinary,
 					timeoutBinary,
@@ -251,10 +257,14 @@ func runStage1CostCorpus(
 					"portable@v1",
 					"-dir",
 					budget.directory,
-					"-provider",
-					artifact,
-					"-provider-digest",
-					certifiedDigest,
+					"-provider-structure",
+					structureArtifact,
+					"-provider-structure-digest",
+					certified.structureDigest,
+					"-provider-semantics",
+					semanticArtifact,
+					"-provider-semantics-digest",
+					certified.semanticDigest,
 				)
 				assertMeasurement(
 					t,
@@ -273,285 +283,62 @@ func runStage1CostCorpus(
 		}
 	}
 	t.Logf(
-		"%s provider artifact=%d bytes largest-shard=%d bytes largest-package=%d records",
-		budget.name,
-		encodedBytes,
-		largestShardBytes,
-		largestPackageRecords,
+		"%s provider artifacts: %+v", budget.name, certified,
 	)
 }
 
-func requiredCostTool(t *testing.T, name string) string {
-	t.Helper()
-	path, err := exec.LookPath(name)
-	if err != nil {
-		t.Fatalf(
-			"Stage-1 certification requires %s: %v",
-			name,
-			err,
-		)
-	}
-	return path
+type stage2ArtifactMeasurement struct {
+	structureDigest     string
+	semanticDigest      string
+	structureBytes      int64
+	semanticBytes       int64
+	structureShardBytes int64
+	semanticShardBytes  int64
+	structureRecords    int
+	semanticRecords     int
 }
 
-func runBoundedCostCommand(
+func parseStage2ArtifactMeasurement(
 	t *testing.T,
-	name string,
-	directory string,
-	prlimitBinary string,
-	timeoutBinary string,
-	timeoutSeconds int,
-	command string,
-	arguments ...string,
-) *exec.Cmd {
+	output string,
+) stage2ArtifactMeasurement {
 	t.Helper()
-	commandArguments := []string{
-		"--as=4294967296",
-		"--",
-		timeoutBinary,
-		"--signal=TERM",
-		"--kill-after=10s",
-		fmt.Sprintf("%ds", timeoutSeconds),
-		command,
-	}
-	commandArguments = append(commandArguments, arguments...)
-	cmd := exec.Command(prlimitBinary, commandArguments...)
-	cmd.Dir = directory
-	cmd.Env = boundedCostEnvironment()
-	logPath := filepath.Join(t.TempDir(), name+".log")
-	logFile, err := os.Create(logPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cmd.Stdout = logFile
-	cmd.Stderr = logFile
-	if err := cmd.Run(); err != nil {
-		_ = logFile.Close()
-		t.Fatalf(
-			"%s failed: %v\n%s",
-			name,
-			err,
-			readBoundedCostLog(t, logPath),
-		)
-	}
-	if err := logFile.Close(); err != nil {
-		t.Fatal(err)
-	}
-	return cmd
-}
-
-func measureBoundedCostCommand(
-	t *testing.T,
-	name string,
-	directory string,
-	timeBinary string,
-	prlimitBinary string,
-	timeoutBinary string,
-	timeoutSeconds int,
-	command string,
-	arguments ...string,
-) processMeasurement {
-	t.Helper()
-	timedArguments := []string{
-		"-f",
-		"GOTOTS_COST wall=%e rss=%M",
-		command,
-	}
-	timedArguments = append(timedArguments, arguments...)
-	commandArguments := []string{
-		"--as=4294967296",
-		"--",
-		timeoutBinary,
-		"--signal=TERM",
-		"--kill-after=10s",
-		fmt.Sprintf("%ds", timeoutSeconds),
-		timeBinary,
-	}
-	commandArguments = append(commandArguments, timedArguments...)
-	cmd := exec.Command(prlimitBinary, commandArguments...)
-	cmd.Dir = directory
-	cmd.Env = boundedCostEnvironment()
-	logPath := filepath.Join(t.TempDir(), name+".log")
-	logFile, err := os.Create(logPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cmd.Stdout = logFile
-	cmd.Stderr = logFile
-	runErr := cmd.Run()
-	if closeErr := logFile.Close(); closeErr != nil {
-		t.Fatal(closeErr)
-	}
-	output := readBoundedCostLog(t, logPath)
-	if runErr != nil {
-		t.Fatalf("%s failed: %v\n%s", name, runErr, output)
-	}
-	return processMeasurement{
-		wallSeconds: parseFloatField(
+	return stage2ArtifactMeasurement{
+		structureDigest: parseTextField(
+			t, output, `structureDigest=([0-9a-f]{64})`,
+		),
+		semanticDigest: parseTextField(
+			t, output, `semanticDigest=([0-9a-f]{64})`,
+		),
+		structureBytes: parseInt64Field(
 			t,
 			output,
-			`GOTOTS_COST wall=([0-9.]+)`,
+			`(?m)^provider structure: [^\n]*encodedBytes=([0-9]+)`,
 		),
-		peakRSSKiB: parseIntField(
+		semanticBytes: parseInt64Field(
 			t,
 			output,
-			`GOTOTS_COST wall=[0-9.]+ rss=([0-9]+)`,
+			`(?m)^provider semantics: [^\n]*encodedBytes=([0-9]+)`,
 		),
-		output: output,
+		structureShardBytes: parseInt64Field(
+			t,
+			output,
+			`(?m)^provider structure: [^\n]*largestShardBytes=([0-9]+)`,
+		),
+		semanticShardBytes: parseInt64Field(
+			t,
+			output,
+			`(?m)^provider semantics: [^\n]*largestShardBytes=([0-9]+)`,
+		),
+		structureRecords: parseIntField(
+			t,
+			output,
+			`(?m)^provider structure: [^\n]*largestPackageRecords=([0-9]+)`,
+		),
+		semanticRecords: parseIntField(
+			t,
+			output,
+			`(?m)^provider semantics: [^\n]*largestPackageRecords=([0-9]+)`,
+		),
 	}
-}
-
-func boundedCostEnvironment() []string {
-	replacements := map[string]string{
-		"GOMEMLIMIT": "768MiB",
-		"GOMAXPROCS": "2",
-		"GOFLAGS":    "-p=1",
-	}
-	environment := make([]string, 0, len(os.Environ())+len(replacements))
-	for _, entry := range os.Environ() {
-		key, _, found := strings.Cut(entry, "=")
-		if _, replace := replacements[key]; found && replace {
-			continue
-		}
-		environment = append(environment, entry)
-	}
-	for _, key := range []string{"GOMEMLIMIT", "GOMAXPROCS", "GOFLAGS"} {
-		environment = append(
-			environment,
-			key+"="+replacements[key],
-		)
-	}
-	return environment
-}
-
-func rootForCostDirectory(t *testing.T, directory string) string {
-	t.Helper()
-	current := directory
-	for {
-		if _, err := os.Stat(filepath.Join(current, "go.mod")); err == nil {
-			return current
-		}
-		parent := filepath.Dir(current)
-		if parent == current {
-			t.Fatalf("no go.mod ancestor for %s", directory)
-		}
-		current = parent
-	}
-}
-
-func readBoundedCostLog(t *testing.T, path string) string {
-	t.Helper()
-	stat, err := os.Stat(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	const maximumLogBytes = 2 * 1024 * 1024
-	if stat.Size() > maximumLogBytes {
-		t.Fatalf(
-			"cost log %s is %d bytes, exceeds %d",
-			path,
-			stat.Size(),
-			maximumLogBytes,
-		)
-	}
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(raw)
-}
-
-func assertMeasurement(
-	t *testing.T,
-	name string,
-	sample int,
-	measurement processMeasurement,
-	wallLimit float64,
-	rssLimit int,
-) {
-	t.Helper()
-	t.Logf(
-		"%s sample %d: wall=%.2fs peakRSS=%dKiB",
-		name,
-		sample,
-		measurement.wallSeconds,
-		measurement.peakRSSKiB,
-	)
-	if measurement.wallSeconds > wallLimit ||
-		measurement.peakRSSKiB > rssLimit {
-		t.Fatalf(
-			"%s sample %d exceeds wall/RSS budgets: %.2fs/%dKiB > %.2fs/%dKiB",
-			name,
-			sample,
-			measurement.wallSeconds,
-			measurement.peakRSSKiB,
-			wallLimit,
-			rssLimit,
-		)
-	}
-}
-
-func parseTextField(
-	t *testing.T,
-	output string,
-	pattern string,
-) string {
-	t.Helper()
-	match := regexp.MustCompile(pattern).FindStringSubmatch(output)
-	if len(match) != 2 {
-		t.Fatalf(
-			"output lacks %q:\n%s",
-			pattern,
-			strings.TrimSpace(output),
-		)
-	}
-	return match[1]
-}
-
-func parseIntField(
-	t *testing.T,
-	output string,
-	pattern string,
-) int {
-	t.Helper()
-	value, err := strconv.Atoi(
-		parseTextField(t, output, pattern),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return value
-}
-
-func parseInt64Field(
-	t *testing.T,
-	output string,
-	pattern string,
-) int64 {
-	t.Helper()
-	value, err := strconv.ParseInt(
-		parseTextField(t, output, pattern),
-		10,
-		64,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return value
-}
-
-func parseFloatField(
-	t *testing.T,
-	output string,
-	pattern string,
-) float64 {
-	t.Helper()
-	value, err := strconv.ParseFloat(
-		parseTextField(t, output, pattern),
-		64,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return value
 }

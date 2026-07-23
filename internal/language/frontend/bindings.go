@@ -68,6 +68,7 @@ func (index *objectIndex) bindingCaptures() (map[*bindingCandidate][]identity.De
 	sets := map[*bindingCandidate]map[identity.DefinitionID]bool{}
 	view := index.input.loaded.CheckerView()
 	for _, occurrenceID := range index.input.order {
+		index.work.CaptureOccurrenceVisits++
 		record := index.input.occurrences[occurrenceID]
 		identifier, ok := record.node.(*ast.Ident)
 		if !ok {
@@ -84,10 +85,9 @@ func (index *objectIndex) bindingCaptures() (map[*bindingCandidate][]identity.De
 			record.owner == candidate.definition {
 			continue
 		}
-		if !definitionContains(
-			index.input,
-			candidate.definition,
-			record.owner,
+		index.work.ContainmentProbes++
+		if !index.input.containment.contains(
+			candidate.definition, record.owner,
 		) {
 			return nil, fmt.Errorf(
 				"binding %s is used by unrelated definition %s",
@@ -112,28 +112,6 @@ func (index *objectIndex) bindingCaptures() (map[*bindingCandidate][]identity.De
 		})
 	}
 	return out, nil
-}
-
-func definitionContains(
-	input *packageInput,
-	outer identity.DefinitionID,
-	inner identity.DefinitionID,
-) bool {
-	if outer == inner {
-		return true
-	}
-	current := inner
-	for !current.IsZero() {
-		parent, present := input.parents[current]
-		if !present {
-			return false
-		}
-		current = parent
-		if current == outer {
-			return true
-		}
-	}
-	return false
 }
 
 func objectUse(

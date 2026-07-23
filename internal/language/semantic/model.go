@@ -2,7 +2,6 @@ package semantic
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/tsoniclang/gotots/internal/identity"
 )
@@ -34,6 +33,10 @@ type Package struct {
 }
 
 func NewPackage(input PackageInput) (Package, error) {
+	return newPackage(input, true)
+}
+
+func newPackage(input PackageInput, clone bool) (Package, error) {
 	if input.ID.IsZero() {
 		return Package{}, fmt.Errorf(
 			"semantic package requires package identity",
@@ -46,26 +49,36 @@ func NewPackage(input PackageInput) (Package, error) {
 	}
 	out := Package{
 		id: input.ID, provenance: input.Provenance,
-		definitions: append(
-			[]DefinitionSemantics(nil), input.Definitions...,
-		),
-		resolutions: append(
-			[]OccurrenceResolution(nil), input.Resolutions...,
-		),
-		declarations: append(
-			[]Declaration(nil), input.Declarations...,
-		),
-		bindings: append([]Binding(nil), input.Bindings...),
-		types:    append([]Type(nil), input.Types...),
-		typeWitnesses: append(
-			[]TypeWitness(nil), input.TypeWitnesses...,
-		),
-		operations: append(
-			[]Operation(nil), input.Operations...,
-		),
-		unsupported: append(
-			[]Unsupported(nil), input.Unsupported...,
-		),
+		definitions:   input.Definitions,
+		resolutions:   input.Resolutions,
+		declarations:  input.Declarations,
+		bindings:      input.Bindings,
+		types:         input.Types,
+		typeWitnesses: input.TypeWitnesses,
+		operations:    input.Operations,
+		unsupported:   input.Unsupported,
+	}
+	if clone {
+		out.definitions = append(
+			[]DefinitionSemantics(nil), out.definitions...,
+		)
+		out.resolutions = append(
+			[]OccurrenceResolution(nil), out.resolutions...,
+		)
+		out.declarations = append(
+			[]Declaration(nil), out.declarations...,
+		)
+		out.bindings = append([]Binding(nil), out.bindings...)
+		out.types = append([]Type(nil), out.types...)
+		out.typeWitnesses = append(
+			[]TypeWitness(nil), out.typeWitnesses...,
+		)
+		out.operations = append(
+			[]Operation(nil), out.operations...,
+		)
+		out.unsupported = append(
+			[]Unsupported(nil), out.unsupported...,
+		)
 	}
 	out.sort()
 	if err := validatePackage(out); err != nil {
@@ -104,37 +117,29 @@ func (pkg Package) Unsupported() []Unsupported {
 }
 
 func (pkg *Package) sort() {
-	sort.Slice(pkg.definitions, func(left, right int) bool {
-		return pkg.definitions[left].Definition().String() <
-			pkg.definitions[right].Definition().String()
+	sortCanonical(pkg.definitions, func(record DefinitionSemantics) string {
+		return record.Definition().String()
 	})
-	sort.Slice(pkg.resolutions, func(left, right int) bool {
-		return pkg.resolutions[left].Occurrence().String() <
-			pkg.resolutions[right].Occurrence().String()
+	sortCanonical(pkg.resolutions, func(record OccurrenceResolution) string {
+		return record.Occurrence().String()
 	})
-	sort.Slice(pkg.declarations, func(left, right int) bool {
-		return pkg.declarations[left].ID().String() <
-			pkg.declarations[right].ID().String()
+	sortCanonical(pkg.declarations, func(record Declaration) string {
+		return record.ID().String()
 	})
-	sort.Slice(pkg.bindings, func(left, right int) bool {
-		return pkg.bindings[left].ID().String() <
-			pkg.bindings[right].ID().String()
+	sortCanonical(pkg.bindings, func(record Binding) string {
+		return record.ID().String()
 	})
-	sort.Slice(pkg.types, func(left, right int) bool {
-		return pkg.types[left].ID().String() <
-			pkg.types[right].ID().String()
+	sortCanonical(pkg.types, func(record Type) string {
+		return record.ID().String()
 	})
-	sort.Slice(pkg.typeWitnesses, func(left, right int) bool {
-		return pkg.typeWitnesses[left].Type().String() <
-			pkg.typeWitnesses[right].Type().String()
+	sortCanonical(pkg.typeWitnesses, func(record TypeWitness) string {
+		return record.Type().String()
 	})
-	sort.Slice(pkg.operations, func(left, right int) bool {
-		return pkg.operations[left].ID().String() <
-			pkg.operations[right].ID().String()
+	sortCanonical(pkg.operations, func(record Operation) string {
+		return record.ID().String()
 	})
-	sort.Slice(pkg.unsupported, func(left, right int) bool {
-		return pkg.unsupported[left].ID().String() <
-			pkg.unsupported[right].ID().String()
+	sortCanonical(pkg.unsupported, func(record Unsupported) string {
+		return record.ID().String()
 	})
 }
 
@@ -148,9 +153,8 @@ func NewModel(packages []Package) (*Model, error) {
 	out := &Model{
 		packages: append([]Package(nil), packages...),
 	}
-	sort.Slice(out.packages, func(left, right int) bool {
-		return out.packages[left].ID().String() <
-			out.packages[right].ID().String()
+	sortCanonical(out.packages, func(pkg Package) string {
+		return pkg.ID().String()
 	})
 	seenPackages := map[identity.PackageID]bool{}
 	seenDefinitions := map[identity.DefinitionID]identity.PackageID{}
@@ -165,7 +169,7 @@ func NewModel(packages []Package) (*Model, error) {
 			)
 		}
 		seenPackages[pkg.ID()] = true
-		for _, record := range pkg.Definitions() {
+		for _, record := range pkg.definitions {
 			if owner, duplicate := seenDefinitions[record.Definition()]; duplicate {
 				return nil, fmt.Errorf(
 					"semantic definition %s is owned by %s and %s",
@@ -174,7 +178,7 @@ func NewModel(packages []Package) (*Model, error) {
 			}
 			seenDefinitions[record.Definition()] = pkg.ID()
 		}
-		for _, record := range pkg.Declarations() {
+		for _, record := range pkg.declarations {
 			if owner, duplicate := seenDeclarations[record.ID()]; duplicate {
 				return nil, fmt.Errorf(
 					"semantic declaration %s is owned by %s and %s",
@@ -183,7 +187,7 @@ func NewModel(packages []Package) (*Model, error) {
 			}
 			seenDeclarations[record.ID()] = pkg.ID()
 		}
-		for _, record := range pkg.Bindings() {
+		for _, record := range pkg.bindings {
 			if owner, duplicate := seenBindings[record.ID()]; duplicate {
 				return nil, fmt.Errorf(
 					"semantic binding %s is owned by %s and %s",
@@ -192,7 +196,7 @@ func NewModel(packages []Package) (*Model, error) {
 			}
 			seenBindings[record.ID()] = pkg.ID()
 		}
-		for _, record := range pkg.Operations() {
+		for _, record := range pkg.operations {
 			if owner, duplicate := seenOperations[record.ID()]; duplicate {
 				return nil, fmt.Errorf(
 					"semantic operation %s is owned by %s and %s",
@@ -201,7 +205,7 @@ func NewModel(packages []Package) (*Model, error) {
 			}
 			seenOperations[record.ID()] = pkg.ID()
 		}
-		for _, record := range pkg.Types() {
+		for _, record := range pkg.types {
 			if canonical, present := seenTypes[record.ID()]; present &&
 				canonical != record.Canonical() {
 				return nil, fmt.Errorf(
@@ -212,7 +216,7 @@ func NewModel(packages []Package) (*Model, error) {
 		}
 	}
 	for _, pkg := range out.packages {
-		for _, record := range pkg.Resolutions() {
+		for _, record := range pkg.resolutions {
 			var declaration identity.SemanticDeclarationID
 			switch record.Kind() {
 			case ResolutionDeclaration:
@@ -253,10 +257,13 @@ func (model *Model) VisitPackage(
 		)
 	}
 	if len(model.projections) == 0 {
-		index := sort.Search(len(model.packages), func(index int) bool {
-			return model.packages[index].ID().String() >=
-				packageID.String()
-		})
+		index := searchCanonical(
+			len(model.packages),
+			func(index int) string {
+				return model.packages[index].ID().String()
+			},
+			packageID.String(),
+		)
 		if index == len(model.packages) ||
 			model.packages[index].ID() != packageID {
 			return fmt.Errorf(
@@ -265,10 +272,13 @@ func (model *Model) VisitPackage(
 		}
 		return visit(model.packages[index])
 	}
-	index := sort.Search(len(model.projections), func(index int) bool {
-		return model.projections[index].id.String() >=
-			packageID.String()
-	})
+	index := searchCanonical(
+		len(model.projections),
+		func(index int) string {
+			return model.projections[index].id.String()
+		},
+		packageID.String(),
+	)
 	if index == len(model.projections) ||
 		model.projections[index].id != packageID {
 		return fmt.Errorf(
@@ -324,6 +334,13 @@ func (model *Model) ProviderReadStats() ProviderReadStats {
 		return ProviderReadStats{}
 	}
 	return model.provider.ReadStats()
+}
+
+func (model *Model) ProviderManifestMetrics() Metrics {
+	if model == nil || model.provider == nil {
+		return Metrics{}
+	}
+	return model.provider.ManifestMetrics()
 }
 func validateTypeRecords(
 	records []Type,

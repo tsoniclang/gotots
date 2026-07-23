@@ -80,7 +80,7 @@ func validateProjectedModel(model *Model) error {
 		if err != nil {
 			return err
 		}
-		for _, declaration := range pkg.Declarations() {
+		for _, declaration := range pkg.declarations {
 			if owner, duplicate := seenDeclarations[declaration.ID()]; duplicate {
 				return fmt.Errorf(
 					"semantic declaration %s belongs to %s and %s",

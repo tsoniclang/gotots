@@ -18,7 +18,7 @@ import (
 )
 
 type occurrenceInput struct {
-	occurrence      structure.Occurrence
+	occurrence      structure.OccurrenceRef
 	node            ast.Node
 	owner           identity.DefinitionID
 	domain          catalog.ResolutionDomain
@@ -39,6 +39,8 @@ type packageInput struct {
 	parents     map[identity.DefinitionID]identity.DefinitionID
 	regions     map[identity.DefinitionID]executable.Region
 	selections  map[identity.DefinitionID]scope.DefinitionSelection
+	containment *definitionContainment
+	work        Work
 }
 
 type stageInput struct {
@@ -142,6 +144,20 @@ func newStageInput(
 					site.ParentDefinition()
 			}
 		}
+		containmentDefinitions := make(
+			map[identity.DefinitionID]struct{},
+			len(input.definitions),
+		)
+		for definition := range input.definitions {
+			containmentDefinitions[definition] = struct{}{}
+		}
+		containment, containmentErr := buildDefinitionContainment(
+			containmentDefinitions, input.parents, &input.work,
+		)
+		if containmentErr != nil {
+			return containmentErr
+		}
+		input.containment = containment
 		if err := input.buildOccurrences(index, executableInventory); err != nil {
 			return err
 		}
@@ -188,6 +204,14 @@ func newStageInput(
 			parents:     map[identity.DefinitionID]identity.DefinitionID{},
 			regions:     map[identity.DefinitionID]executable.Region{},
 			selections:  map[identity.DefinitionID]scope.DefinitionSelection{},
+		}
+		input.containment, err = buildDefinitionContainment(
+			map[identity.DefinitionID]struct{}{},
+			input.parents,
+			&input.work,
+		)
+		if err != nil {
+			return nil, err
 		}
 		authority, err := checkerAuthority(
 			universe, structure.PackageGraph{}, loadedPackage, facts,
@@ -311,7 +335,7 @@ func (input *packageInput) buildOccurrences(
 			}
 		}
 	}
-	appendOccurrence := func(occurrence structure.Occurrence) error {
+	appendOccurrence := func(occurrence structure.OccurrenceRef) error {
 		domain := domains[occurrence.ID()]
 		if !domain.Valid() {
 			return nil
@@ -342,7 +366,7 @@ func (input *packageInput) buildOccurrences(
 		return nil
 	}
 	for _, file := range input.graph.Files() {
-		for _, occurrence := range file.Occurrences() {
+		for _, occurrence := range file.OccurrenceRefs() {
 			if err := appendOccurrence(occurrence); err != nil {
 				return err
 			}
@@ -352,7 +376,11 @@ func (input *packageInput) buildOccurrences(
 	for _, file := range input.graph.Files() {
 		packageFiles[file.Owner().ID().File()] = true
 	}
-	for _, occurrence := range executableInventory.AdditionalOccurrences() {
+	additional, err := executableInventory.AdditionalOccurrenceRefs()
+	if err != nil {
+		return err
+	}
+	for _, occurrence := range additional {
 		if !packageFiles[occurrence.ID().Span().File()] {
 			continue
 		}
@@ -364,9 +392,11 @@ func (input *packageInput) buildOccurrences(
 }
 
 func (input *packageInput) assignChildren() error {
+	input.work.InputOccurrences += len(input.occurrences)
 	for _, record := range input.occurrences {
 		parent := input.occurrences[record.occurrence.Parent()]
 		if parent != nil {
+			input.work.ChildEdgeAssignments++
 			parent.children = append(
 				parent.children, record.occurrence.ID(),
 			)
@@ -380,6 +410,7 @@ func (input *packageInput) assignChildren() error {
 		) {
 			rank[edge] = index
 		}
+		input.work.CanonicalSortInputs += len(parent.children)
 		sort.Slice(parent.children, func(left, right int) bool {
 			leftRecord := input.occurrences[parent.children[left]].
 				occurrence
