@@ -1,6 +1,6 @@
 package semantic
 
-const ProviderArtifactVersion = 1
+const ProviderArtifactVersion = 2
 
 type providerContext struct {
 	Version                  int    `json:"version"`
@@ -92,7 +92,6 @@ type wireDeclaration struct {
 	Class    uint8        `json:"class"`
 	Name     string       `json:"name"`
 	Type     string       `json:"type"`
-	Source   string       `json:"source,omitempty"`
 	Exported bool         `json:"exported,omitempty"`
 	Constant wireConstant `json:"constant,omitempty"`
 }

@@ -114,7 +114,6 @@ type Declaration struct {
 	class     identity.SemanticObjectClass
 	name      string
 	typeID    identity.SemanticTypeID
-	source    identity.OccurrenceID
 	exported  bool
 	constant  Constant
 	authority Authority
@@ -126,7 +125,6 @@ func NewDeclaration(
 	class identity.SemanticObjectClass,
 	name string,
 	typeID identity.SemanticTypeID,
-	source identity.OccurrenceID,
 	exported bool,
 	constant Constant,
 	authority Authority,
@@ -158,7 +156,7 @@ func NewDeclaration(
 			)
 		}
 	case identity.SemanticDeclarationOccurrence:
-		if id.Name() != name || id.Occurrence() != source {
+		if id.Name() != name {
 			return Declaration{}, fmt.Errorf(
 				"local declaration disagrees with identity",
 			)
@@ -194,7 +192,7 @@ func NewDeclaration(
 	}
 	return Declaration{
 		id: id, pkg: pkg, class: class, name: name,
-		typeID: typeID, source: source, exported: exported,
+		typeID: typeID, exported: exported,
 		constant: constant, authority: authority,
 	}, nil
 }
@@ -208,7 +206,6 @@ func (record Declaration) Class() identity.SemanticObjectClass {
 }
 func (record Declaration) Name() string                  { return record.name }
 func (record Declaration) Type() identity.SemanticTypeID { return record.typeID }
-func (record Declaration) Source() identity.OccurrenceID { return record.source }
 func (record Declaration) Exported() bool                { return record.exported }
 func (record Declaration) Constant() Constant            { return record.constant }
 func (record Declaration) Authority() Authority          { return record.authority }

@@ -70,14 +70,14 @@ func TestInspectConstructsReportsExactMultiModuleClosures(t *testing.T) {
 			name:      "independent roots",
 			directory: filepath.Join(root, "dual"),
 			patterns:  []string{"./a/...", "./b/..."},
-			packages:  2,
+			packages:  3,
 			files:     2,
 		},
 		{
 			name:      "linked modules",
 			directory: filepath.Join(root, "linked"),
 			patterns:  []string{"./app/...", "./lib/..."},
-			packages:  2,
+			packages:  3,
 			files:     2,
 		},
 	}

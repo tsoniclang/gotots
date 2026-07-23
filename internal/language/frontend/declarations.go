@@ -111,10 +111,22 @@ func (index *objectIndex) declarationID(
 	}
 	if existing := index.declarationByID[id]; existing != nil &&
 		existing != object {
-		return identity.SemanticDeclarationID{}, fmt.Errorf(
-			"semantic declaration identity %s has checker objects %s and %s",
-			id, existing.Name(), object.Name(),
-		)
+		if !equivalentDeclarationObjects(existing, object) {
+			return identity.SemanticDeclarationID{}, fmt.Errorf(
+				"semantic declaration identity %s has inequivalent checker objects %T %s at %d owner=%s and %T %s at %d owner=%s",
+				id,
+				existing,
+				existing.Name(),
+				existing.Pos(),
+				types.TypeString(index.memberOwners[existing], nil),
+				object,
+				object.Name(),
+				object.Pos(),
+				types.TypeString(index.memberOwners[object], nil),
+			)
+		}
+		index.declarationIDs[object] = id
+		return id, nil
 	}
 	index.declarationIDs[object] = id
 	index.declarationByID[id] = object
@@ -124,6 +136,29 @@ func (index *objectIndex) declarationID(
 		return identity.SemanticDeclarationID{}, err
 	}
 	return id, nil
+}
+
+func equivalentDeclarationObjects(
+	left types.Object,
+	right types.Object,
+) bool {
+	if left == nil ||
+		right == nil ||
+		left.Name() != right.Name() ||
+		left.Exported() != right.Exported() ||
+		!types.Identical(left.Type(), right.Type()) {
+		return false
+	}
+	leftConstant, leftIsConstant := left.(*types.Const)
+	rightConstant, rightIsConstant := right.(*types.Const)
+	if leftIsConstant != rightIsConstant {
+		return false
+	}
+	if leftIsConstant {
+		return leftConstant.Val().ExactString() ==
+			rightConstant.Val().ExactString()
+	}
+	return true
 }
 
 func (index *objectIndex) canonicalDeclarationObject(
@@ -472,27 +507,12 @@ func (index *objectIndex) declarationRecord(
 	if err != nil {
 		return semantic.Declaration{}, err
 	}
-	source := index.sourceByObject[object]
-	if source.IsZero() &&
-		id.Form() != identity.SemanticDeclarationPredeclared &&
-		!index.definitionByObject[object].SyntheticRole().Valid() &&
-		object.Pos().IsValid() {
-		source, err = index.input.index.IdentifierOccurrence(
-			object.Pos(), object.Name(),
-		)
-		if err != nil {
-			return semantic.Declaration{}, fmt.Errorf(
-				"declaration %s source identity: %w", id, err,
-			)
-		}
-	}
 	return semantic.NewDeclaration(
 		id,
 		pkg,
 		class,
 		object.Name(),
 		typeID,
-		source,
 		object.Exported(),
 		constantValue,
 		index.input.authority,

@@ -239,10 +239,6 @@ func decodeDeclaration(
 	if err != nil {
 		return Declaration{}, err
 	}
-	source, err := parseOptionalOccurrence(encoded.Source)
-	if err != nil {
-		return Declaration{}, err
-	}
 	constant, err := decodeConstant(encoded.Constant)
 	if err != nil {
 		return Declaration{}, err
@@ -253,7 +249,6 @@ func decodeDeclaration(
 		identity.SemanticObjectClass(encoded.Class),
 		encoded.Name,
 		typeID,
-		source,
 		encoded.Exported,
 		constant,
 		authority,

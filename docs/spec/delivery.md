@@ -286,6 +286,9 @@ Required exit evidence:
   implementation-owner decision, which belongs to later planning;
 - shadowing, scopes, generic binders, method identity, and source spans are
   exact;
+- repeated spellings of an equal unnamed structural type exact-join their
+  declaration occurrences to one canonical member declaration without
+  selecting one spelling as the declaration payload's source;
 - interface type sets distinguish universe, finite normalized terms, and empty,
   and branch records distinguish an exact same-definition control-target
   operation from an optional label binding;

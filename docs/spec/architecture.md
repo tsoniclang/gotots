@@ -910,6 +910,26 @@ Semantic identities are constructor-only and machine independent:
 - types use a complete canonical descriptor with a full digest and
   collision check.
 
+A canonical declaration payload does not own one privileged source occurrence.
+Source declaration sites are the `OccurrenceResolution` records that resolve
+to it. This distinction is required because equal unnamed structural types may
+be spelled more than once:
+
+```go
+func F(left struct{ Value int }, right struct{ Value int }) {}
+```
+
+Both `Value` spellings introduce source evidence for the same canonical
+unnamed-struct field (`struct-type ID + field ordinal`); neither spelling may
+be discarded, and the declaration payload may not choose one as its identity
+or authority. Package declarations, local declarations, and named members
+normally have one declaring occurrence, predeclared declarations have none,
+and structurally shared unnamed members may have more than one. Exact
+occurrence-to-declaration joins own those cardinalities. Provider projection
+selects declaration authority from declaring occurrences and owning
+definitions, never from an arbitrary source field copied into the declaration
+record.
+
 A type descriptor preserves basic kind; alias versus defined nominal owner;
 generic owner, binder role, ordinal, and arguments; array length; channel direction; signature
 receiver, receiver type parameters, function type parameters, parameters,

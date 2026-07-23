@@ -115,6 +115,25 @@ func ResolveUniverse(req Request) (*Universe, error) {
 	if walkErr != nil {
 		return nil, walkErr
 	}
+	builtinID, err := identity.NewPackageID(
+		identity.LanguagePseudoOwner(), "builtin",
+	)
+	if err != nil {
+		return nil, err
+	}
+	if seen[builtinID] {
+		return nil, &LoadError{
+			Dir: req.Dir,
+			Reason: "selected toolchain returned the language-owned " +
+				"builtin universe as an ordinary package",
+		}
+	}
+	universe.packages = append(universe.packages, &LoadedPackage{
+		id:          builtinID,
+		provenance:  ProvenanceLanguagePseudo,
+		acquisition: AcquisitionGOROOT,
+		disposition: DispositionBuiltinUniverse,
+	})
 	if len(universe.roots) == 0 {
 		return nil, &LoadError{
 			Dir: req.Dir, Reason: "no requested roots after classification",

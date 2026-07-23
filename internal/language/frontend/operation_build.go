@@ -94,6 +94,9 @@ func (builder *packageBuilder) operationValue(
 	if !expressionNode {
 		return noValue()
 	}
+	if item.kind == semantic.OperationKeyedElement {
+		return noValue()
+	}
 	if identifier, ok := expression.(*ast.Ident); ok && identifier.Name == "_" && operationNeedsPlace(item) {
 		return semantic.ValueModePlace,
 			semantic.ResultArityOne,

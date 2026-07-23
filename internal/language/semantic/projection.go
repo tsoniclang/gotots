@@ -323,16 +323,6 @@ func (projection packageProjection) verifySelectedAuthority(
 			)
 		}
 	}
-	for _, record := range provider.Declarations() {
-		if !record.Source().IsZero() &&
-			projection.localFiles[record.Source().Span().File()] &&
-			!projection.localDeclarations[record.ID()] {
-			return fmt.Errorf(
-				"local declaration %s has no checker semantic record",
-				record.ID(),
-			)
-		}
-	}
 	return nil
 }
 

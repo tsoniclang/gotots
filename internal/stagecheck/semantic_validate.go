@@ -26,7 +26,7 @@ func verifySemanticPackage(
 	provider *semantic.ProviderArtifact,
 	localOnly bool,
 ) error {
-	if actual.ID() != expected.pkg.ID() ||
+	if actual.ID() != expected.id ||
 		actual.Provenance().String() != expected.loaded.Provenance().String() {
 		return semanticVerificationError(
 			"package", "semantic package identity or provenance differs",
@@ -301,16 +301,46 @@ func loadedSemanticPackages(
 
 func semanticDefinitionCensus(
 	graph *structure.Graph,
-) map[identity.PackageID]map[identity.DefinitionID]bool {
+	loaded map[identity.PackageID]*source.LoadedPackage,
+) (
+	map[identity.PackageID]map[identity.DefinitionID]bool,
+	error,
+) {
 	out := map[identity.PackageID]map[identity.DefinitionID]bool{}
+	if err := graph.VisitResidentPackages(func(
+		pkg structure.PackageGraph,
+	) error {
+		out[pkg.ID()] = map[identity.DefinitionID]bool{}
+		return nil
+	}); err != nil {
+		return nil, semanticVerificationError(
+			"package", err.Error(),
+		)
+	}
 	for _, record := range graph.DefinitionCensus() {
 		if out[record.Package()] == nil {
-			out[record.Package()] =
-				map[identity.DefinitionID]bool{}
+			return nil, semanticVerificationError(
+				"package",
+				"definition census has no package "+
+					record.Package().String(),
+			)
 		}
 		out[record.Package()][record.ID()] = true
 	}
-	return out
+	for packageID, pkg := range loaded {
+		if pkg.Disposition() != source.DispositionBuiltinUniverse {
+			continue
+		}
+		if _, duplicate := out[packageID]; duplicate {
+			return nil, semanticVerificationError(
+				"package",
+				"builtin package also has structural ownership "+
+					packageID.String(),
+			)
+		}
+		out[packageID] = map[identity.DefinitionID]bool{}
+	}
+	return out, nil
 }
 
 func semanticDefinitionSet(
@@ -411,11 +441,15 @@ func expectedCheckerAuthority(
 	loaded *source.LoadedPackage,
 	facts *selectionfacts.Artifact,
 ) semantic.Authority {
+	structureDigest := structure.PackageDigest(pkg)
+	if loaded.Disposition() == source.DispositionBuiltinUniverse {
+		structureDigest = catalog.StructureDigest()
+	}
 	authority, _ := semantic.NewCheckerAuthority(
 		universe.Toolchain().BinaryDigest(),
 		universe.Toolchain().BuildConfigurationDigest(),
 		loaded.ProviderInputFingerprint(),
-		structure.PackageDigest(pkg),
+		structureDigest,
 		semanticSelectionDigest(pkg, facts),
 	)
 	return authority

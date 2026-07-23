@@ -15,6 +15,7 @@ import (
 )
 
 type semanticPackageExpectation struct {
+	id          identity.PackageID
 	pkg         structure.PackageGraph
 	loaded      *source.LoadedPackage
 	definitions map[identity.DefinitionID]structure.ImplementationDefinition
@@ -43,19 +44,30 @@ func VerifyStage2(
 		facts == nil ||
 		selections == nil ||
 		executableInventory == nil ||
-		model == nil ||
-		model.PackageCount() != graph.PackageCount() {
+		model == nil {
 		return semanticVerificationError(
-			"model", "Stage-2 inputs or package cardinality are invalid",
+			"model", "Stage-2 inputs are invalid",
 		)
 	}
 	loaded := loadedSemanticPackages(universe)
 	selectionIndex := semanticSelections(selections)
 	additional := semanticAdditionalOccurrences(executableInventory)
-	expected := semanticDefinitionCensus(graph)
+	expected, err := semanticDefinitionCensus(graph, loaded)
+	if err != nil {
+		return err
+	}
+	if model.PackageCount() != len(expected) {
+		return semanticVerificationError(
+			"model",
+			fmt.Sprintf(
+				"model has %d packages, expected %d",
+				model.PackageCount(), len(expected),
+			),
+		)
+	}
 	expectations := map[identity.PackageID]semanticPackageExpectation{}
 	before := graph.ProviderProjectionStats().ShardLoads
-	err := graph.VisitResidentPackages(func(
+	err = graph.VisitResidentPackages(func(
 		pkg structure.PackageGraph,
 	) error {
 		expectation, err := newSemanticPackageExpectation(
@@ -75,6 +87,24 @@ func VerifyStage2(
 	})
 	if err != nil {
 		return err
+	}
+	for packageID := range expected {
+		if _, present := expectations[packageID]; present {
+			continue
+		}
+		loadedPackage := loaded[packageID]
+		if loadedPackage == nil ||
+			loadedPackage.Disposition() !=
+				source.DispositionBuiltinUniverse {
+			return semanticVerificationError(
+				"package",
+				"semantic package has no structural or intrinsic owner "+
+					packageID.String(),
+			)
+		}
+		expectations[packageID] = builtinSemanticExpectation(
+			loadedPackage,
+		)
 	}
 	visited := 0
 	for _, packageID := range sortedSemanticPackages(expected) {
@@ -114,12 +144,12 @@ func VerifyStage2(
 			),
 		)
 	}
-	if visited != graph.PackageCount() {
+	if visited != len(expected) {
 		return semanticVerificationError(
 			"model",
 			fmt.Sprintf(
 				"visited %d packages, expected %d",
-				visited, graph.PackageCount(),
+				visited, len(expected),
 			),
 		)
 	}
@@ -224,7 +254,7 @@ func newSemanticPackageExpectation(
 		)
 	}
 	out := semanticPackageExpectation{
-		pkg: pkg, loaded: loaded,
+		id: pkg.ID(), pkg: pkg, loaded: loaded,
 		definitions: map[identity.DefinitionID]structure.ImplementationDefinition{},
 		selections:  map[identity.DefinitionID]scope.DefinitionSelection{},
 		executable:  map[identity.DefinitionID]bool{},
@@ -337,6 +367,21 @@ func newSemanticPackageExpectation(
 		}
 	}
 	return out, nil
+}
+
+func builtinSemanticExpectation(
+	loaded *source.LoadedPackage,
+) semanticPackageExpectation {
+	return semanticPackageExpectation{
+		id: loaded.ID(), loaded: loaded,
+		definitions: map[identity.DefinitionID]structure.ImplementationDefinition{},
+		selections:  map[identity.DefinitionID]scope.DefinitionSelection{},
+		executable:  map[identity.DefinitionID]bool{},
+		occurrences: map[identity.OccurrenceID]structure.Occurrence{},
+		domains:     map[identity.OccurrenceID]catalog.ResolutionDomain{},
+		owners:      map[identity.OccurrenceID]identity.DefinitionID{},
+		localFiles:  map[identity.FileID]bool{},
+	}
 }
 
 func (expected *semanticPackageExpectation) addOccurrence(

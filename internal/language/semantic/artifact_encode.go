@@ -105,7 +105,6 @@ func encodeDeclaration(record Declaration) wireDeclaration {
 		Class:    uint8(record.Class()),
 		Name:     record.Name(),
 		Type:     record.Type().String(),
-		Source:   record.Source().String(),
 		Exported: record.Exported(),
 		Constant: encodeConstant(record.Constant()),
 	}

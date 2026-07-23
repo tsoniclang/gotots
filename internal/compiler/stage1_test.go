@@ -150,7 +150,11 @@ TEXT ·Read(SB), NOSPLIT, $0-48
 		inspection.Hydration().LocalFiles != 1 {
 		t.Fatalf("hydration = %+v, want one package/file", inspection.Hydration())
 	}
-	if !inspection.Workspace().Packages()[0].RequestedRoot() {
+	var requestedRoot bool
+	for _, pkg := range inspection.Workspace().Packages() {
+		requestedRoot = requestedRoot || pkg.RequestedRoot()
+	}
+	if !requestedRoot {
 		t.Fatal("finalized package lost requested-root evidence")
 	}
 }

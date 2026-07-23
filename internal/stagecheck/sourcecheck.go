@@ -204,6 +204,23 @@ func VerifySourceUniverse(ws *source.Workspace, req source.Request) error {
 		}
 		expected[id] = expectation
 	}
+	builtinID, err := identity.NewPackageID(
+		identity.LanguagePseudoOwner(), "builtin",
+	)
+	if err != nil {
+		return fail(err.Error())
+	}
+	expected[builtinID.String()] = &universeExpectation{
+		provenance:    source.ProvenanceLanguagePseudo,
+		acquisition:   source.AcquisitionGOROOT,
+		disposition:   source.DispositionBuiltinUniverse,
+		imports:       map[string]bool{},
+		files:         map[string]bool{},
+		filePaths:     map[string]string{},
+		inputs:        map[string]bool{},
+		embedPatterns: map[string]bool{},
+		cgoSources:    map[string]bool{},
+	}
 	// Exact join, both directions, with bounded one-sided identity evidence.
 	problems := newProblemSet()
 	matched := map[string]bool{}

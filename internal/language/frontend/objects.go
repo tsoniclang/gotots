@@ -77,16 +77,17 @@ func buildObjectIndex(
 		out.packageByPath[path] = loaded.ID()
 	}
 	view := input.loaded.CheckerView()
+	if view == nil &&
+		input.provenance == semantic.ProvenanceLanguagePseudo &&
+		input.id.ImportPath() == "builtin" {
+		newTypeBuilder(out)
+		return out, nil
+	}
 	if input.loaded.Types() == nil {
 		return nil, fmt.Errorf(
 			"local semantic package %s has no transient checker",
 			input.id,
 		)
-	}
-	if view == nil &&
-		input.provenance == semantic.ProvenanceLanguagePseudo &&
-		input.id.ImportPath() == "builtin" {
-		return out, nil
 	}
 	if view == nil {
 		return nil, fmt.Errorf(
@@ -94,8 +95,22 @@ func buildObjectIndex(
 			input.id,
 		)
 	}
+	scope := input.loaded.Types().Scope()
+	for _, name := range scope.Names() {
+		object := scope.Lookup(name)
+		if object != nil {
+			out.indexMembers(object.Type(), nil, map[types.Type]bool{})
+		}
+	}
 	for _, occurrenceID := range input.order {
 		record := input.occurrences[occurrenceID]
+		if selector, ok := record.node.(*ast.SelectorExpr); ok {
+			if selection, present := view.SelectionOf(selector); present {
+				out.indexMembers(
+					selection.Recv(), nil, map[types.Type]bool{},
+				)
+			}
+		}
 		if scope, present := view.ScopeOf(record.node); present {
 			if existing := out.scopeOwners[scope]; !existing.IsZero() &&
 				existing != occurrenceID {
@@ -124,18 +139,20 @@ func buildObjectIndex(
 					!packageObject(object) &&
 					!packageNameObject(object) &&
 					object.Pkg() == input.loaded.Types() &&
-					object.Pos().IsValid() &&
-					out.sourceByObject[object].IsZero() {
-					source, err := input.index.IdentifierOccurrence(
-						object.Pos(), object.Name(),
-					)
-					if err != nil {
-						return nil, err
-					}
-					if err := out.bindObjectSource(
-						object, source,
-					); err != nil {
-						return nil, err
+					object.Pos().IsValid() {
+					object = out.canonicalDeclarationObject(object)
+					if out.sourceByObject[object].IsZero() {
+						source, err := input.index.IdentifierOccurrence(
+							object.Pos(), object.Name(),
+						)
+						if err != nil {
+							return nil, err
+						}
+						if err := out.bindObjectSource(
+							object, source,
+						); err != nil {
+							return nil, err
+						}
 					}
 				}
 			}
@@ -173,13 +190,6 @@ func buildObjectIndex(
 			); err != nil {
 				return nil, err
 			}
-		}
-	}
-	scope := input.loaded.Types().Scope()
-	for _, name := range scope.Names() {
-		object := scope.Lookup(name)
-		if object != nil {
-			out.indexMembers(object.Type(), nil, map[types.Type]bool{})
 		}
 	}
 	if err := out.createBindingCandidates(); err != nil {

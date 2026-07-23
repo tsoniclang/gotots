@@ -87,7 +87,6 @@ func TestSemanticPackageIsImmutableAndResolutionConserved(
 		identity.SemanticObjectFunction,
 		"F",
 		signature.ID(),
-		fixture.root,
 		true,
 		Constant{},
 		fixture.authority,

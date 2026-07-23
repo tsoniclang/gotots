@@ -407,6 +407,13 @@ arguments and exact-join every reference to one origin declaration. Mutating
 method-origin canonicalization or field-owner/ordinal canonicalization produces
 a duplicate declaration or wrong-reference failure.
 
+Unnamed-struct fixtures repeat an identical structural type in distinct source
+positions. Each field spelling remains an independently resolved declaration
+occurrence, while both resolve to one canonical structural member declaration.
+A mutation that stores one arbitrary spelling on the declaration payload or
+creates one declaration per spelling fails declaration conservation,
+relocation, or provider-projection parity.
+
 Generic-binder fixtures separately cover type, callable, and receiver
 parameters; multiple parameters; local lexical uses; imported generic
 functions; and an importing package that mentions an instantiated foreign

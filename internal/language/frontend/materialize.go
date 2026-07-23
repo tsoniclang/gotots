@@ -133,6 +133,20 @@ func buildPackageProjections(
 	for _, pkg := range stage.universe.Packages() {
 		loaded[pkg.ID()] = pkg
 	}
+	for packageID := range local {
+		if _, present := expected[packageID]; present {
+			continue
+		}
+		pkg := loaded[packageID]
+		if pkg == nil ||
+			pkg.Disposition() != source.DispositionBuiltinUniverse {
+			return nil, fmt.Errorf(
+				"semantic package %s has no structural census",
+				packageID,
+			)
+		}
+		expected[packageID] = nil
+	}
 	packageIDs := make(
 		[]identity.PackageID, 0, len(expected),
 	)
@@ -210,51 +224,71 @@ func localPackageProjection(
 		}
 	}
 	var declarations []identity.SemanticDeclarationID
+	if !packageUsesCertifiedSemantics(plan, loaded) {
+		for _, declaration := range pkg.Declarations() {
+			declarations = append(declarations, declaration.ID())
+		}
+		return files, declarations, nil
+	}
+	selectedDeclarations := map[identity.SemanticDeclarationID]bool{}
 	syntheticDeclarations := map[identity.SemanticDeclarationID]bool{}
 	for _, definition := range pkg.Definitions() {
-		if definition.Form() != semantic.DefinitionFormSynthetic {
+		for _, declaration := range definition.Spec().Declarations {
+			selectedDeclarations[declaration] = true
+			if definition.Form() == semantic.DefinitionFormSynthetic {
+				syntheticDeclarations[declaration] = true
+			}
+		}
+	}
+	for _, resolution := range pkg.Resolutions() {
+		var declaration identity.SemanticDeclarationID
+		switch resolution.Kind() {
+		case semantic.ResolutionDeclaration:
+			declaration = resolution.Declaration()
+		case semantic.ResolutionStructuralOnly:
+			if resolution.Structural().Disposition() ==
+				semantic.StructuralCompileTimeExpression {
+				continue
+			}
+			declaration = resolution.Structural().Declaration()
+		}
+		if declaration.IsZero() ||
+			resolution.Role() != catalog.RoleDeclarationName {
 			continue
 		}
-		for _, declaration := range definition.Spec().Declarations {
-			syntheticDeclarations[declaration] = true
-		}
+		selectedDeclarations[declaration] = true
 	}
 	for _, declaration := range pkg.Declarations() {
 		if declaration.ID().Form() ==
 			identity.SemanticDeclarationPredeclared {
-			declarations = append(declarations, declaration.ID())
+			selectedDeclarations[declaration.ID()] = true
 			continue
 		}
-		source := declaration.Source()
-		if source.IsZero() {
-			if syntheticDeclarations[declaration.ID()] {
-				decision, present := plan.SyntheticFor(loaded.ID())
-				if !present {
-					return nil, nil, fmt.Errorf(
-						"semantic synthetic declaration %s has no source plan",
-						declaration.ID(),
-					)
-				}
-				if decision.Kind() == sourceplan.KindLocalSyntax {
-					declarations = append(
-						declarations, declaration.ID(),
-					)
-				}
-				continue
+		if syntheticDeclarations[declaration.ID()] {
+			decision, present := plan.SyntheticFor(loaded.ID())
+			if !present {
+				return nil, nil, fmt.Errorf(
+					"semantic synthetic declaration %s has no source plan",
+					declaration.ID(),
+				)
 			}
-			return nil, nil, fmt.Errorf(
-				"semantic declaration %s has no source authority identity",
-				declaration.ID(),
-			)
+			if decision.Kind() != sourceplan.KindLocalSyntax {
+				delete(selectedDeclarations, declaration.ID())
+			}
+			continue
 		}
-		decision, present := plan.For(source.Span().File())
-		if !present {
-			return nil, nil, fmt.Errorf(
-				"semantic declaration %s source is absent from plan",
-				declaration.ID(),
-			)
+		if declaration.ID().Form() ==
+			identity.SemanticDeclarationOccurrence {
+			source := declaration.ID().Occurrence()
+			decision, present := plan.For(source.Span().File())
+			if !present ||
+				decision.Kind() != sourceplan.KindLocalSyntax {
+				delete(selectedDeclarations, declaration.ID())
+			}
 		}
-		if decision.Kind() == sourceplan.KindLocalSyntax {
+	}
+	for _, declaration := range pkg.Declarations() {
+		if selectedDeclarations[declaration.ID()] {
 			declarations = append(declarations, declaration.ID())
 		}
 	}

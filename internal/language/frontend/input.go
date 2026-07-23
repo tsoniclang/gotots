@@ -165,6 +165,40 @@ func newStageInput(
 	if err != nil {
 		return nil, err
 	}
+	for _, loadedPackage := range universe.Packages() {
+		if loadedPackage.Disposition() != source.DispositionBuiltinUniverse {
+			continue
+		}
+		if allLocal {
+			continue
+		}
+		if _, duplicate := out.byPackage[loadedPackage.ID()]; duplicate {
+			return nil, fmt.Errorf(
+				"builtin semantic package %s is duplicated",
+				loadedPackage.ID(),
+			)
+		}
+		input := &packageInput{
+			id: loadedPackage.ID(), provenance: semanticProvenance(
+				loadedPackage.Provenance(),
+			),
+			loaded: loadedPackage, index: index,
+			occurrences: map[identity.OccurrenceID]*occurrenceInput{},
+			definitions: map[identity.DefinitionID]structure.ImplementationDefinition{},
+			parents:     map[identity.DefinitionID]identity.DefinitionID{},
+			regions:     map[identity.DefinitionID]executable.Region{},
+			selections:  map[identity.DefinitionID]scope.DefinitionSelection{},
+		}
+		authority, err := checkerAuthority(
+			universe, structure.PackageGraph{}, loadedPackage, facts,
+		)
+		if err != nil {
+			return nil, err
+		}
+		input.authority = authority
+		out.byPackage[input.id] = input
+		out.packageList = append(out.packageList, input)
+	}
 	sort.Slice(out.packageList, func(left, right int) bool {
 		return out.packageList[left].id.String() <
 			out.packageList[right].id.String()
@@ -395,11 +429,15 @@ func checkerAuthority(
 	facts *selectionfacts.Artifact,
 ) (semantic.Authority, error) {
 	selectionDigest := packageSelectionDigest(pkg, facts)
+	structureDigest := structure.PackageDigest(pkg)
+	if loaded.Disposition() == source.DispositionBuiltinUniverse {
+		structureDigest = catalog.StructureDigest()
+	}
 	return semantic.NewCheckerAuthority(
 		universe.Toolchain().BinaryDigest(),
 		universe.Toolchain().BuildConfigurationDigest(),
 		loaded.ProviderInputFingerprint(),
-		structure.PackageDigest(pkg),
+		structureDigest,
 		selectionDigest,
 	)
 }
