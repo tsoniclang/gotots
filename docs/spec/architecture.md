@@ -456,16 +456,34 @@ Finalization and independent verification enforce these exact multiset joins:
 11. local or certified provider graphs to the one finalized graph.
 
 No join filters owner regions, sites, headers, or boundaries by evidence depth.
-Spans and hashes prove identity/content but never rediscover topology. Provider
-and audit manifests carry the complete
-owner/containment/definition/site/header/boundary graph; a flat definition
-list may exist only as a derived census projection reconstructible from that
-graph. At provider-artifact production the graph is independently extracted and
-certified. Ordinary consumption trusts only the request-bound certified digest
-plus its own census/selection joins and does not rescan provider interiors.
+Spans and hashes prove identity/content but never rediscover topology. A
+provider artifact carries one complete **logical**
+owner/containment/definition/site/header/boundary graph, physically partitioned
+into independently content-addressed package shards. Its small resident
+manifest carries only package/file membership, the exact sorted
+`DefinitionID` census, aggregate header/boundary cardinalities, requested
+selection facts, and shard digests/offsets. Those records are identity and
+admission projections, not substitute semantic payloads. Detailed owner,
+occurrence, containment, site, header, boundary, and checked-view records occur
+once in their owning package shard and are not duplicated in the manifest.
+
+At provider-artifact production each package shard is independently extracted
+and certified before publication. At ordinary consumption the externally
+selected container digest admits the manifest; the manifest census is sealed
+into the whole-universe definition census without opening every shard; and a
+consumer projects at most one detailed provider package at a time. Projection
+exact-joins the decoded shard to its manifest membership, definition census,
+header/boundary counts, input digest, and requested facts before exposing it.
+The hidden physical cache may retain at most one package and cannot alter the
+immutable logical API. No application-wide provider-detail map or slice exists.
+A flat definition list is legal only as this reconstructible identity-only
+census.
+
+Ordinary consumption therefore trusts the request-bound certified digest plus
+its own census/selection/detail joins and does not rescan provider interiors.
 Graph ownership stays in `internal/language/structure`; source owns selected
-bytes, physical source-acquisition facts, and transient evidence lifetime and never
-imports the catalog to build or census definitions.
+bytes, physical source-acquisition facts, and transient evidence lifetime and
+never imports the catalog to build or census definitions.
 
 Construction has an explicit cost model. The production work ledger counts
 every scalable operation class: catalog edge inspection, definition-boundary
@@ -477,6 +495,19 @@ named deterministic sorts.
 A per-node counter that ignores work performed inside the visit is not evidence.
 No definition performs a linear scan over all definitions, boundaries, or
 occurrences; quadratic and cubic construction are forbidden.
+
+Provider production and ordinary consumption have separate cost equations and
+budgets. Production may stream every selected package once and writes
+`O(total provider detail)` bytes. Ordinary resident storage is
+`O(local detailed graph + provider definition identities + requested manifest
+facts + largest projected provider package)`, never `O(total provider detail)`.
+Ordinary work is linear in the resident projections plus each package detail
+actually visited; it may not repeatedly scan the manifest or all package facts
+per file/package. Provider-production wall/RSS/artifact bytes and
+ordinary-consumption wall/RSS are reported separately. Loading every package
+shard to construct the census, retaining more than one projected package, or
+duplicating detail into the manifest is a stop-the-line regression even if
+semantic joins still pass.
 
 Requested roots, resolved import closure, full-semantic source set,
 declaration-contract set, and later product reachability are different sets with
@@ -905,8 +936,8 @@ internal/identity/           canonical source/definition/type/operation/
 internal/language/catalog/   closed Go construct catalog
 internal/language/structure/ immutable Stage-1 schema and depth-independent
                              owner/containment/definition/site/header/boundary
-                             graph
-                             producer
+                             graph producer; package-sharded provider storage,
+                             identity census, and bounded package projection
 internal/language/selectionfacts/ closed request-bound preselection semantic
                              facts, produced once and reused by Stage 2
 internal/language/typesemantics/ exact shared Go type-set/core-type operations

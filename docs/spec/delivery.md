@@ -174,10 +174,13 @@ Required exit evidence:
   bodies during ordinary compilation;
 - the audit exact-joins selected-byte, build-configuration, provider-contract,
   toolchain, catalog, per-file count, and aggregate-count evidence;
-- provider and audit manifests carry the complete
-  owner/containment/definition/site/header/boundary graph; each file uses
-  exactly one local or certified production graph, and ordinary compilation
-  consumes it without rescanning provider interiors;
+- provider artifacts carry the complete logical
+  owner/containment/definition/site/header/boundary graph in independently
+  content-addressed package shards; the resident manifest carries only exact
+  package/file membership, definition identities, header/boundary counts,
+  requested selection facts, and shard admission data; each file uses exactly
+  one local or certified production graph, and ordinary compilation consumes
+  it without rescanning provider interiors or retaining all provider detail;
 - source owns bytes/acquisition/transient checker lifetime,
   `internal/scope/contract` solely owns the closed provider/rule/fact-request
   schema,
@@ -207,13 +210,22 @@ Required exit evidence:
 - production work/storage satisfy the architecture's linear bound plus only
   named `O(n log n)` sorts; a counted linear-scan mutation in a real production
   lookup and a copied-per-site-path mutation both fail the gate;
+- ordinary provider consumption constructs its whole-universe definition
+  census from manifest identities without opening package shards, exact-joins
+  each projected shard to that census and its requested facts, and keeps at
+  most one provider package resident; eager all-shard decode, detail duplicated
+  into the manifest, repeated all-fact scans, and a multi-package cache each
+  fail their owning gate;
 - ordinary consumption authority comes from an independently selected certified
   digest, and audit certification binds the overlay/build-input projection that
   can change audited membership or selected bytes; and
 - package, definition, site, header occurrence, boundary, executable
   occurrence, provider-artifact byte, construction-work, elapsed-time, and peak
   RSS measures have reviewed absolute and parent-delta bounds, including the
-  twenty largest header/provider artifacts.
+  twenty largest header/provider artifacts; provider production and ordinary
+  consumption are measured separately, and ordinary RSS enforces
+  `local detail + identity census + requested facts + largest provider package`
+  rather than total provider-detail residency.
 
 ### Phase: Typed Frontend And Semantic Model
 
