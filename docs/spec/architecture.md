@@ -492,7 +492,14 @@ A flat definition list is legal only as this reconstructible identity-only
 census.
 
 Ordinary consumption therefore trusts the request-bound certified digest plus
-its own census/selection/detail joins and does not rescan provider interiors.
+its own census/selection joins and does not rescan provider interiors.
+Ordinary structural verification never opens a provider-only package shard:
+the independently certified manifest is the authority for that package's
+identity census. It opens one shard only when a selected local overlay must be
+exact-joined to certified detail or when a downstream consumer explicitly
+requests that package's detail. Sequentially opening every shard merely to
+reverify already-certified interiors is the same forbidden whole-provider
+work class as retaining every shard at once.
 Graph ownership stays in `internal/language/structure`; source owns selected
 bytes, physical source-acquisition facts, and transient evidence lifetime and
 never imports the catalog to build or census definitions.
@@ -867,6 +874,16 @@ this type-closure duplication explicitly. A shard cannot carry Stage-1
 topology or TypeScript decisions. A corrupt shard remains invalid after an
 attacker recomputes both its shard digest and outer artifact digest because
 admission revalidates every typed relationship.
+
+The ordinary Stage-2 verifier exact-joins the semantic model's package,
+provenance, selected-authority, definition, and declaration censuses to the
+source plan and admitted manifest without decoding provider-only semantic
+shards. It decodes exactly the certified shards that also have selected local
+semantic overlays, validates each merged package, then releases it. Later
+phases may request additional package detail through the same bounded
+projection API. The model reports certified-package count, mixed-overlay
+count, shard loads, and maximum simultaneous residency separately; a
+provider-only ordinary compilation has zero semantic shard loads.
 
 When the structural-source plan selects local syntax, the semantic authority
 is the one transient checker graph and the record carries

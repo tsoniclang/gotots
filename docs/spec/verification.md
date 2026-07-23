@@ -496,6 +496,9 @@ type records, and enforces:
 - only named `O(n log n)` canonical sorts;
 - local detail plus one projected provider package, never all provider
   semantic shards, as the ordinary residency bound;
+- zero provider-only semantic shard loads during ordinary Stage-2
+  verification, with loads exact-joined to mixed local/certified package
+  projections; an explicit later package request is measured separately;
 - a wide sibling fixture and deep nesting fixture with counted work; and
 - mutations that introduce a per-occurrence linear scan or copied ancestry
   path and must fail the asymptotic gate.

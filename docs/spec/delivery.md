@@ -304,7 +304,9 @@ Required exit evidence:
   exact structural digest and is independently reproduced before acceptance;
 - local semantic records remain resident while certified semantic detail is
   package-sharded, validates before exposure, and keeps at most one provider
-  package resident;
+  package resident; ordinary Stage-2 verification opens no provider-only
+  semantic shard and exact-joins shard loads to mixed local/certified package
+  projections;
 - canonical type/declaration/binding/operation identities remain identical
   across relocated workspaces, relocated module caches, local checker
   production, and certified-provider consumption; and
