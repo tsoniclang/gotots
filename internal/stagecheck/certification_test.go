@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/identity"
+	"github.com/tsoniclang/gotots/internal/language/semantic"
 )
 
 func TestFinalizedSurfaceScannerRejectsRawToolchainCarriers(t *testing.T) {
@@ -40,6 +41,23 @@ func TestFinalizedSurfaceScannerRejectsRawToolchainCarriers(t *testing.T) {
 		reflect.TypeOf(safe), map[reflect.Type]bool{},
 	); path != "" {
 		t.Fatalf("identity-only control was rejected at %s", path)
+	}
+}
+
+func TestFinalizedStage2ModelRejectsRawToolchainCarriers(t *testing.T) {
+	modelType := reflect.TypeOf((*semantic.Model)(nil))
+	if path := rawFacadePath(
+		modelType, map[reflect.Type]bool{},
+	); path != "" {
+		t.Fatalf("semantic model retains raw transient state at %s", path)
+	}
+	rawControl := struct {
+		Checker *types.Package
+	}{}
+	if path := rawFacadePath(
+		reflect.TypeOf(rawControl), map[reflect.Type]bool{},
+	); path == "" {
+		t.Fatal("raw checker negative control escaped Stage-2 lifecycle gate")
 	}
 }
 

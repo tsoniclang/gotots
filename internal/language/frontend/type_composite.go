@@ -210,13 +210,15 @@ func (builder *typeBuilder) methodSignature(
 
 func sortMethods(methods []semantic.TypeMethod) {
 	sort.Slice(methods, func(left, right int) bool {
-		leftKey := methods[left].Package.String() + "|" +
-			methods[left].Name + "|" +
-			methods[left].Signature.String()
-		rightKey := methods[right].Package.String() + "|" +
-			methods[right].Name + "|" +
+		if methods[left].Package != methods[right].Package {
+			return methods[left].Package.String() <
+				methods[right].Package.String()
+		}
+		if methods[left].Name != methods[right].Name {
+			return methods[left].Name < methods[right].Name
+		}
+		return methods[left].Signature.String() <
 			methods[right].Signature.String()
-		return leftKey < rightKey
 	})
 	for index := range methods {
 		methods[index].Ordinal = index

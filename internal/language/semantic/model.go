@@ -365,7 +365,7 @@ func validateTypeClosure(
 		return nil
 	}
 	for _, pkg := range packages {
-		for _, record := range pkg.Definitions() {
+		for _, record := range pkg.definitions {
 			spec := record.Spec()
 			if err := require(
 				record.Definition().String(), spec.Signature,
@@ -373,21 +373,21 @@ func validateTypeClosure(
 				return err
 			}
 		}
-		for _, record := range pkg.Declarations() {
+		for _, record := range pkg.declarations {
 			if err := require(
 				record.ID().String(), record.Type(),
 			); err != nil {
 				return err
 			}
 		}
-		for _, record := range pkg.Bindings() {
+		for _, record := range pkg.bindings {
 			if err := require(
 				record.ID().String(), record.Type(),
 			); err != nil {
 				return err
 			}
 		}
-		for _, record := range pkg.Operations() {
+		for _, record := range pkg.operations {
 			spec := record.Spec()
 			for _, typeID := range []identity.SemanticTypeID{
 				spec.ResultType,
@@ -400,7 +400,7 @@ func validateTypeClosure(
 				}
 			}
 		}
-		for _, record := range pkg.Resolutions() {
+		for _, record := range pkg.resolutions {
 			if err := require(
 				record.Occurrence().String(), record.Type(),
 			); err != nil {

@@ -3,6 +3,7 @@ package frontend
 import (
 	"go/ast"
 	"go/types"
+	"sort"
 
 	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/catalog"
@@ -63,12 +64,20 @@ func (builder *packageBuilder) implicitEffects(
 	if item.kind == semantic.OperationBlock &&
 		item.record.occurrence.Role() ==
 			catalog.RoleFunctionBody {
+		var candidates []*bindingCandidate
 		for _, candidate := range builder.objects.bindingByObject {
 			if candidate.definition != item.record.owner ||
 				candidate.role != identity.SemanticBindingResult ||
 				candidate.source.IsZero() {
 				continue
 			}
+			candidates = append(candidates, candidate)
+		}
+		sort.Slice(candidates, func(left, right int) bool {
+			return builder.objects.bindingIDs[candidates[left]].String() <
+				builder.objects.bindingIDs[candidates[right]].String()
+		})
+		for _, candidate := range candidates {
 			if err := appendEffect(
 				catalog.ImplicitZeroing,
 				candidate.source,
@@ -82,7 +91,8 @@ func (builder *packageBuilder) implicitEffects(
 	if operationCopiesOperands(item.kind) {
 		for _, operand := range operands {
 			record := builder.input.occurrences[operand]
-			if record == nil {
+			if record == nil ||
+				!implicitCopySource(record.occurrence.Role()) {
 				continue
 			}
 			source := expressionTypeOf(builder, record.node)
@@ -186,6 +196,18 @@ func (builder *packageBuilder) implicitEffects(
 		}
 	}
 	return out, nil
+}
+
+func implicitCopySource(role catalog.Role) bool {
+	switch role {
+	case catalog.RoleAssignmentTarget,
+		catalog.RoleAssignablePlace,
+		catalog.RoleRangeKey,
+		catalog.RoleRangeValue:
+		return false
+	default:
+		return true
+	}
 }
 
 func expressionTypeOf(

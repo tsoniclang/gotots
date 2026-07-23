@@ -15,22 +15,28 @@ import (
 )
 
 type semanticPackageExpectation struct {
-	id          identity.PackageID
-	pkg         structure.PackageGraph
-	loaded      *source.LoadedPackage
-	definitions map[identity.DefinitionID]structure.ImplementationDefinition
-	selections  map[identity.DefinitionID]scope.DefinitionSelection
-	executable  map[identity.DefinitionID]bool
-	occurrences map[identity.OccurrenceID]structure.Occurrence
-	domains     map[identity.OccurrenceID]catalog.ResolutionDomain
-	owners      map[identity.OccurrenceID]identity.DefinitionID
-	localFiles  map[identity.FileID]bool
+	id               identity.PackageID
+	pkg              structure.PackageGraph
+	loaded           *source.LoadedPackage
+	definitions      map[identity.DefinitionID]structure.ImplementationDefinition
+	selections       map[identity.DefinitionID]scope.DefinitionSelection
+	executable       map[identity.DefinitionID]bool
+	regions          map[identity.DefinitionID]executable.Region
+	parents          map[identity.DefinitionID]identity.DefinitionID
+	initializers     map[identity.DefinitionID][]identity.OccurrenceID
+	occurrences      map[identity.OccurrenceID]structure.Occurrence
+	order            []identity.OccurrenceID
+	domains          map[identity.OccurrenceID]catalog.ResolutionDomain
+	owners           map[identity.OccurrenceID]identity.DefinitionID
+	structuralOwners map[identity.OccurrenceID]identity.DefinitionID
+	localFiles       map[identity.FileID]bool
 }
 
 func VerifyStage2(
 	universe *source.Universe,
 	plan *sourceplan.Plan,
 	graph *structure.Graph,
+	index *structure.TransientIndex,
 	facts *selectionfacts.Artifact,
 	selections *scope.DefinitionSelections,
 	executableInventory *executable.Inventory,
@@ -41,6 +47,7 @@ func VerifyStage2(
 		plan == nil ||
 		plan.Purpose() != sourceplan.PurposeCompilation ||
 		graph == nil ||
+		index == nil ||
 		facts == nil ||
 		selections == nil ||
 		executableInventory == nil ||
@@ -64,6 +71,12 @@ func VerifyStage2(
 				model.PackageCount(), len(expected),
 			),
 		)
+	}
+	packageIDs := sortedSemanticPackages(expected)
+	if err := verifySemanticModelClosure(
+		model, provider, packageIDs,
+	); err != nil {
+		return err
 	}
 	expectations := map[identity.PackageID]semanticPackageExpectation{}
 	before := graph.ProviderProjectionStats().ShardLoads
@@ -107,7 +120,7 @@ func VerifyStage2(
 		)
 	}
 	visited := 0
-	for _, packageID := range sortedSemanticPackages(expected) {
+	for _, packageID := range packageIDs {
 		expectation, present := expectations[packageID]
 		if !present {
 			return semanticVerificationError(
@@ -127,6 +140,7 @@ func VerifyStage2(
 					plan,
 					facts,
 					provider,
+					index,
 					true,
 				)
 			},
@@ -171,7 +185,7 @@ func VerifyProducedSemanticPackage(
 	plan *sourceplan.Plan,
 	packageID identity.PackageID,
 	graph *structure.Graph,
-	_ *structure.TransientIndex,
+	index *structure.TransientIndex,
 	facts *selectionfacts.Artifact,
 	selections *scope.DefinitionSelections,
 	executableInventory *executable.Inventory,
@@ -181,6 +195,7 @@ func VerifyProducedSemanticPackage(
 		plan == nil ||
 		plan.Purpose() != sourceplan.PurposeProviderProduction ||
 		graph == nil ||
+		index == nil ||
 		facts == nil ||
 		selections == nil ||
 		executableInventory == nil ||
@@ -222,6 +237,7 @@ func VerifyProducedSemanticPackage(
 						plan,
 						facts,
 						provider,
+						index,
 						false,
 					)
 				},
@@ -255,13 +271,17 @@ func newSemanticPackageExpectation(
 	}
 	out := semanticPackageExpectation{
 		id: pkg.ID(), pkg: pkg, loaded: loaded,
-		definitions: map[identity.DefinitionID]structure.ImplementationDefinition{},
-		selections:  map[identity.DefinitionID]scope.DefinitionSelection{},
-		executable:  map[identity.DefinitionID]bool{},
-		occurrences: map[identity.OccurrenceID]structure.Occurrence{},
-		domains:     map[identity.OccurrenceID]catalog.ResolutionDomain{},
-		owners:      map[identity.OccurrenceID]identity.DefinitionID{},
-		localFiles:  map[identity.FileID]bool{},
+		definitions:      map[identity.DefinitionID]structure.ImplementationDefinition{},
+		selections:       map[identity.DefinitionID]scope.DefinitionSelection{},
+		executable:       map[identity.DefinitionID]bool{},
+		regions:          map[identity.DefinitionID]executable.Region{},
+		parents:          map[identity.DefinitionID]identity.DefinitionID{},
+		initializers:     map[identity.DefinitionID][]identity.OccurrenceID{},
+		occurrences:      map[identity.OccurrenceID]structure.Occurrence{},
+		domains:          map[identity.OccurrenceID]catalog.ResolutionDomain{},
+		owners:           map[identity.OccurrenceID]identity.DefinitionID{},
+		structuralOwners: map[identity.OccurrenceID]identity.DefinitionID{},
+		localFiles:       map[identity.FileID]bool{},
 	}
 	for _, file := range pkg.Files() {
 		out.localFiles[file.Owner().ID().File()] = true
@@ -287,6 +307,17 @@ func newSemanticPackageExpectation(
 			return semanticPackageExpectation{}, err
 		}
 	}
+	for _, site := range pkg.Sites() {
+		if existing, present := out.parents[site.Definition()]; present && existing != site.ParentDefinition() {
+			return semanticPackageExpectation{},
+				semanticVerificationError(
+					"definition",
+					"definition site has two parents "+
+						site.Definition().String(),
+				)
+		}
+		out.parents[site.Definition()] = site.ParentDefinition()
+	}
 	for _, definition := range pkg.Definitions() {
 		if localOnly &&
 			!semanticDefinitionUsesLocal(
@@ -309,6 +340,11 @@ func newSemanticPackageExpectation(
 		out.selections[definition.ID()] = selection
 	}
 	for _, header := range pkg.Headers() {
+		if err := out.assignStructuralOwner(
+			header.Members(), header.ID().Definition(),
+		); err != nil {
+			return semanticPackageExpectation{}, err
+		}
 		_, local := out.definitions[header.ID().Definition()]
 		if localOnly && !local {
 			continue
@@ -322,14 +358,17 @@ func newSemanticPackageExpectation(
 		}
 	}
 	for _, boundary := range pkg.Boundaries() {
-		_, local := out.definitions[boundary.ID().Definition()]
-		if localOnly && !local {
-			continue
-		}
 		var members []identity.OccurrenceID
 		for _, entry := range boundary.Entries() {
 			members = append(members, entry.ID())
 		}
+		_, local := out.definitions[boundary.ID().Definition()]
+		if localOnly && !local {
+			continue
+		}
+		out.initializers[boundary.ID().Definition()] = append(
+			[]identity.OccurrenceID(nil), members...,
+		)
 		if err := out.assign(
 			members,
 			catalog.ResolutionDomainBoundary,
@@ -344,6 +383,7 @@ func newSemanticPackageExpectation(
 			continue
 		}
 		out.executable[definition] = true
+		out.regions[definition] = region
 		for _, member := range region.Members() {
 			if occurrence, present := additional[member]; present {
 				if err := out.addOccurrence(occurrence); err != nil {
@@ -374,26 +414,50 @@ func builtinSemanticExpectation(
 ) semanticPackageExpectation {
 	return semanticPackageExpectation{
 		id: loaded.ID(), loaded: loaded,
-		definitions: map[identity.DefinitionID]structure.ImplementationDefinition{},
-		selections:  map[identity.DefinitionID]scope.DefinitionSelection{},
-		executable:  map[identity.DefinitionID]bool{},
-		occurrences: map[identity.OccurrenceID]structure.Occurrence{},
-		domains:     map[identity.OccurrenceID]catalog.ResolutionDomain{},
-		owners:      map[identity.OccurrenceID]identity.DefinitionID{},
-		localFiles:  map[identity.FileID]bool{},
+		definitions:      map[identity.DefinitionID]structure.ImplementationDefinition{},
+		selections:       map[identity.DefinitionID]scope.DefinitionSelection{},
+		executable:       map[identity.DefinitionID]bool{},
+		regions:          map[identity.DefinitionID]executable.Region{},
+		parents:          map[identity.DefinitionID]identity.DefinitionID{},
+		initializers:     map[identity.DefinitionID][]identity.OccurrenceID{},
+		occurrences:      map[identity.OccurrenceID]structure.Occurrence{},
+		domains:          map[identity.OccurrenceID]catalog.ResolutionDomain{},
+		owners:           map[identity.OccurrenceID]identity.DefinitionID{},
+		structuralOwners: map[identity.OccurrenceID]identity.DefinitionID{},
+		localFiles:       map[identity.FileID]bool{},
 	}
+}
+
+func (expected *semanticPackageExpectation) assignStructuralOwner(
+	occurrences []identity.OccurrenceID,
+	owner identity.DefinitionID,
+) error {
+	for _, occurrence := range occurrences {
+		if existing := expected.structuralOwners[occurrence]; !existing.IsZero() && existing != owner {
+			return semanticVerificationError(
+				"occurrence",
+				"structural occurrence has two definition owners "+
+					occurrence.String(),
+			)
+		}
+		expected.structuralOwners[occurrence] = owner
+	}
+	return nil
 }
 
 func (expected *semanticPackageExpectation) addOccurrence(
 	occurrence structure.Occurrence,
 ) error {
-	if existing, present := expected.occurrences[occurrence.ID()]; present &&
-		existing != occurrence {
-		return semanticVerificationError(
-			"occurrence", "conflicting payload "+occurrence.ID().String(),
-		)
+	if existing, present := expected.occurrences[occurrence.ID()]; present {
+		if existing != occurrence {
+			return semanticVerificationError(
+				"occurrence", "conflicting payload "+occurrence.ID().String(),
+			)
+		}
+		return nil
 	}
 	expected.occurrences[occurrence.ID()] = occurrence
+	expected.order = append(expected.order, occurrence.ID())
 	return nil
 }
 

@@ -3,6 +3,7 @@ package frontend
 import (
 	"fmt"
 	"go/types"
+	"sort"
 
 	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/catalog"
@@ -190,6 +191,11 @@ func (builder *packageBuilder) packageInitializationSequence() (
 		}
 	}
 	zeroOrdinal := 0
+	type zeroCandidate struct {
+		variable *types.Var
+		source   identity.OccurrenceID
+	}
+	var zeroCandidates []zeroCandidate
 	for object, source := range builder.objects.sourceByObject {
 		variable, ok := object.(*types.Var)
 		if !ok ||
@@ -200,6 +206,18 @@ func (builder *packageBuilder) packageInitializationSequence() (
 			source.IsZero() {
 			continue
 		}
+		zeroCandidates = append(zeroCandidates, zeroCandidate{
+			variable: variable,
+			source:   source,
+		})
+	}
+	sort.Slice(zeroCandidates, func(left, right int) bool {
+		return zeroCandidates[left].source.String() <
+			zeroCandidates[right].source.String()
+	})
+	for _, candidate := range zeroCandidates {
+		variable := candidate.variable
+		source := candidate.source
 		target, err := builder.types.build(variable.Type())
 		if err != nil {
 			return nil, nil, nil, err

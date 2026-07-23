@@ -318,9 +318,8 @@ func assignAssignmentContext(
 	case catalog.RoleAssignmentTarget:
 		context.bindingRole = identity.SemanticBindingLocal
 	case catalog.RoleAssignedValue:
-		if len(node.Rhs) == 1 && len(node.Lhs) == 2 {
-			context.arity = semantic.ResultArityCommaOk
-			context.commaOK = true
+		if len(node.Rhs) == 1 && len(node.Lhs) > 1 {
+			assignMultiValueContext(view, node.Rhs[0], context)
 			return
 		}
 		if ordinal < len(node.Lhs) {
@@ -349,6 +348,10 @@ func assignValueSpecContext(
 	if role != catalog.RoleInitializerValue {
 		return
 	}
+	if len(node.Values) == 1 && len(node.Names) > 1 {
+		assignMultiValueContext(view, node.Values[0], context)
+		return
+	}
 	if node.Type != nil {
 		context.expected = expressionType(view, node.Type)
 	}
@@ -362,6 +365,20 @@ func assignValueSpecContext(
 				context.expected = object.Type()
 			}
 		}
+	}
+}
+
+func assignMultiValueContext(
+	view interface {
+		TypeOf(ast.Expr) (types.TypeAndValue, bool)
+	},
+	expression ast.Expr,
+	context *occurrenceContext,
+) {
+	value, present := view.TypeOf(expression)
+	if present && value.HasOk() {
+		context.arity = semantic.ResultArityCommaOk
+		context.commaOK = true
 	}
 }
 

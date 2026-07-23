@@ -232,6 +232,145 @@ func TestResolutionRejectsMismatchedOperationOwner(t *testing.T) {
 	}
 }
 
+func TestTransientTypePoolClosesAndArtifactAdmissionRejectsExtras(
+	t *testing.T,
+) {
+	fixture := semanticFixture(t)
+	integer, err := NewType(TypeSpec{
+		Kind: TypeBasic, Basic: BasicInt,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	extra, err := NewType(TypeSpec{
+		Kind: TypeBasic, Basic: BasicString,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	declarationID, err := identity.NewPackageDeclarationID(
+		fixture.pkg, identity.SemanticObjectVariable, "Value",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	declaration, err := NewDeclaration(
+		declarationID,
+		fixture.pkg,
+		identity.SemanticObjectVariable,
+		"Value",
+		integer.ID(),
+		true,
+		Constant{},
+		fixture.authority,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := PackageInput{
+		ID:           fixture.pkg,
+		Provenance:   ProvenanceWorkspaceModule,
+		Declarations: []Declaration{declaration},
+		Types:        []Type{integer, extra},
+		TypeWitnesses: []TypeWitness{
+			mustTypeWitness(
+				t, fixture.pkg, integer.ID(), fixture.authority,
+			),
+			mustTypeWitness(
+				t, fixture.pkg, extra.ID(), fixture.authority,
+			),
+		},
+	}
+	if _, err := NewPackage(input); err == nil {
+		t.Fatal("artifact admission accepted an unreferenced type")
+	}
+	closed, err := FinalizePackageTypePool(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(closed.Types) != 1 ||
+		closed.Types[0].ID() != integer.ID() ||
+		len(closed.TypeWitnesses) != 1 ||
+		closed.TypeWitnesses[0].Type() != integer.ID() {
+		t.Fatalf(
+			"type closure types=%v witnesses=%v",
+			closed.Types, closed.TypeWitnesses,
+		)
+	}
+	if _, err := NewPackage(closed); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMemberDeclarationRetainsItsOwnerType(t *testing.T) {
+	fixture := semanticFixture(t)
+	integer, err := NewType(TypeSpec{
+		Kind: TypeBasic, Basic: BasicInt,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	structure, err := NewType(TypeSpec{
+		Kind: TypeStruct,
+		Fields: []TypeField{{
+			Name: "Value", Type: integer.ID(), Ordinal: 0,
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	declarationID, err := identity.NewMemberDeclarationID(
+		structure.ID(),
+		identity.PackageID{},
+		identity.SemanticObjectField,
+		"Value",
+		0,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	declaration, err := NewDeclaration(
+		declarationID,
+		fixture.pkg,
+		identity.SemanticObjectField,
+		"Value",
+		integer.ID(),
+		true,
+		Constant{},
+		fixture.authority,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := PackageInput{
+		ID:           fixture.pkg,
+		Provenance:   ProvenanceWorkspaceModule,
+		Declarations: []Declaration{declaration},
+		Types:        []Type{integer, structure},
+		TypeWitnesses: []TypeWitness{
+			mustTypeWitness(
+				t, fixture.pkg, integer.ID(), fixture.authority,
+			),
+			mustTypeWitness(
+				t, fixture.pkg, structure.ID(), fixture.authority,
+			),
+		},
+	}
+	closed, err := FinalizePackageTypePool(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(closed.Types) != 2 {
+		t.Fatalf(
+			"member type closure retained %d types, want 2",
+			len(closed.Types),
+		)
+	}
+	if _, err := NewPackage(closed); err != nil {
+		t.Fatal(err)
+	}
+}
+
 type semanticFixtureState struct {
 	pkg        identity.PackageID
 	file       identity.FileID

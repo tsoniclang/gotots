@@ -364,7 +364,7 @@ func materializePackage(
 		}
 		witnesses = append(witnesses, witness)
 	}
-	pkg, err := semantic.NewPackage(semantic.PackageInput{
+	packageInput := semantic.PackageInput{
 		ID: input.id, Provenance: input.provenance,
 		Definitions:   builder.definitions,
 		Resolutions:   builder.resolutions,
@@ -374,7 +374,15 @@ func materializePackage(
 		TypeWitnesses: witnesses,
 		Operations:    builder.operations,
 		Unsupported:   builder.unsupported,
-	})
+	}
+	packageInput, err = semantic.FinalizePackageTypePool(packageInput)
+	if err != nil {
+		return semantic.Package{}, Work{}, fmt.Errorf(
+			"finalize semantic type closure for %s: %w",
+			input.id, err,
+		)
+	}
+	pkg, err := semantic.NewPackage(packageInput)
 	if err != nil {
 		return semantic.Package{}, Work{}, fmt.Errorf(
 			"materialize semantic package %s: %w", input.id, err,

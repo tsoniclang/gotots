@@ -360,12 +360,37 @@ func (input *packageInput) buildOccurrences(
 			return err
 		}
 	}
-	for _, id := range input.order {
-		record := input.occurrences[id]
+	return input.assignChildren()
+}
+
+func (input *packageInput) assignChildren() error {
+	for _, record := range input.occurrences {
 		parent := input.occurrences[record.occurrence.Parent()]
 		if parent != nil {
-			parent.children = append(parent.children, id)
+			parent.children = append(
+				parent.children, record.occurrence.ID(),
+			)
 		}
+	}
+	for _, parentID := range input.order {
+		parent := input.occurrences[parentID]
+		rank := map[catalog.Edge]int{}
+		for index, edge := range catalog.EdgesOf(
+			parent.occurrence.Kind(),
+		) {
+			rank[edge] = index
+		}
+		sort.Slice(parent.children, func(left, right int) bool {
+			leftRecord := input.occurrences[parent.children[left]].
+				occurrence
+			rightRecord := input.occurrences[parent.children[right]].
+				occurrence
+			if rank[leftRecord.Edge()] != rank[rightRecord.Edge()] {
+				return rank[leftRecord.Edge()] <
+					rank[rightRecord.Edge()]
+			}
+			return leftRecord.Ordinal() < rightRecord.Ordinal()
+		})
 	}
 	return nil
 }

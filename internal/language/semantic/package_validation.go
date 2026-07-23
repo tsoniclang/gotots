@@ -189,7 +189,7 @@ func validatePackage(pkg Package) error {
 	if err := validateTypeClosure([]Package{pkg}, types); err != nil {
 		return err
 	}
-	return nil
+	return validatePackageReachability(pkg)
 }
 
 func declarationIsPackageOwned(

@@ -157,6 +157,7 @@ func InspectConstructs(req source.Request) (*Inspection, error) {
 		universe,
 		plan,
 		graph,
+		index,
 		facts,
 		selections,
 		executableInventory,
@@ -175,6 +176,11 @@ func InspectConstructs(req source.Request) (*Inspection, error) {
 	}
 	if err := stagecheck.VerifyFinalizedStage1(
 		universe, workspace, graph, selections, executableInventory,
+	); err != nil {
+		return nil, err
+	}
+	if err := stagecheck.VerifyFinalizedStage2(
+		semanticResult.Model(),
 	); err != nil {
 		return nil, err
 	}

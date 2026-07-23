@@ -171,53 +171,13 @@ func projectTypeClosure(
 	pkg Package,
 	input PackageInput,
 ) ([]Type, []TypeWitness, error) {
-	records := map[identity.SemanticTypeID]Type{}
-	for _, record := range pkg.Types() {
-		records[record.ID()] = record
+	input.Types = pkg.Types()
+	input.TypeWitnesses = pkg.TypeWitnesses()
+	closed, err := FinalizePackageTypePool(input)
+	if err != nil {
+		return nil, nil, err
 	}
-	witnesses := map[identity.SemanticTypeID]TypeWitness{}
-	for _, witness := range pkg.TypeWitnesses() {
-		witnesses[witness.Type()] = witness
-	}
-	selected := map[identity.SemanticTypeID]bool{}
-	queue := packageInputTypeRoots(input)
-	for len(queue) != 0 {
-		typeID := queue[len(queue)-1]
-		queue = queue[:len(queue)-1]
-		if typeID.IsZero() || selected[typeID] {
-			continue
-		}
-		record, present := records[typeID]
-		if !present {
-			return nil, nil, fmt.Errorf(
-				"semantic local projection references absent type %s",
-				typeID,
-			)
-		}
-		selected[typeID] = true
-		queue = append(queue, referencedTypeIDs(record)...)
-	}
-	typeIDs := make([]identity.SemanticTypeID, 0, len(selected))
-	for typeID := range selected {
-		typeIDs = append(typeIDs, typeID)
-	}
-	sort.Slice(typeIDs, func(left, right int) bool {
-		return typeIDs[left].String() < typeIDs[right].String()
-	})
-	out := make([]Type, 0, len(typeIDs))
-	outWitnesses := make([]TypeWitness, 0, len(typeIDs))
-	for _, typeID := range typeIDs {
-		witness, present := witnesses[typeID]
-		if !present {
-			return nil, nil, fmt.Errorf(
-				"semantic local projection has no type witness %s",
-				typeID,
-			)
-		}
-		out = append(out, records[typeID])
-		outWitnesses = append(outWitnesses, witness)
-	}
-	return out, outWitnesses, nil
+	return closed.Types, closed.TypeWitnesses, nil
 }
 
 func (projection packageProjection) completeLocal() (Package, error) {

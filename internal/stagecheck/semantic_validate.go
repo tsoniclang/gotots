@@ -24,6 +24,7 @@ func verifySemanticPackage(
 	plan *sourceplan.Plan,
 	facts *selectionfacts.Artifact,
 	provider *semantic.ProviderArtifact,
+	index *structure.TransientIndex,
 	localOnly bool,
 ) error {
 	if actual.ID() != expected.id ||
@@ -48,7 +49,19 @@ func verifySemanticPackage(
 	); err != nil {
 		return err
 	}
-	return verifySemanticOperations(expected, actual, localOnly)
+	if err := verifySemanticOperations(
+		expected, actual, localOnly,
+	); err != nil {
+		return err
+	}
+	if err := verifyCheckerSemanticPackage(
+		expected, actual, universe, index, localOnly,
+	); err != nil {
+		return err
+	}
+	return verifyIntrinsicSemanticPackage(
+		actual, expected, universe, facts,
+	)
 }
 
 func verifySemanticDefinitions(
