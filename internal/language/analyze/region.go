@@ -1,6 +1,9 @@
 package analyze
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/catalog"
 	"github.com/tsoniclang/gotots/internal/source"
@@ -93,6 +96,35 @@ func (o RegionOwner) String() string {
 		return "pkginit:" + o.pkg.String()
 	default:
 		return "unit:" + o.unit.String()
+	}
+}
+
+// ParseRegionOwner reconstructs a region owner from its canonical
+// serialization: "decl:<fileID>", "unit:<unitID>", or "pkginit:<pkgID>". It is
+// the typed decoder for a serialized provider reference's parent, routing
+// through the same validating identity constructors that produced it.
+func ParseRegionOwner(s string) (RegionOwner, error) {
+	switch {
+	case strings.HasPrefix(s, "decl:"):
+		file, err := identity.ParseFileID(s[len("decl:"):])
+		if err != nil {
+			return RegionOwner{}, err
+		}
+		return FileDeclarationOwner(file), nil
+	case strings.HasPrefix(s, "unit:"):
+		ref, err := identity.ParseUnitRef(s[len("unit:"):])
+		if err != nil {
+			return RegionOwner{}, err
+		}
+		return UnitOwner(UnitRef{source: ref.Source(), implicit: ref.Implicit()}), nil
+	case strings.HasPrefix(s, "pkginit:"):
+		pkg, err := identity.ParsePackageID(s[len("pkginit:"):])
+		if err != nil {
+			return RegionOwner{}, err
+		}
+		return PackageInitializationOwner(pkg), nil
+	default:
+		return RegionOwner{}, fmt.Errorf("not a canonical region owner: %q", s)
 	}
 }
 

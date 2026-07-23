@@ -33,14 +33,19 @@ func VerifyInventory(req source.Request, ws *source.Workspace, inv *analyze.Work
 		invByPkg[pkg.ID().String()] = pkg
 	}
 
+	// Consuming mode: a certified manifest artifact is bound, so provider
+	// packages must be present in the inventory as decoded typed records and are
+	// verified here. In the audit/recursive path (no artifact) provider packages
+	// are audited separately and skipped.
+	consuming := req.AuditArtifact != ""
 	for _, pkg := range ws.Packages() {
 		if pkg.Disposition() != source.DispositionOrdinarySource {
 			continue
 		}
-		// Only application packages (with a full-semantic unit) enter the
-		// region model; contract-depth provider packages are audited
-		// separately.
-		if !pkg.RetainsFullSemantic() {
+		isApplication := pkg.RetainsFullSemantic()
+		if !isApplication && !consuming {
+			// Audit/recursive path: contract-depth provider packages are audited
+			// separately and do not enter the consumed region model.
 			continue
 		}
 		// Independent expected definitions from the source census.
@@ -175,11 +180,13 @@ func VerifyInventory(req source.Request, ws *source.Workspace, inv *analyze.Work
 		// Exact site<->reference conservation: independently derive every
 		// source implementation site from re-parsed source and exact-multiset-
 		// join. Implicit references have no source site and are conserved by the
-		// 1:1 check above.
-		problems = append(problems, verifyReferenceConservation(pkg, pkgInv.References(), req.Overlay)...)
-		// Exact site<->reference conservation: independently derive every
-		// implementation site from re-parsed source and exact-multiset-join.
-		problems = append(problems, verifyReferenceConservation(pkg, pkgInv.References(), req.Overlay)...)
+		// 1:1 check above. This runs only for application packages — a provider
+		// package's reference topology is the certified graph, trusted through
+		// the request-bound digest and never re-derived by rescanning provider
+		// interiors during ordinary compilation.
+		if isApplication {
+			problems = append(problems, verifyReferenceConservation(pkg, pkgInv.References(), req.Overlay)...)
+		}
 	}
 
 	if len(problems) > 0 {

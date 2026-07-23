@@ -284,6 +284,14 @@ func ParseUnitRef(s string) (UnitRef, error) {
 // IsZero reports whether r references nothing.
 func (r UnitRef) IsZero() bool { return r == UnitRef{} }
 
+// Kind is the referenced unit's kind (implicit-executable for implicit units).
+func (r UnitRef) Kind() UnitKind {
+	if !r.source.IsZero() {
+		return r.source.Kind()
+	}
+	return UnitImplicitExecutable
+}
+
 // Source is the referenced source unit; zero when the reference is implicit.
 func (r UnitRef) Source() SourceUnitID { return r.source }
 

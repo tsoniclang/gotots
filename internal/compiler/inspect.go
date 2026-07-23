@@ -99,6 +99,12 @@ func InspectConstructs(req source.Request) (*Inspection, error) {
 		if err := analyze.VerifyAuditContext(ws, auditMeta(req, contract), artifact); err != nil {
 			return nil, err
 		}
+		// Merge the certified provider graph into the one inventory later stages
+		// consume, so provider packages are present as typed records — not
+		// dropped — without rescanning provider interiors.
+		if err := analyze.ConsumeProviderGraph(inventory, ws, artifact.Files); err != nil {
+			return nil, err
+		}
 	}
 	if err := stagecheck.VerifyInventory(req, ws, inventory); err != nil {
 		return nil, err
@@ -282,5 +288,18 @@ func AuditVerify(req source.Request, path string) error {
 	if err != nil {
 		return err
 	}
-	return analyze.VerifyAuditArtifact(ws, auditMeta(req, contract), path, ordinaryPolicy)
+	if err := analyze.VerifyAuditArtifact(ws, auditMeta(req, contract), path, ordinaryPolicy); err != nil {
+		return err
+	}
+	// The gate independently re-derives and verifies the provider graph — not
+	// only bytes, counts, and the flat unit list: it re-parses every audited
+	// file's source and exact-joins the derived definition/reference topology
+	// against the stored graph. A fabricated, omitted, reordered, mis-parented,
+	// or contract-mutated provider reference fails here even when correctly
+	// sealed and byte-consistent.
+	stored, err := analyze.DecodeAuditArtifact(path)
+	if err != nil {
+		return err
+	}
+	return stagecheck.VerifyProviderGraph(ws, stored.Files, req.Overlay)
 }
