@@ -264,7 +264,20 @@ Required exit evidence:
 - context fixtures cover call/conversion, map/receive/assert comma-ok,
   selectors, assignments, composite literals, and range;
 - semantic records are immutable and constructor-validated; and
-- no TypeScript representation appears in the model.
+- no TypeScript representation appears in the model;
+- Stage-1 structural provider evidence and Stage-2 semantic provider evidence
+  remain separate digest-bound authorities; the semantic artifact binds the
+  exact structural digest and is independently reproduced before acceptance;
+- local semantic records remain resident while certified semantic detail is
+  package-sharded, validates before exposure, and keeps at most one provider
+  package resident;
+- canonical type/declaration/binding/operation identities remain identical
+  across relocated workspaces, relocated module caches, local checker
+  production, and certified-provider consumption; and
+- measured construction is linear plus named canonical sorts, and reports
+  definitions, resolutions, declarations, bindings, types, operations,
+  unsupported records, artifact bytes, largest shards/records, wall time, and
+  peak RSS with parent deltas and top-twenty tails.
 
 ### Phase: Facts And Planning
 

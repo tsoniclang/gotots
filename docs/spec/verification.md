@@ -394,6 +394,39 @@ hash, dispatch target, or verifier and require the relevant gate to fail. A
 test that has never failed under a representative mutation is not accepted as
 proof of its claimed defect class.
 
+The Stage-2 mutation matrix runs against production admission and conservation
+paths. It removes a definition semantic record, duplicates an occurrence
+resolution, changes a parent-assigned arity, swaps ordered operands, conflates
+two shadowed bindings, substitutes an alias with its underlying defined type,
+changes a method-selection index, removes a required implicit operation,
+injects a target-specific field, admits a provider shard whose internal
+relationships are corrupt after all outer digests are recomputed, and restores
+an AST/checker accessor after finalization. Each mutation must fail at its
+owning boundary with exact identities.
+
+Independent Stage-2 verification uses the same selected toolchain but not the
+frontend resolver. It re-queries the one live checker graph through a separate
+bounded extractor before finalization, independently derives context fixtures
+and canonical evidence, and exact-joins definition semantics, occurrence
+resolutions, type/object identities, variants, ordered operands, and implicit
+operations. Provider certification repeats this derivation package by package
+and compares semantic content after removing authority wrappers. It never
+trusts artifact counts, producer hashes, or the frontend's classification
+helpers as semantic proof.
+
+Stage-2 cost certification runs in isolated guarded subprocesses. It measures
+local production and certified-provider production/consumption separately,
+reports the twenty largest semantic packages, definitions, operations, and
+type records, and enforces:
+
+- one frontend visit per retained local occurrence;
+- only named `O(n log n)` canonical sorts;
+- local detail plus one projected provider package, never all provider
+  semantic shards, as the ordinary residency bound;
+- a wide sibling fixture and deep nesting fixture with counted work; and
+- mutations that introduce a per-occurrence linear scan or copied ancestry
+  path and must fail the asymptotic gate.
+
 Method-plan fixtures cover native non-nil calls, nil-panic calls with
 effectful arguments, nil-observing pointer receivers, value receivers with
 observable copies, exact concrete selection across a planned class hierarchy,

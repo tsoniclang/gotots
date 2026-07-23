@@ -790,6 +790,132 @@ disposition is positive typed evidence, not an absent row. Semantic records may
 refer to other semantic IDs, but they cannot silently consume an occurrence
 owned by another resolution or leave an occurrence unresolved.
 
+### Stage-2 Artifact And Authority Boundary
+
+Stage 2 has two packages with non-overlapping ownership:
+
+- `internal/language/semantic` owns the immutable target-independent schema,
+  canonical semantic identities, validating constructors, package projection,
+  and provider-semantic artifact format. It imports no `go/ast`, `go/types`,
+  source loader, compiler orchestrator, or target package.
+- `internal/language/frontend` is the sole transient checker consumer. It maps
+  Stage-1 definitions and occurrences into the semantic schema before source
+  finalization. It owns no second semantic schema and persists no toolchain
+  object.
+
+The Stage-1 structural provider artifact and Stage-2 semantic provider
+artifact are separate authorities. Combining them would make the structural
+layer own declaration types, bindings, variants, and operations; hydrating
+provider bodies during ordinary compilation would defeat bounded acquisition.
+The semantic artifact therefore binds the exact structural-artifact digest,
+provider-contract fingerprint, selected toolchain/configuration, and package
+input digests. It is package-sharded. Its resident manifest contains package
+membership, exact definition identities, record counts, and shard admission
+digests, but no declaration, type, binding, or operation detail.
+
+Ordinary compilation keeps local semantic records resident and projects at
+most one certified semantic package at a time. Admission validates the whole
+package shard before exposing any record. A semantic shard contains exactly
+the package's `DefinitionSemantics`, `OccurrenceResolution`, declarations,
+bindings, types, operations, unsupported records, and authority evidence. It
+cannot carry Stage-1 topology or TypeScript decisions. A corrupt shard remains
+invalid after an attacker recomputes both its shard digest and outer artifact
+digest because admission revalidates every typed relationship.
+
+When the structural-source plan selects local syntax, the semantic authority
+is the one transient checker graph and the record carries
+`CheckerAuthority(toolchain, package-input, structure, selection-fact
+digests)`. When it selects a certified provider graph, the authority is
+`CertifiedProviderAuthority(semantic-artifact digest, package-shard digest,
+bound structural-artifact digest)`. If a package contains both local and
+certified definitions, independently derived checker and provider records for
+the overlapping definitions must be equal after authority is removed; the
+source plan still selects exactly one authority per definition.
+
+### Canonical Semantic Identities
+
+Semantic identities are constructor-only and machine independent:
+
+- package-scope declarations use canonical package identity, closed object
+  class, declared name, and generic owner;
+- local bindings and labels use owning `DefinitionID`, defining
+  `OccurrenceID`, closed binding role, and ordinal;
+- unnamed receiver, parameter, result, and implicit bindings use owning
+  `DefinitionID`, closed role, and ordinal rather than spelling or
+  `token.Pos`;
+- predeclared objects use the pinned predeclared-catalog identity;
+- operations use the owning occurrence plus a closed operation class; and
+- types use a complete canonical descriptor with a full digest and
+  collision check.
+
+A type descriptor preserves basic kind; alias versus defined nominal owner;
+generic binder and arguments; array length; channel direction; signature
+receiver/parameters/results/variadic state; struct field order, names, embeds,
+tags, and package visibility; interface methods, embeds, comparability, and
+normalized terms; and every recursively referenced type identity. Named,
+alias, and type-parameter references terminate structural recursion at their
+nominal identity. No identity uses a pointer address, acquisition path,
+`Type.String()`, source spelling without semantic owner, truncated digest, or
+fallback poison value.
+
+### Context And Operation Records
+
+The transient occurrence index exact-joins every locally retained
+`OccurrenceID` to the one source/checker node only for the Stage-2 build
+window. Stage 1 populates that index during its existing structural and
+executable traversals; Stage 2 may not reconstruct it with another AST walk.
+The index is actively severed with the checker graph and never enters a
+finalized artifact.
+
+Frontend resolution is parent-directed. A parent assigns each child its
+expected type, result arity, composite-literal owner, callable signature,
+storage role, and lexical/control environment. The child consumes that context
+plus its recorded Stage-1 grammatical role and checker evidence. A child never
+walks to or scans its parent, and a later lowering never recomputes the
+decision.
+
+One semantic operation record contains, as applicable:
+
+- closed operation class, catalog kind, semantic variant, grammatical role,
+  lexical token, source span, and owning definition;
+- result type, expected type, exact constant, result arity, addressability,
+  assignability, and value-versus-storage-place class;
+- canonical declaration/binding/call/selection/generic-instance target;
+- ordered operand occurrence identities and evaluation order;
+- receiver adjustment, promotion, copy, conversion, interface, boxing,
+  initialization, panic-boundary, and other cataloged implicit operations;
+  and
+- exact control, label, branch, range, switch, select, defer, panic, and
+  recovery relationships where applicable.
+
+These fields state Go meaning only. An operation cannot contain a helper name,
+TypeScript node, representation choice, output path, runtime dictionary,
+emitter flag, or implementation owner.
+
+### Stage-2 Conservation
+
+The following are blocking exact joins, performed package by package so
+provider scale cannot force whole-artifact residency:
+
+1. every Stage-1 `DefinitionID` ↔ one `DefinitionSemantics`;
+2. every retained owner/header/executable occurrence ↔ one legal
+   `OccurrenceResolution`;
+3. every resolution reference ↔ one declaration, binding, type, operation, or
+   unsupported record in the same logical model;
+4. every full-semantic executable region ↔ complete operation/explicit-
+   unsupported coverage, while every non-full definition ↔ zero executable
+   operations;
+5. every checker object/type/selection/instance consumed by the producer ↔
+   its canonical immutable record and authority witness; and
+6. every local/certified overlap ↔ equal semantic content with exactly one
+   selected authority.
+
+The catalog owns the legal resolution classes for every construct kind, role,
+and semantic variant. There is no default semantic operation, generic
+structural fallback, or "unresolved but present" record. Unsupported is a
+positive typed record with exact identity, evidence, and reason; it is not an
+omitted operation.
+
 ## Whole-Program Facts
 
 Analyses run over the complete selected model and produce one sealed fact set:
