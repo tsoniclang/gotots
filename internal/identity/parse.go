@@ -54,6 +54,90 @@ func ParsePackageID(s string) (PackageID, error) {
 	return pkg, nil
 }
 
+// ParseFileID reconstructs a file identity from owner::rel.
+func ParseFileID(s string) (FileID, error) {
+	sep := strings.Index(s, "::")
+	if sep < 0 {
+		return FileID{}, &Error{Identity: "file", Value: s, Reason: "not a canonical file serialization"}
+	}
+	owner, err := ParseOwner(s[:sep])
+	if err != nil {
+		return FileID{}, err
+	}
+	file, err := NewFileID(owner, s[sep+2:])
+	if err != nil {
+		return FileID{}, err
+	}
+	if file.String() != s {
+		return FileID{}, &Error{Identity: "file", Value: s, Reason: "serialization is not canonical"}
+	}
+	return file, nil
+}
+
+// ParseSpanID reconstructs a span identity from owner::rel#start-end.
+func ParseSpanID(s string) (SpanID, error) {
+	fail := func(reason string) (SpanID, error) {
+		return SpanID{}, &Error{Identity: "span", Value: s, Reason: reason}
+	}
+	hash := strings.LastIndex(s, "#")
+	if hash < 0 {
+		return fail("not a canonical span serialization")
+	}
+	file, err := ParseFileID(s[:hash])
+	if err != nil {
+		return SpanID{}, err
+	}
+	dash := strings.Index(s[hash+1:], "-")
+	if dash < 0 {
+		return fail("malformed span range")
+	}
+	rangePart := s[hash+1:]
+	start, err := strconv.Atoi(rangePart[:dash])
+	if err != nil {
+		return fail("malformed span start")
+	}
+	end, err := strconv.Atoi(rangePart[dash+1:])
+	if err != nil {
+		return fail("malformed span end")
+	}
+	span, err := NewSpanID(file, start, end)
+	if err != nil {
+		return SpanID{}, err
+	}
+	if span.String() != s {
+		return fail("serialization is not canonical")
+	}
+	return span, nil
+}
+
+// ParseOccurrenceID reconstructs an occurrence identity from
+// owner::rel#start-end/K<kindID>.
+func ParseOccurrenceID(s string) (OccurrenceID, error) {
+	fail := func(reason string) (OccurrenceID, error) {
+		return OccurrenceID{}, &Error{Identity: "occurrence", Value: s, Reason: reason}
+	}
+	slashK := strings.LastIndex(s, "/K")
+	if slashK < 0 {
+		return fail("not a canonical occurrence serialization")
+	}
+	span, err := ParseSpanID(s[:slashK])
+	if err != nil {
+		return OccurrenceID{}, err
+	}
+	kindID, err := strconv.ParseUint(s[slashK+2:], 10, 16)
+	if err != nil {
+		return fail("malformed kind identity")
+	}
+	occ, err := NewOccurrenceID(span, uint16(kindID))
+	if err != nil {
+		return OccurrenceID{}, err
+	}
+	if occ.String() != s {
+		return fail("serialization is not canonical")
+	}
+	return occ, nil
+}
+
 // ParseSourceUnitID reconstructs a source-unit identity from
 // owner::rel#start-end/kind.
 func ParseSourceUnitID(s string) (SourceUnitID, error) {

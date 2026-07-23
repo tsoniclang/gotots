@@ -48,10 +48,12 @@ func (r UnitRef) String() string {
 }
 
 // RegionOwner identifies what a region belongs to: a file's top-level
-// declaration structure, or one implementation unit's body.
+// declaration structure, one implementation unit's body, or a package's
+// initialization (the owning catalog operation of an implicit unit).
 type RegionOwner struct {
-	file identity.FileID // set for the file declaration region
-	unit UnitRef         // set for a body region
+	file identity.FileID    // set for the file declaration region
+	unit UnitRef            // set for a body region
+	pkg  identity.PackageID // set for a package-initialization owner
 }
 
 // FileDeclarationOwner is the owner of a file's declaration region.
@@ -60,8 +62,18 @@ func FileDeclarationOwner(file identity.FileID) RegionOwner { return RegionOwner
 // UnitOwner is the owner of one unit's body region.
 func UnitOwner(unit UnitRef) RegionOwner { return RegionOwner{unit: unit} }
 
+// PackageInitializationOwner is the owning catalog operation of a package's
+// implicit executable (package-initialization) unit.
+func PackageInitializationOwner(pkg identity.PackageID) RegionOwner {
+	return RegionOwner{pkg: pkg}
+}
+
 // IsFileDeclaration reports whether the owner is a file declaration region.
-func (o RegionOwner) IsFileDeclaration() bool { return o.unit.IsZero() }
+func (o RegionOwner) IsFileDeclaration() bool { return !o.file.IsZero() }
+
+// IsPackageInitialization reports whether the owner is a package-initialization
+// operation.
+func (o RegionOwner) IsPackageInitialization() bool { return !o.pkg.IsZero() }
 
 // File is the owning file identity (declaration regions only).
 func (o RegionOwner) File() identity.FileID { return o.file }
@@ -69,12 +81,19 @@ func (o RegionOwner) File() identity.FileID { return o.file }
 // Unit is the owning unit reference (body regions only).
 func (o RegionOwner) Unit() UnitRef { return o.unit }
 
+// Package is the owning package identity (package-initialization owner only).
+func (o RegionOwner) Package() identity.PackageID { return o.pkg }
+
 // String is a stable serialization of the owner for joins and reports.
 func (o RegionOwner) String() string {
-	if o.IsFileDeclaration() {
+	switch {
+	case o.IsFileDeclaration():
 		return "decl:" + o.file.String()
+	case o.IsPackageInitialization():
+		return "pkginit:" + o.pkg.String()
+	default:
+		return "unit:" + o.unit.String()
 	}
-	return "unit:" + o.unit.String()
 }
 
 // ImplementationDefinition is one implementation unit's definition: its typed
@@ -143,3 +162,19 @@ func (r ImplementationRef) Anchor() identity.SpanID { return r.anchor }
 
 // Ordinal is the reference's source order within its parent region.
 func (r ImplementationRef) Ordinal() int { return r.ordinal }
+
+// IsImplicit reports whether this reference owns an implicit unit — a
+// package-initialization reference with no grammatical edge, occurrence, or
+// anchor, since an implicit unit has no source span.
+func (r ImplementationRef) IsImplicit() bool { return !r.child.Implicit().IsZero() }
+
+// NewImplicitReference builds the owning reference of a package's implicit
+// executable unit: the package-initialization operation retains the implicit
+// unit with the catalog-owner contract.
+func NewImplicitReference(pkg identity.PackageID, child identity.ImplicitUnitID) ImplementationRef {
+	return ImplementationRef{
+		parent:   PackageInitializationOwner(pkg),
+		child:    ImplicitUnitRef(child),
+		contract: ContractCatalogOwner,
+	}
+}

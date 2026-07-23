@@ -96,6 +96,9 @@ func verifyReferenceConservation(pkg *source.Package, refs []analyze.Implementat
 	// Inventory references, as a multiset of site keys.
 	inventory := map[siteKey]int{}
 	for _, ref := range refs {
+		if ref.IsImplicit() {
+			continue // implicit units have no source site; conserved 1:1 elsewhere
+		}
 		if isCgoRef(ref) {
 			continue
 		}

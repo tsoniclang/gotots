@@ -66,6 +66,17 @@ func (e Edge) String() string {
 	return fmt.Sprintf("catalog.Edge(%d)", uint16(e))
 }
 
+// EdgeByName reconstructs an edge from its canonical name (e.g. "FuncDecl.Body"),
+// for decoding a serialized reference back to the typed catalog edge.
+func EdgeByName(name string) (Edge, error) {
+	for id := Edge(1); id <= edgeCount; id++ {
+		if id.Name() == name {
+			return id, nil
+		}
+	}
+	return Edge(0), fmt.Errorf("no catalog edge named %q", name)
+}
+
 // AllEdges returns every valid Edge in ascending identity order.
 func AllEdges() []Edge {
 	out := make([]Edge, 0, edgeCount)

@@ -132,13 +132,24 @@ func VerifyInventory(req source.Request, ws *source.Workspace, inv *analyze.Work
 		// Reference <-> child-definition join, including the retained contract:
 		// the reference must carry the child's declaration contract so an
 		// excised non-full child never drops the contract from its parent.
+		implicitRefs := map[string]int{}
 		for _, ref := range pkgInv.References() {
 			child := ref.Child().String()
 			childDef, ok := defs[child]
 			if !ok {
 				problems = append(problems, "reference names undefined child unit "+child)
 			}
-			if !ref.Edge().Valid() {
+			if ref.IsImplicit() {
+				// A package-initialization reference owns an implicit unit; it
+				// has no grammatical edge and its parent is the package.
+				implicitRefs[child]++
+				if !ref.Parent().IsPackageInitialization() {
+					problems = append(problems, "implicit reference to "+child+" has a non-package-initialization parent "+ref.Parent().String())
+				}
+				if ref.Parent().Package().String() != pkg.ID().String() {
+					problems = append(problems, "implicit reference to "+child+" names foreign package "+ref.Parent().Package().String())
+				}
+			} else if !ref.Edge().Valid() {
 				problems = append(problems, "reference to "+child+" has an invalid edge")
 			}
 			if ok && ref.Contract() != childDef.Contract() {
@@ -150,6 +161,22 @@ func VerifyInventory(req source.Request, ws *source.Workspace, inv *analyze.Work
 				problems = append(problems, "reference to "+child+" retains contract "+ref.Contract().String()+" != "+want.String()+" for kind "+ref.Child().Kind().String())
 			}
 		}
+		// Implicit conservation: every implicit definition owns exactly one
+		// package-initialization reference.
+		for _, implicit := range pkg.ImplicitUnits() {
+			switch implicitRefs[implicit.ID().String()] {
+			case 1:
+			case 0:
+				problems = append(problems, "implicit unit "+implicit.ID().String()+" has no owning reference")
+			default:
+				problems = append(problems, "implicit unit "+implicit.ID().String()+" has multiple owning references")
+			}
+		}
+		// Exact site<->reference conservation: independently derive every
+		// source implementation site from re-parsed source and exact-multiset-
+		// join. Implicit references have no source site and are conserved by the
+		// 1:1 check above.
+		problems = append(problems, verifyReferenceConservation(pkg, pkgInv.References(), req.Overlay)...)
 		// Exact site<->reference conservation: independently derive every
 		// implementation site from re-parsed source and exact-multiset-join.
 		problems = append(problems, verifyReferenceConservation(pkg, pkgInv.References(), req.Overlay)...)

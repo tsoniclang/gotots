@@ -133,6 +133,10 @@ func Analyze(universe *source.Universe, depths map[identity.SourceUnitID]source.
 				contract: ContractCatalogOwner, depth: depth,
 				full: depth == source.DepthFullSemantic,
 			})
+			// Every implicit definition has its owning package-initialization
+			// reference, so definitions = source units + implicit units all join
+			// references (conservation totality).
+			pkgInv.references = append(pkgInv.references, NewImplicitReference(pkg.ID(), implicit))
 			if depth == source.DepthFullSemantic {
 				fullImplicit = append(fullImplicit, implicit)
 			}
