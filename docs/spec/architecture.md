@@ -896,7 +896,10 @@ Semantic identities are constructor-only and machine independent:
   as owner type and name, so unexported members from different packages never
   conflate; field order is identity evidence, while method order is not;
 - predeclared objects use the pinned predeclared-catalog identity;
-- operations use the owning occurrence plus a closed operation class; and
+- a spelled operation is identified by its owning definition plus its one
+  executable `OccurrenceID` (exactly one operation may own that occurrence);
+  an unspelled operation is identified by its implicit definition, closed
+  implicit entry class, and ordinal, with no fabricated source occurrence; and
 - types use a complete canonical descriptor with a full digest and
   collision check.
 
@@ -932,7 +935,12 @@ plus its recorded Stage-1 grammatical role and checker evidence. A child never
 walks to or scans its parent, and a later lowering never recomputes the
 decision.
 
-One semantic operation record contains, as applicable:
+One semantic operation record has exactly one closed origin:
+`SourceOperation(OccurrenceID, kind, role, variant, token, span)` or
+`ImplicitOperation(ImplicitDefinitionOp, ordinal)`. Source-origin fields are
+forbidden on an implicit origin, and an implicit operation cannot acquire a
+zero-length or synthetic source span merely to satisfy a source-shaped schema.
+The operation record contains, as applicable:
 
 - closed operation class, catalog kind, semantic variant, grammatical role,
   lexical token, source span, and owning definition;
@@ -952,6 +960,14 @@ These fields state Go meaning only. An operation cannot contain a helper name,
 TypeScript node, representation choice, output path, runtime dictionary,
 emitter flag, or implementation owner.
 
+Implicit effects nested under a source operation preserve multiplicity. Each is
+keyed by closed implicit-operation kind, exact source/operand occurrence when
+spelled, and ordinal, plus its source/target semantic types where applicable.
+For example, `f(a, b)` may require two distinct `ValueCopy` effects; one
+kind-only set entry is lossy and forbidden. An unspelled package-init
+coordination operation is a top-level implicit-origin operation, not one of
+these nested effects.
+
 ### Stage-2 Conservation
 
 The following are blocking exact joins, performed package by package so
@@ -966,7 +982,8 @@ provider scale cannot force whole-artifact residency:
    pseudo-package;
 4. every full-semantic executable region ↔ complete operation/explicit-
    unsupported coverage, while every non-full definition ↔ zero executable
-   operations;
+   operations; every typed implicit executable entry ↔ one non-source
+   operation without a fabricated occurrence;
 5. every checker object/type/selection/instance consumed by the producer ↔
    its canonical immutable record and authority witness; and
 6. every local/certified overlap ↔ equal semantic content with exactly one

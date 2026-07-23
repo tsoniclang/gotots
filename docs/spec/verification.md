@@ -412,7 +412,8 @@ type sets, changes a method-selection index, changes a multi-name initializer's
 declaration order, replaces a branch's control target with its label binding,
 removes a compile-time expression's structural coverage target, duplicates a
 predeclared declaration into an ordinary package, admits an operation in a
-boundary domain, removes a required implicit operation,
+boundary domain, fabricates an occurrence for package initialization, collapses
+two same-kind per-operand implicit effects, removes a required implicit operation,
 injects a target-specific field, admits a provider shard whose internal
 relationships are corrupt after all outer digests are recomputed, and restores
 an AST/checker accessor after finalization. Each mutation must fail at its

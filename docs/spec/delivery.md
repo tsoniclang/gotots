@@ -263,7 +263,9 @@ Required exit evidence:
 - every full-semantic executable region is completely resolved; every
   semantically executable occurrence resolves to an operation or explicit
   unsupported record, catalog-authorized structural-only occurrences remain
-  explicit, and every non-full definition has zero executable operations;
+  explicit, every typed implicit executable entry has one closed non-source
+  operation identity without a fabricated span, and every non-full definition
+  has zero executable operations;
 - module, standard-library, and toolchain package identities are constructor-
   validated without machine paths or fabricated module ownership;
 - predeclared declaration payloads are owned once by the `builtin` language
@@ -279,6 +281,9 @@ Required exit evidence:
   operation from an optional label binding;
 - context fixtures cover call/conversion, map/receive/assert comma-ok,
   selectors, assignments, composite literals, and range;
+- nested implicit effects preserve per-operand multiplicity (`f(a, b)` can
+  carry two distinct value-copy effects) rather than collapsing to one entry
+  per implicit kind;
 - semantic records are immutable and constructor-validated; and
 - no TypeScript representation appears in the model;
 - Stage-1 structural provider evidence and Stage-2 semantic provider evidence
