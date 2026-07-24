@@ -40,7 +40,10 @@ type Operation struct {
 }
 
 func NewOperation(spec OperationSpec) (Operation, error) {
-	spec = cloneOperationSpec(spec)
+	return validateOperationSpec(cloneOperationSpec(spec))
+}
+
+func validateOperationSpec(spec OperationSpec) (Operation, error) {
 	if spec.ID.IsZero() ||
 		!spec.Kind.Valid() ||
 		!spec.Mode.Valid() ||
@@ -265,6 +268,81 @@ func (operation Operation) Role() catalog.Role {
 }
 func (operation Operation) Token() catalog.TokenKind {
 	return operation.spec.Token
+}
+func (operation Operation) Mode() ValueMode {
+	return operation.spec.Mode
+}
+func (operation Operation) Arity() ResultArity {
+	return operation.spec.Arity
+}
+func (operation Operation) Place() PlaceKind {
+	return operation.spec.Place
+}
+func (operation Operation) ResultType() identity.SemanticTypeID {
+	return operation.spec.ResultType
+}
+func (operation Operation) ExpectedType() identity.SemanticTypeID {
+	return operation.spec.ExpectedType
+}
+func (operation Operation) Addressable() bool {
+	return operation.spec.Addressable
+}
+func (operation Operation) Assignable() bool {
+	return operation.spec.Assignable
+}
+func (operation Operation) HasOk() bool {
+	return operation.spec.HasOk
+}
+func (operation Operation) Constant() Constant {
+	return operation.spec.Constant
+}
+func (operation Operation) Object() ObjectReference {
+	return operation.spec.Object
+}
+func (operation Operation) Selection() Selection {
+	return operation.spec.Selection
+}
+func (operation Operation) Instance() Instance {
+	return operation.spec.Instance
+}
+func (operation Operation) ControlTarget() identity.OperationID {
+	return operation.spec.ControlTarget
+}
+func (operation Operation) Label() identity.SemanticBindingID {
+	return operation.spec.Label
+}
+func (operation Operation) OperandCount() int {
+	return len(operation.spec.Operands)
+}
+func (operation Operation) Operand(
+	index int,
+) (identity.OccurrenceID, bool) {
+	if index < 0 || index >= len(operation.spec.Operands) {
+		return identity.OccurrenceID{}, false
+	}
+	return operation.spec.Operands[index], true
+}
+func (operation Operation) NestedDefinitionCount() int {
+	return len(operation.spec.Definitions)
+}
+func (operation Operation) NestedDefinition(
+	index int,
+) (identity.DefinitionID, bool) {
+	if index < 0 || index >= len(operation.spec.Definitions) {
+		return identity.DefinitionID{}, false
+	}
+	return operation.spec.Definitions[index], true
+}
+func (operation Operation) ImplicitCount() int {
+	return len(operation.spec.Implicit)
+}
+func (operation Operation) Implicit(
+	index int,
+) (ImplicitOperation, bool) {
+	if index < 0 || index >= len(operation.spec.Implicit) {
+		return ImplicitOperation{}, false
+	}
+	return operation.spec.Implicit[index], true
 }
 func (operation Operation) Spec() OperationSpec {
 	return cloneOperationSpec(operation.spec)

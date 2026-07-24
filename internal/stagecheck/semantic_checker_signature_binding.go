@@ -12,7 +12,9 @@ func (
 	verifier *checkerSemanticVerifier,
 ) deriveIndependentUnnamedSignatureBindings() error {
 	seen := map[types.Object]identity.OccurrenceID{}
-	for _, occurrenceID := range verifier.expected.order {
+	for _, occurrenceReference := range verifier.expected.order {
+		occurrenceID := verifier.expected.
+			occurrenceRecord(occurrenceReference).ID()
 		node, present := verifier.index.OccurrenceNode(occurrenceID)
 		if !present {
 			continue

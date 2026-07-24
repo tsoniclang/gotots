@@ -20,9 +20,9 @@ import (
 type occurrenceInput struct {
 	occurrence      structure.OccurrenceRef
 	node            ast.Node
-	owner           identity.DefinitionID
+	owner           packageDefinitionRef
 	domain          catalog.ResolutionDomain
-	children        []identity.OccurrenceID
+	children        []packageOccurrenceRef
 	checkedUnmapped bool
 	context         occurrenceContext
 	contextAssigned bool
@@ -37,11 +37,8 @@ type packageInput struct {
 	index       *structure.TransientIndex
 	authority   semantic.Authority
 	occurrences *occurrenceStore
-	order       []identity.OccurrenceID
-	definitions map[identity.DefinitionID]structure.ImplementationDefinition
-	parents     map[identity.DefinitionID]identity.DefinitionID
-	regions     map[identity.DefinitionID]executable.Region
-	selections  map[identity.DefinitionID]scope.DefinitionSelection
+	order       []packageOccurrenceRef
+	definitions *definitionStore
 	containment *definitionContainment
 	work        Work
 }
@@ -50,6 +47,39 @@ func (input *packageInput) occurrence(
 	id identity.OccurrenceID,
 ) *occurrenceInput {
 	return input.occurrences.get(id)
+}
+
+func (input *packageInput) occurrenceReference(
+	id identity.OccurrenceID,
+) packageOccurrenceRef {
+	return input.occurrences.reference(id)
+}
+
+func (input *packageInput) occurrenceRecord(
+	reference packageOccurrenceRef,
+) *occurrenceInput {
+	return input.occurrences.record(reference)
+}
+
+func (input *packageInput) definition(
+	id identity.DefinitionID,
+) *definitionInput {
+	return input.definitions.get(id)
+}
+
+func (input *packageInput) definitionID(
+	reference packageDefinitionRef,
+) identity.DefinitionID {
+	return input.definitions.id(reference)
+}
+
+func (input *packageInput) occurrenceOwner(
+	record *occurrenceInput,
+) identity.DefinitionID {
+	if record == nil {
+		return identity.DefinitionID{}
+	}
+	return input.definitionID(record.owner)
 }
 
 type stageInput struct {
@@ -159,6 +189,25 @@ func (input *packageInput) buildOccurrences(
 	index *structure.TransientIndex,
 	executableInventory *executable.Inventory,
 ) error {
+	files := input.graph.Files()
+	structuralCount := 0
+	var packageFiles []identity.FileID
+	for _, file := range files {
+		structuralCount += file.OccurrenceCount()
+		packageFiles = append(
+			packageFiles, file.Owner().ID().File(),
+		)
+	}
+	additional, err := executableInventory.
+		AdditionalOccurrenceRefsForFiles(packageFiles)
+	if err != nil {
+		return err
+	}
+	if err := input.occurrences.reserve(
+		structuralCount + len(additional),
+	); err != nil {
+		return err
+	}
 	appendOccurrence := func(occurrence structure.OccurrenceRef) error {
 		node, local := index.OccurrenceNode(occurrence.ID())
 		if !local {
@@ -180,38 +229,28 @@ func (input *packageInput) buildOccurrences(
 				occurrence.ID(),
 			),
 		}
-		if err := input.occurrences.put(
+		reference, err := input.occurrences.put(
 			occurrence.ID(), record,
-		); err != nil {
+		)
+		if err != nil {
 			return err
 		}
-		input.order = append(input.order, occurrence.ID())
+		input.order = append(input.order, reference)
 		return nil
 	}
-	for _, file := range input.graph.Files() {
+	for _, file := range files {
 		if err := file.VisitOccurrenceRefs(
 			appendOccurrence,
 		); err != nil {
 			return err
 		}
 	}
-	var packageFiles []identity.FileID
-	for _, file := range input.graph.Files() {
-		packageFiles = append(
-			packageFiles, file.Owner().ID().File(),
-		)
-	}
-	additional, err := executableInventory.
-		AdditionalOccurrenceRefsForFiles(packageFiles)
-	if err != nil {
-		return err
-	}
 	for _, occurrence := range additional {
 		if err := appendOccurrence(occurrence); err != nil {
 			return err
 		}
 	}
-	for _, file := range input.graph.Files() {
+	for _, file := range files {
 		for _, member := range file.Owner().Members() {
 			if err := input.assignOccurrenceOwner(
 				member,
@@ -235,7 +274,7 @@ func (input *packageInput) buildOccurrences(
 	}
 	for _, header := range input.graph.Headers() {
 		definition := header.ID().Definition()
-		if _, local := input.definitions[definition]; !local {
+		if input.definition(definition) == nil {
 			continue
 		}
 		for _, member := range header.Members() {
@@ -249,7 +288,7 @@ func (input *packageInput) buildOccurrences(
 	}
 	for _, boundary := range input.graph.Boundaries() {
 		definition := boundary.ID().Definition()
-		if _, local := input.definitions[definition]; !local {
+		if input.definition(definition) == nil {
 			continue
 		}
 		for _, entry := range boundary.Entries() {
@@ -261,13 +300,20 @@ func (input *packageInput) buildOccurrences(
 			}
 		}
 	}
-	for definition, region := range input.regions {
-		if err := region.VisitMembers(func(
+	if err := input.definitions.visit(func(
+		_ packageDefinitionRef,
+		definition *definitionInput,
+	) error {
+		if !definition.hasRegion {
+			return nil
+		}
+		definitionID := definition.definition.ID()
+		if err := definition.region.VisitMembers(func(
 			_ int,
 			member identity.OccurrenceID,
 		) error {
 			if err := input.assignOccurrenceOwner(
-				member, definition,
+				member, definitionID,
 				catalog.ResolutionDomainExecutable,
 			); err != nil {
 				return err
@@ -276,15 +322,18 @@ func (input *packageInput) buildOccurrences(
 		}); err != nil {
 			return err
 		}
+		return nil
+	}); err != nil {
+		return err
 	}
 	filtered := input.order[:0]
-	for _, occurrence := range input.order {
-		record := input.occurrence(occurrence)
+	for _, reference := range input.order {
+		record := input.occurrenceRecord(reference)
 		if !record.domain.Valid() {
-			input.occurrences.remove(occurrence)
+			input.occurrences.remove(record.occurrence.ID())
 			continue
 		}
-		filtered = append(filtered, occurrence)
+		filtered = append(filtered, reference)
 	}
 	input.order = filtered
 	return input.assignChildren()
@@ -293,21 +342,23 @@ func (input *packageInput) buildOccurrences(
 func (input *packageInput) assignChildren() error {
 	input.work.InputOccurrences += input.occurrences.count()
 	if err := input.occurrences.visit(func(
+		reference packageOccurrenceRef,
 		record *occurrenceInput,
 	) error {
-		parent := input.occurrence(record.occurrence.Parent())
-		if parent != nil {
+		parent := input.occurrenceReference(record.occurrence.Parent())
+		parentRecord := input.occurrenceRecord(parent)
+		if parentRecord != nil {
 			input.work.ChildEdgeAssignments++
-			parent.children = append(
-				parent.children, record.occurrence.ID(),
+			parentRecord.children = append(
+				parentRecord.children, reference,
 			)
 		}
 		return nil
 	}); err != nil {
 		return err
 	}
-	for _, parentID := range input.order {
-		parent := input.occurrence(parentID)
+	for _, parentReference := range input.order {
+		parent := input.occurrenceRecord(parentReference)
 		rank := map[catalog.Edge]int{}
 		for index, edge := range catalog.EdgesOf(
 			parent.occurrence.Kind(),
@@ -316,10 +367,12 @@ func (input *packageInput) assignChildren() error {
 		}
 		input.work.CanonicalSortInputs += len(parent.children)
 		sort.Slice(parent.children, func(left, right int) bool {
-			leftRecord := input.occurrence(parent.children[left]).
-				occurrence
-			rightRecord := input.occurrence(parent.children[right]).
-				occurrence
+			leftRecord := input.occurrenceRecord(
+				parent.children[left],
+			).occurrence
+			rightRecord := input.occurrenceRecord(
+				parent.children[right],
+			).occurrence
 			if rank[leftRecord.Edge()] != rank[rightRecord.Edge()] {
 				return rank[leftRecord.Edge()] <
 					rank[rightRecord.Edge()]
@@ -339,8 +392,15 @@ func (input *packageInput) assignOccurrenceOwner(
 	if record == nil {
 		return nil
 	}
-	if existing := record.owner; !existing.IsZero() &&
-		existing != definition {
+	definitionReference := input.definitions.reference(definition)
+	if !definition.IsZero() && !definitionReference.valid() {
+		return fmt.Errorf(
+			"occurrence %s names absent definition %s",
+			occurrence, definition,
+		)
+	}
+	if existing := record.owner; existing.valid() &&
+		existing != definitionReference {
 		current := record.domain
 		switch {
 		case resolutionDomainPrecedence(domain) >
@@ -351,7 +411,10 @@ func (input *packageInput) assignOccurrenceOwner(
 		default:
 			return fmt.Errorf(
 				"occurrence %s is owned by definitions %s and %s in domain %s",
-				occurrence, existing, definition, domain,
+				occurrence,
+				input.definitionID(existing),
+				definition,
+				domain,
 			)
 		}
 	}
@@ -362,7 +425,7 @@ func (input *packageInput) assignOccurrenceOwner(
 			return nil
 		}
 	}
-	record.owner = definition
+	record.owner = definitionReference
 	record.domain = domain
 	return nil
 }

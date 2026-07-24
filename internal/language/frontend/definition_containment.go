@@ -13,51 +13,56 @@ type definitionInterval struct {
 }
 
 type definitionContainment struct {
-	intervals map[identity.DefinitionID]definitionInterval
+	definitions *definitionStore
+	intervals   []definitionInterval
 }
 
 func buildDefinitionContainment(
-	definitions map[identity.DefinitionID]struct{},
-	parents map[identity.DefinitionID]identity.DefinitionID,
+	definitions *definitionStore,
 	work *Work,
 ) (*definitionContainment, error) {
-	nodes := map[identity.DefinitionID]bool{}
-	for definition := range definitions {
-		nodes[definition] = true
+	if definitions == nil {
+		return nil, fmt.Errorf(
+			"semantic definition containment requires definitions",
+		)
 	}
-	for child, parent := range parents {
-		work.DefinitionContainmentEdges++
-		if child.IsZero() || child == parent {
-			return nil, fmt.Errorf(
+	children := make(
+		[][]packageDefinitionRef, definitions.count()+1,
+	)
+	var roots []packageDefinitionRef
+	if err := definitions.visit(func(
+		child packageDefinitionRef,
+		record *definitionInput,
+	) error {
+		parent := record.parent
+		if child == parent {
+			return fmt.Errorf(
 				"semantic definition containment has invalid edge %s -> %s",
-				child, parent,
+				definitions.id(child), definitions.id(parent),
 			)
 		}
-		nodes[child] = true
-		if !parent.IsZero() {
-			nodes[parent] = true
+		if !parent.valid() {
+			roots = append(roots, child)
+			return nil
 		}
+		work.DefinitionContainmentEdges++
+		children[parent] = append(children[parent], child)
+		return nil
+	}); err != nil {
+		return nil, err
 	}
-	children := map[identity.DefinitionID][]identity.DefinitionID{}
-	var roots []identity.DefinitionID
-	for definition := range nodes {
-		parent := parents[definition]
-		if parent.IsZero() {
-			roots = append(roots, definition)
-			continue
-		}
-		children[parent] = append(children[parent], definition)
-	}
-	sortDefinitionIDs(roots)
-	for parent := range children {
-		sortDefinitionIDs(children[parent])
+	sortDefinitionRefs(definitions, roots)
+	for _, descendants := range children {
+		sortDefinitionRefs(definitions, descendants)
 	}
 	type frame struct {
-		definition identity.DefinitionID
+		definition packageDefinitionRef
 		leave      bool
 	}
-	intervals := map[identity.DefinitionID]definitionInterval{}
-	state := map[identity.DefinitionID]uint8{}
+	intervals := make(
+		[]definitionInterval, definitions.count()+1,
+	)
+	state := make([]uint8, definitions.count()+1)
 	clock := 0
 	for _, root := range roots {
 		stack := []frame{{definition: root}}
@@ -78,7 +83,7 @@ func buildDefinitionContainment(
 			case 1:
 				return nil, fmt.Errorf(
 					"semantic definition containment cycle at %s",
-					current.definition,
+					definitions.id(current.definition),
 				)
 			case 2:
 				continue
@@ -100,37 +105,54 @@ func buildDefinitionContainment(
 			}
 		}
 	}
-	if len(intervals) != len(nodes) {
+	reached := 0
+	for reference := packageDefinitionRef(1); int(reference) <= definitions.count(); reference++ {
+		if state[reference] == 2 {
+			reached++
+		}
+	}
+	if reached != definitions.count() {
 		return nil, fmt.Errorf(
 			"semantic definition containment reached %d of %d definitions",
-			len(intervals), len(nodes),
+			reached, definitions.count(),
 		)
 	}
-	work.DefinitionContainmentEntries += len(intervals)
+	work.DefinitionContainmentEntries += reached
 	work.CanonicalSortInputs += len(roots)
 	for _, descendants := range children {
 		work.CanonicalSortInputs += len(descendants)
 	}
-	return &definitionContainment{intervals: intervals}, nil
+	return &definitionContainment{
+		definitions: definitions,
+		intervals:   intervals,
+	}, nil
 }
 
-func sortDefinitionIDs(definitions []identity.DefinitionID) {
+func sortDefinitionRefs(
+	store *definitionStore,
+	definitions []packageDefinitionRef,
+) {
 	sort.Slice(definitions, func(left, right int) bool {
-		return definitions[left].Compare(definitions[right]) < 0
+		return store.id(definitions[left]).Compare(
+			store.id(definitions[right]),
+		) < 0
 	})
 }
 
 func (containment *definitionContainment) contains(
-	outer identity.DefinitionID,
-	inner identity.DefinitionID,
+	outerID identity.DefinitionID,
+	innerID identity.DefinitionID,
 ) bool {
-	if containment == nil || outer.IsZero() || inner.IsZero() {
+	if containment == nil || outerID.IsZero() || innerID.IsZero() {
 		return false
 	}
-	outerInterval, outerPresent := containment.intervals[outer]
-	innerInterval, innerPresent := containment.intervals[inner]
-	return outerPresent &&
-		innerPresent &&
-		outerInterval.enter <= innerInterval.enter &&
+	outer := containment.definitions.reference(outerID)
+	inner := containment.definitions.reference(innerID)
+	if !outer.valid() || !inner.valid() {
+		return false
+	}
+	outerInterval := containment.intervals[outer]
+	innerInterval := containment.intervals[inner]
+	return outerInterval.enter <= innerInterval.enter &&
 		innerInterval.leave <= outerInterval.leave
 }

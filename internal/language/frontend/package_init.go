@@ -13,9 +13,16 @@ import (
 )
 
 func (builder *packageBuilder) buildImplicitOperations() error {
-	for definition, region := range builder.input.regions {
+	return builder.input.definitions.visit(func(
+		_ packageDefinitionRef,
+		record *definitionInput,
+	) error {
+		if !record.hasRegion {
+			return nil
+		}
+		definition := record.definition.ID()
 		if !definition.ImplicitOp().Valid() {
-			continue
+			return nil
 		}
 		if definition.ImplicitOp() !=
 			identity.ImplicitDefinitionPackageInit {
@@ -25,12 +32,12 @@ func (builder *packageBuilder) buildImplicitOperations() error {
 			)
 		}
 		if err := builder.buildPackageInitialization(
-			definition, region,
+			definition, record.region,
 		); err != nil {
 			return err
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 func (builder *packageBuilder) buildPackageInitialization(
@@ -59,7 +66,7 @@ func (builder *packageBuilder) buildPackageInitialization(
 	if err != nil {
 		return err
 	}
-	operation, err := semantic.NewOperation(semantic.OperationSpec{
+	operation := semantic.OperationSpec{
 		ID:          id,
 		Kind:        semantic.OperationPackageInitialization,
 		Mode:        semantic.ValueModeNone,
@@ -69,9 +76,6 @@ func (builder *packageBuilder) buildPackageInitialization(
 		Operands:    operands,
 		Definitions: definitions,
 		Implicit:    effects,
-	})
-	if err != nil {
-		return err
 	}
 	return builder.draft.AddOperation(operation)
 }
@@ -122,18 +126,20 @@ func (builder *packageBuilder) packageInitializationSequence() (
 			)
 		}
 		if record != nil {
-			entryDefinitions[record.owner] = true
+			entryDefinitions[builder.input.occurrenceOwner(record)] = true
 		}
 		fullDefinitions := map[identity.DefinitionID]bool{}
 		for definition := range entryDefinitions {
-			selection, present := builder.input.selections[definition]
-			if !present {
+			definitionRecord := builder.input.definition(definition)
+			if definitionRecord == nil ||
+				!definitionRecord.hasSelection {
 				return nil, nil, nil, fmt.Errorf(
 					"package initializer definition %s has no selection",
 					definition,
 				)
 			}
-			_, hasRegion := builder.input.regions[definition]
+			selection := definitionRecord.selection
+			hasRegion := definitionRecord.hasRegion
 			if hasRegion {
 				fullDefinitions[definition] = true
 			}
@@ -169,9 +175,10 @@ func (builder *packageBuilder) packageInitializationSequence() (
 			)
 		}
 		operands = append(operands, occurrence)
-		if !seenDefinitions[record.owner] {
-			seenDefinitions[record.owner] = true
-			definitions = append(definitions, record.owner)
+		owner := builder.input.occurrenceOwner(record)
+		if !seenDefinitions[owner] {
+			seenDefinitions[owner] = true
+			definitions = append(definitions, owner)
 		}
 		effect, err := semantic.NewImplicitOperation(
 			catalog.ImplicitInitialization,

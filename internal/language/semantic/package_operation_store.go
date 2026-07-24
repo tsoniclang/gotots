@@ -113,7 +113,13 @@ func (builder *packageOperationBuilder) add(
 	identities *packageIdentityBuilder,
 	record Operation,
 ) {
-	spec := record.spec
+	builder.addSpec(identities, record.spec)
+}
+
+func (builder *packageOperationBuilder) addSpec(
+	identities *packageIdentityBuilder,
+	spec OperationSpec,
+) {
 	stored := storedOperation{
 		id:            identities.operation(spec.ID),
 		kind:          spec.Kind,

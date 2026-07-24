@@ -171,13 +171,13 @@ func channelElement(
 func nextCase(
 	input *packageInput,
 	current *occurrenceInput,
-) identity.OccurrenceID {
+) packageOccurrenceRef {
 	parent := input.occurrence(current.occurrence.Parent())
 	if parent == nil {
-		return identity.OccurrenceID{}
+		return 0
 	}
 	for _, childID := range parent.children {
-		child := input.occurrence(childID)
+		child := input.occurrenceRecord(childID)
 		if child == nil ||
 			child.occurrence.Kind() != catalog.KindCaseClause ||
 			child.occurrence.Ordinal() <= current.occurrence.Ordinal() {
@@ -185,5 +185,5 @@ func nextCase(
 		}
 		return childID
 	}
-	return identity.OccurrenceID{}
+	return 0
 }

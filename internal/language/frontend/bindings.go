@@ -74,9 +74,9 @@ func (index *objectIndex) visitBindingRecords(
 func (index *objectIndex) bindingCaptures() (map[*bindingCandidate][]identity.DefinitionID, error) {
 	sets := map[*bindingCandidate]map[identity.DefinitionID]bool{}
 	view := index.input.loaded.CheckerView()
-	for _, occurrenceID := range index.input.order {
+	for _, occurrenceReference := range index.input.order {
 		index.work.CaptureOccurrenceVisits++
-		record := index.input.occurrence(occurrenceID)
+		record := index.input.occurrenceRecord(occurrenceReference)
 		identifier, ok := record.node.(*ast.Ident)
 		if !ok {
 			continue
@@ -86,26 +86,27 @@ func (index *objectIndex) bindingCaptures() (map[*bindingCandidate][]identity.De
 			continue
 		}
 		candidate := index.bindingByObject[object]
+		owner := index.input.occurrenceOwner(record)
 		if candidate == nil ||
 			!semantic.BindingRoleCanBeCaptured(candidate.role) ||
 			candidate.definition.IsZero() ||
-			record.owner.IsZero() ||
-			record.owner == candidate.definition {
+			owner.IsZero() ||
+			owner == candidate.definition {
 			continue
 		}
 		index.work.ContainmentProbes++
 		if !index.input.containment.contains(
-			candidate.definition, record.owner,
+			candidate.definition, owner,
 		) {
 			return nil, fmt.Errorf(
 				"binding %s is used by unrelated definition %s",
-				object.Name(), record.owner,
+				object.Name(), owner,
 			)
 		}
 		if sets[candidate] == nil {
 			sets[candidate] = map[identity.DefinitionID]bool{}
 		}
-		sets[candidate][record.owner] = true
+		sets[candidate][owner] = true
 	}
 	out := map[*bindingCandidate][]identity.DefinitionID{}
 	for candidate, set := range sets {

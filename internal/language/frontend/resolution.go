@@ -21,9 +21,10 @@ func (builder *packageBuilder) resolveOccurrences() error {
 	operationKinds := make(
 		[]semantic.OperationKind, len(builder.input.order),
 	)
-	for index, occurrenceID := range builder.input.order {
+	for index, occurrenceReference := range builder.input.order {
 		builder.objects.work.ResolutionVisits++
-		record := builder.input.occurrence(occurrenceID)
+		record := builder.input.occurrenceRecord(occurrenceReference)
+		occurrenceID := record.occurrence.ID()
 		context := builder.contexts.context(occurrenceID)
 		variant := catalog.VariantNone
 		var err error
@@ -40,7 +41,7 @@ func (builder *packageBuilder) resolveOccurrences() error {
 				return err
 			}
 		}
-		builder.variantByOccurrence[occurrenceID] = variant
+		builder.variantByOccurrence[occurrenceReference] = variant
 		resolution, operation, err := builder.classifyOccurrence(
 			record, context, variant,
 		)
@@ -48,13 +49,14 @@ func (builder *packageBuilder) resolveOccurrences() error {
 			return err
 		}
 		if operation != semantic.OperationInvalid {
+			owner := builder.input.occurrenceOwner(record)
 			operationID, err := identity.NewOperationID(
-				record.owner, occurrenceID,
+				owner, occurrenceID,
 			)
 			if err != nil {
 				return err
 			}
-			builder.operationByOccurrence[occurrenceID] = operationID
+			builder.operationByOccurrence[occurrenceReference] = operationID
 			operationKinds[index] = operation
 			continue
 		}
@@ -66,11 +68,13 @@ func (builder *packageBuilder) resolveOccurrences() error {
 		if operationKind == semantic.OperationInvalid {
 			continue
 		}
-		occurrenceID := builder.input.order[index]
+		occurrenceReference := builder.input.order[index]
+		record := builder.input.occurrenceRecord(occurrenceReference)
+		occurrenceID := record.occurrence.ID()
 		item := pendingOperation{
-			record:  builder.input.occurrence(occurrenceID),
+			record:  record,
 			context: builder.contexts.context(occurrenceID),
-			variant: builder.variantByOccurrence[occurrenceID],
+			variant: builder.variantByOccurrence[occurrenceReference],
 			kind:    operationKind,
 		}
 		operation, err := builder.buildOperation(item)
@@ -84,7 +88,7 @@ func (builder *packageBuilder) resolveOccurrences() error {
 			builder.resolutionSpec(
 				item.record, item.variant,
 				semantic.ResolutionOperation,
-			).withOperation(operation.ID()),
+			).withOperation(operation.ID),
 		)
 		if err != nil {
 			return err
@@ -139,10 +143,11 @@ func (builder *packageBuilder) classifyOccurrence(
 	context occurrenceContext,
 	variant catalog.Variant,
 ) (semantic.OccurrenceResolution, semantic.OperationKind, error) {
+	owner := builder.input.occurrenceOwner(record)
 	if record.checkedUnmapped {
 		return builder.checkedViewUnsupported(record, variant)
 	}
-	if definition := builder.definitionByRoot[record.occurrence.ID()]; !definition.IsZero() {
+	if definition := builder.definitionByRoot[builder.input.occurrenceReference(record.occurrence.ID())]; !definition.IsZero() {
 		return builder.definitionComponent(
 			record, variant, definition,
 			semantic.DefinitionComponentRoot,
@@ -150,19 +155,19 @@ func (builder *packageBuilder) classifyOccurrence(
 	}
 	if record.domain == catalog.ResolutionDomainBoundary {
 		return builder.definitionComponent(
-			record, variant, record.owner,
-			boundaryComponent(record.owner),
+			record, variant, owner,
+			boundaryComponent(owner),
 		)
 	}
 	if record.occurrence.Kind().Disposition() !=
 		catalog.DispositionActive {
 		return builder.unsupportedResolution(record, variant)
 	}
-	if declarationNameIsDefinitionComponent(record) {
+	if declarationNameIsDefinitionComponent(record, owner) {
 		return builder.definitionComponent(
 			record,
 			variant,
-			record.owner,
+			owner,
 			semantic.DefinitionComponentName,
 		)
 	}
@@ -190,7 +195,7 @@ func (builder *packageBuilder) classifyOccurrence(
 	}
 	if record.occurrence.Kind() == catalog.KindFuncLit {
 		return builder.definitionComponent(
-			record, variant, record.owner,
+			record, variant, owner,
 			semantic.DefinitionComponentRoot,
 		)
 	}
@@ -212,6 +217,7 @@ func (builder *packageBuilder) classifyOccurrence(
 		kind, err := operationKind(
 			builder.input.loaded.CheckerView(),
 			record,
+			owner,
 			variant,
 		)
 		if err != nil {
@@ -245,11 +251,13 @@ func (builder *packageBuilder) intrinsicHeader(
 		builder.input.id.ImportPath() != "unsafe" {
 		return false
 	}
-	definition, present := builder.input.definitions[record.owner]
-	if !present {
+	definition := builder.input.definitions.record(record.owner)
+	if definition == nil {
 		return false
 	}
-	member := catalog.UnsafeMemberByName(definition.Name())
+	member := catalog.UnsafeMemberByName(
+		definition.definition.Name(),
+	)
 	return member.Valid() &&
 		member.Class() == catalog.UnsafeMemberClassBuiltin
 }
@@ -282,20 +290,22 @@ func (builder *packageBuilder) intrinsicHeaderResolution(
 
 func declarationNameIsDefinitionComponent(
 	record *occurrenceInput,
+	owner identity.DefinitionID,
 ) bool {
 	identifier, ok := record.node.(*ast.Ident)
 	return ok &&
 		identifier.Name == "init" &&
 		record.occurrence.Role() == catalog.RoleDeclarationName &&
-		record.owner.Kind() == identity.DefinitionFuncDecl
+		owner.Kind() == identity.DefinitionFuncDecl
 }
 
 func (builder *packageBuilder) checkedViewUnsupported(
 	record *occurrenceInput,
 	variant catalog.Variant,
 ) (semantic.OccurrenceResolution, semantic.OperationKind, error) {
+	owner := builder.input.occurrenceOwner(record)
 	id, err := identity.NewUnsupportedID(
-		record.owner, record.occurrence.ID(),
+		owner, record.occurrence.ID(),
 	)
 	if err != nil {
 		return semantic.OccurrenceResolution{},

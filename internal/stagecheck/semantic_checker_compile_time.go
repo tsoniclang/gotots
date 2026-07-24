@@ -5,7 +5,6 @@ import (
 	"go/token"
 	"go/types"
 
-	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/catalog"
 	"github.com/tsoniclang/gotots/internal/language/structure"
 )
@@ -15,35 +14,37 @@ func (
 ) independentCompileTimeContext(
 	occurrence structure.OccurrenceRef,
 ) bool {
-	return !verifier.independentCompileTimeAnchor(
+	return verifier.independentCompileTimeAnchor(
 		occurrence,
-	).IsZero()
+	).valid()
 }
 
 func (
 	verifier *checkerSemanticVerifier,
 ) independentCompileTimeAnchor(
 	occurrence structure.OccurrenceRef,
-) identity.OccurrenceID {
-	id := occurrence.ID()
-	if verifier.compileTimeResolved[id] {
-		return verifier.compileTimeAnchor[id]
+) semanticOccurrenceRef {
+	reference := verifier.expected.occurrences.reference(
+		occurrence.ID(),
+	)
+	if verifier.compileTimeResolved[reference] {
+		return verifier.compileTimeAnchor[reference]
 	}
-	var anchor identity.OccurrenceID
+	var anchor semanticOccurrenceRef
 	if occurrence.Role() == catalog.RoleArrayLength ||
 		(occurrence.Role() == catalog.RoleInitializerValue &&
 			verifier.independentConstInitializer(occurrence)) {
-		anchor = occurrence.ID()
+		anchor = reference
 	}
-	if anchor.IsZero() && !occurrence.Parent().IsZero() {
+	if !anchor.valid() && !occurrence.Parent().IsZero() {
 		if parent, present :=
 			verifier.expected.occurrences.get(occurrence.Parent()); present {
 			anchor =
 				verifier.independentCompileTimeAnchor(parent.OccurrenceRef)
 		}
 	}
-	verifier.compileTimeAnchor[id] = anchor
-	verifier.compileTimeResolved[id] = true
+	verifier.compileTimeAnchor[reference] = anchor
+	verifier.compileTimeResolved[reference] = true
 	return anchor
 }
 
@@ -52,11 +53,11 @@ func (
 ) independentCompileTimeCoverage(
 	occurrence structure.OccurrenceRef,
 ) (types.Object, types.Type) {
-	anchorID := verifier.independentCompileTimeAnchor(occurrence)
-	if anchorID.IsZero() {
+	anchorReference := verifier.independentCompileTimeAnchor(occurrence)
+	if !anchorReference.valid() {
 		return nil, nil
 	}
-	anchor := verifier.expected.occurrence(anchorID)
+	anchor := verifier.expected.occurrenceRecord(anchorReference)
 	parent, present := verifier.expected.occurrences.get(anchor.Parent())
 	if !present {
 		return nil, nil

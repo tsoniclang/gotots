@@ -11,7 +11,6 @@ import (
 )
 
 type occurrenceContext struct {
-	owner             identity.DefinitionID
 	executable        bool
 	expected          types.Type
 	arity             semantic.ResultArity
@@ -27,9 +26,9 @@ type occurrenceContext struct {
 	memberOwner       types.Type
 	compileTime       bool
 	zeroValue         bool
-	breakTarget       identity.OccurrenceID
-	continueTarget    identity.OccurrenceID
-	fallthroughTarget identity.OccurrenceID
+	breakTarget       packageOccurrenceRef
+	continueTarget    packageOccurrenceRef
+	fallthroughTarget packageOccurrenceRef
 	typeSwitchAnchor  bool
 }
 
@@ -53,12 +52,13 @@ func buildContexts(
 	work *Work,
 ) (*contextIndex, error) {
 	out := &contextIndex{input: input}
-	var assign func(identity.OccurrenceID) error
-	assign = func(id identity.OccurrenceID) error {
-		record := input.occurrence(id)
+	var assign func(packageOccurrenceRef) error
+	assign = func(reference packageOccurrenceRef) error {
+		record := input.occurrenceRecord(reference)
 		if record == nil {
 			return fmt.Errorf(
-				"semantic context names absent occurrence %s", id,
+				"semantic context names absent occurrence reference %d",
+				reference,
 			)
 		}
 		if record.contextAssigned {
@@ -66,19 +66,21 @@ func buildContexts(
 		}
 		if record.contextVisiting {
 			return fmt.Errorf(
-				"semantic occurrence context cycle at %s", id,
+				"semantic occurrence context cycle at %s",
+				record.occurrence.ID(),
 			)
 		}
 		record.contextVisiting = true
 		context := occurrenceContext{
-			owner: record.owner,
 			executable: record.domain ==
 				catalog.ResolutionDomainExecutable,
 			arity: semantic.ResultArityOne,
 		}
 		parentID := record.occurrence.Parent()
 		if parent := input.occurrence(parentID); parent != nil {
-			if err := assign(parentID); err != nil {
+			if err := assign(
+				input.occurrenceReference(parentID),
+			); err != nil {
 				return err
 			}
 			context = parent.context
@@ -92,12 +94,12 @@ func buildContexts(
 				context,
 			)
 		}
-		context.owner = record.owner
 		context.executable = record.domain ==
 			catalog.ResolutionDomainExecutable
-		if context.owner != (identity.DefinitionID{}) {
+		owner := input.occurrenceOwner(record)
+		if !owner.IsZero() {
 			signature, err := definitionSignature(
-				input, context.owner,
+				input, owner,
 			)
 			if err != nil {
 				return err
@@ -107,7 +109,7 @@ func buildContexts(
 				if context.coverageObject == nil &&
 					context.coverageType == nil {
 					context.coverageObject = definitionObject(
-						input, context.owner,
+						input, owner,
 					)
 					if context.coverageObject != nil {
 						context.coverageType =
@@ -279,31 +281,43 @@ func childContext(
 			context.expected = types.Typ[types.Bool]
 		}
 		if role == catalog.RoleBody {
-			context.breakTarget = parent.occurrence.ID()
-			context.continueTarget = parent.occurrence.ID()
+			target := input.occurrenceReference(
+				parent.occurrence.ID(),
+			)
+			context.breakTarget = target
+			context.continueTarget = target
 		}
 	case *ast.RangeStmt:
 		assignRangeContext(
 			view, node, role, &context,
 		)
 		if role == catalog.RoleBody {
-			context.breakTarget = parent.occurrence.ID()
-			context.continueTarget = parent.occurrence.ID()
+			target := input.occurrenceReference(
+				parent.occurrence.ID(),
+			)
+			context.breakTarget = target
+			context.continueTarget = target
 		}
 	case *ast.SwitchStmt:
 		if role == catalog.RoleBody {
-			context.breakTarget = parent.occurrence.ID()
+			context.breakTarget = input.occurrenceReference(
+				parent.occurrence.ID(),
+			)
 		}
 	case *ast.TypeSwitchStmt:
 		if role == catalog.RoleBody {
-			context.breakTarget = parent.occurrence.ID()
+			context.breakTarget = input.occurrenceReference(
+				parent.occurrence.ID(),
+			)
 		}
 		if role == catalog.RoleTypeSwitchGuard {
 			context.typeSwitchAnchor = true
 		}
 	case *ast.SelectStmt:
 		if role == catalog.RoleBody {
-			context.breakTarget = parent.occurrence.ID()
+			context.breakTarget = input.occurrenceReference(
+				parent.occurrence.ID(),
+			)
 		}
 	case *ast.CaseClause:
 		if role == catalog.RoleStatement {

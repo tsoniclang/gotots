@@ -215,12 +215,15 @@ func (draft *PackageDraft) VisitDeclarationRoots(
 	return nil
 }
 
-func (draft *PackageDraft) AddOperation(record Operation) error {
+func (draft *PackageDraft) AddOperation(spec OperationSpec) error {
 	if err := draft.ensureOpen(); err != nil {
 		return err
 	}
-	draft.normalized.addOperation(record)
-	draft.addOperationRoots(record)
+	if _, err := validateOperationSpec(spec); err != nil {
+		return err
+	}
+	draft.normalized.addOperationSpec(spec)
+	draft.addOperationRoots(spec)
 	return nil
 }
 
@@ -280,8 +283,7 @@ func (draft *PackageDraft) addResolutionRoots(
 	}
 }
 
-func (draft *PackageDraft) addOperationRoots(record Operation) {
-	spec := record.spec
+func (draft *PackageDraft) addOperationRoots(spec OperationSpec) {
 	draft.addObjectRoots(spec.Object)
 	draft.addDeclarationRoot(spec.Selection.object)
 	draft.addDeclarationOwnerTypeRoot(spec.Selection.object)

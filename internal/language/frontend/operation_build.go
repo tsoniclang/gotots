@@ -14,40 +14,40 @@ import (
 
 func (builder *packageBuilder) buildOperation(
 	item pendingOperation,
-) (semantic.Operation, error) {
-	id := builder.operationByOccurrence[item.record.occurrence.ID()]
+) (semantic.OperationSpec, error) {
+	id := builder.operationByOccurrence[builder.input.occurrenceReference(item.record.occurrence.ID())]
 	mode, arity, place, resultType, addressable, assignable, value, err :=
 		builder.operationValue(item)
 	if err != nil {
-		return semantic.Operation{}, err
+		return semantic.OperationSpec{}, err
 	}
 	expectedType, err := builder.optionalType(item.context.expected)
 	if err != nil {
-		return semantic.Operation{}, err
+		return semantic.OperationSpec{}, err
 	}
 	object, err := builder.operationObject(item)
 	if err != nil {
-		return semantic.Operation{}, err
+		return semantic.OperationSpec{}, err
 	}
 	selection, err := builder.operationSelection(item)
 	if err != nil {
-		return semantic.Operation{}, err
+		return semantic.OperationSpec{}, err
 	}
 	instance, err := builder.operationInstance(item)
 	if err != nil {
-		return semantic.Operation{}, err
+		return semantic.OperationSpec{}, err
 	}
 	operands := builder.operationOperands(item.record)
 	definitions := builder.operationDefinitions(item.record)
 	controlTarget, label, err := builder.operationControl(item)
 	if err != nil {
-		return semantic.Operation{}, err
+		return semantic.OperationSpec{}, err
 	}
 	implicit, err := builder.implicitEffects(item, operands, selection)
 	if err != nil {
-		return semantic.Operation{}, err
+		return semantic.OperationSpec{}, err
 	}
-	return semantic.NewOperation(semantic.OperationSpec{
+	return semantic.OperationSpec{
 		ID: id, Kind: item.kind,
 		Syntax:  item.record.occurrence.Kind(),
 		Variant: item.variant,
@@ -61,7 +61,7 @@ func (builder *packageBuilder) buildOperation(
 		Object:   object, Selection: selection, Instance: instance,
 		Operands: operands, Definitions: definitions,
 		Implicit: implicit, ControlTarget: controlTarget, Label: label,
-	})
+	}, nil
 }
 
 func (builder *packageBuilder) operationValue(
@@ -246,7 +246,7 @@ func (builder *packageBuilder) operationValueWithoutType(
 		identity.SemanticTypeID{},
 		false, false, types.TypeAndValue{}, &Error{
 			Package:    builder.input.id,
-			Definition: item.record.owner,
+			Definition: builder.input.occurrenceOwner(item.record),
 			Occurrence: item.record.occurrence.ID(),
 			Kind:       item.record.occurrence.Kind(),
 			Reason:     "expression operation has no checker type or exact object",

@@ -17,16 +17,16 @@ func (verifier *checkerSemanticVerifier) operationOperands(
 	occurrence structure.OccurrenceRef,
 ) ([]identity.OccurrenceID, error) {
 	children := append(
-		[]identity.OccurrenceID(nil),
-		verifier.children[occurrence.ID()]...,
+		[]semanticOccurrenceRef(nil),
+		verifier.childReferences(occurrence.ID())...,
 	)
 	edgeRank := map[catalog.Edge]int{}
 	for index, edge := range catalog.EdgesOf(occurrence.Kind()) {
 		edgeRank[edge] = index
 	}
 	sort.Slice(children, func(left, right int) bool {
-		leftRecord := verifier.expected.occurrence(children[left])
-		rightRecord := verifier.expected.occurrence(children[right])
+		leftRecord := verifier.expected.occurrenceRecord(children[left])
+		rightRecord := verifier.expected.occurrenceRecord(children[right])
 		if edgeRank[leftRecord.Edge()] !=
 			edgeRank[rightRecord.Edge()] {
 			return edgeRank[leftRecord.Edge()] <
@@ -53,19 +53,23 @@ func (verifier *checkerSemanticVerifier) operationOperands(
 	}
 	if ranks != nil {
 		sort.SliceStable(children, func(left, right int) bool {
-			leftRole := verifier.expected.occurrence(children[left]).Role()
-			rightRole := verifier.expected.occurrence(children[right]).Role()
+			leftRole := verifier.expected.occurrenceRecord(
+				children[left],
+			).Role()
+			rightRole := verifier.expected.occurrenceRecord(
+				children[right],
+			).Role()
 			return ranks[leftRole] < ranks[rightRole]
 		})
 	}
 	out := make([]identity.OccurrenceID, 0, len(children))
-	for _, childID := range children {
-		child, present := verifier.expected.occurrences.get(childID)
-		if !present {
+	for _, childReference := range children {
+		child := verifier.expected.occurrences.record(childReference)
+		if child == nil {
 			continue
 		}
 		if verifier.runtimeOperand(child.OccurrenceRef) {
-			out = append(out, childID)
+			out = append(out, child.ID())
 		}
 	}
 	return out, nil
@@ -342,7 +346,7 @@ func (verifier *checkerSemanticVerifier) verifySelectedNameResolution(
 	}
 	parentResolution, _ := verifier.resolution(occurrence.Parent())
 	operation, _ := verifier.operation(parentResolution.Operation())
-	selection := operation.Spec().Selection
+	selection := operation.Selection()
 	if !selection.IsZero() {
 		if selection.Object() != resolution.Declaration() {
 			return true, fmt.Errorf(

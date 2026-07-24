@@ -115,9 +115,10 @@ func buildObjectIndex(
 	if err := out.indexCheckerSupport(view); err != nil {
 		return nil, err
 	}
-	for _, occurrenceID := range input.order {
+	for _, occurrenceReference := range input.order {
 		work.ObjectOccurrenceVisits++
-		record := input.occurrence(occurrenceID)
+		record := input.occurrenceRecord(occurrenceReference)
+		occurrenceID := record.occurrence.ID()
 		if selector, ok := record.node.(*ast.SelectorExpr); ok {
 			if selection, present := view.SelectionOf(selector); present {
 				out.indexMembers(
@@ -176,9 +177,10 @@ func buildObjectIndex(
 	}
 	for object, source := range out.sourceByObject {
 		record := input.occurrence(source)
-		if record != nil && !record.owner.IsZero() {
+		owner := input.occurrenceOwner(record)
+		if !owner.IsZero() {
 			if err := out.bindObjectDefinition(
-				object, record.owner,
+				object, owner,
 			); err != nil {
 				return nil, err
 			}
@@ -207,11 +209,15 @@ func buildObjectIndex(
 
 func (index *objectIndex) bindCheckedDefinitionSources() error {
 	view := index.input.loaded.CheckerView()
-	for definition := range index.input.definitions {
+	return index.input.definitions.visit(func(
+		_ packageDefinitionRef,
+		record *definitionInput,
+	) error {
+		definition := record.definition.ID()
 		checked, present := index.input.index.
 			CheckedDefinitionNode(definition)
 		if !present || definition.Root().IsZero() {
-			continue
+			return nil
 		}
 		objects := checkedDeclarationObjects(view, checked)
 		sources := definitionNameSources(index.input, definition)
@@ -242,17 +248,21 @@ func (index *objectIndex) bindCheckedDefinitionSources() error {
 				return err
 			}
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 func (index *objectIndex) bindSyntheticDefinitions() error {
 	view := index.input.loaded.CheckerView()
-	for definition := range index.input.definitions {
+	return index.input.definitions.visit(func(
+		_ packageDefinitionRef,
+		record *definitionInput,
+	) error {
+		definition := record.definition.ID()
 		node, present := index.input.index.
 			SyntheticDefinitionNode(definition)
 		if !present {
-			continue
+			return nil
 		}
 		object := declarationObject(
 			view, node, definition.SyntheticName(),
@@ -268,8 +278,8 @@ func (index *objectIndex) bindSyntheticDefinitions() error {
 		); err != nil {
 			return err
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 func (index *objectIndex) bindObjectDefinition(
@@ -330,11 +340,11 @@ func definitionNameSources(
 	}
 	var out []identity.OccurrenceID
 	for _, childID := range root.children {
-		child := input.occurrence(childID)
+		child := input.occurrenceRecord(childID)
 		if child != nil &&
 			child.occurrence.Role() ==
 				catalog.RoleDeclarationName {
-			out = append(out, childID)
+			out = append(out, child.occurrence.ID())
 		}
 	}
 	return out

@@ -107,10 +107,15 @@ func (verifier *checkerSemanticVerifier) deriveIndependentDefinitionOwnership() 
 		}
 		var sources []identity.OccurrenceID
 		if !definition.Root().IsZero() {
-			for _, child := range verifier.children[definition.Root()] {
-				if verifier.expected.occurrence(child).Role() ==
+			for _, childReference := range verifier.childReferences(
+				definition.Root(),
+			) {
+				child := verifier.expected.occurrenceRecord(
+					childReference,
+				)
+				if child.Role() ==
 					catalog.RoleDeclarationName {
-					sources = append(sources, child)
+					sources = append(sources, child.ID())
 				}
 			}
 		}
@@ -153,8 +158,11 @@ func (verifier *checkerSemanticVerifier) deriveIndependentDefinitionOwnership() 
 func (
 	verifier *checkerSemanticVerifier,
 ) deriveIndependentPackageDeclarationSources() error {
-	for _, occurrenceID := range verifier.expected.order {
-		occurrence := verifier.expected.occurrence(occurrenceID)
+	for _, occurrenceReference := range verifier.expected.order {
+		occurrence := verifier.expected.occurrenceRecord(
+			occurrenceReference,
+		)
+		occurrenceID := occurrence.ID()
 		if occurrence.Role() != catalog.RoleDeclarationName {
 			continue
 		}

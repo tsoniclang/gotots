@@ -111,9 +111,11 @@ func (index *objectIndex) supportDefinition(
 	source identity.OccurrenceID,
 	scope identity.OccurrenceID,
 ) identity.DefinitionID {
-	if record := index.input.occurrence(source); record != nil &&
-		!record.owner.IsZero() {
-		return record.owner
+	if record := index.input.occurrence(source); record != nil {
+		owner := index.input.occurrenceOwner(record)
+		if !owner.IsZero() {
+			return owner
+		}
 	}
 	if definition, present := index.input.index.OccurrenceDefinition(
 		source,
@@ -121,7 +123,7 @@ func (index *objectIndex) supportDefinition(
 		return definition
 	}
 	if record := index.input.occurrence(scope); record != nil {
-		return record.owner
+		return index.input.occurrenceOwner(record)
 	}
 	definition, _ := index.input.index.OccurrenceDefinition(scope)
 	return definition

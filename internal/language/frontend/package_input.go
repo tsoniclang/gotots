@@ -7,7 +7,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/executable"
 	"github.com/tsoniclang/gotots/internal/language/structure"
-	"github.com/tsoniclang/gotots/internal/scope"
 	"github.com/tsoniclang/gotots/internal/source"
 )
 
@@ -104,14 +103,21 @@ func (stage *stageInput) buildPackageInput(
 			pkg.ID(),
 		)
 	}
-	input := newPackageInput(loaded, pkg, stage.index)
-	for _, definition := range pkg.Definitions() {
+	definitions := pkg.Definitions()
+	input := newPackageInput(
+		loaded, pkg, stage.index, len(definitions),
+	)
+	for _, definition := range definitions {
 		if !stage.allLocal && !definitionUsesLocalSemantics(
 			stage.plan, loaded, definition.ID(),
 		) {
 			continue
 		}
-		input.definitions[definition.ID()] = definition
+		reference, err := input.definitions.admit(definition)
+		if err != nil {
+			return nil, err
+		}
+		record := input.definitions.record(reference)
 		selection, present := stage.selections.For(definition.ID())
 		if !present {
 			return nil, fmt.Errorf(
@@ -119,22 +125,33 @@ func (stage *stageInput) buildPackageInput(
 				definition.ID(),
 			)
 		}
-		input.selections[definition.ID()] = selection
+		record.selection = selection
+		record.hasSelection = true
 		if region, present := stage.executable.For(
 			definition.ID(),
 		); present {
-			input.regions[definition.ID()] = region
+			record.region = region
+			record.hasRegion = true
 		}
 	}
 	for _, site := range pkg.Sites() {
-		if _, local := input.definitions[site.Definition()]; local {
-			input.parents[site.Definition()] = site.ParentDefinition()
+		record := input.definition(site.Definition())
+		if record == nil {
+			continue
 		}
+		parent := input.definitions.reference(site.ParentDefinition())
+		if !site.ParentDefinition().IsZero() && !parent.valid() {
+			return nil, fmt.Errorf(
+				"local definition %s has absent parent %s",
+				site.Definition(), site.ParentDefinition(),
+			)
+		}
+		record.parent = parent
 	}
 	if err := finishPackageInput(input, stage.executable); err != nil {
 		return nil, err
 	}
-	if len(input.definitions) == 0 &&
+	if input.definitions.count() == 0 &&
 		input.occurrences.count() == 0 {
 		return nil, nil
 	}
@@ -152,7 +169,7 @@ func (stage *stageInput) buildBuiltinInput(
 	loaded *source.LoadedPackage,
 ) (*packageInput, error) {
 	input := newPackageInput(
-		loaded, structure.PackageGraph{}, stage.index,
+		loaded, structure.PackageGraph{}, stage.index, 0,
 	)
 	if err := finishPackageInput(input, stage.executable); err != nil {
 		return nil, err
@@ -174,6 +191,7 @@ func newPackageInput(
 	loaded *source.LoadedPackage,
 	graph structure.PackageGraph,
 	index *structure.TransientIndex,
+	definitionCapacity int,
 ) *packageInput {
 	return &packageInput{
 		id: loaded.ID(),
@@ -183,11 +201,8 @@ func newPackageInput(
 		loaded:      loaded,
 		graph:       graph,
 		index:       index,
-		occurrences: newOccurrenceStore(),
-		definitions: map[identity.DefinitionID]structure.ImplementationDefinition{},
-		parents:     map[identity.DefinitionID]identity.DefinitionID{},
-		regions:     map[identity.DefinitionID]executable.Region{},
-		selections:  map[identity.DefinitionID]scope.DefinitionSelection{},
+		occurrences: newOccurrenceStore(0),
+		definitions: newDefinitionStore(definitionCapacity),
 	}
 }
 
@@ -195,15 +210,8 @@ func finishPackageInput(
 	input *packageInput,
 	inventory *executable.Inventory,
 ) error {
-	definitions := make(
-		map[identity.DefinitionID]struct{},
-		len(input.definitions),
-	)
-	for definition := range input.definitions {
-		definitions[definition] = struct{}{}
-	}
 	containment, err := buildDefinitionContainment(
-		definitions, input.parents, &input.work,
+		input.definitions, &input.work,
 	)
 	if err != nil {
 		return err

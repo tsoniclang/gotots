@@ -168,7 +168,8 @@ func verifySemanticResolutions(
 				"unexpected "+record.Occurrence().String(),
 			)
 		}
-		if record.Owner() != occurrence.owner ||
+		if record.Owner() !=
+			expected.definitionID(occurrence.owner) ||
 			record.Domain() != occurrence.domain ||
 			record.Syntax() != occurrence.Kind() ||
 			record.Role() != occurrence.Role() {
@@ -253,7 +254,7 @@ func verifySemanticOperations(
 				occurrence.domain !=
 					catalog.ResolutionDomainExecutable ||
 				operation.Definition() !=
-					occurrence.owner ||
+					expected.definitionID(occurrence.owner) ||
 				operation.Syntax() != occurrence.Kind() ||
 				operation.Role() != occurrence.Role() ||
 				operation.Token() != occurrence.Token() ||

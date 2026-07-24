@@ -5,7 +5,6 @@ import (
 	"go/ast"
 	"go/constant"
 	"go/types"
-	"slices"
 
 	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/catalog"
@@ -25,9 +24,9 @@ type checkerSemanticVerifier struct {
 	bindings                map[identity.SemanticBindingID]*checkerBindingCandidate
 	bindingsByDefinition    map[identity.DefinitionID][]identity.SemanticBindingID
 	bindingCaptures         map[identity.SemanticBindingID][]identity.DefinitionID
-	children                map[identity.OccurrenceID][]identity.OccurrenceID
-	compileTimeAnchor       map[identity.OccurrenceID]identity.OccurrenceID
-	compileTimeResolved     map[identity.OccurrenceID]bool
+	children                [][]semanticOccurrenceRef
+	compileTimeAnchor       []semanticOccurrenceRef
+	compileTimeResolved     []bool
 	containment             map[identity.DefinitionID]checkerDefinitionInterval
 	scopeOwners             map[*types.Scope]identity.OccurrenceID
 	scopeByOccurrence       map[identity.OccurrenceID]identity.OccurrenceID
@@ -72,13 +71,22 @@ func verifyCheckerSemanticPackage(
 		types: newCheckerTypeVerifier(
 			expected, actual, universe, index,
 		),
-		bindingByObject:         map[types.Object]identity.SemanticBindingID{},
-		bindings:                map[identity.SemanticBindingID]*checkerBindingCandidate{},
-		bindingsByDefinition:    map[identity.DefinitionID][]identity.SemanticBindingID{},
-		bindingCaptures:         map[identity.SemanticBindingID][]identity.DefinitionID{},
-		children:                map[identity.OccurrenceID][]identity.OccurrenceID{},
-		compileTimeAnchor:       map[identity.OccurrenceID]identity.OccurrenceID{},
-		compileTimeResolved:     map[identity.OccurrenceID]bool{},
+		bindingByObject:      map[types.Object]identity.SemanticBindingID{},
+		bindings:             map[identity.SemanticBindingID]*checkerBindingCandidate{},
+		bindingsByDefinition: map[identity.DefinitionID][]identity.SemanticBindingID{},
+		bindingCaptures:      map[identity.SemanticBindingID][]identity.DefinitionID{},
+		children: make(
+			[][]semanticOccurrenceRef,
+			expected.occurrences.referenceCount()+1,
+		),
+		compileTimeAnchor: make(
+			[]semanticOccurrenceRef,
+			expected.occurrences.referenceCount()+1,
+		),
+		compileTimeResolved: make(
+			[]bool,
+			expected.occurrences.referenceCount()+1,
+		),
 		containment:             containment,
 		scopeByOccurrence:       map[identity.OccurrenceID]identity.OccurrenceID{},
 		scopeOccurrenceResolved: map[identity.OccurrenceID]bool{},
@@ -89,12 +97,15 @@ func verifyCheckerSemanticPackage(
 		checkerSourceByObject:   map[types.Object]identity.OccurrenceID{},
 		localOnly:               localOnly,
 	}
-	for _, occurrenceID := range expected.order {
-		occurrence := expected.occurrence(occurrenceID)
+	for _, occurrenceReference := range expected.order {
+		occurrence := expected.occurrenceRecord(occurrenceReference)
 		if !occurrence.Parent().IsZero() {
-			verifier.children[occurrence.Parent()] = append(
-				verifier.children[occurrence.Parent()],
-				occurrenceID,
+			parent := expected.occurrences.reference(
+				occurrence.Parent(),
+			)
+			verifier.children[parent] = append(
+				verifier.children[parent],
+				occurrenceReference,
 			)
 		}
 	}
@@ -136,9 +147,22 @@ func verifyCheckerSemanticPackage(
 	return nil
 }
 
+func (verifier *checkerSemanticVerifier) childReferences(
+	id identity.OccurrenceID,
+) []semanticOccurrenceRef {
+	reference := verifier.expected.occurrences.reference(id)
+	if !reference.valid() {
+		return nil
+	}
+	return verifier.children[reference]
+}
+
 func (verifier *checkerSemanticVerifier) verifyOccurrences() error {
-	for _, occurrenceID := range verifier.expected.order {
-		occurrence := verifier.expected.occurrence(occurrenceID)
+	for _, occurrenceReference := range verifier.expected.order {
+		occurrence := verifier.expected.occurrenceRecord(
+			occurrenceReference,
+		)
+		occurrenceID := occurrence.ID()
 		resolution, present := verifier.resolution(occurrenceID)
 		if !present {
 			continue
@@ -241,26 +265,27 @@ func (verifier *checkerSemanticVerifier) verifyOperation(
 			operation.ID(), operation.Kind(), wantKind,
 		)
 	}
-	spec := operation.Spec()
-	if spec.Selection.IsZero() {
+	selection := operation.Selection()
+	object := operation.Object()
+	if selection.IsZero() {
 		if err := verifier.verifyOperationObject(
-			occurrence, node, spec.Object,
+			occurrence, node, object,
 		); err != nil {
 			return fmt.Errorf(
 				"operation %s object: %w", operation.ID(), err,
 			)
 		}
 	} else {
-		if spec.Object.Kind() !=
+		if object.Kind() !=
 			semantic.ObjectReferenceDeclaration ||
-			spec.Object.Declaration() != spec.Selection.Object() {
+			object.Declaration() != selection.Object() {
 			return fmt.Errorf(
 				"operation %s selection/object identity differs",
 				operation.ID(),
 			)
 		}
 		if err := verifier.verifySelection(
-			node, spec.Selection,
+			node, selection,
 		); err != nil {
 			return fmt.Errorf(
 				"operation %s selection: %w", operation.ID(), err,
@@ -278,10 +303,12 @@ func (verifier *checkerSemanticVerifier) verifyOperation(
 			"operation %s operands: %w", operation.ID(), err,
 		)
 	}
-	if !slices.Equal(spec.Operands, wantOperands) {
+	if !operationOperandsEqual(operation, wantOperands) {
 		return fmt.Errorf(
 			"operation %s operands=%v, checker=%v",
-			operation.ID(), spec.Operands, wantOperands,
+			operation.ID(),
+			operationOperandIdentities(operation),
+			wantOperands,
 		)
 	}
 	if err := verifier.verifyImplicitEffects(
@@ -293,14 +320,16 @@ func (verifier *checkerSemanticVerifier) verifyOperation(
 		)
 	}
 	wantDefinitions := verifier.operationDefinitions(operation)
-	if !slices.Equal(spec.Definitions, wantDefinitions) {
+	if !operationDefinitionsEqual(operation, wantDefinitions) {
 		return fmt.Errorf(
 			"operation %s nested definitions=%v, checker=%v",
-			operation.ID(), spec.Definitions, wantDefinitions,
+			operation.ID(),
+			operationDefinitionIdentities(operation),
+			wantDefinitions,
 		)
 	}
 	if err := verifier.verifyInstance(
-		node, operation.Kind(), spec.Instance,
+		node, operation.Kind(), operation.Instance(),
 	); err != nil {
 		return fmt.Errorf(
 			"operation %s instance: %w", operation.ID(), err,
@@ -333,22 +362,21 @@ func (verifier *checkerSemanticVerifier) verifyOperationValue(
 	if err != nil {
 		return fmt.Errorf("operation %s value: %w", operation.ID(), err)
 	}
-	spec := operation.Spec()
-	if spec.Mode != want.mode ||
-		spec.Arity != want.arity ||
-		spec.Place != want.place ||
-		spec.Addressable != want.addressable ||
-		spec.Assignable != want.assignable ||
-		spec.HasOk != want.hasOK {
+	if operation.Mode() != want.mode ||
+		operation.Arity() != want.arity ||
+		operation.Place() != want.place ||
+		operation.Addressable() != want.addressable ||
+		operation.Assignable() != want.assignable ||
+		operation.HasOk() != want.hasOK {
 		return fmt.Errorf(
 			"operation %s value differs: semantic=%v/%v/%v addressable=%t assignable=%t has-ok=%t checker=%v/%v/%v addressable=%t assignable=%t has-ok=%t",
 			operation.ID(),
-			spec.Mode,
-			spec.Arity,
-			spec.Place,
-			spec.Addressable,
-			spec.Assignable,
-			spec.HasOk,
+			operation.Mode(),
+			operation.Arity(),
+			operation.Place(),
+			operation.Addressable(),
+			operation.Assignable(),
+			operation.HasOk(),
 			want.mode,
 			want.arity,
 			want.place,
@@ -358,20 +386,20 @@ func (verifier *checkerSemanticVerifier) verifyOperationValue(
 		)
 	}
 	if err := verifier.types.verify(
-		spec.ResultType, want.typ,
+		operation.ResultType(), want.typ,
 	); err != nil {
 		return fmt.Errorf(
 			"operation %s result: %w", operation.ID(), err,
 		)
 	}
 	if want.constant == nil {
-		if !spec.Constant.IsZero() {
+		if !operation.Constant().IsZero() {
 			return fmt.Errorf(
 				"operation %s has unexpected constant", operation.ID(),
 			)
 		}
-	} else if spec.Constant.Exact() != want.constant.ExactString() ||
-		spec.Constant.Kind() !=
+	} else if operation.Constant().Exact() != want.constant.ExactString() ||
+		operation.Constant().Kind() !=
 			semanticConstantKind(want.constant.Kind()) {
 		return fmt.Errorf(
 			"operation %s constant differs", operation.ID(),
@@ -383,7 +411,7 @@ func (verifier *checkerSemanticVerifier) verifyOperationValue(
 		occurrence,
 	)
 	if err := verifier.types.verify(
-		spec.ExpectedType, expectedType,
+		operation.ExpectedType(), expectedType,
 	); err != nil {
 		return fmt.Errorf(
 			"operation %s expected type: %w",

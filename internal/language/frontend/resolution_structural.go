@@ -37,7 +37,7 @@ func (builder *packageBuilder) structuralResolution(
 		} else {
 			return semantic.OccurrenceResolution{}, &Error{
 				Package:    builder.input.id,
-				Definition: record.owner,
+				Definition: builder.input.occurrenceOwner(record),
 				Occurrence: record.occurrence.ID(),
 				Kind:       record.occurrence.Kind(),
 				Reason:     "compile-time syntax has no exact declaration or type coverage",
@@ -138,7 +138,8 @@ func (builder *packageBuilder) unsupportedResolution(
 	record *occurrenceInput,
 	variant catalog.Variant,
 ) (semantic.OccurrenceResolution, semantic.OperationKind, error) {
-	if record.owner.IsZero() {
+	owner := builder.input.occurrenceOwner(record)
+	if owner.IsZero() {
 		return semantic.OccurrenceResolution{},
 			semantic.OperationInvalid, &Error{
 				Package:    builder.input.id,
@@ -148,7 +149,7 @@ func (builder *packageBuilder) unsupportedResolution(
 			}
 	}
 	id, err := identity.NewUnsupportedID(
-		record.owner, record.occurrence.ID(),
+		owner, record.occurrence.ID(),
 	)
 	if err != nil {
 		return semantic.OccurrenceResolution{},
@@ -182,7 +183,7 @@ func (builder *packageBuilder) resolutionSpec(
 ) resolutionSpecBuilder {
 	return resolutionSpecBuilder{spec: semantic.ResolutionSpec{
 		Occurrence: record.occurrence.ID(),
-		Owner:      record.owner,
+		Owner:      builder.input.occurrenceOwner(record),
 		Syntax:     record.occurrence.Kind(),
 		Role:       record.occurrence.Role(),
 		Variant:    variant,
@@ -250,9 +251,15 @@ func (builder *packageBuilder) admitResolution(
 	resolution semantic.OccurrenceResolution,
 ) error {
 	id := resolution.Occurrence()
-	if _, duplicate := builder.resolvedOccurrences[id]; duplicate {
+	reference := builder.input.occurrenceReference(id)
+	if !reference.valid() {
+		return fmt.Errorf(
+			"semantic resolution names absent occurrence %s", id,
+		)
+	}
+	if builder.resolvedOccurrences[reference] {
 		return fmt.Errorf("duplicate semantic resolution %s", id)
 	}
-	builder.resolvedOccurrences[id] = struct{}{}
+	builder.resolvedOccurrences[reference] = true
 	return builder.draft.AddResolution(resolution)
 }

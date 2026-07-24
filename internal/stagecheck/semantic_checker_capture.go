@@ -26,7 +26,7 @@ func (verifier *checkerSemanticVerifier) verifyBindingCaptures() error {
 				"capture use names absent occurrence %s", occurrenceID,
 			)
 		}
-		consumer := record.owner
+		consumer := verifier.expected.definitionID(record.owner)
 		if consumer.IsZero() ||
 			consumer == binding.definition {
 			return nil
@@ -46,7 +46,9 @@ func (verifier *checkerSemanticVerifier) verifyBindingCaptures() error {
 		expected[binding.id][consumer] = true
 		return nil
 	}
-	for _, occurrenceID := range verifier.expected.order {
+	for _, occurrenceReference := range verifier.expected.order {
+		occurrenceID := verifier.expected.
+			occurrenceRecord(occurrenceReference).ID()
 		resolution, present := verifier.resolution(occurrenceID)
 		if !present ||
 			resolution.Kind() != semantic.ResolutionBinding {
@@ -72,7 +74,7 @@ func (verifier *checkerSemanticVerifier) verifyBindingCaptures() error {
 		if !operation.ID().Source() {
 			return nil
 		}
-		object := operation.Spec().Object
+		object := operation.Object()
 		if object.Kind() != semantic.ObjectReferenceBinding {
 			return nil
 		}

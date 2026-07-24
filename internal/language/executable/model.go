@@ -199,34 +199,71 @@ func (i *Inventory) AdditionalOccurrenceRefs() (
 func (i *Inventory) AdditionalOccurrenceRefsForFiles(
 	files []identity.FileID,
 ) ([]structure.OccurrenceRef, error) {
+	var out []structure.OccurrenceRef
+	err := i.visitAdditionalOccurrenceIDsForFiles(
+		files,
+		func(id identity.OccurrenceID) error {
+			reference, err := structure.NewOccurrenceRef(
+				i.byOccurrence[id],
+			)
+			if err != nil {
+				return err
+			}
+			out = append(out, reference)
+			return nil
+		},
+	)
+	return out, err
+}
+
+func (i *Inventory) AdditionalOccurrenceCountForFiles(
+	files []identity.FileID,
+) (int, error) {
+	count := 0
+	err := i.visitAdditionalOccurrenceIDsForFiles(
+		files,
+		func(identity.OccurrenceID) error {
+			count++
+			return nil
+		},
+	)
+	return count, err
+}
+
+func (i *Inventory) visitAdditionalOccurrenceIDsForFiles(
+	files []identity.FileID,
+	visit func(identity.OccurrenceID) error,
+) error {
+	if i == nil || visit == nil {
+		return fmt.Errorf(
+			"additional occurrence lookup requires inventory and visitor",
+		)
+	}
 	ordered := append([]identity.FileID(nil), files...)
 	sort.Slice(ordered, func(left, right int) bool {
 		return ordered[left].Compare(ordered[right]) < 0
 	})
-	var out []structure.OccurrenceRef
 	previous := identity.FileID{}
 	for _, file := range ordered {
 		if file.IsZero() {
-			return nil, fmt.Errorf(
+			return fmt.Errorf(
 				"additional occurrence lookup has a zero file identity",
 			)
 		}
 		if file == previous {
-			return nil, fmt.Errorf(
+			return fmt.Errorf(
 				"additional occurrence lookup repeats file %s", file,
 			)
 		}
 		previous = file
 		indexed := i.additionalByFile[file]
 		for _, id := range i.additionalIDs[indexed.start:indexed.end] {
-			reference, err := structure.NewOccurrenceRef(i.byOccurrence[id])
-			if err != nil {
-				return nil, err
+			if err := visit(id); err != nil {
+				return err
 			}
-			out = append(out, reference)
 		}
 	}
-	return out, nil
+	return nil
 }
 func (i *Inventory) Work() Work { return i.work }
 func (i *Inventory) For(

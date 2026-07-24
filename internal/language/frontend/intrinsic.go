@@ -13,9 +13,10 @@ func (index *objectIndex) bindIntrinsicDefinitionSources() error {
 		return nil
 	}
 	seen := map[catalog.UnsafeMemberKind]bool{}
-	for _, occurrenceID := range index.input.order {
+	for _, occurrenceReference := range index.input.order {
 		index.work.IntrinsicOccurrenceVisits++
-		record := index.input.occurrence(occurrenceID)
+		record := index.input.occurrenceRecord(occurrenceReference)
+		occurrenceID := record.occurrence.ID()
 		identifier, identifierNode := record.node.(*ast.Ident)
 		if !identifierNode ||
 			record.occurrence.Role() !=
@@ -48,14 +49,15 @@ func (index *objectIndex) bindIntrinsicDefinitionSources() error {
 			return err
 		}
 		if member.Class() == catalog.UnsafeMemberClassBuiltin {
-			if record.owner.IsZero() {
+			owner := index.input.occurrenceOwner(record)
+			if owner.IsZero() {
 				return fmt.Errorf(
 					"unsafe builtin %s has no Stage-1 definition",
 					member,
 				)
 			}
 			if err := index.bindObjectDefinition(
-				object, record.owner,
+				object, owner,
 			); err != nil {
 				return err
 			}

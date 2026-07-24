@@ -11,26 +11,33 @@ import (
 )
 
 type semanticPackageExpectation struct {
-	id           identity.PackageID
-	pkg          structure.PackageGraph
-	loaded       *source.LoadedPackage
-	definitions  map[identity.DefinitionID]structure.ImplementationDefinition
-	selections   map[identity.DefinitionID]scope.DefinitionSelection
-	executable   map[identity.DefinitionID]bool
-	regions      map[identity.DefinitionID]executable.Region
-	parents      map[identity.DefinitionID]identity.DefinitionID
-	initializers map[identity.DefinitionID][]identity.OccurrenceID
-	occurrences  *semanticOccurrenceStore
-	domainCount  int
-	order        []identity.OccurrenceID
-	localFiles   map[identity.FileID]bool
+	id             identity.PackageID
+	pkg            structure.PackageGraph
+	loaded         *source.LoadedPackage
+	definitions    map[identity.DefinitionID]structure.ImplementationDefinition
+	executable     map[identity.DefinitionID]bool
+	regions        map[identity.DefinitionID]executable.Region
+	parents        map[identity.DefinitionID]identity.DefinitionID
+	initializers   map[identity.DefinitionID][]identity.OccurrenceID
+	occurrences    *semanticOccurrenceStore
+	definitionRefs map[identity.DefinitionID]semanticDefinitionRef
+	definitionIDs  []identity.DefinitionID
+	domainCount    int
+	order          []semanticOccurrenceRef
+	localFiles     map[identity.FileID]bool
+}
+
+type semanticDefinitionRef uint32
+
+func (reference semanticDefinitionRef) valid() bool {
+	return reference != 0
 }
 
 type semanticExpectedOccurrence struct {
 	structure.OccurrenceRef
 	domain          catalog.ResolutionDomain
-	owner           identity.DefinitionID
-	structuralOwner identity.DefinitionID
+	owner           semanticDefinitionRef
+	structuralOwner semanticDefinitionRef
 }
 
 func (expected semanticPackageExpectation) occurrence(
@@ -38,6 +45,16 @@ func (expected semanticPackageExpectation) occurrence(
 ) semanticExpectedOccurrence {
 	record, present := expected.occurrences.get(occurrence)
 	if !present {
+		return semanticExpectedOccurrence{}
+	}
+	return *record
+}
+
+func (expected semanticPackageExpectation) occurrenceRecord(
+	reference semanticOccurrenceRef,
+) semanticExpectedOccurrence {
+	record := expected.occurrences.record(reference)
+	if record == nil {
 		return semanticExpectedOccurrence{}
 	}
 	return *record
@@ -54,14 +71,39 @@ func (expected semanticPackageExpectation) occurrenceOwner(
 	occurrence identity.OccurrenceID,
 ) identity.DefinitionID {
 	record := expected.occurrence(occurrence)
-	return record.owner
+	return expected.definitionID(record.owner)
 }
 
 func (expected semanticPackageExpectation) structuralOccurrenceOwner(
 	occurrence identity.OccurrenceID,
 ) identity.DefinitionID {
 	record := expected.occurrence(occurrence)
-	return record.structuralOwner
+	return expected.definitionID(record.structuralOwner)
+}
+
+func (expected semanticPackageExpectation) definitionID(
+	reference semanticDefinitionRef,
+) identity.DefinitionID {
+	if !reference.valid() ||
+		int(reference) > len(expected.definitionIDs) {
+		return identity.DefinitionID{}
+	}
+	return expected.definitionIDs[reference-1]
+}
+
+func (expected *semanticPackageExpectation) admitDefinition(
+	id identity.DefinitionID,
+) semanticDefinitionRef {
+	if id.IsZero() {
+		return 0
+	}
+	if reference := expected.definitionRefs[id]; reference.valid() {
+		return reference
+	}
+	expected.definitionIDs = append(expected.definitionIDs, id)
+	reference := semanticDefinitionRef(len(expected.definitionIDs))
+	expected.definitionRefs[id] = reference
+	return reference
 }
 
 func newSemanticPackageExpectation(
@@ -77,18 +119,35 @@ func newSemanticPackageExpectation(
 			"package", "structural package is absent from source universe",
 		)
 	}
+	files := pkg.Files()
+	occurrenceCapacity := 0
+	var packageFiles []identity.FileID
+	for _, file := range files {
+		occurrenceCapacity += file.OccurrenceCount()
+		packageFiles = append(
+			packageFiles, file.Owner().ID().File(),
+		)
+	}
+	additionalCount, err := executableInventory.
+		AdditionalOccurrenceCountForFiles(packageFiles)
+	if err != nil {
+		return semanticPackageExpectation{}, err
+	}
+	occurrenceCapacity += additionalCount
 	out := semanticPackageExpectation{
 		id: pkg.ID(), pkg: pkg, loaded: loaded,
 		definitions:  map[identity.DefinitionID]structure.ImplementationDefinition{},
-		selections:   map[identity.DefinitionID]scope.DefinitionSelection{},
 		executable:   map[identity.DefinitionID]bool{},
 		regions:      map[identity.DefinitionID]executable.Region{},
 		parents:      map[identity.DefinitionID]identity.DefinitionID{},
 		initializers: map[identity.DefinitionID][]identity.OccurrenceID{},
-		occurrences:  newSemanticOccurrenceStore(),
-		localFiles:   map[identity.FileID]bool{},
+		occurrences: newSemanticOccurrenceStore(
+			occurrenceCapacity,
+		),
+		definitionRefs: map[identity.DefinitionID]semanticDefinitionRef{},
+		localFiles:     map[identity.FileID]bool{},
 	}
-	for _, file := range pkg.Files() {
+	for _, file := range files {
 		out.localFiles[file.Owner().ID().File()] = true
 		if err := file.VisitOccurrenceRefs(func(
 			reference structure.OccurrenceRef,
@@ -140,7 +199,7 @@ func newSemanticPackageExpectation(
 					definition.ID().String(),
 			)
 		}
-		selection, present := selections[definition.ID()]
+		_, present := selections[definition.ID()]
 		if !present {
 			return semanticPackageExpectation{}, semanticVerificationError(
 				"definition",
@@ -148,7 +207,7 @@ func newSemanticPackageExpectation(
 			)
 		}
 		out.definitions[definition.ID()] = definition
-		out.selections[definition.ID()] = selection
+		out.admitDefinition(definition.ID())
 	}
 	for _, header := range pkg.Headers() {
 		if err := out.assignStructuralOwner(
@@ -226,14 +285,14 @@ func builtinSemanticExpectation(
 ) semanticPackageExpectation {
 	return semanticPackageExpectation{
 		id: loaded.ID(), loaded: loaded,
-		definitions:  map[identity.DefinitionID]structure.ImplementationDefinition{},
-		selections:   map[identity.DefinitionID]scope.DefinitionSelection{},
-		executable:   map[identity.DefinitionID]bool{},
-		regions:      map[identity.DefinitionID]executable.Region{},
-		parents:      map[identity.DefinitionID]identity.DefinitionID{},
-		initializers: map[identity.DefinitionID][]identity.OccurrenceID{},
-		occurrences:  newSemanticOccurrenceStore(),
-		localFiles:   map[identity.FileID]bool{},
+		definitions:    map[identity.DefinitionID]structure.ImplementationDefinition{},
+		executable:     map[identity.DefinitionID]bool{},
+		regions:        map[identity.DefinitionID]executable.Region{},
+		parents:        map[identity.DefinitionID]identity.DefinitionID{},
+		initializers:   map[identity.DefinitionID][]identity.OccurrenceID{},
+		occurrences:    newSemanticOccurrenceStore(0),
+		definitionRefs: map[identity.DefinitionID]semanticDefinitionRef{},
+		localFiles:     map[identity.FileID]bool{},
 	}
 }
 
@@ -250,15 +309,16 @@ func (expected *semanticPackageExpectation) assignStructuralOwner(
 					occurrence.String(),
 			)
 		}
-		if existing := record.structuralOwner; !existing.IsZero() &&
-			existing != owner {
+		ownerReference := expected.admitDefinition(owner)
+		if existing := record.structuralOwner; existing.valid() &&
+			existing != ownerReference {
 			return semanticVerificationError(
 				"occurrence",
 				"structural occurrence has two definition owners "+
 					occurrence.String(),
 			)
 		}
-		record.structuralOwner = owner
+		record.structuralOwner = ownerReference
 	}
 	return nil
 }
@@ -285,10 +345,13 @@ func (expected *semanticPackageExpectation) addOccurrenceRef(
 	record := &semanticExpectedOccurrence{
 		OccurrenceRef: occurrence,
 	}
-	if err := expected.occurrences.put(occurrence.ID(), record); err != nil {
+	reference, err := expected.occurrences.put(
+		occurrence.ID(), record,
+	)
+	if err != nil {
 		return err
 	}
-	expected.order = append(expected.order, occurrence.ID())
+	expected.order = append(expected.order, reference)
 	return nil
 }
 
@@ -321,8 +384,9 @@ func (expected *semanticPackageExpectation) assignOccurrence(
 		)
 	}
 	existing := record.domain
+	ownerReference := expected.admitDefinition(owner)
 	if existing >= domain {
-		if existing == domain && record.owner != owner {
+		if existing == domain && record.owner != ownerReference {
 			return semanticVerificationError(
 				"domain",
 				"occurrence has two owners "+occurrence.String(),
@@ -334,6 +398,6 @@ func (expected *semanticPackageExpectation) assignOccurrence(
 		expected.domainCount++
 	}
 	record.domain = domain
-	record.owner = owner
+	record.owner = ownerReference
 	return nil
 }

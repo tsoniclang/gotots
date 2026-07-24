@@ -244,59 +244,63 @@ func (closure semanticPackageClosure) verifyOperations() error {
 		record semantic.Operation,
 	) error {
 		evidence := record.ID()
-		spec := record.Spec()
 		if err := closure.requireDefinition(record.Definition()); err != nil {
 			return semanticReferenceError(evidence, err)
 		}
-		if err := closure.requireType(spec.ResultType); err != nil {
+		if err := closure.requireType(record.ResultType()); err != nil {
 			return semanticReferenceError(evidence, err)
 		}
-		if err := closure.requireType(spec.ExpectedType); err != nil {
+		if err := closure.requireType(record.ExpectedType()); err != nil {
 			return semanticReferenceError(evidence, err)
 		}
-		if err := closure.requireObject(spec.Object); err != nil {
+		if err := closure.requireObject(record.Object()); err != nil {
 			return semanticReferenceError(evidence, err)
 		}
-		if !spec.Selection.IsZero() {
+		selection := record.Selection()
+		if !selection.IsZero() {
 			if err := closure.requireType(
-				spec.Selection.Receiver(),
+				selection.Receiver(),
 			); err != nil {
 				return semanticReferenceError(evidence, err)
 			}
 			if err := closure.requireDeclaration(
-				spec.Selection.Object(),
+				selection.Object(),
 			); err != nil {
 				return semanticReferenceError(evidence, err)
 			}
 		}
-		if !spec.Instance.IsZero() {
+		instance := record.Instance()
+		if !instance.IsZero() {
 			if err := closure.requireObject(
-				spec.Instance.Target(),
+				instance.Target(),
 			); err != nil {
 				return semanticReferenceError(evidence, err)
 			}
-			for _, typeID := range spec.Instance.Types() {
+			for _, typeID := range instance.Types() {
 				if err := closure.requireType(typeID); err != nil {
 					return semanticReferenceError(evidence, err)
 				}
 			}
 			if err := closure.requireType(
-				spec.Instance.Signature(),
+				instance.Signature(),
 			); err != nil {
 				return semanticReferenceError(evidence, err)
 			}
 		}
-		for _, occurrence := range spec.Operands {
+		for index := 0; index < record.OperandCount(); index++ {
+			occurrence, _ := record.Operand(index)
 			if err := closure.requireOccurrence(occurrence); err != nil {
 				return semanticReferenceError(evidence, err)
 			}
 		}
-		for _, definition := range spec.Definitions {
+		for index := 0; index < record.NestedDefinitionCount(); index++ {
+			definition, _ := record.NestedDefinition(index)
 			if err := closure.requireDefinition(definition); err != nil {
 				return semanticReferenceError(evidence, err)
 			}
 		}
-		for _, implicit := range spec.Implicit {
+		for index := 0; index < record.ImplicitCount(); index++ {
+			implicit, _ := record.Implicit(index)
 			if err := closure.requireOccurrence(
 				implicit.Site(),
 			); err != nil {
@@ -314,12 +318,12 @@ func (closure semanticPackageClosure) verifyOperations() error {
 			}
 		}
 		if err := closure.requireOperation(
-			spec.ControlTarget,
+			record.ControlTarget(),
 		); err != nil {
 			return semanticReferenceError(evidence, err)
 		}
 		if err := closure.requireBinding(
-			spec.Label,
+			record.Label(),
 		); err != nil {
 			return semanticReferenceError(evidence, err)
 		}

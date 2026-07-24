@@ -16,12 +16,12 @@ func (builder *packageBuilder) operationOperands(
 ) []identity.OccurrenceID {
 	children := orderedOperationChildren(builder.input, record)
 	out := make([]identity.OccurrenceID, 0, len(children))
-	for _, childID := range children {
-		child := builder.input.occurrence(childID)
+	for _, childReference := range children {
+		child := builder.input.occurrenceRecord(childReference)
 		if child == nil || !runtimeOperand(child, builder) {
 			continue
 		}
-		out = append(out, childID)
+		out = append(out, child.occurrence.ID())
 	}
 	return out
 }
@@ -29,10 +29,10 @@ func (builder *packageBuilder) operationOperands(
 func orderedOperationChildren(
 	input *packageInput,
 	record *occurrenceInput,
-) []identity.OccurrenceID {
+) []packageOccurrenceRef {
 	if record.occurrence.Kind() != catalog.KindForStmt &&
 		record.occurrence.Kind() != catalog.KindRangeStmt {
-		return append([]identity.OccurrenceID(nil), record.children...)
+		return append([]packageOccurrenceRef(nil), record.children...)
 	}
 	ranks := map[catalog.Role]int{}
 	if record.occurrence.Kind() == catalog.KindForStmt {
@@ -50,10 +50,10 @@ func orderedOperationChildren(
 			catalog.RoleBody:         3,
 		}
 	}
-	out := append([]identity.OccurrenceID(nil), record.children...)
+	out := append([]packageOccurrenceRef(nil), record.children...)
 	sort.SliceStable(out, func(left, right int) bool {
-		leftRole := input.occurrence(out[left]).occurrence.Role()
-		rightRole := input.occurrence(out[right]).occurrence.Role()
+		leftRole := input.occurrenceRecord(out[left]).occurrence.Role()
+		rightRole := input.occurrenceRecord(out[right]).occurrence.Role()
 		return ranks[leftRole] < ranks[rightRole]
 	})
 	return out
@@ -75,7 +75,9 @@ func runtimeOperand(
 	case catalog.RoleElementKey:
 		parent := builder.input.occurrence(record.occurrence.Parent())
 		return parent == nil ||
-			builder.variantByOccurrence[parent.occurrence.ID()] !=
+			builder.variantByOccurrence[builder.input.occurrenceReference(
+				parent.occurrence.ID(),
+			)] !=
 				catalog.VariantKeyFieldName
 	default:
 		return true
@@ -85,10 +87,13 @@ func runtimeOperand(
 func (builder *packageBuilder) operationDefinitions(
 	record *occurrenceInput,
 ) []identity.DefinitionID {
-	region, present := builder.input.regions[record.owner]
-	if !present {
+	definition := builder.input.definition(
+		builder.input.occurrenceOwner(record),
+	)
+	if definition == nil || !definition.hasRegion {
 		return nil
 	}
+	region := definition.region
 	type ordered struct {
 		ordinal int
 		id      identity.DefinitionID
@@ -149,23 +154,25 @@ func (builder *packageBuilder) operationControl(
 		)
 		return target, label, err
 	}
-	var targetOccurrence identity.OccurrenceID
+	var targetReference packageOccurrenceRef
 	switch branch.Tok {
 	case token.BREAK:
-		targetOccurrence = item.context.breakTarget
+		targetReference = item.context.breakTarget
 	case token.CONTINUE:
-		targetOccurrence = item.context.continueTarget
+		targetReference = item.context.continueTarget
 	case token.FALLTHROUGH:
-		targetOccurrence = item.context.fallthroughTarget
+		targetReference = item.context.fallthroughTarget
 	}
-	if targetOccurrence.IsZero() {
+	if !targetReference.valid() {
 		return identity.OperationID{}, label, nil
 	}
-	target := builder.operationByOccurrence[targetOccurrence]
+	targetRecord := builder.input.occurrenceRecord(targetReference)
+	target := builder.operationByOccurrence[targetReference]
 	if target.IsZero() {
 		return identity.OperationID{}, label, fmt.Errorf(
 			"branch %s target occurrence %s has no operation",
-			item.record.occurrence.ID(), targetOccurrence,
+			item.record.occurrence.ID(),
+			targetRecord.occurrence.ID(),
 		)
 	}
 	return target, label, nil
@@ -192,16 +199,16 @@ func (builder *packageBuilder) labeledControlTarget(
 	targetOccurrence := labeled.occurrence.ID()
 	if lexical == token.BREAK || lexical == token.CONTINUE {
 		for _, childID := range labeled.children {
-			child := builder.input.occurrence(childID)
+			child := builder.input.occurrenceRecord(childID)
 			if child != nil &&
 				child.occurrence.Role() ==
 					catalog.RoleLabeledStatement {
-				targetOccurrence = childID
+				targetOccurrence = child.occurrence.ID()
 				break
 			}
 		}
 	}
-	target := builder.operationByOccurrence[targetOccurrence]
+	target := builder.operationByOccurrence[builder.input.occurrenceReference(targetOccurrence)]
 	if target.IsZero() {
 		return identity.OperationID{}, fmt.Errorf(
 			"label binding %s target %s has no operation",

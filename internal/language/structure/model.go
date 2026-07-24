@@ -400,6 +400,9 @@ type FileGraph struct {
 }
 
 func (g FileGraph) Owner() OwnerRegion { return g.owner }
+func (g FileGraph) OccurrenceCount() int {
+	return len(g.occurrences)
+}
 func (g FileGraph) Occurrences() []Occurrence {
 	return append([]Occurrence(nil), g.occurrences...)
 }

@@ -66,7 +66,8 @@ func (builder *packageBuilder) implicitEffects(
 			catalog.RoleFunctionBody {
 		var candidates []*bindingCandidate
 		for _, candidate := range builder.objects.bindingByObject {
-			if candidate.definition != item.record.owner ||
+			if candidate.definition !=
+				builder.input.occurrenceOwner(item.record) ||
 				candidate.role != identity.SemanticBindingResult ||
 				candidate.source.IsZero() {
 				continue

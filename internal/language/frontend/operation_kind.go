@@ -6,6 +6,7 @@ import (
 	"go/token"
 	"go/types"
 
+	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/catalog"
 	"github.com/tsoniclang/gotots/internal/language/semantic"
 )
@@ -13,6 +14,7 @@ import (
 func operationKind(
 	view checkerExpressionView,
 	record *occurrenceInput,
+	owner identity.DefinitionID,
 	variant catalog.Variant,
 ) (semantic.OperationKind, error) {
 	switch record.occurrence.Kind() {
@@ -128,7 +130,7 @@ func operationKind(
 		return semantic.OperationInvalid, nil
 	}
 	return semantic.OperationInvalid, &Error{
-		Definition: record.owner,
+		Definition: owner,
 		Occurrence: record.occurrence.ID(),
 		Kind:       record.occurrence.Kind(),
 		Reason: fmt.Sprintf(

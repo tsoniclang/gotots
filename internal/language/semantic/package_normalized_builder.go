@@ -35,6 +35,12 @@ func (builder *normalizedPackageBuilder) addOperation(
 	builder.operations.add(&builder.identities, record)
 }
 
+func (builder *normalizedPackageBuilder) addOperationSpec(
+	spec OperationSpec,
+) {
+	builder.operations.addSpec(&builder.identities, spec)
+}
+
 func (builder *normalizedPackageBuilder) addDeclaration(
 	record Declaration,
 ) {

@@ -10,8 +10,9 @@ import (
 
 func (index *objectIndex) indexUnnamedSignatureBindings() error {
 	seen := map[types.Object]identity.OccurrenceID{}
-	for _, occurrenceID := range index.input.order {
-		record := index.input.occurrence(occurrenceID)
+	for _, occurrenceReference := range index.input.order {
+		record := index.input.occurrenceRecord(occurrenceReference)
+		occurrenceID := record.occurrence.ID()
 		field, fieldNode := record.node.(*ast.Field)
 		if !fieldNode || len(field.Names) != 0 {
 			continue
@@ -64,20 +65,21 @@ func (index *objectIndex) intrinsicContractBinding(
 	occurrenceID identity.OccurrenceID,
 ) bool {
 	record := index.input.occurrence(occurrenceID)
-	if record == nil || record.owner.IsZero() {
+	owner := index.input.occurrenceOwner(record)
+	if owner.IsZero() {
 		return false
 	}
 	node, present := index.input.index.CheckedDefinitionNode(
-		record.owner,
+		owner,
 	)
 	if !present {
-		node, present = index.input.index.DefinitionNode(record.owner)
+		node, present = index.input.index.DefinitionNode(owner)
 	}
 	function, functionDefinition := node.(*ast.FuncDecl)
 	if !present || !functionDefinition {
 		return false
 	}
-	object := definitionObject(index.input, record.owner)
+	object := definitionObject(index.input, owner)
 	if object == nil {
 		object, _ = index.input.loaded.CheckerView().
 			DefOf(function.Name)
@@ -97,7 +99,7 @@ func (index *objectIndex) signatureBindingRole(
 	if !fieldList {
 		return identity.SemanticBindingInvalid, false
 	}
-	definition := record.owner
+	definition := index.input.occurrenceOwner(record)
 	node, present := index.input.index.CheckedDefinitionNode(definition)
 	if !present {
 		node, present = index.input.index.DefinitionNode(definition)

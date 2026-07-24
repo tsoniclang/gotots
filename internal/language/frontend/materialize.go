@@ -270,10 +270,10 @@ type packageBuilder struct {
 	objects               *objectIndex
 	types                 *typeBuilder
 	draft                 *semantic.PackageDraft
-	operationByOccurrence map[identity.OccurrenceID]identity.OperationID
-	variantByOccurrence   map[identity.OccurrenceID]catalog.Variant
-	resolvedOccurrences   map[identity.OccurrenceID]struct{}
-	definitionByRoot      map[identity.OccurrenceID]identity.DefinitionID
+	operationByOccurrence []identity.OperationID
+	variantByOccurrence   []catalog.Variant
+	resolvedOccurrences   []bool
+	definitionByRoot      map[packageOccurrenceRef]identity.DefinitionID
 }
 
 func materializePackage(
@@ -307,17 +307,36 @@ func materializePackage(
 	}
 	builder := &packageBuilder{
 		stage: stage, input: input, contexts: contexts, objects: objects,
-		types:                 objects.typeBuilder,
-		draft:                 draft,
-		operationByOccurrence: map[identity.OccurrenceID]identity.OperationID{},
-		variantByOccurrence:   map[identity.OccurrenceID]catalog.Variant{},
-		resolvedOccurrences:   map[identity.OccurrenceID]struct{}{},
-		definitionByRoot:      map[identity.OccurrenceID]identity.DefinitionID{},
+		types: objects.typeBuilder,
+		draft: draft,
+		operationByOccurrence: make(
+			[]identity.OperationID,
+			input.occurrences.referenceCount()+1,
+		),
+		variantByOccurrence: make(
+			[]catalog.Variant,
+			input.occurrences.referenceCount()+1,
+		),
+		resolvedOccurrences: make(
+			[]bool,
+			input.occurrences.referenceCount()+1,
+		),
+		definitionByRoot: map[packageOccurrenceRef]identity.DefinitionID{},
 	}
-	for definition := range input.definitions {
+	if err := input.definitions.visit(func(
+		_ packageDefinitionRef,
+		record *definitionInput,
+	) error {
+		definition := record.definition.ID()
 		if !definition.Root().IsZero() {
-			builder.definitionByRoot[definition.Root()] = definition
+			reference := input.occurrenceReference(definition.Root())
+			if reference.valid() {
+				builder.definitionByRoot[reference] = definition
+			}
 		}
+		return nil
+	}); err != nil {
+		return semantic.Package{}, nil, Work{}, err
 	}
 	if err := builder.resolveOccurrences(); err != nil {
 		return semantic.Package{}, nil, Work{}, err
@@ -370,11 +389,12 @@ func packageDraftCapacity(
 	objects *objectIndex,
 ) semantic.PackageCapacity {
 	capacity := semantic.PackageCapacity{
-		Definitions: len(input.definitions),
+		Definitions: input.definitions.count(),
 		Resolutions: len(input.order),
 		Bindings:    len(objects.bindingIDs),
 	}
 	_ = input.occurrences.visit(func(
+		_ packageOccurrenceRef,
 		occurrence *occurrenceInput,
 	) error {
 		if occurrence.domain ==
@@ -392,14 +412,18 @@ func packageDraftCapacity(
 }
 
 func sortedDefinitions(
-	definitions map[identity.DefinitionID]structure.ImplementationDefinition,
+	definitions *definitionStore,
 ) []structure.ImplementationDefinition {
 	out := make(
-		[]structure.ImplementationDefinition, 0, len(definitions),
+		[]structure.ImplementationDefinition, 0, definitions.count(),
 	)
-	for _, definition := range definitions {
-		out = append(out, definition)
-	}
+	_ = definitions.visit(func(
+		_ packageDefinitionRef,
+		definition *definitionInput,
+	) error {
+		out = append(out, definition.definition)
+		return nil
+	})
 	sort.Slice(out, func(left, right int) bool {
 		return out[left].ID().Compare(out[right].ID()) < 0
 	})

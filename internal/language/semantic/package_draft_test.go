@@ -192,3 +192,64 @@ func TestArtifactDraftCompactsEveryRetainedRecordClass(t *testing.T) {
 		t.Fatal("sealed artifact draft accepted another record")
 	}
 }
+
+func TestPackageDraftTransfersOperationRelationsWithoutPublicClone(
+	t *testing.T,
+) {
+	fixture := semanticFixture(t)
+	definition, err := identity.NewImplicitDefinitionID(
+		fixture.pkg,
+		identity.ImplicitDefinitionPackageInit,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	operationID, err := identity.NewImplicitOperationID(
+		definition,
+		identity.ImplicitDefinitionPackageInit,
+		0,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	operands := []identity.OccurrenceID{fixture.body}
+	definitions := []identity.DefinitionID{fixture.definition}
+	draft, err := NewPackageDraft(
+		fixture.pkg,
+		ProvenanceWorkspaceModule,
+		PackageCapacity{Operations: 1},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := draft.AddOperation(OperationSpec{
+		ID:          operationID,
+		Kind:        OperationPackageInitialization,
+		Mode:        ValueModeNone,
+		Arity:       ResultArityZero,
+		Place:       PlaceNone,
+		Object:      NoObjectReference(),
+		Operands:    operands,
+		Definitions: definitions,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	operands[0] = identity.OccurrenceID{}
+	definitions[0] = identity.DefinitionID{}
+
+	identities := newPackageIdentityProjection(
+		draft.normalized.identities.projectionTable(),
+	)
+	if len(draft.normalized.operations.operands) != 1 ||
+		identities.occurrence(
+			draft.normalized.operations.operands[0],
+		) != fixture.body ||
+		len(draft.normalized.operations.definitions) != 1 ||
+		identities.definition(
+			draft.normalized.operations.definitions[0],
+		) != fixture.definition {
+		t.Fatal(
+			"operation draft retained or lost its caller-owned relation slices",
+		)
+	}
+}

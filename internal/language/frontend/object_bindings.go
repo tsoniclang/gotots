@@ -16,9 +16,10 @@ func (index *objectIndex) createBindingCandidates() error {
 	for object := range index.sourceByObject {
 		objects[object] = true
 	}
-	for _, occurrenceID := range index.input.order {
+	for _, occurrenceReference := range index.input.order {
 		index.work.ImplicitBindingVisits++
-		record := index.input.occurrence(occurrenceID)
+		record := index.input.occurrenceRecord(occurrenceReference)
+		occurrenceID := record.occurrence.ID()
 		if identifier, ok := record.node.(*ast.Ident); ok {
 			object, used := index.input.loaded.CheckerView().
 				UseOf(identifier)
@@ -128,14 +129,16 @@ func (index *objectIndex) implicitBinding(
 		)
 	}
 	return &bindingCandidate{
-		object:     object,
-		anchor:     source,
-		source:     identity.OccurrenceID{},
-		scope:      scope,
-		role:       role,
-		typ:        typ,
-		name:       object.Name(),
-		definition: index.input.occurrence(source).owner,
+		object: object,
+		anchor: source,
+		source: identity.OccurrenceID{},
+		scope:  scope,
+		role:   role,
+		typ:    typ,
+		name:   object.Name(),
+		definition: index.input.occurrenceOwner(
+			index.input.occurrence(source),
+		),
 	}, nil
 }
 

@@ -104,7 +104,8 @@ func resolveVariant(
 			reason = "resolved semantic variant is illegal for construct"
 		}
 		return catalog.VariantInvalid, &Error{
-			Package: input.id, Definition: record.owner,
+			Package:    input.id,
+			Definition: input.occurrenceOwner(record),
 			Occurrence: record.occurrence.ID(),
 			Kind:       record.occurrence.Kind(),
 			Reason:     reason,

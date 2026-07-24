@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"go/ast"
 	"go/types"
-	"slices"
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/identity"
@@ -33,7 +32,7 @@ func (verifier *checkerSemanticVerifier) verifyImplicitEffects(
 		return err
 	}
 	return verifier.compareImplicitEffects(
-		operation.Spec().Implicit, expected,
+		operation, expected,
 	)
 }
 
@@ -140,7 +139,7 @@ func (verifier *checkerSemanticVerifier) independentImplicitEffects(
 			}
 		}
 	}
-	selection := operation.Spec().Selection
+	selection := operation.Selection()
 	if !selection.IsZero() {
 		selector, _ := node.(*ast.SelectorExpr)
 		checker, present := verifier.view.SelectionOf(selector)
@@ -190,13 +189,13 @@ func (verifier *checkerSemanticVerifier) independentImplicitEffects(
 }
 
 func (verifier *checkerSemanticVerifier) compareImplicitEffects(
-	actual []semantic.ImplicitOperation,
+	actual semantic.Operation,
 	expected []checkerImplicitEffect,
 ) error {
-	if len(actual) != len(expected) {
+	if actual.ImplicitCount() != len(expected) {
 		return fmt.Errorf(
 			"effect count=%d %v, checker-derived=%d %v",
-			len(actual),
+			actual.ImplicitCount(),
 			semanticEffectIdentities(actual),
 			len(expected),
 			checkerEffectIdentities(expected),
@@ -204,7 +203,13 @@ func (verifier *checkerSemanticVerifier) compareImplicitEffects(
 	}
 	ordinals := map[catalog.ImplicitOp]int{}
 	for index, want := range expected {
-		got := actual[index]
+		got, present := actual.Implicit(index)
+		if !present {
+			return fmt.Errorf(
+				"effect %d is absent from operation %s",
+				index, actual.ID(),
+			)
+		}
 		ordinal := ordinals[want.kind]
 		ordinals[want.kind]++
 		if got.Kind() != want.kind ||
@@ -236,10 +241,13 @@ func (verifier *checkerSemanticVerifier) compareImplicitEffects(
 }
 
 func semanticEffectIdentities(
-	effects []semantic.ImplicitOperation,
+	operation semantic.Operation,
 ) []string {
-	out := make([]string, 0, len(effects))
-	for _, effect := range effects {
+	out := make(
+		[]string, 0, operation.ImplicitCount(),
+	)
+	for index := 0; index < operation.ImplicitCount(); index++ {
+		effect, _ := operation.Implicit(index)
 		out = append(out, fmt.Sprintf(
 			"%s@%s/%d",
 			effect.Kind(), effect.Site(), effect.Ordinal(),
@@ -457,17 +465,16 @@ func (verifier *checkerSemanticVerifier) verifyPackageInitialization(
 	if err != nil {
 		return err
 	}
-	spec := operation.Spec()
 	if operation.Kind() !=
 		semantic.OperationPackageInitialization ||
-		!slices.Equal(spec.Operands, operands) ||
-		!slices.Equal(spec.Definitions, definitions) {
+		!operationOperandsEqual(operation, operands) ||
+		!operationDefinitionsEqual(operation, definitions) {
 		return fmt.Errorf(
 			"package initialization %s sequence differs",
 			operation.ID(),
 		)
 	}
-	return verifier.compareImplicitEffects(spec.Implicit, effects)
+	return verifier.compareImplicitEffects(operation, effects)
 }
 
 func (verifier *checkerSemanticVerifier) independentPackageInitialization() (

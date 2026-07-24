@@ -13,17 +13,57 @@ type localOccurrenceKey struct {
 	kind  uint16
 }
 
+type packageOccurrenceRef uint32
+
+func (reference packageOccurrenceRef) valid() bool {
+	return reference != 0
+}
+
 type occurrenceStore struct {
 	files      map[identity.FileID]uint32
 	nextFile   uint32
-	byIdentity map[localOccurrenceKey]*occurrenceInput
+	byIdentity map[localOccurrenceKey]packageOccurrenceRef
+	records    []occurrenceInput
 }
 
-func newOccurrenceStore() *occurrenceStore {
-	return &occurrenceStore{
-		files:      map[identity.FileID]uint32{},
-		byIdentity: map[localOccurrenceKey]*occurrenceInput{},
+func newOccurrenceStore(capacity int) *occurrenceStore {
+	if capacity < 0 {
+		panic("package occurrence store has negative capacity")
 	}
+	return &occurrenceStore{
+		files: map[identity.FileID]uint32{},
+		byIdentity: make(
+			map[localOccurrenceKey]packageOccurrenceRef,
+			capacity,
+		),
+		records: make([]occurrenceInput, 0, capacity),
+	}
+}
+
+func (store *occurrenceStore) reserve(capacity int) error {
+	if store == nil || capacity < len(store.records) {
+		return fmt.Errorf(
+			"package occurrence store cannot reserve %d for %d records",
+			capacity, len(store.records),
+		)
+	}
+	if cap(store.records) >= capacity {
+		return nil
+	}
+	records := make(
+		[]occurrenceInput, len(store.records), capacity,
+	)
+	copy(records, store.records)
+	store.records = records
+	identities := make(
+		map[localOccurrenceKey]packageOccurrenceRef,
+		capacity,
+	)
+	for key, reference := range store.byIdentity {
+		identities[key] = reference
+	}
+	store.byIdentity = identities
+	return nil
 }
 
 func (store *occurrenceStore) key(
@@ -57,36 +97,62 @@ func (store *occurrenceStore) key(
 func (store *occurrenceStore) get(
 	id identity.OccurrenceID,
 ) *occurrenceInput {
+	return store.record(store.reference(id))
+}
+
+func (store *occurrenceStore) reference(
+	id identity.OccurrenceID,
+) packageOccurrenceRef {
 	key, present := store.key(id, false)
 	if !present {
-		return nil
+		return 0
 	}
 	return store.byIdentity[key]
+}
+
+func (store *occurrenceStore) record(
+	reference packageOccurrenceRef,
+) *occurrenceInput {
+	if !reference.valid() || int(reference) > len(store.records) {
+		return nil
+	}
+	return &store.records[reference-1]
 }
 
 func (store *occurrenceStore) put(
 	id identity.OccurrenceID,
 	record *occurrenceInput,
-) error {
+) (packageOccurrenceRef, error) {
 	if record == nil || record.occurrence.ID() != id {
-		return fmt.Errorf(
+		return 0, fmt.Errorf(
 			"package occurrence store requires identity-aligned record",
 		)
 	}
 	key, present := store.key(id, true)
 	if !present {
-		return fmt.Errorf("package occurrence store rejects zero identity")
+		return 0, fmt.Errorf(
+			"package occurrence store rejects zero identity",
+		)
 	}
-	if existing := store.byIdentity[key]; existing != nil &&
-		existing != record {
-		return fmt.Errorf(
+	if reference := store.byIdentity[key]; reference.valid() {
+		existing := store.record(reference)
+		if existing.occurrence == record.occurrence &&
+			existing.node == record.node {
+			return reference, nil
+		}
+		return 0, fmt.Errorf(
 			"package occurrence key collides for %s and %s",
 			existing.occurrence.ID(),
 			id,
 		)
 	}
-	store.byIdentity[key] = record
-	return nil
+	if uint64(len(store.records)) >= uint64(^uint32(0)) {
+		return 0, fmt.Errorf("package occurrence table overflows uint32")
+	}
+	store.records = append(store.records, *record)
+	reference := packageOccurrenceRef(len(store.records))
+	store.byIdentity[key] = reference
+	return reference, nil
 }
 
 func (store *occurrenceStore) remove(
@@ -94,6 +160,8 @@ func (store *occurrenceStore) remove(
 ) {
 	key, present := store.key(id, false)
 	if present {
+		reference := store.byIdentity[key]
+		store.records[reference-1] = occurrenceInput{}
 		delete(store.byIdentity, key)
 	}
 }
@@ -105,16 +173,28 @@ func (store *occurrenceStore) count() int {
 	return len(store.byIdentity)
 }
 
+func (store *occurrenceStore) referenceCount() int {
+	if store == nil {
+		return 0
+	}
+	return len(store.records)
+}
+
 func (store *occurrenceStore) visit(
-	visit func(*occurrenceInput) error,
+	visit func(packageOccurrenceRef, *occurrenceInput) error,
 ) error {
 	if store == nil || visit == nil {
 		return fmt.Errorf(
 			"package occurrence store visit requires store and visitor",
 		)
 	}
-	for _, record := range store.byIdentity {
-		if err := visit(record); err != nil {
+	for index, record := range store.records {
+		if record.occurrence.ID().IsZero() {
+			continue
+		}
+		if err := visit(
+			packageOccurrenceRef(index+1), &store.records[index],
+		); err != nil {
 			return err
 		}
 	}

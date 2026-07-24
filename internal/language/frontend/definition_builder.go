@@ -14,7 +14,7 @@ import (
 func (builder *packageBuilder) buildDefinitions() error {
 	boundaries := map[identity.DefinitionID]structure.ExecutionBoundary{}
 	for _, boundary := range builder.input.graph.Boundaries() {
-		if _, local := builder.input.definitions[boundary.ID().Definition()]; local {
+		if builder.input.definition(boundary.ID().Definition()) != nil {
 			boundaries[boundary.ID().Definition()] = boundary
 		}
 	}
