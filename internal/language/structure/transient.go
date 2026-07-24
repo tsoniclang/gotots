@@ -269,44 +269,28 @@ func (i *TransientIndex) File(
 	return file, ok
 }
 
-func (i *TransientIndex) bindStructuralOccurrence(
-	occurrence Occurrence,
-	node ast.Node,
+func (i *TransientIndex) bindStructuralStore(
+	store *OccurrenceStore,
+	nodes []ast.Node,
 ) error {
 	if i == nil || i.occurrences == nil || i.occurrences.sealed {
 		return fmt.Errorf(
 			"transient occurrence construction is already sealed",
 		)
 	}
-	id := occurrence.ID()
-	if id.IsZero() || node == nil {
-		return fmt.Errorf(
-			"transient occurrence binding requires identity and node",
-		)
-	}
-	kind, err := Classify(node)
-	if err != nil {
-		return err
-	}
-	if uint16(kind) != id.KindID() {
-		return fmt.Errorf(
-			"transient occurrence %s has node kind %s", id, kind,
-		)
-	}
-	if existing, present := i.occurrences.node(id); present {
-		if existing != node {
-			return fmt.Errorf(
-				"transient occurrence %s has conflicting nodes", id,
-			)
-		}
-	}
-	return i.occurrences.bind(id, node)
+	return i.occurrences.register(
+		transientOccurrenceStructural,
+		store,
+		nodes,
+		i.compatibleOccurrenceNodes,
+	)
 }
 
 func (i *TransientIndex) bindStructuralSupport(
 	occurrence Occurrence,
 	node ast.Node,
 	definition identity.DefinitionID,
+	canonical bool,
 ) error {
 	if definition.IsZero() {
 		return fmt.Errorf(
@@ -320,8 +304,13 @@ func (i *TransientIndex) bindStructuralSupport(
 	if !identifierCandidate && !scopeCandidate {
 		return nil
 	}
-	if err := i.bindStructuralOccurrence(occurrence, node); err != nil {
-		return err
+	if !canonical {
+		if err := i.occurrences.bindSupplement(
+			occurrence.ID(),
+			node,
+		); err != nil {
+			return err
+		}
 	}
 	record := transientSupport{
 		definition: definition,
@@ -341,13 +330,14 @@ func (i *TransientIndex) bindStructuralSupport(
 func (i *TransientIndex) bindStructuralOwner(
 	occurrence identity.OccurrenceID,
 	definition identity.DefinitionID,
+	canonical bool,
 ) error {
 	if occurrence.IsZero() || definition.IsZero() {
 		return fmt.Errorf(
 			"transient structural owner requires occurrence and definition",
 		)
 	}
-	if _, present := i.occurrences.node(occurrence); !present {
+	if !canonical {
 		return fmt.Errorf(
 			"transient occurrence %s has no structural record",
 			occurrence,
@@ -367,7 +357,7 @@ func (i *TransientIndex) bindStructuralOwner(
 // BindExecutableOccurrence records the exact node already visited by the
 // Stage-1 executable traversal. It does not traverse or classify a new path.
 func (i *TransientIndex) BindExecutableOccurrence(
-	id identity.OccurrenceID,
+	reference OccurrenceRef,
 	node ast.Node,
 ) error {
 	if i == nil || i.occurrences == nil || i.occurrences.sealed {
@@ -375,6 +365,7 @@ func (i *TransientIndex) BindExecutableOccurrence(
 			"transient occurrence construction is already sealed",
 		)
 	}
+	id := reference.ID()
 	if id.IsZero() || node == nil {
 		return fmt.Errorf(
 			"transient occurrence binding requires identity and node",
@@ -390,15 +381,70 @@ func (i *TransientIndex) BindExecutableOccurrence(
 			id, kind,
 		)
 	}
-	if existing, present := i.occurrences.node(id); present && existing != node {
-		if i.counterparts[existing] != node {
+	existing, present := i.occurrences.nodeForReference(reference)
+	if !present {
+		return fmt.Errorf(
+			"transient occurrence %s has no canonical structural node",
+			id,
+		)
+	}
+	if existing != node {
+		if !i.compatibleOccurrenceNodes(existing, node) {
 			return fmt.Errorf(
 				"transient occurrence %s has uncertified executable node",
 				id,
 			)
 		}
 	}
-	return i.occurrences.bind(id, node)
+	return i.occurrences.replace(reference, node)
+}
+
+// BindExecutableOccurrenceStore admits the canonical executable-only
+// occurrences after their normalized per-file store seals. The transient bridge
+// retains only index-aligned nodes; identity payload remains owned by the
+// canonical store.
+func (i *TransientIndex) BindExecutableOccurrenceStore(
+	builder *OccurrenceStoreBuilder,
+	store *OccurrenceStore,
+) error {
+	if i == nil || i.occurrences == nil || i.occurrences.sealed {
+		return fmt.Errorf(
+			"transient occurrence construction is already sealed",
+		)
+	}
+	return i.occurrences.registerPending(
+		transientOccurrenceExecutable,
+		builder,
+		store,
+		i.compatibleOccurrenceNodes,
+	)
+}
+
+// BindPendingExecutableOccurrence records an executable-only node against its
+// mutable canonical-store coordinate. The construction carrier lives only in
+// TransientIndex and is consumed when the canonical store seals.
+func (i *TransientIndex) BindPendingExecutableOccurrence(
+	builder *OccurrenceStoreBuilder,
+	index OccurrenceIndex,
+	node ast.Node,
+) error {
+	if i == nil || i.occurrences == nil || i.occurrences.sealed {
+		return fmt.Errorf(
+			"transient occurrence construction is already sealed",
+		)
+	}
+	return i.occurrences.bindPending(builder, index, node)
+}
+
+func (i *TransientIndex) compatibleOccurrenceNodes(
+	left ast.Node,
+	right ast.Node,
+) bool {
+	return left == right ||
+		i.counterparts[left] == right ||
+		i.originals[left] == right ||
+		i.counterparts[right] == left ||
+		i.originals[right] == left
 }
 
 // SealForStage2 ends construction-time reverse-identity validation. Stage 2
@@ -410,7 +456,7 @@ func (i *TransientIndex) SealForStage2() error {
 			"transient occurrence index cannot seal for Stage 2",
 		)
 	}
-	return i.occurrences.seal(i.counterparts, i.originals)
+	return i.occurrences.seal()
 }
 
 // Stage2Ready reports whether construction-only reverse state has been

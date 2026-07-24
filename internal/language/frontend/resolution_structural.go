@@ -248,13 +248,15 @@ func (builder resolutionSpecBuilder) withOperation(
 }
 
 func (builder *packageBuilder) admitResolution(
+	reference packageOccurrenceRef,
 	resolution semantic.OccurrenceResolution,
 ) error {
 	id := resolution.Occurrence()
-	reference := builder.input.occurrenceReference(id)
-	if !reference.valid() {
+	record := builder.input.occurrenceRecord(reference)
+	if record == nil || record.occurrence.ID() != id {
 		return fmt.Errorf(
-			"semantic resolution names absent occurrence %s", id,
+			"semantic resolution reference disagrees with occurrence %s",
+			id,
 		)
 	}
 	if builder.resolvedOccurrences[reference] {

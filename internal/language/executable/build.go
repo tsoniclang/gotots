@@ -55,7 +55,7 @@ func Build(
 		out.byID[definition.ID()] = region
 		out.regionIDs = append(out.regionIDs, definition.ID())
 	}
-	if err := out.sort(); err != nil {
+	if err := out.sort(index); err != nil {
 		return nil, err
 	}
 	if err := Validate(graph, selections, out); err != nil {
@@ -192,7 +192,8 @@ func (b *regionBuilder) visit(
 	if err != nil {
 		return err
 	}
-	member, err := b.recordOccurrence(occurrence)
+	member, structural, structuralPresent, err :=
+		b.recordOccurrence(occurrence)
 	if err != nil {
 		return err
 	}
@@ -205,10 +206,21 @@ func (b *regionBuilder) visit(
 			b.index.MarkCheckedUnmapped(occurrence.ID())
 		}
 	}
-	if err := b.index.BindExecutableOccurrence(
-		occurrence.ID(), checkerNode,
-	); err != nil {
-		return err
+	if structuralPresent {
+		if err := b.index.BindExecutableOccurrence(
+			structural,
+			checkerNode,
+		); err != nil {
+			return err
+		}
+	} else {
+		if err := b.inventory.occurrences.bindNode(
+			b.index,
+			member,
+			checkerNode,
+		); err != nil {
+			return err
+		}
 	}
 	b.region.members = append(b.region.members, member)
 	b.work.RecordAppends++
@@ -310,36 +322,41 @@ func (b *regionBuilder) occurrence(
 
 func (b *regionBuilder) recordOccurrence(
 	occurrence structure.Occurrence,
-) (occurrenceRef, error) {
+) (
+	occurrenceRef,
+	structure.OccurrenceRef,
+	bool,
+	error,
+) {
 	reference, err := b.inventory.occurrences.admit(occurrence.ID())
 	if err != nil {
-		return 0, err
+		return 0, structure.OccurrenceRef{}, false, err
 	}
 	b.work.JoinProbes++
-	if structural, present := b.graph.ResidentOccurrence(
+	if structural, present := b.graph.ResidentOccurrenceRef(
 		occurrence.ID(),
 	); present {
-		if structural != occurrence {
-			return 0, fmt.Errorf(
+		if structural.Occurrence() != occurrence {
+			return 0, structure.OccurrenceRef{}, false, fmt.Errorf(
 				"executable occurrence %s conflicts with structural payload",
 				occurrence.ID(),
 			)
 		}
-		return reference, nil
+		return reference, structural, true, nil
 	}
 	b.work.IdentityProbes++
 	reference, added, err := b.inventory.occurrences.put(occurrence)
 	if err != nil {
-		return 0, err
+		return 0, structure.OccurrenceRef{}, false, err
 	}
 	if !added {
-		return reference, nil
+		return reference, structure.OccurrenceRef{}, false, nil
 	}
 	b.inventory.additional = append(
 		b.inventory.additional, reference,
 	)
 	b.work.RecordAppends++
-	return reference, nil
+	return reference, structure.OccurrenceRef{}, false, nil
 }
 
 func physicalSpan(

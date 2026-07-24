@@ -34,6 +34,15 @@ func TestTransientOccurrenceJoinHasOneBidirectionalOwner(t *testing.T) {
 			)
 		}
 	}
+	canonical := reflect.TypeFor[transientCanonicalOccurrences]()
+	for _, removed := range []string{"key", "keys", "positions", "records"} {
+		if _, present := canonical.FieldByName(removed); present {
+			t.Fatalf(
+				"canonical transient binding repeats occurrence payload field %s",
+				removed,
+			)
+		}
+	}
 }
 
 func TestExecutableOccurrenceAcceptsOnlyCertifiedNodeSubstitution(
@@ -48,14 +57,30 @@ func TestExecutableOccurrenceAcceptsOnlyCertifiedNodeSubstitution(
 	checked := ast.NewIdent("value")
 	uncertified := ast.NewIdent("value")
 	occurrence := testTransientOccurrence(t)
-	if err := index.bindStructuralOccurrence(
-		occurrence,
-		original,
-	); err != nil {
+	builder, err := NewOccurrenceStoreBuilder(
+		occurrence.ID().Span().File(),
+		1,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	occurrenceIndex, err := builder.Append(occurrence)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := builder.Seal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := index.bindStructuralStore(store, []ast.Node{original}); err != nil {
+		t.Fatal(err)
+	}
+	reference, err := store.Reference(occurrenceIndex)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if err := index.BindExecutableOccurrence(
-		occurrence.ID(),
+		reference,
 		uncertified,
 	); err == nil {
 		t.Fatal("uncertified executable node replaced structural truth")
@@ -63,7 +88,7 @@ func TestExecutableOccurrenceAcceptsOnlyCertifiedNodeSubstitution(
 	index.counterparts[original] = checked
 	index.originals[checked] = original
 	if err := index.BindExecutableOccurrence(
-		occurrence.ID(),
+		reference,
 		checked,
 	); err != nil {
 		t.Fatal(err)
@@ -72,26 +97,81 @@ func TestExecutableOccurrenceAcceptsOnlyCertifiedNodeSubstitution(
 	if !present || node != checked {
 		t.Fatal("certified checked counterpart was not selected")
 	}
-	for _, candidate := range []ast.Node{original, checked} {
-		address, found := index.occurrences.reverse[candidate]
-		id, err := index.occurrences.identity(address)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !found || id != occurrence.ID() {
-			t.Fatalf("construction join lost canonical identity %s", id)
-		}
+	if err := index.SealForStage2(); err != nil {
+		t.Fatal(err)
+	}
+	if !index.Stage2Ready() {
+		t.Fatal("Stage-2 seal retained construction reverse state")
+	}
+	if err := index.BindExecutableOccurrence(
+		reference, checked,
+	); err == nil {
+		t.Fatal("sealed occurrence index accepted a construction binding")
+	}
+}
+
+func TestExecutableStorePromotesSupplementWithoutDuplicateIdentity(
+	t *testing.T,
+) {
+	index := &TransientIndex{
+		occurrences:  newTransientOccurrenceStore(),
+		counterparts: map[ast.Node]ast.Node{},
+		originals:    map[ast.Node]ast.Node{},
+	}
+	occurrence := testTransientOccurrence(t)
+	node := ast.NewIdent("value")
+	if err := index.occurrences.bindSupplement(
+		occurrence.ID(),
+		node,
+	); err != nil {
+		t.Fatal(err)
+	}
+	builder, err := NewOccurrenceStoreBuilder(
+		occurrence.ID().Span().File(),
+		1,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	occurrenceIndex, err := builder.Append(occurrence)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := index.BindPendingExecutableOccurrence(
+		builder,
+		occurrenceIndex,
+		node,
+	); err != nil {
+		t.Fatal(err)
+	}
+	store, err := builder.Seal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := index.BindExecutableOccurrenceStore(
+		builder,
+		store,
+	); err != nil {
+		t.Fatal(err)
 	}
 	if err := index.SealForStage2(); err != nil {
 		t.Fatal(err)
 	}
-	if !index.Stage2Ready() || index.occurrences.reverse != nil {
-		t.Fatal("Stage-2 seal retained construction reverse state")
+	fileID := occurrence.ID().Span().File()
+	fileReference := index.occurrences.filesByID[fileID]
+	file := index.occurrences.files[fileReference-1]
+	if len(file.supplements) != 0 ||
+		file.canonical[transientOccurrenceExecutable].store != store {
+		t.Fatal("supplemental identity was not transferred to canonical storage")
 	}
-	if err := index.BindExecutableOccurrence(
-		occurrence.ID(), checked,
-	); err == nil {
-		t.Fatal("sealed occurrence index accepted a construction binding")
+	count, err := index.OccurrenceNodeCountForFiles(
+		[]identity.FileID{occurrence.ID().Span().File()},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("promoted occurrence counted %d times", count)
 	}
 }
 

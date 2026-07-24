@@ -43,6 +43,10 @@ func TestPackageRelationsUseDenseLocalIdentityArenas(t *testing.T) {
 		reflect.TypeFor[[]packageOccurrenceRef](),
 	)
 	assertFieldType(
+		t, reflect.TypeFor[occurrenceStore](), "parents",
+		reflect.TypeFor[[]packageOccurrenceRef](),
+	)
+	assertFieldType(
 		t, reflect.TypeFor[occurrenceStore](), "childRanges",
 		reflect.TypeFor[[]occurrenceRelationRange](),
 	)

@@ -3,6 +3,7 @@ package executable
 import (
 	"cmp"
 	"fmt"
+	"go/ast"
 
 	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/structure"
@@ -38,7 +39,7 @@ type occurrenceIdentityRecord struct {
 type occurrenceStore struct {
 	files           []identity.FileID
 	fileByID        map[identity.FileID]uint32
-	byIdentity      map[occurrenceKey]occurrenceRef
+	byIdentity      occurrenceIdentityIndex
 	identities      [][]occurrenceIdentityRecord
 	payloadBuilders []*structure.OccurrenceStoreBuilder
 	payloadStores   []*structure.OccurrenceStore
@@ -50,7 +51,7 @@ type occurrenceStore struct {
 func newOccurrenceStore() *occurrenceStore {
 	return &occurrenceStore{
 		fileByID:   map[identity.FileID]uint32{},
-		byIdentity: map[occurrenceKey]occurrenceRef{},
+		byIdentity: newOccurrenceIdentityIndex(0),
 	}
 }
 
@@ -103,7 +104,10 @@ func (store *occurrenceStore) admit(
 			"executable occurrence store rejects zero identity",
 		)
 	}
-	if reference := store.byIdentity[key]; reference.valid() {
+	if reference := store.byIdentity.reference(
+		store,
+		key,
+	); reference.valid() {
 		return reference, nil
 	}
 	if store.identityCount == ^uint32(0) {
@@ -111,6 +115,18 @@ func (store *occurrenceStore) admit(
 			"executable occurrence store overflows uint32",
 		)
 	}
+	store.appendIdentityRecord(key)
+	reference := occurrenceRef(store.identityCount)
+	if err := store.byIdentity.insert(store, reference); err != nil {
+		store.removeLastIdentityRecord()
+		return 0, err
+	}
+	return reference, nil
+}
+
+func (store *occurrenceStore) appendIdentityRecord(
+	key occurrenceKey,
+) {
 	index := int(store.identityCount)
 	pageIndex := index / occurrenceIdentityPageSize
 	if pageIndex == len(store.identities) {
@@ -126,13 +142,27 @@ func (store *occurrenceStore) admit(
 	store.identities[pageIndex] = append(
 		store.identities[pageIndex],
 		occurrenceIdentityRecord{
-			file: key.file, start: key.start, end: key.end, kind: key.kind,
+			file:  key.file,
+			start: key.start,
+			end:   key.end,
+			kind:  key.kind,
 		},
 	)
 	store.identityCount++
-	reference := occurrenceRef(store.identityCount)
-	store.byIdentity[key] = reference
-	return reference, nil
+}
+
+func (store *occurrenceStore) removeLastIdentityRecord() {
+	if store == nil || store.identityCount == 0 {
+		return
+	}
+	index := int(store.identityCount - 1)
+	pageIndex := index / occurrenceIdentityPageSize
+	page := store.identities[pageIndex]
+	store.identities[pageIndex] = page[:len(page)-1]
+	if len(store.identities[pageIndex]) == 0 {
+		store.identities = store.identities[:pageIndex]
+	}
+	store.identityCount--
 }
 
 func (store *occurrenceStore) put(
@@ -189,13 +219,46 @@ func (store *occurrenceStore) put(
 	return reference, true, nil
 }
 
-func (store *occurrenceStore) seal() error {
+func (store *occurrenceStore) bindNode(
+	index *structure.TransientIndex,
+	reference occurrenceRef,
+	node ast.Node,
+) error {
+	if store == nil || store.sealed || index == nil || node == nil {
+		return fmt.Errorf(
+			"executable occurrence node binding requires mutable storage",
+		)
+	}
+	record := store.identityRecord(reference)
+	if record == nil || record.payload == 0 ||
+		record.file == 0 ||
+		int(record.file) > len(store.payloadBuilders) {
+		return fmt.Errorf(
+			"executable occurrence node has no additional payload",
+		)
+	}
+	builder := store.payloadBuilders[record.file-1]
+	if builder == nil {
+		return fmt.Errorf(
+			"executable occurrence node has no canonical builder",
+		)
+	}
+	return index.BindPendingExecutableOccurrence(
+		builder,
+		record.payload,
+		node,
+	)
+}
+
+func (store *occurrenceStore) seal(
+	index *structure.TransientIndex,
+) error {
 	if store == nil || store.sealed {
 		return fmt.Errorf(
 			"executable occurrence store is absent or already sealed",
 		)
 	}
-	for index, builder := range store.payloadBuilders {
+	for fileIndex, builder := range store.payloadBuilders {
 		if builder == nil {
 			continue
 		}
@@ -203,8 +266,14 @@ func (store *occurrenceStore) seal() error {
 		if err != nil {
 			return err
 		}
-		store.payloadStores[index] = sealed
-		store.payloadBuilders[index] = nil
+		store.payloadStores[fileIndex] = sealed
+		store.payloadBuilders[fileIndex] = nil
+		if err := index.BindExecutableOccurrenceStore(
+			builder,
+			sealed,
+		); err != nil {
+			return err
+		}
 	}
 	store.sealed = true
 	return nil
@@ -217,7 +286,7 @@ func (store *occurrenceStore) reference(
 	if err != nil || !present {
 		return 0
 	}
-	return store.byIdentity[key]
+	return store.byIdentity.reference(store, key)
 }
 
 func (store *occurrenceStore) identityRecord(

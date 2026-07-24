@@ -14,9 +14,10 @@ import (
 )
 
 func (verifier *checkerSemanticVerifier) operationOperands(
+	reference semanticOccurrenceRef,
 	occurrence structure.OccurrenceRef,
 ) ([]identity.OccurrenceID, error) {
-	children := verifier.childReferences(occurrence.ID())
+	children := verifier.childReferences(reference)
 	var ranks map[catalog.Role]int
 	switch occurrence.Kind() {
 	case catalog.KindForStmt:
@@ -52,7 +53,9 @@ func (verifier *checkerSemanticVerifier) operationOperands(
 		if child == nil {
 			continue
 		}
-		if verifier.runtimeOperand(child.OccurrenceRef) {
+		if verifier.runtimeOperand(
+			childReference, child.OccurrenceRef,
+		) {
 			out = append(out, child.ID())
 		}
 	}
@@ -60,9 +63,10 @@ func (verifier *checkerSemanticVerifier) operationOperands(
 }
 
 func (verifier *checkerSemanticVerifier) runtimeOperand(
+	reference semanticOccurrenceRef,
 	occurrence structure.OccurrenceRef,
 ) bool {
-	if verifier.independentCompileTimeContext(occurrence) {
+	if verifier.independentCompileTimeContext(reference) {
 		return false
 	}
 	if !catalog.RoleMayContributeRuntimeEvaluation(
@@ -72,7 +76,11 @@ func (verifier *checkerSemanticVerifier) runtimeOperand(
 	}
 	switch occurrence.Role() {
 	case catalog.RoleElementKey:
-		parent, _ := verifier.resolution(occurrence.Parent())
+		parentReference := verifier.expected.parentReference(reference)
+		parentRecord := verifier.expected.occurrenceRecord(
+			parentReference,
+		)
+		parent, _ := verifier.resolution(parentRecord.ID())
 		return parent.Variant() != catalog.VariantKeyFieldName
 	default:
 		return true
@@ -110,6 +118,7 @@ func (verifier *checkerSemanticVerifier) operationDefinitions(
 }
 
 func (verifier *checkerSemanticVerifier) verifyResolutionTarget(
+	reference semanticOccurrenceRef,
 	occurrence structure.OccurrenceRef,
 	resolution semantic.OccurrenceResolution,
 	node ast.Node,
@@ -170,7 +179,7 @@ func (verifier *checkerSemanticVerifier) verifyResolutionTarget(
 		}
 		if evidence.Disposition() ==
 			semantic.StructuralCompileTimeExpression {
-			if !verifier.independentCompileTimeContext(occurrence) &&
+			if !verifier.independentCompileTimeContext(reference) &&
 				resolution.Domain() ==
 					catalog.ResolutionDomainExecutable {
 				return fmt.Errorf(
@@ -178,7 +187,7 @@ func (verifier *checkerSemanticVerifier) verifyResolutionTarget(
 				)
 			}
 			object, typ := verifier.independentStructuralCoverage(
-				occurrence,
+				reference, occurrence,
 			)
 			if !evidence.Declaration().IsZero() {
 				return verifier.verifyObjectReference(
@@ -233,18 +242,28 @@ func independentResolutionObject(
 }
 
 func (verifier *checkerSemanticVerifier) independentStructuralCoverage(
+	reference semanticOccurrenceRef,
 	occurrence structure.OccurrenceRef,
 ) (types.Object, types.Type) {
 	if object, typ := verifier.independentCompileTimeCoverage(
-		occurrence,
+		reference,
 	); object != nil || typ != nil {
 		return object, typ
 	}
+	currentReference := reference
 	current := occurrence
 	var typeCoverage types.Type
 	owner := verifier.expected.occurrenceOwner(occurrence.ID())
-	for !current.Parent().IsZero() {
-		parent := verifier.expected.occurrence(current.Parent())
+	for {
+		parentReference := verifier.expected.parentReference(
+			currentReference,
+		)
+		parent := verifier.expected.occurrenceRecord(
+			parentReference,
+		)
+		if parent.ID().IsZero() {
+			break
+		}
 		node, present := verifier.index.OccurrenceNode(parent.ID())
 		if !present {
 			return nil, nil
@@ -308,6 +327,7 @@ func (verifier *checkerSemanticVerifier) independentStructuralCoverage(
 		if !owner.Root().IsZero() && parent.ID() == owner.Root() {
 			break
 		}
+		currentReference = parentReference
 		current = parent.OccurrenceRef
 	}
 	return nil, typeCoverage

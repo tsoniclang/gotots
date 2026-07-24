@@ -49,7 +49,7 @@ func TestDefinitionSiteStoresOnlyCanonicalContainmentAnchors(t *testing.T) {
 func TestStructuralGraphAdmissionRejectsCorruptedRelations(t *testing.T) {
 	mutations := map[string]func(*Graph){
 		"unsealed-occurrence-index": func(graph *Graph) {
-			graph.byOccurrence = nil
+			graph.occurrenceStores = nil
 		},
 		"duplicate-package": func(graph *Graph) {
 			graph.packages = append(graph.packages, graph.packages[0])

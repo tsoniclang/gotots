@@ -59,6 +59,12 @@ func (input *packageInput) occurrenceRecord(
 	return input.occurrences.record(reference)
 }
 
+func (input *packageInput) occurrenceParent(
+	reference packageOccurrenceRef,
+) packageOccurrenceRef {
+	return input.occurrences.parentReference(reference)
+}
+
 func (input *packageInput) definition(
 	id identity.DefinitionID,
 ) *definitionInput {
@@ -371,14 +377,12 @@ func (input *packageInput) assignChildren() error {
 }
 
 func (input *packageInput) occurrenceChildren(
-	record *occurrenceInput,
+	reference packageOccurrenceRef,
 ) []packageOccurrenceRef {
-	if record == nil {
+	if !reference.valid() {
 		return nil
 	}
-	return input.occurrences.childReferences(
-		input.occurrenceReference(record.occurrence.ID()),
-	)
+	return input.occurrences.childReferences(reference)
 }
 
 func (input *packageInput) assignOccurrenceOwner(

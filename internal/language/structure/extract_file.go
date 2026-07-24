@@ -29,6 +29,7 @@ type fileBuilder struct {
 	owner             OwnerRegion
 	occurrenceBuilder *OccurrenceStoreBuilder
 	occurrenceIndex   map[fileOccurrenceKey]OccurrenceIndex
+	occurrenceNodes   []ast.Node
 	anchors           map[identity.OccurrenceID]bool
 	anchorOrder       []identity.OccurrenceID
 	definitions       []ImplementationDefinition
@@ -102,6 +103,12 @@ func buildFile(
 	builder.owner.directives = directives
 	occurrences, err := builder.occurrenceBuilder.Seal()
 	if err != nil {
+		return FileGraph{}, err
+	}
+	if err := index.bindStructuralStore(
+		occurrences,
+		builder.occurrenceNodes,
+	); err != nil {
 		return FileGraph{}, err
 	}
 	return FileGraph{
@@ -230,7 +237,7 @@ func (b *fileBuilder) addDefinition(
 		return err
 	}
 	if err := b.index.bindStructuralOwner(
-		root.id, definitionID,
+		root.id, definitionID, true,
 	); err != nil {
 		return err
 	}
@@ -375,8 +382,9 @@ func (b *fileBuilder) scanNestedDefinitions(
 	context catalog.DefinitionContext,
 ) error {
 	current := b.path[len(b.path)-1].occurrence
+	_, canonical := b.occurrence(current.id)
 	if err := b.index.bindStructuralSupport(
-		current, node, parent,
+		current, node, parent, canonical,
 	); err != nil {
 		return err
 	}

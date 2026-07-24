@@ -49,6 +49,7 @@ type OccurrenceStore struct {
 	file         identity.FileID
 	displayFiles []string
 	records      []occurrenceStoreRecord
+	byIdentity   occurrenceStoreIndex
 	sealed       bool
 }
 
@@ -202,12 +203,30 @@ func (builder *OccurrenceStoreBuilder) Seal() (
 			"occurrence store requires one unsealed non-empty payload",
 		)
 	}
+	byIdentity, err := newOccurrenceStoreIndex(builder.store)
+	if err != nil {
+		return nil, err
+	}
 	builder.sealed = true
+	builder.store.byIdentity = byIdentity
 	builder.store.sealed = true
 	store := builder.store
 	builder.store = nil
 	builder.displayByName = nil
 	return store, nil
+}
+
+func (store *OccurrenceStore) reference(
+	id identity.OccurrenceID,
+) (OccurrenceRef, bool) {
+	if store == nil || !store.sealed {
+		return OccurrenceRef{}, false
+	}
+	index := store.byIdentity.reference(store, id)
+	if !index.valid() {
+		return OccurrenceRef{}, false
+	}
+	return OccurrenceRef{store: store, index: index}, true
 }
 
 func (store *OccurrenceStore) Count() int {

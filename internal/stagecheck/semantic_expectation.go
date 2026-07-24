@@ -60,6 +60,12 @@ func (expected semanticPackageExpectation) occurrenceRecord(
 	return *record
 }
 
+func (expected semanticPackageExpectation) parentReference(
+	reference semanticOccurrenceRef,
+) semanticOccurrenceRef {
+	return expected.occurrences.parentReference(reference)
+}
+
 func (expected semanticPackageExpectation) hasOccurrence(
 	occurrence identity.OccurrenceID,
 ) bool {

@@ -27,17 +27,26 @@ func (b *fileBuilder) recordOccurrence(
 				occurrence.id,
 			)
 		}
+		if int(index) > len(b.occurrenceNodes) ||
+			b.occurrenceNodes[index-1] != node {
+			return fmt.Errorf(
+				"occurrence %s has conflicting transient nodes",
+				occurrence.id,
+			)
+		}
 		return nil
-	}
-	if err := b.index.bindStructuralOccurrence(
-		occurrence, node,
-	); err != nil {
-		return err
 	}
 	index, err := b.occurrenceBuilder.Append(occurrence)
 	if err != nil {
 		return err
 	}
+	if int(index) != len(b.occurrenceNodes)+1 {
+		return fmt.Errorf(
+			"occurrence %s lost canonical node alignment",
+			occurrence.id,
+		)
+	}
+	b.occurrenceNodes = append(b.occurrenceNodes, node)
 	b.occurrenceIndex[key] = index
 	b.work.RecordAppends++
 	return nil

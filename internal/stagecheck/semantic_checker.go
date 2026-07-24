@@ -136,9 +136,8 @@ func verifyCheckerSemanticPackage(
 }
 
 func (verifier *checkerSemanticVerifier) childReferences(
-	id identity.OccurrenceID,
+	reference semanticOccurrenceRef,
 ) []semanticOccurrenceRef {
-	reference := verifier.expected.occurrences.reference(id)
 	if !reference.valid() {
 		return nil
 	}
@@ -204,7 +203,9 @@ func (verifier *checkerSemanticVerifier) verifyOccurrences() error {
 			)
 		}
 		if resolution.Kind() == semantic.ResolutionOperation {
-			if verifier.independentCompileTimeContext(occurrence.OccurrenceRef) {
+			if verifier.independentCompileTimeContext(
+				occurrenceReference,
+			) {
 				return fmt.Errorf(
 					"compile-time occurrence %s owns a runtime operation",
 					occurrenceID,
@@ -219,12 +220,18 @@ func (verifier *checkerSemanticVerifier) verifyOccurrences() error {
 				)
 			}
 			if err := verifier.verifyOperation(
-				occurrence.OccurrenceRef, node, operation,
+				occurrenceReference,
+				occurrence.OccurrenceRef,
+				node,
+				operation,
 			); err != nil {
 				return err
 			}
 		} else if err := verifier.verifyResolutionTarget(
-			occurrence.OccurrenceRef, resolution, node,
+			occurrenceReference,
+			occurrence.OccurrenceRef,
+			resolution,
+			node,
 		); err != nil {
 			return fmt.Errorf(
 				"occurrence %s (%s/%s) resolution %s: %w",
@@ -240,6 +247,7 @@ func (verifier *checkerSemanticVerifier) verifyOccurrences() error {
 }
 
 func (verifier *checkerSemanticVerifier) verifyOperation(
+	reference semanticOccurrenceRef,
 	occurrence structure.OccurrenceRef,
 	node ast.Node,
 	operation semantic.Operation,
@@ -285,7 +293,9 @@ func (verifier *checkerSemanticVerifier) verifyOperation(
 	); err != nil {
 		return err
 	}
-	wantOperands, err := verifier.operationOperands(occurrence)
+	wantOperands, err := verifier.operationOperands(
+		reference, occurrence,
+	)
 	if err != nil {
 		return fmt.Errorf(
 			"operation %s operands: %w", operation.ID(), err,
@@ -324,7 +334,7 @@ func (verifier *checkerSemanticVerifier) verifyOperation(
 		)
 	}
 	return verifier.verifyOperationControl(
-		occurrence, node, operation,
+		reference, occurrence, node, operation,
 	)
 }
 

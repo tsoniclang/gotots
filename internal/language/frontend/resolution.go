@@ -11,18 +11,18 @@ import (
 )
 
 type pendingOperation struct {
-	record  *occurrenceInput
-	context occurrenceContext
-	variant catalog.Variant
-	kind    semantic.OperationKind
+	reference packageOccurrenceRef
+	record    *occurrenceInput
+	context   occurrenceContext
+	variant   catalog.Variant
+	kind      semantic.OperationKind
 }
 
 func (builder *packageBuilder) resolveOccurrences() error {
 	for _, occurrenceReference := range builder.input.order {
 		builder.objects.work.ResolutionVisits++
 		record := builder.input.occurrenceRecord(occurrenceReference)
-		occurrenceID := record.occurrence.ID()
-		context := builder.contexts.context(occurrenceID)
+		context := builder.contexts.contextAt(occurrenceReference)
 		variant := catalog.VariantNone
 		var err error
 		if !record.checkedUnmapped &&
@@ -40,7 +40,7 @@ func (builder *packageBuilder) resolveOccurrences() error {
 		}
 		builder.variantByOccurrence[occurrenceReference] = variant
 		resolution, operation, err := builder.classifyOccurrence(
-			record, context, variant,
+			occurrenceReference, record, context, variant,
 		)
 		if err != nil {
 			return err
@@ -49,7 +49,9 @@ func (builder *packageBuilder) resolveOccurrences() error {
 			builder.operationKinds[occurrenceReference] = operation
 			continue
 		}
-		if err := builder.admitResolution(resolution); err != nil {
+		if err := builder.admitResolution(
+			occurrenceReference, resolution,
+		); err != nil {
 			return err
 		}
 	}
@@ -59,10 +61,12 @@ func (builder *packageBuilder) resolveOccurrences() error {
 			continue
 		}
 		record := builder.input.occurrenceRecord(occurrenceReference)
-		occurrenceID := record.occurrence.ID()
 		item := pendingOperation{
-			record:  record,
-			context: builder.contexts.context(occurrenceID),
+			reference: occurrenceReference,
+			record:    record,
+			context: builder.contexts.contextAt(
+				occurrenceReference,
+			),
 			variant: builder.variantByOccurrence[occurrenceReference],
 			kind:    operationKind,
 		}
@@ -82,7 +86,9 @@ func (builder *packageBuilder) resolveOccurrences() error {
 		if err != nil {
 			return err
 		}
-		if err := builder.admitResolution(resolution); err != nil {
+		if err := builder.admitResolution(
+			occurrenceReference, resolution,
+		); err != nil {
 			return err
 		}
 	}
@@ -128,6 +134,7 @@ func hasDirectCheckerEvidence(
 }
 
 func (builder *packageBuilder) classifyOccurrence(
+	reference packageOccurrenceRef,
 	record *occurrenceInput,
 	context occurrenceContext,
 	variant catalog.Variant,
@@ -136,7 +143,7 @@ func (builder *packageBuilder) classifyOccurrence(
 	if record.checkedUnmapped {
 		return builder.checkedViewUnsupported(record, variant)
 	}
-	if definition := builder.definitionByRoot[builder.input.occurrenceReference(record.occurrence.ID())]; !definition.IsZero() {
+	if definition := builder.definitionByRoot[reference]; !definition.IsZero() {
 		return builder.definitionComponent(
 			record, variant, definition,
 			semantic.DefinitionComponentRoot,
@@ -169,7 +176,7 @@ func (builder *packageBuilder) classifyOccurrence(
 		return resolution, semantic.OperationInvalid, err
 	}
 	if typeID, present, err := builder.typeResolution(
-		record, context,
+		reference, record, context,
 	); present || err != nil {
 		if err != nil {
 			return semantic.OccurrenceResolution{},

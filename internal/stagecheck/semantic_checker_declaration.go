@@ -107,8 +107,11 @@ func (verifier *checkerSemanticVerifier) deriveIndependentDefinitionOwnership() 
 		}
 		var sources []identity.OccurrenceID
 		if !definition.Root().IsZero() {
-			for _, childReference := range verifier.childReferences(
+			rootReference := verifier.expected.occurrences.reference(
 				definition.Root(),
+			)
+			for _, childReference := range verifier.childReferences(
+				rootReference,
 			) {
 				child := verifier.expected.occurrenceRecord(
 					childReference,

@@ -317,8 +317,10 @@ func (i *Inventory) AdditionalOccurrenceRef(
 	return occurrence, true, nil
 }
 
-func (i *Inventory) sort() error {
-	if err := i.occurrences.seal(); err != nil {
+func (i *Inventory) sort(
+	index *structure.TransientIndex,
+) error {
+	if err := i.occurrences.seal(index); err != nil {
 		return err
 	}
 	sort.Slice(i.regionIDs, func(left, right int) bool {

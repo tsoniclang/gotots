@@ -8,6 +8,20 @@ import (
 	"github.com/tsoniclang/gotots/internal/identity"
 )
 
+type transientOccurrenceDomain uint8
+
+const (
+	transientOccurrenceSupplement transientOccurrenceDomain = iota
+	transientOccurrenceStructural
+	transientOccurrenceExecutable
+	transientOccurrenceDomainCount
+)
+
+func (domain transientOccurrenceDomain) valid() bool {
+	return domain > transientOccurrenceSupplement &&
+		domain < transientOccurrenceDomainCount
+}
+
 type transientOccurrenceKey struct {
 	start int
 	end   int
@@ -26,9 +40,9 @@ func (reference transientFileRef) valid() bool {
 	return reference != 0
 }
 
-type transientOccurrenceAddress struct {
-	file       transientFileRef
-	occurrence transientOccurrenceRef
+type transientStoreAddress struct {
+	file   transientFileRef
+	domain transientOccurrenceDomain
 }
 
 type transientOccurrenceBinding struct {
@@ -36,23 +50,34 @@ type transientOccurrenceBinding struct {
 	node ast.Node
 }
 
+type transientCanonicalOccurrences struct {
+	store *OccurrenceStore
+	nodes []ast.Node
+	slots []OccurrenceIndex
+}
+
 type transientOccurrenceFile struct {
-	id        identity.FileID
-	positions map[transientOccurrenceKey]transientOccurrenceRef
-	records   []transientOccurrenceBinding
+	id identity.FileID
+
+	canonical [transientOccurrenceDomainCount]transientCanonicalOccurrences
+
+	supplementPositions map[transientOccurrenceKey]transientOccurrenceRef
+	supplements         []transientOccurrenceBinding
 }
 
 type transientOccurrenceStore struct {
 	filesByID map[identity.FileID]transientFileRef
 	files     []transientOccurrenceFile
-	reverse   map[ast.Node]transientOccurrenceAddress
+	byStore   map[*OccurrenceStore]transientStoreAddress
+	pending   map[*OccurrenceStoreBuilder][]ast.Node
 	sealed    bool
 }
 
 func newTransientOccurrenceStore() *transientOccurrenceStore {
 	return &transientOccurrenceStore{
 		filesByID: map[identity.FileID]transientFileRef{},
-		reverse:   map[ast.Node]transientOccurrenceAddress{},
+		byStore:   map[*OccurrenceStore]transientStoreAddress{},
+		pending:   map[*OccurrenceStoreBuilder][]ast.Node{},
 	}
 }
 
@@ -85,13 +110,294 @@ func (store *transientOccurrenceStore) file(
 			panic("transient occurrence file table overflows uint32")
 		}
 		store.files = append(store.files, transientOccurrenceFile{
-			id:        id,
-			positions: map[transientOccurrenceKey]transientOccurrenceRef{},
+			id:                  id,
+			supplementPositions: map[transientOccurrenceKey]transientOccurrenceRef{},
 		})
 		reference = transientFileRef(len(store.files))
 		store.filesByID[id] = reference
 	}
 	return reference, &store.files[reference-1]
+}
+
+func (store *transientOccurrenceStore) register(
+	domain transientOccurrenceDomain,
+	canonical *OccurrenceStore,
+	nodes []ast.Node,
+	compatible func(ast.Node, ast.Node) bool,
+) error {
+	if store == nil || store.sealed || !domain.valid() ||
+		canonical == nil || !canonical.sealed ||
+		canonical.file.IsZero() ||
+		len(nodes) != canonical.Count() || len(nodes) == 0 ||
+		compatible == nil {
+		return fmt.Errorf(
+			"transient occurrence registration requires one sealed canonical store",
+		)
+	}
+	if _, duplicate := store.byStore[canonical]; duplicate {
+		return fmt.Errorf(
+			"canonical occurrence store for %s is already registered",
+			canonical.file,
+		)
+	}
+	fileReference, file := store.file(canonical.file, true)
+	if file.canonical[domain].store != nil {
+		return fmt.Errorf(
+			"transient occurrence domain %d repeats for %s",
+			domain,
+			canonical.file,
+		)
+	}
+	indexed, err := newTransientCanonicalOccurrences(canonical, nodes)
+	if err != nil {
+		return err
+	}
+	for index := 1; index <= canonical.Count(); index++ {
+		reference := OccurrenceIndex(index)
+		record := canonical.records[reference-1]
+		key := transientOccurrenceKey{
+			start: record.start,
+			end:   record.end,
+			kind:  record.kind,
+		}
+		for other := transientOccurrenceStructural; other < transientOccurrenceDomainCount; other++ {
+			if other == domain {
+				continue
+			}
+			if file.canonical[other].reference(key).valid() {
+				return fmt.Errorf(
+					"canonical occurrence %s is stored in domains %d and %d",
+					occurrenceIdentity(canonical.file, key.start, key.end, key.kind),
+					other,
+					domain,
+				)
+			}
+		}
+		node := nodes[reference-1]
+		if node == nil {
+			return fmt.Errorf(
+				"canonical occurrence %s has no transient node",
+				occurrenceIdentity(canonical.file, key.start, key.end, key.kind),
+			)
+		}
+		kind, classifyErr := Classify(node)
+		if classifyErr != nil {
+			return classifyErr
+		}
+		if uint16(kind) != key.kind {
+			return fmt.Errorf(
+				"canonical occurrence %s has node kind %s",
+				occurrenceIdentity(canonical.file, key.start, key.end, key.kind),
+				kind,
+			)
+		}
+	}
+	file.canonical[domain] = indexed
+	store.byStore[canonical] = transientStoreAddress{
+		file: fileReference, domain: domain,
+	}
+	for index := 1; index <= canonical.Count(); index++ {
+		reference := OccurrenceIndex(index)
+		record := canonical.records[reference-1]
+		key := transientOccurrenceKey{
+			start: record.start,
+			end:   record.end,
+			kind:  record.kind,
+		}
+		if supplement := file.supplementPositions[key]; supplement.valid() {
+			binding := &file.supplements[supplement-1]
+			if !compatible(binding.node, nodes[reference-1]) {
+				return fmt.Errorf(
+					"canonical occurrence %s conflicts with supplemental node",
+					occurrenceIdentity(canonical.file, key.start, key.end, key.kind),
+				)
+			}
+			delete(file.supplementPositions, key)
+			*binding = transientOccurrenceBinding{}
+		}
+	}
+	return nil
+}
+
+func newTransientCanonicalOccurrences(
+	store *OccurrenceStore,
+	nodes []ast.Node,
+) (transientCanonicalOccurrences, error) {
+	capacity := 8
+	for capacity < store.Count()*2 {
+		if capacity > int(^uint(0)>>2) {
+			return transientCanonicalOccurrences{}, fmt.Errorf(
+				"transient canonical occurrence index overflows",
+			)
+		}
+		capacity <<= 1
+	}
+	out := transientCanonicalOccurrences{
+		store: store,
+		nodes: nodes,
+		slots: make([]OccurrenceIndex, capacity),
+	}
+	for index := 1; index <= store.Count(); index++ {
+		reference := OccurrenceIndex(index)
+		record := store.records[reference-1]
+		key := transientOccurrenceKey{
+			start: record.start,
+			end:   record.end,
+			kind:  record.kind,
+		}
+		slot := transientOccurrenceHash(key) & uint64(len(out.slots)-1)
+		for probes := 0; probes < len(out.slots); probes++ {
+			if !out.slots[slot].valid() {
+				out.slots[slot] = reference
+				break
+			}
+			existing := store.records[out.slots[slot]-1]
+			if existing.start == key.start &&
+				existing.end == key.end &&
+				existing.kind == key.kind {
+				return transientCanonicalOccurrences{}, fmt.Errorf(
+					"canonical occurrence key repeats in %s",
+					store.file,
+				)
+			}
+			slot = (slot + 1) & uint64(len(out.slots)-1)
+		}
+	}
+	return out, nil
+}
+
+func (canonical transientCanonicalOccurrences) reference(
+	key transientOccurrenceKey,
+) OccurrenceIndex {
+	if canonical.store == nil || len(canonical.slots) == 0 {
+		return 0
+	}
+	slot := transientOccurrenceHash(key) & uint64(len(canonical.slots)-1)
+	for probes := 0; probes < len(canonical.slots); probes++ {
+		reference := canonical.slots[slot]
+		if !reference.valid() {
+			return 0
+		}
+		record := canonical.store.records[reference-1]
+		if record.start == key.start &&
+			record.end == key.end &&
+			record.kind == key.kind {
+			return reference
+		}
+		slot = (slot + 1) & uint64(len(canonical.slots)-1)
+	}
+	return 0
+}
+
+func transientOccurrenceHash(key transientOccurrenceKey) uint64 {
+	hash := uint64(uint(key.start)) + 0x9e3779b97f4a7c15
+	hash ^= uint64(uint(key.end)) + 0x9e3779b97f4a7c15 +
+		(hash << 6) + (hash >> 2)
+	hash ^= uint64(key.kind) + 0x9e3779b97f4a7c15 +
+		(hash << 6) + (hash >> 2)
+	hash ^= hash >> 30
+	hash *= 0xbf58476d1ce4e5b9
+	hash ^= hash >> 27
+	hash *= 0x94d049bb133111eb
+	return hash ^ (hash >> 31)
+}
+
+func (store *transientOccurrenceStore) bindSupplement(
+	id identity.OccurrenceID,
+	node ast.Node,
+) error {
+	if store == nil || store.sealed || node == nil {
+		return fmt.Errorf(
+			"transient supplemental occurrence rejects sealed or empty binding",
+		)
+	}
+	key, valid := transientKey(id)
+	if !valid {
+		return fmt.Errorf(
+			"transient supplemental occurrence rejects zero identity",
+		)
+	}
+	_, file := store.file(id.Span().File(), true)
+	for domain := transientOccurrenceStructural; domain < transientOccurrenceDomainCount; domain++ {
+		if reference := file.canonical[domain].reference(key); reference.valid() {
+			existing := file.canonical[domain].nodes[reference-1]
+			if existing != node {
+				return fmt.Errorf(
+					"transient occurrence %s has conflicting canonical nodes",
+					id,
+				)
+			}
+			return nil
+		}
+	}
+	reference := file.supplementPositions[key]
+	if !reference.valid() {
+		if uint64(len(file.supplements)) >= uint64(^uint32(0)) {
+			return fmt.Errorf(
+				"transient supplemental occurrence table overflows uint32",
+			)
+		}
+		file.supplements = append(
+			file.supplements,
+			transientOccurrenceBinding{key: key, node: node},
+		)
+		reference = transientOccurrenceRef(len(file.supplements))
+		file.supplementPositions[key] = reference
+	} else if file.supplements[reference-1].node != node {
+		return fmt.Errorf(
+			"transient occurrence %s has conflicting supplemental nodes",
+			id,
+		)
+	}
+	return nil
+}
+
+func (store *transientOccurrenceStore) replace(
+	reference OccurrenceRef,
+	node ast.Node,
+) error {
+	if store == nil || store.sealed || !reference.valid() || node == nil {
+		return fmt.Errorf(
+			"transient executable occurrence replacement is invalid",
+		)
+	}
+	owner, present := store.byStore[reference.store]
+	if !present || !owner.file.valid() ||
+		int(owner.file) > len(store.files) ||
+		!owner.domain.valid() {
+		return fmt.Errorf(
+			"transient executable occurrence has no canonical store",
+		)
+	}
+	file := &store.files[owner.file-1]
+	canonical := &file.canonical[owner.domain]
+	if int(reference.index) > len(canonical.nodes) {
+		return fmt.Errorf(
+			"transient executable occurrence index is outside canonical storage",
+		)
+	}
+	canonical.nodes[reference.index-1] = node
+	return nil
+}
+
+func (store *transientOccurrenceStore) nodeForReference(
+	reference OccurrenceRef,
+) (ast.Node, bool) {
+	if store == nil || !reference.valid() {
+		return nil, false
+	}
+	owner, present := store.byStore[reference.store]
+	if !present || !owner.file.valid() ||
+		int(owner.file) > len(store.files) ||
+		!owner.domain.valid() {
+		return nil, false
+	}
+	canonical := store.files[owner.file-1].canonical[owner.domain]
+	if int(reference.index) > len(canonical.nodes) {
+		return nil, false
+	}
+	node := canonical.nodes[reference.index-1]
+	return node, node != nil
 }
 
 func (store *transientOccurrenceStore) node(
@@ -105,94 +411,32 @@ func (store *transientOccurrenceStore) node(
 	if file == nil {
 		return nil, false
 	}
+	for domain := transientOccurrenceStructural; domain < transientOccurrenceDomainCount; domain++ {
+		canonical := file.canonical[domain]
+		if reference := canonical.reference(key); reference.valid() {
+			node := canonical.nodes[reference-1]
+			return node, node != nil
+		}
+	}
 	if !store.sealed {
-		reference := file.positions[key]
+		reference := file.supplementPositions[key]
 		if !reference.valid() {
 			return nil, false
 		}
-		return file.records[reference-1].node, true
+		node := file.supplements[reference-1].node
+		return node, node != nil
 	}
-	index := sort.Search(len(file.records), func(index int) bool {
+	index := sort.Search(len(file.supplements), func(index int) bool {
 		return !lessTransientOccurrenceKey(
-			file.records[index].key, key,
+			file.supplements[index].key,
+			key,
 		)
 	})
-	if index == len(file.records) ||
-		file.records[index].key != key {
+	if index == len(file.supplements) ||
+		file.supplements[index].key != key {
 		return nil, false
 	}
-	return file.records[index].node, true
-}
-
-func (store *transientOccurrenceStore) bind(
-	id identity.OccurrenceID,
-	node ast.Node,
-) error {
-	if store == nil || store.sealed || node == nil {
-		return fmt.Errorf(
-			"transient occurrence store rejects sealed or empty binding",
-		)
-	}
-	key, valid := transientKey(id)
-	if !valid {
-		return fmt.Errorf(
-			"transient occurrence store rejects zero identity",
-		)
-	}
-	fileReference, file := store.file(id.Span().File(), true)
-	reference := file.positions[key]
-	if !reference.valid() {
-		if uint64(len(file.records)) >= uint64(^uint32(0)) {
-			return fmt.Errorf(
-				"transient occurrence table overflows uint32",
-			)
-		}
-		file.records = append(file.records, transientOccurrenceBinding{
-			key: key, node: node,
-		})
-		reference = transientOccurrenceRef(len(file.records))
-		file.positions[key] = reference
-	}
-	address := transientOccurrenceAddress{
-		file: fileReference, occurrence: reference,
-	}
-	if existing, present := store.reverse[node]; present &&
-		existing != address {
-		existingID, err := store.identity(existing)
-		if err != nil {
-			return err
-		}
-		return fmt.Errorf(
-			"transient node has conflicting occurrences %s and %s",
-			existingID, id,
-		)
-	}
-	store.reverse[node] = address
-	file.records[reference-1].node = node
-	return nil
-}
-
-func (store *transientOccurrenceStore) identity(
-	address transientOccurrenceAddress,
-) (identity.OccurrenceID, error) {
-	if store == nil ||
-		!address.file.valid() ||
-		int(address.file) > len(store.files) {
-		return identity.OccurrenceID{}, fmt.Errorf(
-			"transient occurrence address has absent file",
-		)
-	}
-	file := &store.files[address.file-1]
-	if !address.occurrence.valid() ||
-		int(address.occurrence) > len(file.records) {
-		return identity.OccurrenceID{}, fmt.Errorf(
-			"transient occurrence address has absent record",
-		)
-	}
-	return transientOccurrenceIdentity(
-		file.id,
-		file.records[address.occurrence-1].key,
-	)
+	return file.supplements[index].node, true
 }
 
 func transientOccurrenceIdentity(
@@ -204,120 +448,6 @@ func transientOccurrenceIdentity(
 		return identity.OccurrenceID{}, err
 	}
 	return identity.NewOccurrenceID(span, key.kind)
-}
-
-func (store *transientOccurrenceStore) seal(
-	counterparts map[ast.Node]ast.Node,
-	originals map[ast.Node]ast.Node,
-) error {
-	if store == nil || store.sealed || store.reverse == nil {
-		return fmt.Errorf(
-			"transient occurrence store cannot seal",
-		)
-	}
-	for node, address := range store.reverse {
-		file := &store.files[address.file-1]
-		bound := file.records[address.occurrence-1].node
-		if bound != node &&
-			counterparts[bound] != node &&
-			originals[bound] != node &&
-			counterparts[node] != bound &&
-			originals[node] != bound {
-			id, err := store.identity(address)
-			if err != nil {
-				return err
-			}
-			return fmt.Errorf(
-				"transient reverse occurrence %s disagrees with its forward binding",
-				id,
-			)
-		}
-	}
-	for index := range store.files {
-		file := &store.files[index]
-		sort.Slice(file.records, func(left, right int) bool {
-			return lessTransientOccurrenceKey(
-				file.records[left].key,
-				file.records[right].key,
-			)
-		})
-		for record := 1; record < len(file.records); record++ {
-			if file.records[record-1].key ==
-				file.records[record].key {
-				return fmt.Errorf(
-					"transient occurrence key repeats in %s",
-					file.id,
-				)
-			}
-		}
-		file.positions = nil
-	}
-	store.reverse = nil
-	store.sealed = true
-	return nil
-}
-
-func (store *transientOccurrenceStore) visitFiles(
-	files []identity.FileID,
-	visit func(identity.OccurrenceID, ast.Node) error,
-) error {
-	if store == nil || !store.sealed || visit == nil {
-		return fmt.Errorf(
-			"transient occurrence visit requires sealed storage and visitor",
-		)
-	}
-	seen := map[identity.FileID]bool{}
-	for _, fileID := range files {
-		if fileID.IsZero() || seen[fileID] {
-			return fmt.Errorf(
-				"transient occurrence visit has zero or duplicate file %s",
-				fileID,
-			)
-		}
-		seen[fileID] = true
-		_, file := store.file(fileID, false)
-		if file == nil {
-			continue
-		}
-		for _, record := range file.records {
-			id, err := transientOccurrenceIdentity(
-				file.id, record.key,
-			)
-			if err != nil {
-				return err
-			}
-			if err := visit(id, record.node); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (store *transientOccurrenceStore) countFiles(
-	files []identity.FileID,
-) (int, error) {
-	if store == nil || !store.sealed {
-		return 0, fmt.Errorf(
-			"transient occurrence count requires sealed storage",
-		)
-	}
-	seen := map[identity.FileID]bool{}
-	total := 0
-	for _, fileID := range files {
-		if fileID.IsZero() || seen[fileID] {
-			return 0, fmt.Errorf(
-				"transient occurrence count has zero or duplicate file %s",
-				fileID,
-			)
-		}
-		seen[fileID] = true
-		_, file := store.file(fileID, false)
-		if file != nil {
-			total += len(file.records)
-		}
-	}
-	return total, nil
 }
 
 func lessTransientOccurrenceKey(

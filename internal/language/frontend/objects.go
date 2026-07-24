@@ -334,13 +334,16 @@ func definitionNameSources(
 	input *packageInput,
 	definition identity.DefinitionID,
 ) []identity.OccurrenceID {
-	root := input.occurrence(definition.Root())
+	rootReference := input.occurrenceReference(definition.Root())
+	root := input.occurrenceRecord(rootReference)
 	if root == nil {
 		return nil
 	}
 	var out []identity.OccurrenceID
-	for _, childID := range input.occurrenceChildren(root) {
-		child := input.occurrenceRecord(childID)
+	for _, childReference := range input.occurrenceChildren(
+		rootReference,
+	) {
+		child := input.occurrenceRecord(childReference)
 		if child != nil &&
 			child.occurrence.Role() ==
 				catalog.RoleDeclarationName {

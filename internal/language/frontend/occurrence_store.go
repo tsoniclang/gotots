@@ -33,6 +33,7 @@ type occurrenceStore struct {
 	keys             []localOccurrenceKey
 	records          []occurrenceInput
 	byNode           map[ast.Node]packageOccurrenceRef
+	parents          []packageOccurrenceRef
 	childRanges      []occurrenceRelationRange
 	children         []packageOccurrenceRef
 	active           int
@@ -351,11 +352,16 @@ func (store *occurrenceStore) buildChildRelations(
 	order []packageOccurrenceRef,
 ) (int, error) {
 	if store == nil || !store.sealed ||
+		store.parents != nil ||
 		store.childRanges != nil || store.children != nil {
 		return 0, fmt.Errorf(
 			"package occurrence child relations require one sealed build",
 		)
 	}
+	store.parents = make(
+		[]packageOccurrenceRef,
+		len(store.records)+1,
+	)
 	store.childRanges = make(
 		[]occurrenceRelationRange,
 		len(store.records)+1,
@@ -372,6 +378,7 @@ func (store *occurrenceStore) buildChildRelations(
 		parentReference := store.reference(
 			child.occurrence.Parent(),
 		)
+		store.parents[childReference] = parentReference
 		if !parentReference.valid() {
 			continue
 		}
@@ -397,10 +404,7 @@ func (store *occurrenceStore) buildChildRelations(
 		cursor[reference] = store.childRanges[reference].start
 	}
 	for _, childReference := range order {
-		child := store.record(childReference)
-		parentReference := store.reference(
-			child.occurrence.Parent(),
-		)
+		parentReference := store.parents[childReference]
 		if !parentReference.valid() {
 			continue
 		}
@@ -411,7 +415,7 @@ func (store *occurrenceStore) buildChildRelations(
 	for reference := packageOccurrenceRef(1); int(reference) <= len(store.records); reference++ {
 		parent := store.record(reference)
 		children := store.childReferences(reference)
-		if parent == nil || len(children) < 2 {
+		if parent == nil || len(children) == 0 {
 			continue
 		}
 		for _, childReference := range children {
@@ -435,6 +439,16 @@ func (store *occurrenceStore) buildChildRelations(
 		})
 	}
 	return total, nil
+}
+
+func (store *occurrenceStore) parentReference(
+	child packageOccurrenceRef,
+) packageOccurrenceRef {
+	if store == nil || !child.valid() ||
+		int(child) >= len(store.parents) {
+		return 0
+	}
+	return store.parents[child]
 }
 
 func (store *occurrenceStore) childReferences(

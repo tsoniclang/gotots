@@ -13,13 +13,18 @@ import (
 )
 
 func (builder *packageBuilder) operationOperands(
+	reference packageOccurrenceRef,
 	record *occurrenceInput,
 ) []identity.OccurrenceID {
-	children := orderedOperationChildren(builder.input, record)
+	children := orderedOperationChildren(
+		builder.input, reference, record,
+	)
 	out := make([]identity.OccurrenceID, 0, len(children))
 	for _, childReference := range children {
 		child := builder.input.occurrenceRecord(childReference)
-		if child == nil || !runtimeOperand(child, builder) {
+		if child == nil || !runtimeOperand(
+			childReference, child, builder,
+		) {
 			continue
 		}
 		out = append(out, child.occurrence.ID())
@@ -29,9 +34,10 @@ func (builder *packageBuilder) operationOperands(
 
 func orderedOperationChildren(
 	input *packageInput,
+	reference packageOccurrenceRef,
 	record *occurrenceInput,
 ) []packageOccurrenceRef {
-	children := input.occurrenceChildren(record)
+	children := input.occurrenceChildren(reference)
 	if record.occurrence.Kind() != catalog.KindForStmt &&
 		record.occurrence.Kind() != catalog.KindRangeStmt {
 		return children
@@ -62,10 +68,11 @@ func orderedOperationChildren(
 }
 
 func runtimeOperand(
+	reference packageOccurrenceRef,
 	record *occurrenceInput,
 	builder *packageBuilder,
 ) bool {
-	if builder.contexts.context(record.occurrence.ID()).compileTime {
+	if builder.contexts.contextAt(reference).compileTime {
 		return false
 	}
 	if !catalog.RoleMayContributeRuntimeEvaluation(
@@ -75,11 +82,9 @@ func runtimeOperand(
 	}
 	switch record.occurrence.Role() {
 	case catalog.RoleElementKey:
-		parent := builder.input.occurrence(record.occurrence.Parent())
-		return parent == nil ||
-			builder.variantByOccurrence[builder.input.occurrenceReference(
-				parent.occurrence.ID(),
-			)] !=
+		parentReference := builder.input.occurrenceParent(reference)
+		return !parentReference.valid() ||
+			builder.variantByOccurrence[parentReference] !=
 				catalog.VariantKeyFieldName
 	default:
 		return true
@@ -192,32 +197,35 @@ func (builder *packageBuilder) labeledControlTarget(
 			"label binding %s has no declaration occurrence", label,
 		)
 	}
-	labeled := builder.input.occurrence(labelRecord.occurrence.Parent())
+	labelReference := builder.input.occurrenceReference(declaration)
+	labeledReference := builder.input.occurrenceParent(labelReference)
+	labeled := builder.input.occurrenceRecord(labeledReference)
 	if labeled == nil ||
 		labeled.occurrence.Kind() != catalog.KindLabeledStmt {
 		return identity.OperationID{}, fmt.Errorf(
 			"label binding %s has no labeled statement", label,
 		)
 	}
-	targetOccurrence := labeled.occurrence.ID()
+	targetReference := labeledReference
 	if lexical == token.BREAK || lexical == token.CONTINUE {
-		for _, childID := range builder.input.occurrenceChildren(labeled) {
-			child := builder.input.occurrenceRecord(childID)
+		for _, childReference := range builder.input.occurrenceChildren(
+			labeledReference,
+		) {
+			child := builder.input.occurrenceRecord(childReference)
 			if child != nil &&
 				child.occurrence.Role() ==
 					catalog.RoleLabeledStatement {
-				targetOccurrence = child.occurrence.ID()
+				targetReference = childReference
 				break
 			}
 		}
 	}
-	target, err := builder.operationID(
-		builder.input.occurrenceReference(targetOccurrence),
-	)
+	targetRecord := builder.input.occurrenceRecord(targetReference)
+	target, err := builder.operationID(targetReference)
 	if err != nil {
 		return identity.OperationID{}, fmt.Errorf(
 			"label binding %s target %s: %w",
-			label, targetOccurrence, err,
+			label, targetRecord.occurrence.ID(), err,
 		)
 	}
 	return target, nil

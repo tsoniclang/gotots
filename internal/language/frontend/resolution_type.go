@@ -9,6 +9,7 @@ import (
 )
 
 func (builder *packageBuilder) typeResolution(
+	reference packageOccurrenceRef,
 	record *occurrenceInput,
 	context occurrenceContext,
 ) (identity.SemanticTypeID, bool, error) {
@@ -30,7 +31,9 @@ func (builder *packageBuilder) typeResolution(
 		}
 	}
 	if resolved == nil {
-		resolved = builder.inferredArrayEllipsisType(record)
+		resolved = builder.inferredArrayEllipsisType(
+			reference, record,
+		)
 	}
 	if resolved == nil {
 		return identity.SemanticTypeID{}, false, nil
@@ -40,6 +43,7 @@ func (builder *packageBuilder) typeResolution(
 }
 
 func (builder *packageBuilder) inferredArrayEllipsisType(
+	reference packageOccurrenceRef,
 	record *occurrenceInput,
 ) types.Type {
 	if record.occurrence.Kind() != catalog.KindEllipsis ||
@@ -47,7 +51,9 @@ func (builder *packageBuilder) inferredArrayEllipsisType(
 		return nil
 	}
 	ellipsis, ellipsisNode := record.node.(*ast.Ellipsis)
-	parent := builder.input.occurrence(record.occurrence.Parent())
+	parent := builder.input.occurrenceRecord(
+		builder.input.occurrenceParent(reference),
+	)
 	if !ellipsisNode || parent == nil {
 		return nil
 	}

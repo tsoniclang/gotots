@@ -17,11 +17,13 @@ func (index *objectIndex) indexUnnamedSignatureBindings() error {
 		if !fieldNode || len(field.Names) != 0 {
 			continue
 		}
-		context := index.contexts.context(occurrenceID)
+		context := index.contexts.contextAt(occurrenceReference)
 		if index.intrinsicContractBinding(occurrenceID) {
 			continue
 		}
-		role, signatureField := index.signatureBindingRole(record)
+		role, signatureField := index.signatureBindingRole(
+			occurrenceReference, record,
+		)
 		if !signatureField {
 			continue
 		}
@@ -34,7 +36,7 @@ func (index *objectIndex) indexUnnamedSignatureBindings() error {
 			)
 		}
 		object, err := index.unnamedSignatureObject(
-			record, field, context, role,
+			occurrenceReference, record, field, context, role,
 		)
 		if err != nil {
 			return err
@@ -89,9 +91,12 @@ func (index *objectIndex) intrinsicContractBinding(
 }
 
 func (index *objectIndex) signatureBindingRole(
+	reference packageOccurrenceRef,
 	record *occurrenceInput,
 ) (identity.SemanticBindingRole, bool) {
-	parent := index.input.occurrence(record.occurrence.Parent())
+	parent := index.input.occurrenceRecord(
+		index.input.occurrenceParent(reference),
+	)
 	if parent == nil {
 		return identity.SemanticBindingInvalid, false
 	}
@@ -132,6 +137,7 @@ func (index *objectIndex) signatureBindingRole(
 }
 
 func (index *objectIndex) unnamedSignatureObject(
+	reference packageOccurrenceRef,
 	record *occurrenceInput,
 	field *ast.Field,
 	context occurrenceContext,
@@ -150,7 +156,7 @@ func (index *objectIndex) unnamedSignatureObject(
 		object = signature.Recv()
 	case identity.SemanticBindingParameter:
 		value, err := index.unnamedTupleObject(
-			record, field, signature.Params(),
+			reference, record, field, signature.Params(),
 		)
 		if err != nil {
 			return nil, err
@@ -158,7 +164,7 @@ func (index *objectIndex) unnamedSignatureObject(
 		object = value
 	case identity.SemanticBindingResult:
 		value, err := index.unnamedTupleObject(
-			record, field, signature.Results(),
+			reference, record, field, signature.Results(),
 		)
 		if err != nil {
 			return nil, err
@@ -175,11 +181,14 @@ func (index *objectIndex) unnamedSignatureObject(
 }
 
 func (index *objectIndex) unnamedTupleObject(
+	reference packageOccurrenceRef,
 	record *occurrenceInput,
 	field *ast.Field,
 	tuple *types.Tuple,
 ) (*types.Var, error) {
-	parent := index.input.occurrence(record.occurrence.Parent())
+	parent := index.input.occurrenceRecord(
+		index.input.occurrenceParent(reference),
+	)
 	if parent == nil {
 		return nil, fmt.Errorf(
 			"unnamed signature field %s has no structural parent",

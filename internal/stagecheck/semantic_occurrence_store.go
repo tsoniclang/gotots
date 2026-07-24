@@ -30,10 +30,11 @@ type semanticOccurrenceStore struct {
 	files       map[identity.FileID]uint32
 	fileIDs     []identity.FileID
 	nextFile    uint32
-	byIdentity  map[semanticOccurrenceKey]semanticOccurrenceRef
+	byIdentity  semanticOccurrenceIndex
 	keys        []semanticOccurrenceKey
 	records     []semanticExpectedOccurrence
 	byNode      map[ast.Node]semanticOccurrenceRef
+	parents     []semanticOccurrenceRef
 	childRanges []semanticOccurrenceRange
 	children    []semanticOccurrenceRef
 	active      int
@@ -44,11 +45,8 @@ func newSemanticOccurrenceStore(capacity int) *semanticOccurrenceStore {
 		panic("semantic expectation occurrence store has negative capacity")
 	}
 	return &semanticOccurrenceStore{
-		files: map[identity.FileID]uint32{},
-		byIdentity: make(
-			map[semanticOccurrenceKey]semanticOccurrenceRef,
-			capacity,
-		),
+		files:      map[identity.FileID]uint32{},
+		byIdentity: newSemanticOccurrenceIndex(capacity),
 		records: make(
 			[]semanticExpectedOccurrence, 0, capacity,
 		),
@@ -113,7 +111,7 @@ func (store *semanticOccurrenceStore) identityReference(
 	if !present {
 		return 0
 	}
-	return store.byIdentity[key]
+	return store.byIdentity.reference(store.keys, key)
 }
 
 func (store *semanticOccurrenceStore) record(
@@ -142,7 +140,9 @@ func (store *semanticOccurrenceStore) put(
 			"semantic occurrence store rejects zero identity",
 		)
 	}
-	if reference := store.byIdentity[key]; reference.valid() {
+	if reference := store.byIdentity.reference(
+		store.keys, key,
+	); reference.valid() {
 		existing := store.record(reference)
 		if existing.ID().IsZero() {
 			*existing = *record
@@ -170,7 +170,9 @@ func (store *semanticOccurrenceStore) put(
 func (store *semanticOccurrenceStore) admitIdentity(
 	key semanticOccurrenceKey,
 ) (semanticOccurrenceRef, error) {
-	if reference := store.byIdentity[key]; reference.valid() {
+	if reference := store.byIdentity.reference(
+		store.keys, key,
+	); reference.valid() {
 		return reference, nil
 	}
 	if uint64(len(store.records)) >= uint64(^uint32(0)) {
@@ -184,7 +186,13 @@ func (store *semanticOccurrenceStore) admitIdentity(
 		semanticExpectedOccurrence{},
 	)
 	reference := semanticOccurrenceRef(len(store.records))
-	store.byIdentity[key] = reference
+	if err := store.byIdentity.insert(
+		store.keys, reference,
+	); err != nil {
+		store.keys = store.keys[:len(store.keys)-1]
+		store.records = store.records[:len(store.records)-1]
+		return 0, err
+	}
 	return reference, nil
 }
 
@@ -195,7 +203,7 @@ func (store *semanticOccurrenceStore) remove(
 	if !present {
 		return
 	}
-	reference := store.byIdentity[key]
+	reference := store.byIdentity.reference(store.keys, key)
 	if !reference.valid() ||
 		store.records[reference-1].ID().IsZero() {
 		return
@@ -266,12 +274,17 @@ func (store *semanticOccurrenceStore) buildChildRelations(
 	order []semanticOccurrenceRef,
 ) error {
 	if store == nil ||
+		store.parents != nil ||
 		store.childRanges != nil ||
 		store.children != nil {
 		return fmt.Errorf(
 			"semantic occurrence child relations require one store build",
 		)
 	}
+	store.parents = make(
+		[]semanticOccurrenceRef,
+		len(store.records)+1,
+	)
 	store.childRanges = make(
 		[]semanticOccurrenceRange,
 		len(store.records)+1,
@@ -286,6 +299,7 @@ func (store *semanticOccurrenceStore) buildChildRelations(
 			)
 		}
 		parentReference := store.reference(child.Parent())
+		store.parents[childReference] = parentReference
 		if !parentReference.valid() {
 			continue
 		}
@@ -311,8 +325,7 @@ func (store *semanticOccurrenceStore) buildChildRelations(
 		cursor[reference] = store.childRanges[reference].start
 	}
 	for _, childReference := range order {
-		child := store.record(childReference)
-		parentReference := store.reference(child.Parent())
+		parentReference := store.parents[childReference]
 		if !parentReference.valid() {
 			continue
 		}
@@ -335,6 +348,16 @@ func (store *semanticOccurrenceStore) buildChildRelations(
 		})
 	}
 	return nil
+}
+
+func (store *semanticOccurrenceStore) parentReference(
+	child semanticOccurrenceRef,
+) semanticOccurrenceRef {
+	if store == nil || !child.valid() ||
+		int(child) >= len(store.parents) {
+		return 0
+	}
+	return store.parents[child]
 }
 
 func (store *semanticOccurrenceStore) childReferences(

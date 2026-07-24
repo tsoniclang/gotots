@@ -40,7 +40,13 @@ type contextIndex struct {
 func (index *contextIndex) context(
 	id identity.OccurrenceID,
 ) occurrenceContext {
-	record := index.input.occurrence(id)
+	return index.contextAt(index.input.occurrenceReference(id))
+}
+
+func (index *contextIndex) contextAt(
+	reference packageOccurrenceRef,
+) occurrenceContext {
+	record := index.input.occurrenceRecord(reference)
 	if record == nil || !record.contextAssigned {
 		return occurrenceContext{}
 	}
@@ -76,11 +82,9 @@ func buildContexts(
 				catalog.ResolutionDomainExecutable,
 			arity: semantic.ResultArityOne,
 		}
-		parentID := record.occurrence.Parent()
-		if parent := input.occurrence(parentID); parent != nil {
-			if err := assign(
-				input.occurrenceReference(parentID),
-			); err != nil {
+		parentReference := input.occurrenceParent(reference)
+		if parent := input.occurrenceRecord(parentReference); parent != nil {
+			if err := assign(parentReference); err != nil {
 				return err
 			}
 			context = parent.context
@@ -89,6 +93,7 @@ func buildContexts(
 			context.commaOK = false
 			context = childContext(
 				input,
+				parentReference,
 				parent,
 				record,
 				context,
@@ -137,6 +142,7 @@ func buildContexts(
 
 func childContext(
 	input *packageInput,
+	parentReference packageOccurrenceRef,
 	parent *occurrenceInput,
 	child *occurrenceInput,
 	context occurrenceContext,
@@ -276,47 +282,37 @@ func childContext(
 			context.expected = types.Typ[types.Bool]
 		}
 		if role == catalog.RoleBody {
-			target := input.occurrenceReference(
-				parent.occurrence.ID(),
-			)
-			context.breakTarget = target
-			context.continueTarget = target
+			context.breakTarget = parentReference
+			context.continueTarget = parentReference
 		}
 	case *ast.RangeStmt:
 		assignRangeContext(
 			view, node, role, &context,
 		)
 		if role == catalog.RoleBody {
-			target := input.occurrenceReference(
-				parent.occurrence.ID(),
-			)
-			context.breakTarget = target
-			context.continueTarget = target
+			context.breakTarget = parentReference
+			context.continueTarget = parentReference
 		}
 	case *ast.SwitchStmt:
 		if role == catalog.RoleBody {
-			context.breakTarget = input.occurrenceReference(
-				parent.occurrence.ID(),
-			)
+			context.breakTarget = parentReference
 		}
 	case *ast.TypeSwitchStmt:
 		if role == catalog.RoleBody {
-			context.breakTarget = input.occurrenceReference(
-				parent.occurrence.ID(),
-			)
+			context.breakTarget = parentReference
 		}
 		if role == catalog.RoleTypeSwitchGuard {
 			context.typeSwitchAnchor = true
 		}
 	case *ast.SelectStmt:
 		if role == catalog.RoleBody {
-			context.breakTarget = input.occurrenceReference(
-				parent.occurrence.ID(),
-			)
+			context.breakTarget = parentReference
 		}
 	case *ast.CaseClause:
 		if role == catalog.RoleStatement {
-			context.fallthroughTarget = nextCase(input, parent)
+			context.fallthroughTarget = nextCase(
+				input, parentReference,
+			)
 		}
 	}
 	return context

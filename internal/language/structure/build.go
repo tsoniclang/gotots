@@ -294,33 +294,33 @@ func sortGraphPackages(graph *Graph) {
 }
 
 func sealGraph(graph *Graph) error {
-	graph.byOccurrence = map[identity.OccurrenceID]OccurrenceRef{}
+	graph.occurrenceStores = map[identity.FileID]*OccurrenceStore{}
 	graph.byDefinition = map[identity.DefinitionID]*ImplementationDefinition{}
 	graph.byBoundary = map[identity.DefinitionID]*ExecutionBoundary{}
 	for packageIndex := range graph.packages {
 		pkg := &graph.packages[packageIndex]
 		for fileIndex := range pkg.files {
 			file := &pkg.files[fileIndex]
+			fileID := file.owner.id.file
+			if file.occurrences == nil || fileID.IsZero() {
+				return fmt.Errorf(
+					"file graph has no canonical occurrence store",
+				)
+			}
+			if _, duplicate := graph.occurrenceStores[fileID]; duplicate {
+				return fmt.Errorf(
+					"file occurrence store %s is retained more than once",
+					fileID,
+				)
+			}
+			graph.occurrenceStores[fileID] = file.occurrences
 			if err := file.VisitOccurrenceRefs(func(
 				occurrence OccurrenceRef,
 			) error {
-				id := occurrence.ID()
 				graph.work.IdentityProbes++
-				if existing, duplicate := graph.byOccurrence[id]; duplicate {
-					if !existing.Equal(occurrence) {
-						return fmt.Errorf(
-							"occurrence %s has conflicting canonical payloads",
-							id,
-						)
-					}
-					return fmt.Errorf(
-						"occurrence %s payload is stored more than once",
-						id,
-					)
-				}
-				graph.byOccurrence[id] = occurrence
-				graph.occurrenceIDs = append(
-					graph.occurrenceIDs, id,
+				graph.occurrenceOrder = append(
+					graph.occurrenceOrder,
+					occurrence,
 				)
 				graph.work.RecordAppends++
 				return nil
@@ -357,10 +357,10 @@ func sealGraph(graph *Graph) error {
 			}
 		}
 	}
-	sort.Slice(graph.occurrenceIDs, func(i, j int) bool {
+	sort.Slice(graph.occurrenceOrder, func(i, j int) bool {
 		graph.work.SortComparisons++
-		return graph.occurrenceIDs[i].Compare(
-			graph.occurrenceIDs[j],
+		return graph.occurrenceOrder[i].ID().Compare(
+			graph.occurrenceOrder[j].ID(),
 		) < 0
 	})
 	sort.Slice(graph.definitionIDs, func(i, j int) bool {

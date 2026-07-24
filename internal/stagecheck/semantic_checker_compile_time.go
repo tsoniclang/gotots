@@ -6,41 +6,42 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/language/catalog"
-	"github.com/tsoniclang/gotots/internal/language/structure"
 )
 
 func (
 	verifier *checkerSemanticVerifier,
 ) independentCompileTimeContext(
-	occurrence structure.OccurrenceRef,
+	reference semanticOccurrenceRef,
 ) bool {
 	return verifier.independentCompileTimeAnchor(
-		occurrence,
+		reference,
 	).valid()
 }
 
 func (
 	verifier *checkerSemanticVerifier,
 ) independentCompileTimeAnchor(
-	occurrence structure.OccurrenceRef,
+	reference semanticOccurrenceRef,
 ) semanticOccurrenceRef {
-	reference := verifier.expected.occurrences.reference(
-		occurrence.ID(),
-	)
+	occurrence := verifier.expected.occurrenceRecord(reference)
+	if occurrence.ID().IsZero() {
+		return 0
+	}
 	if verifier.compileTimeResolved[reference] {
 		return verifier.compileTimeAnchor[reference]
 	}
 	var anchor semanticOccurrenceRef
 	if occurrence.Role() == catalog.RoleArrayLength ||
 		(occurrence.Role() == catalog.RoleInitializerValue &&
-			verifier.independentConstInitializer(occurrence)) {
+			verifier.independentConstInitializer(reference)) {
 		anchor = reference
 	}
-	if !anchor.valid() && !occurrence.Parent().IsZero() {
-		if parent, present :=
-			verifier.expected.occurrences.get(occurrence.Parent()); present {
-			anchor =
-				verifier.independentCompileTimeAnchor(parent.OccurrenceRef)
+	if !anchor.valid() {
+		parentReference := verifier.expected.parentReference(reference)
+		if parentReference.valid() {
+			anchor = verifier.independentCompileTimeAnchor(
+				parentReference,
+			)
 		}
 	}
 	verifier.compileTimeAnchor[reference] = anchor
@@ -51,15 +52,17 @@ func (
 func (
 	verifier *checkerSemanticVerifier,
 ) independentCompileTimeCoverage(
-	occurrence structure.OccurrenceRef,
+	reference semanticOccurrenceRef,
 ) (types.Object, types.Type) {
-	anchorReference := verifier.independentCompileTimeAnchor(occurrence)
+	anchorReference := verifier.independentCompileTimeAnchor(reference)
 	if !anchorReference.valid() {
 		return nil, nil
 	}
 	anchor := verifier.expected.occurrenceRecord(anchorReference)
-	parent, present := verifier.expected.occurrences.get(anchor.Parent())
-	if !present {
+	parent := verifier.expected.occurrenceRecord(
+		verifier.expected.parentReference(anchorReference),
+	)
+	if parent.ID().IsZero() {
 		return nil, nil
 	}
 	node, present := verifier.index.OccurrenceNode(parent.ID())
@@ -94,11 +97,13 @@ func (
 func (
 	verifier *checkerSemanticVerifier,
 ) independentConstInitializer(
-	initializer structure.OccurrenceRef,
+	reference semanticOccurrenceRef,
 ) bool {
-	valueSpecOccurrence, present :=
-		verifier.expected.occurrences.get(initializer.Parent())
-	if !present {
+	valueSpecReference := verifier.expected.parentReference(reference)
+	valueSpecOccurrence := verifier.expected.occurrenceRecord(
+		valueSpecReference,
+	)
+	if valueSpecOccurrence.ID().IsZero() {
 		return false
 	}
 	valueSpecNode, present := verifier.index.OccurrenceNode(
@@ -110,9 +115,10 @@ func (
 	if _, ok := valueSpecNode.(*ast.ValueSpec); !ok {
 		return false
 	}
-	genDeclOccurrence, present :=
-		verifier.expected.occurrences.get(valueSpecOccurrence.Parent())
-	if !present {
+	genDeclOccurrence := verifier.expected.occurrenceRecord(
+		verifier.expected.parentReference(valueSpecReference),
+	)
+	if genDeclOccurrence.ID().IsZero() {
 		return false
 	}
 	genDeclNode, present := verifier.index.OccurrenceNode(

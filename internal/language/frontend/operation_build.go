@@ -15,10 +15,7 @@ import (
 func (builder *packageBuilder) buildOperation(
 	item pendingOperation,
 ) (semantic.OperationSpec, error) {
-	reference := builder.input.occurrenceReference(
-		item.record.occurrence.ID(),
-	)
-	id, err := builder.operationID(reference)
+	id, err := builder.operationID(item.reference)
 	if err != nil {
 		return semantic.OperationSpec{}, err
 	}
@@ -43,7 +40,9 @@ func (builder *packageBuilder) buildOperation(
 	if err != nil {
 		return semantic.OperationSpec{}, err
 	}
-	operands := builder.operationOperands(item.record)
+	operands := builder.operationOperands(
+		item.reference, item.record,
+	)
 	definitions := builder.operationDefinitions(item.record)
 	controlTarget, label, err := builder.operationControl(item)
 	if err != nil {

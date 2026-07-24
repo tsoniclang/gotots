@@ -35,6 +35,14 @@ func TestSemanticVerifierRelationsUseDenseLocalIdentityArenas(
 		reflect.TypeFor[[]semanticOccurrenceRef](),
 	)
 	assertSemanticFieldType(
+		t, reflect.TypeFor[semanticOccurrenceStore](), "parents",
+		reflect.TypeFor[[]semanticOccurrenceRef](),
+	)
+	assertSemanticFieldType(
+		t, reflect.TypeFor[semanticOccurrenceStore](), "byIdentity",
+		reflect.TypeFor[semanticOccurrenceIndex](),
+	)
+	assertSemanticFieldType(
 		t, reflect.TypeFor[semanticOccurrenceStore](), "childRanges",
 		reflect.TypeFor[[]semanticOccurrenceRange](),
 	)
