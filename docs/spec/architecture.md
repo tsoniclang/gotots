@@ -878,6 +878,26 @@ does not claim to detect replacement of both artifact content and the
 independently selected trusted digest; that is replacement of the authority,
 not corruption under an admitted authority.
 
+Projection is a single-pass ownership transfer, not a sequence of complete
+representations. The shard is read through a digesting bounded reader; each
+wire record is decoded directly into one append-only package draft pre-sized
+from validated manifest counts; and sealing transfers those exact record
+slices into the immutable package without cloning them. The encoded shard, a
+package-wide wire tree, duplicate semantic slices, and a second type pool may
+never coexist. Before they size storage, manifest counts must be nonnegative,
+must not overflow a capacity sum, and their sum must be bounded by the shard's
+encoded-byte extent. Before exposure, every decoded class is exact-joined to
+its manifest count. Peak transient projection storage is
+`O(validation indexes + largest encoded record + decoder buffer)`, and peak
+total projection storage is
+`O(final decoded package + validation indexes + largest encoded record +
+decoder buffer)`. A package whose final decoded representation exceeds the
+frozen projected-package budget fails explicitly; increasing the process
+limit or retaining another complete representation is not a remedy. A valid
+Go package that cannot fit the budget reopens the artifact grain for bounded
+intra-package projection; publication may not reject valid Go merely because
+the current package is large.
+
 The ordinary Stage-2 verifier exact-joins the semantic model's package,
 provenance, selected-authority, definition, and declaration censuses to the
 source plan and admitted manifest without decoding provider-only semantic

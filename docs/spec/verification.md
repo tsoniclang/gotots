@@ -529,6 +529,13 @@ type records, and enforces:
 - only named `O(n log n)` canonical sorts;
 - local detail plus one projected provider package, never all provider
   semantic shards, as the ordinary residency bound;
+- streaming projection with zero package-wide encoded or wire-tree
+  materialization, zero immutable-package clone, exact manifest-capacity
+  agreement, and peak RSS below the frozen largest-package projection budget;
+  the phase-exit fixture projects the largest real package in the selected Go
+  toolchain three times under a `448 MiB` Go memory limit and a `700 MiB`
+  peak-RSS ceiling, and a failure reopens artifact grain rather than raising
+  either limit;
 - zero provider-only semantic shard loads during ordinary Stage-2
   verification, with loads exact-joined to mixed local/certified package
   projections; an explicit later package request is measured separately;

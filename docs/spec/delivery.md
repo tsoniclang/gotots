@@ -313,7 +313,10 @@ Required exit evidence:
   package-sharded, validates before exposure, and keeps at most one provider
   package resident; ordinary Stage-2 verification opens no provider-only
   semantic shard and exact-joins shard loads to mixed local/certified package
-  projections;
+  projections; an explicit projection streams one record at a time into one
+  ownership-transferred package draft, retains no encoded shard or wire tree,
+  performs no immutable-package clone, and passes the frozen
+  largest-package RSS/record/byte budgets;
 - canonical type/declaration/binding/operation identities remain identical
   across relocated workspaces, relocated module caches, local checker
   production, and certified-provider consumption; and
