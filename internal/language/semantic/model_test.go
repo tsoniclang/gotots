@@ -345,9 +345,7 @@ func TestResolutionRejectsMismatchedOperationOwner(t *testing.T) {
 	}
 }
 
-func TestTransientTypePoolClosesAndArtifactAdmissionRejectsExtras(
-	t *testing.T,
-) {
+func TestArtifactAdmissionRejectsUnreferencedTypes(t *testing.T) {
 	fixture := semanticFixture(t)
 	integer, err := NewType(TypeSpec{
 		Kind: TypeBasic, Basic: BasicInt,
@@ -396,22 +394,6 @@ func TestTransientTypePoolClosesAndArtifactAdmissionRejectsExtras(
 	}
 	if _, err := NewPackage(input); err == nil {
 		t.Fatal("artifact admission accepted an unreferenced type")
-	}
-	closed, err := FinalizePackageTypePool(input)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(closed.Types) != 1 ||
-		closed.Types[0].ID() != integer.ID() ||
-		len(closed.TypeWitnesses) != 1 ||
-		closed.TypeWitnesses[0].Type() != integer.ID() {
-		t.Fatalf(
-			"type closure types=%v witnesses=%v",
-			closed.Types, closed.TypeWitnesses,
-		)
-	}
-	if _, err := NewPackage(closed); err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -498,17 +480,7 @@ func TestMemberTargetRetainsItsCanonicalOwnerType(t *testing.T) {
 			),
 		},
 	}
-	closed, err := FinalizePackageTypePool(input)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(closed.Types) != 3 {
-		t.Fatalf(
-			"member type closure retained %d types, want 3",
-			len(closed.Types),
-		)
-	}
-	pkg, err := NewPackage(closed)
+	pkg, err := NewPackage(input)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"runtime/debug"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/language/semantic"
@@ -393,25 +395,48 @@ func TestStage2LargestSemanticProjectionProcess(t *testing.T) {
 	if records <= 0 {
 		t.Fatal("largest semantic package has no records")
 	}
-	if err := artifact.VisitPackage(
-		largest.Package,
-		func(pkg semantic.Package) error {
-			if pkg.ID() != largest.Package {
-				return fmt.Errorf(
-					"projected package %s, want %s",
-					pkg.ID(),
-					largest.Package,
-				)
-			}
-			return nil
-		},
-	); err != nil {
-		t.Fatal(err)
+	const projectionSamples = 3
+	retainedHeap := make([]uint64, 0, projectionSamples)
+	for sample := 0; sample < projectionSamples; sample++ {
+		if err := artifact.VisitPackage(
+			largest.Package,
+			func(pkg semantic.Package) error {
+				if pkg.ID() != largest.Package {
+					return fmt.Errorf(
+						"projected package %s, want %s",
+						pkg.ID(),
+						largest.Package,
+					)
+				}
+				return nil
+			},
+		); err != nil {
+			t.Fatal(err)
+		}
+		debug.FreeOSMemory()
+		var memory runtime.MemStats
+		runtime.ReadMemStats(&memory)
+		retainedHeap = append(retainedHeap, memory.HeapAlloc)
 	}
 	stats := artifact.ReadStats()
-	if stats.ShardLoads != 1 ||
+	if stats.ShardLoads != projectionSamples ||
 		stats.MaxProviderPackagesResident != 1 {
 		t.Fatalf("projection residency stats = %+v", stats)
+	}
+	t.Logf("largest semantic projection retained heap = %v", retainedHeap)
+	const retainedGrowthLimit = 8 * 1024 * 1024
+	if retainedHeap[1] > retainedHeap[0]+retainedGrowthLimit &&
+		retainedHeap[2] > retainedHeap[1]+retainedGrowthLimit {
+		t.Fatalf(
+			"largest semantic projection retains monotonic package growth: %v",
+			retainedHeap,
+		)
+	}
+	if retainedHeap[2] > retainedHeap[0]+2*retainedGrowthLimit {
+		t.Fatalf(
+			"largest semantic projection retains package-sized state: %v",
+			retainedHeap,
+		)
 	}
 	fmt.Printf(
 		"GOTOTS_PROJECTION package=%s shardBytes=%d records=%d\n",
