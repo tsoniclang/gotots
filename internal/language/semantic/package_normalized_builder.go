@@ -88,7 +88,7 @@ func (builder *normalizedPackageBuilder) addUnsupported(
 }
 
 type normalizedPackageStores struct {
-	identities   packageIdentityTable
+	identities   admittedPackageIdentityTable
 	authorities  packageAuthorityTable
 	definitions  packageDefinitionStore
 	resolutions  packageResolutionStore
@@ -105,6 +105,10 @@ func (builder *normalizedPackageBuilder) seal() (
 	error,
 ) {
 	identities, remap, err := builder.identities.seal()
+	if err != nil {
+		return normalizedPackageStores{}, err
+	}
+	admittedIdentities, err := admitPackageIdentityTable(identities)
 	if err != nil {
 		return normalizedPackageStores{}, err
 	}
@@ -152,7 +156,7 @@ func (builder *normalizedPackageBuilder) seal() (
 		return normalizedPackageStores{}, err
 	}
 	return normalizedPackageStores{
-		identities:   identities,
+		identities:   admittedIdentities,
 		authorities:  authorities,
 		definitions:  definitions,
 		resolutions:  resolutions,

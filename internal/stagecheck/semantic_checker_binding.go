@@ -333,7 +333,7 @@ func (verifier *checkerSemanticVerifier) independentScopeOwners() (
 		node ast.Node,
 		scope *types.Scope,
 	) error {
-		occurrenceID, present := verifier.index.OccurrenceID(
+		occurrenceID, present := verifier.occurrenceID(
 			node,
 		)
 		if !present {

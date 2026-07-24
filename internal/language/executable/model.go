@@ -69,6 +69,12 @@ func (r Region) Members() []identity.OccurrenceID {
 	return out
 }
 func (r Region) MemberCount() int { return len(r.members) }
+func (r Region) ReferenceCount() int {
+	return len(r.references)
+}
+func (r Region) ImplicitOperationCount() int {
+	return len(r.implicit)
+}
 func (r Region) VisitMembers(
 	visit func(int, identity.OccurrenceID) error,
 ) error {

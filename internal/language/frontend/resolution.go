@@ -18,10 +18,7 @@ type pendingOperation struct {
 }
 
 func (builder *packageBuilder) resolveOccurrences() error {
-	operationKinds := make(
-		[]semantic.OperationKind, len(builder.input.order),
-	)
-	for index, occurrenceReference := range builder.input.order {
+	for _, occurrenceReference := range builder.input.order {
 		builder.objects.work.ResolutionVisits++
 		record := builder.input.occurrenceRecord(occurrenceReference)
 		occurrenceID := record.occurrence.ID()
@@ -49,26 +46,18 @@ func (builder *packageBuilder) resolveOccurrences() error {
 			return err
 		}
 		if operation != semantic.OperationInvalid {
-			owner := builder.input.occurrenceOwner(record)
-			operationID, err := identity.NewOperationID(
-				owner, occurrenceID,
-			)
-			if err != nil {
-				return err
-			}
-			builder.operationByOccurrence[occurrenceReference] = operationID
-			operationKinds[index] = operation
+			builder.operationKinds[occurrenceReference] = operation
 			continue
 		}
 		if err := builder.admitResolution(resolution); err != nil {
 			return err
 		}
 	}
-	for index, operationKind := range operationKinds {
+	for _, occurrenceReference := range builder.input.order {
+		operationKind := builder.operationKinds[occurrenceReference]
 		if operationKind == semantic.OperationInvalid {
 			continue
 		}
-		occurrenceReference := builder.input.order[index]
 		record := builder.input.occurrenceRecord(occurrenceReference)
 		occurrenceID := record.occurrence.ID()
 		item := pendingOperation{

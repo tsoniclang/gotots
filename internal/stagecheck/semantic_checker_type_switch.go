@@ -112,7 +112,7 @@ func (verifier *checkerSemanticVerifier) verifyTypeSwitchCaseBindings(
 				identifier.Name,
 			)
 		}
-		clauseID, present := verifier.index.OccurrenceID(clause)
+		clauseID, present := verifier.occurrenceID(clause)
 		if !present {
 			return fmt.Errorf(
 				"type-switch case binding %q has no occurrence",

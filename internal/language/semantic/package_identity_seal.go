@@ -262,11 +262,9 @@ func (builder *packageIdentityBuilder) seal() (
 		builder.unsupported.records,
 		lessStoredUnsupportedIdentity,
 	)
-	table, err := sealPackageIdentityTable(components)
-	if err != nil {
-		return packageIdentityTable{}, packageIdentityRemap{}, err
-	}
-	return table, remap, nil
+	return packageIdentityTable{
+		packageIdentityComponents: components,
+	}, remap, nil
 }
 
 func lessStoredDefinition(

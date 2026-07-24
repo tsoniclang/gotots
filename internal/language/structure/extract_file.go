@@ -1,7 +1,6 @@
 package structure
 
 import (
-	"fmt"
 	"go/ast"
 	"go/token"
 
@@ -15,24 +14,30 @@ type pathStep struct {
 	occurrence Occurrence
 }
 
+type fileOccurrenceKey struct {
+	start int
+	end   int
+	kind  uint16
+}
+
 type fileBuilder struct {
-	file        *source.LoadedFile
-	fset        *token.FileSet
-	raw         []byte
-	displayFile string
-	ownerID     OwnerRegionID
-	owner       OwnerRegion
-	occurrences map[identity.OccurrenceID]Occurrence
-	order       []identity.OccurrenceID
-	anchors     map[identity.OccurrenceID]bool
-	anchorOrder []identity.OccurrenceID
-	definitions []ImplementationDefinition
-	sites       []DefinitionSite
-	headers     []HeaderRegion
-	boundaries  []ExecutionBoundary
-	path        []pathStep
-	work        *Work
-	index       *TransientIndex
+	file              *source.LoadedFile
+	fset              *token.FileSet
+	raw               []byte
+	displayFile       string
+	ownerID           OwnerRegionID
+	owner             OwnerRegion
+	occurrenceBuilder *OccurrenceStoreBuilder
+	occurrenceIndex   map[fileOccurrenceKey]OccurrenceIndex
+	anchors           map[identity.OccurrenceID]bool
+	anchorOrder       []identity.OccurrenceID
+	definitions       []ImplementationDefinition
+	sites             []DefinitionSite
+	headers           []HeaderRegion
+	boundaries        []ExecutionBoundary
+	path              []pathStep
+	work              *Work
+	index             *TransientIndex
 }
 
 func buildFile(
@@ -45,16 +50,25 @@ func buildFile(
 	if err != nil {
 		return FileGraph{}, err
 	}
+	raw := file.SelectedBytes()
+	occurrenceBuilder, err := NewOccurrenceStoreBuilder(
+		file.ID(),
+		estimatedSourceOccurrenceCapacity(len(raw)),
+	)
+	if err != nil {
+		return FileGraph{}, err
+	}
 	builder := &fileBuilder{
-		file:        file,
-		fset:        file.PhysicalFileSet(),
-		raw:         file.SelectedBytes(),
-		displayFile: file.ID().String(),
-		ownerID:     ownerID,
-		occurrences: map[identity.OccurrenceID]Occurrence{},
-		anchors:     map[identity.OccurrenceID]bool{},
-		work:        work,
-		index:       index,
+		file:              file,
+		fset:              file.PhysicalFileSet(),
+		raw:               raw,
+		displayFile:       file.ID().String(),
+		ownerID:           ownerID,
+		occurrenceBuilder: occurrenceBuilder,
+		occurrenceIndex:   map[fileOccurrenceKey]OccurrenceIndex{},
+		anchors:           map[identity.OccurrenceID]bool{},
+		work:              work,
+		index:             index,
 	}
 	index.files[file.ID()] = file
 	if err := index.bindCheckedFile(file); err != nil {
@@ -86,21 +100,7 @@ func buildFile(
 		return FileGraph{}, err
 	}
 	builder.owner.directives = directives
-	occurrenceBuilder, err := NewOccurrenceStoreBuilder(
-		file.ID(),
-		len(builder.order),
-	)
-	if err != nil {
-		return FileGraph{}, err
-	}
-	for _, id := range builder.order {
-		if _, err := occurrenceBuilder.Append(
-			builder.occurrences[id],
-		); err != nil {
-			return FileGraph{}, err
-		}
-	}
-	occurrences, err := occurrenceBuilder.Seal()
+	occurrences, err := builder.occurrenceBuilder.Seal()
 	if err != nil {
 		return FileGraph{}, err
 	}
@@ -301,7 +301,7 @@ func (b *fileBuilder) addDefinition(
 			)
 		}
 		entryNode := entries[entryIndex].node
-		entryOccurrence, present := b.occurrences[entry.id]
+		entryOccurrence, present := b.occurrence(entry.id)
 		if !present {
 			return b.defect(
 				entryNode,
@@ -433,119 +433,6 @@ func (b *fileBuilder) scanNestedDefinitions(
 		}
 	}
 	return nil
-}
-
-func (b *fileBuilder) recordOccurrence(
-	occurrence Occurrence,
-	node ast.Node,
-) error {
-	b.work.IdentityProbes++
-	if existing, present := b.occurrences[occurrence.id]; present {
-		if existing != occurrence {
-			return fmt.Errorf(
-				"occurrence %s has conflicting canonical payloads",
-				occurrence.id,
-			)
-		}
-		return nil
-	}
-	if err := b.index.bindStructuralOccurrence(
-		occurrence, node,
-	); err != nil {
-		return err
-	}
-	b.occurrences[occurrence.id] = occurrence
-	b.order = append(b.order, occurrence.id)
-	b.work.RecordAppends++
-	return nil
-}
-
-func (b *fileBuilder) makeOccurrence(
-	node ast.Node,
-	parent identity.OccurrenceID,
-	edge catalog.Edge,
-	ordinal int,
-) (Occurrence, error) {
-	kind, err := Classify(node)
-	if err != nil {
-		return Occurrence{}, err
-	}
-	if kind.Disposition() != catalog.DispositionActive {
-		return Occurrence{}, b.defect(
-			node,
-			edge,
-			"construct disposition is "+kind.Disposition().String(),
-		)
-	}
-	span := b.physicalSpan(node)
-	spanID, err := identity.NewSpanID(
-		b.file.ID(), span.Start.Offset, span.End.Offset,
-	)
-	if err != nil {
-		return Occurrence{}, err
-	}
-	id, err := identity.NewOccurrenceID(spanID, uint16(kind))
-	if err != nil {
-		return Occurrence{}, err
-	}
-	lexical, err := tokenEvidence(node)
-	if err != nil {
-		return Occurrence{}, b.defect(node, edge, err.Error())
-	}
-	occurrence, err := NewOccurrence(
-		id,
-		kind,
-		parent,
-		edge,
-		ordinal,
-		span,
-		b.displaySpan(node),
-		lexical,
-	)
-	if err != nil {
-		return Occurrence{}, err
-	}
-	return occurrence, nil
-}
-
-func (b *fileBuilder) physicalSpan(node ast.Node) Span {
-	start := b.fset.PositionFor(node.Pos(), false)
-	end := b.fset.PositionFor(node.End(), false)
-	return Span{
-		Start: Position{
-			Line: start.Line, Column: start.Column, Offset: start.Offset,
-		},
-		End: Position{
-			Line: end.Line, Column: end.Column, Offset: end.Offset,
-		},
-	}
-}
-
-func (b *fileBuilder) displaySpan(node ast.Node) DisplaySpan {
-	start := b.fset.Position(node.Pos())
-	end := b.fset.Position(node.End())
-	physicalStart := b.fset.PositionFor(node.Pos(), false)
-	physicalEnd := b.fset.PositionFor(node.End(), false)
-	return DisplaySpan{
-		Start: displayPosition(start, physicalStart, b.displayFile),
-		End:   displayPosition(end, physicalEnd, b.displayFile),
-	}
-}
-
-func displayPosition(
-	adjusted token.Position,
-	physical token.Position,
-	physicalFile string,
-) DisplayPosition {
-	filename := adjusted.Filename
-	if filename == physical.Filename {
-		filename = physicalFile
-	}
-	return DisplayPosition{
-		Filename: filename,
-		Line:     adjusted.Line,
-		Column:   adjusted.Column,
-	}
 }
 
 func (b *fileBuilder) defect(

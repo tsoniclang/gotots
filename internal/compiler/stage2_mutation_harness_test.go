@@ -102,6 +102,9 @@ func newStage2MutationHarness(t *testing.T) *stage2MutationHarness {
 	); err != nil {
 		t.Fatal(err)
 	}
+	if err := index.SealForStage2(); err != nil {
+		t.Fatal(err)
+	}
 	result, err := frontend.Materialize(
 		universe,
 		graph,

@@ -116,8 +116,8 @@ func (builder *packageBuilder) packageInitializationSequence() (
 			}
 			entryDefinitions[definition] = true
 		}
-		occurrence, occurrencePresent := builder.input.index.
-			OccurrenceID(entry.Rhs)
+		occurrence, occurrencePresent := builder.input.
+			occurrenceID(entry.Rhs)
 		record := builder.input.occurrence(occurrence)
 		if occurrencePresent && record == nil {
 			return nil, nil, nil, fmt.Errorf(

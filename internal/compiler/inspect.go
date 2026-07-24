@@ -151,6 +151,9 @@ func InspectConstructs(req source.Request) (*Inspection, error) {
 	); err != nil {
 		return nil, err
 	}
+	if err := index.SealForStage2(); err != nil {
+		return nil, err
+	}
 	semanticResult, err := frontend.Materialize(
 		universe,
 		graph,

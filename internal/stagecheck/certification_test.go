@@ -150,7 +150,7 @@ func TestStructuralLedgerMutationsFailWithExactResidualEvidence(t *testing.T) {
 	arena := newExecutableLedgerArena()
 	reference := compactDefinitionReference{
 		region: arena.definition(outer),
-		parent: arena.occurrence(outer.Root()),
+		parent: outer.Root(),
 		edge:   uint16(catalog.Edge(7)),
 		child:  arena.definition(literal),
 	}
@@ -176,7 +176,7 @@ func TestStructuralLedgerMutationsFailWithExactResidualEvidence(t *testing.T) {
 		"reparent": func(ledger *compactExecutableLedger) {
 			delete(ledger.definitionReferences, reference)
 			mutated := reference
-			mutated.parent = arena.occurrence(literal.Root())
+			mutated.parent = literal.Root()
 			addRecord(
 				&ledger.definitionReferences,
 				mutated,

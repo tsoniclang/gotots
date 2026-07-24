@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"hash"
-	"io"
 	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/identity"
@@ -24,14 +23,87 @@ func (census MemberTargetCensus) Digest() string {
 	return census.digest
 }
 
+const memberTargetCensusBufferBytes = 32 * 1024
+
+type memberTargetCensusWriter struct {
+	digest hash.Hash
+	buffer []byte
+}
+
+func newMemberTargetCensusWriter() *memberTargetCensusWriter {
+	return &memberTargetCensusWriter{
+		digest: sha256.New(),
+		buffer: make([]byte, 0, memberTargetCensusBufferBytes),
+	}
+}
+
+func (writer *memberTargetCensusWriter) flush() {
+	if len(writer.buffer) == 0 {
+		return
+	}
+	_, _ = writer.digest.Write(writer.buffer)
+	writer.buffer = writer.buffer[:0]
+}
+
+func (writer *memberTargetCensusWriter) reserve(size int) {
+	if size <= cap(writer.buffer)-len(writer.buffer) {
+		return
+	}
+	writer.flush()
+	if size > cap(writer.buffer) {
+		writer.buffer = make([]byte, 0, size)
+	}
+}
+
+func (writer *memberTargetCensusWriter) writePart(value string) {
+	writer.reserve(len(value) + 24)
+	writer.buffer = strconv.AppendInt(
+		writer.buffer,
+		int64(len(value)),
+		10,
+	)
+	writer.buffer = append(writer.buffer, ':')
+	writer.buffer = append(writer.buffer, value...)
+	writer.buffer = append(writer.buffer, '|')
+}
+
+func (writer *memberTargetCensusWriter) writeBytes(value []byte) {
+	writer.reserve(len(value) + 24)
+	writer.buffer = strconv.AppendInt(
+		writer.buffer,
+		int64(len(value)),
+		10,
+	)
+	writer.buffer = append(writer.buffer, ':')
+	writer.buffer = append(writer.buffer, value...)
+	writer.buffer = append(writer.buffer, '|')
+}
+
+func (writer *memberTargetCensusWriter) sum() string {
+	writer.flush()
+	return hex.EncodeToString(writer.digest.Sum(nil))
+}
+
 type memberMethodKey struct {
 	pkg  packageRef
 	name string
 }
 
 func (pkg Package) MemberTargetCensus() (MemberTargetCensus, error) {
-	digest := sha256.New()
-	writeCensusPart(digest, "semantic-member-target-census/v2")
+	if pkg.memberTargets.count < 0 ||
+		len(pkg.memberTargets.digest) != sha256.Size*2 {
+		return MemberTargetCensus{}, fmt.Errorf(
+			"semantic package has no sealed member-target census",
+		)
+	}
+	return pkg.memberTargets, nil
+}
+
+func deriveMemberTargetCensus(
+	pkg Package,
+) (MemberTargetCensus, error) {
+	writer := newMemberTargetCensusWriter()
+	writeCensusPart(writer, "semantic-member-target-census/v2")
 	count := 0
 	err := pkg.visitMemberTargets(
 		func(
@@ -42,9 +114,9 @@ func (pkg Package) MemberTargetCensus() (MemberTargetCensus, error) {
 			count++
 			switch {
 			case field != nil:
-				writeFieldTarget(digest, pkg, owner, *field)
+				writeFieldTarget(writer, pkg, owner, *field)
 			case method != nil:
-				writeMethodTarget(digest, pkg, owner, *method)
+				writeMethodTarget(writer, pkg, owner, *method)
 			default:
 				return fmt.Errorf(
 					"semantic member target has no active payload",
@@ -56,11 +128,11 @@ func (pkg Package) MemberTargetCensus() (MemberTargetCensus, error) {
 	if err != nil {
 		return MemberTargetCensus{}, err
 	}
-	writeCensusPart(digest, "count")
-	writeCensusInt(digest, int64(count))
+	writeCensusPart(writer, "count")
+	writeCensusInt(writer, int64(count))
 	return MemberTargetCensus{
 		count:  count,
-		digest: hex.EncodeToString(digest.Sum(nil)),
+		digest: writer.sum(),
 	}, nil
 }
 
@@ -233,108 +305,102 @@ func (pkg Package) visitMethodRange(
 }
 
 func writeFieldTarget(
-	digest hash.Hash,
+	writer *memberTargetCensusWriter,
 	pkg Package,
 	owner typeRef,
 	field storedTypeField,
 ) {
-	writeCensusPart(digest, "field")
-	writeCensusType(digest, pkg, owner)
-	writeCensusPackage(digest, pkg, field.pkg)
-	writeCensusPart(digest, field.name)
-	writeCensusInt(digest, int64(field.ordinal))
-	writeCensusType(digest, pkg, field.typeID)
-	writeCensusBool(digest, field.embedded)
-	writeCensusPart(digest, field.tag)
+	writeCensusPart(writer, "field")
+	writeCensusType(writer, pkg, owner)
+	writeCensusPackage(writer, pkg, field.pkg)
+	writeCensusPart(writer, field.name)
+	writeCensusInt(writer, int64(field.ordinal))
+	writeCensusType(writer, pkg, field.typeID)
+	writeCensusBool(writer, field.embedded)
+	writeCensusPart(writer, field.tag)
 }
 
 func writeMethodTarget(
-	digest hash.Hash,
+	writer *memberTargetCensusWriter,
 	pkg Package,
 	owner typeRef,
 	method storedTypeMethod,
 ) {
-	writeCensusPart(digest, "method")
-	writeCensusType(digest, pkg, owner)
-	writeCensusPackage(digest, pkg, method.pkg)
-	writeCensusPart(digest, method.name)
-	writeCensusInt(digest, int64(method.ordinal))
-	writeCensusType(digest, pkg, method.signature)
+	writeCensusPart(writer, "method")
+	writeCensusType(writer, pkg, owner)
+	writeCensusPackage(writer, pkg, method.pkg)
+	writeCensusPart(writer, method.name)
+	writeCensusInt(writer, int64(method.ordinal))
+	writeCensusType(writer, pkg, method.signature)
 }
 
 func writeCensusType(
-	digest hash.Hash,
+	writer *memberTargetCensusWriter,
 	pkg Package,
 	reference typeRef,
 ) {
 	record, present := componentAt(pkg.identities.types, reference)
 	if !present {
-		writeCensusPart(digest, "")
+		writeCensusPart(writer, "")
 		return
 	}
-	writeCensusPart(digest, record.digest)
+	writeCensusPart(writer, record.digest)
 }
 
 func writeCensusPackage(
-	digest hash.Hash,
+	writer *memberTargetCensusWriter,
 	pkg Package,
 	reference packageRef,
 ) {
 	if reference == 0 {
-		writeCensusBool(digest, false)
+		writeCensusBool(writer, false)
 		return
 	}
-	writeCensusBool(digest, true)
+	writeCensusBool(writer, true)
 	record := pkg.identities.packages[reference-1]
 	owner := pkg.identities.owners[record.owner-1]
-	writeCensusInt(digest, int64(owner.class))
+	writeCensusInt(writer, int64(owner.class))
 	if owner.module == 0 {
-		writeCensusPart(digest, "")
-		writeCensusPart(digest, "")
+		writeCensusPart(writer, "")
+		writeCensusPart(writer, "")
 	} else {
 		module := pkg.identities.modules[owner.module-1]
-		writeCensusPart(digest, module.path)
-		writeCensusPart(digest, module.version)
+		writeCensusPart(writer, module.path)
+		writeCensusPart(writer, module.version)
 	}
-	writeCensusPart(digest, record.importPath)
+	writeCensusPart(writer, record.importPath)
 }
 
-func writeCensusPart(digest hash.Hash, value string) {
-	var length [32]byte
-	encoded := strconv.AppendInt(
-		length[:0],
-		int64(len(value)),
-		10,
-	)
-	_, _ = digest.Write(encoded)
-	_, _ = io.WriteString(digest, ":")
-	_, _ = io.WriteString(digest, value)
-	_, _ = io.WriteString(digest, "|")
+func writeCensusPart(
+	writer *memberTargetCensusWriter,
+	value string,
+) {
+	writer.writePart(value)
 }
 
-func writeCensusInt(digest hash.Hash, value int64) {
+func writeCensusInt(
+	writer *memberTargetCensusWriter,
+	value int64,
+) {
 	var encoded [32]byte
 	part := strconv.AppendInt(encoded[:0], value, 10)
-	writeCensusBytes(digest, part)
+	writeCensusBytes(writer, part)
 }
 
-func writeCensusBool(digest hash.Hash, value bool) {
+func writeCensusBool(
+	writer *memberTargetCensusWriter,
+	value bool,
+) {
 	if value {
-		writeCensusPart(digest, "1")
+		writeCensusPart(writer, "1")
 		return
 	}
-	writeCensusPart(digest, "0")
+	writeCensusPart(writer, "0")
 }
 
-func writeCensusBytes(digest hash.Hash, value []byte) {
-	var length [32]byte
-	encoded := strconv.AppendInt(
-		length[:0],
-		int64(len(value)),
-		10,
-	)
-	_, _ = digest.Write(encoded)
-	_, _ = io.WriteString(digest, ":")
-	_, _ = digest.Write(value)
-	_, _ = io.WriteString(digest, "|")
+func writeCensusBytes(
+	writer *memberTargetCensusWriter,
+	value []byte,
+) {
+	writer.writeBytes(value)
 }

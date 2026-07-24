@@ -185,6 +185,16 @@ func (g *Graph) ResidentOccurrence(
 	return g.residentOccurrence(id)
 }
 
+func (g *Graph) ResidentOccurrenceRef(
+	id identity.OccurrenceID,
+) (OccurrenceRef, bool) {
+	if g == nil {
+		return OccurrenceRef{}, false
+	}
+	reference, present := g.byOccurrence[id]
+	return reference, present
+}
+
 func (g *Graph) ResidentOccurrences() []Occurrence {
 	if g == nil {
 		return nil

@@ -19,7 +19,7 @@ func (index *objectIndex) indexCheckerSupport(
 		object types.Object,
 	) error {
 		index.work.CheckerDefinitionVisits++
-		occurrence, present := index.input.index.OccurrenceID(
+		occurrence, present := index.input.occurrenceID(
 			identifier,
 		)
 		if !present {
@@ -59,7 +59,7 @@ func (index *objectIndex) indexCheckerSupport(
 		scope *types.Scope,
 	) error {
 		index.work.CheckerScopeEvidenceVisits++
-		occurrence, present := index.input.index.OccurrenceID(
+		occurrence, present := index.input.occurrenceID(
 			node,
 		)
 		if !present {
@@ -196,7 +196,7 @@ func (index *objectIndex) assignCompleteBindingOrdinals(
 			variable.IsField() {
 			return nil
 		}
-		anchor, present := index.input.index.OccurrenceID(node)
+		anchor, present := index.input.occurrenceID(node)
 		if !present {
 			return nil
 		}

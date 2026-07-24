@@ -19,6 +19,18 @@ func TestPackageRelationsUseDenseLocalIdentityArenas(t *testing.T) {
 	if cap(newOccurrenceStore(19).records) != 19 {
 		t.Fatal("package occurrence arena ignored its exact capacity")
 	}
+	storeType := reflect.TypeFor[occurrenceStore]()
+	for index := 0; index < storeType.NumField(); index++ {
+		field := storeType.Field(index)
+		if field.Type.Kind() == reflect.Map &&
+			field.Type.Key() ==
+				reflect.TypeFor[localOccurrenceKey]() {
+			t.Fatalf(
+				"package occurrence arena retains full identity map %s",
+				field.Name,
+			)
+		}
+	}
 	if cap(newDefinitionStore(7).records) != 7 {
 		t.Fatal("package definition arena ignored its exact capacity")
 	}
@@ -27,9 +39,17 @@ func TestPackageRelationsUseDenseLocalIdentityArenas(t *testing.T) {
 		reflect.TypeFor[packageDefinitionRef](),
 	)
 	assertFieldType(
-		t, reflect.TypeFor[occurrenceInput](), "children",
+		t, reflect.TypeFor[occurrenceStore](), "children",
 		reflect.TypeFor[[]packageOccurrenceRef](),
 	)
+	assertFieldType(
+		t, reflect.TypeFor[occurrenceStore](), "childRanges",
+		reflect.TypeFor[[]occurrenceRelationRange](),
+	)
+	if _, present := reflect.TypeFor[occurrenceInput]().
+		FieldByName("children"); present {
+		t.Fatal("occurrence record retains an unbounded child slice")
+	}
 	assertFieldType(
 		t, reflect.TypeFor[packageInput](), "order",
 		reflect.TypeFor[[]packageOccurrenceRef](),

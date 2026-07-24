@@ -159,6 +159,14 @@ func TestDeclarationTargetsAreOwnedOnceByCanonicalTypes(
 			census.Count(), census.Digest(),
 		)
 	}
+	if allocations := testing.AllocsPerRun(1_000, func() {
+		_, _ = pkg.MemberTargetCensus()
+	}); allocations != 0 {
+		t.Fatalf(
+			"sealed member-target census access allocates %.2f times",
+			allocations,
+		)
+	}
 	if pkg.DeclarationCount() != len(declarations) {
 		t.Fatalf(
 			"standalone declarations=%d, want %d",

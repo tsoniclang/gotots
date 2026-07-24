@@ -9,15 +9,13 @@ func writeBinaryTypes(
 ) {
 	store := pkg.types
 	encoder.count(len(store.records))
-	identities := newPackageIdentityProjection(pkg.identities)
 	for _, record := range store.records {
 		start := encoder.written
 		encoder.unsigned(uint64(record.id))
 		encoder.unsigned(uint64(record.kind))
 		writeBinaryTypePayload(encoder, store, record)
-		measurement.consider(
-			&measurement.typeTail,
-			identities.typeID(record.id).String(),
+		measurement.considerType(
+			record.id,
 			encoder.written-start,
 		)
 	}

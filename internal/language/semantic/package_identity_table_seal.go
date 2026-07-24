@@ -6,16 +6,13 @@ import (
 	"github.com/tsoniclang/gotots/internal/identity"
 )
 
-func sealPackageIdentityTable(
-	components packageIdentityComponents,
-) (packageIdentityTable, error) {
-	table := packageIdentityTable{
-		packageIdentityComponents: components,
-	}
+func admitPackageIdentityTable(
+	table packageIdentityTable,
+) (admittedPackageIdentityTable, error) {
 	if err := validatePackageIdentityTable(table); err != nil {
-		return packageIdentityTable{}, err
+		return admittedPackageIdentityTable{}, err
 	}
-	return table, nil
+	return admittedPackageIdentityTable{table: table}, nil
 }
 
 func validatePackageIdentityTable(

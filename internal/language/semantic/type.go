@@ -1,8 +1,8 @@
 package semantic
 
 import (
-	"bytes"
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"unicode"
@@ -75,9 +75,7 @@ func NewType(spec TypeSpec) (Type, error) {
 	if err := validateTypeSpec(spec); err != nil {
 		return Type{}, err
 	}
-	identityKey := encodeTypeIdentity(spec)
-	digest := sha256.Sum256([]byte(identityKey))
-	id, err := identity.NewSemanticTypeID(fmt.Sprintf("%x", digest[:]))
+	id, err := semanticTypeID(spec)
 	if err != nil {
 		return Type{}, err
 	}
@@ -111,9 +109,7 @@ func NominalTypeID(
 			"%s is not nominal", kind,
 		)
 	}
-	key := encodeTypeIdentity(spec)
-	digest := sha256.Sum256([]byte(key))
-	return identity.NewSemanticTypeID(fmt.Sprintf("%x", digest[:]))
+	return semanticTypeID(spec)
 }
 
 func TypeParameterTypeID(
@@ -125,9 +121,7 @@ func TypeParameterTypeID(
 		)
 	}
 	spec := TypeSpec{Kind: TypeParameter, Parameter: owner}
-	key := encodeTypeIdentity(spec)
-	digest := sha256.Sum256([]byte(key))
-	return identity.NewSemanticTypeID(fmt.Sprintf("%x", digest[:]))
+	return semanticTypeID(spec)
 }
 
 func (record Type) ID() identity.SemanticTypeID { return record.id }
@@ -355,96 +349,180 @@ func validateSignature(signature Signature) error {
 	return nil
 }
 
-func encodeTypeIdentity(spec TypeSpec) string {
-	var out bytes.Buffer
-	writePart(&out, "semantic-type-identity/v1")
-	writeInt(&out, int64(spec.Kind))
+func semanticTypeID(
+	spec TypeSpec,
+) (identity.SemanticTypeID, error) {
+	encoded := encodeTypeIdentityBytes(spec)
+	digest := sha256.Sum256(encoded)
+	var rendered [sha256.Size * 2]byte
+	hex.Encode(rendered[:], digest[:])
+	return identity.NewSemanticTypeID(string(rendered[:]))
+}
+
+func encodeTypeIdentityBytes(spec TypeSpec) []byte {
+	encoded := make([]byte, 0, 256)
+	encoded = appendTypePart(
+		encoded, "semantic-type-identity/v1",
+	)
+	encoded = appendTypeInt(encoded, int64(spec.Kind))
 	switch spec.Kind {
 	case TypeNamed, TypeAlias:
-		writePart(&out, spec.Declaration.String())
-		writeTypeIDs(&out, spec.Arguments)
+		encoded = appendTypePart(
+			encoded, spec.Declaration.String(),
+		)
+		encoded = appendTypeIDs(encoded, spec.Arguments)
 	case TypeParameter:
-		writePart(&out, spec.Parameter.String())
+		encoded = appendTypePart(
+			encoded, spec.Parameter.String(),
+		)
 	default:
-		writePart(&out, encodeTypeSpec(spec))
+		encoded = appendFramedTypeSpec(encoded, spec)
 	}
-	return out.String()
+	return encoded
 }
 
-func encodeTypeSpec(spec TypeSpec) string {
-	var out bytes.Buffer
-	writePart(&out, "semantic-type/v1")
-	writeInt(&out, int64(spec.Kind))
-	writeInt(&out, int64(spec.Basic))
-	writePart(&out, spec.Declaration.String())
-	writePart(&out, spec.Parameter.String())
-	writeTypeIDs(&out, spec.Arguments)
-	writePart(&out, spec.Underlying.String())
-	writePart(&out, spec.Target.String())
-	writePart(&out, spec.Constraint.String())
-	writePart(&out, spec.Element.String())
-	writePart(&out, spec.Key.String())
-	writeInt(&out, spec.Length)
-	writeInt(&out, int64(spec.Direction))
-	writePart(&out, spec.Signature.Receiver.String())
-	writeTypeIDs(&out, spec.Signature.ReceiverTypeParameters)
-	writeTypeIDs(&out, spec.Signature.TypeParameters)
-	writeTypeIDs(&out, spec.Signature.Parameters)
-	writeTypeIDs(&out, spec.Signature.Results)
-	writeBool(&out, spec.Signature.Variadic)
-	writeInt(&out, int64(len(spec.Fields)))
+func appendFramedTypeSpec(
+	encoded []byte,
+	spec TypeSpec,
+) []byte {
+	const prefixReserve = 24
+	prefixStart := len(encoded)
+	encoded = append(encoded, make([]byte, prefixReserve)...)
+	contentStart := len(encoded)
+	encoded = appendTypeSpec(encoded, spec)
+	contentLength := len(encoded) - contentStart
+	var prefix [prefixReserve]byte
+	renderedPrefix := strconv.AppendInt(
+		prefix[:0], int64(contentLength), 10,
+	)
+	renderedPrefix = append(renderedPrefix, ':')
+	copy(
+		encoded[prefixStart+len(renderedPrefix):],
+		encoded[contentStart:],
+	)
+	copy(encoded[prefixStart:], renderedPrefix)
+	framedEnd := prefixStart + len(renderedPrefix) + contentLength
+	encoded = encoded[:framedEnd]
+	return append(encoded, '|')
+}
+
+func appendTypeSpec(encoded []byte, spec TypeSpec) []byte {
+	encoded = appendTypePart(encoded, "semantic-type/v1")
+	encoded = appendTypeInt(encoded, int64(spec.Kind))
+	encoded = appendTypeInt(encoded, int64(spec.Basic))
+	encoded = appendTypePart(encoded, spec.Declaration.String())
+	encoded = appendTypePart(encoded, spec.Parameter.String())
+	encoded = appendTypeIDs(encoded, spec.Arguments)
+	encoded = appendSemanticTypeIDPart(encoded, spec.Underlying)
+	encoded = appendSemanticTypeIDPart(encoded, spec.Target)
+	encoded = appendSemanticTypeIDPart(encoded, spec.Constraint)
+	encoded = appendSemanticTypeIDPart(encoded, spec.Element)
+	encoded = appendSemanticTypeIDPart(encoded, spec.Key)
+	encoded = appendTypeInt(encoded, spec.Length)
+	encoded = appendTypeInt(encoded, int64(spec.Direction))
+	encoded = appendSemanticTypeIDPart(
+		encoded, spec.Signature.Receiver,
+	)
+	encoded = appendTypeIDs(
+		encoded, spec.Signature.ReceiverTypeParameters,
+	)
+	encoded = appendTypeIDs(
+		encoded, spec.Signature.TypeParameters,
+	)
+	encoded = appendTypeIDs(
+		encoded, spec.Signature.Parameters,
+	)
+	encoded = appendTypeIDs(encoded, spec.Signature.Results)
+	encoded = appendTypeBool(encoded, spec.Signature.Variadic)
+	encoded = appendTypeInt(encoded, int64(len(spec.Fields)))
 	for _, field := range spec.Fields {
-		writePart(&out, field.Name)
-		writePart(&out, field.Package.String())
-		writePart(&out, field.Type.String())
-		writeBool(&out, field.Embedded)
-		writePart(&out, field.Tag)
-		writeInt(&out, int64(field.Ordinal))
+		encoded = appendTypePart(encoded, field.Name)
+		encoded = appendTypePart(
+			encoded, field.Package.String(),
+		)
+		encoded = appendSemanticTypeIDPart(
+			encoded, field.Type,
+		)
+		encoded = appendTypeBool(encoded, field.Embedded)
+		encoded = appendTypePart(encoded, field.Tag)
+		encoded = appendTypeInt(
+			encoded, int64(field.Ordinal),
+		)
 	}
-	writeInt(&out, int64(len(spec.Methods)))
+	encoded = appendTypeInt(encoded, int64(len(spec.Methods)))
 	for _, method := range spec.Methods {
-		writePart(&out, method.Name)
-		writePart(&out, method.Package.String())
-		writePart(&out, method.Signature.String())
-		writeInt(&out, int64(method.Ordinal))
+		encoded = appendTypePart(encoded, method.Name)
+		encoded = appendTypePart(
+			encoded, method.Package.String(),
+		)
+		encoded = appendSemanticTypeIDPart(
+			encoded, method.Signature,
+		)
+		encoded = appendTypeInt(
+			encoded, int64(method.Ordinal),
+		)
 	}
-	writeTypeIDs(&out, spec.Embeddeds)
-	writeInt(&out, int64(len(spec.Terms)))
+	encoded = appendTypeIDs(encoded, spec.Embeddeds)
+	encoded = appendTypeInt(encoded, int64(len(spec.Terms)))
 	for _, term := range spec.Terms {
-		writeBool(&out, term.Tilde)
-		writePart(&out, term.Type.String())
+		encoded = appendTypeBool(encoded, term.Tilde)
+		encoded = appendSemanticTypeIDPart(
+			encoded, term.Type,
+		)
 	}
-	writeBool(&out, spec.Comparable)
-	writeInt(&out, int64(spec.TypeSet))
-	writeTypeIDs(&out, spec.Elements)
-	return out.String()
+	encoded = appendTypeBool(encoded, spec.Comparable)
+	encoded = appendTypeInt(encoded, int64(spec.TypeSet))
+	return appendTypeIDs(encoded, spec.Elements)
 }
 
-func writeTypeIDs(
-	out *bytes.Buffer,
+func appendTypeIDs(
+	encoded []byte,
 	ids []identity.SemanticTypeID,
-) {
-	writeInt(out, int64(len(ids)))
+) []byte {
+	encoded = appendTypeInt(encoded, int64(len(ids)))
 	for _, id := range ids {
-		writePart(out, id.String())
+		encoded = appendSemanticTypeIDPart(encoded, id)
 	}
+	return encoded
 }
 
-func writePart(out *bytes.Buffer, value string) {
-	out.WriteString(strconv.Itoa(len(value)))
-	out.WriteByte(':')
-	out.WriteString(value)
-	out.WriteByte('|')
+func appendSemanticTypeIDPart(
+	encoded []byte,
+	id identity.SemanticTypeID,
+) []byte {
+	if id.IsZero() {
+		return appendTypePart(encoded, "")
+	}
+	const prefix = "semantic-type/sha256:"
+	length := len(prefix) + len(id.Digest())
+	encoded = strconv.AppendInt(encoded, int64(length), 10)
+	encoded = append(encoded, ':')
+	encoded = append(encoded, prefix...)
+	encoded = append(encoded, id.Digest()...)
+	return append(encoded, '|')
 }
 
-func writeInt(out *bytes.Buffer, value int64) {
-	writePart(out, strconv.FormatInt(value, 10))
+func appendTypePart(encoded []byte, value string) []byte {
+	encoded = strconv.AppendInt(encoded, int64(len(value)), 10)
+	encoded = append(encoded, ':')
+	encoded = append(encoded, value...)
+	return append(encoded, '|')
 }
 
-func writeBool(out *bytes.Buffer, value bool) {
+func appendTypeInt(encoded []byte, value int64) []byte {
+	var number [32]byte
+	rendered := strconv.AppendInt(number[:0], value, 10)
+	encoded = strconv.AppendInt(
+		encoded, int64(len(rendered)), 10,
+	)
+	encoded = append(encoded, ':')
+	encoded = append(encoded, rendered...)
+	return append(encoded, '|')
+}
+
+func appendTypeBool(encoded []byte, value bool) []byte {
 	if value {
-		writePart(out, "1")
-		return
+		return appendTypePart(encoded, "1")
 	}
-	writePart(out, "0")
+	return appendTypePart(encoded, "0")
 }

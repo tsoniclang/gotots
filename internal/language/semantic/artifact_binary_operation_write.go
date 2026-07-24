@@ -9,7 +9,6 @@ func writeBinaryOperations(
 ) {
 	store := pkg.operations
 	encoder.count(len(store.records))
-	identities := newPackageIdentityProjection(pkg.identities)
 	for _, record := range store.records {
 		start := encoder.written
 		encoder.unsigned(uint64(record.id))
@@ -45,9 +44,8 @@ func writeBinaryOperations(
 		writeBinaryImplicitOperations(encoder, store, record.implicit)
 		encoder.unsigned(uint64(record.controlTarget))
 		encoder.unsigned(uint64(record.label))
-		measurement.consider(
-			&measurement.operationTail,
-			identities.operation(record.id).String(),
+		measurement.considerOperation(
+			record.id,
 			encoder.written-start,
 		)
 	}

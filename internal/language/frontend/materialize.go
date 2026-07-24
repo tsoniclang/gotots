@@ -264,16 +264,16 @@ func localPackageFiles(
 }
 
 type packageBuilder struct {
-	stage                 *stageInput
-	input                 *packageInput
-	contexts              *contextIndex
-	objects               *objectIndex
-	types                 *typeBuilder
-	draft                 *semantic.PackageDraft
-	operationByOccurrence []identity.OperationID
-	variantByOccurrence   []catalog.Variant
-	resolvedOccurrences   []bool
-	definitionByRoot      map[packageOccurrenceRef]identity.DefinitionID
+	stage               *stageInput
+	input               *packageInput
+	contexts            *contextIndex
+	objects             *objectIndex
+	types               *typeBuilder
+	draft               *semantic.PackageDraft
+	operationKinds      []semantic.OperationKind
+	variantByOccurrence []catalog.Variant
+	resolvedOccurrences []bool
+	definitionByRoot    map[packageOccurrenceRef]identity.DefinitionID
 }
 
 func materializePackage(
@@ -309,8 +309,8 @@ func materializePackage(
 		stage: stage, input: input, contexts: contexts, objects: objects,
 		types: objects.typeBuilder,
 		draft: draft,
-		operationByOccurrence: make(
-			[]identity.OperationID,
+		operationKinds: make(
+			[]semantic.OperationKind,
 			input.occurrences.referenceCount()+1,
 		),
 		variantByOccurrence: make(

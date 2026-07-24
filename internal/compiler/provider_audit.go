@@ -363,6 +363,9 @@ func deriveProviderPackage(
 	); err != nil {
 		return nil, err
 	}
+	if err := index.SealForStage2(); err != nil {
+		return nil, err
+	}
 	return &providerPackageDerivation{
 		universe:   fork,
 		graph:      graph,

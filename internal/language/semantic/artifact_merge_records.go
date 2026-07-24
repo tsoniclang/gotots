@@ -16,7 +16,7 @@ func (merge *mixedBinaryShardMerge) definitions(
 			authority Authority,
 		) (DefinitionSemantics, error) {
 			return decodeBinaryDefinitionValue(
-				decoder, merge.checker.identities, authority,
+				decoder, merge.checker.identities.table, authority,
 			)
 		},
 		func(record DefinitionSemantics) identity.DefinitionID {
@@ -36,7 +36,7 @@ func (merge *mixedBinaryShardMerge) definitions(
 			authority Authority,
 		) (DefinitionSemantics, error) {
 			return decodeBinaryDefinitionValue(
-				decoder, merge.provider.identities, authority,
+				decoder, merge.provider.identities.table, authority,
 			)
 		},
 		func(record DefinitionSemantics) identity.DefinitionID {
@@ -76,7 +76,7 @@ func (merge *mixedBinaryShardMerge) resolutions(
 			_ Authority,
 		) (OccurrenceResolution, error) {
 			return decodeBinaryResolutionValue(
-				decoder, merge.checker.identities,
+				decoder, merge.checker.identities.table,
 			)
 		},
 		func(record OccurrenceResolution) identity.OccurrenceID {
@@ -96,7 +96,7 @@ func (merge *mixedBinaryShardMerge) resolutions(
 			_ Authority,
 		) (OccurrenceResolution, error) {
 			return decodeBinaryResolutionValue(
-				decoder, merge.provider.identities,
+				decoder, merge.provider.identities.table,
 			)
 		},
 		func(record OccurrenceResolution) identity.OccurrenceID {
@@ -135,7 +135,7 @@ func (merge *mixedBinaryShardMerge) declarations(
 			authority Authority,
 		) (Declaration, error) {
 			return decodeBinaryDeclarationValue(
-				decoder, merge.checker.identities, authority,
+				decoder, merge.checker.identities.table, authority,
 			)
 		},
 		func(record Declaration) identity.SemanticDeclarationID {
@@ -155,7 +155,7 @@ func (merge *mixedBinaryShardMerge) declarations(
 			authority Authority,
 		) (Declaration, error) {
 			return decodeBinaryDeclarationValue(
-				decoder, merge.provider.identities, authority,
+				decoder, merge.provider.identities.table, authority,
 			)
 		},
 		func(record Declaration) identity.SemanticDeclarationID {
@@ -191,7 +191,7 @@ func (merge *mixedBinaryShardMerge) bindings(
 			authority Authority,
 		) (Binding, error) {
 			return decodeBinaryBindingValue(
-				decoder, merge.checker.identities, authority,
+				decoder, merge.checker.identities.table, authority,
 			)
 		},
 		func(record Binding) identity.SemanticBindingID {
@@ -211,7 +211,7 @@ func (merge *mixedBinaryShardMerge) bindings(
 			authority Authority,
 		) (Binding, error) {
 			return decodeBinaryBindingValue(
-				decoder, merge.provider.identities, authority,
+				decoder, merge.provider.identities.table, authority,
 			)
 		},
 		func(record Binding) identity.SemanticBindingID {
@@ -247,7 +247,7 @@ func (merge *mixedBinaryShardMerge) types(
 			_ Authority,
 		) (Type, error) {
 			return decodeBinaryTypeValue(
-				decoder, merge.checker.identities,
+				decoder, merge.checker.identities.table,
 			)
 		},
 		func(record Type) identity.SemanticTypeID {
@@ -267,7 +267,7 @@ func (merge *mixedBinaryShardMerge) types(
 			_ Authority,
 		) (Type, error) {
 			return decodeBinaryTypeValue(
-				decoder, merge.provider.identities,
+				decoder, merge.provider.identities.table,
 			)
 		},
 		func(record Type) identity.SemanticTypeID {
@@ -312,7 +312,7 @@ func (merge *mixedBinaryShardMerge) operations(
 			_ Authority,
 		) (Operation, error) {
 			return decodeBinaryOperationValue(
-				decoder, merge.checker.identities,
+				decoder, merge.checker.identities.table,
 			)
 		},
 		func(record Operation) identity.OperationID {
@@ -332,7 +332,7 @@ func (merge *mixedBinaryShardMerge) operations(
 			_ Authority,
 		) (Operation, error) {
 			return decodeBinaryOperationValue(
-				decoder, merge.provider.identities,
+				decoder, merge.provider.identities.table,
 			)
 		},
 		func(record Operation) identity.OperationID {
@@ -368,7 +368,7 @@ func (merge *mixedBinaryShardMerge) unsupported(
 			authority Authority,
 		) (Unsupported, error) {
 			return decodeBinaryUnsupportedValue(
-				decoder, merge.checker.identities, authority,
+				decoder, merge.checker.identities.table, authority,
 			)
 		},
 		func(record Unsupported) identity.UnsupportedID {
@@ -388,7 +388,7 @@ func (merge *mixedBinaryShardMerge) unsupported(
 			authority Authority,
 		) (Unsupported, error) {
 			return decodeBinaryUnsupportedValue(
-				decoder, merge.provider.identities, authority,
+				decoder, merge.provider.identities.table, authority,
 			)
 		},
 		func(record Unsupported) identity.UnsupportedID {

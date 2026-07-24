@@ -176,7 +176,7 @@ func nextCase(
 	if parent == nil {
 		return 0
 	}
-	for _, childID := range parent.children {
+	for _, childID := range input.occurrenceChildren(parent) {
 		child := input.occurrenceRecord(childID)
 		if child == nil ||
 			child.occurrence.Kind() != catalog.KindCaseClause ||

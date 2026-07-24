@@ -503,7 +503,7 @@ func (verifier *checkerSemanticVerifier) independentPackageInitialization() (
 			}
 			entryDefinitions[definition] = true
 		}
-		occurrence, present := verifier.index.OccurrenceID(entry.Rhs)
+		occurrence, present := verifier.occurrenceID(entry.Rhs)
 		if present {
 			definition := verifier.expected.occurrenceOwner(occurrence)
 			if definition.IsZero() {

@@ -125,11 +125,6 @@ func buildContexts(
 		record.contextVisiting = false
 		out.count++
 		work.ContextAssignments++
-		for _, child := range record.children {
-			if err := assign(child); err != nil {
-				return err
-			}
-		}
 		return nil
 	}
 	for _, id := range input.order {

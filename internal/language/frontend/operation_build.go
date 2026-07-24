@@ -15,7 +15,13 @@ import (
 func (builder *packageBuilder) buildOperation(
 	item pendingOperation,
 ) (semantic.OperationSpec, error) {
-	id := builder.operationByOccurrence[builder.input.occurrenceReference(item.record.occurrence.ID())]
+	reference := builder.input.occurrenceReference(
+		item.record.occurrence.ID(),
+	)
+	id, err := builder.operationID(reference)
+	if err != nil {
+		return semantic.OperationSpec{}, err
+	}
 	mode, arity, place, resultType, addressable, assignable, value, err :=
 		builder.operationValue(item)
 	if err != nil {

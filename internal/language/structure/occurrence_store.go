@@ -121,6 +121,17 @@ func (builder *OccurrenceStoreBuilder) Matches(
 		builder.store.occurrence(index) == occurrence
 }
 
+func (builder *OccurrenceStoreBuilder) occurrence(
+	index OccurrenceIndex,
+) Occurrence {
+	if builder == nil ||
+		builder.sealed ||
+		builder.store == nil {
+		return Occurrence{}
+	}
+	return builder.store.occurrence(index)
+}
+
 func (builder *OccurrenceStoreBuilder) record(
 	occurrence Occurrence,
 ) (occurrenceStoreRecord, error) {

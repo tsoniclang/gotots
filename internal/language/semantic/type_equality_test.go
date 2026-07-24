@@ -1,7 +1,11 @@
 package semantic
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -23,6 +27,194 @@ func TestTypeRetainsNoRenderedCanonicalForm(t *testing.T) {
 			)
 		}
 	}
+}
+
+func TestTypeIdentityStreamingPreservesCanonicalBytes(t *testing.T) {
+	fixture := semanticFixture(t)
+	declaration, err := identity.NewPackageDeclarationID(
+		fixture.pkg,
+		identity.SemanticObjectType,
+		"Element",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parameter, err := NewTypeParameterOwner(
+		declaration,
+		identity.DefinitionID{},
+		TypeParameterDeclared,
+		2,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	argument := testSemanticTypeID(t, "ab")
+	cases := []TypeSpec{
+		{Kind: TypeBasic, Basic: BasicInt},
+		{
+			Kind: TypeNamed, Declaration: declaration,
+			Arguments: []identity.SemanticTypeID{argument},
+		},
+		{
+			Kind: TypeAlias, Declaration: declaration,
+			Arguments: []identity.SemanticTypeID{argument},
+		},
+		{Kind: TypeParameter, Parameter: parameter},
+	}
+	for _, spec := range cases {
+		expectedBytes := referenceBufferedTypeIdentity(spec)
+		actualBytes := encodeTypeIdentityBytes(spec)
+		if !bytes.Equal(actualBytes, expectedBytes) {
+			t.Fatalf(
+				"%s canonical bytes differ:\nstreamed=%q\nbuffered=%q",
+				spec.Kind,
+				actualBytes,
+				expectedBytes,
+			)
+		}
+		actual, actualErr := semanticTypeID(spec)
+		if actualErr != nil {
+			t.Fatalf("%s streaming identity: %v", spec.Kind, actualErr)
+		}
+		expected := referenceBufferedSemanticTypeID(t, spec)
+		if actual != expected {
+			t.Fatalf(
+				"%s streaming identity=%s, buffered=%s",
+				spec.Kind,
+				actual,
+				expected,
+			)
+		}
+	}
+	mutated := cases[0]
+	mutated.Basic = BasicString
+	original, err := semanticTypeID(cases[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	changed, err := semanticTypeID(mutated)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if original == changed {
+		t.Fatal("type-identity mutation did not change the digest")
+	}
+}
+
+func referenceBufferedSemanticTypeID(
+	t *testing.T,
+	spec TypeSpec,
+) identity.SemanticTypeID {
+	t.Helper()
+	encoded := referenceBufferedTypeIdentity(spec)
+	digest := sha256.Sum256(encoded)
+	id, err := identity.NewSemanticTypeID(
+		hex.EncodeToString(digest[:]),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
+
+func referenceBufferedTypeIdentity(spec TypeSpec) []byte {
+	var out bytes.Buffer
+	referenceWritePart(&out, "semantic-type-identity/v1")
+	referenceWriteInt(&out, int64(spec.Kind))
+	switch spec.Kind {
+	case TypeNamed, TypeAlias:
+		referenceWritePart(&out, spec.Declaration.String())
+		referenceWriteTypeIDs(&out, spec.Arguments)
+	case TypeParameter:
+		referenceWritePart(&out, spec.Parameter.String())
+	default:
+		referenceWritePart(
+			&out, referenceEncodeTypeSpec(spec),
+		)
+	}
+	return out.Bytes()
+}
+
+func referenceEncodeTypeSpec(spec TypeSpec) string {
+	var out bytes.Buffer
+	referenceWritePart(&out, "semantic-type/v1")
+	referenceWriteInt(&out, int64(spec.Kind))
+	referenceWriteInt(&out, int64(spec.Basic))
+	referenceWritePart(&out, spec.Declaration.String())
+	referenceWritePart(&out, spec.Parameter.String())
+	referenceWriteTypeIDs(&out, spec.Arguments)
+	referenceWritePart(&out, spec.Underlying.String())
+	referenceWritePart(&out, spec.Target.String())
+	referenceWritePart(&out, spec.Constraint.String())
+	referenceWritePart(&out, spec.Element.String())
+	referenceWritePart(&out, spec.Key.String())
+	referenceWriteInt(&out, spec.Length)
+	referenceWriteInt(&out, int64(spec.Direction))
+	referenceWritePart(&out, spec.Signature.Receiver.String())
+	referenceWriteTypeIDs(
+		&out, spec.Signature.ReceiverTypeParameters,
+	)
+	referenceWriteTypeIDs(
+		&out, spec.Signature.TypeParameters,
+	)
+	referenceWriteTypeIDs(&out, spec.Signature.Parameters)
+	referenceWriteTypeIDs(&out, spec.Signature.Results)
+	referenceWriteBool(&out, spec.Signature.Variadic)
+	referenceWriteInt(&out, int64(len(spec.Fields)))
+	for _, field := range spec.Fields {
+		referenceWritePart(&out, field.Name)
+		referenceWritePart(&out, field.Package.String())
+		referenceWritePart(&out, field.Type.String())
+		referenceWriteBool(&out, field.Embedded)
+		referenceWritePart(&out, field.Tag)
+		referenceWriteInt(&out, int64(field.Ordinal))
+	}
+	referenceWriteInt(&out, int64(len(spec.Methods)))
+	for _, method := range spec.Methods {
+		referenceWritePart(&out, method.Name)
+		referenceWritePart(&out, method.Package.String())
+		referenceWritePart(&out, method.Signature.String())
+		referenceWriteInt(&out, int64(method.Ordinal))
+	}
+	referenceWriteTypeIDs(&out, spec.Embeddeds)
+	referenceWriteInt(&out, int64(len(spec.Terms)))
+	for _, term := range spec.Terms {
+		referenceWriteBool(&out, term.Tilde)
+		referenceWritePart(&out, term.Type.String())
+	}
+	referenceWriteBool(&out, spec.Comparable)
+	referenceWriteInt(&out, int64(spec.TypeSet))
+	referenceWriteTypeIDs(&out, spec.Elements)
+	return out.String()
+}
+
+func referenceWriteTypeIDs(
+	out *bytes.Buffer,
+	ids []identity.SemanticTypeID,
+) {
+	referenceWriteInt(out, int64(len(ids)))
+	for _, id := range ids {
+		referenceWritePart(out, id.String())
+	}
+}
+
+func referenceWritePart(out *bytes.Buffer, value string) {
+	out.WriteString(strconv.Itoa(len(value)))
+	out.WriteByte(':')
+	out.WriteString(value)
+	out.WriteByte('|')
+}
+
+func referenceWriteInt(out *bytes.Buffer, value int64) {
+	referenceWritePart(out, strconv.FormatInt(value, 10))
+}
+
+func referenceWriteBool(out *bytes.Buffer, value bool) {
+	if value {
+		referenceWritePart(out, "1")
+		return
+	}
+	referenceWritePart(out, "0")
 }
 
 func TestTypeEqualityCoversEveryDescriptorComponent(t *testing.T) {

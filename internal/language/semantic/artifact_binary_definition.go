@@ -13,7 +13,6 @@ func writeBinaryDefinitions(
 ) {
 	store := pkg.definitions
 	encoder.count(len(store.records))
-	identities := newPackageIdentityProjection(pkg.identities)
 	for _, record := range store.records {
 		start := encoder.written
 		encoder.unsigned(uint64(record.id))
@@ -27,9 +26,8 @@ func writeBinaryDefinitions(
 			record.bindings.count,
 		)
 		writeBinaryDefinitionPayload(encoder, store, record)
-		measurement.consider(
-			&measurement.definitionTail,
-			identities.definition(record.id).String(),
+		measurement.considerDefinition(
+			record.id,
 			encoder.written-start,
 		)
 	}

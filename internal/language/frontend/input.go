@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"go/ast"
-	"sort"
 
 	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/catalog"
@@ -22,7 +21,6 @@ type occurrenceInput struct {
 	node            ast.Node
 	owner           packageDefinitionRef
 	domain          catalog.ResolutionDomain
-	children        []packageOccurrenceRef
 	checkedUnmapped bool
 	context         occurrenceContext
 	contextAssigned bool
@@ -82,6 +80,12 @@ func (input *packageInput) occurrenceOwner(
 	return input.definitionID(record.owner)
 }
 
+func (input *packageInput) occurrenceID(
+	node ast.Node,
+) (identity.OccurrenceID, bool) {
+	return input.occurrences.occurrenceID(node)
+}
+
 type stageInput struct {
 	universe      *source.Universe
 	graph         *structure.Graph
@@ -117,7 +121,8 @@ func newStageInput(
 		selections == nil ||
 		executableInventory == nil ||
 		plan == nil ||
-		plan.Purpose() != expectedPurpose {
+		plan.Purpose() != expectedPurpose ||
+		!index.Stage2Ready() {
 		return nil, fmt.Errorf(
 			"frontend requires every live Stage-1 input before finalization",
 		)
@@ -190,10 +195,8 @@ func (input *packageInput) buildOccurrences(
 	executableInventory *executable.Inventory,
 ) error {
 	files := input.graph.Files()
-	structuralCount := 0
 	var packageFiles []identity.FileID
 	for _, file := range files {
-		structuralCount += file.OccurrenceCount()
 		packageFiles = append(
 			packageFiles, file.Owner().ID().File(),
 		)
@@ -203,24 +206,32 @@ func (input *packageInput) buildOccurrences(
 	if err != nil {
 		return err
 	}
-	if err := input.occurrences.reserve(
-		structuralCount + len(additional),
+	nodeCount, err := index.OccurrenceNodeCountForFiles(
+		packageFiles,
+	)
+	if err != nil {
+		return err
+	}
+	if err := input.occurrences.reserve(nodeCount); err != nil {
+		return err
+	}
+	if err := index.VisitOccurrenceNodesForFiles(
+		packageFiles,
+		func(
+			id identity.OccurrenceID,
+			node ast.Node,
+		) error {
+			return input.occurrences.bindNode(id, node)
+		},
 	); err != nil {
+		return err
+	}
+	if err := input.occurrences.sealIdentities(); err != nil {
 		return err
 	}
 	appendOccurrence := func(occurrence structure.OccurrenceRef) error {
 		node, local := index.OccurrenceNode(occurrence.ID())
 		if !local {
-			return nil
-		}
-		if existing := input.occurrence(occurrence.ID()); existing != nil {
-			if !existing.occurrence.Equal(occurrence) ||
-				existing.node != node {
-				return fmt.Errorf(
-					"occurrence %s has conflicting Stage-2 input",
-					occurrence.ID(),
-				)
-			}
 			return nil
 		}
 		record := &occurrenceInput{
@@ -230,13 +241,12 @@ func (input *packageInput) buildOccurrences(
 				occurrence.ID(),
 			),
 		}
-		reference, err := input.occurrences.put(
+		_, err := input.occurrences.put(
 			occurrence.ID(), record,
 		)
 		if err != nil {
 			return err
 		}
-		input.order = append(input.order, reference)
 		return nil
 	}
 	for _, file := range files {
@@ -250,6 +260,13 @@ func (input *packageInput) buildOccurrences(
 		if err := appendOccurrence(occurrence); err != nil {
 			return err
 		}
+	}
+	if err := input.occurrences.seal(); err != nil {
+		return err
+	}
+	input.order, err = input.occurrences.insertionOrder()
+	if err != nil {
+		return err
 	}
 	for _, file := range files {
 		for _, member := range file.Owner().Members() {
@@ -342,46 +359,26 @@ func (input *packageInput) buildOccurrences(
 
 func (input *packageInput) assignChildren() error {
 	input.work.InputOccurrences += input.occurrences.count()
-	if err := input.occurrences.visit(func(
-		reference packageOccurrenceRef,
-		record *occurrenceInput,
-	) error {
-		parent := input.occurrenceReference(record.occurrence.Parent())
-		parentRecord := input.occurrenceRecord(parent)
-		if parentRecord != nil {
-			input.work.ChildEdgeAssignments++
-			parentRecord.children = append(
-				parentRecord.children, reference,
-			)
-		}
-		return nil
-	}); err != nil {
+	relations, err := input.occurrences.buildChildRelations(
+		input.order,
+	)
+	if err != nil {
 		return err
 	}
-	for _, parentReference := range input.order {
-		parent := input.occurrenceRecord(parentReference)
-		rank := map[catalog.Edge]int{}
-		for index, edge := range catalog.EdgesOf(
-			parent.occurrence.Kind(),
-		) {
-			rank[edge] = index
-		}
-		input.work.CanonicalSortInputs += len(parent.children)
-		sort.Slice(parent.children, func(left, right int) bool {
-			leftRecord := input.occurrenceRecord(
-				parent.children[left],
-			).occurrence
-			rightRecord := input.occurrenceRecord(
-				parent.children[right],
-			).occurrence
-			if rank[leftRecord.Edge()] != rank[rightRecord.Edge()] {
-				return rank[leftRecord.Edge()] <
-					rank[rightRecord.Edge()]
-			}
-			return leftRecord.Ordinal() < rightRecord.Ordinal()
-		})
-	}
+	input.work.ChildEdgeAssignments += relations
+	input.work.CanonicalSortInputs += relations
 	return nil
+}
+
+func (input *packageInput) occurrenceChildren(
+	record *occurrenceInput,
+) []packageOccurrenceRef {
+	if record == nil {
+		return nil
+	}
+	return input.occurrences.childReferences(
+		input.occurrenceReference(record.occurrence.ID()),
+	)
 }
 
 func (input *packageInput) assignOccurrenceOwner(

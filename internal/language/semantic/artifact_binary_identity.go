@@ -270,7 +270,9 @@ func readBinaryIdentityTables(
 	if err != nil {
 		return packageIdentityTable{}, err
 	}
-	return sealPackageIdentityTable(components)
+	return packageIdentityTable{
+		packageIdentityComponents: components,
+	}, nil
 }
 
 func readBinarySpanIdentity(

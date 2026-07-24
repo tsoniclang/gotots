@@ -22,12 +22,17 @@ type RecordSize struct {
 	EncodedBytes int64
 }
 
+type recordSizeCandidate[Reference ~uint64] struct {
+	reference    Reference
+	encodedBytes int64
+}
+
 type semanticShardMeasurement struct {
-	pkg            identity.PackageID
-	encodedBytes   int64
-	definitionTail []RecordSize
-	operationTail  []RecordSize
-	typeTail       []RecordSize
+	pkg                  identity.PackageID
+	encodedBytes         int64
+	definitionCandidates []recordSizeCandidate[definitionRef]
+	operationCandidates  []recordSizeCandidate[operationRef]
+	typeCandidates       []recordSizeCandidate[typeRef]
 }
 
 func newSemanticShardMeasurement(
@@ -36,60 +41,92 @@ func newSemanticShardMeasurement(
 	return semanticShardMeasurement{pkg: pkg}
 }
 
-func (measurement *semanticShardMeasurement) observeDefinition(
-	record DefinitionSemantics,
+func (measurement *semanticShardMeasurement) considerDefinition(
+	reference definitionRef,
 	encodedBytes int64,
 ) {
-	measurement.consider(
-		&measurement.definitionTail,
-		record.Definition().String(),
+	measurement.definitionCandidates = considerRecordSize(
+		measurement.definitionCandidates,
+		reference,
 		encodedBytes,
 	)
 }
 
-func (measurement *semanticShardMeasurement) observeOperation(
-	record Operation,
+func (measurement *semanticShardMeasurement) considerOperation(
+	reference operationRef,
 	encodedBytes int64,
 ) {
-	measurement.consider(
-		&measurement.operationTail,
-		record.ID().String(),
+	measurement.operationCandidates = considerRecordSize(
+		measurement.operationCandidates,
+		reference,
 		encodedBytes,
 	)
 }
 
-func (measurement *semanticShardMeasurement) observeType(
-	record Type,
+func (measurement *semanticShardMeasurement) considerType(
+	reference typeRef,
 	encodedBytes int64,
 ) {
-	measurement.consider(
-		&measurement.typeTail,
-		record.ID().String(),
+	measurement.typeCandidates = considerRecordSize(
+		measurement.typeCandidates,
+		reference,
 		encodedBytes,
 	)
 }
 
-func (measurement *semanticShardMeasurement) consider(
-	tail *[]RecordSize,
-	identityValue string,
+func considerRecordSize[Reference ~uint64](
+	tail []recordSizeCandidate[Reference],
+	reference Reference,
 	encodedBytes int64,
-) {
-	if len(*tail) == semanticTailLimit {
-		last := (*tail)[semanticTailLimit-1]
-		if encodedBytes < last.EncodedBytes ||
-			(encodedBytes == last.EncodedBytes &&
-				identityValue >= last.Identity) {
-			return
+) []recordSizeCandidate[Reference] {
+	if len(tail) == semanticTailLimit {
+		last := tail[semanticTailLimit-1]
+		if encodedBytes < last.encodedBytes ||
+			(encodedBytes == last.encodedBytes &&
+				reference >= last.reference) {
+			return tail
 		}
 	}
-	*tail = append(*tail, RecordSize{
-		Package: measurement.pkg, Identity: identityValue,
-		EncodedBytes: encodedBytes,
+	tail = append(tail, recordSizeCandidate[Reference]{
+		reference: reference, encodedBytes: encodedBytes,
 	})
-	trimRecordTail(*tail)
-	if len(*tail) > semanticTailLimit {
-		*tail = (*tail)[:semanticTailLimit]
+	index := len(tail) - 1
+	for index > 0 && recordSizeCandidateBefore(
+		tail[index], tail[index-1],
+	) {
+		tail[index], tail[index-1] = tail[index-1], tail[index]
+		index--
 	}
+	if len(tail) > semanticTailLimit {
+		tail = tail[:semanticTailLimit]
+	}
+	return tail
+}
+
+func recordSizeCandidateBefore[Reference ~uint64](
+	left recordSizeCandidate[Reference],
+	right recordSizeCandidate[Reference],
+) bool {
+	if left.encodedBytes != right.encodedBytes {
+		return left.encodedBytes > right.encodedBytes
+	}
+	return left.reference < right.reference
+}
+
+func materializeRecordSizes[Reference ~uint64](
+	pkg identity.PackageID,
+	candidates []recordSizeCandidate[Reference],
+	render func(Reference) string,
+) []RecordSize {
+	records := make([]RecordSize, len(candidates))
+	for index, candidate := range candidates {
+		records[index] = RecordSize{
+			Package:      pkg,
+			Identity:     render(candidate.reference),
+			EncodedBytes: candidate.encodedBytes,
+		}
+	}
+	return records
 }
 
 type Metrics struct {
@@ -218,14 +255,36 @@ func (metrics *Metrics) addMeasuredPackage(
 		EncodedBytes: measurement.encodedBytes,
 		Records:      records,
 	})
+	identities := newPackageIdentityProjection(pkg.identities)
 	metrics.definitionTail = append(
-		metrics.definitionTail, measurement.definitionTail...,
+		metrics.definitionTail,
+		materializeRecordSizes(
+			measurement.pkg,
+			measurement.definitionCandidates,
+			func(reference definitionRef) string {
+				return identities.definition(reference).String()
+			},
+		)...,
 	)
 	metrics.operationTail = append(
-		metrics.operationTail, measurement.operationTail...,
+		metrics.operationTail,
+		materializeRecordSizes(
+			measurement.pkg,
+			measurement.operationCandidates,
+			func(reference operationRef) string {
+				return identities.operation(reference).String()
+			},
+		)...,
 	)
 	metrics.typeTail = append(
-		metrics.typeTail, measurement.typeTail...,
+		metrics.typeTail,
+		materializeRecordSizes(
+			measurement.pkg,
+			measurement.typeCandidates,
+			func(reference typeRef) string {
+				return identities.typeID(reference).String()
+			},
+		)...,
 	)
 	metrics.trim()
 	return nil

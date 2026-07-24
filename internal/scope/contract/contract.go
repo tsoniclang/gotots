@@ -184,6 +184,7 @@ type Rule struct {
 	condition  Condition
 	fact       SelectionFactKind
 	provider   Provider
+	id         string
 }
 
 func NewDefinitionRule(
@@ -242,6 +243,11 @@ func finishRule(rule Rule) (Rule, error) {
 	} else if rule.fact != SelectionFactInvalid {
 		return Rule{}, &Error{Reason: "only fact-true rules may name a selection fact"}
 	}
+	id := ruleID(rule)
+	if rule.id != "" && rule.id != id {
+		return Rule{}, &Error{Reason: "rule has a non-canonical identity"}
+	}
+	rule.id = id
 	return rule, nil
 }
 
@@ -254,6 +260,10 @@ func (r Rule) FactKind() SelectionFactKind       { return r.fact }
 func (r Rule) Provider() Provider                { return r.provider }
 
 func (r Rule) ID() string {
+	return r.id
+}
+
+func ruleID(r Rule) string {
 	target := ""
 	switch r.selector {
 	case SelectorExactDefinition:
@@ -290,9 +300,10 @@ func (r Rule) tier() int {
 
 // Contract is one immutable provider-contract artifact.
 type Contract struct {
-	id      string
-	version int
-	rules   []Rule
+	id          string
+	version     int
+	rules       []Rule
+	fingerprint string
 }
 
 func New(id string, rules []Rule) (Contract, error) {
@@ -315,16 +326,23 @@ func New(id string, rules []Rule) (Contract, error) {
 		}
 		seen[rule.key()] = true
 	}
-	return Contract{id: id, version: SchemaVersion, rules: canonical}, nil
+	return Contract{
+		id: id, version: SchemaVersion, rules: canonical,
+		fingerprint: fingerprint(id, SchemaVersion, canonical),
+	}, nil
 }
 
 func (c Contract) ID() string    { return c.id }
 func (c Contract) Version() int  { return c.version }
 func (c Contract) Rules() []Rule { return append([]Rule(nil), c.rules...) }
 func (c Contract) Fingerprint() string {
+	return c.fingerprint
+}
+
+func fingerprint(id string, version int, rules []Rule) string {
 	var text strings.Builder
-	fmt.Fprintf(&text, "%s|v%d", c.id, c.version)
-	for _, rule := range c.rules {
+	fmt.Fprintf(&text, "%s|v%d", id, version)
+	for _, rule := range rules {
 		text.WriteByte('\n')
 		text.WriteString(rule.ID())
 	}

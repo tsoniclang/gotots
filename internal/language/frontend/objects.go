@@ -339,7 +339,7 @@ func definitionNameSources(
 		return nil
 	}
 	var out []identity.OccurrenceID
-	for _, childID := range root.children {
+	for _, childID := range input.occurrenceChildren(root) {
 		child := input.occurrenceRecord(childID)
 		if child != nil &&
 			child.occurrence.Role() ==

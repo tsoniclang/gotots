@@ -85,6 +85,10 @@ func validateNormalizedPackageStorage(pkg Package) error {
 	if err := validatePackageIdentityTable(pkg.identities); err != nil {
 		return err
 	}
+	return validateAdmittedNormalizedPackageStorage(pkg)
+}
+
+func validateAdmittedNormalizedPackageStorage(pkg Package) error {
 	if err := validateDefinitionStorage(pkg.definitions); err != nil {
 		return err
 	}

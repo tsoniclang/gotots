@@ -277,6 +277,26 @@ func TestContractCollectionsAreIsolated(t *testing.T) {
 	}
 }
 
+func TestCanonicalIdentitiesAreMaterializedOnce(t *testing.T) {
+	selected, err := Default()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rule := selected.Rules()[0]
+	if selected.Fingerprint() == "" || rule.ID() == "" {
+		t.Fatal("contract or rule identity is empty")
+	}
+	if allocations := testing.AllocsPerRun(1000, func() {
+		_ = selected.Fingerprint()
+		_ = rule.ID()
+	}); allocations != 0 {
+		t.Fatalf(
+			"cached contract and rule identity access allocates %.2f times",
+			allocations,
+		)
+	}
+}
+
 func exactFacts(
 	selected Contract,
 	definition identity.DefinitionID,

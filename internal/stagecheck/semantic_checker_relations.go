@@ -16,24 +16,7 @@ import (
 func (verifier *checkerSemanticVerifier) operationOperands(
 	occurrence structure.OccurrenceRef,
 ) ([]identity.OccurrenceID, error) {
-	children := append(
-		[]semanticOccurrenceRef(nil),
-		verifier.childReferences(occurrence.ID())...,
-	)
-	edgeRank := map[catalog.Edge]int{}
-	for index, edge := range catalog.EdgesOf(occurrence.Kind()) {
-		edgeRank[edge] = index
-	}
-	sort.Slice(children, func(left, right int) bool {
-		leftRecord := verifier.expected.occurrenceRecord(children[left])
-		rightRecord := verifier.expected.occurrenceRecord(children[right])
-		if edgeRank[leftRecord.Edge()] !=
-			edgeRank[rightRecord.Edge()] {
-			return edgeRank[leftRecord.Edge()] <
-				edgeRank[rightRecord.Edge()]
-		}
-		return leftRecord.Ordinal() < rightRecord.Ordinal()
-	})
+	children := verifier.childReferences(occurrence.ID())
 	var ranks map[catalog.Role]int
 	switch occurrence.Kind() {
 	case catalog.KindForStmt:
@@ -52,6 +35,7 @@ func (verifier *checkerSemanticVerifier) operationOperands(
 		}
 	}
 	if ranks != nil {
+		children = append([]semanticOccurrenceRef(nil), children...)
 		sort.SliceStable(children, func(left, right int) bool {
 			leftRole := verifier.expected.occurrenceRecord(
 				children[left],

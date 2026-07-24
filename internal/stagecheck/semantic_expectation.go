@@ -292,6 +292,9 @@ func newSemanticPackageExpectation(
 		filtered = append(filtered, reference)
 	}
 	out.order = filtered
+	if err := out.occurrences.buildChildRelations(out.order); err != nil {
+		return semanticPackageExpectation{}, err
+	}
 	return out, nil
 }
 

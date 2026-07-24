@@ -34,6 +34,7 @@ type Package struct {
 	operations    packageOperationStore
 	operationView *packageOperationProjection
 	unsupported   packageUnsupportedStore
+	memberTargets MemberTargetCensus
 }
 
 func NewPackage(input PackageInput) (Package, error) {
@@ -105,7 +106,7 @@ func newPackageFromStores(
 	}
 	out := Package{
 		id: id, provenance: provenance,
-		identities:   stores.identities,
+		identities:   stores.identities.table,
 		authorities:  stores.authorities,
 		definitions:  stores.definitions,
 		resolutions:  stores.resolutions,
@@ -120,9 +121,14 @@ func newPackageFromStores(
 		out.operations,
 		out.identities,
 	)
-	if err := validateNormalizedPackageStorage(out); err != nil {
+	if err := validateAdmittedNormalizedPackageStorage(out); err != nil {
 		return Package{}, err
 	}
+	memberTargets, err := deriveMemberTargetCensus(out)
+	if err != nil {
+		return Package{}, err
+	}
+	out.memberTargets = memberTargets
 	return out, nil
 }
 

@@ -21,9 +21,17 @@ func TestTransientOccurrenceJoinHasOneBidirectionalOwner(t *testing.T) {
 			t.Fatalf("transient index retains duplicate map %s", removed)
 		}
 	}
-	for _, required := range []string{"nodes", "ids"} {
+	for _, required := range []string{"occurrences"} {
 		if _, present := typ.FieldByName(required); !present {
 			t.Fatalf("transient index lacks canonical map %s", required)
+		}
+	}
+	for _, removed := range []string{"nodes", "ids", "constructionIDs"} {
+		if _, present := typ.FieldByName(removed); present {
+			t.Fatalf(
+				"transient index retains denormalized occurrence field %s",
+				removed,
+			)
 		}
 	}
 }
@@ -32,8 +40,7 @@ func TestExecutableOccurrenceAcceptsOnlyCertifiedNodeSubstitution(
 	t *testing.T,
 ) {
 	index := &TransientIndex{
-		nodes:        map[identity.OccurrenceID]ast.Node{},
-		ids:          map[ast.Node]identity.OccurrenceID{},
+		occurrences:  newTransientOccurrenceStore(),
 		counterparts: map[ast.Node]ast.Node{},
 		originals:    map[ast.Node]ast.Node{},
 	}
@@ -66,10 +73,25 @@ func TestExecutableOccurrenceAcceptsOnlyCertifiedNodeSubstitution(
 		t.Fatal("certified checked counterpart was not selected")
 	}
 	for _, candidate := range []ast.Node{original, checked} {
-		id, found := index.OccurrenceID(candidate)
-		if !found || id != occurrence.ID() {
-			t.Fatalf("node reverse join lost canonical identity %s", id)
+		address, found := index.occurrences.reverse[candidate]
+		id, err := index.occurrences.identity(address)
+		if err != nil {
+			t.Fatal(err)
 		}
+		if !found || id != occurrence.ID() {
+			t.Fatalf("construction join lost canonical identity %s", id)
+		}
+	}
+	if err := index.SealForStage2(); err != nil {
+		t.Fatal(err)
+	}
+	if !index.Stage2Ready() || index.occurrences.reverse != nil {
+		t.Fatal("Stage-2 seal retained construction reverse state")
+	}
+	if err := index.BindExecutableOccurrence(
+		occurrence.ID(), checked,
+	); err == nil {
+		t.Fatal("sealed occurrence index accepted a construction binding")
 	}
 }
 

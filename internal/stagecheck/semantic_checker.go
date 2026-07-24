@@ -24,7 +24,6 @@ type checkerSemanticVerifier struct {
 	bindings                map[identity.SemanticBindingID]*checkerBindingCandidate
 	bindingsByDefinition    map[identity.DefinitionID][]identity.SemanticBindingID
 	bindingCaptures         map[identity.SemanticBindingID][]identity.DefinitionID
-	children                [][]semanticOccurrenceRef
 	compileTimeAnchor       []semanticOccurrenceRef
 	compileTimeResolved     []bool
 	containment             map[identity.DefinitionID]checkerDefinitionInterval
@@ -65,6 +64,11 @@ func verifyCheckerSemanticPackage(
 	if err != nil {
 		return semanticVerificationError("checker", err.Error())
 	}
+	if err := bindIndependentOccurrenceNodes(
+		&expected, index,
+	); err != nil {
+		return semanticVerificationError("checker", err.Error())
+	}
 	verifier := &checkerSemanticVerifier{
 		expected: expected, actual: actual,
 		index: index, view: view,
@@ -75,10 +79,6 @@ func verifyCheckerSemanticPackage(
 		bindings:             map[identity.SemanticBindingID]*checkerBindingCandidate{},
 		bindingsByDefinition: map[identity.DefinitionID][]identity.SemanticBindingID{},
 		bindingCaptures:      map[identity.SemanticBindingID][]identity.DefinitionID{},
-		children: make(
-			[][]semanticOccurrenceRef,
-			expected.occurrences.referenceCount()+1,
-		),
 		compileTimeAnchor: make(
 			[]semanticOccurrenceRef,
 			expected.occurrences.referenceCount()+1,
@@ -96,18 +96,6 @@ func verifyCheckerSemanticPackage(
 		sourceByObject:          map[types.Object]identity.OccurrenceID{},
 		checkerSourceByObject:   map[types.Object]identity.OccurrenceID{},
 		localOnly:               localOnly,
-	}
-	for _, occurrenceReference := range expected.order {
-		occurrence := expected.occurrenceRecord(occurrenceReference)
-		if !occurrence.Parent().IsZero() {
-			parent := expected.occurrences.reference(
-				occurrence.Parent(),
-			)
-			verifier.children[parent] = append(
-				verifier.children[parent],
-				occurrenceReference,
-			)
-		}
 	}
 	if err := verifier.deriveIndependentCheckerSupport(); err != nil {
 		return semanticVerificationError("checker", err.Error())
@@ -154,7 +142,7 @@ func (verifier *checkerSemanticVerifier) childReferences(
 	if !reference.valid() {
 		return nil
 	}
-	return verifier.children[reference]
+	return verifier.expected.occurrences.childReferences(reference)
 }
 
 func (verifier *checkerSemanticVerifier) verifyOccurrences() error {

@@ -19,8 +19,7 @@ type TransientIndex struct {
 	synthetic       map[identity.DefinitionID]ast.Node
 	entries         map[identity.DefinitionID][]ast.Node
 	files           map[identity.FileID]*source.LoadedFile
-	nodes           map[identity.OccurrenceID]ast.Node
-	ids             map[ast.Node]identity.OccurrenceID
+	occurrences     *transientOccurrenceStore
 	support         map[identity.OccurrenceID]transientSupport
 	definitionRoots map[identity.OccurrenceID]identity.DefinitionID
 	counterparts    map[ast.Node]ast.Node
@@ -45,8 +44,7 @@ func newTransientIndex(
 		synthetic:       map[identity.DefinitionID]ast.Node{},
 		entries:         map[identity.DefinitionID][]ast.Node{},
 		files:           map[identity.FileID]*source.LoadedFile{},
-		nodes:           map[identity.OccurrenceID]ast.Node{},
-		ids:             map[ast.Node]identity.OccurrenceID{},
+		occurrences:     newTransientOccurrenceStore(),
 		support:         map[identity.OccurrenceID]transientSupport{},
 		definitionRoots: map[identity.OccurrenceID]identity.DefinitionID{},
 		counterparts:    map[ast.Node]ast.Node{},
@@ -275,6 +273,11 @@ func (i *TransientIndex) bindStructuralOccurrence(
 	occurrence Occurrence,
 	node ast.Node,
 ) error {
+	if i == nil || i.occurrences == nil || i.occurrences.sealed {
+		return fmt.Errorf(
+			"transient occurrence construction is already sealed",
+		)
+	}
 	id := occurrence.ID()
 	if id.IsZero() || node == nil {
 		return fmt.Errorf(
@@ -290,23 +293,14 @@ func (i *TransientIndex) bindStructuralOccurrence(
 			"transient occurrence %s has node kind %s", id, kind,
 		)
 	}
-	if existing, present := i.nodes[id]; present {
+	if existing, present := i.occurrences.node(id); present {
 		if existing != node {
 			return fmt.Errorf(
 				"transient occurrence %s has conflicting nodes", id,
 			)
 		}
 	}
-	if existing, present := i.ids[node]; present &&
-		existing != id {
-		return fmt.Errorf(
-			"transient node has conflicting occurrences %s and %s",
-			existing, id,
-		)
-	}
-	i.nodes[id] = node
-	i.ids[node] = id
-	return nil
+	return i.occurrences.bind(id, node)
 }
 
 func (i *TransientIndex) bindStructuralSupport(
@@ -353,7 +347,7 @@ func (i *TransientIndex) bindStructuralOwner(
 			"transient structural owner requires occurrence and definition",
 		)
 	}
-	if _, present := i.nodes[occurrence]; !present {
+	if _, present := i.occurrences.node(occurrence); !present {
 		return fmt.Errorf(
 			"transient occurrence %s has no structural record",
 			occurrence,
@@ -376,6 +370,11 @@ func (i *TransientIndex) BindExecutableOccurrence(
 	id identity.OccurrenceID,
 	node ast.Node,
 ) error {
+	if i == nil || i.occurrences == nil || i.occurrences.sealed {
+		return fmt.Errorf(
+			"transient occurrence construction is already sealed",
+		)
+	}
 	if id.IsZero() || node == nil {
 		return fmt.Errorf(
 			"transient occurrence binding requires identity and node",
@@ -391,7 +390,7 @@ func (i *TransientIndex) BindExecutableOccurrence(
 			id, kind,
 		)
 	}
-	if existing, present := i.nodes[id]; present && existing != node {
+	if existing, present := i.occurrences.node(id); present && existing != node {
 		if i.counterparts[existing] != node {
 			return fmt.Errorf(
 				"transient occurrence %s has uncertified executable node",
@@ -399,16 +398,27 @@ func (i *TransientIndex) BindExecutableOccurrence(
 			)
 		}
 	}
-	if existing, present := i.ids[node]; present &&
-		existing != id {
+	return i.occurrences.bind(id, node)
+}
+
+// SealForStage2 ends construction-time reverse-identity validation. Stage 2
+// derives bounded package-local reverse views from the canonical forward
+// bindings and never retains a whole-universe reverse index.
+func (i *TransientIndex) SealForStage2() error {
+	if i == nil || i.occurrences == nil {
 		return fmt.Errorf(
-			"transient node has conflicting occurrences %s and %s",
-			existing, id,
+			"transient occurrence index cannot seal for Stage 2",
 		)
 	}
-	i.nodes[id] = node
-	i.ids[node] = id
-	return nil
+	return i.occurrences.seal(i.counterparts, i.originals)
+}
+
+// Stage2Ready reports whether construction-only reverse state has been
+// discarded and bounded semantic consumption may begin.
+func (i *TransientIndex) Stage2Ready() bool {
+	return i != nil &&
+		i.occurrences != nil &&
+		i.occurrences.sealed
 }
 
 // OccurrenceNode returns the checker-facing node for one locally retained
@@ -417,7 +427,10 @@ func (i *TransientIndex) BindExecutableOccurrence(
 func (i *TransientIndex) OccurrenceNode(
 	id identity.OccurrenceID,
 ) (ast.Node, bool) {
-	node, present := i.nodes[id]
+	if i == nil || i.occurrences == nil {
+		return nil, false
+	}
+	node, present := i.occurrences.node(id)
 	if present {
 		if checked := i.counterparts[node]; checked != nil {
 			return checked, true
@@ -426,17 +439,39 @@ func (i *TransientIndex) OccurrenceNode(
 	return node, present
 }
 
-// OccurrenceID returns the canonical occurrence already assigned to one
-// transient checker/source node. It never classifies or traverses the node.
-func (i *TransientIndex) OccurrenceID(
-	node ast.Node,
-) (identity.OccurrenceID, bool) {
-	if id, present := i.ids[node]; present {
-		return id, true
+// VisitOccurrenceNodesForFiles visits the complete canonical forward
+// occurrence/node relation for a bounded set of source files.
+func (i *TransientIndex) VisitOccurrenceNodesForFiles(
+	files []identity.FileID,
+	visit func(identity.OccurrenceID, ast.Node) error,
+) error {
+	if !i.Stage2Ready() {
+		return fmt.Errorf(
+			"transient occurrence visit requires Stage-2-ready index",
+		)
 	}
-	original := i.originals[node]
-	id, present := i.ids[original]
-	return id, present
+	return i.occurrences.visitFiles(files, func(
+		id identity.OccurrenceID,
+		node ast.Node,
+	) error {
+		if checked := i.counterparts[node]; checked != nil {
+			node = checked
+		}
+		return visit(id, node)
+	})
+}
+
+// OccurrenceNodeCountForFiles reports the exact bounded package-local
+// capacity required by VisitOccurrenceNodesForFiles.
+func (i *TransientIndex) OccurrenceNodeCountForFiles(
+	files []identity.FileID,
+) (int, error) {
+	if !i.Stage2Ready() {
+		return 0, fmt.Errorf(
+			"transient occurrence count requires Stage-2-ready index",
+		)
+	}
+	return i.occurrences.countFiles(files)
 }
 
 // CheckedViewOnly reports whether a checker node belongs only to a cgo

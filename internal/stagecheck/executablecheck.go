@@ -81,15 +81,22 @@ func verifyExecutablePackage(
 	selections []scope.DefinitionSelection,
 	inventory *executable.Inventory,
 ) (executableVerificationSummary, error) {
+	capacity, err := executableLedgerCapacity(
+		sourcePackage, selections, inventory,
+	)
+	if err != nil {
+		return executableVerificationSummary{}, err
+	}
 	arena := newExecutableLedgerArena()
 	actual, summary, err := executableLedgerForPackage(
 		sourcePackage, graph, selections, inventory, arena,
+		capacity,
 	)
 	if err != nil {
 		return executableVerificationSummary{}, err
 	}
 	if err := deriveExecutableLedgerForPackage(
-		packageID, evidence, graph, selections, actual,
+		packageID, evidence, graph, selections, inventory, actual,
 	); err != nil {
 		return executableVerificationSummary{}, err
 	}
@@ -102,15 +109,69 @@ func verifyExecutablePackage(
 	return summary, nil
 }
 
+func executableLedgerCapacity(
+	sourcePackage *source.LoadedPackage,
+	selections []scope.DefinitionSelection,
+	inventory *executable.Inventory,
+) (compactExecutableCapacity, error) {
+	var capacity compactExecutableCapacity
+	files := sourcePackage.Files()
+	fileIDs := make([]identity.FileID, len(files))
+	for index, file := range files {
+		fileIDs[index] = file.ID()
+	}
+	var err error
+	capacity.additionalOccurrences, err =
+		inventory.AdditionalOccurrenceCountForFiles(fileIDs)
+	if err != nil {
+		return compactExecutableCapacity{}, err
+	}
+	for _, selection := range selections {
+		if selection.Depth() != contract.DepthFullSemantic {
+			continue
+		}
+		region, present := inventory.For(selection.Definition())
+		if !present {
+			return compactExecutableCapacity{}, &VerificationError{
+				Stage: "executable-region",
+				Reason: "full definition has no region " +
+					selection.Definition().String(),
+			}
+		}
+		capacity.regions++
+		capacity.members += region.MemberCount()
+		capacity.definitionReferences += region.ReferenceCount()
+		capacity.implicitOperations +=
+			region.ImplicitOperationCount()
+	}
+	return capacity, nil
+}
+
+func canonicalExecutableOccurrence(
+	graph *structure.Graph,
+	inventory *executable.Inventory,
+	id identity.OccurrenceID,
+) (structure.OccurrenceRef, bool, bool, error) {
+	if reference, present := graph.ResidentOccurrenceRef(id); present {
+		return reference, false, true, nil
+	}
+	reference, present, err := inventory.AdditionalOccurrenceRef(id)
+	if err != nil {
+		return structure.OccurrenceRef{}, false, false, err
+	}
+	return reference, present, present, nil
+}
+
 func executableLedgerForPackage(
 	sourcePackage *source.LoadedPackage,
 	graph *structure.Graph,
 	selections []scope.DefinitionSelection,
 	inventory *executable.Inventory,
 	arena *executableLedgerArena,
+	capacity compactExecutableCapacity,
 ) (*compactExecutableLedger, executableVerificationSummary, error) {
-	actual := newCompactExecutableLedger(arena)
-	additional := map[executableLedgerOccurrenceRef]bool{}
+	actual := newSizedCompactExecutableLedger(arena, capacity)
+	additional := map[structure.OccurrenceRef]bool{}
 	var summary executableVerificationSummary
 	for _, file := range sourcePackage.Files() {
 		err := inventory.VisitAdditionalOccurrenceRefsForFile(
@@ -125,7 +186,7 @@ func executableLedgerForPackage(
 							occurrence.ID().String(),
 					}
 				}
-				reference := arena.occurrence(occurrence.ID())
+				reference := occurrence
 				if additional[reference] {
 					return &VerificationError{
 						Stage: "executable-region",
@@ -136,7 +197,7 @@ func executableLedgerForPackage(
 				additional[reference] = true
 				adjustExecutableRecordDifference(
 					&actual.additionalOccurrences,
-					arena.recordFromRef(occurrence),
+					reference,
 					1,
 				)
 				summary.additionalOccurrences++
@@ -169,12 +230,27 @@ func executableLedgerForPackage(
 			regionReference,
 			1,
 		)
-		memberSet := map[executableLedgerOccurrenceRef]bool{}
+		memberSet := map[structure.OccurrenceRef]bool{}
 		if err := region.VisitMembers(func(
 			index int,
 			member identity.OccurrenceID,
 		) error {
-			memberReference := arena.occurrence(member)
+			memberReference, _, present, lookupErr :=
+				canonicalExecutableOccurrence(
+					graph, inventory, member,
+				)
+			if lookupErr != nil {
+				return lookupErr
+			}
+			if !present {
+				return &VerificationError{
+					Stage: "executable-region",
+					Reason: fmt.Sprintf(
+						"region %s member %s has no canonical payload",
+						region.ID(), member,
+					),
+				}
+			}
 			if memberSet[memberReference] {
 				return &VerificationError{
 					Stage: "executable-region",
@@ -184,17 +260,6 @@ func executableLedgerForPackage(
 				}
 			}
 			memberSet[memberReference] = true
-			if _, present := graph.ResidentOccurrence(member); !present {
-				if present = additional[memberReference]; !present {
-					return &VerificationError{
-						Stage: "executable-region",
-						Reason: fmt.Sprintf(
-							"region %s member %s has no canonical payload",
-							region.ID(), member,
-						),
-					}
-				}
-			}
 			adjustExecutableRecordDifference(
 				&actual.members,
 				compactExecutableMember{
@@ -214,10 +279,8 @@ func executableLedgerForPackage(
 			adjustExecutableRecordDifference(
 				&actual.definitionReferences,
 				compactDefinitionReference{
-					region: regionReference,
-					parent: arena.occurrence(
-						reference.Parent(),
-					),
+					region:  regionReference,
+					parent:  reference.Parent(),
 					edge:    uint16(reference.Edge()),
 					ordinal: reference.Ordinal(),
 					child:   arena.definition(reference.Child()),
@@ -253,6 +316,7 @@ func deriveExecutableLedgerForPackage(
 	evidence *independentPackageEvidence,
 	graph *structure.Graph,
 	selections []scope.DefinitionSelection,
+	inventory *executable.Inventory,
 	expected *compactExecutableLedger,
 ) error {
 	definitionAt := map[identity.OccurrenceID]identity.DefinitionID{}
@@ -323,13 +387,14 @@ func deriveExecutableLedgerForPackage(
 			current:      selection.Definition(),
 			definitionAt: definitionAt,
 			graph:        graph,
+			inventory:    inventory,
 			ledger:       expected,
 		}
 		entries, err := independentDefinitionEntries(node)
 		if err != nil {
 			return err
 		}
-		root, present := graph.ResidentOccurrence(
+		root, present := graph.ResidentOccurrenceRef(
 			selection.Definition().Root(),
 		)
 		if !present {
@@ -395,9 +460,10 @@ type independentExecutableBuilder struct {
 	current      identity.DefinitionID
 	definitionAt map[identity.OccurrenceID]identity.DefinitionID
 	graph        *structure.Graph
+	inventory    *executable.Inventory
 	ledger       *compactExecutableLedger
 	memberIndex  int
-	additional   map[executableLedgerOccurrenceRef]bool
+	additional   map[structure.OccurrenceRef]bool
 }
 
 func (b *independentExecutableBuilder) visit(
@@ -412,26 +478,35 @@ func (b *independentExecutableBuilder) visit(
 	if err != nil {
 		return err
 	}
-	if structural, present := b.graph.ResidentOccurrence(
-		occurrence.id,
-	); present {
-		if occurrenceLedgerRecordFromOccurrence(structural) !=
-			occurrenceLedgerRecordFromDerived(occurrence) {
-			return fmt.Errorf(
-				"independent executable occurrence %s conflicts with structure",
-				occurrence.id,
-			)
-		}
-	} else {
+	reference, additional, present, err :=
+		canonicalExecutableOccurrence(
+			b.graph, b.inventory, occurrence.id,
+		)
+	if err != nil {
+		return err
+	}
+	if !present {
+		return fmt.Errorf(
+			"independent executable occurrence %s has no canonical payload",
+			occurrence.id,
+		)
+	}
+	if occurrenceLedgerRecordFromOccurrence(reference.Occurrence()) !=
+		occurrenceLedgerRecordFromDerived(occurrence) {
+		return fmt.Errorf(
+			"independent executable occurrence %s conflicts with canonical payload",
+			occurrence.id,
+		)
+	}
+	if additional {
 		if b.additional == nil {
-			b.additional = map[executableLedgerOccurrenceRef]bool{}
+			b.additional = map[structure.OccurrenceRef]bool{}
 		}
-		reference := b.ledger.arena.occurrence(occurrence.id)
 		if !b.additional[reference] {
 			b.additional[reference] = true
 			adjustExecutableRecordDifference(
 				&b.ledger.additionalOccurrences,
-				b.ledger.arena.recordFromDerived(occurrence),
+				reference,
 				-1,
 			)
 		}
@@ -439,11 +514,9 @@ func (b *independentExecutableBuilder) visit(
 	adjustExecutableRecordDifference(
 		&b.ledger.members,
 		compactExecutableMember{
-			region:  b.region,
-			ordinal: b.memberIndex,
-			occurrence: b.ledger.arena.occurrence(
-				occurrence.id,
-			),
+			region:     b.region,
+			ordinal:    b.memberIndex,
+			occurrence: reference,
 		},
 		-1,
 	)
@@ -504,7 +577,7 @@ func (b *independentExecutableBuilder) reference(
 		&b.ledger.definitionReferences,
 		compactDefinitionReference{
 			region:  b.region,
-			parent:  b.ledger.arena.occurrence(parent),
+			parent:  parent,
 			edge:    uint16(edge),
 			ordinal: ordinal,
 			child:   b.ledger.arena.definition(child),

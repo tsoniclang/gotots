@@ -3,10 +3,43 @@ package semantic
 import (
 	"reflect"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/identity"
 )
+
+func TestIdentityAdmissionRejectsInvalidComponents(t *testing.T) {
+	pkg := semanticWirePackage(t)
+	table := pkg.identities
+	table.operations = append(
+		[]storedOperationIdentity(nil),
+		table.operations...,
+	)
+	table.operations[0].definition =
+		definitionRef(len(table.definitions) + 1)
+	if _, err := admitPackageIdentityTable(table); err == nil ||
+		!strings.Contains(err.Error(), "component references are invalid") {
+		t.Fatalf(
+			"identity admission error = %v, want invalid components",
+			err,
+		)
+	}
+}
+
+func TestNormalizedStoresRequireAdmittedIdentityTable(t *testing.T) {
+	field, found := reflect.TypeFor[normalizedPackageStores]().
+		FieldByName("identities")
+	if !found {
+		t.Fatal("normalized package stores omit identities")
+	}
+	if field.Type != reflect.TypeFor[admittedPackageIdentityTable]() {
+		t.Fatalf(
+			"normalized identity storage type = %s, want admitted table",
+			field.Type,
+		)
+	}
+}
 
 func TestCanonicalizeComponentsHandlesEveryPermutationCycle(
 	t *testing.T,

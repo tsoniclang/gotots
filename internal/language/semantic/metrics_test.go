@@ -266,43 +266,66 @@ func TestSemanticShardWriterOwnsExactBoundedRecordTails(
 	if err != nil {
 		t.Fatal(err)
 	}
+	operationTail := materializeRecordSizes(
+		pkg.ID(),
+		operationMeasurement.operationCandidates,
+		func(reference operationRef) string {
+			return pkg.identities.operation(reference).String()
+		},
+	)
+	measurementOperationTail := materializeRecordSizes(
+		pkg.ID(),
+		measurement.operationCandidates,
+		func(reference operationRef) string {
+			return pkg.identities.operation(reference).String()
+		},
+	)
 	if measurement.encodedBytes != int64(output.Len()) ||
-		len(measurement.operationTail) != 1 ||
-		measurement.operationTail[0].Identity !=
+		len(measurementOperationTail) != 1 ||
+		measurementOperationTail[0].Identity !=
 			operationID.String() ||
-		measurement.operationTail[0].EncodedBytes !=
-			operationMeasurement.operationTail[0].EncodedBytes ||
+		measurementOperationTail[0].EncodedBytes !=
+			operationTail[0].EncodedBytes ||
 		operationSectionBytes !=
-			operationMeasurement.operationTail[0].EncodedBytes+1 {
+			operationTail[0].EncodedBytes+1 {
 		t.Fatalf(
 			"semantic shard measurement=%+v output=%d operation=%d",
 			measurement,
 			output.Len(),
-			operationMeasurement.operationTail[0].EncodedBytes,
+			operationTail[0].EncodedBytes,
 		)
 	}
 
 	measurement = newSemanticShardMeasurement(fixture.pkg)
 	for index := 0; index < 1000; index++ {
-		measurement.consider(
-			&measurement.operationTail,
-			fmt.Sprintf("operation-%04d", index),
+		measurement.considerOperation(
+			operationRef(index+1),
 			int64(index+1),
 		)
-		if len(measurement.operationTail) >
+		if len(measurement.operationCandidates) >
 			semanticTailLimit {
 			t.Fatalf(
 				"record tail retained %d entries",
-				len(measurement.operationTail),
+				len(measurement.operationCandidates),
 			)
 		}
 	}
-	if measurement.operationTail[0].EncodedBytes != 1000 ||
-		measurement.operationTail[semanticTailLimit-1].
-			EncodedBytes != 981 {
+	rendered := 0
+	tail := materializeRecordSizes(
+		fixture.pkg,
+		measurement.operationCandidates,
+		func(reference operationRef) string {
+			rendered++
+			return fmt.Sprintf("operation-%04d", reference)
+		},
+	)
+	if rendered != semanticTailLimit ||
+		tail[0].EncodedBytes != 1000 ||
+		tail[semanticTailLimit-1].EncodedBytes != 981 {
 		t.Fatalf(
-			"bounded record tail=%+v",
-			measurement.operationTail,
+			"bounded record tail=%+v rendered=%d",
+			tail,
+			rendered,
 		)
 	}
 }

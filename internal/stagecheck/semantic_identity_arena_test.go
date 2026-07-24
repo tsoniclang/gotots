@@ -1,6 +1,7 @@
 package stagecheck
 
 import (
+	"go/ast"
 	"reflect"
 	"testing"
 
@@ -30,8 +31,24 @@ func TestSemanticVerifierRelationsUseDenseLocalIdentityArenas(
 		reflect.TypeFor[[]semanticOccurrenceRef](),
 	)
 	assertSemanticFieldType(
-		t, reflect.TypeFor[checkerSemanticVerifier](), "children",
-		reflect.TypeFor[[][]semanticOccurrenceRef](),
+		t, reflect.TypeFor[semanticOccurrenceStore](), "children",
+		reflect.TypeFor[[]semanticOccurrenceRef](),
+	)
+	assertSemanticFieldType(
+		t, reflect.TypeFor[semanticOccurrenceStore](), "childRanges",
+		reflect.TypeFor[[]semanticOccurrenceRange](),
+	)
+	if _, present := reflect.TypeFor[checkerSemanticVerifier]().
+		FieldByName("children"); present {
+		t.Fatal("semantic verifier retains an unbounded child-slice table")
+	}
+	if _, present := reflect.TypeFor[checkerSemanticVerifier]().
+		FieldByName("occurrenceByNode"); present {
+		t.Fatal("semantic verifier retains full-identity reverse state")
+	}
+	assertSemanticFieldType(
+		t, reflect.TypeFor[semanticOccurrenceStore](), "byNode",
+		reflect.TypeFor[map[ast.Node]semanticOccurrenceRef](),
 	)
 	assertSemanticFieldType(
 		t, reflect.TypeFor[checkerSemanticVerifier](),

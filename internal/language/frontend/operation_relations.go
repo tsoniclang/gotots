@@ -9,6 +9,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/catalog"
+	"github.com/tsoniclang/gotots/internal/language/semantic"
 )
 
 func (builder *packageBuilder) operationOperands(
@@ -30,9 +31,10 @@ func orderedOperationChildren(
 	input *packageInput,
 	record *occurrenceInput,
 ) []packageOccurrenceRef {
+	children := input.occurrenceChildren(record)
 	if record.occurrence.Kind() != catalog.KindForStmt &&
 		record.occurrence.Kind() != catalog.KindRangeStmt {
-		return append([]packageOccurrenceRef(nil), record.children...)
+		return children
 	}
 	ranks := map[catalog.Role]int{}
 	if record.occurrence.Kind() == catalog.KindForStmt {
@@ -50,7 +52,7 @@ func orderedOperationChildren(
 			catalog.RoleBody:         3,
 		}
 	}
-	out := append([]packageOccurrenceRef(nil), record.children...)
+	out := append([]packageOccurrenceRef(nil), children...)
 	sort.SliceStable(out, func(left, right int) bool {
 		leftRole := input.occurrenceRecord(out[left]).occurrence.Role()
 		rightRole := input.occurrenceRecord(out[right]).occurrence.Role()
@@ -167,12 +169,13 @@ func (builder *packageBuilder) operationControl(
 		return identity.OperationID{}, label, nil
 	}
 	targetRecord := builder.input.occurrenceRecord(targetReference)
-	target := builder.operationByOccurrence[targetReference]
-	if target.IsZero() {
+	target, err := builder.operationID(targetReference)
+	if err != nil {
 		return identity.OperationID{}, label, fmt.Errorf(
-			"branch %s target occurrence %s has no operation",
+			"branch %s target occurrence %s: %w",
 			item.record.occurrence.ID(),
 			targetRecord.occurrence.ID(),
+			err,
 		)
 	}
 	return target, label, nil
@@ -198,7 +201,7 @@ func (builder *packageBuilder) labeledControlTarget(
 	}
 	targetOccurrence := labeled.occurrence.ID()
 	if lexical == token.BREAK || lexical == token.CONTINUE {
-		for _, childID := range labeled.children {
+		for _, childID := range builder.input.occurrenceChildren(labeled) {
 			child := builder.input.occurrenceRecord(childID)
 			if child != nil &&
 				child.occurrence.Role() ==
@@ -208,14 +211,34 @@ func (builder *packageBuilder) labeledControlTarget(
 			}
 		}
 	}
-	target := builder.operationByOccurrence[builder.input.occurrenceReference(targetOccurrence)]
-	if target.IsZero() {
+	target, err := builder.operationID(
+		builder.input.occurrenceReference(targetOccurrence),
+	)
+	if err != nil {
 		return identity.OperationID{}, fmt.Errorf(
-			"label binding %s target %s has no operation",
-			label, targetOccurrence,
+			"label binding %s target %s: %w",
+			label, targetOccurrence, err,
 		)
 	}
 	return target, nil
+}
+
+func (builder *packageBuilder) operationID(
+	reference packageOccurrenceRef,
+) (identity.OperationID, error) {
+	record := builder.input.occurrenceRecord(reference)
+	if record == nil ||
+		builder.operationKinds[reference] ==
+			semantic.OperationInvalid {
+		return identity.OperationID{}, fmt.Errorf(
+			"occurrence reference %d has no operation",
+			reference,
+		)
+	}
+	return identity.NewOperationID(
+		builder.input.occurrenceOwner(record),
+		record.occurrence.ID(),
+	)
 }
 
 func (builder *packageBuilder) identifierObject(

@@ -14,7 +14,7 @@ var semanticShardMagic = [8]byte{
 
 type binarySemanticShard struct {
 	decoder    *binaryShardDecoder
-	identities packageIdentityTable
+	identities admittedPackageIdentityTable
 	pkgRef     packageRef
 	pkg        identity.PackageID
 	provenance PackageProvenance
@@ -188,14 +188,22 @@ func beginBinarySemanticShard(
 	if err != nil {
 		return binarySemanticShard{}, err
 	}
-	decoder.identityUses = newBinaryIdentityUses(identities)
+	admittedIdentities, err := admitPackageIdentityTable(identities)
+	if err != nil {
+		return binarySemanticShard{}, err
+	}
+	decoder.identityUses = newBinaryIdentityUses(
+		admittedIdentities.table,
+	)
 	packageReference, err := readIdentityReference[packageRef](
 		decoder, "package identity",
 	)
 	if err != nil {
 		return binarySemanticShard{}, err
 	}
-	projection := newPackageIdentityProjection(identities)
+	projection := newPackageIdentityProjection(
+		admittedIdentities.table,
+	)
 	pkg := projection.packageID(packageReference)
 	manifestPackage, err := identity.ParsePackageID(entry.Package)
 	if err != nil {
@@ -209,7 +217,7 @@ func beginBinarySemanticShard(
 		)
 	}
 	return binarySemanticShard{
-		decoder: decoder, identities: identities,
+		decoder: decoder, identities: admittedIdentities,
 		pkgRef: packageReference, pkg: pkg,
 		provenance: provenance,
 	}, nil

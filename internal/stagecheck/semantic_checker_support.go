@@ -17,7 +17,7 @@ func (
 		identifier *ast.Ident,
 		object types.Object,
 	) error {
-		occurrence, present := verifier.index.OccurrenceID(
+		occurrence, present := verifier.occurrenceID(
 			identifier,
 		)
 		if !present {
@@ -140,7 +140,7 @@ func (
 			variable.IsField() {
 			return nil
 		}
-		anchor, present := verifier.index.OccurrenceID(node)
+		anchor, present := verifier.occurrenceID(node)
 		if !present {
 			return nil
 		}
