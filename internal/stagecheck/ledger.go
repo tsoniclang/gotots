@@ -42,11 +42,6 @@ type structuralLedger struct {
 	headerMembers            recordMultiset[headerMemberLedgerRecord]
 	executionBoundaries      recordMultiset[executionBoundaryLedgerRecord]
 	executionEntries         recordMultiset[executionEntryLedgerRecord]
-	additionalOccurrences    recordMultiset[occurrenceLedgerRecord]
-	executableRegions        recordMultiset[executableRegionLedgerRecord]
-	executableMembers        recordMultiset[executableMemberLedgerRecord]
-	definitionReferences     recordMultiset[definitionReferenceLedgerRecord]
-	implicitOperations       recordMultiset[implicitOperationLedgerRecord]
 	definitionCensus         recordMultiset[definitionCensusLedgerRecord]
 	providerDefinitionCensus recordMultiset[definitionCensusLedgerRecord]
 	certifiedSelectionFacts  recordMultiset[certifiedSelectionFactLedgerRecord]
@@ -71,11 +66,6 @@ func (ledger *structuralLedger) merge(other *structuralLedger) {
 	mergeRecords(&ledger.headerMembers, other.headerMembers)
 	mergeRecords(&ledger.executionBoundaries, other.executionBoundaries)
 	mergeRecords(&ledger.executionEntries, other.executionEntries)
-	mergeRecords(&ledger.additionalOccurrences, other.additionalOccurrences)
-	mergeRecords(&ledger.executableRegions, other.executableRegions)
-	mergeRecords(&ledger.executableMembers, other.executableMembers)
-	mergeRecords(&ledger.definitionReferences, other.definitionReferences)
-	mergeRecords(&ledger.implicitOperations, other.implicitOperations)
 	mergeRecords(&ledger.definitionCensus, other.definitionCensus)
 	mergeRecords(
 		&ledger.providerDefinitionCensus,
@@ -181,31 +171,6 @@ func compareLedgers(stage string, actual, expected *structuralLedger) error {
 		problems, "execution-entry",
 		actual.executionEntries, expected.executionEntries,
 		renderExecutionEntryLedgerRecord,
-	)
-	compareLedgerClass(
-		problems, "executable-additional-occurrence",
-		actual.additionalOccurrences, expected.additionalOccurrences,
-		renderOccurrenceLedgerRecord,
-	)
-	compareLedgerClass(
-		problems, "executable-region",
-		actual.executableRegions, expected.executableRegions,
-		renderExecutableRegionLedgerRecord,
-	)
-	compareLedgerClass(
-		problems, "executable-member",
-		actual.executableMembers, expected.executableMembers,
-		renderExecutableMemberLedgerRecord,
-	)
-	compareLedgerClass(
-		problems, "executable-definition-reference",
-		actual.definitionReferences, expected.definitionReferences,
-		renderDefinitionReferenceLedgerRecord,
-	)
-	compareLedgerClass(
-		problems, "executable-implicit-operation",
-		actual.implicitOperations, expected.implicitOperations,
-		renderImplicitOperationLedgerRecord,
 	)
 	compareLedgerClass(
 		problems, "definition-census",

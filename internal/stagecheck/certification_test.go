@@ -99,7 +99,6 @@ func TestStructuralLedgerMutationsFailWithExactResidualEvidence(t *testing.T) {
 	outerBoundary, _ := identity.NewExecutionBoundaryID(outer)
 	literalHeader, _ := identity.NewHeaderRegionID(literal)
 	literalBoundary, _ := identity.NewExecutionBoundaryID(literal)
-	region, _ := identity.NewExecutableRegionID(outer)
 	ownerRegion, _ := structure.SourceFileOwner(file)
 	outerRecord := definitionLedgerRecord{
 		id: outer, owner: ownerRegion,
@@ -109,16 +108,9 @@ func TestStructuralLedgerMutationsFailWithExactResidualEvidence(t *testing.T) {
 		id: literal, owner: ownerRegion,
 		header: literalHeader, boundary: literalBoundary, name: "literal",
 	}
-	reference := definitionReferenceLedgerRecord{
-		region: region,
-		parent: outer.Root(),
-		edge:   catalog.Edge(7),
-		child:  literal,
-	}
 	canonical := func() *structuralLedger {
 		ledger := newStructuralLedger()
 		addRecord(&ledger.definitions, outerRecord)
-		addRecord(&ledger.definitionReferences, reference)
 		addRecord(&ledger.definitions, literalRecord)
 		return ledger
 	}
@@ -128,24 +120,6 @@ func TestStructuralLedgerMutationsFailWithExactResidualEvidence(t *testing.T) {
 		},
 		"duplicate": func(ledger *structuralLedger) {
 			addRecord(&ledger.definitions, outerRecord)
-		},
-		"reparent": func(ledger *structuralLedger) {
-			delete(ledger.definitionReferences, reference)
-			mutated := reference
-			mutated.parent = literal.Root()
-			addRecord(&ledger.definitionReferences, mutated)
-		},
-		"edge": func(ledger *structuralLedger) {
-			delete(ledger.definitionReferences, reference)
-			mutated := reference
-			mutated.edge = catalog.Edge(8)
-			addRecord(&ledger.definitionReferences, mutated)
-		},
-		"ordinal": func(ledger *structuralLedger) {
-			delete(ledger.definitionReferences, reference)
-			mutated := reference
-			mutated.ordinal = 1
-			addRecord(&ledger.definitionReferences, mutated)
 		},
 	}
 	for name, mutate := range mutations {
@@ -171,5 +145,77 @@ func TestStructuralLedgerMutationsFailWithExactResidualEvidence(t *testing.T) {
 	}
 	if err := compareLedgers("clean", canonical(), canonical()); err != nil {
 		t.Fatalf("identical ledgers failed: %v", err)
+	}
+
+	arena := newExecutableLedgerArena()
+	reference := compactDefinitionReference{
+		region: arena.definition(outer),
+		parent: arena.occurrence(outer.Root()),
+		edge:   uint16(catalog.Edge(7)),
+		child:  arena.definition(literal),
+	}
+	canonicalExecutable := func() *compactExecutableLedger {
+		ledger := newCompactExecutableLedger(arena)
+		addRecord(&ledger.regions, reference.region)
+		addRecord(&ledger.definitionReferences, reference)
+		return ledger
+	}
+	executableMutations := map[string]func(*compactExecutableLedger){
+		"omit-reference": func(ledger *compactExecutableLedger) {
+			delete(ledger.definitionReferences, reference)
+		},
+		"duplicate-reference": func(ledger *compactExecutableLedger) {
+			addRecord(&ledger.definitionReferences, reference)
+		},
+		"reparent": func(ledger *compactExecutableLedger) {
+			delete(ledger.definitionReferences, reference)
+			mutated := reference
+			mutated.parent = arena.occurrence(literal.Root())
+			addRecord(&ledger.definitionReferences, mutated)
+		},
+		"edge": func(ledger *compactExecutableLedger) {
+			delete(ledger.definitionReferences, reference)
+			mutated := reference
+			mutated.edge = uint16(catalog.Edge(8))
+			addRecord(&ledger.definitionReferences, mutated)
+		},
+		"ordinal": func(ledger *compactExecutableLedger) {
+			delete(ledger.definitionReferences, reference)
+			mutated := reference
+			mutated.ordinal = 1
+			addRecord(&ledger.definitionReferences, mutated)
+		},
+	}
+	for name, mutate := range executableMutations {
+		t.Run("executable-"+name, func(t *testing.T) {
+			actual := canonicalExecutable()
+			expected := canonicalExecutable()
+			mutate(actual)
+			err := compareCompactExecutableLedgers(
+				"mutation", actual, expected,
+			)
+			if err == nil {
+				t.Fatal("mutated executable ledger exact-joined")
+			}
+			verification, ok := err.(*VerificationError)
+			if !ok ||
+				verification.Stage != "mutation" ||
+				!strings.Contains(
+					verification.Reason,
+					"exact executable join failed",
+				) ||
+				!strings.Contains(verification.Reason, "digest=") ||
+				!strings.Contains(verification.Reason, "sample=") {
+				t.Fatalf(
+					"mutation error lacks exact residual evidence: %v",
+					err,
+				)
+			}
+		})
+	}
+	if err := compareCompactExecutableLedgers(
+		"clean", canonicalExecutable(), canonicalExecutable(),
+	); err != nil {
+		t.Fatalf("identical executable ledgers failed: %v", err)
 	}
 }

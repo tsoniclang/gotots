@@ -81,19 +81,20 @@ func verifyExecutablePackage(
 	selections []scope.DefinitionSelection,
 	inventory *executable.Inventory,
 ) (executableVerificationSummary, error) {
+	arena := newExecutableLedgerArena()
 	actual, summary, err := executableLedgerForPackage(
-		sourcePackage, graph, selections, inventory,
+		sourcePackage, graph, selections, inventory, arena,
 	)
 	if err != nil {
 		return executableVerificationSummary{}, err
 	}
 	expected, err := deriveExecutableLedgerForPackage(
-		packageID, evidence, graph, selections,
+		packageID, evidence, graph, selections, arena,
 	)
 	if err != nil {
 		return executableVerificationSummary{}, err
 	}
-	if err := compareLedgers(
+	if err := compareCompactExecutableLedgers(
 		"executable-region/"+packageID.String(),
 		actual,
 		expected,
@@ -108,9 +109,10 @@ func executableLedgerForPackage(
 	graph *structure.Graph,
 	selections []scope.DefinitionSelection,
 	inventory *executable.Inventory,
-) (*structuralLedger, executableVerificationSummary, error) {
-	actual := newStructuralLedger()
-	additional := map[identity.OccurrenceID]bool{}
+	arena *executableLedgerArena,
+) (*compactExecutableLedger, executableVerificationSummary, error) {
+	actual := newCompactExecutableLedger(arena)
+	additional := map[executableLedgerOccurrenceRef]bool{}
 	var summary executableVerificationSummary
 	for _, file := range sourcePackage.Files() {
 		err := inventory.VisitAdditionalOccurrenceRefsForFile(
@@ -125,17 +127,18 @@ func executableLedgerForPackage(
 							occurrence.ID().String(),
 					}
 				}
-				if additional[occurrence.ID()] {
+				reference := arena.occurrence(occurrence.ID())
+				if additional[reference] {
 					return &VerificationError{
 						Stage: "executable-region",
 						Reason: "additional occurrence is duplicated " +
 							occurrence.ID().String(),
 					}
 				}
-				additional[occurrence.ID()] = true
+				additional[reference] = true
 				addRecord(
 					&actual.additionalOccurrences,
-					occurrenceLedgerRecordFromRef(occurrence),
+					arena.recordFromRef(occurrence),
 				)
 				summary.additionalOccurrences++
 				return nil
@@ -161,16 +164,18 @@ func executableLedgerForPackage(
 			continue
 		}
 		summary.regions++
+		regionReference := arena.definition(region.Definition())
 		addRecord(
-			&actual.executableRegions,
-			executableRegionLedgerRecord{id: region.ID()},
+			&actual.regions,
+			regionReference,
 		)
-		memberSet := map[identity.OccurrenceID]bool{}
+		memberSet := map[executableLedgerOccurrenceRef]bool{}
 		if err := region.VisitMembers(func(
 			index int,
 			member identity.OccurrenceID,
 		) error {
-			if memberSet[member] {
+			memberReference := arena.occurrence(member)
+			if memberSet[memberReference] {
 				return &VerificationError{
 					Stage: "executable-region",
 					Reason: fmt.Sprintf(
@@ -178,9 +183,9 @@ func executableLedgerForPackage(
 					),
 				}
 			}
-			memberSet[member] = true
+			memberSet[memberReference] = true
 			if _, present := graph.ResidentOccurrence(member); !present {
-				if present = additional[member]; !present {
+				if present = additional[memberReference]; !present {
 					return &VerificationError{
 						Stage: "executable-region",
 						Reason: fmt.Sprintf(
@@ -190,8 +195,10 @@ func executableLedgerForPackage(
 					}
 				}
 			}
-			addRecord(&actual.executableMembers, executableMemberLedgerRecord{
-				region: region.ID(), ordinal: index, occurrence: member,
+			addRecord(&actual.members, compactExecutableMember{
+				region:     regionReference,
+				ordinal:    index,
+				occurrence: memberReference,
 			})
 			return nil
 		}); err != nil {
@@ -202,12 +209,14 @@ func executableLedgerForPackage(
 		) error {
 			addRecord(
 				&actual.definitionReferences,
-				definitionReferenceLedgerRecord{
-					region:  region.ID(),
-					parent:  reference.Parent(),
-					edge:    reference.Edge(),
+				compactDefinitionReference{
+					region: regionReference,
+					parent: arena.occurrence(
+						reference.Parent(),
+					),
+					edge:    uint16(reference.Edge()),
 					ordinal: reference.Ordinal(),
-					child:   reference.Child(),
+					child:   arena.definition(reference.Child()),
 				},
 			)
 			return nil
@@ -219,8 +228,8 @@ func executableLedgerForPackage(
 		) error {
 			addRecord(
 				&actual.implicitOperations,
-				implicitOperationLedgerRecord{
-					region: region.ID(),
+				compactImplicitOperation{
+					region: regionReference,
 					kind:   operation.Kind(),
 					pkg:    operation.Package(),
 				},
@@ -238,7 +247,8 @@ func deriveExecutableLedgerForPackage(
 	evidence *independentPackageEvidence,
 	graph *structure.Graph,
 	selections []scope.DefinitionSelection,
-) (*structuralLedger, error) {
+	arena *executableLedgerArena,
+) (*compactExecutableLedger, error) {
 	definitionAt := map[identity.OccurrenceID]identity.DefinitionID{}
 	for _, file := range evidence.files {
 		for definition := range file.definitions {
@@ -247,17 +257,15 @@ func deriveExecutableLedgerForPackage(
 			}
 		}
 	}
-	expected := newStructuralLedger()
+	expected := newCompactExecutableLedger(arena)
 	for _, selection := range selections {
 		if selection.Depth() != contract.DepthFullSemantic {
 			continue
 		}
-		regionID, _ := identity.NewExecutableRegionID(
-			selection.Definition(),
-		)
+		regionReference := arena.definition(selection.Definition())
 		addRecord(
-			&expected.executableRegions,
-			executableRegionLedgerRecord{id: regionID},
+			&expected.regions,
+			regionReference,
 		)
 		if selection.Definition().ImplicitOp().Valid() {
 			if selection.Definition().ImplicitOp() !=
@@ -277,8 +285,8 @@ func deriveExecutableLedgerForPackage(
 			}
 			addRecord(
 				&expected.implicitOperations,
-				implicitOperationLedgerRecord{
-					region: regionID,
+				compactImplicitOperation{
+					region: regionReference,
 					kind: executable.
 						ImplicitOperationCoordinatePackageInitialization,
 					pkg: selection.Definition().Package(),
@@ -304,7 +312,7 @@ func deriveExecutableLedgerForPackage(
 		}
 		builder := independentExecutableBuilder{
 			file:         derived,
-			region:       regionID,
+			region:       regionReference,
 			current:      selection.Definition(),
 			definitionAt: definitionAt,
 			graph:        graph,
@@ -376,13 +384,13 @@ func verifyExecutableSummary(
 
 type independentExecutableBuilder struct {
 	file         *derivedFile
-	region       identity.ExecutableRegionID
+	region       executableLedgerDefinitionRef
 	current      identity.DefinitionID
 	definitionAt map[identity.OccurrenceID]identity.DefinitionID
 	graph        *structure.Graph
-	ledger       *structuralLedger
+	ledger       *compactExecutableLedger
 	memberIndex  int
-	additional   map[identity.OccurrenceID]bool
+	additional   map[executableLedgerOccurrenceRef]bool
 }
 
 func (b *independentExecutableBuilder) visit(
@@ -409,22 +417,25 @@ func (b *independentExecutableBuilder) visit(
 		}
 	} else {
 		if b.additional == nil {
-			b.additional = map[identity.OccurrenceID]bool{}
+			b.additional = map[executableLedgerOccurrenceRef]bool{}
 		}
-		if !b.additional[occurrence.id] {
-			b.additional[occurrence.id] = true
+		reference := b.ledger.arena.occurrence(occurrence.id)
+		if !b.additional[reference] {
+			b.additional[reference] = true
 			addRecord(
 				&b.ledger.additionalOccurrences,
-				occurrenceLedgerRecordFromDerived(occurrence),
+				b.ledger.arena.recordFromDerived(occurrence),
 			)
 		}
 	}
 	addRecord(
-		&b.ledger.executableMembers,
-		executableMemberLedgerRecord{
-			region:     b.region,
-			ordinal:    b.memberIndex,
-			occurrence: occurrence.id,
+		&b.ledger.members,
+		compactExecutableMember{
+			region:  b.region,
+			ordinal: b.memberIndex,
+			occurrence: b.ledger.arena.occurrence(
+				occurrence.id,
+			),
 		},
 	)
 	b.memberIndex++
@@ -482,12 +493,12 @@ func (b *independentExecutableBuilder) reference(
 ) {
 	addRecord(
 		&b.ledger.definitionReferences,
-		definitionReferenceLedgerRecord{
+		compactDefinitionReference{
 			region:  b.region,
-			parent:  parent,
-			edge:    edge,
+			parent:  b.ledger.arena.occurrence(parent),
+			edge:    uint16(edge),
 			ordinal: ordinal,
-			child:   child,
+			child:   b.ledger.arena.definition(child),
 		},
 	)
 }

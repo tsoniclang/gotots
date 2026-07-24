@@ -19,8 +19,8 @@ func Build(
 	selections *scope.DefinitionSelections,
 ) (*Inventory, error) {
 	out := &Inventory{
-		byID:         map[identity.DefinitionID]Region{},
-		byOccurrence: map[identity.OccurrenceID]*structure.Occurrence{},
+		byID:        map[identity.DefinitionID]Region{},
+		occurrences: newOccurrenceStore(),
 	}
 	definitions := map[identity.DefinitionID]structure.ImplementationDefinition{}
 	definitionAt := map[identity.OccurrenceID]identity.DefinitionID{}
@@ -74,7 +74,7 @@ func buildRegion(
 	if err != nil {
 		return Region{}, err
 	}
-	region := Region{id: regionID}
+	region := Region{id: regionID, occurrences: inventory.occurrences}
 	if definition.Kind() == identity.DefinitionImplicit {
 		if definition.ID().ImplicitOp() != identity.ImplicitDefinitionPackageInit {
 			return Region{}, fmt.Errorf(
@@ -190,7 +190,8 @@ func (b *regionBuilder) visit(
 	if err != nil {
 		return err
 	}
-	if err := b.recordOccurrence(occurrence); err != nil {
+	member, err := b.recordOccurrence(occurrence)
+	if err != nil {
 		return err
 	}
 	checkerNode := node
@@ -207,7 +208,7 @@ func (b *regionBuilder) visit(
 	); err != nil {
 		return err
 	}
-	b.region.members = append(b.region.members, occurrence.ID())
+	b.region.members = append(b.region.members, member)
 	b.work.RecordAppends++
 	children, err := structure.Children(node, occurrence.Kind())
 	if err != nil {
@@ -307,36 +308,36 @@ func (b *regionBuilder) occurrence(
 
 func (b *regionBuilder) recordOccurrence(
 	occurrence structure.Occurrence,
-) error {
+) (occurrenceRef, error) {
+	reference, err := b.inventory.occurrences.admit(occurrence.ID())
+	if err != nil {
+		return 0, err
+	}
 	b.work.JoinProbes++
 	if structural, present := b.graph.ResidentOccurrence(
 		occurrence.ID(),
 	); present {
 		if structural != occurrence {
-			return fmt.Errorf(
+			return 0, fmt.Errorf(
 				"executable occurrence %s conflicts with structural payload",
 				occurrence.ID(),
 			)
 		}
-		return nil
+		return reference, nil
 	}
 	b.work.IdentityProbes++
-	if existing, present := b.inventory.byOccurrence[occurrence.ID()]; present {
-		if *existing != occurrence {
-			return fmt.Errorf(
-				"executable occurrence %s has conflicting payloads",
-				occurrence.ID(),
-			)
-		}
-		return nil
+	reference, added, err := b.inventory.occurrences.put(occurrence)
+	if err != nil {
+		return 0, err
 	}
-	stored := occurrence
-	b.inventory.byOccurrence[occurrence.ID()] = &stored
-	b.inventory.additionalIDs = append(
-		b.inventory.additionalIDs, occurrence.ID(),
+	if !added {
+		return reference, nil
+	}
+	b.inventory.additional = append(
+		b.inventory.additional, reference,
 	)
 	b.work.RecordAppends++
-	return nil
+	return reference, nil
 }
 
 func physicalSpan(

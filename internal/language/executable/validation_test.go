@@ -43,19 +43,74 @@ func TestCanonicalOccurrencePayloadCannotCrossStores(t *testing.T) {
 	if duplicated.ID().IsZero() {
 		t.Fatal("fixture has no structurally owned executable member")
 	}
-	inventory.byOccurrence[duplicated.ID()] = &duplicated
-	inventory.additionalIDs = append(
-		inventory.additionalIDs,
-		duplicated.ID(),
-	)
+	reference, added, err := inventory.occurrences.put(duplicated)
+	if err != nil || !added {
+		t.Fatalf("install duplicate occurrence: added=%t err=%v", added, err)
+	}
+	inventory.additional = append(inventory.additional, reference)
 	inventory.sort()
-	err := Validate(graph, selections, inventory)
+	err = Validate(graph, selections, inventory)
 	if err == nil ||
 		!strings.Contains(
 			err.Error(),
 			"duplicated across structural and executable stores",
 		) {
 		t.Fatalf("cross-store payload duplication error = %v", err)
+	}
+}
+
+func TestOccurrenceArenaRejectsConflictingPayload(t *testing.T) {
+	_, _, inventory, _ := buildExecutableFixture(t)
+	additional := inventory.AdditionalOccurrences()
+	if len(additional) == 0 {
+		t.Fatal("fixture has no executable-only occurrences")
+	}
+	original := additional[0]
+	display := original.Display()
+	display.Start.Filename += ".conflict"
+	conflicting, err := structure.NewOccurrence(
+		original.ID(),
+		original.Kind(),
+		original.Parent(),
+		original.Edge(),
+		original.Ordinal(),
+		original.Span(),
+		display,
+		original.Token(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := inventory.occurrences.put(conflicting); err == nil ||
+		!strings.Contains(err.Error(), "conflicting payloads") {
+		t.Fatalf("conflicting occurrence payload error = %v", err)
+	}
+}
+
+func TestOccurrenceArenaOwnsAllRegionReferences(t *testing.T) {
+	_, _, inventory, _ := buildExecutableFixture(t)
+	if inventory.occurrences.length() <
+		inventory.occurrences.payloadLength() {
+		t.Fatal("occurrence arena has more payloads than identities")
+	}
+	for _, region := range inventory.Regions() {
+		if region.occurrences != inventory.occurrences {
+			t.Fatal("region does not use the inventory occurrence arena")
+		}
+		for _, reference := range region.members {
+			id, err := inventory.occurrences.id(reference)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if inventory.occurrences.reference(id) != reference {
+				t.Fatalf("occurrence reference %d is not canonical", reference)
+			}
+		}
+	}
+	for _, reference := range inventory.additional {
+		if inventory.occurrences.payloadFor(reference) == nil {
+			t.Fatalf("additional occurrence %d has no payload", reference)
+		}
 	}
 }
 

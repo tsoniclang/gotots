@@ -30,6 +30,7 @@ type fileBuilder struct {
 	sites       []DefinitionSite
 	headers     []HeaderRegion
 	boundaries  []ExecutionBoundary
+	path        []pathStep
 	work        *Work
 	index       *TransientIndex
 }
@@ -77,7 +78,7 @@ func buildFile(
 	if err != nil {
 		return FileGraph{}, err
 	}
-	if err := builder.walkOwner(syntax, root, nil, context); err != nil {
+	if err := builder.walkOwner(syntax, root, context); err != nil {
 		return FileGraph{}, err
 	}
 	directives, err := builder.scanDirectives(syntax)
@@ -108,7 +109,6 @@ func buildFile(
 func (b *fileBuilder) walkOwner(
 	node ast.Node,
 	current Occurrence,
-	path []pathStep,
 	context catalog.DefinitionContext,
 ) error {
 	nested, err := children(node, current.kind)
@@ -133,32 +133,34 @@ func (b *fileBuilder) walkOwner(
 		if err != nil {
 			return err
 		}
-		nextPath := append(
-			path, pathStep{node: child.node, occurrence: occurrence},
+		b.path = append(
+			b.path, pathStep{node: child.node, occurrence: occurrence},
 		)
 		if isDefinition {
-			if err := b.addDefinition(
+			err = b.addDefinition(
 				child.node,
 				occurrence,
 				definitionKind,
 				identity.DefinitionID{},
-				nextPath,
+				0,
 				childContext,
-			); err != nil {
-				return err
+			)
+		} else {
+			err = b.recordOccurrence(occurrence, child.node)
+			if err == nil {
+				b.owner.members = append(
+					b.owner.members, occurrence.id,
+				)
+				b.work.RecordAppends++
+				err = b.walkOwner(
+					child.node,
+					occurrence,
+					childContext,
+				)
 			}
-			continue
 		}
-		if err := b.recordOccurrence(
-			occurrence, child.node,
-		); err != nil {
-			return err
-		}
-		b.owner.members = append(b.owner.members, occurrence.id)
-		b.work.RecordAppends++
-		if err := b.walkOwner(
-			child.node, occurrence, nextPath, childContext,
-		); err != nil {
+		b.path = b.path[:len(b.path)-1]
+		if err != nil {
 			return err
 		}
 	}
@@ -200,7 +202,7 @@ func (b *fileBuilder) addDefinition(
 	root Occurrence,
 	kind identity.DefinitionKind,
 	parent identity.DefinitionID,
-	path []pathStep,
+	pathStart int,
 	context catalog.DefinitionContext,
 ) error {
 	definitionID, err := identity.NewSourceDefinitionID(root.id, kind)
@@ -236,10 +238,14 @@ func (b *fileBuilder) addDefinition(
 	if err != nil {
 		return err
 	}
-	if len(path) == 0 || path[len(path)-1].occurrence.id != root.id {
+	if pathStart < 0 ||
+		pathStart >= len(b.path) ||
+		b.path[len(b.path)-1].occurrence.id != root.id {
 		return b.defect(node, catalog.EdgeInvalid, "definition has no exact containment path")
 	}
-	if err := b.ensurePath(path[:len(path)-1]); err != nil {
+	if err := b.ensurePath(
+		b.path[pathStart : len(b.path)-1],
+	); err != nil {
 		return err
 	}
 	header, boundary, err := b.buildDefinitionParts(
@@ -295,27 +301,29 @@ func (b *fileBuilder) addDefinition(
 		if err != nil {
 			return err
 		}
+		b.path = append(b.path, pathStep{
+			node: entryNode, occurrence: entryOccurrence,
+		})
+		entryPathStart := len(b.path) - 1
 		if nestedDefinition {
-			if err := b.addDefinition(
+			err = b.addDefinition(
 				entryNode,
 				entryOccurrence,
 				nestedKind,
 				definitionID,
-				[]pathStep{{
-					node: entryNode, occurrence: entryOccurrence,
-				}},
+				entryPathStart,
 				executableContext,
-			); err != nil {
-				return err
-			}
-			continue
+			)
+		} else {
+			err = b.scanNestedDefinitions(
+				entryNode,
+				definitionID,
+				entryPathStart,
+				executableContext,
+			)
 		}
-		if err := b.scanNestedDefinitions(
-			entryNode,
-			definitionID,
-			[]pathStep{{node: entryNode, occurrence: entryOccurrence}},
-			executableContext,
-		); err != nil {
+		b.path = b.path[:len(b.path)-1]
+		if err != nil {
 			return err
 		}
 	}
@@ -349,10 +357,10 @@ func (b *fileBuilder) ensurePath(path []pathStep) error {
 func (b *fileBuilder) scanNestedDefinitions(
 	node ast.Node,
 	parent identity.DefinitionID,
-	path []pathStep,
+	pathStart int,
 	context catalog.DefinitionContext,
 ) error {
-	current := path[len(path)-1].occurrence
+	current := b.path[len(b.path)-1].occurrence
 	if err := b.index.bindStructuralSupport(
 		current, node, parent,
 	); err != nil {
@@ -381,31 +389,32 @@ func (b *fileBuilder) scanNestedDefinitions(
 		if err != nil {
 			return err
 		}
-		nextPath := append(
-			path, pathStep{node: child.node, occurrence: occurrence},
+		b.path = append(
+			b.path, pathStep{node: child.node, occurrence: occurrence},
 		)
 		nestedKind, isDefinition, err := definitionKind(
 			child.node, childContext,
 		)
 		if err != nil {
+			b.path = b.path[:len(b.path)-1]
 			return err
 		}
 		if isDefinition {
-			if err := b.addDefinition(
+			err = b.addDefinition(
 				child.node,
 				occurrence,
 				nestedKind,
 				parent,
-				nextPath,
+				pathStart,
 				childContext,
-			); err != nil {
-				return err
-			}
-			continue
+			)
+		} else {
+			err = b.scanNestedDefinitions(
+				child.node, parent, pathStart, childContext,
+			)
 		}
-		if err := b.scanNestedDefinitions(
-			child.node, parent, nextPath, childContext,
-		); err != nil {
+		b.path = b.path[:len(b.path)-1]
+		if err != nil {
 			return err
 		}
 	}

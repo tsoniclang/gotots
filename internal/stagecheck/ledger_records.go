@@ -5,7 +5,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/catalog"
-	"github.com/tsoniclang/gotots/internal/language/executable"
 	"github.com/tsoniclang/gotots/internal/language/structure"
 	"github.com/tsoniclang/gotots/internal/scope/contract"
 )
@@ -133,30 +132,6 @@ type executionEntryLedgerRecord struct {
 	boundary   identity.ExecutionBoundaryID
 	occurrence identity.OccurrenceID
 	hash       string
-}
-
-type executableRegionLedgerRecord struct {
-	id identity.ExecutableRegionID
-}
-
-type executableMemberLedgerRecord struct {
-	region     identity.ExecutableRegionID
-	ordinal    int
-	occurrence identity.OccurrenceID
-}
-
-type definitionReferenceLedgerRecord struct {
-	region  identity.ExecutableRegionID
-	parent  identity.OccurrenceID
-	edge    catalog.Edge
-	ordinal int
-	child   identity.DefinitionID
-}
-
-type implicitOperationLedgerRecord struct {
-	region identity.ExecutableRegionID
-	kind   executable.ImplicitOperationKind
-	pkg    identity.PackageID
 }
 
 type definitionCensusLedgerRecord struct {
@@ -301,47 +276,6 @@ func renderExecutionEntryLedgerRecord(
 		record.boundary,
 		record.occurrence,
 		record.hash,
-	)
-}
-
-func renderExecutableRegionLedgerRecord(
-	record executableRegionLedgerRecord,
-) string {
-	return record.id.String()
-}
-
-func renderExecutableMemberLedgerRecord(
-	record executableMemberLedgerRecord,
-) string {
-	return fmt.Sprintf(
-		"%s|%d|%s",
-		record.region,
-		record.ordinal,
-		record.occurrence,
-	)
-}
-
-func renderDefinitionReferenceLedgerRecord(
-	record definitionReferenceLedgerRecord,
-) string {
-	return fmt.Sprintf(
-		"%s|%s|%d|%d|%s",
-		record.region,
-		record.parent,
-		uint16(record.edge),
-		record.ordinal,
-		record.child,
-	)
-}
-
-func renderImplicitOperationLedgerRecord(
-	record implicitOperationLedgerRecord,
-) string {
-	return fmt.Sprintf(
-		"%s|%d|%s",
-		record.region,
-		uint8(record.kind),
-		record.pkg,
 	)
 }
 
