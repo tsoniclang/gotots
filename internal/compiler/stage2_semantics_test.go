@@ -68,6 +68,7 @@ var AliasValue Alias
 var External = left.Product{SKU: "external"}
 
 func init() { First++ }
+func _() { First++ }
 
 func pair() (int, int) { return 1, 2 }
 
@@ -345,6 +346,7 @@ func TestStage2ContextMatrixAndSemanticConservation(t *testing.T) {
 		typeKinds[semantic.TypeParameter] == 0 {
 		t.Fatalf("semantic type classes=%v", typeKinds)
 	}
+	requireDeclarationCardinalityAndMethodDescriptors(t, pkg)
 
 	var (
 		initDefinitions          int

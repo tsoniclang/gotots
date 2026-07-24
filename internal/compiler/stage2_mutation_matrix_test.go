@@ -26,6 +26,23 @@ func TestStage2MutationMatrixRejectsSemanticCorruption(t *testing.T) {
 		)
 	})
 
+	t.Run("blank-function-declaration-cardinality", func(t *testing.T) {
+		harness.requireRejected(
+			t, application, nil,
+			func(input *semantic.PackageInput) ([]string, error) {
+				index, record := definitionByName(t, *input, "_")
+				spec := record.Spec()
+				spec.Name = "FabricatedBinding"
+				mutated, err := semantic.NewDefinitionSemantics(spec)
+				if err != nil {
+					return rejectAt(record.Definition(), err)
+				}
+				input.Definitions[index] = mutated
+				return expectIdentity(record.Definition())
+			},
+		)
+	})
+
 	t.Run("duplicate-occurrence-resolution", func(t *testing.T) {
 		harness.requireRejected(
 			t, application, nil,

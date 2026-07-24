@@ -4,11 +4,15 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/identity"
+	"github.com/tsoniclang/gotots/internal/language/catalog"
+	"github.com/tsoniclang/gotots/internal/language/semantic"
 	"github.com/tsoniclang/gotots/internal/scope/contract"
 	"github.com/tsoniclang/gotots/internal/source"
 )
 
 const stage2MemberIdentityFixture = `package members
+
+import "example.com/members/remote"
 
 type A struct {
 	X int
@@ -51,6 +55,17 @@ func Anonymous(
 	return left.X + right.X
 }
 
+type Reader struct{}
+
+func (Reader) Read() int { return 1 }
+
+func CrossPackage(
+	value struct{ X int },
+	reader interface{ Read() int },
+) int {
+	return remote.ReadStruct(value) + remote.ReadInterface(reader)
+}
+
 func Message(err error) string {
 	return err.Error()
 }
@@ -69,8 +84,21 @@ func TestStage2MemberIdentityUsesSemanticOwnerAndGenericOrigin(
 	writeCompilerFile(
 		t, directory, "members.go", stage2MemberIdentityFixture,
 	)
+	writeCompilerFile(
+		t,
+		directory,
+		"remote/remote.go",
+		`package remote
+
+func ReadStruct(value struct{ X int }) int { return value.X }
+
+func ReadInterface(value interface{ Read() int }) int {
+	return value.Read()
+}
+`,
+	)
 	inspection, err := inspectConstructsForTest(t, source.Request{
-		Dir: directory, Patterns: []string{"."},
+		Dir: directory, Patterns: []string{"./..."},
 		ProviderContract: contract.DefaultID,
 	})
 	if err != nil {
@@ -155,6 +183,197 @@ func TestStage2MemberIdentityUsesSemanticOwnerAndGenericOrigin(
 		t.Fatalf(
 			"member identity fixture has %d unsupported records",
 			pkg.UnsupportedCount(),
+		)
+	}
+	requireCrossPackageStructuralMembers(
+		t,
+		pkg,
+		semanticPackageByImportPath(
+			t,
+			inspection.Semantic(),
+			"example.com/members/remote",
+		),
+	)
+}
+
+func requireCrossPackageStructuralMembers(
+	t *testing.T,
+	local semantic.Package,
+	remote semantic.Package,
+) {
+	t.Helper()
+	localStruct := aggregateTypeWithMember(
+		t, local, semantic.TypeStruct, "X",
+	)
+	remoteStruct := aggregateTypeWithMember(
+		t, remote, semantic.TypeStruct, "X",
+	)
+	localInterface := aggregateTypeWithMember(
+		t, local, semantic.TypeInterface, "Read",
+	)
+	remoteInterface := aggregateTypeWithMember(
+		t, remote, semantic.TypeInterface, "Read",
+	)
+	if localStruct.ID() != remoteStruct.ID() ||
+		localInterface.ID() != remoteInterface.ID() {
+		t.Fatalf(
+			"cross-package structural identities differ: struct=%s/%s interface=%s/%s",
+			localStruct.ID(),
+			remoteStruct.ID(),
+			localInterface.ID(),
+			remoteInterface.ID(),
+		)
+	}
+	assertStructuralMemberOccurrences(
+		t, local, localStruct.ID(), "X", 3,
+	)
+	assertStructuralMemberOccurrences(
+		t, remote, remoteStruct.ID(), "X", 1,
+	)
+	assertStructuralMemberOccurrences(
+		t, local, localInterface.ID(), "Read", 1,
+	)
+	assertStructuralMemberOccurrences(
+		t, remote, remoteInterface.ID(), "Read", 1,
+	)
+	assertMemberTarget(
+		t,
+		local,
+		localStruct.ID(),
+		identity.SemanticObjectField,
+		"X",
+	)
+	assertMemberTarget(
+		t,
+		remote,
+		remoteStruct.ID(),
+		identity.SemanticObjectField,
+		"X",
+	)
+	assertMemberTarget(
+		t,
+		local,
+		localInterface.ID(),
+		identity.SemanticObjectMethod,
+		"Read",
+	)
+	assertMemberTarget(
+		t,
+		remote,
+		remoteInterface.ID(),
+		identity.SemanticObjectMethod,
+		"Read",
+	)
+	for _, pkg := range []semantic.Package{local, remote} {
+		for _, declaration := range semanticDeclarations(pkg) {
+			if declaration.ID().Form() ==
+				identity.SemanticDeclarationMember {
+				t.Fatalf(
+					"package %s serialized member declaration %s",
+					pkg.ID(), declaration.ID(),
+				)
+			}
+		}
+	}
+	mutated := localStruct.Spec()
+	mutated.Fields[0].Package = local.ID()
+	if _, err := semantic.NewType(mutated); err == nil {
+		t.Fatal(
+			"exported anonymous field accepted package-specific identity",
+		)
+	}
+	mutated = localInterface.Spec()
+	mutated.Methods[0].Package = local.ID()
+	if _, err := semantic.NewType(mutated); err == nil {
+		t.Fatal(
+			"exported anonymous method accepted package-specific identity",
+		)
+	}
+}
+
+func aggregateTypeWithMember(
+	t *testing.T,
+	pkg semantic.Package,
+	kind semantic.TypeKind,
+	name string,
+) semantic.Type {
+	t.Helper()
+	for _, record := range semanticTypes(pkg) {
+		if record.Kind() != kind {
+			continue
+		}
+		spec := record.Spec()
+		switch kind {
+		case semantic.TypeStruct:
+			if len(spec.Fields) == 1 &&
+				spec.Fields[0].Name == name {
+				return record
+			}
+		case semantic.TypeInterface:
+			if len(spec.Methods) == 1 &&
+				spec.Methods[0].Name == name {
+				return record
+			}
+		}
+	}
+	t.Fatalf(
+		"package %s has no %s type with member %s",
+		pkg.ID(), kind, name,
+	)
+	return semantic.Type{}
+}
+
+func assertStructuralMemberOccurrences(
+	t *testing.T,
+	pkg semantic.Package,
+	owner identity.SemanticTypeID,
+	name string,
+	want int,
+) {
+	t.Helper()
+	var count int
+	for _, resolution := range semanticResolutions(pkg) {
+		if resolution.Kind() != semantic.ResolutionDeclaration ||
+			resolution.Role() != catalog.RoleDeclarationName {
+			continue
+		}
+		declaration := resolution.Declaration()
+		if declaration.Form() ==
+			identity.SemanticDeclarationMember &&
+			declaration.OwnerType() == owner &&
+			declaration.Name() == name {
+			count++
+		}
+	}
+	if count != want {
+		t.Fatalf(
+			"package %s member %s/%s occurrences=%d, want %d",
+			pkg.ID(), owner, name, count, want,
+		)
+	}
+}
+
+func assertMemberTarget(
+	t *testing.T,
+	pkg semantic.Package,
+	owner identity.SemanticTypeID,
+	class identity.SemanticObjectClass,
+	name string,
+) {
+	t.Helper()
+	id, err := identity.NewMemberDeclarationID(
+		owner, identity.PackageID{}, class, name, 0,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, present := pkg.ResolveDeclarationTarget(id)
+	if !present ||
+		target.ID() != id ||
+		target.OwnerType() != owner {
+		t.Fatalf(
+			"package %s member target %s=%+v",
+			pkg.ID(), id, target,
 		)
 	}
 }

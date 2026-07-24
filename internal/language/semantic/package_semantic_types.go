@@ -218,11 +218,36 @@ func (validator normalizedPackageValidator) validateTypeMethods(
 				)
 			}
 		}
-		if err := validator.requireType(
+		if err := validator.validateMethodSignature(
 			method.signature,
 		); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func (validator normalizedPackageValidator) validateMethodSignature(
+	reference typeRef,
+) error {
+	if err := validator.requireType(reference); err != nil {
+		return err
+	}
+	record, present := validator.pkg.types.storedType(reference)
+	if !present || record.kind != TypeSignature {
+		return fmt.Errorf("type method has a non-signature type")
+	}
+	signature, err := payloadAt(
+		validator.pkg.types.signatures, record.payload,
+	)
+	if err != nil {
+		return err
+	}
+	if signature.receiver != 0 ||
+		signature.receiverTypeParameters.count != 0 {
+		return fmt.Errorf(
+			"method descriptor signature retains receiver",
+		)
 	}
 	return nil
 }
