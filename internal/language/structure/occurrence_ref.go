@@ -85,18 +85,7 @@ func (reference OccurrenceRef) Span() Span {
 
 func (reference OccurrenceRef) Display() DisplaySpan {
 	record := reference.record()
-	return DisplaySpan{
-		Start: DisplayPosition{
-			Filename: reference.store.displayFile(record.displayStartFile),
-			Line:     record.displayStartLine,
-			Column:   record.displayStartColumn,
-		},
-		End: DisplayPosition{
-			Filename: reference.store.displayFile(record.displayEndFile),
-			Line:     record.displayEndLine,
-			Column:   record.displayEndColumn,
-		},
-	}
+	return reference.store.displaySpan(record)
 }
 
 func (reference OccurrenceRef) Token() catalog.TokenKind {

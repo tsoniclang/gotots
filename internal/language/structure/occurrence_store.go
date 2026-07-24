@@ -16,6 +16,7 @@ func (index OccurrenceIndex) valid() bool {
 }
 
 type displayFileIndex uint32
+type occurrenceDisplayIndex uint32
 
 type occurrenceStoreRecord struct {
 	start int
@@ -33,12 +34,7 @@ type occurrenceStoreRecord struct {
 	endLine     int
 	endColumn   int
 
-	displayStartFile   displayFileIndex
-	displayStartLine   int
-	displayStartColumn int
-	displayEndFile     displayFileIndex
-	displayEndLine     int
-	displayEndColumn   int
+	display occurrenceDisplayIndex
 
 	token catalog.TokenKind
 }
@@ -47,7 +43,9 @@ type occurrenceStoreRecord struct {
 // Identity file components and display filenames are stored once.
 type OccurrenceStore struct {
 	file         identity.FileID
+	displayFile  string
 	displayFiles []string
+	displaySpans []occurrenceDisplayRecord
 	records      []occurrenceStoreRecord
 	byIdentity   occurrenceStoreIndex
 	sealed       bool
@@ -71,8 +69,9 @@ func NewOccurrenceStoreBuilder(
 	}
 	return &OccurrenceStoreBuilder{
 		store: &OccurrenceStore{
-			file:    file,
-			records: make([]occurrenceStoreRecord, 0, capacity),
+			file:        file,
+			displayFile: file.String(),
+			records:     make([]occurrenceStoreRecord, 0, capacity),
 		},
 		displayByName: map[string]displayFileIndex{},
 	}, nil
@@ -136,12 +135,10 @@ func (builder *OccurrenceStoreBuilder) occurrence(
 func (builder *OccurrenceStoreBuilder) record(
 	occurrence Occurrence,
 ) (occurrenceStoreRecord, error) {
-	display := occurrence.Display()
-	startFile, err := builder.displayFile(display.Start.Filename)
-	if err != nil {
-		return occurrenceStoreRecord{}, err
-	}
-	endFile, err := builder.displayFile(display.End.Filename)
+	display, err := builder.displaySpan(
+		occurrence.Display(),
+		occurrence.Span(),
+	)
 	if err != nil {
 		return occurrenceStoreRecord{}, err
 	}
@@ -151,17 +148,12 @@ func (builder *OccurrenceStoreBuilder) record(
 		start: id.Span().Start(), end: id.Span().End(),
 		kind: id.KindID(),
 		edge: occurrence.Edge(), ordinal: occurrence.Ordinal(),
-		startLine:          occurrence.Span().Start.Line,
-		startColumn:        occurrence.Span().Start.Column,
-		endLine:            occurrence.Span().End.Line,
-		endColumn:          occurrence.Span().End.Column,
-		displayStartFile:   startFile,
-		displayStartLine:   display.Start.Line,
-		displayStartColumn: display.Start.Column,
-		displayEndFile:     endFile,
-		displayEndLine:     display.End.Line,
-		displayEndColumn:   display.End.Column,
-		token:              occurrence.Token(),
+		startLine:   occurrence.Span().Start.Line,
+		startColumn: occurrence.Span().Start.Column,
+		endLine:     occurrence.Span().End.Line,
+		endColumn:   occurrence.Span().End.Column,
+		display:     display,
+		token:       occurrence.Token(),
 	}
 	if !parent.IsZero() {
 		record.parentStart = parent.Span().Start()
@@ -268,7 +260,7 @@ func (store *OccurrenceStore) Visit(
 	return nil
 }
 
-func (store *OccurrenceStore) displayFile(
+func (store *OccurrenceStore) displayFileName(
 	index displayFileIndex,
 ) string {
 	if store == nil || index == 0 ||
@@ -311,19 +303,8 @@ func (store *OccurrenceStore) occurrence(
 				Offset: record.end,
 			},
 		},
-		display: DisplaySpan{
-			Start: DisplayPosition{
-				Filename: store.displayFile(record.displayStartFile),
-				Line:     record.displayStartLine,
-				Column:   record.displayStartColumn,
-			},
-			End: DisplayPosition{
-				Filename: store.displayFile(record.displayEndFile),
-				Line:     record.displayEndLine,
-				Column:   record.displayEndColumn,
-			},
-		},
-		token: record.token,
+		display: store.displaySpan(record),
+		token:   record.token,
 	}
 }
 
