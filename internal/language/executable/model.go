@@ -80,8 +80,36 @@ func (r Region) VisitMembers(
 func (r Region) References() []DefinitionReference {
 	return append([]DefinitionReference(nil), r.references...)
 }
+func (r Region) VisitReferences(
+	visit func(DefinitionReference) error,
+) error {
+	if visit == nil {
+		return fmt.Errorf("executable reference visit requires a visitor")
+	}
+	for _, reference := range r.references {
+		if err := visit(reference); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 func (r Region) ImplicitOperations() []ImplicitOperation {
 	return append([]ImplicitOperation(nil), r.implicit...)
+}
+func (r Region) VisitImplicitOperations(
+	visit func(ImplicitOperation) error,
+) error {
+	if visit == nil {
+		return fmt.Errorf(
+			"executable implicit-operation visit requires a visitor",
+		)
+	}
+	for _, operation := range r.implicit {
+		if err := visit(operation); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Work is the executable traversal's measured scalable work.
@@ -117,6 +145,7 @@ func (i *Inventory) Regions() []Region {
 	}
 	return out
 }
+func (i *Inventory) RegionCount() int { return len(i.regionIDs) }
 func (i *Inventory) AdditionalOccurrences() []structure.Occurrence {
 	out := make(
 		[]structure.Occurrence, 0, len(i.additionalIDs),
@@ -125,6 +154,30 @@ func (i *Inventory) AdditionalOccurrences() []structure.Occurrence {
 		out = append(out, *i.byOccurrence[id])
 	}
 	return out
+}
+func (i *Inventory) AdditionalOccurrenceCount() int {
+	return len(i.additionalIDs)
+}
+func (i *Inventory) VisitAdditionalOccurrenceRefsForFile(
+	file identity.FileID,
+	visit func(structure.OccurrenceRef) error,
+) error {
+	if file.IsZero() || visit == nil {
+		return fmt.Errorf(
+			"additional occurrence visit requires a file and visitor",
+		)
+	}
+	indexed := i.additionalByFile[file]
+	for _, id := range i.additionalIDs[indexed.start:indexed.end] {
+		reference, err := structure.NewOccurrenceRef(i.byOccurrence[id])
+		if err != nil {
+			return err
+		}
+		if err := visit(reference); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 func (i *Inventory) AdditionalOccurrenceRefs() (
 	[]structure.OccurrenceRef,
@@ -190,6 +243,19 @@ func (i *Inventory) AdditionalOccurrence(
 		return structure.Occurrence{}, false
 	}
 	return *occurrence, true
+}
+func (i *Inventory) AdditionalOccurrenceRef(
+	id identity.OccurrenceID,
+) (structure.OccurrenceRef, bool, error) {
+	occurrence, ok := i.byOccurrence[id]
+	if !ok {
+		return structure.OccurrenceRef{}, false, nil
+	}
+	reference, err := structure.NewOccurrenceRef(occurrence)
+	if err != nil {
+		return structure.OccurrenceRef{}, false, err
+	}
+	return reference, true, nil
 }
 
 func (i *Inventory) sort() {

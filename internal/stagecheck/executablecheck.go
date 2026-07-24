@@ -10,60 +10,157 @@ import (
 	"github.com/tsoniclang/gotots/internal/language/structure"
 	"github.com/tsoniclang/gotots/internal/scope"
 	"github.com/tsoniclang/gotots/internal/scope/contract"
-	"github.com/tsoniclang/gotots/internal/scope/sourceplan"
 	"github.com/tsoniclang/gotots/internal/source"
 )
 
-func verifyExecutableRegions(
-	universe *source.Universe,
-	plan *sourceplan.Plan,
-	graph *structure.Graph,
-	selections *scope.DefinitionSelections,
-	inventory *executable.Inventory,
-) error {
-	actual, err := executableLedger(graph, inventory)
-	if err != nil {
-		return err
-	}
-	expected, err := deriveExecutableLedger(
-		universe, plan, graph, selections, inventory,
-	)
-	if err != nil {
-		return err
-	}
-	return compareLedgers("executable-region", actual, expected)
+type executableVerificationIndex struct {
+	byPackage       map[identity.PackageID][]scope.DefinitionSelection
+	fullDefinitions int
 }
 
-func executableLedger(
+func indexExecutableVerification(
 	graph *structure.Graph,
-	inventory *executable.Inventory,
-) (*structuralLedger, error) {
-	actual := newStructuralLedger()
-	additional := map[identity.OccurrenceID]structure.Occurrence{}
-	for _, occurrence := range inventory.AdditionalOccurrences() {
-		if _, structural := graph.ResidentOccurrence(
-			occurrence.ID(),
-		); structural {
-			return nil, &VerificationError{
-				Stage: "executable-region",
-				Reason: "additional occurrence duplicates structural payload " +
-					occurrence.ID().String(),
-			}
-		}
-		if _, duplicate := additional[occurrence.ID()]; duplicate {
-			return nil, &VerificationError{
-				Stage: "executable-region",
-				Reason: "additional occurrence is duplicated " +
-					occurrence.ID().String(),
-			}
-		}
-		additional[occurrence.ID()] = occurrence
-		addRecord(
-			&actual.additionalOccurrences,
-			occurrenceLedgerRecordFromOccurrence(occurrence),
-		)
+	selections *scope.DefinitionSelections,
+	selectedPackages map[identity.PackageID]bool,
+) (*executableVerificationIndex, error) {
+	definitionPackages := map[identity.DefinitionID]identity.PackageID{}
+	for _, record := range graph.DefinitionCensus() {
+		definitionPackages[record.ID()] = record.Package()
 	}
-	for _, region := range inventory.Regions() {
+	index := &executableVerificationIndex{
+		byPackage: map[identity.PackageID][]scope.DefinitionSelection{},
+	}
+	seen := map[identity.DefinitionID]bool{}
+	for _, selection := range selections.Records() {
+		packageID, present := definitionPackages[selection.Definition()]
+		if !present {
+			return nil, &VerificationError{
+				Stage: "executable-region",
+				Reason: "selection names an absent definition " +
+					selection.Definition().String(),
+			}
+		}
+		if selectedPackages != nil && !selectedPackages[packageID] {
+			continue
+		}
+		if seen[selection.Definition()] {
+			return nil, &VerificationError{
+				Stage: "executable-region",
+				Reason: "selection repeats definition " +
+					selection.Definition().String(),
+			}
+		}
+		seen[selection.Definition()] = true
+		index.byPackage[packageID] = append(
+			index.byPackage[packageID], selection,
+		)
+		if selection.Depth() == contract.DepthFullSemantic {
+			index.fullDefinitions++
+		}
+	}
+	return index, nil
+}
+
+type executableVerificationSummary struct {
+	regions               int
+	additionalOccurrences int
+}
+
+func (summary *executableVerificationSummary) add(
+	other executableVerificationSummary,
+) {
+	summary.regions += other.regions
+	summary.additionalOccurrences += other.additionalOccurrences
+}
+
+func verifyExecutablePackage(
+	packageID identity.PackageID,
+	sourcePackage *source.LoadedPackage,
+	evidence *independentPackageEvidence,
+	graph *structure.Graph,
+	selections []scope.DefinitionSelection,
+	inventory *executable.Inventory,
+) (executableVerificationSummary, error) {
+	actual, summary, err := executableLedgerForPackage(
+		sourcePackage, graph, selections, inventory,
+	)
+	if err != nil {
+		return executableVerificationSummary{}, err
+	}
+	expected, err := deriveExecutableLedgerForPackage(
+		packageID, evidence, graph, selections,
+	)
+	if err != nil {
+		return executableVerificationSummary{}, err
+	}
+	if err := compareLedgers(
+		"executable-region/"+packageID.String(),
+		actual,
+		expected,
+	); err != nil {
+		return executableVerificationSummary{}, err
+	}
+	return summary, nil
+}
+
+func executableLedgerForPackage(
+	sourcePackage *source.LoadedPackage,
+	graph *structure.Graph,
+	selections []scope.DefinitionSelection,
+	inventory *executable.Inventory,
+) (*structuralLedger, executableVerificationSummary, error) {
+	actual := newStructuralLedger()
+	additional := map[identity.OccurrenceID]bool{}
+	var summary executableVerificationSummary
+	for _, file := range sourcePackage.Files() {
+		err := inventory.VisitAdditionalOccurrenceRefsForFile(
+			file.ID(),
+			func(occurrence structure.OccurrenceRef) error {
+				if _, structural := graph.ResidentOccurrence(
+					occurrence.ID(),
+				); structural {
+					return &VerificationError{
+						Stage: "executable-region",
+						Reason: "additional occurrence duplicates structural payload " +
+							occurrence.ID().String(),
+					}
+				}
+				if additional[occurrence.ID()] {
+					return &VerificationError{
+						Stage: "executable-region",
+						Reason: "additional occurrence is duplicated " +
+							occurrence.ID().String(),
+					}
+				}
+				additional[occurrence.ID()] = true
+				addRecord(
+					&actual.additionalOccurrences,
+					occurrenceLedgerRecordFromRef(occurrence),
+				)
+				summary.additionalOccurrences++
+				return nil
+			},
+		)
+		if err != nil {
+			return nil, executableVerificationSummary{}, err
+		}
+	}
+	for _, selection := range selections {
+		region, hasRegion := inventory.For(selection.Definition())
+		full := selection.Depth() == contract.DepthFullSemantic
+		if full != hasRegion {
+			return nil, executableVerificationSummary{}, &VerificationError{
+				Stage: "executable-region",
+				Reason: fmt.Sprintf(
+					"%s full=%t region=%t",
+					selection.Definition(), full, hasRegion,
+				),
+			}
+		}
+		if !full {
+			continue
+		}
+		summary.regions++
 		addRecord(
 			&actual.executableRegions,
 			executableRegionLedgerRecord{id: region.ID()},
@@ -83,7 +180,7 @@ func executableLedger(
 			}
 			memberSet[member] = true
 			if _, present := graph.ResidentOccurrence(member); !present {
-				if _, present = additional[member]; !present {
+				if present = additional[member]; !present {
 					return &VerificationError{
 						Stage: "executable-region",
 						Reason: fmt.Sprintf(
@@ -98,9 +195,11 @@ func executableLedger(
 			})
 			return nil
 		}); err != nil {
-			return nil, err
+			return nil, executableVerificationSummary{}, err
 		}
-		for _, reference := range region.References() {
+		if err := region.VisitReferences(func(
+			reference executable.DefinitionReference,
+		) error {
 			addRecord(
 				&actual.definitionReferences,
 				definitionReferenceLedgerRecord{
@@ -111,8 +210,13 @@ func executableLedger(
 					child:   reference.Child(),
 				},
 			)
+			return nil
+		}); err != nil {
+			return nil, executableVerificationSummary{}, err
 		}
-		for _, operation := range region.ImplicitOperations() {
+		if err := region.VisitImplicitOperations(func(
+			operation executable.ImplicitOperation,
+		) error {
 			addRecord(
 				&actual.implicitOperations,
 				implicitOperationLedgerRecord{
@@ -121,46 +225,31 @@ func executableLedger(
 					pkg:    operation.Package(),
 				},
 			)
+			return nil
+		}); err != nil {
+			return nil, executableVerificationSummary{}, err
 		}
 	}
-	return actual, nil
+	return actual, summary, nil
 }
 
-func deriveExecutableLedger(
-	universe *source.Universe,
-	plan *sourceplan.Plan,
+func deriveExecutableLedgerForPackage(
+	packageID identity.PackageID,
+	evidence *independentPackageEvidence,
 	graph *structure.Graph,
-	selections *scope.DefinitionSelections,
-	inventory *executable.Inventory,
+	selections []scope.DefinitionSelection,
 ) (*structuralLedger, error) {
-	loadedFiles := map[identity.FileID]*source.LoadedFile{}
-	for _, pkg := range universe.Packages() {
-		for _, file := range pkg.Files() {
-			loadedFiles[file.ID()] = file
-		}
-	}
-	derivedFiles := map[identity.FileID]*derivedFile{}
-	definitionNodes := map[identity.DefinitionID]ast.Node{}
 	definitionAt := map[identity.OccurrenceID]identity.DefinitionID{}
-	for _, definition := range graph.ResidentDefinitions() {
-		if !definition.ID().Root().IsZero() {
-			definitionAt[definition.ID().Root()] = definition.ID()
+	for _, file := range evidence.files {
+		for definition := range file.definitions {
+			if !definition.Root().IsZero() {
+				definitionAt[definition.Root()] = definition
+			}
 		}
 	}
 	expected := newStructuralLedger()
-	for _, selection := range selections.Records() {
-		_, hasRegion := inventory.For(selection.Definition())
-		full := selection.Depth() == contract.DepthFullSemantic
-		if full != hasRegion {
-			return nil, &VerificationError{
-				Stage: "executable-region",
-				Reason: fmt.Sprintf(
-					"%s full=%t region=%t",
-					selection.Definition(), full, hasRegion,
-				),
-			}
-		}
-		if !full {
+	for _, selection := range selections {
+		if selection.Depth() != contract.DepthFullSemantic {
 			continue
 		}
 		regionID, _ := identity.NewExecutableRegionID(
@@ -179,6 +268,13 @@ func deriveExecutableLedger(
 						selection.Definition().String(),
 				}
 			}
+			if selection.Definition().Package() != packageID {
+				return nil, &VerificationError{
+					Stage: "executable-region",
+					Reason: "implicit definition has the wrong package " +
+						selection.Definition().String(),
+				}
+			}
 			addRecord(
 				&expected.implicitOperations,
 				implicitOperationLedgerRecord{
@@ -190,15 +286,21 @@ func deriveExecutableLedger(
 			)
 			continue
 		}
-		derived, node, err := independentlyLoadDefinition(
-			selection.Definition(),
-			plan,
-			loadedFiles,
-			derivedFiles,
-			definitionNodes,
-		)
-		if err != nil {
-			return nil, err
+		derived := evidence.files[selection.Definition().File()]
+		if derived == nil {
+			return nil, &VerificationError{
+				Stage: "executable-region",
+				Reason: "full definition lacks package-local verifier evidence " +
+					selection.Definition().String(),
+			}
+		}
+		node := derived.definitions[selection.Definition()]
+		if node == nil {
+			return nil, &VerificationError{
+				Stage: "executable-region",
+				Reason: "independent derivation lacks full definition " +
+					selection.Definition().String(),
+			}
 		}
 		builder := independentExecutableBuilder{
 			file:         derived,
@@ -241,52 +343,35 @@ func deriveExecutableLedger(
 	return expected, nil
 }
 
-func independentlyLoadDefinition(
-	definition identity.DefinitionID,
-	plan *sourceplan.Plan,
-	loadedFiles map[identity.FileID]*source.LoadedFile,
-	derivedFiles map[identity.FileID]*derivedFile,
-	definitionNodes map[identity.DefinitionID]ast.Node,
-) (*derivedFile, ast.Node, error) {
-	fileID := definition.File()
-	if plan != nil {
-		decision, present := plan.For(fileID)
-		if !present || decision.Kind() != sourceplan.KindLocalSyntax {
-			return nil, nil, &VerificationError{
-				Stage: "executable-region",
-				Reason: "full definition lacks local structural source " +
-					definition.String(),
-			}
-		}
-	}
-	derived := derivedFiles[fileID]
-	if derived == nil {
-		file := loadedFiles[fileID]
-		if file == nil {
-			return nil, nil, &VerificationError{
-				Stage:  "executable-region",
-				Reason: "full definition file is absent " + fileID.String(),
-			}
-		}
-		var err error
-		derived, err = deriveFile(file)
-		if err != nil {
-			return nil, nil, err
-		}
-		derivedFiles[fileID] = derived
-		for id, node := range derived.definitions {
-			definitionNodes[id] = node
-		}
-	}
-	node := definitionNodes[definition]
-	if node == nil {
-		return nil, nil, &VerificationError{
+func verifyExecutableSummary(
+	inventory *executable.Inventory,
+	fullDefinitions int,
+	actual executableVerificationSummary,
+) error {
+	if actual.regions != fullDefinitions ||
+		inventory.RegionCount() != fullDefinitions {
+		return &VerificationError{
 			Stage: "executable-region",
-			Reason: "independent derivation lacks full definition " +
-				definition.String(),
+			Reason: fmt.Sprintf(
+				"verified/full/inventory region cardinality is %d/%d/%d",
+				actual.regions,
+				fullDefinitions,
+				inventory.RegionCount(),
+			),
 		}
 	}
-	return derived, node, nil
+	if actual.additionalOccurrences !=
+		inventory.AdditionalOccurrenceCount() {
+		return &VerificationError{
+			Stage: "executable-region",
+			Reason: fmt.Sprintf(
+				"verified/inventory additional occurrence cardinality is %d/%d",
+				actual.additionalOccurrences,
+				inventory.AdditionalOccurrenceCount(),
+			),
+		}
+	}
+	return nil
 }
 
 type independentExecutableBuilder struct {

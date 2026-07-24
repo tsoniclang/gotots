@@ -4,7 +4,9 @@ import (
 	"fmt"
 
 	"github.com/tsoniclang/gotots/internal/identity"
+	"github.com/tsoniclang/gotots/internal/language/executable"
 	"github.com/tsoniclang/gotots/internal/language/structure"
+	"github.com/tsoniclang/gotots/internal/scope"
 	"github.com/tsoniclang/gotots/internal/scope/sourceplan"
 	"github.com/tsoniclang/gotots/internal/source"
 )
@@ -13,6 +15,8 @@ func verifyDefinitionGraphPackagesBounded(
 	universe *source.Universe,
 	plan *sourceplan.Plan,
 	graph *structure.Graph,
+	selections *scope.DefinitionSelections,
+	executableInventory *executable.Inventory,
 	certified *structure.ProviderArtifact,
 	selectedPackages map[identity.PackageID]bool,
 ) error {
@@ -31,6 +35,17 @@ func verifyDefinitionGraphPackagesBounded(
 			),
 		}
 	}
+	loaded := map[identity.PackageID]*source.LoadedPackage{}
+	for _, pkg := range universe.Packages() {
+		loaded[pkg.ID()] = pkg
+	}
+	executableIndex, err := indexExecutableVerification(
+		graph, selections, selectedPackages,
+	)
+	if err != nil {
+		return err
+	}
+	var executableSummary executableVerificationSummary
 	census := map[identity.PackageID][]structure.DefinitionCensusRecord{}
 	for _, record := range graph.DefinitionCensus() {
 		census[record.Package()] = append(
@@ -70,10 +85,16 @@ func verifyDefinitionGraphPackagesBounded(
 		); err != nil {
 			return err
 		}
-		expected, err := deriveExpectedResidentGraph(
-			universe,
-			plan,
-			map[identity.PackageID]bool{pkg.ID(): true},
+		sourcePackage := loaded[pkg.ID()]
+		if sourcePackage == nil {
+			return &VerificationError{
+				Stage: "definition-graph-independent",
+				Reason: "resident package lacks source evidence " +
+					pkg.ID().String(),
+			}
+		}
+		expected, err := deriveExpectedResidentPackage(
+			universe, plan, sourcePackage,
 		)
 		if err != nil {
 			return &VerificationError{
@@ -81,11 +102,26 @@ func verifyDefinitionGraphPackagesBounded(
 				Reason: pkg.ID().String() + ": " + err.Error(),
 			}
 		}
-		return compareLedgers(
+		if err := compareLedgers(
 			"definition-graph/"+pkg.ID().String(),
 			ledgerForPackage(pkg),
+			expected.ledger,
+		); err != nil {
+			return err
+		}
+		packageSummary, err := verifyExecutablePackage(
+			pkg.ID(),
+			sourcePackage,
 			expected,
+			graph,
+			executableIndex.byPackage[pkg.ID()],
+			executableInventory,
 		)
+		if err != nil {
+			return err
+		}
+		executableSummary.add(packageSummary)
+		return nil
 	})
 	if err != nil {
 		return err
@@ -116,7 +152,11 @@ func verifyDefinitionGraphPackagesBounded(
 			),
 		}
 	}
-	return nil
+	return verifyExecutableSummary(
+		executableInventory,
+		executableIndex.fullDefinitions,
+		executableSummary,
+	)
 }
 
 func partitionStructuralDefinitionCensus(

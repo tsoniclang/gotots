@@ -12,7 +12,7 @@ import (
 )
 
 func (verifier *checkerSemanticVerifier) verifyOperationControl(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 	node ast.Node,
 	operation semantic.Operation,
 ) error {
@@ -70,7 +70,7 @@ func (verifier *checkerSemanticVerifier) verifyOperationControl(
 }
 
 func (verifier *checkerSemanticVerifier) independentBranchLabel(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 	branch *ast.BranchStmt,
 ) (identity.SemanticBindingID, error) {
 	if branch.Label == nil {
@@ -111,7 +111,7 @@ func (verifier *checkerSemanticVerifier) independentBranchLabel(
 }
 
 func (verifier *checkerSemanticVerifier) independentBranchTarget(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 	branch *ast.BranchStmt,
 	label identity.SemanticBindingID,
 ) (identity.OccurrenceID, error) {
@@ -164,7 +164,7 @@ func (verifier *checkerSemanticVerifier) independentBranchTarget(
 }
 
 func (verifier *checkerSemanticVerifier) nearestControlAncestor(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 	kinds ...catalog.Kind,
 ) identity.OccurrenceID {
 	for parent := occurrence.Parent(); !parent.IsZero(); {
@@ -180,7 +180,7 @@ func (verifier *checkerSemanticVerifier) nearestControlAncestor(
 }
 
 func (verifier *checkerSemanticVerifier) nextCaseOccurrence(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 ) identity.OccurrenceID {
 	caseID := verifier.nearestControlAncestor(
 		occurrence, catalog.KindCaseClause,

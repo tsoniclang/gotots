@@ -61,7 +61,7 @@ func independentOperationObject(
 }
 
 func (verifier *checkerSemanticVerifier) verifyOperationObject(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 	node ast.Node,
 	reference semantic.ObjectReference,
 ) error {

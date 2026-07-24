@@ -172,7 +172,7 @@ func (verifier *checkerSemanticVerifier) verifyOccurrences() error {
 		variant, err := independentSemanticVariant(
 			verifier.expected,
 			verifier.index,
-			occurrence.Occurrence,
+			occurrence.OccurrenceRef,
 			node,
 		)
 		if err != nil {
@@ -192,7 +192,7 @@ func (verifier *checkerSemanticVerifier) verifyOccurrences() error {
 			)
 		}
 		if resolution.Kind() == semantic.ResolutionOperation {
-			if verifier.independentCompileTimeContext(occurrence.Occurrence) {
+			if verifier.independentCompileTimeContext(occurrence.OccurrenceRef) {
 				return fmt.Errorf(
 					"compile-time occurrence %s owns a runtime operation",
 					occurrenceID,
@@ -207,12 +207,12 @@ func (verifier *checkerSemanticVerifier) verifyOccurrences() error {
 				)
 			}
 			if err := verifier.verifyOperation(
-				occurrence.Occurrence, node, operation,
+				occurrence.OccurrenceRef, node, operation,
 			); err != nil {
 				return err
 			}
 		} else if err := verifier.verifyResolutionTarget(
-			occurrence.Occurrence, resolution, node,
+			occurrence.OccurrenceRef, resolution, node,
 		); err != nil {
 			return fmt.Errorf(
 				"occurrence %s (%s/%s) resolution %s: %w",
@@ -228,7 +228,7 @@ func (verifier *checkerSemanticVerifier) verifyOccurrences() error {
 }
 
 func (verifier *checkerSemanticVerifier) verifyOperation(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 	node ast.Node,
 	operation semantic.Operation,
 ) error {
@@ -323,7 +323,7 @@ type checkerOperationValue struct {
 }
 
 func (verifier *checkerSemanticVerifier) verifyOperationValue(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 	node ast.Node,
 	operation semantic.Operation,
 ) error {
@@ -394,7 +394,7 @@ func (verifier *checkerSemanticVerifier) verifyOperationValue(
 }
 
 func (verifier *checkerSemanticVerifier) operationValue(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 	node ast.Node,
 	kind semantic.OperationKind,
 	variant catalog.Variant,
@@ -470,7 +470,7 @@ func (verifier *checkerSemanticVerifier) operationValue(
 }
 
 func (verifier *checkerSemanticVerifier) operationValueWithoutType(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 	expression ast.Expr,
 	kind semantic.OperationKind,
 ) (checkerOperationValue, error) {
@@ -507,7 +507,7 @@ func (verifier *checkerSemanticVerifier) operationValueWithoutType(
 }
 
 func independentOperationNeedsPlace(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 	kind semantic.OperationKind,
 ) bool {
 	switch occurrence.Role() {

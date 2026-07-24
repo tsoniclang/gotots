@@ -12,7 +12,7 @@ import (
 )
 
 func (verifier *checkerSemanticVerifier) verifyTypeSwitchBindingAnchor(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 	node ast.Node,
 ) error {
 	identifier, ok := node.(*ast.Ident)

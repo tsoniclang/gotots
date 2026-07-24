@@ -13,7 +13,7 @@ import (
 func (
 	verifier *checkerSemanticVerifier,
 ) independentCompileTimeContext(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 ) bool {
 	return !verifier.independentCompileTimeAnchor(
 		occurrence,
@@ -23,7 +23,7 @@ func (
 func (
 	verifier *checkerSemanticVerifier,
 ) independentCompileTimeAnchor(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 ) identity.OccurrenceID {
 	id := occurrence.ID()
 	if verifier.compileTimeResolved[id] {
@@ -39,7 +39,7 @@ func (
 		if parent, present :=
 			verifier.expected.occurrences.get(occurrence.Parent()); present {
 			anchor =
-				verifier.independentCompileTimeAnchor(parent.Occurrence)
+				verifier.independentCompileTimeAnchor(parent.OccurrenceRef)
 		}
 	}
 	verifier.compileTimeAnchor[id] = anchor
@@ -50,7 +50,7 @@ func (
 func (
 	verifier *checkerSemanticVerifier,
 ) independentCompileTimeCoverage(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 ) (types.Object, types.Type) {
 	anchorID := verifier.independentCompileTimeAnchor(occurrence)
 	if anchorID.IsZero() {
@@ -93,7 +93,7 @@ func (
 func (
 	verifier *checkerSemanticVerifier,
 ) independentConstInitializer(
-	initializer structure.Occurrence,
+	initializer structure.OccurrenceRef,
 ) bool {
 	valueSpecOccurrence, present :=
 		verifier.expected.occurrences.get(initializer.Parent())

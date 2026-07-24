@@ -39,6 +39,7 @@ type derivedFile struct {
 	file        *source.LoadedFile
 	fset        *token.FileSet
 	raw         []byte
+	displayFile string
 	owner       structure.OwnerRegionID
 	occurrences map[identity.OccurrenceID]derivedOccurrence
 	anchors     map[identity.OccurrenceID]bool
@@ -68,6 +69,7 @@ func deriveFile(file *source.LoadedFile) (*derivedFile, error) {
 		file:        file,
 		fset:        fset,
 		raw:         raw,
+		displayFile: file.ID().String(),
 		owner:       owner,
 		occurrences: map[identity.OccurrenceID]derivedOccurrence{},
 		anchors:     map[identity.OccurrenceID]bool{},
@@ -547,19 +549,19 @@ func (b *derivedFile) display(node ast.Node) structure.DisplaySpan {
 	physicalStart := b.fset.PositionFor(node.Pos(), false)
 	physicalEnd := b.fset.PositionFor(node.End(), false)
 	return structure.DisplaySpan{
-		Start: independentDisplayPosition(start, physicalStart, b.file.ID()),
-		End:   independentDisplayPosition(end, physicalEnd, b.file.ID()),
+		Start: independentDisplayPosition(start, physicalStart, b.displayFile),
+		End:   independentDisplayPosition(end, physicalEnd, b.displayFile),
 	}
 }
 
 func independentDisplayPosition(
 	adjusted token.Position,
 	physical token.Position,
-	file identity.FileID,
+	physicalFile string,
 ) structure.DisplayPosition {
 	filename := adjusted.Filename
 	if filename == physical.Filename {
-		filename = file.String()
+		filename = physicalFile
 	}
 	return structure.DisplayPosition{
 		Filename: filename,

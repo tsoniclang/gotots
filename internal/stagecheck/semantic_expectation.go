@@ -27,7 +27,7 @@ type semanticPackageExpectation struct {
 }
 
 type semanticExpectedOccurrence struct {
-	structure.Occurrence
+	structure.OccurrenceRef
 	domain          catalog.ResolutionDomain
 	owner           identity.DefinitionID
 	structuralOwner identity.DefinitionID
@@ -199,9 +199,13 @@ func newSemanticPackageExpectation(
 			_ int,
 			member identity.OccurrenceID,
 		) error {
-			if occurrence, present :=
-				executableInventory.AdditionalOccurrence(member); present {
-				if err := out.addOccurrence(occurrence); err != nil {
+			occurrence, present, err :=
+				executableInventory.AdditionalOccurrenceRef(member)
+			if err != nil {
+				return err
+			}
+			if present {
+				if err := out.addOccurrenceRef(occurrence); err != nil {
 					return err
 				}
 			}
@@ -259,28 +263,6 @@ func (expected *semanticPackageExpectation) assignStructuralOwner(
 	return nil
 }
 
-func (expected *semanticPackageExpectation) addOccurrence(
-	occurrence structure.Occurrence,
-) error {
-	if existing, present := expected.occurrences.get(occurrence.ID()); present {
-		if existing.Occurrence != occurrence {
-			return semanticVerificationError(
-				"occurrence",
-				"conflicting payload "+occurrence.ID().String(),
-			)
-		}
-		return nil
-	}
-	record := &semanticExpectedOccurrence{
-		Occurrence: occurrence,
-	}
-	if err := expected.occurrences.put(occurrence.ID(), record); err != nil {
-		return err
-	}
-	expected.order = append(expected.order, occurrence.ID())
-	return nil
-}
-
 func (expected *semanticPackageExpectation) addOccurrenceRef(
 	occurrence structure.OccurrenceRef,
 ) error {
@@ -300,20 +282,14 @@ func (expected *semanticPackageExpectation) addOccurrenceRef(
 		}
 		return nil
 	}
-	canonical, err := structure.NewOccurrence(
-		occurrence.ID(),
-		occurrence.Kind(),
-		occurrence.Parent(),
-		occurrence.Edge(),
-		occurrence.Ordinal(),
-		occurrence.Span(),
-		occurrence.Display(),
-		occurrence.Token(),
-	)
-	if err != nil {
+	record := &semanticExpectedOccurrence{
+		OccurrenceRef: occurrence,
+	}
+	if err := expected.occurrences.put(occurrence.ID(), record); err != nil {
 		return err
 	}
-	return expected.addOccurrence(canonical)
+	expected.order = append(expected.order, occurrence.ID())
+	return nil
 }
 
 func (expected *semanticPackageExpectation) assign(

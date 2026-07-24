@@ -36,6 +36,21 @@ func occurrenceLedgerRecordFromOccurrence(
 	}
 }
 
+func occurrenceLedgerRecordFromRef(
+	occurrence structure.OccurrenceRef,
+) occurrenceLedgerRecord {
+	return occurrenceLedgerRecord{
+		id:      occurrence.ID(),
+		kind:    occurrence.Kind(),
+		parent:  occurrence.Parent(),
+		edge:    occurrence.Edge(),
+		ordinal: occurrence.Ordinal(),
+		span:    occurrence.Span(),
+		display: occurrence.Display(),
+		token:   occurrence.Token(),
+	}
+}
+
 func occurrenceLedgerRecordFromDerived(
 	occurrence derivedOccurrence,
 ) occurrenceLedgerRecord {

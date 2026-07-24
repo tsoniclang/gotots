@@ -11,7 +11,7 @@ import (
 func (
 	verifier *checkerSemanticVerifier,
 ) independentInferredArrayEllipsisType(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 	node ast.Node,
 ) types.Type {
 	if occurrence.Kind() != catalog.KindEllipsis ||

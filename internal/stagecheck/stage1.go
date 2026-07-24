@@ -135,7 +135,13 @@ func verifyStage1(
 		return hydrationErr
 	}
 	if err := verifyDefinitionGraphPackages(
-		universe, plan, graph, certified, selectedPackages,
+		universe,
+		plan,
+		graph,
+		selections,
+		executableInventory,
+		certified,
+		selectedPackages,
 	); err != nil {
 		return err
 	}
@@ -159,15 +165,6 @@ func verifyStage1(
 	); err != nil {
 		return err
 	}
-	if err := verifyExecutableRegions(
-		universe,
-		plan,
-		graph,
-		selections,
-		executableInventory,
-	); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -175,6 +172,8 @@ func verifyDefinitionGraphPackages(
 	universe *source.Universe,
 	plan *sourceplan.Plan,
 	graph *structure.Graph,
+	selections *scope.DefinitionSelections,
+	executableInventory *executable.Inventory,
 	certified *structure.ProviderArtifact,
 	selectedPackages map[identity.PackageID]bool,
 ) error {
@@ -182,6 +181,8 @@ func verifyDefinitionGraphPackages(
 		universe,
 		plan,
 		graph,
+		selections,
+		executableInventory,
 		certified,
 		selectedPackages,
 	)

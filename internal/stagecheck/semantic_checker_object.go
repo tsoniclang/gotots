@@ -234,7 +234,7 @@ func (
 func (
 	verifier *checkerSemanticVerifier,
 ) verifyCompositeFieldReference(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 	id identity.SemanticDeclarationID,
 	object types.Object,
 ) (bool, error) {

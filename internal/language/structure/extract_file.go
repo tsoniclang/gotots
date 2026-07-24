@@ -19,6 +19,7 @@ type fileBuilder struct {
 	file        *source.LoadedFile
 	fset        *token.FileSet
 	raw         []byte
+	displayFile string
 	ownerID     OwnerRegionID
 	owner       OwnerRegion
 	occurrences map[identity.OccurrenceID]Occurrence
@@ -47,6 +48,7 @@ func buildFile(
 		file:        file,
 		fset:        file.PhysicalFileSet(),
 		raw:         file.SelectedBytes(),
+		displayFile: file.ID().String(),
 		ownerID:     ownerID,
 		occurrences: map[identity.OccurrenceID]Occurrence{},
 		anchors:     map[identity.OccurrenceID]bool{},
@@ -502,19 +504,19 @@ func (b *fileBuilder) displaySpan(node ast.Node) DisplaySpan {
 	physicalStart := b.fset.PositionFor(node.Pos(), false)
 	physicalEnd := b.fset.PositionFor(node.End(), false)
 	return DisplaySpan{
-		Start: displayPosition(start, physicalStart, b.file.ID()),
-		End:   displayPosition(end, physicalEnd, b.file.ID()),
+		Start: displayPosition(start, physicalStart, b.displayFile),
+		End:   displayPosition(end, physicalEnd, b.displayFile),
 	}
 }
 
 func displayPosition(
 	adjusted token.Position,
 	physical token.Position,
-	file identity.FileID,
+	physicalFile string,
 ) DisplayPosition {
 	filename := adjusted.Filename
 	if filename == physical.Filename {
-		filename = file.String()
+		filename = physicalFile
 	}
 	return DisplayPosition{
 		Filename: filename,

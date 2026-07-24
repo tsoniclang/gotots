@@ -12,7 +12,7 @@ import (
 func independentExpectedType(
 	expected semanticPackageExpectation,
 	index *structure.TransientIndex,
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 ) types.Type {
 	parent := expected.occurrence(occurrence.Parent())
 	parentNode, present := index.OccurrenceNode(parent.ID())
@@ -52,7 +52,7 @@ func independentExpectedType(
 			return nil
 		}
 		signature := independentDefinitionSignature(
-			expected, index, parent.Occurrence,
+			expected, index, parent.OccurrenceRef,
 		)
 		if signature == nil ||
 			(len(node.Results) == 1 && signature.Results().Len() > 1) {
@@ -75,7 +75,7 @@ func independentExpectedType(
 		)
 	case *ast.KeyValueExpr:
 		return independentKeyedExpectedType(
-			expected, index, view, parent.Occurrence, node, role,
+			expected, index, view, parent.OccurrenceRef, node, role,
 		)
 	case *ast.SendStmt:
 		if role == catalog.RoleSentValue {
@@ -142,7 +142,7 @@ func independentKeyedExpectedType(
 	expected semanticPackageExpectation,
 	index *structure.TransientIndex,
 	view *source.TypeInfoView,
-	parent structure.Occurrence,
+	parent structure.OccurrenceRef,
 	node *ast.KeyValueExpr,
 	role catalog.Role,
 ) types.Type {

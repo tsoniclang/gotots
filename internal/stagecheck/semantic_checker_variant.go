@@ -16,7 +16,7 @@ import (
 func independentSemanticVariant(
 	expected semanticPackageExpectation,
 	index *structure.TransientIndex,
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 	node ast.Node,
 ) (catalog.Variant, error) {
 	view := expected.loaded.CheckerView()
@@ -156,7 +156,7 @@ func independentSemanticVariant(
 func independentCommaOK(
 	expected semanticPackageExpectation,
 	index *structure.TransientIndex,
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 ) bool {
 	parent := expected.occurrence(occurrence.Parent())
 	parentNode, present := index.OccurrenceNode(parent.ID())
@@ -297,7 +297,7 @@ func independentCompositeVariant(
 func independentKeyedVariant(
 	expected semanticPackageExpectation,
 	index *structure.TransientIndex,
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 ) catalog.Variant {
 	parentNode, present := index.OccurrenceNode(
 		occurrence.Parent(),
@@ -378,7 +378,7 @@ func independentGenericIdentifier(expression ast.Expr) *ast.Ident {
 func independentDefinitionSignature(
 	expected semanticPackageExpectation,
 	index *structure.TransientIndex,
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 ) *types.Signature {
 	definition := expected.occurrenceOwner(occurrence.ID())
 	node, present := index.CheckedDefinitionNode(definition)
@@ -410,7 +410,7 @@ func independentDefinitionSignature(
 
 func independentOperationKind(
 	view *source.TypeInfoView,
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 	node ast.Node,
 	variant catalog.Variant,
 ) semantic.OperationKind {

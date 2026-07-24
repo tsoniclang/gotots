@@ -21,7 +21,7 @@ type checkerImplicitEffect struct {
 }
 
 func (verifier *checkerSemanticVerifier) verifyImplicitEffects(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 	node ast.Node,
 	operation semantic.Operation,
 	operands []identity.OccurrenceID,
@@ -38,7 +38,7 @@ func (verifier *checkerSemanticVerifier) verifyImplicitEffects(
 }
 
 func (verifier *checkerSemanticVerifier) independentImplicitEffects(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 	node ast.Node,
 	operation semantic.Operation,
 	operands []identity.OccurrenceID,
@@ -111,7 +111,7 @@ func (verifier *checkerSemanticVerifier) independentImplicitEffects(
 			target := independentExpectedType(
 				verifier.expected,
 				verifier.index,
-				verifier.expected.occurrence(operand).Occurrence,
+				verifier.expected.occurrence(operand).OccurrenceRef,
 			)
 			if independentValueCopies(source) {
 				appendEffect(
@@ -266,7 +266,7 @@ func checkerEffectIdentities(
 }
 
 func (verifier *checkerSemanticVerifier) independentZeroValue(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 ) bool {
 	if occurrence.Role() != catalog.RoleDeclarationName {
 		return false

@@ -14,7 +14,7 @@ import (
 )
 
 func (verifier *checkerSemanticVerifier) operationOperands(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 ) ([]identity.OccurrenceID, error) {
 	children := append(
 		[]identity.OccurrenceID(nil),
@@ -64,7 +64,7 @@ func (verifier *checkerSemanticVerifier) operationOperands(
 		if !present {
 			continue
 		}
-		if verifier.runtimeOperand(child.Occurrence) {
+		if verifier.runtimeOperand(child.OccurrenceRef) {
 			out = append(out, childID)
 		}
 	}
@@ -72,7 +72,7 @@ func (verifier *checkerSemanticVerifier) operationOperands(
 }
 
 func (verifier *checkerSemanticVerifier) runtimeOperand(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 ) bool {
 	if verifier.independentCompileTimeContext(occurrence) {
 		return false
@@ -122,7 +122,7 @@ func (verifier *checkerSemanticVerifier) operationDefinitions(
 }
 
 func (verifier *checkerSemanticVerifier) verifyResolutionTarget(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 	resolution semantic.OccurrenceResolution,
 	node ast.Node,
 ) error {
@@ -208,7 +208,7 @@ func (verifier *checkerSemanticVerifier) verifyResolutionTarget(
 
 func independentResolutionObject(
 	view *source.TypeInfoView,
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 	node ast.Node,
 ) types.Object {
 	identifier, ok := node.(*ast.Ident)
@@ -245,7 +245,7 @@ func independentResolutionObject(
 }
 
 func (verifier *checkerSemanticVerifier) independentStructuralCoverage(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 ) (types.Object, types.Type) {
 	if object, typ := verifier.independentCompileTimeCoverage(
 		occurrence,
@@ -320,13 +320,13 @@ func (verifier *checkerSemanticVerifier) independentStructuralCoverage(
 		if !owner.Root().IsZero() && parent.ID() == owner.Root() {
 			break
 		}
-		current = parent.Occurrence
+		current = parent.OccurrenceRef
 	}
 	return nil, typeCoverage
 }
 
 func (verifier *checkerSemanticVerifier) verifySelectedNameResolution(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 	resolution semantic.OccurrenceResolution,
 ) (bool, error) {
 	parentNode, present := verifier.index.OccurrenceNode(

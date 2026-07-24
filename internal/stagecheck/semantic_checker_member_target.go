@@ -12,7 +12,7 @@ import (
 )
 
 func (verifier *checkerSemanticVerifier) verifyMemberDeclarationOccurrence(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 	id identity.SemanticDeclarationID,
 	object types.Object,
 ) error {
@@ -51,7 +51,7 @@ func (verifier *checkerSemanticVerifier) verifyMemberDeclarationOccurrence(
 func (
 	verifier *checkerSemanticVerifier,
 ) independentMemberDeclarationOwner(
-	occurrence structure.Occurrence,
+	occurrence structure.OccurrenceRef,
 	object types.Object,
 ) (types.Type, error) {
 	if function, method := object.(*types.Func); method {

@@ -103,6 +103,7 @@ func buildRegion(
 	builder := regionBuilder{
 		file:         definition.ID().File(),
 		fset:         file.PhysicalFileSet(),
+		displayFile:  definition.ID().File().String(),
 		definitionAt: definitionAt,
 		current:      definition.ID(),
 		graph:        graph,
@@ -168,6 +169,7 @@ func buildRegion(
 type regionBuilder struct {
 	file         identity.FileID
 	fset         *token.FileSet
+	displayFile  string
 	definitionAt map[identity.OccurrenceID]identity.DefinitionID
 	current      identity.DefinitionID
 	graph        *structure.Graph
@@ -299,7 +301,7 @@ func (b *regionBuilder) occurrence(
 	}
 	return structure.NewOccurrence(
 		id, kind, parent, edge, ordinal, span,
-		displaySpan(b.fset, b.file, node), lexical,
+		displaySpan(b.fset, b.displayFile, node), lexical,
 	)
 }
 
@@ -355,7 +357,7 @@ func physicalSpan(
 
 func displaySpan(
 	fset *token.FileSet,
-	file identity.FileID,
+	physicalFile string,
 	node ast.Node,
 ) structure.DisplaySpan {
 	start := fset.Position(node.Pos())
@@ -363,19 +365,19 @@ func displaySpan(
 	physicalStart := fset.PositionFor(node.Pos(), false)
 	physicalEnd := fset.PositionFor(node.End(), false)
 	return structure.DisplaySpan{
-		Start: executableDisplayPosition(start, physicalStart, file),
-		End:   executableDisplayPosition(end, physicalEnd, file),
+		Start: executableDisplayPosition(start, physicalStart, physicalFile),
+		End:   executableDisplayPosition(end, physicalEnd, physicalFile),
 	}
 }
 
 func executableDisplayPosition(
 	adjusted token.Position,
 	physical token.Position,
-	file identity.FileID,
+	physicalFile string,
 ) structure.DisplayPosition {
 	filename := adjusted.Filename
 	if filename == physical.Filename {
-		filename = file.String()
+		filename = physicalFile
 	}
 	return structure.DisplayPosition{
 		Filename: filename,
