@@ -8,7 +8,7 @@ import (
 func (verifier *checkerSemanticVerifier) resolution(
 	id identity.OccurrenceID,
 ) (semantic.OccurrenceResolution, bool) {
-	record, present := verifier.actual.Resolution(id)
+	record, present := verifier.reader.Resolution(id)
 	if !present ||
 		(verifier.localOnly &&
 			!verifier.expected.localOccurrence(
@@ -22,7 +22,7 @@ func (verifier *checkerSemanticVerifier) resolution(
 func (verifier *checkerSemanticVerifier) operation(
 	id identity.OperationID,
 ) (semantic.Operation, bool) {
-	record, present := verifier.actual.Operation(id)
+	record, present := verifier.reader.Operation(id)
 	if !present || !verifier.operationIsLocal(record) {
 		return semantic.Operation{}, false
 	}
@@ -32,7 +32,7 @@ func (verifier *checkerSemanticVerifier) operation(
 func (verifier *checkerSemanticVerifier) declaration(
 	id identity.SemanticDeclarationID,
 ) (semantic.Declaration, bool) {
-	return verifier.actual.Declaration(id)
+	return verifier.reader.Declaration(id)
 }
 
 func (verifier *checkerSemanticVerifier) visitBindings(

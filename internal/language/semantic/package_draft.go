@@ -52,6 +52,7 @@ func NewPackageDraft(
 		id:         id,
 		provenance: provenance,
 		normalized: normalizedPackageBuilder{
+			identities: newPackageIdentityBuilder(capacity),
 			definitions: packageDefinitionBuilder{
 				records: make(
 					[]storedDefinition, 0, capacity.Definitions,

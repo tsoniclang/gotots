@@ -19,6 +19,9 @@ func TestPackageRelationsUseDenseLocalIdentityArenas(t *testing.T) {
 	if cap(newOccurrenceStore(19).records) != 19 {
 		t.Fatal("package occurrence arena ignored its exact capacity")
 	}
+	if cap(newOccurrenceStore(19).keys) != 19 {
+		t.Fatal("package occurrence key arena ignored its exact capacity")
+	}
 	storeType := reflect.TypeFor[occurrenceStore]()
 	for index := 0; index < storeType.NumField(); index++ {
 		field := storeType.Field(index)

@@ -253,3 +253,38 @@ func TestPackageDraftTransfersOperationRelationsWithoutPublicClone(
 		)
 	}
 }
+
+func TestPackageDraftAppliesExactIdentityCapacities(t *testing.T) {
+	fixture := semanticFixture(t)
+	capacity := PackageCapacity{
+		Definitions:  2,
+		Resolutions:  3,
+		Declarations: 5,
+		Bindings:     7,
+		Types:        11,
+		Operations:   13,
+		Unsupported:  17,
+	}
+	draft, err := NewPackageDraft(
+		fixture.pkg,
+		ProvenanceWorkspaceModule,
+		capacity,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	identities := draft.normalized.identities
+	if cap(identities.definitions.records) != capacity.Definitions ||
+		cap(identities.declarations.records) != capacity.Declarations ||
+		cap(identities.bindings.records) != capacity.Bindings ||
+		cap(identities.types.records) != capacity.Types ||
+		cap(identities.operations.records) != capacity.Operations ||
+		cap(identities.unsupported.records) != capacity.Unsupported {
+		t.Fatal("semantic identity dictionaries ignored exact record capacities")
+	}
+	if cap(identities.files.records) != 0 ||
+		cap(identities.spans.records) != 0 ||
+		cap(identities.occurrences.records) != 0 {
+		t.Fatal("semantic identity dictionaries guessed relation capacities")
+	}
+}

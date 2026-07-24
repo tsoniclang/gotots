@@ -20,6 +20,11 @@ func TestSemanticVerifierRelationsUseDenseLocalIdentityArenas(
 			"semantic-verifier occurrence arena ignored its exact capacity",
 		)
 	}
+	if cap(newSemanticOccurrenceStore(19).keys) != 19 {
+		t.Fatal(
+			"semantic-verifier occurrence-key arena ignored its exact capacity",
+		)
+	}
 	for _, name := range []string{"owner", "structuralOwner"} {
 		assertSemanticFieldType(
 			t, reflect.TypeFor[semanticExpectedOccurrence](), name,

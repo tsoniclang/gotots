@@ -45,13 +45,14 @@ func verifySemanticPackage(
 	); err != nil {
 		return err
 	}
-	if err := verifySemanticResolutions(
+	resolvedOperations, err := verifySemanticResolutions(
 		expected, actual, localOnly,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 	if err := verifySemanticOperations(
-		expected, actual, localOnly,
+		expected, actual, localOnly, resolvedOperations,
 	); err != nil {
 		return err
 	}
@@ -152,8 +153,9 @@ func verifySemanticResolutions(
 	expected semanticPackageExpectation,
 	actual semantic.Package,
 	localOnly bool,
-) error {
+) (int, error) {
 	actualCount := 0
+	resolvedOperations := 0
 	if err := actual.VisitResolutions(func(
 		record semantic.OccurrenceResolution,
 	) error {
@@ -182,12 +184,15 @@ func verifySemanticResolutions(
 					record.Occurrence().String(),
 			)
 		}
+		if record.Kind() == semantic.ResolutionOperation {
+			resolvedOperations++
+		}
 		return nil
 	}); err != nil {
-		return err
+		return 0, err
 	}
 	if actualCount != expected.domainCount {
-		return semanticVerificationError(
+		return 0, semanticVerificationError(
 			"resolution",
 			fmt.Sprintf(
 				"package %s has %d records for %d retained occurrences",
@@ -195,35 +200,17 @@ func verifySemanticResolutions(
 			),
 		)
 	}
-	return nil
+	return resolvedOperations, nil
 }
 
 func verifySemanticOperations(
 	expected semanticPackageExpectation,
 	actual semantic.Package,
 	localOnly bool,
+	resolvedOperations int,
 ) error {
 	sourceOperations := 0
 	implicitOperations := 0
-	resolvedOperations := 0
-	if err := actual.VisitResolutions(func(
-		resolution semantic.OccurrenceResolution,
-	) error {
-		if localOnly &&
-			!expected.localOccurrence(
-				resolution.Occurrence(),
-				resolution.Owner(),
-			) {
-			return nil
-		}
-		if resolution.Kind() != semantic.ResolutionOperation {
-			return nil
-		}
-		resolvedOperations++
-		return nil
-	}); err != nil {
-		return err
-	}
 	if err := actual.VisitOperations(func(
 		operation semantic.Operation,
 	) error {

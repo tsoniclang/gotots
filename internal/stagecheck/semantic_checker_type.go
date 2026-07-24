@@ -19,7 +19,7 @@ type checkerTypePair struct {
 
 type checkerTypeVerifier struct {
 	expected          semanticPackageExpectation
-	actual            semantic.Package
+	reader            *semantic.PackageReader
 	packageByPath     map[string]identity.PackageID
 	visiting          map[checkerTypePair]bool
 	verified          map[checkerTypePair]bool
@@ -30,13 +30,13 @@ type checkerTypeVerifier struct {
 
 func newCheckerTypeVerifier(
 	expected semanticPackageExpectation,
-	actual semantic.Package,
+	reader *semantic.PackageReader,
 	universe *source.Universe,
 	index *structure.TransientIndex,
 ) *checkerTypeVerifier {
 	out := &checkerTypeVerifier{
 		expected:          expected,
-		actual:            actual,
+		reader:            reader,
 		packageByPath:     map[string]identity.PackageID{},
 		visiting:          map[checkerTypePair]bool{},
 		verified:          map[checkerTypePair]bool{},
@@ -67,7 +67,7 @@ func (verifier *checkerTypeVerifier) verify(
 	if verifier.verified[pair] || verifier.visiting[pair] {
 		return nil
 	}
-	record, present := verifier.actual.Type(id)
+	record, present := verifier.reader.Type(id)
 	if !present {
 		return fmt.Errorf("semantic type %s is absent", id)
 	}

@@ -13,7 +13,9 @@ type OccurrenceRef struct {
 	index OccurrenceIndex
 }
 
-func (reference OccurrenceRef) valid() bool {
+// Valid reports whether the reference addresses one occurrence in a sealed
+// canonical store.
+func (reference OccurrenceRef) Valid() bool {
 	return reference.store != nil &&
 		reference.store.sealed &&
 		reference.index.valid() &&
@@ -21,7 +23,7 @@ func (reference OccurrenceRef) valid() bool {
 }
 
 func (reference OccurrenceRef) record() occurrenceStoreRecord {
-	if !reference.valid() {
+	if !reference.Valid() {
 		return occurrenceStoreRecord{}
 	}
 	return reference.store.records[reference.index-1]
@@ -95,7 +97,7 @@ func (reference OccurrenceRef) Token() catalog.TokenKind {
 // Occurrence reconstructs one transient public value from normalized owner
 // storage.
 func (reference OccurrenceRef) Occurrence() Occurrence {
-	if !reference.valid() {
+	if !reference.Valid() {
 		return Occurrence{}
 	}
 	return reference.store.occurrence(reference.index)
@@ -103,7 +105,7 @@ func (reference OccurrenceRef) Occurrence() Occurrence {
 
 // Equal reports exact semantic payload equality across stores.
 func (reference OccurrenceRef) Equal(other OccurrenceRef) bool {
-	if !reference.valid() || !other.valid() {
+	if !reference.Valid() || !other.Valid() {
 		return reference == other
 	}
 	if reference.store == other.store && reference.index == other.index {

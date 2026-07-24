@@ -109,7 +109,7 @@ func (store *occurrenceStore) get(
 	id identity.OccurrenceID,
 ) *occurrenceInput {
 	record := store.record(store.reference(id))
-	if record == nil || record.occurrence.ID().IsZero() {
+	if record == nil || !record.occurrence.Valid() {
 		return nil
 	}
 	return record
@@ -120,7 +120,7 @@ func (store *occurrenceStore) reference(
 ) packageOccurrenceRef {
 	reference := store.identityReference(id)
 	record := store.record(reference)
-	if record == nil || record.occurrence.ID().IsZero() {
+	if record == nil || !record.occurrence.Valid() {
 		return 0
 	}
 	return reference
@@ -198,7 +198,7 @@ func (store *occurrenceStore) put(
 		)
 	}
 	existing := store.record(reference)
-	if !existing.occurrence.ID().IsZero() {
+	if existing.occurrence.Valid() {
 		if existing.occurrence.Equal(record.occurrence) &&
 			existing.node == record.node {
 			return reference, nil
@@ -318,7 +318,7 @@ func (store *occurrenceStore) insertionOrder() (
 	}
 	order := make([]packageOccurrenceRef, store.active)
 	for index, key := range store.keys {
-		if store.records[index].occurrence.ID().IsZero() {
+		if !store.records[index].occurrence.Valid() {
 			continue
 		}
 		if int(key.order) >= len(order) ||
@@ -483,7 +483,7 @@ func (store *occurrenceStore) visit(
 		)
 	}
 	for index, record := range store.records {
-		if record.occurrence.ID().IsZero() {
+		if !record.occurrence.Valid() {
 			continue
 		}
 		if err := visit(

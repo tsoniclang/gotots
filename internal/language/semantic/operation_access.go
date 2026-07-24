@@ -88,6 +88,9 @@ func (operation Operation) Object() ObjectReference {
 
 func (operation Operation) Selection() Selection {
 	if stored, present := operation.stored(); present {
+		if stored.selection == 0 {
+			return Selection{}
+		}
 		identities := newPackageIdentityProjection(
 			operation.projection.identities,
 		)
@@ -102,6 +105,9 @@ func (operation Operation) Selection() Selection {
 
 func (operation Operation) Instance() Instance {
 	if stored, present := operation.stored(); present {
+		if stored.instance == 0 {
+			return Instance{}
+		}
 		identities := newPackageIdentityProjection(
 			operation.projection.identities,
 		)

@@ -47,6 +47,7 @@ func newSemanticOccurrenceStore(capacity int) *semanticOccurrenceStore {
 	return &semanticOccurrenceStore{
 		files:      map[identity.FileID]uint32{},
 		byIdentity: newSemanticOccurrenceIndex(capacity),
+		keys:       make([]semanticOccurrenceKey, 0, capacity),
 		records: make(
 			[]semanticExpectedOccurrence, 0, capacity,
 		),
@@ -90,7 +91,7 @@ func (store *semanticOccurrenceStore) get(
 	id identity.OccurrenceID,
 ) (*semanticExpectedOccurrence, bool) {
 	record := store.record(store.reference(id))
-	return record, record != nil && !record.ID().IsZero()
+	return record, record != nil && record.OccurrenceRef.Valid()
 }
 
 func (store *semanticOccurrenceStore) reference(
@@ -98,7 +99,7 @@ func (store *semanticOccurrenceStore) reference(
 ) semanticOccurrenceRef {
 	reference := store.identityReference(id)
 	record := store.record(reference)
-	if record == nil || record.ID().IsZero() {
+	if record == nil || !record.OccurrenceRef.Valid() {
 		return 0
 	}
 	return reference
@@ -144,7 +145,7 @@ func (store *semanticOccurrenceStore) put(
 		store.keys, key,
 	); reference.valid() {
 		existing := store.record(reference)
-		if existing.ID().IsZero() {
+		if !existing.OccurrenceRef.Valid() {
 			*existing = *record
 			store.active++
 			return reference, nil
@@ -205,7 +206,7 @@ func (store *semanticOccurrenceStore) remove(
 	}
 	reference := store.byIdentity.reference(store.keys, key)
 	if !reference.valid() ||
-		store.records[reference-1].ID().IsZero() {
+		!store.records[reference-1].OccurrenceRef.Valid() {
 		return
 	}
 	store.records[reference-1] = semanticExpectedOccurrence{}

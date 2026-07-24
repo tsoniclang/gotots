@@ -113,6 +113,18 @@ type componentPool[Record comparable] struct {
 	index   map[Record]uint64
 }
 
+func newComponentPool[Record comparable](
+	capacity int,
+) componentPool[Record] {
+	if capacity <= 0 {
+		return componentPool[Record]{}
+	}
+	return componentPool[Record]{
+		records: make([]Record, 0, capacity),
+		index:   make(map[Record]uint64, capacity),
+	}
+}
+
 func (pool *componentPool[Record]) intern(record Record) uint64 {
 	if index, present := pool.index[record]; present {
 		return index
@@ -139,6 +151,31 @@ type packageIdentityBuilder struct {
 	bindings     componentPool[storedBindingIdentity]
 	operations   componentPool[storedOperationIdentity]
 	unsupported  componentPool[storedUnsupportedIdentity]
+}
+
+func newPackageIdentityBuilder(
+	capacity PackageCapacity,
+) packageIdentityBuilder {
+	return packageIdentityBuilder{
+		definitions: newComponentPool[storedDefinitionIdentity](
+			capacity.Definitions,
+		),
+		types: newComponentPool[storedTypeIdentity](
+			capacity.Types,
+		),
+		declarations: newComponentPool[storedDeclarationIdentity](
+			capacity.Declarations,
+		),
+		bindings: newComponentPool[storedBindingIdentity](
+			capacity.Bindings,
+		),
+		operations: newComponentPool[storedOperationIdentity](
+			capacity.Operations,
+		),
+		unsupported: newComponentPool[storedUnsupportedIdentity](
+			capacity.Unsupported,
+		),
+	}
 }
 
 func (builder *packageIdentityBuilder) projectionTable() packageIdentityTable {

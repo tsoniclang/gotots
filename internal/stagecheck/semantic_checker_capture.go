@@ -10,64 +10,9 @@ import (
 	"github.com/tsoniclang/gotots/internal/language/semantic"
 )
 
-func (verifier *checkerSemanticVerifier) verifyBindingCaptures() error {
-	expected := map[identity.SemanticBindingID]map[identity.DefinitionID]bool{}
-	addUse := func(
-		bindingID identity.SemanticBindingID,
-		occurrenceID identity.OccurrenceID,
-	) error {
-		binding := verifier.bindings[bindingID]
-		if binding == nil || binding.definition.IsZero() {
-			return nil
-		}
-		record, present := verifier.expected.occurrences.get(occurrenceID)
-		if !present {
-			return fmt.Errorf(
-				"capture use names absent occurrence %s", occurrenceID,
-			)
-		}
-		consumer := verifier.expected.definitionID(record.owner)
-		if consumer.IsZero() ||
-			consumer == binding.definition {
-			return nil
-		}
-		if !verifier.definitionContains(
-			binding.definition, consumer,
-		) {
-			return fmt.Errorf(
-				"binding %s is used by unrelated definition %s",
-				binding.id, consumer,
-			)
-		}
-		if expected[binding.id] == nil {
-			expected[binding.id] =
-				map[identity.DefinitionID]bool{}
-		}
-		expected[binding.id][consumer] = true
-		return nil
-	}
-	for _, occurrenceReference := range verifier.expected.order {
-		occurrenceID := verifier.expected.
-			occurrenceRecord(occurrenceReference).ID()
-		resolution, present := verifier.resolution(occurrenceID)
-		if !present ||
-			resolution.Kind() != semantic.ResolutionBinding {
-			continue
-		}
-		node, present := verifier.index.OccurrenceNode(occurrenceID)
-		identifier, identifierNode := node.(*ast.Ident)
-		if !present || !identifierNode {
-			continue
-		}
-		if _, use := verifier.view.UseOf(identifier); !use {
-			continue
-		}
-		if err := addUse(
-			resolution.Binding(), occurrenceID,
-		); err != nil {
-			return err
-		}
-	}
+func (verifier *checkerSemanticVerifier) verifyBindingCaptures(
+	expected map[identity.SemanticBindingID]map[identity.DefinitionID]bool,
+) error {
 	if err := verifier.visitOperations(func(
 		operation semantic.Operation,
 	) error {
@@ -88,7 +33,8 @@ func (verifier *checkerSemanticVerifier) verifyBindingCaptures() error {
 		if _, use := verifier.view.UseOf(identifier); !use {
 			return nil
 		}
-		return addUse(
+		return verifier.addCheckerCaptureUse(
+			expected,
 			object.Binding(), operation.Occurrence(),
 		)
 	}); err != nil {
@@ -109,6 +55,63 @@ func (verifier *checkerSemanticVerifier) verifyBindingCaptures() error {
 			)
 		}
 	}
+	return nil
+}
+
+func (verifier *checkerSemanticVerifier) recordDirectCaptureUse(
+	expected map[identity.SemanticBindingID]map[identity.DefinitionID]bool,
+	resolution semantic.OccurrenceResolution,
+	occurrenceID identity.OccurrenceID,
+	node ast.Node,
+) error {
+	if resolution.Kind() != semantic.ResolutionBinding {
+		return nil
+	}
+	identifier, identifierNode := node.(*ast.Ident)
+	if !identifierNode {
+		return nil
+	}
+	if _, use := verifier.view.UseOf(identifier); !use {
+		return nil
+	}
+	return verifier.addCheckerCaptureUse(
+		expected, resolution.Binding(), occurrenceID,
+	)
+}
+
+func (verifier *checkerSemanticVerifier) addCheckerCaptureUse(
+	expected map[identity.SemanticBindingID]map[identity.DefinitionID]bool,
+	bindingID identity.SemanticBindingID,
+	occurrenceID identity.OccurrenceID,
+) error {
+	binding := verifier.bindings[bindingID]
+	if binding == nil || binding.definition.IsZero() {
+		return nil
+	}
+	record, present := verifier.expected.occurrences.get(occurrenceID)
+	if !present {
+		return fmt.Errorf(
+			"capture use names absent occurrence %s", occurrenceID,
+		)
+	}
+	consumer := verifier.expected.definitionID(record.owner)
+	if consumer.IsZero() ||
+		consumer == binding.definition {
+		return nil
+	}
+	if !verifier.definitionContains(
+		binding.definition, consumer,
+	) {
+		return fmt.Errorf(
+			"binding %s is used by unrelated definition %s",
+			binding.id, consumer,
+		)
+	}
+	if expected[binding.id] == nil {
+		expected[binding.id] =
+			map[identity.DefinitionID]bool{}
+	}
+	expected[binding.id][consumer] = true
 	return nil
 }
 

@@ -186,7 +186,7 @@ func (verifier *checkerTypeVerifier) verifyMethodSignature(
 	id identity.SemanticTypeID,
 	signature *types.Signature,
 ) error {
-	record, present := verifier.actual.Type(id)
+	record, present := verifier.reader.Type(id)
 	if !present ||
 		record.Kind() != semantic.TypeSignature {
 		return fmt.Errorf(

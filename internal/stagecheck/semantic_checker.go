@@ -17,6 +17,7 @@ import (
 type checkerSemanticVerifier struct {
 	expected                semanticPackageExpectation
 	actual                  semantic.Package
+	reader                  *semantic.PackageReader
 	index                   *structure.TransientIndex
 	view                    *source.TypeInfoView
 	types                   *checkerTypeVerifier
@@ -72,9 +73,6 @@ func verifyCheckerSemanticPackage(
 	verifier := &checkerSemanticVerifier{
 		expected: expected, actual: actual,
 		index: index, view: view,
-		types: newCheckerTypeVerifier(
-			expected, actual, universe, index,
-		),
 		bindingByObject:      map[types.Object]identity.SemanticBindingID{},
 		bindings:             map[identity.SemanticBindingID]*checkerBindingCandidate{},
 		bindingsByDefinition: map[identity.DefinitionID][]identity.SemanticBindingID{},
@@ -97,6 +95,10 @@ func verifyCheckerSemanticPackage(
 		checkerSourceByObject:   map[types.Object]identity.OccurrenceID{},
 		localOnly:               localOnly,
 	}
+	verifier.reader = verifier.actual.Reader()
+	verifier.types = newCheckerTypeVerifier(
+		expected, verifier.reader, universe, index,
+	)
 	if err := verifier.deriveIndependentCheckerSupport(); err != nil {
 		return semanticVerificationError("checker", err.Error())
 	}
@@ -120,13 +122,14 @@ func verifyCheckerSemanticPackage(
 	if err := verifier.verifyBindings(); err != nil {
 		return semanticVerificationError("checker", err.Error())
 	}
-	if err := verifier.verifyOccurrences(); err != nil {
+	captureUses, err := verifier.verifyOccurrences()
+	if err != nil {
 		return semanticVerificationError("checker", err.Error())
 	}
 	if err := verifier.verifyDefinitions(); err != nil {
 		return semanticVerificationError("checker", err.Error())
 	}
-	if err := verifier.verifyBindingCaptures(); err != nil {
+	if err := verifier.verifyBindingCaptures(captureUses); err != nil {
 		return semanticVerificationError("checker", err.Error())
 	}
 	if err := verifier.verifyImplicitPackageOperations(); err != nil {
@@ -142,108 +145,6 @@ func (verifier *checkerSemanticVerifier) childReferences(
 		return nil
 	}
 	return verifier.expected.occurrences.childReferences(reference)
-}
-
-func (verifier *checkerSemanticVerifier) verifyOccurrences() error {
-	for _, occurrenceReference := range verifier.expected.order {
-		occurrence := verifier.expected.occurrenceRecord(
-			occurrenceReference,
-		)
-		occurrenceID := occurrence.ID()
-		resolution, present := verifier.resolution(occurrenceID)
-		if !present {
-			continue
-		}
-		node, present := verifier.index.OccurrenceNode(occurrenceID)
-		if !present {
-			return fmt.Errorf(
-				"occurrence %s has no transient node", occurrenceID,
-			)
-		}
-		if verifier.index.CheckedUnmapped(occurrenceID) {
-			if resolution.Kind() != semantic.ResolutionUnsupported {
-				return fmt.Errorf(
-					"checked-unmapped occurrence %s is not unsupported",
-					occurrenceID,
-				)
-			}
-			continue
-		}
-		if resolution.Kind() == semantic.ResolutionStructuralOnly &&
-			resolution.Structural().Disposition() ==
-				semantic.StructuralIntrinsicContract {
-			if resolution.Variant() != catalog.VariantNone {
-				return fmt.Errorf(
-					"intrinsic occurrence %s carries variant %s",
-					occurrenceID, resolution.Variant(),
-				)
-			}
-			continue
-		}
-		variant, err := independentSemanticVariant(
-			verifier.expected,
-			verifier.index,
-			occurrence.OccurrenceRef,
-			node,
-		)
-		if err != nil {
-			if resolution.Variant() == catalog.VariantNone &&
-				resolution.Kind() ==
-					semantic.ResolutionStructuralOnly {
-				continue
-			}
-			return fmt.Errorf(
-				"occurrence %s variant: %w", occurrenceID, err,
-			)
-		}
-		if resolution.Variant() != variant {
-			return fmt.Errorf(
-				"occurrence %s variant=%s, checker=%s",
-				occurrenceID, resolution.Variant(), variant,
-			)
-		}
-		if resolution.Kind() == semantic.ResolutionOperation {
-			if verifier.independentCompileTimeContext(
-				occurrenceReference,
-			) {
-				return fmt.Errorf(
-					"compile-time occurrence %s owns a runtime operation",
-					occurrenceID,
-				)
-			}
-			operation, present := verifier.operation(
-				resolution.Operation(),
-			)
-			if !present {
-				return fmt.Errorf(
-					"occurrence %s operation is absent", occurrenceID,
-				)
-			}
-			if err := verifier.verifyOperation(
-				occurrenceReference,
-				occurrence.OccurrenceRef,
-				node,
-				operation,
-			); err != nil {
-				return err
-			}
-		} else if err := verifier.verifyResolutionTarget(
-			occurrenceReference,
-			occurrence.OccurrenceRef,
-			resolution,
-			node,
-		); err != nil {
-			return fmt.Errorf(
-				"occurrence %s (%s/%s) resolution %s: %w",
-				occurrenceID,
-				occurrence.Kind(),
-				occurrence.Role(),
-				resolution.Kind(),
-				err,
-			)
-		}
-	}
-	return nil
 }
 
 func (verifier *checkerSemanticVerifier) verifyOperation(

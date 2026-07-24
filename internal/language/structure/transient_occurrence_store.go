@@ -356,7 +356,7 @@ func (store *transientOccurrenceStore) replace(
 	reference OccurrenceRef,
 	node ast.Node,
 ) error {
-	if store == nil || store.sealed || !reference.valid() || node == nil {
+	if store == nil || store.sealed || !reference.Valid() || node == nil {
 		return fmt.Errorf(
 			"transient executable occurrence replacement is invalid",
 		)
@@ -383,7 +383,7 @@ func (store *transientOccurrenceStore) replace(
 func (store *transientOccurrenceStore) nodeForReference(
 	reference OccurrenceRef,
 ) (ast.Node, bool) {
-	if store == nil || !reference.valid() {
+	if store == nil || !reference.Valid() {
 		return nil, false
 	}
 	owner, present := store.byStore[reference.store]
