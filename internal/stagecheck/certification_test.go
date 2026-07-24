@@ -157,7 +157,10 @@ func TestStructuralLedgerMutationsFailWithExactResidualEvidence(t *testing.T) {
 	canonicalExecutable := func() *compactExecutableLedger {
 		ledger := newCompactExecutableLedger(arena)
 		addRecord(&ledger.regions, reference.region)
-		addRecord(&ledger.definitionReferences, reference)
+		addRecord(
+			&ledger.definitionReferences,
+			reference,
+		)
 		return ledger
 	}
 	executableMutations := map[string]func(*compactExecutableLedger){
@@ -165,25 +168,37 @@ func TestStructuralLedgerMutationsFailWithExactResidualEvidence(t *testing.T) {
 			delete(ledger.definitionReferences, reference)
 		},
 		"duplicate-reference": func(ledger *compactExecutableLedger) {
-			addRecord(&ledger.definitionReferences, reference)
+			addRecord(
+				&ledger.definitionReferences,
+				reference,
+			)
 		},
 		"reparent": func(ledger *compactExecutableLedger) {
 			delete(ledger.definitionReferences, reference)
 			mutated := reference
 			mutated.parent = arena.occurrence(literal.Root())
-			addRecord(&ledger.definitionReferences, mutated)
+			addRecord(
+				&ledger.definitionReferences,
+				mutated,
+			)
 		},
 		"edge": func(ledger *compactExecutableLedger) {
 			delete(ledger.definitionReferences, reference)
 			mutated := reference
 			mutated.edge = uint16(catalog.Edge(8))
-			addRecord(&ledger.definitionReferences, mutated)
+			addRecord(
+				&ledger.definitionReferences,
+				mutated,
+			)
 		},
 		"ordinal": func(ledger *compactExecutableLedger) {
 			delete(ledger.definitionReferences, reference)
 			mutated := reference
 			mutated.ordinal = 1
-			addRecord(&ledger.definitionReferences, mutated)
+			addRecord(
+				&ledger.definitionReferences,
+				mutated,
+			)
 		},
 	}
 	for name, mutate := range executableMutations {

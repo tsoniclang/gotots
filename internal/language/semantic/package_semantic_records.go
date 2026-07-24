@@ -283,6 +283,23 @@ func (validator *normalizedPackageValidator) validateUnsupported() error {
 }
 
 func (validator normalizedPackageValidator) validateResolutions() error {
+	sourceOperations := 0
+	for _, record := range validator.pkg.operations.records {
+		identityRecord, present := componentAt(
+			validator.pkg.identities.operations,
+			record.id,
+		)
+		if !present {
+			return fmt.Errorf(
+				"semantic operation identity %d is absent",
+				record.id,
+			)
+		}
+		if identityRecord.occurrence != 0 {
+			sourceOperations++
+		}
+	}
+	operationResolutions := 0
 	for _, record := range validator.pkg.resolutions.records {
 		evidence := validator.pkg.identities.occurrence(
 			record.occurrence,
@@ -297,6 +314,50 @@ func (validator normalizedPackageValidator) validateResolutions() error {
 		); err != nil {
 			return normalizedRecordError(evidence, err)
 		}
+		if record.kind == ResolutionOperation {
+			operationResolutions++
+			if err := validator.validateOperationResolution(
+				record,
+			); err != nil {
+				return normalizedRecordError(evidence, err)
+			}
+		}
+	}
+	if sourceOperations != operationResolutions {
+		return fmt.Errorf(
+			"semantic package %s has %d source operations and %d operation resolutions",
+			validator.pkg.id,
+			sourceOperations,
+			operationResolutions,
+		)
+	}
+	return nil
+}
+
+func (validator normalizedPackageValidator) validateOperationResolution(
+	record storedResolution,
+) error {
+	operation, err := payloadAt(
+		validator.pkg.resolutions.operations,
+		record.payload,
+	)
+	if err != nil {
+		return err
+	}
+	origin, present := componentAt(
+		validator.pkg.identities.operations,
+		operation,
+	)
+	if !present {
+		return fmt.Errorf("operation identity %d is absent", operation)
+	}
+	if origin.implicit != 0 ||
+		origin.occurrence != record.occurrence ||
+		origin.definition != record.owner {
+		return fmt.Errorf(
+			"operation resolution differs from operation origin %s",
+			validator.pkg.identities.operation(operation),
+		)
 	}
 	return nil
 }

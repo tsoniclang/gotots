@@ -232,13 +232,18 @@ func compareProviderPackageCensus(
 		if !files[file.Owner().ID().File()] {
 			continue
 		}
-		for _, definition := range file.Definitions() {
+		if err := file.VisitDefinitions(func(
+			definition structure.ImplementationDefinition,
+		) error {
 			addRecord(
 				&expectedDefinitions.providerDefinitionCensus,
 				definitionCensusLedgerRecord{
 					pkg: pkg.ID(), definition: definition.ID(),
 				},
 			)
+			return nil
+		}); err != nil {
+			return err
 		}
 		for _, header := range file.Headers() {
 			headerOccurrences += len(header.Members())
@@ -248,7 +253,9 @@ func compareProviderPackageCensus(
 		}
 	}
 	if includeSynthetic {
-		for _, definition := range pkg.Definitions() {
+		if err := pkg.VisitDefinitions(func(
+			definition structure.ImplementationDefinition,
+		) error {
 			if definition.ID().SyntheticRole().Valid() {
 				addRecord(
 					&expectedDefinitions.providerDefinitionCensus,
@@ -257,6 +264,9 @@ func compareProviderPackageCensus(
 					},
 				)
 			}
+			return nil
+		}); err != nil {
+			return err
 		}
 		for _, header := range pkg.Headers() {
 			if header.ID().Definition().SyntheticRole().Valid() {

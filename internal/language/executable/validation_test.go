@@ -26,8 +26,8 @@ func TestImplicitFullDefinitionRequiresExactOperationGraph(t *testing.T) {
 	}
 }
 
-func TestCanonicalOccurrencePayloadCannotCrossStores(t *testing.T) {
-	graph, selections, inventory, _ := buildExecutableFixture(t)
+func TestCanonicalOccurrencePayloadCannotBeAddedAfterSeal(t *testing.T) {
+	graph, _, inventory, _ := buildExecutableFixture(t)
 	var duplicated structure.Occurrence
 	for _, region := range inventory.Regions() {
 		for _, member := range region.Members() {
@@ -43,19 +43,9 @@ func TestCanonicalOccurrencePayloadCannotCrossStores(t *testing.T) {
 	if duplicated.ID().IsZero() {
 		t.Fatal("fixture has no structurally owned executable member")
 	}
-	reference, added, err := inventory.occurrences.put(duplicated)
-	if err != nil || !added {
-		t.Fatalf("install duplicate occurrence: added=%t err=%v", added, err)
-	}
-	inventory.additional = append(inventory.additional, reference)
-	inventory.sort()
-	err = Validate(graph, selections, inventory)
-	if err == nil ||
-		!strings.Contains(
-			err.Error(),
-			"duplicated across structural and executable stores",
-		) {
-		t.Fatalf("cross-store payload duplication error = %v", err)
+	if _, _, err := inventory.occurrences.put(duplicated); err == nil ||
+		!strings.Contains(err.Error(), "sealed") {
+		t.Fatalf("post-seal cross-store payload error = %v", err)
 	}
 }
 
@@ -81,8 +71,12 @@ func TestOccurrenceArenaRejectsConflictingPayload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := inventory.occurrences.put(conflicting); err == nil ||
-		!strings.Contains(err.Error(), "conflicting payloads") {
+	store := newOccurrenceStore()
+	if _, added, err := store.put(original); err != nil || !added {
+		t.Fatalf("install original occurrence: added=%t err=%v", added, err)
+	}
+	if _, _, err := store.put(conflicting); err == nil ||
+		!strings.Contains(err.Error(), "conflicting canonical payloads") {
 		t.Fatalf("conflicting occurrence payload error = %v", err)
 	}
 }
@@ -108,7 +102,7 @@ func TestOccurrenceArenaOwnsAllRegionReferences(t *testing.T) {
 		}
 	}
 	for _, reference := range inventory.additional {
-		if inventory.occurrences.payloadFor(reference) == nil {
+		if _, present := inventory.occurrences.payloadFor(reference); !present {
 			t.Fatalf("additional occurrence %d has no payload", reference)
 		}
 	}

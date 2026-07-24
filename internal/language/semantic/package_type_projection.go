@@ -157,9 +157,8 @@ func (store packageTypeStore) record(
 		)
 	}
 	return Type{
-		id:        identities.typeID(stored.id),
-		spec:      spec,
-		canonical: encodeTypeSpec(spec),
+		id:   identities.typeID(stored.id),
+		spec: spec,
 	}, nil
 }
 

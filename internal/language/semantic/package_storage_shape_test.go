@@ -37,11 +37,59 @@ func TestNormalizedRecordCoresStayIndependentOfInactivePayloads(
 		sizes["type-core"] >= unsafe.Sizeof(Type{}) ||
 		sizes["operation-core"] >= unsafe.Sizeof(Operation{}) {
 		t.Fatalf(
-			"normalized cores are not smaller than public projections: cores=%v public=%d/%d/%d",
+			"normalized cores are not smaller than detached public values: cores=%v public=%d/%d/%d",
 			sizes,
 			unsafe.Sizeof(DefinitionSemantics{}),
 			unsafe.Sizeof(Type{}),
 			unsafe.Sizeof(Operation{}),
+		)
+	}
+}
+
+var operationProjectionSink identity.OccurrenceID
+
+func TestOperationVisitorDoesNotCloneRelationArenas(t *testing.T) {
+	empty := semanticWirePackage(t)
+	large := semanticWirePackage(t)
+	record := &large.operations.records[0]
+	reference := record.idOccurrence(large.identities)
+	const count = 4096
+	large.operations.operands = make([]occurrenceRef, count)
+	for index := range large.operations.operands {
+		large.operations.operands[index] = reference
+	}
+	record.operands = occurrenceRefRange{
+		start: 0,
+		count: count,
+	}
+	large.operationView = newPackageOperationProjection(
+		large.operations,
+		large.identities,
+	)
+	allocations := func(pkg Package) float64 {
+		return testing.AllocsPerRun(10, func() {
+			err := pkg.VisitOperations(func(
+				operation Operation,
+			) error {
+				for index := 0; index <
+					operation.OperandCount(); index++ {
+					operationProjectionSink, _ =
+						operation.Operand(index)
+				}
+				return nil
+			})
+			if err != nil {
+				panic(err)
+			}
+		})
+	}
+	emptyAllocations := allocations(empty)
+	largeAllocations := allocations(large)
+	if largeAllocations != emptyAllocations {
+		t.Fatalf(
+			"operation relation traversal allocations grow with relation size: empty=%.0f large=%.0f",
+			emptyAllocations,
+			largeAllocations,
 		)
 	}
 }

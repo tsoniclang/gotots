@@ -103,24 +103,25 @@ func (stage *stageInput) buildPackageInput(
 			pkg.ID(),
 		)
 	}
-	definitions := pkg.Definitions()
 	input := newPackageInput(
-		loaded, pkg, stage.index, len(definitions),
+		loaded, pkg, stage.index, pkg.DefinitionCount(),
 	)
-	for _, definition := range definitions {
+	if err := pkg.VisitDefinitions(func(
+		definition structure.ImplementationDefinition,
+	) error {
 		if !stage.allLocal && !definitionUsesLocalSemantics(
 			stage.plan, loaded, definition.ID(),
 		) {
-			continue
+			return nil
 		}
 		reference, err := input.definitions.admit(definition)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		record := input.definitions.record(reference)
 		selection, present := stage.selections.For(definition.ID())
 		if !present {
-			return nil, fmt.Errorf(
+			return fmt.Errorf(
 				"local definition %s has no selection",
 				definition.ID(),
 			)
@@ -133,6 +134,9 @@ func (stage *stageInput) buildPackageInput(
 			record.region = region
 			record.hasRegion = true
 		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 	for _, site := range pkg.Sites() {
 		record := input.definition(site.Definition())

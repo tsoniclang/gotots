@@ -159,6 +159,8 @@ func writeWireArray[Record any](
 	if _, err := io.WriteString(output, "["); err != nil {
 		return err
 	}
+	recordOutput := wireRecordWriter{output: output}
+	encoder := json.NewEncoder(&recordOutput)
 	for index := 0; index < count; index++ {
 		if index != 0 {
 			if _, err := io.WriteString(output, ","); err != nil {
@@ -169,19 +171,37 @@ func writeWireArray[Record any](
 		if err != nil {
 			return err
 		}
-		encoded, err := json.Marshal(record)
-		if err != nil {
+		recordOutput.bytes = 0
+		if err := encoder.Encode(record); err != nil {
 			return err
 		}
-		if _, err := output.Write(encoded); err != nil {
-			return err
+		if recordOutput.bytes == 0 ||
+			recordOutput.last != '\n' {
+			return fmt.Errorf(
+				"semantic wire encoder omitted its record delimiter",
+			)
 		}
 		if len(observe) != 0 && observe[0] != nil {
-			observe[0](index, int64(len(encoded)))
+			observe[0](index, recordOutput.bytes-1)
 		}
 	}
 	_, err := io.WriteString(output, "]")
 	return err
+}
+
+type wireRecordWriter struct {
+	output io.Writer
+	bytes  int64
+	last   byte
+}
+
+func (writer *wireRecordWriter) Write(value []byte) (int, error) {
+	written, err := writer.output.Write(value)
+	writer.bytes += int64(written)
+	if written != 0 {
+		writer.last = value[written-1]
+	}
+	return written, err
 }
 
 func writeWireSeparator(output io.Writer) error {

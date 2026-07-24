@@ -19,12 +19,10 @@ type TransientIndex struct {
 	synthetic       map[identity.DefinitionID]ast.Node
 	entries         map[identity.DefinitionID][]ast.Node
 	files           map[identity.FileID]*source.LoadedFile
-	structural      map[identity.OccurrenceID]ast.Node
+	nodes           map[identity.OccurrenceID]ast.Node
+	ids             map[ast.Node]identity.OccurrenceID
 	support         map[identity.OccurrenceID]transientSupport
 	definitionRoots map[identity.OccurrenceID]identity.DefinitionID
-	executable      map[identity.OccurrenceID]ast.Node
-	structuralID    map[ast.Node]identity.OccurrenceID
-	executableID    map[ast.Node]identity.OccurrenceID
 	counterparts    map[ast.Node]ast.Node
 	originals       map[ast.Node]ast.Node
 	checkedOnly     map[ast.Node]bool
@@ -47,12 +45,10 @@ func newTransientIndex(
 		synthetic:       map[identity.DefinitionID]ast.Node{},
 		entries:         map[identity.DefinitionID][]ast.Node{},
 		files:           map[identity.FileID]*source.LoadedFile{},
-		structural:      map[identity.OccurrenceID]ast.Node{},
+		nodes:           map[identity.OccurrenceID]ast.Node{},
+		ids:             map[ast.Node]identity.OccurrenceID{},
 		support:         map[identity.OccurrenceID]transientSupport{},
 		definitionRoots: map[identity.OccurrenceID]identity.DefinitionID{},
-		executable:      map[identity.OccurrenceID]ast.Node{},
-		structuralID:    map[ast.Node]identity.OccurrenceID{},
-		executableID:    map[ast.Node]identity.OccurrenceID{},
 		counterparts:    map[ast.Node]ast.Node{},
 		originals:       map[ast.Node]ast.Node{},
 		checkedOnly:     map[ast.Node]bool{},
@@ -294,22 +290,22 @@ func (i *TransientIndex) bindStructuralOccurrence(
 			"transient occurrence %s has node kind %s", id, kind,
 		)
 	}
-	if existing, present := i.structural[id]; present {
+	if existing, present := i.nodes[id]; present {
 		if existing != node {
 			return fmt.Errorf(
 				"transient occurrence %s has conflicting nodes", id,
 			)
 		}
 	}
-	if existing, present := i.structuralID[node]; present &&
+	if existing, present := i.ids[node]; present &&
 		existing != id {
 		return fmt.Errorf(
 			"transient node has conflicting occurrences %s and %s",
 			existing, id,
 		)
 	}
-	i.structural[id] = node
-	i.structuralID[node] = id
+	i.nodes[id] = node
+	i.ids[node] = id
 	return nil
 }
 
@@ -357,7 +353,7 @@ func (i *TransientIndex) bindStructuralOwner(
 			"transient structural owner requires occurrence and definition",
 		)
 	}
-	if _, present := i.structural[occurrence]; !present {
+	if _, present := i.nodes[occurrence]; !present {
 		return fmt.Errorf(
 			"transient occurrence %s has no structural record",
 			occurrence,
@@ -380,17 +376,6 @@ func (i *TransientIndex) BindExecutableOccurrence(
 	id identity.OccurrenceID,
 	node ast.Node,
 ) error {
-	return i.bindOccurrence(
-		i.executable, i.executableID, id, node,
-	)
-}
-
-func (i *TransientIndex) bindOccurrence(
-	target map[identity.OccurrenceID]ast.Node,
-	reverse map[ast.Node]identity.OccurrenceID,
-	id identity.OccurrenceID,
-	node ast.Node,
-) error {
 	if id.IsZero() || node == nil {
 		return fmt.Errorf(
 			"transient occurrence binding requires identity and node",
@@ -406,21 +391,23 @@ func (i *TransientIndex) bindOccurrence(
 			id, kind,
 		)
 	}
-	if existing, present := target[id]; present &&
-		existing != node {
-		return fmt.Errorf(
-			"transient occurrence %s has conflicting nodes", id,
-		)
+	if existing, present := i.nodes[id]; present && existing != node {
+		if i.counterparts[existing] != node {
+			return fmt.Errorf(
+				"transient occurrence %s has uncertified executable node",
+				id,
+			)
+		}
 	}
-	if existing, present := reverse[node]; present &&
+	if existing, present := i.ids[node]; present &&
 		existing != id {
 		return fmt.Errorf(
 			"transient node has conflicting occurrences %s and %s",
 			existing, id,
 		)
 	}
-	target[id] = node
-	reverse[node] = id
+	i.nodes[id] = node
+	i.ids[node] = id
 	return nil
 }
 
@@ -430,10 +417,7 @@ func (i *TransientIndex) bindOccurrence(
 func (i *TransientIndex) OccurrenceNode(
 	id identity.OccurrenceID,
 ) (ast.Node, bool) {
-	if node, present := i.executable[id]; present {
-		return node, true
-	}
-	node, present := i.structural[id]
+	node, present := i.nodes[id]
 	if present {
 		if checked := i.counterparts[node]; checked != nil {
 			return checked, true
@@ -447,14 +431,11 @@ func (i *TransientIndex) OccurrenceNode(
 func (i *TransientIndex) OccurrenceID(
 	node ast.Node,
 ) (identity.OccurrenceID, bool) {
-	if id, present := i.executableID[node]; present {
-		return id, true
-	}
-	if id, present := i.structuralID[node]; present {
+	if id, present := i.ids[node]; present {
 		return id, true
 	}
 	original := i.originals[node]
-	id, present := i.structuralID[original]
+	id, present := i.ids[original]
 	return id, present
 }
 
@@ -488,12 +469,4 @@ func (i *TransientIndex) OccurrenceDefinition(
 		return record.definition, true
 	}
 	return identity.DefinitionID{}, false
-}
-
-func (i *TransientIndex) StructuralOccurrenceCount() int {
-	return len(i.structural)
-}
-
-func (i *TransientIndex) ExecutableOccurrenceCount() int {
-	return len(i.executable)
 }

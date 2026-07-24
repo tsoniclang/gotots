@@ -21,14 +21,18 @@ func verifyIntrinsicSemanticPackage(
 ) error {
 	switch expected.loaded.Disposition() {
 	case source.DispositionBuiltinUniverse:
+		authority, err := expectedCheckerAuthority(
+			universe,
+			structure.PackageGraph{},
+			expected.loaded,
+			facts,
+		)
+		if err != nil {
+			return err
+		}
 		return verifyBuiltinSemanticPackage(
 			actual,
-			expectedCheckerAuthority(
-				universe,
-				structure.PackageGraph{},
-				expected.loaded,
-				facts,
-			),
+			authority,
 		)
 	case source.DispositionUnsafeIntrinsic:
 		return verifyUnsafeSemanticPackage(actual)

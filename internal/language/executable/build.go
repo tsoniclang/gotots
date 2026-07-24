@@ -55,7 +55,9 @@ func Build(
 		out.byID[definition.ID()] = region
 		out.regionIDs = append(out.regionIDs, definition.ID())
 	}
-	out.sort()
+	if err := out.sort(); err != nil {
+		return nil, err
+	}
 	if err := Validate(graph, selections, out); err != nil {
 		return nil, err
 	}

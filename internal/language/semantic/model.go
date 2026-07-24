@@ -21,18 +21,19 @@ type PackageInput struct {
 }
 
 type Package struct {
-	id           identity.PackageID
-	provenance   PackageProvenance
-	identities   packageIdentityTable
-	authorities  packageAuthorityTable
-	definitions  packageDefinitionStore
-	resolutions  packageResolutionStore
-	declarations packageDeclarationStore
-	bindings     packageBindingStore
-	types        packageTypeStore
-	witnesses    packageTypeWitnessStore
-	operations   packageOperationStore
-	unsupported  packageUnsupportedStore
+	id            identity.PackageID
+	provenance    PackageProvenance
+	identities    packageIdentityTable
+	authorities   packageAuthorityTable
+	definitions   packageDefinitionStore
+	resolutions   packageResolutionStore
+	declarations  packageDeclarationStore
+	bindings      packageBindingStore
+	types         packageTypeStore
+	witnesses     packageTypeWitnessStore
+	operations    packageOperationStore
+	operationView *packageOperationProjection
+	unsupported   packageUnsupportedStore
 }
 
 func NewPackage(input PackageInput) (Package, error) {
@@ -102,6 +103,10 @@ func newPackageFromBuilder(
 		operations:   stores.operations,
 		unsupported:  stores.unsupported,
 	}
+	out.operationView = newPackageOperationProjection(
+		out.operations,
+		out.identities,
+	)
 	if err := validateNormalizedPackageStorage(out); err != nil {
 		return Package{}, err
 	}

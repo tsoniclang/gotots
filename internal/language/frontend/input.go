@@ -214,7 +214,8 @@ func (input *packageInput) buildOccurrences(
 			return nil
 		}
 		if existing := input.occurrence(occurrence.ID()); existing != nil {
-			if existing.occurrence != occurrence || existing.node != node {
+			if !existing.occurrence.Equal(occurrence) ||
+				existing.node != node {
 				return fmt.Errorf(
 					"occurrence %s has conflicting Stage-2 input",
 					occurrence.ID(),
@@ -453,7 +454,10 @@ func checkerAuthority(
 	loaded *source.LoadedPackage,
 	facts *selectionfacts.Artifact,
 ) (semantic.Authority, error) {
-	selectionDigest := packageSelectionDigest(pkg, facts)
+	selectionDigest, err := packageSelectionDigest(pkg, facts)
+	if err != nil {
+		return semantic.Authority{}, err
+	}
 	structureDigest := structure.PackageDigest(pkg)
 	if loaded.Disposition() == source.DispositionBuiltinUniverse {
 		structureDigest = catalog.StructureDigest()
@@ -470,10 +474,15 @@ func checkerAuthority(
 func packageSelectionDigest(
 	pkg structure.PackageGraph,
 	facts *selectionfacts.Artifact,
-) string {
+) (string, error) {
 	definitions := map[identity.DefinitionID]bool{}
-	for _, definition := range pkg.Definitions() {
+	if err := pkg.VisitDefinitions(func(
+		definition structure.ImplementationDefinition,
+	) error {
 		definitions[definition.ID()] = true
+		return nil
+	}); err != nil {
+		return "", err
 	}
 	hash := sha256.New()
 	fmt.Fprintln(hash, "gotots-semantic-selection/v1")
@@ -488,7 +497,7 @@ func packageSelectionDigest(
 		)
 		return nil
 	})
-	return fmt.Sprintf("%x", hash.Sum(nil))
+	return fmt.Sprintf("%x", hash.Sum(nil)), nil
 }
 
 func semanticProvenance(

@@ -71,7 +71,7 @@ func (builder *typeBuilder) admit(
 	record semantic.Type,
 ) error {
 	if existing, present := builder.records[record.ID()]; present &&
-		existing.Canonical() != record.Canonical() {
+		!existing.Equal(record) {
 		return fmt.Errorf(
 			"semantic type identity collision %s", record.ID(),
 		)

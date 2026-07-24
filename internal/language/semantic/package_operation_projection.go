@@ -115,101 +115,63 @@ func (store packageOperationStore) instance(
 	}, nil
 }
 
-func (store packageOperationStore) operation(
+type packageOperationProjection struct {
+	store      packageOperationStore
+	identities packageIdentityTable
+}
+
+func newPackageOperationProjection(
+	store packageOperationStore,
+	identities packageIdentityTable,
+) *packageOperationProjection {
+	return &packageOperationProjection{
+		store: store, identities: identities,
+	}
+}
+
+func (projection *packageOperationProjection) operation(
 	identities *packageIdentityProjection,
 	index int,
 ) (Operation, error) {
-	if index < 0 || index >= len(store.records) {
+	if projection == nil ||
+		identities == nil ||
+		index < 0 ||
+		index >= len(projection.store.records) {
 		return Operation{}, fmt.Errorf(
 			"semantic operation index %d is invalid", index,
 		)
 	}
-	stored := store.records[index]
-	constant, err := store.constant(stored.constant)
+	stored := projection.store.records[index]
+	constant, err := projection.store.constant(stored.constant)
 	if err != nil {
 		return Operation{}, err
 	}
-	object, err := store.object(identities, stored.object)
+	object, err := projection.store.object(identities, stored.object)
 	if err != nil {
 		return Operation{}, err
 	}
-	selection, err := store.selection(identities, stored.selection)
-	if err != nil {
-		return Operation{}, err
-	}
-	instance, err := store.instance(identities, stored.instance)
-	if err != nil {
-		return Operation{}, err
-	}
-	operandReferences, err := storedRange(
-		store.operands,
-		stored.operands.start,
-		stored.operands.count,
-	)
-	if err != nil {
-		return Operation{}, err
-	}
-	operands := make(
-		[]identity.OccurrenceID, len(operandReferences),
-	)
-	for index, reference := range operandReferences {
-		operands[index] = identities.occurrence(reference)
-	}
-	definitionReferences, err := storedRange(
-		store.definitions,
-		stored.definitions.start,
-		stored.definitions.count,
-	)
-	if err != nil {
-		return Operation{}, err
-	}
-	definitions := make(
-		[]identity.DefinitionID, len(definitionReferences),
-	)
-	for index, reference := range definitionReferences {
-		definitions[index] = identities.definition(reference)
-	}
-	implicitRecords, err := storedRange(
-		store.implicit,
-		stored.implicit.start,
-		stored.implicit.count,
-	)
-	if err != nil {
-		return Operation{}, err
-	}
-	implicit := make([]ImplicitOperation, len(implicitRecords))
-	for index, record := range implicitRecords {
-		implicit[index] = ImplicitOperation{
-			kind:    record.kind,
-			site:    identities.occurrence(record.site),
-			ordinal: record.ordinal,
-			source:  identities.typeID(record.source),
-			target:  identities.typeID(record.target),
-		}
-	}
-	return Operation{spec: OperationSpec{
-		ID:            identities.operation(stored.id),
-		Kind:          stored.kind,
-		Syntax:        stored.syntax,
-		Variant:       stored.variant,
-		Role:          stored.role,
-		Token:         stored.token,
-		Mode:          stored.mode,
-		Arity:         stored.arity,
-		Place:         stored.place,
-		ResultType:    identities.typeID(stored.resultType),
-		ExpectedType:  identities.typeID(stored.expectedType),
-		Addressable:   stored.addressable,
-		Assignable:    stored.assignable,
-		HasOk:         stored.hasOk,
-		Constant:      constant,
-		Object:        object,
-		Selection:     selection,
-		Instance:      instance,
-		Operands:      operands,
-		Definitions:   definitions,
-		Implicit:      implicit,
-		ControlTarget: identities.operation(stored.controlTarget),
-		Label:         identities.binding(stored.label),
-	}}, nil
+	return Operation{
+		spec: OperationSpec{
+			ID:            identities.operation(stored.id),
+			Kind:          stored.kind,
+			Syntax:        stored.syntax,
+			Variant:       stored.variant,
+			Role:          stored.role,
+			Token:         stored.token,
+			Mode:          stored.mode,
+			Arity:         stored.arity,
+			Place:         stored.place,
+			ResultType:    identities.typeID(stored.resultType),
+			ExpectedType:  identities.typeID(stored.expectedType),
+			Addressable:   stored.addressable,
+			Assignable:    stored.assignable,
+			HasOk:         stored.hasOk,
+			Constant:      constant,
+			Object:        object,
+			ControlTarget: identities.operation(stored.controlTarget),
+			Label:         identities.binding(stored.label),
+		},
+		projection: projection,
+		index:      index,
+	}, nil
 }

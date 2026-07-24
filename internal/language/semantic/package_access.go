@@ -132,8 +132,9 @@ func (pkg Package) VisitOperations(visit func(Operation) error) error {
 	}
 	identities := newPackageIdentityProjection(pkg.identities)
 	for index := range pkg.operations.records {
-		record, err := pkg.operations.operation(
-			identities, index,
+		record, err := pkg.operationView.operation(
+			identities,
+			index,
 		)
 		if err != nil {
 			return err
@@ -254,7 +255,7 @@ func (pkg Package) Operation(
 		return Operation{}, false
 	}
 	identities := newPackageIdentityProjection(pkg.identities)
-	record, err := pkg.operations.operation(identities, index)
+	record, err := pkg.operationView.operation(identities, index)
 	return record, err == nil
 }
 

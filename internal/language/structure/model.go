@@ -390,7 +390,7 @@ func (d ImplementationDefinition) Name() string { return d.name }
 // FileGraph is one complete source-file structural graph.
 type FileGraph struct {
 	owner       OwnerRegion
-	occurrences []Occurrence
+	occurrences *OccurrenceStore
 	containment ContainmentGraph
 	definitions []ImplementationDefinition
 	sites       []DefinitionSite
@@ -401,18 +401,28 @@ type FileGraph struct {
 
 func (g FileGraph) Owner() OwnerRegion { return g.owner }
 func (g FileGraph) OccurrenceCount() int {
-	return len(g.occurrences)
+	return g.occurrences.Count()
 }
 func (g FileGraph) Occurrences() []Occurrence {
-	return append([]Occurrence(nil), g.occurrences...)
+	out := make([]Occurrence, 0, g.OccurrenceCount())
+	if g.occurrences == nil {
+		return out
+	}
+	_ = g.occurrences.Visit(func(reference OccurrenceRef) error {
+		out = append(out, reference.Occurrence())
+		return nil
+	})
+	return out
 }
 func (g FileGraph) OccurrenceRefs() []OccurrenceRef {
-	out := make([]OccurrenceRef, 0, len(g.occurrences))
-	for index := range g.occurrences {
-		out = append(out, OccurrenceRef{
-			occurrence: &g.occurrences[index],
-		})
+	out := make([]OccurrenceRef, 0, g.OccurrenceCount())
+	if g.occurrences == nil {
+		return out
 	}
+	_ = g.occurrences.Visit(func(reference OccurrenceRef) error {
+		out = append(out, reference)
+		return nil
+	})
 	return out
 }
 func (g FileGraph) VisitOccurrenceRefs(
@@ -421,14 +431,10 @@ func (g FileGraph) VisitOccurrenceRefs(
 	if visit == nil {
 		return fmt.Errorf("occurrence visit requires a visitor")
 	}
-	for index := range g.occurrences {
-		if err := visit(OccurrenceRef{
-			occurrence: &g.occurrences[index],
-		}); err != nil {
-			return err
-		}
+	if g.occurrences == nil {
+		return nil
 	}
-	return nil
+	return g.occurrences.Visit(visit)
 }
 func (g FileGraph) Containment() ContainmentGraph { return g.containment }
 func (g FileGraph) Definitions() []ImplementationDefinition {
@@ -533,7 +539,7 @@ type Graph struct {
 	headerOccurrences int
 	boundaryEntries   int
 	occurrenceIDs     []identity.OccurrenceID
-	byOccurrence      map[identity.OccurrenceID]*Occurrence
+	byOccurrence      map[identity.OccurrenceID]OccurrenceRef
 	definitionIDs     []identity.DefinitionID
 	byDefinition      map[identity.DefinitionID]*ImplementationDefinition
 	byBoundary        map[identity.DefinitionID]*ExecutionBoundary
@@ -545,18 +551,18 @@ func (g *Graph) Work() Work   { return g.work }
 func (g *Graph) residentOccurrences() []Occurrence {
 	out := make([]Occurrence, 0, len(g.occurrenceIDs))
 	for _, id := range g.occurrenceIDs {
-		out = append(out, *g.byOccurrence[id])
+		out = append(out, g.byOccurrence[id].Occurrence())
 	}
 	return out
 }
 func (g *Graph) residentOccurrence(
 	id identity.OccurrenceID,
 ) (Occurrence, bool) {
-	occurrence, ok := g.byOccurrence[id]
+	reference, ok := g.byOccurrence[id]
 	if !ok {
 		return Occurrence{}, false
 	}
-	return *occurrence, true
+	return reference.Occurrence(), true
 }
 func (g *Graph) residentDefinitions() []ImplementationDefinition {
 	out := make([]ImplementationDefinition, 0, len(g.definitionIDs))

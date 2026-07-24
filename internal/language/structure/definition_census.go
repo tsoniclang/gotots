@@ -65,11 +65,16 @@ func sealDefinitionCensus(graph *Graph) error {
 	headerOccurrences := 0
 	boundaryEntries := 0
 	for index, pkg := range graph.packages {
-		for _, definition := range pkg.Definitions() {
+		if err := pkg.VisitDefinitions(func(
+			definition ImplementationDefinition,
+		) error {
 			records = append(records, DefinitionCensusRecord{
 				pkg: pkg.id,
 				id:  definition.id,
 			})
+			return nil
+		}); err != nil {
+			return err
 		}
 		for _, header := range pkg.Headers() {
 			headerOccurrences += len(header.members)

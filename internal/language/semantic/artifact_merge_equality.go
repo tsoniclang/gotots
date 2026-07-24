@@ -70,36 +70,58 @@ func equalBindingRecords(left Binding, right Binding) bool {
 }
 
 func equalTypeRecords(left Type, right Type) bool {
-	return left.ID() == right.ID() &&
-		left.Canonical() == right.Canonical()
+	return left.Equal(right)
 }
 
 func equalOperationRecords(left Operation, right Operation) bool {
-	a := left.Spec()
-	b := right.Spec()
-	return a.ID == b.ID &&
-		a.Kind == b.Kind &&
-		a.Syntax == b.Syntax &&
-		a.Variant == b.Variant &&
-		a.Role == b.Role &&
-		a.Token == b.Token &&
-		a.Mode == b.Mode &&
-		a.Arity == b.Arity &&
-		a.Place == b.Place &&
-		a.ResultType == b.ResultType &&
-		a.ExpectedType == b.ExpectedType &&
-		a.Addressable == b.Addressable &&
-		a.Assignable == b.Assignable &&
-		a.HasOk == b.HasOk &&
-		a.Constant == b.Constant &&
-		a.Object == b.Object &&
-		equalSelections(a.Selection, b.Selection) &&
-		equalInstances(a.Instance, b.Instance) &&
-		equalComparableSlices(a.Operands, b.Operands) &&
-		equalComparableSlices(a.Definitions, b.Definitions) &&
-		equalComparableSlices(a.Implicit, b.Implicit) &&
-		a.ControlTarget == b.ControlTarget &&
-		a.Label == b.Label
+	if left.ID() != right.ID() ||
+		left.Kind() != right.Kind() ||
+		left.Syntax() != right.Syntax() ||
+		left.Variant() != right.Variant() ||
+		left.Role() != right.Role() ||
+		left.Token() != right.Token() ||
+		left.Mode() != right.Mode() ||
+		left.Arity() != right.Arity() ||
+		left.Place() != right.Place() ||
+		left.ResultType() != right.ResultType() ||
+		left.ExpectedType() != right.ExpectedType() ||
+		left.Addressable() != right.Addressable() ||
+		left.Assignable() != right.Assignable() ||
+		left.HasOk() != right.HasOk() ||
+		left.Constant() != right.Constant() ||
+		left.Object() != right.Object() ||
+		!equalSelections(left.Selection(), right.Selection()) ||
+		!equalInstances(left.Instance(), right.Instance()) ||
+		left.ControlTarget() != right.ControlTarget() ||
+		left.Label() != right.Label() ||
+		left.OperandCount() != right.OperandCount() ||
+		left.NestedDefinitionCount() !=
+			right.NestedDefinitionCount() ||
+		left.ImplicitCount() != right.ImplicitCount() {
+		return false
+	}
+	for index := 0; index < left.OperandCount(); index++ {
+		leftValue, _ := left.Operand(index)
+		rightValue, _ := right.Operand(index)
+		if leftValue != rightValue {
+			return false
+		}
+	}
+	for index := 0; index < left.NestedDefinitionCount(); index++ {
+		leftValue, _ := left.NestedDefinition(index)
+		rightValue, _ := right.NestedDefinition(index)
+		if leftValue != rightValue {
+			return false
+		}
+	}
+	for index := 0; index < left.ImplicitCount(); index++ {
+		leftValue, _ := left.Implicit(index)
+		rightValue, _ := right.Implicit(index)
+		if leftValue != rightValue {
+			return false
+		}
+	}
+	return true
 }
 
 func equalSelections(left Selection, right Selection) bool {

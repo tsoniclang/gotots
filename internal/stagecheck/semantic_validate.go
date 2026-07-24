@@ -85,9 +85,12 @@ func verifySemanticDefinitions(
 			),
 		)
 	}
-	checkerAuthority := expectedCheckerAuthority(
+	checkerAuthority, err := expectedCheckerAuthority(
 		universe, expected.pkg, expected.loaded, facts,
 	)
+	if err != nil {
+		return err
+	}
 	var providerContext semantic.ProviderPackageContext
 	if provider != nil {
 		providerContext, _, _ = provider.PackageContext(actual.ID())
@@ -202,7 +205,7 @@ func verifySemanticOperations(
 ) error {
 	sourceOperations := 0
 	implicitOperations := 0
-	resolvedOperations := map[identity.OperationID]bool{}
+	resolvedOperations := 0
 	if err := actual.VisitResolutions(func(
 		resolution semantic.OccurrenceResolution,
 	) error {
@@ -216,14 +219,7 @@ func verifySemanticOperations(
 		if resolution.Kind() != semantic.ResolutionOperation {
 			return nil
 		}
-		if resolvedOperations[resolution.Operation()] {
-			return semanticVerificationError(
-				"operation",
-				"operation resolution is duplicated "+
-					resolution.Operation().String(),
-			)
-		}
-		resolvedOperations[resolution.Operation()] = true
+		resolvedOperations++
 		return nil
 	}); err != nil {
 		return err
@@ -257,13 +253,11 @@ func verifySemanticOperations(
 					expected.definitionID(occurrence.owner) ||
 				operation.Syntax() != occurrence.Kind() ||
 				operation.Role() != occurrence.Role() ||
-				operation.Token() != occurrence.Token() ||
-				!resolvedOperations[operation.ID()] {
+				operation.Token() != occurrence.Token() {
 				return semanticVerificationError(
 					"operation", "source origin differs for "+operation.ID().String(),
 				)
 			}
-			delete(resolvedOperations, operation.ID())
 			return nil
 		}
 		implicitOperations++
@@ -279,12 +273,12 @@ func verifySemanticOperations(
 	}); err != nil {
 		return err
 	}
-	if len(resolvedOperations) != 0 {
+	if sourceOperations != resolvedOperations {
 		return semanticVerificationError(
 			"operation",
 			fmt.Sprintf(
-				"%d source operations leave %d unresolved operation references",
-				sourceOperations, len(resolvedOperations),
+				"%d source operations differ from %d operation resolutions",
+				sourceOperations, resolvedOperations,
 			),
 		)
 	}
@@ -459,28 +453,36 @@ func expectedCheckerAuthority(
 	pkg structure.PackageGraph,
 	loaded *source.LoadedPackage,
 	facts *selectionfacts.Artifact,
-) semantic.Authority {
+) (semantic.Authority, error) {
 	structureDigest := structure.PackageDigest(pkg)
 	if loaded.Disposition() == source.DispositionBuiltinUniverse {
 		structureDigest = catalog.StructureDigest()
 	}
-	authority, _ := semantic.NewCheckerAuthority(
+	selectionDigest, err := semanticSelectionDigest(pkg, facts)
+	if err != nil {
+		return semantic.Authority{}, err
+	}
+	return semantic.NewCheckerAuthority(
 		universe.Toolchain().BinaryDigest(),
 		universe.Toolchain().BuildConfigurationDigest(),
 		loaded.ProviderInputFingerprint(),
 		structureDigest,
-		semanticSelectionDigest(pkg, facts),
+		selectionDigest,
 	)
-	return authority
 }
 
 func semanticSelectionDigest(
 	pkg structure.PackageGraph,
 	facts *selectionfacts.Artifact,
-) string {
+) (string, error) {
 	definitions := map[identity.DefinitionID]bool{}
-	for _, definition := range pkg.Definitions() {
+	if err := pkg.VisitDefinitions(func(
+		definition structure.ImplementationDefinition,
+	) error {
 		definitions[definition.ID()] = true
+		return nil
+	}); err != nil {
+		return "", err
 	}
 	hash := sha256.New()
 	fmt.Fprintln(hash, "gotots-semantic-selection/v1")
@@ -494,7 +496,7 @@ func semanticSelectionDigest(
 		}
 		return nil
 	})
-	return fmt.Sprintf("%x", hash.Sum(nil))
+	return fmt.Sprintf("%x", hash.Sum(nil)), nil
 }
 
 func semanticVerificationError(stage string, reason string) error {

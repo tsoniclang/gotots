@@ -18,13 +18,18 @@ func compareDefinitionCensus(
 		)
 	}
 	expected := newStructuralLedger()
-	for _, definition := range pkg.Definitions() {
+	if err := pkg.VisitDefinitions(func(
+		definition structure.ImplementationDefinition,
+	) error {
 		addRecord(
 			&expected.definitionCensus,
 			definitionCensusLedgerRecord{
 				pkg: pkg.ID(), definition: definition.ID(),
 			},
 		)
+		return nil
+	}); err != nil {
+		return err
 	}
 	return compareLedgers(
 		"definition-census/"+pkg.ID().String(),

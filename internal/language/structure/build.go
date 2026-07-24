@@ -294,33 +294,38 @@ func sortGraphPackages(graph *Graph) {
 }
 
 func sealGraph(graph *Graph) error {
-	graph.byOccurrence = map[identity.OccurrenceID]*Occurrence{}
+	graph.byOccurrence = map[identity.OccurrenceID]OccurrenceRef{}
 	graph.byDefinition = map[identity.DefinitionID]*ImplementationDefinition{}
 	graph.byBoundary = map[identity.DefinitionID]*ExecutionBoundary{}
 	for packageIndex := range graph.packages {
 		pkg := &graph.packages[packageIndex]
 		for fileIndex := range pkg.files {
 			file := &pkg.files[fileIndex]
-			for occurrenceIndex := range file.occurrences {
-				occurrence := &file.occurrences[occurrenceIndex]
+			if err := file.VisitOccurrenceRefs(func(
+				occurrence OccurrenceRef,
+			) error {
+				id := occurrence.ID()
 				graph.work.IdentityProbes++
-				if existing, duplicate := graph.byOccurrence[occurrence.id]; duplicate {
-					if *existing != *occurrence {
+				if existing, duplicate := graph.byOccurrence[id]; duplicate {
+					if !existing.Equal(occurrence) {
 						return fmt.Errorf(
 							"occurrence %s has conflicting canonical payloads",
-							occurrence.id,
+							id,
 						)
 					}
 					return fmt.Errorf(
 						"occurrence %s payload is stored more than once",
-						occurrence.id,
+						id,
 					)
 				}
-				graph.byOccurrence[occurrence.id] = occurrence
+				graph.byOccurrence[id] = occurrence
 				graph.occurrenceIDs = append(
-					graph.occurrenceIDs, occurrence.id,
+					graph.occurrenceIDs, id,
 				)
 				graph.work.RecordAppends++
+				return nil
+			}); err != nil {
+				return err
 			}
 			for definitionIndex := range file.definitions {
 				if err := indexDefinition(

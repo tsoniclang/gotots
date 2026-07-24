@@ -8,19 +8,11 @@ import (
 	"github.com/tsoniclang/gotots/internal/language/structure"
 )
 
-const (
-	occurrenceIdentityPageSize = 2048
-	occurrencePayloadPageSize  = 1024
-)
+const occurrenceIdentityPageSize = 2048
 
 type occurrenceRef uint32
-type occurrencePayloadRef uint32
 
 func (reference occurrenceRef) valid() bool {
-	return reference != 0
-}
-
-func (reference occurrencePayloadRef) valid() bool {
 	return reference != 0
 }
 
@@ -36,20 +28,23 @@ type occurrenceIdentityRecord struct {
 	start   int
 	end     int
 	kind    uint16
-	payload occurrencePayloadRef
+	payload structure.OccurrenceIndex
 }
 
 // occurrenceStore is the one package-local executable occurrence dictionary.
-// Every region member has one occurrenceRef. Only identities absent from the
-// structural graph attach a canonical payload to that same reference.
+// Every region member has one compact identity reference. Only identities
+// absent from the structural graph own payloads, normalized by the shared
+// Stage-1 occurrence store.
 type occurrenceStore struct {
-	files         []identity.FileID
-	fileByID      map[identity.FileID]uint32
-	byIdentity    map[occurrenceKey]occurrenceRef
-	identities    [][]occurrenceIdentityRecord
-	payloads      [][]structure.Occurrence
-	identityCount uint32
-	payloadCount  uint32
+	files           []identity.FileID
+	fileByID        map[identity.FileID]uint32
+	byIdentity      map[occurrenceKey]occurrenceRef
+	identities      [][]occurrenceIdentityRecord
+	payloadBuilders []*structure.OccurrenceStoreBuilder
+	payloadStores   []*structure.OccurrenceStore
+	identityCount   uint32
+	payloadCount    uint32
+	sealed          bool
 }
 
 func newOccurrenceStore() *occurrenceStore {
@@ -72,12 +67,19 @@ func (store *occurrenceStore) key(
 		if !admitFile {
 			return occurrenceKey{}, false, nil
 		}
+		if store.sealed {
+			return occurrenceKey{}, false, fmt.Errorf(
+				"executable occurrence store is sealed",
+			)
+		}
 		if uint64(len(store.files)) >= uint64(^uint32(0)) {
 			return occurrenceKey{}, false, fmt.Errorf(
 				"executable occurrence file table overflows uint32",
 			)
 		}
 		store.files = append(store.files, file)
+		store.payloadBuilders = append(store.payloadBuilders, nil)
+		store.payloadStores = append(store.payloadStores, nil)
 		fileReference = uint32(len(store.files))
 		store.fileByID[file] = fileReference
 	}
@@ -136,50 +138,76 @@ func (store *occurrenceStore) admit(
 func (store *occurrenceStore) put(
 	occurrence structure.Occurrence,
 ) (occurrenceRef, bool, error) {
+	if store == nil || store.sealed {
+		return 0, false, fmt.Errorf(
+			"executable occurrence store is sealed",
+		)
+	}
 	reference, err := store.admit(occurrence.ID())
 	if err != nil {
 		return 0, false, err
 	}
 	identityRecord := store.identityRecord(reference)
-	if identityRecord == nil {
+	if identityRecord == nil || identityRecord.file == 0 {
 		return 0, false, fmt.Errorf(
 			"executable occurrence %s has no identity record",
 			occurrence.ID(),
 		)
 	}
-	if identityRecord.payload.valid() {
-		existing := store.payload(identityRecord.payload)
-		if existing != nil && *existing == occurrence {
-			return reference, false, nil
-		}
-		return 0, false, fmt.Errorf(
-			"executable occurrence %s has conflicting payloads",
-			occurrence.ID(),
+	fileIndex := int(identityRecord.file - 1)
+	builder := store.payloadBuilders[fileIndex]
+	if builder == nil {
+		builder, err = structure.NewOccurrenceStoreBuilder(
+			store.files[fileIndex],
+			64,
 		)
+		if err != nil {
+			return 0, false, err
+		}
+		store.payloadBuilders[fileIndex] = builder
 	}
+	if identityRecord.payload != 0 {
+		if !builder.Matches(identityRecord.payload, occurrence) {
+			return 0, false, fmt.Errorf(
+				"occurrence %s has conflicting canonical payloads",
+				occurrence.ID(),
+			)
+		}
+		return reference, false, nil
+	}
+	index, err := builder.Append(occurrence)
+	if err != nil {
+		return 0, false, err
+	}
+	identityRecord.payload = index
 	if store.payloadCount == ^uint32(0) {
 		return 0, false, fmt.Errorf(
 			"executable occurrence payload store overflows uint32",
 		)
 	}
-	index := int(store.payloadCount)
-	pageIndex := index / occurrencePayloadPageSize
-	if pageIndex == len(store.payloads) {
-		store.payloads = append(
-			store.payloads,
-			make(
-				[]structure.Occurrence,
-				0,
-				occurrencePayloadPageSize,
-			),
+	store.payloadCount++
+	return reference, true, nil
+}
+
+func (store *occurrenceStore) seal() error {
+	if store == nil || store.sealed {
+		return fmt.Errorf(
+			"executable occurrence store is absent or already sealed",
 		)
 	}
-	store.payloads[pageIndex] = append(
-		store.payloads[pageIndex], occurrence,
-	)
-	store.payloadCount++
-	identityRecord.payload = occurrencePayloadRef(store.payloadCount)
-	return reference, true, nil
+	for index, builder := range store.payloadBuilders {
+		if builder == nil {
+			continue
+		}
+		sealed, err := builder.Seal()
+		if err != nil {
+			return err
+		}
+		store.payloadStores[index] = sealed
+		store.payloadBuilders[index] = nil
+	}
+	store.sealed = true
+	return nil
 }
 
 func (store *occurrenceStore) reference(
@@ -202,18 +230,6 @@ func (store *occurrenceStore) identityRecord(
 	}
 	index := int(reference - 1)
 	return &store.identities[index/occurrenceIdentityPageSize][index%occurrenceIdentityPageSize]
-}
-
-func (store *occurrenceStore) payload(
-	reference occurrencePayloadRef,
-) *structure.Occurrence {
-	if store == nil ||
-		!reference.valid() ||
-		uint32(reference) > store.payloadCount {
-		return nil
-	}
-	index := int(reference - 1)
-	return &store.payloads[index/occurrencePayloadPageSize][index%occurrencePayloadPageSize]
 }
 
 func (store *occurrenceStore) id(
@@ -251,36 +267,38 @@ func (store *occurrenceStore) mustID(
 
 func (store *occurrenceStore) get(
 	id identity.OccurrenceID,
-) (*structure.Occurrence, bool) {
-	record := store.identityRecord(store.reference(id))
-	if record == nil || !record.payload.valid() {
-		return nil, false
-	}
-	payload := store.payload(record.payload)
-	return payload, payload != nil
+) (structure.OccurrenceRef, bool) {
+	return store.payloadFor(store.reference(id))
 }
 
 func (store *occurrenceStore) payloadFor(
 	reference occurrenceRef,
-) *structure.Occurrence {
+) (structure.OccurrenceRef, bool) {
 	record := store.identityRecord(reference)
-	if record == nil || !record.payload.valid() {
-		return nil
+	if record == nil || record.payload == 0 ||
+		record.file == 0 ||
+		int(record.file) > len(store.payloadStores) {
+		return structure.OccurrenceRef{}, false
 	}
-	return store.payload(record.payload)
+	payloadStore := store.payloadStores[record.file-1]
+	if payloadStore == nil {
+		return structure.OccurrenceRef{}, false
+	}
+	payload, err := payloadStore.Reference(record.payload)
+	return payload, err == nil
 }
 
 func (store *occurrenceStore) visitPayloads(
-	visit func(occurrenceRef, *structure.Occurrence) error,
+	visit func(occurrenceRef, structure.OccurrenceRef) error,
 ) error {
-	if store == nil || visit == nil {
+	if store == nil || !store.sealed || visit == nil {
 		return fmt.Errorf(
-			"executable occurrence visit requires store and visitor",
+			"executable occurrence visit requires sealed store and visitor",
 		)
 	}
 	for reference := occurrenceRef(1); uint32(reference) <= store.identityCount; reference++ {
-		payload := store.payloadFor(reference)
-		if payload == nil {
+		payload, present := store.payloadFor(reference)
+		if !present {
 			continue
 		}
 		if err := visit(reference, payload); err != nil {

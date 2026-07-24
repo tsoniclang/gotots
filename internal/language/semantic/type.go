@@ -66,9 +66,8 @@ type TypeSpec struct {
 }
 
 type Type struct {
-	id        identity.SemanticTypeID
-	spec      TypeSpec
-	canonical string
+	id   identity.SemanticTypeID
+	spec TypeSpec
 }
 
 func NewType(spec TypeSpec) (Type, error) {
@@ -83,9 +82,8 @@ func NewType(spec TypeSpec) (Type, error) {
 		return Type{}, err
 	}
 	return Type{
-		id:        id,
-		spec:      spec,
-		canonical: encodeTypeSpec(spec),
+		id:   id,
+		spec: spec,
 	}, nil
 }
 
@@ -135,7 +133,6 @@ func TypeParameterTypeID(
 func (record Type) ID() identity.SemanticTypeID { return record.id }
 func (record Type) Kind() TypeKind              { return record.spec.Kind }
 func (record Type) Spec() TypeSpec              { return cloneTypeSpec(record.spec) }
-func (record Type) Canonical() string           { return record.canonical }
 
 func cloneTypeSpec(spec TypeSpec) TypeSpec {
 	spec.Arguments = append(
@@ -314,82 +311,6 @@ func validateMethods(methods []TypeMethod) error {
 func semanticNameExported(name string) bool {
 	first, _ := utf8.DecodeRuneInString(name)
 	return first != utf8.RuneError && unicode.IsUpper(first)
-}
-
-func validateTypeMembers(spec TypeSpec) error {
-	allowed := func(fields ...string) map[string]bool {
-		out := map[string]bool{}
-		for _, field := range fields {
-			out[field] = true
-		}
-		return out
-	}
-	var fields map[string]bool
-	switch spec.Kind {
-	case TypeBasic:
-		fields = allowed("basic")
-	case TypeNamed:
-		fields = allowed(
-			"declaration", "arguments", "underlying", "methods",
-		)
-	case TypeAlias:
-		fields = allowed("declaration", "arguments", "target")
-	case TypeParameter:
-		fields = allowed("parameter", "constraint")
-	case TypePointer, TypeSlice:
-		fields = allowed("element")
-	case TypeArray:
-		fields = allowed("element", "length")
-	case TypeMap:
-		fields = allowed("key", "element")
-	case TypeChannel:
-		fields = allowed("element", "direction")
-	case TypeSignature:
-		fields = allowed("signature")
-	case TypeStruct:
-		fields = allowed("fields")
-	case TypeInterface:
-		fields = allowed(
-			"methods", "embeddeds", "terms", "type-set",
-			"comparable",
-		)
-	case TypeTuple:
-		fields = allowed("elements")
-	case TypeUnion:
-		fields = allowed("terms")
-	default:
-		return fmt.Errorf("invalid type kind")
-	}
-	present := map[string]bool{
-		"basic":       spec.Basic != BasicInvalid,
-		"declaration": !spec.Declaration.IsZero(),
-		"parameter":   !spec.Parameter.IsZero(),
-		"arguments":   len(spec.Arguments) != 0,
-		"underlying":  !spec.Underlying.IsZero(),
-		"target":      !spec.Target.IsZero(),
-		"constraint":  !spec.Constraint.IsZero(),
-		"element":     !spec.Element.IsZero(),
-		"key":         !spec.Key.IsZero(),
-		"length":      spec.Length != 0,
-		"direction":   spec.Direction != ChannelInvalid,
-		"signature":   signaturePresent(spec.Signature),
-		"fields":      len(spec.Fields) != 0,
-		"methods":     len(spec.Methods) != 0,
-		"embeddeds":   len(spec.Embeddeds) != 0,
-		"terms":       len(spec.Terms) != 0,
-		"type-set":    spec.TypeSet != TypeSetInvalid,
-		"comparable":  spec.Comparable,
-		"elements":    len(spec.Elements) != 0,
-	}
-	for field, isPresent := range present {
-		if isPresent && !fields[field] {
-			return fmt.Errorf(
-				"%s type carries forbidden %s field",
-				spec.Kind, field,
-			)
-		}
-	}
-	return nil
 }
 
 func signaturePresent(signature Signature) bool {

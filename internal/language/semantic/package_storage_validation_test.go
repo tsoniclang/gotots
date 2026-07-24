@@ -102,6 +102,61 @@ func TestNormalizedPackageConstructionOwnsArenaConservation(
 			want: "absent type",
 		},
 		{
+			name: "missing-operation-resolution",
+			mutate: func(pkg Package) Package {
+				pkg.resolutions.records = nil
+				pkg.resolutions.operations = nil
+				return pkg
+			},
+			want: "1 source operations and 0 operation resolutions",
+		},
+		{
+			name: "duplicate-operation-resolution",
+			mutate: func(pkg Package) Package {
+				pkg.resolutions.records = append(
+					[]storedResolution(nil),
+					pkg.resolutions.records...,
+				)
+				duplicate := pkg.resolutions.records[0]
+				pkg.resolutions.operations = append(
+					[]operationRef(nil),
+					pkg.resolutions.operations...,
+				)
+				pkg.resolutions.operations = append(
+					pkg.resolutions.operations,
+					pkg.resolutions.operations[0],
+				)
+				duplicate.payload = uint64(
+					len(pkg.resolutions.operations),
+				)
+				pkg.resolutions.records = append(
+					pkg.resolutions.records,
+					duplicate,
+				)
+				return pkg
+			},
+			want: "resolution records are not canonical",
+		},
+		{
+			name: "mismatched-operation-resolution-origin",
+			mutate: func(pkg Package) Package {
+				pkg.identities.operations = append(
+					[]storedOperationIdentity(nil),
+					pkg.identities.operations...,
+				)
+				origin := &pkg.identities.operations[0]
+				for index := range pkg.identities.occurrences {
+					reference := occurrenceRef(index + 1)
+					if reference != origin.occurrence {
+						origin.occurrence = reference
+						break
+					}
+				}
+				return pkg
+			},
+			want: "operation resolution differs from operation origin",
+		},
+		{
 			name: "invalid-operation-identity-component",
 			mutate: func(pkg Package) Package {
 				pkg.identities.operations = append(

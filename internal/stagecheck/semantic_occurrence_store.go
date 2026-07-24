@@ -115,7 +115,7 @@ func (store *semanticOccurrenceStore) put(
 	}
 	if reference := store.byIdentity[key]; reference.valid() {
 		existing := store.record(reference)
-		if existing.OccurrenceRef == record.OccurrenceRef {
+		if existing.OccurrenceRef.Equal(record.OccurrenceRef) {
 			return reference, nil
 		}
 		return 0, fmt.Errorf(

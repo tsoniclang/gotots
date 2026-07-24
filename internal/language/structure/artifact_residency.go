@@ -114,7 +114,7 @@ func providerDetailedRecordCount(artifact *ProviderArtifact) int {
 	records := 0
 	for _, file := range artifact.fileGraphs {
 		records++
-		records += len(file.occurrences)
+		records += file.OccurrenceCount()
 		records += len(file.owner.members)
 		records += len(file.owner.directives)
 		records += len(file.containment.anchors)

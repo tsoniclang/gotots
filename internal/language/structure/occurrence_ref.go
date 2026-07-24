@@ -1,87 +1,124 @@
 package structure
 
 import (
-	"fmt"
-
 	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/catalog"
 )
 
-// OccurrenceRef is an immutable reference to one owner-held canonical
-// occurrence payload. It prevents downstream stages from copying that payload
-// into a second record while exposing only read methods.
+// OccurrenceRef is an immutable coordinate into one sealed canonical
+// occurrence store. It exposes one record at a time without copying or
+// retaining the store's normalized payload.
 type OccurrenceRef struct {
-	occurrence *Occurrence
+	store *OccurrenceStore
+	index OccurrenceIndex
 }
 
-func NewOccurrenceRef(occurrence *Occurrence) (OccurrenceRef, error) {
-	if occurrence == nil || occurrence.ID().IsZero() {
-		return OccurrenceRef{}, fmt.Errorf(
-			"occurrence reference requires canonical payload",
-		)
+func (reference OccurrenceRef) valid() bool {
+	return reference.store != nil &&
+		reference.store.sealed &&
+		reference.index.valid() &&
+		int(reference.index) <= len(reference.store.records)
+}
+
+func (reference OccurrenceRef) record() occurrenceStoreRecord {
+	if !reference.valid() {
+		return occurrenceStoreRecord{}
 	}
-	return OccurrenceRef{occurrence: occurrence}, nil
+	return reference.store.records[reference.index-1]
 }
 
 func (reference OccurrenceRef) ID() identity.OccurrenceID {
-	if reference.occurrence == nil {
+	record := reference.record()
+	if record.kind == 0 {
 		return identity.OccurrenceID{}
 	}
-	return reference.occurrence.ID()
+	return occurrenceIdentity(
+		reference.store.file,
+		record.start,
+		record.end,
+		record.kind,
+	)
 }
 
 func (reference OccurrenceRef) Kind() catalog.Kind {
-	if reference.occurrence == nil {
-		return catalog.KindInvalid
-	}
-	return reference.occurrence.Kind()
+	return catalog.Kind(reference.record().kind)
 }
 
 func (reference OccurrenceRef) Parent() identity.OccurrenceID {
-	if reference.occurrence == nil {
+	record := reference.record()
+	if record.parentKind == 0 {
 		return identity.OccurrenceID{}
 	}
-	return reference.occurrence.Parent()
+	return occurrenceIdentity(
+		reference.store.file,
+		record.parentStart,
+		record.parentEnd,
+		record.parentKind,
+	)
 }
 
 func (reference OccurrenceRef) Edge() catalog.Edge {
-	if reference.occurrence == nil {
-		return catalog.EdgeInvalid
-	}
-	return reference.occurrence.Edge()
+	return reference.record().edge
 }
 
 func (reference OccurrenceRef) Role() catalog.Role {
-	if reference.occurrence == nil {
-		return catalog.RoleInvalid
-	}
-	return reference.occurrence.Role()
+	return reference.Edge().Role()
 }
 
 func (reference OccurrenceRef) Ordinal() int {
-	if reference.occurrence == nil {
-		return 0
-	}
-	return reference.occurrence.Ordinal()
+	return reference.record().ordinal
 }
 
 func (reference OccurrenceRef) Span() Span {
-	if reference.occurrence == nil {
-		return Span{}
+	record := reference.record()
+	return Span{
+		Start: Position{
+			Line: record.startLine, Column: record.startColumn,
+			Offset: record.start,
+		},
+		End: Position{
+			Line: record.endLine, Column: record.endColumn,
+			Offset: record.end,
+		},
 	}
-	return reference.occurrence.Span()
 }
 
 func (reference OccurrenceRef) Display() DisplaySpan {
-	if reference.occurrence == nil {
-		return DisplaySpan{}
+	record := reference.record()
+	return DisplaySpan{
+		Start: DisplayPosition{
+			Filename: reference.store.displayFile(record.displayStartFile),
+			Line:     record.displayStartLine,
+			Column:   record.displayStartColumn,
+		},
+		End: DisplayPosition{
+			Filename: reference.store.displayFile(record.displayEndFile),
+			Line:     record.displayEndLine,
+			Column:   record.displayEndColumn,
+		},
 	}
-	return reference.occurrence.Display()
 }
 
 func (reference OccurrenceRef) Token() catalog.TokenKind {
-	if reference.occurrence == nil {
-		return catalog.TokenInvalid
+	return reference.record().token
+}
+
+// Occurrence reconstructs one transient public value from normalized owner
+// storage.
+func (reference OccurrenceRef) Occurrence() Occurrence {
+	if !reference.valid() {
+		return Occurrence{}
 	}
-	return reference.occurrence.Token()
+	return reference.store.occurrence(reference.index)
+}
+
+// Equal reports exact semantic payload equality across stores.
+func (reference OccurrenceRef) Equal(other OccurrenceRef) bool {
+	if !reference.valid() || !other.valid() {
+		return reference == other
+	}
+	if reference.store == other.store && reference.index == other.index {
+		return true
+	}
+	return reference.Occurrence() == other.Occurrence()
 }

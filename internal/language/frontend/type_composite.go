@@ -198,7 +198,7 @@ func (builder *typeBuilder) methodSignature(
 		return identity.SemanticTypeID{}, err
 	}
 	if existing, present := builder.records[record.ID()]; present &&
-		existing.Canonical() != record.Canonical() {
+		!existing.Equal(record) {
 		return identity.SemanticTypeID{}, fmt.Errorf(
 			"semantic method-signature collision %s",
 			record.ID(),

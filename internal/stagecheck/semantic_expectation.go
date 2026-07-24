@@ -185,15 +185,17 @@ func newSemanticPackageExpectation(
 		}
 		out.parents[site.Definition()] = site.ParentDefinition()
 	}
-	for _, definition := range pkg.Definitions() {
+	if err := pkg.VisitDefinitions(func(
+		definition structure.ImplementationDefinition,
+	) error {
 		if localOnly &&
 			!semanticDefinitionUsesLocal(
 				plan, loaded, definition.ID(),
 			) {
-			continue
+			return nil
 		}
 		if _, duplicate := out.definitions[definition.ID()]; duplicate {
-			return semanticPackageExpectation{}, semanticVerificationError(
+			return semanticVerificationError(
 				"definition",
 				"duplicate structural definition "+
 					definition.ID().String(),
@@ -201,13 +203,16 @@ func newSemanticPackageExpectation(
 		}
 		_, present := selections[definition.ID()]
 		if !present {
-			return semanticPackageExpectation{}, semanticVerificationError(
+			return semanticVerificationError(
 				"definition",
 				"missing selection "+definition.ID().String(),
 			)
 		}
 		out.definitions[definition.ID()] = definition
 		out.admitDefinition(definition.ID())
+		return nil
+	}); err != nil {
+		return semanticPackageExpectation{}, err
 	}
 	for _, header := range pkg.Headers() {
 		if err := out.assignStructuralOwner(

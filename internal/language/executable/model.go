@@ -160,7 +160,10 @@ func (i *Inventory) AdditionalOccurrences() []structure.Occurrence {
 		[]structure.Occurrence, 0, len(i.additional),
 	)
 	for _, reference := range i.additional {
-		out = append(out, *i.occurrences.payloadFor(reference))
+		occurrence, present := i.occurrences.payloadFor(reference)
+		if present {
+			out = append(out, occurrence.Occurrence())
+		}
 	}
 	return out
 }
@@ -178,11 +181,12 @@ func (i *Inventory) VisitAdditionalOccurrenceRefsForFile(
 	}
 	indexed := i.additionalByFile[file]
 	for _, stored := range i.additional[indexed.start:indexed.end] {
-		reference, err := structure.NewOccurrenceRef(
-			i.occurrences.payloadFor(stored),
-		)
-		if err != nil {
-			return err
+		reference, present := i.occurrences.payloadFor(stored)
+		if !present {
+			return fmt.Errorf(
+				"additional occurrence %s has no canonical payload",
+				i.occurrences.mustID(stored),
+			)
 		}
 		if err := visit(reference); err != nil {
 			return err
@@ -198,11 +202,12 @@ func (i *Inventory) AdditionalOccurrenceRefs() (
 		[]structure.OccurrenceRef, 0, len(i.additional),
 	)
 	for _, stored := range i.additional {
-		reference, err := structure.NewOccurrenceRef(
-			i.occurrences.payloadFor(stored),
-		)
-		if err != nil {
-			return nil, err
+		reference, present := i.occurrences.payloadFor(stored)
+		if !present {
+			return nil, fmt.Errorf(
+				"additional occurrence %s has no canonical payload",
+				i.occurrences.mustID(stored),
+			)
 		}
 		out = append(out, reference)
 	}
@@ -223,11 +228,7 @@ func (i *Inventory) AdditionalOccurrenceRefsForFiles(
 					id,
 				)
 			}
-			reference, err := structure.NewOccurrenceRef(occurrence)
-			if err != nil {
-				return err
-			}
-			out = append(out, reference)
+			out = append(out, occurrence)
 			return nil
 		},
 	)
@@ -298,7 +299,7 @@ func (i *Inventory) AdditionalOccurrence(
 	if !ok {
 		return structure.Occurrence{}, false
 	}
-	return *occurrence, true
+	return occurrence.Occurrence(), true
 }
 func (i *Inventory) AdditionalOccurrenceRef(
 	id identity.OccurrenceID,
@@ -307,14 +308,13 @@ func (i *Inventory) AdditionalOccurrenceRef(
 	if !ok {
 		return structure.OccurrenceRef{}, false, nil
 	}
-	reference, err := structure.NewOccurrenceRef(occurrence)
-	if err != nil {
-		return structure.OccurrenceRef{}, false, err
-	}
-	return reference, true, nil
+	return occurrence, true, nil
 }
 
-func (i *Inventory) sort() {
+func (i *Inventory) sort() error {
+	if err := i.occurrences.seal(); err != nil {
+		return err
+	}
 	sort.Slice(i.regionIDs, func(left, right int) bool {
 		i.work.SortComparisons++
 		return i.regionIDs[left].Compare(i.regionIDs[right]) < 0
@@ -336,4 +336,5 @@ func (i *Inventory) sort() {
 		indexed.end = index + 1
 		i.additionalByFile[file] = indexed
 	}
+	return nil
 }

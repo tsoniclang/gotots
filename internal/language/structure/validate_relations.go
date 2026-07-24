@@ -97,17 +97,17 @@ func validateSealedIndexes(graph *Graph) error {
 	for _, id := range graph.occurrenceIDs {
 		occurrence := graph.byOccurrence[id]
 		if !previousOccurrence.IsZero() &&
-			previousOccurrence.Compare(occurrence.id) >= 0 {
+			previousOccurrence.Compare(occurrence.ID()) >= 0 {
 			return fmt.Errorf(
 				"canonical occurrence index is not strictly ordered at %s",
-				occurrence.id,
+				occurrence.ID(),
 			)
 		}
-		previousOccurrence = occurrence.id
-		indexed, present := graph.byOccurrence[occurrence.id]
-		if !present || indexed != occurrence {
+		previousOccurrence = occurrence.ID()
+		indexed, present := graph.byOccurrence[occurrence.ID()]
+		if !present || !indexed.Equal(occurrence) {
 			return fmt.Errorf(
-				"canonical occurrence index disagrees at %s", occurrence.id,
+				"canonical occurrence index disagrees at %s", occurrence.ID(),
 			)
 		}
 	}
@@ -196,7 +196,7 @@ func validateDefinitionForest(
 
 func validateCheckedMappings(
 	file FileGraph,
-	all map[identity.OccurrenceID]*Occurrence,
+	all map[identity.OccurrenceID]OccurrenceRef,
 ) error {
 	definitions := map[identity.DefinitionID]bool{}
 	for _, definition := range file.definitions {

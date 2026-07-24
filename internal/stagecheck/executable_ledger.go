@@ -22,7 +22,7 @@ type executableLedgerOccurrenceKey struct {
 type executableLedgerArena struct {
 	files             []identity.FileID
 	fileByID          map[identity.FileID]uint32
-	occurrences       []identity.OccurrenceID
+	occurrences       []executableLedgerOccurrenceKey
 	occurrenceByKey   map[executableLedgerOccurrenceKey]executableLedgerOccurrenceRef
 	definitions       []identity.DefinitionID
 	definitionByID    map[identity.DefinitionID]executableLedgerDefinitionRef
@@ -59,7 +59,7 @@ func (arena *executableLedgerArena) occurrence(
 	if reference := arena.occurrenceByKey[key]; reference != 0 {
 		return reference
 	}
-	arena.occurrences = append(arena.occurrences, id)
+	arena.occurrences = append(arena.occurrences, key)
 	reference := executableLedgerOccurrenceRef(len(arena.occurrences))
 	arena.occurrenceByKey[key] = reference
 	return reference
@@ -71,7 +71,23 @@ func (arena *executableLedgerArena) occurrenceID(
 	if reference == 0 || int(reference) > len(arena.occurrences) {
 		return identity.OccurrenceID{}
 	}
-	return arena.occurrences[reference-1]
+	record := arena.occurrences[reference-1]
+	if record.file == 0 || int(record.file) > len(arena.files) {
+		return identity.OccurrenceID{}
+	}
+	span, err := identity.NewSpanID(
+		arena.files[record.file-1],
+		record.start,
+		record.end,
+	)
+	if err != nil {
+		return identity.OccurrenceID{}
+	}
+	id, err := identity.NewOccurrenceID(span, record.kind)
+	if err != nil {
+		return identity.OccurrenceID{}
+	}
+	return id
 }
 
 func (arena *executableLedgerArena) definition(
@@ -240,45 +256,154 @@ func compareCompactExecutableLedgers(
 	actual *compactExecutableLedger,
 	expected *compactExecutableLedger,
 ) error {
+	difference := newCompactExecutableLedger(actual.arena)
+	mergeExecutableRecordDifference(
+		&difference.additionalOccurrences,
+		actual.additionalOccurrences,
+		1,
+	)
+	mergeExecutableRecordDifference(
+		&difference.additionalOccurrences,
+		expected.additionalOccurrences,
+		-1,
+	)
+	mergeExecutableRecordDifference(
+		&difference.regions,
+		actual.regions,
+		1,
+	)
+	mergeExecutableRecordDifference(
+		&difference.regions,
+		expected.regions,
+		-1,
+	)
+	mergeExecutableRecordDifference(
+		&difference.members,
+		actual.members,
+		1,
+	)
+	mergeExecutableRecordDifference(
+		&difference.members,
+		expected.members,
+		-1,
+	)
+	mergeExecutableRecordDifference(
+		&difference.definitionReferences,
+		actual.definitionReferences,
+		1,
+	)
+	mergeExecutableRecordDifference(
+		&difference.definitionReferences,
+		expected.definitionReferences,
+		-1,
+	)
+	mergeExecutableRecordDifference(
+		&difference.implicitOperations,
+		actual.implicitOperations,
+		1,
+	)
+	mergeExecutableRecordDifference(
+		&difference.implicitOperations,
+		expected.implicitOperations,
+		-1,
+	)
+	return verifyCompactExecutableLedgerDifference(stage, difference)
+}
+
+func verifyCompactExecutableLedgerDifference(
+	stage string,
+	difference *compactExecutableLedger,
+) error {
 	problems := newProblemSet()
-	compareLedgerClass(
+	addExecutableRecordDifferences(
 		problems,
 		"executable-additional-occurrence",
-		actual.additionalOccurrences,
-		expected.additionalOccurrences,
-		actual.renderOccurrence,
+		difference.additionalOccurrences,
+		difference.renderOccurrence,
 	)
-	compareLedgerClass(
+	addExecutableRecordDifferences(
 		problems,
 		"executable-region",
-		actual.regions,
-		expected.regions,
-		actual.renderRegion,
+		difference.regions,
+		difference.renderRegion,
 	)
-	compareLedgerClass(
+	addExecutableRecordDifferences(
 		problems,
 		"executable-member",
-		actual.members,
-		expected.members,
-		actual.renderMember,
+		difference.members,
+		difference.renderMember,
 	)
-	compareLedgerClass(
+	addExecutableRecordDifferences(
 		problems,
 		"executable-definition-reference",
-		actual.definitionReferences,
-		expected.definitionReferences,
-		actual.renderDefinitionReference,
+		difference.definitionReferences,
+		difference.renderDefinitionReference,
 	)
-	compareLedgerClass(
+	addExecutableRecordDifferences(
 		problems,
 		"executable-implicit-operation",
-		actual.implicitOperations,
-		expected.implicitOperations,
-		actual.renderImplicitOperation,
+		difference.implicitOperations,
+		difference.renderImplicitOperation,
 	)
 	return problems.verificationError(
 		stage, "exact executable join failed",
 	)
+}
+
+func adjustExecutableRecordDifference[Record comparable](
+	records *recordMultiset[Record],
+	record Record,
+	delta int,
+) {
+	if delta == 0 {
+		return
+	}
+	if *records == nil {
+		*records = recordMultiset[Record]{}
+	}
+	count := (*records)[record] + delta
+	if count == 0 {
+		delete(*records, record)
+		return
+	}
+	(*records)[record] = count
+}
+
+func mergeExecutableRecordDifference[Record comparable](
+	target *recordMultiset[Record],
+	source recordMultiset[Record],
+	delta int,
+) {
+	for record, count := range source {
+		adjustExecutableRecordDifference(
+			target,
+			record,
+			count*delta,
+		)
+	}
+}
+
+func addExecutableRecordDifferences[Record comparable](
+	problems *problemSet,
+	class string,
+	differences recordMultiset[Record],
+	render func(Record) string,
+) {
+	for record, difference := range differences {
+		expected := 0
+		actual := difference
+		if difference < 0 {
+			expected = -difference
+			actual = 0
+		}
+		problems.addf(
+			"%s|%s|expected=%d|actual=%d",
+			class,
+			render(record),
+			expected,
+			actual,
+		)
+	}
 }
 
 func (ledger *compactExecutableLedger) renderOccurrence(

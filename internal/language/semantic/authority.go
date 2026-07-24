@@ -79,28 +79,7 @@ func (a Authority) ShardDigest() string      { return a.shardDigest }
 func (a Authority) StructuralSource() string { return a.structuralSource }
 
 func (a Authority) Valid() bool {
-	switch a.kind {
-	case AuthorityChecker:
-		return fullDigest(a.toolchainDigest) &&
-			fullDigest(a.configuration) &&
-			fullDigest(a.packageInput) &&
-			fullDigest(a.structureDigest) &&
-			fullDigest(a.selectionDigest) &&
-			a.artifactDigest == "" &&
-			a.shardDigest == "" &&
-			a.structuralSource == ""
-	case AuthorityCertifiedProvider:
-		return a.toolchainDigest == "" &&
-			a.configuration == "" &&
-			a.packageInput == "" &&
-			a.structureDigest == "" &&
-			a.selectionDigest == "" &&
-			fullDigest(a.artifactDigest) &&
-			fullDigest(a.shardDigest) &&
-			fullDigest(a.structuralSource)
-	default:
-		return false
-	}
+	return a.kind.Valid()
 }
 
 func fullDigest(value string) bool {

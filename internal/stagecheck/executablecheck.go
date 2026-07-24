@@ -88,16 +88,14 @@ func verifyExecutablePackage(
 	if err != nil {
 		return executableVerificationSummary{}, err
 	}
-	expected, err := deriveExecutableLedgerForPackage(
-		packageID, evidence, graph, selections, arena,
-	)
-	if err != nil {
+	if err := deriveExecutableLedgerForPackage(
+		packageID, evidence, graph, selections, actual,
+	); err != nil {
 		return executableVerificationSummary{}, err
 	}
-	if err := compareCompactExecutableLedgers(
+	if err := verifyCompactExecutableLedgerDifference(
 		"executable-region/"+packageID.String(),
 		actual,
-		expected,
 	); err != nil {
 		return executableVerificationSummary{}, err
 	}
@@ -136,9 +134,10 @@ func executableLedgerForPackage(
 					}
 				}
 				additional[reference] = true
-				addRecord(
+				adjustExecutableRecordDifference(
 					&actual.additionalOccurrences,
 					arena.recordFromRef(occurrence),
+					1,
 				)
 				summary.additionalOccurrences++
 				return nil
@@ -165,9 +164,10 @@ func executableLedgerForPackage(
 		}
 		summary.regions++
 		regionReference := arena.definition(region.Definition())
-		addRecord(
+		adjustExecutableRecordDifference(
 			&actual.regions,
 			regionReference,
+			1,
 		)
 		memberSet := map[executableLedgerOccurrenceRef]bool{}
 		if err := region.VisitMembers(func(
@@ -195,11 +195,15 @@ func executableLedgerForPackage(
 					}
 				}
 			}
-			addRecord(&actual.members, compactExecutableMember{
-				region:     regionReference,
-				ordinal:    index,
-				occurrence: memberReference,
-			})
+			adjustExecutableRecordDifference(
+				&actual.members,
+				compactExecutableMember{
+					region:     regionReference,
+					ordinal:    index,
+					occurrence: memberReference,
+				},
+				1,
+			)
 			return nil
 		}); err != nil {
 			return nil, executableVerificationSummary{}, err
@@ -207,7 +211,7 @@ func executableLedgerForPackage(
 		if err := region.VisitReferences(func(
 			reference executable.DefinitionReference,
 		) error {
-			addRecord(
+			adjustExecutableRecordDifference(
 				&actual.definitionReferences,
 				compactDefinitionReference{
 					region: regionReference,
@@ -218,6 +222,7 @@ func executableLedgerForPackage(
 					ordinal: reference.Ordinal(),
 					child:   arena.definition(reference.Child()),
 				},
+				1,
 			)
 			return nil
 		}); err != nil {
@@ -226,13 +231,14 @@ func executableLedgerForPackage(
 		if err := region.VisitImplicitOperations(func(
 			operation executable.ImplicitOperation,
 		) error {
-			addRecord(
+			adjustExecutableRecordDifference(
 				&actual.implicitOperations,
 				compactImplicitOperation{
 					region: regionReference,
 					kind:   operation.Kind(),
 					pkg:    operation.Package(),
 				},
+				1,
 			)
 			return nil
 		}); err != nil {
@@ -247,8 +253,8 @@ func deriveExecutableLedgerForPackage(
 	evidence *independentPackageEvidence,
 	graph *structure.Graph,
 	selections []scope.DefinitionSelection,
-	arena *executableLedgerArena,
-) (*compactExecutableLedger, error) {
+	expected *compactExecutableLedger,
+) error {
 	definitionAt := map[identity.OccurrenceID]identity.DefinitionID{}
 	for _, file := range evidence.files {
 		for definition := range file.definitions {
@@ -257,33 +263,33 @@ func deriveExecutableLedgerForPackage(
 			}
 		}
 	}
-	expected := newCompactExecutableLedger(arena)
 	for _, selection := range selections {
 		if selection.Depth() != contract.DepthFullSemantic {
 			continue
 		}
-		regionReference := arena.definition(selection.Definition())
-		addRecord(
+		regionReference := expected.arena.definition(selection.Definition())
+		adjustExecutableRecordDifference(
 			&expected.regions,
 			regionReference,
+			-1,
 		)
 		if selection.Definition().ImplicitOp().Valid() {
 			if selection.Definition().ImplicitOp() !=
 				identity.ImplicitDefinitionPackageInit {
-				return nil, &VerificationError{
+				return &VerificationError{
 					Stage: "executable-region",
 					Reason: "unknown full implicit definition " +
 						selection.Definition().String(),
 				}
 			}
 			if selection.Definition().Package() != packageID {
-				return nil, &VerificationError{
+				return &VerificationError{
 					Stage: "executable-region",
 					Reason: "implicit definition has the wrong package " +
 						selection.Definition().String(),
 				}
 			}
-			addRecord(
+			adjustExecutableRecordDifference(
 				&expected.implicitOperations,
 				compactImplicitOperation{
 					region: regionReference,
@@ -291,12 +297,13 @@ func deriveExecutableLedgerForPackage(
 						ImplicitOperationCoordinatePackageInitialization,
 					pkg: selection.Definition().Package(),
 				},
+				-1,
 			)
 			continue
 		}
 		derived := evidence.files[selection.Definition().File()]
 		if derived == nil {
-			return nil, &VerificationError{
+			return &VerificationError{
 				Stage: "executable-region",
 				Reason: "full definition lacks package-local verifier evidence " +
 					selection.Definition().String(),
@@ -304,7 +311,7 @@ func deriveExecutableLedgerForPackage(
 		}
 		node := derived.definitions[selection.Definition()]
 		if node == nil {
-			return nil, &VerificationError{
+			return &VerificationError{
 				Stage: "executable-region",
 				Reason: "independent derivation lacks full definition " +
 					selection.Definition().String(),
@@ -320,20 +327,20 @@ func deriveExecutableLedgerForPackage(
 		}
 		entries, err := independentDefinitionEntries(node)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		root, present := graph.ResidentOccurrence(
 			selection.Definition().Root(),
 		)
 		if !present {
-			return nil, fmt.Errorf(
+			return fmt.Errorf(
 				"definition root %s is absent", selection.Definition().Root(),
 			)
 		}
 		for _, entry := range entries {
 			nested, isDefinition, err := builder.nested(entry.node)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			if isDefinition {
 				builder.reference(
@@ -344,11 +351,11 @@ func deriveExecutableLedgerForPackage(
 			if err := builder.visit(
 				entry.node, root.ID(), entry.edge, entry.ordinal,
 			); err != nil {
-				return nil, err
+				return err
 			}
 		}
 	}
-	return expected, nil
+	return nil
 }
 
 func verifyExecutableSummary(
@@ -422,13 +429,14 @@ func (b *independentExecutableBuilder) visit(
 		reference := b.ledger.arena.occurrence(occurrence.id)
 		if !b.additional[reference] {
 			b.additional[reference] = true
-			addRecord(
+			adjustExecutableRecordDifference(
 				&b.ledger.additionalOccurrences,
 				b.ledger.arena.recordFromDerived(occurrence),
+				-1,
 			)
 		}
 	}
-	addRecord(
+	adjustExecutableRecordDifference(
 		&b.ledger.members,
 		compactExecutableMember{
 			region:  b.region,
@@ -437,6 +445,7 @@ func (b *independentExecutableBuilder) visit(
 				occurrence.id,
 			),
 		},
+		-1,
 	)
 	b.memberIndex++
 	children, err := independentChildren(node, occurrence.kind)
@@ -491,7 +500,7 @@ func (b *independentExecutableBuilder) reference(
 	ordinal int,
 	child identity.DefinitionID,
 ) {
-	addRecord(
+	adjustExecutableRecordDifference(
 		&b.ledger.definitionReferences,
 		compactDefinitionReference{
 			region:  b.region,
@@ -500,5 +509,6 @@ func (b *independentExecutableBuilder) reference(
 			ordinal: ordinal,
 			child:   b.ledger.arena.definition(child),
 		},
+		-1,
 	)
 }

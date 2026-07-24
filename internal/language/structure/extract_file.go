@@ -86,9 +86,23 @@ func buildFile(
 		return FileGraph{}, err
 	}
 	builder.owner.directives = directives
-	occurrences := make([]Occurrence, 0, len(builder.order))
+	occurrenceBuilder, err := NewOccurrenceStoreBuilder(
+		file.ID(),
+		len(builder.order),
+	)
+	if err != nil {
+		return FileGraph{}, err
+	}
 	for _, id := range builder.order {
-		occurrences = append(occurrences, builder.occurrences[id])
+		if _, err := occurrenceBuilder.Append(
+			builder.occurrences[id],
+		); err != nil {
+			return FileGraph{}, err
+		}
+	}
+	occurrences, err := occurrenceBuilder.Seal()
+	if err != nil {
+		return FileGraph{}, err
 	}
 	return FileGraph{
 		owner:       builder.owner,

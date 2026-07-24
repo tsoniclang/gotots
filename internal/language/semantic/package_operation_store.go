@@ -113,7 +113,7 @@ func (builder *packageOperationBuilder) add(
 	identities *packageIdentityBuilder,
 	record Operation,
 ) {
-	builder.addSpec(identities, record.spec)
+	builder.addSpec(identities, record.normalizationSpec())
 }
 
 func (builder *packageOperationBuilder) addSpec(

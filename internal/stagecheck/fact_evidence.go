@@ -76,7 +76,9 @@ func deriveIndependentFactEvidence(
 				mapping.CheckedDigest(),
 			)
 		}
-		for _, definition := range pkg.Definitions() {
+		if err := pkg.VisitDefinitions(func(
+			definition structure.ImplementationDefinition,
+		) error {
 			out.definitions[definition.ID()] =
 				independentDefinitionEvidence{
 					pkg:      pkg.ID(),
@@ -85,6 +87,9 @@ func deriveIndependentFactEvidence(
 					boundary: boundaries[definition.ID()],
 					mapping:  mappings[definition.ID()],
 				}
+			return nil
+		}); err != nil {
+			return err
 		}
 		return nil
 	}); err != nil {

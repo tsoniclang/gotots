@@ -205,13 +205,18 @@ func ledgerForPackage(pkg structure.PackageGraph) *structuralLedger {
 	for _, owner := range pkg.SyntheticOwners() {
 		addRecord(&ledger.owners, owner.ID())
 	}
+	if err := pkg.VisitDefinitions(func(
+		definition structure.ImplementationDefinition,
+	) error {
+		if definition.ID().File().IsZero() {
+			addDefinitionRecord(ledger, definition)
+		}
+		return nil
+	}); err != nil {
+		panic(err)
+	}
 	addDefinitionRecords(
-		ledger,
-		pkg.Definitions(),
-		pkg.Sites(),
-		pkg.Headers(),
-		pkg.Boundaries(),
-		true,
+		ledger, nil, pkg.Sites(), pkg.Headers(), pkg.Boundaries(), true,
 	)
 	return ledger
 }
@@ -225,11 +230,16 @@ func ledgerForFile(file structure.FileGraph) *structuralLedger {
 func addFileGraph(ledger *structuralLedger, file structure.FileGraph) {
 	owner := file.Owner()
 	addRecord(&ledger.owners, owner.ID())
-	for _, occurrence := range file.Occurrences() {
+	if err := file.VisitOccurrenceRefs(func(
+		occurrence structure.OccurrenceRef,
+	) error {
 		addRecord(
 			&ledger.occurrences,
-			occurrenceLedgerRecordFromOccurrence(occurrence),
+			occurrenceLedgerRecordFromRef(occurrence),
 		)
+		return nil
+	}); err != nil {
+		panic(err)
 	}
 	for _, member := range owner.Members() {
 		addRecord(&ledger.ownerMembers, ownerMemberLedgerRecord{
@@ -257,13 +267,16 @@ func addFileGraph(ledger *structuralLedger, file structure.FileGraph) {
 			},
 		)
 	}
+	if err := file.VisitDefinitions(func(
+		definition structure.ImplementationDefinition,
+	) error {
+		addDefinitionRecord(ledger, definition)
+		return nil
+	}); err != nil {
+		panic(err)
+	}
 	addDefinitionRecords(
-		ledger,
-		file.Definitions(),
-		file.Sites(),
-		file.Headers(),
-		file.Boundaries(),
-		false,
+		ledger, nil, file.Sites(), file.Headers(), file.Boundaries(), false,
 	)
 	for _, mapping := range file.CheckedMappings() {
 		addRecord(&ledger.checkedMappings, checkedMappingLedgerRecord{
@@ -288,13 +301,7 @@ func addDefinitionRecords(
 		if implicitOnly && !definition.ID().File().IsZero() {
 			continue
 		}
-		addRecord(&ledger.definitions, definitionLedgerRecord{
-			id:       definition.ID(),
-			owner:    definition.Owner(),
-			header:   definition.Header(),
-			boundary: definition.Boundary(),
-			name:     definition.Name(),
-		})
+		addDefinitionRecord(ledger, definition)
 	}
 	for _, site := range sites {
 		if implicitOnly && !site.Definition().File().IsZero() {
@@ -343,4 +350,17 @@ func addDefinitionRecords(
 			})
 		}
 	}
+}
+
+func addDefinitionRecord(
+	ledger *structuralLedger,
+	definition structure.ImplementationDefinition,
+) {
+	addRecord(&ledger.definitions, definitionLedgerRecord{
+		id:       definition.ID(),
+		owner:    definition.Owner(),
+		header:   definition.Header(),
+		boundary: definition.Boundary(),
+		name:     definition.Name(),
+	})
 }

@@ -275,7 +275,7 @@ func finalizePackageTypePool(
 	records := map[identity.SemanticTypeID]Type{}
 	for _, record := range input.Types {
 		if existing, duplicate := records[record.ID()]; duplicate {
-			if existing.Canonical() != record.Canonical() {
+			if !existing.Equal(record) {
 				return PackageInput{}, fmt.Errorf(
 					"semantic type pool collides at %s",
 					record.ID(),

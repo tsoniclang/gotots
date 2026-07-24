@@ -129,14 +129,17 @@ func TestStructuralGraphAdmissionRejectsCorruptedRelations(t *testing.T) {
 		},
 		"duplicate-occurrence": func(graph *Graph) {
 			file := &graph.packages[0].files[0]
-			file.occurrences = append(file.occurrences, file.occurrences[0])
+			file.occurrences.records = append(
+				file.occurrences.records,
+				file.occurrences.records[0],
+			)
 		},
 		"noncanonical-child-edge": func(graph *Graph) {
 			for fileIndex := range graph.packages[0].files {
 				file := &graph.packages[0].files[fileIndex]
-				for occurrenceIndex := range file.occurrences {
-					occurrence := &file.occurrences[occurrenceIndex]
-					if occurrence.parent.IsZero() {
+				for occurrenceIndex := range file.occurrences.records {
+					occurrence := &file.occurrences.records[occurrenceIndex]
+					if occurrence.parentKind == 0 {
 						continue
 					}
 					occurrence.edge = catalog.EdgeInvalid

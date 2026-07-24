@@ -29,8 +29,13 @@ func Validate(
 	if err := graph.VisitResidentPackages(func(
 		pkg structure.PackageGraph,
 	) error {
-		for _, definition := range pkg.Definitions() {
+		if err := pkg.VisitDefinitions(func(
+			definition structure.ImplementationDefinition,
+		) error {
 			definitions[definition.ID()] = definition
+			return nil
+		}); err != nil {
+			return err
 		}
 		for _, site := range pkg.Sites() {
 			sites[site.Definition()] = site
@@ -47,7 +52,7 @@ func Validate(
 	}
 	if err := inventory.occurrences.visitPayloads(func(
 		_ occurrenceRef,
-		occurrence *structure.Occurrence,
+		occurrence structure.OccurrenceRef,
 	) error {
 		id := occurrence.ID()
 		if _, duplicated := graph.ResidentOccurrence(id); duplicated {
@@ -131,7 +136,7 @@ func Validate(
 	}
 	if err := inventory.occurrences.visitPayloads(func(
 		_ occurrenceRef,
-		occurrence *structure.Occurrence,
+		occurrence structure.OccurrenceRef,
 	) error {
 		member := inventory.occurrences.reference(occurrence.ID())
 		if !member.valid() || state.memberOwner[member] == 0 {
@@ -202,8 +207,8 @@ func validateInventoryIndexes(inventory *Inventory) error {
 	expectedRanges := map[identity.FileID]occurrenceRange{}
 	seen := make([]bool, inventory.occurrences.length()+1)
 	for position, reference := range inventory.additional {
-		occurrence := inventory.occurrences.payloadFor(reference)
-		if occurrence == nil || seen[reference] {
+		occurrence, present := inventory.occurrences.payloadFor(reference)
+		if !present || seen[reference] {
 			return fmt.Errorf(
 				"additional occurrence reference %d is absent or repeated",
 				reference,

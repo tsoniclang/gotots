@@ -62,10 +62,12 @@ func attachCgo(
 		return err
 	}
 	origins := map[originKey][]identity.DefinitionID{}
-	for _, definition := range graph.Definitions() {
+	if err := graph.VisitDefinitions(func(
+		definition ImplementationDefinition,
+	) error {
 		file, exists := index.files[definition.id.File()]
 		if !exists || !file.CgoOriginal() {
-			continue
+			return nil
 		}
 		node := index.definitions[definition.id]
 		join := definitionJoinNode(node)
@@ -78,6 +80,9 @@ func attachCgo(
 			kind: definition.id.Kind(),
 		}
 		origins[key] = append(origins[key], definition.id)
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	matched := map[identity.DefinitionID]bool{}
@@ -149,11 +154,16 @@ func attachCgo(
 			work.RecordAppends++
 		}
 	}
-	for _, definition := range graph.Definitions() {
+	if err := graph.VisitDefinitions(func(
+		definition ImplementationDefinition,
+	) error {
 		file, exists := index.files[definition.id.File()]
 		if exists && file.CgoOriginal() && !matched[definition.id] {
 			return fmt.Errorf("cgo definition %s has no checked counterpart", definition.id)
 		}
+		return nil
+	}); err != nil {
+		return err
 	}
 	for fileIndex := range graph.files {
 		sort.Slice(graph.files[fileIndex].mappings, func(i, j int) bool {
