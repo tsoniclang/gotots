@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func TestSemanticPackageHasNoResidentWireRecordTree(t *testing.T) {
+func TestSemanticArtifactHasOneNormalizedBinaryDetailPath(t *testing.T) {
 	root := repoRoot(t)
 	directory := filepath.Join(
 		root,
@@ -51,6 +51,12 @@ func TestSemanticPackageHasNoResidentWireRecordTree(t *testing.T) {
 					path,
 					violation,
 				)
+			}
+			for _, violation := range forbiddenSemanticArtifactImports(
+				path,
+				file,
+			) {
+				t.Errorf("%s: %s", path, violation)
 			}
 		}
 	}
@@ -99,6 +105,67 @@ type wireIdentityDecoder struct {
 			len(violations),
 		)
 	}
+	const codecMutation = `package semantic
+import "encoding/json"
+func decodeBinaryDetail(value []byte) error {
+	return json.Unmarshal(value, &struct{}{})
+}`
+	file, err = parser.ParseFile(
+		fset,
+		"artifact_binary_mutation.go",
+		codecMutation,
+		0,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if violations := forbiddenSemanticArtifactImports(
+		"artifact_binary_mutation.go",
+		file,
+	); len(violations) != 1 {
+		t.Fatalf(
+			"binary-codec gate found %d mutation imports, want 1",
+			len(violations),
+		)
+	}
+}
+
+func forbiddenSemanticArtifactImports(
+	path string,
+	file *ast.File,
+) []string {
+	if !strings.HasPrefix(
+		filepath.Base(path),
+		"artifact_",
+	) {
+		return nil
+	}
+	manifestJSONOwners := map[string]bool{
+		"artifact_parse.go":  true,
+		"artifact_store.go":  true,
+		"artifact_writer.go": true,
+	}
+	var out []string
+	for _, imported := range file.Imports {
+		name := strings.Trim(imported.Path.Value, `"`)
+		switch {
+		case name == "encoding/json" &&
+			!manifestJSONOwners[filepath.Base(path)]:
+			out = append(
+				out,
+				"semantic detail imports encoding/json outside manifest owner",
+			)
+		case name == "encoding/gob" ||
+			name == "reflect" ||
+			name == "unsafe":
+			out = append(
+				out,
+				"semantic artifact imports forbidden codec dependency "+
+					name,
+			)
+		}
+	}
+	return out
 }
 
 func wireRecordTreeFields(

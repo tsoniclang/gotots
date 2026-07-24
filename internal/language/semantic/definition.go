@@ -159,7 +159,8 @@ func validateDefinitionIdentityForm(
 	switch spec.Definition.Kind() {
 	case identity.DefinitionFuncDecl:
 		wantForm = DefinitionFormCallable
-		if spec.Name == "_" || spec.Name == "init" {
+		if spec.Name == "_" ||
+			(spec.Name == "init" && spec.Receiver.IsZero()) {
 			wantDeclarations = 0
 		} else {
 			wantDeclarations = 1

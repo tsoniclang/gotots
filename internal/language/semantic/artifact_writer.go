@@ -82,7 +82,7 @@ func NewProviderArtifactWriter(
 			"semantic provider shard spool: %w", err,
 		)
 	}
-	wireContext := providerContext{
+	manifestContext := providerContext{
 		Version:             ProviderArtifactVersion,
 		ToolchainDigest:     context.ToolchainDigest,
 		ConfigurationDigest: context.ConfigurationDigest,
@@ -93,8 +93,8 @@ func NewProviderArtifactWriter(
 		path:       path,
 		spool:      spool,
 		spoolPath:  spool.Name(),
-		context:    wireContext,
-		manifest:   providerManifest{Context: wireContext},
+		context:    manifestContext,
+		manifest:   providerManifest{Context: manifestContext},
 		typeOwners: map[identity.SemanticTypeID]int{},
 		result:     ProviderWriteResult{Path: path},
 	}, nil

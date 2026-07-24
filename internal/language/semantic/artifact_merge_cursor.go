@@ -1,24 +1,20 @@
 package semantic
 
-import (
-	"encoding/json"
-	"fmt"
-)
+import "fmt"
 
 type orderedSemanticKey[Key any] interface {
 	Compare(Key) int
 }
 
-type decodedRecordCursor[
-	Wire any,
+type binaryRecordCursor[
 	Record any,
 	Key orderedSemanticKey[Key],
 ] struct {
-	decoder     *json.Decoder
+	decoder     *binaryShardDecoder
 	authority   Authority
 	name        string
 	expected    int
-	decode      func(Wire, Authority) (Record, error)
+	decode      func(*binaryShardDecoder, Authority) (Record, error)
 	key         func(Record) Key
 	count       int
 	previous    Key
@@ -28,37 +24,32 @@ type decodedRecordCursor[
 	present     bool
 }
 
-func openDecodedRecordCursor[
-	Wire any,
+func openBinaryRecordCursor[
 	Record any,
 	Key orderedSemanticKey[Key],
 ](
-	decoder *json.Decoder,
+	decoder *binaryShardDecoder,
 	authority Authority,
 	name string,
 	expected int,
-	decode func(Wire, Authority) (Record, error),
+	decode func(*binaryShardDecoder, Authority) (Record, error),
 	key func(Record) Key,
-) (*decodedRecordCursor[Wire, Record, Key], error) {
+) (*binaryRecordCursor[Record, Key], error) {
 	if decoder == nil || !authority.Valid() || expected < 0 ||
 		decode == nil || key == nil {
 		return nil, fmt.Errorf(
-			"semantic shard record cursor %s is invalid", name,
+			"semantic binary record cursor %s is invalid", name,
 		)
 	}
-	if err := requireShardField(decoder, name); err != nil {
+	if _, err := readExpectedRecordCount(
+		decoder, name, expected,
+	); err != nil {
 		return nil, err
 	}
-	if err := requireShardDelimiter(decoder, '['); err != nil {
-		return nil, err
-	}
-	cursor := &decodedRecordCursor[Wire, Record, Key]{
-		decoder:   decoder,
-		authority: authority,
-		name:      name,
-		expected:  expected,
-		decode:    decode,
-		key:       key,
+	cursor := &binaryRecordCursor[Record, Key]{
+		decoder: decoder, authority: authority,
+		name: name, expected: expected,
+		decode: decode, key: key,
 	}
 	if err := cursor.advance(); err != nil {
 		return nil, err
@@ -66,94 +57,47 @@ func openDecodedRecordCursor[
 	return cursor, nil
 }
 
-func (cursor *decodedRecordCursor[
-	Wire,
-	Record,
-	Key,
-]) advance() error {
-	if cursor.decoder.More() {
-		if cursor.count >= cursor.expected {
-			return fmt.Errorf(
-				"semantic shard %s exceeds manifest count %d",
-				cursor.name,
-				cursor.expected,
-			)
-		}
-		var encoded Wire
-		if err := cursor.decoder.Decode(&encoded); err != nil {
-			return fmt.Errorf(
-				"decode semantic shard %s record %d: %w",
-				cursor.name,
-				cursor.count,
-				err,
-			)
-		}
-		record, err := cursor.decode(encoded, cursor.authority)
-		if err != nil {
-			return fmt.Errorf(
-				"admit semantic shard %s record %d: %w",
-				cursor.name,
-				cursor.count,
-				err,
-			)
-		}
-		key := cursor.key(record)
-		if cursor.hasPrevious &&
-			key.Compare(cursor.previous) <= 0 {
-			return fmt.Errorf(
-				"semantic shard %s records are not canonical at %v",
-				cursor.name,
-				key,
-			)
-		}
-		cursor.current = record
-		cursor.currentKey = key
-		cursor.previous = key
-		cursor.hasPrevious = true
-		cursor.present = true
-		cursor.count++
+func (cursor *binaryRecordCursor[Record, Key]) advance() error {
+	if cursor.count == cursor.expected {
+		cursor.present = false
+		var zeroKey Key
+		cursor.currentKey = zeroKey
+		var zeroRecord Record
+		cursor.current = zeroRecord
 		return nil
 	}
-	cursor.present = false
-	var zeroKey Key
-	cursor.currentKey = zeroKey
-	var zeroRecord Record
-	cursor.current = zeroRecord
-	return nil
-}
-
-func (cursor *decodedRecordCursor[
-	Wire,
-	Record,
-	Key,
-]) finish() error {
-	if cursor.present {
+	record, err := cursor.decode(cursor.decoder, cursor.authority)
+	if err != nil {
 		return fmt.Errorf(
-			"semantic shard %s cursor has an unconsumed record",
-			cursor.name,
-		)
-	}
-	if err := requireShardDelimiter(cursor.decoder, ']'); err != nil {
-		return err
-	}
-	if cursor.count != cursor.expected {
-		return fmt.Errorf(
-			"semantic shard %s count %d disagrees with manifest %d",
+			"decode semantic binary %s record %d: %w",
 			cursor.name,
 			cursor.count,
-			cursor.expected,
+			err,
 		)
 	}
+	key := cursor.key(record)
+	if cursor.hasPrevious && key.Compare(cursor.previous) <= 0 {
+		return fmt.Errorf(
+			"semantic binary %s records are not canonical at %v",
+			cursor.name,
+			key,
+		)
+	}
+	cursor.current = record
+	cursor.currentKey = key
+	cursor.previous = key
+	cursor.hasPrevious = true
+	cursor.present = true
+	cursor.count++
 	return nil
 }
 
-func mergeDecodedRecords[
-	Wire any,
+func mergeBinaryRecords[
 	Record any,
 	Key orderedSemanticKey[Key],
 ](
-	checker *decodedRecordCursor[Wire, Record, Key],
-	provider *decodedRecordCursor[Wire, Record, Key],
+	checker *binaryRecordCursor[Record, Key],
+	provider *binaryRecordCursor[Record, Key],
 	equal func(Record, Record) bool,
 	requireChecker func(Record) bool,
 	admit func(Record, Authority) error,
@@ -210,8 +154,5 @@ func mergeDecodedRecords[
 			}
 		}
 	}
-	if err := checker.finish(); err != nil {
-		return err
-	}
-	return provider.finish()
+	return nil
 }

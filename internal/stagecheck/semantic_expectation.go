@@ -282,6 +282,16 @@ func newSemanticPackageExpectation(
 			return semanticPackageExpectation{}, err
 		}
 	}
+	filtered := out.order[:0]
+	for _, reference := range out.order {
+		record := out.occurrenceRecord(reference)
+		if !record.domain.Valid() {
+			out.occurrences.remove(record.ID())
+			continue
+		}
+		filtered = append(filtered, reference)
+	}
+	out.order = filtered
 	return out, nil
 }
 

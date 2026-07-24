@@ -94,17 +94,17 @@ func TestOperationVisitorDoesNotCloneRelationArenas(t *testing.T) {
 	}
 }
 
-func TestWireRecordsContainReferencesRatherThanSemanticIdentities(
+func TestBinaryStoredRecordsContainReferencesRatherThanSemanticIdentities(
 	t *testing.T,
 ) {
 	roots := []reflect.Type{
-		reflect.TypeOf(wireDefinitionRecord{}),
-		reflect.TypeOf(wireResolutionRecord{}),
-		reflect.TypeOf(wireDeclarationRecord{}),
-		reflect.TypeOf(wireBindingRecord{}),
-		reflect.TypeOf(wireTypeRecord{}),
-		reflect.TypeOf(wireOperationRecord{}),
-		reflect.TypeOf(wireUnsupportedRecord{}),
+		reflect.TypeOf(storedDefinition{}),
+		reflect.TypeOf(storedResolution{}),
+		reflect.TypeOf(storedDeclaration{}),
+		reflect.TypeOf(storedBinding{}),
+		reflect.TypeOf(storedType{}),
+		reflect.TypeOf(storedOperation{}),
+		reflect.TypeOf(storedUnsupported{}),
 	}
 	for _, root := range roots {
 		if path, forbidden := forbiddenWireCarrier(
@@ -112,7 +112,7 @@ func TestWireRecordsContainReferencesRatherThanSemanticIdentities(
 			map[reflect.Type]bool{},
 		); forbidden {
 			t.Errorf(
-				"wire record %s retains semantic carrier at %s",
+				"binary stored record %s retains semantic carrier at %s",
 				root,
 				path,
 			)
@@ -138,8 +138,19 @@ func forbiddenWireCarrier(
 	for current.Kind() == reflect.Pointer {
 		current = current.Elem()
 	}
-	if current.PkgPath() ==
-		"github.com/tsoniclang/gotots/internal/identity" {
+	switch current {
+	case reflect.TypeFor[identity.ModuleID](),
+		reflect.TypeFor[identity.Owner](),
+		reflect.TypeFor[identity.PackageID](),
+		reflect.TypeFor[identity.FileID](),
+		reflect.TypeFor[identity.SpanID](),
+		reflect.TypeFor[identity.OccurrenceID](),
+		reflect.TypeFor[identity.DefinitionID](),
+		reflect.TypeFor[identity.SemanticTypeID](),
+		reflect.TypeFor[identity.SemanticDeclarationID](),
+		reflect.TypeFor[identity.SemanticBindingID](),
+		reflect.TypeFor[identity.OperationID](),
+		reflect.TypeFor[identity.UnsupportedID]():
 		return current.String(), true
 	}
 	if current.PkgPath() ==

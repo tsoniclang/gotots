@@ -1,17 +1,46 @@
 package compiler
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"testing"
 )
+
+type mutableSemanticManifest struct {
+	Context  json.RawMessage                  `json:"context"`
+	Packages []mutableSemanticManifestPackage `json:"packages"`
+}
+
+type mutableSemanticManifestPackage struct {
+	Package            string   `json:"package"`
+	Provenance         uint8    `json:"provenance"`
+	PackageInput       string   `json:"packageInputDigest"`
+	Structure          string   `json:"structureDigest"`
+	Selection          string   `json:"selectionDigest"`
+	Definitions        []string `json:"definitions"`
+	Declarations       []string `json:"declarations"`
+	DefinitionCount    int      `json:"definitionCount"`
+	ResolutionCount    int      `json:"resolutionCount"`
+	DeclarationCount   int      `json:"declarationCount"`
+	MemberTargetCount  int      `json:"memberTargetCount"`
+	MemberTargetDigest string   `json:"memberTargetDigest"`
+	BindingCount       int      `json:"bindingCount"`
+	TypeCount          int      `json:"typeCount"`
+	OperationCount     int      `json:"operationCount"`
+	UnsupportedCount   int      `json:"unsupportedCount"`
+	ShardOffset        int64    `json:"shardOffset"`
+	ShardBytes         int64    `json:"shardBytes"`
+	ShardDigest        string   `json:"shardDigest"`
+}
+
+type semanticShardMutation func(
+	[]byte,
+	*mutableSemanticManifestPackage,
+) ([]byte, bool)
 
 func rewriteSemanticArtifact(
 	t *testing.T,
@@ -48,16 +77,8 @@ func rewriteSemanticArtifact(
 		}
 		encoded := append([]byte(nil), raw[start:end]...)
 		if !mutated {
-			var shard map[string]json.RawMessage
-			if err := json.Unmarshal(encoded, &shard); err != nil {
-				t.Fatal(err)
-			}
-			if mutate(shard, entry) {
-				encoded, err = marshalMutableSemanticShard(shard)
-				if err != nil {
-					t.Fatal(err)
-				}
-				mutated = true
+			encoded, mutated = mutate(encoded, entry)
+			if mutated {
 				mutatedPackage = entry.Package
 			}
 		}
@@ -69,7 +90,7 @@ func rewriteSemanticArtifact(
 		shards[index] = encoded
 	}
 	if !mutated {
-		t.Fatal("semantic artifact had no shard accepted by the mutation")
+		t.Fatal("semantic artifact had no shard accepted by mutation")
 	}
 	encodedManifest, err := json.Marshal(manifest)
 	if err != nil {
@@ -96,68 +117,4 @@ func rewriteSemanticArtifact(
 	}
 	digest := sha256.Sum256(rewritten)
 	return rewrittenPath, hex.EncodeToString(digest[:]), mutatedPackage
-}
-
-func marshalMutableSemanticShard(
-	shard map[string]json.RawMessage,
-) ([]byte, error) {
-	order := []string{
-		"version",
-		"provenance",
-		"counts",
-		"identities",
-		"package",
-		"definitions",
-		"resolutions",
-		"declarations",
-		"bindings",
-		"types",
-		"operations",
-		"unsupported",
-	}
-	known := map[string]bool{}
-	var output bytes.Buffer
-	output.WriteByte('{')
-	first := true
-	writeField := func(name string) error {
-		value, present := shard[name]
-		if !present {
-			return fmt.Errorf(
-				"semantic mutation shard lacks field %s",
-				name,
-			)
-		}
-		if !first {
-			output.WriteByte(',')
-		}
-		first = false
-		encodedName, err := json.Marshal(name)
-		if err != nil {
-			return err
-		}
-		output.Write(encodedName)
-		output.WriteByte(':')
-		output.Write(value)
-		known[name] = true
-		return nil
-	}
-	for _, name := range order {
-		if err := writeField(name); err != nil {
-			return nil, err
-		}
-	}
-	var extra []string
-	for name := range shard {
-		if !known[name] {
-			extra = append(extra, name)
-		}
-	}
-	sort.Strings(extra)
-	for _, name := range extra {
-		if err := writeField(name); err != nil {
-			return nil, err
-		}
-	}
-	output.WriteByte('}')
-	return output.Bytes(), nil
 }

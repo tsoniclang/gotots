@@ -155,7 +155,7 @@ func (verifier *checkerSemanticVerifier) verifyCallableDefinition(
 		return fmt.Errorf("callable has no checker object")
 	}
 	wantDeclarations := 1
-	if node.Name.Name == "_" || node.Name.Name == "init" {
+	if node.Name.Name == "_" || independentPackageInitializer(node) {
 		wantDeclarations = 0
 	}
 	if definition.SyntheticRole().Valid() {
@@ -307,4 +307,11 @@ func (verifier *checkerSemanticVerifier) independentDefinitionObject(
 		return nil
 	}
 	return verifier.expected.loaded.Types().Scope().Lookup(name.Name)
+}
+
+func independentPackageInitializer(declaration *ast.FuncDecl) bool {
+	return declaration != nil &&
+		declaration.Recv == nil &&
+		declaration.Name != nil &&
+		declaration.Name.Name == "init"
 }

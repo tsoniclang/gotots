@@ -1,7 +1,6 @@
 package compiler
 
 import (
-	"encoding/json"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,33 +10,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/scope/contract"
 	"github.com/tsoniclang/gotots/internal/source"
 )
-
-type mutableSemanticManifest struct {
-	Context  json.RawMessage                  `json:"context"`
-	Packages []mutableSemanticManifestPackage `json:"packages"`
-}
-
-type mutableSemanticManifestPackage struct {
-	Package            string   `json:"package"`
-	Provenance         uint8    `json:"provenance"`
-	PackageInput       string   `json:"packageInputDigest"`
-	Structure          string   `json:"structureDigest"`
-	Selection          string   `json:"selectionDigest"`
-	Definitions        []string `json:"definitions"`
-	Declarations       []string `json:"declarations"`
-	DefinitionCount    int      `json:"definitionCount"`
-	ResolutionCount    int      `json:"resolutionCount"`
-	DeclarationCount   int      `json:"declarationCount"`
-	MemberTargetCount  int      `json:"memberTargetCount"`
-	MemberTargetDigest string   `json:"memberTargetDigest"`
-	BindingCount       int      `json:"bindingCount"`
-	TypeCount          int      `json:"typeCount"`
-	OperationCount     int      `json:"operationCount"`
-	UnsupportedCount   int      `json:"unsupportedCount"`
-	ShardOffset        int64    `json:"shardOffset"`
-	ShardBytes         int64    `json:"shardBytes"`
-	ShardDigest        string   `json:"shardDigest"`
-}
 
 func TestProviderSemanticAdmissionRejectsResealedCorruption(
 	t *testing.T,
@@ -66,204 +38,124 @@ func TestProviderSemanticAdmissionRejectsResealedCorruption(
 	}
 	request.ProviderStructureArtifact = structurePath
 	request.ProviderStructureDigest = result.Structure.Digest
-
-	t.Run("missing-referenced-declaration", func(t *testing.T) {
-		path, digest, packageID := rewriteSemanticArtifact(
-			t,
-			semanticPath,
-			removeReferencedSemanticDeclaration,
-		)
-		request.ProviderSemanticArtifact = path
-		request.ProviderSemanticDigest = digest
-		inspectErr := projectMutatedSemanticPackage(
-			t, request, packageID,
-		)
-		if inspectErr == nil ||
-			!strings.Contains(
-				inspectErr.Error(),
-				"absent owned declaration",
-			) ||
-			!strings.Contains(inspectErr.Error(), packageID) {
-			t.Fatalf(
-				"resealed internal relationship error = %v",
-				inspectErr,
-			)
-		}
-	})
-
-	t.Run("target-specific-field", func(t *testing.T) {
-		path, digest, packageID := rewriteSemanticArtifact(
-			t,
-			semanticPath,
-			injectTargetSpecificSemanticField,
-		)
-		request.ProviderSemanticArtifact = path
-		request.ProviderSemanticDigest = digest
-		inspectErr := projectMutatedSemanticPackage(
-			t, request, packageID,
-		)
-		if inspectErr == nil ||
-			!strings.Contains(
-				inspectErr.Error(), "typescriptShape",
-			) ||
-			!strings.Contains(inspectErr.Error(), packageID) {
-			t.Fatalf(
-				"resealed target-specific field error = %v",
-				inspectErr,
-			)
-		}
-	})
-
-	t.Run("manifest-capacity-exceeds-shard", func(t *testing.T) {
-		path, digest, _ := rewriteSemanticArtifact(
-			t,
-			semanticPath,
-			exceedSemanticManifestCapacity,
-		)
-		request.ProviderSemanticArtifact = path
-		request.ProviderSemanticDigest = digest
-		_, inspectErr := inspectConstructsForTest(t, request)
-		if inspectErr == nil ||
-			!strings.Contains(
-				inspectErr.Error(),
-				"semantic provider manifest package is invalid",
-			) {
-			t.Fatalf(
-				"manifest capacity mutation error = %v",
-				inspectErr,
-			)
-		}
-	})
-
-	t.Run("record-exceeds-manifest-count", func(t *testing.T) {
-		path, digest, packageID := rewriteSemanticArtifact(
-			t,
-			semanticPath,
-			duplicateSemanticResolutionWithoutCount,
-		)
-		request.ProviderSemanticArtifact = path
-		request.ProviderSemanticDigest = digest
-		inspectErr := projectMutatedSemanticPackage(
-			t, request, packageID,
-		)
-		if inspectErr == nil ||
-			!strings.Contains(
-				inspectErr.Error(),
-				"resolutions exceeds manifest count",
-			) ||
-			!strings.Contains(inspectErr.Error(), packageID) {
-			t.Fatalf(
-				"streamed record-count mutation error = %v",
-				inspectErr,
-			)
-		}
-	})
-
-	t.Run("unexported-member-without-package", func(t *testing.T) {
-		path, digest, packageID := rewriteSemanticArtifact(
-			t,
-			semanticPath,
-			dropUnexportedMemberPackage,
-		)
-		request.ProviderSemanticArtifact = path
-		request.ProviderSemanticDigest = digest
-		inspectErr := projectMutatedSemanticPackage(
-			t, request, packageID,
-		)
-		if inspectErr == nil ||
-			!strings.Contains(
-				inspectErr.Error(), packageID,
-			) ||
-			!strings.Contains(
-				inspectErr.Error(), "semantic provider type",
-			) ||
-			!strings.Contains(
-				inspectErr.Error(), "is not canonical",
-			) {
-			t.Fatalf(
-				"unexported-member package mutation error = %v",
-				inspectErr,
-			)
-		}
-	})
-
-	t.Run("circular-interface-method-identity", func(t *testing.T) {
-		path, digest, packageID := rewriteSemanticArtifact(
-			t,
-			semanticPath,
-			introduceCircularInterfaceMethodIdentity,
-		)
-		request.ProviderSemanticArtifact = path
-		request.ProviderSemanticDigest = digest
-		inspectErr := projectMutatedSemanticPackage(
-			t, request, packageID,
-		)
-		if inspectErr == nil ||
-			!strings.Contains(
-				inspectErr.Error(), packageID,
-			) ||
-			!strings.Contains(
-				inspectErr.Error(),
-				"semantic wire type payload disagrees with identity",
-			) {
-			t.Fatalf(
-				"circular interface identity mutation error = %v",
-				inspectErr,
-			)
-		}
-	})
-
-	t.Run("serialized-member-declaration", func(t *testing.T) {
-		path, digest, packageID := rewriteSemanticArtifact(
-			t,
-			semanticPath,
-			serializeSemanticMemberDeclaration,
-		)
-		request.ProviderSemanticArtifact = path
-		request.ProviderSemanticDigest = digest
-		_, inspectErr := inspectConstructsForTest(t, request)
-		if inspectErr == nil ||
-			!strings.Contains(
-				inspectErr.Error(),
-				"serializes member declaration",
-			) ||
-			!strings.Contains(inspectErr.Error(), packageID) {
-			t.Fatalf(
-				"serialized member declaration error = %v",
-				inspectErr,
-			)
-		}
-	})
-
-	for name, mutate := range map[string]semanticShardMutation{
-		"member-target-count":  alterSemanticMemberTargetCount,
-		"member-target-digest": alterSemanticMemberTargetDigest,
-	} {
-		t.Run(name, func(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate semanticShardMutation
+		want   string
+	}{
+		{
+			name: "shard-magic",
+			mutate: func(
+				shard []byte,
+				_ *mutableSemanticManifestPackage,
+			) ([]byte, bool) {
+				shard[0] ^= 0xff
+				return shard, true
+			},
+			want: "shard magic",
+		},
+		{
+			name: "shard-version",
+			mutate: func(
+				shard []byte,
+				_ *mutableSemanticManifestPackage,
+			) ([]byte, bool) {
+				shard[8]++
+				return shard, true
+			},
+			want: "shard version",
+		},
+		{
+			name: "shard-truncation",
+			mutate: func(
+				shard []byte,
+				_ *mutableSemanticManifestPackage,
+			) ([]byte, bool) {
+				return shard[:len(shard)-1], true
+			},
+		},
+		{
+			name: "shard-trailing-byte",
+			mutate: func(
+				shard []byte,
+				_ *mutableSemanticManifestPackage,
+			) ([]byte, bool) {
+				return append(shard, 0), true
+			},
+			want: "trailing bytes",
+		},
+		{
+			name: "manifest-record-count",
+			mutate: func(
+				shard []byte,
+				entry *mutableSemanticManifestPackage,
+			) ([]byte, bool) {
+				entry.ResolutionCount++
+				return shard, true
+			},
+			want: "resolutions count",
+		},
+		{
+			name: "manifest-capacity",
+			mutate: func(
+				shard []byte,
+				entry *mutableSemanticManifestPackage,
+			) ([]byte, bool) {
+				entry.ResolutionCount = len(shard) + 1
+				return shard, true
+			},
+			want: "manifest package is invalid",
+		},
+		{
+			name: "member-target-count",
+			mutate: func(
+				shard []byte,
+				entry *mutableSemanticManifestPackage,
+			) ([]byte, bool) {
+				entry.MemberTargetCount++
+				return shard, true
+			},
+			want: "member targets disagree with manifest",
+		},
+		{
+			name: "member-target-digest",
+			mutate: func(
+				shard []byte,
+				entry *mutableSemanticManifestPackage,
+			) ([]byte, bool) {
+				entry.MemberTargetDigest = strings.Repeat("00", 32)
+				return shard, true
+			},
+			want: "member targets disagree with manifest",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
 			path, digest, packageID := rewriteSemanticArtifact(
-				t, semanticPath, mutate,
+				t, semanticPath, test.mutate,
 			)
-			request.ProviderSemanticArtifact = path
-			request.ProviderSemanticDigest = digest
-			inspectErr := projectMutatedSemanticPackage(
-				t, request, packageID,
+			mutated := request
+			mutated.ProviderSemanticArtifact = path
+			mutated.ProviderSemanticDigest = digest
+			inspectErr := admitOrProjectMutatedSemanticPackage(
+				t, mutated, packageID,
 			)
-			if inspectErr == nil ||
-				!strings.Contains(
-					inspectErr.Error(),
-					"member targets disagree with manifest",
-				) ||
-				!strings.Contains(inspectErr.Error(), packageID) {
+			if inspectErr == nil {
+				t.Fatal("resealed semantic mutation was accepted")
+			}
+			if test.want != "" &&
+				!strings.Contains(inspectErr.Error(), test.want) {
 				t.Fatalf(
-					"%s mutation error = %v",
-					name, inspectErr,
+					"resealed mutation error = %v, want %q",
+					inspectErr,
+					test.want,
 				)
 			}
 		})
 	}
 }
 
-func projectMutatedSemanticPackage(
+func admitOrProjectMutatedSemanticPackage(
 	t *testing.T,
 	request source.Request,
 	encodedPackage string,
@@ -271,10 +163,7 @@ func projectMutatedSemanticPackage(
 	t.Helper()
 	inspection, err := inspectConstructsForTest(t, request)
 	if err != nil {
-		t.Fatalf(
-			"trusted manifest admission opened provider detail: %v",
-			err,
-		)
+		return err
 	}
 	before := inspection.Semantic().ProviderReadStats()
 	if before.ShardLoads != 0 ||
@@ -295,8 +184,3 @@ func projectMutatedSemanticPackage(
 		},
 	)
 }
-
-type semanticShardMutation func(
-	map[string]json.RawMessage,
-	*mutableSemanticManifestPackage,
-) bool

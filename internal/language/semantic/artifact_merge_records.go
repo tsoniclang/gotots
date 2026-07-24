@@ -2,28 +2,22 @@ package semantic
 
 import "github.com/tsoniclang/gotots/internal/identity"
 
-func (merge *mixedShardMerge) definitions(
+func (merge *mixedBinaryShardMerge) definitions(
 	checkerCount int,
 	providerCount int,
 ) error {
-	checkerDecoder := wireDefinitionDecoder{
-		identities: merge.checker.identities,
-		authority:  merge.checkerAuthority,
-	}
-	providerDecoder := wireDefinitionDecoder{
-		identities: merge.provider.identities,
-		authority:  merge.providerAuthority,
-	}
-	checker, err := openDecodedRecordCursor(
+	checker, err := openBinaryRecordCursor(
 		merge.checker.decoder,
 		merge.checkerAuthority,
 		"definitions",
 		checkerCount,
 		func(
-			encoded wireDefinitionRecord,
-			_ Authority,
+			decoder *binaryShardDecoder,
+			authority Authority,
 		) (DefinitionSemantics, error) {
-			return checkerDecoder.record(encoded)
+			return decodeBinaryDefinitionValue(
+				decoder, merge.checker.identities, authority,
+			)
 		},
 		func(record DefinitionSemantics) identity.DefinitionID {
 			return record.Definition()
@@ -32,16 +26,18 @@ func (merge *mixedShardMerge) definitions(
 	if err != nil {
 		return err
 	}
-	provider, err := openDecodedRecordCursor(
+	provider, err := openBinaryRecordCursor(
 		merge.provider.decoder,
 		merge.providerAuthority,
 		"definitions",
 		providerCount,
 		func(
-			encoded wireDefinitionRecord,
-			_ Authority,
+			decoder *binaryShardDecoder,
+			authority Authority,
 		) (DefinitionSemantics, error) {
-			return providerDecoder.record(encoded)
+			return decodeBinaryDefinitionValue(
+				decoder, merge.provider.identities, authority,
+			)
 		},
 		func(record DefinitionSemantics) identity.DefinitionID {
 			return record.Definition()
@@ -50,7 +46,7 @@ func (merge *mixedShardMerge) definitions(
 	if err != nil {
 		return err
 	}
-	return mergeDecodedRecords(
+	return mergeBinaryRecords(
 		checker,
 		provider,
 		equalDefinitionRecords,
@@ -66,26 +62,22 @@ func (merge *mixedShardMerge) definitions(
 	)
 }
 
-func (merge *mixedShardMerge) resolutions(
+func (merge *mixedBinaryShardMerge) resolutions(
 	checkerCount int,
 	providerCount int,
 ) error {
-	checkerDecoder := wireResolutionDecoder{
-		identities: merge.checker.identities,
-	}
-	providerDecoder := wireResolutionDecoder{
-		identities: merge.provider.identities,
-	}
-	checker, err := openDecodedRecordCursor(
+	checker, err := openBinaryRecordCursor(
 		merge.checker.decoder,
 		merge.checkerAuthority,
 		"resolutions",
 		checkerCount,
 		func(
-			encoded wireResolutionRecord,
+			decoder *binaryShardDecoder,
 			_ Authority,
 		) (OccurrenceResolution, error) {
-			return checkerDecoder.record(encoded)
+			return decodeBinaryResolutionValue(
+				decoder, merge.checker.identities,
+			)
 		},
 		func(record OccurrenceResolution) identity.OccurrenceID {
 			return record.Occurrence()
@@ -94,16 +86,18 @@ func (merge *mixedShardMerge) resolutions(
 	if err != nil {
 		return err
 	}
-	provider, err := openDecodedRecordCursor(
+	provider, err := openBinaryRecordCursor(
 		merge.provider.decoder,
 		merge.providerAuthority,
 		"resolutions",
 		providerCount,
 		func(
-			encoded wireResolutionRecord,
+			decoder *binaryShardDecoder,
 			_ Authority,
 		) (OccurrenceResolution, error) {
-			return providerDecoder.record(encoded)
+			return decodeBinaryResolutionValue(
+				decoder, merge.provider.identities,
+			)
 		},
 		func(record OccurrenceResolution) identity.OccurrenceID {
 			return record.Occurrence()
@@ -112,7 +106,7 @@ func (merge *mixedShardMerge) resolutions(
 	if err != nil {
 		return err
 	}
-	return mergeDecodedRecords(
+	return mergeBinaryRecords(
 		checker,
 		provider,
 		equalResolutionRecords,
@@ -127,28 +121,22 @@ func (merge *mixedShardMerge) resolutions(
 	)
 }
 
-func (merge *mixedShardMerge) declarations(
+func (merge *mixedBinaryShardMerge) declarations(
 	checkerCount int,
 	providerCount int,
 ) error {
-	checkerDecoder := wireObjectDecoder{
-		identities: merge.checker.identities,
-		authority:  merge.checkerAuthority,
-	}
-	providerDecoder := wireObjectDecoder{
-		identities: merge.provider.identities,
-		authority:  merge.providerAuthority,
-	}
-	checker, err := openDecodedRecordCursor(
+	checker, err := openBinaryRecordCursor(
 		merge.checker.decoder,
 		merge.checkerAuthority,
 		"declarations",
 		checkerCount,
 		func(
-			encoded wireDeclarationRecord,
-			_ Authority,
+			decoder *binaryShardDecoder,
+			authority Authority,
 		) (Declaration, error) {
-			return checkerDecoder.declaration(encoded)
+			return decodeBinaryDeclarationValue(
+				decoder, merge.checker.identities, authority,
+			)
 		},
 		func(record Declaration) identity.SemanticDeclarationID {
 			return record.ID()
@@ -157,16 +145,18 @@ func (merge *mixedShardMerge) declarations(
 	if err != nil {
 		return err
 	}
-	provider, err := openDecodedRecordCursor(
+	provider, err := openBinaryRecordCursor(
 		merge.provider.decoder,
 		merge.providerAuthority,
 		"declarations",
 		providerCount,
 		func(
-			encoded wireDeclarationRecord,
-			_ Authority,
+			decoder *binaryShardDecoder,
+			authority Authority,
 		) (Declaration, error) {
-			return providerDecoder.declaration(encoded)
+			return decodeBinaryDeclarationValue(
+				decoder, merge.provider.identities, authority,
+			)
 		},
 		func(record Declaration) identity.SemanticDeclarationID {
 			return record.ID()
@@ -175,7 +165,7 @@ func (merge *mixedShardMerge) declarations(
 	if err != nil {
 		return err
 	}
-	return mergeDecodedRecords(
+	return mergeBinaryRecords(
 		checker,
 		provider,
 		equalDeclarationRecords,
@@ -187,28 +177,22 @@ func (merge *mixedShardMerge) declarations(
 	)
 }
 
-func (merge *mixedShardMerge) bindings(
+func (merge *mixedBinaryShardMerge) bindings(
 	checkerCount int,
 	providerCount int,
 ) error {
-	checkerDecoder := wireObjectDecoder{
-		identities: merge.checker.identities,
-		authority:  merge.checkerAuthority,
-	}
-	providerDecoder := wireObjectDecoder{
-		identities: merge.provider.identities,
-		authority:  merge.providerAuthority,
-	}
-	checker, err := openDecodedRecordCursor(
+	checker, err := openBinaryRecordCursor(
 		merge.checker.decoder,
 		merge.checkerAuthority,
 		"bindings",
 		checkerCount,
 		func(
-			encoded wireBindingRecord,
-			_ Authority,
+			decoder *binaryShardDecoder,
+			authority Authority,
 		) (Binding, error) {
-			return checkerDecoder.binding(encoded)
+			return decodeBinaryBindingValue(
+				decoder, merge.checker.identities, authority,
+			)
 		},
 		func(record Binding) identity.SemanticBindingID {
 			return record.ID()
@@ -217,16 +201,18 @@ func (merge *mixedShardMerge) bindings(
 	if err != nil {
 		return err
 	}
-	provider, err := openDecodedRecordCursor(
+	provider, err := openBinaryRecordCursor(
 		merge.provider.decoder,
 		merge.providerAuthority,
 		"bindings",
 		providerCount,
 		func(
-			encoded wireBindingRecord,
-			_ Authority,
+			decoder *binaryShardDecoder,
+			authority Authority,
 		) (Binding, error) {
-			return providerDecoder.binding(encoded)
+			return decodeBinaryBindingValue(
+				decoder, merge.provider.identities, authority,
+			)
 		},
 		func(record Binding) identity.SemanticBindingID {
 			return record.ID()
@@ -235,7 +221,7 @@ func (merge *mixedShardMerge) bindings(
 	if err != nil {
 		return err
 	}
-	return mergeDecodedRecords(
+	return mergeBinaryRecords(
 		checker,
 		provider,
 		equalBindingRecords,
@@ -247,23 +233,22 @@ func (merge *mixedShardMerge) bindings(
 	)
 }
 
-func (merge *mixedShardMerge) types(
+func (merge *mixedBinaryShardMerge) types(
 	checkerCount int,
 	providerCount int,
 ) error {
-	checkerDecoder := wireTypeDecoder{
-		identities: merge.checker.identities,
-	}
-	providerDecoder := wireTypeDecoder{
-		identities: merge.provider.identities,
-	}
-	checker, err := openDecodedRecordCursor(
+	checker, err := openBinaryRecordCursor(
 		merge.checker.decoder,
 		merge.checkerAuthority,
 		"types",
 		checkerCount,
-		func(encoded wireTypeRecord, _ Authority) (Type, error) {
-			return checkerDecoder.record(encoded)
+		func(
+			decoder *binaryShardDecoder,
+			_ Authority,
+		) (Type, error) {
+			return decodeBinaryTypeValue(
+				decoder, merge.checker.identities,
+			)
 		},
 		func(record Type) identity.SemanticTypeID {
 			return record.ID()
@@ -272,13 +257,18 @@ func (merge *mixedShardMerge) types(
 	if err != nil {
 		return err
 	}
-	provider, err := openDecodedRecordCursor(
+	provider, err := openBinaryRecordCursor(
 		merge.provider.decoder,
 		merge.providerAuthority,
 		"types",
 		providerCount,
-		func(encoded wireTypeRecord, _ Authority) (Type, error) {
-			return providerDecoder.record(encoded)
+		func(
+			decoder *binaryShardDecoder,
+			_ Authority,
+		) (Type, error) {
+			return decodeBinaryTypeValue(
+				decoder, merge.provider.identities,
+			)
 		},
 		func(record Type) identity.SemanticTypeID {
 			return record.ID()
@@ -287,7 +277,7 @@ func (merge *mixedShardMerge) types(
 	if err != nil {
 		return err
 	}
-	return mergeDecodedRecords(
+	return mergeBinaryRecords(
 		checker,
 		provider,
 		equalTypeRecords,
@@ -308,23 +298,22 @@ func (merge *mixedShardMerge) types(
 	)
 }
 
-func (merge *mixedShardMerge) operations(
+func (merge *mixedBinaryShardMerge) operations(
 	checkerCount int,
 	providerCount int,
 ) error {
-	checkerDecoder := wireOperationDecoder{
-		identities: merge.checker.identities,
-	}
-	providerDecoder := wireOperationDecoder{
-		identities: merge.provider.identities,
-	}
-	checker, err := openDecodedRecordCursor(
+	checker, err := openBinaryRecordCursor(
 		merge.checker.decoder,
 		merge.checkerAuthority,
 		"operations",
 		checkerCount,
-		func(encoded wireOperationRecord, _ Authority) (Operation, error) {
-			return checkerDecoder.record(encoded)
+		func(
+			decoder *binaryShardDecoder,
+			_ Authority,
+		) (Operation, error) {
+			return decodeBinaryOperationValue(
+				decoder, merge.checker.identities,
+			)
 		},
 		func(record Operation) identity.OperationID {
 			return record.ID()
@@ -333,13 +322,18 @@ func (merge *mixedShardMerge) operations(
 	if err != nil {
 		return err
 	}
-	provider, err := openDecodedRecordCursor(
+	provider, err := openBinaryRecordCursor(
 		merge.provider.decoder,
 		merge.providerAuthority,
 		"operations",
 		providerCount,
-		func(encoded wireOperationRecord, _ Authority) (Operation, error) {
-			return providerDecoder.record(encoded)
+		func(
+			decoder *binaryShardDecoder,
+			_ Authority,
+		) (Operation, error) {
+			return decodeBinaryOperationValue(
+				decoder, merge.provider.identities,
+			)
 		},
 		func(record Operation) identity.OperationID {
 			return record.ID()
@@ -348,7 +342,7 @@ func (merge *mixedShardMerge) operations(
 	if err != nil {
 		return err
 	}
-	return mergeDecodedRecords(
+	return mergeBinaryRecords(
 		checker,
 		provider,
 		equalOperationRecords,
@@ -360,28 +354,22 @@ func (merge *mixedShardMerge) operations(
 	)
 }
 
-func (merge *mixedShardMerge) unsupported(
+func (merge *mixedBinaryShardMerge) unsupported(
 	checkerCount int,
 	providerCount int,
 ) error {
-	checkerDecoder := wireObjectDecoder{
-		identities: merge.checker.identities,
-		authority:  merge.checkerAuthority,
-	}
-	providerDecoder := wireObjectDecoder{
-		identities: merge.provider.identities,
-		authority:  merge.providerAuthority,
-	}
-	checker, err := openDecodedRecordCursor(
+	checker, err := openBinaryRecordCursor(
 		merge.checker.decoder,
 		merge.checkerAuthority,
 		"unsupported",
 		checkerCount,
 		func(
-			encoded wireUnsupportedRecord,
-			_ Authority,
+			decoder *binaryShardDecoder,
+			authority Authority,
 		) (Unsupported, error) {
-			return checkerDecoder.unsupported(encoded)
+			return decodeBinaryUnsupportedValue(
+				decoder, merge.checker.identities, authority,
+			)
 		},
 		func(record Unsupported) identity.UnsupportedID {
 			return record.ID()
@@ -390,16 +378,18 @@ func (merge *mixedShardMerge) unsupported(
 	if err != nil {
 		return err
 	}
-	provider, err := openDecodedRecordCursor(
+	provider, err := openBinaryRecordCursor(
 		merge.provider.decoder,
 		merge.providerAuthority,
 		"unsupported",
 		providerCount,
 		func(
-			encoded wireUnsupportedRecord,
-			_ Authority,
+			decoder *binaryShardDecoder,
+			authority Authority,
 		) (Unsupported, error) {
-			return providerDecoder.unsupported(encoded)
+			return decodeBinaryUnsupportedValue(
+				decoder, merge.provider.identities, authority,
+			)
 		},
 		func(record Unsupported) identity.UnsupportedID {
 			return record.ID()
@@ -408,7 +398,7 @@ func (merge *mixedShardMerge) unsupported(
 	if err != nil {
 		return err
 	}
-	return mergeDecodedRecords(
+	return mergeBinaryRecords(
 		checker,
 		provider,
 		equalUnsupportedRecords,

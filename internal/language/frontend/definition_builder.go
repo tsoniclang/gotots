@@ -173,7 +173,7 @@ func (builder *packageBuilder) callableDefinition(
 				)
 		}
 		declaration := identity.SemanticDeclarationID{}
-		if node.Name.Name != "_" && node.Name.Name != "init" {
+		if node.Name.Name != "_" && !packageInitializerDeclaration(node) {
 			var err error
 			declaration, err = builder.objects.declarationID(object)
 			if err != nil {
@@ -234,6 +234,13 @@ func (builder *packageBuilder) callableDefinition(
 				definition, node,
 			)
 	}
+}
+
+func packageInitializerDeclaration(declaration *ast.FuncDecl) bool {
+	return declaration != nil &&
+		declaration.Recv == nil &&
+		declaration.Name != nil &&
+		declaration.Name.Name == "init"
 }
 
 func (builder *packageBuilder) initializerDeclarations(

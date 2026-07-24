@@ -135,6 +135,18 @@ func (store *semanticOccurrenceStore) put(
 	return reference, nil
 }
 
+func (store *semanticOccurrenceStore) remove(
+	id identity.OccurrenceID,
+) {
+	key, present := store.key(id, false)
+	if !present {
+		return
+	}
+	reference := store.byIdentity[key]
+	store.records[reference-1] = semanticExpectedOccurrence{}
+	delete(store.byIdentity, key)
+}
+
 func (store *semanticOccurrenceStore) count() int {
 	if store == nil {
 		return 0

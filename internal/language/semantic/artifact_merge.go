@@ -1,7 +1,6 @@
 package semantic
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 )
@@ -21,23 +20,14 @@ func decodeMixedSemanticShards(
 			"mixed semantic shard decoder requires both authorities",
 		)
 	}
-	checkerDecoder := json.NewDecoder(checkerInput)
-	checkerDecoder.DisallowUnknownFields()
-	providerDecoder := json.NewDecoder(providerInput)
-	providerDecoder.DisallowUnknownFields()
-	var normalized normalizedPackageBuilder
-	checkerShard, err := beginNormalizedShard(
-		checkerDecoder,
-		checkerEntry,
-		&normalized,
+	checkerShard, err := beginBinarySemanticShard(
+		checkerInput, checkerEntry,
 	)
 	if err != nil {
 		return Package{}, err
 	}
-	providerShard, err := beginNormalizedShard(
-		providerDecoder,
-		providerEntry,
-		&normalized,
+	providerShard, err := beginBinarySemanticShard(
+		providerInput, providerEntry,
 	)
 	if err != nil {
 		return Package{}, err
@@ -51,21 +41,26 @@ func decodeMixedSemanticShards(
 			projection.id,
 		)
 	}
-	merge := mixedShardMerge{
-		checker:           checkerShard,
-		provider:          providerShard,
+	var normalized normalizedPackageBuilder
+	merge := mixedBinaryShardMerge{
+		checker: checkerShard, provider: providerShard,
 		checkerAuthority:  checkerAuthority,
 		providerAuthority: providerAuthority,
-		projection:        projection,
-		normalized:        &normalized,
+		projection:        projection, normalized: &normalized,
 	}
 	if err := merge.records(checkerEntry, providerEntry); err != nil {
 		return Package{}, err
 	}
-	if err := finishNormalizedShard(checkerShard); err != nil {
+	if err := checkerShard.decoder.identityUses.complete(); err != nil {
 		return Package{}, err
 	}
-	if err := finishNormalizedShard(providerShard); err != nil {
+	if err := providerShard.decoder.identityUses.complete(); err != nil {
+		return Package{}, err
+	}
+	if err := checkerShard.decoder.finish(); err != nil {
+		return Package{}, err
+	}
+	if err := providerShard.decoder.finish(); err != nil {
 		return Package{}, err
 	}
 	return newPackageFromBuilder(
@@ -75,16 +70,16 @@ func decodeMixedSemanticShards(
 	)
 }
 
-type mixedShardMerge struct {
-	checker           normalizedShardDecoder
-	provider          normalizedShardDecoder
+type mixedBinaryShardMerge struct {
+	checker           binarySemanticShard
+	provider          binarySemanticShard
 	checkerAuthority  Authority
 	providerAuthority Authority
 	projection        packageProjection
 	normalized        *normalizedPackageBuilder
 }
 
-func (merge *mixedShardMerge) records(
+func (merge *mixedBinaryShardMerge) records(
 	checkerEntry packageShardManifest,
 	providerEntry packageShardManifest,
 ) error {

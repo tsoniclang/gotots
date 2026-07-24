@@ -90,6 +90,19 @@ func newPackageFromBuilder(
 	if err != nil {
 		return Package{}, err
 	}
+	return newPackageFromStores(id, provenance, stores)
+}
+
+func newPackageFromStores(
+	id identity.PackageID,
+	provenance PackageProvenance,
+	stores normalizedPackageStores,
+) (Package, error) {
+	if id.IsZero() || !provenance.Valid() {
+		return Package{}, fmt.Errorf(
+			"semantic normalized package requires identity and provenance",
+		)
+	}
 	out := Package{
 		id: id, provenance: provenance,
 		identities:   stores.identities,

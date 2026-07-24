@@ -163,7 +163,7 @@ func (builder *packageBuilder) classifyOccurrence(
 		catalog.DispositionActive {
 		return builder.unsupportedResolution(record, variant)
 	}
-	if declarationNameIsDefinitionComponent(record, owner) {
+	if builder.declarationNameIsDefinitionComponent(record, owner) {
 		return builder.definitionComponent(
 			record,
 			variant,
@@ -288,15 +288,23 @@ func (builder *packageBuilder) intrinsicHeaderResolution(
 	return resolution, semantic.OperationInvalid, err
 }
 
-func declarationNameIsDefinitionComponent(
+func (builder *packageBuilder) declarationNameIsDefinitionComponent(
 	record *occurrenceInput,
 	owner identity.DefinitionID,
 ) bool {
 	identifier, ok := record.node.(*ast.Ident)
-	return ok &&
-		identifier.Name == "init" &&
-		record.occurrence.Role() == catalog.RoleDeclarationName &&
-		owner.Kind() == identity.DefinitionFuncDecl
+	if !ok ||
+		identifier.Name != "init" ||
+		record.occurrence.Role() != catalog.RoleDeclarationName ||
+		owner.Kind() != identity.DefinitionFuncDecl {
+		return false
+	}
+	node, present := builder.input.index.CheckedDefinitionNode(owner)
+	if !present {
+		node, present = builder.input.index.DefinitionNode(owner)
+	}
+	declaration, callable := node.(*ast.FuncDecl)
+	return present && callable && packageInitializerDeclaration(declaration)
 }
 
 func (builder *packageBuilder) checkedViewUnsupported(

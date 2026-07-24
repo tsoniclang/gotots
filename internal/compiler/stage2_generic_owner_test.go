@@ -26,6 +26,8 @@ func (value Local[Left, Right]) First() Left {
 	return value.left
 }
 
+func (value *Local[Left, Right]) init() {}
+
 func LoadOr[T any](pointer *atomic.Pointer[T], fallback T) T {
 	value := pointer.Load()
 	if value != nil {
@@ -82,12 +84,30 @@ func TestStage2TypeParametersUseCanonicalGenericOwners(t *testing.T) {
 		t, inspection.Semantic(), "example.com/generics",
 	)
 	applicationRoles := semanticTypeParameterRoles(application)
+	methodInitDefinitions := 0
+	for _, definition := range semanticDefinitions(application) {
+		spec := definition.Spec()
+		if spec.Name != "init" {
+			continue
+		}
+		if len(spec.Declarations) != 1 ||
+			spec.Receiver.IsZero() {
+			t.Fatalf(
+				"method init declaration/receiver=%d/%s, want 1/nonzero",
+				len(spec.Declarations),
+				spec.Receiver,
+			)
+		}
+		methodInitDefinitions++
+	}
 	if applicationRoles[semantic.TypeParameterDeclared] < 2 ||
 		applicationRoles[semantic.TypeParameterCallable] < 1 ||
-		applicationRoles[semantic.TypeParameterReceiver] < 2 {
+		applicationRoles[semantic.TypeParameterReceiver] < 4 ||
+		methodInitDefinitions != 1 {
 		t.Fatalf(
-			"application type-parameter roles=%v, want declared>=2 callable>=1 receiver>=2",
+			"application type-parameter roles=%v method-init=%d, want declared>=2 callable>=1 receiver>=4 method-init=1",
 			applicationRoles,
+			methodInitDefinitions,
 		)
 	}
 	atomicPackage := semanticPackageByImportPath(

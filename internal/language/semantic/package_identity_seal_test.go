@@ -166,7 +166,7 @@ func TestIdentityBuilderRetainsNoFullIdentityCollections(t *testing.T) {
 	}
 	roots := []reflect.Type{
 		reflect.TypeFor[packageIdentityBuilder](),
-		reflect.TypeFor[wireIdentityDecoder](),
+		reflect.TypeFor[binarySemanticShard](),
 	}
 	for _, root := range roots {
 		if path, found := retainedFullIdentityCollection(

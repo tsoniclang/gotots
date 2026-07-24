@@ -17,6 +17,10 @@ func Outer() {
 	type score struct{ value int }
 	unused := 0
 	base := score{value: 1}
+	switch hidden := any(base).(type) {
+	case score:
+		_ = hidden
+	}
 	for index, item := range []score{{value: 2}} {
 		use := func(delta score) int {
 			return base.value + delta.value + item.value + index
@@ -144,6 +148,8 @@ func assertMixedDepthSemanticClosure(
 		switch binding.Name() {
 		case "unused":
 			t.Error("unused excluded-parent binding entered semantic closure")
+		case "hidden":
+			t.Error("excluded-parent type-switch binding entered semantic closure")
 		case "base", "index", "item":
 			bindings[binding.Name()] = binding
 		}

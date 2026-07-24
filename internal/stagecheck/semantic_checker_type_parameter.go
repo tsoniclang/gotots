@@ -35,7 +35,7 @@ func (verifier *checkerTypeVerifier) indexTypeParameterOwners(
 		declaration, callable := node.(*ast.FuncDecl)
 		if !present || !callable ||
 			(declaration.Name.Name != "_" &&
-				declaration.Name.Name != "init") {
+				!independentPackageInitializer(declaration)) {
 			continue
 		}
 		object, objectPresent := view.DefOf(declaration.Name)
@@ -200,12 +200,29 @@ func (verifier *checkerTypeVerifier) registerCheckerTypeParameters(
 			prior, candidate,
 		) {
 			verifier.parameterConflict = fmt.Sprintf(
-				"checker type parameter %s has two owners",
+				"checker type parameter %s has two owners: "+
+					"first=(object=%s definition=%s role=%s ordinal=%d) "+
+					"second=(object=%s definition=%s role=%s ordinal=%d)",
 				parameter.Obj().Name(),
+				checkerOwnerName(prior.object),
+				prior.definition,
+				prior.role,
+				prior.ordinal,
+				checkerOwnerName(candidate.object),
+				candidate.definition,
+				candidate.role,
+				candidate.ordinal,
 			)
 		}
 		verifier.parameterOwners[parameter] = candidate
 	}
+}
+
+func checkerOwnerName(object types.Object) string {
+	if object == nil {
+		return "<nil>"
+	}
+	return object.Name()
 }
 
 func sameCheckerTypeParameterOwner(

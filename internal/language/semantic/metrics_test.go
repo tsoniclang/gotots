@@ -2,7 +2,6 @@ package semantic
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -257,15 +256,13 @@ func TestSemanticShardWriterOwnsExactBoundedRecordTails(
 	if err != nil {
 		t.Fatal(err)
 	}
-	operationEncoder := wireOperationEncoder{
-		identities: wireIdentityEncoder{table: pkg.identities},
-		store:      pkg.operations,
-	}
-	wireOperation, err := operationEncoder.record(0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	encodedOperation, err := json.Marshal(wireOperation)
+	var operationOutput bytes.Buffer
+	operationMeasurement := newSemanticShardMeasurement(pkg.ID())
+	operationEncoder := newBinaryShardEncoder(&operationOutput)
+	writeBinaryOperations(
+		operationEncoder, pkg, &operationMeasurement,
+	)
+	operationSectionBytes, err := operationEncoder.finish()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,10 +271,14 @@ func TestSemanticShardWriterOwnsExactBoundedRecordTails(
 		measurement.operationTail[0].Identity !=
 			operationID.String() ||
 		measurement.operationTail[0].EncodedBytes !=
-			int64(len(encodedOperation)) {
+			operationMeasurement.operationTail[0].EncodedBytes ||
+		operationSectionBytes !=
+			operationMeasurement.operationTail[0].EncodedBytes+1 {
 		t.Fatalf(
 			"semantic shard measurement=%+v output=%d operation=%d",
-			measurement, output.Len(), len(encodedOperation),
+			measurement,
+			output.Len(),
+			operationMeasurement.operationTail[0].EncodedBytes,
 		)
 	}
 
