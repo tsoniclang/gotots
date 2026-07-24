@@ -698,6 +698,14 @@ type records, and enforces:
   payload arenas, and relation arenas; a negative-control maximal inline union,
   repeated-full-identity wire schema, or retained public-record snapshot must
   fail structural and cost gates;
+- semantic-detail shards contain the explicit versioned binary normalized
+  schema and no JSON record encoding, reflective/generic serializer, or
+  host-memory image; single-authority decode admits the stores directly and
+  mixed-authority decode exposes only two identity dictionaries plus one
+  current record per input section; mutations of version, section count,
+  dictionary order/domain, reference range, payload ownership, truncation, and
+  trailing bytes are resealed through the real artifact boundary and fail at
+  typed admission;
 - zero provider-only semantic shard loads during ordinary Stage-2
   verification, with loads exact-joined to mixed local/certified package
   projections; an explicit later package request is measured separately;

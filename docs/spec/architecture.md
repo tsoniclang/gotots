@@ -957,14 +957,27 @@ identity into component references; a projection reconstructs one typed
 identity from those references. Both directions use the single structural
 component ordering and neither uses rendered identity strings.
 
-The package-shard wire format uses the same normalized ownership: canonical
-typed identity dictionaries followed by compact records and typed ranges.
+The package-shard wire format is one explicit versioned binary encoding of the
+same normalized ownership: canonical typed identity dictionaries followed by
+compact record cores, active-payload arenas, and typed relation arenas.
 Portable identities are serialized once per dictionary entry, never once per
-reference. Decode validates dictionary canonicality, domain, nonzero/in-range
-references, active-payload tags, range bounds, record counts, and conservation
-before exposing a package. This is one schema, not an in-memory cache beside a
-denormalized wire tree; replacement bumps the semantic-artifact version and
-deletes the prior reader and writer atomically.
+reference. The encoding uses named domain-specific fields, bounded integer and
+string primitives, and a fixed section order; reflective serialization,
+generic object codecs, JSON semantic-detail records, and host-memory dumps are
+forbidden. The small resident artifact manifest may use JSON because it carries
+only context, census, offsets, and digests—not semantic detail.
+
+Single-authority decode transfers validated dictionaries and stores directly
+into the one immutable normalized package without projecting and re-interning
+public records. Mixed-authority decode retains only both bounded identity
+dictionaries and one current record from each ordered section while it
+exact-joins into the one destination draft; it never holds two decoded stores
+plus a merged store. Decode validates dictionary canonicality, domain,
+nonzero/in-range references, active-payload ownership, range bounds, section
+counts, trailing bytes, and semantic conservation before exposing a package.
+This is one schema, not an in-memory cache beside a denormalized wire tree;
+replacement bumps the semantic-artifact version and deletes the prior reader,
+writer, schema records, and compatibility path atomically.
 
 When a shard is projected, typed admission revalidates every relationship, so
 corrupt detail remains invalid even if its shard and outer artifact digests

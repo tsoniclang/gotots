@@ -363,8 +363,12 @@ Required exit evidence:
   records store only their active closed-variant payloads, and variable
   relations use validated typed ranges; public semantic values are transient
   one-record projections, package-local references never escape, the prior
-  denormalized schema/reader/writer are deleted, and dictionary-domain, range,
-  active-payload, round-trip, mutation, struct-size, encoded-size,
+  denormalized schema/reader/writer are deleted; semantic-detail shards use the
+  explicit reflection-free binary schema while only the bounded manifest may
+  remain JSON; single-authority admission transfers normalized stores without
+  record projection/re-interning and mixed admission uses bounded ordered
+  cursors; dictionary-domain, range, active-payload, version, truncation,
+  trailing-byte, round-trip, mutation, struct-size, encoded-size,
   largest-package, and whole-compilation cost gates pass; and
 - the sealed package retains the compact identity-component graph rather than
   expanded composite identity slices, admission and reachability consume the
