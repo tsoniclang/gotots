@@ -17,22 +17,24 @@ import (
 const maxProviderManifestBytes = 64 << 20
 
 type ProviderPackageContext struct {
-	Package          identity.PackageID
-	Provenance       PackageProvenance
-	PackageInput     string
-	Structure        string
-	Selection        string
-	Definitions      []identity.DefinitionID
-	Declarations     []identity.SemanticDeclarationID
-	DefinitionCount  int
-	ResolutionCount  int
-	DeclarationCount int
-	BindingCount     int
-	TypeCount        int
-	OperationCount   int
-	UnsupportedCount int
-	ShardBytes       int64
-	ShardDigest      string
+	Package            identity.PackageID
+	Provenance         PackageProvenance
+	PackageInput       string
+	Structure          string
+	Selection          string
+	Definitions        []identity.DefinitionID
+	Declarations       []identity.SemanticDeclarationID
+	DefinitionCount    int
+	ResolutionCount    int
+	DeclarationCount   int
+	MemberTargetCount  int
+	MemberTargetDigest string
+	BindingCount       int
+	TypeCount          int
+	OperationCount     int
+	UnsupportedCount   int
+	ShardBytes         int64
+	ShardDigest        string
 }
 
 type ProviderReadStats struct {
@@ -49,7 +51,7 @@ type ProviderArtifact struct {
 	path            string
 	digest          string
 	context         providerContext
-	manifest        []providerManifestPackage
+	manifest        []packageShardManifest
 	manifestMetrics Metrics
 	byPackage       map[identity.PackageID]int
 	shardBase       int64
@@ -129,7 +131,7 @@ func DecodeProviderArtifact(
 		digest:  digest,
 		context: manifest.Context,
 		manifest: append(
-			[]providerManifestPackage(nil), manifest.Packages...,
+			[]packageShardManifest(nil), manifest.Packages...,
 		),
 		byPackage: map[identity.PackageID]int{},
 		measured:  map[identity.PackageID]bool{},
@@ -140,7 +142,7 @@ func DecodeProviderArtifact(
 	if err := artifact.validateManifest(); err != nil {
 		return nil, err
 	}
-	artifact.manifestMetrics, err = measureProviderManifest(
+	artifact.manifestMetrics, err = measureShardManifest(
 		artifact.manifest,
 	)
 	if err != nil {
@@ -162,7 +164,7 @@ func (artifact *ProviderArtifact) validateManifest() error {
 		}
 	}
 	var (
-		previous   string
+		previous   identity.PackageID
 		nextOffset int64
 	)
 	for index, entry := range artifact.manifest {
@@ -170,13 +172,14 @@ func (artifact *ProviderArtifact) validateManifest() error {
 		if err != nil {
 			return err
 		}
-		if entry.Package <= previous ||
+		if (!previous.IsZero() && pkg.Compare(previous) <= 0) ||
 			entry.ShardOffset != nextOffset ||
 			entry.ShardBytes <= 0 ||
 			!fullDigest(entry.ShardDigest) ||
 			!fullDigest(entry.PackageInput) ||
 			!fullDigest(entry.Structure) ||
 			!fullDigest(entry.Selection) ||
+			!fullDigest(entry.MemberTargetDigest) ||
 			!PackageProvenance(entry.Provenance).Valid() ||
 			!providerManifestCountsValid(entry) {
 			return &artifactError{
@@ -192,7 +195,7 @@ func (artifact *ProviderArtifact) validateManifest() error {
 			return err
 		}
 		artifact.byPackage[pkg] = index
-		previous = entry.Package
+		previous = pkg
 		nextOffset += entry.ShardBytes
 	}
 	if artifact.shardBase+nextOffset != artifact.fileBytes {
@@ -203,18 +206,32 @@ func (artifact *ProviderArtifact) validateManifest() error {
 	return nil
 }
 
-func providerManifestCountsValid(entry providerManifestPackage) bool {
-	return entry.DefinitionCount >= 0 &&
-		entry.ResolutionCount >= 0 &&
-		entry.DeclarationCount >= 0 &&
-		entry.BindingCount >= 0 &&
-		entry.TypeCount >= 0 &&
-		entry.OperationCount >= 0 &&
-		entry.UnsupportedCount >= 0
+func providerManifestCountsValid(entry packageShardManifest) bool {
+	if entry.MemberTargetCount < 0 {
+		return false
+	}
+	counts := [...]int{
+		entry.DefinitionCount,
+		entry.ResolutionCount,
+		entry.DeclarationCount,
+		entry.BindingCount,
+		entry.TypeCount,
+		entry.OperationCount,
+		entry.UnsupportedCount,
+	}
+	var total int64
+	for _, count := range counts {
+		if count < 0 ||
+			int64(count) > entry.ShardBytes-total {
+			return false
+		}
+		total += int64(count)
+	}
+	return true
 }
 
 func validateManifestCensus(
-	entry providerManifestPackage,
+	entry packageShardManifest,
 ) error {
 	if entry.DefinitionCount != len(entry.Definitions) ||
 		entry.DeclarationCount != len(entry.Declarations) {
@@ -222,29 +239,41 @@ func validateManifestCensus(
 			reason: "semantic provider manifest census count mismatch",
 		}
 	}
-	previous := ""
+	var previousDefinition identity.DefinitionID
 	for _, value := range entry.Definitions {
-		if value <= previous {
+		id, err := identity.ParseDefinitionID(value)
+		if err != nil {
+			return err
+		}
+		if !previousDefinition.IsZero() &&
+			id.Compare(previousDefinition) <= 0 {
 			return &artifactError{
 				reason: "semantic provider definitions are not canonical",
 			}
 		}
-		if _, err := identity.ParseDefinitionID(value); err != nil {
+		previousDefinition = id
+	}
+	var previousDeclaration identity.SemanticDeclarationID
+	for _, value := range entry.Declarations {
+		id, err := identity.ParseSemanticDeclarationID(value)
+		if err != nil {
 			return err
 		}
-		previous = value
-	}
-	previous = ""
-	for _, value := range entry.Declarations {
-		if value <= previous {
+		if !previousDeclaration.IsZero() &&
+			id.Compare(previousDeclaration) <= 0 {
 			return &artifactError{
 				reason: "semantic provider declarations are not canonical",
 			}
 		}
-		if _, err := identity.ParseSemanticDeclarationID(value); err != nil {
-			return err
+		if id.Form() == identity.SemanticDeclarationMember {
+			return &artifactError{
+				reason: fmt.Sprintf(
+					"semantic provider manifest package %s serializes member declaration %s",
+					entry.Package, id,
+				),
+			}
 		}
-		previous = value
+		previousDeclaration = id
 	}
 	return nil
 }
@@ -294,7 +323,7 @@ func (artifact *ProviderArtifact) PackageIDs() []identity.PackageID {
 		out = append(out, packageID)
 	}
 	sort.Slice(out, func(left, right int) bool {
-		return out[left].String() < out[right].String()
+		return out[left].Compare(out[right]) < 0
 	})
 	return out
 }
@@ -319,22 +348,24 @@ func (artifact *ProviderArtifact) PackageContext(
 		return ProviderPackageContext{}, false, err
 	}
 	return ProviderPackageContext{
-		Package:          packageID,
-		Provenance:       PackageProvenance(entry.Provenance),
-		PackageInput:     entry.PackageInput,
-		Structure:        entry.Structure,
-		Selection:        entry.Selection,
-		Definitions:      definitions,
-		Declarations:     declarations,
-		DefinitionCount:  entry.DefinitionCount,
-		ResolutionCount:  entry.ResolutionCount,
-		DeclarationCount: entry.DeclarationCount,
-		BindingCount:     entry.BindingCount,
-		TypeCount:        entry.TypeCount,
-		OperationCount:   entry.OperationCount,
-		UnsupportedCount: entry.UnsupportedCount,
-		ShardBytes:       entry.ShardBytes,
-		ShardDigest:      entry.ShardDigest,
+		Package:            packageID,
+		Provenance:         PackageProvenance(entry.Provenance),
+		PackageInput:       entry.PackageInput,
+		Structure:          entry.Structure,
+		Selection:          entry.Selection,
+		Definitions:        definitions,
+		Declarations:       declarations,
+		DefinitionCount:    entry.DefinitionCount,
+		ResolutionCount:    entry.ResolutionCount,
+		DeclarationCount:   entry.DeclarationCount,
+		MemberTargetCount:  entry.MemberTargetCount,
+		MemberTargetDigest: entry.MemberTargetDigest,
+		BindingCount:       entry.BindingCount,
+		TypeCount:          entry.TypeCount,
+		OperationCount:     entry.OperationCount,
+		UnsupportedCount:   entry.UnsupportedCount,
+		ShardBytes:         entry.ShardBytes,
+		ShardDigest:        entry.ShardDigest,
 	}, true, nil
 }
 
@@ -368,22 +399,6 @@ func (artifact *ProviderArtifact) VisitPackage(
 		return err
 	}
 	defer file.Close()
-	if _, err := file.Seek(
-		artifact.shardBase+entry.ShardOffset,
-		io.SeekStart,
-	); err != nil {
-		return err
-	}
-	encoded := make([]byte, int(entry.ShardBytes))
-	if _, err := io.ReadFull(file, encoded); err != nil {
-		return err
-	}
-	digest := sha256.Sum256(encoded)
-	if fmt.Sprintf("%x", digest[:]) != entry.ShardDigest {
-		return &artifactError{
-			reason: "semantic provider shard digest mismatch",
-		}
-	}
 	authority, err := NewCertifiedProviderAuthority(
 		artifact.digest,
 		entry.ShardDigest,
@@ -392,8 +407,16 @@ func (artifact *ProviderArtifact) VisitPackage(
 	if err != nil {
 		return err
 	}
-	pkg, _, err := decodeProviderShardWithWire(
-		encoded, authority,
+	hash := sha256.New()
+	shard := io.NewSectionReader(
+		file,
+		artifact.shardBase+entry.ShardOffset,
+		entry.ShardBytes,
+	)
+	pkg, err := decodeSemanticShard(
+		io.TeeReader(shard, hash),
+		authority,
+		entry,
 	)
 	if err != nil {
 		return fmt.Errorf(
@@ -401,13 +424,18 @@ func (artifact *ProviderArtifact) VisitPackage(
 			entry.Package, err,
 		)
 	}
+	if fmt.Sprintf("%x", hash.Sum(nil)) != entry.ShardDigest {
+		return &artifactError{
+			reason: "semantic provider shard digest mismatch",
+		}
+	}
 	if err := validateProjectedPackage(pkg, entry); err != nil {
 		return err
 	}
-	var packageMetrics Metrics
-	if err := packageMetrics.addMeasuredPackage(
-		pkg, int64(len(encoded)),
-	); err != nil {
+	packageMetrics, err := measureShardManifest(
+		[]packageShardManifest{entry},
+	)
+	if err != nil {
 		return err
 	}
 	artifact.recordPackageMetrics(pkg.ID(), packageMetrics)
@@ -447,39 +475,60 @@ func (artifact *ProviderArtifact) recordPackageMetrics(
 
 func validateProjectedPackage(
 	pkg Package,
-	entry providerManifestPackage,
+	entry packageShardManifest,
 ) error {
 	if pkg.ID().String() != entry.Package ||
 		uint8(pkg.Provenance()) != entry.Provenance ||
-		len(pkg.definitions) != entry.DefinitionCount ||
-		len(pkg.resolutions) != entry.ResolutionCount ||
-		len(pkg.declarations) != entry.DeclarationCount ||
-		len(pkg.bindings) != entry.BindingCount ||
-		len(pkg.types) != entry.TypeCount ||
-		len(pkg.operations) != entry.OperationCount ||
-		len(pkg.unsupported) != entry.UnsupportedCount {
+		pkg.DefinitionCount() != entry.DefinitionCount ||
+		pkg.ResolutionCount() != entry.ResolutionCount ||
+		pkg.DeclarationCount() != entry.DeclarationCount ||
+		pkg.BindingCount() != entry.BindingCount ||
+		pkg.TypeCount() != entry.TypeCount ||
+		pkg.OperationCount() != entry.OperationCount ||
+		pkg.UnsupportedCount() != entry.UnsupportedCount {
 		return &artifactError{
 			reason: "semantic provider shard disagrees with manifest",
 		}
 	}
+	memberTargets, err := pkg.MemberTargetCensus()
+	if err != nil {
+		return err
+	}
+	if memberTargets.Count() != entry.MemberTargetCount ||
+		memberTargets.Digest() != entry.MemberTargetDigest {
+		return &artifactError{
+			reason: fmt.Sprintf(
+				"semantic provider shard %s member targets disagree with manifest",
+				pkg.ID(),
+			),
+		}
+	}
 	definitions := make(
-		[]string, 0, len(pkg.definitions),
+		[]string, 0, pkg.DefinitionCount(),
 	)
-	for _, record := range pkg.definitions {
+	if err := pkg.VisitDefinitions(func(
+		record DefinitionSemantics,
+	) error {
 		definitions = append(
 			definitions, record.Definition().String(),
 		)
+		return nil
+	}); err != nil {
+		return err
 	}
 	declarations := make(
-		[]string, 0, len(pkg.declarations),
+		[]string, 0, pkg.DeclarationCount(),
 	)
-	for _, record := range pkg.declarations {
+	if err := pkg.VisitDeclarations(func(
+		record Declaration,
+	) error {
 		declarations = append(
 			declarations, record.ID().String(),
 		)
+		return nil
+	}); err != nil {
+		return err
 	}
-	sort.Strings(definitions)
-	sort.Strings(declarations)
 	if !equalStrings(definitions, entry.Definitions) ||
 		!equalStrings(declarations, entry.Declarations) {
 		return &artifactError{

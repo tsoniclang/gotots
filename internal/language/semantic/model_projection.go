@@ -9,19 +9,21 @@ import (
 
 func NewProjectedModel(
 	inputs []PackageProjectionInput,
+	checker *CheckerStore,
 	provider *ProviderArtifact,
 ) (*Model, error) {
-	out := &Model{provider: provider}
+	out := &Model{checker: checker, provider: provider}
 	for _, input := range inputs {
-		projection, err := newPackageProjection(input)
+		projection, err := newPackageProjection(input, checker)
 		if err != nil {
 			return nil, err
 		}
 		out.projections = append(out.projections, projection)
 	}
 	sort.Slice(out.projections, func(left, right int) bool {
-		return out.projections[left].id.String() <
-			out.projections[right].id.String()
+		return out.projections[left].id.Compare(
+			out.projections[right].id,
+		) < 0
 	})
 	if err := validateProjectedModel(out); err != nil {
 		return nil, err
@@ -76,18 +78,25 @@ func validateProjectedModel(model *Model) error {
 			}
 			continue
 		}
-		pkg, err := projection.completeLocal()
+		context, present, err := model.checker.PackageContext(
+			projection.id,
+		)
 		if err != nil {
 			return err
 		}
-		for _, declaration := range pkg.declarations {
-			if owner, duplicate := seenDeclarations[declaration.ID()]; duplicate {
+		if !present {
+			return fmt.Errorf(
+				"semantic checker manifest omits %s", projection.id,
+			)
+		}
+		for _, declaration := range context.Declarations {
+			if owner, duplicate := seenDeclarations[declaration]; duplicate {
 				return fmt.Errorf(
 					"semantic declaration %s belongs to %s and %s",
-					declaration.ID(), owner, projection.id,
+					declaration, owner, projection.id,
 				)
 			}
-			seenDeclarations[declaration.ID()] = projection.id
+			seenDeclarations[declaration] = projection.id
 		}
 	}
 	if err := validateProviderPackageSet(
@@ -115,7 +124,9 @@ func validateProviderProjectionManifest(
 	if !present ||
 		context.Package != projection.id ||
 		context.Provenance != projection.provenance ||
-		len(context.Definitions) != len(projection.expectedDefinitions) {
+		len(context.Definitions) != len(projection.expectedDefinitions) ||
+		context.MemberTargetCount < 0 ||
+		!fullDigest(context.MemberTargetDigest) {
 		return fmt.Errorf(
 			"semantic provider manifest disagrees with package %s",
 			projection.id,

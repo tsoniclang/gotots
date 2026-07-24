@@ -3,13 +3,11 @@ package stagecheck
 import (
 	"fmt"
 	"go/ast"
-	"go/token"
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/semantic"
 	"github.com/tsoniclang/gotots/internal/language/structure"
-	"github.com/tsoniclang/gotots/internal/source"
 )
 
 type checkerTypeParameterOwner struct {
@@ -19,19 +17,12 @@ type checkerTypeParameterOwner struct {
 	ordinal    int
 }
 
-type checkerTypeParameterLocation struct {
-	packagePath string
-	position    token.Pos
-	index       int
-}
-
 func (verifier *checkerTypeVerifier) indexTypeParameterOwners(
-	universe *source.Universe,
 	index *structure.TransientIndex,
 ) {
-	for _, loaded := range universe.Packages() {
-		verifier.indexCheckerPackageTypeParameters(loaded.Types())
-	}
+	verifier.indexCheckerPackageTypeParameters(
+		verifier.expected.loaded.Types(),
+	)
 	view := verifier.expected.loaded.CheckerView()
 	if view == nil || index == nil {
 		return
@@ -70,6 +61,22 @@ func (verifier *checkerTypeVerifier) indexTypeParameterOwners(
 				role:       semantic.TypeParameterReceiver,
 			},
 		)
+	}
+}
+
+func (
+	verifier *checkerTypeVerifier,
+) indexCheckerDeclarationTypeParameters(object types.Object) {
+	switch typed := object.(type) {
+	case *types.TypeName:
+		switch declared := typed.Type().(type) {
+		case *types.Named:
+			verifier.indexEncounteredNamedTypeParameters(declared)
+		case *types.Alias:
+			verifier.indexEncounteredAliasTypeParameters(declared)
+		}
+	case *types.Func:
+		verifier.indexCheckerFunctionTypeParameters(typed.Origin())
 	}
 }
 
@@ -198,21 +205,6 @@ func (verifier *checkerTypeVerifier) registerCheckerTypeParameters(
 			)
 		}
 		verifier.parameterOwners[parameter] = candidate
-		location, present := independentTypeParameterLocation(
-			parameter,
-		)
-		if !present {
-			continue
-		}
-		if prior, duplicate := verifier.parameterLocations[location]; duplicate && !sameCheckerTypeParameterOwner(
-			prior, candidate,
-		) {
-			verifier.parameterConflict = fmt.Sprintf(
-				"checker type-parameter location %v has two owners",
-				location,
-			)
-		}
-		verifier.parameterLocations[location] = candidate
 	}
 }
 
@@ -243,22 +235,6 @@ func sameCheckerOwnerObject(
 	return types.Identical(left.Type(), right.Type())
 }
 
-func independentTypeParameterLocation(
-	parameter *types.TypeParam,
-) (checkerTypeParameterLocation, bool) {
-	if parameter == nil || parameter.Obj() == nil ||
-		parameter.Obj().Pkg() == nil ||
-		!parameter.Obj().Pos().IsValid() ||
-		parameter.Index() < 0 {
-		return checkerTypeParameterLocation{}, false
-	}
-	return checkerTypeParameterLocation{
-		packagePath: parameter.Obj().Pkg().Path(),
-		position:    parameter.Obj().Pos(),
-		index:       parameter.Index(),
-	}, true
-}
-
 func (verifier *checkerTypeVerifier) verifyTypeParameterOwner(
 	record semantic.TypeParameterOwner,
 	parameter *types.TypeParam,
@@ -267,14 +243,6 @@ func (verifier *checkerTypeVerifier) verifyTypeParameterOwner(
 		return fmt.Errorf("%s", verifier.parameterConflict)
 	}
 	expected, present := verifier.parameterOwners[parameter]
-	if !present {
-		if location, located := independentTypeParameterLocation(
-			parameter,
-		); located {
-			expected, present =
-				verifier.parameterLocations[location]
-		}
-	}
 	if !present {
 		return fmt.Errorf(
 			"type parameter %s has no independently derived owner",

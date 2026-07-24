@@ -339,6 +339,87 @@ func TestSupersededStage1ArchitectureIsAbsent(t *testing.T) {
 	}
 }
 
+func TestSupersededStage2ProjectionArchitectureIsAbsent(t *testing.T) {
+	semanticBanned := []string{
+		"type providerShard struct",
+		"decodeProviderShardWithWire",
+		"map[identity.PackageID]Package",
+		"Local *Package",
+		"overlayLocalPackage",
+		"providerManifestPackage",
+		"writeProviderShard",
+		"decodeProviderShard",
+		"measureProviderManifest",
+	}
+	globalBanned := []string{
+		"IdentifierOccurrence",
+		"TransientContext",
+		"ownerCache",
+		"transientStructure",
+		"typeParameterLocation",
+		"typeParameterByLocation",
+		"parameterLocations",
+		"object.Pos()",
+		"Obj().Pos()",
+	}
+	for _, file := range productionGoFiles(t) {
+		raw, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.ToSlash(file)
+		if strings.Contains(path, "/internal/language/frontend/") {
+			for _, spelling := range []string{
+				"AdditionalOccurrenceRefs()",
+				"map[identity.PackageID]*packageInput",
+				"[]*packageInput",
+			} {
+				if strings.Contains(string(raw), spelling) {
+					t.Errorf(
+						"eager Stage-2 package-input spelling %q remains in %s",
+						spelling,
+						file,
+					)
+				}
+			}
+		}
+		if strings.Contains(path, "/internal/language/semantic/") {
+			for _, spelling := range semanticBanned {
+				if strings.Contains(string(raw), spelling) {
+					t.Errorf(
+						"superseded Stage-2 projection spelling %q remains in %s",
+						spelling,
+						file,
+					)
+				}
+			}
+		}
+		for _, spelling := range globalBanned {
+			if strings.Contains(string(raw), spelling) {
+				t.Errorf(
+					"superseded Stage-2 identity/projection spelling %q remains in %s",
+					spelling,
+					file,
+				)
+			}
+		}
+	}
+	superseded := filepath.Join(
+		repoRoot(t),
+		"internal",
+		"language",
+		"semantic",
+		"projection_overlay.go",
+	)
+	if _, err := os.Stat(superseded); !os.IsNotExist(err) {
+		t.Errorf(
+			"superseded complete-package overlay remains at %s: %v",
+			superseded,
+			err,
+		)
+	}
+}
+
 // TestNoGenericProductionBuckets prevents responsibilities from escaping the
 // declared package graph through an unowned utility layer.
 func TestNoGenericProductionBuckets(t *testing.T) {

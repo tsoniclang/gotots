@@ -127,16 +127,15 @@ func deriveCgoPackage(
 			if err != nil {
 				return err
 			}
-			ledger.add(
-				"checked-mapping",
-				fmt.Sprintf(
-					"%s|%d|%d|%d|%s",
-					definition,
-					origin.line,
-					origin.column,
-					uint8(match),
-					checkedDigest,
-				),
+			addRecord(
+				&ledger.checkedMappings,
+				checkedMappingLedgerRecord{
+					definition:    definition,
+					originLine:    origin.line,
+					originColumn:  origin.column,
+					originMatch:   match,
+					checkedDigest: checkedDigest,
+				},
 			)
 		}
 	}
@@ -266,7 +265,7 @@ func independentResolveOrigin(
 	}
 	if len(candidates) != 1 {
 		sort.Slice(candidates, func(left, right int) bool {
-			return candidates[left].String() < candidates[right].String()
+			return candidates[left].Compare(candidates[right]) < 0
 		})
 		return identity.DefinitionID{},
 			structure.CheckedOriginInvalid,
@@ -307,7 +306,6 @@ func deriveSynthetic(
 		if err != nil {
 			return err
 		}
-		owner := ownerID.String()
 		header, _ := identity.NewHeaderRegionID(definition)
 		boundary, _ := identity.NewExecutionBoundaryID(definition)
 		headerContent, boundaryContent, err :=
@@ -320,53 +318,40 @@ func deriveSynthetic(
 			return err
 		}
 		if firstSynthetic {
-			ledger.add("owner", owner)
+			addRecord(&ledger.owners, ownerID)
 		}
-		ledger.add(
-			"definition",
-			fmt.Sprintf(
-				"%s|%s|%s|%s|%s",
-				definition,
-				owner,
-				header,
-				boundary,
-				descriptor.name,
+		addRecord(&ledger.definitions, definitionLedgerRecord{
+			id:       definition,
+			owner:    ownerID,
+			header:   header,
+			boundary: boundary,
+			name:     descriptor.name,
+		})
+		addRecord(&ledger.definitionSites, definitionSiteLedgerRecord{
+			kind:       structure.DefinitionSiteSynthetic,
+			definition: definition,
+			owner:      ownerID,
+		})
+		addRecord(&ledger.headers, headerLedgerRecord{
+			id: header,
+			digest: independentDigest(
+				definition.String(),
+				"synthetic-header",
+				headerContent,
 			),
-		)
-		ledger.add(
-			"definition-site",
-			fmt.Sprintf(
-				"%d|%s|%s||",
-				uint8(structure.DefinitionSiteSynthetic),
-				definition,
-				owner,
-			),
-		)
-		ledger.add(
-			"header",
-			fmt.Sprintf(
-				"%s|%s",
-				header,
-				independentDigest(
-					definition.String(),
-					"synthetic-header",
-					headerContent,
-				),
-			),
-		)
-		ledger.add(
-			"execution-boundary",
-			fmt.Sprintf(
-				"%s|%d|%s|0|%d",
-				boundary,
-				uint8(structure.BoundaryImplicit),
-				independentDigest(
+		})
+		addRecord(
+			&ledger.executionBoundaries,
+			executionBoundaryLedgerRecord{
+				id:   boundary,
+				kind: structure.BoundaryImplicit,
+				digest: independentDigest(
 					definition.String(),
 					"synthetic-boundary",
 					boundaryContent,
 				),
-				uint8(descriptor.role),
-			),
+				synthetic: descriptor.role,
+			},
 		)
 	}
 	return nil

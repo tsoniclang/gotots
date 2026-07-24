@@ -272,11 +272,10 @@ func (builder *typeBuilder) buildTypeParameter(
 	owner, present := builder.objects.typeParameterOwner(typed)
 	if !present {
 		return identity.SemanticTypeID{}, fmt.Errorf(
-			"type parameter %s has no canonical generic owner (materialized-package=%s, object-package=%v, pos=%d, parent=%v)",
+			"type parameter %s has no canonical generic owner (materialized-package=%s, object-package=%v, parent=%v)",
 			typed.Obj().Name(),
 			builder.objects.input.id,
 			typed.Obj().Pkg(),
-			typed.Obj().Pos(),
 			typed.Obj().Parent(),
 		)
 	}
@@ -313,11 +312,10 @@ func (builder *typeBuilder) typeParameterID(
 	owner, present := builder.objects.typeParameterOwner(typed)
 	if !present {
 		return identity.SemanticTypeID{}, fmt.Errorf(
-			"type parameter %s has no canonical generic owner (materialized-package=%s, object-package=%v, pos=%d, parent=%v)",
+			"type parameter %s has no canonical generic owner (materialized-package=%s, object-package=%v, parent=%v)",
 			typed.Obj().Name(),
 			builder.objects.input.id,
 			typed.Obj().Pkg(),
-			typed.Obj().Pos(),
 			typed.Obj().Parent(),
 		)
 	}

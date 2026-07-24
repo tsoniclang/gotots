@@ -63,7 +63,7 @@ func buildFile(
 	if err != nil {
 		return FileGraph{}, err
 	}
-	if err := builder.recordOccurrence(root); err != nil {
+	if err := builder.recordOccurrence(root, syntax); err != nil {
 		return FileGraph{}, err
 	}
 	builder.owner.id = ownerID
@@ -147,7 +147,9 @@ func (b *fileBuilder) walkOwner(
 			}
 			continue
 		}
-		if err := b.recordOccurrence(occurrence); err != nil {
+		if err := b.recordOccurrence(
+			occurrence, child.node,
+		); err != nil {
 			return err
 		}
 		b.owner.members = append(b.owner.members, occurrence.id)
@@ -206,7 +208,12 @@ func (b *fileBuilder) addDefinition(
 	if _, duplicate := b.index.definitions[definitionID]; duplicate {
 		return b.defect(node, catalog.EdgeInvalid, "duplicate definition identity")
 	}
-	if err := b.recordOccurrence(root); err != nil {
+	if err := b.recordOccurrence(root, node); err != nil {
+		return err
+	}
+	if err := b.index.bindStructuralOwner(
+		root.id, definitionID,
+	); err != nil {
 		return err
 	}
 	b.index.definitions[definitionID] = node
@@ -323,7 +330,9 @@ func (b *fileBuilder) ensurePath(path []pathStep) error {
 		}
 	}
 	for _, step := range path[firstNew:] {
-		if err := b.recordOccurrence(step.occurrence); err != nil {
+		if err := b.recordOccurrence(
+			step.occurrence, step.node,
+		); err != nil {
 			return err
 		}
 		b.anchors[step.occurrence.id] = true
@@ -341,6 +350,12 @@ func (b *fileBuilder) scanNestedDefinitions(
 	path []pathStep,
 	context catalog.DefinitionContext,
 ) error {
+	current := path[len(path)-1].occurrence
+	if err := b.index.bindStructuralSupport(
+		current, node, parent,
+	); err != nil {
+		return err
+	}
 	kind, err := Classify(node)
 	if err != nil {
 		return err
@@ -353,12 +368,11 @@ func (b *fileBuilder) scanNestedDefinitions(
 	if err != nil {
 		return err
 	}
-	parentOccurrence := path[len(path)-1].occurrence
 	for _, child := range nested {
 		b.work.CatalogEdges++
 		occurrence, err := b.makeOccurrence(
 			child.node,
-			parentOccurrence.id,
+			current.id,
 			child.edge,
 			child.ordinal,
 		)
@@ -396,7 +410,10 @@ func (b *fileBuilder) scanNestedDefinitions(
 	return nil
 }
 
-func (b *fileBuilder) recordOccurrence(occurrence Occurrence) error {
+func (b *fileBuilder) recordOccurrence(
+	occurrence Occurrence,
+	node ast.Node,
+) error {
 	b.work.IdentityProbes++
 	if existing, present := b.occurrences[occurrence.id]; present {
 		if existing != occurrence {
@@ -406,6 +423,11 @@ func (b *fileBuilder) recordOccurrence(occurrence Occurrence) error {
 			)
 		}
 		return nil
+	}
+	if err := b.index.bindStructuralOccurrence(
+		occurrence, node,
+	); err != nil {
+		return err
 	}
 	b.occurrences[occurrence.id] = occurrence
 	b.order = append(b.order, occurrence.id)
@@ -441,14 +463,11 @@ func (b *fileBuilder) makeOccurrence(
 	if err != nil {
 		return Occurrence{}, err
 	}
-	if err := b.index.bindStructuralOccurrence(id, node); err != nil {
-		return Occurrence{}, err
-	}
 	lexical, err := tokenEvidence(node)
 	if err != nil {
 		return Occurrence{}, b.defect(node, edge, err.Error())
 	}
-	return NewOccurrence(
+	occurrence, err := NewOccurrence(
 		id,
 		kind,
 		parent,
@@ -458,6 +477,10 @@ func (b *fileBuilder) makeOccurrence(
 		b.displaySpan(node),
 		lexical,
 	)
+	if err != nil {
+		return Occurrence{}, err
+	}
+	return occurrence, nil
 }
 
 func (b *fileBuilder) physicalSpan(node ast.Node) Span {

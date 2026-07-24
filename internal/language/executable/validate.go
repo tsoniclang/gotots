@@ -137,17 +137,18 @@ func validateInventoryIndexes(inventory *Inventory) error {
 		len(inventory.additionalIDs) != len(inventory.byOccurrence) {
 		return fmt.Errorf("executable indexes have unequal cardinalities")
 	}
-	previous := ""
+	var previousDefinition identity.DefinitionID
 	for _, regionID := range inventory.regionIDs {
 		region := inventory.byID[regionID]
 		if region.id.IsZero() ||
-			previous >= region.Definition().String() {
+			(!previousDefinition.IsZero() &&
+				previousDefinition.Compare(region.Definition()) >= 0) {
 			return fmt.Errorf(
 				"executable region order is noncanonical at %s",
 				region.Definition(),
 			)
 		}
-		previous = region.Definition().String()
+		previousDefinition = region.Definition()
 		indexed, present := inventory.byID[region.Definition()]
 		if !present || indexed.id != region.id {
 			return fmt.Errorf(
@@ -156,21 +157,43 @@ func validateInventoryIndexes(inventory *Inventory) error {
 			)
 		}
 	}
-	previous = ""
-	for _, id := range inventory.additionalIDs {
+	var previousOccurrence identity.OccurrenceID
+	expectedRanges := map[identity.FileID]occurrenceRange{}
+	for position, id := range inventory.additionalIDs {
 		occurrence := inventory.byOccurrence[id]
-		if previous >= occurrence.ID().String() {
+		if !previousOccurrence.IsZero() &&
+			previousOccurrence.Compare(occurrence.ID()) >= 0 {
 			return fmt.Errorf(
 				"additional occurrence order is noncanonical at %s",
 				occurrence.ID(),
 			)
 		}
-		previous = occurrence.ID().String()
+		previousOccurrence = occurrence.ID()
 		indexed, present := inventory.byOccurrence[occurrence.ID()]
 		if !present || indexed != occurrence {
 			return fmt.Errorf(
 				"additional occurrence index disagrees at %s",
 				occurrence.ID(),
+			)
+		}
+		file := id.Span().File()
+		expectedRange, present := expectedRanges[file]
+		if !present {
+			expectedRange.start = position
+		}
+		expectedRange.end = position + 1
+		expectedRanges[file] = expectedRange
+	}
+	if len(inventory.additionalByFile) != len(expectedRanges) {
+		return fmt.Errorf(
+			"additional occurrence file index has unequal cardinality",
+		)
+	}
+	for file, expected := range expectedRanges {
+		if actual, present := inventory.additionalByFile[file]; !present || actual != expected {
+			return fmt.Errorf(
+				"additional occurrence file range disagrees for %s",
+				file,
 			)
 		}
 	}

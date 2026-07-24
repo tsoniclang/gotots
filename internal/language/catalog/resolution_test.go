@@ -129,6 +129,94 @@ func TestIdentifierResolutionUsesParentAssignedRole(t *testing.T) {
 	}
 }
 
+func TestCallArgumentIdentifierAdmitsBuiltinTypeOrValueMeaning(
+	t *testing.T,
+) {
+	for _, class := range []ResolutionClass{
+		ResolutionClassType,
+		ResolutionClassOperation,
+	} {
+		if !AllowsResolution(
+			KindIdent,
+			RoleCallArgument,
+			VariantNone,
+			ResolutionDomainExecutable,
+			class,
+		) {
+			t.Fatalf(
+				"call-argument identifier rejects checker-selected %v",
+				class,
+			)
+		}
+	}
+}
+
+func TestFieldTagInExecutableRegionIsCompileTimeStructure(
+	t *testing.T,
+) {
+	if RoleMayOwnRuntimeOperation(RoleFieldTag) {
+		t.Fatal("field-tag role can own a runtime operation")
+	}
+	if !AllowsResolution(
+		KindBasicLit,
+		RoleFieldTag,
+		VariantNone,
+		ResolutionDomainExecutable,
+		ResolutionClassStructural,
+	) {
+		t.Fatal("local struct field tag cannot remain structural")
+	}
+	if AllowsResolution(
+		KindBasicLit,
+		RoleFieldTag,
+		VariantNone,
+		ResolutionDomainExecutable,
+		ResolutionClassOperation,
+	) {
+		t.Fatal("local struct field tag can become a runtime literal")
+	}
+}
+
+func TestCaseValueIdentifierAdmitsExpressionOrTypeMeaning(t *testing.T) {
+	for _, class := range []ResolutionClass{
+		ResolutionClassType,
+		ResolutionClassOperation,
+	} {
+		if !AllowsResolution(
+			KindIdent,
+			RoleCaseValue,
+			VariantNone,
+			ResolutionDomainExecutable,
+			class,
+		) {
+			t.Fatalf(
+				"case-value identifier rejects context-selected %v",
+				class,
+			)
+		}
+	}
+}
+
+func TestAssignmentTargetAdmitsTypeSwitchBindingAnchor(t *testing.T) {
+	for _, class := range []ResolutionClass{
+		ResolutionClassOperation,
+		ResolutionClassStructural,
+	} {
+		if !AllowsResolution(
+			KindIdent,
+			RoleAssignmentTarget,
+			VariantNone,
+			ResolutionDomainExecutable,
+			class,
+		) {
+			t.Fatalf(
+				"assignment-target identifier rejects %v",
+				class,
+			)
+		}
+	}
+}
+
 func TestRangeIdentifiersRetainExecutableMeaning(t *testing.T) {
 	for _, role := range []Role{
 		RoleRangeKey,
@@ -235,5 +323,41 @@ func TestTypeSetUnionBinaryExpressionResolvesAsType(t *testing.T) {
 		ResolutionClassOperation,
 	) {
 		t.Fatal("executable index rejects context-selected operation")
+	}
+}
+
+func TestCompileTimeStructuralResolutionCanLiveInExecutableRegion(
+	t *testing.T,
+) {
+	for _, role := range []Role{
+		RoleArrayLength,
+		RoleLeftOperand,
+		RoleRightOperand,
+		RoleInitializerValue,
+	} {
+		if !AllowsCompileTimeStructuralResolution(
+			KindBinaryExpr,
+			role,
+			ResolutionDomainExecutable,
+		) {
+			t.Fatalf(
+				"compile-time binary %s is rejected in an executable region",
+				role,
+			)
+		}
+	}
+	if AllowsCompileTimeStructuralResolution(
+		KindAssignStmt,
+		RoleStatement,
+		ResolutionDomainExecutable,
+	) {
+		t.Fatal("statement admitted as compile-time structural syntax")
+	}
+	if AllowsCompileTimeStructuralResolution(
+		KindBinaryExpr,
+		RoleArrayLength,
+		ResolutionDomainBoundary,
+	) {
+		t.Fatal("boundary admitted as a compile-time expression")
 	}
 }

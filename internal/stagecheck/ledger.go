@@ -1,96 +1,235 @@
 package stagecheck
 
 import (
-	"crypto/sha256"
-	"fmt"
-	"sort"
-
 	"github.com/tsoniclang/gotots/internal/language/structure"
 )
 
+type recordMultiset[Record comparable] map[Record]int
+
+func addRecord[Record comparable](
+	records *recordMultiset[Record],
+	record Record,
+) {
+	if *records == nil {
+		*records = recordMultiset[Record]{}
+	}
+	(*records)[record]++
+}
+
+func mergeRecords[Record comparable](
+	target *recordMultiset[Record],
+	source recordMultiset[Record],
+) {
+	for record, count := range source {
+		if *target == nil {
+			*target = recordMultiset[Record]{}
+		}
+		(*target)[record] += count
+	}
+}
+
 type structuralLedger struct {
-	classes map[string]map[string]int
+	owners                   recordMultiset[structure.OwnerRegionID]
+	occurrences              recordMultiset[occurrenceLedgerRecord]
+	ownerMembers             recordMultiset[ownerMemberLedgerRecord]
+	directives               recordMultiset[directiveLedgerRecord]
+	containmentGraphs        recordMultiset[structure.OwnerRegionID]
+	containmentAnchors       recordMultiset[containmentAnchorLedgerRecord]
+	checkedMappings          recordMultiset[checkedMappingLedgerRecord]
+	definitions              recordMultiset[definitionLedgerRecord]
+	definitionSites          recordMultiset[definitionSiteLedgerRecord]
+	headers                  recordMultiset[headerLedgerRecord]
+	headerMembers            recordMultiset[headerMemberLedgerRecord]
+	executionBoundaries      recordMultiset[executionBoundaryLedgerRecord]
+	executionEntries         recordMultiset[executionEntryLedgerRecord]
+	additionalOccurrences    recordMultiset[occurrenceLedgerRecord]
+	executableRegions        recordMultiset[executableRegionLedgerRecord]
+	executableMembers        recordMultiset[executableMemberLedgerRecord]
+	definitionReferences     recordMultiset[definitionReferenceLedgerRecord]
+	implicitOperations       recordMultiset[implicitOperationLedgerRecord]
+	definitionCensus         recordMultiset[definitionCensusLedgerRecord]
+	providerDefinitionCensus recordMultiset[definitionCensusLedgerRecord]
+	certifiedSelectionFacts  recordMultiset[certifiedSelectionFactLedgerRecord]
+	certifiedFacts           recordMultiset[certifiedFactLedgerRecord]
 }
 
 func newStructuralLedger() *structuralLedger {
-	return &structuralLedger{classes: map[string]map[string]int{}}
+	return &structuralLedger{}
 }
 
-func (l *structuralLedger) add(class, record string) {
-	if l.classes[class] == nil {
-		l.classes[class] = map[string]int{}
+func (ledger *structuralLedger) merge(other *structuralLedger) {
+	mergeRecords(&ledger.owners, other.owners)
+	mergeRecords(&ledger.occurrences, other.occurrences)
+	mergeRecords(&ledger.ownerMembers, other.ownerMembers)
+	mergeRecords(&ledger.directives, other.directives)
+	mergeRecords(&ledger.containmentGraphs, other.containmentGraphs)
+	mergeRecords(&ledger.containmentAnchors, other.containmentAnchors)
+	mergeRecords(&ledger.checkedMappings, other.checkedMappings)
+	mergeRecords(&ledger.definitions, other.definitions)
+	mergeRecords(&ledger.definitionSites, other.definitionSites)
+	mergeRecords(&ledger.headers, other.headers)
+	mergeRecords(&ledger.headerMembers, other.headerMembers)
+	mergeRecords(&ledger.executionBoundaries, other.executionBoundaries)
+	mergeRecords(&ledger.executionEntries, other.executionEntries)
+	mergeRecords(&ledger.additionalOccurrences, other.additionalOccurrences)
+	mergeRecords(&ledger.executableRegions, other.executableRegions)
+	mergeRecords(&ledger.executableMembers, other.executableMembers)
+	mergeRecords(&ledger.definitionReferences, other.definitionReferences)
+	mergeRecords(&ledger.implicitOperations, other.implicitOperations)
+	mergeRecords(&ledger.definitionCensus, other.definitionCensus)
+	mergeRecords(
+		&ledger.providerDefinitionCensus,
+		other.providerDefinitionCensus,
+	)
+	mergeRecords(
+		&ledger.certifiedSelectionFacts,
+		other.certifiedSelectionFacts,
+	)
+	mergeRecords(&ledger.certifiedFacts, other.certifiedFacts)
+}
+
+func compareLedgerClass[Record comparable](
+	problems *problemSet,
+	class string,
+	actual recordMultiset[Record],
+	expected recordMultiset[Record],
+	render func(Record) string,
+) {
+	for record, actualCount := range actual {
+		expectedCount, present := expected[record]
+		if present && actualCount == expectedCount {
+			continue
+		}
+		problems.addf(
+			"%s|%s|expected=%d|actual=%d",
+			class,
+			render(record),
+			expectedCount,
+			actualCount,
+		)
 	}
-	l.classes[class][record]++
-}
-
-func (l *structuralLedger) merge(other *structuralLedger) {
-	for class, records := range other.classes {
-		if l.classes[class] == nil {
-			l.classes[class] = map[string]int{}
+	for record, expectedCount := range expected {
+		if _, present := actual[record]; present {
+			continue
 		}
-		for record, count := range records {
-			l.classes[class][record] += count
-		}
+		problems.addf(
+			"%s|%s|expected=%d|actual=0",
+			class,
+			render(record),
+			expectedCount,
+		)
 	}
 }
 
 func compareLedgers(stage string, actual, expected *structuralLedger) error {
-	classSet := map[string]bool{}
-	for class := range actual.classes {
-		classSet[class] = true
-	}
-	for class := range expected.classes {
-		classSet[class] = true
-	}
-	var classes []string
-	for class := range classSet {
-		classes = append(classes, class)
-	}
-	sort.Strings(classes)
-	const sampleLimit = 20
-	residualHash := sha256.New()
-	var samples []string
-	residuals := 0
-	for _, class := range classes {
-		recordSet := map[string]bool{}
-		for record := range expected.classes[class] {
-			recordSet[record] = true
-		}
-		for record := range actual.classes[class] {
-			recordSet[record] = true
-		}
-		records := make([]string, 0, len(recordSet))
-		for record := range recordSet {
-			records = append(records, record)
-		}
-		sort.Strings(records)
-		for _, record := range records {
-			expectedCount := expected.classes[class][record]
-			actualCount := actual.classes[class][record]
-			if expectedCount == actualCount {
-				continue
-			}
-			residual := fmt.Sprintf(
-				"%s|%s|expected=%d|actual=%d",
-				class, record, expectedCount, actualCount,
-			)
-			fmt.Fprintln(residualHash, residual)
-			residuals++
-			if len(samples) < sampleLimit {
-				samples = append(samples, residual)
-			}
-		}
-	}
-	if residuals == 0 {
-		return nil
-	}
-	return &VerificationError{
-		Stage: stage,
-		Reason: fmt.Sprintf(
-			"exact structural join failed (residuals=%d digest=%x sample=%v)",
-			residuals, residualHash.Sum(nil), samples,
-		),
-	}
+	problems := newProblemSet()
+	compareLedgerClass(
+		problems, "owner", actual.owners, expected.owners,
+		renderOwnerLedgerRecord,
+	)
+	compareLedgerClass(
+		problems, "occurrence", actual.occurrences, expected.occurrences,
+		renderOccurrenceLedgerRecord,
+	)
+	compareLedgerClass(
+		problems, "owner-member", actual.ownerMembers, expected.ownerMembers,
+		renderOwnerMemberLedgerRecord,
+	)
+	compareLedgerClass(
+		problems, "directive", actual.directives, expected.directives,
+		renderDirectiveLedgerRecord,
+	)
+	compareLedgerClass(
+		problems, "containment-graph",
+		actual.containmentGraphs, expected.containmentGraphs,
+		renderOwnerLedgerRecord,
+	)
+	compareLedgerClass(
+		problems, "containment-anchor",
+		actual.containmentAnchors, expected.containmentAnchors,
+		renderContainmentAnchorLedgerRecord,
+	)
+	compareLedgerClass(
+		problems, "checked-mapping",
+		actual.checkedMappings, expected.checkedMappings,
+		renderCheckedMappingLedgerRecord,
+	)
+	compareLedgerClass(
+		problems, "definition", actual.definitions, expected.definitions,
+		renderDefinitionLedgerRecord,
+	)
+	compareLedgerClass(
+		problems, "definition-site",
+		actual.definitionSites, expected.definitionSites,
+		renderDefinitionSiteLedgerRecord,
+	)
+	compareLedgerClass(
+		problems, "header", actual.headers, expected.headers,
+		renderHeaderLedgerRecord,
+	)
+	compareLedgerClass(
+		problems, "header-member",
+		actual.headerMembers, expected.headerMembers,
+		renderHeaderMemberLedgerRecord,
+	)
+	compareLedgerClass(
+		problems, "execution-boundary",
+		actual.executionBoundaries, expected.executionBoundaries,
+		renderExecutionBoundaryLedgerRecord,
+	)
+	compareLedgerClass(
+		problems, "execution-entry",
+		actual.executionEntries, expected.executionEntries,
+		renderExecutionEntryLedgerRecord,
+	)
+	compareLedgerClass(
+		problems, "executable-additional-occurrence",
+		actual.additionalOccurrences, expected.additionalOccurrences,
+		renderOccurrenceLedgerRecord,
+	)
+	compareLedgerClass(
+		problems, "executable-region",
+		actual.executableRegions, expected.executableRegions,
+		renderExecutableRegionLedgerRecord,
+	)
+	compareLedgerClass(
+		problems, "executable-member",
+		actual.executableMembers, expected.executableMembers,
+		renderExecutableMemberLedgerRecord,
+	)
+	compareLedgerClass(
+		problems, "executable-definition-reference",
+		actual.definitionReferences, expected.definitionReferences,
+		renderDefinitionReferenceLedgerRecord,
+	)
+	compareLedgerClass(
+		problems, "executable-implicit-operation",
+		actual.implicitOperations, expected.implicitOperations,
+		renderImplicitOperationLedgerRecord,
+	)
+	compareLedgerClass(
+		problems, "definition-census",
+		actual.definitionCensus, expected.definitionCensus,
+		renderDefinitionCensusLedgerRecord,
+	)
+	compareLedgerClass(
+		problems, "provider-definition-census",
+		actual.providerDefinitionCensus,
+		expected.providerDefinitionCensus,
+		renderDefinitionCensusLedgerRecord,
+	)
+	compareLedgerClass(
+		problems, "certified-selection-fact",
+		actual.certifiedSelectionFacts,
+		expected.certifiedSelectionFacts,
+		renderCertifiedSelectionFactLedgerRecord,
+	)
+	compareLedgerClass(
+		problems, "certified-fact",
+		actual.certifiedFacts, expected.certifiedFacts,
+		renderCertifiedFactLedgerRecord,
+	)
+	return problems.verificationError(stage, "exact structural join failed")
 }
 
 func ledgerForPackage(pkg structure.PackageGraph) *structuralLedger {
@@ -99,7 +238,7 @@ func ledgerForPackage(pkg structure.PackageGraph) *structuralLedger {
 		addFileGraph(ledger, file)
 	}
 	for _, owner := range pkg.SyntheticOwners() {
-		ledger.add("owner", owner.ID().String())
+		addRecord(&ledger.owners, owner.ID())
 	}
 	addDefinitionRecords(
 		ledger,
@@ -120,40 +259,37 @@ func ledgerForFile(file structure.FileGraph) *structuralLedger {
 
 func addFileGraph(ledger *structuralLedger, file structure.FileGraph) {
 	owner := file.Owner()
-	ledger.add("owner", owner.ID().String())
+	addRecord(&ledger.owners, owner.ID())
 	for _, occurrence := range file.Occurrences() {
-		ledger.add(
-			"occurrence",
-			occurrenceKey(occurrence),
+		addRecord(
+			&ledger.occurrences,
+			occurrenceLedgerRecordFromOccurrence(occurrence),
 		)
 	}
 	for _, member := range owner.Members() {
-		ledger.add(
-			"owner-member",
-			fmt.Sprintf("%s|%s", owner.ID(), member),
-		)
+		addRecord(&ledger.ownerMembers, ownerMemberLedgerRecord{
+			owner: owner.ID(), member: member,
+		})
 	}
 	for _, directive := range owner.Directives() {
-		ledger.add(
-			"directive",
-			fmt.Sprintf(
-				"%s|%d|%s|%s|%s|%s|%s",
-				owner.ID(),
-				uint16(directive.Kind()),
-				directive.Tool(),
-				directive.Name(),
-				directive.Args(),
-				spanKey(directive.Span()),
-				displayKey(directive.Display()),
-			),
-		)
+		addRecord(&ledger.directives, directiveLedgerRecord{
+			owner:   owner.ID(),
+			kind:    directive.Kind(),
+			tool:    directive.Tool(),
+			name:    directive.Name(),
+			args:    directive.Args(),
+			span:    directive.Span(),
+			display: directive.Display(),
+		})
 	}
 	containment := file.Containment()
-	ledger.add("containment-graph", containment.Owner().String())
+	addRecord(&ledger.containmentGraphs, containment.Owner())
 	for _, anchor := range containment.Anchors() {
-		ledger.add(
-			"containment-anchor",
-			fmt.Sprintf("%s|%s", containment.Owner(), anchor),
+		addRecord(
+			&ledger.containmentAnchors,
+			containmentAnchorLedgerRecord{
+				owner: containment.Owner(), anchor: anchor,
+			},
 		)
 	}
 	addDefinitionRecords(
@@ -165,17 +301,13 @@ func addFileGraph(ledger *structuralLedger, file structure.FileGraph) {
 		false,
 	)
 	for _, mapping := range file.CheckedMappings() {
-		ledger.add(
-			"checked-mapping",
-			fmt.Sprintf(
-				"%s|%d|%d|%d|%s",
-				mapping.Definition(),
-				mapping.OriginLine(),
-				mapping.OriginColumn(),
-				uint8(mapping.OriginMatch()),
-				mapping.CheckedDigest(),
-			),
-		)
+		addRecord(&ledger.checkedMappings, checkedMappingLedgerRecord{
+			definition:    mapping.Definition(),
+			originLine:    mapping.OriginLine(),
+			originColumn:  mapping.OriginColumn(),
+			originMatch:   mapping.OriginMatch(),
+			checkedDigest: mapping.CheckedDigest(),
+		})
 	}
 }
 
@@ -191,112 +323,59 @@ func addDefinitionRecords(
 		if implicitOnly && !definition.ID().File().IsZero() {
 			continue
 		}
-		ledger.add(
-			"definition",
-			fmt.Sprintf(
-				"%s|%s|%s|%s|%s",
-				definition.ID(),
-				definition.Owner(),
-				definition.Header(),
-				definition.Boundary(),
-				definition.Name(),
-			),
-		)
+		addRecord(&ledger.definitions, definitionLedgerRecord{
+			id:       definition.ID(),
+			owner:    definition.Owner(),
+			header:   definition.Header(),
+			boundary: definition.Boundary(),
+			name:     definition.Name(),
+		})
 	}
 	for _, site := range sites {
 		if implicitOnly && !site.Definition().File().IsZero() {
 			continue
 		}
-		ledger.add(
-			"definition-site",
-			fmt.Sprintf(
-				"%d|%s|%s|%s|%s",
-				uint8(site.Kind()),
-				site.Definition(),
-				site.Owner(),
-				site.ParentDefinition(),
-				site.Terminal(),
-			),
-		)
+		addRecord(&ledger.definitionSites, definitionSiteLedgerRecord{
+			kind:       site.Kind(),
+			definition: site.Definition(),
+			owner:      site.Owner(),
+			parent:     site.ParentDefinition(),
+			terminal:   site.Terminal(),
+		})
 	}
 	for _, header := range headers {
 		if implicitOnly && !header.ID().Definition().File().IsZero() {
 			continue
 		}
-		ledger.add(
-			"header",
-			fmt.Sprintf("%s|%s", header.ID(), header.Digest()),
-		)
+		addRecord(&ledger.headers, headerLedgerRecord{
+			id: header.ID(), digest: header.Digest(),
+		})
 		for index, occurrence := range header.Members() {
-			ledger.add(
-				"header-member",
-				fmt.Sprintf("%s|%d|%s", header.ID(), index, occurrence),
-			)
+			addRecord(&ledger.headerMembers, headerMemberLedgerRecord{
+				header: header.ID(), ordinal: index, occurrence: occurrence,
+			})
 		}
 	}
 	for _, boundary := range boundaries {
 		if implicitOnly && !boundary.ID().Definition().File().IsZero() {
 			continue
 		}
-		ledger.add(
-			"execution-boundary",
-			fmt.Sprintf(
-				"%s|%d|%s|%d|%d",
-				boundary.ID(),
-				uint8(boundary.Kind()),
-				boundary.CombinedDigest(),
-				uint8(boundary.ImplicitOp()),
-				uint8(boundary.SyntheticRole()),
-			),
+		addRecord(
+			&ledger.executionBoundaries,
+			executionBoundaryLedgerRecord{
+				id:        boundary.ID(),
+				kind:      boundary.Kind(),
+				digest:    boundary.CombinedDigest(),
+				implicit:  boundary.ImplicitOp(),
+				synthetic: boundary.SyntheticRole(),
+			},
 		)
 		for _, entry := range boundary.Entries() {
-			ledger.add(
-				"execution-entry",
-				fmt.Sprintf(
-					"%s|%s|%s",
-					boundary.ID(),
-					entry.ID(),
-					entry.Hash(),
-				),
-			)
+			addRecord(&ledger.executionEntries, executionEntryLedgerRecord{
+				boundary:   boundary.ID(),
+				occurrence: entry.ID(),
+				hash:       entry.Hash(),
+			})
 		}
 	}
-}
-
-func occurrenceKey(occurrence structure.Occurrence) string {
-	return fmt.Sprintf(
-		"%s|%d|%s|%d|%d|%s|%s|%d",
-		occurrence.ID(),
-		uint16(occurrence.Kind()),
-		occurrence.Parent(),
-		uint16(occurrence.Edge()),
-		occurrence.Ordinal(),
-		spanKey(occurrence.Span()),
-		displayKey(occurrence.Display()),
-		uint16(occurrence.Token()),
-	)
-}
-
-func spanKey(span structure.Span) string {
-	return fmt.Sprintf(
-		"%d:%d:%d-%d:%d:%d",
-		span.Start.Line,
-		span.Start.Column,
-		span.Start.Offset,
-		span.End.Line,
-		span.End.Column,
-		span.End.Offset,
-	)
-}
-
-func displayKey(span structure.DisplaySpan) string {
-	return fmt.Sprintf(
-		"%s@%d:%d-%s@%d:%d",
-		span.Start.Filename,
-		span.Start.Line,
-		span.Start.Column,
-		span.End.Filename,
-		span.End.Line,
-		span.End.Column,
-	)
 }

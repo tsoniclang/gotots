@@ -14,7 +14,7 @@ func verifyResolutionFingerprint(
 ) error {
 	packages := workspace.Packages()
 	if !sort.SliceIsSorted(packages, func(i, j int) bool {
-		return packages[i].ID().String() < packages[j].ID().String()
+		return packages[i].ID().Compare(packages[j].ID()) < 0
 	}) {
 		return fmt.Errorf("workspace packages are not canonical")
 	}

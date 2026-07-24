@@ -23,20 +23,6 @@ type derivedOccurrence struct {
 	token   catalog.TokenKind
 }
 
-func (o derivedOccurrence) key() string {
-	return fmt.Sprintf(
-		"%s|%d|%s|%d|%d|%s|%s|%d",
-		o.id,
-		uint16(o.kind),
-		o.parent,
-		uint16(o.edge),
-		o.ordinal,
-		spanKey(o.span),
-		displayKey(o.display),
-		uint16(o.token),
-	)
-}
-
 type derivedChild struct {
 	node    ast.Node
 	edge    catalog.Edge
@@ -53,7 +39,7 @@ type derivedFile struct {
 	file        *source.LoadedFile
 	fset        *token.FileSet
 	raw         []byte
-	owner       string
+	owner       structure.OwnerRegionID
 	occurrences map[identity.OccurrenceID]derivedOccurrence
 	anchors     map[identity.OccurrenceID]bool
 	definitions map[identity.DefinitionID]ast.Node
@@ -73,7 +59,10 @@ func deriveFile(file *source.LoadedFile) (*derivedFile, error) {
 			"%s: independent parse failed: %w", file.ID(), err,
 		)
 	}
-	owner := "source:" + file.ID().String()
+	owner, err := structure.SourceFileOwner(file.ID())
+	if err != nil {
+		return nil, err
+	}
 	builder := &derivedFile{
 		ledger:      newStructuralLedger(),
 		file:        file,
@@ -84,8 +73,8 @@ func deriveFile(file *source.LoadedFile) (*derivedFile, error) {
 		anchors:     map[identity.OccurrenceID]bool{},
 		definitions: map[identity.DefinitionID]ast.Node{},
 	}
-	builder.ledger.add("owner", owner)
-	builder.ledger.add("containment-graph", owner)
+	addRecord(&builder.ledger.owners, owner)
+	addRecord(&builder.ledger.containmentGraphs, owner)
 	root, err := builder.occurrence(
 		syntax, identity.OccurrenceID{}, catalog.EdgeInvalid, 0,
 	)
@@ -95,9 +84,9 @@ func deriveFile(file *source.LoadedFile) (*derivedFile, error) {
 	if err := builder.recordOccurrence(root); err != nil {
 		return nil, err
 	}
-	builder.ledger.add(
-		"owner-member", fmt.Sprintf("%s|%s", owner, root.id),
-	)
+	addRecord(&builder.ledger.ownerMembers, ownerMemberLedgerRecord{
+		owner: owner, member: root.id,
+	})
 	context, err := catalog.NewDefinitionContext(
 		catalog.DefinitionScopePackage, catalog.TokenInvalid,
 	)
@@ -161,10 +150,9 @@ func (b *derivedFile) walkOwner(
 		if err := b.recordOccurrence(occurrence); err != nil {
 			return err
 		}
-		b.ledger.add(
-			"owner-member",
-			fmt.Sprintf("%s|%s", b.owner, occurrence.id),
-		)
+		addRecord(&b.ledger.ownerMembers, ownerMemberLedgerRecord{
+			owner: b.owner, member: occurrence.id,
+		})
 		if err := b.walkOwner(
 			child.node, occurrence, next, childContext,
 		); err != nil {
@@ -205,28 +193,20 @@ func (b *derivedFile) addDefinition(
 	if err := b.ensurePath(path[:len(path)-1]); err != nil {
 		return err
 	}
-	b.ledger.add(
-		"definition",
-		fmt.Sprintf(
-			"%s|%s|%s|%s|%s",
-			definition,
-			b.owner,
-			header,
-			boundary,
-			independentDefinitionName(node),
-		),
-	)
-	b.ledger.add(
-		"definition-site",
-		fmt.Sprintf(
-			"%d|%s|%s|%s|%s",
-			uint8(structure.DefinitionSiteSource),
-			definition,
-			b.owner,
-			parent,
-			root.id,
-		),
-	)
+	addRecord(&b.ledger.definitions, definitionLedgerRecord{
+		id:       definition,
+		owner:    b.owner,
+		header:   header,
+		boundary: boundary,
+		name:     independentDefinitionName(node),
+	})
+	addRecord(&b.ledger.definitionSites, definitionSiteLedgerRecord{
+		kind:       structure.DefinitionSiteSource,
+		definition: definition,
+		owner:      b.owner,
+		parent:     parent,
+		terminal:   root.id,
+	})
 	entries, err := independentDefinitionEntries(node)
 	if err != nil {
 		return err
@@ -365,9 +345,11 @@ func (b *derivedFile) ensurePath(path []derivedPathStep) error {
 			continue
 		}
 		b.anchors[step.occurrence.id] = true
-		b.ledger.add(
-			"containment-anchor",
-			fmt.Sprintf("%s|%s", b.owner, step.occurrence.id),
+		addRecord(
+			&b.ledger.containmentAnchors,
+			containmentAnchorLedgerRecord{
+				owner: b.owner, anchor: step.occurrence.id,
+			},
 		)
 	}
 	return nil
@@ -388,12 +370,13 @@ func (b *derivedFile) addHeader(
 	if err != nil {
 		return err
 	}
-	b.ledger.add("header", fmt.Sprintf("%s|%s", header, digest))
+	addRecord(&b.ledger.headers, headerLedgerRecord{
+		id: header, digest: digest,
+	})
 	for index, occurrence := range members {
-		b.ledger.add(
-			"header-member",
-			fmt.Sprintf("%s|%d|%s", header, index, occurrence.id),
-		)
+		addRecord(&b.ledger.headerMembers, headerMemberLedgerRecord{
+			header: header, ordinal: index, occurrence: occurrence.id,
+		})
 	}
 	return nil
 }
@@ -466,20 +449,18 @@ func (b *derivedFile) addBoundary(
 			return err
 		}
 		hashes = append(hashes, hash)
-		b.ledger.add(
-			"execution-entry",
-			fmt.Sprintf("%s|%s|%s", boundary, occurrence.id, hash),
-		)
+		addRecord(&b.ledger.executionEntries, executionEntryLedgerRecord{
+			boundary: boundary, occurrence: occurrence.id, hash: hash,
+		})
 	}
 	if len(hashes) > 0 {
 		combined = independentDigest(hashes...)
 	}
-	b.ledger.add(
-		"execution-boundary",
-		fmt.Sprintf(
-			"%s|%d|%s|0|0",
-			boundary, uint8(boundaryKind), combined,
-		),
+	addRecord(
+		&b.ledger.executionBoundaries,
+		executionBoundaryLedgerRecord{
+			id: boundary, kind: boundaryKind, digest: combined,
+		},
 	)
 	return nil
 }
@@ -497,7 +478,10 @@ func (b *derivedFile) recordOccurrence(
 		return nil
 	}
 	b.occurrences[occurrence.id] = occurrence
-	b.ledger.add("occurrence", occurrence.key())
+	addRecord(
+		&b.ledger.occurrences,
+		occurrenceLedgerRecordFromDerived(occurrence),
+	)
 	return nil
 }
 

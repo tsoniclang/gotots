@@ -40,6 +40,9 @@ func TestInspectConstructsPrintsOnlyBoundedDenominators(t *testing.T) {
 	local := reportLine(
 		t, lines, "semantic-local-production: ",
 	)
+	checker := reportLine(
+		t, lines, "semantic-checker-consumption: ",
+	)
 	manifest := reportLine(
 		t, lines, "semantic-provider-manifest: ",
 	)
@@ -49,9 +52,9 @@ func TestInspectConstructsPrintsOnlyBoundedDenominators(t *testing.T) {
 	residency := reportLine(
 		t,
 		lines,
-		"semantic-provider-consumption-residency: ",
+		"semantic-consumption-residency: ",
 	)
-	expectedLines := 7
+	expectedLines := 8
 	for field, prefix := range map[string]string{
 		"packages":    "semantic-local-production-package-tail ",
 		"definitions": "semantic-local-production-definition-tail ",
@@ -68,10 +71,28 @@ func TestInspectConstructsPrintsOnlyBoundedDenominators(t *testing.T) {
 		}
 		expectedLines += want
 	}
+	checkerPackageTails := minInt(
+		reportInteger(t, checker, "packages"), 20,
+	)
+	if got := countReportLines(
+		lines, "semantic-checker-consumption-package-tail ",
+	); got != checkerPackageTails {
+		t.Fatalf(
+			"checker-consumption package tails=%d, want %d",
+			got, checkerPackageTails,
+		)
+	}
+	expectedLines += checkerPackageTails
 	if reportInteger(t, manifest, "packages") != 0 ||
 		reportInteger(t, provider, "packages") != 0 ||
-		reportInteger(t, residency, "shardLoads") != 0 ||
-		reportInteger(t, residency, "maxResidentPackages") != 0 ||
+		reportInteger(t, residency, "providerShardLoads") != 0 ||
+		reportInteger(t, residency, "maxProviderPackagesResident") != 0 ||
+		reportInteger(t, residency, "checkerShardLoads") !=
+			reportInteger(t, residency, "localPackages") ||
+		reportInteger(t, residency, "logicalPackageLoads") !=
+			reportInteger(t, residency, "localPackages") ||
+		reportInteger(t, residency, "maxCheckerPackagesResident") != 1 ||
+		reportInteger(t, residency, "maxLogicalPackagesResident") != 1 ||
 		countReportLines(
 			lines, "semantic-provider-consumption-package-tail ",
 		) != 0 {

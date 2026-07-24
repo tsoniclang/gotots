@@ -150,8 +150,8 @@ func (p *Plan) SyntheticFor(
 // provider graph artifact.
 type CertifiedInput struct {
 	Digest   string
-	Files    map[string]bool
-	Packages map[string]bool
+	Files    map[identity.FileID]bool
+	Packages map[identity.PackageID]bool
 }
 
 // Build conservatively chooses local syntax whenever any declared rule can
@@ -212,7 +212,8 @@ func build(
 				kind = KindLocalSyntax
 				artifactDigest = ""
 			} else if purpose == PurposeCompilation &&
-				(certified.Digest == "" || !certified.Files[loadedFile.ID().String()]) {
+				(certified.Digest == "" ||
+					!certified.Files[loadedFile.ID()]) {
 				return nil, &Error{Reason: loadedFile.ID().String() +
 					" requires a certified structural graph and none is bound"}
 			}
@@ -233,7 +234,7 @@ func build(
 				artifactDigest = ""
 			} else if purpose == PurposeCompilation &&
 				(certified.Digest == "" ||
-					!certified.Packages[pkg.ID().String()]) {
+					!certified.Packages[pkg.ID()]) {
 				return nil, &Error{Reason: pkg.ID().String() +
 					" requires a certified synthetic graph and none is bound"}
 			}
@@ -256,10 +257,10 @@ func finishPlan(out *Plan) error {
 		return &Error{Reason: "source plan has no valid purpose"}
 	}
 	sort.Slice(out.files, func(i, j int) bool {
-		return out.files[i].id.String() < out.files[j].id.String()
+		return out.files[i].id.Compare(out.files[j].id) < 0
 	})
 	sort.Slice(out.synthetic, func(i, j int) bool {
-		return out.synthetic[i].pkg.String() < out.synthetic[j].pkg.String()
+		return out.synthetic[i].pkg.Compare(out.synthetic[j].pkg) < 0
 	})
 	for index := range out.files {
 		file := &out.files[index]

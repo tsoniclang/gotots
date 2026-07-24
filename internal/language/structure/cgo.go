@@ -81,7 +81,7 @@ func attachCgo(
 	}
 
 	matched := map[identity.DefinitionID]bool{}
-	synthetic := map[string]bool{}
+	synthetic := map[identity.DefinitionID]bool{}
 	for _, declaration := range checked {
 		display := universe.Fset().Position(declaration.Pos())
 		if _, original := filesByPath[display.Filename]; !original {
@@ -158,8 +158,9 @@ func attachCgo(
 	for fileIndex := range graph.files {
 		sort.Slice(graph.files[fileIndex].mappings, func(i, j int) bool {
 			work.SortComparisons++
-			return graph.files[fileIndex].mappings[i].definition.String() <
-				graph.files[fileIndex].mappings[j].definition.String()
+			return graph.files[fileIndex].mappings[i].definition.Compare(
+				graph.files[fileIndex].mappings[j].definition,
+			) < 0
 		})
 	}
 	return nil
@@ -197,6 +198,9 @@ func bindCheckedDeclarationCounterparts(
 	for _, declaration := range checked {
 		position := universe.Fset().Position(declaration.Pos())
 		if filesByPath[position.Filename] == nil {
+			if err := index.markCheckedViewTree(declaration); err != nil {
+				return err
+			}
 			continue
 		}
 		kind, err := Classify(declaration)
@@ -218,6 +222,9 @@ func bindCheckedDeclarationCounterparts(
 			}
 		}
 		if len(candidates) == 0 {
+			if err := index.markCheckedViewTree(declaration); err != nil {
+				return err
+			}
 			continue
 		}
 		if len(candidates) != 1 {
@@ -338,7 +345,7 @@ func addSyntheticDeclaration(
 	declaration ast.Node,
 	graph *PackageGraph,
 	index *TransientIndex,
-	seen map[string]bool,
+	seen map[identity.DefinitionID]bool,
 	work *Work,
 ) error {
 	for _, descriptor := range syntheticDescriptors(declaration, view) {
@@ -346,10 +353,10 @@ func addSyntheticDeclaration(
 		if err != nil {
 			return err
 		}
-		if seen[definitionID.String()] {
+		if seen[definitionID] {
 			return fmt.Errorf("duplicate cgo synthetic definition %s", definitionID)
 		}
-		seen[definitionID.String()] = true
+		seen[definitionID] = true
 		index.synthetic[definitionID] = descriptor.node
 		ownerID, err := SyntheticOwner(pkg, SyntheticOwnerCgoGenerated)
 		if err != nil {

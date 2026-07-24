@@ -21,6 +21,12 @@ type Result struct {
 	metrics semantic.Metrics
 }
 
+type localProjectionSelection struct {
+	files        []identity.FileID
+	declarations []identity.SemanticDeclarationID
+	synthetic    bool
+}
+
 func (result *Result) Model() *semantic.Model { return result.model }
 func (result *Result) Work() Work             { return result.work }
 func (result *Result) Metrics() semantic.Metrics {
@@ -50,35 +56,67 @@ func Materialize(
 	if err != nil {
 		return nil, err
 	}
-	packages := map[identity.PackageID]semantic.Package{}
+	writer, err := semantic.NewCheckerStoreWriter()
+	if err != nil {
+		return nil, err
+	}
+	sealed := false
+	defer func() {
+		if !sealed {
+			writer.Abort()
+		}
+	}()
+	local := map[identity.PackageID]localProjectionSelection{}
 	work := Work{}
-	for _, input := range stage.packageList {
-		pkg, packageWork, err := materializePackage(stage, input)
+	_, err = stage.visitPackageInputs(func(input *packageInput) error {
+		pkg, declarations, packageWork, err :=
+			materializePackage(stage, input)
 		if err != nil {
-			return nil, fmt.Errorf(
+			return fmt.Errorf(
 				"materialize semantic package %s: %w",
 				input.id, err,
 			)
 		}
-		packages[pkg.ID()] = pkg
+		files, err := localPackageFiles(
+			stage.plan, input.loaded,
+		)
+		if err != nil {
+			return err
+		}
+		if err := writer.Append(pkg); err != nil {
+			return err
+		}
+		selection := localProjectionSelection{
+			files: files, declarations: declarations,
+		}
+		if synthetic, present := stage.plan.SyntheticFor(input.id); present {
+			selection.synthetic =
+				synthetic.Kind() == sourceplan.KindLocalSyntax
+		}
+		local[input.id] = selection
 		work.merge(packageWork)
-	}
-	localPackages := make([]semantic.Package, 0, len(packages))
-	for _, pkg := range packages {
-		localPackages = append(localPackages, pkg)
-	}
-	metrics, err := semantic.MeasurePackages(localPackages)
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
+	checker, metrics, err := writer.Seal()
+	if err != nil {
+		return nil, err
+	}
+	sealed = true
 	projections, err := buildPackageProjections(
-		stage, packages,
+		stage, local,
 	)
 	if err != nil {
+		_ = checker.Close()
 		return nil, err
 	}
-	model, err := semantic.NewProjectedModel(projections, provider)
+	model, err := semantic.NewProjectedModel(
+		projections, checker, provider,
+	)
 	if err != nil {
+		_ = checker.Close()
 		return nil, err
 	}
 	return &Result{
@@ -108,18 +146,34 @@ func MaterializeProviderPackage(
 	if err != nil {
 		return semantic.Package{}, Work{}, err
 	}
-	if len(stage.packageList) != 1 {
+	var semanticPackage semantic.Package
+	var work Work
+	count, err := stage.visitPackageInputs(func(input *packageInput) error {
+		if !semanticPackage.ID().IsZero() {
+			return fmt.Errorf(
+				"semantic provider derivation has more than one package",
+			)
+		}
+		var materializeErr error
+		semanticPackage, _, work, materializeErr =
+			materializePackage(stage, input)
+		return materializeErr
+	})
+	if err != nil {
+		return semantic.Package{}, Work{}, err
+	}
+	if count != 1 {
 		return semantic.Package{}, Work{}, fmt.Errorf(
 			"semantic provider derivation has %d packages",
-			len(stage.packageList),
+			count,
 		)
 	}
-	return materializePackage(stage, stage.packageList[0])
+	return semanticPackage, work, nil
 }
 
 func buildPackageProjections(
 	stage *stageInput,
-	local map[identity.PackageID]semantic.Package,
+	local map[identity.PackageID]localProjectionSelection,
 ) ([]semantic.PackageProjectionInput, error) {
 	expected := map[identity.PackageID][]identity.DefinitionID{}
 	for _, record := range stage.graph.DefinitionCensus() {
@@ -152,8 +206,7 @@ func buildPackageProjections(
 		packageIDs = append(packageIDs, packageID)
 	}
 	sort.Slice(packageIDs, func(left, right int) bool {
-		return packageIDs[left].String() <
-			packageIDs[right].String()
+		return packageIDs[left].Compare(packageIDs[right]) < 0
 	})
 	out := make(
 		[]semantic.PackageProjectionInput, 0, len(packageIDs),
@@ -177,43 +230,29 @@ func buildPackageProjections(
 			ExpectedDefinitions: expected[packageID],
 			Certified:           certified,
 		}
-		if pkg, present := local[packageID]; present {
-			input.Local = &pkg
-			localFiles, declarations, err :=
-				localPackageProjection(
-					stage.plan, loadedPackage, pkg,
-				)
-			if err != nil {
-				return nil, err
-			}
-			input.LocalFiles = localFiles
-			input.LocalDeclarations = declarations
-			if synthetic, present := stage.plan.SyntheticFor(
-				packageID,
-			); present {
-				input.LocalSynthetic =
-					synthetic.Kind() == sourceplan.KindLocalSyntax
-			}
+		if selection, present := local[packageID]; present {
+			input.Local = true
+			input.LocalFiles = selection.files
+			input.LocalDeclarations = selection.declarations
+			input.LocalSynthetic = selection.synthetic
 		}
 		out = append(out, input)
 	}
 	return out, nil
 }
 
-func localPackageProjection(
+func localPackageFiles(
 	plan *sourceplan.Plan,
 	loaded *source.LoadedPackage,
-	pkg semantic.Package,
 ) (
 	[]identity.FileID,
-	[]identity.SemanticDeclarationID,
 	error,
 ) {
 	var files []identity.FileID
 	for _, file := range loaded.Files() {
 		decision, present := plan.For(file.ID())
 		if !present {
-			return nil, nil, fmt.Errorf(
+			return nil, fmt.Errorf(
 				"semantic source plan omits %s", file.ID(),
 			)
 		}
@@ -221,79 +260,11 @@ func localPackageProjection(
 			files = append(files, file.ID())
 		}
 	}
-	var declarations []identity.SemanticDeclarationID
-	if !packageUsesCertifiedSemantics(plan, loaded) {
-		for _, declaration := range pkg.Declarations() {
-			declarations = append(declarations, declaration.ID())
-		}
-		return files, declarations, nil
-	}
-	selectedDeclarations := map[identity.SemanticDeclarationID]bool{}
-	syntheticDeclarations := map[identity.SemanticDeclarationID]bool{}
-	for _, definition := range pkg.Definitions() {
-		for _, declaration := range definition.Spec().Declarations {
-			selectedDeclarations[declaration] = true
-			if definition.Form() == semantic.DefinitionFormSynthetic {
-				syntheticDeclarations[declaration] = true
-			}
-		}
-	}
-	for _, resolution := range pkg.Resolutions() {
-		var declaration identity.SemanticDeclarationID
-		switch resolution.Kind() {
-		case semantic.ResolutionDeclaration:
-			declaration = resolution.Declaration()
-		case semantic.ResolutionStructuralOnly:
-			if resolution.Structural().Disposition() ==
-				semantic.StructuralCompileTimeExpression {
-				continue
-			}
-			declaration = resolution.Structural().Declaration()
-		}
-		if declaration.IsZero() ||
-			resolution.Role() != catalog.RoleDeclarationName {
-			continue
-		}
-		selectedDeclarations[declaration] = true
-	}
-	for _, declaration := range pkg.Declarations() {
-		if declaration.ID().Form() ==
-			identity.SemanticDeclarationPredeclared {
-			selectedDeclarations[declaration.ID()] = true
-			continue
-		}
-		if syntheticDeclarations[declaration.ID()] {
-			decision, present := plan.SyntheticFor(loaded.ID())
-			if !present {
-				return nil, nil, fmt.Errorf(
-					"semantic synthetic declaration %s has no source plan",
-					declaration.ID(),
-				)
-			}
-			if decision.Kind() != sourceplan.KindLocalSyntax {
-				delete(selectedDeclarations, declaration.ID())
-			}
-			continue
-		}
-		if declaration.ID().Form() ==
-			identity.SemanticDeclarationOccurrence {
-			source := declaration.ID().Occurrence()
-			decision, present := plan.For(source.Span().File())
-			if !present ||
-				decision.Kind() != sourceplan.KindLocalSyntax {
-				delete(selectedDeclarations, declaration.ID())
-			}
-		}
-	}
-	for _, declaration := range pkg.Declarations() {
-		if selectedDeclarations[declaration.ID()] {
-			declarations = append(declarations, declaration.ID())
-		}
-	}
-	return files, declarations, nil
+	return files, nil
 }
 
 type packageBuilder struct {
+	stage                 *stageInput
 	input                 *packageInput
 	contexts              *contextIndex
 	objects               *objectIndex
@@ -308,18 +279,23 @@ type packageBuilder struct {
 func materializePackage(
 	stage *stageInput,
 	input *packageInput,
-) (semantic.Package, Work, error) {
+) (
+	semantic.Package,
+	[]identity.SemanticDeclarationID,
+	Work,
+	error,
+) {
 	work := input.work
 	work.Packages = 1
 	contexts, err := buildContexts(input, &work)
 	if err != nil {
-		return semantic.Package{}, Work{}, err
+		return semantic.Package{}, nil, Work{}, err
 	}
 	objects, err := buildObjectIndex(
 		stage, input, contexts, &work,
 	)
 	if err != nil {
-		return semantic.Package{}, Work{}, err
+		return semantic.Package{}, nil, Work{}, err
 	}
 	draft, err := semantic.NewPackageDraft(
 		input.id,
@@ -327,10 +303,10 @@ func materializePackage(
 		packageDraftCapacity(input, objects),
 	)
 	if err != nil {
-		return semantic.Package{}, Work{}, err
+		return semantic.Package{}, nil, Work{}, err
 	}
 	builder := &packageBuilder{
-		input: input, contexts: contexts, objects: objects,
+		stage: stage, input: input, contexts: contexts, objects: objects,
 		types:                 objects.typeBuilder,
 		draft:                 draft,
 		operationByOccurrence: map[identity.OccurrenceID]identity.OperationID{},
@@ -344,70 +320,49 @@ func materializePackage(
 		}
 	}
 	if err := builder.resolveOccurrences(); err != nil {
-		return semantic.Package{}, Work{}, err
-	}
-	declarations, err := objects.declarationRecords()
-	if err != nil {
-		return semantic.Package{}, Work{}, err
-	}
-	bindings, err := objects.bindingRecords()
-	if err != nil {
-		return semantic.Package{}, Work{}, err
+		return semantic.Package{}, nil, Work{}, err
 	}
 	if err := builder.buildDefinitions(); err != nil {
-		return semantic.Package{}, Work{}, err
+		return semantic.Package{}, nil, Work{}, err
 	}
-	if err := builder.types.finish(); err != nil {
-		return semantic.Package{}, Work{}, err
+	bindingCount, err := objects.visitBindingRecords(
+		draft.AddBinding,
+	)
+	if err != nil {
+		return semantic.Package{}, nil, Work{}, err
 	}
-	types := builder.types.recordsSorted()
-	for _, record := range types {
-		witness, err := semantic.NewTypeWitness(
-			input.id, record.ID(), input.authority,
-		)
-		if err != nil {
-			return semantic.Package{}, Work{}, err
-		}
-		if err := draft.AddType(record, witness); err != nil {
-			return semantic.Package{}, Work{}, err
-		}
+	declarations, typeCount, err :=
+		builder.materializeSemanticClosure()
+	if err != nil {
+		return semantic.Package{}, nil, Work{}, err
 	}
-	for _, declaration := range declarations {
-		if err := draft.AddDeclaration(declaration); err != nil {
-			return semantic.Package{}, Work{}, err
-		}
-	}
-	for _, binding := range bindings {
-		if err := draft.AddBinding(binding); err != nil {
-			return semantic.Package{}, Work{}, err
-		}
-	}
+	declarationCount := len(declarations)
 	resolutionCount := draft.ResolutionCount()
 	operationCount := draft.OperationCount()
 	unsupportedCount := draft.UnsupportedCount()
 	pkg, err := draft.SealProducer()
 	if err != nil {
-		return semantic.Package{}, Work{}, fmt.Errorf(
+		return semantic.Package{}, nil, Work{}, fmt.Errorf(
 			"materialize semantic package %s: %w", input.id, err,
 		)
 	}
-	if work.ContextAssignments != len(contexts.byOccurrence) {
-		return semantic.Package{}, Work{}, fmt.Errorf(
+	if work.ContextAssignments != contexts.count {
+		return semantic.Package{}, nil, Work{}, fmt.Errorf(
 			"semantic context work=%d, contexts=%d",
 			work.ContextAssignments,
-			len(contexts.byOccurrence),
+			contexts.count,
 		)
 	}
 	work.OccurrenceResolutions = resolutionCount
 	work.TypeConstructions = builder.types.work
 	work.ObjectConstructions =
-		len(declarations) + len(bindings)
+		declarationCount + bindingCount
 	work.OperationConstructions =
 		operationCount + unsupportedCount
 	work.CanonicalSortInputs +=
-		len(types) + len(declarations) + len(bindings) +
+		typeCount + declarationCount + bindingCount +
 			operationCount + resolutionCount
-	return pkg, work, nil
+	return pkg, declarations, work, nil
 }
 
 func packageDraftCapacity(
@@ -419,7 +374,9 @@ func packageDraftCapacity(
 		Resolutions: len(input.order),
 		Bindings:    len(objects.bindingIDs),
 	}
-	for _, occurrence := range input.occurrences {
+	_ = input.occurrences.visit(func(
+		occurrence *occurrenceInput,
+	) error {
 		if occurrence.domain ==
 			catalog.ResolutionDomainExecutable {
 			capacity.Operations++
@@ -429,7 +386,8 @@ func packageDraftCapacity(
 				catalog.DispositionActive {
 			capacity.Unsupported++
 		}
-	}
+		return nil
+	})
 	return capacity
 }
 
@@ -443,8 +401,7 @@ func sortedDefinitions(
 		out = append(out, definition)
 	}
 	sort.Slice(out, func(left, right int) bool {
-		return out[left].ID().String() <
-			out[right].ID().String()
+		return out[left].ID().Compare(out[right].ID()) < 0
 	})
 	return out
 }

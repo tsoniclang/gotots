@@ -43,6 +43,13 @@ func (i *Inspection) SemanticMetrics() semantic.Metrics {
 }
 func (i *Inspection) Hydration() source.HydrationStats { return i.hydration }
 
+func (i *Inspection) Close() error {
+	if i == nil || i.semantic == nil {
+		return nil
+	}
+	return i.semantic.Close()
+}
+
 // InspectConstructs executes the sole ordinary Stage-1 route:
 //
 //	resolve contract -> resolve metadata closure
@@ -157,6 +164,12 @@ func InspectConstructs(req source.Request) (*Inspection, error) {
 	if err != nil {
 		return nil, err
 	}
+	keepSemantic := false
+	defer func() {
+		if !keepSemantic {
+			_ = semanticResult.Model().Close()
+		}
+	}()
 	if err := stagecheck.VerifyStage2(
 		universe,
 		plan,
@@ -188,12 +201,14 @@ func InspectConstructs(req source.Request) (*Inspection, error) {
 	); err != nil {
 		return nil, err
 	}
-	return &Inspection{
+	inspection := &Inspection{
 		workspace: workspace, plan: plan, graph: graph, facts: facts,
 		selections: selections, executable: executableInventory,
 		semantic:        semanticResult.Model(),
 		semanticWork:    semanticResult.Work(),
 		semanticMetrics: semanticResult.Metrics(),
 		hydration:       hydrationStats,
-	}, nil
+	}
+	keepSemantic = true
+	return inspection, nil
 }

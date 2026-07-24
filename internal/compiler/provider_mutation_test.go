@@ -39,7 +39,7 @@ func TestProviderFactMutationInvalidatesBoundSemanticArtifact(t *testing.T) {
 	request.ProviderStructureDigest = digest
 	request.ProviderSemanticArtifact = semanticPath
 	request.ProviderSemanticDigest = result.Semantic.Digest
-	_, err = InspectConstructs(request)
+	_, err = inspectConstructsForTest(t, request)
 	if err == nil ||
 		!strings.Contains(
 			err.Error(),

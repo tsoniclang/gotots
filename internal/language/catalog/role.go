@@ -140,3 +140,55 @@ func AllRoles() []Role {
 	}
 	return roles
 }
+
+// RoleMayOwnRuntimeOperation reports whether an occurrence in this
+// grammatical role can itself execute at runtime. Contextual roles such as an
+// element key remain true; their semantic resolver must use checker evidence
+// to distinguish a runtime key from a compile-time field name.
+func RoleMayOwnRuntimeOperation(role Role) bool {
+	if !role.Valid() {
+		return false
+	}
+	switch role {
+	case RoleDocumentation,
+		RoleTrailingDocumentation,
+		RoleCommentText,
+		RolePackageName,
+		RoleDeclaration,
+		RoleDeclarationName,
+		RoleTypeExpression,
+		RoleFieldTag,
+		RoleFieldGroup,
+		RoleConstructedType,
+		RoleSelectedName,
+		RoleAssertedType,
+		RoleArrayLength,
+		RoleElementType,
+		RoleStructFields,
+		RoleTypeParameters,
+		RoleParameters,
+		RoleResults,
+		RoleInterfaceMethods,
+		RoleKeyType,
+		RoleValueType,
+		RoleLabelDeclaration,
+		RoleLabelReference,
+		RoleImportAlias,
+		RoleImportPath,
+		RoleReceiver,
+		RoleFunctionSignature,
+		RoleSpecification:
+		return false
+	default:
+		return true
+	}
+}
+
+// RoleMayContributeRuntimeEvaluation reports whether a child in this role can
+// contribute to its parent's runtime evaluation relation. A function body
+// owns its own block operation but is not an operand of the function
+// declaration that contains it.
+func RoleMayContributeRuntimeEvaluation(role Role) bool {
+	return RoleMayOwnRuntimeOperation(role) &&
+		role != RoleFunctionBody
+}

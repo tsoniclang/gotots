@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
 
 	"github.com/tsoniclang/gotots/internal/identity"
 )
@@ -34,6 +33,7 @@ type ProviderWriteResult struct {
 	Definitions           int
 	Resolutions           int
 	Declarations          int
+	MemberTargets         int
 	Bindings              int
 	Types                 int
 	Operations            int
@@ -54,7 +54,7 @@ type ProviderArtifactWriter struct {
 	spoolPath  string
 	context    providerContext
 	manifest   providerManifest
-	previous   string
+	previous   identity.PackageID
 	closed     bool
 	result     ProviderWriteResult
 	metrics    Metrics
@@ -104,7 +104,8 @@ func (writer *ProviderArtifactWriter) Append(pkg Package) error {
 	if writer == nil || writer.closed || writer.spool == nil {
 		return &artifactError{reason: "semantic provider writer is closed"}
 	}
-	if pkg.ID().String() <= writer.previous {
+	if !writer.previous.IsZero() &&
+		pkg.ID().Compare(writer.previous) <= 0 {
 		return &artifactError{
 			reason: "semantic provider packages are not canonical",
 		}
@@ -126,7 +127,7 @@ func (writer *ProviderArtifactWriter) Append(pkg Package) error {
 		return err
 	}
 	hash := sha256.New()
-	encodedBytes, err := writeProviderShard(
+	measurement, err := writeSemanticShard(
 		io.MultiWriter(writer.spool, hash), pkg,
 	)
 	if err != nil {
@@ -136,48 +137,34 @@ func (writer *ProviderArtifactWriter) Append(pkg Package) error {
 	}
 	var packageMetrics Metrics
 	if err := packageMetrics.addMeasuredPackage(
-		pkg, encodedBytes,
+		pkg, measurement,
 	); err != nil {
 		_ = writer.spool.Truncate(offset)
 		_, _ = writer.spool.Seek(offset, io.SeekStart)
 		return err
 	}
-	entry := providerManifestPackage{
-		Package:          pkg.ID().String(),
-		Provenance:       uint8(pkg.Provenance()),
-		PackageInput:     authority.PackageInput(),
-		Structure:        authority.StructureDigest(),
-		Selection:        authority.SelectionDigest(),
-		ShardOffset:      offset,
-		ShardBytes:       encodedBytes,
-		ShardDigest:      fmt.Sprintf("%x", hash.Sum(nil)),
-		DefinitionCount:  len(pkg.definitions),
-		ResolutionCount:  len(pkg.resolutions),
-		DeclarationCount: len(pkg.declarations),
-		BindingCount:     len(pkg.bindings),
-		TypeCount:        len(pkg.types),
-		OperationCount:   len(pkg.operations),
-		UnsupportedCount: len(pkg.unsupported),
+	entry, err := packageManifestEntry(
+		pkg,
+		authority,
+		offset,
+		measurement.encodedBytes,
+		fmt.Sprintf("%x", hash.Sum(nil)),
+	)
+	if err != nil {
+		_ = writer.spool.Truncate(offset)
+		_, _ = writer.spool.Seek(offset, io.SeekStart)
+		return err
 	}
-	for _, definition := range pkg.definitions {
-		entry.Definitions = append(
-			entry.Definitions, definition.Definition().String(),
-		)
-	}
-	for _, declaration := range pkg.declarations {
-		entry.Declarations = append(
-			entry.Declarations, declaration.ID().String(),
-		)
-	}
-	sort.Strings(entry.Definitions)
-	sort.Strings(entry.Declarations)
 	writer.manifest.Packages = append(
 		writer.manifest.Packages, entry,
 	)
-	writer.previous = pkg.ID().String()
+	writer.previous = pkg.ID()
 	writer.metrics.merge(packageMetrics)
-	for _, record := range pkg.types {
+	if err := pkg.VisitTypes(func(record Type) error {
 		writer.typeOwners[record.ID()]++
+		return nil
+	}); err != nil {
+		return err
 	}
 	return nil
 }
@@ -263,6 +250,7 @@ func (writer *ProviderArtifactWriter) Finish(
 	writer.result.Definitions = writer.metrics.Definitions()
 	writer.result.Resolutions = writer.metrics.Resolutions()
 	writer.result.Declarations = writer.metrics.Declarations()
+	writer.result.MemberTargets = writer.metrics.MemberTargets()
 	writer.result.Bindings = writer.metrics.Bindings()
 	writer.result.Types = writer.metrics.Types()
 	writer.result.Operations = writer.metrics.Operations()
@@ -312,30 +300,49 @@ func checkerPackageAuthority(pkg Package) (Authority, error) {
 		}
 		return nil
 	}
-	for _, record := range pkg.definitions {
+	if err := pkg.VisitDefinitions(func(
+		record DefinitionSemantics,
+	) error {
 		if err := admit(record.Authority()); err != nil {
-			return Authority{}, err
+			return err
 		}
+		return nil
+	}); err != nil {
+		return Authority{}, err
 	}
-	for _, record := range pkg.declarations {
+	if err := pkg.VisitDeclarations(func(record Declaration) error {
 		if err := admit(record.Authority()); err != nil {
-			return Authority{}, err
+			return err
 		}
+		return nil
+	}); err != nil {
+		return Authority{}, err
 	}
-	for _, record := range pkg.bindings {
+	if err := pkg.VisitBindings(func(record Binding) error {
 		if err := admit(record.Authority()); err != nil {
-			return Authority{}, err
+			return err
 		}
+		return nil
+	}); err != nil {
+		return Authority{}, err
 	}
-	for _, record := range pkg.typeWitnesses {
+	if err := pkg.VisitTypeWitnesses(func(
+		record TypeWitness,
+	) error {
 		if err := admit(record.Authority()); err != nil {
-			return Authority{}, err
+			return err
 		}
+		return nil
+	}); err != nil {
+		return Authority{}, err
 	}
-	for _, record := range pkg.unsupported {
+	if err := pkg.VisitUnsupported(func(record Unsupported) error {
 		if err := admit(record.Authority()); err != nil {
-			return Authority{}, err
+			return err
 		}
+		return nil
+	}); err != nil {
+		return Authority{}, err
 	}
 	if !selected.Valid() {
 		return Authority{}, &artifactError{

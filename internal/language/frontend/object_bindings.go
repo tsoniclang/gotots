@@ -18,10 +18,22 @@ func (index *objectIndex) createBindingCandidates() error {
 	}
 	for _, occurrenceID := range index.input.order {
 		index.work.ImplicitBindingVisits++
-		record := index.input.occurrences[occurrenceID]
+		record := index.input.occurrence(occurrenceID)
+		if identifier, ok := record.node.(*ast.Ident); ok {
+			object, used := index.input.loaded.CheckerView().
+				UseOf(identifier)
+			if used &&
+				index.isBinding(object) &&
+				!index.checkerSourceByObject[object].IsZero() {
+				objects[object] = true
+			}
+		}
 		object, implicit := index.input.loaded.CheckerView().
 			ImplicitOf(record.node)
 		if !implicit || object == nil {
+			continue
+		}
+		if index.intrinsicContractBinding(occurrenceID) {
 			continue
 		}
 		if variable, field := object.(*types.Var); field && variable.IsField() {
@@ -49,20 +61,15 @@ func (index *objectIndex) createBindingCandidates() error {
 		if !index.isBinding(object) {
 			continue
 		}
-		source := index.sourceByObject[object]
-		if source.IsZero() && object.Pos().IsValid() {
-			var err error
-			source, err = index.input.index.IdentifierOccurrence(
-				object.Pos(), object.Name(),
+		source := index.checkerSourceByObject[object]
+		if source.IsZero() {
+			return fmt.Errorf(
+				"explicit checker binding %s has no defining occurrence",
+				object.Name(),
 			)
-			if err != nil {
-				return err
-			}
-			if err := index.bindObjectSource(
-				object, source,
-			); err != nil {
-				return err
-			}
+		}
+		if index.intrinsicContractBinding(source) {
+			continue
 		}
 		role := index.bindingRole(object, source)
 		if !role.Valid() {
@@ -75,19 +82,14 @@ func (index *objectIndex) createBindingCandidates() error {
 		if err != nil {
 			return err
 		}
-		definition := identity.DefinitionID{}
-		if record := index.input.occurrences[source]; record != nil {
-			definition = record.owner
-		} else if record := index.input.occurrences[scope]; record != nil {
-			definition = record.owner
-		}
+		definition := index.supportDefinition(source, scope)
 		typ := object.Type()
 		if role == identity.SemanticBindingImport ||
 			role == identity.SemanticBindingLabel {
 			typ = nil
 		}
 		candidate := &bindingCandidate{
-			object: object, source: source, scope: scope,
+			object: object, anchor: source, source: source, scope: scope,
 			role: role, definition: definition,
 			typ: typ, name: object.Name(),
 		}
@@ -104,20 +106,12 @@ func (index *objectIndex) implicitBinding(
 	node ast.Node,
 	object types.Object,
 ) (*bindingCandidate, error) {
-	context := index.contexts.byOccurrence[source]
-	role := context.bindingRole
-	switch object.(type) {
-	case *types.PkgName:
-		role = identity.SemanticBindingImport
-	case *types.Var:
-		if _, field := node.(*ast.Field); !field {
-			role = identity.SemanticBindingTypeSwitch
-		}
-	}
+	context := index.contexts.context(source)
+	role := index.implicitBindingRole(node, object, context)
 	if !role.Valid() {
 		return nil, nil
 	}
-	scope, err := index.scopeForOccurrence(source)
+	scope, err := index.bindingScope(object, source)
 	if err != nil {
 		return nil, err
 	}
@@ -135,12 +129,13 @@ func (index *objectIndex) implicitBinding(
 	}
 	return &bindingCandidate{
 		object:     object,
+		anchor:     source,
 		source:     identity.OccurrenceID{},
 		scope:      scope,
 		role:       role,
 		typ:        typ,
 		name:       object.Name(),
-		definition: index.input.occurrences[source].owner,
+		definition: index.input.occurrence(source).owner,
 	}, nil
 }
 
@@ -164,10 +159,18 @@ func (index *objectIndex) assignBindingIdentities() error {
 	}
 	for _, candidates := range groups {
 		sort.Slice(candidates, func(left, right int) bool {
-			return bindingOrder(candidates[left]) <
-				bindingOrder(candidates[right])
+			return candidates[left].anchor.Compare(
+				candidates[right].anchor,
+			) < 0
 		})
-		for ordinal, candidate := range candidates {
+		for _, candidate := range candidates {
+			ordinal, present := index.bindingOrdinals[candidate.object]
+			if !present {
+				return fmt.Errorf(
+					"checker binding %s has no complete-set ordinal",
+					candidate.name,
+				)
+			}
 			candidate.ordinal = ordinal
 			id, err := identity.NewSemanticBindingID(
 				candidate.scope,
@@ -184,24 +187,6 @@ func (index *objectIndex) assignBindingIdentities() error {
 	return nil
 }
 
-func bindingOrder(candidate *bindingCandidate) string {
-	if !candidate.source.IsZero() {
-		return fmt.Sprintf(
-			"%020d|%020d|%s",
-			candidate.source.Span().Start(),
-			candidate.source.Span().End(),
-			candidate.name,
-		)
-	}
-	position := 0
-	if candidate.object != nil {
-		position = int(candidate.object.Pos())
-	}
-	return fmt.Sprintf(
-		"%020d|%s", position, candidate.name,
-	)
-}
-
 func (index *objectIndex) bindingScope(
 	object types.Object,
 	source identity.OccurrenceID,
@@ -215,16 +200,15 @@ func (index *objectIndex) bindingScope(
 		scope, err := index.scopeForOccurrence(source)
 		if err != nil {
 			return identity.OccurrenceID{}, fmt.Errorf(
-				"binding %q (%T, parent=%v, pos=%d): %w",
-				object.Name(), object, object.Parent(),
-				object.Pos(), err,
+				"binding %q (%T, parent=%v): %w",
+				object.Name(), object, object.Parent(), err,
 			)
 		}
 		return scope, nil
 	}
 	return identity.OccurrenceID{}, fmt.Errorf(
-		"binding %q (%T, parent=%v, pos=%d) has no canonical lexical scope",
-		object.Name(), object, object.Parent(), object.Pos(),
+		"binding %q (%T, parent=%v) has no canonical lexical scope",
+		object.Name(), object, object.Parent(),
 	)
 }
 
@@ -251,7 +235,7 @@ func (index *objectIndex) scopeForOccurrence(
 			break
 		}
 		path = append(path, current)
-		record := index.input.occurrences[current]
+		record := index.input.occurrence(current)
 		if record == nil {
 			break
 		}
@@ -314,6 +298,9 @@ func (index *objectIndex) ownerOfCheckerScope(
 }
 
 func (index *objectIndex) isBinding(object types.Object) bool {
+	if object == nil || object.Name() == "_" {
+		return false
+	}
 	switch object := object.(type) {
 	case *types.PkgName, *types.Label:
 		return true
@@ -342,9 +329,12 @@ func (index *objectIndex) bindingRole(
 		return identity.SemanticBindingTypeParameter
 	}
 	if !source.IsZero() {
-		role := index.contexts.byOccurrence[source].bindingRole
+		role := index.contexts.context(source).bindingRole
 		if role.Valid() {
 			return role
+		}
+		if role, present := index.supportRole(source); present {
+			return supportBindingRole(role)
 		}
 	}
 	return identity.SemanticBindingLocal
@@ -475,7 +465,15 @@ func nominalMemberOwner(typ types.Type) bool {
 }
 
 func originMemberOwner(typ types.Type) types.Type {
-	unwrapped := stripMemberOwnerPointer(typ)
+	unwrapped := typ
+	for {
+		unwrapped = stripMemberOwnerPointer(unwrapped)
+		target := types.Unalias(unwrapped)
+		if target == unwrapped {
+			break
+		}
+		unwrapped = target
+	}
 	if named, ok := unwrapped.(*types.Named); ok {
 		return named.Origin()
 	}

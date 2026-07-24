@@ -74,8 +74,9 @@ func (builder *packageBuilder) implicitEffects(
 			candidates = append(candidates, candidate)
 		}
 		sort.Slice(candidates, func(left, right int) bool {
-			return builder.objects.bindingIDs[candidates[left]].String() <
-				builder.objects.bindingIDs[candidates[right]].String()
+			return builder.objects.bindingIDs[candidates[left]].Compare(
+				builder.objects.bindingIDs[candidates[right]],
+			) < 0
 		})
 		for _, candidate := range candidates {
 			if err := appendEffect(
@@ -90,13 +91,13 @@ func (builder *packageBuilder) implicitEffects(
 	}
 	if operationCopiesOperands(item.kind) {
 		for _, operand := range operands {
-			record := builder.input.occurrences[operand]
+			record := builder.input.occurrence(operand)
 			if record == nil ||
 				!implicitCopySource(record.occurrence.Role()) {
 				continue
 			}
 			source := expressionTypeOf(builder, record.node)
-			target := builder.contexts.byOccurrence[operand].expected
+			target := builder.contexts.context(operand).expected
 			if valueCopies(source) {
 				if err := appendEffect(
 					catalog.ImplicitValueCopy,

@@ -103,8 +103,7 @@ func (builder *typeBuilder) interfaceSpec(
 		embeddeds = append(embeddeds, embedded)
 	}
 	sort.Slice(embeddeds, func(left, right int) bool {
-		return embeddeds[left].String() <
-			embeddeds[right].String()
+		return embeddeds[left].Compare(embeddeds[right]) < 0
 	})
 	setKind, normalized, ok := typesemantics.NormalizedTerms(iface)
 	if !ok {
@@ -213,14 +212,16 @@ func (builder *typeBuilder) methodSignature(
 func sortMethods(methods []semantic.TypeMethod) {
 	sort.Slice(methods, func(left, right int) bool {
 		if methods[left].Package != methods[right].Package {
-			return methods[left].Package.String() <
-				methods[right].Package.String()
+			return methods[left].Package.Compare(
+				methods[right].Package,
+			) < 0
 		}
 		if methods[left].Name != methods[right].Name {
 			return methods[left].Name < methods[right].Name
 		}
-		return methods[left].Signature.String() <
-			methods[right].Signature.String()
+		return methods[left].Signature.Compare(
+			methods[right].Signature,
+		) < 0
 	})
 	for index := range methods {
 		methods[index].Ordinal = index
@@ -247,13 +248,10 @@ func (builder *typeBuilder) unionTerms(
 
 func sortTypeTerms(terms []semantic.TypeTerm) {
 	sort.Slice(terms, func(left, right int) bool {
-		leftKey := fmt.Sprintf(
-			"%t|%s", terms[left].Tilde, terms[left].Type,
-		)
-		rightKey := fmt.Sprintf(
-			"%t|%s", terms[right].Tilde, terms[right].Type,
-		)
-		return leftKey < rightKey
+		if terms[left].Tilde != terms[right].Tilde {
+			return !terms[left].Tilde
+		}
+		return terms[left].Type.Compare(terms[right].Type) < 0
 	})
 }
 

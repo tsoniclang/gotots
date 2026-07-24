@@ -2,18 +2,11 @@ package frontend
 
 import (
 	"fmt"
-	"go/token"
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/semantic"
 )
-
-type typeParameterLocation struct {
-	packagePath string
-	position    token.Pos
-	index       int
-}
 
 func (index *objectIndex) indexPackageTypeParameterOwners(
 	pkg *types.Package,
@@ -167,18 +160,6 @@ func (index *objectIndex) registerTypeParameterOwner(
 		)
 	}
 	index.typeParameterOwners[parameter] = owner
-	location, present := typeParameterObjectLocation(parameter.Obj())
-	if !present {
-		return nil
-	}
-	if existing := index.typeParameterByLocation[location]; !existing.IsZero() &&
-		existing != owner {
-		return fmt.Errorf(
-			"type-parameter checker location has owners %s and %s",
-			existing, owner,
-		)
-	}
-	index.typeParameterByLocation[location] = owner
 	return nil
 }
 
@@ -191,29 +172,5 @@ func (index *objectIndex) typeParameterOwner(
 	if owner := index.typeParameterOwners[parameter]; !owner.IsZero() {
 		return owner, true
 	}
-	location, present := typeParameterObjectLocation(parameter.Obj())
-	if !present {
-		return semantic.TypeParameterOwner{}, false
-	}
-	owner := index.typeParameterByLocation[location]
-	return owner, !owner.IsZero()
-}
-
-func typeParameterObjectLocation(
-	object *types.TypeName,
-) (typeParameterLocation, bool) {
-	if object == nil ||
-		object.Pkg() == nil ||
-		!object.Pos().IsValid() {
-		return typeParameterLocation{}, false
-	}
-	parameter, typeParameter := object.Type().(*types.TypeParam)
-	if !typeParameter || parameter.Index() < 0 {
-		return typeParameterLocation{}, false
-	}
-	return typeParameterLocation{
-		packagePath: object.Pkg().Path(),
-		position:    object.Pos(),
-		index:       parameter.Index(),
-	}, true
+	return semantic.TypeParameterOwner{}, false
 }

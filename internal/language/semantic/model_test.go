@@ -1,6 +1,8 @@
 package semantic
 
 import (
+	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -161,10 +163,7 @@ func TestSemanticPackageIsImmutableAndResolutionConserved(
 	if err != nil {
 		t.Fatal(err)
 	}
-	model, err := NewModel([]Package{pkg})
-	if err != nil {
-		t.Fatal(err)
-	}
+	model := checkerModelForTest(t, pkg)
 	projections := model.AuthorityProjections()
 	if len(projections) != 1 ||
 		projections[0].ID() != fixture.pkg ||
@@ -204,11 +203,104 @@ func TestSemanticPackageIsImmutableAndResolutionConserved(
 	if revisited.ID() != fixture.pkg {
 		t.Fatal("model exposed mutable package storage")
 	}
-	resolutions := pkg.Resolutions()
-	resolutions[0] = OccurrenceResolution{}
-	if pkg.Resolutions()[0].Occurrence() != fixture.body {
-		t.Fatal("package exposed mutable resolution storage")
+	resolution, present := pkg.Resolution(fixture.body)
+	if !present || resolution.Occurrence() != fixture.body {
+		t.Fatal("package canonical resolution lookup failed")
 	}
+}
+
+func TestPackageReadSurfaceExposesNoRecordSlices(t *testing.T) {
+	assertNoSemanticRecordSlices(t, reflect.TypeFor[Package]())
+	if err := semanticRecordSliceMethod(
+		reflect.TypeFor[packageSliceSurfaceControl](),
+	); err == nil {
+		t.Fatal("semantic record-slice surface control was not detected")
+	}
+}
+
+type packageSliceSurfaceControl struct{}
+
+func (packageSliceSurfaceControl) Records() []OccurrenceResolution {
+	return nil
+}
+
+func assertNoSemanticRecordSlices(t *testing.T, typ reflect.Type) {
+	t.Helper()
+	if err := semanticRecordSliceMethod(typ); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func semanticRecordSliceMethod(typ reflect.Type) error {
+	for index := range typ.NumMethod() {
+		method := typ.Method(index)
+		for output := 0; output < method.Type.NumOut(); output++ {
+			result := method.Type.Out(output)
+			if result.Kind() == reflect.Slice &&
+				result.Elem().PkgPath() ==
+					reflect.TypeFor[Package]().PkgPath() {
+				return fmt.Errorf(
+					"%s exposes semantic record slice %s",
+					method.Name, result,
+				)
+			}
+		}
+	}
+	return nil
+}
+
+func checkerModelForTest(t *testing.T, packages ...Package) *Model {
+	t.Helper()
+	writer, err := NewCheckerStoreWriter()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var projections []PackageProjectionInput
+	for _, pkg := range packages {
+		if err := writer.Append(pkg); err != nil {
+			writer.Abort()
+			t.Fatal(err)
+		}
+		input := PackageProjectionInput{
+			ID: pkg.ID(), Provenance: pkg.Provenance(), Local: true,
+		}
+		if err := pkg.VisitDefinitions(func(
+			definition DefinitionSemantics,
+		) error {
+			input.ExpectedDefinitions = append(
+				input.ExpectedDefinitions, definition.Definition(),
+			)
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if err := pkg.VisitDeclarations(func(
+			declaration Declaration,
+		) error {
+			input.LocalDeclarations = append(
+				input.LocalDeclarations, declaration.ID(),
+			)
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+		projections = append(projections, input)
+	}
+	store, _, err := writer.Seal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	model, err := NewProjectedModel(projections, store, nil)
+	if err != nil {
+		_ = store.Close()
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := model.Close(); err != nil {
+			t.Errorf("close semantic test model: %v", err)
+		}
+	})
+	return model
 }
 
 func mustTypeWitness(
@@ -323,7 +415,7 @@ func TestTransientTypePoolClosesAndArtifactAdmissionRejectsExtras(
 	}
 }
 
-func TestMemberDeclarationRetainsItsOwnerType(t *testing.T) {
+func TestMemberTargetRetainsItsCanonicalOwnerType(t *testing.T) {
 	fixture := semanticFixture(t)
 	integer, err := NewType(TypeSpec{
 		Kind: TypeBasic, Basic: BasicInt,
@@ -350,7 +442,92 @@ func TestMemberDeclarationRetainsItsOwnerType(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	declaration, err := NewDeclaration(
+	structural, err := NewStructuralEvidence(
+		StructuralCompileTimeExpression,
+		declarationID,
+		identity.SemanticTypeID{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolution, err := NewOccurrenceResolution(ResolutionSpec{
+		Occurrence: fixture.body,
+		Owner:      fixture.definition,
+		Syntax:     catalog.KindBasicLit,
+		Role:       catalog.RoleReturnValue,
+		Variant:    catalog.VariantNone,
+		Domain:     catalog.ResolutionDomainExecutable,
+		Kind:       ResolutionStructuralOnly,
+		Structural: structural,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	signature, err := NewType(TypeSpec{Kind: TypeSignature})
+	if err != nil {
+		t.Fatal(err)
+	}
+	definition, err := NewDefinitionSemantics(
+		DefinitionSemanticsSpec{
+			Definition: fixture.definition,
+			Package:    fixture.pkg,
+			Form:       DefinitionFormCallable,
+			Authority:  fixture.authority,
+			Name:       "_",
+			Signature:  signature.ID(),
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := PackageInput{
+		ID:          fixture.pkg,
+		Provenance:  ProvenanceWorkspaceModule,
+		Definitions: []DefinitionSemantics{definition},
+		Resolutions: []OccurrenceResolution{resolution},
+		Types:       []Type{integer, structure, signature},
+		TypeWitnesses: []TypeWitness{
+			mustTypeWitness(
+				t, fixture.pkg, integer.ID(), fixture.authority,
+			),
+			mustTypeWitness(
+				t, fixture.pkg, structure.ID(), fixture.authority,
+			),
+			mustTypeWitness(
+				t, fixture.pkg, signature.ID(), fixture.authority,
+			),
+		},
+	}
+	closed, err := FinalizePackageTypePool(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(closed.Types) != 3 {
+		t.Fatalf(
+			"member type closure retained %d types, want 3",
+			len(closed.Types),
+		)
+	}
+	pkg, err := NewPackage(closed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pkg.DeclarationCount() != 0 {
+		t.Fatalf(
+			"member target produced %d standalone declarations",
+			pkg.DeclarationCount(),
+		)
+	}
+	target, present := pkg.ResolveDeclarationTarget(declarationID)
+	field, fieldTarget := target.Field()
+	if !present ||
+		target.OwnerType() != structure.ID() ||
+		!fieldTarget ||
+		field.Name != "Value" ||
+		field.Type != integer.ID() {
+		t.Fatalf("resolved member target = %+v", target)
+	}
+	if _, err := NewDeclaration(
 		declarationID,
 		fixture.pkg,
 		identity.SemanticObjectField,
@@ -359,36 +536,8 @@ func TestMemberDeclarationRetainsItsOwnerType(t *testing.T) {
 		true,
 		Constant{},
 		fixture.authority,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	input := PackageInput{
-		ID:           fixture.pkg,
-		Provenance:   ProvenanceWorkspaceModule,
-		Declarations: []Declaration{declaration},
-		Types:        []Type{integer, structure},
-		TypeWitnesses: []TypeWitness{
-			mustTypeWitness(
-				t, fixture.pkg, integer.ID(), fixture.authority,
-			),
-			mustTypeWitness(
-				t, fixture.pkg, structure.ID(), fixture.authority,
-			),
-		},
-	}
-	closed, err := FinalizePackageTypePool(input)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(closed.Types) != 2 {
-		t.Fatalf(
-			"member type closure retained %d types, want 2",
-			len(closed.Types),
-		)
-	}
-	if _, err := NewPackage(closed); err != nil {
-		t.Fatal(err)
+	); err == nil {
+		t.Fatal("standalone member declaration was accepted")
 	}
 }
 

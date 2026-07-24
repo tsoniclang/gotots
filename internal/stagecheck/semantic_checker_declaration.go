@@ -25,16 +25,7 @@ func (verifier *checkerSemanticVerifier) independentLocalDeclarationIDs() (
 	error,
 ) {
 	byObject := map[types.Object]identity.OccurrenceID{}
-	for _, occurrenceID := range verifier.expected.order {
-		node, present := verifier.index.OccurrenceNode(occurrenceID)
-		identifier, identifierNode := node.(*ast.Ident)
-		if !present || !identifierNode {
-			continue
-		}
-		object, defined := verifier.view.DefOf(identifier)
-		if !defined {
-			continue
-		}
+	for object, occurrenceID := range verifier.checkerSourceByObject {
 		if _, local := independentLocalDeclarationClass(object); !local {
 			continue
 		}
@@ -117,7 +108,7 @@ func (verifier *checkerSemanticVerifier) deriveIndependentDefinitionOwnership() 
 		var sources []identity.OccurrenceID
 		if !definition.Root().IsZero() {
 			for _, child := range verifier.children[definition.Root()] {
-				if verifier.expected.occurrences[child].Role() ==
+				if verifier.expected.occurrence(child).Role() ==
 					catalog.RoleDeclarationName {
 					sources = append(sources, child)
 				}
@@ -163,7 +154,7 @@ func (
 	verifier *checkerSemanticVerifier,
 ) deriveIndependentPackageDeclarationSources() error {
 	for _, occurrenceID := range verifier.expected.order {
-		occurrence := verifier.expected.occurrences[occurrenceID]
+		occurrence := verifier.expected.occurrence(occurrenceID)
 		if occurrence.Role() != catalog.RoleDeclarationName {
 			continue
 		}

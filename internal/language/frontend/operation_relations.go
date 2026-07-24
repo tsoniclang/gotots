@@ -17,7 +17,7 @@ func (builder *packageBuilder) operationOperands(
 	children := orderedOperationChildren(builder.input, record)
 	out := make([]identity.OccurrenceID, 0, len(children))
 	for _, childID := range children {
-		child := builder.input.occurrences[childID]
+		child := builder.input.occurrence(childID)
 		if child == nil || !runtimeOperand(child, builder) {
 			continue
 		}
@@ -52,8 +52,8 @@ func orderedOperationChildren(
 	}
 	out := append([]identity.OccurrenceID(nil), record.children...)
 	sort.SliceStable(out, func(left, right int) bool {
-		leftRole := input.occurrences[out[left]].occurrence.Role()
-		rightRole := input.occurrences[out[right]].occurrence.Role()
+		leftRole := input.occurrence(out[left]).occurrence.Role()
+		rightRole := input.occurrence(out[right]).occurrence.Role()
 		return ranks[leftRole] < ranks[rightRole]
 	})
 	return out
@@ -63,39 +63,17 @@ func runtimeOperand(
 	record *occurrenceInput,
 	builder *packageBuilder,
 ) bool {
-	switch record.occurrence.Role() {
-	case catalog.RoleDocumentation,
-		catalog.RoleTrailingDocumentation,
-		catalog.RoleCommentText,
-		catalog.RolePackageName,
-		catalog.RoleDeclaration,
-		catalog.RoleDeclarationName,
-		catalog.RoleTypeExpression,
-		catalog.RoleFieldTag,
-		catalog.RoleFieldGroup,
-		catalog.RoleConstructedType,
-		catalog.RoleSelectedName,
-		catalog.RoleAssertedType,
-		catalog.RoleArrayLength,
-		catalog.RoleElementType,
-		catalog.RoleStructFields,
-		catalog.RoleTypeParameters,
-		catalog.RoleParameters,
-		catalog.RoleResults,
-		catalog.RoleInterfaceMethods,
-		catalog.RoleKeyType,
-		catalog.RoleValueType,
-		catalog.RoleLabelDeclaration,
-		catalog.RoleLabelReference,
-		catalog.RoleImportAlias,
-		catalog.RoleImportPath,
-		catalog.RoleReceiver,
-		catalog.RoleFunctionSignature,
-		catalog.RoleFunctionBody,
-		catalog.RoleSpecification:
+	if builder.contexts.context(record.occurrence.ID()).compileTime {
 		return false
+	}
+	if !catalog.RoleMayContributeRuntimeEvaluation(
+		record.occurrence.Role(),
+	) {
+		return false
+	}
+	switch record.occurrence.Role() {
 	case catalog.RoleElementKey:
-		parent := builder.input.occurrences[record.occurrence.Parent()]
+		parent := builder.input.occurrence(record.occurrence.Parent())
 		return parent == nil ||
 			builder.variantByOccurrence[parent.occurrence.ID()] !=
 				catalog.VariantKeyFieldName
@@ -198,13 +176,13 @@ func (builder *packageBuilder) labeledControlTarget(
 	lexical token.Token,
 ) (identity.OperationID, error) {
 	declaration := label.Declaration()
-	labelRecord := builder.input.occurrences[declaration]
+	labelRecord := builder.input.occurrence(declaration)
 	if labelRecord == nil {
 		return identity.OperationID{}, fmt.Errorf(
 			"label binding %s has no declaration occurrence", label,
 		)
 	}
-	labeled := builder.input.occurrences[labelRecord.occurrence.Parent()]
+	labeled := builder.input.occurrence(labelRecord.occurrence.Parent())
 	if labeled == nil ||
 		labeled.occurrence.Kind() != catalog.KindLabeledStmt {
 		return identity.OperationID{}, fmt.Errorf(
@@ -214,7 +192,7 @@ func (builder *packageBuilder) labeledControlTarget(
 	targetOccurrence := labeled.occurrence.ID()
 	if lexical == token.BREAK || lexical == token.CONTINUE {
 		for _, childID := range labeled.children {
-			child := builder.input.occurrences[childID]
+			child := builder.input.occurrence(childID)
 			if child != nil &&
 				child.occurrence.Role() ==
 					catalog.RoleLabeledStatement {

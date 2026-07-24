@@ -144,8 +144,7 @@ func (verifier *checkerTypeVerifier) verifyMethods(
 	}
 	sort.Slice(entries, func(left, right int) bool {
 		if entries[left].pkg != entries[right].pkg {
-			return entries[left].pkg.String() <
-				entries[right].pkg.String()
+			return entries[left].pkg.Compare(entries[right].pkg) < 0
 		}
 		return entries[left].name < entries[right].name
 	})
@@ -187,7 +186,7 @@ func (verifier *checkerTypeVerifier) verifyMethodSignature(
 	id identity.SemanticTypeID,
 	signature *types.Signature,
 ) error {
-	record, present := verifier.types[id]
+	record, present := verifier.actual.Type(id)
 	if !present ||
 		record.Kind() != semantic.TypeSignature {
 		return fmt.Errorf(

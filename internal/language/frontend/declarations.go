@@ -18,7 +18,7 @@ type localDeclarationGroup struct {
 
 func (index *objectIndex) assignLocalDeclarationOrdinals() error {
 	groups := map[localDeclarationGroup][]types.Object{}
-	for object, source := range index.sourceByObject {
+	for object, source := range index.checkerSourceByObject {
 		class, local := localDeclarationClass(object)
 		if !local || source.IsZero() {
 			continue
@@ -35,8 +35,8 @@ func (index *objectIndex) assignLocalDeclarationOrdinals() error {
 	}
 	for _, objects := range groups {
 		sort.Slice(objects, func(left, right int) bool {
-			leftSource := index.sourceByObject[objects[left]]
-			rightSource := index.sourceByObject[objects[right]]
+			leftSource := index.checkerSourceByObject[objects[left]]
+			rightSource := index.checkerSourceByObject[objects[right]]
 			if leftSource.Span().Start() != rightSource.Span().Start() {
 				return leftSource.Span().Start() <
 					rightSource.Span().Start()
@@ -136,17 +136,15 @@ func (index *objectIndex) admitDeclarationID(
 		existing != object {
 		if !equivalentDeclarationObjects(existing, object) {
 			return identity.SemanticDeclarationID{}, fmt.Errorf(
-				"semantic declaration identity %s has inequivalent checker objects %T %s at %d owner=%s and %T %s at %d owner=%s",
+				"semantic declaration identity %s has inequivalent checker objects %T %s owner=%s and %T %s owner=%s",
 				id,
 				existing,
 				existing.Name(),
-				existing.Pos(),
 				memberOwnerDescription(
 					index.memberOwnerRelations[existing],
 				),
 				object,
 				object.Name(),
-				object.Pos(),
 				memberOwnerDescription(
 					index.memberOwnerRelations[object],
 				),
@@ -230,12 +228,11 @@ func (index *objectIndex) localDeclarationID(
 	object types.Object,
 	class identity.SemanticObjectClass,
 ) (identity.SemanticDeclarationID, error) {
-	source := index.sourceByObject[object]
+	source := index.checkerSourceByObject[object]
 	if source.IsZero() {
 		return identity.SemanticDeclarationID{}, fmt.Errorf(
-			"non-package declaration %s (%T, package=%v, parent=%v, pos=%d) has no source occurrence",
+			"non-package declaration %s (%T, package=%v, parent=%v) has no direct checker source occurrence",
 			object.Name(), object, object.Pkg(), object.Parent(),
-			object.Pos(),
 		)
 	}
 	scope, err := index.bindingScope(object, source)
@@ -334,7 +331,10 @@ func predeclaredSemanticClass(
 	}
 }
 
-func (index *objectIndex) declarationRecords() ([]semantic.Declaration, error) {
+func (index *objectIndex) ownedDeclarationIDs() (
+	[]identity.SemanticDeclarationID,
+	error,
+) {
 	if err := index.discoverOwnedDeclarations(); err != nil {
 		return nil, err
 	}
@@ -349,19 +349,20 @@ func (index *objectIndex) declarationRecords() ([]semantic.Declaration, error) {
 		}
 	}
 	sort.Slice(ids, func(left, right int) bool {
-		return ids[left].String() < ids[right].String()
+		return ids[left].Compare(ids[right]) < 0
 	})
-	out := make([]semantic.Declaration, 0, len(ids))
-	for _, id := range ids {
-		record, err := index.declarationRecord(
-			index.declarationByID[id], id,
-		)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, record)
+	return ids, nil
+}
+
+func (index *objectIndex) ownedDeclarationRecord(
+	id identity.SemanticDeclarationID,
+) (semantic.Declaration, bool, error) {
+	object := index.declarationByID[id]
+	if object == nil || !index.ownsDeclaration(object, id) {
+		return semantic.Declaration{}, false, nil
 	}
-	return out, nil
+	record, err := index.declarationRecord(object, id)
+	return record, err == nil, err
 }
 
 func (index *objectIndex) discoverOwnedDeclarations() error {
@@ -377,21 +378,6 @@ func (index *objectIndex) discoverOwnedDeclarations() error {
 			}
 			if _, err := index.declarationID(object); err != nil {
 				return err
-			}
-		}
-		for object, owners := range index.memberOwnerRelations {
-			if object.Pkg() == nil {
-				for _, owner := range owners {
-					ordinal, err := memberOrdinal(object, owner)
-					if err != nil {
-						return err
-					}
-					if _, err := index.declarationIDForMemberOwner(
-						object, owner, ordinal,
-					); err != nil {
-						return err
-					}
-				}
 			}
 		}
 		return nil
@@ -414,19 +400,6 @@ func (index *objectIndex) discoverOwnedDeclarations() error {
 			return err
 		}
 	}
-	for object, owners := range index.memberOwnerRelations {
-		for _, owner := range owners {
-			ordinal, err := memberOrdinal(object, owner)
-			if err != nil {
-				return err
-			}
-			if _, err := index.declarationIDForMemberOwner(
-				object, owner, ordinal,
-			); err != nil {
-				return err
-			}
-		}
-	}
 	return nil
 }
 
@@ -434,8 +407,8 @@ func (index *objectIndex) ownsDeclaration(
 	object types.Object,
 	id identity.SemanticDeclarationID,
 ) bool {
-	if owner, present := index.declarationOwnerPackage[id]; present {
-		return owner == index.input.id
+	if id.Form() == identity.SemanticDeclarationMember {
+		return false
 	}
 	if id.Form() == identity.SemanticDeclarationPredeclared {
 		return index.input.provenance ==
@@ -466,10 +439,7 @@ func (index *objectIndex) declarationRecord(
 		return semantic.Declaration{}, err
 	}
 	pkg := index.input.id
-	if owner, present :=
-		index.declarationOwnerPackage[id]; present {
-		pkg = owner
-	} else if id.Form() != identity.SemanticDeclarationPredeclared {
+	if id.Form() != identity.SemanticDeclarationPredeclared {
 		if object.Pkg() != nil {
 			pkg, err = index.packageID(object.Pkg())
 			if err != nil {

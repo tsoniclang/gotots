@@ -401,6 +401,21 @@ func NewOccurrenceResolution(
 			spec.Syntax, spec.Role, spec.Domain,
 		)
 	}
+	if spec.Kind == ResolutionStructuralOnly &&
+		spec.Structural.Disposition() ==
+			StructuralCompileTimeExpression {
+		allowed = catalog.AllowsCompileTimeStructuralResolution(
+			spec.Syntax, spec.Role, spec.Domain,
+		)
+	}
+	if spec.Kind == ResolutionStructuralOnly &&
+		spec.Structural.Disposition() ==
+			StructuralTypeSwitchBindingAnchor {
+		allowed = spec.Syntax == catalog.KindIdent &&
+			spec.Role == catalog.RoleAssignmentTarget &&
+			spec.Domain == catalog.ResolutionDomainExecutable &&
+			spec.Variant == catalog.VariantNone
+	}
 	if !allowed {
 		return OccurrenceResolution{}, fmt.Errorf(
 			"catalog rejects %s resolution for %s role=%s variant=%s domain=%s at %s",

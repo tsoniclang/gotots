@@ -16,6 +16,12 @@ type A struct {
 
 type B A
 
+type Alias = A
+
+type Embedded struct {
+	A
+}
+
 type Box[T any] struct {
 	Value T
 }
@@ -27,12 +33,26 @@ func (box Box[T]) Load() T {
 func Read(
 	a A,
 	b B,
+	alias Alias,
+	embedded Embedded,
 	ints Box[int],
 	strings Box[string],
 ) int {
 	_ = strings.Value
 	_ = strings.Load()
-	return a.X + b.X + ints.Value + ints.Load()
+	return a.X + b.X + alias.X + embedded.X +
+		ints.Value + ints.Load()
+}
+
+func Anonymous(
+	left struct{ X int },
+	right struct{ X int },
+) int {
+	return left.X + right.X
+}
+
+func Message(err error) string {
+	return err.Error()
 }
 `
 
@@ -49,7 +69,7 @@ func TestStage2MemberIdentityUsesSemanticOwnerAndGenericOrigin(
 	writeCompilerFile(
 		t, directory, "members.go", stage2MemberIdentityFixture,
 	)
-	inspection, err := InspectConstructs(source.Request{
+	inspection, err := inspectConstructsForTest(t, source.Request{
 		Dir: directory, Patterns: []string{"."},
 		ProviderContract: contract.DefaultID,
 	})
@@ -60,7 +80,7 @@ func TestStage2MemberIdentityUsesSemanticOwnerAndGenericOrigin(
 		t, inspection.Semantic(), "example.com/members",
 	)
 	selected := map[string]map[identity.SemanticDeclarationID]bool{}
-	for _, operation := range pkg.Operations() {
+	for _, operation := range semanticOperations(pkg) {
 		selection := operation.Spec().Selection
 		if selection.IsZero() {
 			continue
@@ -72,9 +92,9 @@ func TestStage2MemberIdentityUsesSemanticOwnerAndGenericOrigin(
 		}
 		selected[object.Name()][object] = true
 	}
-	if len(selected["X"]) != 2 {
+	if len(selected["X"]) != 3 {
 		t.Fatalf(
-			"defined owners A and B produced X identities %v",
+			"defined, aliased, promoted, and structural owners produced X identities %v",
 			selected["X"],
 		)
 	}
@@ -90,30 +110,51 @@ func TestStage2MemberIdentityUsesSemanticOwnerAndGenericOrigin(
 			selected["Load"],
 		)
 	}
-	declarationCounts := map[identity.SemanticDeclarationID]int{}
-	for _, declaration := range pkg.Declarations() {
-		declarationCounts[declaration.ID()]++
+	if len(selected["Error"]) != 1 {
+		t.Fatalf(
+			"predeclared error method produced identities %v",
+			selected["Error"],
+		)
 	}
 	for name, identities := range selected {
 		for declaration := range identities {
 			if declaration.Form() !=
 				identity.SemanticDeclarationMember ||
-				declaration.OwnerType().IsZero() ||
-				declarationCounts[declaration] != 1 {
+				declaration.OwnerType().IsZero() {
 				t.Errorf(
-					"selected %s declaration %s has owner=%s records=%d",
+					"selected %s declaration %s has owner=%s",
 					name,
 					declaration,
 					declaration.OwnerType(),
-					declarationCounts[declaration],
+				)
+				continue
+			}
+			if _, present := pkg.Declaration(declaration); present {
+				t.Errorf(
+					"selected %s member %s has a standalone declaration",
+					name, declaration,
+				)
+			}
+			target, present := pkg.ResolveDeclarationTarget(declaration)
+			if !present ||
+				target.ID() != declaration ||
+				target.OwnerType() != declaration.OwnerType() {
+				t.Errorf(
+					"selected %s member %s did not resolve: %+v",
+					name, declaration, target,
 				)
 			}
 		}
 	}
-	if len(pkg.Unsupported()) != 0 {
+	if census, err := pkg.MemberTargetCensus(); err != nil {
+		t.Fatal(err)
+	} else if census.Count() == 0 || len(census.Digest()) != 64 {
+		t.Fatalf("member-target census = %+v", census)
+	}
+	if pkg.UnsupportedCount() != 0 {
 		t.Fatalf(
 			"member identity fixture has %d unsupported records",
-			len(pkg.Unsupported()),
+			pkg.UnsupportedCount(),
 		)
 	}
 }

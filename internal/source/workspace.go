@@ -333,14 +333,15 @@ func finishPackage(p *Package) (*Package, error) {
 		}
 	}
 	seenFiles := map[identity.FileID]bool{}
-	previousFile := ""
+	var previousFile identity.FileID
 	for _, file := range p.files {
 		if file == nil ||
 			file.id.IsZero() ||
 			file.id.Owner() != p.id.Owner() ||
 			file.byteDigest.IsZero() ||
 			seenFiles[file.id] ||
-			(previousFile != "" && file.id.String() <= previousFile) {
+			(!previousFile.IsZero() &&
+				file.id.Compare(previousFile) <= 0) {
 			return fail("source file is invalid, duplicated, or noncanonical")
 		}
 		if file.effectiveVersion == "" &&
@@ -349,27 +350,28 @@ func finishPackage(p *Package) (*Package, error) {
 			return fail("checked Go file lacks an effective language version")
 		}
 		seenFiles[file.id] = true
-		previousFile = file.id.String()
+		previousFile = file.id
 	}
 	for _, file := range p.files {
 		if file.cgoOriginal && !p.hasCheckedView {
 			return fail("cgo source exists without a checked package view")
 		}
 	}
-	previousInput := ""
+	var previousInput identity.FileID
 	for _, input := range p.inputs {
 		if input.id.IsZero() ||
 			input.id.Owner() != p.id.Owner() ||
 			!input.kind.Valid() ||
 			input.byteDigest.IsZero() ||
 			seenFiles[input.id] ||
-			(previousInput != "" && input.id.String() <= previousInput) {
+			(!previousInput.IsZero() &&
+				input.id.Compare(previousInput) <= 0) {
 			return fail(
 				"supplemental input is invalid, colliding, or noncanonical",
 			)
 		}
 		seenFiles[input.id] = true
-		previousInput = input.id.String()
+		previousInput = input.id
 	}
 	return p, nil
 }

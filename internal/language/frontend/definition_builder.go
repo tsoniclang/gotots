@@ -353,7 +353,7 @@ func (builder *packageBuilder) definitionBindings(
 		}
 	}
 	sort.Slice(out, func(left, right int) bool {
-		return out[left].String() < out[right].String()
+		return out[left].Compare(out[right]) < 0
 	})
 	return out
 }

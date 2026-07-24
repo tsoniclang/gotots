@@ -419,7 +419,7 @@ func providerPackageIDs(
 		out = append(out, packageID)
 	}
 	sort.Slice(out, func(i, j int) bool {
-		return out[i].String() < out[j].String()
+		return out[i].Compare(out[j]) < 0
 	})
 	return out, nil
 }

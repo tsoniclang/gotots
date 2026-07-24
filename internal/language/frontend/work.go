@@ -4,27 +4,31 @@ package frontend
 // operations performed by named passes; output and storage counters are kept
 // separate so output cardinality cannot masquerade as construction work.
 type Work struct {
-	Packages                     int
-	InputOccurrences             int
-	ChildEdgeAssignments         int
-	ContextAssignments           int
-	ObjectOccurrenceVisits       int
-	ImplicitBindingVisits        int
-	IntrinsicOccurrenceVisits    int
-	CaptureOccurrenceVisits      int
-	ResolutionVisits             int
-	DefinitionContainmentVisits  int
-	DefinitionContainmentEdges   int
-	MemberTypeVisits             int
-	ContainmentProbes            int
-	OccurrenceScopeProbes        int
-	CheckerScopeProbes           int
-	TypeConstructions            int
-	ObjectConstructions          int
-	OperationConstructions       int
-	OccurrenceResolutions        int
-	DefinitionContainmentEntries int
-	CanonicalSortInputs          int
+	Packages                      int
+	InputOccurrences              int
+	ChildEdgeAssignments          int
+	ContextAssignments            int
+	ObjectOccurrenceVisits        int
+	CheckerDefinitionVisits       int
+	CheckerImplicitEvidenceVisits int
+	CheckerSignatureBindingVisits int
+	CheckerScopeEvidenceVisits    int
+	ImplicitBindingVisits         int
+	IntrinsicOccurrenceVisits     int
+	CaptureOccurrenceVisits       int
+	ResolutionVisits              int
+	DefinitionContainmentVisits   int
+	DefinitionContainmentEdges    int
+	MemberTypeVisits              int
+	ContainmentProbes             int
+	OccurrenceScopeProbes         int
+	CheckerScopeProbes            int
+	TypeConstructions             int
+	ObjectConstructions           int
+	OperationConstructions        int
+	OccurrenceResolutions         int
+	DefinitionContainmentEntries  int
+	CanonicalSortInputs           int
 }
 
 func (work *Work) merge(other Work) {
@@ -33,6 +37,13 @@ func (work *Work) merge(other Work) {
 	work.ChildEdgeAssignments += other.ChildEdgeAssignments
 	work.ContextAssignments += other.ContextAssignments
 	work.ObjectOccurrenceVisits += other.ObjectOccurrenceVisits
+	work.CheckerDefinitionVisits += other.CheckerDefinitionVisits
+	work.CheckerImplicitEvidenceVisits +=
+		other.CheckerImplicitEvidenceVisits
+	work.CheckerSignatureBindingVisits +=
+		other.CheckerSignatureBindingVisits
+	work.CheckerScopeEvidenceVisits +=
+		other.CheckerScopeEvidenceVisits
 	work.ImplicitBindingVisits += other.ImplicitBindingVisits
 	work.IntrinsicOccurrenceVisits += other.IntrinsicOccurrenceVisits
 	work.CaptureOccurrenceVisits += other.CaptureOccurrenceVisits
@@ -64,6 +75,10 @@ func (work Work) LinearOperations() int {
 		work.ChildEdgeAssignments +
 		work.ContextAssignments +
 		work.ObjectOccurrenceVisits +
+		work.CheckerDefinitionVisits +
+		work.CheckerImplicitEvidenceVisits +
+		work.CheckerSignatureBindingVisits +
+		work.CheckerScopeEvidenceVisits +
 		work.ImplicitBindingVisits +
 		work.IntrinsicOccurrenceVisits +
 		work.CaptureOccurrenceVisits +

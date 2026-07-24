@@ -10,7 +10,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/language/catalog"
 	"github.com/tsoniclang/gotots/internal/language/semantic"
 	"github.com/tsoniclang/gotots/internal/language/structure"
-	"github.com/tsoniclang/gotots/internal/source"
 )
 
 func (verifier *checkerSemanticVerifier) verifyDeclarationReferenceIdentity(
@@ -19,6 +18,44 @@ func (verifier *checkerSemanticVerifier) verifyDeclarationReferenceIdentity(
 ) error {
 	if function, ok := object.(*types.Func); ok {
 		object = function.Origin()
+	}
+	if id.Form() == identity.SemanticDeclarationMember {
+		function, method := object.(*types.Func)
+		if !method {
+			return fmt.Errorf(
+				"member declaration %s requires contextual owner evidence",
+				id,
+			)
+		}
+		signature, _ := function.Type().(*types.Signature)
+		if signature == nil || signature.Recv() == nil {
+			return fmt.Errorf(
+				"member declaration %s requires contextual owner evidence",
+				id,
+			)
+		}
+		owner := independentOriginMemberOwner(
+			signature.Recv().Type(),
+		)
+		if err := verifier.types.verify(
+			id.OwnerType(), owner,
+		); err != nil {
+			return fmt.Errorf("method declaration owner: %w", err)
+		}
+		if err := verifier.verifyMemberDeclarationIdentity(
+			id, object, owner, 0,
+		); err != nil {
+			return err
+		}
+		target, present := verifier.actual.ResolveDeclarationTarget(id)
+		if !present {
+			return fmt.Errorf(
+				"method declaration target %s is absent", id,
+			)
+		}
+		return verifier.verifyMemberTargetPayload(
+			target, object, 0,
+		)
 	}
 	if object.Pkg() == nil {
 		predeclared := independentPredeclaredKind(object)
@@ -119,7 +156,9 @@ func (verifier *checkerSemanticVerifier) verifySelectionDeclaration(
 	}
 	object := checker.Obj()
 	class := independentObjectClass(object)
-	if declaration, present := verifier.declarations[selection.Object()]; present {
+	if declaration, present := verifier.declaration(
+		selection.Object(),
+	); present {
 		if declaration.Name() != object.Name() ||
 			declaration.Class() != class ||
 			declaration.Exported() != object.Exported() {
@@ -137,6 +176,7 @@ func (verifier *checkerSemanticVerifier) verifyCheckerSelectionDeclaration(
 	checker *types.Selection,
 ) error {
 	object := checker.Obj()
+	verifier.types.indexCheckerDeclarationTypeParameters(object)
 	if function, ok := object.(*types.Func); ok {
 		object = function.Origin()
 	}
@@ -206,13 +246,13 @@ func (
 		return false, nil
 	}
 	keyValueOccurrence, present :=
-		verifier.expected.occurrences[occurrence.Parent()]
+		verifier.expected.occurrences.get(occurrence.Parent())
 	if !present ||
 		keyValueOccurrence.Kind() != catalog.KindKeyValueExpr {
 		return false, nil
 	}
 	compositeOccurrence, present :=
-		verifier.expected.occurrences[keyValueOccurrence.Parent()]
+		verifier.expected.occurrences.get(keyValueOccurrence.Parent())
 	if !present ||
 		compositeOccurrence.Kind() != catalog.KindCompositeLit {
 		return false, nil
@@ -282,13 +322,11 @@ func independentSelectionOwner(
 				function.Name(),
 			)
 		}
-		owner := stripCheckerPointer(signature.Recv().Type())
-		if named, ok := owner.(*types.Named); ok {
-			return named.Origin(), nil
-		}
-		return owner, nil
+		return independentOriginMemberOwner(
+			signature.Recv().Type(),
+		), nil
 	}
-	current := stripCheckerPointer(checker.Recv())
+	current := independentOriginMemberOwner(checker.Recv())
 	index := checker.Index()
 	for _, part := range index[:len(index)-1] {
 		underlying, ok := types.Unalias(current).Underlying().(*types.Struct)
@@ -297,14 +335,11 @@ func independentSelectionOwner(
 				"selection path crosses non-struct %T", current,
 			)
 		}
-		current = stripCheckerPointer(
+		current = independentOriginMemberOwner(
 			underlying.Field(part).Type(),
 		)
 	}
-	if named, ok := current.(*types.Named); ok {
-		return named.Origin(), nil
-	}
-	return current, nil
+	return independentOriginMemberOwner(current), nil
 }
 
 func stripCheckerPointer(typ types.Type) types.Type {
@@ -366,213 +401,4 @@ func (verifier *checkerSemanticVerifier) verifyInstance(
 		}
 	}
 	return verifier.types.verify(record.Signature(), checker.Type)
-}
-
-func independentCheckerObject(
-	view interface {
-		DefOf(*ast.Ident) (types.Object, bool)
-		UseOf(*ast.Ident) (types.Object, bool)
-		SelectionOf(*ast.SelectorExpr) (*types.Selection, bool)
-	},
-	node ast.Node,
-) types.Object {
-	switch node := node.(type) {
-	case *ast.Ident:
-		if object, present := view.DefOf(node); present {
-			return object
-		}
-		object, _ := view.UseOf(node)
-		return object
-	case *ast.TypeSpec:
-		object, _ := view.DefOf(node.Name)
-		return object
-	case *ast.SelectorExpr:
-		if selection, present := view.SelectionOf(node); present {
-			return selection.Obj()
-		}
-		if object, present := view.UseOf(node.Sel); present {
-			return object
-		}
-		object, _ := view.DefOf(node.Sel)
-		return object
-	default:
-		return nil
-	}
-}
-
-func independentOperationObject(
-	view *source.TypeInfoView,
-	node ast.Node,
-) types.Object {
-	switch node := node.(type) {
-	case *ast.CallExpr:
-		return independentExpressionObject(view, node.Fun)
-	case *ast.IndexExpr:
-		return independentExpressionObject(view, node.X)
-	case *ast.IndexListExpr:
-		return independentExpressionObject(view, node.X)
-	default:
-		return independentCheckerObject(view, node)
-	}
-}
-
-func (verifier *checkerSemanticVerifier) verifyOperationObject(
-	occurrence structure.Occurrence,
-	node ast.Node,
-	reference semantic.ObjectReference,
-) error {
-	if identifier, blank := node.(*ast.Ident); blank &&
-		identifier.Name == "_" {
-		if reference.Kind() != semantic.ObjectReferenceNone {
-			return fmt.Errorf(
-				"blank identifier %s carries semantic object",
-				occurrence.ID(),
-			)
-		}
-		return nil
-	}
-	object := independentOperationObject(verifier.view, node)
-	if object == nil {
-		if reference.Kind() != semantic.ObjectReferenceNone {
-			return fmt.Errorf("semantic object exists without checker object")
-		}
-		return nil
-	}
-	if reference.Kind() ==
-		semantic.ObjectReferenceDeclaration &&
-		reference.Declaration().Form() ==
-			identity.SemanticDeclarationMember {
-		if selection := independentOperationSelection(
-			verifier.view, node,
-		); selection != nil {
-			return verifier.verifyCheckerSelectionDeclaration(
-				reference.Declaration(), selection,
-			)
-		}
-		handled, err := verifier.verifyCompositeFieldReference(
-			occurrence, reference.Declaration(), object,
-		)
-		if handled {
-			return err
-		}
-	}
-	return verifier.verifyObjectReference(reference, object)
-}
-
-func independentOperationSelection(
-	view *source.TypeInfoView,
-	node ast.Node,
-) *types.Selection {
-	var expression ast.Expr
-	switch typed := node.(type) {
-	case *ast.CallExpr:
-		expression = typed.Fun
-	case ast.Expr:
-		expression = typed
-	}
-	for expression != nil {
-		switch typed := ast.Unparen(expression).(type) {
-		case *ast.SelectorExpr:
-			selection, _ := view.SelectionOf(typed)
-			return selection
-		case *ast.IndexExpr:
-			expression = typed.X
-		case *ast.IndexListExpr:
-			expression = typed.X
-		default:
-			return nil
-		}
-	}
-	return nil
-}
-
-func independentExpressionObject(
-	view *source.TypeInfoView,
-	expression ast.Expr,
-) types.Object {
-	switch expression := ast.Unparen(expression).(type) {
-	case *ast.Ident:
-		object, _ := view.UseOf(expression)
-		return object
-	case *ast.SelectorExpr:
-		return independentCheckerObject(view, expression)
-	case *ast.IndexExpr:
-		return independentExpressionObject(view, expression.X)
-	case *ast.IndexListExpr:
-		return independentExpressionObject(view, expression.X)
-	default:
-		return nil
-	}
-}
-
-func independentNodeType(
-	view *source.TypeInfoView,
-	node ast.Node,
-) types.Type {
-	if expression, ok := node.(ast.Expr); ok {
-		if value, present := view.TypeOf(expression); present {
-			return value.Type
-		}
-	}
-	if object := independentCheckerObject(view, node); object != nil {
-		return object.Type()
-	}
-	return nil
-}
-
-func independentGenericNodeIdentifier(node ast.Node) *ast.Ident {
-	switch node := node.(type) {
-	case ast.Expr:
-		return independentGenericIdentifier(node)
-	case *ast.CallExpr:
-		return independentGenericIdentifier(node.Fun)
-	default:
-		return nil
-	}
-}
-
-func independentObjectClass(
-	object types.Object,
-) identity.SemanticObjectClass {
-	switch object := object.(type) {
-	case *types.PkgName:
-		return identity.SemanticObjectPackage
-	case *types.Const:
-		return identity.SemanticObjectConstant
-	case *types.TypeName:
-		if object.IsAlias() {
-			return identity.SemanticObjectAlias
-		}
-		return identity.SemanticObjectType
-	case *types.Var:
-		if object.IsField() {
-			return identity.SemanticObjectField
-		}
-		return identity.SemanticObjectVariable
-	case *types.Func:
-		signature, _ := object.Type().(*types.Signature)
-		if signature != nil && signature.Recv() != nil {
-			return identity.SemanticObjectMethod
-		}
-		return identity.SemanticObjectFunction
-	case *types.Builtin:
-		return identity.SemanticObjectBuiltin
-	case *types.Nil:
-		return identity.SemanticObjectNil
-	case *types.Label:
-		return identity.SemanticObjectInvalid
-	default:
-		return identity.SemanticObjectInvalid
-	}
-}
-
-func independentPredeclaredKind(
-	object types.Object,
-) catalog.PredeclaredKind {
-	for _, member := range catalog.AllPredeclared() {
-		if types.Universe.Lookup(member.Name()) == object {
-			return member
-		}
-	}
-	return catalog.PredeclaredInvalid
 }

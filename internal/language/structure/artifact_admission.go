@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"sort"
 
 	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/scope/contract"
@@ -312,10 +311,9 @@ func admitProviderManifest(
 	}
 	artifact := admission.artifact
 	var admitted []admittedManifestPackage
-	previousPackage := ""
+	var previousPackage identity.PackageID
 	for _, entry := range manifest.Packages {
-		if entry.Package <= previousPackage ||
-			!validSHA256(entry.InputDigest) ||
+		if !validSHA256(entry.InputDigest) ||
 			!validSHA256(entry.ShardDigest) ||
 			entry.ShardBytes <= 0 ||
 			entry.HeaderOccurrences < 0 ||
@@ -323,8 +321,7 @@ func admitProviderManifest(
 			(len(entry.Files) == 0 && entry.Files != nil) ||
 			(len(entry.Definitions) == 0 && entry.Definitions != nil) ||
 			(len(entry.Facts) == 0 && entry.Facts != nil) ||
-			(len(entry.Files) == 0 && !entry.Synthetic) ||
-			!sort.StringsAreSorted(entry.Files) {
+			(len(entry.Files) == 0 && !entry.Synthetic) {
 			return nil, nil, providerArtifactError(
 				"provider manifest has a noncanonical package entry",
 			)
@@ -332,6 +329,12 @@ func admitProviderManifest(
 		packageID, err := identity.ParsePackageID(entry.Package)
 		if err != nil {
 			return nil, nil, err
+		}
+		if !previousPackage.IsZero() &&
+			packageID.Compare(previousPackage) <= 0 {
+			return nil, nil, providerArtifactError(
+				"provider manifest package order is noncanonical",
+			)
 		}
 		if _, duplicate := artifact.packageDigests[packageID]; duplicate {
 			return nil, nil, providerArtifactError(
@@ -343,16 +346,18 @@ func admitProviderManifest(
 			artifact.syntheticPackages[packageID] = true
 		}
 		record := admittedManifestPackage{id: packageID, entry: entry}
-		previousFile := ""
+		var previousFile identity.FileID
 		for _, fileText := range entry.Files {
-			if fileText <= previousFile {
-				return nil, nil, providerArtifactError(
-					"provider manifest has duplicate file " + fileText,
-				)
-			}
 			fileID, err := identity.ParseFileID(fileText)
 			if err != nil {
 				return nil, nil, err
+			}
+			if !previousFile.IsZero() &&
+				fileID.Compare(previousFile) <= 0 {
+				return nil, nil, providerArtifactError(
+					"provider manifest has noncanonical file " +
+						fileText,
+				)
 			}
 			if prior, duplicate := artifact.filePackages[fileID]; duplicate {
 				return nil, nil, providerArtifactError(
@@ -366,25 +371,26 @@ func admitProviderManifest(
 				fileID,
 			)
 			record.files = append(record.files, fileID)
-			previousFile = fileText
+			previousFile = fileID
 		}
 		definitions := make(
 			[]identity.DefinitionID,
 			0,
 			len(entry.Definitions),
 		)
-		previousDefinition := ""
+		var previousDefinition identity.DefinitionID
 		for _, definitionText := range entry.Definitions {
-			if definitionText <= previousDefinition {
-				return nil, nil, providerArtifactError(
-					"provider manifest definitions are noncanonical",
-				)
-			}
 			definition, err := identity.ParseDefinitionID(
 				definitionText,
 			)
 			if err != nil {
 				return nil, nil, err
+			}
+			if !previousDefinition.IsZero() &&
+				definition.Compare(previousDefinition) <= 0 {
+				return nil, nil, providerArtifactError(
+					"provider manifest definitions are noncanonical",
+				)
 			}
 			belongs := !definition.File().IsZero() &&
 				artifact.filePackages[definition.File()] == packageID
@@ -406,7 +412,7 @@ func admitProviderManifest(
 			}
 			admission.definitions[definition] = true
 			definitions = append(definitions, definition)
-			previousDefinition = definitionText
+			previousDefinition = definition
 		}
 		census, err := newProviderPackageCensus(
 			packageID,
@@ -418,7 +424,8 @@ func admitProviderManifest(
 			return nil, nil, err
 		}
 		artifact.packageCensus[packageID] = census
-		previousFact := ""
+		var previousFact certifiedFactID
+		havePreviousFact := false
 		for _, encoded := range entry.Facts {
 			definition, err := identity.ParseDefinitionID(
 				encoded.Definition,
@@ -437,28 +444,31 @@ func admitProviderManifest(
 			if err != nil {
 				return nil, nil, err
 			}
-			key := fmt.Sprintf(
-				"%s/%03d", definition, uint8(kind),
-			)
-			if key <= previousFact {
+			id := certifiedFactID{
+				definition: definition,
+				kind:       kind,
+			}
+			if havePreviousFact &&
+				(compareCertifiedFactID(id, previousFact) <= 0) {
 				return nil, nil, providerArtifactError(
 					"provider manifest facts are noncanonical",
 				)
 			}
-			previousFact = key
+			previousFact = id
+			havePreviousFact = true
 			if !admission.definitions[definition] {
 				return nil, nil, providerArtifactError(
 					"provider manifest fact has no definition " +
 						definition.String(),
 				)
 			}
-			id := certifiedFactID{
-				definition: definition,
-				kind:       kind,
-			}
 			if admission.facts[id] {
 				return nil, nil, providerArtifactError(
-					"provider manifest duplicates fact " + key,
+					fmt.Sprintf(
+						"provider manifest duplicates fact %s/%03d",
+						definition,
+						uint8(kind),
+					),
 				)
 			}
 			admission.facts[id] = true
@@ -468,8 +478,8 @@ func admitProviderManifest(
 			)
 			artifact.factCount++
 		}
+		previousPackage = packageID
 		admitted = append(admitted, record)
-		previousPackage = entry.Package
 	}
 	return artifact, admitted, nil
 }

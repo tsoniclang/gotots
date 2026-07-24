@@ -129,7 +129,9 @@ func SelectDefinitions(
 		out.records = append(out.records, record)
 	}
 	sort.Slice(out.records, func(i, j int) bool {
-		return out.records[i].definition.String() < out.records[j].definition.String()
+		return out.records[i].definition.Compare(
+			out.records[j].definition,
+		) < 0
 	})
 	for index := range out.records {
 		record := &out.records[index]

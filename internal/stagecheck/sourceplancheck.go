@@ -33,8 +33,8 @@ func verifySourcePlan(
 	}
 	expectedFiles := map[identity.FileID]expectedSourceDecision{}
 	expectedSynthetic := map[identity.PackageID]expectedSourceDecision{}
-	certifiedFiles := map[string]bool{}
-	certifiedPackages := map[string]bool{}
+	certifiedFiles := map[identity.FileID]bool{}
+	certifiedPackages := map[identity.PackageID]bool{}
 	if certified != nil {
 		certifiedFiles = certified.FileIDs()
 		certifiedPackages = certified.PackageIDs()
@@ -62,7 +62,7 @@ func verifySourcePlan(
 				decision.artifactDigest =
 					req.ProviderStructureDigest
 				if certified == nil ||
-					!certifiedFiles[file.ID().String()] ||
+					!certifiedFiles[file.ID()] ||
 					req.ProviderStructureDigest == "" {
 					return &VerificationError{
 						Stage: "structural-source-plan",
@@ -85,7 +85,7 @@ func verifySourcePlan(
 				decision.artifactDigest =
 					req.ProviderStructureDigest
 				if certified == nil ||
-					!certifiedPackages[pkg.ID().String()] ||
+					!certifiedPackages[pkg.ID()] ||
 					req.ProviderStructureDigest == "" {
 					return &VerificationError{
 						Stage: "structural-source-plan",

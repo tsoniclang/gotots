@@ -17,32 +17,37 @@ func (verifier *checkerSemanticVerifier) verifyBindingCaptures() error {
 		occurrenceID identity.OccurrenceID,
 	) error {
 		binding := verifier.bindings[bindingID]
-		if binding.ID().IsZero() ||
-			binding.Definition().IsZero() {
+		if binding == nil || binding.definition.IsZero() {
 			return nil
 		}
-		consumer := verifier.expected.owners[occurrenceID]
+		record, present := verifier.expected.occurrences.get(occurrenceID)
+		if !present {
+			return fmt.Errorf(
+				"capture use names absent occurrence %s", occurrenceID,
+			)
+		}
+		consumer := record.owner
 		if consumer.IsZero() ||
-			consumer == binding.Definition() {
+			consumer == binding.definition {
 			return nil
 		}
 		if !verifier.definitionContains(
-			binding.Definition(), consumer,
+			binding.definition, consumer,
 		) {
 			return fmt.Errorf(
 				"binding %s is used by unrelated definition %s",
-				binding.ID(), consumer,
+				binding.id, consumer,
 			)
 		}
-		if expected[binding.ID()] == nil {
-			expected[binding.ID()] =
+		if expected[binding.id] == nil {
+			expected[binding.id] =
 				map[identity.DefinitionID]bool{}
 		}
-		expected[binding.ID()][consumer] = true
+		expected[binding.id][consumer] = true
 		return nil
 	}
 	for _, occurrenceID := range verifier.expected.order {
-		resolution, present := verifier.resolutions[occurrenceID]
+		resolution, present := verifier.resolution(occurrenceID)
 		if !present ||
 			resolution.Kind() != semantic.ResolutionBinding {
 			continue
@@ -61,42 +66,44 @@ func (verifier *checkerSemanticVerifier) verifyBindingCaptures() error {
 			return err
 		}
 	}
-	for _, operation := range verifier.operations {
+	if err := verifier.visitOperations(func(
+		operation semantic.Operation,
+	) error {
 		if !operation.ID().Source() {
-			continue
+			return nil
 		}
 		object := operation.Spec().Object
 		if object.Kind() != semantic.ObjectReferenceBinding {
-			continue
+			return nil
 		}
 		node, present := verifier.index.OccurrenceNode(
 			operation.Occurrence(),
 		)
 		identifier, identifierNode := node.(*ast.Ident)
 		if !present || !identifierNode {
-			continue
+			return nil
 		}
 		if _, use := verifier.view.UseOf(identifier); !use {
-			continue
+			return nil
 		}
-		if err := addUse(
+		return addUse(
 			object.Binding(), operation.Occurrence(),
-		); err != nil {
-			return err
-		}
+		)
+	}); err != nil {
+		return err
 	}
-	for bindingID, record := range verifier.bindings {
+	for bindingID := range verifier.bindings {
 		var want []identity.DefinitionID
 		for definition := range expected[bindingID] {
 			want = append(want, definition)
 		}
 		sort.Slice(want, func(left, right int) bool {
-			return want[left].String() < want[right].String()
+			return want[left].Compare(want[right]) < 0
 		})
-		if !slices.Equal(record.CapturedBy(), want) {
+		if !slices.Equal(verifier.bindingCaptures[bindingID], want) {
 			return fmt.Errorf(
 				"binding %s captures=%v, checker-derived=%v",
-				bindingID, record.CapturedBy(), want,
+				bindingID, verifier.bindingCaptures[bindingID], want,
 			)
 		}
 	}

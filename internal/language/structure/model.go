@@ -412,6 +412,21 @@ func (g FileGraph) OccurrenceRefs() []OccurrenceRef {
 	}
 	return out
 }
+func (g FileGraph) VisitOccurrenceRefs(
+	visit func(OccurrenceRef) error,
+) error {
+	if visit == nil {
+		return fmt.Errorf("occurrence visit requires a visitor")
+	}
+	for index := range g.occurrences {
+		if err := visit(OccurrenceRef{
+			occurrence: &g.occurrences[index],
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 func (g FileGraph) Containment() ContainmentGraph { return g.containment }
 func (g FileGraph) Definitions() []ImplementationDefinition {
 	return append([]ImplementationDefinition(nil), g.definitions...)
@@ -569,6 +584,6 @@ func (g *Graph) residentBoundary(
 func sortPackageGraphs(packages []PackageGraph, work *Work) {
 	sort.Slice(packages, func(i, j int) bool {
 		work.SortComparisons++
-		return packages[i].id.String() < packages[j].id.String()
+		return packages[i].id.Compare(packages[j].id) < 0
 	})
 }

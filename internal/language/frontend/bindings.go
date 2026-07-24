@@ -10,10 +10,17 @@ import (
 	"github.com/tsoniclang/gotots/internal/language/semantic"
 )
 
-func (index *objectIndex) bindingRecords() ([]semantic.Binding, error) {
+func (index *objectIndex) visitBindingRecords(
+	visit func(semantic.Binding) error,
+) (int, error) {
+	if visit == nil {
+		return 0, fmt.Errorf(
+			"semantic binding record visitor is absent",
+		)
+	}
 	captures, err := index.bindingCaptures()
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	type identified struct {
 		id        identity.SemanticBindingID
@@ -26,10 +33,8 @@ func (index *objectIndex) bindingRecords() ([]semantic.Binding, error) {
 		})
 	}
 	sort.Slice(records, func(left, right int) bool {
-		return records[left].id.String() <
-			records[right].id.String()
+		return records[left].id.Compare(records[right].id) < 0
 	})
-	out := make([]semantic.Binding, 0, len(records))
 	for _, item := range records {
 		typeID := identity.SemanticTypeID{}
 		if item.candidate.typ != nil {
@@ -38,7 +43,7 @@ func (index *objectIndex) bindingRecords() ([]semantic.Binding, error) {
 				item.candidate.typ,
 			)
 			if err != nil {
-				return nil, fmt.Errorf(
+				return 0, fmt.Errorf(
 					"binding %s role=%s name=%q: %w",
 					item.id, item.candidate.role,
 					item.candidate.name, err,
@@ -57,11 +62,13 @@ func (index *objectIndex) bindingRecords() ([]semantic.Binding, error) {
 			index.input.authority,
 		)
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
-		out = append(out, record)
+		if err := visit(record); err != nil {
+			return 0, err
+		}
 	}
-	return out, nil
+	return len(records), nil
 }
 
 func (index *objectIndex) bindingCaptures() (map[*bindingCandidate][]identity.DefinitionID, error) {
@@ -69,7 +76,7 @@ func (index *objectIndex) bindingCaptures() (map[*bindingCandidate][]identity.De
 	view := index.input.loaded.CheckerView()
 	for _, occurrenceID := range index.input.order {
 		index.work.CaptureOccurrenceVisits++
-		record := index.input.occurrences[occurrenceID]
+		record := index.input.occurrence(occurrenceID)
 		identifier, ok := record.node.(*ast.Ident)
 		if !ok {
 			continue
@@ -80,6 +87,7 @@ func (index *objectIndex) bindingCaptures() (map[*bindingCandidate][]identity.De
 		}
 		candidate := index.bindingByObject[object]
 		if candidate == nil ||
+			!semantic.BindingRoleCanBeCaptured(candidate.role) ||
 			candidate.definition.IsZero() ||
 			record.owner.IsZero() ||
 			record.owner == candidate.definition {
@@ -107,8 +115,9 @@ func (index *objectIndex) bindingCaptures() (map[*bindingCandidate][]identity.De
 			)
 		}
 		sort.Slice(out[candidate], func(left, right int) bool {
-			return out[candidate][left].String() <
-				out[candidate][right].String()
+			return out[candidate][left].Compare(
+				out[candidate][right],
+			) < 0
 		})
 	}
 	return out, nil

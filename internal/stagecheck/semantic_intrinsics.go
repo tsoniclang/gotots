@@ -41,28 +41,24 @@ func verifyBuiltinSemanticPackage(
 	actual semantic.Package,
 	authority semantic.Authority,
 ) error {
-	if len(actual.Definitions()) != 0 ||
-		len(actual.Resolutions()) != 0 ||
-		len(actual.Bindings()) != 0 ||
-		len(actual.Operations()) != 0 ||
-		len(actual.Unsupported()) != 0 {
+	if actual.DefinitionCount() != 0 ||
+		actual.ResolutionCount() != 0 ||
+		actual.BindingCount() != 0 ||
+		actual.OperationCount() != 0 ||
+		actual.UnsupportedCount() != 0 {
 		return semanticVerificationError(
 			"builtin",
 			"builtin pseudo-package contains source-shaped semantics",
 		)
 	}
-	records := map[identity.SemanticDeclarationID]semantic.Declaration{}
-	for _, declaration := range actual.Declarations() {
-		records[declaration.ID()] = declaration
-	}
 	catalogMembers := catalog.AllPredeclared()
-	if len(records) != len(catalogMembers) ||
+	if actual.DeclarationCount() != len(catalogMembers) ||
 		len(types.Universe.Names()) != len(catalogMembers) {
 		return semanticVerificationError(
 			"builtin",
 			fmt.Sprintf(
 				"declarations=%d universe=%d catalog=%d",
-				len(records),
+				actual.DeclarationCount(),
 				len(types.Universe.Names()),
 				len(catalogMembers),
 			),
@@ -77,7 +73,7 @@ func verifyBuiltinSemanticPackage(
 		if err != nil {
 			return semanticVerificationError("builtin", err.Error())
 		}
-		record, present := records[id]
+		record, present := actual.Declaration(id)
 		if object == nil ||
 			!present ||
 			record.Package() != actual.ID() ||
@@ -118,32 +114,33 @@ func catalogedPredeclaredName(name string) bool {
 }
 
 func verifyUnsafeSemanticPackage(actual semantic.Package) error {
-	records := map[string]semantic.Declaration{}
-	for _, declaration := range actual.Declarations() {
-		if records[declaration.Name()].ID().IsZero() {
-			records[declaration.Name()] = declaration
-			continue
-		}
-		return semanticVerificationError(
-			"unsafe",
-			"duplicate declaration "+declaration.Name(),
-		)
-	}
 	members := catalog.AllUnsafeMembers()
 	scope := types.Unsafe.Scope()
-	if len(records) != len(members) ||
+	if actual.DeclarationCount() != len(members) ||
 		len(scope.Names()) != len(members) {
 		return semanticVerificationError(
 			"unsafe",
 			fmt.Sprintf(
 				"declarations=%d toolchain=%d catalog=%d",
-				len(records), len(scope.Names()), len(members),
+				actual.DeclarationCount(),
+				len(scope.Names()),
+				len(members),
 			),
 		)
 	}
 	for _, member := range members {
 		object := scope.Lookup(member.Name())
-		record, present := records[member.Name()]
+		class := identity.SemanticObjectBuiltin
+		if member.Class() == catalog.UnsafeMemberClassType {
+			class = identity.SemanticObjectType
+		}
+		id, err := identity.NewPackageDeclarationID(
+			actual.ID(), class, member.Name(),
+		)
+		if err != nil {
+			return semanticVerificationError("unsafe", err.Error())
+		}
+		record, present := actual.Declaration(id)
 		if object == nil || !present ||
 			record.Package() != actual.ID() ||
 			record.Name() != object.Name() ||

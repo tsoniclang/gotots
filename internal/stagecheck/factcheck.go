@@ -39,12 +39,12 @@ func verifySelectionFactValues(
 		return err
 	}
 	problems := newProblemSet()
-	for _, fact := range facts.Facts() {
+	if err := facts.VisitFacts(func(fact selectionfacts.Fact) error {
 		if fact.ID().Kind() != contract.SelectionFactCDependent {
 			problems.add(
 				"no independent fact verifier for " + fact.ID().String(),
 			)
-			continue
+			return nil
 		}
 		definition := fact.ID().Definition()
 		pkgID, present := definitionPackage[definition]
@@ -52,7 +52,7 @@ func verifySelectionFactValues(
 			problems.add(
 				"fact names unknown definition " + definition.String(),
 			)
-			continue
+			return nil
 		}
 		if !definition.File().IsZero() {
 			if plan != nil {
@@ -62,10 +62,10 @@ func verifySelectionFactValues(
 						"fact definition lacks source decision " +
 							definition.String(),
 					)
-					continue
+					return nil
 				}
 				if decision.Kind() == sourceplan.KindCertifiedGraph {
-					continue
+					return nil
 				}
 			}
 		} else if definition.SyntheticRole().Valid() {
@@ -73,7 +73,7 @@ func verifySelectionFactValues(
 				decision, planned := plan.SyntheticFor(pkgID)
 				if planned &&
 					decision.Kind() == sourceplan.KindCertifiedGraph {
-					continue
+					return nil
 				}
 			}
 		}
@@ -87,7 +87,7 @@ func verifySelectionFactValues(
 			pkg := packages[pkgID]
 			if pkg == nil {
 				problems.add("fact package is absent " + pkgID.String())
-				continue
+				return nil
 			}
 			if cgoFiles[definition.File()] {
 				data := cgoData[pkgID]
@@ -98,7 +98,7 @@ func verifySelectionFactValues(
 					)
 					if err != nil {
 						problems.add(err.Error())
-						continue
+						return nil
 					}
 					cgoData[pkgID] = data
 				}
@@ -108,7 +108,7 @@ func verifySelectionFactValues(
 						"local cgo fact lacks checked definition " +
 							definition.String(),
 					)
-					continue
+					return nil
 				}
 				expected = independentUsesSynthetic(
 					node, pkg.CheckerView(), data.syntheticObjects,
@@ -136,7 +136,7 @@ func verifySelectionFactValues(
 		)
 		if evidenceErr != nil {
 			problems.add(evidenceErr.Error())
-			continue
+			return nil
 		}
 		if fact.ProducerDigest() != expectedProducer ||
 			fact.EvidenceDigest() != expectedEvidence {
@@ -144,6 +144,9 @@ func verifySelectionFactValues(
 				"fact digest mismatch " + fact.ID().String(),
 			)
 		}
+		return nil
+	}); err != nil {
+		return err
 	}
 	return problems.verificationError(
 		"selection-fact-value",

@@ -7,7 +7,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/catalog"
-	"github.com/tsoniclang/gotots/internal/language/executable"
 	"github.com/tsoniclang/gotots/internal/language/selectionfacts"
 	"github.com/tsoniclang/gotots/internal/language/semantic"
 	"github.com/tsoniclang/gotots/internal/language/structure"
@@ -28,7 +27,9 @@ func verifySemanticPackage(
 	localOnly bool,
 ) error {
 	if actual.ID() != expected.id ||
-		actual.Provenance().String() != expected.loaded.Provenance().String() {
+		actual.Provenance() != verifiedSemanticProvenance(
+			expected.loaded.Provenance(),
+		) {
 		return semanticVerificationError(
 			"package", "semantic package identity or provenance differs",
 		)
@@ -73,16 +74,14 @@ func verifySemanticDefinitions(
 	facts *selectionfacts.Artifact,
 	provider *semantic.ProviderArtifact,
 ) error {
-	records := map[identity.DefinitionID]semantic.DefinitionSemantics{}
-	for _, record := range actual.Definitions() {
-		records[record.Definition()] = record
-	}
-	if len(records) != len(expectedDefinitions) {
+	if actual.DefinitionCount() != len(expectedDefinitions) {
 		return semanticVerificationError(
 			"definition",
 			fmt.Sprintf(
 				"package %s has %d records for %d definitions",
-				actual.ID(), len(records), len(expectedDefinitions),
+				actual.ID(),
+				actual.DefinitionCount(),
+				len(expectedDefinitions),
 			),
 		)
 	}
@@ -93,13 +92,17 @@ func verifySemanticDefinitions(
 	if provider != nil {
 		providerContext, _, _ = provider.PackageContext(actual.ID())
 	}
-	for definition := range expectedDefinitions {
-		record, present := records[definition]
-		if !present {
+	seen := 0
+	if err := actual.VisitDefinitions(func(
+		record semantic.DefinitionSemantics,
+	) error {
+		definition := record.Definition()
+		if !expectedDefinitions[definition] {
 			return semanticVerificationError(
-				"definition", "missing "+definition.String(),
+				"definition", "unexpected "+definition.String(),
 			)
 		}
+		seen++
 		if record.Package() != actual.ID() ||
 			record.Form() != expectedDefinitionForm(definition) {
 			return semanticVerificationError(
@@ -117,6 +120,7 @@ func verifySemanticDefinitions(
 			}
 		} else if record.Authority().Kind() !=
 			semantic.AuthorityCertifiedProvider ||
+			provider == nil ||
 			record.Authority().ArtifactDigest() != provider.Digest() ||
 			record.Authority().ShardDigest() != providerContext.ShardDigest ||
 			record.Authority().StructuralSource() !=
@@ -125,6 +129,18 @@ func verifySemanticDefinitions(
 				"authority", "provider authority differs for "+definition.String(),
 			)
 		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	if seen != len(expectedDefinitions) {
+		return semanticVerificationError(
+			"definition",
+			fmt.Sprintf(
+				"package %s visited %d records for %d definitions",
+				actual.ID(), seen, len(expectedDefinitions),
+			),
+		)
 	}
 	return nil
 }
@@ -134,56 +150,46 @@ func verifySemanticResolutions(
 	actual semantic.Package,
 	localOnly bool,
 ) error {
-	records := map[identity.OccurrenceID]semantic.OccurrenceResolution{}
-	for _, record := range actual.Resolutions() {
+	actualCount := 0
+	if err := actual.VisitResolutions(func(
+		record semantic.OccurrenceResolution,
+	) error {
 		if localOnly &&
 			!expected.localOccurrence(
 				record.Occurrence(), record.Owner(),
 			) {
-			continue
+			return nil
 		}
-		records[record.Occurrence()] = record
-	}
-	if len(records) != len(expected.domains) {
-		var missing []string
-		var extra []string
-		for occurrence := range expected.domains {
-			if _, present := records[occurrence]; !present {
-				missing = append(missing, occurrence.String())
-			}
-		}
-		for occurrence := range records {
-			if _, present := expected.domains[occurrence]; !present {
-				extra = append(extra, occurrence.String())
-			}
-		}
-		sort.Strings(missing)
-		sort.Strings(extra)
-		return semanticVerificationError(
-			"resolution",
-			fmt.Sprintf(
-				"package %s has %d records for %d retained occurrences; missing=%v extra=%v",
-				actual.ID(), len(records), len(expected.domains),
-				missing, extra,
-			),
-		)
-	}
-	for occurrenceID, domain := range expected.domains {
-		record, present := records[occurrenceID]
-		occurrence := expected.occurrences[occurrenceID]
+		actualCount++
+		occurrence, present := expected.occurrences.get(record.Occurrence())
 		if !present {
 			return semanticVerificationError(
-				"resolution", "missing "+occurrenceID.String(),
+				"resolution",
+				"unexpected "+record.Occurrence().String(),
 			)
 		}
-		if record.Owner() != expected.owners[occurrenceID] ||
-			record.Domain() != domain ||
+		if record.Owner() != occurrence.owner ||
+			record.Domain() != occurrence.domain ||
 			record.Syntax() != occurrence.Kind() ||
 			record.Role() != occurrence.Role() {
 			return semanticVerificationError(
-				"resolution", "structural evidence differs for "+occurrenceID.String(),
+				"resolution",
+				"structural evidence differs for "+
+					record.Occurrence().String(),
 			)
 		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	if actualCount != expected.domainCount {
+		return semanticVerificationError(
+			"resolution",
+			fmt.Sprintf(
+				"package %s has %d records for %d retained occurrences",
+				actual.ID(), actualCount, expected.domainCount,
+			),
+		)
 	}
 	return nil
 }
@@ -193,52 +199,71 @@ func verifySemanticOperations(
 	actual semantic.Package,
 	localOnly bool,
 ) error {
-	resolutions := map[identity.OccurrenceID]semantic.OccurrenceResolution{}
-	for _, record := range actual.Resolutions() {
-		if localOnly &&
-			!expected.localOccurrence(
-				record.Occurrence(), record.Owner(),
-			) {
-			continue
-		}
-		resolutions[record.Occurrence()] = record
-	}
 	sourceOperations := 0
 	implicitOperations := 0
-	for _, operation := range actual.Operations() {
+	resolvedOperations := map[identity.OperationID]bool{}
+	if err := actual.VisitResolutions(func(
+		resolution semantic.OccurrenceResolution,
+	) error {
+		if localOnly &&
+			!expected.localOccurrence(
+				resolution.Occurrence(),
+				resolution.Owner(),
+			) {
+			return nil
+		}
+		if resolution.Kind() != semantic.ResolutionOperation {
+			return nil
+		}
+		if resolvedOperations[resolution.Operation()] {
+			return semanticVerificationError(
+				"operation",
+				"operation resolution is duplicated "+
+					resolution.Operation().String(),
+			)
+		}
+		resolvedOperations[resolution.Operation()] = true
+		return nil
+	}); err != nil {
+		return err
+	}
+	if err := actual.VisitOperations(func(
+		operation semantic.Operation,
+	) error {
 		if localOnly {
 			if operation.ID().Source() {
 				if !expected.localOccurrence(
 					operation.Occurrence(),
 					operation.Definition(),
 				) {
-					continue
+					return nil
 				}
 			} else {
 				if _, local := expected.definitions[operation.Definition()]; !local {
-					continue
+					return nil
 				}
 			}
 		}
 		if operation.ID().Source() {
 			sourceOperations++
-			occurrence, present := expected.occurrences[operation.Occurrence()]
-			resolution := resolutions[operation.Occurrence()]
+			occurrence, present := expected.occurrences.get(
+				operation.Occurrence(),
+			)
 			if !present ||
-				expected.domains[operation.Occurrence()] !=
+				occurrence.domain !=
 					catalog.ResolutionDomainExecutable ||
 				operation.Definition() !=
-					expected.owners[operation.Occurrence()] ||
+					occurrence.owner ||
 				operation.Syntax() != occurrence.Kind() ||
 				operation.Role() != occurrence.Role() ||
 				operation.Token() != occurrence.Token() ||
-				resolution.Kind() != semantic.ResolutionOperation ||
-				resolution.Operation() != operation.ID() {
+				!resolvedOperations[operation.ID()] {
 				return semanticVerificationError(
 					"operation", "source origin differs for "+operation.ID().String(),
 				)
 			}
-			continue
+			delete(resolvedOperations, operation.ID())
+			return nil
 		}
 		implicitOperations++
 		if operation.Kind() !=
@@ -249,26 +274,16 @@ func verifySemanticOperations(
 				"operation", "invalid implicit origin "+operation.ID().String(),
 			)
 		}
+		return nil
+	}); err != nil {
+		return err
 	}
-	resolvedOperations := 0
-	for _, resolution := range actual.Resolutions() {
-		if localOnly &&
-			!expected.localOccurrence(
-				resolution.Occurrence(),
-				resolution.Owner(),
-			) {
-			continue
-		}
-		if resolution.Kind() == semantic.ResolutionOperation {
-			resolvedOperations++
-		}
-	}
-	if sourceOperations != resolvedOperations {
+	if len(resolvedOperations) != 0 {
 		return semanticVerificationError(
 			"operation",
 			fmt.Sprintf(
-				"%d source operations differ from %d operation resolutions",
-				sourceOperations, resolvedOperations,
+				"%d source operations leave %d unresolved operation references",
+				sourceOperations, len(resolvedOperations),
 			),
 		)
 	}
@@ -374,7 +389,7 @@ func sortedSemanticPackages(
 		out = append(out, packageID)
 	}
 	sort.Slice(out, func(left, right int) bool {
-		return out[left].String() < out[right].String()
+		return out[left].Compare(out[right]) < 0
 	})
 	return out
 }
@@ -385,16 +400,6 @@ func semanticSelections(
 	out := map[identity.DefinitionID]scope.DefinitionSelection{}
 	for _, selection := range selections.Records() {
 		out[selection.Definition()] = selection
-	}
-	return out
-}
-
-func semanticAdditionalOccurrences(
-	inventory *executable.Inventory,
-) map[identity.OccurrenceID]structure.Occurrence {
-	out := map[identity.OccurrenceID]structure.Occurrence{}
-	for _, occurrence := range inventory.AdditionalOccurrences() {
-		out[occurrence.ID()] = occurrence
 	}
 	return out
 }
@@ -478,7 +483,7 @@ func semanticSelectionDigest(
 	}
 	hash := sha256.New()
 	fmt.Fprintln(hash, "gotots-semantic-selection/v1")
-	for _, fact := range facts.Facts() {
+	_ = facts.VisitFacts(func(fact selectionfacts.Fact) error {
 		if definitions[fact.ID().Definition()] {
 			fmt.Fprintf(
 				hash, "%s|%t|%s|%s\n",
@@ -486,7 +491,8 @@ func semanticSelectionDigest(
 				fact.ProducerDigest(), fact.EvidenceDigest(),
 			)
 		}
-	}
+		return nil
+	})
 	return fmt.Sprintf("%x", hash.Sum(nil))
 }
 
@@ -495,17 +501,4 @@ func semanticVerificationError(stage string, reason string) error {
 		Stage:  "typed-frontend/" + stage,
 		Reason: reason,
 	}
-}
-
-func sortedSemanticDefinitionIDs(
-	records map[identity.DefinitionID]semantic.DefinitionSemantics,
-) []identity.DefinitionID {
-	out := make([]identity.DefinitionID, 0, len(records))
-	for definition := range records {
-		out = append(out, definition)
-	}
-	sort.Slice(out, func(left, right int) bool {
-		return out[left].String() < out[right].String()
-	})
-	return out
 }

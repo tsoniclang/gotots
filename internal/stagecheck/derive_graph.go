@@ -135,7 +135,7 @@ func deriveExpectedGraphAuthority(
 				true,
 			)
 			for _, owner := range certified.SyntheticOwners() {
-				expected.add("owner", owner.ID().String())
+				addRecord(&expected.owners, owner.ID())
 			}
 		}
 		if err := deriveCgoPackage(
@@ -162,7 +162,6 @@ func addExpectedPackageInitialization(
 	if err != nil {
 		return err
 	}
-	owner := ownerID.String()
 	definition, err := identity.NewImplicitDefinitionID(
 		pkg, identity.ImplicitDefinitionPackageInit,
 	)
@@ -171,40 +170,33 @@ func addExpectedPackageInitialization(
 	}
 	header, _ := identity.NewHeaderRegionID(definition)
 	boundary, _ := identity.NewExecutionBoundaryID(definition)
-	ledger.add("owner", owner)
-	ledger.add(
-		"definition",
-		fmt.Sprintf(
-			"%s|%s|%s|%s|package initialization",
-			definition, owner, header, boundary,
-		),
-	)
-	ledger.add(
-		"definition-site",
-		fmt.Sprintf(
-			"%d|%s|%s||",
-			uint8(structure.DefinitionSiteSynthetic),
-			definition,
-			owner,
-		),
-	)
-	ledger.add(
-		"header",
-		fmt.Sprintf(
-			"%s|%s",
-			header,
-			independentDigest(definition.String(), "header"),
-		),
-	)
-	ledger.add(
-		"execution-boundary",
-		fmt.Sprintf(
-			"%s|%d|%s|%d|0",
-			boundary,
-			uint8(structure.BoundaryImplicit),
-			independentDigest(definition.String(), "execution"),
-			uint8(identity.ImplicitDefinitionPackageInit),
-		),
+	addRecord(&ledger.owners, ownerID)
+	addRecord(&ledger.definitions, definitionLedgerRecord{
+		id:       definition,
+		owner:    ownerID,
+		header:   header,
+		boundary: boundary,
+		name:     "package initialization",
+	})
+	addRecord(&ledger.definitionSites, definitionSiteLedgerRecord{
+		kind:       structure.DefinitionSiteSynthetic,
+		definition: definition,
+		owner:      ownerID,
+	})
+	addRecord(&ledger.headers, headerLedgerRecord{
+		id:     header,
+		digest: independentDigest(definition.String(), "header"),
+	})
+	addRecord(
+		&ledger.executionBoundaries,
+		executionBoundaryLedgerRecord{
+			id:   boundary,
+			kind: structure.BoundaryImplicit,
+			digest: independentDigest(
+				definition.String(), "execution",
+			),
+			implicit: identity.ImplicitDefinitionPackageInit,
+		},
 	)
 	return nil
 }

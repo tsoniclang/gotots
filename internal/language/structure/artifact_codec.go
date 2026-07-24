@@ -325,7 +325,7 @@ func orderedArtifactFiles(
 		out = append(out, file)
 	}
 	sort.Slice(out, func(i, j int) bool {
-		return out[i].String() < out[j].String()
+		return out[i].Compare(out[j]) < 0
 	})
 	return out
 }
@@ -340,36 +340,36 @@ func orderedArtifactPackages(
 		out = append(out, pkg)
 	}
 	sort.Slice(out, func(i, j int) bool {
-		return out[i].String() < out[j].String()
+		return out[i].Compare(out[j]) < 0
 	})
 	return out
 }
 
-func (a *ProviderArtifact) FileIDs() map[string]bool {
-	out := make(map[string]bool, len(a.filePackages))
+func (a *ProviderArtifact) FileIDs() map[identity.FileID]bool {
+	out := make(map[identity.FileID]bool, len(a.filePackages))
 	for file := range a.filePackages {
-		out[file.String()] = true
+		out[file] = true
 	}
 	return out
 }
 
-func (a *ProviderArtifact) PackageIDs() map[string]bool {
-	out := make(map[string]bool, len(a.syntheticPackages))
+func (a *ProviderArtifact) PackageIDs() map[identity.PackageID]bool {
+	out := make(map[identity.PackageID]bool, len(a.syntheticPackages))
 	for pkg := range a.syntheticPackages {
-		out[pkg.String()] = true
+		out[pkg] = true
 	}
 	return out
 }
 
 func (a *ProviderArtifact) PackageFileIDs(
 	pkg identity.PackageID,
-) map[string]bool {
-	out := map[string]bool{}
+) map[identity.FileID]bool {
+	out := map[identity.FileID]bool{}
 	if a == nil {
 		return out
 	}
 	for _, file := range a.packageFiles[pkg] {
-		out[file.String()] = true
+		out[file] = true
 	}
 	return out
 }
@@ -406,10 +406,10 @@ func (a *ProviderArtifact) PackageInputDigest(
 	return digest, present
 }
 
-func (a *ProviderArtifact) ContextPackageIDs() map[string]bool {
-	out := make(map[string]bool, len(a.packageDigests))
+func (a *ProviderArtifact) ContextPackageIDs() map[identity.PackageID]bool {
+	out := make(map[identity.PackageID]bool, len(a.packageDigests))
 	for pkg := range a.packageDigests {
-		out[pkg.String()] = true
+		out[pkg] = true
 	}
 	return out
 }
@@ -425,11 +425,16 @@ func orderedCertifiedFacts(
 		out = append(out, facts...)
 	}
 	sort.Slice(out, func(i, j int) bool {
-		if out[i].definition != out[j].definition {
-			return out[i].definition.String() <
-				out[j].definition.String()
-		}
-		return out[i].kind < out[j].kind
+		return compareCertifiedFactID(
+			certifiedFactID{
+				definition: out[i].definition,
+				kind:       out[i].kind,
+			},
+			certifiedFactID{
+				definition: out[j].definition,
+				kind:       out[j].kind,
+			},
+		) < 0
 	})
 	return out
 }

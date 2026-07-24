@@ -73,15 +73,15 @@ type goListPackage struct {
 // universeExpectation is one independently derived package expectation.
 type universeExpectation struct {
 	root          bool
-	cgoSources    map[string]bool
+	cgoSources    map[identity.FileID]bool
 	checkedView   bool
 	provenance    source.Provenance
 	acquisition   source.Acquisition
 	disposition   source.LanguageDisposition
 	moduleGo      string
 	imports       map[string]bool
-	files         map[string]bool
-	filePaths     map[string]string
+	files         map[identity.FileID]bool
+	filePaths     map[identity.FileID]string
 	inputs        map[string]bool
 	embedPatterns map[string]bool
 	relBase       string
@@ -179,7 +179,7 @@ func VerifySourceUniverse(ws *source.Workspace, req source.Request) error {
 			visit(path)
 		}
 	}
-	expected := map[string]*universeExpectation{}
+	expected := map[identity.PackageID]*universeExpectation{}
 	for _, path := range order {
 		pkg := records[path]
 		if !reachable[path] {
@@ -200,7 +200,9 @@ func VerifySourceUniverse(ws *source.Workspace, req source.Request) error {
 			return fail(err.Error())
 		}
 		if _, dup := expected[id]; dup {
-			return fail("duplicate toolchain package identity " + id)
+			return fail(
+				fmt.Sprintf("duplicate toolchain package identity %s", id),
+			)
 		}
 		expected[id] = expectation
 	}
@@ -210,25 +212,25 @@ func VerifySourceUniverse(ws *source.Workspace, req source.Request) error {
 	if err != nil {
 		return fail(err.Error())
 	}
-	expected[builtinID.String()] = &universeExpectation{
+	expected[builtinID] = &universeExpectation{
 		provenance:    source.ProvenanceLanguagePseudo,
 		acquisition:   source.AcquisitionGOROOT,
 		disposition:   source.DispositionBuiltinUniverse,
 		imports:       map[string]bool{},
-		files:         map[string]bool{},
-		filePaths:     map[string]string{},
+		files:         map[identity.FileID]bool{},
+		filePaths:     map[identity.FileID]string{},
 		inputs:        map[string]bool{},
 		embedPatterns: map[string]bool{},
-		cgoSources:    map[string]bool{},
+		cgoSources:    map[identity.FileID]bool{},
 	}
 	// Exact join, both directions, with bounded one-sided identity evidence.
 	problems := newProblemSet()
-	matched := map[string]bool{}
+	matched := map[identity.PackageID]bool{}
 	for _, pkg := range ws.Packages() {
-		id := pkg.ID().String()
+		id := pkg.ID()
 		expectation, wanted := expected[id]
 		if !wanted {
-			problems.add("workspace-only package " + id)
+			problems.addf("workspace-only package %s", id)
 			continue
 		}
 		matched[id] = true
@@ -269,7 +271,9 @@ func VerifySourceUniverse(ws *source.Workspace, req source.Request) error {
 			expectation.imports,
 			problems,
 		)
-		joinSet(id, "file", fileIDSet(pkg), expectation.files, problems)
+		joinFileIDSet(
+			id, "file", fileIDSet(pkg), expectation.files, problems,
+		)
 		joinSet(
 			id, "supplemental-input", inputSet(pkg),
 			expectation.inputs, problems,
@@ -287,7 +291,7 @@ func VerifySourceUniverse(ws *source.Workspace, req source.Request) error {
 	}
 	for id := range expected {
 		if !matched[id] {
-			problems.add("toolchain-only package " + id)
+			problems.addf("toolchain-only package %s", id)
 		}
 	}
 	if !problems.empty() {
@@ -306,7 +310,7 @@ func verifyFileDigests(
 	problems *problemSet,
 ) {
 	for _, file := range pkg.Files() {
-		path := expectation.filePaths[file.ID().String()]
+		path := expectation.filePaths[file.ID()]
 		if path == "" {
 			continue
 		}
@@ -335,59 +339,6 @@ func verifyFileDigests(
 	}
 }
 
-func stringSet(values []string) map[string]bool {
-	set := map[string]bool{}
-	for _, v := range values {
-		set[v] = true
-	}
-	return set
-}
-
-func fileIDSet(pkg *source.Package) map[string]bool {
-	set := map[string]bool{}
-	for _, file := range pkg.Files() {
-		set[file.ID().String()] = true
-	}
-	return set
-}
-
-func inputSet(pkg *source.Package) map[string]bool {
-	set := map[string]bool{}
-	for _, input := range pkg.Inputs() {
-		set[fmt.Sprintf(
-			"%s|%s|%s|%t",
-			input.Kind(),
-			input.ID(),
-			input.ByteDigest(),
-			input.Overlaid(),
-		)] = true
-	}
-	return set
-}
-
-// joinSet exact-joins one input-file class in both directions.
-func joinSet(
-	id, class string,
-	got, want map[string]bool,
-	problems *problemSet,
-) {
-	for member := range got {
-		if !want[member] {
-			problems.addf(
-				"%s holds %s %s the toolchain does not name",
-				id, class, member,
-			)
-		}
-	}
-	for member := range want {
-		if !got[member] {
-			problems.addf(
-				"%s misses toolchain %s %s", id, class, member,
-			)
-		}
-	}
-}
-
 // verifyCheckedViewState checks every finalized cgo classification against the
 // independently resolved toolchain file set. Checker hydration is transient
 // Stage-1 evidence and deliberately does not survive in source.Workspace.
@@ -396,7 +347,7 @@ func verifyCheckedViewState(
 	expectation *universeExpectation,
 	problems *problemSet,
 ) {
-	id := pkg.ID().String()
+	id := pkg.ID()
 	if pkg.HasCheckedView() != expectation.checkedView {
 		problems.addf(
 			"%s checked-view=%t vs independent %t",
@@ -404,21 +355,22 @@ func verifyCheckedViewState(
 		)
 	}
 	if expectation.disposition == source.DispositionOrdinarySource {
-		actual := map[string]bool{}
+		actual := map[identity.FileID]bool{}
 		for _, file := range pkg.Files() {
 			if file.CgoOriginal() {
-				actual[file.ID().String()] = true
+				actual[file.ID()] = true
 			}
 			// A cgo original claims a checked-view difference; the toolchain
 			// must name it.
-			if file.CgoOriginal() && !expectation.cgoSources[file.ID().String()] {
-				problems.add(
-					id + " file " + file.ID().String() +
-						" claims a cgo view difference the toolchain does not name",
+			if file.CgoOriginal() && !expectation.cgoSources[file.ID()] {
+				problems.addf(
+					"%s file %s claims a cgo view difference the toolchain does not name",
+					id,
+					file.ID(),
 				)
 			}
 		}
-		joinSet(
+		joinFileIDSet(
 			id, "cgo-source", actual,
 			expectation.cgoSources, problems,
 		)
@@ -454,7 +406,7 @@ func verifyFileVersions(
 			continue
 		}
 		expected := base
-		path := expectation.filePaths[file.ID().String()]
+		path := expectation.filePaths[file.ID()]
 		if path == "" {
 			problems.addf(
 				"%s has no independent acquisition path", file.ID(),

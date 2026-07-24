@@ -1,6 +1,8 @@
 package semantic
 
-const ProviderArtifactVersion = 2
+import "fmt"
+
+const ProviderArtifactVersion = 5
 
 type providerContext struct {
 	Version                  int    `json:"version"`
@@ -12,219 +14,137 @@ type providerContext struct {
 }
 
 type providerManifest struct {
-	Context  providerContext           `json:"context"`
-	Packages []providerManifestPackage `json:"packages"`
+	Context  providerContext        `json:"context"`
+	Packages []packageShardManifest `json:"packages"`
 }
 
-type providerManifestPackage struct {
-	Package          string   `json:"package"`
-	Provenance       uint8    `json:"provenance"`
-	PackageInput     string   `json:"packageInputDigest"`
-	Structure        string   `json:"structureDigest"`
-	Selection        string   `json:"selectionDigest"`
-	Definitions      []string `json:"definitions"`
-	Declarations     []string `json:"declarations"`
-	DefinitionCount  int      `json:"definitionCount"`
-	ResolutionCount  int      `json:"resolutionCount"`
-	DeclarationCount int      `json:"declarationCount"`
-	BindingCount     int      `json:"bindingCount"`
-	TypeCount        int      `json:"typeCount"`
-	OperationCount   int      `json:"operationCount"`
-	UnsupportedCount int      `json:"unsupportedCount"`
-	ShardOffset      int64    `json:"shardOffset"`
-	ShardBytes       int64    `json:"shardBytes"`
-	ShardDigest      string   `json:"shardDigest"`
-}
-
-type providerShard struct {
-	Version      int               `json:"version"`
-	Package      string            `json:"package"`
-	Provenance   uint8             `json:"provenance"`
-	Definitions  []wireDefinition  `json:"definitions"`
-	Resolutions  []wireResolution  `json:"resolutions"`
-	Declarations []wireDeclaration `json:"declarations"`
-	Bindings     []wireBinding     `json:"bindings"`
-	Types        []wireType        `json:"types"`
-	Operations   []wireOperation   `json:"operations"`
-	Unsupported  []wireUnsupported `json:"unsupported"`
-}
-
-type wireDefinition struct {
-	Definition         string   `json:"definition"`
+type packageShardManifest struct {
 	Package            string   `json:"package"`
-	Form               uint8    `json:"form"`
-	Name               string   `json:"name,omitempty"`
-	Declarations       []string `json:"declarations,omitempty"`
-	Signature          string   `json:"signature,omitempty"`
-	Receiver           string   `json:"receiver,omitempty"`
-	Bindings           []string `json:"bindings,omitempty"`
-	InitializerEntries []string `json:"initializerEntries,omitempty"`
-	Implicit           uint8    `json:"implicit,omitempty"`
+	Provenance         uint8    `json:"provenance"`
+	PackageInput       string   `json:"packageInputDigest"`
+	Structure          string   `json:"structureDigest"`
+	Selection          string   `json:"selectionDigest"`
+	Definitions        []string `json:"definitions"`
+	Declarations       []string `json:"declarations"`
+	DefinitionCount    int      `json:"definitionCount"`
+	ResolutionCount    int      `json:"resolutionCount"`
+	DeclarationCount   int      `json:"declarationCount"`
+	MemberTargetCount  int      `json:"memberTargetCount"`
+	MemberTargetDigest string   `json:"memberTargetDigest"`
+	BindingCount       int      `json:"bindingCount"`
+	TypeCount          int      `json:"typeCount"`
+	OperationCount     int      `json:"operationCount"`
+	UnsupportedCount   int      `json:"unsupportedCount"`
+	ShardOffset        int64    `json:"shardOffset"`
+	ShardBytes         int64    `json:"shardBytes"`
+	ShardDigest        string   `json:"shardDigest"`
 }
 
-type wireResolution struct {
-	Occurrence  string         `json:"occurrence"`
-	Owner       string         `json:"owner"`
-	Syntax      uint16         `json:"syntax"`
-	Role        uint16         `json:"role"`
-	Variant     uint16         `json:"variant"`
-	Domain      uint8          `json:"domain"`
-	Kind        uint8          `json:"kind"`
-	Structural  wireStructural `json:"structural,omitempty"`
-	Component   uint8          `json:"component,omitempty"`
-	Definition  string         `json:"definition,omitempty"`
-	Declaration string         `json:"declaration,omitempty"`
-	Binding     string         `json:"binding,omitempty"`
-	Type        string         `json:"type,omitempty"`
-	Operation   string         `json:"operation,omitempty"`
-	Unsupported string         `json:"unsupported,omitempty"`
+type wireModuleReference uint64
+type wireOwnerReference uint64
+type wirePackageReference uint64
+type wireFileReference uint64
+type wireSpanReference uint64
+type wireOccurrenceReference uint64
+type wireDefinitionReference uint64
+type wireTypeReference uint64
+type wireDeclarationReference uint64
+type wireBindingReference uint64
+type wireOperationReference uint64
+type wireUnsupportedReference uint64
+
+func newWireReference[Reference ~uint64](
+	index uint64,
+) (Reference, error) {
+	if index == 0 {
+		return 0, fmt.Errorf("semantic wire reference is zero")
+	}
+	return Reference(index), nil
 }
 
-type wireStructural struct {
-	Disposition uint8  `json:"disposition,omitempty"`
-	Declaration string `json:"declaration,omitempty"`
-	Type        string `json:"type,omitempty"`
+type wireReferenceRange[Reference ~uint64] struct {
+	Start  uint64      `json:"start"`
+	Count  uint64      `json:"count"`
+	Values []Reference `json:"values,omitempty"`
 }
 
-type wireDeclaration struct {
-	ID       string       `json:"id"`
-	Package  string       `json:"package"`
-	Class    uint8        `json:"class"`
-	Name     string       `json:"name"`
-	Type     string       `json:"type"`
-	Exported bool         `json:"exported,omitempty"`
-	Constant wireConstant `json:"constant,omitempty"`
+type wireIntegerRange struct {
+	Start  uint64 `json:"start"`
+	Count  uint64 `json:"count"`
+	Values []int  `json:"values,omitempty"`
 }
 
-type wireConstant struct {
-	Kind  uint8  `json:"kind,omitempty"`
-	Exact string `json:"exact,omitempty"`
+type semanticShardCounts struct {
+	Modules      uint64 `json:"modules"`
+	Owners       uint64 `json:"owners"`
+	Packages     uint64 `json:"packages"`
+	Files        uint64 `json:"files"`
+	Spans        uint64 `json:"spans"`
+	Occurrences  uint64 `json:"occurrences"`
+	Definitions  uint64 `json:"definitions"`
+	Types        uint64 `json:"types"`
+	Declarations uint64 `json:"declarations"`
+	Bindings     uint64 `json:"bindings"`
+	Operations   uint64 `json:"operations"`
+	Unsupported  uint64 `json:"unsupported"`
+
+	DefinitionRecords  uint64 `json:"definitionRecords"`
+	ResolutionRecords  uint64 `json:"resolutionRecords"`
+	DeclarationRecords uint64 `json:"declarationRecords"`
+	BindingRecords     uint64 `json:"bindingRecords"`
+	TypeRecords        uint64 `json:"typeRecords"`
+	OperationRecords   uint64 `json:"operationRecords"`
+	UnsupportedRecords uint64 `json:"unsupportedRecords"`
 }
 
-type wireBinding struct {
-	ID         string   `json:"id"`
-	Package    string   `json:"package"`
-	Definition string   `json:"definition,omitempty"`
-	Role       uint8    `json:"role"`
-	Name       string   `json:"name,omitempty"`
-	Type       string   `json:"type,omitempty"`
-	Source     string   `json:"source,omitempty"`
-	CapturedBy []string `json:"capturedBy,omitempty"`
+func (counts semanticShardCounts) total() (uint64, bool) {
+	values := [...]uint64{
+		counts.Modules,
+		counts.Owners,
+		counts.Packages,
+		counts.Files,
+		counts.Spans,
+		counts.Occurrences,
+		counts.Definitions,
+		counts.Types,
+		counts.Declarations,
+		counts.Bindings,
+		counts.Operations,
+		counts.Unsupported,
+		counts.DefinitionRecords,
+		counts.ResolutionRecords,
+		counts.DeclarationRecords,
+		counts.BindingRecords,
+		counts.TypeRecords,
+		counts.OperationRecords,
+		counts.UnsupportedRecords,
+	}
+	var total uint64
+	for _, value := range values {
+		if value > ^uint64(0)-total {
+			return 0, false
+		}
+		total += value
+	}
+	return total, true
 }
 
-type wireType struct {
-	ID                   string           `json:"id"`
-	Kind                 uint8            `json:"kind"`
-	Basic                uint8            `json:"basic,omitempty"`
-	Declaration          string           `json:"declaration,omitempty"`
-	ParameterDeclaration string           `json:"parameterDeclaration,omitempty"`
-	ParameterDefinition  string           `json:"parameterDefinition,omitempty"`
-	ParameterRole        uint8            `json:"parameterRole,omitempty"`
-	ParameterOrdinal     int              `json:"parameterOrdinal,omitempty"`
-	Arguments            []string         `json:"arguments,omitempty"`
-	Underlying           string           `json:"underlying,omitempty"`
-	Target               string           `json:"target,omitempty"`
-	Constraint           string           `json:"constraint,omitempty"`
-	Element              string           `json:"element,omitempty"`
-	Key                  string           `json:"key,omitempty"`
-	Length               int64            `json:"length,omitempty"`
-	Direction            uint8            `json:"direction,omitempty"`
-	Signature            wireSignature    `json:"signature,omitempty"`
-	Fields               []wireTypeField  `json:"fields,omitempty"`
-	Methods              []wireTypeMethod `json:"methods,omitempty"`
-	Embeddeds            []string         `json:"embeddeds,omitempty"`
-	Terms                []wireTypeTerm   `json:"terms,omitempty"`
-	TypeSet              uint8            `json:"typeSet,omitempty"`
-	Comparable           bool             `json:"comparable,omitempty"`
-	Elements             []string         `json:"elements,omitempty"`
-}
-
-type wireSignature struct {
-	Receiver               string   `json:"receiver,omitempty"`
-	ReceiverTypeParameters []string `json:"receiverTypeParameters,omitempty"`
-	TypeParameters         []string `json:"typeParameters,omitempty"`
-	Parameters             []string `json:"parameters,omitempty"`
-	Results                []string `json:"results,omitempty"`
-	Variadic               bool     `json:"variadic,omitempty"`
-}
-
-type wireTypeField struct {
-	Name     string `json:"name"`
-	Package  string `json:"package,omitempty"`
-	Type     string `json:"type"`
-	Embedded bool   `json:"embedded,omitempty"`
-	Tag      string `json:"tag,omitempty"`
-	Ordinal  int    `json:"ordinal"`
-}
-
-type wireTypeMethod struct {
-	Name      string `json:"name"`
-	Package   string `json:"package,omitempty"`
-	Signature string `json:"signature"`
-	Ordinal   int    `json:"ordinal"`
-}
-
-type wireTypeTerm struct {
-	Tilde bool   `json:"tilde,omitempty"`
-	Type  string `json:"type"`
-}
-
-type wireOperation struct {
-	ID            string              `json:"id"`
-	Kind          uint16              `json:"kind"`
-	Syntax        uint16              `json:"syntax,omitempty"`
-	Variant       uint16              `json:"variant,omitempty"`
-	Role          uint16              `json:"role,omitempty"`
-	Token         uint16              `json:"token,omitempty"`
-	Mode          uint8               `json:"mode"`
-	Arity         uint8               `json:"arity"`
-	Place         uint8               `json:"place"`
-	ResultType    string              `json:"resultType,omitempty"`
-	ExpectedType  string              `json:"expectedType,omitempty"`
-	Addressable   bool                `json:"addressable,omitempty"`
-	Assignable    bool                `json:"assignable,omitempty"`
-	HasOk         bool                `json:"hasOk,omitempty"`
-	Constant      wireConstant        `json:"constant,omitempty"`
-	Object        wireObjectReference `json:"object"`
-	Selection     wireSelection       `json:"selection,omitempty"`
-	Instance      wireInstance        `json:"instance,omitempty"`
-	Operands      []string            `json:"operands,omitempty"`
-	Definitions   []string            `json:"definitions,omitempty"`
-	Implicit      []wireImplicit      `json:"implicit,omitempty"`
-	ControlTarget string              `json:"controlTarget,omitempty"`
-	Label         string              `json:"label,omitempty"`
-}
-
-type wireObjectReference struct {
-	Kind        uint8  `json:"kind"`
-	Declaration string `json:"declaration,omitempty"`
-	Binding     string `json:"binding,omitempty"`
-}
-
-type wireSelection struct {
-	Kind     uint8  `json:"kind,omitempty"`
-	Receiver string `json:"receiver,omitempty"`
-	Object   string `json:"object,omitempty"`
-	Index    []int  `json:"index,omitempty"`
-	Indirect bool   `json:"indirect,omitempty"`
-}
-
-type wireInstance struct {
-	Target    wireObjectReference `json:"target"`
-	Types     []string            `json:"types,omitempty"`
-	Signature string              `json:"signature,omitempty"`
-}
-
-type wireImplicit struct {
-	Kind    uint8  `json:"kind"`
-	Site    string `json:"site"`
-	Ordinal int    `json:"ordinal"`
-	Source  string `json:"source,omitempty"`
-	Target  string `json:"target,omitempty"`
-}
-
-type wireUnsupported struct {
-	ID       string `json:"id"`
-	Reason   uint8  `json:"reason"`
-	Evidence string `json:"evidence"`
+func (counts semanticShardCounts) validate(
+	entry packageShardManifest,
+) error {
+	total, valid := counts.total()
+	if !valid || entry.ShardBytes <= 0 ||
+		total > uint64(entry.ShardBytes) ||
+		counts.DefinitionRecords != uint64(entry.DefinitionCount) ||
+		counts.ResolutionRecords != uint64(entry.ResolutionCount) ||
+		counts.DeclarationRecords != uint64(entry.DeclarationCount) ||
+		counts.BindingRecords != uint64(entry.BindingCount) ||
+		counts.TypeRecords != uint64(entry.TypeCount) ||
+		counts.OperationRecords != uint64(entry.OperationCount) ||
+		counts.UnsupportedRecords != uint64(entry.UnsupportedCount) {
+		return fmt.Errorf(
+			"semantic normalized shard counts disagree with manifest",
+		)
+	}
+	return nil
 }

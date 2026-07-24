@@ -21,12 +21,13 @@ type checkerSemanticVerifier struct {
 	index                   *structure.TransientIndex
 	view                    *source.TypeInfoView
 	types                   *checkerTypeVerifier
-	resolutions             map[identity.OccurrenceID]semantic.OccurrenceResolution
-	operations              map[identity.OperationID]semantic.Operation
-	declarations            map[identity.SemanticDeclarationID]semantic.Declaration
-	bindings                map[identity.SemanticBindingID]semantic.Binding
 	bindingByObject         map[types.Object]identity.SemanticBindingID
+	bindings                map[identity.SemanticBindingID]*checkerBindingCandidate
+	bindingsByDefinition    map[identity.DefinitionID][]identity.SemanticBindingID
+	bindingCaptures         map[identity.SemanticBindingID][]identity.DefinitionID
 	children                map[identity.OccurrenceID][]identity.OccurrenceID
+	compileTimeAnchor       map[identity.OccurrenceID]identity.OccurrenceID
+	compileTimeResolved     map[identity.OccurrenceID]bool
 	containment             map[identity.DefinitionID]checkerDefinitionInterval
 	scopeOwners             map[*types.Scope]identity.OccurrenceID
 	scopeByOccurrence       map[identity.OccurrenceID]identity.OccurrenceID
@@ -35,6 +36,8 @@ type checkerSemanticVerifier struct {
 	checkerScopeResolved    map[*types.Scope]bool
 	definitionByObject      map[types.Object]identity.DefinitionID
 	sourceByObject          map[types.Object]identity.OccurrenceID
+	checkerSourceByObject   map[types.Object]identity.OccurrenceID
+	localOnly               bool
 }
 
 func verifyCheckerSemanticPackage(
@@ -52,7 +55,7 @@ func verifyCheckerSemanticPackage(
 	if view == nil {
 		if localOnly &&
 			len(expected.definitions) == 0 &&
-			len(expected.domains) == 0 {
+			expected.domainCount == 0 {
 			return nil
 		}
 		return semanticVerificationError(
@@ -69,12 +72,13 @@ func verifyCheckerSemanticPackage(
 		types: newCheckerTypeVerifier(
 			expected, actual, universe, index,
 		),
-		resolutions:             map[identity.OccurrenceID]semantic.OccurrenceResolution{},
-		operations:              map[identity.OperationID]semantic.Operation{},
-		declarations:            map[identity.SemanticDeclarationID]semantic.Declaration{},
-		bindings:                map[identity.SemanticBindingID]semantic.Binding{},
 		bindingByObject:         map[types.Object]identity.SemanticBindingID{},
+		bindings:                map[identity.SemanticBindingID]*checkerBindingCandidate{},
+		bindingsByDefinition:    map[identity.DefinitionID][]identity.SemanticBindingID{},
+		bindingCaptures:         map[identity.SemanticBindingID][]identity.DefinitionID{},
 		children:                map[identity.OccurrenceID][]identity.OccurrenceID{},
+		compileTimeAnchor:       map[identity.OccurrenceID]identity.OccurrenceID{},
+		compileTimeResolved:     map[identity.OccurrenceID]bool{},
 		containment:             containment,
 		scopeByOccurrence:       map[identity.OccurrenceID]identity.OccurrenceID{},
 		scopeOccurrenceResolved: map[identity.OccurrenceID]bool{},
@@ -82,42 +86,20 @@ func verifyCheckerSemanticPackage(
 		checkerScopeResolved:    map[*types.Scope]bool{},
 		definitionByObject:      map[types.Object]identity.DefinitionID{},
 		sourceByObject:          map[types.Object]identity.OccurrenceID{},
-	}
-	for _, record := range actual.Resolutions() {
-		if localOnly &&
-			!expected.localOccurrence(
-				record.Occurrence(), record.Owner(),
-			) {
-			continue
-		}
-		verifier.resolutions[record.Occurrence()] = record
-	}
-	for _, record := range actual.Operations() {
-		if localOnly && record.ID().Source() &&
-			!expected.localOccurrence(
-				record.Occurrence(), record.Definition(),
-			) {
-			continue
-		}
-		verifier.operations[record.ID()] = record
-	}
-	for _, record := range actual.Declarations() {
-		verifier.declarations[record.ID()] = record
-	}
-	for _, record := range actual.Bindings() {
-		if localOnly && !expected.localBinding(record) {
-			continue
-		}
-		verifier.bindings[record.ID()] = record
+		checkerSourceByObject:   map[types.Object]identity.OccurrenceID{},
+		localOnly:               localOnly,
 	}
 	for _, occurrenceID := range expected.order {
-		occurrence := expected.occurrences[occurrenceID]
+		occurrence := expected.occurrence(occurrenceID)
 		if !occurrence.Parent().IsZero() {
 			verifier.children[occurrence.Parent()] = append(
 				verifier.children[occurrence.Parent()],
 				occurrenceID,
 			)
 		}
+	}
+	if err := verifier.deriveIndependentCheckerSupport(); err != nil {
+		return semanticVerificationError("checker", err.Error())
 	}
 	if err := verifier.deriveIndependentDefinitionOwnership(); err != nil {
 		return semanticVerificationError("checker", err.Error())
@@ -156,8 +138,8 @@ func verifyCheckerSemanticPackage(
 
 func (verifier *checkerSemanticVerifier) verifyOccurrences() error {
 	for _, occurrenceID := range verifier.expected.order {
-		occurrence := verifier.expected.occurrences[occurrenceID]
-		resolution, present := verifier.resolutions[occurrenceID]
+		occurrence := verifier.expected.occurrence(occurrenceID)
+		resolution, present := verifier.resolution(occurrenceID)
 		if !present {
 			continue
 		}
@@ -190,7 +172,7 @@ func (verifier *checkerSemanticVerifier) verifyOccurrences() error {
 		variant, err := independentSemanticVariant(
 			verifier.expected,
 			verifier.index,
-			occurrence,
+			occurrence.Occurrence,
 			node,
 		)
 		if err != nil {
@@ -210,19 +192,27 @@ func (verifier *checkerSemanticVerifier) verifyOccurrences() error {
 			)
 		}
 		if resolution.Kind() == semantic.ResolutionOperation {
-			operation := verifier.operations[resolution.Operation()]
-			if operation.ID().IsZero() {
+			if verifier.independentCompileTimeContext(occurrence.Occurrence) {
+				return fmt.Errorf(
+					"compile-time occurrence %s owns a runtime operation",
+					occurrenceID,
+				)
+			}
+			operation, present := verifier.operation(
+				resolution.Operation(),
+			)
+			if !present {
 				return fmt.Errorf(
 					"occurrence %s operation is absent", occurrenceID,
 				)
 			}
 			if err := verifier.verifyOperation(
-				occurrence, node, operation,
+				occurrence.Occurrence, node, operation,
 			); err != nil {
 				return err
 			}
 		} else if err := verifier.verifyResolutionTarget(
-			occurrence, resolution, node,
+			occurrence.Occurrence, resolution, node,
 		); err != nil {
 			return fmt.Errorf(
 				"occurrence %s (%s/%s) resolution %s: %w",
@@ -251,12 +241,37 @@ func (verifier *checkerSemanticVerifier) verifyOperation(
 			operation.ID(), operation.Kind(), wantKind,
 		)
 	}
+	spec := operation.Spec()
+	if spec.Selection.IsZero() {
+		if err := verifier.verifyOperationObject(
+			occurrence, node, spec.Object,
+		); err != nil {
+			return fmt.Errorf(
+				"operation %s object: %w", operation.ID(), err,
+			)
+		}
+	} else {
+		if spec.Object.Kind() !=
+			semantic.ObjectReferenceDeclaration ||
+			spec.Object.Declaration() != spec.Selection.Object() {
+			return fmt.Errorf(
+				"operation %s selection/object identity differs",
+				operation.ID(),
+			)
+		}
+		if err := verifier.verifySelection(
+			node, spec.Selection,
+		); err != nil {
+			return fmt.Errorf(
+				"operation %s selection: %w", operation.ID(), err,
+			)
+		}
+	}
 	if err := verifier.verifyOperationValue(
 		occurrence, node, operation,
 	); err != nil {
 		return err
 	}
-	spec := operation.Spec()
 	wantOperands, err := verifier.operationOperands(occurrence)
 	if err != nil {
 		return fmt.Errorf(
@@ -282,29 +297,6 @@ func (verifier *checkerSemanticVerifier) verifyOperation(
 		return fmt.Errorf(
 			"operation %s nested definitions=%v, checker=%v",
 			operation.ID(), spec.Definitions, wantDefinitions,
-		)
-	}
-	if spec.Selection.IsZero() {
-		if err := verifier.verifyOperationObject(
-			occurrence, node, spec.Object,
-		); err != nil {
-			return fmt.Errorf(
-				"operation %s object: %w", operation.ID(), err,
-			)
-		}
-	} else if spec.Object.Kind() !=
-		semantic.ObjectReferenceDeclaration ||
-		spec.Object.Declaration() != spec.Selection.Object() {
-		return fmt.Errorf(
-			"operation %s selection/object identity differs",
-			operation.ID(),
-		)
-	}
-	if err := verifier.verifySelection(
-		node, spec.Selection,
-	); err != nil {
-		return fmt.Errorf(
-			"operation %s selection: %w", operation.ID(), err,
 		)
 	}
 	if err := verifier.verifyInstance(
@@ -336,7 +328,7 @@ func (verifier *checkerSemanticVerifier) verifyOperationValue(
 	operation semantic.Operation,
 ) error {
 	want, err := verifier.operationValue(
-		occurrence, node, operation.Kind(),
+		occurrence, node, operation.Kind(), operation.Variant(),
 	)
 	if err != nil {
 		return fmt.Errorf("operation %s value: %w", operation.ID(), err)
@@ -405,6 +397,7 @@ func (verifier *checkerSemanticVerifier) operationValue(
 	occurrence structure.Occurrence,
 	node ast.Node,
 	kind semantic.OperationKind,
+	variant catalog.Variant,
 ) (checkerOperationValue, error) {
 	out := checkerOperationValue{
 		mode:  semantic.ValueModeNone,
@@ -412,7 +405,10 @@ func (verifier *checkerSemanticVerifier) operationValue(
 		place: semantic.PlaceNone,
 	}
 	expression, expressionNode := node.(ast.Expr)
-	if !expressionNode || kind == semantic.OperationKeyedElement {
+	if !expressionNode ||
+		kind == semantic.OperationKeyedElement ||
+		(kind == semantic.OperationTypeAssert &&
+			variant == catalog.VariantTypeSwitchGuard) {
 		return out, nil
 	}
 	if identifier, ok := expression.(*ast.Ident); ok &&

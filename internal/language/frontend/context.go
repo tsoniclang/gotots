@@ -24,41 +24,52 @@ type occurrenceContext struct {
 	selectedSelection *types.Selection
 	coverageObject    types.Object
 	coverageType      types.Type
+	memberOwner       types.Type
+	compileTime       bool
 	zeroValue         bool
 	breakTarget       identity.OccurrenceID
 	continueTarget    identity.OccurrenceID
 	fallthroughTarget identity.OccurrenceID
+	typeSwitchAnchor  bool
 }
 
 type contextIndex struct {
-	byOccurrence map[identity.OccurrenceID]occurrenceContext
+	input *packageInput
+	count int
+}
+
+func (index *contextIndex) context(
+	id identity.OccurrenceID,
+) occurrenceContext {
+	record := index.input.occurrence(id)
+	if record == nil || !record.contextAssigned {
+		return occurrenceContext{}
+	}
+	return record.context
 }
 
 func buildContexts(
 	input *packageInput,
 	work *Work,
 ) (*contextIndex, error) {
-	out := &contextIndex{
-		byOccurrence: map[identity.OccurrenceID]occurrenceContext{},
-	}
-	visiting := map[identity.OccurrenceID]bool{}
+	out := &contextIndex{input: input}
 	var assign func(identity.OccurrenceID) error
 	assign = func(id identity.OccurrenceID) error {
-		if _, present := out.byOccurrence[id]; present {
-			return nil
-		}
-		if visiting[id] {
-			return fmt.Errorf(
-				"semantic occurrence context cycle at %s", id,
-			)
-		}
-		record := input.occurrences[id]
+		record := input.occurrence(id)
 		if record == nil {
 			return fmt.Errorf(
 				"semantic context names absent occurrence %s", id,
 			)
 		}
-		visiting[id] = true
+		if record.contextAssigned {
+			return nil
+		}
+		if record.contextVisiting {
+			return fmt.Errorf(
+				"semantic occurrence context cycle at %s", id,
+			)
+		}
+		record.contextVisiting = true
 		context := occurrenceContext{
 			owner: record.owner,
 			executable: record.domain ==
@@ -66,11 +77,11 @@ func buildContexts(
 			arity: semantic.ResultArityOne,
 		}
 		parentID := record.occurrence.Parent()
-		if parent := input.occurrences[parentID]; parent != nil {
+		if parent := input.occurrence(parentID); parent != nil {
 			if err := assign(parentID); err != nil {
 				return err
 			}
-			context = out.byOccurrence[parentID]
+			context = parent.context
 			context.expected = nil
 			context.arity = semantic.ResultArityOne
 			context.commaOK = false
@@ -93,21 +104,25 @@ func buildContexts(
 			}
 			context.signature = signature
 			if record.domain == catalog.ResolutionDomainHeader {
-				context.coverageObject = definitionObject(
-					input, context.owner,
-				)
-				if context.coverageObject != nil {
-					context.coverageType =
-						context.coverageObject.Type()
-				} else if context.coverageType == nil &&
-					signature != nil {
-					context.coverageType = signature
+				if context.coverageObject == nil &&
+					context.coverageType == nil {
+					context.coverageObject = definitionObject(
+						input, context.owner,
+					)
+					if context.coverageObject != nil {
+						context.coverageType =
+							context.coverageObject.Type()
+					} else if signature != nil {
+						context.coverageType = signature
+					}
 				}
 			}
 		}
-		out.byOccurrence[id] = context
+		record.context = context
+		record.contextAssigned = true
+		record.contextVisiting = false
+		out.count++
 		work.ContextAssignments++
-		delete(visiting, id)
 		for _, child := range record.children {
 			if err := assign(child); err != nil {
 				return err
@@ -133,6 +148,11 @@ func childContext(
 	if parent.occurrence.Kind() == catalog.KindGenDecl {
 		context.declaration = parent.occurrence.Token()
 	}
+	if role == catalog.RoleArrayLength ||
+		(role == catalog.RoleInitializerValue &&
+			context.declaration == catalog.TokenCONST) {
+		context.compileTime = true
+	}
 	switch role {
 	case catalog.RoleTypeParameters:
 		context.bindingRole = identity.SemanticBindingTypeParameter
@@ -156,7 +176,44 @@ func childContext(
 			context.coverageType = value.Type
 		}
 	}
+	if role == catalog.RoleArrayLength {
+		context.coverageObject = nil
+		if expression, ok := parent.node.(ast.Expr); ok {
+			context.coverageType = expressionType(view, expression)
+		}
+	}
 	switch node := parent.node.(type) {
+	case *ast.TypeSpec:
+		if role == catalog.RoleTypeExpression {
+			if object, present := view.DefOf(node.Name); present {
+				owner := originMemberOwner(object.Type())
+				switch types.Unalias(owner).Underlying().(type) {
+				case *types.Struct, *types.Interface:
+					context.memberOwner = owner
+				default:
+					context.memberOwner = nil
+				}
+			}
+		}
+		assignTypeSpecCoverage(view, node, role, &context)
+	case *ast.StructType:
+		if role == catalog.RoleStructFields &&
+			context.memberOwner == nil {
+			if owner := expressionType(view, node); owner != nil {
+				context.memberOwner = originMemberOwner(owner)
+			}
+		}
+	case *ast.InterfaceType:
+		if role == catalog.RoleInterfaceMethods &&
+			context.memberOwner == nil {
+			if owner := expressionType(view, node); owner != nil {
+				context.memberOwner = originMemberOwner(owner)
+			}
+		}
+	case *ast.Field:
+		if role == catalog.RoleTypeExpression {
+			context.memberOwner = nil
+		}
 	case *ast.FuncDecl:
 		if role == catalog.RoleFunctionSignature {
 			if object, present := view.DefOf(node.Name); present {
@@ -180,8 +237,6 @@ func childContext(
 		assignValueSpecCoverage(
 			view, node, role, child.occurrence.Ordinal(), &context,
 		)
-	case *ast.TypeSpec:
-		assignTypeSpecCoverage(view, node, role, &context)
 	case *ast.IndexExpr:
 		assignReceiverTypeParameterContext(
 			role, &context,
@@ -235,9 +290,16 @@ func childContext(
 			context.breakTarget = parent.occurrence.ID()
 			context.continueTarget = parent.occurrence.ID()
 		}
-	case *ast.SwitchStmt, *ast.TypeSwitchStmt:
+	case *ast.SwitchStmt:
 		if role == catalog.RoleBody {
 			context.breakTarget = parent.occurrence.ID()
+		}
+	case *ast.TypeSwitchStmt:
+		if role == catalog.RoleBody {
+			context.breakTarget = parent.occurrence.ID()
+		}
+		if role == catalog.RoleTypeSwitchGuard {
+			context.typeSwitchAnchor = true
 		}
 	case *ast.SelectStmt:
 		if role == catalog.RoleBody {
@@ -249,312 +311,4 @@ func childContext(
 		}
 	}
 	return context
-}
-
-func assignReceiverTypeParameterContext(
-	role catalog.Role,
-	context *occurrenceContext,
-) {
-	if role == catalog.RoleIndex &&
-		context.bindingRole == identity.SemanticBindingReceiver {
-		context.bindingRole =
-			identity.SemanticBindingTypeParameter
-	}
-}
-
-func assignValueSpecCoverage(
-	view checkerExpressionView,
-	node *ast.ValueSpec,
-	role catalog.Role,
-	ordinal int,
-	context *occurrenceContext,
-) {
-	switch role {
-	case catalog.RoleTypeExpression:
-		context.coverageType = expressionType(view, node.Type)
-	case catalog.RoleInitializerValue:
-		if ordinal < len(node.Names) {
-			object, present := view.DefOf(node.Names[ordinal])
-			if present {
-				context.coverageObject = object
-			}
-		}
-	}
-}
-
-func assignTypeSpecCoverage(
-	view checkerExpressionView,
-	node *ast.TypeSpec,
-	role catalog.Role,
-	context *occurrenceContext,
-) {
-	if role != catalog.RoleTypeExpression &&
-		role != catalog.RoleTypeParameters {
-		return
-	}
-	if object, present := view.DefOf(node.Name); present {
-		context.coverageObject = object
-		context.coverageType = object.Type()
-		return
-	}
-	context.coverageType = expressionType(view, node.Type)
-}
-
-func selectorObject(
-	view checkerExpressionView,
-	node *ast.SelectorExpr,
-) types.Object {
-	if selection, present := view.SelectionOf(node); present {
-		return selection.Obj()
-	}
-	object, _ := view.UseOf(node.Sel)
-	return object
-}
-
-func assignAssignmentContext(
-	view interface {
-		TypeOf(ast.Expr) (types.TypeAndValue, bool)
-	},
-	node *ast.AssignStmt,
-	role catalog.Role,
-	ordinal int,
-	context *occurrenceContext,
-) {
-	switch role {
-	case catalog.RoleAssignmentTarget:
-		context.bindingRole = identity.SemanticBindingLocal
-	case catalog.RoleAssignedValue:
-		if len(node.Rhs) == 1 && len(node.Lhs) > 1 {
-			assignMultiValueContext(view, node.Rhs[0], context)
-			return
-		}
-		if ordinal < len(node.Lhs) {
-			context.expected = expressionType(view, node.Lhs[ordinal])
-		}
-	}
-}
-
-func assignValueSpecContext(
-	view interface {
-		TypeOf(ast.Expr) (types.TypeAndValue, bool)
-	},
-	node *ast.ValueSpec,
-	declaration catalog.TokenKind,
-	role catalog.Role,
-	ordinal int,
-	context *occurrenceContext,
-) {
-	if role == catalog.RoleDeclarationName {
-		if declaration == catalog.TokenVAR {
-			context.bindingRole = identity.SemanticBindingLocal
-			context.zeroValue = len(node.Values) == 0
-		}
-		return
-	}
-	if role != catalog.RoleInitializerValue {
-		return
-	}
-	if len(node.Values) == 1 && len(node.Names) > 1 {
-		assignMultiValueContext(view, node.Values[0], context)
-		return
-	}
-	if node.Type != nil {
-		context.expected = expressionType(view, node.Type)
-	}
-	if context.expected == nil && ordinal < len(node.Names) {
-		if objectView, ok := view.(interface {
-			DefOf(*ast.Ident) (types.Object, bool)
-		}); ok {
-			if object, present := objectView.DefOf(
-				node.Names[ordinal],
-			); present {
-				context.expected = object.Type()
-			}
-		}
-	}
-}
-
-func assignMultiValueContext(
-	view interface {
-		TypeOf(ast.Expr) (types.TypeAndValue, bool)
-	},
-	expression ast.Expr,
-	context *occurrenceContext,
-) {
-	value, present := view.TypeOf(expression)
-	if present && value.HasOk() {
-		context.arity = semantic.ResultArityCommaOk
-		context.commaOK = true
-	}
-}
-
-func assignCallContext(
-	view interface {
-		TypeOf(ast.Expr) (types.TypeAndValue, bool)
-	},
-	node *ast.CallExpr,
-	role catalog.Role,
-	ordinal int,
-	context *occurrenceContext,
-) {
-	if role == catalog.RoleCallee {
-		return
-	}
-	if role != catalog.RoleCallArgument {
-		return
-	}
-	if value, present := view.TypeOf(node.Fun); present &&
-		value.IsType() {
-		context.expected = value.Type
-		return
-	}
-	signature := signatureOf(expressionType(view, node.Fun))
-	if signature == nil {
-		return
-	}
-	parameters := signature.Params()
-	if signature.Variadic() && ordinal >= parameters.Len()-1 {
-		if parameters.Len() == 0 {
-			return
-		}
-		last := parameters.At(parameters.Len() - 1).Type()
-		if node.Ellipsis.IsValid() {
-			context.expected = last
-			return
-		}
-		if slice, ok := types.Unalias(last).Underlying().(*types.Slice); ok {
-			context.expected = slice.Elem()
-		}
-		return
-	}
-	if ordinal < parameters.Len() {
-		context.expected = parameters.At(ordinal).Type()
-	}
-}
-
-func assignReturnContext(
-	node *ast.ReturnStmt,
-	role catalog.Role,
-	ordinal int,
-	context *occurrenceContext,
-) {
-	if role != catalog.RoleReturnValue ||
-		context.signature == nil {
-		return
-	}
-	results := context.signature.Results()
-	if len(node.Results) == 1 && results.Len() > 1 {
-		context.arity = semantic.ResultArityTuple
-		return
-	}
-	if ordinal < results.Len() {
-		context.expected = results.At(ordinal).Type()
-	}
-}
-
-func assignCompositeContext(
-	view checkerExpressionView,
-	node *ast.CompositeLit,
-	role catalog.Role,
-	ordinal int,
-	context *occurrenceContext,
-) {
-	value, present := view.TypeOf(node)
-	if !present {
-		return
-	}
-	context.composite = aggregateType(value.Type)
-	if role != catalog.RoleCompositeElement {
-		return
-	}
-	context.expected = compositeElementType(
-		view, context.composite, node, ordinal,
-	)
-}
-
-func assignKeyValueContext(
-	view checkerExpressionView,
-	node *ast.KeyValueExpr,
-	role catalog.Role,
-	context *occurrenceContext,
-) {
-	switch aggregate := context.composite.(type) {
-	case *types.Map:
-		if role == catalog.RoleElementKey {
-			context.expected = aggregate.Key()
-		} else if role == catalog.RoleElementValue {
-			context.expected = aggregate.Elem()
-		}
-	case *types.Array:
-		if role == catalog.RoleElementKey {
-			context.expected = types.Typ[types.Int]
-		} else {
-			context.expected = aggregate.Elem()
-		}
-	case *types.Slice:
-		if role == catalog.RoleElementKey {
-			context.expected = types.Typ[types.Int]
-		} else {
-			context.expected = aggregate.Elem()
-		}
-	case *types.Struct:
-		if role != catalog.RoleElementValue {
-			return
-		}
-		if identifier, ok := node.Key.(*ast.Ident); ok {
-			if object, present := view.UseOf(identifier); present {
-				if field, ok := object.(*types.Var); ok &&
-					field.IsField() {
-					context.expected = field.Type()
-				}
-			}
-		}
-	}
-}
-
-func assignRangeContext(
-	view interface {
-		TypeOf(ast.Expr) (types.TypeAndValue, bool)
-	},
-	node *ast.RangeStmt,
-	role catalog.Role,
-	context *occurrenceContext,
-) {
-	if role == catalog.RoleRangeKey ||
-		role == catalog.RoleRangeValue {
-		context.bindingRole = identity.SemanticBindingRange
-	}
-	operand := aggregateType(expressionType(view, node.X))
-	switch value := operand.(type) {
-	case *types.Array:
-		if role == catalog.RoleRangeKey {
-			context.expected = types.Typ[types.Int]
-		} else if role == catalog.RoleRangeValue {
-			context.expected = value.Elem()
-		}
-	case *types.Slice:
-		if role == catalog.RoleRangeKey {
-			context.expected = types.Typ[types.Int]
-		} else if role == catalog.RoleRangeValue {
-			context.expected = value.Elem()
-		}
-	case *types.Map:
-		if role == catalog.RoleRangeKey {
-			context.expected = value.Key()
-		} else if role == catalog.RoleRangeValue {
-			context.expected = value.Elem()
-		}
-	case *types.Chan:
-		if role == catalog.RoleRangeKey {
-			context.expected = value.Elem()
-		}
-	case *types.Basic:
-		if value.Info()&types.IsString != 0 {
-			if role == catalog.RoleRangeKey {
-				context.expected = types.Typ[types.Int]
-			} else if role == catalog.RoleRangeValue {
-				context.expected = types.Typ[types.Rune]
-			}
-		}
-	}
 }

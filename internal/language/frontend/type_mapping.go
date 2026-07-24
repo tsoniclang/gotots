@@ -25,12 +25,11 @@ func (builder *typeBuilder) memberOwnerID(
 	owners := builder.objects.memberOwnerRelations[object]
 	if len(owners) != 1 {
 		return identity.SemanticTypeID{}, fmt.Errorf(
-			"member %s (%T, type=%s, package=%v, position=%d) has %d declaring owner types; contextual owner required",
+			"member %s (%T, type=%s, package=%v) has %d declaring owner types; contextual owner required",
 			object.Name(),
 			object,
 			types.TypeString(object.Type(), nil),
 			object.Pkg(),
-			object.Pos(),
 			len(owners),
 		)
 	}
@@ -45,13 +44,7 @@ func (builder *typeBuilder) memberOwnerTypeID(
 			"semantic member owner type is absent",
 		)
 	}
-	for {
-		pointer, ok := owner.(*types.Pointer)
-		if !ok {
-			break
-		}
-		owner = pointer.Elem()
-	}
+	owner = originMemberOwner(owner)
 	if named, ok := owner.(*types.Named); ok {
 		declaration, err := builder.objects.declarationID(
 			named.Obj(),
@@ -88,17 +81,6 @@ func (builder *typeBuilder) admit(
 	return nil
 }
 
-func (builder *typeBuilder) recordsSorted() []semantic.Type {
-	out := make([]semantic.Type, 0, len(builder.records))
-	for _, record := range builder.records {
-		out = append(out, record)
-	}
-	sort.Slice(out, func(left, right int) bool {
-		return out[left].ID().String() < out[right].ID().String()
-	})
-	return out
-}
-
 func (builder *typeBuilder) finish() error {
 	for len(builder.pending) != 0 {
 		pending := make([]types.Type, 0, len(builder.pending))
@@ -106,8 +88,9 @@ func (builder *typeBuilder) finish() error {
 			pending = append(pending, typ)
 		}
 		sort.Slice(pending, func(left, right int) bool {
-			return builder.byGoType[pending[left]].String() <
-				builder.byGoType[pending[right]].String()
+			return builder.byGoType[pending[left]].Compare(
+				builder.byGoType[pending[right]],
+			) < 0
 		})
 		progress := false
 		for _, typ := range pending {

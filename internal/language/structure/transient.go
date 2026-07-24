@@ -10,43 +10,55 @@ import (
 	"github.com/tsoniclang/gotots/internal/source"
 )
 
-// TransientIndex is the short-lived syntax index shared by later Stage-1
-// structural consumers. It never enters Graph or any finalized artifact.
+// TransientIndex is the short-lived syntax index shared by Stage-1 consumers
+// and the Stage-2 frontend before source finalization. It never enters Graph or
+// any finalized artifact.
 type TransientIndex struct {
-	definitions  map[identity.DefinitionID]ast.Node
-	checked      map[identity.DefinitionID]ast.Node
-	synthetic    map[identity.DefinitionID]ast.Node
-	entries      map[identity.DefinitionID][]ast.Node
-	files        map[identity.FileID]*source.LoadedFile
-	structural   map[identity.OccurrenceID]ast.Node
-	executable   map[identity.OccurrenceID]ast.Node
-	structuralID map[ast.Node]identity.OccurrenceID
-	executableID map[ast.Node]identity.OccurrenceID
-	counterparts map[ast.Node]ast.Node
-	originals    map[ast.Node]ast.Node
-	unmapped     map[identity.OccurrenceID]bool
-	checkedFset  *token.FileSet
-	checkedFiles map[*token.File]identity.FileID
+	definitions     map[identity.DefinitionID]ast.Node
+	checked         map[identity.DefinitionID]ast.Node
+	synthetic       map[identity.DefinitionID]ast.Node
+	entries         map[identity.DefinitionID][]ast.Node
+	files           map[identity.FileID]*source.LoadedFile
+	structural      map[identity.OccurrenceID]ast.Node
+	support         map[identity.OccurrenceID]transientSupport
+	definitionRoots map[identity.OccurrenceID]identity.DefinitionID
+	executable      map[identity.OccurrenceID]ast.Node
+	structuralID    map[ast.Node]identity.OccurrenceID
+	executableID    map[ast.Node]identity.OccurrenceID
+	counterparts    map[ast.Node]ast.Node
+	originals       map[ast.Node]ast.Node
+	checkedOnly     map[ast.Node]bool
+	unmapped        map[identity.OccurrenceID]bool
+	checkedFset     *token.FileSet
+	checkedFiles    map[*token.File]identity.FileID
+}
+
+type transientSupport struct {
+	definition identity.DefinitionID
+	role       catalog.Role
 }
 
 func newTransientIndex(
 	universe *source.Universe,
 ) (*TransientIndex, error) {
 	index := &TransientIndex{
-		definitions:  map[identity.DefinitionID]ast.Node{},
-		checked:      map[identity.DefinitionID]ast.Node{},
-		synthetic:    map[identity.DefinitionID]ast.Node{},
-		entries:      map[identity.DefinitionID][]ast.Node{},
-		files:        map[identity.FileID]*source.LoadedFile{},
-		structural:   map[identity.OccurrenceID]ast.Node{},
-		executable:   map[identity.OccurrenceID]ast.Node{},
-		structuralID: map[ast.Node]identity.OccurrenceID{},
-		executableID: map[ast.Node]identity.OccurrenceID{},
-		counterparts: map[ast.Node]ast.Node{},
-		originals:    map[ast.Node]ast.Node{},
-		unmapped:     map[identity.OccurrenceID]bool{},
-		checkedFset:  universe.Fset(),
-		checkedFiles: map[*token.File]identity.FileID{},
+		definitions:     map[identity.DefinitionID]ast.Node{},
+		checked:         map[identity.DefinitionID]ast.Node{},
+		synthetic:       map[identity.DefinitionID]ast.Node{},
+		entries:         map[identity.DefinitionID][]ast.Node{},
+		files:           map[identity.FileID]*source.LoadedFile{},
+		structural:      map[identity.OccurrenceID]ast.Node{},
+		support:         map[identity.OccurrenceID]transientSupport{},
+		definitionRoots: map[identity.OccurrenceID]identity.DefinitionID{},
+		executable:      map[identity.OccurrenceID]ast.Node{},
+		structuralID:    map[ast.Node]identity.OccurrenceID{},
+		executableID:    map[ast.Node]identity.OccurrenceID{},
+		counterparts:    map[ast.Node]ast.Node{},
+		originals:       map[ast.Node]ast.Node{},
+		checkedOnly:     map[ast.Node]bool{},
+		unmapped:        map[identity.OccurrenceID]bool{},
+		checkedFset:     universe.Fset(),
+		checkedFiles:    map[*token.File]identity.FileID{},
 	}
 	for _, pkg := range universe.Packages() {
 		for tokenFile, fileID := range pkg.CheckerFileIdentities() {
@@ -108,6 +120,7 @@ func (i *TransientIndex) bindCheckedCounterparts(
 	}
 	i.counterparts[original] = checked
 	i.originals[checked] = original
+	i.checkedOnly[checked] = true
 	originalChildren, err := Children(original, originalKind)
 	if err != nil {
 		return err
@@ -126,13 +139,16 @@ func (i *TransientIndex) bindCheckedCounterparts(
 			edge: child.Edge(), ordinal: child.Ordinal(),
 		}] = child
 	}
+	matched := map[childKey]bool{}
 	for _, child := range originalChildren {
-		counterpart, present := byKey[childKey{
+		key := childKey{
 			edge: child.Edge(), ordinal: child.Ordinal(),
-		}]
+		}
+		counterpart, present := byKey[key]
 		if !present {
 			continue
 		}
+		matched[key] = true
 		originalChildKind, err := Classify(child.Node())
 		if err != nil {
 			return err
@@ -142,11 +158,45 @@ func (i *TransientIndex) bindCheckedCounterparts(
 			return err
 		}
 		if originalChildKind != checkedChildKind {
+			if err := i.markCheckedViewTree(
+				counterpart.Node(),
+			); err != nil {
+				return err
+			}
 			continue
 		}
 		if err := i.bindCheckedCounterparts(
 			child.Node(), counterpart.Node(),
 		); err != nil {
+			return err
+		}
+	}
+	for key, child := range byKey {
+		if matched[key] {
+			continue
+		}
+		if err := i.markCheckedViewTree(child.Node()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (i *TransientIndex) markCheckedViewTree(node ast.Node) error {
+	if node == nil || i.checkedOnly[node] {
+		return nil
+	}
+	i.checkedOnly[node] = true
+	kind, err := Classify(node)
+	if err != nil {
+		return err
+	}
+	children, err := Children(node, kind)
+	if err != nil {
+		return err
+	}
+	for _, child := range children {
+		if err := i.markCheckedViewTree(child.Node()); err != nil {
 			return err
 		}
 	}
@@ -226,12 +276,102 @@ func (i *TransientIndex) File(
 }
 
 func (i *TransientIndex) bindStructuralOccurrence(
-	id identity.OccurrenceID,
+	occurrence Occurrence,
 	node ast.Node,
 ) error {
-	return i.bindOccurrence(
-		i.structural, i.structuralID, id, node,
-	)
+	id := occurrence.ID()
+	if id.IsZero() || node == nil {
+		return fmt.Errorf(
+			"transient occurrence binding requires identity and node",
+		)
+	}
+	kind, err := Classify(node)
+	if err != nil {
+		return err
+	}
+	if uint16(kind) != id.KindID() {
+		return fmt.Errorf(
+			"transient occurrence %s has node kind %s", id, kind,
+		)
+	}
+	if existing, present := i.structural[id]; present {
+		if existing != node {
+			return fmt.Errorf(
+				"transient occurrence %s has conflicting nodes", id,
+			)
+		}
+	}
+	if existing, present := i.structuralID[node]; present &&
+		existing != id {
+		return fmt.Errorf(
+			"transient node has conflicting occurrences %s and %s",
+			existing, id,
+		)
+	}
+	i.structural[id] = node
+	i.structuralID[node] = id
+	return nil
+}
+
+func (i *TransientIndex) bindStructuralSupport(
+	occurrence Occurrence,
+	node ast.Node,
+	definition identity.DefinitionID,
+) error {
+	if definition.IsZero() {
+		return fmt.Errorf(
+			"transient support requires an enclosing definition",
+		)
+	}
+	identifierCandidate := occurrence.kind == catalog.KindIdent &&
+		catalog.IdentifierDefinitionCandidate(occurrence.Role())
+	scopeCandidate := catalog.LexicalScope(occurrence.kind) !=
+		catalog.LexicalScopeNone
+	if !identifierCandidate && !scopeCandidate {
+		return nil
+	}
+	if err := i.bindStructuralOccurrence(occurrence, node); err != nil {
+		return err
+	}
+	record := transientSupport{
+		definition: definition,
+		role:       occurrence.Role(),
+	}
+	if existing, present := i.support[occurrence.id]; present &&
+		existing != record {
+		return fmt.Errorf(
+			"transient occurrence %s has conflicting support",
+			occurrence.id,
+		)
+	}
+	i.support[occurrence.id] = record
+	return nil
+}
+
+func (i *TransientIndex) bindStructuralOwner(
+	occurrence identity.OccurrenceID,
+	definition identity.DefinitionID,
+) error {
+	if occurrence.IsZero() || definition.IsZero() {
+		return fmt.Errorf(
+			"transient structural owner requires occurrence and definition",
+		)
+	}
+	if _, present := i.structural[occurrence]; !present {
+		return fmt.Errorf(
+			"transient occurrence %s has no structural record",
+			occurrence,
+		)
+	}
+	if existing := i.definitionRoots[occurrence]; !existing.IsZero() &&
+		existing != definition {
+		return fmt.Errorf(
+			"transient occurrence %s has definitions %s and %s",
+			occurrence, existing, definition,
+		)
+	}
+	i.definitionRoots[occurrence] = definition
+	return nil
 }
 
 // BindExecutableOccurrence records the exact node already visited by the
@@ -318,36 +458,36 @@ func (i *TransientIndex) OccurrenceID(
 	return id, present
 }
 
-// IdentifierOccurrence resolves a checker object's source position to the
-// canonical identifier occurrence identity without retaining or traversing
-// its surrounding syntax.
-func (i *TransientIndex) IdentifierOccurrence(
-	position token.Pos,
-	name string,
-) (identity.OccurrenceID, error) {
-	if !position.IsValid() || name == "" {
-		return identity.OccurrenceID{}, fmt.Errorf(
-			"checker identifier requires position and name",
-		)
+// CheckedViewOnly reports whether a checker node belongs only to a cgo
+// checked/generated view and has no physical-source counterpart.
+func (i *TransientIndex) CheckedViewOnly(node ast.Node) bool {
+	return node != nil &&
+		i.checkedOnly[node] &&
+		i.originals[node] == nil
+}
+
+// StructuralSupport returns the parent-assigned grammatical role retained only
+// for checker definition and lexical-scope candidates outside executable
+// regions.
+func (i *TransientIndex) StructuralSupport(
+	id identity.OccurrenceID,
+) (catalog.Role, bool) {
+	record, present := i.support[id]
+	return record.role, present
+}
+
+// OccurrenceDefinition returns the enclosing implementation definition
+// assigned by the one Stage-1 parent-directed traversal.
+func (i *TransientIndex) OccurrenceDefinition(
+	id identity.OccurrenceID,
+) (identity.DefinitionID, bool) {
+	if definition := i.definitionRoots[id]; !definition.IsZero() {
+		return definition, true
 	}
-	tokenFile := i.checkedFset.File(position)
-	fileID := i.checkedFiles[tokenFile]
-	if tokenFile == nil || fileID.IsZero() {
-		return identity.OccurrenceID{}, fmt.Errorf(
-			"checker identifier %q has no canonical source file",
-			name,
-		)
+	if record, present := i.support[id]; present {
+		return record.definition, true
 	}
-	start := tokenFile.Offset(position)
-	span, err := identity.NewSpanID(
-		fileID, start, start+len(name),
-	)
-	if err != nil {
-		return identity.OccurrenceID{}, err
-	}
-	return identity.NewOccurrenceID(
-		span, uint16(catalog.KindIdent),
-	)
+	return identity.DefinitionID{}, false
 }
 
 func (i *TransientIndex) StructuralOccurrenceCount() int {

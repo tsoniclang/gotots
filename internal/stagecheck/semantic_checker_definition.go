@@ -5,7 +5,6 @@ import (
 	"go/ast"
 	"go/types"
 	"slices"
-	"sort"
 
 	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/semantic"
@@ -13,17 +12,22 @@ import (
 )
 
 func (verifier *checkerSemanticVerifier) verifyDefinitions() error {
-	records := map[identity.DefinitionID]semantic.DefinitionSemantics{}
-	for _, record := range verifier.actual.Definitions() {
-		records[record.Definition()] = record
-	}
-	for definition, structural := range verifier.expected.definitions {
-		record := records[definition]
-		if record.Definition().IsZero() {
+	seen := 0
+	err := verifier.actual.VisitDefinitions(func(
+		record semantic.DefinitionSemantics,
+	) error {
+		definition := record.Definition()
+		structural, present := verifier.expected.definitions[definition]
+		if !present {
+			if verifier.localOnly {
+				return nil
+			}
 			return fmt.Errorf(
-				"definition %s has no semantic record", definition,
+				"definition %s has no structural expectation",
+				definition,
 			)
 		}
+		seen++
 		spec := record.Spec()
 		if spec.Name != structural.Name() ||
 			spec.Implicit != definition.ImplicitOp() {
@@ -49,7 +53,7 @@ func (verifier *checkerSemanticVerifier) verifyDefinitions() error {
 						definition,
 					)
 				}
-				continue
+				return nil
 			}
 			return fmt.Errorf(
 				"definition %s has no checker node", definition,
@@ -62,6 +66,17 @@ func (verifier *checkerSemanticVerifier) verifyDefinitions() error {
 				"definition %s: %w", definition, err,
 			)
 		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if seen != len(verifier.expected.definitions) {
+		return fmt.Errorf(
+			"checker visited %d definitions for %d structural expectations",
+			seen,
+			len(verifier.expected.definitions),
+		)
 	}
 	return nil
 }
@@ -85,15 +100,7 @@ func (verifier *checkerSemanticVerifier) verifyDefinitionBindings(
 	definition identity.DefinitionID,
 	spec semantic.DefinitionSemanticsSpec,
 ) error {
-	var expected []identity.SemanticBindingID
-	for _, binding := range verifier.bindings {
-		if binding.Definition() == definition {
-			expected = append(expected, binding.ID())
-		}
-	}
-	sort.Slice(expected, func(left, right int) bool {
-		return expected[left].String() < expected[right].String()
-	})
+	expected := verifier.bindingsByDefinition[definition]
 	if !slices.Equal(spec.Bindings, expected) {
 		return fmt.Errorf(
 			"definition %s bindings=%v, checker-derived=%v",

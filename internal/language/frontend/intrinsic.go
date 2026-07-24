@@ -15,7 +15,7 @@ func (index *objectIndex) bindIntrinsicDefinitionSources() error {
 	seen := map[catalog.UnsafeMemberKind]bool{}
 	for _, occurrenceID := range index.input.order {
 		index.work.IntrinsicOccurrenceVisits++
-		record := index.input.occurrences[occurrenceID]
+		record := index.input.occurrence(occurrenceID)
 		identifier, identifierNode := record.node.(*ast.Ident)
 		if !identifierNode ||
 			record.occurrence.Role() !=

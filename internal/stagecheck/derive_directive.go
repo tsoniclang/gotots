@@ -18,19 +18,15 @@ func (b *derivedFile) deriveDirectives(syntax *ast.File) error {
 			if !present {
 				continue
 			}
-			b.ledger.add(
-				"directive",
-				fmt.Sprintf(
-					"%s|%d|%s|%s|%s|%s|%s",
-					b.owner,
-					uint16(kind),
-					tool,
-					name,
-					args,
-					spanKey(b.span(comment)),
-					displayKey(b.display(comment)),
-				),
-			)
+			addRecord(&b.ledger.directives, directiveLedgerRecord{
+				owner:   b.owner,
+				kind:    kind,
+				tool:    tool,
+				name:    name,
+				args:    args,
+				span:    b.span(comment),
+				display: b.display(comment),
+			})
 		}
 	}
 	return nil

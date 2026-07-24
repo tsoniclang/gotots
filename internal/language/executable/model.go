@@ -3,6 +3,7 @@
 package executable
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/identity"
@@ -62,6 +63,20 @@ func (r Region) Definition() identity.DefinitionID { return r.id.Definition() }
 func (r Region) Members() []identity.OccurrenceID {
 	return append([]identity.OccurrenceID(nil), r.members...)
 }
+func (r Region) MemberCount() int { return len(r.members) }
+func (r Region) VisitMembers(
+	visit func(int, identity.OccurrenceID) error,
+) error {
+	if visit == nil {
+		return fmt.Errorf("executable member visit requires a visitor")
+	}
+	for ordinal, member := range r.members {
+		if err := visit(ordinal, member); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 func (r Region) References() []DefinitionReference {
 	return append([]DefinitionReference(nil), r.references...)
 }
@@ -82,11 +97,17 @@ type Work struct {
 // Inventory is the immutable exact set of full-semantic regions plus only the
 // canonical occurrences absent from the depth-independent structural store.
 type Inventory struct {
-	regionIDs     []identity.DefinitionID
-	byID          map[identity.DefinitionID]Region
-	additionalIDs []identity.OccurrenceID
-	byOccurrence  map[identity.OccurrenceID]*structure.Occurrence
-	work          Work
+	regionIDs        []identity.DefinitionID
+	byID             map[identity.DefinitionID]Region
+	additionalIDs    []identity.OccurrenceID
+	additionalByFile map[identity.FileID]occurrenceRange
+	byOccurrence     map[identity.OccurrenceID]*structure.Occurrence
+	work             Work
+}
+
+type occurrenceRange struct {
+	start int
+	end   int
 }
 
 func (i *Inventory) Regions() []Region {
@@ -121,6 +142,39 @@ func (i *Inventory) AdditionalOccurrenceRefs() (
 	}
 	return out, nil
 }
+
+func (i *Inventory) AdditionalOccurrenceRefsForFiles(
+	files []identity.FileID,
+) ([]structure.OccurrenceRef, error) {
+	ordered := append([]identity.FileID(nil), files...)
+	sort.Slice(ordered, func(left, right int) bool {
+		return ordered[left].Compare(ordered[right]) < 0
+	})
+	var out []structure.OccurrenceRef
+	previous := identity.FileID{}
+	for _, file := range ordered {
+		if file.IsZero() {
+			return nil, fmt.Errorf(
+				"additional occurrence lookup has a zero file identity",
+			)
+		}
+		if file == previous {
+			return nil, fmt.Errorf(
+				"additional occurrence lookup repeats file %s", file,
+			)
+		}
+		previous = file
+		indexed := i.additionalByFile[file]
+		for _, id := range i.additionalIDs[indexed.start:indexed.end] {
+			reference, err := structure.NewOccurrenceRef(i.byOccurrence[id])
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, reference)
+		}
+	}
+	return out, nil
+}
 func (i *Inventory) Work() Work { return i.work }
 func (i *Inventory) For(
 	definition identity.DefinitionID,
@@ -141,12 +195,22 @@ func (i *Inventory) AdditionalOccurrence(
 func (i *Inventory) sort() {
 	sort.Slice(i.regionIDs, func(left, right int) bool {
 		i.work.SortComparisons++
-		return i.regionIDs[left].String() <
-			i.regionIDs[right].String()
+		return i.regionIDs[left].Compare(i.regionIDs[right]) < 0
 	})
 	sort.Slice(i.additionalIDs, func(left, right int) bool {
 		i.work.SortComparisons++
-		return i.additionalIDs[left].String() <
-			i.additionalIDs[right].String()
+		return i.additionalIDs[left].Compare(
+			i.additionalIDs[right],
+		) < 0
 	})
+	i.additionalByFile = map[identity.FileID]occurrenceRange{}
+	for index, id := range i.additionalIDs {
+		file := id.Span().File()
+		indexed, present := i.additionalByFile[file]
+		if !present {
+			indexed.start = index
+		}
+		indexed.end = index + 1
+		i.additionalByFile[file] = indexed
+	}
 }

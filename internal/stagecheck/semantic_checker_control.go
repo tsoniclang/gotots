@@ -46,8 +46,9 @@ func (verifier *checkerSemanticVerifier) verifyOperationControl(
 	}
 	var target identity.OperationID
 	if !targetOccurrence.IsZero() {
-		resolution := verifier.resolutions[targetOccurrence]
-		if resolution.Kind() != semantic.ResolutionOperation {
+		resolution, present := verifier.resolution(targetOccurrence)
+		if !present ||
+			resolution.Kind() != semantic.ResolutionOperation {
 			return fmt.Errorf(
 				"target occurrence %s has no operation resolution",
 				targetOccurrence,
@@ -77,7 +78,7 @@ func (verifier *checkerSemanticVerifier) independentBranchLabel(
 	}
 	var labelOccurrence identity.OccurrenceID
 	for _, childID := range verifier.children[occurrence.ID()] {
-		child := verifier.expected.occurrences[childID]
+		child := verifier.expected.occurrence(childID)
 		if child.Role() == catalog.RoleLabelReference {
 			if !labelOccurrence.IsZero() {
 				return identity.SemanticBindingID{},
@@ -90,8 +91,8 @@ func (verifier *checkerSemanticVerifier) independentBranchLabel(
 		return identity.SemanticBindingID{},
 			fmt.Errorf("branch label has no occurrence")
 	}
-	resolution := verifier.resolutions[labelOccurrence]
-	if resolution.Kind() != semantic.ResolutionBinding {
+	resolution, present := verifier.resolution(labelOccurrence)
+	if !present || resolution.Kind() != semantic.ResolutionBinding {
 		return identity.SemanticBindingID{},
 			fmt.Errorf("branch label does not resolve to a binding")
 	}
@@ -116,12 +117,12 @@ func (verifier *checkerSemanticVerifier) independentBranchTarget(
 ) (identity.OccurrenceID, error) {
 	if !label.IsZero() {
 		record := verifier.bindings[label]
-		if record.ID().IsZero() || record.Source().IsZero() {
+		if record == nil || record.source.IsZero() {
 			return identity.OccurrenceID{},
 				fmt.Errorf("label %s has no declaration anchor", label)
 		}
-		labelOccurrence := verifier.expected.occurrences[record.Source()]
-		labeled := verifier.expected.occurrences[labelOccurrence.Parent()]
+		labelOccurrence := verifier.expected.occurrence(record.source)
+		labeled := verifier.expected.occurrence(labelOccurrence.Parent())
 		if labeled.Kind() != catalog.KindLabeledStmt {
 			return identity.OccurrenceID{},
 				fmt.Errorf("label %s is not owned by a labeled statement", label)
@@ -131,7 +132,7 @@ func (verifier *checkerSemanticVerifier) independentBranchTarget(
 			return labeled.ID(), nil
 		}
 		for _, childID := range verifier.children[labeled.ID()] {
-			child := verifier.expected.occurrences[childID]
+			child := verifier.expected.occurrence(childID)
 			if child.Role() == catalog.RoleLabeledStatement {
 				return childID, nil
 			}
@@ -167,7 +168,7 @@ func (verifier *checkerSemanticVerifier) nearestControlAncestor(
 	kinds ...catalog.Kind,
 ) identity.OccurrenceID {
 	for parent := occurrence.Parent(); !parent.IsZero(); {
-		record := verifier.expected.occurrences[parent]
+		record := verifier.expected.occurrence(parent)
 		for _, kind := range kinds {
 			if record.Kind() == kind {
 				return parent
@@ -187,17 +188,17 @@ func (verifier *checkerSemanticVerifier) nextCaseOccurrence(
 	if caseID.IsZero() {
 		return identity.OccurrenceID{}
 	}
-	current := verifier.expected.occurrences[caseID]
+	current := verifier.expected.occurrence(caseID)
 	var next identity.OccurrenceID
 	for _, siblingID := range verifier.children[current.Parent()] {
-		sibling := verifier.expected.occurrences[siblingID]
+		sibling := verifier.expected.occurrence(siblingID)
 		if sibling.Kind() != catalog.KindCaseClause ||
 			sibling.Ordinal() <= current.Ordinal() {
 			continue
 		}
 		if next.IsZero() ||
 			sibling.Ordinal() <
-				verifier.expected.occurrences[next].Ordinal() {
+				verifier.expected.occurrence(next).Ordinal() {
 			next = siblingID
 		}
 	}

@@ -285,7 +285,7 @@ func sortGraphPackages(graph *Graph) {
 	}
 	sort.Slice(entries, func(i, j int) bool {
 		graph.work.SortComparisons++
-		return entries[i].pkg.id.String() < entries[j].pkg.id.String()
+		return entries[i].pkg.id.Compare(entries[j].pkg.id) < 0
 	})
 	for index := range entries {
 		graph.packages[index] = entries[index].pkg
@@ -354,13 +354,15 @@ func sealGraph(graph *Graph) error {
 	}
 	sort.Slice(graph.occurrenceIDs, func(i, j int) bool {
 		graph.work.SortComparisons++
-		return graph.occurrenceIDs[i].String() <
-			graph.occurrenceIDs[j].String()
+		return graph.occurrenceIDs[i].Compare(
+			graph.occurrenceIDs[j],
+		) < 0
 	})
 	sort.Slice(graph.definitionIDs, func(i, j int) bool {
 		graph.work.SortComparisons++
-		return graph.definitionIDs[i].String() <
-			graph.definitionIDs[j].String()
+		return graph.definitionIDs[i].Compare(
+			graph.definitionIDs[j],
+		) < 0
 	})
 	return nil
 }

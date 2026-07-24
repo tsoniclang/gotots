@@ -10,8 +10,12 @@ import (
 // semantic package without retaining a second complete record set. It exposes
 // append-only typed methods and no backing storage.
 type PackageDraft struct {
-	input  PackageInput
-	sealed bool
+	id               identity.PackageID
+	provenance       PackageProvenance
+	normalized       normalizedPackageBuilder
+	declarationRoots []declarationRef
+	typeRoots        []typeRef
+	sealed           bool
 }
 
 type PackageCapacity struct {
@@ -45,33 +49,49 @@ func NewPackageDraft(
 		)
 	}
 	return &PackageDraft{
-		input: PackageInput{
-			ID:         id,
-			Provenance: provenance,
-			Definitions: make(
-				[]DefinitionSemantics, 0, capacity.Definitions,
-			),
-			Resolutions: make(
-				[]OccurrenceResolution, 0, capacity.Resolutions,
-			),
-			Declarations: make(
-				[]Declaration, 0, capacity.Declarations,
-			),
-			Bindings: make(
-				[]Binding, 0, capacity.Bindings,
-			),
-			Types: make(
-				[]Type, 0, capacity.Types,
-			),
-			TypeWitnesses: make(
-				[]TypeWitness, 0, capacity.Types,
-			),
-			Operations: make(
-				[]Operation, 0, capacity.Operations,
-			),
-			Unsupported: make(
-				[]Unsupported, 0, capacity.Unsupported,
-			),
+		id:         id,
+		provenance: provenance,
+		normalized: normalizedPackageBuilder{
+			definitions: packageDefinitionBuilder{
+				records: make(
+					[]storedDefinition, 0, capacity.Definitions,
+				),
+			},
+			resolutions: packageResolutionBuilder{
+				records: make(
+					[]storedResolution, 0, capacity.Resolutions,
+				),
+			},
+			declarations: packageDeclarationBuilder{
+				records: make(
+					[]storedDeclaration, 0, capacity.Declarations,
+				),
+			},
+			bindings: packageBindingBuilder{
+				records: make(
+					[]storedBinding, 0, capacity.Bindings,
+				),
+			},
+			types: packageTypeBuilder{
+				records: make(
+					[]storedType, 0, capacity.Types,
+				),
+			},
+			witnesses: packageTypeWitnessBuilder{
+				records: make(
+					[]storedTypeWitness, 0, capacity.Types,
+				),
+			},
+			operations: packageOperationBuilder{
+				records: make(
+					[]storedOperation, 0, capacity.Operations,
+				),
+			},
+			unsupported: packageUnsupportedBuilder{
+				records: make(
+					[]storedUnsupported, 0, capacity.Unsupported,
+				),
+			},
 		},
 	}, nil
 }
@@ -89,7 +109,15 @@ func (draft *PackageDraft) AddDefinition(
 	if err := draft.ensureOpen(); err != nil {
 		return err
 	}
-	draft.input.Definitions = append(draft.input.Definitions, record)
+	draft.normalized.addDefinition(record)
+	spec := record.spec
+	for _, declaration := range spec.Declarations {
+		draft.addDeclarationRoot(declaration)
+	}
+	draft.addTypeRoot(spec.Signature)
+	for _, declaration := range spec.Declarations {
+		draft.addDeclarationOwnerTypeRoot(declaration)
+	}
 	return nil
 }
 
@@ -99,7 +127,8 @@ func (draft *PackageDraft) AddResolution(
 	if err := draft.ensureOpen(); err != nil {
 		return err
 	}
-	draft.input.Resolutions = append(draft.input.Resolutions, record)
+	draft.normalized.addResolution(record)
+	draft.addResolutionRoots(record)
 	return nil
 }
 
@@ -107,7 +136,9 @@ func (draft *PackageDraft) AddDeclaration(record Declaration) error {
 	if err := draft.ensureOpen(); err != nil {
 		return err
 	}
-	draft.input.Declarations = append(draft.input.Declarations, record)
+	draft.normalized.addDeclaration(record)
+	draft.addTypeRoot(record.typeID)
+	draft.addDeclarationOwnerTypeRoot(record.id)
 	return nil
 }
 
@@ -115,7 +146,8 @@ func (draft *PackageDraft) AddBinding(record Binding) error {
 	if err := draft.ensureOpen(); err != nil {
 		return err
 	}
-	draft.input.Bindings = append(draft.input.Bindings, record)
+	draft.normalized.addBinding(record)
+	draft.addTypeRoot(record.typeID)
 	return nil
 }
 
@@ -126,10 +158,60 @@ func (draft *PackageDraft) AddType(
 	if err := draft.ensureOpen(); err != nil {
 		return err
 	}
-	draft.input.Types = append(draft.input.Types, record)
-	draft.input.TypeWitnesses = append(
-		draft.input.TypeWitnesses, witness,
+	draft.normalized.addType(record)
+	draft.normalized.addTypeWitness(witness)
+	return nil
+}
+
+func (draft *PackageDraft) VisitTypeRoots(
+	visit func(identity.SemanticTypeID) error,
+) error {
+	if err := draft.ensureOpen(); err != nil {
+		return err
+	}
+	if visit == nil {
+		return fmt.Errorf(
+			"semantic package draft type-root visitor is absent",
+		)
+	}
+	identities := newPackageIdentityProjection(
+		draft.normalized.identities.projectionTable(),
 	)
+	for _, reference := range draft.typeRoots {
+		typeID := identities.typeID(reference)
+		if typeID.IsZero() {
+			continue
+		}
+		if err := visit(typeID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (draft *PackageDraft) VisitDeclarationRoots(
+	visit func(identity.SemanticDeclarationID) error,
+) error {
+	if err := draft.ensureOpen(); err != nil {
+		return err
+	}
+	if visit == nil {
+		return fmt.Errorf(
+			"semantic package draft declaration-root visitor is absent",
+		)
+	}
+	identities := newPackageIdentityProjection(
+		draft.normalized.identities.projectionTable(),
+	)
+	for _, reference := range draft.declarationRoots {
+		declaration := identities.declaration(reference)
+		if declaration.IsZero() {
+			continue
+		}
+		if err := visit(declaration); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -137,17 +219,91 @@ func (draft *PackageDraft) AddOperation(record Operation) error {
 	if err := draft.ensureOpen(); err != nil {
 		return err
 	}
-	draft.input.Operations = append(draft.input.Operations, record)
+	draft.normalized.addOperation(record)
+	draft.addOperationRoots(record)
 	return nil
+}
+
+func (draft *PackageDraft) addDeclarationRoot(
+	declaration identity.SemanticDeclarationID,
+) {
+	if declaration.IsZero() {
+		return
+	}
+	draft.declarationRoots = append(
+		draft.declarationRoots,
+		draft.normalized.identities.declaration(declaration),
+	)
+}
+
+func (draft *PackageDraft) addTypeRoot(typeID identity.SemanticTypeID) {
+	if typeID.IsZero() {
+		return
+	}
+	draft.typeRoots = append(
+		draft.typeRoots,
+		draft.normalized.identities.typeID(typeID),
+	)
+}
+
+func (draft *PackageDraft) addDeclarationOwnerTypeRoot(
+	declaration identity.SemanticDeclarationID,
+) {
+	if declaration.Form() ==
+		identity.SemanticDeclarationMember {
+		draft.addTypeRoot(declaration.OwnerType())
+	}
+}
+
+func (draft *PackageDraft) addObjectRoots(object ObjectReference) {
+	if object.kind != ObjectReferenceDeclaration {
+		return
+	}
+	draft.addDeclarationRoot(object.declaration)
+	draft.addDeclarationOwnerTypeRoot(object.declaration)
+}
+
+func (draft *PackageDraft) addResolutionRoots(
+	record OccurrenceResolution,
+) {
+	draft.addTypeRoot(record.typeID)
+	switch record.kind {
+	case ResolutionStructuralOnly:
+		draft.addDeclarationRoot(record.structural.declaration)
+		draft.addTypeRoot(record.structural.typeID)
+		draft.addDeclarationOwnerTypeRoot(
+			record.structural.declaration,
+		)
+	case ResolutionDeclaration:
+		draft.addDeclarationRoot(record.declaration)
+		draft.addDeclarationOwnerTypeRoot(record.declaration)
+	}
+}
+
+func (draft *PackageDraft) addOperationRoots(record Operation) {
+	spec := record.spec
+	draft.addObjectRoots(spec.Object)
+	draft.addDeclarationRoot(spec.Selection.object)
+	draft.addDeclarationOwnerTypeRoot(spec.Selection.object)
+	draft.addObjectRoots(spec.Instance.target)
+	draft.addTypeRoot(spec.ResultType)
+	draft.addTypeRoot(spec.ExpectedType)
+	draft.addTypeRoot(spec.Selection.receiver)
+	draft.addTypeRoot(spec.Instance.signature)
+	for _, typeID := range spec.Instance.types {
+		draft.addTypeRoot(typeID)
+	}
+	for _, implicit := range spec.Implicit {
+		draft.addTypeRoot(implicit.source)
+		draft.addTypeRoot(implicit.target)
+	}
 }
 
 func (draft *PackageDraft) AddUnsupported(record Unsupported) error {
 	if err := draft.ensureOpen(); err != nil {
 		return err
 	}
-	draft.input.Unsupported = append(
-		draft.input.Unsupported, record,
-	)
+	draft.normalized.addUnsupported(record)
 	return nil
 }
 
@@ -155,36 +311,46 @@ func (draft *PackageDraft) ResolutionCount() int {
 	if draft == nil {
 		return 0
 	}
-	return len(draft.input.Resolutions)
+	return len(draft.normalized.resolutions.records)
 }
 
 func (draft *PackageDraft) OperationCount() int {
 	if draft == nil {
 		return 0
 	}
-	return len(draft.input.Operations)
+	return len(draft.normalized.operations.records)
 }
 
 func (draft *PackageDraft) UnsupportedCount() int {
 	if draft == nil {
 		return 0
 	}
-	return len(draft.input.Unsupported)
+	return len(draft.normalized.unsupported.records)
 }
 
 func (draft *PackageDraft) SealProducer() (Package, error) {
+	return draft.seal()
+}
+
+func (draft *PackageDraft) sealArtifact() (Package, error) {
+	return draft.seal()
+}
+
+func (draft *PackageDraft) seal() (Package, error) {
 	if err := draft.ensureOpen(); err != nil {
 		return Package{}, err
 	}
-	input, err := FinalizePackageTypePool(draft.input)
+	pkg, err := newPackageFromBuilder(
+		draft.id, draft.provenance, &draft.normalized,
+	)
 	if err != nil {
 		return Package{}, err
 	}
-	pkg, err := newPackage(input, false)
-	if err != nil {
-		return Package{}, err
-	}
-	draft.input = PackageInput{}
+	draft.id = identity.PackageID{}
+	draft.provenance = ProvenanceInvalid
+	draft.normalized = normalizedPackageBuilder{}
+	draft.declarationRoots = nil
+	draft.typeRoots = nil
 	draft.sealed = true
 	return pkg, nil
 }

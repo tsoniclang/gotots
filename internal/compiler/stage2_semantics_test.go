@@ -16,12 +16,13 @@ const stage2ContextMatrix = `package matrix
 
 import (
 	"example.com/stage2/left"
-	_ "example.com/stage2/right"
+	other "example.com/stage2/right"
 	"unsafe"
 )
 
 type Number int
 type Alias = Number
+type Sequence func(func(int) bool)
 
 type Universal interface{}
 type Empty interface {
@@ -53,6 +54,13 @@ type EmbeddedBox struct {
 
 func Identity[T any](value T) T { return value }
 
+func MixedBindings(named string) string {
+	_ = other.Value
+	return named
+}
+
+func UnnamedBindings(int, string) {}
+
 var First, _ = pair()
 var _, _ = pair()
 var Left, Right = pair()
@@ -72,6 +80,7 @@ func Matrix(
 	box Box[int],
 	embedded EmbeddedBox,
 ) (int, bool) {
+	inferred := [...]int{1, 2}
 	value, mapOK := values["key"]
 	if _, exists := values["missing"]; exists {
 		value++
@@ -127,7 +136,7 @@ loop:
 	}
 	return int(converted) + field + methodValue() +
 		methodExpression(box) + received + pointer.Value +
-		int(aliasConverted) + promoted +
+		int(aliasConverted) + promoted + inferred[0] +
 		int(unsafe.Sizeof(structValue)),
 		mapOK && channelOK && assertOK
 }
@@ -164,6 +173,14 @@ func CopyCall(value struct{ Value int }) int {
 func Closure(base int) func(int) int {
 	return func(delta int) int { return base + delta }
 }
+
+func NamedSequence() Sequence {
+	return func(yield func(int) bool) { yield(1) }
+}
+
+func GenericClosure[T any](value T) func() T {
+	return func() T { return value }
+}
 `
 
 func TestStage2ContextMatrixAndSemanticConservation(t *testing.T) {
@@ -172,10 +189,13 @@ func TestStage2ContextMatrixAndSemanticConservation(t *testing.T) {
 		t, inspection.Semantic(), "example.com/stage2",
 	)
 
-	if len(pkg.Unsupported()) != 0 {
-		t.Fatalf("unsupported records=%d, want 0", len(pkg.Unsupported()))
+	if pkg.UnsupportedCount() != 0 {
+		t.Fatalf(
+			"unsupported records=%d, want 0",
+			pkg.UnsupportedCount(),
+		)
 	}
-	operations := pkg.Operations()
+	operations := semanticOperations(pkg)
 	requireOperationVariant(
 		t, operations, semantic.OperationMapLookup,
 		catalog.VariantMapLookupCommaOk,
@@ -230,19 +250,94 @@ func TestStage2ContextMatrixAndSemanticConservation(t *testing.T) {
 			len(copyEffects),
 		)
 	}
+	var namedFunctionReturnConversion bool
+	for _, operation := range operations {
+		if operation.Kind() != semantic.OperationReturn {
+			continue
+		}
+		for _, effect := range operation.Spec().Implicit {
+			if effect.Kind() ==
+				catalog.ImplicitAssignmentConversion &&
+				effect.Site().KindID() ==
+					uint16(catalog.KindFuncLit) &&
+				!effect.Source().IsZero() &&
+				!effect.Target().IsZero() &&
+				effect.Source() != effect.Target() {
+				namedFunctionReturnConversion = true
+			}
+		}
+	}
+	if !namedFunctionReturnConversion {
+		t.Fatal(
+			"named-function return lacks its function-literal assignment conversion",
+		)
+	}
 
-	var capturedBase bool
-	for _, binding := range pkg.Bindings() {
+	var (
+		capturedBase         bool
+		capturedGenericValue bool
+		typeParameterCount   int
+	)
+	for _, binding := range semanticBindings(pkg) {
+		if binding.Name() == "_" {
+			t.Fatal("blank identifier became a semantic binding")
+		}
 		if binding.Name() == "base" && len(binding.CapturedBy()) == 1 {
 			capturedBase = true
+		}
+		if binding.Name() == "value" &&
+			binding.Role() == identity.SemanticBindingParameter &&
+			len(binding.CapturedBy()) == 1 {
+			capturedGenericValue = true
+		}
+		if binding.Role() ==
+			identity.SemanticBindingTypeParameter {
+			typeParameterCount++
+			if len(binding.CapturedBy()) != 0 {
+				t.Fatalf(
+					"type parameter %s has runtime captures %v",
+					binding.ID(), binding.CapturedBy(),
+				)
+			}
 		}
 	}
 	if !capturedBase {
 		t.Fatal("closure capture for base was not materialized")
 	}
+	if !capturedGenericValue || typeParameterCount == 0 {
+		t.Fatalf(
+			"generic closure value capture=%t type parameters=%d",
+			capturedGenericValue, typeParameterCount,
+		)
+	}
+	requireMixedExplicitAndImplicitBindings(t, semanticBindings(pkg))
+	var blankResolution bool
+	for _, resolution := range semanticResolutions(pkg) {
+		if resolution.Kind() == semantic.ResolutionStructuralOnly &&
+			resolution.Structural().Disposition() ==
+				semantic.StructuralBlankIdentifier {
+			blankResolution = true
+			break
+		}
+	}
+	if !blankResolution {
+		t.Fatal("blank identifier structural resolution is absent")
+	}
+	var inferredArrayEllipsis bool
+	for _, resolution := range semanticResolutions(pkg) {
+		if resolution.Syntax() == catalog.KindEllipsis &&
+			resolution.Role() == catalog.RoleArrayLength &&
+			resolution.Kind() == semantic.ResolutionType {
+			inferredArrayEllipsis = true
+			break
+		}
+	}
+	if !inferredArrayEllipsis {
+		t.Fatal("inferred array ellipsis type resolution is absent")
+	}
 
 	typeKinds := map[semantic.TypeKind]int{}
-	for _, record := range pkg.Types() {
+	for _, record := range semanticTypes(pkg) {
 		typeKinds[record.Kind()]++
 	}
 	if typeKinds[semantic.TypeAlias] == 0 ||
@@ -255,7 +350,7 @@ func TestStage2ContextMatrixAndSemanticConservation(t *testing.T) {
 		initDefinitions          int
 		initializerCardinalities []int
 	)
-	for _, definition := range pkg.Definitions() {
+	for _, definition := range semanticDefinitions(pkg) {
 		spec := definition.Spec()
 		if spec.Name == "init" {
 			initDefinitions++
@@ -283,8 +378,8 @@ func TestStage2ContextMatrixAndSemanticConservation(t *testing.T) {
 	totalUnsupported := 0
 	if err := inspection.Semantic().VisitPackages(
 		func(candidate semantic.Package) error {
-			totalOperations += len(candidate.Operations())
-			totalUnsupported += len(candidate.Unsupported())
+			totalOperations += candidate.OperationCount()
+			totalUnsupported += candidate.UnsupportedCount()
 			return nil
 		},
 	); err != nil {
@@ -310,78 +405,6 @@ func TestStage2ContextMatrixAndSemanticConservation(t *testing.T) {
 	}
 }
 
-func requireBuiltinCatalogs(
-	t *testing.T,
-	model *semantic.Model,
-	operations []semantic.Operation,
-) {
-	t.Helper()
-	builtin := semanticPackageByImportPath(t, model, "builtin")
-	if len(builtin.Declarations()) != len(catalog.AllPredeclared()) {
-		t.Fatalf(
-			"predeclared declarations=%d, want %d",
-			len(builtin.Declarations()),
-			len(catalog.AllPredeclared()),
-		)
-	}
-	unsafePackage := semanticPackageByImportPath(t, model, "unsafe")
-	members := map[string]semantic.Declaration{}
-	for _, declaration := range unsafePackage.Declarations() {
-		members[declaration.Name()] = declaration
-	}
-	if len(members) != len(catalog.AllUnsafeMembers()) {
-		t.Fatalf(
-			"unsafe declarations=%d, want %d",
-			len(members),
-			len(catalog.AllUnsafeMembers()),
-		)
-	}
-	for _, member := range catalog.AllUnsafeMembers() {
-		declaration, present := members[member.Name()]
-		if !present {
-			t.Errorf("unsafe member %s is absent", member)
-			continue
-		}
-		switch member.Class() {
-		case catalog.UnsafeMemberClassType:
-			if declaration.Class() != identity.SemanticObjectType ||
-				declaration.Type().IsZero() {
-				t.Errorf("unsafe type member %s has invalid semantics", member)
-			}
-		case catalog.UnsafeMemberClassBuiltin:
-			if declaration.Class() != identity.SemanticObjectBuiltin ||
-				!declaration.Type().IsZero() {
-				t.Errorf(
-					"unsafe builtin member %s has an ordinary type",
-					member,
-				)
-			}
-		}
-	}
-	sizeOf := members[catalog.UnsafeMemberSizeof.Name()]
-	var foundCall bool
-	for _, operation := range operations {
-		spec := operation.Spec()
-		if operation.Kind() != semantic.OperationBuiltinCall ||
-			spec.Object.Kind() !=
-				semantic.ObjectReferenceDeclaration ||
-			spec.Object.Declaration() != sizeOf.ID() {
-			continue
-		}
-		foundCall = true
-		if spec.ResultType.IsZero() ||
-			len(spec.Operands) != 2 {
-			t.Fatalf(
-				"unsafe.Sizeof call-site evidence result=%s operands=%v",
-				spec.ResultType, spec.Operands,
-			)
-		}
-	}
-	if !foundCall {
-		t.Fatal("unsafe.Sizeof call-site semantics are absent")
-	}
-}
-
 func TestStage2SemanticIdentitiesSurviveWorkspaceRelocation(t *testing.T) {
 	first := semanticIdentitySet(inspectStage2Fixture(t))
 	second := semanticIdentitySet(inspectStage2Fixture(t))
@@ -396,7 +419,7 @@ func TestStage2SemanticIdentitiesSurviveWorkspaceRelocation(t *testing.T) {
 func inspectStage2Fixture(t *testing.T) *Inspection {
 	t.Helper()
 	directory := writeStage2Project(t)
-	inspection, err := InspectConstructs(source.Request{
+	inspection, err := inspectConstructsForTest(t, source.Request{
 		Dir: directory, Patterns: []string{"."},
 		ProviderContract: contract.DefaultID,
 	})
@@ -426,7 +449,7 @@ func writeStage2Project(t *testing.T) string {
 		t,
 		directory,
 		"right/right.go",
-		"package right\n\ntype Local interface { hidden() }\n",
+		"package right\n\nconst Value = 1\n\ntype Local interface { hidden() }\n",
 	)
 	return directory
 }
@@ -486,23 +509,23 @@ func semanticIdentitySet(inspection *Inspection) []string {
 	var out []string
 	_ = inspection.Semantic().VisitPackages(
 		func(pkg semantic.Package) error {
-			for _, definition := range pkg.Definitions() {
+			for _, definition := range semanticDefinitions(pkg) {
 				out = append(
 					out, "definition:"+definition.Definition().String(),
 				)
 			}
-			for _, declaration := range pkg.Declarations() {
+			for _, declaration := range semanticDeclarations(pkg) {
 				out = append(
 					out, "declaration:"+declaration.ID().String(),
 				)
 			}
-			for _, binding := range pkg.Bindings() {
+			for _, binding := range semanticBindings(pkg) {
 				out = append(out, "binding:"+binding.ID().String())
 			}
-			for _, record := range pkg.Types() {
+			for _, record := range semanticTypes(pkg) {
 				out = append(out, "type:"+record.ID().String())
 			}
-			for _, operation := range pkg.Operations() {
+			for _, operation := range semanticOperations(pkg) {
 				out = append(out, "operation:"+operation.ID().String())
 			}
 			return nil

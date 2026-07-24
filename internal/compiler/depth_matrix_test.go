@@ -118,7 +118,7 @@ func inspectDepthFixture(
 	request source.Request,
 ) *Inspection {
 	t.Helper()
-	inspection, err := InspectConstructs(request)
+	inspection, err := inspectConstructsForTest(t, request)
 	if err != nil {
 		t.Fatal(err)
 	}

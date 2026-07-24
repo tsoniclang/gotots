@@ -2,6 +2,68 @@ package semantic
 
 import "github.com/tsoniclang/gotots/internal/identity"
 
+type PackageCensus struct {
+	Package            identity.PackageID
+	Definitions        []identity.DefinitionID
+	Declarations       []identity.SemanticDeclarationID
+	MemberTargetCount  int
+	MemberTargetDigest string
+}
+
+func (model *Model) PackageCensus(
+	packageID identity.PackageID,
+) (PackageCensus, bool, error) {
+	if model == nil || packageID.IsZero() {
+		return PackageCensus{}, false, nil
+	}
+	index := searchCanonical(
+		model.projections,
+		func(projection packageProjection) identity.PackageID {
+			return projection.id
+		},
+		packageID,
+	)
+	if index == len(model.projections) ||
+		model.projections[index].id != packageID {
+		return PackageCensus{}, false, nil
+	}
+	projection := model.projections[index]
+	if projection.certified {
+		context, present, err := model.provider.PackageContext(packageID)
+		if err != nil || !present {
+			return PackageCensus{}, present, err
+		}
+		return PackageCensus{
+			Package: packageID,
+			Definitions: append(
+				[]identity.DefinitionID(nil), context.Definitions...,
+			),
+			Declarations: append(
+				[]identity.SemanticDeclarationID(nil),
+				context.Declarations...,
+			),
+			MemberTargetCount:  context.MemberTargetCount,
+			MemberTargetDigest: context.MemberTargetDigest,
+		}, true, nil
+	}
+	context, present, err := model.checker.PackageContext(packageID)
+	if err != nil || !present {
+		return PackageCensus{}, present, err
+	}
+	return PackageCensus{
+		Package: packageID,
+		Definitions: append(
+			[]identity.DefinitionID(nil), context.Definitions...,
+		),
+		Declarations: append(
+			[]identity.SemanticDeclarationID(nil),
+			context.Declarations...,
+		),
+		MemberTargetCount:  context.MemberTargetCount,
+		MemberTargetDigest: context.MemberTargetDigest,
+	}, true, nil
+}
+
 // AuthorityProjection is the immutable identity-only view of one logical
 // semantic package. It exposes selected authority without opening provider
 // detail.
@@ -40,25 +102,6 @@ func (model *Model) AuthorityProjections() []AuthorityProjection {
 	if model == nil {
 		return nil
 	}
-	if len(model.projections) == 0 {
-		out := make([]AuthorityProjection, 0, len(model.packages))
-		for _, pkg := range model.packages {
-			definitions := make(
-				[]identity.DefinitionID, 0, len(pkg.definitions),
-			)
-			for _, definition := range pkg.definitions {
-				definitions = append(
-					definitions, definition.Definition(),
-				)
-			}
-			out = append(out, AuthorityProjection{
-				id: pkg.id, provenance: pkg.provenance,
-				expectedDefinitions: definitions,
-				local:               true,
-			})
-		}
-		return out
-	}
 	out := make(
 		[]AuthorityProjection, 0, len(model.projections),
 	)
@@ -69,7 +112,7 @@ func (model *Model) AuthorityProjections() []AuthorityProjection {
 				[]identity.DefinitionID(nil),
 				projection.expectedDefinitions...,
 			),
-			local:     !projection.local.ID.IsZero(),
+			local:     projection.local,
 			certified: projection.certified,
 		})
 	}

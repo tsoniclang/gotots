@@ -43,7 +43,7 @@ func deriveCheckerDefinitionIntervals(
 	}
 	sortIDs := func(ids []identity.DefinitionID) {
 		sort.Slice(ids, func(left, right int) bool {
-			return ids[left].String() < ids[right].String()
+			return ids[left].Compare(ids[right]) < 0
 		})
 	}
 	sortIDs(roots)

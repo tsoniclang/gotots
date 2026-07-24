@@ -8,44 +8,157 @@ import (
 )
 
 func referencedTypeIDs(record Type) []identity.SemanticTypeID {
-	spec := record.Spec()
 	var references []identity.SemanticTypeID
-	references = appendDeclarationOwnerType(
-		references, spec.Declaration,
-	)
-	references = appendDeclarationOwnerType(
-		references, spec.Parameter.Declaration(),
-	)
-	references = append(references, spec.Arguments...)
-	references = append(
-		references,
+	_ = record.VisitReferences(func(typeID identity.SemanticTypeID) error {
+		references = append(references, typeID)
+		return nil
+	})
+	return references
+}
+
+func (record Type) VisitReferences(
+	visit func(identity.SemanticTypeID) error,
+) error {
+	if visit == nil {
+		return fmt.Errorf("semantic type reference visitor is absent")
+	}
+	emit := func(typeID identity.SemanticTypeID) error {
+		if typeID.IsZero() {
+			return nil
+		}
+		return visit(typeID)
+	}
+	emitDeclarationOwner := func(
+		declaration identity.SemanticDeclarationID,
+	) error {
+		if declaration.Form() !=
+			identity.SemanticDeclarationMember {
+			return nil
+		}
+		return emit(declaration.OwnerType())
+	}
+	spec := record.spec
+	if err := emitDeclarationOwner(spec.Declaration); err != nil {
+		return err
+	}
+	if err := emitDeclarationOwner(
+		spec.Parameter.Declaration(),
+	); err != nil {
+		return err
+	}
+	singles := [...]identity.SemanticTypeID{
 		spec.Underlying,
 		spec.Target,
 		spec.Constraint,
 		spec.Element,
 		spec.Key,
 		spec.Signature.Receiver,
-	)
-	references = append(
-		references, spec.Signature.ReceiverTypeParameters...,
-	)
-	references = append(
-		references, spec.Signature.TypeParameters...,
-	)
-	references = append(references, spec.Signature.Parameters...)
-	references = append(references, spec.Signature.Results...)
+	}
+	for _, typeID := range singles {
+		if err := emit(typeID); err != nil {
+			return err
+		}
+	}
+	lists := [][]identity.SemanticTypeID{
+		spec.Arguments,
+		spec.Signature.ReceiverTypeParameters,
+		spec.Signature.TypeParameters,
+		spec.Signature.Parameters,
+		spec.Signature.Results,
+		spec.Embeddeds,
+		spec.Elements,
+	}
+	for _, values := range lists {
+		for _, typeID := range values {
+			if err := emit(typeID); err != nil {
+				return err
+			}
+		}
+	}
 	for _, field := range spec.Fields {
-		references = append(references, field.Type)
+		if err := emit(field.Type); err != nil {
+			return err
+		}
 	}
 	for _, method := range spec.Methods {
-		references = append(references, method.Signature)
+		if err := emit(method.Signature); err != nil {
+			return err
+		}
 	}
-	references = append(references, spec.Embeddeds...)
 	for _, term := range spec.Terms {
-		references = append(references, term.Type)
+		if err := emit(term.Type); err != nil {
+			return err
+		}
 	}
-	references = append(references, spec.Elements...)
-	return references
+	return nil
+}
+
+func (record Type) VisitDeclarationReferences(
+	visit func(identity.SemanticDeclarationID) error,
+) error {
+	if visit == nil {
+		return fmt.Errorf(
+			"semantic type declaration-reference visitor is absent",
+		)
+	}
+	declarations := [...]identity.SemanticDeclarationID{
+		record.spec.Declaration,
+		record.spec.Parameter.Declaration(),
+	}
+	for _, declaration := range declarations {
+		if declaration.IsZero() {
+			continue
+		}
+		if err := visit(declaration); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func appendResolutionDeclarationRoots(
+	roots []identity.SemanticDeclarationID,
+	record OccurrenceResolution,
+) []identity.SemanticDeclarationID {
+	switch record.Kind() {
+	case ResolutionStructuralOnly:
+		declaration := record.Structural().Declaration()
+		if !declaration.IsZero() {
+			roots = append(roots, declaration)
+		}
+	case ResolutionDeclaration:
+		roots = append(roots, record.Declaration())
+	}
+	return roots
+}
+
+func appendOperationDeclarationRoots(
+	roots []identity.SemanticDeclarationID,
+	record Operation,
+) []identity.SemanticDeclarationID {
+	spec := record.spec
+	roots = appendObjectDeclarationRoot(roots, spec.Object)
+	if !spec.Selection.IsZero() {
+		roots = append(
+			roots, spec.Selection.Object(),
+		)
+	}
+	if !spec.Instance.IsZero() {
+		roots = appendObjectDeclarationRoot(
+			roots, spec.Instance.Target(),
+		)
+	}
+	return roots
+}
+
+func appendObjectDeclarationRoot(
+	roots []identity.SemanticDeclarationID,
+	object ObjectReference,
+) []identity.SemanticDeclarationID {
+	if object.Kind() == ObjectReferenceDeclaration {
+		roots = append(roots, object.Declaration())
+	}
+	return roots
 }
 
 func packageInputTypeRoots(
@@ -53,7 +166,7 @@ func packageInputTypeRoots(
 ) []identity.SemanticTypeID {
 	var roots []identity.SemanticTypeID
 	for _, record := range input.Definitions {
-		spec := record.Spec()
+		spec := record.spec
 		roots = append(roots, spec.Signature)
 		for _, declaration := range spec.Declarations {
 			roots = appendDeclarationOwnerType(
@@ -62,18 +175,7 @@ func packageInputTypeRoots(
 		}
 	}
 	for _, record := range input.Resolutions {
-		roots = append(roots, record.Type())
-		switch record.Kind() {
-		case ResolutionStructuralOnly:
-			roots = append(roots, record.Structural().Type())
-			roots = appendDeclarationOwnerType(
-				roots, record.Structural().Declaration(),
-			)
-		case ResolutionDeclaration:
-			roots = appendDeclarationOwnerType(
-				roots, record.Declaration(),
-			)
-		}
+		roots = appendResolutionTypeRoots(roots, record)
 	}
 	for _, record := range input.Declarations {
 		roots = append(roots, record.Type())
@@ -83,27 +185,54 @@ func packageInputTypeRoots(
 		roots = append(roots, record.Type())
 	}
 	for _, record := range input.Operations {
-		spec := record.Spec()
-		roots = append(
-			roots,
-			spec.ResultType,
-			spec.ExpectedType,
-			spec.Selection.Receiver(),
-			spec.Instance.Signature(),
-		)
-		roots = appendObjectOwnerType(roots, spec.Object)
+		roots = appendOperationTypeRoots(roots, record)
+	}
+	return roots
+}
+
+func appendResolutionTypeRoots(
+	roots []identity.SemanticTypeID,
+	record OccurrenceResolution,
+) []identity.SemanticTypeID {
+	roots = append(roots, record.Type())
+	switch record.Kind() {
+	case ResolutionStructuralOnly:
+		roots = append(roots, record.Structural().Type())
 		roots = appendDeclarationOwnerType(
-			roots, spec.Selection.Object(),
+			roots, record.Structural().Declaration(),
 		)
-		roots = appendObjectOwnerType(
-			roots, spec.Instance.Target(),
+	case ResolutionDeclaration:
+		roots = appendDeclarationOwnerType(
+			roots, record.Declaration(),
 		)
-		roots = append(roots, spec.Instance.Types()...)
-		for _, implicit := range spec.Implicit {
-			roots = append(
-				roots, implicit.Source(), implicit.Target(),
-			)
-		}
+	}
+	return roots
+}
+
+func appendOperationTypeRoots(
+	roots []identity.SemanticTypeID,
+	record Operation,
+) []identity.SemanticTypeID {
+	spec := record.spec
+	roots = append(
+		roots,
+		spec.ResultType,
+		spec.ExpectedType,
+		spec.Selection.Receiver(),
+		spec.Instance.Signature(),
+	)
+	roots = appendObjectOwnerType(roots, spec.Object)
+	roots = appendDeclarationOwnerType(
+		roots, spec.Selection.Object(),
+	)
+	roots = appendObjectOwnerType(
+		roots, spec.Instance.Target(),
+	)
+	roots = append(roots, spec.Instance.types...)
+	for _, implicit := range spec.Implicit {
+		roots = append(
+			roots, implicit.Source(), implicit.Target(),
+		)
 	}
 	return roots
 }
@@ -134,6 +263,15 @@ func appendDeclarationOwnerType(
 func FinalizePackageTypePool(
 	input PackageInput,
 ) (PackageInput, error) {
+	return finalizePackageTypePool(
+		input, packageInputTypeRoots(input),
+	)
+}
+
+func finalizePackageTypePool(
+	input PackageInput,
+	roots []identity.SemanticTypeID,
+) (PackageInput, error) {
 	records := map[identity.SemanticTypeID]Type{}
 	for _, record := range input.Types {
 		if existing, duplicate := records[record.ID()]; duplicate {
@@ -160,7 +298,9 @@ func FinalizePackageTypePool(
 		witnesses[witness.Type()] = witness
 	}
 	selected := map[identity.SemanticTypeID]bool{}
-	queue := packageInputTypeRoots(input)
+	queue := append(
+		[]identity.SemanticTypeID(nil), roots...,
+	)
 	for len(queue) != 0 {
 		typeID := queue[len(queue)-1]
 		queue = queue[:len(queue)-1]
@@ -184,7 +324,7 @@ func FinalizePackageTypePool(
 		typeIDs = append(typeIDs, typeID)
 	}
 	sort.Slice(typeIDs, func(left, right int) bool {
-		return typeIDs[left].String() < typeIDs[right].String()
+		return typeIDs[left].Compare(typeIDs[right]) < 0
 	})
 	input.Types = make([]Type, 0, len(typeIDs))
 	input.TypeWitnesses = make([]TypeWitness, 0, len(typeIDs))

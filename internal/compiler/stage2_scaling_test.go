@@ -62,7 +62,7 @@ func inspectStage2Scaling(
 		"module example.com/scaling\n\ngo 1.26.0\n",
 	)
 	writeCompilerFile(t, directory, "scaling.go", sourceText)
-	inspection, err := InspectConstructs(source.Request{
+	inspection, err := inspectConstructsForTest(t, source.Request{
 		Dir: directory, Patterns: []string{"."},
 		ProviderContract: contract.DefaultID,
 	})

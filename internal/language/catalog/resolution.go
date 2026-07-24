@@ -213,6 +213,18 @@ func AllowsCompileTimeStructural(kind Kind) bool {
 	return kind.Valid() && compileTimeStructuralByKind[kind]
 }
 
+func AllowsCompileTimeStructuralResolution(
+	kind Kind,
+	role Role,
+	domain ResolutionDomain,
+) bool {
+	return kind.Disposition() == DispositionActive &&
+		(role == RoleInvalid || role.Valid()) &&
+		domain.Valid() &&
+		domain != ResolutionDomainBoundary &&
+		AllowsCompileTimeStructural(kind)
+}
+
 func AllowsIntrinsicContract(
 	kind Kind,
 	role Role,
@@ -278,6 +290,7 @@ func AllowsResolution(
 	}
 	if class == ResolutionClassOperation {
 		return domain == ResolutionDomainExecutable &&
+			RoleMayOwnRuntimeOperation(role) &&
 			resolutionMaskFor(kind, role).has(class)
 	}
 	if class == ResolutionClassUnsupported &&
@@ -292,6 +305,11 @@ func AllowsResolution(
 		return true
 	}
 	mask := resolutionMaskFor(kind, role)
+	if class == ResolutionClassStructural &&
+		domain == ResolutionDomainExecutable &&
+		!RoleMayOwnRuntimeOperation(role) {
+		return mask.has(class)
+	}
 	if kind == KindIdent &&
 		domain != ResolutionDomainExecutable &&
 		mask.has(ResolutionClassOperation) {
@@ -345,6 +363,11 @@ func identifierResolution(role Role) resolutionMask {
 			ResolutionClassBinding,
 			ResolutionClassStructural,
 		)
+	case RoleAssignmentTarget:
+		return resolutionClasses(
+			ResolutionClassOperation,
+			ResolutionClassStructural,
+		)
 	case
 		RoleRangeKey,
 		RoleRangeValue:
@@ -362,10 +385,12 @@ func identifierResolution(role Role) resolutionMask {
 			ResolutionClassType,
 			ResolutionClassOperation,
 		)
-	case RoleOperand,
+	case RoleCallArgument,
+		RoleOperand,
 		RoleLeftOperand,
 		RoleRightOperand,
-		RoleIndexedOperand:
+		RoleIndexedOperand,
+		RoleCaseValue:
 		return resolutionClasses(
 			ResolutionClassType,
 			ResolutionClassOperation,

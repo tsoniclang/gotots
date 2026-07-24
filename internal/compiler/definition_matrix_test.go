@@ -40,7 +40,7 @@ TEXT ·Assembly(SB), NOSPLIT, $0-48
 	MOVQ $0, err+40(FP)
 	RET
 `)
-	inspection, err := InspectConstructs(source.Request{
+	inspection, err := inspectConstructsForTest(t, source.Request{
 		Dir: directory, Patterns: []string{"."},
 		ProviderContract: contract.DefaultID,
 	})
@@ -165,7 +165,7 @@ TEXT ·Assembly(SB), NOSPLIT, $0-16
 	MOVQ AX, ret+8(FP)
 	RET
 `)
-	base, err := InspectConstructs(source.Request{
+	base, err := inspectConstructsForTest(t, source.Request{
 		Dir: directory, Patterns: []string{"."},
 		ProviderContract: contract.DefaultID,
 	})
@@ -185,7 +185,7 @@ TEXT ·Assembly(SB), NOSPLIT, $0-16
 		"invalid-bodyless-full@v1",
 		definitions[0],
 	)
-	if _, err := InspectConstructs(source.Request{
+	if _, err := inspectConstructsForTest(t, source.Request{
 		Dir: directory, Patterns: []string{"."},
 		ProviderContract:         "invalid-bodyless-full@v1",
 		ProviderContractArtifact: contractPath,
@@ -213,7 +213,7 @@ func inspectContentVariant(
 		"target.go",
 		"package content\n\nfunc Target("+parameter+" int) int {\n\treturn "+result+"\n}\n",
 	)
-	inspection, err := InspectConstructs(source.Request{
+	inspection, err := inspectConstructsForTest(t, source.Request{
 		Dir: directory, Patterns: []string{"."},
 		ProviderContract: contract.DefaultID,
 	})

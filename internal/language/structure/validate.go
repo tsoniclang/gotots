@@ -193,7 +193,11 @@ func validateFileGraph(
 		}
 	}
 	memberSet := map[identity.OccurrenceID]bool{}
-	primaryOwner := map[identity.OccurrenceID]string{}
+	type primaryOccurrenceOwner struct {
+		source bool
+		header identity.HeaderRegionID
+	}
+	primaryOwner := map[identity.OccurrenceID]primaryOccurrenceOwner{}
 	referenced := map[identity.OccurrenceID]bool{}
 	rootCount := 0
 	for _, id := range file.owner.members {
@@ -201,7 +205,7 @@ func validateFileGraph(
 			return fmt.Errorf("owner repeats member %s", id)
 		}
 		memberSet[id] = true
-		primaryOwner[id] = "source owner"
+		primaryOwner[id] = primaryOccurrenceOwner{source: true}
 		referenced[id] = true
 		occurrence, present := all[id]
 		if !present {
@@ -240,17 +244,24 @@ func validateFileGraph(
 	}
 	for _, header := range file.headers {
 		for index, member := range header.members {
-			if owner := primaryOwner[member]; owner != "" {
+			if owner := primaryOwner[member]; owner.source ||
+				!owner.header.IsZero() {
+				ownerName := "source owner"
+				if !owner.header.IsZero() {
+					ownerName = owner.header.String()
+				}
 				return fmt.Errorf(
 					"occurrence %s is owned by both %s and header %s",
-					member, owner, header.id,
+					member, ownerName, header.id,
 				)
 			}
-			primaryOwner[member] = header.id.String()
+			primaryOwner[member] = primaryOccurrenceOwner{
+				header: header.id,
+			}
 			referenced[member] = true
 			if index > 0 {
 				occurrence := all[member]
-				if primaryOwner[occurrence.parent] != header.id.String() {
+				if primaryOwner[occurrence.parent].header != header.id {
 					return fmt.Errorf(
 						"header %s omits or reorders parent %s of %s",
 						header.id, occurrence.parent, member,

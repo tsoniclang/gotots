@@ -8,79 +8,43 @@ import (
 )
 
 type semanticOwnerCensus struct {
-	definitions  map[identity.DefinitionID]identity.PackageID
-	declarations map[identity.SemanticDeclarationID]identity.PackageID
+	definitions   map[identity.DefinitionID]identity.PackageID
+	declarations  map[identity.SemanticDeclarationID]identity.PackageID
+	memberCounts  map[identity.PackageID]int
+	memberDigests map[identity.PackageID]string
 }
 
 func censusSemanticOwners(
 	model *semantic.Model,
-	provider *semantic.ProviderArtifact,
 	packageIDs []identity.PackageID,
 ) (*semanticOwnerCensus, error) {
 	owners := &semanticOwnerCensus{
-		definitions:  map[identity.DefinitionID]identity.PackageID{},
-		declarations: map[identity.SemanticDeclarationID]identity.PackageID{},
+		definitions:   map[identity.DefinitionID]identity.PackageID{},
+		declarations:  map[identity.SemanticDeclarationID]identity.PackageID{},
+		memberCounts:  map[identity.PackageID]int{},
+		memberDigests: map[identity.PackageID]string{},
 	}
 	for _, packageID := range packageIDs {
-		if provider != nil {
-			context, present, err := provider.PackageContext(packageID)
-			if err != nil {
-				return nil, err
-			}
-			if present {
-				if context.Package != packageID ||
-					context.DefinitionCount != len(context.Definitions) ||
-					context.DeclarationCount != len(context.Declarations) {
-					return nil, fmt.Errorf(
-						"provider census disagrees with package %s",
-						packageID,
-					)
-				}
-				if err := owners.add(
-					packageID,
-					context.Definitions,
-					context.Declarations,
-				); err != nil {
-					return nil, err
-				}
-				continue
-			}
-		}
-		err := model.VisitPackage(
-			packageID,
-			func(pkg semantic.Package) error {
-				return owners.addPackage(pkg)
-			},
-		)
+		census, present, err := model.PackageCensus(packageID)
 		if err != nil {
 			return nil, err
 		}
+		if !present || census.Package != packageID {
+			return nil, fmt.Errorf(
+				"semantic census omits package %s", packageID,
+			)
+		}
+		if err := owners.add(
+			packageID,
+			census.Definitions,
+			census.Declarations,
+		); err != nil {
+			return nil, err
+		}
+		owners.memberCounts[packageID] = census.MemberTargetCount
+		owners.memberDigests[packageID] = census.MemberTargetDigest
 	}
 	return owners, nil
-}
-
-func (owners *semanticOwnerCensus) addPackage(
-	pkg semantic.Package,
-) error {
-	definitions := pkg.Definitions()
-	declarations := pkg.Declarations()
-	definitionIDs := make(
-		[]identity.DefinitionID, 0, len(definitions),
-	)
-	declarationIDs := make(
-		[]identity.SemanticDeclarationID, 0, len(declarations),
-	)
-	for _, record := range definitions {
-		definitionIDs = append(
-			definitionIDs, record.Definition(),
-		)
-	}
-	for _, record := range declarations {
-		declarationIDs = append(
-			declarationIDs, record.ID(),
-		)
-	}
-	return owners.add(pkg.ID(), definitionIDs, declarationIDs)
 }
 
 func (owners *semanticOwnerCensus) add(

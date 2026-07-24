@@ -71,11 +71,12 @@ const (
 	StructuralDefinitionReference
 	StructuralCompileTimeExpression
 	StructuralIntrinsicContract
+	StructuralTypeSwitchBindingAnchor
 )
 
 func (kind StructuralDisposition) Valid() bool {
 	return kind >= StructuralDocumentation &&
-		kind <= StructuralIntrinsicContract
+		kind <= StructuralTypeSwitchBindingAnchor
 }
 
 type DefinitionComponentKind uint8

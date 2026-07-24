@@ -30,29 +30,25 @@ func VerifyProviderManifest(
 		return err
 	}
 	problems := newProblemSet()
-	joinStringSets(
+	joinIdentitySets(
 		"provider file", artifact.FileIDs(), files, problems,
 	)
-	joinStringSets(
+	joinIdentitySets(
 		"provider synthetic package",
 		artifact.PackageIDs(),
 		synthetic,
 		problems,
 	)
-	joinStringSets(
+	joinIdentitySets(
 		"provider package context",
 		artifact.ContextPackageIDs(),
 		contexts,
 		problems,
 	)
-	for packageText := range contexts {
-		packageID, err := identity.ParsePackageID(packageText)
-		if err != nil {
-			return err
-		}
+	for packageID := range contexts {
 		if _, present := artifact.PackageCensus(packageID); !present {
 			problems.add(
-				"provider package census missing " + packageText,
+				"provider package census missing " + packageID.String(),
 			)
 		}
 		actual, present := artifact.PackageInputDigest(packageID)
@@ -63,7 +59,7 @@ func VerifyProviderManifest(
 			packages[packageID],
 		) {
 			problems.add(
-				"provider package input mismatch " + packageText,
+				"provider package input mismatch " + packageID.String(),
 			)
 		}
 	}
@@ -97,27 +93,27 @@ func VerifyProducedProviderPackageArtifact(
 		return err
 	}
 	problems := newProblemSet()
-	joinStringSets(
+	joinIdentitySets(
 		"provider file",
 		artifact.PackageFileIDs(packageID),
 		files,
 		problems,
 	)
-	actualSynthetic := map[string]bool{}
+	actualSynthetic := map[identity.PackageID]bool{}
 	if artifact.HasSyntheticPackage(packageID) {
-		actualSynthetic[packageID.String()] = true
+		actualSynthetic[packageID] = true
 	}
-	joinStringSets(
+	joinIdentitySets(
 		"provider synthetic package",
 		actualSynthetic,
 		synthetic,
 		problems,
 	)
-	actualContext := map[string]bool{}
+	actualContext := map[identity.PackageID]bool{}
 	if _, present := artifact.PackageInputDigest(packageID); present {
-		actualContext[packageID.String()] = true
+		actualContext[packageID] = true
 	}
-	joinStringSets(
+	joinIdentitySets(
 		"provider package context",
 		actualContext,
 		contexts,
@@ -158,7 +154,7 @@ func VerifyProducedProviderPackageArtifact(
 		} else if err := compareProviderPackageCensus(
 			graphPackage,
 			files,
-			synthetic[packageID.String()],
+			synthetic[packageID],
 			census,
 		); err != nil {
 			problems.add(err.Error())
@@ -167,11 +163,7 @@ func VerifyProducedProviderPackageArtifact(
 		for _, file := range graphPackage.Files() {
 			localFiles[file.Owner().ID().File()] = file
 		}
-		for fileText := range files {
-			fileID, parseErr := identity.ParseFileID(fileText)
-			if parseErr != nil {
-				return parseErr
-			}
+		for fileID := range files {
 			stored, _, found, loadErr := artifact.FileGraph(fileID)
 			if loadErr != nil {
 				return loadErr
@@ -187,7 +179,7 @@ func VerifyProducedProviderPackageArtifact(
 				problems.add(err.Error())
 			}
 		}
-		if synthetic[packageID.String()] {
+		if synthetic[packageID] {
 			stored, found, loadErr :=
 				artifact.SyntheticPackageGraph(packageID)
 			if loadErr != nil {
@@ -204,19 +196,19 @@ func VerifyProducedProviderPackageArtifact(
 			}
 		}
 	}
-	expectedFacts := map[string]int{}
+	expectedFacts := recordMultiset[certifiedFactLedgerRecord]{}
 	for _, fact := range facts.CertifiedFacts() {
 		definition := fact.Definition()
-		if files[definition.File().String()] ||
+		if files[definition.File()] ||
 			(definition.SyntheticRole().Valid() &&
-				synthetic[packageID.String()]) {
-			expectedFacts[certifiedFactKey(fact)]++
+				synthetic[packageID]) {
+			expectedFacts[certifiedFactLedgerRecordFromFact(fact)]++
 		}
 	}
-	actualFacts := map[string]int{}
+	actualFacts := recordMultiset[certifiedFactLedgerRecord]{}
 	storedFacts := artifact.CertifiedFactsForPackage(packageID)
 	for _, fact := range storedFacts {
-		actualFacts[certifiedFactKey(fact)]++
+		actualFacts[certifiedFactLedgerRecordFromFact(fact)]++
 	}
 	joinProviderFactCounts(expectedFacts, actualFacts, problems)
 	if !problems.empty() {
@@ -229,7 +221,7 @@ func VerifyProducedProviderPackageArtifact(
 
 func compareProviderPackageCensus(
 	pkg structure.PackageGraph,
-	files map[string]bool,
+	files map[identity.FileID]bool,
 	includeSynthetic bool,
 	actual structure.ProviderPackageCensus,
 ) error {
@@ -237,13 +229,15 @@ func compareProviderPackageCensus(
 	headerOccurrences := 0
 	boundaryEntries := 0
 	for _, file := range pkg.Files() {
-		if !files[file.Owner().ID().File().String()] {
+		if !files[file.Owner().ID().File()] {
 			continue
 		}
 		for _, definition := range file.Definitions() {
-			expectedDefinitions.add(
-				"provider-definition-census",
-				providerCensusIdentity(pkg.ID(), definition.ID()),
+			addRecord(
+				&expectedDefinitions.providerDefinitionCensus,
+				definitionCensusLedgerRecord{
+					pkg: pkg.ID(), definition: definition.ID(),
+				},
 			)
 		}
 		for _, header := range file.Headers() {
@@ -256,12 +250,11 @@ func compareProviderPackageCensus(
 	if includeSynthetic {
 		for _, definition := range pkg.Definitions() {
 			if definition.ID().SyntheticRole().Valid() {
-				expectedDefinitions.add(
-					"provider-definition-census",
-					providerCensusIdentity(
-						pkg.ID(),
-						definition.ID(),
-					),
+				addRecord(
+					&expectedDefinitions.providerDefinitionCensus,
+					definitionCensusLedgerRecord{
+						pkg: pkg.ID(), definition: definition.ID(),
+					},
 				)
 			}
 		}
@@ -278,9 +271,11 @@ func compareProviderPackageCensus(
 	}
 	actualDefinitions := newStructuralLedger()
 	for _, definition := range actual.Definitions() {
-		actualDefinitions.add(
-			"provider-definition-census",
-			providerCensusIdentity(actual.Package(), definition),
+		addRecord(
+			&actualDefinitions.providerDefinitionCensus,
+			definitionCensusLedgerRecord{
+				pkg: actual.Package(), definition: definition,
+			},
 		)
 	}
 	if err := compareLedgers(
@@ -309,21 +304,14 @@ func compareProviderPackageCensus(
 	return nil
 }
 
-func providerCensusIdentity(
-	pkg identity.PackageID,
-	definition identity.DefinitionID,
-) string {
-	return pkg.String() + "|" + definition.String()
-}
-
 func expectedProviderSets(
 	universe *source.Universe,
 	plan *sourceplan.Plan,
 	only identity.PackageID,
 ) (
-	map[string]bool,
-	map[string]bool,
-	map[string]bool,
+	map[identity.FileID]bool,
+	map[identity.PackageID]bool,
+	map[identity.PackageID]bool,
 	map[identity.PackageID]*source.LoadedPackage,
 	error,
 ) {
@@ -341,9 +329,9 @@ func expectedProviderSets(
 			filePackages[file.ID()] = pkg.ID()
 		}
 	}
-	files := map[string]bool{}
-	synthetic := map[string]bool{}
-	contexts := map[string]bool{}
+	files := map[identity.FileID]bool{}
+	synthetic := map[identity.PackageID]bool{}
+	contexts := map[identity.PackageID]bool{}
 	for _, decision := range plan.Files() {
 		if decision.Kind() != sourceplan.KindCertifiedGraph {
 			continue
@@ -358,18 +346,18 @@ func expectedProviderSets(
 		if !only.IsZero() && packageID != only {
 			continue
 		}
-		files[decision.ID().String()] = true
-		contexts[packageID.String()] = true
+		files[decision.ID()] = true
+		contexts[packageID] = true
 	}
 	for _, decision := range plan.SyntheticOwners() {
 		if decision.Kind() != sourceplan.KindCertifiedGraph ||
 			(!only.IsZero() && decision.Package() != only) {
 			continue
 		}
-		synthetic[decision.Package().String()] = true
-		contexts[decision.Package().String()] = true
+		synthetic[decision.Package()] = true
+		contexts[decision.Package()] = true
 	}
-	if !only.IsZero() && !contexts[only.String()] {
+	if !only.IsZero() && !contexts[only] {
 		return nil, nil, nil, nil, providerManifestError(
 			"package has no certified provider records " + only.String(),
 		)
@@ -378,15 +366,17 @@ func expectedProviderSets(
 }
 
 func joinProviderFactCounts(
-	expected map[string]int,
-	actual map[string]int,
+	expected recordMultiset[certifiedFactLedgerRecord],
+	actual recordMultiset[certifiedFactLedgerRecord],
 	problems *problemSet,
 ) {
 	for record, count := range expected {
 		if actual[record] != count {
 			problems.addf(
 				"provider fact expected %s x%d, actual x%d",
-				record, count, actual[record],
+				renderCertifiedFactLedgerRecord(record),
+				count,
+				actual[record],
 			)
 		}
 	}
@@ -394,7 +384,9 @@ func joinProviderFactCounts(
 		if expected[record] != count {
 			problems.addf(
 				"provider fact actual %s x%d, expected x%d",
-				record, count, expected[record],
+				renderCertifiedFactLedgerRecord(record),
+				count,
+				expected[record],
 			)
 		}
 	}

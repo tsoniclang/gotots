@@ -10,16 +10,20 @@ func compareDefinitionCensus(
 ) error {
 	actual := newStructuralLedger()
 	for _, record := range records {
-		actual.add(
-			"definition-census",
-			record.Package().String()+"|"+record.ID().String(),
+		addRecord(
+			&actual.definitionCensus,
+			definitionCensusLedgerRecord{
+				pkg: record.Package(), definition: record.ID(),
+			},
 		)
 	}
 	expected := newStructuralLedger()
 	for _, definition := range pkg.Definitions() {
-		expected.add(
-			"definition-census",
-			pkg.ID().String()+"|"+definition.ID().String(),
+		addRecord(
+			&expected.definitionCensus,
+			definitionCensusLedgerRecord{
+				pkg: pkg.ID(), definition: definition.ID(),
+			},
 		)
 	}
 	return compareLedgers(

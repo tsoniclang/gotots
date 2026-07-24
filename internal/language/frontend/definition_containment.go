@@ -116,8 +116,7 @@ func buildDefinitionContainment(
 
 func sortDefinitionIDs(definitions []identity.DefinitionID) {
 	sort.Slice(definitions, func(left, right int) bool {
-		return definitions[left].String() <
-			definitions[right].String()
+		return definitions[left].Compare(definitions[right]) < 0
 	})
 }
 

@@ -140,12 +140,12 @@ func ResolveUniverse(req Request) (*Universe, error) {
 		}
 	}
 	sort.Slice(universe.packages, func(i, j int) bool {
-		return universe.packages[i].id.String() <
-			universe.packages[j].id.String()
+		return universe.packages[i].id.Compare(
+			universe.packages[j].id,
+		) < 0
 	})
 	sort.Slice(universe.roots, func(i, j int) bool {
-		return universe.roots[i].id.String() <
-			universe.roots[j].id.String()
+		return universe.roots[i].id.Compare(universe.roots[j].id) < 0
 	})
 	return universe, nil
 }
@@ -385,8 +385,7 @@ func (c *classifier) attachMetadata(
 		}
 	}
 	sort.Slice(out.inputs, func(i, j int) bool {
-		return out.inputs[i].id.String() <
-			out.inputs[j].id.String()
+		return out.inputs[i].id.Compare(out.inputs[j].id) < 0
 	})
 	for index := 1; index < len(out.inputs); index++ {
 		if out.inputs[index-1].id == out.inputs[index].id {

@@ -14,7 +14,7 @@ func independentExpectedType(
 	index *structure.TransientIndex,
 	occurrence structure.Occurrence,
 ) types.Type {
-	parent := expected.occurrences[occurrence.Parent()]
+	parent := expected.occurrence(occurrence.Parent())
 	parentNode, present := index.OccurrenceNode(parent.ID())
 	if !present {
 		return nil
@@ -52,7 +52,7 @@ func independentExpectedType(
 			return nil
 		}
 		signature := independentDefinitionSignature(
-			expected, index, occurrence,
+			expected, index, parent.Occurrence,
 		)
 		if signature == nil ||
 			(len(node.Results) == 1 && signature.Results().Len() > 1) {
@@ -75,7 +75,7 @@ func independentExpectedType(
 		)
 	case *ast.KeyValueExpr:
 		return independentKeyedExpectedType(
-			expected, index, view, parent, node, role,
+			expected, index, view, parent.Occurrence, node, role,
 		)
 	case *ast.SendStmt:
 		if role == catalog.RoleSentValue {
@@ -146,7 +146,7 @@ func independentKeyedExpectedType(
 	node *ast.KeyValueExpr,
 	role catalog.Role,
 ) types.Type {
-	literalOccurrence := expected.occurrences[parent.Parent()]
+	literalOccurrence := expected.occurrence(parent.Parent())
 	literalNode, present := index.OccurrenceNode(literalOccurrence.ID())
 	if !present {
 		return nil

@@ -15,13 +15,17 @@ func printSemanticWork(
 ) error {
 	_, err := fmt.Fprintf(
 		output,
-		"semantic-%s-work: packages=%d inputOccurrences=%d childEdges=%d contexts=%d objectVisits=%d implicitBindingVisits=%d intrinsicVisits=%d captureVisits=%d resolutionVisits=%d containmentVisits=%d containmentEdges=%d memberTypeVisits=%d containmentProbes=%d occurrenceScopeProbes=%d checkerScopeProbes=%d typeConstructions=%d objectConstructions=%d operationConstructions=%d resolutions=%d containmentEntries=%d canonicalSortInputs=%d linearOperations=%d\n",
+		"semantic-%s-work: packages=%d inputOccurrences=%d childEdges=%d contexts=%d objectVisits=%d checkerDefinitionVisits=%d checkerImplicitVisits=%d checkerSignatureBindingVisits=%d checkerScopeEvidenceVisits=%d implicitBindingVisits=%d intrinsicVisits=%d captureVisits=%d resolutionVisits=%d containmentVisits=%d containmentEdges=%d memberTypeVisits=%d containmentProbes=%d occurrenceScopeProbes=%d checkerScopeProbes=%d typeConstructions=%d objectConstructions=%d operationConstructions=%d resolutions=%d containmentEntries=%d canonicalSortInputs=%d linearOperations=%d\n",
 		category,
 		work.Packages,
 		work.InputOccurrences,
 		work.ChildEdgeAssignments,
 		work.ContextAssignments,
 		work.ObjectOccurrenceVisits,
+		work.CheckerDefinitionVisits,
+		work.CheckerImplicitEvidenceVisits,
+		work.CheckerSignatureBindingVisits,
+		work.CheckerScopeEvidenceVisits,
 		work.ImplicitBindingVisits,
 		work.IntrinsicOccurrenceVisits,
 		work.CaptureOccurrenceVisits,
@@ -50,12 +54,13 @@ func printSemanticMetrics(
 ) error {
 	if _, err := fmt.Fprintf(
 		output,
-		"semantic-%s: packages=%d definitions=%d resolutions=%d declarations=%d bindings=%d types=%d operations=%d unsupported=%d encodedBytes=%d\n",
+		"semantic-%s: packages=%d definitions=%d resolutions=%d declarations=%d memberTargets=%d bindings=%d types=%d operations=%d unsupported=%d encodedBytes=%d\n",
 		category,
 		metrics.Packages(),
 		metrics.Definitions(),
 		metrics.Resolutions(),
 		metrics.Declarations(),
+		metrics.MemberTargets(),
 		metrics.Bindings(),
 		metrics.Types(),
 		metrics.Operations(),

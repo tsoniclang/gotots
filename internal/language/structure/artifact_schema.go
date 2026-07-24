@@ -115,6 +115,23 @@ type certifiedFactID struct {
 	kind       contract.SelectionFactKind
 }
 
+func compareCertifiedFactID(
+	left certifiedFactID,
+	right certifiedFactID,
+) int {
+	if order := left.definition.Compare(right.definition); order != 0 {
+		return order
+	}
+	switch {
+	case left.kind < right.kind:
+		return -1
+	case left.kind > right.kind:
+		return 1
+	default:
+		return 0
+	}
+}
+
 // providerContextRecord is the first record of each canonical package shard.
 // File/package/fact records follow in canonical order so encoding and admission
 // are bounded to one record at a time.

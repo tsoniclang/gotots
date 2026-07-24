@@ -158,6 +158,94 @@ func TestStage2MutationMatrixRejectsSemanticCorruption(t *testing.T) {
 		)
 	})
 
+	t.Run("explicit-implicit-binding-order", func(t *testing.T) {
+		harness.requireRejected(
+			t, application, nil,
+			func(input *semantic.PackageInput) ([]string, error) {
+				for index, binding := range input.Bindings {
+					if binding.Name() != "other" ||
+						binding.Role() != identity.SemanticBindingImport {
+						continue
+					}
+					if binding.ID().Ordinal() == 0 {
+						t.Fatal("explicit import does not follow the implicit import")
+					}
+					id, err := identity.NewSemanticBindingID(
+						binding.ID().Owner(),
+						binding.ID().Declaration(),
+						binding.Role(),
+						0,
+					)
+					if err != nil {
+						return rejectAt(binding.ID(), err)
+					}
+					mutated, err := semantic.NewBinding(
+						id,
+						binding.Package(),
+						binding.Definition(),
+						binding.Role(),
+						binding.Name(),
+						binding.Type(),
+						binding.Source(),
+						binding.CapturedBy(),
+						binding.Authority(),
+					)
+					if err != nil {
+						return rejectAt(binding.ID(), err)
+					}
+					input.Bindings[index] = mutated
+					for resolutionIndex, resolution := range input.Resolutions {
+						if resolution.Kind() !=
+							semantic.ResolutionBinding ||
+							resolution.Binding() != binding.ID() {
+							continue
+						}
+						spec := resolutionSpec(resolution)
+						spec.Binding = mutated.ID()
+						replacement, err :=
+							semantic.NewOccurrenceResolution(spec)
+						if err != nil {
+							return rejectAt(
+								resolution.Occurrence(),
+								err,
+							)
+						}
+						input.Resolutions[resolutionIndex] =
+							replacement
+					}
+					for operationIndex, operation := range input.Operations {
+						spec := operation.Spec()
+						if spec.Object.Kind() !=
+							semantic.ObjectReferenceBinding ||
+							spec.Object.Binding() != binding.ID() {
+							continue
+						}
+						reference, err := semantic.BindingReference(
+							mutated.ID(),
+						)
+						if err != nil {
+							return rejectAt(operation.ID(), err)
+						}
+						spec.Object = reference
+						replacement, err :=
+							semantic.NewOperation(spec)
+						if err != nil {
+							return rejectAt(operation.ID(), err)
+						}
+						input.Operations[operationIndex] =
+							replacement
+					}
+					return []string{
+						binding.ID().String(),
+						mutated.ID().String(),
+					}, nil
+				}
+				t.Fatal("explicit import binding other is absent")
+				return nil, nil
+			},
+		)
+	})
+
 	t.Run("universal-versus-empty-type-set", func(t *testing.T) {
 		harness.requireRejected(
 			t, application, nil,
@@ -186,6 +274,40 @@ func TestStage2MutationMatrixRejectsSemanticCorruption(t *testing.T) {
 				}
 				input.Types[emptyIndex] = mutated
 				return expectIdentity(empty.ID())
+			},
+		)
+	})
+
+	t.Run("inferred-array-ellipsis-type", func(t *testing.T) {
+		harness.requireRejected(
+			t, application, nil,
+			func(input *semantic.PackageInput) ([]string, error) {
+				number := namedTypeByDeclaration(
+					t,
+					*input,
+					declarationNamed(t, *input, "Number").ID(),
+				)
+				for index, resolution := range input.Resolutions {
+					if resolution.Syntax() != catalog.KindEllipsis ||
+						resolution.Role() != catalog.RoleArrayLength ||
+						resolution.Kind() != semantic.ResolutionType {
+						continue
+					}
+					spec := resolutionSpec(resolution)
+					spec.Type = number.ID()
+					mutated, err :=
+						semantic.NewOccurrenceResolution(spec)
+					if err != nil {
+						return rejectAt(
+							resolution.Occurrence(),
+							err,
+						)
+					}
+					input.Resolutions[index] = mutated
+					return expectIdentity(resolution.Occurrence())
+				}
+				t.Fatal("inferred array ellipsis resolution is absent")
+				return nil, nil
 			},
 		)
 	})
@@ -364,214 +486,4 @@ func TestStage2MutationMatrixRejectsSemanticCorruption(t *testing.T) {
 			t, harness, application, false,
 		)
 	})
-}
-
-func expectIdentity(
-	value interface{ String() string },
-) ([]string, error) {
-	return []string{value.String()}, nil
-}
-
-func rejectAt(
-	value interface{ String() string },
-	err error,
-) ([]string, error) {
-	return []string{value.String()}, err
-}
-
-func mutateOperation(
-	t *testing.T,
-	harness *stage2MutationHarness,
-	importPath string,
-	match func(semantic.Operation) bool,
-	mutate func(*semantic.OperationSpec) error,
-) {
-	t.Helper()
-	harness.requireRejected(
-		t, importPath, nil,
-		func(input *semantic.PackageInput) ([]string, error) {
-			index, record := sourceOperationBy(t, *input, match)
-			spec := record.Spec()
-			if err := mutate(&spec); err != nil {
-				return rejectAt(record.ID(), err)
-			}
-			mutated, err := semantic.NewOperation(spec)
-			if err != nil {
-				return rejectAt(record.ID(), err)
-			}
-			input.Operations[index] = mutated
-			return expectIdentity(record.ID())
-		},
-	)
-}
-
-func mutateBindingResolution(
-	t *testing.T,
-	harness *stage2MutationHarness,
-	importPath string,
-	name string,
-	choose func([]semantic.Binding) (semantic.Binding, semantic.Binding),
-) {
-	t.Helper()
-	harness.requireRejected(
-		t, importPath, nil,
-		func(input *semantic.PackageInput) ([]string, error) {
-			var matching []semantic.Binding
-			for _, binding := range input.Bindings {
-				if binding.Name() == name {
-					matching = append(matching, binding)
-				}
-			}
-			from, to := choose(matching)
-			for index, record := range input.Resolutions {
-				if record.Kind() != semantic.ResolutionBinding ||
-					record.Binding() != from.ID() {
-					continue
-				}
-				spec := resolutionSpec(record)
-				spec.Binding = to.ID()
-				mutated, err := semantic.NewOccurrenceResolution(spec)
-				if err != nil {
-					return rejectAt(record.Occurrence(), err)
-				}
-				input.Resolutions[index] = mutated
-				return expectIdentity(record.Occurrence())
-			}
-			t.Fatalf("binding %s has no semantic reference", from.ID())
-			return nil, nil
-		},
-	)
-}
-
-func mutateDuplicateImplicit(
-	t *testing.T,
-	harness *stage2MutationHarness,
-	importPath string,
-	collapse bool,
-) {
-	t.Helper()
-	mutateOperation(
-		t, harness, importPath,
-		func(operation semantic.Operation) bool {
-			effects := operation.Spec().Implicit
-			for left := range effects {
-				for right := left + 1; right < len(effects); right++ {
-					if effects[left].Kind() == effects[right].Kind() {
-						return true
-					}
-				}
-			}
-			return false
-		},
-		func(spec *semantic.OperationSpec) error {
-			for left := range spec.Implicit {
-				for right := left + 1; right < len(spec.Implicit); right++ {
-					if spec.Implicit[left].Kind() !=
-						spec.Implicit[right].Kind() {
-						continue
-					}
-					if !collapse {
-						spec.Implicit = slices.Delete(
-							spec.Implicit, right, right+1,
-						)
-						return nil
-					}
-					first := spec.Implicit[left]
-					mutated, err := semantic.NewImplicitOperation(
-						first.Kind(),
-						first.Site(),
-						first.Ordinal(),
-						spec.Implicit[right].Source(),
-						spec.Implicit[right].Target(),
-					)
-					if err != nil {
-						return err
-					}
-					spec.Implicit[right] = mutated
-					return nil
-				}
-			}
-			t.Fatal("same-kind implicit effects are absent")
-			return nil
-		},
-	)
-}
-
-func resolutionSpec(
-	record semantic.OccurrenceResolution,
-) semantic.ResolutionSpec {
-	return semantic.ResolutionSpec{
-		Occurrence:  record.Occurrence(),
-		Owner:       record.Owner(),
-		Syntax:      record.Syntax(),
-		Role:        record.Role(),
-		Variant:     record.Variant(),
-		Domain:      record.Domain(),
-		Kind:        record.Kind(),
-		Structural:  record.Structural(),
-		Component:   record.Component(),
-		Definition:  record.Definition(),
-		Declaration: record.Declaration(),
-		Binding:     record.Binding(),
-		Type:        record.Type(),
-		Operation:   record.Operation(),
-		Unsupported: record.Unsupported(),
-	}
-}
-
-func declarationNamed(
-	t *testing.T,
-	input semantic.PackageInput,
-	name string,
-) semantic.Declaration {
-	t.Helper()
-	for _, record := range input.Declarations {
-		if record.Name() == name {
-			return record
-		}
-	}
-	t.Fatalf("semantic declaration %s is absent", name)
-	return semantic.Declaration{}
-}
-
-func resolutionForDeclaration(
-	t *testing.T,
-	input semantic.PackageInput,
-	declaration identity.SemanticDeclarationID,
-) (int, semantic.OccurrenceResolution) {
-	t.Helper()
-	for index, record := range input.Resolutions {
-		if record.Kind() == semantic.ResolutionDeclaration &&
-			record.Declaration() == declaration {
-			return index, record
-		}
-	}
-	t.Fatalf("declaration %s has no semantic reference", declaration)
-	return -1, semantic.OccurrenceResolution{}
-}
-
-func namedTypeByDeclaration(
-	t *testing.T,
-	input semantic.PackageInput,
-	declaration identity.SemanticDeclarationID,
-) semantic.Type {
-	t.Helper()
-	_, record := namedTypeIndexByDeclaration(t, input, declaration)
-	return record
-}
-
-func namedTypeIndexByDeclaration(
-	t *testing.T,
-	input semantic.PackageInput,
-	declaration identity.SemanticDeclarationID,
-) (int, semantic.Type) {
-	t.Helper()
-	for index, record := range input.Types {
-		if record.Kind() == semantic.TypeNamed &&
-			record.Spec().Declaration == declaration {
-			return index, record
-		}
-	}
-	t.Fatalf("named semantic type for %s is absent", declaration)
-	return -1, semantic.Type{}
 }

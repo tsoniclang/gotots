@@ -13,7 +13,7 @@ func (builder *packageBuilder) structuralResolution(
 	context occurrenceContext,
 	variant catalog.Variant,
 ) (semantic.OccurrenceResolution, error) {
-	disposition := structuralDisposition(record)
+	disposition := structuralDisposition(record, context)
 	var (
 		declaration identity.SemanticDeclarationID
 		typeID      identity.SemanticTypeID
@@ -59,7 +59,11 @@ func (builder *packageBuilder) structuralResolution(
 
 func structuralDisposition(
 	record *occurrenceInput,
+	context occurrenceContext,
 ) semantic.StructuralDisposition {
+	if typeSwitchBindingAnchor(record, context) {
+		return semantic.StructuralTypeSwitchBindingAnchor
+	}
 	switch record.occurrence.Role() {
 	case catalog.RoleDocumentation,
 		catalog.RoleTrailingDocumentation,
@@ -88,7 +92,8 @@ func structuralCompileTime(
 	record *occurrenceInput,
 	context occurrenceContext,
 ) bool {
-	if record.domain != catalog.ResolutionDomainOwner &&
+	if !context.compileTime &&
+		record.domain != catalog.ResolutionDomainOwner &&
 		record.domain != catalog.ResolutionDomainHeader {
 		return false
 	}

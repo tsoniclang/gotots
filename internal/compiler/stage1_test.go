@@ -41,7 +41,7 @@ TEXT ·Read(SB), NOSPLIT, $0-48
 	MOVQ $0, err+40(FP)
 	RET
 `)
-	inspection, err := InspectConstructs(source.Request{
+	inspection, err := inspectConstructsForTest(t, source.Request{
 		Dir: dir, Patterns: []string{"."},
 		ProviderContract: contract.DefaultID,
 	})
@@ -253,7 +253,7 @@ func TestProviderArtifactAuditVerifyAndRelocatedConsumption(t *testing.T) {
 	}
 
 	second := writeProviderFixture(t, "example.com/second", "second")
-	inspection, err := InspectConstructs(source.Request{
+	inspection, err := inspectConstructsForTest(t, source.Request{
 		Dir: second, Patterns: []string{"."},
 		ProviderContract:          contract.DefaultID,
 		ProviderStructureArtifact: structurePath,
@@ -327,11 +327,8 @@ func TestProviderArtifactAuditVerifyAndRelocatedConsumption(t *testing.T) {
 	}
 	t.Chdir(t.TempDir())
 	var fileID identity.FileID
-	for encoded := range artifact.FileIDs() {
-		fileID, err = identity.ParseFileID(encoded)
-		if err != nil {
-			t.Fatal(err)
-		}
+	for id := range artifact.FileIDs() {
+		fileID = id
 		break
 	}
 	if fileID.IsZero() {
@@ -406,7 +403,7 @@ func main() { _, _, _, _, _, _ = pure(), shadow(), external(), parent(), cParent
 	request.ProviderStructureDigest = provider.Structure.Digest
 	request.ProviderSemanticArtifact = semanticPath
 	request.ProviderSemanticDigest = provider.Semantic.Digest
-	inspection, err := InspectConstructs(request)
+	inspection, err := inspectConstructsForTest(t, request)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -566,11 +563,7 @@ func assertProviderTamperRejected(
 		t.Fatalf("container admission rejected before shard check: %v", err)
 	}
 	shardRejected := false
-	for encoded := range rebound.FileIDs() {
-		id, err := identity.ParseFileID(encoded)
-		if err != nil {
-			t.Fatal(err)
-		}
+	for id := range rebound.FileIDs() {
 		if _, _, _, err := rebound.FileGraph(id); err != nil {
 			shardRejected = true
 			break

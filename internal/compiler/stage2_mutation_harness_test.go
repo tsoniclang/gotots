@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"sort"
 	"strings"
 	"testing"
 
@@ -114,6 +115,11 @@ func newStage2MutationHarness(t *testing.T) *stage2MutationHarness {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() {
+		if err := result.Model().Close(); err != nil {
+			t.Errorf("close mutation source model: %v", err)
+		}
+	}()
 	if err := stagecheck.VerifyStage2(
 		universe,
 		plan,
@@ -163,7 +169,7 @@ func (h *stage2MutationHarness) requireRejected(
 			packages := append([]semantic.Package(nil), h.packages...)
 			packages[packageIndex] = mutated
 			var model *semantic.Model
-			model, err = semantic.NewModel(packages)
+			model, err = projectedMutationModel(packages)
 			if err == nil {
 				err = stagecheck.VerifyStage2(
 					h.universe,
@@ -176,6 +182,10 @@ func (h *stage2MutationHarness) requireRejected(
 					model,
 					nil,
 				)
+				closeErr := model.Close()
+				if err == nil {
+					err = closeErr
+				}
 			}
 		}
 	}
@@ -192,6 +202,52 @@ func (h *stage2MutationHarness) requireRejected(
 	}
 }
 
+func projectedMutationModel(
+	packages []semantic.Package,
+) (*semantic.Model, error) {
+	ordered := append([]semantic.Package(nil), packages...)
+	sort.Slice(ordered, func(left, right int) bool {
+		return ordered[left].ID().Compare(ordered[right].ID()) < 0
+	})
+	writer, err := semantic.NewCheckerStoreWriter()
+	if err != nil {
+		return nil, err
+	}
+	var projections []semantic.PackageProjectionInput
+	for _, pkg := range ordered {
+		if err := writer.Append(pkg); err != nil {
+			writer.Abort()
+			return nil, err
+		}
+		input := semantic.PackageProjectionInput{
+			ID: pkg.ID(), Provenance: pkg.Provenance(), Local: true,
+		}
+		for _, definition := range semanticDefinitions(pkg) {
+			input.ExpectedDefinitions = append(
+				input.ExpectedDefinitions, definition.Definition(),
+			)
+		}
+		for _, declaration := range semanticDeclarations(pkg) {
+			input.LocalDeclarations = append(
+				input.LocalDeclarations, declaration.ID(),
+			)
+		}
+		projections = append(projections, input)
+	}
+	store, _, err := writer.Seal()
+	if err != nil {
+		return nil, err
+	}
+	model, err := semantic.NewProjectedModel(
+		projections, store, nil,
+	)
+	if err != nil {
+		_ = store.Close()
+		return nil, err
+	}
+	return model, nil
+}
+
 func (h *stage2MutationHarness) packageInput(
 	t *testing.T,
 	importPath string,
@@ -201,17 +257,7 @@ func (h *stage2MutationHarness) packageInput(
 		if pkg.ID().ImportPath() != importPath {
 			continue
 		}
-		return semantic.PackageInput{
-			ID: pkg.ID(), Provenance: pkg.Provenance(),
-			Definitions:   pkg.Definitions(),
-			Resolutions:   pkg.Resolutions(),
-			Declarations:  pkg.Declarations(),
-			Bindings:      pkg.Bindings(),
-			Types:         pkg.Types(),
-			TypeWitnesses: pkg.TypeWitnesses(),
-			Operations:    pkg.Operations(),
-			Unsupported:   pkg.Unsupported(),
-		}, index
+		return semanticPackageInput(pkg), index
 	}
 	t.Fatalf("semantic package %s is absent", importPath)
 	return semantic.PackageInput{}, -1

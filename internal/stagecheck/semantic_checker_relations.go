@@ -25,8 +25,8 @@ func (verifier *checkerSemanticVerifier) operationOperands(
 		edgeRank[edge] = index
 	}
 	sort.Slice(children, func(left, right int) bool {
-		leftRecord := verifier.expected.occurrences[children[left]]
-		rightRecord := verifier.expected.occurrences[children[right]]
+		leftRecord := verifier.expected.occurrence(children[left])
+		rightRecord := verifier.expected.occurrence(children[right])
 		if edgeRank[leftRecord.Edge()] !=
 			edgeRank[rightRecord.Edge()] {
 			return edgeRank[leftRecord.Edge()] <
@@ -53,18 +53,18 @@ func (verifier *checkerSemanticVerifier) operationOperands(
 	}
 	if ranks != nil {
 		sort.SliceStable(children, func(left, right int) bool {
-			leftRole := verifier.expected.occurrences[children[left]].Role()
-			rightRole := verifier.expected.occurrences[children[right]].Role()
+			leftRole := verifier.expected.occurrence(children[left]).Role()
+			rightRole := verifier.expected.occurrence(children[right]).Role()
 			return ranks[leftRole] < ranks[rightRole]
 		})
 	}
 	out := make([]identity.OccurrenceID, 0, len(children))
 	for _, childID := range children {
-		child, present := verifier.expected.occurrences[childID]
+		child, present := verifier.expected.occurrences.get(childID)
 		if !present {
 			continue
 		}
-		if verifier.runtimeOperand(child) {
+		if verifier.runtimeOperand(child.Occurrence) {
 			out = append(out, childID)
 		}
 	}
@@ -74,39 +74,17 @@ func (verifier *checkerSemanticVerifier) operationOperands(
 func (verifier *checkerSemanticVerifier) runtimeOperand(
 	occurrence structure.Occurrence,
 ) bool {
-	switch occurrence.Role() {
-	case catalog.RoleDocumentation,
-		catalog.RoleTrailingDocumentation,
-		catalog.RoleCommentText,
-		catalog.RolePackageName,
-		catalog.RoleDeclaration,
-		catalog.RoleDeclarationName,
-		catalog.RoleTypeExpression,
-		catalog.RoleFieldTag,
-		catalog.RoleFieldGroup,
-		catalog.RoleConstructedType,
-		catalog.RoleSelectedName,
-		catalog.RoleAssertedType,
-		catalog.RoleArrayLength,
-		catalog.RoleElementType,
-		catalog.RoleStructFields,
-		catalog.RoleTypeParameters,
-		catalog.RoleParameters,
-		catalog.RoleResults,
-		catalog.RoleInterfaceMethods,
-		catalog.RoleKeyType,
-		catalog.RoleValueType,
-		catalog.RoleLabelDeclaration,
-		catalog.RoleLabelReference,
-		catalog.RoleImportAlias,
-		catalog.RoleImportPath,
-		catalog.RoleReceiver,
-		catalog.RoleFunctionSignature,
-		catalog.RoleFunctionBody,
-		catalog.RoleSpecification:
+	if verifier.independentCompileTimeContext(occurrence) {
 		return false
+	}
+	if !catalog.RoleMayContributeRuntimeEvaluation(
+		occurrence.Role(),
+	) {
+		return false
+	}
+	switch occurrence.Role() {
 	case catalog.RoleElementKey:
-		parent := verifier.resolutions[occurrence.Parent()]
+		parent, _ := verifier.resolution(occurrence.Parent())
 		return parent.Variant() != catalog.VariantKeyFieldName
 	default:
 		return true
@@ -150,6 +128,16 @@ func (verifier *checkerSemanticVerifier) verifyResolutionTarget(
 ) error {
 	switch resolution.Kind() {
 	case semantic.ResolutionDeclaration:
+		object := independentResolutionObject(
+			verifier.view, occurrence, node,
+		)
+		if resolution.Declaration().Form() ==
+			identity.SemanticDeclarationMember &&
+			occurrence.Role() == catalog.RoleDeclarationName {
+			return verifier.verifyMemberDeclarationOccurrence(
+				occurrence, resolution.Declaration(), object,
+			)
+		}
 		if occurrence.Role() == catalog.RoleSelectedName {
 			if handled, err := verifier.verifySelectedNameResolution(
 				occurrence, resolution,
@@ -159,9 +147,7 @@ func (verifier *checkerSemanticVerifier) verifyResolutionTarget(
 		}
 		return verifier.verifyObjectReference(
 			mustDeclarationReference(resolution.Declaration()),
-			independentResolutionObject(
-				verifier.view, occurrence, node,
-			),
+			object,
 		)
 	case semantic.ResolutionBinding:
 		return verifier.verifyObjectReference(
@@ -179,11 +165,30 @@ func (verifier *checkerSemanticVerifier) verifyResolutionTarget(
 				verifier.expected, verifier.index, occurrence,
 			)
 		}
+		if typ == nil {
+			typ = verifier.independentInferredArrayEllipsisType(
+				occurrence,
+				node,
+			)
+		}
 		return verifier.types.verify(resolution.Type(), typ)
 	case semantic.ResolutionStructuralOnly:
 		evidence := resolution.Structural()
 		if evidence.Disposition() ==
+			semantic.StructuralTypeSwitchBindingAnchor {
+			return verifier.verifyTypeSwitchBindingAnchor(
+				occurrence, node,
+			)
+		}
+		if evidence.Disposition() ==
 			semantic.StructuralCompileTimeExpression {
+			if !verifier.independentCompileTimeContext(occurrence) &&
+				resolution.Domain() ==
+					catalog.ResolutionDomainExecutable {
+				return fmt.Errorf(
+					"compile-time structural occurrence has no independent compile-time context",
+				)
+			}
 			object, typ := verifier.independentStructuralCoverage(
 				occurrence,
 			)
@@ -242,42 +247,23 @@ func independentResolutionObject(
 func (verifier *checkerSemanticVerifier) independentStructuralCoverage(
 	occurrence structure.Occurrence,
 ) (types.Object, types.Type) {
-	if verifier.expected.domains[occurrence.ID()] ==
-		catalog.ResolutionDomainHeader {
-		definition := verifier.expected.owners[occurrence.ID()]
-		node, present := verifier.index.CheckedDefinitionNode(definition)
-		if !present {
-			node, present = verifier.index.DefinitionNode(definition)
-		}
-		if present {
-			switch node := node.(type) {
-			case *ast.FuncDecl:
-				object, _ := verifier.view.DefOf(node.Name)
-				if object != nil {
-					return object, nil
-				}
-			case *ast.TypeSpec:
-				object, _ := verifier.view.DefOf(node.Name)
-				if object != nil {
-					return object, nil
-				}
-			case *ast.FuncLit:
-				return nil, independentExpressionType(
-					verifier.view, node,
-				)
-			}
-		}
+	if object, typ := verifier.independentCompileTimeCoverage(
+		occurrence,
+	); object != nil || typ != nil {
+		return object, typ
 	}
 	current := occurrence
 	var typeCoverage types.Type
+	owner := verifier.expected.occurrenceOwner(occurrence.ID())
 	for !current.Parent().IsZero() {
-		parent := verifier.expected.occurrences[current.Parent()]
+		parent := verifier.expected.occurrence(current.Parent())
 		node, present := verifier.index.OccurrenceNode(parent.ID())
 		if !present {
 			return nil, nil
 		}
 		if expression, ok := node.(ast.Expr); ok {
-			if value, present := verifier.view.TypeOf(expression); present &&
+			value, typed := verifier.view.TypeOf(expression)
+			if typed &&
 				value.IsType() &&
 				typeCoverage == nil {
 				typeCoverage = value.Type
@@ -331,7 +317,10 @@ func (verifier *checkerSemanticVerifier) independentStructuralCoverage(
 				}
 			}
 		}
-		current = parent
+		if !owner.Root().IsZero() && parent.ID() == owner.Root() {
+			break
+		}
+		current = parent.Occurrence
 	}
 	return nil, typeCoverage
 }
@@ -351,8 +340,8 @@ func (verifier *checkerSemanticVerifier) verifySelectedNameResolution(
 	if !present {
 		return false, nil
 	}
-	parentResolution := verifier.resolutions[occurrence.Parent()]
-	operation := verifier.operations[parentResolution.Operation()]
+	parentResolution, _ := verifier.resolution(occurrence.Parent())
+	operation, _ := verifier.operation(parentResolution.Operation())
 	selection := operation.Spec().Selection
 	if !selection.IsZero() {
 		if selection.Object() != resolution.Declaration() {
@@ -391,12 +380,15 @@ func (verifier *checkerSemanticVerifier) verifyObjectReference(
 	if object == nil {
 		return fmt.Errorf("semantic reference has no checker object")
 	}
+	verifier.types.indexCheckerDeclarationTypeParameters(object)
 	switch reference.Kind() {
 	case semantic.ObjectReferenceDeclaration:
 		if function, ok := object.(*types.Func); ok {
 			object = function.Origin()
 		}
-		record, present := verifier.declarations[reference.Declaration()]
+		record, present := verifier.declaration(
+			reference.Declaration(),
+		)
 		if !present {
 			return verifier.verifyDeclarationReferenceIdentity(
 				reference.Declaration(), object,
@@ -439,8 +431,8 @@ func (verifier *checkerSemanticVerifier) verifyObjectReference(
 			}
 		}
 	case semantic.ObjectReferenceBinding:
-		record, present := verifier.bindings[reference.Binding()]
-		if !present {
+		record := verifier.bindings[reference.Binding()]
+		if record == nil {
 			return fmt.Errorf(
 				"binding %s is absent", reference.Binding(),
 			)
@@ -452,42 +444,44 @@ func (verifier *checkerSemanticVerifier) verifyObjectReference(
 				reference.Binding(), expected,
 			)
 		}
-		if record.Name() != object.Name() {
+		if record.name != object.Name() {
 			return fmt.Errorf(
 				"binding %s name differs from %s",
-				record.ID(), object.Name(),
+				record.id, object.Name(),
 			)
 		}
 		switch object.(type) {
 		case *types.PkgName, *types.Label:
-			if !record.Type().IsZero() {
+			if record.typ != nil {
 				return fmt.Errorf(
-					"typeless binding %s carries a type", record.ID(),
+					"typeless binding %s carries a type", record.id,
 				)
 			}
 		default:
-			if err := verifier.types.verify(
-				record.Type(), object.Type(),
-			); err != nil {
-				return err
+			if record.typ == nil ||
+				!types.Identical(record.typ, object.Type()) {
+				return fmt.Errorf(
+					"binding %s type differs from checker object",
+					record.id,
+				)
 			}
 		}
-		if !record.Source().IsZero() {
+		if !record.source.IsZero() {
 			node, present := verifier.index.OccurrenceNode(
-				record.Source(),
+				record.source,
 			)
 			identifier, ok := node.(*ast.Ident)
 			if !present || !ok {
 				return fmt.Errorf(
 					"binding %s source is not an identifier",
-					record.ID(),
+					record.id,
 				)
 			}
 			defined, _ := verifier.view.DefOf(identifier)
 			if defined != object {
 				return fmt.Errorf(
 					"binding %s source defines a different object",
-					record.ID(),
+					record.id,
 				)
 			}
 		}

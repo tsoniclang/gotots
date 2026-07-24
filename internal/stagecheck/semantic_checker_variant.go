@@ -158,7 +158,7 @@ func independentCommaOK(
 	index *structure.TransientIndex,
 	occurrence structure.Occurrence,
 ) bool {
-	parent := expected.occurrences[occurrence.Parent()]
+	parent := expected.occurrence(occurrence.Parent())
 	parentNode, present := index.OccurrenceNode(parent.ID())
 	if !present {
 		return false
@@ -380,7 +380,7 @@ func independentDefinitionSignature(
 	index *structure.TransientIndex,
 	occurrence structure.Occurrence,
 ) *types.Signature {
-	definition := expected.owners[occurrence.ID()]
+	definition := expected.occurrenceOwner(occurrence.ID())
 	node, present := index.CheckedDefinitionNode(definition)
 	if !present {
 		node, present = index.DefinitionNode(definition)

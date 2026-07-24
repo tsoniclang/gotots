@@ -30,17 +30,18 @@ func validateProjectionPlan(graph *Graph) error {
 			len(graph.projections),
 		)
 	}
-	previous := ""
+	var previous identity.PackageID
 	for index, projection := range graph.projections {
 		resident := graph.packages[index]
 		if projection.id.IsZero() ||
 			resident.id != projection.id ||
-			previous >= projection.id.String() {
+			(!previous.IsZero() &&
+				previous.Compare(projection.id) >= 0) {
 			return fmt.Errorf(
 				"noncanonical package projection at %s", projection.id,
 			)
 		}
-		previous = projection.id.String()
+		previous = projection.id
 		residentFiles := map[identity.FileID]bool{}
 		for _, file := range resident.files {
 			residentFiles[file.owner.id.file] = true

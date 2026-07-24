@@ -6,16 +6,15 @@ import (
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/identity"
-	"github.com/tsoniclang/gotots/internal/language/semantic"
 )
 
-func missingBindingDetails(
+func (verifier *checkerSemanticVerifier) missingBindingDetails(
 	expected map[identity.SemanticBindingID]*checkerBindingCandidate,
-	actual map[identity.SemanticBindingID]semantic.Binding,
+	seen map[identity.SemanticBindingID]bool,
 ) []string {
 	var out []string
 	for id, candidate := range expected {
-		if _, present := actual[id]; present {
+		if seen[id] {
 			continue
 		}
 		pkg := "<nil>"

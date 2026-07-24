@@ -59,6 +59,47 @@ func TestCanonicalOccurrencePayloadCannotCrossStores(t *testing.T) {
 	}
 }
 
+func TestAdditionalOccurrenceLookupIsFileScoped(t *testing.T) {
+	_, _, inventory, _ := buildExecutableFixture(t)
+	additional := inventory.AdditionalOccurrences()
+	if len(additional) == 0 {
+		t.Fatal("fixture has no executable-only occurrences")
+	}
+	selectedFile := additional[0].ID().Span().File()
+	references, err := inventory.AdditionalOccurrenceRefsForFiles(
+		[]identity.FileID{selectedFile},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := 0
+	for _, occurrence := range additional {
+		if occurrence.ID().Span().File() == selectedFile {
+			want++
+		}
+	}
+	if len(references) != want {
+		t.Fatalf(
+			"file-scoped additional occurrences = %d, want %d",
+			len(references),
+			want,
+		)
+	}
+	for _, reference := range references {
+		if reference.ID().Span().File() != selectedFile {
+			t.Fatalf(
+				"file-scoped lookup leaked %s",
+				reference.ID(),
+			)
+		}
+	}
+	if _, err := inventory.AdditionalOccurrenceRefsForFiles(
+		[]identity.FileID{selectedFile, selectedFile},
+	); err == nil {
+		t.Fatal("duplicate file lookup did not fail")
+	}
+}
+
 func buildExecutableFixture(
 	t *testing.T,
 ) (

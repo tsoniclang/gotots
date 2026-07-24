@@ -114,7 +114,7 @@ func (builder *packageBuilder) packageInitializationSequence() (
 		}
 		occurrence, occurrencePresent := builder.input.index.
 			OccurrenceID(entry.Rhs)
-		record := builder.input.occurrences[occurrence]
+		record := builder.input.occurrence(occurrence)
 		if occurrencePresent && record == nil {
 			return nil, nil, nil, fmt.Errorf(
 				"package initializer occurrence %s is absent from semantic input",
@@ -211,8 +211,9 @@ func (builder *packageBuilder) packageInitializationSequence() (
 		})
 	}
 	sort.Slice(zeroCandidates, func(left, right int) bool {
-		return zeroCandidates[left].source.String() <
-			zeroCandidates[right].source.String()
+		return zeroCandidates[left].source.Compare(
+			zeroCandidates[right].source,
+		) < 0
 	})
 	for _, candidate := range zeroCandidates {
 		variable := candidate.variable

@@ -165,7 +165,11 @@ func runInspect(arguments []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return printInspection(stdout, inspection)
+	if err := printInspection(stdout, inspection); err != nil {
+		_ = inspection.Close()
+		return err
+	}
+	return inspection.Close()
 }
 
 func runAudit(arguments []string, stdout io.Writer) error {
@@ -213,7 +217,7 @@ func runAuditCatalog(arguments []string, stdout io.Writer) error {
 	}
 	_, err = fmt.Fprintf(
 		stdout,
-		"provider structure: packageContexts=%d files=%d syntheticPackages=%d definitions=%d headerOccurrences=%d boundaryEntries=%d facts=%d largestShardBytes=%d largestPackageRecords=%d encodedBytes=%d unknown=0 -> %s\nstructureDigest=%s\nprovider semantics: packages=%d definitions=%d resolutions=%d declarations=%d bindings=%d types=%d operations=%d unsupported=%d typeClosureDuplicates=%d largestShardBytes=%d largestPackageRecords=%d encodedBytes=%d -> %s\nsemanticDigest=%s\n",
+		"provider structure: packageContexts=%d files=%d syntheticPackages=%d definitions=%d headerOccurrences=%d boundaryEntries=%d facts=%d largestShardBytes=%d largestPackageRecords=%d encodedBytes=%d unknown=0 -> %s\nstructureDigest=%s\nprovider semantics: packages=%d definitions=%d resolutions=%d declarations=%d memberTargets=%d bindings=%d types=%d operations=%d unsupported=%d typeClosureDuplicates=%d largestShardBytes=%d largestPackageRecords=%d encodedBytes=%d -> %s\nsemanticDigest=%s\n",
 		result.Structure.PackageContexts,
 		result.Structure.Files,
 		result.Structure.SyntheticPackages,
@@ -230,6 +234,7 @@ func runAuditCatalog(arguments []string, stdout io.Writer) error {
 		result.Semantic.Definitions,
 		result.Semantic.Resolutions,
 		result.Semantic.Declarations,
+		result.Semantic.MemberTargets,
 		result.Semantic.Bindings,
 		result.Semantic.Types,
 		result.Semantic.Operations,
@@ -427,7 +432,7 @@ func printInspection(
 		len(inspection.Structure().ResidentOccurrences()),
 		len(executableInventory.Regions()),
 		executableOccurrences,
-		len(inspection.SelectionFacts().Facts()),
+		inspection.SelectionFacts().FactCount(),
 		provider.PackageContexts,
 		provider.Files,
 		provider.Definitions,
@@ -456,6 +461,13 @@ func printInspection(
 	}
 	if err := printSemanticMetrics(
 		stdout,
+		"checker-consumption",
+		inspection.Semantic().CheckerReadStats().Metrics(),
+	); err != nil {
+		return err
+	}
+	if err := printSemanticMetrics(
+		stdout,
 		"provider-manifest",
 		inspection.Semantic().ProviderManifestMetrics(),
 	); err != nil {
@@ -469,14 +481,22 @@ func printInspection(
 		return err
 	}
 	semanticRead := inspection.Semantic().ProviderReadStats()
+	checkerRead := inspection.Semantic().CheckerReadStats()
+	logicalRead := inspection.Semantic().ProjectionReadStats()
 	semanticProjection := inspection.Semantic().ProjectionStats()
 	if err := print(
-		"semantic-provider-consumption-residency: packages=%d certifiedPackages=%d mixedPackages=%d shardLoads=%d maxResidentPackages=%d\n",
+		"semantic-consumption-residency: packages=%d localPackages=%d certifiedPackages=%d mixedPackages=%d checkerShardLoads=%d providerShardLoads=%d logicalPackageLoads=%d mixedPackageLoads=%d maxCheckerPackagesResident=%d maxProviderPackagesResident=%d maxLogicalPackagesResident=%d\n",
 		semanticProjection.Packages,
+		semanticProjection.LocalPackages,
 		semanticProjection.CertifiedPackages,
 		semanticProjection.MixedPackages,
+		checkerRead.ShardLoads,
 		semanticRead.ShardLoads,
+		logicalRead.PackageLoads,
+		logicalRead.MixedPackageLoads,
+		checkerRead.MaxPackagesResident,
 		semanticRead.MaxProviderPackagesResident,
+		logicalRead.MaxPackagesResident,
 	); err != nil {
 		return err
 	}

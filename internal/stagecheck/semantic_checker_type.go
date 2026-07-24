@@ -18,16 +18,14 @@ type checkerTypePair struct {
 }
 
 type checkerTypeVerifier struct {
-	expected           semanticPackageExpectation
-	types              map[identity.SemanticTypeID]semantic.Type
-	declarations       map[identity.SemanticDeclarationID]semantic.Declaration
-	packageByPath      map[string]identity.PackageID
-	visiting           map[checkerTypePair]bool
-	verified           map[checkerTypePair]bool
-	parameterOwners    map[*types.TypeParam]checkerTypeParameterOwner
-	parameterLocations map[checkerTypeParameterLocation]checkerTypeParameterOwner
-	parameterConflict  string
-	localDeclarations  map[types.Object]identity.SemanticDeclarationID
+	expected          semanticPackageExpectation
+	actual            semantic.Package
+	packageByPath     map[string]identity.PackageID
+	visiting          map[checkerTypePair]bool
+	verified          map[checkerTypePair]bool
+	parameterOwners   map[*types.TypeParam]checkerTypeParameterOwner
+	parameterConflict string
+	localDeclarations map[types.Object]identity.SemanticDeclarationID
 }
 
 func newCheckerTypeVerifier(
@@ -37,26 +35,18 @@ func newCheckerTypeVerifier(
 	index *structure.TransientIndex,
 ) *checkerTypeVerifier {
 	out := &checkerTypeVerifier{
-		expected:           expected,
-		types:              map[identity.SemanticTypeID]semantic.Type{},
-		declarations:       map[identity.SemanticDeclarationID]semantic.Declaration{},
-		packageByPath:      map[string]identity.PackageID{},
-		visiting:           map[checkerTypePair]bool{},
-		verified:           map[checkerTypePair]bool{},
-		parameterOwners:    map[*types.TypeParam]checkerTypeParameterOwner{},
-		parameterLocations: map[checkerTypeParameterLocation]checkerTypeParameterOwner{},
-		localDeclarations:  map[types.Object]identity.SemanticDeclarationID{},
-	}
-	for _, record := range actual.Types() {
-		out.types[record.ID()] = record
-	}
-	for _, record := range actual.Declarations() {
-		out.declarations[record.ID()] = record
+		expected:          expected,
+		actual:            actual,
+		packageByPath:     map[string]identity.PackageID{},
+		visiting:          map[checkerTypePair]bool{},
+		verified:          map[checkerTypePair]bool{},
+		parameterOwners:   map[*types.TypeParam]checkerTypeParameterOwner{},
+		localDeclarations: map[types.Object]identity.SemanticDeclarationID{},
 	}
 	for _, pkg := range universe.Packages() {
 		out.packageByPath[pkg.ID().ImportPath()] = pkg.ID()
 	}
-	out.indexTypeParameterOwners(universe, index)
+	out.indexTypeParameterOwners(index)
 	return out
 }
 
@@ -77,7 +67,7 @@ func (verifier *checkerTypeVerifier) verify(
 	if verifier.verified[pair] || verifier.visiting[pair] {
 		return nil
 	}
-	record, present := verifier.types[id]
+	record, present := verifier.actual.Type(id)
 	if !present {
 		return fmt.Errorf("semantic type %s is absent", id)
 	}

@@ -1,7 +1,6 @@
 package semantic
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
@@ -23,11 +22,82 @@ type RecordSize struct {
 	EncodedBytes int64
 }
 
+type semanticShardMeasurement struct {
+	pkg            identity.PackageID
+	encodedBytes   int64
+	definitionTail []RecordSize
+	operationTail  []RecordSize
+	typeTail       []RecordSize
+}
+
+func newSemanticShardMeasurement(
+	pkg identity.PackageID,
+) semanticShardMeasurement {
+	return semanticShardMeasurement{pkg: pkg}
+}
+
+func (measurement *semanticShardMeasurement) observeDefinition(
+	record DefinitionSemantics,
+	encodedBytes int64,
+) {
+	measurement.consider(
+		&measurement.definitionTail,
+		record.Definition().String(),
+		encodedBytes,
+	)
+}
+
+func (measurement *semanticShardMeasurement) observeOperation(
+	record Operation,
+	encodedBytes int64,
+) {
+	measurement.consider(
+		&measurement.operationTail,
+		record.ID().String(),
+		encodedBytes,
+	)
+}
+
+func (measurement *semanticShardMeasurement) observeType(
+	record Type,
+	encodedBytes int64,
+) {
+	measurement.consider(
+		&measurement.typeTail,
+		record.ID().String(),
+		encodedBytes,
+	)
+}
+
+func (measurement *semanticShardMeasurement) consider(
+	tail *[]RecordSize,
+	identityValue string,
+	encodedBytes int64,
+) {
+	if len(*tail) == semanticTailLimit {
+		last := (*tail)[semanticTailLimit-1]
+		if encodedBytes < last.EncodedBytes ||
+			(encodedBytes == last.EncodedBytes &&
+				identityValue >= last.Identity) {
+			return
+		}
+	}
+	*tail = append(*tail, RecordSize{
+		Package: measurement.pkg, Identity: identityValue,
+		EncodedBytes: encodedBytes,
+	})
+	trimRecordTail(*tail)
+	if len(*tail) > semanticTailLimit {
+		*tail = (*tail)[:semanticTailLimit]
+	}
+}
+
 type Metrics struct {
 	packages       int
 	definitions    int
 	resolutions    int
 	declarations   int
+	memberTargets  int
 	bindings       int
 	types          int
 	operations     int
@@ -58,8 +128,8 @@ func MeasurePackages(packages []Package) (Metrics, error) {
 	return metrics, nil
 }
 
-func measureProviderManifest(
-	manifest []providerManifestPackage,
+func measureShardManifest(
+	manifest []packageShardManifest,
 ) (Metrics, error) {
 	var metrics Metrics
 	for _, entry := range manifest {
@@ -74,6 +144,7 @@ func measureProviderManifest(
 		metrics.definitions += entry.DefinitionCount
 		metrics.resolutions += entry.ResolutionCount
 		metrics.declarations += entry.DeclarationCount
+		metrics.memberTargets += entry.MemberTargetCount
 		metrics.bindings += entry.BindingCount
 		metrics.types += entry.TypeCount
 		metrics.operations += entry.OperationCount
@@ -100,93 +171,64 @@ func measureProviderManifest(
 }
 
 func (metrics *Metrics) addPackage(pkg Package) error {
-	encodedBytes, err := writeProviderShard(io.Discard, pkg)
+	measurement, err := writeSemanticShard(io.Discard, pkg)
 	if err != nil {
 		return err
 	}
-	return metrics.addMeasuredPackage(pkg, encodedBytes)
+	return metrics.addMeasuredPackage(pkg, measurement)
 }
 
 func (metrics *Metrics) addMeasuredPackage(
 	pkg Package,
-	encodedBytes int64,
+	measurement semanticShardMeasurement,
 ) error {
-	records := len(pkg.definitions) +
-		len(pkg.resolutions) +
-		len(pkg.declarations) +
-		len(pkg.bindings) +
-		len(pkg.types) +
-		len(pkg.operations) +
-		len(pkg.unsupported)
+	if measurement.pkg != pkg.ID() ||
+		measurement.encodedBytes <= 0 {
+		return fmt.Errorf(
+			"semantic shard measurement disagrees with package %s",
+			pkg.ID(),
+		)
+	}
+	records := pkg.DefinitionCount() +
+		pkg.ResolutionCount() +
+		pkg.DeclarationCount() +
+		pkg.BindingCount() +
+		pkg.TypeCount() +
+		pkg.OperationCount() +
+		pkg.UnsupportedCount()
 	metrics.packages++
-	metrics.definitions += len(pkg.definitions)
-	metrics.resolutions += len(pkg.resolutions)
-	metrics.declarations += len(pkg.declarations)
-	metrics.bindings += len(pkg.bindings)
-	metrics.types += len(pkg.types)
-	metrics.operations += len(pkg.operations)
-	metrics.unsupported += len(pkg.unsupported)
-	metrics.encodedBytes += encodedBytes
+	metrics.definitions += pkg.DefinitionCount()
+	metrics.resolutions += pkg.ResolutionCount()
+	metrics.declarations += pkg.DeclarationCount()
+	memberTargets, err := pkg.MemberTargetCensus()
+	if err != nil {
+		return err
+	}
+	metrics.memberTargets += memberTargets.Count()
+	metrics.bindings += pkg.BindingCount()
+	metrics.types += pkg.TypeCount()
+	metrics.operations += pkg.OperationCount()
+	metrics.unsupported += pkg.UnsupportedCount()
+	metrics.encodedBytes += measurement.encodedBytes
 	if records > metrics.largestRecords {
 		metrics.largestRecords = records
 	}
 	metrics.packageTail = append(metrics.packageTail, PackageSize{
 		Package:      pkg.ID(),
-		EncodedBytes: encodedBytes,
+		EncodedBytes: measurement.encodedBytes,
 		Records:      records,
 	})
-	for _, record := range pkg.definitions {
-		size, err := encodedRecordBytes(encodeDefinition(record))
-		if err != nil {
-			return err
-		}
-		metrics.definitionTail = append(
-			metrics.definitionTail,
-			RecordSize{
-				Package:      pkg.ID(),
-				Identity:     record.Definition().String(),
-				EncodedBytes: size,
-			},
-		)
-	}
-	for _, record := range pkg.operations {
-		size, err := encodedRecordBytes(encodeOperation(record))
-		if err != nil {
-			return err
-		}
-		metrics.operationTail = append(
-			metrics.operationTail,
-			RecordSize{
-				Package: pkg.ID(), Identity: record.ID().String(),
-				EncodedBytes: size,
-			},
-		)
-	}
-	for _, record := range pkg.types {
-		size, err := encodedRecordBytes(encodeType(record))
-		if err != nil {
-			return err
-		}
-		metrics.typeTail = append(
-			metrics.typeTail,
-			RecordSize{
-				Package: pkg.ID(), Identity: record.ID().String(),
-				EncodedBytes: size,
-			},
-		)
-	}
+	metrics.definitionTail = append(
+		metrics.definitionTail, measurement.definitionTail...,
+	)
+	metrics.operationTail = append(
+		metrics.operationTail, measurement.operationTail...,
+	)
+	metrics.typeTail = append(
+		metrics.typeTail, measurement.typeTail...,
+	)
 	metrics.trim()
 	return nil
-}
-
-func encodedRecordBytes(record any) (int64, error) {
-	encoded, err := json.Marshal(record)
-	if err != nil {
-		return 0, fmt.Errorf(
-			"encode semantic metric record: %w", err,
-		)
-	}
-	return int64(len(encoded)), nil
 }
 
 func (metrics *Metrics) merge(other Metrics) {
@@ -194,6 +236,7 @@ func (metrics *Metrics) merge(other Metrics) {
 	metrics.definitions += other.definitions
 	metrics.resolutions += other.resolutions
 	metrics.declarations += other.declarations
+	metrics.memberTargets += other.memberTargets
 	metrics.bindings += other.bindings
 	metrics.types += other.types
 	metrics.operations += other.operations
@@ -240,8 +283,9 @@ func (metrics *Metrics) trim() {
 			return metrics.packageTail[left].EncodedBytes >
 				metrics.packageTail[right].EncodedBytes
 		}
-		return metrics.packageTail[left].Package.String() <
-			metrics.packageTail[right].Package.String()
+		return metrics.packageTail[left].Package.Compare(
+			metrics.packageTail[right].Package,
+		) < 0
 	})
 	if len(metrics.packageTail) > semanticTailLimit {
 		metrics.packageTail = metrics.packageTail[:semanticTailLimit]
@@ -271,19 +315,19 @@ func trimRecordTail(records []RecordSize) {
 		if records[left].Identity != records[right].Identity {
 			return records[left].Identity < records[right].Identity
 		}
-		return records[left].Package.String() <
-			records[right].Package.String()
+		return records[left].Package.Compare(records[right].Package) < 0
 	})
 }
 
-func (metrics Metrics) Packages() int     { return metrics.packages }
-func (metrics Metrics) Definitions() int  { return metrics.definitions }
-func (metrics Metrics) Resolutions() int  { return metrics.resolutions }
-func (metrics Metrics) Declarations() int { return metrics.declarations }
-func (metrics Metrics) Bindings() int     { return metrics.bindings }
-func (metrics Metrics) Types() int        { return metrics.types }
-func (metrics Metrics) Operations() int   { return metrics.operations }
-func (metrics Metrics) Unsupported() int  { return metrics.unsupported }
+func (metrics Metrics) Packages() int      { return metrics.packages }
+func (metrics Metrics) Definitions() int   { return metrics.definitions }
+func (metrics Metrics) Resolutions() int   { return metrics.resolutions }
+func (metrics Metrics) Declarations() int  { return metrics.declarations }
+func (metrics Metrics) MemberTargets() int { return metrics.memberTargets }
+func (metrics Metrics) Bindings() int      { return metrics.bindings }
+func (metrics Metrics) Types() int         { return metrics.types }
+func (metrics Metrics) Operations() int    { return metrics.operations }
+func (metrics Metrics) Unsupported() int   { return metrics.unsupported }
 func (metrics Metrics) EncodedBytes() int64 {
 	return metrics.encodedBytes
 }

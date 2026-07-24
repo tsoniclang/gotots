@@ -55,8 +55,8 @@ func verifySelections(
 		return err
 	}
 	actualFacts := map[selectionfacts.ID]selectionfacts.Fact{}
-	for _, fact := range facts.Facts() {
-		if fact.ID().String() == "" ||
+	if err := facts.VisitFacts(func(fact selectionfacts.Fact) error {
+		if fact.ID().IsZero() ||
 			fact.ProducerDigest() == "" ||
 			fact.EvidenceDigest() == "" {
 			return &VerificationError{
@@ -71,6 +71,9 @@ func verifySelections(
 			}
 		}
 		actualFacts[fact.ID()] = fact
+		return nil
+	}); err != nil {
+		return err
 	}
 	expectedFacts := map[selectionfacts.ID]bool{}
 	for definition, pkg := range packages {

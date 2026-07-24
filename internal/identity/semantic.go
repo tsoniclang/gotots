@@ -1,7 +1,6 @@
 package identity
 
 import (
-	"encoding/hex"
 	"fmt"
 	"unicode"
 	"unicode/utf8"
@@ -15,8 +14,7 @@ type SemanticTypeID struct {
 }
 
 func NewSemanticTypeID(digest string) (SemanticTypeID, error) {
-	raw, err := hex.DecodeString(digest)
-	if err != nil || len(raw) != 32 || hex.EncodeToString(raw) != digest {
+	if len(digest) != 64 || !lowerHexDigest(digest) {
 		return SemanticTypeID{}, &Error{
 			Identity: "semantic-type",
 			Value:    digest,
@@ -24,6 +22,17 @@ func NewSemanticTypeID(digest string) (SemanticTypeID, error) {
 		}
 	}
 	return SemanticTypeID{digest: digest}, nil
+}
+
+func lowerHexDigest(value string) bool {
+	for index := range len(value) {
+		character := value[index]
+		if (character < '0' || character > '9') &&
+			(character < 'a' || character > 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 func (id SemanticTypeID) IsZero() bool { return id == SemanticTypeID{} }

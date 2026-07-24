@@ -9,7 +9,9 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/identity"
+	"github.com/tsoniclang/gotots/internal/language/catalog"
 	"github.com/tsoniclang/gotots/internal/language/semantic"
+	"github.com/tsoniclang/gotots/internal/language/structure"
 )
 
 func TestFinalizedSurfaceScannerRejectsRawToolchainCarriers(t *testing.T) {
@@ -62,49 +64,88 @@ func TestFinalizedStage2ModelRejectsRawToolchainCarriers(t *testing.T) {
 }
 
 func TestStructuralLedgerMutationsFailWithExactResidualEvidence(t *testing.T) {
+	module, err := identity.NewModuleID("example.com/ledger", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner, err := identity.NewModuleOwner(module)
+	if err != nil {
+		t.Fatal(err)
+	}
+	file, err := identity.NewFileID(owner, "ledger.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	definitionAt := func(start, end int) identity.DefinitionID {
+		span, spanErr := identity.NewSpanID(file, start, end)
+		if spanErr != nil {
+			t.Fatal(spanErr)
+		}
+		occurrence, occurrenceErr := identity.NewOccurrenceID(span, 47)
+		if occurrenceErr != nil {
+			t.Fatal(occurrenceErr)
+		}
+		definition, definitionErr := identity.NewSourceDefinitionID(
+			occurrence, identity.DefinitionFuncDecl,
+		)
+		if definitionErr != nil {
+			t.Fatal(definitionErr)
+		}
+		return definition
+	}
+	outer := definitionAt(10, 20)
+	literal := definitionAt(12, 18)
+	outerHeader, _ := identity.NewHeaderRegionID(outer)
+	outerBoundary, _ := identity.NewExecutionBoundaryID(outer)
+	literalHeader, _ := identity.NewHeaderRegionID(literal)
+	literalBoundary, _ := identity.NewExecutionBoundaryID(literal)
+	region, _ := identity.NewExecutableRegionID(outer)
+	ownerRegion, _ := structure.SourceFileOwner(file)
+	outerRecord := definitionLedgerRecord{
+		id: outer, owner: ownerRegion,
+		header: outerHeader, boundary: outerBoundary, name: "Outer",
+	}
+	literalRecord := definitionLedgerRecord{
+		id: literal, owner: ownerRegion,
+		header: literalHeader, boundary: literalBoundary, name: "literal",
+	}
+	reference := definitionReferenceLedgerRecord{
+		region: region,
+		parent: outer.Root(),
+		edge:   catalog.Edge(7),
+		child:  literal,
+	}
 	canonical := func() *structuralLedger {
 		ledger := newStructuralLedger()
-		ledger.add("definition", "D1|owner|header|boundary|Outer")
-		ledger.add("definition-reference", "D1|parent|edge=7|ordinal=0|D2")
-		ledger.add("definition", "D2|owner|header|boundary|literal")
+		addRecord(&ledger.definitions, outerRecord)
+		addRecord(&ledger.definitionReferences, reference)
+		addRecord(&ledger.definitions, literalRecord)
 		return ledger
 	}
 	mutations := map[string]func(*structuralLedger){
 		"omit": func(ledger *structuralLedger) {
-			delete(ledger.classes["definition"], "D2|owner|header|boundary|literal")
+			delete(ledger.definitions, literalRecord)
 		},
 		"duplicate": func(ledger *structuralLedger) {
-			ledger.add("definition", "D1|owner|header|boundary|Outer")
+			addRecord(&ledger.definitions, outerRecord)
 		},
 		"reparent": func(ledger *structuralLedger) {
-			delete(
-				ledger.classes["definition-reference"],
-				"D1|parent|edge=7|ordinal=0|D2",
-			)
-			ledger.add(
-				"definition-reference",
-				"D1|wrong-parent|edge=7|ordinal=0|D2",
-			)
+			delete(ledger.definitionReferences, reference)
+			mutated := reference
+			mutated.parent = literal.Root()
+			addRecord(&ledger.definitionReferences, mutated)
 		},
 		"edge": func(ledger *structuralLedger) {
-			delete(
-				ledger.classes["definition-reference"],
-				"D1|parent|edge=7|ordinal=0|D2",
-			)
-			ledger.add(
-				"definition-reference",
-				"D1|parent|edge=8|ordinal=0|D2",
-			)
+			delete(ledger.definitionReferences, reference)
+			mutated := reference
+			mutated.edge = catalog.Edge(8)
+			addRecord(&ledger.definitionReferences, mutated)
 		},
 		"ordinal": func(ledger *structuralLedger) {
-			delete(
-				ledger.classes["definition-reference"],
-				"D1|parent|edge=7|ordinal=0|D2",
-			)
-			ledger.add(
-				"definition-reference",
-				"D1|parent|edge=7|ordinal=1|D2",
-			)
+			delete(ledger.definitionReferences, reference)
+			mutated := reference
+			mutated.ordinal = 1
+			addRecord(&ledger.definitionReferences, mutated)
 		},
 	}
 	for name, mutate := range mutations {

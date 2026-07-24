@@ -93,16 +93,17 @@ func validateSealedIndexes(graph *Graph) error {
 		len(graph.byBoundary) != len(graph.byDefinition) {
 		return fmt.Errorf("sealed structural indexes have unequal cardinalities")
 	}
-	previousOccurrence := ""
+	var previousOccurrence identity.OccurrenceID
 	for _, id := range graph.occurrenceIDs {
 		occurrence := graph.byOccurrence[id]
-		if previousOccurrence >= occurrence.id.String() {
+		if !previousOccurrence.IsZero() &&
+			previousOccurrence.Compare(occurrence.id) >= 0 {
 			return fmt.Errorf(
 				"canonical occurrence index is not strictly ordered at %s",
 				occurrence.id,
 			)
 		}
-		previousOccurrence = occurrence.id.String()
+		previousOccurrence = occurrence.id
 		indexed, present := graph.byOccurrence[occurrence.id]
 		if !present || indexed != occurrence {
 			return fmt.Errorf(
@@ -110,15 +111,16 @@ func validateSealedIndexes(graph *Graph) error {
 			)
 		}
 	}
-	previousDefinition := ""
+	var previousDefinition identity.DefinitionID
 	for _, id := range graph.definitionIDs {
 		definition := graph.byDefinition[id]
-		if previousDefinition >= definition.id.String() {
+		if !previousDefinition.IsZero() &&
+			previousDefinition.Compare(definition.id) >= 0 {
 			return fmt.Errorf(
 				"definition index is not strictly ordered at %s", definition.id,
 			)
 		}
-		previousDefinition = definition.id.String()
+		previousDefinition = definition.id
 		indexed, present := graph.byDefinition[definition.id]
 		if !present || indexed != definition {
 			return fmt.Errorf(
@@ -133,8 +135,9 @@ func validateSealedIndexes(graph *Graph) error {
 		}
 	}
 	for index := 1; index < len(graph.packages); index++ {
-		if graph.packages[index-1].id.String() >=
-			graph.packages[index].id.String() {
+		if graph.packages[index-1].id.Compare(
+			graph.packages[index].id,
+		) >= 0 {
 			return fmt.Errorf("package graph order is not canonical")
 		}
 	}

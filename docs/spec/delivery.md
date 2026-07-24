@@ -106,6 +106,27 @@ An architectural replacement lands with its one owner, all producers
 and consumers, and deletion of the old fields/helpers/tests/comments in the
 same coherent change. Split ownership is never a checkpoint.
 
+Every numbered dependency step closes independently before work begins on its
+consumer. Closure is revision-bound and requires all of the following as
+applicable:
+
+1. focused owner/consumer contract tests;
+2. independently derived exact identity joins at each changed boundary;
+3. production-path mutations for every claimed failure class;
+4. inspection of representative real artifacts and the twenty-item affected
+   size/complexity tail;
+5. staticness, source/generated size, peak memory, wall time, typecheck, and
+   runtime measures with absolute values and parent deltas;
+6. the guarded broader suite covering every migrated consumer; and
+7. broad searches proving deletion of the superseded schema, producer,
+   consumer, fallback, test, and prose.
+
+Evidence from an earlier revision, a narrower substitute, or an intended
+phase-exit run cannot close the step. A failed check reopens that step's
+authoritative owner and blocks all dependent steps. Phase exit reruns the union
+of the step gates; it does not provide the first comprehensive verification of
+an earlier step.
+
 ## Dependency-Ordered Implementation
 
 ### Phase: Language Inventory
@@ -285,7 +306,17 @@ Required exit evidence:
   carry the resolved package identity/provenance but contain no output path or
   implementation-owner decision, which belongs to later planning;
 - shadowing, scopes, generic binders, method identity, and source spans are
-  exact;
+  exact; binding ordinals are assigned once over the complete direct
+  definition and implicit-definition binding set for each canonical
+  scope/role before projection, unnamed signature slots exact-join their
+  implicit object to the checker signature tuple and structural field, and
+  omitted siblings remain identity evidence so independent counters cannot
+  collide;
+- generic-owner derivation is package-scoped and dependency ordered: current
+  declarations are indexed once, an exact imported checker object registers
+  its origin type/callable/receiver parameters before its type is consumed,
+  and no per-package whole-universe scope walk or position/name fallback
+  exists;
 - any nested definition whose enclosing definition is non-full can consume
   exact enclosing local type/alias/constant declarations for its required
   definition semantics, and a full nested definition can additionally consume
@@ -293,33 +324,83 @@ Required exit evidence:
   transient occurrence/scope/definition anchors; only the required semantic
   closure is emitted, stable ordinals include omitted siblings, and the
   excluded parent contributes zero executable operations and no finalized AST;
+- local semantic production writes definitions, resolutions, bindings, and
+  operations directly into one normalized draft, derives one pre-seal fixed
+  point over every admitted declaration/type reference, transfers each selected
+  declaration and type into that same draft once, and seals once; provider
+  production starts from every package-owned declaration, mixed-depth checker
+  production starts from admitted local records, and no post-seal projection,
+  closure repair, or second complete package representation exists;
 - repeated spellings of an equal unnamed structural type exact-join their
-  declaration occurrences to one canonical member declaration without
-  selecting one spelling as the declaration payload's source;
+  declaration occurrences to one canonical type-owned member target without
+  selecting one spelling as payload authority; package/local/predeclared/
+  synthetic objects have one standalone declaration record, fields and methods
+  have zero, and every member reference resolves through the canonical owner
+  type after pointer removal, alias collapse, generic-origin collapse, and
+  promoted-owner selection;
 - interface type sets distinguish universe, finite normalized terms, and empty,
   and branch records distinguish an exact same-definition control-target
   operation from an optional label binding;
 - context fixtures cover call/conversion, map/receive/assert comma-ok,
-  selectors, assignments, composite literals, and range;
+  selectors, assignments, composite literals, inferred-length `[...]T`
+  arrays, explicit constant array lengths, local/package `const`
+  initializers, and range; inferred array ellipses and explicit array-length
+  expression subtrees resolve through checker-derived compile-time coverage
+  and never fabricate runtime operations, while the same binary expression in
+  an ordinary assignment remains runtime;
 - nested implicit effects preserve per-operand multiplicity (`f(a, b)` can
   carry two distinct value-copy effects) rather than collapsing to one entry
   per implicit kind;
-- semantic records are immutable and constructor-validated; and
+- semantic records are immutable and constructor-validated;
+- immutable semantic packages expose counts, ordered visitors, and canonical
+  identity lookups only; declaration-target lookup is a closed validated view
+  over one standalone record or one type-owned field/method component and
+  creates no resident member index, record slice, or complete cloned record
+  class; and
+- each logical semantic package and its wire shard use one normalized
+  representation: typed package-local tables own canonical identity components
+  once and composite identities reference their constituent tables, compact
+  records store only their active closed-variant payloads, and variable
+  relations use validated typed ranges; public semantic values are transient
+  one-record projections, package-local references never escape, the prior
+  denormalized schema/reader/writer are deleted, and dictionary-domain, range,
+  active-payload, round-trip, mutation, struct-size, encoded-size,
+  largest-package, and whole-compilation cost gates pass; and
+- the sealed package retains the compact identity-component graph rather than
+  expanded composite identity slices, admission and reachability consume the
+  compact records directly, and member-target census generation streams
+  without a rendered or package-wide derived member index; and
 - no TypeScript representation appears in the model;
 - Stage-1 structural provider evidence and Stage-2 semantic provider evidence
   remain separate digest-bound authorities; the semantic artifact binds the
   exact structural digest and is independently reproduced before acceptance;
-- local semantic records remain resident while certified semantic detail is
-  package-sharded, validates before exposure, and keeps at most one provider
-  package resident; ordinary Stage-2 verification opens no provider-only
-  semantic shard and exact-joins shard loads to mixed local/certified package
-  projections; an explicit projection streams one record at a time into one
-  ownership-transferred package draft, retains no encoded shard or wire tree,
-  performs no immutable-package clone, and passes the frozen
-  largest-package RSS/record/byte budgets;
+- checker-derived local and certified-provider semantic detail are both
+  package-sharded behind one projection contract; local production writes and
+  releases one validated package at a time while preserving
+  `CheckerAuthority`, ordinary Stage-2 verification projects every package
+  carrying checker authority exactly once and opens no provider-only shard,
+  and at most one final logical package is resident; a mixed projection streams
+  both authorities into one ownership-transferred package draft, exact-joins
+  overlaps after authority removal, retains no package-wide wire tree or
+  separate local/provider/merged package copies, and passes the frozen
+  largest-package and whole-compilation RSS/record/byte budgets;
+- frontend package preparation obeys that same package-at-a-time boundary:
+  whole-universe state contains no resident collection or index of derived
+  package inputs, each package's occurrence/child/containment/object/draft state
+  becomes unreachable after its shard is written, and executable-only
+  occurrences are obtained through package/file-scoped indexes rather than a
+  complete-set scan per package;
 - canonical type/declaration/binding/operation identities remain identical
   across relocated workspaces, relocated module caches, local checker
   production, and certified-provider consumption; and
+- every computational identity sort, search, lookup, deduplication, and join
+  uses the identity package's allocation-free structural order; identity
+  serialization occurs only at artifact and diagnostic boundaries, and no
+  rendered-key cache or consumer-owned component order exists; and
+- the provider semantic schema is bumped atomically for the type-owned-member
+  contract, the prior reader/writer is deleted, per-package standalone
+  declaration and derived member-target counts/digests exact-join, and no
+  serialized member `Declaration` is accepted; and
 - measured construction uses the closed named-pass ledger, is linear with a
   fixed coefficient plus named canonical sorts, and reports
   definitions, resolutions, declarations, bindings, types, operations,
@@ -349,12 +430,22 @@ Required exit evidence:
 
 ### Phase: Typed TypeScript And Source Shape
 
-Implement the target AST, formatter, source-file modules, and direct lowering
-for ordinary declarations, expressions, statements, functions, receivers, and
-control.
+Pin the exact TS-Go schema-level AST contract, generate its typed Go bindings,
+factories, predicates, visitors, transforms, and validator, then implement the
+sole formatter, source-file modules, and direct plan-to-AST lowering for
+ordinary declarations, expressions, statements, functions, receivers, and
+control. There is no handwritten target AST and no text-emission intermediate.
 
 Required exit evidence:
 
+- `schema/tsgo/` binds one TS-Go revision, every upstream schema input and
+  digest, and the generator version; a clean regeneration exact-joins node
+  kinds, abstract categories, fields, optionality, factory parameters, child
+  order, and visitor/transform edges in both directions and produces no diff;
+- every generated AST artifact is admitted through the generated validator;
+  malformed kind, missing/extra field, wrong optionality, wrong child order,
+  hand-added node shape, generic property-bag, and raw-source-node mutations
+  fail before formatting;
 - calibration fixtures match reviewed hand-port AST shape;
 - ordinary calls have no hidden semantic arguments;
 - receiver methods remain methods;
@@ -363,10 +454,20 @@ Required exit evidence:
   differential/mutation fixtures;
 - generated method values and expressions use typed lambdas/functions with no
   `call`, `apply`, `bind`, or prototype invocation;
-- no TypeScript text is generated outside the formatter;
+- lowering returns exact TS-Go AST nodes and never source strings, templates,
+  token streams, raw fragments, ESTree nodes, or TypeScript compiler
+  JavaScript objects; no TypeScript text is generated or patched outside the
+  sole formatter;
+- formatted calibration output is reparsed by the pinned TS-Go parser, its
+  schema-level structural projection exact-joins the constructed AST projection
+  modulo one closed field-by-field classification of parser-derived ranges,
+  trivia, synthetic-only metadata, and formatter-normalized parentheses, and
+  formatter cases are differentially checked against the pinned TS-Go printer;
 - full output parses, strict-typechecks, and passes the Tsonic target-subset
   checker; and
-- size/shape gates run before expanding coverage.
+- AST-node counts, source bytes, formatter time/RSS, strict-typecheck time/RSS,
+  and top-twenty expansion tails are attributed and gated before expanding
+  coverage.
 
 ### Phase: Representations And Dynamic Semantics
 

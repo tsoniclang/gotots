@@ -296,6 +296,17 @@ func validateMethods(methods []TypeMethod) error {
 				"type method %d is not canonical", index,
 			)
 		}
+		if index != 0 {
+			previous := methods[index-1]
+			packageOrder := previous.Package.Compare(method.Package)
+			if packageOrder > 0 ||
+				(packageOrder == 0 && previous.Name >= method.Name) {
+				return fmt.Errorf(
+					"type methods are not canonical at %d",
+					index,
+				)
+			}
+		}
 	}
 	return nil
 }

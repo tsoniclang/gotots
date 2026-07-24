@@ -135,7 +135,7 @@ func usesC() int { return int(C.value()) }
 	request.ProviderStructureDigest = provider.Structure.Digest
 	request.ProviderSemanticArtifact = semanticPath
 	request.ProviderSemanticDigest = provider.Semantic.Digest
-	inspection, err := InspectConstructs(request)
+	inspection, err := inspectConstructsForTest(t, request)
 	if err != nil {
 		t.Fatal(err)
 	}

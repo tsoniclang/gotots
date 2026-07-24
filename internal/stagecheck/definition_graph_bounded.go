@@ -203,17 +203,21 @@ func compareCertifiedDefinitionCensus(
 			}
 		}
 		for _, definition := range census.Definitions() {
-			expected.add(
-				"definition-census",
-				packageID.String()+"|"+definition.String(),
+			addRecord(
+				&expected.definitionCensus,
+				definitionCensusLedgerRecord{
+					pkg: packageID, definition: definition,
+				},
 			)
 		}
 	}
 	actual := newStructuralLedger()
 	for _, record := range records {
-		actual.add(
-			"definition-census",
-			record.Package().String()+"|"+record.ID().String(),
+		addRecord(
+			&actual.definitionCensus,
+			definitionCensusLedgerRecord{
+				pkg: record.Package(), definition: record.ID(),
+			},
 		)
 	}
 	return compareLedgers(

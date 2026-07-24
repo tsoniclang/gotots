@@ -12,6 +12,7 @@ import (
 
 type bindingCandidate struct {
 	object     types.Object
+	anchor     identity.OccurrenceID
 	source     identity.OccurrenceID
 	scope      identity.OccurrenceID
 	role       identity.SemanticBindingRole
@@ -27,6 +28,7 @@ type objectIndex struct {
 	packageByPath           map[string]identity.PackageID
 	predeclared             map[types.Object]catalog.PredeclaredKind
 	sourceByObject          map[types.Object]identity.OccurrenceID
+	checkerSourceByObject   map[types.Object]identity.OccurrenceID
 	objectBySource          map[identity.OccurrenceID]types.Object
 	definitionByObject      map[types.Object]identity.DefinitionID
 	scopeOwners             map[*types.Scope]identity.OccurrenceID
@@ -35,11 +37,10 @@ type objectIndex struct {
 	bindingBySource         map[identity.OccurrenceID]*bindingCandidate
 	declarationIDs          map[types.Object]identity.SemanticDeclarationID
 	declarationByID         map[identity.SemanticDeclarationID]types.Object
-	declarationOwnerPackage map[identity.SemanticDeclarationID]identity.PackageID
 	localOrdinals           map[types.Object]int
+	bindingOrdinals         map[types.Object]int
 	bindingIDs              map[*bindingCandidate]identity.SemanticBindingID
 	typeParameterOwners     map[*types.TypeParam]semantic.TypeParameterOwner
-	typeParameterByLocation map[typeParameterLocation]semantic.TypeParameterOwner
 	typeBuilder             *typeBuilder
 	memberVisits            map[memberVisit]bool
 	scopeByOccurrence       map[identity.OccurrenceID]identity.OccurrenceID
@@ -62,9 +63,10 @@ func buildObjectIndex(
 ) (*objectIndex, error) {
 	out := &objectIndex{
 		input: input, contexts: contexts,
-		packageByPath:           map[string]identity.PackageID{},
+		packageByPath:           stage.packageByPath,
 		predeclared:             predeclaredObjects(),
 		sourceByObject:          map[types.Object]identity.OccurrenceID{},
+		checkerSourceByObject:   map[types.Object]identity.OccurrenceID{},
 		objectBySource:          map[identity.OccurrenceID]types.Object{},
 		definitionByObject:      map[types.Object]identity.DefinitionID{},
 		scopeOwners:             map[*types.Scope]identity.OccurrenceID{},
@@ -73,28 +75,16 @@ func buildObjectIndex(
 		bindingBySource:         map[identity.OccurrenceID]*bindingCandidate{},
 		declarationIDs:          map[types.Object]identity.SemanticDeclarationID{},
 		declarationByID:         map[identity.SemanticDeclarationID]types.Object{},
-		declarationOwnerPackage: map[identity.SemanticDeclarationID]identity.PackageID{},
 		localOrdinals:           map[types.Object]int{},
+		bindingOrdinals:         map[types.Object]int{},
 		bindingIDs:              map[*bindingCandidate]identity.SemanticBindingID{},
 		typeParameterOwners:     map[*types.TypeParam]semantic.TypeParameterOwner{},
-		typeParameterByLocation: map[typeParameterLocation]semantic.TypeParameterOwner{},
 		memberVisits:            map[memberVisit]bool{},
 		scopeByOccurrence:       map[identity.OccurrenceID]identity.OccurrenceID{},
 		scopeOccurrenceResolved: map[identity.OccurrenceID]bool{},
 		checkerScopeOwner:       map[*types.Scope]identity.OccurrenceID{},
 		checkerScopeResolved:    map[*types.Scope]bool{},
 		work:                    work,
-	}
-	for _, loaded := range stage.universe.Packages() {
-		path := loaded.ID().ImportPath()
-		if existing := out.packageByPath[path]; !existing.IsZero() &&
-			existing != loaded.ID() {
-			return nil, fmt.Errorf(
-				"checker import path %s has package identities %s and %s",
-				path, existing, loaded.ID(),
-			)
-		}
-		out.packageByPath[path] = loaded.ID()
 	}
 	view := input.loaded.CheckerView()
 	if view == nil &&
@@ -122,9 +112,12 @@ func buildObjectIndex(
 			out.indexMembers(object.Type(), nil)
 		}
 	}
+	if err := out.indexCheckerSupport(view); err != nil {
+		return nil, err
+	}
 	for _, occurrenceID := range input.order {
 		work.ObjectOccurrenceVisits++
-		record := input.occurrences[occurrenceID]
+		record := input.occurrence(occurrenceID)
 		if selector, ok := record.node.(*ast.SelectorExpr); ok {
 			if selection, present := view.SelectionOf(selector); present {
 				out.indexMembers(
@@ -152,28 +145,6 @@ func buildObjectIndex(
 						object, occurrenceID,
 					); err != nil {
 						return nil, err
-					}
-				}
-			} else if identifier.Name != "_" {
-				if object, present := view.UseOf(identifier); present &&
-					object != nil &&
-					!packageObject(object) &&
-					!packageNameObject(object) &&
-					object.Pkg() == input.loaded.Types() &&
-					object.Pos().IsValid() {
-					object = out.canonicalDeclarationObject(object)
-					if out.sourceByObject[object].IsZero() {
-						source, err := input.index.IdentifierOccurrence(
-							object.Pos(), object.Name(),
-						)
-						if err != nil {
-							return nil, err
-						}
-						if err := out.bindObjectSource(
-							object, source,
-						); err != nil {
-							return nil, err
-						}
 					}
 				}
 			}
@@ -204,7 +175,7 @@ func buildObjectIndex(
 		return nil, err
 	}
 	for object, source := range out.sourceByObject {
-		record := input.occurrences[source]
+		record := input.occurrence(source)
 		if record != nil && !record.owner.IsZero() {
 			if err := out.bindObjectDefinition(
 				object, record.owner,
@@ -213,13 +184,16 @@ func buildObjectIndex(
 			}
 		}
 	}
+	if err := out.assignLocalDeclarationOrdinals(); err != nil {
+		return nil, err
+	}
+	if err := out.assignCompleteBindingOrdinals(view); err != nil {
+		return nil, err
+	}
 	if err := out.createBindingCandidates(); err != nil {
 		return nil, err
 	}
 	if err := out.assignBindingIdentities(); err != nil {
-		return nil, err
-	}
-	if err := out.assignLocalDeclarationOrdinals(); err != nil {
 		return nil, err
 	}
 	newTypeBuilder(out)
@@ -350,13 +324,13 @@ func definitionNameSources(
 	input *packageInput,
 	definition identity.DefinitionID,
 ) []identity.OccurrenceID {
-	root := input.occurrences[definition.Root()]
+	root := input.occurrence(definition.Root())
 	if root == nil {
 		return nil
 	}
 	var out []identity.OccurrenceID
 	for _, childID := range root.children {
-		child := input.occurrences[childID]
+		child := input.occurrence(childID)
 		if child != nil &&
 			child.occurrence.Role() ==
 				catalog.RoleDeclarationName {
@@ -385,6 +359,14 @@ func (index *objectIndex) bindObjectSource(
 		)
 	}
 	index.sourceByObject[object] = source
+	if existing := index.checkerSourceByObject[object]; !existing.IsZero() &&
+		existing != source {
+		return fmt.Errorf(
+			"checker object %s has source occurrences %s and %s",
+			object.Name(), existing, source,
+		)
+	}
+	index.checkerSourceByObject[object] = source
 	index.objectBySource[source] = object
 	return nil
 }

@@ -8,16 +8,9 @@ import (
 )
 
 type semanticPackageClosure struct {
-	packageID    identity.PackageID
-	owners       *semanticOwnerCensus
-	definitions  []semantic.DefinitionSemantics
-	resolutions  []semantic.OccurrenceResolution
-	declarations []semantic.Declaration
-	bindings     []semantic.Binding
-	types        []semantic.Type
-	witnesses    []semantic.TypeWitness
-	operations   []semantic.Operation
-	unsupported  []semantic.Unsupported
+	packageID identity.PackageID
+	owners    *semanticOwnerCensus
+	pkg       semantic.Package
 }
 
 func verifySemanticPackageClosure(
@@ -25,16 +18,9 @@ func verifySemanticPackageClosure(
 	owners *semanticOwnerCensus,
 ) error {
 	closure := semanticPackageClosure{
-		packageID:    pkg.ID(),
-		owners:       owners,
-		definitions:  pkg.Definitions(),
-		resolutions:  pkg.Resolutions(),
-		declarations: pkg.Declarations(),
-		bindings:     pkg.Bindings(),
-		types:        pkg.Types(),
-		witnesses:    pkg.TypeWitnesses(),
-		operations:   pkg.Operations(),
-		unsupported:  pkg.Unsupported(),
+		packageID: pkg.ID(),
+		owners:    owners,
+		pkg:       pkg,
 	}
 	if err := closure.verifyOwners(); err != nil {
 		return err
@@ -64,7 +50,22 @@ func verifySemanticPackageClosure(
 }
 
 func (closure semanticPackageClosure) verifyOwners() error {
-	for _, record := range closure.definitions {
+	memberTargets, err := closure.pkg.MemberTargetCensus()
+	if err != nil {
+		return err
+	}
+	if memberTargets.Count() !=
+		closure.owners.memberCounts[closure.packageID] ||
+		memberTargets.Digest() !=
+			closure.owners.memberDigests[closure.packageID] {
+		return fmt.Errorf(
+			"package %s member-target census disagrees with its manifest",
+			closure.packageID,
+		)
+	}
+	if err := closure.pkg.VisitDefinitions(func(
+		record semantic.DefinitionSemantics,
+	) error {
 		owner, present := closure.owners.definitions[record.Definition()]
 		if !present || owner != closure.packageID {
 			return fmt.Errorf(
@@ -72,8 +73,13 @@ func (closure semanticPackageClosure) verifyOwners() error {
 				record.Definition(),
 			)
 		}
+		return nil
+	}); err != nil {
+		return err
 	}
-	for _, record := range closure.declarations {
+	return closure.pkg.VisitDeclarations(func(
+		record semantic.Declaration,
+	) error {
 		owner, present := closure.owners.declarations[record.ID()]
 		if !present || owner != closure.packageID {
 			return fmt.Errorf(
@@ -81,112 +87,98 @@ func (closure semanticPackageClosure) verifyOwners() error {
 				record.ID(),
 			)
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 func (closure semanticPackageClosure) verifyDefinitions() error {
-	for _, record := range closure.definitions {
-		evidence := record.Definition().String()
+	return closure.pkg.VisitDefinitions(func(
+		record semantic.DefinitionSemantics,
+	) error {
+		evidence := record.Definition()
 		spec := record.Spec()
 		for _, declaration := range spec.Declarations {
-			if err := closure.requireDeclaration(
-				evidence, declaration,
-			); err != nil {
-				return err
+			if err := closure.requireDeclaration(declaration); err != nil {
+				return semanticReferenceError(evidence, err)
 			}
 		}
-		if err := closure.requireType(
-			evidence, spec.Signature,
-		); err != nil {
-			return err
+		if err := closure.requireType(spec.Signature); err != nil {
+			return semanticReferenceError(evidence, err)
 		}
-		if err := closure.requireBinding(
-			evidence, spec.Receiver,
-		); err != nil {
-			return err
+		if err := closure.requireBinding(spec.Receiver); err != nil {
+			return semanticReferenceError(evidence, err)
 		}
 		for _, binding := range spec.Bindings {
-			if err := closure.requireBinding(
-				evidence, binding,
-			); err != nil {
-				return err
+			if err := closure.requireBinding(binding); err != nil {
+				return semanticReferenceError(evidence, err)
 			}
 		}
 		for _, occurrence := range spec.InitializerEntries {
-			if err := closure.requireOccurrence(
-				evidence, occurrence,
-			); err != nil {
-				return err
+			if err := closure.requireOccurrence(occurrence); err != nil {
+				return semanticReferenceError(evidence, err)
 			}
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 func (closure semanticPackageClosure) verifyDeclarations() error {
-	for _, record := range closure.declarations {
-		if err := closure.requireType(
-			record.ID().String(), record.Type(),
-		); err != nil {
-			return err
+	return closure.pkg.VisitDeclarations(func(
+		record semantic.Declaration,
+	) error {
+		if err := closure.requireType(record.Type()); err != nil {
+			return semanticReferenceError(record.ID(), err)
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 func (closure semanticPackageClosure) verifyBindings() error {
-	for _, record := range closure.bindings {
-		evidence := record.ID().String()
-		if err := closure.requireDefinition(
-			evidence, record.Definition(),
-		); err != nil {
-			return err
+	return closure.pkg.VisitBindings(func(
+		record semantic.Binding,
+	) error {
+		evidence := record.ID()
+		if err := closure.requireDefinition(record.Definition()); err != nil {
+			return semanticReferenceError(evidence, err)
 		}
-		if err := closure.requireType(
-			evidence, record.Type(),
-		); err != nil {
-			return err
+		if err := closure.requireType(record.Type()); err != nil {
+			return semanticReferenceError(evidence, err)
 		}
 		for _, definition := range record.CapturedBy() {
-			if err := closure.requireDefinition(
-				evidence, definition,
-			); err != nil {
-				return err
+			if err := closure.requireDefinition(definition); err != nil {
+				return semanticReferenceError(evidence, err)
 			}
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 func (closure semanticPackageClosure) verifyTypes() error {
-	for _, record := range closure.types {
+	return closure.pkg.VisitTypes(func(record semantic.Type) error {
 		if err := closure.verifyType(record); err != nil {
 			return err
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 func (closure semanticPackageClosure) verifyType(
 	record semantic.Type,
 ) error {
 	spec := record.Spec()
-	evidence := record.ID().String()
-	if err := closure.requireDeclaration(
-		evidence, spec.Declaration,
-	); err != nil {
-		return err
+	evidence := record.ID()
+	if err := closure.requireDeclaration(spec.Declaration); err != nil {
+		return semanticReferenceError(evidence, err)
 	}
 	if err := closure.requireDeclaration(
-		evidence, spec.Parameter.Declaration(),
+		spec.Parameter.Declaration(),
 	); err != nil {
-		return err
+		return semanticReferenceError(evidence, err)
 	}
 	if err := closure.requireDefinition(
-		evidence, spec.Parameter.Definition(),
+		spec.Parameter.Definition(),
 	); err != nil {
-		return err
+		return semanticReferenceError(evidence, err)
 	}
 	typeIDs := []identity.SemanticTypeID{
 		spec.Underlying,
@@ -208,334 +200,314 @@ func (closure semanticPackageClosure) verifyType(
 	typeIDs = append(typeIDs, spec.Embeddeds...)
 	typeIDs = append(typeIDs, spec.Elements...)
 	for _, typeID := range typeIDs {
-		if err := closure.requireType(
-			evidence, typeID,
-		); err != nil {
-			return err
+		if err := closure.requireType(typeID); err != nil {
+			return semanticReferenceError(evidence, err)
 		}
 	}
 	for _, field := range spec.Fields {
-		if err := closure.requireType(
-			evidence, field.Type,
-		); err != nil {
-			return err
+		if err := closure.requireType(field.Type); err != nil {
+			return semanticReferenceError(evidence, err)
 		}
 	}
 	for _, method := range spec.Methods {
-		if err := closure.requireType(
-			evidence, method.Signature,
-		); err != nil {
-			return err
+		if err := closure.requireType(method.Signature); err != nil {
+			return semanticReferenceError(evidence, err)
 		}
 	}
 	for _, term := range spec.Terms {
-		if err := closure.requireType(
-			evidence, term.Type,
-		); err != nil {
-			return err
+		if err := closure.requireType(term.Type); err != nil {
+			return semanticReferenceError(evidence, err)
 		}
 	}
 	return nil
 }
 
 func (closure semanticPackageClosure) verifyTypeWitnesses() error {
-	for _, witness := range closure.witnesses {
+	return closure.pkg.VisitTypeWitnesses(func(
+		witness semantic.TypeWitness,
+	) error {
 		if witness.Package() != closure.packageID {
 			return fmt.Errorf(
 				"type witness %s has invalid package owner",
 				witness.Type(),
 			)
 		}
-		if err := closure.requireType(
-			witness.Type().String(), witness.Type(),
-		); err != nil {
-			return err
+		if err := closure.requireType(witness.Type()); err != nil {
+			return semanticReferenceError(witness.Type(), err)
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 func (closure semanticPackageClosure) verifyOperations() error {
-	for _, record := range closure.operations {
-		evidence := record.ID().String()
+	return closure.pkg.VisitOperations(func(
+		record semantic.Operation,
+	) error {
+		evidence := record.ID()
 		spec := record.Spec()
-		if err := closure.requireDefinition(
-			evidence, record.Definition(),
-		); err != nil {
-			return err
+		if err := closure.requireDefinition(record.Definition()); err != nil {
+			return semanticReferenceError(evidence, err)
 		}
-		if err := closure.requireType(
-			evidence, spec.ResultType,
-		); err != nil {
-			return err
+		if err := closure.requireType(spec.ResultType); err != nil {
+			return semanticReferenceError(evidence, err)
 		}
-		if err := closure.requireType(
-			evidence, spec.ExpectedType,
-		); err != nil {
-			return err
+		if err := closure.requireType(spec.ExpectedType); err != nil {
+			return semanticReferenceError(evidence, err)
 		}
-		if err := closure.requireObject(
-			evidence, spec.Object,
-		); err != nil {
-			return err
+		if err := closure.requireObject(spec.Object); err != nil {
+			return semanticReferenceError(evidence, err)
 		}
 		if !spec.Selection.IsZero() {
 			if err := closure.requireType(
-				evidence, spec.Selection.Receiver(),
+				spec.Selection.Receiver(),
 			); err != nil {
-				return err
+				return semanticReferenceError(evidence, err)
 			}
 			if err := closure.requireDeclaration(
-				evidence, spec.Selection.Object(),
+				spec.Selection.Object(),
 			); err != nil {
-				return err
+				return semanticReferenceError(evidence, err)
 			}
 		}
 		if !spec.Instance.IsZero() {
 			if err := closure.requireObject(
-				evidence, spec.Instance.Target(),
+				spec.Instance.Target(),
 			); err != nil {
-				return err
+				return semanticReferenceError(evidence, err)
 			}
 			for _, typeID := range spec.Instance.Types() {
-				if err := closure.requireType(
-					evidence, typeID,
-				); err != nil {
-					return err
+				if err := closure.requireType(typeID); err != nil {
+					return semanticReferenceError(evidence, err)
 				}
 			}
 			if err := closure.requireType(
-				evidence, spec.Instance.Signature(),
+				spec.Instance.Signature(),
 			); err != nil {
-				return err
+				return semanticReferenceError(evidence, err)
 			}
 		}
 		for _, occurrence := range spec.Operands {
-			if err := closure.requireOccurrence(
-				evidence, occurrence,
-			); err != nil {
-				return err
+			if err := closure.requireOccurrence(occurrence); err != nil {
+				return semanticReferenceError(evidence, err)
 			}
 		}
 		for _, definition := range spec.Definitions {
-			if err := closure.requireDefinition(
-				evidence, definition,
-			); err != nil {
-				return err
+			if err := closure.requireDefinition(definition); err != nil {
+				return semanticReferenceError(evidence, err)
 			}
 		}
 		for _, implicit := range spec.Implicit {
 			if err := closure.requireOccurrence(
-				evidence, implicit.Site(),
+				implicit.Site(),
 			); err != nil {
-				return err
+				return semanticReferenceError(evidence, err)
 			}
 			if err := closure.requireType(
-				evidence, implicit.Source(),
+				implicit.Source(),
 			); err != nil {
-				return err
+				return semanticReferenceError(evidence, err)
 			}
 			if err := closure.requireType(
-				evidence, implicit.Target(),
+				implicit.Target(),
 			); err != nil {
-				return err
+				return semanticReferenceError(evidence, err)
 			}
 		}
 		if err := closure.requireOperation(
-			evidence, spec.ControlTarget,
+			spec.ControlTarget,
 		); err != nil {
-			return err
+			return semanticReferenceError(evidence, err)
 		}
 		if err := closure.requireBinding(
-			evidence, spec.Label,
+			spec.Label,
 		); err != nil {
-			return err
+			return semanticReferenceError(evidence, err)
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 func (closure semanticPackageClosure) verifyUnsupported() error {
-	for _, record := range closure.unsupported {
+	return closure.pkg.VisitUnsupported(func(
+		record semantic.Unsupported,
+	) error {
 		if err := closure.requireDefinition(
-			record.ID().String(),
 			record.ID().Definition(),
 		); err != nil {
-			return err
+			return semanticReferenceError(record.ID(), err)
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 func (closure semanticPackageClosure) verifyResolutions() error {
-	for _, record := range closure.resolutions {
-		evidence := record.Occurrence().String()
+	return closure.pkg.VisitResolutions(func(
+		record semantic.OccurrenceResolution,
+	) error {
+		evidence := record.Occurrence()
 		switch record.Kind() {
 		case semantic.ResolutionStructuralOnly:
 			if err := closure.requireDeclaration(
-				evidence,
 				record.Structural().Declaration(),
 			); err != nil {
-				return err
+				return semanticReferenceError(evidence, err)
 			}
 			if err := closure.requireType(
-				evidence, record.Structural().Type(),
+				record.Structural().Type(),
 			); err != nil {
-				return err
+				return semanticReferenceError(evidence, err)
 			}
 		case semantic.ResolutionDefinitionComponent:
 			if err := closure.requireDefinition(
-				evidence, record.Definition(),
+				record.Definition(),
 			); err != nil {
-				return err
+				return semanticReferenceError(evidence, err)
 			}
 		case semantic.ResolutionDeclaration:
 			if err := closure.requireDeclaration(
-				evidence, record.Declaration(),
+				record.Declaration(),
 			); err != nil {
-				return err
+				return semanticReferenceError(evidence, err)
 			}
 		case semantic.ResolutionBinding:
 			if err := closure.requireBinding(
-				evidence, record.Binding(),
+				record.Binding(),
 			); err != nil {
-				return err
+				return semanticReferenceError(evidence, err)
 			}
 		case semantic.ResolutionType:
 			if err := closure.requireType(
-				evidence, record.Type(),
+				record.Type(),
 			); err != nil {
-				return err
+				return semanticReferenceError(evidence, err)
 			}
 		case semantic.ResolutionOperation:
 			if err := closure.requireOperation(
-				evidence, record.Operation(),
+				record.Operation(),
 			); err != nil {
-				return err
+				return semanticReferenceError(evidence, err)
 			}
 		case semantic.ResolutionUnsupported:
 			if err := closure.requireUnsupported(
-				evidence, record.Unsupported(),
+				record.Unsupported(),
 			); err != nil {
-				return err
+				return semanticReferenceError(evidence, err)
 			}
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 func (closure semanticPackageClosure) requireObject(
-	evidence string,
 	reference semantic.ObjectReference,
 ) error {
 	switch reference.Kind() {
 	case semantic.ObjectReferenceDeclaration:
-		return closure.requireDeclaration(
-			evidence, reference.Declaration(),
-		)
+		return closure.requireDeclaration(reference.Declaration())
 	case semantic.ObjectReferenceBinding:
-		return closure.requireBinding(
-			evidence, reference.Binding(),
-		)
+		return closure.requireBinding(reference.Binding())
 	default:
 		return nil
 	}
 }
 
 func (closure semanticPackageClosure) requireDefinition(
-	evidence string,
 	id identity.DefinitionID,
 ) error {
 	if id.IsZero() {
 		return nil
 	}
 	if _, present := closure.owners.definitions[id]; !present {
-		return absentSemanticTarget(evidence, id.String())
+		return absentSemanticTarget(id)
 	}
 	return nil
 }
 
 func (closure semanticPackageClosure) requireDeclaration(
-	evidence string,
 	id identity.SemanticDeclarationID,
 ) error {
 	if id.IsZero() {
 		return nil
 	}
+	if id.Form() == identity.SemanticDeclarationMember {
+		if _, present := closure.pkg.ResolveDeclarationTarget(id); !present {
+			return absentSemanticTarget(id)
+		}
+		return nil
+	}
 	if _, present := closure.owners.declarations[id]; !present {
-		return absentSemanticTarget(evidence, id.String())
+		return absentSemanticTarget(id)
 	}
 	return nil
 }
 
 func (closure semanticPackageClosure) requireBinding(
-	evidence string,
 	id identity.SemanticBindingID,
 ) error {
 	if id.IsZero() {
 		return nil
 	}
-	if !semanticBindingPresent(closure.bindings, id) {
-		return absentSemanticTarget(evidence, id.String())
+	if !closure.pkg.HasBinding(id) {
+		return absentSemanticTarget(id)
 	}
 	return nil
 }
 
 func (closure semanticPackageClosure) requireType(
-	evidence string,
 	id identity.SemanticTypeID,
 ) error {
 	if id.IsZero() {
 		return nil
 	}
-	if !semanticTypePresent(closure.types, id) {
-		return absentSemanticTarget(evidence, id.String())
+	if !closure.pkg.HasType(id) {
+		return absentSemanticTarget(id)
 	}
 	return nil
 }
 
 func (closure semanticPackageClosure) requireOperation(
-	evidence string,
 	id identity.OperationID,
 ) error {
 	if id.IsZero() {
 		return nil
 	}
-	if !semanticOperationPresent(closure.operations, id) {
-		return absentSemanticTarget(evidence, id.String())
+	if !closure.pkg.HasOperation(id) {
+		return absentSemanticTarget(id)
 	}
 	return nil
 }
 
 func (closure semanticPackageClosure) requireUnsupported(
-	evidence string,
 	id identity.UnsupportedID,
 ) error {
 	if id.IsZero() {
 		return nil
 	}
-	if !semanticUnsupportedPresent(closure.unsupported, id) {
-		return absentSemanticTarget(evidence, id.String())
+	if !closure.pkg.HasUnsupported(id) {
+		return absentSemanticTarget(id)
 	}
 	return nil
 }
 
 func (closure semanticPackageClosure) requireOccurrence(
-	evidence string,
 	id identity.OccurrenceID,
 ) error {
 	if id.IsZero() {
 		return nil
 	}
-	if !semanticResolutionPresent(closure.resolutions, id) {
-		return absentSemanticTarget(evidence, id.String())
+	if !closure.pkg.HasResolution(id) {
+		return absentSemanticTarget(id)
 	}
 	return nil
 }
 
-func absentSemanticTarget(evidence, target string) error {
-	return fmt.Errorf(
-		"%s references absent semantic target %s",
-		evidence, target,
-	)
+func semanticReferenceError[Evidence fmt.Stringer](
+	evidence Evidence,
+	err error,
+) error {
+	return fmt.Errorf("%s references %w", evidence, err)
+}
+
+func absentSemanticTarget[Target fmt.Stringer](target Target) error {
+	return fmt.Errorf("absent semantic target %s", target)
 }

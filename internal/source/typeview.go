@@ -54,8 +54,8 @@ func (v *TypeInfoView) InstanceOf(ident *ast.Ident) (types.Instance, bool) {
 	return instance, ok
 }
 
-// ImplicitOf returns the object one node implicitly declares (an unnamed
-// import, a type-switch case binding, or a composite-literal element).
+// ImplicitOf returns the object one node implicitly declares (for example an
+// unnamed import, unnamed signature slot, or type-switch case binding).
 func (v *TypeInfoView) ImplicitOf(node ast.Node) (types.Object, bool) {
 	obj, ok := v.info.Implicits[node]
 	return obj, ok

@@ -18,11 +18,13 @@ type pendingOperation struct {
 }
 
 func (builder *packageBuilder) resolveOccurrences() error {
-	pending := make([]pendingOperation, 0)
-	for _, occurrenceID := range builder.input.order {
+	operationKinds := make(
+		[]semantic.OperationKind, len(builder.input.order),
+	)
+	for index, occurrenceID := range builder.input.order {
 		builder.objects.work.ResolutionVisits++
-		record := builder.input.occurrences[occurrenceID]
-		context := builder.contexts.byOccurrence[occurrenceID]
+		record := builder.input.occurrence(occurrenceID)
+		context := builder.contexts.context(occurrenceID)
 		variant := catalog.VariantNone
 		var err error
 		if !record.checkedUnmapped &&
@@ -53,17 +55,24 @@ func (builder *packageBuilder) resolveOccurrences() error {
 				return err
 			}
 			builder.operationByOccurrence[occurrenceID] = operationID
-			pending = append(pending, pendingOperation{
-				record: record, context: context,
-				variant: variant, kind: operation,
-			})
+			operationKinds[index] = operation
 			continue
 		}
 		if err := builder.admitResolution(resolution); err != nil {
 			return err
 		}
 	}
-	for _, item := range pending {
+	for index, operationKind := range operationKinds {
+		if operationKind == semantic.OperationInvalid {
+			continue
+		}
+		occurrenceID := builder.input.order[index]
+		item := pendingOperation{
+			record:  builder.input.occurrence(occurrenceID),
+			context: builder.contexts.context(occurrenceID),
+			variant: builder.variantByOccurrence[occurrenceID],
+			kind:    operationKind,
+		}
 		operation, err := builder.buildOperation(item)
 		if err != nil {
 			return err
@@ -84,12 +93,13 @@ func (builder *packageBuilder) resolveOccurrences() error {
 			return err
 		}
 	}
-	if builder.draft.ResolutionCount() != len(builder.input.occurrences) {
+	if builder.draft.ResolutionCount() !=
+		builder.input.occurrences.count() {
 		return fmt.Errorf(
 			"semantic package %s resolved %d of %d occurrences",
 			builder.input.id,
 			builder.draft.ResolutionCount(),
-			len(builder.input.occurrences),
+			builder.input.occurrences.count(),
 		)
 	}
 	return builder.buildImplicitOperations()
@@ -184,7 +194,21 @@ func (builder *packageBuilder) classifyOccurrence(
 			semantic.DefinitionComponentRoot,
 		)
 	}
-	if record.domain == catalog.ResolutionDomainExecutable {
+	if typeSwitchBindingAnchor(record, context) {
+		structural, err := builder.structuralResolution(
+			record, context, variant,
+		)
+		return structural, semantic.OperationInvalid, err
+	}
+	if !context.compileTime &&
+		record.domain == catalog.ResolutionDomainExecutable &&
+		catalog.AllowsResolution(
+			record.occurrence.Kind(),
+			record.occurrence.Role(),
+			variant,
+			record.domain,
+			catalog.ResolutionClassOperation,
+		) {
 		kind, err := operationKind(
 			builder.input.loaded.CheckerView(),
 			record,
@@ -202,6 +226,15 @@ func (builder *packageBuilder) classifyOccurrence(
 		record, context, variant,
 	)
 	return structural, semantic.OperationInvalid, err
+}
+
+func typeSwitchBindingAnchor(
+	record *occurrenceInput,
+	context occurrenceContext,
+) bool {
+	return context.typeSwitchAnchor &&
+		record.occurrence.Kind() == catalog.KindIdent &&
+		record.occurrence.Role() == catalog.RoleAssignmentTarget
 }
 
 func (builder *packageBuilder) intrinsicHeader(
@@ -374,9 +407,8 @@ func (builder *packageBuilder) objectResolution(
 				context.selectedSelection,
 			)
 	} else if memberObject(object) &&
-		len(builder.objects.memberOwnerRelations[object]) > 1 &&
-		context.coverageType != nil {
-		owner := originMemberOwner(context.coverageType)
+		context.memberOwner != nil {
+		owner := originMemberOwner(context.memberOwner)
 		ordinal, ordinalErr := memberOrdinal(object, owner)
 		if ordinalErr != nil {
 			return semantic.OccurrenceResolution{}, true,
@@ -501,32 +533,4 @@ func identifierIsType(
 		return present && value.IsType()
 	}
 	return false
-}
-
-func (builder *packageBuilder) typeResolution(
-	record *occurrenceInput,
-	context occurrenceContext,
-) (identity.SemanticTypeID, bool, error) {
-	expression, ok := record.node.(ast.Expr)
-	if !ok {
-		return identity.SemanticTypeID{}, false, nil
-	}
-	value, present := builder.input.loaded.CheckerView().TypeOf(expression)
-	var resolved types.Type
-	if present && value.IsType() {
-		resolved = value.Type
-	}
-	if resolved == nil &&
-		record.occurrence.Kind() == catalog.KindFuncType &&
-		record.occurrence.Role() == catalog.RoleFunctionSignature {
-		resolved = context.coverageType
-		if resolved == nil {
-			resolved = context.signature
-		}
-	}
-	if resolved == nil {
-		return identity.SemanticTypeID{}, false, nil
-	}
-	typeID, err := builder.types.build(resolved)
-	return typeID, true, err
 }

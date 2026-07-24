@@ -54,6 +54,9 @@ func NewOperation(spec OperationSpec) (Operation, error) {
 	if err := validateOperationOrigin(spec); err != nil {
 		return Operation{}, err
 	}
+	if err := validateTypeSwitchGuardOperation(spec); err != nil {
+		return Operation{}, err
+	}
 	if spec.Mode == ValueModePlace {
 		if spec.Place == PlaceNone ||
 			!spec.Assignable ||
@@ -152,6 +155,37 @@ func NewOperation(spec OperationSpec) (Operation, error) {
 		seenImplicit[key] = true
 	}
 	return Operation{spec: spec}, nil
+}
+
+func validateTypeSwitchGuardOperation(spec OperationSpec) error {
+	if spec.Variant != catalog.VariantTypeSwitchGuard {
+		return nil
+	}
+	if spec.Kind != OperationTypeAssert ||
+		spec.Syntax != catalog.KindTypeAssertExpr ||
+		spec.Mode != ValueModeNone ||
+		spec.Arity != ResultArityZero ||
+		spec.Place != PlaceNone ||
+		!spec.ResultType.IsZero() ||
+		!spec.ExpectedType.IsZero() ||
+		spec.Addressable ||
+		spec.Assignable ||
+		spec.HasOk ||
+		!spec.Constant.IsZero() ||
+		spec.Object.Kind() != ObjectReferenceNone ||
+		!spec.Selection.IsZero() ||
+		!spec.Instance.IsZero() ||
+		len(spec.Operands) != 1 ||
+		len(spec.Definitions) != 0 ||
+		len(spec.Implicit) != 0 ||
+		!spec.ControlTarget.IsZero() ||
+		!spec.Label.IsZero() {
+		return fmt.Errorf(
+			"type-switch guard operation %s has noncanonical semantics",
+			spec.ID,
+		)
+	}
+	return nil
 }
 
 func validateOperationOrigin(spec OperationSpec) error {

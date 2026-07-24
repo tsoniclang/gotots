@@ -5,9 +5,12 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/tsoniclang/gotots/internal/language/semantic"
 )
 
 const stage2CertificationEnvironment = "GOTOTS_CERTIFY_STAGE2"
+const stage2ProjectionHelperEnvironment = "GOTOTS_STAGE2_PROJECT_LARGEST"
 
 type stage2CostBudget struct {
 	name                           string
@@ -236,6 +239,17 @@ func runStage2CostCorpus(
 			)
 		}
 		if sample == 3 {
+			if budget.name == "self" {
+				certifyLargestSemanticProjection(
+					t,
+					setsidBinary,
+					timeBinary,
+					timeoutBinary,
+					prlimitBinary,
+					semanticArtifact,
+					certified.semanticDigest,
+				)
+			}
 			for inspectSample := 1; inspectSample <= 3; inspectSample++ {
 				inspect := measureBoundedCostCommand(
 					t,
@@ -284,6 +298,126 @@ func runStage2CostCorpus(
 	}
 	t.Logf(
 		"%s provider artifacts: %+v", budget.name, certified,
+	)
+}
+
+func certifyLargestSemanticProjection(
+	t *testing.T,
+	setsidBinary string,
+	timeBinary string,
+	timeoutBinary string,
+	prlimitBinary string,
+	artifactPath string,
+	artifactDigest string,
+) {
+	t.Helper()
+	t.Setenv(stage2ProjectionHelperEnvironment, "1")
+	t.Setenv("GOTOTS_STAGE2_SEMANTIC_ARTIFACT", artifactPath)
+	t.Setenv("GOTOTS_STAGE2_SEMANTIC_DIGEST", artifactDigest)
+	expected := ""
+	for sample := 1; sample <= 3; sample++ {
+		measurement := measureBoundedCostCommand(
+			t,
+			fmt.Sprintf("largest-semantic-projection-%d", sample),
+			repoRoot(t),
+			setsidBinary,
+			timeBinary,
+			prlimitBinary,
+			timeoutBinary,
+			90,
+			os.Args[0],
+			"-test.run=^TestStage2LargestSemanticProjectionProcess$",
+			"-test.count=1",
+		)
+		assertMeasurement(
+			t,
+			"largest semantic projection",
+			sample,
+			measurement,
+			30,
+			700*1024,
+		)
+		projection := parseTextField(
+			t,
+			measurement.output,
+			`GOTOTS_PROJECTION ([^\n]+)`,
+		)
+		if sample == 1 {
+			expected = projection
+		} else if projection != expected {
+			t.Fatalf(
+				"largest semantic projection changed: first=%q current=%q",
+				expected,
+				projection,
+			)
+		}
+	}
+}
+
+func TestStage2LargestSemanticProjectionProcess(t *testing.T) {
+	if os.Getenv(stage2ProjectionHelperEnvironment) != "1" {
+		t.Skip("projection subprocess only")
+	}
+	artifact, err := semantic.DecodeProviderArtifact(
+		os.Getenv("GOTOTS_STAGE2_SEMANTIC_ARTIFACT"),
+		os.Getenv("GOTOTS_STAGE2_SEMANTIC_DIGEST"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var largest semantic.ProviderPackageContext
+	for _, packageID := range artifact.PackageIDs() {
+		context, present, contextErr := artifact.PackageContext(
+			packageID,
+		)
+		if contextErr != nil {
+			t.Fatal(contextErr)
+		}
+		if !present {
+			t.Fatalf("manifest package %s has no context", packageID)
+		}
+		if context.ShardBytes > largest.ShardBytes {
+			largest = context
+		}
+	}
+	if largest.Package.IsZero() || largest.ShardBytes <= 0 {
+		t.Fatal("semantic provider artifact has no largest package")
+	}
+	records := largest.DefinitionCount +
+		largest.ResolutionCount +
+		largest.DeclarationCount +
+		largest.BindingCount +
+		largest.TypeCount +
+		largest.OperationCount +
+		largest.UnsupportedCount
+	if records <= 0 {
+		t.Fatal("largest semantic package has no records")
+	}
+	if err := artifact.VisitPackage(
+		largest.Package,
+		func(pkg semantic.Package) error {
+			if pkg.ID() != largest.Package {
+				return fmt.Errorf(
+					"projected package %s, want %s",
+					pkg.ID(),
+					largest.Package,
+				)
+			}
+			return nil
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	stats := artifact.ReadStats()
+	if stats.ShardLoads != 1 ||
+		stats.MaxProviderPackagesResident != 1 {
+		t.Fatalf("projection residency stats = %+v", stats)
+	}
+	fmt.Printf(
+		"GOTOTS_PROJECTION package=%s shardBytes=%d records=%d\n",
+		largest.Package,
+		largest.ShardBytes,
+		records,
 	)
 }
 

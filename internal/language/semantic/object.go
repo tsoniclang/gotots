@@ -150,11 +150,9 @@ func NewDeclaration(
 			)
 		}
 	case identity.SemanticDeclarationMember:
-		if id.Name() != name {
-			return Declaration{}, fmt.Errorf(
-				"member declaration disagrees with identity",
-			)
-		}
+		return Declaration{}, fmt.Errorf(
+			"member payload belongs to its canonical semantic type",
+		)
 	case identity.SemanticDeclarationOccurrence:
 		if id.Name() != name {
 			return Declaration{}, fmt.Errorf(
@@ -222,6 +220,22 @@ type Binding struct {
 	authority  Authority
 }
 
+func BindingRoleCanBeCaptured(
+	role identity.SemanticBindingRole,
+) bool {
+	switch role {
+	case identity.SemanticBindingLocal,
+		identity.SemanticBindingReceiver,
+		identity.SemanticBindingParameter,
+		identity.SemanticBindingResult,
+		identity.SemanticBindingRange,
+		identity.SemanticBindingTypeSwitch:
+		return true
+	default:
+		return false
+	}
+}
+
 func NewBinding(
 	id identity.SemanticBindingID,
 	pkg identity.PackageID,
@@ -263,6 +277,13 @@ func NewBinding(
 	if definition.IsZero() && len(captures) != 0 {
 		return Binding{}, fmt.Errorf(
 			"non-executable binding cannot carry capture owners",
+		)
+	}
+	if len(captures) != 0 &&
+		!BindingRoleCanBeCaptured(role) {
+		return Binding{}, fmt.Errorf(
+			"binding role %s cannot carry runtime captures",
+			role,
 		)
 	}
 	for _, capture := range captures {

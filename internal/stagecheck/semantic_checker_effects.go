@@ -73,16 +73,20 @@ func (verifier *checkerSemanticVerifier) independentImplicitEffects(
 	}
 	if operation.Kind() == semantic.OperationBlock &&
 		occurrence.Role() == catalog.RoleFunctionBody {
-		for _, binding := range verifier.namedResultBindings(
+		bindings, err := verifier.namedResultBindings(
 			operation.Definition(),
-		) {
+		)
+		if err != nil {
+			return nil, err
+		}
+		for _, binding := range bindings {
 			object, err := verifier.bindingCheckerObject(binding)
 			if err != nil {
 				return nil, err
 			}
 			appendEffect(
 				catalog.ImplicitZeroing,
-				binding.Source(),
+				binding.source,
 				nil,
 				object.Type(),
 			)
@@ -91,7 +95,7 @@ func (verifier *checkerSemanticVerifier) independentImplicitEffects(
 	if independentOperationCopiesOperands(operation.Kind()) {
 		for _, operand := range operands {
 			if !independentImplicitCopySource(
-				verifier.expected.occurrences[operand].Role(),
+				verifier.expected.occurrence(operand).Role(),
 			) {
 				continue
 			}
@@ -107,7 +111,7 @@ func (verifier *checkerSemanticVerifier) independentImplicitEffects(
 			target := independentExpectedType(
 				verifier.expected,
 				verifier.index,
-				verifier.expected.occurrences[operand],
+				verifier.expected.occurrence(operand).Occurrence,
 			)
 			if independentValueCopies(source) {
 				appendEffect(
@@ -276,35 +280,41 @@ func (verifier *checkerSemanticVerifier) independentZeroValue(
 
 func (verifier *checkerSemanticVerifier) namedResultBindings(
 	definition identity.DefinitionID,
-) []semantic.Binding {
-	var out []semantic.Binding
-	for _, binding := range verifier.bindings {
-		if binding.Definition() == definition &&
-			binding.Role() == identity.SemanticBindingResult &&
-			!binding.Source().IsZero() {
+) ([]*checkerBindingCandidate, error) {
+	var out []*checkerBindingCandidate
+	for _, bindingID := range verifier.bindingsByDefinition[definition] {
+		binding := verifier.bindings[bindingID]
+		if binding == nil {
+			return nil, fmt.Errorf(
+				"definition %s names absent binding %s",
+				definition, bindingID,
+			)
+		}
+		if binding.role == identity.SemanticBindingResult &&
+			!binding.source.IsZero() {
 			out = append(out, binding)
 		}
 	}
 	sort.Slice(out, func(left, right int) bool {
-		return out[left].ID().String() < out[right].ID().String()
+		return out[left].id.Compare(out[right].id) < 0
 	})
-	return out
+	return out, nil
 }
 
 func (verifier *checkerSemanticVerifier) bindingCheckerObject(
-	binding semantic.Binding,
+	binding *checkerBindingCandidate,
 ) (types.Object, error) {
-	node, present := verifier.index.OccurrenceNode(binding.Source())
+	node, present := verifier.index.OccurrenceNode(binding.source)
 	identifier, identifierNode := node.(*ast.Ident)
 	if !present || !identifierNode {
 		return nil, fmt.Errorf(
-			"binding %s has no identifier source", binding.ID(),
+			"binding %s has no identifier source", binding.id,
 		)
 	}
 	object, present := verifier.view.DefOf(identifier)
 	if !present {
 		return nil, fmt.Errorf(
-			"binding %s source has no checker object", binding.ID(),
+			"binding %s source has no checker object", binding.id,
 		)
 	}
 	return object, nil
@@ -423,8 +433,8 @@ func (verifier *checkerSemanticVerifier) verifyImplicitPackageOperations() error
 		if err != nil {
 			return err
 		}
-		operation := verifier.operations[id]
-		if operation.ID().IsZero() {
+		operation, present := verifier.operation(id)
+		if !present {
 			return fmt.Errorf(
 				"package initialization %s has no semantic operation",
 				definition,
@@ -488,7 +498,7 @@ func (verifier *checkerSemanticVerifier) independentPackageInitialization() (
 		}
 		occurrence, present := verifier.index.OccurrenceID(entry.Rhs)
 		if present {
-			definition := verifier.expected.owners[occurrence]
+			definition := verifier.expected.occurrenceOwner(occurrence)
 			if definition.IsZero() {
 				return nil, nil, nil, fmt.Errorf(
 					"initializer expression has no definition",
@@ -510,7 +520,7 @@ func (verifier *checkerSemanticVerifier) independentPackageInitialization() (
 				"checker initialization order crosses semantic depth",
 			)
 		}
-		owner := verifier.expected.owners[occurrence]
+		owner := verifier.expected.occurrenceOwner(occurrence)
 		operands = append(operands, occurrence)
 		if !seenDefinitions[owner] {
 			seenDefinitions[owner] = true
@@ -544,8 +554,9 @@ func (verifier *checkerSemanticVerifier) independentPackageInitialization() (
 		})
 	}
 	sort.Slice(zeroes, func(left, right int) bool {
-		return zeroes[left].occurrence.String() <
-			zeroes[right].occurrence.String()
+		return zeroes[left].occurrence.Compare(
+			zeroes[right].occurrence,
+		) < 0
 	})
 	for _, candidate := range zeroes {
 		effects = append(effects, checkerImplicitEffect{

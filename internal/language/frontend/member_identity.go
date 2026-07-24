@@ -137,35 +137,7 @@ func (index *objectIndex) declarationIDForMemberOwner(
 	if err != nil {
 		return identity.SemanticDeclarationID{}, err
 	}
-	ownerPackage, err := index.memberOwnerPackage(owner, object)
-	if err != nil {
-		return identity.SemanticDeclarationID{}, err
-	}
-	if existing, present :=
-		index.declarationOwnerPackage[admitted]; present &&
-		existing != ownerPackage {
-		return identity.SemanticDeclarationID{}, fmt.Errorf(
-			"semantic member declaration %s has owner packages %s and %s",
-			admitted, existing, ownerPackage,
-		)
-	}
-	index.declarationOwnerPackage[admitted] = ownerPackage
 	return admitted, nil
-}
-
-func (index *objectIndex) memberOwnerPackage(
-	owner types.Type,
-	object types.Object,
-) (identity.PackageID, error) {
-	owner = stripMemberOwnerPointer(owner)
-	if named, ok := owner.(*types.Named); ok &&
-		named.Obj().Pkg() != nil {
-		return index.packageID(named.Obj().Pkg())
-	}
-	if object.Pkg() != nil {
-		return index.packageID(object.Pkg())
-	}
-	return identity.PackageID{}, nil
 }
 
 func canonicalMemberObject(

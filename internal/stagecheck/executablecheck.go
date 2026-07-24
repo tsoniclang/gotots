@@ -58,17 +58,23 @@ func executableLedger(
 			}
 		}
 		additional[occurrence.ID()] = occurrence
-		actual.add(
-			"executable-additional-occurrence",
-			occurrenceKey(occurrence),
+		addRecord(
+			&actual.additionalOccurrences,
+			occurrenceLedgerRecordFromOccurrence(occurrence),
 		)
 	}
 	for _, region := range inventory.Regions() {
-		actual.add("executable-region", region.ID().String())
+		addRecord(
+			&actual.executableRegions,
+			executableRegionLedgerRecord{id: region.ID()},
+		)
 		memberSet := map[identity.OccurrenceID]bool{}
-		for index, member := range region.Members() {
+		if err := region.VisitMembers(func(
+			index int,
+			member identity.OccurrenceID,
+		) error {
 			if memberSet[member] {
-				return nil, &VerificationError{
+				return &VerificationError{
 					Stage: "executable-region",
 					Reason: fmt.Sprintf(
 						"region %s repeats member %s", region.ID(), member,
@@ -78,7 +84,7 @@ func executableLedger(
 			memberSet[member] = true
 			if _, present := graph.ResidentOccurrence(member); !present {
 				if _, present = additional[member]; !present {
-					return nil, &VerificationError{
+					return &VerificationError{
 						Stage: "executable-region",
 						Reason: fmt.Sprintf(
 							"region %s member %s has no canonical payload",
@@ -87,33 +93,33 @@ func executableLedger(
 					}
 				}
 			}
-			actual.add(
-				"executable-member",
-				fmt.Sprintf("%s|%d|%s", region.ID(), index, member),
-			)
+			addRecord(&actual.executableMembers, executableMemberLedgerRecord{
+				region: region.ID(), ordinal: index, occurrence: member,
+			})
+			return nil
+		}); err != nil {
+			return nil, err
 		}
 		for _, reference := range region.References() {
-			actual.add(
-				"executable-definition-reference",
-				fmt.Sprintf(
-					"%s|%s|%d|%d|%s",
-					region.ID(),
-					reference.Parent(),
-					uint16(reference.Edge()),
-					reference.Ordinal(),
-					reference.Child(),
-				),
+			addRecord(
+				&actual.definitionReferences,
+				definitionReferenceLedgerRecord{
+					region:  region.ID(),
+					parent:  reference.Parent(),
+					edge:    reference.Edge(),
+					ordinal: reference.Ordinal(),
+					child:   reference.Child(),
+				},
 			)
 		}
 		for _, operation := range region.ImplicitOperations() {
-			actual.add(
-				"executable-implicit-operation",
-				fmt.Sprintf(
-					"%s|%d|%s",
-					region.ID(),
-					uint8(operation.Kind()),
-					operation.Package(),
-				),
+			addRecord(
+				&actual.implicitOperations,
+				implicitOperationLedgerRecord{
+					region: region.ID(),
+					kind:   operation.Kind(),
+					pkg:    operation.Package(),
+				},
 			)
 		}
 	}
@@ -160,7 +166,10 @@ func deriveExecutableLedger(
 		regionID, _ := identity.NewExecutableRegionID(
 			selection.Definition(),
 		)
-		expected.add("executable-region", regionID.String())
+		addRecord(
+			&expected.executableRegions,
+			executableRegionLedgerRecord{id: regionID},
+		)
 		if selection.Definition().ImplicitOp().Valid() {
 			if selection.Definition().ImplicitOp() !=
 				identity.ImplicitDefinitionPackageInit {
@@ -170,17 +179,14 @@ func deriveExecutableLedger(
 						selection.Definition().String(),
 				}
 			}
-			expected.add(
-				"executable-implicit-operation",
-				fmt.Sprintf(
-					"%s|%d|%s",
-					regionID,
-					uint8(
-						executable.
-							ImplicitOperationCoordinatePackageInitialization,
-					),
-					selection.Definition().Package(),
-				),
+			addRecord(
+				&expected.implicitOperations,
+				implicitOperationLedgerRecord{
+					region: regionID,
+					kind: executable.
+						ImplicitOperationCoordinatePackageInitialization,
+					pkg: selection.Definition().Package(),
+				},
 			)
 			continue
 		}
@@ -309,7 +315,8 @@ func (b *independentExecutableBuilder) visit(
 	if structural, present := b.graph.ResidentOccurrence(
 		occurrence.id,
 	); present {
-		if occurrenceKey(structural) != occurrence.key() {
+		if occurrenceLedgerRecordFromOccurrence(structural) !=
+			occurrenceLedgerRecordFromDerived(occurrence) {
 			return fmt.Errorf(
 				"independent executable occurrence %s conflicts with structure",
 				occurrence.id,
@@ -321,16 +328,19 @@ func (b *independentExecutableBuilder) visit(
 		}
 		if !b.additional[occurrence.id] {
 			b.additional[occurrence.id] = true
-			b.ledger.add(
-				"executable-additional-occurrence", occurrence.key(),
+			addRecord(
+				&b.ledger.additionalOccurrences,
+				occurrenceLedgerRecordFromDerived(occurrence),
 			)
 		}
 	}
-	b.ledger.add(
-		"executable-member",
-		fmt.Sprintf(
-			"%s|%d|%s", b.region, b.memberIndex, occurrence.id,
-		),
+	addRecord(
+		&b.ledger.executableMembers,
+		executableMemberLedgerRecord{
+			region:     b.region,
+			ordinal:    b.memberIndex,
+			occurrence: occurrence.id,
+		},
 	)
 	b.memberIndex++
 	children, err := independentChildren(node, occurrence.kind)
@@ -385,11 +395,14 @@ func (b *independentExecutableBuilder) reference(
 	ordinal int,
 	child identity.DefinitionID,
 ) {
-	b.ledger.add(
-		"executable-definition-reference",
-		fmt.Sprintf(
-			"%s|%s|%d|%d|%s",
-			b.region, parent, uint16(edge), ordinal, child,
-		),
+	addRecord(
+		&b.ledger.definitionReferences,
+		definitionReferenceLedgerRecord{
+			region:  b.region,
+			parent:  parent,
+			edge:    edge,
+			ordinal: ordinal,
+			child:   child,
+		},
 	)
 }

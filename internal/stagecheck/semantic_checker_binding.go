@@ -12,6 +12,7 @@ import (
 )
 
 type checkerBindingCandidate struct {
+	id         identity.SemanticBindingID
 	object     types.Object
 	anchor     identity.OccurrenceID
 	source     identity.OccurrenceID
@@ -20,6 +21,7 @@ type checkerBindingCandidate struct {
 	definition identity.DefinitionID
 	typ        types.Type
 	name       string
+	ordinal    int
 }
 
 type checkerBindingGroup struct {
@@ -28,6 +30,9 @@ type checkerBindingGroup struct {
 }
 
 func (verifier *checkerSemanticVerifier) verifyBindings() error {
+	if err := verifier.deriveIndependentUnnamedSignatureBindings(); err != nil {
+		return err
+	}
 	candidates, err := verifier.independentBindingCandidates()
 	if err != nil {
 		return err
@@ -40,13 +45,28 @@ func (verifier *checkerSemanticVerifier) verifyBindings() error {
 		}
 		groups[key] = append(groups[key], candidate)
 	}
+	ordinals, err := verifier.independentCompleteBindingOrdinals(
+		verifier.scopeOwners,
+	)
+	if err != nil {
+		return err
+	}
 	expected := map[identity.SemanticBindingID]*checkerBindingCandidate{}
 	for _, group := range groups {
 		sort.Slice(group, func(left, right int) bool {
-			return independentBindingOrder(group[left]) <
-				independentBindingOrder(group[right])
+			return group[left].anchor.Compare(
+				group[right].anchor,
+			) < 0
 		})
-		for ordinal, candidate := range group {
+		for _, candidate := range group {
+			ordinal, present := ordinals[candidate.object]
+			if !present {
+				return fmt.Errorf(
+					"checker binding %s has no independent complete-set ordinal",
+					candidate.name,
+				)
+			}
+			candidate.ordinal = ordinal
 			id, err := identity.NewSemanticBindingID(
 				candidate.scope,
 				candidate.source,
@@ -62,6 +82,7 @@ func (verifier *checkerSemanticVerifier) verifyBindings() error {
 					id,
 				)
 			}
+			candidate.id = id
 			expected[id] = candidate
 			if candidate.object != nil {
 				if existing := verifier.bindingByObject[candidate.object]; !existing.IsZero() && existing != id {
@@ -74,26 +95,66 @@ func (verifier *checkerSemanticVerifier) verifyBindings() error {
 			}
 		}
 	}
-	if len(expected) != len(verifier.bindings) {
-		return fmt.Errorf(
-			"bindings checker-derived=%d semantic=%d; missing=%v extra=%v; missing-details=%v",
-			len(expected),
-			len(verifier.bindings),
-			bindingIdentityDifference(expected, verifier.bindings),
-			semanticBindingIdentityDifference(verifier.bindings, expected),
-			missingBindingDetails(expected, verifier.bindings),
+	verifier.bindings = expected
+	for id, candidate := range expected {
+		verifier.bindingsByDefinition[candidate.definition] = append(
+			verifier.bindingsByDefinition[candidate.definition], id,
 		)
 	}
-	for id, candidate := range expected {
-		record, present := verifier.bindings[id]
-		if !present {
-			return fmt.Errorf("checker-derived binding %s is absent", id)
+	for definition := range verifier.bindingsByDefinition {
+		sort.Slice(
+			verifier.bindingsByDefinition[definition],
+			func(left, right int) bool {
+				return verifier.bindingsByDefinition[definition][left].
+					Compare(
+						verifier.bindingsByDefinition[definition][right],
+					) < 0
+			},
+		)
+	}
+	var missing, extra []string
+	seen := map[identity.SemanticBindingID]bool{}
+	actualCount := 0
+	if err := verifier.visitBindings(func(
+		record semantic.Binding,
+	) error {
+		candidate := expected[record.ID()]
+		if candidate == nil {
+			extra = append(extra, record.ID().String())
+			return nil
 		}
+		actualCount++
+		if seen[record.ID()] {
+			extra = append(extra, record.ID().String())
+			return nil
+		}
+		seen[record.ID()] = true
 		if err := verifier.verifyBindingRecord(
 			record, candidate,
 		); err != nil {
-			return fmt.Errorf("binding %s: %w", id, err)
+			return fmt.Errorf("binding %s: %w", record.ID(), err)
 		}
+		verifier.bindingCaptures[record.ID()] = record.CapturedBy()
+		return nil
+	}); err != nil {
+		return err
+	}
+	for id := range expected {
+		if !seen[id] {
+			missing = append(missing, id.String())
+		}
+	}
+	sort.Strings(missing)
+	sort.Strings(extra)
+	if len(missing) != 0 || len(extra) != 0 {
+		return fmt.Errorf(
+			"bindings checker-derived=%d semantic=%d; missing=%v extra=%v; missing-details=%v",
+			len(expected),
+			actualCount,
+			missing,
+			extra,
+			verifier.missingBindingDetails(expected, seen),
+		)
 	}
 	return nil
 }
@@ -126,6 +187,11 @@ func (verifier *checkerSemanticVerifier) independentBindingCandidates() (
 			if defined &&
 				identifier.Name != "_" &&
 				independentLexicalBinding(object) {
+				if verifier.independentIntrinsicContractBinding(
+					occurrenceID,
+				) {
+					continue
+				}
 				if existing := objects[object]; !existing.IsZero() && existing != occurrenceID {
 					return nil, fmt.Errorf(
 						"checker binding %s has sources %s and %s",
@@ -134,9 +200,19 @@ func (verifier *checkerSemanticVerifier) independentBindingCandidates() (
 				}
 				objects[object] = occurrenceID
 			}
+			object, used := verifier.view.UseOf(identifier)
+			if used &&
+				independentLexicalBinding(object) &&
+				!verifier.checkerSourceByObject[object].IsZero() {
+				source := verifier.checkerSourceByObject[object]
+				objects[object] = source
+			}
 		}
 		object, present := verifier.view.ImplicitOf(node)
 		if !present || !independentLexicalBinding(object) {
+			continue
+		}
+		if verifier.independentIntrinsicContractBinding(occurrenceID) {
 			continue
 		}
 		if variable, field := object.(*types.Var); field && variable.IsField() {
@@ -156,28 +232,6 @@ func (verifier *checkerSemanticVerifier) independentBindingCandidates() (
 		}
 		implicit[object] = candidate
 	}
-	for _, occurrenceID := range verifier.expected.order {
-		node, present := verifier.index.OccurrenceNode(occurrenceID)
-		identifier, identifierNode := node.(*ast.Ident)
-		if !present || !identifierNode {
-			continue
-		}
-		object, used := verifier.view.UseOf(identifier)
-		if !used ||
-			!independentLexicalBinding(object) ||
-			independentPackageName(object) ||
-			!object.Pos().IsValid() ||
-			!objects[object].IsZero() {
-			continue
-		}
-		source, err := verifier.index.IdentifierOccurrence(
-			object.Pos(), object.Name(),
-		)
-		if err != nil {
-			return nil, err
-		}
-		objects[object] = source
-	}
 	out := make(
 		[]*checkerBindingCandidate,
 		0,
@@ -185,6 +239,9 @@ func (verifier *checkerSemanticVerifier) independentBindingCandidates() (
 	)
 	for object, source := range objects {
 		if !independentLexicalBinding(object) {
+			continue
+		}
+		if verifier.independentIntrinsicContractBinding(source) {
 			continue
 		}
 		role := verifier.independentBindingRole(object, source)
@@ -210,7 +267,7 @@ func (verifier *checkerSemanticVerifier) independentBindingCandidates() (
 			source: source,
 			scope:  scope,
 			role:   role,
-			definition: verifier.bindingDefinition(
+			definition: verifier.supportBindingDefinition(
 				source, scope,
 			),
 			typ:  typ,
@@ -229,21 +286,16 @@ func (verifier *checkerSemanticVerifier) independentImplicitBinding(
 	scopeOwners map[*types.Scope]identity.OccurrenceID,
 ) (*checkerBindingCandidate, error) {
 	role := verifier.independentBindingRole(object, anchor)
-	if variable, ok := object.(*types.Var); ok &&
-		!variable.IsField() {
-		node, _ := verifier.index.OccurrenceNode(anchor)
-		if _, field := node.(*ast.Field); !field {
-			role = identity.SemanticBindingTypeSwitch
-		}
-	}
+	node, _ := verifier.index.OccurrenceNode(anchor)
+	role = independentImplicitBindingRole(node, object, role)
 	if !role.Valid() {
 		return nil, fmt.Errorf(
 			"implicit checker binding %s has no closed role",
 			object.Name(),
 		)
 	}
-	scope, err := verifier.independentScopeForOccurrence(
-		anchor, scopeOwners,
+	scope, err := verifier.independentBindingScope(
+		object, anchor, scopeOwners,
 	)
 	if err != nil {
 		return nil, err
@@ -275,22 +327,27 @@ func (verifier *checkerSemanticVerifier) independentScopeOwners() (
 	error,
 ) {
 	out := map[*types.Scope]identity.OccurrenceID{}
-	for _, occurrenceID := range verifier.expected.order {
-		node, present := verifier.index.OccurrenceNode(occurrenceID)
+	err := verifier.view.VisitScopes(func(
+		node ast.Node,
+		scope *types.Scope,
+	) error {
+		occurrenceID, present := verifier.index.OccurrenceID(
+			node,
+		)
 		if !present {
-			continue
-		}
-		scope, present := verifier.view.ScopeOf(node)
-		if !present {
-			continue
+			return nil
 		}
 		if existing := out[scope]; !existing.IsZero() && existing != occurrenceID {
-			return nil, fmt.Errorf(
+			return fmt.Errorf(
 				"checker scope has owners %s and %s",
 				existing, occurrenceID,
 			)
 		}
 		out[scope] = occurrenceID
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	return out, nil
 }
@@ -333,7 +390,7 @@ func (verifier *checkerSemanticVerifier) independentScopeForOccurrence(
 			break
 		}
 		path = append(path, current)
-		occurrence, present := verifier.expected.occurrences[current]
+		occurrence, present := verifier.expected.occurrences.get(current)
 		if !present {
 			break
 		}
@@ -408,8 +465,12 @@ func (verifier *checkerSemanticVerifier) independentBindingRole(
 		return identity.SemanticBindingTypeParameter
 	}
 	for current := source; !current.IsZero(); {
-		occurrence, present := verifier.expected.occurrences[current]
+		occurrence, present := verifier.expected.occurrences.get(current)
 		if !present {
+			if role, supportPresent :=
+				verifier.index.StructuralSupport(current); supportPresent {
+				return independentSupportBindingRole(role)
+			}
 			break
 		}
 		switch occurrence.Role() {
@@ -433,7 +494,33 @@ func (verifier *checkerSemanticVerifier) independentBindingRole(
 	return identity.SemanticBindingLocal
 }
 
+func independentSupportBindingRole(
+	role catalog.Role,
+) identity.SemanticBindingRole {
+	switch role {
+	case catalog.RoleTypeParameters:
+		return identity.SemanticBindingTypeParameter
+	case catalog.RoleParameters:
+		return identity.SemanticBindingParameter
+	case catalog.RoleResults:
+		return identity.SemanticBindingResult
+	case catalog.RoleReceiver:
+		return identity.SemanticBindingReceiver
+	case catalog.RoleImportAlias:
+		return identity.SemanticBindingImport
+	case catalog.RoleRangeKey, catalog.RoleRangeValue:
+		return identity.SemanticBindingRange
+	case catalog.RoleLabelDeclaration:
+		return identity.SemanticBindingLabel
+	default:
+		return identity.SemanticBindingLocal
+	}
+}
+
 func independentLexicalBinding(object types.Object) bool {
+	if object == nil || object.Name() == "_" {
+		return false
+	}
 	switch object := object.(type) {
 	case *types.PkgName, *types.Label:
 		return true
@@ -465,107 +552,48 @@ func (verifier *checkerSemanticVerifier) bindingDefinition(
 	anchor identity.OccurrenceID,
 	scope identity.OccurrenceID,
 ) identity.DefinitionID {
-	if owner := verifier.expected.owners[anchor]; !owner.IsZero() {
+	if owner := verifier.expected.occurrenceOwner(anchor); !owner.IsZero() {
 		return owner
 	}
-	if owner := verifier.expected.structuralOwners[anchor]; !owner.IsZero() {
+	if owner := verifier.expected.structuralOccurrenceOwner(anchor); !owner.IsZero() {
 		return owner
 	}
-	if owner := verifier.expected.owners[scope]; !owner.IsZero() {
+	if owner := verifier.expected.occurrenceOwner(scope); !owner.IsZero() {
 		return owner
 	}
-	return verifier.expected.structuralOwners[scope]
+	return verifier.expected.structuralOccurrenceOwner(scope)
 }
 
-func independentBindingOrder(
-	candidate *checkerBindingCandidate,
-) string {
-	if !candidate.source.IsZero() {
-		return fmt.Sprintf(
-			"%020d|%020d|%s",
-			candidate.source.Span().Start(),
-			candidate.source.Span().End(),
-			candidate.name,
-		)
+func (verifier *checkerSemanticVerifier) supportBindingDefinition(
+	source identity.OccurrenceID,
+	scope identity.OccurrenceID,
+) identity.DefinitionID {
+	if definition := verifier.bindingDefinition(
+		source, scope,
+	); !definition.IsZero() {
+		return definition
 	}
-	position := 0
-	if candidate.object != nil {
-		position = int(candidate.object.Pos())
+	if definition, present := verifier.index.OccurrenceDefinition(
+		source,
+	); present {
+		return definition
 	}
-	return fmt.Sprintf("%020d|%s", position, candidate.name)
+	definition, _ := verifier.index.OccurrenceDefinition(scope)
+	return definition
 }
 
-func (verifier *checkerSemanticVerifier) verifyBindingRecord(
-	record semantic.Binding,
-	expected *checkerBindingCandidate,
-) error {
-	if record.Package() != verifier.expected.id ||
-		record.Definition() != expected.definition ||
-		record.Role() != expected.role ||
-		record.Name() != expected.name ||
-		record.Source() != expected.source {
-		return fmt.Errorf(
-			"semantic=%s/%s/%s/%q/%s checker=%s/%s/%s/%q/%s",
-			record.Package(),
-			record.Definition(),
-			record.Role(),
-			record.Name(),
-			record.Source(),
-			verifier.expected.id,
-			expected.definition,
-			expected.role,
-			expected.name,
-			expected.source,
-		)
-	}
-	if expected.typ == nil {
-		if !record.Type().IsZero() {
-			return fmt.Errorf("typeless checker binding carries a type")
-		}
-		return nil
-	}
-	return verifier.types.verify(record.Type(), expected.typ)
-}
-
-func bindingIdentityDifference(
-	expected map[identity.SemanticBindingID]*checkerBindingCandidate,
-	actual map[identity.SemanticBindingID]semantic.Binding,
-) []string {
-	var out []string
-	for id := range expected {
-		if _, present := actual[id]; !present {
-			out = append(out, id.String())
+func independentImplicitBindingRole(
+	node ast.Node,
+	object types.Object,
+	role identity.SemanticBindingRole,
+) identity.SemanticBindingRole {
+	switch object.(type) {
+	case *types.PkgName:
+		return identity.SemanticBindingImport
+	case *types.Var:
+		if _, field := node.(*ast.Field); !field {
+			return identity.SemanticBindingTypeSwitch
 		}
 	}
-	sort.Strings(out)
-	return out
-}
-
-func semanticBindingIdentityDifference(
-	actual map[identity.SemanticBindingID]semantic.Binding,
-	expected map[identity.SemanticBindingID]*checkerBindingCandidate,
-) []string {
-	var out []string
-	for id := range actual {
-		if _, present := expected[id]; !present {
-			out = append(out, id.String())
-		}
-	}
-	sort.Strings(out)
-	return out
-}
-
-func (expected semanticPackageExpectation) localBinding(
-	record semantic.Binding,
-) bool {
-	if !record.Source().IsZero() &&
-		expected.localFiles[record.Source().Span().File()] {
-		return true
-	}
-	if !record.ID().Owner().IsZero() &&
-		expected.localFiles[record.ID().Owner().Span().File()] {
-		return true
-	}
-	_, local := expected.definitions[record.Definition()]
-	return !record.Definition().IsZero() && local
+	return role
 }

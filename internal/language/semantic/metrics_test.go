@@ -1,10 +1,13 @@
 package semantic
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/identity"
+	"github.com/tsoniclang/gotots/internal/language/catalog"
 )
 
 func TestSemanticMetricsKeepIndependentBoundedTails(t *testing.T) {
@@ -106,7 +109,7 @@ func TestMeasurePackagesRejectsDuplicateIdentity(t *testing.T) {
 
 func TestProviderManifestMetricsDoNotRequireRecordPayload(t *testing.T) {
 	pkg := semanticFixture(t).pkg
-	metrics, err := measureProviderManifest([]providerManifestPackage{{
+	metrics, err := measureShardManifest([]packageShardManifest{{
 		Package: pkg.String(), ShardBytes: 4096,
 		DefinitionCount: 3, ResolutionCount: 17,
 		DeclarationCount: 4, BindingCount: 5,
@@ -136,5 +139,169 @@ func TestProviderManifestMetricsDoNotRequireRecordPayload(t *testing.T) {
 		len(metrics.LargestOperations()) != 0 ||
 		len(metrics.LargestTypes()) != 0 {
 		t.Fatalf("provider manifest metric tails = %+v", metrics)
+	}
+}
+
+func TestSemanticShardWriterOwnsExactBoundedRecordTails(
+	t *testing.T,
+) {
+	fixture := semanticFixture(t)
+	operationID, err := identity.NewOperationID(
+		fixture.definition, fixture.body,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	basic, err := NewType(TypeSpec{
+		Kind:  TypeBasic,
+		Basic: BasicInt,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	signature, err := NewType(TypeSpec{
+		Kind: TypeSignature,
+		Signature: Signature{
+			Results: []identity.SemanticTypeID{basic.ID()},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	declarationID, err := identity.NewPackageDeclarationID(
+		fixture.pkg, identity.SemanticObjectFunction, "F",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	declaration, err := NewDeclaration(
+		declarationID,
+		fixture.pkg,
+		identity.SemanticObjectFunction,
+		"F",
+		signature.ID(),
+		true,
+		Constant{},
+		fixture.authority,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	definition, err := NewDefinitionSemantics(
+		DefinitionSemanticsSpec{
+			Definition: fixture.definition,
+			Package:    fixture.pkg,
+			Form:       DefinitionFormCallable,
+			Authority:  fixture.authority,
+			Name:       "F",
+			Declarations: []identity.SemanticDeclarationID{
+				declarationID,
+			},
+			Signature: signature.ID(),
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	operation, err := NewOperation(OperationSpec{
+		ID:         operationID,
+		Kind:       OperationLiteral,
+		Syntax:     catalog.KindBasicLit,
+		Variant:    catalog.VariantNone,
+		Role:       catalog.RoleReturnValue,
+		Token:      catalog.TokenINT,
+		Mode:       ValueModeValue,
+		Arity:      ResultArityOne,
+		Place:      PlaceNone,
+		ResultType: basic.ID(),
+		Object:     NoObjectReference(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolution, err := NewOccurrenceResolution(ResolutionSpec{
+		Occurrence: fixture.body,
+		Owner:      fixture.definition,
+		Syntax:     catalog.KindBasicLit,
+		Role:       catalog.RoleReturnValue,
+		Variant:    catalog.VariantNone,
+		Domain:     catalog.ResolutionDomainExecutable,
+		Kind:       ResolutionOperation,
+		Operation:  operationID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pkg, err := NewPackage(PackageInput{
+		ID:           fixture.pkg,
+		Provenance:   ProvenanceWorkspaceModule,
+		Definitions:  []DefinitionSemantics{definition},
+		Resolutions:  []OccurrenceResolution{resolution},
+		Declarations: []Declaration{declaration},
+		Types:        []Type{basic, signature},
+		TypeWitnesses: []TypeWitness{
+			mustTypeWitness(
+				t, fixture.pkg, basic.ID(), fixture.authority,
+			),
+			mustTypeWitness(
+				t, fixture.pkg, signature.ID(), fixture.authority,
+			),
+		},
+		Operations: []Operation{operation},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	measurement, err := writeSemanticShard(&output, pkg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	operationEncoder := wireOperationEncoder{
+		identities: wireIdentityEncoder{table: pkg.identities},
+		store:      pkg.operations,
+	}
+	wireOperation, err := operationEncoder.record(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encodedOperation, err := json.Marshal(wireOperation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if measurement.encodedBytes != int64(output.Len()) ||
+		len(measurement.operationTail) != 1 ||
+		measurement.operationTail[0].Identity !=
+			operationID.String() ||
+		measurement.operationTail[0].EncodedBytes !=
+			int64(len(encodedOperation)) {
+		t.Fatalf(
+			"semantic shard measurement=%+v output=%d operation=%d",
+			measurement, output.Len(), len(encodedOperation),
+		)
+	}
+
+	measurement = newSemanticShardMeasurement(fixture.pkg)
+	for index := 0; index < 1000; index++ {
+		measurement.consider(
+			&measurement.operationTail,
+			fmt.Sprintf("operation-%04d", index),
+			int64(index+1),
+		)
+		if len(measurement.operationTail) >
+			semanticTailLimit {
+			t.Fatalf(
+				"record tail retained %d entries",
+				len(measurement.operationTail),
+			)
+		}
+	}
+	if measurement.operationTail[0].EncodedBytes != 1000 ||
+		measurement.operationTail[semanticTailLimit-1].
+			EncodedBytes != 981 {
+		t.Fatalf(
+			"bounded record tail=%+v",
+			measurement.operationTail,
+		)
 	}
 }

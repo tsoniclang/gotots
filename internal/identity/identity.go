@@ -61,10 +61,21 @@ func NewModuleID(path, version string) (ModuleID, error) {
 }
 
 func pathHasDotSegment(p string) bool {
-	for _, segment := range strings.Split(p, "/") {
+	for start := 0; start <= len(p); {
+		end := strings.IndexByte(p[start:], '/')
+		if end < 0 {
+			end = len(p)
+		} else {
+			end += start
+		}
+		segment := p[start:end]
 		if segment == "." || segment == ".." {
 			return true
 		}
+		if end == len(p) {
+			return false
+		}
+		start = end + 1
 	}
 	return false
 }

@@ -49,7 +49,7 @@ type ProviderArtifactWriter struct {
 	spool     *os.File
 	spoolPath string
 	manifest  providerManifest
-	previous  string
+	previous  identity.PackageID
 	closed    bool
 	result    ProviderWriteResult
 }
@@ -108,7 +108,8 @@ func (w *ProviderArtifactWriter) Append(
 	for candidate := range artifact.packageDigests {
 		packageID = candidate
 	}
-	if packageID.String() <= w.previous {
+	if !w.previous.IsZero() &&
+		packageID.Compare(w.previous) <= 0 {
 		return providerArtifactError(
 			"provider packages are not appended in canonical order",
 		)
@@ -160,17 +161,25 @@ func (w *ProviderArtifactWriter) Append(
 			EvidenceDigest: fact.evidenceDigest,
 		})
 	}
+	files := make(
+		[]identity.FileID, 0, len(artifact.filePackages),
+	)
 	for file, owner := range artifact.filePackages {
 		if owner != packageID {
 			return providerArtifactError(
 				"provider shard contains a foreign package file",
 			)
 		}
+		files = append(files, file)
+	}
+	sort.Slice(files, func(left, right int) bool {
+		return files[left].Compare(files[right]) < 0
+	})
+	for _, file := range files {
 		entry.Files = append(entry.Files, file.String())
 	}
-	sort.Strings(entry.Files)
 	w.manifest.Packages = append(w.manifest.Packages, entry)
-	w.previous = packageID.String()
+	w.previous = packageID
 	w.result.PackageContexts++
 	w.result.Files += len(entry.Files)
 	if entry.Synthetic {

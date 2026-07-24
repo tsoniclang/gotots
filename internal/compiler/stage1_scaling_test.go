@@ -114,7 +114,7 @@ func inspectScaleFixture(
 		"module "+module+"\n\ngo 1.26.0\n",
 	)
 	writeCompilerFile(t, directory, "fixture.go", sourceText)
-	inspection, err := InspectConstructs(source.Request{
+	inspection, err := inspectConstructsForTest(t, source.Request{
 		Dir: directory, Patterns: []string{"."},
 		ProviderContract: contract.DefaultID,
 	})
