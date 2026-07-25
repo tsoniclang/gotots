@@ -1589,7 +1589,8 @@ rediscover an earlier fact. The input contains exactly:
   package identity, selected local/certified authority, semantic-shard digest,
   and record counts;
 - the finalized Stage-1 package topology: package identity, declared package
-  name, requested-root state, and typed direct-import edges;
+  name, requested-root state, typed direct-import edges, and the selected-Go
+  package-initialization disposition/order;
 - the total Stage-1 definition-provider selections, referenced by
   `DefinitionID`, for implementation ownership and boundary obligations;
 - one externally selected, versioned root contract and its fingerprint;
@@ -1629,16 +1630,21 @@ call. The package topology exact-joins the semantic package census before any
 fact is produced.
 
 `PackageTopology` contains one
-`PackageNode{PackageID, DeclaredName, RequestedRoot, InitializationOrdinal}`
-per selected package and one sorted unique
+`PackageNode{PackageID, DeclaredName, RequestedRoot,
+Initialization{None | Go{Ordinal}}}` per selected package and one sorted unique
 `PackageImport{Importer, Imported}` per direct Go import. Both endpoints must
 be present nodes; self edges, transitive edges represented as direct, duplicate
 pairs, and a package with an empty/invalid Go identifier name fail.
-Initialization ordinals are a complete unique range derived from the selected
-Go toolchain's package-initialization order and must place every imported
-package before its importer. Import source spelling and blank/named/dot form
+`None` is valid only for a selected language pseudo-package or intrinsic that
+has no runtime package-initialization event. `Go{Ordinal}` is valid for every
+ordinary source package; those ordinals alone form a complete unique range
+derived by the selected Go specification rule: repeatedly choose, from all
+packages sorted by import path, the first uninitialized package whose imported
+ordinary packages are initialized. Every imported `Go` package therefore
+precedes its `Go` importer. Import source spelling and blank/named/dot form
 remain Stage-1 occurrence/binding evidence and are not copied into this graph:
-all direct Go imports initialize their target package.
+all direct Go imports create the same typed dependency edge, including blank
+imports.
 
 Definition selection enters as one
 `ImplementationSelection{DefinitionID, Provider, EvidenceDepth, ContractID,
@@ -1869,7 +1875,9 @@ Construction is dependency ordered:
 3. exact-join every referenced identity to one owner, canonicalize each
    identity table, remap draft references once, and seal direct facts in
    canonical relation order;
-4. derive finite interface/generic/call targets and initialization order;
+4. derive finite interface/generic/call targets and the semantic
+   within-package initialization graph while preserving the Stage-1 package
+   order;
 5. compute effect, escape, alias, and other declared monotonic fixed points;
 6. independently validate every domain and seal `ProgramFacts`;
 7. resolve roots and semantic reachability; and

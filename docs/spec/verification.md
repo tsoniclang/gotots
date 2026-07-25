@@ -158,14 +158,17 @@ never inferred from which files happened to be parsed or traversed.
 
 The finalized package topology separately retains the declared Go package name
 and one typed direct `PackageImport{Importer, Imported}` edge per direct import,
-plus the complete selected-Go package-initialization ordinal. The verifier
-derives them from the selected toolchain package/type graph and exact-joins
-names, edge pairs, dependency-before-importer order, and the unique ordinal
-range with both one-sided lists. Import strings and blank/named/dot form are
-diagnostic/source binding evidence only; replacing a typed target with another
-package of the same declared name, adding transitive closure edges, dropping a
-blank import edge, changing an initialization ordinal, or deriving a package
-name from an import-path basename fails.
+plus `Initialization{None | Go{Ordinal}}`. `None` is valid only for language
+pseudo-packages/intrinsics with no runtime package-initialization event. The
+verifier derives the selected-Go import-path-ordered ready sequence from the
+selected toolchain package/type graph and exact-joins names, edge pairs,
+initialization dispositions, dependency-before-importer order, and the unique
+ordinary-source ordinal range with both one-sided lists. Import strings and
+blank/named/dot form are diagnostic/source binding evidence only; replacing a
+typed target with another package of the same declared name, adding transitive
+closure edges, dropping a blank import edge, changing an initialization
+disposition/ordinal, or deriving a package name from an import-path basename
+fails.
 
 Fixtures include, in one verified closure:
 

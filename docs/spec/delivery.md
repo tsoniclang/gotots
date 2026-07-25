@@ -182,13 +182,17 @@ Required exit evidence:
 - package owner, provenance, acquisition, and language disposition exact-join
   independent selected-toolchain metadata, including standard-library,
   dependency, replacement, `unsafe`, and pseudo-package cases;
-- each finalized package retains its exact declared Go package name and typed
-  direct `PackageImport{Importer, Imported}` edges plus a complete selected-Go
-  package-initialization ordinal resolved in the coherent package universe;
-  independent `go list`/type evidence exact-joins names, both edge endpoints,
-  dependency-before-importer order, and the complete ordinal range, while
-  import spellings, blank/named/dot form, and transitive-closure edges are not
-  accepted as Phase-3 topology;
+- each finalized package retains its exact declared Go package name, typed
+  direct `PackageImport{Importer, Imported}` edges, and a closed
+  `Initialization{None | Go{Ordinal}}` value resolved in the coherent package
+  universe; `None` is limited to language pseudo-packages/intrinsics with no
+  runtime package initialization, while ordinary-source ordinals are the
+  complete selected-Go import-path-ordered ready set;
+- independent `go list`/type evidence exact-joins names, both edge endpoints,
+  initialization disposition, dependency-before-importer order, and the
+  complete ordinary-source ordinal range, while import spellings,
+  blank/named/dot form, and transitive-closure edges are not accepted as
+  Phase-3 topology;
 - every Go, non-Go, embed, overlay, and checked-view input has a stable typed
   identity separate from its acquisition path, and relocated inputs preserve
   those identities;
