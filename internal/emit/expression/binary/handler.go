@@ -14,13 +14,9 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.BinaryExpr,
 ) (tsgo.Expression, error) {
-	operator, ok := operatorFor(context, source)
+	operator, operandType, ok := operationFor(context, source)
 	if !ok {
 		return nil, api.Unsupported(context, api.CategoryExpression, source)
-	}
-	operandType := context.TypesInfo().TypeOf(source)
-	if context.ExpectedType() != nil {
-		operandType = context.ExpectedType()
 	}
 	left, err := children.Expression(
 		context.
@@ -49,42 +45,92 @@ func Emit(
 	), nil
 }
 
-func operatorFor(
+func operationFor(
 	context api.Context,
 	source *ast.BinaryExpr,
-) (tsgo.BinaryOperatorToken, bool) {
+) (tsgo.BinaryOperatorToken, types.Type, bool) {
+	leftType := context.TypesInfo().TypeOf(source.X)
+	rightType := context.TypesInfo().TypeOf(source.Y)
+	integerType, integerOperands := integerOperandType(leftType, rightType)
 	switch {
-	case source.Op == token.ADD && isInt(context.TypesInfo().TypeOf(source)):
-		return context.Factory().BinaryOperatorToken(tsgo.BinaryOperatorPlusToken), true
+	case source.Op == token.ADD && isSupportedSignedInteger(context.TypesInfo().TypeOf(source)):
+		operandType := context.TypesInfo().TypeOf(source)
+		if !types.AssignableTo(leftType, operandType) ||
+			!types.AssignableTo(rightType, operandType) {
+			return nil, nil, false
+		}
+		return context.Factory().BinaryOperatorToken(
+			tsgo.BinaryOperatorPlusToken,
+		), operandType, true
+	case isIntegerComparison(source.Op) && integerOperands:
+		operator, ok := comparisonOperator(context, source.Op)
+		return operator, integerType, ok
 	case source.Op == token.EQL &&
-		isBool(context.TypesInfo().TypeOf(source.X)) &&
-		isBool(context.TypesInfo().TypeOf(source.Y)):
+		types.AssignableTo(leftType, types.Typ[types.Bool]) &&
+		types.AssignableTo(rightType, types.Typ[types.Bool]):
 		return context.Factory().BinaryOperatorToken(
 			tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-		), true
+		), types.Typ[types.Bool], true
 	case source.Op == token.NEQ &&
-		isBool(context.TypesInfo().TypeOf(source.X)) &&
-		isBool(context.TypesInfo().TypeOf(source.Y)):
+		types.AssignableTo(leftType, types.Typ[types.Bool]) &&
+		types.AssignableTo(rightType, types.Typ[types.Bool]):
 		return context.Factory().BinaryOperatorToken(
 			tsgo.BinaryOperatorExclamationEqualsEqualsToken,
-		), true
+		), types.Typ[types.Bool], true
+	default:
+		return nil, nil, false
+	}
+}
+
+func isSupportedSignedInteger(value types.Type) bool {
+	if value == nil {
+		return false
+	}
+	basic, ok := types.Unalias(value).(*types.Basic)
+	return ok && (basic.Kind() == types.Int || basic.Kind() == types.Int64)
+}
+
+func integerOperandType(left, right types.Type) (types.Type, bool) {
+	for _, candidate := range []types.Type{left, right} {
+		if !isSupportedSignedInteger(candidate) {
+			continue
+		}
+		if types.AssignableTo(left, candidate) && types.AssignableTo(right, candidate) {
+			return candidate, true
+		}
+	}
+	return nil, false
+}
+
+func isIntegerComparison(operator token.Token) bool {
+	switch operator {
+	case token.EQL, token.NEQ, token.LSS, token.LEQ, token.GTR, token.GEQ:
+		return true
+	default:
+		return false
+	}
+}
+
+func comparisonOperator(
+	context api.Context,
+	operator token.Token,
+) (tsgo.BinaryOperatorToken, bool) {
+	var target tsgo.BinaryOperator
+	switch operator {
+	case token.EQL:
+		target = tsgo.BinaryOperatorEqualsEqualsEqualsToken
+	case token.NEQ:
+		target = tsgo.BinaryOperatorExclamationEqualsEqualsToken
+	case token.LSS:
+		target = tsgo.BinaryOperatorLessThanToken
+	case token.LEQ:
+		target = tsgo.BinaryOperatorLessThanEqualsToken
+	case token.GTR:
+		target = tsgo.BinaryOperatorGreaterThanToken
+	case token.GEQ:
+		target = tsgo.BinaryOperatorGreaterThanEqualsToken
 	default:
 		return nil, false
 	}
-}
-
-func isInt(value types.Type) bool {
-	if value == nil {
-		return false
-	}
-	basic, ok := types.Unalias(value).(*types.Basic)
-	return ok && basic.Kind() == types.Int
-}
-
-func isBool(value types.Type) bool {
-	if value == nil {
-		return false
-	}
-	basic, ok := types.Unalias(value).(*types.Basic)
-	return ok && basic.Info()&types.IsBoolean != 0
+	return context.Factory().BinaryOperatorToken(target), true
 }

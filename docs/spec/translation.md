@@ -41,6 +41,21 @@ Although `IfStmt.Else` has static type `ast.Stmt`, the handler must not route an
 arbitrary statement through the general statement dispatcher. A return
 statement in that field is a malformed AST, not an alternative translation.
 
+The `for` owner similarly uses grammar-specific child entries:
+
+```text
+Init -> for initializer, not an arbitrary target statement
+Cond -> condition expression
+Post -> legal post statement rendered as a target expression
+Body -> block entered with an explicit loop-control capability
+```
+
+An unlabeled `break` or `continue` is accepted only while that capability is
+present. A function boundary clears it, so a nested function cannot branch to
+an enclosing loop. The branch handler neither walks to a parent nor infers a
+target from source spelling. Labeled control flow will add an identity-keyed
+target capability at its own construct boundary; it must not weaken this rule.
+
 Likewise, for:
 
 ```go

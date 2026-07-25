@@ -29,6 +29,29 @@ func emitDefinition(
 	children api.ChildEmitter,
 	source *ast.AssignStmt,
 ) (tsgo.Statement, error) {
+	declarations, err := emitDefinitionList(context, children, source)
+	if err != nil {
+		return nil, err
+	}
+	return context.Factory().VariableStatement(nil, declarations), nil
+}
+
+func EmitForInitializer(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.AssignStmt,
+) (tsgo.ForInitializer, error) {
+	if source.Tok != token.DEFINE {
+		return nil, api.Unsupported(context, api.CategoryStatement, source)
+	}
+	return emitDefinitionList(context, children, source)
+}
+
+func emitDefinitionList(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.AssignStmt,
+) (tsgo.VariableDeclarationList, error) {
 	if len(source.Lhs) != 1 || len(source.Rhs) != 1 {
 		return nil, api.Unsupported(context, api.CategoryStatement, source)
 	}
@@ -66,12 +89,9 @@ func emitDefinition(
 		targetType,
 		value,
 	)
-	return context.Factory().VariableStatement(
-		nil,
-		context.Factory().VariableDeclarationList(
-			[]tsgo.VariableDeclaration{declaration},
-			tsgo.NodeFlagsLet,
-		),
+	return context.Factory().VariableDeclarationList(
+		[]tsgo.VariableDeclaration{declaration},
+		tsgo.NodeFlagsLet,
 	), nil
 }
 

@@ -52,7 +52,7 @@ func Emit(
 	body, err := children.Block(
 		context.
 			WithRole(api.RoleFunctionBody).
-			WithFunctionResults(signature.Results()),
+			EnterFunction(signature.Results()),
 		source.Body,
 	)
 	if err != nil {

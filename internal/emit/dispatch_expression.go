@@ -43,7 +43,7 @@ func (e *Emitter) Condition(context api.Context, source ast.Expr) (tsgo.Expressi
 		return nil, api.Unsupported(context, api.CategoryExpression, source)
 	}
 	basic, ok := types.Unalias(sourceType).(*types.Basic)
-	if !ok || basic.Kind() != types.Bool {
+	if !ok || basic.Info()&types.IsBoolean == 0 {
 		return nil, api.Unsupported(context, api.CategoryExpression, source)
 	}
 	return e.Expression(context.WithExpectedType(types.Typ[types.Bool]), source)

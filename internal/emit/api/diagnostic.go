@@ -35,6 +35,10 @@ const (
 	RoleUnaryOperand        Role = "unary-operand"
 	RoleCallArgument        Role = "call-argument"
 	RoleIntegerConstantType Role = "integer-constant-type"
+	RoleForInitializer      Role = "for-initializer"
+	RoleForCondition        Role = "for-condition"
+	RoleForPost             Role = "for-post"
+	RoleForBody             Role = "for-body"
 )
 
 type UnsupportedError struct {

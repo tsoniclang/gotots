@@ -18,6 +18,8 @@ type Context struct {
 	placement       Placement
 	expectedType    types.Type
 	functionResults *types.Tuple
+	breakDepth      uint32
+	continueDepth   uint32
 }
 
 func NewContext(
@@ -68,8 +70,17 @@ func (c Context) WithExpectedType(expectedType types.Type) Context {
 	return c
 }
 
-func (c Context) WithFunctionResults(results *types.Tuple) Context {
+func (c Context) EnterFunction(results *types.Tuple) Context {
 	c.functionResults = results
+	c.expectedType = nil
+	c.breakDepth = 0
+	c.continueDepth = 0
+	return c
+}
+
+func (c Context) EnterLoop() Context {
+	c.breakDepth++
+	c.continueDepth++
 	return c
 }
 
@@ -111,4 +122,12 @@ func (c Context) ExpectedType() types.Type {
 
 func (c Context) FunctionResults() *types.Tuple {
 	return c.functionResults
+}
+
+func (c Context) CanBreak() bool {
+	return c.breakDepth != 0
+}
+
+func (c Context) CanContinue() bool {
+	return c.continueDepth != 0
 }

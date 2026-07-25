@@ -13,6 +13,8 @@ type ChildEmitter interface {
 	Expression(Context, ast.Expr) (tsgo.Expression, error)
 	Condition(Context, ast.Expr) (tsgo.Expression, error)
 	IntegerConstant(Context, ast.Expr) (tsgo.Expression, error)
+	ForInitializer(Context, ast.Stmt) (tsgo.ForInitializer, error)
+	ForPost(Context, ast.Stmt) (tsgo.Expression, error)
 	Type(Context, ast.Expr) (tsgo.TypeNode, error)
 	RepresentedType(Context, ast.Node, types.Type) (tsgo.TypeNode, error)
 }
