@@ -298,6 +298,22 @@ infer width from `GOARCH` spelling, emit `number`, or call the JavaScript
 primitive/target contract preserves the Go operation; otherwise their shared
 semantic owner must request an explicit typed runtime operation.
 
+The imported Tsonic primitive and its TypeScript checker carrier are different
+facts. For example, a selected Tsonic consumer may expose `int64` through a
+virtual declaration whose checker shape is `number` while attaching the target
+fact that makes C# emission use `long`. GoToTS emits and retains the canonical
+`int64` reference. It must not infer semantics from the virtual declaration's
+structural carrier, replace the import with `number`, or introduce `bigint`
+syntax that the selected Tsonic contract does not admit.
+
+Literal and operator handlers must also preserve exact target evidence. A
+large Go integer constant cannot be passed through a JavaScript numeric-value
+round trip if that changes its source digits. The handler either constructs an
+exact Tsonic-admitted target expression with bounded size or fails typed until
+the selected consumer contract supplies one. Rounded numeric literals,
+ordinary-value-only claims, and test declarations that pretend `int64` is
+`bigint` are forbidden.
+
 An implicit Go operation has no separate source IR node. The handler that owns
 the containing construct queries type evidence and creates the required typed
 TS-Go protocol AST directly. Shared runtime calls are permitted only when they

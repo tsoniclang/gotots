@@ -48,6 +48,7 @@ general-purpose intermediate program.
 | typed target protocol values and factories | generated `internal/target/tsgo` |
 | target lexical placement and deduplication | scoped builders in `internal/emit` |
 | target decoding and formatting | pinned `tsgo --api` `printNode` |
+| Tsonic source-primitive and target semantics | selected Tsonic consumer and target plugin |
 | output paths and atomic writes | `internal/output` |
 | runtime/manual/external ownership | explicit contracts under their named roots |
 | independent checks | `internal/verify` |

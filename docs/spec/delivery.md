@@ -16,7 +16,7 @@ focused Go test and minimal fixture
     -> one semantic-owner handler and closed child contract
     -> typed official TS-Go protocol AST
     -> pinned TS-Go print/reparse and strict typecheck
-    -> Go/TypeScript differential execution
+    -> Go/authoritative-consumer differential execution
     -> mutation and applicable cost proof
 ```
 
@@ -82,6 +82,9 @@ spelling heuristic. A 32-bit Go target requests `int32` instead. Plain
 TypeScript `number`, unqualified `bigint`, and `BigInt.asIntN` are not accepted
 substitutes: the first loses Go integer exactness and the latter two do not
 carry the finalized Tsonic primitive evidence required by the first consumer.
+The selected Tsonic virtual declaration may use `number` as its TypeScript
+checker carrier while attaching an exact `int64` target fact. GoToTS preserves
+the canonical imported type identity; it does not replace it with that carrier.
 
 Bootstrap in dependency order:
 
@@ -93,7 +96,13 @@ Bootstrap in dependency order:
 6. the first construct test, observed failing at that unsupported boundary.
 
 The output must be built as typed official TS-Go protocol AST, printed by
-TS-Go, strict-typechecked, executed against Go, and size-attributed.
+TS-Go, strict-typechecked, executed against Go through the authoritative
+consumer for the represented semantics, and size-attributed. Direct Node
+execution is sufficient only for behavior whose selected Tsonic source carrier
+has identical JavaScript semantics. Width, overflow, and other target-owned
+primitive behavior require a selected Tsonic target build and native
+differential execution; an ordinary-value Node check is supporting evidence
+only.
 
 ## 2. Core Direct Emission
 
