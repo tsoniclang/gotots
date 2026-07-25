@@ -14,7 +14,8 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.BinaryExpr,
 ) (tsgo.Expression, error) {
-	if source.Op != token.ADD || !isInt(context.TypesInfo().TypeOf(source)) {
+	operator, ok := operatorFor(context, source)
+	if !ok {
 		return nil, api.Unsupported(context, api.CategoryExpression, source)
 	}
 	left, err := children.Expression(context.WithRole(api.RoleBinaryLeft), source.X)
@@ -29,9 +30,33 @@ func Emit(
 		nil,
 		left,
 		nil,
-		context.Factory().PlusToken(),
+		operator,
 		right,
 	), nil
+}
+
+func operatorFor(
+	context api.Context,
+	source *ast.BinaryExpr,
+) (tsgo.BinaryOperatorToken, bool) {
+	switch {
+	case source.Op == token.ADD && isInt(context.TypesInfo().TypeOf(source)):
+		return context.Factory().BinaryOperatorToken(tsgo.BinaryOperatorPlusToken), true
+	case source.Op == token.EQL &&
+		isBool(context.TypesInfo().TypeOf(source.X)) &&
+		isBool(context.TypesInfo().TypeOf(source.Y)):
+		return context.Factory().BinaryOperatorToken(
+			tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+		), true
+	case source.Op == token.NEQ &&
+		isBool(context.TypesInfo().TypeOf(source.X)) &&
+		isBool(context.TypesInfo().TypeOf(source.Y)):
+		return context.Factory().BinaryOperatorToken(
+			tsgo.BinaryOperatorExclamationEqualsEqualsToken,
+		), true
+	default:
+		return nil, false
+	}
 }
 
 func isInt(value types.Type) bool {
@@ -40,4 +65,12 @@ func isInt(value types.Type) bool {
 	}
 	basic, ok := types.Unalias(value).(*types.Basic)
 	return ok && basic.Kind() == types.Int
+}
+
+func isBool(value types.Type) bool {
+	if value == nil {
+		return false
+	}
+	basic, ok := types.Unalias(value).(*types.Basic)
+	return ok && basic.Info()&types.IsBoolean != 0
 }

@@ -26,6 +26,14 @@ const (
 	RoleReturnResult    Role = "return-result"
 	RoleBinaryLeft      Role = "binary-left"
 	RoleBinaryRight     Role = "binary-right"
+	RoleLocalType       Role = "local-type"
+	RoleLocalValue      Role = "local-value"
+	RoleAssignmentValue Role = "assignment-value"
+	RoleIfCondition     Role = "if-condition"
+	RoleIfThen          Role = "if-then"
+	RoleIfElse          Role = "if-else"
+	RoleUnaryOperand    Role = "unary-operand"
+	RoleCallArgument    Role = "call-argument"
 )
 
 type UnsupportedError struct {

@@ -2,6 +2,7 @@ package emit
 
 import (
 	"go/ast"
+	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/load"
@@ -36,6 +37,9 @@ func (e *Emitter) EmitFile(sourceFile *ast.File, outputPath string) (tsgo.Source
 	}
 	if !e.ownsFile(sourceFile) {
 		return nil, &Error{Reason: "syntax tree does not belong to the loaded package"}
+	}
+	if err := e.reserveFileDeclarations(sourceFile); err != nil {
+		return nil, err
 	}
 
 	placement := newPlacementOwner()
@@ -75,6 +79,26 @@ func (e *Emitter) EmitFile(sourceFile *ast.File, outputPath string) (tsgo.Source
 			ScriptKind: tsgo.ScriptKindTS,
 		},
 	), nil
+}
+
+func (e *Emitter) reserveFileDeclarations(sourceFile *ast.File) error {
+	for _, declaration := range sourceFile.Decls {
+		function, ok := declaration.(*ast.FuncDecl)
+		if !ok {
+			continue
+		}
+		object, ok := e.source.TypesInfo().Defs[function.Name].(*types.Func)
+		if !ok {
+			return &api.InvariantError{
+				Role:   api.RoleFileDeclaration,
+				Reason: "function declaration has no go/types object",
+			}
+		}
+		if _, err := e.names.Declare(object); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (e *Emitter) ownsFile(candidate *ast.File) bool {
