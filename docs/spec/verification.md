@@ -15,23 +15,29 @@ independent proof.
 The repository always enforces:
 
 1. `AGENTS.md` and `CLAUDE.md` are byte-identical;
-2. the pinned TS-Go schema digest and generated bindings agree;
+2. the pinned TS-Go binary, revision, schema, protocol version, encoder
+   contract, and generated Go bindings agree;
 3. only allowed packages import `go/ast`, `go/types`, and target factories;
 4. no production package named or acting as `ir`, `plan`, `lower`, `catalog`,
    `inventory`, `legacy`, `compat`, or `fallback` exists;
-5. production emission contains no raw TypeScript fragments or alternate
-   formatter;
+5. production emission contains no raw TypeScript fragments, local formatter,
+   alternate target tree, or TS-Go `internal` import/fork;
 6. dynamic import, `.call`, `.apply`, `.bind`, `any`/`unknown` recovery,
    reflection, spelling dispatch, and source-text semantic scans are absent;
-7. maintained non-generated files stay below 600 physical lines.
+7. maintained non-generated files stay below 600 physical lines; and
+8. semantic handlers follow the recursive domain/owner structure, root emitter
+   files contain orchestration only, and no maintained directory exceeds the
+   organization bound.
 
 ## Construct Coverage
 
 Coverage has two distinct proofs:
 
 - a toolchain-derived catalog of Go AST forms/tokens/built-ins is reconciled
-  against handler or explicit-unsupported dispositions; and
-- every selected project occurrence is observed entering exactly one handler.
+  against parent-consumed, handler, metadata, or explicit-unsupported
+  dispositions for every relevant parent-field-child role; and
+- every dispatchable selected-project occurrence is observed entering exactly
+  one handler, while parent-consumed syntax enters none.
 
 The catalog is test authority only. Compilation does not produce or consume a
 per-program inventory.
@@ -40,27 +46,98 @@ Mutation tests remove a handler, skip a child edge, alter child order, erase a
 context role, and route one form to two handlers. Each mutation must fail with
 the exact source occurrence or catalog form.
 
+An AST kind is not the unit of semantic completion. A construct case includes
+the form, parent role, type evidence, expected result shape, and evaluation
+context. These assignments are separate cases:
+
+```go
+a = b
+a, b = b, a
+value, ok = values[key]
+a, b = pair()
+values[i], i = next, i+1
+*pointer = value
+a += b
+```
+
+Support for one case does not admit the others. Encountering an unproved
+contextual variant returns a typed unsupported diagnostic.
+
+Each handler's child contract has an independent conservation proof: every
+direct field is accounted for as owner-consumed, delegated, absent, metadata,
+or impossible; every delegated child has the expected role and order; and no
+forbidden child or automatic descendant enters emission. Mutations omit and
+duplicate a delegated child, mislabel owner-consumed syntax, change a role or
+category, reorder siblings, admit an impossible child, and replace owner
+traversal with generic recursion.
+
+Invalid Go syntax is a loader/parser failure, not a valid red translation
+test. Valid Go that reaches an unsupported contextual case must fail at the
+typed unsupported boundary. Mutations admit a parser-recovery `BadExpr`,
+`BadStmt`, and `BadDecl`; each must fail before dispatch.
+
+## Test-First Construct Expansion
+
+Every construct case follows this sequence:
+
+1. Add the smallest Go fixture, intended TypeScript artifact, and focused typed
+   Go test beside the semantic owner.
+2. Run that exact test before production support. It must fail at the owning
+   typed unsupported boundary. A parser, loader, target client, crash, or
+   unrelated failure is not an acceptable red result.
+3. Add or extend the one semantic-owner handler and its closed child contract.
+4. Assert the constructed typed TS-Go protocol tree and child roles directly.
+5. Encode it, print only through pinned TS-Go, reparse, compare normalized
+   target structure, and strict-typecheck.
+6. Execute the same behavior through Go and generated TypeScript and compare
+   observable results.
+7. Add boundary and interaction cases required by the semantic rule.
+8. Mutate the production decision or child route and prove the owning gate
+   fails.
+9. Inspect the generated artifact and applicable source, generated,
+   typecheck, generation, and runtime costs.
+
+A case is supported only when this sequence is green at one revision. New
+project coverage remains incremental: first reproduce a new unsupported case,
+then extend its shared owner. Do not pre-create speculative handlers,
+directories, fixtures, or support dispositions.
+
+Foundation capabilities are also test-first. The bootstrap order is: pinned
+TS-Go tool/contract test, generated binding/encoder test, native `printNode`
+round-trip test, loader coherence test, unsupported-dispatch test, then the
+first construct case.
+
 The demand-driven scheduler is verified independently from final target
 declarations and source bindings: every selected root and resolved emitted
 reference reaches exactly one target declaration or explicit obligation.
 Mutations omit an enqueue, duplicate an owner, break a cycle reservation, and
 silently drop a function-value/interface/callback target.
 
-## Target-AST Proof
+## Native TS-Go Target Proof
 
 For every generated file:
 
-1. all nodes are constructed through generated pinned-schema bindings;
-2. schema validation succeeds;
-3. the sole formatter produces the file;
-4. TS-Go reparses the formatted file;
-5. a normalized schema-level comparison matches the constructed tree;
-6. source mappings and declaration ownership reconcile;
-7. strict TypeScript resolution/typechecking succeeds.
+1. every target value is constructed through node-specific bindings generated
+   from the exact pinned official TS-Go schema;
+2. compile-time child types and generated factory tests reject invalid shapes;
+3. the generated Go encoder produces the exact pinned protocol version;
+4. the pinned `tsgo --api` process accepts the binary value, decodes it through
+   its real factory, and prints it through its real printer;
+5. TS-Go reparses the printed file;
+6. normalized schema-level structure matches the constructed value;
+7. source mappings and declaration ownership reconcile; and
+8. strict TypeScript resolution/typechecking succeeds.
 
-Mutations introduce an unknown node kind, wrong field shape, duplicate
-declaration, raw fragment, second formatter, and post-format edit. The owning
-gate must reject each.
+The Go encoder is compared against the pinned upstream TypeScript encoder over
+the same representative target graphs, including optional children, lists,
+tokens, literals, declarations, expressions, and source files. Exact encoded
+bytes must agree unless the pinned protocol explicitly permits alternatives.
+
+Mutations change a schema digest, protocol version, node kind, field shape,
+child order, optional-child mask, encoded bytes, TS-Go binary revision,
+declaration ownership, or formatted text. They also introduce a generic target
+node, local formatter, raw fragment, second printer, and post-format edit. The
+owning gate must reject each.
 
 ## Semantic Proof
 
@@ -90,7 +167,7 @@ Examples include:
 Each checkpoint reports absolute values and parent deltas for:
 
 - maintained source files/lines;
-- emitted bytes, tokens, and TS-Go AST nodes;
+- emitted bytes, tokens, typed protocol nodes, and TS-Go-decoded AST nodes;
 - largest twenty emitted declarations, expressions, and files;
 - definitions, helpers, imports, placeholders, and ownership collisions;
 - strict typecheck wall time and peak RSS;
@@ -111,13 +188,15 @@ allowlist, or suppressing a diagnostic is not a fix.
 Before dependent work begins, a capability must have:
 
 1. a reviewed governing rule and concrete Go/TypeScript examples;
-2. one authoritative handler/owner;
-3. positive, negative, interaction, and mutation tests;
-4. TS-Go AST construction/reparse proof;
-5. strict typechecking and differential execution;
-6. artifact-tail inspection and applicable cost bounds;
-7. broad searches proving no alternate route remains;
-8. a clean pushed revision carrying all evidence.
+2. a focused test observed failing at its owning unsupported or missing
+   foundation boundary;
+3. one authoritative handler/owner;
+4. positive, negative, interaction, and mutation tests;
+5. native TS-Go construction/print/reparse proof;
+6. strict typechecking and differential execution;
+7. artifact-tail inspection and applicable cost bounds;
+8. broad searches proving no alternate route remains;
+9. a clean pushed revision carrying all evidence.
 
 Unsupported neighboring constructs may remain explicit failures. A capability
 is not accepted if it silently falls back, emits a placeholder while claiming

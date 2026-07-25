@@ -36,8 +36,8 @@ The compilation architecture is deliberately direct:
 selected Go packages
     -> Go AST plus one coherent go/types graph
     -> one context-aware emission walk
-    -> exact generated bindings for the pinned TS-Go AST
-    -> the sole TS-Go formatter
+    -> typed generated bindings for the official TS-Go AST protocol
+    -> pinned TS-Go printNode using its real decoder/factory/printer
     -> strict ESM TypeScript
 ```
 
@@ -48,30 +48,40 @@ nodes. It must not copy those facts into a second semantic model.
 
 Allowed compiler state is limited to references into the Go AST/type graph,
 deterministic target-name ownership, target lexical-scope builders, explicit
-placement requests, diagnostics, and already-created TS-Go AST nodes. Such
-state coordinates emission; it must not become an alternate representation of
-the source program.
+placement requests, diagnostics, and already-created typed TS-Go protocol AST
+values. Such state coordinates emission; it must not become an alternate
+representation of the source program.
 
 ## Translation Invariants
 
 - Every encountered Go construct has exactly one contextual handler or one
   explicit unsupported disposition. Unknown forms fail before formatting.
+- The selected toolchain's parser, AST, and type checker own Go validity.
+  Production code does not copy the Go grammar or generate a second parser.
+- Production dispatch never recursively walks a node. The selected semantic
+  handler accounts for every direct child under a closed role, order, context,
+  and boundary; it consumes inseparable syntax itself and delegates only
+  semantically independent children, exactly once.
 - Parent handlers supply child roles and expected result shape. Children never
   recover context by source-text scanning, spelling inference, or an alternate
   parent graph.
 - Semantic questions use the selected `go/types.Info`, `types.Package`, and
   method/selection evidence directly. Do not rerun the checker.
-- Translation results contain TS-Go AST nodes plus typed placement requests;
-  they are not a target-independent intermediate representation.
+- Translation results contain typed TS-Go protocol AST values plus typed
+  placement requests; they are not a target-independent intermediate
+  representation.
 - Evaluation-dependent statements remain at the exact execution boundary.
   Imports and preferred-static helpers go to file scope. Placement is selected
   by one deterministic policy, not by whichever caller happens to emit first.
 - Dynamic imports are forbidden. Generated code must not use
   `Function.prototype.call`, `apply`, `bind`, prototype patching, reflection,
   or dynamic shape inspection.
-- TypeScript is generated only through exact generated bindings for the pinned
-  TS-Go schema-level AST and one formatter. No source fragments, templates,
-  token-stream emitter, handwritten target AST, or post-format text patching.
+- TypeScript is generated only through exact typed bindings and an encoder
+  mechanically generated from TS-Go's pinned official external AST protocol.
+  The pinned `tsgo --api` `printNode` endpoint performs real AST decoding and
+  printing. No local formatter, source fragments, templates, token-stream
+  emitter, handwritten target AST, inferred wire shape, forked `internal`
+  import, or post-format text patching.
 - Go embedding is not assumed to be TypeScript inheritance. `extends`,
   `implements`, native methods, receiver functions, and interface dispatch are
   selected only when their Go call, nil, copy, promotion, and method-selection
@@ -105,6 +115,12 @@ standard-library packages, toolchain packages, and true external boundaries.
 
 - Begin implementation only after the relevant specification examples,
   ownership, failure behavior, and verification are explicit.
+- Every foundation capability and construct case begins with its focused test
+  observed failing at the owning missing/unsupported boundary.
+- Semantic handlers live under the recursive
+  `internal/emit/<domain>/<semantic-owner>/<sub-owner-as-discovered>` structure.
+  Root emitter files contain orchestration only; handlers import the narrow API
+  and target boundary, not the root emitter or sibling handlers.
 - Reuse archived code only when it is independently the ideal direct-emitter
   design. Never restore a subsystem merely because it previously passed tests.
 - Keep one production path. Delete replaced helpers, tests, comments, schemas,

@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "repository": "https://github.com/microsoft/typescript-go",
+  "module": "github.com/microsoft/typescript-go",
+  "toolPackage": "github.com/microsoft/typescript-go/cmd/tsgo",
+  "toolVersion": "v0.0.0-20260613021236-c78d39e7075b",
+  "revision": "c78d39e7075b4fc641b12b1f35d905c54cdc13ef",
+  "protocolVersion": 5,
+  "files": [
+    {
+      "sourcePath": "_scripts/ast.json",
+      "path": "upstream/ast.json",
+      "sha256": "9259791a628105b1ed375a1a69f2002ad478f10e60ae68e01e5527e0fe619546"
+    },
+    {
+      "sourcePath": "_scripts/ast.schema.json",
+      "path": "upstream/ast.schema.json",
+      "sha256": "c614df46892e8623fcb4ba9d2cbdc4da2537af140674776f3dbb78e96cdf16d2"
+    },
+    {
+      "sourcePath": "_packages/native-preview/src/ast/ast.ts",
+      "path": "upstream/ast.ts",
+      "sha256": "6dec7bfbc950e6c9fd8c0da39efffe852ab16da0f53f661440de0f4d2c32dc55"
+    },
+    {
+      "sourcePath": "_packages/native-preview/src/api/node/encoder.generated.ts",
+      "path": "upstream/encoder.generated.ts",
+      "sha256": "59836fff92ae5588e22436a31eda81b01d295874521d90925f281060285e49bd"
+    },
+    {
+      "sourcePath": "_packages/native-preview/src/api/node/encoder.ts",
+      "path": "upstream/encoder.ts",
+      "sha256": "49bc631901af852ebf17feb9131adac819c9ab72647e23eb229d0424e6d96091"
+    },
+    {
+      "sourcePath": "_packages/native-preview/src/enums/languageVariant.enum.ts",
+      "path": "upstream/languageVariant.enum.ts",
+      "sha256": "4a8b25d95b2cf8a5f05e046fb5dfee8d9133261f089b9f6720c354daf18c11da"
+    },
+    {
+      "sourcePath": "_packages/native-preview/src/api/node/msgpack.ts",
+      "path": "upstream/msgpack.ts",
+      "sha256": "ea9ad8010e1a2f1f03acac72cf103e74fe2c6db96e08400a237b47709f9df847"
+    },
+    {
+      "sourcePath": "_packages/native-preview/src/enums/nodeFlags.enum.ts",
+      "path": "upstream/nodeFlags.enum.ts",
+      "sha256": "5124354f8188f1e30cc9c8a0cbc334fb104cd27eedfaa1a515d2947ff16f42fe"
+    },
+    {
+      "sourcePath": "_packages/native-preview/src/api/node/protocol.generated.ts",
+      "path": "upstream/protocol.generated.ts",
+      "sha256": "e22fa883d199c0cb11c6bf5961dbae322e36c3bccb3ef9679555e9d1e3d1acc1"
+    },
+    {
+      "sourcePath": "_packages/native-preview/src/api/node/protocol.ts",
+      "path": "upstream/protocol.ts",
+      "sha256": "02662b99b9e40190fc56b7210139175d043e369c59345b61fb5c5533bdd42830"
+    },
+    {
+      "sourcePath": "_packages/native-preview/src/enums/scriptKind.enum.ts",
+      "path": "upstream/scriptKind.enum.ts",
+      "sha256": "f6f795bc9fa49474b34b58930d70d6c2e94017bd50bc6b27b7879b92b58b88ca"
+    },
+    {
+      "sourcePath": "_packages/native-preview/src/enums/syntaxKind.enum.ts",
+      "path": "upstream/syntaxKind.enum.ts",
+      "sha256": "fd37d7fd8e7039fba038450651c893ce58e250946b1e9a3042865c29230d330b"
+    },
+    {
+      "sourcePath": "_packages/native-preview/src/enums/tokenFlags.enum.ts",
+      "path": "upstream/tokenFlags.enum.ts",
+      "sha256": "b500d2ff9253fe478e57a77228fe2ec16b194ee938c8bad77094577082c6f567"
+    }
+  ]
+}

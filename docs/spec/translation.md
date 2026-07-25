@@ -3,13 +3,65 @@
 ## Total Construct Dispatch
 
 The emitter has one closed dispatcher over supported Go AST construct kinds.
-Every selected node reaches exactly one handler or one typed unsupported
-diagnostic. The construct inventory is a coverage table for handlers and tests;
-it is not a per-program artifact and is never passed through compilation.
+Every dispatch request reaches exactly one handler or one typed unsupported
+diagnostic. The test-only construct catalog accounts separately for syntax
+consumed directly by its parent owner. It is not a per-program artifact and is
+never passed through compilation.
 
 Handlers are grouped by semantic family rather than generated as a framework
-per AST type. A handler must still explicitly visit every source child in Go
-evaluation order and pass the child's role.
+per AST type. Category dispatchers route one requested node and never recurse.
+The selected handler explicitly emits meaningful direct children in Go
+evaluation order and supplies each child's role.
+
+## Closed Child Contracts
+
+Production translation does not use the conventional automatic visitor
+pattern. `ast.Walk`, `ast.Inspect`, generated visitors, and equivalent generic
+recursion are not emission mechanisms. The production components are:
+
+- the root `Emitter`;
+- declaration, statement, expression, and type `Dispatcher` functions;
+- semantic-owner `Handler` packages; and
+- the narrow `ChildEmitter` callback implemented by the root.
+
+Each handler has a closed child contract. It uses narrow contextual entry
+points such as value expression, condition, store target, type expression,
+callee, statement, and block. Those entry points are not interchangeable.
+
+For example, the `if` owner handles:
+
+```text
+Init -> optional statement
+Cond -> condition expression
+Body -> block
+Else -> absent, block, or nested if
+```
+
+Although `IfStmt.Else` has static type `ast.Stmt`, the handler must not route an
+arbitrary statement through the general statement dispatcher. A return
+statement in that field is a malformed AST, not an alternative translation.
+
+Likewise, for:
+
+```go
+value, ok = values[key]
+```
+
+the assignment owner emits `value` and `ok` as store targets and dispatches the
+index expression with a two-result comma-ok context. For:
+
+```go
+value = values[key]
+```
+
+it dispatches the same AST form with a one-result value context. The child does
+not rediscover its parent.
+
+Every direct field is accounted for. Inseparable syntax is consumed explicitly
+by the owner; semantically independent children are delegated exactly once;
+optional absence is acknowledged; metadata belongs to a named non-semantic
+owner; nested boundaries are dispatched deliberately; and impossible shapes
+fail. Nothing is silently skipped or visited automatically.
 
 ## Result Shapes
 
@@ -17,16 +69,16 @@ The small result algebra contains target nodes only:
 
 ```text
 ExpressionEmission
-  before: ordered TS-Go statements constrained to this execution point
-  value:  one TS-Go expression
+  before: ordered typed TS-Go protocol statements constrained to this point
+  value:  one typed TS-Go protocol expression
   requests: imports/declarations/helpers with explicit placement policy
 
 StatementEmission
-  statements: ordered TS-Go statements
+  statements: ordered typed TS-Go protocol statements
   requests: placement requests
 
 DeclarationEmission
-  declarations: ordered TS-Go declarations
+  declarations: ordered typed TS-Go protocol declarations
   requests: placement requests
 ```
 
@@ -69,7 +121,7 @@ i, values[i] = i+1, pair()
 
 The assignment handler sees two target places and the complete right side. It
 queries result arity, evaluates target addresses and right values in Go order,
-then emits TS-Go temporary declarations and stores:
+then creates typed TS-Go protocol temporary declarations and stores:
 
 ```ts
 const oldIndex = i;
@@ -93,7 +145,7 @@ if ready() && consume(next()) {
 
 If translating `next()` needs target statements, those statements cannot be
 hoisted before `ready()`: Go executes them only when `ready()` is true. The
-logical-expression handler emits a TS-Go conditional/block shape that places
+logical-expression handler creates a TS-Go conditional/block shape that places
 the statements inside the right-hand execution boundary.
 
 The same rule applies to call arguments. For `f(first(), second())`, if
@@ -237,10 +289,19 @@ Handlers preserve:
 - labels, `goto`, fallthrough, range variants, and termination; and
 - generic constraints, instantiation, type inference, and operations.
 
+The basic-type owner selects integer width from the loaded `types.Sizes`
+evidence and requests the corresponding type-only Tsonic primitive import:
+`int32` or `int64` from `@tsonic/core/types.js`. The file placement owner
+deduplicates and renders that request before declarations. A handler does not
+infer width from `GOARCH` spelling, emit `number`, or call the JavaScript
+`BigInt` global. Integer operations remain direct only where the selected
+primitive/target contract preserves the Go operation; otherwise their shared
+semantic owner must request an explicit typed runtime operation.
+
 An implicit Go operation has no separate source IR node. The handler that owns
-the containing construct queries type evidence and emits the required TS-Go
-AST directly. Shared runtime calls are permitted only when they are the
-smallest exact reusable behavior.
+the containing construct queries type evidence and creates the required typed
+TS-Go protocol AST directly. Shared runtime calls are permitted only when they
+are the smallest exact reusable behavior.
 
 Package initialization is emitted from the checker graph's authoritative
 initializer order. Declarations still belong to their source modules; one
@@ -264,13 +325,15 @@ special-case exists.
 For unavailable behavior, output contains an exact declaration and a throwing
 placeholder at the declaration/body owner. Reachable placeholders block
 publication. Manual completion replaces bodies or declarations through
-structural TS-Go AST ownership, never textual patches or per-file ownership.
+structural typed TS-Go protocol ownership, never textual patches or per-file
+ownership.
 
 ## Failure
 
 The emitter fails with typed diagnostics for:
 
 - an unhandled Go construct or contextual variant;
+- a child shape forbidden by its owner's closed child contract;
 - absent/incoherent type evidence;
 - an illegal or unsatisfied placement request;
 - a representation with no exact static TypeScript form;
