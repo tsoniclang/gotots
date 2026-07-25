@@ -133,6 +133,7 @@ type concreteNode struct {
 
 type schemaModel struct {
 	directory            string
+	manifest             targetManifest
 	raw                  rawSchema
 	syntaxKinds          []enumValue
 	syntaxKindByName     map[string]uint32
@@ -150,6 +151,10 @@ type schemaModel struct {
 }
 
 func loadModel(directory string) (*schemaModel, error) {
+	manifest, err := loadTargetManifest(directory)
+	if err != nil {
+		return nil, err
+	}
 	data, err := os.ReadFile(filepath.Join(directory, "upstream", "ast.json"))
 	if err != nil {
 		return nil, err
@@ -166,6 +171,7 @@ func loadModel(directory string) (*schemaModel, error) {
 	}
 	model := &schemaModel{
 		directory:            directory,
+		manifest:             manifest,
 		raw:                  schema,
 		syntaxKinds:          kinds,
 		syntaxKindByName:     make(map[string]uint32, len(kinds)),

@@ -27,6 +27,11 @@ func TestPinnedContractMatchesCheckedInInputs(t *testing.T) {
 	if contract.ToolVersion() != "v0.0.0-20260613021236-c78d39e7075b" {
 		t.Fatalf("tool version = %q", contract.ToolVersion())
 	}
+	if pinnedToolModule != contract.Module() ||
+		pinnedToolPackage != contract.ToolPackage() ||
+		pinnedToolVersion != contract.ToolVersion() {
+		t.Fatal("generated tool identity differs from the pinned manifest")
+	}
 	requiredPaths := []string{
 		"upstream/ast.json",
 		"upstream/ast.schema.json",

@@ -8,6 +8,10 @@ import (
 
 func TestGeneratedFactoriesBuildConstDeclaration(t *testing.T) {
 	factory := tsgo.NewFactory()
+	filePath, err := tsgo.NewPath("/answer.ts")
+	if err != nil {
+		t.Fatal(err)
+	}
 	name := factory.Identifier("answer")
 	value := factory.NumericLiteral("42", tsgo.TokenFlagsNone)
 	declaration := factory.VariableDeclaration(name, nil, nil, value)
@@ -20,8 +24,8 @@ func TestGeneratedFactoriesBuildConstDeclaration(t *testing.T) {
 		[]tsgo.Statement{statement},
 		factory.EndOfFile(),
 		tsgo.SourceFileData{
-			FileName:        "answer.ts",
-			Path:            "answer.ts",
+			FileName:        filePath,
+			Path:            filePath,
 			LanguageVariant: tsgo.LanguageVariantStandard,
 			ScriptKind:      tsgo.ScriptKindTS,
 		},

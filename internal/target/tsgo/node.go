@@ -1,5 +1,10 @@
 package tsgo
 
+import (
+	"fmt"
+	"path/filepath"
+)
+
 type SyntaxKind uint32
 
 type NodeFlags uint32
@@ -14,6 +19,29 @@ type Factory struct{}
 
 func NewFactory() Factory {
 	return Factory{}
+}
+
+type Path struct {
+	value string
+}
+
+func NewPath(value string) (Path, error) {
+	if value == "" {
+		return Path{}, fmt.Errorf("TS-Go path is empty")
+	}
+	absolute, err := filepath.Abs(value)
+	if err != nil {
+		return Path{}, fmt.Errorf("make TS-Go path absolute: %w", err)
+	}
+	return Path{value: filepath.ToSlash(filepath.Clean(absolute))}, nil
+}
+
+func (p Path) String() string {
+	return p.value
+}
+
+func (p Path) valid() bool {
+	return p.value != ""
 }
 
 type Node interface {

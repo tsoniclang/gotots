@@ -115,8 +115,8 @@ func writeDynamicGenericNodes(buffer *bytes.Buffer, model *schemaModel) {
 func writeSourceFileData(buffer *bytes.Buffer) {
 	buffer.WriteString("type SourceFileData struct {\n")
 	buffer.WriteString("\tText string\n")
-	buffer.WriteString("\tFileName string\n")
-	buffer.WriteString("\tPath string\n")
+	buffer.WriteString("\tFileName Path\n")
+	buffer.WriteString("\tPath Path\n")
 	buffer.WriteString("\tLanguageVariant LanguageVariant\n")
 	buffer.WriteString("\tScriptKind ScriptKind\n")
 	buffer.WriteString("\tIsDeclarationFile bool\n")

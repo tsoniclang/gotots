@@ -2,6 +2,10 @@
 
 package tsgo
 
+const pinnedToolModule = "github.com/microsoft/typescript-go"
+const pinnedToolPackage = "github.com/microsoft/typescript-go/cmd/tsgo"
+const pinnedToolVersion = "v0.0.0-20260613021236-c78d39e7075b"
+
 const (
 	protocolVersion                = 5
 	headerOffsetMetadata           = 0

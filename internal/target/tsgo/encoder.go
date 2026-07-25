@@ -239,15 +239,29 @@ func (s *encoderState) appendExtended(node Node, encoding nodeEncoding) error {
 }
 
 func (s *encoderState) appendSourceFile(source SourceFileData) error {
+	if !source.FileName.valid() {
+		return &EncodeError{
+			Kind:   SyntaxKindSourceFile,
+			Field:  "FileName",
+			Reason: "normalized absolute path is absent",
+		}
+	}
+	if !source.Path.valid() {
+		return &EncodeError{
+			Kind:   SyntaxKindSourceFile,
+			Field:  "Path",
+			Reason: "normalized absolute path is absent",
+		}
+	}
 	textIndex, err := s.strings.add(source.Text)
 	if err != nil {
 		return err
 	}
-	fileNameIndex, err := s.strings.add(source.FileName)
+	fileNameIndex, err := s.strings.add(source.FileName.String())
 	if err != nil {
 		return err
 	}
-	pathIndex, err := s.strings.add(source.Path)
+	pathIndex, err := s.strings.add(source.Path.String())
 	if err != nil {
 		return err
 	}

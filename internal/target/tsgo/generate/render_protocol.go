@@ -21,6 +21,9 @@ func renderProtocol(model *schemaModel) ([]byte, error) {
 
 	var buffer bytes.Buffer
 	generatedHeader(&buffer)
+	fmt.Fprintf(&buffer, "const pinnedToolModule = %q\n", model.manifest.Module)
+	fmt.Fprintf(&buffer, "const pinnedToolPackage = %q\n", model.manifest.ToolPackage)
+	fmt.Fprintf(&buffer, "const pinnedToolVersion = %q\n\n", model.manifest.ToolVersion)
 	buffer.WriteString("const (\n")
 	scanner := bufio.NewScanner(file)
 	count := 0

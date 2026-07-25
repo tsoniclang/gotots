@@ -46,8 +46,24 @@ func TestEncoderRejectsAbsentRequiredChild(t *testing.T) {
 	}
 }
 
+func TestEncoderRejectsMissingSourcePath(t *testing.T) {
+	factory := NewFactory()
+	_, err := EncodeSourceFile(factory.SourceFile(nil, factory.EndOfFile(), SourceFileData{}))
+	var encodeError *EncodeError
+	if !errors.As(err, &encodeError) {
+		t.Fatalf("error = %v, want EncodeError", err)
+	}
+	if encodeError.Field != "FileName" {
+		t.Fatalf("field = %q, want FileName", encodeError.Field)
+	}
+}
+
 func representativeSourceFile() SourceFile {
 	factory := NewFactory()
+	filePath, err := NewPath("/answer.ts")
+	if err != nil {
+		panic(err)
+	}
 	name := factory.Identifier("answer")
 	declaration := factory.VariableDeclaration(
 		name,
@@ -57,7 +73,7 @@ func representativeSourceFile() SourceFile {
 	)
 	declarations := factory.VariableDeclarationList(
 		[]VariableDeclaration{declaration},
-		NodeFlagsConst,
+		NodeFlagsLet,
 	)
 	assignment := factory.BinaryExpression(
 		nil,
@@ -73,8 +89,8 @@ func representativeSourceFile() SourceFile {
 		},
 		factory.EndOfFile(),
 		SourceFileData{
-			FileName:        "answer.ts",
-			Path:            "answer.ts",
+			FileName:        filePath,
+			Path:            filePath,
 			LanguageVariant: LanguageVariantStandard,
 			ScriptKind:      ScriptKindTS,
 		},
@@ -90,7 +106,7 @@ const declaration = factory.createVariableDeclaration(
     undefined,
     factory.createNumericLiteral("42", 0),
 );
-const declarations = factory.createVariableDeclarationList([declaration], 2);
+const declarations = factory.createVariableDeclarationList([declaration], 1);
 const assignment = factory.createBinaryExpression(
     undefined,
     factory.createIdentifier("answer"),
@@ -105,8 +121,8 @@ const sourceFile = factory.createSourceFile(
     ],
     factory.createToken(SyntaxKind.EndOfFile),
     "",
-    "answer.ts",
-    "answer.ts",
+    "/answer.ts",
+    "/answer.ts",
 );
 Object.defineProperty(sourceFile, "languageVariant", { value: 0 });
 Object.defineProperty(sourceFile, "scriptKind", { value: 3 });

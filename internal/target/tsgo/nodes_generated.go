@@ -4,8 +4,8 @@ package tsgo
 
 type SourceFileData struct {
 	Text                    string
-	FileName                string
-	Path                    string
+	FileName                Path
+	Path                    Path
 	LanguageVariant         LanguageVariant
 	ScriptKind              ScriptKind
 	IsDeclarationFile       bool
