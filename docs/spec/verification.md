@@ -156,6 +156,17 @@ partitioned independently into requested roots, full-semantic source,
 declaration contracts, external boundaries, and intrinsics. These sets are
 never inferred from which files happened to be parsed or traversed.
 
+The finalized package topology separately retains the declared Go package name
+and one typed direct `PackageImport{Importer, Imported}` edge per direct import,
+plus the complete selected-Go package-initialization ordinal. The verifier
+derives them from the selected toolchain package/type graph and exact-joins
+names, edge pairs, dependency-before-importer order, and the unique ordinal
+range with both one-sided lists. Import strings and blank/named/dot form are
+diagnostic/source binding evidence only; replacing a typed target with another
+package of the same declared name, adding transitive closure edges, dropping a
+blank import edge, changing an initialization ordinal, or deriving a package
+name from an import-path basename fails.
+
 Fixtures include, in one verified closure:
 
 - workspace packages from two `go.work` modules;
@@ -388,6 +399,190 @@ flatten/sort/deduplicate approximation must fail the matrix.
 At minimum the matrix includes a nontrivial intersection such as
 `interface{ int|string; int|bool }`, whose type set and core type are `int`;
 concatenating the two unions is a known-invalid approximation.
+
+## Whole-Program Facts, Reachability, And Plan Proof
+
+Phase-3 verification starts with input conservation. The verifier independently
+loads the selected toolchain package graph and exact-joins its declared package
+names and direct import edges to finalized
+`PackageImport{Importer, Imported}` records. It then exact-joins package
+identity, semantic-shard digest/counts, and definition selections across the
+source topology, Stage-2 authority manifest, and public semantic package
+census. It never resolves an import string or package basename in Phase 3.
+
+The selected root contract is verified separately from traversal. Every
+contract entry independently resolves to the same ordered
+`(RootKind, EntityID, entry ordinal)` multiset or an explicit-empty record.
+Digest-isolation tests mutate only target policy, only root policy, and only
+semantic/package topology. They prove respectively that only `PlanInputDigest`,
+reachability-plus-plan digests, or all downstream digests change. A single
+broad input digest, stale downstream digest, or unnecessary fact rebuild fails.
+Fixtures cover:
+
+- an executable requested `package main` with `main` and package
+  initialization;
+- a requested library package whose exported declarations are API roots;
+- exact test, reflection, and extension roots;
+- two root kinds selecting the same declaration;
+- a non-`main` package containing a function named `main`;
+- ambiguous, absent, and silently empty selectors; and
+- a rootless product request (failure) versus an explicit analysis-only request
+  that produces no plan; and
+- relocated workspace/module-cache inputs with unchanged root identities.
+
+The fact verifier opens semantic packages through the public Stage-2 projection
+API and uses its own operation/type classification and relation extraction. It
+does not import the production observation catalog, domain builders, relation
+constructors, fixed-point queue, or candidate selector. It exact-multiset-joins
+each direct domain separately:
+
+1. call sites and ordered direct/finite targets;
+2. function/method value capture-time targets;
+3. direct effect sites;
+4. binding storage/address/escape/capture observations;
+5. type copy/zero/equality/key/order observations;
+6. generic owner/argument demands and sites;
+7. interface slots, conversions, assertions, observations, and dispatch
+   targets;
+8. object embeds, promotions, overrides, collisions, construction, copies, and
+   stores;
+9. package/definition initialization and typed import edges; and
+10. explicit unsupported observations and required contracts; and
+11. cost-attribution candidates.
+
+For every Stage-2 operation/type/resolution/unsupported/implicit/provider
+class, a totality gate joins the production observation-catalog disposition to
+the independently maintained expected domain set. An empty domain list is a
+positive no-fact disposition. Adding an enum member, dropping one context arm,
+routing a record to two owners, or accepting a generic fallback fails before
+fixed-point analysis.
+
+Derived call, effect, escape, alias, interface, generic, and object summaries
+are independently recomputed from direct facts. Verification joins identity,
+payload, multiplicity, source/canonical order, and cited direct evidence—not
+only the final bitset or count. Every fixed point reports queue insertions,
+pops, edge visits, and monotonic transitions. Replacing a finite dynamic target
+set with all methods, collapsing repeated copy/effect sites, or iterating until
+an unrecorded retry happens fails.
+
+Reachability verification rebuilds the closed edge graph from independently
+derived facts, resolves roots independently, and runs a separate deterministic
+traversal. It exact-joins:
+
+- edge ID, class, endpoints, ordinal, and fact witness;
+- definition/declaration/binding/operation ownership plus object/type
+  references, proving an API declaration reaches its implementation/type and an
+  executable definition reaches all required bindings and operations;
+- reachable and excluded entity identity sets;
+- each reachable entity's canonical shortest root/predecessor path;
+- every excluded strongly connected component and absence of a reachable
+  incoming edge; and
+- the exact zero-plan set implied by exclusion.
+
+The verifier does not accept "visited count equals entity count" as a
+partition. It checks both one-sided identity lists and disjointness. A
+whole-selected-closure control must produce additional planned identities and
+fail the reachability, size, and work gates.
+
+Plan verification uses an independently maintained compatibility matrix over
+the closed plan dispositions and plan-rule IDs. It consumes sealed facts and
+reachability but does not call the production candidate filter. For every
+reachable package/type/definition/binding/operation it proves:
+
+- exactly one required plan record and no inactive payload;
+- rule applicability to semantic class, cited facts, and target policy;
+- atomic consistency among representation, storage, receiver, call, generic,
+  interface, object, module, initialization, obligation, and cost choices;
+- no stronger mechanism without a typed necessity witness;
+- no fact reference outside the sealed fact digest;
+- no plan for an excluded identity; and
+- exact reconciliation of expected definitions, references, imports, runtime
+  operations, adapters, instances, and AST-node categories.
+
+Required source fixtures include:
+
+```go
+func main() { live() }
+func live() {}
+func dead() {}
+```
+
+`dead` must be excluded and have no plan.
+
+```go
+type Value struct{ N int }
+func copyValue(input Value) Value {
+    output := input
+    output.N++
+    return output
+}
+```
+
+Argument, assignment, mutation, and return sites must preserve distinct copy
+and storage evidence.
+
+```go
+type Speaker interface{ Speak() string }
+type Dog struct{}
+func (Dog) Speak() string { return "dog" }
+func say(value Speaker) string { return value.Speak() }
+```
+
+The call, conversion, method slot, implementer observation, and dispatch plan
+must join; adding many implementers may grow the interface fact set but cannot
+grow the per-call plan record.
+
+```go
+var trace []string
+func init() { trace = append(trace, "local") }
+```
+
+Together with imported packages and a blank import, this proves typed import
+and initializer ordering without import-string inference.
+
+```go
+type Base struct{ Value int }
+type Derived struct{ Base }
+```
+
+Paired fixtures make inheritance admissible and inadmissible by adding a second
+embedded spine, collision, value-copy requirement, nil-sensitive method, or
+construction conflict. The object plan must change through the cited fact,
+never through type spelling.
+
+Production-path mutations must at least:
+
+- change a typed import target while preserving the import spelling;
+- delete or duplicate a semantic manifest package;
+- alter a root kind, target, or entry ordinal;
+- make an ineffective root appear successful;
+- omit, duplicate, reorder, or re-owner a direct fact;
+- collapse two equal-target call/copy/effect sites;
+- add an absent dynamic-call target or remove a present one;
+- mutate a fixed-point predecessor or suppress a queue transition;
+- replace exact reachability with the selected package closure;
+- alter a root witness, reachable predecessor, or excluded SCC;
+- plan an excluded definition or omit a reachable operation;
+- change a cited fact after plan sealing;
+- choose a stronger receiver/interface/object/generic mechanism without its
+  necessity fact;
+- expose a backing identity/fact/plan store;
+- sort or join by rendered identity text;
+- retain semantic package records after their visit; and
+- add per-call work proportional to interface implementer count.
+
+Each mutation runs through the real producer and owning verifier, fails with
+the exact affected identities, and is restored before broader tests.
+
+The Phase-3 cost gate reports semantic packages/records opened, identity-table
+entries/bytes, direct and derived fact records, edge/root/reachable/excluded
+counts, SCC sizes, fixed-point work, candidate evaluations/removals, plan
+records, expected output categories, wall time, and peak RSS. Fixtures include
+wide calls, deep chains, large cycles, many implementers, many generic
+instances, and embedding graphs. Doubling input must match the declared linear
+or named `n log n` term; a quadratic control must fail. At most one semantic
+package is resident, and compact fact/plan storage—not the complete Stage-2
+record payload—is the retained class.
 
 ## Construct And Semantic-Class Oracles
 

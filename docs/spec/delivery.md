@@ -182,6 +182,13 @@ Required exit evidence:
 - package owner, provenance, acquisition, and language disposition exact-join
   independent selected-toolchain metadata, including standard-library,
   dependency, replacement, `unsafe`, and pseudo-package cases;
+- each finalized package retains its exact declared Go package name and typed
+  direct `PackageImport{Importer, Imported}` edges plus a complete selected-Go
+  package-initialization ordinal resolved in the coherent package universe;
+  independent `go list`/type evidence exact-joins names, both edge endpoints,
+  dependency-before-importer order, and the complete ordinal range, while
+  import spellings, blank/named/dot form, and transitive-closure edges are not
+  accepted as Phase-3 topology;
 - every Go, non-Go, embed, overlay, and checked-view input has a stable typed
   identity separate from its acquisition path, and relocated inputs preserve
   those identities;
@@ -424,19 +431,101 @@ analyses and one immutable `ProgramPlan`.
 
 Required exit evidence:
 
-- each fact has one owner and seals before use;
-- semantic reachability starts from explicit executable/API/test/reflection/
-  extension roots, records exact root/exclusion witnesses, and exact-joins every
-  typed call/initialization/function-value/generic/dynamic/registration/external
-  edge before planning;
-- planning and lowering consume only the semantically reachable set; a mutation
-  that plans the whole selected package closure fails size, identity, and
-  reachability gates;
-- plan records are total and atomic;
-- no emitter decision or post-plan mutation exists;
-- ordinary examples select direct plans;
-- mutation of a fact edge changes or invalidates the plan predictably; and
-- plan cost estimates reconcile with expected definitions and references.
+- the Phase-3 authority defines and the implementation admits one
+  `ProgramInput` with orthogonal `FactInputDigest`,
+  `ReachabilityInputDigest`, and `PlanInputDigest` projections: target-policy
+  changes do not invalidate facts, root changes invalidate reachability/plans
+  only, and semantic/topology changes invalidate all downstream projections;
+- finalized source packages retain their declared package name and typed
+  `PackageImport{Importer, Imported}` edges; producer and independent verifier
+  exact-join them against the selected toolchain graph, and Phase 3 contains no
+  import-string, path, basename, package-name, or loader fallback;
+- semantic authority manifests expose package/shard digests and record counts
+  without opening package detail; source topology, selections, and semantic
+  package identities exact-join before fact production;
+- the versioned root contract resolves every executable/API/test/reflection/
+  extension entry to exact semantic identity or an explicit-empty
+  disposition; multiple root reasons are retained, ineffective/ambiguous rules
+  fail, no implicit all-package root exists, and product planning requires at
+  least one nonempty root while a rootless analysis-only request cannot produce
+  a `ProgramPlan`;
+- the complete semantic identity census is interned once into typed compact
+  definition/declaration/binding/type/operation tables; fact/plan relations use
+  those references and retain no semantic package, rendered-key cache, copied
+  record slice, or second denormalized model;
+- the closed observation catalog is total over every Stage-2 operation/type/
+  resolution/unsupported/implicit/provider class and maps each relevant
+  cross-product to its sole call, function-value, effect, storage, value,
+  generic, interface, object, initialization, support, or cost owner,
+  including explicit no-fact dispositions;
+- one package-at-a-time production visits each semantic record once, direct
+  facts seal before declared monotonic fixed points, and package residency,
+  record visits, relation appends, identity probes, sorts, queue work, and
+  state transitions reconcile with the closed work ledger;
+- every direct fact exact-joins an independently derived semantic observation;
+  every derived fact cites its direct evidence and independently recomputed
+  fixed-point result; multiplicity and source/canonical order are preserved;
+- call and function-value targets, package/definition initialization, generic
+  demands, interface open/finite-world status and dispatch observations,
+  object embedding/promotion/override/collision/construction, value copy/zero/
+  equality/key needs, storage/escape/alias/capture, and direct/transitive
+  effects all have constructor-validated immutable records and one query API;
+- semantic reachability starts from the resolved root artifact and traverses
+  the closed edge algebra: declaration ownership/implementation, binding
+  ownership, operation containment, nested definition, object/type reference,
+  direct/finite dynamic call, function value, initialization, generic
+  instantiation, interface conversion, registration, external contract, and
+  capture;
+- every edge exact-joins its fact owner, typed endpoints, source-owned ordinal,
+  and independent derivation; every semantic entity is in exactly one of the
+  reachable/excluded partitions, reachable entities carry a reproducible
+  canonical shortest root path, and excluded SCCs have no reachable incoming
+  edge;
+- planning receives only the reachable projection; mutations that plan the
+  whole selected package closure, retain an unreachable plan, omit a reachable
+  subject, or filter only after planning fail identity, reachability, size, and
+  work gates;
+- one append-only decision catalog is total over every type/definition/
+  operation planning class, declares its required facts and target-policy
+  capabilities, and selects source-shaped rules before stronger mechanisms;
+  equal-priority ambiguity, no candidate without a closed disposition, and
+  post-seal strengthening all fail;
+- `ProgramPlan` has normalized immutable package/module/global-type/
+  declaration/definition/binding/operation stores; standalone declarations
+  have one declaration plan while type-owned members have zero and live in one
+  canonical type plan; every reachable required subject has exactly one atomic
+  compatible record, every excluded subject has zero, and
+  automatic/manual/external/intrinsic/known-unsupported dispositions carry
+  their complete mutually exclusive payload;
+- receiver entry, value copying, generic operations, interface
+  conversion/dispatch/assertion/RTTI, object inheritance/composition,
+  initialization, control/effects, module ownership, and obligations are
+  decided only in the plan and are never recomputed by lowering;
+- ordinary direct calls/methods/control and direct scalar/value examples select
+  direct plans with no hidden protocol; interface-call plan size is independent
+  of implementer count, and every nonordinary plan cites a local typed
+  necessity fact;
+- the automatic direct-plan matrix covers literals, declaration/load/store,
+  direct scalar unary/binary/conversion, direct function and native-method
+  calls, ordinary composite construction, return, block/if/switch/for/range,
+  and source-ordered package initialization when their exact applicability
+  predicates hold; replacing these with `KnownUnsupported`, a runtime helper,
+  or one generic lowering rule fails the catalog and source-shape gates;
+- facts, reachability, and plan expose content digests and immutable
+  visitor/lookup APIs only; mutation attempts, backing-store exposure,
+  nondeterministic ordering, input-digest drift, and plan/fact reference drift
+  fail;
+- plan estimates exact-join planned definitions, references, imports, runtime
+  operations, adapters, specializations, and expected AST-node categories by
+  owner; Phase-4 reconciliation obligations are explicit rather than estimated
+  source text; and
+- independent positive/cross-product/adversarial fixtures and production-path
+  mutations cover direct/deferred/spawned/interface calls, method/function
+  values, closure capture, package-init/import order, unreachable SCCs,
+  generics, embedding/inheritance rejection, copy/escape, open reflection and
+  external boundaries, plus wide/deep/many-implementer scaling; full
+  build/vet/race, architecture walls, real-artifact inspection, absolute and
+  parent-delta size/work/wall/RSS gates pass at one clean pushed revision.
 
 ### Phase: Typed TypeScript And Source Shape
 

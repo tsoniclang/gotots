@@ -51,8 +51,9 @@ provider body retention. This prevents loader provenance, parser availability,
 or retention mechanics from becoming implementation policy.
 
 The Stage-1 package seam is strict. `internal/source` owns selected bytes,
-physical source-acquisition facts, the single transient AST/checker graph,
-source identities, and final severing. It does not classify catalog kinds, bind catalog edges or
+physical source-acquisition facts, declared package names, typed direct package
+imports, the single transient AST/checker graph, source identities, and final
+severing. It does not classify catalog kinds, bind catalog edges or
 roles, resolve lexical tokens, enumerate definitions, or manufacture
 occurrence/header/site records. `internal/scope/contract` owns the closed,
 versioned provider/rule/selection-fact-request schema and validation, but no
@@ -124,7 +125,7 @@ A compilation request contains:
 - workspace/module roots and overlay files;
 - selected Go toolchain identity and `GOOS`, `GOARCH`, tags, experiments, and
   relevant environment;
-- executable, API, test, and extension roots;
+- executable, API, test, reflection, and extension roots;
 - source inclusion/exclusion rules with provenance;
 - target TypeScript/runtime policy;
 - standard-library version and implementation root;
@@ -1578,21 +1579,323 @@ Analyses run over the complete selected model and produce one sealed fact set:
 - source/API/test/extension roots and all dependency edge classes; and
 - output cost attribution candidates.
 
+### Phase-3 Input Boundary
+
+Phase 3 consumes one immutable `ProgramInput`; it cannot receive a workspace
+loader, syntax tree, checker object, source path, or callback that can
+rediscover an earlier fact. The input contains exactly:
+
+- the Stage-2 semantic model and an authority manifest containing each selected
+  package identity, selected local/certified authority, semantic-shard digest,
+  and record counts;
+- the finalized Stage-1 package topology: package identity, declared package
+  name, requested-root state, and typed direct-import edges;
+- the total Stage-1 definition-provider selections, referenced by
+  `DefinitionID`, for implementation ownership and boundary obligations;
+- one externally selected, versioned root contract and its fingerprint;
+- one externally selected, versioned target/runtime policy and its
+  fingerprint; and
+- exact external, reflection, and extension contracts when those edge classes
+  are selected.
+
+The semantic model enters through a narrow read-only `SemanticProjection`
+capability exposing only the authority manifest and canonical one-package
+visitor. It exposes no close/mutation method, backing store, checker/provider
+handle, or arbitrary lookup callback. `internal/compiler` retains lifecycle
+ownership and closes Stage-2 storage only after fact production and its
+independent verification finish. `ProgramFacts` and `ProgramPlan` retain only
+the manifest/digests and normalized identities, never the capability.
+
+The semantic authority manifest has one
+`SemanticPackageAuthority{PackageID, Provenance, LocalAuthority,
+CertifiedAuthority, LocalShardDigest, CertifiedShardDigest,
+AuthoritySelectionDigest, LogicalDigest, DefinitionCount, ResolutionCount,
+DeclarationCount, MemberTargetCount, MemberTargetDigest, BindingCount,
+TypeCount, TypeWitnessCount, OperationCount, UnsupportedCount}` per logical
+package. Inactive authority digests are absent; active ones are full digests.
+`LogicalDigest` is the Merkle digest of semantic schema version, package
+identity, active shard digest(s), and the already-certified local/provider
+authority-selection digest. It identifies the deterministic normalized
+projection without decoding or re-materializing package detail. The manifest
+is available without opening semantic detail and exact-joins every package
+projection and its complete record/member census.
+
+The finalized source owner resolves import spellings to typed
+`PackageImport{Importer, Imported}` records while the coherent package universe
+is available. It also retains the declared package name as package metadata.
+Phase 3 may not recover either fact from `PackageID.ImportPath()`, an import
+string, a directory basename, a declaration spelling search, or a new loader
+call. The package topology exact-joins the semantic package census before any
+fact is produced.
+
+`PackageTopology` contains one
+`PackageNode{PackageID, DeclaredName, RequestedRoot, InitializationOrdinal}`
+per selected package and one sorted unique
+`PackageImport{Importer, Imported}` per direct Go import. Both endpoints must
+be present nodes; self edges, transitive edges represented as direct, duplicate
+pairs, and a package with an empty/invalid Go identifier name fail.
+Initialization ordinals are a complete unique range derived from the selected
+Go toolchain's package-initialization order and must place every imported
+package before its importer. Import source spelling and blank/named/dot form
+remain Stage-1 occurrence/binding evidence and are not copied into this graph:
+all direct Go imports initialize their target package.
+
+Definition selection enters as one
+`ImplementationSelection{DefinitionID, Provider, EvidenceDepth, ContractID,
+ContractFingerprint, WitnessDigest}` per semantic definition. The projection
+is copied from the sealed Stage-1 selection artifact by
+`internal/compiler`; Phase 3 does not import scope/source policy or rerun
+contract binding. The selection census exact-joins semantic definitions, and
+the witness digest binds the complete rule/fact witness without copying its
+mutable construction state.
+
+Authority is split by dependency rather than hidden behind one broad digest:
+
+- `FactInputDigest` binds the ordered semantic authority manifest, typed package
+  topology, definition selections, and semantic portions of selected external
+  contracts;
+- `ReachabilityInputDigest` binds the sealed fact digest, root contract, and
+  selected reflection/extension/external edge contracts; and
+- `PlanInputDigest` binds the sealed fact and reachability digests, target/
+  runtime policy, definition selections, and implementation-obligation
+  contracts.
+
+Machine paths, rendered identity strings, and acquisition locations are
+excluded. A target-policy change invalidates plans but not target-independent
+facts; a root-contract change invalidates reachability and plans but not facts;
+a semantic or package-topology change invalidates all three. Reuse across one
+of these boundaries requires the exact owning digest rather than a broad cache
+key or optimistic incremental patch.
+
+### Root Contract
+
+Root kind and root selector are orthogonal closed domains. Root kinds are
+`Executable`, `PublicAPI`, `SelectedTest`, `Reflection`, and `Extension`.
+Selectors are `ExactDefinition`, `ExactDeclaration`,
+`RequestedExecutableEntrypoints`, and `RequestedExportedDeclarations`.
+Reflection and extension entries must resolve an exact declaration or
+definition through their typed contract; unrestricted name lookup is
+unsupported.
+
+`RootContract` contains `SchemaVersion`, `ContractID`, `Fingerprint`, and an
+ordered list of `RootEntry`. Each entry contains `RootKind`, `RootSelector`,
+entry ordinal, and exactly the selector payload it owns: a `DefinitionID`, a
+`SemanticDeclarationID`, or an exact requested `PackageID` set. An
+`ExplicitEmpty` bit is legal only for test/reflection/extension classes and is
+mutually exclusive with a selector payload. Unknown fields, duplicate
+ordinals, duplicate identical entries, inactive payload, and a kind/selector
+combination outside the closed matrix fail construction.
+
+The Go-language executable selector resolves, only within requested packages
+whose declared package name is `main`, the exact package-level `main`
+declaration and package-initialization definition. API selection resolves
+exported declarations in exact requested packages. Contract spelling is an
+input-boundary selector only: it is resolved once to canonical semantic
+identity, ambiguity or absence fails, and no later fact or plan retains the
+spelling as authority. Tests, reflection, and extensions contribute explicit
+typed entries until their respective discovery contracts are implemented.
+
+The resolved root artifact contains one record per `(RootKind, EntityID,
+contract-entry ordinal)` and preserves multiple reasons for the same entity.
+Every contract entry resolves at least one identity or carries a closed
+explicit-empty disposition; a silently ineffective rule fails. There is no
+implicit "all selected packages" or "keep everything" root.
+Product planning requires at least one resolved nonempty root. A deliberately
+rootless inventory/audit request uses the separate `AnalysisOnly` purpose and
+cannot produce or certify a `ProgramPlan`; an empty product root artifact is
+not a successful zero-work plan.
+
+### Target And Environment Policy
+
+The plan consumes one constructor-validated `TargetPolicy` with
+`SchemaVersion`, `PolicyID`, `Fingerprint`, pinned TypeScript/Tsonic language
+contract, ESM/module contract, runtime ABI contract, and an ordered closed
+`TargetCapability` set. Capabilities describe available exact mechanisms
+(for example bigint, native class methods, and a particular runtime operation);
+they do not grant permission to weaken Go behavior or staticness. Source-shaped
+preference order, no-`call`/`apply`/`bind`, strict ESM, exact numeric behavior,
+and the ban on erased recovery are compiler invariants rather than configurable
+switches.
+
+Implementation-obligation contracts are separate typed inputs keyed by exact
+definition/declaration identity: `Gostdlib`, `ToolchainSource`, `External`,
+`Manual`, and `Extension`. Each carries its own identity/fingerprint, signature
+contract, available entry forms, initialization/external effects, and selected
+runtime capabilities. A package path or Stage-1 provenance cannot stand in for
+one. The Stage-1 provider selection and obligation contract exact-join for every
+nonautomatic definition before planning.
+
+### Program Entities And Normalization
+
+The Phase-3 entity algebra has five active variants:
+`Definition`, `Declaration`, `Binding`, `Type`, and `Operation`. A
+`ProgramEntity` carries one tag and exactly one matching semantic identity.
+Zero, multiple-active-payload, and package/name-only entities are invalid.
+
+One program-global identity table owns each identity domain. Internal fact and
+plan records use typed compact references into those tables; public visitors
+project one immutable record at a time with canonical identities. A fact edge
+does not repeat full semantic identities, and Phase 3 never retains a Stage-2
+`Package`, record slice, rendered-key cache, or second denormalized semantic
+model. Identity tables use structural `Compare` operations; serialization is
+confined to digests, artifacts, and diagnostics.
+
+The fact domains are separate sealed stores:
+
+| Domain owner | Exact observed inputs | Owned output |
+|---|---|---|
+| calls | `Call`, `BuiltinCall`, callable object/selection/instance evidence | one `CallSite` per call operation and an ordered exact target range |
+| function values | function/method value and method-expression operations | one capture-time target record and its callable target range |
+| effects | implicit effects plus spawn/defer/send/receive/panic/recover/control operations and called summaries | ordered direct-effect sites and one fixed-point summary per callable definition |
+| storage | bindings, address/dereference/place operations, captures, and boundary effects | one storage/lifetime record per relevant binding plus exact alias/escape relations |
+| value semantics | semantic types and every copy/zero/equality/key/order observation | one requirement record per observed type and ordered evidence sites |
+| generics | generic declarations/types, `GenericInstantiate`, and call instances | one demand per distinct canonical owner-and-type-argument tuple plus its sites |
+| interfaces | interface types, conversions, assertions, selections, calls, and dynamic observations | method slots, open/finite world, implementer/conversion/assertion/dispatch facts |
+| objects | named struct types, embeds, fields, methods, selections, construction, copies, and stores | embedding/promotion/override/collision/construction facts per object family |
+| initialization | typed package imports, package-init operations, initializer definitions, blank-import effects | one ordered package/definition initialization graph |
+| support | explicit Stage-2 unsupported resolutions/records and missing exact environment contracts | one typed blocking observation per unsupported semantic identity |
+| cost | every candidate definition/type/operation and nonordinary requirement | typed attribution candidates, never estimated source text |
+
+Every occurrence/relation fact has a
+`FactID{Domain, OriginEntity, Ordinal}`. Aggregate records are keyed by their
+one semantic definition/binding/type identity and contain typed ranges of those
+facts. The ordinal is assigned by the owning domain from source order when
+semantics are ordered and canonical structural identity order when the relation
+is a set. The closed record algebra is:
+
+- `CallSite{FactID, OperationID, CallKind, CallableObject, ReceiverType,
+  SignatureType, TargetRange, EvaluationRange}` where each `CallableTarget` is
+  exactly one definition, language intrinsic declaration, or external
+  obligation;
+- `FunctionValueSite{FactID, OperationID, ValueKind, TargetRange,
+  ReceiverCapture, CaptureRange}`;
+- `DirectEffect{FactID, OperationID, ImplicitSite, ImplicitOrdinal,
+  EffectKind, SubjectEntity, SourceType, TargetType}` and
+  `EffectSummary{DefinitionID, EffectKindSet, DirectFactRange,
+  CalleeSummaryRange}`;
+- `StorageFact{StorageEntity, SemanticTypeID, LifetimeKind, AddressTaken,
+  Escapes, AliasRegionID, CaptureRange, EvidenceRange}`, where a
+  `StorageEntity` is exactly one declaration, binding, or allocation/place
+  operation and `AliasRegionID` is derived from the canonical least member of
+  the exact region;
+- `CopyRequirement{FactID, OperationID, CopyBoundaryKind, SemanticTypeID,
+  SourceEntity, TargetEntity}` and
+  `TypeRequirement{SemanticTypeID, ZeroKind, CopyKind, EqualityKind, KeyKind,
+  OrderKind, NumericKind, StringKind, EvidenceRange}`;
+- `GenericDemand{FactID, GenericOwner, TypeArgumentRange,
+  InstantiatedSignature, SiteRange}`, with the owner as the fact origin and the
+  canonical type-argument tuple owning the ordinal;
+- `InterfaceTypeFact{InterfaceType, WorldKind, SlotRange, ImplementerRange,
+  Contract}` and `InterfaceSite{FactID, OperationID, InterfaceSiteKind,
+  SourceType, TargetType, Slot, DynamicTypeRange}`;
+- `ObjectFamilyFact{NamedType, SpineCandidate, EmbedRange, PromotionRange,
+  OverrideRange, CollisionRange, ConstructionRange, CopyEvidenceRange,
+  ZeroEvidenceRange}`;
+- `InitializationNode{DefinitionID, PackageID, InitKind, SourceOrdinal}` and
+  `InitializationEdge{FactID, FromDefinition, ToDefinition, InitEdgeKind,
+  SourceOrdinal}`;
+- `UnsupportedObservation{FactID, UnsupportedID, OwnerDefinition, Reason,
+  Evidence, RequiredContract}`; and
+- `CostCandidate{FactID, SubjectEntity, CostKind, Cardinality, NecessityFact}`.
+
+Every named `Kind` above is a pinned closed enum with an append-only numeric-ID
+test. Each record validates active payload, zero/inactive fields, endpoint
+membership, range bounds, and domain-specific cardinality. For example,
+`ReceiverCapture` is present only for a method value, a finite interface target
+range is nonempty and canonically sorted, an open interface carries an exact
+contract and zero finite implementers, an alias region contains every and only
+its members, and `NecessityFact` is required for every nonordinary cost
+candidate. These are different records because call, effect, storage, copy,
+generic, interface, object, initialization, support, and cost evidence are
+orthogonal; one discriminator or "requirements" property bag cannot replace
+them.
+
+The minimum closed values are:
+
+- `CallKind`: direct function, direct method, finite interface, open-contract
+  interface, builtin, and external;
+- `EffectKind`: read, write, allocate, copy, panic, recover, defer, spawn,
+  send, receive, block, initialize, register, and external;
+- `LifetimeKind`: local value, captured cell, escaped heap, package storage,
+  and external storage;
+- `CopyBoundaryKind`: assignment, argument, receiver, result, interface,
+  map, channel, append/copy, defer capture, and external/manual;
+- `WorldKind`: closed finite and open contract;
+- `InterfaceSiteKind`: conversion, assertion, call, equality, type switch, and
+  dynamic observation; and
+- `InitEdgeKind`: package import, variable dependency, lexical initializer,
+  explicit `init`, and registration.
+
+An unsupported semantic class is not encoded by inventing an enum value in a
+fact domain. The observation catalog emits a typed unsupported fact disposition
+with the exact missing analysis/contract requirement, and planning produces a
+`KnownUnsupported` record if that entity is reachable.
+
+An operation or type may contribute to several orthogonal domains, but each
+fact record is produced by exactly one domain owner. A closed observation
+catalog maps every `semantic.OperationKind`, `TypeKind`, `ResolutionKind`,
+`UnsupportedReason`, implicit-operation kind, provider class, and relevant
+cross-product to the domains that must observe it, including an explicit
+no-fact disposition. Adding a semantic enum member without updating that
+catalog fails totality before analysis. Domain builders cannot enumerate
+semantic packages themselves or call one another's private derivation; the
+coordinator opens one package at a time and dispatches each canonical record
+once.
+
+Every relation record has a typed source, target, edge class, source-owned
+ordinal, and evidence identity. Multiplicity is preserved. Sets are used only
+for mathematically set-valued relations such as unique implementer identity;
+two copy sites, registrations, conversions, or calls to the same target remain
+two records. Derived transitive summaries cite their direct records and
+fixed-point generation, not a source spelling.
+
 Each fact kind has one owner and one query API. Parallel maps carrying pieces
 of one logical record are forbidden. Population occurs before sealing; any
 post-seal mutation is an invariant failure. Unknown facts select an explicit
 unsupported disposition unless a declared conservative representation is
-itself exact.
+itself exact. Conservative does not mean "all definitions": the record names
+the closed observation class that makes its bounded over-approximation exact
+for the selected contract.
+
+### Construction And Sealing
+
+Construction is dependency ordered:
+
+1. exact-join source topology, semantic package manifests, and definition
+   selections and initialize empty typed identity tables;
+2. stream each semantic package once, interning every owned and referenced
+   identity while collecting direct domain facts without retaining package
+   detail; references may precede their owner but remain unresolved draft refs;
+3. exact-join every referenced identity to one owner, canonicalize each
+   identity table, remap draft references once, and seal direct facts in
+   canonical relation order;
+4. derive finite interface/generic/call targets and initialization order;
+5. compute effect, escape, alias, and other declared monotonic fixed points;
+6. independently validate every domain and seal `ProgramFacts`;
+7. resolve roots and semantic reachability; and
+8. build and seal `ProgramPlan`.
+
+Only the current semantic package may be resident during steps 1-2. A domain
+requiring a second complete semantic-model pass, a package cache, or another
+record projection must reopen its input summary design. Fixed points use
+bounded work queues and monotonic state. A result that oscillates, depends on
+map iteration, or requires retrying with a stronger interpretation is a
+compiler defect.
+
+`ProgramFacts` exposes counts, canonical visitors, identity lookup, relation
+visitors, its input digest, and its own content digest. It exposes no builder,
+backing slice/map, semantic package, mutable bitset, or callback into the
+frontend.
 
 Semantic reachability is sealed before planning. It starts from explicit
 executable, public API, selected test, reflection, and extension semantic roots
 and traverses typed call, initialization, function-value, generic
 instantiation, interface/dynamic, registration, and external-contract edges.
-Every reachable semantic definition/operation has a root witness; every
-unreachable one has an exact exclusion explanation. A conservative edge is
-allowed only when its typed observation class makes that edge exact. Planning
-and lowering receive only this reachable semantic set—“emit the selected
-closure and prune later” is forbidden.
+Every reachable semantic entity has a root witness; every unreachable one has
+an exact exclusion explanation. A conservative edge is allowed only when its
+typed observation class makes that edge exact. Planning and lowering receive
+only this reachable semantic set—“emit the selected closure and prune later”
+is forbidden.
 
 Post-completion implementation reachability remains separate. It traverses the
 actual generated/manual/runtime/standard-library/external/extension artifacts,
@@ -1601,11 +1904,51 @@ implementation-only helper/adapter/initialization edges, reports orphan manual
 work, and determines publication/pruning. Neither graph substitutes for the
 other.
 
+### Semantic Reachability Algebra
+
+Reachability uses the same five entity variants as the fact model. Its edge
+classes are `OwnsDeclaration`, `ImplementsDeclaration`, `OwnsBinding`,
+`ContainsOperation`, `NestedDefinition`, `ObjectReference`, `TypeReference`,
+`DirectCall`, `FiniteDynamicCall`, `FunctionValue`, `Initialization`,
+`GenericInstantiation`, `InterfaceConversion`, `Registration`,
+`ExternalContract`, and `Capture`. The first seven preserve exact Stage-2
+ownership/reference topology: an API declaration reaches its implementation
+and type, an executable definition reaches its declaration/bindings/
+operations, and an operation reaches the declaration/binding/type it uses.
+The observation catalog declares which fact owner supplies each class. A new
+edge class cannot be smuggled through a generic "dependency" record.
+
+Every edge has one canonical `EdgeID` composed structurally from source entity,
+edge class, source-owned ordinal, and target entity. Dynamic target ordinals
+follow canonical target identity order; source-ordered relations preserve
+source order. Duplicate IDs, changed order, target identities absent from the
+program census, and an edge unsupported by its cited fact all fail.
+
+Traversal is deterministic breadth-first over canonical root then edge order.
+Each reachable entity stores one canonical shortest witness:
+`root -> ordered EdgeID path`; equal-length paths select structural identity
+order. This bounds witness storage to one predecessor per entity while
+remaining independently reproducible. Every non-reachable entity stores the
+closed reason `NoSelectedRootPath` bound to root and graph digests. The
+independent verifier recomputes the partition and proves no reachable
+predecessor enters an excluded strongly connected component. Thus an exclusion
+record is not a count or an assertion that traversal happened.
+
+The entity census is partitioned exactly:
+
+```text
+all semantic entities = reachable entities disjoint-union excluded entities
+```
+
+Planning receives a reachability-filtered package/type/definition/operation
+view. Passing the complete selected semantic closure, filtering after planning,
+or retaining an unreachable "just in case" plan is forbidden.
+
 ## Immutable Program Plan
 
 Planning chooses the simplest exact representation after all facts are sealed.
-`ProgramPlan` is atomic: every semantically reachable declaration and operation receives a
-complete validated plan or an error. It includes:
+`ProgramPlan` is atomic: every semantically reachable declaration and operation
+receives a complete validated plan or an error. It includes:
 
 - type/storage/zero/copy/equality/key plans;
 - function, method, receiver, closure, call, and generic plans;
@@ -1620,9 +1963,140 @@ Related choices are one record. For example an external method obligation
 stores identity, emitted slot, signature, receiver representation, and adapter
 plan atomically. Consumers never recompute one field.
 
-Planning is monotonic until fixed point and then frozen. Lowering cannot choose
-between candidates, introduce a helper because printing is difficult, or retry
-with a stronger representation.
+`ProgramPlan` is normalized into package, module, global-type, declaration,
+definition, binding, and operation plan stores. It references semantic
+identities and fact records; it does not copy semantic payloads. Its closed
+subject records are:
+
+- `PackagePlan`: reachable package identity, initialization plan, selected
+  aggregate obligation census, and ordered module references; implementation
+  ownership remains per declaration/definition and may be mixed in one package;
+- `ModulePlan`: one source-file mirror or one evidence-backed merge group,
+  ordered imports, definitions, initialization edges, and cost;
+- `TypePlan`: representation, zero, storage, copy, equality/key/order,
+  nilability, generic, interface/RTTI, and object-family decisions as one
+  compatible record; unnamed structural types have one global plan rather than
+  one copy per spelling/package, and fields/methods are components of this
+  record;
+- `DeclarationPlan`: one standalone declaration's owning module, emitted
+  symbol/visibility class, type/value/initialization relation, owning
+  `DefinitionPlan` when one exists, and declaration-surface cost; it never
+  repeats implementation disposition; type-owned fields/methods have zero
+  standalone declaration plans and are planned by their `TypePlan`;
+- `DefinitionPlan`: implementation disposition, owning module, function/method/
+  receiver/closure/generic entry plan, obligations, cited facts, and cost;
+- `BindingPlan`: storage, lifetime, capture/cell disposition, initialization,
+  and cited alias/escape facts; and
+- `OperationPlan`: one lowering rule, evaluation schedule, required checks or
+  runtime operations, result/storage action, cited facts, and cost.
+
+Every record has a closed disposition:
+`Automatic`, `ManualObligation`, `ExternalObligation`,
+`LanguageIntrinsic`, or `KnownUnsupported`. Only `Automatic` carries a
+lowering rule. Obligation records carry exact contract identity and signature;
+unsupported records carry a typed reason and the missing/contradictory fact.
+Neither is an empty automatic plan.
+
+Every named decision inside a plan record is itself a closed enum or a typed
+reference, never a free-form option map. The minimum decision algebras are
+`TypeRepresentationKind`, `ZeroPlanKind`, `StoragePlanKind`, `CopyPlanKind`,
+`EqualityPlanKind`, `KeyPlanKind`, `ReceiverEntryKind`, `CallPlanKind`,
+`GenericPlanKind`, `InterfacePlanKind`, `ObjectPlanKind`,
+`InitializationPlanKind`, `EvaluationStepKind`, `RuntimeOperationKind`, and
+`ObligationKind`. Their numeric IDs are pinned and append-only. Each
+combination has one validating constructor; inactive decision payloads must be
+zero. The exact receiver/object/interface/value alternatives and applicability
+conditions are those in `translation.md`, not a second planner-local table.
+
+The disposition payload matrix is exact:
+
+| Disposition | Required active payload | Forbidden payload |
+|---|---|---|
+| `Automatic` | rule ID, all applicable decision enums/references, fact range, evaluation schedule, cost | obligation, unsupported reason |
+| `ManualObligation` | contract ID/digest, exact declaration/signature, allowed entry form, effects, cost | lowering rule |
+| `ExternalObligation` | contract ID/digest, exact declaration/signature, call/initialization/effect contract, cost | lowering rule |
+| `LanguageIntrinsic` | intrinsic catalog ID, signature/operation contract, cost | ordinary implementation rule |
+| `KnownUnsupported` | reason, exact subject, blocking fact/contract requirement | lowering rule or obligation implementation |
+
+One append-only decision catalog owns the legal rule for every semantic
+operation kind and every type/definition class. Rules declare required fact
+predicates, mutually exclusive payload shape, applicable target-policy
+capabilities, and an expected-cost formula. The catalog totality test enumerates
+the complete Stage-2 semantic algebra. No lowerer, runtime provider, completion
+pass, or extension can select a different rule.
+
+Planning is monotonic until fixed point and then frozen. Internally, each
+subject begins with the catalog's finite ordered candidate set. Facts can only
+remove candidates or strengthen a cited requirement; they cannot add a
+fallback. Dependencies are processed by a deterministic work queue. At seal,
+exactly one candidate must remain, or a closed unsupported/obligation
+disposition must explain why none can. An equal-priority ambiguity is an error;
+selection never depends on map iteration or package spelling.
+
+The preference order is source-shaped first, then the smallest typed mechanism
+whose necessity is proven. For example, ordinary direct calls select direct
+call plans; interface dispatch cannot create per-call work proportional to
+implementer count; receiver entry selects native method, checked thunk, or
+explicit-receiver body according to the exact nil/dispatch facts defined in
+`translation.md`; embedding selects `extends` only when the complete object
+spine proof passes. A convenience for lowering is not a fact and cannot select
+a stronger plan.
+
+Plan cost is structural, not predicted formatted text. Each record attributes
+expected AST nodes, definitions, references, imports, runtime operations,
+adapters, and specialization instances to exact semantic/fact identities.
+Phase 4 exact-joins actual AST and formatted costs to these estimates and
+reopens the owning plan rule on an unexplained tail.
+
+### Phase-3 Conservation
+
+The following joins are blocking:
+
+1. source package topology, semantic authority manifest, and semantic package
+   census have the same package identities;
+2. every definition selection and root selector resolves to an identity in
+   that census;
+3. every catalog-declared semantic observation has exactly its required direct
+   fact record or explicit no-fact/unsupported disposition;
+4. every direct and derived relation references present identities, cites its
+   sole fact owner, and exact-joins an independently derived relation;
+5. every semantic entity is exactly reachable or excluded, and every reachable
+   witness/recomputed excluded component agrees;
+6. every reachable package/type/definition/binding/operation requiring a plan
+   has exactly one compatible plan record, while every excluded subject has
+   zero plan records;
+7. every plan fact reference resolves into the sealed fact set and every
+   nonordinary plan cites at least one typed necessity fact; and
+8. plan estimates reconcile by owner and category with all planned definitions,
+   references, imports, runtime operations, adapters, and instances.
+
+The independent checker re-reads semantic packages through the public
+projection API and separately derives expected observations and edges. It may
+share identity types and closed schemas but not the production observation
+catalog, relation constructors, candidate filtering, fixed-point helpers, or
+root traversal implementation.
+
+### Phase-3 Cost Bound
+
+Direct construction is
+`O(semantic records + direct relations + identity probes)` plus named canonical
+`O(n log n)` sorts. Each fixed point is
+`O(entities + edges + monotonic state transitions)`. Reachability is
+`O(entities + edges)`. Planning is
+`O(reachable subjects * bounded catalog candidates + plan dependency edges)`.
+Storage is
+`O(unique identities + facts + edges + reachable plans)` and excludes semantic
+record snapshots. The work ledger counts package opens, record visits, identity
+probes/interns, relation appends, comparisons, queue insertions/pops, edge
+visits, candidate evaluations/removals, and plan appends. A counter that omits
+work inside a visit is invalid.
+
+Exit budgets report absolute and parent-delta values for every ledger class,
+fact/edge/root/reachable/excluded/plan count, compact-record widths, retained
+bytes, largest domains/packages/SCCs/candidate sets, wall time, and peak RSS.
+Adversarial wide-call, deep-chain, large-SCC, many-implementer, generic-demand,
+and object-embedding fixtures distinguish linear/bounded behavior from
+quadratic scans and per-call implementer expansion.
 
 ## Typed TypeScript Construction
 
@@ -1753,8 +2227,9 @@ directories:
 ```text
 cmd/gotots/                  CLI wiring only
 internal/compiler/           phase orchestration
-internal/source/             workspace, toolchain, selected inputs, transient
-                             syntax/checker lifetime, final severing
+internal/source/             workspace, toolchain, selected inputs, declared
+                             package names, typed direct-import topology,
+                             transient syntax/checker lifetime, final severing
 internal/scope/contract/     closed versioned provider/rule/fact-request
                              schema and validation; no source/graph state
 internal/scope/sourceplan/   request-bound local/certified structural-source
@@ -1780,8 +2255,11 @@ internal/language/frontend/  sole checker-to-semantic materializer: definition
 internal/stagecheck/         blocking in-pipeline independent stage joins,
                              run synchronously between phases; distinct from
                              internal/verify offline/certification gates
-internal/analysis/           sealed whole-program facts
-internal/plan/               immutable representation/implementation plan
+internal/analysis/           target-independent ProgramInput/root schema,
+                             normalized sealed fact domains, and semantic
+                             reachability; no source loader or target import
+internal/plan/               target-policy decision catalog and normalized
+                             immutable ProgramPlan; no AST or formatter
 schema/tsgo/                 pinned content-addressed TS-Go schema-level AST
                              inputs and lock manifest; sole target authority
 internal/typescript/ast/     generated exact TS-Go nodes, factories, visitors,
@@ -1804,6 +2282,45 @@ calibration/                 reviewed Go and hand-written TS pairs
 profiles/                    data-only project requests
 schemas/                     machine artifact schemas
 ```
+
+Phase-3 production files are split by sole owner rather than numeric shard:
+
+```text
+internal/analysis/
+  input.go                    ProgramInput projections and digest isolation
+  topology.go                 typed package/semantic census admission
+  entity.go                   compact five-domain entity tables
+  observation_catalog.go      total semantic-class to fact-domain contract
+  call.go                     call and function-value facts
+  effect.go                   direct and fixed-point effect facts
+  storage.go                  storage, escape, alias, and capture facts
+  value.go                    zero/copy/equality/key/order requirements
+  generic.go                  generic demand facts
+  interface.go                interface world/slot/site/target facts
+  object.go                   embedding/promotion/object-family facts
+  initialization.go           package/definition initialization graph
+  support.go                  explicit unsupported observations
+  reachability.go             edge algebra, roots, witnesses, exclusions
+  model.go                    sealed ProgramFacts API only
+
+internal/plan/
+  policy.go                   target/obligation policy schema
+  catalog.go                  total append-only decision rules
+  package.go                  package/module plans
+  type.go                     type and type-owned-member plans
+  declaration.go              standalone declaration plans
+  definition.go               implementation/receiver/obligation plans
+  binding.go                  storage/capture plans
+  operation.go                operation/evaluation/runtime plans
+  build.go                    monotonic dependency-ordered selection
+  model.go                    sealed ProgramPlan API only
+```
+
+Domain files may share private compact identity/range primitives in their own
+package, but there is no generic fact record, option bag, catch-all builder, or
+second aggregate map. Independent Phase-3 derivation and joins live under
+`internal/stagecheck/`; mutation/cost/architecture gates live under
+`internal/verify/`. Tests are adjacent to the production owner they challenge.
 
 Directories are dependency/ownership boundaries. Files are construct families,
 not one file per AST node and not numeric shards. Examples include

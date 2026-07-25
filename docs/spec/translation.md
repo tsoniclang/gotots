@@ -486,6 +486,104 @@ Package variables preserve live mutation and addressability across modules.
 The reachability graph activates initialization only for reachable imports and
 registrations.
 
+## Whole-Program Fact And Plan Examples
+
+Phase 2 records Go meaning; Phase 3 records only observations that require a
+whole-program answer and then freezes the implementation choice. The same
+semantic operation cannot be reinterpreted by a lowerer.
+
+For direct reachable code:
+
+```go
+func add(left, right int32) int32 { return left + right }
+func main() { println(add(1, 2)) }
+func unused() {}
+```
+
+Phase 3 records the direct `main -> add` call edge, the exact `int32`
+arithmetic requirement, and roots `main`. `unused` receives
+`NoSelectedRootPath` and no plan. `add` and its call receive direct
+function/call plans. The eventual lowering is source-shaped:
+
+```ts
+function add(left: number, right: number): number {
+  return (left + right) | 0;
+}
+```
+
+The width operation is present because the `int32` fact requires it; the
+function call itself gains no hidden arguments.
+
+For value copying:
+
+```go
+type Point struct{ X int32 }
+
+func move(input Point) Point {
+    output := input
+    output.X++
+    return output
+}
+```
+
+Phase 3 records copy boundaries at parameter entry, assignment, and return;
+the mutation makes aliasing observable. The atomic type/binding/operation plans
+therefore require independent `Point` storage at those boundaries. If a
+whole-region proof later establishes that one copy is unobservable, the plan
+cites that exact proof; lowering cannot opportunistically omit a copy.
+
+For interface dispatch:
+
+```go
+type Speaker interface{ Speak() string }
+type Dog struct{}
+func (Dog) Speak() string { return "dog" }
+func say(value Speaker) string { return value.Speak() }
+```
+
+Phase 3 records the method slot, `Dog -> Speaker` conversion, observed dynamic
+type, and call site. The call plan is one constant-size dynamic dispatch
+record. Adding 200 implementers may enlarge the interface fact set and
+conversion/adapter definitions, but it cannot add 200 arms to each call plan.
+The eventual ordinary call remains:
+
+```ts
+return value.Speak();
+```
+
+or uses one separately planned constant-size adapter when direct class/interface
+dispatch is not exact. A per-call implementer switch is never a candidate.
+
+For Go embedding:
+
+```go
+type Base struct{ Position int }
+type Identifier struct {
+    Base
+    Text string
+}
+```
+
+The object-family facts record the physical embed, promoted fields/methods,
+copy/zero/construction behavior, collisions, and override graph. `extends Base`
+is selected only if the full single-spine proof passes. Otherwise the same
+semantic input receives a composition plan. Neither source resemblance nor a
+type name selects inheritance.
+
+For package initialization:
+
+```go
+import _ "example.com/register"
+
+var value = load()
+func init() { publish(value) }
+```
+
+Typed package-import edges, initializer definitions, the blank-import effect,
+and lexical `init` order produce one initialization graph. Import text is not
+consulted after Stage 1. Only roots whose traversal reaches this package
+activate its initialization plan.
+
 ## Complex Translation Example
 
 ```go
