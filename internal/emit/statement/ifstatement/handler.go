@@ -11,41 +11,61 @@ func Emit(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.IfStmt,
-) (tsgo.IfStatement, error) {
+) (api.StatementEmission, error) {
 	if source.Init != nil || source.Body == nil {
-		return nil, api.Unsupported(context, api.CategoryStatement, source)
+		return api.StatementEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
 	}
 	condition, err := children.Condition(
 		context.WithRole(api.RoleIfCondition),
 		source.Cond,
 	)
 	if err != nil {
-		return nil, err
+		return api.StatementEmission{}, err
 	}
 	thenBlock, err := children.Block(
 		context.WithRole(api.RoleIfThen),
 		source.Body,
 	)
 	if err != nil {
-		return nil, err
+		return api.StatementEmission{}, err
 	}
 	var elseStatement tsgo.Statement
+	var elseRequests []api.PlacementRequest
 	switch alternate := source.Else.(type) {
 	case nil:
 	case *ast.BlockStmt:
-		elseStatement, err = children.Block(
+		var alternateBlock api.BlockEmission
+		alternateBlock, err = children.Block(
 			context.WithRole(api.RoleIfElse),
 			alternate,
 		)
+		if err == nil {
+			elseStatement = alternateBlock.Value()
+			elseRequests = alternateBlock.Requests()
+		}
 	default:
-		return nil, api.Unsupported(context, api.CategoryStatement, source)
+		return api.StatementEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
 	}
 	if err != nil {
-		return nil, err
+		return api.StatementEmission{}, err
 	}
-	return context.Factory().IfStatement(
-		condition,
-		thenBlock,
-		elseStatement,
-	), nil
+	statements := condition.Before()
+	statements = append(
+		statements,
+		context.Factory().IfStatement(
+			condition.Value(),
+			thenBlock.Value(),
+			elseStatement,
+		),
+	)
+	return api.NewStatementEmission(
+		statements,
+		api.CombineRequests(
+			condition.Requests(),
+			thenBlock.Requests(),
+			elseRequests,
+		),
+	)
 }

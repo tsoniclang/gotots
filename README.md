@@ -20,9 +20,9 @@ strict ESM TypeScript
 There is no custom semantic IR, planning IR, lowering IR, or text emitter.
 The governing contract is [`docs/spec/`](docs/spec/README.md).
 
-This branch is intentionally a clean baseline containing authority and project
-metadata only. Implementation is added capability by capability after the
-relevant design and verification contract is accepted.
+Implementation advances capability by capability from focused failing
+construct tests. Each accepted case builds typed TS-Go AST, passes strict
+TypeScript checks, and proves behavior before neighboring cases are admitted.
 
 Superseded implementations remain available on the pushed `archive/*`
 branches. They are historical evidence and test-idea donors, not production

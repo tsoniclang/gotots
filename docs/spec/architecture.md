@@ -147,6 +147,14 @@ A narrow memoized answer is allowed only when its key is the authoritative Go
 object, its value is directly needed target state, and recomputation would
 produce the same answer. It is a cache, not a new identity domain.
 
+Target names are keyed by `types.Object`, not source spelling. A declaration
+that shadows an ancestor receives a deterministic distinct target name because
+JavaScript/TypeScript lexical declarations have a temporal dead zone before
+their textual declaration while the new Go variable is not in scope during
+the right side of its short declaration. Sibling target scopes may reuse a
+name. Compiler-created names use a namespace impossible in Go source and are
+owned by the lexical name service.
+
 Representation consistency has one owner inside `internal/emit`. On the first
 request for a Go type, object, or method, that owner queries the complete
 selected Go AST/type graph, chooses the exact target form, and creates or
@@ -205,6 +213,13 @@ imports are required, typed placement requests with:
 3. the preferred scope;
 4. the execution/evaluation constraint; and
 5. a typed deduplication owner where repetition is legal.
+
+Name reservation and placement are separate operations. The authoritative
+name owner may allocate a stable local name while a handler constructs a
+reference, but the handler returns the associated placement request in its
+emission result. Only the root placement owner consumes requests and mutates a
+target builder. No `Context` capability may silently install an import or
+hoisted declaration while a child is being translated.
 
 One placement service applies the policy:
 

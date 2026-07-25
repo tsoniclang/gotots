@@ -5,23 +5,29 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func Emit(context api.Context, source *ast.Ident) (tsgo.Expression, error) {
+func Emit(
+	context api.Context,
+	source *ast.Ident,
+) (api.ExpressionEmission, error) {
 	object := context.TypesInfo().Uses[source]
 	if object == nil {
-		return nil, api.Unsupported(context, api.CategoryExpression, source)
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	switch object {
 	case types.Universe.Lookup("false"):
-		return context.Factory().FalseLiteral(), nil
+		return api.DirectExpression(context.Factory().FalseLiteral()), nil
 	case types.Universe.Lookup("true"):
-		return context.Factory().TrueLiteral(), nil
+		return api.DirectExpression(context.Factory().TrueLiteral()), nil
 	}
-	name, err := context.Names().Reference(object)
+	reference, err := context.Names().Reference(object)
 	if err != nil {
-		return nil, err
+		return api.ExpressionEmission{}, err
 	}
-	return context.Factory().Identifier(name), nil
+	return api.DirectExpression(
+		context.Factory().Identifier(reference.Name()),
+		reference.Requests()...,
+	), nil
 }

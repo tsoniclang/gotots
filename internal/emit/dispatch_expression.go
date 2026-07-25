@@ -10,10 +10,12 @@ import (
 	identifierexpression "github.com/tsoniclang/gotots/internal/emit/expression/identifier"
 	integerliteral "github.com/tsoniclang/gotots/internal/emit/expression/literal/integer"
 	unaryexpression "github.com/tsoniclang/gotots/internal/emit/expression/unary"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func (e *Emitter) Expression(context api.Context, source ast.Expr) (tsgo.Expression, error) {
+func (e *Emitter) Expression(
+	context api.Context,
+	source ast.Expr,
+) (api.ExpressionEmission, error) {
 	switch source := source.(type) {
 	case *ast.BinaryExpr:
 		return binaryexpression.Emit(context, e, source)
@@ -26,25 +28,31 @@ func (e *Emitter) Expression(context api.Context, source ast.Expr) (tsgo.Express
 	case *ast.UnaryExpr:
 		return unaryexpression.Emit(context, e, source)
 	default:
-		return nil, api.Unsupported(context, api.CategoryExpression, source)
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
 	}
 }
 
 func (e *Emitter) IntegerConstant(
 	context api.Context,
 	source ast.Expr,
-) (tsgo.Expression, error) {
+) (api.ExpressionEmission, error) {
 	return integerliteral.Emit(context, e, source)
 }
 
-func (e *Emitter) Condition(context api.Context, source ast.Expr) (tsgo.Expression, error) {
+func (e *Emitter) Condition(
+	context api.Context,
+	source ast.Expr,
+) (api.ExpressionEmission, error) {
 	sourceType := context.TypesInfo().TypeOf(source)
 	if sourceType == nil {
-		return nil, api.Unsupported(context, api.CategoryExpression, source)
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	basic, ok := types.Unalias(sourceType).(*types.Basic)
 	if !ok || basic.Info()&types.IsBoolean == 0 {
-		return nil, api.Unsupported(context, api.CategoryExpression, source)
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	return e.Expression(context.WithExpectedType(types.Typ[types.Bool]), source)
 }

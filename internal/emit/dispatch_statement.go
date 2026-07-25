@@ -11,14 +11,19 @@ import (
 	ifstatement "github.com/tsoniclang/gotots/internal/emit/statement/ifstatement"
 	incdecstatement "github.com/tsoniclang/gotots/internal/emit/statement/incdec"
 	returnstatement "github.com/tsoniclang/gotots/internal/emit/statement/returnstatement"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func (e *Emitter) Block(context api.Context, source *ast.BlockStmt) (tsgo.Block, error) {
+func (e *Emitter) Block(
+	context api.Context,
+	source *ast.BlockStmt,
+) (api.BlockEmission, error) {
 	return blockstatement.Emit(context, e, source)
 }
 
-func (e *Emitter) Statement(context api.Context, source ast.Stmt) (tsgo.Statement, error) {
+func (e *Emitter) Statement(
+	context api.Context,
+	source ast.Stmt,
+) (api.StatementEmission, error) {
 	switch source := source.(type) {
 	case *ast.AssignStmt:
 		return assignment.Emit(context, e, source)
@@ -33,17 +38,19 @@ func (e *Emitter) Statement(context api.Context, source ast.Stmt) (tsgo.Statemen
 	case *ast.ReturnStmt:
 		return returnstatement.Emit(context, e, source)
 	default:
-		return nil, api.Unsupported(context, api.CategoryStatement, source)
+		return api.StatementEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
 	}
 }
 
 func (e *Emitter) ForInitializer(
 	context api.Context,
 	source ast.Stmt,
-) (tsgo.ForInitializer, error) {
+) (api.ForInitializerEmission, error) {
 	assignmentStatement, ok := source.(*ast.AssignStmt)
 	if !ok {
-		return nil, api.Unsupported(context, api.CategoryStatement, source)
+		return api.ForInitializerEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
 	}
 	return assignment.EmitForInitializer(context, e, assignmentStatement)
 }
@@ -51,10 +58,11 @@ func (e *Emitter) ForInitializer(
 func (e *Emitter) ForPost(
 	context api.Context,
 	source ast.Stmt,
-) (tsgo.Expression, error) {
+) (api.ExpressionEmission, error) {
 	post, ok := source.(*ast.IncDecStmt)
 	if !ok {
-		return nil, api.Unsupported(context, api.CategoryStatement, source)
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
 	}
 	return incdecstatement.EmitExpression(context, post)
 }

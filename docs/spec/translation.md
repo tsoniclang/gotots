@@ -97,8 +97,37 @@ DeclarationEmission
   requests: placement requests
 ```
 
+Narrow contextual entries whose target category is not an expression,
+statement, or declaration use the same immutable `value + requests` shape
+specialized to that exact TS-Go protocol category (currently type, block, and
+`for` initializer). They have no independent semantic payload and no
+`before` list; they do not enlarge the source model.
+
 These wrappers coordinate insertion and evaluation order. They do not encode
 source semantics independently of the Go AST/type graph.
+
+The wrappers are immutable values. Slice accessors return copies. A handler
+may reserve a deterministic target name through the name owner, but it does
+not install an import, declaration, helper, or statement into a mutable parent.
+The corresponding typed placement request travels in the result and is
+applied once by the root placement owner.
+
+Result composition is owner-directed:
+
+- a block flattens each child `StatementEmission.statements` in source order;
+- a parent combines child requests without rendering or string-key
+  deduplication;
+- a direct expression normally has an empty `before` list;
+- when a later eager child has `before` statements, already encountered
+  side-effecting values are captured before those statements so source
+  evaluation order is retained; and
+- a lazy child keeps its `before` statements inside the branch, short-circuit
+  arm, loop iteration, or closure that owns its execution.
+
+No compatibility entry point may unwrap an expression and discard its
+`before` statements or placement requests. Until an owner implements the
+required composition rule, that contextual case remains an explicit
+unsupported failure.
 
 The parent consumes a child result. It may place `before` statements only where
 the child is guaranteed to execute. For lazy or conditional children, the
@@ -129,6 +158,28 @@ const [value, ok] = values.getOk(key);
 No child scans its parent, and no inventory record is needed.
 
 ### Multiple Results And Assignment Order
+
+Even an identifier-only swap requires transactional ownership:
+
+```go
+left, right = right, left
+```
+
+An exact direct form captures every right side before the first store:
+
+```ts
+const $assign0: GoInt = right;
+const $assign1: GoInt = left;
+left = $assign0;
+right = $assign1;
+```
+
+The captures are target coordination nodes, not a source IR. Their names and
+types come from the lexical name owner and the existing `go/types` objects.
+For a mixed short declaration, existing variables are stored and new variables
+are declared only after all captures. A shadowing new variable receives a
+distinct target name so an earlier right-side reference still denotes the
+outer Go object.
 
 ```go
 i, values[i] = i+1, pair()

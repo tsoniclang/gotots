@@ -13,10 +13,11 @@ func Emit(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.BinaryExpr,
-) (tsgo.Expression, error) {
+) (api.ExpressionEmission, error) {
 	operator, operandType, ok := operationFor(context, source)
 	if !ok {
-		return nil, api.Unsupported(context, api.CategoryExpression, source)
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	left, err := children.Expression(
 		context.
@@ -25,7 +26,7 @@ func Emit(
 		source.X,
 	)
 	if err != nil {
-		return nil, err
+		return api.ExpressionEmission{}, err
 	}
 	right, err := children.Expression(
 		context.
@@ -34,15 +35,23 @@ func Emit(
 		source.Y,
 	)
 	if err != nil {
-		return nil, err
+		return api.ExpressionEmission{}, err
 	}
-	return context.Factory().BinaryExpression(
+	if len(left.Before()) != 0 || len(right.Before()) != 0 {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	return api.NewExpressionEmission(
 		nil,
-		left,
-		nil,
-		operator,
-		right,
-	), nil
+		context.Factory().BinaryExpression(
+			nil,
+			left.Value(),
+			nil,
+			operator,
+			right.Value(),
+		),
+		api.CombineRequests(left.Requests(), right.Requests()),
+	)
 }
 
 func operationFor(

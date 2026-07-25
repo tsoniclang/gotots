@@ -11,14 +11,19 @@ func Emit(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.BlockStmt,
-) (tsgo.Block, error) {
+) (api.BlockEmission, error) {
 	statements := make([]tsgo.Statement, 0, len(source.List))
+	var requests []api.PlacementRequest
 	for _, statement := range source.List {
 		target, err := children.Statement(context.WithRole(api.RoleBlockStatement), statement)
 		if err != nil {
-			return nil, err
+			return api.BlockEmission{}, err
 		}
-		statements = append(statements, target)
+		statements = append(statements, target.Statements()...)
+		requests = append(requests, target.Requests()...)
 	}
-	return context.Factory().Block(statements, true), nil
+	return api.DirectBlock(
+		context.Factory().Block(statements, true),
+		requests...,
+	), nil
 }
