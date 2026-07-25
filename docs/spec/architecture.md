@@ -48,6 +48,7 @@ general-purpose intermediate program.
 | typed target protocol values and factories | generated `internal/target/tsgo` |
 | target lexical placement and deduplication | scoped builders in `internal/emit` |
 | target decoding and formatting | pinned `tsgo --api` `printNode` |
+| Tsonic source-primitive and target semantics | selected Tsonic consumer and target plugin |
 | output paths and atomic writes | `internal/output` |
 | runtime/manual/external ownership | explicit contracts under their named roots |
 | independent checks | `internal/verify` |
@@ -208,6 +209,10 @@ imports are required, typed placement requests with:
 One placement service applies the policy:
 
 - imports always enter file import scope; dynamic imports are forbidden;
+- every emitted package declaration is exported from its generated source-file
+  module for static intra-package linking, including declarations whose Go
+  names are unexported; only the package assembly facade exposes the selected
+  Go public API to consumers;
 - reusable static declarations prefer file scope;
 - function-wide declarations enter the function prologue only when their
   lifetime is function-wide;

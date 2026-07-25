@@ -12,10 +12,16 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.ReturnStmt,
 ) (tsgo.ReturnStatement, error) {
-	if len(source.Results) != 1 {
+	results := context.FunctionResults()
+	if len(source.Results) != 1 || results == nil || results.Len() != 1 {
 		return nil, api.Unsupported(context, api.CategoryStatement, source)
 	}
-	result, err := children.Expression(context.WithRole(api.RoleReturnResult), source.Results[0])
+	result, err := children.Expression(
+		context.
+			WithRole(api.RoleReturnResult).
+			WithExpectedType(results.At(0).Type()),
+		source.Results[0],
+	)
 	if err != nil {
 		return nil, err
 	}

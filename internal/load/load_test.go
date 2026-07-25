@@ -21,13 +21,16 @@ func TestOneReturnsOneCoherentSyntaxAndTypeGraph(t *testing.T) {
 		t.Fatalf("package path = %q, want example.com/add", loaded.Path())
 	}
 
-	files := loaded.Syntax()
+	files := loaded.Files()
 	if len(files) != 1 {
 		t.Fatalf("syntax files = %d, want 1", len(files))
 	}
-	function, ok := files[0].Decls[0].(*ast.FuncDecl)
+	if filepath.Base(files[0].Path()) != "add.go" {
+		t.Fatalf("source path = %q, want add.go", files[0].Path())
+	}
+	function, ok := files[0].Syntax().Decls[0].(*ast.FuncDecl)
 	if !ok {
-		t.Fatalf("first declaration = %T, want *ast.FuncDecl", files[0].Decls[0])
+		t.Fatalf("first declaration = %T, want *ast.FuncDecl", files[0].Syntax().Decls[0])
 	}
 	signature, ok := loaded.TypesInfo().Defs[function.Name].Type().(*types.Signature)
 	if !ok {

@@ -18,14 +18,27 @@ const (
 type Role string
 
 const (
-	RoleFileDeclaration Role = "file-declaration"
-	RoleFunctionBody    Role = "function-body"
-	RoleParameterType   Role = "parameter-type"
-	RoleResultType      Role = "result-type"
-	RoleBlockStatement  Role = "block-statement"
-	RoleReturnResult    Role = "return-result"
-	RoleBinaryLeft      Role = "binary-left"
-	RoleBinaryRight     Role = "binary-right"
+	RoleFileDeclaration     Role = "file-declaration"
+	RoleFunctionBody        Role = "function-body"
+	RoleParameterType       Role = "parameter-type"
+	RoleResultType          Role = "result-type"
+	RoleBlockStatement      Role = "block-statement"
+	RoleReturnResult        Role = "return-result"
+	RoleBinaryLeft          Role = "binary-left"
+	RoleBinaryRight         Role = "binary-right"
+	RoleLocalType           Role = "local-type"
+	RoleLocalValue          Role = "local-value"
+	RoleAssignmentValue     Role = "assignment-value"
+	RoleIfCondition         Role = "if-condition"
+	RoleIfThen              Role = "if-then"
+	RoleIfElse              Role = "if-else"
+	RoleUnaryOperand        Role = "unary-operand"
+	RoleCallArgument        Role = "call-argument"
+	RoleIntegerConstantType Role = "integer-constant-type"
+	RoleForInitializer      Role = "for-initializer"
+	RoleForCondition        Role = "for-condition"
+	RoleForPost             Role = "for-post"
+	RoleForBody             Role = "for-body"
 )
 
 type UnsupportedError struct {
@@ -88,7 +101,7 @@ type PlacementError struct {
 
 func (e *PlacementError) Error() string {
 	return fmt.Sprintf(
-		"place type import %q from %q: %s",
+		"place import %q from %q: %s",
 		e.ExportedName,
 		e.ModulePath,
 		e.Reason,

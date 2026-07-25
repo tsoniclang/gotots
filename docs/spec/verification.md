@@ -89,8 +89,8 @@ Every construct case follows this sequence:
 4. Assert the constructed typed TS-Go protocol tree and child roles directly.
 5. Encode it, print only through pinned TS-Go, reparse, compare normalized
    target structure, and strict-typecheck.
-6. Execute the same behavior through Go and generated TypeScript and compare
-   observable results.
+6. Execute the same behavior through Go and the authoritative generated-code
+   consumer and compare observable results.
 7. Add boundary and interaction cases required by the semantic rule.
 8. Mutate the production decision or child route and prove the owning gate
    fails.
@@ -145,7 +145,7 @@ Every implemented semantic family includes:
 
 - focused source fixtures for ordinary and context-sensitive forms;
 - boundary/property cases;
-- Go-versus-generated-TypeScript differential execution;
+- Go-versus-authoritative-consumer differential execution;
 - interaction cases for evaluation order, aliasing, copies, nil, panic,
   generics, method selection, and environment boundaries where applicable;
 - real-project samples unrelated to the discovering corpus; and
@@ -161,6 +161,33 @@ Examples include:
   dispatch;
 - interfaces with many implementers, proving constant-size call sites;
 - nested function literals requiring branch-local versus file-level placement.
+
+### Execution Authority
+
+Strict TS-Go resolution and typechecking is mandatory for every generated
+artifact. Behavioral execution then follows the owner of the represented
+semantics:
+
+- execute generated TypeScript directly when the selected Tsonic source
+  carrier and operation have identical JavaScript runtime behavior, such as
+  ordinary booleans and strings;
+- compile through the selected Tsonic target and execute the target artifact
+  when finalized Tsonic facts own behavior not represented by the JavaScript
+  carrier, such as fixed-width integer overflow; and
+- run both where both are authoritative for the tested domain.
+
+The target-native path consumes the exact TS-Go-printed artifact. It may not
+rewrite literals, inject facts, or substitute a test-only declaration shape.
+For example, if the real Tsonic virtual declaration exposes `int64` with a
+`number` checker carrier and an `int64` target fact, a test declaring
+`int64 = bigint` is a false contract and must fail the contract gate. A Node
+check over small integer values is useful corroboration but does not prove
+width, overflow, shifts, conversions, or exact large constants.
+
+Each checkpoint records the exact Tsonic, source-semantics provider, target
+plugin, and target-toolchain identities used by target-native proof. If the
+authoritative consumer is unavailable, the affected semantic capability
+remains unclosed rather than being certified by a weaker runtime.
 
 ## Architecture And Cost Proof
 
@@ -193,7 +220,7 @@ Before dependent work begins, a capability must have:
 3. one authoritative handler/owner;
 4. positive, negative, interaction, and mutation tests;
 5. native TS-Go construction/print/reparse proof;
-6. strict typechecking and differential execution;
+6. strict typechecking and authoritative-consumer differential execution;
 7. artifact-tail inspection and applicable cost bounds;
 8. broad searches proving no alternate route remains;
 9. a clean pushed revision carrying all evidence.
@@ -220,6 +247,6 @@ cleanliness; memory limits are execution safety, not a substitute for design.
 
 Publication requires all selected constructs and reachable environment
 obligations to be implemented, every generated module strict-typechecked, all
-required differential/project suites green, no reachable placeholder, exact
-deterministic regeneration, and all architecture/size/typecheck/runtime gates
-passing at one clean revision.
+required direct and target-native differential/project suites green, no
+reachable placeholder, exact deterministic regeneration, and all
+architecture/size/typecheck/runtime gates passing at one clean revision.

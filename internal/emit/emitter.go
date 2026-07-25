@@ -2,6 +2,9 @@ package emit
 
 import (
 	"go/ast"
+	"go/types"
+	"path/filepath"
+	"strings"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/load"
@@ -34,11 +37,16 @@ func (e *Emitter) EmitFile(sourceFile *ast.File, outputPath string) (tsgo.Source
 	if e == nil || e.source == nil {
 		return nil, &Error{Reason: "source package is nil"}
 	}
-	if !e.ownsFile(sourceFile) {
+	_, ok := e.source.FileForSyntax(sourceFile)
+	if !ok {
 		return nil, &Error{Reason: "syntax tree does not belong to the loaded package"}
+	}
+	if err := e.reservePackageDeclarations(); err != nil {
+		return nil, err
 	}
 
 	placement := newPlacementOwner()
+	names := e.names.ForFile(sourceFile, e.source.Types().Scope(), placement)
 	context, err := api.NewContext(
 		api.RoleFileDeclaration,
 		e.source.FileSet(),
@@ -46,7 +54,7 @@ func (e *Emitter) EmitFile(sourceFile *ast.File, outputPath string) (tsgo.Source
 		e.source.TypesInfo(),
 		e.source.TypesSizes(),
 		e.factory,
-		e.names,
+		names,
 		placement,
 	)
 	if err != nil {
@@ -77,11 +85,40 @@ func (e *Emitter) EmitFile(sourceFile *ast.File, outputPath string) (tsgo.Source
 	), nil
 }
 
-func (e *Emitter) ownsFile(candidate *ast.File) bool {
-	for _, sourceFile := range e.source.Syntax() {
-		if sourceFile == candidate {
-			return true
+func (e *Emitter) reservePackageDeclarations() error {
+	for _, sourceFile := range e.source.Files() {
+		modulePath, err := targetModulePath(sourceFile.Path())
+		if err != nil {
+			return err
+		}
+		for _, declaration := range sourceFile.Syntax().Decls {
+			function, ok := declaration.(*ast.FuncDecl)
+			if !ok {
+				continue
+			}
+			object, ok := e.source.TypesInfo().Defs[function.Name].(*types.Func)
+			if !ok {
+				return &api.InvariantError{
+					Role:   api.RoleFileDeclaration,
+					Reason: "function declaration has no go/types object",
+				}
+			}
+			if _, err := e.names.Reserve(object, sourceFile.Syntax(), modulePath); err != nil {
+				return err
+			}
 		}
 	}
-	return false
+	return nil
+}
+
+func targetModulePath(sourcePath string) (string, error) {
+	extension := filepath.Ext(sourcePath)
+	baseName := strings.TrimSuffix(filepath.Base(sourcePath), extension)
+	if extension != ".go" || baseName == "" {
+		return "", &api.PlacementError{
+			ModulePath: sourcePath,
+			Reason:     "source file does not have a target module name",
+		}
+	}
+	return "./" + baseName + ".js", nil
 }

@@ -22,7 +22,7 @@ func TestDeclarationDispatcherRejectsUnsupportedNode(t *testing.T) {
 	}
 
 	compiler := emit.New(loaded)
-	_, err = compiler.EmitFile(loaded.Syntax()[0], filepath.Join(t.TempDir(), "variable.ts"))
+	_, err = compiler.EmitFile(loaded.Files()[0].Syntax(), filepath.Join(t.TempDir(), "variable.ts"))
 	var unsupported *api.UnsupportedError
 	if !errors.As(err, &unsupported) {
 		t.Fatalf("error = %v, want *api.UnsupportedError", err)

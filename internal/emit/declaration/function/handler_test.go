@@ -110,12 +110,12 @@ func TestAddConstructPrintsTypechecksAndExecutesDifferentially(t *testing.T) {
 
 func TestAddRejectsUnsupportedBinaryOperator(t *testing.T) {
 	loaded := loadAddProject(t)
-	function := loaded.Syntax()[0].Decls[0].(*ast.FuncDecl)
+	function := loaded.Files()[0].Syntax().Decls[0].(*ast.FuncDecl)
 	binary := function.Body.List[0].(*ast.ReturnStmt).Results[0].(*ast.BinaryExpr)
 	binary.Op = token.SUB
 
 	compiler := emit.New(loaded)
-	_, err := compiler.EmitFile(loaded.Syntax()[0], filepath.Join(t.TempDir(), "add.ts"))
+	_, err := compiler.EmitFile(loaded.Files()[0].Syntax(), filepath.Join(t.TempDir(), "add.ts"))
 	var unsupported *api.UnsupportedError
 	if !errors.As(err, &unsupported) {
 		t.Fatalf("error = %v, want *api.UnsupportedError", err)
@@ -129,7 +129,7 @@ func TestAddRejectsUnsupportedBinaryOperator(t *testing.T) {
 
 func TestAddReferencesUseGoObjectIdentity(t *testing.T) {
 	loaded := loadAddProject(t)
-	function := loaded.Syntax()[0].Decls[0].(*ast.FuncDecl)
+	function := loaded.Files()[0].Syntax().Decls[0].(*ast.FuncDecl)
 	binary := function.Body.List[0].(*ast.ReturnStmt).Results[0].(*ast.BinaryExpr)
 	binary.X.(*ast.Ident).Name = "forgedSourceSpelling"
 
@@ -220,7 +220,7 @@ func loadAddProject(t *testing.T) *load.Package {
 func emitAdd(t *testing.T, loaded *load.Package, outputPath string) tsgo.SourceFile {
 	t.Helper()
 	compiler := emit.New(loaded)
-	targetFile, err := compiler.EmitFile(loaded.Syntax()[0], outputPath)
+	targetFile, err := compiler.EmitFile(loaded.Files()[0].Syntax(), outputPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -268,8 +268,8 @@ func executeTypeScript(t *testing.T, workingDirectory, outputPath string) string
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	writeFile(t, runnerPath, `import { Add } from "./add.js";
 
-console.log(Add(20n, 22n).toString());
-console.log(Add(-7n, 2n).toString());
+console.log(Add(20, 22).toString());
+console.log(Add(-7, 2).toString());
 `)
 	outputDirectory := filepath.Join(workingDirectory, "out")
 	toolPath := strings.TrimSpace(run(
@@ -310,8 +310,9 @@ func installTsonicCoreTypes(t *testing.T, workingDirectory string) {
   }
 }
 `)
-	writeFile(t, filepath.Join(moduleDirectory, "types.d.ts"), `export type int32 = number;
-export type int64 = bigint;
+	writeFile(t, filepath.Join(moduleDirectory, "types.d.ts"), `export type bool = boolean;
+export type int32 = number;
+export type int64 = number;
 `)
 	writeFile(t, filepath.Join(moduleDirectory, "types.js"), "export {};\n")
 }

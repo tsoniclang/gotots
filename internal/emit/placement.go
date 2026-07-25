@@ -7,20 +7,33 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-type typeImport struct {
+type importRequest struct {
+	typeOnly     bool
 	modulePath   string
 	exportedName string
 }
 
 type placementOwner struct {
-	typeImports map[typeImport]struct{}
+	imports map[importRequest]struct{}
 }
 
 func newPlacementOwner() *placementOwner {
-	return &placementOwner{typeImports: make(map[typeImport]struct{})}
+	return &placementOwner{imports: make(map[importRequest]struct{})}
 }
 
 func (p *placementOwner) TypeImport(modulePath string, exportedName string) (string, error) {
+	return p.importName(true, modulePath, exportedName)
+}
+
+func (p *placementOwner) ValueImport(modulePath string, exportedName string) (string, error) {
+	return p.importName(false, modulePath, exportedName)
+}
+
+func (p *placementOwner) importName(
+	typeOnly bool,
+	modulePath string,
+	exportedName string,
+) (string, error) {
 	if modulePath == "" || exportedName == "" {
 		return "", &api.PlacementError{
 			ModulePath:   modulePath,
@@ -28,24 +41,38 @@ func (p *placementOwner) TypeImport(modulePath string, exportedName string) (str
 			Reason:       "module path and exported name are required",
 		}
 	}
-	p.typeImports[typeImport{modulePath: modulePath, exportedName: exportedName}] = struct{}{}
+	p.imports[importRequest{
+		typeOnly:     typeOnly,
+		modulePath:   modulePath,
+		exportedName: exportedName,
+	}] = struct{}{}
 	return exportedName, nil
 }
 
 func (p *placementOwner) Statements(factory tsgo.Factory) []tsgo.Statement {
-	byModule := make(map[string][]string)
-	for request := range p.typeImports {
-		byModule[request.modulePath] = append(byModule[request.modulePath], request.exportedName)
+	type importGroup struct {
+		typeOnly   bool
+		modulePath string
 	}
-	modules := make([]string, 0, len(byModule))
-	for modulePath := range byModule {
-		modules = append(modules, modulePath)
+	byGroup := make(map[importGroup][]string)
+	for request := range p.imports {
+		group := importGroup{typeOnly: request.typeOnly, modulePath: request.modulePath}
+		byGroup[group] = append(byGroup[group], request.exportedName)
 	}
-	sort.Strings(modules)
+	groups := make([]importGroup, 0, len(byGroup))
+	for group := range byGroup {
+		groups = append(groups, group)
+	}
+	sort.Slice(groups, func(left, right int) bool {
+		if groups[left].typeOnly != groups[right].typeOnly {
+			return groups[left].typeOnly
+		}
+		return groups[left].modulePath < groups[right].modulePath
+	})
 
-	statements := make([]tsgo.Statement, 0, len(modules))
-	for _, modulePath := range modules {
-		names := byModule[modulePath]
+	statements := make([]tsgo.Statement, 0, len(groups))
+	for _, group := range groups {
+		names := byGroup[group]
 		sort.Strings(names)
 		specifiers := make([]tsgo.ImportSpecifier, 0, len(names))
 		for _, name := range names {
@@ -55,15 +82,19 @@ func (p *placementOwner) Statements(factory tsgo.Factory) []tsgo.Statement {
 				factory.Identifier(name),
 			))
 		}
+		var phase tsgo.ImportPhaseModifierSyntaxKind
+		if group.typeOnly {
+			phase = tsgo.ImportPhaseModifierSyntaxKindTypeKeyword
+		}
 		clause := factory.ImportClause(
-			tsgo.ImportPhaseModifierSyntaxKindTypeKeyword,
+			phase,
 			nil,
 			factory.NamedImports(specifiers),
 		)
 		statements = append(statements, factory.ImportDeclaration(
 			nil,
 			clause,
-			factory.StringLiteral(modulePath, tsgo.TokenFlagsNone),
+			factory.StringLiteral(group.modulePath, tsgo.TokenFlagsNone),
 			nil,
 		))
 	}

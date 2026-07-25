@@ -49,13 +49,22 @@ func Emit(
 	if err != nil {
 		return nil, err
 	}
-	body, err := children.Block(context.WithRole(api.RoleFunctionBody), source.Body)
+	body, err := children.Block(
+		context.
+			WithRole(api.RoleFunctionBody).
+			EnterFunction(signature.Results()),
+		source.Body,
+	)
 	if err != nil {
 		return nil, err
 	}
 
+	moduleExport, err := context.Names().ModuleExport(functionObject)
+	if err != nil {
+		return nil, err
+	}
 	var modifiers []tsgo.ModifierLike
-	if functionObject.Exported() {
+	if moduleExport {
 		modifiers = []tsgo.ModifierLike{context.Factory().ExportKeyword()}
 	}
 	return context.Factory().FunctionDeclaration(

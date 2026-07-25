@@ -18,15 +18,27 @@ type Request struct {
 	Pattern   string
 }
 
+type File struct {
+	path   string
+	syntax *ast.File
+}
+
+func (f File) Path() string {
+	return f.path
+}
+
+func (f File) Syntax() *ast.File {
+	return f.syntax
+}
+
 type Package struct {
-	path            string
-	name            string
-	compiledGoFiles []string
-	syntax          []*ast.File
-	fileSet         *token.FileSet
-	typesPackage    *types.Package
-	typesInfo       *types.Info
-	typesSizes      types.Sizes
+	path         string
+	name         string
+	files        []File
+	fileSet      *token.FileSet
+	typesPackage *types.Package
+	typesInfo    *types.Info
+	typesSizes   types.Sizes
 }
 
 type Error struct {
@@ -94,15 +106,21 @@ func One(ctx context.Context, request Request) (*Package, error) {
 		}
 	}
 
+	files := make([]File, len(selected.Syntax))
+	for index := range selected.Syntax {
+		files[index] = File{
+			path:   selected.CompiledGoFiles[index],
+			syntax: selected.Syntax[index],
+		}
+	}
 	return &Package{
-		path:            selected.PkgPath,
-		name:            selected.Name,
-		compiledGoFiles: slices.Clone(selected.CompiledGoFiles),
-		syntax:          slices.Clone(selected.Syntax),
-		fileSet:         selected.Fset,
-		typesPackage:    selected.Types,
-		typesInfo:       selected.TypesInfo,
-		typesSizes:      selected.TypesSizes,
+		path:         selected.PkgPath,
+		name:         selected.Name,
+		files:        files,
+		fileSet:      selected.Fset,
+		typesPackage: selected.Types,
+		typesInfo:    selected.TypesInfo,
+		typesSizes:   selected.TypesSizes,
 	}, nil
 }
 
@@ -114,12 +132,17 @@ func (p *Package) Name() string {
 	return p.name
 }
 
-func (p *Package) CompiledGoFiles() []string {
-	return slices.Clone(p.compiledGoFiles)
+func (p *Package) Files() []File {
+	return slices.Clone(p.files)
 }
 
-func (p *Package) Syntax() []*ast.File {
-	return slices.Clone(p.syntax)
+func (p *Package) FileForSyntax(syntax *ast.File) (File, bool) {
+	for _, file := range p.files {
+		if file.syntax == syntax {
+			return file, true
+		}
+	}
+	return File{}, false
 }
 
 func (p *Package) FileSet() *token.FileSet {

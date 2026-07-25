@@ -13,16 +13,33 @@ func Emit(context api.Context, source ast.Expr) (tsgo.TypeNode, error) {
 	if sourceType == nil {
 		return nil, api.Unsupported(context, api.CategoryType, source)
 	}
+	return EmitRepresented(context, source, sourceType)
+}
+
+func EmitRepresented(
+	context api.Context,
+	source ast.Node,
+	sourceType types.Type,
+) (tsgo.TypeNode, error) {
 	basic, ok := types.Unalias(sourceType).(*types.Basic)
-	if !ok || basic.Kind() != types.Int {
+	if !ok {
 		return nil, api.Unsupported(context, api.CategoryType, source)
 	}
 	var targetName string
-	switch context.TypesSizes().Sizeof(types.Typ[types.Int]) {
-	case 4:
-		targetName = "int32"
-	case 8:
+	switch basic.Kind() {
+	case types.Bool:
+		targetName = "bool"
+	case types.Int64:
 		targetName = "int64"
+	case types.Int:
+		switch context.TypesSizes().Sizeof(types.Typ[types.Int]) {
+		case 4:
+			targetName = "int32"
+		case 8:
+			targetName = "int64"
+		default:
+			return nil, api.Unsupported(context, api.CategoryType, source)
+		}
 	default:
 		return nil, api.Unsupported(context, api.CategoryType, source)
 	}

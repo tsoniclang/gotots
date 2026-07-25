@@ -41,6 +41,21 @@ Although `IfStmt.Else` has static type `ast.Stmt`, the handler must not route an
 arbitrary statement through the general statement dispatcher. A return
 statement in that field is a malformed AST, not an alternative translation.
 
+The `for` owner similarly uses grammar-specific child entries:
+
+```text
+Init -> for initializer, not an arbitrary target statement
+Cond -> condition expression
+Post -> legal post statement rendered as a target expression
+Body -> block entered with an explicit loop-control capability
+```
+
+An unlabeled `break` or `continue` is accepted only while that capability is
+present. A function boundary clears it, so a nested function cannot branch to
+an enclosing loop. The branch handler neither walks to a parent nor infers a
+target from source spelling. Labeled control flow will add an identity-keyed
+target capability at its own construct boundary; it must not weaken this rule.
+
 Likewise, for:
 
 ```go
@@ -297,6 +312,54 @@ infer width from `GOARCH` spelling, emit `number`, or call the JavaScript
 `BigInt` global. Integer operations remain direct only where the selected
 primitive/target contract preserves the Go operation; otherwise their shared
 semantic owner must request an explicit typed runtime operation.
+
+The imported Tsonic primitive and its TypeScript checker carrier are different
+facts. For example, a selected Tsonic consumer may expose `int64` through a
+virtual declaration whose checker shape is `number` while attaching the target
+fact that makes C# emission use `long`. GoToTS emits and retains the canonical
+`int64` reference. It must not infer semantics from the virtual declaration's
+structural carrier, replace the import with `number`, or introduce `bigint`
+syntax that the selected Tsonic contract does not admit.
+
+Literal and operator handlers must also preserve exact target evidence. A
+large Go integer constant cannot be passed through a JavaScript numeric-value
+round trip if that changes its source digits. The handler either constructs an
+exact Tsonic-admitted target expression with bounded size or fails typed until
+the selected consumer contract supplies one. Rounded numeric literals,
+ordinary-value-only claims, and test declarations that pretend `int64` is
+`bigint` are forbidden.
+
+For the selected Tsonic contract, the signed-integer literal owner reads the
+exact `go/constant.Value` and the expected Go type supplied by its parent. A
+small value is explicitly attributed to the canonical target primitive:
+
+```ts
+42 as int64
+```
+
+A value outside JavaScript's exact integer range is split into at most two
+base-`2^32` chunks, each still exactly representable:
+
+```ts
+(2147483647 as int64) * (4294967296 as int64)
+    + (4294967295 as int64)
+```
+
+That expression denotes Go's `9223372036854775807` without ever materializing
+an inexact JavaScript numeric literal. Negative constants use typed subtraction
+rather than a target-ambiguous unary minus; `MinInt64` is:
+
+```ts
+((0 as int64) - (2147483647 as int64) - (1 as int64))
+    * (4294967296 as int64)
+```
+
+These `as int64` nodes are canonical Tsonic source-primitive evidence selected
+from the authoritative expected Go type. They are not unchecked casts,
+structural recovery, or substitutes for a missing semantic fact. The
+representation is constant-size for every signed 64-bit value, introduces no
+helper or runtime call, and must be compiled and executed through the selected
+target because direct Node execution cannot verify its result.
 
 An implicit Go operation has no separate source IR node. The handler that owns
 the containing construct queries type evidence and creates the required typed

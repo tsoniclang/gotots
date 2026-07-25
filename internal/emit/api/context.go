@@ -8,14 +8,18 @@ import (
 )
 
 type Context struct {
-	role         Role
-	fileSet      *token.FileSet
-	typesPackage *types.Package
-	typesInfo    *types.Info
-	typesSizes   types.Sizes
-	factory      tsgo.Factory
-	names        Names
-	placement    Placement
+	role            Role
+	fileSet         *token.FileSet
+	typesPackage    *types.Package
+	typesInfo       *types.Info
+	typesSizes      types.Sizes
+	factory         tsgo.Factory
+	names           Names
+	placement       Placement
+	expectedType    types.Type
+	functionResults *types.Tuple
+	breakDepth      uint32
+	continueDepth   uint32
 }
 
 func NewContext(
@@ -61,6 +65,25 @@ func (c Context) WithRole(role Role) Context {
 	return c
 }
 
+func (c Context) WithExpectedType(expectedType types.Type) Context {
+	c.expectedType = expectedType
+	return c
+}
+
+func (c Context) EnterFunction(results *types.Tuple) Context {
+	c.functionResults = results
+	c.expectedType = nil
+	c.breakDepth = 0
+	c.continueDepth = 0
+	return c
+}
+
+func (c Context) EnterLoop() Context {
+	c.breakDepth++
+	c.continueDepth++
+	return c
+}
+
 func (c Context) Role() Role {
 	return c.role
 }
@@ -91,4 +114,20 @@ func (c Context) Names() Names {
 
 func (c Context) Placement() Placement {
 	return c.placement
+}
+
+func (c Context) ExpectedType() types.Type {
+	return c.expectedType
+}
+
+func (c Context) FunctionResults() *types.Tuple {
+	return c.functionResults
+}
+
+func (c Context) CanBreak() bool {
+	return c.breakDepth != 0
+}
+
+func (c Context) CanContinue() bool {
+	return c.continueDepth != 0
 }
