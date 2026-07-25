@@ -5,6 +5,7 @@
 package selectionfacts
 
 import (
+	"cmp"
 	"crypto/sha256"
 	"fmt"
 	"go/ast"
@@ -40,8 +41,17 @@ func NewID(
 
 func (id ID) Definition() identity.DefinitionID { return id.definition }
 func (id ID) Kind() contract.SelectionFactKind  { return id.kind }
+func (id ID) IsZero() bool {
+	return id.definition.IsZero() || !id.kind.Valid()
+}
+func (id ID) Compare(other ID) int {
+	if order := id.definition.Compare(other.definition); order != 0 {
+		return order
+	}
+	return cmp.Compare(id.kind, other.kind)
+}
 func (id ID) String() string {
-	if id.definition.IsZero() || !id.kind.Valid() {
+	if id.IsZero() {
 		return ""
 	}
 	return id.definition.String() + "#selection-fact/" + id.kind.String()
@@ -68,7 +78,23 @@ type Artifact struct {
 	fingerprint string
 }
 
-func (a *Artifact) Facts() []Fact       { return append([]Fact(nil), a.facts...) }
+func (a *Artifact) FactCount() int {
+	if a == nil {
+		return 0
+	}
+	return len(a.facts)
+}
+func (a *Artifact) VisitFacts(visit func(Fact) error) error {
+	if a == nil || visit == nil {
+		return fmt.Errorf("selection-fact visit requires artifact and visitor")
+	}
+	for _, fact := range a.facts {
+		if err := visit(fact); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 func (a *Artifact) Fingerprint() string { return a.fingerprint }
 func (a *Artifact) Value(
 	definition identity.DefinitionID,
@@ -241,7 +267,7 @@ func materialize(
 		}
 	}
 	sort.Slice(out.facts, func(i, j int) bool {
-		return out.facts[i].id.String() < out.facts[j].id.String()
+		return out.facts[i].id.Compare(out.facts[j].id) < 0
 	})
 	for index := range out.facts {
 		fact := &out.facts[index]

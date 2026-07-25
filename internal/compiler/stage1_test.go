@@ -41,7 +41,7 @@ TEXT ·Read(SB), NOSPLIT, $0-48
 	MOVQ $0, err+40(FP)
 	RET
 `)
-	inspection, err := InspectConstructs(source.Request{
+	inspection, err := inspectConstructsForTest(t, source.Request{
 		Dir: dir, Patterns: []string{"."},
 		ProviderContract: contract.DefaultID,
 	})
@@ -150,50 +150,116 @@ TEXT ·Read(SB), NOSPLIT, $0-48
 		inspection.Hydration().LocalFiles != 1 {
 		t.Fatalf("hydration = %+v, want one package/file", inspection.Hydration())
 	}
-	if !inspection.Workspace().Packages()[0].RequestedRoot() {
+	var requestedRoot bool
+	for _, pkg := range inspection.Workspace().Packages() {
+		requestedRoot = requestedRoot || pkg.RequestedRoot()
+	}
+	if !requestedRoot {
 		t.Fatal("finalized package lost requested-root evidence")
 	}
 }
 
 func TestProviderArtifactAuditVerifyAndRelocatedConsumption(t *testing.T) {
 	first := writeProviderFixture(t, "example.com/first", "first")
-	path := filepath.Join(t.TempDir(), "provider.gotots")
+	output := t.TempDir()
+	structurePath := filepath.Join(output, "provider.structure.gotots")
+	semanticPath := filepath.Join(output, "provider.semantic.gotots")
 	request := source.Request{
 		Dir: first, Patterns: []string{"."},
 		ProviderContract: contract.DefaultID,
 	}
-	result, err := AuditCatalog(request, path)
+	result, err := AuditCatalog(
+		request, structurePath, semanticPath,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Digest == "" || result.EncodedBytes <= 0 ||
-		result.PackageContexts == 0 ||
-		result.Files == 0 ||
-		result.Definitions == 0 ||
-		result.LargestShardBytes == 0 ||
-		result.LargestPackageRecords == 0 ||
-		len(result.LargestPackages()) == 0 ||
-		len(result.LargestPackages()) > 20 ||
-		len(result.LargestHeaders()) == 0 ||
-		len(result.LargestHeaders()) > 20 {
+	if result.Structure.Digest == "" ||
+		result.Structure.EncodedBytes <= 0 ||
+		result.Structure.PackageContexts == 0 ||
+		result.Structure.Files == 0 ||
+		result.Structure.Definitions == 0 ||
+		result.Structure.LargestShardBytes == 0 ||
+		result.Structure.LargestPackageRecords == 0 ||
+		len(result.Structure.LargestPackages()) == 0 ||
+		len(result.Structure.LargestPackages()) > 20 ||
+		len(result.Structure.LargestHeaders()) == 0 ||
+		len(result.Structure.LargestHeaders()) > 20 ||
+		result.Semantic.Digest == "" ||
+		result.Semantic.EncodedBytes <= 0 ||
+		result.Semantic.Packages == 0 ||
+		result.Semantic.Definitions == 0 ||
+		result.Semantic.LargestShardBytes == 0 ||
+		result.Semantic.LargestPackageRecords == 0 {
 		t.Fatalf("provider result is vacuous: %+v", result)
 	}
-	stat, err := os.Stat(path)
+	productionMetrics := result.Semantic.Metrics()
+	if productionMetrics.Packages() != result.Semantic.Packages ||
+		productionMetrics.Definitions() != result.Semantic.Definitions ||
+		productionMetrics.Resolutions() != result.Semantic.Resolutions ||
+		productionMetrics.EncodedBytes() <= 0 ||
+		len(productionMetrics.LargestPackages()) == 0 ||
+		len(productionMetrics.LargestPackages()) > 20 ||
+		len(productionMetrics.LargestDefinitions()) !=
+			minimumInt(productionMetrics.Definitions(), 20) ||
+		len(productionMetrics.LargestOperations()) !=
+			minimumInt(productionMetrics.Operations(), 20) ||
+		len(productionMetrics.LargestTypes()) !=
+			minimumInt(productionMetrics.Types(), 20) {
+		t.Fatalf(
+			"provider semantic metrics disagree with production: %+v",
+			productionMetrics,
+		)
+	}
+	productionWork := result.SemanticWork
+	if productionWork.Packages != result.Semantic.Packages ||
+		productionWork.InputOccurrences == 0 ||
+		productionWork.ContextAssignments !=
+			productionWork.InputOccurrences ||
+		productionWork.ResolutionVisits !=
+			productionWork.InputOccurrences ||
+		productionWork.OccurrenceResolutions !=
+			productionWork.InputOccurrences ||
+		productionWork.LinearOperations() == 0 {
+		t.Fatalf(
+			"provider semantic work is not conserved: %+v",
+			productionWork,
+		)
+	}
+	stat, err := os.Stat(structurePath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stat.Size() != result.EncodedBytes {
-		t.Fatalf("provider size=%d, reported=%d", stat.Size(), result.EncodedBytes)
+	if stat.Size() != result.Structure.EncodedBytes {
+		t.Fatalf(
+			"provider structure size=%d, reported=%d",
+			stat.Size(), result.Structure.EncodedBytes,
+		)
 	}
-	if err := AuditVerify(request, path); err != nil {
+	semanticStat, err := os.Stat(semanticPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if semanticStat.Size() != result.Semantic.EncodedBytes {
+		t.Fatalf(
+			"provider semantic size=%d, reported=%d",
+			semanticStat.Size(), result.Semantic.EncodedBytes,
+		)
+	}
+	if err := AuditVerify(
+		request, structurePath, semanticPath,
+	); err != nil {
 		t.Fatal(err)
 	}
 
 	second := writeProviderFixture(t, "example.com/second", "second")
-	inspection, err := InspectConstructs(source.Request{
+	inspection, err := inspectConstructsForTest(t, source.Request{
 		Dir: second, Patterns: []string{"."},
-		ProviderContract: contract.DefaultID,
-		AuditArtifact:    path, AuditArtifactDigest: result.Digest,
+		ProviderContract:          contract.DefaultID,
+		ProviderStructureArtifact: structurePath,
+		ProviderStructureDigest:   result.Structure.Digest,
+		ProviderSemanticArtifact:  semanticPath,
+		ProviderSemanticDigest:    result.Semantic.Digest,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -208,13 +274,17 @@ func TestProviderArtifactAuditVerifyAndRelocatedConsumption(t *testing.T) {
 	}
 	manifestStats := inspection.Structure().ProviderManifestStats()
 	projectionStats := inspection.Structure().ProviderProjectionStats()
+	assertBoundedProviderAuthorities(
+		t, inspection, manifestStats,
+	)
 	if manifestStats.PackageContexts <= 1 ||
-		projectionStats.ShardLoads != manifestStats.PackageContexts ||
-		projectionStats.ProjectedPackages != manifestStats.PackageContexts ||
-		projectionStats.MaxResidentPackages != 1 ||
-		projectionStats.CacheHits == 0 ||
-		projectionStats.LargestPackageBytes == 0 ||
-		projectionStats.LargestPackageRecords == 0 ||
+		len(manifestStats.LargestShards()) == 0 ||
+		projectionStats.ShardLoads != 0 ||
+		projectionStats.ProjectedPackages != 0 ||
+		projectionStats.MaxResidentPackages != 0 ||
+		projectionStats.CacheHits != 0 ||
+		projectionStats.LargestPackageBytes != 0 ||
+		projectionStats.LargestPackageRecords != 0 ||
 		len(inspection.Structure().LargestHeaderArtifacts()) == 0 ||
 		len(inspection.Structure().LargestHeaderArtifacts()) > 20 {
 		t.Fatalf(
@@ -223,21 +293,42 @@ func TestProviderArtifactAuditVerifyAndRelocatedConsumption(t *testing.T) {
 			projectionStats,
 		)
 	}
+	localMetrics := inspection.SemanticMetrics()
+	semanticRead := inspection.Semantic().ProviderReadStats()
+	providerMetrics := inspection.Semantic().ProviderManifestMetrics()
+	consumedMetrics := semanticRead.Metrics()
+	semanticProjection := inspection.Semantic().ProjectionStats()
+	if localMetrics.Packages() == 0 ||
+		localMetrics.Definitions() == 0 ||
+		providerMetrics.Packages() != result.Semantic.Packages ||
+		semanticProjection.CertifiedPackages != providerMetrics.Packages() ||
+		semanticProjection.MixedPackages != 0 ||
+		consumedMetrics.Packages() != 0 ||
+		semanticRead.ShardLoads != 0 ||
+		semanticRead.MaxProviderPackagesResident != 0 ||
+		len(providerMetrics.LargestPackages()) == 0 ||
+		len(providerMetrics.LargestPackages()) > 20 {
+		t.Fatalf(
+			"semantic production/manifest/consumption metrics local=%+v provider=%+v consumed=%+v projections=%+v reads=%+v",
+			localMetrics,
+			providerMetrics,
+			consumedMetrics,
+			semanticProjection,
+			semanticRead,
+		)
+	}
 
-	t.Chdir(filepath.Dir(path))
+	t.Chdir(filepath.Dir(structurePath))
 	artifact, err := structure.DecodeProviderArtifact(
-		filepath.Base(path), result.Digest,
+		filepath.Base(structurePath), result.Structure.Digest,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Chdir(t.TempDir())
 	var fileID identity.FileID
-	for encoded := range artifact.FileIDs() {
-		fileID, err = identity.ParseFileID(encoded)
-		if err != nil {
-			t.Fatal(err)
-		}
+	for id := range artifact.FileIDs() {
+		fileID = id
 		break
 	}
 	if fileID.IsZero() {
@@ -246,7 +337,16 @@ func TestProviderArtifactAuditVerifyAndRelocatedConsumption(t *testing.T) {
 	if _, _, present, err := artifact.FileGraph(fileID); err != nil || !present {
 		t.Fatalf("lazy graph after cwd change: present=%t err=%v", present, err)
 	}
-	assertProviderTamperRejected(t, path, result.Digest)
+	assertProviderTamperRejected(
+		t, structurePath, result.Structure.Digest,
+	)
+}
+
+func minimumInt(left int, right int) int {
+	if left < right {
+		return left
+	}
+	return right
 }
 
 func TestCgoSelectionFactsAreScopeExact(t *testing.T) {
@@ -290,14 +390,20 @@ func main() { _, _, _, _, _, _ = pure(), shadow(), external(), parent(), cParent
 		ProviderContract: contract.DefaultID,
 		Env:              []string{"CGO_ENABLED=1"},
 	}
-	providerPath := filepath.Join(t.TempDir(), "cgo-provider.gotots")
-	provider, err := AuditCatalog(request, providerPath)
+	output := t.TempDir()
+	structurePath := filepath.Join(output, "cgo-provider.structure.gotots")
+	semanticPath := filepath.Join(output, "cgo-provider.semantic.gotots")
+	provider, err := AuditCatalog(
+		request, structurePath, semanticPath,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	request.AuditArtifact = providerPath
-	request.AuditArtifactDigest = provider.Digest
-	inspection, err := InspectConstructs(request)
+	request.ProviderStructureArtifact = structurePath
+	request.ProviderStructureDigest = provider.Structure.Digest
+	request.ProviderSemanticArtifact = semanticPath
+	request.ProviderSemanticDigest = provider.Semantic.Digest
+	inspection, err := inspectConstructsForTest(t, request)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -457,11 +563,7 @@ func assertProviderTamperRejected(
 		t.Fatalf("container admission rejected before shard check: %v", err)
 	}
 	shardRejected := false
-	for encoded := range rebound.FileIDs() {
-		id, err := identity.ParseFileID(encoded)
-		if err != nil {
-			t.Fatal(err)
-		}
+	for id := range rebound.FileIDs() {
 		if _, _, _, err := rebound.FileGraph(id); err != nil {
 			shardRejected = true
 			break

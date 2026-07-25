@@ -15,6 +15,7 @@ const ProviderArtifactVersion = 11
 // mutated after admission.
 type ProviderArtifact struct {
 	version               int
+	digest                string
 	toolchainFingerprint  string
 	catalogFingerprint    string
 	buildFlagsFingerprint string
@@ -31,6 +32,13 @@ type ProviderArtifact struct {
 	factsByPackage        map[identity.PackageID][]CertifiedFact
 	factCount             int
 	storage               *providerStorage
+}
+
+func (a *ProviderArtifact) Digest() string {
+	if a == nil {
+		return ""
+	}
+	return a.digest
 }
 
 func (a *ProviderArtifact) FileCount() int {
@@ -105,6 +113,23 @@ func (f CertifiedFact) EvidenceDigest() string           { return f.evidenceDige
 type certifiedFactID struct {
 	definition identity.DefinitionID
 	kind       contract.SelectionFactKind
+}
+
+func compareCertifiedFactID(
+	left certifiedFactID,
+	right certifiedFactID,
+) int {
+	if order := left.definition.Compare(right.definition); order != 0 {
+		return order
+	}
+	switch {
+	case left.kind < right.kind:
+		return -1
+	case left.kind > right.kind:
+		return 1
+	default:
+		return 0
+	}
 }
 
 // providerContextRecord is the first record of each canonical package shard.

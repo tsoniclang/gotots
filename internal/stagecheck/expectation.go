@@ -20,13 +20,14 @@ func deriveExpectation(
 	stdSet, cmdSet map[string]bool,
 	goroot, workspaceDir string,
 	overlay map[string][]byte,
-) (*universeExpectation, string, error) {
+) (*universeExpectation, identity.PackageID, error) {
 	out := &universeExpectation{
 		root: !pkg.DepOnly, disposition: source.DispositionOrdinarySource,
-		files: map[string]bool{}, filePaths: map[string]string{},
-		inputs: map[string]bool{}, embedPatterns: map[string]bool{},
+		files:     map[identity.FileID]bool{},
+		filePaths: map[identity.FileID]string{},
+		inputs:    map[string]bool{}, embedPatterns: map[string]bool{},
 		imports:    map[string]bool{},
-		cgoSources: map[string]bool{},
+		cgoSources: map[identity.FileID]bool{},
 	}
 	for _, imported := range pkg.Imports {
 		if imported != "C" {
@@ -46,7 +47,7 @@ func deriveExpectation(
 		relBase = filepath.Join(goroot, "src")
 	case stdSet[pkg.ImportPath]:
 		if !pkg.Standard || !pkg.Goroot {
-			return nil, "", fmt.Errorf("%s: std-set member without corroborating Standard/Goroot facts", pkg.ImportPath)
+			return nil, identity.PackageID{}, fmt.Errorf("%s: std-set member without corroborating Standard/Goroot facts", pkg.ImportPath)
 		}
 		owner = identity.StandardLibraryOwner()
 		out.provenance, out.acquisition = source.ProvenanceStandardLibrary, source.AcquisitionGOROOT
@@ -72,11 +73,11 @@ func deriveExpectation(
 		}
 		moduleID, err := identity.NewModuleID(pkg.Module.Path, version)
 		if err != nil {
-			return nil, "", err
+			return nil, identity.PackageID{}, err
 		}
 		owner, err = identity.NewModuleOwner(moduleID)
 		if err != nil {
-			return nil, "", err
+			return nil, identity.PackageID{}, err
 		}
 		switch {
 		case pkg.Module.Main:
@@ -103,24 +104,24 @@ func deriveExpectation(
 			}
 		}
 	default:
-		return nil, "", fmt.Errorf("%s: toolchain names a package that is neither module-owned nor std/cmd", pkg.ImportPath)
+		return nil, identity.PackageID{}, fmt.Errorf("%s: toolchain names a package that is neither module-owned nor std/cmd", pkg.ImportPath)
 	}
 	packageID, err := identity.NewPackageID(owner, pkg.ImportPath)
 	if err != nil {
-		return nil, "", err
+		return nil, identity.PackageID{}, err
 	}
 	for _, goFile := range append(append([]string{}, pkg.GoFiles...), pkg.CgoFiles...) {
 		absolute := absOrJoin(pkg.Dir, goFile)
 		rel, err := filepath.Rel(relBase, absolute)
 		if err != nil || strings.HasPrefix(rel, "..") {
-			return nil, "", fmt.Errorf("%s: file %s outside owner root", pkg.ImportPath, goFile)
+			return nil, identity.PackageID{}, fmt.Errorf("%s: file %s outside owner root", pkg.ImportPath, goFile)
 		}
 		fileID, err := identity.NewFileID(owner, filepath.ToSlash(rel))
 		if err != nil {
-			return nil, "", err
+			return nil, identity.PackageID{}, err
 		}
-		out.files[fileID.String()] = true
-		out.filePaths[fileID.String()] = absolute
+		out.files[fileID] = true
+		out.filePaths[fileID] = absolute
 	}
 	sourcePaths := map[string]bool{}
 	for _, path := range append(
@@ -144,7 +145,7 @@ func deriveExpectation(
 		rel, err := filepath.Rel(relBase, absOrJoin(pkg.Dir, cgoFile))
 		if err == nil && !strings.HasPrefix(rel, "..") {
 			if fileID, err := identity.NewFileID(owner, filepath.ToSlash(rel)); err == nil {
-				out.cgoSources[fileID.String()] = true
+				out.cgoSources[fileID] = true
 			}
 		}
 	}
@@ -173,7 +174,7 @@ func deriveExpectation(
 				group.kind,
 				overlay,
 			); err != nil {
-				return nil, "", err
+				return nil, identity.PackageID{}, err
 			}
 		}
 	}
@@ -187,13 +188,13 @@ func deriveExpectation(
 			source.InputEmbed,
 			overlay,
 		); err != nil {
-			return nil, "", err
+			return nil, identity.PackageID{}, err
 		}
 	}
 	for _, pattern := range pkg.EmbedPatterns {
 		out.embedPatterns[pattern] = true
 	}
-	return out, packageID.String(), nil
+	return out, packageID, nil
 }
 
 func addExpectedInput(

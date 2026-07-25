@@ -287,16 +287,18 @@ func writePlanFile(t *testing.T, dir, name, content string) {
 
 func certifiedFromPlan(plan *Plan, digest string) CertifiedInput {
 	out := CertifiedInput{
-		Digest: digest, Files: map[string]bool{}, Packages: map[string]bool{},
+		Digest:   digest,
+		Files:    map[identity.FileID]bool{},
+		Packages: map[identity.PackageID]bool{},
 	}
 	for _, file := range plan.Files() {
 		if file.Kind() == KindCertifiedGraph {
-			out.Files[file.ID().String()] = true
+			out.Files[file.ID()] = true
 		}
 	}
 	for _, owner := range plan.SyntheticOwners() {
 		if owner.Kind() == KindCertifiedGraph {
-			out.Packages[owner.Package().String()] = true
+			out.Packages[owner.Package()] = true
 		}
 	}
 	return out

@@ -4,7 +4,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -23,7 +22,7 @@ func TestCgoStructuralMutationsFailIndependentJoin(t *testing.T) {
 	); err != nil {
 		t.Fatalf("clean cgo structure failed: %v", err)
 	}
-	mapping := firstLedgerIdentity(t, actual, "checked-mapping")
+	mapping := firstCheckedMapping(t, actual)
 	synthetic, syntheticWithDifferentRole :=
 		syntheticDefinitionRoleMutation(
 			t,
@@ -31,36 +30,25 @@ func TestCgoStructuralMutationsFailIndependentJoin(t *testing.T) {
 		)
 	mutations := map[string]func(*structuralLedger){
 		"missing-origin": func(ledger *structuralLedger) {
-			delete(ledger.classes["checked-mapping"], mapping)
+			delete(ledger.checkedMappings, mapping)
 		},
 		"duplicate-origin": func(ledger *structuralLedger) {
-			ledger.classes["checked-mapping"][mapping]++
+			ledger.checkedMappings[mapping]++
 		},
 		"extra-origin": func(ledger *structuralLedger) {
-			ledger.add(
-				"checked-mapping",
-				mapping+"|extra",
-			)
+			mutated := mapping
+			mutated.checkedDigest += "extra"
+			addRecord(&ledger.checkedMappings, mutated)
 		},
 		"relocated-origin": func(ledger *structuralLedger) {
-			delete(ledger.classes["checked-mapping"], mapping)
-			parts := strings.Split(mapping, "|")
-			if len(parts) != 5 {
-				t.Fatalf("checked mapping %q has %d fields", mapping, len(parts))
-			}
-			line, err := strconv.Atoi(parts[1])
-			if err != nil {
-				t.Fatal(err)
-			}
-			parts[1] = strconv.Itoa(line + 100)
-			ledger.add(
-				"checked-mapping",
-				strings.Join(parts, "|"),
-			)
+			delete(ledger.checkedMappings, mapping)
+			mutated := mapping
+			mutated.originLine += 100
+			addRecord(&ledger.checkedMappings, mutated)
 		},
 		"name-only-synthetic": func(ledger *structuralLedger) {
-			delete(ledger.classes["definition"], synthetic)
-			ledger.add("definition", syntheticWithDifferentRole)
+			delete(ledger.definitions, synthetic)
+			addRecord(&ledger.definitions, syntheticWithDifferentRole)
 		},
 	}
 	for name, mutate := range mutations {
@@ -80,15 +68,8 @@ func TestCgoStructuralMutationsFailIndependentJoin(t *testing.T) {
 
 func TestIndependentCgoOriginRejectsAmbiguity(t *testing.T) {
 	actual, _ := cgoStructuralLedgers(t)
-	mapping := firstLedgerIdentity(t, actual, "checked-mapping")
-	parts := strings.Split(mapping, "|")
-	if len(parts) != 5 {
-		t.Fatalf("checked mapping %q has %d fields", mapping, len(parts))
-	}
-	definition, err := identity.ParseDefinitionID(parts[0])
-	if err != nil {
-		t.Fatal(err)
-	}
+	mapping := firstCheckedMapping(t, actual)
+	definition := mapping.definition
 	secondRoot, err := identity.NewOccurrenceID(
 		mustShiftSpan(t, definition.Root().Span()),
 		uint16(catalog.KindFuncDecl),
@@ -103,18 +84,10 @@ func TestIndependentCgoOriginRejectsAmbiguity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	line, err := strconv.Atoi(parts[1])
-	if err != nil {
-		t.Fatal(err)
-	}
-	column, err := strconv.Atoi(parts[2])
-	if err != nil {
-		t.Fatal(err)
-	}
 	key := independentOrigin{
 		file:   definition.File().String(),
-		line:   line,
-		column: column,
+		line:   mapping.originLine,
+		column: mapping.originColumn,
 		kind:   definition.Kind(),
 	}
 	if _, _, err := independentResolveOrigin(
@@ -242,31 +215,26 @@ func main() { _ = external() }
 	return actual, expected
 }
 
-func firstLedgerIdentity(
+func firstCheckedMapping(
 	t *testing.T,
 	ledger *structuralLedger,
-	class string,
-) string {
+) checkedMappingLedgerRecord {
 	t.Helper()
-	for identity := range ledger.classes[class] {
-		return identity
+	for mapping := range ledger.checkedMappings {
+		return mapping
 	}
-	t.Fatalf("ledger has no %s identity", class)
-	return ""
+	t.Fatal("ledger has no checked mapping")
+	return checkedMappingLedgerRecord{}
 }
 
 func syntheticDefinitionRoleMutation(
 	t *testing.T,
 	ledger *structuralLedger,
-) (string, string) {
+) (definitionLedgerRecord, definitionLedgerRecord) {
 	t.Helper()
-	for record := range ledger.classes["definition"] {
-		parts := strings.Split(record, "|")
-		if len(parts) == 0 {
-			continue
-		}
-		definition, err := identity.ParseDefinitionID(parts[0])
-		if err != nil || !definition.SyntheticRole().Valid() {
+	for record := range ledger.definitions {
+		definition := record.id
+		if !definition.SyntheticRole().Valid() {
 			continue
 		}
 		for role := identity.SyntheticDefinitionRole(1); role.Valid(); role++ {
@@ -281,24 +249,20 @@ func syntheticDefinitionRoleMutation(
 			if err != nil {
 				t.Fatal(err)
 			}
-			parts[0] = replacement.String()
-			return record, strings.Join(parts, "|")
+			mutated := record
+			mutated.id = replacement
+			return record, mutated
 		}
 	}
 	t.Fatal("cgo ledger has no synthetic definition")
-	return "", ""
+	return definitionLedgerRecord{}, definitionLedgerRecord{}
 }
 
 func cloneStructuralLedger(
 	source *structuralLedger,
 ) *structuralLedger {
 	out := newStructuralLedger()
-	for class, records := range source.classes {
-		out.classes[class] = map[string]int{}
-		for identity, count := range records {
-			out.classes[class][identity] = count
-		}
-	}
+	out.merge(source)
 	return out
 }
 

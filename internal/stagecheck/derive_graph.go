@@ -15,11 +15,35 @@ func deriveExpectedGraph(
 	artifact *structure.ProviderArtifact,
 	selectedPackages map[identity.PackageID]bool,
 ) (*structuralLedger, error) {
+	return deriveExpectedGraphAuthority(
+		universe, plan, artifact, selectedPackages, true,
+	)
+}
+
+type independentPackageEvidence struct {
+	ledger *structuralLedger
+	files  map[identity.FileID]*derivedFile
+}
+
+func deriveExpectedResidentPackage(
+	universe *source.Universe,
+	plan *sourceplan.Plan,
+	pkg *source.LoadedPackage,
+) (*independentPackageEvidence, error) {
+	return deriveExpectedPackageAuthority(
+		universe, plan, nil, pkg, false,
+	)
+}
+
+func deriveExpectedGraphAuthority(
+	universe *source.Universe,
+	plan *sourceplan.Plan,
+	artifact *structure.ProviderArtifact,
+	selectedPackages map[identity.PackageID]bool,
+	includeCertified bool,
+) (*structuralLedger, error) {
 	expected := newStructuralLedger()
-	loadedByPackage := map[identity.PackageID]*source.LoadedPackage{}
-	derivedByPackage := map[identity.PackageID]map[identity.FileID]*derivedFile{}
 	for _, pkg := range universe.Packages() {
-		loadedByPackage[pkg.ID()] = pkg
 		if selectedPackages != nil &&
 			!selectedPackages[pkg.ID()] {
 			continue
@@ -28,102 +52,124 @@ func deriveExpectedGraph(
 			pkg.Disposition() != source.DispositionUnsafeIntrinsic {
 			continue
 		}
-		derivedByPackage[pkg.ID()] = map[identity.FileID]*derivedFile{}
-		for _, file := range pkg.Files() {
-			decisionKind := sourceplan.KindLocalSyntax
-			if plan != nil {
-				decision, present := plan.For(file.ID())
-				if !present {
-					return nil, fmt.Errorf(
-						"independent source plan omits %s", file.ID(),
-					)
-				}
-				decisionKind = decision.Kind()
-			}
-			switch decisionKind {
-			case sourceplan.KindLocalSyntax:
-				derived, err := deriveFile(file)
-				if err != nil {
-					return nil, err
-				}
-				derivedByPackage[pkg.ID()][file.ID()] = derived
-				expected.merge(derived.ledger)
-			case sourceplan.KindCertifiedGraph:
-				if artifact == nil {
-					return nil, fmt.Errorf(
-						"independent certified file %s lacks artifact",
-						file.ID(),
-					)
-				}
-				certified, digest, found, err := artifact.FileGraph(file.ID())
-				if err != nil {
-					return nil, err
-				}
-				if !found ||
-					digest != file.ByteDigest().String() {
-					return nil, fmt.Errorf(
-						"independent certified file %s is missing or stale",
-						file.ID(),
-					)
-				}
-				expected.merge(ledgerForFile(certified))
-			default:
-				return nil, fmt.Errorf(
-					"independent file %s has invalid source decision",
-					file.ID(),
-				)
-			}
+		evidence, err := deriveExpectedPackageAuthority(
+			universe, plan, artifact, pkg, includeCertified,
+		)
+		if err != nil {
+			return nil, err
 		}
+		expected.merge(evidence.ledger)
 	}
-	for pkgID, files := range derivedByPackage {
-		pkg := loadedByPackage[pkgID]
-		var synthetic sourceplan.SyntheticOwner
-		planned := false
+	return expected, nil
+}
+
+func deriveExpectedPackageAuthority(
+	universe *source.Universe,
+	plan *sourceplan.Plan,
+	artifact *structure.ProviderArtifact,
+	pkg *source.LoadedPackage,
+	includeCertified bool,
+) (*independentPackageEvidence, error) {
+	evidence := &independentPackageEvidence{
+		ledger: newStructuralLedger(),
+		files:  map[identity.FileID]*derivedFile{},
+	}
+	for _, file := range pkg.Files() {
+		decisionKind := sourceplan.KindLocalSyntax
 		if plan != nil {
-			synthetic, planned = plan.SyntheticFor(pkgID)
-		}
-		localSynthetic := !planned ||
-			synthetic.Kind() == sourceplan.KindLocalSyntax
-		if planned &&
-			synthetic.Kind() == sourceplan.KindCertifiedGraph {
-			if artifact == nil {
+			decision, present := plan.For(file.ID())
+			if !present {
 				return nil, fmt.Errorf(
-					"independent synthetic owner %s lacks artifact", pkgID,
+					"independent source plan omits %s", file.ID(),
 				)
 			}
-			certified, present, err := artifact.SyntheticPackageGraph(pkgID)
+			decisionKind = decision.Kind()
+		}
+		switch decisionKind {
+		case sourceplan.KindLocalSyntax:
+			derived, err := deriveFile(file)
 			if err != nil {
 				return nil, err
 			}
-			if !present {
+			evidence.files[file.ID()] = derived
+			evidence.ledger.merge(derived.ledger)
+		case sourceplan.KindCertifiedGraph:
+			if !includeCertified {
+				continue
+			}
+			if artifact == nil {
 				return nil, fmt.Errorf(
-					"independent synthetic owner %s is absent", pkgID,
+					"independent certified file %s lacks artifact",
+					file.ID(),
 				)
 			}
-			addDefinitionRecords(
-				expected,
-				certified.Definitions(),
-				certified.Sites(),
-				certified.Headers(),
-				certified.Boundaries(),
-				true,
-			)
-			for _, owner := range certified.SyntheticOwners() {
-				expected.add("owner", owner.ID().String())
+			certified, digest, found, err := artifact.FileGraph(file.ID())
+			if err != nil {
+				return nil, err
 			}
+			if !found || digest != file.ByteDigest().String() {
+				return nil, fmt.Errorf(
+					"independent certified file %s is missing or stale",
+					file.ID(),
+				)
+			}
+			evidence.ledger.merge(ledgerForFile(certified))
+		default:
+			return nil, fmt.Errorf(
+				"independent file %s has invalid source decision",
+				file.ID(),
+			)
 		}
-		if err := deriveCgoPackage(
-			universe, pkg, files, localSynthetic, expected,
+	}
+	var synthetic sourceplan.SyntheticOwner
+	planned := false
+	if plan != nil {
+		synthetic, planned = plan.SyntheticFor(pkg.ID())
+	}
+	localSynthetic := !planned ||
+		synthetic.Kind() == sourceplan.KindLocalSyntax
+	if planned &&
+		synthetic.Kind() == sourceplan.KindCertifiedGraph &&
+		includeCertified {
+		if artifact == nil {
+			return nil, fmt.Errorf(
+				"independent synthetic owner %s lacks artifact", pkg.ID(),
+			)
+		}
+		certified, present, err := artifact.SyntheticPackageGraph(pkg.ID())
+		if err != nil {
+			return nil, err
+		}
+		if !present {
+			return nil, fmt.Errorf(
+				"independent synthetic owner %s is absent", pkg.ID(),
+			)
+		}
+		addDefinitionRecords(
+			evidence.ledger,
+			certified.Definitions(),
+			certified.Sites(),
+			certified.Headers(),
+			certified.Boundaries(),
+			true,
+		)
+		for _, owner := range certified.SyntheticOwners() {
+			addRecord(&evidence.ledger.owners, owner.ID())
+		}
+	}
+	if err := deriveCgoPackage(
+		universe, pkg, evidence.files, localSynthetic, evidence.ledger,
+	); err != nil {
+		return nil, err
+	}
+	if pkg.Disposition() == source.DispositionOrdinarySource {
+		if err := addExpectedPackageInitialization(
+			evidence.ledger, pkg.ID(),
 		); err != nil {
 			return nil, err
 		}
-		if pkg.Disposition() == source.DispositionOrdinarySource {
-			if err := addExpectedPackageInitialization(expected, pkgID); err != nil {
-				return nil, err
-			}
-		}
 	}
-	return expected, nil
+	return evidence, nil
 }
 
 func addExpectedPackageInitialization(
@@ -136,7 +182,6 @@ func addExpectedPackageInitialization(
 	if err != nil {
 		return err
 	}
-	owner := ownerID.String()
 	definition, err := identity.NewImplicitDefinitionID(
 		pkg, identity.ImplicitDefinitionPackageInit,
 	)
@@ -145,40 +190,33 @@ func addExpectedPackageInitialization(
 	}
 	header, _ := identity.NewHeaderRegionID(definition)
 	boundary, _ := identity.NewExecutionBoundaryID(definition)
-	ledger.add("owner", owner)
-	ledger.add(
-		"definition",
-		fmt.Sprintf(
-			"%s|%s|%s|%s|package initialization",
-			definition, owner, header, boundary,
-		),
-	)
-	ledger.add(
-		"definition-site",
-		fmt.Sprintf(
-			"%d|%s|%s||",
-			uint8(structure.DefinitionSiteSynthetic),
-			definition,
-			owner,
-		),
-	)
-	ledger.add(
-		"header",
-		fmt.Sprintf(
-			"%s|%s",
-			header,
-			independentDigest(definition.String(), "header"),
-		),
-	)
-	ledger.add(
-		"execution-boundary",
-		fmt.Sprintf(
-			"%s|%d|%s|%d|0",
-			boundary,
-			uint8(structure.BoundaryImplicit),
-			independentDigest(definition.String(), "execution"),
-			uint8(identity.ImplicitDefinitionPackageInit),
-		),
+	addRecord(&ledger.owners, ownerID)
+	addRecord(&ledger.definitions, definitionLedgerRecord{
+		id:       definition,
+		owner:    ownerID,
+		header:   header,
+		boundary: boundary,
+		name:     "package initialization",
+	})
+	addRecord(&ledger.definitionSites, definitionSiteLedgerRecord{
+		kind:       structure.DefinitionSiteSynthetic,
+		definition: definition,
+		owner:      ownerID,
+	})
+	addRecord(&ledger.headers, headerLedgerRecord{
+		id:     header,
+		digest: independentDigest(definition.String(), "header"),
+	})
+	addRecord(
+		&ledger.executionBoundaries,
+		executionBoundaryLedgerRecord{
+			id:   boundary,
+			kind: structure.BoundaryImplicit,
+			digest: independentDigest(
+				definition.String(), "execution",
+			),
+			implicit: identity.ImplicitDefinitionPackageInit,
+		},
 	)
 	return nil
 }

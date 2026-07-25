@@ -29,8 +29,13 @@ func Validate(
 	if err := graph.VisitResidentPackages(func(
 		pkg structure.PackageGraph,
 	) error {
-		for _, definition := range pkg.Definitions() {
+		if err := pkg.VisitDefinitions(func(
+			definition structure.ImplementationDefinition,
+		) error {
 			definitions[definition.ID()] = definition
+			return nil
+		}); err != nil {
+			return err
 		}
 		for _, site := range pkg.Sites() {
 			sites[site.Definition()] = site
@@ -45,13 +50,20 @@ func Validate(
 	if err := validateInventoryIndexes(inventory); err != nil {
 		return err
 	}
-	for id := range inventory.byOccurrence {
+	if err := inventory.occurrences.visitPayloads(func(
+		_ occurrenceRef,
+		occurrence structure.OccurrenceRef,
+	) error {
+		id := occurrence.ID()
 		if _, duplicated := graph.ResidentOccurrence(id); duplicated {
 			return fmt.Errorf(
 				"occurrence %s is duplicated across structural and executable stores",
 				id,
 			)
 		}
+		return nil
+	}); err != nil {
+		return err
 	}
 	full := map[identity.DefinitionID]bool{}
 	for _, selection := range selections.Records() {
@@ -71,9 +83,9 @@ func Validate(
 			len(selections.Records()), len(census),
 		)
 	}
-	memberOwner := map[identity.OccurrenceID]identity.DefinitionID{}
+	state := newRegionValidationState(inventory.occurrences.length())
 	referenceCount := map[identity.DefinitionID]int{}
-	for _, regionID := range inventory.regionIDs {
+	for regionIndex, regionID := range inventory.regionIDs {
 		region := inventory.byID[regionID]
 		definition := region.Definition()
 		if !full[definition] {
@@ -89,7 +101,8 @@ func Validate(
 			sites,
 			boundaries[definition],
 			region,
-			memberOwner,
+			uint32(regionIndex+1),
+			&state,
 			referenceCount,
 		); err != nil {
 			return err
@@ -121,33 +134,67 @@ func Validate(
 			)
 		}
 	}
-	for id := range inventory.byOccurrence {
-		if memberOwner[id].IsZero() {
+	if err := inventory.occurrences.visitPayloads(func(
+		_ occurrenceRef,
+		occurrence structure.OccurrenceRef,
+	) error {
+		member := inventory.occurrences.reference(occurrence.ID())
+		if !member.valid() || state.memberOwner[member] == 0 {
 			return fmt.Errorf(
 				"additional occurrence %s belongs to no executable region",
-				id,
+				occurrence.ID(),
 			)
 		}
+		return nil
+	}); err != nil {
+		return err
 	}
 	return nil
 }
 
+type regionValidationState struct {
+	memberOwner []uint32
+	local       []uint32
+	entry       []uint32
+	generation  uint32
+}
+
+func newRegionValidationState(
+	memberCount int,
+) regionValidationState {
+	return regionValidationState{
+		memberOwner: make([]uint32, memberCount+1),
+		local:       make([]uint32, memberCount+1),
+		entry:       make([]uint32, memberCount+1),
+	}
+}
+
+func (state *regionValidationState) nextRegion() {
+	state.generation++
+	if state.generation == 0 {
+		clear(state.local)
+		clear(state.entry)
+		state.generation = 1
+	}
+}
+
 func validateInventoryIndexes(inventory *Inventory) error {
 	if len(inventory.regionIDs) != len(inventory.byID) ||
-		len(inventory.additionalIDs) != len(inventory.byOccurrence) {
+		len(inventory.additional) != inventory.occurrences.payloadLength() {
 		return fmt.Errorf("executable indexes have unequal cardinalities")
 	}
-	previous := ""
+	var previousDefinition identity.DefinitionID
 	for _, regionID := range inventory.regionIDs {
 		region := inventory.byID[regionID]
 		if region.id.IsZero() ||
-			previous >= region.Definition().String() {
+			(!previousDefinition.IsZero() &&
+				previousDefinition.Compare(region.Definition()) >= 0) {
 			return fmt.Errorf(
 				"executable region order is noncanonical at %s",
 				region.Definition(),
 			)
 		}
-		previous = region.Definition().String()
+		previousDefinition = region.Definition()
 		indexed, present := inventory.byID[region.Definition()]
 		if !present || indexed.id != region.id {
 			return fmt.Errorf(
@@ -156,21 +203,51 @@ func validateInventoryIndexes(inventory *Inventory) error {
 			)
 		}
 	}
-	previous = ""
-	for _, id := range inventory.additionalIDs {
-		occurrence := inventory.byOccurrence[id]
-		if previous >= occurrence.ID().String() {
+	var previousOccurrence identity.OccurrenceID
+	expectedRanges := map[identity.FileID]occurrenceRange{}
+	seen := make([]bool, inventory.occurrences.length()+1)
+	for position, reference := range inventory.additional {
+		occurrence, present := inventory.occurrences.payloadFor(reference)
+		if !present || seen[reference] {
+			return fmt.Errorf(
+				"additional occurrence reference %d is absent or repeated",
+				reference,
+			)
+		}
+		seen[reference] = true
+		if !previousOccurrence.IsZero() &&
+			previousOccurrence.Compare(occurrence.ID()) >= 0 {
 			return fmt.Errorf(
 				"additional occurrence order is noncanonical at %s",
 				occurrence.ID(),
 			)
 		}
-		previous = occurrence.ID().String()
-		indexed, present := inventory.byOccurrence[occurrence.ID()]
-		if !present || indexed != occurrence {
+		previousOccurrence = occurrence.ID()
+		indexed := inventory.occurrences.reference(occurrence.ID())
+		if indexed != reference {
 			return fmt.Errorf(
 				"additional occurrence index disagrees at %s",
 				occurrence.ID(),
+			)
+		}
+		file := occurrence.ID().Span().File()
+		expectedRange, present := expectedRanges[file]
+		if !present {
+			expectedRange.start = position
+		}
+		expectedRange.end = position + 1
+		expectedRanges[file] = expectedRange
+	}
+	if len(inventory.additionalByFile) != len(expectedRanges) {
+		return fmt.Errorf(
+			"additional occurrence file index has unequal cardinality",
+		)
+	}
+	for file, expected := range expectedRanges {
+		if actual, present := inventory.additionalByFile[file]; !present || actual != expected {
+			return fmt.Errorf(
+				"additional occurrence file range disagrees for %s",
+				file,
 			)
 		}
 	}
@@ -184,7 +261,8 @@ func validateRegion(
 	sites map[identity.DefinitionID]structure.DefinitionSite,
 	boundary structure.ExecutionBoundary,
 	region Region,
-	memberOwner map[identity.OccurrenceID]identity.DefinitionID,
+	regionOrdinal uint32,
+	state *regionValidationState,
 	referenceCount map[identity.DefinitionID]int,
 ) error {
 	definition, present := definitions[region.Definition()]
@@ -203,40 +281,51 @@ func validateRegion(
 			definition.ID(),
 		)
 	}
-	entries := map[identity.OccurrenceID]bool{}
+	state.nextRegion()
 	for _, entry := range boundary.Entries() {
-		entries[entry.ID()] = true
+		reference := inventory.occurrences.reference(entry.ID())
+		if reference.valid() {
+			state.entry[reference] = state.generation
+		}
 	}
-	local := map[identity.OccurrenceID]bool{}
 	for _, member := range region.members {
-		if prior := memberOwner[member]; !prior.IsZero() {
+		memberID, err := inventory.occurrences.id(member)
+		if err != nil {
+			return err
+		}
+		if prior := state.memberOwner[member]; prior != 0 {
 			return fmt.Errorf(
 				"occurrence %s belongs to executable regions %s and %s",
-				member, prior, definition.ID(),
+				memberID,
+				inventory.regionIDs[prior-1],
+				definition.ID(),
 			)
 		}
 		occurrence, found := executableOccurrence(
-			graph, inventory, member,
+			graph, inventory, memberID,
 		)
 		if !found {
 			return fmt.Errorf(
 				"region %s member %s has no canonical occurrence",
-				region.id, member,
+				region.id, memberID,
 			)
 		}
-		if local[member] {
+		if state.local[member] == state.generation {
 			return fmt.Errorf(
-				"region %s repeats occurrence %s", region.id, member,
+				"region %s repeats occurrence %s", region.id, memberID,
 			)
 		}
-		if !entries[member] && !local[occurrence.Parent()] {
+		parent := inventory.occurrences.reference(occurrence.Parent())
+		if state.entry[member] != state.generation &&
+			(!parent.valid() ||
+				state.local[parent] != state.generation) {
 			return fmt.Errorf(
 				"region %s member %s precedes or omits parent %s",
-				region.id, member, occurrence.Parent(),
+				region.id, memberID, occurrence.Parent(),
 			)
 		}
-		local[member] = true
-		memberOwner[member] = definition.ID()
+		state.local[member] = state.generation
+		state.memberOwner[member] = regionOrdinal
 	}
 	seenReferences := map[identity.DefinitionID]bool{}
 	for _, reference := range region.references {
@@ -256,7 +345,9 @@ func validateRegion(
 			root.Edge() != reference.edge ||
 			root.Ordinal() != reference.ordinal ||
 			(reference.parent != definition.ID().Root() &&
-				!local[reference.parent]) {
+				state.local[inventory.occurrences.reference(
+					reference.parent,
+				)] != state.generation) {
 			return fmt.Errorf(
 				"region %s has incoherent child reference %s",
 				region.id, reference.child,

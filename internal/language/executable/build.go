@@ -19,8 +19,8 @@ func Build(
 	selections *scope.DefinitionSelections,
 ) (*Inventory, error) {
 	out := &Inventory{
-		byID:         map[identity.DefinitionID]Region{},
-		byOccurrence: map[identity.OccurrenceID]structure.Occurrence{},
+		byID:        map[identity.DefinitionID]Region{},
+		occurrences: newOccurrenceStore(),
 	}
 	definitions := map[identity.DefinitionID]structure.ImplementationDefinition{}
 	definitionAt := map[identity.OccurrenceID]identity.DefinitionID{}
@@ -55,7 +55,9 @@ func Build(
 		out.byID[definition.ID()] = region
 		out.regionIDs = append(out.regionIDs, definition.ID())
 	}
-	out.sort()
+	if err := out.sort(index); err != nil {
+		return nil, err
+	}
 	if err := Validate(graph, selections, out); err != nil {
 		return nil, err
 	}
@@ -74,7 +76,7 @@ func buildRegion(
 	if err != nil {
 		return Region{}, err
 	}
-	region := Region{id: regionID}
+	region := Region{id: regionID, occurrences: inventory.occurrences}
 	if definition.Kind() == identity.DefinitionImplicit {
 		if definition.ID().ImplicitOp() != identity.ImplicitDefinitionPackageInit {
 			return Region{}, fmt.Errorf(
@@ -103,12 +105,17 @@ func buildRegion(
 	builder := regionBuilder{
 		file:         definition.ID().File(),
 		fset:         file.PhysicalFileSet(),
+		displayFile:  definition.ID().File().String(),
 		definitionAt: definitionAt,
 		current:      definition.ID(),
 		graph:        graph,
+		index:        index,
 		inventory:    inventory,
 		work:         work,
 		region:       &region,
+	}
+	if _, checked := index.CheckedDefinitionNode(definition.ID()); checked {
+		builder.checked = true
 	}
 	boundary, present := graph.ResidentBoundary(definition.ID())
 	if !present {
@@ -164,12 +171,15 @@ func buildRegion(
 type regionBuilder struct {
 	file         identity.FileID
 	fset         *token.FileSet
+	displayFile  string
 	definitionAt map[identity.OccurrenceID]identity.DefinitionID
 	current      identity.DefinitionID
 	graph        *structure.Graph
+	index        *structure.TransientIndex
 	inventory    *Inventory
 	work         *Work
 	region       *Region
+	checked      bool
 }
 
 func (b *regionBuilder) visit(
@@ -182,10 +192,37 @@ func (b *regionBuilder) visit(
 	if err != nil {
 		return err
 	}
-	if err := b.recordOccurrence(occurrence); err != nil {
+	member, structural, structuralPresent, err :=
+		b.recordOccurrence(occurrence)
+	if err != nil {
 		return err
 	}
-	b.region.members = append(b.region.members, occurrence.ID())
+	checkerNode := node
+	if b.checked {
+		var present bool
+		checkerNode, present = b.index.CheckedCounterpart(node)
+		if !present {
+			checkerNode = node
+			b.index.MarkCheckedUnmapped(occurrence.ID())
+		}
+	}
+	if structuralPresent {
+		if err := b.index.BindExecutableOccurrence(
+			structural,
+			checkerNode,
+		); err != nil {
+			return err
+		}
+	} else {
+		if err := b.inventory.occurrences.bindNode(
+			b.index,
+			member,
+			checkerNode,
+		); err != nil {
+			return err
+		}
+	}
+	b.region.members = append(b.region.members, member)
 	b.work.RecordAppends++
 	children, err := structure.Children(node, occurrence.Kind())
 	if err != nil {
@@ -279,41 +316,47 @@ func (b *regionBuilder) occurrence(
 	}
 	return structure.NewOccurrence(
 		id, kind, parent, edge, ordinal, span,
-		displaySpan(b.fset, b.file, node), lexical,
+		displaySpan(b.fset, b.displayFile, node), lexical,
 	)
 }
 
 func (b *regionBuilder) recordOccurrence(
 	occurrence structure.Occurrence,
-) error {
+) (
+	occurrenceRef,
+	structure.OccurrenceRef,
+	bool,
+	error,
+) {
+	reference, err := b.inventory.occurrences.admit(occurrence.ID())
+	if err != nil {
+		return 0, structure.OccurrenceRef{}, false, err
+	}
 	b.work.JoinProbes++
-	if structural, present := b.graph.ResidentOccurrence(
+	if structural, present := b.graph.ResidentOccurrenceRef(
 		occurrence.ID(),
 	); present {
-		if structural != occurrence {
-			return fmt.Errorf(
+		if structural.Occurrence() != occurrence {
+			return 0, structure.OccurrenceRef{}, false, fmt.Errorf(
 				"executable occurrence %s conflicts with structural payload",
 				occurrence.ID(),
 			)
 		}
-		return nil
+		return reference, structural, true, nil
 	}
 	b.work.IdentityProbes++
-	if existing, present := b.inventory.byOccurrence[occurrence.ID()]; present {
-		if existing != occurrence {
-			return fmt.Errorf(
-				"executable occurrence %s has conflicting payloads",
-				occurrence.ID(),
-			)
-		}
-		return nil
+	reference, added, err := b.inventory.occurrences.put(occurrence)
+	if err != nil {
+		return 0, structure.OccurrenceRef{}, false, err
 	}
-	b.inventory.byOccurrence[occurrence.ID()] = occurrence
-	b.inventory.additionalIDs = append(
-		b.inventory.additionalIDs, occurrence.ID(),
+	if !added {
+		return reference, structure.OccurrenceRef{}, false, nil
+	}
+	b.inventory.additional = append(
+		b.inventory.additional, reference,
 	)
 	b.work.RecordAppends++
-	return nil
+	return reference, structure.OccurrenceRef{}, false, nil
 }
 
 func physicalSpan(
@@ -334,7 +377,7 @@ func physicalSpan(
 
 func displaySpan(
 	fset *token.FileSet,
-	file identity.FileID,
+	physicalFile string,
 	node ast.Node,
 ) structure.DisplaySpan {
 	start := fset.Position(node.Pos())
@@ -342,19 +385,19 @@ func displaySpan(
 	physicalStart := fset.PositionFor(node.Pos(), false)
 	physicalEnd := fset.PositionFor(node.End(), false)
 	return structure.DisplaySpan{
-		Start: executableDisplayPosition(start, physicalStart, file),
-		End:   executableDisplayPosition(end, physicalEnd, file),
+		Start: executableDisplayPosition(start, physicalStart, physicalFile),
+		End:   executableDisplayPosition(end, physicalEnd, physicalFile),
 	}
 }
 
 func executableDisplayPosition(
 	adjusted token.Position,
 	physical token.Position,
-	file identity.FileID,
+	physicalFile string,
 ) structure.DisplayPosition {
 	filename := adjusted.Filename
 	if filename == physical.Filename {
-		filename = file.String()
+		filename = physicalFile
 	}
 	return structure.DisplayPosition{
 		Filename: filename,

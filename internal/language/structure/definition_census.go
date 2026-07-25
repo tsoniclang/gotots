@@ -65,11 +65,16 @@ func sealDefinitionCensus(graph *Graph) error {
 	headerOccurrences := 0
 	boundaryEntries := 0
 	for index, pkg := range graph.packages {
-		for _, definition := range pkg.Definitions() {
+		if err := pkg.VisitDefinitions(func(
+			definition ImplementationDefinition,
+		) error {
 			records = append(records, DefinitionCensusRecord{
 				pkg: pkg.id,
 				id:  definition.id,
 			})
+			return nil
+		}); err != nil {
+			return err
 		}
 		for _, header := range pkg.Headers() {
 			headerOccurrences += len(header.members)
@@ -122,8 +127,9 @@ func sealDefinitionCensus(graph *Graph) error {
 		boundaryEntries += certified.BoundaryEntryCount()
 	}
 	sort.Slice(records, func(i, j int) bool {
-		return definitionCensusKey(records[i]) <
-			definitionCensusKey(records[j])
+		return compareDefinitionCensusRecord(
+			records[i], records[j],
+		) < 0
 	})
 	byID := make(
 		map[identity.DefinitionID]*DefinitionCensusRecord,
@@ -152,18 +158,21 @@ func validateDefinitionCensus(graph *Graph) error {
 		graph.boundaryEntries < 0 {
 		return fmt.Errorf("definition census is absent or incoherent")
 	}
-	previous := ""
+	var previous DefinitionCensusRecord
+	hasPrevious := false
 	for index := range graph.definitions {
 		record := &graph.definitions[index]
 		if record.pkg.IsZero() ||
 			record.id.IsZero() ||
-			previous >= definitionCensusKey(*record) ||
+			(hasPrevious &&
+				compareDefinitionCensusRecord(previous, *record) >= 0) ||
 			graph.definitionByID[record.id] != record {
 			return fmt.Errorf(
 				"definition census has invalid record %s", record.id,
 			)
 		}
-		previous = definitionCensusKey(*record)
+		previous = *record
+		hasPrevious = true
 	}
 	for _, definition := range graph.residentDefinitions() {
 		_, present := graph.definitionByID[definition.id]
@@ -177,6 +186,12 @@ func validateDefinitionCensus(graph *Graph) error {
 	return nil
 }
 
-func definitionCensusKey(record DefinitionCensusRecord) string {
-	return record.pkg.String() + "\x00" + record.id.String()
+func compareDefinitionCensusRecord(
+	left DefinitionCensusRecord,
+	right DefinitionCensusRecord,
+) int {
+	if order := left.pkg.Compare(right.pkg); order != 0 {
+		return order
+	}
+	return left.id.Compare(right.id)
 }

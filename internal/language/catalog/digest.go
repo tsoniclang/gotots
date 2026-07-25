@@ -4,12 +4,19 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"strings"
+	"sync"
 )
+
+var structureDigest = sync.OnceValue(computeStructureDigest)
 
 // StructureDigest is the canonical digest of the complete catalog structure:
 // every pinned identity and name across every closed domain. Audit artifacts
 // bind to it so a catalog change invalidates stored coverage evidence.
 func StructureDigest() string {
+	return structureDigest()
+}
+
+func computeStructureDigest() string {
 	var parts []string
 	for _, kind := range All() {
 		parts = append(parts, fmt.Sprintf("kind:%d=%s:%s:%s", uint16(kind), kind.Name(), kind.Category(), kind.Disposition()))

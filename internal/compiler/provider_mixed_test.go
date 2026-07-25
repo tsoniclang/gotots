@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/tsoniclang/gotots/internal/identity"
+	"github.com/tsoniclang/gotots/internal/language/semantic"
 	"github.com/tsoniclang/gotots/internal/scope/contract"
 	"github.com/tsoniclang/gotots/internal/scope/sourceplan"
 	"github.com/tsoniclang/gotots/internal/source"
@@ -29,7 +31,7 @@ func TestMixedLocalAndCertifiedFilesUseOneAuthorityEach(t *testing.T) {
 		"provided.go",
 		"package mixed\n\nfunc Provided() int { return 2 }\n",
 	)
-	base, err := InspectConstructs(source.Request{
+	base, err := inspectConstructsForTest(t, source.Request{
 		Dir: directory, Patterns: []string{"."},
 		ProviderContract: contract.DefaultID,
 	})
@@ -65,14 +67,18 @@ func TestMixedLocalAndCertifiedFilesUseOneAuthorityEach(t *testing.T) {
 		ProviderContract:         "mixed-authority@v1",
 		ProviderContractArtifact: contractPath,
 	}
-	providerPath := filepath.Join(t.TempDir(), "provider.gotots")
-	provider, err := AuditCatalog(request, providerPath)
+	output := t.TempDir()
+	structurePath := filepath.Join(output, "provider.structure.gotots")
+	semanticPath := filepath.Join(output, "provider.semantic.gotots")
+	provider, err := AuditCatalog(request, structurePath, semanticPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	request.AuditArtifact = providerPath
-	request.AuditArtifactDigest = provider.Digest
-	inspection, err := InspectConstructs(request)
+	request.ProviderStructureArtifact = structurePath
+	request.ProviderStructureDigest = provider.Structure.Digest
+	request.ProviderSemanticArtifact = semanticPath
+	request.ProviderSemanticDigest = provider.Semantic.Digest
+	inspection, err := inspectConstructsForTest(t, request)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,5 +147,51 @@ func TestMixedLocalAndCertifiedFilesUseOneAuthorityEach(t *testing.T) {
 			manifest,
 			projection,
 		)
+	}
+	checkerReads := inspection.Semantic().CheckerReadStats()
+	providerReads := inspection.Semantic().ProviderReadStats()
+	logicalReads := inspection.Semantic().ProjectionReadStats()
+	if checkerReads.ShardLoads != 2 ||
+		providerReads.ShardLoads != 1 ||
+		logicalReads.PackageLoads != 2 ||
+		logicalReads.MixedPackageLoads != 1 ||
+		logicalReads.MaxPackagesResident != 1 {
+		t.Fatalf(
+			"mixed semantic residency checker=%+v provider=%+v logical=%+v",
+			checkerReads, providerReads, logicalReads,
+		)
+	}
+	var semanticPackageID identity.PackageID
+	for _, authority := range inspection.Semantic().AuthorityProjections() {
+		for _, definition := range authority.ExpectedDefinitions() {
+			if definition == automatic {
+				semanticPackageID = authority.ID()
+			}
+		}
+	}
+	if semanticPackageID.IsZero() {
+		t.Fatal("mixed semantic package identity is absent")
+	}
+	if err := inspection.Semantic().VisitPackage(
+		semanticPackageID,
+		func(pkg semantic.Package) error {
+			authorities := map[semantic.AuthorityKind]bool{}
+			for _, definition := range semanticDefinitions(pkg) {
+				switch definition.Definition() {
+				case automatic, provided:
+					authorities[definition.Authority().Kind()] = true
+				}
+			}
+			if !authorities[semantic.AuthorityChecker] ||
+				!authorities[semantic.AuthorityCertifiedProvider] {
+				t.Fatalf(
+					"mixed projection authorities = %+v",
+					authorities,
+				)
+			}
+			return nil
+		},
+	); err != nil {
+		t.Fatal(err)
 	}
 }

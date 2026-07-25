@@ -47,16 +47,17 @@ func newProviderPackageCensus(
 	}
 	canonical := append([]identity.DefinitionID(nil), definitions...)
 	sort.Slice(canonical, func(i, j int) bool {
-		return canonical[i].String() < canonical[j].String()
+		return canonical[i].Compare(canonical[j]) < 0
 	})
-	previous := ""
+	var previous identity.DefinitionID
 	for _, definition := range canonical {
-		if definition.IsZero() || definition.String() <= previous {
+		if definition.IsZero() ||
+			(!previous.IsZero() && definition.Compare(previous) <= 0) {
 			return ProviderPackageCensus{}, providerArtifactError(
 				"provider package census has duplicate definition",
 			)
 		}
-		previous = definition.String()
+		previous = definition
 	}
 	return ProviderPackageCensus{
 		pkg:               pkg,

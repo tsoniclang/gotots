@@ -1,8 +1,6 @@
 package stagecheck
 
 import (
-	"fmt"
-
 	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/structure"
 	"github.com/tsoniclang/gotots/internal/scope/contract"
@@ -31,9 +29,11 @@ func verifyCertifiedSelectionFacts(
 		for _, kind := range selected.RequestedFacts(
 			record.ID(), record.Package(),
 		) {
-			expected.add(
-				"certified-selection-fact",
-				certifiedSelectionFactIdentity(record.ID(), kind),
+			addRecord(
+				&expected.certifiedSelectionFacts,
+				certifiedSelectionFactLedgerRecord{
+					definition: record.ID(), kind: kind,
+				},
 			)
 		}
 	}
@@ -51,11 +51,11 @@ func verifyCertifiedSelectionFacts(
 			) {
 				continue
 			}
-			actual.add(
-				"certified-selection-fact",
-				certifiedSelectionFactIdentity(
-					fact.Definition(), fact.Kind(),
-				),
+			addRecord(
+				&actual.certifiedSelectionFacts,
+				certifiedSelectionFactLedgerRecord{
+					definition: fact.Definition(), kind: fact.Kind(),
+				},
 			)
 		}
 	}
@@ -81,11 +81,4 @@ func definitionUsesCertifiedGraph(
 	}
 	decision, present := plan.For(definition.File())
 	return present && decision.Kind() == sourceplan.KindCertifiedGraph
-}
-
-func certifiedSelectionFactIdentity(
-	definition identity.DefinitionID,
-	kind contract.SelectionFactKind,
-) string {
-	return fmt.Sprintf("%s|%d", definition, uint8(kind))
 }

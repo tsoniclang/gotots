@@ -115,18 +115,37 @@ func ResolveUniverse(req Request) (*Universe, error) {
 	if walkErr != nil {
 		return nil, walkErr
 	}
+	builtinID, err := identity.NewPackageID(
+		identity.LanguagePseudoOwner(), "builtin",
+	)
+	if err != nil {
+		return nil, err
+	}
+	if seen[builtinID] {
+		return nil, &LoadError{
+			Dir: req.Dir,
+			Reason: "selected toolchain returned the language-owned " +
+				"builtin universe as an ordinary package",
+		}
+	}
+	universe.packages = append(universe.packages, &LoadedPackage{
+		id:          builtinID,
+		provenance:  ProvenanceLanguagePseudo,
+		acquisition: AcquisitionGOROOT,
+		disposition: DispositionBuiltinUniverse,
+	})
 	if len(universe.roots) == 0 {
 		return nil, &LoadError{
 			Dir: req.Dir, Reason: "no requested roots after classification",
 		}
 	}
 	sort.Slice(universe.packages, func(i, j int) bool {
-		return universe.packages[i].id.String() <
-			universe.packages[j].id.String()
+		return universe.packages[i].id.Compare(
+			universe.packages[j].id,
+		) < 0
 	})
 	sort.Slice(universe.roots, func(i, j int) bool {
-		return universe.roots[i].id.String() <
-			universe.roots[j].id.String()
+		return universe.roots[i].id.Compare(universe.roots[j].id) < 0
 	})
 	return universe, nil
 }
@@ -366,8 +385,7 @@ func (c *classifier) attachMetadata(
 		}
 	}
 	sort.Slice(out.inputs, func(i, j int) bool {
-		return out.inputs[i].id.String() <
-			out.inputs[j].id.String()
+		return out.inputs[i].id.Compare(out.inputs[j].id) < 0
 	})
 	for index := 1; index < len(out.inputs); index++ {
 		if out.inputs[index-1].id == out.inputs[index].id {

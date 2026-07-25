@@ -42,6 +42,14 @@ defined by the specification.
 ## Architecture Invariants
 
 - One semantic fact has one authoritative producer and typed identity.
+- Typed identities own computational equality and structural order. Rendered
+  identity strings are artifact/diagnostic output only and may not drive
+  sorting, searching, lookup, deduplication, or joins.
+- Repeated semantic references use one typed package-local identity dictionary.
+  Closed sum-type records store only their active payload and typed bounded
+  relation ranges. Maximal inline unions, repeated full identities, retained
+  heavyweight record snapshots, and a second denormalized package view are
+  forbidden.
 - Parent visitors assign grammatical roles; children do not inspect parents or
   source text to infer meaning.
 - The semantic model is target-independent.
@@ -192,7 +200,10 @@ generic finalized-evidence boundary. No textual patching or checker re-entry.
   below 600 physical lines. The fixed six-file governing specification is
   bounded by responsibility rather than this code-file line limit.
 - Use descriptive filenames, not numeric shards.
-- Generate TypeScript only through the typed target AST and one formatter.
+- Generate TypeScript only through generated bindings for the exact pinned
+  TS-Go schema-level AST and one formatter. No handwritten/alternate target
+  AST, token-stream lowering, raw source fragment, template, or text patch is
+  permitted.
 - Use `apply_patch` for file edits.
 - Delete replaced fields, helpers, tests, comments, and routes in the same
   architectural change.
@@ -203,6 +214,17 @@ Start with focused construct/contract/differential/mutation tests, then strict
 TypeScript and broader suites. Only the coordinator runs heavy whole-product
 jobs; never stack them. Use bounded concurrency, disk-backed staging, memory
 preflight, and resumable breadcrumbs.
+
+Every dependency-ordered implementation step has its own comprehensive closure
+gate. Before the next step begins, the exact revision must pass: focused owner
+tests; independent identity joins at every changed boundary; representative
+production mutations; inspection of real emitted/stored artifacts including
+the affected tail; applicable staticness, source-size, memory, time, and
+runtime bounds with parent deltas; the guarded affected broader suite; and
+broad searches proving the superseded path is absent. Proof may not be deferred
+to phase exit, inherited from an earlier revision, or replaced by a claim that
+later work will exercise the path. A failure reopens the current truth owner
+and blocks dependent steps.
 
 Every heavy test, whole-repository test, cost run, cgo run, or test that can
 launch another compiler/toolchain must run as one process group with a timeout,

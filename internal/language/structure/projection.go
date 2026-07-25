@@ -121,8 +121,9 @@ func (g *Graph) projectPackage(
 		)
 	}
 	sort.Slice(pkg.files, func(i, j int) bool {
-		return pkg.files[i].owner.id.file.String() <
-			pkg.files[j].owner.id.file.String()
+		return pkg.files[i].owner.id.file.Compare(
+			pkg.files[j].owner.id.file,
+		) < 0
 	})
 	return pkg, nil
 }
@@ -182,6 +183,15 @@ func (g *Graph) ResidentOccurrence(
 		return Occurrence{}, false
 	}
 	return g.residentOccurrence(id)
+}
+
+func (g *Graph) ResidentOccurrenceRef(
+	id identity.OccurrenceID,
+) (OccurrenceRef, bool) {
+	if g == nil {
+		return OccurrenceRef{}, false
+	}
+	return g.residentOccurrenceRef(id)
 }
 
 func (g *Graph) ResidentOccurrences() []Occurrence {

@@ -25,8 +25,8 @@ workspace, target policy, and explicit environment contracts.
 | Typed frontend | definition graph, executable occurrences, selection facts, and transient checker/certified semantic evidence | Go semantic model | TypeScript shape |
 | Whole-program analysis | complete semantic model plus explicit product/API/test/reflection/extension roots | sealed facts including semantic reachability and root witnesses | emission |
 | Planning | semantically reachable model plus sealed facts | immutable total `ProgramPlan` | planning unreachable definitions or source rediscovery |
-| TS lowering | semantic model plus `ProgramPlan` | typed TypeScript AST | semantic decisions |
-| Baseline formatting | typed TS AST | canonical generated files | manual preservation |
+| TS lowering | semantic model plus `ProgramPlan` and generated bindings for the pinned TS-Go schema | exact validated TS-Go schema-level AST | semantic decisions or target-source text |
+| Baseline formatting | validated TS-Go AST | canonical generated files | manual preservation or AST repair |
 | Completion | new baseline plus prior editable AST | reconciled mixed AST | guessing ownership |
 | Implementation reachability | full generated/manual/runtime/stdlib/external/extension graph | retained product graph and root/non-reachability witnesses | text search or semantic-graph substitution |
 | Verification | sources, models, plans, artifacts | gate evidence | repairing output |
@@ -66,8 +66,10 @@ the frontend. `internal/scope` owns only per-definition provider/depth
 selection. `internal/language/executable` owns the later parent-directed
 structural pass and produces full-semantic occurrences plus grammatical roles,
 without interpreting `go/types`. `internal/language/frontend` alone resolves
-typed variants, bindings, declaration semantics, and implicit semantic
-operations. These owners consume the one catalog authority; none owns a private
+typed variants, bindings, declaration semantics, and all implicit semantic
+operations. Stage 1 catalogs those implicit-operation classes and their
+required evidence but produces none of their occurrences. These owners consume
+the one catalog authority; none owns a private
 edge/variant table or recreates another owner's artifact.
 
 The compiler orchestrates
@@ -490,7 +492,14 @@ A flat definition list is legal only as this reconstructible identity-only
 census.
 
 Ordinary consumption therefore trusts the request-bound certified digest plus
-its own census/selection/detail joins and does not rescan provider interiors.
+its own census/selection joins and does not rescan provider interiors.
+Ordinary structural verification never opens a provider-only package shard:
+the independently certified manifest is the authority for that package's
+identity census. It opens one shard only when a selected local overlay must be
+exact-joined to certified detail or when a downstream consumer explicitly
+requests that package's detail. Sequentially opening every shard merely to
+reverify already-certified interiors is the same forbidden whole-provider
+work class as retaining every shard at once.
 Graph ownership stays in `internal/language/structure`; source owns selected
 bytes, physical source-acquisition facts, and transient evidence lifetime and
 never imports the catalog to build or census definitions.
@@ -733,6 +742,22 @@ Identical syntax can mean a call or conversion. Selection comes from the
 resolved `go/types.Object` and `TypeAndValue`, producing `Call` or `Convert`.
 Name capitalization, argument count, and source text have no authority.
 
+The grammatical role alone is not always the semantic result. In
+`new(Record)` the `Record` identifier has the ordinary call-argument role, but
+the selected `new` builtin and checker evidence establish that it denotes a
+type. In `consume(record)` the same role denotes a runtime value. The closed
+catalog therefore admits both type and value meanings for a call-argument
+identifier, while the checker-backed resolver selects exactly one; neither the
+child nor the emitter inspects the callee spelling.
+
+Conversely, syntax nested textually in an executable body does not
+automatically execute. In
+``type Record struct { Value string `json:"value"` }`` declared inside a
+function, the field-tag literal belongs to the function's retained occurrence
+region but is compile-time structure and owns no runtime literal operation.
+The catalog is the single owner of whether a grammatical role may own a runtime
+operation; producer and verifier do not maintain duplicate role switches.
+
 Operations defined over type sets—core type, structural terms, assignability,
 method sets, comparability, and constraint satisfaction—belong to one exact
 toolchain-semantic service. Construct visitors consume its typed result. They
@@ -779,16 +804,763 @@ Each record carries a closed `CheckerAuthority` or
 available they may be exact-joined as corroboration, but only the authority
 selected by the contract enters the semantic model.
 
-Every retained Stage-1 occurrence in an owner, header, or executable region has
-exactly one `OccurrenceResolution`. Its closed variants are
+Every retained Stage-1 occurrence has exactly one semantic resolution domain:
+`owner`, `header`, `boundary`, or `executable`. Region membership is not copied
+into the occurrence payload. If one canonical occurrence is referenced by more
+than one Stage-1 relation, its resolution domain is selected by the closed
+precedence `executable > boundary > header > owner`: a full definition's entry
+is executable, the same entry of a non-full definition is a boundary, and
+header/owner syntax never masquerades as an executable operation. Every such
+occurrence has exactly one `OccurrenceResolution`. Its closed variants are
 `StructuralOnly(DispositionID)`, `DefinitionComponent(DefinitionID,
 ComponentKind)`, `Declaration(SemanticDeclarationID)`,
 `Binding(SemanticBindingID)`, `Type(SemanticTypeID)`,
 `Operation(OperationID)`, and `Unsupported(UnsupportedID)`. The catalog declares
-which variants are legal for each kind/role/semantic variant. A structural-only
-disposition is positive typed evidence, not an absent row. Semantic records may
+which variants are legal for each kind/role/semantic variant and resolution
+domain. `Operation` is legal only in the executable domain, but membership in
+an executable region does not imply runtime evaluation. The parent-directed
+context algebra marks the complete subtree of an array-length expression and a
+`const` initializer as compile-time evaluation, including when either appears
+inside a function or variable-initializer executable region. Every occurrence
+in that subtree owns zero runtime operations. A constant/type expression may
+be `StructuralCompileTimeExpression` only when that independently derivable
+context is present and its structural payload names exactly one covering
+`SemanticDeclarationID` or `SemanticTypeID` whose canonical record conserves
+the expression's meaning. For example, in
+`var names = [count + 1]string{}`, `count + 1` is covered by the canonical
+array type and is not a binary runtime operation; in `value := count + 1`, the
+same syntax is runtime evaluation. This is positive typed evidence, never a
+generic fallback for an unclassified expression. Other structural
+dispositions carry no coverage target. Boundary entries resolve as exact
+definition components or explicit unsupported records. Semantic records may
 refer to other semantic IDs, but they cannot silently consume an occurrence
 owned by another resolution or leave an occurrence unresolved.
+
+`DefinitionSemantics` preserves declaration multiplicity and order rather than
+pretending every implementation definition owns one name:
+
+| Stage-1 definition class | Semantic form | Owned declaration IDs |
+|---|---|---:|
+| ordinary function or method declaration | callable | exactly one |
+| blank function declaration (`func _()`) | callable | zero; it has a signature and body but introduces no package declaration |
+| package initializer function (`func init()`) | callable | zero; each source definition is independently owned and no `init` package binding exists |
+| function literal | callable | zero |
+| package `var` initializer (`var a, b = f()`) | initializer | zero or more non-blank declarations, in source name order; `var _ = f()` retains evaluation but declares nothing |
+| bodyless function/method obligation | bodyless | exactly one |
+| cataloged implicit definition | implicit | zero |
+| package-synthetic cgo adapter | synthetic | exactly one and one callable signature |
+| package-synthetic cgo type/data | synthetic | exactly one and no callable signature |
+
+The declaration-name occurrence of `func init()` resolves to the owning
+definition's name component, not to a fabricated declaration. Its body,
+signature, source identity, and package-initialization reachability remain
+independently conserved.
+
+Evidence depth and provider selection are not semantic forms. In particular,
+`external` and `intrinsic` cannot appear as `DefinitionSemantics` forms; the
+Stage-1 `DefinitionSelection` and the semantic authority witness already own
+those independent facts. Standalone declaration records own package, local,
+predeclared, and synthetic value/type facts. Canonical type descriptors own
+field and method facts. `DefinitionSemantics` references either through one
+`SemanticDeclarationID` algebra and does not duplicate a second unordered
+declared-type set.
+
+A declaration identity is therefore a reference target, not a promise that
+every target has a standalone `Declaration` record:
+
+| Identity form | Sole payload owner | Standalone `Declaration` |
+|---|---|---:|
+| package object | package semantic shard | exactly one |
+| local occurrence object | enclosing package semantic shard | exactly one |
+| predeclared object | `builtin` language pseudo-package | exactly one |
+| synthetic object | owning package semantic shard | exactly one |
+| field | canonical owner type's `TypeField` component | zero |
+| method | canonical owner type's `TypeMethod` component | zero |
+
+Persisting a field or method as both a type component and a declaration record
+is forbidden duplicate semantic state. A member identity remains necessary for
+selections, definitions, generic-binder ownership, and source occurrence
+resolution; its payload is resolved through its owner type.
+
+### Stage-2 Artifact And Authority Boundary
+
+Stage 2 has two packages with non-overlapping ownership:
+
+- `internal/language/semantic` owns the immutable target-independent schema,
+  canonical semantic identities, validating constructors, package projection,
+  and provider-semantic artifact format. It imports no `go/ast`, `go/types`,
+  source loader, compiler orchestrator, or target package.
+- `internal/language/frontend` is the sole transient checker consumer. It maps
+  Stage-1 definitions and occurrences into the semantic schema before source
+  finalization. It owns no second semantic schema and persists no toolchain
+  object.
+
+The Stage-1 structural provider artifact and Stage-2 semantic provider
+artifact are separate authorities. Combining them would make the structural
+layer own declaration types, bindings, variants, and operations; hydrating
+provider bodies during ordinary compilation would defeat bounded acquisition.
+The semantic artifact therefore binds the exact structural-artifact digest,
+provider-contract fingerprint, selected toolchain/configuration, and package
+input digests. It is package-sharded. Its resident manifest contains package
+membership, exact definition and standalone-declaration identity censuses,
+record counts, a derived type-member-target count/digest, and shard admission
+digests, but no declaration payload, type, binding, or operation detail.
+
+Ordinary compilation keeps only semantic package manifests resident. Checker-
+derived local detail and certified-provider detail use the same package-shard
+projection boundary, and at most one final logical semantic package is decoded
+at a time. A local shard is only bounded storage: it preserves the exact
+`CheckerAuthority` of the transient graph and never becomes or impersonates a
+provider authority. A certified shard preserves
+`CertifiedProviderAuthority`. Admission validates the whole selected package
+projection before exposing any record.
+
+A semantic shard contains exactly the package-owned `DefinitionSemantics`,
+`OccurrenceResolution`, standalone declarations, bindings, operations, and
+unsupported records, plus the complete canonical type closure and per-type
+authority witnesses needed to validate that package in isolation. Canonically
+equal type values—and therefore their type-owned member components—may occur
+in more than one package shard; standalone declarations and definitions may
+not. This is type-closure replication, not duplicate member ownership. The
+artifact reports it explicitly. A shard cannot carry Stage-1 topology or
+TypeScript decisions.
+
+The sole immutable in-memory representation of that logical package is
+normalized. Typed package-local identity tables own each canonical identity
+component once. Leaf entries own canonical owner/path/span/hash components;
+composite entries use domain-specific references to their constituent tables
+rather than embedding those constituents again. Stored semantic records use
+domain-specific nonzero references into the identity tables; a reference from
+one identity domain cannot be supplied where another is required. Each closed
+sum record stores a compact common core plus exactly its selected payload.
+Repeated operands, captures, arguments, containment links, and effects occupy
+typed append-only arenas addressed by validated, non-overlapping bounded ranges
+whose union exactly owns every arena element. A record may not embed every
+variant payload, repeat a complete identity at each reference site, or retain
+an unbounded relation slice.
+
+Package-local references are storage coordinates, not semantic identities.
+They never cross a package, artifact API, diagnostic, plan, or generated-output
+boundary. Ordered visitors and lookups reconstruct at most one public immutable
+semantic value at a time from the normalized store; such values are transient
+projections and are never retained as a second package representation. Thus a
+large composite literal with thousands of operations stores each occurrence
+identity once, one active operation payload per operation, and one contiguous
+operand range—not thousands of copies whose size equals the largest possible
+operation variant.
+
+Sealing retains those component-reference tables as the package identity
+representation. It must not expand them into resident
+`[]OccurrenceID`, `[]DefinitionID`, `[]SemanticDeclarationID`, or
+`[]OperationID` tables. A consumer lookup decomposes one supplied typed
+identity into component references; a projection reconstructs one typed
+identity from those references. Both directions use the single structural
+component ordering and neither uses rendered identity strings.
+
+The package-shard wire format is one explicit versioned binary encoding of the
+same normalized ownership: canonical typed identity dictionaries followed by
+compact record cores, active-payload arenas, and typed relation arenas.
+Portable identities are serialized once per dictionary entry, never once per
+reference. The encoding uses named domain-specific fields, bounded integer and
+string primitives, and a fixed section order; reflective serialization,
+generic object codecs, JSON semantic-detail records, and host-memory dumps are
+forbidden. The small resident artifact manifest may use JSON because it carries
+only context, census, offsets, and digests—not semantic detail.
+
+Single-authority decode transfers validated dictionaries and stores directly
+into the one immutable normalized package without projecting and re-interning
+public records. Mixed-authority decode retains only both bounded identity
+dictionaries and one current record from each ordered section while it
+exact-joins into the one destination draft; it never holds two decoded stores
+plus a merged store. Decode validates dictionary canonicality, domain,
+nonzero/in-range references, active-payload ownership, range bounds, section
+counts, trailing bytes, and semantic conservation before exposing a package.
+This is one schema, not an in-memory cache beside a denormalized wire tree;
+replacement bumps the semantic-artifact version and deletes the prior reader,
+writer, schema records, and compatibility path atomically.
+
+When a shard is projected, typed admission revalidates every relationship, so
+corrupt detail remains invalid even if its shard and outer artifact digests
+were recomputed. Ordinary manifest admission does not claim to detect
+replacement of both artifact content and the independently selected trusted
+digest; that is replacement of the authority, not corruption under an
+admitted authority.
+
+Package-local semantic closure has exactly that one owner: normalized-package
+admission over compact typed references. A later gate must not reconstruct
+every public definition, type, binding, operation, and resolution merely to
+repeat the same local-reference proof. Model-global closure instead streams
+the package's canonical declaration-identity dictionary and exact-joins every
+non-member identity against the one global declaration-owner census; member
+targets remain package-local and are covered by normalized admission plus the
+manifest-bound member census. Independent checker verification combines each
+resolution's structural-origin check with its semantic comparison in one
+occurrence pass, and combines operation-origin and capture checks in one
+operation pass. Coalescing these checks does not merge authorities: the
+normalized store, global owner census, and live checker graph remain three
+distinct evidence sources.
+
+Admission validates normalized records and relation ranges directly. Wire
+decoding may construct exactly one current public semantic record to reuse its
+one authoritative validating constructor, then immediately transfers that
+record into compact storage. It may not retain a public-record slice, a second
+type pool, canonical strings, or a second package graph. Its only derived
+package-sized state is typed presence/reachability bitsets, compact wire-to-
+component reference tables, and bounded work queues. Reachability follows
+compact references iteratively. The member-target census similarly streams the
+canonical type-record traversal directly into its digest and may retain only a
+bounded per-owner collision set—not a package-wide member list or rendered
+member identity.
+
+A binding's declaration occurrence is an identity anchor, not automatically a
+retained semantic edge. For example, when a selected nested function captures
+`outer` from a contract-only enclosing body, the binding still carries the
+physical declaration occurrence for stable identity even though that excluded
+enclosing occurrence has no `OccurrenceResolution`. Operands, initializer
+entries, implicit-operation sites, and other executable semantic edges do
+require retained resolutions.
+
+Local production seals, validates, measures, and writes one package shard,
+then releases its decoded records before producing the next package. A model
+must not retain decoded local packages merely because they came from the
+checker. The bounded local store is lifecycle-owned by the semantic model and
+is closed with it; it is neither a published provider artifact nor a second
+semantic truth owner.
+
+Local production has one pre-seal semantic-closure owner. Definitions,
+resolutions, bindings, and operations enter the package draft directly and
+contribute their declaration and type references as roots. The frontend then
+computes one fixed point over declaration-to-type, type-to-type, and
+type-to-declaration edges. Each selected standalone declaration and canonical
+type is transferred into that same draft exactly once before it seals.
+Certified-provider production seeds all package-owned declarations; a mixed-
+depth checker package seeds only references reachable from admitted local
+semantic records. Thus `func use(value score)` retains the local `score`
+declaration and its complete type graph even when `score` was declared in an
+excluded enclosing body, while an unrelated local `first` type remains absent.
+There is no post-seal local-package projection, closure repair, or second
+complete local `PackageInput` reconstruction: an absent support declaration or
+type fails before the sole seal.
+
+The same bound begins before shard construction. The frontend may retain the
+one transient checker graph, Stage-1 artifacts, and compact immutable
+whole-universe indexes, but it constructs occurrence, child-edge, containment,
+selection, region, object, and draft state for exactly one package at a time.
+After that package is projected into its checker shard, all such package state
+is unreachable before the next package begins. A resident
+`[]*packageInput`, package-to-`packageInput` map, or equivalent all-package
+derived graph is forbidden. Package-local lookup of executable-only
+occurrences uses a file/package index owned by the executable inventory; it
+does not rescan the complete executable occurrence set for every package.
+
+For example, while compiling a module containing `example/a` and `example/b`,
+the checker may hold both packages because Go type information is one coherent
+graph. While materializing `example/a`, however, no occurrence-child map,
+definition-containment graph, object index, or semantic draft for `example/b`
+exists. Those are constructed only after `example/a` has been written and
+released. This preserves checker identity without multiplying Stage-2 working
+state by package count.
+
+Projection is a single-pass ownership transfer, not a sequence of complete
+representations. The shard is read through a digesting bounded reader; identity
+entries enter compact component dictionaries, while each current wire record
+is constructor-validated and immediately decomposed into one normalized
+package builder pre-sized from validated manifest counts. At most that current
+record and its largest active payload are public semantic values. Sealing
+transfers the builder's dictionaries, record columns, active-payload arenas,
+and relation arenas into the immutable package without cloning them. Builder
+lookup maps are dropped at seal. A mixed
+checker/provider package streams both authorities into one final draft,
+exact-joins overlapping records after authority is removed, and never
+materializes separate complete local, provider, and merged packages. The
+encoded shard, a package-wide wire tree, duplicate semantic slices, and a
+second type pool may never coexist. Before they size storage, manifest counts
+must be nonnegative, must not overflow a capacity sum, and their sum must be
+bounded by the shard's encoded-byte extent. Before exposure, every decoded
+class is exact-joined to its manifest count. Peak transient projection storage is
+`O(validation indexes + largest encoded record + decoder buffer)`, and peak
+total projection storage is
+`O(unique identities + record cores + active payloads + relation elements +
+validation indexes + largest encoded record + decoder buffer)`. It must not be
+`O(record count * largest sum-variant payload)` or
+`O(identity reference count * full identity width)`. A package whose final
+decoded representation exceeds the
+frozen projected-package budget fails explicitly; increasing the process
+limit or retaining another complete representation is not a remedy. A valid
+Go package that cannot fit the budget reopens the artifact grain for bounded
+intra-package projection; publication may not reject valid Go merely because
+the current package is large.
+
+The immutable package read surface preserves that ownership transfer. It
+exposes exact per-record-class counts, ordered read-only visitors, canonical
+identity lookups, and one `ResolveDeclarationTarget` operation returning the
+closed variants `StandaloneDeclaration`, `FieldMember`, or `MethodMember`. It
+does not expose copy-returning record slices, mutable backing storage, a
+complete derived member index, or a convenience API that materializes a
+second package representation. Member resolution binary-searches the owner
+type, follows only canonical named-underlying links, then uses the exact field
+ordinal or method package/name key. It validates every identity component
+against the type component before returning. For example, verifying one
+identifier resolution reads it by `OccurrenceID`; checking all operations
+visits the resident operation records in canonical order without cloning them.
+A consumer that needs a new package value must explicitly construct a
+`PackageInput`, making the allocation and ownership boundary visible.
+
+The ordinary Stage-2 verifier exact-joins the semantic model's package,
+provenance, selected-authority, definition, standalone-declaration, and
+derived type-member-target censuses to the source plan and admitted manifests
+without decoding provider-only semantic shards. It projects each package
+carrying checker authority exactly once, including mixed local/certified
+packages, validates it, then releases it. Later phases request additional
+package detail through the same bounded projection API. The model reports
+checker-shard and provider-shard loads, mixed-overlay count, and maximum
+simultaneous logical-package residency separately; a provider-only ordinary
+compilation has zero semantic shard loads.
+
+When the structural-source plan selects local syntax, the semantic authority
+is the one transient checker graph and the record carries
+`CheckerAuthority(toolchain, package-input, structure, selection-fact
+digests)`. When it selects a certified provider graph, the authority is
+`CertifiedProviderAuthority(semantic-artifact digest, package-shard digest,
+bound structural-artifact digest)`. If a package contains both local and
+certified definitions, independently derived checker and provider records for
+the overlapping definitions must be equal after authority is removed; the
+source plan still selects exactly one authority per definition.
+
+The toolchain `builtin` pseudo-package is the sole semantic owner of
+predeclared declaration payloads. Ordinary package shards may reference their
+pinned catalog identities and canonical types, but never duplicate predeclared
+declarations. The language pseudo-package is materialized once from the
+catalog exact-joined to `types.Universe`; it is not inferred from identifier
+spelling.
+
+### Canonical Semantic Identities
+
+Semantic identities are constructor-only and machine independent:
+
+- package-scope declarations use canonical package identity, closed object
+  class, declared name, and generic owner;
+- lexical bindings and labels use the exact Stage-1 occurrence that introduces
+  their Go scope, their defining `OccurrenceID` when spelled, a closed binding
+  role, and an ordinal. The scope occurrence is a file, definition root,
+  signature, block, clause, or other cataloged scope owner; it is never a
+  `go/types.Scope` pointer or reconstructed source path;
+- unnamed receiver, parameter, result, and implicit bindings use that same
+  scope occurrence, closed role, and ordinal rather than spelling or
+  `token.Pos`;
+- field and method identities use the canonical declaring owner type plus
+  visibility namespace, class, and name; field order is identity evidence,
+  while method order is not. Pointer layers are removed, aliases collapse to
+  their target, instantiated named types collapse to their generic origin, and
+  a promoted selection uses the original declaring owner. Unexported members
+  include their declaring package namespace so equal spellings from different
+  packages never conflate;
+- predeclared objects use the pinned predeclared-catalog identity;
+- a spelled operation is identified by its owning definition plus its one
+  executable `OccurrenceID` (exactly one operation may own that occurrence);
+  an unspelled operation is identified by its implicit definition, closed
+  implicit entry class, and ordinal, with no fabricated source occurrence; and
+- types use a complete canonical descriptor with a full digest and
+  collision check.
+
+Identity equality and canonical computational order are owned by the typed
+identity itself. Ordering compares its closed structural components directly
+(for example, package owner then import path, or file then numeric byte start,
+byte end, and pinned kind). `String()` is only a canonical wire/diagnostic
+serialization. A sort, binary search, lookup key, deduplication pass, or
+validation join may not render identities to strings, cache rendered identity
+keys, or independently choose component order. Consequently byte offset `2`
+orders before byte offset `10`; decimal-text lexical order is not semantic
+order. Artifact encoders may render an already ordered identity exactly once
+at the wire boundary, and decoders reconstruct the typed identity before any
+comparison.
+
+Binding ordinals have one owner and one domain. Stage 2 orders the complete
+direct `Info.Defs` and `Info.Implicits` binding set by canonical structural
+anchor within each `(scope occurrence, binding role)` before semantic-closure
+projection. Every unnamed receiver/parameter/result additionally exact-joins
+the same checker object across its `Info.Implicits` entry, enclosing function
+`Signature` tuple slot, and corresponding unnamed `ast.Field`; no second
+binding producer exists. Explicit and implicit bindings never use separate
+counters. Thus an implicit import followed by an explicit alias receives
+import ordinals `0, 1`, while `func f(int, string)` receives unnamed parameter
+ordinals `0, 1`. Go does not permit named and unnamed parameters to be mixed in
+one parameter list; `func f(int, named string)` means two named `string`
+parameters. Omitting a binding from a selected semantic closure does not
+renumber its retained siblings. Equal ordering evidence fails closed instead
+of falling back to checker-map order, object position, or name.
+
+Compile-time syntax inside an executable region remains semantic without
+becoming a runtime operation. For `values := [...]int{1, 2}`, the `...`
+occurrence exact-joins its `ArrayType.Len` structural edge to the checker type
+of the containing array expression and resolves to the canonical `[2]int`
+`SemanticTypeID`; it emits zero runtime operations. It may not be dropped as
+decorative syntax or modeled as an invented runtime ellipsis operation.
+
+Mixed-depth lexical support is an explicit transient semantic-closure rule,
+not a reason to retain an excluded executable region. Every nested definition,
+including a non-full definition whose semantic payload is signature-only, may
+refer to a binding, local type, alias, or constant declared in an enclosing
+non-full definition:
+
+```go
+func outer() {
+	type score struct{ value int }
+	base := score{value: 1}
+	use := func(delta score) int { return base.value + delta.value }
+	_ = use
+}
+```
+
+At declaration-contract depth, Stage 2 materializes the canonical `score`
+declaration required by `use`'s signature but no operations or captured
+binding. If only `use` is full-semantic, it additionally materializes the
+captured `base` binding from the one checker graph.
+Their source identities come only from the direct `Info.Defs` identifier
+association exact-joined to the occurrence identity already assigned by the
+Stage-1 transient traversal; their lexical-scope and enclosing-definition
+owners come from those same transient structural facts. Stage 2 may index
+these facts once and emit only the declarations and bindings in the selected
+semantic closure. It must not walk the excluded parent region, recover a
+source through `types.Object.Pos`, infer by spelling, promote the parent to
+full-semantic, emit parent operations, or retain the parent AST after
+finalization. Stable ordinals are computed against the complete direct
+checker-definition set for the owning scope even when only one sibling enters
+the selected semantic closure. Closure is driven by the typed references
+already present in admitted definition, resolution, binding, operation,
+declaration, and type records—not by a second source walk or a declaration-
+only heuristic. Provider production uses the same algorithm with the complete
+owned-declaration set as its roots.
+
+The independently implemented Stage-2 verifier builds its own direct
+`Info.Defs`-to-transient-occurrence and checker-scope joins and compares the
+resulting declaration/binding identities, owner definitions, types, and
+capture edges. The frontend and verifier may share the checker graph and
+constructor-only identity types; they may not share a reverse-position index,
+semantic resolver, or fallback lookup.
+
+Type-switch variables preserve Go's case-local checker semantics:
+
+```go
+switch value := input.(type) {
+case int:
+	return value
+case string:
+	return len(value)
+}
+```
+
+The guard identifier has no `go/types.Info.Defs` or `Uses` object. It resolves
+once as a `TypeSwitchBindingAnchor` structural disposition. Each `CaseClause`
+owns one distinct implicit `SemanticBindingID` obtained from
+`go/types.Info.Implicits`, with the case clause as scope owner, no fabricated
+declaring occurrence, the checker-provided name and case-specific type, and
+ordinary uses resolving to that case's binding. One guard spelling may
+therefore anchor zero or more bindings but may never be treated as one
+declaration occurrence shared by multiple checker objects. Resolving an
+unindexed checker object through `types.Object.Pos`, identifier spelling, or a
+position-to-source lookup is forbidden; explicit definitions come from
+`Info.Defs`, implicit definitions come from `Info.Implicits`, and absent
+evidence fails closed. The guard's `input.(type)` occurrence is one
+`OperationTypeAssert` with `VariantTypeSwitchGuard`, `ValueModeNone`,
+`ResultArityZero`, no fabricated result type or object, and exactly the
+interface operand occurrence; the enclosing `OperationTypeSwitch` owns control
+dispatch.
+
+A canonical semantic target does not own one privileged source occurrence.
+Source declaration sites are the `OccurrenceResolution` records that resolve
+to it. This distinction is required because equal unnamed structural types may
+be spelled more than once:
+
+```go
+func F(left struct{ Value int }, right struct{ Value int }) {}
+```
+
+Both `Value` spellings introduce source evidence for the same canonical
+unnamed-struct field (`struct-type ID + field ordinal`); neither spelling may
+be discarded. The `TypeField` component of the canonical struct descriptor is
+the sole payload. Package declarations, local declarations, and named members
+normally have one declaring occurrence, predeclared declarations have none,
+and structurally shared unnamed members may have more than one. Exact
+occurrence-to-target joins own those cardinalities. Provider projection never
+chooses an arbitrary source field or creates one member declaration record per
+spelling.
+
+A type descriptor preserves basic kind; alias versus defined nominal owner;
+generic owner, binder role, ordinal, and arguments; array length; channel direction; signature
+receiver, receiver type parameters, function type parameters, parameters,
+results, and variadic state; struct field order, names, embeds, tags, and
+package visibility; interface method names, declaring packages, signatures,
+embeds, comparability, and normalized terms; and every recursively referenced
+type identity. An interface's normalized structural type set has an explicit
+closed state—`universe`, `finite(terms)`, or `empty`—because an empty term slice
+cannot distinguish the universe from the empty set. Method descriptors contain
+semantic method components rather than a member identity that points back to
+the type being hashed, so anonymous interfaces have no circular identity
+construction. Their callable signature excludes the receiver and receiver type
+parameters because the containing method descriptor already owns that
+relationship; declared method definitions retain receiver binding and receiver
+type separately. Named, alias, and type-parameter references terminate structural
+recursion at their nominal identity. No identity uses a pointer address, acquisition path,
+`Type.String()`, source spelling without semantic owner, truncated digest, or
+fallback poison value.
+
+`ResolveDeclarationTarget` reconstructs a member identity from the selected
+component and requires exact equality with the requested identity. A field on
+a named type resolves through that named type's canonical `Underlying` link to
+its struct component while retaining the named declaring owner in the member
+identity. A named method resolves from the named type's method components; an
+interface method resolves from the canonical interface component. A field
+ordinal gives direct indexed lookup; methods are canonically sorted and use
+binary search by package namespace and name. Work is
+`O(log(types) + named-underlying depth + log(methods))` per lookup and requires
+no resident member map. Missing owner type, wrong component class/name/package/
+ordinal/signature, an alias-owned identity, or an underlying cycle fails
+admission.
+
+For the predeclared declaration:
+
+```go
+type error interface {
+	Error() string
+}
+```
+
+the `error` declaration remains the one `builtin` declaration record, while
+`error.Error` is the method component of the canonical named/interface type.
+No language package can own a second `Error` declaration record. The same rule
+covers imported, anonymous, and generic owner types without a builtin case.
+
+Type-parameter identity is owned by the generic language declaration, not by a
+checker object or a lexical-binding record. Its closed owner is either the
+canonical `SemanticDeclarationID` of an ordinary generic type/function/method
+or the canonical `DefinitionID` of a source definition that intentionally has
+no declaration (for example a legal blank-named generic function). The owner is
+combined with a closed binder role (`type`, `callable`, or `receiver`) and the
+zero-based source ordinal. Thus the `T` in:
+
+```go
+package dep
+
+type Pointer[T any] struct{ value *T }
+
+func (pointer *Pointer[T]) Load() *T { return pointer.value }
+```
+
+has stable identities derivable from `dep.Pointer` and `dep.Pointer.Load`
+without retaining `dep` syntax in an importing package. The lexical
+`SemanticBindingID` for a locally spelled `T` remains a separate binding fact
+whose type is that canonical type-parameter `SemanticTypeID`; it is never the
+type's identity owner.
+
+This separation is required for export-data and instantiated-checker forms.
+For example:
+
+```go
+package app
+
+import "dep"
+
+var current dep.Pointer[int]
+```
+
+may expose cloned `go/types.TypeParam` objects with no parent scope while the
+`app` shard builds its complete canonical type closure. The frontend joins
+such transient objects to the origin declaration, binder role, and ordinal.
+Object addresses, `token.Pos`, parent-scope presence, and the spelling `T` are
+corroborating lookup evidence only and never enter semantic identity. A
+foreign generic type never requires a fabricated local binding or foreign
+source hydration.
+
+Owner derivation follows checker evidence in dependency order. The current
+package's generic declarations are indexed once. Before a referenced imported
+generic object's type is materialized or verified, that exact `go/types.Object`
+registers its origin type/callable/receiver parameter list; only then may its
+signature or result type consume those parameters. For example, the selector
+in `reflect.TypeFor[T]` registers the canonical `reflect.TypeFor` declaration,
+callable role, and ordinal `0` before checking the selector's generic
+signature. Stage 2 never enumerates every package's scope for every selected
+package, assumes that metadata-package `Types()` nodes belong to the selective
+hydration graph, or falls back to position/name matching.
+
+`go/types.Builtin` is not an ordinary callable declaration: both predeclared
+functions (for example `append`) and package `unsafe` intrinsics (for example
+`unsafe.Offsetof`) have call-site-specific semantics and no single valid
+checker signature. Their declaration record therefore carries a closed
+catalog-backed builtin identity and no `SemanticTypeID`. Every ordinary
+declaration still requires exactly one canonical type. A builtin call operation
+carries the exact call-site result, operands, expected type, and builtin
+declaration reference. The complete real package `unsafe` surface
+(`Pointer` plus its builtins) is exact-joined bidirectionally against one pinned
+append-only member catalog carrying each member's type-or-builtin class.
+Documentary-only `ArbitraryType`/`IntegerType` declarations are excluded;
+neither source spelling nor their documentary signatures may be treated as
+semantic types.
+The non-root header occurrences inside those documentary declarations resolve
+through the closed `IntrinsicContract` structural disposition. They preserve
+the Stage-1 definition/header topology but carry no fabricated checker type;
+the cataloged builtin declaration and each call site's operation evidence are
+the semantic contract.
+
+Go checker maps that intentionally attach both a definition and a use to one
+identifier are represented by their language-defined primary resolution, while
+the companion fact remains owned by its declaration/type record. In
+`struct { T }`, `struct { *T }`, or an embedded qualified/generic type, the
+defining identifier resolves to the embedded type and the field declaration is
+owned separately. In `func (p *Pair[A, B]) M()`, each receiver
+index resolves to its newly declared receiver type-parameter binding and the
+receiver signature references that parameter type. Any other simultaneous
+definition/use pair fails closed.
+
+Instantiated checker objects are references, not new declarations. A generic
+method object canonicalizes through `types.Func.Origin`; an instantiated struct
+field canonicalizes through the original named owner and exact field ordinal.
+All instantiations therefore reference one method/field declaration identity.
+Pointer inequality between checker objects is never treated as semantic
+duplication, while unequal origins or ordinals remain hard collisions.
+Receiver type-parameter checker aliases exact-join through their canonical
+defining `OccurrenceID`; an object pointer or scope parent is never an identity
+component.
+
+### Context And Operation Records
+
+The transient occurrence index exact-joins every locally retained
+`OccurrenceID` to the one source/checker node only for the Stage-2 build
+window. Stage 1 populates that index during its existing structural and
+executable traversals; Stage 2 may not reconstruct it with another AST walk.
+The index is actively severed with the checker graph and never enters a
+finalized artifact.
+
+Frontend resolution is parent-directed. A parent assigns each child its
+expected type, result arity, composite-literal owner, callable signature,
+storage role, and lexical/control environment. The child consumes that context
+plus its recorded Stage-1 grammatical role and checker evidence. A child never
+walks to or scans its parent, and a later lowering never recomputes the
+decision.
+
+Stage 2 uses separate fixed linear passes because context assignment, checker-
+object indexing, binding/capture extraction, and semantic resolution are
+different relations with different owners. Each named pass visits a retained
+occurrence at most once; it may use only constant-time or amortized indexed
+scope/containment probes. Input admission itself is package-scoped: it does not
+rebuild a whole-universe map or scan a whole-universe occurrence collection
+once per package. The production work ledger counts input admission,
+child-edge assignment, context assignment, object evidence, implicit bindings,
+intrinsic evidence, captures, resolution, containment construction/probes,
+member-type visits, scope probes, and record construction separately. Canonical
+sort inputs and containment storage are separate counters. Combining these
+relations into one stateful mega-visitor, hiding a scan inside one counted
+visit, or reporting output records as construction work is forbidden.
+
+For example, in:
+
+```go
+func Outer(value int) func() int {
+	return func() int { return value }
+}
+```
+
+the context pass assigns the literal and identifier roles, the object pass
+joins the identifier to the parameter object, the capture pass records the
+literal definition as a capturer, and the resolution pass materializes the
+operations. Each pass sees each retained occurrence once; capture containment
+is an indexed probe rather than a walk from the literal back to `Outer`.
+
+A child implementation root does not replace its parent operation as the
+context owner. For example:
+
+```go
+type Sequence func(func(int) bool)
+
+func Values() Sequence {
+	return func(yield func(int) bool) { yield(1) }
+}
+```
+
+The `ReturnStmt` in `Values` assigns the function literal the expected
+`Sequence` type and therefore owns the unnamed-function-to-named-function
+assignment conversion. The function literal separately owns its signature and
+body. Producer and independent verifier both cross the definition boundary
+through the exact recorded parent edge; neither scans for an enclosing
+function or substitutes the child signature for the parent result signature.
+
+`Binding.CapturedBy` is exclusively a runtime closure-environment relation.
+Its closed eligible roles are local, receiver, parameter, result, range, and
+type-switch value bindings. Imports, labels, type parameters, and source-less
+implicit identities cannot carry captures. Thus:
+
+```go
+func Wrap[T any](value T) func() T {
+	return func() T { return value }
+}
+```
+
+captures `value` but not `T`; the nested signature and operations reference
+the canonical compile-time type-parameter identity directly. The semantic
+binding constructor rejects an ineligible capture rather than relying on
+later lowering to erase it.
+
+One semantic operation record has exactly one closed origin:
+`SourceOperation(OccurrenceID, kind, role, variant, token, span)` or
+`ImplicitOperation(ImplicitDefinitionOp, ordinal)`. Source-origin fields are
+forbidden on an implicit origin, and an implicit operation cannot acquire a
+zero-length or synthetic source span merely to satisfy a source-shaped schema.
+The operation record contains, as applicable:
+
+- closed operation class, catalog kind, semantic variant, grammatical role,
+  lexical token, source span, and owning definition;
+- result type, expected type, exact constant, result arity, addressability,
+  assignability, and value-versus-storage-place class;
+- canonical declaration/binding/call/selection/generic-instance target;
+- ordered operand occurrence identities and evaluation order;
+- receiver adjustment, promotion, copy, conversion, interface, boxing,
+  initialization, panic-boundary, and other cataloged implicit operations;
+  and
+- exact control, branch, range, switch, select, defer, panic, and recovery
+  relationships where applicable. A branch's structural target is an
+  `OperationID` in the same definition; its optional spelled label is a
+  separate `SemanticBindingID`. One field never stands for both relations.
+
+These fields state Go meaning only. An operation cannot contain a helper name,
+TypeScript node, representation choice, output path, runtime dictionary,
+emitter flag, or implementation owner.
+
+Implicit effects nested under a source operation preserve multiplicity. Each is
+keyed by closed implicit-operation kind, exact source/operand occurrence when
+spelled, and ordinal, plus its source/target semantic types where applicable.
+For example, `f(a, b)` may require two distinct `ValueCopy` effects; one
+kind-only set entry is lossy and forbidden. An unspelled package-init
+coordination operation is a top-level implicit-origin operation, not one of
+these nested effects.
+
+### Stage-2 Conservation
+
+The following are blocking exact joins, performed package by package so
+provider scale cannot force whole-artifact residency:
+
+1. every Stage-1 `DefinitionID` ↔ one `DefinitionSemantics`;
+2. every retained owner/header/boundary/executable occurrence ↔ one legal
+   `OccurrenceResolution`;
+3. every resolution reference and structural coverage target ↔ one
+   declaration target, binding, type, operation, or unsupported record in the
+   same logical model. A non-member declaration target exact-joins one
+   standalone record, including predeclared declarations in the one language
+   pseudo-package; a member target exact-joins one component of its canonical
+   owner type and zero standalone member records;
+4. every full-semantic executable region ↔ complete operation/explicit-
+   unsupported coverage, while every non-full definition ↔ zero executable
+   operations; every typed implicit executable entry ↔ one non-source
+   operation without a fabricated occurrence;
+5. every checker object/type/selection/instance consumed by the producer ↔
+   its canonical immutable record and authority witness; and
+6. every local/certified overlap ↔ equal semantic content with exactly one
+   selected authority.
+
+The catalog owns the legal resolution classes for every construct kind, role,
+and semantic variant. There is no default semantic operation, generic
+structural fallback, or "unresolved but present" record. Unsupported is a
+positive typed record with exact identity, evidence, and reason; it is not an
+omitted operation.
 
 ## Whole-Program Facts
 
@@ -854,18 +1626,63 @@ with a stronger representation.
 
 ## Typed TypeScript Construction
 
-GoToTS owns a typed TypeScript AST sufficient for every generated construct.
-Lowering traverses the immutable semantic model and requires one validated plan
-record for every semantic operation it encounters. The plan references
-semantic IDs instead of copying the semantic tree. Lowering may not import
-`go/ast`, `go/types`, workspace loaders, analyzers, project profiles, or
-whole-program fact producers, and it may not infer a missing plan.
+The target is the exact schema-level AST contract from one pinned TS-Go
+revision. The content-addressed snapshot under `schema/tsgo/` is the sole
+authority for node-kind values, abstract node categories, fields, field types
+and optionality, token identities, factory signatures, child/visitor order,
+transform traversal, and source-range/trivia carriers. The pin records the
+upstream revision, every copied input path and digest, and the schema generator
+version. Drift, an unknown node/field, or an unaccounted upstream schema input
+fails before lowering.
 
-One formatter owns TypeScript spelling and layout. Generator code outside that
-formatter must not concatenate TypeScript source or hide templates in Go string
-literals. Hand-maintained files under `runtime/`, `gostdlib/`, external
-implementations, and extensions are ordinary TypeScript source and are not
-generator templates.
+`internal/typescript/ast/` is generated solely from that snapshot. Its typed Go
+nodes, factories, predicates, visitor, transform support, and validator are
+derived artifacts and are never hand-maintained. Generation exact-joins every
+pinned node kind, field, factory parameter, and child edge in both directions
+and is reproducible from an empty generated directory. GoToTS does not define a
+smaller convenience AST, a parallel printer tree, ESTree nodes, TypeScript
+compiler JavaScript object shapes, generic property bags, or opaque raw-source
+nodes.
+
+Lowering traverses the immutable semantic model and requires one validated plan
+record for every semantic operation it encounters. It constructs only the
+generated TS-Go AST types through generated factories. The plan references
+semantic IDs instead of copying the semantic tree. Lowering may not import
+`go/ast`, `go/types`, workspace loaders, analyzers, project profiles,
+whole-program fact producers, the formatter, or a target-text builder, and it
+may not infer a missing plan. For example:
+
+```text
+Go:       result := add(left, right)
+plan:     local declaration + direct-call plan
+TS-Go AST VariableStatement(
+             VariableDeclaration(
+               Identifier("result"),
+               CallExpression(
+                 Identifier("add"),
+                 [Identifier("left"), Identifier("right")])))
+text:     const result = add(left, right);
+```
+
+The plan and AST stages are typed records. `"const result = add(left, right)"`
+is not a legal lowering result or AST payload. Identifier spellings, string
+literal values, regular-expression values, comment text, and module specifiers
+are scalar node payloads. Their data may contain arbitrary user text, including
+text that resembles TypeScript; no consumer may parse, interpolate, or
+reinterpret that data as a subtree. Only the formatter escapes and spells it
+according to its node field.
+
+One formatter consumes validated TS-Go AST and owns all generated TypeScript
+spelling, token placement, escaping, whitespace, and layout. It follows the
+pinned TS-Go printer contract and is differentially checked against that
+revision. No generator, lowerer, completion pass, source-map pass, runtime
+assembler, or artifact writer may concatenate TypeScript source, store a source
+template, or patch formatted text. The formatter cannot repair an invalid tree
+or make a semantic/representation choice. Hand-maintained files under
+`runtime/`, `gostdlib/`, external implementations, and extensions are ordinary
+TypeScript source; when structural reconciliation is required they are parsed
+into the same TS-Go AST contract before merging and formatting, never
+represented as raw generated fragments.
 
 Each implementation lowers into an isolated typed fragment containing its AST,
 imports, definitions, initialization edges, helper requirements, and source-map
@@ -922,7 +1739,9 @@ Architecture tests enforce:
   `internal/language/selectionfacts`, `internal/language/frontend`, independent
   stage verification, and the exact `internal/language/typesemantics` service;
 - no source or project-profile imports below planning;
-- no TypeScript string construction outside the formatter;
+- no target AST definition outside generated `internal/typescript/ast`, no
+  lowering path around its generated factories and validator, and no
+  TypeScript string construction outside the formatter;
 - no production import of verification packages; and
 - no cycles hidden through a generic utility package.
 
@@ -963,10 +1782,14 @@ internal/stagecheck/         blocking in-pipeline independent stage joins,
                              internal/verify offline/certification gates
 internal/analysis/           sealed whole-program facts
 internal/plan/               immutable representation/implementation plan
-internal/typescript/ast/     typed target nodes
-internal/typescript/lower/   plan-to-AST conversion
-internal/typescript/format/  deterministic source printer
-internal/typescript/service/ parser, resolver, and strict checker bridge
+schema/tsgo/                 pinned content-addressed TS-Go schema-level AST
+                             inputs and lock manifest; sole target authority
+internal/typescript/ast/     generated exact TS-Go nodes, factories, visitors,
+                             transforms, predicates, and validator
+internal/typescript/lower/   plan-to-TS-Go-AST conversion; no target text
+internal/typescript/format/  sole deterministic TS-Go-AST source printer
+internal/typescript/service/ pinned-TS-Go parser, resolver, strict checker,
+                             and printer-differential bridge
 internal/completion/         ownership and structural reconciliation
 internal/reachability/       full graph, traversal, explanation, pruning
 internal/external/           typed external contract planning

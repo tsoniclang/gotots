@@ -26,8 +26,8 @@ func TestImplicitFullDefinitionRequiresExactOperationGraph(t *testing.T) {
 	}
 }
 
-func TestCanonicalOccurrencePayloadCannotCrossStores(t *testing.T) {
-	graph, selections, inventory, _ := buildExecutableFixture(t)
+func TestCanonicalOccurrencePayloadCannotBeAddedAfterSeal(t *testing.T) {
+	graph, _, inventory, _ := buildExecutableFixture(t)
 	var duplicated structure.Occurrence
 	for _, region := range inventory.Regions() {
 		for _, member := range region.Members() {
@@ -43,19 +43,109 @@ func TestCanonicalOccurrencePayloadCannotCrossStores(t *testing.T) {
 	if duplicated.ID().IsZero() {
 		t.Fatal("fixture has no structurally owned executable member")
 	}
-	inventory.byOccurrence[duplicated.ID()] = duplicated
-	inventory.additionalIDs = append(
-		inventory.additionalIDs,
-		duplicated.ID(),
+	if _, _, err := inventory.occurrences.put(duplicated); err == nil ||
+		!strings.Contains(err.Error(), "sealed") {
+		t.Fatalf("post-seal cross-store payload error = %v", err)
+	}
+}
+
+func TestOccurrenceArenaRejectsConflictingPayload(t *testing.T) {
+	_, _, inventory, _ := buildExecutableFixture(t)
+	additional := inventory.AdditionalOccurrences()
+	if len(additional) == 0 {
+		t.Fatal("fixture has no executable-only occurrences")
+	}
+	original := additional[0]
+	display := original.Display()
+	display.Start.Filename += ".conflict"
+	conflicting, err := structure.NewOccurrence(
+		original.ID(),
+		original.Kind(),
+		original.Parent(),
+		original.Edge(),
+		original.Ordinal(),
+		original.Span(),
+		display,
+		original.Token(),
 	)
-	inventory.sort()
-	err := Validate(graph, selections, inventory)
-	if err == nil ||
-		!strings.Contains(
-			err.Error(),
-			"duplicated across structural and executable stores",
-		) {
-		t.Fatalf("cross-store payload duplication error = %v", err)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := newOccurrenceStore()
+	if _, added, err := store.put(original); err != nil || !added {
+		t.Fatalf("install original occurrence: added=%t err=%v", added, err)
+	}
+	if _, _, err := store.put(conflicting); err == nil ||
+		!strings.Contains(err.Error(), "conflicting canonical payloads") {
+		t.Fatalf("conflicting occurrence payload error = %v", err)
+	}
+}
+
+func TestOccurrenceArenaOwnsAllRegionReferences(t *testing.T) {
+	_, _, inventory, _ := buildExecutableFixture(t)
+	if inventory.occurrences.length() <
+		inventory.occurrences.payloadLength() {
+		t.Fatal("occurrence arena has more payloads than identities")
+	}
+	for _, region := range inventory.Regions() {
+		if region.occurrences != inventory.occurrences {
+			t.Fatal("region does not use the inventory occurrence arena")
+		}
+		for _, reference := range region.members {
+			id, err := inventory.occurrences.id(reference)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if inventory.occurrences.reference(id) != reference {
+				t.Fatalf("occurrence reference %d is not canonical", reference)
+			}
+		}
+	}
+	for _, reference := range inventory.additional {
+		if _, present := inventory.occurrences.payloadFor(reference); !present {
+			t.Fatalf("additional occurrence %d has no payload", reference)
+		}
+	}
+}
+
+func TestAdditionalOccurrenceLookupIsFileScoped(t *testing.T) {
+	_, _, inventory, _ := buildExecutableFixture(t)
+	additional := inventory.AdditionalOccurrences()
+	if len(additional) == 0 {
+		t.Fatal("fixture has no executable-only occurrences")
+	}
+	selectedFile := additional[0].ID().Span().File()
+	references, err := inventory.AdditionalOccurrenceRefsForFiles(
+		[]identity.FileID{selectedFile},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := 0
+	for _, occurrence := range additional {
+		if occurrence.ID().Span().File() == selectedFile {
+			want++
+		}
+	}
+	if len(references) != want {
+		t.Fatalf(
+			"file-scoped additional occurrences = %d, want %d",
+			len(references),
+			want,
+		)
+	}
+	for _, reference := range references {
+		if reference.ID().Span().File() != selectedFile {
+			t.Fatalf(
+				"file-scoped lookup leaked %s",
+				reference.ID(),
+			)
+		}
+	}
+	if _, err := inventory.AdditionalOccurrenceRefsForFiles(
+		[]identity.FileID{selectedFile, selectedFile},
+	); err == nil {
+		t.Fatal("duplicate file lookup did not fail")
 	}
 }
 

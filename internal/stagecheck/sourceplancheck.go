@@ -33,8 +33,8 @@ func verifySourcePlan(
 	}
 	expectedFiles := map[identity.FileID]expectedSourceDecision{}
 	expectedSynthetic := map[identity.PackageID]expectedSourceDecision{}
-	certifiedFiles := map[string]bool{}
-	certifiedPackages := map[string]bool{}
+	certifiedFiles := map[identity.FileID]bool{}
+	certifiedPackages := map[identity.PackageID]bool{}
 	if certified != nil {
 		certifiedFiles = certified.FileIDs()
 		certifiedPackages = certified.PackageIDs()
@@ -59,10 +59,11 @@ func verifySourcePlan(
 			}
 			if !local {
 				decision.kind = sourceplan.KindCertifiedGraph
-				decision.artifactDigest = req.AuditArtifactDigest
+				decision.artifactDigest =
+					req.ProviderStructureDigest
 				if certified == nil ||
-					!certifiedFiles[file.ID().String()] ||
-					req.AuditArtifactDigest == "" {
+					!certifiedFiles[file.ID()] ||
+					req.ProviderStructureDigest == "" {
 					return &VerificationError{
 						Stage: "structural-source-plan",
 						Reason: "expected certified file is unavailable " +
@@ -81,10 +82,11 @@ func verifySourcePlan(
 			}
 			if !localCgo {
 				decision.kind = sourceplan.KindCertifiedGraph
-				decision.artifactDigest = req.AuditArtifactDigest
+				decision.artifactDigest =
+					req.ProviderStructureDigest
 				if certified == nil ||
-					!certifiedPackages[pkg.ID().String()] ||
-					req.AuditArtifactDigest == "" {
+					!certifiedPackages[pkg.ID()] ||
+					req.ProviderStructureDigest == "" {
 					return &VerificationError{
 						Stage: "structural-source-plan",
 						Reason: "expected certified synthetic owner is unavailable " +

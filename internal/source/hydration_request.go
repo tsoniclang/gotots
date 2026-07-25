@@ -26,10 +26,10 @@ func NewHydrationRequest(
 		synthetic: append([]identity.PackageID(nil), synthetic...),
 	}
 	sort.Slice(out.files, func(i, j int) bool {
-		return out.files[i].String() < out.files[j].String()
+		return out.files[i].Compare(out.files[j]) < 0
 	})
 	sort.Slice(out.synthetic, func(i, j int) bool {
-		return out.synthetic[i].String() < out.synthetic[j].String()
+		return out.synthetic[i].Compare(out.synthetic[j]) < 0
 	})
 	for index, file := range out.files {
 		if file.IsZero() {

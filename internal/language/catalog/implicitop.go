@@ -32,18 +32,14 @@ type ImplicitOwner uint8
 
 const (
 	ImplicitOwnerInvalid ImplicitOwner = iota
-	// ImplicitOwnerInventory: the construct inventory detects the operation
-	// from syntax plus go/types evidence.
-	ImplicitOwnerInventory
-	// ImplicitOwnerSemanticModel: the operation is produced by the semantic
-	// model phase, which owns whole-body evaluation evidence.
+	// ImplicitOwnerSemanticModel means the typed frontend materializes the
+	// operation from Stage-1 context plus the one transient checker graph.
 	ImplicitOwnerSemanticModel
 
 	numImplicitOwners
 )
 
 var implicitOwnerNames = [numImplicitOwners]string{
-	ImplicitOwnerInventory:     "inventory-detected",
 	ImplicitOwnerSemanticModel: "semantic-model-owned",
 }
 
@@ -65,12 +61,12 @@ type implicitDescriptor struct {
 }
 
 var implicitOps = [implicitOpCount + 1]implicitDescriptor{
-	ImplicitZeroing:              {"zeroing", ImplicitOwnerInventory, "var declaration binding without initializer"},
-	ImplicitValueCopy:            {"value-copy", ImplicitOwnerInventory, "struct/array-typed value crossing an assignment or call boundary"},
+	ImplicitZeroing:              {"zeroing", ImplicitOwnerSemanticModel, "var declaration binding without initializer"},
+	ImplicitValueCopy:            {"value-copy", ImplicitOwnerSemanticModel, "struct/array-typed value crossing an assignment or call boundary"},
 	ImplicitAssignmentConversion: {"assignment-conversion", ImplicitOwnerSemanticModel, "assignability step with distinct source/target types"},
-	ImplicitReceiverAdjustment:   {"receiver-adjustment", ImplicitOwnerInventory, "method selection with go/types-reported indirection"},
-	ImplicitMethodPromotion:      {"method-promotion", ImplicitOwnerInventory, "selection index path longer than one"},
-	ImplicitInterfaceConversion:  {"interface-conversion", ImplicitOwnerInventory, "non-interface operand meeting an interface-typed target"},
+	ImplicitReceiverAdjustment:   {"receiver-adjustment", ImplicitOwnerSemanticModel, "method selection with go/types-reported indirection"},
+	ImplicitMethodPromotion:      {"method-promotion", ImplicitOwnerSemanticModel, "selection index path longer than one"},
+	ImplicitInterfaceConversion:  {"interface-conversion", ImplicitOwnerSemanticModel, "non-interface operand meeting an interface-typed target"},
 	ImplicitBoxing:               {"boxing", ImplicitOwnerSemanticModel, "value representation change at a dynamic-type boundary"},
 	ImplicitInitialization:       {"initialization", ImplicitOwnerSemanticModel, "package initialization ordering edges"},
 	ImplicitEvaluationOrder:      {"evaluation-order", ImplicitOwnerSemanticModel, "multi-operand sequencing constraints"},

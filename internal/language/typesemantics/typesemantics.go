@@ -7,6 +7,55 @@ package typesemantics
 
 import "go/types"
 
+// SetKind distinguishes the universal, finite, and empty normalized
+// structural type sets. An empty slice alone cannot distinguish universe from
+// empty and is therefore never the authority.
+type SetKind uint8
+
+const (
+	SetInvalid SetKind = iota
+	SetUniverse
+	SetFinite
+	SetEmpty
+)
+
+// Term is one exported normalized structural type-set term.
+type Term struct {
+	Type  types.Type
+	Tilde bool
+}
+
+// NormalizedTerms computes the exact structural type set of an interface or
+// type-parameter constraint. Methods and comparability remain separate facts.
+func NormalizedTerms(
+	typ types.Type,
+) (SetKind, []Term, bool) {
+	if parameter, ok := types.Unalias(typ).(*types.TypeParam); ok {
+		typ = parameter.Constraint()
+	}
+	iface, ok := types.Unalias(typ).Underlying().(*types.Interface)
+	if !ok {
+		return SetInvalid, nil, false
+	}
+	set, ok := interfaceTermSet(iface)
+	if !ok {
+		return SetInvalid, nil, false
+	}
+	if set.universe {
+		return SetUniverse, nil, true
+	}
+	if len(set.terms) == 0 {
+		return SetEmpty, nil, true
+	}
+	out := make([]Term, 0, len(set.terms))
+	for _, term := range set.terms {
+		out = append(out, Term{
+			Type: term.typ, Tilde: term.tilde,
+		})
+	}
+	return SetFinite, out, true
+}
+
 // Core computes the core type of t per the Go specification's core-type
 // definition, resolving type parameters through their constraint's type set:
 //
@@ -87,7 +136,13 @@ func elementTermSet(embedded types.Type) (termSet, bool) {
 		set := termSet{}
 		for j := 0; j < e.Len(); j++ {
 			t := e.Term(j)
-			set.terms = append(set.terms, term{typ: types.Unalias(t.Type()), tilde: t.Tilde()})
+			set.terms = appendTermDedup(
+				set.terms,
+				term{
+					typ:   types.Unalias(t.Type()),
+					tilde: t.Tilde(),
+				},
+			)
 		}
 		return set, true
 	case *types.Interface:

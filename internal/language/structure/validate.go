@@ -11,7 +11,7 @@ func validateCompleteGraph(graph *Graph) error {
 	if graph == nil || graph.version != ArtifactVersion {
 		return fmt.Errorf("invalid structural artifact version")
 	}
-	if graph.byOccurrence == nil ||
+	if graph.occurrenceStores == nil ||
 		graph.byDefinition == nil ||
 		graph.byBoundary == nil {
 		return fmt.Errorf("structural artifact is not sealed")
@@ -33,7 +33,7 @@ func validateCompleteGraph(graph *Graph) error {
 			return err
 		}
 		for _, file := range pkg.files {
-			if err := validateFileGraph(file, graph.byOccurrence); err != nil {
+			if err := validateFileGraph(graph, file); err != nil {
 				return fmt.Errorf("%s: %w", pkg.id, err)
 			}
 			ownerIDs[file.owner.id]++
@@ -58,7 +58,9 @@ func validateCompleteGraph(graph *Graph) error {
 			}
 			ownerIDs[owner.id]++
 		}
-		for _, definition := range pkg.Definitions() {
+		if err := pkg.VisitDefinitions(func(
+			definition ImplementationDefinition,
+		) error {
 			if definition.id.IsZero() || definition.owner.IsZero() {
 				return fmt.Errorf("package %s has an invalid definition", pkg.id)
 			}
@@ -76,6 +78,9 @@ func validateCompleteGraph(graph *Graph) error {
 					definition.id,
 				)
 			}
+			return nil
+		}); err != nil {
+			return err
 		}
 		for _, site := range pkg.Sites() {
 			if _, duplicate := sites[site.definition]; duplicate {
@@ -149,7 +154,7 @@ func validateCompleteGraph(graph *Graph) error {
 		return err
 	}
 	for anchor := range declaredAnchors {
-		if _, present := graph.byOccurrence[anchor]; !present {
+		if _, present := graph.residentOccurrenceRef(anchor); !present {
 			return fmt.Errorf(
 				"containment anchor %s has no canonical occurrence", anchor,
 			)
@@ -167,8 +172,8 @@ func validateCompleteGraph(graph *Graph) error {
 }
 
 func validateFileGraph(
+	graph *Graph,
 	file FileGraph,
-	all map[identity.OccurrenceID]*Occurrence,
 ) error {
 	if file.owner.id.kind != OwnerRegionSourceFile ||
 		file.owner.id.file.IsZero() ||
@@ -176,24 +181,37 @@ func validateFileGraph(
 		return fmt.Errorf("file graph has invalid owner/containment identity")
 	}
 	seen := map[identity.OccurrenceID]bool{}
-	for _, occurrence := range file.occurrences {
-		if seen[occurrence.id] {
+	if err := file.VisitOccurrenceRefs(func(
+		occurrence OccurrenceRef,
+	) error {
+		id := occurrence.ID()
+		if seen[id] {
 			return fmt.Errorf(
-				"file stores occurrence %s more than once", occurrence.id,
+				"file stores occurrence %s more than once", id,
 			)
 		}
-		seen[occurrence.id] = true
-		if occurrence.id.Span().File() != file.owner.id.file {
+		seen[id] = true
+		if id.Span().File() != file.owner.id.file {
 			return fmt.Errorf(
-				"occurrence %s belongs to another file", occurrence.id,
+				"occurrence %s belongs to another file", id,
 			)
 		}
-		if err := validateOccurrence(occurrence, all); err != nil {
+		if err := validateOccurrence(
+			occurrence,
+			graph.residentOccurrenceRef,
+		); err != nil {
 			return err
 		}
+		return nil
+	}); err != nil {
+		return err
 	}
 	memberSet := map[identity.OccurrenceID]bool{}
-	primaryOwner := map[identity.OccurrenceID]string{}
+	type primaryOccurrenceOwner struct {
+		source bool
+		header identity.HeaderRegionID
+	}
+	primaryOwner := map[identity.OccurrenceID]primaryOccurrenceOwner{}
 	referenced := map[identity.OccurrenceID]bool{}
 	rootCount := 0
 	for _, id := range file.owner.members {
@@ -201,23 +219,23 @@ func validateFileGraph(
 			return fmt.Errorf("owner repeats member %s", id)
 		}
 		memberSet[id] = true
-		primaryOwner[id] = "source owner"
+		primaryOwner[id] = primaryOccurrenceOwner{source: true}
 		referenced[id] = true
-		occurrence, present := all[id]
+		occurrence, present := graph.residentOccurrenceRef(id)
 		if !present {
 			return fmt.Errorf("owner member %s has no canonical occurrence", id)
 		}
-		if occurrence.parent.IsZero() {
-			if occurrence.kind != catalog.KindFile {
+		if occurrence.Parent().IsZero() {
+			if occurrence.Kind() != catalog.KindFile {
 				return fmt.Errorf(
-					"source owner root %s is %s, not File", id, occurrence.kind,
+					"source owner root %s is %s, not File", id, occurrence.Kind(),
 				)
 			}
 			rootCount++
-		} else if !memberSet[occurrence.parent] {
+		} else if !memberSet[occurrence.Parent()] {
 			return fmt.Errorf(
 				"owner member %s precedes or omits parent %s",
-				id, occurrence.parent,
+				id, occurrence.Parent(),
 			)
 		}
 	}
@@ -231,8 +249,8 @@ func validateFileGraph(
 		}
 		anchorSet[anchor] = true
 		referenced[anchor] = true
-		occurrence, present := all[anchor]
-		if !present || occurrence.id.Span().File() != file.owner.id.file {
+		occurrence, present := graph.residentOccurrenceRef(anchor)
+		if !present || occurrence.ID().Span().File() != file.owner.id.file {
 			return fmt.Errorf(
 				"containment anchor %s lacks same-file canonical payload", anchor,
 			)
@@ -240,20 +258,34 @@ func validateFileGraph(
 	}
 	for _, header := range file.headers {
 		for index, member := range header.members {
-			if owner := primaryOwner[member]; owner != "" {
+			if owner := primaryOwner[member]; owner.source ||
+				!owner.header.IsZero() {
+				ownerName := "source owner"
+				if !owner.header.IsZero() {
+					ownerName = owner.header.String()
+				}
 				return fmt.Errorf(
 					"occurrence %s is owned by both %s and header %s",
-					member, owner, header.id,
+					member, ownerName, header.id,
 				)
 			}
-			primaryOwner[member] = header.id.String()
+			primaryOwner[member] = primaryOccurrenceOwner{
+				header: header.id,
+			}
 			referenced[member] = true
 			if index > 0 {
-				occurrence := all[member]
-				if primaryOwner[occurrence.parent] != header.id.String() {
+				occurrence, present := graph.residentOccurrenceRef(member)
+				if !present {
+					return fmt.Errorf(
+						"header %s has absent member %s",
+						header.id,
+						member,
+					)
+				}
+				if primaryOwner[occurrence.Parent()].header != header.id {
 					return fmt.Errorf(
 						"header %s omits or reorders parent %s of %s",
-						header.id, occurrence.parent, member,
+						header.id, occurrence.Parent(), member,
 					)
 				}
 			}
@@ -271,51 +303,8 @@ func validateFileGraph(
 			)
 		}
 	}
-	if err := validateCheckedMappings(file, all); err != nil {
+	if err := validateCheckedMappings(graph, file); err != nil {
 		return err
-	}
-	return nil
-}
-
-func validateOccurrence(
-	occurrence Occurrence,
-	all map[identity.OccurrenceID]*Occurrence,
-) error {
-	canonical, err := NewOccurrence(
-		occurrence.id,
-		occurrence.kind,
-		occurrence.parent,
-		occurrence.edge,
-		occurrence.ordinal,
-		occurrence.span,
-		occurrence.display,
-		occurrence.token,
-	)
-	if err != nil || canonical != occurrence {
-		return fmt.Errorf(
-			"occurrence %s has noncanonical identity facts", occurrence.id,
-		)
-	}
-	if occurrence.parent.IsZero() {
-		if occurrence.edge != catalog.EdgeInvalid || occurrence.ordinal != 0 {
-			return fmt.Errorf(
-				"root occurrence %s has child-edge facts", occurrence.id,
-			)
-		}
-		return nil
-	}
-	parent, present := all[occurrence.parent]
-	if !present {
-		return fmt.Errorf(
-			"occurrence %s has absent parent %s", occurrence.id, occurrence.parent,
-		)
-	}
-	if !occurrence.edge.Valid() ||
-		occurrence.edge.Parent() != parent.kind ||
-		(!occurrence.edge.IsList() && occurrence.ordinal != 0) {
-		return fmt.Errorf(
-			"occurrence %s has invalid parent edge %s", occurrence.id, occurrence.edge,
-		)
 	}
 	return nil
 }
@@ -371,17 +360,19 @@ func validateContainmentPath(
 	definitions map[identity.DefinitionID]ImplementationDefinition,
 	requiredAnchors map[identity.OccurrenceID]bool,
 ) error {
-	current, present := graph.byOccurrence[site.terminal]
+	current, present := graph.residentOccurrenceRef(
+		site.terminal,
+	)
 	if !present {
 		return fmt.Errorf(
 			"definition %s terminal %s has no occurrence",
 			site.definition, site.terminal,
 		)
 	}
-	visited := map[identity.OccurrenceID]bool{current.id: true}
-	for !current.parent.IsZero() {
+	visited := map[identity.OccurrenceID]bool{current.ID(): true}
+	for !current.Parent().IsZero() {
 		if !site.parentDefinition.IsZero() &&
-			current.parent == site.parentDefinition.Root() {
+			current.Parent() == site.parentDefinition.Root() {
 			parent, present := definitions[site.parentDefinition]
 			if !present ||
 				parent.owner != site.owner ||
@@ -393,31 +384,33 @@ func validateContainmentPath(
 			}
 			return nil
 		}
-		parent, exists := graph.byOccurrence[current.parent]
+		parent, exists := graph.residentOccurrenceRef(
+			current.Parent(),
+		)
 		if !exists {
 			return fmt.Errorf(
 				"definition %s path loses parent %s",
-				site.definition, current.parent,
+				site.definition, current.Parent(),
 			)
 		}
-		if visited[parent.id] {
+		if visited[parent.ID()] {
 			return fmt.Errorf(
 				"definition %s containment path cycles at %s",
-				site.definition, parent.id,
+				site.definition, parent.ID(),
 			)
 		}
-		visited[parent.id] = true
-		if parent.parent.IsZero() {
+		visited[parent.ID()] = true
+		if parent.Parent().IsZero() {
 			if !site.parentDefinition.IsZero() ||
-				parent.kind != catalog.KindFile ||
-				parent.id.Span().File() != site.owner.file {
+				parent.Kind() != catalog.KindFile ||
+				parent.ID().Span().File() != site.owner.file {
 				return fmt.Errorf(
 					"definition %s path reaches wrong owner root", site.definition,
 				)
 			}
 			return nil
 		}
-		requiredAnchors[parent.id] = true
+		requiredAnchors[parent.ID()] = true
 		current = parent
 	}
 	return fmt.Errorf(
@@ -447,13 +440,13 @@ func validateHeader(
 			return fmt.Errorf("definition %s repeats header member %s", definition, member)
 		}
 		seen[member] = true
-		occurrence, present := graph.byOccurrence[member]
+		occurrence, present := graph.residentOccurrenceRef(member)
 		if !present {
 			return fmt.Errorf(
 				"definition %s header member %s is absent", definition, member,
 			)
 		}
-		if index > 0 && occurrence.edge.DefinitionEntry() {
+		if index > 0 && occurrence.Edge().DefinitionEntry() {
 			return fmt.Errorf(
 				"definition %s header contains execution entry %s",
 				definition, member,
@@ -498,10 +491,10 @@ func validateBoundary(
 		}
 	}
 	for _, entry := range boundary.entries {
-		occurrence, present := graph.byOccurrence[entry.id]
+		occurrence, present := graph.residentOccurrenceRef(entry.id)
 		if !present ||
-			occurrence.parent != definition.Root() ||
-			!occurrence.edge.DefinitionEntry() ||
+			occurrence.Parent() != definition.Root() ||
+			!occurrence.Edge().DefinitionEntry() ||
 			!validSHA256(entry.hash) {
 			return fmt.Errorf(
 				"definition %s has invalid execution entry %s",
@@ -559,7 +552,9 @@ func validateBoundary(
 
 func validatePackageGraph(pkg PackageGraph) error {
 	seen := map[identity.DefinitionID]bool{}
-	for _, definition := range pkg.Definitions() {
+	return pkg.VisitDefinitions(func(
+		definition ImplementationDefinition,
+	) error {
 		if definition.id.IsZero() || seen[definition.id] {
 			return fmt.Errorf(
 				"package %s has zero or duplicate definition %s",
@@ -567,6 +562,6 @@ func validatePackageGraph(pkg PackageGraph) error {
 			)
 		}
 		seen[definition.id] = true
-	}
-	return nil
+		return nil
+	})
 }

@@ -41,12 +41,14 @@ func Outer() func() int {
 		t, "child-full@v1", child,
 	)
 	noneContract := writeDepthContract(t, "none-full@v1")
-	providerPath := filepath.Join(t.TempDir(), "provider.gotots")
+	output := t.TempDir()
+	structurePath := filepath.Join(output, "provider.structure.gotots")
+	semanticPath := filepath.Join(output, "provider.semantic.gotots")
 	provider, err := AuditCatalog(source.Request{
 		Dir: directory, Patterns: []string{"."},
 		ProviderContract:         "none-full@v1",
 		ProviderContractArtifact: noneContract,
-	}, providerPath)
+	}, structurePath, semanticPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,10 +89,12 @@ func Outer() func() int {
 			name: "both-contract-certified",
 			request: source.Request{
 				Dir: directory, Patterns: []string{"."},
-				ProviderContract:         "none-full@v1",
-				ProviderContractArtifact: noneContract,
-				AuditArtifact:            providerPath,
-				AuditArtifactDigest:      provider.Digest,
+				ProviderContract:          "none-full@v1",
+				ProviderContractArtifact:  noneContract,
+				ProviderStructureArtifact: structurePath,
+				ProviderStructureDigest:   provider.Structure.Digest,
+				ProviderSemanticArtifact:  semanticPath,
+				ProviderSemanticDigest:    provider.Semantic.Digest,
 			},
 		},
 	}
@@ -114,7 +118,7 @@ func inspectDepthFixture(
 	request source.Request,
 ) *Inspection {
 	t.Helper()
-	inspection, err := InspectConstructs(request)
+	inspection, err := inspectConstructsForTest(t, request)
 	if err != nil {
 		t.Fatal(err)
 	}

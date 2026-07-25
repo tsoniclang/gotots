@@ -23,7 +23,7 @@ func TestExactRuleTargetMustExistEvenWhenRuleDoesNotWin(t *testing.T) {
 		"main.go",
 		"package exactrule\n\nfunc Main() int { return 1 }\n",
 	)
-	baseInspection, err := InspectConstructs(source.Request{
+	baseInspection, err := inspectConstructsForTest(t, source.Request{
 		Dir: directory, Patterns: []string{"."},
 		ProviderContract: contract.DefaultID,
 	})
@@ -78,7 +78,7 @@ func TestExactRuleTargetMustExistEvenWhenRuleDoesNotWin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = InspectConstructs(source.Request{
+	_, err = inspectConstructsForTest(t, source.Request{
 		Dir: directory, Patterns: []string{"."},
 		ProviderContract:         selected.ID(),
 		ProviderContractDigest:   selected.Fingerprint(),

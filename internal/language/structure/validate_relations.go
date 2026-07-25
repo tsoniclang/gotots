@@ -88,37 +88,56 @@ func validatePackageStorage(pkg PackageGraph) error {
 }
 
 func validateSealedIndexes(graph *Graph) error {
-	if len(graph.occurrenceIDs) != len(graph.byOccurrence) ||
-		len(graph.definitionIDs) != len(graph.byDefinition) ||
+	if len(graph.definitionIDs) != len(graph.byDefinition) ||
 		len(graph.byBoundary) != len(graph.byDefinition) {
 		return fmt.Errorf("sealed structural indexes have unequal cardinalities")
 	}
-	previousOccurrence := ""
-	for _, id := range graph.occurrenceIDs {
-		occurrence := graph.byOccurrence[id]
-		if previousOccurrence >= occurrence.id.String() {
+	occurrenceCount := 0
+	for file, store := range graph.occurrenceStores {
+		if store == nil || !store.sealed || store.file != file {
 			return fmt.Errorf(
-				"canonical occurrence index is not strictly ordered at %s",
-				occurrence.id,
+				"sealed structural occurrence directory has invalid file %s",
+				file,
 			)
 		}
-		previousOccurrence = occurrence.id.String()
-		indexed, present := graph.byOccurrence[occurrence.id]
-		if !present || indexed != occurrence {
+		occurrenceCount += store.Count()
+	}
+	if occurrenceCount != len(graph.occurrenceOrder) {
+		return fmt.Errorf(
+			"sealed structural occurrence directory has %d records and %d ordered references",
+			occurrenceCount,
+			len(graph.occurrenceOrder),
+		)
+	}
+	var previousOccurrence identity.OccurrenceID
+	for _, occurrence := range graph.occurrenceOrder {
+		if !previousOccurrence.IsZero() &&
+			previousOccurrence.Compare(occurrence.ID()) >= 0 {
 			return fmt.Errorf(
-				"canonical occurrence index disagrees at %s", occurrence.id,
+				"canonical occurrence index is not strictly ordered at %s",
+				occurrence.ID(),
+			)
+		}
+		previousOccurrence = occurrence.ID()
+		indexed, present := graph.residentOccurrenceRef(
+			occurrence.ID(),
+		)
+		if !present || !indexed.Equal(occurrence) {
+			return fmt.Errorf(
+				"canonical occurrence index disagrees at %s", occurrence.ID(),
 			)
 		}
 	}
-	previousDefinition := ""
+	var previousDefinition identity.DefinitionID
 	for _, id := range graph.definitionIDs {
 		definition := graph.byDefinition[id]
-		if previousDefinition >= definition.id.String() {
+		if !previousDefinition.IsZero() &&
+			previousDefinition.Compare(definition.id) >= 0 {
 			return fmt.Errorf(
 				"definition index is not strictly ordered at %s", definition.id,
 			)
 		}
-		previousDefinition = definition.id.String()
+		previousDefinition = definition.id
 		indexed, present := graph.byDefinition[definition.id]
 		if !present || indexed != definition {
 			return fmt.Errorf(
@@ -133,8 +152,9 @@ func validateSealedIndexes(graph *Graph) error {
 		}
 	}
 	for index := 1; index < len(graph.packages); index++ {
-		if graph.packages[index-1].id.String() >=
-			graph.packages[index].id.String() {
+		if graph.packages[index-1].id.Compare(
+			graph.packages[index].id,
+		) >= 0 {
 			return fmt.Errorf("package graph order is not canonical")
 		}
 	}
@@ -192,8 +212,8 @@ func validateDefinitionForest(
 }
 
 func validateCheckedMappings(
+	graph *Graph,
 	file FileGraph,
-	all map[identity.OccurrenceID]*Occurrence,
 ) error {
 	definitions := map[identity.DefinitionID]bool{}
 	for _, definition := range file.definitions {
@@ -213,7 +233,9 @@ func validateCheckedMappings(
 				file.owner.id.file, mapping.definition,
 			)
 		}
-		if _, present := all[mapping.definition.Root()]; !present {
+		if _, present := graph.residentOccurrenceRef(
+			mapping.definition.Root(),
+		); !present {
 			return fmt.Errorf(
 				"checked mapping definition %s has no root occurrence",
 				mapping.definition,

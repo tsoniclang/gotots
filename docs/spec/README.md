@@ -58,7 +58,7 @@ selected Go workspace and toolchain
         -> typed, target-independent Go semantic model
         -> sealed whole-program facts and semantic reachability
         -> one immutable TypeScript representation plan
-        -> typed TypeScript AST
+        -> exact pinned TS-Go schema-level AST
         -> generated/manual reconciliation
         -> complete post-assembly implementation reachability graph
         -> strict verification and atomic publication
@@ -215,6 +215,14 @@ reopens the owning abstraction.
   immutable before lowering.
 - Lowering performs no type checking, semantic discovery, representation
   choice, or corpus-specific recognition.
+- Every generated TypeScript syntactic construct is represented by an exact
+  typed node in the pinned TS-Go schema-level AST contract; punctuation,
+  keywords, escaping, and trivia are derived only by the sole formatter from
+  that tree. The schema snapshot is the sole target-AST authority; generated
+  bindings, factories, visitors, validators, transforms, completion parsing,
+  and formatting cannot define or admit a second node shape. Identifier and
+  literal payloads are data, never reinterpreted as preformatted TypeScript
+  fragments.
 - One current implementation path exists. No fallback, compatibility reader,
   old/new mode, retry with changed semantics, or duplicate state survives.
 - No semantic value is recovered through `any`, `unknown`, unchecked casts,

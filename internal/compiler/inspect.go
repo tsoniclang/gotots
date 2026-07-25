@@ -4,12 +4,10 @@
 package compiler
 
 import (
-	"fmt"
-	"sort"
-
-	"github.com/tsoniclang/gotots/internal/identity"
 	"github.com/tsoniclang/gotots/internal/language/executable"
+	"github.com/tsoniclang/gotots/internal/language/frontend"
 	"github.com/tsoniclang/gotots/internal/language/selectionfacts"
+	"github.com/tsoniclang/gotots/internal/language/semantic"
 	"github.com/tsoniclang/gotots/internal/language/structure"
 	"github.com/tsoniclang/gotots/internal/scope"
 	"github.com/tsoniclang/gotots/internal/scope/contract"
@@ -20,13 +18,16 @@ import (
 
 // Inspection is the immutable verified Stage-1 result.
 type Inspection struct {
-	workspace  *source.Workspace
-	plan       *sourceplan.Plan
-	graph      *structure.Graph
-	facts      *selectionfacts.Artifact
-	selections *scope.DefinitionSelections
-	executable *executable.Inventory
-	hydration  source.HydrationStats
+	workspace       *source.Workspace
+	plan            *sourceplan.Plan
+	graph           *structure.Graph
+	facts           *selectionfacts.Artifact
+	selections      *scope.DefinitionSelections
+	executable      *executable.Inventory
+	semantic        *semantic.Model
+	semanticWork    frontend.Work
+	semanticMetrics semantic.Metrics
+	hydration       source.HydrationStats
 }
 
 func (i *Inspection) Workspace() *source.Workspace             { return i.workspace }
@@ -35,7 +36,19 @@ func (i *Inspection) Structure() *structure.Graph              { return i.graph 
 func (i *Inspection) SelectionFacts() *selectionfacts.Artifact { return i.facts }
 func (i *Inspection) Selections() *scope.DefinitionSelections  { return i.selections }
 func (i *Inspection) Executable() *executable.Inventory        { return i.executable }
-func (i *Inspection) Hydration() source.HydrationStats         { return i.hydration }
+func (i *Inspection) Semantic() *semantic.Model                { return i.semantic }
+func (i *Inspection) SemanticWork() frontend.Work              { return i.semanticWork }
+func (i *Inspection) SemanticMetrics() semantic.Metrics {
+	return i.semanticMetrics
+}
+func (i *Inspection) Hydration() source.HydrationStats { return i.hydration }
+
+func (i *Inspection) Close() error {
+	if i == nil || i.semantic == nil {
+		return nil
+	}
+	return i.semantic.Close()
+}
 
 // InspectConstructs executes the sole ordinary Stage-1 route:
 //
@@ -54,7 +67,11 @@ func InspectConstructs(req source.Request) (*Inspection, error) {
 	if err != nil {
 		return nil, err
 	}
-	certified, err := decodeSelectedArtifact(req)
+	certifiedStructure, err := decodeSelectedStructureArtifact(req)
+	if err != nil {
+		return nil, err
+	}
+	certifiedSemantic, err := decodeSelectedSemanticArtifact(req)
 	if err != nil {
 		return nil, err
 	}
@@ -62,9 +79,17 @@ func InspectConstructs(req source.Request) (*Inspection, error) {
 	if err != nil {
 		return nil, err
 	}
-	if certified != nil {
+	if certifiedStructure != nil {
 		if err := structure.VerifyProviderArtifactContext(
-			certified, universe, selected,
+			certifiedStructure, universe, selected,
+		); err != nil {
+			return nil, err
+		}
+	}
+	if certifiedSemantic != nil {
+		if err := certifiedSemantic.VerifyContext(
+			semanticProviderContext(universe, selected),
+			req.ProviderStructureDigest,
 		); err != nil {
 			return nil, err
 		}
@@ -72,13 +97,13 @@ func InspectConstructs(req source.Request) (*Inspection, error) {
 	plan, err := sourceplan.Build(
 		universe,
 		selected,
-		certifiedInput(req, certified),
+		certifiedInput(req, certifiedStructure),
 	)
 	if err != nil {
 		return nil, err
 	}
 	if err := stagecheck.VerifyProviderSelection(
-		universe, plan, certified,
+		universe, plan, certifiedStructure,
 	); err != nil {
 		return nil, err
 	}
@@ -92,12 +117,14 @@ func InspectConstructs(req source.Request) (*Inspection, error) {
 	if err := source.HydrateUniverse(universe, hydration); err != nil {
 		return nil, err
 	}
-	graph, index, err := structure.BuildPlanned(universe, plan, certified)
+	graph, index, err := structure.BuildPlanned(
+		universe, plan, certifiedStructure,
+	)
 	if err != nil {
 		return nil, err
 	}
 	facts, err := selectionfacts.Materialize(
-		universe, graph, index, plan, selected, certified,
+		universe, graph, index, plan, selected, certifiedStructure,
 	)
 	if err != nil {
 		return nil, err
@@ -120,7 +147,42 @@ func InspectConstructs(req source.Request) (*Inspection, error) {
 		facts,
 		selections,
 		executableInventory,
-		certified,
+		certifiedStructure,
+	); err != nil {
+		return nil, err
+	}
+	if err := index.SealForStage2(); err != nil {
+		return nil, err
+	}
+	semanticResult, err := frontend.Materialize(
+		universe,
+		graph,
+		index,
+		facts,
+		selections,
+		executableInventory,
+		plan,
+		certifiedSemantic,
+	)
+	if err != nil {
+		return nil, err
+	}
+	keepSemantic := false
+	defer func() {
+		if !keepSemantic {
+			_ = semanticResult.Model().Close()
+		}
+	}()
+	if err := stagecheck.VerifyStage2(
+		universe,
+		plan,
+		graph,
+		index,
+		facts,
+		selections,
+		executableInventory,
+		semanticResult.Model(),
+		certifiedSemantic,
 	); err != nil {
 		return nil, err
 	}
@@ -137,371 +199,19 @@ func InspectConstructs(req source.Request) (*Inspection, error) {
 	); err != nil {
 		return nil, err
 	}
-	return &Inspection{
+	if err := stagecheck.VerifyFinalizedStage2(
+		semanticResult.Model(),
+	); err != nil {
+		return nil, err
+	}
+	inspection := &Inspection{
 		workspace: workspace, plan: plan, graph: graph, facts: facts,
 		selections: selections, executable: executableInventory,
-		hydration: hydrationStats,
-	}, nil
-}
-
-// AuditCatalog derives and independently certifies provider structural graphs
-// from local syntax. It is the only provider-artifact production route.
-func AuditCatalog(
-	req source.Request,
-	output string,
-) (structure.ProviderWriteResult, error) {
-	selected, err := contract.Resolve(
-		req.ProviderContract,
-		req.ProviderContractDigest,
-		req.ProviderContractArtifact,
-	)
-	if err != nil {
-		return structure.ProviderWriteResult{}, err
+		semantic:        semanticResult.Model(),
+		semanticWork:    semanticResult.Work(),
+		semanticMetrics: semanticResult.Metrics(),
+		hydration:       hydrationStats,
 	}
-	universe, err := source.ResolveUniverse(req)
-	if err != nil {
-		return structure.ProviderWriteResult{}, err
-	}
-	plan, err := sourceplan.BuildForAudit(universe, selected)
-	if err != nil {
-		return structure.ProviderWriteResult{}, err
-	}
-	packageIDs, err := providerPackageIDs(universe, plan)
-	if err != nil {
-		return structure.ProviderWriteResult{}, err
-	}
-	writer, err := structure.NewProviderArtifactWriter(
-		universe, selected, output,
-	)
-	if err != nil {
-		return structure.ProviderWriteResult{}, err
-	}
-	defer writer.Abort()
-	for _, packageID := range packageIDs {
-		shard, err := auditProviderPackage(
-			req, universe, selected, plan, packageID,
-		)
-		if err != nil {
-			return structure.ProviderWriteResult{}, err
-		}
-		if err := writer.Append(shard); err != nil {
-			return structure.ProviderWriteResult{}, err
-		}
-	}
-	manifest, err := writer.ManifestArtifact()
-	if err != nil {
-		return structure.ProviderWriteResult{}, err
-	}
-	if err := stagecheck.VerifyProviderManifest(
-		universe, selected, plan, manifest,
-	); err != nil {
-		return structure.ProviderWriteResult{}, err
-	}
-	workspace, err := source.FinalizeResolved(universe)
-	if err != nil {
-		return structure.ProviderWriteResult{}, err
-	}
-	if err := stagecheck.VerifySourceUniverse(workspace, req); err != nil {
-		return structure.ProviderWriteResult{}, err
-	}
-	return writer.Finish()
-}
-
-// AuditVerify independently re-derives the provider graph and exact-joins a
-// stored artifact. The artifact seal is integrity evidence; certification is
-// this independent derivation.
-func AuditVerify(req source.Request, path string) error {
-	stored, err := structure.DecodeProviderArtifact(path, "")
-	if err != nil {
-		return err
-	}
-	selected, err := contract.Resolve(
-		req.ProviderContract,
-		req.ProviderContractDigest,
-		req.ProviderContractArtifact,
-	)
-	if err != nil {
-		return err
-	}
-	universe, err := source.ResolveUniverse(req)
-	if err != nil {
-		return err
-	}
-	if err := structure.VerifyProviderArtifactContext(
-		stored, universe, selected,
-	); err != nil {
-		return err
-	}
-	plan, err := sourceplan.BuildForAudit(universe, selected)
-	if err != nil {
-		return err
-	}
-	if err := stagecheck.VerifyProviderManifest(
-		universe, selected, plan, stored,
-	); err != nil {
-		return err
-	}
-	packageIDs, err := providerPackageIDs(universe, plan)
-	if err != nil {
-		return err
-	}
-	for _, packageID := range packageIDs {
-		if err := verifyProviderPackage(
-			req,
-			universe,
-			selected,
-			plan,
-			packageID,
-			stored,
-		); err != nil {
-			return err
-		}
-	}
-	workspace, err := source.FinalizeResolved(universe)
-	if err != nil {
-		return err
-	}
-	if err := stagecheck.VerifySourceUniverse(workspace, req); err != nil {
-		return err
-	}
-	return nil
-}
-
-func auditProviderPackage(
-	req source.Request,
-	base *source.Universe,
-	selected contract.Contract,
-	plan *sourceplan.Plan,
-	packageID identity.PackageID,
-) (*structure.ProviderArtifact, error) {
-	derived, err := deriveProviderPackage(
-		req, base, selected, packageID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer derived.discard()
-	artifact, err := structure.ProduceProviderPackageArtifact(
-		derived.universe,
-		selected,
-		plan,
-		packageID,
-		derived.graph,
-		derived.facts.CertifiedFacts(),
-	)
-	if err != nil {
-		return nil, err
-	}
-	if err := stagecheck.VerifyProducedProviderPackageArtifact(
-		derived.universe,
-		selected,
-		plan,
-		packageID,
-		derived.graph,
-		derived.facts,
-		artifact,
-	); err != nil {
-		return nil, err
-	}
-	return artifact, nil
-}
-
-func verifyProviderPackage(
-	req source.Request,
-	base *source.Universe,
-	selected contract.Contract,
-	plan *sourceplan.Plan,
-	packageID identity.PackageID,
-	stored *structure.ProviderArtifact,
-) error {
-	derived, err := deriveProviderPackage(
-		req, base, selected, packageID,
-	)
-	if err != nil {
-		return err
-	}
-	defer derived.discard()
-	return stagecheck.VerifyProducedProviderPackageArtifact(
-		derived.universe,
-		selected,
-		plan,
-		packageID,
-		derived.graph,
-		derived.facts,
-		stored,
-	)
-}
-
-type providerPackageDerivation struct {
-	universe *source.Universe
-	graph    *structure.Graph
-	facts    *selectionfacts.Artifact
-}
-
-func deriveProviderPackage(
-	req source.Request,
-	base *source.Universe,
-	selected contract.Contract,
-	packageID identity.PackageID,
-) (_ *providerPackageDerivation, resultErr error) {
-	fork, err := source.ForkForHydration(
-		base, []identity.PackageID{packageID},
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if resultErr != nil {
-			source.DiscardHydratedUniverse(fork)
-		}
-	}()
-	files, synthetic, err := packageHydration(fork, packageID)
-	if err != nil {
-		return nil, err
-	}
-	hydration, err := source.NewHydrationRequest(files, synthetic)
-	if err != nil {
-		return nil, err
-	}
-	if err := source.HydrateUniverse(fork, hydration); err != nil {
-		return nil, err
-	}
-	graph, index, err := structure.BuildPackages(
-		fork, []identity.PackageID{packageID},
-	)
-	if err != nil {
-		return nil, err
-	}
-	facts, err := selectionfacts.MaterializeForAudit(
-		fork, graph, index, selected,
-	)
-	if err != nil {
-		return nil, err
-	}
-	selections, err := scope.SelectDefinitions(
-		fork, graph, facts, selected,
-	)
-	if err != nil {
-		return nil, err
-	}
-	executableInventory, err := executable.Build(
-		graph, index, selections,
-	)
-	if err != nil {
-		return nil, err
-	}
-	if err := stagecheck.VerifyExtractedPackageStage1(
-		req,
-		fork,
-		packageID,
-		graph,
-		facts,
-		selections,
-		executableInventory,
-	); err != nil {
-		return nil, err
-	}
-	return &providerPackageDerivation{
-		universe: fork, graph: graph, facts: facts,
-	}, nil
-}
-
-func (d *providerPackageDerivation) discard() {
-	source.DiscardHydratedUniverse(d.universe)
-}
-
-func providerPackageIDs(
-	universe *source.Universe,
-	plan *sourceplan.Plan,
-) ([]identity.PackageID, error) {
-	filePackages := map[identity.FileID]identity.PackageID{}
-	for _, pkg := range universe.Packages() {
-		for _, file := range pkg.Files() {
-			filePackages[file.ID()] = pkg.ID()
-		}
-	}
-	set := map[identity.PackageID]bool{}
-	for _, decision := range plan.Files() {
-		if decision.Kind() != sourceplan.KindCertifiedGraph {
-			continue
-		}
-		packageID := filePackages[decision.ID()]
-		if packageID.IsZero() {
-			return nil, fmt.Errorf(
-				"provider plan file has no package %s", decision.ID(),
-			)
-		}
-		set[packageID] = true
-	}
-	for _, decision := range plan.SyntheticOwners() {
-		if decision.Kind() == sourceplan.KindCertifiedGraph {
-			set[decision.Package()] = true
-		}
-	}
-	out := make([]identity.PackageID, 0, len(set))
-	for packageID := range set {
-		out = append(out, packageID)
-	}
-	sort.Slice(out, func(i, j int) bool {
-		return out[i].String() < out[j].String()
-	})
-	return out, nil
-}
-
-func packageHydration(
-	universe *source.Universe,
-	packageID identity.PackageID,
-) ([]identity.FileID, []identity.PackageID, error) {
-	for _, pkg := range universe.Packages() {
-		if pkg.ID() != packageID {
-			continue
-		}
-		files := make([]identity.FileID, 0, len(pkg.Files()))
-		for _, file := range pkg.Files() {
-			files = append(files, file.ID())
-		}
-		var synthetic []identity.PackageID
-		if pkg.HasCheckedView() {
-			synthetic = append(synthetic, packageID)
-		}
-		return files, synthetic, nil
-	}
-	return nil, nil, fmt.Errorf(
-		"provider package %s is absent from source", packageID,
-	)
-}
-
-func decodeSelectedArtifact(
-	req source.Request,
-) (*structure.ProviderArtifact, error) {
-	if req.AuditArtifact == "" {
-		if req.AuditArtifactDigest != "" {
-			return nil, fmt.Errorf(
-				"provider artifact digest is present without an artifact",
-			)
-		}
-		return nil, nil
-	}
-	if req.AuditArtifactDigest == "" {
-		return nil, fmt.Errorf(
-			"provider artifact requires an externally selected file digest",
-		)
-	}
-	return structure.DecodeProviderArtifact(
-		req.AuditArtifact, req.AuditArtifactDigest,
-	)
-}
-
-func certifiedInput(
-	req source.Request,
-	artifact *structure.ProviderArtifact,
-) sourceplan.CertifiedInput {
-	if artifact == nil {
-		return sourceplan.CertifiedInput{}
-	}
-	return sourceplan.CertifiedInput{
-		Digest:   req.AuditArtifactDigest,
-		Files:    artifact.FileIDs(),
-		Packages: artifact.PackageIDs(),
-	}
+	keepSemantic = true
+	return inspection, nil
 }

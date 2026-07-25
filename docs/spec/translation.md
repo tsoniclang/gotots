@@ -41,10 +41,12 @@ every input file; occurrence admission uses that file's effective language
 version. Directives and toolchain extensions receive typed dispositions;
 unknown directives cannot silently disappear.
 
-The command `gotots inspect constructs` must report, by canonical occurrence
-identity, every catalog kind encountered, its semantic variant, support state,
-plan, and evidence. Adding an unrecognized concrete AST form or semantic
-variant must fail analysis before emission.
+`gotots inspect constructs` reports Stage-1 syntax, role, definition, and
+evidence-depth records. `gotots inspect semantics` reports, by canonical
+occurrence identity, every Stage-2 semantic variant, resolution, operation,
+support state, and evidence. The Stage-1 command never fabricates semantic
+variants after checker finalization. Adding an unrecognized concrete AST form
+or semantic variant must fail its owning stage before emission.
 
 ## Context Resolution Matrix
 
@@ -119,9 +121,12 @@ value receiver, result, interface conversion, map operation, channel operation,
 append/copy, defer capture, and external/manual boundary. The copy may be
 elided only by a whole-region non-observability proof.
 
-Bindings use canonical `*types.Var`-derived identities converted to stable
-ordinals. Source spelling is metadata. Shadowed names, closure captures, cells,
-range variables, type-switch variables, and named results cannot conflate.
+Bindings use the exact Stage-1 occurrence that introduces their lexical scope,
+their defining occurrence when spelled, a closed role, and a stable ordinal
+derived from checker order. Source spelling is metadata. File-scoped imports,
+generic binders on non-executable type declarations, shadowed locals, closure
+captures, range variables, type-switch variables, and named results cannot
+conflate or require a fabricated implementation definition.
 
 ## Types And Representations
 

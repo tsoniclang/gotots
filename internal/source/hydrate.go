@@ -257,6 +257,14 @@ func attachHydratedPackage(
 	sourcePaths := map[string]bool{}
 	for _, file := range record.files {
 		sourcePaths[filepath.Clean(file.path)] = true
+		if syntax := syntaxByPath[filepath.Clean(file.path)]; syntax != nil {
+			file.checkerFile = fset.File(syntax.Pos())
+			if file.checkerFile == nil {
+				return invalidHydration(
+					"%s has no checker token file", file.id,
+				)
+			}
+		}
 	}
 	if localSynthetic {
 		record.checkedDecls = nil

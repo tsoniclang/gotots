@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/identity"
+	"github.com/tsoniclang/gotots/internal/language/catalog"
 	"github.com/tsoniclang/gotots/internal/source"
 )
 
@@ -22,6 +23,13 @@ type checkedCandidate struct {
 	root ast.Node
 	join ast.Node
 	kind identity.DefinitionKind
+}
+
+type declarationOriginKey struct {
+	file   string
+	line   int
+	column int
+	kind   catalog.Kind
 }
 
 func attachCgo(
@@ -48,11 +56,18 @@ func attachCgo(
 	if len(filesByPath) == 0 {
 		return fmt.Errorf("package %s has checked declarations but no cgo originals", loaded.ID())
 	}
+	if err := bindCheckedDeclarationCounterparts(
+		universe, checked, filesByPath, index,
+	); err != nil {
+		return err
+	}
 	origins := map[originKey][]identity.DefinitionID{}
-	for _, definition := range graph.Definitions() {
+	if err := graph.VisitDefinitions(func(
+		definition ImplementationDefinition,
+	) error {
 		file, exists := index.files[definition.id.File()]
 		if !exists || !file.CgoOriginal() {
-			continue
+			return nil
 		}
 		node := index.definitions[definition.id]
 		join := definitionJoinNode(node)
@@ -65,10 +80,13 @@ func attachCgo(
 			kind: definition.id.Kind(),
 		}
 		origins[key] = append(origins[key], definition.id)
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	matched := map[identity.DefinitionID]bool{}
-	synthetic := map[string]bool{}
+	synthetic := map[identity.DefinitionID]bool{}
 	for _, declaration := range checked {
 		display := universe.Fset().Position(declaration.Pos())
 		if _, original := filesByPath[display.Filename]; !original {
@@ -81,6 +99,7 @@ func attachCgo(
 				universe.Fset(),
 				declaration,
 				graph,
+				index,
 				synthetic,
 				work,
 			); err != nil {
@@ -103,6 +122,14 @@ func attachCgo(
 			}
 			matched[definition] = true
 			index.checked[definition] = candidate.root
+			if err := index.bindCheckedCounterparts(
+				index.definitions[definition], candidate.root,
+			); err != nil {
+				return fmt.Errorf(
+					"cgo definition %s checked correspondence: %w",
+					definition, err,
+				)
+			}
 			checkedDigest, err := checkedNodeDigest(
 				universe.Fset(), candidate.root,
 			)
@@ -127,18 +154,104 @@ func attachCgo(
 			work.RecordAppends++
 		}
 	}
-	for _, definition := range graph.Definitions() {
+	if err := graph.VisitDefinitions(func(
+		definition ImplementationDefinition,
+	) error {
 		file, exists := index.files[definition.id.File()]
 		if exists && file.CgoOriginal() && !matched[definition.id] {
 			return fmt.Errorf("cgo definition %s has no checked counterpart", definition.id)
 		}
+		return nil
+	}); err != nil {
+		return err
 	}
 	for fileIndex := range graph.files {
 		sort.Slice(graph.files[fileIndex].mappings, func(i, j int) bool {
 			work.SortComparisons++
-			return graph.files[fileIndex].mappings[i].definition.String() <
-				graph.files[fileIndex].mappings[j].definition.String()
+			return graph.files[fileIndex].mappings[i].definition.Compare(
+				graph.files[fileIndex].mappings[j].definition,
+			) < 0
 		})
+	}
+	return nil
+}
+
+func bindCheckedDeclarationCounterparts(
+	universe *source.Universe,
+	checked []ast.Node,
+	filesByPath map[string]*source.LoadedFile,
+	index *TransientIndex,
+) error {
+	originals := map[declarationOriginKey][]ast.Node{}
+	for _, file := range filesByPath {
+		syntax := file.PhysicalSyntax()
+		fset := file.PhysicalFileSet()
+		if syntax == nil || fset == nil {
+			return fmt.Errorf(
+				"cgo file %s has no physical declaration view",
+				file.ID(),
+			)
+		}
+		for _, declaration := range syntax.Decls {
+			kind, err := Classify(declaration)
+			if err != nil {
+				return err
+			}
+			position := fset.PositionFor(declaration.Pos(), false)
+			key := declarationOriginKey{
+				file: position.Filename, line: position.Line,
+				column: position.Column, kind: kind,
+			}
+			originals[key] = append(originals[key], declaration)
+		}
+	}
+	for _, declaration := range checked {
+		position := universe.Fset().Position(declaration.Pos())
+		if filesByPath[position.Filename] == nil {
+			if err := index.markCheckedViewTree(declaration); err != nil {
+				return err
+			}
+			continue
+		}
+		kind, err := Classify(declaration)
+		if err != nil {
+			return err
+		}
+		key := declarationOriginKey{
+			file: position.Filename, line: position.Line,
+			column: position.Column, kind: kind,
+		}
+		candidates := originals[key]
+		if len(candidates) == 0 {
+			for candidateKey, nodes := range originals {
+				if candidateKey.file == key.file &&
+					candidateKey.line == key.line &&
+					candidateKey.kind == key.kind {
+					candidates = append(candidates, nodes...)
+				}
+			}
+		}
+		if len(candidates) == 0 {
+			if err := index.markCheckedViewTree(declaration); err != nil {
+				return err
+			}
+			continue
+		}
+		if len(candidates) != 1 {
+			return fmt.Errorf(
+				"cgo declaration origin %s:%d:%d kind %s resolves %d declarations",
+				key.file, key.line, key.column, key.kind,
+				len(candidates),
+			)
+		}
+		if err := index.bindCheckedCounterparts(
+			candidates[0], declaration,
+		); err != nil {
+			return fmt.Errorf(
+				"cgo declaration correspondence at %s:%d:%d: %w",
+				key.file, key.line, key.column, err,
+			)
+		}
 	}
 	return nil
 }
@@ -241,7 +354,8 @@ func addSyntheticDeclaration(
 	fset *token.FileSet,
 	declaration ast.Node,
 	graph *PackageGraph,
-	seen map[string]bool,
+	index *TransientIndex,
+	seen map[identity.DefinitionID]bool,
 	work *Work,
 ) error {
 	for _, descriptor := range syntheticDescriptors(declaration, view) {
@@ -249,10 +363,11 @@ func addSyntheticDeclaration(
 		if err != nil {
 			return err
 		}
-		if seen[definitionID.String()] {
+		if seen[definitionID] {
 			return fmt.Errorf("duplicate cgo synthetic definition %s", definitionID)
 		}
-		seen[definitionID.String()] = true
+		seen[definitionID] = true
+		index.synthetic[definitionID] = descriptor.node
 		ownerID, err := SyntheticOwner(pkg, SyntheticOwnerCgoGenerated)
 		if err != nil {
 			return err
@@ -334,7 +449,9 @@ func syntheticDescriptors(
 		switch node.Tok {
 		case token.TYPE:
 			for _, spec := range node.Specs {
-				if named, ok := spec.(*ast.TypeSpec); ok && named.Name != nil {
+				if named, ok := spec.(*ast.TypeSpec); ok &&
+					named.Name != nil &&
+					named.Name.Name != "_" {
 					out = append(out, syntheticDescriptor{
 						name: named.Name.Name,
 						role: identity.SyntheticDefinitionType,

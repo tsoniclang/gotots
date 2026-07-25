@@ -83,10 +83,14 @@ func occurrenceStrings(ids []identity.OccurrenceID) []string {
 }
 
 func encodeOccurrences(
-	occurrences []Occurrence,
+	occurrences *OccurrenceStore,
 ) []artifactOccurrence {
-	out := make([]artifactOccurrence, 0, len(occurrences))
-	for _, occurrence := range occurrences {
+	out := make([]artifactOccurrence, 0, occurrences.Count())
+	if occurrences == nil {
+		return out
+	}
+	if err := occurrences.Visit(func(reference OccurrenceRef) error {
+		occurrence := reference.Occurrence()
 		out = append(out, artifactOccurrence{
 			ID:      occurrence.id.String(),
 			Kind:    uint16(occurrence.kind),
@@ -97,6 +101,9 @@ func encodeOccurrences(
 			Display: occurrence.display,
 			Token:   uint16(occurrence.token),
 		})
+		return nil
+	}); err != nil {
+		panic(err)
 	}
 	return out
 }
@@ -349,8 +356,11 @@ func decodeBoundary(
 func decodeOccurrences(
 	encoded []artifactOccurrence,
 	file identity.FileID,
-) ([]Occurrence, error) {
-	out := make([]Occurrence, 0, len(encoded))
+) (*OccurrenceStore, error) {
+	builder, err := NewOccurrenceStoreBuilder(file, len(encoded))
+	if err != nil {
+		return nil, err
+	}
 	for _, record := range encoded {
 		id, err := identity.ParseOccurrenceID(record.ID)
 		if err != nil {
@@ -389,9 +399,11 @@ func decodeOccurrences(
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, occurrence)
+		if _, err := builder.Append(occurrence); err != nil {
+			return nil, err
+		}
 	}
-	return out, nil
+	return builder.Seal()
 }
 
 func parseOccurrenceStrings(

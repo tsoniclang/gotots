@@ -119,6 +119,8 @@ func TestWallGateSeesTheTree(t *testing.T) {
 		"internal/identity",
 		"internal/language/catalog",
 		"internal/language/executable",
+		"internal/language/frontend",
+		"internal/language/semantic",
 		"internal/language/selectionfacts",
 		"internal/language/structure",
 		"internal/language/typesemantics",
@@ -145,6 +147,7 @@ func TestToolchainObjectImportsAreWalled(t *testing.T) {
 			"internal/language/structure":      true,
 			"internal/language/selectionfacts": true,
 			"internal/language/executable":     true,
+			"internal/language/frontend":       true,
 			"internal/stagecheck":              true,
 		},
 		"go/types": {
@@ -152,12 +155,14 @@ func TestToolchainObjectImportsAreWalled(t *testing.T) {
 			"internal/language/structure":      true,
 			"internal/language/selectionfacts": true,
 			"internal/language/typesemantics":  true,
+			"internal/language/frontend":       true,
 			"internal/stagecheck":              true,
 		},
 		"go/token": {
 			"internal/source":              true,
 			"internal/language/structure":  true,
 			"internal/language/executable": true,
+			"internal/language/frontend":   true,
 			"internal/stagecheck":          true,
 		},
 	}
@@ -238,6 +243,8 @@ var layerRank = map[string]int{
 	"internal/language/selectionfacts": 45,
 	"internal/scope":                   50,
 	"internal/language/executable":     55,
+	"internal/language/semantic":       58,
+	"internal/language/frontend":       60,
 	"internal/stagecheck":              70,
 	"internal/compiler":                80,
 	"cmd/gotots":                       90,
@@ -329,6 +336,87 @@ func TestSupersededStage1ArchitectureIsAbsent(t *testing.T) {
 	}
 	if strings.Contains(string(hydration), "packages.NeedDeps") {
 		t.Error("semantic hydration recursively requests dependency interiors")
+	}
+}
+
+func TestSupersededStage2ProjectionArchitectureIsAbsent(t *testing.T) {
+	semanticBanned := []string{
+		"type providerShard struct",
+		"decodeProviderShardWithWire",
+		"map[identity.PackageID]Package",
+		"Local *Package",
+		"overlayLocalPackage",
+		"providerManifestPackage",
+		"writeProviderShard",
+		"decodeProviderShard",
+		"measureProviderManifest",
+	}
+	globalBanned := []string{
+		"IdentifierOccurrence",
+		"TransientContext",
+		"ownerCache",
+		"transientStructure",
+		"typeParameterLocation",
+		"typeParameterByLocation",
+		"parameterLocations",
+		"object.Pos()",
+		"Obj().Pos()",
+	}
+	for _, file := range productionGoFiles(t) {
+		raw, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.ToSlash(file)
+		if strings.Contains(path, "/internal/language/frontend/") {
+			for _, spelling := range []string{
+				"AdditionalOccurrenceRefs()",
+				"map[identity.PackageID]*packageInput",
+				"[]*packageInput",
+			} {
+				if strings.Contains(string(raw), spelling) {
+					t.Errorf(
+						"eager Stage-2 package-input spelling %q remains in %s",
+						spelling,
+						file,
+					)
+				}
+			}
+		}
+		if strings.Contains(path, "/internal/language/semantic/") {
+			for _, spelling := range semanticBanned {
+				if strings.Contains(string(raw), spelling) {
+					t.Errorf(
+						"superseded Stage-2 projection spelling %q remains in %s",
+						spelling,
+						file,
+					)
+				}
+			}
+		}
+		for _, spelling := range globalBanned {
+			if strings.Contains(string(raw), spelling) {
+				t.Errorf(
+					"superseded Stage-2 identity/projection spelling %q remains in %s",
+					spelling,
+					file,
+				)
+			}
+		}
+	}
+	superseded := filepath.Join(
+		repoRoot(t),
+		"internal",
+		"language",
+		"semantic",
+		"projection_overlay.go",
+	)
+	if _, err := os.Stat(superseded); !os.IsNotExist(err) {
+		t.Errorf(
+			"superseded complete-package overlay remains at %s: %v",
+			superseded,
+			err,
+		)
 	}
 }
 

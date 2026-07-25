@@ -1,17 +1,13 @@
 package stagecheck
 
-import (
-	"fmt"
-
-	"github.com/tsoniclang/gotots/internal/language/structure"
-)
+import "github.com/tsoniclang/gotots/internal/language/structure"
 
 func syntheticLedger(pkg structure.PackageGraph) *structuralLedger {
 	ledger := newStructuralLedger()
 	for _, owner := range pkg.SyntheticOwners() {
 		if owner.ID().SyntheticKind() ==
 			structure.SyntheticOwnerCgoGenerated {
-			ledger.add("owner", owner.ID().String())
+			addRecord(&ledger.owners, owner.ID())
 		}
 	}
 	var definitions []structure.ImplementationDefinition
@@ -44,30 +40,26 @@ func syntheticLedger(pkg structure.PackageGraph) *structuralLedger {
 	return ledger
 }
 
-func certifiedFactKey(fact structure.CertifiedFact) string {
-	return fmt.Sprintf(
-		"%s|%d|%t|%s|%s",
-		fact.Definition(),
-		fact.Kind(),
-		fact.Value(),
-		fact.ProducerDigest(),
-		fact.EvidenceDigest(),
-	)
+type joinedIdentity[Self any] interface {
+	comparable
+	String() string
 }
 
-func joinStringSets(
+func joinIdentitySets[ID joinedIdentity[ID]](
 	class string,
-	actual, expected map[string]bool,
+	actual, expected map[ID]bool,
 	problems *problemSet,
 ) {
 	for value := range actual {
 		if !expected[value] {
-			problems.add("unexpected " + class + " " + value)
+			problems.add(
+				"unexpected " + class + " " + value.String(),
+			)
 		}
 	}
 	for value := range expected {
 		if !actual[value] {
-			problems.add("missing " + class + " " + value)
+			problems.add("missing " + class + " " + value.String())
 		}
 	}
 }

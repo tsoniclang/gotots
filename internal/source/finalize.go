@@ -54,10 +54,12 @@ func finalize(
 		}
 	}
 	sort.Slice(workspace.packages, func(i, j int) bool {
-		return workspace.packages[i].id.String() < workspace.packages[j].id.String()
+		return workspace.packages[i].id.Compare(
+			workspace.packages[j].id,
+		) < 0
 	})
 	sort.Slice(workspace.roots, func(i, j int) bool {
-		return workspace.roots[i].id.String() < workspace.roots[j].id.String()
+		return workspace.roots[i].id.Compare(workspace.roots[j].id) < 0
 	})
 	if universe.hydrated {
 		severTransientGraph(universe)
@@ -83,6 +85,7 @@ func clearTransientEvidence(universe *Universe) {
 		for _, file := range loaded.files {
 			file.fset = nil
 			file.syntax = nil
+			file.checkerFile = nil
 			file.physicalFset = nil
 			file.physicalSyntax = nil
 			file.selectedBytes = nil
@@ -123,8 +126,7 @@ func finalizePackage(loaded *LoadedPackage) (*Package, error) {
 		return record.files[i].id.Rel() < record.files[j].id.Rel()
 	})
 	sort.Slice(record.inputs, func(i, j int) bool {
-		return record.inputs[i].id.String() <
-			record.inputs[j].id.String()
+		return record.inputs[i].id.Compare(record.inputs[j].id) < 0
 	})
 	return record, nil
 }

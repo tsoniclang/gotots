@@ -46,20 +46,15 @@ func validateDecodedFile(graph FileGraph) error {
 		graph.containment.owner != graph.owner.id {
 		return fmt.Errorf("decoded file graph has invalid owner")
 	}
-	occurrences := map[identity.OccurrenceID]*Occurrence{}
-	for index := range graph.occurrences {
-		occurrence := &graph.occurrences[index]
-		if _, duplicate := occurrences[occurrence.id]; duplicate {
-			return fmt.Errorf(
-				"decoded file duplicates occurrence %s", occurrence.id,
-			)
-		}
-		occurrences[occurrence.id] = occurrence
-	}
-	for _, occurrence := range graph.occurrences {
-		if err := validateOccurrence(occurrence, occurrences); err != nil {
-			return err
-		}
+	if err := graph.VisitOccurrenceRefs(func(
+		occurrence OccurrenceRef,
+	) error {
+		return validateOccurrence(
+			occurrence,
+			graph.occurrences.reference,
+		)
+	}); err != nil {
+		return err
 	}
 	definitions := map[identity.DefinitionID]int{}
 	sites := map[identity.DefinitionID]int{}

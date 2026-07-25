@@ -114,7 +114,7 @@ func providerDetailedRecordCount(artifact *ProviderArtifact) int {
 	records := 0
 	for _, file := range artifact.fileGraphs {
 		records++
-		records += len(file.occurrences)
+		records += file.OccurrenceCount()
 		records += len(file.owner.members)
 		records += len(file.owner.directives)
 		records += len(file.containment.anchors)
@@ -151,7 +151,7 @@ func sortProviderPackageSizes(records []ProviderPackageSize) {
 		if records[i].Bytes != records[j].Bytes {
 			return records[i].Bytes > records[j].Bytes
 		}
-		return records[i].Package.String() < records[j].Package.String()
+		return records[i].Package.Compare(records[j].Package) < 0
 	})
 }
 
@@ -246,7 +246,7 @@ func mergeHeaderArtifactSizes(
 		if out[left].EncodedBytes != out[right].EncodedBytes {
 			return out[left].EncodedBytes > out[right].EncodedBytes
 		}
-		return out[left].Header.String() < out[right].Header.String()
+		return out[left].Header.Compare(out[right].Header) < 0
 	})
 	if len(out) > providerTailLimit {
 		out = out[:providerTailLimit]

@@ -45,7 +45,7 @@ func (b *fileBuilder) headerDigest(
 	)
 	hash.Write(b.raw[span.Start.Offset:end])
 	for _, id := range members {
-		occurrence, present := b.occurrences[id]
+		occurrence, present := b.occurrence(id)
 		if !present {
 			return "", fmt.Errorf(
 				"header member %s has no canonical occurrence", id,

@@ -55,7 +55,9 @@ func (b *fileBuilder) walkHeader(
 		if err != nil {
 			return err
 		}
-		if err := b.recordOccurrence(occurrence); err != nil {
+		if err := b.recordOccurrence(
+			occurrence, child.node,
+		); err != nil {
 			return err
 		}
 		*out = append(*out, occurrence.id)
@@ -130,7 +132,9 @@ func (b *fileBuilder) executionBoundary(
 		if err != nil {
 			return ExecutionBoundary{}, err
 		}
-		if err := b.recordOccurrence(occurrence); err != nil {
+		if err := b.recordOccurrence(
+			occurrence, entry.node,
+		); err != nil {
 			return ExecutionBoundary{}, err
 		}
 		hash, err := digestSpan(b.raw, occurrence.span)

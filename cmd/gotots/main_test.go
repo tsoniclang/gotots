@@ -22,9 +22,6 @@ func TestInspectConstructsPrintsOnlyBoundedDenominators(t *testing.T) {
 		t.Fatal(err)
 	}
 	lines := strings.Split(strings.TrimSpace(output.String()), "\n")
-	if len(lines) < 3 || len(lines) > 22 {
-		t.Fatalf("inspect output has %d lines:\n%s", len(lines), output.String())
-	}
 	if !strings.HasPrefix(lines[0], "toolchain ") ||
 		!strings.HasPrefix(lines[1], "denominators: ") ||
 		!strings.Contains(lines[1], "residentDefinitions=") ||
@@ -40,16 +37,126 @@ func TestInspectConstructsPrintsOnlyBoundedDenominators(t *testing.T) {
 		!strings.Contains(lines[1], "unknownDirectives=0") {
 		t.Fatalf("inspect output lacks bounded proof denominators:\n%s", output.String())
 	}
+	local := reportLine(
+		t, lines, "semantic-local-production: ",
+	)
+	checker := reportLine(
+		t, lines, "semantic-checker-consumption: ",
+	)
+	manifest := reportLine(
+		t, lines, "semantic-provider-manifest: ",
+	)
+	provider := reportLine(
+		t, lines, "semantic-provider-consumption: ",
+	)
+	residency := reportLine(
+		t,
+		lines,
+		"semantic-consumption-residency: ",
+	)
+	expectedLines := 8
+	for field, prefix := range map[string]string{
+		"packages":    "semantic-local-production-package-tail ",
+		"definitions": "semantic-local-production-definition-tail ",
+		"operations":  "semantic-local-production-operation-tail ",
+		"types":       "semantic-local-production-type-tail ",
+	} {
+		want := minInt(reportInteger(t, local, field), 20)
+		if got := countReportLines(lines, prefix); got != want {
+			t.Fatalf(
+				"%s lines=%d, want %d:\n%s",
+				strings.TrimSpace(prefix), got, want,
+				output.String(),
+			)
+		}
+		expectedLines += want
+	}
+	checkerPackageTails := minInt(
+		reportInteger(t, checker, "packages"), 20,
+	)
+	if got := countReportLines(
+		lines, "semantic-checker-consumption-package-tail ",
+	); got != checkerPackageTails {
+		t.Fatalf(
+			"checker-consumption package tails=%d, want %d",
+			got, checkerPackageTails,
+		)
+	}
+	expectedLines += checkerPackageTails
+	if reportInteger(t, manifest, "packages") != 0 ||
+		reportInteger(t, provider, "packages") != 0 ||
+		reportInteger(t, residency, "providerShardLoads") != 0 ||
+		reportInteger(t, residency, "maxProviderPackagesResident") != 0 ||
+		reportInteger(t, residency, "checkerShardLoads") !=
+			reportInteger(t, residency, "localPackages") ||
+		reportInteger(t, residency, "logicalPackageLoads") !=
+			reportInteger(t, residency, "localPackages") ||
+		reportInteger(t, residency, "maxCheckerPackagesResident") != 1 ||
+		reportInteger(t, residency, "maxLogicalPackagesResident") != 1 ||
+		countReportLines(
+			lines, "semantic-provider-consumption-package-tail ",
+		) != 0 {
+		t.Fatalf(
+			"provider-free inspection reports consumed semantics:\n%s",
+			output.String(),
+		)
+	}
+	headerCount := minInt(
+		reportInteger(t, lines[1], "definitions"), 20,
+	)
+	if got := countReportLines(lines, "header-tail "); got != headerCount {
+		t.Fatalf("header tails=%d, want %d", got, headerCount)
+	}
+	expectedLines += headerCount
+	if len(lines) != expectedLines {
+		t.Fatalf(
+			"inspect output has %d lines, exact bounded model requires %d:\n%s",
+			len(lines), expectedLines, output.String(),
+		)
+	}
 	for _, line := range lines[2:] {
-		if !strings.HasPrefix(line, "header-tail ") {
+		if !strings.HasPrefix(line, "semantic-") &&
+			!strings.HasPrefix(line, "header-tail ") {
 			t.Fatalf("unexpected unbounded detail line %q", line)
 		}
 	}
-	if output.Len() > 16*1024 ||
+	if output.Len() > 128*1024 ||
 		strings.Contains(output.String(), "func Main") ||
 		strings.Contains(output.String(), project) {
 		t.Fatalf("inspect output leaks unbounded source evidence:\n%s", output.String())
 	}
+}
+
+func reportLine(
+	t *testing.T,
+	lines []string,
+	prefix string,
+) string {
+	t.Helper()
+	for _, line := range lines {
+		if strings.HasPrefix(line, prefix) {
+			return line
+		}
+	}
+	t.Fatalf("output lacks %q", prefix)
+	return ""
+}
+
+func countReportLines(lines []string, prefix string) int {
+	count := 0
+	for _, line := range lines {
+		if strings.HasPrefix(line, prefix) {
+			count++
+		}
+	}
+	return count
+}
+
+func minInt(left int, right int) int {
+	if left < right {
+		return left
+	}
+	return right
 }
 
 func TestInspectConstructsReportsExactMultiModuleClosures(t *testing.T) {
@@ -70,14 +177,14 @@ func TestInspectConstructsReportsExactMultiModuleClosures(t *testing.T) {
 			name:      "independent roots",
 			directory: filepath.Join(root, "dual"),
 			patterns:  []string{"./a/...", "./b/..."},
-			packages:  2,
+			packages:  3,
 			files:     2,
 		},
 		{
 			name:      "linked modules",
 			directory: filepath.Join(root, "linked"),
 			patterns:  []string{"./app/...", "./lib/..."},
-			packages:  2,
+			packages:  3,
 			files:     2,
 		},
 	}
@@ -168,11 +275,13 @@ func TestProviderArtifactSelectionFailsClosed(t *testing.T) {
 	for name, arguments := range map[string][]string{
 		"path-without-digest": {
 			"inspect", "constructs", "-contract", "portable@v1",
-			"-dir", project, "-provider", "provider.gotots",
+			"-dir", project,
+			"-provider-structure", "provider.structure.gotots",
 		},
 		"digest-without-path": {
 			"inspect", "constructs", "-contract", "portable@v1",
-			"-dir", project, "-provider-digest", strings.Repeat("0", 64),
+			"-dir", project,
+			"-provider-structure-digest", strings.Repeat("0", 64),
 		},
 	} {
 		t.Run(name, func(t *testing.T) {

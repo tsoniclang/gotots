@@ -23,20 +23,6 @@ type derivedOccurrence struct {
 	token   catalog.TokenKind
 }
 
-func (o derivedOccurrence) key() string {
-	return fmt.Sprintf(
-		"%s|%d|%s|%d|%d|%s|%s|%d",
-		o.id,
-		uint16(o.kind),
-		o.parent,
-		uint16(o.edge),
-		o.ordinal,
-		spanKey(o.span),
-		displayKey(o.display),
-		uint16(o.token),
-	)
-}
-
 type derivedChild struct {
 	node    ast.Node
 	edge    catalog.Edge
@@ -53,10 +39,12 @@ type derivedFile struct {
 	file        *source.LoadedFile
 	fset        *token.FileSet
 	raw         []byte
-	owner       string
+	displayFile string
+	owner       structure.OwnerRegionID
 	occurrences map[identity.OccurrenceID]derivedOccurrence
 	anchors     map[identity.OccurrenceID]bool
 	definitions map[identity.DefinitionID]ast.Node
+	path        []derivedPathStep
 }
 
 func deriveFile(file *source.LoadedFile) (*derivedFile, error) {
@@ -73,19 +61,23 @@ func deriveFile(file *source.LoadedFile) (*derivedFile, error) {
 			"%s: independent parse failed: %w", file.ID(), err,
 		)
 	}
-	owner := "source:" + file.ID().String()
+	owner, err := structure.SourceFileOwner(file.ID())
+	if err != nil {
+		return nil, err
+	}
 	builder := &derivedFile{
 		ledger:      newStructuralLedger(),
 		file:        file,
 		fset:        fset,
 		raw:         raw,
+		displayFile: file.ID().String(),
 		owner:       owner,
 		occurrences: map[identity.OccurrenceID]derivedOccurrence{},
 		anchors:     map[identity.OccurrenceID]bool{},
 		definitions: map[identity.DefinitionID]ast.Node{},
 	}
-	builder.ledger.add("owner", owner)
-	builder.ledger.add("containment-graph", owner)
+	addRecord(&builder.ledger.owners, owner)
+	addRecord(&builder.ledger.containmentGraphs, owner)
 	root, err := builder.occurrence(
 		syntax, identity.OccurrenceID{}, catalog.EdgeInvalid, 0,
 	)
@@ -95,16 +87,16 @@ func deriveFile(file *source.LoadedFile) (*derivedFile, error) {
 	if err := builder.recordOccurrence(root); err != nil {
 		return nil, err
 	}
-	builder.ledger.add(
-		"owner-member", fmt.Sprintf("%s|%s", owner, root.id),
-	)
+	addRecord(&builder.ledger.ownerMembers, ownerMemberLedgerRecord{
+		owner: owner, member: root.id,
+	})
 	context, err := catalog.NewDefinitionContext(
 		catalog.DefinitionScopePackage, catalog.TokenInvalid,
 	)
 	if err != nil {
 		return nil, err
 	}
-	if err := builder.walkOwner(syntax, root, nil, context); err != nil {
+	if err := builder.walkOwner(syntax, root, context); err != nil {
 		return nil, err
 	}
 	if err := builder.deriveDirectives(syntax); err != nil {
@@ -116,7 +108,6 @@ func deriveFile(file *source.LoadedFile) (*derivedFile, error) {
 func (b *derivedFile) walkOwner(
 	node ast.Node,
 	current derivedOccurrence,
-	path []derivedPathStep,
 	context catalog.DefinitionContext,
 ) error {
 	children, err := independentChildren(node, current.kind)
@@ -136,38 +127,41 @@ func (b *derivedFile) walkOwner(
 		if err != nil {
 			return err
 		}
-		next := append(path, derivedPathStep{
+		b.path = append(b.path, derivedPathStep{
 			node: child.node, occurrence: occurrence,
 		})
 		definitionKind, isDefinition, err := independentDefinitionKind(
 			child.node, childContext,
 		)
 		if err != nil {
+			b.path = b.path[:len(b.path)-1]
 			return err
 		}
 		if isDefinition {
-			if err := b.addDefinition(
+			err = b.addDefinition(
 				child.node,
 				occurrence,
 				definitionKind,
 				identity.DefinitionID{},
-				next,
+				0,
 				childContext,
-			); err != nil {
-				return err
+			)
+		} else {
+			err = b.recordOccurrence(occurrence)
+			if err == nil {
+				addRecord(
+					&b.ledger.ownerMembers,
+					ownerMemberLedgerRecord{
+						owner: b.owner, member: occurrence.id,
+					},
+				)
+				err = b.walkOwner(
+					child.node, occurrence, childContext,
+				)
 			}
-			continue
 		}
-		if err := b.recordOccurrence(occurrence); err != nil {
-			return err
-		}
-		b.ledger.add(
-			"owner-member",
-			fmt.Sprintf("%s|%s", b.owner, occurrence.id),
-		)
-		if err := b.walkOwner(
-			child.node, occurrence, next, childContext,
-		); err != nil {
+		b.path = b.path[:len(b.path)-1]
+		if err != nil {
 			return err
 		}
 	}
@@ -179,7 +173,7 @@ func (b *derivedFile) addDefinition(
 	root derivedOccurrence,
 	kind identity.DefinitionKind,
 	parent identity.DefinitionID,
-	path []derivedPathStep,
+	pathStart int,
 	context catalog.DefinitionContext,
 ) error {
 	definition, err := identity.NewSourceDefinitionID(root.id, kind)
@@ -197,36 +191,32 @@ func (b *derivedFile) addDefinition(
 	b.definitions[definition] = node
 	header, _ := identity.NewHeaderRegionID(definition)
 	boundary, _ := identity.NewExecutionBoundaryID(definition)
-	if len(path) == 0 || path[len(path)-1].occurrence.id != root.id {
+	if pathStart < 0 ||
+		pathStart >= len(b.path) ||
+		b.path[len(b.path)-1].occurrence.id != root.id {
 		return fmt.Errorf(
 			"independent definition %s has no exact path", definition,
 		)
 	}
-	if err := b.ensurePath(path[:len(path)-1]); err != nil {
+	if err := b.ensurePath(
+		b.path[pathStart : len(b.path)-1],
+	); err != nil {
 		return err
 	}
-	b.ledger.add(
-		"definition",
-		fmt.Sprintf(
-			"%s|%s|%s|%s|%s",
-			definition,
-			b.owner,
-			header,
-			boundary,
-			independentDefinitionName(node),
-		),
-	)
-	b.ledger.add(
-		"definition-site",
-		fmt.Sprintf(
-			"%d|%s|%s|%s|%s",
-			uint8(structure.DefinitionSiteSource),
-			definition,
-			b.owner,
-			parent,
-			root.id,
-		),
-	)
+	addRecord(&b.ledger.definitions, definitionLedgerRecord{
+		id:       definition,
+		owner:    b.owner,
+		header:   header,
+		boundary: boundary,
+		name:     independentDefinitionName(node),
+	})
+	addRecord(&b.ledger.definitionSites, definitionSiteLedgerRecord{
+		kind:       structure.DefinitionSiteSource,
+		definition: definition,
+		owner:      b.owner,
+		parent:     parent,
+		terminal:   root.id,
+	})
 	entries, err := independentDefinitionEntries(node)
 	if err != nil {
 		return err
@@ -267,29 +257,29 @@ func (b *derivedFile) addDefinition(
 		if err != nil {
 			return err
 		}
+		b.path = append(b.path, derivedPathStep{
+			node: entry.node, occurrence: entryOccurrence,
+		})
+		entryPathStart := len(b.path) - 1
 		if nested {
-			if err := b.addDefinition(
+			err = b.addDefinition(
 				entry.node,
 				entryOccurrence,
 				nestedKind,
 				definition,
-				[]derivedPathStep{{
-					node: entry.node, occurrence: entryOccurrence,
-				}},
+				entryPathStart,
 				executableContext,
-			); err != nil {
-				return err
-			}
-			continue
+			)
+		} else {
+			err = b.scanNested(
+				entry.node,
+				definition,
+				entryPathStart,
+				executableContext,
+			)
 		}
-		if err := b.scanNested(
-			entry.node,
-			definition,
-			[]derivedPathStep{{
-				node: entry.node, occurrence: entryOccurrence,
-			}},
-			executableContext,
-		); err != nil {
+		b.path = b.path[:len(b.path)-1]
+		if err != nil {
 			return err
 		}
 	}
@@ -299,7 +289,7 @@ func (b *derivedFile) addDefinition(
 func (b *derivedFile) scanNested(
 	node ast.Node,
 	parent identity.DefinitionID,
-	path []derivedPathStep,
+	pathStart int,
 	context catalog.DefinitionContext,
 ) error {
 	kind, err := independentKind(node)
@@ -314,7 +304,7 @@ func (b *derivedFile) scanNested(
 	if err != nil {
 		return err
 	}
-	parentOccurrence := path[len(path)-1].occurrence
+	parentOccurrence := b.path[len(b.path)-1].occurrence
 	for _, child := range children {
 		occurrence, err := b.occurrence(
 			child.node,
@@ -325,31 +315,32 @@ func (b *derivedFile) scanNested(
 		if err != nil {
 			return err
 		}
-		next := append(path, derivedPathStep{
+		b.path = append(b.path, derivedPathStep{
 			node: child.node, occurrence: occurrence,
 		})
 		definitionKind, nested, err := independentDefinitionKind(
 			child.node, childContext,
 		)
 		if err != nil {
+			b.path = b.path[:len(b.path)-1]
 			return err
 		}
 		if nested {
-			if err := b.addDefinition(
+			err = b.addDefinition(
 				child.node,
 				occurrence,
 				definitionKind,
 				parent,
-				next,
+				pathStart,
 				childContext,
-			); err != nil {
-				return err
-			}
-			continue
+			)
+		} else {
+			err = b.scanNested(
+				child.node, parent, pathStart, childContext,
+			)
 		}
-		if err := b.scanNested(
-			child.node, parent, next, childContext,
-		); err != nil {
+		b.path = b.path[:len(b.path)-1]
+		if err != nil {
 			return err
 		}
 	}
@@ -365,9 +356,11 @@ func (b *derivedFile) ensurePath(path []derivedPathStep) error {
 			continue
 		}
 		b.anchors[step.occurrence.id] = true
-		b.ledger.add(
-			"containment-anchor",
-			fmt.Sprintf("%s|%s", b.owner, step.occurrence.id),
+		addRecord(
+			&b.ledger.containmentAnchors,
+			containmentAnchorLedgerRecord{
+				owner: b.owner, anchor: step.occurrence.id,
+			},
 		)
 	}
 	return nil
@@ -388,12 +381,13 @@ func (b *derivedFile) addHeader(
 	if err != nil {
 		return err
 	}
-	b.ledger.add("header", fmt.Sprintf("%s|%s", header, digest))
+	addRecord(&b.ledger.headers, headerLedgerRecord{
+		id: header, digest: digest,
+	})
 	for index, occurrence := range members {
-		b.ledger.add(
-			"header-member",
-			fmt.Sprintf("%s|%d|%s", header, index, occurrence.id),
-		)
+		addRecord(&b.ledger.headerMembers, headerMemberLedgerRecord{
+			header: header, ordinal: index, occurrence: occurrence.id,
+		})
 	}
 	return nil
 }
@@ -466,20 +460,18 @@ func (b *derivedFile) addBoundary(
 			return err
 		}
 		hashes = append(hashes, hash)
-		b.ledger.add(
-			"execution-entry",
-			fmt.Sprintf("%s|%s|%s", boundary, occurrence.id, hash),
-		)
+		addRecord(&b.ledger.executionEntries, executionEntryLedgerRecord{
+			boundary: boundary, occurrence: occurrence.id, hash: hash,
+		})
 	}
 	if len(hashes) > 0 {
 		combined = independentDigest(hashes...)
 	}
-	b.ledger.add(
-		"execution-boundary",
-		fmt.Sprintf(
-			"%s|%d|%s|0|0",
-			boundary, uint8(boundaryKind), combined,
-		),
+	addRecord(
+		&b.ledger.executionBoundaries,
+		executionBoundaryLedgerRecord{
+			id: boundary, kind: boundaryKind, digest: combined,
+		},
 	)
 	return nil
 }
@@ -497,7 +489,10 @@ func (b *derivedFile) recordOccurrence(
 		return nil
 	}
 	b.occurrences[occurrence.id] = occurrence
-	b.ledger.add("occurrence", occurrence.key())
+	addRecord(
+		&b.ledger.occurrences,
+		occurrenceLedgerRecordFromDerived(occurrence),
+	)
 	return nil
 }
 
@@ -563,19 +558,19 @@ func (b *derivedFile) display(node ast.Node) structure.DisplaySpan {
 	physicalStart := b.fset.PositionFor(node.Pos(), false)
 	physicalEnd := b.fset.PositionFor(node.End(), false)
 	return structure.DisplaySpan{
-		Start: independentDisplayPosition(start, physicalStart, b.file.ID()),
-		End:   independentDisplayPosition(end, physicalEnd, b.file.ID()),
+		Start: independentDisplayPosition(start, physicalStart, b.displayFile),
+		End:   independentDisplayPosition(end, physicalEnd, b.displayFile),
 	}
 }
 
 func independentDisplayPosition(
 	adjusted token.Position,
 	physical token.Position,
-	file identity.FileID,
+	physicalFile string,
 ) structure.DisplayPosition {
 	filename := adjusted.Filename
 	if filename == physical.Filename {
-		filename = file.String()
+		filename = physicalFile
 	}
 	return structure.DisplayPosition{
 		Filename: filename,

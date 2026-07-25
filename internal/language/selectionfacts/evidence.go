@@ -77,7 +77,9 @@ func buildEvidenceIndex(
 				mapping.CheckedDigest(),
 			)
 		}
-		for _, definition := range pkg.Definitions() {
+		if err := pkg.VisitDefinitions(func(
+			definition structure.ImplementationDefinition,
+		) error {
 			out.definitions[definition.ID()] = definitionEvidence{
 				pkg:      pkg.ID(),
 				fileHash: fileHashes[definition.ID().File()],
@@ -85,6 +87,9 @@ func buildEvidenceIndex(
 				boundary: boundaries[definition.ID()],
 				mapping:  mappings[definition.ID()],
 			}
+			return nil
+		}); err != nil {
+			return err
 		}
 		return nil
 	}); err != nil {
