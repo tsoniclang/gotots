@@ -49,7 +49,12 @@ func Emit(
 	if err != nil {
 		return nil, err
 	}
-	body, err := children.Block(context.WithRole(api.RoleFunctionBody), source.Body)
+	body, err := children.Block(
+		context.
+			WithRole(api.RoleFunctionBody).
+			WithFunctionResults(signature.Results()),
+		source.Body,
+	)
 	if err != nil {
 		return nil, err
 	}

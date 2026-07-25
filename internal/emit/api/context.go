@@ -8,14 +8,16 @@ import (
 )
 
 type Context struct {
-	role         Role
-	fileSet      *token.FileSet
-	typesPackage *types.Package
-	typesInfo    *types.Info
-	typesSizes   types.Sizes
-	factory      tsgo.Factory
-	names        Names
-	placement    Placement
+	role            Role
+	fileSet         *token.FileSet
+	typesPackage    *types.Package
+	typesInfo       *types.Info
+	typesSizes      types.Sizes
+	factory         tsgo.Factory
+	names           Names
+	placement       Placement
+	expectedType    types.Type
+	functionResults *types.Tuple
 }
 
 func NewContext(
@@ -61,6 +63,16 @@ func (c Context) WithRole(role Role) Context {
 	return c
 }
 
+func (c Context) WithExpectedType(expectedType types.Type) Context {
+	c.expectedType = expectedType
+	return c
+}
+
+func (c Context) WithFunctionResults(results *types.Tuple) Context {
+	c.functionResults = results
+	return c
+}
+
 func (c Context) Role() Role {
 	return c.role
 }
@@ -91,4 +103,12 @@ func (c Context) Names() Names {
 
 func (c Context) Placement() Placement {
 	return c.placement
+}
+
+func (c Context) ExpectedType() types.Type {
+	return c.expectedType
+}
+
+func (c Context) FunctionResults() *types.Tuple {
+	return c.functionResults
 }

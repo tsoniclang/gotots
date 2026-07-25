@@ -43,7 +43,9 @@ func Emit(
 			return nil, api.Unsupported(context, api.CategoryExpression, source)
 		}
 		target, err := children.Expression(
-			context.WithRole(api.RoleCallArgument),
+			context.
+				WithRole(api.RoleCallArgument).
+				WithExpectedType(signature.Params().At(index).Type()),
 			argument,
 		)
 		if err != nil {

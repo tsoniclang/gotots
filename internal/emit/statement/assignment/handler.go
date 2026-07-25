@@ -52,7 +52,9 @@ func emitDefinition(
 		return nil, err
 	}
 	value, err := children.Expression(
-		context.WithRole(api.RoleLocalValue),
+		context.
+			WithRole(api.RoleLocalValue).
+			WithExpectedType(object.Type()),
 		source.Rhs[0],
 	)
 	if err != nil {
@@ -94,7 +96,9 @@ func emitAssignment(
 		return nil, err
 	}
 	value, err := children.Expression(
-		context.WithRole(api.RoleAssignmentValue),
+		context.
+			WithRole(api.RoleAssignmentValue).
+			WithExpectedType(object.Type()),
 		source.Rhs[0],
 	)
 	if err != nil {

@@ -14,6 +14,9 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.UnaryExpr,
 ) (tsgo.Expression, error) {
+	if source.Op == token.SUB && context.TypesInfo().Types[source].Value != nil {
+		return children.IntegerConstant(context, source)
+	}
 	resultType, resultIsBasic := boolType(context.TypesInfo().TypeOf(source))
 	operandType, operandIsBasic := boolType(context.TypesInfo().TypeOf(source.X))
 	if source.Op != token.NOT ||
@@ -24,7 +27,9 @@ func Emit(
 		return nil, api.Unsupported(context, api.CategoryExpression, source)
 	}
 	operand, err := children.Expression(
-		context.WithRole(api.RoleUnaryOperand),
+		context.
+			WithRole(api.RoleUnaryOperand).
+			WithExpectedType(types.Typ[types.Bool]),
 		source.X,
 	)
 	if err != nil {

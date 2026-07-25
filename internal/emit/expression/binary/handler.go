@@ -18,11 +18,25 @@ func Emit(
 	if !ok {
 		return nil, api.Unsupported(context, api.CategoryExpression, source)
 	}
-	left, err := children.Expression(context.WithRole(api.RoleBinaryLeft), source.X)
+	operandType := context.TypesInfo().TypeOf(source)
+	if context.ExpectedType() != nil {
+		operandType = context.ExpectedType()
+	}
+	left, err := children.Expression(
+		context.
+			WithRole(api.RoleBinaryLeft).
+			WithExpectedType(operandType),
+		source.X,
+	)
 	if err != nil {
 		return nil, err
 	}
-	right, err := children.Expression(context.WithRole(api.RoleBinaryRight), source.Y)
+	right, err := children.Expression(
+		context.
+			WithRole(api.RoleBinaryRight).
+			WithExpectedType(operandType),
+		source.Y,
+	)
 	if err != nil {
 		return nil, err
 	}

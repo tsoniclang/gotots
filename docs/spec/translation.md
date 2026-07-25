@@ -314,6 +314,38 @@ the selected consumer contract supplies one. Rounded numeric literals,
 ordinary-value-only claims, and test declarations that pretend `int64` is
 `bigint` are forbidden.
 
+For the selected Tsonic contract, the signed-integer literal owner reads the
+exact `go/constant.Value` and the expected Go type supplied by its parent. A
+small value is explicitly attributed to the canonical target primitive:
+
+```ts
+42 as int64
+```
+
+A value outside JavaScript's exact integer range is split into at most two
+base-`2^32` chunks, each still exactly representable:
+
+```ts
+(2147483647 as int64) * (4294967296 as int64)
+    + (4294967295 as int64)
+```
+
+That expression denotes Go's `9223372036854775807` without ever materializing
+an inexact JavaScript numeric literal. Negative constants use typed subtraction
+rather than a target-ambiguous unary minus; `MinInt64` is:
+
+```ts
+((0 as int64) - (2147483647 as int64) - (1 as int64))
+    * (4294967296 as int64)
+```
+
+These `as int64` nodes are canonical Tsonic source-primitive evidence selected
+from the authoritative expected Go type. They are not unchecked casts,
+structural recovery, or substitutes for a missing semantic fact. The
+representation is constant-size for every signed 64-bit value, introduces no
+helper or runtime call, and must be compiled and executed through the selected
+target because direct Node execution cannot verify its result.
+
 An implicit Go operation has no separate source IR node. The handler that owns
 the containing construct queries type evidence and creates the required typed
 TS-Go protocol AST directly. Shared runtime calls are permitted only when they
