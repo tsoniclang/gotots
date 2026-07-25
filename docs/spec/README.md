@@ -1,306 +1,115 @@
-# GoToTS Governing Specification
+# GoToTS Specification
 
 ## Authority
 
-This directory is the only normative GoToTS specification. Its six Markdown
-files form one contract. Requirements are interpreted in this order:
+These five files are the complete governing specification:
 
-1. the selected Go language version and build semantics;
-2. this specification;
-3. accepted architecture decisions that satisfy this specification;
-4. revision-bound machine evidence; and
-5. implementation comments.
+1. `README.md` — product boundary and vocabulary;
+2. `architecture.md` — direct compiler architecture and project structure;
+3. `translation.md` — contextual construct translation contract;
+4. `verification.md` — proof and regression requirements; and
+5. `delivery.md` — implementation order and completion criteria.
 
-Historical plans, reviews, generated reports, and non-governing implementations are
-evidence only. They cannot override this contract. There is no compatibility
-specification and no second implementation path.
-
-The terms **must** and **must not** are requirements. **Should** means required
-unless a reviewed, strictly stronger mechanism proves every affected
-requirement. Examples are normative in semantic shape; incidental identifier
-spelling is illustrative.
+Historical branches, plans, reports, and implementations are evidence only.
+They cannot override this specification. Requirements use **must** and
+**must not**.
 
 ## Mission
 
-GoToTS is a general Go-to-TypeScript compiler. Given an arbitrary valid Go
-workspace, a selected Go toolchain/build configuration, roots, and explicit
-environment contracts, it must produce deterministic, readable, strict ESM
-TypeScript with Go-equivalent observable behavior.
+Given a valid selected Go project, toolchain, build configuration, and explicit
+environment contracts, GoToTS produces deterministic, readable, strict ESM
+TypeScript with equivalent observable behavior.
 
-Generated core TypeScript is also a Tsonic compilation input. It must remain in
-the statically compilable Tsonic subset; JavaScript dynamic-invocation or
-prototype mechanisms are not an intermediate escape hatch. The final bootstrap
-includes translating GoToTS itself and compiling that generated TypeScript with
-Tsonic.
+It is a general Go compiler. `typescript-go` is an acceptance corpus, not a
+production dependency, language authority, package-name exception, or source
+of privileged translation rules.
 
-Microsoft's `typescript-go` repository is the first large acceptance corpus.
-It is not a language authority, compiler dependency, privileged profile, or
-source of lowering rules. A fix discovered through that corpus must be reduced
-to a project-independent Go construct or semantic operation before entering
-the compiler.
+Generated TypeScript must remain inside the statically compilable Tsonic
+subset. Translating GoToTS itself and compiling that output through Tsonic is a
+final product proof.
 
-GoToTS is complete only when the selected language constructs and environment
-contracts are implemented and all applicable gates pass. During development,
-an unsupported construct may produce an explicit typed placeholder in manual
-completion mode; it must never be reported as translated or publishable.
-
-## Central Contract
+## One Compilation Model
 
 ```text
-selected Go workspace and toolchain
-        -> coherent resolved package/file/byte universe
-        -> request-bound local/certified structural-source plan
-        -> complete depth-independent
-           owner/containment/definition/site/header/boundary graph
-        -> closed preselection facts
-        -> explicit per-definition provider/evidence-depth selection
-        -> complete full-semantic executable occurrence/role inventory
-        -> typed, target-independent Go semantic model
-        -> sealed whole-program facts and semantic reachability
-        -> one immutable TypeScript representation plan
-        -> exact pinned TS-Go schema-level AST
-        -> generated/manual reconciliation
-        -> complete post-assembly implementation reachability graph
-        -> strict verification and atomic publication
+selected files and package graph
+        |
+        v
+standard Go parser + one coherent go/types graph
+        |
+        v
+one parent-directed, context-aware emission walk
+        |
+        v
+generated Go bindings for the pinned TS-Go AST schema
+        |
+        v
+one TS-Go formatter
+        |
+        v
+strict TypeScript modules
 ```
 
-The governing equation is:
+The source program is represented only by the selected Go AST and its
+`go/types` evidence. The target program is represented only by TS-Go AST nodes.
+There is no compiler-defined source inventory artifact, semantic IR, operation
+graph, whole-program plan, lowering IR, handwritten target tree, or target-text
+fallback between them.
 
-```text
-complex compile-time reasoning + one owner per semantic fact
-    = simple, direct, source-shaped TypeScript
-```
+This does not prohibit ordinary compiler coordination. Deterministic names,
+scope builders, imports, target declarations, diagnostics, references into the
+Go graph, and placement requests are allowed. They must not restate the source
+program as a second model or become a second semantic truth owner.
 
-Runtime dictionaries, repeated aliases, per-call implementer switches, hidden
-operation arguments, wrappers, casts, or duplicated definitions are not
-acceptable substitutes for compile-time analysis.
+## Vocabulary
 
-## Scope And Boundaries
+- **Go construct:** a grammar form represented by Go syntax, such as an
+  assignment, call, declaration, index, receive, return, or function literal.
+- **construct occurrence:** one concrete Go AST node in one selected file.
+- **context:** facts supplied by the parent handler, such as expression versus
+  statement position, assignment target, expected arity/type, lexical scope,
+  and evaluation boundary.
+- **semantic evidence:** the selected toolchain's `go/types` facts for the
+  existing Go AST, including object bindings, types, constants, instances,
+  selections, and signatures.
+- **handler:** the one contextual translation owner for a construct family.
+- **emission result:** TS-Go AST nodes plus explicit placement requests and
+  diagnostics. It is target output under construction, not an IR.
+- **placement request:** a typed request to insert an import, declaration,
+  helper, temporary, or statement at a legal preferred target scope.
+- **representation rule:** the direct rule choosing an exact TypeScript shape
+  for a Go type, method, interface, value, or operation.
+- **manual obligation:** an exact generated declaration whose implementation
+  must be supplied manually.
+- **true external:** unavailable or host/native behavior represented by an
+  explicit contract rather than inferred from import spelling.
 
-The compiler owns:
+## Product Boundaries
 
-- Go syntax, typing, evaluation order, storage, copying, nil, panic, defer,
-  initialization, interfaces, generics, concurrency, and built-in operations;
-- target-independent semantic classification and whole-program analysis;
-- one exact TypeScript representation for each selected semantic region;
-- deterministic typed output, provenance, and source maps;
-- generated/manual ownership, regeneration, and full-graph reachability; and
-- proof that generated behavior and architecture satisfy this specification.
+All imported packages obey the same Go language. Toolchain metadata separately
+identifies:
 
-The compiler does not invent host behavior. The following have explicit
-owners:
+- workspace and source-available dependency packages, which are translated;
+- standard-library declarations, whose selected-`GOROOT` contracts are
+  generated and whose behavior is completed in reusable `gostdlib`;
+- toolchain pseudo-packages and intrinsics, which have explicit compiler
+  ownership; and
+- true external, native, platform, `cgo`, or unsupported boundaries, which
+  receive exact contracts and explicit placeholders.
 
-- `runtime/` implements the smallest reusable machinery needed for Go language
-  semantics that ordinary TypeScript cannot express directly;
-- `gostdlib/` is the reusable, manually completed TypeScript implementation of
-  the selected Go standard-library API, with signatures and placeholders
-  generated from that toolchain;
-- external contracts own unavailable source, host, native, `cgo`, `unsafe`, or
-  platform operations; and
-- the existing customer-facing extension architecture owns separately
-  supplied product behavior through finalized typed evidence.
+No import-path prefix decides these classes.
 
-All ordinary imported packages have the same Go language semantics. Package
-provenance is a separate resolved fact used for identity, output routing, and
-implementation ownership; it never changes construct interpretation.
-Source-available third-party dependencies are ordinary selected Go source, not
-external stubs merely because they are outside the root module. Standard-library
-membership comes only from the selected toolchain's package metadata, never
-from import-path spelling or a filesystem-prefix test.
+## Non-Negotiable Results
 
-## Binding Vocabulary
-
-- **Go construct:** a syntactic form expressible by the selected Go grammar,
-  such as assignment, call, declaration, receive, type assertion, or `defer`.
-- **semantic variant:** a construct after contextual typing resolves its
-  meaning, such as one-result map lookup versus comma-ok lookup.
-- **implicit operation:** Go behavior not represented by a dedicated syntax
-  node, such as value copying, zero construction, method promotion, boxing, or
-  package initialization.
-- **source identity:** stable identity for a package, declaration, binding,
-  type, construct occurrence, or source span.
-- **package provenance:** the toolchain-resolved class `workspace-module`,
-  `module-dependency`, `standard-library`, `toolchain-package`, or
-  `language-pseudo`; it is not an implementation policy.
-- **source acquisition:** where selected bytes came from—workspace, module
-  cache, vendor tree, local replacement, or `GOROOT`—plus applied overlays.
-  Acquisition never substitutes for provenance or semantic identity.
-- **structural-source plan:** the request-bound per-file choice of local syntax
-  or a certified provider graph from which Stage 1 derives definitions. It is
-  policy owned by `internal/scope/sourceplan`, not a physical
-  source-acquisition fact or a definition-depth decision.
-- **implementation definition:** one source-spanned or typed implicit Go
-  construct with independently selectable implementation ownership: a function
-  or method declaration, function literal, package initializer, bodyless
-  obligation, or cataloged implicit implementation. Value copying, zeroing,
-  boxing, promotion, and other implicit semantics inside an existing definition
-  are operations in that definition, not additional definitions.
-- **owner region:** one structural root for a selected source file or canonical
-  synthetic semantic owner. A source-file region owns package/import/type/
-  non-implementation declaration structure and stops at every implementation
-  definition site.
-- **definition identity (`DefinitionID`):** revision-bound identity for one
-  implementation definition, anchored to its construct root or typed implicit
-  owner rather than to whichever executable evidence is retained.
-- **definition site:** the definition's one source-containment edge or typed
-  implicit-owner edge. A source site references a complete path in the file's
-  normalized sparse containment graph; it does not copy that path. It is not a
-  call, use, or reachability reference.
-- **header region:** the definition root and its ordered non-executable
-  construct occurrences, excluding its execution boundary and every nested
-  definition interior.
-- **execution boundary:** the closed definition-owned description of executable
-  entries: one block, ordered initializer expressions, a bodyless obligation,
-  or a typed implicit operation. Its identity and content digest are separate
-  from the definition and header.
-- **executable region:** the ordered contextual occurrence graph reachable from
-  a source execution boundary, or the typed operation graph of a cataloged
-  implicit implementation, excluding nested definition interiors. It is
-  materialized only when evidence depth is `full-semantic`.
-- **definition selection:** the separate request-bound provider, evidence depth,
-  rule, and witness chosen for one `DefinitionID`. Selection is not a field of
-  the depth-independent structural graph.
-- **implementation identity (`ImplementationID`):** stable identity for one
-  concrete planned, emitted, or manual implementation. One `DefinitionID` may
-  produce multiple `ImplementationID`s through generic or representation
-  specialization; the two identity domains are never interchangeable.
-- **semantic model:** the minimum target-independent representation needed to
-  state exact Go operations and effects. It is not emitted TypeScript.
-- **fact:** a whole-program truth derived once from the semantic model.
-- **plan:** an immutable, total decision selecting storage, calls, copies,
-  dispatch, modules, and target operations.
-- **generated unit:** a declaration or executable body carrying a valid
-  GoToTS ownership marker and matching post-format baseline hash.
-- **manual unit:** a declaration/body without a generated marker, or one whose
-  current post-format body hash differs from its generated baseline.
-- **placeholder:** a generated, typed, throwing body for an explicitly
-  unsupported or externally owned implementation.
-- **product root:** an explicitly selected executable, public API, test, or
-  extension assembly root.
-- **certified:** materialized, strict-typechecked, reachable, executed where
-  applicable, independently verified, and covered by a passing publication
-  attestation.
-
-## WCBUBWHB Requirement
-
-Every design, implementation, review, test, and generated-surface change begins
-with WCBUBWHB analysis:
-
-1. Show the observed source and artifact problem.
-2. Search for the complete semantic class and sibling paths.
-3. Name the one authoritative truth owner.
-4. Fix the highest layer that can eliminate the class.
-5. Delete the wrong abstraction, duplicate state, fallback, or alternate route.
-6. State the simplest exact result without preserving current implementation
-   shape.
-7. Measure staticness, source size, typecheck cost, runtime, extension, and
-   consumer consequences.
-8. Show source -> semantic decision -> produced TypeScript examples.
-9. Establish independent differential/contract and mutation proof.
-10. Prove by broad search that no sibling or replaced path remains.
-
-A second occurrence of the same workaround class stops feature work and
-reopens the owning abstraction.
-
-## Non-Negotiable Invariants
-
-- One semantic fact has one authoritative producer and one typed identity.
-- Every encountered/audited Go construct occurrence has exactly one catalog
-  classification and support disposition. Every retained owner/header/
-  executable occurrence has exactly one contextual `OccurrenceResolution`;
-  unknown, unclassified, and silently omitted are hard failures.
-- Parents assign grammatical roles to child constructs; children do not infer
-  meaning by inspecting parents or source text.
-- Whole-program facts are sealed before planning; planning is total and
-  immutable before lowering.
-- Lowering performs no type checking, semantic discovery, representation
-  choice, or corpus-specific recognition.
-- Every generated TypeScript syntactic construct is represented by an exact
-  typed node in the pinned TS-Go schema-level AST contract; punctuation,
-  keywords, escaping, and trivia are derived only by the sole formatter from
-  that tree. The schema snapshot is the sole target-AST authority; generated
-  bindings, factories, visitors, validators, transforms, completion parsing,
-  and formatting cannot define or admit a second node shape. Identifier and
-  literal payloads are data, never reinterpreted as preformatted TypeScript
-  fragments.
-- One current implementation path exists. No fallback, compatibility reader,
-  old/new mode, retry with changed semantics, or duplicate state survives.
-- No semantic value is recovered through `any`, `unknown`, unchecked casts,
-  reflection, spelling lookup, source-text scanning, or dynamic host-shape
-  inspection.
-- Every implementation definition is owned once and has exactly one definition
-  site. Later semantic, call, dispatch, initialization, and reachability
-  references may repeat; none substitutes for the definition site.
-- Ordinary Go calls remain ordinary TypeScript calls; hidden semantic
-  arguments require local typed necessity evidence and are never the default.
-- Generated code never invokes through `Function.prototype.call`, `apply`, or
-  `bind`, and never uses prototype lookup/manipulation to recover Go method
-  semantics. Method adapters are ordinary statically typed functions or
-  lambdas selected by a closed plan.
-- Generated output is source-shaped and cost-bounded from the first construct,
-  not optimized after semantic completion.
-- Generated and manual declarations may coexist in one file; ownership is per
-  declaration/body, never per file.
-- Manual code requires only TypeScript code. No user-authored registry attaches
-  it to generated output.
-- Regeneration starts from an empty generated baseline and never preserves old
-  generated text.
-- Reachability traverses generated, manual, runtime, standard-library,
-  external, extension, initialization, function-value, and dynamic-dispatch
-  edges before publication or pruning.
-- Customer extension behavior remains supported through one typed extension
-  contract; extensions consume finalized evidence and never re-enter semantic
-  analysis.
-- Compilation and verification are deterministic and have no LLM dependency.
-
-## Honest Support States
-
-Each selected concrete `ImplementationID` has exactly one current support
-state:
-
-- `automatic`: completely generated by a proven lowering;
-- `manual`: implemented by accepted manual TypeScript;
-- `external`: implemented through a resolved external or standard-library
-  contract;
-- `placeholder`: typed but unresolved and therefore publication-blocking; or
-- `unsupported`: analysis can identify the exact construct but no permitted
-  materialization exists.
-
-Before planning creates concrete implementations, a `DefinitionID` carries only
-its exact analysis/provider disposition; it does not borrow a final support
-state from one future specialization. One definition may produce several
-concrete implementations, and their states are reported separately.
-
-These states are separate from processing stages such as inventoried,
-semantically analyzed, planned, emitted, typechecked, executed, and certified.
-Reports must name both the support state and the highest completed stage.
-
-## Reading Order
-
-- [`architecture.md`](architecture.md) defines ownership, pipeline, dependency
-  walls, project structure, and context-aware analysis.
-- [`translation.md`](translation.md) defines the Go construct inventory,
-  semantic operations, planning rules, and representative output.
-- [`completion.md`](completion.md) defines runtime, standard library,
-  externals, extensions, manual ownership, regeneration, and reachability.
-- [`verification.md`](verification.md) defines independent proof, architecture
-  gates, performance controls, and the eighteen publication gates.
-- [`delivery.md`](delivery.md) defines the cleanroom implementation order,
-  deletion policy, upgrade process, and final acceptance checklist.
-
-## Completion
-
-GoToTS may be described as complete for a declared Go version and target
-profile only when:
-
-- the language catalog is exhaustive for that Go version;
-- every selected occurrence has one exact disposition;
-- every reachable implementation is automatic, accepted manual, or resolved
-  external;
-- no reachable placeholder or unsupported construct remains;
-- two unrelated Go projects and the first large acceptance corpus pass;
-- regeneration preserves reachable manual work and identifies obsolete work;
-- the existing extension contract passes its customer compatibility suite;
-- generated architecture and costs pass their calibrated budgets; and
-- all eighteen gates pass with zero blocked, failed, waived, or stale results
-  at the exact clean published revision.
+- Every encountered construct is handled or fails with a typed unsupported
+  diagnostic carrying source identity and context.
+- Context-sensitive meanings are decided by the parent handler plus
+  `go/types`, never by text or guesses.
+- Every emitted TypeScript construct exists first as an exact TS-Go AST node.
+- Definitions are owned once and output growth remains proportional to source
+  complexity, not interface implementer count or package count.
+- Generated code uses no `any`/`unknown` recovery, dynamic semantic lookup,
+  `.call`, `.apply`, `.bind`, dynamic import, prototype patch, or source-text
+  patching.
+- Correct behavior, strict static typing, maintainable source shape, generated
+  size, typecheck cost, generation cost, and runtime cost are simultaneous
+  acceptance dimensions.
