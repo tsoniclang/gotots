@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -26,8 +27,28 @@ func TestPinnedContractMatchesCheckedInInputs(t *testing.T) {
 	if contract.ToolVersion() != "v0.0.0-20260613021236-c78d39e7075b" {
 		t.Fatalf("tool version = %q", contract.ToolVersion())
 	}
-	if len(contract.Files()) != 7 {
-		t.Fatalf("pinned files = %d, want 7", len(contract.Files()))
+	requiredPaths := []string{
+		"upstream/ast.json",
+		"upstream/ast.schema.json",
+		"upstream/ast.ts",
+		"upstream/encoder.generated.ts",
+		"upstream/encoder.ts",
+		"upstream/languageVariant.enum.ts",
+		"upstream/msgpack.ts",
+		"upstream/nodeFlags.enum.ts",
+		"upstream/protocol.generated.ts",
+		"upstream/protocol.ts",
+		"upstream/scriptKind.enum.ts",
+		"upstream/syntaxKind.enum.ts",
+		"upstream/tokenFlags.enum.ts",
+	}
+	files := contract.Files()
+	paths := make([]string, len(files))
+	for index, file := range files {
+		paths[index] = file.Path()
+	}
+	if !slices.Equal(paths, requiredPaths) {
+		t.Fatalf("pinned paths = %q, want %q", paths, requiredPaths)
 	}
 }
 
