@@ -6,6 +6,34 @@ The compiler always uses the one direct architecture described in
 `architecture.md`. The milestones below sequence implementation and proof; they
 must not become inventory, semantic-model, planning, or lowering stages.
 
+## Construct-Driven Development
+
+Delivery proceeds by construct case:
+
+```text
+focused Go test and minimal fixture
+    -> observed typed unsupported failure
+    -> one semantic-owner handler and closed child contract
+    -> typed official TS-Go protocol AST
+    -> pinned TS-Go print/reparse and strict typecheck
+    -> Go/TypeScript differential execution
+    -> mutation and applicable cost proof
+```
+
+The test is written and run before production support. A semantic owner may
+close several inseparable cases atomically, such as parallel-assignment
+evaluation, but must not silently admit neighboring contextual variants.
+
+Production directories follow:
+
+```text
+internal/emit/<domain>/<semantic-owner>/<sub-owner-as-discovered>
+testdata/constructs/<domain>/<semantic-owner>/<case>
+```
+
+Neither hierarchy is pre-populated. New nesting records an evidenced ownership
+boundary, not an attempt to predict every Go construct.
+
 ## 0. Clean Baseline
 
 Retire the previous implementation and contradictory authority. Preserve its
@@ -19,11 +47,18 @@ Exit:
 - direct architecture and forbidden paths are stated consistently;
 - documentation links and policy identity pass.
 
-## 1. Target Contract And Minimal Loader
+## 1. Native Target Contract And Minimal Loader
 
-Pin the TS-Go schema, generate typed Go bindings/factories, install the sole
-formatter adapter, and load one selected Go package with one coherent
-`go/types` graph.
+Pin one exact TS-Go tool revision and its official external AST schema,
+protocol, encoder contract, and `printNode` API. Generate total node-specific Go
+bindings/factories and the exact binary encoder. Start a persistent pinned
+`tsgo --api --async` process and prove that TS-Go's real decoder, factory, and
+printer accept and print a minimal source file.
+
+Do not create a local formatter, generic target node tree, hand-maintained
+target profile, inferred wire format, or fork of TS-Go internals.
+
+Load one selected Go package with one coherent `go/types` graph.
 
 Install the contextual dispatcher and coverage test. Unsupported constructs
 fail explicitly. Prove one trivial declaration end to end:
@@ -32,8 +67,17 @@ fail explicitly. Prove one trivial declaration end to end:
 func Add(left, right int) int { return left + right }
 ```
 
-The output must be TS-Go-AST-built, strict-typechecked, executed against Go,
-and size-attributed.
+Bootstrap in dependency order:
+
+1. pinned TS-Go tool/contract test;
+2. generated binding and upstream-encoder differential test;
+3. native `printNode` round-trip test;
+4. loader coherence test;
+5. unsupported-dispatch test; and
+6. the first construct test, observed failing at that unsupported boundary.
+
+The output must be built as typed official TS-Go protocol AST, printed by
+TS-Go, strict-typechecked, executed against Go, and size-attributed.
 
 ## 2. Core Direct Emission
 

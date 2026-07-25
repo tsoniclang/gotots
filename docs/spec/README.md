@@ -40,40 +40,58 @@ standard Go parser + one coherent go/types graph
 one parent-directed, context-aware emission walk
         |
         v
-generated Go bindings for the pinned TS-Go AST schema
+generated typed Go bindings for the pinned TS-Go AST protocol
         |
         v
-one TS-Go formatter
+pinned TS-Go printNode API
+(real TS-Go decoder, node factory, and printer)
         |
         v
 strict TypeScript modules
 ```
 
 The source program is represented only by the selected Go AST and its
-`go/types` evidence. The target program is represented only by TS-Go AST nodes.
-There is no compiler-defined source inventory artifact, semantic IR, operation
-graph, whole-program plan, lowering IR, handwritten target tree, or target-text
-fallback between them.
+`go/types` evidence. The target program is represented only by strongly typed
+values generated from TS-Go's official external AST protocol. The pinned TS-Go
+process decodes those values into its real AST nodes and prints them with its
+real printer. There is no compiler-defined source inventory artifact, semantic
+IR, operation graph, whole-program plan, lowering IR, handwritten target tree,
+local formatter, or target-text fallback between them.
 
 This does not prohibit ordinary compiler coordination. Deterministic names,
 scope builders, imports, target declarations, diagnostics, references into the
 Go graph, and placement requests are allowed. They must not restate the source
 program as a second model or become a second semantic truth owner.
 
+Mutable target builders and placement are owned by the root emitter. Handlers
+receive immutable scope identities/capabilities and return placement requests;
+they do not mutate arbitrary ancestors.
+
 ## Vocabulary
 
 - **Go construct:** a grammar form represented by Go syntax, such as an
   assignment, call, declaration, index, receive, return, or function literal.
-- **construct occurrence:** one concrete Go AST node in one selected file.
+- **construct occurrence:** one concrete Go AST node in a dispatchable semantic
+  role. Child syntax consumed as part of its parent's indivisible rule is not
+  forced through an independent handler.
 - **context:** facts supplied by the parent handler, such as expression versus
   statement position, assignment target, expected arity/type, lexical scope,
   and evaluation boundary.
+- **construct case:** a Go AST form together with its parent role, relevant
+  type evidence, expected results, and evaluation context. `values[key]` in a
+  one-result assignment and in a comma-ok assignment are different cases.
 - **semantic evidence:** the selected toolchain's `go/types` facts for the
   existing Go AST, including object bindings, types, constants, instances,
   selections, and signatures.
+- **dispatcher:** a category-level router that selects exactly one semantic
+  owner for one requested node. It never recursively walks the node.
 - **handler:** the one contextual translation owner for a construct family.
-- **emission result:** TS-Go AST nodes plus explicit placement requests and
-  diagnostics. It is target output under construction, not an IR.
+- **child contract:** the handler-owned list of meaningful direct children,
+  their closed roles, dispatch categories, order, and semantic boundaries.
+- **child emitter:** the narrow callback interface through which a handler asks
+  the root emitter to dispatch one child with an explicit context.
+- **emission result:** typed TS-Go protocol AST values plus explicit placement
+  requests and diagnostics. It is target output under construction, not an IR.
 - **placement request:** a typed request to insert an import, declaration,
   helper, temporary, or statement at a legal preferred target scope.
 - **representation rule:** the direct rule choosing an exact TypeScript shape
@@ -102,9 +120,13 @@ No import-path prefix decides these classes.
 
 - Every encountered construct is handled or fails with a typed unsupported
   diagnostic carrying source identity and context.
+- Production dispatch never descends automatically. The selected handler
+  accounts for every direct field and delegates each semantically independent
+  child exactly once under its closed child contract.
 - Context-sensitive meanings are decided by the parent handler plus
   `go/types`, never by text or guesses.
-- Every emitted TypeScript construct exists first as an exact TS-Go AST node.
+- Every emitted TypeScript construct exists first as an exact typed value of
+  TS-Go's official AST protocol and is printed by pinned TS-Go itself.
 - Definitions are owned once and output growth remains proportional to source
   complexity, not interface implementer count or package count.
 - Generated code uses no `any`/`unknown` recovery, dynamic semantic lookup,
