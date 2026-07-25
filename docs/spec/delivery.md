@@ -67,6 +67,22 @@ fail explicitly. Prove one trivial declaration end to end:
 func Add(left, right int) int { return left + right }
 ```
 
+On a selected 64-bit Go target, the first accepted artifact is constructed as
+TS-Go AST and printed as:
+
+```ts
+import type { int64 } from "@tsonic/core/types.js";
+export function Add(left: int64, right: int64): int64 {
+    return left + right;
+}
+```
+
+The `int64` import is a selected-width target primitive contract, not a source
+spelling heuristic. A 32-bit Go target requests `int32` instead. Plain
+TypeScript `number`, unqualified `bigint`, and `BigInt.asIntN` are not accepted
+substitutes: the first loses Go integer exactness and the latter two do not
+carry the finalized Tsonic primitive evidence required by the first consumer.
+
 Bootstrap in dependency order:
 
 1. pinned TS-Go tool/contract test;

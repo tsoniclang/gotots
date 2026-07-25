@@ -289,6 +289,15 @@ Handlers preserve:
 - labels, `goto`, fallthrough, range variants, and termination; and
 - generic constraints, instantiation, type inference, and operations.
 
+The basic-type owner selects integer width from the loaded `types.Sizes`
+evidence and requests the corresponding type-only Tsonic primitive import:
+`int32` or `int64` from `@tsonic/core/types.js`. The file placement owner
+deduplicates and renders that request before declarations. A handler does not
+infer width from `GOARCH` spelling, emit `number`, or call the JavaScript
+`BigInt` global. Integer operations remain direct only where the selected
+primitive/target contract preserves the Go operation; otherwise their shared
+semantic owner must request an explicit typed runtime operation.
+
 An implicit Go operation has no separate source IR node. The handler that owns
 the containing construct queries type evidence and creates the required typed
 TS-Go protocol AST directly. Shared runtime calls are permitted only when they
