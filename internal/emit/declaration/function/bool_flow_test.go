@@ -165,28 +165,6 @@ func TestBoolFlowRejectsUnaryOperatorVariant(t *testing.T) {
 	}
 }
 
-func TestBoolFlowRejectsElseIfUntilItsCaseIsProven(t *testing.T) {
-	loaded := loadBoolFlowProject(t)
-	runFunction := loaded.Files()[0].Syntax().Decls[0].(*ast.FuncDecl)
-	ifStatement := runFunction.Body.List[1].(*ast.IfStmt)
-	ifStatement.Else = &ast.IfStmt{
-		Cond: ifStatement.Cond,
-		Body: ifStatement.Else.(*ast.BlockStmt),
-	}
-
-	compiler := emit.New(loaded)
-	_, err := compiler.EmitFile(loaded.Files()[0].Syntax(), filepath.Join(t.TempDir(), "bool-flow.ts"))
-	var unsupported *api.UnsupportedError
-	if !errors.As(err, &unsupported) {
-		t.Fatalf("error = %v, want *api.UnsupportedError", err)
-	}
-	if unsupported.Category != api.CategoryStatement ||
-		unsupported.Construct != "*ast.IfStmt" ||
-		unsupported.Role != api.RoleBlockStatement {
-		t.Fatalf("unsupported error = %#v", unsupported)
-	}
-}
-
 func TestBoolFlowRejectsConversionAtOrdinaryCallOwner(t *testing.T) {
 	loaded := loadBoolFlowProject(t)
 	runFunction := loaded.Files()[0].Syntax().Decls[0].(*ast.FuncDecl)

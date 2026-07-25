@@ -29,6 +29,7 @@ const (
 	RoleLocalType           Role = "local-type"
 	RoleLocalValue          Role = "local-value"
 	RoleAssignmentValue     Role = "assignment-value"
+	RoleIfInitializer       Role = "if-initializer"
 	RoleIfCondition         Role = "if-condition"
 	RoleIfThen              Role = "if-then"
 	RoleIfElse              Role = "if-else"

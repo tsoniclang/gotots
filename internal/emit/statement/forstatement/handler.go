@@ -4,6 +4,7 @@ import (
 	"go/ast"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func Emit(
@@ -11,30 +12,56 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.ForStmt,
 ) (api.StatementEmission, error) {
-	if source.Init == nil || source.Cond == nil || source.Post == nil || source.Body == nil {
+	if source.Body == nil {
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	initializer, err := children.ForInitializer(
-		context.WithRole(api.RoleForInitializer),
-		source.Init,
-	)
-	if err != nil {
-		return api.StatementEmission{}, err
+	var initializer tsgo.ForInitializer
+	var initializerRequests []api.PlacementRequest
+	if source.Init != nil {
+		target, err := children.ForInitializer(
+			context.WithRole(api.RoleForInitializer),
+			source.Init,
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		initializer = target.Value()
+		initializerRequests = target.Requests()
 	}
-	condition, err := children.Condition(
-		context.WithRole(api.RoleForCondition),
-		source.Cond,
-	)
-	if err != nil {
-		return api.StatementEmission{}, err
+	var condition tsgo.Expression
+	var conditionRequests []api.PlacementRequest
+	if source.Cond != nil {
+		target, err := children.Condition(
+			context.WithRole(api.RoleForCondition),
+			source.Cond,
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		if len(target.Before()) != 0 {
+			return api.StatementEmission{},
+				api.Unsupported(context, api.CategoryStatement, source)
+		}
+		condition = target.Value()
+		conditionRequests = target.Requests()
 	}
-	post, err := children.ForPost(
-		context.WithRole(api.RoleForPost),
-		source.Post,
-	)
-	if err != nil {
-		return api.StatementEmission{}, err
+	var post tsgo.Expression
+	var postRequests []api.PlacementRequest
+	if source.Post != nil {
+		target, err := children.ForPost(
+			context.WithRole(api.RoleForPost),
+			source.Post,
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		if len(target.Before()) != 0 {
+			return api.StatementEmission{},
+				api.Unsupported(context, api.CategoryStatement, source)
+		}
+		post = target.Value()
+		postRequests = target.Requests()
 	}
 	body, err := children.Block(
 		context.WithRole(api.RoleForBody).EnterLoop(),
@@ -43,21 +70,17 @@ func Emit(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	if len(condition.Before()) != 0 || len(post.Before()) != 0 {
-		return api.StatementEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
-	}
 	return api.DirectStatement(
 		context.Factory().ForStatement(
-			initializer.Value(),
-			condition.Value(),
-			post.Value(),
+			initializer,
+			condition,
+			post,
 			body.Value(),
 		),
 		api.CombineRequests(
-			initializer.Requests(),
-			condition.Requests(),
-			post.Requests(),
+			initializerRequests,
+			conditionRequests,
+			postRequests,
 			body.Requests(),
 		)...,
 	), nil

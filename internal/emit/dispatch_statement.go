@@ -46,6 +46,25 @@ func (e *Emitter) Statement(
 	}
 }
 
+func (e *Emitter) IfInitializer(
+	context api.Context,
+	source ast.Stmt,
+) (api.StatementEmission, error) {
+	initializer, ok := source.(*ast.AssignStmt)
+	if !ok {
+		return api.StatementEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	return assignment.Emit(context, e, initializer)
+}
+
+func (e *Emitter) IfAlternate(
+	context api.Context,
+	source *ast.IfStmt,
+) (api.StatementEmission, error) {
+	return ifstatement.Emit(context, e, source)
+}
+
 func (e *Emitter) ForInitializer(
 	context api.Context,
 	source ast.Stmt,

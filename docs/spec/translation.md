@@ -56,6 +56,37 @@ an enclosing loop. The branch handler neither walks to a parent nor infers a
 target from source spelling. Labeled control flow will add an identity-keyed
 target capability at its own construct boundary; it must not weaken this rule.
 
+An `if` initializer is not flattened into the surrounding target block. Its Go
+bindings are scoped to the condition, both branches, and nested `else if`
+chain, so the owner emits one target block containing the initializer
+statements followed by the target `if`:
+
+```go
+if current := value; current < limit {
+	use(current)
+}
+```
+
+```ts
+{
+  let current: GoInt = value;
+  if (current < limit) {
+    use(current);
+  }
+}
+```
+
+An `else if` is delegated through the dedicated `if` child entry, not the
+general statement dispatcher. A nested initializer is therefore wrapped at
+that alternate boundary rather than leaked.
+
+The three `for` clauses are independently optional. Their absence becomes an
+absent TS-Go `ForStatement` child, so `for condition {}`, `for {}`, and partial
+three-clause loops remain direct `for` statements. A present initializer or
+post clause still uses its narrow grammar entry, and a child with prerequisite
+statements remains unsupported until those statements can be placed at the
+per-iteration boundary exactly.
+
 Likewise, for:
 
 ```go

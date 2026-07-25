@@ -12,9 +12,20 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.IfStmt,
 ) (api.StatementEmission, error) {
-	if source.Init != nil || source.Body == nil {
+	if source.Body == nil {
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	var initializer api.StatementEmission
+	var err error
+	if source.Init != nil {
+		initializer, err = children.IfInitializer(
+			context.WithRole(api.RoleIfInitializer),
+			source.Init,
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
 	}
 	condition, err := children.Condition(
 		context.WithRole(api.RoleIfCondition),
@@ -44,28 +55,61 @@ func Emit(
 			elseStatement = alternateBlock.Value()
 			elseRequests = alternateBlock.Requests()
 		}
+	case *ast.IfStmt:
+		var alternateIf api.StatementEmission
+		alternateIf, err = children.IfAlternate(
+			context.WithRole(api.RoleIfElse),
+			alternate,
+		)
+		if err == nil {
+			alternateStatements := alternateIf.Statements()
+			switch len(alternateStatements) {
+			case 0:
+				return api.StatementEmission{}, &api.InvariantError{
+					Role:   api.RoleIfElse,
+					Reason: "nested if emitted no target statement",
+				}
+			case 1:
+				elseStatement = alternateStatements[0]
+			default:
+				elseStatement = context.Factory().Block(alternateStatements, true)
+			}
+			elseRequests = alternateIf.Requests()
+		}
 	default:
 		return api.StatementEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
+			api.Unsupported(
+				context.WithRole(api.RoleIfElse),
+				api.CategoryStatement,
+				alternate,
+			)
 	}
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	statements := condition.Before()
-	statements = append(
-		statements,
-		context.Factory().IfStatement(
-			condition.Value(),
-			thenBlock.Value(),
-			elseStatement,
-		),
+	target := context.Factory().IfStatement(
+		condition.Value(),
+		thenBlock.Value(),
+		elseStatement,
 	)
+	requests := api.CombineRequests(
+		initializer.Requests(),
+		condition.Requests(),
+		thenBlock.Requests(),
+		elseRequests,
+	)
+	statements := condition.Before()
+	statements = append(statements, target)
+	if source.Init != nil {
+		scoped := initializer.Statements()
+		scoped = append(scoped, statements...)
+		return api.DirectStatement(
+			context.Factory().Block(scoped, true),
+			requests...,
+		), nil
+	}
 	return api.NewStatementEmission(
 		statements,
-		api.CombineRequests(
-			condition.Requests(),
-			thenBlock.Requests(),
-			elseRequests,
-		),
+		requests,
 	)
 }
