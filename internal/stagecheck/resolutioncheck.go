@@ -20,7 +20,7 @@ func verifyResolutionFingerprint(
 	}
 	toolchain := workspace.Toolchain()
 	hash := sha256.New()
-	fmt.Fprintln(hash, "gotots-source-universe/v1")
+	fmt.Fprintln(hash, "gotots-source-universe/v2")
 	fmt.Fprintf(
 		hash,
 		"toolchain|%s|%s|%s|%s\n",
@@ -35,8 +35,10 @@ func verifyResolutionFingerprint(
 	for _, pkg := range packages {
 		fmt.Fprintf(
 			hash,
-			"package|%s|%d|%d|%d|%t|%s|%t\n",
+			"package|%s|%d:%s|%d|%d|%d|%t|%s|%t\n",
 			pkg.ID(),
+			len(pkg.DeclaredName()),
+			pkg.DeclaredName(),
 			uint8(pkg.Provenance()),
 			uint8(pkg.Acquisition()),
 			uint8(pkg.Disposition()),
@@ -44,8 +46,22 @@ func verifyResolutionFingerprint(
 			pkg.ModuleGoVersion(),
 			pkg.HasCheckedView(),
 		)
+		initialization := pkg.Initialization()
+		if ordinal, initializes := initialization.GoOrdinal(); initializes {
+			fmt.Fprintf(
+				hash, "initialization|%d|%d\n",
+				initialization.Kind(), ordinal,
+			)
+		} else {
+			fmt.Fprintf(
+				hash, "initialization|%d\n", initialization.Kind(),
+			)
+		}
 		for _, imported := range pkg.Imports() {
-			fmt.Fprintf(hash, "import|%s|%s\n", pkg.ID(), imported)
+			fmt.Fprintf(
+				hash, "import|%s|%s\n",
+				imported.Importer(), imported.Imported(),
+			)
 		}
 		for _, file := range pkg.Files() {
 			fmt.Fprintf(

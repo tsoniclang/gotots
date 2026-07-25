@@ -37,6 +37,7 @@ func (e *VerificationError) Error() string {
 // authoritative classification input.
 type goListPackage struct {
 	ImportPath      string
+	Name            string
 	Dir             string
 	Standard        bool
 	Goroot          bool
@@ -72,20 +73,24 @@ type goListPackage struct {
 
 // universeExpectation is one independently derived package expectation.
 type universeExpectation struct {
-	root          bool
-	cgoSources    map[identity.FileID]bool
-	checkedView   bool
-	provenance    source.Provenance
-	acquisition   source.Acquisition
-	disposition   source.LanguageDisposition
-	moduleGo      string
-	imports       map[string]bool
-	files         map[identity.FileID]bool
-	filePaths     map[identity.FileID]string
-	inputs        map[string]bool
-	embedPatterns map[string]bool
-	relBase       string
-	moduleGoRaw   string
+	root           bool
+	cgoSources     map[identity.FileID]bool
+	checkedView    bool
+	provenance     source.Provenance
+	acquisition    source.Acquisition
+	disposition    source.LanguageDisposition
+	moduleGo       string
+	name           string
+	importPaths    map[string]bool
+	imports        map[identity.PackageID]bool
+	initialization source.PackageInitializationKind
+	initOrdinal    int
+	files          map[identity.FileID]bool
+	filePaths      map[identity.FileID]string
+	inputs         map[string]bool
+	embedPatterns  map[string]bool
+	relBase        string
+	moduleGoRaw    string
 }
 
 // VerifySourceUniverse independently reconciles the loaded universe against
@@ -213,15 +218,21 @@ func VerifySourceUniverse(ws *source.Workspace, req source.Request) error {
 		return fail(err.Error())
 	}
 	expected[builtinID] = &universeExpectation{
-		provenance:    source.ProvenanceLanguagePseudo,
-		acquisition:   source.AcquisitionGOROOT,
-		disposition:   source.DispositionBuiltinUniverse,
-		imports:       map[string]bool{},
-		files:         map[identity.FileID]bool{},
-		filePaths:     map[identity.FileID]string{},
-		inputs:        map[string]bool{},
-		embedPatterns: map[string]bool{},
-		cgoSources:    map[identity.FileID]bool{},
+		name:           "builtin",
+		provenance:     source.ProvenanceLanguagePseudo,
+		acquisition:    source.AcquisitionGOROOT,
+		disposition:    source.DispositionBuiltinUniverse,
+		importPaths:    map[string]bool{},
+		imports:        map[identity.PackageID]bool{},
+		initialization: source.PackageInitializationNone,
+		files:          map[identity.FileID]bool{},
+		filePaths:      map[identity.FileID]string{},
+		inputs:         map[string]bool{},
+		embedPatterns:  map[string]bool{},
+		cgoSources:     map[identity.FileID]bool{},
+	}
+	if err := resolveExpectedPackageTopology(expected); err != nil {
+		return fail(err.Error())
 	}
 	// Exact join, both directions, with bounded one-sided identity evidence.
 	problems := newProblemSet()
@@ -264,10 +275,17 @@ func VerifySourceUniverse(ws *source.Workspace, req source.Request) error {
 				id, pkg.ModuleGoVersion(), expectation.moduleGo,
 			)
 		}
-		joinSet(
+		if pkg.DeclaredName() != expectation.name {
+			problems.addf(
+				"%s declared name %q vs independent %q",
+				id, pkg.DeclaredName(), expectation.name,
+			)
+		}
+		verifyPackageInitialization(pkg, expectation, problems)
+		joinPackageIDSet(
 			id,
 			"import",
-			stringSet(pkg.Imports()),
+			packageImportSet(pkg, problems),
 			expectation.imports,
 			problems,
 		)

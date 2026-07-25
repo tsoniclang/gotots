@@ -61,6 +61,9 @@ func finalize(
 	sort.Slice(workspace.roots, func(i, j int) bool {
 		return workspace.roots[i].id.Compare(workspace.roots[j].id) < 0
 	})
+	if err := validatePackageTopology(workspace.packages); err != nil {
+		return nil, err
+	}
 	if universe.hydrated {
 		severTransientGraph(universe)
 	} else {
@@ -104,7 +107,9 @@ func finalizePackage(loaded *LoadedPackage) (*Package, error) {
 		id: loaded.id, provenance: loaded.provenance,
 		acquisition: loaded.acquisition, disposition: loaded.disposition,
 		moduleGoVersion: loaded.moduleGoVersion, requestedRoot: loaded.requestedRoot,
-		imports:        append([]string(nil), loaded.imports...),
+		name:           loaded.name,
+		initialization: loaded.initialization,
+		imports:        append([]PackageImport(nil), loaded.imports...),
 		embedPatterns:  append([]string(nil), loaded.embedPatterns...),
 		hasCheckedView: loaded.hasCheckedView,
 	}

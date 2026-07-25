@@ -12,6 +12,7 @@ package source
 
 import (
 	"fmt"
+	"go/token"
 
 	"github.com/tsoniclang/gotots/internal/identity"
 )
@@ -238,7 +239,9 @@ type Package struct {
 	disposition     LanguageDisposition
 	moduleGoVersion string
 	requestedRoot   bool
-	imports         []string
+	name            string
+	initialization  PackageInitialization
+	imports         []PackageImport
 	files           []*File
 	inputs          []Input
 	embedPatterns   []string
@@ -317,20 +320,24 @@ func finishPackage(p *Package) (*Package, error) {
 			return fail("intrinsic package has ordinary disposition")
 		}
 	}
+	if p.name == "" || !token.IsIdentifier(p.name) || p.name == "_" {
+		return fail("declared package name is invalid")
+	}
+	if !p.initialization.Valid() {
+		return fail("package initialization is invalid")
+	}
+	_, initializes := p.initialization.GoOrdinal()
+	if initializes != (p.disposition == DispositionOrdinarySource) {
+		return fail("disposition and package initialization disagree")
+	}
 	if p.disposition != DispositionBuiltinUniverse && len(p.files) == 0 {
 		return fail("source package has no files")
 	}
 	if p.hasCheckedView && p.disposition != DispositionOrdinarySource {
 		return fail("non-ordinary package claims a checked source view")
 	}
-	if !strictlySortedUnique(p.imports) ||
-		!strictlySortedUnique(p.embedPatterns) {
-		return fail("imports or embed patterns are not canonical")
-	}
-	for _, imported := range p.imports {
-		if imported == "" {
-			return fail("imports contain an invalid semantic edge")
-		}
+	if !strictlySortedUnique(p.embedPatterns) {
+		return fail("embed patterns are not canonical")
 	}
 	seenFiles := map[identity.FileID]bool{}
 	var previousFile identity.FileID
@@ -391,9 +398,15 @@ func (p *Package) Acquisition() Acquisition         { return p.acquisition }
 func (p *Package) Disposition() LanguageDisposition { return p.disposition }
 func (p *Package) ModuleGoVersion() string          { return p.moduleGoVersion }
 func (p *Package) RequestedRoot() bool              { return p.requestedRoot }
-func (p *Package) Imports() []string                { return append([]string(nil), p.imports...) }
-func (p *Package) Files() []*File                   { return append([]*File(nil), p.files...) }
-func (p *Package) Inputs() []Input                  { return append([]Input(nil), p.inputs...) }
+func (p *Package) DeclaredName() string             { return p.name }
+func (p *Package) Initialization() PackageInitialization {
+	return p.initialization
+}
+func (p *Package) Imports() []PackageImport {
+	return append([]PackageImport(nil), p.imports...)
+}
+func (p *Package) Files() []*File  { return append([]*File(nil), p.files...) }
+func (p *Package) Inputs() []Input { return append([]Input(nil), p.inputs...) }
 func (p *Package) EmbedPatterns() []string {
 	return append([]string(nil), p.embedPatterns...)
 }

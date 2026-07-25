@@ -16,18 +16,23 @@ func (p *LoadedPackage) ProviderInputFingerprint() string {
 		return ""
 	}
 	hash := sha256.New()
-	fmt.Fprintln(hash, "gotots-provider-package/v1")
+	fmt.Fprintln(hash, "gotots-provider-package/v2")
 	fmt.Fprintf(
 		hash,
-		"package|%s|%d|%d|%s|%t\n",
+		"package|%s|%d:%s|%d|%d|%s|%t\n",
 		p.id,
+		len(p.name),
+		p.name,
 		p.provenance,
 		p.disposition,
 		p.moduleGoVersion,
 		p.hasCheckedView,
 	)
 	for _, imported := range p.imports {
-		fmt.Fprintf(hash, "import|%d:%s\n", len(imported), imported)
+		fmt.Fprintf(
+			hash, "import|%s|%s\n",
+			imported.importer, imported.imported,
+		)
 	}
 	for _, file := range p.files {
 		fmt.Fprintf(
@@ -66,7 +71,7 @@ func (u *Universe) ResolutionFingerprint() string {
 		return ""
 	}
 	hash := sha256.New()
-	fmt.Fprintln(hash, "gotots-source-universe/v1")
+	fmt.Fprintln(hash, "gotots-source-universe/v2")
 	fmt.Fprintf(
 		hash,
 		"toolchain|%s|%s|%s|%s\n",
@@ -81,8 +86,10 @@ func (u *Universe) ResolutionFingerprint() string {
 	for _, pkg := range u.packages {
 		fmt.Fprintf(
 			hash,
-			"package|%s|%d|%d|%d|%t|%s|%t\n",
+			"package|%s|%d:%s|%d|%d|%d|%t|%s|%t\n",
 			pkg.id,
+			len(pkg.name),
+			pkg.name,
 			pkg.provenance,
 			pkg.acquisition,
 			pkg.disposition,
@@ -90,8 +97,22 @@ func (u *Universe) ResolutionFingerprint() string {
 			pkg.moduleGoVersion,
 			pkg.hasCheckedView,
 		)
+		if ordinal, initializes := pkg.initialization.GoOrdinal(); initializes {
+			fmt.Fprintf(
+				hash, "initialization|%d|%d\n",
+				pkg.initialization.Kind(), ordinal,
+			)
+		} else {
+			fmt.Fprintf(
+				hash, "initialization|%d\n",
+				pkg.initialization.Kind(),
+			)
+		}
 		for _, imported := range pkg.imports {
-			fmt.Fprintf(hash, "import|%s|%s\n", pkg.id, imported)
+			fmt.Fprintf(
+				hash, "import|%s|%s\n",
+				imported.importer, imported.imported,
+			)
 		}
 		for _, file := range pkg.files {
 			fmt.Fprintf(

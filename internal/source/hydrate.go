@@ -154,6 +154,13 @@ func HydrateUniverse(
 				checked.Types.Path(), record.id,
 			)
 		}
+		if checked.Name != record.name ||
+			checked.Types.Name() != record.name {
+			return invalidHydration(
+				"package name %q/%q disagrees with %s name %q",
+				checked.Name, checked.Types.Name(), record.id, record.name,
+			)
+		}
 		record.types = checked.Types
 		if err := attachHydratedPackage(
 			universe,

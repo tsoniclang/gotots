@@ -168,9 +168,22 @@ func TestFinalizedCollectionsDoNotExposeBackingStorage(t *testing.T) {
 	pkg := finalizedByPath(t, workspace, "example.com/app/cmd/app")
 	imports := pkg.Imports()
 	originalImport := imports[0]
-	imports[0] = "mutated"
+	imports[0] = PackageImport{}
 	if pkg.Imports()[0] != originalImport {
 		t.Fatal("Package.Imports exposes backing storage")
+	}
+	topology := workspace.PackageTopology()
+	nodes := topology.Nodes()
+	originalNode := nodes[0]
+	nodes[0] = PackageNode{}
+	if workspace.PackageTopology().Nodes()[0] != originalNode {
+		t.Fatal("PackageTopology.Nodes exposes backing storage")
+	}
+	topologyImports := topology.Imports()
+	originalTopologyImport := topologyImports[0]
+	topologyImports[0] = PackageImport{}
+	if workspace.PackageTopology().Imports()[0] != originalTopologyImport {
+		t.Fatal("PackageTopology.Imports exposes backing storage")
 	}
 	files := pkg.Files()
 	originalFile := files[0]
@@ -222,11 +235,11 @@ func TestPackageAdmissionRejectsNoncanonicalEvidence(t *testing.T) {
 		"invalid provenance": func(pkg *Package) {
 			pkg.provenance = ProvenanceStandardLibrary
 		},
-		"unsorted imports": func(pkg *Package) {
-			pkg.imports = []string{"z", "a"}
+		"invalid declared name": func(pkg *Package) {
+			pkg.name = "_"
 		},
-		"duplicate imports": func(pkg *Package) {
-			pkg.imports = []string{"a", "a"}
+		"invalid initialization": func(pkg *Package) {
+			pkg.initialization = PackageInitialization{}
 		},
 		"zero file digest": func(pkg *Package) {
 			pkg.files[0].byteDigest = SourceSpanHash{}
@@ -359,7 +372,7 @@ func packageAndFileIDs(universe *Universe) []string {
 
 func cloneFinalizedPackage(pkg *Package) *Package {
 	out := *pkg
-	out.imports = append([]string(nil), pkg.imports...)
+	out.imports = append([]PackageImport(nil), pkg.imports...)
 	out.embedPatterns = append([]string(nil), pkg.embedPatterns...)
 	out.inputs = append([]Input(nil), pkg.inputs...)
 	out.files = make([]*File, 0, len(pkg.files))

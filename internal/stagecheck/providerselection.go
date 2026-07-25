@@ -93,18 +93,23 @@ func independentProviderInputFingerprint(
 	pkg *source.LoadedPackage,
 ) string {
 	hash := sha256.New()
-	fmt.Fprintln(hash, "gotots-provider-package/v1")
+	fmt.Fprintln(hash, "gotots-provider-package/v2")
 	fmt.Fprintf(
 		hash,
-		"package|%s|%d|%d|%s|%t\n",
+		"package|%s|%d:%s|%d|%d|%s|%t\n",
 		pkg.ID(),
+		len(pkg.DeclaredName()),
+		pkg.DeclaredName(),
 		pkg.Provenance(),
 		pkg.Disposition(),
 		pkg.ModuleGoVersion(),
 		pkg.HasCheckedView(),
 	)
 	for _, imported := range pkg.Imports() {
-		fmt.Fprintf(hash, "import|%d:%s\n", len(imported), imported)
+		fmt.Fprintf(
+			hash, "import|%s|%s\n",
+			imported.Importer(), imported.Imported(),
+		)
 	}
 	for _, file := range pkg.Files() {
 		fmt.Fprintf(

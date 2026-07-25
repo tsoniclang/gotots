@@ -20,7 +20,9 @@ type LoadedPackage struct {
 	disposition     LanguageDisposition
 	moduleGoVersion string
 	requestedRoot   bool
-	imports         []string
+	name            string
+	initialization  PackageInitialization
+	imports         []PackageImport
 	files           []*LoadedFile
 	inputs          []loadedInput
 	embedPatterns   []string
@@ -51,10 +53,14 @@ func (p *LoadedPackage) ModuleGoVersion() string { return p.moduleGoVersion }
 // RequestedRoot reports whether the package was a requested root.
 func (p *LoadedPackage) RequestedRoot() bool { return p.requestedRoot }
 
-// Imports returns the canonical direct import-path set resolved by the
-// selected toolchain.
-func (p *LoadedPackage) Imports() []string {
-	return append([]string(nil), p.imports...)
+func (p *LoadedPackage) DeclaredName() string { return p.name }
+
+func (p *LoadedPackage) Initialization() PackageInitialization {
+	return p.initialization
+}
+
+func (p *LoadedPackage) Imports() []PackageImport {
+	return append([]PackageImport(nil), p.imports...)
 }
 
 // Files are the transient per-file records.

@@ -23,15 +23,17 @@ func deriveExpectation(
 ) (*universeExpectation, identity.PackageID, error) {
 	out := &universeExpectation{
 		root: !pkg.DepOnly, disposition: source.DispositionOrdinarySource,
+		name:      pkg.Name,
 		files:     map[identity.FileID]bool{},
 		filePaths: map[identity.FileID]string{},
 		inputs:    map[string]bool{}, embedPatterns: map[string]bool{},
-		imports:    map[string]bool{},
-		cgoSources: map[identity.FileID]bool{},
+		importPaths: map[string]bool{},
+		imports:     map[identity.PackageID]bool{},
+		cgoSources:  map[identity.FileID]bool{},
 	}
 	for _, imported := range pkg.Imports {
 		if imported != "C" {
-			out.imports[imported] = true
+			out.importPaths[imported] = true
 		}
 	}
 	if pkg.Module != nil {
@@ -109,6 +111,11 @@ func deriveExpectation(
 	packageID, err := identity.NewPackageID(owner, pkg.ImportPath)
 	if err != nil {
 		return nil, identity.PackageID{}, err
+	}
+	if out.disposition == source.DispositionOrdinarySource {
+		out.initialization = source.PackageInitializationGo
+	} else {
+		out.initialization = source.PackageInitializationNone
 	}
 	for _, goFile := range append(append([]string{}, pkg.GoFiles...), pkg.CgoFiles...) {
 		absolute := absOrJoin(pkg.Dir, goFile)

@@ -66,7 +66,7 @@ func cloneLoadedPackageMetadata(
 	pkg *LoadedPackage,
 ) *LoadedPackage {
 	out := *pkg
-	out.imports = append([]string(nil), pkg.imports...)
+	out.imports = append([]PackageImport(nil), pkg.imports...)
 	out.inputs = append([]loadedInput(nil), pkg.inputs...)
 	out.embedPatterns = append([]string(nil), pkg.embedPatterns...)
 	out.types = nil

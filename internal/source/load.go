@@ -77,6 +77,7 @@ func ResolveUniverse(req Request) (*Universe, error) {
 	}
 	universe := &Universe{toolchain: toolchain, request: req}
 	seen := map[identity.PackageID]bool{}
+	metadata := map[string]*packages.Package{}
 	var walkErr error
 	packages.Visit(loaded, nil, func(pkg *packages.Package) {
 		if walkErr != nil {
@@ -107,6 +108,14 @@ func ResolveUniverse(req Request) (*Universe, error) {
 			return
 		}
 		seen[record.id] = true
+		if prior := metadata[pkg.PkgPath]; prior != nil && prior != pkg {
+			walkErr = &LoadError{
+				Dir:    req.Dir,
+				Reason: "duplicate package metadata " + pkg.PkgPath,
+			}
+			return
+		}
+		metadata[pkg.PkgPath] = pkg
 		universe.packages = append(universe.packages, record)
 		if record.requestedRoot {
 			universe.roots = append(universe.roots, record)
@@ -130,6 +139,7 @@ func ResolveUniverse(req Request) (*Universe, error) {
 	}
 	universe.packages = append(universe.packages, &LoadedPackage{
 		id:          builtinID,
+		name:        "builtin",
 		provenance:  ProvenanceLanguagePseudo,
 		acquisition: AcquisitionGOROOT,
 		disposition: DispositionBuiltinUniverse,
@@ -138,6 +148,9 @@ func ResolveUniverse(req Request) (*Universe, error) {
 		return nil, &LoadError{
 			Dir: req.Dir, Reason: "no requested roots after classification",
 		}
+	}
+	if err := resolvePackageTopology(universe, metadata); err != nil {
+		return nil, err
 	}
 	sort.Slice(universe.packages, func(i, j int) bool {
 		return universe.packages[i].id.Compare(
@@ -196,6 +209,7 @@ func (c *classifier) record(
 	out := &LoadedPackage{
 		requestedRoot: isRoot,
 		disposition:   DispositionOrdinarySource,
+		name:          pkg.Name,
 	}
 	owner, relBase, err := c.classifyPackage(pkg, out)
 	if err != nil {
@@ -206,7 +220,6 @@ func (c *classifier) record(
 		return nil, err
 	}
 	out.id = packageID
-	out.imports = importPaths(pkg)
 	if err := c.attachMetadata(out, pkg, owner, relBase); err != nil {
 		return nil, err
 	}
@@ -548,15 +561,6 @@ func vendorBase(pkg *packages.Package, workspaceDir string) string {
 		return dir[:index+len(marker)]
 	}
 	return workspaceDir
-}
-
-func importPaths(pkg *packages.Package) []string {
-	out := make([]string, 0, len(pkg.Imports))
-	for path := range pkg.Imports {
-		out = append(out, path)
-	}
-	sort.Strings(out)
-	return out
 }
 
 func fileByID(
