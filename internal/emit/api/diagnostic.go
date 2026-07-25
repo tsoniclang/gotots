@@ -34,6 +34,7 @@ const (
 	RoleIfElse              Role = "if-else"
 	RoleUnaryOperand        Role = "unary-operand"
 	RoleCallArgument        Role = "call-argument"
+	RoleExpressionStatement Role = "expression-statement"
 	RoleIntegerConstantType Role = "integer-constant-type"
 	RoleForInitializer      Role = "for-initializer"
 	RoleForCondition        Role = "for-condition"

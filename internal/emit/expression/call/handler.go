@@ -14,6 +14,23 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.CallExpr,
 ) (api.ExpressionEmission, error) {
+	return emit(context, children, source, false)
+}
+
+func EmitDiscarded(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.CallExpr,
+) (api.ExpressionEmission, error) {
+	return emit(context, children, source, true)
+}
+
+func emit(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.CallExpr,
+	discarded bool,
+) (api.ExpressionEmission, error) {
 	callee, ok := source.Fun.(*ast.Ident)
 	if !ok || source.Ellipsis != token.NoPos {
 		return api.ExpressionEmission{},
@@ -29,8 +46,15 @@ func Emit(
 		signature.Recv() != nil ||
 		signature.Variadic() ||
 		signature.TypeParams().Len() != 0 ||
-		signature.Params().Len() != len(source.Args) ||
-		signature.Results().Len() != 1 {
+		signature.Params().Len() != len(source.Args) {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	resultCount := 0
+	if signature.Results() != nil {
+		resultCount = signature.Results().Len()
+	}
+	if (!discarded && resultCount != 1) || (discarded && resultCount > 1) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}

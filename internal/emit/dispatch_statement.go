@@ -7,6 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/statement/assignment"
 	blockstatement "github.com/tsoniclang/gotots/internal/emit/statement/block"
 	branchstatement "github.com/tsoniclang/gotots/internal/emit/statement/branch"
+	expressionstatement "github.com/tsoniclang/gotots/internal/emit/statement/expressionstatement"
 	forstatement "github.com/tsoniclang/gotots/internal/emit/statement/forstatement"
 	ifstatement "github.com/tsoniclang/gotots/internal/emit/statement/ifstatement"
 	incdecstatement "github.com/tsoniclang/gotots/internal/emit/statement/incdec"
@@ -29,6 +30,8 @@ func (e *Emitter) Statement(
 		return assignment.Emit(context, e, source)
 	case *ast.BranchStmt:
 		return branchstatement.Emit(context, source)
+	case *ast.ExprStmt:
+		return expressionstatement.Emit(context, e, source)
 	case *ast.ForStmt:
 		return forstatement.Emit(context, e, source)
 	case *ast.IfStmt:

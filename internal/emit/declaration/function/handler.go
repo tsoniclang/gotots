@@ -17,7 +17,6 @@ func Emit(
 		source.Recv != nil ||
 		source.Type == nil ||
 		source.Type.Params == nil ||
-		source.Type.Results == nil ||
 		source.Type.TypeParams != nil ||
 		source.Body == nil {
 		return api.DeclarationEmission{},
@@ -35,7 +34,7 @@ func Emit(
 		signature.TypeParams() != nil ||
 		signature.RecvTypeParams() != nil ||
 		signature.Variadic() ||
-		signature.Results().Len() != 1 {
+		resultCount(signature.Results()) > 1 {
 		return api.DeclarationEmission{},
 			api.Unsupported(context, api.CategoryDeclaration, source)
 	}
@@ -152,6 +151,17 @@ func emitResult(
 	fields *ast.FieldList,
 	signature *types.Signature,
 ) (api.TypeEmission, error) {
+	if resultCount(signature.Results()) == 0 {
+		if fields != nil && len(fields.List) != 0 {
+			return api.TypeEmission{},
+				api.Unsupported(context, api.CategoryDeclaration, fields)
+		}
+		return api.DirectType(
+			context.Factory().KeywordTypeNode(
+				tsgo.KeywordTypeSyntaxKindVoidKeyword,
+			),
+		), nil
+	}
 	if fields == nil || len(fields.List) != 1 {
 		if fields == nil {
 			return api.TypeEmission{},
@@ -167,4 +177,11 @@ func emitResult(
 			api.Unsupported(context, api.CategoryDeclaration, field)
 	}
 	return children.Type(context.WithRole(api.RoleResultType), field.Type)
+}
+
+func resultCount(results *types.Tuple) int {
+	if results == nil {
+		return 0
+	}
+	return results.Len()
 }

@@ -12,7 +12,14 @@ func Emit(
 	source *ast.ReturnStmt,
 ) (api.StatementEmission, error) {
 	results := context.FunctionResults()
-	if len(source.Results) != 1 || results == nil || results.Len() != 1 {
+	resultCount := 0
+	if results != nil {
+		resultCount = results.Len()
+	}
+	if resultCount == 0 && len(source.Results) == 0 {
+		return api.DirectStatement(context.Factory().ReturnStatement(nil)), nil
+	}
+	if len(source.Results) != 1 || resultCount != 1 {
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}

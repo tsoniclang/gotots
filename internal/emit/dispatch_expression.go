@@ -40,6 +40,13 @@ func (e *Emitter) IntegerConstant(
 	return integerliteral.Emit(context, e, source)
 }
 
+func (e *Emitter) DiscardedCall(
+	context api.Context,
+	source *ast.CallExpr,
+) (api.ExpressionEmission, error) {
+	return callexpression.EmitDiscarded(context, e, source)
+}
+
 func (e *Emitter) Condition(
 	context api.Context,
 	source ast.Expr,

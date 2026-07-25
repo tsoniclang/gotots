@@ -253,6 +253,36 @@ result := add(left, right)
 const result = add(left, right);
 ```
 
+A zero-result Go function emits an explicit `void` result type, and a call used
+as a statement remains a direct call expression statement:
+
+```go
+func Touch(value int) {
+	if value > 0 {
+		return
+	}
+}
+
+Touch(value)
+```
+
+```ts
+function Touch(value: GoInt): void {
+  if (value > 0) {
+    return;
+  }
+}
+
+Touch(value);
+```
+
+The function owner derives zero results from the selected `types.Signature`;
+the return owner accepts a bare return only in that function context; and the
+expression-statement owner admits only a toolchain-valid discarded call case
+that its call owner can represent. Calls returning a supported value may also
+be discarded. A receive statement, multi-result call, `go`, or `defer` remains
+with its own semantic owner until that complete case is implemented.
+
 Hidden operation arguments are not a default protocol. A runtime or generated
 helper is allowed only for a Go behavior that direct TypeScript cannot express,
 and its necessity and cost must be proved for the whole semantic class.
