@@ -122,14 +122,18 @@ func verifyCheckerSemanticPackage(
 	if err := verifier.verifyBindings(); err != nil {
 		return semanticVerificationError("checker", err.Error())
 	}
-	captureUses, err := verifier.verifyOccurrences()
+	captureUses, resolvedOperations, err :=
+		verifier.verifyOccurrences()
 	if err != nil {
 		return semanticVerificationError("checker", err.Error())
 	}
 	if err := verifier.verifyDefinitions(); err != nil {
 		return semanticVerificationError("checker", err.Error())
 	}
-	if err := verifier.verifyBindingCaptures(captureUses); err != nil {
+	if err := verifier.verifyOperationsAndBindingCaptures(
+		captureUses,
+		resolvedOperations,
+	); err != nil {
 		return semanticVerificationError("checker", err.Error())
 	}
 	if err := verifier.verifyImplicitPackageOperations(); err != nil {

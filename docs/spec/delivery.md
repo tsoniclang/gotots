@@ -374,6 +374,12 @@ Required exit evidence:
   expanded composite identity slices, admission and reachability consume the
   compact records directly, and member-target census generation streams
   without a rendered or package-wide derived member index; and
+- normalized-package admission is the sole package-local reference-closure
+  owner; model-global verification streams the canonical declaration-identity
+  dictionary into the global owner join, while the independent checker gate
+  checks structural origin and semantic meaning in one resolution pass and
+  operation origin and captures in one operation pass; no later full-public-
+  record closure walk repeats normalized admission; and
 - no TypeScript representation appears in the model;
 - Stage-1 structural provider evidence and Stage-2 semantic provider evidence
   remain separate digest-bound authorities; the semantic artifact binds the

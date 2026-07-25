@@ -7,17 +7,50 @@ import (
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/identity"
+	"github.com/tsoniclang/gotots/internal/language/catalog"
 	"github.com/tsoniclang/gotots/internal/language/semantic"
 )
 
-func (verifier *checkerSemanticVerifier) verifyBindingCaptures(
+func (
+	verifier *checkerSemanticVerifier,
+) verifyOperationsAndBindingCaptures(
 	expected map[identity.SemanticBindingID]map[identity.DefinitionID]bool,
+	resolvedOperations int,
 ) error {
+	sourceOperations := 0
+	implicitOperations := 0
 	if err := verifier.visitOperations(func(
 		operation semantic.Operation,
 	) error {
 		if !operation.ID().Source() {
+			implicitOperations++
+			if operation.Kind() !=
+				semantic.OperationPackageInitialization ||
+				operation.ID().ImplicitOp() !=
+					identity.ImplicitDefinitionPackageInit {
+				return fmt.Errorf(
+					"invalid implicit operation origin %s",
+					operation.ID(),
+				)
+			}
 			return nil
+		}
+		sourceOperations++
+		occurrence, present := verifier.expected.occurrences.get(
+			operation.Occurrence(),
+		)
+		if !present ||
+			occurrence.domain !=
+				catalog.ResolutionDomainExecutable ||
+			operation.Definition() !=
+				verifier.expected.definitionID(occurrence.owner) ||
+			operation.Syntax() != occurrence.Kind() ||
+			operation.Role() != occurrence.Role() ||
+			operation.Token() != occurrence.Token() {
+			return fmt.Errorf(
+				"source operation origin differs for %s",
+				operation.ID(),
+			)
 		}
 		object := operation.Object()
 		if object.Kind() != semantic.ObjectReferenceBinding {
@@ -39,6 +72,27 @@ func (verifier *checkerSemanticVerifier) verifyBindingCaptures(
 		)
 	}); err != nil {
 		return err
+	}
+	if sourceOperations != resolvedOperations {
+		return fmt.Errorf(
+			"%d source operations differ from %d operation resolutions",
+			sourceOperations,
+			resolvedOperations,
+		)
+	}
+	implicitDefinitions := 0
+	for definition := range verifier.expected.definitions {
+		if definition.ImplicitOp().Valid() &&
+			verifier.expected.executable[definition] {
+			implicitDefinitions++
+		}
+	}
+	if implicitOperations != implicitDefinitions {
+		return fmt.Errorf(
+			"%d implicit operations differ from %d implicit definitions",
+			implicitOperations,
+			implicitDefinitions,
+		)
 	}
 	for bindingID := range verifier.bindings {
 		var want []identity.DefinitionID

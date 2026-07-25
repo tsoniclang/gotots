@@ -10,10 +10,13 @@ import (
 
 func (verifier *checkerSemanticVerifier) verifyOccurrences() (
 	map[identity.SemanticBindingID]map[identity.DefinitionID]bool,
+	int,
 	error,
 ) {
 	captureUses :=
 		map[identity.SemanticBindingID]map[identity.DefinitionID]bool{}
+	actualCount := 0
+	resolvedOperations := 0
 	err := verifier.actual.VisitResolutions(func(
 		resolution semantic.OccurrenceResolution,
 	) error {
@@ -24,6 +27,7 @@ func (verifier *checkerSemanticVerifier) verifyOccurrences() (
 			) {
 			return nil
 		}
+		actualCount++
 		occurrenceReference := verifier.expected.occurrences.reference(
 			resolution.Occurrence(),
 		)
@@ -37,6 +41,16 @@ func (verifier *checkerSemanticVerifier) verifyOccurrences() (
 			occurrenceReference,
 		)
 		occurrenceID := occurrence.ID()
+		if resolution.Owner() !=
+			verifier.expected.definitionID(occurrence.owner) ||
+			resolution.Domain() != occurrence.domain ||
+			resolution.Syntax() != occurrence.Kind() ||
+			resolution.Role() != occurrence.Role() {
+			return fmt.Errorf(
+				"resolution structural evidence differs for %s",
+				occurrenceID,
+			)
+		}
 		node, present := verifier.index.OccurrenceNode(occurrenceID)
 		if !present {
 			return fmt.Errorf(
@@ -86,6 +100,7 @@ func (verifier *checkerSemanticVerifier) verifyOccurrences() (
 			)
 		}
 		if resolution.Kind() == semantic.ResolutionOperation {
+			resolvedOperations++
 			if verifier.independentCompileTimeContext(
 				occurrenceReference,
 			) {
@@ -132,5 +147,16 @@ func (verifier *checkerSemanticVerifier) verifyOccurrences() (
 			node,
 		)
 	})
-	return captureUses, err
+	if err != nil {
+		return nil, 0, err
+	}
+	if actualCount != verifier.expected.domainCount {
+		return nil, 0, fmt.Errorf(
+			"package %s has %d resolutions for %d retained occurrences",
+			verifier.actual.ID(),
+			actualCount,
+			verifier.expected.domainCount,
+		)
+	}
+	return captureUses, resolvedOperations, nil
 }

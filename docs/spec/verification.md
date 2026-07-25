@@ -611,8 +611,13 @@ does not own it, omit or retain an inactive payload, repeat a portable identity
 at each wire reference, retain expanded composite identity tables, restore
 package-wide public-record reconstruction during admission, retain a package-
 wide derived member list, use rendered identity strings in a census, and
-restore a retained heavyweight record slice. The public-record round trip,
-local/provider/mixed
+restore a retained heavyweight record slice. Global-closure mutations replace
+a referenced external declaration with an identity absent from the global
+owner census, omit a package-owned declaration or definition from that census,
+change a member-target digest, and restore a full-public-record closure walk
+that duplicates normalized admission. The missing/extra owner mutations must
+fail at the global identity join; an architecture/cost mutation must detect the
+duplicate closure walk. The public-record round trip, local/provider/mixed
 artifact round trips, and independent conservation joins must all fail at the
 owning admission or architecture gate. A mixed-depth capture fixture also
 proves that a binding's declaration-occurrence identity may survive while the

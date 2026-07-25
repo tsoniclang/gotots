@@ -986,6 +986,20 @@ replacement of both artifact content and the independently selected trusted
 digest; that is replacement of the authority, not corruption under an
 admitted authority.
 
+Package-local semantic closure has exactly that one owner: normalized-package
+admission over compact typed references. A later gate must not reconstruct
+every public definition, type, binding, operation, and resolution merely to
+repeat the same local-reference proof. Model-global closure instead streams
+the package's canonical declaration-identity dictionary and exact-joins every
+non-member identity against the one global declaration-owner census; member
+targets remain package-local and are covered by normalized admission plus the
+manifest-bound member census. Independent checker verification combines each
+resolution's structural-origin check with its semantic comparison in one
+occurrence pass, and combines operation-origin and capture checks in one
+operation pass. Coalescing these checks does not merge authorities: the
+normalized store, global owner census, and live checker graph remain three
+distinct evidence sources.
+
 Admission validates normalized records and relation ranges directly. Wire
 decoding may construct exactly one current public semantic record to reuse its
 one authoritative validating constructor, then immediately transfers that
