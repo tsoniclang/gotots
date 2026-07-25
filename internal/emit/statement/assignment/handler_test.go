@@ -81,9 +81,9 @@ func TestParallelAssignmentCreatesCapturesBeforeStores(t *testing.T) {
 		DeclarationList().Declarations()[0]
 	secondCapture := statements[1].(tsgo.VariableStatement).
 		DeclarationList().Declarations()[0]
-	if identifierText(firstCapture.Name()) != "$assign0" ||
+	if identifierText(firstCapture.Name()) != "__gotots_assign_0" ||
 		identifierText(firstCapture.Initializer()) != "right" ||
-		identifierText(secondCapture.Name()) != "$assign1" ||
+		identifierText(secondCapture.Name()) != "__gotots_assign_1" ||
 		identifierText(secondCapture.Initializer()) != "left" {
 		t.Fatal("right sides were not captured in source order before stores")
 	}
@@ -97,9 +97,9 @@ func TestParallelAssignmentCreatesCapturesBeforeStores(t *testing.T) {
 	secondStore := statements[3].(tsgo.ExpressionStatement).
 		Expression().(tsgo.BinaryExpression)
 	if identifierText(firstStore.Left()) != "left" ||
-		identifierText(firstStore.Right()) != "$assign0" ||
+		identifierText(firstStore.Right()) != "__gotots_assign_0" ||
 		identifierText(secondStore.Left()) != "right" ||
-		identifierText(secondStore.Right()) != "$assign1" {
+		identifierText(secondStore.Right()) != "__gotots_assign_1" {
 		t.Fatal("stores do not consume captures in left-to-right target order")
 	}
 }

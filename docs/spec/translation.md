@@ -119,6 +119,30 @@ fallthrough, type switches, and types whose target equality is not yet proved
 remain distinct typed-unsupported cases. They are not approximated by
 re-evaluation, source spelling, loose equality, or a generic statement walk.
 
+A fully initialized local `var` declaration is owned by its enclosing
+declaration statement:
+
+```go
+var left, right int = first(), second()
+```
+
+The owner uses the `types.Var` identity for each name, verifies each initializer
+against that object's exact Go type, delegates initializers left-to-right, and
+constructs one typed target declaration list. The Go scope begins after the
+`ValueSpec`, so an initializer that resolves to an outer same-named object must
+retain that outer identity. The target name owner allocates a distinct inner
+name when needed; it must not rely on TypeScript's temporal-dead-zone behavior.
+
+A standalone Go block becomes one target block and is never flattened into its
+parent. This preserves local declaration scopes directly. Grouped `var`
+declarations emit their `ValueSpec` records in source order, with each spec
+forming its own declaration statement and scope boundary.
+
+Zero-initialized declarations, package declarations and initialization order,
+constants, multi-result initializers, and initializer prerequisite statements
+remain separate typed-unsupported cases until their complete semantic owners
+are installed.
+
 Likewise, for:
 
 ```go
@@ -231,10 +255,10 @@ left, right = right, left
 An exact direct form captures every right side before the first store:
 
 ```ts
-const $assign0: GoInt = right;
-const $assign1: GoInt = left;
-left = $assign0;
-right = $assign1;
+const __gotots_assign_0: GoInt = right;
+const __gotots_assign_1: GoInt = left;
+left = __gotots_assign_0;
+right = __gotots_assign_1;
 ```
 
 The captures are target coordination nodes, not a source IR. Their names and

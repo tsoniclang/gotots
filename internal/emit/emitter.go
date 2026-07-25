@@ -26,10 +26,16 @@ func (e *Error) Error() string {
 }
 
 func New(source *load.Package) *Emitter {
+	var typesInfo *types.Info
+	var packageScope *types.Scope
+	if source != nil {
+		typesInfo = source.TypesInfo()
+		packageScope = source.Types().Scope()
+	}
 	return &Emitter{
 		source:  source,
 		factory: tsgo.NewFactory(),
-		names:   newNameOwner(),
+		names:   newNameOwner(packageScope, typesInfo),
 	}
 }
 

@@ -28,6 +28,7 @@ const (
 	RoleBinaryRight          Role = "binary-right"
 	RoleLocalType            Role = "local-type"
 	RoleLocalValue           Role = "local-value"
+	RoleLocalDeclaration     Role = "local-declaration"
 	RoleAssignmentValue      Role = "assignment-value"
 	RoleIfInitializer        Role = "if-initializer"
 	RoleIfCondition          Role = "if-condition"

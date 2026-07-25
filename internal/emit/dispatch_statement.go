@@ -11,6 +11,7 @@ import (
 	forstatement "github.com/tsoniclang/gotots/internal/emit/statement/forstatement"
 	ifstatement "github.com/tsoniclang/gotots/internal/emit/statement/ifstatement"
 	incdecstatement "github.com/tsoniclang/gotots/internal/emit/statement/incdec"
+	localdeclaration "github.com/tsoniclang/gotots/internal/emit/statement/localdeclaration"
 	returnstatement "github.com/tsoniclang/gotots/internal/emit/statement/returnstatement"
 	switchstatement "github.com/tsoniclang/gotots/internal/emit/statement/switchstatement"
 )
@@ -29,8 +30,16 @@ func (e *Emitter) Statement(
 	switch source := source.(type) {
 	case *ast.AssignStmt:
 		return assignment.Emit(context, e, source)
+	case *ast.BlockStmt:
+		target, err := blockstatement.Emit(context, e, source)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		return api.DirectStatement(target.Value(), target.Requests()...), nil
 	case *ast.BranchStmt:
 		return branchstatement.Emit(context, source)
+	case *ast.DeclStmt:
+		return localdeclaration.Emit(context, e, source)
 	case *ast.ExprStmt:
 		return expressionstatement.Emit(context, e, source)
 	case *ast.ForStmt:

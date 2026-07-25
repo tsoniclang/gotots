@@ -44,7 +44,7 @@ type Names interface {
 func TemporaryPrefix(kind TemporaryKind) (string, error) {
 	switch kind {
 	case TemporaryAssignmentValue:
-		return "$assign", nil
+		return "__gotots_assign_", nil
 	default:
 		return "", &NameError{
 			Reason: fmt.Sprintf("temporary kind %d is invalid", kind),
