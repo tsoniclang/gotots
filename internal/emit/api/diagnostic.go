@@ -96,7 +96,7 @@ type PlacementError struct {
 
 func (e *PlacementError) Error() string {
 	return fmt.Sprintf(
-		"place type import %q from %q: %s",
+		"place import %q from %q: %s",
 		e.ExportedName,
 		e.ModulePath,
 		e.Reason,

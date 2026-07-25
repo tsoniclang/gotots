@@ -54,8 +54,12 @@ func Emit(
 		return nil, err
 	}
 
+	moduleExport, err := context.Names().ModuleExport(functionObject)
+	if err != nil {
+		return nil, err
+	}
 	var modifiers []tsgo.ModifierLike
-	if functionObject.Exported() {
+	if moduleExport {
 		modifiers = []tsgo.ModifierLike{context.Factory().ExportKeyword()}
 	}
 	return context.Factory().FunctionDeclaration(

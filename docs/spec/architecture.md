@@ -209,6 +209,10 @@ imports are required, typed placement requests with:
 One placement service applies the policy:
 
 - imports always enter file import scope; dynamic imports are forbidden;
+- every emitted package declaration is exported from its generated source-file
+  module for static intra-package linking, including declarations whose Go
+  names are unexported; only the package assembly facade exposes the selected
+  Go public API to consumers;
 - reusable static declarations prefer file scope;
 - function-wide declarations enter the function prologue only when their
   lifetime is function-wide;

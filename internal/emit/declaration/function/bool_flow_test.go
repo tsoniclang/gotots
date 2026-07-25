@@ -91,13 +91,13 @@ func TestBoolFlowCreatesExactTargetTree(t *testing.T) {
 
 func TestBoolFlowRejectsCompoundAssignmentVariant(t *testing.T) {
 	loaded := loadBoolFlowProject(t)
-	runFunction := loaded.Syntax()[0].Decls[0].(*ast.FuncDecl)
+	runFunction := loaded.Files()[0].Syntax().Decls[0].(*ast.FuncDecl)
 	ifStatement := runFunction.Body.List[1].(*ast.IfStmt)
 	assignment := ifStatement.Body.List[0].(*ast.AssignStmt)
 	assignment.Tok = token.ADD_ASSIGN
 
 	compiler := emit.New(loaded)
-	_, err := compiler.EmitFile(loaded.Syntax()[0], filepath.Join(t.TempDir(), "bool-flow.ts"))
+	_, err := compiler.EmitFile(loaded.Files()[0].Syntax(), filepath.Join(t.TempDir(), "bool-flow.ts"))
 	var unsupported *api.UnsupportedError
 	if !errors.As(err, &unsupported) {
 		t.Fatalf("error = %v, want *api.UnsupportedError", err)
@@ -111,7 +111,7 @@ func TestBoolFlowRejectsCompoundAssignmentVariant(t *testing.T) {
 
 func TestBoolFlowCallsUseGoObjectIdentity(t *testing.T) {
 	loaded := loadBoolFlowProject(t)
-	runFunction := loaded.Syntax()[0].Decls[0].(*ast.FuncDecl)
+	runFunction := loaded.Files()[0].Syntax().Decls[0].(*ast.FuncDecl)
 	ifStatement := runFunction.Body.List[1].(*ast.IfStmt)
 	assignment := ifStatement.Body.List[0].(*ast.AssignStmt)
 	call := assignment.Rhs[0].(*ast.CallExpr)
@@ -132,7 +132,7 @@ func TestBoolFlowCallsUseGoObjectIdentity(t *testing.T) {
 
 func TestBoolFlowLiteralsUseGoObjectIdentity(t *testing.T) {
 	loaded := loadBoolFlowProject(t)
-	runFunction := loaded.Syntax()[0].Decls[0].(*ast.FuncDecl)
+	runFunction := loaded.Files()[0].Syntax().Decls[0].(*ast.FuncDecl)
 	definition := runFunction.Body.List[0].(*ast.AssignStmt)
 	literal := definition.Rhs[0].(*ast.Ident)
 	literal.Name = "true"
@@ -148,12 +148,12 @@ func TestBoolFlowLiteralsUseGoObjectIdentity(t *testing.T) {
 
 func TestBoolFlowRejectsUnaryOperatorVariant(t *testing.T) {
 	loaded := loadBoolFlowProject(t)
-	runFunction := loaded.Syntax()[0].Decls[0].(*ast.FuncDecl)
+	runFunction := loaded.Files()[0].Syntax().Decls[0].(*ast.FuncDecl)
 	ifStatement := runFunction.Body.List[1].(*ast.IfStmt)
 	ifStatement.Cond.(*ast.UnaryExpr).Op = token.ADD
 
 	compiler := emit.New(loaded)
-	_, err := compiler.EmitFile(loaded.Syntax()[0], filepath.Join(t.TempDir(), "bool-flow.ts"))
+	_, err := compiler.EmitFile(loaded.Files()[0].Syntax(), filepath.Join(t.TempDir(), "bool-flow.ts"))
 	var unsupported *api.UnsupportedError
 	if !errors.As(err, &unsupported) {
 		t.Fatalf("error = %v, want *api.UnsupportedError", err)
@@ -167,7 +167,7 @@ func TestBoolFlowRejectsUnaryOperatorVariant(t *testing.T) {
 
 func TestBoolFlowRejectsElseIfUntilItsCaseIsProven(t *testing.T) {
 	loaded := loadBoolFlowProject(t)
-	runFunction := loaded.Syntax()[0].Decls[0].(*ast.FuncDecl)
+	runFunction := loaded.Files()[0].Syntax().Decls[0].(*ast.FuncDecl)
 	ifStatement := runFunction.Body.List[1].(*ast.IfStmt)
 	ifStatement.Else = &ast.IfStmt{
 		Cond: ifStatement.Cond,
@@ -175,7 +175,7 @@ func TestBoolFlowRejectsElseIfUntilItsCaseIsProven(t *testing.T) {
 	}
 
 	compiler := emit.New(loaded)
-	_, err := compiler.EmitFile(loaded.Syntax()[0], filepath.Join(t.TempDir(), "bool-flow.ts"))
+	_, err := compiler.EmitFile(loaded.Files()[0].Syntax(), filepath.Join(t.TempDir(), "bool-flow.ts"))
 	var unsupported *api.UnsupportedError
 	if !errors.As(err, &unsupported) {
 		t.Fatalf("error = %v, want *api.UnsupportedError", err)
@@ -189,14 +189,14 @@ func TestBoolFlowRejectsElseIfUntilItsCaseIsProven(t *testing.T) {
 
 func TestBoolFlowRejectsConversionAtOrdinaryCallOwner(t *testing.T) {
 	loaded := loadBoolFlowProject(t)
-	runFunction := loaded.Syntax()[0].Decls[0].(*ast.FuncDecl)
+	runFunction := loaded.Files()[0].Syntax().Decls[0].(*ast.FuncDecl)
 	ifStatement := runFunction.Body.List[1].(*ast.IfStmt)
 	call := ifStatement.Body.List[0].(*ast.AssignStmt).Rhs[0].(*ast.CallExpr)
 	callee := call.Fun.(*ast.Ident)
 	loaded.TypesInfo().Uses[callee] = types.Universe.Lookup("bool")
 
 	compiler := emit.New(loaded)
-	_, err := compiler.EmitFile(loaded.Syntax()[0], filepath.Join(t.TempDir(), "bool-flow.ts"))
+	_, err := compiler.EmitFile(loaded.Files()[0].Syntax(), filepath.Join(t.TempDir(), "bool-flow.ts"))
 	var unsupported *api.UnsupportedError
 	if !errors.As(err, &unsupported) {
 		t.Fatalf("error = %v, want *api.UnsupportedError", err)
@@ -223,7 +223,7 @@ func loadBoolFlowProject(t *testing.T) *load.Package {
 func emitBoolFlow(t *testing.T, loaded *load.Package, outputPath string) tsgo.SourceFile {
 	t.Helper()
 	compiler := emit.New(loaded)
-	targetFile, err := compiler.EmitFile(loaded.Syntax()[0], outputPath)
+	targetFile, err := compiler.EmitFile(loaded.Files()[0].Syntax(), outputPath)
 	if err != nil {
 		t.Fatal(err)
 	}
