@@ -12,7 +12,7 @@ type ChildEmitter interface {
 	DiscardedCall(Context, *ast.CallExpr) (ExpressionEmission, error)
 	Condition(Context, ast.Expr) (ExpressionEmission, error)
 	IntegerConstant(Context, ast.Expr) (ExpressionEmission, error)
-	IfInitializer(Context, ast.Stmt) (StatementEmission, error)
+	ScopedInitializer(Context, ast.Stmt) (StatementEmission, error)
 	IfAlternate(Context, *ast.IfStmt) (StatementEmission, error)
 	ForInitializer(Context, ast.Stmt) (ForInitializerEmission, error)
 	ForPost(Context, ast.Stmt) (ExpressionEmission, error)

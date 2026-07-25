@@ -12,6 +12,7 @@ import (
 	ifstatement "github.com/tsoniclang/gotots/internal/emit/statement/ifstatement"
 	incdecstatement "github.com/tsoniclang/gotots/internal/emit/statement/incdec"
 	returnstatement "github.com/tsoniclang/gotots/internal/emit/statement/returnstatement"
+	switchstatement "github.com/tsoniclang/gotots/internal/emit/statement/switchstatement"
 )
 
 func (e *Emitter) Block(
@@ -40,13 +41,15 @@ func (e *Emitter) Statement(
 		return incdecstatement.Emit(context, source)
 	case *ast.ReturnStmt:
 		return returnstatement.Emit(context, e, source)
+	case *ast.SwitchStmt:
+		return switchstatement.Emit(context, e, source)
 	default:
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
 }
 
-func (e *Emitter) IfInitializer(
+func (e *Emitter) ScopedInitializer(
 	context api.Context,
 	source ast.Stmt,
 ) (api.StatementEmission, error) {

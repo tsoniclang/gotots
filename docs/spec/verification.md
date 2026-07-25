@@ -133,6 +133,16 @@ the same representative target graphs, including optional children, lists,
 tokens, literals, declarations, expressions, and source files. Exact encoded
 bytes must agree unless the pinned protocol explicitly permits alternatives.
 
+Required-child validation follows the concrete pinned TS-Go variant, not only
+the shared schema member. The pinned `CaseOrDefaultClause` schema exposes an
+`Expression` member for both discriminants, while the pinned parser constructs
+`DefaultClause` with that child absent and the pinned protocol encoder records
+the absent-child mask. The generated Go encoder must do the same; it must not
+fabricate an expression merely to satisfy the shared member. Every such
+discriminant-specific absence requires its own exact-byte differential against
+the pinned upstream factory and encoder. It is not a general optional-child
+escape hatch.
+
 Mutations change a schema digest, protocol version, node kind, field shape,
 child order, optional-child mask, encoded bytes, TS-Go binary revision,
 declaration ownership, or formatted text. They also introduce a generic target

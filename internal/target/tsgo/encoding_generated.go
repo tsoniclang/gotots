@@ -1750,7 +1750,7 @@ func (n *defaultClauseNode) targetEncoding() nodeEncoding {
 	return nodeEncoding{
 		dataType: nodeDataChildren,
 		children: []childEncoding{
-			{name: "Expression", present: n.expression != nil, required: true, node: n.expression},
+			{name: "Expression", present: n.expression != nil, required: false, node: n.expression},
 			{name: "Statements", present: true, required: true, raw: false, nodes: nodesOf(n.statements)},
 		},
 	}

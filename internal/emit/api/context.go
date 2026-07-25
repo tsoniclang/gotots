@@ -79,6 +79,11 @@ func (c Context) EnterLoop() Context {
 	return c
 }
 
+func (c Context) EnterBreakable() Context {
+	c.breakDepth++
+	return c
+}
+
 func (c Context) Role() Role {
 	return c.role
 }

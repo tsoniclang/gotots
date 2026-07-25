@@ -19,7 +19,7 @@ func Emit(
 	var initializer api.StatementEmission
 	var err error
 	if source.Init != nil {
-		initializer, err = children.IfInitializer(
+		initializer, err = children.ScopedInitializer(
 			context.WithRole(api.RoleIfInitializer),
 			source.Init,
 		)

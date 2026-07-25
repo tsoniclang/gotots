@@ -87,6 +87,38 @@ post clause still uses its narrow grammar entry, and a child with prerequisite
 statements remains unsupported until those statements can be placed at the
 per-iteration boundary exactly.
 
+An expression switch owns its tag, ordered case expressions, clause bodies,
+default, implicit clause scopes, and implicit breaks as one construct family:
+
+```go
+switch current := value; current {
+case 0:
+	branch := 10
+	result = branch
+case 1, 2:
+	branch := 20
+	result = branch
+default:
+	branch := 30
+	result = branch
+}
+```
+
+The initializer uses the same scoped-simple-statement child contract as an
+`if` initializer. The owner emits a target block around the initializer and
+switch so the binding does not escape. The tag is evaluated once. Case
+expressions are delegated in source order with the tag's exact Go type.
+Multiple expressions become adjacent target case labels sharing one body.
+Each Go clause body is wrapped in its own target block because Go clauses are
+implicit lexical blocks while TypeScript case labels otherwise share one
+scope. The owner appends the one target `break` needed to preserve Go's
+implicit non-fallthrough behavior.
+
+Case-expression prerequisite statements, expressionless switches,
+fallthrough, type switches, and types whose target equality is not yet proved
+remain distinct typed-unsupported cases. They are not approximated by
+re-evaluation, source spelling, loose equality, or a generic statement walk.
+
 Likewise, for:
 
 ```go
