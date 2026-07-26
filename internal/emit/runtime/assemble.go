@@ -51,9 +51,13 @@ func Build(
 	if module == api.RuntimeModuleArray &&
 		len(symbols) == 1 &&
 		symbols[0] == api.RuntimeArray {
+		statement, err := runtimearray.Build(factory)
+		if err != nil {
+			return nil, err
+		}
 		definition, err := NewDefinition(
 			api.RuntimeArray,
-			runtimearray.Build(factory),
+			statement,
 		)
 		if err != nil {
 			return nil, err

@@ -1,10 +1,17 @@
 package array
 
-import "github.com/tsoniclang/gotots/internal/target/tsgo"
+import (
+	"github.com/tsoniclang/gotots/internal/emit/api"
+	arraymember "github.com/tsoniclang/gotots/internal/emit/runtime/array/member"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
 
-const className = "GoArray"
-
-func Build(factory tsgo.Factory) tsgo.ClassDeclaration {
+func Build(factory tsgo.Factory) (tsgo.ClassDeclaration, error) {
+	contract, err := api.RuntimeContract(api.RuntimeArray)
+	if err != nil {
+		return nil, err
+	}
+	exportedName := contract.ExportedName()
 	elementType := typeReference(factory, "T")
 	lengthType := typeReference(factory, "N")
 	typeParameters := []tsgo.TypeParameterDeclaration{
@@ -25,21 +32,21 @@ func Build(factory tsgo.Factory) tsgo.ClassDeclaration {
 	}
 	members := []tsgo.ClassElement{
 		constructor(factory, elementType, lengthType),
-		zeroMethod(factory),
-		literalMethod(factory),
-		copyMethod(factory, elementType, lengthType),
-		equalMethod(factory, elementType, lengthType),
+		zeroMethod(factory, exportedName),
+		literalMethod(factory, exportedName),
+		copyMethod(factory, exportedName, elementType, lengthType),
+		equalMethod(factory, exportedName, elementType, lengthType),
 		getMethod(factory, elementType),
 		setMethod(factory, elementType),
 		checkMethod(factory),
 	}
 	return factory.ClassDeclaration(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
-		factory.Identifier(className),
+		factory.Identifier(exportedName),
 		typeParameters,
 		nil,
 		members,
-	)
+	), nil
 }
 
 func constructor(
@@ -66,7 +73,7 @@ func constructor(
 					factory.PublicKeyword(),
 					factory.ReadonlyKeyword(),
 				},
-				"length",
+				arraymember.Length.Name(),
 				lengthType,
 			),
 		},
@@ -75,7 +82,10 @@ func constructor(
 	)
 }
 
-func zeroMethod(factory tsgo.Factory) tsgo.MethodDeclaration {
+func zeroMethod(
+	factory tsgo.Factory,
+	exportedName string,
+) tsgo.MethodDeclaration {
 	elementType := typeReference(factory, "T")
 	lengthType := typeReference(factory, "N")
 	values := factory.Identifier("values")
@@ -119,29 +129,32 @@ func zeroMethod(factory tsgo.Factory) tsgo.MethodDeclaration {
 			}, true),
 		),
 		factory.ReturnStatement(factory.NewExpression(
-			factory.Identifier(className),
+			factory.Identifier(exportedName),
 			[]tsgo.TypeNode{elementType, lengthType},
 			[]tsgo.Expression{values, length},
 		)),
 	}
-	return method(
+	return runtimeMethod(
 		factory,
 		[]tsgo.ModifierLike{
 			factory.PublicKeyword(),
 			factory.StaticKeyword(),
 		},
-		"zero",
+		arraymember.Zero,
 		typeParameters(factory),
 		[]tsgo.ParameterDeclaration{
 			parameter(factory, nil, "length", lengthType),
 			parameter(factory, nil, "zero", elementType),
 		},
-		arrayType(factory, elementType, lengthType),
+		arrayType(factory, exportedName, elementType, lengthType),
 		body,
 	)
 }
 
-func literalMethod(factory tsgo.Factory) tsgo.MethodDeclaration {
+func literalMethod(
+	factory tsgo.Factory,
+	exportedName string,
+) tsgo.MethodDeclaration {
 	elementType := typeReference(factory, "T")
 	lengthType := typeReference(factory, "N")
 	indexes := factory.Identifier("indexes")
@@ -169,7 +182,11 @@ func literalMethod(factory tsgo.Factory) tsgo.MethodDeclaration {
 			nil,
 			call(
 				factory,
-				property(factory, factory.Identifier(className), "zero"),
+				runtimeProperty(
+					factory,
+					factory.Identifier(exportedName),
+					arraymember.Zero,
+				),
 				[]tsgo.TypeNode{elementType, lengthType},
 				factory.Identifier("length"),
 				factory.Identifier("zero"),
@@ -198,7 +215,7 @@ func literalMethod(factory tsgo.Factory) tsgo.MethodDeclaration {
 			factory.Block([]tsgo.Statement{
 				factory.ExpressionStatement(call(
 					factory,
-					property(factory, result, "set"),
+					runtimeProperty(factory, result, arraymember.Set),
 					nil,
 					element(factory, indexes, entry),
 					element(factory, values, entry),
@@ -207,13 +224,13 @@ func literalMethod(factory tsgo.Factory) tsgo.MethodDeclaration {
 		),
 		factory.ReturnStatement(result),
 	}
-	return method(
+	return runtimeMethod(
 		factory,
 		[]tsgo.ModifierLike{
 			factory.PublicKeyword(),
 			factory.StaticKeyword(),
 		},
-		"literal",
+		arraymember.Literal,
 		typeParameters(factory),
 		[]tsgo.ParameterDeclaration{
 			parameter(factory, nil, "length", lengthType),
@@ -235,25 +252,26 @@ func literalMethod(factory tsgo.Factory) tsgo.MethodDeclaration {
 				factory.ArrayTypeNode(elementType),
 			),
 		},
-		arrayType(factory, elementType, lengthType),
+		arrayType(factory, exportedName, elementType, lengthType),
 		body,
 	)
 }
 
 func copyMethod(
 	factory tsgo.Factory,
+	exportedName string,
 	elementType tsgo.TypeNode,
 	lengthType tsgo.TypeNode,
 ) tsgo.MethodDeclaration {
-	return method(
+	return runtimeMethod(
 		factory,
 		[]tsgo.ModifierLike{factory.PublicKeyword()},
-		"copy",
+		arraymember.Copy,
 		nil,
 		nil,
-		arrayType(factory, elementType, lengthType),
+		arrayType(factory, exportedName, elementType, lengthType),
 		[]tsgo.Statement{factory.ReturnStatement(factory.NewExpression(
-			factory.Identifier(className),
+			factory.Identifier(exportedName),
 			[]tsgo.TypeNode{elementType, lengthType},
 			[]tsgo.Expression{
 				call(
@@ -265,7 +283,11 @@ func copyMethod(
 					),
 					nil,
 				),
-				property(factory, factory.ThisExpression(), "length"),
+				runtimeProperty(
+					factory,
+					factory.ThisExpression(),
+					arraymember.Length,
+				),
 			},
 		))},
 	)
@@ -273,6 +295,7 @@ func copyMethod(
 
 func equalMethod(
 	factory tsgo.Factory,
+	exportedName string,
 	elementType tsgo.TypeNode,
 	lengthType tsgo.TypeNode,
 ) tsgo.MethodDeclaration {
@@ -287,16 +310,16 @@ func equalMethod(
 		property(factory, factory.Identifier("other"), "$values"),
 		index,
 	)
-	return method(
+	return runtimeMethod(
 		factory,
 		[]tsgo.ModifierLike{factory.PublicKeyword()},
-		"equal",
+		arraymember.Equal,
 		nil,
 		[]tsgo.ParameterDeclaration{parameter(
 			factory,
 			nil,
 			"other",
-			arrayType(factory, elementType, lengthType),
+			arrayType(factory, exportedName, elementType, lengthType),
 		)},
 		factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindBooleanKeyword),
 		[]tsgo.Statement{
@@ -314,7 +337,11 @@ func equalMethod(
 					factory,
 					index,
 					tsgo.BinaryOperatorLessThanToken,
-					property(factory, factory.ThisExpression(), "length"),
+					runtimeProperty(
+						factory,
+						factory.ThisExpression(),
+						arraymember.Length,
+					),
 				),
 				factory.PostfixUnaryExpression(
 					index,
@@ -345,10 +372,10 @@ func getMethod(
 	elementType tsgo.TypeNode,
 ) tsgo.MethodDeclaration {
 	index := factory.Identifier("index")
-	return method(
+	return runtimeMethod(
 		factory,
 		[]tsgo.ModifierLike{factory.PublicKeyword()},
-		"get",
+		arraymember.Get,
 		nil,
 		[]tsgo.ParameterDeclaration{parameter(
 			factory,
@@ -386,10 +413,10 @@ func setMethod(
 	elementType tsgo.TypeNode,
 ) tsgo.MethodDeclaration {
 	index := factory.Identifier("index")
-	return method(
+	return runtimeMethod(
 		factory,
 		[]tsgo.ModifierLike{factory.PublicKeyword()},
-		"set",
+		arraymember.Set,
 		nil,
 		[]tsgo.ParameterDeclaration{
 			parameter(
@@ -443,7 +470,11 @@ func checkMethod(factory tsgo.Factory) tsgo.MethodDeclaration {
 		factory,
 		offset,
 		tsgo.BinaryOperatorGreaterThanEqualsToken,
-		property(factory, factory.ThisExpression(), "length"),
+		runtimeProperty(
+			factory,
+			factory.ThisExpression(),
+			arraymember.Length,
+		),
 	)
 	return method(
 		factory,

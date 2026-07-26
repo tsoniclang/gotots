@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	arraymember "github.com/tsoniclang/gotots/internal/emit/runtime/array/member"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -43,7 +44,7 @@ func (a RuntimeArray) EmitIndex(
 	before = append(before, index.Before()...)
 	return api.NewExpressionEmission(
 		before,
-		callMember(context, receiverValue, "get", index.Value()),
+		callMember(context, receiverValue, arraymember.Get, index.Value()),
 		api.CombineRequests(receiver.Requests(), index.Requests()),
 	)
 }
@@ -85,7 +86,7 @@ func (a RuntimeArray) EmitStore(
 		callMember(
 			context,
 			receiver.Value(),
-			"set",
+			arraymember.Set,
 			indexValue,
 			value.Value(),
 		),
@@ -116,11 +117,10 @@ func (a RuntimeArray) EmitLength(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	target := tsgo.Expression(context.Factory().PropertyAccessExpression(
+	target := tsgo.Expression(memberProperty(
+		context,
 		value.Value(),
-		nil,
-		context.Factory().Identifier("length"),
-		tsgo.NodeFlagsNone,
+		arraymember.Length,
 	))
 	if context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
 		target = context.Factory().CallExpression(

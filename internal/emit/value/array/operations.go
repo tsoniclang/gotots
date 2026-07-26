@@ -4,6 +4,7 @@ import (
 	"go/ast"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	arraymember "github.com/tsoniclang/gotots/internal/emit/runtime/array/member"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -29,7 +30,7 @@ func (a RuntimeArray) Zero(
 	}
 	target, requests, err := a.callStatic(
 		context,
-		"zero",
+		arraymember.Zero,
 		typeArguments,
 		a.lengthLiteral(context),
 		elementZero.Value(),
@@ -61,7 +62,7 @@ func (a RuntimeArray) Copy(
 	}
 	return api.NewExpressionEmission(
 		value.Before(),
-		callMember(context, value.Value(), "copy"),
+		callMember(context, value.Value(), arraymember.Copy),
 		value.Requests(),
 	)
 }
@@ -71,5 +72,7 @@ func (a RuntimeArray) Equal(
 	left tsgo.Expression,
 	right tsgo.Expression,
 ) api.ExpressionEmission {
-	return api.DirectExpression(callMember(context, left, "equal", right))
+	return api.DirectExpression(
+		callMember(context, left, arraymember.Equal, right),
+	)
 }

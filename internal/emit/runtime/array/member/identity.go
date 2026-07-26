@@ -1,0 +1,51 @@
+package arraymember
+
+type Identity uint8
+
+const (
+	Invalid Identity = 0
+	Zero    Identity = 1
+	Literal Identity = 2
+	Copy    Identity = 3
+	Equal   Identity = 4
+	Get     Identity = 5
+	Set     Identity = 6
+	Length  Identity = 7
+)
+
+func All() []Identity {
+	return []Identity{
+		Zero,
+		Literal,
+		Copy,
+		Equal,
+		Get,
+		Set,
+		Length,
+	}
+}
+
+func (i Identity) Valid() bool {
+	return i >= Zero && i <= Length
+}
+
+func (i Identity) Name() string {
+	switch i {
+	case Zero:
+		return "zero"
+	case Literal:
+		return "literal"
+	case Copy:
+		return "copy"
+	case Equal:
+		return "equal"
+	case Get:
+		return "get"
+	case Set:
+		return "set"
+	case Length:
+		return "length"
+	default:
+		panic("invalid array runtime member identity")
+	}
+}

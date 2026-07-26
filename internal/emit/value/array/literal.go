@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	arraymember "github.com/tsoniclang/gotots/internal/emit/runtime/array/member"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -60,7 +61,7 @@ func (a RuntimeArray) EmitLiteral(
 	}
 	target, runtimeRequests, err := a.callStatic(
 		context,
-		"literal",
+		arraymember.Literal,
 		typeArguments,
 		a.lengthLiteral(context),
 		elementZero.Value(),

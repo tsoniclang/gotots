@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	arraymember "github.com/tsoniclang/gotots/internal/emit/runtime/array/member"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -97,7 +98,7 @@ func (a RuntimeArray) runtime(
 
 func (a RuntimeArray) callStatic(
 	context api.Context,
-	name string,
+	member arraymember.Identity,
 	typeArguments []tsgo.TypeNode,
 	arguments ...tsgo.Expression,
 ) (tsgo.CallExpression, []api.PlacementRequest, error) {
@@ -109,7 +110,7 @@ func (a RuntimeArray) callStatic(
 		context.Factory().PropertyAccessExpression(
 			context.Factory().Identifier(reference.Name()),
 			nil,
-			context.Factory().Identifier(name),
+			context.Factory().Identifier(member.Name()),
 			tsgo.NodeFlagsNone,
 		),
 		nil,
@@ -148,19 +149,32 @@ func (a RuntimeArray) targetTypeArguments(
 func callMember(
 	context api.Context,
 	receiver tsgo.Expression,
-	name string,
+	member arraymember.Identity,
 	arguments ...tsgo.Expression,
 ) tsgo.CallExpression {
 	return context.Factory().CallExpression(
 		context.Factory().PropertyAccessExpression(
 			receiver,
 			nil,
-			context.Factory().Identifier(name),
+			context.Factory().Identifier(member.Name()),
 			tsgo.NodeFlagsNone,
 		),
 		nil,
 		nil,
 		arguments,
+		tsgo.NodeFlagsNone,
+	)
+}
+
+func memberProperty(
+	context api.Context,
+	receiver tsgo.Expression,
+	member arraymember.Identity,
+) tsgo.PropertyAccessExpression {
+	return context.Factory().PropertyAccessExpression(
+		receiver,
+		nil,
+		context.Factory().Identifier(member.Name()),
 		tsgo.NodeFlagsNone,
 	)
 }

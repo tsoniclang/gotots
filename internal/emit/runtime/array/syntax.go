@@ -1,6 +1,9 @@
 package array
 
-import "github.com/tsoniclang/gotots/internal/target/tsgo"
+import (
+	arraymember "github.com/tsoniclang/gotots/internal/emit/runtime/array/member"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
 
 func typeParameters(factory tsgo.Factory) []tsgo.TypeParameterDeclaration {
 	return []tsgo.TypeParameterDeclaration{
@@ -27,11 +30,12 @@ func typeReference(factory tsgo.Factory, name string) tsgo.TypeReferenceNode {
 
 func arrayType(
 	factory tsgo.Factory,
+	exportedName string,
 	elementType tsgo.TypeNode,
 	lengthType tsgo.TypeNode,
 ) tsgo.TypeReferenceNode {
 	return factory.TypeReferenceNode(
-		factory.Identifier(className),
+		factory.Identifier(exportedName),
 		[]tsgo.TypeNode{elementType, lengthType},
 	)
 }
@@ -54,6 +58,26 @@ func method(
 		parameters,
 		result,
 		factory.Block(body, true),
+	)
+}
+
+func runtimeMethod(
+	factory tsgo.Factory,
+	modifiers []tsgo.ModifierLike,
+	member arraymember.Identity,
+	typeParameters []tsgo.TypeParameterDeclaration,
+	parameters []tsgo.ParameterDeclaration,
+	result tsgo.TypeNode,
+	body []tsgo.Statement,
+) tsgo.MethodDeclaration {
+	return method(
+		factory,
+		modifiers,
+		member.Name(),
+		typeParameters,
+		parameters,
+		result,
+		body,
 	)
 }
 
@@ -105,6 +129,14 @@ func property(
 		factory.Identifier(name),
 		tsgo.NodeFlagsNone,
 	)
+}
+
+func runtimeProperty(
+	factory tsgo.Factory,
+	value tsgo.Expression,
+	member arraymember.Identity,
+) tsgo.PropertyAccessExpression {
+	return property(factory, value, member.Name())
 }
 
 func element(
