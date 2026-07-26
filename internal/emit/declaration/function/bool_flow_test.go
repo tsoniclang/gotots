@@ -96,8 +96,7 @@ func TestBoolFlowRejectsCompoundAssignmentVariant(t *testing.T) {
 	assignment := ifStatement.Body.List[0].(*ast.AssignStmt)
 	assignment.Tok = token.ADD_ASSIGN
 
-	compiler := emit.New(loaded)
-	_, err := compiler.EmitFile(loaded.Files()[0].Syntax(), filepath.Join(t.TempDir(), "bool-flow.ts"))
+	_, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 	var unsupported *api.UnsupportedError
 	if !errors.As(err, &unsupported) {
 		t.Fatalf("error = %v, want *api.UnsupportedError", err)
@@ -154,8 +153,7 @@ func TestBoolFlowRejectsUnaryOperatorVariant(t *testing.T) {
 	ifStatement := runFunction.Body.List[1].(*ast.IfStmt)
 	ifStatement.Cond.(*ast.UnaryExpr).Op = token.ADD
 
-	compiler := emit.New(loaded)
-	_, err := compiler.EmitFile(loaded.Files()[0].Syntax(), filepath.Join(t.TempDir(), "bool-flow.ts"))
+	_, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 	var unsupported *api.UnsupportedError
 	if !errors.As(err, &unsupported) {
 		t.Fatalf("error = %v, want *api.UnsupportedError", err)
@@ -175,8 +173,7 @@ func TestBoolFlowRejectsConversionAtOrdinaryCallOwner(t *testing.T) {
 	callee := call.Fun.(*ast.Ident)
 	loaded.TypesInfo().Uses[callee] = types.Universe.Lookup("bool")
 
-	compiler := emit.New(loaded)
-	_, err := compiler.EmitFile(loaded.Files()[0].Syntax(), filepath.Join(t.TempDir(), "bool-flow.ts"))
+	_, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 	var unsupported *api.UnsupportedError
 	if !errors.As(err, &unsupported) {
 		t.Fatalf("error = %v, want *api.UnsupportedError", err)
@@ -202,8 +199,7 @@ func loadBoolFlowProject(t *testing.T) *load.Package {
 
 func emitBoolFlow(t *testing.T, loaded *load.Package, outputPath string) tsgo.SourceFile {
 	t.Helper()
-	compiler := emit.New(loaded)
-	targetFile, err := compiler.EmitFile(loaded.Files()[0].Syntax(), outputPath)
+	targetFile, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 	if err != nil {
 		t.Fatal(err)
 	}

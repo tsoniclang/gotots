@@ -199,10 +199,7 @@ func TestLocalVariablesBoundaryMutationsFailClosed(t *testing.T) {
 			source := function.Body.List[0].(*ast.DeclStmt)
 			testCase.mutate(source)
 
-			_, err := emit.New(loaded).EmitFile(
-				loaded.Files()[0].Syntax(),
-				filepath.Join(t.TempDir(), "local-variables.ts"),
-			)
+			_, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 			var unsupported *api.UnsupportedError
 			if !errors.As(err, &unsupported) {
 				t.Fatalf("error = %v, want *api.UnsupportedError", err)
@@ -234,7 +231,7 @@ func emitLocalVariables(
 	outputPath string,
 ) tsgo.SourceFile {
 	t.Helper()
-	targetFile, err := emit.New(loaded).EmitFile(loaded.Files()[0].Syntax(), outputPath)
+	targetFile, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 	if err != nil {
 		t.Fatal(err)
 	}

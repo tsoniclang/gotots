@@ -103,10 +103,7 @@ func TestMultipleResultNamedReturnRemainsExplicitlyUnsupported(t *testing.T) {
 	pair := loaded.Files()[0].Syntax().Decls[0].(*ast.FuncDecl)
 	pair.Type.Results.List[0].Names = []*ast.Ident{ast.NewIdent("left")}
 
-	_, err := emit.New(loaded).EmitFile(
-		loaded.Files()[0].Syntax(),
-		filepath.Join(t.TempDir(), "multiple-results.ts"),
-	)
+	_, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 	assertUnsupportedCallable(
 		t,
 		err,
@@ -122,10 +119,7 @@ func TestMultipleResultArityMutationFailsAtCallOwner(t *testing.T) {
 	multipleCall := consume.Body.List[0].(*ast.AssignStmt).Rhs[0]
 	consume.Body.List[len(consume.Body.List)-1].(*ast.ReturnStmt).Results[0] = multipleCall
 
-	_, err := emit.New(loaded).EmitFile(
-		loaded.Files()[0].Syntax(),
-		filepath.Join(t.TempDir(), "multiple-results.ts"),
-	)
+	_, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 	assertUnsupportedCallable(
 		t,
 		err,
@@ -174,7 +168,7 @@ func emitMultipleResultsProject(
 	outputPath string,
 ) tsgo.SourceFile {
 	t.Helper()
-	targetFile, err := emit.New(loaded).EmitFile(loaded.Files()[0].Syntax(), outputPath)
+	targetFile, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 	if err != nil {
 		t.Fatal(err)
 	}

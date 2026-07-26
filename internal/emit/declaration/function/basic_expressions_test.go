@@ -125,10 +125,7 @@ func TestBasicExpressionBoundaryMutationsFailClosed(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			loaded := loadBasicExpressionsProject(t)
 			testCase.mutate(loaded.Files()[0].Syntax())
-			_, err := emit.New(loaded).EmitFile(
-				loaded.Files()[0].Syntax(),
-				filepath.Join(t.TempDir(), "basic-expressions.ts"),
-			)
+			_, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 			var unsupported *api.UnsupportedError
 			if !errors.As(err, &unsupported) {
 				t.Fatalf("error = %v, want *api.UnsupportedError", err)
@@ -227,7 +224,7 @@ func emitBasicExpressions(
 	outputPath string,
 ) tsgo.SourceFile {
 	t.Helper()
-	targetFile, err := emit.New(loaded).EmitFile(loaded.Files()[0].Syntax(), outputPath)
+	targetFile, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 	if err != nil {
 		t.Fatal(err)
 	}

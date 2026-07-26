@@ -102,10 +102,7 @@ func TestPackageConstantUntypedAndIotaCasesFailAtDeclarationOwner(t *testing.T) 
 			constants := sourceFileNamed(t, loaded, "constants.go")
 			mutate(constants.Decls[0].(*ast.GenDecl))
 
-			_, err := emit.New(loaded).EmitFile(
-				constants,
-				filepath.Join(t.TempDir(), "constants.ts"),
-			)
+			_, err := emit.CompileFile(loaded, constants)
 			var unsupported *api.UnsupportedError
 			if !errors.As(err, &unsupported) {
 				t.Fatalf("error = %v, want *api.UnsupportedError", err)
@@ -136,14 +133,10 @@ func emitPackageConstantsProject(
 	workingDirectory string,
 ) map[string]tsgo.SourceFile {
 	t.Helper()
-	compiler := emit.New(loaded)
 	targets := make(map[string]tsgo.SourceFile, len(loaded.Files()))
 	for _, file := range loaded.Files() {
 		name := strings.TrimSuffix(filepath.Base(file.Path()), ".go")
-		target, err := compiler.EmitFile(
-			file.Syntax(),
-			filepath.Join(workingDirectory, name+".ts"),
-		)
+		target, err := emit.CompileFile(loaded, file.Syntax())
 		if err != nil {
 			t.Fatal(err)
 		}

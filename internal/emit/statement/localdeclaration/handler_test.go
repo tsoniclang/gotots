@@ -24,10 +24,7 @@ func TestInitializedLocalDeclarationBuildsTypedVariableList(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	target, err := emit.New(loaded).EmitFile(
-		loaded.Files()[0].Syntax(),
-		filepath.Join(t.TempDir(), "local-variables.ts"),
-	)
+	target, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 	if err != nil {
 		t.Fatal(err)
 	}

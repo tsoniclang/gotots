@@ -295,6 +295,20 @@ concerns.
 
 ## Package And Output Shape
 
+Every source-available Go file has one checkout-independent target path:
+
+```text
+modules/<sha256(module-path NUL module-version)>/<module-relative-package>/<source-base>.ts
+```
+
+The full digest is an opaque semantic-module owner, not a shortened display
+identifier. Generated value imports use canonical relative `.js` specifiers.
+Every cross-package imported binding uses a deterministic package-qualified
+local alias even when its source spelling is currently unshadowed. This keeps
+the reference exact when a local declaration has the same spelling and prevents
+unrelated lexical traversal order from selecting whether qualification occurs.
+Same-package cross-file references retain their reserved package name.
+
 The source tree is organized recursively by authoritative responsibility. This
 is a growth rule, not a prediction of every construct. Create a directory only
 when its first real owner is implemented:

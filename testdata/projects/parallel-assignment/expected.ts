@@ -30,3 +30,7 @@ export function Shadow(value: int64): int64 {
     }
     return 0 as int64;
 }
+export function Accumulate(total: int64, delta: int64): int64 {
+    total += delta;
+    return total;
+}

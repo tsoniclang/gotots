@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"go/ast"
+	"go/token"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,7 +26,7 @@ func TestParallelIdentifierAssignmentPrintsTypechecksAndExecutesDifferentially(
 	loaded := loadProject(t)
 	workingDirectory := t.TempDir()
 	outputPath := filepath.Join(workingDirectory, "assignment.ts")
-	targetFile := emitProject(t, loaded, outputPath)
+	targetFile := emitProject(t, loaded)
 
 	client, err := tsgo.StartClient(repositoryRoot(), workingDirectory)
 	if err != nil {
@@ -61,7 +62,6 @@ func TestParallelAssignmentCreatesCapturesBeforeStores(t *testing.T) {
 	targetFile := emitProject(
 		t,
 		loaded,
-		filepath.Join(t.TempDir(), "assignment.ts"),
 	)
 	function := targetFile.Statements()[1].(tsgo.FunctionDeclaration)
 	statements := function.Body().(tsgo.Block).Statements()
@@ -117,10 +117,7 @@ func TestParallelAssignmentRejectsUnownedTargetAndMultiResultCases(t *testing.T)
 		function := loaded.Files()[0].Syntax().Decls[0].(*ast.FuncDecl)
 		mutate(function.Body.List[0].(*ast.AssignStmt))
 
-		_, err := emit.New(loaded).EmitFile(
-			loaded.Files()[0].Syntax(),
-			filepath.Join(t.TempDir(), "assignment.ts"),
-		)
+		_, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 		var unsupported *api.UnsupportedError
 		if !errors.As(err, &unsupported) {
 			t.Fatalf("error = %v, want *api.UnsupportedError", err)
@@ -130,6 +127,49 @@ func TestParallelAssignmentRejectsUnownedTargetAndMultiResultCases(t *testing.T)
 			unsupported.Role != api.RoleBlockStatement {
 			t.Fatalf("unsupported error = %#v", unsupported)
 		}
+	}
+}
+
+func TestCompoundIdentifierAssignmentUsesDirectTypedOperator(t *testing.T) {
+	loaded := loadProject(t)
+	targetFile := emitProject(
+		t,
+		loaded,
+	)
+	function := targetFile.Statements()[5].(tsgo.FunctionDeclaration)
+	statement := function.Body().(tsgo.Block).Statements()[0].(tsgo.ExpressionStatement)
+	operation := statement.Expression().(tsgo.BinaryExpression)
+	if operation.OperatorToken().Kind() != tsgo.SyntaxKindPlusEqualsToken ||
+		identifierText(operation.Left()) != "total" ||
+		identifierText(operation.Right()) != "delta" {
+		t.Fatal("compound assignment is not the direct owned += operation")
+	}
+}
+
+func TestCompoundAssignmentBoundaryMutationsFailClosed(t *testing.T) {
+	for name, mutate := range map[string]func(*ast.AssignStmt){
+		"store shape": func(source *ast.AssignStmt) {
+			source.Lhs[0] = &ast.IndexExpr{
+				X:     source.Lhs[0],
+				Index: source.Rhs[0],
+			}
+		},
+		"operator": func(source *ast.AssignStmt) {
+			source.Tok = token.SUB_ASSIGN
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			loaded := loadProject(t)
+			function := loaded.Files()[0].Syntax().Decls[4].(*ast.FuncDecl)
+			mutate(function.Body.List[0].(*ast.AssignStmt))
+			_, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
+			var unsupported *api.UnsupportedError
+			if !errors.As(err, &unsupported) ||
+				unsupported.Construct != "*ast.AssignStmt" ||
+				unsupported.Role != api.RoleBlockStatement {
+				t.Fatalf("error = %#v, want owned assignment failure", err)
+			}
+		})
 	}
 }
 
@@ -152,10 +192,9 @@ func loadProject(t *testing.T) *load.Package {
 func emitProject(
 	t *testing.T,
 	loaded *load.Package,
-	outputPath string,
 ) tsgo.SourceFile {
 	t.Helper()
-	targetFile, err := emit.New(loaded).EmitFile(loaded.Files()[0].Syntax(), outputPath)
+	targetFile, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,6 +232,7 @@ func main() {
 	fmt.Println(assignment.Rotate(4, 7))
 	fmt.Println(assignment.Declare(11, 13))
 	fmt.Println(assignment.Shadow(17))
+	fmt.Println(assignment.Accumulate(19, 23))
 }
 `)
 	return run(t, runnerDirectory, filepath.Join(runtime.GOROOT(), "bin", "go"), "run", ".")
@@ -207,12 +247,13 @@ func executeTypeScript(
 	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
 	installCoreTypes(t, workingDirectory)
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
-	writeFile(t, runnerPath, `import { Declare, Rotate, Shadow, SwapLeft } from "./assignment.js";
+	writeFile(t, runnerPath, `import { Accumulate, Declare, Rotate, Shadow, SwapLeft } from "./assignment.js";
 
 console.log(SwapLeft(3, 9));
 console.log(Rotate(4, 7));
 console.log(Declare(11, 13));
 console.log(Shadow(17));
+console.log(Accumulate(19, 23));
 `)
 	outputDirectory := filepath.Join(workingDirectory, "out")
 	toolPath := strings.TrimSpace(run(

@@ -54,3 +54,21 @@ func EmitRepresented(
 		reference.Requests()...,
 	), nil
 }
+
+func SupportsSignedArithmetic(sizes types.Sizes, sourceType types.Type) bool {
+	if sizes == nil || sourceType == nil {
+		return false
+	}
+	basic, ok := types.Unalias(sourceType).(*types.Basic)
+	if !ok {
+		return false
+	}
+	switch basic.Kind() {
+	case types.Int64:
+		return true
+	case types.Int:
+		return sizes.Sizeof(types.Typ[types.Int]) == 8
+	default:
+		return false
+	}
+}

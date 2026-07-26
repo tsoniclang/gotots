@@ -10,10 +10,11 @@ import (
 	identifierexpression "github.com/tsoniclang/gotots/internal/emit/expression/identifier"
 	integerliteral "github.com/tsoniclang/gotots/internal/emit/expression/literal/integer"
 	parenthesizedexpression "github.com/tsoniclang/gotots/internal/emit/expression/parenthesized"
+	selectorexpression "github.com/tsoniclang/gotots/internal/emit/expression/selector"
 	unaryexpression "github.com/tsoniclang/gotots/internal/emit/expression/unary"
 )
 
-func (e *Emitter) Expression(
+func (e *emitter) Expression(
 	context api.Context,
 	source ast.Expr,
 ) (api.ExpressionEmission, error) {
@@ -26,6 +27,8 @@ func (e *Emitter) Expression(
 		return identifierexpression.Emit(context, e, source)
 	case *ast.ParenExpr:
 		return parenthesizedexpression.Emit(context, e, source)
+	case *ast.SelectorExpr:
+		return selectorexpression.Emit(context, source)
 	case *ast.BasicLit:
 		return e.IntegerConstant(context, source)
 	case *ast.UnaryExpr:
@@ -36,21 +39,21 @@ func (e *Emitter) Expression(
 	}
 }
 
-func (e *Emitter) IntegerConstant(
+func (e *emitter) IntegerConstant(
 	context api.Context,
 	source ast.Expr,
 ) (api.ExpressionEmission, error) {
 	return integerliteral.Emit(context, e, source)
 }
 
-func (e *Emitter) DiscardedCall(
+func (e *emitter) DiscardedCall(
 	context api.Context,
 	source *ast.CallExpr,
 ) (api.ExpressionEmission, error) {
 	return callexpression.EmitDiscarded(context, e, source)
 }
 
-func (e *Emitter) Condition(
+func (e *emitter) Condition(
 	context api.Context,
 	source ast.Expr,
 ) (api.ExpressionEmission, error) {

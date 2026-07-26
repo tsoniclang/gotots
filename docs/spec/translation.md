@@ -286,6 +286,24 @@ are declared only after all captures. A shadowing new variable receives a
 distinct target name so an earlier right-side reference still denotes the
 outer Go object.
 
+For an identifier of a directly represented signed integer type, compound
+addition remains one direct target operation:
+
+```go
+total += delta
+```
+
+```ts
+total += delta;
+```
+
+The assignment owner proves the exact `types.Var`, represented operand type,
+and assignability of the right side. It accepts the direct form only when the
+right-side emission has no prerequisite statements, so reading the left value
+cannot move across right-side effects. Selector, index, pointer, other
+compound-operator, unsupported-width, and prerequisite-statement cases remain
+separate typed failures until their single-evaluation rules are proved.
+
 An ordinary Go function with two or more results has one direct TypeScript
 tuple carrier. Result declarations use `[T0, T1, ...]`; an explicit
 `return left, right` constructs `[left, right]`; and `return pair()` preserves

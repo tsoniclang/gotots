@@ -6,6 +6,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -19,10 +20,65 @@ func Emit(
 		return emitDefinition(context, children, source)
 	case token.ASSIGN:
 		return emitAssignment(context, children, source)
+	case token.ADD_ASSIGN:
+		return emitCompoundAddition(context, children, source)
 	default:
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
+}
+
+func emitCompoundAddition(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.AssignStmt,
+) (api.StatementEmission, error) {
+	if len(source.Lhs) != 1 || len(source.Rhs) != 1 {
+		return api.StatementEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	name, ok := source.Lhs[0].(*ast.Ident)
+	if !ok {
+		return api.StatementEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	object, ok := context.TypesInfo().Uses[name].(*types.Var)
+	if !ok ||
+		!basictype.SupportsSignedArithmetic(context.TypesSizes(), object.Type()) ||
+		!types.AssignableTo(context.TypesInfo().TypeOf(source.Rhs[0]), object.Type()) {
+		return api.StatementEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	reference, err := context.Names().Reference(object)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
+	value, err := children.Expression(
+		context.
+			WithRole(api.RoleAssignmentValue).
+			WithExpectedType(object.Type()),
+		source.Rhs[0],
+	)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
+	if len(value.Before()) != 0 {
+		return api.StatementEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	target := context.Factory().BinaryExpression(
+		nil,
+		context.Factory().Identifier(reference.Name()),
+		nil,
+		context.Factory().BinaryOperatorToken(
+			tsgo.BinaryOperatorPlusEqualsToken,
+		),
+		value.Value(),
+	)
+	return api.DirectStatement(
+		context.Factory().ExpressionStatement(target),
+		api.CombineRequests(reference.Requests(), value.Requests())...,
+	), nil
 }
 
 func emitDefinition(

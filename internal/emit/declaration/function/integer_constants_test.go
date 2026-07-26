@@ -87,11 +87,7 @@ func TestIntegerConstantsRejectNonIntegerSyntaxMutation(t *testing.T) {
 	literal := small.Body.List[0].(*ast.ReturnStmt).Results[0].(*ast.BasicLit)
 	literal.Kind = token.FLOAT
 
-	compiler := emit.New(loaded)
-	_, err := compiler.EmitFile(
-		loaded.Files()[0].Syntax(),
-		filepath.Join(t.TempDir(), "constants.ts"),
-	)
+	_, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 	var unsupported *api.UnsupportedError
 	if !errors.As(err, &unsupported) {
 		t.Fatalf("error = %v, want *api.UnsupportedError", err)
@@ -121,8 +117,7 @@ func emitIntegerConstants(
 	outputPath string,
 ) tsgo.SourceFile {
 	t.Helper()
-	compiler := emit.New(loaded)
-	targetFile, err := compiler.EmitFile(loaded.Files()[0].Syntax(), outputPath)
+	targetFile, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 	if err != nil {
 		t.Fatal(err)
 	}

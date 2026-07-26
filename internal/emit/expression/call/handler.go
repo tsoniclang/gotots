@@ -31,13 +31,12 @@ func emit(
 	source *ast.CallExpr,
 	discarded bool,
 ) (api.ExpressionEmission, error) {
-	callee, ok := source.Fun.(*ast.Ident)
-	if !ok || source.Ellipsis != token.NoPos {
+	if source.Ellipsis != token.NoPos {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	object, ok := context.TypesInfo().Uses[callee].(*types.Func)
-	if !ok || object.Pkg() != context.TypesPackage() {
+	object, ok := calleeObject(context, source.Fun)
+	if !ok {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
@@ -92,6 +91,33 @@ func emit(
 		),
 		api.CombineRequests(reference.Requests(), argumentRequests),
 	)
+}
+
+func calleeObject(context api.Context, source ast.Expr) (*types.Func, bool) {
+	switch source := source.(type) {
+	case *ast.Ident:
+		object, ok := context.TypesInfo().Uses[source].(*types.Func)
+		return object, ok
+	case *ast.SelectorExpr:
+		if context.TypesInfo().Selections[source] != nil {
+			return nil, false
+		}
+		qualifier, ok := source.X.(*ast.Ident)
+		if !ok {
+			return nil, false
+		}
+		packageName, ok := context.TypesInfo().Uses[qualifier].(*types.PkgName)
+		if !ok {
+			return nil, false
+		}
+		object, ok := context.TypesInfo().Uses[source.Sel].(*types.Func)
+		if !ok || object.Pkg() != packageName.Imported() {
+			return nil, false
+		}
+		return object, true
+	default:
+		return nil, false
+	}
 }
 
 func emitArguments(

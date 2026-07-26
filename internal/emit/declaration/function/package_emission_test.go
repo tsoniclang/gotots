@@ -107,8 +107,7 @@ func TestPackageWideImportUsesGoObjectOwnership(t *testing.T) {
 	call := runFunction.Body.List[0].(*ast.ReturnStmt).Results[0].(*ast.CallExpr)
 	call.Fun.(*ast.Ident).Name = "identity"
 
-	compiler := emit.New(loaded)
-	targetFile, err := compiler.EmitFile(entryFile, filepath.Join(t.TempDir(), "entry.ts"))
+	targetFile, err := emit.CompileFile(loaded, entryFile)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,15 +171,11 @@ func emitBoolMultifile(
 	workingDirectory string,
 ) map[string]tsgo.SourceFile {
 	t.Helper()
-	compiler := emit.New(loaded)
 	files := loaded.Files()
 	targetFiles := make(map[string]tsgo.SourceFile, len(files))
 	for _, sourceFile := range files {
 		baseName := strings.TrimSuffix(filepath.Base(sourceFile.Path()), ".go")
-		targetFile, err := compiler.EmitFile(
-			sourceFile.Syntax(),
-			filepath.Join(workingDirectory, baseName+".ts"),
-		)
+		targetFile, err := emit.CompileFile(loaded, sourceFile.Syntax())
 		if err != nil {
 			t.Fatal(err)
 		}

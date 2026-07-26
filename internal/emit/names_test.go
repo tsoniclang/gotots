@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func TestPortableIdentifierEscapesNonASCIIWithoutChangingASCII(t *testing.T) {
@@ -142,5 +143,48 @@ func TestNameOwnerRejectsDeclarationOutsideIndexedTypeGraph(t *testing.T) {
 		nameError.Name != "late" ||
 		nameError.Reason != "declaration object was not indexed from its Go scope" {
 		t.Fatalf("error = %#v, want indexed-scope NameError", err)
+	}
+}
+
+func TestCrossPackageReferenceRequiresItsExactObjectBeforeImporting(t *testing.T) {
+	currentPackage := types.NewPackage("example.com/current", "current")
+	importedPackage := types.NewPackage("example.com/dependency", "dependency")
+	object := types.NewFunc(
+		token.Pos(1),
+		importedPackage,
+		"Run",
+		types.NewSignatureType(nil, nil, nil, nil, nil, false),
+	)
+	importedPackage.Scope().Insert(object)
+	sourceFile := &ast.File{}
+	declarationFile := &ast.File{}
+	registry := newDeclarationRegistry()
+	if err := registry.reserve(object, targetBinding{
+		name:         "Run",
+		sourceFile:   declarationFile,
+		sourcePath:   "modules/dependency/dependency.ts",
+		moduleExport: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	required := errors.New("enqueue mutation sentinel")
+	names := newNameOwnerWithRegistry(
+		currentPackage.Scope(),
+		&types.Info{Defs: make(map[*ast.Ident]types.Object)},
+		registry,
+	).ForFile(
+		sourceFile,
+		currentPackage.Scope(),
+		tsgo.NewFactory(),
+		"modules/current/current.ts",
+		func(actual types.Object) error {
+			if actual != object {
+				t.Fatalf("required object = %v, want imported Run", actual)
+			}
+			return required
+		},
+	)
+	if _, err := names.Reference(object); !errors.Is(err, required) {
+		t.Fatalf("reference error = %v, want enqueue sentinel", err)
 	}
 }

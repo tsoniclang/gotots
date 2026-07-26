@@ -112,6 +112,11 @@ declarations and source bindings: every selected root and resolved emitted
 reference reaches exactly one target declaration or explicit obligation.
 Mutations omit an enqueue, duplicate an owner, break a cycle reservation, and
 silently drop a function-value/interface/callback target.
+Multi-package scheduler proof also includes checkout relocation, root-order
+reversal, recursive cycles, unreachable declarations, cross-package/local-name
+collisions, direct tuple flow, and nested control flow. Generated module paths,
+encoded TS-Go source files, reachable declaration sets, strict typechecking,
+and Go-versus-authoritative-consumer behavior must remain exact.
 
 ## Native TS-Go Target Proof
 

@@ -81,10 +81,7 @@ func TestZeroResultCallableMutationsFailAtOwningContext(t *testing.T) {
 		touchCall := runFunction.Body.List[0].(*ast.ExprStmt).X
 		identity.Body.List[0].(*ast.ReturnStmt).Results = []ast.Expr{touchCall}
 
-		_, err := emit.New(loaded).EmitFile(
-			loaded.Files()[0].Syntax(),
-			filepath.Join(t.TempDir(), "void-calls.ts"),
-		)
+		_, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 		assertUnsupportedCallable(
 			t,
 			err,
@@ -99,10 +96,7 @@ func TestZeroResultCallableMutationsFailAtOwningContext(t *testing.T) {
 		identity := loaded.Files()[0].Syntax().Decls[1].(*ast.FuncDecl)
 		identity.Body.List[0].(*ast.ReturnStmt).Results = nil
 
-		_, err := emit.New(loaded).EmitFile(
-			loaded.Files()[0].Syntax(),
-			filepath.Join(t.TempDir(), "void-calls.ts"),
-		)
+		_, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 		assertUnsupportedCallable(
 			t,
 			err,
@@ -150,7 +144,7 @@ func emitZeroResultProject(
 	outputPath string,
 ) tsgo.SourceFile {
 	t.Helper()
-	targetFile, err := emit.New(loaded).EmitFile(loaded.Files()[0].Syntax(), outputPath)
+	targetFile, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 	if err != nil {
 		t.Fatal(err)
 	}

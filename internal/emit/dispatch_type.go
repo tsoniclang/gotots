@@ -9,14 +9,14 @@ import (
 	tupletype "github.com/tsoniclang/gotots/internal/emit/type/tuple"
 )
 
-func (e *Emitter) Type(
+func (e *emitter) Type(
 	context api.Context,
 	source ast.Expr,
 ) (api.TypeEmission, error) {
 	return basictype.Emit(context, source)
 }
 
-func (e *Emitter) RepresentedType(
+func (e *emitter) RepresentedType(
 	context api.Context,
 	source ast.Node,
 	sourceType types.Type,
