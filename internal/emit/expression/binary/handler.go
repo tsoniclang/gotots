@@ -54,9 +54,6 @@ func Emit(
 		operator,
 		right.Value(),
 	))
-	if isSignedArithmetic(source.Op) {
-		target = exactInt32Arithmetic(context, source.Op, left.Value(), right.Value())
-	}
 	return api.NewExpressionEmission(
 		nil,
 		target,
@@ -126,48 +123,6 @@ func emitValueEquality(
 	), true, nil
 }
 
-func exactInt32Arithmetic(
-	context api.Context,
-	operator token.Token,
-	left tsgo.Expression,
-	right tsgo.Expression,
-) tsgo.Expression {
-	if operator == token.MUL {
-		return context.Factory().CallExpression(
-			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier("Math"),
-				nil,
-				context.Factory().Identifier("imul"),
-				tsgo.NodeFlagsNone,
-			),
-			nil,
-			nil,
-			[]tsgo.Expression{left, right},
-			tsgo.NodeFlagsNone,
-		)
-	}
-	var targetOperator tsgo.BinaryOperator
-	if operator == token.ADD {
-		targetOperator = tsgo.BinaryOperatorPlusToken
-	} else {
-		targetOperator = tsgo.BinaryOperatorMinusToken
-	}
-	value := context.Factory().BinaryExpression(
-		nil,
-		left,
-		nil,
-		context.Factory().BinaryOperatorToken(targetOperator),
-		right,
-	)
-	return context.Factory().BinaryExpression(
-		nil,
-		context.Factory().ParenthesizedExpression(value),
-		nil,
-		context.Factory().BinaryOperatorToken(tsgo.BinaryOperatorBarToken),
-		context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
-	)
-}
-
 func operationFor(
 	context api.Context,
 	source *ast.BinaryExpr,
@@ -181,7 +136,7 @@ func operationFor(
 	)
 	switch {
 	case isSignedArithmetic(source.Op) &&
-		basictype.SupportsExactInt32(
+		basictype.SupportsInteger(
 			context.TypesSizes(),
 			context.TypesInfo().TypeOf(source),
 		):
@@ -278,7 +233,7 @@ func integerOperandType(
 	right types.Type,
 ) (types.Type, bool) {
 	for _, candidate := range []types.Type{left, right} {
-		if !basictype.SupportsExactInt32(sizes, candidate) {
+		if !basictype.SupportsInteger(sizes, candidate) {
 			continue
 		}
 		if types.AssignableTo(left, candidate) && types.AssignableTo(right, candidate) {

@@ -16,6 +16,7 @@ type Context struct {
 	factory         tsgo.Factory
 	names           Names
 	values          Values
+	integer         IntegerRepresentation
 	expectedType    types.Type
 	expectedResults *types.Tuple
 	functionResults *types.Tuple
@@ -32,6 +33,7 @@ func NewContext(
 	factory tsgo.Factory,
 	names Names,
 	values Values,
+	integer IntegerRepresentation,
 ) (Context, error) {
 	switch {
 	case role == "":
@@ -48,6 +50,8 @@ func NewContext(
 		return Context{}, &ContextError{Reason: "name owner is nil"}
 	case values == nil:
 		return Context{}, &ContextError{Reason: "value owner is nil"}
+	case !integer.Valid():
+		return Context{}, &ContextError{Reason: "integer representation is invalid"}
 	}
 	return Context{
 		role:         role,
@@ -58,6 +62,7 @@ func NewContext(
 		factory:      factory,
 		names:        names,
 		values:       values,
+		integer:      integer,
 	}, nil
 }
 
@@ -131,6 +136,10 @@ func (c Context) Names() Names {
 
 func (c Context) Values() Values {
 	return c.values
+}
+
+func (c Context) IntegerRepresentation() IntegerRepresentation {
+	return c.integer
 }
 
 func (c Context) ExpectedType() types.Type {

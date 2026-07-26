@@ -125,9 +125,9 @@ func emitMethod(
 
 func captureReceiver(
 	context api.Context,
-	children api.ChildEmitter,
-	source ast.Node,
-	sourceType types.Type,
+	_ api.ChildEmitter,
+	_ ast.Node,
+	_ types.Type,
 	receiver api.ExpressionEmission,
 ) (
 	tsgo.Expression,
@@ -135,14 +135,6 @@ func captureReceiver(
 	[]tsgo.Statement,
 	error,
 ) {
-	targetType, err := children.RepresentedType(
-		context.WithRole(api.RoleReceiverType),
-		source,
-		sourceType,
-	)
-	if err != nil {
-		return nil, nil, nil, err
-	}
 	name, err := context.Names().Temporary(api.TemporaryReceiverValue)
 	if err != nil {
 		return nil, nil, nil, err
@@ -150,7 +142,7 @@ func captureReceiver(
 	declaration := context.Factory().VariableDeclaration(
 		context.Factory().Identifier(name),
 		nil,
-		targetType.Value(),
+		nil,
 		receiver.Value(),
 	)
 	before := receiver.Before()
@@ -162,7 +154,7 @@ func captureReceiver(
 		),
 	))
 	return context.Factory().Identifier(name),
-		targetType.Requests(),
+		nil,
 		before,
 		nil
 }

@@ -57,9 +57,10 @@ func TestLoopControlCreatesExactTargetTree(t *testing.T) {
 	if loop.Condition().Kind() != tsgo.SyntaxKindBinaryExpression {
 		t.Fatalf("loop condition kind = %d, want binary expression", loop.Condition().Kind())
 	}
-	increment, ok := loop.Incrementor().(tsgo.BinaryExpression)
-	if !ok || increment.OperatorToken().Kind() != tsgo.SyntaxKindEqualsToken {
-		t.Fatalf("loop incrementor = %T, want exact wrapped assignment", loop.Incrementor())
+	increment, ok := loop.Incrementor().(tsgo.PostfixUnaryExpression)
+	if !ok ||
+		increment.Operator() != tsgo.PostfixUnaryExpressionOperatorKindPlusPlusToken {
+		t.Fatalf("loop incrementor = %T, want direct postfix increment", loop.Incrementor())
 	}
 	body := loop.Statement().(tsgo.Block)
 	firstIf := body.Statements()[0].(tsgo.IfStatement)
@@ -164,8 +165,8 @@ func TestLoopControlPostUsesGoObjectIdentity(t *testing.T) {
 	targetFile := emitLoopControl(t, loaded)
 	targetFunction := targetFile.Statements()[1].(tsgo.FunctionDeclaration)
 	targetLoop := targetFunction.Body().(tsgo.Block).Statements()[1].(tsgo.ForStatement)
-	increment := targetLoop.Incrementor().(tsgo.BinaryExpression)
-	if name := increment.Left().(tsgo.Identifier).Text(); name != "current" {
+	increment := targetLoop.Incrementor().(tsgo.PostfixUnaryExpression)
+	if name := increment.Operand().(tsgo.Identifier).Text(); name != "current" {
 		t.Fatalf("post operand = %q, want current", name)
 	}
 }

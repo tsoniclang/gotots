@@ -1,6 +1,8 @@
 package emit_test
 
 import (
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit"
@@ -86,4 +88,143 @@ func TestCompileFileReturnsCompleteStandaloneEmission(t *testing.T) {
 	if len(packages) != 3 || support != 1 {
 		t.Fatalf("complete files = packages %v, support %d", packages, support)
 	}
+}
+
+func TestIntegerRepresentationDefaultsToDirectNumberSyntax(t *testing.T) {
+	program := loadDemandProgram(t)
+	roots, err := emit.ExportedAPIRoots(program.Roots()[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	emission, err := emit.Compile(program, roots)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertIntegerCarrier(t, emission, tsgo.SyntaxKindNumberKeyword)
+	assertEmissionHasNoIntegerNoise(t, emission)
+}
+
+func TestIntegerRepresentationCanSelectBigIntForTheWholeEmission(t *testing.T) {
+	program := loadDemandProgram(t)
+	roots, err := emit.ExportedAPIRoots(program.Roots()[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	emission, err := emit.CompileWithOptions(program, roots, emit.Options{
+		IntegerRepresentation: emit.IntegerRepresentationBigInt,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertIntegerCarrier(t, emission, tsgo.SyntaxKindBigIntKeyword)
+	printed := printIntegerEmission(t, emission)
+	if !strings.Contains(printed, "0n") && !strings.Contains(printed, "1n") {
+		t.Fatalf("BigInt emission contains no BigInt literal:\n%s", printed)
+	}
+	assertNoIntegerNoise(t, printed)
+}
+
+func TestInvalidIntegerRepresentationFailsAtCompilationEntry(t *testing.T) {
+	program := loadDemandProgram(t)
+	roots, err := emit.ExportedAPIRoots(program.Roots()[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = emit.CompileWithOptions(program, roots, emit.Options{})
+	var optionsError *emit.OptionsError
+	if !errors.As(err, &optionsError) {
+		t.Fatalf("error = %#v, want *emit.OptionsError", err)
+	}
+}
+
+func TestIntegerRepresentationSelectionParsesOnlyClosedProfiles(t *testing.T) {
+	for source, want := range map[string]emit.IntegerRepresentation{
+		"number": emit.IntegerRepresentationNumber,
+		"bigint": emit.IntegerRepresentationBigInt,
+	} {
+		got, err := emit.ParseIntegerRepresentation(source)
+		if err != nil {
+			t.Fatalf("parse %q: %v", source, err)
+		}
+		if got != want {
+			t.Fatalf("parse %q = %v, want %v", source, got, want)
+		}
+	}
+	got, err := emit.ParseIntegerRepresentation("int32")
+	var optionsError *emit.OptionsError
+	if got != emit.IntegerRepresentationInvalid ||
+		!errors.As(err, &optionsError) {
+		t.Fatalf("parse invalid = (%v, %#v), want invalid OptionsError", got, err)
+	}
+}
+
+func assertIntegerCarrier(
+	t *testing.T,
+	emission emit.ProgramEmission,
+	want tsgo.SyntaxKind,
+) {
+	t.Helper()
+	found := false
+	for _, file := range emission.Files() {
+		if file.Kind() != emit.TargetFileSupport {
+			continue
+		}
+		for _, statement := range file.SourceFile().Statements() {
+			alias, ok := statement.(tsgo.TypeAliasDeclaration)
+			if !ok || alias.Name().Text() == "bool" {
+				continue
+			}
+			found = true
+			if alias.Type().Kind() != want {
+				t.Fatalf("%s carrier = %d, want %d", alias.Name().Text(), alias.Type().Kind(), want)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("emission contains no integer support alias")
+	}
+}
+
+func assertEmissionHasNoIntegerNoise(t *testing.T, emission emit.ProgramEmission) {
+	t.Helper()
+	assertNoIntegerNoise(t, printIntegerEmission(t, emission))
+}
+
+func assertNoIntegerNoise(t *testing.T, printed string) {
+	t.Helper()
+	for _, forbidden := range []string{
+		" as int32",
+		" as int64",
+		"Math.imul",
+		") | 0",
+	} {
+		if strings.Contains(printed, forbidden) {
+			t.Fatalf("generated TypeScript contains %q:\n%s", forbidden, printed)
+		}
+	}
+}
+
+func printIntegerEmission(t *testing.T, emission emit.ProgramEmission) string {
+	t.Helper()
+	client, err := tsgo.StartClient(repositoryRoot(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := client.Close(); err != nil {
+			t.Errorf("close TS-Go client: %v", err)
+		}
+	})
+	var result strings.Builder
+	for _, file := range emission.Files() {
+		if file.Kind() != emit.TargetFileSource {
+			continue
+		}
+		printed, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		result.WriteString(printed)
+	}
+	return result.String()
 }

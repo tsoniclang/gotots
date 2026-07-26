@@ -74,11 +74,6 @@ func (n *nameOwner) preallocateMembers(packageScope *types.Scope) {
 		}
 		used := map[string]struct{}{
 			"constructor": {},
-			"$goType":     {},
-			"$zero":       {},
-			"$copy":       {},
-			"$assign":     {},
-			"$equal":      {},
 		}
 		for index := range structType.NumFields() {
 			field := structType.Field(index)

@@ -20,39 +20,34 @@ func (Owner) Zero(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.ExpressionEmission, error) {
-	if alias, ok := exactPrimitive(context, sourceType); ok {
-		reference, err := context.Names().Primitive(alias)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
+	if alias, ok := primitive(context, sourceType); ok {
 		var literal tsgo.Expression
 		if alias == api.PrimitiveBool {
 			literal = context.Factory().FalseLiteral()
 		} else {
-			literal = context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone)
+			var err error
+			literal, err = api.IntegerLiteral(
+				context.Factory(),
+				context.IntegerRepresentation(),
+				"0",
+			)
+			if err != nil {
+				return api.ExpressionEmission{}, err
+			}
 		}
-		return api.DirectExpression(
-			context.Factory().AsExpression(
-				literal,
-				context.Factory().TypeReferenceNode(
-					context.Factory().Identifier(reference.Name()),
-					nil,
-				),
-			),
-			reference.Requests()...,
-		), nil
+		return api.DirectExpression(literal), nil
 	}
 	typeName, _, ok := namedStruct(sourceType)
 	if !ok {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	reference, err := context.Names().Reference(typeName)
+	reference, err := context.Names().Companion(typeName, api.CompanionZero)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
 	return api.DirectExpression(
-		staticCall(context, reference.Name(), "$zero", nil),
+		companionCall(context, reference.Name(), nil),
 		reference.Requests()...,
 	), nil
 }
@@ -82,16 +77,15 @@ func (Owner) Copy(
 			value.Requests(),
 		)
 	}
-	reference, err := context.Names().Reference(typeName)
+	reference, err := context.Names().Companion(typeName, api.CompanionCopy)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
 	return api.NewExpressionEmission(
 		value.Before(),
-		staticCall(
+		companionCall(
 			context,
 			reference.Name(),
-			"$copy",
 			[]tsgo.Expression{value.Value()},
 		),
 		api.CombineRequests(value.Requests(), reference.Requests()),
@@ -138,24 +132,23 @@ func (Owner) Assign(
 			value.Requests(),
 		)
 	}
-	typeName, _, ok := namedStruct(sourceType)
+	_, _, ok := namedStruct(sourceType)
 	if !ok {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	reference, err := context.Names().Reference(typeName)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
 	return api.NewExpressionEmission(
 		value.Before(),
-		staticCall(
-			context,
-			reference.Name(),
-			"$assign",
-			[]tsgo.Expression{target, value.Value()},
+		context.Factory().BinaryExpression(
+			nil,
+			target,
+			nil,
+			context.Factory().BinaryOperatorToken(
+				tsgo.BinaryOperatorEqualsToken,
+			),
+			value.Value(),
 		),
-		api.CombineRequests(value.Requests(), reference.Requests()),
+		value.Requests(),
 	)
 }
 
@@ -166,7 +159,7 @@ func (Owner) Equal(
 	left tsgo.Expression,
 	right tsgo.Expression,
 ) (api.ExpressionEmission, error) {
-	if _, ok := exactPrimitive(context, sourceType); ok {
+	if _, ok := primitive(context, sourceType); ok {
 		return api.DirectExpression(context.Factory().BinaryExpression(
 			nil,
 			left,
@@ -182,15 +175,14 @@ func (Owner) Equal(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	reference, err := context.Names().Reference(typeName)
+	reference, err := context.Names().Companion(typeName, api.CompanionEqual)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
 	return api.DirectExpression(
-		staticCall(
+		companionCall(
 			context,
 			reference.Name(),
-			"$equal",
 			[]tsgo.Expression{left, right},
 		),
 		reference.Requests()...,
@@ -202,14 +194,6 @@ func primitive(
 	sourceType types.Type,
 ) (api.PrimitiveAlias, bool) {
 	return api.PrimitiveAliasFor(context.TypesSizes(), sourceType)
-}
-
-func exactPrimitive(
-	context api.Context,
-	sourceType types.Type,
-) (api.PrimitiveAlias, bool) {
-	alias, ok := primitive(context, sourceType)
-	return alias, ok && alias != api.PrimitiveInt64
 }
 
 func namedStruct(
@@ -229,19 +213,13 @@ func namedStruct(
 	return named.Obj(), structType, true
 }
 
-func staticCall(
+func companionCall(
 	context api.Context,
-	typeName string,
-	operation string,
+	name string,
 	arguments []tsgo.Expression,
 ) tsgo.CallExpression {
 	return context.Factory().CallExpression(
-		context.Factory().PropertyAccessExpression(
-			context.Factory().Identifier(typeName),
-			nil,
-			context.Factory().Identifier(operation),
-			tsgo.NodeFlagsNone,
-		),
+		context.Factory().Identifier(name),
 		nil,
 		nil,
 		arguments,

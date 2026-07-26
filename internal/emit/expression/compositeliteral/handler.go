@@ -158,7 +158,7 @@ func emitElements(
 
 func arrange(
 	context api.Context,
-	children api.ChildEmitter,
+	_ api.ChildEmitter,
 	source *ast.CompositeLit,
 	structType *types.Struct,
 	elements []element,
@@ -184,14 +184,6 @@ func arrange(
 			byField[element.fieldIndex] = element.value.Value()
 			continue
 		}
-		targetType, err := children.RepresentedType(
-			context.WithRole(api.RoleStructFieldType),
-			element.source,
-			structType.Field(element.fieldIndex).Type(),
-		)
-		if err != nil {
-			return nil, nil, nil, err
-		}
 		name, err := context.Names().Temporary(api.TemporaryCompositeField)
 		if err != nil {
 			return nil, nil, nil, err
@@ -203,13 +195,12 @@ func arrange(
 				[]tsgo.VariableDeclaration{context.Factory().VariableDeclaration(
 					context.Factory().Identifier(name),
 					nil,
-					targetType.Value(),
+					nil,
 					element.value.Value(),
 				)},
 				tsgo.NodeFlagsConst,
 			),
 		))
-		requests = append(requests, targetType.Requests()...)
 		byField[element.fieldIndex] = context.Factory().Identifier(name)
 	}
 	values := make([]tsgo.Expression, 0, structType.NumFields())

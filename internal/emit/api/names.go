@@ -40,6 +40,7 @@ func (r NameReference) Requests() []PlacementRequest {
 type Names interface {
 	Declare(types.Object) (string, error)
 	Reference(types.Object) (NameReference, error)
+	Companion(*types.TypeName, CompanionOperation) (NameReference, error)
 	Member(*types.Var) (string, error)
 	Primitive(PrimitiveAlias) (NameReference, error)
 	Temporary(TemporaryKind) (string, error)

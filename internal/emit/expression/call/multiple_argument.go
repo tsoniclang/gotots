@@ -35,14 +35,6 @@ func emitMultipleArgument(
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	targetType, err := children.RepresentedType(
-		context.WithRole(api.RoleLocalType),
-		source.Args[0],
-		results,
-	)
-	if err != nil {
-		return nil, nil, nil, err
-	}
 	temporaryName, err := context.Names().Temporary(api.TemporaryMultipleResults)
 	if err != nil {
 		return nil, nil, nil, err
@@ -50,7 +42,7 @@ func emitMultipleArgument(
 	declaration := context.Factory().VariableDeclaration(
 		context.Factory().Identifier(temporaryName),
 		nil,
-		targetType.Value(),
+		nil,
 		value.Value(),
 	)
 	before := value.Before()
@@ -66,7 +58,7 @@ func emitMultipleArgument(
 	)
 
 	arguments := make([]tsgo.Expression, 0, results.Len())
-	requests := api.CombineRequests(value.Requests(), targetType.Requests())
+	requests := value.Requests()
 	for index := range results.Len() {
 		element := context.Factory().ElementAccessExpression(
 			context.Factory().Identifier(temporaryName),

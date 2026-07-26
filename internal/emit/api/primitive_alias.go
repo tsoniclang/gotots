@@ -47,16 +47,46 @@ const (
 
 func PrimitiveAliasRepresentation(
 	alias PrimitiveAlias,
+	integer IntegerRepresentation,
 ) (string, tsgo.KeywordTypeSyntaxKind, error) {
+	name, err := PrimitiveAliasName(alias)
+	if err != nil {
+		return "", 0, err
+	}
 	switch alias {
 	case PrimitiveBool:
-		return "bool", tsgo.KeywordTypeSyntaxKindBooleanKeyword, nil
-	case PrimitiveInt32:
-		return "int32", tsgo.KeywordTypeSyntaxKindNumberKeyword, nil
-	case PrimitiveInt64:
-		return "int64", tsgo.KeywordTypeSyntaxKindNumberKeyword, nil
+		return name, tsgo.KeywordTypeSyntaxKindBooleanKeyword, nil
+	case PrimitiveInt32, PrimitiveInt64:
+		keyword, err := integerKeyword(integer)
+		return name, keyword, err
 	default:
 		return "", 0, &PrimitiveAliasError{Alias: alias}
+	}
+}
+
+func PrimitiveAliasName(alias PrimitiveAlias) (string, error) {
+	switch alias {
+	case PrimitiveBool:
+		return "bool", nil
+	case PrimitiveInt32:
+		return "int32", nil
+	case PrimitiveInt64:
+		return "int64", nil
+	default:
+		return "", &PrimitiveAliasError{Alias: alias}
+	}
+}
+
+func integerKeyword(
+	representation IntegerRepresentation,
+) (tsgo.KeywordTypeSyntaxKind, error) {
+	switch representation {
+	case IntegerRepresentationNumber:
+		return tsgo.KeywordTypeSyntaxKindNumberKeyword, nil
+	case IntegerRepresentationBigInt:
+		return tsgo.KeywordTypeSyntaxKindBigIntKeyword, nil
+	default:
+		return 0, &IntegerRepresentationError{Representation: representation}
 	}
 }
 
@@ -66,4 +96,15 @@ type PrimitiveAliasError struct {
 
 func (e *PrimitiveAliasError) Error() string {
 	return fmt.Sprintf("primitive alias %d is invalid", e.Alias)
+}
+
+type IntegerRepresentationError struct {
+	Representation IntegerRepresentation
+}
+
+func (e *IntegerRepresentationError) Error() string {
+	return fmt.Sprintf(
+		"integer representation %d is invalid",
+		e.Representation,
+	)
 }

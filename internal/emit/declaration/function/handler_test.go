@@ -60,15 +60,10 @@ func TestAddConstructCreatesExactTargetTree(t *testing.T) {
 	if !ok {
 		t.Fatalf("body statement = %T, want tsgo.ReturnStatement", bodyStatements[0])
 	}
-	wrapped, ok := returnStatement.Expression().(tsgo.BinaryExpression)
-	if !ok || wrapped.OperatorToken().Kind() != tsgo.SyntaxKindBarToken {
-		t.Fatalf("return expression = %T, want tsgo.BinaryExpression", returnStatement.Expression())
-	}
-	grouped, ok := wrapped.Left().(tsgo.ParenthesizedExpression)
+	addition, ok := returnStatement.Expression().(tsgo.BinaryExpression)
 	if !ok {
-		t.Fatalf("wrapped left = %T, want parenthesized addition", wrapped.Left())
+		t.Fatalf("return expression = %T, want direct binary addition", returnStatement.Expression())
 	}
-	addition := grouped.Expression().(tsgo.BinaryExpression)
 	if addition.OperatorToken().Kind() != tsgo.SyntaxKindPlusToken {
 		t.Fatalf("binary operator = %d, want plus", addition.OperatorToken().Kind())
 	}
@@ -141,9 +136,7 @@ func TestAddReferencesUseGoObjectIdentity(t *testing.T) {
 	targetFunction := targetFile.Statements()[1].(tsgo.FunctionDeclaration)
 	targetBody := targetFunction.Body().(tsgo.Block)
 	targetReturn := targetBody.Statements()[0].(tsgo.ReturnStatement)
-	wrapped := targetReturn.Expression().(tsgo.BinaryExpression)
-	grouped := wrapped.Left().(tsgo.ParenthesizedExpression)
-	targetBinary := grouped.Expression().(tsgo.BinaryExpression)
+	targetBinary := targetReturn.Expression().(tsgo.BinaryExpression)
 	assertIdentifier(t, targetBinary.Left(), "left")
 }
 

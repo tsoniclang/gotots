@@ -1,11 +1,11 @@
 import type { bool } from "../../../support/scalars.js";
 export function Run(input: bool): bool {
-    let current: bool = false as bool;
+    let current = false;
     if (!input) {
-        current = Flip(true as bool);
+        current = Flip(true);
     }
     else {
-        current = Same(input, true as bool);
+        current = Same(input, true);
     }
     return current;
 }

@@ -37,7 +37,7 @@ func EmitExpression(
 	}
 	object, ok := context.TypesInfo().Uses[identifier].(*types.Var)
 	if !ok ||
-		!basictype.SupportsExactInt32(context.TypesSizes(), object.Type()) {
+		!basictype.SupportsInteger(context.TypesSizes(), object.Type()) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
@@ -45,37 +45,20 @@ func EmitExpression(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	var operator tsgo.BinaryOperator
+	var operator tsgo.PostfixUnaryExpressionOperatorKind
 	switch source.Tok {
 	case token.INC:
-		operator = tsgo.BinaryOperatorPlusToken
+		operator = tsgo.PostfixUnaryExpressionOperatorKindPlusPlusToken
 	case token.DEC:
-		operator = tsgo.BinaryOperatorMinusToken
+		operator = tsgo.PostfixUnaryExpressionOperatorKindMinusMinusToken
 	default:
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	value := context.Factory().BinaryExpression(
-		nil,
-		context.Factory().Identifier(reference.Name()),
-		nil,
-		context.Factory().BinaryOperatorToken(operator),
-		context.Factory().NumericLiteral("1", tsgo.TokenFlagsNone),
-	)
-	wrapped := context.Factory().BinaryExpression(
-		nil,
-		context.Factory().ParenthesizedExpression(value),
-		nil,
-		context.Factory().BinaryOperatorToken(tsgo.BinaryOperatorBarToken),
-		context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
-	)
 	return api.DirectExpression(
-		context.Factory().BinaryExpression(
-			nil,
+		context.Factory().PostfixUnaryExpression(
 			context.Factory().Identifier(reference.Name()),
-			nil,
-			context.Factory().BinaryOperatorToken(tsgo.BinaryOperatorEqualsToken),
-			wrapped,
+			operator,
 		),
 		reference.Requests()...,
 	), nil

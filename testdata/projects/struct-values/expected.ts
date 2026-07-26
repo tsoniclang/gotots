@@ -3,261 +3,207 @@ export class Point {
     declare private readonly $goType: void;
     constructor(public X: int32, public Visible: bool) {
     }
-    static $zero(): Point {
-        return new Point(0 as int32, false as bool);
-    }
-    static $copy($source: Point): Point {
-        return new Point($source.X, $source.Visible);
-    }
-    static $assign($target: Point, $source: Point): void {
-        $target.X = $source.X;
-        $target.Visible = $source.Visible;
-    }
-    static $equal($left: Point, $right: Point): bool {
-        return $left.X === $right.X && $left.Visible === $right.Visible;
-    }
+}
+export function Point$zero(): Point {
+    return new Point(0, false);
+}
+export function Point$copy($source: Point): Point {
+    return new Point($source.X, $source.Visible);
+}
+export function Point$equal($left: Point, $right: Point): bool {
+    return $left.X === $right.X && $left.Visible === $right.Visible;
 }
 export class Box {
     declare private readonly $goType: void;
     constructor(public Point: Point, public Active: bool) {
     }
-    static $zero(): Box {
-        return new Box(Point.$zero(), false as bool);
-    }
-    static $copy($source: Box): Box {
-        return new Box(Point.$copy($source.Point), $source.Active);
-    }
-    static $assign($target: Box, $source: Box): void {
-        Point.$assign($target.Point, $source.Point);
-        $target.Active = $source.Active;
-    }
-    static $equal($left: Box, $right: Box): bool {
-        return Point.$equal($left.Point, $right.Point) && $left.Active === $right.Active;
-    }
+}
+export function Box$zero(): Box {
+    return new Box(Point$zero(), false);
+}
+export function Box$copy($source: Box): Box {
+    return new Box(Point$copy($source.Point), $source.Active);
+}
+export function Box$equal($left: Box, $right: Box): bool {
+    return Point$equal($left.Point, $right.Point) && $left.Active === $right.Active;
 }
 export class Mirror {
     declare private readonly $goType: void;
     constructor(public Point: Point, public Active: bool) {
-    }
-    static $zero(): Mirror {
-        return new Mirror(Point.$zero(), false as bool);
-    }
-    static $copy($source: Mirror): Mirror {
-        return new Mirror(Point.$copy($source.Point), $source.Active);
-    }
-    static $assign($target: Mirror, $source: Mirror): void {
-        Point.$assign($target.Point, $source.Point);
-        $target.Active = $source.Active;
-    }
-    static $equal($left: Mirror, $right: Mirror): bool {
-        return Point.$equal($left.Point, $right.Point) && $left.Active === $right.Active;
     }
 }
 export class Reserved {
     declare private readonly $goType: void;
     constructor(public __go_constructor: int32) {
     }
-    static $zero(): Reserved {
-        return new Reserved(0 as int32);
-    }
-    static $copy($source: Reserved): Reserved {
-        return new Reserved($source.__go_constructor);
-    }
-    static $assign($target: Reserved, $source: Reserved): void {
-        $target.__go_constructor = $source.__go_constructor;
-    }
-    static $equal($left: Reserved, $right: Reserved): bool {
-        return $left.__go_constructor === $right.__go_constructor;
-    }
 }
 export class Grouped {
     declare private readonly $goType: void;
     constructor(public Left: int32, public Right: int32) {
-    }
-    static $zero(): Grouped {
-        return new Grouped(0 as int32, 0 as int32);
-    }
-    static $copy($source: Grouped): Grouped {
-        return new Grouped($source.Left, $source.Right);
-    }
-    static $assign($target: Grouped, $source: Grouped): void {
-        $target.Left = $source.Left;
-        $target.Right = $source.Right;
-    }
-    static $equal($left: Grouped, $right: Grouped): bool {
-        return $left.Left === $right.Left && $left.Right === $right.Right;
     }
 }
 export class Empty {
     declare private readonly $goType: void;
     constructor() {
     }
-    static $zero(): Empty {
-        return new Empty();
-    }
-    static $copy($source: Empty): Empty {
-        return new Empty();
-    }
-    static $assign($target: Empty, $source: Empty): void {
-    }
-    static $equal($left: Empty, $right: Empty): bool {
-        return true;
-    }
+}
+export function Empty$zero(): Empty {
+    return new Empty();
+}
+export function Empty$equal($left: Empty, $right: Empty): bool {
+    return true;
 }
 export function NewBox(value: int32): Box {
-    const __gotots_field_2: bool = value > (0 as int32);
-    const __gotots_field_0: bool = true as bool;
-    const __gotots_field_1: int32 = value;
-    const __gotots_field_3: Point = new Point(__gotots_field_1, __gotots_field_0);
+    const __gotots_field_2 = value > 0;
+    const __gotots_field_0 = true;
+    const __gotots_field_1 = value;
+    const __gotots_field_3 = new Point(__gotots_field_1, __gotots_field_0);
     return new Box(__gotots_field_3, __gotots_field_2);
 }
 export function ZeroIsFresh(): bool {
-    let left: Box = Box.$zero();
-    let right: Box = Box.$zero();
-    left.Point.X = 7 as int32;
-    return right.Point.X === 0 as int32;
+    let left = Box$zero();
+    let right = Box$zero();
+    left.Point.X = 7;
+    return right.Point.X === 0;
 }
 export function CopyIsolated(value: Box): int32 {
-    let copy: Box = Box.$copy(value);
-    copy.Point.X = (copy.Point.X + (1 as int32)) | 0;
-    return (Math.imul(value.Point.X, 10 as int32) + copy.Point.X) | 0;
+    let copy = Box$copy(value);
+    copy.Point.X = copy.Point.X + 1;
+    return value.Point.X * 10 + copy.Point.X;
 }
 export function AssignIsolated(value: Box): int32 {
-    let target: Box = Box.$zero();
-    Box.$assign(target, value);
-    target.Point.X = (target.Point.X + (2 as int32)) | 0;
-    return (Math.imul(value.Point.X, 10 as int32) + target.Point.X) | 0;
+    let target = Box$zero();
+    target = Box$copy(value);
+    target.Point.X = target.Point.X + 2;
+    return value.Point.X * 10 + target.Point.X;
 }
 export function MutateParameter(value: Box): Box {
-    value.Point.X = (value.Point.X + (3 as int32)) | 0;
+    value.Point.X = value.Point.X + 3;
     return value;
 }
 export function ParameterIsolated(value: Box): int32 {
-    let changed: Box = MutateParameter(Box.$copy(value));
-    return (Math.imul(value.Point.X, 10 as int32) + changed.Point.X) | 0;
+    let changed = MutateParameter(Box$copy(value));
+    return value.Point.X * 10 + changed.Point.X;
 }
 export function Equal(left: Box, right: Box): bool {
-    return Box.$equal(left, right);
+    return Box$equal(left, right);
 }
 export function Box_WithX(box: Box, value: int32): Box {
     box.Point.X = value;
     return box;
 }
 export function Invoke(value: Box, next: int32): Box {
-    return Box_WithX(Box.$copy(value), next);
+    return Box_WithX(Box$copy(value), next);
 }
 export function CopyResult(): int32 {
-    return CopyIsolated(NewBox(4 as int32));
+    return CopyIsolated(NewBox(4));
 }
 export function AssignResult(): int32 {
-    return AssignIsolated(NewBox(4 as int32));
+    return AssignIsolated(NewBox(4));
 }
 export function ParameterResult(): int32 {
-    return ParameterIsolated(NewBox(4 as int32));
+    return ParameterIsolated(NewBox(4));
 }
 export function EqualSameResult(): bool {
-    return Equal(NewBox(4 as int32), NewBox(4 as int32));
+    return Equal(NewBox(4), NewBox(4));
 }
 export function EqualDifferentResult(): bool {
-    return Equal(NewBox(4 as int32), NewBox(5 as int32));
+    return Equal(NewBox(4), NewBox(5));
 }
 export function MethodResult(): int32 {
-    let first: Box = NewBox(4 as int32);
-    let changed: Box = Invoke(Box.$copy(first), 9 as int32);
-    return (Math.imul(changed.Point.X, 10 as int32) + first.Point.X) | 0;
+    let first = NewBox(4);
+    let changed = Invoke(Box$copy(first), 9);
+    return changed.Point.X * 10 + first.Point.X;
 }
 export function ReservedValue(): int32 {
-    let value: Reserved = new Reserved(7 as int32);
+    let value = new Reserved(7);
     return value.__go_constructor;
 }
 export function PrimitiveZero(): bool {
-    let count: int32 = 0 as int32;
-    let ready: bool = false as bool;
-    return count === 0 as int32 && ready === false as bool;
+    let count = 0;
+    let ready = false;
+    return count === 0 && ready === false;
 }
 export function Duplicate(value: Box): [
     Box,
     Box
 ] {
-    return [Box.$copy(value), Box.$copy(value)];
+    return [Box$copy(value), Box$copy(value)];
 }
 export function MultipleResultIsolated(): int32 {
-    const __gotots_results_0: [
-        Box,
-        Box
-    ] = Duplicate(NewBox(4 as int32));
-    let left: Box = __gotots_results_0[0];
-    let right: Box = __gotots_results_0[1];
-    left.Point.X = 8 as int32;
-    return (Math.imul(left.Point.X, 10 as int32) + right.Point.X) | 0;
+    const __gotots_results_0 = Duplicate(NewBox(4));
+    let left = __gotots_results_0[0];
+    let right = __gotots_results_0[1];
+    left.Point.X = 8;
+    return left.Point.X * 10 + right.Point.X;
 }
 export function ReadX(value: Box): int32 {
     return value.Point.X;
 }
 export function CompositeArgument(): int32 {
-    const __gotots_field_6: bool = true as bool;
-    const __gotots_field_4: bool = true as bool;
-    const __gotots_field_5: int32 = 6 as int32;
-    const __gotots_field_7: Point = new Point(__gotots_field_5, __gotots_field_4);
-    const __gotots_argument_0: Box = new Box(__gotots_field_7, __gotots_field_6);
+    const __gotots_field_6 = true;
+    const __gotots_field_4 = true;
+    const __gotots_field_5 = 6;
+    const __gotots_field_7 = new Point(__gotots_field_5, __gotots_field_4);
+    const __gotots_argument_0 = new Box(__gotots_field_7, __gotots_field_6);
     return ReadX(__gotots_argument_0);
 }
 export function ReadXAfter(first: int32, value: Box): int32 {
-    return (Math.imul(first, 10 as int32) + value.Point.X) | 0;
+    return first * 10 + value.Point.X;
 }
 export function DirectValue(): int32 {
-    return 2 as int32;
+    return 2;
 }
 export function CompositeSecondArgument(): int32 {
-    const __gotots_argument_1: int32 = DirectValue();
-    const __gotots_field_10: bool = true as bool;
-    const __gotots_field_8: bool = true as bool;
-    const __gotots_field_9: int32 = 6 as int32;
-    const __gotots_field_11: Point = new Point(__gotots_field_9, __gotots_field_8);
-    const __gotots_argument_2: Box = new Box(__gotots_field_11, __gotots_field_10);
+    const __gotots_argument_1 = DirectValue();
+    const __gotots_field_10 = true;
+    const __gotots_field_8 = true;
+    const __gotots_field_9 = 6;
+    const __gotots_field_11 = new Point(__gotots_field_9, __gotots_field_8);
+    const __gotots_argument_2 = new Box(__gotots_field_11, __gotots_field_10);
     return ReadXAfter(__gotots_argument_1, __gotots_argument_2);
 }
 export function CompositeField(): int32 {
-    const __gotots_field_14: bool = true as bool;
-    const __gotots_field_12: bool = true as bool;
-    const __gotots_field_13: int32 = 7 as int32;
-    const __gotots_field_15: Point = new Point(__gotots_field_13, __gotots_field_12);
+    const __gotots_field_14 = true;
+    const __gotots_field_12 = true;
+    const __gotots_field_13 = 7;
+    const __gotots_field_15 = new Point(__gotots_field_13, __gotots_field_12);
     return new Box(__gotots_field_15, __gotots_field_14).Point.X;
 }
 export function PositionalComposite(): int32 {
-    let value: Point = new Point(8 as int32, true as bool);
+    let value = new Point(8, true);
     return value.X;
 }
 export function OmittedComposite(): bool {
-    let value: Point = new Point(5 as int32, false as bool);
-    return value.X === 5 as int32 && !value.Visible;
+    let value = new Point(5, false);
+    return value.X === 5 && !value.Visible;
 }
 export function NotEqual(): bool {
-    return !Box.$equal(NewBox(4 as int32), NewBox(5 as int32));
+    return !Box$equal(NewBox(4), NewBox(5));
 }
 export function ExplicitVarCopy(value: Box): int32 {
-    let copied: Box = Box.$copy(value);
-    copied.Point.X = 6 as int32;
-    return (Math.imul(value.Point.X, 10 as int32) + copied.Point.X) | 0;
+    let copied = Box$copy(value);
+    copied.Point.X = 6;
+    return value.Point.X * 10 + copied.Point.X;
 }
 export function ExplicitVarCopyResult(): int32 {
-    return ExplicitVarCopy(NewBox(4 as int32));
+    return ExplicitVarCopy(NewBox(4));
 }
 export function ParallelAssignment(): int32 {
-    let left: Box = NewBox(4 as int32);
-    let right: Box = NewBox(9 as int32);
-    const __gotots_assign_0: Box = Box.$copy(right);
-    const __gotots_assign_1: Box = Box.$copy(left);
-    Box.$assign(left, __gotots_assign_0);
-    Box.$assign(right, __gotots_assign_1);
-    left.Point.X = 8 as int32;
-    return (Math.imul(left.Point.X, 10 as int32) + right.Point.X) | 0;
+    let left = NewBox(4);
+    let right = NewBox(9);
+    const __gotots_assign_0 = Box$copy(right);
+    const __gotots_assign_1 = Box$copy(left);
+    left = __gotots_assign_0;
+    right = __gotots_assign_1;
+    left.Point.X = 8;
+    return left.Point.X * 10 + right.Point.X;
 }
 export function GroupedResult(): int32 {
-    let value: Grouped = new Grouped(1 as int32, 2 as int32);
-    return (Math.imul(value.Left, 10 as int32) + value.Right) | 0;
+    let value = new Grouped(1, 2);
+    return value.Left * 10 + value.Right;
 }
 export function EmptyEqual(): bool {
-    let left: Empty = Empty.$zero();
-    return Empty.$equal(left, new Empty());
+    let left = Empty$zero();
+    return Empty$equal(left, new Empty());
 }

@@ -82,6 +82,9 @@ func Run() int32 {
 	})
 	var targetPaths []string
 	var apiModule string
+	modelCopyDefinitions := 0
+	apiCopyDefinitions := 0
+	apiCopyImports := 0
 	for _, file := range emission.Files() {
 		printed, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
 		if err != nil {
@@ -93,6 +96,39 @@ func Run() int32 {
 		)
 		writeProgramFile(t, targetPath, printed)
 		targetPaths = append(targetPaths, targetPath)
+		for _, statement := range file.SourceFile().Statements() {
+			switch statement := statement.(type) {
+			case tsgo.FunctionDeclaration:
+				if statement.Name().Text() != "Point$copy" {
+					continue
+				}
+				if file.PackageName() == "model" {
+					modelCopyDefinitions++
+				}
+				if file.PackageName() == "api" {
+					apiCopyDefinitions++
+				}
+			case tsgo.ImportDeclaration:
+				if file.PackageName() != "api" ||
+					statement.ImportClause() == nil {
+					continue
+				}
+				bindings, ok := statement.ImportClause().
+					NamedBindings().(tsgo.NamedImports)
+				if !ok {
+					continue
+				}
+				for _, binding := range bindings.Elements() {
+					exported := binding.Name().Text()
+					if binding.PropertyName() != nil {
+						exported = binding.PropertyName().(tsgo.Identifier).Text()
+					}
+					if exported == "Point$copy" {
+						apiCopyImports++
+					}
+				}
+			}
+		}
 		if file.PackageName() == "api" {
 			if !strings.Contains(printed, `import { Point`) ||
 				strings.Count(printed, "export class Point") != 0 {
@@ -100,6 +136,16 @@ func Run() int32 {
 			}
 			apiModule = "./" + strings.TrimSuffix(file.OutputPath(), ".ts") + ".js"
 		}
+	}
+	if modelCopyDefinitions != 1 ||
+		apiCopyDefinitions != 0 ||
+		apiCopyImports != 1 {
+		t.Fatalf(
+			"Point$copy ownership = model definitions %d, api definitions %d, api imports %d; want 1/0/1",
+			modelCopyDefinitions,
+			apiCopyDefinitions,
+			apiCopyImports,
+		)
 	}
 	if apiModule == "" {
 		t.Fatal("cross-package emission has no api module")

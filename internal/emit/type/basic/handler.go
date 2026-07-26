@@ -37,20 +37,7 @@ func EmitRepresented(
 	), nil
 }
 
-func SupportsExactInt32(sizes types.Sizes, sourceType types.Type) bool {
-	if sizes == nil || sourceType == nil {
-		return false
-	}
-	basic, ok := types.Unalias(sourceType).Underlying().(*types.Basic)
-	if !ok {
-		return false
-	}
-	switch basic.Kind() {
-	case types.Int32:
-		return true
-	case types.Int:
-		return sizes.Sizeof(types.Typ[types.Int]) == 4
-	default:
-		return false
-	}
+func SupportsInteger(sizes types.Sizes, sourceType types.Type) bool {
+	alias, ok := api.PrimitiveAliasFor(sizes, sourceType)
+	return ok && alias != api.PrimitiveBool
 }

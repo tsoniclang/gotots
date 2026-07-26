@@ -692,10 +692,11 @@ Ordinary integer syntax is source-shaped under both initial profiles:
 | ordered/equality comparison or expression switch | direct comparison/switch | `left < right`, `switch (value)` |
 
 The `number` profile prints ordinary numeric literals such as `1`; the
-`bigint` profile prints `1n`. Contextual parameter, result, field, and binding
-types carry aliases. A literal is not routinely wrapped in `as int32`,
-`as int64`, or `as bool`, and an initialized binding omits a type annotation
-when its initializer already makes the target type exact.
+`bigint` profile prints `1n`. Contextual parameter, result, field, and
+package-boundary binding types carry aliases. A literal is not routinely
+wrapped in `as int32`, `as int64`, or `as bool`, and an initialized local
+binding omits a type annotation when its initializer already makes the target
+type exact.
 
 Neither initial profile reproduces implicit fixed-width overflow. The default
 also accepts JavaScript-number precision as its declared integer contract.

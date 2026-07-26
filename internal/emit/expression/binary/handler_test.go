@@ -10,7 +10,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func TestExactInt32CapabilityRejectsWideIntegerCarriers(t *testing.T) {
+func TestIntegerCapabilityAcceptsEveryRepresentedSignedCarrier(t *testing.T) {
 	testCases := []struct {
 		name       string
 		sourceType types.Type
@@ -19,8 +19,8 @@ func TestExactInt32CapabilityRejectsWideIntegerCarriers(t *testing.T) {
 	}{
 		{name: "int32", sourceType: types.Typ[types.Int32], arch: "amd64", want: true},
 		{name: "32-bit int", sourceType: types.Typ[types.Int], arch: "386", want: true},
-		{name: "64-bit int", sourceType: types.Typ[types.Int], arch: "amd64", want: false},
-		{name: "int64", sourceType: types.Typ[types.Int64], arch: "386", want: false},
+		{name: "64-bit int", sourceType: types.Typ[types.Int], arch: "amd64", want: true},
+		{name: "int64", sourceType: types.Typ[types.Int64], arch: "386", want: true},
 	}
 
 	for _, testCase := range testCases {
@@ -44,6 +44,7 @@ func TestExactInt32CapabilityRejectsWideIntegerCarriers(t *testing.T) {
 				tsgo.Factory{},
 				unusedNames{},
 				unusedValues{},
+				api.IntegerRepresentationNumber,
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -64,6 +65,13 @@ func (unusedNames) Declare(types.Object) (string, error) {
 }
 
 func (unusedNames) Reference(types.Object) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) Companion(
+	*types.TypeName,
+	api.CompanionOperation,
+) (api.NameReference, error) {
 	panic("unused")
 }
 

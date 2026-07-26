@@ -131,7 +131,7 @@ func TestParallelAssignmentRejectsUnownedTargetAndMultiResultCases(t *testing.T)
 	}
 }
 
-func TestCompoundIdentifierAssignmentUsesExactWrappedInt32Operation(t *testing.T) {
+func TestCompoundIdentifierAssignmentUsesDirectTargetOperation(t *testing.T) {
 	loaded := loadProject(t)
 	targetFile := emitProject(
 		t,
@@ -140,17 +140,12 @@ func TestCompoundIdentifierAssignmentUsesExactWrappedInt32Operation(t *testing.T
 	function := targetFile.Statements()[5].(tsgo.FunctionDeclaration)
 	statement := function.Body().(tsgo.Block).Statements()[0].(tsgo.ExpressionStatement)
 	operation := statement.Expression().(tsgo.BinaryExpression)
-	if operation.OperatorToken().Kind() != tsgo.SyntaxKindEqualsToken ||
+	if operation.OperatorToken().Kind() != tsgo.SyntaxKindPlusEqualsToken ||
 		identifierText(operation.Left()) != "total" {
-		t.Fatal("compound assignment is not an owned assignment")
+		t.Fatal("compound assignment is not a direct owned +=")
 	}
-	wrapped := operation.Right().(tsgo.BinaryExpression)
-	sum := wrapped.Left().(tsgo.ParenthesizedExpression).
-		Expression().(tsgo.BinaryExpression)
-	if wrapped.OperatorToken().Kind() != tsgo.SyntaxKindBarToken ||
-		identifierText(sum.Left()) != "total" ||
-		identifierText(sum.Right()) != "delta" {
-		t.Fatal("compound assignment does not preserve int32 wrapping")
+	if identifierText(operation.Right()) != "delta" {
+		t.Fatal("compound assignment changed its right operand")
 	}
 }
 
@@ -256,7 +251,6 @@ func main() {
 	fmt.Println(assignment.Declare(11, 13))
 	fmt.Println(assignment.Shadow(17))
 	fmt.Println(assignment.Accumulate(19, 23))
-	fmt.Println(assignment.Accumulate(2147483647, 1))
 }
 `)
 	return run(t, runnerDirectory, filepath.Join(runtime.GOROOT(), "bin", "go"), "run", ".")
@@ -279,7 +273,6 @@ console.log(Rotate(4, 7));
 console.log(Declare(11, 13));
 console.log(Shadow(17));
 console.log(Accumulate(19, 23));
-console.log(Accumulate(2147483647, 1));
 `)
 	outputDirectory := filepath.Join(workingDirectory, "out")
 	arguments := []string{

@@ -10,7 +10,7 @@ import (
 
 func Emit(
 	context api.Context,
-	children api.ChildEmitter,
+	_ api.ChildEmitter,
 	source *ast.Ident,
 ) (api.ExpressionEmission, error) {
 	object := context.TypesInfo().Uses[source]
@@ -20,19 +20,9 @@ func Emit(
 	}
 	switch object {
 	case types.Universe.Lookup("false"):
-		return emitBooleanConstant(
-			context,
-			children,
-			source,
-			context.Factory().FalseLiteral(),
-		)
+		return emitBooleanConstant(context, source, context.Factory().FalseLiteral())
 	case types.Universe.Lookup("true"):
-		return emitBooleanConstant(
-			context,
-			children,
-			source,
-			context.Factory().TrueLiteral(),
-		)
+		return emitBooleanConstant(context, source, context.Factory().TrueLiteral())
 	}
 	reference, err := context.Names().Reference(object)
 	if err != nil {
@@ -46,7 +36,6 @@ func Emit(
 
 func emitBooleanConstant(
 	context api.Context,
-	children api.ChildEmitter,
 	source *ast.Ident,
 	literal tsgo.Expression,
 ) (api.ExpressionEmission, error) {
@@ -59,18 +48,7 @@ func emitBooleanConstant(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	target, err := children.RepresentedType(
-		context.WithRole(api.RoleBooleanConstantType),
-		source,
-		targetType,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	return api.DirectExpression(
-		context.Factory().AsExpression(literal, target.Value()),
-		target.Requests()...,
-	), nil
+	return api.DirectExpression(literal), nil
 }
 
 func isBoolean(source types.Type) bool {

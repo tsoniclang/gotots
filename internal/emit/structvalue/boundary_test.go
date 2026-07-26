@@ -55,9 +55,9 @@ func TestNamedStructUnsupportedNeighborsFailAtTypedOwners(t *testing.T) {
 			construct: "*ast.InterfaceType",
 		},
 		{
-			name: "wide integer field",
+			name: "unsigned integer field",
 			source: "package boundary\n" +
-				"type Wide struct { Value int64 }\n",
+				"type Unsigned struct { Value uint64 }\n",
 			role:      api.RoleStructFieldType,
 			category:  api.CategoryType,
 			construct: "*ast.Ident",
@@ -95,9 +95,9 @@ func TestNamedStructUnsupportedNeighborsFailAtTypedOwners(t *testing.T) {
 				"type Value struct { X int32 }\n" +
 				"func (value Value) WithX(next int32) Value { value.X = next; return value }\n" +
 				"func Use(value Value) Value { method := value.WithX; return method(1) }\n",
-			role:      api.RoleLocalType,
-			category:  api.CategoryType,
-			construct: "*ast.Ident",
+			role:      api.RoleLocalValue,
+			category:  api.CategoryExpression,
+			construct: "*ast.SelectorExpr",
 		},
 	}
 	for _, testCase := range testCases {

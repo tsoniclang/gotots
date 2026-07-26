@@ -209,23 +209,15 @@ func emitArguments(
 
 func captureArguments(
 	context api.Context,
-	children api.ChildEmitter,
-	source *ast.CallExpr,
-	signature *types.Signature,
+	_ api.ChildEmitter,
+	_ *ast.CallExpr,
+	_ *types.Signature,
 	emissions []api.ExpressionEmission,
 ) ([]tsgo.Expression, []tsgo.Statement, []api.PlacementRequest, error) {
 	arguments := make([]tsgo.Expression, 0, len(emissions))
 	var before []tsgo.Statement
 	var requests []api.PlacementRequest
-	for index, emission := range emissions {
-		targetType, err := children.RepresentedType(
-			context.WithRole(api.RoleCallArgumentType),
-			source.Args[index],
-			signature.Params().At(index).Type(),
-		)
-		if err != nil {
-			return nil, nil, nil, err
-		}
+	for _, emission := range emissions {
 		temporaryName, err := context.Names().Temporary(api.TemporaryCallArgument)
 		if err != nil {
 			return nil, nil, nil, err
@@ -233,7 +225,7 @@ func captureArguments(
 		declaration := context.Factory().VariableDeclaration(
 			context.Factory().Identifier(temporaryName),
 			nil,
-			targetType.Value(),
+			nil,
 			emission.Value(),
 		)
 		before = append(before, emission.Before()...)
@@ -252,7 +244,6 @@ func captureArguments(
 			context.Factory().Identifier(temporaryName),
 		)
 		requests = append(requests, emission.Requests()...)
-		requests = append(requests, targetType.Requests()...)
 	}
 	return arguments, before, requests, nil
 }

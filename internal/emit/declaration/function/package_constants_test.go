@@ -82,9 +82,7 @@ func TestPackageConstantSpellingMutationKeepsObjectOwnedReference(t *testing.T) 
 	targetFiles := emitPackageConstantsProject(t, loaded, t.TempDir())
 	targetUse := targetFiles["use"].Statements()[2].(tsgo.FunctionDeclaration)
 	targetReturn := targetUse.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement)
-	wrapped := targetReturn.Expression().(tsgo.BinaryExpression)
-	sum := wrapped.Left().(tsgo.ParenthesizedExpression).
-		Expression().(tsgo.BinaryExpression)
+	sum := targetReturn.Expression().(tsgo.BinaryExpression)
 	targetReference := sum.Left().(tsgo.Identifier)
 	if targetReference.Text() != "Base" {
 		t.Fatalf("target reference = %q, want Base", targetReference.Text())

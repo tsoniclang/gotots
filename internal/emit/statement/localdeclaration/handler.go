@@ -102,14 +102,6 @@ func emitSpec(
 					sourceName,
 				)
 		}
-		targetType, err := children.RepresentedType(
-			context.WithRole(api.RoleLocalType),
-			sourceName,
-			object.Type(),
-		)
-		if err != nil {
-			return nil, nil, err
-		}
 		targetName, err := context.Names().Declare(object)
 		if err != nil {
 			return nil, nil, err
@@ -119,13 +111,13 @@ func emitSpec(
 			context.Factory().VariableDeclaration(
 				context.Factory().Identifier(targetName),
 				nil,
-				targetType.Value(),
+				nil,
 				value.Value(),
 			),
 		)
 		requests = append(
 			requests,
-			api.CombineRequests(value.Requests(), targetType.Requests())...,
+			value.Requests()...,
 		)
 	}
 	return context.Factory().VariableStatement(

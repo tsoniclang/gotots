@@ -1,6 +1,6 @@
 import type { int32 } from "../../../support/scalars.js";
 export function Touch(value: int32): void {
-    if (value > (0 as int32)) {
+    if (value > 0) {
         return;
     }
 }

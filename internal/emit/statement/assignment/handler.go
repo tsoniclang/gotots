@@ -44,7 +44,7 @@ func emitCompoundAddition(
 	}
 	object, ok := context.TypesInfo().Uses[name].(*types.Var)
 	if !ok ||
-		!basictype.SupportsExactInt32(context.TypesSizes(), object.Type()) ||
+		!basictype.SupportsInteger(context.TypesSizes(), object.Type()) ||
 		!types.AssignableTo(context.TypesInfo().TypeOf(source.Rhs[0]), object.Type()) {
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
@@ -66,28 +66,12 @@ func emitCompoundAddition(
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	sum := context.Factory().BinaryExpression(
-		nil,
-		context.Factory().Identifier(reference.Name()),
-		nil,
-		context.Factory().BinaryOperatorToken(
-			tsgo.BinaryOperatorPlusToken,
-		),
-		value.Value(),
-	)
-	wrapped := context.Factory().BinaryExpression(
-		nil,
-		context.Factory().ParenthesizedExpression(sum),
-		nil,
-		context.Factory().BinaryOperatorToken(tsgo.BinaryOperatorBarToken),
-		context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
-	)
 	target := context.Factory().BinaryExpression(
 		nil,
 		context.Factory().Identifier(reference.Name()),
 		nil,
-		context.Factory().BinaryOperatorToken(tsgo.BinaryOperatorEqualsToken),
-		wrapped,
+		context.Factory().BinaryOperatorToken(tsgo.BinaryOperatorPlusEqualsToken),
+		value.Value(),
 	)
 	return api.DirectStatement(
 		context.Factory().ExpressionStatement(target),
@@ -167,13 +151,6 @@ func emitDefinitionList(
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	targetType, err := children.Type(
-		context.WithRole(api.RoleLocalType),
-		name,
-	)
-	if err != nil {
-		return nil, nil, nil, err
-	}
 	value, err := children.Expression(
 		context.
 			WithRole(api.RoleLocalValue).
@@ -195,7 +172,7 @@ func emitDefinitionList(
 	declaration := context.Factory().VariableDeclaration(
 		context.Factory().Identifier(targetName),
 		nil,
-		targetType.Value(),
+		nil,
 		value.Value(),
 	)
 	return context.Factory().VariableDeclarationList(
@@ -203,7 +180,7 @@ func emitDefinitionList(
 			tsgo.NodeFlagsLet,
 		),
 		value.Before(),
-		api.CombineRequests(targetType.Requests(), value.Requests()),
+		value.Requests(),
 		nil
 }
 
@@ -236,6 +213,15 @@ func emitAssignment(
 			WithRole(api.RoleAssignmentValue).
 			WithExpectedType(target.SourceType()),
 		source.Rhs[0],
+	)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
+	value, err = context.Values().Copy(
+		context.WithRole(api.RoleAssignmentValue),
+		source.Rhs[0],
+		target.SourceType(),
+		value,
 	)
 	if err != nil {
 		return api.StatementEmission{}, err
@@ -335,14 +321,6 @@ func emitParallel(
 				return api.StatementEmission{}, err
 			}
 		}
-		temporaryType, err := children.RepresentedType(
-			context.WithRole(api.RoleLocalType),
-			target.source,
-			expectedType,
-		)
-		if err != nil {
-			return api.StatementEmission{}, err
-		}
 		temporaryName, err := context.Names().Temporary(api.TemporaryAssignmentValue)
 		if err != nil {
 			return api.StatementEmission{}, err
@@ -355,7 +333,6 @@ func emitParallel(
 				context,
 				tsgo.NodeFlagsConst,
 				temporaryName,
-				temporaryType.Value(),
 				value.Value(),
 			),
 		)
@@ -363,7 +340,6 @@ func emitParallel(
 			requests,
 			value.Requests()...,
 		)
-		requests = append(requests, temporaryType.Requests()...)
 	}
 
 	for index, target := range targets {
@@ -372,25 +348,15 @@ func emitParallel(
 		}
 		temporary := context.Factory().Identifier(temporaryNames[index])
 		if target.declaration {
-			targetType, err := children.RepresentedType(
-				context.WithRole(api.RoleLocalType),
-				target.source,
-				target.object.Type(),
-			)
-			if err != nil {
-				return api.StatementEmission{}, err
-			}
 			statements = append(
 				statements,
 				variableStatement(
 					context,
 					tsgo.NodeFlagsLet,
 					target.name,
-					targetType.Value(),
 					temporary,
 				),
 			)
-			requests = append(requests, targetType.Requests()...)
 		} else {
 			assigned, err := context.Values().Assign(
 				context.WithRole(api.RoleAssignmentTarget),
@@ -468,13 +434,12 @@ func variableStatement(
 	context api.Context,
 	flags tsgo.NodeFlags,
 	name string,
-	targetType tsgo.TypeNode,
 	value tsgo.Expression,
 ) tsgo.VariableStatement {
 	declaration := context.Factory().VariableDeclaration(
 		context.Factory().Identifier(name),
 		nil,
-		targetType,
+		nil,
 		value,
 	)
 	return context.Factory().VariableStatement(

@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -11,6 +12,7 @@ type PlacementKind uint8
 const (
 	PlacementInvalid PlacementKind = iota
 	PlacementImport
+	PlacementCompanion
 )
 
 type PlacementScope uint8
@@ -18,6 +20,7 @@ type PlacementScope uint8
 const (
 	ScopeInvalid PlacementScope = iota
 	ScopeFileImports
+	ScopeOwningFile
 )
 
 type ExecutionConstraint uint8
@@ -40,6 +43,7 @@ type PlacementOwner struct {
 	phase        ImportPhase
 	modulePath   string
 	exportedName string
+	companion    CompanionOwner
 }
 
 type PlacementRequest struct {
@@ -96,7 +100,7 @@ func NewPrimitiveAliasRequest(
 	alias PrimitiveAlias,
 	localName string,
 ) (PlacementRequest, error) {
-	exportedName, _, err := PrimitiveAliasRepresentation(alias)
+	exportedName, err := PrimitiveAliasName(alias)
 	if err != nil {
 		return PlacementRequest{}, err
 	}
@@ -114,6 +118,22 @@ func NewPrimitiveAliasRequest(
 	return request, nil
 }
 
+func NewCompanionRequest(
+	typeName *types.TypeName,
+	operation CompanionOperation,
+) (PlacementRequest, error) {
+	owner, err := NewCompanionOwner(typeName, operation)
+	if err != nil {
+		return PlacementRequest{}, err
+	}
+	return PlacementRequest{
+		owner: PlacementOwner{
+			kind:      PlacementCompanion,
+			companion: owner,
+		},
+	}, nil
+}
+
 func (r PlacementRequest) Kind() PlacementKind {
 	return r.owner.kind
 }
@@ -121,6 +141,9 @@ func (r PlacementRequest) Kind() PlacementKind {
 func (r PlacementRequest) LegalScope() PlacementScope {
 	if r.owner.kind == PlacementImport {
 		return ScopeFileImports
+	}
+	if r.owner.kind == PlacementCompanion {
+		return ScopeOwningFile
 	}
 	return ScopeInvalid
 }
@@ -131,6 +154,9 @@ func (r PlacementRequest) PreferredScope() PlacementScope {
 
 func (r PlacementRequest) Execution() ExecutionConstraint {
 	if r.owner.kind == PlacementImport {
+		return ExecutionStatic
+	}
+	if r.owner.kind == PlacementCompanion {
 		return ExecutionStatic
 	}
 	return ExecutionInvalid
@@ -169,6 +195,15 @@ func (r PlacementRequest) PrimitiveAlias() (PrimitiveAlias, bool) {
 		return PrimitiveInvalid, false
 	}
 	return r.primitiveAlias, true
+}
+
+func (r PlacementRequest) Companion() (CompanionOwner, bool) {
+	if r.owner.kind != PlacementCompanion ||
+		r.owner.companion.TypeName() == nil ||
+		!r.owner.companion.Operation().Valid() {
+		return CompanionOwner{}, false
+	}
+	return r.owner.companion, true
 }
 
 type PlacementRequestError struct {

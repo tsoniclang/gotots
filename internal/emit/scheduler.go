@@ -3,6 +3,8 @@ package emit
 import (
 	"fmt"
 	"go/types"
+
+	"github.com/tsoniclang/gotots/internal/emit/api"
 )
 
 type scheduler struct {
@@ -50,4 +52,39 @@ func (s *scheduler) next() (types.Object, bool) {
 	delete(s.pending, object)
 	s.emitted[object] = struct{}{}
 	return object, true
+}
+
+type companionScheduler struct {
+	queue   []api.CompanionOwner
+	pending map[api.CompanionOwner]struct{}
+	emitted map[api.CompanionOwner]struct{}
+}
+
+func newCompanionScheduler() *companionScheduler {
+	return &companionScheduler{
+		pending: make(map[api.CompanionOwner]struct{}),
+		emitted: make(map[api.CompanionOwner]struct{}),
+	}
+}
+
+func (s *companionScheduler) enqueue(owner api.CompanionOwner) {
+	if _, done := s.emitted[owner]; done {
+		return
+	}
+	if _, queued := s.pending[owner]; queued {
+		return
+	}
+	s.pending[owner] = struct{}{}
+	s.queue = append(s.queue, owner)
+}
+
+func (s *companionScheduler) next() (api.CompanionOwner, bool) {
+	if len(s.queue) == 0 {
+		return api.CompanionOwner{}, false
+	}
+	owner := s.queue[0]
+	s.queue = s.queue[1:]
+	delete(s.pending, owner)
+	s.emitted[owner] = struct{}{}
+	return owner, true
 }

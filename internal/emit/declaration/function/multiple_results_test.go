@@ -73,8 +73,8 @@ func TestMultipleResultsCreateDirectTupleTreeAndSingleEvaluation(t *testing.T) {
 	if capture.Name().(tsgo.Identifier).Text() != "__gotots_results_0" {
 		t.Fatalf("capture name = %q", capture.Name().(tsgo.Identifier).Text())
 	}
-	if _, ok := capture.Type().(tsgo.TupleTypeNode); !ok {
-		t.Fatalf("capture type = %T, want tuple", capture.Type())
+	if capture.Type() != nil {
+		t.Fatalf("capture type = %T, want inference from tuple initializer", capture.Type())
 	}
 
 	keepFirst := statements[5].(tsgo.FunctionDeclaration)
