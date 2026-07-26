@@ -68,15 +68,8 @@ func (n *fileNames) Parameter(parameter *types.Var, index int) (string, error) {
 		return "", &api.NameError{Reason: "parameter index is negative"}
 	case parameter.Name() != "":
 		return n.Declare(parameter)
-	}
-	for suffix := uint64(0); ; suffix++ {
-		candidate := "__gotots_parameter_" + strconv.Itoa(index)
-		if suffix != 0 {
-			candidate += "_" + strconv.FormatUint(suffix, 10)
-		}
-		if _, reserved := n.owner.sourceNameBases[candidate]; !reserved {
-			return candidate, nil
-		}
+	default:
+		return "$" + strconv.Itoa(index), nil
 	}
 }
 

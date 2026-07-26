@@ -60,7 +60,7 @@ func TestCallableValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	}
 	if !strings.Contains(
 		printed,
-		"transform: (",
+		"transform: ($0: int32) => int32",
 	) || !strings.Contains(
 		printed,
 		"return function (value: int32): int32",
@@ -69,6 +69,9 @@ func TestCallableValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 		"return Choose(positive)(value);",
 	) {
 		t.Fatalf("printed callable artifact is not direct:\n%s", printed)
+	}
+	if strings.Contains(printed, "__gotots_parameter_") {
+		t.Fatalf("printed callable artifact contains wide synthetic parameter names:\n%s", printed)
 	}
 	calleeCapture := strings.Index(printed, "const __gotots_callee_")
 	argumentCapture := strings.Index(printed, "const __gotots_results_")
