@@ -1,10 +1,11 @@
-package emit_test
+package structvalue_test
 
 import (
 	"context"
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -28,11 +29,18 @@ func TestNamedStructValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
     CompositeField,
     CompositeSecondArgument,
     CopyResult,
+    EmptyEqual,
     EqualDifferentResult,
     EqualSameResult,
+    ExplicitVarCopyResult,
+    GroupedResult,
     MethodResult,
     MultipleResultIsolated,
+    NotEqual,
+    OmittedComposite,
     ParameterResult,
+    ParallelAssignment,
+    PositionalComposite,
     PrimitiveZero,
     ReservedValue,
     ZeroIsFresh,
@@ -51,6 +59,13 @@ console.log(PrimitiveZero());
 console.log(CompositeArgument());
 console.log(CompositeSecondArgument());
 console.log(CompositeField());
+console.log(PositionalComposite());
+console.log(OmittedComposite());
+console.log(NotEqual());
+console.log(ExplicitVarCopyResult());
+console.log(ParallelAssignment());
+console.log(GroupedResult());
+console.log(EmptyEqual());
 `)
 	writeProgramFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
 	targetPaths = append(targetPaths, runnerPath)
@@ -266,6 +281,13 @@ func main() {
 	fmt.Println(values.CompositeArgument())
 	fmt.Println(values.CompositeSecondArgument())
 	fmt.Println(values.CompositeField())
+	fmt.Println(values.PositionalComposite())
+	fmt.Println(values.OmittedComposite())
+	fmt.Println(values.NotEqual())
+	fmt.Println(values.ExplicitVarCopyResult())
+	fmt.Println(values.ParallelAssignment())
+	fmt.Println(values.GroupedResult())
+	fmt.Println(values.EmptyEqual())
 }
 `)
 	return runProgram(
@@ -279,4 +301,37 @@ func main() {
 
 func structValuesDirectory() string {
 	return filepath.Join(repositoryRoot(), "testdata", "projects", "struct-values")
+}
+
+func runProgram(
+	t *testing.T,
+	directory string,
+	name string,
+	arguments ...string,
+) string {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	command := exec.CommandContext(ctx, name, arguments...)
+	command.Dir = directory
+	command.Env = append(os.Environ(), "GOMEMLIMIT=1GiB")
+	output, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("%s %s: %v\n%s", name, strings.Join(arguments, " "), err, output)
+	}
+	return string(output)
+}
+
+func writeProgramFile(t *testing.T, path string, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func repositoryRoot() string {
+	return filepath.Join("..", "..", "..")
 }

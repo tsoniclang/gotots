@@ -1,4 +1,4 @@
-package emit_test
+package structvalue_test
 
 import (
 	"context"

@@ -70,6 +70,40 @@ export class Reserved {
         return $left.__go_constructor === $right.__go_constructor;
     }
 }
+export class Grouped {
+    declare private readonly $goType: void;
+    constructor(public Left: int32, public Right: int32) {
+    }
+    static $zero(): Grouped {
+        return new Grouped(0 as int32, 0 as int32);
+    }
+    static $copy($source: Grouped): Grouped {
+        return new Grouped($source.Left, $source.Right);
+    }
+    static $assign($target: Grouped, $source: Grouped): void {
+        $target.Left = $source.Left;
+        $target.Right = $source.Right;
+    }
+    static $equal($left: Grouped, $right: Grouped): bool {
+        return $left.Left === $right.Left && $left.Right === $right.Right;
+    }
+}
+export class Empty {
+    declare private readonly $goType: void;
+    constructor() {
+    }
+    static $zero(): Empty {
+        return new Empty();
+    }
+    static $copy($source: Empty): Empty {
+        return new Empty();
+    }
+    static $assign($target: Empty, $source: Empty): void {
+    }
+    static $equal($left: Empty, $right: Empty): bool {
+        return true;
+    }
+}
 export function NewBox(value: int32): Box {
     const __gotots_field_2: bool = value > (0 as int32);
     const __gotots_field_0: bool = true as bool;
@@ -189,4 +223,41 @@ export function CompositeField(): int32 {
     const __gotots_field_13: int32 = 7 as int32;
     const __gotots_field_15: Point = new Point(__gotots_field_13, __gotots_field_12);
     return new Box(__gotots_field_15, __gotots_field_14).Point.X;
+}
+export function PositionalComposite(): int32 {
+    let value: Point = new Point(8 as int32, true as bool);
+    return value.X;
+}
+export function OmittedComposite(): bool {
+    let value: Point = new Point(5 as int32, false as bool);
+    return value.X === 5 as int32 && !value.Visible;
+}
+export function NotEqual(): bool {
+    return !Box.$equal(NewBox(4 as int32), NewBox(5 as int32));
+}
+export function ExplicitVarCopy(value: Box): int32 {
+    let copied: Box = Box.$copy(value);
+    copied.Point.X = 6 as int32;
+    return (Math.imul(value.Point.X, 10 as int32) + copied.Point.X) | 0;
+}
+export function ExplicitVarCopyResult(): int32 {
+    return ExplicitVarCopy(NewBox(4 as int32));
+}
+export function ParallelAssignment(): int32 {
+    let left: Box = NewBox(4 as int32);
+    let right: Box = NewBox(9 as int32);
+    const __gotots_assign_0: Box = Box.$copy(right);
+    const __gotots_assign_1: Box = Box.$copy(left);
+    Box.$assign(left, __gotots_assign_0);
+    Box.$assign(right, __gotots_assign_1);
+    left.Point.X = 8 as int32;
+    return (Math.imul(left.Point.X, 10 as int32) + right.Point.X) | 0;
+}
+export function GroupedResult(): int32 {
+    let value: Grouped = new Grouped(1 as int32, 2 as int32);
+    return (Math.imul(value.Left, 10 as int32) + value.Right) | 0;
+}
+export function EmptyEqual(): bool {
+    let left: Empty = Empty.$zero();
+    return Empty.$equal(left, new Empty());
 }

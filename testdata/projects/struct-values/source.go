@@ -20,6 +20,12 @@ type Reserved struct {
 	constructor int32
 }
 
+type Grouped struct {
+	Left, Right int32
+}
+
+type Empty struct{}
+
 func NewBox(value int32) Box {
 	return Box{
 		Active: value > 0,
@@ -160,4 +166,46 @@ func CompositeField() int32 {
 			X:       7,
 		},
 	}.Point.X
+}
+
+func PositionalComposite() int32 {
+	value := Point{8, true}
+	return value.X
+}
+
+func OmittedComposite() bool {
+	value := Point{X: 5}
+	return value.X == 5 && !value.Visible
+}
+
+func NotEqual() bool {
+	return NewBox(4) != NewBox(5)
+}
+
+func ExplicitVarCopy(value Box) int32 {
+	var copied Box = value
+	copied.Point.X = 6
+	return value.Point.X*10 + copied.Point.X
+}
+
+func ExplicitVarCopyResult() int32 {
+	return ExplicitVarCopy(NewBox(4))
+}
+
+func ParallelAssignment() int32 {
+	left := NewBox(4)
+	right := NewBox(9)
+	left, right = right, left
+	left.Point.X = 8
+	return left.Point.X*10 + right.Point.X
+}
+
+func GroupedResult() int32 {
+	value := Grouped{1, 2}
+	return value.Left*10 + value.Right
+}
+
+func EmptyEqual() bool {
+	var left Empty
+	return left == Empty{}
 }

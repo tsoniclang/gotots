@@ -565,8 +565,8 @@ func (flag Flag) Disable() { flag.Ready = false }
 ```
 
 ```ts
-export function Flag_Disable(value: Flag): void {
-  value.Ready = false as bool;
+export function Flag_Disable(flag: Flag): void {
+  flag.Ready = false as bool;
 }
 ```
 

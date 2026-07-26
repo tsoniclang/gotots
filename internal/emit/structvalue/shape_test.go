@@ -1,4 +1,4 @@
-package emit_test
+package structvalue_test
 
 import (
 	"testing"
@@ -8,7 +8,14 @@ import (
 
 func TestNamedStructValuesConstructExactTargetShape(t *testing.T) {
 	source := structTargetSource(t, compileStructFixture(t))
-	for _, name := range []string{"Point", "Box", "Mirror", "Reserved"} {
+	for _, name := range []string{
+		"Point",
+		"Box",
+		"Mirror",
+		"Reserved",
+		"Grouped",
+		"Empty",
+	} {
 		class := targetClass(t, source, name)
 		if len(class.TypeParameters()) != 0 || len(class.HeritageClauses()) != 0 {
 			t.Fatalf("%s has type parameters or heritage clauses", name)

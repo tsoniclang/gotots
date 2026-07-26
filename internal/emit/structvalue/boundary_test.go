@@ -1,4 +1,4 @@
-package emit_test
+package structvalue_test
 
 import (
 	"context"
@@ -125,7 +125,7 @@ func TestNamedStructCompositeMutationFailsAtElementOwner(t *testing.T) {
 		t.Fatal(err)
 	}
 	source := program.Roots()[0].Files()[0].Syntax()
-	newBox := source.Decls[4].(*ast.FuncDecl)
+	newBox := sourceFunction(t, source, "NewBox")
 	composite := newBox.Body.List[0].(*ast.ReturnStmt).Results[0].(*ast.CompositeLit)
 	composite.Elts[1] = composite.Elts[1].(*ast.KeyValueExpr).Value
 
@@ -152,17 +152,7 @@ func TestNamedStructReceiverSelectionUsesGoTypesIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	source := program.Roots()[0].Files()[0].Syntax()
-	var invoke *ast.FuncDecl
-	for _, declaration := range source.Decls {
-		function, ok := declaration.(*ast.FuncDecl)
-		if ok && function.Name.Name == "Invoke" {
-			invoke = function
-			break
-		}
-	}
-	if invoke == nil {
-		t.Fatal("fixture Invoke declaration is absent")
-	}
+	invoke := sourceFunction(t, source, "Invoke")
 	call := invoke.Body.List[0].(*ast.ReturnStmt).Results[0].(*ast.CallExpr)
 	selector := call.Fun.(*ast.SelectorExpr)
 	selector.Sel.Name = "forgedSpelling"
@@ -219,6 +209,22 @@ func compileTemporaryStructSource(t *testing.T, source string) error {
 	t.Helper()
 	_, err := compileTemporaryStructProgram(t, source)
 	return err
+}
+
+func sourceFunction(
+	t *testing.T,
+	source *ast.File,
+	name string,
+) *ast.FuncDecl {
+	t.Helper()
+	for _, declaration := range source.Decls {
+		function, ok := declaration.(*ast.FuncDecl)
+		if ok && function.Name.Name == name {
+			return function
+		}
+	}
+	t.Fatalf("fixture function %s is absent", name)
+	return nil
 }
 
 func compileTemporaryStructProgram(

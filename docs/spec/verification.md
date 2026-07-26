@@ -190,6 +190,8 @@ Examples include:
 
 The first named-struct family additionally proves:
 
+- empty structs and grouped field declarations use the same single
+  representation owner;
 - two field-identical named Go structs remain incompatible in strict
   TypeScript through an erased nominal brand;
 - zero values allocate fresh nested records;
@@ -200,8 +202,9 @@ The first named-struct family additionally proves:
   a duplicate field walk;
 - `$assign` preserves destination storage identity while copying every nested
   value field;
-- keyed composite literals retain source evaluation order even when field
-  declaration order differs;
+- positional, keyed, and omitted-field composite literals are exact; keyed
+  literals retain source evaluation order even when field declaration order
+  differs;
 - equality is field-wise and recursive rather than target object identity;
 - concrete value-receiver calls use the exact `go/types.Selection` and a named
   receiver function, never a class method or virtual dispatch; and
