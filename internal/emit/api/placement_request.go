@@ -47,6 +47,7 @@ type PlacementRequest struct {
 	localName       string
 	moduleSpecifier tsgo.StringLiteral
 	specifier       tsgo.ImportSpecifier
+	primitiveAlias  PrimitiveAlias
 }
 
 func NewImportRequest(
@@ -87,6 +88,30 @@ func NewImportRequest(
 			factory.Identifier(localName),
 		),
 	}, nil
+}
+
+func NewPrimitiveAliasRequest(
+	factory tsgo.Factory,
+	modulePath string,
+	alias PrimitiveAlias,
+	localName string,
+) (PlacementRequest, error) {
+	exportedName, _, err := PrimitiveAliasRepresentation(alias)
+	if err != nil {
+		return PlacementRequest{}, err
+	}
+	request, err := NewImportRequest(
+		factory,
+		ImportPhaseType,
+		modulePath,
+		exportedName,
+		localName,
+	)
+	if err != nil {
+		return PlacementRequest{}, err
+	}
+	request.primitiveAlias = alias
+	return request, nil
 }
 
 func (r PlacementRequest) Kind() PlacementKind {
@@ -137,6 +162,13 @@ func (r PlacementRequest) ModuleSpecifier() tsgo.StringLiteral {
 
 func (r PlacementRequest) Specifier() tsgo.ImportSpecifier {
 	return r.specifier
+}
+
+func (r PlacementRequest) PrimitiveAlias() (PrimitiveAlias, bool) {
+	if r.primitiveAlias == PrimitiveInvalid {
+		return PrimitiveInvalid, false
+	}
+	return r.primitiveAlias, true
 }
 
 type PlacementRequestError struct {

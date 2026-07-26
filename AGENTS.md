@@ -30,6 +30,13 @@ reopens its shared owner.
 `docs/spec/` is authoritative. GoToTS is a general Go-to-TypeScript compiler;
 no acceptance corpus receives privileged behavior.
 
+GoToTS is a standalone project. It has no build, runtime, semantic,
+verification, configuration, or release dependency on an unrelated compiler,
+transpiler, target, or product. An independently useful idea may be adopted
+only as GoToTS-owned source or generated output with standalone TypeScript
+semantics. The originating project is never imported, invoked, or treated as a
+truth owner.
+
 The compilation architecture is deliberately direct:
 
 ```text
@@ -93,8 +100,13 @@ representation of the source program.
   spelling lookup, source scans, or runtime semantic dispatch.
 - Definitions are emitted once. References may repeat. All helper and import
   requests are deduplicated by typed ownership, never rendered text.
-- Generated output must remain strict ESM and within the statically compilable
-  Tsonic subset.
+- Generated output must remain standalone strict ESM. Generated primitive
+  aliases, support declarations, and runtime helpers are emitted and owned by
+  GoToTS; they never import an unrelated compiler or target project.
+- A borrowed marker or declaration is admissible only when GoToTS emits and
+  owns it locally and its ordinary TypeScript meaning is complete. A no-op
+  marker must never stand in for missing Go zero, copy, call, type, or runtime
+  semantics.
 
 ## Environment Ownership
 
@@ -106,6 +118,8 @@ standard-library packages, toolchain packages, and true external boundaries.
 - The selected `GOROOT` defines the standard-library declarations.
 - `gostdlib` supplies manually completed behavior against generated contracts.
 - True externals receive exact typed contracts and explicit placeholders.
+- Generated primitive aliases and reusable runtime modules are GoToTS-owned
+  output, not external environment contracts.
 - Runtime helpers exist only for Go behavior that direct TypeScript cannot
   preserve exactly.
 - Extensions receive explicit typed emission context and TS-Go factories; they
@@ -113,6 +127,9 @@ standard-library packages, toolchain packages, and true external boundaries.
 
 ## Code Discipline
 
+- Parallel agents are forbidden unless the user explicitly authorizes them for
+  the specific task. Task size, urgency, or separability does not imply
+  permission.
 - Begin implementation only after the relevant specification examples,
   ownership, failure behavior, and verification are explicit.
 - Every foundation capability and construct case begins with its focused test

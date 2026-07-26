@@ -1,6 +1,7 @@
 package emit
 
 import (
+	"slices"
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
@@ -9,6 +10,24 @@ import (
 
 type placementOwner struct {
 	requests map[api.PlacementOwner]api.PlacementRequest
+}
+
+func (p *placementOwner) PrimitiveAliases() []api.PrimitiveAlias {
+	aliases := make([]api.PrimitiveAlias, 0)
+	seen := make(map[api.PrimitiveAlias]struct{})
+	for _, request := range p.requests {
+		alias, ok := request.PrimitiveAlias()
+		if !ok {
+			continue
+		}
+		if _, duplicate := seen[alias]; duplicate {
+			continue
+		}
+		seen[alias] = struct{}{}
+		aliases = append(aliases, alias)
+	}
+	slices.Sort(aliases)
+	return aliases
 }
 
 func newPlacementOwner() *placementOwner {

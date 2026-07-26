@@ -1,6 +1,6 @@
 package structuredcontrol
 
-func Classify(value int) int {
+func Classify(value int32) int32 {
 	if current := value; current < 0 {
 		return -1
 	} else if current == 0 {
@@ -10,9 +10,9 @@ func Classify(value int) int {
 	}
 }
 
-func Sum(limit int) int {
-	total := 0
-	current := 0
+func Sum(limit int32) int32 {
+	var total int32 = 0
+	var current int32 = 0
 	for current < limit {
 		total = total + current
 		current++
@@ -20,8 +20,8 @@ func Sum(limit int) int {
 	return total
 }
 
-func Once() int {
-	total := 0
+func Once() int32 {
+	var total int32 = 0
 	for {
 		total = total + 1
 		break

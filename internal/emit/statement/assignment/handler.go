@@ -44,7 +44,7 @@ func emitCompoundAddition(
 	}
 	object, ok := context.TypesInfo().Uses[name].(*types.Var)
 	if !ok ||
-		!basictype.SupportsSignedArithmetic(context.TypesSizes(), object.Type()) ||
+		!basictype.SupportsExactInt32(context.TypesSizes(), object.Type()) ||
 		!types.AssignableTo(context.TypesInfo().TypeOf(source.Rhs[0]), object.Type()) {
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
@@ -66,14 +66,28 @@ func emitCompoundAddition(
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	target := context.Factory().BinaryExpression(
+	sum := context.Factory().BinaryExpression(
 		nil,
 		context.Factory().Identifier(reference.Name()),
 		nil,
 		context.Factory().BinaryOperatorToken(
-			tsgo.BinaryOperatorPlusEqualsToken,
+			tsgo.BinaryOperatorPlusToken,
 		),
 		value.Value(),
+	)
+	wrapped := context.Factory().BinaryExpression(
+		nil,
+		context.Factory().ParenthesizedExpression(sum),
+		nil,
+		context.Factory().BinaryOperatorToken(tsgo.BinaryOperatorBarToken),
+		context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
+	)
+	target := context.Factory().BinaryExpression(
+		nil,
+		context.Factory().Identifier(reference.Name()),
+		nil,
+		context.Factory().BinaryOperatorToken(tsgo.BinaryOperatorEqualsToken),
+		wrapped,
 	)
 	return api.DirectStatement(
 		context.Factory().ExpressionStatement(target),

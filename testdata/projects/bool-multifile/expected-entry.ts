@@ -1,4 +1,4 @@
-import type { bool } from "@tsonic/core/types.js";
+import type { bool } from "../../../support/scalars.js";
 import { flip } from "./logic.js";
 export function Run(input: bool): bool {
     return flip(input);

@@ -42,16 +42,62 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	target := tsgo.Expression(context.Factory().BinaryExpression(
+		nil,
+		left.Value(),
+		nil,
+		operator,
+		right.Value(),
+	))
+	if isSignedArithmetic(source.Op) {
+		target = exactInt32Arithmetic(context, source.Op, left.Value(), right.Value())
+	}
 	return api.NewExpressionEmission(
 		nil,
-		context.Factory().BinaryExpression(
-			nil,
-			left.Value(),
-			nil,
-			operator,
-			right.Value(),
-		),
+		target,
 		api.CombineRequests(left.Requests(), right.Requests()),
+	)
+}
+
+func exactInt32Arithmetic(
+	context api.Context,
+	operator token.Token,
+	left tsgo.Expression,
+	right tsgo.Expression,
+) tsgo.Expression {
+	if operator == token.MUL {
+		return context.Factory().CallExpression(
+			context.Factory().PropertyAccessExpression(
+				context.Factory().Identifier("Math"),
+				nil,
+				context.Factory().Identifier("imul"),
+				tsgo.NodeFlagsNone,
+			),
+			nil,
+			nil,
+			[]tsgo.Expression{left, right},
+			tsgo.NodeFlagsNone,
+		)
+	}
+	var targetOperator tsgo.BinaryOperator
+	if operator == token.ADD {
+		targetOperator = tsgo.BinaryOperatorPlusToken
+	} else {
+		targetOperator = tsgo.BinaryOperatorMinusToken
+	}
+	value := context.Factory().BinaryExpression(
+		nil,
+		left,
+		nil,
+		context.Factory().BinaryOperatorToken(targetOperator),
+		right,
+	)
+	return context.Factory().BinaryExpression(
+		nil,
+		context.Factory().ParenthesizedExpression(value),
+		nil,
+		context.Factory().BinaryOperatorToken(tsgo.BinaryOperatorBarToken),
+		context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
 	)
 }
 
@@ -61,10 +107,14 @@ func operationFor(
 ) (tsgo.BinaryOperatorToken, types.Type, bool) {
 	leftType := context.TypesInfo().TypeOf(source.X)
 	rightType := context.TypesInfo().TypeOf(source.Y)
-	integerType, integerOperands := integerOperandType(leftType, rightType)
+	integerType, integerOperands := integerOperandType(
+		context.TypesSizes(),
+		leftType,
+		rightType,
+	)
 	switch {
 	case isSignedArithmetic(source.Op) &&
-		basictype.SupportsSignedArithmetic(
+		basictype.SupportsExactInt32(
 			context.TypesSizes(),
 			context.TypesInfo().TypeOf(source),
 		):
@@ -155,17 +205,13 @@ func isSupportedBoolean(value types.Type) bool {
 	return ok && basic.Kind() == types.Bool
 }
 
-func isSupportedSignedInteger(value types.Type) bool {
-	if value == nil {
-		return false
-	}
-	basic, ok := types.Unalias(value).(*types.Basic)
-	return ok && (basic.Kind() == types.Int || basic.Kind() == types.Int64)
-}
-
-func integerOperandType(left, right types.Type) (types.Type, bool) {
+func integerOperandType(
+	sizes types.Sizes,
+	left types.Type,
+	right types.Type,
+) (types.Type, bool) {
 	for _, candidate := range []types.Type{left, right} {
-		if !isSupportedSignedInteger(candidate) {
+		if !basictype.SupportsExactInt32(sizes, candidate) {
 			continue
 		}
 		if types.AssignableTo(left, candidate) && types.AssignableTo(right, candidate) {

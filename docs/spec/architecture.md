@@ -48,7 +48,8 @@ general-purpose intermediate program.
 | typed target protocol values and factories | generated `internal/target/tsgo` |
 | target lexical placement and deduplication | scoped builders in `internal/emit` |
 | target decoding and formatting | pinned `tsgo --api` `printNode` |
-| Tsonic source-primitive and target semantics | selected Tsonic consumer and target plugin |
+| Go primitive target names and support declarations | representation owner in `internal/emit` plus generated `support/scalars.ts` |
+| standalone runtime behavior not expressible directly | GoToTS-owned modules under generated `runtime/` |
 | output paths and atomic writes | `internal/output` |
 | runtime/manual/external ownership | explicit contracts under their named roots |
 | independent checks | `internal/verify` |
@@ -152,15 +153,15 @@ that shadows an ancestor receives a deterministic distinct target name because
 JavaScript/TypeScript lexical declarations have a temporal dead zone before
 their textual declaration while the new Go variable is not in scope during
 the right side of its short declaration. The lexical name service emits the
-portable ASCII identifier subset accepted by TypeScript and the selected
-Tsonic target. Non-ASCII Go identifier runes are escaped deterministically.
+portable ASCII identifier subset accepted by strict TypeScript. Non-ASCII Go
+identifier runes are escaped deterministically.
 Every pinned TS-Go keyword spelling and strict-binding name is escaped at this
 same boundary; the keyword set is generated from the pinned `SyntaxKind`
 contract rather than copied into the emitter.
 Names are distinct across the same or ancestor/descendant lexical declaration
-spaces in either source order because selected consumers may apply that rule
-to the complete enclosing block. Sibling scopes and distinct functions may
-reuse a target name.
+spaces in either source order so a target declaration remains valid throughout
+the complete enclosing block. Sibling scopes and distinct functions may reuse
+a target name.
 Shadow suffixes and compiler-created prefixes are distinct, and allocation
 excludes every portable source-name base in the loaded package before emission;
 there is no claim that a valid cross-target identifier namespace is impossible
@@ -293,6 +294,21 @@ expressions/statements, patch formatted text, or carry an alternate target
 tree. Imports, trivia, escaping, precedence, and punctuation are TS-Go
 concerns.
 
+Generated support modules obey the same rule. The representation owner requests
+one canonical primitive alias by typed identity; the root emitter constructs
+the corresponding exported TS-Go `TypeAliasDeclaration` in
+`support/scalars.ts` and deduplicates it. Generated package files use canonical
+relative type-only `.js` imports. No checked-in source template or external
+package supplies these declarations. Any other marker-like support declaration
+must have complete ordinary TypeScript semantics; a no-op declaration cannot
+delegate missing behavior to an external tool.
+
+Every compilation entry point returns the complete reachable target-file set,
+including generated support/runtime modules and source dependencies. A
+file-root convenience may choose roots from one Go file, but it must not return
+only that file's TypeScript module or discard any requested artifact. Consumers
+never reconstruct omitted support from imports.
+
 ## Package And Output Shape
 
 Every source-available Go file has one checkout-independent target path:
@@ -419,6 +435,7 @@ A generated product uses deterministic ownership:
   modules/<module-key>/<package>/<source-file>.ts
   gostdlib/<toolchain-key>/<import-path>/<source-file>.ts
   externals/<contract-key>/<import-path>/index.ts
+  support/scalars.ts
   runtime/<runtime-module>.ts
   manifest.json
 ```
@@ -426,7 +443,10 @@ A generated product uses deterministic ownership:
 Source-available dependencies go under `modules`, regardless of whether they
 come from the workspace, module cache, vendor tree, or replacement directory.
 Standard-library and external routing uses resolved metadata and explicit
-contracts, never path spelling.
+contracts, never path spelling. `support/scalars.ts` contains only aliases
+requested by the selected program, each defined once. `runtime/` contains only
+GoToTS-owned behavior required for exact standalone execution; neither location
+imports an unrelated compiler, transpiler, target, or product.
 
 ## Extension Boundary
 

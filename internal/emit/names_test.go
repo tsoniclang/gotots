@@ -188,3 +188,59 @@ func TestCrossPackageReferenceRequiresItsExactObjectBeforeImporting(t *testing.T
 		t.Fatalf("reference error = %v, want enqueue sentinel", err)
 	}
 }
+
+func TestPrimitiveAliasImportAvoidsSourceNamesAndRemainsOneTypedOwner(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/current", "current")
+	packageScope := sourcePackage.Scope()
+	int32Object := types.NewVar(
+		token.Pos(1),
+		sourcePackage,
+		"int32",
+		types.Typ[types.Int32],
+	)
+	reservedAlias := types.NewVar(
+		token.Pos(2),
+		sourcePackage,
+		"int32__from_gotots_support",
+		types.Typ[types.Int32],
+	)
+	packageScope.Insert(int32Object)
+	packageScope.Insert(reservedAlias)
+	owner := newNameOwner(packageScope, &types.Info{
+		Defs: map[*ast.Ident]types.Object{
+			{Name: "int32"}:                      int32Object,
+			{Name: "int32__from_gotots_support"}: reservedAlias,
+		},
+	})
+	names := owner.ForFile(
+		&ast.File{},
+		packageScope,
+		tsgo.NewFactory(),
+		"modules/current/source.ts",
+		nil,
+	)
+
+	first, err := names.Primitive(api.PrimitiveInt32)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := names.Primitive(api.PrimitiveInt32)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const expectedLocal = "int32__from_gotots_support_1"
+	if first.Name() != expectedLocal || second.Name() != expectedLocal {
+		t.Fatalf("primitive names = %q, %q; want %q", first.Name(), second.Name(), expectedLocal)
+	}
+	requests := first.Requests()
+	if len(requests) != 1 ||
+		requests[0].ExportedName() != "int32" ||
+		requests[0].LocalName() != expectedLocal ||
+		requests[0].ModulePath() != "../../support/scalars.js" {
+		t.Fatalf("primitive request = %#v", requests)
+	}
+	alias, ok := requests[0].PrimitiveAlias()
+	if !ok || alias != api.PrimitiveInt32 {
+		t.Fatalf("primitive owner = %d, %v; want int32, true", alias, ok)
+	}
+}

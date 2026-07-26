@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit"
@@ -22,7 +21,7 @@ func TestLocalVariablesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	loaded := loadLocalVariablesProject(t)
 	workingDirectory := t.TempDir()
 	outputPath := filepath.Join(workingDirectory, "local-variables.ts")
-	targetFile := emitLocalVariables(t, loaded, outputPath)
+	targetFile := emitLocalVariables(t, loaded)
 	printed := printTargetFile(t, targetFile, workingDirectory)
 
 	expected, err := os.ReadFile(filepath.Join(localVariablesProjectDirectory(), "expected.ts"))
@@ -35,7 +34,7 @@ func TestLocalVariablesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	writeFile(t, outputPath, printed)
 
 	goOutput := executeLocalVariablesGo(t, workingDirectory)
-	typeScriptOutput := executeLocalVariablesTypeScript(t, workingDirectory, outputPath)
+	typeScriptOutput := executeLocalVariablesTypeScript(t, loaded, workingDirectory)
 	if typeScriptOutput != goOutput {
 		t.Fatalf("TypeScript output = %q, Go output = %q", typeScriptOutput, goOutput)
 	}
@@ -43,11 +42,7 @@ func TestLocalVariablesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 
 func TestLocalVariablesCreateExactScopedTargetTree(t *testing.T) {
 	loaded := loadLocalVariablesProject(t)
-	targetFile := emitLocalVariables(
-		t,
-		loaded,
-		filepath.Join(t.TempDir(), "local-variables.ts"),
-	)
+	targetFile := emitLocalVariables(t, loaded)
 	function := targetFile.Statements()[1].(tsgo.FunctionDeclaration)
 	body := function.Body().(tsgo.Block).Statements()
 	if len(body) != 2 {
@@ -69,7 +64,9 @@ func TestLocalVariablesCreateExactScopedTargetTree(t *testing.T) {
 	if name := shadowDeclaration.Name().(tsgo.Identifier).Text(); name != "base__shadow_1" {
 		t.Fatalf("shadow name = %q, want base__shadow_1", name)
 	}
-	initializer := shadowDeclaration.Initializer().(tsgo.BinaryExpression)
+	wrapped := shadowDeclaration.Initializer().(tsgo.BinaryExpression)
+	initializer := wrapped.Left().(tsgo.ParenthesizedExpression).
+		Expression().(tsgo.BinaryExpression)
 	if name := initializer.Left().(tsgo.Identifier).Text(); name != "base" {
 		t.Fatalf("shadow initializer reference = %q, want outer base", name)
 	}
@@ -117,17 +114,15 @@ func TestLocalVariablesUseGoObjectIdentityAcrossShadowing(t *testing.T) {
 	outerReference := shadow.Values[0].(*ast.BinaryExpr).X.(*ast.Ident)
 	outerReference.Name = "forgedSourceSpelling"
 
-	targetFile := emitLocalVariables(
-		t,
-		loaded,
-		filepath.Join(t.TempDir(), "local-variables.ts"),
-	)
+	targetFile := emitLocalVariables(t, loaded)
 	targetFunction := targetFile.Statements()[1].(tsgo.FunctionDeclaration)
 	targetBlock := targetFunction.Body().(tsgo.Block).Statements()[1].(tsgo.Block)
 	declaration := targetBlock.Statements()[0].(tsgo.VariableStatement).
 		DeclarationList().
 		Declarations()[0]
-	initializer := declaration.Initializer().(tsgo.BinaryExpression)
+	wrapped := declaration.Initializer().(tsgo.BinaryExpression)
+	initializer := wrapped.Left().(tsgo.ParenthesizedExpression).
+		Expression().(tsgo.BinaryExpression)
 	if name := initializer.Left().(tsgo.Identifier).Text(); name != "base" {
 		t.Fatalf("shadow initializer reference = %q, want outer base", name)
 	}
@@ -228,14 +223,9 @@ func loadLocalVariablesProject(t *testing.T) *load.Package {
 func emitLocalVariables(
 	t *testing.T,
 	loaded *load.Package,
-	outputPath string,
 ) tsgo.SourceFile {
 	t.Helper()
-	targetFile, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return targetFile
+	return compileSourceFile(t, loaded, loaded.Files()[0].Syntax())
 }
 
 func executeLocalVariablesGo(t *testing.T, workingDirectory string) string {
@@ -277,14 +267,14 @@ func main() {
 
 func executeLocalVariablesTypeScript(
 	t *testing.T,
+	loaded *load.Package,
 	workingDirectory string,
-	outputPath string,
 ) string {
 	t.Helper()
-	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
-	installTsonicCoreTypes(t, workingDirectory)
+	artifacts := materializeExportedProgram(t, loaded, workingDirectory)
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
-	writeFile(t, runnerPath, `import { Compute, LateOuter } from "./local-variables.js";
+	writeFile(t, runnerPath, `import { Compute, LateOuter } from "`+
+		artifacts.module(t, "source.ts")+`";
 
 console.log(Compute(0));
 console.log(Compute(5));
@@ -292,23 +282,7 @@ console.log(Compute(20));
 console.log(LateOuter(0));
 console.log(LateOuter(5));
 `)
-	outputDirectory := filepath.Join(workingDirectory, "out")
-	toolPath := strings.TrimSpace(
-		run(t, repositoryRoot(), filepath.Join(runtime.GOROOT(), "bin", "go"), "tool", "-n", "tsgo"),
-	)
-	run(
-		t,
-		workingDirectory,
-		toolPath,
-		"--target", "es2022",
-		"--module", "nodenext",
-		"--moduleResolution", "nodenext",
-		"--strict",
-		"--outDir", outputDirectory,
-		outputPath,
-		runnerPath,
-	)
-	return run(t, workingDirectory, "node", filepath.Join(outputDirectory, "runner.js"))
+	return executeMaterializedTypeScript(t, workingDirectory, artifacts, runnerPath)
 }
 
 func localVariablesProjectDirectory() string {

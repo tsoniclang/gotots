@@ -37,9 +37,18 @@ func TestOrdinaryMultiPackageProgramsUseOneDemandEmissionPath(t *testing.T) {
 	for _, project := range []struct {
 		name       string
 		modulePath string
+		support    string
 	}{
-		{name: "demand-results", modulePath: "example.com/results"},
-		{name: "demand-control", modulePath: "example.com/control"},
+		{
+			name:       "demand-results",
+			modulePath: "example.com/results",
+			support:    "scalars-bool-int32.ts",
+		},
+		{
+			name:       "demand-control",
+			modulePath: "example.com/control",
+			support:    "scalars-int32.ts",
+		},
 	} {
 		t.Run(project.name, func(t *testing.T) {
 			projectDirectory := filepath.Join(
@@ -64,8 +73,11 @@ func TestOrdinaryMultiPackageProgramsUseOneDemandEmissionPath(t *testing.T) {
 				t.Fatal(err)
 			}
 			files := emission.Files()
-			if len(files) != 2 {
-				t.Fatalf("emitted files = %d, want api plus one dependency", len(files))
+			if len(files) != 3 {
+				t.Fatalf(
+					"emitted files = %d, want two source modules plus scalar support",
+					len(files),
+				)
 			}
 
 			workingDirectory := t.TempDir()
@@ -89,6 +101,14 @@ func TestOrdinaryMultiPackageProgramsUseOneDemandEmissionPath(t *testing.T) {
 					file.PackageName(),
 					"expected.ts",
 				)
+				if file.Kind() == emit.TargetFileSupport {
+					expectedPath = filepath.Join(
+						repositoryRoot(),
+						"testdata",
+						"support",
+						project.support,
+					)
+				}
 				expected, err := os.ReadFile(expectedPath)
 				if err != nil {
 					t.Fatal(err)

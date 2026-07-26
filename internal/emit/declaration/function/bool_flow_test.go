@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit"
@@ -23,7 +22,7 @@ func TestBoolFlowPrintsTypechecksAndExecutesDifferentially(t *testing.T) {
 	loaded := loadBoolFlowProject(t)
 	workingDirectory := t.TempDir()
 	outputPath := filepath.Join(workingDirectory, "bool-flow.ts")
-	targetFile := emitBoolFlow(t, loaded, outputPath)
+	targetFile := emitBoolFlow(t, loaded)
 
 	client, err := tsgo.StartClient(repositoryRoot(), workingDirectory)
 	if err != nil {
@@ -50,7 +49,7 @@ func TestBoolFlowPrintsTypechecksAndExecutesDifferentially(t *testing.T) {
 	}
 
 	goOutput := executeBoolFlowGo(t, workingDirectory)
-	typeScriptOutput := executeBoolFlowTypeScript(t, workingDirectory, outputPath)
+	typeScriptOutput := executeBoolFlowTypeScript(t, loaded, workingDirectory)
 	if typeScriptOutput != goOutput {
 		t.Fatalf("TypeScript output = %q, Go output = %q", typeScriptOutput, goOutput)
 	}
@@ -58,7 +57,7 @@ func TestBoolFlowPrintsTypechecksAndExecutesDifferentially(t *testing.T) {
 
 func TestBoolFlowCreatesExactTargetTree(t *testing.T) {
 	loaded := loadBoolFlowProject(t)
-	targetFile := emitBoolFlow(t, loaded, filepath.Join(t.TempDir(), "bool-flow.ts"))
+	targetFile := emitBoolFlow(t, loaded)
 	statements := targetFile.Statements()
 	if len(statements) != 4 {
 		t.Fatalf("target statements = %d, want import plus three functions", len(statements))
@@ -116,7 +115,7 @@ func TestBoolFlowCallsUseGoObjectIdentity(t *testing.T) {
 	call := assignment.Rhs[0].(*ast.CallExpr)
 	call.Fun.(*ast.Ident).Name = "forgedSourceSpelling"
 
-	targetFile := emitBoolFlow(t, loaded, filepath.Join(t.TempDir(), "bool-flow.ts"))
+	targetFile := emitBoolFlow(t, loaded)
 	runTarget := targetFile.Statements()[1].(tsgo.FunctionDeclaration)
 	targetIf := runTarget.Body().(tsgo.Block).Statements()[1].(tsgo.IfStatement)
 	thenBlock := targetIf.ThenStatement().(tsgo.Block)
@@ -136,7 +135,7 @@ func TestBoolFlowLiteralsUseGoObjectIdentity(t *testing.T) {
 	literal := definition.Rhs[0].(*ast.Ident)
 	literal.Name = "true"
 
-	targetFile := emitBoolFlow(t, loaded, filepath.Join(t.TempDir(), "bool-flow.ts"))
+	targetFile := emitBoolFlow(t, loaded)
 	runTarget := targetFile.Statements()[1].(tsgo.FunctionDeclaration)
 	targetDefinition := runTarget.Body().(tsgo.Block).Statements()[0].(tsgo.VariableStatement)
 	initializer := targetDefinition.DeclarationList().Declarations()[0].Initializer()
@@ -197,13 +196,9 @@ func loadBoolFlowProject(t *testing.T) *load.Package {
 	return loaded
 }
 
-func emitBoolFlow(t *testing.T, loaded *load.Package, outputPath string) tsgo.SourceFile {
+func emitBoolFlow(t *testing.T, loaded *load.Package) tsgo.SourceFile {
 	t.Helper()
-	targetFile, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return targetFile
+	return compileSourceFile(t, loaded, loaded.Files()[0].Syntax())
 }
 
 func executeBoolFlowGo(t *testing.T, workingDirectory string) string {
@@ -243,12 +238,16 @@ func main() {
 	return run(t, runnerDirectory, filepath.Join(runtime.GOROOT(), "bin", "go"), "run", ".")
 }
 
-func executeBoolFlowTypeScript(t *testing.T, workingDirectory, outputPath string) string {
+func executeBoolFlowTypeScript(
+	t *testing.T,
+	loaded *load.Package,
+	workingDirectory string,
+) string {
 	t.Helper()
-	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
-	installTsonicCoreTypes(t, workingDirectory)
+	artifacts := materializeExportedProgram(t, loaded, workingDirectory)
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
-	writeFile(t, runnerPath, `import { Flip, Run, Same } from "./bool-flow.js";
+	writeFile(t, runnerPath, `import { Flip, Run, Same } from "`+
+		artifacts.module(t, "source.ts")+`";
 
 console.log(Run(false));
 console.log(Run(true));
@@ -256,21 +255,7 @@ console.log(Flip(false));
 console.log(Same(true, true));
 console.log(Same(true, false));
 `)
-	outputDirectory := filepath.Join(workingDirectory, "out")
-	toolPath := strings.TrimSpace(
-		run(t, repositoryRoot(), filepath.Join(runtime.GOROOT(), "bin", "go"), "tool", "-n", "tsgo"),
-	)
-	run(t, workingDirectory,
-		toolPath,
-		"--target", "es2022",
-		"--module", "nodenext",
-		"--moduleResolution", "nodenext",
-		"--strict",
-		"--outDir", outputDirectory,
-		outputPath,
-		runnerPath,
-	)
-	return run(t, workingDirectory, "node", filepath.Join(outputDirectory, "runner.js"))
+	return executeMaterializedTypeScript(t, workingDirectory, artifacts, runnerPath)
 }
 
 func boolFlowProjectDirectory() string {

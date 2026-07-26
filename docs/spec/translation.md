@@ -330,8 +330,8 @@ A blank target omits only its final declaration/store; it never omits the
 source evaluation or changes tuple position. When one multi-valued call is the
 complete argument list of another call, the call owner uses the same
 single-evaluation rule and passes the indexed values in parameter order.
-Target-consumer verification must prove that the selected source tuple maps to
-the target's native product type without an alternate ABI.
+Direct generated-program verification must prove that the selected source tuple
+maps to the TypeScript tuple without an alternate ABI.
 
 ```go
 i, values[i] = i+1, pair()
@@ -453,28 +453,115 @@ Calls then invoke `Counter_Add(counter, delta)` directly.
 
 ## Structs, Receivers, And Classes
 
-Classes are preferred when they preserve Go behavior directly, but Go
-embedding is not TypeScript subtyping.
+An ordinary named Go struct is a value type. TypeScript objects and classes are
+reference values, so direct target assignment cannot represent Go copying.
+GoToTS must make zeroing and copying explicit through one representation owner;
+it must not assume that a later compiler, plugin, or runtime will reinterpret
+ordinary TypeScript assignment.
 
 ```go
-type Counter struct { Value int }
-func (counter *Counter) Add(delta int) { counter.Value += delta }
-```
+type Pair struct {
+	Left  int64
+	Ready bool
+}
 
-may emit:
+func NewPair(left int64) Pair {
+	return Pair{Left: left, Ready: true}
+}
 
-```ts
-class Counter {
-  Value: GoInt = 0n;
-  Add(delta: GoInt): void {
-    this.Value += delta;
-  }
+func ZeroPair() Pair {
+	var pair Pair
+	return pair
 }
 ```
 
-The emitter chooses among a native member, a named checked entry, and a named
-explicit-receiver body based on nil behavior, value-receiver copying, method
-selection, method values, and interface use. The body has one owner.
+```ts
+import type { bool, int64 } from "../../support/scalars.js";
+
+export interface Pair {
+  Left: int64;
+  Ready: bool;
+}
+
+export function Pair$zero(): Pair {
+  return { Left: 0 as int64, Ready: false as bool };
+}
+
+export function Pair$copy(source: Pair): Pair {
+  return { Left: source.Left, Ready: source.Ready };
+}
+
+export function NewPair(left: int64): Pair {
+  return { Left: left, Ready: true as bool };
+}
+
+export function ZeroPair(): Pair {
+  let pair: Pair = Pair$zero();
+  return pair;
+}
+```
+
+For this field-only case, the structural type plus zero/copy functions is one
+admissible standalone shape. It does not preselect a structural type or class
+for every Go struct. Before a struct family is supported, its representation
+owner must select one exact shape for the complete relevant semantic class and
+prove construction, zero, copy, receiver, field, equality, interface,
+reflection-visible, and runtime-type behavior together.
+
+Whichever shape is selected emits one zero definition and one copy definition
+per represented struct and references them at all required boundaries. Nested
+value fields invoke their own copy owner; pointer, map, slice, function,
+channel, and interface fields preserve their specified reference or descriptor
+value. The helper definition grows with the struct's fields, while each use
+remains constant size. Composite literals may remain typed object literals
+when that is valid for the selected representation and every field value is
+present; omitted fields request the same zero owner.
+
+Assignment, argument passing, return, value receivers, interface boxing, map
+stores, channel sends, and append/copy operations each request copying where Go
+requires it. For example:
+
+```go
+copy := value
+copy.Ready = false
+```
+
+```ts
+let copy: Pair = Pair$copy(value);
+copy.Ready = false as bool;
+```
+
+Emitting `let copy = value` is forbidden because it aliases the same object.
+Every representation capability requires strict typechecking and direct
+Go-versus-generated-ESM differential execution. If zeroing, copying, equality,
+or field representation is unproved, that struct case remains unsupported.
+
+Receiver bodies still have one owner. A value receiver may emit as an explicit
+typed receiver entry that requests the same copy owner:
+
+```go
+type Flag struct{ Ready bool }
+func (flag Flag) Disable() { flag.Ready = false }
+```
+
+```ts
+export function Flag_Disable(value: Flag): void {
+  const flag: Flag = Flag$copy(value);
+  flag.Ready = false as bool;
+}
+```
+
+Concrete calls invoke `Flag_Disable(flag)` directly. Pointer
+receivers, method values, and interface calls select their own exact checked
+entry shape from `go/types`; they do not reuse a value-receiver entry when its
+copy or nil behavior differs. Generated code never uses `.call`, `.apply`, or
+`.bind`.
+
+A TypeScript class is selected only when reference identity and all relevant
+Go call, nil, copy, promotion, equality, construction, and runtime-type rules
+remain exact. When selected, its constructor, zero owner, and copy owner are
+side-effect-free generated behavior rather than an assumption that class
+assignment copies. A class is not selected merely to attach receiver syntax.
 
 This Go program demonstrates why embedding cannot blindly become `extends`:
 
@@ -498,9 +585,9 @@ function Base_Call(base: Base): string { return Base_Name(base); }
 
 `extends` is selected only when every relevant field, construction, copy,
 promotion, method-selection, equality, nil, and runtime-type rule remains
-equivalent. Otherwise composition and owner-specific receiver functions are
-used. `implements` states a target contract; it never supplies storage or
-behavior.
+equivalent. Otherwise structural fields, explicit copy/zero owners, composition,
+and owner-specific receiver functions are used. `implements` states a target
+contract; it never supplies storage or behavior.
 
 ## Interfaces
 
@@ -539,31 +626,51 @@ Handlers preserve:
 - generic constraints, instantiation, type inference, and operations.
 
 The basic-type owner selects integer width from the loaded `types.Sizes`
-evidence and requests the corresponding type-only Tsonic primitive import:
-`int32` or `int64` from `@tsonic/core/types.js`. The file placement owner
-deduplicates and renders that request before declarations. A handler does not
-infer width from `GOARCH` spelling, emit `number`, or call the JavaScript
-`BigInt` global. Integer operations remain direct only where the selected
-primitive/target contract preserves the Go operation; otherwise their shared
-semantic owner must request an explicit typed runtime operation.
+evidence and requests the corresponding alias from the generated
+`support/scalars.ts` module. The first aliases are:
 
-The imported Tsonic primitive and its TypeScript checker carrier are different
-facts. For example, a selected Tsonic consumer may expose `int64` through a
-virtual declaration whose checker shape is `number` while attaching the target
-fact that makes C# emission use `long`. GoToTS emits and retains the canonical
-`int64` reference. It must not infer semantics from the virtual declaration's
-structural carrier, replace the import with `number`, or introduce `bigint`
-syntax that the selected Tsonic contract does not admit.
+```ts
+export type bool = boolean;
+export type int32 = number;
+export type int64 = number;
+```
 
-For selected `int64` values and selected `int` values represented by the same
-64-bit target primitive, addition, subtraction, and multiplication emit the
-corresponding direct typed TS-Go binary expression only after native Tsonic
-differential tests prove the target primitive's wraparound behavior at both
-bounds. A 32-bit `int` remains unsupported for these operators until its
-separate native boundary proof exists. Boolean `&&` and `||` emit direct binary
-expressions and retain native short-circuit evaluation. Neither operand may
-carry prerequisite statements: moving such work before a short-circuit
-operator would change behavior.
+Each alias is emitted once as a typed TS-Go `TypeAliasDeclaration`; generated
+package modules use canonical relative type-only imports. The aliases retain
+the selected Go representation name in generated source. TypeScript still
+treats `int32` and `int64` structurally as `number`, so an alias is not range,
+precision, overflow, shift, conversion, or runtime-behavior evidence.
+
+A handler does not infer width from `GOARCH` spelling or replace the selected
+alias with an unqualified carrier. Integer operations remain direct only when
+standalone TypeScript behavior is proved exact for the complete admitted Go
+domain. Otherwise their shared semantic owner requests a behaviorally exact
+GoToTS-owned runtime operation, or the construct remains unsupported. In
+particular, general signed 64-bit arithmetic cannot be certified by
+JavaScript-number tests over small values.
+
+The first exact signed-integer operation family is `int32` (and `int` only
+when the selected `types.Sizes` makes it 32 bits). Its direct target rules are:
+
+| Go source | TS-Go AST decision | Printed TypeScript |
+|---|---|---|
+| `left + right` | addition nested under `BinaryOperatorBarToken` with zero | `(left + right) \| 0` |
+| `left - right` | subtraction nested under `BinaryOperatorBarToken` with zero | `(left - right) \| 0` |
+| `left * right` | typed `CallExpression` to the static built-in operation | `Math.imul(left, right)` |
+| `value += delta` | assignment whose right side is wrapped addition | `value = (value + delta) \| 0` |
+| `value++` / `value--` | assignment whose right side is wrapped add/subtract one | `value = (value +/- 1) \| 0` |
+| ordered/equality comparison or expression switch | direct comparison/switch over exact `int32` carriers | `left < right`, `switch (value)` |
+
+The parent still supplies expected type and role; no expression handler infers
+this capability from a target alias name. General `int64` and 64-bit `int`
+arithmetic, comparison, increment/decrement, compound assignment, and switch
+remain typed unsupported. A safely representable `int64` literal may still be
+emitted because that proves only that exact value, not operations over the
+full type.
+
+Boolean `&&` and `||` emit direct binary expressions and retain native
+short-circuit evaluation. Neither operand may carry prerequisite statements:
+moving such work before a short-circuit operator would change behavior.
 
 An untyped Go boolean constant is explicitly attributed to the expected
 canonical target primitive, just like an untyped integer constant:
@@ -573,11 +680,10 @@ false as bool
 ```
 
 Raw TypeScript `true` and `false` have only the ordinary TypeScript `boolean`
-carrier; that is not the selected Tsonic source-primitive fact required by
-native target operators. The parent supplies the expected Go `bool`, the
-predeclared-constant identifier handler verifies semantic object identity and
-assignability through `go/types`, and the existing basic-type owner supplies
-the one `bool` import. No operator handler guesses a carrier from spelling.
+carrier. The parent supplies the expected Go `bool`, the predeclared-constant
+identifier handler verifies semantic object identity and assignability through
+`go/types`, and the basic-type owner supplies the one generated `bool` alias.
+No operator handler guesses a carrier from spelling.
 
 An explicit Go parenthesized expression becomes one TS-Go
 `ParenthesizedExpression` around the directly emitted child. It preserves
@@ -585,49 +691,30 @@ source grouping without creating a source-side wrapper or intermediate
 expression model.
 
 Division, remainder, shifts, bitwise operators, unsupported widths, and any
-operator whose selected target edge behavior is unproved remain typed
-unsupported cases. A direct JavaScript-number result is not evidence for
-integer semantics.
+operator whose standalone behavior is unproved remain typed unsupported cases.
+A direct JavaScript-number result is not evidence for integer semantics.
 
-Literal and operator handlers must also preserve exact target evidence. A
+Literal and operator handlers must also preserve exact source evidence. A
 large Go integer constant cannot be passed through a JavaScript numeric-value
 round trip if that changes its source digits. The handler either constructs an
-exact Tsonic-admitted target expression with bounded size or fails typed until
-the selected consumer contract supplies one. Rounded numeric literals,
-ordinary-value-only claims, and test declarations that pretend `int64` is
-`bigint` are forbidden.
+exact standalone target expression with bounded size or fails typed until a
+GoToTS-owned exact representation exists. Rounded numeric literals and
+ordinary-value-only claims are forbidden.
 
-For the selected Tsonic contract, the signed-integer literal owner reads the
-exact `go/constant.Value` and the expected Go type supplied by its parent. A
-small value is explicitly attributed to the canonical target primitive:
+The signed-integer literal owner reads the exact `go/constant.Value` and the
+expected Go type supplied by its parent. A value exactly representable by the
+selected `number` carrier may be attributed to the generated alias:
 
 ```ts
 42 as int64
 ```
 
-A value outside JavaScript's exact integer range is split into at most two
-base-`2^32` chunks, each still exactly representable:
-
-```ts
-(2147483647 as int64) * (4294967296 as int64)
-    + (4294967295 as int64)
-```
-
-That expression denotes Go's `9223372036854775807` without ever materializing
-an inexact JavaScript numeric literal. Negative constants use typed subtraction
-rather than a target-ambiguous unary minus; `MinInt64` is:
-
-```ts
-((0 as int64) - (2147483647 as int64) - (1 as int64))
-    * (4294967296 as int64)
-```
-
-These `as int64` nodes are canonical Tsonic source-primitive evidence selected
-from the authoritative expected Go type. They are not unchecked casts,
-structural recovery, or substitutes for a missing semantic fact. The
-representation is constant-size for every signed 64-bit value, introduces no
-helper or runtime call, and must be compiled and executed through the selected
-target because direct Node execution cannot verify its result.
+That attribution is selected from authoritative type evidence, not spelling,
+and is not proof that every value of the alias is exactly representable. A
+constant outside JavaScript's exact integer range remains unsupported until a
+GoToTS-owned exact value representation is installed and proved. Splitting a
+large integer into arithmetic over several exactly written `number` literals
+is not sufficient because the resulting arithmetic can still round.
 
 An implicit Go operation has no separate source IR node. The handler that owns
 the containing construct queries type evidence and creates the required typed

@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit"
@@ -22,7 +21,7 @@ func TestLoopControlPrintsTypechecksAndExecutesDifferentially(t *testing.T) {
 	loaded := loadLoopControlProject(t)
 	workingDirectory := t.TempDir()
 	outputPath := filepath.Join(workingDirectory, "loop.ts")
-	targetFile := emitLoopControl(t, loaded, outputPath)
+	targetFile := emitLoopControl(t, loaded)
 	printed := printTargetFile(t, targetFile, workingDirectory)
 
 	expected, err := os.ReadFile(filepath.Join(loopControlProjectDirectory(), "expected.ts"))
@@ -34,7 +33,7 @@ func TestLoopControlPrintsTypechecksAndExecutesDifferentially(t *testing.T) {
 	}
 	writeFile(t, outputPath, printed)
 	goOutput := executeLoopControlGo(t, workingDirectory)
-	typeScriptOutput := executeLoopControlTypeScript(t, workingDirectory, outputPath)
+	typeScriptOutput := executeLoopControlTypeScript(t, loaded, workingDirectory)
 	if typeScriptOutput != goOutput {
 		t.Fatalf("TypeScript output = %q, Go output = %q", typeScriptOutput, goOutput)
 	}
@@ -42,7 +41,7 @@ func TestLoopControlPrintsTypechecksAndExecutesDifferentially(t *testing.T) {
 
 func TestLoopControlCreatesExactTargetTree(t *testing.T) {
 	loaded := loadLoopControlProject(t)
-	targetFile := emitLoopControl(t, loaded, filepath.Join(t.TempDir(), "loop.ts"))
+	targetFile := emitLoopControl(t, loaded)
 	function := targetFile.Statements()[1].(tsgo.FunctionDeclaration)
 	statements := function.Body().(tsgo.Block).Statements()
 	if len(statements) != 3 {
@@ -58,8 +57,9 @@ func TestLoopControlCreatesExactTargetTree(t *testing.T) {
 	if loop.Condition().Kind() != tsgo.SyntaxKindBinaryExpression {
 		t.Fatalf("loop condition kind = %d, want binary expression", loop.Condition().Kind())
 	}
-	if loop.Incrementor().Kind() != tsgo.SyntaxKindPostfixUnaryExpression {
-		t.Fatalf("loop incrementor kind = %d, want postfix unary expression", loop.Incrementor().Kind())
+	increment, ok := loop.Incrementor().(tsgo.BinaryExpression)
+	if !ok || increment.OperatorToken().Kind() != tsgo.SyntaxKindEqualsToken {
+		t.Fatalf("loop incrementor = %T, want exact wrapped assignment", loop.Incrementor())
 	}
 	body := loop.Statement().(tsgo.Block)
 	firstIf := body.Statements()[0].(tsgo.IfStatement)
@@ -161,11 +161,11 @@ func TestLoopControlPostUsesGoObjectIdentity(t *testing.T) {
 	loop := function.Body.List[1].(*ast.ForStmt)
 	loop.Post.(*ast.IncDecStmt).X.(*ast.Ident).Name = "forgedSourceSpelling"
 
-	targetFile := emitLoopControl(t, loaded, filepath.Join(t.TempDir(), "loop.ts"))
+	targetFile := emitLoopControl(t, loaded)
 	targetFunction := targetFile.Statements()[1].(tsgo.FunctionDeclaration)
 	targetLoop := targetFunction.Body().(tsgo.Block).Statements()[1].(tsgo.ForStatement)
-	increment := targetLoop.Incrementor().(tsgo.PostfixUnaryExpression)
-	if name := increment.Operand().(tsgo.Identifier).Text(); name != "current" {
+	increment := targetLoop.Incrementor().(tsgo.BinaryExpression)
+	if name := increment.Left().(tsgo.Identifier).Text(); name != "current" {
 		t.Fatalf("post operand = %q, want current", name)
 	}
 }
@@ -198,14 +198,9 @@ func loadLoopControlProject(t *testing.T) *load.Package {
 func emitLoopControl(
 	t *testing.T,
 	loaded *load.Package,
-	outputPath string,
 ) tsgo.SourceFile {
 	t.Helper()
-	targetFile, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return targetFile
+	return compileSourceFile(t, loaded, loaded.Files()[0].Syntax())
 }
 
 func executeLoopControlGo(t *testing.T, workingDirectory string) string {
@@ -246,35 +241,20 @@ func main() {
 
 func executeLoopControlTypeScript(
 	t *testing.T,
+	loaded *load.Package,
 	workingDirectory string,
-	outputPath string,
 ) string {
 	t.Helper()
-	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
-	installTsonicCoreTypes(t, workingDirectory)
+	artifacts := materializeExportedProgram(t, loaded, workingDirectory)
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
-	writeFile(t, runnerPath, `import { Sum } from "./loop.js";
+	writeFile(t, runnerPath, `import { Sum } from "`+artifacts.module(t, "loop.ts")+`";
 
 console.log(Sum(0));
 console.log(Sum(1));
 console.log(Sum(5));
 console.log(Sum(10));
 `)
-	outputDirectory := filepath.Join(workingDirectory, "out")
-	toolPath := strings.TrimSpace(
-		run(t, repositoryRoot(), filepath.Join(runtime.GOROOT(), "bin", "go"), "tool", "-n", "tsgo"),
-	)
-	run(t, workingDirectory,
-		toolPath,
-		"--target", "es2022",
-		"--module", "nodenext",
-		"--moduleResolution", "nodenext",
-		"--strict",
-		"--outDir", outputDirectory,
-		outputPath,
-		runnerPath,
-	)
-	return run(t, workingDirectory, "node", filepath.Join(outputDirectory, "runner.js"))
+	return executeMaterializedTypeScript(t, workingDirectory, artifacts, runnerPath)
 }
 
 func loopControlProjectDirectory() string {

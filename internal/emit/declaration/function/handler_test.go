@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,18 +17,19 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/load"
+	"github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func TestAddConstructCreatesExactTargetTree(t *testing.T) {
 	loaded := loadAddProject(t)
-	targetFile := emitAdd(t, loaded, filepath.Join(t.TempDir(), "add.ts"))
+	targetFile := emitAdd(t, loaded)
 
 	statements := targetFile.Statements()
 	if len(statements) != 2 {
 		t.Fatalf("target statements = %d, want 2", len(statements))
 	}
-	assertIntTypeImport(t, statements[0], primitiveName(loaded))
+	assertPrimitiveImportDeclaration(t, statements[0], "int32")
 	function, ok := statements[1].(tsgo.FunctionDeclaration)
 	if !ok {
 		t.Fatalf("target declaration = %T, want tsgo.FunctionDeclaration", statements[0])
@@ -45,9 +45,9 @@ func TestAddConstructCreatesExactTargetTree(t *testing.T) {
 	if len(parameters) != 2 {
 		t.Fatalf("parameters = %d, want 2", len(parameters))
 	}
-	assertIntParameter(t, parameters[0], "left", primitiveName(loaded))
-	assertIntParameter(t, parameters[1], "right", primitiveName(loaded))
-	assertPrimitiveType(t, function.Type(), primitiveName(loaded))
+	assertIntParameter(t, parameters[0], "left", "int32")
+	assertIntParameter(t, parameters[1], "right", "int32")
+	assertPrimitiveType(t, function.Type(), "int32")
 	body, ok := function.Body().(tsgo.Block)
 	if !ok {
 		t.Fatalf("function body = %T, want tsgo.Block", function.Body())
@@ -60,22 +60,27 @@ func TestAddConstructCreatesExactTargetTree(t *testing.T) {
 	if !ok {
 		t.Fatalf("body statement = %T, want tsgo.ReturnStatement", bodyStatements[0])
 	}
-	binary, ok := returnStatement.Expression().(tsgo.BinaryExpression)
-	if !ok {
+	wrapped, ok := returnStatement.Expression().(tsgo.BinaryExpression)
+	if !ok || wrapped.OperatorToken().Kind() != tsgo.SyntaxKindBarToken {
 		t.Fatalf("return expression = %T, want tsgo.BinaryExpression", returnStatement.Expression())
 	}
-	if binary.OperatorToken().Kind() != tsgo.SyntaxKindPlusToken {
-		t.Fatalf("binary operator = %d, want plus", binary.OperatorToken().Kind())
+	grouped, ok := wrapped.Left().(tsgo.ParenthesizedExpression)
+	if !ok {
+		t.Fatalf("wrapped left = %T, want parenthesized addition", wrapped.Left())
 	}
-	assertIdentifier(t, binary.Left(), "left")
-	assertIdentifier(t, binary.Right(), "right")
+	addition := grouped.Expression().(tsgo.BinaryExpression)
+	if addition.OperatorToken().Kind() != tsgo.SyntaxKindPlusToken {
+		t.Fatalf("binary operator = %d, want plus", addition.OperatorToken().Kind())
+	}
+	assertIdentifier(t, addition.Left(), "left")
+	assertIdentifier(t, addition.Right(), "right")
 }
 
 func TestAddConstructPrintsTypechecksAndExecutesDifferentially(t *testing.T) {
 	loaded := loadAddProject(t)
 	workingDirectory := t.TempDir()
 	outputPath := filepath.Join(workingDirectory, "add.ts")
-	targetFile := emitAdd(t, loaded, outputPath)
+	targetFile := emitAdd(t, loaded)
 
 	client, err := tsgo.StartClient(repositoryRoot(), workingDirectory)
 	if err != nil {
@@ -102,7 +107,7 @@ func TestAddConstructPrintsTypechecksAndExecutesDifferentially(t *testing.T) {
 	}
 
 	goOutput := executeGo(t, workingDirectory)
-	typeScriptOutput := executeTypeScript(t, workingDirectory, outputPath)
+	typeScriptOutput := executeTypeScript(t, loaded, workingDirectory)
 	if typeScriptOutput != goOutput {
 		t.Fatalf("TypeScript output = %q, Go output = %q", typeScriptOutput, goOutput)
 	}
@@ -132,23 +137,32 @@ func TestAddReferencesUseGoObjectIdentity(t *testing.T) {
 	binary := function.Body.List[0].(*ast.ReturnStmt).Results[0].(*ast.BinaryExpr)
 	binary.X.(*ast.Ident).Name = "forgedSourceSpelling"
 
-	targetFile := emitAdd(t, loaded, filepath.Join(t.TempDir(), "add.ts"))
+	targetFile := emitAdd(t, loaded)
 	targetFunction := targetFile.Statements()[1].(tsgo.FunctionDeclaration)
 	targetBody := targetFunction.Body().(tsgo.Block)
 	targetReturn := targetBody.Statements()[0].(tsgo.ReturnStatement)
-	targetBinary := targetReturn.Expression().(tsgo.BinaryExpression)
+	wrapped := targetReturn.Expression().(tsgo.BinaryExpression)
+	grouped := wrapped.Left().(tsgo.ParenthesizedExpression)
+	targetBinary := grouped.Expression().(tsgo.BinaryExpression)
 	assertIdentifier(t, targetBinary.Left(), "left")
 }
 
-func assertIntTypeImport(t *testing.T, statement tsgo.Statement, targetName string) {
+func assertPrimitiveImportDeclaration(
+	t *testing.T,
+	statement tsgo.Statement,
+	targetName string,
+) {
 	t.Helper()
 	declaration, ok := statement.(tsgo.ImportDeclaration)
 	if !ok {
 		t.Fatalf("first target statement = %T, want tsgo.ImportDeclaration", statement)
 	}
 	module, ok := declaration.ModuleSpecifier().(tsgo.StringLiteral)
-	if !ok || module.Text() != "@tsonic/core/types.js" {
-		t.Fatalf("type import module = %T, want @tsonic/core/types.js", declaration.ModuleSpecifier())
+	if !ok || module.Text() != "../../../support/scalars.js" {
+		t.Fatalf(
+			"type import module = %T, want ../../../support/scalars.js",
+			declaration.ModuleSpecifier(),
+		)
 	}
 	clause := declaration.ImportClause()
 	if clause.PhaseModifier() != tsgo.ImportPhaseModifierSyntaxKindTypeKeyword {
@@ -216,13 +230,36 @@ func loadAddProject(t *testing.T) *load.Package {
 	return loaded
 }
 
-func emitAdd(t *testing.T, loaded *load.Package, outputPath string) tsgo.SourceFile {
+func emitAdd(t *testing.T, loaded *load.Package) tsgo.SourceFile {
 	t.Helper()
-	targetFile, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
+	return compileSourceFile(t, loaded, loaded.Files()[0].Syntax())
+}
+
+func compileSourceFile(
+	t *testing.T,
+	loaded *load.Package,
+	source *ast.File,
+) tsgo.SourceFile {
+	t.Helper()
+	emission, err := emit.CompileFile(loaded, source)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return targetFile
+	owned, ok := loaded.FileForSyntax(source)
+	if !ok {
+		t.Fatal("source syntax is not package-owned")
+	}
+	expectedPath, err := output.SourcePath(loaded, owned)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range emission.Files() {
+		if file.Kind() == emit.TargetFileSource && file.OutputPath() == expectedPath {
+			return file.SourceFile()
+		}
+	}
+	t.Fatalf("complete emission has no source artifact %s", expectedPath)
+	return nil
 }
 
 func executeGo(t *testing.T, workingDirectory string) string {
@@ -259,16 +296,91 @@ func main() {
 	return run(t, runnerDirectory, filepath.Join(runtime.GOROOT(), "bin", "go"), "run", ".")
 }
 
-func executeTypeScript(t *testing.T, workingDirectory, outputPath string) string {
+func executeTypeScript(
+	t *testing.T,
+	loaded *load.Package,
+	workingDirectory string,
+) string {
 	t.Helper()
-	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
-	installTsonicCoreTypes(t, workingDirectory)
+	artifacts := materializeExportedProgram(t, loaded, workingDirectory)
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
-	writeFile(t, runnerPath, `import { Add } from "./add.js";
+	writeFile(t, runnerPath, `import { Add } from "`+artifacts.module(t, "source.ts")+`";
 
 console.log(Add(20, 22).toString());
 console.log(Add(-7, 2).toString());
 `)
+	return executeMaterializedTypeScript(t, workingDirectory, artifacts, runnerPath)
+}
+
+type materializedProgram struct {
+	targetPaths []string
+	modules     map[string]string
+}
+
+func materializeExportedProgram(
+	t *testing.T,
+	loaded *load.Package,
+	workingDirectory string,
+) materializedProgram {
+	t.Helper()
+	roots, err := emit.ExportedAPIRoots(loaded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	emission, err := emit.Compile(loaded.Program(), roots)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client, err := tsgo.StartClient(repositoryRoot(), workingDirectory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := client.Close(); err != nil {
+			t.Errorf("close TS-Go client: %v", err)
+		}
+	})
+	result := materializedProgram{modules: make(map[string]string)}
+	for _, file := range emission.Files() {
+		printed, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		targetPath := filepath.Join(
+			workingDirectory,
+			filepath.FromSlash(file.OutputPath()),
+		)
+		writeFile(t, targetPath, printed)
+		result.targetPaths = append(result.targetPaths, targetPath)
+		if file.Kind() == emit.TargetFileSource {
+			base := filepath.Base(file.OutputPath())
+			if result.modules[base] != "" {
+				t.Fatalf("multiple emitted source modules use basename %q", base)
+			}
+			result.modules[base] = "./" +
+				strings.TrimSuffix(file.OutputPath(), ".ts") + ".js"
+		}
+	}
+	return result
+}
+
+func (p materializedProgram) module(t *testing.T, base string) string {
+	t.Helper()
+	module := p.modules[base]
+	if module == "" {
+		t.Fatalf("emitted source module %q is absent", base)
+	}
+	return module
+}
+
+func executeMaterializedTypeScript(
+	t *testing.T,
+	workingDirectory string,
+	artifacts materializedProgram,
+	runnerPath string,
+) string {
+	t.Helper()
+	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
 	outputDirectory := filepath.Join(workingDirectory, "out")
 	toolPath := strings.TrimSpace(run(
 		t,
@@ -278,48 +390,17 @@ console.log(Add(-7, 2).toString());
 		"-n",
 		"tsgo",
 	))
-	run(t, workingDirectory,
-		toolPath,
+	arguments := []string{
 		"--target", "es2022",
 		"--module", "nodenext",
 		"--moduleResolution", "nodenext",
 		"--strict",
 		"--outDir", outputDirectory,
-		outputPath,
-		runnerPath,
-	)
+	}
+	arguments = append(arguments, artifacts.targetPaths...)
+	arguments = append(arguments, runnerPath)
+	run(t, workingDirectory, toolPath, arguments...)
 	return run(t, workingDirectory, "node", filepath.Join(outputDirectory, "runner.js"))
-}
-
-func installTsonicCoreTypes(t *testing.T, workingDirectory string) {
-	t.Helper()
-	moduleDirectory := filepath.Join(workingDirectory, "node_modules", "@tsonic", "core")
-	if err := os.MkdirAll(moduleDirectory, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	writeFile(t, filepath.Join(moduleDirectory, "package.json"), `{
-  "name": "@tsonic/core",
-  "type": "module",
-  "exports": {
-    "./types.js": {
-      "types": "./types.d.ts",
-      "default": "./types.js"
-    }
-  }
-}
-`)
-	writeFile(t, filepath.Join(moduleDirectory, "types.d.ts"), `export type bool = boolean;
-export type int32 = number;
-export type int64 = number;
-`)
-	writeFile(t, filepath.Join(moduleDirectory, "types.js"), "export {};\n")
-}
-
-func primitiveName(loaded *load.Package) string {
-	if loaded.TypesSizes().Sizeof(types.Typ[types.Int]) == 4 {
-		return "int32"
-	}
-	return "int64"
 }
 
 func run(t *testing.T, directory, name string, arguments ...string) string {
@@ -338,6 +419,9 @@ func run(t *testing.T, directory, name string, arguments ...string) string {
 
 func writeFile(t *testing.T, path, content string) {
 	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}

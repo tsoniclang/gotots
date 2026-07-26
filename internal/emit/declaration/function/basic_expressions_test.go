@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit"
@@ -22,7 +21,7 @@ func TestBasicExpressionsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	loaded := loadBasicExpressionsProject(t)
 	workingDirectory := t.TempDir()
 	outputPath := filepath.Join(workingDirectory, "basic-expressions.ts")
-	targetFile := emitBasicExpressions(t, loaded, outputPath)
+	targetFile := emitBasicExpressions(t, loaded)
 	printed := printTargetFile(t, targetFile, workingDirectory)
 
 	expected, err := os.ReadFile(filepath.Join(basicExpressionsProjectDirectory(), "expected.ts"))
@@ -35,7 +34,7 @@ func TestBasicExpressionsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	writeFile(t, outputPath, printed)
 
 	goOutput := executeBasicExpressionsGo(t, workingDirectory)
-	typeScriptOutput := executeBasicExpressionsTypeScript(t, workingDirectory, outputPath)
+	typeScriptOutput := executeBasicExpressionsTypeScript(t, loaded, workingDirectory)
 	if typeScriptOutput != goOutput {
 		t.Fatalf("TypeScript output = %q, Go output = %q", typeScriptOutput, goOutput)
 	}
@@ -43,21 +42,24 @@ func TestBasicExpressionsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 
 func TestBasicExpressionsCreateExactTargetTrees(t *testing.T) {
 	loaded := loadBasicExpressionsProject(t)
-	targetFile := emitBasicExpressions(
-		t,
-		loaded,
-		filepath.Join(t.TempDir(), "basic-expressions.ts"),
-	)
+	targetFile := emitBasicExpressions(t, loaded)
 
 	arithmetic := targetFunction(t, targetFile, "Arithmetic")
 	arithmeticReturn := targetReturn(t, arithmetic)
-	product, ok := arithmeticReturn.Expression().(tsgo.BinaryExpression)
-	if !ok || product.OperatorToken().Kind() != tsgo.SyntaxKindAsteriskToken {
-		t.Fatalf("Arithmetic expression = %T, want multiplication", arithmeticReturn.Expression())
-	}
-	group, ok := product.Left().(tsgo.ParenthesizedExpression)
+	product, ok := arithmeticReturn.Expression().(tsgo.CallExpression)
 	if !ok {
-		t.Fatalf("Arithmetic left = %T, want tsgo.ParenthesizedExpression", product.Left())
+		t.Fatalf("Arithmetic expression = %T, want Math.imul call", arithmeticReturn.Expression())
+	}
+	access := product.Expression().(tsgo.PropertyAccessExpression)
+	if access.Expression().(tsgo.Identifier).Text() != "Math" ||
+		access.Name().(tsgo.Identifier).Text() != "imul" {
+		t.Fatal("Arithmetic multiplication is not owned by Math.imul")
+	}
+	outerGroup := product.Arguments()[0].(tsgo.ParenthesizedExpression)
+	wrapped := outerGroup.Expression().(tsgo.BinaryExpression)
+	group, ok := wrapped.Left().(tsgo.ParenthesizedExpression)
+	if !ok {
+		t.Fatalf("Arithmetic left = %T, want wrapped subtraction", wrapped.Left())
 	}
 	difference, ok := group.Expression().(tsgo.BinaryExpression)
 	if !ok || difference.OperatorToken().Kind() != tsgo.SyntaxKindMinusToken {
@@ -147,11 +149,7 @@ func TestBooleanConstantsUseGoObjectIdentity(t *testing.T) {
 	literal := logical.X.(*ast.Ident)
 	literal.Name = "forgedSourceSpelling"
 
-	targetFile := emitBasicExpressions(
-		t,
-		loaded,
-		filepath.Join(t.TempDir(), "basic-expressions.ts"),
-	)
+	targetFile := emitBasicExpressions(t, loaded)
 	targetLogical := targetReturn(
 		t,
 		targetFunction(t, targetFile, "ShortCircuitAnd"),
@@ -221,14 +219,9 @@ func loadBasicExpressionsProject(t *testing.T) *load.Package {
 func emitBasicExpressions(
 	t *testing.T,
 	loaded *load.Package,
-	outputPath string,
 ) tsgo.SourceFile {
 	t.Helper()
-	targetFile, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return targetFile
+	return compileSourceFile(t, loaded, loaded.Files()[0].Syntax())
 }
 
 func executeBasicExpressionsGo(t *testing.T, workingDirectory string) string {
@@ -261,11 +254,15 @@ func main() {
 	fmt.Println(expressions.Arithmetic(10))
 	fmt.Println(expressions.Arithmetic(-4))
 	fmt.Println(expressions.WrapAdd(40))
+	fmt.Println(expressions.WrapAdd(2147483647))
 	fmt.Println(expressions.WrapSubtract(40))
+	fmt.Println(expressions.WrapSubtract(-2147483648))
 	fmt.Println(expressions.WrapMultiply(21))
-	fmt.Println(expressions.IntWrapAdd(40))
-	fmt.Println(expressions.IntWrapSubtract(40))
-	fmt.Println(expressions.IntWrapMultiply(21))
+	fmt.Println(expressions.WrapMultiply(1073741824))
+	fmt.Println(expressions.Increment(2147483647))
+	fmt.Println(expressions.Decrement(-2147483648))
+	fmt.Println(expressions.Compare(-2147483648, 2147483647))
+	fmt.Println(expressions.Compare(7, 7))
 	fmt.Println(expressions.Logic(false, false))
 	fmt.Println(expressions.Logic(false, true))
 	fmt.Println(expressions.Logic(true, false))
@@ -279,34 +276,37 @@ func main() {
 
 func executeBasicExpressionsTypeScript(
 	t *testing.T,
+	loaded *load.Package,
 	workingDirectory string,
-	outputPath string,
 ) string {
 	t.Helper()
-	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
-	installTsonicCoreTypes(t, workingDirectory)
+	artifacts := materializeExportedProgram(t, loaded, workingDirectory)
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	writeFile(t, runnerPath, `import {
     Arithmetic,
-    IntWrapAdd,
-    IntWrapMultiply,
-    IntWrapSubtract,
+    Compare,
+    Decrement,
+    Increment,
     Logic,
     ShortCircuitAnd,
     ShortCircuitOr,
     WrapAdd,
     WrapMultiply,
     WrapSubtract,
-} from "./basic-expressions.js";
+	} from "`+artifacts.module(t, "source.ts")+`";
 
 console.log(Arithmetic(10));
 console.log(Arithmetic(-4));
 console.log(WrapAdd(40));
+console.log(WrapAdd(2147483647));
 console.log(WrapSubtract(40));
+console.log(WrapSubtract(-2147483648));
 console.log(WrapMultiply(21));
-console.log(IntWrapAdd(40));
-console.log(IntWrapSubtract(40));
-console.log(IntWrapMultiply(21));
+console.log(WrapMultiply(1073741824));
+console.log(Increment(2147483647));
+console.log(Decrement(-2147483648));
+console.log(...Compare(-2147483648, 2147483647));
+console.log(...Compare(7, 7));
 console.log(Logic(false, false));
 console.log(Logic(false, true));
 console.log(Logic(true, false));
@@ -314,23 +314,7 @@ console.log(Logic(true, true));
 console.log(ShortCircuitAnd());
 console.log(ShortCircuitOr());
 `)
-	outputDirectory := filepath.Join(workingDirectory, "out")
-	toolPath := strings.TrimSpace(
-		run(t, repositoryRoot(), filepath.Join(runtime.GOROOT(), "bin", "go"), "tool", "-n", "tsgo"),
-	)
-	run(
-		t,
-		workingDirectory,
-		toolPath,
-		"--target", "es2022",
-		"--module", "nodenext",
-		"--moduleResolution", "nodenext",
-		"--strict",
-		"--outDir", outputDirectory,
-		outputPath,
-		runnerPath,
-	)
-	return run(t, workingDirectory, "node", filepath.Join(outputDirectory, "runner.js"))
+	return executeMaterializedTypeScript(t, workingDirectory, artifacts, runnerPath)
 }
 
 func basicExpressionsProjectDirectory() string {

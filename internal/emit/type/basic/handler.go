@@ -24,25 +24,27 @@ func EmitRepresented(
 	if !ok {
 		return api.TypeEmission{}, api.Unsupported(context, api.CategoryType, source)
 	}
-	var targetName string
+	var alias api.PrimitiveAlias
 	switch basic.Kind() {
 	case types.Bool:
-		targetName = "bool"
+		alias = api.PrimitiveBool
 	case types.Int64:
-		targetName = "int64"
+		alias = api.PrimitiveInt64
+	case types.Int32:
+		alias = api.PrimitiveInt32
 	case types.Int:
 		switch context.TypesSizes().Sizeof(types.Typ[types.Int]) {
 		case 4:
-			targetName = "int32"
+			alias = api.PrimitiveInt32
 		case 8:
-			targetName = "int64"
+			alias = api.PrimitiveInt64
 		default:
 			return api.TypeEmission{}, api.Unsupported(context, api.CategoryType, source)
 		}
 	default:
 		return api.TypeEmission{}, api.Unsupported(context, api.CategoryType, source)
 	}
-	reference, err := context.Names().TypeImport("@tsonic/core/types.js", targetName)
+	reference, err := context.Names().Primitive(alias)
 	if err != nil {
 		return api.TypeEmission{}, err
 	}
@@ -55,19 +57,19 @@ func EmitRepresented(
 	), nil
 }
 
-func SupportsSignedArithmetic(sizes types.Sizes, sourceType types.Type) bool {
+func SupportsExactInt32(sizes types.Sizes, sourceType types.Type) bool {
 	if sizes == nil || sourceType == nil {
 		return false
 	}
-	basic, ok := types.Unalias(sourceType).(*types.Basic)
+	basic, ok := types.Unalias(sourceType).Underlying().(*types.Basic)
 	if !ok {
 		return false
 	}
 	switch basic.Kind() {
-	case types.Int64:
+	case types.Int32:
 		return true
 	case types.Int:
-		return sizes.Sizeof(types.Typ[types.Int]) == 8
+		return sizes.Sizeof(types.Typ[types.Int]) == 4
 	default:
 		return false
 	}

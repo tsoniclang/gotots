@@ -34,8 +34,8 @@ func TestDemandProgramPrintsTypechecksAndExecutesReachableDefinitions(t *testing
 		t.Fatal(err)
 	}
 	files := emission.Files()
-	if len(files) != 3 {
-		t.Fatalf("emitted files = %d, want api, service, mathx", len(files))
+	if len(files) != 4 {
+		t.Fatalf("emitted files = %d, want three source modules plus scalar support", len(files))
 	}
 
 	workingDirectory := t.TempDir()
@@ -54,11 +54,10 @@ func TestDemandProgramPrintsTypechecksAndExecutesReachableDefinitions(t *testing
 		if err != nil {
 			t.Fatal(err)
 		}
-		expectedPath := filepath.Join(
-			demandProgramDirectory(),
-			file.PackageName(),
-			"expected.ts",
-		)
+		expectedPath := filepath.Join(demandProgramDirectory(), file.PackageName(), "expected.ts")
+		if file.Kind() == emit.TargetFileSupport {
+			expectedPath = filepath.Join(repositoryRoot(), "testdata", "support", "scalars-int32.ts")
+		}
 		expected, err := os.ReadFile(expectedPath)
 		if err != nil {
 			t.Fatal(err)
@@ -75,76 +74,6 @@ func TestDemandProgramPrintsTypechecksAndExecutesReachableDefinitions(t *testing
 	targetOutput := executeDemandTypeScript(t, workingDirectory, targetPaths, files)
 	if targetOutput != goOutput {
 		t.Fatalf("TypeScript output = %q, Go output = %q", targetOutput, goOutput)
-	}
-}
-
-func TestDemandProgramExecutesDifferentiallyThroughTsonic(t *testing.T) {
-	program := loadDemandProgram(t)
-	roots, err := emit.ExportedAPIRoots(program.Roots()[0])
-	if err != nil {
-		t.Fatal(err)
-	}
-	emission, err := emit.Compile(program, roots)
-	if err != nil {
-		t.Fatal(err)
-	}
-	workingDirectory := t.TempDir()
-	sourceDirectory := filepath.Join(workingDirectory, "src")
-	client, err := tsgo.StartClient(repositoryRoot(), workingDirectory)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if err := client.Close(); err != nil {
-			t.Errorf("close TS-Go client: %v", err)
-		}
-	})
-	var apiPath string
-	for _, file := range emission.Files() {
-		printed, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		writeProgramFile(
-			t,
-			filepath.Join(sourceDirectory, filepath.FromSlash(file.OutputPath())),
-			printed,
-		)
-		if file.PackageName() == "api" {
-			apiPath = file.OutputPath()
-		}
-	}
-	if apiPath == "" {
-		t.Fatal("emitted api module is absent")
-	}
-	apiSpecifier := "./" + strings.TrimSuffix(apiPath, ".ts") + ".js"
-	writeProgramFile(t, filepath.Join(sourceDirectory, "entry.ts"), `import type { int64 } from "@tsonic/core/types.js";
-import { Run } from "`+apiSpecifier+`";
-
-export function Execute(value: int64): int64 {
-    return Run(value);
-}
-`)
-	targetOutput, generatedTarget := executeDemandTsonic(t, workingDirectory)
-	for _, required := range []string{
-		".Compute(value) + Compute;",
-		"Even +=",
-		".Even(value);",
-		"return Odd(value - (1));",
-		"return Even(value - (1));",
-	} {
-		if !strings.Contains(generatedTarget, required) {
-			t.Fatalf("generated C# lacks %q:\n%s", required, generatedTarget)
-		}
-	}
-	for _, forbidden := range []string{"dynamic", "UnusedService", "UnusedMath"} {
-		if strings.Contains(generatedTarget, forbidden) {
-			t.Fatalf("generated C# contains forbidden %q:\n%s", forbidden, generatedTarget)
-		}
-	}
-	goOutput := executeDemandGo(t, filepath.Join(workingDirectory, "go"))
-	if targetOutput != goOutput {
-		t.Fatalf("Tsonic/C# output = %q, Go output = %q", targetOutput, goOutput)
 	}
 }
 
@@ -242,7 +171,9 @@ func TestDemandProgramRetainsExplicitReferencedFunctionTarget(t *testing.T) {
 		t.Fatal(err)
 	}
 	files := emission.Files()
-	if len(files) != 1 || files[0].PackageName() != "mathx" {
+	if len(files) != 2 ||
+		files[0].PackageName() != "mathx" ||
+		files[1].Kind() != emit.TargetFileSupport {
 		t.Fatalf("explicit target files = %v", files)
 	}
 	var functions []string
@@ -311,10 +242,9 @@ func executeDemandTypeScript(
 ) string {
 	t.Helper()
 	writeProgramFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
-	installProgramCoreTypes(t, workingDirectory)
 	var apiFile emit.TargetFile
 	for _, file := range files {
-		if file.PackageName() == "api" {
+		if file.Kind() == emit.TargetFileSource && file.PackageName() == "api" {
 			apiFile = file
 			break
 		}
@@ -352,30 +282,6 @@ console.log(Run(4));
 	return runProgram(t, workingDirectory, "node", filepath.Join(outputDirectory, "runner.js"))
 }
 
-func installProgramCoreTypes(t *testing.T, workingDirectory string) {
-	t.Helper()
-	moduleDirectory := filepath.Join(workingDirectory, "node_modules", "@tsonic", "core")
-	if err := os.MkdirAll(moduleDirectory, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	writeProgramFile(t, filepath.Join(moduleDirectory, "package.json"), `{
-  "name": "@tsonic/core",
-  "type": "module",
-  "exports": {
-    "./types.js": {
-      "types": "./types.d.ts",
-      "default": "./types.js"
-    }
-  }
-}
-`)
-	writeProgramFile(t, filepath.Join(moduleDirectory, "types.d.ts"), `export type bool = boolean;
-export type int32 = number;
-export type int64 = number;
-`)
-	writeProgramFile(t, filepath.Join(moduleDirectory, "types.js"), "export {};\n")
-}
-
 func runProgram(t *testing.T, directory, name string, arguments ...string) string {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -388,158 +294,6 @@ func runProgram(t *testing.T, directory, name string, arguments ...string) strin
 		t.Fatalf("%s %s: %v\n%s", name, strings.Join(arguments, " "), err, output)
 	}
 	return string(output)
-}
-
-func executeDemandTsonic(t *testing.T, workingDirectory string) (string, string) {
-	t.Helper()
-	tsonicRoot := os.Getenv("GOTOTS_TSONIC_ROOT")
-	if tsonicRoot == "" {
-		repository, err := filepath.Abs(repositoryRoot())
-		if err != nil {
-			t.Fatal(err)
-		}
-		tsonicRoot = filepath.Join(filepath.Dir(repository), "tsonic")
-	}
-	cliPath := filepath.Join(tsonicRoot, "packages", "cli", "dist", "src", "index.js")
-	if _, err := os.Stat(cliPath); err != nil {
-		t.Skipf("selected Tsonic CLI is unavailable: %v", err)
-	}
-	targetRoot := os.Getenv("GOTOTS_TSONIC_CSHARP_ROOT")
-	if targetRoot == "" {
-		targetRoot = filepath.Join(filepath.Dir(tsonicRoot), "tsonic-csharp")
-	}
-	scopeDirectory := filepath.Join(workingDirectory, "node_modules", "@tsonic")
-	if err := os.MkdirAll(scopeDirectory, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	for _, dependency := range []struct {
-		name string
-		root string
-	}{
-		{name: "csharp-js", root: filepath.Join(filepath.Dir(tsonicRoot), "csharp-js")},
-		{name: "csharp-runtime", root: filepath.Join(filepath.Dir(tsonicRoot), "csharp-runtime")},
-		{name: "target-csharp", root: targetRoot},
-	} {
-		if _, err := os.Stat(filepath.Join(dependency.root, "package.json")); err != nil {
-			t.Skipf("selected Tsonic dependency %s is unavailable: %v", dependency.name, err)
-		}
-		if err := os.Symlink(
-			dependency.root,
-			filepath.Join(scopeDirectory, dependency.name),
-		); err != nil {
-			t.Fatal(err)
-		}
-		t.Logf(
-			"selected %s revision: %s",
-			dependency.name,
-			strings.TrimSpace(runProgram(t, dependency.root, "git", "rev-parse", "HEAD")),
-		)
-	}
-	t.Logf(
-		"selected Tsonic revision: %s",
-		strings.TrimSpace(runProgram(t, tsonicRoot, "git", "rev-parse", "HEAD")),
-	)
-	writeProgramFile(t, filepath.Join(workingDirectory, "package.json"), `{
-  "name": "gotots-demand-proof",
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "@tsonic/csharp-js": "0.0.1",
-    "@tsonic/csharp-runtime": "0.0.1",
-    "@tsonic/target-csharp": "0.0.1"
-  }
-}
-`)
-	writeProgramFile(t, filepath.Join(workingDirectory, "tsonic.json"), `{
-  "entryPoint": "entry.ts",
-  "rootDir": "src",
-  "outDir": "out",
-  "targets": [
-    {
-      "id": "csharp",
-      "options": {
-        "namespace": "GoToTS.Demand",
-        "assemblyName": "GoToTSDemand",
-        "targetFramework": "net10.0",
-        "outputType": "Exe"
-      }
-    }
-  ]
-}
-`)
-	runProgram(t, workingDirectory, "node", cliPath, "build", "--project", "tsonic.json")
-	generatedProject := filepath.Join(
-		workingDirectory,
-		"out",
-		"csharp",
-		"GoToTSDemand.csproj",
-	)
-	var generated strings.Builder
-	err := filepath.Walk(
-		filepath.Join(workingDirectory, "out", "csharp", "src"),
-		func(path string, info os.FileInfo, walkErr error) error {
-			if walkErr != nil {
-				return walkErr
-			}
-			if info.IsDir() || filepath.Ext(path) != ".cs" {
-				return nil
-			}
-			source, err := os.ReadFile(path)
-			if err != nil {
-				return err
-			}
-			generated.Write(source)
-			return nil
-		},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if generated.Len() == 0 {
-		t.Fatal("Tsonic generated no C# source files")
-	}
-	runProgram(
-		t,
-		workingDirectory,
-		"dotnet",
-		"build",
-		generatedProject,
-		"--nologo",
-		"--verbosity:quiet",
-	)
-	runnerDirectory := filepath.Join(workingDirectory, "runner")
-	writeProgramFile(t, filepath.Join(runnerDirectory, "Runner.csproj"), `<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="`+filepath.ToSlash(generatedProject)+`" />
-  </ItemGroup>
-</Project>
-`)
-	writeProgramFile(t, filepath.Join(runnerDirectory, "Program.cs"), `Console.WriteLine(GoToTS.Demand.Entry.Execute(0));
-Console.WriteLine(GoToTS.Demand.Entry.Execute(1));
-Console.WriteLine(GoToTS.Demand.Entry.Execute(4));
-`)
-	runnerProject := filepath.Join(runnerDirectory, "Runner.csproj")
-	runProgram(
-		t,
-		runnerDirectory,
-		"dotnet",
-		"build",
-		runnerProject,
-		"--nologo",
-		"--verbosity:quiet",
-	)
-	return runProgram(
-		t,
-		runnerDirectory,
-		"dotnet",
-		filepath.Join(runnerDirectory, "bin", "Debug", "net10.0", "Runner.dll"),
-	), generated.String()
 }
 
 func writeProgramFile(t *testing.T, path, content string) {

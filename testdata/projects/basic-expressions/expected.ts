@@ -1,24 +1,33 @@
-import type { bool, int64 } from "@tsonic/core/types.js";
-export function Arithmetic(value: int64): int64 {
-    return (value - (3 as int64)) * (2 as int64);
+import type { bool, int32 } from "../../../support/scalars.js";
+export function Arithmetic(value: int32): int32 {
+    return Math.imul(((value - (3 as int32)) | 0), 2 as int32);
 }
-export function WrapAdd(value: int64): int64 {
-    return value + (1 as int64);
+export function WrapAdd(value: int32): int32 {
+    return (value + (1 as int32)) | 0;
 }
-export function WrapSubtract(value: int64): int64 {
-    return value - (1 as int64);
+export function WrapSubtract(value: int32): int32 {
+    return (value - (1 as int32)) | 0;
 }
-export function WrapMultiply(value: int64): int64 {
-    return value * (2 as int64);
+export function WrapMultiply(value: int32): int32 {
+    return Math.imul(value, 2 as int32);
 }
-export function IntWrapAdd(value: int64): int64 {
-    return value + (1 as int64);
+export function Increment(value: int32): int32 {
+    value = (value + 1) | 0;
+    return value;
 }
-export function IntWrapSubtract(value: int64): int64 {
-    return value - (1 as int64);
+export function Decrement(value: int32): int32 {
+    value = (value - 1) | 0;
+    return value;
 }
-export function IntWrapMultiply(value: int64): int64 {
-    return value * (2 as int64);
+export function Compare(left: int32, right: int32): [
+    bool,
+    bool,
+    bool,
+    bool,
+    bool,
+    bool
+] {
+    return [left === right, left !== right, left < right, left <= right, left > right, left >= right];
 }
 export function Logic(left: bool, right: bool): bool {
     return (left && !right) || (!left && right);

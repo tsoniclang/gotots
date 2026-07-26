@@ -1,22 +1,22 @@
-import type { int64 } from "@tsonic/core/types.js";
-export function Classify(value: int64): int64 {
-    let result: int64 = 0 as int64;
+import type { int32 } from "../../../support/scalars.js";
+export function Classify(value: int32): int32 {
+    let result: int32 = 0 as int32;
     {
-        let current: int64 = value;
+        let current: int32 = value;
         switch (current) {
-            case 0 as int64: {
-                let branch: int64 = 10 as int64;
+            case 0 as int32: {
+                let branch: int32 = 10 as int32;
                 result = branch;
                 break;
             }
-            case 1 as int64:
-            case 2 as int64: {
-                let branch: int64 = 20 as int64;
+            case 1 as int32:
+            case 2 as int32: {
+                let branch: int32 = 20 as int32;
                 result = branch;
                 break;
             }
             default: {
-                let branch: int64 = 30 as int64;
+                let branch: int32 = 30 as int32;
                 result = branch;
                 break;
             }

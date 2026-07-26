@@ -37,7 +37,7 @@ func (r NameReference) Requests() []PlacementRequest {
 type Names interface {
 	Declare(types.Object) (string, error)
 	Reference(types.Object) (NameReference, error)
-	TypeImport(modulePath string, exportedName string) (NameReference, error)
+	Primitive(PrimitiveAlias) (NameReference, error)
 	Temporary(TemporaryKind) (string, error)
 	ModuleExport(types.Object) (bool, error)
 }

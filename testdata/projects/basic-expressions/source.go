@@ -1,31 +1,38 @@
 package basicexpressions
 
-func Arithmetic(value int64) int64 {
+func Arithmetic(value int32) int32 {
 	return (value - 3) * 2
 }
 
-func WrapAdd(value int64) int64 {
+func WrapAdd(value int32) int32 {
 	return value + 1
 }
 
-func WrapSubtract(value int64) int64 {
+func WrapSubtract(value int32) int32 {
 	return value - 1
 }
 
-func WrapMultiply(value int64) int64 {
+func WrapMultiply(value int32) int32 {
 	return value * 2
 }
 
-func IntWrapAdd(value int) int {
-	return value + 1
+func Increment(value int32) int32 {
+	value++
+	return value
 }
 
-func IntWrapSubtract(value int) int {
-	return value - 1
+func Decrement(value int32) int32 {
+	value--
+	return value
 }
 
-func IntWrapMultiply(value int) int {
-	return value * 2
+func Compare(left, right int32) (bool, bool, bool, bool, bool, bool) {
+	return left == right,
+		left != right,
+		left < right,
+		left <= right,
+		left > right,
+		left >= right
 }
 
 func Logic(left, right bool) bool {

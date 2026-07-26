@@ -15,7 +15,7 @@ func TestEmissionResultsOwnImmutableTargetNodesAndRequests(t *testing.T) {
 	request, err := api.NewImportRequest(
 		factory,
 		api.ImportPhaseType,
-		"@tsonic/core/types.js",
+		"../../../support/scalars.js",
 		"int64",
 		"int64",
 	)
@@ -52,6 +52,30 @@ func TestEmissionResultsOwnImmutableTargetNodesAndRequests(t *testing.T) {
 	}
 	if got := result.Requests()[0].ExportedName(); got != "int64" {
 		t.Fatalf("request after accessor mutation = %q, want int64", got)
+	}
+}
+
+func TestPrimitiveAliasRequestCarriesGeneratedSupportIdentity(t *testing.T) {
+	factory := tsgo.NewFactory()
+	request, err := api.NewPrimitiveAliasRequest(
+		factory,
+		"../../../support/scalars.js",
+		api.PrimitiveInt64,
+		"sourceInt64",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	alias, ok := request.PrimitiveAlias()
+	if !ok || alias != api.PrimitiveInt64 {
+		t.Fatalf("primitive alias = %d, %v; want int64, true", alias, ok)
+	}
+	if request.ExportedName() != "int64" || request.LocalName() != "sourceInt64" {
+		t.Fatalf(
+			"primitive import = %s as %s, want int64 as sourceInt64",
+			request.ExportedName(),
+			request.LocalName(),
+		)
 	}
 }
 

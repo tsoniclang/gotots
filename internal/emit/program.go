@@ -17,7 +17,16 @@ type TargetFile struct {
 	outputPath  string
 	packageName string
 	sourceFile  tsgo.SourceFile
+	kind        TargetFileKind
 }
+
+type TargetFileKind uint8
+
+const (
+	TargetFileInvalid TargetFileKind = iota
+	TargetFileSource
+	TargetFileSupport
+)
 
 type ProgramEmission struct {
 	files []TargetFile
@@ -108,32 +117,19 @@ func Compile(source *load.Program, roots []Root) (ProgramEmission, error) {
 func CompileFile(
 	sourcePackage *load.Package,
 	sourceFile *ast.File,
-) (tsgo.SourceFile, error) {
+) (ProgramEmission, error) {
 	if sourcePackage == nil || sourcePackage.Program() == nil {
-		return nil, &ScheduleError{Reason: "source package is nil"}
+		return ProgramEmission{}, &ScheduleError{Reason: "source package is nil"}
 	}
-	ownedFile, ok := sourcePackage.FileForSyntax(sourceFile)
+	_, ok := sourcePackage.FileForSyntax(sourceFile)
 	if !ok {
-		return nil, &ScheduleError{Reason: "source file is not package-owned"}
+		return ProgramEmission{}, &ScheduleError{Reason: "source file is not package-owned"}
 	}
 	roots, err := fileRoots(sourcePackage, sourceFile)
 	if err != nil {
-		return nil, err
+		return ProgramEmission{}, err
 	}
-	emission, err := Compile(sourcePackage.Program(), roots)
-	if err != nil {
-		return nil, err
-	}
-	outputPath, err := targetoutput.SourcePath(sourcePackage, ownedFile)
-	if err != nil {
-		return nil, err
-	}
-	for _, file := range emission.files {
-		if file.outputPath == outputPath {
-			return file.sourceFile, nil
-		}
-	}
-	return nil, &ScheduleError{Reason: "selected source file produced no target module"}
+	return Compile(sourcePackage.Program(), roots)
 }
 
 func fileRoots(
@@ -229,6 +225,10 @@ func (f TargetFile) PackageName() string {
 
 func (f TargetFile) SourceFile() tsgo.SourceFile {
 	return f.sourceFile
+}
+
+func (f TargetFile) Kind() TargetFileKind {
+	return f.kind
 }
 
 func newProgramSession(source *load.Program) (*programSession, error) {
@@ -365,9 +365,13 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 		paths = append(paths, outputPath)
 	}
 	sort.Strings(paths)
-	files := make([]TargetFile, 0, len(paths))
+	files := make([]TargetFile, 0, len(paths)+1)
+	primitiveAliases := make(map[api.PrimitiveAlias]struct{})
 	for _, outputPath := range paths {
 		builder := s.builders[outputPath]
+		for _, alias := range builder.placement.PrimitiveAliases() {
+			primitiveAliases[alias] = struct{}{}
+		}
 		sort.Slice(builder.declarations, func(left, right int) bool {
 			if builder.declarations[left].position != builder.declarations[right].position {
 				return builder.declarations[left].position < builder.declarations[right].position
@@ -390,6 +394,7 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 		files = append(files, TargetFile{
 			outputPath:  outputPath,
 			packageName: builder.sourcePackage.Name(),
+			kind:        TargetFileSource,
 			sourceFile: s.factory.SourceFile(
 				statements,
 				s.factory.EndOfFile(),
@@ -401,7 +406,57 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 			),
 		})
 	}
+	if len(primitiveAliases) != 0 {
+		aliases := make([]api.PrimitiveAlias, 0, len(primitiveAliases))
+		for alias := range primitiveAliases {
+			aliases = append(aliases, alias)
+		}
+		slices.Sort(aliases)
+		support, err := s.scalarSupportFile(aliases)
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, support)
+		sort.Slice(files, func(left, right int) bool {
+			return files[left].outputPath < files[right].outputPath
+		})
+	}
 	return files, nil
+}
+
+func (s *programSession) scalarSupportFile(
+	aliases []api.PrimitiveAlias,
+) (TargetFile, error) {
+	statements := make([]tsgo.Statement, 0, len(aliases))
+	for _, alias := range aliases {
+		name, keyword, err := api.PrimitiveAliasRepresentation(alias)
+		if err != nil {
+			return TargetFile{}, err
+		}
+		statements = append(statements, s.factory.TypeAliasDeclaration(
+			[]tsgo.ModifierLike{s.factory.ExportKeyword()},
+			s.factory.Identifier(name),
+			nil,
+			s.factory.KeywordTypeNode(keyword),
+		))
+	}
+	targetPath, err := tsgo.NewPath(targetoutput.ScalarSupportPath)
+	if err != nil {
+		return TargetFile{}, err
+	}
+	return TargetFile{
+		outputPath: targetoutput.ScalarSupportPath,
+		kind:       TargetFileSupport,
+		sourceFile: s.factory.SourceFile(
+			statements,
+			s.factory.EndOfFile(),
+			tsgo.SourceFileData{
+				FileName:   targetPath,
+				Path:       targetPath,
+				ScriptKind: tsgo.ScriptKindTS,
+			},
+		),
+	}, nil
 }
 
 func indexDeclarations(source *load.Program) (map[types.Object]declarationSite, error) {

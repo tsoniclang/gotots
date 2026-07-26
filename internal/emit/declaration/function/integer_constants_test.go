@@ -18,85 +18,228 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func TestIntegerConstantsPrintAndStrictTypecheck(t *testing.T) {
+func TestSafeIntegerConstantPrintsTypechecksAndExecutesDifferentially(t *testing.T) {
 	loaded := loadIntegerConstantsProject(t)
+	emission := compileIntegerRoot(t, loaded, 0)
 	workingDirectory := t.TempDir()
-	outputPath := filepath.Join(workingDirectory, "constants.ts")
-	targetFile := emitIntegerConstants(t, loaded, outputPath)
-	printed := printTargetFile(t, targetFile, workingDirectory)
-
-	expected, err := os.ReadFile(filepath.Join(integerConstantsProjectDirectory(), "expected.ts"))
+	client, err := tsgo.StartClient(repositoryRoot(), workingDirectory)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if printed != string(expected) {
-		t.Fatalf("printed TypeScript:\n%s\nwant:\n%s", printed, expected)
+	t.Cleanup(func() {
+		if err := client.Close(); err != nil {
+			t.Errorf("close TS-Go client: %v", err)
+		}
+	})
+
+	var sourceModule string
+	var targetPaths []string
+	for _, file := range emission.Files() {
+		printed, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		expectedPath := filepath.Join(integerConstantsProjectDirectory(), "expected.ts")
+		if file.Kind() == emit.TargetFileSupport {
+			expectedPath = filepath.Join(
+				repositoryRoot(),
+				"testdata",
+				"support",
+				"scalars-int64.ts",
+			)
+		} else {
+			sourceModule = "./" + strings.TrimSuffix(file.OutputPath(), ".ts") + ".js"
+		}
+		expected, err := os.ReadFile(expectedPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if printed != string(expected) {
+			t.Fatalf("%s:\n%s\nwant:\n%s", file.OutputPath(), printed, expected)
+		}
+		targetPath := filepath.Join(workingDirectory, filepath.FromSlash(file.OutputPath()))
+		writeFile(t, targetPath, printed)
+		targetPaths = append(targetPaths, targetPath)
 	}
-	if strings.Contains(printed, "9223372036854775807") ||
-		strings.Contains(printed, "9223372036854776000") ||
-		strings.Contains(printed, "n as int64") {
-		t.Fatalf("printed TypeScript contains an inexact or bigint wide literal:\n%s", printed)
+	if sourceModule == "" {
+		t.Fatal("safe integer source module is absent")
 	}
-	writeFile(t, outputPath, printed)
-	strictTypecheckIntegerConstants(t, workingDirectory, outputPath)
+
+	runnerPath := filepath.Join(workingDirectory, "runner.ts")
+	writeFile(t, runnerPath, `import { Small } from "`+sourceModule+`";
+
+console.log(Small());
+`)
+	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
+	outputDirectory := filepath.Join(workingDirectory, "out")
+	toolPath := strings.TrimSpace(
+		run(t, repositoryRoot(), filepath.Join(runtime.GOROOT(), "bin", "go"), "tool", "-n", "tsgo"),
+	)
+	arguments := []string{
+		"--target", "es2022",
+		"--module", "nodenext",
+		"--moduleResolution", "nodenext",
+		"--strict",
+		"--outDir", outputDirectory,
+	}
+	arguments = append(arguments, targetPaths...)
+	arguments = append(arguments, runnerPath)
+	run(t, workingDirectory, toolPath, arguments...)
+	targetOutput := run(
+		t,
+		workingDirectory,
+		"node",
+		filepath.Join(outputDirectory, "runner.js"),
+	)
+	if goOutput := executeSafeIntegerGo(t, workingDirectory); targetOutput != goOutput {
+		t.Fatalf("TypeScript output = %q, Go output = %q", targetOutput, goOutput)
+	}
 }
 
-func TestIntegerConstantsCreateBoundedTypedTargetTrees(t *testing.T) {
+func TestWideIntegerConstantsFailAtTheirExpressionOwner(t *testing.T) {
+	for _, declarationIndex := range []int{1, 2, 3} {
+		loaded := loadIntegerConstantsProject(t)
+		_, err := compileIntegerRootError(loaded, declarationIndex)
+		var unsupported *api.UnsupportedError
+		if !errors.As(err, &unsupported) ||
+			unsupported.Category != api.CategoryExpression {
+			t.Fatalf(
+				"declaration %d error = %#v, want expression UnsupportedError",
+				declarationIndex,
+				err,
+			)
+		}
+	}
+}
+
+func TestWideIntegerOperationsFailAtTheirSemanticOwner(t *testing.T) {
+	for _, testCase := range []struct {
+		declarationIndex int
+		category         api.Category
+		construct        string
+		role             api.Role
+	}{
+		{
+			declarationIndex: 4,
+			category:         api.CategoryExpression,
+			construct:        "*ast.BinaryExpr",
+			role:             api.RoleReturnResult,
+		},
+		{
+			declarationIndex: 5,
+			category:         api.CategoryExpression,
+			construct:        "*ast.BinaryExpr",
+			role:             api.RoleReturnResult,
+		},
+		{
+			declarationIndex: 6,
+			category:         api.CategoryExpression,
+			construct:        "*ast.BinaryExpr",
+			role:             api.RoleReturnResult,
+		},
+		{
+			declarationIndex: 7,
+			category:         api.CategoryExpression,
+			construct:        "*ast.Ident",
+			role:             api.RoleSwitchTag,
+		},
+		{
+			declarationIndex: 8,
+			category:         api.CategoryStatement,
+			construct:        "*ast.AssignStmt",
+			role:             api.RoleBlockStatement,
+		},
+		{
+			declarationIndex: 9,
+			category:         api.CategoryStatement,
+			construct:        "*ast.IncDecStmt",
+			role:             api.RoleBlockStatement,
+		},
+	} {
+		loaded := loadIntegerConstantsProject(t)
+		_, err := compileIntegerRootError(loaded, testCase.declarationIndex)
+		var unsupported *api.UnsupportedError
+		if !errors.As(err, &unsupported) ||
+			unsupported.Category != testCase.category ||
+			unsupported.Construct != testCase.construct ||
+			unsupported.Role != testCase.role {
+			t.Fatalf(
+				"declaration %d error = %#v, want %s at %s",
+				testCase.declarationIndex,
+				err,
+				testCase.construct,
+				testCase.role,
+			)
+		}
+	}
+}
+
+func TestIntegerConstantUsesGoValueNotLiteralSpelling(t *testing.T) {
 	loaded := loadIntegerConstantsProject(t)
-	targetFile := emitIntegerConstants(t, loaded, filepath.Join(t.TempDir(), "constants.ts"))
-	statements := targetFile.Statements()
-	if len(statements) != 5 {
-		t.Fatalf("target statements = %d, want import plus four functions", len(statements))
-	}
-	maximum := statements[3].(tsgo.FunctionDeclaration)
-	maximumReturn := maximum.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement)
-	sum, ok := maximumReturn.Expression().(tsgo.BinaryExpression)
-	if !ok || sum.OperatorToken().Kind() != tsgo.SyntaxKindPlusToken {
-		t.Fatalf("maximum expression = %T, want bounded binary sum", maximumReturn.Expression())
-	}
-	product, ok := sum.Left().(tsgo.BinaryExpression)
-	if !ok || product.OperatorToken().Kind() != tsgo.SyntaxKindAsteriskToken {
-		t.Fatalf("maximum left = %T, want bounded binary product", sum.Left())
-	}
-	minimum := statements[4].(tsgo.FunctionDeclaration)
-	minimumReturn := minimum.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement)
-	if minimumReturn.Expression().Kind() != tsgo.SyntaxKindBinaryExpression {
-		t.Fatalf("minimum expression kind = %d, want binary expression", minimumReturn.Expression().Kind())
+	small := loaded.Files()[0].Syntax().Decls[0].(*ast.FuncDecl)
+	literal := small.Body.List[0].(*ast.ReturnStmt).Results[0].(*ast.BasicLit)
+	literal.Value = "43"
+
+	emission := compileIntegerRoot(t, loaded, 0)
+	target := integerSourceFile(t, emission)
+	function := target.Statements()[1].(tsgo.FunctionDeclaration)
+	result := function.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement)
+	asExpression := result.Expression().(tsgo.AsExpression)
+	if text := asExpression.Expression().(tsgo.NumericLiteral).Text(); text != "42" {
+		t.Fatalf("semantic literal = %q, want 42", text)
 	}
 }
 
-func TestIntegerConstantsUseGoConstantValueNotLiteralSpelling(t *testing.T) {
-	loaded := loadIntegerConstantsProject(t)
-	maximum := loaded.Files()[0].Syntax().Decls[2].(*ast.FuncDecl)
-	literal := maximum.Body.List[0].(*ast.ReturnStmt).Results[0].(*ast.BasicLit)
-	literal.Value = "9223372036854776000"
-
-	targetFile := emitIntegerConstants(t, loaded, filepath.Join(t.TempDir(), "constants.ts"))
-	targetMaximum := targetFile.Statements()[3].(tsgo.FunctionDeclaration)
-	targetReturn := targetMaximum.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement)
-	sum := targetReturn.Expression().(tsgo.BinaryExpression)
-	low := sum.Right().(tsgo.AsExpression).Expression().(tsgo.NumericLiteral)
-	if low.Text() != "4294967295" {
-		t.Fatalf("low chunk = %q, want exact semantic chunk 4294967295", low.Text())
-	}
-}
-
-func TestIntegerConstantsRejectNonIntegerSyntaxMutation(t *testing.T) {
+func TestIntegerConstantRejectsNonIntegerSyntaxMutation(t *testing.T) {
 	loaded := loadIntegerConstantsProject(t)
 	small := loaded.Files()[0].Syntax().Decls[0].(*ast.FuncDecl)
 	literal := small.Body.List[0].(*ast.ReturnStmt).Results[0].(*ast.BasicLit)
 	literal.Kind = token.FLOAT
 
-	_, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
+	_, err := compileIntegerRootError(loaded, 0)
 	var unsupported *api.UnsupportedError
-	if !errors.As(err, &unsupported) {
-		t.Fatalf("error = %v, want *api.UnsupportedError", err)
-	}
-	if unsupported.Category != api.CategoryExpression ||
+	if !errors.As(err, &unsupported) ||
+		unsupported.Category != api.CategoryExpression ||
 		unsupported.Construct != "*ast.BasicLit" ||
 		unsupported.Role != api.RoleReturnResult {
 		t.Fatalf("unsupported error = %#v", unsupported)
 	}
+}
+
+func compileIntegerRoot(
+	t *testing.T,
+	loaded *load.Package,
+	declarationIndex int,
+) emit.ProgramEmission {
+	t.Helper()
+	emission, err := compileIntegerRootError(loaded, declarationIndex)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return emission
+}
+
+func compileIntegerRootError(
+	loaded *load.Package,
+	declarationIndex int,
+) (emit.ProgramEmission, error) {
+	declaration := loaded.Files()[0].Syntax().Decls[declarationIndex].(*ast.FuncDecl)
+	root, err := emit.NewRoot(loaded.TypesInfo().Defs[declaration.Name])
+	if err != nil {
+		return emit.ProgramEmission{}, err
+	}
+	return emit.Compile(loaded.Program(), []emit.Root{root})
+}
+
+func integerSourceFile(t *testing.T, emission emit.ProgramEmission) tsgo.SourceFile {
+	t.Helper()
+	for _, file := range emission.Files() {
+		if file.Kind() == emit.TargetFileSource {
+			return file.SourceFile()
+		}
+	}
+	t.Fatal("integer source file is absent")
+	return nil
 }
 
 func loadIntegerConstantsProject(t *testing.T) *load.Package {
@@ -109,19 +252,6 @@ func loadIntegerConstantsProject(t *testing.T) *load.Package {
 		t.Fatal(err)
 	}
 	return loaded
-}
-
-func emitIntegerConstants(
-	t *testing.T,
-	loaded *load.Package,
-	outputPath string,
-) tsgo.SourceFile {
-	t.Helper()
-	targetFile, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return targetFile
 }
 
 func printTargetFile(
@@ -146,34 +276,13 @@ func printTargetFile(
 	return printed
 }
 
-func strictTypecheckIntegerConstants(t *testing.T, workingDirectory, outputPath string) {
-	t.Helper()
-	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
-	installTsonicCoreTypes(t, workingDirectory)
-	toolPath := strings.TrimSpace(
-		run(t, repositoryRoot(), filepath.Join(runtime.GOROOT(), "bin", "go"), "tool", "-n", "tsgo"),
-	)
-	run(t, workingDirectory,
-		toolPath,
-		"--target", "es2022",
-		"--module", "nodenext",
-		"--moduleResolution", "nodenext",
-		"--strict",
-		"--noEmit",
-		outputPath,
-	)
-}
-
-func executeIntegerConstantsGo(t *testing.T, workingDirectory string) string {
+func executeSafeIntegerGo(t *testing.T, workingDirectory string) string {
 	t.Helper()
 	modulePath, err := filepath.Abs(integerConstantsProjectDirectory())
 	if err != nil {
 		t.Fatal(err)
 	}
 	runnerDirectory := filepath.Join(workingDirectory, "go-runner")
-	if err := os.MkdirAll(runnerDirectory, 0o755); err != nil {
-		t.Fatal(err)
-	}
 	writeFile(t, filepath.Join(runnerDirectory, "go.mod"), fmt.Sprintf(`module example.com/runner
 
 go 1.26.4
@@ -192,9 +301,6 @@ import (
 
 func main() {
 	fmt.Println(constants.Small())
-	fmt.Println(constants.BeyondSafe())
-	fmt.Println(constants.Maximum())
-	fmt.Println(constants.Minimum())
 }
 `)
 	return run(t, runnerDirectory, filepath.Join(runtime.GOROOT(), "bin", "go"), "run", ".")

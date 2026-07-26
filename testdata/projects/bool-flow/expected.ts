@@ -1,4 +1,4 @@
-import type { bool } from "@tsonic/core/types.js";
+import type { bool } from "../../../support/scalars.js";
 export function Run(input: bool): bool {
     let current: bool = false as bool;
     if (!input) {
