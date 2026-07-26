@@ -50,7 +50,8 @@ func emitSpec(
 ) (tsgo.VariableStatement, []api.PlacementRequest, error) {
 	if source.Doc != nil || source.Comment != nil ||
 		len(source.Names) == 0 ||
-		len(source.Names) != len(source.Values) {
+		(len(source.Values) != 0 && len(source.Names) != len(source.Values)) ||
+		(len(source.Values) == 0 && source.Type == nil) {
 		return nil, nil,
 			api.Unsupported(
 				context.WithRole(api.RoleLocalDeclaration),
@@ -89,22 +90,7 @@ func emitSpec(
 				)
 		}
 
-		sourceValue := source.Values[index]
-		valueType := context.TypesInfo().TypeOf(sourceValue)
-		if valueType == nil || !types.AssignableTo(valueType, object.Type()) {
-			return nil, nil,
-				api.Unsupported(
-					context.WithRole(api.RoleLocalValue),
-					api.CategoryExpression,
-					sourceValue,
-				)
-		}
-		value, err := children.Expression(
-			context.
-				WithRole(api.RoleLocalValue).
-				WithExpectedType(object.Type()),
-			sourceValue,
-		)
+		value, err := localValue(context, children, source, sourceName, index, object)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -113,16 +99,8 @@ func emitSpec(
 				api.Unsupported(
 					context.WithRole(api.RoleLocalValue),
 					api.CategoryExpression,
-					sourceValue,
+					sourceName,
 				)
-		}
-		targetType, err := children.RepresentedType(
-			context.WithRole(api.RoleLocalType),
-			sourceName,
-			object.Type(),
-		)
-		if err != nil {
-			return nil, nil, err
 		}
 		targetName, err := context.Names().Declare(object)
 		if err != nil {
@@ -133,13 +111,13 @@ func emitSpec(
 			context.Factory().VariableDeclaration(
 				context.Factory().Identifier(targetName),
 				nil,
-				targetType.Value(),
+				nil,
 				value.Value(),
 			),
 		)
 		requests = append(
 			requests,
-			api.CombineRequests(value.Requests(), targetType.Requests())...,
+			value.Requests()...,
 		)
 	}
 	return context.Factory().VariableStatement(
@@ -149,4 +127,40 @@ func emitSpec(
 			tsgo.NodeFlagsLet,
 		),
 	), requests, nil
+}
+
+func localValue(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.ValueSpec,
+	sourceName *ast.Ident,
+	index int,
+	object *types.Var,
+) (api.ExpressionEmission, error) {
+	valueContext := context.
+		WithRole(api.RoleLocalValue).
+		WithExpectedType(object.Type())
+	if len(source.Values) == 0 {
+		return context.Values().Zero(valueContext, sourceName, object.Type())
+	}
+	sourceValue := source.Values[index]
+	valueType := context.TypesInfo().TypeOf(sourceValue)
+	if valueType == nil || !types.AssignableTo(valueType, object.Type()) {
+		return api.ExpressionEmission{},
+			api.Unsupported(
+				valueContext,
+				api.CategoryExpression,
+				sourceValue,
+			)
+	}
+	value, err := children.Expression(valueContext, sourceValue)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return context.Values().Copy(
+		valueContext,
+		sourceValue,
+		object.Type(),
+		value,
+	)
 }

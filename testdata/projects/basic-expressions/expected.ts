@@ -1,22 +1,22 @@
 import type { bool, int32 } from "../../../support/scalars.js";
 export function Arithmetic(value: int32): int32 {
-    return Math.imul(((value - (3 as int32)) | 0), 2 as int32);
+    return (value - 3) * 2;
 }
 export function WrapAdd(value: int32): int32 {
-    return (value + (1 as int32)) | 0;
+    return value + 1;
 }
 export function WrapSubtract(value: int32): int32 {
-    return (value - (1 as int32)) | 0;
+    return value - 1;
 }
 export function WrapMultiply(value: int32): int32 {
-    return Math.imul(value, 2 as int32);
+    return value * 2;
 }
 export function Increment(value: int32): int32 {
-    value = (value + 1) | 0;
+    value++;
     return value;
 }
 export function Decrement(value: int32): int32 {
-    value = (value - 1) | 0;
+    value--;
     return value;
 }
 export function Compare(left: int32, right: int32): [
@@ -37,8 +37,8 @@ export function Never(): bool {
     }
 }
 export function ShortCircuitAnd(): bool {
-    return false as bool && Never();
+    return false && Never();
 }
 export function ShortCircuitOr(): bool {
-    return true as bool || Never();
+    return true || Never();
 }

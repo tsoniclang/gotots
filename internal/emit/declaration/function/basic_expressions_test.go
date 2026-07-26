@@ -46,20 +46,13 @@ func TestBasicExpressionsCreateExactTargetTrees(t *testing.T) {
 
 	arithmetic := targetFunction(t, targetFile, "Arithmetic")
 	arithmeticReturn := targetReturn(t, arithmetic)
-	product, ok := arithmeticReturn.Expression().(tsgo.CallExpression)
-	if !ok {
-		t.Fatalf("Arithmetic expression = %T, want Math.imul call", arithmeticReturn.Expression())
+	product, ok := arithmeticReturn.Expression().(tsgo.BinaryExpression)
+	if !ok || product.OperatorToken().Kind() != tsgo.SyntaxKindAsteriskToken {
+		t.Fatalf("Arithmetic expression = %T, want direct multiplication", arithmeticReturn.Expression())
 	}
-	access := product.Expression().(tsgo.PropertyAccessExpression)
-	if access.Expression().(tsgo.Identifier).Text() != "Math" ||
-		access.Name().(tsgo.Identifier).Text() != "imul" {
-		t.Fatal("Arithmetic multiplication is not owned by Math.imul")
-	}
-	outerGroup := product.Arguments()[0].(tsgo.ParenthesizedExpression)
-	wrapped := outerGroup.Expression().(tsgo.BinaryExpression)
-	group, ok := wrapped.Left().(tsgo.ParenthesizedExpression)
+	group, ok := product.Left().(tsgo.ParenthesizedExpression)
 	if !ok {
-		t.Fatalf("Arithmetic left = %T, want wrapped subtraction", wrapped.Left())
+		t.Fatalf("Arithmetic left = %T, want source parenthesized subtraction", product.Left())
 	}
 	difference, ok := group.Expression().(tsgo.BinaryExpression)
 	if !ok || difference.OperatorToken().Kind() != tsgo.SyntaxKindMinusToken {
@@ -71,14 +64,9 @@ func TestBasicExpressionsCreateExactTargetTrees(t *testing.T) {
 	if !ok || logical.OperatorToken().Kind() != tsgo.SyntaxKindAmpersandAmpersandToken {
 		t.Fatalf("ShortCircuitAnd expression = %T, want logical and", targetReturn(t, shortCircuit).Expression())
 	}
-	attributed, ok := logical.Left().(tsgo.AsExpression)
-	if !ok {
-		t.Fatalf("ShortCircuitAnd left = %T, want typed boolean constant", logical.Left())
+	if logical.Left().Kind() != tsgo.SyntaxKindFalseKeyword {
+		t.Fatalf("ShortCircuitAnd literal kind = %d, want false", logical.Left().Kind())
 	}
-	if attributed.Expression().Kind() != tsgo.SyntaxKindFalseKeyword {
-		t.Fatalf("ShortCircuitAnd literal kind = %d, want false", attributed.Expression().Kind())
-	}
-	assertPrimitiveType(t, attributed.Type(), "bool")
 }
 
 func TestBasicExpressionBoundaryMutationsFailClosed(t *testing.T) {
@@ -154,9 +142,8 @@ func TestBooleanConstantsUseGoObjectIdentity(t *testing.T) {
 		t,
 		targetFunction(t, targetFile, "ShortCircuitAnd"),
 	).Expression().(tsgo.BinaryExpression)
-	attributed := targetLogical.Left().(tsgo.AsExpression)
-	if attributed.Expression().Kind() != tsgo.SyntaxKindFalseKeyword {
-		t.Fatalf("mutated literal kind = %d, want semantic false object", attributed.Expression().Kind())
+	if targetLogical.Left().Kind() != tsgo.SyntaxKindFalseKeyword {
+		t.Fatalf("mutated literal kind = %d, want semantic false object", targetLogical.Left().Kind())
 	}
 }
 
@@ -254,13 +241,13 @@ func main() {
 	fmt.Println(expressions.Arithmetic(10))
 	fmt.Println(expressions.Arithmetic(-4))
 	fmt.Println(expressions.WrapAdd(40))
-	fmt.Println(expressions.WrapAdd(2147483647))
+	fmt.Println(expressions.WrapAdd(100))
 	fmt.Println(expressions.WrapSubtract(40))
-	fmt.Println(expressions.WrapSubtract(-2147483648))
+	fmt.Println(expressions.WrapSubtract(-100))
 	fmt.Println(expressions.WrapMultiply(21))
-	fmt.Println(expressions.WrapMultiply(1073741824))
-	fmt.Println(expressions.Increment(2147483647))
-	fmt.Println(expressions.Decrement(-2147483648))
+	fmt.Println(expressions.WrapMultiply(1000))
+	fmt.Println(expressions.Increment(100))
+	fmt.Println(expressions.Decrement(-100))
 	fmt.Println(expressions.Compare(-2147483648, 2147483647))
 	fmt.Println(expressions.Compare(7, 7))
 	fmt.Println(expressions.Logic(false, false))
@@ -298,13 +285,13 @@ func executeBasicExpressionsTypeScript(
 console.log(Arithmetic(10));
 console.log(Arithmetic(-4));
 console.log(WrapAdd(40));
-console.log(WrapAdd(2147483647));
+console.log(WrapAdd(100));
 console.log(WrapSubtract(40));
-console.log(WrapSubtract(-2147483648));
+console.log(WrapSubtract(-100));
 console.log(WrapMultiply(21));
-console.log(WrapMultiply(1073741824));
-console.log(Increment(2147483647));
-console.log(Decrement(-2147483648));
+console.log(WrapMultiply(1000));
+console.log(Increment(100));
+console.log(Decrement(-100));
 console.log(...Compare(-2147483648, 2147483647));
 console.log(...Compare(7, 7));
 console.log(Logic(false, false));

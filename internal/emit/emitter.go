@@ -5,6 +5,8 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	storetarget "github.com/tsoniclang/gotots/internal/emit/store"
+	"github.com/tsoniclang/gotots/internal/emit/value/representation"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -13,13 +15,25 @@ type emitter struct {
 	source  *load.Package
 	factory tsgo.Factory
 	names   *nameOwner
+	values  api.Values
+	integer api.IntegerRepresentation
+	order   api.EvaluationOrder
 	require func(types.Object) error
+}
+
+func (e *emitter) StoreTarget(
+	context api.Context,
+	source ast.Expr,
+) (api.StoreTargetEmission, error) {
+	return storetarget.Emit(context, e, source)
 }
 
 func newEmitter(
 	source *load.Package,
 	factory tsgo.Factory,
 	registry *declarationRegistry,
+	integer api.IntegerRepresentation,
+	order api.EvaluationOrder,
 	require func(types.Object) error,
 ) *emitter {
 	var typesInfo *types.Info
@@ -32,6 +46,9 @@ func newEmitter(
 		source:  source,
 		factory: factory,
 		names:   newNameOwnerWithRegistry(packageScope, typesInfo, registry),
+		values:  representation.Owner{},
+		integer: integer,
+		order:   order,
 		require: require,
 	}
 }
@@ -55,5 +72,8 @@ func (e *emitter) fileContext(
 		e.source.TypesSizes(),
 		e.factory,
 		names,
+		e.values,
+		e.integer,
+		e.order,
 	)
 }

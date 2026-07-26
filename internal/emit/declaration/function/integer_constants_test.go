@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/emit/api"
@@ -72,9 +73,6 @@ console.log(Small());
 `)
 	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
 	outputDirectory := filepath.Join(workingDirectory, "out")
-	toolPath := strings.TrimSpace(
-		run(t, repositoryRoot(), filepath.Join(runtime.GOROOT(), "bin", "go"), "tool", "-n", "tsgo"),
-	)
 	arguments := []string{
 		"--target", "es2022",
 		"--module", "nodenext",
@@ -84,7 +82,16 @@ console.log(Small());
 	}
 	arguments = append(arguments, targetPaths...)
 	arguments = append(arguments, runnerPath)
-	run(t, workingDirectory, toolPath, arguments...)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := tsgo.Compile(
+		ctx,
+		repositoryRoot(),
+		workingDirectory,
+		arguments,
+	); err != nil {
+		t.Fatal(err)
+	}
 	targetOutput := run(
 		t,
 		workingDirectory,
@@ -92,6 +99,115 @@ console.log(Small());
 		filepath.Join(outputDirectory, "runner.js"),
 	)
 	if goOutput := executeSafeIntegerGo(t, workingDirectory); targetOutput != goOutput {
+		t.Fatalf("TypeScript output = %q, Go output = %q", targetOutput, goOutput)
+	}
+}
+
+func TestBigIntProfileTypechecksAndExecutesBeyondSafeNumberRange(t *testing.T) {
+	loaded := loadIntegerConstantsProject(t)
+	roots, err := emit.ExportedAPIRoots(loaded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	emission, err := emit.CompileWithOptions(
+		loaded.Program(),
+		roots,
+		emit.Options{
+			IntegerRepresentation: emit.IntegerRepresentationBigInt,
+			EvaluationOrder:       emit.EvaluationOrderDirect,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	workingDirectory := t.TempDir()
+	client, err := tsgo.StartClient(repositoryRoot(), workingDirectory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := client.Close(); err != nil {
+			t.Errorf("close TS-Go client: %v", err)
+		}
+	})
+	var sourceModule string
+	var targetPaths []string
+	for _, file := range emission.Files() {
+		printed, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if file.Kind() == emit.TargetFileSupport &&
+			!strings.Contains(printed, "export type int64 = bigint;") {
+			t.Fatalf("BigInt support artifact:\n%s", printed)
+		}
+		if file.Kind() == emit.TargetFileSource {
+			sourceModule = "./" + strings.TrimSuffix(file.OutputPath(), ".ts") + ".js"
+		}
+		targetPath := filepath.Join(
+			workingDirectory,
+			filepath.FromSlash(file.OutputPath()),
+		)
+		writeFile(t, targetPath, printed)
+		targetPaths = append(targetPaths, targetPath)
+	}
+	if sourceModule == "" {
+		t.Fatal("BigInt source module is absent")
+	}
+
+	runnerPath := filepath.Join(workingDirectory, "runner.ts")
+	writeFile(t, runnerPath, `import {
+    BeyondSafe,
+    Maximum,
+    Minimum,
+    WideAdd,
+    WideCompound,
+    WideIncrement,
+    WideLess,
+    WideSwitch,
+} from "`+sourceModule+`";
+
+const render = (value: bigint): string => value.toString();
+console.log(render(BeyondSafe()));
+console.log(render(Maximum()));
+console.log(render(Minimum()));
+console.log(render(WideAdd(9007199254740990n, 3n)));
+console.log(WideLess(9007199254740993n, 9007199254740994n));
+console.log(render(WideSwitch(0n)));
+console.log(render(WideSwitch(7n)));
+console.log(render(WideCompound(9007199254740993n, 4n)));
+console.log(render(WideIncrement(9007199254740993n)));
+`)
+	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
+	outputDirectory := filepath.Join(workingDirectory, "out")
+	arguments := []string{
+		"--target", "es2022",
+		"--module", "nodenext",
+		"--moduleResolution", "nodenext",
+		"--strict",
+		"--outDir", outputDirectory,
+	}
+	arguments = append(arguments, targetPaths...)
+	arguments = append(arguments, runnerPath)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := tsgo.Compile(
+		ctx,
+		repositoryRoot(),
+		workingDirectory,
+		arguments,
+	); err != nil {
+		t.Fatal(err)
+	}
+	targetOutput := run(
+		t,
+		workingDirectory,
+		"node",
+		filepath.Join(outputDirectory, "runner.js"),
+	)
+	goOutput := executeWideIntegerGo(t, workingDirectory)
+	if targetOutput != goOutput {
 		t.Fatalf("TypeScript output = %q, Go output = %q", targetOutput, goOutput)
 	}
 }
@@ -112,64 +228,11 @@ func TestWideIntegerConstantsFailAtTheirExpressionOwner(t *testing.T) {
 	}
 }
 
-func TestWideIntegerOperationsFailAtTheirSemanticOwner(t *testing.T) {
-	for _, testCase := range []struct {
-		declarationIndex int
-		category         api.Category
-		construct        string
-		role             api.Role
-	}{
-		{
-			declarationIndex: 4,
-			category:         api.CategoryExpression,
-			construct:        "*ast.BinaryExpr",
-			role:             api.RoleReturnResult,
-		},
-		{
-			declarationIndex: 5,
-			category:         api.CategoryExpression,
-			construct:        "*ast.BinaryExpr",
-			role:             api.RoleReturnResult,
-		},
-		{
-			declarationIndex: 6,
-			category:         api.CategoryExpression,
-			construct:        "*ast.BinaryExpr",
-			role:             api.RoleReturnResult,
-		},
-		{
-			declarationIndex: 7,
-			category:         api.CategoryExpression,
-			construct:        "*ast.Ident",
-			role:             api.RoleSwitchTag,
-		},
-		{
-			declarationIndex: 8,
-			category:         api.CategoryStatement,
-			construct:        "*ast.AssignStmt",
-			role:             api.RoleBlockStatement,
-		},
-		{
-			declarationIndex: 9,
-			category:         api.CategoryStatement,
-			construct:        "*ast.IncDecStmt",
-			role:             api.RoleBlockStatement,
-		},
-	} {
+func TestWideIntegerOperationsUseTheSelectedCarrier(t *testing.T) {
+	for declarationIndex := 4; declarationIndex <= 9; declarationIndex++ {
 		loaded := loadIntegerConstantsProject(t)
-		_, err := compileIntegerRootError(loaded, testCase.declarationIndex)
-		var unsupported *api.UnsupportedError
-		if !errors.As(err, &unsupported) ||
-			unsupported.Category != testCase.category ||
-			unsupported.Construct != testCase.construct ||
-			unsupported.Role != testCase.role {
-			t.Fatalf(
-				"declaration %d error = %#v, want %s at %s",
-				testCase.declarationIndex,
-				err,
-				testCase.construct,
-				testCase.role,
-			)
+		if _, err := compileIntegerRootError(loaded, declarationIndex); err != nil {
+			t.Fatalf("declaration %d: %v", declarationIndex, err)
 		}
 	}
 }
@@ -184,8 +247,7 @@ func TestIntegerConstantUsesGoValueNotLiteralSpelling(t *testing.T) {
 	target := integerSourceFile(t, emission)
 	function := target.Statements()[1].(tsgo.FunctionDeclaration)
 	result := function.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement)
-	asExpression := result.Expression().(tsgo.AsExpression)
-	if text := asExpression.Expression().(tsgo.NumericLiteral).Text(); text != "42" {
+	if text := result.Expression().(tsgo.NumericLiteral).Text(); text != "42" {
 		t.Fatalf("semantic literal = %q, want 42", text)
 	}
 }
@@ -304,6 +366,50 @@ func main() {
 }
 `)
 	return run(t, runnerDirectory, filepath.Join(runtime.GOROOT(), "bin", "go"), "run", ".")
+}
+
+func executeWideIntegerGo(t *testing.T, workingDirectory string) string {
+	t.Helper()
+	modulePath, err := filepath.Abs(integerConstantsProjectDirectory())
+	if err != nil {
+		t.Fatal(err)
+	}
+	runnerDirectory := filepath.Join(workingDirectory, "go-wide-runner")
+	writeFile(t, filepath.Join(runnerDirectory, "go.mod"), fmt.Sprintf(`module example.com/runner
+
+go 1.26.4
+
+require example.com/integerconstants v0.0.0
+
+replace example.com/integerconstants => %s
+`, filepath.ToSlash(modulePath)))
+	writeFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
+
+import (
+	"fmt"
+
+	constants "example.com/integerconstants"
+)
+
+func main() {
+	fmt.Println(constants.BeyondSafe())
+	fmt.Println(constants.Maximum())
+	fmt.Println(constants.Minimum())
+	fmt.Println(constants.WideAdd(9007199254740990, 3))
+	fmt.Println(constants.WideLess(9007199254740993, 9007199254740994))
+	fmt.Println(constants.WideSwitch(0))
+	fmt.Println(constants.WideSwitch(7))
+	fmt.Println(constants.WideCompound(9007199254740993, 4))
+	fmt.Println(constants.WideIncrement(9007199254740993))
+}
+`)
+	return run(
+		t,
+		runnerDirectory,
+		filepath.Join(runtime.GOROOT(), "bin", "go"),
+		"run",
+		".",
+	)
 }
 
 func integerConstantsProjectDirectory() string {

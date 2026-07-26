@@ -18,7 +18,7 @@ const (
 
 func Emit(
 	context api.Context,
-	children api.ChildEmitter,
+	_ api.ChildEmitter,
 	source ast.Expr,
 ) (api.ExpressionEmission, error) {
 	if !isIntegerLiteralSyntax(source) {
@@ -44,8 +44,9 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	if value > int64(exactNumberMaximum) ||
-		value < -int64(exactNumberMaximum) {
+	if context.IntegerRepresentation() == api.IntegerRepresentationNumber &&
+		(value > int64(exactNumberMaximum) ||
+			value < -int64(exactNumberMaximum)) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
@@ -54,7 +55,7 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	return emitValue(context, children, source, targetType, value)
+	return emitValue(context, value)
 }
 
 func isIntegerLiteralSyntax(source ast.Expr) bool {
@@ -102,70 +103,31 @@ func fitsWidth(value int64, width int) bool {
 
 func emitValue(
 	context api.Context,
-	children api.ChildEmitter,
-	source ast.Expr,
-	targetType types.Type,
 	value int64,
 ) (api.ExpressionEmission, error) {
-	typedLiteral := func(value uint64) (api.ExpressionEmission, error) {
-		target, err := children.RepresentedType(
-			context.WithRole(api.RoleIntegerConstantType),
-			source,
-			targetType,
+	literal := func(value uint64) (tsgo.Expression, error) {
+		return api.IntegerLiteral(
+			context.Factory(),
+			context.IntegerRepresentation(),
+			strconv.FormatUint(value, 10),
 		)
+	}
+	if value >= 0 {
+		target, err := literal(uint64(value))
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		return api.DirectExpression(
-			context.Factory().AsExpression(
-				context.Factory().NumericLiteral(
-					strconv.FormatUint(value, 10),
-					tsgo.TokenFlagsNone,
-				),
-				target.Value(),
-			),
-			target.Requests()...,
-		), nil
-	}
-	if value >= 0 {
-		return typedLiteral(uint64(value))
+		return api.DirectExpression(target), nil
 	}
 	magnitude := uint64(-(value + 1)) + 1
-	return subtraction(context, typedLiteral, magnitude)
-}
-
-type typedLiteralEmitter func(uint64) (api.ExpressionEmission, error)
-
-func subtraction(
-	context api.Context,
-	typedLiteral typedLiteralEmitter,
-	magnitude uint64,
-) (api.ExpressionEmission, error) {
-	zero, err := typedLiteral(0)
+	target, err := literal(magnitude)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	right, err := typedLiteral(magnitude)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	return binary(context, zero, tsgo.BinaryOperatorMinusToken, right), nil
-}
-
-func binary(
-	context api.Context,
-	left api.ExpressionEmission,
-	operator tsgo.BinaryOperator,
-	right api.ExpressionEmission,
-) api.ExpressionEmission {
 	return api.DirectExpression(
-		context.Factory().BinaryExpression(
-			nil,
-			left.Value(),
-			nil,
-			context.Factory().BinaryOperatorToken(operator),
-			right.Value(),
+		context.Factory().PrefixUnaryExpression(
+			tsgo.PrefixUnaryExpressionOperatorKindMinusToken,
+			target,
 		),
-		api.CombineRequests(left.Requests(), right.Requests())...,
-	)
+	), nil
 }

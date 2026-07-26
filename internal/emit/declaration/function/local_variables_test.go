@@ -64,9 +64,7 @@ func TestLocalVariablesCreateExactScopedTargetTree(t *testing.T) {
 	if name := shadowDeclaration.Name().(tsgo.Identifier).Text(); name != "base__shadow_1" {
 		t.Fatalf("shadow name = %q, want base__shadow_1", name)
 	}
-	wrapped := shadowDeclaration.Initializer().(tsgo.BinaryExpression)
-	initializer := wrapped.Left().(tsgo.ParenthesizedExpression).
-		Expression().(tsgo.BinaryExpression)
+	initializer := shadowDeclaration.Initializer().(tsgo.BinaryExpression)
 	if name := initializer.Left().(tsgo.Identifier).Text(); name != "base" {
 		t.Fatalf("shadow initializer reference = %q, want outer base", name)
 	}
@@ -120,9 +118,7 @@ func TestLocalVariablesUseGoObjectIdentityAcrossShadowing(t *testing.T) {
 	declaration := targetBlock.Statements()[0].(tsgo.VariableStatement).
 		DeclarationList().
 		Declarations()[0]
-	wrapped := declaration.Initializer().(tsgo.BinaryExpression)
-	initializer := wrapped.Left().(tsgo.ParenthesizedExpression).
-		Expression().(tsgo.BinaryExpression)
+	initializer := declaration.Initializer().(tsgo.BinaryExpression)
 	if name := initializer.Left().(tsgo.Identifier).Text(); name != "base" {
 		t.Fatalf("shadow initializer reference = %q, want outer base", name)
 	}
@@ -157,9 +153,11 @@ func TestLocalVariablesBoundaryMutationsFailClosed(t *testing.T) {
 			role:      api.RoleLocalDeclaration,
 		},
 		{
-			name: "zero initializer",
+			name: "missing type and initializer",
 			mutate: func(source *ast.DeclStmt) {
-				source.Decl.(*ast.GenDecl).Specs[0].(*ast.ValueSpec).Values = nil
+				spec := source.Decl.(*ast.GenDecl).Specs[0].(*ast.ValueSpec)
+				spec.Type = nil
+				spec.Values = nil
 			},
 			category:  api.CategoryStatement,
 			construct: "*ast.ValueSpec",

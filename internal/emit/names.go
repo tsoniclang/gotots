@@ -20,7 +20,8 @@ type targetBinding struct {
 }
 
 type declarationRegistry struct {
-	byObject map[types.Object]targetBinding
+	byObject           map[types.Object]targetBinding
+	memberNameByObject map[*types.Var]string
 }
 
 type nameOwner struct {
@@ -29,6 +30,7 @@ type nameOwner struct {
 	sourceNameBases     map[string]struct{}
 	generatedSuffixes   map[string][]uint64
 	nextGeneratedSuffix map[string]uint64
+	memberNameByObject  map[*types.Var]string
 	registry            *declarationRegistry
 }
 
@@ -37,7 +39,10 @@ func newNameOwner(packageScope *types.Scope, info *types.Info) *nameOwner {
 }
 
 func newDeclarationRegistry() *declarationRegistry {
-	return &declarationRegistry{byObject: make(map[types.Object]targetBinding)}
+	return &declarationRegistry{
+		byObject:           make(map[types.Object]targetBinding),
+		memberNameByObject: make(map[*types.Var]string),
+	}
 }
 
 func newNameOwnerWithRegistry(
@@ -51,6 +56,7 @@ func newNameOwnerWithRegistry(
 		sourceNameBases:     make(map[string]struct{}),
 		generatedSuffixes:   make(map[string][]uint64),
 		nextGeneratedSuffix: make(map[string]uint64),
+		memberNameByObject:  registry.memberNameByObject,
 		registry:            registry,
 	}
 	if info == nil {
@@ -79,6 +85,8 @@ func newNameOwnerWithRegistry(
 			make(map[string]uint64),
 			make(map[string]uint32),
 		)
+		owner.preallocateMethods(info)
+		owner.preallocateMembers(packageScope)
 	}
 	return owner
 }
@@ -258,16 +266,17 @@ func compareNameObjects(left types.Object, right types.Object) int {
 }
 
 type fileNames struct {
-	owner         *nameOwner
-	sourceFile    *ast.File
-	packageScope  *types.Scope
-	factory       tsgo.Factory
-	targetPath    string
-	require       func(types.Object) error
-	temporaries   map[api.TemporaryKind]uint64
-	importNames   map[string]struct{}
-	importAliases map[types.Object]string
-	primitives    map[api.PrimitiveAlias]string
+	owner            *nameOwner
+	sourceFile       *ast.File
+	packageScope     *types.Scope
+	factory          tsgo.Factory
+	targetPath       string
+	require          func(types.Object) error
+	temporaries      map[api.TemporaryKind]uint64
+	importNames      map[string]struct{}
+	importAliases    map[types.Object]string
+	companionAliases map[api.CompanionOwner]string
+	primitives       map[api.PrimitiveAlias]string
 }
 
 func (n *nameOwner) ForFile(
@@ -278,16 +287,17 @@ func (n *nameOwner) ForFile(
 	require func(types.Object) error,
 ) api.Names {
 	return &fileNames{
-		owner:         n,
-		sourceFile:    sourceFile,
-		packageScope:  packageScope,
-		factory:       factory,
-		targetPath:    targetPath,
-		require:       require,
-		temporaries:   make(map[api.TemporaryKind]uint64),
-		importNames:   make(map[string]struct{}),
-		importAliases: make(map[types.Object]string),
-		primitives:    make(map[api.PrimitiveAlias]string),
+		owner:            n,
+		sourceFile:       sourceFile,
+		packageScope:     packageScope,
+		factory:          factory,
+		targetPath:       targetPath,
+		require:          require,
+		temporaries:      make(map[api.TemporaryKind]uint64),
+		importNames:      make(map[string]struct{}),
+		importAliases:    make(map[types.Object]string),
+		companionAliases: make(map[api.CompanionOwner]string),
+		primitives:       make(map[api.PrimitiveAlias]string),
 	}
 }
 
@@ -309,11 +319,6 @@ func (n *fileNames) Reference(object types.Object) (api.NameReference, error) {
 	if object == nil {
 		return api.NameReference{}, &api.NameError{Reason: "reference object is nil"}
 	}
-	if isPackageObject(object) && n.require != nil {
-		if err := n.require(object); err != nil {
-			return api.NameReference{}, err
-		}
-	}
 	binding, ok := n.owner.byObject[object]
 	if !ok && n.owner.registry != nil {
 		binding, ok = n.owner.registry.byObject[object]
@@ -322,6 +327,11 @@ func (n *fileNames) Reference(object types.Object) (api.NameReference, error) {
 		return api.NameReference{}, &api.NameError{
 			Name:   object.Name(),
 			Reason: "object has no emitted declaration",
+		}
+	}
+	if binding.sourceFile != nil && n.require != nil {
+		if err := n.require(object); err != nil {
+			return api.NameReference{}, err
 		}
 	}
 	if binding.sourceFile != nil && binding.sourceFile != n.sourceFile {
@@ -348,11 +358,92 @@ func (n *fileNames) Reference(object types.Object) (api.NameReference, error) {
 	return api.NewNameReference(binding.name)
 }
 
+func (n *fileNames) Companion(
+	typeName *types.TypeName,
+	operation api.CompanionOperation,
+) (api.NameReference, error) {
+	if typeName == nil {
+		return api.NameReference{}, &api.NameError{
+			Reason: "companion type is nil",
+		}
+	}
+	binding, ok := n.owner.byObject[typeName]
+	if !ok && n.owner.registry != nil {
+		binding, ok = n.owner.registry.byObject[typeName]
+	}
+	if !ok {
+		return api.NameReference{}, &api.NameError{
+			Name:   typeName.Name(),
+			Reason: "companion type has no emitted declaration",
+		}
+	}
+	if binding.sourceFile != nil && n.require != nil {
+		if err := n.require(typeName); err != nil {
+			return api.NameReference{}, err
+		}
+	}
+	companion, err := api.NewCompanionOwner(typeName, operation)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	request, err := api.NewCompanionRequest(typeName, operation)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	exportedName, err := api.CompanionExportName(binding.name, operation)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	if binding.sourceFile == nil || binding.sourceFile == n.sourceFile {
+		return api.NewNameReference(exportedName, request)
+	}
+	modulePath, err := output.ModuleSpecifier(n.targetPath, binding.sourcePath)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	localName := n.companionAliases[companion]
+	if localName == "" {
+		localName = n.allocateImportName(exportedName, typeName.Pkg().Path())
+		n.companionAliases[companion] = localName
+	}
+	importRequest, err := api.NewImportRequest(
+		n.factory,
+		api.ImportPhaseValue,
+		modulePath,
+		exportedName,
+		localName,
+	)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	return api.NewNameReference(localName, request, importRequest)
+}
+
+func (n *fileNames) Member(field *types.Var) (string, error) {
+	if field == nil {
+		return "", &api.NameError{Reason: "field object is nil"}
+	}
+	name := n.owner.memberNameByObject[field]
+	if name == "" {
+		return "", &api.NameError{
+			Name:   field.Name(),
+			Reason: "field object was not indexed from a named struct",
+		}
+	}
+	return name, nil
+}
+
 func (n *fileNames) importName(object types.Object, preferred string) string {
 	if existing := n.importAliases[object]; existing != "" {
 		return existing
 	}
-	base := preferred + "__from_" + portableIdentifier(object.Pkg().Path())
+	candidate := n.allocateImportName(preferred, object.Pkg().Path())
+	n.importAliases[object] = candidate
+	return candidate
+}
+
+func (n *fileNames) allocateImportName(preferred string, packagePath string) string {
+	base := preferred + "__from_" + portableIdentifier(packagePath)
 	candidate := base
 	for suffix := uint64(1); n.packageScope.Lookup(candidate) != nil ||
 		n.hasImportName(candidate) ||
@@ -360,7 +451,6 @@ func (n *fileNames) importName(object types.Object, preferred string) string {
 		candidate = base + "_" + strconv.FormatUint(suffix, 10)
 	}
 	n.importNames[candidate] = struct{}{}
-	n.importAliases[object] = candidate
 	return candidate
 }
 
@@ -386,7 +476,7 @@ func (n *fileNames) Primitive(alias api.PrimitiveAlias) (api.NameReference, erro
 		}
 		return api.NewNameReference(existing, request)
 	}
-	exportedName, _, err := api.PrimitiveAliasRepresentation(alias)
+	exportedName, err := api.PrimitiveAliasName(alias)
 	if err != nil {
 		return api.NameReference{}, err
 	}
@@ -446,11 +536,6 @@ func (n *fileNames) ModuleExport(object types.Object) (bool, error) {
 		}
 	}
 	return binding.moduleExport, nil
-}
-
-func isPackageObject(object types.Object) bool {
-	return object != nil && object.Pkg() != nil &&
-		object.Parent() == object.Pkg().Scope()
 }
 
 func objectName(object types.Object) string {

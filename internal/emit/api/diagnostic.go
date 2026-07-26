@@ -37,6 +37,7 @@ const (
 	RoleIfElse               Role = "if-else"
 	RoleUnaryOperand         Role = "unary-operand"
 	RoleCallArgument         Role = "call-argument"
+	RoleCallArgumentType     Role = "call-argument-type"
 	RoleExpressionStatement  Role = "expression-statement"
 	RoleIntegerConstantType  Role = "integer-constant-type"
 	RoleBooleanConstantType  Role = "boolean-constant-type"
@@ -51,6 +52,17 @@ const (
 	RoleSwitchClause         Role = "switch-clause"
 	RoleSwitchCaseExpression Role = "switch-case-expression"
 	RoleSwitchCaseStatement  Role = "switch-case-statement"
+	RoleStructField          Role = "struct-field"
+	RoleStructFieldType      Role = "struct-field-type"
+	RoleStructZeroField      Role = "struct-zero-field"
+	RoleStructCopyField      Role = "struct-copy-field"
+	RoleStructAssignField    Role = "struct-assign-field"
+	RoleStructEqualField     Role = "struct-equal-field"
+	RoleCompositeElement     Role = "composite-element"
+	RoleFieldReceiver        Role = "field-receiver"
+	RoleAssignmentTarget     Role = "assignment-target"
+	RoleReceiverType         Role = "receiver-type"
+	RoleReceiverValue        Role = "receiver-value"
 )
 
 type UnsupportedError struct {

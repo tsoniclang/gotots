@@ -35,14 +35,6 @@ func emitMultipleArgument(
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	targetType, err := children.RepresentedType(
-		context.WithRole(api.RoleLocalType),
-		source.Args[0],
-		results,
-	)
-	if err != nil {
-		return nil, nil, nil, err
-	}
 	temporaryName, err := context.Names().Temporary(api.TemporaryMultipleResults)
 	if err != nil {
 		return nil, nil, nil, err
@@ -50,7 +42,7 @@ func emitMultipleArgument(
 	declaration := context.Factory().VariableDeclaration(
 		context.Factory().Identifier(temporaryName),
 		nil,
-		targetType.Value(),
+		nil,
 		value.Value(),
 	)
 	before := value.Before()
@@ -66,17 +58,29 @@ func emitMultipleArgument(
 	)
 
 	arguments := make([]tsgo.Expression, 0, results.Len())
+	requests := value.Requests()
 	for index := range results.Len() {
-		arguments = append(
-			arguments,
-			context.Factory().ElementAccessExpression(
-				context.Factory().Identifier(temporaryName),
-				nil,
-				context.Factory().NumericLiteral(strconv.Itoa(index), tsgo.TokenFlagsNone),
-				tsgo.NodeFlagsNone,
-			),
+		element := context.Factory().ElementAccessExpression(
+			context.Factory().Identifier(temporaryName),
+			nil,
+			context.Factory().NumericLiteral(strconv.Itoa(index), tsgo.TokenFlagsNone),
+			tsgo.NodeFlagsNone,
 		)
+		copied, err := context.Values().Copy(
+			context.WithRole(api.RoleCallArgument),
+			source.Args[0],
+			signature.Params().At(index).Type(),
+			api.DirectExpression(element),
+		)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		if len(copied.Before()) != 0 {
+			return nil, nil, nil,
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		arguments = append(arguments, copied.Value())
+		requests = append(requests, copied.Requests()...)
 	}
-	return arguments, before,
-		api.CombineRequests(value.Requests(), targetType.Requests()), nil
+	return arguments, before, requests, nil
 }

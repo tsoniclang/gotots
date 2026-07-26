@@ -127,6 +127,8 @@ selected-toolchain contract reconciliation, and other non-producing checks.
 An emission session may retain:
 
 - selected package/file references and the shared `types.Info`;
+- one immutable compilation-wide profile containing closed, independent
+  semantic-policy axes;
 - a stack of source context and target lexical builders;
 - deterministic mappings from typed Go objects to target names/declarations;
 - already-created typed TS-Go protocol AST values;
@@ -179,6 +181,27 @@ reserves its TS-Go declaration. Every later use retrieves that same target
 state by authoritative Go identity. The decision is final before dependent
 target nodes are emitted; it is never serialized into a plan or consumed by a
 later lowering stage.
+
+Compilation policy is selected once at the compilation entry point and is
+immutable for the complete dependency closure. Each axis is a closed typed
+choice. The initial integer-representation axis selects `number` (the default)
+or `bigint`. The initial evaluation-order axis selects `direct` (the default)
+or `preserve-go`. Handlers query the typed profile carried by their context;
+they never inspect CLI flags or independently select behavior. A generated file
+set may not mix selections. Every selected axis is part of reproducibility
+evidence and any eventual output manifest.
+
+`direct` evaluation emits target expressions without introducing temporaries
+solely to preserve the source order of expressions that target reshaping
+reorders. It applies equally to literals, calls, and other expressions; no
+purity or side-effect heuristic selects behavior. For example, a keyed
+`Point{Visible: visible(), X: x()}` represented by a positional
+`Point(X, Visible)` constructor emits `new Point(x(), visible())`. This is an
+intentional profile boundary and is not exact Go behavior when the calls'
+effects expose their order. `preserve-go` evaluates `visible()` and `x()` into
+source-ordered temporaries before constructing `Point`, preserving Go behavior.
+Temporaries required by target syntax or independently selected semantics such
+as parallel assignment are unaffected by this axis.
 
 ## Definition Scheduling
 
@@ -239,6 +262,14 @@ request in its emission result. Only the root placement owner consumes requests
 and mutates a target builder. No `Context` capability may silently install an
 import or hoisted declaration while a child is being translated.
 
+A use-dependent operation on a named type is a typed companion-declaration
+request keyed by the authoritative `types.TypeName` and a closed operation
+kind. It is owned by the generated source-file module containing that type's
+declaration, not by the first caller. Applying one request may produce further
+typed requests, such as `Box` copying requesting `Point` copying. The root
+placement owner resolves this work to a fixed point, deduplicates by typed
+owner, and rejects ownership conflicts.
+
 One placement service applies the policy:
 
 - imports always enter file import scope; dynamic imports are forbidden;
@@ -247,6 +278,8 @@ One placement service applies the policy:
   names are unexported; only the package assembly facade exposes the selected
   Go public API to consumers;
 - reusable static declarations prefer file scope;
+- named-type companion declarations are emitted immediately after their
+  owning type declaration in a fixed operation order;
 - function-wide declarations enter the function prologue only when their
   lifetime is function-wide;
 - evaluation-dependent temporaries remain immediately inside the branch,
@@ -256,12 +289,25 @@ One placement service applies the policy:
 
 This permits hoisting without maintaining a separate target IR.
 
-Call and composite handlers consume child emissions in Go evaluation order. If
-a later child has prerequisite statements, already-evaluated earlier children
-are captured in target temporaries before those statements. Package-level
-initializers use the selected checker graph's exact initialization order and
-append their TS-Go statements to one package-initialization builder; no second
-dependency graph is constructed.
+Creating a typed TS-Go node is not finalizing or printing its containing file.
+The root emitter seals each target file only after scheduling and placement
+queues are empty. A sealed file accepts no further request. Already-created
+class nodes are never reopened: genuine class members come from the complete Go
+type contract when the class is constructed, while use-dependent generated
+operations are top-level companion declarations. There is no target-text
+patch, prototype assignment, mutable class reopening, or post-print insertion.
+
+Under `preserve-go`, a keyed composite captures child values in Go source order
+before consuming them in target constructor order. If any child emission has
+prerequisite statements, its parent still places those statements at the
+required execution boundary and captures values required to make the target
+AST representable. Under `direct`, the composite itself creates no prerequisite
+statements solely for field reordering, so an enclosing call remains a direct
+call when its other children are direct. Package-level initialization order and
+atomic multi-value operations are separate semantic contracts and remain exact
+under both profiles. Package-level initializers use the selected checker
+graph's exact initialization order and append their TS-Go statements to one
+package-initialization builder; no second dependency graph is constructed.
 
 ## Target Construction
 

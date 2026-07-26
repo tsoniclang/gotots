@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	functiondeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/function"
+	namedstructdeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/namedstruct"
 	packageconstant "github.com/tsoniclang/gotots/internal/emit/declaration/packageconstant"
 )
 
@@ -26,6 +27,9 @@ func (e *emitter) declarationObject(
 		}
 		return functiondeclaration.Emit(context, e, source)
 	case *ast.GenDecl:
+		if typeName, ok := object.(*types.TypeName); ok {
+			return namedstructdeclaration.Emit(context, e, source, typeName)
+		}
 		constant, ok := object.(*types.Const)
 		if !ok {
 			return api.DeclarationEmission{},

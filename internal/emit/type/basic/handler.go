@@ -20,28 +20,8 @@ func EmitRepresented(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
-	basic, ok := types.Unalias(sourceType).(*types.Basic)
+	alias, ok := api.PrimitiveAliasFor(context.TypesSizes(), sourceType)
 	if !ok {
-		return api.TypeEmission{}, api.Unsupported(context, api.CategoryType, source)
-	}
-	var alias api.PrimitiveAlias
-	switch basic.Kind() {
-	case types.Bool:
-		alias = api.PrimitiveBool
-	case types.Int64:
-		alias = api.PrimitiveInt64
-	case types.Int32:
-		alias = api.PrimitiveInt32
-	case types.Int:
-		switch context.TypesSizes().Sizeof(types.Typ[types.Int]) {
-		case 4:
-			alias = api.PrimitiveInt32
-		case 8:
-			alias = api.PrimitiveInt64
-		default:
-			return api.TypeEmission{}, api.Unsupported(context, api.CategoryType, source)
-		}
-	default:
 		return api.TypeEmission{}, api.Unsupported(context, api.CategoryType, source)
 	}
 	reference, err := context.Names().Primitive(alias)
@@ -57,20 +37,7 @@ func EmitRepresented(
 	), nil
 }
 
-func SupportsExactInt32(sizes types.Sizes, sourceType types.Type) bool {
-	if sizes == nil || sourceType == nil {
-		return false
-	}
-	basic, ok := types.Unalias(sourceType).Underlying().(*types.Basic)
-	if !ok {
-		return false
-	}
-	switch basic.Kind() {
-	case types.Int32:
-		return true
-	case types.Int:
-		return sizes.Sizeof(types.Typ[types.Int]) == 4
-	default:
-		return false
-	}
+func SupportsInteger(sizes types.Sizes, sourceType types.Type) bool {
+	alias, ok := api.PrimitiveAliasFor(sizes, sourceType)
+	return ok && alias != api.PrimitiveBool
 }

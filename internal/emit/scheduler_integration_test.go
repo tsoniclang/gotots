@@ -161,7 +161,7 @@ func emittedObjectCounts(
 	roots []Root,
 ) map[types.Object]int {
 	t.Helper()
-	session, err := newProgramSession(program)
+	session, err := newProgramSession(program, DefaultOptions())
 	if err != nil {
 		t.Fatal(err)
 	}

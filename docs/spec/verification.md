@@ -188,6 +188,44 @@ Examples include:
 - interfaces with many implementers, proving constant-size call sites;
 - nested function literals requiring branch-local versus file-level placement.
 
+The first named-struct family additionally proves:
+
+- empty structs and grouped field declarations use the same single
+  representation owner;
+- two field-identical named Go structs remain incompatible in strict
+  TypeScript through an erased nominal brand;
+- zero values allocate fresh nested records;
+- assignment, initialization, arguments, results, and value receivers do not
+  alias mutable struct storage;
+- borrowed values are copied once at each admitted boundary while fresh
+  composite/call results and single-result returns transfer ownership without
+  a duplicate field walk;
+- pointer-free assignment rebinds to one copied value without a speculative
+  destination-identity helper;
+- positional, keyed, and omitted-field composite literals have exact values;
+  the default `direct` profile contains no field or argument temporaries added
+  solely for keyed source order, while `preserve-go` retains source evaluation
+  order when field declaration order differs;
+- equality is field-wise and recursive rather than target object identity;
+- concrete value-receiver calls use the exact `go/types.Selection` and a named
+  receiver function, never a class method or virtual dispatch; and
+- tags, embedding, pointers, interfaces, method values/expressions, generics,
+  and unsupported field representations fail at their typed owner.
+
+Mutations replace a requested copy with direct assignment, replace requested
+field equality with `===`, remove the private brand, add source-order captures
+to `direct`, remove them from `preserve-go`, attach a receiver method to the
+class, emit an unrequested companion, duplicate a companion, route it to the
+caller's file, or admit an unsupported field. Each fails its owning structural,
+strict-type, differential, placement, or unsupported-boundary gate. The
+`preserve-go` fixture uses call-valued field expressions; the `direct` artifact
+test treats constants and calls identically, proving that no purity heuristic
+silently changes profiles. A scaling fixture doubles fields and proves
+definition size/work grows linearly while copy, assignment, equality, and
+method call sites remain constant-size. An ownership mutation adds a callee
+prologue copy or copies a fresh composite/call result; artifact and operation
+counts must reject the duplicate boundary work.
+
 ### Execution Authority
 
 Strict TS-Go resolution and typechecking is mandatory for every generated
@@ -195,28 +233,32 @@ artifact. The exact TS-Go-printed artifact and every requested GoToTS-owned
 support/runtime module are then compiled to ESM JavaScript and executed
 directly. The generated product may not rewrite literals after printing, inject
 test-only facts, or substitute a different declaration shape.
+The pinned compiler may report diagnostics without a failing process status.
+The one compiler-process owner therefore treats either a process error or any
+diagnostic output as failure; tests and product gates must not invoke the
+executable through a status-only wrapper.
 
 Primitive aliases preserve selected Go names in target source but do not prove
-runtime range or arithmetic. For example, `int64 = number` does not establish
-64-bit precision, overflow, shifts, conversions, or exact large constants. A
-small-value runtime test cannot certify the full class. The capability closes
-only when direct standalone behavior is exact for the complete admitted domain
-or a GoToTS-owned generated/runtime operation implements and differentially
-proves that behavior. Otherwise the construct remains typed unsupported.
+runtime range or overflow. Every integer gate runs under an explicit
+compilation-wide integer selection. The default `number` gate inspects direct arithmetic,
+ordinary numeric literals, and the absence of routine casts, `Math.imul`, and
+wrapping operators; its differential values remain inside the declared exact
+number domain. The `bigint` gate inspects BigInt aliases and literals, executes
+values beyond JavaScript's safe-number range, and proves that no number carrier
+leaks into integer operations.
 
-The signed-integer gate differentially exercises every admitted `int32`
-operator at `math.MinInt32`, `math.MaxInt32`, and overflow-producing operands,
-and inspects the exact wrapped TS-Go AST. It separately proves that `int64` and
-64-bit `int` arithmetic, comparison, compound update, increment/decrement, and
-switch fail at their contextual semantic owner. Mutations remove `| 0`,
-replace `Math.imul` with ordinary multiplication, admit a wide operation, or
-round a wide constant; each must fail its owning differential or unsupported
-boundary.
+Mutations reintroduce a routine literal cast or redundant inferred annotation,
+emit a wrapped default multiplication, mix representations across generated
+files, or print a number literal in BigInt mode. Each fails its owning AST,
+strict-type, differential, or profile-coherence gate. Reports explicitly state
+that implicit fixed-width overflow is deferred; neither profile may be
+described as proving it.
 
-Each checkpoint records the exact Go toolchain, pinned TS-Go revision/schema,
-JavaScript runtime, and GoToTS support/runtime revision used by proof. No
-external transpiler, target compiler, plugin, or unrelated product may supply
-missing semantics or verification.
+Each checkpoint records every compilation-profile axis plus the exact Go
+toolchain, pinned TS-Go revision/schema, JavaScript runtime, and GoToTS
+support/runtime revision used by proof. No external transpiler, target
+compiler, plugin, or unrelated product may supply missing semantics or
+verification.
 
 ## Architecture And Cost Proof
 

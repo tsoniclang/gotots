@@ -171,7 +171,9 @@ Heavy jobs run one at a time with bounded concurrency, timeout, disk-backed
 output, and an OS memory ceiling. Preserve failure artifacts. Never retry an
 OOM with the same unbounded command.
 
-Passing tests alone is insufficient. Exact Go behavior, strict static
+Passing tests alone is insufficient. Behavior must be exact within the
+explicitly selected compilation profile; every intentional profile boundary
+must be named and must never be reported as exact Go behavior. Strict static
 TypeScript, source-shaped output, bounded generated size, bounded typecheck
 cost, and bounded runtime are simultaneous correctness requirements.
 

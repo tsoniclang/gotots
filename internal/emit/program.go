@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	namedstructdeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/namedstruct"
 	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -32,28 +33,23 @@ type ProgramEmission struct {
 	files []TargetFile
 }
 
-type declarationSite struct {
-	object      types.Object
-	source      *load.Package
-	sourceFile  load.File
-	declaration ast.Decl
-	outputPath  string
-}
-
 type programSession struct {
-	source    *load.Program
-	factory   tsgo.Factory
-	registry  *declarationRegistry
-	scheduler *scheduler
-	sites     map[types.Object]declarationSite
-	emitters  map[*load.Package]*emitter
-	builders  map[string]*targetFileBuilder
+	source     *load.Program
+	factory    tsgo.Factory
+	integer    api.IntegerRepresentation
+	registry   *declarationRegistry
+	scheduler  *scheduler
+	companions *companionScheduler
+	sites      map[types.Object]declarationSite
+	emitters   map[*load.Package]*emitter
+	builders   map[string]*targetFileBuilder
 }
 
 type targetDeclaration struct {
 	object     types.Object
 	position   token.Pos
 	statements []tsgo.Statement
+	companions map[api.CompanionOperation][]tsgo.Statement
 }
 
 type targetFileBuilder struct {
@@ -65,9 +61,21 @@ type targetFileBuilder struct {
 	placement     *placementOwner
 	declarations  []targetDeclaration
 	byObject      map[types.Object]struct{}
+	indexByObject map[types.Object]int
 }
 
 func Compile(source *load.Program, roots []Root) (ProgramEmission, error) {
+	return CompileWithOptions(source, roots, DefaultOptions())
+}
+
+func CompileWithOptions(
+	source *load.Program,
+	roots []Root,
+	options Options,
+) (ProgramEmission, error) {
+	if err := options.validate(); err != nil {
+		return ProgramEmission{}, err
+	}
 	if source == nil {
 		return ProgramEmission{},
 			&ScheduleError{Reason: "source program is nil"}
@@ -76,7 +84,7 @@ func Compile(source *load.Program, roots []Root) (ProgramEmission, error) {
 		return ProgramEmission{},
 			&ScheduleError{Reason: "emission roots are empty"}
 	}
-	session, err := newProgramSession(source)
+	session, err := newProgramSession(source, options)
 	if err != nil {
 		return ProgramEmission{}, err
 	}
@@ -99,13 +107,19 @@ func Compile(source *load.Program, roots []Root) (ProgramEmission, error) {
 		}
 	}
 	for {
-		object, ok := session.scheduler.next()
-		if !ok {
-			break
+		if object, ok := session.scheduler.next(); ok {
+			if err := session.emit(object); err != nil {
+				return ProgramEmission{}, err
+			}
+			continue
 		}
-		if err := session.emit(object); err != nil {
-			return ProgramEmission{}, err
+		if companion, ok := session.companions.next(); ok {
+			if err := session.emitCompanion(companion); err != nil {
+				return ProgramEmission{}, err
+			}
+			continue
 		}
+		break
 	}
 	files, err := session.targetFiles()
 	if err != nil {
@@ -231,25 +245,32 @@ func (f TargetFile) Kind() TargetFileKind {
 	return f.kind
 }
 
-func newProgramSession(source *load.Program) (*programSession, error) {
+func newProgramSession(
+	source *load.Program,
+	options Options,
+) (*programSession, error) {
 	sites, err := indexDeclarations(source)
 	if err != nil {
 		return nil, err
 	}
 	session := &programSession{
-		source:    source,
-		factory:   tsgo.NewFactory(),
-		registry:  newDeclarationRegistry(),
-		scheduler: newScheduler(),
-		sites:     sites,
-		emitters:  make(map[*load.Package]*emitter),
-		builders:  make(map[string]*targetFileBuilder),
+		source:     source,
+		factory:    tsgo.NewFactory(),
+		integer:    options.IntegerRepresentation,
+		registry:   newDeclarationRegistry(),
+		scheduler:  newScheduler(),
+		companions: newCompanionScheduler(),
+		sites:      sites,
+		emitters:   make(map[*load.Package]*emitter),
+		builders:   make(map[string]*targetFileBuilder),
 	}
 	for _, sourcePackage := range source.Packages() {
 		session.emitters[sourcePackage] = newEmitter(
 			sourcePackage,
 			session.factory,
 			session.registry,
+			options.IntegerRepresentation,
+			options.EvaluationOrder,
 			session.require,
 		)
 	}
@@ -319,15 +340,83 @@ func (s *programSession) emit(object types.Object) error {
 	if err != nil {
 		return err
 	}
-	if err := builder.placement.Apply(result.Requests()); err != nil {
+	if err := s.applyRequests(builder, result.Requests()); err != nil {
 		return err
 	}
 	builder.byObject[object] = struct{}{}
+	builder.indexByObject[object] = len(builder.declarations)
 	builder.declarations = append(builder.declarations, targetDeclaration{
 		object:     object,
 		position:   object.Pos(),
 		statements: result.Declarations(),
+		companions: make(map[api.CompanionOperation][]tsgo.Statement),
 	})
+	return nil
+}
+
+func (s *programSession) applyRequests(
+	builder *targetFileBuilder,
+	requests []api.PlacementRequest,
+) error {
+	imports := make([]api.PlacementRequest, 0, len(requests))
+	for _, request := range requests {
+		switch request.Kind() {
+		case api.PlacementImport:
+			imports = append(imports, request)
+		case api.PlacementCompanion:
+			owner, ok := request.Companion()
+			if !ok {
+				return &ScheduleError{Reason: "companion request is invalid"}
+			}
+			s.companions.enqueue(owner)
+		default:
+			return &ScheduleError{Reason: "placement request kind is invalid"}
+		}
+	}
+	return builder.placement.Apply(imports)
+}
+
+func (s *programSession) emitCompanion(owner api.CompanionOwner) error {
+	typeName := owner.TypeName()
+	site, ok := s.sites[typeName]
+	if !ok {
+		return &ScheduleError{
+			Object: typeName.Name(),
+			Reason: "companion owner has no source declaration",
+		}
+	}
+	builder, err := s.builder(site)
+	if err != nil {
+		return err
+	}
+	index, ok := builder.indexByObject[typeName]
+	if !ok {
+		return &ScheduleError{
+			Object: typeName.Name(),
+			Reason: "companion owner was not emitted first",
+		}
+	}
+	declaration := &builder.declarations[index]
+	if _, duplicate := declaration.companions[owner.Operation()]; duplicate {
+		return &ScheduleError{
+			Object: typeName.Name(),
+			Reason: "companion was emitted more than once",
+		}
+	}
+	result, err := namedstructdeclaration.EmitCompanion(
+		builder.context,
+		builder.emitter,
+		site.declaration,
+		typeName,
+		owner.Operation(),
+	)
+	if err != nil {
+		return err
+	}
+	if err := s.applyRequests(builder, result.Requests()); err != nil {
+		return err
+	}
+	declaration.companions[owner.Operation()] = result.Declarations()
 	return nil
 }
 
@@ -354,6 +443,7 @@ func (s *programSession) builder(site declarationSite) (*targetFileBuilder, erro
 		context:       context,
 		placement:     newPlacementOwner(),
 		byObject:      make(map[types.Object]struct{}),
+		indexByObject: make(map[types.Object]int),
 	}
 	s.builders[site.outputPath] = builder
 	return builder, nil
@@ -382,6 +472,16 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 		var declarations []tsgo.Statement
 		for _, declaration := range builder.declarations {
 			declarations = append(declarations, declaration.statements...)
+			for _, operation := range []api.CompanionOperation{
+				api.CompanionZero,
+				api.CompanionCopy,
+				api.CompanionEqual,
+			} {
+				declarations = append(
+					declarations,
+					declaration.companions[operation]...,
+				)
+			}
 		}
 		statements := append(
 			builder.placement.Statements(s.factory),
@@ -429,7 +529,10 @@ func (s *programSession) scalarSupportFile(
 ) (TargetFile, error) {
 	statements := make([]tsgo.Statement, 0, len(aliases))
 	for _, alias := range aliases {
-		name, keyword, err := api.PrimitiveAliasRepresentation(alias)
+		name, keyword, err := api.PrimitiveAliasRepresentation(
+			alias,
+			s.integer,
+		)
 		if err != nil {
 			return TargetFile{}, err
 		}
@@ -457,121 +560,4 @@ func (s *programSession) scalarSupportFile(
 			},
 		),
 	}, nil
-}
-
-func indexDeclarations(source *load.Program) (map[types.Object]declarationSite, error) {
-	sites := make(map[types.Object]declarationSite)
-	for _, sourcePackage := range source.Packages() {
-		for _, sourceFile := range sourcePackage.Files() {
-			outputPath, err := targetoutput.SourcePath(sourcePackage, sourceFile)
-			if err != nil {
-				return nil, err
-			}
-			for _, declaration := range sourceFile.Syntax().Decls {
-				switch declaration := declaration.(type) {
-				case *ast.FuncDecl:
-					if declaration.Recv != nil || declaration.Name.Name == "init" {
-						continue
-					}
-					object, ok := sourcePackage.TypesInfo().Defs[declaration.Name].(*types.Func)
-					if !ok {
-						return nil, &api.InvariantError{
-							Role:   api.RoleFileDeclaration,
-							Reason: "function declaration has no go/types object",
-						}
-					}
-					if err := addDeclarationSite(
-						sites,
-						object,
-						sourcePackage,
-						sourceFile,
-						declaration,
-						outputPath,
-					); err != nil {
-						return nil, err
-					}
-				case *ast.GenDecl:
-					if declaration.Tok != token.CONST {
-						continue
-					}
-					for _, spec := range declaration.Specs {
-						valueSpec, ok := spec.(*ast.ValueSpec)
-						if !ok {
-							return nil, &api.InvariantError{
-								Role:   api.RoleFileDeclaration,
-								Reason: "constant declaration has a non-value spec",
-							}
-						}
-						for _, name := range valueSpec.Names {
-							object, ok := sourcePackage.TypesInfo().Defs[name].(*types.Const)
-							if !ok {
-								return nil, &api.InvariantError{
-									Role:   api.RoleFileDeclaration,
-									Reason: "constant declaration has no go/types object",
-								}
-							}
-							if err := addDeclarationSite(
-								sites,
-								object,
-								sourcePackage,
-								sourceFile,
-								declaration,
-								outputPath,
-							); err != nil {
-								return nil, err
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-	return sites, nil
-}
-
-func addDeclarationSite(
-	sites map[types.Object]declarationSite,
-	object types.Object,
-	sourcePackage *load.Package,
-	sourceFile load.File,
-	declaration ast.Decl,
-	outputPath string,
-) error {
-	if _, duplicate := sites[object]; duplicate {
-		return &ScheduleError{
-			Object: object.Name(),
-			Reason: "object has multiple source declarations",
-		}
-	}
-	sites[object] = declarationSite{
-		object:      object,
-		source:      sourcePackage,
-		sourceFile:  sourceFile,
-		declaration: declaration,
-		outputPath:  outputPath,
-	}
-	return nil
-}
-
-func compareDeclarationSites(left declarationSite, right declarationSite) int {
-	switch {
-	case left.source.Path() < right.source.Path():
-		return -1
-	case left.source.Path() > right.source.Path():
-		return 1
-	case left.outputPath < right.outputPath:
-		return -1
-	case left.outputPath > right.outputPath:
-		return 1
-	case left.object.Pos() < right.object.Pos():
-		return -1
-	case left.object.Pos() > right.object.Pos():
-		return 1
-	case left.object.Name() < right.object.Name():
-		return -1
-	case left.object.Name() > right.object.Name():
-		return 1
-	default:
-		return 0
-	}
 }

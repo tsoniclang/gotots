@@ -10,7 +10,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func TestExactInt32CapabilityRejectsWideIntegerCarriers(t *testing.T) {
+func TestIntegerCapabilityAcceptsEveryRepresentedSignedCarrier(t *testing.T) {
 	testCases := []struct {
 		name       string
 		sourceType types.Type
@@ -19,8 +19,8 @@ func TestExactInt32CapabilityRejectsWideIntegerCarriers(t *testing.T) {
 	}{
 		{name: "int32", sourceType: types.Typ[types.Int32], arch: "amd64", want: true},
 		{name: "32-bit int", sourceType: types.Typ[types.Int], arch: "386", want: true},
-		{name: "64-bit int", sourceType: types.Typ[types.Int], arch: "amd64", want: false},
-		{name: "int64", sourceType: types.Typ[types.Int64], arch: "386", want: false},
+		{name: "64-bit int", sourceType: types.Typ[types.Int], arch: "amd64", want: true},
+		{name: "int64", sourceType: types.Typ[types.Int64], arch: "386", want: true},
 	}
 
 	for _, testCase := range testCases {
@@ -43,6 +43,9 @@ func TestExactInt32CapabilityRejectsWideIntegerCarriers(t *testing.T) {
 				types.SizesFor("gc", testCase.arch),
 				tsgo.Factory{},
 				unusedNames{},
+				unusedValues{},
+				api.IntegerRepresentationNumber,
+				api.EvaluationOrderDirect,
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -66,6 +69,17 @@ func (unusedNames) Reference(types.Object) (api.NameReference, error) {
 	panic("unused")
 }
 
+func (unusedNames) Companion(
+	*types.TypeName,
+	api.CompanionOperation,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) Member(*types.Var) (string, error) {
+	panic("unused")
+}
+
 func (unusedNames) Primitive(api.PrimitiveAlias) (api.NameReference, error) {
 	panic("unused")
 }
@@ -75,5 +89,48 @@ func (unusedNames) Temporary(api.TemporaryKind) (string, error) {
 }
 
 func (unusedNames) ModuleExport(types.Object) (bool, error) {
+	panic("unused")
+}
+
+type unusedValues struct{}
+
+func (unusedValues) RequiresCustomEquality(types.Type) bool {
+	panic("unused")
+}
+
+func (unusedValues) Zero(
+	api.Context,
+	ast.Node,
+	types.Type,
+) (api.ExpressionEmission, error) {
+	panic("unused")
+}
+
+func (unusedValues) Copy(
+	api.Context,
+	ast.Node,
+	types.Type,
+	api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	panic("unused")
+}
+
+func (unusedValues) Assign(
+	api.Context,
+	ast.Node,
+	types.Type,
+	tsgo.Expression,
+	api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	panic("unused")
+}
+
+func (unusedValues) Equal(
+	api.Context,
+	ast.Node,
+	types.Type,
+	tsgo.Expression,
+	tsgo.Expression,
+) (api.ExpressionEmission, error) {
 	panic("unused")
 }

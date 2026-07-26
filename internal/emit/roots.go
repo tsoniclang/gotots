@@ -28,13 +28,31 @@ func NewRoot(object types.Object) (Root, error) {
 	if object == nil {
 		return Root{}, &RootError{Reason: "object is nil"}
 	}
-	if object.Pkg() == nil || object.Parent() != object.Pkg().Scope() {
+	if object.Pkg() == nil ||
+		(object.Parent() != object.Pkg().Scope() && !isDeclaredMethod(object)) {
 		return Root{}, &RootError{
 			Object: object.Name(),
 			Reason: "object is not a package declaration",
 		}
 	}
 	return Root{object: object}, nil
+}
+
+func isDeclaredMethod(object types.Object) bool {
+	method, ok := object.(*types.Func)
+	if !ok {
+		return false
+	}
+	signature, ok := method.Type().(*types.Signature)
+	if !ok || signature.Recv() == nil {
+		return false
+	}
+	receiverType := signature.Recv().Type()
+	if pointer, ok := types.Unalias(receiverType).(*types.Pointer); ok {
+		receiverType = pointer.Elem()
+	}
+	named, ok := types.Unalias(receiverType).(*types.Named)
+	return ok && named.Obj() != nil && named.Obj().Pkg() == object.Pkg()
 }
 
 func (r Root) Object() types.Object {
@@ -59,6 +77,28 @@ func ExportedAPIRoots(source *load.Package) ([]Root, error) {
 			return nil, err
 		}
 		roots = append(roots, root)
+		typeName, ok := object.(*types.TypeName)
+		if !ok {
+			continue
+		}
+		named, ok := types.Unalias(typeName.Type()).(*types.Named)
+		if !ok {
+			continue
+		}
+		for index := range named.NumMethods() {
+			method := named.Method(index)
+			if !method.Exported() {
+				continue
+			}
+			methodRoot, err := NewRoot(method)
+			if err != nil {
+				return nil, err
+			}
+			roots = append(roots, methodRoot)
+		}
 	}
+	sort.Slice(roots, func(left, right int) bool {
+		return compareObjects(roots[left].object, roots[right].object) < 0
+	})
 	return roots, nil
 }

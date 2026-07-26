@@ -15,6 +15,11 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.BinaryExpr,
 ) (api.ExpressionEmission, error) {
+	if source.Op == token.EQL || source.Op == token.NEQ {
+		if target, ok, err := emitValueEquality(context, children, source); ok || err != nil {
+			return target, err
+		}
+	}
 	operator, operandType, ok := operationFor(context, source)
 	if !ok {
 		return api.ExpressionEmission{},
@@ -49,9 +54,6 @@ func Emit(
 		operator,
 		right.Value(),
 	))
-	if isSignedArithmetic(source.Op) {
-		target = exactInt32Arithmetic(context, source.Op, left.Value(), right.Value())
-	}
 	return api.NewExpressionEmission(
 		nil,
 		target,
@@ -59,46 +61,66 @@ func Emit(
 	)
 }
 
-func exactInt32Arithmetic(
+func emitValueEquality(
 	context api.Context,
-	operator token.Token,
-	left tsgo.Expression,
-	right tsgo.Expression,
-) tsgo.Expression {
-	if operator == token.MUL {
-		return context.Factory().CallExpression(
-			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier("Math"),
-				nil,
-				context.Factory().Identifier("imul"),
-				tsgo.NodeFlagsNone,
-			),
-			nil,
-			nil,
-			[]tsgo.Expression{left, right},
-			tsgo.NodeFlagsNone,
+	children api.ChildEmitter,
+	source *ast.BinaryExpr,
+) (api.ExpressionEmission, bool, error) {
+	leftType := context.TypesInfo().TypeOf(source.X)
+	rightType := context.TypesInfo().TypeOf(source.Y)
+	if leftType == nil ||
+		rightType == nil ||
+		!types.Identical(leftType, rightType) ||
+		!context.Values().RequiresCustomEquality(leftType) {
+		return api.ExpressionEmission{}, false, nil
+	}
+	left, err := children.Expression(
+		context.
+			WithRole(api.RoleBinaryLeft).
+			WithExpectedType(leftType),
+		source.X,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	right, err := children.Expression(
+		context.
+			WithRole(api.RoleBinaryRight).
+			WithExpectedType(rightType),
+		source.Y,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	if len(left.Before()) != 0 || len(right.Before()) != 0 {
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	equal, err := context.Values().Equal(
+		context,
+		source,
+		leftType,
+		left.Value(),
+		right.Value(),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	value := equal.Value()
+	if source.Op == token.NEQ {
+		value = context.Factory().PrefixUnaryExpression(
+			tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
+			value,
 		)
 	}
-	var targetOperator tsgo.BinaryOperator
-	if operator == token.ADD {
-		targetOperator = tsgo.BinaryOperatorPlusToken
-	} else {
-		targetOperator = tsgo.BinaryOperatorMinusToken
-	}
-	value := context.Factory().BinaryExpression(
-		nil,
-		left,
-		nil,
-		context.Factory().BinaryOperatorToken(targetOperator),
-		right,
-	)
-	return context.Factory().BinaryExpression(
-		nil,
-		context.Factory().ParenthesizedExpression(value),
-		nil,
-		context.Factory().BinaryOperatorToken(tsgo.BinaryOperatorBarToken),
-		context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
-	)
+	return api.DirectExpression(
+		value,
+		api.CombineRequests(
+			left.Requests(),
+			right.Requests(),
+			equal.Requests(),
+		)...,
+	), true, nil
 }
 
 func operationFor(
@@ -114,7 +136,7 @@ func operationFor(
 	)
 	switch {
 	case isSignedArithmetic(source.Op) &&
-		basictype.SupportsExactInt32(
+		basictype.SupportsInteger(
 			context.TypesSizes(),
 			context.TypesInfo().TypeOf(source),
 		):
@@ -211,7 +233,7 @@ func integerOperandType(
 	right types.Type,
 ) (types.Type, bool) {
 	for _, candidate := range []types.Type{left, right} {
-		if !basictype.SupportsExactInt32(sizes, candidate) {
+		if !basictype.SupportsInteger(sizes, candidate) {
 			continue
 		}
 		if types.AssignableTo(left, candidate) && types.AssignableTo(right, candidate) {

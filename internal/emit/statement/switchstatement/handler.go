@@ -19,7 +19,7 @@ func Emit(
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
 	tagType := context.TypesInfo().TypeOf(source.Tag)
-	if !basictype.SupportsExactInt32(context.TypesSizes(), tagType) {
+	if !basictype.SupportsInteger(context.TypesSizes(), tagType) {
 		return api.StatementEmission{},
 			api.Unsupported(
 				context.WithRole(api.RoleSwitchTag),

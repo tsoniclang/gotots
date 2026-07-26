@@ -45,14 +45,6 @@ func emitMultipleResults(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	targetType, err := children.RepresentedType(
-		context.WithRole(api.RoleLocalType),
-		source.Rhs[0],
-		results,
-	)
-	if err != nil {
-		return api.StatementEmission{}, err
-	}
 	temporaryName, err := context.Names().Temporary(api.TemporaryMultipleResults)
 	if err != nil {
 		return api.StatementEmission{}, err
@@ -64,11 +56,10 @@ func emitMultipleResults(
 			context,
 			tsgo.NodeFlagsConst,
 			temporaryName,
-			targetType.Value(),
 			value.Value(),
 		),
 	)
-	requests := api.CombineRequests(value.Requests(), targetType.Requests())
+	requests := value.Requests()
 
 	for index, target := range targets {
 		if target.discard {
@@ -81,30 +72,32 @@ func emitMultipleResults(
 			tsgo.NodeFlagsNone,
 		)
 		if target.declaration {
-			declarationType, err := children.RepresentedType(
-				context.WithRole(api.RoleLocalType),
-				target.source,
-				target.object.Type(),
-			)
-			if err != nil {
-				return api.StatementEmission{}, err
-			}
 			statements = append(
 				statements,
 				variableStatement(
 					context,
 					tsgo.NodeFlagsLet,
 					target.name,
-					declarationType.Value(),
 					element,
 				),
 			)
-			requests = append(requests, declarationType.Requests()...)
 		} else {
+			assigned, err := context.Values().Assign(
+				context.WithRole(api.RoleAssignmentTarget),
+				target.source,
+				target.object.Type(),
+				context.Factory().Identifier(target.name),
+				api.DirectExpression(element),
+			)
+			if err != nil {
+				return api.StatementEmission{}, err
+			}
+			statements = append(statements, assigned.Before()...)
 			statements = append(
 				statements,
-				assignmentStatement(context, target.name, element),
+				context.Factory().ExpressionStatement(assigned.Value()),
 			)
+			requests = append(requests, assigned.Requests()...)
 		}
 		requests = append(requests, target.requests...)
 	}

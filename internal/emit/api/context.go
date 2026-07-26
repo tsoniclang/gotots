@@ -15,6 +15,9 @@ type Context struct {
 	typesSizes      types.Sizes
 	factory         tsgo.Factory
 	names           Names
+	values          Values
+	integer         IntegerRepresentation
+	evaluationOrder EvaluationOrder
 	expectedType    types.Type
 	expectedResults *types.Tuple
 	functionResults *types.Tuple
@@ -30,6 +33,9 @@ func NewContext(
 	typesSizes types.Sizes,
 	factory tsgo.Factory,
 	names Names,
+	values Values,
+	integer IntegerRepresentation,
+	evaluationOrder EvaluationOrder,
 ) (Context, error) {
 	switch {
 	case role == "":
@@ -44,15 +50,24 @@ func NewContext(
 		return Context{}, &ContextError{Reason: "types sizes are nil"}
 	case names == nil:
 		return Context{}, &ContextError{Reason: "name owner is nil"}
+	case values == nil:
+		return Context{}, &ContextError{Reason: "value owner is nil"}
+	case !integer.Valid():
+		return Context{}, &ContextError{Reason: "integer representation is invalid"}
+	case !evaluationOrder.Valid():
+		return Context{}, &ContextError{Reason: "evaluation order is invalid"}
 	}
 	return Context{
-		role:         role,
-		fileSet:      fileSet,
-		typesPackage: typesPackage,
-		typesInfo:    typesInfo,
-		typesSizes:   typesSizes,
-		factory:      factory,
-		names:        names,
+		role:            role,
+		fileSet:         fileSet,
+		typesPackage:    typesPackage,
+		typesInfo:       typesInfo,
+		typesSizes:      typesSizes,
+		factory:         factory,
+		names:           names,
+		values:          values,
+		integer:         integer,
+		evaluationOrder: evaluationOrder,
 	}, nil
 }
 
@@ -122,6 +137,18 @@ func (c Context) Factory() tsgo.Factory {
 
 func (c Context) Names() Names {
 	return c.names
+}
+
+func (c Context) Values() Values {
+	return c.values
+}
+
+func (c Context) IntegerRepresentation() IntegerRepresentation {
+	return c.integer
+}
+
+func (c Context) EvaluationOrder() EvaluationOrder {
+	return c.evaluationOrder
 }
 
 func (c Context) ExpectedType() types.Type {
