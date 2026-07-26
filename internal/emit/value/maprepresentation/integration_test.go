@@ -86,15 +86,17 @@ func TestMapValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 		".call(",
 		".apply(",
 		".bind(",
+		"get(key)!",
 	} {
 		if strings.Contains(runtimeSource, forbidden) {
 			t.Fatalf("runtime map artifact contains %q:\n%s", forbidden, runtimeSource)
 		}
 	}
 	for _, required := range []string{
-		"class GoMap<K, V>",
+		"class GoMap<K extends boolean | number | bigint, V extends boolean | number | bigint>",
 		"Map<K, V>",
-		"this.values === undefined || !this.values.has(key)",
+		"const storedValue = storage.get(key);",
+		"storedValue === undefined",
 		"return this.zeroValue;",
 		"assignment to entry in nil map",
 	} {

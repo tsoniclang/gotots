@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -44,12 +45,16 @@ func (Owner) Zero(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
+		nilName, err := mapruntime.Name(mapruntime.MemberNil)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 		return api.DirectExpression(
 			context.Factory().CallExpression(
 				context.Factory().PropertyAccessExpression(
 					context.Factory().Identifier(reference.Name()),
 					nil,
-					context.Factory().Identifier("nil"),
+					context.Factory().Identifier(nilName),
 					tsgo.NodeFlagsNone,
 				),
 				nil,

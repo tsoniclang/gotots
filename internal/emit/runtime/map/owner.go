@@ -16,6 +16,38 @@ const (
 	entriesName   = "entries"
 )
 
+type memberNames struct {
+	nilMember  string
+	makeMember string
+	lookup     string
+	lookupOK   string
+	store      string
+	delete     string
+	length     string
+	isNil      string
+}
+
+func resolveMemberNames() (memberNames, error) {
+	resolved := make([]string, 0, MemberIsNil)
+	for member := MemberNil; member <= MemberIsNil; member++ {
+		name, err := Name(member)
+		if err != nil {
+			return memberNames{}, err
+		}
+		resolved = append(resolved, name)
+	}
+	return memberNames{
+		nilMember:  resolved[0],
+		makeMember: resolved[1],
+		lookup:     resolved[2],
+		lookupOK:   resolved[3],
+		store:      resolved[4],
+		delete:     resolved[5],
+		length:     resolved[6],
+		isNil:      resolved[7],
+	}, nil
+}
+
 func Build(
 	factory tsgo.Factory,
 	symbol api.RuntimeSymbol,
@@ -27,6 +59,10 @@ func Build(
 	if symbol != api.RuntimeMap ||
 		contract.Module() != api.RuntimeModuleMap {
 		return nil, &api.RuntimeSymbolError{Symbol: symbol}
+	}
+	members, err := resolveMemberNames()
+	if err != nil {
+		return nil, err
 	}
 	className := contract.ExportedName()
 	keyType := typeName(factory, keyTypeName)
@@ -42,14 +78,14 @@ func Build(
 		nil,
 		[]tsgo.ClassElement{
 			constructor(factory, keyType, valueType),
-			nilMethod(factory, className),
-			makeMethod(factory, className),
-			lookupMethod(factory, valueType),
-			lookupOKMethod(factory, valueType),
-			storeMethod(factory, valueType),
-			deleteMethod(factory),
-			lengthMethod(factory),
-			nilStateMethod(factory),
+			nilMethod(factory, className, members.nilMember),
+			makeMethod(factory, className, members.makeMember),
+			lookupMethod(factory, valueType, members.lookup),
+			lookupOKMethod(factory, valueType, members.lookupOK),
+			storeMethod(factory, valueType, members.store),
+			deleteMethod(factory, members.delete),
+			lengthMethod(factory, members.length),
+			nilStateMethod(factory, members.isNil),
 		},
 	), nil
 }
@@ -83,6 +119,7 @@ func constructor(
 func nilMethod(
 	factory tsgo.Factory,
 	className string,
+	memberName string,
 ) tsgo.MethodDeclaration {
 	keyType := typeName(factory, keyTypeName)
 	valueType := typeName(factory, valueTypeName)
@@ -91,7 +128,7 @@ func nilMethod(
 			factory.StaticKeyword(),
 		},
 		nil,
-		factory.Identifier("nil"),
+		factory.Identifier(memberName),
 		nil,
 		[]tsgo.TypeParameterDeclaration{
 			typeParameter(factory, keyTypeName),
@@ -119,6 +156,7 @@ func nilMethod(
 func makeMethod(
 	factory tsgo.Factory,
 	className string,
+	memberName string,
 ) tsgo.MethodDeclaration {
 	keyType := typeName(factory, keyTypeName)
 	valueType := typeName(factory, valueTypeName)
@@ -127,7 +165,7 @@ func makeMethod(
 			factory.StaticKeyword(),
 		},
 		nil,
-		factory.Identifier("make"),
+		factory.Identifier(memberName),
 		nil,
 		[]tsgo.TypeParameterDeclaration{
 			typeParameter(factory, keyTypeName),
@@ -182,37 +220,26 @@ func makeMethod(
 func lookupMethod(
 	factory tsgo.Factory,
 	valueType tsgo.TypeNode,
+	memberName string,
 ) tsgo.MethodDeclaration {
 	return factory.MethodDeclaration(
 		nil,
 		nil,
-		factory.Identifier("lookup"),
+		factory.Identifier(memberName),
 		nil,
 		nil,
 		[]tsgo.ParameterDeclaration{
 			parameter(factory, keyName, typeName(factory, keyTypeName)),
 		},
 		valueType,
-		factory.Block([]tsgo.Statement{
-			missingReturn(factory, field(factory, zeroName)),
-			factory.ReturnStatement(
-				factory.NonNullExpression(
-					methodCall(
-						factory,
-						field(factory, valuesName),
-						"get",
-						factory.Identifier(keyName),
-					),
-					tsgo.NodeFlagsNone,
-				),
-			),
-		}, true),
+		factory.Block(lookupStatements(factory, false), true),
 	)
 }
 
 func lookupOKMethod(
 	factory tsgo.Factory,
 	valueType tsgo.TypeNode,
+	memberName string,
 ) tsgo.MethodDeclaration {
 	tupleType := factory.TupleTypeNode([]tsgo.TypeNode{
 		valueType,
@@ -223,53 +250,26 @@ func lookupOKMethod(
 	return factory.MethodDeclaration(
 		nil,
 		nil,
-		factory.Identifier("lookupOk"),
+		factory.Identifier(memberName),
 		nil,
 		nil,
 		[]tsgo.ParameterDeclaration{
 			parameter(factory, keyName, typeName(factory, keyTypeName)),
 		},
 		tupleType,
-		factory.Block([]tsgo.Statement{
-			missingReturn(
-				factory,
-				factory.ArrayLiteralExpression(
-					[]tsgo.Expression{
-						field(factory, zeroName),
-						factory.FalseLiteral(),
-					},
-					false,
-				),
-			),
-			factory.ReturnStatement(
-				factory.ArrayLiteralExpression(
-					[]tsgo.Expression{
-						factory.NonNullExpression(
-							methodCall(
-								factory,
-								field(factory, valuesName),
-								"get",
-								factory.Identifier(keyName),
-							),
-							tsgo.NodeFlagsNone,
-						),
-						factory.TrueLiteral(),
-					},
-					false,
-				),
-			),
-		}, true),
+		factory.Block(lookupStatements(factory, true), true),
 	)
 }
 
 func storeMethod(
 	factory tsgo.Factory,
 	valueType tsgo.TypeNode,
+	memberName string,
 ) tsgo.MethodDeclaration {
 	return factory.MethodDeclaration(
 		nil,
 		nil,
-		factory.Identifier("store"),
+		factory.Identifier(memberName),
 		nil,
 		nil,
 		[]tsgo.ParameterDeclaration{
@@ -292,11 +292,14 @@ func storeMethod(
 	)
 }
 
-func deleteMethod(factory tsgo.Factory) tsgo.MethodDeclaration {
+func deleteMethod(
+	factory tsgo.Factory,
+	memberName string,
+) tsgo.MethodDeclaration {
 	return factory.MethodDeclaration(
 		nil,
 		nil,
-		factory.Identifier("delete"),
+		factory.Identifier(memberName),
 		nil,
 		nil,
 		[]tsgo.ParameterDeclaration{
@@ -322,11 +325,14 @@ func deleteMethod(factory tsgo.Factory) tsgo.MethodDeclaration {
 	)
 }
 
-func lengthMethod(factory tsgo.Factory) tsgo.MethodDeclaration {
+func lengthMethod(
+	factory tsgo.Factory,
+	memberName string,
+) tsgo.MethodDeclaration {
 	return factory.MethodDeclaration(
 		nil,
 		nil,
-		factory.Identifier("length"),
+		factory.Identifier(memberName),
 		nil,
 		nil,
 		nil,
@@ -352,11 +358,14 @@ func lengthMethod(factory tsgo.Factory) tsgo.MethodDeclaration {
 	)
 }
 
-func nilStateMethod(factory tsgo.Factory) tsgo.MethodDeclaration {
+func nilStateMethod(
+	factory tsgo.Factory,
+	memberName string,
+) tsgo.MethodDeclaration {
 	return factory.MethodDeclaration(
 		nil,
 		nil,
-		factory.Identifier("isNil"),
+		factory.Identifier(memberName),
 		nil,
 		nil,
 		nil,
@@ -376,45 +385,6 @@ func nilStateMethod(factory tsgo.Factory) tsgo.MethodDeclaration {
 				),
 			),
 		}, true),
-	)
-}
-
-func missingReturn(
-	factory tsgo.Factory,
-	value tsgo.Expression,
-) tsgo.IfStatement {
-	missing := factory.BinaryExpression(
-		nil,
-		field(factory, valuesName),
-		nil,
-		factory.BinaryOperatorToken(
-			tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-		),
-		factory.Identifier("undefined"),
-	)
-	missing = factory.BinaryExpression(
-		nil,
-		missing,
-		nil,
-		factory.BinaryOperatorToken(
-			tsgo.BinaryOperatorBarBarToken,
-		),
-		factory.PrefixUnaryExpression(
-			tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
-			methodCall(
-				factory,
-				field(factory, valuesName),
-				"has",
-				factory.Identifier(keyName),
-			),
-		),
-	)
-	return factory.IfStatement(
-		missing,
-		factory.Block([]tsgo.Statement{
-			factory.ReturnStatement(value),
-		}, true),
-		nil,
 	)
 }
 
@@ -499,10 +469,24 @@ func typeParameter(
 	return factory.TypeParameterDeclaration(
 		nil,
 		factory.Identifier(name),
-		nil,
+		scalarConstraint(factory),
 		nil,
 		nil,
 	)
+}
+
+func scalarConstraint(factory tsgo.Factory) tsgo.TypeNode {
+	return factory.UnionTypeNode([]tsgo.TypeNode{
+		factory.KeywordTypeNode(
+			tsgo.KeywordTypeSyntaxKindBooleanKeyword,
+		),
+		factory.KeywordTypeNode(
+			tsgo.KeywordTypeSyntaxKindNumberKeyword,
+		),
+		factory.KeywordTypeNode(
+			tsgo.KeywordTypeSyntaxKindBigIntKeyword,
+		),
+	})
 }
 
 func typeName(factory tsgo.Factory, name string) tsgo.TypeNode {

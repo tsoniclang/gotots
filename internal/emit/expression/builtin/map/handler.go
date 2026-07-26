@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -147,7 +148,15 @@ func emitLen(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	target := tsgo.Expression(methodCall(context, receiver.Value(), "length"))
+	lengthName, err := mapruntime.Name(mapruntime.MemberLength)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	target := tsgo.Expression(methodCall(
+		context,
+		receiver.Value(),
+		lengthName,
+	))
 	if context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
 		target = context.Factory().CallExpression(
 			context.Factory().Identifier("BigInt"),
@@ -213,9 +222,13 @@ func emitDelete(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	deleteName, err := mapruntime.Name(mapruntime.MemberDelete)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	return api.NewExpressionEmission(
 		before,
-		methodCall(context, values[0], "delete", values[1]),
+		methodCall(context, values[0], deleteName, values[1]),
 		requests,
 	)
 }

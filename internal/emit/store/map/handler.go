@@ -6,6 +6,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -84,6 +85,10 @@ func EmitAssignment(
 	if err != nil {
 		return api.StatementEmission{}, true, err
 	}
+	storeName, err := mapruntime.Name(mapruntime.MemberStore)
+	if err != nil {
+		return api.StatementEmission{}, true, err
+	}
 	before = append(
 		before,
 		context.Factory().ExpressionStatement(
@@ -91,7 +96,7 @@ func EmitAssignment(
 				context.Factory().PropertyAccessExpression(
 					values[0],
 					nil,
-					context.Factory().Identifier("store"),
+					context.Factory().Identifier(storeName),
 					tsgo.NodeFlagsNone,
 				),
 				nil,

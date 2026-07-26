@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -107,6 +108,10 @@ func Make(
 	if err != nil {
 		return nil, nil, err
 	}
+	makeName, err := mapruntime.Name(mapruntime.MemberMake)
+	if err != nil {
+		return nil, nil, err
+	}
 	allRequests := append(
 		[][]api.PlacementRequest{reference.Requests()},
 		requests...,
@@ -115,7 +120,7 @@ func Make(
 		context.Factory().PropertyAccessExpression(
 			context.Factory().Identifier(reference.Name()),
 			nil,
-			context.Factory().Identifier("make"),
+			context.Factory().Identifier(makeName),
 			tsgo.NodeFlagsNone,
 		),
 		nil,

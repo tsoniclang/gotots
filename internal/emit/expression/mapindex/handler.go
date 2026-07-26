@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -47,9 +48,13 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	method := "lookup"
+	member := mapruntime.MemberLookup
 	if context.ExpectedResults() != nil {
-		method = "lookupOk"
+		member = mapruntime.MemberLookupOK
+	}
+	method, err := mapruntime.Name(member)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
 	return api.NewExpressionEmission(
 		before,

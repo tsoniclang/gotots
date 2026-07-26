@@ -55,12 +55,15 @@ func TestRuntimeMapMutationGuardsOwnMissingAndNilWriteSemantics(t *testing.T) {
 		methods[method.Name().(tsgo.Identifier).Text()] = method
 	}
 	lookup := methods["lookup"].Body().(tsgo.Block).Statements()
-	if len(lookup) != 2 {
-		t.Fatalf("lookup statements = %d, want missing guard and present return", len(lookup))
+	if len(lookup) != 5 {
+		t.Fatalf("lookup statements = %d, want typed storage/value narrowing", len(lookup))
 	}
-	missing, ok := lookup[0].(tsgo.IfStatement)
+	if _, ok := lookup[0].(tsgo.VariableStatement); !ok {
+		t.Fatalf("lookup storage capture = %T", lookup[0])
+	}
+	missing, ok := lookup[1].(tsgo.IfStatement)
 	if !ok || missing.Expression().Kind() != tsgo.SyntaxKindBinaryExpression {
-		t.Fatalf("lookup missing guard = %T", lookup[0])
+		t.Fatalf("lookup missing-storage guard = %T", lookup[1])
 	}
 	missingReturn := missing.ThenStatement().(tsgo.Block).
 		Statements()[0].(tsgo.ReturnStatement).
@@ -68,9 +71,24 @@ func TestRuntimeMapMutationGuardsOwnMissingAndNilWriteSemantics(t *testing.T) {
 	if missingReturn.Name().(tsgo.Identifier).Text() != zeroName {
 		t.Fatal("missing lookup does not return the represented Go zero")
 	}
-	present := lookup[1].(tsgo.ReturnStatement).Expression()
-	if present.Kind() != tsgo.SyntaxKindNonNullExpression {
-		t.Fatalf("present lookup = %T, want checked Map.get result", present)
+	if _, ok := lookup[2].(tsgo.VariableStatement); !ok {
+		t.Fatalf("lookup value capture = %T", lookup[2])
+	}
+	if _, ok := lookup[3].(tsgo.IfStatement); !ok {
+		t.Fatalf("lookup missing-value guard = %T", lookup[3])
+	}
+	present := lookup[4].(tsgo.ReturnStatement).Expression()
+	if present.Kind() != tsgo.SyntaxKindIdentifier {
+		t.Fatalf("present lookup = %T, want narrowed scalar identifier", present)
+	}
+	lookupOK := methods["lookupOk"].Body().(tsgo.Block).Statements()
+	if len(lookupOK) != 5 {
+		t.Fatalf("lookupOk statements = %d, want typed storage/value narrowing", len(lookupOK))
+	}
+	for _, statement := range lookupOK {
+		if statement.Kind() == tsgo.SyntaxKindNonNullExpression {
+			t.Fatal("lookupOk retains a non-null assertion")
+		}
 	}
 
 	store := methods["store"].Body().(tsgo.Block).Statements()
