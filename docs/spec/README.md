@@ -65,13 +65,16 @@ IR, operation graph, whole-program plan, lowering IR, handwritten target tree,
 local formatter, or target-text fallback between them.
 
 This does not prohibit ordinary compiler coordination. Deterministic names,
-scope builders, imports, target declarations, diagnostics, references into the
-Go graph, and placement requests are allowed. They must not restate the source
-program as a second model or become a second semantic truth owner.
+scope builders, imports, target declaration assemblies, diagnostics, references
+into the Go graph, and placement requests are allowed. They must not restate the
+source program as a second model or become a second semantic truth owner.
 
-Mutable target builders and placement are owned by the root emitter. Handlers
-receive immutable scope identities/capabilities and return placement requests;
-they do not mutate arbitrary ancestors.
+Mutable target builders, declaration assembly, and placement are owned by the
+root emitter. Handlers receive immutable scope identities/capabilities and
+return placement or declaration-requirement requests; they do not mutate
+arbitrary ancestors. One declaration owner may reconstruct its own typed TS-Go
+nodes while the compilation is open. The final target file is sealed and
+printed only after all such requests reach a fixed point.
 
 ## Vocabulary
 
@@ -100,6 +103,13 @@ they do not mutate arbitrary ancestors.
   requests and diagnostics. It is target output under construction, not an IR.
 - **placement request:** a typed request to insert an import, declaration,
   helper, temporary, or statement at a legal preferred target scope.
+- **declaration requirement:** a closed typed request, keyed by the
+  authoritative `go/types` declaration identity, asking that declaration's one
+  target owner to add or revise a use-dependent target obligation before the
+  containing file is sealed.
+- **declaration assembly:** the root-owned, compilation-local target state for
+  one source definition: already-created typed TS-Go protocol nodes plus its
+  deduplicated declaration requirements. It is not a source model or IR.
 - **generated support module:** a GoToTS-owned TypeScript module containing
   deduplicated type aliases or behaviorally real runtime operations required by
   generated files. It is constructed through TS-Go AST like every other output

@@ -233,15 +233,16 @@ The small result algebra contains target nodes only:
 ExpressionEmission
   before: ordered typed TS-Go protocol statements constrained to this point
   value:  one typed TS-Go protocol expression
-  requests: imports/declarations/helpers with explicit placement policy
+  requests: imports/declarations/helpers or declaration requirements with
+            explicit placement policy
 
 StatementEmission
   statements: ordered typed TS-Go protocol statements
-  requests: placement requests
+  requests: placement or declaration-requirement requests
 
 DeclarationEmission
   declarations: ordered typed TS-Go protocol declarations
-  requests: placement requests
+  requests: placement or declaration-requirement requests
 ```
 
 Narrow contextual entries whose target category is not an expression,
@@ -258,6 +259,13 @@ may reserve a deterministic target name through the name owner, but it does
 not install an import, declaration, helper, or statement into a mutable parent.
 The corresponding typed placement request travels in the result and is
 applied once by the root placement owner.
+
+A declaration requirement similarly carries no mutable target node. It names
+the exact declaration owner and one closed obligation. The root routes it back
+to that semantic owner, which reconstructs its complete typed TS-Go declaration
+assembly from the source declaration and accumulated requirement set. This
+replacement occurs only in compilation-local target state before file sealing;
+no handler patches a previously printed artifact.
 
 Result composition is owner-directed:
 
