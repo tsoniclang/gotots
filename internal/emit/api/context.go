@@ -16,6 +16,7 @@ type Context struct {
 	factory         tsgo.Factory
 	names           Names
 	expectedType    types.Type
+	expectedResults *types.Tuple
 	functionResults *types.Tuple
 	breakDepth      uint32
 	continueDepth   uint32
@@ -62,12 +63,23 @@ func (c Context) WithRole(role Role) Context {
 
 func (c Context) WithExpectedType(expectedType types.Type) Context {
 	c.expectedType = expectedType
+	c.expectedResults = nil
+	return c
+}
+
+func (c Context) WithExpectedResults(expectedResults *types.Tuple) Context {
+	if expectedResults == nil || expectedResults.Len() < 2 {
+		panic("expected result tuple has fewer than two elements")
+	}
+	c.expectedType = nil
+	c.expectedResults = expectedResults
 	return c
 }
 
 func (c Context) EnterFunction(results *types.Tuple) Context {
 	c.functionResults = results
 	c.expectedType = nil
+	c.expectedResults = nil
 	c.breakDepth = 0
 	c.continueDepth = 0
 	return c
@@ -114,6 +126,10 @@ func (c Context) Names() Names {
 
 func (c Context) ExpectedType() types.Type {
 	return c.expectedType
+}
+
+func (c Context) ExpectedResults() *types.Tuple {
+	return c.expectedResults
 }
 
 func (c Context) FunctionResults() *types.Tuple {

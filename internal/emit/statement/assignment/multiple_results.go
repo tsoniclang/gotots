@@ -1,0 +1,112 @@
+package assignment
+
+import (
+	"go/ast"
+	"go/token"
+	"go/types"
+	"strconv"
+
+	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
+
+func emitMultipleResults(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.AssignStmt,
+	results *types.Tuple,
+) (api.StatementEmission, error) {
+	if results == nil || results.Len() != len(source.Lhs) {
+		return api.StatementEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	targets, err := parallelTargets(context, source)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
+	for index, target := range targets {
+		if !target.discard &&
+			!types.AssignableTo(results.At(index).Type(), target.object.Type()) {
+			return api.StatementEmission{},
+				api.Unsupported(context, api.CategoryStatement, source)
+		}
+	}
+
+	role := api.RoleAssignmentValue
+	if source.Tok == token.DEFINE {
+		role = api.RoleLocalValue
+	}
+	value, err := children.Expression(
+		context.
+			WithRole(role).
+			WithExpectedResults(results),
+		source.Rhs[0],
+	)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
+	targetType, err := children.RepresentedType(
+		context.WithRole(api.RoleLocalType),
+		source.Rhs[0],
+		results,
+	)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
+	temporaryName, err := context.Names().Temporary(api.TemporaryMultipleResults)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
+	statements := value.Before()
+	statements = append(
+		statements,
+		variableStatement(
+			context,
+			tsgo.NodeFlagsConst,
+			temporaryName,
+			targetType.Value(),
+			value.Value(),
+		),
+	)
+	requests := api.CombineRequests(value.Requests(), targetType.Requests())
+
+	for index, target := range targets {
+		if target.discard {
+			continue
+		}
+		element := context.Factory().ElementAccessExpression(
+			context.Factory().Identifier(temporaryName),
+			nil,
+			context.Factory().NumericLiteral(strconv.Itoa(index), tsgo.TokenFlagsNone),
+			tsgo.NodeFlagsNone,
+		)
+		if target.declaration {
+			declarationType, err := children.RepresentedType(
+				context.WithRole(api.RoleLocalType),
+				target.source,
+				target.object.Type(),
+			)
+			if err != nil {
+				return api.StatementEmission{}, err
+			}
+			statements = append(
+				statements,
+				variableStatement(
+					context,
+					tsgo.NodeFlagsLet,
+					target.name,
+					declarationType.Value(),
+					element,
+				),
+			)
+			requests = append(requests, declarationType.Requests()...)
+		} else {
+			statements = append(
+				statements,
+				assignmentStatement(context, target.name, element),
+			)
+		}
+		requests = append(requests, target.requests...)
+	}
+	return api.NewStatementEmission(statements, requests)
+}

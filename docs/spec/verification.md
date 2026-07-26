@@ -165,6 +165,8 @@ Examples include:
 
 - one-result versus comma-ok map indexing;
 - one RHS producing multiple assignment results;
+- direct tuple declaration/return/forwarding, blank-result stores, and one
+  multi-valued call supplying a complete argument list;
 - side effects in parallel assignment and short-circuit expressions;
 - nil pointer receiver methods that do and do not dereference;
 - embedded methods whose Go static selection differs from TypeScript virtual

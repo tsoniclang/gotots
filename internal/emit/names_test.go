@@ -44,15 +44,23 @@ func TestNameOwnerSeparatesShadowAndTemporaryNamespaces(t *testing.T) {
 		"__gotots_assign_0",
 		types.Typ[types.Int],
 	)
+	reservedResults := types.NewVar(
+		token.NoPos,
+		nil,
+		"__gotots_results_0",
+		types.Typ[types.Int],
+	)
 	functionScope.Insert(outer)
 	blockScope.Insert(shadow)
 	blockScope.Insert(reservedShadow)
 	blockScope.Insert(reservedTemporary)
+	blockScope.Insert(reservedResults)
 	info := &types.Info{Defs: map[*ast.Ident]types.Object{
 		{Name: "value"}:             outer,
 		{Name: "shadow"}:            shadow,
 		{Name: "reservedShadow"}:    reservedShadow,
 		{Name: "reservedTemporary"}: reservedTemporary,
+		{Name: "reservedResults"}:   reservedResults,
 	}}
 	owner := newNameOwner(packageScope, info)
 
@@ -70,6 +78,10 @@ func TestNameOwnerSeparatesShadowAndTemporaryNamespaces(t *testing.T) {
 	if name, err := file.Temporary(api.TemporaryAssignmentValue); err != nil ||
 		name != "__gotots_assign_1" {
 		t.Fatalf("temporary = %q, %v", name, err)
+	}
+	if name, err := file.Temporary(api.TemporaryMultipleResults); err != nil ||
+		name != "__gotots_results_1" {
+		t.Fatalf("result temporary = %q, %v", name, err)
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	tupletype "github.com/tsoniclang/gotots/internal/emit/type/tuple"
 )
 
 func (e *Emitter) Type(
@@ -20,5 +21,8 @@ func (e *Emitter) RepresentedType(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
+	if tuple, ok := types.Unalias(sourceType).(*types.Tuple); ok {
+		return tupletype.Emit(context, e, source, tuple)
+	}
 	return basictype.EmitRepresented(context, source, sourceType)
 }

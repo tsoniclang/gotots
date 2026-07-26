@@ -183,6 +183,7 @@ type parallelTarget struct {
 	object      *types.Var
 	name        string
 	declaration bool
+	discard     bool
 	requests    []api.PlacementRequest
 }
 
@@ -191,7 +192,16 @@ func emitParallel(
 	children api.ChildEmitter,
 	source *ast.AssignStmt,
 ) (api.StatementEmission, error) {
-	if len(source.Lhs) < 2 || len(source.Lhs) != len(source.Rhs) {
+	if len(source.Lhs) < 2 {
+		return api.StatementEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	if len(source.Rhs) == 1 {
+		if tuple, ok := context.TypesInfo().TypeOf(source.Rhs[0]).(*types.Tuple); ok {
+			return emitMultipleResults(context, children, source, tuple)
+		}
+	}
+	if len(source.Lhs) != len(source.Rhs) {
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
@@ -206,9 +216,17 @@ func emitParallel(
 	for index, target := range targets {
 		sourceValue := source.Rhs[index]
 		sourceType := context.TypesInfo().TypeOf(sourceValue)
-		if sourceType == nil || !types.AssignableTo(sourceType, target.object.Type()) {
+		if sourceType == nil {
 			return api.StatementEmission{},
 				api.Unsupported(context, api.CategoryStatement, source)
+		}
+		expectedType := sourceType
+		if !target.discard {
+			expectedType = target.object.Type()
+			if !types.AssignableTo(sourceType, expectedType) {
+				return api.StatementEmission{},
+					api.Unsupported(context, api.CategoryStatement, source)
+			}
 		}
 		role := api.RoleAssignmentValue
 		if source.Tok == token.DEFINE {
@@ -217,7 +235,7 @@ func emitParallel(
 		value, err := children.Expression(
 			context.
 				WithRole(role).
-				WithExpectedType(target.object.Type()),
+				WithExpectedType(expectedType),
 			sourceValue,
 		)
 		if err != nil {
@@ -226,7 +244,7 @@ func emitParallel(
 		temporaryType, err := children.RepresentedType(
 			context.WithRole(api.RoleLocalType),
 			target.source,
-			target.object.Type(),
+			expectedType,
 		)
 		if err != nil {
 			return api.StatementEmission{}, err
@@ -255,6 +273,9 @@ func emitParallel(
 	}
 
 	for index, target := range targets {
+		if target.discard {
+			continue
+		}
 		temporary := context.Factory().Identifier(temporaryNames[index])
 		if target.declaration {
 			targetType, err := children.RepresentedType(
@@ -294,8 +315,15 @@ func parallelTargets(
 	targets := make([]parallelTarget, 0, len(source.Lhs))
 	for _, expression := range source.Lhs {
 		identifier, ok := expression.(*ast.Ident)
-		if !ok || identifier.Name == "_" {
+		if !ok {
 			return nil, api.Unsupported(context, api.CategoryStatement, source)
+		}
+		if identifier.Name == "_" {
+			targets = append(targets, parallelTarget{
+				source:  identifier,
+				discard: true,
+			})
+			continue
 		}
 		if source.Tok == token.DEFINE {
 			if object, ok := context.TypesInfo().Defs[identifier].(*types.Var); ok {

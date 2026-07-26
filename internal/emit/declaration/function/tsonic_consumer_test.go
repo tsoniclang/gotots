@@ -143,10 +143,14 @@ func installTsonicTarget(t *testing.T, workingDirectory, tsonicRoot string) {
 		t.Fatal(err)
 	}
 	parent := filepath.Dir(tsonicRoot)
+	csharpTargetRoot := os.Getenv("GOTOTS_TSONIC_CSHARP_ROOT")
+	if csharpTargetRoot == "" {
+		csharpTargetRoot = filepath.Join(parent, "tsonic-csharp")
+	}
 	for name, target := range map[string]string{
 		"csharp-js":      filepath.Join(parent, "csharp-js"),
 		"csharp-runtime": filepath.Join(parent, "csharp-runtime"),
-		"target-csharp":  filepath.Join(parent, "tsonic-csharp"),
+		"target-csharp":  csharpTargetRoot,
 	} {
 		if _, err := os.Stat(filepath.Join(target, "package.json")); err != nil {
 			t.Skipf("selected Tsonic dependency %s is unavailable: %v", name, err)
