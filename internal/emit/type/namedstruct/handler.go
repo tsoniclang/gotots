@@ -21,7 +21,7 @@ func Emit(
 		return api.TypeEmission{},
 			api.Unsupported(context, api.CategoryType, source)
 	}
-	reference, err := context.Names().Reference(named.Obj())
+	reference, err := context.Names().TypeReference(named.Obj())
 	if err != nil {
 		return api.TypeEmission{}, err
 	}

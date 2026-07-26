@@ -129,12 +129,18 @@ func Run() int32 {
 				}
 			}
 		}
-		if file.PackageName() == "api" {
+		if file.Kind() == emit.TargetFileSource &&
+			file.PackageName() == "api" {
 			if !strings.Contains(printed, `import { Point`) ||
 				strings.Count(printed, "export class Point") != 0 {
 				t.Fatal("api module does not reference the one model-owned Point definition")
 			}
-			apiModule = "./" + strings.TrimSuffix(file.OutputPath(), ".ts") + ".js"
+		}
+		if file.Kind() == emit.TargetFilePackageAssembly &&
+			file.PackageName() == "api" {
+			apiModule = "./" +
+				strings.TrimSuffix(file.OutputPath(), ".ts") +
+				".js"
 		}
 	}
 	if modelCopyDefinitions != 1 ||
@@ -151,7 +157,8 @@ func Run() int32 {
 		t.Fatal("cross-package emission has no api module")
 	}
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
-	writeProgramFile(t, runnerPath, `import { Run } from "`+apiModule+`";
+	writeProgramFile(t, runnerPath, `import "./program.js";
+import { Run } from "`+apiModule+`";
 
 console.log(Run());
 `)

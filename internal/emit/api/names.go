@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"go/types"
 	"slices"
+
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type TemporaryKind uint8
@@ -37,9 +39,60 @@ func (r NameReference) Requests() []PlacementRequest {
 	return slices.Clone(r.requests)
 }
 
+type PackageVariableReference struct {
+	stateName string
+	fieldName string
+	requests  []PlacementRequest
+}
+
+func NewPackageVariableReference(
+	stateName string,
+	fieldName string,
+	requests ...PlacementRequest,
+) (PackageVariableReference, error) {
+	switch {
+	case stateName == "":
+		return PackageVariableReference{},
+			&NameError{Reason: "package state name is empty"}
+	case fieldName == "":
+		return PackageVariableReference{},
+			&NameError{Reason: "package variable field name is empty"}
+	}
+	return PackageVariableReference{
+		stateName: stateName,
+		fieldName: fieldName,
+		requests:  slices.Clone(requests),
+	}, nil
+}
+
+func (r PackageVariableReference) StateName() string {
+	return r.stateName
+}
+
+func (r PackageVariableReference) FieldName() string {
+	return r.fieldName
+}
+
+func (r PackageVariableReference) Requests() []PlacementRequest {
+	return slices.Clone(r.requests)
+}
+
+func (r PackageVariableReference) Expression(
+	factory tsgo.Factory,
+) tsgo.PropertyAccessExpression {
+	return factory.PropertyAccessExpression(
+		factory.Identifier(r.stateName),
+		nil,
+		factory.Identifier(r.fieldName),
+		tsgo.NodeFlagsNone,
+	)
+}
+
 type Names interface {
 	Declare(types.Object) (string, error)
 	Reference(types.Object) (NameReference, error)
+	TypeReference(types.Object) (NameReference, error)
+	PackageVariable(*types.Var) (PackageVariableReference, error)
 	Companion(*types.TypeName, CompanionOperation) (NameReference, error)
 	Member(*types.Var) (string, error)
 	Primitive(PrimitiveAlias) (NameReference, error)

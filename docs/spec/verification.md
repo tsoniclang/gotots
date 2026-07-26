@@ -123,9 +123,14 @@ Mutations omit an enqueue, duplicate an owner, break a cycle reservation, and
 silently drop a function-value/interface/callback target.
 Multi-package scheduler proof also includes checkout relocation, root-order
 reversal, recursive cycles, unreachable declarations, cross-package/local-name
-collisions, direct tuple flow, and nested control flow. Generated module paths,
+collisions, colliding portable encodings of distinct Unicode/ASCII package
+names, direct tuple flow, and nested control flow. Generated module paths,
 encoded TS-Go source files, reachable declaration sets, strict typechecking,
 and Go-versus-generated-program behavior must remain exact.
+An imported declaration used as both a type and a value must produce one value
+import regardless of request order. Mutations that retain both imports, let the
+type-only request dominate, or assign different local names must fail at the
+placement or strict-type gate.
 
 ## Native TS-Go Target Proof
 
@@ -225,6 +230,45 @@ definition size/work grows linearly while copy, assignment, equality, and
 method call sites remain constant-size. An ownership mutation adds a callee
 prologue copy or copies a fresh composite/call result; artifact and operation
 counts must reject the duplicate boundary work.
+
+The package-state and initialization family additionally proves:
+
+- reaching one declaration reaches every variable initializer in that package,
+  including an otherwise unreferenced effectful initializer;
+- state fields join exactly to package-scope `types.Var` identities, with one
+  field and no source-file-local mutable binding per variable;
+- every field receives its representation owner's exact zero before the first
+  initializer executes;
+- initializer assignments match `go/types.Info.InitOrder` exactly across
+  source files and do not use lexical file order;
+- same-package reads, stores, compound assignments, and increments mutate one
+  state object;
+- package assemblies are passive and contain no top-level Go initialization
+  statements;
+- one `program.ts` exact-joins reached packages with initialization work,
+  consumes the selected import graph, and calls them in Go's global
+  import-path-sorted dependency order exactly once; blank-import-only packages
+  participate identically;
+- admitted `init` functions run after variable initialization in the selected
+  loader's file order and declaration order, with no filesystem rescan or
+  independently sorted file list;
+- the state module has no runtime import from a source-file module, no
+  initializer, and no `any`/`unknown`/cast-created empty object;
+- strict ESM execution is differential against Go for cross-file order,
+  dependency order, a branching graph where ESM depth-first order differs from
+  Go global order, zero-observing initializers, mutation, and repeated reads;
+  and
+- state/assembly bytes, typed AST nodes, imports, assignments, typecheck
+  time/RSS, and runtime grow linearly with variables and initializers.
+
+Mutations emit a package variable as a source-file `let`, omit an unreferenced
+initializer, use file order instead of `Info.InitOrder`, skip zeroing, duplicate
+a state field, execute initialization at package-module top level, derive order
+from ESM depth-first traversal, omit/duplicate/reorder a `program.ts` call,
+import a dependency source module instead of its passive assembly, add a
+runtime source import to `state.ts`, or replace the state class with a cast
+empty object. Each must fail at the ownership, structure, strict-type,
+differential, or scaling gate.
 
 ### Execution Authority
 

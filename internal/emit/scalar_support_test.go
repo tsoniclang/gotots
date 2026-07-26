@@ -66,15 +66,23 @@ func TestCompileFileReturnsCompleteStandaloneEmission(t *testing.T) {
 		t.Fatal(err)
 	}
 	packages := make(map[string]struct{})
+	initialization := 0
 	support := 0
 	for _, file := range emission.Files() {
 		switch file.Kind() {
-		case emit.TargetFileSource:
+		case emit.TargetFileSource,
+			emit.TargetFilePackageState,
+			emit.TargetFilePackageAssembly:
 			packages[file.PackageName()] = struct{}{}
 		case emit.TargetFileSupport:
 			support++
 			if file.OutputPath() != output.ScalarSupportPath {
 				t.Fatalf("support path = %q", file.OutputPath())
+			}
+		case emit.TargetFileProgramInitialization:
+			initialization++
+			if file.OutputPath() != output.ProgramInitializationPath {
+				t.Fatalf("program initialization path = %q", file.OutputPath())
 			}
 		default:
 			t.Fatalf("target file %s has invalid kind %d", file.OutputPath(), file.Kind())
@@ -85,8 +93,13 @@ func TestCompileFileReturnsCompleteStandaloneEmission(t *testing.T) {
 			t.Fatalf("file-root emission dropped dependency package %s", packageName)
 		}
 	}
-	if len(packages) != 3 || support != 1 {
-		t.Fatalf("complete files = packages %v, support %d", packages, support)
+	if len(packages) != 3 || initialization != 1 || support != 1 {
+		t.Fatalf(
+			"complete files = packages %v, program %d, support %d",
+			packages,
+			initialization,
+			support,
+		)
 	}
 }
 

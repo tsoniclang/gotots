@@ -7,10 +7,11 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit"
+	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
-func TestDemandCompilerRejectsUnsupportedDeclarationRoot(t *testing.T) {
+func TestDemandCompilerRejectsUnsupportedPackageVariableRepresentation(t *testing.T) {
 	projectDirectory := projectPath("constructs", "declaration", "unsupported", "variable")
 	loaded, err := load.One(context.Background(), load.Request{
 		Directory: projectDirectory,
@@ -21,10 +22,10 @@ func TestDemandCompilerRejectsUnsupportedDeclarationRoot(t *testing.T) {
 	}
 
 	_, err = emit.CompileFile(loaded, loaded.Files()[0].Syntax())
-	var unsupported *emit.ScheduleError
+	var unsupported *api.UnsupportedError
 	if !errors.As(err, &unsupported) ||
-		unsupported.Object != "Value" ||
-		unsupported.Reason != "object has no supported source declaration" {
+		unsupported.Category != api.CategoryType ||
+		unsupported.Role != api.RolePackageVariableType {
 		t.Fatalf("error = %#v, want exact unsupported declaration obligation", err)
 	}
 }

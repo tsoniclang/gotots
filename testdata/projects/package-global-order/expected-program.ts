@@ -1,0 +1,12 @@
+import { $initialize as $initialize__a } from "./packages/f641d752540074a61a2a86f20a0fc01438449fb8ec6ef8ff85cd4a2e7c2728c4/a/package.js";
+import { $initialize as $initialize__api } from "./packages/f641d752540074a61a2a86f20a0fc01438449fb8ec6ef8ff85cd4a2e7c2728c4/api/package.js";
+import { $initialize as $initialize__b } from "./packages/f641d752540074a61a2a86f20a0fc01438449fb8ec6ef8ff85cd4a2e7c2728c4/b/package.js";
+import { $initialize as $initialize__registry } from "./packages/f641d752540074a61a2a86f20a0fc01438449fb8ec6ef8ff85cd4a2e7c2728c4/registry/package.js";
+import { $initialize as $initialize____u3c0_ } from "./packages/f641d752540074a61a2a86f20a0fc01438449fb8ec6ef8ff85cd4a2e7c2728c4/y/package.js";
+import { $initialize as $initialize____u3c0___package_1 } from "./packages/f641d752540074a61a2a86f20a0fc01438449fb8ec6ef8ff85cd4a2e7c2728c4/z/package.js";
+$initialize__registry();
+$initialize____u3c0_();
+$initialize__b();
+$initialize____u3c0___package_1();
+$initialize__a();
+$initialize__api();

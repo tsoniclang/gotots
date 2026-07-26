@@ -26,6 +26,9 @@ type TargetFileKind uint8
 const (
 	TargetFileInvalid TargetFileKind = iota
 	TargetFileSource
+	TargetFilePackageState
+	TargetFilePackageAssembly
+	TargetFileProgramInitialization
 	TargetFileSupport
 )
 
@@ -34,15 +37,17 @@ type ProgramEmission struct {
 }
 
 type programSession struct {
-	source     *load.Program
-	factory    tsgo.Factory
-	integer    api.IntegerRepresentation
-	registry   *declarationRegistry
-	scheduler  *scheduler
-	companions *companionScheduler
-	sites      map[types.Object]declarationSite
-	emitters   map[*load.Package]*emitter
-	builders   map[string]*targetFileBuilder
+	source                 *load.Program
+	factory                tsgo.Factory
+	integer                api.IntegerRepresentation
+	registry               *declarationRegistry
+	scheduler              *scheduler
+	companions             *companionScheduler
+	sites                  map[types.Object]declarationSite
+	emitters               map[*load.Package]*emitter
+	builders               map[string]*targetFileBuilder
+	packageBuilders        map[*load.Package]*packageTargetBuilder
+	packageInitializations *packageInitializationScheduler
 }
 
 type targetDeclaration struct {
@@ -52,16 +57,23 @@ type targetDeclaration struct {
 	companions map[api.CompanionOperation][]tsgo.Statement
 }
 
+type targetPackageInitDeclaration struct {
+	position   token.Pos
+	name       string
+	statements []tsgo.Statement
+}
+
 type targetFileBuilder struct {
-	sourcePackage *load.Package
-	sourceFile    load.File
-	outputPath    string
-	emitter       *emitter
-	context       api.Context
-	placement     *placementOwner
-	declarations  []targetDeclaration
-	byObject      map[types.Object]struct{}
-	indexByObject map[types.Object]int
+	sourcePackage       *load.Package
+	sourceFile          load.File
+	outputPath          string
+	emitter             *emitter
+	context             api.Context
+	placement           *placementOwner
+	declarations        []targetDeclaration
+	byObject            map[types.Object]struct{}
+	indexByObject       map[types.Object]int
+	packageInitializers []targetPackageInitDeclaration
 }
 
 func Compile(source *load.Program, roots []Root) (ProgramEmission, error) {
@@ -119,6 +131,12 @@ func CompileWithOptions(
 			}
 			continue
 		}
+		if sourcePackage, ok := session.packageInitializations.next(); ok {
+			if err := session.emitPackageInitialization(sourcePackage); err != nil {
+				return ProgramEmission{}, err
+			}
+			continue
+		}
 		break
 	}
 	files, err := session.targetFiles()
@@ -154,6 +172,9 @@ func fileRoots(
 	for _, declaration := range sourceFile.Decls {
 		switch declaration := declaration.(type) {
 		case *ast.FuncDecl:
+			if isPackageInitDeclaration(declaration) {
+				continue
+			}
 			object := sourcePackage.TypesInfo().Defs[declaration.Name]
 			if object == nil {
 				return nil, &ScheduleError{
@@ -253,16 +274,22 @@ func newProgramSession(
 	if err != nil {
 		return nil, err
 	}
+	registry := newDeclarationRegistry()
+	if err := registry.indexPackageTargets(source.Packages()); err != nil {
+		return nil, err
+	}
 	session := &programSession{
-		source:     source,
-		factory:    tsgo.NewFactory(),
-		integer:    options.IntegerRepresentation,
-		registry:   newDeclarationRegistry(),
-		scheduler:  newScheduler(),
-		companions: newCompanionScheduler(),
-		sites:      sites,
-		emitters:   make(map[*load.Package]*emitter),
-		builders:   make(map[string]*targetFileBuilder),
+		source:                 source,
+		factory:                tsgo.NewFactory(),
+		integer:                options.IntegerRepresentation,
+		registry:               registry,
+		scheduler:              newScheduler(),
+		companions:             newCompanionScheduler(),
+		sites:                  sites,
+		emitters:               make(map[*load.Package]*emitter),
+		builders:               make(map[string]*targetFileBuilder),
+		packageBuilders:        make(map[*load.Package]*packageTargetBuilder),
+		packageInitializations: newPackageInitializationScheduler(),
 	}
 	for _, sourcePackage := range source.Packages() {
 		session.emitters[sourcePackage] = newEmitter(
@@ -289,12 +316,26 @@ func newProgramSession(
 				Reason: "declaration package has no emitter",
 			}
 		}
-		if _, err := emitter.names.Reserve(
-			site.object,
-			site.sourceFile.Syntax(),
-			site.outputPath,
-		); err != nil {
-			return nil, err
+		if variable, ok := site.object.(*types.Var); ok {
+			assemblyPath, err := targetoutput.PackageAssemblyPath(site.source)
+			if err != nil {
+				return nil, err
+			}
+			if _, err := emitter.names.ReservePackageVariable(
+				variable,
+				site.outputPath,
+				assemblyPath,
+			); err != nil {
+				return nil, err
+			}
+		} else {
+			if _, err := emitter.names.Reserve(
+				site.object,
+				site.sourceFile.Syntax(),
+				site.outputPath,
+			); err != nil {
+				return nil, err
+			}
 		}
 	}
 	return session, nil
@@ -310,6 +351,16 @@ func (s *programSession) require(object types.Object) error {
 			Reason: "object has no supported source declaration",
 		}
 	}
+	sourcePackage := s.source.PackageForTypes(object.Pkg())
+	if sourcePackage == nil {
+		return &ScheduleError{
+			Object: object.Name(),
+			Reason: "object package has no source owner",
+		}
+	}
+	if err := s.requirePackage(sourcePackage); err != nil {
+		return err
+	}
 	s.scheduler.enqueue(object)
 	return nil
 }
@@ -321,6 +372,9 @@ func (s *programSession) emit(object types.Object) error {
 			Object: object.Name(),
 			Reason: "scheduled object lost its declaration",
 		}
+	}
+	if variable, ok := object.(*types.Var); ok {
+		return s.emitPackageStorage(variable, site)
 	}
 	builder, err := s.builder(site)
 	if err != nil {
@@ -358,6 +412,13 @@ func (s *programSession) applyRequests(
 	builder *targetFileBuilder,
 	requests []api.PlacementRequest,
 ) error {
+	return s.applyPlacementRequests(builder.placement, requests)
+}
+
+func (s *programSession) applyPlacementRequests(
+	placement *placementOwner,
+	requests []api.PlacementRequest,
+) error {
 	imports := make([]api.PlacementRequest, 0, len(requests))
 	for _, request := range requests {
 		switch request.Kind() {
@@ -373,7 +434,7 @@ func (s *programSession) applyRequests(
 			return &ScheduleError{Reason: "placement request kind is invalid"}
 		}
 	}
-	return builder.placement.Apply(imports)
+	return placement.Apply(imports)
 }
 
 func (s *programSession) emitCompanion(owner api.CompanionOwner) error {
@@ -421,143 +482,44 @@ func (s *programSession) emitCompanion(owner api.CompanionOwner) error {
 }
 
 func (s *programSession) builder(site declarationSite) (*targetFileBuilder, error) {
-	if existing := s.builders[site.outputPath]; existing != nil {
+	return s.builderForFile(
+		site.source,
+		site.sourceFile,
+		site.outputPath,
+		site.object.Name(),
+	)
+}
+
+func (s *programSession) builderForFile(
+	sourcePackage *load.Package,
+	sourceFile load.File,
+	outputPath string,
+	objectName string,
+) (*targetFileBuilder, error) {
+	if existing := s.builders[outputPath]; existing != nil {
 		return existing, nil
 	}
-	emitter := s.emitters[site.source]
+	emitter := s.emitters[sourcePackage]
 	if emitter == nil {
 		return nil, &ScheduleError{
-			Object: site.object.Name(),
+			Object: objectName,
 			Reason: "source package has no emitter",
 		}
 	}
-	context, err := emitter.fileContext(site.sourceFile.Syntax(), site.outputPath)
+	context, err := emitter.fileContext(sourceFile.Syntax(), outputPath)
 	if err != nil {
 		return nil, err
 	}
 	builder := &targetFileBuilder{
-		sourcePackage: site.source,
-		sourceFile:    site.sourceFile,
-		outputPath:    site.outputPath,
+		sourcePackage: sourcePackage,
+		sourceFile:    sourceFile,
+		outputPath:    outputPath,
 		emitter:       emitter,
 		context:       context,
 		placement:     newPlacementOwner(),
 		byObject:      make(map[types.Object]struct{}),
 		indexByObject: make(map[types.Object]int),
 	}
-	s.builders[site.outputPath] = builder
+	s.builders[outputPath] = builder
 	return builder, nil
-}
-
-func (s *programSession) targetFiles() ([]TargetFile, error) {
-	paths := make([]string, 0, len(s.builders))
-	for outputPath := range s.builders {
-		paths = append(paths, outputPath)
-	}
-	sort.Strings(paths)
-	files := make([]TargetFile, 0, len(paths)+1)
-	primitiveAliases := make(map[api.PrimitiveAlias]struct{})
-	for _, outputPath := range paths {
-		builder := s.builders[outputPath]
-		for _, alias := range builder.placement.PrimitiveAliases() {
-			primitiveAliases[alias] = struct{}{}
-		}
-		sort.Slice(builder.declarations, func(left, right int) bool {
-			if builder.declarations[left].position != builder.declarations[right].position {
-				return builder.declarations[left].position < builder.declarations[right].position
-			}
-			return builder.declarations[left].object.Name() <
-				builder.declarations[right].object.Name()
-		})
-		var declarations []tsgo.Statement
-		for _, declaration := range builder.declarations {
-			declarations = append(declarations, declaration.statements...)
-			for _, operation := range []api.CompanionOperation{
-				api.CompanionZero,
-				api.CompanionCopy,
-				api.CompanionEqual,
-			} {
-				declarations = append(
-					declarations,
-					declaration.companions[operation]...,
-				)
-			}
-		}
-		statements := append(
-			builder.placement.Statements(s.factory),
-			declarations...,
-		)
-		targetPath, err := tsgo.NewPath(outputPath)
-		if err != nil {
-			return nil, err
-		}
-		files = append(files, TargetFile{
-			outputPath:  outputPath,
-			packageName: builder.sourcePackage.Name(),
-			kind:        TargetFileSource,
-			sourceFile: s.factory.SourceFile(
-				statements,
-				s.factory.EndOfFile(),
-				tsgo.SourceFileData{
-					FileName:   targetPath,
-					Path:       targetPath,
-					ScriptKind: tsgo.ScriptKindTS,
-				},
-			),
-		})
-	}
-	if len(primitiveAliases) != 0 {
-		aliases := make([]api.PrimitiveAlias, 0, len(primitiveAliases))
-		for alias := range primitiveAliases {
-			aliases = append(aliases, alias)
-		}
-		slices.Sort(aliases)
-		support, err := s.scalarSupportFile(aliases)
-		if err != nil {
-			return nil, err
-		}
-		files = append(files, support)
-		sort.Slice(files, func(left, right int) bool {
-			return files[left].outputPath < files[right].outputPath
-		})
-	}
-	return files, nil
-}
-
-func (s *programSession) scalarSupportFile(
-	aliases []api.PrimitiveAlias,
-) (TargetFile, error) {
-	statements := make([]tsgo.Statement, 0, len(aliases))
-	for _, alias := range aliases {
-		name, keyword, err := api.PrimitiveAliasRepresentation(
-			alias,
-			s.integer,
-		)
-		if err != nil {
-			return TargetFile{}, err
-		}
-		statements = append(statements, s.factory.TypeAliasDeclaration(
-			[]tsgo.ModifierLike{s.factory.ExportKeyword()},
-			s.factory.Identifier(name),
-			nil,
-			s.factory.KeywordTypeNode(keyword),
-		))
-	}
-	targetPath, err := tsgo.NewPath(targetoutput.ScalarSupportPath)
-	if err != nil {
-		return TargetFile{}, err
-	}
-	return TargetFile{
-		outputPath: targetoutput.ScalarSupportPath,
-		kind:       TargetFileSupport,
-		sourceFile: s.factory.SourceFile(
-			statements,
-			s.factory.EndOfFile(),
-			tsgo.SourceFileData{
-				FileName:   targetPath,
-				Path:       targetPath,
-				ScriptKind: tsgo.ScriptKindTS,
-			},
-		),
-	}, nil
 }

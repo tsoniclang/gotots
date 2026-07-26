@@ -35,6 +35,20 @@ func TestLayoutOwnsCheckoutIndependentModulePackageAndImportPaths(t *testing.T) 
 	if servicePath != "modules/"+moduleKey+"/service/service.ts" {
 		t.Fatalf("service path = %q", servicePath)
 	}
+	assemblyPath, err := PackageAssemblyPath(apiPackage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if assemblyPath != "packages/"+moduleKey+"/api/package.ts" {
+		t.Fatalf("assembly path = %q", assemblyPath)
+	}
+	statePath, err := PackageStatePath(apiPackage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if statePath != "packages/"+moduleKey+"/api/state.ts" {
+		t.Fatalf("state path = %q", statePath)
+	}
 	specifer, err := ModuleSpecifier(apiPath, servicePath)
 	if err != nil {
 		t.Fatal(err)
@@ -79,6 +93,26 @@ func TestScalarSupportPathProducesCanonicalRelativeSpecifier(t *testing.T) {
 	if specifier != "../../../support/scalars.js" {
 		t.Fatalf(
 			"scalar support specifier = %q, want ../../../support/scalars.js",
+			specifier,
+		)
+	}
+}
+
+func TestProgramInitializationPathProducesCanonicalPackageSpecifier(t *testing.T) {
+	if ProgramInitializationPath != "program.ts" {
+		t.Fatalf(
+			"program initialization path = %q, want program.ts",
+			ProgramInitializationPath,
+		)
+	}
+	const assemblyPath = "packages/example/api/package.ts"
+	specifier, err := ModuleSpecifier(ProgramInitializationPath, assemblyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if specifier != "./packages/example/api/package.js" {
+		t.Fatalf(
+			"program package specifier = %q, want ./packages/example/api/package.js",
 			specifier,
 		)
 	}

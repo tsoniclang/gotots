@@ -24,6 +24,19 @@ func Emit(
 	case types.Universe.Lookup("true"):
 		return emitBooleanConstant(context, source, context.Factory().TrueLiteral())
 	}
+	if variable, ok := object.(*types.Var); ok &&
+		!variable.IsField() &&
+		variable.Pkg() != nil &&
+		variable.Parent() == variable.Pkg().Scope() {
+		reference, err := context.Names().PackageVariable(variable)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.DirectExpression(
+			reference.Expression(context.Factory()),
+			reference.Requests()...,
+		), nil
+	}
 	reference, err := context.Names().Reference(object)
 	if err != nil {
 		return api.ExpressionEmission{}, err

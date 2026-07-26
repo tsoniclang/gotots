@@ -4,10 +4,12 @@ import (
 	"go/ast"
 	"go/types"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -19,9 +21,18 @@ type targetBinding struct {
 	moduleExport bool
 }
 
+type packageVariableBinding struct {
+	fieldName    string
+	statePath    string
+	assemblyPath string
+}
+
 type declarationRegistry struct {
-	byObject           map[types.Object]targetBinding
-	memberNameByObject map[*types.Var]string
+	byObject                 map[types.Object]targetBinding
+	memberNameByObject       map[*types.Var]string
+	packageVariables         map[*types.Var]packageVariableBinding
+	assemblyPathByPackage    map[*types.Package]string
+	importQualifierByPackage map[*types.Package]string
 }
 
 type nameOwner struct {
@@ -40,8 +51,11 @@ func newNameOwner(packageScope *types.Scope, info *types.Info) *nameOwner {
 
 func newDeclarationRegistry() *declarationRegistry {
 	return &declarationRegistry{
-		byObject:           make(map[types.Object]targetBinding),
-		memberNameByObject: make(map[*types.Var]string),
+		byObject:                 make(map[types.Object]targetBinding),
+		memberNameByObject:       make(map[*types.Var]string),
+		packageVariables:         make(map[*types.Var]packageVariableBinding),
+		assemblyPathByPackage:    make(map[*types.Package]string),
+		importQualifierByPackage: make(map[*types.Package]string),
 	}
 }
 
@@ -171,6 +185,125 @@ func (r *declarationRegistry) reserve(
 	return nil
 }
 
+func (r *declarationRegistry) indexPackageTargets(
+	sourcePackages []*load.Package,
+) error {
+	if r == nil {
+		return &api.NameError{Reason: "declaration registry is nil"}
+	}
+	packages := make([]*types.Package, 0, len(sourcePackages))
+	for _, sourcePackage := range sourcePackages {
+		if sourcePackage == nil || sourcePackage.Types() == nil {
+			return &api.NameError{Reason: "source package identity is nil"}
+		}
+		typesPackage := sourcePackage.Types()
+		if _, duplicate := r.assemblyPathByPackage[typesPackage]; duplicate {
+			return &api.NameError{
+				Name:   typesPackage.Path(),
+				Reason: "source package identity is duplicated",
+			}
+		}
+		assemblyPath, err := output.PackageAssemblyPath(sourcePackage)
+		if err != nil {
+			return err
+		}
+		r.assemblyPathByPackage[typesPackage] = assemblyPath
+		packages = append(packages, typesPackage)
+	}
+	return r.indexPackageQualifiers(packages)
+}
+
+func (r *declarationRegistry) indexPackageQualifiers(
+	sourcePackages []*types.Package,
+) error {
+	if r == nil {
+		return &api.NameError{Reason: "declaration registry is nil"}
+	}
+	packages := slices.Clone(sourcePackages)
+	for _, sourcePackage := range packages {
+		if sourcePackage == nil ||
+			sourcePackage.Path() == "" ||
+			sourcePackage.Name() == "" {
+			return &api.NameError{Reason: "source package identity is nil"}
+		}
+	}
+	sort.Slice(packages, func(left, right int) bool {
+		return packages[left].Path() < packages[right].Path()
+	})
+	used := make(map[string]struct{}, len(packages))
+	paths := make(map[string]struct{}, len(packages))
+	for _, sourcePackage := range packages {
+		if _, duplicate := paths[sourcePackage.Path()]; duplicate {
+			return &api.NameError{
+				Name:   sourcePackage.Path(),
+				Reason: "source package path is duplicated",
+			}
+		}
+		paths[sourcePackage.Path()] = struct{}{}
+		base := portableIdentifier(sourcePackage.Name())
+		qualifier := base
+		for suffix := uint64(1); ; suffix++ {
+			if _, duplicate := used[qualifier]; !duplicate {
+				break
+			}
+			qualifier = base + "__package_" + strconv.FormatUint(suffix, 10)
+		}
+		used[qualifier] = struct{}{}
+		r.importQualifierByPackage[sourcePackage] = qualifier
+	}
+	return nil
+}
+
+func (n *nameOwner) ReservePackageVariable(
+	variable *types.Var,
+	statePath string,
+	assemblyPath string,
+) (string, error) {
+	switch {
+	case variable == nil:
+		return "", &api.NameError{Reason: "package variable is nil"}
+	case variable.IsField() || variable.Pkg() == nil ||
+		variable.Parent() != variable.Pkg().Scope():
+		return "", &api.NameError{
+			Name:   variable.Name(),
+			Reason: "variable is not package-scoped",
+		}
+	case statePath == "":
+		return "", &api.NameError{
+			Name:   variable.Name(),
+			Reason: "package state path is empty",
+		}
+	case assemblyPath == "":
+		return "", &api.NameError{
+			Name:   variable.Name(),
+			Reason: "package assembly path is empty",
+		}
+	}
+	fieldName, ok := n.targetNameByObject[variable]
+	if !ok {
+		return "", &api.NameError{
+			Name:   variable.Name(),
+			Reason: "package variable was not indexed from its Go scope",
+		}
+	}
+	binding := packageVariableBinding{
+		fieldName:    fieldName,
+		statePath:    statePath,
+		assemblyPath: assemblyPath,
+	}
+	if existing, exists := n.registry.packageVariables[variable]; exists {
+		if existing != binding {
+			return "", &api.NameError{
+				Name:   variable.Name(),
+				Reason: "package variable has conflicting target ownership",
+			}
+		}
+		return fieldName, nil
+	}
+	n.registry.packageVariables[variable] = binding
+	return fieldName, nil
+}
+
 func (n *nameOwner) preallocateScope(
 	scope *types.Scope,
 	objectsByScope map[*types.Scope][]types.Object,
@@ -265,279 +398,6 @@ func compareNameObjects(left types.Object, right types.Object) int {
 	}
 }
 
-type fileNames struct {
-	owner            *nameOwner
-	sourceFile       *ast.File
-	packageScope     *types.Scope
-	factory          tsgo.Factory
-	targetPath       string
-	require          func(types.Object) error
-	temporaries      map[api.TemporaryKind]uint64
-	importNames      map[string]struct{}
-	importAliases    map[types.Object]string
-	companionAliases map[api.CompanionOwner]string
-	primitives       map[api.PrimitiveAlias]string
-}
-
-func (n *nameOwner) ForFile(
-	sourceFile *ast.File,
-	packageScope *types.Scope,
-	factory tsgo.Factory,
-	targetPath string,
-	require func(types.Object) error,
-) api.Names {
-	return &fileNames{
-		owner:            n,
-		sourceFile:       sourceFile,
-		packageScope:     packageScope,
-		factory:          factory,
-		targetPath:       targetPath,
-		require:          require,
-		temporaries:      make(map[api.TemporaryKind]uint64),
-		importNames:      make(map[string]struct{}),
-		importAliases:    make(map[types.Object]string),
-		companionAliases: make(map[api.CompanionOwner]string),
-		primitives:       make(map[api.PrimitiveAlias]string),
-	}
-}
-
-func (n *fileNames) Declare(object types.Object) (string, error) {
-	if object != nil && object.Parent() == n.packageScope {
-		binding, ok := n.owner.byObject[object]
-		if !ok {
-			return "", &api.NameError{
-				Name:   object.Name(),
-				Reason: "package declaration was not reserved",
-			}
-		}
-		return binding.name, nil
-	}
-	return n.owner.declare(object, targetBinding{})
-}
-
-func (n *fileNames) Reference(object types.Object) (api.NameReference, error) {
-	if object == nil {
-		return api.NameReference{}, &api.NameError{Reason: "reference object is nil"}
-	}
-	binding, ok := n.owner.byObject[object]
-	if !ok && n.owner.registry != nil {
-		binding, ok = n.owner.registry.byObject[object]
-	}
-	if !ok {
-		return api.NameReference{}, &api.NameError{
-			Name:   object.Name(),
-			Reason: "object has no emitted declaration",
-		}
-	}
-	if binding.sourceFile != nil && n.require != nil {
-		if err := n.require(object); err != nil {
-			return api.NameReference{}, err
-		}
-	}
-	if binding.sourceFile != nil && binding.sourceFile != n.sourceFile {
-		modulePath, err := output.ModuleSpecifier(n.targetPath, binding.sourcePath)
-		if err != nil {
-			return api.NameReference{}, err
-		}
-		localName := binding.name
-		if object.Parent() != n.packageScope {
-			localName = n.importName(object, binding.name)
-		}
-		request, err := api.NewImportRequest(
-			n.factory,
-			api.ImportPhaseValue,
-			modulePath,
-			binding.name,
-			localName,
-		)
-		if err != nil {
-			return api.NameReference{}, err
-		}
-		return api.NewNameReference(localName, request)
-	}
-	return api.NewNameReference(binding.name)
-}
-
-func (n *fileNames) Companion(
-	typeName *types.TypeName,
-	operation api.CompanionOperation,
-) (api.NameReference, error) {
-	if typeName == nil {
-		return api.NameReference{}, &api.NameError{
-			Reason: "companion type is nil",
-		}
-	}
-	binding, ok := n.owner.byObject[typeName]
-	if !ok && n.owner.registry != nil {
-		binding, ok = n.owner.registry.byObject[typeName]
-	}
-	if !ok {
-		return api.NameReference{}, &api.NameError{
-			Name:   typeName.Name(),
-			Reason: "companion type has no emitted declaration",
-		}
-	}
-	if binding.sourceFile != nil && n.require != nil {
-		if err := n.require(typeName); err != nil {
-			return api.NameReference{}, err
-		}
-	}
-	companion, err := api.NewCompanionOwner(typeName, operation)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	request, err := api.NewCompanionRequest(typeName, operation)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	exportedName, err := api.CompanionExportName(binding.name, operation)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	if binding.sourceFile == nil || binding.sourceFile == n.sourceFile {
-		return api.NewNameReference(exportedName, request)
-	}
-	modulePath, err := output.ModuleSpecifier(n.targetPath, binding.sourcePath)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	localName := n.companionAliases[companion]
-	if localName == "" {
-		localName = n.allocateImportName(exportedName, typeName.Pkg().Path())
-		n.companionAliases[companion] = localName
-	}
-	importRequest, err := api.NewImportRequest(
-		n.factory,
-		api.ImportPhaseValue,
-		modulePath,
-		exportedName,
-		localName,
-	)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	return api.NewNameReference(localName, request, importRequest)
-}
-
-func (n *fileNames) Member(field *types.Var) (string, error) {
-	if field == nil {
-		return "", &api.NameError{Reason: "field object is nil"}
-	}
-	name := n.owner.memberNameByObject[field]
-	if name == "" {
-		return "", &api.NameError{
-			Name:   field.Name(),
-			Reason: "field object was not indexed from a named struct",
-		}
-	}
-	return name, nil
-}
-
-func (n *fileNames) importName(object types.Object, preferred string) string {
-	if existing := n.importAliases[object]; existing != "" {
-		return existing
-	}
-	candidate := n.allocateImportName(preferred, object.Pkg().Path())
-	n.importAliases[object] = candidate
-	return candidate
-}
-
-func (n *fileNames) allocateImportName(preferred string, packagePath string) string {
-	base := preferred + "__from_" + portableIdentifier(packagePath)
-	candidate := base
-	for suffix := uint64(1); n.packageScope.Lookup(candidate) != nil ||
-		n.hasImportName(candidate) ||
-		n.owner.hasSourceName(candidate); suffix++ {
-		candidate = base + "_" + strconv.FormatUint(suffix, 10)
-	}
-	n.importNames[candidate] = struct{}{}
-	return candidate
-}
-
-func (n *fileNames) hasImportName(name string) bool {
-	_, exists := n.importNames[name]
-	return exists
-}
-
-func (n *nameOwner) hasSourceName(name string) bool {
-	_, exists := n.sourceNameBases[name]
-	return exists
-}
-
-func (n *fileNames) Primitive(alias api.PrimitiveAlias) (api.NameReference, error) {
-	if existing := n.primitives[alias]; existing != "" {
-		modulePath, err := output.ModuleSpecifier(n.targetPath, output.ScalarSupportPath)
-		if err != nil {
-			return api.NameReference{}, err
-		}
-		request, err := api.NewPrimitiveAliasRequest(n.factory, modulePath, alias, existing)
-		if err != nil {
-			return api.NameReference{}, err
-		}
-		return api.NewNameReference(existing, request)
-	}
-	exportedName, err := api.PrimitiveAliasName(alias)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	localName := exportedName
-	if n.packageScope.Lookup(localName) != nil ||
-		n.owner.hasSourceName(localName) ||
-		n.hasImportName(localName) {
-		base := exportedName + "__from_gotots_support"
-		localName = base
-		for suffix := uint64(1); n.packageScope.Lookup(localName) != nil ||
-			n.owner.hasSourceName(localName) ||
-			n.hasImportName(localName); suffix++ {
-			localName = base + "_" + strconv.FormatUint(suffix, 10)
-		}
-	}
-	n.importNames[localName] = struct{}{}
-	n.primitives[alias] = localName
-	modulePath, err := output.ModuleSpecifier(n.targetPath, output.ScalarSupportPath)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	request, err := api.NewPrimitiveAliasRequest(n.factory, modulePath, alias, localName)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	return api.NewNameReference(localName, request)
-}
-
-func (n *fileNames) Temporary(kind api.TemporaryKind) (string, error) {
-	prefix, err := api.TemporaryPrefix(kind)
-	if err != nil {
-		return "", err
-	}
-	for {
-		index := n.temporaries[kind]
-		n.temporaries[kind] = index + 1
-		candidate := prefix + strconv.FormatUint(index, 10)
-		if _, reserved := n.owner.sourceNameBases[candidate]; reserved {
-			continue
-		}
-		return candidate, nil
-	}
-}
-
-func (n *fileNames) ModuleExport(object types.Object) (bool, error) {
-	if object == nil {
-		return false, &api.NameError{Reason: "declaration object is nil"}
-	}
-	binding, ok := n.owner.byObject[object]
-	if !ok && n.owner.registry != nil {
-		binding, ok = n.owner.registry.byObject[object]
-	}
-	if !ok {
-		return false, &api.NameError{
-			Name:   object.Name(),
-			Reason: "object has no emitted declaration",
-		}
-	}
-	return binding.moduleExport, nil
-}
-
 func objectName(object types.Object) string {
 	if object == nil {
 		return ""
@@ -561,7 +421,8 @@ func portableIdentifier(source string) string {
 		}
 	}
 	identifier := result.String()
-	if tsgo.RequiresBindingIdentifierEscape(identifier) {
+	if identifier == "__proto__" ||
+		tsgo.RequiresBindingIdentifierEscape(identifier) {
 		return "__go_" + identifier
 	}
 	return identifier

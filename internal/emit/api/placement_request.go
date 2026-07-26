@@ -40,7 +40,6 @@ const (
 
 type PlacementOwner struct {
 	kind         PlacementKind
-	phase        ImportPhase
 	modulePath   string
 	exportedName string
 	companion    CompanionOwner
@@ -48,6 +47,7 @@ type PlacementOwner struct {
 
 type PlacementRequest struct {
 	owner           PlacementOwner
+	importPhase     ImportPhase
 	localName       string
 	moduleSpecifier tsgo.StringLiteral
 	specifier       tsgo.ImportSpecifier
@@ -80,10 +80,10 @@ func NewImportRequest(
 	return PlacementRequest{
 		owner: PlacementOwner{
 			kind:         PlacementImport,
-			phase:        phase,
 			modulePath:   modulePath,
 			exportedName: exportedName,
 		},
+		importPhase:     phase,
 		localName:       localName,
 		moduleSpecifier: factory.StringLiteral(modulePath, tsgo.TokenFlagsNone),
 		specifier: factory.ImportSpecifier(
@@ -167,7 +167,7 @@ func (r PlacementRequest) Owner() PlacementOwner {
 }
 
 func (r PlacementRequest) ImportPhase() ImportPhase {
-	return r.owner.phase
+	return r.importPhase
 }
 
 func (r PlacementRequest) ModulePath() string {

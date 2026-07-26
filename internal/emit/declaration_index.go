@@ -29,7 +29,7 @@ func indexDeclarations(source *load.Program) (map[types.Object]declarationSite, 
 			for _, declaration := range sourceFile.Syntax().Decls {
 				switch declaration := declaration.(type) {
 				case *ast.FuncDecl:
-					if declaration.Name.Name == "init" {
+					if isPackageInitDeclaration(declaration) {
 						continue
 					}
 					object, ok := sourcePackage.TypesInfo().Defs[declaration.Name].(*types.Func)
@@ -66,6 +66,13 @@ func indexDeclarations(source *load.Program) (map[types.Object]declarationSite, 
 	return sites, nil
 }
 
+func isPackageInitDeclaration(declaration *ast.FuncDecl) bool {
+	return declaration != nil &&
+		declaration.Name != nil &&
+		declaration.Name.Name == "init" &&
+		declaration.Recv == nil
+}
+
 func indexGeneralDeclaration(
 	sites map[types.Object]declarationSite,
 	sourcePackage *load.Package,
@@ -98,6 +105,44 @@ func indexGeneralDeclaration(
 					sourceFile,
 					declaration,
 					outputPath,
+				); err != nil {
+					return err
+				}
+			}
+		}
+	case token.VAR:
+		statePath, err := targetoutput.PackageStatePath(sourcePackage)
+		if err != nil {
+			return err
+		}
+		for _, spec := range declaration.Specs {
+			valueSpec, ok := spec.(*ast.ValueSpec)
+			if !ok {
+				return &api.InvariantError{
+					Role:   api.RoleFileDeclaration,
+					Reason: "variable declaration has a non-value spec",
+				}
+			}
+			for _, name := range valueSpec.Names {
+				if name.Name == "_" {
+					continue
+				}
+				object, ok := sourcePackage.TypesInfo().Defs[name].(*types.Var)
+				if !ok ||
+					object.IsField() ||
+					object.Parent() != sourcePackage.Types().Scope() {
+					return &api.InvariantError{
+						Role:   api.RoleFileDeclaration,
+						Reason: "variable declaration has no package-scope go/types object",
+					}
+				}
+				if err := addDeclarationSite(
+					sites,
+					object,
+					sourcePackage,
+					sourceFile,
+					declaration,
+					statePath,
 				); err != nil {
 					return err
 				}

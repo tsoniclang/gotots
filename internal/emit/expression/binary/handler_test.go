@@ -69,6 +69,16 @@ func (unusedNames) Reference(types.Object) (api.NameReference, error) {
 	panic("unused")
 }
 
+func (unusedNames) TypeReference(types.Object) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) PackageVariable(
+	*types.Var,
+) (api.PackageVariableReference, error) {
+	panic("unused")
+}
+
 func (unusedNames) Companion(
 	*types.TypeName,
 	api.CompanionOperation,
