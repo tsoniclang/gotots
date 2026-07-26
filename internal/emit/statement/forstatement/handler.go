@@ -11,42 +11,77 @@ func Emit(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.ForStmt,
-) (tsgo.ForStatement, error) {
-	if source.Init == nil || source.Cond == nil || source.Post == nil || source.Body == nil {
-		return nil, api.Unsupported(context, api.CategoryStatement, source)
+) (api.StatementEmission, error) {
+	if source.Body == nil {
+		return api.StatementEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	initializer, err := children.ForInitializer(
-		context.WithRole(api.RoleForInitializer),
-		source.Init,
-	)
-	if err != nil {
-		return nil, err
+	var initializer tsgo.ForInitializer
+	var initializerRequests []api.PlacementRequest
+	if source.Init != nil {
+		target, err := children.ForInitializer(
+			context.WithRole(api.RoleForInitializer),
+			source.Init,
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		initializer = target.Value()
+		initializerRequests = target.Requests()
 	}
-	condition, err := children.Condition(
-		context.WithRole(api.RoleForCondition),
-		source.Cond,
-	)
-	if err != nil {
-		return nil, err
+	var condition tsgo.Expression
+	var conditionRequests []api.PlacementRequest
+	if source.Cond != nil {
+		target, err := children.Condition(
+			context.WithRole(api.RoleForCondition),
+			source.Cond,
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		if len(target.Before()) != 0 {
+			return api.StatementEmission{},
+				api.Unsupported(context, api.CategoryStatement, source)
+		}
+		condition = target.Value()
+		conditionRequests = target.Requests()
 	}
-	post, err := children.ForPost(
-		context.WithRole(api.RoleForPost),
-		source.Post,
-	)
-	if err != nil {
-		return nil, err
+	var post tsgo.Expression
+	var postRequests []api.PlacementRequest
+	if source.Post != nil {
+		target, err := children.ForPost(
+			context.WithRole(api.RoleForPost),
+			source.Post,
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		if len(target.Before()) != 0 {
+			return api.StatementEmission{},
+				api.Unsupported(context, api.CategoryStatement, source)
+		}
+		post = target.Value()
+		postRequests = target.Requests()
 	}
 	body, err := children.Block(
 		context.WithRole(api.RoleForBody).EnterLoop(),
 		source.Body,
 	)
 	if err != nil {
-		return nil, err
+		return api.StatementEmission{}, err
 	}
-	return context.Factory().ForStatement(
-		initializer,
-		condition,
-		post,
-		body,
+	return api.DirectStatement(
+		context.Factory().ForStatement(
+			initializer,
+			condition,
+			post,
+			body.Value(),
+		),
+		api.CombineRequests(
+			initializerRequests,
+			conditionRequests,
+			postRequests,
+			body.Requests(),
+		)...,
 	), nil
 }

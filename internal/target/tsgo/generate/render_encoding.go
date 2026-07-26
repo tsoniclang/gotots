@@ -52,7 +52,7 @@ func writeNodeEncoding(buffer *bytes.Buffer, model *schemaModel, node concreteNo
 	dynamicJSDocOrder := node.SchemaName == "JSDocParameterOrPropertyTag"
 	if dynamicJSDocOrder {
 		buffer.WriteString("\tchildren := []childEncoding{\n")
-		writeChildEntries(buffer, children, "\t\t")
+		writeChildEntries(buffer, node, children, "\t\t")
 		buffer.WriteString("\t}\n")
 		buffer.WriteString("\tif !n.isNameFirst {\n")
 		buffer.WriteString("\t\tchildren[1], children[2] = children[2], children[1]\n")
@@ -68,7 +68,7 @@ func writeNodeEncoding(buffer *bytes.Buffer, model *schemaModel, node concreteNo
 			buffer.WriteString("\t\tchildren: children,\n")
 		} else {
 			buffer.WriteString("\t\tchildren: []childEncoding{\n")
-			writeChildEntries(buffer, children, "\t\t\t")
+			writeChildEntries(buffer, node, children, "\t\t\t")
 			buffer.WriteString("\t\t},\n")
 		}
 	}
@@ -114,9 +114,15 @@ func writeNodeEncoding(buffer *bytes.Buffer, model *schemaModel, node concreteNo
 	return nil
 }
 
-func writeChildEntries(buffer *bytes.Buffer, children []member, indent string) {
+func writeChildEntries(
+	buffer *bytes.Buffer,
+	node concreteNode,
+	children []member,
+	indent string,
+) {
 	for _, value := range children {
 		field := "n." + parameterName(value.Name)
+		required := childRequired(node, value)
 		if value.List == "" {
 			fmt.Fprintf(
 				buffer,
@@ -124,7 +130,7 @@ func writeChildEntries(buffer *bytes.Buffer, children []member, indent string) {
 				indent,
 				value.Name,
 				field,
-				!value.Optional,
+				required,
 				field,
 			)
 			continue
@@ -142,11 +148,18 @@ func writeChildEntries(buffer *bytes.Buffer, children []member, indent string) {
 			indent,
 			value.Name,
 			present,
-			!value.Optional && value.List != "raw",
+			required && value.List != "raw",
 			value.List == "raw",
 			field,
 		)
 	}
+}
+
+func childRequired(node concreteNode, value member) bool {
+	if node.Kind == "DefaultClause" && value.Name == "Expression" {
+		return false
+	}
+	return !value.Optional
 }
 
 func (m *schemaModel) nodeDataType(node concreteNode) string {

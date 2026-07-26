@@ -1,11 +1,11 @@
 import type { bool } from "@tsonic/core/types.js";
 export function Run(input: bool): bool {
-    let current: bool = false;
+    let current: bool = false as bool;
     if (!input) {
-        current = Flip(true);
+        current = Flip(true as bool);
     }
     else {
-        current = Same(input, true);
+        current = Same(input, true as bool);
     }
     return current;
 }

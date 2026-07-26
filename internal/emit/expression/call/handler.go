@@ -13,34 +13,63 @@ func Emit(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.CallExpr,
-) (tsgo.Expression, error) {
+) (api.ExpressionEmission, error) {
+	return emit(context, children, source, false)
+}
+
+func EmitDiscarded(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.CallExpr,
+) (api.ExpressionEmission, error) {
+	return emit(context, children, source, true)
+}
+
+func emit(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.CallExpr,
+	discarded bool,
+) (api.ExpressionEmission, error) {
 	callee, ok := source.Fun.(*ast.Ident)
 	if !ok || source.Ellipsis != token.NoPos {
-		return nil, api.Unsupported(context, api.CategoryExpression, source)
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	object, ok := context.TypesInfo().Uses[callee].(*types.Func)
 	if !ok || object.Pkg() != context.TypesPackage() {
-		return nil, api.Unsupported(context, api.CategoryExpression, source)
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	signature, ok := object.Type().(*types.Signature)
 	if !ok ||
 		signature.Recv() != nil ||
 		signature.Variadic() ||
 		signature.TypeParams().Len() != 0 ||
-		signature.Params().Len() != len(source.Args) ||
-		signature.Results().Len() != 1 {
-		return nil, api.Unsupported(context, api.CategoryExpression, source)
+		signature.Params().Len() != len(source.Args) {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	targetName, err := context.Names().Reference(object)
+	resultCount := 0
+	if signature.Results() != nil {
+		resultCount = signature.Results().Len()
+	}
+	if (!discarded && resultCount != 1) || (discarded && resultCount > 1) {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	reference, err := context.Names().Reference(object)
 	if err != nil {
-		return nil, err
+		return api.ExpressionEmission{}, err
 	}
 	arguments := make([]tsgo.Expression, 0, len(source.Args))
+	requests := reference.Requests()
 	for index, argument := range source.Args {
 		argumentType := context.TypesInfo().TypeOf(argument)
 		if argumentType == nil ||
 			!types.AssignableTo(argumentType, signature.Params().At(index).Type()) {
-			return nil, api.Unsupported(context, api.CategoryExpression, source)
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
 		}
 		target, err := children.Expression(
 			context.
@@ -49,15 +78,24 @@ func Emit(
 			argument,
 		)
 		if err != nil {
-			return nil, err
+			return api.ExpressionEmission{}, err
 		}
-		arguments = append(arguments, target)
+		if len(target.Before()) != 0 {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		arguments = append(arguments, target.Value())
+		requests = append(requests, target.Requests()...)
 	}
-	return context.Factory().CallExpression(
-		context.Factory().Identifier(targetName),
+	return api.NewExpressionEmission(
 		nil,
-		nil,
-		arguments,
-		tsgo.NodeFlagsNone,
-	), nil
+		context.Factory().CallExpression(
+			context.Factory().Identifier(reference.Name()),
+			nil,
+			nil,
+			arguments,
+			tsgo.NodeFlagsNone,
+		),
+		requests,
+	)
 }

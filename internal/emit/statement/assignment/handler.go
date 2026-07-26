@@ -13,14 +13,15 @@ func Emit(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.AssignStmt,
-) (tsgo.Statement, error) {
+) (api.StatementEmission, error) {
 	switch source.Tok {
 	case token.DEFINE:
 		return emitDefinition(context, children, source)
 	case token.ASSIGN:
 		return emitAssignment(context, children, source)
 	default:
-		return nil, api.Unsupported(context, api.CategoryStatement, source)
+		return api.StatementEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
 	}
 }
 
@@ -28,51 +29,80 @@ func emitDefinition(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.AssignStmt,
-) (tsgo.Statement, error) {
-	declarations, err := emitDefinitionList(context, children, source)
-	if err != nil {
-		return nil, err
+) (api.StatementEmission, error) {
+	if len(source.Lhs) > 1 {
+		return emitParallel(context, children, source)
 	}
-	return context.Factory().VariableStatement(nil, declarations), nil
+	declarations, before, requests, err := emitDefinitionList(
+		context,
+		children,
+		source,
+	)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
+	statements := append(
+		before,
+		context.Factory().VariableStatement(nil, declarations),
+	)
+	return api.NewStatementEmission(statements, requests)
 }
 
 func EmitForInitializer(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.AssignStmt,
-) (tsgo.ForInitializer, error) {
+) (api.ForInitializerEmission, error) {
 	if source.Tok != token.DEFINE {
-		return nil, api.Unsupported(context, api.CategoryStatement, source)
+		return api.ForInitializerEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	return emitDefinitionList(context, children, source)
+	declarations, before, requests, err := emitDefinitionList(
+		context,
+		children,
+		source,
+	)
+	if err != nil {
+		return api.ForInitializerEmission{}, err
+	}
+	if len(before) != 0 {
+		return api.ForInitializerEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	return api.DirectForInitializer(declarations, requests...), nil
 }
 
 func emitDefinitionList(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.AssignStmt,
-) (tsgo.VariableDeclarationList, error) {
+) (
+	tsgo.VariableDeclarationList,
+	[]tsgo.Statement,
+	[]api.PlacementRequest,
+	error,
+) {
 	if len(source.Lhs) != 1 || len(source.Rhs) != 1 {
-		return nil, api.Unsupported(context, api.CategoryStatement, source)
+		return nil, nil, nil, api.Unsupported(context, api.CategoryStatement, source)
 	}
 	name, ok := source.Lhs[0].(*ast.Ident)
 	if !ok {
-		return nil, api.Unsupported(context, api.CategoryStatement, source)
+		return nil, nil, nil, api.Unsupported(context, api.CategoryStatement, source)
 	}
 	object, ok := context.TypesInfo().Defs[name].(*types.Var)
 	if !ok {
-		return nil, api.Unsupported(context, api.CategoryStatement, source)
+		return nil, nil, nil, api.Unsupported(context, api.CategoryStatement, source)
 	}
 	targetName, err := context.Names().Declare(object)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 	targetType, err := children.Type(
 		context.WithRole(api.RoleLocalType),
 		name,
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 	value, err := children.Expression(
 		context.
@@ -81,39 +111,48 @@ func emitDefinitionList(
 		source.Rhs[0],
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 	declaration := context.Factory().VariableDeclaration(
 		context.Factory().Identifier(targetName),
 		nil,
-		targetType,
-		value,
+		targetType.Value(),
+		value.Value(),
 	)
 	return context.Factory().VariableDeclarationList(
-		[]tsgo.VariableDeclaration{declaration},
-		tsgo.NodeFlagsLet,
-	), nil
+			[]tsgo.VariableDeclaration{declaration},
+			tsgo.NodeFlagsLet,
+		),
+		value.Before(),
+		api.CombineRequests(targetType.Requests(), value.Requests()),
+		nil
 }
 
 func emitAssignment(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.AssignStmt,
-) (tsgo.Statement, error) {
+) (api.StatementEmission, error) {
+	if len(source.Lhs) > 1 {
+		return emitParallel(context, children, source)
+	}
 	if len(source.Lhs) != 1 || len(source.Rhs) != 1 {
-		return nil, api.Unsupported(context, api.CategoryStatement, source)
+		return api.StatementEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
 	}
 	name, ok := source.Lhs[0].(*ast.Ident)
 	if !ok {
-		return nil, api.Unsupported(context, api.CategoryStatement, source)
+		return api.StatementEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
 	}
 	object, ok := context.TypesInfo().Uses[name].(*types.Var)
 	if !ok {
-		return nil, api.Unsupported(context, api.CategoryStatement, source)
+		return api.StatementEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	targetName, err := context.Names().Reference(object)
+	reference, err := context.Names().Reference(object)
 	if err != nil {
-		return nil, err
+		return api.StatementEmission{}, err
 	}
 	value, err := children.Expression(
 		context.
@@ -122,14 +161,208 @@ func emitAssignment(
 		source.Rhs[0],
 	)
 	if err != nil {
-		return nil, err
+		return api.StatementEmission{}, err
 	}
 	target := context.Factory().BinaryExpression(
 		nil,
-		context.Factory().Identifier(targetName),
+		context.Factory().Identifier(reference.Name()),
+		nil,
+		context.Factory().BinaryOperatorToken(tsgo.BinaryOperatorEqualsToken),
+		value.Value(),
+	)
+	statements := value.Before()
+	statements = append(statements, context.Factory().ExpressionStatement(target))
+	return api.NewStatementEmission(
+		statements,
+		api.CombineRequests(reference.Requests(), value.Requests()),
+	)
+}
+
+type parallelTarget struct {
+	source      *ast.Ident
+	object      *types.Var
+	name        string
+	declaration bool
+	requests    []api.PlacementRequest
+}
+
+func emitParallel(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.AssignStmt,
+) (api.StatementEmission, error) {
+	if len(source.Lhs) < 2 || len(source.Lhs) != len(source.Rhs) {
+		return api.StatementEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	targets, err := parallelTargets(context, source)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
+
+	statements := make([]tsgo.Statement, 0, len(targets)*2)
+	requests := make([]api.PlacementRequest, 0, len(targets)*2)
+	temporaryNames := make([]string, len(targets))
+	for index, target := range targets {
+		sourceValue := source.Rhs[index]
+		sourceType := context.TypesInfo().TypeOf(sourceValue)
+		if sourceType == nil || !types.AssignableTo(sourceType, target.object.Type()) {
+			return api.StatementEmission{},
+				api.Unsupported(context, api.CategoryStatement, source)
+		}
+		role := api.RoleAssignmentValue
+		if source.Tok == token.DEFINE {
+			role = api.RoleLocalValue
+		}
+		value, err := children.Expression(
+			context.
+				WithRole(role).
+				WithExpectedType(target.object.Type()),
+			sourceValue,
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		temporaryType, err := children.RepresentedType(
+			context.WithRole(api.RoleLocalType),
+			target.source,
+			target.object.Type(),
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		temporaryName, err := context.Names().Temporary(api.TemporaryAssignmentValue)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		temporaryNames[index] = temporaryName
+		statements = append(statements, value.Before()...)
+		statements = append(
+			statements,
+			variableStatement(
+				context,
+				tsgo.NodeFlagsConst,
+				temporaryName,
+				temporaryType.Value(),
+				value.Value(),
+			),
+		)
+		requests = append(
+			requests,
+			value.Requests()...,
+		)
+		requests = append(requests, temporaryType.Requests()...)
+	}
+
+	for index, target := range targets {
+		temporary := context.Factory().Identifier(temporaryNames[index])
+		if target.declaration {
+			targetType, err := children.RepresentedType(
+				context.WithRole(api.RoleLocalType),
+				target.source,
+				target.object.Type(),
+			)
+			if err != nil {
+				return api.StatementEmission{}, err
+			}
+			statements = append(
+				statements,
+				variableStatement(
+					context,
+					tsgo.NodeFlagsLet,
+					target.name,
+					targetType.Value(),
+					temporary,
+				),
+			)
+			requests = append(requests, targetType.Requests()...)
+		} else {
+			statements = append(
+				statements,
+				assignmentStatement(context, target.name, temporary),
+			)
+		}
+		requests = append(requests, target.requests...)
+	}
+	return api.NewStatementEmission(statements, requests)
+}
+
+func parallelTargets(
+	context api.Context,
+	source *ast.AssignStmt,
+) ([]parallelTarget, error) {
+	targets := make([]parallelTarget, 0, len(source.Lhs))
+	for _, expression := range source.Lhs {
+		identifier, ok := expression.(*ast.Ident)
+		if !ok || identifier.Name == "_" {
+			return nil, api.Unsupported(context, api.CategoryStatement, source)
+		}
+		if source.Tok == token.DEFINE {
+			if object, ok := context.TypesInfo().Defs[identifier].(*types.Var); ok {
+				name, err := context.Names().Declare(object)
+				if err != nil {
+					return nil, err
+				}
+				targets = append(targets, parallelTarget{
+					source:      identifier,
+					object:      object,
+					name:        name,
+					declaration: true,
+				})
+				continue
+			}
+		}
+		object, ok := context.TypesInfo().Uses[identifier].(*types.Var)
+		if !ok {
+			return nil, api.Unsupported(context, api.CategoryStatement, source)
+		}
+		reference, err := context.Names().Reference(object)
+		if err != nil {
+			return nil, err
+		}
+		targets = append(targets, parallelTarget{
+			source:   identifier,
+			object:   object,
+			name:     reference.Name(),
+			requests: reference.Requests(),
+		})
+	}
+	return targets, nil
+}
+
+func variableStatement(
+	context api.Context,
+	flags tsgo.NodeFlags,
+	name string,
+	targetType tsgo.TypeNode,
+	value tsgo.Expression,
+) tsgo.VariableStatement {
+	declaration := context.Factory().VariableDeclaration(
+		context.Factory().Identifier(name),
+		nil,
+		targetType,
+		value,
+	)
+	return context.Factory().VariableStatement(
+		nil,
+		context.Factory().VariableDeclarationList(
+			[]tsgo.VariableDeclaration{declaration},
+			flags,
+		),
+	)
+}
+
+func assignmentStatement(
+	context api.Context,
+	name string,
+	value tsgo.Expression,
+) tsgo.ExpressionStatement {
+	target := context.Factory().BinaryExpression(
+		nil,
+		context.Factory().Identifier(name),
 		nil,
 		context.Factory().BinaryOperatorToken(tsgo.BinaryOperatorEqualsToken),
 		value,
 	)
-	return context.Factory().ExpressionStatement(target), nil
+	return context.Factory().ExpressionStatement(target)
 }

@@ -5,13 +5,12 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func Emit(context api.Context, source ast.Expr) (tsgo.TypeNode, error) {
+func Emit(context api.Context, source ast.Expr) (api.TypeEmission, error) {
 	sourceType := context.TypesInfo().TypeOf(source)
 	if sourceType == nil {
-		return nil, api.Unsupported(context, api.CategoryType, source)
+		return api.TypeEmission{}, api.Unsupported(context, api.CategoryType, source)
 	}
 	return EmitRepresented(context, source, sourceType)
 }
@@ -20,10 +19,10 @@ func EmitRepresented(
 	context api.Context,
 	source ast.Node,
 	sourceType types.Type,
-) (tsgo.TypeNode, error) {
+) (api.TypeEmission, error) {
 	basic, ok := types.Unalias(sourceType).(*types.Basic)
 	if !ok {
-		return nil, api.Unsupported(context, api.CategoryType, source)
+		return api.TypeEmission{}, api.Unsupported(context, api.CategoryType, source)
 	}
 	var targetName string
 	switch basic.Kind() {
@@ -38,14 +37,20 @@ func EmitRepresented(
 		case 8:
 			targetName = "int64"
 		default:
-			return nil, api.Unsupported(context, api.CategoryType, source)
+			return api.TypeEmission{}, api.Unsupported(context, api.CategoryType, source)
 		}
 	default:
-		return nil, api.Unsupported(context, api.CategoryType, source)
+		return api.TypeEmission{}, api.Unsupported(context, api.CategoryType, source)
 	}
-	localName, err := context.Placement().TypeImport("@tsonic/core/types.js", targetName)
+	reference, err := context.Names().TypeImport("@tsonic/core/types.js", targetName)
 	if err != nil {
-		return nil, err
+		return api.TypeEmission{}, err
 	}
-	return context.Factory().TypeReferenceNode(context.Factory().Identifier(localName), nil), nil
+	return api.DirectType(
+		context.Factory().TypeReferenceNode(
+			context.Factory().Identifier(reference.Name()),
+			nil,
+		),
+		reference.Requests()...,
+	), nil
 }

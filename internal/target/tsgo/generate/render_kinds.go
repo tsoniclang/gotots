@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"strings"
 )
 
 func renderKinds(model *schemaModel) ([]byte, error) {
@@ -42,6 +43,9 @@ func renderKinds(model *schemaModel) ([]byte, error) {
 		}
 		buffer.WriteString(")\n\n")
 	}
+	if err := writeKeywordIdentifierPredicate(&buffer, model); err != nil {
+		return nil, err
+	}
 	return buffer.Bytes(), nil
 }
 
@@ -58,4 +62,33 @@ func writeEnumConstants(buffer *bytes.Buffer, typeName string, values []enumValu
 		)
 	}
 	buffer.WriteString(")\n\n")
+}
+
+func writeKeywordIdentifierPredicate(buffer *bytes.Buffer, model *schemaModel) error {
+	first, firstExists := model.syntaxKindByName["FirstKeyword"]
+	last, lastExists := model.syntaxKindByName["LastKeyword"]
+	if !firstExists || !lastExists || first > last {
+		return fmt.Errorf("pinned SyntaxKind keyword range is invalid")
+	}
+	buffer.WriteString("func RequiresBindingIdentifierEscape(text string) bool {\n")
+	buffer.WriteString("\tswitch text {\n")
+	buffer.WriteString("\tcase\n")
+	for _, value := range model.syntaxKinds {
+		if value.Alias || value.Value < first || value.Value > last {
+			continue
+		}
+		stem, found := strings.CutSuffix(value.Name, "Keyword")
+		if !found || stem == "" {
+			return fmt.Errorf("keyword syntax kind %s has no Keyword suffix", value.Name)
+		}
+		fmt.Fprintf(buffer, "\t\t%q,\n", strings.ToLower(stem))
+	}
+	buffer.WriteString("\t\t\"arguments\",\n")
+	buffer.WriteString("\t\t\"eval\":\n")
+	buffer.WriteString("\t\treturn true\n")
+	buffer.WriteString("\tdefault:\n")
+	buffer.WriteString("\t\treturn false\n")
+	buffer.WriteString("\t}\n")
+	buffer.WriteString("}\n")
+	return nil
 }

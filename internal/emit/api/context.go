@@ -15,7 +15,6 @@ type Context struct {
 	typesSizes      types.Sizes
 	factory         tsgo.Factory
 	names           Names
-	placement       Placement
 	expectedType    types.Type
 	functionResults *types.Tuple
 	breakDepth      uint32
@@ -30,7 +29,6 @@ func NewContext(
 	typesSizes types.Sizes,
 	factory tsgo.Factory,
 	names Names,
-	placement Placement,
 ) (Context, error) {
 	switch {
 	case role == "":
@@ -45,8 +43,6 @@ func NewContext(
 		return Context{}, &ContextError{Reason: "types sizes are nil"}
 	case names == nil:
 		return Context{}, &ContextError{Reason: "name owner is nil"}
-	case placement == nil:
-		return Context{}, &ContextError{Reason: "placement owner is nil"}
 	}
 	return Context{
 		role:         role,
@@ -56,7 +52,6 @@ func NewContext(
 		typesSizes:   typesSizes,
 		factory:      factory,
 		names:        names,
-		placement:    placement,
 	}, nil
 }
 
@@ -81,6 +76,11 @@ func (c Context) EnterFunction(results *types.Tuple) Context {
 func (c Context) EnterLoop() Context {
 	c.breakDepth++
 	c.continueDepth++
+	return c
+}
+
+func (c Context) EnterBreakable() Context {
+	c.breakDepth++
 	return c
 }
 
@@ -110,10 +110,6 @@ func (c Context) Factory() tsgo.Factory {
 
 func (c Context) Names() Names {
 	return c.names
-}
-
-func (c Context) Placement() Placement {
-	return c.placement
 }
 
 func (c Context) ExpectedType() types.Type {

@@ -4,17 +4,24 @@ import (
 	"go/ast"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func Emit(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.ReturnStmt,
-) (tsgo.ReturnStatement, error) {
+) (api.StatementEmission, error) {
 	results := context.FunctionResults()
-	if len(source.Results) != 1 || results == nil || results.Len() != 1 {
-		return nil, api.Unsupported(context, api.CategoryStatement, source)
+	resultCount := 0
+	if results != nil {
+		resultCount = results.Len()
+	}
+	if resultCount == 0 && len(source.Results) == 0 {
+		return api.DirectStatement(context.Factory().ReturnStatement(nil)), nil
+	}
+	if len(source.Results) != 1 || resultCount != 1 {
+		return api.StatementEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
 	}
 	result, err := children.Expression(
 		context.
@@ -23,7 +30,12 @@ func Emit(
 		source.Results[0],
 	)
 	if err != nil {
-		return nil, err
+		return api.StatementEmission{}, err
 	}
-	return context.Factory().ReturnStatement(result), nil
+	statements := result.Before()
+	statements = append(
+		statements,
+		context.Factory().ReturnStatement(result.Value()),
+	)
+	return api.NewStatementEmission(statements, result.Requests())
 }

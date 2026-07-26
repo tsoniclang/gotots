@@ -33,6 +33,34 @@ func TestEncoderMatchesPinnedUpstreamEncoder(t *testing.T) {
 	}
 }
 
+func TestEncoderMatchesPinnedDefaultClauseAbsentExpression(t *testing.T) {
+	factory := NewFactory()
+	clause := factory.DefaultClause(
+		nil,
+		[]Statement{factory.BreakStatement(nil)},
+	)
+	actual, err := EncodeNode(clause)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := encodeWithPinnedScript(t, `
+const clause = factory.createDefaultClause(
+    undefined,
+    [factory.createBreakStatement(undefined)],
+);
+process.stdout.write(Buffer.from(encodeNode(clause)).toString("base64"));
+`)
+	if !bytes.Equal(actual, expected) {
+		offset := firstDifference(actual, expected)
+		t.Fatalf(
+			"default-clause bytes differ at %d (Go=%d bytes, upstream=%d bytes)",
+			offset,
+			len(actual),
+			len(expected),
+		)
+	}
+}
+
 func TestEncoderRejectsAbsentRequiredChild(t *testing.T) {
 	factory := NewFactory()
 	declaration := factory.VariableDeclaration(nil, nil, nil, factory.NumericLiteral("1", TokenFlagsNone))

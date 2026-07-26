@@ -21,17 +21,20 @@ func Emit(
 	context api.Context,
 	children api.ChildEmitter,
 	source ast.Expr,
-) (tsgo.Expression, error) {
+) (api.ExpressionEmission, error) {
 	if !isIntegerLiteralSyntax(source) {
-		return nil, api.Unsupported(context, api.CategoryExpression, source)
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	typeAndValue, ok := context.TypesInfo().Types[source]
 	if !ok || typeAndValue.Value == nil || typeAndValue.Value.Kind() != constant.Int {
-		return nil, api.Unsupported(context, api.CategoryExpression, source)
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	value, exact := constant.Int64Val(typeAndValue.Value)
 	if !exact {
-		return nil, api.Unsupported(context, api.CategoryExpression, source)
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	targetType := context.ExpectedType()
 	if targetType == nil {
@@ -39,11 +42,13 @@ func Emit(
 	}
 	width, ok := signedWidth(context, targetType)
 	if !ok || !fitsWidth(value, width) {
-		return nil, api.Unsupported(context, api.CategoryExpression, source)
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	sourceType := context.TypesInfo().TypeOf(source)
 	if sourceType == nil || !types.AssignableTo(sourceType, targetType) {
-		return nil, api.Unsupported(context, api.CategoryExpression, source)
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	return emitValue(context, children, source, targetType, width, value)
 }
@@ -96,22 +101,25 @@ func emitValue(
 	targetType types.Type,
 	width int,
 	value int64,
-) (tsgo.Expression, error) {
-	typedLiteral := func(value uint64) (tsgo.Expression, error) {
+) (api.ExpressionEmission, error) {
+	typedLiteral := func(value uint64) (api.ExpressionEmission, error) {
 		target, err := children.RepresentedType(
 			context.WithRole(api.RoleIntegerConstantType),
 			source,
 			targetType,
 		)
 		if err != nil {
-			return nil, err
+			return api.ExpressionEmission{}, err
 		}
-		return context.Factory().AsExpression(
-			context.Factory().NumericLiteral(
-				strconv.FormatUint(value, 10),
-				tsgo.TokenFlagsNone,
+		return api.DirectExpression(
+			context.Factory().AsExpression(
+				context.Factory().NumericLiteral(
+					strconv.FormatUint(value, 10),
+					tsgo.TokenFlagsNone,
+				),
+				target.Value(),
 			),
-			target,
+			target.Requests()...,
 		), nil
 	}
 	if value >= 0 {
@@ -121,24 +129,24 @@ func emitValue(
 	return emitNegative(context, typedLiteral, width, magnitude)
 }
 
-type typedLiteralEmitter func(uint64) (tsgo.Expression, error)
+type typedLiteralEmitter func(uint64) (api.ExpressionEmission, error)
 
 func emitPositive(
 	context api.Context,
 	typedLiteral typedLiteralEmitter,
 	value uint64,
-) (tsgo.Expression, error) {
+) (api.ExpressionEmission, error) {
 	if value <= exactNumberMaximum {
 		return typedLiteral(value)
 	}
 	high, low := value>>32, value&(wideBase-1)
 	left, err := typedLiteral(high)
 	if err != nil {
-		return nil, err
+		return api.ExpressionEmission{}, err
 	}
 	base, err := typedLiteral(wideBase)
 	if err != nil {
-		return nil, err
+		return api.ExpressionEmission{}, err
 	}
 	result := binary(context, left, tsgo.BinaryOperatorAsteriskToken, base)
 	if low == 0 {
@@ -146,7 +154,7 @@ func emitPositive(
 	}
 	right, err := typedLiteral(low)
 	if err != nil {
-		return nil, err
+		return api.ExpressionEmission{}, err
 	}
 	return binary(context, result, tsgo.BinaryOperatorPlusToken, right), nil
 }
@@ -156,18 +164,18 @@ func emitNegative(
 	typedLiteral typedLiteralEmitter,
 	width int,
 	magnitude uint64,
-) (tsgo.Expression, error) {
+) (api.ExpressionEmission, error) {
 	if magnitude <= math.MaxInt32 {
 		return subtraction(context, typedLiteral, magnitude)
 	}
 	if width == 32 {
 		minimum, err := subtraction(context, typedLiteral, math.MaxInt32)
 		if err != nil {
-			return nil, err
+			return api.ExpressionEmission{}, err
 		}
 		one, err := typedLiteral(1)
 		if err != nil {
-			return nil, err
+			return api.ExpressionEmission{}, err
 		}
 		return binary(context, minimum, tsgo.BinaryOperatorMinusToken, one), nil
 	}
@@ -176,11 +184,11 @@ func emitNegative(
 	remainder := high*wideBase - magnitude
 	negativeHigh, err := subtraction(context, typedLiteral, high)
 	if err != nil {
-		return nil, err
+		return api.ExpressionEmission{}, err
 	}
 	base, err := typedLiteral(wideBase)
 	if err != nil {
-		return nil, err
+		return api.ExpressionEmission{}, err
 	}
 	result := binary(context, negativeHigh, tsgo.BinaryOperatorAsteriskToken, base)
 	if remainder == 0 {
@@ -188,7 +196,7 @@ func emitNegative(
 	}
 	right, err := typedLiteral(remainder)
 	if err != nil {
-		return nil, err
+		return api.ExpressionEmission{}, err
 	}
 	return binary(context, result, tsgo.BinaryOperatorPlusToken, right), nil
 }
@@ -197,25 +205,25 @@ func subtraction(
 	context api.Context,
 	typedLiteral typedLiteralEmitter,
 	magnitude uint64,
-) (tsgo.Expression, error) {
+) (api.ExpressionEmission, error) {
 	zero, err := typedLiteral(0)
 	if err != nil {
-		return nil, err
+		return api.ExpressionEmission{}, err
 	}
 	if magnitude <= math.MaxInt32 {
 		right, err := typedLiteral(magnitude)
 		if err != nil {
-			return nil, err
+			return api.ExpressionEmission{}, err
 		}
 		return binary(context, zero, tsgo.BinaryOperatorMinusToken, right), nil
 	}
 	maximum, err := typedLiteral(math.MaxInt32)
 	if err != nil {
-		return nil, err
+		return api.ExpressionEmission{}, err
 	}
 	one, err := typedLiteral(1)
 	if err != nil {
-		return nil, err
+		return api.ExpressionEmission{}, err
 	}
 	partial := binary(context, zero, tsgo.BinaryOperatorMinusToken, maximum)
 	return binary(context, partial, tsgo.BinaryOperatorMinusToken, one), nil
@@ -223,15 +231,18 @@ func subtraction(
 
 func binary(
 	context api.Context,
-	left tsgo.Expression,
+	left api.ExpressionEmission,
 	operator tsgo.BinaryOperator,
-	right tsgo.Expression,
-) tsgo.Expression {
-	return context.Factory().BinaryExpression(
-		nil,
-		left,
-		nil,
-		context.Factory().BinaryOperatorToken(operator),
-		right,
+	right api.ExpressionEmission,
+) api.ExpressionEmission {
+	return api.DirectExpression(
+		context.Factory().BinaryExpression(
+			nil,
+			left.Value(),
+			nil,
+			context.Factory().BinaryOperatorToken(operator),
+			right.Value(),
+		),
+		api.CombineRequests(left.Requests(), right.Requests())...,
 	)
 }

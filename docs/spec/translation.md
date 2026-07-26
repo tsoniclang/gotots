@@ -56,6 +56,93 @@ an enclosing loop. The branch handler neither walks to a parent nor infers a
 target from source spelling. Labeled control flow will add an identity-keyed
 target capability at its own construct boundary; it must not weaken this rule.
 
+An `if` initializer is not flattened into the surrounding target block. Its Go
+bindings are scoped to the condition, both branches, and nested `else if`
+chain, so the owner emits one target block containing the initializer
+statements followed by the target `if`:
+
+```go
+if current := value; current < limit {
+	use(current)
+}
+```
+
+```ts
+{
+  let current: GoInt = value;
+  if (current < limit) {
+    use(current);
+  }
+}
+```
+
+An `else if` is delegated through the dedicated `if` child entry, not the
+general statement dispatcher. A nested initializer is therefore wrapped at
+that alternate boundary rather than leaked.
+
+The three `for` clauses are independently optional. Their absence becomes an
+absent TS-Go `ForStatement` child, so `for condition {}`, `for {}`, and partial
+three-clause loops remain direct `for` statements. A present initializer or
+post clause still uses its narrow grammar entry, and a child with prerequisite
+statements remains unsupported until those statements can be placed at the
+per-iteration boundary exactly.
+
+An expression switch owns its tag, ordered case expressions, clause bodies,
+default, implicit clause scopes, and implicit breaks as one construct family:
+
+```go
+switch current := value; current {
+case 0:
+	branch := 10
+	result = branch
+case 1, 2:
+	branch := 20
+	result = branch
+default:
+	branch := 30
+	result = branch
+}
+```
+
+The initializer uses the same scoped-simple-statement child contract as an
+`if` initializer. The owner emits a target block around the initializer and
+switch so the binding does not escape. The tag is evaluated once. Case
+expressions are delegated in source order with the tag's exact Go type.
+Multiple expressions become adjacent target case labels sharing one body.
+Each Go clause body is wrapped in its own target block because Go clauses are
+implicit lexical blocks while TypeScript case labels otherwise share one
+scope. The owner appends the one target `break` needed to preserve Go's
+implicit non-fallthrough behavior.
+
+Case-expression prerequisite statements, expressionless switches,
+fallthrough, type switches, and types whose target equality is not yet proved
+remain distinct typed-unsupported cases. They are not approximated by
+re-evaluation, source spelling, loose equality, or a generic statement walk.
+
+A fully initialized local `var` declaration is owned by its enclosing
+declaration statement:
+
+```go
+var left, right int = first(), second()
+```
+
+The owner uses the `types.Var` identity for each name, verifies each initializer
+against that object's exact Go type, delegates initializers left-to-right, and
+constructs one typed target declaration list. The Go scope begins after the
+`ValueSpec`, so an initializer that resolves to an outer same-named object must
+retain that outer identity. The target name owner allocates a distinct inner
+name when needed; it must not rely on TypeScript's temporal-dead-zone behavior.
+
+A standalone Go block becomes one target block and is never flattened into its
+parent. This preserves local declaration scopes directly. Grouped `var`
+declarations emit their `ValueSpec` records in source order, with each spec
+forming its own declaration statement and scope boundary.
+
+Zero-initialized declarations, package declarations and initialization order,
+constants, multi-result initializers, and initializer prerequisite statements
+remain separate typed-unsupported cases until their complete semantic owners
+are installed.
+
 Likewise, for:
 
 ```go
@@ -97,8 +184,37 @@ DeclarationEmission
   requests: placement requests
 ```
 
+Narrow contextual entries whose target category is not an expression,
+statement, or declaration use the same immutable `value + requests` shape
+specialized to that exact TS-Go protocol category (currently type, block, and
+`for` initializer). They have no independent semantic payload and no
+`before` list; they do not enlarge the source model.
+
 These wrappers coordinate insertion and evaluation order. They do not encode
 source semantics independently of the Go AST/type graph.
+
+The wrappers are immutable values. Slice accessors return copies. A handler
+may reserve a deterministic target name through the name owner, but it does
+not install an import, declaration, helper, or statement into a mutable parent.
+The corresponding typed placement request travels in the result and is
+applied once by the root placement owner.
+
+Result composition is owner-directed:
+
+- a block flattens each child `StatementEmission.statements` in source order;
+- a parent combines child requests without rendering or string-key
+  deduplication;
+- a direct expression normally has an empty `before` list;
+- when a later eager child has `before` statements, already encountered
+  side-effecting values are captured before those statements so source
+  evaluation order is retained; and
+- a lazy child keeps its `before` statements inside the branch, short-circuit
+  arm, loop iteration, or closure that owns its execution.
+
+No compatibility entry point may unwrap an expression and discard its
+`before` statements or placement requests. Until an owner implements the
+required composition rule, that contextual case remains an explicit
+unsupported failure.
 
 The parent consumes a child result. It may place `before` statements only where
 the child is guaranteed to execute. For lazy or conditional children, the
@@ -129,6 +245,28 @@ const [value, ok] = values.getOk(key);
 No child scans its parent, and no inventory record is needed.
 
 ### Multiple Results And Assignment Order
+
+Even an identifier-only swap requires transactional ownership:
+
+```go
+left, right = right, left
+```
+
+An exact direct form captures every right side before the first store:
+
+```ts
+const __gotots_assign_0: GoInt = right;
+const __gotots_assign_1: GoInt = left;
+left = __gotots_assign_0;
+right = __gotots_assign_1;
+```
+
+The captures are target coordination nodes, not a source IR. Their names and
+types come from the lexical name owner and the existing `go/types` objects.
+For a mixed short declaration, existing variables are stored and new variables
+are declared only after all captures. A shadowing new variable receives a
+distinct target name so an earlier right-side reference still denotes the
+outer Go object.
 
 ```go
 i, values[i] = i+1, pair()
@@ -201,6 +339,36 @@ result := add(left, right)
 ```ts
 const result = add(left, right);
 ```
+
+A zero-result Go function emits an explicit `void` result type, and a call used
+as a statement remains a direct call expression statement:
+
+```go
+func Touch(value int) {
+	if value > 0 {
+		return
+	}
+}
+
+Touch(value)
+```
+
+```ts
+function Touch(value: GoInt): void {
+  if (value > 0) {
+    return;
+  }
+}
+
+Touch(value);
+```
+
+The function owner derives zero results from the selected `types.Signature`;
+the return owner accepts a bare return only in that function context; and the
+expression-statement owner admits only a toolchain-valid discarded call case
+that its call owner can represent. Calls returning a supported value may also
+be discarded. A receive statement, multi-result call, `go`, or `defer` remains
+with its own semantic owner until that complete case is implemented.
 
 Hidden operation arguments are not a default protocol. A runtime or generated
 helper is allowed only for a Go behavior that direct TypeScript cannot express,
@@ -320,6 +488,40 @@ fact that makes C# emission use `long`. GoToTS emits and retains the canonical
 `int64` reference. It must not infer semantics from the virtual declaration's
 structural carrier, replace the import with `number`, or introduce `bigint`
 syntax that the selected Tsonic contract does not admit.
+
+For selected `int64` values and selected `int` values represented by the same
+64-bit target primitive, addition, subtraction, and multiplication emit the
+corresponding direct typed TS-Go binary expression only after native Tsonic
+differential tests prove the target primitive's wraparound behavior at both
+bounds. A 32-bit `int` remains unsupported for these operators until its
+separate native boundary proof exists. Boolean `&&` and `||` emit direct binary
+expressions and retain native short-circuit evaluation. Neither operand may
+carry prerequisite statements: moving such work before a short-circuit
+operator would change behavior.
+
+An untyped Go boolean constant is explicitly attributed to the expected
+canonical target primitive, just like an untyped integer constant:
+
+```ts
+false as bool
+```
+
+Raw TypeScript `true` and `false` have only the ordinary TypeScript `boolean`
+carrier; that is not the selected Tsonic source-primitive fact required by
+native target operators. The parent supplies the expected Go `bool`, the
+predeclared-constant identifier handler verifies semantic object identity and
+assignability through `go/types`, and the existing basic-type owner supplies
+the one `bool` import. No operator handler guesses a carrier from spelling.
+
+An explicit Go parenthesized expression becomes one TS-Go
+`ParenthesizedExpression` around the directly emitted child. It preserves
+source grouping without creating a source-side wrapper or intermediate
+expression model.
+
+Division, remainder, shifts, bitwise operators, unsupported widths, and any
+operator whose selected target edge behavior is unproved remain typed
+unsupported cases. A direct JavaScript-number result is not evidence for
+integer semantics.
 
 Literal and operator handlers must also preserve exact target evidence. A
 large Go integer constant cannot be passed through a JavaScript numeric-value

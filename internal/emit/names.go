@@ -3,8 +3,12 @@ package emit
 import (
 	"go/ast"
 	"go/types"
+	"slices"
+	"strconv"
+	"strings"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type targetBinding struct {
@@ -15,11 +19,49 @@ type targetBinding struct {
 }
 
 type nameOwner struct {
-	byObject map[types.Object]targetBinding
+	byObject            map[types.Object]targetBinding
+	targetNameByObject  map[types.Object]string
+	sourceNameBases     map[string]struct{}
+	generatedSuffixes   map[string][]uint64
+	nextGeneratedSuffix map[string]uint64
 }
 
-func newNameOwner() *nameOwner {
-	return &nameOwner{byObject: make(map[types.Object]targetBinding)}
+func newNameOwner(packageScope *types.Scope, info *types.Info) *nameOwner {
+	owner := &nameOwner{
+		byObject:            make(map[types.Object]targetBinding),
+		targetNameByObject:  make(map[types.Object]string),
+		sourceNameBases:     make(map[string]struct{}),
+		generatedSuffixes:   make(map[string][]uint64),
+		nextGeneratedSuffix: make(map[string]uint64),
+	}
+	if info == nil {
+		return owner
+	}
+	objectsByScope := make(map[*types.Scope][]types.Object)
+	seen := make(map[types.Object]struct{})
+	for _, object := range info.Defs {
+		if object == nil || object.Name() == "_" {
+			continue
+		}
+		owner.sourceNameBases[portableIdentifier(object.Name())] = struct{}{}
+		if object.Parent() == nil {
+			continue
+		}
+		if _, exists := seen[object]; exists {
+			continue
+		}
+		seen[object] = struct{}{}
+		objectsByScope[object.Parent()] = append(objectsByScope[object.Parent()], object)
+	}
+	if packageScope != nil {
+		owner.preallocateScope(
+			packageScope,
+			objectsByScope,
+			make(map[string]uint64),
+			make(map[string]uint32),
+		)
+	}
+	return owner
 }
 
 func (n *nameOwner) Reserve(
@@ -59,28 +101,131 @@ func (n *nameOwner) declare(object types.Object, binding targetBinding) (string,
 	if object.Name() == "" {
 		return "", &api.NameError{Reason: "declaration name is empty"}
 	}
-	binding.name = object.Name()
+	name, ok := n.targetNameByObject[object]
+	if !ok {
+		return "", &api.NameError{
+			Name:   object.Name(),
+			Reason: "declaration object was not indexed from its Go scope",
+		}
+	}
+	binding.name = name
 	n.byObject[object] = binding
-	return object.Name(), nil
+	return name, nil
+}
+
+func (n *nameOwner) preallocateScope(
+	scope *types.Scope,
+	objectsByScope map[*types.Scope][]types.Object,
+	activeCounts map[string]uint64,
+	activeNames map[string]uint32,
+) {
+	objects := slices.Clone(objectsByScope[scope])
+	slices.SortFunc(objects, compareNameObjects)
+	originalCounts := make(map[string]uint64)
+	scopeNames := make([]string, 0, len(objects))
+	for _, object := range objects {
+		base := portableIdentifier(object.Name())
+		if _, recorded := originalCounts[base]; !recorded {
+			originalCounts[base] = activeCounts[base]
+		}
+		rank := activeCounts[base]
+		candidate := base
+		for {
+			if rank != 0 {
+				suffix := n.generatedSuffix(base, rank-1)
+				candidate = base + "__shadow_" + strconv.FormatUint(suffix, 10)
+			}
+			if activeNames[candidate] == 0 {
+				break
+			}
+			rank++
+		}
+		activeCounts[base] = rank + 1
+		activeNames[candidate]++
+		scopeNames = append(scopeNames, candidate)
+		n.targetNameByObject[object] = candidate
+	}
+	for index := range scope.NumChildren() {
+		n.preallocateScope(
+			scope.Child(index),
+			objectsByScope,
+			activeCounts,
+			activeNames,
+		)
+	}
+	for _, name := range scopeNames {
+		activeNames[name]--
+		if activeNames[name] == 0 {
+			delete(activeNames, name)
+		}
+	}
+	for base, original := range originalCounts {
+		if original == 0 {
+			delete(activeCounts, base)
+		} else {
+			activeCounts[base] = original
+		}
+	}
+}
+
+func (n *nameOwner) generatedSuffix(base string, index uint64) uint64 {
+	suffixes := n.generatedSuffixes[base]
+	next := n.nextGeneratedSuffix[base]
+	if next == 0 {
+		next = 1
+	}
+	for uint64(len(suffixes)) <= index {
+		candidate := base + "__shadow_" + strconv.FormatUint(next, 10)
+		suffix := next
+		next++
+		if _, reserved := n.sourceNameBases[candidate]; reserved {
+			continue
+		}
+		suffixes = append(suffixes, suffix)
+	}
+	n.generatedSuffixes[base] = suffixes
+	n.nextGeneratedSuffix[base] = next
+	return suffixes[index]
+}
+
+func compareNameObjects(left types.Object, right types.Object) int {
+	switch {
+	case left.Pos() < right.Pos():
+		return -1
+	case left.Pos() > right.Pos():
+		return 1
+	case left.Name() < right.Name():
+		return -1
+	case left.Name() > right.Name():
+		return 1
+	case left.String() < right.String():
+		return -1
+	case left.String() > right.String():
+		return 1
+	default:
+		return 0
+	}
 }
 
 type fileNames struct {
 	owner        *nameOwner
 	sourceFile   *ast.File
 	packageScope *types.Scope
-	placement    *placementOwner
+	factory      tsgo.Factory
+	temporaries  map[api.TemporaryKind]uint64
 }
 
 func (n *nameOwner) ForFile(
 	sourceFile *ast.File,
 	packageScope *types.Scope,
-	placement *placementOwner,
+	factory tsgo.Factory,
 ) api.Names {
 	return &fileNames{
 		owner:        n,
 		sourceFile:   sourceFile,
 		packageScope: packageScope,
-		placement:    placement,
+		factory:      factory,
+		temporaries:  make(map[api.TemporaryKind]uint64),
 	}
 }
 
@@ -98,18 +243,64 @@ func (n *fileNames) Declare(object types.Object) (string, error) {
 	return n.owner.declare(object, targetBinding{})
 }
 
-func (n *fileNames) Reference(object types.Object) (string, error) {
+func (n *fileNames) Reference(object types.Object) (api.NameReference, error) {
 	if object == nil {
-		return "", &api.NameError{Reason: "reference object is nil"}
+		return api.NameReference{}, &api.NameError{Reason: "reference object is nil"}
 	}
 	binding, ok := n.owner.byObject[object]
 	if !ok {
-		return "", &api.NameError{Name: object.Name(), Reason: "object has no emitted declaration"}
+		return api.NameReference{}, &api.NameError{
+			Name:   object.Name(),
+			Reason: "object has no emitted declaration",
+		}
 	}
 	if binding.sourceFile != nil && binding.sourceFile != n.sourceFile {
-		return n.placement.ValueImport(binding.modulePath, binding.name)
+		request, err := api.NewImportRequest(
+			n.factory,
+			api.ImportPhaseValue,
+			binding.modulePath,
+			binding.name,
+			binding.name,
+		)
+		if err != nil {
+			return api.NameReference{}, err
+		}
+		return api.NewNameReference(binding.name, request)
 	}
-	return binding.name, nil
+	return api.NewNameReference(binding.name)
+}
+
+func (n *fileNames) TypeImport(
+	modulePath string,
+	exportedName string,
+) (api.NameReference, error) {
+	request, err := api.NewImportRequest(
+		n.factory,
+		api.ImportPhaseType,
+		modulePath,
+		exportedName,
+		exportedName,
+	)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	return api.NewNameReference(exportedName, request)
+}
+
+func (n *fileNames) Temporary(kind api.TemporaryKind) (string, error) {
+	prefix, err := api.TemporaryPrefix(kind)
+	if err != nil {
+		return "", err
+	}
+	for {
+		index := n.temporaries[kind]
+		n.temporaries[kind] = index + 1
+		candidate := prefix + strconv.FormatUint(index, 10)
+		if _, reserved := n.owner.sourceNameBases[candidate]; reserved {
+			continue
+		}
+		return candidate, nil
+	}
 }
 
 func (n *fileNames) ModuleExport(object types.Object) (bool, error) {
@@ -131,4 +322,26 @@ func objectName(object types.Object) string {
 		return ""
 	}
 	return object.Name()
+}
+
+func portableIdentifier(source string) string {
+	var result strings.Builder
+	for _, value := range source {
+		switch {
+		case value >= 'A' && value <= 'Z',
+			value >= 'a' && value <= 'z',
+			value >= '0' && value <= '9',
+			value == '_':
+			result.WriteRune(value)
+		default:
+			result.WriteString("__u")
+			result.WriteString(strconv.FormatInt(int64(value), 16))
+			result.WriteByte('_')
+		}
+	}
+	identifier := result.String()
+	if tsgo.RequiresBindingIdentifierEscape(identifier) {
+		return "__go_" + identifier
+	}
+	return identifier
 }

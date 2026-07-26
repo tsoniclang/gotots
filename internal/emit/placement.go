@@ -7,83 +7,80 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-type importRequest struct {
-	typeOnly     bool
-	modulePath   string
-	exportedName string
-}
-
 type placementOwner struct {
-	imports map[importRequest]struct{}
+	requests map[api.PlacementOwner]api.PlacementRequest
 }
 
 func newPlacementOwner() *placementOwner {
-	return &placementOwner{imports: make(map[importRequest]struct{})}
-}
-
-func (p *placementOwner) TypeImport(modulePath string, exportedName string) (string, error) {
-	return p.importName(true, modulePath, exportedName)
-}
-
-func (p *placementOwner) ValueImport(modulePath string, exportedName string) (string, error) {
-	return p.importName(false, modulePath, exportedName)
-}
-
-func (p *placementOwner) importName(
-	typeOnly bool,
-	modulePath string,
-	exportedName string,
-) (string, error) {
-	if modulePath == "" || exportedName == "" {
-		return "", &api.PlacementError{
-			ModulePath:   modulePath,
-			ExportedName: exportedName,
-			Reason:       "module path and exported name are required",
-		}
+	return &placementOwner{
+		requests: make(map[api.PlacementOwner]api.PlacementRequest),
 	}
-	p.imports[importRequest{
-		typeOnly:     typeOnly,
-		modulePath:   modulePath,
-		exportedName: exportedName,
-	}] = struct{}{}
-	return exportedName, nil
+}
+
+func (p *placementOwner) Apply(requests []api.PlacementRequest) error {
+	for _, request := range requests {
+		if request.Kind() != api.PlacementImport ||
+			request.LegalScope() != api.ScopeFileImports ||
+			request.PreferredScope() != api.ScopeFileImports ||
+			request.Execution() != api.ExecutionStatic {
+			return &api.PlacementError{
+				ModulePath:   request.ModulePath(),
+				ExportedName: request.ExportedName(),
+				Reason:       "request is not a static file import",
+			}
+		}
+		owner := request.Owner()
+		if existing, ok := p.requests[owner]; ok {
+			if existing.LocalName() != request.LocalName() {
+				return &api.PlacementError{
+					ModulePath:   request.ModulePath(),
+					ExportedName: request.ExportedName(),
+					Reason:       "one import owner requested multiple local names",
+				}
+			}
+			continue
+		}
+		p.requests[owner] = request
+	}
+	return nil
 }
 
 func (p *placementOwner) Statements(factory tsgo.Factory) []tsgo.Statement {
 	type importGroup struct {
-		typeOnly   bool
+		phase      api.ImportPhase
 		modulePath string
 	}
-	byGroup := make(map[importGroup][]string)
-	for request := range p.imports {
-		group := importGroup{typeOnly: request.typeOnly, modulePath: request.modulePath}
-		byGroup[group] = append(byGroup[group], request.exportedName)
+	byGroup := make(map[importGroup][]api.PlacementRequest)
+	for _, request := range p.requests {
+		group := importGroup{
+			phase:      request.ImportPhase(),
+			modulePath: request.ModulePath(),
+		}
+		byGroup[group] = append(byGroup[group], request)
 	}
 	groups := make([]importGroup, 0, len(byGroup))
 	for group := range byGroup {
 		groups = append(groups, group)
 	}
 	sort.Slice(groups, func(left, right int) bool {
-		if groups[left].typeOnly != groups[right].typeOnly {
-			return groups[left].typeOnly
+		if groups[left].phase != groups[right].phase {
+			return groups[left].phase < groups[right].phase
 		}
 		return groups[left].modulePath < groups[right].modulePath
 	})
 
 	statements := make([]tsgo.Statement, 0, len(groups))
 	for _, group := range groups {
-		names := byGroup[group]
-		sort.Strings(names)
-		specifiers := make([]tsgo.ImportSpecifier, 0, len(names))
-		for _, name := range names {
-			specifiers = append(specifiers, factory.ImportSpecifier(
-				false,
-				nil,
-				factory.Identifier(name),
-			))
+		requests := byGroup[group]
+		sort.Slice(requests, func(left, right int) bool {
+			return requests[left].LocalName() < requests[right].LocalName()
+		})
+		specifiers := make([]tsgo.ImportSpecifier, 0, len(requests))
+		for _, request := range requests {
+			specifiers = append(specifiers, request.Specifier())
 		}
 		var phase tsgo.ImportPhaseModifierSyntaxKind
-		if group.typeOnly {
+		if group.phase == api.ImportPhaseType {
 			phase = tsgo.ImportPhaseModifierSyntaxKindTypeKeyword
 		}
 		clause := factory.ImportClause(
@@ -94,7 +91,7 @@ func (p *placementOwner) Statements(factory tsgo.Factory) []tsgo.Statement {
 		statements = append(statements, factory.ImportDeclaration(
 			nil,
 			clause,
-			factory.StringLiteral(group.modulePath, tsgo.TokenFlagsNone),
+			requests[0].ModuleSpecifier(),
 			nil,
 		))
 	}

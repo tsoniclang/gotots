@@ -26,10 +26,16 @@ func (e *Error) Error() string {
 }
 
 func New(source *load.Package) *Emitter {
+	var typesInfo *types.Info
+	var packageScope *types.Scope
+	if source != nil {
+		typesInfo = source.TypesInfo()
+		packageScope = source.Types().Scope()
+	}
 	return &Emitter{
 		source:  source,
 		factory: tsgo.NewFactory(),
-		names:   newNameOwner(),
+		names:   newNameOwner(packageScope, typesInfo),
 	}
 }
 
@@ -46,7 +52,7 @@ func (e *Emitter) EmitFile(sourceFile *ast.File, outputPath string) (tsgo.Source
 	}
 
 	placement := newPlacementOwner()
-	names := e.names.ForFile(sourceFile, e.source.Types().Scope(), placement)
+	names := e.names.ForFile(sourceFile, e.source.Types().Scope(), e.factory)
 	context, err := api.NewContext(
 		api.RoleFileDeclaration,
 		e.source.FileSet(),
@@ -55,18 +61,20 @@ func (e *Emitter) EmitFile(sourceFile *ast.File, outputPath string) (tsgo.Source
 		e.source.TypesSizes(),
 		e.factory,
 		names,
-		placement,
 	)
 	if err != nil {
 		return nil, err
 	}
 	declarations := make([]tsgo.Statement, 0, len(sourceFile.Decls))
 	for _, declaration := range sourceFile.Decls {
-		statement, err := e.declaration(context, declaration)
+		result, err := e.declaration(context, declaration)
 		if err != nil {
 			return nil, err
 		}
-		declarations = append(declarations, statement)
+		if err := placement.Apply(result.Requests()); err != nil {
+			return nil, err
+		}
+		declarations = append(declarations, result.Declarations()...)
 	}
 	statements := append(placement.Statements(e.factory), declarations...)
 

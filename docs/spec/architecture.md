@@ -147,6 +147,30 @@ A narrow memoized answer is allowed only when its key is the authoritative Go
 object, its value is directly needed target state, and recomputation would
 produce the same answer. It is a cache, not a new identity domain.
 
+Target names are keyed by `types.Object`, not source spelling. A declaration
+that shadows an ancestor receives a deterministic distinct target name because
+JavaScript/TypeScript lexical declarations have a temporal dead zone before
+their textual declaration while the new Go variable is not in scope during
+the right side of its short declaration. The lexical name service emits the
+portable ASCII identifier subset accepted by TypeScript and the selected
+Tsonic target. Non-ASCII Go identifier runes are escaped deterministically.
+Every pinned TS-Go keyword spelling and strict-binding name is escaped at this
+same boundary; the keyword set is generated from the pinned `SyntaxKind`
+contract rather than copied into the emitter.
+Names are distinct across the same or ancestor/descendant lexical declaration
+spaces in either source order because selected consumers may apply that rule
+to the complete enclosing block. Sibling scopes and distinct functions may
+reuse a target name.
+Shadow suffixes and compiler-created prefixes are distinct, and allocation
+excludes every portable source-name base in the loaded package before emission;
+there is no claim that a valid cross-target identifier namespace is impossible
+for Go source to spell. Compiler-created names and all collision decisions are
+owned by this one service. The service derives its target-name index once from
+the authoritative `go/types` scope tree in outer-to-inner order. This is an
+O(n log n) target-name cache keyed by `types.Object`, not a source inventory or
+semantic plan; declaration and reference lookup during emission is O(1)
+average.
+
 Representation consistency has one owner inside `internal/emit`. On the first
 request for a Go type, object, or method, that owner queries the complete
 selected Go AST/type graph, chooses the exact target form, and creates or
@@ -205,6 +229,14 @@ imports are required, typed placement requests with:
 3. the preferred scope;
 4. the execution/evaluation constraint; and
 5. a typed deduplication owner where repetition is legal.
+
+Name reservation and placement are separate operations. The authoritative
+name owner indexes stable target names from the selected `go/types` scope tree
+before emission; a handler reserves or references that indexed name while
+constructing its target node. The handler returns any associated placement
+request in its emission result. Only the root placement owner consumes requests
+and mutates a target builder. No `Context` capability may silently install an
+import or hoisted declaration while a child is being translated.
 
 One placement service applies the policy:
 

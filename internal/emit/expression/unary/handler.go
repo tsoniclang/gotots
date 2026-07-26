@@ -13,7 +13,7 @@ func Emit(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.UnaryExpr,
-) (tsgo.Expression, error) {
+) (api.ExpressionEmission, error) {
 	if source.Op == token.SUB && context.TypesInfo().Types[source].Value != nil {
 		return children.IntegerConstant(context, source)
 	}
@@ -24,7 +24,8 @@ func Emit(
 		resultType.Kind() != types.Bool ||
 		!operandIsBasic ||
 		operandType.Kind() != types.Bool {
-		return nil, api.Unsupported(context, api.CategoryExpression, source)
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	operand, err := children.Expression(
 		context.
@@ -33,12 +34,16 @@ func Emit(
 		source.X,
 	)
 	if err != nil {
-		return nil, err
+		return api.ExpressionEmission{}, err
 	}
-	return context.Factory().PrefixUnaryExpression(
-		tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
-		operand,
-	), nil
+	return api.NewExpressionEmission(
+		operand.Before(),
+		context.Factory().PrefixUnaryExpression(
+			tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
+			operand.Value(),
+		),
+		operand.Requests(),
+	)
 }
 
 func boolType(sourceType types.Type) (*types.Basic, bool) {

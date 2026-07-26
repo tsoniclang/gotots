@@ -141,9 +141,11 @@ func TestBoolFlowLiteralsUseGoObjectIdentity(t *testing.T) {
 	runTarget := targetFile.Statements()[1].(tsgo.FunctionDeclaration)
 	targetDefinition := runTarget.Body().(tsgo.Block).Statements()[0].(tsgo.VariableStatement)
 	initializer := targetDefinition.DeclarationList().Declarations()[0].Initializer()
-	if initializer.Kind() != tsgo.SyntaxKindFalseKeyword {
-		t.Fatalf("initializer kind = %d, want false keyword", initializer.Kind())
+	attributed, ok := initializer.(tsgo.AsExpression)
+	if !ok || attributed.Expression().Kind() != tsgo.SyntaxKindFalseKeyword {
+		t.Fatalf("initializer = %T, want typed semantic false constant", initializer)
 	}
+	assertPrimitiveType(t, attributed.Type(), "bool")
 }
 
 func TestBoolFlowRejectsUnaryOperatorVariant(t *testing.T) {
@@ -161,28 +163,6 @@ func TestBoolFlowRejectsUnaryOperatorVariant(t *testing.T) {
 	if unsupported.Category != api.CategoryExpression ||
 		unsupported.Construct != "*ast.UnaryExpr" ||
 		unsupported.Role != api.RoleIfCondition {
-		t.Fatalf("unsupported error = %#v", unsupported)
-	}
-}
-
-func TestBoolFlowRejectsElseIfUntilItsCaseIsProven(t *testing.T) {
-	loaded := loadBoolFlowProject(t)
-	runFunction := loaded.Files()[0].Syntax().Decls[0].(*ast.FuncDecl)
-	ifStatement := runFunction.Body.List[1].(*ast.IfStmt)
-	ifStatement.Else = &ast.IfStmt{
-		Cond: ifStatement.Cond,
-		Body: ifStatement.Else.(*ast.BlockStmt),
-	}
-
-	compiler := emit.New(loaded)
-	_, err := compiler.EmitFile(loaded.Files()[0].Syntax(), filepath.Join(t.TempDir(), "bool-flow.ts"))
-	var unsupported *api.UnsupportedError
-	if !errors.As(err, &unsupported) {
-		t.Fatalf("error = %v, want *api.UnsupportedError", err)
-	}
-	if unsupported.Category != api.CategoryStatement ||
-		unsupported.Construct != "*ast.IfStmt" ||
-		unsupported.Role != api.RoleBlockStatement {
 		t.Fatalf("unsupported error = %#v", unsupported)
 	}
 }
