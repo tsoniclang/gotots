@@ -114,8 +114,7 @@ func TestAddRejectsUnsupportedBinaryOperator(t *testing.T) {
 	binary := function.Body.List[0].(*ast.ReturnStmt).Results[0].(*ast.BinaryExpr)
 	binary.Op = token.QUO
 
-	compiler := emit.New(loaded)
-	_, err := compiler.EmitFile(loaded.Files()[0].Syntax(), filepath.Join(t.TempDir(), "add.ts"))
+	_, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 	var unsupported *api.UnsupportedError
 	if !errors.As(err, &unsupported) {
 		t.Fatalf("error = %v, want *api.UnsupportedError", err)
@@ -219,8 +218,7 @@ func loadAddProject(t *testing.T) *load.Package {
 
 func emitAdd(t *testing.T, loaded *load.Package, outputPath string) tsgo.SourceFile {
 	t.Helper()
-	compiler := emit.New(loaded)
-	targetFile, err := compiler.EmitFile(loaded.Files()[0].Syntax(), outputPath)
+	targetFile, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 	if err != nil {
 		t.Fatal(err)
 	}

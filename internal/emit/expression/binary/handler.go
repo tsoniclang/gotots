@@ -6,6 +6,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -63,8 +64,8 @@ func operationFor(
 	integerType, integerOperands := integerOperandType(leftType, rightType)
 	switch {
 	case isSignedArithmetic(source.Op) &&
-		isSupportedSignedArithmetic(
-			context,
+		basictype.SupportsSignedArithmetic(
+			context.TypesSizes(),
 			context.TypesInfo().TypeOf(source),
 		):
 		operandType := context.TypesInfo().TypeOf(source)
@@ -152,24 +153,6 @@ func logicalOperator(
 func isSupportedBoolean(value types.Type) bool {
 	basic, ok := types.Unalias(value).(*types.Basic)
 	return ok && basic.Kind() == types.Bool
-}
-
-func isSupportedSignedArithmetic(context api.Context, value types.Type) bool {
-	if value == nil {
-		return false
-	}
-	basic, ok := types.Unalias(value).(*types.Basic)
-	if !ok {
-		return false
-	}
-	switch basic.Kind() {
-	case types.Int64:
-		return true
-	case types.Int:
-		return context.TypesSizes().Sizeof(types.Typ[types.Int]) == 8
-	default:
-		return false
-	}
 }
 
 func isSupportedSignedInteger(value types.Type) bool {

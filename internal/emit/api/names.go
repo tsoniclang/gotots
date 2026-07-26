@@ -11,6 +11,7 @@ type TemporaryKind uint8
 const (
 	TemporaryInvalid TemporaryKind = iota
 	TemporaryAssignmentValue
+	TemporaryMultipleResults
 )
 
 type NameReference struct {
@@ -45,6 +46,8 @@ func TemporaryPrefix(kind TemporaryKind) (string, error) {
 	switch kind {
 	case TemporaryAssignmentValue:
 		return "__gotots_assign_", nil
+	case TemporaryMultipleResults:
+		return "__gotots_results_", nil
 	default:
 		return "", &NameError{
 			Reason: fmt.Sprintf("temporary kind %d is invalid", kind),

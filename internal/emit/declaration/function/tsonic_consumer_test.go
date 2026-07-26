@@ -21,13 +21,30 @@ func executeThroughTsonic(
 	proof tsonicProof,
 ) string {
 	t.Helper()
+	return executeFilesThroughTsonic(
+		t,
+		map[string]string{"index.ts": printedSource},
+		"index.ts",
+		proof,
+	)
+}
+
+func executeFilesThroughTsonic(
+	t *testing.T,
+	printedSources map[string]string,
+	entryPoint string,
+	proof tsonicProof,
+) string {
+	t.Helper()
 	tsonicRoot := selectedTsonicRoot(t)
 	workingDirectory := t.TempDir()
 	sourceDirectory := filepath.Join(workingDirectory, "src")
 	if err := os.MkdirAll(sourceDirectory, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, filepath.Join(sourceDirectory, "index.ts"), printedSource)
+	for name, source := range printedSources {
+		writeFile(t, filepath.Join(sourceDirectory, name), source)
+	}
 	installTsonicTarget(t, workingDirectory, tsonicRoot)
 	writeFile(t, filepath.Join(workingDirectory, "package.json"), `{
   "name": "gotots-consumer-proof",
@@ -41,7 +58,7 @@ func executeThroughTsonic(
 }
 `)
 	writeFile(t, filepath.Join(workingDirectory, "tsonic.json"), `{
-  "entryPoint": "index.ts",
+  "entryPoint": "`+entryPoint+`",
   "rootDir": "src",
   "outDir": "out",
   "targets": [
@@ -66,26 +83,36 @@ func executeThroughTsonic(
 		"csharp",
 		proof.assembly+".csproj",
 	)
-	generatedSourcePath := filepath.Join(
+	generatedSourceDirectory := filepath.Join(
 		workingDirectory,
 		"out",
 		"csharp",
 		"src",
-		"Index.cs",
 	)
-	generatedSource, err := os.ReadFile(generatedSourcePath)
+	generatedPaths, err := filepath.Glob(filepath.Join(generatedSourceDirectory, "*.cs"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	generated := string(generatedSource)
+	if len(generatedPaths) == 0 {
+		t.Fatal("Tsonic generated no C# source files")
+	}
+	var generated strings.Builder
+	for _, generatedPath := range generatedPaths {
+		generatedSource, err := os.ReadFile(generatedPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		generated.Write(generatedSource)
+	}
+	generatedText := generated.String()
 	for _, required := range proof.requiredTarget {
-		if !strings.Contains(generated, required) {
-			t.Fatalf("generated C# lacks %q:\n%s", required, generated)
+		if !strings.Contains(generatedText, required) {
+			t.Fatalf("generated C# lacks %q:\n%s", required, generatedText)
 		}
 	}
 	for _, forbidden := range proof.forbiddenTarget {
-		if strings.Contains(generated, forbidden) {
-			t.Fatalf("generated C# contains forbidden %q:\n%s", forbidden, generated)
+		if strings.Contains(generatedText, forbidden) {
+			t.Fatalf("generated C# contains forbidden %q:\n%s", forbidden, generatedText)
 		}
 	}
 	run(t, workingDirectory, "dotnet", "build", generatedProject, "--nologo", "--verbosity:quiet")
@@ -143,10 +170,14 @@ func installTsonicTarget(t *testing.T, workingDirectory, tsonicRoot string) {
 		t.Fatal(err)
 	}
 	parent := filepath.Dir(tsonicRoot)
+	csharpTargetRoot := os.Getenv("GOTOTS_TSONIC_CSHARP_ROOT")
+	if csharpTargetRoot == "" {
+		csharpTargetRoot = filepath.Join(parent, "tsonic-csharp")
+	}
 	for name, target := range map[string]string{
 		"csharp-js":      filepath.Join(parent, "csharp-js"),
 		"csharp-runtime": filepath.Join(parent, "csharp-runtime"),
-		"target-csharp":  filepath.Join(parent, "tsonic-csharp"),
+		"target-csharp":  csharpTargetRoot,
 	} {
 		if _, err := os.Stat(filepath.Join(target, "package.json")); err != nil {
 			t.Skipf("selected Tsonic dependency %s is unavailable: %v", name, err)
@@ -158,4 +189,35 @@ func installTsonicTarget(t *testing.T, workingDirectory, tsonicRoot string) {
 		}
 	}
 	t.Logf("selected dotnet version: %s", strings.TrimSpace(run(t, workingDirectory, "dotnet", "--version")))
+}
+
+func TestIntegerConstantsExecuteDifferentiallyThroughTsonic(t *testing.T) {
+	loaded := loadIntegerConstantsProject(t)
+	workingDirectory := t.TempDir()
+	targetFile := emitIntegerConstants(
+		t,
+		loaded,
+		filepath.Join(workingDirectory, "index.ts"),
+	)
+	printed := printTargetFile(t, targetFile, workingDirectory)
+	targetOutput := executeThroughTsonic(t, printed, tsonicProof{
+		namespace: "GoToTS.IntegerConstants",
+		assembly:  "GoToTSIntegerConstants",
+		runnerSource: `Console.WriteLine(GoToTS.IntegerConstants.Index.Small());
+Console.WriteLine(GoToTS.IntegerConstants.Index.BeyondSafe());
+Console.WriteLine(GoToTS.IntegerConstants.Index.Maximum());
+Console.WriteLine(GoToTS.IntegerConstants.Index.Minimum());
+`,
+		requiredTarget: []string{
+			"return 42;",
+			"return (2097152) * (4294967296) + (1);",
+			"return (2147483647) * (4294967296) + (4294967295);",
+			"return ((0) - (2147483647) - (1)) * (4294967296);",
+		},
+		forbiddenTarget: []string{"9223372036854776000"},
+	})
+	goOutput := executeIntegerConstantsGo(t, workingDirectory)
+	if targetOutput != goOutput {
+		t.Fatalf("Tsonic/C# output = %q, Go output = %q", targetOutput, goOutput)
+	}
 }

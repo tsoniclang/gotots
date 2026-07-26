@@ -28,10 +28,7 @@ func TestExpressionStatementRejectsNonCallMutation(t *testing.T) {
 	statement := runFunction.Body.List[0].(*ast.ExprStmt)
 	statement.X = &ast.Ident{Name: "notACall"}
 
-	_, err = emit.New(loaded).EmitFile(
-		loaded.Files()[0].Syntax(),
-		filepath.Join(t.TempDir(), "void-calls.ts"),
-	)
+	_, err = emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 	var unsupported *api.UnsupportedError
 	if !errors.As(err, &unsupported) {
 		t.Fatalf("error = %v, want *api.UnsupportedError", err)

@@ -33,8 +33,7 @@ func Emit(
 		signature.Recv() != nil ||
 		signature.TypeParams() != nil ||
 		signature.RecvTypeParams() != nil ||
-		signature.Variadic() ||
-		resultCount(signature.Results()) > 1 {
+		signature.Variadic() {
 		return api.DeclarationEmission{},
 			api.Unsupported(context, api.CategoryDeclaration, source)
 	}
@@ -162,21 +161,40 @@ func emitResult(
 			),
 		), nil
 	}
-	if fields == nil || len(fields.List) != 1 {
-		if fields == nil {
-			return api.TypeEmission{},
-				&api.InvariantError{Role: context.Role(), Reason: "result list is nil"}
-		}
+	if fields == nil {
+		return api.TypeEmission{},
+			&api.InvariantError{Role: context.Role(), Reason: "result list is nil"}
+	}
+	if len(fields.List) != resultCount(signature.Results()) {
 		return api.TypeEmission{},
 			api.Unsupported(context, api.CategoryDeclaration, fields)
 	}
-	field := fields.List[0]
-	if field.Doc != nil || field.Comment != nil || field.Tag != nil || len(field.Names) != 0 ||
-		!types.Identical(signature.Results().At(0).Type(), context.TypesInfo().TypeOf(field.Type)) {
-		return api.TypeEmission{},
-			api.Unsupported(context, api.CategoryDeclaration, field)
+	for index, field := range fields.List {
+		if field.Doc != nil || field.Comment != nil || field.Tag != nil ||
+			len(field.Names) != 0 ||
+			!types.Identical(
+				signature.Results().At(index).Type(),
+				context.TypesInfo().TypeOf(field.Type),
+			) {
+			return api.TypeEmission{},
+				api.Unsupported(
+					context.WithRole(api.RoleResultType),
+					api.CategoryDeclaration,
+					field,
+				)
+		}
 	}
-	return children.Type(context.WithRole(api.RoleResultType), field.Type)
+	if signature.Results().Len() == 1 {
+		return children.Type(
+			context.WithRole(api.RoleResultType),
+			fields.List[0].Type,
+		)
+	}
+	return children.RepresentedType(
+		context.WithRole(api.RoleResultType),
+		fields,
+		signature.Results(),
+	)
 }
 
 func resultCount(results *types.Tuple) int {

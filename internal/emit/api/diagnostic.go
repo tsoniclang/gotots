@@ -40,6 +40,8 @@ const (
 	RoleExpressionStatement  Role = "expression-statement"
 	RoleIntegerConstantType  Role = "integer-constant-type"
 	RoleBooleanConstantType  Role = "boolean-constant-type"
+	RolePackageConstantType  Role = "package-constant-type"
+	RolePackageConstantValue Role = "package-constant-value"
 	RoleForInitializer       Role = "for-initializer"
 	RoleForCondition         Role = "for-condition"
 	RoleForPost              Role = "for-post"

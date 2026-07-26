@@ -8,14 +8,19 @@ import (
 	"strings"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type targetBinding struct {
 	name         string
 	sourceFile   *ast.File
-	modulePath   string
+	sourcePath   string
 	moduleExport bool
+}
+
+type declarationRegistry struct {
+	byObject map[types.Object]targetBinding
 }
 
 type nameOwner struct {
@@ -24,15 +29,29 @@ type nameOwner struct {
 	sourceNameBases     map[string]struct{}
 	generatedSuffixes   map[string][]uint64
 	nextGeneratedSuffix map[string]uint64
+	registry            *declarationRegistry
 }
 
 func newNameOwner(packageScope *types.Scope, info *types.Info) *nameOwner {
+	return newNameOwnerWithRegistry(packageScope, info, newDeclarationRegistry())
+}
+
+func newDeclarationRegistry() *declarationRegistry {
+	return &declarationRegistry{byObject: make(map[types.Object]targetBinding)}
+}
+
+func newNameOwnerWithRegistry(
+	packageScope *types.Scope,
+	info *types.Info,
+	registry *declarationRegistry,
+) *nameOwner {
 	owner := &nameOwner{
 		byObject:            make(map[types.Object]targetBinding),
 		targetNameByObject:  make(map[types.Object]string),
 		sourceNameBases:     make(map[string]struct{}),
 		generatedSuffixes:   make(map[string][]uint64),
 		nextGeneratedSuffix: make(map[string]uint64),
+		registry:            registry,
 	}
 	if info == nil {
 		return owner
@@ -67,20 +86,29 @@ func newNameOwner(packageScope *types.Scope, info *types.Info) *nameOwner {
 func (n *nameOwner) Reserve(
 	object types.Object,
 	sourceFile *ast.File,
-	modulePath string,
+	sourcePath string,
 ) (string, error) {
 	if sourceFile == nil {
 		return "", &api.NameError{Name: objectName(object), Reason: "source file is nil"}
 	}
-	if modulePath == "" {
+	if sourcePath == "" {
 		return "", &api.NameError{Name: objectName(object), Reason: "target module path is empty"}
 	}
-	return n.declare(object, targetBinding{
+	binding := targetBinding{
 		name:         objectName(object),
 		sourceFile:   sourceFile,
-		modulePath:   modulePath,
+		sourcePath:   sourcePath,
 		moduleExport: true,
-	})
+	}
+	name, err := n.declare(object, binding)
+	if err != nil {
+		return "", err
+	}
+	binding.name = name
+	if err := n.registry.reserve(object, binding); err != nil {
+		return "", err
+	}
+	return name, nil
 }
 
 func (n *nameOwner) declare(object types.Object, binding targetBinding) (string, error) {
@@ -90,7 +118,7 @@ func (n *nameOwner) declare(object types.Object, binding targetBinding) (string,
 	if existing, ok := n.byObject[object]; ok {
 		if binding.sourceFile != nil &&
 			(existing.sourceFile != binding.sourceFile ||
-				existing.modulePath != binding.modulePath) {
+				existing.sourcePath != binding.sourcePath) {
 			return "", &api.NameError{
 				Name:   object.Name(),
 				Reason: "declaration was reserved by a different target module",
@@ -111,6 +139,28 @@ func (n *nameOwner) declare(object types.Object, binding targetBinding) (string,
 	binding.name = name
 	n.byObject[object] = binding
 	return name, nil
+}
+
+func (r *declarationRegistry) reserve(
+	object types.Object,
+	binding targetBinding,
+) error {
+	if r == nil {
+		return &api.NameError{Name: objectName(object), Reason: "declaration registry is nil"}
+	}
+	if existing, ok := r.byObject[object]; ok {
+		if existing.sourceFile != binding.sourceFile ||
+			existing.sourcePath != binding.sourcePath ||
+			existing.name != binding.name {
+			return &api.NameError{
+				Name:   objectName(object),
+				Reason: "declaration has conflicting target ownership",
+			}
+		}
+		return nil
+	}
+	r.byObject[object] = binding
+	return nil
 }
 
 func (n *nameOwner) preallocateScope(
@@ -208,24 +258,34 @@ func compareNameObjects(left types.Object, right types.Object) int {
 }
 
 type fileNames struct {
-	owner        *nameOwner
-	sourceFile   *ast.File
-	packageScope *types.Scope
-	factory      tsgo.Factory
-	temporaries  map[api.TemporaryKind]uint64
+	owner         *nameOwner
+	sourceFile    *ast.File
+	packageScope  *types.Scope
+	factory       tsgo.Factory
+	targetPath    string
+	require       func(types.Object) error
+	temporaries   map[api.TemporaryKind]uint64
+	importNames   map[string]types.Object
+	importAliases map[types.Object]string
 }
 
 func (n *nameOwner) ForFile(
 	sourceFile *ast.File,
 	packageScope *types.Scope,
 	factory tsgo.Factory,
+	targetPath string,
+	require func(types.Object) error,
 ) api.Names {
 	return &fileNames{
-		owner:        n,
-		sourceFile:   sourceFile,
-		packageScope: packageScope,
-		factory:      factory,
-		temporaries:  make(map[api.TemporaryKind]uint64),
+		owner:         n,
+		sourceFile:    sourceFile,
+		packageScope:  packageScope,
+		factory:       factory,
+		targetPath:    targetPath,
+		require:       require,
+		temporaries:   make(map[api.TemporaryKind]uint64),
+		importNames:   make(map[string]types.Object),
+		importAliases: make(map[types.Object]string),
 	}
 }
 
@@ -247,7 +307,15 @@ func (n *fileNames) Reference(object types.Object) (api.NameReference, error) {
 	if object == nil {
 		return api.NameReference{}, &api.NameError{Reason: "reference object is nil"}
 	}
+	if isPackageObject(object) && n.require != nil {
+		if err := n.require(object); err != nil {
+			return api.NameReference{}, err
+		}
+	}
 	binding, ok := n.owner.byObject[object]
+	if !ok && n.owner.registry != nil {
+		binding, ok = n.owner.registry.byObject[object]
+	}
 	if !ok {
 		return api.NameReference{}, &api.NameError{
 			Name:   object.Name(),
@@ -255,19 +323,48 @@ func (n *fileNames) Reference(object types.Object) (api.NameReference, error) {
 		}
 	}
 	if binding.sourceFile != nil && binding.sourceFile != n.sourceFile {
+		modulePath, err := output.ModuleSpecifier(n.targetPath, binding.sourcePath)
+		if err != nil {
+			return api.NameReference{}, err
+		}
+		localName := binding.name
+		if object.Parent() != n.packageScope {
+			localName = n.importName(object, binding.name)
+		}
 		request, err := api.NewImportRequest(
 			n.factory,
 			api.ImportPhaseValue,
-			binding.modulePath,
+			modulePath,
 			binding.name,
-			binding.name,
+			localName,
 		)
 		if err != nil {
 			return api.NameReference{}, err
 		}
-		return api.NewNameReference(binding.name, request)
+		return api.NewNameReference(localName, request)
 	}
 	return api.NewNameReference(binding.name)
+}
+
+func (n *fileNames) importName(object types.Object, preferred string) string {
+	if existing := n.importAliases[object]; existing != "" {
+		return existing
+	}
+	base := preferred + "__from_" + portableIdentifier(object.Pkg().Path())
+	candidate := base
+	for suffix := uint64(1); n.packageScope.Lookup(candidate) != nil ||
+		n.importNames[candidate] != nil ||
+		n.owner.hasSourceName(candidate); suffix++ {
+		candidate = base + "_" + strconv.FormatUint(suffix, 10)
+	}
+	n.importNames[candidate] = object
+	n.importAliases[object] = candidate
+	return candidate
+}
+
+func (n *nameOwner) hasSourceName(name string) bool {
+	_, exists := n.sourceNameBases[name]
+	return exists
 }
 
 func (n *fileNames) TypeImport(
@@ -308,6 +405,9 @@ func (n *fileNames) ModuleExport(object types.Object) (bool, error) {
 		return false, &api.NameError{Reason: "declaration object is nil"}
 	}
 	binding, ok := n.owner.byObject[object]
+	if !ok && n.owner.registry != nil {
+		binding, ok = n.owner.registry.byObject[object]
+	}
 	if !ok {
 		return false, &api.NameError{
 			Name:   object.Name(),
@@ -315,6 +415,11 @@ func (n *fileNames) ModuleExport(object types.Object) (bool, error) {
 		}
 	}
 	return binding.moduleExport, nil
+}
+
+func isPackageObject(object types.Object) bool {
+	return object != nil && object.Pkg() != nil &&
+		object.Parent() == object.Pkg().Scope()
 }
 
 func objectName(object types.Object) string {

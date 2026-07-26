@@ -16,14 +16,14 @@ import (
 	switchstatement "github.com/tsoniclang/gotots/internal/emit/statement/switchstatement"
 )
 
-func (e *Emitter) Block(
+func (e *emitter) Block(
 	context api.Context,
 	source *ast.BlockStmt,
 ) (api.BlockEmission, error) {
 	return blockstatement.Emit(context, e, source)
 }
 
-func (e *Emitter) Statement(
+func (e *emitter) Statement(
 	context api.Context,
 	source ast.Stmt,
 ) (api.StatementEmission, error) {
@@ -58,7 +58,7 @@ func (e *Emitter) Statement(
 	}
 }
 
-func (e *Emitter) ScopedInitializer(
+func (e *emitter) ScopedInitializer(
 	context api.Context,
 	source ast.Stmt,
 ) (api.StatementEmission, error) {
@@ -70,14 +70,14 @@ func (e *Emitter) ScopedInitializer(
 	return assignment.Emit(context, e, initializer)
 }
 
-func (e *Emitter) IfAlternate(
+func (e *emitter) IfAlternate(
 	context api.Context,
 	source *ast.IfStmt,
 ) (api.StatementEmission, error) {
 	return ifstatement.Emit(context, e, source)
 }
 
-func (e *Emitter) ForInitializer(
+func (e *emitter) ForInitializer(
 	context api.Context,
 	source ast.Stmt,
 ) (api.ForInitializerEmission, error) {
@@ -89,7 +89,7 @@ func (e *Emitter) ForInitializer(
 	return assignment.EmitForInitializer(context, e, assignmentStatement)
 }
 
-func (e *Emitter) ForPost(
+func (e *emitter) ForPost(
 	context api.Context,
 	source ast.Stmt,
 ) (api.ExpressionEmission, error) {

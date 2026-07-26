@@ -4,9 +4,11 @@
 
 The emitter has one closed dispatcher over supported Go AST construct kinds.
 Every dispatch request reaches exactly one handler or one typed unsupported
-diagnostic. The test-only construct catalog accounts separately for syntax
-consumed directly by its parent owner. It is not a per-program artifact and is
-never passed through compilation.
+diagnostic. An independent test derives and structurally fingerprints the
+selected toolchain's complete AST domain. Forms that are not declarations,
+expressions, or statements are parent-owned syntax; the owning handler's
+focused child-contract tests account for them. There is no construct catalog
+or per-program coverage artifact.
 
 Handlers are grouped by semantic family rather than generated as a framework
 per AST type. Category dispatchers route one requested node and never recurse.
@@ -138,10 +140,28 @@ parent. This preserves local declaration scopes directly. Grouped `var`
 declarations emit their `ValueSpec` records in source order, with each spec
 forming its own declaration statement and scope boundary.
 
-Zero-initialized declarations, package declarations and initialization order,
-constants, multi-result initializers, and initializer prerequisite statements
-remain separate typed-unsupported cases until their complete semantic owners
-are installed.
+An explicitly typed package constant is a direct declaration owned by its
+source-file module:
+
+```go
+const Base int = 40
+```
+
+```ts
+export const Base: GoInt = 40 as GoInt;
+```
+
+The owner uses the package-scope `types.Const` identity and exact constant value
+while the initializer handler preserves the supported source expression shape.
+Every emitted package declaration is exported for static generated-module
+linking; package assembly later selects the public surface. Untyped constants,
+implicit constant expressions and `iota` remain one later constant-semantics
+family because their representation may depend on each use context.
+
+Zero-initialized declarations, package variables and initialization order,
+multi-result `var` initializers, and initializer prerequisite statements remain
+separate typed-unsupported cases until their complete semantic owners are
+installed.
 
 Likewise, for:
 
@@ -268,6 +288,51 @@ are declared only after all captures. A shadowing new variable receives a
 distinct target name so an earlier right-side reference still denotes the
 outer Go object.
 
+For an identifier of a directly represented signed integer type, compound
+addition remains one direct target operation:
+
+```go
+total += delta
+```
+
+```ts
+total += delta;
+```
+
+The assignment owner proves the exact `types.Var`, represented operand type,
+and assignability of the right side. It accepts the direct form only when the
+right-side emission has no prerequisite statements, so reading the left value
+cannot move across right-side effects. Selector, index, pointer, other
+compound-operator, unsupported-width, and prerequisite-statement cases remain
+separate typed failures until their single-evaluation rules are proved.
+
+An ordinary Go function with two or more results has one direct TypeScript
+tuple carrier. Result declarations use `[T0, T1, ...]`; an explicit
+`return left, right` constructs `[left, right]`; and `return pair()` preserves
+the tuple-valued call directly. There is no generated result class, wrapper,
+out-parameter ABI, erased carrier, or per-function representation choice.
+
+For one multi-valued right side, the assignment owner evaluates it exactly once
+into a typed tuple temporary and then performs target declarations/stores from
+numeric element accesses:
+
+```go
+next, ok := pair(value)
+```
+
+```ts
+const __gotots_results_0: [GoInt, GoBool] = pair(value);
+let next: GoInt = __gotots_results_0[0];
+let ok: GoBool = __gotots_results_0[1];
+```
+
+A blank target omits only its final declaration/store; it never omits the
+source evaluation or changes tuple position. When one multi-valued call is the
+complete argument list of another call, the call owner uses the same
+single-evaluation rule and passes the indexed values in parameter order.
+Target-consumer verification must prove that the selected source tuple maps to
+the target's native product type without an alternate ABI.
+
 ```go
 i, values[i] = i+1, pair()
 ```
@@ -284,9 +349,10 @@ i = nextI;
 values[oldIndex] = pairResult;
 ```
 
-The exact representation of `pairResult` follows the selected multi-result
-rule. The important ownership is that the assignment handler—not each child—
-controls the transaction.
+If `pair` is single-valued, `pairResult` has that direct represented type; a
+multi-valued source expression instead uses the direct tuple rule above. The
+important ownership is that the assignment handler—not each child—controls the
+transaction.
 
 ### Short-Circuit Placement
 
@@ -366,8 +432,8 @@ Touch(value);
 The function owner derives zero results from the selected `types.Signature`;
 the return owner accepts a bare return only in that function context; and the
 expression-statement owner admits only a toolchain-valid discarded call case
-that its call owner can represent. Calls returning a supported value may also
-be discarded. A receive statement, multi-result call, `go`, or `defer` remains
+that its call owner can represent. Calls returning supported single or multiple
+results may also be discarded. A receive statement, `go`, or `defer` remains
 with its own semantic owner until that complete case is implemented.
 
 Hidden operation arguments are not a default protocol. A runtime or generated

@@ -84,11 +84,7 @@ func TestLoopControlRejectsBranchOutsideLoopContext(t *testing.T) {
 				function.Body.List...,
 			)
 
-			compiler := emit.New(loaded)
-			_, err := compiler.EmitFile(
-				loaded.Files()[0].Syntax(),
-				filepath.Join(t.TempDir(), "loop.ts"),
-			)
+			_, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 			assertUnsupportedStatement(t, err, "*ast.BranchStmt")
 		})
 	}
@@ -100,11 +96,7 @@ func TestLoopControlRejectsUnsupportedPostVariant(t *testing.T) {
 	loop := function.Body.List[1].(*ast.ForStmt)
 	loop.Post.(*ast.IncDecStmt).Tok = token.ADD
 
-	compiler := emit.New(loaded)
-	_, err := compiler.EmitFile(
-		loaded.Files()[0].Syntax(),
-		filepath.Join(t.TempDir(), "loop.ts"),
-	)
+	_, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 	var unsupported *api.UnsupportedError
 	if !errors.As(err, &unsupported) {
 		t.Fatalf("error = %v, want *api.UnsupportedError", err)
@@ -122,11 +114,7 @@ func TestLoopControlRejectsUnsupportedInitializerVariant(t *testing.T) {
 	loop := function.Body.List[1].(*ast.ForStmt)
 	loop.Init.(*ast.AssignStmt).Tok = token.ASSIGN
 
-	compiler := emit.New(loaded)
-	_, err := compiler.EmitFile(
-		loaded.Files()[0].Syntax(),
-		filepath.Join(t.TempDir(), "loop.ts"),
-	)
+	_, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 	var unsupported *api.UnsupportedError
 	if !errors.As(err, &unsupported) {
 		t.Fatalf("error = %v, want *api.UnsupportedError", err)
@@ -145,11 +133,7 @@ func TestLoopControlRejectsLabeledBranchUntilTargetIdentityExists(t *testing.T) 
 	breakStatement := loop.Body.List[2].(*ast.IfStmt).Body.List[0].(*ast.BranchStmt)
 	breakStatement.Label = &ast.Ident{Name: "outer"}
 
-	compiler := emit.New(loaded)
-	_, err := compiler.EmitFile(
-		loaded.Files()[0].Syntax(),
-		filepath.Join(t.TempDir(), "loop.ts"),
-	)
+	_, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 	assertUnsupportedStatement(t, err, "*ast.BranchStmt")
 }
 
@@ -159,11 +143,7 @@ func TestLoopControlRejectsUnsupportedConditionOperator(t *testing.T) {
 	loop := function.Body.List[1].(*ast.ForStmt)
 	loop.Cond.(*ast.BinaryExpr).Op = token.SHL
 
-	compiler := emit.New(loaded)
-	_, err := compiler.EmitFile(
-		loaded.Files()[0].Syntax(),
-		filepath.Join(t.TempDir(), "loop.ts"),
-	)
+	_, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 	var unsupported *api.UnsupportedError
 	if !errors.As(err, &unsupported) {
 		t.Fatalf("error = %v, want *api.UnsupportedError", err)
@@ -221,8 +201,7 @@ func emitLoopControl(
 	outputPath string,
 ) tsgo.SourceFile {
 	t.Helper()
-	compiler := emit.New(loaded)
-	targetFile, err := compiler.EmitFile(loaded.Files()[0].Syntax(), outputPath)
+	targetFile, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 	if err != nil {
 		t.Fatal(err)
 	}

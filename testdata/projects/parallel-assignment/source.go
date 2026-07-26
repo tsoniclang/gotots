@@ -22,3 +22,8 @@ func Shadow(value int) int {
 	}
 	return 0
 }
+
+func Accumulate(total, delta int) int {
+	total += delta
+	return total
+}

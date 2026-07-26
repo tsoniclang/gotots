@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func TestPortableIdentifierEscapesNonASCIIWithoutChangingASCII(t *testing.T) {
@@ -44,15 +45,23 @@ func TestNameOwnerSeparatesShadowAndTemporaryNamespaces(t *testing.T) {
 		"__gotots_assign_0",
 		types.Typ[types.Int],
 	)
+	reservedResults := types.NewVar(
+		token.NoPos,
+		nil,
+		"__gotots_results_0",
+		types.Typ[types.Int],
+	)
 	functionScope.Insert(outer)
 	blockScope.Insert(shadow)
 	blockScope.Insert(reservedShadow)
 	blockScope.Insert(reservedTemporary)
+	blockScope.Insert(reservedResults)
 	info := &types.Info{Defs: map[*ast.Ident]types.Object{
 		{Name: "value"}:             outer,
 		{Name: "shadow"}:            shadow,
 		{Name: "reservedShadow"}:    reservedShadow,
 		{Name: "reservedTemporary"}: reservedTemporary,
+		{Name: "reservedResults"}:   reservedResults,
 	}}
 	owner := newNameOwner(packageScope, info)
 
@@ -70,6 +79,10 @@ func TestNameOwnerSeparatesShadowAndTemporaryNamespaces(t *testing.T) {
 	if name, err := file.Temporary(api.TemporaryAssignmentValue); err != nil ||
 		name != "__gotots_assign_1" {
 		t.Fatalf("temporary = %q, %v", name, err)
+	}
+	if name, err := file.Temporary(api.TemporaryMultipleResults); err != nil ||
+		name != "__gotots_results_1" {
+		t.Fatalf("result temporary = %q, %v", name, err)
 	}
 }
 
@@ -130,5 +143,48 @@ func TestNameOwnerRejectsDeclarationOutsideIndexedTypeGraph(t *testing.T) {
 		nameError.Name != "late" ||
 		nameError.Reason != "declaration object was not indexed from its Go scope" {
 		t.Fatalf("error = %#v, want indexed-scope NameError", err)
+	}
+}
+
+func TestCrossPackageReferenceRequiresItsExactObjectBeforeImporting(t *testing.T) {
+	currentPackage := types.NewPackage("example.com/current", "current")
+	importedPackage := types.NewPackage("example.com/dependency", "dependency")
+	object := types.NewFunc(
+		token.Pos(1),
+		importedPackage,
+		"Run",
+		types.NewSignatureType(nil, nil, nil, nil, nil, false),
+	)
+	importedPackage.Scope().Insert(object)
+	sourceFile := &ast.File{}
+	declarationFile := &ast.File{}
+	registry := newDeclarationRegistry()
+	if err := registry.reserve(object, targetBinding{
+		name:         "Run",
+		sourceFile:   declarationFile,
+		sourcePath:   "modules/dependency/dependency.ts",
+		moduleExport: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	required := errors.New("enqueue mutation sentinel")
+	names := newNameOwnerWithRegistry(
+		currentPackage.Scope(),
+		&types.Info{Defs: make(map[*ast.Ident]types.Object)},
+		registry,
+	).ForFile(
+		sourceFile,
+		currentPackage.Scope(),
+		tsgo.NewFactory(),
+		"modules/current/current.ts",
+		func(actual types.Object) error {
+			if actual != object {
+				t.Fatalf("required object = %v, want imported Run", actual)
+			}
+			return required
+		},
+	)
+	if _, err := names.Reference(object); !errors.Is(err, required) {
+		t.Fatalf("reference error = %v, want enqueue sentinel", err)
 	}
 }

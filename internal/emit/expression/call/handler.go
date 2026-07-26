@@ -31,13 +31,12 @@ func emit(
 	source *ast.CallExpr,
 	discarded bool,
 ) (api.ExpressionEmission, error) {
-	callee, ok := source.Fun.(*ast.Ident)
-	if !ok || source.Ellipsis != token.NoPos {
+	if source.Ellipsis != token.NoPos {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	object, ok := context.TypesInfo().Uses[callee].(*types.Func)
-	if !ok || object.Pkg() != context.TypesPackage() {
+	object, ok := calleeObject(context.TypesInfo(), source.Fun)
+	if !ok {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
@@ -45,8 +44,7 @@ func emit(
 	if !ok ||
 		signature.Recv() != nil ||
 		signature.Variadic() ||
-		signature.TypeParams().Len() != 0 ||
-		signature.Params().Len() != len(source.Args) {
+		signature.TypeParams().Len() != 0 {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
@@ -54,21 +52,99 @@ func emit(
 	if signature.Results() != nil {
 		resultCount = signature.Results().Len()
 	}
-	if (!discarded && resultCount != 1) || (discarded && resultCount > 1) {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
+	if !discarded {
+		if resultCount == 0 {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		} else if resultCount == 1 {
+			if context.ExpectedResults() != nil {
+				return api.ExpressionEmission{},
+					api.Unsupported(context, api.CategoryExpression, source)
+			}
+		} else if expected := context.ExpectedResults(); expected == nil ||
+			!types.Identical(signature.Results(), expected) {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
 	}
 	reference, err := context.Names().Reference(object)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	arguments, before, argumentRequests, err := emitArguments(
+		context,
+		children,
+		source,
+		signature,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return api.NewExpressionEmission(
+		before,
+		context.Factory().CallExpression(
+			context.Factory().Identifier(reference.Name()),
+			nil,
+			nil,
+			arguments,
+			tsgo.NodeFlagsNone,
+		),
+		api.CombineRequests(reference.Requests(), argumentRequests),
+	)
+}
+
+func calleeObject(info *types.Info, source ast.Expr) (*types.Func, bool) {
+	if info == nil {
+		return nil, false
+	}
+	switch source := source.(type) {
+	case *ast.Ident:
+		object, ok := info.Uses[source].(*types.Func)
+		return object, ok
+	case *ast.SelectorExpr:
+		if info.Selections[source] != nil {
+			return nil, false
+		}
+		qualifier, ok := source.X.(*ast.Ident)
+		if !ok {
+			return nil, false
+		}
+		packageName, ok := info.Uses[qualifier].(*types.PkgName)
+		if !ok {
+			return nil, false
+		}
+		object, ok := info.Uses[source.Sel].(*types.Func)
+		if !ok || object.Pkg() != packageName.Imported() {
+			return nil, false
+		}
+		return object, true
+	default:
+		return nil, false
+	}
+}
+
+func emitArguments(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.CallExpr,
+	signature *types.Signature,
+) ([]tsgo.Expression, []tsgo.Statement, []api.PlacementRequest, error) {
+	if len(source.Args) == 1 {
+		if results, ok := context.TypesInfo().TypeOf(source.Args[0]).(*types.Tuple); ok {
+			return emitMultipleArgument(context, children, source, signature, results)
+		}
+	}
+	if signature.Params().Len() != len(source.Args) {
+		return nil, nil, nil,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
 	arguments := make([]tsgo.Expression, 0, len(source.Args))
-	requests := reference.Requests()
+	var requests []api.PlacementRequest
 	for index, argument := range source.Args {
 		argumentType := context.TypesInfo().TypeOf(argument)
 		if argumentType == nil ||
 			!types.AssignableTo(argumentType, signature.Params().At(index).Type()) {
-			return api.ExpressionEmission{},
+			return nil, nil, nil,
 				api.Unsupported(context, api.CategoryExpression, source)
 		}
 		target, err := children.Expression(
@@ -78,24 +154,14 @@ func emit(
 			argument,
 		)
 		if err != nil {
-			return api.ExpressionEmission{}, err
+			return nil, nil, nil, err
 		}
 		if len(target.Before()) != 0 {
-			return api.ExpressionEmission{},
+			return nil, nil, nil,
 				api.Unsupported(context, api.CategoryExpression, source)
 		}
 		arguments = append(arguments, target.Value())
 		requests = append(requests, target.Requests()...)
 	}
-	return api.NewExpressionEmission(
-		nil,
-		context.Factory().CallExpression(
-			context.Factory().Identifier(reference.Name()),
-			nil,
-			nil,
-			arguments,
-			tsgo.NodeFlagsNone,
-		),
-		requests,
-	)
+	return arguments, nil, requests, nil
 }
