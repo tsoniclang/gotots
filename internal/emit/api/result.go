@@ -251,6 +251,20 @@ func DirectForInitializer(
 	}
 }
 
+func ExpressionForInitializer(
+	value tsgo.Expression,
+	requests ...PlacementRequest,
+) (ForInitializerEmission, error) {
+	target, ok := value.(tsgo.ForInitializer)
+	if !ok {
+		return ForInitializerEmission{}, &ResultError{
+			Result: "for initializer",
+			Reason: "target expression is not admitted by the TS-Go contract",
+		}
+	}
+	return DirectForInitializer(target, requests...), nil
+}
+
 func (e ForInitializerEmission) Value() tsgo.ForInitializer {
 	return e.value
 }

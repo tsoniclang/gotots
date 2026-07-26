@@ -21,6 +21,9 @@ func Emit(
 	if resultCount == 0 && len(source.Results) == 0 {
 		return api.DirectStatement(context.Factory().ReturnStatement(nil)), nil
 	}
+	if resultCount > 0 && len(source.Results) == 0 {
+		return emitNamed(context, source, results)
+	}
 	if resultCount == 1 {
 		return emitSingle(context, children, source, results.At(0).Type())
 	}
@@ -29,6 +32,40 @@ func Emit(
 	}
 	return api.StatementEmission{},
 		api.Unsupported(context, api.CategoryStatement, source)
+}
+
+func emitNamed(
+	context api.Context,
+	source *ast.ReturnStmt,
+	results *types.Tuple,
+) (api.StatementEmission, error) {
+	values := make([]tsgo.Expression, 0, results.Len())
+	var requests []api.PlacementRequest
+	for index := range results.Len() {
+		result := results.At(index)
+		if result.Name() == "" {
+			return api.StatementEmission{},
+				api.Unsupported(context, api.CategoryStatement, source)
+		}
+		reference, err := context.Names().Reference(result)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		values = append(values, context.Factory().Identifier(reference.Name()))
+		requests = append(requests, reference.Requests()...)
+	}
+	if len(values) == 1 {
+		return api.DirectStatement(
+			context.Factory().ReturnStatement(values[0]),
+			requests...,
+		), nil
+	}
+	return api.DirectStatement(
+		context.Factory().ReturnStatement(
+			context.Factory().ArrayLiteralExpression(values, false),
+		),
+		requests...,
+	), nil
 }
 
 func emitSingle(

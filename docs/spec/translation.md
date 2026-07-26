@@ -89,6 +89,14 @@ post clause still uses its narrow grammar entry, and a child with prerequisite
 statements remains unsupported until those statements can be placed at the
 per-iteration boundary exactly.
 
+Within those narrow entries, the direct simple-statement family includes a
+single short declaration, a single-target assignment, `++`/`--`, and a
+discarded direct call. A `for` post excludes short declarations exactly as Go
+does. The owner accepts a target expression only when child emission has no
+prerequisite statements; it does not drop a statement wrapper, flatten a
+parallel transaction into a comma expression, or move work across the loop
+boundary.
+
 An expression switch owns its tag, ordered case expressions, clause bodies,
 default, implicit clause scopes, and implicit breaks as one construct family:
 
@@ -116,10 +124,36 @@ implicit lexical blocks while TypeScript case labels otherwise share one
 scope. The owner appends the one target `break` needed to preserve Go's
 implicit non-fallthrough behavior.
 
-Case-expression prerequisite statements, expressionless switches,
-fallthrough, type switches, and types whose target equality is not yet proved
-remain distinct typed-unsupported cases. They are not approximated by
-re-evaluation, source spelling, loose equality, or a generic statement walk.
+An expressionless switch supplies the semantic boolean tag directly:
+
+```go
+switch {
+case ready:
+	use()
+default:
+	wait()
+}
+```
+
+```ts
+switch (true) {
+case ready: {
+	use();
+	break;
+}
+default: {
+	wait();
+	break;
+}
+}
+```
+
+Its case expressions are dispatched as conditions in source order. No source
+node, spelling check, or fabricated semantic record represents the absent tag.
+Case-expression prerequisite statements, fallthrough, type switches, and types
+whose target equality is not yet proved remain distinct typed-unsupported
+cases. They are not approximated by re-evaluation, loose equality, or a generic
+statement walk.
 
 A local `var` declaration is owned by its enclosing declaration statement:
 
@@ -141,6 +175,22 @@ A standalone Go block becomes one target block and is never flattened into its
 parent. This preserves local declaration scopes directly. Grouped `var`
 declarations emit their `ValueSpec` records in source order, with each spec
 forming its own declaration statement and scope boundary.
+
+An explicitly typed local constant uses the same exact `types.Const` value
+contract as an explicitly typed package constant, but its declaration remains
+inside the owning block:
+
+```go
+const limit int32 = 4
+```
+
+```ts
+const limit: int32 = 4;
+```
+
+Untyped constants, omitted repeated expressions, and `iota` remain one
+constant-semantics family. A local constant handler does not borrow package
+placement or infer an omitted initializer.
 
 An explicitly typed package constant is a direct declaration owned by its
 source-file module:
@@ -383,6 +433,33 @@ single-evaluation rule and passes the indexed values in parameter order.
 Direct generated-program verification must prove that the selected source tuple
 maps to the TypeScript tuple without an alternate ABI.
 
+Named results are the function owner's lexical variables, initialized to the
+same exact zero representation used elsewhere:
+
+```go
+func Next(value int32) (next int32, ok bool) {
+	next = value + 1
+	ok = value >= 0
+	return
+}
+```
+
+```ts
+export function Next(value: int32): [int32, bool] {
+	let next: int32 = 0;
+	let ok: bool = false;
+	next = value + 1;
+	ok = value >= 0;
+	return [next, ok];
+}
+```
+
+The selected signature supplies each exact result `types.Var`; the name owner
+supplies its lexical binding; and the value owner supplies its zero. A bare
+return is accepted only when every result is named. A nested function literal
+enters a new function-result context, so it cannot return an enclosing
+function's named results.
+
 ```go
 i, values[i] = i+1, pair()
 ```
@@ -432,6 +509,52 @@ The literal may remain an inline TS-Go function expression. If a representation
 rule requires a reusable static declaration, the handler requests file scope
 and emits a reference at the call site. The placement service chooses the
 preferred legal scope; the child does not mutate an arbitrary ancestor.
+
+The initial callable-value family uses the direct form for an unnamed function
+type whenever the signature's parameter and result representations are already
+supported:
+
+```go
+func Apply(
+	transform func(int32) int32,
+	value int32,
+) int32 {
+	return transform(value)
+}
+
+func Offset(delta int32) func(int32) int32 {
+	return func(value int32) int32 {
+		return value + delta
+	}
+}
+```
+
+```ts
+export function Apply(
+	transform: (value: int32) => int32,
+	value: int32,
+): int32 {
+	return transform(value);
+}
+
+export function Offset(delta: int32): (value: int32) => int32 {
+	return function (value: int32): int32 {
+		return value + delta;
+	};
+}
+```
+
+The one `go/types.Signature` is the callable truth. Function declarations,
+function types, function literals, values, and calls consume the same signature
+owner. JavaScript lexical capture directly represents admitted Go variable
+capture; no environment object, callback registry, hidden receiver, or callable
+side table is introduced. Copying an admitted function value is a direct
+reference-value copy. A nil function value, comparison with nil, variadic or
+generic signature, method value/expression, or interface callable remains at
+its own typed boundary. A defined or declared-alias function type is also
+deferred: preserving two distinct named Go function types requires the
+named-value representation family rather than silently making TypeScript
+structural aliases interchangeable.
 
 ## Calls
 
@@ -500,6 +623,42 @@ function Counter_Add(receiver: Counter, delta: GoInt): void {
 ```
 
 Calls then invoke `Counter_Add(counter, delta)` directly.
+
+For an admitted function-valued callee, the call handler emits the callee
+expression once and invokes it directly:
+
+```go
+selected := choose(flag)
+return selected(value)
+```
+
+```ts
+let selected = choose(flag);
+return selected(value);
+```
+
+The signature comes from `types.Info.TypeOf(call.Fun)`. A named function
+identifier additionally requests its declaration through the ordinary
+identity-keyed name owner. An arbitrary callee is delegated through the
+call-callee child role. Generated code never uses `.call`, `.apply`, `.bind`,
+an erased callable carrier, or source-spelling classification.
+
+If argument translation requires statements, the arbitrary callee is captured
+before those statements so Go's function-before-arguments order remains exact:
+
+```go
+return selectPair()(pair())
+```
+
+```ts
+const callee = selectPair();
+const results = pair();
+return callee(results[0], results[1]);
+```
+
+The capture is requested only by this execution-boundary requirement; a direct
+call remains a direct call and possible-function count never expands the call
+site.
 
 ## Structs, Receivers, And Classes
 

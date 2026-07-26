@@ -17,6 +17,7 @@ const (
 	TemporaryCompositeField
 	TemporaryReceiverValue
 	TemporaryCallArgument
+	TemporaryCallCallee
 )
 
 type NameReference struct {
@@ -90,6 +91,7 @@ func (r PackageVariableReference) Expression(
 
 type Names interface {
 	Declare(types.Object) (string, error)
+	Parameter(*types.Var, int) (string, error)
 	Reference(types.Object) (NameReference, error)
 	TypeReference(types.Object) (NameReference, error)
 	PackageVariable(*types.Var) (PackageVariableReference, error)
@@ -112,6 +114,8 @@ func TemporaryPrefix(kind TemporaryKind) (string, error) {
 		return "__gotots_receiver_", nil
 	case TemporaryCallArgument:
 		return "__gotots_argument_", nil
+	case TemporaryCallCallee:
+		return "__gotots_callee_", nil
 	default:
 		return "", &NameError{
 			Reason: fmt.Sprintf("temporary kind %d is invalid", kind),

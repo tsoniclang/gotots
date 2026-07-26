@@ -60,6 +60,26 @@ func (n *fileNames) Declare(object types.Object) (string, error) {
 	return n.owner.declare(object, targetBinding{})
 }
 
+func (n *fileNames) Parameter(parameter *types.Var, index int) (string, error) {
+	switch {
+	case parameter == nil:
+		return "", &api.NameError{Reason: "parameter object is nil"}
+	case index < 0:
+		return "", &api.NameError{Reason: "parameter index is negative"}
+	case parameter.Name() != "":
+		return n.Declare(parameter)
+	}
+	for suffix := uint64(0); ; suffix++ {
+		candidate := "__gotots_parameter_" + strconv.Itoa(index)
+		if suffix != 0 {
+			candidate += "_" + strconv.FormatUint(suffix, 10)
+		}
+		if _, reserved := n.owner.sourceNameBases[candidate]; !reserved {
+			return candidate, nil
+		}
+	}
+}
+
 func (n *fileNames) Reference(object types.Object) (api.NameReference, error) {
 	return n.reference(object, api.ImportPhaseValue)
 }

@@ -137,9 +137,9 @@ func TestLocalVariablesBoundaryMutationsFailClosed(t *testing.T) {
 			mutate: func(source *ast.DeclStmt) {
 				source.Decl.(*ast.GenDecl).Tok = token.CONST
 			},
-			category:  api.CategoryStatement,
-			construct: "*ast.DeclStmt",
-			role:      api.RoleBlockStatement,
+			category:  api.CategoryDeclaration,
+			construct: "*ast.Ident",
+			role:      api.RoleLocalDeclaration,
 		},
 		{
 			name: "non-value spec",

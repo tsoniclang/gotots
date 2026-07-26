@@ -14,18 +14,9 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.SwitchStmt,
 ) (api.StatementEmission, error) {
-	if source.Body == nil || source.Tag == nil {
+	if source.Body == nil {
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
-	}
-	tagType := context.TypesInfo().TypeOf(source.Tag)
-	if !basictype.SupportsInteger(context.TypesSizes(), tagType) {
-		return api.StatementEmission{},
-			api.Unsupported(
-				context.WithRole(api.RoleSwitchTag),
-				api.CategoryExpression,
-				source.Tag,
-			)
 	}
 
 	var initializer api.StatementEmission
@@ -39,14 +30,28 @@ func Emit(
 			return api.StatementEmission{}, err
 		}
 	}
-	tag, err := children.Expression(
-		context.
-			WithRole(api.RoleSwitchTag).
-			WithExpectedType(tagType),
-		source.Tag,
-	)
-	if err != nil {
-		return api.StatementEmission{}, err
+	expressionless := source.Tag == nil
+	tagType := types.Type(types.Typ[types.Bool])
+	tag := api.DirectExpression(context.Factory().TrueLiteral())
+	if !expressionless {
+		tagType = context.TypesInfo().TypeOf(source.Tag)
+		if !basictype.SupportsInteger(context.TypesSizes(), tagType) {
+			return api.StatementEmission{},
+				api.Unsupported(
+					context.WithRole(api.RoleSwitchTag),
+					api.CategoryExpression,
+					source.Tag,
+				)
+		}
+		tag, err = children.Expression(
+			context.
+				WithRole(api.RoleSwitchTag).
+				WithExpectedType(tagType),
+			source.Tag,
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
 	}
 
 	clauses := make([]tsgo.CaseOrDefaultClause, 0, len(source.Body.List))
@@ -67,6 +72,7 @@ func Emit(
 			children,
 			clause,
 			tagType,
+			expressionless,
 		)
 		if err != nil {
 			return api.StatementEmission{}, err
@@ -108,6 +114,7 @@ func emitClause(
 	children api.ChildEmitter,
 	source *ast.CaseClause,
 	tagType types.Type,
+	expressionless bool,
 ) ([]tsgo.CaseOrDefaultClause, []api.PlacementRequest, bool, error) {
 	if len(source.List) == 0 {
 		body, requests, err := emitClauseBody(context, children, source.Body)
@@ -135,12 +142,16 @@ func emitClause(
 					caseExpression,
 				)
 		}
-		target, err := children.Expression(
-			context.
-				WithRole(api.RoleSwitchCaseExpression).
-				WithExpectedType(tagType),
-			caseExpression,
-		)
+		caseContext := context.
+			WithRole(api.RoleSwitchCaseExpression).
+			WithExpectedType(tagType)
+		var target api.ExpressionEmission
+		var err error
+		if expressionless {
+			target, err = children.Condition(caseContext, caseExpression)
+		} else {
+			target, err = children.Expression(caseContext, caseExpression)
+		}
 		if err != nil {
 			return nil, nil, false, err
 		}

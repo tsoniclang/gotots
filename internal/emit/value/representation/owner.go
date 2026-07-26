@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/callable"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -58,7 +59,7 @@ func (Owner) Copy(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	if _, ok := primitive(context, sourceType); ok {
+	if _, ok := primitive(context, sourceType); ok || callableValue(sourceType) {
 		return api.NewExpressionEmission(
 			value.Before(),
 			value.Value(),
@@ -117,7 +118,7 @@ func (Owner) Assign(
 	target tsgo.Expression,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	if _, ok := primitive(context, sourceType); ok {
+	if _, ok := primitive(context, sourceType); ok || callableValue(sourceType) {
 		return api.NewExpressionEmission(
 			value.Before(),
 			context.Factory().BinaryExpression(
@@ -194,6 +195,11 @@ func primitive(
 	sourceType types.Type,
 ) (api.PrimitiveAlias, bool) {
 	return api.PrimitiveAliasFor(context.TypesSizes(), sourceType)
+}
+
+func callableValue(sourceType types.Type) bool {
+	_, ok := callable.Signature(sourceType)
+	return ok
 }
 
 func namedStruct(

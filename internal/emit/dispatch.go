@@ -2,15 +2,18 @@ package emit
 
 import (
 	"go/ast"
+	"go/token"
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/callable"
 	functiondeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/function"
 	namedstructdeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/namedstruct"
 	packageconstant "github.com/tsoniclang/gotots/internal/emit/declaration/packageconstant"
 	binaryexpression "github.com/tsoniclang/gotots/internal/emit/expression/binary"
 	callexpression "github.com/tsoniclang/gotots/internal/emit/expression/call"
 	compositeliteral "github.com/tsoniclang/gotots/internal/emit/expression/compositeliteral"
+	functionliteral "github.com/tsoniclang/gotots/internal/emit/expression/functionliteral"
 	identifierexpression "github.com/tsoniclang/gotots/internal/emit/expression/identifier"
 	integerliteral "github.com/tsoniclang/gotots/internal/emit/expression/literal/integer"
 	parenthesizedexpression "github.com/tsoniclang/gotots/internal/emit/expression/parenthesized"
@@ -23,6 +26,7 @@ import (
 	forstatement "github.com/tsoniclang/gotots/internal/emit/statement/forstatement"
 	ifstatement "github.com/tsoniclang/gotots/internal/emit/statement/ifstatement"
 	incdecstatement "github.com/tsoniclang/gotots/internal/emit/statement/incdec"
+	localconstant "github.com/tsoniclang/gotots/internal/emit/statement/localconstant"
 	localdeclaration "github.com/tsoniclang/gotots/internal/emit/statement/localdeclaration"
 	returnstatement "github.com/tsoniclang/gotots/internal/emit/statement/returnstatement"
 	switchstatement "github.com/tsoniclang/gotots/internal/emit/statement/switchstatement"
@@ -164,6 +168,8 @@ func (e *emitter) Expression(
 		return callexpression.Emit(context, e, source)
 	case *ast.CompositeLit:
 		return compositeliteral.Emit(context, e, source)
+	case *ast.FuncLit:
+		return functionliteral.Emit(context, e, source)
 	case *ast.Ident:
 		return identifierexpression.Emit(context, e, source)
 	case *ast.ParenExpr:
@@ -234,7 +240,20 @@ func (e *emitter) Statement(
 	case *ast.BranchStmt:
 		return branchstatement.Emit(context, source)
 	case *ast.DeclStmt:
-		return localdeclaration.Emit(context, e, source)
+		declaration, ok := source.Decl.(*ast.GenDecl)
+		if !ok {
+			return api.StatementEmission{},
+				api.Unsupported(context, api.CategoryStatement, source)
+		}
+		switch declaration.Tok {
+		case token.VAR:
+			return localdeclaration.Emit(context, e, source)
+		case token.CONST:
+			return localconstant.Emit(context, e, source)
+		default:
+			return api.StatementEmission{},
+				api.Unsupported(context, api.CategoryStatement, source)
+		}
 	case *ast.ExprStmt:
 		return expressionstatement.Emit(context, e, source)
 	case *ast.ForStmt:
@@ -257,12 +276,17 @@ func (e *emitter) ScopedInitializer(
 	context api.Context,
 	source ast.Stmt,
 ) (api.StatementEmission, error) {
-	initializer, ok := source.(*ast.AssignStmt)
-	if !ok {
+	switch source := source.(type) {
+	case *ast.AssignStmt:
+		return assignment.Emit(context, e, source)
+	case *ast.ExprStmt:
+		return expressionstatement.Emit(context, e, source)
+	case *ast.IncDecStmt:
+		return incdecstatement.Emit(context, e, source)
+	default:
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	return assignment.Emit(context, e, initializer)
 }
 
 func (e *emitter) IfAlternate(
@@ -276,24 +300,54 @@ func (e *emitter) ForInitializer(
 	context api.Context,
 	source ast.Stmt,
 ) (api.ForInitializerEmission, error) {
-	assignmentStatement, ok := source.(*ast.AssignStmt)
-	if !ok {
+	switch source := source.(type) {
+	case *ast.AssignStmt:
+		return assignment.EmitForInitializer(context, e, source)
+	case *ast.ExprStmt:
+		target, err := expressionstatement.EmitExpression(context, e, source)
+		if err != nil {
+			return api.ForInitializerEmission{}, err
+		}
+		if len(target.Before()) != 0 {
+			return api.ForInitializerEmission{},
+				api.Unsupported(context, api.CategoryStatement, source)
+		}
+		return api.ExpressionForInitializer(target.Value(), target.Requests()...)
+	case *ast.IncDecStmt:
+		target, err := incdecstatement.EmitExpression(context, e, source)
+		if err != nil {
+			return api.ForInitializerEmission{}, err
+		}
+		return api.ExpressionForInitializer(target.Value(), target.Requests()...)
+	default:
 		return api.ForInitializerEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	return assignment.EmitForInitializer(context, e, assignmentStatement)
 }
 
 func (e *emitter) ForPost(
 	context api.Context,
 	source ast.Stmt,
 ) (api.ExpressionEmission, error) {
-	post, ok := source.(*ast.IncDecStmt)
-	if !ok {
+	switch source := source.(type) {
+	case *ast.AssignStmt:
+		return assignment.EmitExpression(context, e, source)
+	case *ast.ExprStmt:
+		target, err := expressionstatement.EmitExpression(context, e, source)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if len(target.Before()) != 0 {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryStatement, source)
+		}
+		return target, nil
+	case *ast.IncDecStmt:
+		return incdecstatement.EmitExpression(context, e, source)
+	default:
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	return incdecstatement.EmitExpression(context, e, post)
 }
 
 func (e *emitter) Type(
@@ -301,6 +355,14 @@ func (e *emitter) Type(
 	source ast.Expr,
 ) (api.TypeEmission, error) {
 	if sourceType := context.TypesInfo().TypeOf(source); sourceType != nil {
+		if signature, ok := types.Unalias(sourceType).(*types.Signature); ok {
+			functionType, valid := source.(*ast.FuncType)
+			if !valid {
+				return api.TypeEmission{},
+					api.Unsupported(context, api.CategoryType, source)
+			}
+			return callable.EmitSyntaxType(context, e, functionType, signature)
+		}
 		if _, ok := types.Unalias(sourceType).(*types.Named); ok {
 			return namedstructtype.Emit(context, source, sourceType)
 		}
@@ -315,6 +377,9 @@ func (e *emitter) RepresentedType(
 ) (api.TypeEmission, error) {
 	if tuple, ok := types.Unalias(sourceType).(*types.Tuple); ok {
 		return tupletype.Emit(context, e, source, tuple)
+	}
+	if signature, ok := types.Unalias(sourceType).(*types.Signature); ok {
+		return callable.EmitType(context, e, source, signature)
 	}
 	if _, ok := types.Unalias(sourceType).(*types.Named); ok {
 		return namedstructtype.Emit(context, source, sourceType)
