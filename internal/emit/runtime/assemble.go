@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	runtimearray "github.com/tsoniclang/gotots/internal/emit/runtime/array"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -37,7 +38,7 @@ func (d Definition) Statement() tsgo.Statement {
 }
 
 func Build(
-	_ tsgo.Factory,
+	factory tsgo.Factory,
 	module api.RuntimeModule,
 	symbols []api.RuntimeSymbol,
 ) ([]Definition, error) {
@@ -46,6 +47,18 @@ func Build(
 	}
 	if len(symbols) == 0 {
 		return nil, &AssemblyError{Reason: "runtime symbol set is empty"}
+	}
+	if module == api.RuntimeModuleArray &&
+		len(symbols) == 1 &&
+		symbols[0] == api.RuntimeArray {
+		definition, err := NewDefinition(
+			api.RuntimeArray,
+			runtimearray.Build(factory),
+		)
+		if err != nil {
+			return nil, err
+		}
+		return []Definition{definition}, nil
 	}
 	return nil, &AssemblyError{
 		Module: module,

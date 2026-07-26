@@ -7,6 +7,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	builtinexpression "github.com/tsoniclang/gotots/internal/emit/expression/builtin"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -32,6 +33,13 @@ func emit(
 	source *ast.CallExpr,
 	discarded bool,
 ) (api.ExpressionEmission, error) {
+	if target, handled, err := builtinexpression.Emit(
+		context,
+		children,
+		source,
+	); handled || err != nil {
+		return target, err
+	}
 	if source.Ellipsis != token.NoPos {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)

@@ -8,7 +8,7 @@ import (
 )
 
 type Values interface {
-	RequiresCustomEquality(types.Type) bool
+	RequiresCustomEquality(Context, types.Type) bool
 	Zero(Context, ast.Node, types.Type) (ExpressionEmission, error)
 	Copy(Context, ast.Node, types.Type, ExpressionEmission) (ExpressionEmission, error)
 	Assign(

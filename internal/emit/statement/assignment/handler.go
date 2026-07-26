@@ -231,6 +231,9 @@ func emitAssignment(
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
+	if index, ok := source.Lhs[0].(*ast.IndexExpr); ok {
+		return emitArrayStore(context, children, source, index)
+	}
 	target, err := children.StoreTarget(
 		context.WithRole(api.RoleAssignmentTarget),
 		source.Lhs[0],

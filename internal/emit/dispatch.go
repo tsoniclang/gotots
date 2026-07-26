@@ -15,6 +15,7 @@ import (
 	compositeliteral "github.com/tsoniclang/gotots/internal/emit/expression/compositeliteral"
 	functionliteral "github.com/tsoniclang/gotots/internal/emit/expression/functionliteral"
 	identifierexpression "github.com/tsoniclang/gotots/internal/emit/expression/identifier"
+	indexexpression "github.com/tsoniclang/gotots/internal/emit/expression/index"
 	integerliteral "github.com/tsoniclang/gotots/internal/emit/expression/literal/integer"
 	parenthesizedexpression "github.com/tsoniclang/gotots/internal/emit/expression/parenthesized"
 	selectorexpression "github.com/tsoniclang/gotots/internal/emit/expression/selector"
@@ -34,6 +35,7 @@ import (
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	namedstructtype "github.com/tsoniclang/gotots/internal/emit/type/namedstruct"
 	tupletype "github.com/tsoniclang/gotots/internal/emit/type/tuple"
+	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	"github.com/tsoniclang/gotots/internal/emit/value/representation"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -172,6 +174,8 @@ func (e *emitter) Expression(
 		return functionliteral.Emit(context, e, source)
 	case *ast.Ident:
 		return identifierexpression.Emit(context, e, source)
+	case *ast.IndexExpr:
+		return indexexpression.Emit(context, e, source)
 	case *ast.ParenExpr:
 		return parenthesizedexpression.Emit(context, e, source)
 	case *ast.SelectorExpr:
@@ -355,6 +359,9 @@ func (e *emitter) Type(
 	source ast.Expr,
 ) (api.TypeEmission, error) {
 	if sourceType := context.TypesInfo().TypeOf(source); sourceType != nil {
+		if array, ok := arrayvalue.Resolve(context, sourceType); ok {
+			return array.EmitType(context, e, source)
+		}
 		if signature, ok := types.Unalias(sourceType).(*types.Signature); ok {
 			functionType, valid := source.(*ast.FuncType)
 			if !valid {
@@ -375,6 +382,9 @@ func (e *emitter) RepresentedType(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
+	if array, ok := arrayvalue.Resolve(context, sourceType); ok {
+		return array.EmitType(context, e, source)
+	}
 	if tuple, ok := types.Unalias(sourceType).(*types.Tuple); ok {
 		return tupletype.Emit(context, e, source, tuple)
 	}

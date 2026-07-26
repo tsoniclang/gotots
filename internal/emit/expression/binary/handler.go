@@ -71,7 +71,7 @@ func emitValueEquality(
 	if leftType == nil ||
 		rightType == nil ||
 		!types.Identical(leftType, rightType) ||
-		!context.Values().RequiresCustomEquality(leftType) {
+		!context.Values().RequiresCustomEquality(context, leftType) {
 		return api.ExpressionEmission{}, false, nil
 	}
 	left, err := children.Expression(
