@@ -98,6 +98,7 @@ type Names interface {
 	Companion(*types.TypeName, CompanionOperation) (NameReference, error)
 	Member(*types.Var) (string, error)
 	Primitive(PrimitiveAlias) (NameReference, error)
+	Runtime(RuntimeSymbol, ImportPhase) (NameReference, error)
 	Temporary(TemporaryKind) (string, error)
 	ModuleExport(types.Object) (bool, error)
 }

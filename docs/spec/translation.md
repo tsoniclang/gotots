@@ -968,6 +968,59 @@ and admitted `init` calls. One static program-initialization builder consumes
 the selected package graph and invokes those bodies in exact Go package order;
 it does not build a second semantic graph.
 
+### Value-Foundation Representations
+
+Milestone 3A uses bounded representations rather than pretending native
+JavaScript values already implement Go.
+
+Go string values are stored as TypeScript strings whose code units are Go
+bytes. For example, Go `"é"` contains bytes `c3 a9`, so its target semantic
+literal contains code units `0x00c3, 0x00a9`; target `.length` is therefore the
+Go byte length. Concatenation and equality are direct. Indexing and slicing use
+one demanded string runtime owner for bounds behavior:
+
+```go
+value := "é"
+return value[1], value[:1]
+```
+
+```ts
+const value: gostring = "\u00c3\u00a9";
+return [goStringIndex(value, 1), goStringSlice(value, 0, 1)];
+```
+
+An admitted fixed array retains its length in the target type. A `[2]int32`
+cannot become interchangeable with `[3]int32`. Array zero and copy create
+fresh storage; an indexed store mutates only that storage.
+
+An admitted slice is a descriptor over backing storage:
+
+```text
+backing identity + offset + length + capacity + nil state
+```
+
+Copying a slice copies the descriptor and aliases the backing storage.
+Slicing changes descriptor bounds. Append reuses capacity or allocates and
+copies according to Go behavior. Representing a slice as a bare `T[]` is
+forbidden because it cannot distinguish nil, preserve capacity, or model
+subslice append aliasing.
+
+An admitted map is a reference value with an explicit nil state. Map assignment
+aliases the same map. Lookup of a missing key returns the element zero;
+comma-ok additionally returns `false`; storing through nil fails. A plain
+object literal is forbidden because it changes key identity and prototype
+behavior.
+
+An admitted pointer is a typed reference cell created by `new(T)`. Assignment
+copies the reference, dereference reads or writes the cell, nil is distinct,
+and equality compares cell identity. Address-of is not simulated by wrapping
+all locals. It remains unsupported until the exact local/field/indexed storage
+owner can revise only declarations whose address becomes observable.
+
+Each runtime call remains constant-size. Element/key/value representations are
+selected from the same `go/types` evidence; runtime objects never carry erased
+`any`/`unknown` payloads or callbacks that rediscover Go semantics.
+
 ## Packages, Standard Library, And Externals
 
 Go does not assign different language semantics to standard and third-party

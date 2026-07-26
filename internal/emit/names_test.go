@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"slices"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
@@ -384,5 +385,99 @@ func TestPrimitiveAliasImportAvoidsSourceNamesAndRemainsOneTypedOwner(t *testing
 	alias, ok := requests[0].PrimitiveAlias()
 	if !ok || alias != api.PrimitiveInt32 {
 		t.Fatalf("primitive owner = %d, %v; want int32, true", alias, ok)
+	}
+}
+
+func TestRuntimeImportAvoidsSourceNamesAndRemainsOneTypedOwner(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/current", "current")
+	packageScope := sourcePackage.Scope()
+	reservedExport := types.NewVar(
+		token.Pos(1),
+		sourcePackage,
+		"goStringIndex",
+		types.Typ[types.Int],
+	)
+	reservedAlias := types.NewVar(
+		token.Pos(2),
+		sourcePackage,
+		"goStringIndex__from_gotots_runtime",
+		types.Typ[types.Int],
+	)
+	packageScope.Insert(reservedExport)
+	packageScope.Insert(reservedAlias)
+	owner := newNameOwner(packageScope, &types.Info{
+		Defs: map[*ast.Ident]types.Object{
+			{Name: "goStringIndex"}:                      reservedExport,
+			{Name: "goStringIndex__from_gotots_runtime"}: reservedAlias,
+		},
+	})
+	names := owner.ForFile(
+		&ast.File{},
+		packageScope,
+		tsgo.NewFactory(),
+		"modules/current/source.ts",
+		nil,
+	)
+
+	first, err := names.Runtime(api.RuntimeStringIndex, api.ImportPhaseValue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := names.Runtime(api.RuntimeStringIndex, api.ImportPhaseValue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const expectedLocal = "goStringIndex__from_gotots_runtime_1"
+	if first.Name() != expectedLocal || second.Name() != expectedLocal {
+		t.Fatalf("runtime names = %q, %q; want %q", first.Name(), second.Name(), expectedLocal)
+	}
+	requests := first.Requests()
+	if len(requests) != 1 ||
+		requests[0].ExportedName() != "goStringIndex" ||
+		requests[0].LocalName() != expectedLocal ||
+		requests[0].ModulePath() != "../../runtime/string.js" {
+		t.Fatalf("runtime request = %#v", requests)
+	}
+	symbol, ok := requests[0].RuntimeSymbol()
+	if !ok || symbol != api.RuntimeStringIndex {
+		t.Fatalf("runtime owner = %d, %v; want string-index, true", symbol, ok)
+	}
+}
+
+func TestPlacementRuntimeSymbolsAreExactAndSorted(t *testing.T) {
+	factory := tsgo.NewFactory()
+	placement := newPlacementOwner()
+	for _, symbol := range []api.RuntimeSymbol{
+		api.RuntimePointer,
+		api.RuntimeStringSlice,
+		api.RuntimeStringIndex,
+		api.RuntimeStringSlice,
+	} {
+		contract, err := api.RuntimeContract(symbol)
+		if err != nil {
+			t.Fatal(err)
+		}
+		request, err := api.NewRuntimeImportRequest(
+			factory,
+			api.ImportPhaseValue,
+			"../../"+contract.OutputPath(),
+			symbol,
+			contract.ExportedName(),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := placement.Apply([]api.PlacementRequest{request}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	actual := placement.RuntimeSymbols()
+	expected := []api.RuntimeSymbol{
+		api.RuntimeStringIndex,
+		api.RuntimeStringSlice,
+		api.RuntimePointer,
+	}
+	if !slices.Equal(actual, expected) {
+		t.Fatalf("runtime symbols = %v, want %v", actual, expected)
 	}
 }

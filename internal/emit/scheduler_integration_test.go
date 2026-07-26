@@ -2,6 +2,7 @@ package emit
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/token"
@@ -11,7 +12,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tsoniclang/gotots/internal/emit/api"
+	runtimeemission "github.com/tsoniclang/gotots/internal/emit/runtime"
 	"github.com/tsoniclang/gotots/internal/load"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func TestDemandSchedulerExactJoinsIndependentReferenceClosure(t *testing.T) {
@@ -391,4 +395,69 @@ func objectLabel(object types.Object) string {
 		return object.Name()
 	}
 	return object.Pkg().Path() + "." + object.Name()
+}
+
+func TestRuntimeDefinitionsExactJoinRequestedSymbols(t *testing.T) {
+	factory := tsgo.NewFactory()
+	index := runtimeDefinition(t, factory, api.RuntimeStringIndex)
+	slice := runtimeDefinition(t, factory, api.RuntimeStringSlice)
+	statements, err := exactRuntimeDefinitions(
+		api.RuntimeModuleString,
+		[]api.RuntimeSymbol{api.RuntimeStringIndex, api.RuntimeStringSlice},
+		[]runtimeemission.Definition{slice, index},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(statements) != 2 ||
+		statements[0] != index.Statement() ||
+		statements[1] != slice.Statement() {
+		t.Fatalf("runtime statements = %#v", statements)
+	}
+}
+
+func TestRuntimeDefinitionsRejectJoinMutations(t *testing.T) {
+	factory := tsgo.NewFactory()
+	index := runtimeDefinition(t, factory, api.RuntimeStringIndex)
+	slice := runtimeDefinition(t, factory, api.RuntimeStringSlice)
+	pointer := runtimeDefinition(t, factory, api.RuntimePointer)
+	tests := []struct {
+		name        string
+		requested   []api.RuntimeSymbol
+		definitions []runtimeemission.Definition
+	}{
+		{"missing", []api.RuntimeSymbol{api.RuntimeStringIndex, api.RuntimeStringSlice}, []runtimeemission.Definition{index}},
+		{"duplicate", []api.RuntimeSymbol{api.RuntimeStringIndex}, []runtimeemission.Definition{index, index}},
+		{"extra", []api.RuntimeSymbol{api.RuntimeStringIndex}, []runtimeemission.Definition{index, slice}},
+		{"wrong module", []api.RuntimeSymbol{api.RuntimePointer}, []runtimeemission.Definition{pointer}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := exactRuntimeDefinitions(
+				api.RuntimeModuleString,
+				test.requested,
+				test.definitions,
+			)
+			var assemblyError *runtimeemission.AssemblyError
+			if !errors.As(err, &assemblyError) {
+				t.Fatalf("error = %v, want runtime assembly error", err)
+			}
+		})
+	}
+}
+
+func runtimeDefinition(
+	t *testing.T,
+	factory tsgo.Factory,
+	symbol api.RuntimeSymbol,
+) runtimeemission.Definition {
+	t.Helper()
+	definition, err := runtimeemission.NewDefinition(
+		symbol,
+		factory.EmptyStatement(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return definition
 }

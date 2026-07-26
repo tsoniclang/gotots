@@ -98,6 +98,13 @@ func (unusedNames) Primitive(api.PrimitiveAlias) (api.NameReference, error) {
 	panic("unused")
 }
 
+func (unusedNames) Runtime(
+	api.RuntimeSymbol,
+	api.ImportPhase,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (unusedNames) Temporary(api.TemporaryKind) (string, error) {
 	panic("unused")
 }

@@ -513,6 +513,39 @@ file-root convenience may choose roots from one Go file, but it must not return
 only that file's TypeScript module or discard any requested artifact. Consumers
 never reconstruct omitted support from imports.
 
+Runtime support follows the same typed placement model. A contextual handler
+requests a closed runtime symbol from the name owner. That symbol fixes:
+
+- its one `runtime/<family>.ts` output owner;
+- its exported target name and allowed type/value uses;
+- the family builder that constructs its declaration as typed TS-Go AST; and
+- its deterministic deduplication identity.
+
+The source-file placement owner receives the resulting ordinary static import
+at the requested type or value phase and upgrades type to value when both are
+needed in one file.
+The program target-file owner independently collects the tagged runtime
+symbols, exact-joins every requested export to one generated definition, and
+emits each demanded runtime module once. A raw module/export string may not
+select runtime behavior, and a runtime declaration may not be carried from a
+use-site handler as an opaque duplicate AST payload.
+
+```text
+contextual family handler
+    -> Names.Runtime(closed symbol)
+    -> static ESM import request + tagged definition requirement
+    -> program-level exact symbol join
+    -> internal/emit/runtime/<family> TS-Go AST builder
+    -> runtime/<family>.ts
+```
+
+Runtime classes may encapsulate JavaScript storage only when that storage is
+the smallest exact representation of a Go value family. They may expose
+ordinary statically typed methods, but no reflection, dynamic operation name,
+erased payload recovery, `.call`/`.apply`/`.bind`, or per-use semantic closure.
+Compiler handlers still own Go evaluation order and copy boundaries; runtime
+code does not rediscover source semantics.
+
 ## Package And Output Shape
 
 Every source-available Go file has one checkout-independent target path:

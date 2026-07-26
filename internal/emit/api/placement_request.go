@@ -52,6 +52,7 @@ type PlacementRequest struct {
 	moduleSpecifier tsgo.StringLiteral
 	specifier       tsgo.ImportSpecifier
 	primitiveAlias  PrimitiveAlias
+	runtimeSymbol   RuntimeSymbol
 }
 
 func NewImportRequest(
@@ -115,6 +116,36 @@ func NewPrimitiveAliasRequest(
 		return PlacementRequest{}, err
 	}
 	request.primitiveAlias = alias
+	return request, nil
+}
+
+func NewRuntimeImportRequest(
+	factory tsgo.Factory,
+	phase ImportPhase,
+	modulePath string,
+	symbol RuntimeSymbol,
+	localName string,
+) (PlacementRequest, error) {
+	contract, err := RuntimeContract(symbol)
+	if err != nil {
+		return PlacementRequest{}, err
+	}
+	if !contract.AllowsImportPhase(phase) {
+		return PlacementRequest{}, &PlacementRequestError{
+			Reason: "runtime symbol does not allow the requested import phase",
+		}
+	}
+	request, err := NewImportRequest(
+		factory,
+		phase,
+		modulePath,
+		contract.ExportedName(),
+		localName,
+	)
+	if err != nil {
+		return PlacementRequest{}, err
+	}
+	request.runtimeSymbol = symbol
 	return request, nil
 }
 
@@ -195,6 +226,13 @@ func (r PlacementRequest) PrimitiveAlias() (PrimitiveAlias, bool) {
 		return PrimitiveInvalid, false
 	}
 	return r.primitiveAlias, true
+}
+
+func (r PlacementRequest) RuntimeSymbol() (RuntimeSymbol, bool) {
+	if r.runtimeSymbol == RuntimeInvalid {
+		return RuntimeInvalid, false
+	}
+	return r.runtimeSymbol, true
 }
 
 func (r PlacementRequest) DeclarationRequirement() (

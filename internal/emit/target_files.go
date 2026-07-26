@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	runtimeemission "github.com/tsoniclang/gotots/internal/emit/runtime"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -27,10 +28,14 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 	sort.Strings(paths)
 	files := make([]TargetFile, 0, len(paths)+1)
 	primitiveAliases := make(map[api.PrimitiveAlias]struct{})
+	runtimeSymbols := make(map[api.RuntimeSymbol]struct{})
 	for _, outputPath := range paths {
 		builder := s.builders[outputPath]
 		for _, alias := range builder.placement.PrimitiveAliases() {
 			primitiveAliases[alias] = struct{}{}
+		}
+		for _, symbol := range builder.placement.RuntimeSymbols() {
+			runtimeSymbols[symbol] = struct{}{}
 		}
 		type declarationChunk struct {
 			position   token.Pos
@@ -86,6 +91,14 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 		return nil, err
 	}
 	files = append(files, packageFiles...)
+	for _, builder := range s.packageBuilders {
+		for _, symbol := range builder.statePlacement.RuntimeSymbols() {
+			runtimeSymbols[symbol] = struct{}{}
+		}
+		for _, symbol := range builder.assemblyPlacement.RuntimeSymbols() {
+			runtimeSymbols[symbol] = struct{}{}
+		}
+	}
 	programFile, err := s.programInitializationFile()
 	if err != nil {
 		return nil, err
@@ -103,6 +116,11 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 		}
 		files = append(files, support)
 	}
+	runtimeFiles, err := s.runtimeSupportFiles(runtimeSymbols)
+	if err != nil {
+		return nil, err
+	}
+	files = append(files, runtimeFiles...)
 	sort.Slice(files, func(left, right int) bool {
 		return files[left].outputPath < files[right].outputPath
 	})
@@ -270,4 +288,115 @@ func (s *programSession) scalarSupportFile(
 		TargetFileSupport,
 		statements,
 	)
+}
+
+func (s *programSession) runtimeSupportFiles(
+	requested map[api.RuntimeSymbol]struct{},
+) ([]TargetFile, error) {
+	byModule := make(map[api.RuntimeModule][]api.RuntimeSymbol)
+	paths := make(map[api.RuntimeModule]string)
+	for symbol := range requested {
+		contract, err := api.RuntimeContract(symbol)
+		if err != nil {
+			return nil, err
+		}
+		module := contract.Module()
+		if existing := paths[module]; existing != "" &&
+			existing != contract.OutputPath() {
+			return nil, &runtimeemission.AssemblyError{
+				Module: module,
+				Symbol: symbol,
+				Reason: "one runtime module has multiple output paths",
+			}
+		}
+		paths[module] = contract.OutputPath()
+		byModule[module] = append(byModule[module], symbol)
+	}
+	modules := make([]api.RuntimeModule, 0, len(byModule))
+	for module := range byModule {
+		modules = append(modules, module)
+	}
+	sort.Slice(modules, func(left, right int) bool {
+		return modules[left] < modules[right]
+	})
+	files := make([]TargetFile, 0, len(modules))
+	for _, module := range modules {
+		symbols := byModule[module]
+		sort.Slice(symbols, func(left, right int) bool {
+			return symbols[left] < symbols[right]
+		})
+		definitions, err := runtimeemission.Build(s.factory, module, symbols)
+		if err != nil {
+			return nil, err
+		}
+		statements, err := exactRuntimeDefinitions(module, symbols, definitions)
+		if err != nil {
+			return nil, err
+		}
+		file, err := s.sourceFile(
+			paths[module],
+			"",
+			TargetFileSupport,
+			statements,
+		)
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, file)
+	}
+	return files, nil
+}
+
+func exactRuntimeDefinitions(
+	module api.RuntimeModule,
+	symbols []api.RuntimeSymbol,
+	definitions []runtimeemission.Definition,
+) ([]tsgo.Statement, error) {
+	requested := make(map[api.RuntimeSymbol]struct{}, len(symbols))
+	for _, symbol := range symbols {
+		requested[symbol] = struct{}{}
+	}
+	bySymbol := make(map[api.RuntimeSymbol]tsgo.Statement, len(definitions))
+	for _, definition := range definitions {
+		symbol := definition.Symbol()
+		contract, err := api.RuntimeContract(symbol)
+		if err != nil {
+			return nil, err
+		}
+		if contract.Module() != module {
+			return nil, &runtimeemission.AssemblyError{
+				Module: module,
+				Symbol: symbol,
+				Reason: "definition belongs to another runtime module",
+			}
+		}
+		if _, ok := requested[symbol]; !ok {
+			return nil, &runtimeemission.AssemblyError{
+				Module: module,
+				Symbol: symbol,
+				Reason: "definition was not requested",
+			}
+		}
+		if _, duplicate := bySymbol[symbol]; duplicate {
+			return nil, &runtimeemission.AssemblyError{
+				Module: module,
+				Symbol: symbol,
+				Reason: "runtime symbol has duplicate definitions",
+			}
+		}
+		bySymbol[symbol] = definition.Statement()
+	}
+	statements := make([]tsgo.Statement, 0, len(symbols))
+	for _, symbol := range symbols {
+		statement := bySymbol[symbol]
+		if statement == nil {
+			return nil, &runtimeemission.AssemblyError{
+				Module: module,
+				Symbol: symbol,
+				Reason: "requested runtime symbol has no definition",
+			}
+		}
+		statements = append(statements, statement)
+	}
+	return statements, nil
 }

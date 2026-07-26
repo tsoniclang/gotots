@@ -175,6 +175,62 @@ Add exact representations for:
 Each family must satisfy the source-shape and cost gates before the next
 dependent family proceeds. Interface dispatch must remain constant-size.
 
+### 3A. Value-Model Foundation
+
+The first Milestone 3 checkpoint installs six bounded families together
+because they share zero, copy, assignment, equality, nil, bounds, and runtime
+support ownership. The families remain separate semantic owners; they do not
+create a value IR or a generic operation registry.
+
+1. Every predeclared integer type receives a width-preserving GoToTS-owned
+   target alias and the operators admitted by the selected `number` or
+   `bigint` profile. Division, remainder, shifts, bitwise operations, and
+   explicit conversions are admitted only where the selected profile has an
+   exact bounded implementation. Fixed-width implicit overflow remains a
+   separately selected future profile rather than hidden ordinary-expression
+   baggage.
+2. Go strings use one byte-preserving target representation. Source literals,
+   concatenation, ordered/equality comparison, `len`, indexing, and two-index
+   slicing are exact over arbitrary Go string bytes. Rune conversion,
+   iteration, formatting, and external text encoding remain separate
+   boundaries.
+3. Unnamed fixed-length arrays of represented scalar elements support zero,
+   copy, equality, literals, indexing/stores, `len`, and `cap`. Target types
+   retain the array length. Named arrays and recursively aggregate elements
+   remain unsupported until their identity and copy contracts are proved.
+4. Unnamed slices of represented scalar elements support nil, `make`, literals,
+   indexing/stores, two- and three-index slicing, `len`, `cap`, `append`, and
+   `copy`. The representation preserves backing-store aliasing, offset, length,
+   capacity, append reallocation, and fresh zero slices.
+5. Unnamed maps with represented scalar comparable keys and represented scalar
+   values support nil, `make`, literals, lookup, comma-ok lookup, stores,
+   `delete`, and `len`. Missing lookup returns the exact value zero; writes to a
+   nil map fail at runtime; map iteration remains deferred.
+6. Pointers to represented scalar values support nil, `new`, dereference read
+   and store, assignment, return/argument passing, and equality. Address-of
+   existing variables, fields, and indexed elements remains unsupported until
+   stable addressable-storage identity can be installed without cell-wrapping
+   unrelated locals.
+
+The generated runtime boundary is demand-driven and typed. Each family owns
+its runtime module and exported operations; source handlers request imports by
+closed semantic identity. Runtime files are constructed as TS-Go AST and
+printed by the pinned TS-Go printer. No checked-in TypeScript, source fragment,
+template, raw export spelling, or handler-local duplicate implementation is
+allowed.
+
+The checkpoint exits only when all six families:
+
+- use the one `go/types` graph and the existing parent-directed walk;
+- install one representation owner and migrate every admitted context;
+- retain typed unsupported failures for every named neighboring boundary;
+- strict-typecheck and execute differentially in ordinary multi-package
+  projects;
+- prove nil, aliasing, copy, bounds, evaluation order, and mutation behavior;
+- keep every operation/use site constant-size and runtime modules linear in
+  exported behavior; and
+- pass an integrated mixed-family project without compatibility paths.
+
 ## 4. Environment And Completion
 
 Add deterministic module output, minimal runtime modules, selected-`GOROOT`
