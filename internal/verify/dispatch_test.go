@@ -82,17 +82,18 @@ func TestSelectedToolchainASTUniverseHasTotalTypedDispatch(t *testing.T) {
 	}
 
 	root := repositoryRoot(t)
-	for category, fileName := range map[nodeCategory]string{
-		categoryDeclaration: "dispatch_declaration.go",
-		categoryExpression:  "dispatch_expression.go",
-		categoryStatement:   "dispatch_statement.go",
+	dispatchPath := filepath.Join(root, "internal", "emit", "dispatch.go")
+	for category, functionName := range map[nodeCategory]string{
+		categoryDeclaration: "declarationObject",
+		categoryExpression:  "Expression",
+		categoryStatement:   "Statement",
 	} {
-		cases := dispatchCases(t, filepath.Join(root, "internal", "emit", fileName))
+		cases := dispatchCases(t, dispatchPath, functionName)
 		for _, name := range cases {
 			if actual, exists := universe[name]; !exists || actual.category != category {
 				t.Errorf(
 					"%s dispatches %s, selected go/ast category is %s",
-					fileName,
+					functionName,
 					name,
 					actual.category,
 				)
@@ -100,7 +101,7 @@ func TestSelectedToolchainASTUniverseHasTotalTypedDispatch(t *testing.T) {
 		}
 		for _, bad := range []string{"BadDecl", "BadExpr", "BadStmt"} {
 			if contains(cases, bad) {
-				t.Errorf("%s handles parser recovery form %s", fileName, bad)
+				t.Errorf("%s handles parser recovery form %s", functionName, bad)
 			}
 		}
 	}
@@ -233,16 +234,23 @@ func interfaceType(
 	return value.Complete()
 }
 
-func dispatchCases(t *testing.T, sourcePath string) []string {
+func dispatchCases(
+	t *testing.T,
+	sourcePath string,
+	functionName string,
+) []string {
 	t.Helper()
-	result, err := inspectDispatch(sourcePath)
+	result, err := inspectDispatch(sourcePath, functionName)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return result
 }
 
-func inspectDispatch(sourcePath string) ([]string, error) {
+func inspectDispatch(
+	sourcePath string,
+	functionName string,
+) ([]string, error) {
 	file, err := parser.ParseFile(token.NewFileSet(), sourcePath, nil, 0)
 	if err != nil {
 		return nil, err
@@ -256,8 +264,23 @@ func inspectDispatch(sourcePath string) ([]string, error) {
 	if astAlias == "" || apiAlias == "" {
 		return nil, fmt.Errorf("%s lacks exact ast/api imports", sourcePath)
 	}
+	var function *ast.FuncDecl
+	for _, declaration := range file.Decls {
+		candidate, ok := declaration.(*ast.FuncDecl)
+		if ok && candidate.Name.Name == functionName {
+			function = candidate
+			break
+		}
+	}
+	if function == nil {
+		return nil, fmt.Errorf(
+			"%s lacks root dispatch function %s",
+			sourcePath,
+			functionName,
+		)
+	}
 	var switches []*ast.TypeSwitchStmt
-	ast.Inspect(file, func(node ast.Node) bool {
+	ast.Inspect(function.Body, func(node ast.Node) bool {
 		if value, ok := node.(*ast.TypeSwitchStmt); ok {
 			switches = append(switches, value)
 		}
@@ -265,8 +288,9 @@ func inspectDispatch(sourcePath string) ([]string, error) {
 	})
 	if len(switches) != 1 {
 		return nil, fmt.Errorf(
-			"%s has %d type switches, want one root dispatch",
+			"%s.%s has %d type switches, want one root dispatch",
 			sourcePath,
+			functionName,
 			len(switches),
 		)
 	}
@@ -433,7 +457,7 @@ func dispatch(source ast.Expr) {
 			if err := os.WriteFile(sourcePath, []byte(source), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := inspectDispatch(sourcePath); err == nil {
+			if _, err := inspectDispatch(sourcePath, "dispatch"); err == nil {
 				t.Fatal("dispatch mutation passed its owning gate")
 			}
 		})

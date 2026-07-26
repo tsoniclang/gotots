@@ -47,6 +47,8 @@ general-purpose intermediate program.
 | external target node kinds, fields, encoding, protocol version | pinned TS-Go schema/protocol under `schema/tsgo` |
 | typed target protocol values and factories | generated `internal/target/tsgo` |
 | target lexical placement and deduplication | scoped builders in `internal/emit` |
+| mutable package storage and package-local initialization bodies | package-state and passive package-assembly builders in `internal/emit`, driven by the selected `go/types.Info.InitOrder` |
+| whole-program package initialization order | one static program-initialization builder consuming the selected `types.Package` import graph |
 | target decoding and formatting | pinned `tsgo --api` `printNode` |
 | Go primitive target names and support declarations | representation owner in `internal/emit` plus generated `support/scalars.ts` |
 | standalone runtime behavior not expressible directly | GoToTS-owned modules under generated `runtime/` |
@@ -156,7 +158,10 @@ JavaScript/TypeScript lexical declarations have a temporal dead zone before
 their textual declaration while the new Go variable is not in scope during
 the right side of its short declaration. The lexical name service emits the
 portable ASCII identifier subset accepted by strict TypeScript. Non-ASCII Go
-identifier runes are escaped deterministically.
+identifier runes are escaped deterministically. Escaped spellings are not
+assumed to be injective: every target namespace, including package import
+qualifiers, allocates from the escaped candidates as one globally checked
+collision domain with deterministic Go-identity ordering.
 Every pinned TS-Go keyword spelling and strict-binding name is escaped at this
 same boundary; the keyword set is generated from the pinned `SyntaxKind`
 contract rather than copied into the emitter.
@@ -210,6 +215,14 @@ extension roots plus Go package initialization roots. A resolved reference
 enqueues its authoritative Go object for emission. The scheduler stores only
 `pending` and `emitted` Go identities and direct links to their target
 declarations; it does not copy call edges into a source graph.
+
+Reaching any source-available package also reaches that package's complete
+initialization obligation. This includes every package variable, including an
+unexported or otherwise unreferenced variable whose initializer has effects,
+and every admitted `init` function. Reachability may prune packages, but it
+must not prune initialization within a reached package. The selected
+`go/types.Info.InitOrder` is the sole variable-initializer order; the emitter
+does not infer order from files, imports, references, or source positions.
 
 Function values, interface conversions, callbacks, reflection contracts,
 generic instantiations, initialization, runtime helpers, manual obligations,
@@ -273,10 +286,19 @@ owner, and rejects ownership conflicts.
 One placement service applies the policy:
 
 - imports always enter file import scope; dynamic imports are forbidden;
-- every emitted package declaration is exported from its generated source-file
-  module for static intra-package linking, including declarations whose Go
-  names are unexported; only the package assembly facade exposes the selected
-  Go public API to consumers;
+- one imported binding has one placement identity independent of whether a
+  requester needs its type or value namespace; a value import dominates a
+  type-only request for the same module, export, and local binding, in either
+  request order, because the value import supplies both namespaces;
+- every emitted immutable package declaration is exported from its generated
+  source-file module for static intra-package linking, including declarations
+  whose Go names are unexported;
+- mutable package variables are fields of the package's one state object, not
+  duplicate `let` declarations in source-file modules;
+- same-package generated source modules import that state object directly,
+  while cross-package references use the passive package assembly; consumers
+  import the program-initialization module before using a selected package
+  surface;
 - reusable static declarations prefer file scope;
 - named-type companion declarations are emitted immediately after their
   owning type declaration in a fixed operation order;
@@ -307,7 +329,118 @@ call when its other children are direct. Package-level initialization order and
 atomic multi-value operations are separate semantic contracts and remain exact
 under both profiles. Package-level initializers use the selected checker
 graph's exact initialization order and append their TS-Go statements to one
-package-initialization builder; no second dependency graph is constructed.
+package-assembly function body. Whole-program order consumes the selected
+package import graph directly; it does not infer order from target imports or
+construct a parallel semantic graph.
+
+## Package State And Assembly
+
+TypeScript ESM imported bindings cannot be assigned by another module, while
+Go package variables are mutable from every file in their package. Therefore
+every reached package has one package assembly, and a package with mutable
+variables additionally has one state module. Every compilation also has one
+program-initialization module:
+
+```text
+packages/<module-key>/<module-relative-package>/state.ts
+packages/<module-key>/<module-relative-package>/package.ts
+program.ts
+```
+
+The state module owns storage. It emits one generated class whose public
+`declare` fields are typed from the authoritative package-scope `types.Var`
+objects, and one state instance:
+
+```go
+var Counter int
+```
+
+```ts
+export class $PackageState {
+  declare Counter: int32;
+}
+
+export const $state = new $PackageState();
+```
+
+`declare` is intentional: it is erased JavaScript and avoids importing runtime
+source declarations into the state module. The state module may use type-only
+imports and primitive-alias imports, but it must have no runtime dependency on
+a generated source-file module. It contains no initializer and no cast from an
+empty object.
+
+The package assembly is passive at module evaluation. It imports the state and
+required source declarations and exports one `$initialize` function when the
+package has initialization work. That function assigns the exact Go zero to
+every state field before any package initializer runs, then emits initializer
+assignments in `go/types.Info.InitOrder`. Admitted `init` functions follow in
+the selected toolchain loader's file order and declaration order within each
+file; the emitter preserves that evidence and does not rescan the filesystem
+or sort a second file list. For example:
+
+```go
+var B = 4
+var A = B + 1
+
+func Read() int { return A + B }
+```
+
+becomes structurally:
+
+```ts
+import { Read } from "../../modules/<module-key>/<package>/read.js";
+import { $state } from "./state.js";
+
+export function $initialize(): void {
+  $state.A = 0;
+  $state.B = 0;
+  $state.B = 4;
+  $state.A = $state.B + 1;
+}
+
+export { $state, Read };
+```
+
+The program-initialization module is the sole executor. Go does not use a
+depth-first module walk: from all packages sorted by import path, it repeatedly
+initializes the first package whose imports are already initialized. ESM
+dependency evaluation is depth-first and can produce a different order for
+independent branches. Therefore no package assembly executes initialization at
+top level and target import order is never treated as Go initialization order.
+
+The program builder applies Go's algorithm directly to the reached
+`types.Package` identities and their selected `Imports()` edges, then filters
+the resulting order to packages with initialization work. It emits static
+imports and one direct call per such package:
+
+```ts
+import { $initialize as $initialize_registry } from "./packages/<key>/registry/package.js";
+import { $initialize as $initialize_y } from "./packages/<key>/y/package.js";
+import { $initialize as $initialize_b } from "./packages/<key>/b/package.js";
+
+$initialize_registry();
+$initialize_y();
+$initialize_b();
+```
+
+There is no runtime registry, idempotence flag, callback table, dynamic import,
+or alternate package graph. ESM evaluates `program.ts` once, so each direct
+call executes once. A consumer imports `program.ts` for effects before using
+bindings from a passive package assembly.
+
+Generated reads and stores use the same field identity (`$state.A`,
+`$state.A = value`, `$state.A++`). No per-variable getter/setter, mutable-cell
+wrapper, duplicated source-file binding, or source-order emulation exists.
+Same-package source modules import `state.ts`; cross-package generated code
+imports the dependency state and declarations through passive `package.ts`.
+Loading source and package modules cannot execute Go initialization early.
+
+The package assemblies and `program.ts` are sealed only after the declaration
+scheduler, package initialization work, and placement requests reach a fixed
+point. A consumer that omits `program.ts` is outside the executable output
+contract. Package-state, assembly, and program-initialization nodes are
+constructed through the same typed TS-Go protocol factories and printed by the
+same pinned printer as every other target file.
 
 ## Target Construction
 
@@ -363,6 +496,17 @@ Every source-available Go file has one checkout-independent target path:
 modules/<sha256(module-path NUL module-version)>/<module-relative-package>/<source-base>.ts
 ```
 
+Its package-owned assembly and conditional mutable state use the same semantic
+module key and module-relative package under the separate `packages/` root:
+
+```text
+packages/<sha256(module-path NUL module-version)>/<module-relative-package>/state.ts
+packages/<sha256(module-path NUL module-version)>/<module-relative-package>/package.ts
+```
+
+The compilation-owned initialization entry has the checkout-independent path
+`program.ts`.
+
 The full digest is an opaque semantic-module owner, not a shortened display
 identifier. Generated value imports use canonical relative `.js` specifiers.
 Every cross-package imported binding uses a deterministic package-qualified
@@ -385,11 +529,10 @@ schema/tsgo/                        exact pinned TS-Go external contract
 internal/load/                      project and selected-toolchain loading
 
 internal/emit/                      session, scheduling, closed dispatch only
-  emitter.go
-  dispatch_declaration.go
-  dispatch_statement.go
-  dispatch_expression.go
-  dispatch_type.go
+  dispatch.go                       emitter plus closed typed dispatch
+  scheduling.go                     roots and demand scheduler
+  target_files.go                   source/support/program file sealing
+  package_state.go                  package storage and initialization owner
   api/                              narrow handler contracts
     context.go
     role.go
@@ -478,7 +621,10 @@ A generated product uses deterministic ownership:
 
 ```text
 <output>/
+  program.ts
   modules/<module-key>/<package>/<source-file>.ts
+  packages/<module-key>/<package>/state.ts
+  packages/<module-key>/<package>/package.ts
   gostdlib/<toolchain-key>/<import-path>/<source-file>.ts
   externals/<contract-key>/<import-path>/index.ts
   support/scalars.ts

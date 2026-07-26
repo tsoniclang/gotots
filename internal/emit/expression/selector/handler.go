@@ -26,8 +26,24 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	object, ok := context.TypesInfo().Uses[source.Sel].(*types.Const)
-	if !ok || object.Pkg() != packageName.Imported() {
+	object := context.TypesInfo().Uses[source.Sel]
+	if object == nil || object.Pkg() != packageName.Imported() {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if variable, ok := object.(*types.Var); ok &&
+		!variable.IsField() &&
+		variable.Parent() == variable.Pkg().Scope() {
+		reference, err := context.Names().PackageVariable(variable)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.DirectExpression(
+			reference.Expression(context.Factory()),
+			reference.Requests()...,
+		), nil
+	}
+	if _, ok := object.(*types.Const); !ok {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}

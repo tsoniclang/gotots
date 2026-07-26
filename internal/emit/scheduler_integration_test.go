@@ -31,6 +31,7 @@ func TestDemandSchedulerExactJoinsIndependentReferenceClosure(t *testing.T) {
 			"example.com/demand/mathx.Even,"+
 			"example.com/demand/mathx.Odd,"+
 			"example.com/demand/mathx.Offset,"+
+			"example.com/demand/mathx.unsupportedValue,"+
 			"example.com/demand/service.Compute" {
 		t.Fatalf("independent reachable closure = %v", labels)
 	}
@@ -86,6 +87,7 @@ func independentReferenceClosure(
 	t.Helper()
 	declarations := make(map[types.Object]ast.Decl)
 	infoByObject := make(map[types.Object]*types.Info)
+	packageVariables := make(map[*types.Package][]types.Object)
 	for _, sourcePackage := range program.Packages() {
 		info := sourcePackage.TypesInfo()
 		for _, sourceFile := range sourcePackage.Files() {
@@ -100,7 +102,8 @@ func independentReferenceClosure(
 						infoByObject[object] = info
 					}
 				case *ast.GenDecl:
-					if declaration.Tok != token.CONST {
+					if declaration.Tok != token.CONST &&
+						declaration.Tok != token.VAR {
 						continue
 					}
 					for _, sourceSpec := range declaration.Specs {
@@ -109,9 +112,22 @@ func independentReferenceClosure(
 							t.Fatalf("constant declaration contains %T", sourceSpec)
 						}
 						for _, name := range valueSpec.Names {
-							if object, ok := info.Defs[name].(*types.Const); ok {
+							object := info.Defs[name]
+							switch object := object.(type) {
+							case *types.Const:
 								declarations[object] = declaration
 								infoByObject[object] = info
+							case *types.Var:
+								if object.Name() == "_" ||
+									object.Parent() != sourcePackage.Types().Scope() {
+									continue
+								}
+								declarations[object] = declaration
+								infoByObject[object] = info
+								packageVariables[sourcePackage.Types()] = append(
+									packageVariables[sourcePackage.Types()],
+									object,
+								)
 							}
 						}
 					}
@@ -125,6 +141,25 @@ func independentReferenceClosure(
 		pending = append(pending, root.object)
 	}
 	expected := make(map[types.Object]int)
+	reachedPackages := make(map[*types.Package]struct{})
+	var reachPackage func(*types.Package)
+	reachPackage = func(sourcePackage *types.Package) {
+		if sourcePackage == nil {
+			return
+		}
+		if _, reached := reachedPackages[sourcePackage]; reached {
+			return
+		}
+		reachedPackages[sourcePackage] = struct{}{}
+		pending = append(pending, packageVariables[sourcePackage]...)
+		imports := sourcePackage.Imports()
+		sort.Slice(imports, func(left, right int) bool {
+			return imports[left].Path() < imports[right].Path()
+		})
+		for _, imported := range imports {
+			reachPackage(imported)
+		}
+	}
 	for len(pending) != 0 {
 		sort.Slice(pending, func(left, right int) bool {
 			return compareObjects(pending[left], pending[right]) < 0
@@ -134,6 +169,7 @@ func independentReferenceClosure(
 		if expected[object] != 0 {
 			continue
 		}
+		reachPackage(object.Pkg())
 		declaration := declarations[object]
 		if declaration == nil {
 			t.Fatalf("root/reference %s has no independently derived declaration", objectLabel(object))
@@ -171,17 +207,34 @@ func emittedObjectCounts(
 		}
 	}
 	for {
-		object, ok := session.scheduler.next()
-		if !ok {
-			break
+		if object, ok := session.scheduler.next(); ok {
+			if err := session.emit(object); err != nil {
+				t.Fatal(err)
+			}
+			continue
 		}
-		if err := session.emit(object); err != nil {
-			t.Fatal(err)
+		if companion, ok := session.companions.next(); ok {
+			if err := session.emitCompanion(companion); err != nil {
+				t.Fatal(err)
+			}
+			continue
 		}
+		if sourcePackage, ok := session.packageInitializations.next(); ok {
+			if err := session.emitPackageInitialization(sourcePackage); err != nil {
+				t.Fatal(err)
+			}
+			continue
+		}
+		break
 	}
 	actual := make(map[types.Object]int)
 	for _, builder := range session.builders {
 		for object := range builder.byObject {
+			actual[object]++
+		}
+	}
+	for _, builder := range session.packageBuilders {
+		for object := range builder.storageByObject {
 			actual[object]++
 		}
 	}

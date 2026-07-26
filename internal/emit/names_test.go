@@ -19,9 +19,50 @@ func TestPortableIdentifierEscapesNonASCIIWithoutChangingASCII(t *testing.T) {
 		"class":     "__go_class",
 		"await":     "__go_await",
 		"arguments": "__go_arguments",
+		"__proto__": "__go___proto__",
 	} {
 		if actual := portableIdentifier(source); actual != expected {
 			t.Fatalf("portableIdentifier(%q) = %q, want %q", source, actual, expected)
+		}
+	}
+}
+
+func TestPackageQualifiersAreGloballyUniqueAfterPortableEscaping(t *testing.T) {
+	packages := []*types.Package{
+		types.NewPackage("example.com/first", "π"),
+		types.NewPackage("example.com/second", "__u3c0_"),
+		types.NewPackage("example.com/third", "π"),
+	}
+	registry := newDeclarationRegistry()
+	if err := registry.indexPackageQualifiers(packages); err != nil {
+		t.Fatal(err)
+	}
+	seen := make(map[string]*types.Package)
+	for _, sourcePackage := range packages {
+		qualifier := registry.importQualifierByPackage[sourcePackage]
+		if qualifier == "" {
+			t.Fatalf("package %s has no qualifier", sourcePackage.Path())
+		}
+		if previous := seen[qualifier]; previous != nil {
+			t.Fatalf(
+				"packages %s and %s share qualifier %q",
+				previous.Path(),
+				sourcePackage.Path(),
+				qualifier,
+			)
+		}
+		seen[qualifier] = sourcePackage
+	}
+
+	reversed := []*types.Package{packages[2], packages[1], packages[0]}
+	second := newDeclarationRegistry()
+	if err := second.indexPackageQualifiers(reversed); err != nil {
+		t.Fatal(err)
+	}
+	for _, sourcePackage := range packages {
+		if registry.importQualifierByPackage[sourcePackage] !=
+			second.importQualifierByPackage[sourcePackage] {
+			t.Fatalf("package %s qualifier depends on input order", sourcePackage.Path())
 		}
 	}
 }
@@ -186,6 +227,107 @@ func TestCrossPackageReferenceRequiresItsExactObjectBeforeImporting(t *testing.T
 	)
 	if _, err := names.Reference(object); !errors.Is(err, required) {
 		t.Fatalf("reference error = %v, want enqueue sentinel", err)
+	}
+}
+
+func TestPackageStatePlacementRejectsRuntimeImports(t *testing.T) {
+	factory := tsgo.NewFactory()
+	typeRequest, err := api.NewImportRequest(
+		factory,
+		api.ImportPhaseType,
+		"./model.js",
+		"Model",
+		"Model",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	placement := newPlacementOwner()
+	if err := placement.Apply([]api.PlacementRequest{typeRequest}); err != nil {
+		t.Fatal(err)
+	}
+	if err := placement.RequireTypeOnly(); err != nil {
+		t.Fatalf("type-only state placement failed: %v", err)
+	}
+
+	valueRequest, err := api.NewImportRequest(
+		factory,
+		api.ImportPhaseValue,
+		"./runtime.js",
+		"Runtime",
+		"Runtime",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	placement = newPlacementOwner()
+	if err := placement.Apply([]api.PlacementRequest{valueRequest}); err != nil {
+		t.Fatal(err)
+	}
+	var placementError *api.PlacementError
+	if err := placement.RequireTypeOnly(); !errors.As(err, &placementError) {
+		t.Fatalf("runtime state import error = %T, want PlacementError", err)
+	}
+}
+
+func TestValueImportDominatesTypeRequestIndependentOfOrder(t *testing.T) {
+	factory := tsgo.NewFactory()
+	typeRequest, err := api.NewImportRequest(
+		factory,
+		api.ImportPhaseType,
+		"./model.js",
+		"Point",
+		"Point__from_model",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	valueRequest, err := api.NewImportRequest(
+		factory,
+		api.ImportPhaseValue,
+		"./model.js",
+		"Point",
+		"Point__from_model",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if typeRequest.Owner() != valueRequest.Owner() {
+		t.Fatal("type and value requests for one binding have different owners")
+	}
+	for _, requests := range [][]api.PlacementRequest{
+		{typeRequest, valueRequest},
+		{valueRequest, typeRequest},
+	} {
+		placement := newPlacementOwner()
+		if err := placement.Apply(requests); err != nil {
+			t.Fatal(err)
+		}
+		statements := placement.Statements(factory)
+		if len(statements) != 1 {
+			t.Fatalf("import declarations = %d, want one", len(statements))
+		}
+		declaration := statements[0].(tsgo.ImportDeclaration)
+		if declaration.ImportClause().PhaseModifier() != 0 {
+			t.Fatal("type-only request incorrectly dominated a value import")
+		}
+	}
+	conflicting, err := api.NewImportRequest(
+		factory,
+		api.ImportPhaseValue,
+		"./model.js",
+		"Point",
+		"OtherPoint",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	placement := newPlacementOwner()
+	if err := placement.Apply([]api.PlacementRequest{
+		typeRequest,
+		conflicting,
+	}); err == nil {
+		t.Fatal("one import binding accepted two local names")
 	}
 }
 

@@ -57,9 +57,27 @@ func (p *placementOwner) Apply(requests []api.PlacementRequest) error {
 					Reason:       "one import owner requested multiple local names",
 				}
 			}
+			if existing.ImportPhase() == api.ImportPhaseType &&
+				request.ImportPhase() == api.ImportPhaseValue {
+				p.requests[owner] = request
+			}
 			continue
 		}
 		p.requests[owner] = request
+	}
+	return nil
+}
+
+func (p *placementOwner) RequireTypeOnly() error {
+	for _, request := range p.requests {
+		if request.Kind() != api.PlacementImport ||
+			request.ImportPhase() != api.ImportPhaseType {
+			return &api.PlacementError{
+				ModulePath:   request.ModulePath(),
+				ExportedName: request.ExportedName(),
+				Reason:       "package state requires type-only imports",
+			}
+		}
 	}
 	return nil
 }

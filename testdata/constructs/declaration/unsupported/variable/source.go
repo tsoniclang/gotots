@@ -1,3 +1,3 @@
 package unsupportedvariable
 
-var Value = 1
+var Value *int

@@ -34,8 +34,11 @@ func TestDemandProgramPrintsTypechecksAndExecutesReachableDefinitions(t *testing
 		t.Fatal(err)
 	}
 	files := emission.Files()
-	if len(files) != 4 {
-		t.Fatalf("emitted files = %d, want three source modules plus scalar support", len(files))
+	if len(files) != 9 {
+		t.Fatalf(
+			"emitted files = %d, want source, package, state, program, and support modules",
+			len(files),
+		)
 	}
 
 	workingDirectory := t.TempDir()
@@ -54,16 +57,36 @@ func TestDemandProgramPrintsTypechecksAndExecutesReachableDefinitions(t *testing
 		if err != nil {
 			t.Fatal(err)
 		}
-		expectedPath := filepath.Join(demandProgramDirectory(), file.PackageName(), "expected.ts")
-		if file.Kind() == emit.TargetFileSupport {
+		var expectedPath string
+		switch file.Kind() {
+		case emit.TargetFileSource:
+			expectedPath = filepath.Join(
+				demandProgramDirectory(),
+				file.PackageName(),
+				"expected.ts",
+			)
+		case emit.TargetFileSupport:
 			expectedPath = filepath.Join(repositoryRoot(), "testdata", "support", "scalars-int32.ts")
+		case emit.TargetFilePackageState,
+			emit.TargetFilePackageAssembly,
+			emit.TargetFileProgramInitialization:
+			expectedPath = ""
+		default:
+			t.Fatalf("unexpected target file %s kind %d", file.OutputPath(), file.Kind())
 		}
-		expected, err := os.ReadFile(expectedPath)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if printed != string(expected) {
-			t.Fatalf("%s TypeScript:\n%s\nwant:\n%s", file.PackageName(), printed, expected)
+		if expectedPath != "" {
+			expected, err := os.ReadFile(expectedPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if printed != string(expected) {
+				t.Fatalf(
+					"%s TypeScript:\n%s\nwant:\n%s",
+					file.PackageName(),
+					printed,
+					expected,
+				)
+			}
 		}
 		targetPath := filepath.Join(workingDirectory, filepath.FromSlash(file.OutputPath()))
 		writeProgramFile(t, targetPath, printed)
@@ -89,6 +112,9 @@ func TestDemandProgramPrunesUnreachableDefinitionsAndReservesCycles(t *testing.T
 	}
 	var declarations []string
 	for _, file := range emission.Files() {
+		if file.Kind() != emit.TargetFileSource {
+			continue
+		}
 		for _, statement := range file.SourceFile().Statements() {
 			switch statement := statement.(type) {
 			case tsgo.FunctionDeclaration:
@@ -171,15 +197,19 @@ func TestDemandProgramRetainsExplicitReferencedFunctionTarget(t *testing.T) {
 		t.Fatal(err)
 	}
 	files := emission.Files()
-	if len(files) != 2 ||
-		files[0].PackageName() != "mathx" ||
-		files[1].Kind() != emit.TargetFileSupport {
+	if len(files) != 5 {
 		t.Fatalf("explicit target files = %v", files)
 	}
 	var functions []string
-	for _, statement := range files[0].SourceFile().Statements() {
-		if function, ok := statement.(tsgo.FunctionDeclaration); ok {
-			functions = append(functions, function.Name().Text())
+	for _, file := range files {
+		if file.Kind() != emit.TargetFileSource ||
+			file.PackageName() != "mathx" {
+			continue
+		}
+		for _, statement := range file.SourceFile().Statements() {
+			if function, ok := statement.(tsgo.FunctionDeclaration); ok {
+				functions = append(functions, function.Name().Text())
+			}
 		}
 	}
 	if strings.Join(functions, ",") != "UnusedMath" {
@@ -244,7 +274,8 @@ func executeDemandTypeScript(
 	writeProgramFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
 	var apiFile emit.TargetFile
 	for _, file := range files {
-		if file.Kind() == emit.TargetFileSource && file.PackageName() == "api" {
+		if file.Kind() == emit.TargetFilePackageAssembly &&
+			file.PackageName() == "api" {
 			apiFile = file
 			break
 		}
@@ -254,7 +285,8 @@ func executeDemandTypeScript(
 	}
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	module := "./" + strings.TrimSuffix(apiFile.OutputPath(), ".ts") + ".js"
-	writeProgramFile(t, runnerPath, `import { Run } from "`+module+`";
+	writeProgramFile(t, runnerPath, `import "./program.js";
+import { Run } from "`+module+`";
 
 console.log(Run(0));
 console.log(Run(1));

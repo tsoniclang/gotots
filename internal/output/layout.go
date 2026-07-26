@@ -11,7 +11,15 @@ import (
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
-const ScalarSupportPath = "support/scalars.ts"
+const (
+	ProgramInitializationPath = "program.ts"
+	ScalarSupportPath         = "support/scalars.ts"
+)
+
+const (
+	packageAssemblyFile = "package.ts"
+	packageStateFile    = "state.ts"
+)
 
 type PathError struct {
 	Source string
@@ -56,10 +64,47 @@ func SourcePath(sourcePackage *load.Package, sourceFile load.File) (string, erro
 	}
 	return path.Join(
 		"modules",
-		moduleKey(sourcePackage.ModulePath(), sourcePackage.ModuleVersion()),
+		semanticModuleKey(sourcePackage),
 		packagePath,
 		baseName+".ts",
 	), nil
+}
+
+func PackageAssemblyPath(sourcePackage *load.Package) (string, error) {
+	return packageArtifactPath(sourcePackage, packageAssemblyFile)
+}
+
+func PackageStatePath(sourcePackage *load.Package) (string, error) {
+	return packageArtifactPath(sourcePackage, packageStateFile)
+}
+
+func packageArtifactPath(
+	sourcePackage *load.Package,
+	fileName string,
+) (string, error) {
+	if sourcePackage == nil {
+		return "", &PathError{Reason: "source package is nil"}
+	}
+	if sourcePackage.ModulePath() == "" {
+		return "", &PathError{
+			Source: sourcePackage.Path(),
+			Reason: "package has no source module identity",
+		}
+	}
+	packagePath, err := moduleRelativePackage(sourcePackage)
+	if err != nil {
+		return "", err
+	}
+	return path.Join(
+		"packages",
+		semanticModuleKey(sourcePackage),
+		packagePath,
+		fileName,
+	), nil
+}
+
+func semanticModuleKey(sourcePackage *load.Package) string {
+	return moduleKey(sourcePackage.ModulePath(), sourcePackage.ModuleVersion())
 }
 
 func ModuleSpecifier(fromSourcePath string, toSourcePath string) (string, error) {

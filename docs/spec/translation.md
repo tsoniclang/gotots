@@ -160,9 +160,48 @@ linking; package assembly later selects the public surface. Untyped constants,
 implicit constant expressions and `iota` remain one later constant-semantics
 family because their representation may depend on each use context.
 
-Package variables and initialization order, multi-result `var` initializers,
-and initializer prerequisite statements remain separate typed-unsupported
-cases until their complete semantic owners are installed.
+Package variables are package-state fields, never source-file-local `let`
+bindings. A same-package read or store uses the package's direct state import;
+a qualified cross-package use routes through the dependency's passive
+assembly:
+
+```go
+var Count int
+
+func Add() { Count++ }
+func Read() int { return Count }
+```
+
+```ts
+import { $state } from "../../packages/<module-key>/<package>/state.js";
+
+export function Add(): void {
+  $state.Count++;
+}
+
+export function Read(): int32 {
+  return $state.Count;
+}
+```
+
+The package-state owner derives the field name and represented type from the
+exact package-scope `types.Var`. The package-assembly owner emits one passive
+`$initialize` body containing zero assignments for all reached-package
+variables and then consumes the selected `go/types.Info.InitOrder` directly.
+It does not recover initializers by scanning declarations or sort files.
+One-to-one, multi-result, blank-target, prerequisite-producing, and
+function-literal initializers are contextual cases of that same owner and are
+admitted only as each complete assignment shape is proved. `init` functions
+join the assembly after variable initialization in the selected toolchain
+loader's file order and each file's declaration order. The emitter preserves
+that order directly; it does not rescan the filesystem or sort a second file
+list.
+
+One compilation-owned `program.ts` consumes the reached `types.Package` import
+graph and calls package `$initialize` functions in Go's global
+import-path-sorted dependency order. Package assemblies never execute Go
+initialization at module top level. Generated target import order is not a
+semantic proxy for Go package order.
 
 Likewise, for:
 
@@ -754,9 +793,13 @@ TS-Go protocol AST directly. Shared runtime calls are permitted only when they
 are the smallest exact reusable behavior.
 
 Package initialization is emitted from the checker graph's authoritative
-initializer order. Declarations still belong to their source modules; one
-package-initialization target builder receives the ordered initializer
-statements. The emitter does not rebuild an initialization graph.
+initializer order. Immutable declarations and executable bodies remain owned
+by their source modules. Mutable package variables are owned once as fields of
+the package state module. One passive package-assembly builder receives a
+typed `$initialize` body containing zeroing, ordered initializer statements,
+and admitted `init` calls. One static program-initialization builder consumes
+the selected package graph and invokes those bodies in exact Go package order;
+it does not build a second semantic graph.
 
 ## Packages, Standard Library, And Externals
 

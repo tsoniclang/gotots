@@ -40,23 +40,40 @@ func TestSafeIntegerConstantPrintsTypechecksAndExecutesDifferentially(t *testing
 		if err != nil {
 			t.Fatal(err)
 		}
-		expectedPath := filepath.Join(integerConstantsProjectDirectory(), "expected.ts")
-		if file.Kind() == emit.TargetFileSupport {
+		var expectedPath string
+		switch file.Kind() {
+		case emit.TargetFileSource:
+			expectedPath = filepath.Join(
+				integerConstantsProjectDirectory(),
+				"expected.ts",
+			)
+		case emit.TargetFilePackageAssembly:
+			sourceModule = "./" +
+				strings.TrimSuffix(file.OutputPath(), ".ts") +
+				".js"
+		case emit.TargetFileSupport:
 			expectedPath = filepath.Join(
 				repositoryRoot(),
 				"testdata",
 				"support",
 				"scalars-int64.ts",
 			)
-		} else {
-			sourceModule = "./" + strings.TrimSuffix(file.OutputPath(), ".ts") + ".js"
+		case emit.TargetFileProgramInitialization:
+		default:
+			t.Fatalf(
+				"unexpected integer-constant target %s kind %d",
+				file.OutputPath(),
+				file.Kind(),
+			)
 		}
-		expected, err := os.ReadFile(expectedPath)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if printed != string(expected) {
-			t.Fatalf("%s:\n%s\nwant:\n%s", file.OutputPath(), printed, expected)
+		if expectedPath != "" {
+			expected, err := os.ReadFile(expectedPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if printed != string(expected) {
+				t.Fatalf("%s:\n%s\nwant:\n%s", file.OutputPath(), printed, expected)
+			}
 		}
 		targetPath := filepath.Join(workingDirectory, filepath.FromSlash(file.OutputPath()))
 		writeFile(t, targetPath, printed)
@@ -67,7 +84,8 @@ func TestSafeIntegerConstantPrintsTypechecksAndExecutesDifferentially(t *testing
 	}
 
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
-	writeFile(t, runnerPath, `import { Small } from "`+sourceModule+`";
+	writeFile(t, runnerPath, `import "./program.js";
+import { Small } from "`+sourceModule+`";
 
 console.log(Small());
 `)

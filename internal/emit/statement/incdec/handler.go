@@ -3,7 +3,6 @@ package incdec
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
@@ -12,9 +11,10 @@ import (
 
 func Emit(
 	context api.Context,
+	children api.ChildEmitter,
 	source *ast.IncDecStmt,
 ) (api.StatementEmission, error) {
-	expression, err := EmitExpression(context, source)
+	expression, err := EmitExpression(context, children, source)
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
@@ -28,22 +28,19 @@ func Emit(
 
 func EmitExpression(
 	context api.Context,
+	children api.ChildEmitter,
 	source *ast.IncDecStmt,
 ) (api.ExpressionEmission, error) {
-	identifier, ok := source.X.(*ast.Ident)
-	if !ok {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
-	}
-	object, ok := context.TypesInfo().Uses[identifier].(*types.Var)
-	if !ok ||
-		!basictype.SupportsInteger(context.TypesSizes(), object.Type()) {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
-	}
-	reference, err := context.Names().Reference(object)
+	target, err := children.StoreTarget(
+		context.WithRole(api.RoleAssignmentTarget),
+		source.X,
+	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	if !basictype.SupportsInteger(context.TypesSizes(), target.SourceType()) {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
 	}
 	var operator tsgo.PostfixUnaryExpressionOperatorKind
 	switch source.Tok {
@@ -57,9 +54,9 @@ func EmitExpression(
 	}
 	return api.DirectExpression(
 		context.Factory().PostfixUnaryExpression(
-			context.Factory().Identifier(reference.Name()),
+			target.Value(),
 			operator,
 		),
-		reference.Requests()...,
+		target.Requests()...,
 	), nil
 }
