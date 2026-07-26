@@ -138,10 +138,28 @@ parent. This preserves local declaration scopes directly. Grouped `var`
 declarations emit their `ValueSpec` records in source order, with each spec
 forming its own declaration statement and scope boundary.
 
-Zero-initialized declarations, package declarations and initialization order,
-constants, multi-result initializers, and initializer prerequisite statements
-remain separate typed-unsupported cases until their complete semantic owners
-are installed.
+An explicitly typed package constant is a direct declaration owned by its
+source-file module:
+
+```go
+const Base int = 40
+```
+
+```ts
+export const Base: GoInt = 40 as GoInt;
+```
+
+The owner uses the package-scope `types.Const` identity and exact constant value
+while the initializer handler preserves the supported source expression shape.
+Every emitted package declaration is exported for static generated-module
+linking; package assembly later selects the public surface. Untyped constants,
+implicit constant expressions and `iota` remain one later constant-semantics
+family because their representation may depend on each use context.
+
+Zero-initialized declarations, package variables and initialization order,
+multi-result `var` initializers, and initializer prerequisite statements remain
+separate typed-unsupported cases until their complete semantic owners are
+installed.
 
 Likewise, for:
 

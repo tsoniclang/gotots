@@ -21,13 +21,30 @@ func executeThroughTsonic(
 	proof tsonicProof,
 ) string {
 	t.Helper()
+	return executeFilesThroughTsonic(
+		t,
+		map[string]string{"index.ts": printedSource},
+		"index.ts",
+		proof,
+	)
+}
+
+func executeFilesThroughTsonic(
+	t *testing.T,
+	printedSources map[string]string,
+	entryPoint string,
+	proof tsonicProof,
+) string {
+	t.Helper()
 	tsonicRoot := selectedTsonicRoot(t)
 	workingDirectory := t.TempDir()
 	sourceDirectory := filepath.Join(workingDirectory, "src")
 	if err := os.MkdirAll(sourceDirectory, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, filepath.Join(sourceDirectory, "index.ts"), printedSource)
+	for name, source := range printedSources {
+		writeFile(t, filepath.Join(sourceDirectory, name), source)
+	}
 	installTsonicTarget(t, workingDirectory, tsonicRoot)
 	writeFile(t, filepath.Join(workingDirectory, "package.json"), `{
   "name": "gotots-consumer-proof",
@@ -41,7 +58,7 @@ func executeThroughTsonic(
 }
 `)
 	writeFile(t, filepath.Join(workingDirectory, "tsonic.json"), `{
-  "entryPoint": "index.ts",
+  "entryPoint": "`+entryPoint+`",
   "rootDir": "src",
   "outDir": "out",
   "targets": [
@@ -66,26 +83,36 @@ func executeThroughTsonic(
 		"csharp",
 		proof.assembly+".csproj",
 	)
-	generatedSourcePath := filepath.Join(
+	generatedSourceDirectory := filepath.Join(
 		workingDirectory,
 		"out",
 		"csharp",
 		"src",
-		"Index.cs",
 	)
-	generatedSource, err := os.ReadFile(generatedSourcePath)
+	generatedPaths, err := filepath.Glob(filepath.Join(generatedSourceDirectory, "*.cs"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	generated := string(generatedSource)
+	if len(generatedPaths) == 0 {
+		t.Fatal("Tsonic generated no C# source files")
+	}
+	var generated strings.Builder
+	for _, generatedPath := range generatedPaths {
+		generatedSource, err := os.ReadFile(generatedPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		generated.Write(generatedSource)
+	}
+	generatedText := generated.String()
 	for _, required := range proof.requiredTarget {
-		if !strings.Contains(generated, required) {
-			t.Fatalf("generated C# lacks %q:\n%s", required, generated)
+		if !strings.Contains(generatedText, required) {
+			t.Fatalf("generated C# lacks %q:\n%s", required, generatedText)
 		}
 	}
 	for _, forbidden := range proof.forbiddenTarget {
-		if strings.Contains(generated, forbidden) {
-			t.Fatalf("generated C# contains forbidden %q:\n%s", forbidden, generated)
+		if strings.Contains(generatedText, forbidden) {
+			t.Fatalf("generated C# contains forbidden %q:\n%s", forbidden, generatedText)
 		}
 	}
 	run(t, workingDirectory, "dotnet", "build", generatedProject, "--nologo", "--verbosity:quiet")

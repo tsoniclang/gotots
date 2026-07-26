@@ -2,6 +2,7 @@ package emit
 
 import (
 	"go/ast"
+	"go/token"
 	"go/types"
 	"path/filepath"
 	"strings"
@@ -100,19 +101,51 @@ func (e *Emitter) reservePackageDeclarations() error {
 			return err
 		}
 		for _, declaration := range sourceFile.Syntax().Decls {
-			function, ok := declaration.(*ast.FuncDecl)
-			if !ok {
-				continue
-			}
-			object, ok := e.source.TypesInfo().Defs[function.Name].(*types.Func)
-			if !ok {
-				return &api.InvariantError{
-					Role:   api.RoleFileDeclaration,
-					Reason: "function declaration has no go/types object",
+			switch declaration := declaration.(type) {
+			case *ast.FuncDecl:
+				object, ok := e.source.TypesInfo().Defs[declaration.Name].(*types.Func)
+				if !ok {
+					return &api.InvariantError{
+						Role:   api.RoleFileDeclaration,
+						Reason: "function declaration has no go/types object",
+					}
 				}
-			}
-			if _, err := e.names.Reserve(object, sourceFile.Syntax(), modulePath); err != nil {
-				return err
+				if _, err := e.names.Reserve(
+					object,
+					sourceFile.Syntax(),
+					modulePath,
+				); err != nil {
+					return err
+				}
+			case *ast.GenDecl:
+				if declaration.Tok != token.CONST {
+					continue
+				}
+				for _, spec := range declaration.Specs {
+					valueSpec, ok := spec.(*ast.ValueSpec)
+					if !ok {
+						return &api.InvariantError{
+							Role:   api.RoleFileDeclaration,
+							Reason: "constant declaration has a non-value spec",
+						}
+					}
+					for _, name := range valueSpec.Names {
+						object, ok := e.source.TypesInfo().Defs[name].(*types.Const)
+						if !ok {
+							return &api.InvariantError{
+								Role:   api.RoleFileDeclaration,
+								Reason: "constant declaration has no go/types object",
+							}
+						}
+						if _, err := e.names.Reserve(
+							object,
+							sourceFile.Syntax(),
+							modulePath,
+						); err != nil {
+							return err
+						}
+					}
+				}
 			}
 		}
 	}

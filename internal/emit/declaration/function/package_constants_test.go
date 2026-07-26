@@ -1,0 +1,243 @@
+package function_test
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"go/ast"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
+
+	"github.com/tsoniclang/gotots/internal/emit"
+	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/load"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
+
+func TestPackageConstantsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
+	loaded := loadPackageConstantsProject(t)
+	workingDirectory := t.TempDir()
+	targetFiles := emitPackageConstantsProject(t, loaded, workingDirectory)
+	for name, targetFile := range targetFiles {
+		printed := printTargetFile(t, targetFile, workingDirectory)
+		expected, err := os.ReadFile(filepath.Join(
+			packageConstantsProjectDirectory(),
+			"expected-"+name+".ts",
+		))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if printed != string(expected) {
+			t.Fatalf("%s TypeScript:\n%s\nwant:\n%s", name, printed, expected)
+		}
+		writeFile(t, filepath.Join(workingDirectory, name+".ts"), printed)
+	}
+
+	goOutput := runPackageConstantsGo(t, workingDirectory)
+	targetOutput := runPackageConstantsTypeScript(t, workingDirectory)
+	if targetOutput != goOutput {
+		t.Fatalf("TypeScript output = %q, Go output = %q", targetOutput, goOutput)
+	}
+}
+
+func TestPackageConstantsCreateOwnedExportedDeclarationsAndImports(t *testing.T) {
+	loaded := loadPackageConstantsProject(t)
+	targetFiles := emitPackageConstantsProject(t, loaded, t.TempDir())
+	constants := targetFiles["constants"].Statements()
+	if len(constants) != 3 {
+		t.Fatalf("constant statements = %d, want type import and two declarations", len(constants))
+	}
+	for index, name := range []string{"Base", "Enabled"} {
+		statement := constants[index+1].(tsgo.VariableStatement)
+		if statement.Modifiers()[0].Kind() != tsgo.SyntaxKindExportKeyword {
+			t.Fatalf("%s is not exported", name)
+		}
+		if statement.DeclarationList().Flags()&tsgo.NodeFlagsConst == 0 {
+			t.Fatalf("%s is not const", name)
+		}
+		declaration := statement.DeclarationList().Declarations()[0]
+		if declaration.Name().(tsgo.Identifier).Text() != name {
+			t.Fatalf("declaration name = %q, want %q", declaration.Name(), name)
+		}
+	}
+
+	use := targetFiles["use"].Statements()
+	valueImport := use[1].(tsgo.ImportDeclaration)
+	if valueImport.ModuleSpecifier().(tsgo.StringLiteral).Text() != "./constants.js" {
+		t.Fatalf("constant import module = %q", valueImport.ModuleSpecifier())
+	}
+}
+
+func TestPackageConstantSpellingMutationKeepsObjectOwnedReference(t *testing.T) {
+	loaded := loadPackageConstantsProject(t)
+	use := sourceFileNamed(t, loaded, "use.go")
+	addBase := use.Decls[0].(*ast.FuncDecl)
+	reference := addBase.Body.List[0].(*ast.ReturnStmt).
+		Results[0].(*ast.BinaryExpr).X.(*ast.Ident)
+	reference.Name = "forged"
+
+	targetFiles := emitPackageConstantsProject(t, loaded, t.TempDir())
+	targetUse := targetFiles["use"].Statements()[2].(tsgo.FunctionDeclaration)
+	targetReturn := targetUse.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement)
+	targetReference := targetReturn.Expression().(tsgo.BinaryExpression).Left().(tsgo.Identifier)
+	if targetReference.Text() != "Base" {
+		t.Fatalf("target reference = %q, want Base", targetReference.Text())
+	}
+}
+
+func TestPackageConstantUntypedAndIotaCasesFailAtDeclarationOwner(t *testing.T) {
+	for name, mutate := range map[string]func(*ast.GenDecl){
+		"untyped": func(declaration *ast.GenDecl) {
+			declaration.Specs[0].(*ast.ValueSpec).Type = nil
+		},
+		"iota": func(declaration *ast.GenDecl) {
+			declaration.Specs[0].(*ast.ValueSpec).Values[0] = ast.NewIdent("iota")
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			loaded := loadPackageConstantsProject(t)
+			constants := sourceFileNamed(t, loaded, "constants.go")
+			mutate(constants.Decls[0].(*ast.GenDecl))
+
+			_, err := emit.New(loaded).EmitFile(
+				constants,
+				filepath.Join(t.TempDir(), "constants.ts"),
+			)
+			var unsupported *api.UnsupportedError
+			if !errors.As(err, &unsupported) {
+				t.Fatalf("error = %v, want *api.UnsupportedError", err)
+			}
+			if unsupported.Category != api.CategoryDeclaration ||
+				unsupported.Role != api.RoleFileDeclaration {
+				t.Fatalf("unsupported = %#v", unsupported)
+			}
+		})
+	}
+}
+
+func loadPackageConstantsProject(t *testing.T) *load.Package {
+	t.Helper()
+	loaded, err := load.One(context.Background(), load.Request{
+		Directory: packageConstantsProjectDirectory(),
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return loaded
+}
+
+func emitPackageConstantsProject(
+	t *testing.T,
+	loaded *load.Package,
+	workingDirectory string,
+) map[string]tsgo.SourceFile {
+	t.Helper()
+	compiler := emit.New(loaded)
+	targets := make(map[string]tsgo.SourceFile, len(loaded.Files()))
+	for _, file := range loaded.Files() {
+		name := strings.TrimSuffix(filepath.Base(file.Path()), ".go")
+		target, err := compiler.EmitFile(
+			file.Syntax(),
+			filepath.Join(workingDirectory, name+".ts"),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		targets[name] = target
+	}
+	return targets
+}
+
+func sourceFileNamed(t *testing.T, loaded *load.Package, name string) *ast.File {
+	t.Helper()
+	for _, file := range loaded.Files() {
+		if filepath.Base(file.Path()) == name {
+			return file.Syntax()
+		}
+	}
+	t.Fatalf("source file %s not found", name)
+	return nil
+}
+
+func runPackageConstantsGo(t *testing.T, workingDirectory string) string {
+	t.Helper()
+	modulePath, err := filepath.Abs(packageConstantsProjectDirectory())
+	if err != nil {
+		t.Fatal(err)
+	}
+	runnerDirectory := filepath.Join(workingDirectory, "go-runner")
+	if err := os.MkdirAll(runnerDirectory, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(runnerDirectory, "go.mod"), fmt.Sprintf(`module example.com/runner
+
+go 1.26.4
+
+require example.com/packageconstants v0.0.0
+
+replace example.com/packageconstants => %s
+`, filepath.ToSlash(modulePath)))
+	writeFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
+
+import (
+	"fmt"
+
+	constants "example.com/packageconstants"
+)
+
+func main() {
+	fmt.Println(constants.AddBase(2))
+	fmt.Println(constants.IsEnabled())
+}
+`)
+	return run(
+		t,
+		runnerDirectory,
+		filepath.Join(runtime.GOROOT(), "bin", "go"),
+		"run",
+		".",
+	)
+}
+
+func runPackageConstantsTypeScript(t *testing.T, workingDirectory string) string {
+	t.Helper()
+	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
+	installTsonicCoreTypes(t, workingDirectory)
+	runner := filepath.Join(workingDirectory, "runner.ts")
+	writeFile(t, runner, `import { AddBase, IsEnabled } from "./use.js";
+
+console.log(AddBase(2));
+console.log(IsEnabled());
+`)
+	toolPath := strings.TrimSpace(run(
+		t,
+		repositoryRoot(),
+		filepath.Join(runtime.GOROOT(), "bin", "go"),
+		"tool",
+		"-n",
+		"tsgo",
+	))
+	outputDirectory := filepath.Join(workingDirectory, "out")
+	run(
+		t,
+		workingDirectory,
+		toolPath,
+		"--target", "es2022",
+		"--module", "nodenext",
+		"--moduleResolution", "nodenext",
+		"--strict",
+		"--outDir", outputDirectory,
+		filepath.Join(workingDirectory, "constants.ts"),
+		filepath.Join(workingDirectory, "use.ts"),
+		runner,
+	)
+	return run(t, workingDirectory, "node", filepath.Join(outputDirectory, "runner.js"))
+}
+
+func packageConstantsProjectDirectory() string {
+	return filepath.Join(repositoryRoot(), "testdata", "projects", "package-constants")
+}
