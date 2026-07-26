@@ -63,6 +63,38 @@ func TestDemandSchedulerJoinMutationControls(t *testing.T) {
 	})
 }
 
+func TestDeclarationIndexRejectsDuplicateObjectOwnership(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/schedule", "schedule")
+	object := types.NewFunc(
+		token.Pos(1),
+		sourcePackage,
+		"Run",
+		types.NewSignatureType(nil, nil, nil, nil, nil, false),
+	)
+	sites := make(map[types.Object]declarationSite)
+	declaration := &ast.FuncDecl{Name: ast.NewIdent("Run")}
+	if err := addDeclarationSite(
+		sites,
+		object,
+		nil,
+		load.File{},
+		declaration,
+		"modules/key/schedule/run.ts",
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := addDeclarationSite(
+		sites,
+		object,
+		nil,
+		load.File{},
+		declaration,
+		"modules/key/schedule/other.ts",
+	); err == nil {
+		t.Fatal("duplicate declaration ownership was accepted")
+	}
+}
+
 func loadSchedulerFixture(t *testing.T) *load.Program {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
@@ -213,8 +245,8 @@ func emittedObjectCounts(
 			}
 			continue
 		}
-		if companion, ok := session.companions.next(); ok {
-			if err := session.emitCompanion(companion); err != nil {
+		if requirements, ok := session.requirements.nextBatch(); ok {
+			if err := session.applyDeclarationRequirements(requirements); err != nil {
 				t.Fatal(err)
 			}
 			continue

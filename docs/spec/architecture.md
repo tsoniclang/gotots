@@ -256,12 +256,13 @@ child entry point when ordinary expression dispatch would be semantically
 wrong, such as a store target, condition, call callee, type expression, or
 comma-ok result.
 
-The root emitter owns mutable target builders and the placement service.
-Handlers cannot mutate an arbitrary target ancestor. They return typed TS-Go
-protocol AST values and, when additional target statements, declarations, or
-imports are required, typed placement requests with:
+The root emitter owns mutable target builders, declaration assemblies, and the
+placement service. Handlers cannot mutate an arbitrary target ancestor. They
+return typed TS-Go protocol AST values and, when additional target statements,
+declarations, imports, or changes to an owned declaration are required, typed
+requests with:
 
-1. the exact target nodes;
+1. exact target nodes or an exact declaration identity plus closed requirement;
 2. legal scopes;
 3. the preferred scope;
 4. the execution/evaluation constraint; and
@@ -275,13 +276,30 @@ request in its emission result. Only the root placement owner consumes requests
 and mutates a target builder. No `Context` capability may silently install an
 import or hoisted declaration while a child is being translated.
 
-A use-dependent operation on a named type is a typed companion-declaration
-request keyed by the authoritative `types.TypeName` and a closed operation
-kind. It is owned by the generated source-file module containing that type's
-declaration, not by the first caller. Applying one request may produce further
-typed requests, such as `Box` copying requesting `Point` copying. The root
-placement owner resolves this work to a fixed point, deduplicates by typed
-owner, and rejects ownership conflicts.
+A use-dependent target obligation is a declaration requirement keyed by the
+authoritative `types.Object` and a closed requirement kind. It is owned by the
+semantic handler and generated source-file module containing that declaration,
+not by the first caller. The first admitted requirement family is a named
+struct's zero/copy/equality companion, keyed by its exact `types.TypeName` and
+closed companion operation. Applying one requirement may produce further typed
+requests, such as `Box` copying requesting `Point` copying.
+
+The root owner keeps one open declaration assembly per emitted definition.
+Only that definition's semantic owner interprets its requirements and
+reconstructs its typed TS-Go protocol nodes. Requirements are monotonic,
+identity-deduplicated, and applied in deterministic closed-kind order;
+incompatible requirements fail rather than selecting whichever was discovered
+first. Reconstructing a declaration replaces its prior in-memory target nodes;
+it never creates a second final definition. The root resolves declaration,
+requirement, initialization, and placement work to a fixed point before file
+sealing.
+
+A fact already available from the Go declaration or selected `go/types`
+evidence is not a legitimate late requirement. For example, source export
+identity and the target module policy determine accessibility without waiting
+for a later use. Late requirements are reserved for obligations that genuinely
+arise from reached uses, such as a requested value operation, interface
+adapter, generic specialization, callback adapter, or runtime-type carrier.
 
 One placement service applies the policy:
 
@@ -300,7 +318,7 @@ One placement service applies the policy:
   import the program-initialization module before using a selected package
   surface;
 - reusable static declarations prefer file scope;
-- named-type companion declarations are emitted immediately after their
+- named-type companion declarations are assembled immediately after their
   owning type declaration in a fixed operation order;
 - function-wide declarations enter the function prologue only when their
   lifetime is function-wide;
@@ -312,12 +330,19 @@ One placement service applies the policy:
 This permits hoisting without maintaining a separate target IR.
 
 Creating a typed TS-Go node is not finalizing or printing its containing file.
-The root emitter seals each target file only after scheduling and placement
-queues are empty. A sealed file accepts no further request. Already-created
-class nodes are never reopened: genuine class members come from the complete Go
-type contract when the class is constructed, while use-dependent generated
-operations are top-level companion declarations. There is no target-text
-patch, prototype assignment, mutable class reopening, or post-print insertion.
+The root emitter seals each target file only after declaration, requirement,
+initialization, and placement queues are empty. A sealed file accepts no
+further request. Before sealing, an already-created class or other declaration
+may be replaced only by its one semantic owner using freshly constructed typed
+TS-Go protocol nodes and the complete accumulated requirement set. Other
+handlers can request a closed obligation but cannot receive or mutate the
+target declaration.
+
+This is controlled pre-seal target assembly, not mutable class reopening.
+There is no target-text patch, prototype assignment, arbitrary AST callback,
+post-print insertion, or editable on-disk AST authority. A future disk cache
+may retain only immutable, fully fingerprinted sealed artifacts; any changed
+input or requirement regenerates the declaration through its owner.
 
 Under `preserve-go`, a keyed composite captures child values in Go source order
 before consuming them in target constructor order. If any child emission has
@@ -530,7 +555,7 @@ internal/load/                      project and selected-toolchain loading
 
 internal/emit/                      session, scheduling, closed dispatch only
   dispatch.go                       emitter plus closed typed dispatch
-  scheduling.go                     roots and demand scheduler
+  declaration_assembly.go           roots, demand, requirements, and owner-keyed pre-seal reconstruction
   target_files.go                   source/support/program file sealing
   package_state.go                  package storage and initialization owner
   api/                              narrow handler contracts

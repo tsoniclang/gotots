@@ -2,7 +2,6 @@ package api
 
 import (
 	"fmt"
-	"go/types"
 )
 
 type CompanionOperation uint8
@@ -29,36 +28,6 @@ func (o CompanionOperation) String() string {
 	default:
 		return fmt.Sprintf("companion-operation(%d)", o)
 	}
-}
-
-type CompanionOwner struct {
-	typeName  *types.TypeName
-	operation CompanionOperation
-}
-
-func NewCompanionOwner(
-	typeName *types.TypeName,
-	operation CompanionOperation,
-) (CompanionOwner, error) {
-	switch {
-	case typeName == nil:
-		return CompanionOwner{}, &PlacementRequestError{
-			Reason: "companion type is nil",
-		}
-	case !operation.Valid():
-		return CompanionOwner{}, &PlacementRequestError{
-			Reason: "companion operation is invalid",
-		}
-	}
-	return CompanionOwner{typeName: typeName, operation: operation}, nil
-}
-
-func (o CompanionOwner) TypeName() *types.TypeName {
-	return o.typeName
-}
-
-func (o CompanionOwner) Operation() CompanionOperation {
-	return o.operation
 }
 
 func CompanionExportName(

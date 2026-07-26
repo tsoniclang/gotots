@@ -168,6 +168,42 @@ declaration ownership, or formatted text. They also introduce a generic target
 node, local formatter, raw fragment, second printer, and post-format edit. The
 owning gate must reject each.
 
+## Declaration Assembly Proof
+
+Every use-dependent declaration requirement proves the complete open-to-sealed
+lifecycle:
+
+1. the initial declaration owns one typed TS-Go assembly keyed by its exact
+   `types.Object`;
+2. a later reached use requests a closed requirement without receiving the
+   declaration node;
+3. the root deduplicates the typed requirement and routes it to that
+   declaration's semantic owner;
+4. the owner reconstructs and replaces the complete in-memory declaration
+   assembly through TS-Go factories;
+5. requirements produced by that reconstruction re-enter the same fixed-point
+   queue;
+6. root order and duplicate request order produce byte-identical sealed files;
+7. exactly one final definition exists and every requested addition is
+   adjacent to or incorporated into its declared owner as specified; and
+8. sealing rejects any later request.
+
+The first non-vacuous proof uses named-struct zero/copy/equality companions:
+the class is constructed before a reached assignment, argument, return, zero,
+or equality site discovers the operation; the subsequent requirement rebuilds
+the owner's assembly and the final artifact contains exactly the requested
+companions in closed operation order. A nested struct operation must request
+its nested owner through the same queue.
+
+Mutations route a requirement by spelling, apply it in the caller's file,
+append a duplicate final definition, let a non-owner mutate the class, process
+requirements in discovery order, seal with pending work, accept a request after
+sealing, patch printed text, or retain a mutable on-disk AST. Each fails at the
+identity, ownership, determinism, lifecycle, schema, or broad-search gate.
+Scaling reports initial declarations, applied requirements, owner
+reconstructions, final definitions, AST nodes, and bytes separately; moving
+growth into repeated reconstruction does not hide it.
+
 ## Semantic Proof
 
 Every implemented semantic family includes:

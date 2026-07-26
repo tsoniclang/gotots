@@ -12,7 +12,7 @@ type PlacementKind uint8
 const (
 	PlacementInvalid PlacementKind = iota
 	PlacementImport
-	PlacementCompanion
+	PlacementDeclarationRequirement
 )
 
 type PlacementScope uint8
@@ -39,10 +39,10 @@ const (
 )
 
 type PlacementOwner struct {
-	kind         PlacementKind
-	modulePath   string
-	exportedName string
-	companion    CompanionOwner
+	kind                   PlacementKind
+	modulePath             string
+	exportedName           string
+	declarationRequirement DeclarationRequirement
 }
 
 type PlacementRequest struct {
@@ -122,14 +122,14 @@ func NewCompanionRequest(
 	typeName *types.TypeName,
 	operation CompanionOperation,
 ) (PlacementRequest, error) {
-	owner, err := NewCompanionOwner(typeName, operation)
+	requirement, err := NewNamedStructCompanionRequirement(typeName, operation)
 	if err != nil {
 		return PlacementRequest{}, err
 	}
 	return PlacementRequest{
 		owner: PlacementOwner{
-			kind:      PlacementCompanion,
-			companion: owner,
+			kind:                   PlacementDeclarationRequirement,
+			declarationRequirement: requirement,
 		},
 	}, nil
 }
@@ -142,7 +142,7 @@ func (r PlacementRequest) LegalScope() PlacementScope {
 	if r.owner.kind == PlacementImport {
 		return ScopeFileImports
 	}
-	if r.owner.kind == PlacementCompanion {
+	if r.owner.kind == PlacementDeclarationRequirement {
 		return ScopeOwningFile
 	}
 	return ScopeInvalid
@@ -156,7 +156,7 @@ func (r PlacementRequest) Execution() ExecutionConstraint {
 	if r.owner.kind == PlacementImport {
 		return ExecutionStatic
 	}
-	if r.owner.kind == PlacementCompanion {
+	if r.owner.kind == PlacementDeclarationRequirement {
 		return ExecutionStatic
 	}
 	return ExecutionInvalid
@@ -197,13 +197,16 @@ func (r PlacementRequest) PrimitiveAlias() (PrimitiveAlias, bool) {
 	return r.primitiveAlias, true
 }
 
-func (r PlacementRequest) Companion() (CompanionOwner, bool) {
-	if r.owner.kind != PlacementCompanion ||
-		r.owner.companion.TypeName() == nil ||
-		!r.owner.companion.Operation().Valid() {
-		return CompanionOwner{}, false
+func (r PlacementRequest) DeclarationRequirement() (
+	DeclarationRequirement,
+	bool,
+) {
+	requirement := r.owner.declarationRequirement
+	if r.owner.kind != PlacementDeclarationRequirement ||
+		!requirement.Valid() {
+		return DeclarationRequirement{}, false
 	}
-	return r.owner.companion, true
+	return requirement, true
 }
 
 type PlacementRequestError struct {

@@ -8,7 +8,6 @@ import (
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	namedstructdeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/namedstruct"
 	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -42,19 +41,20 @@ type programSession struct {
 	integer                api.IntegerRepresentation
 	registry               *declarationRegistry
 	scheduler              *scheduler
-	companions             *companionScheduler
+	requirements           *declarationRequirementScheduler
 	sites                  map[types.Object]declarationSite
 	emitters               map[*load.Package]*emitter
 	builders               map[string]*targetFileBuilder
 	packageBuilders        map[*load.Package]*packageTargetBuilder
 	packageInitializations *packageInitializationScheduler
+	sealed                 bool
 }
 
 type targetDeclaration struct {
-	object     types.Object
-	position   token.Pos
-	statements []tsgo.Statement
-	companions map[api.CompanionOperation][]tsgo.Statement
+	object          types.Object
+	position        token.Pos
+	statements      []tsgo.Statement
+	reconstructions uint64
 }
 
 type targetPackageInitDeclaration struct {
@@ -125,8 +125,8 @@ func CompileWithOptions(
 			}
 			continue
 		}
-		if companion, ok := session.companions.next(); ok {
-			if err := session.emitCompanion(companion); err != nil {
+		if requirements, ok := session.requirements.nextBatch(); ok {
+			if err := session.applyDeclarationRequirements(requirements); err != nil {
 				return ProgramEmission{}, err
 			}
 			continue
@@ -284,7 +284,7 @@ func newProgramSession(
 		integer:                options.IntegerRepresentation,
 		registry:               registry,
 		scheduler:              newScheduler(),
-		companions:             newCompanionScheduler(),
+		requirements:           newDeclarationRequirementScheduler(),
 		sites:                  sites,
 		emitters:               make(map[*load.Package]*emitter),
 		builders:               make(map[string]*targetFileBuilder),
@@ -342,6 +342,16 @@ func newProgramSession(
 }
 
 func (s *programSession) require(object types.Object) error {
+	if s.sealed {
+		objectName := ""
+		if object != nil {
+			objectName = object.Name()
+		}
+		return &ScheduleError{
+			Object: objectName,
+			Reason: "declaration requested after target files were sealed",
+		}
+	}
 	if object == nil {
 		return &ScheduleError{Reason: "referenced object is nil"}
 	}
@@ -390,6 +400,7 @@ func (s *programSession) emit(object types.Object) error {
 		builder.context,
 		site.declaration,
 		object,
+		nil,
 	)
 	if err != nil {
 		return err
@@ -403,7 +414,6 @@ func (s *programSession) emit(object types.Object) error {
 		object:     object,
 		position:   object.Pos(),
 		statements: result.Declarations(),
-		companions: make(map[api.CompanionOperation][]tsgo.Statement),
 	})
 	return nil
 }
@@ -419,66 +429,27 @@ func (s *programSession) applyPlacementRequests(
 	placement *placementOwner,
 	requests []api.PlacementRequest,
 ) error {
+	if s.sealed {
+		return &ScheduleError{Reason: "placement requested after target files were sealed"}
+	}
 	imports := make([]api.PlacementRequest, 0, len(requests))
 	for _, request := range requests {
 		switch request.Kind() {
 		case api.PlacementImport:
 			imports = append(imports, request)
-		case api.PlacementCompanion:
-			owner, ok := request.Companion()
+		case api.PlacementDeclarationRequirement:
+			requirement, ok := request.DeclarationRequirement()
 			if !ok {
-				return &ScheduleError{Reason: "companion request is invalid"}
+				return &ScheduleError{Reason: "declaration requirement is invalid"}
 			}
-			s.companions.enqueue(owner)
+			if err := s.scheduleDeclarationRequirement(requirement); err != nil {
+				return err
+			}
 		default:
 			return &ScheduleError{Reason: "placement request kind is invalid"}
 		}
 	}
 	return placement.Apply(imports)
-}
-
-func (s *programSession) emitCompanion(owner api.CompanionOwner) error {
-	typeName := owner.TypeName()
-	site, ok := s.sites[typeName]
-	if !ok {
-		return &ScheduleError{
-			Object: typeName.Name(),
-			Reason: "companion owner has no source declaration",
-		}
-	}
-	builder, err := s.builder(site)
-	if err != nil {
-		return err
-	}
-	index, ok := builder.indexByObject[typeName]
-	if !ok {
-		return &ScheduleError{
-			Object: typeName.Name(),
-			Reason: "companion owner was not emitted first",
-		}
-	}
-	declaration := &builder.declarations[index]
-	if _, duplicate := declaration.companions[owner.Operation()]; duplicate {
-		return &ScheduleError{
-			Object: typeName.Name(),
-			Reason: "companion was emitted more than once",
-		}
-	}
-	result, err := namedstructdeclaration.EmitCompanion(
-		builder.context,
-		builder.emitter,
-		site.declaration,
-		typeName,
-		owner.Operation(),
-	)
-	if err != nil {
-		return err
-	}
-	if err := s.applyRequests(builder, result.Requests()); err != nil {
-		return err
-	}
-	declaration.companions[owner.Operation()] = result.Declarations()
-	return nil
 }
 
 func (s *programSession) builder(site declarationSite) (*targetFileBuilder, error) {

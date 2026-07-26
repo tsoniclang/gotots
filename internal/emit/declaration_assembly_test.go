@@ -1,0 +1,574 @@
+package emit
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"go/token"
+	"go/types"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+
+	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/load"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
+
+func TestReachedUsesReconstructAndSealDeclarationAssemblies(t *testing.T) {
+	program := loadDeclarationAssemblyFixture(t)
+	sourcePackage := program.Roots()[0]
+	box := sourcePackage.Types().Scope().Lookup("Box").(*types.TypeName)
+	item := sourcePackage.Types().Scope().Lookup("Item").(*types.TypeName)
+	use := sourcePackage.Types().Scope().Lookup("Use")
+	session, err := newProgramSession(program, DefaultOptions())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := session.require(box); err != nil {
+		t.Fatal(err)
+	}
+	object, ok := session.scheduler.next()
+	if !ok || object != box {
+		t.Fatalf("initial declaration = %v, %t; want Box", object, ok)
+	}
+	if err := session.emit(object); err != nil {
+		t.Fatal(err)
+	}
+	boxDeclaration := declarationForObject(t, session, box)
+	if len(boxDeclaration.statements) != 1 ||
+		len(session.requirements.appliedFor(box)) != 0 ||
+		boxDeclaration.reconstructions != 0 {
+		t.Fatalf("initial Box assembly = %#v", boxDeclaration)
+	}
+	initialClass := boxDeclaration.statements[0]
+
+	if err := session.require(use); err != nil {
+		t.Fatal(err)
+	}
+	drainProgramSession(t, session)
+
+	boxDeclaration = declarationForObject(t, session, box)
+	itemDeclaration := declarationForObject(t, session, item)
+	for name, declaration := range map[string]*targetDeclaration{
+		"Box":  boxDeclaration,
+		"Item": itemDeclaration,
+	} {
+		if len(session.requirements.appliedFor(declaration.object)) != 3 {
+			t.Fatalf(
+				"%s requirements = %d, want zero/copy/equal",
+				name,
+				len(session.requirements.appliedFor(declaration.object)),
+			)
+		}
+		if declaration.reconstructions != 1 {
+			t.Fatalf(
+				"%s reconstructions = %d, want one batched reconstruction",
+				name,
+				declaration.reconstructions,
+			)
+		}
+		if len(declaration.statements) != 4 {
+			t.Fatalf("%s assembly statements = %d, want class plus three companions", name, len(declaration.statements))
+		}
+	}
+	if initialClass == boxDeclaration.statements[0] {
+		t.Fatal("Box class node was not reconstructed after late requirements")
+	}
+
+	files, err := session.targetFiles()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertOneFinalDeclarationAssembly(t, files, "Box")
+	assertOneFinalDeclarationAssembly(t, files, "Item")
+
+	requirement, err := api.NewNamedStructCompanionRequirement(
+		box,
+		api.CompanionCopy,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = session.scheduleDeclarationRequirement(requirement)
+	var scheduleError *ScheduleError
+	if !errors.As(err, &scheduleError) {
+		t.Fatalf("post-seal requirement error = %#v, want ScheduleError", err)
+	}
+	importRequest, err := api.NewImportRequest(
+		session.factory,
+		api.ImportPhaseValue,
+		"./dependency.js",
+		"Value",
+		"Value",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = session.applyPlacementRequests(
+		newPlacementOwner(),
+		[]api.PlacementRequest{importRequest},
+	)
+	if !errors.As(err, &scheduleError) {
+		t.Fatalf("post-seal import error = %#v, want ScheduleError", err)
+	}
+}
+
+func TestDeclarationRequirementRejectsSameSpellingWithoutExactOwner(
+	t *testing.T,
+) {
+	program := loadDeclarationAssemblyFixture(t)
+	sourcePackage := program.Roots()[0]
+	box := sourcePackage.Types().Scope().Lookup("Box").(*types.TypeName)
+	forged := types.NewTypeName(box.Pos(), box.Pkg(), box.Name(), box.Type())
+	requirement, err := api.NewNamedStructCompanionRequirement(
+		forged,
+		api.CompanionCopy,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := newProgramSession(program, DefaultOptions())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = session.scheduleDeclarationRequirement(requirement)
+	var scheduleError *ScheduleError
+	if !errors.As(err, &scheduleError) {
+		t.Fatalf("forged-owner error = %#v, want ScheduleError", err)
+	}
+}
+
+func TestDeclarationAssembliesAreByteStableAcrossRootOrder(t *testing.T) {
+	program := loadDeclarationAssemblyFixture(t)
+	roots, err := ExportedAPIRoots(program.Roots()[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := Compile(program, roots)
+	if err != nil {
+		t.Fatal(err)
+	}
+	slices.Reverse(roots)
+	second, err := Compile(program, roots)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstFiles := first.Files()
+	secondFiles := second.Files()
+	if len(firstFiles) != len(secondFiles) {
+		t.Fatalf("target file counts = %d and %d", len(firstFiles), len(secondFiles))
+	}
+	for index := range firstFiles {
+		if firstFiles[index].OutputPath() != secondFiles[index].OutputPath() {
+			t.Fatalf("target file %d paths differ", index)
+		}
+		firstBytes, err := tsgo.EncodeSourceFile(firstFiles[index].SourceFile())
+		if err != nil {
+			t.Fatal(err)
+		}
+		secondBytes, err := tsgo.EncodeSourceFile(secondFiles[index].SourceFile())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(firstBytes, secondBytes) {
+			t.Fatalf(
+				"target file %s changed with root order",
+				firstFiles[index].OutputPath(),
+			)
+		}
+	}
+}
+
+func TestDeclarationAssembliesCannotSealWithPendingWork(t *testing.T) {
+	program := loadDeclarationAssemblyFixture(t)
+	box := program.Roots()[0].Types().Scope().Lookup("Box").(*types.TypeName)
+	requirement, err := api.NewNamedStructCompanionRequirement(
+		box,
+		api.CompanionCopy,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := newProgramSession(program, DefaultOptions())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := session.require(box); err != nil {
+		t.Fatal(err)
+	}
+	drainProgramSession(t, session)
+	if err := session.scheduleDeclarationRequirement(requirement); err != nil {
+		t.Fatal(err)
+	}
+	if session.scheduler.hasPending() ||
+		session.packageInitializations.hasPending() ||
+		!session.requirements.hasPending() {
+		t.Fatal("pending-seal fixture is not isolated to declaration requirements")
+	}
+	_, err = session.targetFiles()
+	var scheduleError *ScheduleError
+	if !errors.As(err, &scheduleError) {
+		t.Fatalf("pending-seal error = %#v, want ScheduleError", err)
+	}
+	if session.sealed {
+		t.Fatal("failed pending-work seal closed the session")
+	}
+}
+
+func TestDeclarationAssemblyCostDoesNotGrowPerUseSite(t *testing.T) {
+	useCounts := []int{8, 16, 32}
+	measurements := make([]declarationAssemblyMeasurement, len(useCounts))
+	for index, useCount := range useCounts {
+		measurements[index] = measureDeclarationAssembly(t, useCount)
+		t.Logf(
+			"use sites=%d requirements=%d reconstructions=%d definition roots=%d assembly bytes=%d source-file bytes=%d",
+			useCount,
+			measurements[index].requirements,
+			measurements[index].reconstructions,
+			measurements[index].definitionRoots,
+			measurements[index].assemblyBytes,
+			measurements[index].fileBytes,
+		)
+		if measurements[index].requirements != 3 ||
+			measurements[index].reconstructions != 1 ||
+			measurements[index].definitionRoots != 4 {
+			t.Fatalf(
+				"use sites %d metrics = %#v, want 3 requirements, 1 reconstruction, 4 definition roots",
+				useCount,
+				measurements[index],
+			)
+		}
+		if index != 0 &&
+			measurements[index].assemblyBytes != measurements[0].assemblyBytes {
+			t.Fatalf(
+				"assembly bytes grew with use sites: %d then %d",
+				measurements[0].assemblyBytes,
+				measurements[index].assemblyBytes,
+			)
+		}
+	}
+	firstDelta := measurements[1].fileBytes - measurements[0].fileBytes
+	secondDelta := measurements[2].fileBytes - measurements[1].fileBytes
+	if firstDelta <= 0 ||
+		secondDelta*10 < firstDelta*17 ||
+		secondDelta*10 > firstDelta*23 {
+		t.Fatalf(
+			"file bytes = %d/%d/%d; doubling-use deltas %d/%d are not linear",
+			measurements[0].fileBytes,
+			measurements[1].fileBytes,
+			measurements[2].fileBytes,
+			firstDelta,
+			secondDelta,
+		)
+	}
+}
+
+type declarationAssemblyMeasurement struct {
+	requirements    int
+	reconstructions uint64
+	definitionRoots int
+	assemblyBytes   int
+	fileBytes       int
+}
+
+func measureDeclarationAssembly(
+	t *testing.T,
+	useCount int,
+) declarationAssemblyMeasurement {
+	t.Helper()
+	program := loadDeclarationAssemblyScalingFixture(t, useCount)
+	roots, err := ExportedAPIRoots(program.Roots()[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := newProgramSession(program, DefaultOptions())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, root := range roots {
+		if err := session.require(root.object); err != nil {
+			t.Fatal(err)
+		}
+	}
+	drainProgramSession(t, session)
+	record := program.Roots()[0].Types().Scope().
+		Lookup("Record").(*types.TypeName)
+	declaration := declarationForObject(t, session, record)
+	measurement := declarationAssemblyMeasurement{
+		requirements:    len(session.requirements.appliedFor(record)),
+		reconstructions: declaration.reconstructions,
+		definitionRoots: len(declaration.statements),
+	}
+	for _, statement := range declaration.statements {
+		encoded, err := tsgo.EncodeNode(statement)
+		if err != nil {
+			t.Fatal(err)
+		}
+		measurement.assemblyBytes += len(encoded)
+	}
+	files, err := session.targetFiles()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertOneFinalDeclarationAssembly(t, files, "Record")
+	for _, file := range files {
+		if file.Kind() != TargetFileSource {
+			continue
+		}
+		encoded, err := tsgo.EncodeSourceFile(file.SourceFile())
+		if err != nil {
+			t.Fatal(err)
+		}
+		measurement.fileBytes += len(encoded)
+	}
+	return measurement
+}
+
+func loadDeclarationAssemblyScalingFixture(
+	t *testing.T,
+	useCount int,
+) *load.Program {
+	t.Helper()
+	directory := t.TempDir()
+	if err := os.WriteFile(
+		filepath.Join(directory, "go.mod"),
+		[]byte("module example.com/assemblyscale\n\ngo 1.26.4\n"),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	var source strings.Builder
+	source.WriteString("package assemblyscale\n\ntype Record struct { Value int32 }\n")
+	for index := range useCount {
+		fmt.Fprintf(&source, `
+func Use%d(left, right Record) Record {
+	var result Record
+	result = left
+	if left == right {
+		return result
+	}
+	return right
+}
+`, index)
+	}
+	if err := os.WriteFile(
+		filepath.Join(directory, "source.go"),
+		[]byte(source.String()),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	program, err := load.Load(context.Background(), load.Request{
+		Directory: directory,
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return program
+}
+
+func loadDeclarationAssemblyFixture(t *testing.T) *load.Program {
+	t.Helper()
+	directory := t.TempDir()
+	if err := os.WriteFile(
+		filepath.Join(directory, "go.mod"),
+		[]byte("module example.com/assembly\n\ngo 1.26.4\n"),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(directory, "source.go"),
+		[]byte(`package assembly
+
+type Item struct {
+	Value int32
+}
+
+type Box struct {
+	Item Item
+}
+
+func Use(left, right Box) Box {
+	var result Box
+	result = left
+	if left == right {
+		return result
+	}
+	return right
+}
+`),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	program, err := load.Load(context.Background(), load.Request{
+		Directory: directory,
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return program
+}
+
+func drainProgramSession(t *testing.T, session *programSession) {
+	t.Helper()
+	for {
+		if object, ok := session.scheduler.next(); ok {
+			if err := session.emit(object); err != nil {
+				t.Fatal(err)
+			}
+			continue
+		}
+		if requirements, ok := session.requirements.nextBatch(); ok {
+			if err := session.applyDeclarationRequirements(requirements); err != nil {
+				t.Fatal(err)
+			}
+			continue
+		}
+		if sourcePackage, ok := session.packageInitializations.next(); ok {
+			if err := session.emitPackageInitialization(sourcePackage); err != nil {
+				t.Fatal(err)
+			}
+			continue
+		}
+		return
+	}
+}
+
+func declarationForObject(
+	t *testing.T,
+	session *programSession,
+	object types.Object,
+) *targetDeclaration {
+	t.Helper()
+	site := session.sites[object]
+	builder, err := session.builder(site)
+	if err != nil {
+		t.Fatal(err)
+	}
+	index, ok := builder.indexByObject[object]
+	if !ok {
+		t.Fatalf("declaration %s is absent", object.Name())
+	}
+	return &builder.declarations[index]
+}
+
+func assertOneFinalDeclarationAssembly(
+	t *testing.T,
+	files []TargetFile,
+	owner string,
+) {
+	t.Helper()
+	counts := map[string]int{
+		owner:            0,
+		owner + "$zero":  0,
+		owner + "$copy":  0,
+		owner + "$equal": 0,
+	}
+	for _, file := range files {
+		if file.Kind() != TargetFileSource {
+			continue
+		}
+		for _, statement := range file.SourceFile().Statements() {
+			switch statement := statement.(type) {
+			case tsgo.ClassDeclaration:
+				counts[statement.Name().Text()]++
+			case tsgo.FunctionDeclaration:
+				counts[statement.Name().Text()]++
+			}
+		}
+	}
+	for name, count := range counts {
+		if count != 1 {
+			t.Fatalf("%s final definition count = %d, want one", name, count)
+		}
+	}
+}
+
+func TestSchedulerDeduplicatesPendingAndCycleReferences(t *testing.T) {
+	sourcePackage := types.NewPackage("example.com/schedule", "schedule")
+	first := types.NewFunc(
+		token.Pos(1),
+		sourcePackage,
+		"First",
+		types.NewSignatureType(nil, nil, nil, nil, nil, false),
+	)
+	second := types.NewFunc(
+		token.Pos(2),
+		sourcePackage,
+		"Second",
+		types.NewSignatureType(nil, nil, nil, nil, nil, false),
+	)
+	scheduler := newScheduler()
+	scheduler.enqueue(first)
+	scheduler.enqueue(first)
+	if object, ok := scheduler.next(); !ok || object != first {
+		t.Fatalf("first scheduled object = %v, %v", object, ok)
+	}
+	scheduler.enqueue(second)
+	scheduler.enqueue(first)
+	if object, ok := scheduler.next(); !ok || object != second {
+		t.Fatalf("second scheduled object = %v, %v", object, ok)
+	}
+	if object, ok := scheduler.next(); ok || object != nil {
+		t.Fatalf("duplicate cycle target was re-enqueued: %v", object)
+	}
+}
+
+func TestDeclarationRequirementSchedulerDeduplicatesAndUsesClosedOrder(
+	t *testing.T,
+) {
+	sourcePackage := types.NewPackage("example.com/schedule", "schedule")
+	first := types.NewTypeName(token.Pos(1), sourcePackage, "First", nil)
+	second := types.NewTypeName(token.Pos(2), sourcePackage, "Second", nil)
+	firstCopy, err := api.NewNamedStructCompanionRequirement(
+		first,
+		api.CompanionCopy,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstEqual, err := api.NewNamedStructCompanionRequirement(
+		first,
+		api.CompanionEqual,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondZero, err := api.NewNamedStructCompanionRequirement(
+		second,
+		api.CompanionZero,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scheduler := newDeclarationRequirementScheduler()
+	scheduler.enqueue(secondZero)
+	scheduler.enqueue(firstEqual)
+	scheduler.enqueue(firstCopy)
+	scheduler.enqueue(firstCopy)
+
+	firstBatch, ok := scheduler.nextBatch()
+	if !ok ||
+		len(firstBatch) != 2 ||
+		firstBatch[0] != firstCopy ||
+		firstBatch[1] != firstEqual {
+		t.Fatalf("first requirement batch = %#v, %t", firstBatch, ok)
+	}
+	secondBatch, ok := scheduler.nextBatch()
+	if !ok || len(secondBatch) != 1 || secondBatch[0] != secondZero {
+		t.Fatalf("second requirement batch = %#v, %t", secondBatch, ok)
+	}
+	if actual, ok := scheduler.nextBatch(); ok || actual != nil {
+		t.Fatalf("unexpected trailing requirement batch = %#v, %t", actual, ok)
+	}
+}
