@@ -17,7 +17,7 @@ They cannot override this specification. Requirements use **must** and
 ## Mission
 
 Given a valid selected Go project, toolchain, build configuration, explicit
-representation profile, and environment contracts, GoToTS produces
+compilation profile, and environment contracts, GoToTS produces
 deterministic, readable, strict ESM TypeScript with observable behavior defined
 by that profile. Any intentional departure from Go semantics is named in the
 profile and may not be described as exact.
@@ -107,6 +107,10 @@ they do not mutate arbitrary ancestors.
 - **representation rule:** the direct rule choosing the TypeScript shape
   required by the selected profile for a Go type, method, interface, value, or
   operation.
+- **compilation profile:** the immutable compilation-wide selection of every
+  semantic tradeoff axis. The initial axes are integer representation
+  (`number` or `bigint`) and evaluation order (`direct` or `preserve-go`).
+  Generated files in one compilation cannot mix selections.
 - **manual obligation:** an exact generated declaration whose implementation
   must be supplied manually.
 - **true external:** unavailable or host/native behavior represented by an

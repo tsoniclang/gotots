@@ -26,6 +26,7 @@ func TestNamedStructValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	writeProgramFile(t, runnerPath, `import {
     AssignResult,
     CompositeArgument,
+    CompositeCalls,
     CompositeField,
     CompositeSecondArgument,
     CopyResult,
@@ -57,6 +58,7 @@ console.log(MultipleResultIsolated());
 console.log(ReservedValue());
 console.log(PrimitiveZero());
 console.log(CompositeArgument());
+console.log(CompositeCalls());
 console.log(CompositeSecondArgument());
 console.log(CompositeField());
 console.log(PositionalComposite());
@@ -130,7 +132,50 @@ console.log(invalid);
 	}
 }
 
+func TestNamedStructValuesPreserveGoProfileTypechecks(t *testing.T) {
+	emission := compileStructFixtureWithOptions(t, emit.Options{
+		IntegerRepresentation: emit.IntegerRepresentationNumber,
+		EvaluationOrder:       emit.EvaluationOrderPreserveGo,
+	})
+	workingDirectory := t.TempDir()
+	targetPaths, _ := materializeStructProgramWithGolden(
+		t,
+		workingDirectory,
+		emission,
+		false,
+	)
+	writeProgramFile(
+		t,
+		filepath.Join(workingDirectory, "package.json"),
+		"{\"type\":\"module\"}\n",
+	)
+	compileStructTypeScript(t, workingDirectory, targetPaths)
+}
+
 func compileStructFixture(t *testing.T) emit.ProgramEmission {
+	t.Helper()
+	program, roots := loadStructFixture(t)
+	emission, err := emit.Compile(program, roots)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return emission
+}
+
+func compileStructFixtureWithOptions(
+	t *testing.T,
+	options emit.Options,
+) emit.ProgramEmission {
+	t.Helper()
+	program, roots := loadStructFixture(t)
+	emission, err := emit.CompileWithOptions(program, roots, options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return emission
+}
+
+func loadStructFixture(t *testing.T) (*load.Program, []emit.Root) {
 	t.Helper()
 	program, err := load.Load(context.Background(), load.Request{
 		Directory: structValuesDirectory(),
@@ -143,17 +188,23 @@ func compileStructFixture(t *testing.T) emit.ProgramEmission {
 	if err != nil {
 		t.Fatal(err)
 	}
-	emission, err := emit.Compile(program, roots)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return emission
+	return program, roots
 }
 
 func materializeStructProgram(
 	t *testing.T,
 	workingDirectory string,
 	emission emit.ProgramEmission,
+) ([]string, string) {
+	t.Helper()
+	return materializeStructProgramWithGolden(t, workingDirectory, emission, true)
+}
+
+func materializeStructProgramWithGolden(
+	t *testing.T,
+	workingDirectory string,
+	emission emit.ProgramEmission,
+	compareGolden bool,
 ) ([]string, string) {
 	t.Helper()
 	client, err := tsgo.StartClient(repositoryRoot(), workingDirectory)
@@ -167,11 +218,14 @@ func materializeStructProgram(
 	})
 	var targetPaths []string
 	var module string
-	expected, err := os.ReadFile(
-		filepath.Join(structValuesDirectory(), "expected.ts"),
-	)
-	if err != nil {
-		t.Fatal(err)
+	var expected []byte
+	if compareGolden {
+		expected, err = os.ReadFile(
+			filepath.Join(structValuesDirectory(), "expected.ts"),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	for _, file := range emission.Files() {
 		printed, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
@@ -185,7 +239,7 @@ func materializeStructProgram(
 			if module != "" {
 				t.Fatal("struct fixture emitted multiple source modules")
 			}
-			if printed != string(expected) {
+			if compareGolden && printed != string(expected) {
 				t.Fatalf("printed struct TypeScript:\n%s\nwant:\n%s", printed, expected)
 			}
 			module = "./" + strings.TrimSuffix(file.OutputPath(), ".ts") + ".js"
@@ -279,6 +333,7 @@ func main() {
 	fmt.Println(values.ReservedValue())
 	fmt.Println(values.PrimitiveZero())
 	fmt.Println(values.CompositeArgument())
+	fmt.Println(values.CompositeCalls())
 	fmt.Println(values.CompositeSecondArgument())
 	fmt.Println(values.CompositeField())
 	fmt.Println(values.PositionalComposite())

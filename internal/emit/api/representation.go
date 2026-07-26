@@ -30,6 +30,30 @@ func (r IntegerRepresentation) String() string {
 	}
 }
 
+type EvaluationOrder uint8
+
+const (
+	EvaluationOrderInvalid EvaluationOrder = iota
+	EvaluationOrderDirect
+	EvaluationOrderPreserveGo
+)
+
+func (o EvaluationOrder) Valid() bool {
+	return o == EvaluationOrderDirect ||
+		o == EvaluationOrderPreserveGo
+}
+
+func (o EvaluationOrder) String() string {
+	switch o {
+	case EvaluationOrderDirect:
+		return "direct"
+	case EvaluationOrderPreserveGo:
+		return "preserve-go"
+	default:
+		return fmt.Sprintf("evaluation-order(%d)", o)
+	}
+}
+
 func IntegerLiteral(
 	factory tsgo.Factory,
 	representation IntegerRepresentation,

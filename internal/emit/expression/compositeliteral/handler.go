@@ -170,7 +170,9 @@ func arrange(
 ) {
 	capture := false
 	for index, element := range elements {
-		if element.fieldIndex != index || len(element.value.Before()) != 0 {
+		reordersSource := element.fieldIndex != index &&
+			context.EvaluationOrder() == api.EvaluationOrderPreserveGo
+		if reordersSource || len(element.value.Before()) != 0 {
 			capture = true
 			break
 		}

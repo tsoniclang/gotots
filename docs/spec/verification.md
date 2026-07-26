@@ -202,9 +202,10 @@ The first named-struct family additionally proves:
   a duplicate field walk;
 - pointer-free assignment rebinds to one copied value without a speculative
   destination-identity helper;
-- positional, keyed, and omitted-field composite literals are exact; keyed
-  literals retain source evaluation order even when field declaration order
-  differs;
+- positional, keyed, and omitted-field composite literals have exact values;
+  the default `direct` profile contains no field or argument temporaries added
+  solely for keyed source order, while `preserve-go` retains source evaluation
+  order when field declaration order differs;
 - equality is field-wise and recursive rather than target object identity;
 - concrete value-receiver calls use the exact `go/types.Selection` and a named
   receiver function, never a class method or virtual dispatch; and
@@ -212,11 +213,14 @@ The first named-struct family additionally proves:
   and unsupported field representations fail at their typed owner.
 
 Mutations replace a requested copy with direct assignment, replace requested
-field equality with `===`, remove the private brand, reorder keyed initializers,
-attach a receiver method to the class, emit an unrequested companion, duplicate
-a companion, route it to the caller's file, or admit an unsupported field. Each
-fails its owning structural, strict-type, differential, placement, or
-unsupported-boundary gate. A scaling fixture doubles fields and proves
+field equality with `===`, remove the private brand, add source-order captures
+to `direct`, remove them from `preserve-go`, attach a receiver method to the
+class, emit an unrequested companion, duplicate a companion, route it to the
+caller's file, or admit an unsupported field. Each fails its owning structural,
+strict-type, differential, placement, or unsupported-boundary gate. The
+`preserve-go` fixture uses call-valued field expressions; the `direct` artifact
+test treats constants and calls identically, proving that no purity heuristic
+silently changes profiles. A scaling fixture doubles fields and proves
 definition size/work grows linearly while copy, assignment, equality, and
 method call sites remain constant-size. An ownership mutation adds a callee
 prologue copy or copies a fresh composite/call result; artifact and operation
@@ -236,7 +240,7 @@ executable through a status-only wrapper.
 
 Primitive aliases preserve selected Go names in target source but do not prove
 runtime range or overflow. Every integer gate runs under an explicit
-compilation-wide profile. The default `number` gate inspects direct arithmetic,
+compilation-wide integer selection. The default `number` gate inspects direct arithmetic,
 ordinary numeric literals, and the absence of routine casts, `Math.imul`, and
 wrapping operators; its differential values remain inside the declared exact
 number domain. The `bigint` gate inspects BigInt aliases and literals, executes
@@ -250,10 +254,11 @@ strict-type, differential, or profile-coherence gate. Reports explicitly state
 that implicit fixed-width overflow is deferred; neither profile may be
 described as proving it.
 
-Each checkpoint records the exact Go toolchain, pinned TS-Go revision/schema,
-JavaScript runtime, and GoToTS support/runtime revision used by proof. No
-external transpiler, target compiler, plugin, or unrelated product may supply
-missing semantics or verification.
+Each checkpoint records every compilation-profile axis plus the exact Go
+toolchain, pinned TS-Go revision/schema, JavaScript runtime, and GoToTS
+support/runtime revision used by proof. No external transpiler, target
+compiler, plugin, or unrelated product may supply missing semantics or
+verification.
 
 ## Architecture And Cost Proof
 

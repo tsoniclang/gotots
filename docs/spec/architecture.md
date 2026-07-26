@@ -127,7 +127,8 @@ selected-toolchain contract reconciliation, and other non-producing checks.
 An emission session may retain:
 
 - selected package/file references and the shared `types.Info`;
-- one immutable compilation-wide representation profile;
+- one immutable compilation-wide profile containing closed, independent
+  semantic-policy axes;
 - a stack of source context and target lexical builders;
 - deterministic mappings from typed Go objects to target names/declarations;
 - already-created typed TS-Go protocol AST values;
@@ -181,13 +182,26 @@ state by authoritative Go identity. The decision is final before dependent
 target nodes are emitted; it is never serialized into a plan or consumed by a
 later lowering stage.
 
-Target-carrier policy is selected once at the compilation entry point and is
-immutable for the complete dependency closure. The initial integer
-representation profile is a closed choice between `number` (the default) and
-`bigint`. Handlers query one typed representation owner; they never inspect
-CLI flags or independently choose carriers. A generated file set may not mix
-profiles. The selected profile is part of reproducibility evidence and any
-eventual output manifest.
+Compilation policy is selected once at the compilation entry point and is
+immutable for the complete dependency closure. Each axis is a closed typed
+choice. The initial integer-representation axis selects `number` (the default)
+or `bigint`. The initial evaluation-order axis selects `direct` (the default)
+or `preserve-go`. Handlers query the typed profile carried by their context;
+they never inspect CLI flags or independently select behavior. A generated file
+set may not mix selections. Every selected axis is part of reproducibility
+evidence and any eventual output manifest.
+
+`direct` evaluation emits target expressions without introducing temporaries
+solely to preserve the source order of expressions that target reshaping
+reorders. It applies equally to literals, calls, and other expressions; no
+purity or side-effect heuristic selects behavior. For example, a keyed
+`Point{Visible: visible(), X: x()}` represented by a positional
+`Point(X, Visible)` constructor emits `new Point(x(), visible())`. This is an
+intentional profile boundary and is not exact Go behavior when the calls'
+effects expose their order. `preserve-go` evaluates `visible()` and `x()` into
+source-ordered temporaries before constructing `Point`, preserving Go behavior.
+Temporaries required by target syntax or independently selected semantics such
+as parallel assignment are unaffected by this axis.
 
 ## Definition Scheduling
 
@@ -283,12 +297,17 @@ type contract when the class is constructed, while use-dependent generated
 operations are top-level companion declarations. There is no target-text
 patch, prototype assignment, mutable class reopening, or post-print insertion.
 
-Call and composite handlers consume child emissions in Go evaluation order. If
-a later child has prerequisite statements, already-evaluated earlier children
-are captured in target temporaries before those statements. Package-level
-initializers use the selected checker graph's exact initialization order and
-append their TS-Go statements to one package-initialization builder; no second
-dependency graph is constructed.
+Under `preserve-go`, a keyed composite captures child values in Go source order
+before consuming them in target constructor order. If any child emission has
+prerequisite statements, its parent still places those statements at the
+required execution boundary and captures values required to make the target
+AST representable. Under `direct`, the composite itself creates no prerequisite
+statements solely for field reordering, so an enclosing call remains a direct
+call when its other children are direct. Package-level initialization order and
+atomic multi-value operations are separate semantic contracts and remain exact
+under both profiles. Package-level initializers use the selected checker
+graph's exact initialization order and append their TS-Go statements to one
+package-initialization builder; no second dependency graph is constructed.
 
 ## Target Construction
 

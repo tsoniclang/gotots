@@ -112,6 +112,7 @@ func TestIntegerRepresentationCanSelectBigIntForTheWholeEmission(t *testing.T) {
 	}
 	emission, err := emit.CompileWithOptions(program, roots, emit.Options{
 		IntegerRepresentation: emit.IntegerRepresentationBigInt,
+		EvaluationOrder:       emit.EvaluationOrderDirect,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -137,6 +138,22 @@ func TestInvalidIntegerRepresentationFailsAtCompilationEntry(t *testing.T) {
 	}
 }
 
+func TestInvalidEvaluationOrderFailsAtCompilationEntry(t *testing.T) {
+	program := loadDemandProgram(t)
+	roots, err := emit.ExportedAPIRoots(program.Roots()[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	options := emit.DefaultOptions()
+	options.EvaluationOrder = emit.EvaluationOrderInvalid
+	_, err = emit.CompileWithOptions(program, roots, options)
+	var optionsError *emit.OptionsError
+	if !errors.As(err, &optionsError) ||
+		optionsError.Field != "evaluation order" {
+		t.Fatalf("error = %#v, want evaluation-order OptionsError", err)
+	}
+}
+
 func TestIntegerRepresentationSelectionParsesOnlyClosedProfiles(t *testing.T) {
 	for source, want := range map[string]emit.IntegerRepresentation{
 		"number": emit.IntegerRepresentationNumber,
@@ -153,6 +170,33 @@ func TestIntegerRepresentationSelectionParsesOnlyClosedProfiles(t *testing.T) {
 	got, err := emit.ParseIntegerRepresentation("int32")
 	var optionsError *emit.OptionsError
 	if got != emit.IntegerRepresentationInvalid ||
+		!errors.As(err, &optionsError) {
+		t.Fatalf("parse invalid = (%v, %#v), want invalid OptionsError", got, err)
+	}
+}
+
+func TestEvaluationOrderDefaultsToDirectEmission(t *testing.T) {
+	if got := emit.DefaultOptions().EvaluationOrder; got != emit.EvaluationOrderDirect {
+		t.Fatalf("default evaluation order = %v, want direct", got)
+	}
+}
+
+func TestEvaluationOrderSelectionParsesOnlyClosedProfiles(t *testing.T) {
+	for source, want := range map[string]emit.EvaluationOrder{
+		"direct":      emit.EvaluationOrderDirect,
+		"preserve-go": emit.EvaluationOrderPreserveGo,
+	} {
+		got, err := emit.ParseEvaluationOrder(source)
+		if err != nil {
+			t.Fatalf("parse %q: %v", source, err)
+		}
+		if got != want {
+			t.Fatalf("parse %q = %v, want %v", source, got, want)
+		}
+	}
+	got, err := emit.ParseEvaluationOrder("automatic")
+	var optionsError *emit.OptionsError
+	if got != emit.EvaluationOrderInvalid ||
 		!errors.As(err, &optionsError) {
 		t.Fatalf("parse invalid = (%v, %#v), want invalid OptionsError", got, err)
 	}

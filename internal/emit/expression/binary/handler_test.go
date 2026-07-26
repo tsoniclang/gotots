@@ -45,6 +45,7 @@ func TestIntegerCapabilityAcceptsEveryRepresentedSignedCarrier(t *testing.T) {
 				unusedNames{},
 				unusedValues{},
 				api.IntegerRepresentationNumber,
+				api.EvaluationOrderDirect,
 			)
 			if err != nil {
 				t.Fatal(err)

@@ -270,6 +270,7 @@ func newProgramSession(
 			session.factory,
 			session.registry,
 			options.IntegerRepresentation,
+			options.EvaluationOrder,
 			session.require,
 		)
 	}

@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -94,8 +95,41 @@ func TestNamedStructCompanionsAreUniqueAndAdjacentToTheirOwner(t *testing.T) {
 	}
 }
 
-func TestNamedStructValuesPreserveConstructionOrderAndOwnership(t *testing.T) {
+func TestNamedStructValuesDefaultToDirectConstruction(t *testing.T) {
 	source := structTargetSource(t, compileStructFixture(t))
+	for _, name := range []string{
+		"NewBox",
+		"CompositeArgument",
+		"CompositeCalls",
+		"CompositeSecondArgument",
+		"CompositeField",
+	} {
+		statements := targetFunction(t, source, name).Body().(tsgo.Block).Statements()
+		if len(statements) != 1 {
+			t.Fatalf("%s statements = %d, want one direct return", name, len(statements))
+		}
+		if _, ok := statements[0].(tsgo.ReturnStatement); !ok {
+			t.Fatalf("%s statement = %T, want direct return", name, statements[0])
+		}
+	}
+	direct := targetFunction(t, source, "CompositeCalls").
+		Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement).Expression().(tsgo.PropertyAccessExpression).Expression().(tsgo.NewExpression)
+	if got := targetName(direct.Arguments()[0].(tsgo.CallExpression).Expression()); got != "DirectX" {
+		t.Fatalf("direct constructor argument 0 = %q, want declaration-order DirectX", got)
+	}
+	if got := targetName(direct.Arguments()[1].(tsgo.CallExpression).Expression()); got != "DirectVisible" {
+		t.Fatalf("direct constructor argument 1 = %q, want declaration-order DirectVisible", got)
+	}
+}
+
+func TestNamedStructValuesPreserveConstructionOrderWhenSelected(t *testing.T) {
+	source := structTargetSource(t, compileStructFixtureWithOptions(
+		t,
+		emit.Options{
+			IntegerRepresentation: emit.IntegerRepresentationNumber,
+			EvaluationOrder:       emit.EvaluationOrderPreserveGo,
+		},
+	))
 	newBox := targetFunction(t, source, "NewBox")
 	statements := newBox.Body().(tsgo.Block).Statements()
 	if len(statements) != 5 {
@@ -130,6 +164,20 @@ func TestNamedStructValuesPreserveConstructionOrderAndOwnership(t *testing.T) {
 		targetName(result.Arguments()[0]) != targetName(captures[3].Name()) ||
 		targetName(result.Arguments()[1]) != targetName(captures[0].Name()) {
 		t.Fatal("Box construction does not consume source-ordered captures in field order")
+	}
+
+	callStatements := targetFunction(t, source, "CompositeCalls").
+		Body().(tsgo.Block).Statements()
+	if len(callStatements) != 3 {
+		t.Fatalf("CompositeCalls statements = %d, want two captures and return", len(callStatements))
+	}
+	firstCall := callStatements[0].(tsgo.VariableStatement).
+		DeclarationList().Declarations()[0].Initializer().(tsgo.CallExpression)
+	secondCall := callStatements[1].(tsgo.VariableStatement).
+		DeclarationList().Declarations()[0].Initializer().(tsgo.CallExpression)
+	if targetName(firstCall.Expression()) != "DirectVisible" ||
+		targetName(secondCall.Expression()) != "DirectX" {
+		t.Fatal("preserve-go did not capture call-valued keyed fields in source order")
 	}
 
 	copyResult := targetFunction(t, source, "CopyResult").
@@ -218,7 +266,13 @@ func TestNamedStructMultipleResultsCopyBorrowedValuesOnce(t *testing.T) {
 }
 
 func TestNamedStructCallArgumentsPlacePrerequisitesInSourceOrder(t *testing.T) {
-	source := structTargetSource(t, compileStructFixture(t))
+	source := structTargetSource(t, compileStructFixtureWithOptions(
+		t,
+		emit.Options{
+			IntegerRepresentation: emit.IntegerRepresentationNumber,
+			EvaluationOrder:       emit.EvaluationOrderPreserveGo,
+		},
+	))
 	function := targetFunction(t, source, "CompositeSecondArgument")
 	statements := function.Body().(tsgo.Block).Statements()
 	if len(statements) != 7 {

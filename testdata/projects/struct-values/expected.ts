@@ -54,11 +54,7 @@ export function Empty$equal($left: Empty, $right: Empty): bool {
     return true;
 }
 export function NewBox(value: int32): Box {
-    const __gotots_field_2 = value > 0;
-    const __gotots_field_0 = true;
-    const __gotots_field_1 = value;
-    const __gotots_field_3 = new Point(__gotots_field_1, __gotots_field_0);
-    return new Box(__gotots_field_3, __gotots_field_2);
+    return new Box(new Point(value, true), value > 0);
 }
 export function ZeroIsFresh(): bool {
     let left = Box$zero();
@@ -141,12 +137,7 @@ export function ReadX(value: Box): int32 {
     return value.Point.X;
 }
 export function CompositeArgument(): int32 {
-    const __gotots_field_6 = true;
-    const __gotots_field_4 = true;
-    const __gotots_field_5 = 6;
-    const __gotots_field_7 = new Point(__gotots_field_5, __gotots_field_4);
-    const __gotots_argument_0 = new Box(__gotots_field_7, __gotots_field_6);
-    return ReadX(__gotots_argument_0);
+    return ReadX(new Box(new Point(6, true), true));
 }
 export function ReadXAfter(first: int32, value: Box): int32 {
     return first * 10 + value.Point.X;
@@ -155,20 +146,19 @@ export function DirectValue(): int32 {
     return 2;
 }
 export function CompositeSecondArgument(): int32 {
-    const __gotots_argument_1 = DirectValue();
-    const __gotots_field_10 = true;
-    const __gotots_field_8 = true;
-    const __gotots_field_9 = 6;
-    const __gotots_field_11 = new Point(__gotots_field_9, __gotots_field_8);
-    const __gotots_argument_2 = new Box(__gotots_field_11, __gotots_field_10);
-    return ReadXAfter(__gotots_argument_1, __gotots_argument_2);
+    return ReadXAfter(DirectValue(), new Box(new Point(6, true), true));
 }
 export function CompositeField(): int32 {
-    const __gotots_field_14 = true;
-    const __gotots_field_12 = true;
-    const __gotots_field_13 = 7;
-    const __gotots_field_15 = new Point(__gotots_field_13, __gotots_field_12);
-    return new Box(__gotots_field_15, __gotots_field_14).Point.X;
+    return new Box(new Point(7, true), true).Point.X;
+}
+export function DirectVisible(): bool {
+    return true;
+}
+export function DirectX(): int32 {
+    return 6;
+}
+export function CompositeCalls(): int32 {
+    return new Point(DirectX(), DirectVisible()).X;
 }
 export function PositionalComposite(): int32 {
     let value = new Point(8, true);

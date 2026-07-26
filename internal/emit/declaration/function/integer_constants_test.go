@@ -112,7 +112,10 @@ func TestBigIntProfileTypechecksAndExecutesBeyondSafeNumberRange(t *testing.T) {
 	emission, err := emit.CompileWithOptions(
 		loaded.Program(),
 		roots,
-		emit.Options{IntegerRepresentation: emit.IntegerRepresentationBigInt},
+		emit.Options{
+			IntegerRepresentation: emit.IntegerRepresentationBigInt,
+			EvaluationOrder:       emit.EvaluationOrderDirect,
+		},
 	)
 	if err != nil {
 		t.Fatal(err)

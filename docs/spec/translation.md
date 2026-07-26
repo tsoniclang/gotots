@@ -226,9 +226,11 @@ Result composition is owner-directed:
 - a parent combines child requests without rendering or string-key
   deduplication;
 - a direct expression normally has an empty `before` list;
-- when a later eager child has `before` statements, already encountered
-  side-effecting values are captured before those statements so source
-  evaluation order is retained; and
+- under `preserve-go`, when a later eager child has `before` statements,
+  already encountered values are captured before those statements so source
+  evaluation order is retained;
+- under `direct`, no capture is introduced solely because target reshaping
+  evaluates otherwise-direct children in a different order; and
 - a lazy child keeps its `before` statements inside the branch, short-circuit
   arm, loop iteration, or closure that owns its execution.
 
@@ -516,9 +518,11 @@ Each zero, copy, or equality capability is emitted at most once and only when a
 selected occurrence requests it. Its typed request is routed to the defining
 source-file module even when the first use is in another file. Companion
 definitions grow linearly with fields while each use remains constant size.
-The first family constructs only through `new Name(...)`; positional and keyed
-composite literals preserve source evaluation order, and omitted fields request
-the same zero owner rather than a second default table.
+The first family constructs only through `new Name(...)`. Positional composites
+are direct in both profiles. For keyed composites, `direct` emits constructor
+arguments directly in declaration order, while `preserve-go` captures values
+in keyed source order before consuming them in declaration order. Omitted
+fields request the same zero owner rather than a second default table.
 
 Generated source modules use a caller-owns-value convention. A borrowed struct
 expression (for example, a local identifier or field selection) is copied
@@ -643,15 +647,19 @@ declarations immediately; they are not stored in a later-consumed plan.
 
 ## Values, Control Flow, And Implicit Semantics
 
-Handlers preserve:
+Handlers preserve within the selected profile:
 
-- Go evaluation order and parallel assignment;
+- exact Go evaluation order when `preserve-go` is selected; `direct` accepts
+  target order only where representation reshaping reorders direct
+  expressions;
+- parallel assignment and other atomic multi-value operations under both
+  evaluation-order selections;
 - zero values and fresh mutable aggregate zeros;
 - value copying at assignment, argument, result, receiver, interface, map,
   channel, and append/copy boundaries;
 - nil and panic behavior;
 - selected integer carriers, explicit conversions, shifts, `float32`, complex,
-  and exact untyped constants within the declared representation profile;
+  and exact untyped constants within the declared integer-representation axis;
 - `defer`, `panic`, `recover`, `go`, `select`, channels, and package
   initialization;
 - labels, `goto`, fallthrough, range variants, and termination; and

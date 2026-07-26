@@ -168,6 +168,21 @@ func CompositeField() int32 {
 	}.Point.X
 }
 
+func DirectVisible() bool {
+	return true
+}
+
+func DirectX() int32 {
+	return 6
+}
+
+func CompositeCalls() int32 {
+	return Point{
+		Visible: DirectVisible(),
+		X:       DirectX(),
+	}.X
+}
+
 func PositionalComposite() int32 {
 	value := Point{8, true}
 	return value.X

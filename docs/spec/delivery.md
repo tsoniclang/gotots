@@ -102,6 +102,14 @@ integer contract rather than being scattered through ordinary arithmetic.
 Explicit narrowing conversions and a future fixed-width profile require their
 own complete construct proof.
 
+The independent evaluation-order selection defaults to `direct`. It emits
+direct target expressions and does not add temporaries solely because a keyed
+composite's source order differs from positional constructor order. The CLI may
+select `preserve-go`, which captures those values in Go source order before
+construction. `direct` is intentionally not exact when reordered expressions
+have observable effects; reports must name that boundary. There is no
+purity/call heuristic and no per-site automatic mode.
+
 Bootstrap in dependency order:
 
 1. pinned TS-Go tool/contract test;
@@ -114,8 +122,9 @@ Bootstrap in dependency order:
 The output must be built as typed official TS-Go protocol AST, printed by
 TS-Go, strict-typechecked, compiled to ESM JavaScript, executed directly against
 Go within the selected representation contract, and size-attributed. Evidence
-must state the selected integer representation and may not describe overflow or
-wide-number behavior as exact when that behavior is outside the profile.
+must state the selected integer representation and evaluation order and may not
+describe overflow, wide-number behavior, or reordered effectful expressions as
+exact when that behavior is outside the selected profile.
 
 ## 2. Core Direct Emission
 

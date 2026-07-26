@@ -17,6 +17,7 @@ type emitter struct {
 	names   *nameOwner
 	values  api.Values
 	integer api.IntegerRepresentation
+	order   api.EvaluationOrder
 	require func(types.Object) error
 }
 
@@ -32,6 +33,7 @@ func newEmitter(
 	factory tsgo.Factory,
 	registry *declarationRegistry,
 	integer api.IntegerRepresentation,
+	order api.EvaluationOrder,
 	require func(types.Object) error,
 ) *emitter {
 	var typesInfo *types.Info
@@ -46,6 +48,7 @@ func newEmitter(
 		names:   newNameOwnerWithRegistry(packageScope, typesInfo, registry),
 		values:  representation.Owner{},
 		integer: integer,
+		order:   order,
 		require: require,
 	}
 }
@@ -71,5 +74,6 @@ func (e *emitter) fileContext(
 		names,
 		e.values,
 		e.integer,
+		e.order,
 	)
 }
