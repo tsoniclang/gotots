@@ -38,6 +38,9 @@ func (Owner) Zero(
 		}
 		return api.DirectExpression(literal), nil
 	}
+	if _, _, ok := scalarSlice(context, sourceType); ok {
+		return sliceZero(context, source, sourceType)
+	}
 	typeName, _, ok := namedStruct(sourceType)
 	if !ok {
 		return api.ExpressionEmission{},
@@ -59,7 +62,9 @@ func (Owner) Copy(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	if _, ok := primitive(context, sourceType); ok || callableValue(sourceType) {
+	if _, ok := primitive(context, sourceType); ok ||
+		callableValue(sourceType) ||
+		isScalarSlice(context, sourceType) {
 		return api.NewExpressionEmission(
 			value.Before(),
 			value.Value(),
@@ -118,7 +123,9 @@ func (Owner) Assign(
 	target tsgo.Expression,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	if _, ok := primitive(context, sourceType); ok || callableValue(sourceType) {
+	if _, ok := primitive(context, sourceType); ok ||
+		callableValue(sourceType) ||
+		isScalarSlice(context, sourceType) {
 		return api.NewExpressionEmission(
 			value.Before(),
 			context.Factory().BinaryExpression(

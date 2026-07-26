@@ -7,6 +7,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	builtinexpression "github.com/tsoniclang/gotots/internal/emit/expression/builtin"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -35,6 +36,18 @@ func emit(
 	if source.Ellipsis != token.NoPos {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if builtin, ok := builtinexpression.SliceBuiltin(
+		context.TypesInfo(),
+		source.Fun,
+	); ok {
+		return builtinexpression.Emit(
+			context,
+			children,
+			source,
+			builtin,
+			discarded,
+		)
 	}
 	if selector, method, selection, ok := selectedMethod(
 		context.TypesInfo(),

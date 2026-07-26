@@ -1,11 +1,48 @@
 package api_test
 
 import (
+	"go/types"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
+
+func TestSetterStoreTargetOwnsTypedImmutableArguments(t *testing.T) {
+	factory := tsgo.NewFactory()
+	before := []tsgo.Statement{
+		factory.ExpressionStatement(factory.Identifier("prepare")),
+	}
+	arguments := []tsgo.Expression{factory.NumericLiteral("1", tsgo.TokenFlagsNone)}
+	target, err := api.NewSetterStoreTargetEmission(
+		before,
+		factory.PropertyAccessExpression(
+			factory.Identifier("values"),
+			nil,
+			factory.Identifier("set"),
+			tsgo.NodeFlagsNone,
+		),
+		arguments,
+		types.Typ[types.Int32],
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before[0] = factory.ExpressionStatement(factory.Identifier("mutated"))
+	arguments[0] = factory.NumericLiteral("2", tsgo.TokenFlagsNone)
+	if !target.IsSetter() ||
+		target.Before()[0].(tsgo.ExpressionStatement).
+			Expression().(tsgo.Identifier).Text() != "prepare" ||
+		target.Arguments()[0].(tsgo.NumericLiteral).Text() != "1" {
+		t.Fatalf("setter target leaked mutable input: %#v", target)
+	}
+	exposed := target.Arguments()
+	exposed[0] = factory.NumericLiteral("3", tsgo.TokenFlagsNone)
+	if target.Arguments()[0].(tsgo.NumericLiteral).Text() != "1" {
+		t.Fatal("setter target exposed mutable argument backing")
+	}
+}
 
 func TestEmissionResultsOwnImmutableTargetNodesAndRequests(t *testing.T) {
 	factory := tsgo.NewFactory()

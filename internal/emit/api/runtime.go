@@ -2,6 +2,8 @@ package api
 
 import "fmt"
 
+const RuntimeSliceExportName = "RuntimeSlice"
+
 type RuntimeModule uint8
 
 const (
@@ -66,7 +68,7 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 		return runtimeContract(
 			RuntimeModuleSlice,
 			"runtime/slice.ts",
-			"GoSlice",
+			RuntimeSliceExportName,
 			true,
 		), nil
 	case RuntimeMap:

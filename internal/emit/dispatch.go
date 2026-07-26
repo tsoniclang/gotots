@@ -15,9 +15,11 @@ import (
 	compositeliteral "github.com/tsoniclang/gotots/internal/emit/expression/compositeliteral"
 	functionliteral "github.com/tsoniclang/gotots/internal/emit/expression/functionliteral"
 	identifierexpression "github.com/tsoniclang/gotots/internal/emit/expression/identifier"
+	indexexpression "github.com/tsoniclang/gotots/internal/emit/expression/index"
 	integerliteral "github.com/tsoniclang/gotots/internal/emit/expression/literal/integer"
 	parenthesizedexpression "github.com/tsoniclang/gotots/internal/emit/expression/parenthesized"
 	selectorexpression "github.com/tsoniclang/gotots/internal/emit/expression/selector"
+	slicingexpression "github.com/tsoniclang/gotots/internal/emit/expression/slicing"
 	unaryexpression "github.com/tsoniclang/gotots/internal/emit/expression/unary"
 	"github.com/tsoniclang/gotots/internal/emit/statement/assignment"
 	blockstatement "github.com/tsoniclang/gotots/internal/emit/statement/block"
@@ -33,6 +35,7 @@ import (
 	storetarget "github.com/tsoniclang/gotots/internal/emit/store"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	namedstructtype "github.com/tsoniclang/gotots/internal/emit/type/namedstruct"
+	slicetype "github.com/tsoniclang/gotots/internal/emit/type/slice"
 	tupletype "github.com/tsoniclang/gotots/internal/emit/type/tuple"
 	"github.com/tsoniclang/gotots/internal/emit/value/representation"
 	"github.com/tsoniclang/gotots/internal/load"
@@ -172,10 +175,14 @@ func (e *emitter) Expression(
 		return functionliteral.Emit(context, e, source)
 	case *ast.Ident:
 		return identifierexpression.Emit(context, e, source)
+	case *ast.IndexExpr:
+		return indexexpression.Emit(context, e, source)
 	case *ast.ParenExpr:
 		return parenthesizedexpression.Emit(context, e, source)
 	case *ast.SelectorExpr:
 		return selectorexpression.Emit(context, e, source)
+	case *ast.SliceExpr:
+		return slicingexpression.Emit(context, e, source)
 	case *ast.BasicLit:
 		return e.IntegerConstant(context, source)
 	case *ast.UnaryExpr:
@@ -366,6 +373,19 @@ func (e *emitter) Type(
 		if _, ok := types.Unalias(sourceType).(*types.Named); ok {
 			return namedstructtype.Emit(context, source, sourceType)
 		}
+		if sliceType, ok := types.Unalias(sourceType).(*types.Slice); ok {
+			arrayType, valid := source.(*ast.ArrayType)
+			if !valid {
+				return api.TypeEmission{},
+					api.Unsupported(context, api.CategoryType, source)
+			}
+			return slicetype.EmitSyntax(
+				context,
+				e,
+				arrayType,
+				sliceType,
+			)
+		}
 	}
 	return basictype.Emit(context, source)
 }
@@ -383,6 +403,9 @@ func (e *emitter) RepresentedType(
 	}
 	if _, ok := types.Unalias(sourceType).(*types.Named); ok {
 		return namedstructtype.Emit(context, source, sourceType)
+	}
+	if _, ok := types.Unalias(sourceType).(*types.Slice); ok {
+		return slicetype.EmitRepresented(context, e, source, sourceType)
 	}
 	return basictype.EmitRepresented(context, source, sourceType)
 }

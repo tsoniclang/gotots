@@ -5,6 +5,9 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
+	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -16,12 +19,69 @@ func Emit(
 	switch source := source.(type) {
 	case *ast.Ident:
 		return identifier(context, source)
+	case *ast.IndexExpr:
+		return sliceIndex(context, children, source)
 	case *ast.SelectorExpr:
 		return field(context, children, source)
 	default:
 		return api.StoreTargetEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+}
+
+func sliceIndex(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.IndexExpr,
+) (api.StoreTargetEmission, error) {
+	receiverType := context.TypesInfo().TypeOf(source.X)
+	_, elementType, ok := slicevalue.Scalar(
+		context.TypesSizes(),
+		receiverType,
+	)
+	indexType := context.TypesInfo().TypeOf(source.Index)
+	if !ok ||
+		!types.Identical(context.TypesInfo().TypeOf(source), elementType) ||
+		!basictype.SupportsInteger(context.TypesSizes(), indexType) {
+		return api.StoreTargetEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	receiver, err := children.Expression(
+		context.
+			WithRole(api.RoleSliceReceiver).
+			WithExpectedType(receiverType),
+		source.X,
+	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
+	index, err := children.Expression(
+		context.
+			WithRole(api.RoleSliceIndex).
+			WithExpectedType(indexType),
+		source.Index,
+	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
+	if len(receiver.Before()) != 0 || len(index.Before()) != 0 {
+		return api.StoreTargetEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	return api.NewSetterStoreTargetEmission(
+		nil,
+		context.Factory().PropertyAccessExpression(
+			receiver.Value(),
+			nil,
+			context.Factory().Identifier(
+				runtimeslice.MemberName(runtimeslice.MemberSet),
+			),
+			tsgo.NodeFlagsNone,
+		),
+		[]tsgo.Expression{index.Value()},
+		elementType,
+		api.CombineRequests(receiver.Requests(), index.Requests()),
+	)
 }
 
 func identifier(
