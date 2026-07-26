@@ -43,6 +43,7 @@ func TestExactInt32CapabilityRejectsWideIntegerCarriers(t *testing.T) {
 				types.SizesFor("gc", testCase.arch),
 				tsgo.Factory{},
 				unusedNames{},
+				unusedValues{},
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -66,6 +67,10 @@ func (unusedNames) Reference(types.Object) (api.NameReference, error) {
 	panic("unused")
 }
 
+func (unusedNames) Member(*types.Var) (string, error) {
+	panic("unused")
+}
+
 func (unusedNames) Primitive(api.PrimitiveAlias) (api.NameReference, error) {
 	panic("unused")
 }
@@ -75,5 +80,48 @@ func (unusedNames) Temporary(api.TemporaryKind) (string, error) {
 }
 
 func (unusedNames) ModuleExport(types.Object) (bool, error) {
+	panic("unused")
+}
+
+type unusedValues struct{}
+
+func (unusedValues) RequiresCustomEquality(types.Type) bool {
+	panic("unused")
+}
+
+func (unusedValues) Zero(
+	api.Context,
+	ast.Node,
+	types.Type,
+) (api.ExpressionEmission, error) {
+	panic("unused")
+}
+
+func (unusedValues) Copy(
+	api.Context,
+	ast.Node,
+	types.Type,
+	api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	panic("unused")
+}
+
+func (unusedValues) Assign(
+	api.Context,
+	ast.Node,
+	types.Type,
+	tsgo.Expression,
+	api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	panic("unused")
+}
+
+func (unusedValues) Equal(
+	api.Context,
+	ast.Node,
+	types.Type,
+	tsgo.Expression,
+	tsgo.Expression,
+) (api.ExpressionEmission, error) {
 	panic("unused")
 }

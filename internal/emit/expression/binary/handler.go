@@ -15,6 +15,11 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.BinaryExpr,
 ) (api.ExpressionEmission, error) {
+	if source.Op == token.EQL || source.Op == token.NEQ {
+		if target, ok, err := emitValueEquality(context, children, source); ok || err != nil {
+			return target, err
+		}
+	}
 	operator, operandType, ok := operationFor(context, source)
 	if !ok {
 		return api.ExpressionEmission{},
@@ -57,6 +62,68 @@ func Emit(
 		target,
 		api.CombineRequests(left.Requests(), right.Requests()),
 	)
+}
+
+func emitValueEquality(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.BinaryExpr,
+) (api.ExpressionEmission, bool, error) {
+	leftType := context.TypesInfo().TypeOf(source.X)
+	rightType := context.TypesInfo().TypeOf(source.Y)
+	if leftType == nil ||
+		rightType == nil ||
+		!types.Identical(leftType, rightType) ||
+		!context.Values().RequiresCustomEquality(leftType) {
+		return api.ExpressionEmission{}, false, nil
+	}
+	left, err := children.Expression(
+		context.
+			WithRole(api.RoleBinaryLeft).
+			WithExpectedType(leftType),
+		source.X,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	right, err := children.Expression(
+		context.
+			WithRole(api.RoleBinaryRight).
+			WithExpectedType(rightType),
+		source.Y,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	if len(left.Before()) != 0 || len(right.Before()) != 0 {
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	equal, err := context.Values().Equal(
+		context,
+		source,
+		leftType,
+		left.Value(),
+		right.Value(),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	value := equal.Value()
+	if source.Op == token.NEQ {
+		value = context.Factory().PrefixUnaryExpression(
+			tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
+			value,
+		)
+	}
+	return api.DirectExpression(
+		value,
+		api.CombineRequests(
+			left.Requests(),
+			right.Requests(),
+			equal.Requests(),
+		)...,
+	), true, nil
 }
 
 func exactInt32Arithmetic(

@@ -195,6 +195,9 @@ The first named-struct family additionally proves:
 - zero values allocate fresh nested records;
 - assignment, initialization, arguments, results, and value receivers do not
   alias mutable struct storage;
+- borrowed values are copied once at each admitted boundary while fresh
+  composite/call results and single-result returns transfer ownership without
+  a duplicate field walk;
 - `$assign` preserves destination storage identity while copying every nested
   value field;
 - keyed composite literals retain source evaluation order even when field
@@ -211,7 +214,9 @@ initializers, attach a receiver method to the class, or admit an unsupported
 field. Each fails its owning structural, strict-type, differential, or
 unsupported-boundary gate. A scaling fixture doubles fields and proves
 definition size/work grows linearly while copy, assignment, equality, and
-method call sites remain constant-size.
+method call sites remain constant-size. An ownership mutation adds a callee
+prologue copy or copies a fresh composite/call result; artifact and operation
+counts must reject the duplicate boundary work.
 
 ### Execution Authority
 

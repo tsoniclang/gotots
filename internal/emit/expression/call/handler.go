@@ -35,6 +35,20 @@ func emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	if selector, method, selection, ok := selectedMethod(
+		context.TypesInfo(),
+		source.Fun,
+	); ok {
+		return emitMethod(
+			context,
+			children,
+			source,
+			selector,
+			method,
+			selection,
+			discarded,
+		)
+	}
 	object, ok := calleeObject(context.TypesInfo(), source.Fun)
 	if !ok {
 		return api.ExpressionEmission{},
@@ -48,24 +62,8 @@ func emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	resultCount := 0
-	if signature.Results() != nil {
-		resultCount = signature.Results().Len()
-	}
-	if !discarded {
-		if resultCount == 0 {
-			return api.ExpressionEmission{},
-				api.Unsupported(context, api.CategoryExpression, source)
-		} else if resultCount == 1 {
-			if context.ExpectedResults() != nil {
-				return api.ExpressionEmission{},
-					api.Unsupported(context, api.CategoryExpression, source)
-			}
-		} else if expected := context.ExpectedResults(); expected == nil ||
-			!types.Identical(signature.Results(), expected) {
-			return api.ExpressionEmission{},
-				api.Unsupported(context, api.CategoryExpression, source)
-		}
+	if err := validateResults(context, source, signature, discarded); err != nil {
+		return api.ExpressionEmission{}, err
 	}
 	reference, err := context.Names().Reference(object)
 	if err != nil {
@@ -91,6 +89,33 @@ func emit(
 		),
 		api.CombineRequests(reference.Requests(), argumentRequests),
 	)
+}
+
+func validateResults(
+	context api.Context,
+	source *ast.CallExpr,
+	signature *types.Signature,
+	discarded bool,
+) error {
+	resultCount := 0
+	if signature.Results() != nil {
+		resultCount = signature.Results().Len()
+	}
+	if discarded {
+		return nil
+	}
+	switch {
+	case resultCount == 0:
+		return api.Unsupported(context, api.CategoryExpression, source)
+	case resultCount == 1 && context.ExpectedResults() != nil:
+		return api.Unsupported(context, api.CategoryExpression, source)
+	case resultCount > 1 &&
+		(context.ExpectedResults() == nil ||
+			!types.Identical(signature.Results(), context.ExpectedResults())):
+		return api.Unsupported(context, api.CategoryExpression, source)
+	default:
+		return nil
+	}
 }
 
 func calleeObject(info *types.Info, source ast.Expr) (*types.Func, bool) {
@@ -138,8 +163,8 @@ func emitArguments(
 		return nil, nil, nil,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	arguments := make([]tsgo.Expression, 0, len(source.Args))
-	var requests []api.PlacementRequest
+	emissions := make([]api.ExpressionEmission, 0, len(source.Args))
+	requiresCapture := false
 	for index, argument := range source.Args {
 		argumentType := context.TypesInfo().TypeOf(argument)
 		if argumentType == nil ||
@@ -156,12 +181,78 @@ func emitArguments(
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		if len(target.Before()) != 0 {
-			return nil, nil, nil,
-				api.Unsupported(context, api.CategoryExpression, source)
+		target, err = context.Values().Copy(
+			context.WithRole(api.RoleCallArgument),
+			argument,
+			signature.Params().At(index).Type(),
+			target,
+		)
+		if err != nil {
+			return nil, nil, nil, err
 		}
+		if len(target.Before()) != 0 {
+			requiresCapture = true
+		}
+		emissions = append(emissions, target)
+	}
+	if requiresCapture {
+		return captureArguments(context, children, source, signature, emissions)
+	}
+	arguments := make([]tsgo.Expression, 0, len(emissions))
+	var requests []api.PlacementRequest
+	for _, target := range emissions {
 		arguments = append(arguments, target.Value())
 		requests = append(requests, target.Requests()...)
 	}
 	return arguments, nil, requests, nil
+}
+
+func captureArguments(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.CallExpr,
+	signature *types.Signature,
+	emissions []api.ExpressionEmission,
+) ([]tsgo.Expression, []tsgo.Statement, []api.PlacementRequest, error) {
+	arguments := make([]tsgo.Expression, 0, len(emissions))
+	var before []tsgo.Statement
+	var requests []api.PlacementRequest
+	for index, emission := range emissions {
+		targetType, err := children.RepresentedType(
+			context.WithRole(api.RoleCallArgumentType),
+			source.Args[index],
+			signature.Params().At(index).Type(),
+		)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		temporaryName, err := context.Names().Temporary(api.TemporaryCallArgument)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		declaration := context.Factory().VariableDeclaration(
+			context.Factory().Identifier(temporaryName),
+			nil,
+			targetType.Value(),
+			emission.Value(),
+		)
+		before = append(before, emission.Before()...)
+		before = append(
+			before,
+			context.Factory().VariableStatement(
+				nil,
+				context.Factory().VariableDeclarationList(
+					[]tsgo.VariableDeclaration{declaration},
+					tsgo.NodeFlagsConst,
+				),
+			),
+		)
+		arguments = append(
+			arguments,
+			context.Factory().Identifier(temporaryName),
+		)
+		requests = append(requests, emission.Requests()...)
+		requests = append(requests, targetType.Requests()...)
+	}
+	return arguments, before, requests, nil
 }

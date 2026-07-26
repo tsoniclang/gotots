@@ -15,6 +15,7 @@ type Context struct {
 	typesSizes      types.Sizes
 	factory         tsgo.Factory
 	names           Names
+	values          Values
 	expectedType    types.Type
 	expectedResults *types.Tuple
 	functionResults *types.Tuple
@@ -30,6 +31,7 @@ func NewContext(
 	typesSizes types.Sizes,
 	factory tsgo.Factory,
 	names Names,
+	values Values,
 ) (Context, error) {
 	switch {
 	case role == "":
@@ -44,6 +46,8 @@ func NewContext(
 		return Context{}, &ContextError{Reason: "types sizes are nil"}
 	case names == nil:
 		return Context{}, &ContextError{Reason: "name owner is nil"}
+	case values == nil:
+		return Context{}, &ContextError{Reason: "value owner is nil"}
 	}
 	return Context{
 		role:         role,
@@ -53,6 +57,7 @@ func NewContext(
 		typesSizes:   typesSizes,
 		factory:      factory,
 		names:        names,
+		values:       values,
 	}, nil
 }
 
@@ -122,6 +127,10 @@ func (c Context) Factory() tsgo.Factory {
 
 func (c Context) Names() Names {
 	return c.names
+}
+
+func (c Context) Values() Values {
+	return c.values
 }
 
 func (c Context) ExpectedType() types.Type {

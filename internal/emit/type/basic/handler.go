@@ -20,28 +20,8 @@ func EmitRepresented(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
-	basic, ok := types.Unalias(sourceType).(*types.Basic)
+	alias, ok := api.PrimitiveAliasFor(context.TypesSizes(), sourceType)
 	if !ok {
-		return api.TypeEmission{}, api.Unsupported(context, api.CategoryType, source)
-	}
-	var alias api.PrimitiveAlias
-	switch basic.Kind() {
-	case types.Bool:
-		alias = api.PrimitiveBool
-	case types.Int64:
-		alias = api.PrimitiveInt64
-	case types.Int32:
-		alias = api.PrimitiveInt32
-	case types.Int:
-		switch context.TypesSizes().Sizeof(types.Typ[types.Int]) {
-		case 4:
-			alias = api.PrimitiveInt32
-		case 8:
-			alias = api.PrimitiveInt64
-		default:
-			return api.TypeEmission{}, api.Unsupported(context, api.CategoryType, source)
-		}
-	default:
 		return api.TypeEmission{}, api.Unsupported(context, api.CategoryType, source)
 	}
 	reference, err := context.Names().Primitive(alias)

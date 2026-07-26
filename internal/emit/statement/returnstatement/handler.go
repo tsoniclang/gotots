@@ -105,6 +105,15 @@ func emitMultiple(
 		if err != nil {
 			return api.StatementEmission{}, err
 		}
+		result, err = context.Values().Copy(
+			context.WithRole(api.RoleReturnResult),
+			sourceResult,
+			results.At(index).Type(),
+			result,
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
 		if len(result.Before()) != 0 {
 			return api.StatementEmission{},
 				api.Unsupported(context, api.CategoryStatement, source)

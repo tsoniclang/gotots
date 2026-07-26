@@ -121,8 +121,7 @@ fallthrough, type switches, and types whose target equality is not yet proved
 remain distinct typed-unsupported cases. They are not approximated by
 re-evaluation, source spelling, loose equality, or a generic statement walk.
 
-A fully initialized local `var` declaration is owned by its enclosing
-declaration statement:
+A local `var` declaration is owned by its enclosing declaration statement:
 
 ```go
 var left, right int = first(), second()
@@ -134,6 +133,9 @@ constructs one typed target declaration list. The Go scope begins after the
 `ValueSpec`, so an initializer that resolves to an outer same-named object must
 retain that outer identity. The target name owner allocates a distinct inner
 name when needed; it must not rely on TypeScript's temporal-dead-zone behavior.
+When an explicit type has no initializer, the same value-representation owner
+used by assignment supplies the exact zero value. If that type has no proved
+zero representation, the declaration fails at the local-value boundary.
 
 A standalone Go block becomes one target block and is never flattened into its
 parent. This preserves local declaration scopes directly. Grouped `var`
@@ -158,10 +160,9 @@ linking; package assembly later selects the public surface. Untyped constants,
 implicit constant expressions and `iota` remain one later constant-semantics
 family because their representation may depend on each use context.
 
-Zero-initialized declarations, package variables and initialization order,
-multi-result `var` initializers, and initializer prerequisite statements remain
-separate typed-unsupported cases until their complete semantic owners are
-installed.
+Package variables and initialization order, multi-result `var` initializers,
+and initializer prerequisite statements remain separate typed-unsupported
+cases until their complete semantic owners are installed.
 
 Likewise, for:
 
@@ -459,48 +460,6 @@ GoToTS must make zeroing and copying explicit through one representation owner;
 it must not assume that a later compiler, plugin, or runtime will reinterpret
 ordinary TypeScript assignment.
 
-```go
-type Pair struct {
-	Left  int64
-	Ready bool
-}
-
-func NewPair(left int64) Pair {
-	return Pair{Left: left, Ready: true}
-}
-
-func ZeroPair() Pair {
-	var pair Pair
-	return pair
-}
-```
-
-```ts
-import type { bool, int64 } from "../../support/scalars.js";
-
-export interface Pair {
-  Left: int64;
-  Ready: bool;
-}
-
-export function Pair$zero(): Pair {
-  return { Left: 0 as int64, Ready: false as bool };
-}
-
-export function Pair$copy(source: Pair): Pair {
-  return { Left: source.Left, Ready: source.Ready };
-}
-
-export function NewPair(left: int64): Pair {
-  return { Left: left, Ready: true as bool };
-}
-
-export function ZeroPair(): Pair {
-  let pair: Pair = Pair$zero();
-  return pair;
-}
-```
-
 The first supported struct family is narrower and selects one nominal record
 class for non-generic, non-embedded named structs whose fields recursively
 contain only `bool`, exact `int32` (including a selected 32-bit `int`), and
@@ -562,6 +521,22 @@ positional and keyed composite literals preserve source evaluation order, and
 omitted fields request the same `$zero` semantics rather than a second default
 table.
 
+Generated source modules use a caller-owns-value convention. A borrowed struct
+expression (for example, a local identifier or field selection) is copied
+exactly when it crosses an initialization, argument, receiver, or composite
+field boundary. A fresh composite literal or function result already owns
+fresh storage and transfers that ownership without another copy. A supported
+single-result return transfers the function's owned local value. Because
+pointers, shared containers, closures over struct storage, and package
+variables are outside this first family, no admitted path can retain an alias
+to that transferred storage.
+
+Module-level `export` exists for deterministic generated-module linking; it is
+not by itself a JavaScript FFI contract. A future explicitly selected external
+entry adapter must copy incoming struct values once at that true external
+boundary. Generated internal calls must not pay a second callee-prologue copy,
+grow a wrapper per call, or carry a hidden ownership flag.
+
 Assignment, argument passing, return, value receivers, interface boxing, map
 stores, channel sends, and append/copy operations each request copying where Go
 requires it. For example:
@@ -572,7 +547,7 @@ copy.Ready = false
 ```
 
 ```ts
-let copy: Pair = Pair$copy(value);
+let copy: Pair = Pair.$copy(value);
 copy.Ready = false as bool;
 ```
 
@@ -591,12 +566,12 @@ func (flag Flag) Disable() { flag.Ready = false }
 
 ```ts
 export function Flag_Disable(value: Flag): void {
-  const flag: Flag = Flag$copy(value);
-  flag.Ready = false as bool;
+  value.Ready = false as bool;
 }
 ```
 
-Concrete calls invoke `Flag_Disable(flag)` directly. Pointer
+Concrete generated calls invoke `Flag_Disable(Flag.$copy(flag))` directly, so
+the selected value receiver owns exactly one copy before its body runs. Pointer
 receivers, method values, and interface calls select their own exact checked
 entry shape from `go/types`; they do not reuse a value-receiver entry when its
 copy or nil behavior differs. Generated code never uses `.call`, `.apply`, or

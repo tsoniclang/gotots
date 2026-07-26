@@ -157,9 +157,11 @@ func TestLocalVariablesBoundaryMutationsFailClosed(t *testing.T) {
 			role:      api.RoleLocalDeclaration,
 		},
 		{
-			name: "zero initializer",
+			name: "missing type and initializer",
 			mutate: func(source *ast.DeclStmt) {
-				source.Decl.(*ast.GenDecl).Specs[0].(*ast.ValueSpec).Values = nil
+				spec := source.Decl.(*ast.GenDecl).Specs[0].(*ast.ValueSpec)
+				spec.Type = nil
+				spec.Values = nil
 			},
 			category:  api.CategoryStatement,
 			construct: "*ast.ValueSpec",

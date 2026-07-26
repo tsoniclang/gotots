@@ -20,7 +20,8 @@ type targetBinding struct {
 }
 
 type declarationRegistry struct {
-	byObject map[types.Object]targetBinding
+	byObject           map[types.Object]targetBinding
+	memberNameByObject map[*types.Var]string
 }
 
 type nameOwner struct {
@@ -29,6 +30,7 @@ type nameOwner struct {
 	sourceNameBases     map[string]struct{}
 	generatedSuffixes   map[string][]uint64
 	nextGeneratedSuffix map[string]uint64
+	memberNameByObject  map[*types.Var]string
 	registry            *declarationRegistry
 }
 
@@ -37,7 +39,10 @@ func newNameOwner(packageScope *types.Scope, info *types.Info) *nameOwner {
 }
 
 func newDeclarationRegistry() *declarationRegistry {
-	return &declarationRegistry{byObject: make(map[types.Object]targetBinding)}
+	return &declarationRegistry{
+		byObject:           make(map[types.Object]targetBinding),
+		memberNameByObject: make(map[*types.Var]string),
+	}
 }
 
 func newNameOwnerWithRegistry(
@@ -51,6 +56,7 @@ func newNameOwnerWithRegistry(
 		sourceNameBases:     make(map[string]struct{}),
 		generatedSuffixes:   make(map[string][]uint64),
 		nextGeneratedSuffix: make(map[string]uint64),
+		memberNameByObject:  registry.memberNameByObject,
 		registry:            registry,
 	}
 	if info == nil {
@@ -79,6 +85,8 @@ func newNameOwnerWithRegistry(
 			make(map[string]uint64),
 			make(map[string]uint32),
 		)
+		owner.preallocateMethods(info)
+		owner.preallocateMembers(packageScope)
 	}
 	return owner
 }
@@ -309,11 +317,6 @@ func (n *fileNames) Reference(object types.Object) (api.NameReference, error) {
 	if object == nil {
 		return api.NameReference{}, &api.NameError{Reason: "reference object is nil"}
 	}
-	if isPackageObject(object) && n.require != nil {
-		if err := n.require(object); err != nil {
-			return api.NameReference{}, err
-		}
-	}
 	binding, ok := n.owner.byObject[object]
 	if !ok && n.owner.registry != nil {
 		binding, ok = n.owner.registry.byObject[object]
@@ -322,6 +325,11 @@ func (n *fileNames) Reference(object types.Object) (api.NameReference, error) {
 		return api.NameReference{}, &api.NameError{
 			Name:   object.Name(),
 			Reason: "object has no emitted declaration",
+		}
+	}
+	if binding.sourceFile != nil && n.require != nil {
+		if err := n.require(object); err != nil {
+			return api.NameReference{}, err
 		}
 	}
 	if binding.sourceFile != nil && binding.sourceFile != n.sourceFile {
@@ -346,6 +354,20 @@ func (n *fileNames) Reference(object types.Object) (api.NameReference, error) {
 		return api.NewNameReference(localName, request)
 	}
 	return api.NewNameReference(binding.name)
+}
+
+func (n *fileNames) Member(field *types.Var) (string, error) {
+	if field == nil {
+		return "", &api.NameError{Reason: "field object is nil"}
+	}
+	name := n.owner.memberNameByObject[field]
+	if name == "" {
+		return "", &api.NameError{
+			Name:   field.Name(),
+			Reason: "field object was not indexed from a named struct",
+		}
+	}
+	return name, nil
 }
 
 func (n *fileNames) importName(object types.Object, preferred string) string {
@@ -446,11 +468,6 @@ func (n *fileNames) ModuleExport(object types.Object) (bool, error) {
 		}
 	}
 	return binding.moduleExport, nil
-}
-
-func isPackageObject(object types.Object) bool {
-	return object != nil && object.Pkg() != nil &&
-		object.Parent() == object.Pkg().Scope()
 }
 
 func objectName(object types.Object) string {

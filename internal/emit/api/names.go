@@ -12,6 +12,9 @@ const (
 	TemporaryInvalid TemporaryKind = iota
 	TemporaryAssignmentValue
 	TemporaryMultipleResults
+	TemporaryCompositeField
+	TemporaryReceiverValue
+	TemporaryCallArgument
 )
 
 type NameReference struct {
@@ -37,6 +40,7 @@ func (r NameReference) Requests() []PlacementRequest {
 type Names interface {
 	Declare(types.Object) (string, error)
 	Reference(types.Object) (NameReference, error)
+	Member(*types.Var) (string, error)
 	Primitive(PrimitiveAlias) (NameReference, error)
 	Temporary(TemporaryKind) (string, error)
 	ModuleExport(types.Object) (bool, error)
@@ -48,6 +52,12 @@ func TemporaryPrefix(kind TemporaryKind) (string, error) {
 		return "__gotots_assign_", nil
 	case TemporaryMultipleResults:
 		return "__gotots_results_", nil
+	case TemporaryCompositeField:
+		return "__gotots_field_", nil
+	case TemporaryReceiverValue:
+		return "__gotots_receiver_", nil
+	case TemporaryCallArgument:
+		return "__gotots_argument_", nil
 	default:
 		return "", &NameError{
 			Reason: fmt.Sprintf("temporary kind %d is invalid", kind),

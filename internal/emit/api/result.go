@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"go/types"
 	"slices"
 
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -53,6 +54,48 @@ func (e ExpressionEmission) Value() tsgo.Expression {
 }
 
 func (e ExpressionEmission) Requests() []PlacementRequest {
+	return slices.Clone(e.requests)
+}
+
+type StoreTargetEmission struct {
+	value      tsgo.Expression
+	sourceType types.Type
+	requests   []PlacementRequest
+}
+
+func NewStoreTargetEmission(
+	value tsgo.Expression,
+	sourceType types.Type,
+	requests []PlacementRequest,
+) (StoreTargetEmission, error) {
+	switch {
+	case value == nil:
+		return StoreTargetEmission{}, &ResultError{
+			Result: "store target",
+			Reason: "target value is nil",
+		}
+	case sourceType == nil:
+		return StoreTargetEmission{}, &ResultError{
+			Result: "store target",
+			Reason: "source type is nil",
+		}
+	}
+	return StoreTargetEmission{
+		value:      value,
+		sourceType: sourceType,
+		requests:   slices.Clone(requests),
+	}, nil
+}
+
+func (e StoreTargetEmission) Value() tsgo.Expression {
+	return e.value
+}
+
+func (e StoreTargetEmission) SourceType() types.Type {
+	return e.sourceType
+}
+
+func (e StoreTargetEmission) Requests() []PlacementRequest {
 	return slices.Clone(e.requests)
 }
 

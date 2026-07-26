@@ -101,10 +101,22 @@ func emitMultipleResults(
 			)
 			requests = append(requests, declarationType.Requests()...)
 		} else {
+			assigned, err := context.Values().Assign(
+				context.WithRole(api.RoleAssignmentTarget),
+				target.source,
+				target.object.Type(),
+				context.Factory().Identifier(target.name),
+				api.DirectExpression(element),
+			)
+			if err != nil {
+				return api.StatementEmission{}, err
+			}
+			statements = append(statements, assigned.Before()...)
 			statements = append(
 				statements,
-				assignmentStatement(context, target.name, element),
+				context.Factory().ExpressionStatement(assigned.Value()),
 			)
+			requests = append(requests, assigned.Requests()...)
 		}
 		requests = append(requests, target.requests...)
 	}

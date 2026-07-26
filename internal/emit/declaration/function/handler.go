@@ -14,7 +14,6 @@ func Emit(
 	source *ast.FuncDecl,
 ) (api.DeclarationEmission, error) {
 	if source.Doc != nil ||
-		source.Recv != nil ||
 		source.Type == nil ||
 		source.Type.Params == nil ||
 		source.Type.TypeParams != nil ||
@@ -30,10 +29,10 @@ func Emit(
 	}
 	signature, ok := functionObject.Type().(*types.Signature)
 	if !ok ||
-		signature.Recv() != nil ||
 		signature.TypeParams() != nil ||
 		signature.RecvTypeParams() != nil ||
-		signature.Variadic() {
+		signature.Variadic() ||
+		(source.Recv == nil) != (signature.Recv() == nil) {
 		return api.DeclarationEmission{},
 			api.Unsupported(context, api.CategoryDeclaration, source)
 	}
@@ -51,6 +50,19 @@ func Emit(
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
+	if signature.Recv() != nil {
+		receiver, receiverRequests, err := emitReceiver(
+			context,
+			children,
+			source,
+			signature,
+		)
+		if err != nil {
+			return api.DeclarationEmission{}, err
+		}
+		parameters = append([]tsgo.ParameterDeclaration{receiver}, parameters...)
+		parameterRequests = append(receiverRequests, parameterRequests...)
+	}
 	resultType, err := emitResult(context, children, source.Type.Results, signature)
 	if err != nil {
 		return api.DeclarationEmission{}, err
@@ -64,7 +76,6 @@ func Emit(
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
-
 	moduleExport, err := context.Names().ModuleExport(functionObject)
 	if err != nil {
 		return api.DeclarationEmission{}, err
@@ -97,7 +108,11 @@ func emitParameters(
 	children api.ChildEmitter,
 	fields *ast.FieldList,
 	signature *types.Signature,
-) ([]tsgo.ParameterDeclaration, []api.PlacementRequest, error) {
+) (
+	[]tsgo.ParameterDeclaration,
+	[]api.PlacementRequest,
+	error,
+) {
 	if fields == nil {
 		return nil, nil,
 			&api.InvariantError{Role: context.Role(), Reason: "parameter list is nil"}
@@ -107,7 +122,8 @@ func emitParameters(
 	parameterIndex := 0
 	for _, field := range fields.List {
 		if field.Doc != nil || field.Comment != nil || field.Tag != nil || len(field.Names) == 0 {
-			return nil, nil, api.Unsupported(context, api.CategoryDeclaration, field)
+			return nil, nil,
+				api.Unsupported(context, api.CategoryDeclaration, field)
 		}
 		targetType, err := children.Type(context.WithRole(api.RoleParameterType), field.Type)
 		if err != nil {
@@ -116,12 +132,14 @@ func emitParameters(
 		requests = append(requests, targetType.Requests()...)
 		for _, sourceName := range field.Names {
 			if parameterIndex >= signature.Params().Len() {
-				return nil, nil, api.Unsupported(context, api.CategoryDeclaration, field)
+				return nil, nil,
+					api.Unsupported(context, api.CategoryDeclaration, field)
 			}
 			parameter := signature.Params().At(parameterIndex)
 			if context.TypesInfo().Defs[sourceName] != parameter ||
 				!types.Identical(parameter.Type(), context.TypesInfo().TypeOf(field.Type)) {
-				return nil, nil, api.Unsupported(context, api.CategoryDeclaration, field)
+				return nil, nil,
+					api.Unsupported(context, api.CategoryDeclaration, field)
 			}
 			name, err := context.Names().Declare(parameter)
 			if err != nil {
@@ -139,7 +157,8 @@ func emitParameters(
 		}
 	}
 	if parameterIndex != signature.Params().Len() {
-		return nil, nil, api.Unsupported(context, api.CategoryDeclaration, fields)
+		return nil, nil,
+			api.Unsupported(context, api.CategoryDeclaration, fields)
 	}
 	return parameters, requests, nil
 }
