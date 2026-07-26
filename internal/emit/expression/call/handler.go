@@ -7,6 +7,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	integerconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/integer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -32,6 +33,13 @@ func emit(
 	source *ast.CallExpr,
 	discarded bool,
 ) (api.ExpressionEmission, error) {
+	if target, ok, err := integerconversion.Emit(
+		context,
+		children,
+		source,
+	); ok || err != nil {
+		return target, err
+	}
 	if source.Ellipsis != token.NoPos {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)

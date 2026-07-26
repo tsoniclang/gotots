@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -194,7 +195,7 @@ func primitive(
 	context api.Context,
 	sourceType types.Type,
 ) (api.PrimitiveAlias, bool) {
-	return api.PrimitiveAliasFor(context.TypesSizes(), sourceType)
+	return basictype.PrimitiveAlias(context.TypesSizes(), sourceType)
 }
 
 func callableValue(sourceType types.Type) bool {
