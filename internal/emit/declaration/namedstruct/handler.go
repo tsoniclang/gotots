@@ -15,7 +15,7 @@ type field struct {
 	name       string
 }
 
-func Emit(
+func emitClass(
 	context api.Context,
 	children api.ChildEmitter,
 	declaration *ast.GenDecl,
@@ -84,7 +84,7 @@ func Emit(
 	), nil
 }
 
-func EmitCompanion(
+func emitCompanion(
 	context api.Context,
 	children api.ChildEmitter,
 	declaration ast.Decl,

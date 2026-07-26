@@ -20,7 +20,7 @@ type fileNames struct {
 	temporaries      map[api.TemporaryKind]uint64
 	importNames      map[string]struct{}
 	importAliases    map[types.Object]string
-	companionAliases map[api.CompanionOwner]string
+	companionAliases map[api.DeclarationRequirement]string
 	primitives       map[api.PrimitiveAlias]string
 }
 
@@ -41,7 +41,7 @@ func (n *nameOwner) ForFile(
 		temporaries:      make(map[api.TemporaryKind]uint64),
 		importNames:      make(map[string]struct{}),
 		importAliases:    make(map[types.Object]string),
-		companionAliases: make(map[api.CompanionOwner]string),
+		companionAliases: make(map[api.DeclarationRequirement]string),
 		primitives:       make(map[api.PrimitiveAlias]string),
 	}
 }
@@ -218,7 +218,7 @@ func (n *fileNames) Companion(
 			return api.NameReference{}, err
 		}
 	}
-	companion, err := api.NewCompanionOwner(typeName, operation)
+	companion, err := api.NewNamedStructCompanionRequirement(typeName, operation)
 	if err != nil {
 		return api.NameReference{}, err
 	}

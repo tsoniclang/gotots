@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestCompanionRequestCarriesTypedOwningFileIdentity(t *testing.T) {
+func TestCompanionRequestCarriesTypedDeclarationRequirement(t *testing.T) {
 	typeName := types.NewTypeName(
 		token.NoPos,
 		types.NewPackage("example.com/records", "records"),
@@ -18,11 +18,20 @@ func TestCompanionRequestCarriesTypedOwningFileIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	owner, ok := request.Companion()
+	requirement, ok := request.DeclarationRequirement()
 	if !ok ||
-		owner.TypeName() != typeName ||
-		owner.Operation() != CompanionCopy {
-		t.Fatalf("companion owner = %#v, %t", owner, ok)
+		requirement.Owner() != typeName ||
+		requirement.Kind() != DeclarationRequirementNamedStructCompanion {
+		t.Fatalf("declaration requirement = %#v, %t", requirement, ok)
+	}
+	owner, operation, ok := requirement.NamedStructCompanion()
+	if !ok || owner != typeName || operation != CompanionCopy {
+		t.Fatalf(
+			"named-struct companion = %v, %v, %t",
+			owner,
+			operation,
+			ok,
+		)
 	}
 	if request.LegalScope() != ScopeOwningFile ||
 		request.PreferredScope() != ScopeOwningFile ||

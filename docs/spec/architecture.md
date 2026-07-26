@@ -555,8 +555,7 @@ internal/load/                      project and selected-toolchain loading
 
 internal/emit/                      session, scheduling, closed dispatch only
   dispatch.go                       emitter plus closed typed dispatch
-  scheduling.go                     roots, demand, and requirement schedulers
-  declaration_assembly.go           owner-keyed pre-seal target reconstruction
+  declaration_assembly.go           roots, demand, requirements, and owner-keyed pre-seal reconstruction
   target_files.go                   source/support/program file sealing
   package_state.go                  package storage and initialization owner
   api/                              narrow handler contracts

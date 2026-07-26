@@ -106,9 +106,16 @@ func (e *emitter) declarationObject(
 	context api.Context,
 	source ast.Decl,
 	object types.Object,
+	requirements []api.DeclarationRequirement,
 ) (api.DeclarationEmission, error) {
 	switch source := source.(type) {
 	case *ast.FuncDecl:
+		if len(requirements) != 0 {
+			return api.DeclarationEmission{}, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "function declaration received target requirements",
+			}
+		}
 		function, ok := object.(*types.Func)
 		if !ok || context.TypesInfo().Defs[source.Name] != function {
 			return api.DeclarationEmission{},
@@ -120,7 +127,19 @@ func (e *emitter) declarationObject(
 		return functiondeclaration.Emit(context, e, source)
 	case *ast.GenDecl:
 		if typeName, ok := object.(*types.TypeName); ok {
-			return namedstructdeclaration.Emit(context, e, source, typeName)
+			return namedstructdeclaration.EmitAssembly(
+				context,
+				e,
+				source,
+				typeName,
+				requirements,
+			)
+		}
+		if len(requirements) != 0 {
+			return api.DeclarationEmission{}, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "non-type declaration received target requirements",
+			}
 		}
 		constant, ok := object.(*types.Const)
 		if !ok {

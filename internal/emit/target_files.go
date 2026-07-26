@@ -11,6 +11,15 @@ import (
 )
 
 func (s *programSession) targetFiles() ([]TargetFile, error) {
+	if s.sealed {
+		return nil, &ScheduleError{Reason: "target files were sealed more than once"}
+	}
+	if s.scheduler.hasPending() ||
+		s.requirements.hasPending() ||
+		s.packageInitializations.hasPending() {
+		return nil, &ScheduleError{Reason: "target files sealed with pending work"}
+	}
+	s.sealed = true
 	paths := make([]string, 0, len(s.builders))
 	for outputPath := range s.builders {
 		paths = append(paths, outputPath)
@@ -34,21 +43,10 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 			len(builder.declarations)+len(builder.packageInitializers),
 		)
 		for _, declaration := range builder.declarations {
-			statements := slices.Clone(declaration.statements)
-			for _, operation := range []api.CompanionOperation{
-				api.CompanionZero,
-				api.CompanionCopy,
-				api.CompanionEqual,
-			} {
-				statements = append(
-					statements,
-					declaration.companions[operation]...,
-				)
-			}
 			chunks = append(chunks, declarationChunk{
 				position:   declaration.position,
 				name:       declaration.object.Name(),
-				statements: statements,
+				statements: slices.Clone(declaration.statements),
 			})
 		}
 		for _, declaration := range builder.packageInitializers {

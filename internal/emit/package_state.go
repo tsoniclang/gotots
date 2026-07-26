@@ -72,6 +72,10 @@ func (s *packageInitializationScheduler) next() (*load.Package, bool) {
 	return sourcePackage, true
 }
 
+func (s *packageInitializationScheduler) hasPending() bool {
+	return len(s.queue) != 0 || len(s.pending) != 0
+}
+
 func (s *programSession) requirePackage(sourcePackage *load.Package) error {
 	if sourcePackage == nil || sourcePackage.Types() == nil {
 		return &ScheduleError{Reason: "required package is nil"}
@@ -508,12 +512,11 @@ func (s *programSession) packageExports(
 				byPath[binding.sourcePath],
 				binding.name,
 			)
-			typeName, ok := declaration.object.(*types.TypeName)
-			if !ok {
-				continue
-			}
-			for operation, statements := range declaration.companions {
-				if len(statements) == 0 {
+			for _, requirement := range s.requirements.appliedFor(
+				declaration.object,
+			) {
+				typeName, operation, ok := requirement.NamedStructCompanion()
+				if !ok {
 					continue
 				}
 				companionName, err := api.CompanionExportName(
