@@ -127,6 +127,7 @@ selected-toolchain contract reconciliation, and other non-producing checks.
 An emission session may retain:
 
 - selected package/file references and the shared `types.Info`;
+- one immutable compilation-wide representation profile;
 - a stack of source context and target lexical builders;
 - deterministic mappings from typed Go objects to target names/declarations;
 - already-created typed TS-Go protocol AST values;
@@ -179,6 +180,14 @@ reserves its TS-Go declaration. Every later use retrieves that same target
 state by authoritative Go identity. The decision is final before dependent
 target nodes are emitted; it is never serialized into a plan or consumed by a
 later lowering stage.
+
+Target-carrier policy is selected once at the compilation entry point and is
+immutable for the complete dependency closure. The initial integer
+representation profile is a closed choice between `number` (the default) and
+`bigint`. Handlers query one typed representation owner; they never inspect
+CLI flags or independently choose carriers. A generated file set may not mix
+profiles. The selected profile is part of reproducibility evidence and any
+eventual output manifest.
 
 ## Definition Scheduling
 
@@ -239,6 +248,14 @@ request in its emission result. Only the root placement owner consumes requests
 and mutates a target builder. No `Context` capability may silently install an
 import or hoisted declaration while a child is being translated.
 
+A use-dependent operation on a named type is a typed companion-declaration
+request keyed by the authoritative `types.TypeName` and a closed operation
+kind. It is owned by the generated source-file module containing that type's
+declaration, not by the first caller. Applying one request may produce further
+typed requests, such as `Box` copying requesting `Point` copying. The root
+placement owner resolves this work to a fixed point, deduplicates by typed
+owner, and rejects ownership conflicts.
+
 One placement service applies the policy:
 
 - imports always enter file import scope; dynamic imports are forbidden;
@@ -247,6 +264,8 @@ One placement service applies the policy:
   names are unexported; only the package assembly facade exposes the selected
   Go public API to consumers;
 - reusable static declarations prefer file scope;
+- named-type companion declarations are emitted immediately after their
+  owning type declaration in a fixed operation order;
 - function-wide declarations enter the function prologue only when their
   lifetime is function-wide;
 - evaluation-dependent temporaries remain immediately inside the branch,
@@ -255,6 +274,14 @@ One placement service applies the policy:
   scope is syntactically legal.
 
 This permits hoisting without maintaining a separate target IR.
+
+Creating a typed TS-Go node is not finalizing or printing its containing file.
+The root emitter seals each target file only after scheduling and placement
+queues are empty. A sealed file accepts no further request. Already-created
+class nodes are never reopened: genuine class members come from the complete Go
+type contract when the class is constructed, while use-dependent generated
+operations are top-level companion declarations. There is no target-text
+patch, prototype assignment, mutable class reopening, or post-print insertion.
 
 Call and composite handlers consume child emissions in Go evaluation order. If
 a later child has prerequisite statements, already-evaluated earlier children

@@ -16,9 +16,11 @@ They cannot override this specification. Requirements use **must** and
 
 ## Mission
 
-Given a valid selected Go project, toolchain, build configuration, and explicit
-environment contracts, GoToTS produces deterministic, readable, strict ESM
-TypeScript with equivalent observable behavior.
+Given a valid selected Go project, toolchain, build configuration, explicit
+representation profile, and environment contracts, GoToTS produces
+deterministic, readable, strict ESM TypeScript with observable behavior defined
+by that profile. Any intentional departure from Go semantics is named in the
+profile and may not be described as exact.
 
 It is a general Go compiler. `typescript-go` is an acceptance corpus, not a
 production dependency, language authority, package-name exception, or source
@@ -102,8 +104,9 @@ they do not mutate arbitrary ancestors.
   deduplicated type aliases or behaviorally real runtime operations required by
   generated files. It is constructed through TS-Go AST like every other output
   file and has no external compiler dependency.
-- **representation rule:** the direct rule choosing an exact TypeScript shape
-  for a Go type, method, interface, value, or operation.
+- **representation rule:** the direct rule choosing the TypeScript shape
+  required by the selected profile for a Go type, method, interface, value, or
+  operation.
 - **manual obligation:** an exact generated declaration whose implementation
   must be supplied manually.
 - **true external:** unavailable or host/native behavior represented by an
@@ -146,6 +149,6 @@ No import-path prefix decides these classes.
 - A marker-like declaration is valid only when GoToTS emits and owns it and its
   ordinary TypeScript meaning is complete. A no-op marker cannot substitute for
   Go zeroing, copying, dispatch, type identity, or runtime behavior.
-- Correct behavior, strict static typing, maintainable source shape, generated
-  size, typecheck cost, generation cost, and runtime cost are simultaneous
-  acceptance dimensions.
+- Correct behavior within the declared profile, strict static typing,
+  maintainable source shape, generated size, typecheck cost, generation cost,
+  and runtime cost are simultaneous acceptance dimensions.

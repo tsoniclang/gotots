@@ -200,8 +200,8 @@ The first named-struct family additionally proves:
 - borrowed values are copied once at each admitted boundary while fresh
   composite/call results and single-result returns transfer ownership without
   a duplicate field walk;
-- `$assign` preserves destination storage identity while copying every nested
-  value field;
+- pointer-free assignment rebinds to one copied value without a speculative
+  destination-identity helper;
 - positional, keyed, and omitted-field composite literals are exact; keyed
   literals retain source evaluation order even when field declaration order
   differs;
@@ -211,10 +211,11 @@ The first named-struct family additionally proves:
 - tags, embedding, pointers, interfaces, method values/expressions, generics,
   and unsupported field representations fail at their typed owner.
 
-Mutations replace `$copy` with direct assignment, `$assign` with target
-rebinding, `$equal` with `===`, remove the private brand, reorder keyed
-initializers, attach a receiver method to the class, or admit an unsupported
-field. Each fails its owning structural, strict-type, differential, or
+Mutations replace a requested copy with direct assignment, replace requested
+field equality with `===`, remove the private brand, reorder keyed initializers,
+attach a receiver method to the class, emit an unrequested companion, duplicate
+a companion, route it to the caller's file, or admit an unsupported field. Each
+fails its owning structural, strict-type, differential, placement, or
 unsupported-boundary gate. A scaling fixture doubles fields and proves
 definition size/work grows linearly while copy, assignment, equality, and
 method call sites remain constant-size. An ownership mutation adds a callee
@@ -234,21 +235,20 @@ diagnostic output as failure; tests and product gates must not invoke the
 executable through a status-only wrapper.
 
 Primitive aliases preserve selected Go names in target source but do not prove
-runtime range or arithmetic. For example, `int64 = number` does not establish
-64-bit precision, overflow, shifts, conversions, or exact large constants. A
-small-value runtime test cannot certify the full class. The capability closes
-only when direct standalone behavior is exact for the complete admitted domain
-or a GoToTS-owned generated/runtime operation implements and differentially
-proves that behavior. Otherwise the construct remains typed unsupported.
+runtime range or overflow. Every integer gate runs under an explicit
+compilation-wide profile. The default `number` gate inspects direct arithmetic,
+ordinary numeric literals, and the absence of routine casts, `Math.imul`, and
+wrapping operators; its differential values remain inside the declared exact
+number domain. The `bigint` gate inspects BigInt aliases and literals, executes
+values beyond JavaScript's safe-number range, and proves that no number carrier
+leaks into integer operations.
 
-The signed-integer gate differentially exercises every admitted `int32`
-operator at `math.MinInt32`, `math.MaxInt32`, and overflow-producing operands,
-and inspects the exact wrapped TS-Go AST. It separately proves that `int64` and
-64-bit `int` arithmetic, comparison, compound update, increment/decrement, and
-switch fail at their contextual semantic owner. Mutations remove `| 0`,
-replace `Math.imul` with ordinary multiplication, admit a wide operation, or
-round a wide constant; each must fail its owning differential or unsupported
-boundary.
+Mutations reintroduce a routine literal cast or redundant inferred annotation,
+emit a wrapped default multiplication, mix representations across generated
+files, or print a number literal in BigInt mode. Each fails its owning AST,
+strict-type, differential, or profile-coherence gate. Reports explicitly state
+that implicit fixed-width overflow is deferred; neither profile may be
+described as proving it.
 
 Each checkpoint records the exact Go toolchain, pinned TS-Go revision/schema,
 JavaScript runtime, and GoToTS support/runtime revision used by proof. No

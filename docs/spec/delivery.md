@@ -85,18 +85,22 @@ export function Negate(value: bool): bool {
 ```
 
 The basic representation owner may also request `int32` or `int64` according
-to the loaded `types.Sizes`. Their generated declarations are aliases of
-`number`, preserving the selected Go-width name in target source:
+to the loaded `types.Sizes`. The default compilation-wide integer
+representation is `number`, preserving the selected Go-width name in target
+source:
 
 ```ts
 export type int32 = number;
 export type int64 = number;
 ```
 
-An alias is not proof that JavaScript numbers implement the corresponding Go
-range, overflow, conversion, or bit operation. Such a capability remains
-unsupported until direct standalone behavior is proved for its complete domain
-or a GoToTS-owned runtime representation implements it exactly.
+The CLI may instead select the `bigint` representation for the complete
+dependency closure, in which case the aliases target `bigint` and integer
+literals use BigInt syntax. Neither initial representation reproduces implicit
+fixed-width Go overflow. That behavior is deliberately outside the initial
+integer contract rather than being scattered through ordinary arithmetic.
+Explicit narrowing conversions and a future fixed-width profile require their
+own complete construct proof.
 
 Bootstrap in dependency order:
 
@@ -109,9 +113,9 @@ Bootstrap in dependency order:
 
 The output must be built as typed official TS-Go protocol AST, printed by
 TS-Go, strict-typechecked, compiled to ESM JavaScript, executed directly against
-Go, and size-attributed. If JavaScript's native carrier is not exact, the
-generated program must use a behaviorally exact GoToTS-owned runtime operation
-or the construct remains unsupported.
+Go within the selected representation contract, and size-attributed. Evidence
+must state the selected integer representation and may not describe overflow or
+wide-number behavior as exact when that behavior is outside the profile.
 
 ## 2. Core Direct Emission
 
