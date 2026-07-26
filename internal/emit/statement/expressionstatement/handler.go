@@ -11,15 +11,7 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.ExprStmt,
 ) (api.StatementEmission, error) {
-	call, ok := source.X.(*ast.CallExpr)
-	if !ok {
-		return api.StatementEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
-	}
-	target, err := children.DiscardedCall(
-		context.WithRole(api.RoleExpressionStatement),
-		call,
-	)
+	target, err := EmitExpression(context, children, source)
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
@@ -29,4 +21,24 @@ func Emit(
 		context.Factory().ExpressionStatement(target.Value()),
 	)
 	return api.NewStatementEmission(statements, target.Requests())
+}
+
+func EmitExpression(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.ExprStmt,
+) (api.ExpressionEmission, error) {
+	call, ok := source.X.(*ast.CallExpr)
+	if !ok {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	target, err := children.DiscardedCall(
+		context.WithRole(api.RoleExpressionStatement),
+		call,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return target, nil
 }

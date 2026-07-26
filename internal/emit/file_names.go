@@ -60,6 +60,19 @@ func (n *fileNames) Declare(object types.Object) (string, error) {
 	return n.owner.declare(object, targetBinding{})
 }
 
+func (n *fileNames) Parameter(parameter *types.Var, index int) (string, error) {
+	switch {
+	case parameter == nil:
+		return "", &api.NameError{Reason: "parameter object is nil"}
+	case index < 0:
+		return "", &api.NameError{Reason: "parameter index is negative"}
+	case parameter.Name() != "":
+		return n.Declare(parameter)
+	default:
+		return "$" + strconv.Itoa(index), nil
+	}
+}
+
 func (n *fileNames) Reference(object types.Object) (api.NameReference, error) {
 	return n.reference(object, api.ImportPhaseValue)
 }

@@ -2,11 +2,11 @@ package packageconstant
 
 import (
 	"go/ast"
-	"go/constant"
 	"go/token"
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -86,41 +86,17 @@ func emitSpec(
 		return nil, nil, false, nil
 	}
 	sourceName := source.Names[selectedIndex]
-	if sourceName.Name == "_" ||
-		!types.Identical(context.TypesInfo().TypeOf(source.Type), selected.Type()) {
-		return nil, nil, false,
-			api.Unsupported(context, api.CategoryDeclaration, source)
-	}
 	sourceValue := source.Values[selectedIndex]
-	typeAndValue, ok := context.TypesInfo().Types[sourceValue]
-	if !ok || typeAndValue.Value == nil ||
-		!constant.Compare(typeAndValue.Value, token.EQL, selected.Val()) ||
-		!types.AssignableTo(typeAndValue.Type, selected.Type()) {
-		return nil, nil, false,
-			api.Unsupported(context, api.CategoryDeclaration, source)
-	}
-	value, err := children.Expression(
-		context.
-			WithRole(api.RolePackageConstantValue).
-			WithExpectedType(selected.Type()),
-		sourceValue,
-	)
-	if err != nil {
-		return nil, nil, false, err
-	}
-	if len(value.Before()) != 0 {
-		return nil, nil, false,
-			api.Unsupported(context, api.CategoryDeclaration, source)
-	}
-	targetType, err := children.RepresentedType(
-		context.WithRole(api.RolePackageConstantType),
+	binding, err := constantbinding.EmitBinding(
+		context,
+		children,
 		sourceName,
-		selected.Type(),
+		source.Type,
+		sourceValue,
+		selected,
+		api.RolePackageConstantType,
+		api.RolePackageConstantValue,
 	)
-	if err != nil {
-		return nil, nil, false, err
-	}
-	targetName, err := context.Names().Declare(selected)
 	if err != nil {
 		return nil, nil, false, err
 	}
@@ -135,25 +111,16 @@ func emitSpec(
 				Reason: "package constant is not module-exported",
 			}
 	}
-	declaration := context.Factory().VariableDeclaration(
-		context.Factory().Identifier(targetName),
-		nil,
-		targetType.Value(),
-		value.Value(),
-	)
 	declarations = append(
 		declarations,
 		context.Factory().VariableStatement(
 			[]tsgo.ModifierLike{context.Factory().ExportKeyword()},
 			context.Factory().VariableDeclarationList(
-				[]tsgo.VariableDeclaration{declaration},
+				[]tsgo.VariableDeclaration{binding.Declaration()},
 				tsgo.NodeFlagsConst,
 			),
 		),
 	)
-	requests = append(
-		requests,
-		api.CombineRequests(targetType.Requests(), value.Requests())...,
-	)
+	requests = append(requests, binding.Requests()...)
 	return declarations, requests, true, nil
 }

@@ -93,7 +93,7 @@ func TestMultipleResultsCreateDirectTupleTreeAndSingleEvaluation(t *testing.T) {
 	}
 }
 
-func TestMultipleResultNamedReturnRemainsExplicitlyUnsupported(t *testing.T) {
+func TestMultipleResultNameWithoutCheckerIdentityFailsClosed(t *testing.T) {
 	loaded := loadMultipleResultsProject(t)
 	pair := loaded.Files()[0].Syntax().Decls[0].(*ast.FuncDecl)
 	pair.Type.Results.List[0].Names = []*ast.Ident{ast.NewIdent("left")}
@@ -102,8 +102,8 @@ func TestMultipleResultNamedReturnRemainsExplicitlyUnsupported(t *testing.T) {
 	assertUnsupportedCallable(
 		t,
 		err,
-		api.CategoryDeclaration,
-		"*ast.Field",
+		api.CategoryType,
+		"*ast.Ident",
 		api.RoleResultType,
 	)
 }

@@ -109,7 +109,7 @@ func TestLoopControlRejectsUnsupportedPostVariant(t *testing.T) {
 	}
 }
 
-func TestLoopControlRejectsUnsupportedInitializerVariant(t *testing.T) {
+func TestLoopControlRejectsAssignmentWithoutTargetIdentity(t *testing.T) {
 	loaded := loadLoopControlProject(t)
 	function := loaded.Files()[0].Syntax().Decls[0].(*ast.FuncDecl)
 	loop := function.Body.List[1].(*ast.ForStmt)
@@ -120,9 +120,9 @@ func TestLoopControlRejectsUnsupportedInitializerVariant(t *testing.T) {
 	if !errors.As(err, &unsupported) {
 		t.Fatalf("error = %v, want *api.UnsupportedError", err)
 	}
-	if unsupported.Category != api.CategoryStatement ||
-		unsupported.Construct != "*ast.AssignStmt" ||
-		unsupported.Role != api.RoleForInitializer {
+	if unsupported.Category != api.CategoryExpression ||
+		unsupported.Construct != "*ast.Ident" ||
+		unsupported.Role != api.RoleAssignmentTarget {
 		t.Fatalf("unsupported error = %#v", unsupported)
 	}
 }

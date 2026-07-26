@@ -112,3 +112,15 @@ func TestExpressionEmissionRejectsMissingValue(t *testing.T) {
 		t.Fatal("missing target expression was accepted")
 	}
 }
+
+func TestExpressionForInitializerUsesPinnedTargetCategory(t *testing.T) {
+	factory := tsgo.NewFactory()
+	result, err := api.ExpressionForInitializer(factory.Identifier("value"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	identifier, ok := result.Value().(tsgo.Identifier)
+	if !ok || identifier.Text() != "value" {
+		t.Fatalf("for initializer = %T, want value identifier", result.Value())
+	}
+}

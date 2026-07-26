@@ -222,12 +222,31 @@ Examples include:
 - one RHS producing multiple assignment results;
 - direct tuple declaration/return/forwarding, blank-result stores, and one
   multi-valued call supplying a complete argument list;
+- direct callable parameters, returned named functions, immediately invoked
+  literals, lexical captures, and cross-package function values, with the
+  exact reached declaration set joined by `types.Object` identity;
+- named single and multiple results, zero initialization, bare return, explicit
+  return, and a nested literal proving the inner result context replaces the
+  outer one;
+- explicitly typed local constants, expressionless switches, and each admitted
+  direct simple-statement position;
 - side effects in parallel assignment and short-circuit expressions;
 - nil pointer receiver methods that do and do not dereference;
 - embedded methods whose Go static selection differs from TypeScript virtual
   dispatch;
 - interfaces with many implementers, proving constant-size call sites;
 - nested function literals requiring branch-local versus file-level placement.
+
+The callable-value family additionally mutates the callee from a named
+declaration to a function-valued expression, changes a signature parameter or
+result, drops one lexical capture reference, replaces direct invocation with
+`.call`, aliases the signature through `any`/`unknown`, omits a reached
+cross-package function, and leaks an outer named-result context into a nested
+literal. Each mutation must fail at the target-structure, strict-type,
+identity-closure, differential, or broad-search gate. Construction and output
+size are measured over doubled parameters, nested literals, captures, and call
+sites; call-site size must remain constant per argument and must not grow with
+the number of possible function values.
 
 The first named-struct family additionally proves:
 

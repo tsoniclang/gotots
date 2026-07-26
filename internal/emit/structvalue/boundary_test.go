@@ -85,9 +85,9 @@ func TestNamedStructUnsupportedNeighborsFailAtTypedOwners(t *testing.T) {
 				"type Value struct { X int32 }\n" +
 				"func (value Value) WithX(next int32) Value { value.X = next; return value }\n" +
 				"func Use(value Value) Value { return Value.WithX(value, 1) }\n",
-			role:      api.RoleReturnResult,
+			role:      api.RoleCallCallee,
 			category:  api.CategoryExpression,
-			construct: "*ast.CallExpr",
+			construct: "*ast.SelectorExpr",
 		},
 		{
 			name: "method value",
@@ -173,9 +173,9 @@ func TestNamedStructReceiverSelectionUsesGoTypesIdentity(t *testing.T) {
 	_, err = emit.Compile(program, roots)
 	var unsupported *api.UnsupportedError
 	if !errors.As(err, &unsupported) ||
-		unsupported.Role != api.RoleReturnResult ||
+		unsupported.Role != api.RoleCallCallee ||
 		unsupported.Category != api.CategoryExpression ||
-		unsupported.Construct != "*ast.CallExpr" {
+		unsupported.Construct != "*ast.SelectorExpr" {
 		t.Fatalf("missing selection error = %#v, want typed receiver-call failure", err)
 	}
 }

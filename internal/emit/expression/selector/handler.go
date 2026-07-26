@@ -43,7 +43,9 @@ func Emit(
 			reference.Requests()...,
 		), nil
 	}
-	if _, ok := object.(*types.Const); !ok {
+	switch object.(type) {
+	case *types.Const, *types.Func:
+	default:
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}

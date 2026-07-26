@@ -65,6 +65,10 @@ func (unusedNames) Declare(types.Object) (string, error) {
 	panic("unused")
 }
 
+func (unusedNames) Parameter(*types.Var, int) (string, error) {
+	panic("unused")
+}
+
 func (unusedNames) Reference(types.Object) (api.NameReference, error) {
 	panic("unused")
 }

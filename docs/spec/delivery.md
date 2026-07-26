@@ -134,8 +134,33 @@ results directly from Go AST/type evidence. Add the identity-keyed demand
 scheduler for executable, API, test, extension, initialization, function-value,
 and callback roots without constructing a parallel source graph.
 
-Close each construct family independently. Finish with several ordinary
-multi-package programs and no runtime/manual/external dependency.
+Close each construct family independently. The exit boundary includes:
+
+- non-generic, non-variadic function declarations, function literals, and
+  unnamed function types over already-supported value representations;
+- function values used as parameters, locals, arguments, results, direct
+  callees, and lexical closures, with reached declarations scheduled by exact
+  `go/types` object identity;
+- unnamed and named result variables, including exact zero initialization and
+  bare returns where every result is named;
+- explicitly typed local constants without `iota` or inherited expressions;
+- expression and expressionless switches without fallthrough; and
+- a single-binding short declaration, single-target supported assignment,
+  `++`/`--`, or discarded direct call in each Go-legal `if`, `switch`, and
+  three-clause `for` simple-statement position. A scoped `if`/`switch`
+  initializer may retain an already-supported multi-statement transaction;
+  a `for` header rejects any form that cannot remain one target initializer or
+  expression without prerequisite statements.
+
+Function nil values, defined or declared-alias function types, variadics,
+generics, method values/expressions, interface dispatch, strings and
+containers, `defer`, `go`, labels, `goto`, fallthrough, range, type switches,
+and other runtime/value-model families remain Milestone 3 obligations. Their
+absence does not justify a helper or erased callable protocol in Milestone 2.
+
+Finish with several ordinary multi-package programs that exercise direct calls,
+callbacks, returned closures, named results, package initialization, and
+cross-package demand without a runtime/manual/external dependency.
 
 ## 3. Go Semantic Families
 

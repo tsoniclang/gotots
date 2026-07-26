@@ -90,26 +90,41 @@ func TestPackageConstantSpellingMutationKeepsObjectOwnedReference(t *testing.T) 
 }
 
 func TestPackageConstantUntypedAndIotaCasesFailAtDeclarationOwner(t *testing.T) {
-	for name, mutate := range map[string]func(*ast.GenDecl){
-		"untyped": func(declaration *ast.GenDecl) {
-			declaration.Specs[0].(*ast.ValueSpec).Type = nil
+	for _, testCase := range []struct {
+		name     string
+		mutate   func(*ast.GenDecl)
+		category api.Category
+		role     api.Role
+	}{
+		{
+			name: "untyped",
+			mutate: func(declaration *ast.GenDecl) {
+				declaration.Specs[0].(*ast.ValueSpec).Type = nil
+			},
+			category: api.CategoryDeclaration,
+			role:     api.RoleFileDeclaration,
 		},
-		"iota": func(declaration *ast.GenDecl) {
-			declaration.Specs[0].(*ast.ValueSpec).Values[0] = ast.NewIdent("iota")
+		{
+			name: "iota",
+			mutate: func(declaration *ast.GenDecl) {
+				declaration.Specs[0].(*ast.ValueSpec).Values[0] = ast.NewIdent("iota")
+			},
+			category: api.CategoryExpression,
+			role:     api.RolePackageConstantValue,
 		},
 	} {
-		t.Run(name, func(t *testing.T) {
+		t.Run(testCase.name, func(t *testing.T) {
 			loaded := loadPackageConstantsProject(t)
 			constants := sourceFileNamed(t, loaded, "constants.go")
-			mutate(constants.Decls[0].(*ast.GenDecl))
+			testCase.mutate(constants.Decls[0].(*ast.GenDecl))
 
 			_, err := emit.CompileFile(loaded, constants)
 			var unsupported *api.UnsupportedError
 			if !errors.As(err, &unsupported) {
 				t.Fatalf("error = %v, want *api.UnsupportedError", err)
 			}
-			if unsupported.Category != api.CategoryDeclaration ||
-				unsupported.Role != api.RoleFileDeclaration {
+			if unsupported.Category != testCase.category ||
+				unsupported.Role != testCase.role {
 				t.Fatalf("unsupported = %#v", unsupported)
 			}
 		})

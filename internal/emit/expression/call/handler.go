@@ -6,6 +6,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/callable"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -49,27 +50,29 @@ func emit(
 			discarded,
 		)
 	}
-	object, ok := calleeObject(context.TypesInfo(), source.Fun)
-	if !ok {
+	signature, ok := callable.Signature(
+		context.TypesInfo().TypeOf(source.Fun),
+	)
+	if !ok || signature.Recv() != nil {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	signature, ok := object.Type().(*types.Signature)
-	if !ok ||
-		signature.Recv() != nil ||
-		signature.Variadic() ||
-		signature.TypeParams().Len() != 0 {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
+	if identifier, directIdentifier := source.Fun.(*ast.Ident); directIdentifier {
+		switch context.TypesInfo().Uses[identifier].(type) {
+		case *types.Func, *types.Var:
+		default:
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
 	}
 	if err := validateResults(context, source, signature, discarded); err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	reference, err := context.Names().Reference(object)
+	callee, static, err := emitCallee(context, children, source.Fun, signature)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	arguments, before, argumentRequests, err := emitArguments(
+	arguments, argumentBefore, argumentRequests, err := emitArguments(
 		context,
 		children,
 		source,
@@ -78,16 +81,50 @@ func emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	targetCallee := callee.Value()
+	before := callee.Before()
+	if static && len(before) != 0 {
+		return api.ExpressionEmission{},
+			&api.InvariantError{
+				Role:   api.RoleCallCallee,
+				Reason: "static callee produced prerequisite statements",
+			}
+	}
+	if !static && len(argumentBefore) != 0 {
+		temporaryName, err := context.Names().Temporary(api.TemporaryCallCallee)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		before = append(
+			before,
+			context.Factory().VariableStatement(
+				nil,
+				context.Factory().VariableDeclarationList(
+					[]tsgo.VariableDeclaration{
+						context.Factory().VariableDeclaration(
+							context.Factory().Identifier(temporaryName),
+							nil,
+							nil,
+							targetCallee,
+						),
+					},
+					tsgo.NodeFlagsConst,
+				),
+			),
+		)
+		targetCallee = context.Factory().Identifier(temporaryName)
+	}
+	before = append(before, argumentBefore...)
 	return api.NewExpressionEmission(
 		before,
 		context.Factory().CallExpression(
-			context.Factory().Identifier(reference.Name()),
+			targetCallee,
 			nil,
 			nil,
 			arguments,
 			tsgo.NodeFlagsNone,
 		),
-		api.CombineRequests(reference.Requests(), argumentRequests),
+		api.CombineRequests(callee.Requests(), argumentRequests),
 	)
 }
 
@@ -146,6 +183,56 @@ func calleeObject(info *types.Info, source ast.Expr) (*types.Func, bool) {
 	default:
 		return nil, false
 	}
+}
+
+func emitCallee(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Expr,
+	signature *types.Signature,
+) (api.ExpressionEmission, bool, error) {
+	static := false
+	if object, ok := calleeObject(context.TypesInfo(), source); ok {
+		objectSignature, valid := callable.Signature(object.Type())
+		if !valid || !types.Identical(objectSignature, signature) {
+			return api.ExpressionEmission{}, false,
+				api.Unsupported(
+					context.WithRole(api.RoleCallCallee),
+					api.CategoryExpression,
+					source,
+				)
+		}
+		static = true
+	} else if identifier, ok := source.(*ast.Ident); ok {
+		variable, valid := context.TypesInfo().Uses[identifier].(*types.Var)
+		if !valid {
+			return api.ExpressionEmission{}, false,
+				api.Unsupported(
+					context.WithRole(api.RoleCallCallee),
+					api.CategoryExpression,
+					source,
+				)
+		}
+		variableSignature, represented := callable.Signature(variable.Type())
+		if !represented || !types.Identical(variableSignature, signature) {
+			return api.ExpressionEmission{}, false,
+				api.Unsupported(
+					context.WithRole(api.RoleCallCallee),
+					api.CategoryExpression,
+					source,
+				)
+		}
+	}
+	target, err := children.Expression(
+		context.
+			WithRole(api.RoleCallCallee).
+			WithExpectedType(signature),
+		source,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, false, err
+	}
+	return target, static, nil
 }
 
 func emitArguments(

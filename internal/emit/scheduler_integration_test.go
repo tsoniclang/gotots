@@ -63,6 +63,42 @@ func TestDemandSchedulerJoinMutationControls(t *testing.T) {
 	})
 }
 
+func TestFunctionValueReferenceSchedulesExactCrossPackageDeclaration(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	program, err := load.Load(context.Background(), load.Request{
+		Directory: filepath.Join(
+			root,
+			"testdata",
+			"constructs",
+			"expression",
+			"function-value",
+			"cross-package",
+		),
+		Pattern: "./api",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	roots, err := ExportedAPIRoots(program.Roots()[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := independentReferenceClosure(t, program, roots)
+	actual := emittedObjectCounts(t, program, roots)
+	if err := verifyObjectMultiset(expected, actual); err != nil {
+		t.Fatal(err)
+	}
+	labels := strings.Join(objectLabels(actual), ",")
+	if labels != "example.com/callbackdemand/api.Apply,"+
+		"example.com/callbackdemand/api.Run,"+
+		"example.com/callbackdemand/worker.Double" {
+		t.Fatalf("callable demand closure = %s", labels)
+	}
+}
+
 func TestDeclarationIndexRejectsDuplicateObjectOwnership(t *testing.T) {
 	sourcePackage := types.NewPackage("example.com/schedule", "schedule")
 	object := types.NewFunc(
