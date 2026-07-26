@@ -12,6 +12,7 @@ import (
 )
 
 func TestRuntimeAssemblyExactJoinsFrozenSliceSymbol(t *testing.T) {
+	className := runtimeSliceClassName(t)
 	definitions, err := runtimeemission.Build(
 		tsgo.NewFactory(),
 		api.RuntimeModuleSlice,
@@ -23,7 +24,7 @@ func TestRuntimeAssemblyExactJoinsFrozenSliceSymbol(t *testing.T) {
 	if len(definitions) != 1 ||
 		definitions[0].Symbol() != api.RuntimeSlice ||
 		definitions[0].Statement().(tsgo.ClassDeclaration).Name().Text() !=
-			api.RuntimeSliceExportName {
+			className {
 		t.Fatalf("runtime slice definitions = %#v, want exact frozen symbol", definitions)
 	}
 	if _, err := runtimeemission.Build(
@@ -35,9 +36,33 @@ func TestRuntimeAssemblyExactJoinsFrozenSliceSymbol(t *testing.T) {
 	}
 }
 
+func TestRuntimeSliceBuilderConsumesInjectedContractName(t *testing.T) {
+	const changedContractName = "ChangedRuntimeSlice"
+	class := runtimeslice.Build(tsgo.NewFactory(), changedContractName)
+	if class.Name().Text() != changedContractName {
+		t.Fatalf(
+			"runtime slice declaration = %q, want injected contract name",
+			class.Name().Text(),
+		)
+	}
+	nilMethod := class.Members()[1].(tsgo.MethodDeclaration)
+	assertTypeReferenceName(t, nilMethod.Type(), changedContractName)
+	constructor := nilMethod.Body().(tsgo.Block).
+		Statements()[0].(tsgo.ReturnStatement).
+		Expression().(tsgo.NewExpression).
+		Expression().(tsgo.Identifier)
+	if constructor.Text() != changedContractName {
+		t.Fatalf(
+			"runtime slice self-construction = %q, want injected contract name",
+			constructor.Text(),
+		)
+	}
+}
+
 func TestRuntimeSliceOwnsOneClosedGenericDescriptor(t *testing.T) {
-	class := runtimeslice.Build(tsgo.NewFactory())
-	if class.Name().Text() != "RuntimeSlice" ||
+	className := runtimeSliceClassName(t)
+	class := runtimeslice.Build(tsgo.NewFactory(), className)
+	if class.Name().Text() != className ||
 		len(class.TypeParameters()) != 1 ||
 		class.TypeParameters()[0].Name().Text() != "T" {
 		t.Fatalf("runtime slice declaration = %#v", class)
@@ -115,15 +140,33 @@ func TestSourceSliceSignaturesUseRuntimeDescriptorNotBareArray(t *testing.T) {
 
 func assertRuntimeSliceType(t *testing.T, source tsgo.TypeNode) {
 	t.Helper()
+	assertTypeReferenceName(t, source, runtimeSliceClassName(t))
+}
+
+func assertTypeReferenceName(
+	t *testing.T,
+	source tsgo.TypeNode,
+	expected string,
+) {
+	t.Helper()
 	reference, ok := source.(tsgo.TypeReferenceNode)
 	if !ok {
 		t.Fatalf("slice type = %T, want RuntimeSlice<T> reference", source)
 	}
 	name, ok := reference.TypeName().(tsgo.Identifier)
-	if !ok || name.Text() != "RuntimeSlice" || len(reference.TypeArguments()) != 1 {
+	if !ok || name.Text() != expected || len(reference.TypeArguments()) != 1 {
 		t.Fatalf("slice reference = %#v, want RuntimeSlice with one concrete argument", reference)
 	}
 	if _, bare := source.(tsgo.ArrayTypeNode); bare {
 		t.Fatal("source slice signature became a bare target array")
 	}
+}
+
+func runtimeSliceClassName(t *testing.T) string {
+	t.Helper()
+	contract, err := api.RuntimeContract(api.RuntimeSlice)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return contract.ExportedName()
 }

@@ -3,14 +3,21 @@ package slice
 import "github.com/tsoniclang/gotots/internal/target/tsgo"
 
 type builder struct {
-	factory tsgo.Factory
+	factory   tsgo.Factory
+	className string
 }
 
-func Build(factory tsgo.Factory) tsgo.ClassDeclaration {
-	target := builder{factory: factory}
+func Build(
+	factory tsgo.Factory,
+	className string,
+) tsgo.ClassDeclaration {
+	target := builder{
+		factory:   factory,
+		className: className,
+	}
 	return factory.ClassDeclaration(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
-		factory.Identifier(ClassName),
+		factory.Identifier(className),
 		[]tsgo.TypeParameterDeclaration{target.typeParameter()},
 		nil,
 		[]tsgo.ClassElement{
@@ -44,7 +51,7 @@ func (b builder) typeT() tsgo.TypeNode {
 
 func (b builder) sliceType() tsgo.TypeNode {
 	return b.factory.TypeReferenceNode(
-		b.id(ClassName),
+		b.id(b.className),
 		[]tsgo.TypeNode{b.typeT()},
 	)
 }
@@ -214,7 +221,7 @@ func (b builder) newSlice(
 	zero tsgo.Expression,
 ) tsgo.NewExpression {
 	return b.factory.NewExpression(
-		b.id(ClassName),
+		b.id(b.className),
 		[]tsgo.TypeNode{b.typeT()},
 		[]tsgo.Expression{backing, offset, length, capacity, zero},
 	)

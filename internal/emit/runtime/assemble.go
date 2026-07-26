@@ -51,9 +51,13 @@ func Build(
 	if module == api.RuntimeModuleSlice &&
 		len(symbols) == 1 &&
 		symbols[0] == api.RuntimeSlice {
+		contract, err := api.RuntimeContract(api.RuntimeSlice)
+		if err != nil {
+			return nil, err
+		}
 		definition, err := NewDefinition(
 			api.RuntimeSlice,
-			runtimeslice.Build(factory),
+			runtimeslice.Build(factory, contract.ExportedName()),
 		)
 		if err != nil {
 			return nil, err

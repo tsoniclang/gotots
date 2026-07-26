@@ -1,9 +1,5 @@
 package slice
 
-import "github.com/tsoniclang/gotots/internal/emit/api"
-
-const ClassName = api.RuntimeSliceExportName
-
 type Member uint8
 
 const (
