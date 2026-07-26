@@ -5,6 +5,8 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
+	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -18,10 +20,72 @@ func Emit(
 		return identifier(context, source)
 	case *ast.SelectorExpr:
 		return field(context, children, source)
+	case *ast.StarExpr:
+		return dereference(context, children, source)
 	default:
 		return api.StoreTargetEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+}
+
+func dereference(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.StarExpr,
+) (api.StoreTargetEmission, error) {
+	if source == nil || source.X == nil {
+		return api.StoreTargetEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	pointerType := context.TypesInfo().TypeOf(source.X)
+	_, element, ok := pointertype.Scalar(context.TypesSizes(), pointerType)
+	if !ok || !types.Identical(context.TypesInfo().TypeOf(source), element) {
+		return api.StoreTargetEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	pointer, err := children.Expression(
+		context.
+			WithRole(api.RoleAssignmentTarget).
+			WithExpectedType(pointerType),
+		source.X,
+	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
+	if len(pointer.Before()) != 0 {
+		return api.StoreTargetEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	targetElement, err := children.RepresentedType(
+		context.WithRole(api.RoleAssignmentTarget),
+		source,
+		element,
+	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
+	reference, err := context.Names().Runtime(
+		api.RuntimePointer,
+		api.ImportPhaseValue,
+	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
+	target := pointerruntime.CellValue(
+		context.Factory(),
+		reference.Name(),
+		targetElement.Value(),
+		pointer.Value(),
+	)
+	return api.NewStoreTargetEmission(
+		target,
+		element,
+		api.CombineRequests(
+			pointer.Requests(),
+			targetElement.Requests(),
+			reference.Requests(),
+		),
+	)
 }
 
 func identifier(

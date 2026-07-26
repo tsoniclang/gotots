@@ -13,6 +13,7 @@ import (
 	binaryexpression "github.com/tsoniclang/gotots/internal/emit/expression/binary"
 	callexpression "github.com/tsoniclang/gotots/internal/emit/expression/call"
 	compositeliteral "github.com/tsoniclang/gotots/internal/emit/expression/compositeliteral"
+	dereferenceexpression "github.com/tsoniclang/gotots/internal/emit/expression/dereference"
 	functionliteral "github.com/tsoniclang/gotots/internal/emit/expression/functionliteral"
 	identifierexpression "github.com/tsoniclang/gotots/internal/emit/expression/identifier"
 	integerliteral "github.com/tsoniclang/gotots/internal/emit/expression/literal/integer"
@@ -33,6 +34,7 @@ import (
 	storetarget "github.com/tsoniclang/gotots/internal/emit/store"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	namedstructtype "github.com/tsoniclang/gotots/internal/emit/type/namedstruct"
+	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	tupletype "github.com/tsoniclang/gotots/internal/emit/type/tuple"
 	"github.com/tsoniclang/gotots/internal/emit/value/representation"
 	"github.com/tsoniclang/gotots/internal/load"
@@ -176,6 +178,8 @@ func (e *emitter) Expression(
 		return parenthesizedexpression.Emit(context, e, source)
 	case *ast.SelectorExpr:
 		return selectorexpression.Emit(context, e, source)
+	case *ast.StarExpr:
+		return dereferenceexpression.Emit(context, e, source)
 	case *ast.BasicLit:
 		return e.IntegerConstant(context, source)
 	case *ast.UnaryExpr:
@@ -355,6 +359,19 @@ func (e *emitter) Type(
 	source ast.Expr,
 ) (api.TypeEmission, error) {
 	if sourceType := context.TypesInfo().TypeOf(source); sourceType != nil {
+		if _, _, ok := pointertype.Scalar(context.TypesSizes(), sourceType); ok {
+			pointerSyntax, valid := source.(*ast.StarExpr)
+			if !valid {
+				return api.TypeEmission{},
+					api.Unsupported(context, api.CategoryType, source)
+			}
+			return pointertype.EmitSyntax(
+				context,
+				e,
+				pointerSyntax,
+				sourceType,
+			)
+		}
 		if signature, ok := types.Unalias(sourceType).(*types.Signature); ok {
 			functionType, valid := source.(*ast.FuncType)
 			if !valid {
@@ -380,6 +397,9 @@ func (e *emitter) RepresentedType(
 	}
 	if signature, ok := types.Unalias(sourceType).(*types.Signature); ok {
 		return callable.EmitType(context, e, source, signature)
+	}
+	if _, _, ok := pointertype.Scalar(context.TypesSizes(), sourceType); ok {
+		return pointertype.EmitRepresented(context, e, source, sourceType)
 	}
 	if _, ok := types.Unalias(sourceType).(*types.Named); ok {
 		return namedstructtype.Emit(context, source, sourceType)

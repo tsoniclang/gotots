@@ -6,14 +6,28 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type Owner struct{}
 
-func (Owner) RequiresCustomEquality(sourceType types.Type) bool {
+func (Owner) RequiresCustomEquality(
+	context api.Context,
+	sourceType types.Type,
+) bool {
+	if scalarPointer(context, sourceType) {
+		return true
+	}
 	_, _, ok := namedStruct(sourceType)
 	return ok
+}
+
+func (Owner) RequiresExplicitType(
+	context api.Context,
+	sourceType types.Type,
+) bool {
+	return scalarPointer(context, sourceType)
 }
 
 func (Owner) Zero(
@@ -38,6 +52,13 @@ func (Owner) Zero(
 		}
 		return api.DirectExpression(literal), nil
 	}
+	if _, _, ok := pointertype.Scalar(context.TypesSizes(), sourceType); ok {
+		return api.DirectExpression(
+			context.Factory().VoidExpression(
+				context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
+			),
+		), nil
+	}
 	typeName, _, ok := namedStruct(sourceType)
 	if !ok {
 		return api.ExpressionEmission{},
@@ -59,7 +80,9 @@ func (Owner) Copy(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	if _, ok := primitive(context, sourceType); ok || callableValue(sourceType) {
+	if _, ok := primitive(context, sourceType); ok ||
+		callableValue(sourceType) ||
+		scalarPointer(context, sourceType) {
 		return api.NewExpressionEmission(
 			value.Before(),
 			value.Value(),
@@ -118,7 +141,9 @@ func (Owner) Assign(
 	target tsgo.Expression,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	if _, ok := primitive(context, sourceType); ok || callableValue(sourceType) {
+	if _, ok := primitive(context, sourceType); ok ||
+		callableValue(sourceType) ||
+		scalarPointer(context, sourceType) {
 		return api.NewExpressionEmission(
 			value.Before(),
 			context.Factory().BinaryExpression(
@@ -171,6 +196,17 @@ func (Owner) Equal(
 			right,
 		)), nil
 	}
+	if scalarPointer(context, sourceType) {
+		return api.DirectExpression(context.Factory().BinaryExpression(
+			nil,
+			left,
+			nil,
+			context.Factory().BinaryOperatorToken(
+				tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+			),
+			right,
+		)), nil
+	}
 	typeName, _, ok := namedStruct(sourceType)
 	if !ok {
 		return api.ExpressionEmission{},
@@ -199,6 +235,11 @@ func primitive(
 
 func callableValue(sourceType types.Type) bool {
 	_, ok := callable.Signature(sourceType)
+	return ok
+}
+
+func scalarPointer(context api.Context, sourceType types.Type) bool {
+	_, _, ok := pointertype.Scalar(context.TypesSizes(), sourceType)
 	return ok
 }
 

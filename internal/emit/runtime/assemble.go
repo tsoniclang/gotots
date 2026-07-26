@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -37,7 +38,7 @@ func (d Definition) Statement() tsgo.Statement {
 }
 
 func Build(
-	_ tsgo.Factory,
+	factory tsgo.Factory,
 	module api.RuntimeModule,
 	symbols []api.RuntimeSymbol,
 ) ([]Definition, error) {
@@ -46,6 +47,26 @@ func Build(
 	}
 	if len(symbols) == 0 {
 		return nil, &AssemblyError{Reason: "runtime symbol set is empty"}
+	}
+	if module == api.RuntimeModulePointer {
+		if len(symbols) != 1 || symbols[0] != api.RuntimePointer {
+			return nil, &AssemblyError{
+				Module: module,
+				Reason: "pointer runtime requires exactly RuntimePointer",
+			}
+		}
+		contract, err := api.RuntimeContract(api.RuntimePointer)
+		if err != nil {
+			return nil, err
+		}
+		definition, err := NewDefinition(
+			api.RuntimePointer,
+			pointerruntime.Build(factory, contract.ExportedName()),
+		)
+		if err != nil {
+			return nil, err
+		}
+		return []Definition{definition}, nil
 	}
 	return nil, &AssemblyError{
 		Module: module,
