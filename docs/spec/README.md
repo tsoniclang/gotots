@@ -24,9 +24,13 @@ It is a general Go compiler. `typescript-go` is an acceptance corpus, not a
 production dependency, language authority, package-name exception, or source
 of privileged translation rules.
 
-Generated TypeScript must remain inside the statically compilable Tsonic
-subset. Translating GoToTS itself and compiling that output through Tsonic is a
-final product proof.
+GoToTS is a standalone project. Apart from the pinned TS-Go toolchain explicitly
+owned below for TypeScript AST construction, printing, compilation, and
+typechecking, it has no build, runtime, semantic, verification, configuration,
+or release dependency on another transpiler, target compiler, or product. An
+independently useful idea may be adopted only as GoToTS-owned source or
+generated output with standalone TypeScript semantics; the originating project
+is never imported, invoked, or treated as a truth owner.
 
 ## One Compilation Model
 
@@ -94,6 +98,10 @@ they do not mutate arbitrary ancestors.
   requests and diagnostics. It is target output under construction, not an IR.
 - **placement request:** a typed request to insert an import, declaration,
   helper, temporary, or statement at a legal preferred target scope.
+- **generated support module:** a GoToTS-owned TypeScript module containing
+  deduplicated type aliases or behaviorally real runtime operations required by
+  generated files. It is constructed through TS-Go AST like every other output
+  file and has no external compiler dependency.
 - **representation rule:** the direct rule choosing an exact TypeScript shape
   for a Go type, method, interface, value, or operation.
 - **manual obligation:** an exact generated declaration whose implementation
@@ -132,6 +140,12 @@ No import-path prefix decides these classes.
 - Generated code uses no `any`/`unknown` recovery, dynamic semantic lookup,
   `.call`, `.apply`, `.bind`, dynamic import, prototype patch, or source-text
   patching.
+- Generated primitive aliases, support declarations, and runtime operations
+  are defined within the generated product. No unrelated compiler, transpiler,
+  target plugin, or product participates in translation or verification.
+- A marker-like declaration is valid only when GoToTS emits and owns it and its
+  ordinary TypeScript meaning is complete. A no-op marker cannot substitute for
+  Go zeroing, copying, dispatch, type identity, or runtime behavior.
 - Correct behavior, strict static typing, maintainable source shape, generated
   size, typecheck cost, generation cost, and runtime cost are simultaneous
   acceptance dimensions.

@@ -16,7 +16,7 @@ focused Go test and minimal fixture
     -> one semantic-owner handler and closed child contract
     -> typed official TS-Go protocol AST
     -> pinned TS-Go print/reparse and strict typecheck
-    -> Go/authoritative-consumer differential execution
+    -> Go/generated-ESM differential execution
     -> mutation and applicable cost proof
 ```
 
@@ -64,27 +64,39 @@ Install the contextual dispatcher and coverage test. Unsupported constructs
 fail explicitly. Prove one trivial declaration end to end:
 
 ```go
-func Add(left, right int) int { return left + right }
+func Negate(value bool) bool { return !value }
 ```
 
-On a selected 64-bit Go target, the first accepted artifact is constructed as
-TS-Go AST and printed as:
+The first accepted artifact includes a GoToTS-owned support module and a
+generated package module, both constructed as TS-Go AST and printed by TS-Go:
 
 ```ts
-import type { int64 } from "@tsonic/core/types.js";
-export function Add(left: int64, right: int64): int64 {
-    return left + right;
+// support/scalars.ts
+export type bool = boolean;
+```
+
+```ts
+// modules/example/logic.ts
+import type { bool } from "../../support/scalars.js";
+
+export function Negate(value: bool): bool {
+    return !value;
 }
 ```
 
-The `int64` import is a selected-width target primitive contract, not a source
-spelling heuristic. A 32-bit Go target requests `int32` instead. Plain
-TypeScript `number`, unqualified `bigint`, and `BigInt.asIntN` are not accepted
-substitutes: the first loses Go integer exactness and the latter two do not
-carry the finalized Tsonic primitive evidence required by the first consumer.
-The selected Tsonic virtual declaration may use `number` as its TypeScript
-checker carrier while attaching an exact `int64` target fact. GoToTS preserves
-the canonical imported type identity; it does not replace it with that carrier.
+The basic representation owner may also request `int32` or `int64` according
+to the loaded `types.Sizes`. Their generated declarations are aliases of
+`number`, preserving the selected Go-width name in target source:
+
+```ts
+export type int32 = number;
+export type int64 = number;
+```
+
+An alias is not proof that JavaScript numbers implement the corresponding Go
+range, overflow, conversion, or bit operation. Such a capability remains
+unsupported until direct standalone behavior is proved for its complete domain
+or a GoToTS-owned runtime representation implements it exactly.
 
 Bootstrap in dependency order:
 
@@ -96,13 +108,10 @@ Bootstrap in dependency order:
 6. the first construct test, observed failing at that unsupported boundary.
 
 The output must be built as typed official TS-Go protocol AST, printed by
-TS-Go, strict-typechecked, executed against Go through the authoritative
-consumer for the represented semantics, and size-attributed. Direct Node
-execution is sufficient only for behavior whose selected Tsonic source carrier
-has identical JavaScript semantics. Width, overflow, and other target-owned
-primitive behavior require a selected Tsonic target build and native
-differential execution; an ordinary-value Node check is supporting evidence
-only.
+TS-Go, strict-typechecked, compiled to ESM JavaScript, executed directly against
+Go, and size-attributed. If JavaScript's native carrier is not exact, the
+generated program must use a behaviorally exact GoToTS-owned runtime operation
+or the construct remains unsupported.
 
 ## 2. Core Direct Emission
 
@@ -142,7 +151,9 @@ Reachable unresolved placeholders block publication.
 
 Run broad project differentials, deterministic regeneration, source/toolchain
 upgrade and relocation tests, generated-tail reviews, strict whole-product
-typechecking, runtime/performance gates, and the self-host/Tsonic bootstrap.
+typechecking, direct generated-program execution, runtime/performance gates,
+and standalone installation tests with no undeclared external compiler or
+target dependency.
 
 Completion is one clean published revision with:
 
