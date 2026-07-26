@@ -1,0 +1,318 @@
+package verify
+
+import (
+	"bufio"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"os"
+	"path"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"testing"
+)
+
+const modulePath = "github.com/tsoniclang/gotots"
+
+func TestRepositoryArchitectureWalls(t *testing.T) {
+	root := repositoryRoot(t)
+	agents, err := os.ReadFile(filepath.Join(root, "AGENTS.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	claude, err := os.ReadFile(filepath.Join(root, "CLAUDE.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(agents) != string(claude) {
+		t.Fatal("AGENTS.md and CLAUDE.md differ")
+	}
+
+	directoryFiles := make(map[string]int)
+	err = filepath.Walk(
+		filepath.Join(root, "internal"),
+		func(path string, info os.FileInfo, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if info.IsDir() || filepath.Ext(path) != ".go" {
+				return nil
+			}
+			relative, err := filepath.Rel(root, path)
+			if err != nil {
+				return err
+			}
+			relative = filepath.ToSlash(relative)
+			if strings.HasSuffix(relative, "_generated.go") {
+				return nil
+			}
+			directoryFiles[filepath.ToSlash(filepath.Dir(relative))]++
+			lines, err := physicalLines(path)
+			if err != nil {
+				return err
+			}
+			if lines >= 600 {
+				t.Errorf("%s has %d physical lines, want fewer than 600", relative, lines)
+			}
+			if strings.HasSuffix(relative, "_test.go") {
+				return nil
+			}
+			if err := verifyProductionFile(relative, path); err != nil {
+				t.Error(err)
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for directory, count := range directoryFiles {
+		if count > 20 {
+			t.Errorf("%s has %d maintained Go files, want at most 20", directory, count)
+		}
+	}
+}
+
+func verifyProductionFile(relative string, sourcePath string) error {
+	for _, element := range strings.Split(filepath.ToSlash(filepath.Dir(relative)), "/") {
+		switch element {
+		case "ir", "plan", "lower", "catalog", "inventory", "legacy", "compat",
+			"fallback", "util", "utils", "helper", "helpers", "misc", "common",
+			"shared":
+			return &wallError{source: relative, reason: "forbidden package directory " + element}
+		}
+	}
+	sourceLayer := layerFor(relative)
+	if sourceLayer == 0 {
+		return &wallError{source: relative, reason: "production package has no layer owner"}
+	}
+	file, err := parser.ParseFile(token.NewFileSet(), sourcePath, nil, 0)
+	if err != nil {
+		return &wallError{source: relative, reason: err.Error()}
+	}
+	importAliases := make(map[string]string)
+	for _, sourceImport := range file.Imports {
+		importPath, err := strconv.Unquote(sourceImport.Path.Value)
+		if err != nil {
+			return &wallError{source: relative, reason: "invalid import literal"}
+		}
+		if importPath == "reflect" {
+			return &wallError{source: relative, reason: "production reflection is forbidden"}
+		}
+		alias := path.Base(importPath)
+		if sourceImport.Name != nil {
+			alias = sourceImport.Name.Name
+		}
+		importAliases[importPath] = alias
+		if importPath == "go/ast" || importPath == "go/types" {
+			if !strings.HasPrefix(relative, "internal/load/") &&
+				!strings.HasPrefix(relative, "internal/emit/") {
+				return &wallError{
+					source: relative,
+					reason: "Go semantic graph import is outside load/emit",
+				}
+			}
+		}
+		internalPrefix := modulePath + "/internal/"
+		if !strings.HasPrefix(importPath, internalPrefix) {
+			continue
+		}
+		importRelative := strings.TrimPrefix(importPath, modulePath+"/") + "/owner.go"
+		targetLayer := layerFor(importRelative)
+		if targetLayer == 0 {
+			return &wallError{
+				source: relative,
+				reason: "internal import has no layer owner: " + importPath,
+			}
+		}
+		if targetLayer > sourceLayer {
+			return &wallError{
+				source: relative,
+				reason: "reverse layer import: " + importPath,
+			}
+		}
+	}
+	if strings.HasPrefix(relative, "internal/emit/") {
+		if err := verifyEmissionSource(relative, file, importAliases); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func verifyEmissionSource(
+	relative string,
+	file *ast.File,
+	importAliases map[string]string,
+) error {
+	for _, forbiddenImport := range []string{
+		"go/format",
+		"go/parser",
+		"go/printer",
+		"html/template",
+		"text/template",
+	} {
+		if importAliases[forbiddenImport] != "" {
+			return &wallError{
+				source: relative,
+				reason: "emission may construct only typed TS-Go AST",
+			}
+		}
+	}
+	astAlias := importAliases["go/ast"]
+	var violation string
+	ast.Inspect(file, func(node ast.Node) bool {
+		if violation != "" {
+			return false
+		}
+		switch node := node.(type) {
+		case *ast.CallExpr:
+			selector, ok := node.Fun.(*ast.SelectorExpr)
+			if !ok {
+				return true
+			}
+			qualifier, qualifierOK := selector.X.(*ast.Ident)
+			if qualifierOK && qualifier.Name == astAlias &&
+				(selector.Sel.Name == "Walk" || selector.Sel.Name == "Inspect") {
+				violation = "production emission uses generic AST recursion"
+			}
+		case *ast.BasicLit:
+			if node.Kind != token.STRING {
+				return true
+			}
+			value, err := strconv.Unquote(node.Value)
+			if err != nil {
+				violation = "invalid production string literal"
+				return false
+			}
+			for _, forbidden := range []string{
+				".apply(",
+				".bind(",
+				".call(",
+				"as any",
+				"as unknown",
+				"import(",
+				"module.exports",
+				"require(",
+				"/// <reference",
+			} {
+				if strings.Contains(value, forbidden) {
+					violation = "production emission contains forbidden target fragment " + forbidden
+					return false
+				}
+			}
+		}
+		return true
+	})
+	if violation != "" {
+		return &wallError{source: relative, reason: violation}
+	}
+	return nil
+}
+
+func TestArchitectureWallMutationControls(t *testing.T) {
+	for name, fixture := range map[string]struct {
+		relative string
+		source   string
+	}{
+		"reverse layer": {
+			relative: "internal/output/leak.go",
+			source: `package output
+import _ "github.com/tsoniclang/gotots/internal/emit"
+`,
+		},
+		"reflection": {
+			relative: "internal/load/leak.go",
+			source: `package load
+import _ "reflect"
+`,
+		},
+		"semantic graph outside owner": {
+			relative: "internal/output/leak.go",
+			source: `package output
+import _ "go/ast"
+`,
+		},
+		"generic production walk": {
+			relative: "internal/emit/expression/leak.go",
+			source: `package expression
+import "go/ast"
+func leak(node ast.Node) { ast.Inspect(node, func(ast.Node) bool { return true }) }
+`,
+		},
+		"raw dynamic target fragment": {
+			relative: "internal/emit/expression/leak.go",
+			source: `package expression
+const leak = "value.call(receiver)"
+`,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			sourcePath := filepath.Join(t.TempDir(), "leak.go")
+			if err := os.WriteFile(sourcePath, []byte(fixture.source), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if err := verifyProductionFile(fixture.relative, sourcePath); err == nil {
+				t.Fatal("architecture mutation passed its owning wall")
+			}
+		})
+	}
+	if layerFor("internal/rogue/rogue.go") != 0 {
+		t.Fatal("unregistered production package received an implicit layer")
+	}
+}
+
+func layerFor(relative string) int {
+	relative = filepath.ToSlash(relative)
+	switch {
+	case strings.HasPrefix(relative, "internal/load/"):
+		return 10
+	case strings.HasPrefix(relative, "internal/target/tsgo/"):
+		return 10
+	case strings.HasPrefix(relative, "internal/output/"):
+		return 20
+	case strings.HasPrefix(relative, "internal/emit/api/"):
+		return 20
+	case filepath.Dir(relative) == "internal/emit":
+		return 40
+	case strings.HasPrefix(relative, "internal/emit/"):
+		return 30
+	case strings.HasPrefix(relative, "internal/verify/"):
+		return 50
+	default:
+		return 0
+	}
+}
+
+func physicalLines(path string) (int, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return 0, err
+	}
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	lines := 0
+	for scanner.Scan() {
+		lines++
+	}
+	return lines, scanner.Err()
+}
+
+type wallError struct {
+	source string
+	reason string
+}
+
+func (e *wallError) Error() string {
+	return e.source + ": " + e.reason
+}
+
+func repositoryRoot(t *testing.T) string {
+	t.Helper()
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return root
+}

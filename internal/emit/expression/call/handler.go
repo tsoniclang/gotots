@@ -35,7 +35,7 @@ func emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	object, ok := calleeObject(context, source.Fun)
+	object, ok := calleeObject(context.TypesInfo(), source.Fun)
 	if !ok {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
@@ -93,24 +93,27 @@ func emit(
 	)
 }
 
-func calleeObject(context api.Context, source ast.Expr) (*types.Func, bool) {
+func calleeObject(info *types.Info, source ast.Expr) (*types.Func, bool) {
+	if info == nil {
+		return nil, false
+	}
 	switch source := source.(type) {
 	case *ast.Ident:
-		object, ok := context.TypesInfo().Uses[source].(*types.Func)
+		object, ok := info.Uses[source].(*types.Func)
 		return object, ok
 	case *ast.SelectorExpr:
-		if context.TypesInfo().Selections[source] != nil {
+		if info.Selections[source] != nil {
 			return nil, false
 		}
 		qualifier, ok := source.X.(*ast.Ident)
 		if !ok {
 			return nil, false
 		}
-		packageName, ok := context.TypesInfo().Uses[qualifier].(*types.PkgName)
+		packageName, ok := info.Uses[qualifier].(*types.PkgName)
 		if !ok {
 			return nil, false
 		}
-		object, ok := context.TypesInfo().Uses[source.Sel].(*types.Func)
+		object, ok := info.Uses[source.Sel].(*types.Func)
 		if !ok || object.Pkg() != packageName.Imported() {
 			return nil, false
 		}

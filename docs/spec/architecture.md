@@ -119,7 +119,7 @@ may drive production emission or recurse on behalf of a handler. A bounded
 read-only query may inspect the authoritative Go graph for a representation
 decision, but it must not emit nodes, duplicate source state, or bypass the
 owning handler. Generic visitors are reserved for independent verification,
-catalog reconciliation, and other non-producing checks.
+selected-toolchain contract reconciliation, and other non-producing checks.
 
 ## Allowed Emission State
 

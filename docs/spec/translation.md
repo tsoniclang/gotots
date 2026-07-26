@@ -4,9 +4,11 @@
 
 The emitter has one closed dispatcher over supported Go AST construct kinds.
 Every dispatch request reaches exactly one handler or one typed unsupported
-diagnostic. The test-only construct catalog accounts separately for syntax
-consumed directly by its parent owner. It is not a per-program artifact and is
-never passed through compilation.
+diagnostic. An independent test derives and structurally fingerprints the
+selected toolchain's complete AST domain. Forms that are not declarations,
+expressions, or statements are parent-owned syntax; the owning handler's
+focused child-contract tests account for them. There is no construct catalog
+or per-program coverage artifact.
 
 Handlers are grouped by semantic family rather than generated as a framework
 per AST type. Category dispatchers route one requested node and never recurse.

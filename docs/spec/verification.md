@@ -33,18 +33,24 @@ The repository always enforces:
 
 Coverage has two distinct proofs:
 
-- a toolchain-derived catalog of Go AST forms/tokens/built-ins is reconciled
-  against parent-consumed, handler, metadata, or explicit-unsupported
-  dispositions for every relevant parent-field-child role; and
-- every dispatchable selected-project occurrence is observed entering exactly
-  one handler, while parent-consumed syntax enters none.
+- an independent test derives the complete selected-toolchain `go/ast`,
+  `go/token`, and `types.Universe` domains at runtime, exact-joins every
+  production dispatch case to that universe, fingerprints exact AST field
+  shapes/token values/predeclared contracts, and proves each category has one
+  typed-unsupported default; and
+- each implemented handler's focused tests account for its complete direct
+  child contract, roles, order, contextual variants, and parent-consumed
+  syntax.
 
-The catalog is test authority only. Compilation does not produce or consume a
-per-program inventory.
+There is no checked-in disposition registry, case manifest, or per-program
+inventory. Removing a handler case is caught by its construct artifact tests;
+adding or duplicating a case is caught by the independent universe join and Go
+typechecking; a newly selected-toolchain AST form reaches the typed default
+until its first construct case is proved.
 
 Mutation tests remove a handler, skip a child edge, alter child order, erase a
 context role, and route one form to two handlers. Each mutation must fail with
-the exact source occurrence or catalog form.
+the exact source occurrence or selected-toolchain form.
 
 An AST kind is not the unit of semantic completion. A construct case includes
 the form, parent role, type evidence, expected result shape, and evaluation

@@ -1,0 +1,273 @@
+package emit
+
+import (
+	"context"
+	"fmt"
+	"go/ast"
+	"go/token"
+	"go/types"
+	"path/filepath"
+	"sort"
+	"strings"
+	"testing"
+
+	"github.com/tsoniclang/gotots/internal/load"
+)
+
+func TestDemandSchedulerExactJoinsIndependentReferenceClosure(t *testing.T) {
+	program := loadSchedulerFixture(t)
+	roots, err := ExportedAPIRoots(program.Roots()[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := independentReferenceClosure(t, program, roots)
+	actual := emittedObjectCounts(t, program, roots)
+	if err := verifyObjectMultiset(expected, actual); err != nil {
+		t.Fatal(err)
+	}
+	if labels := objectLabels(expected); strings.Join(labels, ",") !=
+		"example.com/demand/api.Compute,"+
+			"example.com/demand/api.Run,"+
+			"example.com/demand/mathx.Even,"+
+			"example.com/demand/mathx.Odd,"+
+			"example.com/demand/mathx.Offset,"+
+			"example.com/demand/service.Compute" {
+		t.Fatalf("independent reachable closure = %v", labels)
+	}
+}
+
+func TestDemandSchedulerJoinMutationControls(t *testing.T) {
+	program := loadSchedulerFixture(t)
+	roots, err := ExportedAPIRoots(program.Roots()[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := independentReferenceClosure(t, program, roots)
+	actual := emittedObjectCounts(t, program, roots)
+	target := objectByLabel(t, expected, "example.com/demand/mathx.Odd")
+
+	t.Run("omitted enqueue", func(t *testing.T) {
+		mutated := cloneObjectCounts(actual)
+		delete(mutated, target)
+		if err := verifyObjectMultiset(expected, mutated); err == nil {
+			t.Fatal("omitted reachable object passed the exact scheduler join")
+		}
+	})
+	t.Run("duplicate owner", func(t *testing.T) {
+		mutated := cloneObjectCounts(actual)
+		mutated[target]++
+		if err := verifyObjectMultiset(expected, mutated); err == nil {
+			t.Fatal("duplicate target owner passed the exact scheduler join")
+		}
+	})
+}
+
+func loadSchedulerFixture(t *testing.T) *load.Program {
+	t.Helper()
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	program, err := load.Load(context.Background(), load.Request{
+		Directory: filepath.Join(root, "testdata", "projects", "demand-program"),
+		Pattern:   "./api",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return program
+}
+
+func independentReferenceClosure(
+	t *testing.T,
+	program *load.Program,
+	roots []Root,
+) map[types.Object]int {
+	t.Helper()
+	declarations := make(map[types.Object]ast.Decl)
+	infoByObject := make(map[types.Object]*types.Info)
+	for _, sourcePackage := range program.Packages() {
+		info := sourcePackage.TypesInfo()
+		for _, sourceFile := range sourcePackage.Files() {
+			for _, declaration := range sourceFile.Syntax().Decls {
+				switch declaration := declaration.(type) {
+				case *ast.FuncDecl:
+					if declaration.Recv != nil || declaration.Name.Name == "init" {
+						continue
+					}
+					if object, ok := info.Defs[declaration.Name].(*types.Func); ok {
+						declarations[object] = declaration
+						infoByObject[object] = info
+					}
+				case *ast.GenDecl:
+					if declaration.Tok != token.CONST {
+						continue
+					}
+					for _, sourceSpec := range declaration.Specs {
+						valueSpec, ok := sourceSpec.(*ast.ValueSpec)
+						if !ok {
+							t.Fatalf("constant declaration contains %T", sourceSpec)
+						}
+						for _, name := range valueSpec.Names {
+							if object, ok := info.Defs[name].(*types.Const); ok {
+								declarations[object] = declaration
+								infoByObject[object] = info
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	pending := make([]types.Object, 0, len(roots))
+	for _, root := range roots {
+		pending = append(pending, root.object)
+	}
+	expected := make(map[types.Object]int)
+	for len(pending) != 0 {
+		sort.Slice(pending, func(left, right int) bool {
+			return compareObjects(pending[left], pending[right]) < 0
+		})
+		object := pending[0]
+		pending = pending[1:]
+		if expected[object] != 0 {
+			continue
+		}
+		declaration := declarations[object]
+		if declaration == nil {
+			t.Fatalf("root/reference %s has no independently derived declaration", objectLabel(object))
+		}
+		expected[object] = 1
+		info := infoByObject[object]
+		ast.Inspect(declaration, func(node ast.Node) bool {
+			identifier, ok := node.(*ast.Ident)
+			if !ok {
+				return true
+			}
+			referenced := info.Uses[identifier]
+			if declarations[referenced] != nil && expected[referenced] == 0 {
+				pending = append(pending, referenced)
+			}
+			return true
+		})
+	}
+	return expected
+}
+
+func emittedObjectCounts(
+	t *testing.T,
+	program *load.Program,
+	roots []Root,
+) map[types.Object]int {
+	t.Helper()
+	session, err := newProgramSession(program)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, root := range roots {
+		if err := session.require(root.object); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for {
+		object, ok := session.scheduler.next()
+		if !ok {
+			break
+		}
+		if err := session.emit(object); err != nil {
+			t.Fatal(err)
+		}
+	}
+	actual := make(map[types.Object]int)
+	for _, builder := range session.builders {
+		for object := range builder.byObject {
+			actual[object]++
+		}
+	}
+	for object := range session.scheduler.emitted {
+		if actual[object] != 1 {
+			t.Fatalf(
+				"scheduled object %s owns %d target declarations",
+				objectLabel(object),
+				actual[object],
+			)
+		}
+	}
+	return actual
+}
+
+func verifyObjectMultiset(
+	expected map[types.Object]int,
+	actual map[types.Object]int,
+) error {
+	var differences []string
+	for object, expectedCount := range expected {
+		if actual[object] != expectedCount {
+			differences = append(
+				differences,
+				fmt.Sprintf(
+					"%s expected %d actual %d",
+					objectLabel(object),
+					expectedCount,
+					actual[object],
+				),
+			)
+		}
+	}
+	for object, actualCount := range actual {
+		if expected[object] == 0 {
+			differences = append(
+				differences,
+				fmt.Sprintf("%s expected 0 actual %d", objectLabel(object), actualCount),
+			)
+		}
+	}
+	sort.Strings(differences)
+	if len(differences) != 0 {
+		return fmt.Errorf("scheduler exact join failed: %s", strings.Join(differences, "; "))
+	}
+	return nil
+}
+
+func cloneObjectCounts(source map[types.Object]int) map[types.Object]int {
+	result := make(map[types.Object]int, len(source))
+	for object, count := range source {
+		result[object] = count
+	}
+	return result
+}
+
+func objectByLabel(
+	t *testing.T,
+	objects map[types.Object]int,
+	label string,
+) types.Object {
+	t.Helper()
+	for object := range objects {
+		if objectLabel(object) == label {
+			return object
+		}
+	}
+	t.Fatalf("object %s is absent", label)
+	return nil
+}
+
+func objectLabels(objects map[types.Object]int) []string {
+	result := make([]string, 0, len(objects))
+	for object := range objects {
+		result = append(result, objectLabel(object))
+	}
+	sort.Strings(result)
+	return result
+}
+
+func objectLabel(object types.Object) string {
+	if object == nil {
+		return "<nil>"
+	}
+	if object.Pkg() == nil {
+		return object.Name()
+	}
+	return object.Pkg().Path() + "." + object.Name()
+}
