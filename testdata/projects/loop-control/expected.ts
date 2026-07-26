@@ -1,12 +1,12 @@
-import type { int64 } from "@tsonic/core/types.js";
-export function Sum(limit: int64): int64 {
-    let total: int64 = 0 as int64;
-    for (let current: int64 = 0 as int64; current < limit; current++) {
-        if (current === 2 as int64) {
+import type { int32 } from "../../../support/scalars.js";
+export function Sum(limit: int32): int32 {
+    let total: int32 = 0 as int32;
+    for (let current: int32 = total; current < limit; current = (current + 1) | 0) {
+        if (current === 2 as int32) {
             continue;
         }
-        total = total + current;
-        if (total > (10 as int64)) {
+        total = (total + current) | 0;
+        if (total > (10 as int32)) {
             break;
         }
     }

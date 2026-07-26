@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -18,7 +19,7 @@ func Emit(
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
 	tagType := context.TypesInfo().TypeOf(source.Tag)
-	if !supportsExactSwitchEquality(tagType) {
+	if !basictype.SupportsExactInt32(context.TypesSizes(), tagType) {
 		return api.StatementEmission{},
 			api.Unsupported(
 				context.WithRole(api.RoleSwitchTag),
@@ -197,12 +198,4 @@ func emitClauseBody(
 		requests = append(requests, target.Requests()...)
 	}
 	return statements, requests, nil
-}
-
-func supportsExactSwitchEquality(sourceType types.Type) bool {
-	basic, ok := types.Unalias(sourceType).(*types.Basic)
-	if !ok {
-		return false
-	}
-	return basic.Kind() == types.Int || basic.Kind() == types.Int64
 }

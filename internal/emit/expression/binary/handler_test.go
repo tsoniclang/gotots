@@ -10,16 +10,17 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func TestSignedArithmeticRequiresNativeProofForSelectedWidth(t *testing.T) {
+func TestExactInt32CapabilityRejectsWideIntegerCarriers(t *testing.T) {
 	testCases := []struct {
 		name       string
 		sourceType types.Type
 		arch       string
 		want       bool
 	}{
-		{name: "64-bit int", sourceType: types.Typ[types.Int], arch: "amd64", want: true},
-		{name: "32-bit int", sourceType: types.Typ[types.Int], arch: "386", want: false},
-		{name: "int64 on 32-bit host", sourceType: types.Typ[types.Int64], arch: "386", want: true},
+		{name: "int32", sourceType: types.Typ[types.Int32], arch: "amd64", want: true},
+		{name: "32-bit int", sourceType: types.Typ[types.Int], arch: "386", want: true},
+		{name: "64-bit int", sourceType: types.Typ[types.Int], arch: "amd64", want: false},
+		{name: "int64", sourceType: types.Typ[types.Int64], arch: "386", want: false},
 	}
 
 	for _, testCase := range testCases {
@@ -65,7 +66,7 @@ func (unusedNames) Reference(types.Object) (api.NameReference, error) {
 	panic("unused")
 }
 
-func (unusedNames) TypeImport(string, string) (api.NameReference, error) {
+func (unusedNames) Primitive(api.PrimitiveAlias) (api.NameReference, error) {
 	panic("unused")
 }
 

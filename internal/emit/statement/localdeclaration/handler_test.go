@@ -7,6 +7,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
+	"github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -24,9 +25,24 @@ func TestInitializedLocalDeclarationBuildsTypedVariableList(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	target, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
+	source := loaded.Files()[0]
+	emission, err := emit.CompileFile(loaded, source.Syntax())
 	if err != nil {
 		t.Fatal(err)
+	}
+	expectedPath, err := output.SourcePath(loaded, source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var target tsgo.SourceFile
+	for _, file := range emission.Files() {
+		if file.Kind() == emit.TargetFileSource && file.OutputPath() == expectedPath {
+			target = file.SourceFile()
+			break
+		}
+	}
+	if target == nil {
+		t.Fatalf("complete emission has no source artifact %s", expectedPath)
 	}
 	compute := target.Statements()[1].(tsgo.FunctionDeclaration)
 	inner := compute.Body().(tsgo.Block).Statements()[1].(tsgo.Block)

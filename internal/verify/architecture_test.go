@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -27,6 +28,9 @@ func TestRepositoryArchitectureWalls(t *testing.T) {
 	}
 	if string(agents) != string(claude) {
 		t.Fatal("AGENTS.md and CLAUDE.md differ")
+	}
+	if err := verifyStandaloneOwnership(root); err != nil {
+		t.Fatal(err)
 	}
 
 	directoryFiles := make(map[string]int)
@@ -261,6 +265,65 @@ const leak = "value.call(receiver)"
 	if layerFor("internal/rogue/rogue.go") != 0 {
 		t.Fatal("unregistered production package received an implicit layer")
 	}
+	unrelatedProduct := "tso" + "nic"
+	for _, mutation := range []string{
+		"import type { int64 } from \"@" + unrelatedProduct + "/core\";",
+		"go run github.com/tsoniclang/" + unrelatedProduct,
+		"target language: " + "c" + "sharp",
+	} {
+		if err := verifyStandaloneText("mutation.txt", []byte(mutation)); err == nil {
+			t.Fatalf("standalone ownership mutation passed: %q", mutation)
+		}
+	}
+}
+
+func verifyStandaloneOwnership(root string) error {
+	return filepath.Walk(
+		root,
+		func(sourcePath string, info os.FileInfo, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if info.IsDir() {
+				switch info.Name() {
+				case ".analysis", ".claude", ".git", ".temp", ".tests":
+					return filepath.SkipDir
+				default:
+					return nil
+				}
+			}
+			switch filepath.Ext(sourcePath) {
+			case ".go", ".json", ".md", ".mod", ".sh", ".sum", ".ts", ".yaml", ".yml":
+			default:
+				return nil
+			}
+			relative, err := filepath.Rel(root, sourcePath)
+			if err != nil {
+				return err
+			}
+			source, err := os.ReadFile(sourcePath)
+			if err != nil {
+				return err
+			}
+			return verifyStandaloneText(filepath.ToSlash(relative), source)
+		},
+	)
+}
+
+func verifyStandaloneText(relative string, source []byte) error {
+	unrelatedProduct := "tso" + "nic"
+	forbidden := regexp.MustCompile(
+		`(?i)(\b` + regexp.QuoteMeta(unrelatedProduct) +
+			`\b|@` + regexp.QuoteMeta(unrelatedProduct) +
+			`/|\b` + "c" + `sharp\b|` + "c" + `#)`,
+	)
+	if forbidden.MatchString(relative) || forbidden.Match(source) {
+		return &wallError{
+			source: relative,
+			reason: "standalone GoToTS source references an unrelated product or target",
+		}
+	}
+	return nil
 }
 
 func layerFor(relative string) int {

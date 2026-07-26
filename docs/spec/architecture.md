@@ -303,6 +303,12 @@ package supplies these declarations. Any other marker-like support declaration
 must have complete ordinary TypeScript semantics; a no-op declaration cannot
 delegate missing behavior to an external tool.
 
+Every compilation entry point returns the complete reachable target-file set,
+including generated support/runtime modules and source dependencies. A
+file-root convenience may choose roots from one Go file, but it must not return
+only that file's TypeScript module or discard any requested artifact. Consumers
+never reconstruct omitted support from imports.
+
 ## Package And Output Shape
 
 Every source-available Go file has one checkout-independent target path:

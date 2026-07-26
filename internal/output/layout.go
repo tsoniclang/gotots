@@ -11,6 +11,8 @@ import (
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
+const ScalarSupportPath = "support/scalars.ts"
+
 type PathError struct {
 	Source string
 	Reason string

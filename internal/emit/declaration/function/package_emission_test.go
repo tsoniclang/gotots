@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -54,7 +53,7 @@ func TestPackageWideCallsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	}
 
 	goOutput := executeBoolMultifileGo(t, workingDirectory)
-	typeScriptOutput := executeBoolMultifileTypeScript(t, workingDirectory)
+	typeScriptOutput := executeBoolMultifileTypeScript(t, loaded, workingDirectory)
 	if typeScriptOutput != goOutput {
 		t.Fatalf("TypeScript output = %q, Go output = %q", typeScriptOutput, goOutput)
 	}
@@ -107,10 +106,7 @@ func TestPackageWideImportUsesGoObjectOwnership(t *testing.T) {
 	call := runFunction.Body.List[0].(*ast.ReturnStmt).Results[0].(*ast.CallExpr)
 	call.Fun.(*ast.Ident).Name = "identity"
 
-	targetFile, err := emit.CompileFile(loaded, entryFile)
-	if err != nil {
-		t.Fatal(err)
-	}
+	targetFile := compileSourceFile(t, loaded, entryFile)
 	valueImport := targetFile.Statements()[1].(tsgo.ImportDeclaration)
 	imported := valueImport.ImportClause().NamedBindings().(tsgo.NamedImports).Elements()
 	if len(imported) != 1 || imported[0].Name().Text() != "flip" {
@@ -175,10 +171,7 @@ func emitBoolMultifile(
 	targetFiles := make(map[string]tsgo.SourceFile, len(files))
 	for _, sourceFile := range files {
 		baseName := strings.TrimSuffix(filepath.Base(sourceFile.Path()), ".go")
-		targetFile, err := emit.CompileFile(loaded, sourceFile.Syntax())
-		if err != nil {
-			t.Fatal(err)
-		}
+		targetFile := compileSourceFile(t, loaded, sourceFile.Syntax())
 		targetFiles[baseName] = targetFile
 	}
 	return targetFiles
@@ -219,33 +212,22 @@ func main() {
 	return run(t, runnerDirectory, filepath.Join(runtime.GOROOT(), "bin", "go"), "run", ".")
 }
 
-func executeBoolMultifileTypeScript(t *testing.T, workingDirectory string) string {
+func executeBoolMultifileTypeScript(
+	t *testing.T,
+	loaded *load.Package,
+	workingDirectory string,
+) string {
 	t.Helper()
-	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
-	installTsonicCoreTypes(t, workingDirectory)
+	artifacts := materializeExportedProgram(t, loaded, workingDirectory)
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
-	writeFile(t, runnerPath, `import { Again, Run } from "./entry.js";
+	writeFile(t, runnerPath, `import { Again, Run } from "`+
+		artifacts.module(t, "entry.ts")+`";
 
 console.log(Run(false));
 console.log(Run(true));
 console.log(Again(false));
 `)
-	outputDirectory := filepath.Join(workingDirectory, "out")
-	toolPath := strings.TrimSpace(
-		run(t, repositoryRoot(), filepath.Join(runtime.GOROOT(), "bin", "go"), "tool", "-n", "tsgo"),
-	)
-	run(t, workingDirectory,
-		toolPath,
-		"--target", "es2022",
-		"--module", "nodenext",
-		"--moduleResolution", "nodenext",
-		"--strict",
-		"--outDir", outputDirectory,
-		filepath.Join(workingDirectory, "entry.ts"),
-		filepath.Join(workingDirectory, "logic.ts"),
-		runnerPath,
-	)
-	return run(t, workingDirectory, "node", filepath.Join(outputDirectory, "runner.js"))
+	return executeMaterializedTypeScript(t, workingDirectory, artifacts, runnerPath)
 }
 
 func boolMultifileProjectDirectory() string {

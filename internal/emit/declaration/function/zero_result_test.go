@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit"
@@ -21,7 +20,7 @@ func TestZeroResultCallsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	loaded := loadZeroResultProject(t)
 	workingDirectory := t.TempDir()
 	outputPath := filepath.Join(workingDirectory, "void-calls.ts")
-	targetFile := emitZeroResultProject(t, loaded, outputPath)
+	targetFile := emitZeroResultProject(t, loaded)
 	printed := printTargetFile(t, targetFile, workingDirectory)
 
 	expected, err := os.ReadFile(filepath.Join(zeroResultProjectDirectory(), "expected.ts"))
@@ -34,7 +33,7 @@ func TestZeroResultCallsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	writeFile(t, outputPath, printed)
 
 	goOutput := executeZeroResultGo(t, workingDirectory)
-	typeScriptOutput := executeZeroResultTypeScript(t, workingDirectory, outputPath)
+	typeScriptOutput := executeZeroResultTypeScript(t, loaded, workingDirectory)
 	if typeScriptOutput != goOutput {
 		t.Fatalf("TypeScript output = %q, Go output = %q", typeScriptOutput, goOutput)
 	}
@@ -42,11 +41,7 @@ func TestZeroResultCallsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 
 func TestZeroResultCallsCreateExactTargetTree(t *testing.T) {
 	loaded := loadZeroResultProject(t)
-	targetFile := emitZeroResultProject(
-		t,
-		loaded,
-		filepath.Join(t.TempDir(), "void-calls.ts"),
-	)
+	targetFile := emitZeroResultProject(t, loaded)
 	statements := targetFile.Statements()
 	if len(statements) != 4 {
 		t.Fatalf("target statements = %d, want import and three functions", len(statements))
@@ -141,14 +136,9 @@ func loadZeroResultProject(t *testing.T) *load.Package {
 func emitZeroResultProject(
 	t *testing.T,
 	loaded *load.Package,
-	outputPath string,
 ) tsgo.SourceFile {
 	t.Helper()
-	targetFile, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return targetFile
+	return compileSourceFile(t, loaded, loaded.Files()[0].Syntax())
 }
 
 func executeZeroResultGo(t *testing.T, workingDirectory string) string {
@@ -187,35 +177,18 @@ func main() {
 
 func executeZeroResultTypeScript(
 	t *testing.T,
+	loaded *load.Package,
 	workingDirectory string,
-	outputPath string,
 ) string {
 	t.Helper()
-	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
-	installTsonicCoreTypes(t, workingDirectory)
+	artifacts := materializeExportedProgram(t, loaded, workingDirectory)
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
-	writeFile(t, runnerPath, `import { Run } from "./void-calls.js";
+	writeFile(t, runnerPath, `import { Run } from "`+artifacts.module(t, "source.ts")+`";
 
 console.log(Run(-1));
 console.log(Run(7));
 `)
-	outputDirectory := filepath.Join(workingDirectory, "out")
-	toolPath := strings.TrimSpace(
-		run(t, repositoryRoot(), filepath.Join(runtime.GOROOT(), "bin", "go"), "tool", "-n", "tsgo"),
-	)
-	run(
-		t,
-		workingDirectory,
-		toolPath,
-		"--target", "es2022",
-		"--module", "nodenext",
-		"--moduleResolution", "nodenext",
-		"--strict",
-		"--outDir", outputDirectory,
-		outputPath,
-		runnerPath,
-	)
-	return run(t, workingDirectory, "node", filepath.Join(outputDirectory, "runner.js"))
+	return executeMaterializedTypeScript(t, workingDirectory, artifacts, runnerPath)
 }
 
 func zeroResultProjectDirectory() string {

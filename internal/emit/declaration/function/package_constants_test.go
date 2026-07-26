@@ -37,7 +37,7 @@ func TestPackageConstantsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	}
 
 	goOutput := runPackageConstantsGo(t, workingDirectory)
-	targetOutput := runPackageConstantsTypeScript(t, workingDirectory)
+	targetOutput := runPackageConstantsTypeScript(t, loaded, workingDirectory)
 	if targetOutput != goOutput {
 		t.Fatalf("TypeScript output = %q, Go output = %q", targetOutput, goOutput)
 	}
@@ -82,7 +82,10 @@ func TestPackageConstantSpellingMutationKeepsObjectOwnedReference(t *testing.T) 
 	targetFiles := emitPackageConstantsProject(t, loaded, t.TempDir())
 	targetUse := targetFiles["use"].Statements()[2].(tsgo.FunctionDeclaration)
 	targetReturn := targetUse.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement)
-	targetReference := targetReturn.Expression().(tsgo.BinaryExpression).Left().(tsgo.Identifier)
+	wrapped := targetReturn.Expression().(tsgo.BinaryExpression)
+	sum := wrapped.Left().(tsgo.ParenthesizedExpression).
+		Expression().(tsgo.BinaryExpression)
+	targetReference := sum.Left().(tsgo.Identifier)
 	if targetReference.Text() != "Base" {
 		t.Fatalf("target reference = %q, want Base", targetReference.Text())
 	}
@@ -136,10 +139,7 @@ func emitPackageConstantsProject(
 	targets := make(map[string]tsgo.SourceFile, len(loaded.Files()))
 	for _, file := range loaded.Files() {
 		name := strings.TrimSuffix(filepath.Base(file.Path()), ".go")
-		target, err := emit.CompileFile(loaded, file.Syntax())
-		if err != nil {
-			t.Fatal(err)
-		}
+		target := compileSourceFile(t, loaded, file.Syntax())
 		targets[name] = target
 	}
 	return targets
@@ -196,39 +196,21 @@ func main() {
 	)
 }
 
-func runPackageConstantsTypeScript(t *testing.T, workingDirectory string) string {
+func runPackageConstantsTypeScript(
+	t *testing.T,
+	loaded *load.Package,
+	workingDirectory string,
+) string {
 	t.Helper()
-	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
-	installTsonicCoreTypes(t, workingDirectory)
+	artifacts := materializeExportedProgram(t, loaded, workingDirectory)
 	runner := filepath.Join(workingDirectory, "runner.ts")
-	writeFile(t, runner, `import { AddBase, IsEnabled } from "./use.js";
+	writeFile(t, runner, `import { AddBase, IsEnabled } from "`+
+		artifacts.module(t, "use.ts")+`";
 
 console.log(AddBase(2));
 console.log(IsEnabled());
 `)
-	toolPath := strings.TrimSpace(run(
-		t,
-		repositoryRoot(),
-		filepath.Join(runtime.GOROOT(), "bin", "go"),
-		"tool",
-		"-n",
-		"tsgo",
-	))
-	outputDirectory := filepath.Join(workingDirectory, "out")
-	run(
-		t,
-		workingDirectory,
-		toolPath,
-		"--target", "es2022",
-		"--module", "nodenext",
-		"--moduleResolution", "nodenext",
-		"--strict",
-		"--outDir", outputDirectory,
-		filepath.Join(workingDirectory, "constants.ts"),
-		filepath.Join(workingDirectory, "use.ts"),
-		runner,
-	)
-	return run(t, workingDirectory, "node", filepath.Join(outputDirectory, "runner.js"))
+	return executeMaterializedTypeScript(t, workingDirectory, artifacts, runner)
 }
 
 func packageConstantsProjectDirectory() string {

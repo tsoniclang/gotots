@@ -17,6 +17,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/load"
+	"github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -51,7 +52,7 @@ func TestParallelIdentifierAssignmentPrintsTypechecksAndExecutesDifferentially(
 	writeFile(t, outputPath, printed)
 
 	goOutput := executeGo(t, workingDirectory)
-	typeScriptOutput := executeTypeScript(t, workingDirectory, outputPath)
+	typeScriptOutput := executeTypeScript(t, loaded, workingDirectory)
 	if typeScriptOutput != goOutput {
 		t.Fatalf("TypeScript output = %q, Go output = %q", typeScriptOutput, goOutput)
 	}
@@ -130,7 +131,7 @@ func TestParallelAssignmentRejectsUnownedTargetAndMultiResultCases(t *testing.T)
 	}
 }
 
-func TestCompoundIdentifierAssignmentUsesDirectTypedOperator(t *testing.T) {
+func TestCompoundIdentifierAssignmentUsesExactWrappedInt32Operation(t *testing.T) {
 	loaded := loadProject(t)
 	targetFile := emitProject(
 		t,
@@ -139,10 +140,17 @@ func TestCompoundIdentifierAssignmentUsesDirectTypedOperator(t *testing.T) {
 	function := targetFile.Statements()[5].(tsgo.FunctionDeclaration)
 	statement := function.Body().(tsgo.Block).Statements()[0].(tsgo.ExpressionStatement)
 	operation := statement.Expression().(tsgo.BinaryExpression)
-	if operation.OperatorToken().Kind() != tsgo.SyntaxKindPlusEqualsToken ||
-		identifierText(operation.Left()) != "total" ||
-		identifierText(operation.Right()) != "delta" {
-		t.Fatal("compound assignment is not the direct owned += operation")
+	if operation.OperatorToken().Kind() != tsgo.SyntaxKindEqualsToken ||
+		identifierText(operation.Left()) != "total" {
+		t.Fatal("compound assignment is not an owned assignment")
+	}
+	wrapped := operation.Right().(tsgo.BinaryExpression)
+	sum := wrapped.Left().(tsgo.ParenthesizedExpression).
+		Expression().(tsgo.BinaryExpression)
+	if wrapped.OperatorToken().Kind() != tsgo.SyntaxKindBarToken ||
+		identifierText(sum.Left()) != "total" ||
+		identifierText(sum.Right()) != "delta" {
+		t.Fatal("compound assignment does not preserve int32 wrapping")
 	}
 }
 
@@ -194,11 +202,26 @@ func emitProject(
 	loaded *load.Package,
 ) tsgo.SourceFile {
 	t.Helper()
-	targetFile, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
+	source := loaded.Files()[0].Syntax()
+	emission, err := emit.CompileFile(loaded, source)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return targetFile
+	owned, ok := loaded.FileForSyntax(source)
+	if !ok {
+		t.Fatal("source syntax is not package-owned")
+	}
+	expectedPath, err := output.SourcePath(loaded, owned)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range emission.Files() {
+		if file.Kind() == emit.TargetFileSource && file.OutputPath() == expectedPath {
+			return file.SourceFile()
+		}
+	}
+	t.Fatalf("complete emission has no source artifact %s", expectedPath)
+	return nil
 }
 
 func executeGo(t *testing.T, workingDirectory string) string {
@@ -233,6 +256,7 @@ func main() {
 	fmt.Println(assignment.Declare(11, 13))
 	fmt.Println(assignment.Shadow(17))
 	fmt.Println(assignment.Accumulate(19, 23))
+	fmt.Println(assignment.Accumulate(2147483647, 1))
 }
 `)
 	return run(t, runnerDirectory, filepath.Join(runtime.GOROOT(), "bin", "go"), "run", ".")
@@ -240,20 +264,22 @@ func main() {
 
 func executeTypeScript(
 	t *testing.T,
+	loaded *load.Package,
 	workingDirectory string,
-	outputPath string,
 ) string {
 	t.Helper()
 	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
-	installCoreTypes(t, workingDirectory)
+	targetPaths, sourceModule := materializeProject(t, loaded, workingDirectory)
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
-	writeFile(t, runnerPath, `import { Accumulate, Declare, Rotate, Shadow, SwapLeft } from "./assignment.js";
+	writeFile(t, runnerPath, `import { Accumulate, Declare, Rotate, Shadow, SwapLeft } from "`+
+		sourceModule+`";
 
 console.log(SwapLeft(3, 9));
 console.log(Rotate(4, 7));
 console.log(Declare(11, 13));
 console.log(Shadow(17));
 console.log(Accumulate(19, 23));
+console.log(Accumulate(2147483647, 1));
 `)
 	outputDirectory := filepath.Join(workingDirectory, "out")
 	toolPath := strings.TrimSpace(run(
@@ -264,43 +290,63 @@ console.log(Accumulate(19, 23));
 		"-n",
 		"tsgo",
 	))
-	run(
-		t,
-		workingDirectory,
-		toolPath,
+	arguments := []string{
 		"--target", "es2022",
 		"--module", "nodenext",
 		"--moduleResolution", "nodenext",
 		"--strict",
 		"--outDir", outputDirectory,
-		outputPath,
-		runnerPath,
-	)
+	}
+	arguments = append(arguments, targetPaths...)
+	arguments = append(arguments, runnerPath)
+	run(t, workingDirectory, toolPath, arguments...)
 	return run(t, workingDirectory, "node", filepath.Join(outputDirectory, "runner.js"))
 }
 
-func installCoreTypes(t *testing.T, workingDirectory string) {
+func materializeProject(
+	t *testing.T,
+	loaded *load.Package,
+	workingDirectory string,
+) ([]string, string) {
 	t.Helper()
-	moduleDirectory := filepath.Join(workingDirectory, "node_modules", "@tsonic", "core")
-	if err := os.MkdirAll(moduleDirectory, 0o755); err != nil {
+	roots, err := emit.ExportedAPIRoots(loaded)
+	if err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, filepath.Join(moduleDirectory, "package.json"), `{
-  "name": "@tsonic/core",
-  "type": "module",
-  "exports": {
-    "./types.js": {
-      "types": "./types.d.ts",
-      "default": "./types.js"
-    }
-  }
-}
-`)
-	writeFile(t, filepath.Join(moduleDirectory, "types.d.ts"), `export type bool = boolean;
-export type int32 = number;
-export type int64 = number;
-`)
-	writeFile(t, filepath.Join(moduleDirectory, "types.js"), "export {};\n")
+	emission, err := emit.Compile(loaded.Program(), roots)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client, err := tsgo.StartClient(repositoryRoot(), workingDirectory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := client.Close(); err != nil {
+			t.Errorf("close TS-Go client: %v", err)
+		}
+	})
+	var targetPaths []string
+	var sourceModule string
+	for _, file := range emission.Files() {
+		printed, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		targetPath := filepath.Join(workingDirectory, filepath.FromSlash(file.OutputPath()))
+		writeFile(t, targetPath, printed)
+		targetPaths = append(targetPaths, targetPath)
+		if file.Kind() == emit.TargetFileSource {
+			if sourceModule != "" {
+				t.Fatal("assignment fixture emitted multiple source modules")
+			}
+			sourceModule = "./" + strings.TrimSuffix(file.OutputPath(), ".ts") + ".js"
+		}
+	}
+	if sourceModule == "" {
+		t.Fatal("assignment fixture emitted no source module")
+	}
+	return targetPaths, sourceModule
 }
 
 func run(t *testing.T, directory, name string, arguments ...string) string {
@@ -319,6 +365,9 @@ func run(t *testing.T, directory, name string, arguments ...string) string {
 
 func writeFile(t *testing.T, path, content string) {
 	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}

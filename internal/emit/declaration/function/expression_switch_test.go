@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit"
@@ -22,7 +21,7 @@ func TestExpressionSwitchPrintsTypechecksAndExecutesDifferentially(t *testing.T)
 	loaded := loadExpressionSwitchProject(t)
 	workingDirectory := t.TempDir()
 	outputPath := filepath.Join(workingDirectory, "expression-switch.ts")
-	targetFile := emitExpressionSwitch(t, loaded, outputPath)
+	targetFile := emitExpressionSwitch(t, loaded)
 	printed := printTargetFile(t, targetFile, workingDirectory)
 
 	expected, err := os.ReadFile(filepath.Join(expressionSwitchProjectDirectory(), "expected.ts"))
@@ -35,7 +34,7 @@ func TestExpressionSwitchPrintsTypechecksAndExecutesDifferentially(t *testing.T)
 	writeFile(t, outputPath, printed)
 
 	goOutput := executeExpressionSwitchGo(t, workingDirectory)
-	typeScriptOutput := executeExpressionSwitchTypeScript(t, workingDirectory, outputPath)
+	typeScriptOutput := executeExpressionSwitchTypeScript(t, loaded, workingDirectory)
 	if typeScriptOutput != goOutput {
 		t.Fatalf("TypeScript output = %q, Go output = %q", typeScriptOutput, goOutput)
 	}
@@ -43,11 +42,7 @@ func TestExpressionSwitchPrintsTypechecksAndExecutesDifferentially(t *testing.T)
 
 func TestExpressionSwitchCreatesScopedExactTargetTree(t *testing.T) {
 	loaded := loadExpressionSwitchProject(t)
-	targetFile := emitExpressionSwitch(
-		t,
-		loaded,
-		filepath.Join(t.TempDir(), "expression-switch.ts"),
-	)
+	targetFile := emitExpressionSwitch(t, loaded)
 	function := targetFile.Statements()[1].(tsgo.FunctionDeclaration)
 	body := function.Body().(tsgo.Block).Statements()
 	if len(body) != 3 {
@@ -174,14 +169,9 @@ func loadExpressionSwitchProject(t *testing.T) *load.Package {
 func emitExpressionSwitch(
 	t *testing.T,
 	loaded *load.Package,
-	outputPath string,
 ) tsgo.SourceFile {
 	t.Helper()
-	targetFile, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return targetFile
+	return compileSourceFile(t, loaded, loaded.Files()[0].Syntax())
 }
 
 func executeExpressionSwitchGo(t *testing.T, workingDirectory string) string {
@@ -215,6 +205,8 @@ func main() {
 	fmt.Println(expressionswitch.Classify(1))
 	fmt.Println(expressionswitch.Classify(2))
 	fmt.Println(expressionswitch.Classify(9))
+	fmt.Println(expressionswitch.Classify(2147483647))
+	fmt.Println(expressionswitch.Classify(-2147483648))
 }
 `)
 	return run(t, runnerDirectory, filepath.Join(runtime.GOROOT(), "bin", "go"), "run", ".")
@@ -222,37 +214,22 @@ func main() {
 
 func executeExpressionSwitchTypeScript(
 	t *testing.T,
+	loaded *load.Package,
 	workingDirectory string,
-	outputPath string,
 ) string {
 	t.Helper()
-	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
-	installTsonicCoreTypes(t, workingDirectory)
+	artifacts := materializeExportedProgram(t, loaded, workingDirectory)
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
-	writeFile(t, runnerPath, `import { Classify } from "./expression-switch.js";
+	writeFile(t, runnerPath, `import { Classify } from "`+artifacts.module(t, "source.ts")+`";
 
 console.log(Classify(0));
 console.log(Classify(1));
 console.log(Classify(2));
 console.log(Classify(9));
+console.log(Classify(2147483647));
+console.log(Classify(-2147483648));
 `)
-	outputDirectory := filepath.Join(workingDirectory, "out")
-	toolPath := strings.TrimSpace(
-		run(t, repositoryRoot(), filepath.Join(runtime.GOROOT(), "bin", "go"), "tool", "-n", "tsgo"),
-	)
-	run(
-		t,
-		workingDirectory,
-		toolPath,
-		"--target", "es2022",
-		"--module", "nodenext",
-		"--moduleResolution", "nodenext",
-		"--strict",
-		"--outDir", outputDirectory,
-		outputPath,
-		runnerPath,
-	)
-	return run(t, workingDirectory, "node", filepath.Join(outputDirectory, "runner.js"))
+	return executeMaterializedTypeScript(t, workingDirectory, artifacts, runnerPath)
 }
 
 func expressionSwitchProjectDirectory() string {

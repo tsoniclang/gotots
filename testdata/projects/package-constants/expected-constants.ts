@@ -1,3 +1,3 @@
-import type { bool, int64 } from "@tsonic/core/types.js";
-export const Base: int64 = 40 as int64;
+import type { bool, int32 } from "../../../support/scalars.js";
+export const Base: int32 = 40 as int32;
 export const Enabled: bool = true as bool;

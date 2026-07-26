@@ -265,8 +265,9 @@ type fileNames struct {
 	targetPath    string
 	require       func(types.Object) error
 	temporaries   map[api.TemporaryKind]uint64
-	importNames   map[string]types.Object
+	importNames   map[string]struct{}
 	importAliases map[types.Object]string
+	primitives    map[api.PrimitiveAlias]string
 }
 
 func (n *nameOwner) ForFile(
@@ -284,8 +285,9 @@ func (n *nameOwner) ForFile(
 		targetPath:    targetPath,
 		require:       require,
 		temporaries:   make(map[api.TemporaryKind]uint64),
-		importNames:   make(map[string]types.Object),
+		importNames:   make(map[string]struct{}),
 		importAliases: make(map[types.Object]string),
+		primitives:    make(map[api.PrimitiveAlias]string),
 	}
 }
 
@@ -353,13 +355,18 @@ func (n *fileNames) importName(object types.Object, preferred string) string {
 	base := preferred + "__from_" + portableIdentifier(object.Pkg().Path())
 	candidate := base
 	for suffix := uint64(1); n.packageScope.Lookup(candidate) != nil ||
-		n.importNames[candidate] != nil ||
+		n.hasImportName(candidate) ||
 		n.owner.hasSourceName(candidate); suffix++ {
 		candidate = base + "_" + strconv.FormatUint(suffix, 10)
 	}
-	n.importNames[candidate] = object
+	n.importNames[candidate] = struct{}{}
 	n.importAliases[object] = candidate
 	return candidate
+}
+
+func (n *fileNames) hasImportName(name string) bool {
+	_, exists := n.importNames[name]
+	return exists
 }
 
 func (n *nameOwner) hasSourceName(name string) bool {
@@ -367,21 +374,45 @@ func (n *nameOwner) hasSourceName(name string) bool {
 	return exists
 }
 
-func (n *fileNames) TypeImport(
-	modulePath string,
-	exportedName string,
-) (api.NameReference, error) {
-	request, err := api.NewImportRequest(
-		n.factory,
-		api.ImportPhaseType,
-		modulePath,
-		exportedName,
-		exportedName,
-	)
+func (n *fileNames) Primitive(alias api.PrimitiveAlias) (api.NameReference, error) {
+	if existing := n.primitives[alias]; existing != "" {
+		modulePath, err := output.ModuleSpecifier(n.targetPath, output.ScalarSupportPath)
+		if err != nil {
+			return api.NameReference{}, err
+		}
+		request, err := api.NewPrimitiveAliasRequest(n.factory, modulePath, alias, existing)
+		if err != nil {
+			return api.NameReference{}, err
+		}
+		return api.NewNameReference(existing, request)
+	}
+	exportedName, _, err := api.PrimitiveAliasRepresentation(alias)
 	if err != nil {
 		return api.NameReference{}, err
 	}
-	return api.NewNameReference(exportedName, request)
+	localName := exportedName
+	if n.packageScope.Lookup(localName) != nil ||
+		n.owner.hasSourceName(localName) ||
+		n.hasImportName(localName) {
+		base := exportedName + "__from_gotots_support"
+		localName = base
+		for suffix := uint64(1); n.packageScope.Lookup(localName) != nil ||
+			n.owner.hasSourceName(localName) ||
+			n.hasImportName(localName); suffix++ {
+			localName = base + "_" + strconv.FormatUint(suffix, 10)
+		}
+	}
+	n.importNames[localName] = struct{}{}
+	n.primitives[alias] = localName
+	modulePath, err := output.ModuleSpecifier(n.targetPath, output.ScalarSupportPath)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	request, err := api.NewPrimitiveAliasRequest(n.factory, modulePath, alias, localName)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	return api.NewNameReference(localName, request)
 }
 
 func (n *fileNames) Temporary(kind api.TemporaryKind) (string, error) {

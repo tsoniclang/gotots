@@ -204,6 +204,15 @@ only when direct standalone behavior is exact for the complete admitted domain
 or a GoToTS-owned generated/runtime operation implements and differentially
 proves that behavior. Otherwise the construct remains typed unsupported.
 
+The signed-integer gate differentially exercises every admitted `int32`
+operator at `math.MinInt32`, `math.MaxInt32`, and overflow-producing operands,
+and inspects the exact wrapped TS-Go AST. It separately proves that `int64` and
+64-bit `int` arithmetic, comparison, compound update, increment/decrement, and
+switch fail at their contextual semantic owner. Mutations remove `| 0`,
+replace `Math.imul` with ordinary multiplication, admit a wide operation, or
+round a wide constant; each must fail its owning differential or unsupported
+boundary.
+
 Each checkpoint records the exact Go toolchain, pinned TS-Go revision/schema,
 JavaScript runtime, and GoToTS support/runtime revision used by proof. No
 external transpiler, target compiler, plugin, or unrelated product may supply

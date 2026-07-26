@@ -2,7 +2,7 @@ package api
 
 import "example.com/control/worker"
 
-func Run(value int) int {
+func Run(value int32) int32 {
 	switch value {
 	case 0:
 		return 0

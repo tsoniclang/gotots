@@ -1,4 +1,4 @@
-import type { int64 } from "@tsonic/core/types.js";
-export function Add(left: int64, right: int64): int64 {
-    return left + right;
+import type { int32 } from "../../../support/scalars.js";
+export function Add(left: int32, right: int32): int32 {
+    return (left + right) | 0;
 }

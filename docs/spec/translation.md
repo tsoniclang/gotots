@@ -649,6 +649,25 @@ GoToTS-owned runtime operation, or the construct remains unsupported. In
 particular, general signed 64-bit arithmetic cannot be certified by
 JavaScript-number tests over small values.
 
+The first exact signed-integer operation family is `int32` (and `int` only
+when the selected `types.Sizes` makes it 32 bits). Its direct target rules are:
+
+| Go source | TS-Go AST decision | Printed TypeScript |
+|---|---|---|
+| `left + right` | addition nested under `BinaryOperatorBarToken` with zero | `(left + right) \| 0` |
+| `left - right` | subtraction nested under `BinaryOperatorBarToken` with zero | `(left - right) \| 0` |
+| `left * right` | typed `CallExpression` to the static built-in operation | `Math.imul(left, right)` |
+| `value += delta` | assignment whose right side is wrapped addition | `value = (value + delta) \| 0` |
+| `value++` / `value--` | assignment whose right side is wrapped add/subtract one | `value = (value +/- 1) \| 0` |
+| ordered/equality comparison or expression switch | direct comparison/switch over exact `int32` carriers | `left < right`, `switch (value)` |
+
+The parent still supplies expected type and role; no expression handler infers
+this capability from a target alias name. General `int64` and 64-bit `int`
+arithmetic, comparison, increment/decrement, compound assignment, and switch
+remain typed unsupported. A safely representable `int64` literal may still be
+emitted because that proves only that exact value, not operations over the
+full type.
+
 Boolean `&&` and `||` emit direct binary expressions and retain native
 short-circuit evaluation. Neither operand may carry prerequisite statements:
 moving such work before a short-circuit operator would change behavior.

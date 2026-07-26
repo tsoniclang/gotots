@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit"
@@ -20,7 +19,7 @@ func TestMultipleResultsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	loaded := loadMultipleResultsProject(t)
 	workingDirectory := t.TempDir()
 	outputPath := filepath.Join(workingDirectory, "multiple-results.ts")
-	targetFile := emitMultipleResultsProject(t, loaded, outputPath)
+	targetFile := emitMultipleResultsProject(t, loaded)
 	printed := printTargetFile(t, targetFile, workingDirectory)
 
 	expected, err := os.ReadFile(filepath.Join(multipleResultsProjectDirectory(), "expected.ts"))
@@ -33,7 +32,7 @@ func TestMultipleResultsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	writeFile(t, outputPath, printed)
 
 	goOutput := executeMultipleResultsGo(t, workingDirectory)
-	typeScriptOutput := executeMultipleResultsTypeScript(t, workingDirectory, outputPath)
+	typeScriptOutput := executeMultipleResultsTypeScript(t, loaded, workingDirectory)
 	if typeScriptOutput != goOutput {
 		t.Fatalf("TypeScript output = %q, Go output = %q", typeScriptOutput, goOutput)
 	}
@@ -41,11 +40,7 @@ func TestMultipleResultsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 
 func TestMultipleResultsCreateDirectTupleTreeAndSingleEvaluation(t *testing.T) {
 	loaded := loadMultipleResultsProject(t)
-	targetFile := emitMultipleResultsProject(
-		t,
-		loaded,
-		filepath.Join(t.TempDir(), "multiple-results.ts"),
-	)
+	targetFile := emitMultipleResultsProject(t, loaded)
 	statements := targetFile.Statements()
 	if len(statements) != 10 {
 		t.Fatalf("target statements = %d, want import and nine functions", len(statements))
@@ -165,14 +160,9 @@ func loadMultipleResultsProject(t *testing.T) *load.Package {
 func emitMultipleResultsProject(
 	t *testing.T,
 	loaded *load.Package,
-	outputPath string,
 ) tsgo.SourceFile {
 	t.Helper()
-	targetFile, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return targetFile
+	return compileSourceFile(t, loaded, loaded.Files()[0].Syntax())
 }
 
 func executeMultipleResultsGo(t *testing.T, workingDirectory string) string {
@@ -217,12 +207,11 @@ func main() {
 
 func executeMultipleResultsTypeScript(
 	t *testing.T,
+	loaded *load.Package,
 	workingDirectory string,
-	outputPath string,
 ) string {
 	t.Helper()
-	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
-	installTsonicCoreTypes(t, workingDirectory)
+	artifacts := materializeExportedProgram(t, loaded, workingDirectory)
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	writeFile(t, runnerPath, `import {
     Consume,
@@ -232,7 +221,7 @@ func executeMultipleResultsTypeScript(
     KeepFirst,
     Pair,
     Reassign,
-} from "./multiple-results.js";
+} from "`+artifacts.module(t, "source.ts")+`";
 
 console.log(...Pair(3));
 console.log(...Forward(-2));
@@ -243,23 +232,7 @@ console.log(KeepFirst(9));
 console.log(Discard(11));
 console.log(AddPair(5));
 `)
-	outputDirectory := filepath.Join(workingDirectory, "out")
-	toolPath := strings.TrimSpace(
-		run(t, repositoryRoot(), filepath.Join(runtime.GOROOT(), "bin", "go"), "tool", "-n", "tsgo"),
-	)
-	run(
-		t,
-		workingDirectory,
-		toolPath,
-		"--target", "es2022",
-		"--module", "nodenext",
-		"--moduleResolution", "nodenext",
-		"--strict",
-		"--outDir", outputDirectory,
-		outputPath,
-		runnerPath,
-	)
-	return run(t, workingDirectory, "node", filepath.Join(outputDirectory, "runner.js"))
+	return executeMaterializedTypeScript(t, workingDirectory, artifacts, runnerPath)
 }
 
 func multipleResultsProjectDirectory() string {

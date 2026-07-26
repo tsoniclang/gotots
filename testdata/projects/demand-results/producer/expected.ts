@@ -1,7 +1,7 @@
-import type { bool, int64 } from "@tsonic/core/types.js";
-export function Pair(value: int64): [
-    int64,
+import type { bool, int32 } from "../../../support/scalars.js";
+export function Pair(value: int32): [
+    int32,
     bool
 ] {
-    return [value + (1 as int64), value === 0 as int64];
+    return [(value + (1 as int32)) | 0, value === 0 as int32];
 }

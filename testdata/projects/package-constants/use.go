@@ -1,6 +1,6 @@
 package packageconstants
 
-func AddBase(value int) int {
+func AddBase(value int32) int32 {
 	return Base + value
 }
 

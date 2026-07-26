@@ -6,6 +6,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -35,7 +36,8 @@ func EmitExpression(
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
 	object, ok := context.TypesInfo().Uses[identifier].(*types.Var)
-	if !ok || !isSupportedInteger(object.Type()) {
+	if !ok ||
+		!basictype.SupportsExactInt32(context.TypesSizes(), object.Type()) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
@@ -43,29 +45,38 @@ func EmitExpression(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	var operator tsgo.PostfixUnaryExpressionOperatorKind
+	var operator tsgo.BinaryOperator
 	switch source.Tok {
 	case token.INC:
-		operator = tsgo.PostfixUnaryExpressionOperatorKindPlusPlusToken
+		operator = tsgo.BinaryOperatorPlusToken
 	case token.DEC:
-		operator = tsgo.PostfixUnaryExpressionOperatorKindMinusMinusToken
+		operator = tsgo.BinaryOperatorMinusToken
 	default:
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
+	value := context.Factory().BinaryExpression(
+		nil,
+		context.Factory().Identifier(reference.Name()),
+		nil,
+		context.Factory().BinaryOperatorToken(operator),
+		context.Factory().NumericLiteral("1", tsgo.TokenFlagsNone),
+	)
+	wrapped := context.Factory().BinaryExpression(
+		nil,
+		context.Factory().ParenthesizedExpression(value),
+		nil,
+		context.Factory().BinaryOperatorToken(tsgo.BinaryOperatorBarToken),
+		context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
+	)
 	return api.DirectExpression(
-		context.Factory().PostfixUnaryExpression(
+		context.Factory().BinaryExpression(
+			nil,
 			context.Factory().Identifier(reference.Name()),
-			operator,
+			nil,
+			context.Factory().BinaryOperatorToken(tsgo.BinaryOperatorEqualsToken),
+			wrapped,
 		),
 		reference.Requests()...,
 	), nil
-}
-
-func isSupportedInteger(sourceType types.Type) bool {
-	basic, ok := types.Unalias(sourceType).(*types.Basic)
-	if !ok {
-		return false
-	}
-	return basic.Kind() == types.Int || basic.Kind() == types.Int64
 }
