@@ -15,9 +15,12 @@ import (
 	compositeliteral "github.com/tsoniclang/gotots/internal/emit/expression/compositeliteral"
 	functionliteral "github.com/tsoniclang/gotots/internal/emit/expression/functionliteral"
 	identifierexpression "github.com/tsoniclang/gotots/internal/emit/expression/identifier"
+	indexexpression "github.com/tsoniclang/gotots/internal/emit/expression/index"
 	integerliteral "github.com/tsoniclang/gotots/internal/emit/expression/literal/integer"
+	stringliteral "github.com/tsoniclang/gotots/internal/emit/expression/literal/string"
 	parenthesizedexpression "github.com/tsoniclang/gotots/internal/emit/expression/parenthesized"
 	selectorexpression "github.com/tsoniclang/gotots/internal/emit/expression/selector"
+	sliceexpression "github.com/tsoniclang/gotots/internal/emit/expression/slice"
 	unaryexpression "github.com/tsoniclang/gotots/internal/emit/expression/unary"
 	"github.com/tsoniclang/gotots/internal/emit/statement/assignment"
 	blockstatement "github.com/tsoniclang/gotots/internal/emit/statement/block"
@@ -172,11 +175,18 @@ func (e *emitter) Expression(
 		return functionliteral.Emit(context, e, source)
 	case *ast.Ident:
 		return identifierexpression.Emit(context, e, source)
+	case *ast.IndexExpr:
+		return indexexpression.Emit(context, e, source)
 	case *ast.ParenExpr:
 		return parenthesizedexpression.Emit(context, e, source)
 	case *ast.SelectorExpr:
 		return selectorexpression.Emit(context, e, source)
+	case *ast.SliceExpr:
+		return sliceexpression.Emit(context, e, source)
 	case *ast.BasicLit:
+		if source.Kind == token.STRING {
+			return stringliteral.Emit(context, e, source)
+		}
 		return e.IntegerConstant(context, source)
 	case *ast.UnaryExpr:
 		return unaryexpression.Emit(context, e, source)

@@ -39,5 +39,23 @@ func EmitRepresented(
 
 func SupportsInteger(sizes types.Sizes, sourceType types.Type) bool {
 	alias, ok := api.PrimitiveAliasFor(sizes, sourceType)
-	return ok && alias != api.PrimitiveBool
+	return ok && (alias == api.PrimitiveInt32 || alias == api.PrimitiveInt64)
+}
+
+func SupportsString(sourceType types.Type) bool {
+	basic, ok := types.Unalias(sourceType).(*types.Basic)
+	return ok && basic.Kind() == types.String
+}
+
+func SupportsStringIndex(sizes types.Sizes, sourceType types.Type) bool {
+	if basic, ok := types.Unalias(sourceType).(*types.Basic); ok &&
+		basic.Info()&types.IsUntyped != 0 &&
+		basic.Info()&types.IsInteger != 0 {
+		sourceType = types.Typ[types.Int]
+	}
+	alias, ok := api.PrimitiveAliasFor(sizes, sourceType)
+	return ok &&
+		(alias == api.PrimitiveUint8 ||
+			alias == api.PrimitiveInt32 ||
+			alias == api.PrimitiveInt64)
 }

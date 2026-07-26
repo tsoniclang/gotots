@@ -21,6 +21,10 @@ func PrimitiveAliasFor(
 	switch basic.Kind() {
 	case types.Bool:
 		return PrimitiveBool, true
+	case types.String:
+		return PrimitiveString, true
+	case types.Uint8:
+		return PrimitiveUint8, true
 	case types.Int32:
 		return PrimitiveInt32, true
 	case types.Int64:
@@ -43,6 +47,8 @@ const (
 	PrimitiveBool
 	PrimitiveInt32
 	PrimitiveInt64
+	PrimitiveString
+	PrimitiveUint8
 )
 
 func PrimitiveAliasRepresentation(
@@ -56,6 +62,10 @@ func PrimitiveAliasRepresentation(
 	switch alias {
 	case PrimitiveBool:
 		return name, tsgo.KeywordTypeSyntaxKindBooleanKeyword, nil
+	case PrimitiveString:
+		return name, tsgo.KeywordTypeSyntaxKindStringKeyword, nil
+	case PrimitiveUint8:
+		return name, tsgo.KeywordTypeSyntaxKindNumberKeyword, nil
 	case PrimitiveInt32, PrimitiveInt64:
 		keyword, err := integerKeyword(integer)
 		return name, keyword, err
@@ -68,6 +78,10 @@ func PrimitiveAliasName(alias PrimitiveAlias) (string, error) {
 	switch alias {
 	case PrimitiveBool:
 		return "bool", nil
+	case PrimitiveString:
+		return "gostring", nil
+	case PrimitiveUint8:
+		return "uint8", nil
 	case PrimitiveInt32:
 		return "int32", nil
 	case PrimitiveInt64:

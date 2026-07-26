@@ -23,9 +23,12 @@ func (Owner) Zero(
 ) (api.ExpressionEmission, error) {
 	if alias, ok := primitive(context, sourceType); ok {
 		var literal tsgo.Expression
-		if alias == api.PrimitiveBool {
+		switch alias {
+		case api.PrimitiveBool:
 			literal = context.Factory().FalseLiteral()
-		} else {
+		case api.PrimitiveString:
+			literal = context.Factory().StringLiteral("", tsgo.TokenFlagsNone)
+		default:
 			var err error
 			literal, err = api.IntegerLiteral(
 				context.Factory(),

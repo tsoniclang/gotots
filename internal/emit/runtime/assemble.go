@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	stringruntime "github.com/tsoniclang/gotots/internal/emit/runtime/string"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -37,7 +38,7 @@ func (d Definition) Statement() tsgo.Statement {
 }
 
 func Build(
-	_ tsgo.Factory,
+	factory tsgo.Factory,
 	module api.RuntimeModule,
 	symbols []api.RuntimeSymbol,
 ) ([]Definition, error) {
@@ -46,6 +47,27 @@ func Build(
 	}
 	if len(symbols) == 0 {
 		return nil, &AssemblyError{Reason: "runtime symbol set is empty"}
+	}
+	if module == api.RuntimeModuleString {
+		statements, err := stringruntime.Build(factory, symbols)
+		if err != nil {
+			return nil, err
+		}
+		if len(statements) != len(symbols) {
+			return nil, &AssemblyError{
+				Module: module,
+				Reason: "string runtime returned a non-exact definition set",
+			}
+		}
+		definitions := make([]Definition, 0, len(symbols))
+		for index, symbol := range symbols {
+			definition, err := NewDefinition(symbol, statements[index])
+			if err != nil {
+				return nil, err
+			}
+			definitions = append(definitions, definition)
+		}
+		return definitions, nil
 	}
 	return nil, &AssemblyError{
 		Module: module,

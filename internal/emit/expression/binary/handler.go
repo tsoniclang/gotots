@@ -135,6 +135,18 @@ func operationFor(
 		rightType,
 	)
 	switch {
+	case source.Op == token.ADD &&
+		basictype.SupportsString(context.TypesInfo().TypeOf(source)) &&
+		types.AssignableTo(leftType, context.TypesInfo().TypeOf(source)) &&
+		types.AssignableTo(rightType, context.TypesInfo().TypeOf(source)):
+		return context.Factory().BinaryOperatorToken(
+			tsgo.BinaryOperatorPlusToken,
+		), context.TypesInfo().TypeOf(source), true
+	case isStringComparison(source.Op) &&
+		basictype.SupportsString(leftType) &&
+		basictype.SupportsString(rightType):
+		operator, ok := comparisonOperator(context, source.Op)
+		return operator, types.Typ[types.String], ok
 	case isSignedArithmetic(source.Op) &&
 		basictype.SupportsInteger(
 			context.TypesSizes(),
@@ -170,6 +182,15 @@ func operationFor(
 		), types.Typ[types.Bool], true
 	default:
 		return nil, nil, false
+	}
+}
+
+func isStringComparison(operator token.Token) bool {
+	switch operator {
+	case token.EQL, token.NEQ, token.LSS, token.LEQ, token.GTR, token.GEQ:
+		return true
+	default:
+		return false
 	}
 }
 

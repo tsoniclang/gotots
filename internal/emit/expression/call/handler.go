@@ -36,6 +36,14 @@ func emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	if target, ok, err := emitStringLength(
+		context,
+		children,
+		source,
+		discarded,
+	); ok || err != nil {
+		return target, err
+	}
 	if selector, method, selection, ok := selectedMethod(
 		context.TypesInfo(),
 		source.Fun,
