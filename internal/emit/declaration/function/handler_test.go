@@ -382,14 +382,6 @@ func executeMaterializedTypeScript(
 	t.Helper()
 	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
 	outputDirectory := filepath.Join(workingDirectory, "out")
-	toolPath := strings.TrimSpace(run(
-		t,
-		repositoryRoot(),
-		filepath.Join(runtime.GOROOT(), "bin", "go"),
-		"tool",
-		"-n",
-		"tsgo",
-	))
 	arguments := []string{
 		"--target", "es2022",
 		"--module", "nodenext",
@@ -399,7 +391,16 @@ func executeMaterializedTypeScript(
 	}
 	arguments = append(arguments, artifacts.targetPaths...)
 	arguments = append(arguments, runnerPath)
-	run(t, workingDirectory, toolPath, arguments...)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := tsgo.Compile(
+		ctx,
+		repositoryRoot(),
+		workingDirectory,
+		arguments,
+	); err != nil {
+		t.Fatal(err)
+	}
 	return run(t, workingDirectory, "node", filepath.Join(outputDirectory, "runner.js"))
 }
 

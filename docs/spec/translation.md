@@ -501,21 +501,66 @@ export function ZeroPair(): Pair {
 }
 ```
 
-For this field-only case, the structural type plus zero/copy functions is one
-admissible standalone shape. It does not preselect a structural type or class
-for every Go struct. Before a struct family is supported, its representation
-owner must select one exact shape for the complete relevant semantic class and
-prove construction, zero, copy, receiver, field, equality, interface,
-reflection-visible, and runtime-type behavior together.
+The first supported struct family is narrower and selects one nominal record
+class for non-generic, non-embedded named structs whose fields recursively
+contain only `bool`, exact `int32` (including a selected 32-bit `int`), and
+members of the same supported struct family. A generated record class has:
 
-Whichever shape is selected emits one zero definition and one copy definition
-per represented struct and references them at all required boundaries. Nested
-value fields invoke their own copy owner; pointer, map, slice, function,
-channel, and interface fields preserve their specified reference or descriptor
-value. The helper definition grows with the struct's fields, while each use
-remains constant size. Composite literals may remain typed object literals
-when that is valid for the selected representation and every field value is
-present; omitted fields request the same zero owner.
+- one erased private brand, which makes distinct named Go structs nominally
+  distinct to strict TypeScript without adding an instance field;
+- public data fields initialized by its constructor;
+- static `$zero`, `$copy`, `$assign`, and `$equal` operations; and
+- no instance receiver methods, inheritance, dynamic lookup, or hidden
+  semantic payload.
+
+For example, the selected shape for a supported `Pair` is:
+
+```ts
+export class Pair {
+  declare private readonly $goType: void;
+
+  constructor(public Left: int32, public Ready: bool) {}
+
+  static $zero(): Pair {
+    return new Pair(0 as int32, false as bool);
+  }
+
+  static $copy(source: Pair): Pair {
+    return new Pair(source.Left, source.Ready);
+  }
+
+  static $assign(target: Pair, source: Pair): void {
+    target.Left = source.Left;
+    target.Ready = source.Ready;
+  }
+
+  static $equal(left: Pair, right: Pair): bool {
+    return (left.Left === right.Left && left.Ready === right.Ready) as bool;
+  }
+}
+```
+
+The class supplies target nominality and stable runtime constructor identity;
+it does not change Go value semantics. The four static operations are the only
+ordinary value boundaries. Distinct named structs remain statically
+incompatible even when their fields match. Nested struct operations call the
+nested class's corresponding static owner. The erased brand must produce no
+JavaScript instance field.
+
+Tags, embedding, pointers, interfaces, method values/expressions, generics,
+reflection entry, and fields whose complete standalone representation is not
+yet exact are neighboring typed-unsupported families. They may be admitted
+only by extending or replacing this representation under their own complete
+proof. They must not be approximated by structural assignment or virtual
+dispatch.
+
+Every selected shape emits exactly one zero, copy, assignment, and equality
+definition per represented struct and references them at all required
+boundaries. The definition grows linearly with fields while each use remains
+constant size. The first family constructs only through `new Name(...)`;
+positional and keyed composite literals preserve source evaluation order, and
+omitted fields request the same `$zero` semantics rather than a second default
+table.
 
 Assignment, argument passing, return, value receivers, interface boxing, map
 stores, channel sends, and append/copy operations each request copying where Go
@@ -557,11 +602,12 @@ entry shape from `go/types`; they do not reuse a value-receiver entry when its
 copy or nil behavior differs. Generated code never uses `.call`, `.apply`, or
 `.bind`.
 
-A TypeScript class is selected only when reference identity and all relevant
-Go call, nil, copy, promotion, equality, construction, and runtime-type rules
-remain exact. When selected, its constructor, zero owner, and copy owner are
-side-effect-free generated behavior rather than an assumption that class
-assignment copies. A class is not selected merely to attach receiver syntax.
+A TypeScript class outside this bounded nominal-record family is selected only
+when reference identity and all relevant Go call, nil, copy, promotion,
+equality, construction, and runtime-type rules remain exact. Its constructor
+and value operations are side-effect-free generated behavior rather than an
+assumption that class assignment copies. A class is never selected merely to
+attach receiver syntax.
 
 This Go program demonstrates why embedding cannot blindly become `extends`:
 

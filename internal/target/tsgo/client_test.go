@@ -1,11 +1,12 @@
 package tsgo
 
 import (
+	"context"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestNativePrintNodeRoundTrip(t *testing.T) {
@@ -41,10 +42,15 @@ func TestNativePrintNodeRoundTrip(t *testing.T) {
 	if err := os.WriteFile(outputPath, []byte(printed), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	typecheck := exec.Command(client.command.Path, "--noEmit", "--strict", outputPath)
-	typecheck.Dir = workingDirectory
-	if output, err := typecheck.CombinedOutput(); err != nil {
-		t.Fatalf("strict TS-Go typecheck: %v\n%s", err, output)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := Compile(
+		ctx,
+		repositoryRoot(),
+		workingDirectory,
+		[]string{"--noEmit", "--strict", outputPath},
+	); err != nil {
+		t.Fatalf("strict TS-Go typecheck: %v", err)
 	}
 }
 

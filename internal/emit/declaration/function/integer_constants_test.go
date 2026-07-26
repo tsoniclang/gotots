@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/emit/api"
@@ -72,9 +73,6 @@ console.log(Small());
 `)
 	writeFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
 	outputDirectory := filepath.Join(workingDirectory, "out")
-	toolPath := strings.TrimSpace(
-		run(t, repositoryRoot(), filepath.Join(runtime.GOROOT(), "bin", "go"), "tool", "-n", "tsgo"),
-	)
 	arguments := []string{
 		"--target", "es2022",
 		"--module", "nodenext",
@@ -84,7 +82,16 @@ console.log(Small());
 	}
 	arguments = append(arguments, targetPaths...)
 	arguments = append(arguments, runnerPath)
-	run(t, workingDirectory, toolPath, arguments...)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := tsgo.Compile(
+		ctx,
+		repositoryRoot(),
+		workingDirectory,
+		arguments,
+	); err != nil {
+		t.Fatal(err)
+	}
 	targetOutput := run(
 		t,
 		workingDirectory,

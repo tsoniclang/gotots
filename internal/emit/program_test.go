@@ -258,17 +258,9 @@ func executeDemandTypeScript(
 
 console.log(Run(0));
 console.log(Run(1));
-console.log(Run(4));
+	console.log(Run(4));
 `)
 	outputDirectory := filepath.Join(workingDirectory, "out")
-	toolPath := strings.TrimSpace(runProgram(
-		t,
-		repositoryRoot(),
-		filepath.Join(runtime.GOROOT(), "bin", "go"),
-		"tool",
-		"-n",
-		"tsgo",
-	))
 	arguments := []string{
 		"--target", "es2022",
 		"--module", "nodenext",
@@ -278,7 +270,16 @@ console.log(Run(4));
 	}
 	arguments = append(arguments, targetPaths...)
 	arguments = append(arguments, runnerPath)
-	runProgram(t, workingDirectory, toolPath, arguments...)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	if err := tsgo.Compile(
+		ctx,
+		repositoryRoot(),
+		workingDirectory,
+		arguments,
+	); err != nil {
+		t.Fatal(err)
+	}
 	return runProgram(t, workingDirectory, "node", filepath.Join(outputDirectory, "runner.js"))
 }
 

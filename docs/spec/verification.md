@@ -188,6 +188,31 @@ Examples include:
 - interfaces with many implementers, proving constant-size call sites;
 - nested function literals requiring branch-local versus file-level placement.
 
+The first named-struct family additionally proves:
+
+- two field-identical named Go structs remain incompatible in strict
+  TypeScript through an erased nominal brand;
+- zero values allocate fresh nested records;
+- assignment, initialization, arguments, results, and value receivers do not
+  alias mutable struct storage;
+- `$assign` preserves destination storage identity while copying every nested
+  value field;
+- keyed composite literals retain source evaluation order even when field
+  declaration order differs;
+- equality is field-wise and recursive rather than target object identity;
+- concrete value-receiver calls use the exact `go/types.Selection` and a named
+  receiver function, never a class method or virtual dispatch; and
+- tags, embedding, pointers, interfaces, method values/expressions, generics,
+  and unsupported field representations fail at their typed owner.
+
+Mutations replace `$copy` with direct assignment, `$assign` with target
+rebinding, `$equal` with `===`, remove the private brand, reorder keyed
+initializers, attach a receiver method to the class, or admit an unsupported
+field. Each fails its owning structural, strict-type, differential, or
+unsupported-boundary gate. A scaling fixture doubles fields and proves
+definition size/work grows linearly while copy, assignment, equality, and
+method call sites remain constant-size.
+
 ### Execution Authority
 
 Strict TS-Go resolution and typechecking is mandatory for every generated
@@ -195,6 +220,10 @@ artifact. The exact TS-Go-printed artifact and every requested GoToTS-owned
 support/runtime module are then compiled to ESM JavaScript and executed
 directly. The generated product may not rewrite literals after printing, inject
 test-only facts, or substitute a different declaration shape.
+The pinned compiler may report diagnostics without a failing process status.
+The one compiler-process owner therefore treats either a process error or any
+diagnostic output as failure; tests and product gates must not invoke the
+executable through a status-only wrapper.
 
 Primitive aliases preserve selected Go names in target source but do not prove
 runtime range or arithmetic. For example, `int64 = number` does not establish
