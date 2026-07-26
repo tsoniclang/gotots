@@ -113,6 +113,9 @@ standard-library packages, toolchain packages, and true external boundaries.
 
 ## Code Discipline
 
+- Parallel agents are forbidden unless the user explicitly authorizes them for
+  the specific task. Task size, urgency, or separability does not imply
+  permission.
 - Begin implementation only after the relevant specification examples,
   ownership, failure behavior, and verification are explicit.
 - Every foundation capability and construct case begins with its focused test
