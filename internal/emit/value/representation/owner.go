@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -21,6 +22,47 @@ func (Owner) Zero(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.ExpressionEmission, error) {
+	if mapType, ok := maprepresentation.Source(context, sourceType); ok {
+		zero, err := (Owner{}).Zero(
+			context.WithRole(api.RoleMapValue),
+			source,
+			mapType.Elem(),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if len(zero.Before()) != 0 {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		reference, typeArguments, err := maprepresentation.Reference(
+			context,
+			source,
+			sourceType,
+			api.ImportPhaseValue,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.DirectExpression(
+			context.Factory().CallExpression(
+				context.Factory().PropertyAccessExpression(
+					context.Factory().Identifier(reference.Name()),
+					nil,
+					context.Factory().Identifier("nil"),
+					tsgo.NodeFlagsNone,
+				),
+				nil,
+				typeArguments,
+				[]tsgo.Expression{zero.Value()},
+				tsgo.NodeFlagsNone,
+			),
+			api.CombineRequests(
+				reference.Requests(),
+				zero.Requests(),
+			)...,
+		), nil
+	}
 	if alias, ok := primitive(context, sourceType); ok {
 		var literal tsgo.Expression
 		if alias == api.PrimitiveBool {
@@ -59,7 +101,9 @@ func (Owner) Copy(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	if _, ok := primitive(context, sourceType); ok || callableValue(sourceType) {
+	if _, ok := primitive(context, sourceType); ok ||
+		callableValue(sourceType) ||
+		mapValue(context, sourceType) {
 		return api.NewExpressionEmission(
 			value.Before(),
 			value.Value(),
@@ -118,7 +162,9 @@ func (Owner) Assign(
 	target tsgo.Expression,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	if _, ok := primitive(context, sourceType); ok || callableValue(sourceType) {
+	if _, ok := primitive(context, sourceType); ok ||
+		callableValue(sourceType) ||
+		mapValue(context, sourceType) {
 		return api.NewExpressionEmission(
 			value.Before(),
 			context.Factory().BinaryExpression(
@@ -199,6 +245,11 @@ func primitive(
 
 func callableValue(sourceType types.Type) bool {
 	_, ok := callable.Signature(sourceType)
+	return ok
+}
+
+func mapValue(context api.Context, sourceType types.Type) bool {
+	_, ok := maprepresentation.Source(context, sourceType)
 	return ok
 }
 

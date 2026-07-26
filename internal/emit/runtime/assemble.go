@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -37,7 +38,7 @@ func (d Definition) Statement() tsgo.Statement {
 }
 
 func Build(
-	_ tsgo.Factory,
+	factory tsgo.Factory,
 	module api.RuntimeModule,
 	symbols []api.RuntimeSymbol,
 ) ([]Definition, error) {
@@ -47,10 +48,32 @@ func Build(
 	if len(symbols) == 0 {
 		return nil, &AssemblyError{Reason: "runtime symbol set is empty"}
 	}
+	if module == api.RuntimeModuleMap {
+		return buildMap(factory, symbols)
+	}
 	return nil, &AssemblyError{
 		Module: module,
 		Reason: "runtime module owner is not installed",
 	}
+}
+
+func buildMap(
+	factory tsgo.Factory,
+	symbols []api.RuntimeSymbol,
+) ([]Definition, error) {
+	result := make([]Definition, 0, len(symbols))
+	for _, symbol := range symbols {
+		statement, err := mapruntime.Build(factory, symbol)
+		if err != nil {
+			return nil, err
+		}
+		definition, err := NewDefinition(symbol, statement)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, definition)
+	}
+	return result, nil
 }
 
 type AssemblyError struct {

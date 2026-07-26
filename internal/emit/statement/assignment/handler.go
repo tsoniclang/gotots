@@ -6,6 +6,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	mapstore "github.com/tsoniclang/gotots/internal/emit/store/map"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -224,6 +225,13 @@ func emitAssignment(
 	children api.ChildEmitter,
 	source *ast.AssignStmt,
 ) (api.StatementEmission, error) {
+	if target, handled, err := mapstore.EmitAssignment(
+		context,
+		children,
+		source,
+	); handled {
+		return target, err
+	}
 	if len(source.Lhs) > 1 {
 		return emitParallel(context, children, source)
 	}

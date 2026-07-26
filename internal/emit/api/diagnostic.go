@@ -74,6 +74,10 @@ const (
 	RoleAssignmentTarget     Role = "assignment-target"
 	RoleReceiverType         Role = "receiver-type"
 	RoleReceiverValue        Role = "receiver-value"
+	RoleMapKey               Role = "map-key"
+	RoleMapValue             Role = "map-value"
+	RoleMapSize              Role = "map-size"
+	RoleMapReceiver          Role = "map-receiver"
 )
 
 type UnsupportedError struct {

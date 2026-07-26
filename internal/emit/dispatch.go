@@ -16,6 +16,7 @@ import (
 	functionliteral "github.com/tsoniclang/gotots/internal/emit/expression/functionliteral"
 	identifierexpression "github.com/tsoniclang/gotots/internal/emit/expression/identifier"
 	integerliteral "github.com/tsoniclang/gotots/internal/emit/expression/literal/integer"
+	mapindexexpression "github.com/tsoniclang/gotots/internal/emit/expression/mapindex"
 	parenthesizedexpression "github.com/tsoniclang/gotots/internal/emit/expression/parenthesized"
 	selectorexpression "github.com/tsoniclang/gotots/internal/emit/expression/selector"
 	unaryexpression "github.com/tsoniclang/gotots/internal/emit/expression/unary"
@@ -32,6 +33,7 @@ import (
 	switchstatement "github.com/tsoniclang/gotots/internal/emit/statement/switchstatement"
 	storetarget "github.com/tsoniclang/gotots/internal/emit/store"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	maptype "github.com/tsoniclang/gotots/internal/emit/type/map"
 	namedstructtype "github.com/tsoniclang/gotots/internal/emit/type/namedstruct"
 	tupletype "github.com/tsoniclang/gotots/internal/emit/type/tuple"
 	"github.com/tsoniclang/gotots/internal/emit/value/representation"
@@ -172,6 +174,8 @@ func (e *emitter) Expression(
 		return functionliteral.Emit(context, e, source)
 	case *ast.Ident:
 		return identifierexpression.Emit(context, e, source)
+	case *ast.IndexExpr:
+		return mapindexexpression.Emit(context, e, source)
 	case *ast.ParenExpr:
 		return parenthesizedexpression.Emit(context, e, source)
 	case *ast.SelectorExpr:
@@ -366,6 +370,9 @@ func (e *emitter) Type(
 		if _, ok := types.Unalias(sourceType).(*types.Named); ok {
 			return namedstructtype.Emit(context, source, sourceType)
 		}
+		if _, ok := sourceType.(*types.Map); ok {
+			return maptype.Emit(context, source, sourceType)
+		}
 	}
 	return basictype.Emit(context, source)
 }
@@ -383,6 +390,9 @@ func (e *emitter) RepresentedType(
 	}
 	if _, ok := types.Unalias(sourceType).(*types.Named); ok {
 		return namedstructtype.Emit(context, source, sourceType)
+	}
+	if _, ok := sourceType.(*types.Map); ok {
+		return maptype.Emit(context, source, sourceType)
 	}
 	return basictype.EmitRepresented(context, source, sourceType)
 }
