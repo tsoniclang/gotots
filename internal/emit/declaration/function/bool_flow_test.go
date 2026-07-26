@@ -141,9 +141,11 @@ func TestBoolFlowLiteralsUseGoObjectIdentity(t *testing.T) {
 	runTarget := targetFile.Statements()[1].(tsgo.FunctionDeclaration)
 	targetDefinition := runTarget.Body().(tsgo.Block).Statements()[0].(tsgo.VariableStatement)
 	initializer := targetDefinition.DeclarationList().Declarations()[0].Initializer()
-	if initializer.Kind() != tsgo.SyntaxKindFalseKeyword {
-		t.Fatalf("initializer kind = %d, want false keyword", initializer.Kind())
+	attributed, ok := initializer.(tsgo.AsExpression)
+	if !ok || attributed.Expression().Kind() != tsgo.SyntaxKindFalseKeyword {
+		t.Fatalf("initializer = %T, want typed semantic false constant", initializer)
 	}
+	assertPrimitiveType(t, attributed.Type(), "bool")
 }
 
 func TestBoolFlowRejectsUnaryOperatorVariant(t *testing.T) {

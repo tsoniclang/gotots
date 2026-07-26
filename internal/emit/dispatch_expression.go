@@ -9,6 +9,7 @@ import (
 	callexpression "github.com/tsoniclang/gotots/internal/emit/expression/call"
 	identifierexpression "github.com/tsoniclang/gotots/internal/emit/expression/identifier"
 	integerliteral "github.com/tsoniclang/gotots/internal/emit/expression/literal/integer"
+	parenthesizedexpression "github.com/tsoniclang/gotots/internal/emit/expression/parenthesized"
 	unaryexpression "github.com/tsoniclang/gotots/internal/emit/expression/unary"
 )
 
@@ -22,7 +23,9 @@ func (e *Emitter) Expression(
 	case *ast.CallExpr:
 		return callexpression.Emit(context, e, source)
 	case *ast.Ident:
-		return identifierexpression.Emit(context, source)
+		return identifierexpression.Emit(context, e, source)
+	case *ast.ParenExpr:
+		return parenthesizedexpression.Emit(context, e, source)
 	case *ast.BasicLit:
 		return e.IntegerConstant(context, source)
 	case *ast.UnaryExpr:

@@ -489,6 +489,40 @@ fact that makes C# emission use `long`. GoToTS emits and retains the canonical
 structural carrier, replace the import with `number`, or introduce `bigint`
 syntax that the selected Tsonic contract does not admit.
 
+For selected `int64` values and selected `int` values represented by the same
+64-bit target primitive, addition, subtraction, and multiplication emit the
+corresponding direct typed TS-Go binary expression only after native Tsonic
+differential tests prove the target primitive's wraparound behavior at both
+bounds. A 32-bit `int` remains unsupported for these operators until its
+separate native boundary proof exists. Boolean `&&` and `||` emit direct binary
+expressions and retain native short-circuit evaluation. Neither operand may
+carry prerequisite statements: moving such work before a short-circuit
+operator would change behavior.
+
+An untyped Go boolean constant is explicitly attributed to the expected
+canonical target primitive, just like an untyped integer constant:
+
+```ts
+false as bool
+```
+
+Raw TypeScript `true` and `false` have only the ordinary TypeScript `boolean`
+carrier; that is not the selected Tsonic source-primitive fact required by
+native target operators. The parent supplies the expected Go `bool`, the
+predeclared-constant identifier handler verifies semantic object identity and
+assignability through `go/types`, and the existing basic-type owner supplies
+the one `bool` import. No operator handler guesses a carrier from spelling.
+
+An explicit Go parenthesized expression becomes one TS-Go
+`ParenthesizedExpression` around the directly emitted child. It preserves
+source grouping without creating a source-side wrapper or intermediate
+expression model.
+
+Division, remainder, shifts, bitwise operators, unsupported widths, and any
+operator whose selected target edge behavior is unproved remain typed
+unsupported cases. A direct JavaScript-number result is not evidence for
+integer semantics.
+
 Literal and operator handlers must also preserve exact target evidence. A
 large Go integer constant cannot be passed through a JavaScript numeric-value
 round trip if that changes its source digits. The handler either constructs an

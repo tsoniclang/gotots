@@ -112,7 +112,7 @@ func TestAddRejectsUnsupportedBinaryOperator(t *testing.T) {
 	loaded := loadAddProject(t)
 	function := loaded.Files()[0].Syntax().Decls[0].(*ast.FuncDecl)
 	binary := function.Body.List[0].(*ast.ReturnStmt).Results[0].(*ast.BinaryExpr)
-	binary.Op = token.SUB
+	binary.Op = token.QUO
 
 	compiler := emit.New(loaded)
 	_, err := compiler.EmitFile(loaded.Files()[0].Syntax(), filepath.Join(t.TempDir(), "add.ts"))

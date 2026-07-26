@@ -1,4 +1,4 @@
-import type { int64 } from "@tsonic/core/types.js";
+import type { bool, int64 } from "@tsonic/core/types.js";
 export function SwapLeft(left: int64, right: int64): int64 {
     const __gotots_assign_0: int64 = right;
     const __gotots_assign_1: int64 = left;
@@ -21,7 +21,7 @@ export function Declare(left: int64, right: int64): int64 {
     return first + second;
 }
 export function Shadow(value: int64): int64 {
-    if (true) {
+    if (true as bool) {
         const __gotots_assign_6: int64 = value + (1 as int64);
         const __gotots_assign_7: int64 = value;
         let value__shadow_1: int64 = __gotots_assign_6;
