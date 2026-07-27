@@ -149,18 +149,23 @@ func (e *emitter) declarationObject(
 				requirements,
 			)
 		}
+		if constant, ok := object.(*types.Const); ok {
+			return packageconstant.EmitObject(
+				context,
+				e,
+				source,
+				constant,
+				requirements,
+			)
+		}
 		if len(requirements) != 0 {
 			return api.DeclarationEmission{}, &api.InvariantError{
 				Role:   context.Role(),
-				Reason: "non-type declaration received target requirements",
+				Reason: "non-type non-constant declaration received target requirements",
 			}
 		}
-		constant, ok := object.(*types.Const)
-		if !ok {
-			return api.DeclarationEmission{},
-				api.Unsupported(context, api.CategoryDeclaration, source)
-		}
-		return packageconstant.EmitObject(context, e, source, constant)
+		return api.DeclarationEmission{},
+			api.Unsupported(context, api.CategoryDeclaration, source)
 	default:
 		return api.DeclarationEmission{},
 			api.Unsupported(context, api.CategoryDeclaration, source)

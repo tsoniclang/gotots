@@ -188,12 +188,15 @@ const limit int32 = 4
 const limit: int32 = 4;
 ```
 
-Untyped constants, omitted repeated expressions, and `iota` remain one
-constant-semantics family. A local constant handler does not borrow package
-placement or infer an omitted initializer.
+Constants are materialized from their checker evidence, never from a
+re-evaluation of the source value expression. The value is the exact
+`go/constant.Value` on the `*types.Const`; the source initializer syntax
+(`iota`, shifts, inherited/omitted specs) is validated and accounted for as a
+grammatical child, but never re-executed as target code. `iota` is a
+declaration-time constant-folding fact only and never appears in target output.
 
-An explicitly typed package constant is a direct declaration owned by its
-source-file module:
+An explicitly **typed** constant — package or local — is one direct binding at
+the constant's own concrete type:
 
 ```go
 const Base int = 40
@@ -203,12 +206,30 @@ const Base int = 40
 export const Base: int32 = 40;
 ```
 
-The owner uses the package-scope `types.Const` identity and exact constant value
-while the initializer handler preserves the supported source expression shape.
-Every emitted package declaration is exported for static generated-module
-linking; package assembly later selects the public surface. Untyped constants,
-implicit constant expressions and `iota` remain one later constant-semantics
-family because their representation may depend on each use context.
+An **untyped** constant has no single runtime type: Go converts it to a concrete
+type independently at each use. It therefore has no single binding. Each
+source-declared untyped constant is projected once per required target
+representation — the exact contextual type the checker records at a use
+(`Types[use].Type`) — through the demand-driven reconstructible-artifact
+lifecycle. A package-level projection is one exported declaration imported
+statically; a function-local projection has deterministic in-block placement.
+Every use — a same-package identifier, a package-qualified selector, or a
+dot-imported identifier — is a constant-size reference to its projection, so
+output size is `O(value-size + uses)`, never `O(value-size × uses)`; inlining a
+value at each use is forbidden. A projection whose value is not representable in
+the selected profile fails at the typed value boundary, not at a caller
+invariant.
+
+All root and use paths share this one classification: whole-file compilation,
+the exported-API surface, demand roots, and every same-package and cross-package
+use route a constant through the single constant-use owner, which takes the
+source expression, the `*types.Const`, and the `types.TypeAndValue`. Every
+emitted package declaration (typed binding or untyped projection) is exported
+for static generated-module linking; package assembly later selects the public
+surface. A single `go/constant.Value.Kind` dispatcher owns value materialization;
+integer, string, and later float/complex materializers have no other semantic
+callers — a syntax owner may validate its AST form but delegates the value to
+this one owner.
 
 Package variables are package-state fields, never source-file-local `let`
 bindings. A same-package read or store uses the package's direct state import;
@@ -962,12 +983,14 @@ Boolean `&&` and `||` emit direct binary expressions and retain native
 short-circuit evaluation. Neither operand may carry prerequisite statements:
 moving such work before a short-circuit operator would change behavior.
 
-An untyped Go boolean constant emits as the direct TypeScript boolean literal.
-The parent still supplies the expected Go `bool`, the predeclared-constant
-identifier handler verifies semantic object identity and assignability through
-`go/types`, and the basic-type owner supplies the one generated `bool` alias
-where a declaration boundary needs it. No operator handler guesses a carrier
-from spelling.
+The predeclared `true` and `false` are literal booleans, not source-declared
+constants, so they materialize in place as the direct TypeScript boolean literal
+through the one constant-value owner. The parent still supplies the expected Go
+`bool`, the identifier handler verifies semantic object identity and
+assignability through `go/types`, and the basic-type owner supplies the one
+generated `bool` alias where a declaration boundary needs it. A source-declared
+untyped boolean constant is projected like any other untyped constant, not
+inlined. No operator handler guesses a carrier from spelling.
 
 An explicit Go parenthesized expression becomes one TS-Go
 `ParenthesizedExpression` around the directly emitted child. It preserves

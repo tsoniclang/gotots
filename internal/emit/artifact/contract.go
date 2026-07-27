@@ -110,7 +110,7 @@ func ProjectContract(
 		}
 		contract[facet] = encoded
 	}
-	if len(contract) == 0 {
+	if len(contract) == 0 && len(statements) != 0 {
 		return nil, &ContractError{
 			Reason: "artifact contains no observable declaration",
 		}

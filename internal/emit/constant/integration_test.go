@@ -59,46 +59,124 @@ func TestConstantFamilyBigIntProfileExecutesDifferentially(t *testing.T) {
 	}
 }
 
-// TestConstantFamilyShape pins the exact TS-Go AST shape: an untyped constant
-// has no declaration and is inlined as a literal at each use, while a typed
-// constant is a single exported binding referenced by identity.
+// TestConstantFamilyShape pins the exact TS-Go AST shape of the projection
+// design: an untyped constant has no base binding but one exported projection
+// per demanded representation, and every use is a constant-size reference to a
+// projection — never an inline literal — while a typed constant is a single
+// exported binding referenced by identity.
 func TestConstantFamilyShape(t *testing.T) {
 	loaded := loadConstantFamily(t)
 	emission := compileConstantFamily(t, loaded, emit.DefaultOptions(), numberRoots...)
 	source := constantFamilySourceFile(t, emission)
 
-	// Exactly the typed constants are declared; no untyped constant is.
+	declared := declaredTopLevelBindings(source)
+
+	// No untyped constant is declared by its base name; its representations are.
+	for _, base := range []string{"Scale", "Text", "Flag", "Alpha", "Letter"} {
+		if slices.Contains(declared, base) {
+			t.Fatalf("untyped constant %q must not be declared by its base name", base)
+		}
+	}
+	// Scale is used at four distinct representations; each is one projection.
+	for _, projection := range []string{"Scale$int8", "Scale$int32", "Scale$int64", "Scale$uint16"} {
+		if !slices.Contains(declared, projection) {
+			t.Fatalf("projection %q is absent from %v", projection, declared)
+		}
+	}
+	// The typed constants keep their single base bindings.
+	for _, typed := range []string{"TypedWidth", "TypedEnabled"} {
+		if !slices.Contains(declared, typed) {
+			t.Fatalf("typed constant %q must keep its base binding", typed)
+		}
+	}
+
+	// A bare untyped constant use is a constant-size reference to its
+	// projection, never an inline literal — one reference per representation.
+	multiple := targetFunction(t, source, "MultipleTargets")
+	multipleElements := multiple.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement).
+		Expression().(tsgo.ArrayLiteralExpression).Elements()
+	for index, want := range []string{"Scale$int8", "Scale$int32", "Scale$int64", "Scale$uint16"} {
+		reference, ok := multipleElements[index].(tsgo.Identifier)
+		if !ok || reference.Text() != want {
+			t.Fatalf("MultipleTargets element %d = %T, want %s reference", index, multipleElements[index], want)
+		}
+	}
+
+	// A constant conversion expression folds to a value and materializes it, the
+	// same as any constant expression — only a bare named-constant reference is
+	// projected: Conversion returns int64(Scale) folded to 100.
+	conversion := targetFunction(t, source, "Conversion")
+	returned := conversion.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement).Expression()
+	literal, ok := returned.(tsgo.NumericLiteral)
+	if !ok || literal.Text() != "100" {
+		t.Fatalf("Conversion returns %T (%v), want folded literal 100", returned, returned)
+	}
+
+	// A typed constant use is a reference to its base binding.
+	typed := targetFunction(t, source, "Typed")
+	elements := typed.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement).
+		Expression().(tsgo.ArrayLiteralExpression).Elements()
+	typedReference, ok := elements[0].(tsgo.Identifier)
+	if !ok || typedReference.Text() != "TypedWidth" {
+		t.Fatalf("Typed element 0 = %T, want TypedWidth reference", elements[0])
+	}
+}
+
+// TestLocalUntypedConstantProjectsIntoFunctionPrologue proves a function-local
+// untyped constant is not inlined at its uses but materialized once, at its
+// demanded representation, as a prologue const binding owned by the enclosing
+// function, and referenced constant-size.
+func TestLocalUntypedConstantProjectsIntoFunctionPrologue(t *testing.T) {
+	loaded := loadConstantFamily(t)
+	emission := compileConstantFamily(t, loaded, emit.DefaultOptions(), numberRoots...)
+	source := constantFamilySourceFile(t, emission)
+
+	local := targetFunction(t, source, "Local")
+	statements := local.Body().(tsgo.Block).Statements()
+
+	// The prologue declares the two local projections before the return.
+	var prologueNames []string
+	for _, statement := range statements {
+		variable, ok := statement.(tsgo.VariableStatement)
+		if !ok {
+			continue
+		}
+		for _, modifier := range variable.Modifiers() {
+			if modifier.Kind() == tsgo.SyntaxKindExportKeyword {
+				t.Fatalf("local projection %v must not be exported", statement)
+			}
+		}
+		name := variable.DeclarationList().Declarations()[0].Name().(tsgo.Identifier).Text()
+		prologueNames = append(prologueNames, name)
+	}
+	slices.Sort(prologueNames)
+	if !slices.Equal(prologueNames, []string{"high$int", "low$int"}) {
+		t.Fatalf("Local prologue declares %v, want [high$int low$int]", prologueNames)
+	}
+
+	// The return references the projections, never inline literals.
+	returned := statements[len(statements)-1].(tsgo.ReturnStatement).
+		Expression().(tsgo.ArrayLiteralExpression).Elements()
+	for index, want := range []string{"low$int", "high$int"} {
+		reference, ok := returned[index].(tsgo.Identifier)
+		if !ok || reference.Text() != want {
+			t.Fatalf("Local return element %d = %T, want %s reference", index, returned[index], want)
+		}
+	}
+}
+
+func declaredTopLevelBindings(source tsgo.SourceFile) []string {
 	var declared []string
 	for _, statement := range source.Statements() {
 		variable, ok := statement.(tsgo.VariableStatement)
 		if !ok {
 			continue
 		}
-		name := variable.DeclarationList().Declarations()[0].Name().(tsgo.Identifier).Text()
-		declared = append(declared, name)
+		for _, declaration := range variable.DeclarationList().Declarations() {
+			declared = append(declared, declaration.Name().(tsgo.Identifier).Text())
+		}
 	}
-	slices.Sort(declared)
-	if !slices.Equal(declared, []string{"TypedEnabled", "TypedWidth"}) {
-		t.Fatalf("declared constants = %v, want only the typed constants", declared)
-	}
-
-	// An untyped constant use is an inline literal, not a reference: Conversion
-	// returns the projected literal 100.
-	conversion := targetFunction(t, source, "Conversion")
-	returned := conversion.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement).Expression()
-	literal, ok := returned.(tsgo.NumericLiteral)
-	if !ok || literal.Text() != "100" {
-		t.Fatalf("Conversion returns %T, want inline NumericLiteral 100", returned)
-	}
-
-	// A typed constant use is a reference: Typed returns [TypedWidth, ...].
-	typed := targetFunction(t, source, "Typed")
-	elements := typed.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement).
-		Expression().(tsgo.ArrayLiteralExpression).Elements()
-	reference, ok := elements[0].(tsgo.Identifier)
-	if !ok || reference.Text() != "TypedWidth" {
-		t.Fatalf("Typed element 0 = %T, want TypedWidth reference", elements[0])
-	}
+	return declared
 }
 
 // TestUntypedConstantValueOwnerRejectsUnrepresentable proves the projection
@@ -116,9 +194,9 @@ func TestUntypedConstantValueOwnerRejectsUnrepresentable(t *testing.T) {
 	var unsupported *api.UnsupportedError
 	if !errors.As(err, &unsupported) ||
 		unsupported.Category != api.CategoryExpression ||
-		unsupported.Role != api.RoleReturnResult ||
+		unsupported.Role != api.RolePackageConstantValue ||
 		unsupported.Construct != "*ast.Ident" {
-		t.Fatalf("error = %#v, want return-result expression UnsupportedError at the value owner", err)
+		t.Fatalf("error = %#v, want package-constant-value expression UnsupportedError at the projection's value owner", err)
 	}
 }
 

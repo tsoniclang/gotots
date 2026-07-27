@@ -235,6 +235,17 @@ type DeclarationEmission struct {
 	requests     []RootRequest
 }
 
+// EmptyDeclarationEmission is a valid declaration emission that contributes no
+// target statements. It is the disposition of a source declaration whose runtime
+// form is supplied entirely by later demand-driven reconstruction — an untyped
+// constant with no projected uses yet — and never a silent skip of a construct
+// that owed a direct declaration. The requests, if any, still propagate.
+func EmptyDeclarationEmission(requests ...RootRequest) DeclarationEmission {
+	return DeclarationEmission{
+		requests: slices.Clone(requests),
+	}
+}
+
 func NewDeclarationEmission(
 	declarations []tsgo.Statement,
 	requests []RootRequest,

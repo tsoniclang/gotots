@@ -10,11 +10,19 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
+// EmitObject emits a package-level constant. A typed constant becomes one direct
+// binding materialized from its checker value. An untyped constant has no single
+// runtime type, so it is never emitted directly: it is projected once per
+// required target basic representation, each projection scheduled by a use site
+// through the constant-projection declaration requirement. An untyped constant
+// with no requirements yet contributes no statements; its projections arrive by
+// artifact reconstruction as uses demand them.
 func EmitObject(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.GenDecl,
 	selected *types.Const,
+	requirements []api.DeclarationRequirement,
 ) (api.DeclarationEmission, error) {
 	if selected == nil {
 		return api.DeclarationEmission{},
@@ -27,64 +35,59 @@ func EmitObject(
 		return api.DeclarationEmission{},
 			api.Unsupported(context, api.CategoryDeclaration, source)
 	}
-	var declarations []tsgo.Statement
-	var requests []api.RootRequest
-	for _, sourceSpec := range source.Specs {
-		spec, ok := sourceSpec.(*ast.ValueSpec)
-		if !ok {
-			return api.DeclarationEmission{},
-				api.Unsupported(context, api.CategoryDeclaration, sourceSpec)
-		}
-		target, targetRequests, found, err := emitSpec(
-			context,
-			children,
-			spec,
-			selected,
-		)
-		if err != nil {
-			return api.DeclarationEmission{}, err
-		}
-		declarations = append(declarations, target...)
-		requests = append(requests, targetRequests...)
-		if found {
-			break
-		}
+	sourceName, err := locateName(context, source, selected)
+	if err != nil {
+		return api.DeclarationEmission{}, err
 	}
-	if len(declarations) == 0 {
+	if constantbinding.IsUntyped(selected.Type()) {
+		return emitProjections(context, children, sourceName, selected, requirements)
+	}
+	if len(requirements) != 0 {
 		return api.DeclarationEmission{},
 			&api.InvariantError{
 				Role:   context.Role(),
-				Reason: "selected package constant is absent from its declaration",
+				Reason: "typed constant received projection requirements",
 			}
 	}
-	return api.NewDeclarationEmission(declarations, requests)
+	return emitTypedBinding(context, children, sourceName, selected)
 }
 
-func emitSpec(
+// locateName finds the declaring identifier of the selected constant among the
+// declaration's specs. Every constant object has exactly one declaring name;
+// its absence is a scheduling invariant violation, not source shape the handler
+// tolerates.
+func locateName(
 	context api.Context,
-	children api.ChildEmitter,
-	source *ast.ValueSpec,
+	source *ast.GenDecl,
 	selected *types.Const,
-) ([]tsgo.Statement, []api.RootRequest, bool, error) {
-	if source.Doc != nil || source.Comment != nil || len(source.Names) == 0 {
-		return nil, nil, false,
-			api.Unsupported(context, api.CategoryDeclaration, source)
-	}
-
-	declarations := make([]tsgo.Statement, 0, len(source.Names))
-	var requests []api.RootRequest
-	selectedIndex := -1
-	for index, sourceName := range source.Names {
-		object, ok := context.TypesInfo().Defs[sourceName].(*types.Const)
-		if ok && object == selected {
-			selectedIndex = index
-			break
+) (*ast.Ident, error) {
+	for _, sourceSpec := range source.Specs {
+		spec, ok := sourceSpec.(*ast.ValueSpec)
+		if !ok {
+			return nil, api.Unsupported(context, api.CategoryDeclaration, sourceSpec)
+		}
+		if spec.Doc != nil || spec.Comment != nil || len(spec.Names) == 0 {
+			return nil, api.Unsupported(context, api.CategoryDeclaration, spec)
+		}
+		for _, name := range spec.Names {
+			object, ok := context.TypesInfo().Defs[name].(*types.Const)
+			if ok && object == selected {
+				return name, nil
+			}
 		}
 	}
-	if selectedIndex < 0 {
-		return nil, nil, false, nil
+	return nil, &api.InvariantError{
+		Role:   context.Role(),
+		Reason: "selected package constant is absent from its declaration",
 	}
-	sourceName := source.Names[selectedIndex]
+}
+
+func emitTypedBinding(
+	context api.Context,
+	children api.ChildEmitter,
+	sourceName *ast.Ident,
+	selected *types.Const,
+) (api.DeclarationEmission, error) {
 	binding, err := constantbinding.EmitBinding(
 		context,
 		children,
@@ -94,29 +97,93 @@ func emitSpec(
 		api.RolePackageConstantValue,
 	)
 	if err != nil {
-		return nil, nil, false, err
+		return api.DeclarationEmission{}, err
 	}
 	moduleExport, err := context.Names().ModuleExport(selected)
 	if err != nil {
-		return nil, nil, false, err
+		return api.DeclarationEmission{}, err
 	}
 	if !moduleExport {
-		return nil, nil, false,
+		return api.DeclarationEmission{},
 			&api.InvariantError{
 				Role:   context.Role(),
 				Reason: "package constant is not module-exported",
 			}
 	}
-	declarations = append(
-		declarations,
-		context.Factory().VariableStatement(
-			[]tsgo.ModifierLike{context.Factory().ExportKeyword()},
-			context.Factory().VariableDeclarationList(
-				[]tsgo.VariableDeclaration{binding.Declaration()},
-				tsgo.NodeFlagsConst,
-			),
+	statement := context.Factory().VariableStatement(
+		[]tsgo.ModifierLike{context.Factory().ExportKeyword()},
+		context.Factory().VariableDeclarationList(
+			[]tsgo.VariableDeclaration{binding.Declaration()},
+			tsgo.NodeFlagsConst,
 		),
 	)
-	requests = append(requests, binding.Requests()...)
-	return declarations, requests, true, nil
+	return api.NewDeclarationEmission(
+		[]tsgo.Statement{statement},
+		binding.Requests(),
+	)
+}
+
+func emitProjections(
+	context api.Context,
+	children api.ChildEmitter,
+	sourceName *ast.Ident,
+	selected *types.Const,
+	requirements []api.DeclarationRequirement,
+) (api.DeclarationEmission, error) {
+	baseName, err := context.Names().Declare(selected)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	moduleExport, err := context.Names().ModuleExport(selected)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	if !moduleExport {
+		return api.DeclarationEmission{},
+			&api.InvariantError{
+				Role:   context.Role(),
+				Reason: "package constant projection owner is not module-exported",
+			}
+	}
+	declarations := make([]tsgo.Statement, 0, len(requirements))
+	var requests []api.RootRequest
+	for _, requirement := range requirements {
+		constant, projection, ok := requirement.ConstantProjection()
+		if !ok || constant != selected {
+			return api.DeclarationEmission{},
+				&api.InvariantError{
+					Role:   context.Role(),
+					Reason: "constant projection requirement does not own this constant",
+				}
+		}
+		projectionName := api.ConstantProjectionName(baseName, projection)
+		emission, err := constantbinding.EmitProjection(
+			context,
+			children,
+			sourceName,
+			selected,
+			projectionName,
+			projection,
+			api.RolePackageConstantType,
+			api.RolePackageConstantValue,
+		)
+		if err != nil {
+			return api.DeclarationEmission{}, err
+		}
+		declarations = append(
+			declarations,
+			context.Factory().VariableStatement(
+				[]tsgo.ModifierLike{context.Factory().ExportKeyword()},
+				context.Factory().VariableDeclarationList(
+					[]tsgo.VariableDeclaration{emission.Declaration()},
+					tsgo.NodeFlagsConst,
+				),
+			),
+		)
+		requests = append(requests, emission.Requests()...)
+	}
+	if len(declarations) == 0 {
+		return api.EmptyDeclarationEmission(), nil
+	}
+	return api.NewDeclarationEmission(declarations, requests)
 }

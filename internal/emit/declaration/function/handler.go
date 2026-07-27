@@ -86,6 +86,23 @@ func Emit(
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
+	projectionPrologue, projectionRequests, err := localConstantProjectionPrologue(
+		context,
+		children,
+		source,
+		functionObject,
+		requirements,
+	)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	bodyBlock := body.Value()
+	if len(projectionPrologue) != 0 {
+		bodyBlock = context.Factory().Block(
+			append(projectionPrologue, bodyBlock.Statements()...),
+			true,
+		)
+	}
 	moduleExport, err := context.Names().ModuleExport(functionObject)
 	if err != nil {
 		return api.DeclarationEmission{}, err
@@ -101,13 +118,14 @@ func Emit(
 		nil,
 		parameters,
 		targetSignature.Result(),
-		body.Value(),
+		bodyBlock,
 	)
 	return api.DirectDeclaration(
 		target,
 		api.CombineRequests(
 			parameterRequests,
 			body.Requests(),
+			projectionRequests,
 		)...,
 	), nil
 }

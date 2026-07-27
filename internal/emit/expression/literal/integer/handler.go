@@ -7,7 +7,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
+	constantvalue "github.com/tsoniclang/gotots/internal/emit/constant"
 )
 
 func Emit(
@@ -33,7 +33,7 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	return integervalue.EmitConstant(
+	return constantvalue.EmitValue(
 		context,
 		source,
 		targetType,

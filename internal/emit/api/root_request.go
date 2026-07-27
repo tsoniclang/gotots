@@ -183,6 +183,43 @@ func NewAddressableStorageRequest(
 	}, nil
 }
 
+func NewConstantProjectionRequest(
+	constant *types.Const,
+	projection types.BasicKind,
+) (RootRequest, error) {
+	requirement, err := NewConstantProjectionRequirement(constant, projection)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return RootRequest{
+		owner: RootRequestOwner{
+			kind:                   RootRequestDeclarationRequirement,
+			declarationRequirement: requirement,
+		},
+	}, nil
+}
+
+func NewLocalConstantProjectionRequest(
+	owner *types.Func,
+	constant *types.Const,
+	projection types.BasicKind,
+) (RootRequest, error) {
+	requirement, err := NewLocalConstantProjectionRequirement(
+		owner,
+		constant,
+		projection,
+	)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return RootRequest{
+		owner: RootRequestOwner{
+			kind:                   RootRequestDeclarationRequirement,
+			declarationRequirement: requirement,
+		},
+	}, nil
+}
+
 func NewArtifactDependencyRequest(
 	provider types.Object,
 	facet ArtifactFacet,

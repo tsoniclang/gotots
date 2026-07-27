@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
 	packagevariable "github.com/tsoniclang/gotots/internal/emit/declaration/packagevariable"
 	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
@@ -463,6 +464,31 @@ func (b *packageTargetBuilder) hasInitializationWork() bool {
 	return len(b.storage) != 0 || len(b.initialization) != 0
 }
 
+// exportedBindingNames is the public surface an exported declaration
+// contributes to its package assembly. Ordinary declarations export their one
+// binding name. An untyped constant has no single binding — its public surface
+// is exactly the projections its uses demanded — so it re-exports each applied
+// projection's derived name, and nothing when no use projected it.
+func (s *programSession) exportedBindingNames(
+	object types.Object,
+	baseName string,
+) []string {
+	constant, ok := object.(*types.Const)
+	if !ok || !constantbinding.IsUntyped(constant.Type()) {
+		return []string{baseName}
+	}
+	requirements := s.requirements.appliedFor(constant)
+	names := make([]string, 0, len(requirements))
+	for _, requirement := range requirements {
+		_, projection, ok := requirement.ConstantProjection()
+		if !ok {
+			continue
+		}
+		names = append(names, api.ConstantProjectionName(baseName, projection))
+	}
+	return names
+}
+
 func (s *programSession) packageExports(
 	builder *packageTargetBuilder,
 ) ([]tsgo.Statement, error) {
@@ -484,7 +510,7 @@ func (s *programSession) packageExports(
 			}
 			byPath[binding.sourcePath] = append(
 				byPath[binding.sourcePath],
-				binding.name,
+				s.exportedBindingNames(declaration.object, binding.name)...,
 			)
 		}
 	}

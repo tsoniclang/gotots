@@ -254,6 +254,80 @@ func (n *fileNames) NamedStructOperation(
 	return api.NewNameReference(reference.Name(), requests...)
 }
 
+// ConstantProjection returns a constant-size reference to the untyped
+// constant's projection at the given target basic representation, and the
+// requests that make the projection exist once on its owning constant: the
+// declaration-requirement that schedules/reconstructs the projection, a require
+// of the owner, an artifact dependency on the owner's value surface, and a
+// static import when the use is in another file or package.
+func (n *fileNames) ConstantProjection(
+	constant *types.Const,
+	projection types.BasicKind,
+) (api.NameReference, error) {
+	if constant == nil {
+		return api.NameReference{}, &api.NameError{Reason: "constant projection constant is nil"}
+	}
+	request, err := api.NewConstantProjectionRequest(constant, projection)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	binding, ok := n.owner.byObject[constant]
+	if !ok && n.owner.registry != nil {
+		binding, ok = n.owner.registry.byObject[constant]
+	}
+	if !ok {
+		return api.NameReference{}, &api.NameError{
+			Name:   constant.Name(),
+			Reason: "constant has no reserved projection owner",
+		}
+	}
+	projectionName := api.ConstantProjectionName(binding.name, projection)
+	requests := []api.RootRequest{request}
+	if binding.sourceFile != nil && n.require != nil {
+		if err := n.require(constant); err != nil {
+			return api.NameReference{}, err
+		}
+	}
+	if binding.sourceFile != nil && n.artifactOwner != nil {
+		dependency, err := api.NewArtifactDependencyRequest(
+			constant,
+			api.ArtifactFacetValueSurface,
+		)
+		if err != nil {
+			return api.NameReference{}, err
+		}
+		requests = append(requests, dependency)
+	}
+	if binding.sourceFile != nil && binding.sourceFile != n.sourceFile {
+		referencePath := binding.sourcePath
+		if constant.Pkg() != nil && constant.Pkg().Scope() != n.packageScope {
+			referencePath = n.owner.registry.assemblyPathByPackage[constant.Pkg()]
+			if referencePath == "" {
+				return api.NameReference{}, &api.NameError{
+					Name:   constant.Name(),
+					Reason: "cross-package constant has no assembly path",
+				}
+			}
+		}
+		modulePath, err := output.ModuleSpecifier(n.targetPath, referencePath)
+		if err != nil {
+			return api.NameReference{}, err
+		}
+		importRequest, err := api.NewImportRequest(
+			n.factory,
+			api.ImportPhaseValue,
+			modulePath,
+			projectionName,
+			projectionName,
+		)
+		if err != nil {
+			return api.NameReference{}, err
+		}
+		requests = append(requests, importRequest)
+	}
+	return api.NewNameReference(projectionName, requests...)
+}
+
 func (n *fileNames) beginArtifact(owner types.Object) (func(), error) {
 	if owner == nil {
 		return nil, &api.NameError{Reason: "artifact owner is nil"}

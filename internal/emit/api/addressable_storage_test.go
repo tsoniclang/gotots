@@ -113,7 +113,9 @@ func TestAddressableStorageRequirementNeverKeysBySpelling(t *testing.T) {
 func TestDeclarationRequirementKindIDsArePinned(t *testing.T) {
 	if DeclarationRequirementNamedStructOperation != 1 ||
 		DeclarationRequirementAddressableStorage != 2 ||
-		DeclarationRequirementKind(3).Valid() {
+		DeclarationRequirementConstantProjection != 3 ||
+		DeclarationRequirementLocalConstantProjection != 4 ||
+		DeclarationRequirementKind(5).Valid() {
 		t.Fatal("declaration requirement kind IDs drifted")
 	}
 }

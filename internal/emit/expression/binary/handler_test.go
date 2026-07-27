@@ -91,6 +91,13 @@ func (unusedNames) NamedStructOperation(
 	panic("unused")
 }
 
+func (unusedNames) ConstantProjection(
+	*types.Const,
+	types.BasicKind,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (unusedNames) Member(*types.Var) (string, error) {
 	panic("unused")
 }

@@ -238,6 +238,17 @@ func (s *declarationRequirementScheduler) appliedFor(
 	return requirements
 }
 
+func compareBasicKinds(left types.BasicKind, right types.BasicKind) int {
+	switch {
+	case left < right:
+		return -1
+	case left > right:
+		return 1
+	default:
+		return 0
+	}
+}
+
 func compareDeclarationRequirements(
 	left api.DeclarationRequirement,
 	right api.DeclarationRequirement,
@@ -264,6 +275,19 @@ func compareDeclarationRequirements(
 		default:
 			return compareObjects(leftVariable, rightVariable)
 		}
+	}
+	if left.Kind() == api.DeclarationRequirementConstantProjection {
+		_, leftProjection, _ := left.ConstantProjection()
+		_, rightProjection, _ := right.ConstantProjection()
+		return compareBasicKinds(leftProjection, rightProjection)
+	}
+	if left.Kind() == api.DeclarationRequirementLocalConstantProjection {
+		_, leftConstant, leftProjection, _ := left.LocalConstantProjection()
+		_, rightConstant, rightProjection, _ := right.LocalConstantProjection()
+		if order := compareObjects(leftConstant, rightConstant); order != 0 {
+			return order
+		}
+		return compareBasicKinds(leftProjection, rightProjection)
 	}
 	_, leftOperation, _ := left.NamedStructOperation()
 	_, rightOperation, _ := right.NamedStructOperation()

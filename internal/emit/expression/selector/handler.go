@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -42,6 +43,27 @@ func Emit(
 		}
 		return api.DirectExpression(
 			reference.Expression(context.Factory()),
+			reference.Requests()...,
+		), nil
+	}
+	if constObject, ok := object.(*types.Const); ok &&
+		constantbinding.IsUntyped(constObject.Type()) {
+		typeAndValue := context.TypesInfo().Types[source]
+		if typeAndValue.Value == nil {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		projection, ok := constantbinding.ProjectionKind(typeAndValue.Type)
+		if !ok {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		reference, err := context.Names().ConstantProjection(constObject, projection)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.DirectExpression(
+			context.Factory().Identifier(reference.Name()),
 			reference.Requests()...,
 		), nil
 	}

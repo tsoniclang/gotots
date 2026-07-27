@@ -103,6 +103,7 @@ type Names interface {
 	TypeReference(types.Object) (NameReference, error)
 	PackageVariable(*types.Var) (PackageVariableReference, error)
 	NamedStructOperation(*types.TypeName, NamedStructOperation) (NameReference, error)
+	ConstantProjection(*types.Const, types.BasicKind) (NameReference, error)
 	Member(*types.Var) (string, error)
 	Primitive(PrimitiveAlias) (NameReference, error)
 	Runtime(RuntimeSymbol, ImportPhase) (NameReference, error)
