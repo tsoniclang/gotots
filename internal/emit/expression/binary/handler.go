@@ -6,6 +6,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	floatbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/float"
 	integerbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/integer"
 	"github.com/tsoniclang/gotots/internal/emit/expression/mapcomparison"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
@@ -37,6 +38,13 @@ func Emit(
 		}
 	}
 	if target, ok, err := integerbinary.Emit(
+		context,
+		children,
+		source,
+	); ok || err != nil {
+		return target, err
+	}
+	if target, ok, err := floatbinary.Emit(
 		context,
 		children,
 		source,
