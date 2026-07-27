@@ -61,23 +61,16 @@ type targetDeclaration struct {
 	reconstructions uint64
 }
 
-type targetPackageInitDeclaration struct {
-	position   token.Pos
-	name       string
-	statements []tsgo.Statement
-}
-
 type targetFileBuilder struct {
-	sourcePackage       *load.Package
-	sourceFile          load.File
-	outputPath          string
-	emitter             *emitter
-	context             api.Context
-	placement           *placementOwner
-	declarations        []targetDeclaration
-	byObject            map[types.Object]struct{}
-	indexByObject       map[types.Object]int
-	packageInitializers []targetPackageInitDeclaration
+	sourcePackage *load.Package
+	sourceFile    load.File
+	outputPath    string
+	emitter       *emitter
+	context       api.Context
+	placement     *placementOwner
+	declarations  []targetDeclaration
+	byObject      map[types.Object]struct{}
+	indexByObject map[types.Object]int
 }
 
 func Compile(source *load.Program, roots []Root) (ProgramEmission, error) {
@@ -319,6 +312,28 @@ func newProgramSession(
 	sort.Slice(orderedSites, func(left, right int) bool {
 		return compareDeclarationSites(orderedSites[left], orderedSites[right]) < 0
 	})
+	initializers := make(map[*load.Package][]types.Object)
+	for _, site := range orderedSites {
+		function, ok := site.declaration.(*ast.FuncDecl)
+		if ok && isPackageInitDeclaration(function) {
+			initializers[site.source] = append(
+				initializers[site.source],
+				site.object,
+			)
+		}
+	}
+	for sourcePackage, objects := range initializers {
+		emitter := session.emitters[sourcePackage]
+		if emitter == nil {
+			return nil, &ScheduleError{
+				Object: "init",
+				Reason: "package initializer has no emitter",
+			}
+		}
+		if err := emitter.names.preallocatePackageInitializers(objects); err != nil {
+			return nil, err
+		}
+	}
 	for _, site := range orderedSites {
 		emitter := session.emitters[site.source]
 		if emitter == nil {
@@ -434,13 +449,6 @@ func (s *programSession) emit(object types.Object) error {
 		temporaryStart: revision.temporaryStart,
 	})
 	return nil
-}
-
-func (s *programSession) applyNonArtifactRequests(
-	builder *targetFileBuilder,
-	requests []api.RootRequest,
-) error {
-	return s.applyRootRequests(builder.placement, requests)
 }
 
 func (s *programSession) applyRootRequests(

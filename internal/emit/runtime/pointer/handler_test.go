@@ -3,6 +3,7 @@ package pointer_test
 import (
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
@@ -11,7 +12,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func TestBuildCreatesOneTypedGenericCellClass(t *testing.T) {
+func TestBuildCreatesOneTypedCanonicalLocationClass(t *testing.T) {
 	factory := tsgo.NewFactory()
 	statement := pointer.Build(factory, pointerClassName(t), panicClassName(t))
 
@@ -31,32 +32,33 @@ func TestBuildCreatesOneTypedGenericCellClass(t *testing.T) {
 		t.Fatalf("pointer type parameters = %v, want T", parameters)
 	}
 	members := class.Members()
-	if len(members) != 2 {
-		t.Fatalf("pointer class members = %d, want constructor and guard", len(members))
+	if len(members) != 14 {
+		t.Fatalf("pointer class members = %d, want 14", len(members))
 	}
-	constructor, ok := members[0].(tsgo.ConstructorDeclaration)
+	constructor, ok := members[2].(tsgo.ConstructorDeclaration)
 	if !ok {
-		t.Fatalf("pointer member = %T, want constructor", members[0])
+		t.Fatalf("pointer member = %T, want constructor", members[2])
 	}
-	cell := constructor.Parameters()
-	if len(cell) != 1 ||
-		cell[0].Name().(tsgo.Identifier).Text() != pointer.CellValueName ||
-		len(cell[0].Modifiers()) != 1 ||
-		cell[0].Modifiers()[0].Kind() != tsgo.SyntaxKindPublicKeyword {
-		t.Fatalf("pointer constructor parameter is not public value: %v", cell)
+	constructorParameters := constructor.Parameters()
+	if len(constructorParameters) != 3 {
+		t.Fatalf("pointer constructor parameters = %d, want 3", len(constructorParameters))
 	}
-	cellType, ok := cell[0].Type().(tsgo.TypeReferenceNode)
-	if !ok || cellType.TypeName().(tsgo.Identifier).Text() != "T" {
-		t.Fatalf("pointer cell type = %T, want T", cell[0].Type())
+	for index, name := range []string{"address", "read", "write"} {
+		parameter := constructorParameters[index]
+		if parameter.Name().(tsgo.Identifier).Text() != name ||
+			len(parameter.Modifiers()) != 2 ||
+			parameter.Modifiers()[0].Kind() != tsgo.SyntaxKindPrivateKeyword ||
+			parameter.Modifiers()[1].Kind() != tsgo.SyntaxKindReadonlyKeyword {
+			t.Fatalf("pointer constructor parameter %d = %#v", index, parameter)
+		}
 	}
-	guard, ok := members[1].(tsgo.MethodDeclaration)
-	if !ok ||
-		guard.Name().(tsgo.Identifier).Text() != pointer.DereferenceName ||
+	guard := pointerMethod(t, class, pointer.DereferenceName)
+	if guard.Name().(tsgo.Identifier).Text() != pointer.DereferenceName ||
 		len(guard.Modifiers()) != 1 ||
 		guard.Modifiers()[0].Kind() != tsgo.SyntaxKindStaticKeyword ||
 		len(guard.TypeParameters()) != 1 ||
 		len(guard.Parameters()) != 1 {
-		t.Fatalf("pointer guard = %T, want static typed dereference", members[1])
+		t.Fatalf("pointer guard = %T, want static typed dereference", guard)
 	}
 }
 
@@ -66,7 +68,7 @@ func TestNilDereferenceSuccessMutationRemovesRequiredThrow(t *testing.T) {
 		pointerClassName(t),
 		panicClassName(t),
 	).(tsgo.ClassDeclaration)
-	guard := class.Members()[1].(tsgo.MethodDeclaration)
+	guard := pointerMethod(t, class, pointer.DereferenceName)
 	body := guard.Body().(tsgo.Block).Statements()
 	if len(body) != 2 {
 		t.Fatalf("pointer guard statements = %d, want check and return", len(body))
@@ -118,7 +120,7 @@ func TestPointerRuntimeBuildExactJoinsItsFrozenSymbol(t *testing.T) {
 	}
 }
 
-func TestBuildPrintsSourceShapedCell(t *testing.T) {
+func TestBuildPrintsSourceShapedCanonicalLocations(t *testing.T) {
 	factory := tsgo.NewFactory()
 	client, err := tsgo.StartClient(
 		filepath.Join("..", "..", "..", ".."),
@@ -139,19 +141,50 @@ func TestBuildPrintsSourceShapedCell(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const expected = `export class GoPointer<T> {
-    constructor(public value: T) {
-    }
-    static dereference<T>(pointer: GoPointer<T> | undefined): GoPointer<T> {
-        if (pointer === void 0) {
-            GoPanic.raise("nil pointer dereference");
-        }
-        return pointer;
-    }
-}`
-	if printed != expected {
-		t.Fatalf("pointer runtime:\n%s\nwant:\n%s", printed, expected)
+	for _, required := range []string{
+		"export class GoPointer<T>",
+		"private static readonly roots: WeakMap<object, object>",
+		"private constructor(private readonly address: object",
+		"static cell<T>(value: T): GoPointer<T>",
+		"static field<O extends object, K extends keyof O>",
+		"static objectField<O extends object, K extends keyof O>",
+		"static index<T, O extends",
+		"const numericIndex = Number(index);",
+		"static equal<T>",
+		"static dereference<T>",
+		"get value(): T",
+		"set value(value: T)",
+		`GoPanic.raise("nil pointer dereference")`,
+	} {
+		if !strings.Contains(printed, required) {
+			t.Fatalf("pointer runtime lacks %q:\n%s", required, printed)
+		}
 	}
+	for _, forbidden := range []string{"any", "unknown", ".call(", ".apply(", ".bind("} {
+		if strings.Contains(printed, forbidden) {
+			t.Fatalf("pointer runtime contains %q:\n%s", forbidden, printed)
+		}
+	}
+}
+
+func pointerMethod(
+	t *testing.T,
+	class tsgo.ClassDeclaration,
+	name string,
+) tsgo.MethodDeclaration {
+	t.Helper()
+	for _, member := range class.Members() {
+		method, ok := member.(tsgo.MethodDeclaration)
+		if !ok {
+			continue
+		}
+		identifier, ok := method.Name().(tsgo.Identifier)
+		if ok && identifier.Text() == name {
+			return method
+		}
+	}
+	t.Fatalf("pointer method %q is absent", name)
+	return nil
 }
 
 func pointerClassName(t *testing.T) string {

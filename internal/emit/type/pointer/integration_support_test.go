@@ -18,8 +18,9 @@ import (
 )
 
 type materializedProgram struct {
-	targetPaths []string
-	modules     map[string]string
+	targetPaths           []string
+	modules               map[string]string
+	programInitialization string
 }
 
 func materializeExportedProgram(
@@ -27,12 +28,26 @@ func materializeExportedProgram(
 	loaded *load.Package,
 	workingDirectory string,
 ) materializedProgram {
+	return materializeExportedProgramWithOptions(
+		t,
+		loaded,
+		workingDirectory,
+		emit.DefaultOptions(),
+	)
+}
+
+func materializeExportedProgramWithOptions(
+	t *testing.T,
+	loaded *load.Package,
+	workingDirectory string,
+	options emit.Options,
+) materializedProgram {
 	t.Helper()
 	roots, err := emit.ExportedAPIRoots(loaded)
 	if err != nil {
 		t.Fatal(err)
 	}
-	emission, err := emit.Compile(loaded.Program(), roots)
+	emission, err := emit.CompileWithOptions(loaded.Program(), roots, options)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,6 +78,10 @@ func materializeExportedProgram(
 				t.Fatalf("multiple emitted source modules use basename %q", base)
 			}
 			result.modules[base] = "./" +
+				strings.TrimSuffix(file.OutputPath(), ".ts") + ".js"
+		}
+		if file.Kind() == emit.TargetFileProgramInitialization {
+			result.programInitialization = "./" +
 				strings.TrimSuffix(file.OutputPath(), ".ts") + ".js"
 		}
 	}

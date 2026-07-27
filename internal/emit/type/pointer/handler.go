@@ -5,15 +5,13 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func Scalar(
-	sizes types.Sizes,
+func Resolve(
 	sourceType types.Type,
 ) (*types.Pointer, types.Type, bool) {
-	if sizes == nil || sourceType == nil {
+	if sourceType == nil {
 		return nil, nil, false
 	}
 	pointer, ok := types.Unalias(sourceType).(*types.Pointer)
@@ -21,7 +19,7 @@ func Scalar(
 		return nil, nil, false
 	}
 	element := pointer.Elem()
-	if _, represented := basictype.PrimitiveAlias(sizes, element); !represented {
+	if element == nil {
 		return nil, nil, false
 	}
 	return pointer, element, true
@@ -33,7 +31,7 @@ func EmitSyntax(
 	source *ast.StarExpr,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
-	pointer, element, ok := Scalar(context.TypesSizes(), sourceType)
+	pointer, element, ok := Resolve(sourceType)
 	if !ok ||
 		source == nil ||
 		source.X == nil ||
@@ -51,7 +49,7 @@ func EmitRepresented(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
-	_, element, ok := Scalar(context.TypesSizes(), sourceType)
+	_, element, ok := Resolve(sourceType)
 	if !ok {
 		return api.TypeEmission{},
 			api.Unsupported(context, api.CategoryType, source)

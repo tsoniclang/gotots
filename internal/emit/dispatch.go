@@ -10,6 +10,7 @@ import (
 	functiondeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/function"
 	namedstructdeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/namedstruct"
 	packageconstant "github.com/tsoniclang/gotots/internal/emit/declaration/packageconstant"
+	addressexpression "github.com/tsoniclang/gotots/internal/emit/expression/address"
 	binaryexpression "github.com/tsoniclang/gotots/internal/emit/expression/binary"
 	callexpression "github.com/tsoniclang/gotots/internal/emit/expression/call"
 	compositeliteral "github.com/tsoniclang/gotots/internal/emit/expression/compositeliteral"
@@ -34,6 +35,7 @@ import (
 	localdeclaration "github.com/tsoniclang/gotots/internal/emit/statement/localdeclaration"
 	returnstatement "github.com/tsoniclang/gotots/internal/emit/statement/returnstatement"
 	switchstatement "github.com/tsoniclang/gotots/internal/emit/statement/switchstatement"
+	"github.com/tsoniclang/gotots/internal/emit/storage"
 	storetarget "github.com/tsoniclang/gotots/internal/emit/store"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	maptype "github.com/tsoniclang/gotots/internal/emit/type/map"
@@ -109,6 +111,7 @@ func (e *emitter) targetContext(
 		e.factory,
 		names,
 		e.values,
+		storage.Owner{},
 		e.integer,
 		e.order,
 	)
@@ -122,12 +125,6 @@ func (e *emitter) declarationObject(
 ) (api.DeclarationEmission, error) {
 	switch source := source.(type) {
 	case *ast.FuncDecl:
-		if len(requirements) != 0 {
-			return api.DeclarationEmission{}, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "function declaration received target requirements",
-			}
-		}
 		function, ok := object.(*types.Func)
 		if !ok || context.TypesInfo().Defs[source.Name] != function {
 			return api.DeclarationEmission{},
@@ -136,7 +133,12 @@ func (e *emitter) declarationObject(
 					Reason: "scheduled function does not own its declaration",
 				}
 		}
-		return functiondeclaration.Emit(context, e, source)
+		return functiondeclaration.Emit(
+			context,
+			e,
+			source,
+			requirements,
+		)
 	case *ast.GenDecl:
 		if typeName, ok := object.(*types.TypeName); ok {
 			return namedstructdeclaration.EmitAssembly(
@@ -208,6 +210,13 @@ func (e *emitter) IntegerConstant(
 	source ast.Expr,
 ) (api.ExpressionEmission, error) {
 	return integerliteral.Emit(context, e, source)
+}
+
+func (e *emitter) Address(
+	context api.Context,
+	source ast.Expr,
+) (api.ExpressionEmission, error) {
+	return addressexpression.Emit(context, e, source)
 }
 
 func (e *emitter) DiscardedCall(
@@ -375,7 +384,7 @@ func (e *emitter) Type(
 		if array, ok := arrayvalue.Resolve(context, sourceType); ok {
 			return array.EmitType(context, e, source)
 		}
-		if _, _, ok := pointertype.Scalar(context.TypesSizes(), sourceType); ok {
+		if _, _, ok := pointertype.Resolve(sourceType); ok {
 			pointerSyntax, valid := source.(*ast.StarExpr)
 			if !valid {
 				return api.TypeEmission{},
@@ -433,7 +442,7 @@ func (e *emitter) RepresentedType(
 	if signature, ok := types.Unalias(sourceType).(*types.Signature); ok {
 		return callable.EmitType(context, e, source, signature)
 	}
-	if _, _, ok := pointertype.Scalar(context.TypesSizes(), sourceType); ok {
+	if _, _, ok := pointertype.Resolve(sourceType); ok {
 		return pointertype.EmitRepresented(context, e, source, sourceType)
 	}
 	if _, ok := types.Unalias(sourceType).(*types.Named); ok {

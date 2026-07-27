@@ -102,12 +102,24 @@ func emitSpec(
 					sourceName,
 				)
 		}
-		targetName, err := context.Names().Declare(object)
+		targetName, selected := context.AddressableStorage().Name(context, object)
+		if !selected {
+			targetName, err = context.Names().Declare(object)
+		} else {
+			value, err = context.AddressableStorage().Cell(
+				context,
+				children,
+				sourceName,
+				object.Type(),
+				value,
+			)
+		}
 		if err != nil {
 			return nil, nil, err
 		}
 		var targetType tsgo.TypeNode
-		if context.Values().RequiresExplicitType(context, object.Type()) {
+		if !selected &&
+			context.Values().RequiresExplicitType(context, object.Type()) {
 			represented, err := children.RepresentedType(
 				context.WithRole(api.RoleLocalType),
 				sourceName,

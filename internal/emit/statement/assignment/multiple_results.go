@@ -65,13 +65,27 @@ func emitMultipleResults(
 		if target.discard {
 			continue
 		}
-		element := context.Factory().ElementAccessExpression(
+		element := tsgo.Expression(context.Factory().ElementAccessExpression(
 			context.Factory().Identifier(temporaryName),
 			nil,
 			context.Factory().NumericLiteral(strconv.Itoa(index), tsgo.TokenFlagsNone),
 			tsgo.NodeFlagsNone,
-		)
+		))
 		if target.declaration {
+			if target.storage {
+				cell, err := context.AddressableStorage().Cell(
+					context,
+					children,
+					target.source,
+					target.object.Type(),
+					api.DirectExpression(element),
+				)
+				if err != nil {
+					return api.StatementEmission{}, err
+				}
+				element = cell.Value()
+				requests = append(requests, cell.Requests()...)
+			}
 			targetType, typeRequests, err := pointerAnnotation(
 				context.WithRole(api.RoleLocalType),
 				children,
@@ -80,6 +94,10 @@ func emitMultipleResults(
 			)
 			if err != nil {
 				return api.StatementEmission{}, err
+			}
+			if target.storage {
+				targetType = nil
+				typeRequests = nil
 			}
 			statements = append(
 				statements,
@@ -93,11 +111,15 @@ func emitMultipleResults(
 			)
 			requests = append(requests, typeRequests...)
 		} else {
+			targetExpression, err := parallelTargetExpression(context, target)
+			if err != nil {
+				return api.StatementEmission{}, err
+			}
 			assigned, err := context.Values().Assign(
 				context.WithRole(api.RoleAssignmentTarget),
 				target.source,
 				target.object.Type(),
-				context.Factory().Identifier(target.name),
+				targetExpression,
 				api.DirectExpression(element),
 			)
 			if err != nil {

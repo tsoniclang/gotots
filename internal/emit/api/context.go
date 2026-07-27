@@ -16,6 +16,7 @@ type Context struct {
 	factory         tsgo.Factory
 	names           Names
 	values          Values
+	storage         AddressableStorage
 	integer         IntegerRepresentation
 	evaluationOrder EvaluationOrder
 	expectedType    types.Type
@@ -23,6 +24,26 @@ type Context struct {
 	functionResults *types.Tuple
 	breakDepth      uint32
 	continueDepth   uint32
+	artifactOwner   *types.Func
+	storageNames    map[*types.Var]string
+}
+
+func (c Context) WithAddressableStorage(
+	owner *types.Func,
+	storageNames map[*types.Var]string,
+) Context {
+	if owner == nil {
+		panic("addressable-storage owner is nil")
+	}
+	c.artifactOwner = owner
+	c.storageNames = make(map[*types.Var]string, len(storageNames))
+	for variable, name := range storageNames {
+		if variable == nil || variable.IsField() || name == "" {
+			panic("addressable-storage selection is invalid")
+		}
+		c.storageNames[variable] = name
+	}
+	return c
 }
 
 func NewContext(
@@ -34,6 +55,7 @@ func NewContext(
 	factory tsgo.Factory,
 	names Names,
 	values Values,
+	storage AddressableStorage,
 	integer IntegerRepresentation,
 	evaluationOrder EvaluationOrder,
 ) (Context, error) {
@@ -52,6 +74,8 @@ func NewContext(
 		return Context{}, &ContextError{Reason: "name owner is nil"}
 	case values == nil:
 		return Context{}, &ContextError{Reason: "value owner is nil"}
+	case storage == nil:
+		return Context{}, &ContextError{Reason: "addressable-storage owner is nil"}
 	case !integer.Valid():
 		return Context{}, &ContextError{Reason: "integer representation is invalid"}
 	case !evaluationOrder.Valid():
@@ -66,6 +90,7 @@ func NewContext(
 		factory:         factory,
 		names:           names,
 		values:          values,
+		storage:         storage,
 		integer:         integer,
 		evaluationOrder: evaluationOrder,
 	}, nil
@@ -143,6 +168,10 @@ func (c Context) Values() Values {
 	return c.values
 }
 
+func (c Context) AddressableStorage() AddressableStorage {
+	return c.storage
+}
+
 func (c Context) IntegerRepresentation() IntegerRepresentation {
 	return c.integer
 }
@@ -169,4 +198,16 @@ func (c Context) CanBreak() bool {
 
 func (c Context) CanContinue() bool {
 	return c.continueDepth != 0
+}
+
+func (c Context) ArtifactOwner() *types.Func {
+	return c.artifactOwner
+}
+
+func (c Context) AddressableStorageName(variable *types.Var) (string, bool) {
+	if variable == nil {
+		return "", false
+	}
+	name, ok := c.storageNames[variable]
+	return name, ok
 }

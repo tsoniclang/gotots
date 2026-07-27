@@ -81,6 +81,18 @@ func IsNil(callback func() int32) bool {
 			category:  api.CategoryExpression,
 			construct: "*ast.BinaryExpr",
 		},
+		{
+			name: "new function value requires nil callable representation",
+			source: `package boundary
+
+func NewCallback() *func() int32 {
+	return new(func() int32)
+}
+`,
+			role:      api.RoleCallArgument,
+			category:  api.CategoryExpression,
+			construct: "*ast.FuncType",
+		},
 	}
 
 	for _, testCase := range testCases {

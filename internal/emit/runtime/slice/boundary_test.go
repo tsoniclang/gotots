@@ -81,17 +81,6 @@ func F(values []int32) { values[0] += 1 }
 			category:  api.CategoryStatement,
 			construct: "*ast.AssignStmt",
 		},
-		{
-			name: "addressable index",
-			source: `package boundary
-func F(values []int32) {
-	pointer := &values[0]
-	_ = pointer
-}
-`,
-			category:  api.CategoryExpression,
-			construct: "*ast.UnaryExpr",
-		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

@@ -41,6 +41,62 @@ func TestSetterStoreTargetOwnsTypedImmutableArguments(t *testing.T) {
 	}
 }
 
+func TestOrderedStoreTargetOwnsTypedImmutablePrerequisites(t *testing.T) {
+	factory := tsgo.NewFactory()
+	before := []tsgo.Statement{
+		factory.ExpressionStatement(factory.Identifier("prepare")),
+	}
+	request, err := api.NewImportRequest(
+		factory,
+		api.ImportPhaseValue,
+		"./storage.js",
+		"cell",
+		"cell",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requests := []api.RootRequest{request}
+	target, err := api.NewOrderedStoreTargetEmission(
+		before,
+		factory.Identifier("value"),
+		types.Typ[types.Int32],
+		requests,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	before[0] = factory.ExpressionStatement(factory.Identifier("mutated"))
+	requests[0] = api.RootRequest{}
+	if name := target.Before()[0].(tsgo.ExpressionStatement).
+		Expression().(tsgo.Identifier).Text(); name != "prepare" {
+		t.Fatalf("store prerequisite = %q, want prepare", name)
+	}
+	if target.Requests()[0].ExportedName() != "cell" {
+		t.Fatal("store target leaked mutable request input")
+	}
+
+	exposed := target.Before()
+	exposed[0] = factory.ExpressionStatement(factory.Identifier("alsoMutated"))
+	if name := target.Before()[0].(tsgo.ExpressionStatement).
+		Expression().(tsgo.Identifier).Text(); name != "prepare" {
+		t.Fatalf("store prerequisite after accessor mutation = %q, want prepare", name)
+	}
+}
+
+func TestOrderedStoreTargetRejectsNilPrerequisite(t *testing.T) {
+	_, err := api.NewOrderedStoreTargetEmission(
+		[]tsgo.Statement{nil},
+		tsgo.NewFactory().Identifier("value"),
+		types.Typ[types.Int32],
+		nil,
+	)
+	if err == nil {
+		t.Fatal("nil store prerequisite was accepted")
+	}
+}
+
 func TestEmissionResultsOwnImmutableTargetNodesAndRequests(t *testing.T) {
 	factory := tsgo.NewFactory()
 	before := []tsgo.Statement{

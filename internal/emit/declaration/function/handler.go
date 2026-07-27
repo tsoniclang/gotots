@@ -13,6 +13,7 @@ func Emit(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.FuncDecl,
+	requirements []api.DeclarationRequirement,
 ) (api.DeclarationEmission, error) {
 	if source.Doc != nil ||
 		source.Type == nil ||
@@ -33,6 +34,15 @@ func Emit(
 		(source.Recv == nil) != (signature.Recv() == nil) {
 		return api.DeclarationEmission{},
 			api.Unsupported(context, api.CategoryDeclaration, source)
+	}
+	context, err := applyAddressableStorage(
+		context,
+		source,
+		functionObject,
+		requirements,
+	)
+	if err != nil {
+		return api.DeclarationEmission{}, err
 	}
 
 	name, err := context.Names().Declare(functionObject)

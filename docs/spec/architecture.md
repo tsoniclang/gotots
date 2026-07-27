@@ -182,6 +182,14 @@ O(n log n) target-name cache keyed by `types.Object`, not a source inventory or
 semantic plan; declaration and reference lookup during emission is O(1)
 average.
 
+Multiple package `init` declarations are the one legal same-spelling
+package-level definition family that is not represented as ordinary lookup
+members of the package scope. The same name service assigns those exact
+`*types.Func` identities in canonical source-module-path and physical
+declaration order before scheduling. Cross-file `token.Pos` allocation,
+checker map iteration, root order, and demand order never select which
+initializer receives a collision suffix.
+
 Representation consistency has one owner inside `internal/emit`. On the first
 request for a Go type, object, or method, that owner queries the complete
 selected Go AST/type graph, chooses the exact target form, and creates or
@@ -296,6 +304,31 @@ the owning class and is called through the statically selected Go type
 (`Box.$copy(value)`), never through an instance. Applying one requirement may
 produce further typed requests, such as `Box` copying requesting
 `Point.$copy`.
+
+Addressable local storage is the second admitted requirement family. An
+address expression identifies the exact `*types.Var` whose storage becomes
+observable and requests that storage from the enclosing reconstructible
+`*types.Func` artifact. The function owner then reconstructs its whole typed
+TS-Go declaration with a cell only for each requested variable. Parameters and
+receivers keep their observable callable parameters and receive one body-local
+cell; local variables and named results are declared directly as cells. Reads,
+stores, captures, and address formation all query that one identity-keyed
+selection. No source prepass, escape-analysis copy, blanket local wrapping, or
+second body emitter may select storage.
+
+The concrete storage representation is installed once by the root emitter as
+a typed `api.Context` capability. Construct handlers consume only that
+capability; in particular, the generic assignment owner imports neither the
+storage implementation nor the pointer runtime. This keeps assignment ordering
+independent of the selected value representation while retaining one storage
+truth owner.
+
+Every executable Go function body, including each package `init` declaration,
+is a reconstructible artifact. Package initialization may impose ordering and
+an exported generated entry name, but it does not own a second emission or
+requirement lifecycle. A body-only storage reconstruction leaves the
+mechanically projected callable signature unchanged and therefore publishes no
+consumer invalidation.
 
 The root owner keeps one open declaration assembly per emitted definition.
 Only that definition's semantic owner interprets its requirements and
@@ -663,6 +696,15 @@ proved invariant.
 Compiler handlers still own Go evaluation order and copy boundaries; runtime
 code does not rediscover source semantics.
 
+The pointer runtime is the one exception for typed location accessors because a
+Go pointer is itself a first-class reference to mutable storage rather than a
+copied value. Its closed factories may capture only statically typed read and
+write access to an already-selected local, field, array element, or slice
+backing element. They may not capture source nodes, names, type metadata,
+operation tags, or semantic decisions. A canonical opaque address token owns
+equality; payloads never pass through `any`, `unknown`, reflection, or dynamic
+shape inspection.
+
 Setter-backed stores have one target contract shared by arrays, slices, maps,
 and future setter representations. The store-target owner returns typed
 TS-Go receiver and argument expressions with their prerequisite statements;
@@ -721,6 +763,7 @@ internal/emit/                      session, scheduling, closed dispatch only
     graph.go                        facet edges, revisions, and fixed point
   target_files.go                   source/support/program file sealing
   package_state.go                  package storage and initialization owner
+  storage/                          exact identity-selected local cell access
   api/                              narrow handler contracts
     context.go
     role.go
@@ -731,6 +774,8 @@ internal/emit/                      session, scheduling, closed dispatch only
   <domain>/                         declaration, statement, expression, type
     <semantic-owner>/               assignment, call, index, function, ...
       <sub-owner>/                  only after an evidenced ownership split
+  expression/address/               address formation and location projection
+  runtime/pointer/                  one typed canonical-location runtime owner
 
 internal/target/tsgo/               official-protocol target boundary
   generate/                         schema/protocol binding generator

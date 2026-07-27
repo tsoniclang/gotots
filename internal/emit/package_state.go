@@ -5,10 +5,8 @@ import (
 	"go/types"
 	"slices"
 	"sort"
-	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	packageinit "github.com/tsoniclang/gotots/internal/emit/declaration/packageinit"
 	packagevariable "github.com/tsoniclang/gotots/internal/emit/declaration/packagevariable"
 	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
@@ -293,56 +291,33 @@ func (s *programSession) emitPackageInitialization(
 func (s *programSession) emitPackageInitFunctions(
 	packageBuilder *packageTargetBuilder,
 ) error {
-	ordinal := 0
 	for _, sourceFile := range packageBuilder.sourcePackage.Files() {
 		for _, declaration := range sourceFile.Syntax().Decls {
 			function, ok := declaration.(*ast.FuncDecl)
 			if !ok || !isPackageInitDeclaration(function) {
 				continue
 			}
-			outputPath, err := targetoutput.SourcePath(
-				packageBuilder.sourcePackage,
-				sourceFile,
-			)
-			if err != nil {
+			object, ok := packageBuilder.sourcePackage.TypesInfo().
+				Defs[function.Name].(*types.Func)
+			if !ok {
+				return &ScheduleError{
+					Object: "init",
+					Reason: "package init has no function identity",
+				}
+			}
+			if err := s.require(object); err != nil {
 				return err
 			}
-			sourceBuilder, err := s.builderForFile(
-				packageBuilder.sourcePackage,
-				sourceFile,
-				outputPath,
-				"init",
-			)
-			if err != nil {
-				return err
+			binding, ok := s.registry.byObject[object]
+			if !ok || binding.name == "" || binding.sourcePath == "" {
+				return &ScheduleError{
+					Object: "init",
+					Reason: "package init has no target artifact binding",
+				}
 			}
-			targetName := "$init_" + strconv.Itoa(ordinal)
-			emission, err := packageinit.Emit(
-				sourceBuilder.context.WithRole(api.RoleFileDeclaration),
-				sourceBuilder.emitter,
-				function,
-				targetName,
-			)
-			if err != nil {
-				return err
-			}
-			if err := s.applyNonArtifactRequests(
-				sourceBuilder,
-				emission.Requests(),
-			); err != nil {
-				return err
-			}
-			sourceBuilder.packageInitializers = append(
-				sourceBuilder.packageInitializers,
-				targetPackageInitDeclaration{
-					position:   function.Pos(),
-					name:       targetName,
-					statements: emission.Declarations(),
-				},
-			)
 			modulePath, err := targetoutput.ModuleSpecifier(
 				packageBuilder.assemblyPath,
-				outputPath,
+				binding.sourcePath,
 			)
 			if err != nil {
 				return err
@@ -351,8 +326,8 @@ func (s *programSession) emitPackageInitFunctions(
 				s.factory,
 				api.ImportPhaseValue,
 				modulePath,
-				targetName,
-				targetName,
+				binding.name,
+				binding.name,
 			)
 			if err != nil {
 				return err
@@ -366,7 +341,7 @@ func (s *programSession) emitPackageInitFunctions(
 				packageBuilder.initialization,
 				s.factory.ExpressionStatement(
 					s.factory.CallExpression(
-						s.factory.Identifier(targetName),
+						s.factory.Identifier(binding.name),
 						nil,
 						nil,
 						nil,
@@ -374,7 +349,6 @@ func (s *programSession) emitPackageInitFunctions(
 					),
 				),
 			)
-			ordinal++
 		}
 	}
 	return nil

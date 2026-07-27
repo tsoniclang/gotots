@@ -133,6 +133,29 @@ func (n *nameOwner) Reserve(
 	return name, nil
 }
 
+func (n *nameOwner) preallocatePackageInitializers(
+	objects []types.Object,
+) error {
+	for index, object := range objects {
+		function, ok := object.(*types.Func)
+		if !ok || function.Name() != "init" || function.Pkg() == nil {
+			return &api.NameError{
+				Name:   objectName(object),
+				Reason: "package initializer identity is invalid",
+			}
+		}
+		name := portableIdentifier(function.Name())
+		if index != 0 {
+			name += "__shadow_" + strconv.FormatUint(
+				n.generatedSuffix(name, uint64(index-1)),
+				10,
+			)
+		}
+		n.targetNameByObject[function] = name
+	}
+	return nil
+}
+
 func (n *nameOwner) declare(object types.Object, binding targetBinding) (string, error) {
 	if object == nil {
 		return "", &api.NameError{Reason: "declaration object is nil"}

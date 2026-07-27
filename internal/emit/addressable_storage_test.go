@@ -1,0 +1,204 @@
+package emit
+
+import (
+	"context"
+	"errors"
+	"go/ast"
+	"go/types"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/load"
+)
+
+func TestAddressableStorageReconstructsOnlyOwningBodiesIncludingInit(
+	t *testing.T,
+) {
+	program := loadAddressableArtifactFixture(t)
+	sourcePackage := program.Roots()[0]
+	scope := sourcePackage.Types().Scope()
+	addressed := scope.Lookup("Addressed").(*types.Func)
+	caller := scope.Lookup("Caller").(*types.Func)
+	var initializer *types.Func
+	for _, declaration := range sourcePackage.Files()[0].Syntax().Decls {
+		function, ok := declaration.(*ast.FuncDecl)
+		if !ok || !isPackageInitDeclaration(function) {
+			continue
+		}
+		initializer = sourcePackage.TypesInfo().Defs[function.Name].(*types.Func)
+	}
+	if initializer == nil {
+		t.Fatal("package init identity is absent")
+	}
+
+	session, err := newProgramSession(program, DefaultOptions())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := session.require(caller); err != nil {
+		t.Fatal(err)
+	}
+	drainProgramSession(t, session)
+
+	for object, want := range map[types.Object]uint64{
+		addressed:   1,
+		initializer: 1,
+		caller:      0,
+	} {
+		declaration := declarationForObject(t, session, object)
+		if declaration.reconstructions != want {
+			t.Fatalf(
+				"%s reconstructions = %d, want %d",
+				object.Name(),
+				declaration.reconstructions,
+				want,
+			)
+		}
+		if session.artifacts.FacetRevision(
+			object,
+			api.ArtifactFacetCallableSignature,
+		) != 1 {
+			t.Fatalf(
+				"%s callable signature changed during body reconstruction",
+				object.Name(),
+			)
+		}
+	}
+	if len(session.requirements.appliedFor(addressed)) != 1 ||
+		len(session.requirements.appliedFor(initializer)) != 1 ||
+		len(session.requirements.appliedFor(caller)) != 0 {
+		t.Fatal("addressable-storage requirements escaped their exact body owners")
+	}
+	if session.artifacts.HasPending() ||
+		session.requirements.hasPending() ||
+		session.scheduler.hasPending() {
+		t.Fatal("addressable-storage reconstruction did not reach a fixed point")
+	}
+}
+
+func TestAddressableStorageRejectsForeignAndForgedSameSpellingVariables(
+	t *testing.T,
+) {
+	program := loadAddressableArtifactFixture(t)
+	scope := program.Roots()[0].Types().Scope()
+	addressed := scope.Lookup("Addressed").(*types.Func)
+	caller := scope.Lookup("Caller").(*types.Func)
+	addressedSignature := addressed.Type().(*types.Signature)
+	callerSignature := caller.Type().(*types.Signature)
+	if addressedSignature.Params().At(0).Name() !=
+		callerSignature.Params().At(0).Name() {
+		t.Fatal("foreign-variable fixture does not share a spelling")
+	}
+	requirement, err := api.NewAddressableStorageRequirement(
+		addressed,
+		callerSignature.Params().At(0),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := newProgramSession(program, DefaultOptions())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := session.require(addressed); err != nil {
+		t.Fatal(err)
+	}
+	drainProgramSession(t, session)
+	if err := session.scheduleDeclarationRequirement(requirement); err != nil {
+		t.Fatal(err)
+	}
+	requirements, ok := session.requirements.nextBatch()
+	if !ok {
+		t.Fatal("foreign same-spelling requirement was not scheduled")
+	}
+	err = session.applyDeclarationRequirements(requirements)
+	var invariant *api.InvariantError
+	if !errors.As(err, &invariant) ||
+		invariant.Reason !=
+			"function received foreign addressable-storage requirement" {
+		t.Fatalf("foreign same-spelling requirement error = %#v", err)
+	}
+
+	addressedParameter := addressedSignature.Params().At(0)
+	forged := types.NewVar(
+		addressedParameter.Pos(),
+		addressedParameter.Pkg(),
+		addressedParameter.Name(),
+		addressedParameter.Type(),
+	)
+	requirement, err = api.NewAddressableStorageRequirement(addressed, forged)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err = newProgramSession(program, DefaultOptions())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := session.require(addressed); err != nil {
+		t.Fatal(err)
+	}
+	drainProgramSession(t, session)
+	if err := session.scheduleDeclarationRequirement(requirement); err != nil {
+		t.Fatal(err)
+	}
+	requirements, ok = session.requirements.nextBatch()
+	if !ok {
+		t.Fatal("forged exact-position requirement was not scheduled")
+	}
+	err = session.applyDeclarationRequirements(requirements)
+	var nameError *api.NameError
+	if !errors.As(err, &nameError) ||
+		nameError.Reason !=
+			"declaration object was not indexed from its Go scope" {
+		t.Fatalf("forged exact-position requirement error = %#v", err)
+	}
+}
+
+func loadAddressableArtifactFixture(t *testing.T) *load.Program {
+	t.Helper()
+	directory := t.TempDir()
+	if err := os.WriteFile(
+		filepath.Join(directory, "go.mod"),
+		[]byte("module example.com/addressable-artifact\n\ngo 1.26.4\n"),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(directory, "source.go"),
+		[]byte(`package addressableartifact
+
+var initialized int32
+
+func init() {
+	value := int32(2)
+	pointer := &value
+	*pointer++
+	initialized = value
+}
+
+func Addressed(value int32) int32 {
+	pointer := &value
+	*pointer++
+	return value
+}
+
+func Caller(value int32) int32 {
+	return Addressed(value) + initialized
+}
+`),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	program, err := load.Load(context.Background(), load.Request{
+		Directory: directory,
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return program
+}

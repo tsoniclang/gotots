@@ -9,6 +9,7 @@ type ChildEmitter interface {
 	Block(Context, *ast.BlockStmt) (BlockEmission, error)
 	Statement(Context, ast.Stmt) (StatementEmission, error)
 	Expression(Context, ast.Expr) (ExpressionEmission, error)
+	Address(Context, ast.Expr) (ExpressionEmission, error)
 	StoreTarget(Context, ast.Expr) (StoreTargetEmission, error)
 	DiscardedCall(Context, *ast.CallExpr) (ExpressionEmission, error)
 	Condition(Context, ast.Expr) (ExpressionEmission, error)

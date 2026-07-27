@@ -19,7 +19,7 @@ func Emit(
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	pointerType := context.TypesInfo().TypeOf(source.X)
-	_, element, ok := pointertype.Scalar(context.TypesSizes(), pointerType)
+	_, element, ok := pointertype.Resolve(pointerType)
 	if !ok ||
 		!types.Identical(context.TypesInfo().TypeOf(source), element) {
 		return api.ExpressionEmission{},

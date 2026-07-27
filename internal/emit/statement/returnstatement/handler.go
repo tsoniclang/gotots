@@ -41,6 +41,7 @@ func emitNamed(
 	results *types.Tuple,
 ) (api.StatementEmission, error) {
 	values := make([]tsgo.Expression, 0, results.Len())
+	var before []tsgo.Statement
 	var requests []api.RootRequest
 	for index := range results.Len() {
 		result := results.At(index)
@@ -48,25 +49,41 @@ func emitNamed(
 			return api.StatementEmission{},
 				api.Unsupported(context, api.CategoryStatement, source)
 		}
-		reference, err := context.Names().Reference(result)
+		value, selected := context.AddressableStorage().Read(
+			context,
+			result,
+		)
+		if !selected {
+			reference, err := context.Names().Reference(result)
+			if err != nil {
+				return api.StatementEmission{}, err
+			}
+			value = api.DirectExpression(
+				context.Factory().Identifier(reference.Name()),
+				reference.Requests()...,
+			)
+		}
+		value, err := context.Values().Copy(
+			context.WithRole(api.RoleReturnResult),
+			source,
+			result.Type(),
+			value,
+		)
 		if err != nil {
 			return api.StatementEmission{}, err
 		}
-		values = append(values, context.Factory().Identifier(reference.Name()))
-		requests = append(requests, reference.Requests()...)
+		before = append(before, value.Before()...)
+		values = append(values, value.Value())
+		requests = append(requests, value.Requests()...)
 	}
+	var result tsgo.Expression
 	if len(values) == 1 {
-		return api.DirectStatement(
-			context.Factory().ReturnStatement(values[0]),
-			requests...,
-		), nil
+		result = values[0]
+	} else {
+		result = context.Factory().ArrayLiteralExpression(values, false)
 	}
-	return api.DirectStatement(
-		context.Factory().ReturnStatement(
-			context.Factory().ArrayLiteralExpression(values, false),
-		),
-		requests...,
-	), nil
+	before = append(before, context.Factory().ReturnStatement(result))
+	return api.NewStatementEmission(before, requests)
 }
 
 func emitSingle(

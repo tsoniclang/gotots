@@ -16,28 +16,46 @@ func Build(
 	className string,
 	panicName string,
 ) tsgo.ClassDeclaration {
+	return BuildWithAddress(
+		factory,
+		className,
+		panicName,
+		false,
+	)
+}
+
+func BuildWithAddress(
+	factory tsgo.Factory,
+	className string,
+	panicName string,
+	withAddress bool,
+) tsgo.ClassDeclaration {
 	target := builder{
 		factory:   factory,
 		className: className,
 		panicName: panicName,
+	}
+	members := []tsgo.ClassElement{
+		target.constructor(),
+		target.nilMethod(),
+		target.makeMethod(),
+		target.literalMethod(),
+		target.isNilMethod(),
+		target.getMethod(),
+		target.setMethod(),
+		target.sliceMethod(),
+		target.appendMethod(),
+		target.copyMethod(),
+	}
+	if withAddress {
+		members = append(members, target.addressMethod())
 	}
 	return factory.ClassDeclaration(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
 		factory.Identifier(className),
 		[]tsgo.TypeParameterDeclaration{target.typeParameter()},
 		nil,
-		[]tsgo.ClassElement{
-			target.constructor(),
-			target.nilMethod(),
-			target.makeMethod(),
-			target.literalMethod(),
-			target.isNilMethod(),
-			target.getMethod(),
-			target.setMethod(),
-			target.sliceMethod(),
-			target.appendMethod(),
-			target.copyMethod(),
-		},
+		members,
 	)
 }
 

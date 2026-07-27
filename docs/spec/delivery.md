@@ -218,11 +218,21 @@ create a value IR or a generic operation registry.
    values support nil, `make`, literals, lookup, comma-ok lookup, stores,
    `delete`, and `len`. Missing lookup returns the exact value zero; writes to a
    nil map fail at runtime; map iteration remains deferred.
-6. Pointers to represented scalar values support nil, `new`, dereference read
-   and store, assignment, return/argument passing, and equality. Address-of
-   existing variables, fields, and indexed elements remains unsupported until
-   stable addressable-storage identity can be installed without cell-wrapping
-   unrelated locals.
+6. Pointers whose element has an admitted complete value representation
+   support nil, `new`, dereference read and store, assignment,
+   return/argument passing, and canonical-location equality. The current
+   `new` matrix covers represented primitives, pointers, scalar slices, scalar
+   maps, fixed arrays, and named structs. Function zero/nil behavior is not
+   admitted, so `new(func(...))` remains a typed failure with that whole
+   callable-nil family. Demand-driven addressability covers locals,
+   parameters, named results, receivers, package variables,
+   direct/indirect named-struct fields, fixed-array elements, slice elements,
+   composite literals, and `&*pointer`. Only exact addressed variables become
+   cells. Package `init` bodies use the same reconstructible artifact
+   lifecycle. Direct pointer-receiver calls and value-receiver calls through
+   pointers preserve Go nil, addressability, and copy behavior; method values,
+   method expressions, embedding/promotion, and interface dispatch remain
+   their separately proved families.
 
 The generated runtime boundary is demand-driven and typed. Each family owns
 its runtime module and exported operations; source handlers request imports by
@@ -260,6 +270,12 @@ The checkpoint exits only when all six families:
 - pass an integrated mixed-family, multi-package project through strict
   typechecking and Go-versus-generated-ESM execution for ordinary results and
   every admitted runtime-failure class without compatibility paths.
+
+The addressability extension additionally exits only when a declaration with
+no addressability or pointer-identity demand has a byte-identical TS-Go
+artifact when address sites are added elsewhere, storage reconstruction
+converges, its unchanged callable contract triggers zero reverse-consumer
+reconstructions, and package `init` uses no non-artifact requirement path.
 
 ## 4. Environment And Completion
 
