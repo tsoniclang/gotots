@@ -52,7 +52,9 @@ func Emit(
 func isIntegerLiteralSyntax(source ast.Expr) bool {
 	switch source := source.(type) {
 	case *ast.BasicLit:
-		return source.Kind == token.INT
+		// A rune literal is an int32 Unicode code point: integer syntax whose
+		// checker value is a constant.Int materialized at its integer target.
+		return source.Kind == token.INT || source.Kind == token.CHAR
 	case *ast.UnaryExpr:
 		literal, ok := source.X.(*ast.BasicLit)
 		return source.Op == token.SUB && ok && literal.Kind == token.INT
