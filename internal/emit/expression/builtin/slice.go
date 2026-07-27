@@ -295,7 +295,7 @@ func runtimeStaticCall(
 	method runtimeslice.Member,
 	arguments []tsgo.Expression,
 	before []tsgo.Statement,
-	requests []api.PlacementRequest,
+	requests []api.RootRequest,
 ) (api.ExpressionEmission, error) {
 	element, err := children.RepresentedType(
 		context.WithRole(api.RoleSliceElementType),
@@ -340,7 +340,7 @@ func arrangeValues(
 ) (
 	[]tsgo.Expression,
 	[]tsgo.Statement,
-	[]api.PlacementRequest,
+	[]api.RootRequest,
 	error,
 ) {
 	capture := false
@@ -349,7 +349,7 @@ func arrangeValues(
 	}
 	targets := make([]tsgo.Expression, 0, len(values))
 	var before []tsgo.Statement
-	var requests []api.PlacementRequest
+	var requests []api.RootRequest
 	for _, value := range values {
 		requests = append(requests, value.Requests()...)
 		if !capture {

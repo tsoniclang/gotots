@@ -326,12 +326,12 @@ func unkeyedSliceElements(
 ) (
 	[]tsgo.Expression,
 	[]tsgo.Statement,
-	[]api.PlacementRequest,
+	[]api.RootRequest,
 	error,
 ) {
 	values := make([]tsgo.Expression, 0, len(emissions))
 	var before []tsgo.Statement
-	var requests []api.PlacementRequest
+	var requests []api.RootRequest
 	for _, emission := range emissions {
 		requests = append(requests, emission.Requests()...)
 		if !capture {

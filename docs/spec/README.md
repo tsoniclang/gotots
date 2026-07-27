@@ -66,15 +66,19 @@ local formatter, or target-text fallback between them.
 
 This does not prohibit ordinary compiler coordination. Deterministic names,
 scope builders, imports, target declaration assemblies, diagnostics, references
-into the Go graph, and placement requests are allowed. They must not restate the
-source program as a second model or become a second semantic truth owner.
+into the Go graph, root requests, and observable-contract dependency edges are
+allowed. They must not restate the source program as a second model or become a
+second semantic truth owner.
 
 Mutable target builders, declaration assembly, and placement are owned by the
 root emitter. Handlers receive immutable scope identities/capabilities and
-return placement or declaration-requirement requests; they do not mutate
-arbitrary ancestors. One declaration owner may reconstruct its own typed TS-Go
-nodes while the compilation is open. The final target file is sealed and
-printed only after all such requests reach a fixed point.
+return typed root requests; they do not mutate arbitrary ancestors. One
+declaration owner may reconstruct its own typed TS-Go nodes while the
+compilation is open. References record exactly which observable facet of
+another target artifact they consumed. The root reconstructs reverse dependents
+only when structural comparison says that subscribed facet changed. The final
+target file is sealed and printed only after all requests and affected
+artifacts reach a fixed point.
 
 ## Vocabulary
 
@@ -99,17 +103,35 @@ printed only after all such requests reach a fixed point.
   their closed roles, dispatch categories, order, and semantic boundaries.
 - **child emitter:** the narrow callback interface through which a handler asks
   the root emitter to dispatch one child with an explicit context.
-- **emission result:** typed TS-Go protocol AST values plus explicit placement
+- **emission result:** typed TS-Go protocol AST values plus explicit root
   requests and diagnostics. It is target output under construction, not an IR.
+- **root request:** a closed typed request for placement, a use-dependent
+  declaration obligation, or an artifact dependency. Only the root consumes it.
 - **placement request:** a typed request to insert an import, declaration,
   helper, temporary, or statement at a legal preferred target scope.
 - **declaration requirement:** a closed typed request, keyed by the
   authoritative `go/types` declaration identity, asking that declaration's one
   target owner to add or revise a use-dependent target obligation before the
   containing file is sealed.
+- **target artifact:** the complete root-owned, pre-seal TS-Go AST assembly for
+  one authoritative Go definition. Its semantic owner is the only code allowed
+  to reconstruct it.
+- **observable facet:** one closed consumer-visible part of a target artifact's
+  canonical TS-Go AST contract, such as callable signature, constructor
+  surface, instance type surface, static surface, or exported value surface.
+  Function bodies and explicitly typed member/value initializers are not
+  observable facets; inference-dependent target declarations are rejected. A
+  body-only artifact may consume dependencies while providing zero facets.
+- **artifact dependency:** a typed edge from one target artifact to one
+  observable facet of another, recorded when the consumer constructs a target
+  reference. Containment and source reachability are not artifact dependencies.
+- **artifact reconstruction:** one transactional replacement of an artifact's
+  complete TS-Go AST roots, root requests, dependency set, and observable
+  contract. Exact unchanged facets do not notify consumers.
 - **declaration assembly:** the root-owned, compilation-local target state for
   one source definition: already-created typed TS-Go protocol nodes plus its
-  deduplicated declaration requirements. It is not a source model or IR.
+  deduplicated declaration requirements, requests, dependencies, and canonical
+  observable contract. It is not a source model or IR.
 - **generated support module:** a GoToTS-owned TypeScript module containing
   deduplicated type aliases or behaviorally real runtime operations required by
   generated files. It is constructed through TS-Go AST like every other output

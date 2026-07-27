@@ -22,7 +22,10 @@ type fileNames struct {
 	importAliases map[types.Object]string
 	primitives    map[api.PrimitiveAlias]string
 	runtime       map[api.RuntimeSymbol]string
+	artifactOwner types.Object
 }
+
+type temporarySnapshot map[api.TemporaryKind]uint64
 
 func (n *nameOwner) ForFile(
 	sourceFile *ast.File,
@@ -74,18 +77,33 @@ func (n *fileNames) Parameter(parameter *types.Var, index int) (string, error) {
 }
 
 func (n *fileNames) Reference(object types.Object) (api.NameReference, error) {
-	return n.reference(object, api.ImportPhaseValue)
+	facet, err := valueReferenceFacet(object)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	return n.reference(object, api.ImportPhaseValue, facet)
 }
 
 func (n *fileNames) TypeReference(
 	object types.Object,
 ) (api.NameReference, error) {
-	return n.reference(object, api.ImportPhaseType)
+	if _, ok := object.(*types.TypeName); !ok {
+		return api.NameReference{}, &api.NameError{
+			Name:   objectName(object),
+			Reason: "type reference object is not a type declaration",
+		}
+	}
+	return n.reference(
+		object,
+		api.ImportPhaseType,
+		api.ArtifactFacetInstanceTypeSurface,
+	)
 }
 
 func (n *fileNames) reference(
 	object types.Object,
 	phase api.ImportPhase,
+	facet api.ArtifactFacet,
 ) (api.NameReference, error) {
 	if object == nil {
 		return api.NameReference{}, &api.NameError{Reason: "reference object is nil"}
@@ -113,6 +131,14 @@ func (n *fileNames) reference(
 		if err := n.require(object); err != nil {
 			return api.NameReference{}, err
 		}
+	}
+	var requests []api.RootRequest
+	if binding.sourceFile != nil && n.artifactOwner != nil {
+		request, err := api.NewArtifactDependencyRequest(object, facet)
+		if err != nil {
+			return api.NameReference{}, err
+		}
+		requests = append(requests, request)
 	}
 	if binding.sourceFile != nil && binding.sourceFile != n.sourceFile {
 		referencePath := binding.sourcePath
@@ -146,9 +172,10 @@ func (n *fileNames) reference(
 		if err != nil {
 			return api.NameReference{}, err
 		}
-		return api.NewNameReference(localName, request)
+		requests = append(requests, request)
+		return api.NewNameReference(localName, requests...)
 	}
-	return api.NewNameReference(binding.name)
+	return api.NewNameReference(binding.name, requests...)
 }
 
 func (n *fileNames) PackageVariable(
@@ -215,12 +242,63 @@ func (n *fileNames) NamedStructOperation(
 	if err != nil {
 		return api.NameReference{}, err
 	}
-	reference, err := n.reference(typeName, api.ImportPhaseValue)
+	reference, err := n.reference(
+		typeName,
+		api.ImportPhaseValue,
+		api.ArtifactFacetStaticSurface,
+	)
 	if err != nil {
 		return api.NameReference{}, err
 	}
 	requests := append(reference.Requests(), request)
 	return api.NewNameReference(reference.Name(), requests...)
+}
+
+func (n *fileNames) beginArtifact(owner types.Object) (func(), error) {
+	if owner == nil {
+		return nil, &api.NameError{Reason: "artifact owner is nil"}
+	}
+	if n.artifactOwner != nil {
+		return nil, &api.NameError{
+			Name:   owner.Name(),
+			Reason: "artifact emission is already active",
+		}
+	}
+	n.artifactOwner = owner
+	return func() {
+		n.artifactOwner = nil
+	}, nil
+}
+
+func (n *fileNames) snapshotTemporaries() temporarySnapshot {
+	snapshot := make(temporarySnapshot, len(n.temporaries))
+	for kind, value := range n.temporaries {
+		snapshot[kind] = value
+	}
+	return snapshot
+}
+
+func (n *fileNames) restoreTemporaries(snapshot temporarySnapshot) {
+	n.temporaries = make(map[api.TemporaryKind]uint64, len(snapshot))
+	for kind, value := range snapshot {
+		n.temporaries[kind] = value
+	}
+}
+
+func valueReferenceFacet(object types.Object) (api.ArtifactFacet, error) {
+	switch object.(type) {
+	case *types.Func:
+		return api.ArtifactFacetCallableSignature, nil
+	case *types.TypeName:
+		return api.ArtifactFacetConstructorSurface, nil
+	case *types.Const, *types.Var:
+		return api.ArtifactFacetValueSurface, nil
+	default:
+		return api.ArtifactFacetInvalid, &api.NameError{
+			Name:   objectName(object),
+			Reason: "value reference has no observable artifact facet",
+		}
+	}
 }
 
 func (n *fileNames) Member(field *types.Var) (string, error) {

@@ -41,7 +41,7 @@ func emitNamed(
 	results *types.Tuple,
 ) (api.StatementEmission, error) {
 	values := make([]tsgo.Expression, 0, results.Len())
-	var requests []api.PlacementRequest
+	var requests []api.RootRequest
 	for index := range results.Len() {
 		result := results.At(index)
 		if result.Name() == "" {
@@ -138,7 +138,7 @@ func emitMultiple(
 	}
 
 	values := make([]tsgo.Expression, 0, results.Len())
-	var requests []api.PlacementRequest
+	var requests []api.RootRequest
 	for index, sourceResult := range source.Results {
 		sourceType := context.TypesInfo().TypeOf(sourceResult)
 		if sourceType == nil || !types.AssignableTo(sourceType, results.At(index).Type()) {

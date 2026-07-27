@@ -15,7 +15,7 @@ func emitReceiver(
 	signature *types.Signature,
 ) (
 	tsgo.ParameterDeclaration,
-	[]api.PlacementRequest,
+	[]api.RootRequest,
 	error,
 ) {
 	if source.Recv == nil ||

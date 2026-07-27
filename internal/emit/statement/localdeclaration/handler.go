@@ -22,7 +22,7 @@ func Emit(
 	}
 
 	statements := make([]tsgo.Statement, 0, len(declaration.Specs))
-	var requests []api.PlacementRequest
+	var requests []api.RootRequest
 	for _, sourceSpec := range declaration.Specs {
 		spec, ok := sourceSpec.(*ast.ValueSpec)
 		if !ok {
@@ -47,7 +47,7 @@ func emitSpec(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.ValueSpec,
-) (tsgo.VariableStatement, []api.PlacementRequest, error) {
+) (tsgo.VariableStatement, []api.RootRequest, error) {
 	if source.Doc != nil || source.Comment != nil ||
 		len(source.Names) == 0 ||
 		(len(source.Values) != 0 && len(source.Names) != len(source.Values)) ||
@@ -61,7 +61,7 @@ func emitSpec(
 	}
 
 	declarations := make([]tsgo.VariableDeclaration, 0, len(source.Names))
-	var requests []api.PlacementRequest
+	var requests []api.RootRequest
 	for index, sourceName := range source.Names {
 		if sourceName.Name == "_" {
 			return nil, nil,

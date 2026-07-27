@@ -21,11 +21,11 @@ func NewNamedStructOperationRequirement(
 ) (DeclarationRequirement, error) {
 	switch {
 	case typeName == nil:
-		return DeclarationRequirement{}, &PlacementRequestError{
+		return DeclarationRequirement{}, &RootRequestError{
 			Reason: "named-struct operation type is nil",
 		}
 	case !operation.Valid():
-		return DeclarationRequirement{}, &PlacementRequestError{
+		return DeclarationRequirement{}, &RootRequestError{
 			Reason: "named-struct operation is invalid",
 		}
 	}

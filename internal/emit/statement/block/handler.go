@@ -13,7 +13,7 @@ func Emit(
 	source *ast.BlockStmt,
 ) (api.BlockEmission, error) {
 	statements := make([]tsgo.Statement, 0, len(source.List))
-	var requests []api.PlacementRequest
+	var requests []api.RootRequest
 	for _, statement := range source.List {
 		target, err := children.Statement(context.WithRole(api.RoleBlockStatement), statement)
 		if err != nil {

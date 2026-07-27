@@ -9,7 +9,7 @@ import (
 )
 
 type placementOwner struct {
-	requests map[api.PlacementOwner]api.PlacementRequest
+	requests map[api.RootRequestOwner]api.RootRequest
 }
 
 func (p *placementOwner) RuntimeSymbols() []api.RuntimeSymbol {
@@ -50,13 +50,21 @@ func (p *placementOwner) PrimitiveAliases() []api.PrimitiveAlias {
 
 func newPlacementOwner() *placementOwner {
 	return &placementOwner{
-		requests: make(map[api.PlacementOwner]api.PlacementRequest),
+		requests: make(map[api.RootRequestOwner]api.RootRequest),
 	}
 }
 
-func (p *placementOwner) Apply(requests []api.PlacementRequest) error {
+func (p *placementOwner) Requests() []api.RootRequest {
+	requests := make([]api.RootRequest, 0, len(p.requests))
+	for _, request := range p.requests {
+		requests = append(requests, request)
+	}
+	return requests
+}
+
+func (p *placementOwner) Apply(requests []api.RootRequest) error {
 	for _, request := range requests {
-		if request.Kind() != api.PlacementImport ||
+		if request.Kind() != api.RootRequestImport ||
 			request.LegalScope() != api.ScopeFileImports ||
 			request.PreferredScope() != api.ScopeFileImports ||
 			request.Execution() != api.ExecutionStatic {
@@ -88,7 +96,7 @@ func (p *placementOwner) Apply(requests []api.PlacementRequest) error {
 
 func (p *placementOwner) RequireTypeOnly() error {
 	for _, request := range p.requests {
-		if request.Kind() != api.PlacementImport ||
+		if request.Kind() != api.RootRequestImport ||
 			request.ImportPhase() != api.ImportPhaseType {
 			return &api.PlacementError{
 				ModulePath:   request.ModulePath(),
@@ -105,7 +113,7 @@ func (p *placementOwner) Statements(factory tsgo.Factory) []tsgo.Statement {
 		phase      api.ImportPhase
 		modulePath string
 	}
-	byGroup := make(map[importGroup][]api.PlacementRequest)
+	byGroup := make(map[importGroup][]api.RootRequest)
 	for _, request := range p.requests {
 		group := importGroup{
 			phase:      request.ImportPhase(),

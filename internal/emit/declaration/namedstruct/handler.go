@@ -224,9 +224,9 @@ func constructor(
 	context api.Context,
 	children api.ChildEmitter,
 	fields []field,
-) (tsgo.ConstructorDeclaration, []api.PlacementRequest, error) {
+) (tsgo.ConstructorDeclaration, []api.RootRequest, error) {
 	parameters := make([]tsgo.ParameterDeclaration, 0, len(fields))
-	var requests []api.PlacementRequest
+	var requests []api.RootRequest
 	for _, field := range fields {
 		targetType, err := children.RepresentedType(
 			context.WithRole(api.RoleStructFieldType),

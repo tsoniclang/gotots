@@ -6,7 +6,9 @@ import (
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	"github.com/tsoniclang/gotots/internal/load"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type Root struct {
@@ -301,25 +303,12 @@ func (s *programSession) applyDeclarationRequirements(
 	if owner == nil {
 		return &ScheduleError{Reason: "declaration requirement owner is nil"}
 	}
-	site, ok := s.sites[owner]
-	if !ok {
+	if _, ok := s.sites[owner]; !ok {
 		return &ScheduleError{
 			Object: owner.Name(),
 			Reason: "declaration requirement owner lost its source declaration",
 		}
 	}
-	builder, err := s.builder(site)
-	if err != nil {
-		return err
-	}
-	index, ok := builder.indexByObject[owner]
-	if !ok {
-		return &ScheduleError{
-			Object: owner.Name(),
-			Reason: "declaration requirement owner was not emitted first",
-		}
-	}
-	declaration := &builder.declarations[index]
 	for _, requirement := range requirements {
 		if !requirement.Valid() || requirement.Owner() != owner {
 			return &ScheduleError{
@@ -334,21 +323,7 @@ func (s *programSession) applyDeclarationRequirements(
 			}
 		}
 	}
-	result, err := builder.emitter.declarationObject(
-		builder.context,
-		site.declaration,
-		owner,
-		s.requirements.appliedFor(owner),
-	)
-	if err != nil {
-		return err
-	}
-	if err := s.applyRequests(builder, result.Requests()); err != nil {
-		return err
-	}
-	declaration.statements = result.Declarations()
-	declaration.reconstructions++
-	return nil
+	return s.reconstructArtifact(owner)
 }
 
 func requirementOwnerName(requirement api.DeclarationRequirement) string {
@@ -356,4 +331,172 @@ func requirementOwnerName(requirement api.DeclarationRequirement) string {
 		return ""
 	}
 	return requirement.Owner().Name()
+}
+
+type artifactRevision struct {
+	statements     []tsgo.Statement
+	placement      *placementOwner
+	dependencies   []api.ArtifactDependency
+	contract       artifactstate.Contract
+	temporaryStart temporarySnapshot
+}
+
+func (s *programSession) buildArtifactRevision(
+	builder *targetFileBuilder,
+	site declarationSite,
+	owner types.Object,
+	temporaryStart temporarySnapshot,
+	reconstruction bool,
+) (artifactRevision, error) {
+	names, ok := builder.context.Names().(*fileNames)
+	if !ok {
+		return artifactRevision{}, &ScheduleError{
+			Object: owner.Name(),
+			Reason: "target artifact has no concrete name owner",
+		}
+	}
+	if !reconstruction {
+		temporaryStart = names.snapshotTemporaries()
+	} else {
+		current := names.snapshotTemporaries()
+		names.restoreTemporaries(temporaryStart)
+		defer names.restoreTemporaries(current)
+	}
+	finish, err := names.beginArtifact(owner)
+	if err != nil {
+		return artifactRevision{}, err
+	}
+	defer finish()
+
+	result, err := builder.emitter.declarationObject(
+		builder.context,
+		site.declaration,
+		owner,
+		s.requirements.appliedFor(owner),
+	)
+	if err != nil {
+		return artifactRevision{}, err
+	}
+	placement, dependencies, err := s.consumeArtifactRequests(
+		owner,
+		result.Requests(),
+	)
+	if err != nil {
+		return artifactRevision{}, err
+	}
+	statements := result.Declarations()
+	contract, err := artifactstate.ProjectContract(s.factory, statements)
+	if err != nil {
+		return artifactRevision{}, err
+	}
+	return artifactRevision{
+		statements:     statements,
+		placement:      placement,
+		dependencies:   dependencies,
+		contract:       contract,
+		temporaryStart: temporaryStart,
+	}, nil
+}
+
+func (s *programSession) consumeArtifactRequests(
+	consumer types.Object,
+	requests []api.RootRequest,
+) (*placementOwner, []api.ArtifactDependency, error) {
+	placement := newPlacementOwner()
+	imports := make([]api.RootRequest, 0, len(requests))
+	dependencies := make([]api.ArtifactDependency, 0, len(requests))
+	for _, request := range requests {
+		switch request.Kind() {
+		case api.RootRequestImport:
+			imports = append(imports, request)
+		case api.RootRequestDeclarationRequirement:
+			requirement, ok := request.DeclarationRequirement()
+			if !ok {
+				return nil, nil, &ScheduleError{
+					Object: consumer.Name(),
+					Reason: "declaration requirement is invalid",
+				}
+			}
+			if err := s.scheduleDeclarationRequirement(requirement); err != nil {
+				return nil, nil, err
+			}
+		case api.RootRequestArtifactDependency:
+			dependency, ok := request.ArtifactDependency()
+			if !ok {
+				return nil, nil, &ScheduleError{
+					Object: consumer.Name(),
+					Reason: "artifact dependency is invalid",
+				}
+			}
+			if _, ok := s.sites[dependency.Provider()]; !ok {
+				return nil, nil, &ScheduleError{
+					Object: dependency.Provider().Name(),
+					Reason: "artifact dependency provider has no source declaration",
+				}
+			}
+			if err := s.require(dependency.Provider()); err != nil {
+				return nil, nil, err
+			}
+			dependencies = append(dependencies, dependency)
+		default:
+			return nil, nil, &ScheduleError{
+				Object: consumer.Name(),
+				Reason: "root request kind is invalid",
+			}
+		}
+	}
+	if err := placement.Apply(imports); err != nil {
+		return nil, nil, err
+	}
+	return placement, dependencies, nil
+}
+
+func (s *programSession) reconstructArtifact(owner types.Object) error {
+	if s.sealed {
+		return &ScheduleError{
+			Object: owner.Name(),
+			Reason: "target artifact reconstructed after target files were sealed",
+		}
+	}
+	site, ok := s.sites[owner]
+	if !ok {
+		return &ScheduleError{
+			Object: owner.Name(),
+			Reason: "dirty target artifact lost its source declaration",
+		}
+	}
+	builder, err := s.builder(site)
+	if err != nil {
+		return err
+	}
+	index, ok := builder.indexByObject[owner]
+	if !ok {
+		return &ScheduleError{
+			Object: owner.Name(),
+			Reason: "dirty target artifact was not emitted first",
+		}
+	}
+	declaration := &builder.declarations[index]
+	revision, err := s.buildArtifactRevision(
+		builder,
+		site,
+		owner,
+		declaration.temporaryStart,
+		true,
+	)
+	if err != nil {
+		return err
+	}
+	if err := s.artifacts.Commit(
+		owner,
+		revision.contract,
+		revision.dependencies,
+	); err != nil {
+		return err
+	}
+	s.artifacts.DiscardDirty(owner)
+	declaration.statements = revision.statements
+	declaration.placement = revision.placement
+	declaration.reconstructions++
+	return nil
 }

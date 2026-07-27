@@ -7,12 +7,13 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-type PlacementKind uint8
+type RootRequestKind uint8
 
 const (
-	PlacementInvalid PlacementKind = iota
-	PlacementImport
-	PlacementDeclarationRequirement
+	RootRequestInvalid RootRequestKind = iota
+	RootRequestImport
+	RootRequestDeclarationRequirement
+	RootRequestArtifactDependency
 )
 
 type PlacementScope uint8
@@ -38,15 +39,16 @@ const (
 	ImportPhaseValue
 )
 
-type PlacementOwner struct {
-	kind                   PlacementKind
+type RootRequestOwner struct {
+	kind                   RootRequestKind
 	modulePath             string
 	exportedName           string
 	declarationRequirement DeclarationRequirement
+	artifactDependency     ArtifactDependency
 }
 
-type PlacementRequest struct {
-	owner           PlacementOwner
+type RootRequest struct {
+	owner           RootRequestOwner
 	importPhase     ImportPhase
 	localName       string
 	moduleSpecifier tsgo.StringLiteral
@@ -61,26 +63,26 @@ func NewImportRequest(
 	modulePath string,
 	exportedName string,
 	localName string,
-) (PlacementRequest, error) {
+) (RootRequest, error) {
 	if phase != ImportPhaseType && phase != ImportPhaseValue {
-		return PlacementRequest{}, &PlacementRequestError{Reason: "invalid import phase"}
+		return RootRequest{}, &RootRequestError{Reason: "invalid import phase"}
 	}
 	if modulePath == "" {
-		return PlacementRequest{}, &PlacementRequestError{Reason: "module path is empty"}
+		return RootRequest{}, &RootRequestError{Reason: "module path is empty"}
 	}
 	if exportedName == "" {
-		return PlacementRequest{}, &PlacementRequestError{Reason: "exported name is empty"}
+		return RootRequest{}, &RootRequestError{Reason: "exported name is empty"}
 	}
 	if localName == "" {
-		return PlacementRequest{}, &PlacementRequestError{Reason: "local name is empty"}
+		return RootRequest{}, &RootRequestError{Reason: "local name is empty"}
 	}
 	var propertyName tsgo.ModuleExportName
 	if localName != exportedName {
 		propertyName = factory.Identifier(exportedName)
 	}
-	return PlacementRequest{
-		owner: PlacementOwner{
-			kind:         PlacementImport,
+	return RootRequest{
+		owner: RootRequestOwner{
+			kind:         RootRequestImport,
 			modulePath:   modulePath,
 			exportedName: exportedName,
 		},
@@ -100,10 +102,10 @@ func NewPrimitiveAliasRequest(
 	modulePath string,
 	alias PrimitiveAlias,
 	localName string,
-) (PlacementRequest, error) {
+) (RootRequest, error) {
 	exportedName, err := PrimitiveAliasName(alias)
 	if err != nil {
-		return PlacementRequest{}, err
+		return RootRequest{}, err
 	}
 	request, err := NewImportRequest(
 		factory,
@@ -113,7 +115,7 @@ func NewPrimitiveAliasRequest(
 		localName,
 	)
 	if err != nil {
-		return PlacementRequest{}, err
+		return RootRequest{}, err
 	}
 	request.primitiveAlias = alias
 	return request, nil
@@ -125,13 +127,13 @@ func NewRuntimeImportRequest(
 	modulePath string,
 	symbol RuntimeSymbol,
 	localName string,
-) (PlacementRequest, error) {
+) (RootRequest, error) {
 	contract, err := RuntimeContract(symbol)
 	if err != nil {
-		return PlacementRequest{}, err
+		return RootRequest{}, err
 	}
 	if !contract.AllowsImportPhase(phase) {
-		return PlacementRequest{}, &PlacementRequestError{
+		return RootRequest{}, &RootRequestError{
 			Reason: "runtime symbol does not allow the requested import phase",
 		}
 	}
@@ -143,7 +145,7 @@ func NewRuntimeImportRequest(
 		localName,
 	)
 	if err != nil {
-		return PlacementRequest{}, err
+		return RootRequest{}, err
 	}
 	request.runtimeSymbol = symbol
 	return request, nil
@@ -152,105 +154,130 @@ func NewRuntimeImportRequest(
 func NewNamedStructOperationRequest(
 	typeName *types.TypeName,
 	operation NamedStructOperation,
-) (PlacementRequest, error) {
+) (RootRequest, error) {
 	requirement, err := NewNamedStructOperationRequirement(typeName, operation)
 	if err != nil {
-		return PlacementRequest{}, err
+		return RootRequest{}, err
 	}
-	return PlacementRequest{
-		owner: PlacementOwner{
-			kind:                   PlacementDeclarationRequirement,
+	return RootRequest{
+		owner: RootRequestOwner{
+			kind:                   RootRequestDeclarationRequirement,
 			declarationRequirement: requirement,
 		},
 	}, nil
 }
 
-func (r PlacementRequest) Kind() PlacementKind {
+func NewArtifactDependencyRequest(
+	provider types.Object,
+	facet ArtifactFacet,
+) (RootRequest, error) {
+	dependency, err := NewArtifactDependency(provider, facet)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return RootRequest{
+		owner: RootRequestOwner{
+			kind:               RootRequestArtifactDependency,
+			artifactDependency: dependency,
+		},
+	}, nil
+}
+
+func (r RootRequest) Kind() RootRequestKind {
 	return r.owner.kind
 }
 
-func (r PlacementRequest) LegalScope() PlacementScope {
-	if r.owner.kind == PlacementImport {
+func (r RootRequest) LegalScope() PlacementScope {
+	if r.owner.kind == RootRequestImport {
 		return ScopeFileImports
 	}
-	if r.owner.kind == PlacementDeclarationRequirement {
+	if r.owner.kind == RootRequestDeclarationRequirement {
 		return ScopeOwningFile
 	}
 	return ScopeInvalid
 }
 
-func (r PlacementRequest) PreferredScope() PlacementScope {
+func (r RootRequest) PreferredScope() PlacementScope {
 	return r.LegalScope()
 }
 
-func (r PlacementRequest) Execution() ExecutionConstraint {
-	if r.owner.kind == PlacementImport {
+func (r RootRequest) Execution() ExecutionConstraint {
+	if r.owner.kind == RootRequestImport {
 		return ExecutionStatic
 	}
-	if r.owner.kind == PlacementDeclarationRequirement {
+	if r.owner.kind == RootRequestDeclarationRequirement {
 		return ExecutionStatic
 	}
 	return ExecutionInvalid
 }
 
-func (r PlacementRequest) Owner() PlacementOwner {
+func (r RootRequest) Owner() RootRequestOwner {
 	return r.owner
 }
 
-func (r PlacementRequest) ImportPhase() ImportPhase {
+func (r RootRequest) ImportPhase() ImportPhase {
 	return r.importPhase
 }
 
-func (r PlacementRequest) ModulePath() string {
+func (r RootRequest) ModulePath() string {
 	return r.owner.modulePath
 }
 
-func (r PlacementRequest) ExportedName() string {
+func (r RootRequest) ExportedName() string {
 	return r.owner.exportedName
 }
 
-func (r PlacementRequest) LocalName() string {
+func (r RootRequest) LocalName() string {
 	return r.localName
 }
 
-func (r PlacementRequest) ModuleSpecifier() tsgo.StringLiteral {
+func (r RootRequest) ModuleSpecifier() tsgo.StringLiteral {
 	return r.moduleSpecifier
 }
 
-func (r PlacementRequest) Specifier() tsgo.ImportSpecifier {
+func (r RootRequest) Specifier() tsgo.ImportSpecifier {
 	return r.specifier
 }
 
-func (r PlacementRequest) PrimitiveAlias() (PrimitiveAlias, bool) {
+func (r RootRequest) PrimitiveAlias() (PrimitiveAlias, bool) {
 	if r.primitiveAlias == PrimitiveInvalid {
 		return PrimitiveInvalid, false
 	}
 	return r.primitiveAlias, true
 }
 
-func (r PlacementRequest) RuntimeSymbol() (RuntimeSymbol, bool) {
+func (r RootRequest) RuntimeSymbol() (RuntimeSymbol, bool) {
 	if r.runtimeSymbol == RuntimeInvalid {
 		return RuntimeInvalid, false
 	}
 	return r.runtimeSymbol, true
 }
 
-func (r PlacementRequest) DeclarationRequirement() (
+func (r RootRequest) DeclarationRequirement() (
 	DeclarationRequirement,
 	bool,
 ) {
 	requirement := r.owner.declarationRequirement
-	if r.owner.kind != PlacementDeclarationRequirement ||
+	if r.owner.kind != RootRequestDeclarationRequirement ||
 		!requirement.Valid() {
 		return DeclarationRequirement{}, false
 	}
 	return requirement, true
 }
 
-type PlacementRequestError struct {
+func (r RootRequest) ArtifactDependency() (ArtifactDependency, bool) {
+	dependency := r.owner.artifactDependency
+	if r.owner.kind != RootRequestArtifactDependency ||
+		!dependency.Valid() {
+		return ArtifactDependency{}, false
+	}
+	return dependency, true
+}
+
+type RootRequestError struct {
 	Reason string
 }
 
-func (e *PlacementRequestError) Error() string {
-	return fmt.Sprintf("create placement request: %s", e.Reason)
+func (e *RootRequestError) Error() string {
+	return fmt.Sprintf("create root request: %s", e.Reason)
 }

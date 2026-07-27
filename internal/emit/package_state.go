@@ -187,13 +187,13 @@ func (s *programSession) emitPackageStorage(
 	if err != nil {
 		return err
 	}
-	if err := s.applyPlacementRequests(
+	if err := s.applyRootRequests(
 		builder.statePlacement,
 		emission.StateRequests(),
 	); err != nil {
 		return err
 	}
-	if err := s.applyPlacementRequests(
+	if err := s.applyRootRequests(
 		builder.assemblyPlacement,
 		emission.AssemblyRequests(),
 	); err != nil {
@@ -276,7 +276,7 @@ func (s *programSession) emitPackageInitialization(
 		if err != nil {
 			return err
 		}
-		if err := s.applyPlacementRequests(
+		if err := s.applyRootRequests(
 			builder.assemblyPlacement,
 			emission.Requests(),
 		); err != nil {
@@ -326,7 +326,7 @@ func (s *programSession) emitPackageInitFunctions(
 			if err != nil {
 				return err
 			}
-			if err := s.applyRequests(
+			if err := s.applyNonArtifactRequests(
 				sourceBuilder,
 				emission.Requests(),
 			); err != nil {
@@ -358,7 +358,7 @@ func (s *programSession) emitPackageInitFunctions(
 				return err
 			}
 			if err := packageBuilder.assemblyPlacement.Apply(
-				[]api.PlacementRequest{request},
+				[]api.RootRequest{request},
 			); err != nil {
 				return err
 			}

@@ -98,8 +98,8 @@ func Make(
 	zero tsgo.Expression,
 	size tsgo.Expression,
 	entries []tsgo.Expression,
-	requests ...[]api.PlacementRequest,
-) (tsgo.Expression, []api.PlacementRequest, error) {
+	requests ...[]api.RootRequest,
+) (tsgo.Expression, []api.RootRequest, error) {
 	reference, typeArguments, err := Reference(
 		context,
 		source,
@@ -114,7 +114,7 @@ func Make(
 		return nil, nil, err
 	}
 	allRequests := append(
-		[][]api.PlacementRequest{reference.Requests()},
+		[][]api.RootRequest{reference.Requests()},
 		requests...,
 	)
 	return context.Factory().CallExpression(
@@ -139,7 +139,7 @@ func scalarType(
 	context api.Context,
 	source ast.Node,
 	sourceType types.Type,
-) (tsgo.TypeNode, []api.PlacementRequest, error) {
+) (tsgo.TypeNode, []api.RootRequest, error) {
 	alias, ok := basictype.PrimitiveAlias(context.TypesSizes(), sourceType)
 	if !ok {
 		return nil, nil,

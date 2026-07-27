@@ -17,7 +17,7 @@ func Emit(
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
 	var initializer tsgo.ForInitializer
-	var initializerRequests []api.PlacementRequest
+	var initializerRequests []api.RootRequest
 	if source.Init != nil {
 		target, err := children.ForInitializer(
 			context.WithRole(api.RoleForInitializer),
@@ -30,7 +30,7 @@ func Emit(
 		initializerRequests = target.Requests()
 	}
 	var condition tsgo.Expression
-	var conditionRequests []api.PlacementRequest
+	var conditionRequests []api.RootRequest
 	if source.Cond != nil {
 		target, err := children.Condition(
 			context.WithRole(api.RoleForCondition),
@@ -47,7 +47,7 @@ func Emit(
 		conditionRequests = target.Requests()
 	}
 	var post tsgo.Expression
-	var postRequests []api.PlacementRequest
+	var postRequests []api.RootRequest
 	if source.Post != nil {
 		target, err := children.ForPost(
 			context.WithRole(api.RoleForPost),

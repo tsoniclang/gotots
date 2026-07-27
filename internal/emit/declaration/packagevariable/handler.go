@@ -18,8 +18,8 @@ const (
 type StorageEmission struct {
 	field            tsgo.PropertyDeclaration
 	zeroStatements   []tsgo.Statement
-	stateRequests    []api.PlacementRequest
-	assemblyRequests []api.PlacementRequest
+	stateRequests    []api.RootRequest
+	assemblyRequests []api.RootRequest
 }
 
 func EmitStorage(
@@ -400,10 +400,10 @@ func (e StorageEmission) ZeroStatements() []tsgo.Statement {
 	return slices.Clone(e.zeroStatements)
 }
 
-func (e StorageEmission) StateRequests() []api.PlacementRequest {
+func (e StorageEmission) StateRequests() []api.RootRequest {
 	return slices.Clone(e.stateRequests)
 }
 
-func (e StorageEmission) AssemblyRequests() []api.PlacementRequest {
+func (e StorageEmission) AssemblyRequests() []api.RootRequest {
 	return slices.Clone(e.assemblyRequests)
 }

@@ -42,7 +42,7 @@ func Emit(
 		return api.StatementEmission{}, err
 	}
 	var elseStatement tsgo.Statement
-	var elseRequests []api.PlacementRequest
+	var elseRequests []api.RootRequest
 	switch alternate := source.Else.(type) {
 	case nil:
 	case *ast.BlockStmt:

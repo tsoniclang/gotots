@@ -291,6 +291,12 @@ func emittedObjectCounts(
 			}
 			continue
 		}
+		if object, ok := session.artifacts.NextDirty(); ok {
+			if err := session.reconstructArtifact(object); err != nil {
+				t.Fatal(err)
+			}
+			continue
+		}
 		if sourcePackage, ok := session.packageInitializations.next(); ok {
 			if err := session.emitPackageInitialization(sourcePackage); err != nil {
 				t.Fatal(err)

@@ -180,7 +180,7 @@ func arrange(
 	elements []element,
 ) (
 	[]tsgo.Statement,
-	[]api.PlacementRequest,
+	[]api.RootRequest,
 	[]tsgo.Expression,
 	error,
 ) {
@@ -195,7 +195,7 @@ func arrange(
 	}
 	byField := make(map[int]tsgo.Expression, len(elements))
 	var before []tsgo.Statement
-	var requests []api.PlacementRequest
+	var requests []api.RootRequest
 	for _, element := range elements {
 		requests = append(requests, element.value.Requests()...)
 		if !capture {

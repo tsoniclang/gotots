@@ -115,7 +115,7 @@ func emitClause(
 	source *ast.CaseClause,
 	tagType types.Type,
 	expressionless bool,
-) ([]tsgo.CaseOrDefaultClause, []api.PlacementRequest, bool, error) {
+) ([]tsgo.CaseOrDefaultClause, []api.RootRequest, bool, error) {
 	if len(source.List) == 0 {
 		body, requests, err := emitClauseBody(context, children, source.Body)
 		if err != nil {
@@ -131,7 +131,7 @@ func emitClause(
 	}
 
 	expressions := make([]tsgo.Expression, 0, len(source.List))
-	var requests []api.PlacementRequest
+	var requests []api.RootRequest
 	for _, caseExpression := range source.List {
 		caseType := context.TypesInfo().TypeOf(caseExpression)
 		if caseType == nil || !types.AssignableTo(caseType, tagType) {
@@ -192,9 +192,9 @@ func emitClauseBody(
 	context api.Context,
 	children api.ChildEmitter,
 	source []ast.Stmt,
-) ([]tsgo.Statement, []api.PlacementRequest, error) {
+) ([]tsgo.Statement, []api.RootRequest, error) {
 	var statements []tsgo.Statement
-	var requests []api.PlacementRequest
+	var requests []api.RootRequest
 	for _, sourceStatement := range source {
 		target, err := children.Statement(
 			context.

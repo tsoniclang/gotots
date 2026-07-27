@@ -55,8 +55,9 @@ nodes. It must not copy those facts into a second semantic model.
 
 Allowed compiler state is limited to references into the Go AST/type graph,
 deterministic target-name ownership, target lexical-scope builders, explicit
-placement requests, diagnostics, and already-created typed TS-Go protocol AST
-values. Such state coordinates emission; it must not become an alternate
+root requests, canonical observable TS-Go contract facets, facet-specific
+reverse dependencies, diagnostics, and already-created typed TS-Go protocol
+AST values. Such state coordinates emission; it must not become an alternate
 representation of the source program.
 
 ## Translation Invariants
@@ -74,8 +75,8 @@ representation of the source program.
   parent graph.
 - Semantic questions use the selected `go/types.Info`, `types.Package`, and
   method/selection evidence directly. Do not rerun the checker.
-- Translation results contain typed TS-Go protocol AST values plus typed
-  placement requests; they are not a target-independent intermediate
+- Translation results contain typed TS-Go protocol AST values plus typed root
+  requests; they are not a target-independent intermediate
   representation.
 - Evaluation-dependent statements remain at the exact execution boundary.
   Imports and preferred-static helpers go to file scope. Placement is selected
@@ -100,6 +101,14 @@ representation of the source program.
   spelling lookup, source scans, or runtime semantic dispatch.
 - Definitions are emitted once. References may repeat. All helper and import
   requests are deduplicated by typed ownership, never rendered text.
+- Every revisable target artifact is keyed by authoritative Go identity and
+  reconstructed only by its semantic owner. References record closed,
+  facet-specific dependencies on the provider's canonical observable TS-Go AST
+  contract. The root requeues reverse dependents only when exact structural
+  comparison changes a subscribed facet; implementation-only changes do not
+  propagate. Reconstruction replaces the complete pre-seal artifact and its
+  dependency/request set transactionally. Text patching, mutable-node sharing,
+  spelling keys, unconditional rescans, and non-convergent cycles are forbidden.
 - Generated output must remain standalone strict ESM. Generated primitive
   aliases, support declarations, and runtime helpers are emitted and owned by
   GoToTS; they never import an unrelated compiler or target project.

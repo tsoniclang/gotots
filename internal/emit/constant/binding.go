@@ -13,14 +13,14 @@ import (
 
 type BindingEmission struct {
 	declaration tsgo.VariableDeclaration
-	requests    []api.PlacementRequest
+	requests    []api.RootRequest
 }
 
 func (e BindingEmission) Declaration() tsgo.VariableDeclaration {
 	return e.declaration
 }
 
-func (e BindingEmission) Requests() []api.PlacementRequest {
+func (e BindingEmission) Requests() []api.RootRequest {
 	return slices.Clone(e.requests)
 }
 

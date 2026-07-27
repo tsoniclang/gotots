@@ -12,7 +12,7 @@ import (
 type SignatureEmission struct {
 	parameters []tsgo.ParameterDeclaration
 	result     tsgo.TypeNode
-	requests   []api.PlacementRequest
+	requests   []api.RootRequest
 }
 
 func (e SignatureEmission) Parameters() []tsgo.ParameterDeclaration {
@@ -23,7 +23,7 @@ func (e SignatureEmission) Result() tsgo.TypeNode {
 	return e.result
 }
 
-func (e SignatureEmission) Requests() []api.PlacementRequest {
+func (e SignatureEmission) Requests() []api.RootRequest {
 	return slices.Clone(e.requests)
 }
 
@@ -121,7 +121,7 @@ func emitRepresented(
 			api.Unsupported(context, api.CategoryType, source)
 	}
 	parameters := make([]tsgo.ParameterDeclaration, 0, signature.Params().Len())
-	var requests []api.PlacementRequest
+	var requests []api.RootRequest
 	for index := range signature.Params().Len() {
 		parameter := signature.Params().At(index)
 		targetType, err := children.RepresentedType(
@@ -168,14 +168,14 @@ func emitResultType(
 	children api.ChildEmitter,
 	source ast.Node,
 	results *types.Tuple,
-) (tsgo.TypeNode, []api.PlacementRequest, error) {
+) (tsgo.TypeNode, []api.RootRequest, error) {
 	if results == nil || results.Len() == 0 {
 		return context.Factory().KeywordTypeNode(
 			tsgo.KeywordTypeSyntaxKindVoidKeyword,
 		), nil, nil
 	}
 	elements := make([]tsgo.TypeNode, 0, results.Len())
-	var requests []api.PlacementRequest
+	var requests []api.RootRequest
 	for index := range results.Len() {
 		target, err := children.RepresentedType(
 			context,

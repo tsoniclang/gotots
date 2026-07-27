@@ -17,8 +17,12 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 	}
 	if s.scheduler.hasPending() ||
 		s.requirements.hasPending() ||
+		s.artifacts.HasPending() ||
 		s.packageInitializations.hasPending() {
 		return nil, &ScheduleError{Reason: "target files sealed with pending work"}
+	}
+	if err := s.artifacts.VerifyClosure(); err != nil {
+		return nil, err
 	}
 	s.sealed = true
 	paths := make([]string, 0, len(s.builders))
@@ -31,10 +35,14 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 	runtimeSymbols := make(map[api.RuntimeSymbol]struct{})
 	for _, outputPath := range paths {
 		builder := s.builders[outputPath]
-		for _, alias := range builder.placement.PrimitiveAliases() {
+		placement, err := committedTargetFilePlacement(builder)
+		if err != nil {
+			return nil, err
+		}
+		for _, alias := range placement.PrimitiveAliases() {
 			primitiveAliases[alias] = struct{}{}
 		}
-		for _, symbol := range builder.placement.RuntimeSymbols() {
+		for _, symbol := range placement.RuntimeSymbols() {
 			runtimeSymbols[symbol] = struct{}{}
 		}
 		type declarationChunk struct {
@@ -72,7 +80,7 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 			declarations = append(declarations, chunk.statements...)
 		}
 		statements := append(
-			builder.placement.Statements(s.factory),
+			placement.Statements(s.factory),
 			declarations...,
 		)
 		target, err := s.sourceFile(
@@ -127,6 +135,36 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 	return files, nil
 }
 
+func committedTargetFilePlacement(
+	builder *targetFileBuilder,
+) (*placementOwner, error) {
+	if builder == nil || builder.placement == nil {
+		return nil, &ScheduleError{
+			Reason: "target file has no root placement owner",
+		}
+	}
+	placement := newPlacementOwner()
+	if err := placement.Apply(builder.placement.Requests()); err != nil {
+		return nil, err
+	}
+	for _, declaration := range builder.declarations {
+		if declaration.placement == nil {
+			name := ""
+			if declaration.object != nil {
+				name = declaration.object.Name()
+			}
+			return nil, &ScheduleError{
+				Object: name,
+				Reason: "target artifact has no committed placement",
+			}
+		}
+		if err := placement.Apply(declaration.placement.Requests()); err != nil {
+			return nil, err
+		}
+	}
+	return placement, nil
+}
+
 func (s *programSession) programInitializationFile() (TargetFile, error) {
 	order, err := s.packageInitializationOrder()
 	if err != nil {
@@ -163,7 +201,7 @@ func (s *programSession) programInitializationFile() (TargetFile, error) {
 		if err != nil {
 			return TargetFile{}, err
 		}
-		if err := placement.Apply([]api.PlacementRequest{request}); err != nil {
+		if err := placement.Apply([]api.RootRequest{request}); err != nil {
 			return TargetFile{}, err
 		}
 		calls = append(calls, s.factory.ExpressionStatement(
@@ -437,7 +475,7 @@ func (s *programSession) runtimeModuleImports(
 			if err != nil {
 				return nil, err
 			}
-			if err := placement.Apply([]api.PlacementRequest{request}); err != nil {
+			if err := placement.Apply([]api.RootRequest{request}); err != nil {
 				return nil, err
 			}
 		}

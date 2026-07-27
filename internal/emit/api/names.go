@@ -28,10 +28,10 @@ const (
 
 type NameReference struct {
 	name     string
-	requests []PlacementRequest
+	requests []RootRequest
 }
 
-func NewNameReference(name string, requests ...PlacementRequest) (NameReference, error) {
+func NewNameReference(name string, requests ...RootRequest) (NameReference, error) {
 	if name == "" {
 		return NameReference{}, &NameError{Reason: "reference name is empty"}
 	}
@@ -42,20 +42,20 @@ func (r NameReference) Name() string {
 	return r.name
 }
 
-func (r NameReference) Requests() []PlacementRequest {
+func (r NameReference) Requests() []RootRequest {
 	return slices.Clone(r.requests)
 }
 
 type PackageVariableReference struct {
 	stateName string
 	fieldName string
-	requests  []PlacementRequest
+	requests  []RootRequest
 }
 
 func NewPackageVariableReference(
 	stateName string,
 	fieldName string,
-	requests ...PlacementRequest,
+	requests ...RootRequest,
 ) (PackageVariableReference, error) {
 	switch {
 	case stateName == "":
@@ -80,7 +80,7 @@ func (r PackageVariableReference) FieldName() string {
 	return r.fieldName
 }
 
-func (r PackageVariableReference) Requests() []PlacementRequest {
+func (r PackageVariableReference) Requests() []RootRequest {
 	return slices.Clone(r.requests)
 }
 

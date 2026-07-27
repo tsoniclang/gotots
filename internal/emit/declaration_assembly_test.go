@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"go/token"
 	"go/types"
 	"os"
 	"path/filepath"
@@ -54,10 +53,14 @@ func TestReachedUsesReconstructAndSealDeclarationAssemblies(t *testing.T) {
 
 	boxDeclaration = declarationForObject(t, session, box)
 	itemDeclaration := declarationForObject(t, session, item)
-	for name, declaration := range map[string]*targetDeclaration{
-		"Box":  boxDeclaration,
-		"Item": itemDeclaration,
+	for name, expected := range map[string]struct {
+		declaration     *targetDeclaration
+		reconstructions uint64
+	}{
+		"Box":  {declaration: boxDeclaration, reconstructions: 2},
+		"Item": {declaration: itemDeclaration, reconstructions: 1},
 	} {
+		declaration := expected.declaration
 		if len(session.requirements.appliedFor(declaration.object)) != 3 {
 			t.Fatalf(
 				"%s requirements = %d, want zero/copy/equal",
@@ -65,11 +68,12 @@ func TestReachedUsesReconstructAndSealDeclarationAssemblies(t *testing.T) {
 				len(session.requirements.appliedFor(declaration.object)),
 			)
 		}
-		if declaration.reconstructions != 1 {
+		if declaration.reconstructions != expected.reconstructions {
 			t.Fatalf(
-				"%s reconstructions = %d, want one batched reconstruction",
+				"%s reconstructions = %d, want %d",
 				name,
 				declaration.reconstructions,
+				expected.reconstructions,
 			)
 		}
 		if len(declaration.statements) != 1 {
@@ -109,12 +113,62 @@ func TestReachedUsesReconstructAndSealDeclarationAssemblies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = session.applyPlacementRequests(
+	err = session.applyRootRequests(
 		newPlacementOwner(),
-		[]api.PlacementRequest{importRequest},
+		[]api.RootRequest{importRequest},
 	)
 	if !errors.As(err, &scheduleError) {
 		t.Fatalf("post-seal import error = %#v, want ScheduleError", err)
+	}
+}
+
+func TestObservableChangesReconstructOnlySubscribedDeclarations(t *testing.T) {
+	program := loadDeclarationAssemblyFixture(t)
+	scope := program.Roots()[0].Types().Scope()
+	item := scope.Lookup("Item")
+	box := scope.Lookup("Box")
+	trigger := scope.Lookup("Trigger")
+	caller := scope.Lookup("Caller")
+	session, err := newProgramSession(program, DefaultOptions())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := session.require(caller); err != nil {
+		t.Fatal(err)
+	}
+	drainProgramSession(t, session)
+
+	expected := map[types.Object]uint64{
+		item:    1,
+		box:     2,
+		trigger: 1,
+		caller:  0,
+	}
+	for object, reconstructions := range expected {
+		declaration := declarationForObject(t, session, object)
+		if declaration.reconstructions != reconstructions {
+			t.Fatalf(
+				"%s reconstructions = %d, want %d",
+				object.Name(),
+				declaration.reconstructions,
+				reconstructions,
+			)
+		}
+	}
+	if session.artifacts.FacetRevision(
+		box,
+		api.ArtifactFacetStaticSurface,
+	) != 2 {
+		t.Fatal("Box static surface did not publish its late operations")
+	}
+	if session.artifacts.FacetRevision(
+		trigger,
+		api.ArtifactFacetCallableSignature,
+	) != 1 {
+		t.Fatal("Trigger body reconstruction changed its callable signature")
+	}
+	if session.artifacts.HasPending() {
+		t.Fatal("observable propagation did not reach a fixed point")
 	}
 }
 
@@ -403,6 +457,20 @@ func Use(left, right Box) Box {
 	}
 	return right
 }
+
+func Trigger() int32 {
+	var left Box
+	var right Box
+	left, right = right, left
+	if left == right {
+		return 1
+	}
+	return 0
+}
+
+func Caller() int32 {
+	return Trigger()
+}
 `),
 		0o600,
 	); err != nil {
@@ -429,6 +497,12 @@ func drainProgramSession(t *testing.T, session *programSession) {
 		}
 		if requirements, ok := session.requirements.nextBatch(); ok {
 			if err := session.applyDeclarationRequirements(requirements); err != nil {
+				t.Fatal(err)
+			}
+			continue
+		}
+		if object, ok := session.artifacts.NextDirty(); ok {
+			if err := session.reconstructArtifact(object); err != nil {
 				t.Fatal(err)
 			}
 			continue
@@ -505,85 +579,5 @@ func assertOneFinalDeclarationAssembly(
 		if count != 1 {
 			t.Fatalf("%s.%s final definition count = %d, want one", owner, name, count)
 		}
-	}
-}
-
-func TestSchedulerDeduplicatesPendingAndCycleReferences(t *testing.T) {
-	sourcePackage := types.NewPackage("example.com/schedule", "schedule")
-	first := types.NewFunc(
-		token.Pos(1),
-		sourcePackage,
-		"First",
-		types.NewSignatureType(nil, nil, nil, nil, nil, false),
-	)
-	second := types.NewFunc(
-		token.Pos(2),
-		sourcePackage,
-		"Second",
-		types.NewSignatureType(nil, nil, nil, nil, nil, false),
-	)
-	scheduler := newScheduler()
-	scheduler.enqueue(first)
-	scheduler.enqueue(first)
-	if object, ok := scheduler.next(); !ok || object != first {
-		t.Fatalf("first scheduled object = %v, %v", object, ok)
-	}
-	scheduler.enqueue(second)
-	scheduler.enqueue(first)
-	if object, ok := scheduler.next(); !ok || object != second {
-		t.Fatalf("second scheduled object = %v, %v", object, ok)
-	}
-	if object, ok := scheduler.next(); ok || object != nil {
-		t.Fatalf("duplicate cycle target was re-enqueued: %v", object)
-	}
-}
-
-func TestDeclarationRequirementSchedulerDeduplicatesAndUsesClosedOrder(
-	t *testing.T,
-) {
-	sourcePackage := types.NewPackage("example.com/schedule", "schedule")
-	first := types.NewTypeName(token.Pos(1), sourcePackage, "First", nil)
-	second := types.NewTypeName(token.Pos(2), sourcePackage, "Second", nil)
-	firstCopy, err := api.NewNamedStructOperationRequirement(
-		first,
-		api.NamedStructOperationCopy,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	firstEqual, err := api.NewNamedStructOperationRequirement(
-		first,
-		api.NamedStructOperationEqual,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	secondZero, err := api.NewNamedStructOperationRequirement(
-		second,
-		api.NamedStructOperationZero,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	scheduler := newDeclarationRequirementScheduler()
-	scheduler.enqueue(secondZero)
-	scheduler.enqueue(firstEqual)
-	scheduler.enqueue(firstCopy)
-	scheduler.enqueue(firstCopy)
-
-	firstBatch, ok := scheduler.nextBatch()
-	if !ok ||
-		len(firstBatch) != 2 ||
-		firstBatch[0] != firstCopy ||
-		firstBatch[1] != firstEqual {
-		t.Fatalf("first requirement batch = %#v, %t", firstBatch, ok)
-	}
-	secondBatch, ok := scheduler.nextBatch()
-	if !ok || len(secondBatch) != 1 || secondBatch[0] != secondZero {
-		t.Fatalf("second requirement batch = %#v, %t", secondBatch, ok)
-	}
-	if actual, ok := scheduler.nextBatch(); ok || actual != nil {
-		t.Fatalf("unexpected trailing requirement batch = %#v, %t", actual, ok)
 	}
 }

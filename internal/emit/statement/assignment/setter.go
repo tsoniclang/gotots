@@ -46,7 +46,7 @@ func arrangeSetterOperands(
 ) (
 	[]tsgo.Expression,
 	[]tsgo.Statement,
-	[]api.PlacementRequest,
+	[]api.RootRequest,
 	error,
 ) {
 	capture := make([]bool, len(operands))
@@ -59,7 +59,7 @@ func arrangeSetterOperands(
 	}
 	values := make([]tsgo.Expression, 0, len(operands))
 	var statements []tsgo.Statement
-	var requests []api.PlacementRequest
+	var requests []api.RootRequest
 	for index, operand := range operands {
 		statements = append(statements, operand.Before()...)
 		value := operand.Value()

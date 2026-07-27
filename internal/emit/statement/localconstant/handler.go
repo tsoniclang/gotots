@@ -24,7 +24,7 @@ func Emit(
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
 	var statements []tsgo.Statement
-	var requests []api.PlacementRequest
+	var requests []api.RootRequest
 	for _, sourceSpec := range declaration.Specs {
 		spec, ok := sourceSpec.(*ast.ValueSpec)
 		if !ok ||

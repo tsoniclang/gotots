@@ -15,7 +15,7 @@ func emitMultipleArgument(
 	source *ast.CallExpr,
 	signature *types.Signature,
 	results *types.Tuple,
-) ([]tsgo.Expression, []tsgo.Statement, []api.PlacementRequest, error) {
+) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
 	if results == nil || results.Len() != signature.Params().Len() {
 		return nil, nil, nil,
 			api.Unsupported(context, api.CategoryExpression, source)

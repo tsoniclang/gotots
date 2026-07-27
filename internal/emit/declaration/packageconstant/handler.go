@@ -28,7 +28,7 @@ func EmitObject(
 			api.Unsupported(context, api.CategoryDeclaration, source)
 	}
 	var declarations []tsgo.Statement
-	var requests []api.PlacementRequest
+	var requests []api.RootRequest
 	for _, sourceSpec := range source.Specs {
 		spec, ok := sourceSpec.(*ast.ValueSpec)
 		if !ok {
@@ -65,7 +65,7 @@ func emitSpec(
 	children api.ChildEmitter,
 	source *ast.ValueSpec,
 	selected *types.Const,
-) ([]tsgo.Statement, []api.PlacementRequest, bool, error) {
+) ([]tsgo.Statement, []api.RootRequest, bool, error) {
 	if source.Doc != nil || source.Comment != nil || source.Type == nil ||
 		len(source.Names) == 0 || len(source.Names) != len(source.Values) {
 		return nil, nil, false,
@@ -73,7 +73,7 @@ func emitSpec(
 	}
 
 	declarations := make([]tsgo.Statement, 0, len(source.Names))
-	var requests []api.PlacementRequest
+	var requests []api.RootRequest
 	selectedIndex := -1
 	for index, sourceName := range source.Names {
 		object, ok := context.TypesInfo().Defs[sourceName].(*types.Const)

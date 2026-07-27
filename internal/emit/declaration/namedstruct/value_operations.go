@@ -16,7 +16,7 @@ func emitValueOperation(
 	classType tsgo.TypeNode,
 	fields []field,
 	operation api.NamedStructOperation,
-) (tsgo.MethodDeclaration, []api.PlacementRequest, error) {
+) (tsgo.MethodDeclaration, []api.RootRequest, error) {
 	memberName, err := api.NamedStructOperationMemberName(operation)
 	if err != nil {
 		return nil, nil, err
@@ -50,9 +50,9 @@ func zeroMethod(
 	className string,
 	classType tsgo.TypeNode,
 	fields []field,
-) (tsgo.MethodDeclaration, []api.PlacementRequest, error) {
+) (tsgo.MethodDeclaration, []api.RootRequest, error) {
 	arguments := make([]tsgo.Expression, 0, len(fields))
-	var requests []api.PlacementRequest
+	var requests []api.RootRequest
 	for _, field := range fields {
 		value, err := context.Values().Zero(
 			context.WithRole(api.RoleStructZeroField),
@@ -94,9 +94,9 @@ func copyMethod(
 	className string,
 	classType tsgo.TypeNode,
 	fields []field,
-) (tsgo.MethodDeclaration, []api.PlacementRequest, error) {
+) (tsgo.MethodDeclaration, []api.RootRequest, error) {
 	arguments := make([]tsgo.Expression, 0, len(fields))
-	var requests []api.PlacementRequest
+	var requests []api.RootRequest
 	for _, field := range fields {
 		value := api.DirectExpression(property(context, "$source", field.name))
 		copied, err := context.Values().Copy(
@@ -140,9 +140,9 @@ func equalMethod(
 	memberName string,
 	classType tsgo.TypeNode,
 	fields []field,
-) (tsgo.MethodDeclaration, []api.PlacementRequest, error) {
+) (tsgo.MethodDeclaration, []api.RootRequest, error) {
 	var expression tsgo.Expression = context.Factory().TrueLiteral()
-	var requests []api.PlacementRequest
+	var requests []api.RootRequest
 	for index, field := range fields {
 		equal, err := context.Values().Equal(
 			context.WithRole(api.RoleStructEqualField),

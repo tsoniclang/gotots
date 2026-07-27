@@ -102,7 +102,7 @@ func (a RuntimeArray) callStatic(
 	member arraymember.Identity,
 	typeArguments []tsgo.TypeNode,
 	arguments ...tsgo.Expression,
-) (tsgo.CallExpression, []api.PlacementRequest, error) {
+) (tsgo.CallExpression, []api.RootRequest, error) {
 	reference, err := a.runtime(context, api.ImportPhaseValue)
 	if err != nil {
 		return nil, nil, err
@@ -123,7 +123,7 @@ func (a RuntimeArray) callStatic(
 
 func (a RuntimeArray) targetTypeArguments(
 	context api.Context,
-) ([]tsgo.TypeNode, []api.PlacementRequest, error) {
+) ([]tsgo.TypeNode, []api.RootRequest, error) {
 	alias, ok := basictype.PrimitiveAlias(
 		context.TypesSizes(),
 		a.ElementType(),
