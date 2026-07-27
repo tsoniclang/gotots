@@ -678,40 +678,38 @@ class has:
   distinct to strict TypeScript without adding an instance field;
 - public data fields initialized by its constructor;
 - no instance receiver methods, inheritance, dynamic lookup, or hidden
-  semantic payload.
+  semantic payload;
+- use-demanded static zero, copy, and equality operations incorporated into
+  the class by its one declaration owner.
 
-For example, the base shape for a supported `Pair` is:
+For example, when selected uses require all three operations, a supported
+`Pair` is:
 
 ```ts
 export class Pair {
   declare private readonly $goType: void;
 
   constructor(public Left: int32, public Ready: bool) {}
-}
-```
 
-Operations are top-level companion declarations in the same generated
-source-file module and exist only when selected code requests them:
+  static $zero(): Pair {
+    return new Pair(0, false);
+  }
 
-```ts
-export function Pair$zero(): Pair {
-  return new Pair(0, false);
-}
+  static $copy(source: Pair): Pair {
+    return new Pair(source.Left, source.Ready);
+  }
 
-export function Pair$copy(source: Pair): Pair {
-  return new Pair(source.Left, source.Ready);
-}
-
-export function Pair$equal(left: Pair, right: Pair): bool {
-  return left.Left === right.Left && left.Ready === right.Ready;
+  static $equal(left: Pair, right: Pair): bool {
+    return left.Left === right.Left && left.Ready === right.Ready;
+  }
 }
 ```
 
 The class supplies target nominality and stable runtime constructor identity;
 it does not change Go value semantics. Distinct named structs remain statically
 incompatible even when their fields match. A requested nested struct operation
-requests the corresponding companion from the nested type's owner. The erased
-brand must produce no JavaScript instance field.
+requests the corresponding static operation from the nested type's owner. The
+erased brand must produce no JavaScript instance field.
 
 Tags, embedding, pointers, interfaces, method values/expressions, generics,
 reflection entry, and fields whose complete standalone representation is not
@@ -722,13 +720,18 @@ dispatch.
 
 Each zero, copy, or equality capability is emitted at most once and only when a
 selected occurrence requests it. Its typed request is routed to the defining
-source-file module even when the first use is in another file. Companion
-definitions grow linearly with fields while each use remains constant size.
-The first family constructs only through `new Name(...)`. Positional composites
-are direct in both profiles. For keyed composites, `direct` emits constructor
-arguments directly in declaration order, while `preserve-go` captures values
-in keyed source order before consuming them in declaration order. Omitted
-fields request the same zero owner rather than a second default table.
+source-file module even when the first use is in another file. The class is
+reconstructed from its complete accumulated operation set, so exactly one
+class definition remains and no top-level operation helper exists. Static
+operation definitions grow linearly with fields while each use remains
+constant size. Calls use the exact statically selected class
+(`Pair.$copy(value)`), never `value.$copy()`, so TypeScript virtual dispatch
+cannot replace Go's static method selection. The first family constructs only
+through `new Name(...)`. Positional composites are direct in both profiles.
+For keyed composites, `direct` emits constructor arguments directly in
+declaration order, while `preserve-go` captures values in keyed source order
+before consuming them in declaration order. Omitted fields request the same
+zero owner rather than a second default table.
 
 Generated source modules use a caller-owns-value convention. A borrowed struct
 expression (for example, a local identifier or field selection) is copied
@@ -752,7 +755,7 @@ where Go requires it. Assignment to an ordinary local or field in the initial
 pointer-free family rebinds that target to a copied value:
 
 ```ts
-target = Pair$copy(value);
+target = Pair.$copy(value);
 ```
 
 No admitted construct can observe the replaced target object's identity.
@@ -768,7 +771,7 @@ copy.Ready = false
 ```
 
 ```ts
-let copy = Pair$copy(value);
+let copy = Pair.$copy(value);
 copy.Ready = false;
 ```
 
@@ -791,7 +794,7 @@ export function Flag_Disable(flag: Flag): void {
 }
 ```
 
-Concrete generated calls invoke `Flag_Disable(Flag$copy(flag))` directly, so
+Concrete generated calls invoke `Flag_Disable(Flag.$copy(flag))` directly, so
 the selected value receiver owns exactly one copy before its body runs. Pointer
 receivers, method values, and interface calls select their own exact checked
 entry shape from `go/types`; they do not reuse a value-receiver entry when its

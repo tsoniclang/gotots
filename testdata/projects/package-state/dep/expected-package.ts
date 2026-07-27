@@ -1,11 +1,11 @@
-import { Cell, Cell$zero as Cell$zero__from_dep, mark } from "../../../modules/30b189d6a1f032298fdb86d2246d93c1095afdffc5c48f3a05e48e2d7fd2d1f6/dep/state.js";
+import { Cell, mark } from "../../../modules/30b189d6a1f032298fdb86d2246d93c1095afdffc5c48f3a05e48e2d7fd2d1f6/dep/state.js";
 import { $state } from "./state.js";
 export function $initialize(): void {
     $state.A = 0;
     $state.B = 0;
     $state.Dormant = 0;
-    $state.Empty = Cell$zero__from_dep();
-    $state.Filled = Cell$zero__from_dep();
+    $state.Empty = Cell.$zero();
+    $state.Filled = Cell.$zero();
     $state.Trace = 0;
     $state.__go___proto__ = 0;
     $state.hidden = 0;
@@ -14,5 +14,5 @@ export function $initialize(): void {
     $state.hidden = mark(3);
     $state.Filled = new Cell(4);
 }
-export { Cell, Cell$zero, Snapshot } from "../../../modules/30b189d6a1f032298fdb86d2246d93c1095afdffc5c48f3a05e48e2d7fd2d1f6/dep/state.js";
+export { Cell, Snapshot } from "../../../modules/30b189d6a1f032298fdb86d2246d93c1095afdffc5c48f3a05e48e2d7fd2d1f6/dep/state.js";
 export { $state };

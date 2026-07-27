@@ -512,31 +512,6 @@ func (s *programSession) packageExports(
 				byPath[binding.sourcePath],
 				binding.name,
 			)
-			for _, requirement := range s.requirements.appliedFor(
-				declaration.object,
-			) {
-				typeName, operation, ok := requirement.NamedStructCompanion()
-				if !ok {
-					continue
-				}
-				companionName, err := api.CompanionExportName(
-					binding.name,
-					operation,
-				)
-				if err != nil {
-					return nil, err
-				}
-				if typeName.Pkg() != builder.sourcePackage.Types() {
-					return nil, &ScheduleError{
-						Object: typeName.Name(),
-						Reason: "companion assembly export has a foreign owner",
-					}
-				}
-				byPath[binding.sourcePath] = append(
-					byPath[binding.sourcePath],
-					companionName,
-				)
-			}
 		}
 	}
 	paths := make([]string, 0, len(byPath))

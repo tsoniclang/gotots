@@ -72,8 +72,8 @@ func TestReachedUsesReconstructAndSealDeclarationAssemblies(t *testing.T) {
 				declaration.reconstructions,
 			)
 		}
-		if len(declaration.statements) != 4 {
-			t.Fatalf("%s assembly statements = %d, want class plus three companions", name, len(declaration.statements))
+		if len(declaration.statements) != 1 {
+			t.Fatalf("%s assembly statements = %d, want one reconstructed class", name, len(declaration.statements))
 		}
 	}
 	if initialClass == boxDeclaration.statements[0] {
@@ -87,9 +87,9 @@ func TestReachedUsesReconstructAndSealDeclarationAssemblies(t *testing.T) {
 	assertOneFinalDeclarationAssembly(t, files, "Box")
 	assertOneFinalDeclarationAssembly(t, files, "Item")
 
-	requirement, err := api.NewNamedStructCompanionRequirement(
+	requirement, err := api.NewNamedStructOperationRequirement(
 		box,
-		api.CompanionCopy,
+		api.NamedStructOperationCopy,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -125,9 +125,9 @@ func TestDeclarationRequirementRejectsSameSpellingWithoutExactOwner(
 	sourcePackage := program.Roots()[0]
 	box := sourcePackage.Types().Scope().Lookup("Box").(*types.TypeName)
 	forged := types.NewTypeName(box.Pos(), box.Pkg(), box.Name(), box.Type())
-	requirement, err := api.NewNamedStructCompanionRequirement(
+	requirement, err := api.NewNamedStructOperationRequirement(
 		forged,
-		api.CompanionCopy,
+		api.NamedStructOperationCopy,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -187,9 +187,9 @@ func TestDeclarationAssembliesAreByteStableAcrossRootOrder(t *testing.T) {
 func TestDeclarationAssembliesCannotSealWithPendingWork(t *testing.T) {
 	program := loadDeclarationAssemblyFixture(t)
 	box := program.Roots()[0].Types().Scope().Lookup("Box").(*types.TypeName)
-	requirement, err := api.NewNamedStructCompanionRequirement(
+	requirement, err := api.NewNamedStructOperationRequirement(
 		box,
-		api.CompanionCopy,
+		api.NamedStructOperationCopy,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -236,9 +236,9 @@ func TestDeclarationAssemblyCostDoesNotGrowPerUseSite(t *testing.T) {
 		)
 		if measurements[index].requirements != 3 ||
 			measurements[index].reconstructions != 1 ||
-			measurements[index].definitionRoots != 4 {
+			measurements[index].definitionRoots != 1 {
 			t.Fatalf(
-				"use sites %d metrics = %#v, want 3 requirements, 1 reconstruction, 4 definition roots",
+				"use sites %d metrics = %#v, want 3 requirements, 1 reconstruction, 1 definition root",
 				useCount,
 				measurements[index],
 			)
@@ -467,11 +467,11 @@ func assertOneFinalDeclarationAssembly(
 	owner string,
 ) {
 	t.Helper()
-	counts := map[string]int{
-		owner:            0,
-		owner + "$zero":  0,
-		owner + "$copy":  0,
-		owner + "$equal": 0,
+	classCount := 0
+	operationCounts := map[string]int{
+		"$zero":  0,
+		"$copy":  0,
+		"$equal": 0,
 	}
 	for _, file := range files {
 		if file.Kind() != TargetFileSource {
@@ -480,15 +480,30 @@ func assertOneFinalDeclarationAssembly(
 		for _, statement := range file.SourceFile().Statements() {
 			switch statement := statement.(type) {
 			case tsgo.ClassDeclaration:
-				counts[statement.Name().Text()]++
+				if statement.Name().Text() != owner {
+					continue
+				}
+				classCount++
+				for _, member := range statement.Members() {
+					method, ok := member.(tsgo.MethodDeclaration)
+					if !ok {
+						continue
+					}
+					operationCounts[method.Name().(tsgo.Identifier).Text()]++
+				}
 			case tsgo.FunctionDeclaration:
-				counts[statement.Name().Text()]++
+				if strings.HasPrefix(statement.Name().Text(), owner+"$") {
+					t.Fatalf("top-level operation helper %s remains", statement.Name().Text())
+				}
 			}
 		}
 	}
-	for name, count := range counts {
+	if classCount != 1 {
+		t.Fatalf("%s final class count = %d, want one", owner, classCount)
+	}
+	for name, count := range operationCounts {
 		if count != 1 {
-			t.Fatalf("%s final definition count = %d, want one", name, count)
+			t.Fatalf("%s.%s final definition count = %d, want one", owner, name, count)
 		}
 	}
 }
@@ -529,23 +544,23 @@ func TestDeclarationRequirementSchedulerDeduplicatesAndUsesClosedOrder(
 	sourcePackage := types.NewPackage("example.com/schedule", "schedule")
 	first := types.NewTypeName(token.Pos(1), sourcePackage, "First", nil)
 	second := types.NewTypeName(token.Pos(2), sourcePackage, "Second", nil)
-	firstCopy, err := api.NewNamedStructCompanionRequirement(
+	firstCopy, err := api.NewNamedStructOperationRequirement(
 		first,
-		api.CompanionCopy,
+		api.NamedStructOperationCopy,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	firstEqual, err := api.NewNamedStructCompanionRequirement(
+	firstEqual, err := api.NewNamedStructOperationRequirement(
 		first,
-		api.CompanionEqual,
+		api.NamedStructOperationEqual,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondZero, err := api.NewNamedStructCompanionRequirement(
+	secondZero, err := api.NewNamedStructOperationRequirement(
 		second,
-		api.CompanionZero,
+		api.NamedStructOperationZero,
 	)
 	if err != nil {
 		t.Fatal(err)

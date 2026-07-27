@@ -82,9 +82,9 @@ func Run() int32 {
 	})
 	var targetPaths []string
 	var apiModule string
-	modelCopyDefinitions := 0
-	apiCopyDefinitions := 0
-	apiCopyImports := 0
+	modelCopyMethods := 0
+	apiPointDefinitions := 0
+	apiPointImports := 0
 	for _, file := range emission.Files() {
 		printed, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
 		if err != nil {
@@ -98,15 +98,20 @@ func Run() int32 {
 		targetPaths = append(targetPaths, targetPath)
 		for _, statement := range file.SourceFile().Statements() {
 			switch statement := statement.(type) {
-			case tsgo.FunctionDeclaration:
-				if statement.Name().Text() != "Point$copy" {
+			case tsgo.ClassDeclaration:
+				if statement.Name().Text() != "Point" {
 					continue
 				}
 				if file.PackageName() == "model" {
-					modelCopyDefinitions++
+					for _, member := range statement.Members() {
+						method, ok := member.(tsgo.MethodDeclaration)
+						if ok && targetName(method.Name()) == "$copy" {
+							modelCopyMethods++
+						}
+					}
 				}
 				if file.PackageName() == "api" {
-					apiCopyDefinitions++
+					apiPointDefinitions++
 				}
 			case tsgo.ImportDeclaration:
 				if file.PackageName() != "api" ||
@@ -123,8 +128,8 @@ func Run() int32 {
 					if binding.PropertyName() != nil {
 						exported = binding.PropertyName().(tsgo.Identifier).Text()
 					}
-					if exported == "Point$copy" {
-						apiCopyImports++
+					if exported == "Point" {
+						apiPointImports++
 					}
 				}
 			}
@@ -143,14 +148,14 @@ func Run() int32 {
 				".js"
 		}
 	}
-	if modelCopyDefinitions != 1 ||
-		apiCopyDefinitions != 0 ||
-		apiCopyImports != 1 {
+	if modelCopyMethods != 1 ||
+		apiPointDefinitions != 0 ||
+		apiPointImports != 1 {
 		t.Fatalf(
-			"Point$copy ownership = model definitions %d, api definitions %d, api imports %d; want 1/0/1",
-			modelCopyDefinitions,
-			apiCopyDefinitions,
-			apiCopyImports,
+			"Point.$copy ownership = model methods %d, api Point definitions %d, api Point imports %d; want 1/0/1",
+			modelCopyMethods,
+			apiPointDefinitions,
+			apiPointImports,
 		)
 	}
 	if apiModule == "" {

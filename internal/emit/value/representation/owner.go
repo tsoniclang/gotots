@@ -125,12 +125,24 @@ func (Owner) Zero(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	reference, err := context.Names().Companion(typeName, api.CompanionZero)
+	reference, err := context.Names().NamedStructOperation(
+		typeName,
+		api.NamedStructOperationZero,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	call, err := namedStructOperationCall(
+		context,
+		reference.Name(),
+		api.NamedStructOperationZero,
+		nil,
+	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
 	return api.DirectExpression(
-		companionCall(context, reference.Name(), nil),
+		call,
 		reference.Requests()...,
 	), nil
 }
@@ -167,17 +179,25 @@ func (Owner) Copy(
 			value.Requests(),
 		)
 	}
-	reference, err := context.Names().Companion(typeName, api.CompanionCopy)
+	reference, err := context.Names().NamedStructOperation(
+		typeName,
+		api.NamedStructOperationCopy,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	call, err := namedStructOperationCall(
+		context,
+		reference.Name(),
+		api.NamedStructOperationCopy,
+		[]tsgo.Expression{value.Value()},
+	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
 	return api.NewExpressionEmission(
 		value.Before(),
-		companionCall(
-			context,
-			reference.Name(),
-			[]tsgo.Expression{value.Value()},
-		),
+		call,
 		api.CombineRequests(value.Requests(), reference.Requests()),
 	)
 }
@@ -272,16 +292,24 @@ func (Owner) Equal(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	reference, err := context.Names().Companion(typeName, api.CompanionEqual)
+	reference, err := context.Names().NamedStructOperation(
+		typeName,
+		api.NamedStructOperationEqual,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	call, err := namedStructOperationCall(
+		context,
+		reference.Name(),
+		api.NamedStructOperationEqual,
+		[]tsgo.Expression{left, right},
+	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
 	return api.DirectExpression(
-		companionCall(
-			context,
-			reference.Name(),
-			[]tsgo.Expression{left, right},
-		),
+		call,
 		reference.Requests()...,
 	), nil
 }
@@ -325,16 +353,26 @@ func namedStruct(
 	return named.Obj(), structType, true
 }
 
-func companionCall(
+func namedStructOperationCall(
 	context api.Context,
-	name string,
+	className string,
+	operation api.NamedStructOperation,
 	arguments []tsgo.Expression,
-) tsgo.CallExpression {
+) (tsgo.CallExpression, error) {
+	memberName, err := api.NamedStructOperationMemberName(operation)
+	if err != nil {
+		return nil, err
+	}
 	return context.Factory().CallExpression(
-		context.Factory().Identifier(name),
+		context.Factory().PropertyAccessExpression(
+			context.Factory().Identifier(className),
+			nil,
+			context.Factory().Identifier(memberName),
+			tsgo.NodeFlagsNone,
+		),
 		nil,
 		nil,
 		arguments,
 		tsgo.NodeFlagsNone,
-	)
+	), nil
 }
