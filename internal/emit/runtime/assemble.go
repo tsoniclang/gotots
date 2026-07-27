@@ -6,6 +6,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	runtimearray "github.com/tsoniclang/gotots/internal/emit/runtime/array"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
+	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	stringruntime "github.com/tsoniclang/gotots/internal/emit/runtime/string"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -101,6 +102,22 @@ func Build(
 		definition, err := NewDefinition(
 			api.RuntimeArray,
 			statement,
+		)
+		if err != nil {
+			return nil, err
+		}
+		return []Definition{definition}, nil
+	}
+	if module == api.RuntimeModuleSlice &&
+		len(symbols) == 1 &&
+		symbols[0] == api.RuntimeSlice {
+		contract, err := api.RuntimeContract(api.RuntimeSlice)
+		if err != nil {
+			return nil, err
+		}
+		definition, err := NewDefinition(
+			api.RuntimeSlice,
+			runtimeslice.Build(factory, contract.ExportedName()),
 		)
 		if err != nil {
 			return nil, err

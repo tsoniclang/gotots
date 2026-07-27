@@ -50,52 +50,40 @@ func (a RuntimeArray) EmitIndex(
 	)
 }
 
-func (a RuntimeArray) EmitStore(
+func (a RuntimeArray) EmitStoreTarget(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.IndexExpr,
-	value api.ExpressionEmission,
-) (api.ExpressionEmission, error) {
+) (api.StoreTargetEmission, error) {
 	receiver, err := children.StoreTarget(
 		context.WithRole(api.RoleArrayReceiver),
 		source.X,
 	)
 	if err != nil {
-		return api.ExpressionEmission{}, err
+		return api.StoreTargetEmission{}, err
 	}
-	if !types.Identical(receiver.SourceType(), a.source) {
-		return api.ExpressionEmission{},
+	if receiver.IsSetter() ||
+		!types.Identical(receiver.SourceType(), a.source) {
+		return api.StoreTargetEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	index, err := emitIndex(context, children, source.Index)
 	if err != nil {
-		return api.ExpressionEmission{}, err
+		return api.StoreTargetEmission{}, err
 	}
-	before := index.Before()
-	indexValue := index.Value()
-	if len(value.Before()) != 0 {
-		name, err := context.Names().Temporary(api.TemporaryArrayIndex)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		before = append(before, variable(context, name, indexValue))
-		indexValue = context.Factory().Identifier(name)
-	}
-	before = append(before, value.Before()...)
-	return api.NewExpressionEmission(
+	before := receiver.Before()
+	before = append(before, index.Before()...)
+	return api.NewSetterStoreTargetEmission(
 		before,
-		callMember(
-			context,
+		context.Factory().PropertyAccessExpression(
 			receiver.Value(),
-			arraymember.Set,
-			indexValue,
-			value.Value(),
+			nil,
+			context.Factory().Identifier(arraymember.Set.Name()),
+			tsgo.NodeFlagsNone,
 		),
-		api.CombineRequests(
-			receiver.Requests(),
-			index.Requests(),
-			value.Requests(),
-		),
+		[]tsgo.Expression{index.Value()},
+		a.ElementType(),
+		api.CombineRequests(receiver.Requests(), index.Requests()),
 	)
 }
 

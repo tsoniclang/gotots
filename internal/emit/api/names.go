@@ -19,7 +19,10 @@ const (
 	TemporaryCallArgument
 	TemporaryCallCallee
 	TemporaryArrayReceiver
-	TemporaryArrayIndex
+	TemporarySliceElement
+	TemporarySliceReceiver
+	TemporarySliceOperand
+	TemporarySetterArgument
 )
 
 type NameReference struct {
@@ -121,8 +124,14 @@ func TemporaryPrefix(kind TemporaryKind) (string, error) {
 		return "__gotots_callee_", nil
 	case TemporaryArrayReceiver:
 		return "__gotots_array_", nil
-	case TemporaryArrayIndex:
-		return "__gotots_index_", nil
+	case TemporarySliceElement:
+		return "__gotots_slice_element_", nil
+	case TemporarySliceReceiver:
+		return "__gotots_slice_receiver_", nil
+	case TemporarySliceOperand:
+		return "__gotots_slice_operand_", nil
+	case TemporarySetterArgument:
+		return "__gotots_setter_argument_", nil
 	default:
 		return "", &NameError{
 			Reason: fmt.Sprintf("temporary kind %d is invalid", kind),

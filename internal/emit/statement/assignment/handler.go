@@ -240,9 +240,6 @@ func emitAssignment(
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	if index, ok := source.Lhs[0].(*ast.IndexExpr); ok {
-		return emitArrayStore(context, children, source, index)
-	}
 	target, err := children.StoreTarget(
 		context.WithRole(api.RoleAssignmentTarget),
 		source.Lhs[0],
@@ -273,6 +270,47 @@ func emitAssignment(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
+	if target.IsSetter() {
+		arguments := target.Arguments()
+		statements := target.Before()
+		if len(value.Before()) != 0 {
+			for index, argument := range arguments {
+				name, err := context.Names().Temporary(
+					api.TemporarySetterArgument,
+				)
+				if err != nil {
+					return api.StatementEmission{}, err
+				}
+				statements = append(
+					statements,
+					variableStatement(
+						context,
+						tsgo.NodeFlagsConst,
+						name,
+						argument,
+					),
+				)
+				arguments[index] = context.Factory().Identifier(name)
+			}
+		}
+		statements = append(statements, value.Before()...)
+		arguments = append(arguments, value.Value())
+		call := context.Factory().CallExpression(
+			target.Value(),
+			nil,
+			nil,
+			arguments,
+			tsgo.NodeFlagsNone,
+		)
+		statements = append(
+			statements,
+			context.Factory().ExpressionStatement(call),
+		)
+		return api.NewStatementEmission(
+			statements,
+			api.CombineRequests(target.Requests(), value.Requests()),
+		)
+	}
 	assigned, err := context.Values().Assign(
 		context.WithRole(api.RoleAssignmentTarget),
 		source,
@@ -283,7 +321,8 @@ func emitAssignment(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	statements := assigned.Before()
+	statements := target.Before()
+	statements = append(statements, assigned.Before()...)
 	statements = append(
 		statements,
 		context.Factory().ExpressionStatement(assigned.Value()),

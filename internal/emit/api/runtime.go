@@ -66,7 +66,7 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 		return runtimeContract(
 			RuntimeModuleSlice,
 			"runtime/slice.ts",
-			"GoSlice",
+			"RuntimeSlice",
 			true,
 		), nil
 	case RuntimeMap:

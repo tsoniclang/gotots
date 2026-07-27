@@ -38,6 +38,7 @@ import (
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	namedstructtype "github.com/tsoniclang/gotots/internal/emit/type/namedstruct"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
+	slicetype "github.com/tsoniclang/gotots/internal/emit/type/slice"
 	tupletype "github.com/tsoniclang/gotots/internal/emit/type/tuple"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	"github.com/tsoniclang/gotots/internal/emit/value/representation"
@@ -397,6 +398,19 @@ func (e *emitter) Type(
 		if _, ok := types.Unalias(sourceType).(*types.Named); ok {
 			return namedstructtype.Emit(context, source, sourceType)
 		}
+		if sliceType, ok := types.Unalias(sourceType).(*types.Slice); ok {
+			arrayType, valid := source.(*ast.ArrayType)
+			if !valid {
+				return api.TypeEmission{},
+					api.Unsupported(context, api.CategoryType, source)
+			}
+			return slicetype.EmitSyntax(
+				context,
+				e,
+				arrayType,
+				sliceType,
+			)
+		}
 	}
 	return basictype.Emit(context, source)
 }
@@ -420,6 +434,9 @@ func (e *emitter) RepresentedType(
 	}
 	if _, ok := types.Unalias(sourceType).(*types.Named); ok {
 		return namedstructtype.Emit(context, source, sourceType)
+	}
+	if _, ok := types.Unalias(sourceType).(*types.Slice); ok {
+		return slicetype.EmitRepresented(context, e, source, sourceType)
 	}
 	return basictype.EmitRepresented(context, source, sourceType)
 }

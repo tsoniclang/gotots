@@ -58,12 +58,17 @@ func emit(
 	); ok || err != nil {
 		return target, err
 	}
-	if target, handled, err := builtinexpression.Emit(
-		context,
-		children,
-		source,
-	); handled || err != nil {
-		return target, err
+	if builtin, ok := builtinexpression.SliceBuiltin(
+		context.TypesInfo(),
+		source.Fun,
+	); ok {
+		return builtinexpression.Emit(
+			context,
+			children,
+			source,
+			builtin,
+			discarded,
+		)
 	}
 	if selector, method, selection, ok := selectedMethod(
 		context.TypesInfo(),

@@ -26,7 +26,10 @@ func Emit(
 	); ok {
 		return array.EmitLiteral(context, children, source)
 	}
-	named, structType, ok := sourceType(context, source)
+	if target, handled, err := emitSlice(context, children, source); handled || err != nil {
+		return target, err
+	}
+	named, structType, ok := structSourceType(context, source)
 	if !ok {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
@@ -60,7 +63,7 @@ func Emit(
 	)
 }
 
-func sourceType(
+func structSourceType(
 	context api.Context,
 	source *ast.CompositeLit,
 ) (*types.Named, *types.Struct, bool) {

@@ -70,6 +70,9 @@ func (Owner) Zero(
 			),
 		), nil
 	}
+	if _, _, ok := scalarSlice(context, sourceType); ok {
+		return sliceZero(context, source, sourceType)
+	}
 	typeName, _, ok := namedStruct(sourceType)
 	if !ok {
 		return api.ExpressionEmission{},
@@ -96,7 +99,8 @@ func (Owner) Copy(
 	}
 	if _, ok := primitive(context, sourceType); ok ||
 		callableValue(sourceType) ||
-		scalarPointer(context, sourceType) {
+		scalarPointer(context, sourceType) ||
+		isScalarSlice(context, sourceType) {
 		return api.NewExpressionEmission(
 			value.Before(),
 			value.Value(),
@@ -162,6 +166,7 @@ func (Owner) Assign(
 		!primitiveOK &&
 		!callableValue(sourceType) &&
 		!scalarPointer(context, sourceType) &&
+		!isScalarSlice(context, sourceType) &&
 		!structOK {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)

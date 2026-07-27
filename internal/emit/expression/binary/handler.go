@@ -17,6 +17,13 @@ func Emit(
 	source *ast.BinaryExpr,
 ) (api.ExpressionEmission, error) {
 	if source.Op == token.EQL || source.Op == token.NEQ {
+		if target, ok, err := emitSliceNilEquality(
+			context,
+			children,
+			source,
+		); ok || err != nil {
+			return target, err
+		}
 		if target, ok, err := emitValueEquality(context, children, source); ok || err != nil {
 			return target, err
 		}
