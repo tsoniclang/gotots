@@ -52,13 +52,13 @@ func namedResultPrologue(
 	children api.ChildEmitter,
 	source *ast.FuncType,
 	results *types.Tuple,
-) ([]tsgo.Statement, []api.PlacementRequest, error) {
+) ([]tsgo.Statement, []api.RootRequest, error) {
 	names, err := namedResultSyntax(context, source, results)
 	if err != nil || len(names) == 0 {
 		return nil, nil, err
 	}
 	var statements []tsgo.Statement
-	var requests []api.PlacementRequest
+	var requests []api.RootRequest
 	for index, sourceName := range names {
 		result := results.At(index)
 		targetName, err := context.Names().Declare(result)

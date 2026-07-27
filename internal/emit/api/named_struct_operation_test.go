@@ -68,9 +68,9 @@ func TestNamedStructOperationRequestRejectsInvalidOwners(t *testing.T) {
 				testCase.typeName,
 				testCase.operation,
 			)
-			var requestError *PlacementRequestError
+			var requestError *RootRequestError
 			if !errors.As(err, &requestError) {
-				t.Fatalf("error = %#v, want PlacementRequestError", err)
+				t.Fatalf("error = %#v, want RootRequestError", err)
 			}
 		})
 	}

@@ -56,7 +56,7 @@ func TestEmissionResultsOwnImmutableTargetNodesAndRequests(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	requests := []api.PlacementRequest{request}
+	requests := []api.RootRequest{request}
 	result, err := api.NewExpressionEmission(
 		before,
 		factory.Identifier("value"),
@@ -67,7 +67,7 @@ func TestEmissionResultsOwnImmutableTargetNodesAndRequests(t *testing.T) {
 	}
 
 	before[0] = factory.ExpressionStatement(factory.Identifier("mutated"))
-	requests[0] = api.PlacementRequest{}
+	requests[0] = api.RootRequest{}
 	if name := result.Before()[0].(tsgo.ExpressionStatement).
 		Expression().(tsgo.Identifier).Text(); name != "prepare" {
 		t.Fatalf("before statement = %q, want prepare", name)
@@ -79,7 +79,7 @@ func TestEmissionResultsOwnImmutableTargetNodesAndRequests(t *testing.T) {
 	exposedBefore := result.Before()
 	exposedBefore[0] = factory.ExpressionStatement(factory.Identifier("alsoMutated"))
 	exposedRequests := result.Requests()
-	exposedRequests[0] = api.PlacementRequest{}
+	exposedRequests[0] = api.RootRequest{}
 	if name := result.Before()[0].(tsgo.ExpressionStatement).
 		Expression().(tsgo.Identifier).Text(); name != "prepare" {
 		t.Fatalf("before statement after accessor mutation = %q, want prepare", name)
@@ -126,7 +126,7 @@ func TestImportRequestCarriesExactPlacementPolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if request.Kind() != api.PlacementImport ||
+	if request.Kind() != api.RootRequestImport ||
 		request.LegalScope() != api.ScopeFileImports ||
 		request.PreferredScope() != api.ScopeFileImports ||
 		request.Execution() != api.ExecutionStatic {

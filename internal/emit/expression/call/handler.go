@@ -261,7 +261,7 @@ func emitArguments(
 	children api.ChildEmitter,
 	source *ast.CallExpr,
 	signature *types.Signature,
-) ([]tsgo.Expression, []tsgo.Statement, []api.PlacementRequest, error) {
+) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
 	if len(source.Args) == 1 {
 		if results, ok := context.TypesInfo().TypeOf(source.Args[0]).(*types.Tuple); ok {
 			return emitMultipleArgument(context, children, source, signature, results)
@@ -307,7 +307,7 @@ func emitArguments(
 		return captureArguments(context, children, source, signature, emissions)
 	}
 	arguments := make([]tsgo.Expression, 0, len(emissions))
-	var requests []api.PlacementRequest
+	var requests []api.RootRequest
 	for _, target := range emissions {
 		arguments = append(arguments, target.Value())
 		requests = append(requests, target.Requests()...)
@@ -321,10 +321,10 @@ func captureArguments(
 	_ *ast.CallExpr,
 	_ *types.Signature,
 	emissions []api.ExpressionEmission,
-) ([]tsgo.Expression, []tsgo.Statement, []api.PlacementRequest, error) {
+) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
 	arguments := make([]tsgo.Expression, 0, len(emissions))
 	var before []tsgo.Statement
-	var requests []api.PlacementRequest
+	var requests []api.RootRequest
 	for _, emission := range emissions {
 		temporaryName, err := context.Names().Temporary(api.TemporaryCallArgument)
 		if err != nil {

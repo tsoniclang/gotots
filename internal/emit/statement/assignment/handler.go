@@ -168,7 +168,7 @@ func emitDefinitionList(
 ) (
 	tsgo.VariableDeclarationList,
 	[]tsgo.Statement,
-	[]api.PlacementRequest,
+	[]api.RootRequest,
 	error,
 ) {
 	if len(source.Lhs) != 1 || len(source.Rhs) != 1 {
@@ -301,7 +301,7 @@ type parallelTarget struct {
 	name        string
 	declaration bool
 	discard     bool
-	requests    []api.PlacementRequest
+	requests    []api.RootRequest
 }
 
 func emitParallel(
@@ -328,7 +328,7 @@ func emitParallel(
 	}
 
 	statements := make([]tsgo.Statement, 0, len(targets)*2)
-	requests := make([]api.PlacementRequest, 0, len(targets)*2)
+	requests := make([]api.RootRequest, 0, len(targets)*2)
 	temporaryNames := make([]string, len(targets))
 	for index, target := range targets {
 		sourceValue := source.Rhs[index]
@@ -525,7 +525,7 @@ func pointerAnnotation(
 	children api.ChildEmitter,
 	source ast.Node,
 	sourceType types.Type,
-) (tsgo.TypeNode, []api.PlacementRequest, error) {
+) (tsgo.TypeNode, []api.RootRequest, error) {
 	if !context.Values().RequiresExplicitType(context, sourceType) {
 		return nil, nil, nil
 	}

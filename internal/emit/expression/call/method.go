@@ -86,7 +86,7 @@ func emitMethod(
 	}
 	before := receiver.Before()
 	receiverValue := receiver.Value()
-	var receiverRequests []api.PlacementRequest
+	var receiverRequests []api.RootRequest
 	if len(argumentBefore) != 0 {
 		receiverValue, receiverRequests, before, err = captureReceiver(
 			context,
@@ -131,7 +131,7 @@ func captureReceiver(
 	receiver api.ExpressionEmission,
 ) (
 	tsgo.Expression,
-	[]api.PlacementRequest,
+	[]api.RootRequest,
 	[]tsgo.Statement,
 	error,
 ) {

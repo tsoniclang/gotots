@@ -151,7 +151,7 @@ func (a RuntimeArray) emitLiteralElements(
 func arrangeLiteralElements(
 	context api.Context,
 	elements []literalElement,
-) ([]tsgo.Statement, []tsgo.Expression, []api.PlacementRequest, error) {
+) ([]tsgo.Statement, []tsgo.Expression, []api.RootRequest, error) {
 	needsCapture := false
 	for _, element := range elements {
 		if len(element.value.Before()) != 0 {
@@ -161,7 +161,7 @@ func arrangeLiteralElements(
 	}
 	values := make([]tsgo.Expression, 0, len(elements))
 	var before []tsgo.Statement
-	var requests []api.PlacementRequest
+	var requests []api.RootRequest
 	for _, element := range elements {
 		requests = append(requests, element.value.Requests()...)
 		if !needsCapture {

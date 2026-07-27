@@ -70,7 +70,7 @@ func TestRuntimeImportRequestCarriesDefinitionIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if request.Kind() != api.PlacementImport ||
+	if request.Kind() != api.RootRequestImport ||
 		request.ImportPhase() != api.ImportPhaseValue ||
 		request.ModulePath() != "../../../runtime/string.js" ||
 		request.ExportedName() != "goStringIndex" ||

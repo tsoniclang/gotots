@@ -11,13 +11,13 @@ import (
 type ExpressionEmission struct {
 	before   []tsgo.Statement
 	value    tsgo.Expression
-	requests []PlacementRequest
+	requests []RootRequest
 }
 
 func NewExpressionEmission(
 	before []tsgo.Statement,
 	value tsgo.Expression,
-	requests []PlacementRequest,
+	requests []RootRequest,
 ) (ExpressionEmission, error) {
 	if value == nil {
 		return ExpressionEmission{}, &ResultError{
@@ -34,7 +34,7 @@ func NewExpressionEmission(
 
 func DirectExpression(
 	value tsgo.Expression,
-	requests ...PlacementRequest,
+	requests ...RootRequest,
 ) ExpressionEmission {
 	if value == nil {
 		panic("direct expression target is nil")
@@ -53,7 +53,7 @@ func (e ExpressionEmission) Value() tsgo.Expression {
 	return e.value
 }
 
-func (e ExpressionEmission) Requests() []PlacementRequest {
+func (e ExpressionEmission) Requests() []RootRequest {
 	return slices.Clone(e.requests)
 }
 
@@ -65,13 +65,13 @@ type StoreTargetEmission struct {
 	setterMember    string
 	setterArguments []ExpressionEmission
 	sourceType      types.Type
-	requests        []PlacementRequest
+	requests        []RootRequest
 }
 
 func NewStoreTargetEmission(
 	value tsgo.Expression,
 	sourceType types.Type,
-	requests []PlacementRequest,
+	requests []RootRequest,
 ) (StoreTargetEmission, error) {
 	switch {
 	case value == nil:
@@ -160,7 +160,7 @@ func (e StoreTargetEmission) SourceType() types.Type {
 	return e.sourceType
 }
 
-func (e StoreTargetEmission) Requests() []PlacementRequest {
+func (e StoreTargetEmission) Requests() []RootRequest {
 	if e.setter {
 		requests := e.setterReceiver.Requests()
 		for _, argument := range e.setterArguments {
@@ -173,12 +173,12 @@ func (e StoreTargetEmission) Requests() []PlacementRequest {
 
 type StatementEmission struct {
 	statements []tsgo.Statement
-	requests   []PlacementRequest
+	requests   []RootRequest
 }
 
 func NewStatementEmission(
 	statements []tsgo.Statement,
-	requests []PlacementRequest,
+	requests []RootRequest,
 ) (StatementEmission, error) {
 	for _, statement := range statements {
 		if statement == nil {
@@ -196,7 +196,7 @@ func NewStatementEmission(
 
 func DirectStatement(
 	statement tsgo.Statement,
-	requests ...PlacementRequest,
+	requests ...RootRequest,
 ) StatementEmission {
 	if statement == nil {
 		panic("direct statement target is nil")
@@ -211,18 +211,18 @@ func (e StatementEmission) Statements() []tsgo.Statement {
 	return slices.Clone(e.statements)
 }
 
-func (e StatementEmission) Requests() []PlacementRequest {
+func (e StatementEmission) Requests() []RootRequest {
 	return slices.Clone(e.requests)
 }
 
 type DeclarationEmission struct {
 	declarations []tsgo.Statement
-	requests     []PlacementRequest
+	requests     []RootRequest
 }
 
 func NewDeclarationEmission(
 	declarations []tsgo.Statement,
-	requests []PlacementRequest,
+	requests []RootRequest,
 ) (DeclarationEmission, error) {
 	if len(declarations) == 0 {
 		return DeclarationEmission{}, &ResultError{
@@ -246,7 +246,7 @@ func NewDeclarationEmission(
 
 func DirectDeclaration(
 	declaration tsgo.Statement,
-	requests ...PlacementRequest,
+	requests ...RootRequest,
 ) DeclarationEmission {
 	if declaration == nil {
 		panic("direct declaration target is nil")
@@ -261,16 +261,16 @@ func (e DeclarationEmission) Declarations() []tsgo.Statement {
 	return slices.Clone(e.declarations)
 }
 
-func (e DeclarationEmission) Requests() []PlacementRequest {
+func (e DeclarationEmission) Requests() []RootRequest {
 	return slices.Clone(e.requests)
 }
 
 type TypeEmission struct {
 	value    tsgo.TypeNode
-	requests []PlacementRequest
+	requests []RootRequest
 }
 
-func DirectType(value tsgo.TypeNode, requests ...PlacementRequest) TypeEmission {
+func DirectType(value tsgo.TypeNode, requests ...RootRequest) TypeEmission {
 	if value == nil {
 		panic("direct type target is nil")
 	}
@@ -281,16 +281,16 @@ func (e TypeEmission) Value() tsgo.TypeNode {
 	return e.value
 }
 
-func (e TypeEmission) Requests() []PlacementRequest {
+func (e TypeEmission) Requests() []RootRequest {
 	return slices.Clone(e.requests)
 }
 
 type BlockEmission struct {
 	value    tsgo.Block
-	requests []PlacementRequest
+	requests []RootRequest
 }
 
-func DirectBlock(value tsgo.Block, requests ...PlacementRequest) BlockEmission {
+func DirectBlock(value tsgo.Block, requests ...RootRequest) BlockEmission {
 	if value == nil {
 		panic("direct block target is nil")
 	}
@@ -301,18 +301,18 @@ func (e BlockEmission) Value() tsgo.Block {
 	return e.value
 }
 
-func (e BlockEmission) Requests() []PlacementRequest {
+func (e BlockEmission) Requests() []RootRequest {
 	return slices.Clone(e.requests)
 }
 
 type ForInitializerEmission struct {
 	value    tsgo.ForInitializer
-	requests []PlacementRequest
+	requests []RootRequest
 }
 
 func DirectForInitializer(
 	value tsgo.ForInitializer,
-	requests ...PlacementRequest,
+	requests ...RootRequest,
 ) ForInitializerEmission {
 	if value == nil {
 		panic("direct for initializer target is nil")
@@ -325,7 +325,7 @@ func DirectForInitializer(
 
 func ExpressionForInitializer(
 	value tsgo.Expression,
-	requests ...PlacementRequest,
+	requests ...RootRequest,
 ) (ForInitializerEmission, error) {
 	target, ok := value.(tsgo.ForInitializer)
 	if !ok {
@@ -341,16 +341,16 @@ func (e ForInitializerEmission) Value() tsgo.ForInitializer {
 	return e.value
 }
 
-func (e ForInitializerEmission) Requests() []PlacementRequest {
+func (e ForInitializerEmission) Requests() []RootRequest {
 	return slices.Clone(e.requests)
 }
 
-func CombineRequests(groups ...[]PlacementRequest) []PlacementRequest {
+func CombineRequests(groups ...[]RootRequest) []RootRequest {
 	size := 0
 	for _, group := range groups {
 		size += len(group)
 	}
-	result := make([]PlacementRequest, 0, size)
+	result := make([]RootRequest, 0, size)
 	for _, group := range groups {
 		result = append(result, group...)
 	}

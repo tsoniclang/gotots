@@ -283,16 +283,16 @@ The small result algebra contains target nodes only:
 ExpressionEmission
   before: ordered typed TS-Go protocol statements constrained to this point
   value:  one typed TS-Go protocol expression
-  requests: imports/declarations/helpers or declaration requirements with
-            explicit placement policy
+  requests: typed root requests for imports/declarations/helpers, declaration
+            requirements, or facet-specific artifact dependencies
 
 StatementEmission
   statements: ordered typed TS-Go protocol statements
-  requests: placement or declaration-requirement requests
+  requests: typed root requests
 
 DeclarationEmission
   declarations: ordered typed TS-Go protocol declarations
-  requests: placement or declaration-requirement requests
+  requests: typed root requests
 ```
 
 Narrow contextual entries whose target category is not an expression,
@@ -316,6 +316,16 @@ to that semantic owner, which reconstructs its complete typed TS-Go declaration
 assembly from the source declaration and accumulated requirement set. This
 replacement occurs only in compilation-local target state before file sealing;
 no handler patches a previously printed artifact.
+
+A target reference also carries no provider node. It records a closed artifact
+dependency from the currently assembled declaration to the exact provider
+`types.Object` and observable facet consumed by that reference. The root
+replaces the consumer's complete dependency set when its artifact transaction
+commits. If a provider reconstruction changes that facet's canonical TS-Go AST
+projection, the root requeues the consumer; exact unchanged projections do
+nothing. Dependencies emitted outside a reconstructible artifact are rejected
+until that enclosing target owner participates in the same lifecycle rather
+than being silently dropped.
 
 Result composition is owner-directed:
 

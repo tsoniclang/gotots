@@ -135,7 +135,7 @@ func arrange(
 	tsgo.Expression,
 	[]tsgo.Expression,
 	[]tsgo.Statement,
-	[]api.PlacementRequest,
+	[]api.RootRequest,
 	error,
 ) {
 	capture := len(receiver.Before()) != 0
@@ -186,7 +186,7 @@ func arrange(
 func captureOperand(
 	context api.Context,
 	emission api.ExpressionEmission,
-) (tsgo.Expression, []tsgo.Statement, []api.PlacementRequest, error) {
+) (tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
 	name, err := context.Names().Temporary(api.TemporarySliceOperand)
 	if err != nil {
 		return nil, nil, nil, err

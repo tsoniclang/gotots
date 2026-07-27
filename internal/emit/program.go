@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -42,6 +43,7 @@ type programSession struct {
 	registry               *declarationRegistry
 	scheduler              *scheduler
 	requirements           *declarationRequirementScheduler
+	artifacts              *artifactstate.Graph
 	sites                  map[types.Object]declarationSite
 	emitters               map[*load.Package]*emitter
 	builders               map[string]*targetFileBuilder
@@ -54,6 +56,8 @@ type targetDeclaration struct {
 	object          types.Object
 	position        token.Pos
 	statements      []tsgo.Statement
+	placement       *placementOwner
+	temporaryStart  temporarySnapshot
 	reconstructions uint64
 }
 
@@ -127,6 +131,12 @@ func CompileWithOptions(
 		}
 		if requirements, ok := session.requirements.nextBatch(); ok {
 			if err := session.applyDeclarationRequirements(requirements); err != nil {
+				return ProgramEmission{}, err
+			}
+			continue
+		}
+		if object, ok := session.artifacts.NextDirty(); ok {
+			if err := session.reconstructArtifact(object); err != nil {
 				return ProgramEmission{}, err
 			}
 			continue
@@ -285,6 +295,7 @@ func newProgramSession(
 		registry:               registry,
 		scheduler:              newScheduler(),
 		requirements:           newDeclarationRequirementScheduler(),
+		artifacts:              artifactstate.NewGraph(compareObjects),
 		sites:                  sites,
 		emitters:               make(map[*load.Package]*emitter),
 		builders:               make(map[string]*targetFileBuilder),
@@ -396,48 +407,55 @@ func (s *programSession) emit(object types.Object) error {
 			Reason: "object was emitted more than once",
 		}
 	}
-	result, err := builder.emitter.declarationObject(
-		builder.context,
-		site.declaration,
+	revision, err := s.buildArtifactRevision(
+		builder,
+		site,
 		object,
 		nil,
+		false,
 	)
 	if err != nil {
 		return err
 	}
-	if err := s.applyRequests(builder, result.Requests()); err != nil {
+	if err := s.artifacts.Commit(
+		object,
+		revision.contract,
+		revision.dependencies,
+	); err != nil {
 		return err
 	}
 	builder.byObject[object] = struct{}{}
 	builder.indexByObject[object] = len(builder.declarations)
 	builder.declarations = append(builder.declarations, targetDeclaration{
-		object:     object,
-		position:   object.Pos(),
-		statements: result.Declarations(),
+		object:         object,
+		position:       object.Pos(),
+		statements:     revision.statements,
+		placement:      revision.placement,
+		temporaryStart: revision.temporaryStart,
 	})
 	return nil
 }
 
-func (s *programSession) applyRequests(
+func (s *programSession) applyNonArtifactRequests(
 	builder *targetFileBuilder,
-	requests []api.PlacementRequest,
+	requests []api.RootRequest,
 ) error {
-	return s.applyPlacementRequests(builder.placement, requests)
+	return s.applyRootRequests(builder.placement, requests)
 }
 
-func (s *programSession) applyPlacementRequests(
+func (s *programSession) applyRootRequests(
 	placement *placementOwner,
-	requests []api.PlacementRequest,
+	requests []api.RootRequest,
 ) error {
 	if s.sealed {
-		return &ScheduleError{Reason: "placement requested after target files were sealed"}
+		return &ScheduleError{Reason: "root request arrived after target files were sealed"}
 	}
-	imports := make([]api.PlacementRequest, 0, len(requests))
+	imports := make([]api.RootRequest, 0, len(requests))
 	for _, request := range requests {
 		switch request.Kind() {
-		case api.PlacementImport:
+		case api.RootRequestImport:
 			imports = append(imports, request)
-		case api.PlacementDeclarationRequirement:
+		case api.RootRequestDeclarationRequirement:
 			requirement, ok := request.DeclarationRequirement()
 			if !ok {
 				return &ScheduleError{Reason: "declaration requirement is invalid"}
@@ -445,8 +463,12 @@ func (s *programSession) applyPlacementRequests(
 			if err := s.scheduleDeclarationRequirement(requirement); err != nil {
 				return err
 			}
+		case api.RootRequestArtifactDependency:
+			return &ScheduleError{
+				Reason: "artifact dependency has no reconstructible target owner",
+			}
 		default:
-			return &ScheduleError{Reason: "placement request kind is invalid"}
+			return &ScheduleError{Reason: "root request kind is invalid"}
 		}
 	}
 	return placement.Apply(imports)

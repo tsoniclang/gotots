@@ -18,7 +18,7 @@ func Emit(
 		return api.TypeEmission{}, api.Unsupported(context, api.CategoryType, source)
 	}
 	elements := make([]tsgo.TypeNode, 0, sourceType.Len())
-	var requests []api.PlacementRequest
+	var requests []api.RootRequest
 	for index := range sourceType.Len() {
 		element, err := children.RepresentedType(
 			context,

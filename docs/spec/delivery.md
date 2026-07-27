@@ -134,6 +134,16 @@ results directly from Go AST/type evidence. Add the identity-keyed demand
 scheduler for executable, API, test, extension, initialization, function-value,
 and callback roots without constructing a parallel source graph.
 
+Before later semantic families add more use-dependent target obligations,
+install the generic pre-seal artifact lifecycle: semantic-owner reconstruction,
+mechanically projected observable TS-Go contract facets, typed consumer edges,
+exact unchanged suppression, deterministic transitive propagation, atomic
+replacement of requests/dependencies, convergence failure, and seal gating.
+The existing named-struct static-operation requirements are the first real
+producer; direct function/type/value references are the first consumers. This
+coordination remains target assembly and must not become a source or semantic
+IR.
+
 Close each construct family independently. The exit boundary includes:
 
 - non-generic, non-variadic function declarations, function literals, and

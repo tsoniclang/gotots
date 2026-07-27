@@ -11,7 +11,7 @@ func ArrangeOperands(
 ) (
 	[]tsgo.Expression,
 	[]tsgo.Statement,
-	[]api.PlacementRequest,
+	[]api.RootRequest,
 	error,
 ) {
 	capture := false
@@ -23,7 +23,7 @@ func ArrangeOperands(
 	}
 	values := make([]tsgo.Expression, 0, len(operands))
 	var before []tsgo.Statement
-	var requests []api.PlacementRequest
+	var requests []api.RootRequest
 	for _, operand := range operands {
 		requests = append(requests, operand.Requests()...)
 		if !capture {

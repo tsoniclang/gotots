@@ -80,7 +80,7 @@ func sliceElementTarget(
 	context api.Context,
 	source ast.Node,
 	sourceType types.Type,
-) (tsgo.TypeNode, []api.PlacementRequest, error) {
+) (tsgo.TypeNode, []api.RootRequest, error) {
 	_, elementType, ok := scalarSlice(context, sourceType)
 	if !ok {
 		return nil, nil,

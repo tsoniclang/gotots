@@ -134,7 +134,10 @@ An emission session may retain:
 - a stack of source context and target lexical builders;
 - deterministic mappings from typed Go objects to target names/declarations;
 - already-created typed TS-Go protocol AST values;
-- typed import/helper/declaration placement requests;
+- typed root requests for placement, declaration requirements, and artifact
+  dependencies;
+- canonical encoded TS-Go observable contract facets plus their deterministic
+  reverse-dependency and dirty sets;
 - source-map/provenance links; and
 - typed diagnostics.
 
@@ -183,9 +186,13 @@ Representation consistency has one owner inside `internal/emit`. On the first
 request for a Go type, object, or method, that owner queries the complete
 selected Go AST/type graph, chooses the exact target form, and creates or
 reserves its TS-Go declaration. Every later use retrieves that same target
-state by authoritative Go identity. The decision is final before dependent
-target nodes are emitted; it is never serialized into a plan or consumed by a
-later lowering stage.
+state by authoritative Go identity. Source-semantic and base representation
+decisions are final when selected; they are never serialized into a plan or
+consumed by a later lowering stage. A genuinely use-dependent target
+obligation may nevertheless reconstruct an open target artifact. If that
+reconstruction changes a consumer-visible TS-Go contract facet, the root
+reconstructs only consumers that recorded a dependency on that exact facet
+before sealing.
 
 Compilation policy is selected once at the compilation entry point and is
 immutable for the complete dependency closure. Each axis is a closed typed
@@ -256,17 +263,20 @@ child entry point when ordinary expression dispatch would be semantically
 wrong, such as a store target, condition, call callee, type expression, or
 comma-ok result.
 
-The root emitter owns mutable target builders, declaration assemblies, and the
-placement service. Handlers cannot mutate an arbitrary target ancestor. They
-return typed TS-Go protocol AST values and, when additional target statements,
-declarations, imports, or changes to an owned declaration are required, typed
-requests with:
+The root emitter owns mutable target builders, declaration assemblies, the
+artifact dependency graph, and the placement service. Handlers cannot mutate
+an arbitrary target ancestor. They return typed TS-Go protocol AST values and,
+when additional target statements, declarations, imports, changes to an owned
+declaration, or dependencies on another artifact are required, typed requests
+with:
 
 1. exact target nodes or an exact declaration identity plus closed requirement;
 2. legal scopes;
 3. the preferred scope;
 4. the execution/evaluation constraint; and
-5. a typed deduplication owner where repetition is legal.
+5. a typed deduplication owner where repetition is legal; and
+6. for a dependency, the authoritative provider identity and one closed
+   observable facet.
 
 Name reservation and placement are separate operations. The authoritative
 name owner indexes stable target names from the selected `go/types` scope tree
@@ -304,6 +314,85 @@ for a later use. Late requirements are reserved for obligations that genuinely
 arise from reached uses, such as a requested value operation, interface
 adapter, generic specialization, callback adapter, or runtime-type carrier.
 
+## Observable Artifact Propagation
+
+Every source definition that can be reconstructed owns one target artifact
+keyed by its exact `types.Object`. An artifact revision is a transaction:
+
+```text
+authoritative Go object + Go AST/type evidence + accumulated requirements
+    -> one semantic-owner handler
+    -> complete replacement TS-Go AST roots
+    -> complete replacement root-request set
+    -> complete replacement artifact-dependency set
+    -> mechanically projected observable contract
+```
+
+No consumer receives a mutable provider node. A reference records a dependency
+on the smallest closed provider facet it consumes:
+
+- `CallableSignature` for a call or function value;
+- `ConstructorSurface` for construction;
+- `InstanceTypeSurface` for an instance type/member contract;
+- `StaticSurface` for a statically selected class operation; and
+- `ValueSurface` for an exported target value.
+
+An artifact that emits only an executable body may provide an explicit empty
+contract while still consuming dependencies. It is reconstructed when a
+provider facet changes, but cannot dirty downstream artifacts because it
+provides no facet. An absent contract is invalid; an explicit empty contract is
+therefore not confused with failed projection.
+
+The facet enum is closed. A new facet requires a concrete source example,
+canonical projection, consumer rule, equality proof, and mutation test; string
+facets and catch-all dependencies are forbidden.
+
+The canonical contract is derived mechanically from the artifact's typed
+TS-Go AST, never restated by a handler. Function and method projections retain
+modifiers, names, type parameters, parameters, and explicit return types while
+removing bodies. Class projections partition constructors, instance members,
+and static members; member bodies and explicitly typed property initializers
+are removed. Interface and type-alias structure is already contract-only.
+Variable projections retain binding, modifiers, declaration flags, and
+explicit type while removing initializers. A declaration whose visible target
+type depends on TypeScript inference fails at this boundary: silently dropping
+its body or initializer would make implementation bytes masquerade as a stable
+contract. Exact encoded TS-Go structure is the equality authority. A hash may
+only accelerate comparison; it cannot establish equality.
+
+The root replaces an artifact's reverse edges when a reconstruction commits,
+compares each old and new facet structurally, and queues only consumers
+subscribed to changed facets. Duplicate edges and dirty entries collapse by
+typed identity. Dirty artifacts are processed in deterministic Go-object
+order. An initial publication establishes a baseline and does not notify
+consumers. A body-only change therefore commits without rebuilding callers:
+
+```go
+func Value() int32 { return source }
+func Use() int32  { return Value() }
+```
+
+Changing only `Value`'s emitted body leaves its `CallableSignature` projection
+unchanged, so `Use` remains untouched. If a later target obligation changes
+`Value` from `Value(): number` to `Value(flag: boolean): number`, the callable
+facet changes, `Use` is reconstructed, and any resulting change to `Use`'s own
+callable facet propagates to its callers.
+
+Cycles are permitted only when structural contracts converge. The root records
+each distinct committed canonical contract for the compilation, without a
+second copy of the current revision. Repeating a prior non-current contract is
+a typed non-convergence error, not an arbitrary iteration limit or silently
+accepted result. Storage is bounded by current artifacts, consumed facet edges,
+and the exact bytes of distinct changed contracts; unchanged reconstruction
+adds no history. Sealing requires empty declaration, requirement,
+initialization, placement, and dirty-artifact queues.
+
+This graph is target-assembly coordination, not a semantic IR or call graph. It
+contains only authoritative Go definition identities, closed target-contract
+facets, and reverse invalidation edges discovered while constructing actual
+TS-Go references. It does not copy source statements, infer whole-program
+meaning, perform name lookup, or decide reachability.
+
 One placement service applies the policy:
 
 - imports always enter file import scope; dynamic imports are forbidden;
@@ -335,12 +424,14 @@ This permits hoisting without maintaining a separate target IR.
 
 Creating a typed TS-Go node is not finalizing or printing its containing file.
 The root emitter seals each target file only after declaration, requirement,
-initialization, and placement queues are empty. A sealed file accepts no
-further request. Before sealing, an already-created class or other declaration
-may be replaced only by its one semantic owner using freshly constructed typed
-TS-Go protocol nodes and the complete accumulated requirement set. Other
-handlers can request a closed obligation but cannot receive or mutate the
-target declaration.
+initialization, placement, and dirty-artifact queues are empty. A sealed file
+accepts no further request. Before sealing, an already-created class or other
+declaration may be replaced only by its one semantic owner using freshly
+constructed typed TS-Go protocol nodes and the complete accumulated requirement
+set. The replacement transaction also replaces that artifact's root requests
+and dependencies and publishes its mechanically derived observable contract.
+Other handlers can request a closed obligation or record a typed dependency but
+cannot receive or mutate the target declaration.
 
 This is controlled pre-seal target assembly, not mutable class reopening.
 There is no target-text patch, prototype assignment, arbitrary AST callback,
@@ -624,13 +715,18 @@ internal/load/                      project and selected-toolchain loading
 
 internal/emit/                      session, scheduling, closed dispatch only
   dispatch.go                       emitter plus closed typed dispatch
-  declaration_assembly.go           roots, demand, requirements, and owner-keyed pre-seal reconstruction
+  declaration_assembly.go           roots, demands, and artifact reconstruction
+  artifact/                         target-contract coordination authority
+    contract.go                     mechanical TS-Go observable projections
+    graph.go                        facet edges, revisions, and fixed point
   target_files.go                   source/support/program file sealing
   package_state.go                  package storage and initialization owner
   api/                              narrow handler contracts
     context.go
     role.go
     result.go
+    root_request.go
+    artifact_dependency.go
     children.go
   <domain>/                         declaration, statement, expression, type
     <semantic-owner>/               assignment, call, index, function, ...

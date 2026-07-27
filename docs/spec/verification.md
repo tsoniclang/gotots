@@ -207,6 +207,47 @@ Scaling reports initial declarations, applied requirements, owner
 reconstructions, final definitions, AST nodes, and bytes separately; moving
 growth into repeated reconstruction does not hide it.
 
+## Observable Contract Propagation Proof
+
+The generic pre-seal artifact graph is accepted only with all of these
+independent proofs:
+
+1. canonical facet projections are built from typed TS-Go AST and encode
+   identically for semantically identical signatures despite different bodies
+   or explicitly typed initializers, while inference-dependent visible
+   declarations fail closed;
+2. changing one facet dirties exactly the consumers subscribed to that facet;
+3. publishing an identical contract performs zero consumer reconstruction;
+4. one-hop and transitive changes reach every affected consumer once in
+   deterministic object order;
+5. duplicate references and duplicate requests do not duplicate edges,
+   requirements, imports, declarations, or reconstructions;
+6. reconstruction atomically replaces AST roots, root requests, dependencies,
+   and the contract, so dropped imports and dependencies do not survive;
+7. a convergent dependency cycle seals, while a contract oscillation that
+   repeats a previous non-current structural contract fails with the exact
+   artifact and changed facets;
+8. real named-struct static-operation discovery reconstructs the provider and
+   any signature-relevant consumer, while a consumer whose own callable
+   signature remains unchanged does not notify its callers; and
+9. a body-only consumer with an explicit empty contract is reconstructed but
+   cannot propagate further, while an absent contract fails closed; and
+10. sealing rejects pending dirty artifacts or dependencies from an enclosing
+   target owner that is not reconstructible.
+
+Mutations remove a dependency edge, widen it to all facets, compare only a
+hash, notify on equal contracts, ignore a changed contract, retain old
+dependencies, process dirty work nondeterministically, mutate a provider node
+through a consumer, or accept an oscillating cycle. Each must fail at the
+contract, graph, lifecycle, determinism, ownership, or broad-search gate.
+Measure declarations, graph vertices/edges, contract bytes, revisions,
+reconstructions, final AST bytes, generation time, typecheck time/RSS, and
+runtime. Current graph state must remain O(artifacts + consumed facet edges +
+current contract bytes); convergence evidence additionally retains one exact
+copy of each distinct changed contract and no entry for an unchanged rebuild.
+Use-site count may add deduplicated edges but must not duplicate provider
+contracts.
+
 ## Semantic Proof
 
 Every implemented semantic family includes:
