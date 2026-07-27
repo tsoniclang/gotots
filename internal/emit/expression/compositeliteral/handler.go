@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -19,6 +20,12 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.CompositeLit,
 ) (api.ExpressionEmission, error) {
+	if array, ok := arrayvalue.Resolve(
+		context,
+		context.TypesInfo().TypeOf(source),
+	); ok {
+		return array.EmitLiteral(context, children, source)
+	}
 	named, structType, ok := sourceType(context, source)
 	if !ok {
 		return api.ExpressionEmission{},

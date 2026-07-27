@@ -8,6 +8,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
+	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -17,6 +18,9 @@ func (Owner) RequiresCustomEquality(
 	context api.Context,
 	sourceType types.Type,
 ) bool {
+	if _, ok := arrayvalue.Resolve(context, sourceType); ok {
+		return true
+	}
 	if scalarPointer(context, sourceType) {
 		return true
 	}
@@ -36,6 +40,9 @@ func (Owner) Zero(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.ExpressionEmission, error) {
+	if array, ok := arrayvalue.Resolve(context, sourceType); ok {
+		return array.Zero(context, source)
+	}
 	if alias, ok := primitive(context, sourceType); ok {
 		var literal tsgo.Expression
 		switch alias {
@@ -84,6 +91,9 @@ func (Owner) Copy(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
+	if array, ok := arrayvalue.Resolve(context, sourceType); ok {
+		return array.Copy(context, ownsFreshValue(context, source), value)
+	}
 	if _, ok := primitive(context, sourceType); ok ||
 		callableValue(sourceType) ||
 		scalarPointer(context, sourceType) {
@@ -145,25 +155,14 @@ func (Owner) Assign(
 	target tsgo.Expression,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	if _, ok := primitive(context, sourceType); ok ||
-		callableValue(sourceType) ||
-		scalarPointer(context, sourceType) {
-		return api.NewExpressionEmission(
-			value.Before(),
-			context.Factory().BinaryExpression(
-				nil,
-				target,
-				nil,
-				context.Factory().BinaryOperatorToken(
-					tsgo.BinaryOperatorEqualsToken,
-				),
-				value.Value(),
-			),
-			value.Requests(),
-		)
-	}
-	_, _, ok := namedStruct(sourceType)
-	if !ok {
+	_, arrayOK := arrayvalue.Resolve(context, sourceType)
+	_, primitiveOK := primitive(context, sourceType)
+	_, _, structOK := namedStruct(sourceType)
+	if !arrayOK &&
+		!primitiveOK &&
+		!callableValue(sourceType) &&
+		!scalarPointer(context, sourceType) &&
+		!structOK {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
@@ -189,6 +188,9 @@ func (Owner) Equal(
 	left tsgo.Expression,
 	right tsgo.Expression,
 ) (api.ExpressionEmission, error) {
+	if array, ok := arrayvalue.Resolve(context, sourceType); ok {
+		return array.Equal(context, left, right), nil
+	}
 	if _, ok := primitive(context, sourceType); ok {
 		return api.DirectExpression(context.Factory().BinaryExpression(
 			nil,

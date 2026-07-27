@@ -7,6 +7,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	builtinexpression "github.com/tsoniclang/gotots/internal/emit/expression/builtin"
 	newvalue "github.com/tsoniclang/gotots/internal/emit/expression/call/builtin/newvalue"
 	integerconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/integer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -55,6 +56,13 @@ func emit(
 		source,
 		discarded,
 	); ok || err != nil {
+		return target, err
+	}
+	if target, handled, err := builtinexpression.Emit(
+		context,
+		children,
+		source,
+	); handled || err != nil {
 		return target, err
 	}
 	if selector, method, selection, ok := selectedMethod(

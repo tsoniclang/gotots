@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -15,6 +16,9 @@ func Emit(
 	source *ast.IndexExpr,
 ) (api.ExpressionEmission, error) {
 	operandType := context.TypesInfo().TypeOf(source.X)
+	if array, ok := arrayvalue.Resolve(context, operandType); ok {
+		return array.EmitIndex(context, children, source)
+	}
 	indexType := context.TypesInfo().TypeOf(source.Index)
 	resultType := context.TypesInfo().TypeOf(source)
 	if !basictype.SupportsString(operandType) ||

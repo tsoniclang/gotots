@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	runtimearray "github.com/tsoniclang/gotots/internal/emit/runtime/array"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	stringruntime "github.com/tsoniclang/gotots/internal/emit/runtime/string"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -84,6 +85,22 @@ func Build(
 		definition, err := NewDefinition(
 			api.RuntimePointer,
 			pointerruntime.Build(factory, contract.ExportedName()),
+		)
+		if err != nil {
+			return nil, err
+		}
+		return []Definition{definition}, nil
+	}
+	if module == api.RuntimeModuleArray &&
+		len(symbols) == 1 &&
+		symbols[0] == api.RuntimeArray {
+		statement, err := runtimearray.Build(factory)
+		if err != nil {
+			return nil, err
+		}
+		definition, err := NewDefinition(
+			api.RuntimeArray,
+			statement,
 		)
 		if err != nil {
 			return nil, err

@@ -39,6 +39,7 @@ import (
 	namedstructtype "github.com/tsoniclang/gotots/internal/emit/type/namedstruct"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	tupletype "github.com/tsoniclang/gotots/internal/emit/type/tuple"
+	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	"github.com/tsoniclang/gotots/internal/emit/value/representation"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -369,6 +370,9 @@ func (e *emitter) Type(
 	source ast.Expr,
 ) (api.TypeEmission, error) {
 	if sourceType := context.TypesInfo().TypeOf(source); sourceType != nil {
+		if array, ok := arrayvalue.Resolve(context, sourceType); ok {
+			return array.EmitType(context, e, source)
+		}
 		if _, _, ok := pointertype.Scalar(context.TypesSizes(), sourceType); ok {
 			pointerSyntax, valid := source.(*ast.StarExpr)
 			if !valid {
@@ -402,6 +406,9 @@ func (e *emitter) RepresentedType(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
+	if array, ok := arrayvalue.Resolve(context, sourceType); ok {
+		return array.EmitType(context, e, source)
+	}
 	if tuple, ok := types.Unalias(sourceType).(*types.Tuple); ok {
 		return tupletype.Emit(context, e, source, tuple)
 	}

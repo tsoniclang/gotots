@@ -20,9 +20,11 @@ func emitStringLength(
 		return api.ExpressionEmission{}, false, nil
 	}
 	if len(source.Args) != 1 ||
-		discarded ||
+		!basictype.SupportsString(context.TypesInfo().TypeOf(source.Args[0])) {
+		return api.ExpressionEmission{}, false, nil
+	}
+	if discarded ||
 		context.ExpectedResults() != nil ||
-		!basictype.SupportsString(context.TypesInfo().TypeOf(source.Args[0])) ||
 		!basictype.SupportsInteger(
 			context.TypesSizes(),
 			context.TypesInfo().TypeOf(source),
