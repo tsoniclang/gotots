@@ -7,6 +7,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	integerbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/integer"
+	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -143,6 +144,18 @@ func operationFor(
 		return operator, operandType, true
 	}
 	switch {
+	case source.Op == token.ADD &&
+		basictype.SupportsString(context.TypesInfo().TypeOf(source)) &&
+		types.AssignableTo(leftType, context.TypesInfo().TypeOf(source)) &&
+		types.AssignableTo(rightType, context.TypesInfo().TypeOf(source)):
+		return context.Factory().BinaryOperatorToken(
+			tsgo.BinaryOperatorPlusToken,
+		), context.TypesInfo().TypeOf(source), true
+	case isStringComparison(source.Op) &&
+		basictype.SupportsString(leftType) &&
+		basictype.SupportsString(rightType):
+		operator, ok := stringOperator(context, source.Op)
+		return operator, types.Typ[types.String], ok
 	case isLogicalOperator(source.Op) &&
 		isSupportedBoolean(context.TypesInfo().TypeOf(source)) &&
 		types.AssignableTo(leftType, types.Typ[types.Bool]) &&
@@ -164,6 +177,39 @@ func operationFor(
 	default:
 		return nil, nil, false
 	}
+}
+
+func isStringComparison(operator token.Token) bool {
+	switch operator {
+	case token.EQL, token.NEQ, token.LSS, token.LEQ, token.GTR, token.GEQ:
+		return true
+	default:
+		return false
+	}
+}
+
+func stringOperator(
+	context api.Context,
+	operator token.Token,
+) (tsgo.BinaryOperatorToken, bool) {
+	var target tsgo.BinaryOperator
+	switch operator {
+	case token.EQL:
+		target = tsgo.BinaryOperatorEqualsEqualsEqualsToken
+	case token.NEQ:
+		target = tsgo.BinaryOperatorExclamationEqualsEqualsToken
+	case token.LSS:
+		target = tsgo.BinaryOperatorLessThanToken
+	case token.LEQ:
+		target = tsgo.BinaryOperatorLessThanEqualsToken
+	case token.GTR:
+		target = tsgo.BinaryOperatorGreaterThanToken
+	case token.GEQ:
+		target = tsgo.BinaryOperatorGreaterThanEqualsToken
+	default:
+		return nil, false
+	}
+	return context.Factory().BinaryOperatorToken(target), true
 }
 
 func isLogicalOperator(operator token.Token) bool {

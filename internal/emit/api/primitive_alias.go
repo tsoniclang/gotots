@@ -19,6 +19,7 @@ const (
 	PrimitiveUint16
 	PrimitiveUint32
 	PrimitiveUint64
+	PrimitiveString
 )
 
 func PrimitiveAliasRepresentation(
@@ -32,6 +33,8 @@ func PrimitiveAliasRepresentation(
 	switch alias {
 	case PrimitiveBool:
 		return name, tsgo.KeywordTypeSyntaxKindBooleanKeyword, nil
+	case PrimitiveString:
+		return name, tsgo.KeywordTypeSyntaxKindStringKeyword, nil
 	case PrimitiveInt8,
 		PrimitiveInt16,
 		PrimitiveInt32,
@@ -67,6 +70,8 @@ func PrimitiveAliasName(alias PrimitiveAlias) (string, error) {
 		return "uint32", nil
 	case PrimitiveUint64:
 		return "uint64", nil
+	case PrimitiveString:
+		return "gostring", nil
 	default:
 		return "", &PrimitiveAliasError{Alias: alias}
 	}
