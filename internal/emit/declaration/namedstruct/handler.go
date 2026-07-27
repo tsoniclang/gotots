@@ -22,6 +22,7 @@ func emitClass(
 	children api.ChildEmitter,
 	declaration *ast.GenDecl,
 	typeName *types.TypeName,
+	operations []api.NamedStructOperation,
 ) (api.DeclarationEmission, error) {
 	sourceStruct, structType, ok := sourceType(
 		context,
@@ -66,6 +67,27 @@ func emitClass(
 	}
 	members = append(members, constructor)
 
+	classType := context.Factory().TypeReferenceNode(
+		context.Factory().Identifier(className),
+		nil,
+	)
+	for _, operation := range operations {
+		member, operationRequests, err := emitValueOperation(
+			context,
+			children,
+			sourceStruct,
+			className,
+			classType,
+			fields,
+			operation,
+		)
+		if err != nil {
+			return api.DeclarationEmission{}, err
+		}
+		members = append(members, member)
+		requests = append(requests, operationRequests...)
+	}
+
 	moduleExport, err := context.Names().ModuleExport(typeName)
 	if err != nil {
 		return api.DeclarationEmission{}, err
@@ -84,82 +106,6 @@ func emitClass(
 		),
 		requests...,
 	), nil
-}
-
-func emitCompanion(
-	context api.Context,
-	children api.ChildEmitter,
-	declaration ast.Decl,
-	typeName *types.TypeName,
-	operation api.CompanionOperation,
-) (api.DeclarationEmission, error) {
-	general, ok := declaration.(*ast.GenDecl)
-	if !ok {
-		return api.DeclarationEmission{},
-			api.Unsupported(context, api.CategoryDeclaration, declaration)
-	}
-	sourceStruct, structType, ok := sourceType(context, general, typeName)
-	if !ok {
-		return api.DeclarationEmission{},
-			api.Unsupported(context, api.CategoryDeclaration, declaration)
-	}
-	fields, err := fields(context, sourceStruct, structType)
-	if err != nil {
-		return api.DeclarationEmission{}, err
-	}
-	className, err := context.Names().Declare(typeName)
-	if err != nil {
-		return api.DeclarationEmission{}, err
-	}
-	companionName, err := api.CompanionExportName(className, operation)
-	if err != nil {
-		return api.DeclarationEmission{}, err
-	}
-	classType := context.Factory().TypeReferenceNode(
-		context.Factory().Identifier(className),
-		nil,
-	)
-
-	var target tsgo.FunctionDeclaration
-	var requests []api.PlacementRequest
-	switch operation {
-	case api.CompanionZero:
-		target, requests, err = zeroFunction(
-			context,
-			sourceStruct,
-			companionName,
-			className,
-			classType,
-			fields,
-		)
-	case api.CompanionCopy:
-		target, requests, err = copyFunction(
-			context,
-			sourceStruct,
-			companionName,
-			className,
-			classType,
-			fields,
-		)
-	case api.CompanionEqual:
-		target, requests, err = equalFunction(
-			context,
-			children,
-			sourceStruct,
-			companionName,
-			classType,
-			fields,
-		)
-	default:
-		return api.DeclarationEmission{}, &api.InvariantError{
-			Role:   context.Role(),
-			Reason: "companion operation is invalid",
-		}
-	}
-	if err != nil {
-		return api.DeclarationEmission{}, err
-	}
-	return api.DirectDeclaration(target, requests...), nil
 }
 
 func sourceType(
@@ -307,197 +253,4 @@ func constructor(
 		nil,
 		context.Factory().Block(nil, true),
 	), requests, nil
-}
-
-func zeroFunction(
-	context api.Context,
-	source ast.Node,
-	companionName string,
-	className string,
-	classType tsgo.TypeNode,
-	fields []field,
-) (tsgo.FunctionDeclaration, []api.PlacementRequest, error) {
-	arguments := make([]tsgo.Expression, 0, len(fields))
-	var requests []api.PlacementRequest
-	for _, field := range fields {
-		value, err := context.Values().Zero(
-			context.WithRole(api.RoleStructZeroField),
-			field.source,
-			field.object.Type(),
-		)
-		if err != nil {
-			return nil, nil, err
-		}
-		if len(value.Before()) != 0 {
-			return nil, nil, api.Unsupported(
-				context.WithRole(api.RoleStructZeroField),
-				api.CategoryDeclaration,
-				source,
-			)
-		}
-		arguments = append(arguments, value.Value())
-		requests = append(requests, value.Requests()...)
-	}
-	return companionFunction(
-		context,
-		companionName,
-		nil,
-		classType,
-		[]tsgo.Statement{context.Factory().ReturnStatement(
-			context.Factory().NewExpression(
-				context.Factory().Identifier(className),
-				nil,
-				arguments,
-			),
-		)},
-	), requests, nil
-}
-
-func copyFunction(
-	context api.Context,
-	source ast.Node,
-	companionName string,
-	className string,
-	classType tsgo.TypeNode,
-	fields []field,
-) (tsgo.FunctionDeclaration, []api.PlacementRequest, error) {
-	arguments := make([]tsgo.Expression, 0, len(fields))
-	var requests []api.PlacementRequest
-	for _, field := range fields {
-		value := api.DirectExpression(property(context, "$source", field.name))
-		copied, err := context.Values().Copy(
-			context.WithRole(api.RoleStructCopyField),
-			field.source,
-			field.object.Type(),
-			value,
-		)
-		if err != nil {
-			return nil, nil, err
-		}
-		if len(copied.Before()) != 0 {
-			return nil, nil, api.Unsupported(
-				context.WithRole(api.RoleStructCopyField),
-				api.CategoryDeclaration,
-				source,
-			)
-		}
-		arguments = append(arguments, copied.Value())
-		requests = append(requests, copied.Requests()...)
-	}
-	return companionFunction(
-		context,
-		companionName,
-		[]tsgo.ParameterDeclaration{parameter(context, "$source", classType)},
-		classType,
-		[]tsgo.Statement{context.Factory().ReturnStatement(
-			context.Factory().NewExpression(
-				context.Factory().Identifier(className),
-				nil,
-				arguments,
-			),
-		)},
-	), requests, nil
-}
-
-func equalFunction(
-	context api.Context,
-	children api.ChildEmitter,
-	source ast.Node,
-	companionName string,
-	classType tsgo.TypeNode,
-	fields []field,
-) (tsgo.FunctionDeclaration, []api.PlacementRequest, error) {
-	var expression tsgo.Expression = context.Factory().TrueLiteral()
-	var requests []api.PlacementRequest
-	for index, field := range fields {
-		equal, err := context.Values().Equal(
-			context.WithRole(api.RoleStructEqualField),
-			field.source,
-			field.object.Type(),
-			property(context, "$left", field.name),
-			property(context, "$right", field.name),
-		)
-		if err != nil {
-			return nil, nil, err
-		}
-		if index == 0 {
-			expression = equal.Value()
-		} else {
-			expression = context.Factory().BinaryExpression(
-				nil,
-				expression,
-				nil,
-				context.Factory().BinaryOperatorToken(
-					tsgo.BinaryOperatorAmpersandAmpersandToken,
-				),
-				equal.Value(),
-			)
-		}
-		requests = append(requests, equal.Requests()...)
-	}
-	resultType, err := children.RepresentedType(
-		context.WithRole(api.RoleResultType),
-		source,
-		types.Typ[types.Bool],
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-	requests = append(requests, resultType.Requests()...)
-	return companionFunction(
-		context,
-		companionName,
-		[]tsgo.ParameterDeclaration{
-			parameter(context, "$left", classType),
-			parameter(context, "$right", classType),
-		},
-		resultType.Value(),
-		[]tsgo.Statement{context.Factory().ReturnStatement(expression)},
-	), requests, nil
-}
-
-func companionFunction(
-	context api.Context,
-	name string,
-	parameters []tsgo.ParameterDeclaration,
-	result tsgo.TypeNode,
-	statements []tsgo.Statement,
-) tsgo.FunctionDeclaration {
-	return context.Factory().FunctionDeclaration(
-		[]tsgo.ModifierLike{context.Factory().ExportKeyword()},
-		nil,
-		context.Factory().Identifier(name),
-		nil,
-		parameters,
-		result,
-		context.Factory().Block(statements, true),
-	)
-}
-
-func parameter(
-	context api.Context,
-	name string,
-	targetType tsgo.TypeNode,
-) tsgo.ParameterDeclaration {
-	return context.Factory().ParameterDeclaration(
-		nil,
-		nil,
-		context.Factory().Identifier(name),
-		nil,
-		targetType,
-		nil,
-	)
-}
-
-func property(
-	context api.Context,
-	receiver string,
-	name string,
-) tsgo.PropertyAccessExpression {
-	return context.Factory().PropertyAccessExpression(
-		context.Factory().Identifier(receiver),
-		nil,
-		context.Factory().Identifier(name),
-		tsgo.NodeFlagsNone,
-	)
 }

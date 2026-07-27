@@ -4,9 +4,9 @@ export class Cell {
     declare private readonly $goType: void;
     constructor(public Value: int32) {
     }
-}
-export function Cell$zero(): Cell {
-    return new Cell(0);
+    static $zero(): Cell {
+        return new Cell(0);
+    }
 }
 export function mark(value: int32): int32 {
     $state.Trace = $state.Trace * 10 + value;

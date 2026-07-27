@@ -189,12 +189,14 @@ lifecycle:
    adjacent to or incorporated into its declared owner as specified; and
 8. sealing rejects any later request.
 
-The first non-vacuous proof uses named-struct zero/copy/equality companions:
+The first non-vacuous proof uses named-struct static zero/copy/equality
+operations:
 the class is constructed before a reached assignment, argument, return, zero,
 or equality site discovers the operation; the subsequent requirement rebuilds
 the owner's assembly and the final artifact contains exactly the requested
-companions in closed operation order. A nested struct operation must request
-its nested owner through the same queue.
+static members in closed operation order. Calls use the exact statically
+selected class, never an instance, and no top-level operation helper remains.
+A nested struct operation must request its nested owner through the same queue.
 
 Mutations route a requirement by spelling, apply it in the caller's file,
 append a duplicate final definition, let a non-owner mutate the class, process
@@ -276,9 +278,10 @@ The first named-struct family additionally proves:
 Mutations replace a requested copy with direct assignment, replace requested
 field equality with `===`, remove the private brand, add source-order captures
 to `direct`, remove them from `preserve-go`, attach a receiver method to the
-class, emit an unrequested companion, duplicate a companion, route it to the
-caller's file, or admit an unsupported field. Each fails its owning structural,
-strict-type, differential, placement, or unsupported-boundary gate. The
+class, emit an unrequested static operation, duplicate an operation, make it an
+instance member, emit a top-level helper, route it to the caller's file, or
+admit an unsupported field. Each fails its owning structural, strict-type,
+differential, placement, or unsupported-boundary gate. The
 `preserve-go` fixture uses call-valued field expressions; the `direct` artifact
 test treats constants and calls identically, proving that no purity heuristic
 silently changes profiles. A scaling fixture doubles fields and proves

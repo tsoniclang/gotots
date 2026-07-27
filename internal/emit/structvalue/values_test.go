@@ -102,9 +102,9 @@ func TestNamedStructValuesAreNominalUnderStrictTypeScript(t *testing.T) {
 	targetPaths, module := materializeStructProgram(t, workingDirectory, emission)
 	writeProgramFile(t, filepath.Join(workingDirectory, "package.json"), "{\"type\":\"module\"}\n")
 	invalidPath := filepath.Join(workingDirectory, "nominal-mutation.ts")
-	writeProgramFile(t, invalidPath, `import { Box$zero, Mirror } from "`+module+`";
+	writeProgramFile(t, invalidPath, `import { Box, Mirror } from "`+module+`";
 
-const invalid: Mirror = Box$zero();
+const invalid: Mirror = Box.$zero();
 console.log(invalid);
 `)
 	targetPaths = append(targetPaths, invalidPath)

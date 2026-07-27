@@ -249,8 +249,8 @@ func compareDeclarationRequirements(
 	if left.Kind() > right.Kind() {
 		return 1
 	}
-	_, leftOperation, _ := left.NamedStructCompanion()
-	_, rightOperation, _ := right.NamedStructCompanion()
+	_, leftOperation, _ := left.NamedStructOperation()
+	_, rightOperation, _ := right.NamedStructOperation()
 	switch {
 	case leftOperation < rightOperation:
 		return -1

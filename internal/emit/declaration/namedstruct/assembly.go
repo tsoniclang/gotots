@@ -19,7 +19,7 @@ func EmitAssembly(
 	ordered := slices.Clone(requirements)
 	seen := make(map[api.DeclarationRequirement]struct{}, len(ordered))
 	for _, requirement := range ordered {
-		owner, _, ok := requirement.NamedStructCompanion()
+		owner, _, ok := requirement.NamedStructOperation()
 		if !ok || owner != typeName {
 			return api.DeclarationEmission{}, &api.InvariantError{
 				Role:   context.Role(),
@@ -35,30 +35,14 @@ func EmitAssembly(
 		seen[requirement] = struct{}{}
 	}
 	sort.Slice(ordered, func(left, right int) bool {
-		_, leftOperation, _ := ordered[left].NamedStructCompanion()
-		_, rightOperation, _ := ordered[right].NamedStructCompanion()
+		_, leftOperation, _ := ordered[left].NamedStructOperation()
+		_, rightOperation, _ := ordered[right].NamedStructOperation()
 		return leftOperation < rightOperation
 	})
-	base, err := emitClass(context, children, declaration, typeName)
-	if err != nil {
-		return api.DeclarationEmission{}, err
-	}
-	declarations := base.Declarations()
-	requests := base.Requests()
+	operations := make([]api.NamedStructOperation, 0, len(ordered))
 	for _, requirement := range ordered {
-		_, operation, _ := requirement.NamedStructCompanion()
-		companion, err := emitCompanion(
-			context,
-			children,
-			declaration,
-			typeName,
-			operation,
-		)
-		if err != nil {
-			return api.DeclarationEmission{}, err
-		}
-		declarations = append(declarations, companion.Declarations()...)
-		requests = append(requests, companion.Requests()...)
+		_, operation, _ := requirement.NamedStructOperation()
+		operations = append(operations, operation)
 	}
-	return api.NewDeclarationEmission(declarations, requests)
+	return emitClass(context, children, declaration, typeName, operations)
 }

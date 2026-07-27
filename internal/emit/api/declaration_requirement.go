@@ -6,39 +6,39 @@ type DeclarationRequirementKind uint8
 
 const (
 	DeclarationRequirementInvalid DeclarationRequirementKind = iota
-	DeclarationRequirementNamedStructCompanion
+	DeclarationRequirementNamedStructOperation
 )
 
 type DeclarationRequirement struct {
 	owner     types.Object
 	kind      DeclarationRequirementKind
-	companion CompanionOperation
+	operation NamedStructOperation
 }
 
-func NewNamedStructCompanionRequirement(
+func NewNamedStructOperationRequirement(
 	typeName *types.TypeName,
-	operation CompanionOperation,
+	operation NamedStructOperation,
 ) (DeclarationRequirement, error) {
 	switch {
 	case typeName == nil:
 		return DeclarationRequirement{}, &PlacementRequestError{
-			Reason: "companion type is nil",
+			Reason: "named-struct operation type is nil",
 		}
 	case !operation.Valid():
 		return DeclarationRequirement{}, &PlacementRequestError{
-			Reason: "companion operation is invalid",
+			Reason: "named-struct operation is invalid",
 		}
 	}
 	return DeclarationRequirement{
 		owner:     typeName,
-		kind:      DeclarationRequirementNamedStructCompanion,
-		companion: operation,
+		kind:      DeclarationRequirementNamedStructOperation,
+		operation: operation,
 	}, nil
 }
 
 func (r DeclarationRequirement) Valid() bool {
-	if r.kind != DeclarationRequirementNamedStructCompanion ||
-		!r.companion.Valid() {
+	if r.kind != DeclarationRequirementNamedStructOperation ||
+		!r.operation.Valid() {
 		return false
 	}
 	_, ok := r.owner.(*types.TypeName)
@@ -53,14 +53,14 @@ func (r DeclarationRequirement) Kind() DeclarationRequirementKind {
 	return r.kind
 }
 
-func (r DeclarationRequirement) NamedStructCompanion() (
+func (r DeclarationRequirement) NamedStructOperation() (
 	*types.TypeName,
-	CompanionOperation,
+	NamedStructOperation,
 	bool,
 ) {
 	if !r.Valid() {
-		return nil, CompanionInvalid, false
+		return nil, NamedStructOperationInvalid, false
 	}
 	typeName, ok := r.owner.(*types.TypeName)
-	return typeName, r.companion, ok
+	return typeName, r.operation, ok
 }

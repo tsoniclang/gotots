@@ -121,12 +121,12 @@ func assertStructOperationWidths(
 	class := targetClass(t, source, "Record")
 	members := class.Members()
 	constructor := members[1].(tsgo.ConstructorDeclaration)
-	zero := targetFunction(t, source, "Record$zero")
-	copyFunction := targetFunction(t, source, "Record$copy")
-	equal := targetFunction(t, source, "Record$equal")
+	zero := targetMethod(t, class, "$zero")
+	copyMethod := targetMethod(t, class, "$copy")
+	equal := targetMethod(t, class, "$equal")
 	if len(constructor.Parameters()) != fieldCount ||
 		newArgumentCount(zero) != fieldCount ||
-		newArgumentCount(copyFunction) != fieldCount ||
+		newArgumentCount(copyMethod) != fieldCount ||
 		equalityLeafCount(
 			equal.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement).Expression(),
 		) != fieldCount {
@@ -134,8 +134,8 @@ func assertStructOperationWidths(
 	}
 }
 
-func newArgumentCount(function tsgo.FunctionDeclaration) int {
-	result := function.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement).Expression().(tsgo.NewExpression)
+func newArgumentCount(method tsgo.MethodDeclaration) int {
+	result := method.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement).Expression().(tsgo.NewExpression)
 	return len(result.Arguments())
 }
 

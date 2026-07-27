@@ -101,7 +101,7 @@ type Names interface {
 	Reference(types.Object) (NameReference, error)
 	TypeReference(types.Object) (NameReference, error)
 	PackageVariable(*types.Var) (PackageVariableReference, error)
-	Companion(*types.TypeName, CompanionOperation) (NameReference, error)
+	NamedStructOperation(*types.TypeName, NamedStructOperation) (NameReference, error)
 	Member(*types.Var) (string, error)
 	Primitive(PrimitiveAlias) (NameReference, error)
 	Runtime(RuntimeSymbol, ImportPhase) (NameReference, error)

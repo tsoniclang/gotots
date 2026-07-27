@@ -280,9 +280,12 @@ A use-dependent target obligation is a declaration requirement keyed by the
 authoritative `types.Object` and a closed requirement kind. It is owned by the
 semantic handler and generated source-file module containing that declaration,
 not by the first caller. The first admitted requirement family is a named
-struct's zero/copy/equality companion, keyed by its exact `types.TypeName` and
-closed companion operation. Applying one requirement may produce further typed
-requests, such as `Box` copying requesting `Point` copying.
+struct's static zero/copy/equality operation, keyed by its exact
+`types.TypeName` and closed operation kind. The operation is incorporated into
+the owning class and is called through the statically selected Go type
+(`Box.$copy(value)`), never through an instance. Applying one requirement may
+produce further typed requests, such as `Box` copying requesting
+`Point.$copy`.
 
 The root owner keeps one open declaration assembly per emitted definition.
 Only that definition's semantic owner interprets its requirements and
@@ -318,8 +321,9 @@ One placement service applies the policy:
   import the program-initialization module before using a selected package
   surface;
 - reusable static declarations prefer file scope;
-- named-type companion declarations are assembled immediately after their
-  owning type declaration in a fixed operation order;
+- named-struct static operations are incorporated into their owning class in a
+  fixed operation order; no top-level sibling helper or instance operation is
+  emitted;
 - function-wide declarations enter the function prologue only when their
   lifetime is function-wide;
 - evaluation-dependent temporaries remain immediately inside the branch,

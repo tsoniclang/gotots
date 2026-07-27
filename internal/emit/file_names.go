@@ -11,18 +11,17 @@ import (
 )
 
 type fileNames struct {
-	owner            *nameOwner
-	sourceFile       *ast.File
-	packageScope     *types.Scope
-	factory          tsgo.Factory
-	targetPath       string
-	require          func(types.Object) error
-	temporaries      map[api.TemporaryKind]uint64
-	importNames      map[string]struct{}
-	importAliases    map[types.Object]string
-	companionAliases map[api.DeclarationRequirement]string
-	primitives       map[api.PrimitiveAlias]string
-	runtime          map[api.RuntimeSymbol]string
+	owner         *nameOwner
+	sourceFile    *ast.File
+	packageScope  *types.Scope
+	factory       tsgo.Factory
+	targetPath    string
+	require       func(types.Object) error
+	temporaries   map[api.TemporaryKind]uint64
+	importNames   map[string]struct{}
+	importAliases map[types.Object]string
+	primitives    map[api.PrimitiveAlias]string
+	runtime       map[api.RuntimeSymbol]string
 }
 
 func (n *nameOwner) ForFile(
@@ -33,18 +32,17 @@ func (n *nameOwner) ForFile(
 	require func(types.Object) error,
 ) api.Names {
 	return &fileNames{
-		owner:            n,
-		sourceFile:       sourceFile,
-		packageScope:     packageScope,
-		factory:          factory,
-		targetPath:       targetPath,
-		require:          require,
-		temporaries:      make(map[api.TemporaryKind]uint64),
-		importNames:      make(map[string]struct{}),
-		importAliases:    make(map[types.Object]string),
-		companionAliases: make(map[api.DeclarationRequirement]string),
-		primitives:       make(map[api.PrimitiveAlias]string),
-		runtime:          make(map[api.RuntimeSymbol]string),
+		owner:         n,
+		sourceFile:    sourceFile,
+		packageScope:  packageScope,
+		factory:       factory,
+		targetPath:    targetPath,
+		require:       require,
+		temporaries:   make(map[api.TemporaryKind]uint64),
+		importNames:   make(map[string]struct{}),
+		importAliases: make(map[types.Object]string),
+		primitives:    make(map[api.PrimitiveAlias]string),
+		runtime:       make(map[api.RuntimeSymbol]string),
 	}
 }
 
@@ -209,79 +207,20 @@ func (n *fileNames) PackageVariable(
 	)
 }
 
-func (n *fileNames) Companion(
+func (n *fileNames) NamedStructOperation(
 	typeName *types.TypeName,
-	operation api.CompanionOperation,
+	operation api.NamedStructOperation,
 ) (api.NameReference, error) {
-	if typeName == nil {
-		return api.NameReference{}, &api.NameError{
-			Reason: "companion type is nil",
-		}
-	}
-	binding, ok := n.owner.byObject[typeName]
-	if !ok && n.owner.registry != nil {
-		binding, ok = n.owner.registry.byObject[typeName]
-	}
-	if !ok {
-		return api.NameReference{}, &api.NameError{
-			Name:   typeName.Name(),
-			Reason: "companion type has no emitted declaration",
-		}
-	}
-	if binding.sourceFile != nil && n.require != nil {
-		if err := n.require(typeName); err != nil {
-			return api.NameReference{}, err
-		}
-	}
-	companion, err := api.NewNamedStructCompanionRequirement(typeName, operation)
+	request, err := api.NewNamedStructOperationRequest(typeName, operation)
 	if err != nil {
 		return api.NameReference{}, err
 	}
-	request, err := api.NewCompanionRequest(typeName, operation)
+	reference, err := n.reference(typeName, api.ImportPhaseValue)
 	if err != nil {
 		return api.NameReference{}, err
 	}
-	exportedName, err := api.CompanionExportName(binding.name, operation)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	if binding.sourceFile == nil || binding.sourceFile == n.sourceFile {
-		return api.NewNameReference(exportedName, request)
-	}
-	referencePath := binding.sourcePath
-	if typeName.Pkg().Scope() != n.packageScope {
-		referencePath = n.owner.registry.assemblyPathByPackage[typeName.Pkg()]
-		if referencePath == "" {
-			return api.NameReference{}, &api.NameError{
-				Name:   typeName.Name(),
-				Reason: "cross-package companion has no assembly path",
-			}
-		}
-	}
-	modulePath, err := output.ModuleSpecifier(n.targetPath, referencePath)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	localName := n.companionAliases[companion]
-	if localName == "" {
-		qualifier, err := n.packageImportQualifier(typeName.Pkg())
-		if err != nil {
-			return api.NameReference{}, err
-		}
-		localName = n.allocateImportName(exportedName, qualifier)
-		n.companionAliases[companion] = localName
-	}
-	importRequest, err := api.NewImportRequest(
-		n.factory,
-		api.ImportPhaseValue,
-		modulePath,
-		exportedName,
-		localName,
-	)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	return api.NewNameReference(localName, request, importRequest)
+	requests := append(reference.Requests(), request)
+	return api.NewNameReference(reference.Name(), requests...)
 }
 
 func (n *fileNames) Member(field *types.Var) (string, error) {

@@ -7,27 +7,27 @@ import (
 	"testing"
 )
 
-func TestCompanionRequestCarriesTypedDeclarationRequirement(t *testing.T) {
+func TestNamedStructOperationRequestCarriesTypedDeclarationRequirement(t *testing.T) {
 	typeName := types.NewTypeName(
 		token.NoPos,
 		types.NewPackage("example.com/records", "records"),
 		"Box",
 		nil,
 	)
-	request, err := NewCompanionRequest(typeName, CompanionCopy)
+	request, err := NewNamedStructOperationRequest(typeName, NamedStructOperationCopy)
 	if err != nil {
 		t.Fatal(err)
 	}
 	requirement, ok := request.DeclarationRequirement()
 	if !ok ||
 		requirement.Owner() != typeName ||
-		requirement.Kind() != DeclarationRequirementNamedStructCompanion {
+		requirement.Kind() != DeclarationRequirementNamedStructOperation {
 		t.Fatalf("declaration requirement = %#v, %t", requirement, ok)
 	}
-	owner, operation, ok := requirement.NamedStructCompanion()
-	if !ok || owner != typeName || operation != CompanionCopy {
+	owner, operation, ok := requirement.NamedStructOperation()
+	if !ok || owner != typeName || operation != NamedStructOperationCopy {
 		t.Fatalf(
-			"named-struct companion = %v, %v, %t",
+			"named-struct operation = %v, %v, %t",
 			owner,
 			operation,
 			ok,
@@ -45,13 +45,13 @@ func TestCompanionRequestCarriesTypedDeclarationRequirement(t *testing.T) {
 	}
 }
 
-func TestCompanionRequestRejectsInvalidOwners(t *testing.T) {
+func TestNamedStructOperationRequestRejectsInvalidOwners(t *testing.T) {
 	for _, testCase := range []struct {
 		name      string
 		typeName  *types.TypeName
-		operation CompanionOperation
+		operation NamedStructOperation
 	}{
-		{name: "nil type", operation: CompanionCopy},
+		{name: "nil type", operation: NamedStructOperationCopy},
 		{
 			name: "invalid operation",
 			typeName: types.NewTypeName(
@@ -60,11 +60,11 @@ func TestCompanionRequestRejectsInvalidOwners(t *testing.T) {
 				"Box",
 				nil,
 			),
-			operation: CompanionInvalid,
+			operation: NamedStructOperationInvalid,
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			_, err := NewCompanionRequest(
+			_, err := NewNamedStructOperationRequest(
 				testCase.typeName,
 				testCase.operation,
 			)
@@ -73,5 +73,24 @@ func TestCompanionRequestRejectsInvalidOwners(t *testing.T) {
 				t.Fatalf("error = %#v, want PlacementRequestError", err)
 			}
 		})
+	}
+}
+
+func TestNamedStructOperationMemberNamesAreClosed(t *testing.T) {
+	for _, testCase := range []struct {
+		operation NamedStructOperation
+		want      string
+	}{
+		{operation: NamedStructOperationZero, want: "$zero"},
+		{operation: NamedStructOperationCopy, want: "$copy"},
+		{operation: NamedStructOperationEqual, want: "$equal"},
+	} {
+		got, err := NamedStructOperationMemberName(testCase.operation)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != testCase.want {
+			t.Fatalf("member name = %q, want %q", got, testCase.want)
+		}
 	}
 }

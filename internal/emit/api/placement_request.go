@@ -149,11 +149,11 @@ func NewRuntimeImportRequest(
 	return request, nil
 }
 
-func NewCompanionRequest(
+func NewNamedStructOperationRequest(
 	typeName *types.TypeName,
-	operation CompanionOperation,
+	operation NamedStructOperation,
 ) (PlacementRequest, error) {
-	requirement, err := NewNamedStructCompanionRequirement(typeName, operation)
+	requirement, err := NewNamedStructOperationRequirement(typeName, operation)
 	if err != nil {
 		return PlacementRequest{}, err
 	}

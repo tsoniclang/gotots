@@ -82,9 +82,9 @@ func (unusedNames) PackageVariable(
 	panic("unused")
 }
 
-func (unusedNames) Companion(
+func (unusedNames) NamedStructOperation(
 	*types.TypeName,
-	api.CompanionOperation,
+	api.NamedStructOperation,
 ) (api.NameReference, error) {
 	panic("unused")
 }

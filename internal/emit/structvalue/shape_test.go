@@ -1,7 +1,6 @@
 package structvalue_test
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit"
@@ -10,6 +9,11 @@ import (
 
 func TestNamedStructValuesConstructExactTargetShape(t *testing.T) {
 	source := structTargetSource(t, compileStructFixture(t))
+	operations := map[string][]string{
+		"Point": {"$zero", "$copy", "$equal"},
+		"Box":   {"$zero", "$copy", "$equal"},
+		"Empty": {"$zero", "$equal"},
+	}
 	for _, name := range []string{
 		"Point",
 		"Box",
@@ -23,8 +27,9 @@ func TestNamedStructValuesConstructExactTargetShape(t *testing.T) {
 			t.Fatalf("%s has type parameters or heritage clauses", name)
 		}
 		members := class.Members()
-		if len(members) != 2 {
-			t.Fatalf("%s members = %d, want only brand and constructor", name, len(members))
+		wantMembers := 2 + len(operations[name])
+		if len(members) != wantMembers {
+			t.Fatalf("%s members = %d, want %d", name, len(members), wantMembers)
 		}
 		assertErasedBrand(t, name, members[0])
 		if _, ok := members[1].(tsgo.ConstructorDeclaration); !ok {
@@ -38,60 +43,30 @@ func TestNamedStructValuesConstructExactTargetShape(t *testing.T) {
 		t.Fatalf("reserved field name = %q, want collision-safe target name", got)
 	}
 
-	for _, name := range []string{
-		"Point$zero",
-		"Point$copy",
-		"Point$equal",
-		"Box$zero",
-		"Box$copy",
-		"Box$equal",
-		"Empty$zero",
-		"Empty$equal",
-	} {
-		targetFunction(t, source, name)
-	}
-	for _, name := range []string{
-		"Mirror$zero",
-		"Mirror$copy",
-		"Mirror$equal",
-		"Reserved$zero",
-		"Reserved$copy",
-		"Reserved$equal",
-		"Grouped$zero",
-		"Grouped$copy",
-		"Grouped$equal",
-		"Point$assign",
-		"Box$assign",
-		"Empty$assign",
-	} {
-		if targetFunctionOrNil(source, name) != nil {
-			t.Fatalf("undemanded companion %s was emitted", name)
-		}
-	}
 }
 
-func TestNamedStructCompanionsAreUniqueAndAdjacentToTheirOwner(t *testing.T) {
+func TestNamedStructOperationsAreUniqueAndOwnedByClass(t *testing.T) {
 	source := structTargetSource(t, compileStructFixture(t))
-	assertCompanionSequence(
+	assertStaticOperationSequence(
 		t,
 		source,
 		"Point",
-		[]string{"Point$zero", "Point$copy", "Point$equal"},
+		[]string{"$zero", "$copy", "$equal"},
 	)
-	assertCompanionSequence(
+	assertStaticOperationSequence(
 		t,
 		source,
 		"Box",
-		[]string{"Box$zero", "Box$copy", "Box$equal"},
+		[]string{"$zero", "$copy", "$equal"},
 	)
-	assertCompanionSequence(
+	assertStaticOperationSequence(
 		t,
 		source,
 		"Empty",
-		[]string{"Empty$zero", "Empty$equal"},
+		[]string{"$zero", "$equal"},
 	)
 	for _, name := range []string{"Mirror", "Reserved", "Grouped"} {
-		assertCompanionSequence(t, source, name, nil)
+		assertStaticOperationSequence(t, source, name, nil)
 	}
 }
 
@@ -190,7 +165,7 @@ func TestNamedStructValuesPreserveConstructionOrderWhenSelected(t *testing.T) {
 	}
 }
 
-func TestNamedStructValuesUseTopLevelCompanionOperations(t *testing.T) {
+func TestNamedStructValuesUseStaticallySelectedClassOperations(t *testing.T) {
 	source := structTargetSource(t, compileStructFixture(t))
 	invoke := targetFunction(t, source, "Invoke")
 	call := invoke.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement).Expression().(tsgo.CallExpression)
@@ -198,8 +173,9 @@ func TestNamedStructValuesUseTopLevelCompanionOperations(t *testing.T) {
 		t.Fatalf("receiver call target = %q, want exact named function", targetName(call.Expression()))
 	}
 	copyCall := call.Arguments()[0].(tsgo.CallExpression)
-	if targetName(copyCall.Expression()) != "Box$copy" {
-		t.Fatalf("receiver boundary = %s, want Box$copy", targetName(copyCall.Expression()))
+	if receiver, member := targetProperty(copyCall.Expression()); receiver != "Box" ||
+		member != "$copy" {
+		t.Fatalf("receiver boundary = %s.%s, want Box.$copy", receiver, member)
 	}
 
 	method := targetFunction(t, source, "Box_WithX")
@@ -221,8 +197,9 @@ func TestNamedStructValuesUseTopLevelCompanionOperations(t *testing.T) {
 		t.Fatal("assignment boundary is not a direct rebinding")
 	}
 	assignCopy := assignExpression.Right().(tsgo.CallExpression)
-	if targetName(assignCopy.Expression()) != "Box$copy" {
-		t.Fatalf("assignment copy = %s, want Box$copy", targetName(assignCopy.Expression()))
+	if receiver, member := targetProperty(assignCopy.Expression()); receiver != "Box" ||
+		member != "$copy" {
+		t.Fatalf("assignment copy = %s.%s, want Box.$copy", receiver, member)
 	}
 
 	parameter := targetFunction(t, source, "ParameterIsolated")
@@ -232,8 +209,9 @@ func TestNamedStructValuesUseTopLevelCompanionOperations(t *testing.T) {
 		t.Fatal("parameter isolation does not call the selected function")
 	}
 	argumentCopy := initializer.Arguments()[0].(tsgo.CallExpression)
-	if targetName(argumentCopy.Expression()) != "Box$copy" {
-		t.Fatalf("argument boundary = %s, want exactly one Box$copy", targetName(argumentCopy.Expression()))
+	if receiver, member := targetProperty(argumentCopy.Expression()); receiver != "Box" ||
+		member != "$copy" {
+		t.Fatalf("argument boundary = %s.%s, want exactly one Box.$copy", receiver, member)
 	}
 }
 
@@ -249,8 +227,9 @@ func TestNamedStructMultipleResultsCopyBorrowedValuesOnce(t *testing.T) {
 		if !ok {
 			t.Fatalf("Duplicate result %d = %T, want copy call", index, element)
 		}
-		if targetName(call.Expression()) != "Box$copy" {
-			t.Fatalf("Duplicate result %d = %s, want Box$copy", index, targetName(call.Expression()))
+		receiver, member := targetProperty(call.Expression())
+		if receiver != "Box" || member != "$copy" {
+			t.Fatalf("Duplicate result %d = %s.%s, want Box.$copy", index, receiver, member)
 		}
 	}
 
@@ -338,6 +317,22 @@ func targetClass(t *testing.T, source tsgo.SourceFile, name string) tsgo.ClassDe
 	return nil
 }
 
+func targetMethod(
+	t *testing.T,
+	class tsgo.ClassDeclaration,
+	name string,
+) tsgo.MethodDeclaration {
+	t.Helper()
+	for _, member := range class.Members() {
+		method, ok := member.(tsgo.MethodDeclaration)
+		if ok && targetName(method.Name()) == name {
+			return method
+		}
+	}
+	t.Fatalf("target method %s.%s is absent", class.Name().Text(), name)
+	return nil
+}
+
 func targetFunction(t *testing.T, source tsgo.SourceFile, name string) tsgo.FunctionDeclaration {
 	t.Helper()
 	if function := targetFunctionOrNil(source, name); function != nil {
@@ -357,51 +352,34 @@ func targetFunctionOrNil(source tsgo.SourceFile, name string) tsgo.FunctionDecla
 	return nil
 }
 
-func assertCompanionSequence(
+func assertStaticOperationSequence(
 	t *testing.T,
 	source tsgo.SourceFile,
 	owner string,
 	want []string,
 ) {
 	t.Helper()
-	statements := source.Statements()
-	ownerIndex := -1
+	class := targetClass(t, source, owner)
 	counts := make(map[string]int, len(want))
-	for index, statement := range statements {
-		switch statement := statement.(type) {
-		case tsgo.ClassDeclaration:
-			if statement.Name().Text() == owner {
-				ownerIndex = index
-			}
-		case tsgo.FunctionDeclaration:
-			if strings.HasPrefix(statement.Name().Text(), owner+"$") {
-				counts[statement.Name().Text()]++
-			}
+	var got []string
+	for _, member := range class.Members() {
+		method, ok := member.(tsgo.MethodDeclaration)
+		if !ok {
+			continue
 		}
+		name := targetName(method.Name())
+		got = append(got, name)
+		counts[name]++
 	}
-	if ownerIndex < 0 {
-		t.Fatalf("owner class %s is absent", owner)
+	if len(got) != len(want) {
+		t.Fatalf("%s static operation set = %v, want %v", owner, got, want)
 	}
-	if len(counts) != len(want) {
-		t.Fatalf("%s companion set = %v, want %v", owner, counts, want)
-	}
-	for offset, name := range want {
-		index := ownerIndex + offset + 1
-		if index >= len(statements) {
-			t.Fatalf("%s companion %s is absent after owner", owner, name)
-		}
-		function, ok := statements[index].(tsgo.FunctionDeclaration)
-		if !ok || function.Name().Text() != name {
-			t.Fatalf(
-				"%s statement %d = %T, want adjacent %s",
-				owner,
-				index,
-				statements[index],
-				name,
-			)
+	for index, name := range want {
+		if got[index] != name {
+			t.Fatalf("%s static operation %d = %s, want %s", owner, index, got[index], name)
 		}
 		if counts[name] != 1 {
-			t.Fatalf("%s definition count = %d, want one", name, counts[name])
+			t.Fatalf("%s.%s definition count = %d, want one", owner, name, counts[name])
 		}
 	}
 }

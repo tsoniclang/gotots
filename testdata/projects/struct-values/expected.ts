@@ -3,29 +3,29 @@ export class Point {
     declare private readonly $goType: void;
     constructor(public X: int32, public Visible: bool) {
     }
-}
-export function Point$zero(): Point {
-    return new Point(0, false);
-}
-export function Point$copy($source: Point): Point {
-    return new Point($source.X, $source.Visible);
-}
-export function Point$equal($left: Point, $right: Point): bool {
-    return $left.X === $right.X && $left.Visible === $right.Visible;
+    static $zero(): Point {
+        return new Point(0, false);
+    }
+    static $copy($source: Point): Point {
+        return new Point($source.X, $source.Visible);
+    }
+    static $equal($left: Point, $right: Point): bool {
+        return $left.X === $right.X && $left.Visible === $right.Visible;
+    }
 }
 export class Box {
     declare private readonly $goType: void;
     constructor(public Point: Point, public Active: bool) {
     }
-}
-export function Box$zero(): Box {
-    return new Box(Point$zero(), false);
-}
-export function Box$copy($source: Box): Box {
-    return new Box(Point$copy($source.Point), $source.Active);
-}
-export function Box$equal($left: Box, $right: Box): bool {
-    return Point$equal($left.Point, $right.Point) && $left.Active === $right.Active;
+    static $zero(): Box {
+        return new Box(Point.$zero(), false);
+    }
+    static $copy($source: Box): Box {
+        return new Box(Point.$copy($source.Point), $source.Active);
+    }
+    static $equal($left: Box, $right: Box): bool {
+        return Point.$equal($left.Point, $right.Point) && $left.Active === $right.Active;
+    }
 }
 export class Mirror {
     declare private readonly $goType: void;
@@ -46,30 +46,30 @@ export class Empty {
     declare private readonly $goType: void;
     constructor() {
     }
-}
-export function Empty$zero(): Empty {
-    return new Empty();
-}
-export function Empty$equal($left: Empty, $right: Empty): bool {
-    return true;
+    static $zero(): Empty {
+        return new Empty();
+    }
+    static $equal($left: Empty, $right: Empty): bool {
+        return true;
+    }
 }
 export function NewBox(value: int32): Box {
     return new Box(new Point(value, true), value > 0);
 }
 export function ZeroIsFresh(): bool {
-    let left = Box$zero();
-    let right = Box$zero();
+    let left = Box.$zero();
+    let right = Box.$zero();
     left.Point.X = 7;
     return right.Point.X === 0;
 }
 export function CopyIsolated(value: Box): int32 {
-    let copy = Box$copy(value);
+    let copy = Box.$copy(value);
     copy.Point.X = copy.Point.X + 1;
     return value.Point.X * 10 + copy.Point.X;
 }
 export function AssignIsolated(value: Box): int32 {
-    let target = Box$zero();
-    target = Box$copy(value);
+    let target = Box.$zero();
+    target = Box.$copy(value);
     target.Point.X = target.Point.X + 2;
     return value.Point.X * 10 + target.Point.X;
 }
@@ -78,18 +78,18 @@ export function MutateParameter(value: Box): Box {
     return value;
 }
 export function ParameterIsolated(value: Box): int32 {
-    let changed = MutateParameter(Box$copy(value));
+    let changed = MutateParameter(Box.$copy(value));
     return value.Point.X * 10 + changed.Point.X;
 }
 export function Equal(left: Box, right: Box): bool {
-    return Box$equal(left, right);
+    return Box.$equal(left, right);
 }
 export function Box_WithX(box: Box, value: int32): Box {
     box.Point.X = value;
     return box;
 }
 export function Invoke(value: Box, next: int32): Box {
-    return Box_WithX(Box$copy(value), next);
+    return Box_WithX(Box.$copy(value), next);
 }
 export function CopyResult(): int32 {
     return CopyIsolated(NewBox(4));
@@ -108,7 +108,7 @@ export function EqualDifferentResult(): bool {
 }
 export function MethodResult(): int32 {
     let first = NewBox(4);
-    let changed = Invoke(Box$copy(first), 9);
+    let changed = Invoke(Box.$copy(first), 9);
     return changed.Point.X * 10 + first.Point.X;
 }
 export function ReservedValue(): int32 {
@@ -124,7 +124,7 @@ export function Duplicate(value: Box): [
     Box,
     Box
 ] {
-    return [Box$copy(value), Box$copy(value)];
+    return [Box.$copy(value), Box.$copy(value)];
 }
 export function MultipleResultIsolated(): int32 {
     const __gotots_results_0 = Duplicate(NewBox(4));
@@ -169,10 +169,10 @@ export function OmittedComposite(): bool {
     return value.X === 5 && !value.Visible;
 }
 export function NotEqual(): bool {
-    return !Box$equal(NewBox(4), NewBox(5));
+    return !Box.$equal(NewBox(4), NewBox(5));
 }
 export function ExplicitVarCopy(value: Box): int32 {
-    let copied = Box$copy(value);
+    let copied = Box.$copy(value);
     copied.Point.X = 6;
     return value.Point.X * 10 + copied.Point.X;
 }
@@ -182,8 +182,8 @@ export function ExplicitVarCopyResult(): int32 {
 export function ParallelAssignment(): int32 {
     let left = NewBox(4);
     let right = NewBox(9);
-    const __gotots_assign_0 = Box$copy(right);
-    const __gotots_assign_1 = Box$copy(left);
+    const __gotots_assign_0 = Box.$copy(right);
+    const __gotots_assign_1 = Box.$copy(left);
     left = __gotots_assign_0;
     right = __gotots_assign_1;
     left.Point.X = 8;
@@ -194,6 +194,6 @@ export function GroupedResult(): int32 {
     return value.Left * 10 + value.Right;
 }
 export function EmptyEqual(): bool {
-    let left = Empty$zero();
-    return Empty$equal(left, new Empty());
+    let left = Empty.$zero();
+    return Empty.$equal(left, new Empty());
 }
