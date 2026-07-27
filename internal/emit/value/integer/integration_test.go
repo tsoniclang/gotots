@@ -1,0 +1,512 @@
+package integer_test
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"go/ast"
+	"os"
+	"path/filepath"
+	"runtime"
+	"slices"
+	"strings"
+	"testing"
+
+	"github.com/tsoniclang/gotots/internal/emit"
+	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/load"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
+
+var integerCarrierRoots = []string{
+	"Byte",
+	"ConstantConversion",
+	"Int8",
+	"Int16",
+	"Int32",
+	"Int64",
+	"NativeInt",
+	"NativeUint",
+	"PointerUint",
+	"Rune",
+	"Uint8",
+	"Uint16",
+	"Uint32",
+	"Uint64",
+	"UnsignedComplement8",
+}
+
+func TestIntegerNumberProfilePrintsTypechecksAndExecutesDifferentially(t *testing.T) {
+	loaded := loadIntegerFamily(t)
+	names := append(slices.Clone(integerCarrierRoots),
+		"NumberBits8",
+		"NumberBits16",
+		"NumberBits32",
+		"NumberShifts",
+		"NumberUnary",
+		"NumberUnaryUint",
+		"NumberUnsignedShift",
+		"WidenSigned",
+		"WidenUnsigned",
+	)
+	emission := compileIntegerFamily(t, loaded, emit.DefaultOptions(), names...)
+	assertIntegerAliases(t, emission, tsgo.SyntaxKindNumberKeyword)
+	printed := printIntegerFamily(t, emission)
+	assertDirectIntegerArtifact(t, printed, false)
+
+	workingDirectory := t.TempDir()
+	goOutput := executeIntegerFamilyGo(t, workingDirectory, false)
+	targetOutput := executeIntegerFamilyTS(t, emission, workingDirectory, false)
+	if targetOutput != goOutput {
+		t.Fatalf("number TypeScript output = %q, Go output = %q", targetOutput, goOutput)
+	}
+}
+
+func TestIntegerBigIntProfilePrintsTypechecksAndExecutesDifferentially(t *testing.T) {
+	loaded := loadIntegerFamily(t)
+	names := append(slices.Clone(integerCarrierRoots),
+		"BigShifts",
+		"BigSigned",
+		"BigUnary",
+		"BigUnsigned",
+		"WidenSigned",
+		"WidenUnsigned",
+	)
+	options := emit.DefaultOptions()
+	options.IntegerRepresentation = emit.IntegerRepresentationBigInt
+	emission := compileIntegerFamily(t, loaded, options, names...)
+	assertIntegerAliases(t, emission, tsgo.SyntaxKindBigIntKeyword)
+	printed := printIntegerFamily(t, emission)
+	assertDirectIntegerArtifact(t, printed, true)
+
+	workingDirectory := t.TempDir()
+	goOutput := executeIntegerFamilyGo(t, workingDirectory, true)
+	targetOutput := executeIntegerFamilyTS(t, emission, workingDirectory, true)
+	if targetOutput != goOutput {
+		t.Fatalf("BigInt TypeScript output = %q, Go output = %q", targetOutput, goOutput)
+	}
+}
+
+func TestIntegerUnsupportedNeighborsFailAtTheirExactOwner(t *testing.T) {
+	loaded, err := load.One(context.Background(), load.Request{
+		Directory: integerBoundaryDirectory(),
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	testCases := []struct {
+		name           string
+		root           string
+		representation emit.IntegerRepresentation
+		construct      string
+		category       api.Category
+	}{
+		{"number division", "NumberDivide", emit.IntegerRepresentationNumber, "*ast.BinaryExpr", api.CategoryExpression},
+		{"number remainder", "NumberRemainder", emit.IntegerRepresentationNumber, "*ast.BinaryExpr", api.CategoryExpression},
+		{"number int64 bits", "NumberInt64Bits", emit.IntegerRepresentationNumber, "*ast.BinaryExpr", api.CategoryExpression},
+		{"number variable shift", "VariableShift", emit.IntegerRepresentationNumber, "*ast.BinaryExpr", api.CategoryExpression},
+		{"bigint variable shift", "VariableShift", emit.IntegerRepresentationBigInt, "*ast.BinaryExpr", api.CategoryExpression},
+		{"narrow conversion", "Narrow", emit.IntegerRepresentationNumber, "*ast.CallExpr", api.CategoryExpression},
+		{"signed to unsigned", "ChangeSign", emit.IntegerRepresentationBigInt, "*ast.CallExpr", api.CategoryExpression},
+		{"named integer", "NamedValue", emit.IntegerRepresentationNumber, "*ast.FuncType", api.CategoryType},
+		{"unsafe number literal", "UnsafeNumber", emit.IntegerRepresentationNumber, "*ast.BasicLit", api.CategoryExpression},
+		{"unsafe number conversion", "UnsafeConversion", emit.IntegerRepresentationNumber, "*ast.CallExpr", api.CategoryExpression},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			options := emit.DefaultOptions()
+			options.IntegerRepresentation = testCase.representation
+			object := loaded.Types().Scope().Lookup(testCase.root)
+			root, rootErr := emit.NewRoot(object)
+			if rootErr != nil {
+				t.Fatal(rootErr)
+			}
+			_, compileErr := emit.CompileWithOptions(
+				loaded.Program(),
+				[]emit.Root{root},
+				options,
+			)
+			var unsupported *api.UnsupportedError
+			if !errors.As(compileErr, &unsupported) ||
+				unsupported.Construct != testCase.construct ||
+				unsupported.Category != testCase.category {
+				t.Fatalf(
+					"error = %#v, want %s %s UnsupportedError",
+					compileErr,
+					testCase.category,
+					testCase.construct,
+				)
+			}
+		})
+	}
+}
+
+func TestUint32OperationsCarryRequiredTypedASTNormalization(t *testing.T) {
+	loaded := loadIntegerFamily(t)
+	emission := compileIntegerFamily(
+		t,
+		loaded,
+		emit.DefaultOptions(),
+		"NumberBits32",
+		"NumberUnsignedShift",
+		"NumberUnaryUint",
+	)
+	source := integerFamilySourceFile(t, emission)
+	for _, name := range []string{"NumberBits32", "NumberUnsignedShift"} {
+		function := targetFunction(t, source, name)
+		returnStatement := function.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement)
+		values := returnStatement.Expression().(tsgo.ArrayLiteralExpression).Elements()
+		for index, value := range values {
+			binary, ok := value.(tsgo.BinaryExpression)
+			if !ok ||
+				binary.OperatorToken().Kind() !=
+					tsgo.SyntaxKindGreaterThanGreaterThanGreaterThanToken {
+				t.Fatalf("%s result %d = %T/%d, want unsigned normalization", name, index, value, value.Kind())
+			}
+		}
+	}
+	unary := targetFunction(t, source, "NumberUnaryUint")
+	result := unary.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement).Expression().(tsgo.BinaryExpression)
+	if result.OperatorToken().Kind() != tsgo.SyntaxKindGreaterThanGreaterThanGreaterThanToken {
+		t.Fatalf("uint32 complement operator = %d, want unsigned normalization", result.OperatorToken().Kind())
+	}
+}
+
+func TestIntegerConstantSyntaxMutationFailsAtLiteralOwner(t *testing.T) {
+	loaded := loadIntegerFamily(t)
+	function := loaded.Files()[0].Syntax().Decls[0].(*ast.FuncDecl)
+	result := function.Body.List[2].(*ast.IfStmt).
+		Body.List[0].(*ast.ReturnStmt).Results[0].(*ast.BasicLit)
+	result.Kind = 0
+	object := loaded.TypesInfo().Defs[function.Name]
+	root, err := emit.NewRoot(object)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = emit.Compile(loaded.Program(), []emit.Root{root})
+	var unsupported *api.UnsupportedError
+	if !errors.As(err, &unsupported) ||
+		unsupported.Role != api.RoleReturnResult ||
+		unsupported.Construct != "*ast.BasicLit" {
+		t.Fatalf("mutation error = %#v, want return literal UnsupportedError", err)
+	}
+}
+
+func TestIntegerSemanticEvidenceMutationsFailAtExpressionOwners(t *testing.T) {
+	t.Run("conversion result", func(t *testing.T) {
+		loaded := loadIntegerFamily(t)
+		function := sourceFunction(t, loaded.Files()[0].Syntax(), "WidenSigned")
+		call := function.Body.List[0].(*ast.ReturnStmt).Results[0].(*ast.CallExpr)
+		delete(loaded.TypesInfo().Types, call)
+		assertIntegerExpressionMutationFails(t, loaded, function, "*ast.CallExpr")
+	})
+	t.Run("constant shift count", func(t *testing.T) {
+		loaded := loadIntegerFamily(t)
+		function := sourceFunction(t, loaded.Files()[0].Syntax(), "NumberShifts")
+		shift := function.Body.List[0].(*ast.ReturnStmt).Results[0].(*ast.BinaryExpr)
+		facts := loaded.TypesInfo().Types[shift.Y]
+		facts.Value = nil
+		loaded.TypesInfo().Types[shift.Y] = facts
+		assertIntegerExpressionMutationFails(t, loaded, function, "*ast.BinaryExpr")
+	})
+}
+
+func assertIntegerExpressionMutationFails(
+	t *testing.T,
+	loaded *load.Package,
+	function *ast.FuncDecl,
+	construct string,
+) {
+	t.Helper()
+	root, err := emit.NewRoot(loaded.TypesInfo().Defs[function.Name])
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = emit.Compile(loaded.Program(), []emit.Root{root})
+	var unsupported *api.UnsupportedError
+	if !errors.As(err, &unsupported) ||
+		unsupported.Role != api.RoleReturnResult ||
+		unsupported.Category != api.CategoryExpression ||
+		unsupported.Construct != construct {
+		t.Fatalf("mutation error = %#v, want return %s UnsupportedError", err, construct)
+	}
+}
+
+func compileIntegerFamily(
+	t *testing.T,
+	loaded *load.Package,
+	options emit.Options,
+	names ...string,
+) emit.ProgramEmission {
+	t.Helper()
+	roots := make([]emit.Root, 0, len(names))
+	for _, name := range names {
+		object := loaded.Types().Scope().Lookup(name)
+		if object == nil {
+			t.Fatalf("integer root %q is absent", name)
+		}
+		root, err := emit.NewRoot(object)
+		if err != nil {
+			t.Fatal(err)
+		}
+		roots = append(roots, root)
+	}
+	emission, err := emit.CompileWithOptions(loaded.Program(), roots, options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return emission
+}
+
+func assertIntegerAliases(
+	t *testing.T,
+	emission emit.ProgramEmission,
+	carrier tsgo.SyntaxKind,
+) {
+	t.Helper()
+	want := []string{
+		"int8", "int16", "int32", "int64",
+		"uint8", "uint16", "uint32", "uint64",
+	}
+	var got []string
+	for _, file := range emission.Files() {
+		if file.Kind() != emit.TargetFileSupport {
+			continue
+		}
+		for _, statement := range file.SourceFile().Statements() {
+			alias, ok := statement.(tsgo.TypeAliasDeclaration)
+			if !ok || alias.Name().Text() == "bool" {
+				continue
+			}
+			if alias.Type().Kind() != carrier {
+				t.Fatalf("%s carrier = %d, want %d", alias.Name().Text(), alias.Type().Kind(), carrier)
+			}
+			got = append(got, alias.Name().Text())
+		}
+	}
+	slices.Sort(want)
+	slices.Sort(got)
+	if !slices.Equal(got, want) {
+		t.Fatalf("integer aliases = %v, want %v", got, want)
+	}
+}
+
+func assertDirectIntegerArtifact(t *testing.T, printed string, bigint bool) {
+	t.Helper()
+	for _, forbidden := range []string{
+		"Math.imul",
+		" as ",
+		"any",
+		"unknown",
+		".call(",
+		".apply(",
+		".bind(",
+	} {
+		if strings.Contains(printed, forbidden) {
+			t.Fatalf("integer artifact contains %q:\n%s", forbidden, printed)
+		}
+	}
+	if bigint && (!strings.Contains(printed, "1n") || strings.Contains(printed, " = number;")) {
+		t.Fatalf("BigInt artifact mixes carriers:\n%s", printed)
+	}
+	if !bigint && strings.Contains(printed, "n;") {
+		t.Fatalf("number artifact contains BigInt syntax:\n%s", printed)
+	}
+}
+
+func printIntegerFamily(t *testing.T, emission emit.ProgramEmission) string {
+	t.Helper()
+	client, err := tsgo.StartClient(repositoryRoot(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := client.Close(); err != nil {
+			t.Errorf("close TS-Go client: %v", err)
+		}
+	})
+	var result strings.Builder
+	for _, file := range emission.Files() {
+		printed, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		result.WriteString(printed)
+	}
+	return result.String()
+}
+
+func integerFamilySourceFile(
+	t *testing.T,
+	emission emit.ProgramEmission,
+) tsgo.SourceFile {
+	t.Helper()
+	for _, file := range emission.Files() {
+		if file.Kind() == emit.TargetFileSource &&
+			file.PackageName() == "integerfamily" {
+			return file.SourceFile()
+		}
+	}
+	t.Fatal("integer family source artifact is absent")
+	return nil
+}
+
+func executeIntegerFamilyTS(
+	t *testing.T,
+	emission emit.ProgramEmission,
+	workingDirectory string,
+	bigint bool,
+) string {
+	t.Helper()
+	artifacts := materializeIntegerFamily(t, emission, workingDirectory)
+	suffix := ""
+	if bigint {
+		suffix = "n"
+	}
+	runner := `import * as values from "` + artifacts.module(t, "source.ts") + `";
+
+const show = (value: number | bigint): string => value.toString();
+const row = (value: readonly (number | bigint)[]): string => value.map(show).join(" ");
+`
+	if bigint {
+		runner += `
+console.log(row(values.BigSigned(9007199254740993n, 7n)));
+console.log(row(values.BigUnsigned(18446744073709551600n, 15n)));
+console.log(row(values.BigShifts(-9007199254740993n)));
+console.log(row(values.BigUnary(9007199254740993n)));
+console.log(show(values.WidenSigned(-8n)));
+console.log(show(values.WidenUnsigned(4000000000n)));
+`
+	} else {
+		runner += `
+console.log(row(values.NumberBits8(-7, 3)));
+console.log(row(values.NumberBits16(60000, 3855)));
+console.log(row(values.NumberBits32(4042322160, 252645135)));
+console.log(row(values.NumberShifts(-128)));
+console.log(row(values.NumberUnsignedShift(4042322160)));
+console.log(row(values.NumberUnary(-123456)));
+console.log(show(values.NumberUnaryUint(4042322160)));
+console.log(show(values.WidenSigned(-8)));
+console.log(show(values.WidenUnsigned(4000000000)));
+`
+	}
+	runner += `
+console.log(show(values.ConstantConversion()));
+console.log(show(values.UnsignedComplement8(240` + suffix + `)));
+console.log(show(values.Int8(-5` + suffix + `, 3` + suffix + `)));
+console.log(show(values.Uint64(40` + suffix + `, 2` + suffix + `)));
+`
+	runnerPath := filepath.Join(workingDirectory, "runner.ts")
+	writeFile(t, runnerPath, runner)
+	return executeMaterializedTypeScript(t, workingDirectory, artifacts, runnerPath)
+}
+
+func materializeIntegerFamily(
+	t *testing.T,
+	emission emit.ProgramEmission,
+	workingDirectory string,
+) materializedProgram {
+	t.Helper()
+	client, err := tsgo.StartClient(repositoryRoot(), workingDirectory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := client.Close(); err != nil {
+			t.Errorf("close TS-Go client: %v", err)
+		}
+	})
+	result := materializedProgram{modules: make(map[string]string)}
+	for _, file := range emission.Files() {
+		printed, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		targetPath := filepath.Join(workingDirectory, filepath.FromSlash(file.OutputPath()))
+		writeFile(t, targetPath, printed)
+		result.targetPaths = append(result.targetPaths, targetPath)
+		if file.Kind() == emit.TargetFileSource {
+			result.modules[filepath.Base(file.OutputPath())] = "./" +
+				strings.TrimSuffix(file.OutputPath(), ".ts") + ".js"
+		}
+	}
+	return result
+}
+
+func executeIntegerFamilyGo(t *testing.T, workingDirectory string, bigint bool) string {
+	t.Helper()
+	modulePath, err := filepath.Abs(integerFamilyDirectory())
+	if err != nil {
+		t.Fatal(err)
+	}
+	runnerDirectory := filepath.Join(workingDirectory, "go-runner")
+	if err := os.MkdirAll(runnerDirectory, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(runnerDirectory, "go.mod"), fmt.Sprintf(`module example.com/runner
+
+go 1.26.4
+
+require example.com/integerfamily v0.0.0
+
+replace example.com/integerfamily => %s
+`, filepath.ToSlash(modulePath)))
+	body := `
+	fmt.Println(values.NumberBits8(-7, 3))
+	fmt.Println(values.NumberBits16(60000, 3855))
+	fmt.Println(values.NumberBits32(4042322160, 252645135))
+	fmt.Println(values.NumberShifts(-128))
+	fmt.Println(values.NumberUnsignedShift(4042322160))
+	fmt.Println(values.NumberUnary(-123456))
+	fmt.Println(values.NumberUnaryUint(4042322160))
+	fmt.Println(values.WidenSigned(-8))
+	fmt.Println(values.WidenUnsigned(4000000000))
+`
+	if bigint {
+		body = `
+	fmt.Println(values.BigSigned(9007199254740993, 7))
+	fmt.Println(values.BigUnsigned(18446744073709551600, 15))
+	fmt.Println(values.BigShifts(-9007199254740993))
+	fmt.Println(values.BigUnary(9007199254740993))
+	fmt.Println(values.WidenSigned(-8))
+	fmt.Println(values.WidenUnsigned(4000000000))
+`
+	}
+	writeFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
+
+import (
+	"fmt"
+	values "example.com/integerfamily"
+)
+
+func main() {
+`+body+`
+	fmt.Println(values.ConstantConversion())
+	fmt.Println(values.UnsignedComplement8(240))
+	fmt.Println(values.Int8(-5, 3))
+	fmt.Println(values.Uint64(40, 2))
+}
+`)
+	return run(t, runnerDirectory, filepath.Join(runtime.GOROOT(), "bin", "go"), "run", ".")
+}
+
+func loadIntegerFamily(t *testing.T) *load.Package {
+	t.Helper()
+	loaded, err := load.One(context.Background(), load.Request{
+		Directory: integerFamilyDirectory(),
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return loaded
+}
+
+func integerFamilyDirectory() string {
+	return filepath.Join(repositoryRoot(), "testdata", "constructs", "value", "integer-family")
+}
+
+func integerBoundaryDirectory() string {
+	return filepath.Join(repositoryRoot(), "testdata", "constructs", "value", "integer-boundaries")
+}

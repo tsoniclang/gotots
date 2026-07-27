@@ -38,6 +38,7 @@ const (
 	RoleIfThen               Role = "if-then"
 	RoleIfElse               Role = "if-else"
 	RoleUnaryOperand         Role = "unary-operand"
+	RoleConversionOperand    Role = "conversion-operand"
 	RoleCallCallee           Role = "call-callee"
 	RoleCallArgument         Role = "call-argument"
 	RoleCallArgumentType     Role = "call-argument-type"
