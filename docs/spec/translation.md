@@ -398,8 +398,9 @@ are declared only after all captures. A shadowing new variable receives a
 distinct target name so an earlier right-side reference still denotes the
 outer Go object.
 
-For an identifier of a directly represented signed integer type, compound
-addition remains one direct target operation:
+For an identifier, direct named field, or pointer-dereferenced field of a
+directly represented signed integer type, compound addition remains one direct
+target operation:
 
 ```go
 total += delta
@@ -409,12 +410,14 @@ total += delta
 total += delta;
 ```
 
-The assignment owner proves the exact `types.Var`, represented operand type,
+The assignment owner proves the exact store target, represented operand type,
 and assignability of the right side. It accepts the direct form only when the
 right-side emission has no prerequisite statements, so reading the left value
-cannot move across right-side effects. Selector, index, pointer, other
-compound-operator, unsupported-width, and prerequisite-statement cases remain
-separate typed failures until their single-evaluation rules are proved.
+cannot move across right-side effects. The target owner's prerequisite
+statements remain before the direct compound operation. Indexed and
+setter-backed targets, other compound operators, unsupported widths, and
+right-side prerequisite-statement cases remain separate typed failures until
+their single-evaluation rules are proved.
 
 An ordinary Go function with two or more results has one direct TypeScript
 tuple carrier. Result declarations use `[T0, T1, ...]`; an explicit
@@ -721,12 +724,12 @@ incompatible even when their fields match. A requested nested struct operation
 requests the corresponding static operation from the nested type's owner. The
 erased brand must produce no JavaScript instance field.
 
-Tags, embedding, pointers, interfaces, method values/expressions, generics,
-reflection entry, and fields whose complete standalone representation is not
-yet exact are neighboring typed-unsupported families. They may be admitted
-only by extending or replacing this representation under their own complete
-proof. They must not be approximated by structural assignment or virtual
-dispatch.
+Tags, embedding, interfaces, method values/expressions, generics, reflection
+entry, pointers to unrepresented targets, and fields whose complete standalone
+representation is not yet exact are neighboring typed-unsupported families.
+They may be admitted only by extending or replacing this representation under
+their own complete proof. They must not be approximated by structural
+assignment or virtual dispatch.
 
 Each zero, copy, or equality capability is emitted at most once and only when a
 selected occurrence requests it. Its typed request is routed to the defining
@@ -748,10 +751,12 @@ expression (for example, a local identifier or field selection) is copied
 exactly when it crosses an initialization, argument, receiver, or composite
 field boundary. A fresh composite literal or function result already owns
 fresh storage and transfers that ownership without another copy. A supported
-single-result return transfers the function's owned local value. Because
-pointers, shared containers, closures over struct storage, and package
-variables are outside this first family, no admitted path can retain an alias
-to that transferred storage.
+single-result return transfers the function's owned local value. When no
+address is selected, no admitted path can retain an alias to that transferred
+storage. When an address is selected, the exact variable becomes a mutable
+cell and projections read through that cell, so replacing the whole struct
+updates what an existing field pointer observes without destination-preserving
+mutation of every ordinary struct.
 
 Module-level `export` exists for deterministic generated-module linking; it is
 not by itself a JavaScript FFI contract. A future explicitly selected external
@@ -768,10 +773,10 @@ pointer-free family rebinds that target to a copied value:
 target = Pair.$copy(value);
 ```
 
-No admitted construct can observe the replaced target object's identity.
-Destination-preserving mutation is therefore not emitted speculatively. A
-future pointer/addressable-storage family must install its exact storage owner
-when such identity first becomes observable.
+No unaddressed construct can observe the replaced target object's identity.
+Destination-preserving mutation is therefore not emitted speculatively.
+Addressability installs storage only at the exact `*types.Var` whose identity
+becomes observable.
 
 For example:
 
@@ -1047,15 +1052,85 @@ comma-ok additionally returns `false`; storing through nil fails. A plain
 object literal is forbidden because it changes key identity and prototype
 behavior.
 
-An admitted pointer is a typed reference cell created by `new(T)`. Assignment
-copies the reference, dereference reads or writes the cell, nil is distinct,
-and equality compares cell identity. Address-of is not simulated by wrapping
-all locals. It remains unsupported until the exact local/field/indexed storage
-owner can revise only declarations whose address becomes observable.
+An admitted pointer is a typed reference to one canonical storage location.
+`new(T)` creates a fresh cell when `T` has a complete admitted value
+representation including its Go zero value; assignment copies the pointer;
+dereference reads or writes the selected location; nil is distinct; and
+equality compares canonical address identity. The admitted matrix currently
+includes primitives, pointers, scalar slices, scalar maps, fixed arrays, and
+named structs. Callable values do not yet admit their nil state, so
+`new(func(...))` fails at the callable-zero boundary rather than injecting
+`undefined` into an otherwise non-nil function contract.
+
+Address formation is context-directed:
+
+```go
+value := Box{Count: 1}
+pointer := &value.Count
+value = Box{Count: 7}
+*pointer++
+```
+
+The enclosing function first emits an addressable-storage requirement for the
+exact `value` object. Its reconstructed TS-Go body has one cell:
+
+```ts
+const value$storage = GoPointer.cell(new Box(1));
+const pointer = GoPointer.field(value$storage, "Count");
+value$storage.value = new Box(7);
+GoPointer.dereference(pointer).value++;
+```
+
+The field pointer follows the variable's storage after whole-value assignment,
+as Go requires. Unrelated locals remain ordinary variables. Address requests
+inside nested function literals belong to the enclosing top-level function
+artifact but the selected variable's lexical cell remains in its own scope, so
+closures capture the same cell.
+
+The same address owner handles:
+
+- locals, parameters, named results, receivers, and package-state fields;
+- direct and pointer-indirect named-struct fields;
+- fixed-array elements by projecting from the addressable array root;
+- slice elements by canonical backing identity plus absolute index, so
+  `&slice[0] == &slice[:][0]`; and
+- `&*pointer`, which evaluates the pointer once, performs Go's required nil
+  dereference check, and returns the same canonical location without reading
+  the stored value.
+
+Map and string indexes remain non-addressable because Go declares them so.
+Unsupported aggregate representations fail before requesting storage.
+Address/index operands are evaluated once in Go order. Repeated formation of
+the same live location yields equal pointers; different cells with equal
+values do not.
 
 Each runtime call remains constant-size. Element/key/value representations are
-selected from the same `go/types` evidence; runtime objects never carry erased
-`any`/`unknown` payloads or callbacks that rediscover Go semantics.
+selected from the same `go/types` evidence. Pointer projection factories may
+retain only typed location accessors plus opaque canonical address identity;
+runtime objects never carry erased `any`/`unknown` payloads or callbacks that
+rediscover Go semantics.
+
+Pointer receiver declarations remain named typed receiver functions rather
+than class members:
+
+```go
+func (box *Box) Add(delta int32) { box.Count += delta }
+```
+
+```ts
+export function Box_Add(
+  box: GoPointer<Box> | undefined,
+  delta: int32,
+): void {
+  GoPointer.dereference(box).value.Count += delta;
+}
+```
+
+`pointer.Add(1)` passes the pointer directly, including nil; the body panics
+only if it dereferences nil. `value.Add(1)` is admitted only when `value` is
+addressable and passes its selected cell. Calling a value-receiver method
+through a pointer nil-checks, dereferences, and copies once. Selection uses the
+exact `go/types.Selection`; target virtual dispatch is never substituted.
 
 Bounds failures, nil pointer dereference, nil map store, and BigInt
 divide-by-zero all enter the one generated `GoPanic<T>` carrier. Family

@@ -39,14 +39,6 @@ func TestNamedStructUnsupportedNeighborsFailAtTypedOwners(t *testing.T) {
 			construct: "*ast.Field",
 		},
 		{
-			name: "pointer field",
-			source: "package boundary\n" +
-				"type Pointer struct { Value *int32 }\n",
-			role:      api.RoleStructFieldType,
-			category:  api.CategoryType,
-			construct: "*ast.StarExpr",
-		},
-		{
 			name: "interface field",
 			source: "package boundary\n" +
 				"type Interface struct { Value interface{ Read() int32 } }\n",
@@ -69,15 +61,6 @@ func TestNamedStructUnsupportedNeighborsFailAtTypedOwners(t *testing.T) {
 			role:      api.RoleFileDeclaration,
 			category:  api.CategoryDeclaration,
 			construct: "*ast.GenDecl",
-		},
-		{
-			name: "pointer receiver",
-			source: "package boundary\n" +
-				"type Value struct { X int32 }\n" +
-				"func (value *Value) Set(next int32) { value.X = next }\n",
-			role:      api.RoleReceiverType,
-			category:  api.CategoryType,
-			construct: "*ast.StarExpr",
 		},
 		{
 			name: "method expression",

@@ -3,6 +3,7 @@ package emit_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,9 +15,37 @@ import (
 	"time"
 
 	"github.com/tsoniclang/gotots/internal/emit"
+	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
+
+func TestDemandCompilerRejectsUnsupportedPackageVariableRepresentation(t *testing.T) {
+	projectDirectory := filepath.Join(
+		"..",
+		"..",
+		"testdata",
+		"constructs",
+		"declaration",
+		"unsupported",
+		"variable",
+	)
+	loaded, err := load.One(context.Background(), load.Request{
+		Directory: projectDirectory,
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = emit.CompileFile(loaded, loaded.Files()[0].Syntax())
+	var unsupported *api.UnsupportedError
+	if !errors.As(err, &unsupported) ||
+		unsupported.Category != api.CategoryType ||
+		unsupported.Role != api.RolePackageVariableType {
+		t.Fatalf("error = %#v, want exact unsupported declaration obligation", err)
+	}
+}
 
 func TestDemandProgramPrintsTypechecksAndExecutesReachableDefinitions(t *testing.T) {
 	program := loadDemandProgram(t)

@@ -22,6 +22,15 @@ func EmitBody(
 			Reason: "callable body input is nil",
 		}
 	}
+	parameterPrologue, parameterRequests, err := addressableParameterPrologue(
+		context,
+		children,
+		sourceType,
+		signature,
+	)
+	if err != nil {
+		return api.BlockEmission{}, err
+	}
 	prologue, prologueRequests, err := namedResultPrologue(
 		context,
 		children,
@@ -40,10 +49,15 @@ func EmitBody(
 	if err != nil {
 		return api.BlockEmission{}, err
 	}
-	statements := append(prologue, body.Value().Statements()...)
+	statements := append(parameterPrologue, prologue...)
+	statements = append(statements, body.Value().Statements()...)
 	return api.DirectBlock(
 		context.Factory().Block(statements, true),
-		api.CombineRequests(prologueRequests, body.Requests())...,
+		api.CombineRequests(
+			parameterRequests,
+			prologueRequests,
+			body.Requests(),
+		)...,
 	), nil
 }
 
@@ -61,17 +75,25 @@ func namedResultPrologue(
 	var requests []api.RootRequest
 	for index, sourceName := range names {
 		result := results.At(index)
-		targetName, err := context.Names().Declare(result)
+		targetName, selected := context.AddressableStorage().Name(context, result)
+		if !selected {
+			targetName, err = context.Names().Declare(result)
+		}
 		if err != nil {
 			return nil, nil, err
 		}
-		targetType, err := children.RepresentedType(
-			context.WithRole(api.RoleResultType),
-			sourceName,
-			result.Type(),
-		)
-		if err != nil {
-			return nil, nil, err
+		var declarationType tsgo.TypeNode
+		if !selected {
+			targetType, err := children.RepresentedType(
+				context.WithRole(api.RoleResultType),
+				sourceName,
+				result.Type(),
+			)
+			if err != nil {
+				return nil, nil, err
+			}
+			declarationType = targetType.Value()
+			requests = append(requests, targetType.Requests()...)
 		}
 		zero, err := context.Values().Zero(
 			context.WithRole(api.RoleNamedResultZero),
@@ -80,6 +102,18 @@ func namedResultPrologue(
 		)
 		if err != nil {
 			return nil, nil, err
+		}
+		if selected {
+			zero, err = context.AddressableStorage().Cell(
+				context,
+				children,
+				sourceName,
+				result.Type(),
+				zero,
+			)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 		statements = append(statements, zero.Before()...)
 		statements = append(
@@ -91,17 +125,13 @@ func namedResultPrologue(
 						context.Factory().VariableDeclaration(
 							context.Factory().Identifier(targetName),
 							nil,
-							targetType.Value(),
+							declarationType,
 							zero.Value(),
 						),
 					},
 					tsgo.NodeFlagsLet,
 				),
 			),
-		)
-		requests = append(
-			requests,
-			targetType.Requests()...,
 		)
 		requests = append(requests, zero.Requests()...)
 	}

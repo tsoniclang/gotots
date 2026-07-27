@@ -144,7 +144,7 @@ func Run() int32 { return 2 }
 		case emit.TargetFileSource:
 			for _, statement := range file.SourceFile().Statements() {
 				function, ok := statement.(tsgo.FunctionDeclaration)
-				if ok && strings.HasPrefix(function.Name().Text(), "$init_") {
+				if ok && function.Name().Text() == "init" {
 					initFunctions++
 				}
 			}

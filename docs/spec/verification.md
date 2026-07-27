@@ -352,6 +352,8 @@ The package-state and initialization family additionally proves:
 - admitted `init` functions run after variable initialization in the selected
   loader's file order and declaration order, with no filesystem rescan or
   independently sorted file list;
+- multiple legal `init` declarations retain identical target names and call
+  order across fresh loads even when cross-file token allocation differs;
 - the state module has no runtime import from a source-file module, no
   initializer, and no `any`/`unknown`/cast-created empty object;
 - strict ESM execution is differential against Go for cross-file order,
@@ -457,7 +459,7 @@ program. The required evidence includes:
 | arrays | length-distinct target types, fresh zero/copy, equality, index/store/len/cap | erased length; shared zero; shallow copy where element policy forbids it |
 | slices | nil/empty distinction, aliasing, reslice, append reuse/reallocation, copy overlap | bare-array substitution; lost capacity; always-reallocate append |
 | maps | nil write, missing zero, comma-ok, aliasing, scalar-key equality, delete/len | plain-object substitution; missing-value `undefined`; copy-on-assignment |
-| pointers | nil/new/read/store/alias/equality across calls and results | fresh wrapper on copy; nil dereference success; unrelated-local cell wrapping |
+| pointers | nil/new/read/store/alias/equality; local/parameter/result/receiver/package/field/array/slice addresses; reassignment through projections; pointer receiver nil/copy cases | fresh wrapper on copy; wrapper identity instead of canonical location; nil dereference success; unrelated-local cell wrapping; wrong requirement owner |
 
 For every family:
 
@@ -497,6 +499,43 @@ The cross-family owners have additional blocking proofs:
 Deletion mutations restore a family-specific assignment route, a second
 builtin resolver, a native family throw, or an undeclared runtime dependency;
 each must fail at the owning architecture, artifact, or differential gate.
+
+Addressability has an additional exact matrix:
+
+1. direct local, parameter, named-result, receiver, package-state, nested
+   closure, struct-field, fixed-array-element, slice-element, composite-literal,
+   and `&*pointer` cases strict-typecheck and execute differentially;
+2. a pointer to a struct field observes later whole-struct assignment, while a
+   pointer projected from a pointer variable is not retargeted when that
+   pointer variable changes;
+3. slice aliases produce equal element pointers from the same backing/index
+   and unequal pointers for different indexes or reallocated backing;
+4. address/index/receiver operands execute once and in Go order;
+5. only exact requested `*types.Var` identities become cells; shadowed
+   same-spelling variables and a deterministic ordinary sample remain
+   byte-identical and unwrapped;
+6. a nested literal captures the selected outer cell and owns any selected
+   inner cell at the inner lexical declaration;
+7. package `init` is reconstructed by the ordinary artifact scheduler, with no
+   non-artifact declaration requirement;
+8. pointer-receiver calls on values and pointers, and value-receiver calls
+   through pointers, preserve nil and copy behavior without class methods,
+   `.call`, `.apply`, or `.bind`;
+9. adding storage changes only the function body contract, causes zero caller
+   reconstruction, and reaches a deterministic fixed point; and
+10. 1x/2x/4x address sites keep each use constant-size and leave an unaffected
+    declaration's generated TS-Go bytes unchanged;
+11. the assignment package has no concrete storage or pointer-runtime import,
+    while the root emitter installs exactly one typed storage capability.
+
+Production-path mutations drop a storage requirement, key it by spelling,
+select a shadow sibling, wrap every local, compare pointer wrapper identity,
+mis-key a field/index projection, key a slice by descriptor identity, skip the
+required `&*p` nil check or read its stored value, copy a pointer receiver,
+omit the value-receiver copy,
+bypass package-`init` artifact reconstruction, or dirty callers after an
+unchanged callable facet. Each fails at its owning structure, artifact,
+strict-type, or differential gate.
 
 ## Heavy Runs
 

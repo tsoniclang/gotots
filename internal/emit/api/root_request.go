@@ -167,6 +167,22 @@ func NewNamedStructOperationRequest(
 	}, nil
 }
 
+func NewAddressableStorageRequest(
+	owner *types.Func,
+	variable *types.Var,
+) (RootRequest, error) {
+	requirement, err := NewAddressableStorageRequirement(owner, variable)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return RootRequest{
+		owner: RootRequestOwner{
+			kind:                   RootRequestDeclarationRequirement,
+			declarationRequirement: requirement,
+		},
+	}, nil
+}
+
 func NewArtifactDependencyRequest(
 	provider types.Object,
 	facet ArtifactFacet,

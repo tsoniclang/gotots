@@ -13,6 +13,7 @@ const (
 	MemberSlice
 	MemberAppend
 	MemberCopy
+	MemberAddress
 	MemberLength
 	MemberCapacity
 )
@@ -37,6 +38,8 @@ func MemberName(member Member) string {
 		return "append"
 	case MemberCopy:
 		return "copy"
+	case MemberAddress:
+		return "address"
 	case MemberLength:
 		return "length"
 	case MemberCapacity:

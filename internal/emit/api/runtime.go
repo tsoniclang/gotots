@@ -27,6 +27,7 @@ const (
 	RuntimePointer          RuntimeSymbol = 100
 	RuntimeArray            RuntimeSymbol = 200
 	RuntimeSlice            RuntimeSymbol = 300
+	RuntimeSliceAddress     RuntimeSymbol = 301
 	RuntimeMap              RuntimeSymbol = 400
 	RuntimePanic            RuntimeSymbol = 500
 	RuntimeIntegerDivide    RuntimeSymbol = 600
@@ -82,6 +83,15 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"RuntimeSlice",
 			true,
 			RuntimePanic,
+		), nil
+	case RuntimeSliceAddress:
+		return runtimeContract(
+			RuntimeModuleSlice,
+			"runtime/slice.ts",
+			"goSliceAddress",
+			false,
+			RuntimeSlice,
+			RuntimePointer,
 		), nil
 	case RuntimeMap:
 		return runtimeContract(

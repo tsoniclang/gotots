@@ -351,6 +351,54 @@ func TestPackageInitializationHandlesMultipleResultsInitFunctionsAndBlankImports
 	}
 }
 
+func TestPackageInitArtifactNamesAreStableAcrossLoads(t *testing.T) {
+	projectDirectory := filepath.Join(
+		repositoryRoot(),
+		"testdata",
+		"projects",
+		"package-initialization",
+	)
+	for iteration := 0; iteration < 8; iteration++ {
+		program, err := load.Load(context.Background(), load.Request{
+			Directory: projectDirectory,
+			Pattern:   "./api",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		roots, err := emit.ExportedAPIRoots(program.Roots()[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		emission, err := emit.Compile(program, roots)
+		if err != nil {
+			t.Fatal(err)
+		}
+		actual := make(map[string]string)
+		for _, file := range emission.Files() {
+			if file.Kind() != emit.TargetFileSource ||
+				file.PackageName() != "sideeffect" {
+				continue
+			}
+			base := filepath.Base(file.OutputPath())
+			for _, statement := range file.SourceFile().Statements() {
+				function, ok := statement.(tsgo.FunctionDeclaration)
+				if ok {
+					actual[base] = function.Name().Text()
+				}
+			}
+		}
+		if actual["a_init.ts"] != "init" ||
+			actual["z_init.ts"] != "init__shadow_1" {
+			t.Fatalf(
+				"iteration %d initializer names = %#v",
+				iteration,
+				actual,
+			)
+		}
+	}
+}
+
 func assertOrdinaryInitMethodIsSchedulable(
 	t *testing.T,
 	program *load.Program,

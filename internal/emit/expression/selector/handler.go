@@ -5,6 +5,8 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
+	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -66,7 +68,6 @@ func emitField(
 	selection *types.Selection,
 ) (api.ExpressionEmission, error) {
 	if selection.Kind() != types.FieldVal ||
-		selection.Indirect() ||
 		len(selection.Index()) != 1 {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
@@ -90,6 +91,41 @@ func emitField(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	receiverValue := receiver.Value()
+	requests := receiver.Requests()
+	if selection.Indirect() {
+		_, element, ok := pointertype.Resolve(receiverType)
+		if !ok {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		targetElement, err := children.RepresentedType(
+			context.WithRole(api.RoleFieldReceiver),
+			source.X,
+			element,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		runtime, err := context.Names().Runtime(
+			api.RuntimePointer,
+			api.ImportPhaseValue,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		receiverValue = pointerruntime.CellValue(
+			context.Factory(),
+			runtime.Name(),
+			targetElement.Value(),
+			receiverValue,
+		)
+		requests = api.CombineRequests(
+			requests,
+			targetElement.Requests(),
+			runtime.Requests(),
+		)
+	}
 	name, err := context.Names().Member(field)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -97,11 +133,11 @@ func emitField(
 	return api.NewExpressionEmission(
 		receiver.Before(),
 		context.Factory().PropertyAccessExpression(
-			receiver.Value(),
+			receiverValue,
 			nil,
 			context.Factory().Identifier(name),
 			tsgo.NodeFlagsNone,
 		),
-		receiver.Requests(),
+		requests,
 	)
 }

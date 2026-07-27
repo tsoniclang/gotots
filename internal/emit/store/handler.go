@@ -58,7 +58,7 @@ func dereference(
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	pointerType := context.TypesInfo().TypeOf(source.X)
-	_, element, ok := pointertype.Scalar(context.TypesSizes(), pointerType)
+	_, element, ok := pointertype.Resolve(pointerType)
 	if !ok || !types.Identical(context.TypesInfo().TypeOf(source), element) {
 		return api.StoreTargetEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
@@ -71,10 +71,6 @@ func dereference(
 	)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
-	}
-	if len(pointer.Before()) != 0 {
-		return api.StoreTargetEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	targetElement, err := children.RepresentedType(
 		context.WithRole(api.RoleAssignmentTarget),
@@ -97,7 +93,8 @@ func dereference(
 		targetElement.Value(),
 		pointer.Value(),
 	)
-	return api.NewStoreTargetEmission(
+	return api.NewOrderedStoreTargetEmission(
+		pointer.Before(),
 		target,
 		element,
 		api.CombineRequests(
@@ -213,6 +210,12 @@ func identifier(
 		object.Parent() == object.Pkg().Scope() {
 		return packageVariable(context, object)
 	}
+	if selected, ok, err := context.AddressableStorage().StoreTarget(
+		context,
+		object,
+	); ok || err != nil {
+		return selected, err
+	}
 	reference, err := context.Names().Reference(object)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
@@ -238,6 +241,63 @@ func field(
 		return api.StoreTargetEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	name, err := context.Names().Member(field)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
+	if selection.Indirect() {
+		receiverType := context.TypesInfo().TypeOf(source.X)
+		_, element, ok := pointertype.Resolve(receiverType)
+		if !ok {
+			return api.StoreTargetEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		receiver, err := children.Expression(
+			context.
+				WithRole(api.RoleAssignmentTarget).
+				WithExpectedType(receiverType),
+			source.X,
+		)
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
+		targetElement, err := children.RepresentedType(
+			context.WithRole(api.RoleAssignmentTarget),
+			source.X,
+			element,
+		)
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
+		reference, err := context.Names().Runtime(
+			api.RuntimePointer,
+			api.ImportPhaseValue,
+		)
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
+		value := pointerruntime.CellValue(
+			context.Factory(),
+			reference.Name(),
+			targetElement.Value(),
+			receiver.Value(),
+		)
+		return api.NewOrderedStoreTargetEmission(
+			receiver.Before(),
+			context.Factory().PropertyAccessExpression(
+				value,
+				nil,
+				context.Factory().Identifier(name),
+				tsgo.NodeFlagsNone,
+			),
+			field.Type(),
+			api.CombineRequests(
+				receiver.Requests(),
+				targetElement.Requests(),
+				reference.Requests(),
+			),
+		)
+	}
 	receiver, err := children.StoreTarget(
 		context.WithRole(api.RoleAssignmentTarget),
 		source.X,
@@ -245,11 +305,8 @@ func field(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	name, err := context.Names().Member(field)
-	if err != nil {
-		return api.StoreTargetEmission{}, err
-	}
-	return api.NewStoreTargetEmission(
+	return api.NewOrderedStoreTargetEmission(
+		receiver.Before(),
 		context.Factory().PropertyAccessExpression(
 			receiver.Value(),
 			nil,
@@ -304,7 +361,6 @@ func packageVariable(
 func selectedField(selection *types.Selection) (*types.Var, bool) {
 	if selection == nil ||
 		selection.Kind() != types.FieldVal ||
-		selection.Indirect() ||
 		len(selection.Index()) != 1 {
 		return nil, false
 	}

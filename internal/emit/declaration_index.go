@@ -29,9 +29,6 @@ func indexDeclarations(source *load.Program) (map[types.Object]declarationSite, 
 			for _, declaration := range sourceFile.Syntax().Decls {
 				switch declaration := declaration.(type) {
 				case *ast.FuncDecl:
-					if isPackageInitDeclaration(declaration) {
-						continue
-					}
 					object, ok := sourcePackage.TypesInfo().Defs[declaration.Name].(*types.Func)
 					if !ok {
 						return nil, &api.InvariantError{

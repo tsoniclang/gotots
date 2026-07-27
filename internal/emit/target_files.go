@@ -53,19 +53,12 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 		chunks := make(
 			[]declarationChunk,
 			0,
-			len(builder.declarations)+len(builder.packageInitializers),
+			len(builder.declarations),
 		)
 		for _, declaration := range builder.declarations {
 			chunks = append(chunks, declarationChunk{
 				position:   declaration.position,
 				name:       declaration.object.Name(),
-				statements: slices.Clone(declaration.statements),
-			})
-		}
-		for _, declaration := range builder.packageInitializers {
-			chunks = append(chunks, declarationChunk{
-				position:   declaration.position,
-				name:       declaration.name,
 				statements: slices.Clone(declaration.statements),
 			})
 		}

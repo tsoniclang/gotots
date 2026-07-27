@@ -251,6 +251,20 @@ func compareDeclarationRequirements(
 	if left.Kind() > right.Kind() {
 		return 1
 	}
+	if left.Kind() == api.DeclarationRequirementAddressableStorage {
+		_, leftVariable, leftOK := left.AddressableStorage()
+		_, rightVariable, rightOK := right.AddressableStorage()
+		switch {
+		case !leftOK && rightOK:
+			return -1
+		case leftOK && !rightOK:
+			return 1
+		case !leftOK:
+			return 0
+		default:
+			return compareObjects(leftVariable, rightVariable)
+		}
+	}
 	_, leftOperation, _ := left.NamedStructOperation()
 	_, rightOperation, _ := right.NamedStructOperation()
 	switch {

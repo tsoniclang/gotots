@@ -2,7 +2,6 @@ package pointer_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"go/ast"
 	"os"
@@ -17,7 +16,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func TestScalarPointerCopyAndOrdinaryLocalMutationsAreRejected(t *testing.T) {
+func TestPointerCopyAndOrdinaryLocalsUseOnlyRequiredStorage(t *testing.T) {
 	loaded := loadScalarPointerProject(t)
 	emission := compileScalarPointerProject(t, loaded)
 	source := targetFileByPathSuffix(t, emission, "/source.ts").SourceFile()
@@ -29,13 +28,15 @@ func TestScalarPointerCopyAndOrdinaryLocalMutationsAreRejected(t *testing.T) {
 	newBody := newValue.Body().(tsgo.Block).Statements()
 	declaration := newBody[0].(tsgo.VariableStatement).
 		DeclarationList().Declarations()[0]
-	created, ok := declaration.Initializer().(tsgo.NewExpression)
+	created, ok := declaration.Initializer().(tsgo.CallExpression)
 	if !ok {
-		t.Fatalf("new pointer initializer = %T, want NewExpression", declaration.Initializer())
+		t.Fatalf("new pointer initializer = %T, want CallExpression", declaration.Initializer())
 	}
-	constructor, ok := created.Expression().(tsgo.Identifier)
-	if !ok || constructor.Text() != "GoPointer" {
-		t.Fatalf("pointer constructor = %T, want GoPointer", created.Expression())
+	callee, ok := created.Expression().(tsgo.PropertyAccessExpression)
+	if !ok ||
+		callee.Expression().(tsgo.Identifier).Text() != "GoPointer" ||
+		callee.Name().(tsgo.Identifier).Text() != "cell" {
+		t.Fatalf("pointer constructor = %T, want GoPointer.cell", created.Expression())
 	}
 	if len(created.TypeArguments()) != 1 || len(created.Arguments()) != 1 {
 		t.Fatalf(
@@ -60,8 +61,13 @@ func TestScalarPointerCopyAndOrdinaryLocalMutationsAreRejected(t *testing.T) {
 			aliasDeclaration.Initializer(),
 		)
 	}
-	if _, wrapped := aliasDeclaration.Initializer().(tsgo.NewExpression); wrapped {
-		t.Fatal("pointer copy allocated a fresh cell")
+	if call, wrapped := aliasDeclaration.Initializer().(tsgo.CallExpression); wrapped {
+		callee, selected := call.Expression().(tsgo.PropertyAccessExpression)
+		if selected &&
+			callee.Expression().(tsgo.Identifier).Text() == "GoPointer" &&
+			callee.Name().(tsgo.Identifier).Text() == "cell" {
+			t.Fatal("pointer copy allocated a fresh cell")
+		}
 	}
 
 	ordinary := targetFunction(t, source, "Ordinary")
@@ -71,8 +77,13 @@ func TestScalarPointerCopyAndOrdinaryLocalMutationsAreRejected(t *testing.T) {
 			continue
 		}
 		for _, declaration := range variables.DeclarationList().Declarations() {
-			if _, wrapped := declaration.Initializer().(tsgo.NewExpression); wrapped {
-				t.Fatal("pointer support wrapped an unrelated ordinary local")
+			if call, wrapped := declaration.Initializer().(tsgo.CallExpression); wrapped {
+				callee, selected := call.Expression().(tsgo.PropertyAccessExpression)
+				if selected &&
+					callee.Expression().(tsgo.Identifier).Text() == "GoPointer" &&
+					callee.Name().(tsgo.Identifier).Text() == "cell" {
+					t.Fatal("pointer support wrapped an unrelated ordinary local")
+				}
 			}
 		}
 	}
@@ -93,10 +104,10 @@ func TestScalarPointersPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	}
 	target := string(printed)
 	for _, required := range []string{
-		"new GoPointer<int32>(0)",
+		"GoPointer.cell<int32>(0)",
 		"GoPointer.dereference<int32>(pointer).value",
-		"original === alias",
-		"!(original === void 0)",
+		"GoPointer.equal(original, alias)",
+		"!GoPointer.equal(original, void 0)",
 		"let assigned: GoPointer<int32> | undefined",
 	} {
 		if !strings.Contains(target, required) {
@@ -192,75 +203,6 @@ func TestScalarPointerRuntimeRequestExactJoinsOneDefinition(t *testing.T) {
 	}
 }
 
-func TestScalarPointerBoundariesFailAtTheirSemanticOwners(t *testing.T) {
-	for _, testCase := range []struct {
-		name      string
-		source    string
-		role      api.Role
-		category  api.Category
-		construct string
-	}{
-		{
-			name: "address local",
-			source: `package boundary
-func Address() *int32 {
-    var value int32
-    return &value
-}
-			`,
-			role:      api.RoleReturnResult,
-			category:  api.CategoryExpression,
-			construct: "*ast.UnaryExpr",
-		},
-		{
-			name: "address field",
-			source: `package boundary
-type Box struct { Value int32 }
-func Address(box Box) *int32 {
-    return &box.Value
-}
-			`,
-			role:      api.RoleReturnResult,
-			category:  api.CategoryExpression,
-			construct: "*ast.UnaryExpr",
-		},
-		{
-			name: "address indexed element",
-			source: `package boundary
-func Address() *int32 {
-    return &(&[1]int32{1})[0]
-}
-			`,
-			role:      api.RoleReturnResult,
-			category:  api.CategoryExpression,
-			construct: "*ast.UnaryExpr",
-		},
-		{
-			name: "pointer to struct",
-			source: `package boundary
-type Box struct { Value int32 }
-func Allocate() *Box {
-    return new(Box)
-}
-			`,
-			role:      api.RoleResultType,
-			category:  api.CategoryType,
-			construct: "*ast.FuncType",
-		},
-	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			err := compileTemporaryFunctionSource(t, testCase.source)
-			assertUnsupported(
-				t,
-				err,
-				testCase.role,
-				testCase.category,
-				testCase.construct,
-			)
-		})
-	}
-}
-
 func TestScalarPointerTypeEvidenceMutationIsObserved(t *testing.T) {
 	loaded := loadScalarPointerProject(t)
 	nilRead := sourceFunction(t, loaded.Files()[0].Syntax(), "NilRead")
@@ -285,10 +227,10 @@ func TestScalarPointerUseSitesScaleLinearly(t *testing.T) {
 		source, target := compilePointerScaling(t, count)
 		sourceBytes[index] = len(source)
 		targetBytes[index] = len(target)
-		if strings.Count(target, "new GoPointer<int32>(0)") != count {
+		if strings.Count(target, "GoPointer.cell<int32>(0)") != count {
 			t.Fatalf(
 				"pointer constructors = %d, want %d",
-				strings.Count(target, "new GoPointer<int32>(0)"),
+				strings.Count(target, "GoPointer.cell<int32>(0)"),
 				count,
 			)
 		}
@@ -482,17 +424,4 @@ func scalarPointerProjectDirectory() string {
 		"pointer",
 		"scalar",
 	)
-}
-
-func TestPointerBoundaryErrorTypesRemainTyped(t *testing.T) {
-	err := compileTemporaryFunctionSource(t, `package boundary
-func Address() *int32 {
-    value := int32(1)
-    return &value
-}
-`)
-	var unsupported *api.UnsupportedError
-	if !errors.As(err, &unsupported) {
-		t.Fatalf("error = %v, want *api.UnsupportedError", err)
-	}
 }

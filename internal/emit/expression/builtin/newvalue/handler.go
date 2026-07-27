@@ -6,6 +6,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -27,10 +28,7 @@ func Emit(
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	resultType := context.TypesInfo().TypeOf(source)
-	pointer, element, represented := pointertype.Scalar(
-		context.TypesSizes(),
-		resultType,
-	)
+	pointer, element, represented := pointertype.Resolve(resultType)
 	if !represented ||
 		!types.Identical(context.TypesInfo().TypeOf(source.Args[0]), element) {
 		return api.ExpressionEmission{},
@@ -69,10 +67,17 @@ func Emit(
 		return api.ExpressionEmission{}, err
 	}
 	return api.DirectExpression(
-		context.Factory().NewExpression(
-			context.Factory().Identifier(reference.Name()),
+		context.Factory().CallExpression(
+			context.Factory().PropertyAccessExpression(
+				context.Factory().Identifier(reference.Name()),
+				nil,
+				context.Factory().Identifier(pointerruntime.CellName),
+				tsgo.NodeFlagsNone,
+			),
+			nil,
 			[]tsgo.TypeNode{targetElement.Value()},
 			[]tsgo.Expression{zero.Value()},
+			tsgo.NodeFlagsNone,
 		),
 		api.CombineRequests(
 			targetElement.Requests(),

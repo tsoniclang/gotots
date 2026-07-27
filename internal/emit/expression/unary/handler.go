@@ -15,6 +15,9 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.UnaryExpr,
 ) (api.ExpressionEmission, error) {
+	if source.Op == token.AND {
+		return children.Address(context, source)
+	}
 	if source.Op == token.SUB && context.TypesInfo().Types[source].Value != nil {
 		return children.IntegerConstant(context, source)
 	}

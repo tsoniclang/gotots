@@ -1,100 +1,55 @@
 package pointer
 
-import (
-	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
-)
+import "github.com/tsoniclang/gotots/internal/target/tsgo"
 
 const (
+	CellName        = "cell"
 	CellValueName   = "value"
 	DereferenceName = "dereference"
+	EqualName       = "equal"
+	FieldName       = "field"
+	ObjectFieldName = "objectField"
+	ElementName     = "element"
+	IndexName       = "index"
 )
+
+type builder struct {
+	factory   tsgo.Factory
+	className string
+	panicName string
+}
 
 func Build(
 	factory tsgo.Factory,
 	className string,
 	panicName string,
 ) tsgo.Statement {
-	typeParameter := targetTypeParameter(factory)
-	cell := factory.ParameterDeclaration(
-		[]tsgo.ModifierLike{factory.PublicKeyword()},
-		nil,
-		factory.Identifier(CellValueName),
-		nil,
-		factory.TypeReferenceNode(factory.Identifier("T"), nil),
-		nil,
-	)
-	constructor := factory.ConstructorDeclaration(
-		nil,
-		nil,
-		[]tsgo.ParameterDeclaration{cell},
-		nil,
-		factory.Block(nil, true),
-	)
-	pointerType := targetPointerType(factory, className)
-	pointer := factory.ParameterDeclaration(
-		nil,
-		nil,
-		factory.Identifier("pointer"),
-		nil,
-		factory.UnionTypeNode([]tsgo.TypeNode{
-			pointerType,
-			factory.KeywordTypeNode(
-				tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
-			),
-		}),
-		nil,
-	)
-	nilCondition := factory.BinaryExpression(
-		nil,
-		factory.Identifier("pointer"),
-		nil,
-		factory.BinaryOperatorToken(
-			tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-		),
-		factory.VoidExpression(
-			factory.NumericLiteral("0", tsgo.TokenFlagsNone),
-		),
-	)
-	nilFailure := factory.ExpressionStatement(
-		panicruntime.Call(
-			factory,
-			panicName,
-			factory.StringLiteral(
-				"nil pointer dereference",
-				tsgo.TokenFlagsNone,
-			),
-		),
-	)
-	dereference := factory.MethodDeclaration(
-		[]tsgo.ModifierLike{factory.StaticKeyword()},
-		nil,
-		factory.Identifier(DereferenceName),
-		nil,
-		[]tsgo.TypeParameterDeclaration{targetTypeParameter(factory)},
-		[]tsgo.ParameterDeclaration{pointer},
-		pointerType,
-		factory.Block(
-			[]tsgo.Statement{
-				factory.IfStatement(
-					nilCondition,
-					factory.Block(
-						[]tsgo.Statement{nilFailure},
-						true,
-					),
-					nil,
-				),
-				factory.ReturnStatement(factory.Identifier("pointer")),
-			},
-			true,
-		),
-	)
+	target := builder{
+		factory:   factory,
+		className: className,
+		panicName: panicName,
+	}
 	return factory.ClassDeclaration(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
-		factory.Identifier(className),
-		[]tsgo.TypeParameterDeclaration{typeParameter},
+		target.id(className),
+		[]tsgo.TypeParameterDeclaration{target.typeParameter("T", nil)},
 		nil,
-		[]tsgo.ClassElement{constructor, dereference},
+		[]tsgo.ClassElement{
+			target.rootsProperty(),
+			target.childrenProperty(),
+			target.constructor(),
+			target.rootMethod(),
+			target.childMethod(),
+			target.cellMethod(),
+			target.fieldMethod(),
+			target.objectFieldMethod(),
+			target.elementMethod(),
+			target.indexMethod(),
+			target.equalMethod(),
+			target.dereferenceMethod(),
+			target.valueGetter(),
+			target.valueSetter(),
+		},
 	)
 }
 
@@ -124,26 +79,202 @@ func CellValue(
 	)
 }
 
-func targetTypeParameter(
+func Cell(
 	factory tsgo.Factory,
+	runtimeName string,
+	elementType tsgo.TypeNode,
+	value tsgo.Expression,
+) tsgo.CallExpression {
+	return factory.CallExpression(
+		factory.PropertyAccessExpression(
+			factory.Identifier(runtimeName),
+			nil,
+			factory.Identifier(CellName),
+			tsgo.NodeFlagsNone,
+		),
+		nil,
+		[]tsgo.TypeNode{elementType},
+		[]tsgo.Expression{value},
+		tsgo.NodeFlagsNone,
+	)
+}
+
+func (b builder) id(name string) tsgo.Identifier {
+	return b.factory.Identifier(name)
+}
+
+func (b builder) typeParameter(
+	name string,
+	constraint tsgo.TypeNode,
 ) tsgo.TypeParameterDeclaration {
-	return factory.TypeParameterDeclaration(
+	return b.factory.TypeParameterDeclaration(
 		nil,
-		factory.Identifier("T"),
-		nil,
+		b.id(name),
+		constraint,
 		nil,
 		nil,
 	)
 }
 
-func targetPointerType(
-	factory tsgo.Factory,
-	className string,
+func (b builder) typeReference(
+	name string,
+	arguments ...tsgo.TypeNode,
 ) tsgo.TypeReferenceNode {
-	return factory.TypeReferenceNode(
-		factory.Identifier(className),
+	return b.factory.TypeReferenceNode(b.id(name), arguments)
+}
+
+func (b builder) typeT() tsgo.TypeNode {
+	return b.typeReference("T")
+}
+
+func (b builder) pointerType(element tsgo.TypeNode) tsgo.TypeNode {
+	return b.typeReference(b.className, element)
+}
+
+func (b builder) objectType() tsgo.TypeNode {
+	return b.factory.KeywordTypeNode(
+		tsgo.KeywordTypeSyntaxKindObjectKeyword,
+	)
+}
+
+func (b builder) undefinedType() tsgo.TypeNode {
+	return b.factory.KeywordTypeNode(
+		tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
+	)
+}
+
+func (b builder) booleanType() tsgo.TypeNode {
+	return b.factory.KeywordTypeNode(
+		tsgo.KeywordTypeSyntaxKindBooleanKeyword,
+	)
+}
+
+func (b builder) numberType() tsgo.TypeNode {
+	return b.factory.KeywordTypeNode(
+		tsgo.KeywordTypeSyntaxKindNumberKeyword,
+	)
+}
+
+func (b builder) propertyKeyType() tsgo.TypeNode {
+	return b.typeReference("PropertyKey")
+}
+
+func (b builder) addressKeyType() tsgo.TypeNode {
+	return b.factory.UnionTypeNode(
 		[]tsgo.TypeNode{
-			factory.TypeReferenceNode(factory.Identifier("T"), nil),
+			b.propertyKeyType(),
+			b.factory.KeywordTypeNode(
+				tsgo.KeywordTypeSyntaxKindBigIntKeyword,
+			),
 		},
+	)
+}
+
+func (b builder) parameter(
+	name string,
+	targetType tsgo.TypeNode,
+) tsgo.ParameterDeclaration {
+	return b.factory.ParameterDeclaration(
+		nil,
+		nil,
+		b.id(name),
+		nil,
+		targetType,
+		nil,
+	)
+}
+
+func (b builder) property(
+	receiver tsgo.Expression,
+	name string,
+) tsgo.PropertyAccessExpression {
+	return b.factory.PropertyAccessExpression(
+		receiver,
+		nil,
+		b.id(name),
+		tsgo.NodeFlagsNone,
+	)
+}
+
+func (b builder) call(
+	receiver tsgo.Expression,
+	name string,
+	arguments ...tsgo.Expression,
+) tsgo.CallExpression {
+	return b.factory.CallExpression(
+		b.property(receiver, name),
+		nil,
+		nil,
+		arguments,
+		tsgo.NodeFlagsNone,
+	)
+}
+
+func (b builder) binary(
+	left tsgo.Expression,
+	operator tsgo.BinaryOperator,
+	right tsgo.Expression,
+) tsgo.BinaryExpression {
+	return b.factory.BinaryExpression(
+		nil,
+		left,
+		nil,
+		b.factory.BinaryOperatorToken(operator),
+		right,
+	)
+}
+
+func (b builder) assign(
+	left tsgo.Expression,
+	right tsgo.Expression,
+) tsgo.BinaryExpression {
+	return b.binary(left, tsgo.BinaryOperatorEqualsToken, right)
+}
+
+func (b builder) undefined() tsgo.Expression {
+	return b.factory.VoidExpression(
+		b.factory.NumericLiteral("0", tsgo.TokenFlagsNone),
+	)
+}
+
+func (b builder) variable(
+	flags tsgo.NodeFlags,
+	name string,
+	targetType tsgo.TypeNode,
+	value tsgo.Expression,
+) tsgo.VariableStatement {
+	return b.factory.VariableStatement(
+		nil,
+		b.factory.VariableDeclarationList(
+			[]tsgo.VariableDeclaration{
+				b.factory.VariableDeclaration(
+					b.id(name),
+					nil,
+					targetType,
+					value,
+				),
+			},
+			flags,
+		),
+	)
+}
+
+func (b builder) method(
+	modifiers []tsgo.ModifierLike,
+	name string,
+	typeParameters []tsgo.TypeParameterDeclaration,
+	parameters []tsgo.ParameterDeclaration,
+	result tsgo.TypeNode,
+	statements ...tsgo.Statement,
+) tsgo.MethodDeclaration {
+	return b.factory.MethodDeclaration(
+		modifiers,
+		nil,
+		b.id(name),
+		nil,
+		typeParameters,
+		parameters,
+		result,
+		b.factory.Block(statements, true),
 	)
 }

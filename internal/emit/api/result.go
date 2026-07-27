@@ -73,7 +73,21 @@ func NewStoreTargetEmission(
 	sourceType types.Type,
 	requests []RootRequest,
 ) (StoreTargetEmission, error) {
+	return NewOrderedStoreTargetEmission(nil, value, sourceType, requests)
+}
+
+func NewOrderedStoreTargetEmission(
+	before []tsgo.Statement,
+	value tsgo.Expression,
+	sourceType types.Type,
+	requests []RootRequest,
+) (StoreTargetEmission, error) {
 	switch {
+	case slices.Contains(before, nil):
+		return StoreTargetEmission{}, &ResultError{
+			Result: "store target",
+			Reason: "prerequisite statement is nil",
+		}
 	case value == nil:
 		return StoreTargetEmission{}, &ResultError{
 			Result: "store target",
@@ -86,6 +100,7 @@ func NewStoreTargetEmission(
 		}
 	}
 	return StoreTargetEmission{
+		before:     slices.Clone(before),
 		value:      value,
 		sourceType: sourceType,
 		requests:   slices.Clone(requests),

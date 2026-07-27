@@ -135,8 +135,9 @@ func Build(
 		return []Definition{definition}, nil
 	}
 	if module == api.RuntimeModuleSlice &&
-		len(symbols) == 1 &&
-		symbols[0] == api.RuntimeSlice {
+		(len(symbols) == 1 || len(symbols) == 2) &&
+		symbols[0] == api.RuntimeSlice &&
+		(len(symbols) == 1 || symbols[1] == api.RuntimeSliceAddress) {
 		contract, err := api.RuntimeContract(api.RuntimeSlice)
 		if err != nil {
 			return nil, err
@@ -145,18 +146,46 @@ func Build(
 		if err != nil {
 			return nil, err
 		}
+		address := len(symbols) == 2
 		definition, err := NewDefinition(
 			api.RuntimeSlice,
-			runtimeslice.Build(
+			runtimeslice.BuildWithAddress(
 				factory,
 				contract.ExportedName(),
 				panicContract.ExportedName(),
+				address,
 			),
 		)
 		if err != nil {
 			return nil, err
 		}
-		return []Definition{definition}, nil
+		definitions := []Definition{definition}
+		if address {
+			addressContract, err := api.RuntimeContract(
+				api.RuntimeSliceAddress,
+			)
+			if err != nil {
+				return nil, err
+			}
+			pointerContract, err := api.RuntimeContract(api.RuntimePointer)
+			if err != nil {
+				return nil, err
+			}
+			addressDefinition, err := NewDefinition(
+				api.RuntimeSliceAddress,
+				runtimeslice.BuildAddress(
+					factory,
+					addressContract.ExportedName(),
+					contract.ExportedName(),
+					pointerContract.ExportedName(),
+				),
+			)
+			if err != nil {
+				return nil, err
+			}
+			definitions = append(definitions, addressDefinition)
+		}
+		return definitions, nil
 	}
 	if module == api.RuntimeModuleMap {
 		return buildMap(factory, symbols)

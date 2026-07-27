@@ -50,6 +50,14 @@ func Emit(
 			reference.Requests()...,
 		), nil
 	}
+	if variable, ok := object.(*types.Var); ok {
+		if selected, exists := context.AddressableStorage().Read(
+			context,
+			variable,
+		); exists {
+			return selected, nil
+		}
+	}
 	reference, err := context.Names().Reference(object)
 	if err != nil {
 		return api.ExpressionEmission{}, err

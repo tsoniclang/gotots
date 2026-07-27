@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/storage"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -43,6 +44,7 @@ func TestParentOperatorOwnerDoesNotCreateAnIntegerFallback(t *testing.T) {
 				tsgo.Factory{},
 				unusedNames{},
 				unusedValues{},
+				storage.Owner{},
 				api.IntegerRepresentationNumber,
 				api.EvaluationOrderDirect,
 			)

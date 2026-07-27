@@ -5,8 +5,6 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
-	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -155,13 +153,6 @@ func fields(
 			)
 		}
 		sourceType := context.TypesInfo().TypeOf(sourceField.Type)
-		if !supportedFieldType(context, sourceType) {
-			return nil, api.Unsupported(
-				context.WithRole(api.RoleStructFieldType),
-				api.CategoryType,
-				sourceField.Type,
-			)
-		}
 		for _, sourceName := range sourceField.Names {
 			if fieldIndex >= structType.NumFields() {
 				return nil, api.Unsupported(
@@ -200,24 +191,6 @@ func fields(
 		return nil, api.Unsupported(context, api.CategoryDeclaration, source)
 	}
 	return result, nil
-}
-
-func supportedFieldType(context api.Context, sourceType types.Type) bool {
-	if _, ok := arrayvalue.Resolve(context, sourceType); ok {
-		return true
-	}
-	if alias, ok := basictype.PrimitiveAlias(
-		context.TypesSizes(),
-		sourceType,
-	); ok {
-		return alias != api.PrimitiveInvalid
-	}
-	named, ok := types.Unalias(sourceType).(*types.Named)
-	if !ok || named.TypeParams().Len() != 0 {
-		return false
-	}
-	_, ok = named.Underlying().(*types.Struct)
-	return ok
 }
 
 func constructor(
