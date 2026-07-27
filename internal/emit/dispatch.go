@@ -36,6 +36,7 @@ import (
 	switchstatement "github.com/tsoniclang/gotots/internal/emit/statement/switchstatement"
 	storetarget "github.com/tsoniclang/gotots/internal/emit/store"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	maptype "github.com/tsoniclang/gotots/internal/emit/type/map"
 	namedstructtype "github.com/tsoniclang/gotots/internal/emit/type/namedstruct"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	slicetype "github.com/tsoniclang/gotots/internal/emit/type/slice"
@@ -398,6 +399,9 @@ func (e *emitter) Type(
 		if _, ok := types.Unalias(sourceType).(*types.Named); ok {
 			return namedstructtype.Emit(context, source, sourceType)
 		}
+		if _, ok := types.Unalias(sourceType).(*types.Map); ok {
+			return maptype.Emit(context, source, sourceType)
+		}
 		if sliceType, ok := types.Unalias(sourceType).(*types.Slice); ok {
 			arrayType, valid := source.(*ast.ArrayType)
 			if !valid {
@@ -434,6 +438,9 @@ func (e *emitter) RepresentedType(
 	}
 	if _, ok := types.Unalias(sourceType).(*types.Named); ok {
 		return namedstructtype.Emit(context, source, sourceType)
+	}
+	if _, ok := types.Unalias(sourceType).(*types.Map); ok {
+		return maptype.Emit(context, source, sourceType)
 	}
 	if _, ok := types.Unalias(sourceType).(*types.Slice); ok {
 		return slicetype.EmitRepresented(context, e, source, sourceType)

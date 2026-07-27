@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/expression/mapliteral"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -20,6 +21,11 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.CompositeLit,
 ) (api.ExpressionEmission, error) {
+	if _, ok := types.Unalias(
+		context.TypesInfo().TypeOf(source),
+	).(*types.Map); ok {
+		return mapliteral.Emit(context, children, source)
+	}
 	if array, ok := arrayvalue.Resolve(
 		context,
 		context.TypesInfo().TypeOf(source),

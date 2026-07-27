@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	mapbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/map"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
@@ -20,6 +21,14 @@ func Emit(
 	if source == nil || builtin == nil {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if target, handled, err := mapbuiltin.Emit(
+		context,
+		children,
+		source,
+		discarded,
+	); handled {
+		return target, err
 	}
 	switch types.Object(builtin) {
 	case types.Universe.Lookup("make"):

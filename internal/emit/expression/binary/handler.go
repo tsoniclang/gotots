@@ -7,6 +7,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	integerbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/integer"
+	"github.com/tsoniclang/gotots/internal/emit/expression/mapcomparison"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -16,6 +17,13 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.BinaryExpr,
 ) (api.ExpressionEmission, error) {
+	if target, handled, err := mapcomparison.Emit(
+		context,
+		children,
+		source,
+	); handled {
+		return target, err
+	}
 	if source.Op == token.EQL || source.Op == token.NEQ {
 		if target, ok, err := emitSliceNilEquality(
 			context,

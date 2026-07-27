@@ -5,6 +5,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	runtimearray "github.com/tsoniclang/gotots/internal/emit/runtime/array"
+	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	stringruntime "github.com/tsoniclang/gotots/internal/emit/runtime/string"
@@ -124,10 +125,32 @@ func Build(
 		}
 		return []Definition{definition}, nil
 	}
+	if module == api.RuntimeModuleMap {
+		return buildMap(factory, symbols)
+	}
 	return nil, &AssemblyError{
 		Module: module,
 		Reason: "runtime module owner is not installed",
 	}
+}
+
+func buildMap(
+	factory tsgo.Factory,
+	symbols []api.RuntimeSymbol,
+) ([]Definition, error) {
+	result := make([]Definition, 0, len(symbols))
+	for _, symbol := range symbols {
+		statement, err := mapruntime.Build(factory, symbol)
+		if err != nil {
+			return nil, err
+		}
+		definition, err := NewDefinition(symbol, statement)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, definition)
+	}
+	return result, nil
 }
 
 type AssemblyError struct {

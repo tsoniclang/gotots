@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	mapindexexpression "github.com/tsoniclang/gotots/internal/emit/expression/mapindex"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
@@ -18,6 +19,9 @@ func Emit(
 	source *ast.IndexExpr,
 ) (api.ExpressionEmission, error) {
 	operandType := context.TypesInfo().TypeOf(source.X)
+	if _, ok := types.Unalias(operandType).(*types.Map); ok {
+		return mapindexexpression.Emit(context, children, source)
+	}
 	if array, ok := arrayvalue.Resolve(context, operandType); ok {
 		return array.EmitIndex(context, children, source)
 	}
