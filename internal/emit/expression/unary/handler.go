@@ -196,8 +196,9 @@ func emitFloat(
 		return api.ExpressionEmission{}, false, nil
 	}
 	resultType := context.TypesInfo().TypeOf(source)
-	carrier, ok := floatvalue.Describe(resultType)
-	if !ok || carrier.Bits() != 64 ||
+	// Negation and identity flip only the sign bit, so both float32 and float64
+	// are exact and need no rounding helper.
+	if _, ok := floatvalue.Describe(resultType); !ok ||
 		!types.AssignableTo(context.TypesInfo().TypeOf(source.X), resultType) {
 		return api.ExpressionEmission{}, false, nil
 	}

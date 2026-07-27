@@ -16,6 +16,7 @@ const (
 	RuntimeModuleMap
 	RuntimeModulePanic
 	RuntimeModuleInteger
+	RuntimeModuleFloat
 )
 
 type RuntimeSymbol uint16
@@ -32,6 +33,7 @@ const (
 	RuntimePanic            RuntimeSymbol = 500
 	RuntimeIntegerDivide    RuntimeSymbol = 600
 	RuntimeIntegerRemainder RuntimeSymbol = 601
+	RuntimeFloat32Round     RuntimeSymbol = 700
 )
 
 type RuntimeSymbolContract struct {
@@ -123,6 +125,13 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"goIntegerRemainder",
 			false,
 			RuntimePanic,
+		), nil
+	case RuntimeFloat32Round:
+		return runtimeContract(
+			RuntimeModuleFloat,
+			"runtime/float.ts",
+			"goFloat32",
+			false,
 		), nil
 	default:
 		return RuntimeSymbolContract{}, &RuntimeSymbolError{Symbol: symbol}

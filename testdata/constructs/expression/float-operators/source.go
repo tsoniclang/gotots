@@ -51,3 +51,23 @@ func Equal(a, b float64) bool {
 func NotEqual(a, b float64) bool {
 	return a != b
 }
+
+func Add32(a, b float32) float32 {
+	return a + b
+}
+
+func Mul32(a, b float32) float32 {
+	return a * b
+}
+
+func Div32(a, b float32) float32 {
+	return a / b
+}
+
+func Negate32(a float32) float32 {
+	return -a
+}
+
+func Less32(a, b float32) bool {
+	return a < b
+}

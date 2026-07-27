@@ -129,6 +129,11 @@ func main() {
 	fmt.Println(values.Greater(3, 2), values.Greater(nan, nan))
 	fmt.Println(values.Equal(0, math.Copysign(0, -1)), values.Equal(nan, nan))
 	fmt.Println(values.NotEqual(nan, nan), values.NotEqual(1, 1))
+	fmt.Println(js(float64(values.Add32(0.1, 0.2))))
+	fmt.Println(js(float64(values.Mul32(1.1, 1.1))))
+	fmt.Println(js(float64(values.Div32(1, 3))))
+	fmt.Println(js(float64(values.Negate32(0.5))))
+	fmt.Println(values.Less32(0.1, 0.2))
 }
 `)
 	return runCommand(t, runnerDirectory, filepath.Join(runtime.GOROOT(), "bin", "go"), "run", ".")
@@ -153,6 +158,11 @@ console.log(values.LessEqual(2, 2), values.GreaterEqual(2, 2));
 console.log(values.Greater(3, 2), values.Greater(nan, nan));
 console.log(values.Equal(0, -0), values.Equal(nan, nan));
 console.log(values.NotEqual(nan, nan), values.NotEqual(1, 1));
+console.log(String(values.Add32(0.1, 0.2)));
+console.log(String(values.Mul32(1.1, 1.1)));
+console.log(String(values.Div32(1, 3)));
+console.log(String(values.Negate32(0.5)));
+console.log(values.Less32(0.1, 0.2));
 `
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	writeFile(t, runnerPath, runner)
