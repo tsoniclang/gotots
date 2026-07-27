@@ -66,8 +66,7 @@ func emitSpec(
 	source *ast.ValueSpec,
 	selected *types.Const,
 ) ([]tsgo.Statement, []api.RootRequest, bool, error) {
-	if source.Doc != nil || source.Comment != nil || source.Type == nil ||
-		len(source.Names) == 0 || len(source.Names) != len(source.Values) {
+	if source.Doc != nil || source.Comment != nil || len(source.Names) == 0 {
 		return nil, nil, false,
 			api.Unsupported(context, api.CategoryDeclaration, source)
 	}
@@ -86,13 +85,10 @@ func emitSpec(
 		return nil, nil, false, nil
 	}
 	sourceName := source.Names[selectedIndex]
-	sourceValue := source.Values[selectedIndex]
 	binding, err := constantbinding.EmitBinding(
 		context,
 		children,
 		sourceName,
-		source.Type,
-		sourceValue,
 		selected,
 		api.RolePackageConstantType,
 		api.RolePackageConstantValue,

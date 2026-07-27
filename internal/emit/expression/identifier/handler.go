@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -36,6 +37,23 @@ func Emit(
 	case types.Universe.Lookup("iota"):
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if constObject, ok := object.(*types.Const); ok &&
+		constantbinding.IsUntyped(constObject.Type()) {
+		// An untyped constant is a compile-time value with no runtime
+		// declaration: project its canonical value at this use's exact
+		// contextual type, which the checker recorded on the identifier.
+		typeAndValue := context.TypesInfo().Types[source]
+		if typeAndValue.Value == nil {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		return constantbinding.EmitValue(
+			context,
+			source,
+			typeAndValue.Type,
+			typeAndValue.Value,
+		)
 	}
 	if variable, ok := object.(*types.Var); ok &&
 		!variable.IsField() &&

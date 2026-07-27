@@ -1,4 +1,4 @@
-package stringliteral
+package stringvalue
 
 import "testing"
 

@@ -30,9 +30,7 @@ func Emit(
 		if !ok ||
 			spec.Doc != nil ||
 			spec.Comment != nil ||
-			spec.Type == nil ||
-			len(spec.Names) == 0 ||
-			len(spec.Names) != len(spec.Values) {
+			len(spec.Names) == 0 {
 			return api.StatementEmission{},
 				api.Unsupported(
 					context.WithRole(api.RoleLocalDeclaration),
@@ -41,7 +39,7 @@ func Emit(
 				)
 		}
 		declarations := make([]tsgo.VariableDeclaration, 0, len(spec.Names))
-		for index, sourceName := range spec.Names {
+		for _, sourceName := range spec.Names {
 			selected, ok := context.TypesInfo().Defs[sourceName].(*types.Const)
 			if !ok {
 				return api.StatementEmission{},
@@ -51,12 +49,15 @@ func Emit(
 						sourceName,
 					)
 			}
+			if constantbinding.IsUntyped(selected.Type()) {
+				// An untyped local constant is a compile-time value with no
+				// runtime declaration; each use projects its contextual type.
+				continue
+			}
 			target, err := constantbinding.EmitBinding(
 				context,
 				children,
 				sourceName,
-				spec.Type,
-				spec.Values[index],
 				selected,
 				api.RoleLocalConstantType,
 				api.RoleLocalConstantValue,
@@ -66,6 +67,9 @@ func Emit(
 			}
 			declarations = append(declarations, target.Declaration())
 			requests = append(requests, target.Requests()...)
+		}
+		if len(declarations) == 0 {
+			continue
 		}
 		statements = append(
 			statements,

@@ -2,7 +2,6 @@ package function_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"go/ast"
 	"os"
@@ -11,8 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tsoniclang/gotots/internal/emit"
-	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -86,48 +83,6 @@ func TestPackageConstantSpellingMutationKeepsObjectOwnedReference(t *testing.T) 
 	targetReference := sum.Left().(tsgo.Identifier)
 	if targetReference.Text() != "Base" {
 		t.Fatalf("target reference = %q, want Base", targetReference.Text())
-	}
-}
-
-func TestPackageConstantUntypedAndIotaCasesFailAtDeclarationOwner(t *testing.T) {
-	for _, testCase := range []struct {
-		name     string
-		mutate   func(*ast.GenDecl)
-		category api.Category
-		role     api.Role
-	}{
-		{
-			name: "untyped",
-			mutate: func(declaration *ast.GenDecl) {
-				declaration.Specs[0].(*ast.ValueSpec).Type = nil
-			},
-			category: api.CategoryDeclaration,
-			role:     api.RoleFileDeclaration,
-		},
-		{
-			name: "iota",
-			mutate: func(declaration *ast.GenDecl) {
-				declaration.Specs[0].(*ast.ValueSpec).Values[0] = ast.NewIdent("iota")
-			},
-			category: api.CategoryExpression,
-			role:     api.RolePackageConstantValue,
-		},
-	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			loaded := loadPackageConstantsProject(t)
-			constants := sourceFileNamed(t, loaded, "constants.go")
-			testCase.mutate(constants.Decls[0].(*ast.GenDecl))
-
-			_, err := emit.CompileFile(loaded, constants)
-			var unsupported *api.UnsupportedError
-			if !errors.As(err, &unsupported) {
-				t.Fatalf("error = %v, want *api.UnsupportedError", err)
-			}
-			if unsupported.Category != testCase.category ||
-				unsupported.Role != testCase.role {
-				t.Fatalf("unsupported = %#v", unsupported)
-			}
-		})
 	}
 }
 

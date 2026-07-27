@@ -62,35 +62,6 @@ func TestDirectSeamUnsupportedNeighborsFailAtContextOwners(t *testing.T) {
 		construct string
 	}{
 		{
-			name: "inherited local constant",
-			source: `package boundary
-
-func Value() int32 {
-	const (
-		low int32 = 3
-		high
-	)
-	return high
-}
-`,
-			role:      api.RoleLocalDeclaration,
-			category:  api.CategoryDeclaration,
-			construct: "*ast.ValueSpec",
-		},
-		{
-			name: "local iota",
-			source: `package boundary
-
-func Value() int32 {
-	const value int32 = iota
-	return value
-}
-`,
-			role:      api.RoleLocalConstantValue,
-			category:  api.CategoryExpression,
-			construct: "*ast.Ident",
-		},
-		{
 			name: "parallel for initializer",
 			source: `package boundary
 
@@ -139,23 +110,6 @@ func Swap() int32 {
 }
 
 func TestDirectSeamMutationsFailAtSemanticOwners(t *testing.T) {
-	t.Run("local constant loses explicit type", func(t *testing.T) {
-		loaded := loadDirectSeamsProject(t)
-		classify := sourceFunction(t, loaded.Files()[0].Syntax(), "Classify")
-		declaration := classify.Body.List[0].(*ast.DeclStmt)
-		spec := declaration.Decl.(*ast.GenDecl).Specs[0].(*ast.ValueSpec)
-		spec.Type = nil
-
-		err := compileLoadedPackage(t, loaded)
-		assertUnsupported(
-			t,
-			err,
-			api.RoleLocalDeclaration,
-			api.CategoryDeclaration,
-			"*ast.ValueSpec",
-		)
-	})
-
 	t.Run("switch case loses boolean type", func(t *testing.T) {
 		loaded := loadDirectSeamsProject(t)
 		classify := sourceFunction(t, loaded.Files()[0].Syntax(), "Classify")
