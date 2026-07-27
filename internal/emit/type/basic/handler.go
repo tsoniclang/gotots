@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	floatvalue "github.com/tsoniclang/gotots/internal/emit/value/float"
 	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 )
 
@@ -56,6 +57,9 @@ func PrimitiveAlias(
 				return api.PrimitiveString, true
 			}
 		}
+	}
+	if floatCarrier, ok := floatvalue.Describe(sourceType); ok {
+		return floatCarrier.Alias(), true
 	}
 	carrier, ok := integervalue.Describe(sizes, sourceType)
 	if !ok {

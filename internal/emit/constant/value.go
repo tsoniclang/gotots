@@ -7,6 +7,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/stringvalue"
+	floatvalue "github.com/tsoniclang/gotots/internal/emit/value/float"
 	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 )
 
@@ -26,6 +27,13 @@ func EmitValue(
 	if value == nil {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	// A float target owns its materialization regardless of the constant's value
+	// kind: `const x float64 = 5` carries an Int value that must still render as a
+	// float. Float-kind values only ever have float targets, so a non-float
+	// target below never sees one.
+	if _, ok := floatvalue.Describe(targetType); ok {
+		return floatvalue.EmitConstant(context, source, targetType, value)
 	}
 	switch value.Kind() {
 	case constant.Int:

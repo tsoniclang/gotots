@@ -246,16 +246,17 @@ func TestConstantBindingMutationFailsAtItsGate(t *testing.T) {
 	}
 }
 
-// TestConstantTypeNeighborsFailAtTypeOwner proves unsupported constant TYPES
-// (complex, and float until its value family lands) remain a typed boundary, so
-// the handler did not widen silently.
+// TestConstantTypeNeighborsFailAtTypeOwner proves the still-unsupported constant
+// TYPE (complex) remains a typed boundary, so the handler did not widen silently
+// when the float value family landed. Float is now supported and no longer
+// belongs here.
 func TestConstantTypeNeighborsFailAtTypeOwner(t *testing.T) {
 	dir := filepath.Join(repositoryRoot(), "testdata", "constructs", "value", "constant-boundaries")
 	loaded, err := load.One(context.Background(), load.Request{Directory: dir, Pattern: "."})
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"Float", "Complex"} {
+	for _, name := range []string{"Complex"} {
 		t.Run(name, func(t *testing.T) {
 			object := loaded.Types().Scope().Lookup(name)
 			root, err := emit.NewRoot(object)

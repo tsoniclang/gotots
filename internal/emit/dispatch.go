@@ -18,6 +18,7 @@ import (
 	functionliteral "github.com/tsoniclang/gotots/internal/emit/expression/functionliteral"
 	identifierexpression "github.com/tsoniclang/gotots/internal/emit/expression/identifier"
 	indexexpression "github.com/tsoniclang/gotots/internal/emit/expression/index"
+	floatliteral "github.com/tsoniclang/gotots/internal/emit/expression/literal/float"
 	integerliteral "github.com/tsoniclang/gotots/internal/emit/expression/literal/integer"
 	stringliteral "github.com/tsoniclang/gotots/internal/emit/expression/literal/string"
 	parenthesizedexpression "github.com/tsoniclang/gotots/internal/emit/expression/parenthesized"
@@ -200,6 +201,9 @@ func (e *emitter) Expression(
 	case *ast.BasicLit:
 		if source.Kind == token.STRING {
 			return stringliteral.Emit(context, e, source)
+		}
+		if source.Kind == token.FLOAT {
+			return floatliteral.Emit(context, e, source)
 		}
 		return e.IntegerConstant(context, source)
 	case *ast.UnaryExpr:

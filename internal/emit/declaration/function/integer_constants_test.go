@@ -274,7 +274,10 @@ func TestIntegerConstantRejectsNonIntegerSyntaxMutation(t *testing.T) {
 	loaded := loadIntegerConstantsProject(t)
 	small := loaded.Files()[0].Syntax().Decls[0].(*ast.FuncDecl)
 	literal := small.Body.List[0].(*ast.ReturnStmt).Results[0].(*ast.BasicLit)
-	literal.Kind = token.FLOAT
+	// token.FLOAT is now a supported neighbor owned by the float literal handler;
+	// token.IMAG remains an unowned syntax the integer handler must reject rather
+	// than materialize from a spelling it does not recognize.
+	literal.Kind = token.IMAG
 
 	_, err := compileIntegerRootError(loaded, 0)
 	var unsupported *api.UnsupportedError

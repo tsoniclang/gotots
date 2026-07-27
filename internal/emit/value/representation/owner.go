@@ -98,6 +98,8 @@ func (Owner) Zero(
 			literal = context.Factory().FalseLiteral()
 		case api.PrimitiveString:
 			literal = context.Factory().StringLiteral("", tsgo.TokenFlagsNone)
+		case api.PrimitiveFloat32, api.PrimitiveFloat64:
+			literal = context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone)
 		default:
 			var err error
 			literal, err = api.IntegerLiteral(

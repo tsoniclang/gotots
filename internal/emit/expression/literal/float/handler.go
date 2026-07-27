@@ -1,4 +1,4 @@
-package integer
+package float
 
 import (
 	"go/ast"
@@ -10,12 +10,15 @@ import (
 	constantvalue "github.com/tsoniclang/gotots/internal/emit/constant"
 )
 
+// Emit materializes a floating-point literal at its contextual float type
+// through the single constant-value owner. The literal's value is the checker's
+// canonical go/constant value; the source spelling is never re-evaluated.
 func Emit(
 	context api.Context,
 	_ api.ChildEmitter,
 	source ast.Expr,
 ) (api.ExpressionEmission, error) {
-	if !isIntegerLiteralSyntax(source) {
+	if !isFloatLiteralSyntax(source) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
@@ -24,11 +27,7 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	// Integer syntax may carry a float value when the checker converts an untyped
-	// integer literal to a float target (`var x float64 = 8`). The single value
-	// owner materializes it at the target representation; a non-numeric value is
-	// never integer syntax.
-	if kind := typeAndValue.Value.Kind(); kind != constant.Int && kind != constant.Float {
+	if kind := typeAndValue.Value.Kind(); kind != constant.Float && kind != constant.Int {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
@@ -49,14 +48,7 @@ func Emit(
 	)
 }
 
-func isIntegerLiteralSyntax(source ast.Expr) bool {
-	switch source := source.(type) {
-	case *ast.BasicLit:
-		return source.Kind == token.INT
-	case *ast.UnaryExpr:
-		literal, ok := source.X.(*ast.BasicLit)
-		return source.Op == token.SUB && ok && literal.Kind == token.INT
-	default:
-		return false
-	}
+func isFloatLiteralSyntax(source ast.Expr) bool {
+	literal, ok := source.(*ast.BasicLit)
+	return ok && literal.Kind == token.FLOAT
 }

@@ -933,6 +933,18 @@ package modules use canonical relative type-only imports. The aliases retain
 the selected Go representation name in generated source. A handler does not
 infer width from `GOARCH` spelling or independently inspect configuration.
 
+`float32` and `float64` both carry as the `number` alias regardless of the
+integer-representation profile — TypeScript has one binary64 number type and no
+separate float axis. A floating-point constant materializes its exact
+`go/constant` value through the one constant-value owner, never the source
+spelling: a `float64` constant emits the shortest decimal that round-trips to
+its binary64 value; a `float32` constant is first rounded to its nearest
+binary32 (as Go does at compile time) and then emitted as the binary64 that
+equals that rounded value, so the emitted literal is bit-identical to Go's
+`float32` result and never the shorter binary32 spelling, which would denote a
+different `number`. A runtime `float32` operation rounds through a generated
+helper at each Go-required boundary; a `float64` operation is direct.
+
 Ordinary integer syntax is source-shaped under both initial profiles:
 
 | Go source | TS-Go AST decision | Printed TypeScript |
