@@ -172,6 +172,25 @@ Finish with several ordinary multi-package programs that exercise direct calls,
 callbacks, returned closures, named results, package initialization, and
 cross-package demand without a runtime/manual/external dependency.
 
+Before proceeding beyond the constant/float/rune checkpoint, close the
+constant-context subsystem as one end-to-end capability:
+
+- bare named constants use one identity-based owner for identifier,
+  package-selector, and dot-import routes;
+- concrete projection type comes from the occurrence when concrete, otherwise
+  from a validated owning-parent expectation, never `types.Default`;
+- enclosing checker-constant expressions such as `Scale + Scale` materialize
+  their folded value without runtime child evaluation;
+- local projections remain at their lexical `const` declaration;
+- cross-package projection imports are keyed by package constant identity plus
+  representation;
+- whole-file and exported-Go-API roots retain the compile-time-only disposition
+  of unused untyped constants, while an explicit constant root must name and
+  materialize one concrete representation; and
+- float32 operation rounding, the complete admitted float operator matrix, and
+  rune value materialization have focused shape, strict-type, differential,
+  mutation, and cost evidence.
+
 ## 3. Go Semantic Families
 
 Add exact representations for:

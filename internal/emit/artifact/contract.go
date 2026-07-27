@@ -24,6 +24,11 @@ func ProjectContract(
 	factory tsgo.Factory,
 	statements []tsgo.Statement,
 ) (Contract, error) {
+	if len(statements) == 0 {
+		return nil, &ContractError{
+			Reason: "materialized artifact has no target declaration",
+		}
+	}
 	nodes := make(map[api.ArtifactFacet][]tsgo.Node)
 	for _, statement := range statements {
 		switch statement := statement.(type) {
@@ -110,12 +115,21 @@ func ProjectContract(
 		}
 		contract[facet] = encoded
 	}
-	if len(contract) == 0 && len(statements) != 0 {
+	if len(contract) == 0 {
 		return nil, &ContractError{
 			Reason: "artifact contains no observable declaration",
 		}
 	}
 	return contract, nil
+}
+
+func ProjectCoverageContract(statements []tsgo.Statement) (Contract, error) {
+	if len(statements) != 0 {
+		return nil, &ContractError{
+			Reason: "coverage-only artifact contains target declarations",
+		}
+	}
+	return make(Contract), nil
 }
 
 func projectClassContract(

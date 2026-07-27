@@ -16,8 +16,8 @@ import (
 // only; it never evaluates the source spelling. This is the single owner of
 // constant-value materialization: a typed constant's binding projects its own
 // type here, and every use of an untyped constant projects its exact contextual
-// type here. Float and complex constants remain a typed unsupported boundary
-// until their value families exist.
+// type here. Complex constants remain a typed unsupported boundary until their
+// value family exists.
 func EmitValue(
 	context api.Context,
 	source ast.Node,
@@ -35,9 +35,13 @@ func EmitValue(
 	if _, ok := floatvalue.Describe(targetType); ok {
 		return floatvalue.EmitConstant(context, source, targetType, value)
 	}
-	switch value.Kind() {
-	case constant.Int:
+	if _, ok := integervalue.Describe(context.TypesSizes(), targetType); ok {
+		if value.Kind() == constant.Float {
+			value = constant.ToInt(value)
+		}
 		return integervalue.EmitConstant(context, source, targetType, value)
+	}
+	switch value.Kind() {
 	case constant.String:
 		return stringvalue.EmitConstant(context, source, targetType, value)
 	case constant.Bool:

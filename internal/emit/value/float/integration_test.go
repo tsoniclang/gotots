@@ -113,6 +113,7 @@ import (
 
 func main() {
 	fmt.Println(values.Constant())
+	fmt.Println(float64(values.RoundedConstant()))
 	fmt.Println(values.NegativeConstant())
 	fmt.Println(values.TypedConstant())
 	fmt.Println(values.Literal())
@@ -131,6 +132,7 @@ func executeFloatTS(t *testing.T, workingDirectory string, targetPaths []string,
 	t.Helper()
 	runner := `import * as values from "` + sourceModule + `";
 console.log(String(values.Constant()));
+console.log(String(values.RoundedConstant()));
 console.log(String(values.NegativeConstant()));
 console.log(String(values.TypedConstant()));
 console.log(String(values.Literal()));

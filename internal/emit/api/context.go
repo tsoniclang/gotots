@@ -3,29 +3,31 @@ package api
 import (
 	"go/token"
 	"go/types"
+	"slices"
 
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type Context struct {
-	role            Role
-	fileSet         *token.FileSet
-	typesPackage    *types.Package
-	typesInfo       *types.Info
-	typesSizes      types.Sizes
-	factory         tsgo.Factory
-	names           Names
-	values          Values
-	storage         AddressableStorage
-	integer         IntegerRepresentation
-	evaluationOrder EvaluationOrder
-	expectedType    types.Type
-	expectedResults *types.Tuple
-	functionResults *types.Tuple
-	breakDepth      uint32
-	continueDepth   uint32
-	artifactOwner   *types.Func
-	storageNames    map[*types.Var]string
+	role                     Role
+	fileSet                  *token.FileSet
+	typesPackage             *types.Package
+	typesInfo                *types.Info
+	typesSizes               types.Sizes
+	factory                  tsgo.Factory
+	names                    Names
+	values                   Values
+	storage                  AddressableStorage
+	integer                  IntegerRepresentation
+	evaluationOrder          EvaluationOrder
+	expectedType             types.Type
+	expectedResults          *types.Tuple
+	functionResults          *types.Tuple
+	breakDepth               uint32
+	continueDepth            uint32
+	artifactOwner            *types.Func
+	storageNames             map[*types.Var]string
+	localConstantProjections map[*types.Const][]types.BasicKind
 }
 
 func (c Context) WithAddressableStorage(
@@ -42,6 +44,26 @@ func (c Context) WithAddressableStorage(
 			panic("addressable-storage selection is invalid")
 		}
 		c.storageNames[variable] = name
+	}
+	return c
+}
+
+func (c Context) WithLocalConstantProjections(
+	owner *types.Func,
+	projections map[*types.Const][]types.BasicKind,
+) Context {
+	if owner == nil || c.artifactOwner != owner {
+		panic("local-constant projection owner differs from artifact owner")
+	}
+	c.localConstantProjections = make(
+		map[*types.Const][]types.BasicKind,
+		len(projections),
+	)
+	for selected, kinds := range projections {
+		if selected == nil || len(kinds) == 0 {
+			panic("local-constant projection selection is invalid")
+		}
+		c.localConstantProjections[selected] = slices.Clone(kinds)
 	}
 	return c
 }
@@ -202,6 +224,12 @@ func (c Context) CanContinue() bool {
 
 func (c Context) ArtifactOwner() *types.Func {
 	return c.artifactOwner
+}
+
+func (c Context) LocalConstantProjections(
+	selected *types.Const,
+) []types.BasicKind {
+	return slices.Clone(c.localConstantProjections[selected])
 }
 
 func (c Context) AddressableStorageName(variable *types.Var) (string, bool) {

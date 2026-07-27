@@ -156,10 +156,8 @@ func TestArrayFamilyStrictTypechecksUnderTheBigIntProfile(t *testing.T) {
 		!strings.Contains(runtime, "Number(index)") {
 		t.Fatalf("BigInt-compatible runtime array artifact:\n%s", runtime)
 	}
-	source := target.printed[sourceOutputPath(target)]
-	if !strings.Contains(source, "BigInt(") {
-		t.Fatalf("BigInt array len/cap artifact:\n%s", source)
-	}
+	assertBigIntConstantReturn(t, emission, "LengthAndCapacity", "10n")
+	assertBigIntConstantReturn(t, emission, "InferredLength", "8n")
 }
 
 func sourceOutputPath(target materializedProgram) string {
@@ -169,6 +167,52 @@ func sourceOutputPath(target materializedProgram) string {
 		}
 	}
 	return ""
+}
+
+func assertBigIntConstantReturn(
+	t *testing.T,
+	emission emit.ProgramEmission,
+	name string,
+	want string,
+) {
+	t.Helper()
+	matches := 0
+	for _, file := range emission.Files() {
+		if file.Kind() != emit.TargetFileSource {
+			continue
+		}
+		for _, statement := range file.SourceFile().Statements() {
+			function, ok := statement.(tsgo.FunctionDeclaration)
+			if !ok || function.Name().Text() != name {
+				continue
+			}
+			matches++
+			body, ok := function.Body().(tsgo.Block)
+			if !ok {
+				t.Fatalf("%s body = %T, want tsgo.Block", name, function.Body())
+			}
+			var expression tsgo.Expression
+			for _, bodyStatement := range body.Statements() {
+				returned, ok := bodyStatement.(tsgo.ReturnStatement)
+				if ok {
+					expression = returned.Expression()
+				}
+			}
+			literal, ok := expression.(tsgo.BigIntLiteral)
+			if !ok || literal.Text() != want {
+				t.Fatalf(
+					"%s return = %T/%v, want bigint literal %s",
+					name,
+					expression,
+					expression,
+					want,
+				)
+			}
+		}
+	}
+	if matches != 1 {
+		t.Fatalf("%s declarations = %d, want one", name, matches)
+	}
 }
 
 func executeGoArrayRunner(t *testing.T, directory string) string {

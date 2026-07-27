@@ -6,6 +6,10 @@ func ASCII() rune {
 	return 'A'
 }
 
+func EscapedASCII() rune {
+	return '\u0041'
+}
+
 func Newline() rune {
 	return '\n'
 }

@@ -260,6 +260,37 @@ Every implemented semantic family includes:
 - real-project samples unrelated to the discovering corpus; and
 - production-path mutations that prove the gate detects the intended defect.
 
+The constant-context family additionally proves:
+
+- `return Scale`, `Scale + Scale`, assignment, argument, case, conversion,
+  package selector, and dot-import contexts select the exact parent-owned or
+  enclosing-expression checker fact;
+- a named untyped float constant used at `float32` and `float64` proves that
+  contextual occurrence rounding is not mistaken for declaration-value drift;
+- sibling and nested local `const Width` declarations stay in their lexical
+  blocks and produce no duplicate target binding;
+- two packages exporting the same constant spelling import distinct
+  `(constant identity, representation)` projections;
+- whole-file and exported-Go-API roots account for an unused untyped constant
+  without runtime output, a generic representation root rejects it as
+  ambiguous, and an explicit concrete-projection root materializes exactly the
+  requested representation or fails;
+- removing parent expected-type propagation, restoring `types.Default`,
+  flattening a local projection into a function prologue, keying an import by
+  spelling, accepting an ambiguous constant root, dropping an explicit
+  projection, or restoring a generic empty declaration path fails an owning
+  gate; and
+- 1x/2x/4x named uses retain one value payload per projection and constant-size
+  references.
+
+The float/rune checkpoint additionally covers every admitted float32 and
+float64 arithmetic, ordering, equality, and unary operation; float32
+overflow, underflow, subnormal, signed-zero, infinity, and NaN behavior; and
+canonical rune values independent of source spelling. Mutations remove
+float32 rounding, swap each operator class, and substitute source spelling for
+checker value. Tests invoke generated Go-shaped call sites so arbitrary host
+numbers cannot bypass an input conversion boundary.
+
 Examples include:
 
 - one-result versus comma-ok map indexing;

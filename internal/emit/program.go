@@ -98,20 +98,17 @@ func CompileWithOptions(
 		return ProgramEmission{}, err
 	}
 	for _, root := range roots {
-		if root.object == nil {
+		if !root.valid() {
 			return ProgramEmission{},
 				&ScheduleError{Reason: "emission root is invalid"}
 		}
 	}
 	orderedRoots := slices.Clone(roots)
 	sort.Slice(orderedRoots, func(left, right int) bool {
-		return compareObjects(
-			orderedRoots[left].object,
-			orderedRoots[right].object,
-		) < 0
+		return compareRoots(orderedRoots[left], orderedRoots[right]) < 0
 	})
 	for _, root := range orderedRoots {
-		if err := session.require(root.object); err != nil {
+		if err := session.requireRoot(root); err != nil {
 			return ProgramEmission{}, err
 		}
 	}
@@ -144,6 +141,9 @@ func CompileWithOptions(
 	}
 	files, err := session.targetFiles()
 	if err != nil {
+		return ProgramEmission{}, err
+	}
+	if err := session.verifyRootObligations(orderedRoots, files); err != nil {
 		return ProgramEmission{}, err
 	}
 	return ProgramEmission{files: files}, nil
@@ -185,7 +185,7 @@ func fileRoots(
 					Reason: "function declaration has no object identity",
 				}
 			}
-			root, err := NewRoot(object)
+			root, err := newRoot(object, RootFileCoverage)
 			if err != nil {
 				return nil, err
 			}
@@ -199,7 +199,7 @@ func fileRoots(
 						if object == nil {
 							continue
 						}
-						root, err := NewRoot(object)
+						root, err := newRoot(object, RootFileCoverage)
 						if err != nil {
 							return nil, err
 						}
@@ -210,7 +210,7 @@ func fileRoots(
 					if object == nil {
 						continue
 					}
-					root, err := NewRoot(object)
+					root, err := newRoot(object, RootFileCoverage)
 					if err != nil {
 						return nil, err
 					}

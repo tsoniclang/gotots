@@ -233,16 +233,31 @@ func (e StatementEmission) Requests() []RootRequest {
 type DeclarationEmission struct {
 	declarations []tsgo.Statement
 	requests     []RootRequest
+	disposition  DeclarationDisposition
 }
 
-// EmptyDeclarationEmission is a valid declaration emission that contributes no
-// target statements. It is the disposition of a source declaration whose runtime
-// form is supplied entirely by later demand-driven reconstruction — an untyped
-// constant with no projected uses yet — and never a silent skip of a construct
-// that owed a direct declaration. The requests, if any, still propagate.
-func EmptyDeclarationEmission(requests ...RootRequest) DeclarationEmission {
+type DeclarationDisposition uint8
+
+const (
+	DeclarationDispositionInvalid DeclarationDisposition = iota
+	DeclarationDispositionMaterialized
+	DeclarationDispositionCoverageOnly
+)
+
+func (d DeclarationDisposition) Valid() bool {
+	return d == DeclarationDispositionMaterialized ||
+		d == DeclarationDispositionCoverageOnly
+}
+
+// CoverageOnlyDeclarationEmission is the sole declaration result with no
+// target statement. It records that the source declaration was visited for
+// whole-file coverage but has no requested runtime representation.
+func CoverageOnlyDeclarationEmission(
+	requests ...RootRequest,
+) DeclarationEmission {
 	return DeclarationEmission{
-		requests: slices.Clone(requests),
+		requests:    slices.Clone(requests),
+		disposition: DeclarationDispositionCoverageOnly,
 	}
 }
 
@@ -267,6 +282,7 @@ func NewDeclarationEmission(
 	return DeclarationEmission{
 		declarations: slices.Clone(declarations),
 		requests:     slices.Clone(requests),
+		disposition:  DeclarationDispositionMaterialized,
 	}, nil
 }
 
@@ -280,6 +296,7 @@ func DirectDeclaration(
 	return DeclarationEmission{
 		declarations: []tsgo.Statement{declaration},
 		requests:     slices.Clone(requests),
+		disposition:  DeclarationDispositionMaterialized,
 	}
 }
 
@@ -289,6 +306,10 @@ func (e DeclarationEmission) Declarations() []tsgo.Statement {
 
 func (e DeclarationEmission) Requests() []RootRequest {
 	return slices.Clone(e.requests)
+}
+
+func (e DeclarationEmission) Disposition() DeclarationDisposition {
+	return e.disposition
 }
 
 type TypeEmission struct {

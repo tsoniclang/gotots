@@ -22,7 +22,8 @@ import (
 // profile because its value exceeds the safe-integer range.
 var numberRoots = []string{
 	"Enum", "Inherited", "MultipleTargets", "Argument", "Assignment",
-	"Case", "Conversion", "Untyped", "Typed", "RuneValue", "Local",
+	"Case", "Conversion", "Arithmetic", "Float32Expression",
+	"Float64Expression", "Defaulted", "Untyped", "Typed", "RuneValue", "Local",
 }
 
 const hugeRoot = "HugeAsUint"
@@ -167,6 +168,7 @@ replace example.com/constantfamily => %s
 
 import (
 	"fmt"
+	"strconv"
 
 	values "example.com/constantfamily"
 )
@@ -180,6 +182,10 @@ func main() {
 	fmt.Println(values.Case(100))
 	fmt.Println(values.Case(5))
 	fmt.Println(values.Conversion())
+	fmt.Println(values.Arithmetic())
+	fmt.Println(strconv.FormatFloat(float64(values.Float32Expression()), 'g', -1, 64))
+	fmt.Println(values.Float64Expression())
+	fmt.Println(values.Defaulted())
 	fmt.Println(values.Untyped())
 	fmt.Println(values.Typed())
 	fmt.Println(values.RuneValue())
@@ -219,6 +225,10 @@ console.log(String(values.Assignment()));
 console.log(String(values.Case(100` + suffix + `)));
 console.log(String(values.Case(5` + suffix + `)));
 console.log(String(values.Conversion()));
+console.log(String(values.Arithmetic()));
+console.log(String(values.Float32Expression()));
+console.log(String(values.Float64Expression()));
+console.log(row(values.Defaulted()));
 console.log(row(values.Untyped()));
 console.log(row(values.Typed()));
 console.log(String(values.RuneValue()));

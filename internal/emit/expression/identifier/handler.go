@@ -37,7 +37,7 @@ func Emit(
 	}
 	if constObject, ok := object.(*types.Const); ok &&
 		constantbinding.IsUntyped(constObject.Type()) {
-		return emitUntypedConstantProjection(context, source, constObject)
+		return constantbinding.EmitUse(context, source, constObject)
 	}
 	if variable, ok := object.(*types.Var); ok &&
 		!variable.IsField() &&
@@ -67,70 +67,6 @@ func Emit(
 	return api.DirectExpression(
 		context.Factory().Identifier(reference.Name()),
 		reference.Requests()...,
-	), nil
-}
-
-// emitUntypedConstantProjection emits a use of a source-declared untyped
-// constant as a constant-size reference to its projection at this use's exact
-// contextual basic representation, which the checker recorded on the identifier.
-// A package-level constant projects to a module-level binding owned by the
-// constant; a function-local constant projects to a prologue binding owned by
-// the enclosing function. Neither inlines the value, so output stays
-// O(value-size + uses).
-func emitUntypedConstantProjection(
-	context api.Context,
-	source *ast.Ident,
-	constObject *types.Const,
-) (api.ExpressionEmission, error) {
-	typeAndValue := context.TypesInfo().Types[source]
-	if typeAndValue.Value == nil {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
-	projection, ok := constantbinding.ProjectionKind(typeAndValue.Type)
-	if !ok {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
-	if constObject.Pkg() != nil &&
-		constObject.Parent() == constObject.Pkg().Scope() {
-		reference, err := context.Names().ConstantProjection(
-			constObject,
-			projection,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		return api.DirectExpression(
-			context.Factory().Identifier(reference.Name()),
-			reference.Requests()...,
-		), nil
-	}
-	owner := context.ArtifactOwner()
-	if owner == nil {
-		return api.ExpressionEmission{},
-			&api.InvariantError{
-				Role:   context.Role(),
-				Reason: "local constant use has no enclosing function owner",
-			}
-	}
-	request, err := api.NewLocalConstantProjectionRequest(
-		owner,
-		constObject,
-		projection,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	base, err := context.Names().Declare(constObject)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	return api.DirectExpression(
-		context.Factory().Identifier(
-			api.ConstantProjectionName(base, projection),
-		),
-		request,
 	), nil
 }
 

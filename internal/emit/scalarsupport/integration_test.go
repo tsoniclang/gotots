@@ -1,11 +1,14 @@
-package emit_test
+package scalarsupport_test
 
 import (
+	"context"
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit"
+	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -284,4 +287,25 @@ func printIntegerEmission(t *testing.T, emission emit.ProgramEmission) string {
 		result.WriteString(printed)
 	}
 	return result.String()
+}
+
+func loadDemandProgram(t *testing.T) *load.Program {
+	t.Helper()
+	program, err := load.Load(context.Background(), load.Request{
+		Directory: filepath.Join(
+			repositoryRoot(),
+			"testdata",
+			"projects",
+			"demand-program",
+		),
+		Pattern: "./api",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return program
+}
+
+func repositoryRoot() string {
+	return filepath.Join("..", "..", "..")
 }

@@ -1,7 +1,9 @@
 package integer_test
 
 import (
+	"bytes"
 	"context"
+	"go/ast"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -32,18 +34,7 @@ func runeDirectory() string {
 // int32 code point and execute identically to Go, including a rune literal used
 // at an int32 target.
 func TestRuneLiteralExecutesDifferentially(t *testing.T) {
-	loaded, err := load.One(context.Background(), load.Request{Directory: runeDirectory(), Pattern: "."})
-	if err != nil {
-		t.Fatal(err)
-	}
-	roots, err := emit.ExportedAPIRoots(loaded)
-	if err != nil {
-		t.Fatal(err)
-	}
-	emission, err := emit.Compile(loaded.Program(), roots)
-	if err != nil {
-		t.Fatalf("rune compile failed: %v", err)
-	}
+	emission := compileRune(t, loadRune(t))
 
 	workingDirectory := t.TempDir()
 	client, err := tsgo.StartClient(repositoryRoot(), workingDirectory)
@@ -84,6 +75,139 @@ func TestRuneLiteralExecutesDifferentially(t *testing.T) {
 	}
 }
 
+func TestRuneValuesComeFromCheckerEvidence(t *testing.T) {
+	baseline := compileRune(t, loadRune(t))
+	mutatedInput := loadRune(t)
+	mutated := false
+	for _, file := range mutatedInput.Files() {
+		ast.Inspect(file.Syntax(), func(node ast.Node) bool {
+			literal, ok := node.(*ast.BasicLit)
+			if ok && literal.Value == "'A'" {
+				// This deliberately poisons syntax after type checking. The
+				// retained checker value is still U+0041; a source-spelling
+				// materializer would incorrectly emit U+005A.
+				literal.Value = "'Z'"
+				mutated = true
+				return false
+			}
+			return true
+		})
+	}
+	if !mutated {
+		t.Fatal("rune literal mutation target was absent")
+	}
+	changedSyntax := compileRune(t, mutatedInput)
+	assertRuneProgramASTEqual(t, baseline, changedSyntax)
+
+	source := runeSourceFile(t, baseline)
+	for _, name := range []string{"ASCII", "EscapedASCII"} {
+		value := runeFunctionReturn(t, source, name)
+		literal, ok := value.(tsgo.NumericLiteral)
+		if !ok || literal.Text() != "65" {
+			t.Fatalf("%s returns %T %v, want canonical numeric rune 65", name, value, value)
+		}
+	}
+}
+
+func loadRune(t *testing.T) *load.Package {
+	t.Helper()
+	loaded, err := load.One(
+		context.Background(),
+		load.Request{Directory: runeDirectory(), Pattern: "."},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return loaded
+}
+
+func compileRune(t *testing.T, loaded *load.Package) emit.ProgramEmission {
+	t.Helper()
+	roots, err := emit.ExportedAPIRoots(loaded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	emission, err := emit.Compile(loaded.Program(), roots)
+	if err != nil {
+		t.Fatalf("rune compile failed: %v", err)
+	}
+	return emission
+}
+
+func runeSourceFile(
+	t *testing.T,
+	emission emit.ProgramEmission,
+) tsgo.SourceFile {
+	t.Helper()
+	for _, file := range emission.Files() {
+		if file.Kind() == emit.TargetFileSource &&
+			file.PackageName() == "rune" {
+			return file.SourceFile()
+		}
+	}
+	t.Fatal("rune source artifact is absent")
+	return nil
+}
+
+func runeFunctionReturn(
+	t *testing.T,
+	source tsgo.SourceFile,
+	name string,
+) tsgo.Expression {
+	t.Helper()
+	for _, statement := range source.Statements() {
+		function, ok := statement.(tsgo.FunctionDeclaration)
+		if !ok || function.Name().Text() != name {
+			continue
+		}
+		for _, bodyStatement := range function.Body().(tsgo.Block).Statements() {
+			if returned, ok := bodyStatement.(tsgo.ReturnStatement); ok {
+				return returned.Expression()
+			}
+		}
+		t.Fatalf("%s has no target return statement", name)
+	}
+	t.Fatalf("target function %s is absent", name)
+	return nil
+}
+
+func assertRuneProgramASTEqual(
+	t *testing.T,
+	left emit.ProgramEmission,
+	right emit.ProgramEmission,
+) {
+	t.Helper()
+	leftFiles := left.Files()
+	rightFiles := right.Files()
+	if len(leftFiles) != len(rightFiles) {
+		t.Fatalf("file counts differ: %d and %d", len(leftFiles), len(rightFiles))
+	}
+	for index := range leftFiles {
+		if leftFiles[index].OutputPath() != rightFiles[index].OutputPath() {
+			t.Fatalf(
+				"file %d paths differ: %s and %s",
+				index,
+				leftFiles[index].OutputPath(),
+				rightFiles[index].OutputPath(),
+			)
+		}
+		leftBytes, err := tsgo.EncodeSourceFile(leftFiles[index].SourceFile())
+		if err != nil {
+			t.Fatal(err)
+		}
+		rightBytes, err := tsgo.EncodeSourceFile(rightFiles[index].SourceFile())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(leftBytes, rightBytes) {
+			t.Fatalf(
+				"target AST for %s changed when only stale rune spelling changed",
+				leftFiles[index].OutputPath(),
+			)
+		}
+	}
+}
+
 func runRuneGo(t *testing.T, workingDirectory string) string {
 	t.Helper()
 	modulePath, err := filepath.Abs(runeDirectory())
@@ -109,6 +233,7 @@ import (
 
 func main() {
 	fmt.Println(values.ASCII())
+	fmt.Println(values.EscapedASCII())
 	fmt.Println(values.Newline())
 	fmt.Println(values.Accented())
 	fmt.Println(values.CJK())
@@ -124,6 +249,7 @@ func runRuneTS(t *testing.T, workingDirectory string, targetPaths []string, sour
 	t.Helper()
 	runner := `import * as values from "` + sourceModule + `";
 console.log(String(values.ASCII()));
+console.log(String(values.EscapedASCII()));
 console.log(String(values.Newline()));
 console.log(String(values.Accented()));
 console.log(String(values.CJK()));

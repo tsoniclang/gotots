@@ -207,29 +207,65 @@ export const Base: int32 = 40;
 ```
 
 An **untyped** constant has no single runtime type: Go converts it to a concrete
-type independently at each use. It therefore has no single binding. Each
-source-declared untyped constant is projected once per required target
-representation — the exact contextual type the checker records at a use
-(`Types[use].Type`) — through the demand-driven reconstructible-artifact
-lifecycle. A package-level projection is one exported declaration imported
-statically; a function-local projection has deterministic in-block placement.
-Every use — a same-package identifier, a package-qualified selector, or a
-dot-imported identifier — is a constant-size reference to its projection, so
-output size is `O(value-size + uses)`, never `O(value-size × uses)`; inlining a
-value at each use is forbidden. A projection whose value is not representable in
-the selected profile fails at the typed value boundary, not at a caller
-invariant.
+type independently at each use. It therefore has no single binding. Each bare
+named use requests one projection at its effective concrete type through the
+demand-driven reconstructible-artifact lifecycle. The effective type is the
+concrete checker type on that occurrence when one exists; otherwise it is the
+concrete type supplied by the owning parent context after assignability is
+validated. For example, in `return Scale`, `Scale` remains `untyped int` in
+`go/types.Info.Types`, while the return owner supplies the function's `int32`
+result type. The emitter must not call `types.Default`, infer a type from
+spelling, or assume that a child occurrence carries its parent's conversion.
+The exact `*types.Const` selected by `go/types.Info.Uses` owns the declaration
+value. An occurrence's `TypeAndValue.Value` may already reflect contextual
+conversion or rounding (for example, an untyped `Pi` used as `float64`), so it
+proves that the occurrence is constant but is not a second declaration-value
+truth and is not compared byte-for-byte with `Const.Val()`.
 
-All root and use paths share this one classification: whole-file compilation,
-the exported-API surface, demand roots, and every same-package and cross-package
-use route a constant through the single constant-use owner, which takes the
-source expression, the `*types.Const`, and the `types.TypeAndValue`. Every
-emitted package declaration (typed binding or untyped projection) is exported
-for static generated-module linking; package assembly later selects the public
-surface. A single `go/constant.Value.Kind` dispatcher owns value materialization;
-integer, string, and later float/complex materializers have no other semantic
-callers — a syntax owner may validate its AST form but delegates the value to
-this one owner.
+A non-reference constant expression is different. In
+`return Scale + Scale`, the two identifiers remain untyped, while the
+`*ast.BinaryExpr` carries the exact folded checker value. The binary owner emits
+that enclosing value at the parent's concrete result type; it does not emit
+runtime addition and does not ask either child to rediscover the context.
+
+A package-level projection is one exported declaration imported statically. A
+function-local projection is emitted at its original lexical `const`
+declaration, never flattened into a function prologue. Sibling blocks may
+therefore declare the same Go spelling without colliding or widening scope.
+Every use — a same-package identifier, a package-qualified selector, or a
+dot-imported identifier — routes through the same constant-use owner and is a
+constant-size reference to its projection. Cross-package import identity is the
+full `(package constant identity, target representation)` pair, so two packages
+exporting `Width` cannot create duplicate local bindings. Output size is
+`O(value-size + uses)`, never `O(value-size × uses)`; inlining a named value at
+each use is forbidden. A projection whose value is not representable in the
+selected profile fails at the typed value boundary, not at a caller invariant.
+
+Emission roots retain their intent. Whole-file coverage and exported-Go-API
+roots account for an unused untyped constant as a compile-time-only declaration;
+they do not invent a runtime value. This is necessary rather than an
+optimization: Go's exported untyped-constant contract admits an open set of
+future contextual conversions, so no finite set of target runtime bindings can
+be its exact public replacement. A translated Go consumer requests the exact
+projection it uses. An explicit representation root must name its concrete
+basic representation and materialize that projection or fail; a generic
+`NewRoot` request for an untyped constant is rejected as ambiguous. Projection
+kinds are the closed concrete constant-capable basic domain; untyped kinds,
+`Invalid`, out-of-range values, and `unsafe.Pointer` fail at construction.
+These typed dispositions may not be confused with failed projection or use
+`types.Default`.
+
+All bare named-use paths share this one classification: same-package
+identifiers, package-qualified selectors, and dot-imported identifiers identify
+the exact `*types.Const` and delegate to the single constant-use owner with the
+source expression and `types.TypeAndValue`. Root policy is a separate typed
+owner because coverage and public representation are different obligations.
+Every materialized package declaration (typed binding or untyped projection) is
+exported for static generated-module linking; package assembly later selects the
+public surface. A single `go/constant.Value.Kind` dispatcher owns value
+materialization; integer, string, float, and later complex materializers have no
+other semantic callers. A syntax owner may validate its AST form and choose the
+enclosing checker value, but delegates value materialization to this owner.
 
 Package variables are package-state fields, never source-file-local `let`
 bindings. A same-package read or store uses the package's direct state import;

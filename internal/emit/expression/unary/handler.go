@@ -20,8 +20,15 @@ func Emit(
 	if source.Op == token.AND {
 		return children.Address(context, source)
 	}
-	if source.Op == token.SUB && context.TypesInfo().Types[source].Value != nil {
-		return emitConstant(context, source)
+	if target, handled, err := constantvalue.EmitFolded(
+		context,
+		source,
+	); handled {
+		return target, err
+	}
+	if unaryConstantEvidenceIsIncomplete(context, source) {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	if result, ok, err := emitInteger(context, children, source); ok || err != nil {
 		return result, err
@@ -56,6 +63,23 @@ func Emit(
 		),
 		operand.Requests(),
 	)
+}
+
+func unaryConstantEvidenceIsIncomplete(
+	context api.Context,
+	source *ast.UnaryExpr,
+) bool {
+	switch source.Op {
+	case token.ADD, token.SUB, token.XOR, token.NOT:
+	default:
+		return false
+	}
+	result, resultExists := context.TypesInfo().Types[source]
+	operand, operandExists := context.TypesInfo().Types[source.X]
+	return resultExists &&
+		result.Value == nil &&
+		operandExists &&
+		operand.Value != nil
 }
 
 func emitInteger(
@@ -160,33 +184,7 @@ func emitInteger(
 	return result, true, err
 }
 
-// emitConstant materializes a constant unary expression from its folded checker
-// value through the single value owner, so a negated integer or float constant
-// (`-5`, `-4.5`) renders at its target representation without re-evaluating the
-// operator or the source spelling.
-func emitConstant(
-	context api.Context,
-	source *ast.UnaryExpr,
-) (api.ExpressionEmission, error) {
-	typeAndValue := context.TypesInfo().Types[source]
-	if typeAndValue.Value == nil {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
-	targetType := context.ExpectedType()
-	if targetType == nil {
-		targetType = typeAndValue.Type
-	}
-	if typeAndValue.Type == nil ||
-		!types.AssignableTo(typeAndValue.Type, targetType) {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
-	return constantvalue.EmitValue(context, source, targetType, typeAndValue.Value)
-}
-
-// emitFloat handles runtime float64 unary negation and identity. float32 needs
-// rounding and stays a boundary here.
+// emitFloat handles runtime float32/float64 unary negation and identity.
 func emitFloat(
 	context api.Context,
 	children api.ChildEmitter,

@@ -23,10 +23,9 @@ func loadConstantRoots(t *testing.T) *load.Package {
 
 // TestCompileFileEmitsUntypedConstantRootsWithoutCrashing proves the primary
 // whole-file entrypoint no longer fails on untyped-constant roots: CompileFile
-// schedules every package declaration — including the untyped constants Zero,
-// Width, Label, Enabled, and the unexported one — as a root. Each untyped
-// constant root contributes no direct binding; its projections arrive only as
-// the functions that use them demand representations. The whole program
+// schedules every package declaration — including untyped constants — as a
+// typed coverage root. A coverage-only constant contributes no runtime binding;
+// projections arrive only from represented uses. The whole program
 // strict-typechecks.
 func TestCompileFileEmitsUntypedConstantRootsWithoutCrashing(t *testing.T) {
 	loaded := loadConstantRoots(t)
@@ -40,8 +39,9 @@ func TestCompileFileEmitsUntypedConstantRootsWithoutCrashing(t *testing.T) {
 }
 
 // TestExportedAPIRootsEmitsUntypedConstantRootsWithoutCrashing proves the same
-// for the exported-API entrypoint: the exported untyped constants become roots
-// directly, and the program strict-typechecks.
+// for the exported-Go-API entrypoint: unused exported untyped constants retain
+// their compile-time-only disposition, while represented uses still demand
+// projections. The program strict-typechecks.
 func TestExportedAPIRootsEmitsUntypedConstantRootsWithoutCrashing(t *testing.T) {
 	loaded := loadConstantRoots(t)
 	roots, err := emit.ExportedAPIRoots(loaded)

@@ -6,6 +6,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	constantvalue "github.com/tsoniclang/gotots/internal/emit/constant"
 	floatbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/float"
 	integerbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/integer"
 	"github.com/tsoniclang/gotots/internal/emit/expression/mapcomparison"
@@ -18,6 +19,16 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.BinaryExpr,
 ) (api.ExpressionEmission, error) {
+	if target, handled, err := constantvalue.EmitFolded(
+		context,
+		source,
+	); handled {
+		return target, err
+	}
+	if binaryConstantEvidenceIsIncomplete(context, source) {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
 	if target, handled, err := mapcomparison.Emit(
 		context,
 		children,
@@ -90,6 +101,21 @@ func Emit(
 		target,
 		api.CombineRequests(left.Requests(), right.Requests()),
 	)
+}
+
+func binaryConstantEvidenceIsIncomplete(
+	context api.Context,
+	source *ast.BinaryExpr,
+) bool {
+	result, resultExists := context.TypesInfo().Types[source]
+	left, leftExists := context.TypesInfo().Types[source.X]
+	right, rightExists := context.TypesInfo().Types[source.Y]
+	return resultExists &&
+		result.Value == nil &&
+		leftExists &&
+		left.Value != nil &&
+		rightExists &&
+		right.Value != nil
 }
 
 func emitValueEquality(

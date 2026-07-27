@@ -48,24 +48,7 @@ func Emit(
 	}
 	if constObject, ok := object.(*types.Const); ok &&
 		constantbinding.IsUntyped(constObject.Type()) {
-		typeAndValue := context.TypesInfo().Types[source]
-		if typeAndValue.Value == nil {
-			return api.ExpressionEmission{},
-				api.Unsupported(context, api.CategoryExpression, source)
-		}
-		projection, ok := constantbinding.ProjectionKind(typeAndValue.Type)
-		if !ok {
-			return api.ExpressionEmission{},
-				api.Unsupported(context, api.CategoryExpression, source)
-		}
-		reference, err := context.Names().ConstantProjection(constObject, projection)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		return api.DirectExpression(
-			context.Factory().Identifier(reference.Name()),
-			reference.Requests()...,
-		), nil
+		return constantbinding.EmitUse(context, source, constObject)
 	}
 	switch object.(type) {
 	case *types.Const, *types.Func:

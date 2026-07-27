@@ -13,6 +13,8 @@ const (
 
 const Scale = 100
 
+const Fraction = 1.25
+
 const Huge = 1 << 63
 
 const Text = "hi"
@@ -61,6 +63,27 @@ func Case(value int32) int32 {
 
 func Conversion() int64 {
 	return int64(Scale)
+}
+
+func Arithmetic() int {
+	return Scale + Scale
+}
+
+func Float32Expression() float32 {
+	return 0.1 + 0.2
+}
+
+func Float64Expression() float64 {
+	return 0.1 + 0.2
+}
+
+func Defaulted() (int, float64, rune, string, bool) {
+	integer := Scale
+	floating := Fraction
+	character := Letter
+	text := Text
+	enabled := Flag
+	return integer, floating, character, text, enabled
 }
 
 func Untyped() (int, string, bool) {

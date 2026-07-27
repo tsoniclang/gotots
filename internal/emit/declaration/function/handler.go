@@ -44,6 +44,15 @@ func Emit(
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
+	context, err = applyLocalConstantProjections(
+		context,
+		source,
+		functionObject,
+		requirements,
+	)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
 
 	name, err := context.Names().Declare(functionObject)
 	if err != nil {
@@ -86,23 +95,6 @@ func Emit(
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
-	projectionPrologue, projectionRequests, err := localConstantProjectionPrologue(
-		context,
-		children,
-		source,
-		functionObject,
-		requirements,
-	)
-	if err != nil {
-		return api.DeclarationEmission{}, err
-	}
-	bodyBlock := body.Value()
-	if len(projectionPrologue) != 0 {
-		bodyBlock = context.Factory().Block(
-			append(projectionPrologue, bodyBlock.Statements()...),
-			true,
-		)
-	}
 	moduleExport, err := context.Names().ModuleExport(functionObject)
 	if err != nil {
 		return api.DeclarationEmission{}, err
@@ -118,14 +110,55 @@ func Emit(
 		nil,
 		parameters,
 		targetSignature.Result(),
-		bodyBlock,
+		body.Value(),
 	)
 	return api.DirectDeclaration(
 		target,
 		api.CombineRequests(
 			parameterRequests,
 			body.Requests(),
-			projectionRequests,
 		)...,
 	), nil
+}
+
+func applyLocalConstantProjections(
+	context api.Context,
+	source *ast.FuncDecl,
+	owner *types.Func,
+	requirements []api.DeclarationRequirement,
+) (api.Context, error) {
+	if source == nil || owner == nil {
+		return api.Context{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "local-constant projection artifact identity is nil",
+		}
+	}
+	projections := make(map[*types.Const][]types.BasicKind)
+	for _, requirement := range requirements {
+		if requirement.Kind() != api.DeclarationRequirementLocalConstantProjection {
+			continue
+		}
+		requirementOwner, selected, projection, ok :=
+			requirement.LocalConstantProjection()
+		if !ok ||
+			requirementOwner != owner ||
+			selected.Pkg() != owner.Pkg() ||
+			selected.Pos() < source.Pos() ||
+			selected.Pos() > source.End() {
+			return api.Context{}, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "function received foreign local-constant projection requirement",
+			}
+		}
+		for _, existing := range projections[selected] {
+			if existing == projection {
+				return api.Context{}, &api.InvariantError{
+					Role:   context.Role(),
+					Reason: "function received duplicate local-constant projection requirement",
+				}
+			}
+		}
+		projections[selected] = append(projections[selected], projection)
+	}
+	return context.WithLocalConstantProjections(owner, projections), nil
 }

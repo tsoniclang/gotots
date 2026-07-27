@@ -156,7 +156,13 @@ func emitProjections(
 					Reason: "constant projection requirement does not own this constant",
 				}
 		}
-		projectionName := api.ConstantProjectionName(baseName, projection)
+		projectionName, err := api.ConstantProjectionName(
+			baseName,
+			projection,
+		)
+		if err != nil {
+			return api.DeclarationEmission{}, err
+		}
 		emission, err := constantbinding.EmitProjection(
 			context,
 			children,
@@ -183,7 +189,7 @@ func emitProjections(
 		requests = append(requests, emission.Requests()...)
 	}
 	if len(declarations) == 0 {
-		return api.EmptyDeclarationEmission(), nil
+		return api.CoverageOnlyDeclarationEmission(), nil
 	}
 	return api.NewDeclarationEmission(declarations, requests)
 }

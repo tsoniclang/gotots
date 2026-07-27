@@ -472,10 +472,10 @@ func (b *packageTargetBuilder) hasInitializationWork() bool {
 func (s *programSession) exportedBindingNames(
 	object types.Object,
 	baseName string,
-) []string {
+) ([]string, error) {
 	constant, ok := object.(*types.Const)
 	if !ok || !constantbinding.IsUntyped(constant.Type()) {
-		return []string{baseName}
+		return []string{baseName}, nil
 	}
 	requirements := s.requirements.appliedFor(constant)
 	names := make([]string, 0, len(requirements))
@@ -484,9 +484,13 @@ func (s *programSession) exportedBindingNames(
 		if !ok {
 			continue
 		}
-		names = append(names, api.ConstantProjectionName(baseName, projection))
+		name, err := api.ConstantProjectionName(baseName, projection)
+		if err != nil {
+			return nil, err
+		}
+		names = append(names, name)
 	}
-	return names
+	return names, nil
 }
 
 func (s *programSession) packageExports(
@@ -508,9 +512,16 @@ func (s *programSession) packageExports(
 					Reason: "assembly export has no target binding",
 				}
 			}
+			names, err := s.exportedBindingNames(
+				declaration.object,
+				binding.name,
+			)
+			if err != nil {
+				return nil, err
+			}
 			byPath[binding.sourcePath] = append(
 				byPath[binding.sourcePath],
-				s.exportedBindingNames(declaration.object, binding.name)...,
+				names...,
 			)
 		}
 	}

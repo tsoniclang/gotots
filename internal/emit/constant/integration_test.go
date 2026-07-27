@@ -18,8 +18,8 @@ import (
 
 // TestConstantFamilyNumberProfileExecutesDifferentially proves iota, inherited
 // specs, rune constants, and untyped constants projected at their contextual
-// type across multiple targets, argument, assignment, case, and conversion
-// contexts, plus typed constant bindings, emit exact TypeScript that
+// type across defaulting, multiple targets, argument, assignment, case, and
+// conversion contexts, plus typed constant bindings, emit exact TypeScript that
 // strict-typechecks and executes identically to Go.
 func TestConstantFamilyNumberProfileExecutesDifferentially(t *testing.T) {
 	loaded := loadConstantFamily(t)
@@ -83,6 +83,17 @@ func TestConstantFamilyShape(t *testing.T) {
 			t.Fatalf("projection %q is absent from %v", projection, declared)
 		}
 	}
+	for _, projection := range []string{
+		"Scale$int",
+		"Fraction$float64",
+		"Letter$int32",
+		"Text$string",
+		"Flag$bool",
+	} {
+		if !slices.Contains(declared, projection) {
+			t.Fatalf("defaulted projection %q is absent from %v", projection, declared)
+		}
+	}
 	// The typed constants keep their single base bindings.
 	for _, typed := range []string{"TypedWidth", "TypedEnabled"} {
 		if !slices.Contains(declared, typed) {
@@ -122,11 +133,11 @@ func TestConstantFamilyShape(t *testing.T) {
 	}
 }
 
-// TestLocalUntypedConstantProjectsIntoFunctionPrologue proves a function-local
+// TestLocalUntypedConstantProjectsAtItsDeclaration proves a function-local
 // untyped constant is not inlined at its uses but materialized once, at its
-// demanded representation, as a prologue const binding owned by the enclosing
-// function, and referenced constant-size.
-func TestLocalUntypedConstantProjectsIntoFunctionPrologue(t *testing.T) {
+// demanded representation, at its original lexical declaration and referenced
+// constant-size.
+func TestLocalUntypedConstantProjectsAtItsDeclaration(t *testing.T) {
 	loaded := loadConstantFamily(t)
 	emission := compileConstantFamily(t, loaded, emit.DefaultOptions(), numberRoots...)
 	source := constantFamilySourceFile(t, emission)
@@ -134,8 +145,9 @@ func TestLocalUntypedConstantProjectsIntoFunctionPrologue(t *testing.T) {
 	local := targetFunction(t, source, "Local")
 	statements := local.Body().(tsgo.Block).Statements()
 
-	// The prologue declares the two local projections before the return.
-	var prologueNames []string
+	// The source declarations at the start of this fixture materialize the two
+	// local projections before the return.
+	var projectionNames []string
 	for _, statement := range statements {
 		variable, ok := statement.(tsgo.VariableStatement)
 		if !ok {
@@ -147,11 +159,14 @@ func TestLocalUntypedConstantProjectsIntoFunctionPrologue(t *testing.T) {
 			}
 		}
 		name := variable.DeclarationList().Declarations()[0].Name().(tsgo.Identifier).Text()
-		prologueNames = append(prologueNames, name)
+		projectionNames = append(projectionNames, name)
 	}
-	slices.Sort(prologueNames)
-	if !slices.Equal(prologueNames, []string{"high$int", "low$int"}) {
-		t.Fatalf("Local prologue declares %v, want [high$int low$int]", prologueNames)
+	slices.Sort(projectionNames)
+	if !slices.Equal(projectionNames, []string{"high$int", "low$int"}) {
+		t.Fatalf(
+			"Local declarations materialize %v, want [high$int low$int]",
+			projectionNames,
+		)
 	}
 
 	// The return references the projections, never inline literals.
@@ -219,6 +234,29 @@ func TestConstantValueSpellingIsIgnored(t *testing.T) {
 		compileConstantFamily(t, loaded, emit.DefaultOptions(), "MultipleTargets"))
 	if baseline != mutated {
 		t.Fatalf("artifact changed after an alternate-spelling mutation (same checker value):\n%s\n---\n%s", baseline, mutated)
+	}
+}
+
+// TestConstantValueSyntaxCannotOverrideCheckerEvidence poisons the source AST
+// after type checking while retaining the original checker graph. This is an
+// internal mutation, not a second valid source program: a spelling-based value
+// path would emit 101, while the authoritative *types.Const must still emit
+// 100 and therefore leave the target artifact unchanged.
+func TestConstantValueSyntaxCannotOverrideCheckerEvidence(t *testing.T) {
+	baseline := printConstantFamily(t,
+		compileConstantFamily(t, loadConstantFamily(t), emit.DefaultOptions(), "MultipleTargets"))
+
+	loaded := loadConstantFamily(t)
+	spec := packageConstSpec(t, loaded, "Scale")
+	spec.Values[0] = &ast.BasicLit{
+		ValuePos: spec.Values[0].Pos(),
+		Kind:     token.INT,
+		Value:    "101",
+	}
+	mutated := printConstantFamily(t,
+		compileConstantFamily(t, loaded, emit.DefaultOptions(), "MultipleTargets"))
+	if baseline != mutated {
+		t.Fatalf("stale source syntax overrode checker-owned constant value:\n%s\n---\n%s", baseline, mutated)
 	}
 }
 

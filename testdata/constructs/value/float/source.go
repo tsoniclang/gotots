@@ -10,6 +10,10 @@ func Constant() float64 {
 	return Pi
 }
 
+func RoundedConstant() float32 {
+	return Pi
+}
+
 func NegativeConstant() float64 {
 	return Neg
 }

@@ -50,8 +50,37 @@ func Emit(
 					)
 			}
 			if constantbinding.IsUntyped(selected.Type()) {
-				// An untyped local constant is a compile-time value with no
-				// runtime declaration; each use projects its contextual type.
+				base, err := context.Names().Declare(selected)
+				if err != nil {
+					return api.StatementEmission{}, err
+				}
+				for _, projection := range context.LocalConstantProjections(selected) {
+					projectionName, err := api.ConstantProjectionName(
+						base,
+						projection,
+					)
+					if err != nil {
+						return api.StatementEmission{}, err
+					}
+					target, err := constantbinding.EmitProjection(
+						context,
+						children,
+						sourceName,
+						selected,
+						projectionName,
+						projection,
+						api.RoleLocalConstantType,
+						api.RoleLocalConstantValue,
+					)
+					if err != nil {
+						return api.StatementEmission{}, err
+					}
+					declarations = append(
+						declarations,
+						target.Declaration(),
+					)
+					requests = append(requests, target.Requests()...)
+				}
 				continue
 			}
 			target, err := constantbinding.EmitBinding(

@@ -231,6 +231,17 @@ enqueues its authoritative Go object for emission. The scheduler stores only
 `pending` and `emitted` Go identities and direct links to their target
 declarations; it does not copy call edges into a source graph.
 
+Root intent is a closed typed part of the request and is not discarded after
+object selection. Whole-file coverage, exported Go API, ordinary declaration
+demand, and explicit constant-representation demand are distinct. This matters
+when a source declaration has no single runtime form: an unused exported
+untyped constant is a compile-time-only Go contract and therefore has no target
+declaration, while an explicit constant-representation root names and
+materializes exactly one concrete projection. A generic representation request
+for an untyped constant is invalid. Only a typed compile-time-only disposition
+may publish an explicit empty observable contract; an empty concrete
+representation root is a gate failure.
+
 Reaching any source-available package also reaches that package's complete
 initialization obligation. This includes every package variable, including an
 unexported or otherwise unreferenced variable whose initializer has effects,
@@ -370,11 +381,14 @@ on the smallest closed provider facet it consumes:
 - `StaticSurface` for a statically selected class operation; and
 - `ValueSurface` for an exported target value.
 
-An artifact that emits only an executable body may provide an explicit empty
-contract while still consuming dependencies. It is reconstructed when a
-provider facet changes, but cannot dirty downstream artifacts because it
-provides no facet. An absent contract is invalid; an explicit empty contract is
-therefore not confused with failed projection.
+An artifact with a typed compile-time-only disposition may provide an explicit
+empty contract while still consuming dependencies. This includes whole-file
+and exported-Go-API accounting for an unused untyped constant. It is
+reconstructed when a provider facet changes, but cannot dirty downstream
+artifacts because it provides no facet. No generic declaration constructor may
+emit an empty result. An absent contract is invalid, and an explicit concrete
+representation root is forbidden from ending with an empty contract; source
+accounting is therefore not confused with failed projection.
 
 The facet enum is closed. A new facet requires a concrete source example,
 canonical projection, consumer rule, equality proof, and mutation test; string

@@ -36,14 +36,50 @@ type DeclarationRequirement struct {
 	projection types.BasicKind
 }
 
+// ConstantProjectionType resolves a validated concrete constant-capable basic
+// representation. Raw types.BasicKind values are representable outside this
+// package, so every public projection boundary uses this owner before indexing
+// types.Typ. Untyped kinds and unsafe.Pointer are not projection types.
+func ConstantProjectionType(
+	projection types.BasicKind,
+) (*types.Basic, bool) {
+	index := int(projection)
+	if projection == types.Invalid ||
+		index < 0 ||
+		index >= len(types.Typ) {
+		return nil, false
+	}
+	selected := types.Typ[index]
+	if selected == nil ||
+		selected.Info()&types.IsUntyped != 0 ||
+		selected.Info()&(types.IsBoolean|
+			types.IsInteger|
+			types.IsFloat|
+			types.IsComplex|
+			types.IsString) == 0 {
+		return nil, false
+	}
+	return selected, true
+}
+
 // ConstantProjectionName is the exported name of an untyped constant's
 // projection at one target basic representation. The `$` separator cannot occur
 // in a Go source identifier, so a projection name never collides with a user
 // declaration, and distinct (constant, representation) pairs never collide with
 // each other. Both the declaration owner and every use site derive the name
 // through this one function.
-func ConstantProjectionName(base string, projection types.BasicKind) string {
-	return base + "$" + types.Typ[projection].Name()
+func ConstantProjectionName(
+	base string,
+	projection types.BasicKind,
+) (string, error) {
+	selected, ok := ConstantProjectionType(projection)
+	if base == "" || !ok {
+		return "", &NameError{
+			Name:   base,
+			Reason: "constant projection identity is invalid",
+		}
+	}
+	return base + "$" + selected.Name(), nil
 }
 
 // NewConstantProjectionRequirement requires one untyped constant to be projected
@@ -57,7 +93,7 @@ func NewConstantProjectionRequirement(
 		return DeclarationRequirement{}, &RootRequestError{
 			Reason: "constant projection constant is nil",
 		}
-	case projection == types.Invalid:
+	case !validConstantProjection(projection):
 		return DeclarationRequirement{}, &RootRequestError{
 			Reason: "constant projection target representation is invalid",
 		}
@@ -71,9 +107,10 @@ func NewConstantProjectionRequirement(
 
 // NewLocalConstantProjectionRequirement requires one untyped constant declared
 // inside a function to be projected once, at the given target basic
-// representation, in that function's prologue. The enclosing function owns the
-// requirement because a function-local constant has no package declaration to
-// reconstruct; the dedup key is the (function, constant, representation) triple.
+// representation, at its original lexical declaration. The enclosing function
+// owns reconstruction because a function-local constant has no package
+// declaration artifact; the dedup key is the
+// (function, constant, representation) triple.
 func NewLocalConstantProjectionRequirement(
 	owner *types.Func,
 	constant *types.Const,
@@ -88,7 +125,7 @@ func NewLocalConstantProjectionRequirement(
 		return DeclarationRequirement{}, &RootRequestError{
 			Reason: "local constant projection constant is nil",
 		}
-	case projection == types.Invalid:
+	case !validConstantProjection(projection):
 		return DeclarationRequirement{}, &RootRequestError{
 			Reason: "local constant projection target representation is invalid",
 		}
@@ -170,7 +207,7 @@ func (r DeclarationRequirement) Valid() bool {
 		if r.operation != NamedStructOperationInvalid ||
 			r.variable != nil ||
 			r.constant != nil ||
-			r.projection == types.Invalid {
+			!validConstantProjection(r.projection) {
 			return false
 		}
 		_, ok := r.owner.(*types.Const)
@@ -179,7 +216,7 @@ func (r DeclarationRequirement) Valid() bool {
 		if r.operation != NamedStructOperationInvalid ||
 			r.variable != nil ||
 			r.constant == nil ||
-			r.projection == types.Invalid {
+			!validConstantProjection(r.projection) {
 			return false
 		}
 		_, ok := r.owner.(*types.Func)
@@ -187,6 +224,11 @@ func (r DeclarationRequirement) Valid() bool {
 	default:
 		return false
 	}
+}
+
+func validConstantProjection(projection types.BasicKind) bool {
+	_, ok := ConstantProjectionType(projection)
+	return ok
 }
 
 func (r DeclarationRequirement) Owner() types.Object {

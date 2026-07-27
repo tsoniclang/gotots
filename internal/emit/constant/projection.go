@@ -17,10 +17,11 @@ import (
 // comparable, so it is a stable per-representation dedup key.
 func ProjectionKind(contextual types.Type) (types.BasicKind, bool) {
 	basic, ok := types.Unalias(contextual).(*types.Basic)
-	if !ok || basic.Info()&types.IsUntyped != 0 {
+	if !ok {
 		return types.Invalid, false
 	}
-	return basic.Kind(), true
+	_, ok = api.ConstantProjectionType(basic.Kind())
+	return basic.Kind(), ok
 }
 
 // ProjectionEmission is one materialized untyped-constant projection: an
@@ -67,13 +68,13 @@ func EmitProjection(
 			Reason: "typed constant has a declared binding and is never projected",
 		}
 	}
-	if projection == types.Invalid {
+	targetType, ok := api.ConstantProjectionType(projection)
+	if !ok {
 		return ProjectionEmission{}, &api.InvariantError{
 			Role:   context.Role(),
 			Reason: "constant projection target representation is invalid",
 		}
 	}
-	targetType := types.Typ[projection]
 	value, err := EmitValue(
 		context.WithRole(valueRole),
 		source,
