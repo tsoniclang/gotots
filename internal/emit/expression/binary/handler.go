@@ -6,6 +6,8 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	integerbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/integer"
+	"github.com/tsoniclang/gotots/internal/emit/expression/mapcomparison"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -15,10 +17,31 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.BinaryExpr,
 ) (api.ExpressionEmission, error) {
+	if target, handled, err := mapcomparison.Emit(
+		context,
+		children,
+		source,
+	); handled {
+		return target, err
+	}
 	if source.Op == token.EQL || source.Op == token.NEQ {
+		if target, ok, err := emitSliceNilEquality(
+			context,
+			children,
+			source,
+		); ok || err != nil {
+			return target, err
+		}
 		if target, ok, err := emitValueEquality(context, children, source); ok || err != nil {
 			return target, err
 		}
+	}
+	if target, ok, err := integerbinary.Emit(
+		context,
+		children,
+		source,
+	); ok || err != nil {
+		return target, err
 	}
 	operator, operandType, ok := operationFor(context, source)
 	if !ok {
@@ -68,16 +91,25 @@ func emitValueEquality(
 ) (api.ExpressionEmission, bool, error) {
 	leftType := context.TypesInfo().TypeOf(source.X)
 	rightType := context.TypesInfo().TypeOf(source.Y)
-	if leftType == nil ||
-		rightType == nil ||
-		!types.Identical(leftType, rightType) ||
-		!context.Values().RequiresCustomEquality(leftType) {
+	if leftType == nil || rightType == nil {
+		return api.ExpressionEmission{}, false, nil
+	}
+	var operandType types.Type
+	for _, candidate := range []types.Type{leftType, rightType} {
+		if context.Values().RequiresCustomEquality(context, candidate) &&
+			types.AssignableTo(leftType, candidate) &&
+			types.AssignableTo(rightType, candidate) {
+			operandType = candidate
+			break
+		}
+	}
+	if operandType == nil {
 		return api.ExpressionEmission{}, false, nil
 	}
 	left, err := children.Expression(
 		context.
 			WithRole(api.RoleBinaryLeft).
-			WithExpectedType(leftType),
+			WithExpectedType(operandType),
 		source.X,
 	)
 	if err != nil {
@@ -86,7 +118,7 @@ func emitValueEquality(
 	right, err := children.Expression(
 		context.
 			WithRole(api.RoleBinaryRight).
-			WithExpectedType(rightType),
+			WithExpectedType(operandType),
 		source.Y,
 	)
 	if err != nil {
@@ -99,7 +131,7 @@ func emitValueEquality(
 	equal, err := context.Values().Equal(
 		context,
 		source,
-		leftType,
+		operandType,
 		left.Value(),
 		right.Value(),
 	)
@@ -129,27 +161,19 @@ func operationFor(
 ) (tsgo.BinaryOperatorToken, types.Type, bool) {
 	leftType := context.TypesInfo().TypeOf(source.X)
 	rightType := context.TypesInfo().TypeOf(source.Y)
-	integerType, integerOperands := integerOperandType(
-		context.TypesSizes(),
-		leftType,
-		rightType,
-	)
 	switch {
-	case isSignedArithmetic(source.Op) &&
-		basictype.SupportsInteger(
-			context.TypesSizes(),
-			context.TypesInfo().TypeOf(source),
-		):
-		operandType := context.TypesInfo().TypeOf(source)
-		if !types.AssignableTo(leftType, operandType) ||
-			!types.AssignableTo(rightType, operandType) {
-			return nil, nil, false
-		}
-		operator, ok := arithmeticOperator(context, source.Op)
-		return operator, operandType, ok
-	case isIntegerComparison(source.Op) && integerOperands:
-		operator, ok := comparisonOperator(context, source.Op)
-		return operator, integerType, ok
+	case source.Op == token.ADD &&
+		basictype.SupportsString(context.TypesInfo().TypeOf(source)) &&
+		types.AssignableTo(leftType, context.TypesInfo().TypeOf(source)) &&
+		types.AssignableTo(rightType, context.TypesInfo().TypeOf(source)):
+		return context.Factory().BinaryOperatorToken(
+			tsgo.BinaryOperatorPlusToken,
+		), context.TypesInfo().TypeOf(source), true
+	case isStringComparison(source.Op) &&
+		basictype.SupportsString(leftType) &&
+		basictype.SupportsString(rightType):
+		operator, ok := stringOperator(context, source.Op)
+		return operator, types.Typ[types.String], ok
 	case isLogicalOperator(source.Op) &&
 		isSupportedBoolean(context.TypesInfo().TypeOf(source)) &&
 		types.AssignableTo(leftType, types.Typ[types.Bool]) &&
@@ -173,27 +197,33 @@ func operationFor(
 	}
 }
 
-func isSignedArithmetic(operator token.Token) bool {
+func isStringComparison(operator token.Token) bool {
 	switch operator {
-	case token.ADD, token.SUB, token.MUL:
+	case token.EQL, token.NEQ, token.LSS, token.LEQ, token.GTR, token.GEQ:
 		return true
 	default:
 		return false
 	}
 }
 
-func arithmeticOperator(
+func stringOperator(
 	context api.Context,
 	operator token.Token,
 ) (tsgo.BinaryOperatorToken, bool) {
 	var target tsgo.BinaryOperator
 	switch operator {
-	case token.ADD:
-		target = tsgo.BinaryOperatorPlusToken
-	case token.SUB:
-		target = tsgo.BinaryOperatorMinusToken
-	case token.MUL:
-		target = tsgo.BinaryOperatorAsteriskToken
+	case token.EQL:
+		target = tsgo.BinaryOperatorEqualsEqualsEqualsToken
+	case token.NEQ:
+		target = tsgo.BinaryOperatorExclamationEqualsEqualsToken
+	case token.LSS:
+		target = tsgo.BinaryOperatorLessThanToken
+	case token.LEQ:
+		target = tsgo.BinaryOperatorLessThanEqualsToken
+	case token.GTR:
+		target = tsgo.BinaryOperatorGreaterThanToken
+	case token.GEQ:
+		target = tsgo.BinaryOperatorGreaterThanEqualsToken
 	default:
 		return nil, false
 	}
@@ -225,53 +255,4 @@ func logicalOperator(
 func isSupportedBoolean(value types.Type) bool {
 	basic, ok := types.Unalias(value).(*types.Basic)
 	return ok && basic.Kind() == types.Bool
-}
-
-func integerOperandType(
-	sizes types.Sizes,
-	left types.Type,
-	right types.Type,
-) (types.Type, bool) {
-	for _, candidate := range []types.Type{left, right} {
-		if !basictype.SupportsInteger(sizes, candidate) {
-			continue
-		}
-		if types.AssignableTo(left, candidate) && types.AssignableTo(right, candidate) {
-			return candidate, true
-		}
-	}
-	return nil, false
-}
-
-func isIntegerComparison(operator token.Token) bool {
-	switch operator {
-	case token.EQL, token.NEQ, token.LSS, token.LEQ, token.GTR, token.GEQ:
-		return true
-	default:
-		return false
-	}
-}
-
-func comparisonOperator(
-	context api.Context,
-	operator token.Token,
-) (tsgo.BinaryOperatorToken, bool) {
-	var target tsgo.BinaryOperator
-	switch operator {
-	case token.EQL:
-		target = tsgo.BinaryOperatorEqualsEqualsEqualsToken
-	case token.NEQ:
-		target = tsgo.BinaryOperatorExclamationEqualsEqualsToken
-	case token.LSS:
-		target = tsgo.BinaryOperatorLessThanToken
-	case token.LEQ:
-		target = tsgo.BinaryOperatorLessThanEqualsToken
-	case token.GTR:
-		target = tsgo.BinaryOperatorGreaterThanToken
-	case token.GEQ:
-		target = tsgo.BinaryOperatorGreaterThanEqualsToken
-	default:
-		return nil, false
-	}
-	return context.Factory().BinaryOperatorToken(target), true
 }

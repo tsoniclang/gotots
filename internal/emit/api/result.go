@@ -58,9 +58,14 @@ func (e ExpressionEmission) Requests() []PlacementRequest {
 }
 
 type StoreTargetEmission struct {
-	value      tsgo.Expression
-	sourceType types.Type
-	requests   []PlacementRequest
+	setter          bool
+	before          []tsgo.Statement
+	value           tsgo.Expression
+	setterReceiver  ExpressionEmission
+	setterMember    string
+	setterArguments []ExpressionEmission
+	sourceType      types.Type
+	requests        []PlacementRequest
 }
 
 func NewStoreTargetEmission(
@@ -87,8 +92,68 @@ func NewStoreTargetEmission(
 	}, nil
 }
 
+func NewSetterStoreTargetEmission(
+	receiver ExpressionEmission,
+	member string,
+	arguments []ExpressionEmission,
+	sourceType types.Type,
+) (StoreTargetEmission, error) {
+	switch {
+	case receiver.Value() == nil:
+		return StoreTargetEmission{}, &ResultError{
+			Result: "setter store target",
+			Reason: "target receiver is nil",
+		}
+	case member == "":
+		return StoreTargetEmission{}, &ResultError{
+			Result: "setter store target",
+			Reason: "target member is empty",
+		}
+	case sourceType == nil:
+		return StoreTargetEmission{}, &ResultError{
+			Result: "setter store target",
+			Reason: "source type is nil",
+		}
+	}
+	for _, argument := range arguments {
+		if argument.Value() == nil {
+			return StoreTargetEmission{}, &ResultError{
+				Result: "setter store target",
+				Reason: "setter argument is nil",
+			}
+		}
+	}
+	return StoreTargetEmission{
+		setter:          true,
+		setterReceiver:  receiver,
+		setterMember:    member,
+		setterArguments: slices.Clone(arguments),
+		sourceType:      sourceType,
+	}, nil
+}
+
+func (e StoreTargetEmission) IsSetter() bool {
+	return e.setter
+}
+
+func (e StoreTargetEmission) Before() []tsgo.Statement {
+	return slices.Clone(e.before)
+}
+
 func (e StoreTargetEmission) Value() tsgo.Expression {
 	return e.value
+}
+
+func (e StoreTargetEmission) SetterReceiver() ExpressionEmission {
+	return e.setterReceiver
+}
+
+func (e StoreTargetEmission) SetterMember() string {
+	return e.setterMember
+}
+
+func (e StoreTargetEmission) SetterArguments() []ExpressionEmission {
+	return slices.Clone(e.setterArguments)
 }
 
 func (e StoreTargetEmission) SourceType() types.Type {
@@ -96,6 +161,13 @@ func (e StoreTargetEmission) SourceType() types.Type {
 }
 
 func (e StoreTargetEmission) Requests() []PlacementRequest {
+	if e.setter {
+		requests := e.setterReceiver.Requests()
+		for _, argument := range e.setterArguments {
+			requests = append(requests, argument.Requests()...)
+		}
+		return requests
+	}
 	return slices.Clone(e.requests)
 }
 

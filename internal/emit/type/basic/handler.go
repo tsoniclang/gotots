@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 )
 
 func Emit(context api.Context, source ast.Expr) (api.TypeEmission, error) {
@@ -20,7 +21,7 @@ func EmitRepresented(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
-	alias, ok := api.PrimitiveAliasFor(context.TypesSizes(), sourceType)
+	alias, ok := PrimitiveAlias(context.TypesSizes(), sourceType)
 	if !ok {
 		return api.TypeEmission{}, api.Unsupported(context, api.CategoryType, source)
 	}
@@ -38,6 +39,42 @@ func EmitRepresented(
 }
 
 func SupportsInteger(sizes types.Sizes, sourceType types.Type) bool {
-	alias, ok := api.PrimitiveAliasFor(sizes, sourceType)
-	return ok && alias != api.PrimitiveBool
+	_, ok := integervalue.Describe(sizes, sourceType)
+	return ok
+}
+
+func PrimitiveAlias(
+	sizes types.Sizes,
+	sourceType types.Type,
+) (api.PrimitiveAlias, bool) {
+	if sourceType != nil {
+		if basic, ok := types.Unalias(sourceType).(*types.Basic); ok {
+			switch basic.Kind() {
+			case types.Bool:
+				return api.PrimitiveBool, true
+			case types.String:
+				return api.PrimitiveString, true
+			}
+		}
+	}
+	carrier, ok := integervalue.Describe(sizes, sourceType)
+	if !ok {
+		return api.PrimitiveInvalid, false
+	}
+	return carrier.Alias(), true
+}
+
+func SupportsString(sourceType types.Type) bool {
+	basic, ok := types.Unalias(sourceType).(*types.Basic)
+	return ok && basic.Info()&types.IsString != 0
+}
+
+func SupportsStringIndex(sizes types.Sizes, sourceType types.Type) bool {
+	if basic, ok := types.Unalias(sourceType).(*types.Basic); ok &&
+		basic.Info()&types.IsUntyped != 0 &&
+		basic.Info()&types.IsInteger != 0 {
+		sourceType = types.Typ[types.Int]
+	}
+	_, ok := integervalue.Describe(sizes, sourceType)
+	return ok
 }

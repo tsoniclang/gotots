@@ -6,14 +6,35 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
+	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
+	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
+	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type Owner struct{}
 
-func (Owner) RequiresCustomEquality(sourceType types.Type) bool {
+func (Owner) RequiresCustomEquality(
+	context api.Context,
+	sourceType types.Type,
+) bool {
+	if _, ok := arrayvalue.Resolve(context, sourceType); ok {
+		return true
+	}
+	if scalarPointer(context, sourceType) {
+		return true
+	}
 	_, _, ok := namedStruct(sourceType)
 	return ok
+}
+
+func (Owner) RequiresExplicitType(
+	context api.Context,
+	sourceType types.Type,
+) bool {
+	return scalarPointer(context, sourceType)
 }
 
 func (Owner) Zero(
@@ -21,11 +42,62 @@ func (Owner) Zero(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.ExpressionEmission, error) {
+	if mapType, ok := maprepresentation.Source(context, sourceType); ok {
+		zero, err := (Owner{}).Zero(
+			context.WithRole(api.RoleMapValue),
+			source,
+			mapType.Elem(),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if len(zero.Before()) != 0 {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		reference, typeArguments, err := maprepresentation.Reference(
+			context,
+			source,
+			sourceType,
+			api.ImportPhaseValue,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		nilName, err := mapruntime.Name(mapruntime.MemberNil)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.DirectExpression(
+			context.Factory().CallExpression(
+				context.Factory().PropertyAccessExpression(
+					context.Factory().Identifier(reference.Name()),
+					nil,
+					context.Factory().Identifier(nilName),
+					tsgo.NodeFlagsNone,
+				),
+				nil,
+				typeArguments,
+				[]tsgo.Expression{zero.Value()},
+				tsgo.NodeFlagsNone,
+			),
+			api.CombineRequests(
+				reference.Requests(),
+				zero.Requests(),
+			)...,
+		), nil
+	}
+	if array, ok := arrayvalue.Resolve(context, sourceType); ok {
+		return array.Zero(context, source)
+	}
 	if alias, ok := primitive(context, sourceType); ok {
 		var literal tsgo.Expression
-		if alias == api.PrimitiveBool {
+		switch alias {
+		case api.PrimitiveBool:
 			literal = context.Factory().FalseLiteral()
-		} else {
+		case api.PrimitiveString:
+			literal = context.Factory().StringLiteral("", tsgo.TokenFlagsNone)
+		default:
 			var err error
 			literal, err = api.IntegerLiteral(
 				context.Factory(),
@@ -37,6 +109,16 @@ func (Owner) Zero(
 			}
 		}
 		return api.DirectExpression(literal), nil
+	}
+	if _, _, ok := pointertype.Scalar(context.TypesSizes(), sourceType); ok {
+		return api.DirectExpression(
+			context.Factory().VoidExpression(
+				context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
+			),
+		), nil
+	}
+	if _, _, ok := scalarSlice(context, sourceType); ok {
+		return sliceZero(context, source, sourceType)
 	}
 	typeName, _, ok := namedStruct(sourceType)
 	if !ok {
@@ -59,7 +141,14 @@ func (Owner) Copy(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	if _, ok := primitive(context, sourceType); ok || callableValue(sourceType) {
+	if array, ok := arrayvalue.Resolve(context, sourceType); ok {
+		return array.Copy(context, ownsFreshValue(context, source), value)
+	}
+	if _, ok := primitive(context, sourceType); ok ||
+		callableValue(sourceType) ||
+		scalarPointer(context, sourceType) ||
+		isScalarSlice(context, sourceType) ||
+		mapValue(context, sourceType) {
 		return api.NewExpressionEmission(
 			value.Before(),
 			value.Value(),
@@ -118,23 +207,16 @@ func (Owner) Assign(
 	target tsgo.Expression,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	if _, ok := primitive(context, sourceType); ok || callableValue(sourceType) {
-		return api.NewExpressionEmission(
-			value.Before(),
-			context.Factory().BinaryExpression(
-				nil,
-				target,
-				nil,
-				context.Factory().BinaryOperatorToken(
-					tsgo.BinaryOperatorEqualsToken,
-				),
-				value.Value(),
-			),
-			value.Requests(),
-		)
-	}
-	_, _, ok := namedStruct(sourceType)
-	if !ok {
+	_, arrayOK := arrayvalue.Resolve(context, sourceType)
+	_, primitiveOK := primitive(context, sourceType)
+	_, _, structOK := namedStruct(sourceType)
+	if !arrayOK &&
+		!primitiveOK &&
+		!callableValue(sourceType) &&
+		!scalarPointer(context, sourceType) &&
+		!isScalarSlice(context, sourceType) &&
+		!mapValue(context, sourceType) &&
+		!structOK {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
@@ -160,7 +242,21 @@ func (Owner) Equal(
 	left tsgo.Expression,
 	right tsgo.Expression,
 ) (api.ExpressionEmission, error) {
+	if array, ok := arrayvalue.Resolve(context, sourceType); ok {
+		return array.Equal(context, left, right), nil
+	}
 	if _, ok := primitive(context, sourceType); ok {
+		return api.DirectExpression(context.Factory().BinaryExpression(
+			nil,
+			left,
+			nil,
+			context.Factory().BinaryOperatorToken(
+				tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+			),
+			right,
+		)), nil
+	}
+	if scalarPointer(context, sourceType) {
 		return api.DirectExpression(context.Factory().BinaryExpression(
 			nil,
 			left,
@@ -194,11 +290,21 @@ func primitive(
 	context api.Context,
 	sourceType types.Type,
 ) (api.PrimitiveAlias, bool) {
-	return api.PrimitiveAliasFor(context.TypesSizes(), sourceType)
+	return basictype.PrimitiveAlias(context.TypesSizes(), sourceType)
 }
 
 func callableValue(sourceType types.Type) bool {
 	_, ok := callable.Signature(sourceType)
+	return ok
+}
+
+func scalarPointer(context api.Context, sourceType types.Type) bool {
+	_, _, ok := pointertype.Scalar(context.TypesSizes(), sourceType)
+	return ok
+}
+
+func mapValue(context api.Context, sourceType types.Type) bool {
+	_, ok := maprepresentation.Source(context, sourceType)
 	return ok
 }
 

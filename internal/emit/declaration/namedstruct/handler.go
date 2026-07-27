@@ -5,6 +5,8 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -255,7 +257,10 @@ func fields(
 }
 
 func supportedFieldType(context api.Context, sourceType types.Type) bool {
-	if alias, ok := api.PrimitiveAliasFor(
+	if _, ok := arrayvalue.Resolve(context, sourceType); ok {
+		return true
+	}
+	if alias, ok := basictype.PrimitiveAlias(
 		context.TypesSizes(),
 		sourceType,
 	); ok {

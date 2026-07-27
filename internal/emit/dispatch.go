@@ -13,11 +13,15 @@ import (
 	binaryexpression "github.com/tsoniclang/gotots/internal/emit/expression/binary"
 	callexpression "github.com/tsoniclang/gotots/internal/emit/expression/call"
 	compositeliteral "github.com/tsoniclang/gotots/internal/emit/expression/compositeliteral"
+	dereferenceexpression "github.com/tsoniclang/gotots/internal/emit/expression/dereference"
 	functionliteral "github.com/tsoniclang/gotots/internal/emit/expression/functionliteral"
 	identifierexpression "github.com/tsoniclang/gotots/internal/emit/expression/identifier"
+	indexexpression "github.com/tsoniclang/gotots/internal/emit/expression/index"
 	integerliteral "github.com/tsoniclang/gotots/internal/emit/expression/literal/integer"
+	stringliteral "github.com/tsoniclang/gotots/internal/emit/expression/literal/string"
 	parenthesizedexpression "github.com/tsoniclang/gotots/internal/emit/expression/parenthesized"
 	selectorexpression "github.com/tsoniclang/gotots/internal/emit/expression/selector"
+	sliceexpression "github.com/tsoniclang/gotots/internal/emit/expression/slice"
 	unaryexpression "github.com/tsoniclang/gotots/internal/emit/expression/unary"
 	"github.com/tsoniclang/gotots/internal/emit/statement/assignment"
 	blockstatement "github.com/tsoniclang/gotots/internal/emit/statement/block"
@@ -32,8 +36,12 @@ import (
 	switchstatement "github.com/tsoniclang/gotots/internal/emit/statement/switchstatement"
 	storetarget "github.com/tsoniclang/gotots/internal/emit/store"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	maptype "github.com/tsoniclang/gotots/internal/emit/type/map"
 	namedstructtype "github.com/tsoniclang/gotots/internal/emit/type/namedstruct"
+	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
+	slicetype "github.com/tsoniclang/gotots/internal/emit/type/slice"
 	tupletype "github.com/tsoniclang/gotots/internal/emit/type/tuple"
+	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	"github.com/tsoniclang/gotots/internal/emit/value/representation"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -172,11 +180,20 @@ func (e *emitter) Expression(
 		return functionliteral.Emit(context, e, source)
 	case *ast.Ident:
 		return identifierexpression.Emit(context, e, source)
+	case *ast.IndexExpr:
+		return indexexpression.Emit(context, e, source)
 	case *ast.ParenExpr:
 		return parenthesizedexpression.Emit(context, e, source)
 	case *ast.SelectorExpr:
 		return selectorexpression.Emit(context, e, source)
+	case *ast.SliceExpr:
+		return sliceexpression.Emit(context, e, source)
+	case *ast.StarExpr:
+		return dereferenceexpression.Emit(context, e, source)
 	case *ast.BasicLit:
+		if source.Kind == token.STRING {
+			return stringliteral.Emit(context, e, source)
+		}
 		return e.IntegerConstant(context, source)
 	case *ast.UnaryExpr:
 		return unaryexpression.Emit(context, e, source)
@@ -355,6 +372,22 @@ func (e *emitter) Type(
 	source ast.Expr,
 ) (api.TypeEmission, error) {
 	if sourceType := context.TypesInfo().TypeOf(source); sourceType != nil {
+		if array, ok := arrayvalue.Resolve(context, sourceType); ok {
+			return array.EmitType(context, e, source)
+		}
+		if _, _, ok := pointertype.Scalar(context.TypesSizes(), sourceType); ok {
+			pointerSyntax, valid := source.(*ast.StarExpr)
+			if !valid {
+				return api.TypeEmission{},
+					api.Unsupported(context, api.CategoryType, source)
+			}
+			return pointertype.EmitSyntax(
+				context,
+				e,
+				pointerSyntax,
+				sourceType,
+			)
+		}
 		if signature, ok := types.Unalias(sourceType).(*types.Signature); ok {
 			functionType, valid := source.(*ast.FuncType)
 			if !valid {
@@ -366,6 +399,22 @@ func (e *emitter) Type(
 		if _, ok := types.Unalias(sourceType).(*types.Named); ok {
 			return namedstructtype.Emit(context, source, sourceType)
 		}
+		if _, ok := types.Unalias(sourceType).(*types.Map); ok {
+			return maptype.Emit(context, source, sourceType)
+		}
+		if sliceType, ok := types.Unalias(sourceType).(*types.Slice); ok {
+			arrayType, valid := source.(*ast.ArrayType)
+			if !valid {
+				return api.TypeEmission{},
+					api.Unsupported(context, api.CategoryType, source)
+			}
+			return slicetype.EmitSyntax(
+				context,
+				e,
+				arrayType,
+				sliceType,
+			)
+		}
 	}
 	return basictype.Emit(context, source)
 }
@@ -375,14 +424,26 @@ func (e *emitter) RepresentedType(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
+	if array, ok := arrayvalue.Resolve(context, sourceType); ok {
+		return array.EmitType(context, e, source)
+	}
 	if tuple, ok := types.Unalias(sourceType).(*types.Tuple); ok {
 		return tupletype.Emit(context, e, source, tuple)
 	}
 	if signature, ok := types.Unalias(sourceType).(*types.Signature); ok {
 		return callable.EmitType(context, e, source, signature)
 	}
+	if _, _, ok := pointertype.Scalar(context.TypesSizes(), sourceType); ok {
+		return pointertype.EmitRepresented(context, e, source, sourceType)
+	}
 	if _, ok := types.Unalias(sourceType).(*types.Named); ok {
 		return namedstructtype.Emit(context, source, sourceType)
+	}
+	if _, ok := types.Unalias(sourceType).(*types.Map); ok {
+		return maptype.Emit(context, source, sourceType)
+	}
+	if _, ok := types.Unalias(sourceType).(*types.Slice); ok {
+		return slicetype.EmitRepresented(context, e, source, sourceType)
 	}
 	return basictype.EmitRepresented(context, source, sourceType)
 }

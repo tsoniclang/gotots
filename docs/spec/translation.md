@@ -905,6 +905,26 @@ Ordinary integer syntax is source-shaped under both initial profiles:
 | `value++` / `value--` | direct update | `value++` / `value--` |
 | ordered/equality comparison or expression switch | direct comparison/switch | `left < right`, `switch (value)` |
 
+BigInt division and remainder are the bounded exception to direct operators.
+JavaScript BigInt has the required truncation behavior, but division by zero
+throws a host exception. The integer-expression owner therefore requests one
+of two constant-size runtime operations:
+
+```go
+quotient := left / right
+remainder := left % right
+```
+
+```ts
+const quotient = goIntegerDivide(left, right);
+const remainder = goIntegerRemainder(left, right);
+```
+
+Each helper checks `right === 0n`, enters the shared `GoPanic.raise` ABI, and
+otherwise performs exactly one `/` or `%`. The default `number` profile keeps
+integer division and remainder unsupported because direct JavaScript number
+division does not implement Go integer truncation.
+
 The `number` profile prints ordinary numeric literals such as `1`; the
 `bigint` profile prints `1n`. Contextual parameter, result, field, and
 package-boundary binding types carry aliases. A literal is not routinely
@@ -936,8 +956,9 @@ An explicit Go parenthesized expression becomes one TS-Go
 source grouping without creating a source-side wrapper or intermediate
 expression model.
 
-Division, remainder, shifts, bitwise operators, and explicit conversions remain
-separate construct families until their profile-specific behavior is admitted.
+Shifts, bitwise operators, and explicit conversions remain separate
+profile-specific construct families. Their admission does not authorize a
+fallback operator in the parent binary dispatcher.
 
 Literal and operator handlers must also preserve exact source evidence. A
 large Go integer constant cannot be passed through a JavaScript numeric-value
@@ -967,6 +988,84 @@ typed `$initialize` body containing zeroing, ordered initializer statements,
 and admitted `init` calls. One static program-initialization builder consumes
 the selected package graph and invokes those bodies in exact Go package order;
 it does not build a second semantic graph.
+
+### Value-Foundation Representations
+
+Milestone 3A uses bounded representations rather than pretending native
+JavaScript values already implement Go.
+
+Go string values are stored as TypeScript strings whose code units are Go
+bytes. For example, Go `"é"` contains bytes `c3 a9`, so its target semantic
+literal contains code units `0x00c3, 0x00a9`; target `.length` is therefore the
+Go byte length. Concatenation and equality are direct. Indexing and slicing use
+one demanded string runtime owner for bounds behavior:
+
+```go
+value := "é"
+return value[1], value[:1]
+```
+
+```ts
+const value: gostring = "\u00c3\u00a9";
+return [goStringIndex(value, 1), goStringSlice(value, 0, 1)];
+```
+
+An admitted fixed array retains its length in the target type. A `[2]int32`
+cannot become interchangeable with `[3]int32`. Array zero and copy create
+fresh storage; an indexed store mutates only that storage.
+
+An admitted slice is a descriptor over backing storage:
+
+```text
+backing identity + offset + length + capacity + nil state
+```
+
+Copying a slice copies the descriptor and aliases the backing storage.
+Slicing changes descriptor bounds. Append reuses capacity or allocates and
+copies according to Go behavior. Representing a slice as a bare `T[]` is
+forbidden because it cannot distinguish nil, preserve capacity, or model
+subslice append aliasing.
+Runtime methods narrow nullable backing storage through explicit branches.
+They do not emit TypeScript non-null assertions to recover a storage invariant.
+
+An admitted map is a reference value with an explicit nil state. Map assignment
+aliases the same map. Lookup of a missing key returns the element zero;
+comma-ok additionally returns `false`; storing through nil fails. A plain
+object literal is forbidden because it changes key identity and prototype
+behavior.
+
+An admitted pointer is a typed reference cell created by `new(T)`. Assignment
+copies the reference, dereference reads or writes the cell, nil is distinct,
+and equality compares cell identity. Address-of is not simulated by wrapping
+all locals. It remains unsupported until the exact local/field/indexed storage
+owner can revise only declarations whose address becomes observable.
+
+Each runtime call remains constant-size. Element/key/value representations are
+selected from the same `go/types` evidence; runtime objects never carry erased
+`any`/`unknown` payloads or callbacks that rediscover Go semantics.
+
+Bounds failures, nil pointer dereference, nil map store, and BigInt
+divide-by-zero all enter the one generated `GoPanic<T>` carrier. Family
+runtime modules import that carrier through the closed runtime dependency
+graph; they never throw `Error`/`RangeError` independently.
+Because source-level `recover` is not admitted in this checkpoint, the
+observable contract here is panic occurrence plus the shared carrier identity.
+Recovered runtime-fault payload equivalence is installed with the later
+`panic`/`recover` family rather than guessed now.
+
+Array, slice, and map indexed stores use the same setter-store transaction.
+For:
+
+```go
+values[nextIndex()] = chooseSecond(resultPair())
+```
+
+the store-target owner returns the receiver and index target expressions; the
+assignment owner evaluates and captures only operands that would otherwise
+move across prerequisite statements from `resultPair`, then emits one
+`.set(index, value)` or `.store(key, value)` call. The ordinary case remains a
+direct call with no temporary. A map-specific assignment route or unconditional
+capture policy is forbidden.
 
 ## Packages, Standard Library, And Externals
 

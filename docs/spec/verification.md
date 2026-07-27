@@ -23,7 +23,8 @@ The repository always enforces:
 5. production emission contains no raw TypeScript fragments, local formatter,
    alternate target tree, or TS-Go `internal` import/fork;
 6. dynamic import, `.call`, `.apply`, `.bind`, `any`/`unknown` recovery,
-   reflection, spelling dispatch, and source-text semantic scans are absent;
+   target non-null assertions, reflection, spelling dispatch, and source-text
+   semantic scans are absent;
 7. maintained non-generated files stay below 600 physical lines; and
 8. semantic handlers follow the recursive domain/owner structure, root emitter
    files contain orchestration only, and no maintained directory exceeds the
@@ -398,6 +399,60 @@ Before dependent work begins, a capability must have:
 Unsupported neighboring constructs may remain explicit failures. A capability
 is not accepted if it silently falls back, emits a placeholder while claiming
 translation, or defers its own proof to a later milestone.
+
+### Milestone 3A Value-Foundation Gate
+
+Each of the six value families has an independent focused gate and mutation
+battery. Integration additionally runs one mixed-family, multi-package
+program. The required evidence includes:
+
+| Family | Independent behavioral proofs | Required mutations |
+|---|---|---|
+| integers | every admitted width/profile/operator/conversion at boundary values; BigInt division/remainder for nonzero and zero divisors | width alias collapse; unsafe number literal; missing narrowing/bounds operation; direct host divide/remainder bypass |
+| strings | arbitrary-byte literal, concat, comparison, byte length/index/slice and bounds | Unicode-code-point literal; UTF-16 indexing; missing bounds check |
+| arrays | length-distinct target types, fresh zero/copy, equality, index/store/len/cap | erased length; shared zero; shallow copy where element policy forbids it |
+| slices | nil/empty distinction, aliasing, reslice, append reuse/reallocation, copy overlap | bare-array substitution; lost capacity; always-reallocate append |
+| maps | nil write, missing zero, comma-ok, aliasing, scalar-key equality, delete/len | plain-object substitution; missing-value `undefined`; copy-on-assignment |
+| pointers | nil/new/read/store/alias/equality across calls and results | fresh wrapper on copy; nil dereference success; unrelated-local cell wrapping |
+
+For every family:
+
+1. the focused test is first observed failing at the typed unsupported owner;
+2. TS-Go AST shape is asserted before printing;
+3. printed output strict-typechecks before execution;
+4. Go and generated ESM execute differentially;
+5. the runtime export request exact-joins one definition and fails for omitted,
+   duplicated, wrong-module, cyclic, or dependency-incomplete symbols;
+6. generated source-module bytes, fixed support/runtime bytes, encoded target
+   AST bytes/nodes, and definition counts are reported separately and measured
+   for 1x/2x/4x use sites;
+7. the twenty largest changed bodies and all runtime declarations are
+   inspected; and
+8. broad searches prove no text emission, duplicate representation switch,
+   native-JS approximation, compatibility path, or erased payload remains.
+
+The cross-family owners have additional blocking proofs:
+
+1. the runtime dependency closure emits one `runtime/panic.ts`, and each
+   demanded integer/string/pointer/array/slice/map module imports exactly one
+   `GoPanic` binding through its contract;
+2. only the panic runtime owner constructs a target `ThrowStatement`; replacing
+   one family guard with a host exception or removing one dependency fails;
+3. array, slice, and map stores all enter the same setter transaction, which
+   differentially proves receiver/index/key/right-side order with both direct
+   and prerequisite-bearing operands;
+4. `new`, `make`, `len`, `cap`, `append`, `copy`, and `delete` enter one
+   `*types.Builtin` dispatcher, while family sub-owners cannot rediscover the
+   builtin from spelling; and
+5. the mixed-family fixture spans at least two source packages, strict
+   typechecks all emitted modules under the default `number` profile and the
+   `bigint` override, exact-compares ordinary Go/ESM output, and observes the
+   shared panic carrier for BigInt divide-by-zero, string bounds, nil pointer
+   dereference, array bounds, slice bounds, and nil map store.
+
+Deletion mutations restore a family-specific assignment route, a second
+builtin resolver, a native family throw, or an undeclared runtime dependency;
+each must fail at the owning architecture, artifact, or differential gate.
 
 ## Heavy Runs
 

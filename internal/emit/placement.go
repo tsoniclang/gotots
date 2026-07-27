@@ -12,6 +12,24 @@ type placementOwner struct {
 	requests map[api.PlacementOwner]api.PlacementRequest
 }
 
+func (p *placementOwner) RuntimeSymbols() []api.RuntimeSymbol {
+	symbols := make([]api.RuntimeSymbol, 0)
+	seen := make(map[api.RuntimeSymbol]struct{})
+	for _, request := range p.requests {
+		symbol, ok := request.RuntimeSymbol()
+		if !ok {
+			continue
+		}
+		if _, duplicate := seen[symbol]; duplicate {
+			continue
+		}
+		seen[symbol] = struct{}{}
+		symbols = append(symbols, symbol)
+	}
+	slices.Sort(symbols)
+	return symbols
+}
+
 func (p *placementOwner) PrimitiveAliases() []api.PrimitiveAlias {
 	aliases := make([]api.PrimitiveAlias, 0)
 	seen := make(map[api.PrimitiveAlias]struct{})

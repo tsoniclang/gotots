@@ -10,17 +10,16 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func TestIntegerCapabilityAcceptsEveryRepresentedSignedCarrier(t *testing.T) {
+func TestParentOperatorOwnerDoesNotCreateAnIntegerFallback(t *testing.T) {
 	testCases := []struct {
 		name       string
 		sourceType types.Type
 		arch       string
-		want       bool
 	}{
-		{name: "int32", sourceType: types.Typ[types.Int32], arch: "amd64", want: true},
-		{name: "32-bit int", sourceType: types.Typ[types.Int], arch: "386", want: true},
-		{name: "64-bit int", sourceType: types.Typ[types.Int], arch: "amd64", want: true},
-		{name: "int64", sourceType: types.Typ[types.Int64], arch: "386", want: true},
+		{name: "int32", sourceType: types.Typ[types.Int32], arch: "amd64"},
+		{name: "32-bit int", sourceType: types.Typ[types.Int], arch: "386"},
+		{name: "64-bit int", sourceType: types.Typ[types.Int], arch: "amd64"},
+		{name: "int64", sourceType: types.Typ[types.Int64], arch: "386"},
 	}
 
 	for _, testCase := range testCases {
@@ -52,8 +51,8 @@ func TestIntegerCapabilityAcceptsEveryRepresentedSignedCarrier(t *testing.T) {
 			}
 
 			_, _, ok := operationFor(context, source)
-			if ok != testCase.want {
-				t.Fatalf("operation supported = %v, want %v", ok, testCase.want)
+			if ok {
+				t.Fatal("parent binary owner admitted an integer fallback")
 			}
 		})
 	}
@@ -98,6 +97,13 @@ func (unusedNames) Primitive(api.PrimitiveAlias) (api.NameReference, error) {
 	panic("unused")
 }
 
+func (unusedNames) Runtime(
+	api.RuntimeSymbol,
+	api.ImportPhase,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (unusedNames) Temporary(api.TemporaryKind) (string, error) {
 	panic("unused")
 }
@@ -108,7 +114,11 @@ func (unusedNames) ModuleExport(types.Object) (bool, error) {
 
 type unusedValues struct{}
 
-func (unusedValues) RequiresCustomEquality(types.Type) bool {
+func (unusedValues) RequiresCustomEquality(api.Context, types.Type) bool {
+	panic("unused")
+}
+
+func (unusedValues) RequiresExplicitType(api.Context, types.Type) bool {
 	panic("unused")
 }
 

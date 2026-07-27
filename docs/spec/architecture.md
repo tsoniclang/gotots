@@ -513,6 +513,71 @@ file-root convenience may choose roots from one Go file, but it must not return
 only that file's TypeScript module or discard any requested artifact. Consumers
 never reconstruct omitted support from imports.
 
+Runtime support follows the same typed placement model. A contextual handler
+requests a closed runtime symbol from the name owner. That symbol fixes:
+
+- its one `runtime/<family>.ts` output owner;
+- its exported target name and allowed type/value uses;
+- its closed runtime-symbol dependencies;
+- the family builder that constructs its declaration as typed TS-Go AST; and
+- its deterministic deduplication identity.
+
+The source-file placement owner receives the resulting ordinary static import
+at the requested type or value phase and upgrades type to value when both are
+needed in one file.
+The program target-file owner independently collects the tagged runtime
+symbols, computes their cycle-free transitive dependency closure, exact-joins
+every requested export to one generated definition, emits each demanded
+runtime module once, and creates canonical relative static ESM imports between
+runtime modules. A raw module/export string may not select runtime behavior,
+and a runtime declaration may not be carried from a use-site handler as an
+opaque duplicate AST payload.
+
+```text
+contextual family handler
+    -> Names.Runtime(closed symbol)
+    -> static ESM import request + tagged definition requirement
+    -> program-level dependency closure + exact symbol join
+    -> internal/emit/runtime/<family> TS-Go AST builder
+    -> runtime/<family>.ts
+```
+
+All generated runtime failures use one closed Go panic ABI:
+
+```text
+family runtime guard
+    -> GoPanic.raise(typed value)
+    -> one runtime/panic.ts owner
+    -> one thrown GoPanic<T> carrier
+```
+
+A family runtime must not throw a host `Error`/`RangeError` or depend on an
+implicit JavaScript exception for Go panic behavior. The panic module is the
+only generated runtime owner allowed to construct a target `ThrowStatement`.
+This boundary does not implement source-level `panic`/`recover`; it gives every
+already-admitted runtime guard one stable carrier that those later constructs
+can consume without replacing six family-specific exception protocols.
+
+Runtime classes may encapsulate JavaScript storage only when that storage is
+the smallest exact representation of a Go value family. They may expose
+ordinary statically typed methods, but no reflection, dynamic operation name,
+erased payload recovery, target non-null assertion, `.call`/`.apply`/`.bind`,
+or per-use semantic closure. Nullable storage is narrowed by explicit control
+flow at the runtime owner; a generated `value!` may not substitute for a
+proved invariant.
+Compiler handlers still own Go evaluation order and copy boundaries; runtime
+code does not rediscover source semantics.
+
+Setter-backed stores have one target contract shared by arrays, slices, maps,
+and future setter representations. The store-target owner returns typed
+TS-Go receiver and argument expressions with their prerequisite statements;
+the assignment owner alone orders and conditionally captures them before the
+right side, then constructs the final member call. A family-specific
+assignment handler is forbidden. Likewise, one builtin-object dispatcher owns
+semantic dispatch for `new`, `make`, `len`, `cap`, `append`, `copy`, and
+`delete`; family sub-owners consume the already-resolved `*types.Builtin`
+rather than rediscovering it from spelling.
+
 ## Package And Output Shape
 
 Every source-available Go file has one checkout-independent target path:

@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -86,6 +87,17 @@ func emitSingle(
 	)
 	if err != nil {
 		return api.StatementEmission{}, err
+	}
+	if _, ok := arrayvalue.Resolve(context, resultType); ok {
+		result, err = context.Values().Copy(
+			context.WithRole(api.RoleReturnResult),
+			source.Results[0],
+			resultType,
+			result,
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
 	}
 	statements := result.Before()
 	statements = append(

@@ -204,10 +204,19 @@ func emitDefinitionList(
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	targetType, typeRequests, err := pointerAnnotation(
+		context.WithRole(api.RoleLocalType),
+		children,
+		name,
+		object.Type(),
+	)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 	declaration := context.Factory().VariableDeclaration(
 		context.Factory().Identifier(targetName),
 		nil,
-		nil,
+		targetType,
 		value.Value(),
 	)
 	return context.Factory().VariableDeclarationList(
@@ -215,7 +224,7 @@ func emitDefinitionList(
 			tsgo.NodeFlagsLet,
 		),
 		value.Before(),
-		value.Requests(),
+		api.CombineRequests(value.Requests(), typeRequests),
 		nil
 }
 
@@ -261,6 +270,9 @@ func emitAssignment(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
+	if target.IsSetter() {
+		return emitSetter(context, target, value)
+	}
 	assigned, err := context.Values().Assign(
 		context.WithRole(api.RoleAssignmentTarget),
 		source,
@@ -271,7 +283,8 @@ func emitAssignment(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	statements := assigned.Before()
+	statements := target.Before()
+	statements = append(statements, assigned.Before()...)
 	statements = append(
 		statements,
 		context.Factory().ExpressionStatement(assigned.Value()),
@@ -383,15 +396,26 @@ func emitParallel(
 		}
 		temporary := context.Factory().Identifier(temporaryNames[index])
 		if target.declaration {
+			targetType, typeRequests, err := pointerAnnotation(
+				context.WithRole(api.RoleLocalType),
+				children,
+				target.source,
+				target.object.Type(),
+			)
+			if err != nil {
+				return api.StatementEmission{}, err
+			}
 			statements = append(
 				statements,
-				variableStatement(
+				typedVariableStatement(
 					context,
 					tsgo.NodeFlagsLet,
 					target.name,
+					targetType,
 					temporary,
 				),
 			)
+			requests = append(requests, typeRequests...)
 		} else {
 			assigned, err := context.Values().Assign(
 				context.WithRole(api.RoleAssignmentTarget),
@@ -471,10 +495,20 @@ func variableStatement(
 	name string,
 	value tsgo.Expression,
 ) tsgo.VariableStatement {
+	return typedVariableStatement(context, flags, name, nil, value)
+}
+
+func typedVariableStatement(
+	context api.Context,
+	flags tsgo.NodeFlags,
+	name string,
+	targetType tsgo.TypeNode,
+	value tsgo.Expression,
+) tsgo.VariableStatement {
 	declaration := context.Factory().VariableDeclaration(
 		context.Factory().Identifier(name),
 		nil,
-		nil,
+		targetType,
 		value,
 	)
 	return context.Factory().VariableStatement(
@@ -484,6 +518,22 @@ func variableStatement(
 			flags,
 		),
 	)
+}
+
+func pointerAnnotation(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	sourceType types.Type,
+) (tsgo.TypeNode, []api.PlacementRequest, error) {
+	if !context.Values().RequiresExplicitType(context, sourceType) {
+		return nil, nil, nil
+	}
+	target, err := children.RepresentedType(context, source, sourceType)
+	if err != nil {
+		return nil, nil, err
+	}
+	return target.Value(), target.Requests(), nil
 }
 
 func assignmentStatement(

@@ -119,6 +119,21 @@ func verifyProductionFile(relative string, sourcePath string) error {
 			}
 		}
 		internalPrefix := modulePath + "/internal/"
+		if strings.HasPrefix(
+			relative,
+			"internal/emit/statement/assignment/",
+		) && strings.HasPrefix(importPath, internalPrefix) {
+			switch importPath {
+			case modulePath + "/internal/emit/api",
+				modulePath + "/internal/emit/type/basic",
+				modulePath + "/internal/target/tsgo":
+			default:
+				return &wallError{
+					source: relative,
+					reason: "assignment owner imports a value-family route",
+				}
+			}
+		}
 		if !strings.HasPrefix(importPath, internalPrefix) {
 			continue
 		}
@@ -175,6 +190,15 @@ func verifyEmissionSource(
 			selector, ok := node.Fun.(*ast.SelectorExpr)
 			if !ok {
 				return true
+			}
+			if selector.Sel.Name == "ThrowStatement" &&
+				relative != "internal/emit/runtime/panic/owner.go" {
+				violation = "target throw is owned only by the panic runtime"
+				return false
+			}
+			if selector.Sel.Name == "NonNullExpression" {
+				violation = "unchecked target non-null assertion is forbidden"
+				return false
 			}
 			qualifier, qualifierOK := selector.X.(*ast.Ident)
 			if qualifierOK && qualifier.Name == astAlias &&
@@ -251,6 +275,24 @@ func leak(node ast.Node) { ast.Inspect(node, func(ast.Node) bool { return true }
 const leak = "value.call(receiver)"
 `,
 		},
+		"runtime throw outside panic owner": {
+			relative: "internal/emit/runtime/array/leak.go",
+			source: `package array
+func leak(factory Factory, value Expression) { factory.ThrowStatement(value) }
+`,
+		},
+		"target non-null assertion": {
+			relative: "internal/emit/runtime/slice/leak.go",
+			source: `package slice
+func leak(factory Factory, value Expression) { factory.NonNullExpression(value, 0) }
+`,
+		},
+		"family-specific assignment route": {
+			relative: "internal/emit/statement/assignment/leak.go",
+			source: `package assignment
+import _ "github.com/tsoniclang/gotots/internal/emit/store/map"
+`,
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			sourcePath := filepath.Join(t.TempDir(), "leak.go")
@@ -274,6 +316,64 @@ const leak = "value.call(receiver)"
 		if err := verifyStandaloneText("mutation.txt", []byte(mutation)); err == nil {
 			t.Fatalf("standalone ownership mutation passed: %q", mutation)
 		}
+	}
+}
+
+func TestBuiltinIdentityResolutionHasOneOwner(t *testing.T) {
+	root := repositoryRoot(t)
+	owner := "internal/emit/expression/builtin/handler.go"
+	resolvers := 0
+	err := filepath.Walk(
+		filepath.Join(root, "internal", "emit"),
+		func(sourcePath string, info os.FileInfo, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if info.IsDir() ||
+				filepath.Ext(sourcePath) != ".go" ||
+				strings.HasSuffix(sourcePath, "_test.go") {
+				return nil
+			}
+			relative, err := filepath.Rel(root, sourcePath)
+			if err != nil {
+				return err
+			}
+			relative = filepath.ToSlash(relative)
+			source, err := os.ReadFile(sourcePath)
+			if err != nil {
+				return err
+			}
+			resolverCount := strings.Count(
+				string(source),
+				".(*types.Builtin)",
+			)
+			if resolverCount != 0 && relative != owner {
+				t.Errorf(
+					"%s resolves builtin identity outside %s",
+					relative,
+					owner,
+				)
+			}
+			resolvers += resolverCount
+			if relative != owner &&
+				strings.Contains(string(source), "TypesInfo().Uses") &&
+				strings.HasPrefix(
+					relative,
+					"internal/emit/expression/builtin/",
+				) {
+				t.Errorf(
+					"%s rediscovers builtin identity inside a family owner",
+					relative,
+				)
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolvers != 1 {
+		t.Fatalf("builtin identity resolvers = %d, want one", resolvers)
 	}
 }
 

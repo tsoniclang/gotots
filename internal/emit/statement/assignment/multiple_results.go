@@ -72,15 +72,26 @@ func emitMultipleResults(
 			tsgo.NodeFlagsNone,
 		)
 		if target.declaration {
+			targetType, typeRequests, err := pointerAnnotation(
+				context.WithRole(api.RoleLocalType),
+				children,
+				target.source,
+				target.object.Type(),
+			)
+			if err != nil {
+				return api.StatementEmission{}, err
+			}
 			statements = append(
 				statements,
-				variableStatement(
+				typedVariableStatement(
 					context,
 					tsgo.NodeFlagsLet,
 					target.name,
+					targetType,
 					element,
 				),
 			)
+			requests = append(requests, typeRequests...)
 		} else {
 			assigned, err := context.Values().Assign(
 				context.WithRole(api.RoleAssignmentTarget),

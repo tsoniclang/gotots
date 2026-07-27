@@ -2,47 +2,24 @@ package api
 
 import (
 	"fmt"
-	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
-
-func PrimitiveAliasFor(
-	sizes types.Sizes,
-	sourceType types.Type,
-) (PrimitiveAlias, bool) {
-	if sizes == nil || sourceType == nil {
-		return PrimitiveInvalid, false
-	}
-	basic, ok := types.Unalias(sourceType).(*types.Basic)
-	if !ok {
-		return PrimitiveInvalid, false
-	}
-	switch basic.Kind() {
-	case types.Bool:
-		return PrimitiveBool, true
-	case types.Int32:
-		return PrimitiveInt32, true
-	case types.Int64:
-		return PrimitiveInt64, true
-	case types.Int:
-		switch sizes.Sizeof(types.Typ[types.Int]) {
-		case 4:
-			return PrimitiveInt32, true
-		case 8:
-			return PrimitiveInt64, true
-		}
-	}
-	return PrimitiveInvalid, false
-}
 
 type PrimitiveAlias uint8
 
 const (
 	PrimitiveInvalid PrimitiveAlias = iota
 	PrimitiveBool
+	PrimitiveInt8
+	PrimitiveInt16
 	PrimitiveInt32
 	PrimitiveInt64
+	PrimitiveUint8
+	PrimitiveUint16
+	PrimitiveUint32
+	PrimitiveUint64
+	PrimitiveString
 )
 
 func PrimitiveAliasRepresentation(
@@ -56,7 +33,16 @@ func PrimitiveAliasRepresentation(
 	switch alias {
 	case PrimitiveBool:
 		return name, tsgo.KeywordTypeSyntaxKindBooleanKeyword, nil
-	case PrimitiveInt32, PrimitiveInt64:
+	case PrimitiveString:
+		return name, tsgo.KeywordTypeSyntaxKindStringKeyword, nil
+	case PrimitiveInt8,
+		PrimitiveInt16,
+		PrimitiveInt32,
+		PrimitiveInt64,
+		PrimitiveUint8,
+		PrimitiveUint16,
+		PrimitiveUint32,
+		PrimitiveUint64:
 		keyword, err := integerKeyword(integer)
 		return name, keyword, err
 	default:
@@ -68,10 +54,24 @@ func PrimitiveAliasName(alias PrimitiveAlias) (string, error) {
 	switch alias {
 	case PrimitiveBool:
 		return "bool", nil
+	case PrimitiveInt8:
+		return "int8", nil
+	case PrimitiveInt16:
+		return "int16", nil
 	case PrimitiveInt32:
 		return "int32", nil
 	case PrimitiveInt64:
 		return "int64", nil
+	case PrimitiveUint8:
+		return "uint8", nil
+	case PrimitiveUint16:
+		return "uint16", nil
+	case PrimitiveUint32:
+		return "uint32", nil
+	case PrimitiveUint64:
+		return "uint64", nil
+	case PrimitiveString:
+		return "gostring", nil
 	default:
 		return "", &PrimitiveAliasError{Alias: alias}
 	}

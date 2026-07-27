@@ -55,9 +55,9 @@ func TestNamedStructUnsupportedNeighborsFailAtTypedOwners(t *testing.T) {
 			construct: "*ast.InterfaceType",
 		},
 		{
-			name: "unsigned integer field",
+			name: "complex field",
 			source: "package boundary\n" +
-				"type Unsigned struct { Value uint64 }\n",
+				"type Complex struct { Value complex64 }\n",
 			role:      api.RoleStructFieldType,
 			category:  api.CategoryType,
 			construct: "*ast.Ident",

@@ -42,6 +42,10 @@ func EmitExpression(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
+	if target.IsSetter() {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
 	var operator tsgo.PostfixUnaryExpressionOperatorKind
 	switch source.Tok {
 	case token.INC:

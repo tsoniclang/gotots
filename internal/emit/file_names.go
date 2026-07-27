@@ -22,6 +22,7 @@ type fileNames struct {
 	importAliases    map[types.Object]string
 	companionAliases map[api.DeclarationRequirement]string
 	primitives       map[api.PrimitiveAlias]string
+	runtime          map[api.RuntimeSymbol]string
 }
 
 func (n *nameOwner) ForFile(
@@ -43,6 +44,7 @@ func (n *nameOwner) ForFile(
 		importAliases:    make(map[types.Object]string),
 		companionAliases: make(map[api.DeclarationRequirement]string),
 		primitives:       make(map[api.PrimitiveAlias]string),
+		runtime:          make(map[api.RuntimeSymbol]string),
 	}
 }
 
@@ -399,6 +401,62 @@ func (n *fileNames) Primitive(alias api.PrimitiveAlias) (api.NameReference, erro
 		n.factory,
 		modulePath,
 		alias,
+		localName,
+	)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	return api.NewNameReference(localName, request)
+}
+
+func (n *fileNames) Runtime(
+	symbol api.RuntimeSymbol,
+	phase api.ImportPhase,
+) (api.NameReference, error) {
+	contract, err := api.RuntimeContract(symbol)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	modulePath, err := output.ModuleSpecifier(
+		n.targetPath,
+		contract.OutputPath(),
+	)
+	if err != nil {
+		return api.NameReference{}, err
+	}
+	if existing := n.runtime[symbol]; existing != "" {
+		request, err := api.NewRuntimeImportRequest(
+			n.factory,
+			phase,
+			modulePath,
+			symbol,
+			existing,
+		)
+		if err != nil {
+			return api.NameReference{}, err
+		}
+		return api.NewNameReference(existing, request)
+	}
+	exportedName := contract.ExportedName()
+	localName := exportedName
+	if n.packageScope.Lookup(localName) != nil ||
+		n.owner.hasSourceName(localName) ||
+		n.hasImportName(localName) {
+		base := exportedName + "__from_gotots_runtime"
+		localName = base
+		for suffix := uint64(1); n.packageScope.Lookup(localName) != nil ||
+			n.owner.hasSourceName(localName) ||
+			n.hasImportName(localName); suffix++ {
+			localName = base + "_" + strconv.FormatUint(suffix, 10)
+		}
+	}
+	n.importNames[localName] = struct{}{}
+	n.runtime[symbol] = localName
+	request, err := api.NewRuntimeImportRequest(
+		n.factory,
+		phase,
+		modulePath,
+		symbol,
 		localName,
 	)
 	if err != nil {

@@ -106,12 +106,25 @@ func emitSpec(
 		if err != nil {
 			return nil, nil, err
 		}
+		var targetType tsgo.TypeNode
+		if context.Values().RequiresExplicitType(context, object.Type()) {
+			represented, err := children.RepresentedType(
+				context.WithRole(api.RoleLocalType),
+				sourceName,
+				object.Type(),
+			)
+			if err != nil {
+				return nil, nil, err
+			}
+			targetType = represented.Value()
+			requests = append(requests, represented.Requests()...)
+		}
 		declarations = append(
 			declarations,
 			context.Factory().VariableDeclaration(
 				context.Factory().Identifier(targetName),
 				nil,
-				nil,
+				targetType,
 				value.Value(),
 			),
 		)
