@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	stringruntime "github.com/tsoniclang/gotots/internal/emit/runtime/string"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -68,6 +69,26 @@ func Build(
 			definitions = append(definitions, definition)
 		}
 		return definitions, nil
+	}
+	if module == api.RuntimeModulePointer {
+		if len(symbols) != 1 || symbols[0] != api.RuntimePointer {
+			return nil, &AssemblyError{
+				Module: module,
+				Reason: "pointer runtime requires exactly RuntimePointer",
+			}
+		}
+		contract, err := api.RuntimeContract(api.RuntimePointer)
+		if err != nil {
+			return nil, err
+		}
+		definition, err := NewDefinition(
+			api.RuntimePointer,
+			pointerruntime.Build(factory, contract.ExportedName()),
+		)
+		if err != nil {
+			return nil, err
+		}
+		return []Definition{definition}, nil
 	}
 	return nil, &AssemblyError{
 		Module: module,

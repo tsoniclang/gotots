@@ -7,6 +7,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	newvalue "github.com/tsoniclang/gotots/internal/emit/expression/call/builtin/newvalue"
 	integerconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/integer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -33,6 +34,10 @@ func emit(
 	source *ast.CallExpr,
 	discarded bool,
 ) (api.ExpressionEmission, error) {
+	if identifier, ok := source.Fun.(*ast.Ident); ok &&
+		context.TypesInfo().Uses[identifier] == types.Universe.Lookup("new") {
+		return newvalue.Emit(context, children, source)
+	}
 	if target, ok, err := integerconversion.Emit(
 		context,
 		children,

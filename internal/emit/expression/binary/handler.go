@@ -76,16 +76,25 @@ func emitValueEquality(
 ) (api.ExpressionEmission, bool, error) {
 	leftType := context.TypesInfo().TypeOf(source.X)
 	rightType := context.TypesInfo().TypeOf(source.Y)
-	if leftType == nil ||
-		rightType == nil ||
-		!types.Identical(leftType, rightType) ||
-		!context.Values().RequiresCustomEquality(leftType) {
+	if leftType == nil || rightType == nil {
+		return api.ExpressionEmission{}, false, nil
+	}
+	var operandType types.Type
+	for _, candidate := range []types.Type{leftType, rightType} {
+		if context.Values().RequiresCustomEquality(context, candidate) &&
+			types.AssignableTo(leftType, candidate) &&
+			types.AssignableTo(rightType, candidate) {
+			operandType = candidate
+			break
+		}
+	}
+	if operandType == nil {
 		return api.ExpressionEmission{}, false, nil
 	}
 	left, err := children.Expression(
 		context.
 			WithRole(api.RoleBinaryLeft).
-			WithExpectedType(leftType),
+			WithExpectedType(operandType),
 		source.X,
 	)
 	if err != nil {
@@ -94,7 +103,7 @@ func emitValueEquality(
 	right, err := children.Expression(
 		context.
 			WithRole(api.RoleBinaryRight).
-			WithExpectedType(rightType),
+			WithExpectedType(operandType),
 		source.Y,
 	)
 	if err != nil {
@@ -107,7 +116,7 @@ func emitValueEquality(
 	equal, err := context.Values().Equal(
 		context,
 		source,
-		leftType,
+		operandType,
 		left.Value(),
 		right.Value(),
 	)

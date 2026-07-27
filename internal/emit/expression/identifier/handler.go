@@ -23,7 +23,17 @@ func Emit(
 		return emitBooleanConstant(context, source, context.Factory().FalseLiteral())
 	case types.Universe.Lookup("true"):
 		return emitBooleanConstant(context, source, context.Factory().TrueLiteral())
-	case types.Universe.Lookup("iota"), types.Universe.Lookup("nil"):
+	case types.Universe.Lookup("nil"):
+		sourceType := context.TypesInfo().TypeOf(source)
+		targetType := context.ExpectedType()
+		if sourceType == nil ||
+			targetType == nil ||
+			!types.AssignableTo(sourceType, targetType) {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		return context.Values().Zero(context, source, targetType)
+	case types.Universe.Lookup("iota"):
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
