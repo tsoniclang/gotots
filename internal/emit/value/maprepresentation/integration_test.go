@@ -57,9 +57,15 @@ func TestMapValuesCreateTypedTargetAST(t *testing.T) {
 	}
 
 	runtimeFile := targetFileBySuffix(t, emission.Files(), "runtime/map.ts")
-	class, ok := runtimeFile.SourceFile().Statements()[0].(tsgo.ClassDeclaration)
-	if !ok {
-		t.Fatalf("runtime declaration = %T, want ClassDeclaration", runtimeFile.SourceFile().Statements()[0])
+	var class tsgo.ClassDeclaration
+	for _, statement := range runtimeFile.SourceFile().Statements() {
+		candidate, ok := statement.(tsgo.ClassDeclaration)
+		if ok && candidate.Name().Text() == "GoMap" {
+			class = candidate
+		}
+	}
+	if class == nil {
+		t.Fatal("runtime map declaration is absent")
 	}
 	if class.Name().Text() != "GoMap" ||
 		len(class.TypeParameters()) != 2 ||

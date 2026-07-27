@@ -161,12 +161,6 @@ func operationFor(
 ) (tsgo.BinaryOperatorToken, types.Type, bool) {
 	leftType := context.TypesInfo().TypeOf(source.X)
 	rightType := context.TypesInfo().TypeOf(source.Y)
-	if operator, operandType, ok := integerbinary.OperationFor(
-		context,
-		source,
-	); ok {
-		return operator, operandType, true
-	}
 	switch {
 	case source.Op == token.ADD &&
 		basictype.SupportsString(context.TypesInfo().TypeOf(source)) &&

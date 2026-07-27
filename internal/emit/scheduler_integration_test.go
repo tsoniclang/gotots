@@ -446,6 +446,56 @@ func TestRuntimeDefinitionsRejectJoinMutations(t *testing.T) {
 	}
 }
 
+func TestRuntimeDependencyClosureIncludesEveryTransitiveOwner(t *testing.T) {
+	closure, err := runtimeDependencyClosure(map[api.RuntimeSymbol]struct{}{
+		api.RuntimeArray:         {},
+		api.RuntimeIntegerDivide: {},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[api.RuntimeSymbol]struct{}{
+		api.RuntimeArray:         {},
+		api.RuntimeIntegerDivide: {},
+		api.RuntimePanic:         {},
+	}
+	if len(closure) != len(want) {
+		t.Fatalf("runtime closure = %v, want %v", closure, want)
+	}
+	for symbol := range want {
+		if _, ok := closure[symbol]; !ok {
+			t.Fatalf("runtime closure omits symbol %d", symbol)
+		}
+	}
+}
+
+func TestRuntimeModuleImportsExactDependencyContract(t *testing.T) {
+	session := &programSession{factory: tsgo.NewFactory()}
+	imports, err := session.runtimeModuleImports(
+		"runtime/array.ts",
+		api.RuntimeModuleArray,
+		[]api.RuntimeSymbol{api.RuntimeArray},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(imports) != 1 {
+		t.Fatalf("array runtime imports = %d, want one", len(imports))
+	}
+	declaration := imports[0].(tsgo.ImportDeclaration)
+	module := declaration.ModuleSpecifier().(tsgo.StringLiteral)
+	if module.Text() != "./panic.js" {
+		t.Fatalf("array runtime dependency = %q, want ./panic.js", module.Text())
+	}
+	bindings := declaration.ImportClause().NamedBindings().(tsgo.NamedImports).
+		Elements()
+	if len(bindings) != 1 ||
+		bindings[0].Name().Text() != "GoPanic" ||
+		bindings[0].PropertyName() != nil {
+		t.Fatalf("array runtime bindings = %#v, want direct GoPanic", bindings)
+	}
+}
+
 func runtimeDefinition(
 	t *testing.T,
 	factory tsgo.Factory,

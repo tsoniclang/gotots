@@ -20,10 +20,7 @@ func (b builder) appendMethod() tsgo.MethodDeclaration {
 		b.factory.ExpressionStatement(
 			b.assign(
 				b.index(
-					b.factory.NonNullExpression(
-						b.thisProperty("backing"),
-						tsgo.NodeFlagsNone,
-					),
+					b.id("existingBacking"),
 					b.add(
 						b.add(
 							b.thisProperty("offset"),
@@ -37,10 +34,19 @@ func (b builder) appendMethod() tsgo.MethodDeclaration {
 		),
 	)
 	reuse := b.factory.Block([]tsgo.Statement{
+		b.factory.IfStatement(
+			b.binary(
+				b.id("existingBacking"),
+				tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+				b.factory.NullLiteral(),
+			),
+			b.throwBounds(),
+			nil,
+		),
 		reuseLoop,
 		b.returnStatement(
 			b.newSlice(
-				b.thisProperty("backing"),
+				b.id("existingBacking"),
 				b.thisProperty("offset"),
 				b.id("newLength"),
 				b.thisProperty(MemberName(MemberCapacity)),
@@ -92,7 +98,10 @@ func (b builder) appendMethod() tsgo.MethodDeclaration {
 		b.factory.ExpressionStatement(
 			b.assign(
 				b.index(b.id("backing"), b.id("index")),
-				b.backingElement(b.id("index")),
+				b.index(
+					b.id("existingBacking"),
+					b.add(b.thisProperty("offset"), b.id("index")),
+				),
 			),
 		),
 	)
@@ -139,6 +148,20 @@ func (b builder) appendMethod() tsgo.MethodDeclaration {
 		[]tsgo.ParameterDeclaration{values},
 		b.sliceType(),
 		b.variable(tsgo.NodeFlagsConst, "newLength", newLength),
+		b.variable(
+			tsgo.NodeFlagsConst,
+			"existingBacking",
+			b.thisProperty("backing"),
+		),
+		b.factory.IfStatement(
+			b.binary(
+				b.property(b.id("values"), "length"),
+				tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+				b.number("0"),
+			),
+			b.returnStatement(b.factory.ThisExpression()),
+			nil,
+		),
 		b.factory.IfStatement(
 			b.binary(
 				b.id("newLength"),
@@ -155,7 +178,15 @@ func (b builder) appendMethod() tsgo.MethodDeclaration {
 			"backing",
 			b.call(backing, "fill", b.thisProperty("zero")),
 		),
-		copyExisting,
+		b.factory.IfStatement(
+			b.binary(
+				b.id("existingBacking"),
+				tsgo.BinaryOperatorExclamationEqualsEqualsToken,
+				b.factory.NullLiteral(),
+			),
+			b.factory.Block([]tsgo.Statement{copyExisting}, true),
+			nil,
+		),
 		copyAppended,
 		b.returnStatement(
 			b.newSlice(
@@ -181,15 +212,12 @@ func (b builder) copyMethod() tsgo.MethodDeclaration {
 		tsgo.NodeFlagsNone,
 	)
 	sameBacking := b.binary(
-		b.property(b.id("target"), "backing"),
+		b.id("targetBacking"),
 		tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-		b.property(b.id("source"), "backing"),
+		b.id("sourceBacking"),
 	)
 	copyWithin := b.call(
-		b.factory.NonNullExpression(
-			b.property(b.id("target"), "backing"),
-			tsgo.NodeFlagsNone,
-		),
+		b.id("targetBacking"),
 		"copyWithin",
 		b.property(b.id("target"), "offset"),
 		b.property(b.id("source"), "offset"),
@@ -200,20 +228,14 @@ func (b builder) copyMethod() tsgo.MethodDeclaration {
 		b.factory.ExpressionStatement(
 			b.assign(
 				b.index(
-					b.factory.NonNullExpression(
-						b.property(b.id("target"), "backing"),
-						tsgo.NodeFlagsNone,
-					),
+					b.id("targetBacking"),
 					b.add(
 						b.property(b.id("target"), "offset"),
 						b.id("index"),
 					),
 				),
 				b.index(
-					b.factory.NonNullExpression(
-						b.property(b.id("source"), "backing"),
-						tsgo.NodeFlagsNone,
-					),
+					b.id("sourceBacking"),
 					b.add(
 						b.property(b.id("source"), "offset"),
 						b.id("index"),
@@ -232,6 +254,16 @@ func (b builder) copyMethod() tsgo.MethodDeclaration {
 		},
 		b.numberType(),
 		b.variable(tsgo.NodeFlagsConst, "count", count),
+		b.variable(
+			tsgo.NodeFlagsConst,
+			"targetBacking",
+			b.property(b.id("target"), "backing"),
+		),
+		b.variable(
+			tsgo.NodeFlagsConst,
+			"sourceBacking",
+			b.property(b.id("source"), "backing"),
+		),
 		b.factory.IfStatement(
 			b.binary(
 				b.id("count"),
@@ -239,6 +271,23 @@ func (b builder) copyMethod() tsgo.MethodDeclaration {
 				b.number("0"),
 			),
 			b.returnStatement(b.number("0")),
+			nil,
+		),
+		b.factory.IfStatement(
+			b.binary(
+				b.binary(
+					b.id("targetBacking"),
+					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+					b.factory.NullLiteral(),
+				),
+				tsgo.BinaryOperatorBarBarToken,
+				b.binary(
+					b.id("sourceBacking"),
+					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+					b.factory.NullLiteral(),
+				),
+			),
+			b.throwBounds(),
 			nil,
 		),
 		b.factory.IfStatement(

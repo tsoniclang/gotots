@@ -66,6 +66,7 @@ func TestBuildRejectsNonStringSymbol(t *testing.T) {
 	_, err := stringruntime.Build(
 		tsgo.NewFactory(),
 		[]api.RuntimeSymbol{api.RuntimePointer},
+		apiName(t, api.RuntimePanic),
 	)
 	var buildError *stringruntime.BuildError
 	if !errors.As(err, &buildError) || buildError.Symbol != api.RuntimePointer {

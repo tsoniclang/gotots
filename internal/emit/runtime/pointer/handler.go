@@ -1,13 +1,20 @@
 package pointer
 
-import "github.com/tsoniclang/gotots/internal/target/tsgo"
+import (
+	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
 
 const (
 	CellValueName   = "value"
 	DereferenceName = "dereference"
 )
 
-func Build(factory tsgo.Factory, className string) tsgo.Statement {
+func Build(
+	factory tsgo.Factory,
+	className string,
+	panicName string,
+) tsgo.Statement {
 	typeParameter := targetTypeParameter(factory)
 	cell := factory.ParameterDeclaration(
 		[]tsgo.ModifierLike{factory.PublicKeyword()},
@@ -49,16 +56,16 @@ func Build(factory tsgo.Factory, className string) tsgo.Statement {
 			factory.NumericLiteral("0", tsgo.TokenFlagsNone),
 		),
 	)
-	nilFailure := factory.ThrowStatement(factory.NewExpression(
-		factory.Identifier("Error"),
-		nil,
-		[]tsgo.Expression{
+	nilFailure := factory.ExpressionStatement(
+		panicruntime.Call(
+			factory,
+			panicName,
 			factory.StringLiteral(
 				"nil pointer dereference",
 				tsgo.TokenFlagsNone,
 			),
-		},
-	))
+		),
+	)
 	dereference := factory.MethodDeclaration(
 		[]tsgo.ModifierLike{factory.StaticKeyword()},
 		nil,

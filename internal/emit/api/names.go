@@ -22,7 +22,7 @@ const (
 	TemporarySliceElement
 	TemporarySliceReceiver
 	TemporarySliceOperand
-	TemporarySetterArgument
+	TemporaryStoreOperand
 	TemporaryMapOperand
 )
 
@@ -131,8 +131,8 @@ func TemporaryPrefix(kind TemporaryKind) (string, error) {
 		return "__gotots_slice_receiver_", nil
 	case TemporarySliceOperand:
 		return "__gotots_slice_operand_", nil
-	case TemporarySetterArgument:
-		return "__gotots_setter_argument_", nil
+	case TemporaryStoreOperand:
+		return "__gotots_store_", nil
 	case TemporaryMapOperand:
 		return "__gotots_map_", nil
 	default:

@@ -10,36 +10,33 @@ import (
 
 func TestSetterStoreTargetOwnsTypedImmutableArguments(t *testing.T) {
 	factory := tsgo.NewFactory()
-	before := []tsgo.Statement{
-		factory.ExpressionStatement(factory.Identifier("prepare")),
-	}
-	arguments := []tsgo.Expression{factory.NumericLiteral("1", tsgo.TokenFlagsNone)}
+	receiver := api.DirectExpression(factory.Identifier("values"))
+	arguments := []api.ExpressionEmission{api.DirectExpression(
+		factory.NumericLiteral("1", tsgo.TokenFlagsNone),
+	)}
 	target, err := api.NewSetterStoreTargetEmission(
-		before,
-		factory.PropertyAccessExpression(
-			factory.Identifier("values"),
-			nil,
-			factory.Identifier("set"),
-			tsgo.NodeFlagsNone,
-		),
+		receiver,
+		"set",
 		arguments,
 		types.Typ[types.Int32],
-		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	before[0] = factory.ExpressionStatement(factory.Identifier("mutated"))
-	arguments[0] = factory.NumericLiteral("2", tsgo.TokenFlagsNone)
+	arguments[0] = api.DirectExpression(
+		factory.NumericLiteral("2", tsgo.TokenFlagsNone),
+	)
 	if !target.IsSetter() ||
-		target.Before()[0].(tsgo.ExpressionStatement).
-			Expression().(tsgo.Identifier).Text() != "prepare" ||
-		target.Arguments()[0].(tsgo.NumericLiteral).Text() != "1" {
+		target.SetterReceiver().Value().(tsgo.Identifier).Text() != "values" ||
+		target.SetterMember() != "set" ||
+		target.SetterArguments()[0].Value().(tsgo.NumericLiteral).Text() != "1" {
 		t.Fatalf("setter target leaked mutable input: %#v", target)
 	}
-	exposed := target.Arguments()
-	exposed[0] = factory.NumericLiteral("3", tsgo.TokenFlagsNone)
-	if target.Arguments()[0].(tsgo.NumericLiteral).Text() != "1" {
+	exposed := target.SetterArguments()
+	exposed[0] = api.DirectExpression(
+		factory.NumericLiteral("3", tsgo.TokenFlagsNone),
+	)
+	if target.SetterArguments()[0].Value().(tsgo.NumericLiteral).Text() != "1" {
 		t.Fatal("setter target exposed mutable argument backing")
 	}
 }

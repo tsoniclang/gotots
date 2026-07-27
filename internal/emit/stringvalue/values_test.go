@@ -79,7 +79,7 @@ func TestStringShapeChecksRejectRequiredMutations(t *testing.T) {
 			true,
 		),
 	)
-	if hasThrowingBoundsCheck(unchecked) {
+	if hasPanicBoundsCheck(unchecked) {
 		t.Fatal("missing-bounds-check mutation passed runtime bounds check")
 	}
 }
@@ -337,12 +337,15 @@ func runtimeCallMatches(expression tsgo.Expression, name string, arguments int) 
 
 func assertBoundsFunction(t *testing.T, function tsgo.FunctionDeclaration) {
 	t.Helper()
-	if !hasThrowingBoundsCheck(function) {
-		t.Fatalf("runtime function %s lacks a throwing bounds check", function.Name().Text())
+	if !hasPanicBoundsCheck(function) {
+		t.Fatalf(
+			"runtime function %s lacks a shared-panic bounds check",
+			function.Name().Text(),
+		)
 	}
 }
 
-func hasThrowingBoundsCheck(function tsgo.FunctionDeclaration) bool {
+func hasPanicBoundsCheck(function tsgo.FunctionDeclaration) bool {
 	body, ok := function.Body().(tsgo.Block)
 	if !ok {
 		return false
@@ -352,14 +355,23 @@ func hasThrowingBoundsCheck(function tsgo.FunctionDeclaration) bool {
 		if !ok {
 			continue
 		}
-		switch target := check.ThenStatement().(type) {
-		case tsgo.ThrowStatement:
-			return true
-		case tsgo.Block:
-			for _, nested := range target.Statements() {
-				if _, ok := nested.(tsgo.ThrowStatement); ok {
-					return true
-				}
+		target, ok := check.ThenStatement().(tsgo.Block)
+		if !ok {
+			continue
+		}
+		for _, nested := range target.Statements() {
+			expression, ok := nested.(tsgo.ExpressionStatement)
+			if !ok {
+				continue
+			}
+			call, ok := expression.Expression().(tsgo.CallExpression)
+			if !ok {
+				continue
+			}
+			member, ok := call.Expression().(tsgo.PropertyAccessExpression)
+			if ok &&
+				member.Name().(tsgo.Identifier).Text() == "raise" {
+				return true
 			}
 		}
 	}

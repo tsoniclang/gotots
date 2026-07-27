@@ -117,7 +117,12 @@ func assertScalingAST(
 	for _, file := range emission.Files() {
 		nodes += len(file.SourceFile().Statements())
 		if file.OutputPath() == "runtime/array.ts" {
-			runtimeDefinitions += len(file.SourceFile().Statements())
+			for _, statement := range file.SourceFile().Statements() {
+				class, ok := statement.(tsgo.ClassDeclaration)
+				if ok && class.Name().Text() == "GoArray" {
+					runtimeDefinitions++
+				}
+			}
 		}
 		if file.Kind() != emit.TargetFileSource {
 			continue

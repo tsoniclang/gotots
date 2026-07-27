@@ -1,19 +1,25 @@
 package slice
 
-import "github.com/tsoniclang/gotots/internal/target/tsgo"
+import (
+	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
 
 type builder struct {
 	factory   tsgo.Factory
 	className string
+	panicName string
 }
 
 func Build(
 	factory tsgo.Factory,
 	className string,
+	panicName string,
 ) tsgo.ClassDeclaration {
 	target := builder{
 		factory:   factory,
 		className: className,
+		panicName: panicName,
 	}
 	return factory.ClassDeclaration(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
@@ -227,17 +233,15 @@ func (b builder) newSlice(
 	)
 }
 
-func (b builder) throwBounds() tsgo.ThrowStatement {
-	return b.factory.ThrowStatement(
-		b.factory.NewExpression(
-			b.id("Error"),
-			nil,
-			[]tsgo.Expression{
-				b.factory.StringLiteral(
-					"slice bounds out of range",
-					tsgo.TokenFlagsNone,
-				),
-			},
+func (b builder) throwBounds() tsgo.ExpressionStatement {
+	return b.factory.ExpressionStatement(
+		panicruntime.Call(
+			b.factory,
+			b.panicName,
+			b.factory.StringLiteral(
+				"slice bounds out of range",
+				tsgo.TokenFlagsNone,
+			),
 		),
 	)
 }

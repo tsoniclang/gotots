@@ -1,6 +1,9 @@
 package api
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+)
 
 type RuntimeModule uint8
 
@@ -11,18 +14,23 @@ const (
 	RuntimeModuleArray
 	RuntimeModuleSlice
 	RuntimeModuleMap
+	RuntimeModulePanic
+	RuntimeModuleInteger
 )
 
 type RuntimeSymbol uint16
 
 const (
-	RuntimeInvalid     RuntimeSymbol = 0
-	RuntimeStringIndex RuntimeSymbol = 1
-	RuntimeStringSlice RuntimeSymbol = 2
-	RuntimePointer     RuntimeSymbol = 100
-	RuntimeArray       RuntimeSymbol = 200
-	RuntimeSlice       RuntimeSymbol = 300
-	RuntimeMap         RuntimeSymbol = 400
+	RuntimeInvalid          RuntimeSymbol = 0
+	RuntimeStringIndex      RuntimeSymbol = 1
+	RuntimeStringSlice      RuntimeSymbol = 2
+	RuntimePointer          RuntimeSymbol = 100
+	RuntimeArray            RuntimeSymbol = 200
+	RuntimeSlice            RuntimeSymbol = 300
+	RuntimeMap              RuntimeSymbol = 400
+	RuntimePanic            RuntimeSymbol = 500
+	RuntimeIntegerDivide    RuntimeSymbol = 600
+	RuntimeIntegerRemainder RuntimeSymbol = 601
 )
 
 type RuntimeSymbolContract struct {
@@ -30,6 +38,7 @@ type RuntimeSymbolContract struct {
 	outputPath   string
 	exportedName string
 	typeUsable   bool
+	dependencies []RuntimeSymbol
 }
 
 func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
@@ -40,6 +49,7 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"runtime/string.ts",
 			"goStringIndex",
 			false,
+			RuntimePanic,
 		), nil
 	case RuntimeStringSlice:
 		return runtimeContract(
@@ -47,6 +57,7 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"runtime/string.ts",
 			"goStringSlice",
 			false,
+			RuntimePanic,
 		), nil
 	case RuntimePointer:
 		return runtimeContract(
@@ -54,6 +65,7 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"runtime/pointer.ts",
 			"GoPointer",
 			true,
+			RuntimePanic,
 		), nil
 	case RuntimeArray:
 		return runtimeContract(
@@ -61,6 +73,7 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"runtime/array.ts",
 			"GoArray",
 			true,
+			RuntimePanic,
 		), nil
 	case RuntimeSlice:
 		return runtimeContract(
@@ -68,6 +81,7 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"runtime/slice.ts",
 			"RuntimeSlice",
 			true,
+			RuntimePanic,
 		), nil
 	case RuntimeMap:
 		return runtimeContract(
@@ -75,6 +89,30 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"runtime/map.ts",
 			"GoMap",
 			true,
+			RuntimePanic,
+		), nil
+	case RuntimePanic:
+		return runtimeContract(
+			RuntimeModulePanic,
+			"runtime/panic.ts",
+			"GoPanic",
+			true,
+		), nil
+	case RuntimeIntegerDivide:
+		return runtimeContract(
+			RuntimeModuleInteger,
+			"runtime/integer.ts",
+			"goIntegerDivide",
+			false,
+			RuntimePanic,
+		), nil
+	case RuntimeIntegerRemainder:
+		return runtimeContract(
+			RuntimeModuleInteger,
+			"runtime/integer.ts",
+			"goIntegerRemainder",
+			false,
+			RuntimePanic,
 		), nil
 	default:
 		return RuntimeSymbolContract{}, &RuntimeSymbolError{Symbol: symbol}
@@ -86,12 +124,14 @@ func runtimeContract(
 	outputPath string,
 	exportedName string,
 	typeUsable bool,
+	dependencies ...RuntimeSymbol,
 ) RuntimeSymbolContract {
 	return RuntimeSymbolContract{
 		module:       module,
 		outputPath:   outputPath,
 		exportedName: exportedName,
 		typeUsable:   typeUsable,
+		dependencies: slices.Clone(dependencies),
 	}
 }
 
@@ -105,6 +145,10 @@ func (c RuntimeSymbolContract) OutputPath() string {
 
 func (c RuntimeSymbolContract) ExportedName() string {
 	return c.exportedName
+}
+
+func (c RuntimeSymbolContract) Dependencies() []RuntimeSymbol {
+	return slices.Clone(c.dependencies)
 }
 
 func (c RuntimeSymbolContract) AllowsImportPhase(phase ImportPhase) bool {

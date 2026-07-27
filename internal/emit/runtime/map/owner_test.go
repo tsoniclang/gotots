@@ -8,7 +8,11 @@ import (
 )
 
 func TestBuildCreatesOneTypedGenericMapClass(t *testing.T) {
-	statement, err := Build(tsgo.NewFactory(), api.RuntimeMap)
+	statement, err := Build(
+		tsgo.NewFactory(),
+		api.RuntimeMap,
+		panicClassName(t),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,7 +32,11 @@ func TestBuildCreatesOneTypedGenericMapClass(t *testing.T) {
 }
 
 func TestRuntimeMapMutationGuardsOwnMissingAndNilWriteSemantics(t *testing.T) {
-	statement, err := Build(tsgo.NewFactory(), api.RuntimeMap)
+	statement, err := Build(
+		tsgo.NewFactory(),
+		api.RuntimeMap,
+		panicClassName(t),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,9 +107,13 @@ func TestRuntimeMapMutationGuardsOwnMissingAndNilWriteSemantics(t *testing.T) {
 	if !ok {
 		t.Fatalf("store nil guard = %T", store[0])
 	}
-	if _, ok := nilGuard.ThenStatement().(tsgo.Block).
-		Statements()[0].(tsgo.ThrowStatement); !ok {
-		t.Fatal("nil map store does not throw")
+	panicCall, ok := nilGuard.ThenStatement().(tsgo.Block).
+		Statements()[0].(tsgo.ExpressionStatement).
+		Expression().(tsgo.CallExpression)
+	if !ok ||
+		panicCall.Expression().(tsgo.PropertyAccessExpression).
+			Expression().(tsgo.Identifier).Text() != panicClassName(t) {
+		t.Fatal("nil map store bypasses the shared panic ABI")
 	}
 	setCall := store[1].(tsgo.ExpressionStatement).
 		Expression().(tsgo.CallExpression).
@@ -119,8 +131,21 @@ func TestBuildRejectsSiblingRuntimeSymbols(t *testing.T) {
 		api.RuntimeArray,
 		api.RuntimeSlice,
 	} {
-		if _, err := Build(tsgo.NewFactory(), symbol); err == nil {
+		if _, err := Build(
+			tsgo.NewFactory(),
+			symbol,
+			panicClassName(t),
+		); err == nil {
 			t.Fatalf("symbol %d was accepted by map owner", symbol)
 		}
 	}
+}
+
+func panicClassName(t *testing.T) string {
+	t.Helper()
+	contract, err := api.RuntimeContract(api.RuntimePanic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return contract.ExportedName()
 }

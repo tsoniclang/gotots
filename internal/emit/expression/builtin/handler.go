@@ -6,7 +6,9 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	mapbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/map"
+	newvalue "github.com/tsoniclang/gotots/internal/emit/expression/builtin/newvalue"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
+	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 )
@@ -26,14 +28,28 @@ func Emit(
 		context,
 		children,
 		source,
+		builtin,
 		discarded,
 	); handled {
 		return target, err
 	}
 	switch types.Object(builtin) {
+	case types.Universe.Lookup("new"):
+		return newvalue.Emit(context, children, source, builtin)
 	case types.Universe.Lookup("make"):
 		return emitMake(context, children, source, discarded)
 	case types.Universe.Lookup("len"):
+		if len(source.Args) == 1 &&
+			basictype.SupportsString(
+				context.TypesInfo().TypeOf(source.Args[0]),
+			) {
+			return emitStringLength(
+				context,
+				children,
+				source,
+				discarded,
+			)
+		}
 		if array, ok := arrayArgument(context, source); ok {
 			return emitArrayMeasure(
 				context,
@@ -77,20 +93,16 @@ func Emit(
 	}
 }
 
-func builtinObject(info *types.Info, source ast.Expr) (*types.Builtin, bool) {
+func Object(
+	info *types.Info,
+	source ast.Expr,
+) (*types.Builtin, bool) {
 	identifier, ok := source.(*ast.Ident)
 	if !ok || info == nil {
 		return nil, false
 	}
 	builtin, ok := info.Uses[identifier].(*types.Builtin)
 	return builtin, ok
-}
-
-func SliceBuiltin(
-	info *types.Info,
-	source ast.Expr,
-) (*types.Builtin, bool) {
-	return builtinObject(info, source)
 }
 
 func resultType(

@@ -58,12 +58,14 @@ func (e ExpressionEmission) Requests() []PlacementRequest {
 }
 
 type StoreTargetEmission struct {
-	setter     bool
-	before     []tsgo.Statement
-	value      tsgo.Expression
-	arguments  []tsgo.Expression
-	sourceType types.Type
-	requests   []PlacementRequest
+	setter          bool
+	before          []tsgo.Statement
+	value           tsgo.Expression
+	setterReceiver  ExpressionEmission
+	setterMember    string
+	setterArguments []ExpressionEmission
+	sourceType      types.Type
+	requests        []PlacementRequest
 }
 
 func NewStoreTargetEmission(
@@ -91,17 +93,21 @@ func NewStoreTargetEmission(
 }
 
 func NewSetterStoreTargetEmission(
-	before []tsgo.Statement,
-	setter tsgo.Expression,
-	arguments []tsgo.Expression,
+	receiver ExpressionEmission,
+	member string,
+	arguments []ExpressionEmission,
 	sourceType types.Type,
-	requests []PlacementRequest,
 ) (StoreTargetEmission, error) {
 	switch {
-	case setter == nil:
+	case receiver.Value() == nil:
 		return StoreTargetEmission{}, &ResultError{
 			Result: "setter store target",
-			Reason: "target setter is nil",
+			Reason: "target receiver is nil",
+		}
+	case member == "":
+		return StoreTargetEmission{}, &ResultError{
+			Result: "setter store target",
+			Reason: "target member is empty",
 		}
 	case sourceType == nil:
 		return StoreTargetEmission{}, &ResultError{
@@ -110,7 +116,7 @@ func NewSetterStoreTargetEmission(
 		}
 	}
 	for _, argument := range arguments {
-		if argument == nil {
+		if argument.Value() == nil {
 			return StoreTargetEmission{}, &ResultError{
 				Result: "setter store target",
 				Reason: "setter argument is nil",
@@ -118,12 +124,11 @@ func NewSetterStoreTargetEmission(
 		}
 	}
 	return StoreTargetEmission{
-		setter:     true,
-		before:     slices.Clone(before),
-		value:      setter,
-		arguments:  slices.Clone(arguments),
-		sourceType: sourceType,
-		requests:   slices.Clone(requests),
+		setter:          true,
+		setterReceiver:  receiver,
+		setterMember:    member,
+		setterArguments: slices.Clone(arguments),
+		sourceType:      sourceType,
 	}, nil
 }
 
@@ -139,8 +144,16 @@ func (e StoreTargetEmission) Value() tsgo.Expression {
 	return e.value
 }
 
-func (e StoreTargetEmission) Arguments() []tsgo.Expression {
-	return slices.Clone(e.arguments)
+func (e StoreTargetEmission) SetterReceiver() ExpressionEmission {
+	return e.setterReceiver
+}
+
+func (e StoreTargetEmission) SetterMember() string {
+	return e.setterMember
+}
+
+func (e StoreTargetEmission) SetterArguments() []ExpressionEmission {
+	return slices.Clone(e.setterArguments)
 }
 
 func (e StoreTargetEmission) SourceType() types.Type {
@@ -148,6 +161,13 @@ func (e StoreTargetEmission) SourceType() types.Type {
 }
 
 func (e StoreTargetEmission) Requests() []PlacementRequest {
+	if e.setter {
+		requests := e.setterReceiver.Requests()
+		for _, argument := range e.setterArguments {
+			requests = append(requests, argument.Requests()...)
+		}
+		return requests
+	}
 	return slices.Clone(e.requests)
 }
 

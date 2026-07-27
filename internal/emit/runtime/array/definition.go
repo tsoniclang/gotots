@@ -6,7 +6,10 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func Build(factory tsgo.Factory) (tsgo.ClassDeclaration, error) {
+func Build(
+	factory tsgo.Factory,
+	panicName string,
+) (tsgo.ClassDeclaration, error) {
 	contract, err := api.RuntimeContract(api.RuntimeArray)
 	if err != nil {
 		return nil, err
@@ -33,12 +36,12 @@ func Build(factory tsgo.Factory) (tsgo.ClassDeclaration, error) {
 	members := []tsgo.ClassElement{
 		constructor(factory, elementType, lengthType),
 		zeroMethod(factory, exportedName),
-		literalMethod(factory, exportedName),
+		literalMethod(factory, exportedName, panicName),
 		copyMethod(factory, exportedName, elementType, lengthType),
 		equalMethod(factory, exportedName, elementType, lengthType),
 		getMethod(factory, elementType),
 		setMethod(factory, elementType),
-		checkMethod(factory),
+		checkMethod(factory, panicName),
 	}
 	return factory.ClassDeclaration(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
@@ -154,6 +157,7 @@ func zeroMethod(
 func literalMethod(
 	factory tsgo.Factory,
 	exportedName string,
+	panicName string,
 ) tsgo.MethodDeclaration {
 	elementType := typeReference(factory, "T")
 	lengthType := typeReference(factory, "N")
@@ -169,8 +173,9 @@ func literalMethod(
 				tsgo.BinaryOperatorExclamationEqualsEqualsToken,
 				property(factory, values, "length"),
 			),
-			factory.Block([]tsgo.Statement{rangeError(
+			factory.Block([]tsgo.Statement{boundsPanic(
 				factory,
+				panicName,
 				"array literal index/value length mismatch",
 			)}, true),
 			nil,
@@ -457,7 +462,10 @@ func setMethod(
 	)
 }
 
-func checkMethod(factory tsgo.Factory) tsgo.MethodDeclaration {
+func checkMethod(
+	factory tsgo.Factory,
+	panicName string,
+) tsgo.MethodDeclaration {
 	index := factory.Identifier("index")
 	offset := factory.Identifier("offset")
 	negative := binary(
@@ -528,7 +536,11 @@ func checkMethod(factory tsgo.Factory) tsgo.MethodDeclaration {
 					tooLarge,
 				),
 				factory.Block([]tsgo.Statement{
-					rangeError(factory, "array index out of bounds"),
+					boundsPanic(
+						factory,
+						panicName,
+						"array index out of bounds",
+					),
 				}, true),
 				nil,
 			),

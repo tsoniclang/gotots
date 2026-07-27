@@ -5,11 +5,13 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
+	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -23,6 +25,12 @@ func Emit(
 	case *ast.Ident:
 		return identifier(context, source)
 	case *ast.IndexExpr:
+		if _, ok := maprepresentation.Source(
+			context,
+			context.TypesInfo().TypeOf(source.X),
+		); ok {
+			return mapIndex(context, children, source)
+		}
 		if array, ok := arrayvalue.Resolve(
 			context,
 			context.TypesInfo().TypeOf(source.X),
@@ -135,23 +143,59 @@ func sliceIndex(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	if len(receiver.Before()) != 0 || len(index.Before()) != 0 {
+	return api.NewSetterStoreTargetEmission(
+		receiver,
+		runtimeslice.MemberName(runtimeslice.MemberSet),
+		[]api.ExpressionEmission{index},
+		elementType,
+	)
+}
+
+func mapIndex(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.IndexExpr,
+) (api.StoreTargetEmission, error) {
+	mapType, ok := maprepresentation.Source(
+		context,
+		context.TypesInfo().TypeOf(source.X),
+	)
+	if !ok ||
+		!types.Identical(context.TypesInfo().TypeOf(source), mapType.Elem()) ||
+		!types.AssignableTo(
+			context.TypesInfo().TypeOf(source.Index),
+			mapType.Key(),
+		) {
 		return api.StoreTargetEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	receiver, err := children.Expression(
+		context.
+			WithRole(api.RoleMapReceiver).
+			WithExpectedType(mapType),
+		source.X,
+	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
+	key, err := children.Expression(
+		context.
+			WithRole(api.RoleMapKey).
+			WithExpectedType(mapType.Key()),
+		source.Index,
+	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
+	member, err := mapruntime.Name(mapruntime.MemberStore)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
 	return api.NewSetterStoreTargetEmission(
-		nil,
-		context.Factory().PropertyAccessExpression(
-			receiver.Value(),
-			nil,
-			context.Factory().Identifier(
-				runtimeslice.MemberName(runtimeslice.MemberSet),
-			),
-			tsgo.NodeFlagsNone,
-		),
-		[]tsgo.Expression{index.Value()},
-		elementType,
-		api.CombineRequests(receiver.Requests(), index.Requests()),
+		receiver,
+		member,
+		[]api.ExpressionEmission{key},
+		mapType.Elem(),
 	)
 }
 

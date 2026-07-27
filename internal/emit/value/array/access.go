@@ -71,19 +71,19 @@ func (a RuntimeArray) EmitStoreTarget(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	before := receiver.Before()
-	before = append(before, index.Before()...)
+	targetReceiver, err := api.NewExpressionEmission(
+		receiver.Before(),
+		receiver.Value(),
+		receiver.Requests(),
+	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
 	return api.NewSetterStoreTargetEmission(
-		before,
-		context.Factory().PropertyAccessExpression(
-			receiver.Value(),
-			nil,
-			context.Factory().Identifier(arraymember.Set.Name()),
-			tsgo.NodeFlagsNone,
-		),
-		[]tsgo.Expression{index.Value()},
+		targetReceiver,
+		arraymember.Set.Name(),
+		[]api.ExpressionEmission{index},
 		a.ElementType(),
-		api.CombineRequests(receiver.Requests(), index.Requests()),
 	)
 }
 

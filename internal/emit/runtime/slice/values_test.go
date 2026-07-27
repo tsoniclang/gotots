@@ -44,7 +44,7 @@ func TestScalarSlicesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	}
 	for _, fragment := range []string{
 		"export class RuntimeSlice<T>",
-		"throw new Error",
+		"GoPanic.raise",
 		"copyWithin",
 	} {
 		if !strings.Contains(printed.runtime, fragment) {

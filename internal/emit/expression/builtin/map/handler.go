@@ -14,14 +14,13 @@ func Emit(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.CallExpr,
+	builtin *types.Builtin,
 	discarded bool,
 ) (api.ExpressionEmission, bool, error) {
-	identifier, ok := source.Fun.(*ast.Ident)
-	if !ok {
+	if source == nil || builtin == nil {
 		return api.ExpressionEmission{}, false, nil
 	}
-	object := context.TypesInfo().Uses[identifier]
-	switch object {
+	switch types.Object(builtin) {
 	case types.Universe.Lookup("make"):
 		if _, ok := maprepresentation.Source(
 			context,

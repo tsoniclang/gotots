@@ -6,7 +6,6 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	mapstore "github.com/tsoniclang/gotots/internal/emit/store/map"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -234,13 +233,6 @@ func emitAssignment(
 	children api.ChildEmitter,
 	source *ast.AssignStmt,
 ) (api.StatementEmission, error) {
-	if target, handled, err := mapstore.EmitAssignment(
-		context,
-		children,
-		source,
-	); handled {
-		return target, err
-	}
 	if len(source.Lhs) > 1 {
 		return emitParallel(context, children, source)
 	}
@@ -279,45 +271,7 @@ func emitAssignment(
 		return api.StatementEmission{}, err
 	}
 	if target.IsSetter() {
-		arguments := target.Arguments()
-		statements := target.Before()
-		if len(value.Before()) != 0 {
-			for index, argument := range arguments {
-				name, err := context.Names().Temporary(
-					api.TemporarySetterArgument,
-				)
-				if err != nil {
-					return api.StatementEmission{}, err
-				}
-				statements = append(
-					statements,
-					variableStatement(
-						context,
-						tsgo.NodeFlagsConst,
-						name,
-						argument,
-					),
-				)
-				arguments[index] = context.Factory().Identifier(name)
-			}
-		}
-		statements = append(statements, value.Before()...)
-		arguments = append(arguments, value.Value())
-		call := context.Factory().CallExpression(
-			target.Value(),
-			nil,
-			nil,
-			arguments,
-			tsgo.NodeFlagsNone,
-		)
-		statements = append(
-			statements,
-			context.Factory().ExpressionStatement(call),
-		)
-		return api.NewStatementEmission(
-			statements,
-			api.CombineRequests(target.Requests(), value.Requests()),
-		)
+		return emitSetter(context, target, value)
 	}
 	assigned, err := context.Values().Assign(
 		context.WithRole(api.RoleAssignmentTarget),

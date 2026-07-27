@@ -2,6 +2,7 @@ package mapruntime
 
 import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -51,6 +52,7 @@ func resolveMemberNames() (memberNames, error) {
 func Build(
 	factory tsgo.Factory,
 	symbol api.RuntimeSymbol,
+	panicName string,
 ) (tsgo.Statement, error) {
 	contract, err := api.RuntimeContract(symbol)
 	if err != nil {
@@ -82,7 +84,7 @@ func Build(
 			makeMethod(factory, className, members.makeMember),
 			lookupMethod(factory, valueType, members.lookup),
 			lookupOKMethod(factory, valueType, members.lookupOK),
-			storeMethod(factory, valueType, members.store),
+			storeMethod(factory, valueType, members.store, panicName),
 			deleteMethod(factory, members.delete),
 			lengthMethod(factory, members.length),
 			nilStateMethod(factory, members.isNil),
@@ -265,6 +267,7 @@ func storeMethod(
 	factory tsgo.Factory,
 	valueType tsgo.TypeNode,
 	memberName string,
+	panicName string,
 ) tsgo.MethodDeclaration {
 	return factory.MethodDeclaration(
 		nil,
@@ -278,7 +281,7 @@ func storeMethod(
 		},
 		factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindVoidKeyword),
 		factory.Block([]tsgo.Statement{
-			nilWriteGuard(factory),
+			nilWriteGuard(factory, panicName),
 			factory.ExpressionStatement(
 				methodCall(
 					factory,
@@ -388,7 +391,10 @@ func nilStateMethod(
 	)
 }
 
-func nilWriteGuard(factory tsgo.Factory) tsgo.IfStatement {
+func nilWriteGuard(
+	factory tsgo.Factory,
+	panicName string,
+) tsgo.IfStatement {
 	return factory.IfStatement(
 		factory.BinaryExpression(
 			nil,
@@ -400,16 +406,14 @@ func nilWriteGuard(factory tsgo.Factory) tsgo.IfStatement {
 			factory.Identifier("undefined"),
 		),
 		factory.Block([]tsgo.Statement{
-			factory.ThrowStatement(
-				factory.NewExpression(
-					factory.Identifier("Error"),
-					nil,
-					[]tsgo.Expression{
-						factory.StringLiteral(
-							"assignment to entry in nil map",
-							tsgo.TokenFlagsNone,
-						),
-					},
+			factory.ExpressionStatement(
+				panicruntime.Call(
+					factory,
+					panicName,
+					factory.StringLiteral(
+						"assignment to entry in nil map",
+						tsgo.TokenFlagsNone,
+					),
 				),
 			),
 		}, true),

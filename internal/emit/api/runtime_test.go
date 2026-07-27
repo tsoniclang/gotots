@@ -1,6 +1,7 @@
 package api_test
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
@@ -15,13 +16,17 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		path   string
 		name   string
 		typeOK bool
+		deps   []api.RuntimeSymbol
 	}{
-		{api.RuntimeStringIndex, 1, api.RuntimeModuleString, "runtime/string.ts", "goStringIndex", false},
-		{api.RuntimeStringSlice, 2, api.RuntimeModuleString, "runtime/string.ts", "goStringSlice", false},
-		{api.RuntimePointer, 100, api.RuntimeModulePointer, "runtime/pointer.ts", "GoPointer", true},
-		{api.RuntimeArray, 200, api.RuntimeModuleArray, "runtime/array.ts", "GoArray", true},
-		{api.RuntimeSlice, 300, api.RuntimeModuleSlice, "runtime/slice.ts", "RuntimeSlice", true},
-		{api.RuntimeMap, 400, api.RuntimeModuleMap, "runtime/map.ts", "GoMap", true},
+		{api.RuntimeStringIndex, 1, api.RuntimeModuleString, "runtime/string.ts", "goStringIndex", false, []api.RuntimeSymbol{api.RuntimePanic}},
+		{api.RuntimeStringSlice, 2, api.RuntimeModuleString, "runtime/string.ts", "goStringSlice", false, []api.RuntimeSymbol{api.RuntimePanic}},
+		{api.RuntimePointer, 100, api.RuntimeModulePointer, "runtime/pointer.ts", "GoPointer", true, []api.RuntimeSymbol{api.RuntimePanic}},
+		{api.RuntimeArray, 200, api.RuntimeModuleArray, "runtime/array.ts", "GoArray", true, []api.RuntimeSymbol{api.RuntimePanic}},
+		{api.RuntimeSlice, 300, api.RuntimeModuleSlice, "runtime/slice.ts", "RuntimeSlice", true, []api.RuntimeSymbol{api.RuntimePanic}},
+		{api.RuntimeMap, 400, api.RuntimeModuleMap, "runtime/map.ts", "GoMap", true, []api.RuntimeSymbol{api.RuntimePanic}},
+		{api.RuntimePanic, 500, api.RuntimeModulePanic, "runtime/panic.ts", "GoPanic", true, nil},
+		{api.RuntimeIntegerDivide, 600, api.RuntimeModuleInteger, "runtime/integer.ts", "goIntegerDivide", false, []api.RuntimeSymbol{api.RuntimePanic}},
+		{api.RuntimeIntegerRemainder, 601, api.RuntimeModuleInteger, "runtime/integer.ts", "goIntegerRemainder", false, []api.RuntimeSymbol{api.RuntimePanic}},
 	}
 	for _, test := range tests {
 		if uint16(test.symbol) != test.id {
@@ -34,6 +39,7 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		if contract.Module() != test.module ||
 			contract.OutputPath() != test.path ||
 			contract.ExportedName() != test.name ||
+			!slices.Equal(contract.Dependencies(), test.deps) ||
 			contract.AllowsImportPhase(api.ImportPhaseType) != test.typeOK ||
 			!contract.AllowsImportPhase(api.ImportPhaseValue) {
 			t.Fatalf(
@@ -74,6 +80,19 @@ func TestRuntimeImportRequestCarriesDefinitionIdentity(t *testing.T) {
 	symbol, ok := request.RuntimeSymbol()
 	if !ok || symbol != api.RuntimeStringIndex {
 		t.Fatalf("runtime symbol = %v, %v", symbol, ok)
+	}
+}
+
+func TestRuntimeContractDoesNotExposeDependencyBacking(t *testing.T) {
+	contract, err := api.RuntimeContract(api.RuntimeArray)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dependencies := contract.Dependencies()
+	dependencies[0] = api.RuntimeInvalid
+	if actual := contract.Dependencies(); len(actual) != 1 ||
+		actual[0] != api.RuntimePanic {
+		t.Fatalf("runtime dependencies leaked mutable backing: %v", actual)
 	}
 }
 

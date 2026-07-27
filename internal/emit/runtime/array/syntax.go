@@ -2,6 +2,7 @@ package array
 
 import (
 	arraymember "github.com/tsoniclang/gotots/internal/emit/runtime/array/member"
+	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -182,12 +183,14 @@ func binary(
 	)
 }
 
-func rangeError(factory tsgo.Factory, message string) tsgo.ThrowStatement {
-	return factory.ThrowStatement(factory.NewExpression(
-		factory.Identifier("RangeError"),
-		nil,
-		[]tsgo.Expression{
-			factory.StringLiteral(message, tsgo.TokenFlagsNone),
-		},
+func boundsPanic(
+	factory tsgo.Factory,
+	panicName string,
+	message string,
+) tsgo.ExpressionStatement {
+	return factory.ExpressionStatement(panicruntime.Call(
+		factory,
+		panicName,
+		factory.StringLiteral(message, tsgo.TokenFlagsNone),
 	))
 }

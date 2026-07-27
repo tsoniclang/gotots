@@ -293,6 +293,10 @@ func (s *programSession) scalarSupportFile(
 func (s *programSession) runtimeSupportFiles(
 	requested map[api.RuntimeSymbol]struct{},
 ) ([]TargetFile, error) {
+	requested, err := runtimeDependencyClosure(requested)
+	if err != nil {
+		return nil, err
+	}
 	byModule := make(map[api.RuntimeModule][]api.RuntimeSymbol)
 	paths := make(map[api.RuntimeModule]string)
 	for symbol := range requested {
@@ -333,6 +337,11 @@ func (s *programSession) runtimeSupportFiles(
 		if err != nil {
 			return nil, err
 		}
+		imports, err := s.runtimeModuleImports(paths[module], module, symbols)
+		if err != nil {
+			return nil, err
+		}
+		statements = append(imports, statements...)
 		file, err := s.sourceFile(
 			paths[module],
 			"",
@@ -345,6 +354,95 @@ func (s *programSession) runtimeSupportFiles(
 		files = append(files, file)
 	}
 	return files, nil
+}
+
+func runtimeDependencyClosure(
+	requested map[api.RuntimeSymbol]struct{},
+) (map[api.RuntimeSymbol]struct{}, error) {
+	result := make(map[api.RuntimeSymbol]struct{}, len(requested))
+	state := make(map[api.RuntimeSymbol]uint8, len(requested))
+	var visit func(api.RuntimeSymbol) error
+	visit = func(symbol api.RuntimeSymbol) error {
+		switch state[symbol] {
+		case 1:
+			return &runtimeemission.AssemblyError{
+				Symbol: symbol,
+				Reason: "runtime dependency graph contains a cycle",
+			}
+		case 2:
+			return nil
+		}
+		contract, err := api.RuntimeContract(symbol)
+		if err != nil {
+			return err
+		}
+		state[symbol] = 1
+		dependencies := contract.Dependencies()
+		slices.Sort(dependencies)
+		for _, dependency := range dependencies {
+			if err := visit(dependency); err != nil {
+				return err
+			}
+		}
+		state[symbol] = 2
+		result[symbol] = struct{}{}
+		return nil
+	}
+	symbols := make([]api.RuntimeSymbol, 0, len(requested))
+	for symbol := range requested {
+		symbols = append(symbols, symbol)
+	}
+	slices.Sort(symbols)
+	for _, symbol := range symbols {
+		if err := visit(symbol); err != nil {
+			return nil, err
+		}
+	}
+	return result, nil
+}
+
+func (s *programSession) runtimeModuleImports(
+	outputPath string,
+	module api.RuntimeModule,
+	symbols []api.RuntimeSymbol,
+) ([]tsgo.Statement, error) {
+	placement := newPlacementOwner()
+	for _, symbol := range symbols {
+		contract, err := api.RuntimeContract(symbol)
+		if err != nil {
+			return nil, err
+		}
+		for _, dependency := range contract.Dependencies() {
+			dependencyContract, err := api.RuntimeContract(dependency)
+			if err != nil {
+				return nil, err
+			}
+			if dependencyContract.Module() == module {
+				continue
+			}
+			modulePath, err := targetoutput.ModuleSpecifier(
+				outputPath,
+				dependencyContract.OutputPath(),
+			)
+			if err != nil {
+				return nil, err
+			}
+			request, err := api.NewRuntimeImportRequest(
+				s.factory,
+				api.ImportPhaseValue,
+				modulePath,
+				dependency,
+				dependencyContract.ExportedName(),
+			)
+			if err != nil {
+				return nil, err
+			}
+			if err := placement.Apply([]api.PlacementRequest{request}); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return placement.Statements(s.factory), nil
 }
 
 func exactRuntimeDefinitions(

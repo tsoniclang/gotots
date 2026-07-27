@@ -5,7 +5,9 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	runtimearray "github.com/tsoniclang/gotots/internal/emit/runtime/array"
+	integerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/integer"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
+	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	stringruntime "github.com/tsoniclang/gotots/internal/emit/runtime/string"
@@ -53,7 +55,15 @@ func Build(
 		return nil, &AssemblyError{Reason: "runtime symbol set is empty"}
 	}
 	if module == api.RuntimeModuleString {
-		statements, err := stringruntime.Build(factory, symbols)
+		panicContract, err := api.RuntimeContract(api.RuntimePanic)
+		if err != nil {
+			return nil, err
+		}
+		statements, err := stringruntime.Build(
+			factory,
+			symbols,
+			panicContract.ExportedName(),
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -84,9 +94,17 @@ func Build(
 		if err != nil {
 			return nil, err
 		}
+		panicContract, err := api.RuntimeContract(api.RuntimePanic)
+		if err != nil {
+			return nil, err
+		}
 		definition, err := NewDefinition(
 			api.RuntimePointer,
-			pointerruntime.Build(factory, contract.ExportedName()),
+			pointerruntime.Build(
+				factory,
+				contract.ExportedName(),
+				panicContract.ExportedName(),
+			),
 		)
 		if err != nil {
 			return nil, err
@@ -96,7 +114,14 @@ func Build(
 	if module == api.RuntimeModuleArray &&
 		len(symbols) == 1 &&
 		symbols[0] == api.RuntimeArray {
-		statement, err := runtimearray.Build(factory)
+		panicContract, err := api.RuntimeContract(api.RuntimePanic)
+		if err != nil {
+			return nil, err
+		}
+		statement, err := runtimearray.Build(
+			factory,
+			panicContract.ExportedName(),
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -116,9 +141,17 @@ func Build(
 		if err != nil {
 			return nil, err
 		}
+		panicContract, err := api.RuntimeContract(api.RuntimePanic)
+		if err != nil {
+			return nil, err
+		}
 		definition, err := NewDefinition(
 			api.RuntimeSlice,
-			runtimeslice.Build(factory, contract.ExportedName()),
+			runtimeslice.Build(
+				factory,
+				contract.ExportedName(),
+				panicContract.ExportedName(),
+			),
 		)
 		if err != nil {
 			return nil, err
@@ -127,6 +160,45 @@ func Build(
 	}
 	if module == api.RuntimeModuleMap {
 		return buildMap(factory, symbols)
+	}
+	if module == api.RuntimeModuleInteger {
+		panicContract, err := api.RuntimeContract(api.RuntimePanic)
+		if err != nil {
+			return nil, err
+		}
+		statements, err := integerruntime.Build(
+			factory,
+			symbols,
+			panicContract.ExportedName(),
+		)
+		if err != nil {
+			return nil, err
+		}
+		definitions := make([]Definition, 0, len(symbols))
+		for index, symbol := range symbols {
+			definition, err := NewDefinition(symbol, statements[index])
+			if err != nil {
+				return nil, err
+			}
+			definitions = append(definitions, definition)
+		}
+		return definitions, nil
+	}
+	if module == api.RuntimeModulePanic &&
+		len(symbols) == 1 &&
+		symbols[0] == api.RuntimePanic {
+		contract, err := api.RuntimeContract(api.RuntimePanic)
+		if err != nil {
+			return nil, err
+		}
+		definition, err := NewDefinition(
+			api.RuntimePanic,
+			panicruntime.Build(factory, contract.ExportedName()),
+		)
+		if err != nil {
+			return nil, err
+		}
+		return []Definition{definition}, nil
 	}
 	return nil, &AssemblyError{
 		Module: module,
@@ -138,9 +210,17 @@ func buildMap(
 	factory tsgo.Factory,
 	symbols []api.RuntimeSymbol,
 ) ([]Definition, error) {
+	panicContract, err := api.RuntimeContract(api.RuntimePanic)
+	if err != nil {
+		return nil, err
+	}
 	result := make([]Definition, 0, len(symbols))
 	for _, symbol := range symbols {
-		statement, err := mapruntime.Build(factory, symbol)
+		statement, err := mapruntime.Build(
+			factory,
+			symbol,
+			panicContract.ExportedName(),
+		)
 		if err != nil {
 			return nil, err
 		}

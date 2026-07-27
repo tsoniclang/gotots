@@ -1,4 +1,4 @@
-package call
+package builtin
 
 import (
 	"go/ast"
@@ -14,27 +14,23 @@ func emitStringLength(
 	children api.ChildEmitter,
 	source *ast.CallExpr,
 	discarded bool,
-) (api.ExpressionEmission, bool, error) {
-	identifier, ok := source.Fun.(*ast.Ident)
-	if !ok || context.TypesInfo().Uses[identifier] != types.Universe.Lookup("len") {
-		return api.ExpressionEmission{}, false, nil
-	}
+) (api.ExpressionEmission, error) {
 	if len(source.Args) != 1 ||
-		!basictype.SupportsString(context.TypesInfo().TypeOf(source.Args[0])) {
-		return api.ExpressionEmission{}, false, nil
-	}
-	if discarded ||
+		!basictype.SupportsString(
+			context.TypesInfo().TypeOf(source.Args[0]),
+		) ||
+		discarded ||
 		context.ExpectedResults() != nil ||
 		!basictype.SupportsInteger(
 			context.TypesSizes(),
 			context.TypesInfo().TypeOf(source),
 		) {
-		return api.ExpressionEmission{}, true,
+		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	if expected := context.ExpectedType(); expected != nil &&
 		!types.AssignableTo(context.TypesInfo().TypeOf(source), expected) {
-		return api.ExpressionEmission{}, true,
+		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	value, err := children.Expression(
@@ -44,7 +40,7 @@ func emitStringLength(
 		source.Args[0],
 	)
 	if err != nil {
-		return api.ExpressionEmission{}, true, err
+		return api.ExpressionEmission{}, err
 	}
 	length := tsgo.Expression(context.Factory().PropertyAccessExpression(
 		value.Value(),
@@ -61,10 +57,9 @@ func emitStringLength(
 			tsgo.NodeFlagsNone,
 		)
 	}
-	returned, err := api.NewExpressionEmission(
+	return api.NewExpressionEmission(
 		value.Before(),
 		length,
 		value.Requests(),
 	)
-	return returned, true, err
 }

@@ -45,6 +45,7 @@ func TestArrayZeroCopyEqualityLiteralAccessAndBoundsMatchGo(t *testing.T) {
 	}
 	runner := filepath.Join(directory, "runner.ts")
 	writeFile(t, runner, `import "`+target.programInit+`";
+import { GoPanic } from "./runtime/panic.js";
 import {
     ArgumentAndResultCopy,
     BoolValues,
@@ -88,13 +89,13 @@ try {
     IndexStore(3, 9);
     console.log("bounds-missing");
 } catch (error) {
-    console.log(error instanceof RangeError ? "bounds" : "wrong-error");
+    console.log(error instanceof GoPanic ? "bounds" : "wrong-error");
 }
 try {
     IndexStore(-1, 9);
     console.log("bounds-missing");
 } catch (error) {
-    console.log(error instanceof RangeError ? "bounds" : "wrong-error");
+    console.log(error instanceof GoPanic ? "bounds" : "wrong-error");
 }
 `)
 	writeFile(t, filepath.Join(directory, "package.json"), "{\"type\":\"module\"}\n")

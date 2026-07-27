@@ -76,6 +76,7 @@ func TestIntegerBigIntProfilePrintsTypechecksAndExecutesDifferentially(t *testin
 	options.IntegerRepresentation = emit.IntegerRepresentationBigInt
 	emission := compileIntegerFamily(t, loaded, options, names...)
 	assertIntegerAliases(t, emission, tsgo.SyntaxKindBigIntKeyword)
+	assertBigIntDivisionUsesRuntime(t, emission)
 	printed := printIntegerFamily(t, emission)
 	assertDirectIntegerArtifact(t, printed, true)
 
@@ -84,6 +85,45 @@ func TestIntegerBigIntProfilePrintsTypechecksAndExecutesDifferentially(t *testin
 	targetOutput := executeIntegerFamilyTS(t, emission, workingDirectory, true)
 	if targetOutput != goOutput {
 		t.Fatalf("BigInt TypeScript output = %q, Go output = %q", targetOutput, goOutput)
+	}
+}
+
+func assertBigIntDivisionUsesRuntime(
+	t *testing.T,
+	emission emit.ProgramEmission,
+) {
+	t.Helper()
+	function := targetFunction(
+		t,
+		integerFamilySourceFile(t, emission),
+		"BigSigned",
+	)
+	returned := function.Body().(tsgo.Block).
+		Statements()[0].(tsgo.ReturnStatement).
+		Expression().(tsgo.ArrayLiteralExpression).
+		Elements()
+	for index, expected := range []string{
+		"goIntegerDivide",
+		"goIntegerRemainder",
+	} {
+		call, ok := returned[index].(tsgo.CallExpression)
+		if !ok {
+			t.Fatalf(
+				"BigSigned result %d = %T, want %s runtime call",
+				index,
+				returned[index],
+				expected,
+			)
+		}
+		callee, calleeOK := call.Expression().(tsgo.Identifier)
+		if !calleeOK || callee.Text() != expected {
+			t.Fatalf(
+				"BigSigned result %d = %T, want %s runtime call",
+				index,
+				returned[index],
+				expected,
+			)
+		}
 	}
 }
 

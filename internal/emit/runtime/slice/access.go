@@ -20,12 +20,12 @@ func (b builder) boundsCondition(index tsgo.Expression) tsgo.Expression {
 	)
 }
 
-func (b builder) backingElement(index tsgo.Expression) tsgo.ElementAccessExpression {
+func (b builder) backingElement(
+	backing tsgo.Expression,
+	index tsgo.Expression,
+) tsgo.ElementAccessExpression {
 	return b.index(
-		b.factory.NonNullExpression(
-			b.thisProperty("backing"),
-			tsgo.NodeFlagsNone,
-		),
+		backing,
 		b.add(b.thisProperty("offset"), index),
 	)
 }
@@ -42,12 +42,27 @@ func (b builder) getMethod() tsgo.MethodDeclaration {
 			"numericIndex",
 			b.toNumber(b.id("index")),
 		),
+		b.variable(
+			tsgo.NodeFlagsConst,
+			"backing",
+			b.thisProperty("backing"),
+		),
 		b.factory.IfStatement(
-			b.boundsCondition(b.id("numericIndex")),
+			b.binary(
+				b.binary(
+					b.id("backing"),
+					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+					b.factory.NullLiteral(),
+				),
+				tsgo.BinaryOperatorBarBarToken,
+				b.boundsCondition(b.id("numericIndex")),
+			),
 			b.throwBounds(),
 			nil,
 		),
-		b.returnStatement(b.backingElement(b.id("numericIndex"))),
+		b.returnStatement(
+			b.backingElement(b.id("backing"), b.id("numericIndex")),
+		),
 	)
 }
 
@@ -66,13 +81,29 @@ func (b builder) setMethod() tsgo.MethodDeclaration {
 			"numericIndex",
 			b.toNumber(b.id("index")),
 		),
+		b.variable(
+			tsgo.NodeFlagsConst,
+			"backing",
+			b.thisProperty("backing"),
+		),
 		b.factory.IfStatement(
-			b.boundsCondition(b.id("numericIndex")),
+			b.binary(
+				b.binary(
+					b.id("backing"),
+					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+					b.factory.NullLiteral(),
+				),
+				tsgo.BinaryOperatorBarBarToken,
+				b.boundsCondition(b.id("numericIndex")),
+			),
 			b.throwBounds(),
 			nil,
 		),
 		b.factory.ExpressionStatement(
-			b.assign(b.backingElement(b.id("numericIndex")), b.id("value")),
+			b.assign(
+				b.backingElement(b.id("backing"), b.id("numericIndex")),
+				b.id("value"),
+			),
 		),
 		b.returnStatement(b.id("value")),
 	)

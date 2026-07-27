@@ -120,7 +120,10 @@ func emitAppend(
 	discarded bool,
 ) (api.ExpressionEmission, error) {
 	result, err := resultType(context, source, discarded)
-	if err != nil || discarded || len(source.Args) < 1 {
+	if err != nil ||
+		discarded ||
+		source.Ellipsis.IsValid() ||
+		len(source.Args) < 1 {
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}

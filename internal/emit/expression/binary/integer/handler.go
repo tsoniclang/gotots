@@ -42,6 +42,32 @@ func Emit(
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	if symbol, ok := runtimeOperation(
+		context.IntegerRepresentation(),
+		source.Op,
+	); ok {
+		reference, err := context.Names().Runtime(
+			symbol,
+			api.ImportPhaseValue,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, true, err
+		}
+		return api.DirectExpression(
+			context.Factory().CallExpression(
+				context.Factory().Identifier(reference.Name()),
+				nil,
+				nil,
+				[]tsgo.Expression{left.Value(), right.Value()},
+				tsgo.NodeFlagsNone,
+			),
+			api.CombineRequests(
+				left.Requests(),
+				right.Requests(),
+				reference.Requests(),
+			)...,
+		), true, nil
+	}
 	target, ok := target(
 		context,
 		source.Op,
@@ -58,19 +84,21 @@ func Emit(
 	), true, nil
 }
 
-func OperationFor(
-	context api.Context,
-	source *ast.BinaryExpr,
-) (tsgo.BinaryOperatorToken, types.Type, bool) {
-	leftType, rightType, carrier, ok := operationTypes(context, source)
-	if !ok ||
-		!types.Identical(leftType, rightType) ||
-		source.Op == token.AND_NOT ||
-		needsUint32Normalization(context, carrier, source.Op) {
-		return nil, nil, false
+func runtimeOperation(
+	representation api.IntegerRepresentation,
+	operator token.Token,
+) (api.RuntimeSymbol, bool) {
+	if representation != api.IntegerRepresentationBigInt {
+		return api.RuntimeInvalid, false
 	}
-	operator, represented := targetOperator(context, source.Op, carrier)
-	return operator, leftType, represented
+	switch operator {
+	case token.QUO:
+		return api.RuntimeIntegerDivide, true
+	case token.REM:
+		return api.RuntimeIntegerRemainder, true
+	default:
+		return api.RuntimeInvalid, false
+	}
 }
 
 func operationTypes(
@@ -212,10 +240,6 @@ func targetOperator(
 		target = tsgo.BinaryOperatorMinusToken
 	case token.MUL:
 		target = tsgo.BinaryOperatorAsteriskToken
-	case token.QUO:
-		target = tsgo.BinaryOperatorSlashToken
-	case token.REM:
-		target = tsgo.BinaryOperatorPercentToken
 	case token.AND:
 		target = tsgo.BinaryOperatorAmpersandToken
 	case token.OR:

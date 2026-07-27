@@ -4,12 +4,14 @@ import (
 	"fmt"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func Build(
 	factory tsgo.Factory,
 	symbols []api.RuntimeSymbol,
+	panicName string,
 ) ([]tsgo.Statement, error) {
 	statements := make([]tsgo.Statement, 0, len(symbols))
 	for _, symbol := range symbols {
@@ -20,9 +22,17 @@ func Build(
 		var statement tsgo.Statement
 		switch symbol {
 		case api.RuntimeStringIndex:
-			statement = stringIndex(factory, contract.ExportedName())
+			statement = stringIndex(
+				factory,
+				contract.ExportedName(),
+				panicName,
+			)
 		case api.RuntimeStringSlice:
-			statement = stringSlice(factory, contract.ExportedName())
+			statement = stringSlice(
+				factory,
+				contract.ExportedName(),
+				panicName,
+			)
 		default:
 			return nil, &BuildError{Symbol: symbol}
 		}
@@ -31,7 +41,11 @@ func Build(
 	return statements, nil
 }
 
-func stringIndex(factory tsgo.Factory, exportedName string) tsgo.FunctionDeclaration {
+func stringIndex(
+	factory tsgo.Factory,
+	exportedName string,
+	panicName string,
+) tsgo.FunctionDeclaration {
 	value := factory.Identifier("value")
 	index := factory.Identifier("index")
 	offset := factory.Identifier("offset")
@@ -50,6 +64,7 @@ func stringIndex(factory tsgo.Factory, exportedName string) tsgo.FunctionDeclara
 				constNumber(factory, offset, index),
 				boundsCheck(
 					factory,
+					panicName,
 					or(
 						factory,
 						notSafeInteger(factory, offset),
@@ -79,7 +94,11 @@ func stringIndex(factory tsgo.Factory, exportedName string) tsgo.FunctionDeclara
 	)
 }
 
-func stringSlice(factory tsgo.Factory, exportedName string) tsgo.FunctionDeclaration {
+func stringSlice(
+	factory tsgo.Factory,
+	exportedName string,
+	panicName string,
+) tsgo.FunctionDeclaration {
 	value := factory.Identifier("value")
 	low := factory.Identifier("low")
 	high := factory.Identifier("high")
@@ -102,6 +121,7 @@ func stringSlice(factory tsgo.Factory, exportedName string) tsgo.FunctionDeclara
 				constSliceHigh(factory, end, high, value),
 				boundsCheck(
 					factory,
+					panicName,
 					or(
 						factory,
 						notSafeInteger(factory, start),
@@ -228,6 +248,7 @@ func constSliceHigh(
 
 func boundsCheck(
 	factory tsgo.Factory,
+	panicName string,
 	condition tsgo.Expression,
 	message string,
 ) tsgo.IfStatement {
@@ -235,13 +256,14 @@ func boundsCheck(
 		condition,
 		factory.Block(
 			[]tsgo.Statement{
-				factory.ThrowStatement(
-					factory.NewExpression(
-						factory.Identifier("RangeError"),
-						nil,
-						[]tsgo.Expression{
-							factory.StringLiteral(message, tsgo.TokenFlagsNone),
-						},
+				factory.ExpressionStatement(
+					panicruntime.Call(
+						factory,
+						panicName,
+						factory.StringLiteral(
+							message,
+							tsgo.TokenFlagsNone,
+						),
 					),
 				),
 			},

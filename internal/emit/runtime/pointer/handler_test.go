@@ -13,7 +13,7 @@ import (
 
 func TestBuildCreatesOneTypedGenericCellClass(t *testing.T) {
 	factory := tsgo.NewFactory()
-	statement := pointer.Build(factory, pointerClassName(t))
+	statement := pointer.Build(factory, pointerClassName(t), panicClassName(t))
 
 	class, ok := statement.(tsgo.ClassDeclaration)
 	if !ok {
@@ -64,6 +64,7 @@ func TestNilDereferenceSuccessMutationRemovesRequiredThrow(t *testing.T) {
 	class := pointer.Build(
 		tsgo.NewFactory(),
 		pointerClassName(t),
+		panicClassName(t),
 	).(tsgo.ClassDeclaration)
 	guard := class.Members()[1].(tsgo.MethodDeclaration)
 	body := guard.Body().(tsgo.Block).Statements()
@@ -75,10 +76,15 @@ func TestNilDereferenceSuccessMutationRemovesRequiredThrow(t *testing.T) {
 		t.Fatalf("pointer guard first statement = %T, want IfStatement", body[0])
 	}
 	failure, ok := condition.ThenStatement().(tsgo.Block)
+	if !ok || len(failure.Statements()) != 1 {
+		t.Fatal("nil pointer branch has no failure")
+	}
+	call, ok := failure.Statements()[0].(tsgo.ExpressionStatement).
+		Expression().(tsgo.CallExpression)
 	if !ok ||
-		len(failure.Statements()) != 1 ||
-		failure.Statements()[0].Kind() != tsgo.SyntaxKindThrowStatement {
-		t.Fatal("nil pointer branch does not throw")
+		call.Expression().(tsgo.PropertyAccessExpression).
+			Expression().(tsgo.Identifier).Text() != panicClassName(t) {
+		t.Fatal("nil pointer branch bypasses the shared panic ABI")
 	}
 }
 
@@ -127,7 +133,7 @@ func TestBuildPrintsSourceShapedCell(t *testing.T) {
 		}
 	})
 	printed, err := client.PrintNode(
-		pointer.Build(factory, pointerClassName(t)),
+		pointer.Build(factory, pointerClassName(t), panicClassName(t)),
 		tsgo.PrintOptions{},
 	)
 	if err != nil {
@@ -138,7 +144,7 @@ func TestBuildPrintsSourceShapedCell(t *testing.T) {
     }
     static dereference<T>(pointer: GoPointer<T> | undefined): GoPointer<T> {
         if (pointer === void 0) {
-            throw new Error("nil pointer dereference");
+            GoPanic.raise("nil pointer dereference");
         }
         return pointer;
     }
@@ -151,6 +157,15 @@ func TestBuildPrintsSourceShapedCell(t *testing.T) {
 func pointerClassName(t *testing.T) string {
 	t.Helper()
 	contract, err := api.RuntimeContract(api.RuntimePointer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return contract.ExportedName()
+}
+
+func panicClassName(t *testing.T) string {
+	t.Helper()
+	contract, err := api.RuntimeContract(api.RuntimePanic)
 	if err != nil {
 		t.Fatal(err)
 	}

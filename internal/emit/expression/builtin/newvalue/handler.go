@@ -14,15 +14,14 @@ func Emit(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.CallExpr,
+	builtin *types.Builtin,
 ) (api.ExpressionEmission, error) {
-	if source == nil {
+	if source == nil ||
+		types.Object(builtin) != types.Universe.Lookup("new") {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	identifier, ok := source.Fun.(*ast.Ident)
-	if !ok ||
-		context.TypesInfo().Uses[identifier] != types.Universe.Lookup("new") ||
-		source.Ellipsis != token.NoPos ||
+	if source.Ellipsis != token.NoPos ||
 		len(source.Args) != 1 {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)

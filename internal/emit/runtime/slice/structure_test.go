@@ -38,7 +38,11 @@ func TestRuntimeAssemblyExactJoinsFrozenSliceSymbol(t *testing.T) {
 
 func TestRuntimeSliceBuilderConsumesInjectedContractName(t *testing.T) {
 	const changedContractName = "ChangedRuntimeSlice"
-	class := runtimeslice.Build(tsgo.NewFactory(), changedContractName)
+	class := runtimeslice.Build(
+		tsgo.NewFactory(),
+		changedContractName,
+		runtimePanicClassName(t),
+	)
 	if class.Name().Text() != changedContractName {
 		t.Fatalf(
 			"runtime slice declaration = %q, want injected contract name",
@@ -61,7 +65,11 @@ func TestRuntimeSliceBuilderConsumesInjectedContractName(t *testing.T) {
 
 func TestRuntimeSliceOwnsOneClosedGenericDescriptor(t *testing.T) {
 	className := runtimeSliceClassName(t)
-	class := runtimeslice.Build(tsgo.NewFactory(), className)
+	class := runtimeslice.Build(
+		tsgo.NewFactory(),
+		className,
+		runtimePanicClassName(t),
+	)
 	if class.Name().Text() != className ||
 		len(class.TypeParameters()) != 1 ||
 		class.TypeParameters()[0].Name().Text() != "T" {
@@ -165,6 +173,15 @@ func assertTypeReferenceName(
 func runtimeSliceClassName(t *testing.T) string {
 	t.Helper()
 	contract, err := api.RuntimeContract(api.RuntimeSlice)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return contract.ExportedName()
+}
+
+func runtimePanicClassName(t *testing.T) string {
+	t.Helper()
+	contract, err := api.RuntimeContract(api.RuntimePanic)
 	if err != nil {
 		t.Fatal(err)
 	}

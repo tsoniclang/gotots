@@ -16,13 +16,11 @@ func TestArraySourceAndRuntimeUseTypedTsGoAST(t *testing.T) {
 	for _, file := range emission.Files() {
 		if file.OutputPath() == "runtime/array.ts" {
 			statements := file.SourceFile().Statements()
-			if len(statements) != 1 {
-				t.Fatalf("array runtime statements = %d, want one", len(statements))
-			}
-			var ok bool
-			runtimeClass, ok = statements[0].(tsgo.ClassDeclaration)
-			if !ok {
-				t.Fatalf("array runtime statement = %T", statements[0])
+			for _, statement := range statements {
+				class, ok := statement.(tsgo.ClassDeclaration)
+				if ok && class.Name().Text() == "GoArray" {
+					runtimeClass = class
+				}
 			}
 			continue
 		}
@@ -218,8 +216,15 @@ func assertBoundsFailure(
 	if !ok || len(body.Statements()) != 1 {
 		t.Fatal("RuntimeArray.$check bounds branch is not a single failure")
 	}
-	if _, ok := body.Statements()[0].(tsgo.ThrowStatement); !ok {
-		t.Fatalf("RuntimeArray.$check failure = %T", body.Statements()[0])
+	call, ok := body.Statements()[0].(tsgo.ExpressionStatement).
+		Expression().(tsgo.CallExpression)
+	if !ok ||
+		call.Expression().(tsgo.PropertyAccessExpression).
+			Name().(tsgo.Identifier).Text() != "raise" {
+		t.Fatalf(
+			"RuntimeArray.$check failure = %T, want shared panic call",
+			body.Statements()[0],
+		)
 	}
 }
 

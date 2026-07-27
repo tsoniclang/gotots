@@ -188,7 +188,9 @@ create a value IR or a generic operation registry.
    explicit conversions are admitted only where the selected profile has an
    exact bounded implementation. Fixed-width implicit overflow remains a
    separately selected future profile rather than hidden ordinary-expression
-   baggage.
+   baggage. In this checkpoint, BigInt division and remainder use constant-size
+   checked runtime operations; the `number` profile keeps them unsupported
+   rather than approximating Go integer truncation.
 2. Go strings use one byte-preserving target representation. Source literals,
    concatenation, ordered/equality comparison, `len`, indexing, and two-index
    slicing are exact over arbitrary Go string bytes. Rune conversion,
@@ -214,10 +216,26 @@ create a value IR or a generic operation registry.
 
 The generated runtime boundary is demand-driven and typed. Each family owns
 its runtime module and exported operations; source handlers request imports by
-closed semantic identity. Runtime files are constructed as TS-Go AST and
-printed by the pinned TS-Go printer. No checked-in TypeScript, source fragment,
-template, raw export spelling, or handler-local duplicate implementation is
-allowed.
+closed semantic identity. One runtime-symbol contract owns every symbol's
+module, export, type/value phase, and closed dependencies. Program assembly
+computes the cycle-free transitive closure, emits each symbol once, and creates
+canonical static ESM imports between runtime modules. Runtime files are
+constructed as TS-Go AST and printed by the pinned TS-Go printer.
+
+All admitted runtime failures enter one generated `GoPanic<T>` carrier.
+`runtime/panic.ts` is the only runtime module that constructs a target
+`ThrowStatement`; integer, string, pointer, array, slice, and map modules
+request it through the dependency graph. Source-level `panic` and `recover`
+remain a later semantic family, so this checkpoint proves failure occurrence
+and carrier identity, not yet recovered runtime-fault payload equivalence.
+
+One builtin-object dispatcher owns `new`, `make`, `len`, `cap`, `append`,
+`copy`, and `delete`. One setter-store transaction owns Go evaluation order
+for array, slice, and map stores. Family owners provide typed operands and
+members; they do not rediscover builtin identity or install assignment routes.
+No checked-in TypeScript, source fragment, template, raw export spelling,
+handler-local duplicate implementation, or family-specific store transaction
+is allowed.
 
 The checkpoint exits only when all six families:
 
@@ -229,7 +247,9 @@ The checkpoint exits only when all six families:
 - prove nil, aliasing, copy, bounds, evaluation order, and mutation behavior;
 - keep every operation/use site constant-size and runtime modules linear in
   exported behavior; and
-- pass an integrated mixed-family project without compatibility paths.
+- pass an integrated mixed-family, multi-package project through strict
+  typechecking and Go-versus-generated-ESM execution for ordinary results and
+  every admitted runtime-failure class without compatibility paths.
 
 ## 4. Environment And Completion
 
