@@ -75,6 +75,7 @@ const (
 	RoleStructCopyField       Role = "struct-copy-field"
 	RoleStructAssignField     Role = "struct-assign-field"
 	RoleStructEqualField      Role = "struct-equal-field"
+	RoleStructHashField       Role = "struct-hash-field"
 	RoleDefinedUnderlyingType Role = "defined-underlying-type"
 	RoleDefinedValue          Role = "defined-value"
 	RoleCompositeElement      Role = "composite-element"

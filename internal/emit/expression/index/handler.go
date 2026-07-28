@@ -13,6 +13,7 @@ import (
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
+	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -23,7 +24,7 @@ func Emit(
 	source *ast.IndexExpr,
 ) (api.ExpressionEmission, error) {
 	operandType := context.TypesInfo().TypeOf(source.X)
-	if _, ok := types.Unalias(operandType).(*types.Map); ok {
+	if _, ok := maprepresentation.Source(context, operandType); ok {
 		return mapindexexpression.Emit(context, children, source)
 	}
 	if array, ok := arrayvalue.Resolve(context, operandType); ok {

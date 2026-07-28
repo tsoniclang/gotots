@@ -66,6 +66,7 @@ type StoreTargetEmission struct {
 	setterMember      string
 	accessorArguments []ExpressionEmission
 	locationCaptured  bool
+	copiesValue       bool
 	sourceType        types.Type
 	requests          []RootRequest
 }
@@ -156,8 +157,33 @@ func NewAccessorStoreTargetEmission(
 	}, nil
 }
 
+func NewCopyingAccessorStoreTargetEmission(
+	receiver ExpressionEmission,
+	getter string,
+	setter string,
+	arguments []ExpressionEmission,
+	sourceType types.Type,
+) (StoreTargetEmission, error) {
+	target, err := NewAccessorStoreTargetEmission(
+		receiver,
+		getter,
+		setter,
+		arguments,
+		sourceType,
+	)
+	if err != nil {
+		return StoreTargetEmission{}, err
+	}
+	target.copiesValue = true
+	return target, nil
+}
+
 func (e StoreTargetEmission) IsAccessor() bool {
 	return e.accessor
+}
+
+func (e StoreTargetEmission) CopiesValue() bool {
+	return e.copiesValue
 }
 
 func (e StoreTargetEmission) Before() []tsgo.Statement {

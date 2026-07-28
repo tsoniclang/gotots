@@ -31,6 +31,7 @@ const (
 	TemporaryEqualityOperand
 	TemporaryBinaryOperand
 	TemporaryLogicalResult
+	TemporaryArrayHash
 )
 
 type NameReference struct {
@@ -161,6 +162,8 @@ func TemporaryPrefix(kind TemporaryKind) (string, error) {
 		return "__gotots_binary_operand_", nil
 	case TemporaryLogicalResult:
 		return "__gotots_logical_result_", nil
+	case TemporaryArrayHash:
+		return "__gotots_array_hash_", nil
 	default:
 		return "", &NameError{
 			Reason: fmt.Sprintf("temporary kind %d is invalid", kind),

@@ -54,6 +54,9 @@ func Build(
 	symbol api.RuntimeSymbol,
 	panicName string,
 ) (tsgo.Statement, error) {
+	if symbol == api.RuntimeMapHash {
+		return buildHash(factory)
+	}
 	contract, err := api.RuntimeContract(symbol)
 	if err != nil {
 		return nil, err

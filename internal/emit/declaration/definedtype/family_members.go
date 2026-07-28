@@ -203,6 +203,19 @@ func emitFamilyMembers(
 			className,
 			underlying,
 		)
+	case definedtype.FamilyMap:
+		if len(requirements) != 0 {
+			return nil, nil, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "defined map received declaration requirements",
+			}
+		}
+		return emitMapMembers(
+			context,
+			source,
+			model,
+			underlying,
+		)
 	case definedtype.FamilyArray:
 		addressIndex, err := arrayRequirements(
 			context,

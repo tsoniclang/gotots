@@ -12,12 +12,14 @@ const (
 	NamedStructOperationZero
 	NamedStructOperationCopy
 	NamedStructOperationEqual
+	NamedStructOperationHash
 )
 
 func (o NamedStructOperation) Valid() bool {
 	return o == NamedStructOperationZero ||
 		o == NamedStructOperationCopy ||
-		o == NamedStructOperationEqual
+		o == NamedStructOperationEqual ||
+		o == NamedStructOperationHash
 }
 
 func (o NamedStructOperation) String() string {
@@ -28,6 +30,8 @@ func (o NamedStructOperation) String() string {
 		return "copy"
 	case NamedStructOperationEqual:
 		return "equal"
+	case NamedStructOperationHash:
+		return "hash"
 	default:
 		return fmt.Sprintf("named-struct-operation(%d)", o)
 	}

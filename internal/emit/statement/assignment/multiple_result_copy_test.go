@@ -10,7 +10,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func TestMultipleResultDestinationsEnterTheValueCopyOwner(t *testing.T) {
+func TestMultipleResultDestinationsUseTheRHSOwnershipEvidence(t *testing.T) {
 	directory := t.TempDir()
 	writeFile(
 		t,
@@ -65,26 +65,19 @@ func Use(value int32) int32 {
 	}
 	statements := use.Body().(tsgo.Block).Statements()
 	if len(statements) < 2 {
-		t.Fatalf("Use statements = %d, want tuple capture and copied declaration", len(statements))
+		t.Fatalf("Use statements = %d, want tuple capture and declaration", len(statements))
 	}
 	declaration := statements[1].(tsgo.VariableStatement).
 		DeclarationList().
 		Declarations()[0]
-	copyCall, ok := declaration.Initializer().(tsgo.CallExpression)
+	element, ok := declaration.Initializer().(tsgo.ElementAccessExpression)
 	if !ok {
 		t.Fatalf(
-			"aggregate tuple destination initializer = %T, want copy call",
+			"owned tuple destination initializer = %T, want direct element",
 			declaration.Initializer(),
 		)
 	}
-	callee, ok := copyCall.Expression().(tsgo.PropertyAccessExpression)
-	if !ok {
-		t.Fatalf("aggregate tuple destination callee = %T", copyCall.Expression())
-	}
-	member, memberOK := callee.Name().(tsgo.Identifier)
-	if !memberOK ||
-		member.Text() != "$copy" ||
-		len(copyCall.Arguments()) != 1 {
-		t.Fatalf("aggregate tuple destination copy = %#v", copyCall)
+	if _, ok := element.Expression().(tsgo.Identifier); !ok {
+		t.Fatalf("owned tuple source = %T, want captured identifier", element.Expression())
 	}
 }

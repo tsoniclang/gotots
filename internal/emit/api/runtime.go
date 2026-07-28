@@ -42,6 +42,7 @@ const (
 	RuntimeSliceNilWith     RuntimeSymbol = 305
 	RuntimeSliceLiteralWith RuntimeSymbol = 306
 	RuntimeMap              RuntimeSymbol = 400
+	RuntimeMapHash          RuntimeSymbol = 401
 	RuntimePanic            RuntimeSymbol = 500
 	RuntimeIntegerDivide    RuntimeSymbol = 600
 	RuntimeIntegerRemainder RuntimeSymbol = 601
@@ -210,6 +211,13 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"GoMap",
 			true,
 			RuntimePanic,
+		), nil
+	case RuntimeMapHash:
+		return runtimeContract(
+			RuntimeModuleMap,
+			"runtime/map.ts",
+			"GoMapHash",
+			false,
 		), nil
 	case RuntimePanic:
 		return runtimeContract(

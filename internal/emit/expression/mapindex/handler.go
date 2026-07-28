@@ -19,16 +19,20 @@ func Emit(
 		context,
 		context.TypesInfo().TypeOf(source.X),
 	)
-	if !ok || !validResultContext(context, source, mapType) {
+	if !ok || !validResultContext(context, source, mapType.Map()) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	receiver, err := children.Expression(
 		context.
 			WithRole(api.RoleMapReceiver).
-			WithExpectedType(mapType),
+			WithExpectedType(mapType.Type()),
 		source.X,
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	receiver, err = mapType.ReadReceiver(context, source.X, receiver)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}

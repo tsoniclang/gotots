@@ -146,6 +146,10 @@ func (unusedValues) RequiresStructuralCopy(api.Context, types.Type) bool {
 	panic("unused")
 }
 
+func (unusedValues) SupportsHash(api.Context, types.Type) bool {
+	panic("unused")
+}
+
 func (unusedValues) Zero(
 	api.Context,
 	ast.Node,
@@ -178,6 +182,15 @@ func (unusedValues) Equal(
 	ast.Node,
 	types.Type,
 	tsgo.Expression,
+	tsgo.Expression,
+) (api.ExpressionEmission, error) {
+	panic("unused")
+}
+
+func (unusedValues) Hash(
+	api.Context,
+	ast.Node,
+	types.Type,
 	tsgo.Expression,
 ) (api.ExpressionEmission, error) {
 	panic("unused")

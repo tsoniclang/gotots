@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -35,12 +36,104 @@ func emitValueOperation(
 			classType,
 			fields,
 		)
+	case api.NamedStructOperationHash:
+		return hashMethod(context, source, memberName, classType, fields)
 	default:
 		return nil, nil, &api.InvariantError{
 			Role:   context.Role(),
 			Reason: "named-struct operation is invalid",
 		}
 	}
+}
+
+func hashMethod(
+	context api.Context,
+	source ast.Node,
+	memberName string,
+	classType tsgo.TypeNode,
+	fields []field,
+) (tsgo.MethodDeclaration, []api.RootRequest, error) {
+	runtime, err := context.Names().Runtime(
+		api.RuntimeMapHash,
+		api.ImportPhaseValue,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	hashName := "$hash"
+	hash := context.Factory().Identifier(hashName)
+	body := []tsgo.Statement{
+		context.Factory().VariableStatement(
+			nil,
+			context.Factory().VariableDeclarationList(
+				[]tsgo.VariableDeclaration{
+					context.Factory().VariableDeclaration(
+						hash,
+						nil,
+						nil,
+						context.Factory().NumericLiteral(
+							"2166136261",
+							tsgo.TokenFlagsNone,
+						),
+					),
+				},
+				tsgo.NodeFlagsLet,
+			),
+		),
+	}
+	requests := runtime.Requests()
+	for _, field := range fields {
+		fieldHash, err := context.Values().Hash(
+			context.WithRole(api.RoleStructHashField),
+			field.source,
+			field.object.Type(),
+			property(context, "$source", field.name),
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		body = append(body, fieldHash.Before()...)
+		body = append(
+			body,
+			context.Factory().ExpressionStatement(
+				context.Factory().BinaryExpression(
+					nil,
+					hash,
+					nil,
+					context.Factory().BinaryOperatorToken(
+						tsgo.BinaryOperatorEqualsToken,
+					),
+					context.Factory().CallExpression(
+						context.Factory().PropertyAccessExpression(
+							context.Factory().Identifier(runtime.Name()),
+							nil,
+							context.Factory().Identifier(
+								mapruntime.HashMixMember,
+							),
+							tsgo.NodeFlagsNone,
+						),
+						nil,
+						nil,
+						[]tsgo.Expression{hash, fieldHash.Value()},
+						tsgo.NodeFlagsNone,
+					),
+				),
+			),
+		)
+		requests = append(requests, fieldHash.Requests()...)
+	}
+	body = append(body, context.Factory().ReturnStatement(hash))
+	return operationMethod(
+		context,
+		memberName,
+		[]tsgo.ParameterDeclaration{
+			parameter(context, "$source", classType),
+		},
+		context.Factory().KeywordTypeNode(
+			tsgo.KeywordTypeSyntaxKindNumberKeyword,
+		),
+		body,
+	), requests, nil
 }
 
 func zeroMethod(

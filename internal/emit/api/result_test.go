@@ -28,6 +28,7 @@ func TestAccessorStoreTargetOwnsTypedImmutableArguments(t *testing.T) {
 		factory.NumericLiteral("2", tsgo.TokenFlagsNone),
 	)
 	if !target.IsAccessor() ||
+		target.CopiesValue() ||
 		target.AccessorReceiver().Value().(tsgo.Identifier).Text() != "values" ||
 		target.GetterMember() != "get" ||
 		target.SetterMember() != "set" ||
@@ -40,6 +41,27 @@ func TestAccessorStoreTargetOwnsTypedImmutableArguments(t *testing.T) {
 	)
 	if target.AccessorArguments()[0].Value().(tsgo.NumericLiteral).Text() != "1" {
 		t.Fatal("accessor target exposed mutable argument backing")
+	}
+}
+
+func TestCopyingAccessorOwnsTheValueCopyBoundary(t *testing.T) {
+	factory := tsgo.NewFactory()
+	target, err := api.NewCopyingAccessorStoreTargetEmission(
+		api.DirectExpression(factory.Identifier("values")),
+		"get",
+		"set",
+		[]api.ExpressionEmission{
+			api.DirectExpression(
+				factory.NumericLiteral("1", tsgo.TokenFlagsNone),
+			),
+		},
+		types.Typ[types.Int32],
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !target.IsAccessor() || !target.CopiesValue() {
+		t.Fatalf("copying accessor ownership = %#v", target)
 	}
 }
 

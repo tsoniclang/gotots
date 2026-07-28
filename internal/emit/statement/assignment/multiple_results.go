@@ -73,7 +73,7 @@ func emitMultipleResults(
 		))
 		copied, err := context.Values().Copy(
 			context.WithRole(role),
-			target.source,
+			source.Rhs[0],
 			target.object.Type(),
 			api.DirectExpression(element),
 		)

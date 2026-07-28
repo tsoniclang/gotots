@@ -16,6 +16,7 @@ import (
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
 	floatvalue "github.com/tsoniclang/gotots/internal/emit/value/float"
 	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
+	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 )
 
 func Emit(
@@ -80,6 +81,15 @@ func Emit(
 		if _, ok := callable.Signature(targetType); ok {
 			return operandValue, true, nil
 		}
+	}
+	if target, handled, mapErr := maprepresentation.Convert(
+		context,
+		source,
+		sourceType,
+		targetType,
+		operandValue,
+	); handled {
+		return target, true, mapErr
 	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
 		operandValue, err = defined.Project(context, operandValue)

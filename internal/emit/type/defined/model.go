@@ -9,10 +9,13 @@ import (
 )
 
 const (
-	BrandMember   = "$goType"
-	ValueMember   = "$value"
-	FromMember    = "$from"
-	ValueOfMember = "$valueOf"
+	BrandMember    = "$goType"
+	ValueMember    = "$value"
+	FromMember     = "$from"
+	ValueOfMember  = "$valueOf"
+	MapReadMember  = "$readMap"
+	MapStoreMember = "$storeMap"
+	MapWrapMember  = "$wrapMap"
 )
 
 type Model struct {
@@ -31,6 +34,7 @@ const (
 	FamilySlice
 	FamilyPointer
 	FamilyCallable
+	FamilyMap
 )
 
 func Resolve(sourceType types.Type) (Model, bool) {
@@ -58,6 +62,8 @@ func Resolve(sourceType types.Type) (Model, bool) {
 			return Model{}, false
 		}
 		family = FamilyCallable
+	case *types.Map:
+		family = FamilyMap
 	default:
 		return Model{}, false
 	}
@@ -94,6 +100,11 @@ func ResolveCallable(sourceType types.Type) (Model, bool) {
 	return model, ok && model.family == FamilyCallable
 }
 
+func ResolveMap(sourceType types.Type) (Model, bool) {
+	model, ok := Resolve(sourceType)
+	return model, ok && model.family == FamilyMap
+}
+
 func (m Model) Type() *types.Named {
 	return m.named
 }
@@ -113,7 +124,8 @@ func (m Model) Family() Family {
 func (m Model) NilCapable() bool {
 	return m.family == FamilySlice ||
 		m.family == FamilyPointer ||
-		m.family == FamilyCallable
+		m.family == FamilyCallable ||
+		m.family == FamilyMap
 }
 
 func (m Model) Basic() (*types.Basic, bool) {
@@ -139,6 +151,11 @@ func (m Model) Pointer() (*types.Pointer, bool) {
 func (m Model) Callable() (*types.Signature, bool) {
 	signature, ok := m.underlying.(*types.Signature)
 	return signature, ok && m.family == FamilyCallable
+}
+
+func (m Model) Map() (*types.Map, bool) {
+	mapType, ok := m.underlying.(*types.Map)
+	return mapType, ok && m.family == FamilyMap
 }
 
 func (m Model) Unwrap(
@@ -258,6 +275,23 @@ func (m Model) Wrap(
 					nil,
 					[]tsgo.Expression{temporary},
 				),
+			),
+			api.CombineRequests(value.Requests(), reference.Requests()),
+		)
+	case FamilyMap:
+		return api.NewExpressionEmission(
+			value.Before(),
+			context.Factory().CallExpression(
+				context.Factory().PropertyAccessExpression(
+					context.Factory().Identifier(reference.Name()),
+					nil,
+					context.Factory().Identifier(MapWrapMember),
+					tsgo.NodeFlagsNone,
+				),
+				nil,
+				nil,
+				[]tsgo.Expression{value.Value()},
+				tsgo.NodeFlagsNone,
 			),
 			api.CombineRequests(value.Requests(), reference.Requests()),
 		)

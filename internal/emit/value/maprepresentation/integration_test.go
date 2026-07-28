@@ -184,13 +184,6 @@ func TestMapBoundariesRemainTypedUnsupported(t *testing.T) {
 		source string
 	}{
 		{
-			name: "named map",
-			source: `package boundary
-type Named map[int32]int32
-func F() Named { return make(Named) }
-`,
-		},
-		{
 			name: "aggregate key",
 			source: `package boundary
 type Key struct { Value int32 }

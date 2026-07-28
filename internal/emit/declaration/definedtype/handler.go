@@ -158,7 +158,9 @@ func constructorModifiers(
 	model definedtype.Model,
 ) []tsgo.ModifierLike {
 	switch model.Family() {
-	case definedtype.FamilySlice, definedtype.FamilyPointer:
+	case definedtype.FamilySlice,
+		definedtype.FamilyPointer,
+		definedtype.FamilyMap:
 		return []tsgo.ModifierLike{context.Factory().PrivateKeyword()}
 	default:
 		return nil

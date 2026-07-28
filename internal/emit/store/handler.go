@@ -194,7 +194,7 @@ func mapIndex(
 		context.TypesInfo().TypeOf(source.X),
 	)
 	if !ok ||
-		!types.Identical(context.TypesInfo().TypeOf(source), mapType.Elem()) ||
+		!types.Identical(context.TypesInfo().TypeOf(source), mapType.Element()) ||
 		!types.AssignableTo(
 			context.TypesInfo().TypeOf(source.Index),
 			mapType.Key(),
@@ -205,9 +205,13 @@ func mapIndex(
 	receiver, err := children.Expression(
 		context.
 			WithRole(api.RoleMapReceiver).
-			WithExpectedType(mapType),
+			WithExpectedType(mapType.Type()),
 		source.X,
 	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
+	receiver, err = mapType.StoreReceiver(context, source.X, receiver)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
@@ -237,12 +241,12 @@ func mapIndex(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	return api.NewAccessorStoreTargetEmission(
+	return api.NewCopyingAccessorStoreTargetEmission(
 		receiver,
 		getter,
 		member,
 		[]api.ExpressionEmission{key},
-		mapType.Elem(),
+		mapType.Element(),
 	)
 }
 

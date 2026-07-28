@@ -59,8 +59,8 @@ func Emit(
 			context.WithRole(api.RoleMapValue),
 			children,
 			entry.Value,
-			mapType.Elem(),
-			true,
+			mapType.Element(),
+			false,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
@@ -87,7 +87,7 @@ func Emit(
 	zero, err := context.Values().Zero(
 		context.WithRole(api.RoleMapValue),
 		source,
-		mapType.Elem(),
+		mapType.Element(),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -96,7 +96,7 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	target, targetRequests, err := maprepresentation.Make(
+	target, err := maprepresentation.Make(
 		context,
 		source,
 		sourceType,
@@ -112,7 +112,11 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return api.NewExpressionEmission(before, target, targetRequests)
+	return api.NewExpressionEmission(
+		append(before, target.Before()...),
+		target.Value(),
+		target.Requests(),
+	)
 }
 
 func emitOperand(

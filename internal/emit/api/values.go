@@ -13,6 +13,7 @@ type Values interface {
 	RequiresCustomUpdate(Context, types.Type) bool
 	RequiresExplicitType(Context, types.Type) bool
 	RequiresStructuralCopy(Context, types.Type) bool
+	SupportsHash(Context, types.Type) bool
 	Zero(Context, ast.Node, types.Type) (ExpressionEmission, error)
 	Copy(Context, ast.Node, types.Type, ExpressionEmission) (ExpressionEmission, error)
 	Assign(
@@ -27,6 +28,12 @@ type Values interface {
 		ast.Node,
 		types.Type,
 		tsgo.Expression,
+		tsgo.Expression,
+	) (ExpressionEmission, error)
+	Hash(
+		Context,
+		ast.Node,
+		types.Type,
 		tsgo.Expression,
 	) (ExpressionEmission, error)
 	BinaryUpdate(

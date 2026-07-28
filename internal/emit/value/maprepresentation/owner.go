@@ -12,47 +12,115 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func Source(
-	context api.Context,
-	sourceType types.Type,
-) (*types.Map, bool) {
-	mapType, ok := types.Unalias(sourceType).(*types.Map)
-	if !ok {
-		return nil, false
-	}
-	if _, keyOK := directKey(
-		context,
-		mapType.Key(),
-	); !keyOK || !types.Comparable(mapType.Key()) {
-		return nil, false
-	}
-	if !representedBasic(context, mapType.Elem()) {
-		return nil, false
-	}
-	return mapType, true
-}
-
 func EmitType(
 	context api.Context,
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
-	reference, typeArguments, err := Reference(
-		context,
-		source,
-		sourceType,
-		api.ImportPhaseType,
-	)
-	if err != nil {
-		return api.TypeEmission{}, err
+	model, ok := Source(context, sourceType)
+	if !ok {
+		return api.TypeEmission{},
+			api.Unsupported(context, api.CategoryType, source)
 	}
-	return api.DirectType(
-		context.Factory().TypeReferenceNode(
-			context.Factory().Identifier(reference.Name()),
-			typeArguments,
-		),
-		reference.Requests()...,
-	), nil
+	if model.Nominal() {
+		reference, err := context.Names().TypeReference(model.TypeName())
+		if err != nil {
+			return api.TypeEmission{}, err
+		}
+		return api.DirectType(
+			context.Factory().UnionTypeNode([]tsgo.TypeNode{
+				context.Factory().TypeReferenceNode(
+					context.Factory().Identifier(reference.Name()),
+					nil,
+				),
+				context.Factory().KeywordTypeNode(
+					tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
+				),
+			}),
+			reference.Requests()...,
+		), nil
+	}
+	if model.Storage() == StorageScalar {
+		reference, typeArguments, err := Reference(
+			context,
+			source,
+			sourceType,
+			api.ImportPhaseType,
+		)
+		if err != nil {
+			return api.TypeEmission{}, err
+		}
+		return api.DirectType(
+			context.Factory().TypeReferenceNode(
+				context.Factory().Identifier(reference.Name()),
+				typeArguments,
+			),
+			reference.Requests()...,
+		), nil
+	}
+	return api.TypeEmission{},
+		api.Unsupported(context, api.CategoryType, source)
+}
+
+func Nil(
+	context api.Context,
+	source ast.Node,
+	sourceType types.Type,
+) (api.ExpressionEmission, error) {
+	model, ok := Source(context, sourceType)
+	if !ok {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if model.Nominal() {
+		return api.DirectExpression(
+			context.Factory().VoidExpression(
+				context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
+			),
+		), nil
+	}
+	if model.Storage() == StorageScalar {
+		zero, err := context.Values().Zero(
+			context.WithRole(api.RoleMapValue),
+			source,
+			model.Element(),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if len(zero.Before()) != 0 {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		reference, typeArguments, err := Reference(
+			context,
+			source,
+			sourceType,
+			api.ImportPhaseValue,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		nilName, err := mapruntime.Name(mapruntime.MemberNil)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.DirectExpression(
+			context.Factory().CallExpression(
+				staticMember(context, reference.Name(), nilName),
+				nil,
+				typeArguments,
+				[]tsgo.Expression{zero.Value()},
+				tsgo.NodeFlagsNone,
+			),
+			api.CombineRequests(
+				reference.Requests(),
+				zero.Requests(),
+			)...,
+		), nil
+	}
+	return api.ExpressionEmission{},
+		api.Unsupported(context, api.CategoryExpression, source)
 }
 
 func Reference(
@@ -61,12 +129,13 @@ func Reference(
 	sourceType types.Type,
 	phase api.ImportPhase,
 ) (api.NameReference, []tsgo.TypeNode, error) {
-	mapType, ok := Source(context, sourceType)
-	if !ok {
+	model, ok := Source(context, sourceType)
+	if !ok || model.Storage() != StorageScalar {
 		return api.NameReference{}, nil,
 			api.Unsupported(context, api.CategoryType, source)
 	}
-	keyBasic, _ := directKey(context, mapType.Key())
+	mapType := model.Map()
+	keyBasic, _ := directKey(context, model.Key())
 	key, keyRequests, err := primitiveType(context, source, keyBasic)
 	if err != nil {
 		return api.NameReference{}, nil, err
@@ -103,7 +172,16 @@ func Make(
 	size tsgo.Expression,
 	entries []tsgo.Expression,
 	requests ...[]api.RootRequest,
-) (tsgo.Expression, []api.RootRequest, error) {
+) (api.ExpressionEmission, error) {
+	model, ok := Source(context, sourceType)
+	if !ok {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if model.Storage() == StorageSpecialized {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
 	reference, typeArguments, err := Reference(
 		context,
 		source,
@@ -111,32 +189,35 @@ func Make(
 		api.ImportPhaseValue,
 	)
 	if err != nil {
-		return nil, nil, err
+		return api.ExpressionEmission{}, err
 	}
 	makeName, err := mapruntime.Name(mapruntime.MemberMake)
 	if err != nil {
-		return nil, nil, err
+		return api.ExpressionEmission{}, err
 	}
 	allRequests := append(
 		[][]api.RootRequest{reference.Requests()},
 		requests...,
 	)
-	return context.Factory().CallExpression(
-		context.Factory().PropertyAccessExpression(
-			context.Factory().Identifier(reference.Name()),
+	return model.Wrap(context, api.DirectExpression(
+		context.Factory().CallExpression(
+			context.Factory().PropertyAccessExpression(
+				context.Factory().Identifier(reference.Name()),
+				nil,
+				context.Factory().Identifier(makeName),
+				tsgo.NodeFlagsNone,
+			),
 			nil,
-			context.Factory().Identifier(makeName),
+			typeArguments,
+			[]tsgo.Expression{
+				zero,
+				size,
+				context.Factory().ArrayLiteralExpression(entries, false),
+			},
 			tsgo.NodeFlagsNone,
 		),
-		nil,
-		typeArguments,
-		[]tsgo.Expression{
-			zero,
-			size,
-			context.Factory().ArrayLiteralExpression(entries, false),
-		},
-		tsgo.NodeFlagsNone,
-	), api.CombineRequests(allRequests...), nil
+		api.CombineRequests(allRequests...)...,
+	))
 }
 
 func ProjectKey(
@@ -145,10 +226,6 @@ func ProjectKey(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	if _, ok := directKey(context, sourceType); !ok {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
 	if model, ok := definedtype.ResolveBasic(sourceType); ok {
 		if expression, ok := source.(ast.Expr); ok {
 			facts, found := context.TypesInfo().Types[expression]
@@ -166,6 +243,13 @@ func ProjectKey(
 			model.Unwrap(context.Factory(), value.Value()),
 			value.Requests(),
 		)
+	}
+	if context.Values().SupportsHash(context, sourceType) {
+		return value, nil
+	}
+	if _, ok := directKey(context, sourceType); !ok {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	return value, nil
 }

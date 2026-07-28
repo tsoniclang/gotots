@@ -452,14 +452,16 @@ func emitAssignment(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	value, err = context.Values().Copy(
-		context.WithRole(api.RoleAssignmentValue),
-		source.Rhs[0],
-		target.SourceType(),
-		value,
-	)
-	if err != nil {
-		return api.StatementEmission{}, err
+	if !target.CopiesValue() {
+		value, err = context.Values().Copy(
+			context.WithRole(api.RoleAssignmentValue),
+			source.Rhs[0],
+			target.SourceType(),
+			value,
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
 	}
 	if target.IsAccessor() {
 		return emitSetter(context, target, value)

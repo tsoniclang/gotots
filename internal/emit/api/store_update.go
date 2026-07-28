@@ -49,6 +49,7 @@ func (e StoreTargetEmission) CaptureAccessorLocation(
 	if err != nil {
 		return StoreTargetEmission{}, err
 	}
+	captured.copiesValue = e.copiesValue
 	captured.before = before
 	captured.requests = requests
 	captured.locationCaptured = true

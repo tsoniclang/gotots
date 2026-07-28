@@ -6,7 +6,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
-	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
@@ -78,6 +77,16 @@ func (Owner) Zero(
 	sourceType types.Type,
 ) (api.ExpressionEmission, error) {
 	if defined, ok := definedtype.Resolve(sourceType); ok {
+		if defined.NilCapable() {
+			return api.DirectExpression(
+				context.Factory().VoidExpression(
+					context.Factory().NumericLiteral(
+						"0",
+						tsgo.TokenFlagsNone,
+					),
+				),
+			), nil
+		}
 		zero, err := (Owner{}).Zero(
 			context.WithRole(api.RoleDefinedValue),
 			source,
@@ -99,50 +108,12 @@ func (Owner) Zero(
 			context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
 		)
 	}
-	if mapType, ok := maprepresentation.Source(context, sourceType); ok {
-		zero, err := (Owner{}).Zero(
-			context.WithRole(api.RoleMapValue),
-			source,
-			mapType.Elem(),
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		if len(zero.Before()) != 0 {
-			return api.ExpressionEmission{},
-				api.Unsupported(context, api.CategoryExpression, source)
-		}
-		reference, typeArguments, err := maprepresentation.Reference(
+	if _, ok := maprepresentation.Source(context, sourceType); ok {
+		return maprepresentation.Nil(
 			context,
 			source,
 			sourceType,
-			api.ImportPhaseValue,
 		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		nilName, err := mapruntime.Name(mapruntime.MemberNil)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		return api.DirectExpression(
-			context.Factory().CallExpression(
-				context.Factory().PropertyAccessExpression(
-					context.Factory().Identifier(reference.Name()),
-					nil,
-					context.Factory().Identifier(nilName),
-					tsgo.NodeFlagsNone,
-				),
-				nil,
-				typeArguments,
-				[]tsgo.Expression{zero.Value()},
-				tsgo.NodeFlagsNone,
-			),
-			api.CombineRequests(
-				reference.Requests(),
-				zero.Requests(),
-			)...,
-		), nil
 	}
 	if array, ok := arrayvalue.Resolve(context, sourceType); ok {
 		return array.Zero(context, source)
@@ -309,6 +280,13 @@ func ownsFreshValue(context api.Context, source ast.Node) bool {
 	switch source := source.(type) {
 	case *ast.CallExpr, *ast.CompositeLit:
 		return true
+	case *ast.IndexExpr:
+		sourceType := context.TypesInfo().TypeOf(source.X)
+		if sourceType == nil {
+			return false
+		}
+		_, ok := types.Unalias(sourceType).Underlying().(*types.Map)
+		return ok
 	case *ast.ParenExpr:
 		return ownsFreshValue(context, source.X)
 	case *ast.SelectorExpr:
