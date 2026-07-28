@@ -5,6 +5,8 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
+	floatvalue "github.com/tsoniclang/gotots/internal/emit/value/float"
 	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 )
 
@@ -21,6 +23,9 @@ func EmitRepresented(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
+	if _, ok := complexvalue.Describe(sourceType); ok {
+		return complexvalue.EmitType(context, source, sourceType)
+	}
 	alias, ok := PrimitiveAlias(context.TypesSizes(), sourceType)
 	if !ok {
 		return api.TypeEmission{}, api.Unsupported(context, api.CategoryType, source)
@@ -56,6 +61,9 @@ func PrimitiveAlias(
 				return api.PrimitiveString, true
 			}
 		}
+	}
+	if floatCarrier, ok := floatvalue.Describe(sourceType); ok {
+		return floatCarrier.Alias(), true
 	}
 	carrier, ok := integervalue.Describe(sizes, sourceType)
 	if !ok {

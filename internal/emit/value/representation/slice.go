@@ -12,10 +12,10 @@ import (
 )
 
 func scalarSlice(
-	context api.Context,
+	_ api.Context,
 	sourceType types.Type,
 ) (*types.Slice, types.Type, bool) {
-	return slicevalue.Scalar(context.TypesSizes(), sourceType)
+	return slicevalue.Resolve(sourceType)
 }
 
 func isScalarSlice(context api.Context, sourceType types.Type) bool {
@@ -33,10 +33,6 @@ func sliceZero(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	elementType, requests, err := sliceElementTarget(context, source, sourceType)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
 	zero, err := context.Values().Zero(
 		context.WithRole(api.RoleSliceElement),
 		source,
@@ -45,58 +41,95 @@ func sliceZero(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	aggregate := context.Values().RequiresStructuralCopy(
+		context,
+		sourceElementType,
+	)
+	var typeArguments []tsgo.TypeNode
+	var typeRequests []api.RootRequest
+	elementType, requests, represented, err := scalarSliceElementTarget(
+		context,
+		sourceElementType,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if represented {
+		typeArguments = []tsgo.TypeNode{elementType}
+		typeRequests = requests
+	}
+	runtimeSymbol := api.RuntimeSlice
+	if aggregate {
+		runtimeSymbol = api.RuntimeSliceNilWith
+	}
 	runtime, err := context.Names().Runtime(
-		api.RuntimeSlice,
+		runtimeSymbol,
 		api.ImportPhaseValue,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	callee := tsgo.Expression(context.Factory().PropertyAccessExpression(
+		context.Factory().Identifier(runtime.Name()),
+		nil,
+		context.Factory().Identifier(
+			runtimeslice.MemberName(runtimeslice.MemberNil),
+		),
+		tsgo.NodeFlagsNone,
+	))
+	arguments := []tsgo.Expression{zero.Value()}
+	if aggregate {
+		callee = context.Factory().Identifier(runtime.Name())
+		arguments[0] = sliceZeroFactory(context, zero.Value())
+	}
 	return api.NewExpressionEmission(
 		zero.Before(),
 		context.Factory().CallExpression(
-			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(runtime.Name()),
-				nil,
-				context.Factory().Identifier(
-					runtimeslice.MemberName(runtimeslice.MemberNil),
-				),
-				tsgo.NodeFlagsNone,
-			),
+			callee,
 			nil,
-			[]tsgo.TypeNode{elementType},
-			[]tsgo.Expression{zero.Value()},
+			typeArguments,
+			arguments,
 			tsgo.NodeFlagsNone,
 		),
 		api.CombineRequests(
-			requests,
+			typeRequests,
 			runtime.Requests(),
 			zero.Requests(),
 		),
 	)
 }
 
-func sliceElementTarget(
+func sliceZeroFactory(
 	context api.Context,
-	source ast.Node,
-	sourceType types.Type,
-) (tsgo.TypeNode, []api.RootRequest, error) {
-	_, elementType, ok := scalarSlice(context, sourceType)
-	if !ok {
-		return nil, nil,
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
+	value tsgo.Expression,
+) tsgo.ArrowFunction {
+	return context.Factory().ArrowFunction(
+		nil,
+		nil,
+		nil,
+		nil,
+		context.Factory().EqualsGreaterThanToken(),
+		context.Factory().Block(
+			[]tsgo.Statement{context.Factory().ReturnStatement(value)},
+			true,
+		),
+	)
+}
+
+func scalarSliceElementTarget(
+	context api.Context,
+	elementType types.Type,
+) (tsgo.TypeNode, []api.RootRequest, bool, error) {
 	alias, ok := basictype.PrimitiveAlias(context.TypesSizes(), elementType)
 	if !ok {
-		return nil, nil,
-			api.Unsupported(context, api.CategoryType, source)
+		return nil, nil, false, nil
 	}
 	reference, err := context.Names().Primitive(alias)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 	return context.Factory().TypeReferenceNode(
 		context.Factory().Identifier(reference.Name()),
 		nil,
-	), reference.Requests(), nil
+	), reference.Requests(), true, nil
 }

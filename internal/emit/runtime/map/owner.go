@@ -54,6 +54,9 @@ func Build(
 	symbol api.RuntimeSymbol,
 	panicName string,
 ) (tsgo.Statement, error) {
+	if symbol == api.RuntimeMapHash {
+		return buildHash(factory)
+	}
 	contract, err := api.RuntimeContract(symbol)
 	if err != nil {
 		return nil, err
@@ -74,7 +77,7 @@ func Build(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
 		factory.Identifier(className),
 		[]tsgo.TypeParameterDeclaration{
-			typeParameter(factory, keyTypeName),
+			keyTypeParameter(factory, keyTypeName),
 			typeParameter(factory, valueTypeName),
 		},
 		nil,
@@ -133,7 +136,7 @@ func nilMethod(
 		factory.Identifier(memberName),
 		nil,
 		[]tsgo.TypeParameterDeclaration{
-			typeParameter(factory, keyTypeName),
+			keyTypeParameter(factory, keyTypeName),
 			typeParameter(factory, valueTypeName),
 		},
 		[]tsgo.ParameterDeclaration{
@@ -170,7 +173,7 @@ func makeMethod(
 		factory.Identifier(memberName),
 		nil,
 		[]tsgo.TypeParameterDeclaration{
-			typeParameter(factory, keyTypeName),
+			keyTypeParameter(factory, keyTypeName),
 			typeParameter(factory, valueTypeName),
 		},
 		[]tsgo.ParameterDeclaration{
@@ -467,6 +470,19 @@ func parameter(
 }
 
 func typeParameter(
+	factory tsgo.Factory,
+	name string,
+) tsgo.TypeParameterDeclaration {
+	return factory.TypeParameterDeclaration(
+		nil,
+		factory.Identifier(name),
+		nil,
+		nil,
+		nil,
+	)
+}
+
+func keyTypeParameter(
 	factory tsgo.Factory,
 	name string,
 ) tsgo.TypeParameterDeclaration {

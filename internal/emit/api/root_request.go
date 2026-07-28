@@ -22,6 +22,7 @@ const (
 	ScopeInvalid PlacementScope = iota
 	ScopeFileImports
 	ScopeOwningFile
+	ScopeCompilationSupport
 )
 
 type ExecutionConstraint uint8
@@ -167,6 +168,25 @@ func NewNamedStructOperationRequest(
 	}, nil
 }
 
+func NewDefinedArrayOperationRequest(
+	typeName *types.TypeName,
+	operation DefinedArrayOperation,
+) (RootRequest, error) {
+	requirement, err := NewDefinedArrayOperationRequirement(
+		typeName,
+		operation,
+	)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return RootRequest{
+		owner: RootRequestOwner{
+			kind:                   RootRequestDeclarationRequirement,
+			declarationRequirement: requirement,
+		},
+	}, nil
+}
+
 func NewAddressableStorageRequest(
 	owner *types.Func,
 	variable *types.Var,
@@ -183,8 +203,67 @@ func NewAddressableStorageRequest(
 	}, nil
 }
 
+func NewConstantProjectionRequest(
+	constant *types.Const,
+	projection types.BasicKind,
+) (RootRequest, error) {
+	requirement, err := NewConstantProjectionRequirement(constant, projection)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return RootRequest{
+		owner: RootRequestOwner{
+			kind:                   RootRequestDeclarationRequirement,
+			declarationRequirement: requirement,
+		},
+	}, nil
+}
+
+func NewLocalConstantProjectionRequest(
+	owner *types.Func,
+	constant *types.Const,
+	projection types.BasicKind,
+) (RootRequest, error) {
+	requirement, err := NewLocalConstantProjectionRequirement(
+		owner,
+		constant,
+		projection,
+	)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return RootRequest{
+		owner: RootRequestOwner{
+			kind:                   RootRequestDeclarationRequirement,
+			declarationRequirement: requirement,
+		},
+	}, nil
+}
+
 func NewArtifactDependencyRequest(
 	provider types.Object,
+	facet ArtifactFacet,
+) (RootRequest, error) {
+	owner, err := SourceArtifactOwner(provider)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return newArtifactDependencyRequest(owner, facet)
+}
+
+func NewGeneratedArtifactDependencyRequest(
+	provider *GeneratedArtifact,
+	facet ArtifactFacet,
+) (RootRequest, error) {
+	owner, err := GeneratedArtifactOwner(provider)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return newArtifactDependencyRequest(owner, facet)
+}
+
+func newArtifactDependencyRequest(
+	provider ArtifactOwner,
 	facet ArtifactFacet,
 ) (RootRequest, error) {
 	dependency, err := NewArtifactDependency(provider, facet)
@@ -199,6 +278,41 @@ func NewArtifactDependencyRequest(
 	}, nil
 }
 
+func NewAnonymousStructRequest(
+	artifact *GeneratedArtifact,
+	demand AnonymousStructDemand,
+) (RootRequest, error) {
+	requirement, err := NewAnonymousStructRequirement(
+		artifact,
+		demand,
+	)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return RootRequest{
+		owner: RootRequestOwner{
+			kind:                   RootRequestDeclarationRequirement,
+			declarationRequirement: requirement,
+		},
+	}, nil
+}
+
+func NewMapSpecializationRequest(
+	artifact *GeneratedArtifact,
+	demand MapSpecializationDemand,
+) (RootRequest, error) {
+	requirement, err := NewMapSpecializationRequirement(artifact, demand)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return RootRequest{
+		owner: RootRequestOwner{
+			kind:                   RootRequestDeclarationRequirement,
+			declarationRequirement: requirement,
+		},
+	}, nil
+}
+
 func (r RootRequest) Kind() RootRequestKind {
 	return r.owner.kind
 }
@@ -208,6 +322,12 @@ func (r RootRequest) LegalScope() PlacementScope {
 		return ScopeFileImports
 	}
 	if r.owner.kind == RootRequestDeclarationRequirement {
+		if artifact, ok := r.owner.declarationRequirement.
+			GeneratedArtifact(); ok &&
+			artifact.Placement() ==
+				GeneratedArtifactPlacementCompilation {
+			return ScopeCompilationSupport
+		}
 		return ScopeOwningFile
 	}
 	return ScopeInvalid

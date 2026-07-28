@@ -8,30 +8,42 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	arraymember "github.com/tsoniclang/gotots/internal/emit/runtime/array/member"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type RuntimeArray struct {
-	source *types.Array
+	sourceType types.Type
+	source     *types.Array
+	defined    definedtype.Model
+	nominal    bool
+	aggregate  bool
 }
 
 func Resolve(
 	context api.Context,
 	sourceType types.Type,
 ) (RuntimeArray, bool) {
-	source, ok := types.Unalias(sourceType).(*types.Array)
-	if !ok || source.Len() < 0 {
+	var source *types.Array
+	defined, nominal := definedtype.ResolveArray(sourceType)
+	if nominal {
+		source, _ = defined.Array()
+	} else {
+		source, _ = types.Unalias(sourceType).(*types.Array)
+	}
+	if source == nil || source.Len() < 0 {
 		return RuntimeArray{}, false
 	}
-	array := RuntimeArray{source: source}
-	alias, represented := basictype.PrimitiveAlias(
-		context.TypesSizes(),
-		array.ElementType(),
-	)
-	if !represented || alias == api.PrimitiveInvalid {
-		return RuntimeArray{}, false
-	}
-	return array, true
+	return RuntimeArray{
+		sourceType: sourceType,
+		source:     source,
+		defined:    defined,
+		nominal:    nominal,
+		aggregate: context.Values().RequiresStructuralCopy(
+			context,
+			source.Elem(),
+		),
+	}, true
 }
 
 func (a RuntimeArray) ElementType() types.Type {
@@ -40,6 +52,10 @@ func (a RuntimeArray) ElementType() types.Type {
 
 func (a RuntimeArray) Length() int64 {
 	return a.source.Len()
+}
+
+func (a RuntimeArray) Aggregate() bool {
+	return a.aggregate
 }
 
 func (a RuntimeArray) EmitType(
@@ -52,6 +68,19 @@ func (a RuntimeArray) EmitType(
 			Role:   context.Role(),
 			Reason: "runtime array has no Go array type",
 		}
+	}
+	if a.nominal {
+		reference, err := context.Names().TypeReference(a.defined.TypeName())
+		if err != nil {
+			return api.TypeEmission{}, err
+		}
+		return api.DirectType(
+			context.Factory().TypeReferenceNode(
+				context.Factory().Identifier(reference.Name()),
+				nil,
+			),
+			reference.Requests()...,
+		), nil
 	}
 	element, err := children.RepresentedType(
 		context,
@@ -83,6 +112,41 @@ func (a RuntimeArray) EmitType(
 	), nil
 }
 
+func (a RuntimeArray) storage(
+	context api.Context,
+	value tsgo.Expression,
+) tsgo.Expression {
+	if !a.nominal {
+		return value
+	}
+	return a.defined.Unwrap(context.Factory(), value)
+}
+
+func (a RuntimeArray) wrap(
+	context api.Context,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	if !a.nominal {
+		return value, nil
+	}
+	return a.defined.Wrap(context, value)
+}
+
+func (a RuntimeArray) AddressIndexRequirement() (
+	api.RootRequest,
+	bool,
+	error,
+) {
+	if !a.nominal {
+		return api.RootRequest{}, false, nil
+	}
+	request, err := api.NewDefinedArrayOperationRequest(
+		a.defined.TypeName(),
+		api.DefinedArrayOperationAddressIndex,
+	)
+	return request, true, err
+}
+
 func (a RuntimeArray) lengthLiteral(context api.Context) tsgo.NumericLiteral {
 	return context.Factory().NumericLiteral(
 		strconv.FormatInt(a.source.Len(), 10),
@@ -95,6 +159,24 @@ func (a RuntimeArray) runtime(
 	phase api.ImportPhase,
 ) (api.NameReference, error) {
 	return context.Names().Runtime(api.RuntimeArray, phase)
+}
+
+func (a RuntimeArray) runtimeOperation(
+	context api.Context,
+	symbol api.RuntimeSymbol,
+	arguments ...tsgo.Expression,
+) (tsgo.CallExpression, []api.RootRequest, error) {
+	reference, err := context.Names().Runtime(symbol, api.ImportPhaseValue)
+	if err != nil {
+		return nil, nil, err
+	}
+	return context.Factory().CallExpression(
+		context.Factory().Identifier(reference.Name()),
+		nil,
+		nil,
+		arguments,
+		tsgo.NodeFlagsNone,
+	), reference.Requests(), nil
 }
 
 func (a RuntimeArray) callStatic(
@@ -129,10 +211,7 @@ func (a RuntimeArray) targetTypeArguments(
 		a.ElementType(),
 	)
 	if !ok {
-		return nil, nil, &api.InvariantError{
-			Role:   context.Role(),
-			Reason: "runtime array element lost its scalar representation",
-		}
+		return nil, nil, nil
 	}
 	element, err := context.Names().Primitive(alias)
 	if err != nil {

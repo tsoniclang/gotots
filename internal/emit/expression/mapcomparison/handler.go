@@ -34,11 +34,34 @@ func Emit(
 	value, err := children.Expression(
 		context.
 			WithRole(api.RoleMapReceiver).
-			WithExpectedType(mapType),
+			WithExpectedType(mapType.Type()),
 		mapSource,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
+	}
+	if mapType.Nominal() {
+		target := tsgo.Expression(context.Factory().BinaryExpression(
+			nil,
+			value.Value(),
+			nil,
+			context.Factory().BinaryOperatorToken(
+				tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+			),
+			context.Factory().Identifier("undefined"),
+		))
+		if source.Op == token.NEQ {
+			target = context.Factory().PrefixUnaryExpression(
+				tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
+				target,
+			)
+		}
+		result, err := api.NewExpressionEmission(
+			value.Before(),
+			target,
+			value.Requests(),
+		)
+		return result, true, err
 	}
 	isNilName, err := mapruntime.Name(mapruntime.MemberIsNil)
 	if err != nil {
@@ -73,7 +96,7 @@ func Emit(
 func operands(
 	context api.Context,
 	source *ast.BinaryExpr,
-) (ast.Expr, *types.Map, bool) {
+) (ast.Expr, maprepresentation.Model, bool) {
 	if isNil(context, source.X) {
 		mapType, ok := maprepresentation.Source(
 			context,
@@ -88,7 +111,7 @@ func operands(
 		)
 		return source.X, mapType, ok
 	}
-	return nil, nil, false
+	return nil, maprepresentation.Model{}, false
 }
 
 func isNil(context api.Context, source ast.Expr) bool {

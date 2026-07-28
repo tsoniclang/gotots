@@ -5,17 +5,13 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
-
-type operand struct {
-	emission api.ExpressionEmission
-	present  bool
-	omitted  tsgo.Expression
-}
 
 func Emit(
 	context api.Context,
@@ -23,7 +19,9 @@ func Emit(
 	source *ast.SliceExpr,
 ) (api.ExpressionEmission, error) {
 	sourceType := context.TypesInfo().TypeOf(source.X)
-	_, _, ok := slicevalue.Scalar(context.TypesSizes(), sourceType)
+	_, _, ok := slicevalue.Resolve(sourceType)
+	defined, definedOK := definedtype.ResolveSlice(sourceType)
+	ok = ok || definedOK
 	resultType := context.TypesInfo().TypeOf(source)
 	if !ok ||
 		resultType == nil ||
@@ -43,6 +41,12 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	if definedOK {
+		receiver, err = defined.Project(context, receiver)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	}
 	low, err := emitBound(
 		context.WithRole(api.RoleSliceLow),
 		children,
@@ -61,9 +65,7 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	max := operand{
-		omitted: context.Factory().NullLiteral(),
-	}
+	max := expressionoperands.Omitted(context.Factory().NullLiteral())
 	if source.Slice3 {
 		max, err = emitBound(
 			context.WithRole(api.RoleSliceMax),
@@ -75,19 +77,23 @@ func Emit(
 			return api.ExpressionEmission{}, err
 		}
 	}
-	targetReceiver, bounds, before, requests, err := arrange(
+	ordered, err := expressionoperands.Preserve(
 		context,
-		receiver,
-		[]operand{low, high, max},
+		api.TemporarySliceOperand,
+		expressionoperands.Present(receiver),
+		low,
+		high,
+		max,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return api.NewExpressionEmission(
-		before,
+	values := ordered.Values()
+	result, err := api.NewExpressionEmission(
+		ordered.Before(),
 		context.Factory().CallExpression(
 			context.Factory().PropertyAccessExpression(
-				targetReceiver,
+				values[0],
 				nil,
 				context.Factory().Identifier(
 					runtimeslice.MemberName(runtimeslice.MemberSlice),
@@ -96,11 +102,18 @@ func Emit(
 			),
 			nil,
 			nil,
-			bounds,
+			values[1:],
 			tsgo.NodeFlagsNone,
 		),
-		requests,
+		ordered.Requests(),
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if definedOK {
+		return defined.Wrap(context, result)
+	}
+	return result, nil
 }
 
 func emitBound(
@@ -108,13 +121,13 @@ func emitBound(
 	children api.ChildEmitter,
 	source ast.Expr,
 	omitted tsgo.Expression,
-) (operand, error) {
+) (expressionoperands.Item, error) {
 	if source == nil {
-		return operand{omitted: omitted}, nil
+		return expressionoperands.Omitted(omitted), nil
 	}
 	sourceType := context.TypesInfo().TypeOf(source)
 	if !basictype.SupportsInteger(context.TypesSizes(), sourceType) {
-		return operand{},
+		return expressionoperands.Item{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	emission, err := children.Expression(
@@ -122,89 +135,7 @@ func emitBound(
 		source,
 	)
 	if err != nil {
-		return operand{}, err
+		return expressionoperands.Item{}, err
 	}
-	return operand{emission: emission, present: true}, nil
-}
-
-func arrange(
-	context api.Context,
-	receiver api.ExpressionEmission,
-	operands []operand,
-) (
-	tsgo.Expression,
-	[]tsgo.Expression,
-	[]tsgo.Statement,
-	[]api.RootRequest,
-	error,
-) {
-	capture := len(receiver.Before()) != 0
-	for _, item := range operands {
-		capture = capture || item.present && len(item.emission.Before()) != 0
-	}
-	if !capture {
-		values := make([]tsgo.Expression, 0, len(operands))
-		for _, item := range operands {
-			if item.present {
-				values = append(values, item.emission.Value())
-			} else {
-				values = append(values, item.omitted)
-			}
-		}
-		requests := receiver.Requests()
-		for _, item := range operands {
-			if item.present {
-				requests = append(requests, item.emission.Requests()...)
-			}
-		}
-		return receiver.Value(), values, nil, requests, nil
-	}
-	targetReceiver, before, requests, err := captureOperand(context, receiver)
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-	values := make([]tsgo.Expression, 0, len(operands))
-	for _, item := range operands {
-		if !item.present {
-			values = append(values, item.omitted)
-			continue
-		}
-		value, statements, itemRequests, err := captureOperand(
-			context,
-			item.emission,
-		)
-		if err != nil {
-			return nil, nil, nil, nil, err
-		}
-		before = append(before, statements...)
-		requests = append(requests, itemRequests...)
-		values = append(values, value)
-	}
-	return targetReceiver, values, before, requests, nil
-}
-
-func captureOperand(
-	context api.Context,
-	emission api.ExpressionEmission,
-) (tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
-	name, err := context.Names().Temporary(api.TemporarySliceOperand)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	statements := emission.Before()
-	statements = append(statements, context.Factory().VariableStatement(
-		nil,
-		context.Factory().VariableDeclarationList(
-			[]tsgo.VariableDeclaration{
-				context.Factory().VariableDeclaration(
-					context.Factory().Identifier(name),
-					nil,
-					nil,
-					emission.Value(),
-				),
-			},
-			tsgo.NodeFlagsConst,
-		),
-	))
-	return context.Factory().Identifier(name), statements, emission.Requests(), nil
+	return expressionoperands.Present(emission), nil
 }

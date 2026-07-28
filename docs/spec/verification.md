@@ -260,6 +260,56 @@ Every implemented semantic family includes:
 - real-project samples unrelated to the discovering corpus; and
 - production-path mutations that prove the gate detects the intended defect.
 
+The constant-context family additionally proves:
+
+- `return Scale`, `Scale + Scale`, assignment, argument, case, conversion,
+  package selector, and dot-import contexts select the exact parent-owned or
+  enclosing-expression checker fact;
+- a named untyped float constant used at `float32` and `float64` proves that
+  contextual occurrence rounding is not mistaken for declaration-value drift;
+- sibling and nested local `const Width` declarations stay in their lexical
+  blocks and produce no duplicate target binding;
+- two packages exporting the same constant spelling import distinct
+  `(constant identity, representation)` projections;
+- whole-file and exported-Go-API roots account for an unused untyped constant
+  without runtime output, a generic representation root rejects it as
+  ambiguous, and an explicit concrete-projection root materializes exactly the
+  requested representation or fails;
+- removing parent expected-type propagation, restoring `types.Default`,
+  flattening a local projection into a function prologue, keying an import by
+  spelling, accepting an ambiguous constant root, dropping an explicit
+  projection, or restoring a generic empty declaration path fails an owning
+  gate; and
+- 1x/2x/4x named uses retain one value payload per projection and constant-size
+  references.
+
+The float/rune checkpoint additionally covers every admitted float32 and
+float64 arithmetic, ordering, equality, and unary operation; float32
+overflow, underflow, subnormal, signed-zero, infinity, and NaN behavior; and
+canonical rune values independent of source spelling. Mutations remove
+float32 rounding, swap each operator class, and substitute source spelling for
+checker value. Tests invoke generated Go-shaped call sites so arbitrary host
+numbers cannot bypass an input conversion boundary.
+
+The complex checkpoint additionally proves:
+
+- `complex64` and `complex128` are statically incompatible without casts;
+- imaginary literals and complex constants use checker values despite
+  alternate source spellings;
+- zero, construction, `real`, `imag`, unary `+`/`-`, `+`, `-`, `*`, `/`,
+  `==`, and `!=` match the selected Go toolchain for both widths;
+- `complex64` rounds each construction/result component and `complex128`
+  preserves binary64 components;
+- division matches the selected runtime algorithm for ordinary values, zero,
+  signed zero, overflow-sensitive ratios, infinities, and NaNs;
+- `complex`, `real`, and `imag` dispatch by exact `*types.Builtin` identity and
+  preserve argument evaluation order;
+- each reached width emits exactly one nominal class, division emits one
+  shared definition, and every use site remains O(1); and
+- mutations remove a width brand, omit component rounding, replace robust
+  division with the naive formula, swap real/imaginary parts, or dispatch a
+  built-in by spelling, and each fails its owning gate.
+
 Examples include:
 
 - one-result versus comma-ok map indexing;
@@ -292,6 +342,57 @@ size are measured over doubled parameters, nested literals, captures, and call
 sites; call-site size must remain constant per argument and must not grow with
 the number of possible function values.
 
+The nil/defined-callable extension additionally proves that callee and
+arguments execute in Go order before the nil panic, known non-nil calls remain
+byte-stable and direct, aliases add no wrapper, and distinct defined callables
+remain statically incompatible. Mutations remove the nil guard, move it before
+argument evaluation, replace the nominal wrapper with an intersection/string
+brand, mutate the function object with `Object.assign`, or invoke through
+`.call`; each must fail its owning shape, differential, or broad-search gate.
+
+The recursive-struct extension additionally proves:
+
+- same-spelled local named component types in different lexical declarations
+  never canonicalize together;
+- identical anonymous structs reuse one declaration, while field tag, blank
+  field, unexported-field package, embeddedness, and named-component changes
+  remain distinct exactly where `types.Identical` says they do;
+- a forced fingerprint collision cannot unify non-identical Go types;
+- a shape containing a local named type is emitted only where that type is
+  nameable;
+- legal pointer/slice/map recursion converges, while definitions grow with
+  shape once and zero/copy/equality/hash use sites remain constant-size; and
+- mutations restore spelling-only identity, choose first-encounter placement,
+  expose a blank field, or inline a field walk at every use, and each fails.
+
+The aggregate-map extension additionally proves key copy on insertion, value
+copy on store and lookup, exact collision equality, nil operations, comma-ok,
+and one operation owner reused by multiple values. Generated artifacts and a
+mutation gate reject function-valued hash/equality/copy fields, strategy
+objects, JSON/text keys, reflection, and target object identity.
+
+It also proves:
+
+- number and BigInt profiles both strict-typecheck and execute differentially
+  against Go for aggregate keys and values;
+- reversed roots produce byte-identical artifacts, and an unreachable map
+  shape creates no artifact or target-name perturbation;
+- `types.Identical` is the join authority: forced full artifact-key and
+  truncated target-name collisions cannot merge non-identical maps, while
+  mutating a derived TypeScript declaration spelling cannot change canonical
+  Go-type identity;
+- an anonymous-struct key and value demand their canonical struct artifacts,
+  including exactly one key hash member, through the same generated-artifact
+  fixed point rather than a map-only identity or placement graph;
+- shapes containing local named types remain immediately after the exact local
+  type anchor in a nested block, nested function literal, or package
+  initializer, and never create compilation-support output;
+- a multi-LHS `types.Initializer` remains one reconstruction owner while no LHS
+  variable can masquerade as that owner; checker-produced blank targets remain
+  admitted and foreign nonblank targets fail closed; and
+- doubling equal-shape use sites keeps one byte-identical specialization class
+  and grows source use-site bytes linearly rather than duplicating shape logic.
+
 The first named-struct family additionally proves:
 
 - empty structs and grouped field declarations use the same single
@@ -311,6 +412,10 @@ The first named-struct family additionally proves:
   solely for keyed source order, while `preserve-go` retains source evaluation
   order when field declaration order differs;
 - equality is field-wise and recursive rather than target object identity;
+- a field whose equality needs prerequisite statements, such as an array,
+  executes those statements inside the static struct equality operation and
+  short-circuits in field order; scalar-only structs retain the compact direct
+  conjunction;
 - concrete value-receiver calls use the exact `go/types.Selection` and a named
   receiver function, never a class method or virtual dispatch; and
 - tags, embedding, pointers, interfaces, method values/expressions, generics,
@@ -454,11 +559,11 @@ program. The required evidence includes:
 
 | Family | Independent behavioral proofs | Required mutations |
 |---|---|---|
-| integers | every admitted width/profile/operator/conversion at boundary values; BigInt division/remainder for nonzero and zero divisors | width alias collapse; unsafe number literal; missing narrowing/bounds operation; direct host divide/remainder bypass |
+| integers and numeric conversions | every source/destination width and profile disposition; narrowing, sign change, integer/float, float-width, and complex-width boundaries; constants; NaN, infinity, signed zero, and representability; BigInt division/remainder for nonzero and zero divisors | width alias collapse; unsafe number literal; missing narrowing/bounds operation; conversion spelling lookup; ordinary-call fallthrough; duplicated conversion operand; direct host divide/remainder or non-finite BigInt conversion bypass |
 | strings | arbitrary-byte literal, concat, comparison, byte length/index/slice and bounds | Unicode-code-point literal; UTF-16 indexing; missing bounds check |
-| arrays | length-distinct target types, fresh zero/copy, equality, index/store/len/cap | erased length; shared zero; shallow copy where element policy forbids it |
+| arrays | length-distinct target types, fresh zero/copy, compiler-lowered recursive equality, index/store/len/cap | erased length; shared zero; shallow copy where element policy forbids it; runtime equality callback or target object identity |
 | slices | nil/empty distinction, aliasing, reslice, append reuse/reallocation, copy overlap | bare-array substitution; lost capacity; always-reallocate append |
-| maps | nil write, missing zero, comma-ok, aliasing, scalar-key equality, delete/len | plain-object substitution; missing-value `undefined`; copy-on-assignment |
+| maps | nil write, missing zero, comma-ok, aliasing, direct bool/integer/string keys, defined-key projection, delete/len, and explicit floating-key rejection | plain-object substitution; missing-value `undefined`; copy-on-assignment; wrapper object identity; floating-key admission through native SameValueZero |
 | pointers | nil/new/read/store/alias/equality; local/parameter/result/receiver/package/field/array/slice addresses; reassignment through projections; pointer receiver nil/copy cases | fresh wrapper on copy; wrapper identity instead of canonical location; nil dereference success; unrelated-local cell wrapping; wrong requirement owner |
 
 For every family:

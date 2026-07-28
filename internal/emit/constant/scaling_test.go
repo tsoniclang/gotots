@@ -1,0 +1,77 @@
+package constant_test
+
+import (
+	"context"
+	"fmt"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/tsoniclang/gotots/internal/emit"
+	"github.com/tsoniclang/gotots/internal/load"
+)
+
+// TestLargeConstantProjectionScalesWithUsesNotValueSize proves the projection
+// design is O(value-size + uses), never O(value-size × uses): a large untyped
+// string constant used 1, 2, and 4 times materializes its payload exactly once
+// as a single projection, and every use is a constant-size reference. If uses
+// inlined the value, the payload would appear once per use and the artifact
+// would grow by the payload size for every added use.
+func TestLargeConstantProjectionScalesWithUsesNotValueSize(t *testing.T) {
+	const payload = "PAYLOAD_" // repeated to a large, distinctive literal
+	large := strings.Repeat(payload, 512)
+
+	sizes := make(map[int]int)
+	for _, uses := range []int{1, 2, 4} {
+		printed := compileScalingProgram(t, large, uses)
+
+		// The payload is materialized exactly once regardless of use count.
+		if count := strings.Count(printed, large); count != 1 {
+			t.Fatalf("uses=%d: payload appears %d times, want exactly one projection", uses, count)
+		}
+		// Every use is a constant-size reference to the projection.
+		if refs := strings.Count(printed, "Banner$string"); refs < uses {
+			t.Fatalf("uses=%d: found %d Banner$string references, want at least %d", uses, refs, uses)
+		}
+		sizes[uses] = len(printed)
+	}
+
+	// Going from 1 to 4 uses adds three references, not three payload copies.
+	// The growth must be a tiny fraction of a single payload — proof the payload
+	// is not duplicated per use.
+	growth := sizes[4] - sizes[1]
+	if growth >= len(large) {
+		t.Fatalf("artifact grew by %d bytes across 3 added uses (payload is %d bytes); uses are not constant-size",
+			growth, len(large))
+	}
+}
+
+func compileScalingProgram(t *testing.T, payload string, uses int) string {
+	t.Helper()
+	directory := t.TempDir()
+	writeFile(t, filepath.Join(directory, "go.mod"), "module example.com/scaling\n\ngo 1.26.4\n")
+
+	var builder strings.Builder
+	builder.WriteString("package scaling\n\n")
+	fmt.Fprintf(&builder, "const Banner = %q\n\n", payload)
+	// Separate functions keep each use out of a constant-foldable expression, so
+	// each is a genuine independent reference to the projection.
+	for index := 0; index < uses; index++ {
+		fmt.Fprintf(&builder, "func Use%d() string {\n\treturn Banner\n}\n\n", index)
+	}
+	writeFile(t, filepath.Join(directory, "source.go"), builder.String())
+
+	loaded, err := load.One(context.Background(), load.Request{Directory: directory, Pattern: "."})
+	if err != nil {
+		t.Fatal(err)
+	}
+	roots, err := emit.ExportedAPIRoots(loaded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	emission, err := emit.Compile(loaded.Program(), roots)
+	if err != nil {
+		t.Fatalf("scaling compile (uses=%d) failed: %v", uses, err)
+	}
+	return printConstantFamily(t, emission)
+}

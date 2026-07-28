@@ -5,7 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
 )
 
 func Emit(
@@ -19,10 +19,8 @@ func Emit(
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	switch object {
-	case types.Universe.Lookup("false"):
-		return emitBooleanConstant(context, source, context.Factory().FalseLiteral())
-	case types.Universe.Lookup("true"):
-		return emitBooleanConstant(context, source, context.Factory().TrueLiteral())
+	case types.Universe.Lookup("false"), types.Universe.Lookup("true"):
+		return emitPredeclaredBoolean(context, source)
 	case types.Universe.Lookup("nil"):
 		sourceType := context.TypesInfo().TypeOf(source)
 		targetType := context.ExpectedType()
@@ -36,6 +34,10 @@ func Emit(
 	case types.Universe.Lookup("iota"):
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if constObject, ok := object.(*types.Const); ok &&
+		constantbinding.IsUntyped(constObject.Type()) {
+		return constantbinding.EmitUse(context, source, constObject)
 	}
 	if variable, ok := object.(*types.Var); ok &&
 		!variable.IsField() &&
@@ -68,21 +70,32 @@ func Emit(
 	), nil
 }
 
-func emitBooleanConstant(
+// emitPredeclaredBoolean projects the predeclared true/false constant through
+// the single constant-value owner. These are literal booleans, not
+// source-declared constants, so they are materialized in place rather than
+// projected; routing them through EmitValue keeps one value-materialization
+// owner rather than a second boolean path.
+func emitPredeclaredBoolean(
 	context api.Context,
 	source *ast.Ident,
-	literal tsgo.Expression,
 ) (api.ExpressionEmission, error) {
+	typeAndValue := context.TypesInfo().Types[source]
 	sourceType := context.TypesInfo().TypeOf(source)
 	targetType := context.ExpectedType()
-	if sourceType == nil ||
+	if typeAndValue.Value == nil ||
+		sourceType == nil ||
 		targetType == nil ||
 		!types.AssignableTo(sourceType, targetType) ||
 		!isBoolean(targetType) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	return api.DirectExpression(literal), nil
+	return constantbinding.EmitValue(
+		context,
+		source,
+		targetType,
+		typeAndValue.Value,
+	)
 }
 
 func isBoolean(source types.Type) bool {

@@ -52,12 +52,44 @@ func emitMake(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	aggregate := context.Values().RequiresStructuralCopy(context, elementType)
+	if aggregate {
+		if len(zero.Before()) != 0 {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		arguments, before, requests, err := arrangeValues(
+			context,
+			[]api.ExpressionEmission{length, capacity},
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		arguments = append(
+			arguments,
+			sliceValueFactory(context, nil, zero.Value()),
+		)
+		target, err := aggregateSliceCall(
+			context,
+			children,
+			source,
+			elementType,
+			api.RuntimeSliceMakeWith,
+			arguments,
+			before,
+			api.CombineRequests(requests, zero.Requests()),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return wrapDefinedSlice(context, result, target)
+	}
 	values = append(values, zero)
 	arguments, before, requests, err := arrangeValues(context, values)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return runtimeStaticCall(
+	target, err := runtimeStaticCall(
 		context,
 		children,
 		source,
@@ -67,6 +99,10 @@ func emitMake(
 		before,
 		requests,
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return wrapDefinedSlice(context, result, target)
 }
 
 func emitMeasure(
@@ -94,6 +130,10 @@ func emitMeasure(
 			WithExpectedType(sourceType),
 		source.Args[0],
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	value, err = projectDefinedSlice(context, sourceType, value)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -145,6 +185,10 @@ func emitAppend(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	receiver, err = projectDefinedSlice(context, result, receiver)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	values = append(values, receiver)
 	for _, argument := range source.Args[1:] {
 		argumentType := context.TypesInfo().TypeOf(argument)
@@ -180,7 +224,42 @@ func emitAppend(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return api.NewExpressionEmission(
+	if context.Values().RequiresStructuralCopy(context, elementType) {
+		zero, zeroRequests, err := aggregateSliceZeroFactory(
+			context,
+			source,
+			elementType,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		copyValue, copyRequests, err := aggregateSliceCopyFactory(
+			context,
+			source,
+			elementType,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		arguments := make([]tsgo.Expression, 0, len(ordered)+2)
+		arguments = append(arguments, ordered[0], zero, copyValue)
+		arguments = append(arguments, ordered[1:]...)
+		target, err := aggregateSliceCall(
+			context,
+			children,
+			source,
+			elementType,
+			api.RuntimeSliceAppendWith,
+			arguments,
+			before,
+			api.CombineRequests(requests, zeroRequests, copyRequests),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return wrapDefinedSlice(context, result, target)
+	}
+	target, err := api.NewExpressionEmission(
 		before,
 		context.Factory().CallExpression(
 			context.Factory().PropertyAccessExpression(
@@ -198,6 +277,10 @@ func emitAppend(
 		),
 		requests,
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return wrapDefinedSlice(context, result, target)
 }
 
 func emitCopy(
@@ -236,22 +319,49 @@ func emitCopy(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
+		value, err = projectDefinedSlice(context, expected, value)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 		values = append(values, value)
 	}
 	arguments, before, requests, err := arrangeValues(context, values)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	result, err := runtimeStaticCall(
-		context,
-		children,
-		source,
-		elementType,
-		runtimeslice.MemberCopy,
-		arguments,
-		before,
-		requests,
-	)
+	var result api.ExpressionEmission
+	if context.Values().RequiresStructuralCopy(context, elementType) {
+		copyValue, copyRequests, err := aggregateSliceCopyFactory(
+			context,
+			source,
+			elementType,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		arguments = append(arguments, copyValue)
+		result, err = aggregateSliceCall(
+			context,
+			children,
+			source,
+			elementType,
+			api.RuntimeSliceCopyWith,
+			arguments,
+			before,
+			api.CombineRequests(requests, copyRequests),
+		)
+	} else {
+		result, err = runtimeStaticCall(
+			context,
+			children,
+			source,
+			elementType,
+			runtimeslice.MemberCopy,
+			arguments,
+			before,
+			requests,
+		)
+	}
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}

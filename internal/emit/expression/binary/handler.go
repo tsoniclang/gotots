@@ -6,8 +6,14 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	constantvalue "github.com/tsoniclang/gotots/internal/emit/constant"
+	basicbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/basic"
+	complexbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/complex"
+	definedbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/defined"
+	floatbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/float"
 	integerbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/integer"
 	"github.com/tsoniclang/gotots/internal/emit/expression/mapcomparison"
+	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -17,6 +23,16 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.BinaryExpr,
 ) (api.ExpressionEmission, error) {
+	if target, handled, err := constantvalue.EmitFolded(
+		context,
+		source,
+	); handled {
+		return target, err
+	}
+	if binaryConstantEvidenceIsIncomplete(context, source) {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
 	if target, handled, err := mapcomparison.Emit(
 		context,
 		children,
@@ -36,7 +52,28 @@ func Emit(
 			return target, err
 		}
 	}
+	if target, ok, err := definedbinary.Emit(
+		context,
+		children,
+		source,
+	); ok || err != nil {
+		return target, err
+	}
+	if target, ok, err := complexbinary.Emit(
+		context,
+		children,
+		source,
+	); ok || err != nil {
+		return target, err
+	}
 	if target, ok, err := integerbinary.Emit(
+		context,
+		children,
+		source,
+	); ok || err != nil {
+		return target, err
+	}
+	if target, ok, err := floatbinary.Emit(
 		context,
 		children,
 		source,
@@ -66,22 +103,118 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if len(left.Before()) != 0 || len(right.Before()) != 0 {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
+	if isLogicalOperator(source.Op) {
+		return emitLogical(context, source.Op, operator, left, right)
 	}
-	target := tsgo.Expression(context.Factory().BinaryExpression(
-		nil,
-		left.Value(),
-		nil,
-		operator,
-		right.Value(),
-	))
+	operands, err := expressionoperands.PreservePair(
+		context,
+		left,
+		right,
+		api.TemporaryBinaryOperand,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return expressionoperands.Finish(
+		operands,
+		api.DirectExpression(
+			context.Factory().BinaryExpression(
+				nil,
+				operands.Left().Value(),
+				nil,
+				operator,
+				operands.Right().Value(),
+			),
+			api.CombineRequests(
+				operands.Left().Requests(),
+				operands.Right().Requests(),
+			)...,
+		),
+	)
+}
+
+func emitLogical(
+	context api.Context,
+	sourceOperator token.Token,
+	targetOperator tsgo.BinaryOperatorToken,
+	left api.ExpressionEmission,
+	right api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	if len(right.Before()) == 0 {
+		return api.NewExpressionEmission(
+			left.Before(),
+			context.Factory().BinaryExpression(
+				nil,
+				left.Value(),
+				nil,
+				targetOperator,
+				right.Value(),
+			),
+			api.CombineRequests(left.Requests(), right.Requests()),
+		)
+	}
+	resultName, err := context.Names().Temporary(api.TemporaryLogicalResult)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	result := context.Factory().Identifier(resultName)
+	condition := tsgo.Expression(result)
+	if sourceOperator == token.LOR {
+		condition = context.Factory().PrefixUnaryExpression(
+			tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
+			result,
+		)
+	}
+	branch := right.Before()
+	branch = append(
+		branch,
+		context.Factory().ExpressionStatement(
+			context.Factory().BinaryExpression(
+				nil,
+				result,
+				nil,
+				context.Factory().BinaryOperatorToken(
+					tsgo.BinaryOperatorEqualsToken,
+				),
+				right.Value(),
+			),
+		),
+	)
+	before := left.Before()
+	before = append(
+		before,
+		binaryVariable(
+			context,
+			tsgo.NodeFlagsLet,
+			resultName,
+			left.Value(),
+		),
+		context.Factory().IfStatement(
+			condition,
+			context.Factory().Block(branch, true),
+			nil,
+		),
+	)
 	return api.NewExpressionEmission(
-		nil,
-		target,
+		before,
+		result,
 		api.CombineRequests(left.Requests(), right.Requests()),
 	)
+}
+
+func binaryConstantEvidenceIsIncomplete(
+	context api.Context,
+	source *ast.BinaryExpr,
+) bool {
+	result, resultExists := context.TypesInfo().Types[source]
+	left, leftExists := context.TypesInfo().Types[source.X]
+	right, rightExists := context.TypesInfo().Types[source.Y]
+	return resultExists &&
+		result.Value == nil &&
+		leftExists &&
+		left.Value != nil &&
+		rightExists &&
+		right.Value != nil
 }
 
 func emitValueEquality(
@@ -124,20 +257,33 @@ func emitValueEquality(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	if len(left.Before()) != 0 || len(right.Before()) != 0 {
-		return api.ExpressionEmission{}, true,
-			api.Unsupported(context, api.CategoryExpression, source)
+	before := left.Before()
+	leftValue := left.Value()
+	if len(right.Before()) != 0 {
+		leftName, err := context.Names().Temporary(
+			api.TemporaryEqualityOperand,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, true, err
+		}
+		before = append(
+			before,
+			equalityOperandStatement(context, leftName, leftValue),
+		)
+		leftValue = context.Factory().Identifier(leftName)
 	}
+	before = append(before, right.Before()...)
 	equal, err := context.Values().Equal(
 		context,
 		source,
 		operandType,
-		left.Value(),
+		leftValue,
 		right.Value(),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
+	before = append(before, equal.Before()...)
 	value := equal.Value()
 	if source.Op == token.NEQ {
 		value = context.Factory().PrefixUnaryExpression(
@@ -145,14 +291,46 @@ func emitValueEquality(
 			value,
 		)
 	}
-	return api.DirectExpression(
+	result, err := api.NewExpressionEmission(
+		before,
 		value,
 		api.CombineRequests(
 			left.Requests(),
 			right.Requests(),
 			equal.Requests(),
-		)...,
-	), true, nil
+		),
+	)
+	return result, true, err
+}
+
+func equalityOperandStatement(
+	context api.Context,
+	name string,
+	value tsgo.Expression,
+) tsgo.VariableStatement {
+	return binaryVariable(context, tsgo.NodeFlagsConst, name, value)
+}
+
+func binaryVariable(
+	context api.Context,
+	flags tsgo.NodeFlags,
+	name string,
+	value tsgo.Expression,
+) tsgo.VariableStatement {
+	return context.Factory().VariableStatement(
+		nil,
+		context.Factory().VariableDeclarationList(
+			[]tsgo.VariableDeclaration{
+				context.Factory().VariableDeclaration(
+					context.Factory().Identifier(name),
+					nil,
+					nil,
+					value,
+				),
+			},
+			flags,
+		),
+	)
 }
 
 func operationFor(
@@ -166,32 +344,49 @@ func operationFor(
 		basictype.SupportsString(context.TypesInfo().TypeOf(source)) &&
 		types.AssignableTo(leftType, context.TypesInfo().TypeOf(source)) &&
 		types.AssignableTo(rightType, context.TypesInfo().TypeOf(source)):
-		return context.Factory().BinaryOperatorToken(
-			tsgo.BinaryOperatorPlusToken,
-		), context.TypesInfo().TypeOf(source), true
+		operator, ok := basicbinary.Operator(
+			context,
+			context.TypesInfo().TypeOf(source),
+			source.Op,
+		)
+		return operator, context.TypesInfo().TypeOf(source), ok
 	case isStringComparison(source.Op) &&
 		basictype.SupportsString(leftType) &&
 		basictype.SupportsString(rightType):
-		operator, ok := stringOperator(context, source.Op)
+		operator, ok := basicbinary.Operator(
+			context,
+			types.Typ[types.String],
+			source.Op,
+		)
 		return operator, types.Typ[types.String], ok
 	case isLogicalOperator(source.Op) &&
 		isSupportedBoolean(context.TypesInfo().TypeOf(source)) &&
 		types.AssignableTo(leftType, types.Typ[types.Bool]) &&
 		types.AssignableTo(rightType, types.Typ[types.Bool]):
-		operator, ok := logicalOperator(context, source.Op)
+		operator, ok := basicbinary.Operator(
+			context,
+			types.Typ[types.Bool],
+			source.Op,
+		)
 		return operator, types.Typ[types.Bool], ok
 	case source.Op == token.EQL &&
 		types.AssignableTo(leftType, types.Typ[types.Bool]) &&
 		types.AssignableTo(rightType, types.Typ[types.Bool]):
-		return context.Factory().BinaryOperatorToken(
-			tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-		), types.Typ[types.Bool], true
+		operator, ok := basicbinary.Operator(
+			context,
+			types.Typ[types.Bool],
+			source.Op,
+		)
+		return operator, types.Typ[types.Bool], ok
 	case source.Op == token.NEQ &&
 		types.AssignableTo(leftType, types.Typ[types.Bool]) &&
 		types.AssignableTo(rightType, types.Typ[types.Bool]):
-		return context.Factory().BinaryOperatorToken(
-			tsgo.BinaryOperatorExclamationEqualsEqualsToken,
-		), types.Typ[types.Bool], true
+		operator, ok := basicbinary.Operator(
+			context,
+			types.Typ[types.Bool],
+			source.Op,
+		)
+		return operator, types.Typ[types.Bool], ok
 	default:
 		return nil, nil, false
 	}
@@ -206,50 +401,8 @@ func isStringComparison(operator token.Token) bool {
 	}
 }
 
-func stringOperator(
-	context api.Context,
-	operator token.Token,
-) (tsgo.BinaryOperatorToken, bool) {
-	var target tsgo.BinaryOperator
-	switch operator {
-	case token.EQL:
-		target = tsgo.BinaryOperatorEqualsEqualsEqualsToken
-	case token.NEQ:
-		target = tsgo.BinaryOperatorExclamationEqualsEqualsToken
-	case token.LSS:
-		target = tsgo.BinaryOperatorLessThanToken
-	case token.LEQ:
-		target = tsgo.BinaryOperatorLessThanEqualsToken
-	case token.GTR:
-		target = tsgo.BinaryOperatorGreaterThanToken
-	case token.GEQ:
-		target = tsgo.BinaryOperatorGreaterThanEqualsToken
-	default:
-		return nil, false
-	}
-	return context.Factory().BinaryOperatorToken(target), true
-}
-
 func isLogicalOperator(operator token.Token) bool {
 	return operator == token.LAND || operator == token.LOR
-}
-
-func logicalOperator(
-	context api.Context,
-	operator token.Token,
-) (tsgo.BinaryOperatorToken, bool) {
-	switch operator {
-	case token.LAND:
-		return context.Factory().BinaryOperatorToken(
-			tsgo.BinaryOperatorAmpersandAmpersandToken,
-		), true
-	case token.LOR:
-		return context.Factory().BinaryOperatorToken(
-			tsgo.BinaryOperatorBarBarToken,
-		), true
-	default:
-		return nil, false
-	}
 }
 
 func isSupportedBoolean(value types.Type) bool {

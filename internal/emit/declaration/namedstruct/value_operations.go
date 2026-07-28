@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -35,12 +36,107 @@ func emitValueOperation(
 			classType,
 			fields,
 		)
+	case api.NamedStructOperationHash:
+		return hashMethod(context, source, memberName, classType, fields)
 	default:
 		return nil, nil, &api.InvariantError{
 			Role:   context.Role(),
 			Reason: "named-struct operation is invalid",
 		}
 	}
+}
+
+func hashMethod(
+	context api.Context,
+	source ast.Node,
+	memberName string,
+	classType tsgo.TypeNode,
+	fields []field,
+) (tsgo.MethodDeclaration, []api.RootRequest, error) {
+	runtime, err := context.Names().Runtime(
+		api.RuntimeMapHash,
+		api.ImportPhaseValue,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	hashName := "$hash"
+	hash := context.Factory().Identifier(hashName)
+	body := []tsgo.Statement{
+		context.Factory().VariableStatement(
+			nil,
+			context.Factory().VariableDeclarationList(
+				[]tsgo.VariableDeclaration{
+					context.Factory().VariableDeclaration(
+						hash,
+						nil,
+						nil,
+						context.Factory().NumericLiteral(
+							"2166136261",
+							tsgo.TokenFlagsNone,
+						),
+					),
+				},
+				tsgo.NodeFlagsLet,
+			),
+		),
+	}
+	requests := runtime.Requests()
+	for _, field := range fields {
+		if field.blank {
+			continue
+		}
+		fieldHash, err := context.Values().Hash(
+			context.WithRole(api.RoleStructHashField),
+			field.source,
+			field.object.Type(),
+			property(context, "$source", field.name),
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		body = append(body, fieldHash.Before()...)
+		body = append(
+			body,
+			context.Factory().ExpressionStatement(
+				context.Factory().BinaryExpression(
+					nil,
+					hash,
+					nil,
+					context.Factory().BinaryOperatorToken(
+						tsgo.BinaryOperatorEqualsToken,
+					),
+					context.Factory().CallExpression(
+						context.Factory().PropertyAccessExpression(
+							context.Factory().Identifier(runtime.Name()),
+							nil,
+							context.Factory().Identifier(
+								mapruntime.HashMixMember,
+							),
+							tsgo.NodeFlagsNone,
+						),
+						nil,
+						nil,
+						[]tsgo.Expression{hash, fieldHash.Value()},
+						tsgo.NodeFlagsNone,
+					),
+				),
+			),
+		)
+		requests = append(requests, fieldHash.Requests()...)
+	}
+	body = append(body, context.Factory().ReturnStatement(hash))
+	return operationMethod(
+		context,
+		memberName,
+		[]tsgo.ParameterDeclaration{
+			parameter(context, "$source", classType),
+		},
+		context.Factory().KeywordTypeNode(
+			tsgo.KeywordTypeSyntaxKindNumberKeyword,
+		),
+		body,
+	), requests, nil
 }
 
 func zeroMethod(
@@ -98,13 +194,23 @@ func copyMethod(
 	arguments := make([]tsgo.Expression, 0, len(fields))
 	var requests []api.RootRequest
 	for _, field := range fields {
-		value := api.DirectExpression(property(context, "$source", field.name))
-		copied, err := context.Values().Copy(
-			context.WithRole(api.RoleStructCopyField),
-			field.source,
-			field.object.Type(),
-			value,
-		)
+		var copied api.ExpressionEmission
+		var err error
+		if field.blank {
+			copied, err = context.Values().Zero(
+				context.WithRole(api.RoleStructCopyField),
+				field.source,
+				field.object.Type(),
+			)
+		} else {
+			value := api.DirectExpression(property(context, "$source", field.name))
+			copied, err = context.Values().Copy(
+				context.WithRole(api.RoleStructCopyField),
+				field.source,
+				field.object.Type(),
+				value,
+			)
+		}
 		if err != nil {
 			return nil, nil, err
 		}
@@ -141,9 +247,13 @@ func equalMethod(
 	classType tsgo.TypeNode,
 	fields []field,
 ) (tsgo.MethodDeclaration, []api.RootRequest, error) {
-	var expression tsgo.Expression = context.Factory().TrueLiteral()
+	equalities := make([]api.ExpressionEmission, 0, len(fields))
 	var requests []api.RootRequest
-	for index, field := range fields {
+	hasPrerequisites := false
+	for _, field := range fields {
+		if field.blank {
+			continue
+		}
 		equal, err := context.Values().Equal(
 			context.WithRole(api.RoleStructEqualField),
 			field.source,
@@ -154,19 +264,10 @@ func equalMethod(
 		if err != nil {
 			return nil, nil, err
 		}
-		if index == 0 {
-			expression = equal.Value()
-		} else {
-			expression = context.Factory().BinaryExpression(
-				nil,
-				expression,
-				nil,
-				context.Factory().BinaryOperatorToken(
-					tsgo.BinaryOperatorAmpersandAmpersandToken,
-				),
-				equal.Value(),
-			)
+		if len(equal.Before()) != 0 {
+			hasPrerequisites = true
 		}
+		equalities = append(equalities, equal)
 		requests = append(requests, equal.Requests()...)
 	}
 	resultType, err := children.RepresentedType(
@@ -178,6 +279,7 @@ func equalMethod(
 		return nil, nil, err
 	}
 	requests = append(requests, resultType.Requests()...)
+	body := structEqualityBody(context, equalities, hasPrerequisites)
 	return operationMethod(
 		context,
 		memberName,
@@ -186,8 +288,62 @@ func equalMethod(
 			parameter(context, "$right", classType),
 		},
 		resultType.Value(),
-		[]tsgo.Statement{context.Factory().ReturnStatement(expression)},
+		body,
 	), requests, nil
+}
+
+func structEqualityBody(
+	context api.Context,
+	equalities []api.ExpressionEmission,
+	hasPrerequisites bool,
+) []tsgo.Statement {
+	if !hasPrerequisites {
+		var expression tsgo.Expression = context.Factory().TrueLiteral()
+		for index, equal := range equalities {
+			if index == 0 {
+				expression = equal.Value()
+				continue
+			}
+			expression = context.Factory().BinaryExpression(
+				nil,
+				expression,
+				nil,
+				context.Factory().BinaryOperatorToken(
+					tsgo.BinaryOperatorAmpersandAmpersandToken,
+				),
+				equal.Value(),
+			)
+		}
+		return []tsgo.Statement{
+			context.Factory().ReturnStatement(expression),
+		}
+	}
+	var body []tsgo.Statement
+	for _, equal := range equalities {
+		body = append(body, equal.Before()...)
+		body = append(
+			body,
+			context.Factory().IfStatement(
+				context.Factory().PrefixUnaryExpression(
+					tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
+					equal.Value(),
+				),
+				context.Factory().Block(
+					[]tsgo.Statement{
+						context.Factory().ReturnStatement(
+							context.Factory().FalseLiteral(),
+						),
+					},
+					true,
+				),
+				nil,
+			),
+		)
+	}
+	return append(
+		body,
+		context.Factory().ReturnStatement(context.Factory().TrueLiteral()),
+	)
 }
 
 func operationMethod(

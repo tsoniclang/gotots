@@ -8,6 +8,8 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	packagevariable "github.com/tsoniclang/gotots/internal/emit/declaration/packagevariable"
+	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
+	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -27,18 +29,30 @@ type packageStorage struct {
 	zeroStatements []tsgo.Statement
 }
 
+type packageInitializationArtifact struct {
+	owner           api.ArtifactOwner
+	initializer     *types.Initializer
+	site            declarationSite
+	statements      []tsgo.Statement
+	placement       *targetplacement.Owner
+	temporaryStart  emitnaming.TemporarySnapshot
+	reconstructions uint64
+}
+
 type packageTargetBuilder struct {
-	sourcePackage     *load.Package
-	statePath         string
-	assemblyPath      string
-	emitter           *emitter
-	stateContext      api.Context
-	assemblyContext   api.Context
-	statePlacement    *placementOwner
-	assemblyPlacement *placementOwner
-	storage           []packageStorage
-	storageByObject   map[*types.Var]struct{}
-	initialization    []tsgo.Statement
+	sourcePackage      *load.Package
+	statePath          string
+	assemblyPath       string
+	emitter            *emitter
+	stateContext       api.Context
+	assemblyContext    api.Context
+	statePlacement     *targetplacement.Owner
+	assemblyPlacement  *targetplacement.Owner
+	storage            []packageStorage
+	storageByObject    map[*types.Var]struct{}
+	initialization     []packageInitializationArtifact
+	initializerByOwner map[api.ArtifactOwner]int
+	initFunctions      []tsgo.Statement
 }
 
 func newPackageInitializationScheduler() *packageInitializationScheduler {
@@ -105,15 +119,16 @@ func (s *programSession) requirePackage(sourcePackage *load.Package) error {
 		return err
 	}
 	builder := &packageTargetBuilder{
-		sourcePackage:     sourcePackage,
-		statePath:         statePath,
-		assemblyPath:      assemblyPath,
-		emitter:           emitter,
-		stateContext:      stateContext,
-		assemblyContext:   assemblyContext,
-		statePlacement:    newPlacementOwner(),
-		assemblyPlacement: newPlacementOwner(),
-		storageByObject:   make(map[*types.Var]struct{}),
+		sourcePackage:      sourcePackage,
+		statePath:          statePath,
+		assemblyPath:       assemblyPath,
+		emitter:            emitter,
+		stateContext:       stateContext,
+		assemblyContext:    assemblyContext,
+		statePlacement:     targetplacement.New(),
+		assemblyPlacement:  targetplacement.New(),
+		storageByObject:    make(map[*types.Var]struct{}),
+		initializerByOwner: make(map[api.ArtifactOwner]int),
 	}
 	s.packageBuilders[sourcePackage] = builder
 
@@ -266,24 +281,9 @@ func (s *programSession) emitPackageInitialization(
 		}
 	}
 	for _, initializer := range sourcePackage.TypesInfo().InitOrder {
-		emission, err := packagevariable.EmitInitializer(
-			builder.assemblyContext,
-			builder.emitter,
-			initializer,
-		)
-		if err != nil {
+		if err := s.emitPackageInitializer(builder, initializer); err != nil {
 			return err
 		}
-		if err := s.applyRootRequests(
-			builder.assemblyPlacement,
-			emission.Requests(),
-		); err != nil {
-			return err
-		}
-		builder.initialization = append(
-			builder.initialization,
-			emission.Statements()...,
-		)
 	}
 	return s.emitPackageInitFunctions(builder)
 }
@@ -308,8 +308,8 @@ func (s *programSession) emitPackageInitFunctions(
 			if err := s.require(object); err != nil {
 				return err
 			}
-			binding, ok := s.registry.byObject[object]
-			if !ok || binding.name == "" || binding.sourcePath == "" {
+			binding, ok := s.registry.Target(object)
+			if !ok || binding.Name == "" || binding.SourcePath == "" {
 				return &ScheduleError{
 					Object: "init",
 					Reason: "package init has no target artifact binding",
@@ -317,7 +317,7 @@ func (s *programSession) emitPackageInitFunctions(
 			}
 			modulePath, err := targetoutput.ModuleSpecifier(
 				packageBuilder.assemblyPath,
-				binding.sourcePath,
+				binding.SourcePath,
 			)
 			if err != nil {
 				return err
@@ -326,8 +326,8 @@ func (s *programSession) emitPackageInitFunctions(
 				s.factory,
 				api.ImportPhaseValue,
 				modulePath,
-				binding.name,
-				binding.name,
+				binding.Name,
+				binding.Name,
 			)
 			if err != nil {
 				return err
@@ -337,11 +337,11 @@ func (s *programSession) emitPackageInitFunctions(
 			); err != nil {
 				return err
 			}
-			packageBuilder.initialization = append(
-				packageBuilder.initialization,
+			packageBuilder.initFunctions = append(
+				packageBuilder.initFunctions,
 				s.factory.ExpressionStatement(
 					s.factory.CallExpression(
-						s.factory.Identifier(binding.name),
+						s.factory.Identifier(binding.Name),
 						nil,
 						nil,
 						nil,
@@ -352,197 +352,4 @@ func (s *programSession) emitPackageInitFunctions(
 		}
 	}
 	return nil
-}
-
-func (s *programSession) packageTargetFiles(
-	primitiveAliases map[api.PrimitiveAlias]struct{},
-) ([]TargetFile, error) {
-	builders := make([]*packageTargetBuilder, 0, len(s.packageBuilders))
-	for _, builder := range s.packageBuilders {
-		builders = append(builders, builder)
-	}
-	sort.Slice(builders, func(left, right int) bool {
-		return builders[left].assemblyPath < builders[right].assemblyPath
-	})
-	files := make([]TargetFile, 0, len(builders)*2)
-	for _, builder := range builders {
-		if _, initialized := s.packageInitializations.emitted[builder.sourcePackage]; !initialized {
-			return nil, &ScheduleError{
-				Object: builder.sourcePackage.Path(),
-				Reason: "package assembly was sealed before initialization",
-			}
-		}
-		for _, alias := range builder.statePlacement.PrimitiveAliases() {
-			primitiveAliases[alias] = struct{}{}
-		}
-		for _, alias := range builder.assemblyPlacement.PrimitiveAliases() {
-			primitiveAliases[alias] = struct{}{}
-		}
-		if len(builder.storage) != 0 {
-			stateFile, err := s.packageStateFile(builder)
-			if err != nil {
-				return nil, err
-			}
-			files = append(files, stateFile)
-		}
-		assemblyFile, err := s.packageAssemblyFile(builder)
-		if err != nil {
-			return nil, err
-		}
-		files = append(files, assemblyFile)
-	}
-	return files, nil
-}
-
-func (s *programSession) packageStateFile(
-	builder *packageTargetBuilder,
-) (TargetFile, error) {
-	if err := builder.statePlacement.RequireTypeOnly(); err != nil {
-		return TargetFile{}, err
-	}
-	sort.Slice(builder.storage, func(left, right int) bool {
-		return builder.storage[left].variable.Name() <
-			builder.storage[right].variable.Name()
-	})
-	fields := make([]tsgo.PropertyDeclaration, 0, len(builder.storage))
-	for _, storage := range builder.storage {
-		fields = append(fields, storage.field)
-	}
-	declarations, err := packagevariable.StateDeclarations(s.factory, fields)
-	if err != nil {
-		return TargetFile{}, err
-	}
-	statements := append(
-		builder.statePlacement.Statements(s.factory),
-		declarations...,
-	)
-	return s.sourceFile(
-		builder.statePath,
-		builder.sourcePackage.Name(),
-		TargetFilePackageState,
-		statements,
-	)
-}
-
-func (s *programSession) packageAssemblyFile(
-	builder *packageTargetBuilder,
-) (TargetFile, error) {
-	statements := builder.assemblyPlacement.Statements(s.factory)
-	var initialization []tsgo.Statement
-	for _, storage := range builder.storage {
-		initialization = append(initialization, storage.zeroStatements...)
-	}
-	initialization = append(initialization, builder.initialization...)
-	if len(initialization) != 0 {
-		statements = append(statements, s.factory.FunctionDeclaration(
-			[]tsgo.ModifierLike{s.factory.ExportKeyword()},
-			nil,
-			s.factory.Identifier(packageInitializeName),
-			nil,
-			nil,
-			s.factory.KeywordTypeNode(
-				tsgo.KeywordTypeSyntaxKindVoidKeyword,
-			),
-			s.factory.Block(initialization, true),
-		))
-	}
-	exports, err := s.packageExports(builder)
-	if err != nil {
-		return TargetFile{}, err
-	}
-	statements = append(statements, exports...)
-	return s.sourceFile(
-		builder.assemblyPath,
-		builder.sourcePackage.Name(),
-		TargetFilePackageAssembly,
-		statements,
-	)
-}
-
-func (b *packageTargetBuilder) hasInitializationWork() bool {
-	return len(b.storage) != 0 || len(b.initialization) != 0
-}
-
-func (s *programSession) packageExports(
-	builder *packageTargetBuilder,
-) ([]tsgo.Statement, error) {
-	byPath := make(map[string][]string)
-	for _, sourceBuilder := range s.builders {
-		if sourceBuilder.sourcePackage != builder.sourcePackage {
-			continue
-		}
-		for _, declaration := range sourceBuilder.declarations {
-			if !declaration.object.Exported() {
-				continue
-			}
-			binding, ok := s.registry.byObject[declaration.object]
-			if !ok {
-				return nil, &ScheduleError{
-					Object: declaration.object.Name(),
-					Reason: "assembly export has no target binding",
-				}
-			}
-			byPath[binding.sourcePath] = append(
-				byPath[binding.sourcePath],
-				binding.name,
-			)
-		}
-	}
-	paths := make([]string, 0, len(byPath))
-	for sourcePath := range byPath {
-		paths = append(paths, sourcePath)
-	}
-	sort.Strings(paths)
-	exports := make([]tsgo.Statement, 0, len(paths)+1)
-	for _, sourcePath := range paths {
-		names := byPath[sourcePath]
-		sort.Strings(names)
-		specifiers := make([]tsgo.ExportSpecifier, 0, len(names))
-		for _, name := range names {
-			specifiers = append(specifiers, s.factory.ExportSpecifier(
-				false,
-				nil,
-				s.factory.Identifier(name),
-			))
-		}
-		modulePath, err := targetoutput.ModuleSpecifier(
-			builder.assemblyPath,
-			sourcePath,
-		)
-		if err != nil {
-			return nil, err
-		}
-		exports = append(exports, s.factory.ExportDeclaration(
-			nil,
-			false,
-			s.factory.NamedExports(specifiers),
-			s.factory.StringLiteral(modulePath, tsgo.TokenFlagsNone),
-			nil,
-		))
-	}
-	if hasExportedPackageVariable(builder.storage) {
-		exports = append(exports, s.factory.ExportDeclaration(
-			nil,
-			false,
-			s.factory.NamedExports([]tsgo.ExportSpecifier{
-				s.factory.ExportSpecifier(
-					false,
-					nil,
-					s.factory.Identifier(packagevariable.StateValueName),
-				),
-			}),
-			nil,
-			nil,
-		))
-	}
-	return exports, nil
-}
-
-func hasExportedPackageVariable(storage []packageStorage) bool {
-	for _, item := range storage {
-		if item.variable.Exported() {
-			return true
-		}
-	}
-	return false
 }

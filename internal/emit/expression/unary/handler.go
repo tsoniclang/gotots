@@ -6,8 +6,9 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
+	constantvalue "github.com/tsoniclang/gotots/internal/emit/constant"
+	definedunary "github.com/tsoniclang/gotots/internal/emit/expression/unary/defined"
+	unaryoperation "github.com/tsoniclang/gotots/internal/emit/expression/unary/operation"
 )
 
 func Emit(
@@ -18,57 +19,30 @@ func Emit(
 	if source.Op == token.AND {
 		return children.Address(context, source)
 	}
-	if source.Op == token.SUB && context.TypesInfo().Types[source].Value != nil {
-		return children.IntegerConstant(context, source)
+	if target, handled, err := constantvalue.EmitFolded(
+		context,
+		source,
+	); handled {
+		return target, err
 	}
-	if result, ok, err := emitInteger(context, children, source); ok || err != nil {
-		return result, err
-	}
-	resultType, resultIsBasic := boolType(context.TypesInfo().TypeOf(source))
-	operandType, operandIsBasic := boolType(context.TypesInfo().TypeOf(source.X))
-	if source.Op != token.NOT ||
-		!resultIsBasic ||
-		resultType.Kind() != types.Bool ||
-		!operandIsBasic ||
-		operandType.Kind() != types.Bool {
+	if unaryConstantEvidenceIsIncomplete(context, source) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	operand, err := children.Expression(
-		context.
-			WithRole(api.RoleUnaryOperand).
-			WithExpectedType(types.Typ[types.Bool]),
-		source.X,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
+	if target, handled, err := definedunary.Emit(
+		context,
+		children,
+		source,
+	); handled {
+		return target, err
 	}
-	return api.NewExpressionEmission(
-		operand.Before(),
-		context.Factory().PrefixUnaryExpression(
-			tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
-			operand.Value(),
-		),
-		operand.Requests(),
-	)
-}
-
-func emitInteger(
-	context api.Context,
-	children api.ChildEmitter,
-	source *ast.UnaryExpr,
-) (api.ExpressionEmission, bool, error) {
 	resultType := context.TypesInfo().TypeOf(source)
 	operandType := context.TypesInfo().TypeOf(source.X)
-	carrier, ok := integervalue.Describe(context.TypesSizes(), resultType)
-	if !ok ||
-		!types.AssignableTo(operandType, resultType) ||
-		!integervalue.SupportsUnary(
-			context.IntegerRepresentation(),
-			carrier,
-			source.Op,
-		) {
-		return api.ExpressionEmission{}, false, nil
+	if resultType == nil ||
+		operandType == nil ||
+		!types.AssignableTo(operandType, resultType) {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	operand, err := children.Expression(
 		context.
@@ -77,88 +51,37 @@ func emitInteger(
 		source.X,
 	)
 	if err != nil {
-		return api.ExpressionEmission{}, true, err
+		return api.ExpressionEmission{}, err
 	}
-	target := operand.Value()
-	switch source.Op {
-	case token.ADD:
-		if context.IntegerRepresentation() == api.IntegerRepresentationNumber {
-			target = context.Factory().PrefixUnaryExpression(
-				tsgo.PrefixUnaryExpressionOperatorKindPlusToken,
-				target,
-			)
-		}
-	case token.SUB:
-		target = context.Factory().PrefixUnaryExpression(
-			tsgo.PrefixUnaryExpressionOperatorKindMinusToken,
-			target,
-		)
-	case token.XOR:
-		target = context.Factory().PrefixUnaryExpression(
-			tsgo.PrefixUnaryExpressionOperatorKindTildeToken,
-			target,
-		)
-		switch {
-		case integervalue.RequiresUint32Normalization(
-			context.IntegerRepresentation(),
-			carrier,
-		):
-			zero, literalErr := api.IntegerLiteral(
-				context.Factory(),
-				api.IntegerRepresentationNumber,
-				"0",
-			)
-			if literalErr != nil {
-				return api.ExpressionEmission{}, true, literalErr
-			}
-			target = context.Factory().BinaryExpression(
-				nil,
-				target,
-				nil,
-				context.Factory().BinaryOperatorToken(
-					tsgo.BinaryOperatorGreaterThanGreaterThanGreaterThanToken,
-				),
-				zero,
-			)
-		case !carrier.Signed():
-			mask, ok := integervalue.UnsignedMask(carrier)
-			if !ok {
-				return api.ExpressionEmission{}, true,
-					api.Unsupported(context, api.CategoryExpression, source)
-			}
-			maskLiteral, literalErr := api.IntegerLiteral(
-				context.Factory(),
-				context.IntegerRepresentation(),
-				mask,
-			)
-			if literalErr != nil {
-				return api.ExpressionEmission{}, true, literalErr
-			}
-			target = context.Factory().BinaryExpression(
-				nil,
-				target,
-				nil,
-				context.Factory().BinaryOperatorToken(
-					tsgo.BinaryOperatorAmpersandToken,
-				),
-				maskLiteral,
-			)
-		}
-	default:
-		return api.ExpressionEmission{}, false, nil
-	}
-	result, err := api.NewExpressionEmission(
-		operand.Before(),
-		target,
-		operand.Requests(),
+	target, handled, err := unaryoperation.Apply(
+		context,
+		source.Op,
+		resultType,
+		operand,
 	)
-	return result, true, err
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if !handled {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	return target, nil
 }
 
-func boolType(sourceType types.Type) (*types.Basic, bool) {
-	if sourceType == nil {
-		return nil, false
+func unaryConstantEvidenceIsIncomplete(
+	context api.Context,
+	source *ast.UnaryExpr,
+) bool {
+	switch source.Op {
+	case token.ADD, token.SUB, token.XOR, token.NOT:
+	default:
+		return false
 	}
-	basic, ok := types.Unalias(sourceType).(*types.Basic)
-	return basic, ok
+	result, resultExists := context.TypesInfo().Types[source]
+	operand, operandExists := context.TypesInfo().Types[source.X]
+	return resultExists &&
+		result.Value == nil &&
+		operandExists &&
+		operand.Value != nil
 }

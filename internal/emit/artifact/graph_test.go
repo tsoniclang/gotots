@@ -50,7 +50,7 @@ func TestArtifactGraphSuppressesUnchangedAndIsolatesFacets(t *testing.T) {
 	if graph.HasPending() {
 		t.Fatal("equal contract dirtied a consumer")
 	}
-	if len(graph.records[provider].history) != 1 {
+	if len(graph.records[artifactTestOwner(provider)].history) != 1 {
 		t.Fatal("equal contract added convergence history")
 	}
 
@@ -59,20 +59,23 @@ func TestArtifactGraphSuppressesUnchangedAndIsolatesFacets(t *testing.T) {
 		api.ArtifactFacetStaticSurface:     []byte("static-b"),
 	})
 	dirty, ok := graph.NextDirty()
-	if !ok || dirty != staticConsumer {
+	if !ok || dirty != artifactTestOwner(staticConsumer) {
 		t.Fatalf("dirty = %v, %t; want static consumer", dirty, ok)
 	}
 	if graph.HasPending() {
 		t.Fatal("static change dirtied an unrelated callable consumer")
 	}
-	if len(graph.records[provider].history) != 2 {
+	if len(graph.records[artifactTestOwner(provider)].history) != 2 {
 		t.Fatal("changed contract did not add exactly one history entry")
 	}
 	if graph.FacetRevision(
-		provider,
+		artifactTestOwner(provider),
 		api.ArtifactFacetCallableSignature,
 	) != 1 ||
-		graph.FacetRevision(provider, api.ArtifactFacetStaticSurface) != 2 {
+		graph.FacetRevision(
+			artifactTestOwner(provider),
+			api.ArtifactFacetStaticSurface,
+		) != 2 {
 		t.Fatal("facet revisions did not isolate the changed contract")
 	}
 }
@@ -101,7 +104,7 @@ func TestArtifactGraphNeverRoutesByProviderSpelling(t *testing.T) {
 	}
 	commitArtifactTestRevision(t, graph, first, artifactCallable("first-b"))
 	dirty, ok := graph.NextDirty()
-	if !ok || dirty != consumer {
+	if !ok || dirty != artifactTestOwner(consumer) {
 		t.Fatalf("exact-provider dirty = %v, %t", dirty, ok)
 	}
 }
@@ -149,7 +152,7 @@ func TestArtifactGraphPropagatesTransitivelyInStableOrder(t *testing.T) {
 
 	commitArtifactTestRevision(t, graph, leaf, artifactCallable("leaf-b"))
 	dirty, ok := graph.NextDirty()
-	if !ok || dirty != middle {
+	if !ok || dirty != artifactTestOwner(middle) {
 		t.Fatalf("first dirty = %v, %t; want middle", dirty, ok)
 	}
 	commitArtifactTestRevision(
@@ -163,7 +166,7 @@ func TestArtifactGraphPropagatesTransitivelyInStableOrder(t *testing.T) {
 			api.ArtifactFacetCallableSignature,
 		),
 	)
-	var order []types.Object
+	var order []api.ArtifactOwner
 	for {
 		dirty, ok := graph.NextDirty()
 		if !ok {
@@ -171,7 +174,10 @@ func TestArtifactGraphPropagatesTransitivelyInStableOrder(t *testing.T) {
 		}
 		order = append(order, dirty)
 	}
-	if !reflect.DeepEqual(order, []types.Object{firstRoot, secondRoot}) {
+	if !reflect.DeepEqual(order, []api.ArtifactOwner{
+		artifactTestOwner(firstRoot),
+		artifactTestOwner(secondRoot),
+	}) {
 		t.Fatalf("dirty order = %v", artifactTestNames(order))
 	}
 }
@@ -226,7 +232,7 @@ func TestArtifactGraphRebuildsConsumerWithoutOutgoingFacets(t *testing.T) {
 
 	commitArtifactTestRevision(t, graph, provider, artifactCallable("b"))
 	dirty, ok := graph.NextDirty()
-	if !ok || dirty != bodyOnlyConsumer {
+	if !ok || dirty != artifactTestOwner(bodyOnlyConsumer) {
 		t.Fatalf("body-only dirty = %v, %t; want consumer", dirty, ok)
 	}
 	commitArtifactTestRevision(
@@ -280,7 +286,11 @@ func TestArtifactGraphRejectsAbsentContract(t *testing.T) {
 	graph := NewGraph(compareArtifactTestObjects)
 	owner := artifactTestObject("Owner", 10)
 	var graphError *GraphError
-	if err := graph.Commit(owner, nil, nil); !errors.As(err, &graphError) {
+	if err := graph.Commit(
+		artifactTestOwner(owner),
+		nil,
+		nil,
+	); !errors.As(err, &graphError) {
 		t.Fatalf("absent-contract error = %#v", err)
 	}
 }
@@ -302,8 +312,8 @@ func TestArtifactGraphClosureRejectsMissingProvidersAndFacets(t *testing.T) {
 	)
 	var graphError *GraphError
 	if err := graph.VerifyClosure(); !errors.As(err, &graphError) ||
-		graphError.Object != consumer ||
-		graphError.Provider != provider ||
+		graphError.Object != artifactTestOwner(consumer) ||
+		graphError.Provider != artifactTestOwner(provider) ||
 		graphError.Facet != api.ArtifactFacetCallableSignature {
 		t.Fatalf("missing-provider error = %#v", err)
 	}
@@ -363,8 +373,8 @@ func TestArtifactGraphClosureDiagnosticsUseStableObjectOrder(t *testing.T) {
 
 	var graphError *GraphError
 	if err := graph.VerifyClosure(); !errors.As(err, &graphError) ||
-		graphError.Object != firstConsumer ||
-		graphError.Provider != firstProvider {
+		graphError.Object != artifactTestOwner(firstConsumer) ||
+		graphError.Provider != artifactTestOwner(firstProvider) {
 		t.Fatalf("closure error = %#v, want first consumer/provider", err)
 	}
 }
@@ -397,7 +407,7 @@ func TestArtifactGraphConvergesCyclesAndRejectsOscillation(t *testing.T) {
 	)
 	commitArtifactTestRevision(t, graph, first, artifactCallable("first-b"))
 	dirty, ok := graph.NextDirty()
-	if !ok || dirty != second {
+	if !ok || dirty != artifactTestOwner(second) {
 		t.Fatalf("cycle dirty = %v, %t; want second", dirty, ok)
 	}
 	commitArtifactTestRevision(
@@ -415,10 +425,14 @@ func TestArtifactGraphConvergesCyclesAndRejectsOscillation(t *testing.T) {
 		t.Fatal("stable cycle did not converge")
 	}
 
-	err := graph.Commit(first, artifactCallable("first-a"), nil)
+	err := graph.Commit(
+		artifactTestOwner(first),
+		artifactCallable("first-a"),
+		nil,
+	)
 	var convergenceError *ArtifactConvergenceError
 	if !errors.As(err, &convergenceError) ||
-		convergenceError.Object != first ||
+		convergenceError.Object != artifactTestOwner(first) ||
 		len(convergenceError.Facets) != 1 ||
 		convergenceError.Facets[0] != api.ArtifactFacetCallableSignature {
 		t.Fatalf("oscillation error = %#v", err)
@@ -433,7 +447,11 @@ func commitArtifactTestRevision(
 	dependencies ...api.ArtifactDependency,
 ) {
 	t.Helper()
-	if err := graph.Commit(owner, contract, dependencies); err != nil {
+	if err := graph.Commit(
+		artifactTestOwner(owner),
+		contract,
+		dependencies,
+	); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -450,7 +468,10 @@ func artifactTestDependency(
 	facet api.ArtifactFacet,
 ) api.ArtifactDependency {
 	t.Helper()
-	dependency, err := api.NewArtifactDependency(provider, facet)
+	dependency, err := api.NewArtifactDependency(
+		artifactTestOwner(provider),
+		facet,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -466,7 +487,23 @@ func artifactTestObject(name string, position token.Pos) types.Object {
 	)
 }
 
-func compareArtifactTestObjects(left types.Object, right types.Object) int {
+func artifactTestOwner(object types.Object) api.ArtifactOwner {
+	return api.MustSourceArtifactOwner(object)
+}
+
+func compareArtifactTestObjects(
+	left api.ArtifactOwner,
+	right api.ArtifactOwner,
+) int {
+	leftObject, leftOK := left.Source()
+	rightObject, rightOK := right.Source()
+	if !leftOK || !rightOK {
+		panic("artifact graph test owner is not source-backed")
+	}
+	return compareArtifactTestSourceObjects(leftObject, rightObject)
+}
+
+func compareArtifactTestSourceObjects(left types.Object, right types.Object) int {
 	leftPackage := ""
 	if left.Pkg() != nil {
 		leftPackage = left.Pkg().Path()
@@ -493,10 +530,10 @@ func compareArtifactTestObjects(left types.Object, right types.Object) int {
 	}
 }
 
-func artifactTestNames(objects []types.Object) []string {
+func artifactTestNames(objects []api.ArtifactOwner) []string {
 	names := make([]string, len(objects))
-	for index, object := range objects {
-		names[index] = object.Name()
+	for index, owner := range objects {
+		names[index] = owner.Name()
 	}
 	return names
 }

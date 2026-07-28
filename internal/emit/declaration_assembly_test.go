@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -40,7 +41,7 @@ func TestReachedUsesReconstructAndSealDeclarationAssemblies(t *testing.T) {
 	}
 	boxDeclaration := declarationForObject(t, session, box)
 	if len(boxDeclaration.statements) != 1 ||
-		len(session.requirements.appliedFor(box)) != 0 ||
+		len(session.requirements.appliedFor(sourceArtifactOwner(box))) != 0 ||
 		boxDeclaration.reconstructions != 0 {
 		t.Fatalf("initial Box assembly = %#v", boxDeclaration)
 	}
@@ -61,11 +62,11 @@ func TestReachedUsesReconstructAndSealDeclarationAssemblies(t *testing.T) {
 		"Item": {declaration: itemDeclaration, reconstructions: 1},
 	} {
 		declaration := expected.declaration
-		if len(session.requirements.appliedFor(declaration.object)) != 3 {
+		if len(session.requirements.appliedFor(declaration.owner)) != 3 {
 			t.Fatalf(
 				"%s requirements = %d, want zero/copy/equal",
 				name,
-				len(session.requirements.appliedFor(declaration.object)),
+				len(session.requirements.appliedFor(declaration.owner)),
 			)
 		}
 		if declaration.reconstructions != expected.reconstructions {
@@ -114,7 +115,7 @@ func TestReachedUsesReconstructAndSealDeclarationAssemblies(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = session.applyRootRequests(
-		newPlacementOwner(),
+		targetplacement.New(),
 		[]api.RootRequest{importRequest},
 	)
 	if !errors.As(err, &scheduleError) {
@@ -156,13 +157,13 @@ func TestObservableChangesReconstructOnlySubscribedDeclarations(t *testing.T) {
 		}
 	}
 	if session.artifacts.FacetRevision(
-		box,
+		sourceArtifactOwner(box),
 		api.ArtifactFacetStaticSurface,
 	) != 2 {
 		t.Fatal("Box static surface did not publish its late operations")
 	}
 	if session.artifacts.FacetRevision(
-		trigger,
+		sourceArtifactOwner(trigger),
 		api.ArtifactFacetCallableSignature,
 	) != 1 {
 		t.Fatal("Trigger body reconstruction changed its callable signature")
@@ -354,7 +355,9 @@ func measureDeclarationAssembly(
 		Lookup("Record").(*types.TypeName)
 	declaration := declarationForObject(t, session, record)
 	measurement := declarationAssemblyMeasurement{
-		requirements:    len(session.requirements.appliedFor(record)),
+		requirements: len(session.requirements.appliedFor(
+			sourceArtifactOwner(record),
+		)),
 		reconstructions: declaration.reconstructions,
 		definitionRoots: len(declaration.statements),
 	}
@@ -502,7 +505,7 @@ func drainProgramSession(t *testing.T, session *programSession) {
 			continue
 		}
 		if object, ok := session.artifacts.NextDirty(); ok {
-			if err := session.reconstructArtifact(object); err != nil {
+			if err := session.reconstructScheduledArtifact(object); err != nil {
 				t.Fatal(err)
 			}
 			continue
@@ -528,7 +531,7 @@ func declarationForObject(
 	if err != nil {
 		t.Fatal(err)
 	}
-	index, ok := builder.indexByObject[object]
+	index, ok := builder.indexByOwner[sourceArtifactOwner(object)]
 	if !ok {
 		t.Fatalf("declaration %s is absent", object.Name())
 	}

@@ -9,6 +9,7 @@ import (
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
@@ -38,6 +39,19 @@ func Emit(
 			return array.EmitStoreTarget(context, children, source)
 		}
 		return sliceIndex(context, children, source)
+	case *ast.ParenExpr:
+		target, err := children.StoreTarget(context, source.X)
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
+		if !types.Identical(
+			context.TypesInfo().TypeOf(source),
+			target.SourceType(),
+		) {
+			return api.StoreTargetEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		return target, nil
 	case *ast.SelectorExpr:
 		return field(context, children, source)
 	case *ast.StarExpr:
@@ -59,6 +73,12 @@ func dereference(
 	}
 	pointerType := context.TypesInfo().TypeOf(source.X)
 	_, element, ok := pointertype.Resolve(pointerType)
+	defined, definedOK := definedtype.ResolvePointer(pointerType)
+	if definedOK {
+		pointer, _ := defined.Pointer()
+		element = pointer.Elem()
+		ok = true
+	}
 	if !ok || !types.Identical(context.TypesInfo().TypeOf(source), element) {
 		return api.StoreTargetEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
@@ -71,6 +91,12 @@ func dereference(
 	)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
+	}
+	if definedOK {
+		pointer, err = defined.Project(context, pointer)
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
 	}
 	targetElement, err := children.RepresentedType(
 		context.WithRole(api.RoleAssignmentTarget),
@@ -111,10 +137,13 @@ func sliceIndex(
 	source *ast.IndexExpr,
 ) (api.StoreTargetEmission, error) {
 	receiverType := context.TypesInfo().TypeOf(source.X)
-	_, elementType, ok := slicevalue.Scalar(
-		context.TypesSizes(),
-		receiverType,
-	)
+	_, elementType, ok := slicevalue.Resolve(receiverType)
+	defined, definedOK := definedtype.ResolveSlice(receiverType)
+	if definedOK {
+		sliceType, _ := defined.Slice()
+		elementType = sliceType.Elem()
+		ok = true
+	}
 	indexType := context.TypesInfo().TypeOf(source.Index)
 	if !ok ||
 		!types.Identical(context.TypesInfo().TypeOf(source), elementType) ||
@@ -131,6 +160,12 @@ func sliceIndex(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
+	if definedOK {
+		receiver, err = defined.Project(context, receiver)
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
+	}
 	index, err := children.Expression(
 		context.
 			WithRole(api.RoleSliceIndex).
@@ -140,8 +175,9 @@ func sliceIndex(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	return api.NewSetterStoreTargetEmission(
+	return api.NewAccessorStoreTargetEmission(
 		receiver,
+		runtimeslice.MemberName(runtimeslice.MemberGet),
 		runtimeslice.MemberName(runtimeslice.MemberSet),
 		[]api.ExpressionEmission{index},
 		elementType,
@@ -158,7 +194,7 @@ func mapIndex(
 		context.TypesInfo().TypeOf(source.X),
 	)
 	if !ok ||
-		!types.Identical(context.TypesInfo().TypeOf(source), mapType.Elem()) ||
+		!types.Identical(context.TypesInfo().TypeOf(source), mapType.Element()) ||
 		!types.AssignableTo(
 			context.TypesInfo().TypeOf(source.Index),
 			mapType.Key(),
@@ -169,9 +205,13 @@ func mapIndex(
 	receiver, err := children.Expression(
 		context.
 			WithRole(api.RoleMapReceiver).
-			WithExpectedType(mapType),
+			WithExpectedType(mapType.Type()),
 		source.X,
 	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
+	receiver, err = mapType.StoreReceiver(context, source.X, receiver)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
@@ -184,15 +224,29 @@ func mapIndex(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
+	key, err = maprepresentation.ProjectKey(
+		context.WithRole(api.RoleMapKey),
+		source.Index,
+		mapType.Key(),
+		key,
+	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
 	member, err := mapruntime.Name(mapruntime.MemberStore)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	return api.NewSetterStoreTargetEmission(
+	getter, err := mapruntime.Name(mapruntime.MemberLookup)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
+	return api.NewCopyingAccessorStoreTargetEmission(
 		receiver,
+		getter,
 		member,
 		[]api.ExpressionEmission{key},
-		mapType.Elem(),
+		mapType.Element(),
 	)
 }
 
@@ -248,6 +302,12 @@ func field(
 	if selection.Indirect() {
 		receiverType := context.TypesInfo().TypeOf(source.X)
 		_, element, ok := pointertype.Resolve(receiverType)
+		defined, definedOK := definedtype.ResolvePointer(receiverType)
+		if definedOK {
+			pointer, _ := defined.Pointer()
+			element = pointer.Elem()
+			ok = true
+		}
 		if !ok {
 			return api.StoreTargetEmission{},
 				api.Unsupported(context, api.CategoryExpression, source)
@@ -260,6 +320,12 @@ func field(
 		)
 		if err != nil {
 			return api.StoreTargetEmission{}, err
+		}
+		if definedOK {
+			receiver, err = defined.Project(context, receiver)
+			if err != nil {
+				return api.StoreTargetEmission{}, err
+			}
 		}
 		targetElement, err := children.RepresentedType(
 			context.WithRole(api.RoleAssignmentTarget),
@@ -298,8 +364,15 @@ func field(
 			),
 		)
 	}
-	receiver, err := children.StoreTarget(
-		context.WithRole(api.RoleAssignmentTarget),
+	receiverType := context.TypesInfo().TypeOf(source.X)
+	if receiverType == nil {
+		return api.StoreTargetEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	receiver, err := children.Expression(
+		context.
+			WithRole(api.RoleAssignmentTarget).
+			WithExpectedType(receiverType),
 		source.X,
 	)
 	if err != nil {

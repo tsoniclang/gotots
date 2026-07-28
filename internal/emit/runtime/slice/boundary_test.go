@@ -20,32 +20,6 @@ func TestScalarSliceNeighborsFailAtTypedOwners(t *testing.T) {
 		construct string
 	}{
 		{
-			name: "named slice",
-			source: `package boundary
-type Values []int32
-func F(values Values) int { return len(values) }
-`,
-			category:  api.CategoryType,
-			construct: "*ast.FuncType",
-		},
-		{
-			name: "slice element is slice",
-			source: `package boundary
-func F(values [][]int32) int { return len(values) }
-`,
-			category:  api.CategoryType,
-			construct: "*ast.FuncType",
-		},
-		{
-			name: "slice element is struct",
-			source: `package boundary
-type Item struct { Value int32 }
-func F(values []Item) int { return len(values) }
-`,
-			category:  api.CategoryType,
-			construct: "*ast.FuncType",
-		},
-		{
 			name: "append spread",
 			source: `package boundary
 func F(left, right []int32) []int32 { return append(left, right...) }
@@ -101,6 +75,15 @@ func F(values []int32) { values[0] += 1 }
 				)
 			}
 		})
+	}
+}
+
+func TestNestedSliceTypeUsesRecursiveDescriptor(t *testing.T) {
+	err := compileBoundary(t, `package boundary
+func F(values [][]int32) int { return len(values) }
+`)
+	if err != nil {
+		t.Fatalf("nested slice type was rejected: %v", err)
 	}
 }
 

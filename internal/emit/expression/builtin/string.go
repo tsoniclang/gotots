@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -16,9 +17,6 @@ func emitStringLength(
 	discarded bool,
 ) (api.ExpressionEmission, error) {
 	if len(source.Args) != 1 ||
-		!basictype.SupportsString(
-			context.TypesInfo().TypeOf(source.Args[0]),
-		) ||
 		discarded ||
 		context.ExpectedResults() != nil ||
 		!basictype.SupportsInteger(
@@ -28,19 +26,39 @@ func emitStringLength(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	argumentType := context.TypesInfo().TypeOf(source.Args[0])
+	if !supportsStringArgument(argumentType) {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
 	if expected := context.ExpectedType(); expected != nil &&
 		!types.AssignableTo(context.TypesInfo().TypeOf(source), expected) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	expectedType := types.Type(types.Typ[types.String])
+	defined, definedArgument := definedtype.ResolveBasic(argumentType)
+	if definedArgument {
+		expectedType = defined.Type()
+	}
 	value, err := children.Expression(
 		context.
 			WithRole(api.RoleCallArgument).
-			WithExpectedType(types.Typ[types.String]),
+			WithExpectedType(expectedType),
 		source.Args[0],
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	if definedArgument {
+		value, err = api.NewExpressionEmission(
+			value.Before(),
+			defined.Unwrap(context.Factory(), value.Value()),
+			value.Requests(),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	}
 	length := tsgo.Expression(context.Factory().PropertyAccessExpression(
 		value.Value(),
@@ -62,4 +80,12 @@ func emitStringLength(
 		length,
 		value.Requests(),
 	)
+}
+
+func supportsStringArgument(sourceType types.Type) bool {
+	if basictype.SupportsString(sourceType) {
+		return true
+	}
+	defined, ok := definedtype.ResolveBasic(sourceType)
+	return ok && basictype.SupportsString(defined.Underlying())
 }

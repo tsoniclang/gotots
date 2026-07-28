@@ -76,3 +76,32 @@ func TestBuildRejectsSymbolsOwnedByOtherRuntimeModules(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildCreatesTypedStableIntegerMaxAndMin(t *testing.T) {
+	statements, err := Build(
+		tsgo.NewFactory(),
+		[]api.RuntimeSymbol{
+			api.RuntimeIntegerMax,
+			api.RuntimeIntegerMin,
+		},
+		"GoPanic",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index, operator := range []tsgo.SyntaxKind{
+		tsgo.SyntaxKindGreaterThanEqualsToken,
+		tsgo.SyntaxKindLessThanEqualsToken,
+	} {
+		function := statements[index].(tsgo.FunctionDeclaration)
+		body := function.Body().(tsgo.Block).Statements()
+		selected := body[0].(tsgo.ReturnStatement).
+			Expression().(tsgo.ConditionalExpression)
+		condition := selected.Condition().(tsgo.BinaryExpression)
+		if condition.OperatorToken().Kind() != operator ||
+			selected.WhenTrue().(tsgo.Identifier).Text() != "left" ||
+			selected.WhenFalse().(tsgo.Identifier).Text() != "right" {
+			t.Fatalf("ordered integer helper %d is not stable", index)
+		}
+	}
+}

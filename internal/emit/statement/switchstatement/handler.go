@@ -5,7 +5,8 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	constantvalue "github.com/tsoniclang/gotots/internal/emit/constant"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -33,9 +34,12 @@ func Emit(
 	expressionless := source.Tag == nil
 	tagType := types.Type(types.Typ[types.Bool])
 	tag := api.DirectExpression(context.Factory().TrueLiteral())
+	var tagModel definedtype.Model
+	wrappedTag := false
 	if !expressionless {
 		tagType = context.TypesInfo().TypeOf(source.Tag)
-		if !basictype.SupportsInteger(context.TypesSizes(), tagType) {
+		tagModel, wrappedTag = directSwitchModel(tagType)
+		if !directSwitchType(tagType, tagModel, wrappedTag) {
 			return api.StatementEmission{},
 				api.Unsupported(
 					context.WithRole(api.RoleSwitchTag),
@@ -51,6 +55,16 @@ func Emit(
 		)
 		if err != nil {
 			return api.StatementEmission{}, err
+		}
+		if wrappedTag {
+			tag, err = api.NewExpressionEmission(
+				tag.Before(),
+				tagModel.Unwrap(context.Factory(), tag.Value()),
+				tag.Requests(),
+			)
+			if err != nil {
+				return api.StatementEmission{}, err
+			}
 		}
 	}
 
@@ -73,6 +87,8 @@ func Emit(
 			clause,
 			tagType,
 			expressionless,
+			tagModel,
+			wrappedTag,
 		)
 		if err != nil {
 			return api.StatementEmission{}, err
@@ -115,6 +131,8 @@ func emitClause(
 	source *ast.CaseClause,
 	tagType types.Type,
 	expressionless bool,
+	tagModel definedtype.Model,
+	wrappedTag bool,
 ) ([]tsgo.CaseOrDefaultClause, []api.RootRequest, bool, error) {
 	if len(source.List) == 0 {
 		body, requests, err := emitClauseBody(context, children, source.Body)
@@ -147,13 +165,31 @@ func emitClause(
 			WithExpectedType(tagType)
 		var target api.ExpressionEmission
 		var err error
-		if expressionless {
+		facts, hasFacts := context.TypesInfo().Types[caseExpression]
+		if wrappedTag && hasFacts && facts.Value != nil {
+			target, err = constantvalue.EmitValue(
+				caseContext,
+				caseExpression,
+				tagModel.Underlying(),
+				facts.Value,
+			)
+		} else if expressionless {
 			target, err = children.Condition(caseContext, caseExpression)
 		} else {
 			target, err = children.Expression(caseContext, caseExpression)
 		}
 		if err != nil {
 			return nil, nil, false, err
+		}
+		if wrappedTag && (!hasFacts || facts.Value == nil) {
+			target, err = api.NewExpressionEmission(
+				target.Before(),
+				tagModel.Unwrap(context.Factory(), target.Value()),
+				target.Requests(),
+			)
+			if err != nil {
+				return nil, nil, false, err
+			}
 		}
 		if len(target.Before()) != 0 {
 			return nil, nil, false,
@@ -186,6 +222,31 @@ func emitClause(
 		)
 	}
 	return targets, requests, false, nil
+}
+
+func directSwitchModel(
+	sourceType types.Type,
+) (definedtype.Model, bool) {
+	model, ok := definedtype.ResolveBasic(sourceType)
+	return model, ok
+}
+
+func directSwitchType(
+	sourceType types.Type,
+	model definedtype.Model,
+	wrapped bool,
+) bool {
+	if wrapped {
+		sourceType = model.Underlying()
+	}
+	basic, ok := types.Unalias(sourceType).(*types.Basic)
+	if !ok {
+		return false
+	}
+	return basic.Info()&(types.IsBoolean|
+		types.IsInteger|
+		types.IsFloat|
+		types.IsString) != 0
 }
 
 func emitClauseBody(

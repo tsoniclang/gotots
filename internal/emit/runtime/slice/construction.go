@@ -2,7 +2,7 @@ package slice
 
 import "github.com/tsoniclang/gotots/internal/target/tsgo"
 
-func (b builder) constructor() tsgo.ConstructorDeclaration {
+func (b builder) constructor(lazyZero bool) tsgo.ConstructorDeclaration {
 	privateReadonly := []tsgo.ModifierLike{
 		b.factory.PrivateKeyword(),
 		b.factory.ReadonlyKeyword(),
@@ -10,6 +10,10 @@ func (b builder) constructor() tsgo.ConstructorDeclaration {
 	publicReadonly := []tsgo.ModifierLike{
 		b.factory.PublicKeyword(),
 		b.factory.ReadonlyKeyword(),
+	}
+	zeroType := tsgo.TypeNode(b.typeT())
+	if lazyZero {
+		zeroType = b.valueFactoryType()
 	}
 	return b.factory.ConstructorDeclaration(
 		[]tsgo.ModifierLike{b.factory.PrivateKeyword()},
@@ -52,7 +56,7 @@ func (b builder) constructor() tsgo.ConstructorDeclaration {
 				nil,
 				b.id("zero"),
 				nil,
-				b.typeT(),
+				zeroType,
 				nil,
 			),
 		},
@@ -61,7 +65,7 @@ func (b builder) constructor() tsgo.ConstructorDeclaration {
 	)
 }
 
-func (b builder) nilMethod() tsgo.MethodDeclaration {
+func (b builder) nilMethod(lazyZero bool) tsgo.MethodDeclaration {
 	return b.method(
 		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
 		MemberName(MemberNil),
@@ -74,13 +78,19 @@ func (b builder) nilMethod() tsgo.MethodDeclaration {
 				b.number("0"),
 				b.number("0"),
 				b.number("0"),
-				b.id("zero"),
+				b.zeroStorage(lazyZero, b.id("zero")),
 			),
 		),
 	)
 }
 
-func (b builder) makeMethod() tsgo.MethodDeclaration {
+func (b builder) makeMethod(
+	sharedShape bool,
+	lazyZero bool,
+) tsgo.MethodDeclaration {
+	if sharedShape {
+		return b.makeMethodWithShape(lazyZero)
+	}
 	invalidLength := b.binary(
 		b.id("numericLength"),
 		tsgo.BinaryOperatorLessThanToken,
@@ -150,13 +160,13 @@ func (b builder) makeMethod() tsgo.MethodDeclaration {
 				b.number("0"),
 				b.id("numericLength"),
 				b.id("resolvedCapacity"),
-				b.id("zero"),
+				b.zeroStorage(lazyZero, b.id("zero")),
 			),
 		),
 	)
 }
 
-func (b builder) literalMethod() tsgo.MethodDeclaration {
+func (b builder) literalMethod(lazyZero bool) tsgo.MethodDeclaration {
 	values := b.factory.ParameterDeclaration(
 		nil,
 		b.factory.DotDotDotToken(),
@@ -181,8 +191,28 @@ func (b builder) literalMethod() tsgo.MethodDeclaration {
 				b.number("0"),
 				length,
 				length,
-				b.id("zero"),
+				b.zeroStorage(lazyZero, b.id("zero")),
 			),
+		),
+	)
+}
+
+func (b builder) zeroStorage(
+	lazyZero bool,
+	value tsgo.Expression,
+) tsgo.Expression {
+	if !lazyZero {
+		return value
+	}
+	return b.factory.ArrowFunction(
+		nil,
+		nil,
+		nil,
+		nil,
+		b.factory.EqualsGreaterThanToken(),
+		b.factory.Block(
+			[]tsgo.Statement{b.returnStatement(value)},
+			true,
 		),
 	)
 }

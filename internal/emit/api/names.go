@@ -15,6 +15,7 @@ const (
 	TemporaryAssignmentValue
 	TemporaryMultipleResults
 	TemporaryCompositeField
+	TemporaryStructSource
 	TemporaryReceiverValue
 	TemporaryCallArgument
 	TemporaryCallCallee
@@ -25,6 +26,12 @@ const (
 	TemporaryStoreOperand
 	TemporaryMapOperand
 	TemporaryAddressOperand
+	TemporaryConversionOperand
+	TemporaryArrayComparison
+	TemporaryEqualityOperand
+	TemporaryBinaryOperand
+	TemporaryLogicalResult
+	TemporaryArrayHash
 )
 
 type NameReference struct {
@@ -103,6 +110,15 @@ type Names interface {
 	TypeReference(types.Object) (NameReference, error)
 	PackageVariable(*types.Var) (PackageVariableReference, error)
 	NamedStructOperation(*types.TypeName, NamedStructOperation) (NameReference, error)
+	AnonymousStruct(
+		*types.Struct,
+		AnonymousStructDemand,
+	) (NameReference, error)
+	MapSpecialization(
+		types.Type,
+		MapSpecializationDemand,
+	) (NameReference, error)
+	ConstantProjection(*types.Const, types.BasicKind) (NameReference, error)
 	Member(*types.Var) (string, error)
 	Primitive(PrimitiveAlias) (NameReference, error)
 	Runtime(RuntimeSymbol, ImportPhase) (NameReference, error)
@@ -118,6 +134,8 @@ func TemporaryPrefix(kind TemporaryKind) (string, error) {
 		return "__gotots_results_", nil
 	case TemporaryCompositeField:
 		return "__gotots_field_", nil
+	case TemporaryStructSource:
+		return "__gotots_struct_", nil
 	case TemporaryReceiverValue:
 		return "__gotots_receiver_", nil
 	case TemporaryCallArgument:
@@ -138,6 +156,18 @@ func TemporaryPrefix(kind TemporaryKind) (string, error) {
 		return "__gotots_map_", nil
 	case TemporaryAddressOperand:
 		return "__gotots_address_", nil
+	case TemporaryConversionOperand:
+		return "__gotots_conversion_", nil
+	case TemporaryArrayComparison:
+		return "__gotots_array_equal_", nil
+	case TemporaryEqualityOperand:
+		return "__gotots_equal_operand_", nil
+	case TemporaryBinaryOperand:
+		return "__gotots_binary_operand_", nil
+	case TemporaryLogicalResult:
+		return "__gotots_logical_result_", nil
+	case TemporaryArrayHash:
+		return "__gotots_array_hash_", nil
 	default:
 		return "", &NameError{
 			Reason: fmt.Sprintf("temporary kind %d is invalid", kind),

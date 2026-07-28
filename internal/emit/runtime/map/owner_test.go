@@ -31,6 +31,48 @@ func TestBuildCreatesOneTypedGenericMapClass(t *testing.T) {
 	}
 }
 
+func TestBuildCreatesOneStaticHashPrimitiveOwner(t *testing.T) {
+	statement, err := Build(
+		tsgo.NewFactory(),
+		api.RuntimeMapHash,
+		panicClassName(t),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	class, ok := statement.(tsgo.ClassDeclaration)
+	if !ok {
+		t.Fatalf("definition = %T, want ClassDeclaration", statement)
+	}
+	contract, err := api.RuntimeContract(api.RuntimeMapHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if class.Name().Text() != contract.ExportedName() ||
+		len(class.Members()) != 5 {
+		t.Fatalf(
+			"hash owner = %q with %d members",
+			class.Name().Text(),
+			len(class.Members()),
+		)
+	}
+	for _, member := range class.Members() {
+		method, ok := member.(tsgo.MethodDeclaration)
+		if !ok {
+			t.Fatalf("hash owner member = %T, want static method", member)
+		}
+		static := false
+		for _, modifier := range method.Modifiers() {
+			if modifier.Kind() == tsgo.SyntaxKindStaticKeyword {
+				static = true
+			}
+		}
+		if !static {
+			t.Fatalf("hash owner method %v is not static", method.Name())
+		}
+	}
+}
+
 func TestRuntimeMapMutationGuardsOwnMissingAndNilWriteSemantics(t *testing.T) {
 	statement, err := Build(
 		tsgo.NewFactory(),

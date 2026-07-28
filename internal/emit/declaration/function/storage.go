@@ -21,6 +21,9 @@ func applyAddressableStorage(
 	}
 	storageNames := make(map[*types.Var]string, len(requirements))
 	for _, requirement := range requirements {
+		if requirement.Kind() != api.DeclarationRequirementAddressableStorage {
+			continue
+		}
 		requirementOwner, variable, ok := requirement.AddressableStorage()
 		if !ok ||
 			requirementOwner != owner ||

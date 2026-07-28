@@ -5,55 +5,161 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	constantvalue "github.com/tsoniclang/gotots/internal/emit/constant"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
-
-func Source(
-	context api.Context,
-	sourceType types.Type,
-) (*types.Map, bool) {
-	mapType, ok := types.Unalias(sourceType).(*types.Map)
-	if !ok {
-		return nil, false
-	}
-	if _, keyOK := basictype.PrimitiveAlias(
-		context.TypesSizes(),
-		mapType.Key(),
-	); !keyOK || !types.Comparable(mapType.Key()) {
-		return nil, false
-	}
-	if _, valueOK := basictype.PrimitiveAlias(
-		context.TypesSizes(),
-		mapType.Elem(),
-	); !valueOK {
-		return nil, false
-	}
-	return mapType, true
-}
 
 func EmitType(
 	context api.Context,
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
-	reference, typeArguments, err := Reference(
-		context,
-		source,
-		sourceType,
-		api.ImportPhaseType,
-	)
-	if err != nil {
-		return api.TypeEmission{}, err
+	model, ok := Source(context, sourceType)
+	if !ok {
+		return api.TypeEmission{},
+			api.Unsupported(context, api.CategoryType, source)
 	}
-	return api.DirectType(
-		context.Factory().TypeReferenceNode(
-			context.Factory().Identifier(reference.Name()),
-			typeArguments,
-		),
-		reference.Requests()...,
-	), nil
+	if model.Nominal() {
+		reference, err := context.Names().TypeReference(model.TypeName())
+		if err != nil {
+			return api.TypeEmission{}, err
+		}
+		return api.DirectType(
+			context.Factory().UnionTypeNode([]tsgo.TypeNode{
+				context.Factory().TypeReferenceNode(
+					context.Factory().Identifier(reference.Name()),
+					nil,
+				),
+				context.Factory().KeywordTypeNode(
+					tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
+				),
+			}),
+			reference.Requests()...,
+		), nil
+	}
+	if model.Storage() == StorageScalar {
+		reference, typeArguments, err := Reference(
+			context,
+			source,
+			sourceType,
+			api.ImportPhaseType,
+		)
+		if err != nil {
+			return api.TypeEmission{}, err
+		}
+		return api.DirectType(
+			context.Factory().TypeReferenceNode(
+				context.Factory().Identifier(reference.Name()),
+				typeArguments,
+			),
+			reference.Requests()...,
+		), nil
+	}
+	if model.Storage() == StorageSpecialized {
+		reference, err := context.Names().MapSpecialization(
+			sourceType,
+			api.MapSpecializationDemandDefinition,
+		)
+		if err != nil {
+			return api.TypeEmission{}, err
+		}
+		return api.DirectType(
+			context.Factory().TypeReferenceNode(
+				context.Factory().Identifier(reference.Name()),
+				nil,
+			),
+			reference.Requests()...,
+		), nil
+	}
+	return api.TypeEmission{},
+		api.Unsupported(context, api.CategoryType, source)
+}
+
+func Nil(
+	context api.Context,
+	source ast.Node,
+	sourceType types.Type,
+) (api.ExpressionEmission, error) {
+	model, ok := Source(context, sourceType)
+	if !ok {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if model.Nominal() {
+		return api.DirectExpression(
+			context.Factory().VoidExpression(
+				context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
+			),
+		), nil
+	}
+	if model.Storage() == StorageScalar {
+		zero, err := context.Values().Zero(
+			context.WithRole(api.RoleMapValue),
+			source,
+			model.Element(),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if len(zero.Before()) != 0 {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		reference, typeArguments, err := Reference(
+			context,
+			source,
+			sourceType,
+			api.ImportPhaseValue,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		nilName, err := mapruntime.Name(mapruntime.MemberNil)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.DirectExpression(
+			context.Factory().CallExpression(
+				staticMember(context, reference.Name(), nilName),
+				nil,
+				typeArguments,
+				[]tsgo.Expression{zero.Value()},
+				tsgo.NodeFlagsNone,
+			),
+			api.CombineRequests(
+				reference.Requests(),
+				zero.Requests(),
+			)...,
+		), nil
+	}
+	if model.Storage() == StorageSpecialized {
+		reference, err := context.Names().MapSpecialization(
+			sourceType,
+			api.MapSpecializationDemandStatic,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		nilName, err := mapruntime.Name(mapruntime.MemberNil)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.DirectExpression(
+			context.Factory().CallExpression(
+				staticMember(context, reference.Name(), nilName),
+				nil,
+				nil,
+				nil,
+				tsgo.NodeFlagsNone,
+			),
+			reference.Requests()...,
+		), nil
+	}
+	return api.ExpressionEmission{},
+		api.Unsupported(context, api.CategoryExpression, source)
 }
 
 func Reference(
@@ -62,16 +168,22 @@ func Reference(
 	sourceType types.Type,
 	phase api.ImportPhase,
 ) (api.NameReference, []tsgo.TypeNode, error) {
-	mapType, ok := Source(context, sourceType)
-	if !ok {
+	model, ok := Source(context, sourceType)
+	if !ok || model.Storage() != StorageScalar {
 		return api.NameReference{}, nil,
 			api.Unsupported(context, api.CategoryType, source)
 	}
-	key, keyRequests, err := scalarType(context, source, mapType.Key())
+	mapType := model.Map()
+	keyBasic, _ := directKey(context, model.Key())
+	key, keyRequests, err := primitiveType(context, source, keyBasic)
 	if err != nil {
 		return api.NameReference{}, nil, err
 	}
-	value, valueRequests, err := scalarType(context, source, mapType.Elem())
+	value, valueRequests, err := representedType(
+		context,
+		source,
+		mapType.Elem(),
+	)
 	if err != nil {
 		return api.NameReference{}, nil, err
 	}
@@ -99,7 +211,42 @@ func Make(
 	size tsgo.Expression,
 	entries []tsgo.Expression,
 	requests ...[]api.RootRequest,
-) (tsgo.Expression, []api.RootRequest, error) {
+) (api.ExpressionEmission, error) {
+	model, ok := Source(context, sourceType)
+	if !ok {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if model.Storage() == StorageSpecialized {
+		reference, err := context.Names().MapSpecialization(
+			sourceType,
+			api.MapSpecializationDemandStatic,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		makeName, err := mapruntime.Name(mapruntime.MemberMake)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		allRequests := append(
+			[][]api.RootRequest{reference.Requests()},
+			requests...,
+		)
+		return model.Wrap(context, api.DirectExpression(
+			context.Factory().CallExpression(
+				staticMember(context, reference.Name(), makeName),
+				nil,
+				nil,
+				[]tsgo.Expression{
+					size,
+					context.Factory().ArrayLiteralExpression(entries, false),
+				},
+				tsgo.NodeFlagsNone,
+			),
+			api.CombineRequests(allRequests...)...,
+		))
+	}
 	reference, typeArguments, err := Reference(
 		context,
 		source,
@@ -107,40 +254,130 @@ func Make(
 		api.ImportPhaseValue,
 	)
 	if err != nil {
-		return nil, nil, err
+		return api.ExpressionEmission{}, err
 	}
 	makeName, err := mapruntime.Name(mapruntime.MemberMake)
 	if err != nil {
-		return nil, nil, err
+		return api.ExpressionEmission{}, err
 	}
 	allRequests := append(
 		[][]api.RootRequest{reference.Requests()},
 		requests...,
 	)
-	return context.Factory().CallExpression(
-		context.Factory().PropertyAccessExpression(
-			context.Factory().Identifier(reference.Name()),
+	return model.Wrap(context, api.DirectExpression(
+		context.Factory().CallExpression(
+			context.Factory().PropertyAccessExpression(
+				context.Factory().Identifier(reference.Name()),
+				nil,
+				context.Factory().Identifier(makeName),
+				tsgo.NodeFlagsNone,
+			),
 			nil,
-			context.Factory().Identifier(makeName),
+			typeArguments,
+			[]tsgo.Expression{
+				zero,
+				size,
+				context.Factory().ArrayLiteralExpression(entries, false),
+			},
 			tsgo.NodeFlagsNone,
 		),
-		nil,
-		typeArguments,
-		[]tsgo.Expression{
-			zero,
-			size,
-			context.Factory().ArrayLiteralExpression(entries, false),
-		},
-		tsgo.NodeFlagsNone,
-	), api.CombineRequests(allRequests...), nil
+		api.CombineRequests(allRequests...)...,
+	))
 }
 
-func scalarType(
+func ProjectKey(
+	context api.Context,
+	source ast.Node,
+	sourceType types.Type,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	if model, ok := definedtype.ResolveBasic(sourceType); ok {
+		if expression, ok := source.(ast.Expr); ok {
+			facts, found := context.TypesInfo().Types[expression]
+			if found && facts.Value != nil {
+				return constantvalue.EmitValue(
+					context,
+					expression,
+					model.Underlying(),
+					facts.Value,
+				)
+			}
+		}
+		return api.NewExpressionEmission(
+			value.Before(),
+			model.Unwrap(context.Factory(), value.Value()),
+			value.Requests(),
+		)
+	}
+	if context.Values().SupportsHash(context, sourceType) {
+		return value, nil
+	}
+	if _, ok := directKey(context, sourceType); !ok {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	return value, nil
+}
+
+func directKey(
+	context api.Context,
+	sourceType types.Type,
+) (*types.Basic, bool) {
+	var basic *types.Basic
+	if model, ok := definedtype.ResolveBasic(sourceType); ok {
+		basic, _ = model.Basic()
+	} else {
+		basic, _ = types.Unalias(sourceType).(*types.Basic)
+	}
+	if basic == nil ||
+		basic.Info()&types.IsUntyped != 0 ||
+		basic.Info()&(types.IsBoolean|types.IsInteger|types.IsString) == 0 {
+		return nil, false
+	}
+	_, represented := basictype.PrimitiveAlias(context.TypesSizes(), basic)
+	return basic, represented
+}
+
+func representedBasic(
+	context api.Context,
+	sourceType types.Type,
+) bool {
+	if _, ok := definedtype.ResolveBasic(sourceType); ok {
+		return true
+	}
+	_, ok := basictype.PrimitiveAlias(context.TypesSizes(), sourceType)
+	return ok
+}
+
+func representedType(
 	context api.Context,
 	source ast.Node,
 	sourceType types.Type,
 ) (tsgo.TypeNode, []api.RootRequest, error) {
-	alias, ok := basictype.PrimitiveAlias(context.TypesSizes(), sourceType)
+	if model, ok := definedtype.ResolveBasic(sourceType); ok {
+		reference, err := context.Names().TypeReference(model.TypeName())
+		if err != nil {
+			return nil, nil, err
+		}
+		return context.Factory().TypeReferenceNode(
+			context.Factory().Identifier(reference.Name()),
+			nil,
+		), reference.Requests(), nil
+	}
+	basic, ok := types.Unalias(sourceType).(*types.Basic)
+	if !ok {
+		return nil, nil,
+			api.Unsupported(context, api.CategoryType, source)
+	}
+	return primitiveType(context, source, basic)
+}
+
+func primitiveType(
+	context api.Context,
+	source ast.Node,
+	basic *types.Basic,
+) (tsgo.TypeNode, []api.RootRequest, error) {
+	alias, ok := basictype.PrimitiveAlias(context.TypesSizes(), basic)
 	if !ok {
 		return nil, nil,
 			api.Unsupported(context, api.CategoryType, source)

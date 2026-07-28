@@ -6,6 +6,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -38,13 +39,39 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	if len(left.Before()) != 0 || len(right.Before()) != 0 {
-		return api.ExpressionEmission{}, true,
-			api.Unsupported(context, api.CategoryExpression, source)
+	operands, err := expressionoperands.PreservePair(
+		context,
+		left,
+		right,
+		api.TemporaryBinaryOperand,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
 	}
+	target, handled, err := Apply(
+		context,
+		source.Op,
+		carrier,
+		operands.Left(),
+		operands.Right(),
+	)
+	if err != nil || !handled {
+		return target, handled, err
+	}
+	target, err = expressionoperands.Finish(operands, target)
+	return target, true, err
+}
+
+func Apply(
+	context api.Context,
+	operator token.Token,
+	carrier integervalue.Carrier,
+	left api.ExpressionEmission,
+	right api.ExpressionEmission,
+) (api.ExpressionEmission, bool, error) {
 	if symbol, ok := runtimeOperation(
 		context.IntegerRepresentation(),
-		source.Op,
+		operator,
 	); ok {
 		reference, err := context.Names().Runtime(
 			symbol,
@@ -70,7 +97,7 @@ func Emit(
 	}
 	target, ok := target(
 		context,
-		source.Op,
+		operator,
 		carrier,
 		left.Value(),
 		right.Value(),

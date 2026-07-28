@@ -9,6 +9,8 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
+	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
+	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -40,7 +42,7 @@ type programSession struct {
 	source                 *load.Program
 	factory                tsgo.Factory
 	integer                api.IntegerRepresentation
-	registry               *declarationRegistry
+	registry               *emitnaming.Registry
 	scheduler              *scheduler
 	requirements           *declarationRequirementScheduler
 	artifacts              *artifactstate.Graph
@@ -53,11 +55,12 @@ type programSession struct {
 }
 
 type targetDeclaration struct {
-	object          types.Object
+	owner           api.ArtifactOwner
+	name            string
 	position        token.Pos
 	statements      []tsgo.Statement
-	placement       *placementOwner
-	temporaryStart  temporarySnapshot
+	placement       *targetplacement.Owner
+	temporaryStart  emitnaming.TemporarySnapshot
 	reconstructions uint64
 }
 
@@ -67,10 +70,10 @@ type targetFileBuilder struct {
 	outputPath    string
 	emitter       *emitter
 	context       api.Context
-	placement     *placementOwner
+	placement     *targetplacement.Owner
 	declarations  []targetDeclaration
-	byObject      map[types.Object]struct{}
-	indexByObject map[types.Object]int
+	byOwner       map[api.ArtifactOwner]struct{}
+	indexByOwner  map[api.ArtifactOwner]int
 }
 
 func Compile(source *load.Program, roots []Root) (ProgramEmission, error) {
@@ -98,20 +101,17 @@ func CompileWithOptions(
 		return ProgramEmission{}, err
 	}
 	for _, root := range roots {
-		if root.object == nil {
+		if !root.valid() {
 			return ProgramEmission{},
 				&ScheduleError{Reason: "emission root is invalid"}
 		}
 	}
 	orderedRoots := slices.Clone(roots)
 	sort.Slice(orderedRoots, func(left, right int) bool {
-		return compareObjects(
-			orderedRoots[left].object,
-			orderedRoots[right].object,
-		) < 0
+		return compareRoots(orderedRoots[left], orderedRoots[right]) < 0
 	})
 	for _, root := range orderedRoots {
-		if err := session.require(root.object); err != nil {
+		if err := session.requireRoot(root); err != nil {
 			return ProgramEmission{}, err
 		}
 	}
@@ -129,7 +129,7 @@ func CompileWithOptions(
 			continue
 		}
 		if object, ok := session.artifacts.NextDirty(); ok {
-			if err := session.reconstructArtifact(object); err != nil {
+			if err := session.reconstructScheduledArtifact(object); err != nil {
 				return ProgramEmission{}, err
 			}
 			continue
@@ -144,6 +144,9 @@ func CompileWithOptions(
 	}
 	files, err := session.targetFiles()
 	if err != nil {
+		return ProgramEmission{}, err
+	}
+	if err := session.verifyRootObligations(orderedRoots, files); err != nil {
 		return ProgramEmission{}, err
 	}
 	return ProgramEmission{files: files}, nil
@@ -185,7 +188,7 @@ func fileRoots(
 					Reason: "function declaration has no object identity",
 				}
 			}
-			root, err := NewRoot(object)
+			root, err := newRoot(object, RootFileCoverage)
 			if err != nil {
 				return nil, err
 			}
@@ -196,10 +199,10 @@ func fileRoots(
 				case *ast.ValueSpec:
 					for _, name := range spec.Names {
 						object := sourcePackage.TypesInfo().Defs[name]
-						if object == nil {
+						if object == nil || object.Name() == "_" {
 							continue
 						}
-						root, err := NewRoot(object)
+						root, err := newRoot(object, RootFileCoverage)
 						if err != nil {
 							return nil, err
 						}
@@ -210,7 +213,7 @@ func fileRoots(
 					if object == nil {
 						continue
 					}
-					root, err := NewRoot(object)
+					root, err := newRoot(object, RootFileCoverage)
 					if err != nil {
 						return nil, err
 					}
@@ -249,6 +252,69 @@ func compareObjects(left types.Object, right types.Object) int {
 	}
 }
 
+func compareArtifactOwners(
+	left api.ArtifactOwner,
+	right api.ArtifactOwner,
+) int {
+	leftSource, leftIsSource := left.Source()
+	rightSource, rightIsSource := right.Source()
+	switch {
+	case leftIsSource && rightIsSource:
+		return compareObjects(leftSource, rightSource)
+	case leftIsSource:
+		return -1
+	case rightIsSource:
+		return 1
+	}
+	leftPackage, leftInitializer, leftIsInitializer :=
+		left.PackageInitializer()
+	rightPackage, rightInitializer, rightIsInitializer :=
+		right.PackageInitializer()
+	switch {
+	case leftIsInitializer && rightIsInitializer:
+		switch {
+		case leftPackage.Path() < rightPackage.Path():
+			return -1
+		case leftPackage.Path() > rightPackage.Path():
+			return 1
+		case leftInitializer.Rhs.Pos() < rightInitializer.Rhs.Pos():
+			return -1
+		case leftInitializer.Rhs.Pos() > rightInitializer.Rhs.Pos():
+			return 1
+		default:
+			return 0
+		}
+	case leftIsInitializer:
+		return -1
+	case rightIsInitializer:
+		return 1
+	}
+	leftGenerated, leftOK := left.Generated()
+	rightGenerated, rightOK := right.Generated()
+	if !leftOK || !rightOK {
+		switch {
+		case leftOK:
+			return 1
+		case rightOK:
+			return -1
+		default:
+			return 0
+		}
+	}
+	switch {
+	case leftGenerated.Kind() < rightGenerated.Kind():
+		return -1
+	case leftGenerated.Kind() > rightGenerated.Kind():
+		return 1
+	case leftGenerated.ArtifactKey() < rightGenerated.ArtifactKey():
+		return -1
+	case leftGenerated.ArtifactKey() > rightGenerated.ArtifactKey():
+		return 1
+	default:
+		return 0
+	}
+}
+
 func (e ProgramEmission) Files() []TargetFile {
 	return slices.Clone(e.files)
 }
@@ -277,8 +343,8 @@ func newProgramSession(
 	if err != nil {
 		return nil, err
 	}
-	registry := newDeclarationRegistry()
-	if err := registry.indexPackageTargets(source.Packages()); err != nil {
+	registry := emitnaming.NewRegistry()
+	if err := registry.IndexPackageTargets(source.Packages()); err != nil {
 		return nil, err
 	}
 	session := &programSession{
@@ -288,7 +354,7 @@ func newProgramSession(
 		registry:               registry,
 		scheduler:              newScheduler(),
 		requirements:           newDeclarationRequirementScheduler(),
-		artifacts:              artifactstate.NewGraph(compareObjects),
+		artifacts:              artifactstate.NewGraph(compareArtifactOwners),
 		sites:                  sites,
 		emitters:               make(map[*load.Package]*emitter),
 		builders:               make(map[string]*targetFileBuilder),
@@ -330,7 +396,7 @@ func newProgramSession(
 				Reason: "package initializer has no emitter",
 			}
 		}
-		if err := emitter.names.preallocatePackageInitializers(objects); err != nil {
+		if err := emitter.names.PreallocatePackageInitializers(objects); err != nil {
 			return nil, err
 		}
 	}
@@ -343,6 +409,9 @@ func newProgramSession(
 			}
 		}
 		if variable, ok := site.object.(*types.Var); ok {
+			if variable.Name() == "_" {
+				continue
+			}
 			assemblyPath, err := targetoutput.PackageAssemblyPath(site.source)
 			if err != nil {
 				return nil, err
@@ -416,7 +485,8 @@ func (s *programSession) emit(object types.Object) error {
 	if err != nil {
 		return err
 	}
-	if _, duplicate := builder.byObject[object]; duplicate {
+	owner := api.MustSourceArtifactOwner(object)
+	if _, duplicate := builder.byOwner[owner]; duplicate {
 		return &ScheduleError{
 			Object: object.Name(),
 			Reason: "object was emitted more than once",
@@ -433,16 +503,17 @@ func (s *programSession) emit(object types.Object) error {
 		return err
 	}
 	if err := s.artifacts.Commit(
-		object,
+		owner,
 		revision.contract,
 		revision.dependencies,
 	); err != nil {
 		return err
 	}
-	builder.byObject[object] = struct{}{}
-	builder.indexByObject[object] = len(builder.declarations)
+	builder.byOwner[owner] = struct{}{}
+	builder.indexByOwner[owner] = len(builder.declarations)
 	builder.declarations = append(builder.declarations, targetDeclaration{
-		object:         object,
+		owner:          owner,
+		name:           object.Name(),
 		position:       object.Pos(),
 		statements:     revision.statements,
 		placement:      revision.placement,
@@ -452,7 +523,7 @@ func (s *programSession) emit(object types.Object) error {
 }
 
 func (s *programSession) applyRootRequests(
-	placement *placementOwner,
+	placement *targetplacement.Owner,
 	requests []api.RootRequest,
 ) error {
 	if s.sealed {
@@ -517,9 +588,9 @@ func (s *programSession) builderForFile(
 		outputPath:    outputPath,
 		emitter:       emitter,
 		context:       context,
-		placement:     newPlacementOwner(),
-		byObject:      make(map[types.Object]struct{}),
-		indexByObject: make(map[types.Object]int),
+		placement:     targetplacement.New(),
+		byOwner:       make(map[api.ArtifactOwner]struct{}),
+		indexByOwner:  make(map[api.ArtifactOwner]int),
 	}
 	s.builders[outputPath] = builder
 	return builder, nil

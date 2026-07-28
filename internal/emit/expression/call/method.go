@@ -78,6 +78,7 @@ func emitMethod(
 		children,
 		source,
 		signature,
+		false,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err

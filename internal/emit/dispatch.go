@@ -7,6 +7,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	definedtypedeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/definedtype"
 	functiondeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/function"
 	namedstructdeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/namedstruct"
 	packageconstant "github.com/tsoniclang/gotots/internal/emit/declaration/packageconstant"
@@ -18,12 +19,15 @@ import (
 	functionliteral "github.com/tsoniclang/gotots/internal/emit/expression/functionliteral"
 	identifierexpression "github.com/tsoniclang/gotots/internal/emit/expression/identifier"
 	indexexpression "github.com/tsoniclang/gotots/internal/emit/expression/index"
+	complexliteral "github.com/tsoniclang/gotots/internal/emit/expression/literal/complex"
+	floatliteral "github.com/tsoniclang/gotots/internal/emit/expression/literal/float"
 	integerliteral "github.com/tsoniclang/gotots/internal/emit/expression/literal/integer"
 	stringliteral "github.com/tsoniclang/gotots/internal/emit/expression/literal/string"
 	parenthesizedexpression "github.com/tsoniclang/gotots/internal/emit/expression/parenthesized"
 	selectorexpression "github.com/tsoniclang/gotots/internal/emit/expression/selector"
 	sliceexpression "github.com/tsoniclang/gotots/internal/emit/expression/slice"
 	unaryexpression "github.com/tsoniclang/gotots/internal/emit/expression/unary"
+	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	"github.com/tsoniclang/gotots/internal/emit/statement/assignment"
 	blockstatement "github.com/tsoniclang/gotots/internal/emit/statement/block"
 	branchstatement "github.com/tsoniclang/gotots/internal/emit/statement/branch"
@@ -33,11 +37,14 @@ import (
 	incdecstatement "github.com/tsoniclang/gotots/internal/emit/statement/incdec"
 	localconstant "github.com/tsoniclang/gotots/internal/emit/statement/localconstant"
 	localdeclaration "github.com/tsoniclang/gotots/internal/emit/statement/localdeclaration"
+	localtype "github.com/tsoniclang/gotots/internal/emit/statement/localtype"
 	returnstatement "github.com/tsoniclang/gotots/internal/emit/statement/returnstatement"
 	switchstatement "github.com/tsoniclang/gotots/internal/emit/statement/switchstatement"
 	"github.com/tsoniclang/gotots/internal/emit/storage"
 	storetarget "github.com/tsoniclang/gotots/internal/emit/store"
+	anonymousstructtype "github.com/tsoniclang/gotots/internal/emit/type/anonymousstruct"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	maptype "github.com/tsoniclang/gotots/internal/emit/type/map"
 	namedstructtype "github.com/tsoniclang/gotots/internal/emit/type/namedstruct"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
@@ -52,7 +59,7 @@ import (
 type emitter struct {
 	source  *load.Package
 	factory tsgo.Factory
-	names   *nameOwner
+	names   *emitnaming.Owner
 	values  api.Values
 	integer api.IntegerRepresentation
 	order   api.EvaluationOrder
@@ -62,7 +69,7 @@ type emitter struct {
 func newEmitter(
 	source *load.Package,
 	factory tsgo.Factory,
-	registry *declarationRegistry,
+	registry *emitnaming.Registry,
 	integer api.IntegerRepresentation,
 	order api.EvaluationOrder,
 	require func(types.Object) error,
@@ -76,7 +83,7 @@ func newEmitter(
 	return &emitter{
 		source:  source,
 		factory: factory,
-		names:   newNameOwnerWithRegistry(packageScope, typesInfo, registry),
+		names:   emitnaming.NewOwner(packageScope, typesInfo, registry),
 		values:  representation.Owner{},
 		integer: integer,
 		order:   order,
@@ -102,6 +109,28 @@ func (e *emitter) targetContext(
 		targetPath,
 		e.require,
 	)
+	return e.context(names)
+}
+
+func (e *emitter) generatedContext(
+	targetPath string,
+	registry *emitnaming.Registry,
+) (api.Context, error) {
+	names := emitnaming.NewOwner(
+		nil,
+		nil,
+		registry,
+	).ForFile(
+		nil,
+		nil,
+		e.factory,
+		targetPath,
+		e.require,
+	)
+	return e.context(names)
+}
+
+func (e *emitter) context(names api.Names) (api.Context, error) {
 	return api.NewContext(
 		api.RoleFileDeclaration,
 		e.source.FileSet(),
@@ -141,6 +170,15 @@ func (e *emitter) declarationObject(
 		)
 	case *ast.GenDecl:
 		if typeName, ok := object.(*types.TypeName); ok {
+			if target, handled, err := definedtypedeclaration.Emit(
+				context,
+				e,
+				source,
+				typeName,
+				requirements,
+			); handled {
+				return target, err
+			}
 			return namedstructdeclaration.EmitAssembly(
 				context,
 				e,
@@ -149,18 +187,23 @@ func (e *emitter) declarationObject(
 				requirements,
 			)
 		}
+		if constant, ok := object.(*types.Const); ok {
+			return packageconstant.EmitObject(
+				context,
+				e,
+				source,
+				constant,
+				requirements,
+			)
+		}
 		if len(requirements) != 0 {
 			return api.DeclarationEmission{}, &api.InvariantError{
 				Role:   context.Role(),
-				Reason: "non-type declaration received target requirements",
+				Reason: "non-type non-constant declaration received target requirements",
 			}
 		}
-		constant, ok := object.(*types.Const)
-		if !ok {
-			return api.DeclarationEmission{},
-				api.Unsupported(context, api.CategoryDeclaration, source)
-		}
-		return packageconstant.EmitObject(context, e, source, constant)
+		return api.DeclarationEmission{},
+			api.Unsupported(context, api.CategoryDeclaration, source)
 	default:
 		return api.DeclarationEmission{},
 			api.Unsupported(context, api.CategoryDeclaration, source)
@@ -195,6 +238,12 @@ func (e *emitter) Expression(
 	case *ast.BasicLit:
 		if source.Kind == token.STRING {
 			return stringliteral.Emit(context, e, source)
+		}
+		if source.Kind == token.IMAG {
+			return complexliteral.Emit(context, e, source)
+		}
+		if source.Kind == token.FLOAT {
+			return floatliteral.Emit(context, e, source)
 		}
 		return e.IntegerConstant(context, source)
 	case *ast.UnaryExpr:
@@ -276,6 +325,8 @@ func (e *emitter) Statement(
 			return localdeclaration.Emit(context, e, source)
 		case token.CONST:
 			return localconstant.Emit(context, e, source)
+		case token.TYPE:
+			return localtype.Emit(context, e, source)
 		default:
 			return api.StatementEmission{},
 				api.Unsupported(context, api.CategoryStatement, source)
@@ -397,6 +448,16 @@ func (e *emitter) Type(
 				sourceType,
 			)
 		}
+		if _, ok := types.Unalias(sourceType).(*types.Named); ok {
+			if target, handled, err := definedtype.Emit(
+				context,
+				source,
+				sourceType,
+			); handled {
+				return target, err
+			}
+			return namedstructtype.Emit(context, source, sourceType)
+		}
 		if signature, ok := types.Unalias(sourceType).(*types.Signature); ok {
 			functionType, valid := source.(*ast.FuncType)
 			if !valid {
@@ -404,9 +465,6 @@ func (e *emitter) Type(
 					api.Unsupported(context, api.CategoryType, source)
 			}
 			return callable.EmitSyntaxType(context, e, functionType, signature)
-		}
-		if _, ok := types.Unalias(sourceType).(*types.Named); ok {
-			return namedstructtype.Emit(context, source, sourceType)
 		}
 		if _, ok := types.Unalias(sourceType).(*types.Map); ok {
 			return maptype.Emit(context, source, sourceType)
@@ -424,6 +482,19 @@ func (e *emitter) Type(
 				sliceType,
 			)
 		}
+		if _, ok := anonymousstructtype.Resolve(sourceType); ok {
+			structType, valid := source.(*ast.StructType)
+			if !valid {
+				return api.TypeEmission{},
+					api.Unsupported(context, api.CategoryType, source)
+			}
+			return anonymousstructtype.Emit(
+				context,
+				e,
+				structType,
+				sourceType,
+			)
+		}
 	}
 	return basictype.Emit(context, source)
 }
@@ -439,20 +510,30 @@ func (e *emitter) RepresentedType(
 	if tuple, ok := types.Unalias(sourceType).(*types.Tuple); ok {
 		return tupletype.Emit(context, e, source, tuple)
 	}
-	if signature, ok := types.Unalias(sourceType).(*types.Signature); ok {
-		return callable.EmitType(context, e, source, signature)
-	}
 	if _, _, ok := pointertype.Resolve(sourceType); ok {
 		return pointertype.EmitRepresented(context, e, source, sourceType)
 	}
 	if _, ok := types.Unalias(sourceType).(*types.Named); ok {
+		if target, handled, err := definedtype.Emit(
+			context,
+			source,
+			sourceType,
+		); handled {
+			return target, err
+		}
 		return namedstructtype.Emit(context, source, sourceType)
+	}
+	if signature, ok := types.Unalias(sourceType).(*types.Signature); ok {
+		return callable.EmitType(context, e, source, signature)
 	}
 	if _, ok := types.Unalias(sourceType).(*types.Map); ok {
 		return maptype.Emit(context, source, sourceType)
 	}
 	if _, ok := types.Unalias(sourceType).(*types.Slice); ok {
 		return slicetype.EmitRepresented(context, e, source, sourceType)
+	}
+	if _, ok := anonymousstructtype.Resolve(sourceType); ok {
+		return anonymousstructtype.Emit(context, e, source, sourceType)
 	}
 	return basictype.EmitRepresented(context, source, sourceType)
 }

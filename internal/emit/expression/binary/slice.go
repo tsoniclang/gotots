@@ -7,6 +7,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -35,12 +36,11 @@ func emitSliceNilEquality(
 		return api.ExpressionEmission{}, false, nil
 	}
 	valueType := context.TypesInfo().TypeOf(valueSource)
-	if _, _, represented := slicevalue.Scalar(
-		context.TypesSizes(),
-		valueType,
-	); !represented {
-		return api.ExpressionEmission{}, true,
-			api.Unsupported(context, api.CategoryExpression, source)
+	if _, _, represented := slicevalue.Resolve(valueType); !represented {
+		if _, defined := definedtype.ResolveSlice(valueType); !defined {
+			return api.ExpressionEmission{}, true,
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
 	}
 	if context.ExpectedType() == nil ||
 		!types.AssignableTo(types.Typ[types.Bool], context.ExpectedType()) {
@@ -59,6 +59,12 @@ func emitSliceNilEquality(
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
+	}
+	if defined, ok := definedtype.ResolveSlice(valueType); ok {
+		value, err = defined.Project(context, value)
+		if err != nil {
+			return api.ExpressionEmission{}, true, err
+		}
 	}
 	target := tsgo.Expression(context.Factory().CallExpression(
 		context.Factory().PropertyAccessExpression(
@@ -97,8 +103,11 @@ func sliceAndNil(
 	if !ok || info.Uses[identifier] != types.Universe.Lookup("nil") {
 		return nil, nil, false
 	}
-	if _, ok := types.Unalias(info.TypeOf(value)).(*types.Slice); !ok {
-		return nil, nil, false
+	valueType := info.TypeOf(value)
+	if _, ok := types.Unalias(valueType).(*types.Slice); !ok {
+		if _, defined := definedtype.ResolveSlice(valueType); !defined {
+			return nil, nil, false
+		}
 	}
 	return value, identifier, true
 }

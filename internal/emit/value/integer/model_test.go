@@ -184,7 +184,7 @@ func TestIntegerCapabilityMatrixRejectsUnprovedNeighbors(t *testing.T) {
 	}
 }
 
-func TestCanConvertOnlyWhenEverySourceValueFitsTarget(t *testing.T) {
+func TestCanConvertDirectlyOnlyWhenEverySourceValueFitsTarget(t *testing.T) {
 	sizes := types.SizesFor("gc", "amd64")
 	carrier := func(kind types.BasicKind) Carrier {
 		result, ok := Describe(sizes, types.Typ[kind])
@@ -205,7 +205,10 @@ func TestCanConvertOnlyWhenEverySourceValueFitsTarget(t *testing.T) {
 		{types.Int8, types.Uint64, false},
 		{types.Uint64, types.Int64, false},
 	} {
-		if got := CanConvert(carrier(testCase.source), carrier(testCase.target)); got != testCase.want {
+		if got := CanConvertDirectly(
+			carrier(testCase.source),
+			carrier(testCase.target),
+		); got != testCase.want {
 			t.Fatalf("convert %v -> %v = %v, want %v", testCase.source, testCase.target, got, testCase.want)
 		}
 	}

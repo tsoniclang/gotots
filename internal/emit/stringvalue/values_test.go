@@ -110,6 +110,7 @@ func TestStringFamilyPrintsTypechecksAndExecutesDifferentially(t *testing.T) {
     Equal,
     Greater,
     GreaterEqual,
+    IndexCall,
     InvalidBytes,
     Length,
     Less,
@@ -166,6 +167,9 @@ console.log(bytes(Suffix(UTF8(), 1)));
 const [suffixCallValue, suffixCallCount] = SuffixCall(1);
 console.log(bytes(suffixCallValue));
 console.log(suffixCallCount.toString());
+const [indexCallValue, indexCallCount] = IndexCall(1);
+console.log(indexCallValue.toString());
+console.log(indexCallCount.toString());
 console.log(panics(() => ByteAt("a", -1)));
 console.log(panics(() => ByteAt("a", 1)));
 console.log(panics(() => ByteAt("a", 9007199254740992)));
@@ -490,6 +494,9 @@ func main() {
 	suffixCallValue, suffixCallCount := values.SuffixCall(1)
 	fmt.Printf("%x\n", suffixCallValue)
 	fmt.Println(suffixCallCount)
+	indexCallValue, indexCallCount := values.IndexCall(1)
+	fmt.Println(indexCallValue)
+	fmt.Println(indexCallCount)
 	fmt.Println(panics(func() { values.ByteAt("a", -1) }))
 	fmt.Println(panics(func() { values.ByteAt("a", 1) }))
 	fmt.Println(panics(func() { values.ByteAt("a", 9007199254740992) }))

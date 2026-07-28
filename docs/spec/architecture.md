@@ -47,6 +47,7 @@ general-purpose intermediate program.
 | external target node kinds, fields, encoding, protocol version | pinned TS-Go schema/protocol under `schema/tsgo` |
 | typed target protocol values and factories | generated `internal/target/tsgo` |
 | target lexical placement and deduplication | scoped builders in `internal/emit` |
+| canonical generated-type identity | one generated-artifact registry in `internal/emit/naming`, indexed and named by a full canonical Go-type digest that never includes generated target spelling, then exact-joined by `types.Identical` |
 | mutable package storage and package-local initialization bodies | package-state and passive package-assembly builders in `internal/emit`, driven by the selected `go/types.Info.InitOrder` |
 | whole-program package initialization order | one static program-initialization builder consuming the selected `types.Package` import graph |
 | target decoding and formatting | pinned `tsgo --api` `printNode` |
@@ -231,6 +232,17 @@ enqueues its authoritative Go object for emission. The scheduler stores only
 `pending` and `emitted` Go identities and direct links to their target
 declarations; it does not copy call edges into a source graph.
 
+Root intent is a closed typed part of the request and is not discarded after
+object selection. Whole-file coverage, exported Go API, ordinary declaration
+demand, and explicit constant-representation demand are distinct. This matters
+when a source declaration has no single runtime form: an unused exported
+untyped constant is a compile-time-only Go contract and therefore has no target
+declaration, while an explicit constant-representation root names and
+materializes exactly one concrete projection. A generic representation request
+for an untyped constant is invalid. Only a typed compile-time-only disposition
+may publish an explicit empty observable contract; an empty concrete
+representation root is a gate failure.
+
 Reaching any source-available package also reaches that package's complete
 initialization obligation. This includes every package variable, including an
 unexported or otherwise unreferenced variable whose initializer has effects,
@@ -300,10 +312,11 @@ semantic handler and generated source-file module containing that declaration,
 not by the first caller. The first admitted requirement family is a named
 struct's static zero/copy/equality operation, keyed by its exact
 `types.TypeName` and closed operation kind. The operation is incorporated into
-the owning class and is called through the statically selected Go type
-(`Box.$copy(value)`), never through an instance. Applying one requirement may
-produce further typed requests, such as `Box` copying requesting
-`Point.$copy`.
+the owning class and callers use the statically selected Go type
+(`Box.$copy(value)`), never an instance. A defined-basic wrapper instead
+composes equality directly from its underlying value and has no operation
+requirement. Applying one requirement may produce further typed requests, such
+as `Box` copying requesting `Point.$copy`.
 
 Addressable local storage is the second admitted requirement family. An
 address expression identifies the exact `*types.Var` whose storage becomes
@@ -370,11 +383,14 @@ on the smallest closed provider facet it consumes:
 - `StaticSurface` for a statically selected class operation; and
 - `ValueSurface` for an exported target value.
 
-An artifact that emits only an executable body may provide an explicit empty
-contract while still consuming dependencies. It is reconstructed when a
-provider facet changes, but cannot dirty downstream artifacts because it
-provides no facet. An absent contract is invalid; an explicit empty contract is
-therefore not confused with failed projection.
+An artifact with a typed compile-time-only disposition may provide an explicit
+empty contract while still consuming dependencies. This includes whole-file
+and exported-Go-API accounting for an unused untyped constant. It is
+reconstructed when a provider facet changes, but cannot dirty downstream
+artifacts because it provides no facet. No generic declaration constructor may
+emit an empty result. An absent contract is invalid, and an explicit concrete
+representation root is forbidden from ending with an empty contract; source
+accounting is therefore not confused with failed projection.
 
 The facet enum is closed. A new facet requires a concrete source example,
 canonical projection, consumer rule, equality proof, and mutation test; string
@@ -443,9 +459,19 @@ One placement service applies the policy:
   import the program-initialization module before using a selected package
   surface;
 - reusable static declarations prefer file scope;
-- named-struct static operations are incorporated into their owning class in a
-  fixed operation order; no top-level sibling helper or instance operation is
-  emitted;
+- demanded named-struct static operations are incorporated into their owning
+  class in a fixed operation order; no top-level sibling helper or instance
+  operation is emitted;
+- one canonical generated artifact represents each exact reached anonymous
+  struct or specialized map shape. A shape with no local named component enters
+  deterministic compilation support; a shape containing local named
+  components is emitted immediately after the deepest declaration that makes
+  every component legally nameable, inside the exact reconstructible source
+  artifact;
+- a package initializer is a first-class artifact owned by its selected
+  `(*types.Package, *types.Initializer)` identity. Its first LHS variable is
+  only a source-declaration anchor, never its owner; multi-result initializers
+  remain one artifact, and checker-produced blank LHS targets remain legal;
 - function-wide declarations enter the function prologue only when their
   lifetime is function-wide;
 - evaluation-dependent temporaries remain immediately inside the branch,
@@ -690,9 +716,11 @@ Runtime classes may encapsulate JavaScript storage only when that storage is
 the smallest exact representation of a Go value family. They may expose
 ordinary statically typed methods, but no reflection, dynamic operation name,
 erased payload recovery, target non-null assertion, `.call`/`.apply`/`.bind`,
-or per-use semantic closure. Nullable storage is narrowed by explicit control
-flow at the runtime owner; a generated `value!` may not substitute for a
-proved invariant.
+per-use semantic closure, or stored semantic callback/strategy. Passing a
+statically typed hash, equality, copy, zero, conversion, or dispatch function
+into a runtime value still constitutes runtime semantic dispatch and is
+forbidden. Nullable storage is narrowed by explicit control flow at the
+runtime owner; a generated `value!` may not substitute for a proved invariant.
 Compiler handlers still own Go evaluation order and copy boundaries; runtime
 code does not rediscover source semantics.
 
@@ -761,6 +789,11 @@ internal/emit/                      session, scheduling, closed dispatch only
   artifact/                         target-contract coordination authority
     contract.go                     mechanical TS-Go observable projections
     graph.go                        facet edges, revisions, and fixed point
+  naming/                           exact Go-identity target names and generated-artifact registry
+    registry.go                     immutable target lookup and canonical generated-artifact ownership
+    file_names.go                   one file/scope name service implementing `api.Names`
+  placement/                        deterministic static import/request placement
+  verification/                     public-surface program/session integration tests
   target_files.go                   source/support/program file sealing
   package_state.go                  package storage and initialization owner
   storage/                          exact identity-selected local cell access
@@ -774,6 +807,7 @@ internal/emit/                      session, scheduling, closed dispatch only
   <domain>/                         declaration, statement, expression, type
     <semantic-owner>/               assignment, call, index, function, ...
       <sub-owner>/                  only after an evidenced ownership split
+      verification/                 end-to-end construct tests when the owner has a substantial matrix
   expression/address/               address formation and location projection
   runtime/pointer/                  one typed canonical-location runtime owner
 

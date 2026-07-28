@@ -80,8 +80,7 @@ func emitMake(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	if _, ok := source.Args[0].(*ast.MapType); !ok ||
-		!types.Identical(context.TypesInfo().TypeOf(source.Args[0]), sourceType) {
+	if argumentType := context.TypesInfo().TypeOf(source.Args[0]); argumentType == nil || !types.Identical(argumentType, sourceType) {
 		return api.ExpressionEmission{},
 			api.Unsupported(
 				context.WithRole(api.RoleCallArgumentType),
@@ -116,7 +115,7 @@ func emitMake(
 	zero, err := context.Values().Zero(
 		context.WithRole(api.RoleMapValue),
 		source,
-		mapType.Elem(),
+		mapType.Element(),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -125,7 +124,7 @@ func emitMake(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	target, requests, err := maprepresentation.Make(
+	target, err := maprepresentation.Make(
 		context,
 		source,
 		sourceType,
@@ -138,7 +137,11 @@ func emitMake(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return api.NewExpressionEmission(size.Before(), target, requests)
+	return api.NewExpressionEmission(
+		append(size.Before(), target.Before()...),
+		target.Value(),
+		target.Requests(),
+	)
 }
 
 func emitLen(
@@ -168,9 +171,13 @@ func emitLen(
 	receiver, err := children.Expression(
 		context.
 			WithRole(api.RoleMapReceiver).
-			WithExpectedType(mapType),
+			WithExpectedType(mapType.Type()),
 		source.Args[0],
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	receiver, err = mapType.ReadReceiver(context, source.Args[0], receiver)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -226,9 +233,13 @@ func emitDelete(
 	receiver, err := children.Expression(
 		context.
 			WithRole(api.RoleMapReceiver).
-			WithExpectedType(mapType),
+			WithExpectedType(mapType.Type()),
 		source.Args[0],
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	receiver, err = mapType.ReadReceiver(context, source.Args[0], receiver)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -237,6 +248,15 @@ func emitDelete(
 			WithRole(api.RoleMapKey).
 			WithExpectedType(mapType.Key()),
 		source.Args[1],
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	key, err = maprepresentation.ProjectKey(
+		context.WithRole(api.RoleMapKey),
+		source.Args[1],
+		mapType.Key(),
+		key,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err

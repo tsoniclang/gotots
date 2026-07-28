@@ -78,6 +78,20 @@ func (unusedNames) TypeReference(types.Object) (api.NameReference, error) {
 	panic("unused")
 }
 
+func (unusedNames) AnonymousStruct(
+	*types.Struct,
+	api.AnonymousStructDemand,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) MapSpecialization(
+	types.Type,
+	api.MapSpecializationDemand,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (unusedNames) PackageVariable(
 	*types.Var,
 ) (api.PackageVariableReference, error) {
@@ -87,6 +101,13 @@ func (unusedNames) PackageVariable(
 func (unusedNames) NamedStructOperation(
 	*types.TypeName,
 	api.NamedStructOperation,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) ConstantProjection(
+	*types.Const,
+	types.BasicKind,
 ) (api.NameReference, error) {
 	panic("unused")
 }
@@ -120,7 +141,19 @@ func (unusedValues) RequiresCustomEquality(api.Context, types.Type) bool {
 	panic("unused")
 }
 
+func (unusedValues) RequiresCustomUpdate(api.Context, types.Type) bool {
+	panic("unused")
+}
+
 func (unusedValues) RequiresExplicitType(api.Context, types.Type) bool {
+	panic("unused")
+}
+
+func (unusedValues) RequiresStructuralCopy(api.Context, types.Type) bool {
+	panic("unused")
+}
+
+func (unusedValues) SupportsHash(api.Context, types.Type) bool {
 	panic("unused")
 }
 
@@ -158,5 +191,37 @@ func (unusedValues) Equal(
 	tsgo.Expression,
 	tsgo.Expression,
 ) (api.ExpressionEmission, error) {
+	panic("unused")
+}
+
+func (unusedValues) Hash(
+	api.Context,
+	ast.Node,
+	types.Type,
+	tsgo.Expression,
+) (api.ExpressionEmission, error) {
+	panic("unused")
+}
+
+func (unusedValues) BinaryUpdate(
+	api.Context,
+	ast.Node,
+	ast.Expr,
+	types.Type,
+	types.Type,
+	token.Token,
+	tsgo.Expression,
+	api.ExpressionEmission,
+) (api.ExpressionEmission, bool, error) {
+	panic("unused")
+}
+
+func (unusedValues) Increment(
+	api.Context,
+	ast.Node,
+	types.Type,
+	token.Token,
+	tsgo.Expression,
+) (api.ExpressionEmission, bool, error) {
 	panic("unused")
 }

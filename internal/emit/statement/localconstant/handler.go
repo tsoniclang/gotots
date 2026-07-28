@@ -30,9 +30,7 @@ func Emit(
 		if !ok ||
 			spec.Doc != nil ||
 			spec.Comment != nil ||
-			spec.Type == nil ||
-			len(spec.Names) == 0 ||
-			len(spec.Names) != len(spec.Values) {
+			len(spec.Names) == 0 {
 			return api.StatementEmission{},
 				api.Unsupported(
 					context.WithRole(api.RoleLocalDeclaration),
@@ -41,7 +39,7 @@ func Emit(
 				)
 		}
 		declarations := make([]tsgo.VariableDeclaration, 0, len(spec.Names))
-		for index, sourceName := range spec.Names {
+		for _, sourceName := range spec.Names {
 			selected, ok := context.TypesInfo().Defs[sourceName].(*types.Const)
 			if !ok {
 				return api.StatementEmission{},
@@ -51,12 +49,44 @@ func Emit(
 						sourceName,
 					)
 			}
+			if constantbinding.IsUntyped(selected.Type()) {
+				base, err := context.Names().Declare(selected)
+				if err != nil {
+					return api.StatementEmission{}, err
+				}
+				for _, projection := range context.LocalConstantProjections(selected) {
+					projectionName, err := api.ConstantProjectionName(
+						base,
+						projection,
+					)
+					if err != nil {
+						return api.StatementEmission{}, err
+					}
+					target, err := constantbinding.EmitProjection(
+						context,
+						children,
+						sourceName,
+						selected,
+						projectionName,
+						projection,
+						api.RoleLocalConstantType,
+						api.RoleLocalConstantValue,
+					)
+					if err != nil {
+						return api.StatementEmission{}, err
+					}
+					declarations = append(
+						declarations,
+						target.Declaration(),
+					)
+					requests = append(requests, target.Requests()...)
+				}
+				continue
+			}
 			target, err := constantbinding.EmitBinding(
 				context,
 				children,
 				sourceName,
-				spec.Type,
-				spec.Values[index],
 				selected,
 				api.RoleLocalConstantType,
 				api.RoleLocalConstantValue,
@@ -66,6 +96,9 @@ func Emit(
 			}
 			declarations = append(declarations, target.Declaration())
 			requests = append(requests, target.Requests()...)
+		}
+		if len(declarations) == 0 {
+			continue
 		}
 		statements = append(
 			statements,

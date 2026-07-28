@@ -68,7 +68,24 @@ func materializeArrayProgram(
 	for _, file := range emission.Files() {
 		printed, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
 		if err != nil {
-			t.Fatal(err)
+			for index, statement := range file.SourceFile().Statements() {
+				if _, statementErr := tsgo.EncodeNode(statement); statementErr != nil {
+					name := ""
+					if function, ok := statement.(tsgo.FunctionDeclaration); ok &&
+						function.Name() != nil {
+						name = function.Name().Text()
+					}
+					t.Fatalf(
+						"print %s statement %d %s (%T): %v",
+						file.OutputPath(),
+						index,
+						name,
+						statement,
+						statementErr,
+					)
+				}
+			}
+			t.Fatalf("print %s: %v", file.OutputPath(), err)
 		}
 		targetPath := filepath.Join(
 			directory,

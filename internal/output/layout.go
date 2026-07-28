@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	ProgramInitializationPath = "program.ts"
-	ScalarSupportPath         = "support/scalars.ts"
+	ProgramInitializationPath  = "program.ts"
+	ScalarSupportPath          = "support/scalars.ts"
+	AnonymousStructSupportPath = "support/anonymous-structs.ts"
 )
 
 const (
@@ -76,6 +77,25 @@ func PackageAssemblyPath(sourcePackage *load.Package) (string, error) {
 
 func PackageStatePath(sourcePackage *load.Package) (string, error) {
 	return packageArtifactPath(sourcePackage, packageStateFile)
+}
+
+func MapSpecializationPath(artifactKey string) (string, error) {
+	if len(artifactKey) != sha256.Size*2 {
+		return "", &PathError{
+			Source: artifactKey,
+			Reason: "map-specialization artifact key is invalid",
+		}
+	}
+	for _, character := range artifactKey {
+		if character < '0' || character > '9' &&
+			character < 'a' || character > 'f' {
+			return "", &PathError{
+				Source: artifactKey,
+				Reason: "map-specialization artifact key is invalid",
+			}
+		}
+	}
+	return path.Join("support", "maps", artifactKey+".ts"), nil
 }
 
 func packageArtifactPath(

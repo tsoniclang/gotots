@@ -172,6 +172,25 @@ Finish with several ordinary multi-package programs that exercise direct calls,
 callbacks, returned closures, named results, package initialization, and
 cross-package demand without a runtime/manual/external dependency.
 
+Before proceeding beyond the constant/float/rune checkpoint, close the
+constant-context subsystem as one end-to-end capability:
+
+- bare named constants use one identity-based owner for identifier,
+  package-selector, and dot-import routes;
+- concrete projection type comes from the occurrence when concrete, otherwise
+  from a validated owning-parent expectation, never `types.Default`;
+- enclosing checker-constant expressions such as `Scale + Scale` materialize
+  their folded value without runtime child evaluation;
+- local projections remain at their lexical `const` declaration;
+- cross-package projection imports are keyed by package constant identity plus
+  representation;
+- whole-file and exported-Go-API roots retain the compile-time-only disposition
+  of unused untyped constants, while an explicit constant root must name and
+  materialize one concrete representation; and
+- float32 operation rounding, the complete admitted float operator matrix, and
+  rune value materialization have focused shape, strict-type, differential,
+  mutation, and cost evidence.
+
 ## 3. Go Semantic Families
 
 Add exact representations for:
@@ -206,14 +225,21 @@ create a value IR or a generic operation registry.
    slicing are exact over arbitrary Go string bytes. Rune conversion,
    iteration, formatting, and external text encoding remain separate
    boundaries.
-3. Unnamed fixed-length arrays of represented scalar elements support zero,
-   copy, equality, literals, indexing/stores, `len`, and `cap`. Target types
-   retain the array length. Named arrays and recursively aggregate elements
-   remain unsupported until their identity and copy contracts are proved.
-4. Unnamed slices of represented scalar elements support nil, `make`, literals,
-   indexing/stores, two- and three-index slicing, `len`, `cap`, `append`, and
-   `copy`. The representation preserves backing-store aliasing, offset, length,
-   capacity, append reallocation, and fresh zero slices.
+3. Fixed-length arrays of admitted recursively represented elements support
+   zero, copy, equality, literals, indexing/stores, `len`, and `cap`. Target
+   types retain the array length. A defined array has one minimal nominal
+   wrapper around the same exact array storage; aliases add no wrapper.
+   Aggregate-element zero, literal, and copy operations are requested only
+   when the element representation requires structural copying, while the
+   scalar-only runtime artifact remains byte-identical.
+4. Unnamed slices of admitted recursively represented elements support nil,
+   `make`, literals, indexing/stores, two- and three-index slicing, `len`,
+   `cap`, `append`, and `copy`. The representation preserves backing-store
+   aliasing, offset, length, capacity, append reallocation, fresh zero values,
+   aggregate-element copying, and overlap-safe copy. Aggregate operations are
+   demand-selected; scalar-only slice artifacts do not acquire aggregate
+   callbacks or methods. Defined slice identity remains a separate named-type
+   obligation.
 5. Unnamed maps with represented scalar comparable keys and represented scalar
    values support nil, `make`, literals, lookup, comma-ok lookup, stores,
    `delete`, and `len`. Missing lookup returns the exact value zero; writes to a
@@ -250,9 +276,11 @@ remain a later semantic family, so this checkpoint proves failure occurrence
 and carrier identity, not yet recovered runtime-fault payload equivalence.
 
 One builtin-object dispatcher owns `new`, `make`, `len`, `cap`, `append`,
-`copy`, and `delete`. One setter-store transaction owns Go evaluation order
-for array, slice, and map stores. Family owners provide typed operands and
-members; they do not rediscover builtin identity or install assignment routes.
+`copy`, and `delete`. One accessor-store transaction owns Go evaluation order
+for array, slice, and map stores, including the captured getter/setter location
+used by compound defined-value updates. Family owners provide typed operands
+and members; they do not rediscover builtin identity or install assignment
+routes.
 No checked-in TypeScript, source fragment, template, raw export spelling,
 handler-local duplicate implementation, or family-specific store transaction
 is allowed.
@@ -276,6 +304,38 @@ no addressability or pointer-identity demand has a byte-identical TS-Go
 artifact when address sites are added elsewhere, storage reconstruction
 converges, its unchanged callable contract triggers zero reverse-consumer
 reconstructions, and package `init` uses no non-artifact requirement path.
+
+### 3B. Defined And Recursive Values
+
+The next value checkpoint completes aliases and defined types whose underlying
+value families are represented here, anonymous and legal recursive structs,
+recursive arrays/slices/maps, aggregate map keys and values, and
+nil-capable/defined callable values. Interfaces, channels, and generic
+underlying families retain their later explicit boundaries.
+
+It extends the existing family owners rather than introducing a value IR,
+generic operation registry, runtime strategy object, or second type-identity
+model:
+
+- exact `*types.TypeName` identity owns each defined nominal class; aliases add
+  no runtime owner;
+- `types.Identical` owns anonymous-struct canonicalization, with fingerprints
+  used only for indexed lookup and collision-checked artifact naming;
+- zero/copy/equality/hash/address capabilities are static demanded members
+  owned once per exact represented type;
+- aggregate-map lookup/store/delete use one canonical statically specialized
+  owner per represented map shape; map instances carry storage, never semantic
+  callbacks;
+- nil callable values use `undefined`; defined non-nil callables use one
+  minimal wrapper whose `$value` is invoked directly after the nil guard; and
+- local component types constrain generated declarations to the highest scope
+  where every referenced type is legally nameable.
+
+This checkpoint exits only when recursive requirements converge, scalar
+artifacts remain byte-identical, definitions grow `O(type shape)`, use sites
+remain constant-size, aggregate stores/lookups preserve Go copies, and the
+twenty largest changed type and operation artifacts pass strict, differential,
+mutation, source-size, typecheck, runtime, and broad-deletion review.
 
 ## 4. Environment And Completion
 

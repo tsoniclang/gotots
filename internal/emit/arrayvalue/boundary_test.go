@@ -18,26 +18,6 @@ func TestArrayFamilyRejectsDeferredNeighborsAtTypedBoundaries(t *testing.T) {
 		category api.Category
 	}{
 		{
-			name: "named array",
-			source: `package boundary
-
-type Named [2]int32
-
-func Use(value Named) int32 { return value[0] }
-`,
-			category: api.CategoryDeclaration,
-		},
-		{
-			name: "aggregate element",
-			source: `package boundary
-
-type Box struct { Value int32 }
-
-func Use(value [2]Box) int32 { return value[0].Value }
-`,
-			category: api.CategoryType,
-		},
-		{
 			name: "range",
 			source: `package boundary
 

@@ -11,16 +11,25 @@ type builder struct {
 	panicName string
 }
 
+type Capabilities struct {
+	AggregateNil     bool
+	Address          bool
+	AggregateMake    bool
+	AggregateLiteral bool
+	AggregateAppend  bool
+	AggregateCopy    bool
+}
+
 func Build(
 	factory tsgo.Factory,
 	className string,
 	panicName string,
 ) tsgo.ClassDeclaration {
-	return BuildWithAddress(
+	return BuildWithCapabilities(
 		factory,
 		className,
 		panicName,
-		false,
+		Capabilities{},
 	)
 }
 
@@ -30,24 +39,64 @@ func BuildWithAddress(
 	panicName string,
 	withAddress bool,
 ) tsgo.ClassDeclaration {
+	return BuildWithCapabilities(
+		factory,
+		className,
+		panicName,
+		Capabilities{Address: withAddress},
+	)
+}
+
+func BuildWithCapabilities(
+	factory tsgo.Factory,
+	className string,
+	panicName string,
+	capabilities Capabilities,
+) tsgo.ClassDeclaration {
 	target := builder{
 		factory:   factory,
 		className: className,
 		panicName: panicName,
 	}
-	members := []tsgo.ClassElement{
-		target.constructor(),
-		target.nilMethod(),
-		target.makeMethod(),
-		target.literalMethod(),
+	lazyZero := capabilities.AggregateNil ||
+		capabilities.AggregateMake ||
+		capabilities.AggregateLiteral ||
+		capabilities.AggregateAppend
+	members := []tsgo.ClassElement{target.constructor(lazyZero)}
+	if capabilities.AggregateMake {
+		members = append(members, target.shapeMethod())
+	}
+	if capabilities.AggregateAppend {
+		members = append(members, target.grownCapacityMethod())
+	}
+	members = append(
+		members,
+		target.nilMethod(lazyZero),
+		target.makeMethod(capabilities.AggregateMake, lazyZero),
+		target.literalMethod(lazyZero),
 		target.isNilMethod(),
 		target.getMethod(),
 		target.setMethod(),
 		target.sliceMethod(),
-		target.appendMethod(),
+		target.appendMethod(capabilities.AggregateAppend, lazyZero),
 		target.copyMethod(),
+	)
+	if capabilities.AggregateNil {
+		members = append(members, target.aggregateNilMethod())
 	}
-	if withAddress {
+	if capabilities.AggregateMake {
+		members = append(members, target.aggregateMakeMethod())
+	}
+	if capabilities.AggregateLiteral {
+		members = append(members, target.aggregateLiteralMethod())
+	}
+	if capabilities.AggregateAppend {
+		members = append(members, target.aggregateAppendMethod())
+	}
+	if capabilities.AggregateCopy {
+		members = append(members, target.aggregateCopyMethod())
+	}
+	if capabilities.Address {
 		members = append(members, target.addressMethod())
 	}
 	return factory.ClassDeclaration(

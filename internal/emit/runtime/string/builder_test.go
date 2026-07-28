@@ -41,6 +41,8 @@ func TestBuildEmitsOnlyTheDemandedStringDefinition(t *testing.T) {
 	for _, symbol := range []api.RuntimeSymbol{
 		api.RuntimeStringIndex,
 		api.RuntimeStringSlice,
+		api.RuntimeStringMax,
+		api.RuntimeStringMin,
 	} {
 		t.Run(apiName(t, symbol), func(t *testing.T) {
 			definitions, err := runtimeemission.Build(
@@ -63,14 +65,20 @@ func TestBuildEmitsOnlyTheDemandedStringDefinition(t *testing.T) {
 }
 
 func TestBuildRejectsNonStringSymbol(t *testing.T) {
-	_, err := stringruntime.Build(
-		tsgo.NewFactory(),
-		[]api.RuntimeSymbol{api.RuntimePointer},
-		apiName(t, api.RuntimePanic),
-	)
-	var buildError *stringruntime.BuildError
-	if !errors.As(err, &buildError) || buildError.Symbol != api.RuntimePointer {
-		t.Fatalf("error = %#v, want string runtime build error", err)
+	for _, symbols := range [][]api.RuntimeSymbol{
+		nil,
+		{api.RuntimePointer},
+		{api.RuntimeStringMax, api.RuntimeStringMax},
+	} {
+		_, err := stringruntime.Build(
+			tsgo.NewFactory(),
+			symbols,
+			apiName(t, api.RuntimePanic),
+		)
+		var buildError *stringruntime.BuildError
+		if !errors.As(err, &buildError) {
+			t.Fatalf("error = %#v, want string runtime build error", err)
+		}
 	}
 }
 

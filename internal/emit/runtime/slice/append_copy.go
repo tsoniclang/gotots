@@ -2,7 +2,10 @@ package slice
 
 import "github.com/tsoniclang/gotots/internal/target/tsgo"
 
-func (b builder) appendMethod() tsgo.MethodDeclaration {
+func (b builder) appendMethod(
+	sharedGrowth bool,
+	lazyZero bool,
+) tsgo.MethodDeclaration {
 	values := b.factory.ParameterDeclaration(
 		nil,
 		b.factory.DotDotDotToken(),
@@ -15,6 +18,10 @@ func (b builder) appendMethod() tsgo.MethodDeclaration {
 		b.thisProperty(MemberName(MemberLength)),
 		b.property(b.id("values"), "length"),
 	)
+	zero := tsgo.Expression(b.thisProperty("zero"))
+	if lazyZero {
+		zero = b.invoke(zero)
+	}
 	reuseLoop := b.loop(
 		b.property(b.id("values"), "length"),
 		b.factory.ExpressionStatement(
@@ -141,12 +148,7 @@ func (b builder) appendMethod() tsgo.MethodDeclaration {
 			),
 		}, true),
 	)
-	return b.method(
-		nil,
-		MemberName(MemberAppend),
-		nil,
-		[]tsgo.ParameterDeclaration{values},
-		b.sliceType(),
+	statements := []tsgo.Statement{
 		b.variable(tsgo.NodeFlagsConst, "newLength", newLength),
 		b.variable(
 			tsgo.NodeFlagsConst,
@@ -171,12 +173,31 @@ func (b builder) appendMethod() tsgo.MethodDeclaration {
 			reuse,
 			nil,
 		),
-		b.variable(tsgo.NodeFlagsLet, "nextCapacity", initialCapacity),
-		growCapacity,
+	}
+	if sharedGrowth {
+		statements = append(statements, b.variable(
+			tsgo.NodeFlagsConst,
+			"nextCapacity",
+			b.call(
+				b.id(b.className),
+				aggregateGrowthMember,
+				b.thisProperty(MemberName(MemberCapacity)),
+				b.id("newLength"),
+			),
+		))
+	} else {
+		statements = append(
+			statements,
+			b.variable(tsgo.NodeFlagsLet, "nextCapacity", initialCapacity),
+			growCapacity,
+		)
+	}
+	statements = append(
+		statements,
 		b.variable(
 			tsgo.NodeFlagsConst,
 			"backing",
-			b.call(backing, "fill", b.thisProperty("zero")),
+			b.call(backing, "fill", zero),
 		),
 		b.factory.IfStatement(
 			b.binary(
@@ -197,6 +218,14 @@ func (b builder) appendMethod() tsgo.MethodDeclaration {
 				b.thisProperty("zero"),
 			),
 		),
+	)
+	return b.method(
+		nil,
+		MemberName(MemberAppend),
+		nil,
+		[]tsgo.ParameterDeclaration{values},
+		b.sliceType(),
+		statements...,
 	)
 }
 

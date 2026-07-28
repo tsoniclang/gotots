@@ -19,8 +19,10 @@ func TestNamedStructOperationRequestCarriesTypedDeclarationRequirement(t *testin
 		t.Fatal(err)
 	}
 	requirement, ok := request.DeclarationRequirement()
+	sourceOwner, sourceOwned := requirement.Owner().Source()
 	if !ok ||
-		requirement.Owner() != typeName ||
+		!sourceOwned ||
+		sourceOwner != typeName ||
 		requirement.Kind() != DeclarationRequirementNamedStructOperation {
 		t.Fatalf("declaration requirement = %#v, %t", requirement, ok)
 	}
@@ -84,6 +86,7 @@ func TestNamedStructOperationMemberNamesAreClosed(t *testing.T) {
 		{operation: NamedStructOperationZero, want: "$zero"},
 		{operation: NamedStructOperationCopy, want: "$copy"},
 		{operation: NamedStructOperationEqual, want: "$equal"},
+		{operation: NamedStructOperationHash, want: "$hash"},
 	} {
 		got, err := NamedStructOperationMemberName(testCase.operation)
 		if err != nil {

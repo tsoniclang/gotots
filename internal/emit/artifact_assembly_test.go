@@ -10,6 +10,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
+	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -18,18 +19,18 @@ func TestCommittedArtifactPlacementDropsSupersededImports(t *testing.T) {
 	base := artifactTestImport(t, factory, "./base.js", "Base")
 	old := artifactTestImport(t, factory, "./old.js", "Old")
 	next := artifactTestImport(t, factory, "./next.js", "Next")
-	basePlacement := newPlacementOwner()
+	basePlacement := targetplacement.New()
 	if err := basePlacement.Apply([]api.RootRequest{base}); err != nil {
 		t.Fatal(err)
 	}
-	oldPlacement := newPlacementOwner()
+	oldPlacement := targetplacement.New()
 	if err := oldPlacement.Apply([]api.RootRequest{old}); err != nil {
 		t.Fatal(err)
 	}
 	builder := &targetFileBuilder{
 		placement: basePlacement,
 		declarations: []targetDeclaration{{
-			object:    artifactTestObject("Consumer", 10),
+			owner:     sourceArtifactOwner(artifactTestObject("Consumer", 10)),
 			placement: oldPlacement,
 		}},
 	}
@@ -44,7 +45,7 @@ func TestCommittedArtifactPlacementDropsSupersededImports(t *testing.T) {
 		t.Fatalf("initial modules = %v", actual)
 	}
 
-	nextPlacement := newPlacementOwner()
+	nextPlacement := targetplacement.New()
 	if err := nextPlacement.Apply([]api.RootRequest{next}); err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +110,7 @@ func TestTargetFilesRejectPendingArtifactReconstruction(t *testing.T) {
 	}
 	drainProgramSession(t, session)
 	if err := session.artifacts.Commit(
-		trigger,
+		sourceArtifactOwner(trigger),
 		artifactstate.Contract{
 			api.ArtifactFacetCallableSignature: []byte("changed"),
 		},
@@ -117,10 +118,11 @@ func TestTargetFilesRejectPendingArtifactReconstruction(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
-	if dirty, ok := session.artifacts.NextDirty(); !ok || dirty != caller {
+	if dirty, ok := session.artifacts.NextDirty(); !ok ||
+		dirty != sourceArtifactOwner(caller) {
 		t.Fatalf("dirty = %v, %t; want Caller", dirty, ok)
 	} else if err := session.artifacts.Commit(
-		trigger,
+		sourceArtifactOwner(trigger),
 		artifactstate.Contract{
 			api.ArtifactFacetCallableSignature: []byte("changed-again"),
 		},
@@ -149,7 +151,7 @@ func TestNonArtifactDependencyCannotBeSilentlyDropped(t *testing.T) {
 	}
 	session := &programSession{}
 	err = session.applyRootRequests(
-		newPlacementOwner(),
+		targetplacement.New(),
 		[]api.RootRequest{request},
 	)
 	var scheduleError *ScheduleError
@@ -178,7 +180,7 @@ func artifactTestImport(
 	return request
 }
 
-func artifactTestModules(placement *placementOwner) []string {
+func artifactTestModules(placement *targetplacement.Owner) []string {
 	modules := make([]string, 0)
 	for _, request := range placement.Requests() {
 		modules = append(modules, request.ModulePath())

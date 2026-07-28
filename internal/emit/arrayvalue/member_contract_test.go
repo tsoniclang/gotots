@@ -14,33 +14,39 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func TestArrayRuntimeMemberContractExactJoinsBothArtifactSides(t *testing.T) {
+func TestArrayRuntimeContractAndFixtureDemandRemainSeparate(t *testing.T) {
 	emission := compileArrayFixture(t)
 	directory := t.TempDir()
 	target := materializeArrayProgram(t, directory, emission)
 	expected := memberNames(arraymember.All())
 	runtime := runtimeMemberNames(t, emission)
+	if err := exactJoinNames("runtime", expected, runtime); err != nil {
+		t.Fatal(err)
+	}
+
+	fixtureDemand := cloneNames(expected)
+	delete(fixtureDemand, arraymember.Length.Name())
 	source := sourceMemberNames(
 		t,
 		target.printed[sourceOutputPath(target)],
 		expected,
 	)
-	if err := exactJoinMemberNames(expected, runtime, source); err != nil {
+	if err := exactJoinNames("fixture source", fixtureDemand, source); err != nil {
 		t.Fatal(err)
 	}
 
 	mutatedRuntime := cloneNames(runtime)
 	delete(mutatedRuntime, arraymember.Get.Name())
 	mutatedRuntime["read"] = struct{}{}
-	if exactJoinMemberNames(expected, mutatedRuntime, source) == nil {
+	if exactJoinNames("runtime", expected, mutatedRuntime) == nil {
 		t.Fatal("one-sided runtime member-name mutation passed the contract join")
 	}
 
 	mutatedSource := cloneNames(source)
 	delete(mutatedSource, arraymember.Set.Name())
 	mutatedSource["store"] = struct{}{}
-	if exactJoinMemberNames(expected, runtime, mutatedSource) == nil {
-		t.Fatal("one-sided source member-name mutation passed the contract join")
+	if exactJoinNames("fixture source", fixtureDemand, mutatedSource) == nil {
+		t.Fatal("one-sided fixture-demand mutation passed the contract join")
 	}
 }
 
@@ -247,27 +253,19 @@ func memberNames(identities []arraymember.Identity) map[string]struct{} {
 	return result
 }
 
-func exactJoinMemberNames(
+func exactJoinNames(
+	side string,
 	expected map[string]struct{},
-	runtime map[string]struct{},
-	source map[string]struct{},
+	actual map[string]struct{},
 ) error {
 	for name := range expected {
-		if _, ok := runtime[name]; !ok {
-			return fmt.Errorf("runtime array member %q is missing", name)
-		}
-		if _, ok := source[name]; !ok {
-			return fmt.Errorf("source array member %q is missing", name)
+		if _, ok := actual[name]; !ok {
+			return fmt.Errorf("%s array member %q is missing", side, name)
 		}
 	}
-	for side, names := range map[string]map[string]struct{}{
-		"runtime": runtime,
-		"source":  source,
-	} {
-		for name := range names {
-			if _, ok := expected[name]; !ok {
-				return fmt.Errorf("%s array member %q has no identity", side, name)
-			}
+	for name := range actual {
+		if _, ok := expected[name]; !ok {
+			return fmt.Errorf("%s array member %q is unexpected", side, name)
 		}
 	}
 	return nil

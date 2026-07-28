@@ -2,8 +2,6 @@ package constant
 
 import (
 	"go/ast"
-	"go/constant"
-	"go/token"
 	"go/types"
 	"slices"
 
@@ -24,53 +22,55 @@ func (e BindingEmission) Requests() []api.RootRequest {
 	return slices.Clone(e.requests)
 }
 
+// EmitBinding emits one TYPED constant binding from its checker evidence: the
+// target type is the constant's own concrete type, and the value is its
+// canonical go/constant value (never the source value spelling). Untyped
+// constants have no single type and therefore no binding — each of their uses
+// projects the value at its exact contextual type through EmitValue — so an
+// untyped constant reaching this owner is a caller invariant violation.
 func EmitBinding(
 	context api.Context,
 	children api.ChildEmitter,
 	sourceName *ast.Ident,
-	sourceType ast.Expr,
-	sourceValue ast.Expr,
 	selected *types.Const,
 	typeRole api.Role,
 	valueRole api.Role,
 ) (BindingEmission, error) {
-	if sourceName == nil || sourceType == nil || sourceValue == nil || selected == nil {
+	if sourceName == nil || selected == nil {
 		return BindingEmission{}, &api.InvariantError{
 			Role:   context.Role(),
 			Reason: "constant binding input is nil",
 		}
 	}
+	if IsUntyped(selected.Type()) {
+		return BindingEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "untyped constant has no binding; each use projects its contextual type",
+		}
+	}
 	if sourceName.Name == "_" ||
-		context.TypesInfo().Defs[sourceName] != selected ||
-		!types.Identical(context.TypesInfo().TypeOf(sourceType), selected.Type()) {
+		context.TypesInfo().Defs[sourceName] != selected {
 		return BindingEmission{},
 			api.Unsupported(context, api.CategoryDeclaration, sourceName)
 	}
-	typeAndValue, ok := context.TypesInfo().Types[sourceValue]
-	if !ok ||
-		typeAndValue.Value == nil ||
-		!constant.Compare(typeAndValue.Value, token.EQL, selected.Val()) ||
-		!types.AssignableTo(typeAndValue.Type, selected.Type()) {
-		return BindingEmission{},
-			api.Unsupported(context.WithRole(valueRole), api.CategoryExpression, sourceValue)
-	}
-	value, err := children.Expression(
-		context.
-			WithRole(valueRole).
-			WithExpectedType(selected.Type()),
-		sourceValue,
+	targetType := selected.Type()
+	value, err := EmitValue(
+		context.WithRole(valueRole),
+		sourceName,
+		targetType,
+		selected.Val(),
 	)
 	if err != nil {
 		return BindingEmission{}, err
 	}
 	if len(value.Before()) != 0 {
 		return BindingEmission{},
-			api.Unsupported(context.WithRole(valueRole), api.CategoryExpression, sourceValue)
+			api.Unsupported(context.WithRole(valueRole), api.CategoryExpression, sourceName)
 	}
-	targetType, err := children.RepresentedType(
+	targetTypeEmission, err := children.RepresentedType(
 		context.WithRole(typeRole),
-		sourceType,
-		selected.Type(),
+		sourceName,
+		targetType,
 	)
 	if err != nil {
 		return BindingEmission{}, err
@@ -83,11 +83,11 @@ func EmitBinding(
 		declaration: context.Factory().VariableDeclaration(
 			context.Factory().Identifier(targetName),
 			nil,
-			targetType.Value(),
+			targetTypeEmission.Value(),
 			value.Value(),
 		),
 		requests: api.CombineRequests(
-			targetType.Requests(),
+			targetTypeEmission.Requests(),
 			value.Requests(),
 		),
 	}, nil

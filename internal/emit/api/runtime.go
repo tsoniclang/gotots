@@ -16,6 +16,9 @@ const (
 	RuntimeModuleMap
 	RuntimeModulePanic
 	RuntimeModuleInteger
+	RuntimeModuleFloat
+	RuntimeModuleComplex
+	RuntimeModuleConversion
 )
 
 type RuntimeSymbol uint16
@@ -24,14 +27,44 @@ const (
 	RuntimeInvalid          RuntimeSymbol = 0
 	RuntimeStringIndex      RuntimeSymbol = 1
 	RuntimeStringSlice      RuntimeSymbol = 2
+	RuntimeStringMax        RuntimeSymbol = 3
+	RuntimeStringMin        RuntimeSymbol = 4
 	RuntimePointer          RuntimeSymbol = 100
 	RuntimeArray            RuntimeSymbol = 200
+	RuntimeArrayZeroWith    RuntimeSymbol = 201
+	RuntimeArrayLiteralWith RuntimeSymbol = 202
+	RuntimeArrayCopyWith    RuntimeSymbol = 203
 	RuntimeSlice            RuntimeSymbol = 300
 	RuntimeSliceAddress     RuntimeSymbol = 301
+	RuntimeSliceMakeWith    RuntimeSymbol = 302
+	RuntimeSliceAppendWith  RuntimeSymbol = 303
+	RuntimeSliceCopyWith    RuntimeSymbol = 304
+	RuntimeSliceNilWith     RuntimeSymbol = 305
+	RuntimeSliceLiteralWith RuntimeSymbol = 306
 	RuntimeMap              RuntimeSymbol = 400
+	RuntimeMapHash          RuntimeSymbol = 401
 	RuntimePanic            RuntimeSymbol = 500
 	RuntimeIntegerDivide    RuntimeSymbol = 600
 	RuntimeIntegerRemainder RuntimeSymbol = 601
+	RuntimeIntegerMax       RuntimeSymbol = 602
+	RuntimeIntegerMin       RuntimeSymbol = 603
+	RuntimeFloat32Round     RuntimeSymbol = 700
+	RuntimeComplex64        RuntimeSymbol = 800
+	RuntimeComplex128       RuntimeSymbol = 801
+	RuntimeComplexDivide    RuntimeSymbol = 802
+	RuntimeComplex64Add     RuntimeSymbol = 810
+	RuntimeComplex64Sub     RuntimeSymbol = 811
+	RuntimeComplex64Mul     RuntimeSymbol = 812
+	RuntimeComplex64Div     RuntimeSymbol = 813
+	RuntimeComplex64Neg     RuntimeSymbol = 814
+	RuntimeComplex64Equal   RuntimeSymbol = 815
+	RuntimeComplex128Add    RuntimeSymbol = 820
+	RuntimeComplex128Sub    RuntimeSymbol = 821
+	RuntimeComplex128Mul    RuntimeSymbol = 822
+	RuntimeComplex128Div    RuntimeSymbol = 823
+	RuntimeComplex128Neg    RuntimeSymbol = 824
+	RuntimeComplex128Equal  RuntimeSymbol = 825
+	RuntimeNumberToBigInt   RuntimeSymbol = 900
 )
 
 type RuntimeSymbolContract struct {
@@ -60,6 +93,20 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			false,
 			RuntimePanic,
 		), nil
+	case RuntimeStringMax:
+		return runtimeContract(
+			RuntimeModuleString,
+			"runtime/string.ts",
+			"goStringMax",
+			false,
+		), nil
+	case RuntimeStringMin:
+		return runtimeContract(
+			RuntimeModuleString,
+			"runtime/string.ts",
+			"goStringMin",
+			false,
+		), nil
 	case RuntimePointer:
 		return runtimeContract(
 			RuntimeModulePointer,
@@ -75,6 +122,30 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"GoArray",
 			true,
 			RuntimePanic,
+		), nil
+	case RuntimeArrayZeroWith:
+		return runtimeContract(
+			RuntimeModuleArray,
+			"runtime/array.ts",
+			"goArrayZeroWith",
+			false,
+			RuntimeArray,
+		), nil
+	case RuntimeArrayLiteralWith:
+		return runtimeContract(
+			RuntimeModuleArray,
+			"runtime/array.ts",
+			"goArrayLiteralWith",
+			false,
+			RuntimeArrayZeroWith,
+		), nil
+	case RuntimeArrayCopyWith:
+		return runtimeContract(
+			RuntimeModuleArray,
+			"runtime/array.ts",
+			"goArrayCopyWith",
+			false,
+			RuntimeArrayZeroWith,
 		), nil
 	case RuntimeSlice:
 		return runtimeContract(
@@ -93,6 +164,46 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			RuntimeSlice,
 			RuntimePointer,
 		), nil
+	case RuntimeSliceMakeWith:
+		return runtimeContract(
+			RuntimeModuleSlice,
+			"runtime/slice.ts",
+			"goSliceMakeWith",
+			false,
+			RuntimeSlice,
+		), nil
+	case RuntimeSliceAppendWith:
+		return runtimeContract(
+			RuntimeModuleSlice,
+			"runtime/slice.ts",
+			"goSliceAppendWith",
+			false,
+			RuntimeSlice,
+		), nil
+	case RuntimeSliceCopyWith:
+		return runtimeContract(
+			RuntimeModuleSlice,
+			"runtime/slice.ts",
+			"goSliceCopyWith",
+			false,
+			RuntimeSlice,
+		), nil
+	case RuntimeSliceNilWith:
+		return runtimeContract(
+			RuntimeModuleSlice,
+			"runtime/slice.ts",
+			"goSliceNilWith",
+			false,
+			RuntimeSlice,
+		), nil
+	case RuntimeSliceLiteralWith:
+		return runtimeContract(
+			RuntimeModuleSlice,
+			"runtime/slice.ts",
+			"goSliceLiteralWith",
+			false,
+			RuntimeSlice,
+		), nil
 	case RuntimeMap:
 		return runtimeContract(
 			RuntimeModuleMap,
@@ -100,6 +211,13 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"GoMap",
 			true,
 			RuntimePanic,
+		), nil
+	case RuntimeMapHash:
+		return runtimeContract(
+			RuntimeModuleMap,
+			"runtime/map.ts",
+			"GoMapHash",
+			false,
 		), nil
 	case RuntimePanic:
 		return runtimeContract(
@@ -124,9 +242,134 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			false,
 			RuntimePanic,
 		), nil
+	case RuntimeIntegerMax:
+		return runtimeContract(
+			RuntimeModuleInteger,
+			"runtime/integer.ts",
+			"goIntegerMax",
+			false,
+		), nil
+	case RuntimeIntegerMin:
+		return runtimeContract(
+			RuntimeModuleInteger,
+			"runtime/integer.ts",
+			"goIntegerMin",
+			false,
+		), nil
+	case RuntimeFloat32Round:
+		return runtimeContract(
+			RuntimeModuleFloat,
+			"runtime/float.ts",
+			"goFloat32",
+			false,
+		), nil
+	case RuntimeComplex64:
+		return runtimeContract(
+			RuntimeModuleComplex,
+			"runtime/complex.ts",
+			"GoComplex64",
+			true,
+			RuntimeFloat32Round,
+		), nil
+	case RuntimeComplex128:
+		return runtimeContract(
+			RuntimeModuleComplex,
+			"runtime/complex.ts",
+			"GoComplex128",
+			true,
+		), nil
+	case RuntimeComplexDivide:
+		return runtimeContract(
+			RuntimeModuleComplex,
+			"runtime/complex.ts",
+			"goComplexDivide",
+			false,
+		), nil
+	case RuntimeComplex64Add:
+		return complexOperationContract(
+			"goComplex64Add",
+			RuntimeComplex64,
+		)
+	case RuntimeComplex64Sub:
+		return complexOperationContract(
+			"goComplex64Subtract",
+			RuntimeComplex64,
+		)
+	case RuntimeComplex64Mul:
+		return complexOperationContract(
+			"goComplex64Multiply",
+			RuntimeComplex64,
+		)
+	case RuntimeComplex64Div:
+		return complexOperationContract(
+			"goComplex64Divide",
+			RuntimeComplex64,
+			RuntimeComplexDivide,
+		)
+	case RuntimeComplex64Neg:
+		return complexOperationContract(
+			"goComplex64Negate",
+			RuntimeComplex64,
+		)
+	case RuntimeComplex64Equal:
+		return complexOperationContract(
+			"goComplex64Equal",
+			RuntimeComplex64,
+		)
+	case RuntimeComplex128Add:
+		return complexOperationContract(
+			"goComplex128Add",
+			RuntimeComplex128,
+		)
+	case RuntimeComplex128Sub:
+		return complexOperationContract(
+			"goComplex128Subtract",
+			RuntimeComplex128,
+		)
+	case RuntimeComplex128Mul:
+		return complexOperationContract(
+			"goComplex128Multiply",
+			RuntimeComplex128,
+		)
+	case RuntimeComplex128Div:
+		return complexOperationContract(
+			"goComplex128Divide",
+			RuntimeComplex128,
+			RuntimeComplexDivide,
+		)
+	case RuntimeComplex128Neg:
+		return complexOperationContract(
+			"goComplex128Negate",
+			RuntimeComplex128,
+		)
+	case RuntimeComplex128Equal:
+		return complexOperationContract(
+			"goComplex128Equal",
+			RuntimeComplex128,
+		)
+	case RuntimeNumberToBigInt:
+		return runtimeContract(
+			RuntimeModuleConversion,
+			"runtime/conversion.ts",
+			"goNumberToBigInt",
+			false,
+		), nil
 	default:
 		return RuntimeSymbolContract{}, &RuntimeSymbolError{Symbol: symbol}
 	}
+}
+
+func complexOperationContract(
+	exportedName string,
+	dependencies ...RuntimeSymbol,
+) (RuntimeSymbolContract, error) {
+	return runtimeContract(
+		RuntimeModuleComplex,
+		"runtime/complex.ts",
+		exportedName,
+		false,
+		dependencies...,
+	), nil
 }
 
 func runtimeContract(

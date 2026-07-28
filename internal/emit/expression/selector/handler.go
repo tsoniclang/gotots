@@ -5,7 +5,9 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -44,6 +46,10 @@ func Emit(
 			reference.Expression(context.Factory()),
 			reference.Requests()...,
 		), nil
+	}
+	if constObject, ok := object.(*types.Const); ok &&
+		constantbinding.IsUntyped(constObject.Type()) {
+		return constantbinding.EmitUse(context, source, constObject)
 	}
 	switch object.(type) {
 	case *types.Const, *types.Func:
@@ -95,6 +101,12 @@ func emitField(
 	requests := receiver.Requests()
 	if selection.Indirect() {
 		_, element, ok := pointertype.Resolve(receiverType)
+		defined, definedOK := definedtype.ResolvePointer(receiverType)
+		if definedOK {
+			pointer, _ := defined.Pointer()
+			element = pointer.Elem()
+			ok = true
+		}
 		if !ok {
 			return api.ExpressionEmission{},
 				api.Unsupported(context, api.CategoryExpression, source)
@@ -106,6 +118,14 @@ func emitField(
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
+		}
+		if definedOK {
+			receiver, err = defined.Project(context, receiver)
+			if err != nil {
+				return api.ExpressionEmission{}, err
+			}
+			receiverValue = receiver.Value()
+			requests = receiver.Requests()
 		}
 		runtime, err := context.Names().Runtime(
 			api.RuntimePointer,

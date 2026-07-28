@@ -188,12 +188,15 @@ const limit int32 = 4
 const limit: int32 = 4;
 ```
 
-Untyped constants, omitted repeated expressions, and `iota` remain one
-constant-semantics family. A local constant handler does not borrow package
-placement or infer an omitted initializer.
+Constants are materialized from their checker evidence, never from a
+re-evaluation of the source value expression. The value is the exact
+`go/constant.Value` on the `*types.Const`; the source initializer syntax
+(`iota`, shifts, inherited/omitted specs) is validated and accounted for as a
+grammatical child, but never re-executed as target code. `iota` is a
+declaration-time constant-folding fact only and never appears in target output.
 
-An explicitly typed package constant is a direct declaration owned by its
-source-file module:
+An explicitly **typed** constant — package or local — is one direct binding at
+the constant's own concrete type:
 
 ```go
 const Base int = 40
@@ -203,12 +206,66 @@ const Base int = 40
 export const Base: int32 = 40;
 ```
 
-The owner uses the package-scope `types.Const` identity and exact constant value
-while the initializer handler preserves the supported source expression shape.
-Every emitted package declaration is exported for static generated-module
-linking; package assembly later selects the public surface. Untyped constants,
-implicit constant expressions and `iota` remain one later constant-semantics
-family because their representation may depend on each use context.
+An **untyped** constant has no single runtime type: Go converts it to a concrete
+type independently at each use. It therefore has no single binding. Each bare
+named use requests one projection at its effective concrete type through the
+demand-driven reconstructible-artifact lifecycle. The effective type is the
+concrete checker type on that occurrence when one exists; otherwise it is the
+concrete type supplied by the owning parent context after assignability is
+validated. For example, in `return Scale`, `Scale` remains `untyped int` in
+`go/types.Info.Types`, while the return owner supplies the function's `int32`
+result type. The emitter must not call `types.Default`, infer a type from
+spelling, or assume that a child occurrence carries its parent's conversion.
+The exact `*types.Const` selected by `go/types.Info.Uses` owns the declaration
+value. An occurrence's `TypeAndValue.Value` may already reflect contextual
+conversion or rounding (for example, an untyped `Pi` used as `float64`), so it
+proves that the occurrence is constant but is not a second declaration-value
+truth and is not compared byte-for-byte with `Const.Val()`.
+
+A non-reference constant expression is different. In
+`return Scale + Scale`, the two identifiers remain untyped, while the
+`*ast.BinaryExpr` carries the exact folded checker value. The binary owner emits
+that enclosing value at the parent's concrete result type; it does not emit
+runtime addition and does not ask either child to rediscover the context.
+
+A package-level projection is one exported declaration imported statically. A
+function-local projection is emitted at its original lexical `const`
+declaration, never flattened into a function prologue. Sibling blocks may
+therefore declare the same Go spelling without colliding or widening scope.
+Every use — a same-package identifier, a package-qualified selector, or a
+dot-imported identifier — routes through the same constant-use owner and is a
+constant-size reference to its projection. Cross-package import identity is the
+full `(package constant identity, target representation)` pair, so two packages
+exporting `Width` cannot create duplicate local bindings. Output size is
+`O(value-size + uses)`, never `O(value-size × uses)`; inlining a named value at
+each use is forbidden. A projection whose value is not representable in the
+selected profile fails at the typed value boundary, not at a caller invariant.
+
+Emission roots retain their intent. Whole-file coverage and exported-Go-API
+roots account for an unused untyped constant as a compile-time-only declaration;
+they do not invent a runtime value. This is necessary rather than an
+optimization: Go's exported untyped-constant contract admits an open set of
+future contextual conversions, so no finite set of target runtime bindings can
+be its exact public replacement. A translated Go consumer requests the exact
+projection it uses. An explicit representation root must name its concrete
+basic representation and materialize that projection or fail; a generic
+`NewRoot` request for an untyped constant is rejected as ambiguous. Projection
+kinds are the closed concrete constant-capable basic domain; untyped kinds,
+`Invalid`, out-of-range values, and `unsafe.Pointer` fail at construction.
+These typed dispositions may not be confused with failed projection or use
+`types.Default`.
+
+All bare named-use paths share this one classification: same-package
+identifiers, package-qualified selectors, and dot-imported identifiers identify
+the exact `*types.Const` and delegate to the single constant-use owner with the
+source expression and `types.TypeAndValue`. Root policy is a separate typed
+owner because coverage and public representation are different obligations.
+Every materialized package declaration (typed binding or untyped projection) is
+exported for static generated-module linking; package assembly later selects the
+public surface. A single `go/constant.Value.Kind` dispatcher owns value
+materialization; integer, string, float, and later complex materializers have no
+other semantic callers. A syntax owner may validate its AST form and choose the
+enclosing checker value, but delegates value materialization to this owner.
 
 Package variables are package-state fields, never source-file-local `let`
 bindings. A same-package read or store uses the package's direct state import;
@@ -411,19 +468,42 @@ total += delta;
 ```
 
 The assignment owner proves the exact store target, represented operand type,
-and assignability of the right side. It accepts the direct form only when the
-right-side emission has no prerequisite statements, so reading the left value
-cannot move across right-side effects. The target owner's prerequisite
-statements remain before the direct compound operation. Indexed and
-setter-backed targets, other compound operators, unsupported widths, and
-right-side prerequisite-statement cases remain separate typed failures until
-their single-evaluation rules are proved.
+and assignability of the right side. A direct primitive target accepts this
+form only when the right-side emission has no prerequisite statements, so
+reading the left value cannot move across right-side effects. The target
+owner's prerequisite statements remain before the direct compound operation.
+
+For a represented defined value behind an array, slice, or map accessor, one
+accessor-store transaction captures the receiver and index/key once. Under the
+`preserve-go` profile it then evaluates and captures the right side before
+calling the getter, applies the exact underlying-family operation, wraps the
+result, and calls the setter once:
+
+```go
+values[nextIndex()] += nextValue()
+```
+
+```ts
+const receiver = values;
+const index = nextIndex();
+const right = nextValue();
+receiver.set(index, new Count(receiver.get(index).$value + right.$value));
+```
+
+The `direct` profile retains its explicit target-order tradeoff and may keep a
+direct right expression. Primitive accessor compounds and every operation not
+owned by the represented value family remain typed failures; no generic host
+operator fallback is inferred.
 
 An ordinary Go function with two or more results has one direct TypeScript
 tuple carrier. Result declarations use `[T0, T1, ...]`; an explicit
 `return left, right` constructs `[left, right]`; and `return pair()` preserves
 the tuple-valued call directly. There is no generated result class, wrapper,
 out-parameter ABI, erased carrier, or per-function representation choice.
+When any explicit result has prerequisite statements, the return owner
+evaluates and copies every result left-to-right into one local constant before
+evaluating the next result, then returns the tuple of constants. Direct
+multi-result returns acquire no such captures.
 
 For one multi-valued right side, the assignment owner evaluates it exactly once
 into a typed tuple temporary and then performs target declarations/stores from
@@ -562,12 +642,45 @@ function types, function literals, values, and calls consume the same signature
 owner. JavaScript lexical capture directly represents admitted Go variable
 capture; no environment object, callback registry, hidden receiver, or callable
 side table is introduced. Copying an admitted function value is a direct
-reference-value copy. A nil function value, comparison with nil, variadic or
-generic signature, method value/expression, or interface callable remains at
-its own typed boundary. A defined or declared-alias function type is also
-deferred: preserving two distinct named Go function types requires the
-named-value representation family rather than silently making TypeScript
-structural aliases interchangeable.
+reference-value copy.
+
+An unnamed callable value that may contain Go nil has the static target type
+`((parameters) => results) | undefined`. Known non-nil declarations and
+literals remain direct functions. Calls evaluate the callee once, evaluate and
+capture arguments left-to-right, then perform the nil guard at the invocation
+boundary; this preserves the fact that Go evaluates arguments before a nil
+function call panics. The non-nil branch invokes the function directly, never
+through `.call`, `.apply`, `.bind`, reflection, or an erased carrier.
+
+A defined callable has one minimal nominal class for its non-nil value:
+
+```go
+type Transform func(int32) int32
+type Alias = Transform
+```
+
+```ts
+export class Transform {
+  declare private readonly $goType: void;
+  constructor(public readonly $value: (value: int32) => int32) {}
+}
+export type Alias = Transform | undefined;
+```
+
+Every Go use of `Transform` is represented as `Transform | undefined`; the
+class itself represents only the non-nil member. Conversion from an unnamed
+non-nil function constructs `new Transform(value)` once. Conversion between
+distinct defined callable types unwraps the exact source and constructs the
+exact destination. Calling a defined callable checks the wrapper for
+`undefined` and then invokes `wrapper.$value(arguments)` directly. The class
+contains no string brand, runtime property mutation, `Object.assign`, callback
+registry, or speculative method protocol. A declared alias reuses the same
+representation and emits no class.
+
+Nil equality compares only with `undefined`, as selected by the checker.
+`new(func(...))` creates a fresh pointer cell whose value is `undefined`.
+Variadic or generic signatures, method values/expressions, and interface
+callables remain at their separately owned boundaries.
 
 ## Calls
 
@@ -673,6 +786,69 @@ The capture is requested only by this execution-boundary requirement; a direct
 call remains a direct call and possible-function count never expands the call
 site.
 
+## Defined Types And Aliases
+
+The exact `*types.TypeName` and its `go/types` type decide whether a declaration
+is an alias or a defined type. Source spelling, underlying-type text, and
+structural target assignability never make that decision.
+
+An alias adds no runtime identity. Its exported target declaration is a
+TypeScript type alias to the already selected representation:
+
+```go
+type Count int32
+type Alias = Count
+```
+
+```ts
+export class Count {
+  declare private readonly $goType: void;
+  constructor(public readonly $value: int32) {}
+}
+export type Alias = Count;
+```
+
+A non-struct defined type has one minimal nominal wrapper class keyed by its
+exact `*types.TypeName`. The erased private brand prevents unrelated defined
+types with the same underlying type from becoming assignable. The public
+readonly `$value` carries the exact represented underlying value. The class
+contains no operator table, callback, dynamic tag, source node, or speculative
+zero/copy/equality method.
+
+The containing semantic owner composes the underlying value operation directly:
+
+```go
+type Count int32
+func Add(left, right Count) Count { return left + right }
+```
+
+```ts
+export function Add(left: Count, right: Count): Count {
+  return new Count(left.$value + right.$value);
+}
+```
+
+Zero, copy, equality, hashing, addressing, conversion, and container operations
+follow the same rule: unwrap once, invoke the exact existing underlying-family
+operation, and wrap the result only when the Go result has the defined type.
+Immutable underlying values may share their immutable wrapper on copy.
+Aggregate underlying values request their recursive copy operation before
+wrapping. Use sites remain O(1), and each defined type contributes exactly one
+class definition.
+
+Named struct definitions keep the direct nominal record class described below;
+they do not acquire a redundant wrapper around that class. Nil-capable defined
+types use `Defined | undefined`; `undefined` remains the sole nil value and only
+a non-nil underlying value is wrapped. Aliases reuse that same union without a
+new class.
+
+Type conversions are the only bridges between a defined type and its
+underlying or another defined type. The conversion owner strips only the exact
+source wrapper, applies the existing source-to-destination representation
+conversion, then constructs only the exact destination wrapper. Constants are
+materialized from the checker value at the destination underlying type before
+wrapping. No conversion falls through to an ordinary call.
+
 ## Structs, Receivers, And Classes
 
 An ordinary named Go struct is a value type. TypeScript objects and classes are
@@ -724,12 +900,52 @@ incompatible even when their fields match. A requested nested struct operation
 requests the corresponding static operation from the nested type's owner. The
 erased brand must produce no JavaScript instance field.
 
-Tags, embedding, interfaces, method values/expressions, generics, reflection
-entry, pointers to unrepresented targets, and fields whose complete standalone
+Interface behavior, method values/expressions, generics, reflection entry,
+pointers to unrepresented targets, and fields whose complete standalone
 representation is not yet exact are neighboring typed-unsupported families.
-They may be admitted only by extending or replacing this representation under
-their own complete proof. They must not be approximated by structural
-assignment or virtual dispatch.
+Embedding may contribute exact storage in the recursive-value extension, but
+promotion and method selection remain deferred. Tags and blank fields may
+participate in exact type identity without implying reflection metadata or
+ordinary mutable storage. No neighboring family may be approximated by
+structural assignment or virtual dispatch.
+
+The recursive-value extension admits represented fields through arrays,
+slices, maps, pointers, callables, and other structs. A direct infinitely sized
+cycle is invalid Go and never reaches emission; every legal recursive cycle
+crosses a reference-capable representation. Static zero, copy, equality, hash,
+and address operations therefore request one another by exact type identity
+and converge instead of recursively expanding source at each use.
+
+An anonymous struct receives one canonical nominal target declaration because
+plain TypeScript structural typing cannot preserve Go field tags, blank
+fields, unexported-field package identity, or exact anonymous-type identity.
+`go/types` and `types.Identical` are the sole identity authority. A stable
+structural fingerprint may select a candidate bucket and target artifact name,
+but every reuse decision exact-checks `types.Identical`; a fingerprint collision
+must retain two declarations. A named component's stable key is derived from
+its authoritative declaration object's semantic package and deterministic
+lexical declaration identity, while the selected object remains the in-memory
+truth for the decision. Package path plus source spelling alone is never
+identity.
+
+The canonical declaration is placed at the highest preferred lexical scope
+that can name every component representation. Shapes whose components are all
+module-nameable use one compilation-owned shared artifact, so identical
+anonymous structs in different Go packages remain one target type. A shape
+depending on a local named type remains in the owning lexical scope; it is
+never hoisted to a module that cannot name that type. The first encounter does
+not decide placement. A root request or digest is only an artifact key and
+must carry or validate the exact Go type; it is not a second type-identity
+model.
+
+Each canonical anonymous declaration owns its field storage and demanded
+static zero, copy, equality, and hash members once. Ordinary construction may
+remain direct, but operation use sites are constant-size calls. Doubling uses
+must not duplicate field walks. Field tags participate in identity but emit no
+runtime metadata unless a later reflection consumer requests it. Blank fields
+participate in identity and required evaluation order but expose no mutable
+target property. Embedded fields remain storage composition here; promotion
+and method selection remain with their later semantic owner.
 
 Each zero, copy, or equality capability is emitted at most once and only when a
 selected occurrence requests it. Its typed request is routed to the defining
@@ -912,6 +1128,143 @@ package modules use canonical relative type-only imports. The aliases retain
 the selected Go representation name in generated source. A handler does not
 infer width from `GOARCH` spelling or independently inspect configuration.
 
+`float32` and `float64` both carry as the `number` alias regardless of the
+integer-representation profile — TypeScript has one binary64 number type and no
+separate float axis. A floating-point constant materializes its exact
+`go/constant` value through the one constant-value owner, never the source
+spelling: a `float64` constant emits the shortest decimal that round-trips to
+its binary64 value; a `float32` constant is first rounded to its nearest
+binary32 (as Go does at compile time) and then emitted as the binary64 that
+equals that rounded value, so the emitted literal is bit-identical to Go's
+`float32` result and never the shorter binary32 spelling, which would denote a
+different `number`. A runtime `float32` operation rounds through a generated
+helper at each Go-required boundary; a `float64` operation is direct.
+
+`complex64` and `complex128` use distinct immutable GoToTS-owned nominal
+classes. A bare object or tuple is insufficient because TypeScript would make
+the two widths structurally interchangeable; an assertion-based brand is
+forbidden. Each class therefore has a distinct private, declared-only brand,
+readonly `real` and `imag` number components, a private constructor, and a
+closed static construction surface. The brand emits no JavaScript. Construction
+is the sole component-rounding boundary: `complex64` rounds both components
+through `goFloat32`, while `complex128` preserves binary64 values. The runtime
+module owns demand-driven, statically typed standalone operation functions;
+unused operations are absent rather than widening each class or each call site.
+
+```go
+func Product(left, right complex64) complex64 {
+    return left * right
+}
+```
+
+```ts
+export function Product(
+    left: GoComplex64,
+    right: GoComplex64,
+): GoComplex64 {
+    return goComplex64Multiply(left, right);
+}
+```
+
+The classes own construction and readonly component access. Typed standalone
+functions own unary negation, addition, subtraction, multiplication, equality,
+and division. Complex division is not expanded at use sites: one shared runtime
+operation ports the selected Go toolchain's
+robust `runtime.complex128div` algorithm, including zero, infinity, and NaN
+corrections. `complex64` division widens through that operation and rounds the
+two result components on construction, matching the selected toolchain's
+complex-division lowering. Every source operation is therefore one
+constant-size typed call, and a complex runtime definition is emitted only
+when its width is reached. Immutable complex objects need no copy operation:
+sharing the object preserves Go value behavior because no component can be
+mutated.
+
+Imaginary and complex constants are read only from `go/constant`. Their real
+and imaginary parts are materialized independently at the selected complex
+width and passed through the same constructor as runtime values. Source token
+spelling never determines either component. The predeclared `complex`, `real`,
+and `imag` functions are selected only from their exact `*types.Builtin`
+identity; `real` and `imag` become readonly component access, while `complex`
+evaluates its two arguments once in order and calls the width-owned
+constructor.
+
+### Explicit numeric conversions
+
+A `CallExpr` is a conversion only when the selected `go/types.TypeAndValue`
+for its callee reports `IsType()`. The conversion owner reads the checker's
+source type, destination type, and converted constant value. It never
+recognizes a conversion from callee spelling and never lets an unimplemented
+conversion fall through to ordinary-call emission.
+
+This section closes conversions among the currently represented integer,
+floating-point, and complex types. String/container, defined-type, pointer,
+interface, channel, and generic conversions retain their separate semantic
+owners and remain typed unsupported until those families land.
+
+Constant conversions materialize the converted checker value directly:
+
+```go
+func F() float32 { return float32(16777217) }
+```
+
+```ts
+export function F(): float32 {
+    return 16777216;
+}
+```
+
+Non-constant conversions have one closed destination-family decision:
+
+| Go conversion | TS-Go AST/output decision |
+|---|---|
+| lossless integer widening | the emitted operand directly |
+| integer narrowing or sign change, `bigint` profile | `BigInt.asIntN` or `BigInt.asUintN` at the destination width |
+| integer narrowing to 8/16/32 bits, `number` profile | one width-owned bitwise normalization |
+| integer conversion requiring a 64-bit sign boundary, `number` profile | a demand-only number-to-BigInt boundary, static width normalization, then `Number` |
+| integer to float | `Number` only from a BigInt carrier; `float32` additionally uses the shared binary32 rounder |
+| float to integer | truncate once, select deterministic non-finite result zero, then apply the destination integer normalization |
+| `float32` to `float64` | the already-rounded operand directly |
+| `float64` to `float32` | the shared binary32 rounder |
+| `complex64` to `complex128` or the reverse | construct the destination nominal value from its two components; the `complex64` constructor rounds both |
+
+The selected GoToTS implementation-defined result for a non-finite
+floating-to-integer conversion is zero before width normalization. Finite
+out-of-range values are truncated and reduced to the destination width. This
+choice is explicit, deterministic, and non-panicking as required by Go; tests
+do not misreport implementation-defined cases as a differential match to a
+particular host Go backend.
+
+Every conversion evaluates its operand once. Direct cases add no helper.
+Only a conversion that must cross from a `number` carrier into BigInt
+normalization requests the one standalone number-to-BigInt operation needed
+to avoid duplicated evaluation and a host exception. This includes
+floating-to-integer conversion in the `bigint` profile and 64-bit sign/width
+boundaries in the `number` profile.
+Conversion output remains O(1) per occurrence and no generic conversion
+registry, erased carrier, cast, or source-text route exists.
+
+### Ordered `max` and `min`
+
+The predeclared `max` and `min` functions are selected only from their exact
+`*types.Builtin` objects. Checker-folded calls materialize the result constant
+directly. Runtime calls admit the currently represented predeclared integer,
+floating-point, and byte-preserving string types; defined ordered types remain
+with the defined-type family.
+
+Number-carrier integers and floats use one `Math.max` or `Math.min` call.
+Those host operations have the required NaN propagation, infinity behavior,
+and `-0`/`+0` ordering. BigInt integers and byte strings use demand-only typed
+pair operations folded left-to-right; the string operation uses `>=` for
+`max` and `<=` for `min`, preserving the first equal argument and Go's
+byte-wise order. A one-argument call is the argument directly.
+
+All arguments evaluate once in Go order. If a child has prerequisite
+statements, the owner captures the argument list at the call boundary before
+forming the target operation. Use-site size is O(source arguments), each
+runtime pair definition is emitted once, and neither implementation depends
+on source spelling, arity-specific helpers, erased values, or runtime type
+dispatch.
+
 Ordinary integer syntax is source-shaped under both initial profiles:
 
 | Go source | TS-Go AST decision | Printed TypeScript |
@@ -958,16 +1311,36 @@ claims these deferred semantics. Explicit narrowing conversions and any future
 fixed-width profile are separate construct families rather than baggage in
 ordinary multiplication.
 
-Boolean `&&` and `||` emit direct binary expressions and retain native
-short-circuit evaluation. Neither operand may carry prerequisite statements:
-moving such work before a short-circuit operator would change behavior.
+Boolean `&&` and `||` emit direct binary expressions when the right operand has
+no prerequisite statements. Prerequisites of the always-evaluated left operand
+remain immediately before the expression. If the right operand has
+prerequisites, the binary owner emits one boolean temporary and places the
+right prerequisites inside the selected branch:
 
-An untyped Go boolean constant emits as the direct TypeScript boolean literal.
-The parent still supplies the expected Go `bool`, the predeclared-constant
-identifier handler verifies semantic object identity and assignability through
-`go/types`, and the basic-type owner supplies the one generated `bool` alias
-where a declaration boundary needs it. No operator handler guesses a carrier
-from spelling.
+```go
+left() && ([2]int32{1, 2} == right())
+```
+
+```ts
+let result = left();
+if (result) {
+  const rightArray = right();
+  // bounded generated array comparison
+  result = arraysEqual;
+}
+```
+
+The `||` branch executes only when the left result is false. Moving right-side
+work before the branch or evaluating either operand twice is forbidden.
+
+The predeclared `true` and `false` are literal booleans, not source-declared
+constants, so they materialize in place as the direct TypeScript boolean literal
+through the one constant-value owner. The parent still supplies the expected Go
+`bool`, the identifier handler verifies semantic object identity and
+assignability through `go/types`, and the basic-type owner supplies the one
+generated `bool` alias where a declaration boundary needs it. A source-declared
+untyped boolean constant is projected like any other untyped constant, not
+inlined. No operator handler guesses a carrier from spelling.
 
 An explicit Go parenthesized expression becomes one TS-Go
 `ParenthesizedExpression` around the directly emitted child. It preserves
@@ -1030,7 +1403,13 @@ return [goStringIndex(value, 1), goStringSlice(value, 0, 1)];
 
 An admitted fixed array retains its length in the target type. A `[2]int32`
 cannot become interchangeable with `[3]int32`. Array zero and copy create
-fresh storage; an indexed store mutates only that storage.
+fresh storage; an indexed store mutates only that storage. Equality is lowered
+at the source expression into one fixed-bound loop whose element comparison is
+selected statically from the exact element type. Both operands are evaluated
+once, nested comparisons compose recursively, and the loop stops at the first
+unequal element. The generic array runtime carries no equality callback,
+semantic tag, or implementer switch; comparison source size is independent of
+the array length.
 
 An admitted slice is a descriptor over backing storage:
 
@@ -1051,6 +1430,78 @@ aliases the same map. Lookup of a missing key returns the element zero;
 comma-ok additionally returns `false`; storing through nil fails. A plain
 object literal is forbidden because it changes key identity and prototype
 behavior.
+
+The current native-`Map` key family is exactly `bool`, represented integer, or
+string, plus defined-basic wrappers whose exact checker type unwraps to one of
+those primitives before every literal/store/lookup/delete operation. The map's
+target key type is the underlying primitive while its Go signature retains the
+defined wrapper at source boundaries:
+
+```go
+type Count int32
+func Lookup(values map[Count]string, key Count) string {
+	return values[key]
+}
+```
+
+```ts
+export function Lookup(values: GoMap<int32, gostring>, key: Count): gostring {
+  return values.lookup(key.$value);
+}
+```
+
+Floating keys remain a typed boundary: JavaScript `Map` uses SameValueZero,
+while Go permits distinct stored NaN keys that cannot be retrieved by another
+NaN comparison. Interface keys remain a typed boundary until interface dynamic
+value identity and hashing exist. Admitted aggregate comparable keys and
+admitted non-basic values use the exact specialized owner below; neither class
+may silently use object identity or serialization.
+
+Specialized maps select key and value semantics once from the authoritative
+`go/types` map type. One canonical target artifact per exact represented map
+shape directly references the key family's static hash, equality, and copy
+operations and the value family's zero and copy operations. This includes an
+aggregate key or any value whose Go copy/zero behavior cannot be represented by
+the scalar native-`Map` owner. The map value does not store function-valued
+strategies, closures, operation objects, tags, or dynamic member names. A
+shared runtime primitive may own only non-semantic bucket, count, and nil
+storage; the canonical map-shape artifact owns typed lookup, store, and delete
+behavior and invokes the selected operations directly.
+
+```go
+type Key struct{ X int32 }
+var values map[Key]string
+```
+
+```ts
+// Schematic shape; production output is constructed as TS-Go AST.
+class map$Key$string {
+  static lookup(storage: GoMapBuckets<Key, gostring>, key: Key): gostring {
+    const bucket = storage.bucket(Key.$hash(key));
+    // The generated owner calls Key.$equal directly while resolving collisions.
+    return map$Key$string.lookupBucket(bucket, key);
+  }
+}
+```
+
+The declaration cost is `O(map shape)` once, while every map operation site is
+constant-size. Two map values of the same exact semantic shape reuse the same
+owner. A full deterministic canonical-type digest indexes one artifact, but
+`go/types` identity remains authoritative and a digest collision must never
+unify non-identical map types. The digest uses semantic package/declaration
+identity and source position for local named components; generated TypeScript
+names are outputs and never feed back into identity. Generated-artifact tests reject
+function-valued key-operation fields and mutations that restore callback
+storage.
+
+A specialization whose exact type contains no function-local named component
+is one compilation support module under `support/maps/`. A specialization that
+mentions a local named key or value cannot escape that name's scope: it is
+inserted as typed TS-Go class AST immediately after the deepest local type
+declaration required by the shape. This rule applies inside nested blocks,
+function literals, and package initializer expressions. Package initializer
+placement is owned by the exact `types.Initializer`, not by an arbitrarily
+chosen LHS variable. Unreachable shapes create no target name, file, or class.
 
 An admitted pointer is a typed reference to one canonical storage location.
 `new(T)` creates a fresh cell when `T` has a complete admitted value
@@ -1141,19 +1592,21 @@ observable contract here is panic occurrence plus the shared carrier identity.
 Recovered runtime-fault payload equivalence is installed with the later
 `panic`/`recover` family rather than guessed now.
 
-Array, slice, and map indexed stores use the same setter-store transaction.
+Array, slice, and map indexed stores use the same accessor-store transaction.
 For:
 
 ```go
 values[nextIndex()] = chooseSecond(resultPair())
 ```
 
-the store-target owner returns the receiver and index target expressions; the
-assignment owner evaluates and captures only operands that would otherwise
-move across prerequisite statements from `resultPair`, then emits one
-`.set(index, value)` or `.store(key, value)` call. The ordinary case remains a
-direct call with no temporary. A map-specific assignment route or unconditional
-capture policy is forbidden.
+the store-target owner returns the receiver, getter, setter, and index/key
+expressions. The assignment owner evaluates and captures only operands that
+would otherwise move across prerequisite statements from `resultPair`, then
+emits one `.set(index, value)` or `.store(key, value)` call. A compound defined
+value uses the same captured location for one later getter and one setter. The
+ordinary store remains a direct call with no temporary. A map-specific
+assignment route, write-only target model, or unconditional capture policy is
+forbidden.
 
 ## Packages, Standard Library, And Externals
 

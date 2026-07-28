@@ -9,6 +9,26 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
+func TestObservableContractRejectsGenericEmptyButAcceptsTypedCoverage(t *testing.T) {
+	factory := tsgo.NewFactory()
+	if _, err := ProjectContract(factory, nil); err == nil {
+		t.Fatal("generic empty materialized contract was accepted")
+	}
+	contract, err := ProjectCoverageContract(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if contract == nil || len(contract) != 0 {
+		t.Fatalf("coverage contract = %#v, want explicit empty contract", contract)
+	}
+	statement := artifactTestFunction(factory, "value", nil)
+	if _, err := ProjectCoverageContract(
+		[]tsgo.Statement{statement},
+	); err == nil {
+		t.Fatal("coverage-only contract accepted a target declaration")
+	}
+}
+
 func TestObservableFunctionContractIgnoresBody(t *testing.T) {
 	factory := tsgo.NewFactory()
 	first := artifactTestFunction(factory, "value", nil)

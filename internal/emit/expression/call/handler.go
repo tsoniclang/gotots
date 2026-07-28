@@ -8,7 +8,8 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	builtinexpression "github.com/tsoniclang/gotots/internal/emit/expression/builtin"
-	integerconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/integer"
+	conversionexpression "github.com/tsoniclang/gotots/internal/emit/expression/conversion"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -34,7 +35,7 @@ func emit(
 	source *ast.CallExpr,
 	discarded bool,
 ) (api.ExpressionEmission, error) {
-	if target, ok, err := integerconversion.Emit(
+	if target, ok, err := conversionexpression.Emit(
 		context,
 		children,
 		source,
@@ -93,11 +94,13 @@ func emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	guardNil := !static && !knownNonNil(source.Fun)
 	arguments, argumentBefore, argumentRequests, err := emitArguments(
 		context,
 		children,
 		source,
 		signature,
+		guardNil,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -111,7 +114,7 @@ func emit(
 				Reason: "static callee produced prerequisite statements",
 			}
 	}
-	if !static && len(argumentBefore) != 0 {
+	if guardNil || (!static && len(argumentBefore) != 0) {
 		temporaryName, err := context.Names().Temporary(api.TemporaryCallCallee)
 		if err != nil {
 			return api.ExpressionEmission{}, err
@@ -136,17 +139,38 @@ func emit(
 		targetCallee = context.Factory().Identifier(temporaryName)
 	}
 	before = append(before, argumentBefore...)
-	return api.NewExpressionEmission(
-		before,
-		context.Factory().CallExpression(
-			targetCallee,
-			nil,
-			nil,
-			arguments,
-			tsgo.NodeFlagsNone,
-		),
-		api.CombineRequests(callee.Requests(), argumentRequests),
+	var guardRequests []api.RootRequest
+	if guardNil {
+		guard, requests, err := nilGuard(context, targetCallee)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		before = append(before, guard)
+		guardRequests = requests
+		if _, ok := definedtype.ResolveCallable(
+			context.TypesInfo().TypeOf(source.Fun),
+		); ok {
+			targetCallee = context.Factory().PropertyAccessExpression(
+				targetCallee,
+				nil,
+				context.Factory().Identifier(definedtype.ValueMember),
+				tsgo.NodeFlagsNone,
+			)
+		}
+	}
+	call := context.Factory().CallExpression(
+		targetCallee,
+		nil,
+		nil,
+		arguments,
+		tsgo.NodeFlagsNone,
 	)
+	requests := api.CombineRequests(
+		callee.Requests(),
+		argumentRequests,
+		guardRequests,
+	)
+	return api.NewExpressionEmission(before, call, requests)
 }
 
 func validateResults(
@@ -261,10 +285,26 @@ func emitArguments(
 	children api.ChildEmitter,
 	source *ast.CallExpr,
 	signature *types.Signature,
+	captureAll bool,
 ) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
 	if len(source.Args) == 1 {
 		if results, ok := context.TypesInfo().TypeOf(source.Args[0]).(*types.Tuple); ok {
-			return emitMultipleArgument(context, children, source, signature, results)
+			arguments, before, requests, err := emitMultipleArgument(
+				context,
+				children,
+				source,
+				signature,
+				results,
+			)
+			if err != nil || !captureAll {
+				return arguments, before, requests, err
+			}
+			return captureArgumentExpressions(
+				context,
+				arguments,
+				before,
+				requests,
+			)
 		}
 	}
 	if signature.Params().Len() != len(source.Args) {
@@ -303,7 +343,7 @@ func emitArguments(
 		}
 		emissions = append(emissions, target)
 	}
-	if requiresCapture {
+	if requiresCapture || captureAll {
 		return captureArguments(context, children, source, signature, emissions)
 	}
 	arguments := make([]tsgo.Expression, 0, len(emissions))
@@ -313,6 +353,45 @@ func emitArguments(
 		requests = append(requests, target.Requests()...)
 	}
 	return arguments, nil, requests, nil
+}
+
+func captureArgumentExpressions(
+	context api.Context,
+	expressions []tsgo.Expression,
+	before []tsgo.Statement,
+	requests []api.RootRequest,
+) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
+	arguments := make([]tsgo.Expression, 0, len(expressions))
+	for _, expression := range expressions {
+		temporaryName, err := context.Names().Temporary(
+			api.TemporaryCallArgument,
+		)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		before = append(
+			before,
+			context.Factory().VariableStatement(
+				nil,
+				context.Factory().VariableDeclarationList(
+					[]tsgo.VariableDeclaration{
+						context.Factory().VariableDeclaration(
+							context.Factory().Identifier(temporaryName),
+							nil,
+							nil,
+							expression,
+						),
+					},
+					tsgo.NodeFlagsConst,
+				),
+			),
+		)
+		arguments = append(
+			arguments,
+			context.Factory().Identifier(temporaryName),
+		)
+	}
+	return arguments, before, requests, nil
 }
 
 func captureArguments(

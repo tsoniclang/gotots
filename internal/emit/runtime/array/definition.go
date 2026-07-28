@@ -38,7 +38,6 @@ func Build(
 		zeroMethod(factory, exportedName),
 		literalMethod(factory, exportedName, panicName),
 		copyMethod(factory, exportedName, elementType, lengthType),
-		equalMethod(factory, exportedName, elementType, lengthType),
 		getMethod(factory, elementType),
 		setMethod(factory, elementType),
 		checkMethod(factory, panicName),
@@ -295,80 +294,6 @@ func copyMethod(
 				),
 			},
 		))},
-	)
-}
-
-func equalMethod(
-	factory tsgo.Factory,
-	exportedName string,
-	elementType tsgo.TypeNode,
-	lengthType tsgo.TypeNode,
-) tsgo.MethodDeclaration {
-	index := factory.Identifier("index")
-	left := element(
-		factory,
-		property(factory, factory.ThisExpression(), "$values"),
-		index,
-	)
-	right := element(
-		factory,
-		property(factory, factory.Identifier("other"), "$values"),
-		index,
-	)
-	return runtimeMethod(
-		factory,
-		[]tsgo.ModifierLike{factory.PublicKeyword()},
-		arraymember.Equal,
-		nil,
-		[]tsgo.ParameterDeclaration{parameter(
-			factory,
-			nil,
-			"other",
-			arrayType(factory, exportedName, elementType, lengthType),
-		)},
-		factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindBooleanKeyword),
-		[]tsgo.Statement{
-			factory.ForStatement(
-				factory.VariableDeclarationList(
-					[]tsgo.VariableDeclaration{factory.VariableDeclaration(
-						index,
-						nil,
-						nil,
-						factory.NumericLiteral("0", tsgo.TokenFlagsNone),
-					)},
-					tsgo.NodeFlagsLet,
-				),
-				binary(
-					factory,
-					index,
-					tsgo.BinaryOperatorLessThanToken,
-					runtimeProperty(
-						factory,
-						factory.ThisExpression(),
-						arraymember.Length,
-					),
-				),
-				factory.PostfixUnaryExpression(
-					index,
-					tsgo.PostfixUnaryExpressionOperatorKindPlusPlusToken,
-				),
-				factory.Block([]tsgo.Statement{
-					factory.IfStatement(
-						binary(
-							factory,
-							left,
-							tsgo.BinaryOperatorExclamationEqualsEqualsToken,
-							right,
-						),
-						factory.Block([]tsgo.Statement{
-							factory.ReturnStatement(factory.FalseLiteral()),
-						}, true),
-						nil,
-					),
-				}, true),
-			),
-			factory.ReturnStatement(factory.TrueLiteral()),
-		},
 	)
 }
 

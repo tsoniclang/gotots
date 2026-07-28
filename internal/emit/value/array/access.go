@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
 	arraymember "github.com/tsoniclang/gotots/internal/emit/runtime/array/member"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -22,7 +23,7 @@ func (a RuntimeArray) EmitIndex(
 	receiver, err := children.Expression(
 		context.
 			WithRole(api.RoleArrayReceiver).
-			WithExpectedType(a.source),
+			WithExpectedType(a.sourceType),
 		source.X,
 	)
 	if err != nil {
@@ -32,21 +33,25 @@ func (a RuntimeArray) EmitIndex(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	before := receiver.Before()
-	receiverValue := receiver.Value()
-	if len(index.Before()) != 0 {
-		name, err := context.Names().Temporary(api.TemporaryArrayReceiver)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		before = append(before, variable(context, name, receiverValue))
-		receiverValue = context.Factory().Identifier(name)
+	ordered, err := expressionoperands.Preserve(
+		context,
+		api.TemporaryArrayReceiver,
+		expressionoperands.Present(receiver),
+		expressionoperands.Present(index),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
-	before = append(before, index.Before()...)
+	values := ordered.Values()
 	return api.NewExpressionEmission(
-		before,
-		callMember(context, receiverValue, arraymember.Get, index.Value()),
-		api.CombineRequests(receiver.Requests(), index.Requests()),
+		ordered.Before(),
+		callMember(
+			context,
+			a.storage(context, values[0]),
+			arraymember.Get,
+			values[1],
+		),
+		ordered.Requests(),
 	)
 }
 
@@ -55,17 +60,21 @@ func (a RuntimeArray) EmitStoreTarget(
 	children api.ChildEmitter,
 	source *ast.IndexExpr,
 ) (api.StoreTargetEmission, error) {
-	receiver, err := children.StoreTarget(
-		context.WithRole(api.RoleArrayReceiver),
+	if !types.Identical(
+		context.TypesInfo().TypeOf(source.X),
+		a.sourceType,
+	) {
+		return api.StoreTargetEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	receiver, err := children.Expression(
+		context.
+			WithRole(api.RoleArrayReceiver).
+			WithExpectedType(a.sourceType),
 		source.X,
 	)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
-	}
-	if receiver.IsSetter() ||
-		!types.Identical(receiver.SourceType(), a.source) {
-		return api.StoreTargetEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	index, err := emitIndex(context, children, source.Index)
 	if err != nil {
@@ -73,14 +82,15 @@ func (a RuntimeArray) EmitStoreTarget(
 	}
 	targetReceiver, err := api.NewExpressionEmission(
 		receiver.Before(),
-		receiver.Value(),
+		a.storage(context, receiver.Value()),
 		receiver.Requests(),
 	)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	return api.NewSetterStoreTargetEmission(
+	return api.NewAccessorStoreTargetEmission(
 		targetReceiver,
+		arraymember.Get.Name(),
 		arraymember.Set.Name(),
 		[]api.ExpressionEmission{index},
 		a.ElementType(),
@@ -93,14 +103,17 @@ func (a RuntimeArray) EmitLength(
 	source *ast.CallExpr,
 ) (api.ExpressionEmission, error) {
 	if len(source.Args) != 1 ||
-		!types.Identical(context.TypesInfo().TypeOf(source.Args[0]), a.source) {
+		!types.Identical(
+			context.TypesInfo().TypeOf(source.Args[0]),
+			a.sourceType,
+		) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	value, err := children.Expression(
 		context.
 			WithRole(api.RoleBuiltinArgument).
-			WithExpectedType(a.source),
+			WithExpectedType(a.sourceType),
 		source.Args[0],
 	)
 	if err != nil {
@@ -108,7 +121,7 @@ func (a RuntimeArray) EmitLength(
 	}
 	target := tsgo.Expression(memberProperty(
 		context,
-		value.Value(),
+		a.storage(context, value.Value()),
 		arraymember.Length,
 	))
 	if context.IntegerRepresentation() == api.IntegerRepresentationBigInt {

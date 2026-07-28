@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -74,6 +75,12 @@ func cancelDereference(
 ) (api.ExpressionEmission, error) {
 	pointerType := context.TypesInfo().TypeOf(source.X)
 	_, pointerElement, ok := pointertype.Resolve(pointerType)
+	defined, definedOK := definedtype.ResolvePointer(pointerType)
+	if definedOK {
+		pointer, _ := defined.Pointer()
+		pointerElement = pointer.Elem()
+		ok = true
+	}
 	if !ok || !types.Identical(pointerElement, element) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
@@ -104,9 +111,22 @@ func dereference(
 	pointer api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
 	_, element, ok := pointertype.Resolve(pointerType)
+	defined, definedOK := definedtype.ResolvePointer(pointerType)
+	if definedOK {
+		pointer, _ := defined.Pointer()
+		element = pointer.Elem()
+		ok = true
+	}
 	if !ok {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if definedOK {
+		var err error
+		pointer, err = defined.Project(context, pointer)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	}
 	targetElement, err := children.RepresentedType(
 		context.WithRole(api.RoleFieldReceiver),

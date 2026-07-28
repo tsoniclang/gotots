@@ -5,11 +5,13 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	runtimearray "github.com/tsoniclang/gotots/internal/emit/runtime/array"
+	complexruntime "github.com/tsoniclang/gotots/internal/emit/runtime/complex"
+	conversionruntime "github.com/tsoniclang/gotots/internal/emit/runtime/conversion"
+	floatruntime "github.com/tsoniclang/gotots/internal/emit/runtime/float"
 	integerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/integer"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
-	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	stringruntime "github.com/tsoniclang/gotots/internal/emit/runtime/string"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -111,9 +113,13 @@ func Build(
 		}
 		return []Definition{definition}, nil
 	}
-	if module == api.RuntimeModuleArray &&
-		len(symbols) == 1 &&
-		symbols[0] == api.RuntimeArray {
+	if module == api.RuntimeModuleArray {
+		if symbols[0] != api.RuntimeArray {
+			return nil, &AssemblyError{
+				Module: module,
+				Reason: "array runtime requires RuntimeArray first",
+			}
+		}
 		panicContract, err := api.RuntimeContract(api.RuntimePanic)
 		if err != nil {
 			return nil, err
@@ -132,60 +138,25 @@ func Build(
 		if err != nil {
 			return nil, err
 		}
-		return []Definition{definition}, nil
-	}
-	if module == api.RuntimeModuleSlice &&
-		(len(symbols) == 1 || len(symbols) == 2) &&
-		symbols[0] == api.RuntimeSlice &&
-		(len(symbols) == 1 || symbols[1] == api.RuntimeSliceAddress) {
-		contract, err := api.RuntimeContract(api.RuntimeSlice)
-		if err != nil {
-			return nil, err
-		}
-		panicContract, err := api.RuntimeContract(api.RuntimePanic)
-		if err != nil {
-			return nil, err
-		}
-		address := len(symbols) == 2
-		definition, err := NewDefinition(
-			api.RuntimeSlice,
-			runtimeslice.BuildWithAddress(
-				factory,
-				contract.ExportedName(),
-				panicContract.ExportedName(),
-				address,
-			),
-		)
-		if err != nil {
-			return nil, err
-		}
 		definitions := []Definition{definition}
-		if address {
-			addressContract, err := api.RuntimeContract(
-				api.RuntimeSliceAddress,
+		for _, symbol := range symbols[1:] {
+			statement, err := runtimearray.BuildAggregateOperation(
+				factory,
+				symbol,
 			)
 			if err != nil {
 				return nil, err
 			}
-			pointerContract, err := api.RuntimeContract(api.RuntimePointer)
+			definition, err := NewDefinition(symbol, statement)
 			if err != nil {
 				return nil, err
 			}
-			addressDefinition, err := NewDefinition(
-				api.RuntimeSliceAddress,
-				runtimeslice.BuildAddress(
-					factory,
-					addressContract.ExportedName(),
-					contract.ExportedName(),
-					pointerContract.ExportedName(),
-				),
-			)
-			if err != nil {
-				return nil, err
-			}
-			definitions = append(definitions, addressDefinition)
+			definitions = append(definitions, definition)
 		}
 		return definitions, nil
+	}
+	if module == api.RuntimeModuleSlice {
+		return buildSlice(factory, symbols)
 	}
 	if module == api.RuntimeModuleMap {
 		return buildMap(factory, symbols)
@@ -200,6 +171,51 @@ func Build(
 			symbols,
 			panicContract.ExportedName(),
 		)
+		if err != nil {
+			return nil, err
+		}
+		definitions := make([]Definition, 0, len(symbols))
+		for index, symbol := range symbols {
+			definition, err := NewDefinition(symbol, statements[index])
+			if err != nil {
+				return nil, err
+			}
+			definitions = append(definitions, definition)
+		}
+		return definitions, nil
+	}
+	if module == api.RuntimeModuleFloat {
+		statements, err := floatruntime.Build(factory, symbols)
+		if err != nil {
+			return nil, err
+		}
+		definitions := make([]Definition, 0, len(symbols))
+		for index, symbol := range symbols {
+			definition, err := NewDefinition(symbol, statements[index])
+			if err != nil {
+				return nil, err
+			}
+			definitions = append(definitions, definition)
+		}
+		return definitions, nil
+	}
+	if module == api.RuntimeModuleComplex {
+		statements, err := complexruntime.Build(factory, symbols)
+		if err != nil {
+			return nil, err
+		}
+		definitions := make([]Definition, 0, len(symbols))
+		for index, symbol := range symbols {
+			definition, err := NewDefinition(symbol, statements[index])
+			if err != nil {
+				return nil, err
+			}
+			definitions = append(definitions, definition)
+		}
+		return definitions, nil
+	}
+	if module == api.RuntimeModuleConversion {
+		statements, err := conversionruntime.Build(factory, symbols)
 		if err != nil {
 			return nil, err
 		}

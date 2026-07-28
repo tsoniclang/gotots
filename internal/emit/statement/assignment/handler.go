@@ -20,26 +20,23 @@ func Emit(
 		return emitDefinition(context, children, source)
 	case token.ASSIGN:
 		return emitAssignment(context, children, source)
-	case token.ADD_ASSIGN:
-		return emitCompoundAddition(context, children, source)
 	default:
-		return api.StatementEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
+		operator, ok := compoundOperator(source.Tok)
+		if !ok {
+			return api.StatementEmission{},
+				api.Unsupported(context, api.CategoryStatement, source)
+		}
+		return emitCompound(context, children, source, operator)
 	}
 }
 
-func emitCompoundAddition(
+func emitCompound(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.AssignStmt,
+	operator token.Token,
 ) (api.StatementEmission, error) {
 	if len(source.Lhs) != 1 || len(source.Rhs) != 1 {
-		return api.StatementEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
-	}
-	switch source.Lhs[0].(type) {
-	case *ast.Ident, *ast.SelectorExpr, *ast.StarExpr:
-	default:
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
@@ -50,7 +47,20 @@ func emitCompoundAddition(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	if target.IsSetter() ||
+	if context.Values().RequiresCustomUpdate(
+		context,
+		target.SourceType(),
+	) {
+		return emitCustomCompound(
+			context,
+			children,
+			source,
+			operator,
+			target,
+		)
+	}
+	if target.IsAccessor() ||
+		source.Tok != token.ADD_ASSIGN ||
 		!basictype.SupportsInteger(context.TypesSizes(), target.SourceType()) ||
 		!types.AssignableTo(
 			context.TypesInfo().TypeOf(source.Rhs[0]),
@@ -88,6 +98,156 @@ func emitCompoundAddition(
 		statements,
 		api.CombineRequests(target.Requests(), value.Requests()),
 	)
+}
+
+func emitCustomCompound(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.AssignStmt,
+	operator token.Token,
+	target api.StoreTargetEmission,
+) (api.StatementEmission, error) {
+	left := target.Value()
+	if target.IsAccessor() {
+		var err error
+		target, err = target.CaptureAccessorLocation(context)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		left, err = target.AccessorRead(context)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+	}
+	rightType := context.TypesInfo().TypeOf(source.Rhs[0])
+	expectedRight := rightType
+	assignable := rightType != nil &&
+		types.AssignableTo(rightType, target.SourceType())
+	if assignable {
+		expectedRight = target.SourceType()
+	}
+	if operator != token.SHL &&
+		operator != token.SHR &&
+		!assignable {
+		return api.StatementEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	right, err := children.Expression(
+		context.
+			WithRole(api.RoleAssignmentValue).
+			WithExpectedType(expectedRight),
+		source.Rhs[0],
+	)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
+	if context.EvaluationOrder() == api.EvaluationOrderPreserveGo {
+		right, err = captureCompoundRight(context, right)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+	}
+	result, handled, err := context.Values().BinaryUpdate(
+		context,
+		source,
+		source.Rhs[0],
+		target.SourceType(),
+		expectedRight,
+		operator,
+		left,
+		right,
+	)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
+	if !handled {
+		return api.StatementEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	if target.IsAccessor() {
+		stored, err := target.AccessorStore(context, result)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		statements := append(
+			stored.Before(),
+			context.Factory().ExpressionStatement(stored.Value()),
+		)
+		return api.NewStatementEmission(statements, stored.Requests())
+	}
+	assigned, err := context.Values().Assign(
+		context.WithRole(api.RoleAssignmentTarget),
+		source,
+		target.SourceType(),
+		target.Value(),
+		result,
+	)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
+	statements := target.Before()
+	statements = append(statements, assigned.Before()...)
+	statements = append(
+		statements,
+		context.Factory().ExpressionStatement(assigned.Value()),
+	)
+	return api.NewStatementEmission(
+		statements,
+		api.CombineRequests(target.Requests(), assigned.Requests()),
+	)
+}
+
+func captureCompoundRight(
+	context api.Context,
+	right api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	name, err := context.Names().Temporary(api.TemporaryAssignmentValue)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	before := append(
+		right.Before(),
+		variableStatement(
+			context,
+			tsgo.NodeFlagsConst,
+			name,
+			right.Value(),
+		),
+	)
+	return api.NewExpressionEmission(
+		before,
+		context.Factory().Identifier(name),
+		right.Requests(),
+	)
+}
+
+func compoundOperator(source token.Token) (token.Token, bool) {
+	switch source {
+	case token.ADD_ASSIGN:
+		return token.ADD, true
+	case token.SUB_ASSIGN:
+		return token.SUB, true
+	case token.MUL_ASSIGN:
+		return token.MUL, true
+	case token.QUO_ASSIGN:
+		return token.QUO, true
+	case token.REM_ASSIGN:
+		return token.REM, true
+	case token.AND_ASSIGN:
+		return token.AND, true
+	case token.OR_ASSIGN:
+		return token.OR, true
+	case token.XOR_ASSIGN:
+		return token.XOR, true
+	case token.SHL_ASSIGN:
+		return token.SHL, true
+	case token.SHR_ASSIGN:
+		return token.SHR, true
+	case token.AND_NOT_ASSIGN:
+		return token.AND_NOT, true
+	default:
+		return token.ILLEGAL, false
+	}
 }
 
 func emitDefinition(
@@ -292,16 +452,18 @@ func emitAssignment(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	value, err = context.Values().Copy(
-		context.WithRole(api.RoleAssignmentValue),
-		source.Rhs[0],
-		target.SourceType(),
-		value,
-	)
-	if err != nil {
-		return api.StatementEmission{}, err
+	if !target.CopiesValue() {
+		value, err = context.Values().Copy(
+			context.WithRole(api.RoleAssignmentValue),
+			source.Rhs[0],
+			target.SourceType(),
+			value,
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
 	}
-	if target.IsSetter() {
+	if target.IsAccessor() {
 		return emitSetter(context, target, value)
 	}
 	assigned, err := context.Values().Assign(

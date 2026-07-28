@@ -5,10 +5,12 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	complexbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/complex"
 	mapbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/map"
 	newvalue "github.com/tsoniclang/gotots/internal/emit/expression/builtin/newvalue"
+	orderedbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/ordered"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
-	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 )
@@ -24,12 +26,29 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	if target, handled, err := complexbuiltin.Emit(
+		context,
+		children,
+		source,
+		builtin,
+		discarded,
+	); handled {
+		return target, err
+	}
 	if target, handled, err := mapbuiltin.Emit(
 		context,
 		children,
 		source,
 		builtin,
 		discarded,
+	); handled {
+		return target, err
+	}
+	if target, handled, err := orderedbuiltin.Emit(
+		context,
+		children,
+		source,
+		builtin,
 	); handled {
 		return target, err
 	}
@@ -40,7 +59,7 @@ func Emit(
 		return emitMake(context, children, source, discarded)
 	case types.Universe.Lookup("len"):
 		if len(source.Args) == 1 &&
-			basictype.SupportsString(
+			supportsStringArgument(
 				context.TypesInfo().TypeOf(source.Args[0]),
 			) {
 			return emitStringLength(
@@ -123,10 +142,38 @@ func resultType(
 }
 
 func scalarSlice(
-	context api.Context,
+	_ api.Context,
 	sourceType types.Type,
 ) (*types.Slice, types.Type, bool) {
-	return slicevalue.Scalar(context.TypesSizes(), sourceType)
+	if defined, ok := definedtype.ResolveSlice(sourceType); ok {
+		sliceType, _ := defined.Slice()
+		return sliceType, sliceType.Elem(), true
+	}
+	return slicevalue.Resolve(sourceType)
+}
+
+func projectDefinedSlice(
+	context api.Context,
+	sourceType types.Type,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	defined, ok := definedtype.ResolveSlice(sourceType)
+	if !ok {
+		return value, nil
+	}
+	return defined.Project(context, value)
+}
+
+func wrapDefinedSlice(
+	context api.Context,
+	sourceType types.Type,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	defined, ok := definedtype.ResolveSlice(sourceType)
+	if !ok {
+		return value, nil
+	}
+	return defined.Wrap(context, value)
 }
 
 func arrayArgument(

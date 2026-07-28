@@ -1,12 +1,63 @@
 package arrayvalue_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
+
+func TestMultiResultPrerequisiteCapturesEachResultInOrder(t *testing.T) {
+	emission := compileArrayFixture(t)
+	var function tsgo.FunctionDeclaration
+	for _, file := range emission.Files() {
+		if file.Kind() != emit.TargetFileSource {
+			continue
+		}
+		for _, statement := range file.SourceFile().Statements() {
+			candidate, ok := statement.(tsgo.FunctionDeclaration)
+			if ok && candidate.Name().Text() == "MultiReturnArray" {
+				function = candidate
+			}
+		}
+	}
+	if function == nil {
+		t.Fatal("MultiReturnArray target function is absent")
+	}
+	statements := function.Body().(tsgo.Block).Statements()
+	var captures []string
+	for _, statement := range statements {
+		variable, ok := statement.(tsgo.VariableStatement)
+		if !ok {
+			continue
+		}
+		for _, declaration := range variable.DeclarationList().Declarations() {
+			name, ok := declaration.Name().(tsgo.Identifier)
+			if ok && strings.HasPrefix(name.Text(), "__gotots_results_") {
+				captures = append(captures, name.Text())
+			}
+		}
+	}
+	if len(captures) != 2 {
+		t.Fatalf("multi-return captures = %v, want one per result", captures)
+	}
+	returned, ok := statements[len(statements)-1].(tsgo.ReturnStatement)
+	if !ok {
+		t.Fatalf("last MultiReturnArray statement = %T, want return", statements[len(statements)-1])
+	}
+	tuple, ok := returned.Expression().(tsgo.ArrayLiteralExpression)
+	if !ok || len(tuple.Elements()) != 2 {
+		t.Fatalf("multi-return target = %T, want two-element tuple", returned.Expression())
+	}
+	for index, element := range tuple.Elements() {
+		identifier, ok := element.(tsgo.Identifier)
+		if !ok || identifier.Text() != captures[index] {
+			t.Fatalf("tuple element %d = %#v, want %s", index, element, captures[index])
+		}
+	}
+}
 
 func TestArraySourceAndRuntimeUseTypedTsGoAST(t *testing.T) {
 	emission := compileArrayFixture(t)
@@ -124,7 +175,6 @@ func assertArrayRuntimeMembers(
 		"zero",
 		"literal",
 		"copy",
-		"equal",
 		"get",
 		"set",
 		"$check",
@@ -132,6 +182,9 @@ func assertArrayRuntimeMembers(
 		if found[name] == nil {
 			t.Fatalf("array runtime has no %s method", name)
 		}
+	}
+	if len(found) != 6 {
+		t.Fatalf("array runtime methods = %v, want the six closed members", found)
 	}
 	assertFreshZeroConstruction(t, found["zero"])
 	assertCheckedAccess(t, found["get"])
