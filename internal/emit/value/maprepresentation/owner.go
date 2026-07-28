@@ -58,6 +58,22 @@ func EmitType(
 			reference.Requests()...,
 		), nil
 	}
+	if model.Storage() == StorageSpecialized {
+		reference, err := context.Names().MapSpecialization(
+			sourceType,
+			api.MapSpecializationDemandDefinition,
+		)
+		if err != nil {
+			return api.TypeEmission{}, err
+		}
+		return api.DirectType(
+			context.Factory().TypeReferenceNode(
+				context.Factory().Identifier(reference.Name()),
+				nil,
+			),
+			reference.Requests()...,
+		), nil
+	}
 	return api.TypeEmission{},
 		api.Unsupported(context, api.CategoryType, source)
 }
@@ -117,6 +133,29 @@ func Nil(
 				reference.Requests(),
 				zero.Requests(),
 			)...,
+		), nil
+	}
+	if model.Storage() == StorageSpecialized {
+		reference, err := context.Names().MapSpecialization(
+			sourceType,
+			api.MapSpecializationDemandStatic,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		nilName, err := mapruntime.Name(mapruntime.MemberNil)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.DirectExpression(
+			context.Factory().CallExpression(
+				staticMember(context, reference.Name(), nilName),
+				nil,
+				nil,
+				nil,
+				tsgo.NodeFlagsNone,
+			),
+			reference.Requests()...,
 		), nil
 	}
 	return api.ExpressionEmission{},
@@ -179,8 +218,34 @@ func Make(
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	if model.Storage() == StorageSpecialized {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
+		reference, err := context.Names().MapSpecialization(
+			sourceType,
+			api.MapSpecializationDemandStatic,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		makeName, err := mapruntime.Name(mapruntime.MemberMake)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		allRequests := append(
+			[][]api.RootRequest{reference.Requests()},
+			requests...,
+		)
+		return model.Wrap(context, api.DirectExpression(
+			context.Factory().CallExpression(
+				staticMember(context, reference.Name(), makeName),
+				nil,
+				nil,
+				[]tsgo.Expression{
+					size,
+					context.Factory().ArrayLiteralExpression(entries, false),
+				},
+				tsgo.NodeFlagsNone,
+			),
+			api.CombineRequests(allRequests...)...,
+		))
 	}
 	reference, typeArguments, err := Reference(
 		context,

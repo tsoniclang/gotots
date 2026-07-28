@@ -63,6 +63,13 @@ func TestDefinedMapsUseNilUnionAndExecuteDifferentially(t *testing.T) {
 func assertDefinedMapArtifacts(t *testing.T, artifacts materialized) {
 	t.Helper()
 	source := readFile(t, artifacts.file(t, "source.ts"))
+	t.Logf("defined map source bytes=%d", len(source))
+	if len(source) > 12_000 {
+		t.Fatalf(
+			"defined map source = %d bytes, want at most 12000",
+			len(source),
+		)
+	}
 	for _, required := range []string{
 		"Values | undefined",
 		"export type Alias = Values | undefined",

@@ -48,6 +48,26 @@ func supportsHash(
 		return types.Comparable(sourceType) &&
 			supportsHash(context, array.ElementType(), visiting)
 	}
+	if structType, ok := isAnonymousStruct(sourceType); ok {
+		if !types.Comparable(sourceType) {
+			return false
+		}
+		visiting[sourceType] = true
+		defer delete(visiting, sourceType)
+		for index := range structType.NumFields() {
+			if structType.Field(index).Name() == "_" {
+				continue
+			}
+			if !supportsHash(
+				context,
+				structType.Field(index).Type(),
+				visiting,
+			) {
+				return false
+			}
+		}
+		return true
+	}
 	_, structType, ok := namedStruct(sourceType)
 	if !ok || !types.Comparable(sourceType) {
 		return false
@@ -55,6 +75,9 @@ func supportsHash(
 	visiting[sourceType] = true
 	defer delete(visiting, sourceType)
 	for index := range structType.NumFields() {
+		if structType.Field(index).Name() == "_" {
+			continue
+		}
 		if !supportsHash(context, structType.Field(index).Type(), visiting) {
 			return false
 		}
@@ -78,6 +101,18 @@ func (Owner) Hash(
 	}
 	if array, ok := arrayvalue.Resolve(context, sourceType); ok {
 		return array.Hash(context, source, value)
+	}
+	if structType, ok := isAnonymousStruct(sourceType); ok {
+		if !(Owner{}).SupportsHash(context, sourceType) {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		return anonymousStructHash(
+			context,
+			source,
+			structType,
+			value,
+		)
 	}
 	if basic, ok := types.Unalias(sourceType).(*types.Basic); ok {
 		member, valid := hashMember(context, basic)

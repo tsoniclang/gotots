@@ -129,14 +129,14 @@ func onlyAnonymousStructArtifact(
 	session *programSession,
 ) *api.GeneratedArtifact {
 	t.Helper()
-	if len(session.registry.anonymousStructs) != 1 {
+	artifacts := session.registry.GeneratedArtifacts(
+		api.GeneratedArtifactAnonymousStruct,
+	)
+	if len(artifacts) != 1 {
 		t.Fatalf(
 			"anonymous artifacts = %d, want one",
-			len(session.registry.anonymousStructs),
+			len(artifacts),
 		)
 	}
-	for _, binding := range session.registry.anonymousStructs {
-		return binding.owner
-	}
-	return nil
+	return artifacts[0]
 }

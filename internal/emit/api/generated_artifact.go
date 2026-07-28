@@ -5,6 +5,19 @@ import (
 	"go/types"
 )
 
+type GeneratedArtifactKind uint8
+
+const (
+	GeneratedArtifactInvalid GeneratedArtifactKind = iota
+	GeneratedArtifactAnonymousStruct
+	GeneratedArtifactMapSpecialization
+)
+
+func (k GeneratedArtifactKind) Valid() bool {
+	return k == GeneratedArtifactAnonymousStruct ||
+		k == GeneratedArtifactMapSpecialization
+}
+
 type GeneratedArtifactPlacement uint8
 
 const (
@@ -19,7 +32,8 @@ func (p GeneratedArtifactPlacement) Valid() bool {
 }
 
 type GeneratedArtifact struct {
-	sourceType   *types.Struct
+	kind         GeneratedArtifactKind
+	sourceType   types.Type
 	artifact     string
 	targetName   string
 	placement    GeneratedArtifactPlacement
@@ -29,12 +43,13 @@ type GeneratedArtifact struct {
 }
 
 func NewCompilationGeneratedArtifact(
-	sourceType *types.Struct,
+	kind GeneratedArtifactKind,
+	sourceType types.Type,
 	artifact string,
 	targetName string,
 	outputPath string,
 ) (*GeneratedArtifact, error) {
-	if sourceType == nil ||
+	if !validGeneratedArtifactType(kind, sourceType) ||
 		artifact == "" ||
 		targetName == "" ||
 		outputPath == "" {
@@ -43,6 +58,7 @@ func NewCompilationGeneratedArtifact(
 		}
 	}
 	return &GeneratedArtifact{
+		kind:       kind,
 		sourceType: sourceType,
 		artifact:   artifact,
 		targetName: targetName,
@@ -52,20 +68,23 @@ func NewCompilationGeneratedArtifact(
 }
 
 func NewLexicalGeneratedArtifact(
-	sourceType *types.Struct,
+	kind GeneratedArtifactKind,
+	sourceType types.Type,
 	artifact string,
 	targetName string,
 	lexicalOwner ArtifactOwner,
 	anchor *types.TypeName,
 ) (*GeneratedArtifact, error) {
-	sourceOwner, sourceOwned := lexicalOwner.Source()
-	if sourceType == nil ||
+	sourcePackage := lexicalOwner.Package()
+	_, sourceOwned := lexicalOwner.Source()
+	_, _, initializerOwned := lexicalOwner.PackageInitializer()
+	if !validGeneratedArtifactType(kind, sourceType) ||
 		artifact == "" ||
 		targetName == "" ||
-		!sourceOwned ||
+		(!sourceOwned && !initializerOwned) ||
 		anchor == nil ||
-		sourceOwner.Pkg() == nil ||
-		anchor.Pkg() != sourceOwner.Pkg() ||
+		sourcePackage == nil ||
+		anchor.Pkg() != sourcePackage ||
 		anchor.Parent() == nil ||
 		anchor.Parent() == anchor.Pkg().Scope() {
 		return nil, &RootRequestError{
@@ -73,6 +92,7 @@ func NewLexicalGeneratedArtifact(
 		}
 	}
 	return &GeneratedArtifact{
+		kind:         kind,
 		sourceType:   sourceType,
 		artifact:     artifact,
 		targetName:   targetName,
@@ -82,11 +102,34 @@ func NewLexicalGeneratedArtifact(
 	}, nil
 }
 
-func (o *GeneratedArtifact) SourceType() *types.Struct {
+func (o *GeneratedArtifact) Kind() GeneratedArtifactKind {
+	if o == nil {
+		return GeneratedArtifactInvalid
+	}
+	return o.kind
+}
+
+func (o *GeneratedArtifact) SourceType() types.Type {
 	if o == nil {
 		return nil
 	}
 	return o.sourceType
+}
+
+func (o *GeneratedArtifact) StructType() (*types.Struct, bool) {
+	if o == nil || o.kind != GeneratedArtifactAnonymousStruct {
+		return nil, false
+	}
+	source, ok := types.Unalias(o.sourceType).(*types.Struct)
+	return source, ok
+}
+
+func (o *GeneratedArtifact) MapType() (*types.Map, bool) {
+	if o == nil || o.kind != GeneratedArtifactMapSpecialization {
+		return nil, false
+	}
+	source, ok := types.Unalias(o.sourceType).(*types.Map)
+	return source, ok
 }
 
 func (o *GeneratedArtifact) ArtifactKey() string {
@@ -143,7 +186,7 @@ func (o *GeneratedArtifact) ReconstructionOwner() ArtifactOwner {
 
 func (o *GeneratedArtifact) Valid() bool {
 	if o == nil ||
-		o.sourceType == nil ||
+		!validGeneratedArtifactType(o.kind, o.sourceType) ||
 		o.artifact == "" ||
 		o.targetName == "" ||
 		!o.placement.Valid() {
@@ -155,14 +198,35 @@ func (o *GeneratedArtifact) Valid() bool {
 			!o.lexicalOwner.Valid() &&
 			o.anchor == nil
 	case GeneratedArtifactPlacementLexical:
-		sourceOwner, sourceOwned := o.lexicalOwner.Source()
+		sourcePackage := o.lexicalOwner.Package()
+		_, sourceOwned := o.lexicalOwner.Source()
+		_, _, initializerOwned := o.lexicalOwner.PackageInitializer()
 		return o.outputPath == "" &&
-			sourceOwned &&
+			(sourceOwned || initializerOwned) &&
 			o.anchor != nil &&
-			sourceOwner.Pkg() != nil &&
-			o.anchor.Pkg() == sourceOwner.Pkg() &&
+			sourcePackage != nil &&
+			o.anchor.Pkg() == sourcePackage &&
 			o.anchor.Parent() != nil &&
 			o.anchor.Parent() != o.anchor.Pkg().Scope()
+	default:
+		return false
+	}
+}
+
+func validGeneratedArtifactType(
+	kind GeneratedArtifactKind,
+	sourceType types.Type,
+) bool {
+	if sourceType == nil || !kind.Valid() {
+		return false
+	}
+	switch kind {
+	case GeneratedArtifactAnonymousStruct:
+		_, ok := types.Unalias(sourceType).(*types.Struct)
+		return ok
+	case GeneratedArtifactMapSpecialization:
+		source, ok := types.Unalias(sourceType).(*types.Map)
+		return ok && types.Comparable(source.Key())
 	default:
 		return false
 	}

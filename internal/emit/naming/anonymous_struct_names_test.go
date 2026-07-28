@@ -1,4 +1,4 @@
-package emit
+package naming
 
 import (
 	"go/ast"
@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	anonymousstruct "github.com/tsoniclang/gotots/internal/emit/type/anonymousstruct"
+	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -32,8 +32,8 @@ func Distinct() {
 	if len(structTypes) != 8 {
 		t.Fatalf("anonymous struct types = %d, want 8", len(structTypes))
 	}
-	registry := newDeclarationRegistry()
-	names := newNameOwnerWithRegistry(
+	registry := NewRegistry()
+	names := NewOwner(
 		sourcePackage.Scope(),
 		info,
 		registry,
@@ -43,7 +43,7 @@ func Distinct() {
 		tsgo.NewFactory(),
 		"modules/identity/source.ts",
 		nil,
-	).(*fileNames)
+	).(*File)
 	references := make([]api.NameReference, len(structTypes))
 	for index, structType := range structTypes {
 		var err error
@@ -94,7 +94,7 @@ func Second() {
 		types.TypeString(structTypes[1].target, qualifier) {
 		t.Fatal("spelling-only identity foil is not actually identical")
 	}
-	registry := newDeclarationRegistry()
+	registry := NewRegistry()
 	var functions []*types.Func
 	var functionDeclarations []*ast.FuncDecl
 	for _, declaration := range sourceFile.Decls {
@@ -111,7 +111,7 @@ func Second() {
 			t.Fatal(err)
 		}
 	}
-	names := newNameOwnerWithRegistry(
+	names := NewOwner(
 		sourcePackage.Scope(),
 		info,
 		registry,
@@ -121,11 +121,11 @@ func Second() {
 		tsgo.NewFactory(),
 		"modules/identity/source.ts",
 		nil,
-	).(*fileNames)
+	).(*File)
 	var references []api.NameReference
 	for index, structType := range structTypes {
-		finish, err := names.beginArtifact(
-			sourceArtifactOwner(functions[index]),
+		finish, err := names.BeginArtifact(
+			api.MustSourceArtifactOwner(functions[index]),
 			functionDeclarations[index],
 			sourceFile,
 			"modules/identity/source.ts",
@@ -157,7 +157,105 @@ func Second() {
 	}
 }
 
-func TestAnonymousStructFingerprintCollisionStillExactJoins(t *testing.T) {
+func TestGeneratedArtifactIdentityIgnoresTargetSpelling(t *testing.T) {
+	sourceFile, sourcePackage, info, structTypes := checkAnonymousStructs(t, `package identity
+
+type PackageValue int32
+
+func Use() {
+	type LocalValue int32
+	var _ struct {
+		Package PackageValue
+		Local LocalValue
+	}
+}
+`)
+	if len(structTypes) != 1 {
+		t.Fatalf("anonymous struct types = %d, want 1", len(structTypes))
+	}
+	var packageType *types.TypeName
+	var localType *types.TypeName
+	var function *types.Func
+	var declaration *ast.FuncDecl
+	for identifier, object := range info.Defs {
+		switch identifier.Name {
+		case "PackageValue":
+			packageType, _ = object.(*types.TypeName)
+		case "LocalValue":
+			localType, _ = object.(*types.TypeName)
+		case "Use":
+			function, _ = object.(*types.Func)
+		}
+	}
+	for _, selected := range sourceFile.Decls {
+		candidate, ok := selected.(*ast.FuncDecl)
+		if ok && candidate.Name.Name == "Use" {
+			declaration = candidate
+		}
+	}
+	if packageType == nil ||
+		localType == nil ||
+		function == nil ||
+		declaration == nil {
+		t.Fatal("named-component identity fixture is incomplete")
+	}
+	registry := NewRegistry()
+	owner := NewOwner(sourcePackage.Scope(), info, registry)
+	if _, err := owner.Reserve(
+		packageType,
+		sourceFile,
+		"modules/identity/source.ts",
+	); err != nil {
+		t.Fatal(err)
+	}
+	names := owner.ForFile(
+		sourceFile,
+		sourcePackage.Scope(),
+		tsgo.NewFactory(),
+		"modules/identity/source.ts",
+		nil,
+	).(*File)
+	finish, err := names.BeginArtifact(
+		api.MustSourceArtifactOwner(function),
+		declaration,
+		sourceFile,
+		"modules/identity/source.ts",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer finish()
+	first, err := names.AnonymousStruct(
+		structTypes[0].target,
+		api.AnonymousStructDemandDefinition,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner.targetNameByObject[packageType] = "renamed_package_value"
+	owner.targetNameByObject[localType] = "renamed_local_value"
+	second, err := names.AnonymousStruct(
+		structTypes[0].target,
+		api.AnonymousStructDemandDefinition,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Name() != second.Name() {
+		t.Fatalf(
+			"target spelling changed generated identity: %q/%q",
+			first.Name(),
+			second.Name(),
+		)
+	}
+	if artifacts := registry.GeneratedArtifacts(
+		api.GeneratedArtifactAnonymousStruct,
+	); len(artifacts) != 1 {
+		t.Fatalf("generated artifacts = %d, want 1", len(artifacts))
+	}
+}
+
+func TestAnonymousStructIdentityCollisionsFailClosed(t *testing.T) {
 	_, _, _, structTypes := checkAnonymousStructs(t, `package collision
 
 var First struct{ Value int32 }
@@ -169,58 +267,33 @@ var Second struct{ Value int64 }
 	objectIdentity := func(object *types.TypeName) (string, error) {
 		return object.Name(), nil
 	}
-	firstKeys, err := anonymousstruct.BuildKeys(
+	firstKey, err := typeidentity.BuildKey(
 		structTypes[0].target,
 		objectIdentity,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondKeys, err := anonymousstruct.BuildKeys(
+	secondKey, err := typeidentity.BuildKey(
 		structTypes[1].target,
 		objectIdentity,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondKeys.Fingerprint = firstKeys.Fingerprint
-	registry := newDeclarationRegistry()
 	placement := moduleAnonymousStructPlacement()
-	first, err := registry.internAnonymousStruct(
-		firstKeys,
-		structTypes[0].target,
-		placement,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, err := registry.internAnonymousStruct(
-		secondKeys,
-		structTypes[1].target,
-		placement,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if first.owner.ArtifactKey() == second.owner.ArtifactKey() ||
-		first.name == second.name ||
-		len(registry.anonymousStructBuckets[firstKeys.Fingerprint]) != 2 {
-		t.Fatal("forced fingerprint collision unified non-identical Go types")
-	}
 
 	t.Run("artifact key", func(t *testing.T) {
-		registry := newDeclarationRegistry()
+		registry := NewRegistry()
 		if _, err := registry.internAnonymousStruct(
-			firstKeys,
+			firstKey,
 			structTypes[0].target,
 			placement,
 		); err != nil {
 			t.Fatal(err)
 		}
-		collision := secondKeys
-		collision.Artifact = firstKeys.Artifact
 		if _, err := registry.internAnonymousStruct(
-			collision,
+			firstKey,
 			structTypes[1].target,
 			placement,
 		); err == nil {
@@ -229,18 +302,16 @@ var Second struct{ Value int64 }
 	})
 
 	t.Run("target prefix", func(t *testing.T) {
-		registry := newDeclarationRegistry()
+		registry := NewRegistry()
 		if _, err := registry.internAnonymousStruct(
-			firstKeys,
+			firstKey,
 			structTypes[0].target,
 			placement,
 		); err != nil {
 			t.Fatal(err)
 		}
-		collision := secondKeys
-		collision.Artifact =
-			firstKeys.Artifact[:20] + secondKeys.Artifact[20:]
-		if collision.Artifact == firstKeys.Artifact {
+		collision := firstKey[:20] + secondKey[20:]
+		if collision == firstKey {
 			t.Fatal("target-prefix collision fixture is identical")
 		}
 		if _, err := registry.internAnonymousStruct(
@@ -274,27 +345,27 @@ func TestAnonymousStructCrossPackageOwnershipIgnoresFirstEncounter(t *testing.T)
 	identity := func(object *types.TypeName) (string, error) {
 		return object.Name(), nil
 	}
-	firstKeys, err := anonymousstruct.BuildKeys(firstType, identity)
+	firstKey, err := typeidentity.BuildKey(firstType, identity)
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondKeys, err := anonymousstruct.BuildKeys(secondType, identity)
+	secondKey, err := typeidentity.BuildKey(secondType, identity)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if firstKeys != secondKeys {
-		t.Fatalf("identical cross-package keys = %#v/%#v", firstKeys, secondKeys)
+	if firstKey != secondKey {
+		t.Fatalf("identical cross-package keys = %q/%q", firstKey, secondKey)
 	}
-	firstOwner, err := newDeclarationRegistry().internAnonymousStruct(
-		firstKeys,
+	firstOwner, err := NewRegistry().internAnonymousStruct(
+		firstKey,
 		firstType,
 		moduleAnonymousStructPlacement(),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondOwner, err := newDeclarationRegistry().internAnonymousStruct(
-		secondKeys,
+	secondOwner, err := NewRegistry().internAnonymousStruct(
+		secondKey,
 		secondType,
 		moduleAnonymousStructPlacement(),
 	)
@@ -308,10 +379,9 @@ func TestAnonymousStructCrossPackageOwnershipIgnoresFirstEncounter(t *testing.T)
 	}
 }
 
-func moduleAnonymousStructPlacement() anonymousStructPlacement {
-	return anonymousStructPlacement{
-		kind:       api.GeneratedArtifactPlacementCompilation,
-		outputPath: "support/anonymous-structs.ts",
+func moduleAnonymousStructPlacement() generatedArtifactPlacement {
+	return generatedArtifactPlacement{
+		kind: api.GeneratedArtifactPlacementCompilation,
 	}
 }
 

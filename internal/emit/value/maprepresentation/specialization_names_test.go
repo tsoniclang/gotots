@@ -44,6 +44,13 @@ func (staticSpecializationNames) AnonymousStruct(
 	panic("unused")
 }
 
+func (staticSpecializationNames) MapSpecialization(
+	types.Type,
+	api.MapSpecializationDemand,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (staticSpecializationNames) ConstantProjection(
 	*types.Const,
 	types.BasicKind,

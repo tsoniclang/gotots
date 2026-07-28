@@ -297,6 +297,22 @@ func NewAnonymousStructRequest(
 	}, nil
 }
 
+func NewMapSpecializationRequest(
+	artifact *GeneratedArtifact,
+	demand MapSpecializationDemand,
+) (RootRequest, error) {
+	requirement, err := NewMapSpecializationRequirement(artifact, demand)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return RootRequest{
+		owner: RootRequestOwner{
+			kind:                   RootRequestDeclarationRequirement,
+			declarationRequirement: requirement,
+		},
+	}, nil
+}
+
 func (r RootRequest) Kind() RootRequestKind {
 	return r.owner.kind
 }
@@ -306,8 +322,8 @@ func (r RootRequest) LegalScope() PlacementScope {
 		return ScopeFileImports
 	}
 	if r.owner.kind == RootRequestDeclarationRequirement {
-		if artifact, _, ok := r.owner.declarationRequirement.
-			AnonymousStruct(); ok &&
+		if artifact, ok := r.owner.declarationRequirement.
+			GeneratedArtifact(); ok &&
 			artifact.Placement() ==
 				GeneratedArtifactPlacementCompilation {
 			return ScopeCompilationSupport

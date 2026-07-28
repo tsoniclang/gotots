@@ -246,7 +246,7 @@ func (s *programSession) verifyRootObligations(
 			root.kind != RootConstantProjection {
 			continue
 		}
-		binding, ok := s.registry.byObject[selected]
+		binding, ok := s.registry.Target(selected)
 		if !ok {
 			return &ScheduleError{
 				Object: selected.Name(),
@@ -254,7 +254,7 @@ func (s *programSession) verifyRootObligations(
 			}
 		}
 		name, err := api.ConstantProjectionName(
-			binding.name,
+			binding.Name,
 			root.projection,
 		)
 		if err != nil {
@@ -263,7 +263,7 @@ func (s *programSession) verifyRootObligations(
 		count := 0
 		for _, file := range files {
 			if file.kind != TargetFileSource ||
-				file.outputPath != binding.sourcePath {
+				file.outputPath != binding.SourcePath {
 				continue
 			}
 			for _, statement := range file.sourceFile.Statements() {

@@ -1,4 +1,4 @@
-package emit
+package naming
 
 import (
 	"go/ast"
@@ -10,8 +10,8 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-type fileNames struct {
-	owner          *nameOwner
+type File struct {
+	owner          *Owner
 	sourceFile     *ast.File
 	packageScope   *types.Scope
 	factory        tsgo.Factory
@@ -29,16 +29,16 @@ type fileNames struct {
 	artifactPath   string
 }
 
-type temporarySnapshot map[api.TemporaryKind]uint64
+type TemporarySnapshot map[api.TemporaryKind]uint64
 
-func (n *nameOwner) ForFile(
+func (n *Owner) ForFile(
 	sourceFile *ast.File,
 	packageScope *types.Scope,
 	factory tsgo.Factory,
 	targetPath string,
 	require func(types.Object) error,
 ) api.Names {
-	return &fileNames{
+	return &File{
 		owner:         n,
 		sourceFile:    sourceFile,
 		packageScope:  packageScope,
@@ -54,7 +54,7 @@ func (n *nameOwner) ForFile(
 	}
 }
 
-func (n *fileNames) Declare(object types.Object) (string, error) {
+func (n *File) Declare(object types.Object) (string, error) {
 	if object != nil && object.Parent() == n.packageScope {
 		binding, ok := n.owner.byObject[object]
 		if !ok {
@@ -68,7 +68,7 @@ func (n *fileNames) Declare(object types.Object) (string, error) {
 	return n.owner.declare(object, targetBinding{})
 }
 
-func (n *fileNames) Parameter(parameter *types.Var, index int) (string, error) {
+func (n *File) Parameter(parameter *types.Var, index int) (string, error) {
 	switch {
 	case parameter == nil:
 		return "", &api.NameError{Reason: "parameter object is nil"}
@@ -81,7 +81,7 @@ func (n *fileNames) Parameter(parameter *types.Var, index int) (string, error) {
 	}
 }
 
-func (n *fileNames) Reference(object types.Object) (api.NameReference, error) {
+func (n *File) Reference(object types.Object) (api.NameReference, error) {
 	facet, err := valueReferenceFacet(object)
 	if err != nil {
 		return api.NameReference{}, err
@@ -89,7 +89,7 @@ func (n *fileNames) Reference(object types.Object) (api.NameReference, error) {
 	return n.reference(object, api.ImportPhaseValue, facet)
 }
 
-func (n *fileNames) TypeReference(
+func (n *File) TypeReference(
 	object types.Object,
 ) (api.NameReference, error) {
 	if _, ok := object.(*types.TypeName); !ok {
@@ -105,7 +105,7 @@ func (n *fileNames) TypeReference(
 	)
 }
 
-func (n *fileNames) reference(
+func (n *File) reference(
 	object types.Object,
 	phase api.ImportPhase,
 	facet api.ArtifactFacet,
@@ -183,7 +183,7 @@ func (n *fileNames) reference(
 	return api.NewNameReference(binding.name, requests...)
 }
 
-func (n *fileNames) PackageVariable(
+func (n *File) PackageVariable(
 	variable *types.Var,
 ) (api.PackageVariableReference, error) {
 	if variable == nil {
@@ -239,7 +239,7 @@ func (n *fileNames) PackageVariable(
 	)
 }
 
-func (n *fileNames) NamedStructOperation(
+func (n *File) NamedStructOperation(
 	typeName *types.TypeName,
 	operation api.NamedStructOperation,
 ) (api.NameReference, error) {
@@ -259,7 +259,7 @@ func (n *fileNames) NamedStructOperation(
 	return api.NewNameReference(reference.Name(), requests...)
 }
 
-func (n *fileNames) beginArtifact(
+func (n *File) BeginArtifact(
 	owner api.ArtifactOwner,
 	source ast.Node,
 	sourceFile *ast.File,
@@ -275,6 +275,7 @@ func (n *fileNames) beginArtifact(
 		}
 	}
 	sourceOwner, sourceOwned := owner.Source()
+	_, initializer, initializerOwned := owner.PackageInitializer()
 	generatedOwner, generatedOwned := owner.Generated()
 	switch {
 	case sourceOwned:
@@ -288,6 +289,19 @@ func (n *fileNames) beginArtifact(
 			return nil, &api.NameError{
 				Name:   owner.Name(),
 				Reason: "source artifact has no exact declaration anchor",
+			}
+		}
+	case initializerOwned:
+		if source == nil ||
+			sourceFile == nil ||
+			sourcePath == "" ||
+			initializer.Rhs.Pos() < source.Pos() ||
+			initializer.Rhs.End() > source.End() ||
+			source.Pos() < sourceFile.Pos() ||
+			source.End() > sourceFile.End() {
+			return nil, &api.NameError{
+				Name:   owner.Name(),
+				Reason: "package initializer artifact has no exact declaration anchor",
 			}
 		}
 	case generatedOwned:
@@ -314,15 +328,15 @@ func (n *fileNames) beginArtifact(
 	}, nil
 }
 
-func (n *fileNames) snapshotTemporaries() temporarySnapshot {
-	snapshot := make(temporarySnapshot, len(n.temporaries))
+func (n *File) SnapshotTemporaries() TemporarySnapshot {
+	snapshot := make(TemporarySnapshot, len(n.temporaries))
 	for kind, value := range n.temporaries {
 		snapshot[kind] = value
 	}
 	return snapshot
 }
 
-func (n *fileNames) restoreTemporaries(snapshot temporarySnapshot) {
+func (n *File) RestoreTemporaries(snapshot TemporarySnapshot) {
 	n.temporaries = make(map[api.TemporaryKind]uint64, len(snapshot))
 	for kind, value := range snapshot {
 		n.temporaries[kind] = value
@@ -345,7 +359,7 @@ func valueReferenceFacet(object types.Object) (api.ArtifactFacet, error) {
 	}
 }
 
-func (n *fileNames) Member(field *types.Var) (string, error) {
+func (n *File) Member(field *types.Var) (string, error) {
 	if field == nil {
 		return "", &api.NameError{Reason: "field object is nil"}
 	}
@@ -362,7 +376,7 @@ func (n *fileNames) Member(field *types.Var) (string, error) {
 	return name, nil
 }
 
-func (n *fileNames) importName(
+func (n *File) importName(
 	object types.Object,
 	preferred string,
 ) (string, error) {
@@ -378,7 +392,7 @@ func (n *fileNames) importName(
 	return candidate, nil
 }
 
-func (n *fileNames) packageImportQualifier(
+func (n *File) packageImportQualifier(
 	sourcePackage *types.Package,
 ) (string, error) {
 	if sourcePackage == nil {
@@ -394,7 +408,7 @@ func (n *fileNames) packageImportQualifier(
 	return qualifier, nil
 }
 
-func (n *fileNames) allocateImportName(preferred string, qualifier string) string {
+func (n *File) allocateImportName(preferred string, qualifier string) string {
 	base := preferred + "__from_" + qualifier
 	candidate := base
 	for suffix := uint64(1); n.sourceNameExists(candidate) ||
@@ -405,22 +419,22 @@ func (n *fileNames) allocateImportName(preferred string, qualifier string) strin
 	return candidate
 }
 
-func (n *fileNames) sourceNameExists(name string) bool {
+func (n *File) sourceNameExists(name string) bool {
 	return (n.packageScope != nil && n.packageScope.Lookup(name) != nil) ||
 		n.owner.hasSourceName(name)
 }
 
-func (n *fileNames) hasImportName(name string) bool {
+func (n *File) hasImportName(name string) bool {
 	_, exists := n.importNames[name]
 	return exists
 }
 
-func (n *nameOwner) hasSourceName(name string) bool {
+func (n *Owner) hasSourceName(name string) bool {
 	_, exists := n.sourceNameBases[name]
 	return exists
 }
 
-func (n *fileNames) Primitive(alias api.PrimitiveAlias) (api.NameReference, error) {
+func (n *File) Primitive(alias api.PrimitiveAlias) (api.NameReference, error) {
 	if existing := n.primitives[alias]; existing != "" {
 		modulePath, err := output.ModuleSpecifier(
 			n.targetPath,
@@ -475,7 +489,7 @@ func (n *fileNames) Primitive(alias api.PrimitiveAlias) (api.NameReference, erro
 	return api.NewNameReference(localName, request)
 }
 
-func (n *fileNames) Runtime(
+func (n *File) Runtime(
 	symbol api.RuntimeSymbol,
 	phase api.ImportPhase,
 ) (api.NameReference, error) {
@@ -529,7 +543,7 @@ func (n *fileNames) Runtime(
 	return api.NewNameReference(localName, request)
 }
 
-func (n *fileNames) Temporary(kind api.TemporaryKind) (string, error) {
+func (n *File) Temporary(kind api.TemporaryKind) (string, error) {
 	prefix, err := api.TemporaryPrefix(kind)
 	if err != nil {
 		return "", err
@@ -545,7 +559,7 @@ func (n *fileNames) Temporary(kind api.TemporaryKind) (string, error) {
 	}
 }
 
-func (n *fileNames) ModuleExport(object types.Object) (bool, error) {
+func (n *File) ModuleExport(object types.Object) (bool, error) {
 	if object == nil {
 		return false, &api.NameError{Reason: "declaration object is nil"}
 	}

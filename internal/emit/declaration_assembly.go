@@ -7,6 +7,8 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
+	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
+	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -142,93 +144,6 @@ func (s *declarationRequirementScheduler) appliedFor(
 	return requirements
 }
 
-func compareBasicKinds(left types.BasicKind, right types.BasicKind) int {
-	switch {
-	case left < right:
-		return -1
-	case left > right:
-		return 1
-	default:
-		return 0
-	}
-}
-
-func compareDeclarationRequirements(
-	left api.DeclarationRequirement,
-	right api.DeclarationRequirement,
-) int {
-	if order := compareArtifactOwners(left.Owner(), right.Owner()); order != 0 {
-		return order
-	}
-	if left.Kind() < right.Kind() {
-		return -1
-	}
-	if left.Kind() > right.Kind() {
-		return 1
-	}
-	if left.Kind() == api.DeclarationRequirementAddressableStorage {
-		_, leftVariable, leftOK := left.AddressableStorage()
-		_, rightVariable, rightOK := right.AddressableStorage()
-		switch {
-		case !leftOK && rightOK:
-			return -1
-		case leftOK && !rightOK:
-			return 1
-		case !leftOK:
-			return 0
-		default:
-			return compareObjects(leftVariable, rightVariable)
-		}
-	}
-	if left.Kind() == api.DeclarationRequirementConstantProjection {
-		_, leftProjection, _ := left.ConstantProjection()
-		_, rightProjection, _ := right.ConstantProjection()
-		return compareBasicKinds(leftProjection, rightProjection)
-	}
-	if left.Kind() == api.DeclarationRequirementLocalConstantProjection {
-		_, leftConstant, leftProjection, _ := left.LocalConstantProjection()
-		_, rightConstant, rightProjection, _ := right.LocalConstantProjection()
-		if order := compareObjects(leftConstant, rightConstant); order != 0 {
-			return order
-		}
-		return compareBasicKinds(leftProjection, rightProjection)
-	}
-	if left.Kind() == api.DeclarationRequirementDefinedArrayOperation {
-		_, leftOperation, _ := left.DefinedArrayOperation()
-		_, rightOperation, _ := right.DefinedArrayOperation()
-		switch {
-		case leftOperation < rightOperation:
-			return -1
-		case leftOperation > rightOperation:
-			return 1
-		default:
-			return 0
-		}
-	}
-	if left.Kind() == api.DeclarationRequirementAnonymousStruct {
-		_, leftDemand, _ := left.AnonymousStruct()
-		_, rightDemand, _ := right.AnonymousStruct()
-		switch {
-		case leftDemand < rightDemand:
-			return -1
-		case leftDemand > rightDemand:
-			return 1
-		default:
-			return 0
-		}
-	}
-	_, leftOperation, _ := left.NamedStructOperation()
-	_, rightOperation, _ := right.NamedStructOperation()
-	switch {
-	case leftOperation < rightOperation:
-		return -1
-	case leftOperation > rightOperation:
-		return 1
-	default:
-		return 0
-	}
-}
-
 func (s *programSession) scheduleDeclarationRequirement(
 	requirement api.DeclarationRequirement,
 ) error {
@@ -241,35 +156,34 @@ func (s *programSession) scheduleDeclarationRequirement(
 	if !requirement.Valid() {
 		return &ScheduleError{Reason: "declaration requirement is invalid"}
 	}
-	if artifact, _, anonymous := requirement.AnonymousStruct(); anonymous {
-		if err := s.validateAnonymousStructArtifact(artifact); err != nil {
+	if artifact, generated := requirement.GeneratedArtifact(); generated {
+		if err := s.validateGeneratedArtifact(artifact); err != nil {
 			return err
 		}
 	}
-	if sourceOwner, sourceOwned := requirement.Owner().Source(); sourceOwned {
+	owner := requirement.Owner()
+	if sourceOwner, sourceOwned := owner.Source(); sourceOwned {
 		if _, ok := s.sites[sourceOwner]; !ok {
 			return &ScheduleError{
 				Object: requirementOwnerName(requirement),
 				Reason: "declaration requirement owner has no source declaration",
 			}
 		}
-		if _, initializerOwner := s.packageInitializerOwners[sourceOwner]; initializerOwner {
-			sourcePackage := s.source.PackageForTypes(sourceOwner.Pkg())
-			if sourcePackage == nil {
-				return &ScheduleError{
-					Object: sourceOwner.Name(),
-					Reason: "package initializer owner has no source package",
-				}
-			}
-			if err := s.requirePackage(sourcePackage); err != nil {
-				return err
-			}
-		} else {
-			if err := s.require(sourceOwner); err != nil {
-				return err
+		if err := s.require(sourceOwner); err != nil {
+			return err
+		}
+	} else if sourceTypes, _, initializerOwned := owner.PackageInitializer(); initializerOwned {
+		sourcePackage := s.source.PackageForTypes(sourceTypes)
+		if sourcePackage == nil {
+			return &ScheduleError{
+				Object: owner.Name(),
+				Reason: "package initializer owner has no source package",
 			}
 		}
-	} else if _, generatedOwned := requirement.Owner().Generated(); !generatedOwned {
+		if err := s.requirePackage(sourcePackage); err != nil {
+			return err
+		}
+	} else if _, generatedOwned := owner.Generated(); !generatedOwned {
 		return &ScheduleError{
 			Object: requirementOwnerName(requirement),
 			Reason: "declaration requirement owner is invalid",
@@ -296,24 +210,41 @@ func (s *programSession) applyDeclarationRequirements(
 	}
 	if generatedOwner, ok := owner.Generated(); ok {
 		for _, requirement := range requirements {
-			selectedOwner, _, anonymous := requirement.AnonymousStruct()
+			selectedOwner, generated := requirement.GeneratedArtifact()
 			if !requirement.Valid() ||
-				!anonymous ||
+				!generated ||
 				selectedOwner != generatedOwner ||
 				requirement.Owner() != owner {
 				return &ScheduleError{
 					Object: owner.Name(),
-					Reason: "anonymous-struct requirement batch has mixed or invalid ownership",
+					Reason: "generated-artifact requirement batch has mixed or invalid ownership",
 				}
 			}
 			if _, accepted := s.requirements.applied[requirement]; !accepted {
 				return &ScheduleError{
 					Object: owner.Name(),
-					Reason: "anonymous-struct requirement was not accepted by its owner",
+					Reason: "generated-artifact requirement was not accepted by its owner",
 				}
 			}
 		}
-		return s.reconstructAnonymousStruct(generatedOwner)
+		return s.reconstructGeneratedArtifact(generatedOwner)
+	}
+	if _, _, initializerOwned := owner.PackageInitializer(); initializerOwned {
+		for _, requirement := range requirements {
+			if !requirement.Valid() || requirement.Owner() != owner {
+				return &ScheduleError{
+					Object: owner.Name(),
+					Reason: "package initializer requirement batch has mixed or invalid ownership",
+				}
+			}
+			if _, accepted := s.requirements.applied[requirement]; !accepted {
+				return &ScheduleError{
+					Object: owner.Name(),
+					Reason: "package initializer requirement was not accepted by its owner",
+				}
+			}
+		}
+		return s.reconstructPackageInitializer(owner)
 	}
 	sourceOwner, sourceOwned := owner.Source()
 	if !sourceOwned {
@@ -351,20 +282,20 @@ func requirementOwnerName(requirement api.DeclarationRequirement) string {
 
 type artifactRevision struct {
 	statements     []tsgo.Statement
-	placement      *placementOwner
+	placement      *targetplacement.Owner
 	dependencies   []api.ArtifactDependency
 	contract       artifactstate.Contract
-	temporaryStart temporarySnapshot
+	temporaryStart emitnaming.TemporarySnapshot
 }
 
 func (s *programSession) buildArtifactRevision(
 	builder *targetFileBuilder,
 	site declarationSite,
 	owner types.Object,
-	temporaryStart temporarySnapshot,
+	temporaryStart emitnaming.TemporarySnapshot,
 	reconstruction bool,
 ) (artifactRevision, error) {
-	names, ok := builder.context.Names().(*fileNames)
+	names, ok := builder.context.Names().(*emitnaming.File)
 	if !ok {
 		return artifactRevision{}, &ScheduleError{
 			Object: owner.Name(),
@@ -372,14 +303,14 @@ func (s *programSession) buildArtifactRevision(
 		}
 	}
 	if !reconstruction {
-		temporaryStart = names.snapshotTemporaries()
+		temporaryStart = names.SnapshotTemporaries()
 	} else {
-		current := names.snapshotTemporaries()
-		names.restoreTemporaries(temporaryStart)
-		defer names.restoreTemporaries(current)
+		current := names.SnapshotTemporaries()
+		names.RestoreTemporaries(temporaryStart)
+		defer names.RestoreTemporaries(current)
 	}
 	artifactOwner := api.MustSourceArtifactOwner(owner)
-	finish, err := names.beginArtifact(
+	finish, err := names.BeginArtifact(
 		artifactOwner,
 		site.declaration,
 		site.sourceFile.Syntax(),
@@ -391,7 +322,7 @@ func (s *programSession) buildArtifactRevision(
 	defer finish()
 
 	requirements := s.requirements.appliedFor(artifactOwner)
-	context, err := withLexicalAnonymousStructs(
+	context, err := emitnaming.WithLexicalGeneratedArtifacts(
 		builder.context,
 		site.declaration,
 		artifactOwner,
@@ -444,8 +375,8 @@ func (s *programSession) buildArtifactRevision(
 func (s *programSession) consumeArtifactRequests(
 	consumer api.ArtifactOwner,
 	requests []api.RootRequest,
-) (*placementOwner, []api.ArtifactDependency, error) {
-	placement := newPlacementOwner()
+) (*targetplacement.Owner, []api.ArtifactDependency, error) {
+	placement := targetplacement.New()
 	imports := make([]api.RootRequest, 0, len(requests))
 	dependencies := make([]api.ArtifactDependency, 0, len(requests))
 	for _, request := range requests {
@@ -478,7 +409,7 @@ func (s *programSession) consumeArtifactRequests(
 			generated, generatedProvider := dependency.Provider().Generated()
 			if generatedProvider {
 				generatedProvider =
-					s.validateAnonymousStructArtifact(generated) == nil &&
+					s.validateGeneratedArtifact(generated) == nil &&
 						generated.Placement() ==
 							api.GeneratedArtifactPlacementCompilation
 			}
@@ -562,21 +493,14 @@ func (s *programSession) reconstructScheduledArtifact(
 	owner api.ArtifactOwner,
 ) error {
 	if generated, ok := owner.Generated(); ok {
-		return s.reconstructAnonymousStruct(generated)
+		return s.reconstructGeneratedArtifact(generated)
+	}
+	if _, _, ok := owner.PackageInitializer(); ok {
+		return s.reconstructPackageInitializer(owner)
 	}
 	source, ok := owner.Source()
 	if !ok {
 		return &ScheduleError{Reason: "dirty target artifact owner is invalid"}
-	}
-	if _, initializerOwner := s.packageInitializerOwners[source]; initializerOwner {
-		variable, ok := source.(*types.Var)
-		if !ok {
-			return &ScheduleError{
-				Object: source.Name(),
-				Reason: "package initializer owner is not a variable",
-			}
-		}
-		return s.reconstructPackageInitializer(variable)
 	}
 	return s.reconstructArtifact(source)
 }

@@ -1,4 +1,4 @@
-package emit
+package naming
 
 import (
 	"go/ast"
@@ -7,17 +7,28 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
 
-func withLexicalAnonymousStructs(
+func WithLexicalGeneratedArtifacts(
 	context api.Context,
 	source ast.Node,
 	owner api.ArtifactOwner,
 	requirements []api.DeclarationRequirement,
 ) (api.Context, error) {
 	sourceOwner, sourceOwned := owner.Source()
-	if source == nil ||
-		!sourceOwned ||
-		sourceOwner.Pos() < source.Pos() ||
-		sourceOwner.Pos() > source.End() {
+	_, initializer, initializerOwned := owner.PackageInitializer()
+	validSource := source != nil
+	switch {
+	case sourceOwned:
+		validSource = validSource &&
+			sourceOwner.Pos() >= source.Pos() &&
+			sourceOwner.Pos() <= source.End()
+	case initializerOwned:
+		validSource = validSource &&
+			initializer.Rhs.Pos() >= source.Pos() &&
+			initializer.Rhs.End() <= source.End()
+	default:
+		validSource = false
+	}
+	if !validSource {
 		return api.Context{}, &api.InvariantError{
 			Role:   context.Role(),
 			Reason: "lexical generated artifact has no exact source owner",
@@ -27,14 +38,12 @@ func withLexicalAnonymousStructs(
 		map[*types.TypeName][]api.DeclarationRequirement,
 	)
 	for _, requirement := range requirements {
-		if requirement.Kind() !=
-			api.DeclarationRequirementAnonymousStruct {
+		artifact, generated := requirement.GeneratedArtifact()
+		if !generated {
 			continue
 		}
-		artifact, _, ok := requirement.AnonymousStruct()
-		if !ok ||
-			artifact.Placement() !=
-				api.GeneratedArtifactPlacementLexical ||
+		if artifact.Placement() !=
+			api.GeneratedArtifactPlacementLexical ||
 			artifact.ReconstructionOwner() != owner {
 			return api.Context{}, &api.InvariantError{
 				Role:   context.Role(),
@@ -52,5 +61,5 @@ func withLexicalAnonymousStructs(
 		}
 		byAnchor[anchor] = append(byAnchor[anchor], requirement)
 	}
-	return context.WithLexicalAnonymousStructs(owner, byAnchor), nil
+	return context.WithLexicalGeneratedArtifacts(owner, byAnchor), nil
 }

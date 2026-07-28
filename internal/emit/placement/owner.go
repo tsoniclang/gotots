@@ -1,4 +1,4 @@
-package emit
+package placement
 
 import (
 	"slices"
@@ -8,11 +8,11 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-type placementOwner struct {
+type Owner struct {
 	requests map[api.RootRequestOwner]api.RootRequest
 }
 
-func (p *placementOwner) RuntimeSymbols() []api.RuntimeSymbol {
+func (p *Owner) RuntimeSymbols() []api.RuntimeSymbol {
 	symbols := make([]api.RuntimeSymbol, 0)
 	seen := make(map[api.RuntimeSymbol]struct{})
 	for _, request := range p.requests {
@@ -30,7 +30,7 @@ func (p *placementOwner) RuntimeSymbols() []api.RuntimeSymbol {
 	return symbols
 }
 
-func (p *placementOwner) PrimitiveAliases() []api.PrimitiveAlias {
+func (p *Owner) PrimitiveAliases() []api.PrimitiveAlias {
 	aliases := make([]api.PrimitiveAlias, 0)
 	seen := make(map[api.PrimitiveAlias]struct{})
 	for _, request := range p.requests {
@@ -48,13 +48,13 @@ func (p *placementOwner) PrimitiveAliases() []api.PrimitiveAlias {
 	return aliases
 }
 
-func newPlacementOwner() *placementOwner {
-	return &placementOwner{
+func New() *Owner {
+	return &Owner{
 		requests: make(map[api.RootRequestOwner]api.RootRequest),
 	}
 }
 
-func (p *placementOwner) Requests() []api.RootRequest {
+func (p *Owner) Requests() []api.RootRequest {
 	requests := make([]api.RootRequest, 0, len(p.requests))
 	for _, request := range p.requests {
 		requests = append(requests, request)
@@ -62,7 +62,7 @@ func (p *placementOwner) Requests() []api.RootRequest {
 	return requests
 }
 
-func (p *placementOwner) Apply(requests []api.RootRequest) error {
+func (p *Owner) Apply(requests []api.RootRequest) error {
 	for _, request := range requests {
 		if request.Kind() != api.RootRequestImport ||
 			request.LegalScope() != api.ScopeFileImports ||
@@ -94,7 +94,7 @@ func (p *placementOwner) Apply(requests []api.RootRequest) error {
 	return nil
 }
 
-func (p *placementOwner) RequireTypeOnly() error {
+func (p *Owner) RequireTypeOnly() error {
 	for _, request := range p.requests {
 		if request.Kind() != api.RootRequestImport ||
 			request.ImportPhase() != api.ImportPhaseType {
@@ -108,7 +108,7 @@ func (p *placementOwner) RequireTypeOnly() error {
 	return nil
 }
 
-func (p *placementOwner) Statements(factory tsgo.Factory) []tsgo.Statement {
+func (p *Owner) Statements(factory tsgo.Factory) []tsgo.Statement {
 	type importGroup struct {
 		phase      api.ImportPhase
 		modulePath string

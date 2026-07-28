@@ -426,5 +426,5 @@ func addProjectDirectory() string {
 }
 
 func repositoryRoot() string {
-	return filepath.Join("..", "..", "..", "..")
+	return filepath.Join("..", "..", "..", "..", "..")
 }

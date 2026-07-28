@@ -371,6 +371,28 @@ and one operation owner reused by multiple values. Generated artifacts and a
 mutation gate reject function-valued hash/equality/copy fields, strategy
 objects, JSON/text keys, reflection, and target object identity.
 
+It also proves:
+
+- number and BigInt profiles both strict-typecheck and execute differentially
+  against Go for aggregate keys and values;
+- reversed roots produce byte-identical artifacts, and an unreachable map
+  shape creates no artifact or target-name perturbation;
+- `types.Identical` is the join authority: forced full artifact-key and
+  truncated target-name collisions cannot merge non-identical maps, while
+  mutating a derived TypeScript declaration spelling cannot change canonical
+  Go-type identity;
+- an anonymous-struct key and value demand their canonical struct artifacts,
+  including exactly one key hash member, through the same generated-artifact
+  fixed point rather than a map-only identity or placement graph;
+- shapes containing local named types remain immediately after the exact local
+  type anchor in a nested block, nested function literal, or package
+  initializer, and never create compilation-support output;
+- a multi-LHS `types.Initializer` remains one reconstruction owner while no LHS
+  variable can masquerade as that owner; checker-produced blank targets remain
+  admitted and foreign nonblank targets fail closed; and
+- doubling equal-shape use sites keeps one byte-identical specialization class
+  and grows source use-site bytes linearly rather than duplicating shape logic.
+
 The first named-struct family additionally proves:
 
 - empty structs and grouped field declarations use the same single

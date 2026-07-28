@@ -69,6 +69,26 @@ func anonymousStructEqual(
 	)
 }
 
+func anonymousStructHash(
+	context api.Context,
+	source ast.Node,
+	structType *types.Struct,
+	value tsgo.Expression,
+) (api.ExpressionEmission, error) {
+	if !types.Comparable(structType) {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	return anonymousStructOperation(
+		context,
+		source,
+		structType,
+		api.AnonymousStructDemandHash,
+		api.NamedStructOperationHash,
+		[]tsgo.Expression{value},
+	)
+}
+
 func anonymousStructOperation(
 	context api.Context,
 	source ast.Node,

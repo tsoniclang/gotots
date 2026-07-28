@@ -7,6 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
 	packagevariable "github.com/tsoniclang/gotots/internal/emit/declaration/packagevariable"
+	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -84,7 +85,7 @@ func (s *programSession) packageStateFile(
 func (s *programSession) packageAssemblyFile(
 	builder *packageTargetBuilder,
 ) (TargetFile, error) {
-	placement := newPlacementOwner()
+	placement := targetplacement.New()
 	if err := placement.Apply(builder.assemblyPlacement.Requests()); err != nil {
 		return TargetFile{}, err
 	}
@@ -179,19 +180,19 @@ func (s *programSession) packageExports(
 			if !sourceOwned || !object.Exported() {
 				continue
 			}
-			binding, ok := s.registry.byObject[object]
+			binding, ok := s.registry.Target(object)
 			if !ok {
 				return nil, &ScheduleError{
 					Object: object.Name(),
 					Reason: "assembly export has no target binding",
 				}
 			}
-			names, err := s.exportedBindingNames(object, binding.name)
+			names, err := s.exportedBindingNames(object, binding.Name)
 			if err != nil {
 				return nil, err
 			}
-			byPath[binding.sourcePath] = append(
-				byPath[binding.sourcePath],
+			byPath[binding.SourcePath] = append(
+				byPath[binding.SourcePath],
 				names...,
 			)
 		}

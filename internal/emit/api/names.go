@@ -114,6 +114,10 @@ type Names interface {
 		*types.Struct,
 		AnonymousStructDemand,
 	) (NameReference, error)
+	MapSpecialization(
+		types.Type,
+		MapSpecializationDemand,
+	) (NameReference, error)
 	ConstantProjection(*types.Const, types.BasicKind) (NameReference, error)
 	Member(*types.Var) (string, error)
 	Primitive(PrimitiveAlias) (NameReference, error)

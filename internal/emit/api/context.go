@@ -9,26 +9,26 @@ import (
 )
 
 type Context struct {
-	role                     Role
-	fileSet                  *token.FileSet
-	typesPackage             *types.Package
-	typesInfo                *types.Info
-	typesSizes               types.Sizes
-	factory                  tsgo.Factory
-	names                    Names
-	values                   Values
-	storage                  AddressableStorage
-	integer                  IntegerRepresentation
-	evaluationOrder          EvaluationOrder
-	expectedType             types.Type
-	expectedResults          *types.Tuple
-	functionResults          *types.Tuple
-	breakDepth               uint32
-	continueDepth            uint32
-	artifactOwner            *types.Func
-	storageNames             map[*types.Var]string
-	localConstantProjections map[*types.Const][]types.BasicKind
-	lexicalAnonymousStructs  map[*types.TypeName][]DeclarationRequirement
+	role                      Role
+	fileSet                   *token.FileSet
+	typesPackage              *types.Package
+	typesInfo                 *types.Info
+	typesSizes                types.Sizes
+	factory                   tsgo.Factory
+	names                     Names
+	values                    Values
+	storage                   AddressableStorage
+	integer                   IntegerRepresentation
+	evaluationOrder           EvaluationOrder
+	expectedType              types.Type
+	expectedResults           *types.Tuple
+	functionResults           *types.Tuple
+	breakDepth                uint32
+	continueDepth             uint32
+	artifactOwner             *types.Func
+	storageNames              map[*types.Var]string
+	localConstantProjections  map[*types.Const][]types.BasicKind
+	lexicalGeneratedArtifacts map[*types.TypeName][]DeclarationRequirement
 }
 
 func (c Context) WithAddressableStorage(
@@ -69,32 +69,34 @@ func (c Context) WithLocalConstantProjections(
 	return c
 }
 
-func (c Context) WithLexicalAnonymousStructs(
+func (c Context) WithLexicalGeneratedArtifacts(
 	owner ArtifactOwner,
 	requirements map[*types.TypeName][]DeclarationRequirement,
 ) Context {
-	if _, sourceOwned := owner.Source(); !sourceOwned {
-		panic("lexical anonymous-struct owner is not source-backed")
+	_, sourceOwned := owner.Source()
+	_, _, initializerOwned := owner.PackageInitializer()
+	if !sourceOwned && !initializerOwned {
+		panic("lexical generated-artifact owner has no source reconstruction")
 	}
-	c.lexicalAnonymousStructs = make(
+	c.lexicalGeneratedArtifacts = make(
 		map[*types.TypeName][]DeclarationRequirement,
 		len(requirements),
 	)
 	for anchor, selected := range requirements {
 		if anchor == nil || len(selected) == 0 {
-			panic("lexical anonymous-struct selection is invalid")
+			panic("lexical generated-artifact selection is invalid")
 		}
 		for _, requirement := range selected {
-			artifact, _, ok := requirement.AnonymousStruct()
+			artifact, ok := requirement.GeneratedArtifact()
 			if !ok ||
 				artifact.Placement() !=
 					GeneratedArtifactPlacementLexical ||
 				artifact.LexicalOwner() != owner ||
 				artifact.LexicalAnchor() != anchor {
-				panic("lexical anonymous-struct requirement is inconsistent")
+				panic("lexical generated-artifact requirement is inconsistent")
 			}
 		}
-		c.lexicalAnonymousStructs[anchor] = slices.Clone(selected)
+		c.lexicalGeneratedArtifacts[anchor] = slices.Clone(selected)
 	}
 	return c
 }
@@ -263,10 +265,10 @@ func (c Context) LocalConstantProjections(
 	return slices.Clone(c.localConstantProjections[selected])
 }
 
-func (c Context) LexicalAnonymousStructs(
+func (c Context) LexicalGeneratedArtifacts(
 	anchor *types.TypeName,
 ) []DeclarationRequirement {
-	return slices.Clone(c.lexicalAnonymousStructs[anchor])
+	return slices.Clone(c.lexicalGeneratedArtifacts[anchor])
 }
 
 func (c Context) AddressableStorageName(variable *types.Var) (string, bool) {

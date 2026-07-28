@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -114,7 +115,7 @@ func TestReachedUsesReconstructAndSealDeclarationAssemblies(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = session.applyRootRequests(
-		newPlacementOwner(),
+		targetplacement.New(),
 		[]api.RootRequest{importRequest},
 	)
 	if !errors.As(err, &scheduleError) {

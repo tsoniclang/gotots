@@ -184,13 +184,6 @@ func TestMapBoundariesRemainTypedUnsupported(t *testing.T) {
 		source string
 	}{
 		{
-			name: "aggregate key",
-			source: `package boundary
-type Key struct { Value int32 }
-func F() map[Key]int32 { return make(map[Key]int32) }
-`,
-		},
-		{
 			name: "floating key",
 			source: `package boundary
 func F() map[float64]int32 { return make(map[float64]int32) }
@@ -204,10 +197,9 @@ func F() map[Key]int32 { return make(map[Key]int32) }
 `,
 		},
 		{
-			name: "aggregate value",
+			name: "interface key",
 			source: `package boundary
-type Value struct { Number int32 }
-func F() map[int32]Value { return make(map[int32]Value) }
+func F() map[any]int32 { return make(map[any]int32) }
 `,
 		},
 		{
@@ -564,7 +556,7 @@ func repositoryRoot() string {
 	if !ok {
 		panic("resolve repository root")
 	}
-	return filepath.Clean(filepath.Join(filepath.Dir(current), "../../../.."))
+	return filepath.Clean(filepath.Join(filepath.Dir(current), "../../../../.."))
 }
 
 func mapValuesProjectDirectory() string {

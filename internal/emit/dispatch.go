@@ -27,6 +27,7 @@ import (
 	selectorexpression "github.com/tsoniclang/gotots/internal/emit/expression/selector"
 	sliceexpression "github.com/tsoniclang/gotots/internal/emit/expression/slice"
 	unaryexpression "github.com/tsoniclang/gotots/internal/emit/expression/unary"
+	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	"github.com/tsoniclang/gotots/internal/emit/statement/assignment"
 	blockstatement "github.com/tsoniclang/gotots/internal/emit/statement/block"
 	branchstatement "github.com/tsoniclang/gotots/internal/emit/statement/branch"
@@ -58,7 +59,7 @@ import (
 type emitter struct {
 	source  *load.Package
 	factory tsgo.Factory
-	names   *nameOwner
+	names   *emitnaming.Owner
 	values  api.Values
 	integer api.IntegerRepresentation
 	order   api.EvaluationOrder
@@ -68,7 +69,7 @@ type emitter struct {
 func newEmitter(
 	source *load.Package,
 	factory tsgo.Factory,
-	registry *declarationRegistry,
+	registry *emitnaming.Registry,
 	integer api.IntegerRepresentation,
 	order api.EvaluationOrder,
 	require func(types.Object) error,
@@ -82,7 +83,7 @@ func newEmitter(
 	return &emitter{
 		source:  source,
 		factory: factory,
-		names:   newNameOwnerWithRegistry(packageScope, typesInfo, registry),
+		names:   emitnaming.NewOwner(packageScope, typesInfo, registry),
 		values:  representation.Owner{},
 		integer: integer,
 		order:   order,
@@ -113,9 +114,9 @@ func (e *emitter) targetContext(
 
 func (e *emitter) generatedContext(
 	targetPath string,
-	registry *declarationRegistry,
+	registry *emitnaming.Registry,
 ) (api.Context, error) {
-	names := newNameOwnerWithRegistry(
+	names := emitnaming.NewOwner(
 		nil,
 		nil,
 		registry,

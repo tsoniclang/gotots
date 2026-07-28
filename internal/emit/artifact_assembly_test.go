@@ -10,6 +10,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
+	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -18,11 +19,11 @@ func TestCommittedArtifactPlacementDropsSupersededImports(t *testing.T) {
 	base := artifactTestImport(t, factory, "./base.js", "Base")
 	old := artifactTestImport(t, factory, "./old.js", "Old")
 	next := artifactTestImport(t, factory, "./next.js", "Next")
-	basePlacement := newPlacementOwner()
+	basePlacement := targetplacement.New()
 	if err := basePlacement.Apply([]api.RootRequest{base}); err != nil {
 		t.Fatal(err)
 	}
-	oldPlacement := newPlacementOwner()
+	oldPlacement := targetplacement.New()
 	if err := oldPlacement.Apply([]api.RootRequest{old}); err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +45,7 @@ func TestCommittedArtifactPlacementDropsSupersededImports(t *testing.T) {
 		t.Fatalf("initial modules = %v", actual)
 	}
 
-	nextPlacement := newPlacementOwner()
+	nextPlacement := targetplacement.New()
 	if err := nextPlacement.Apply([]api.RootRequest{next}); err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +151,7 @@ func TestNonArtifactDependencyCannotBeSilentlyDropped(t *testing.T) {
 	}
 	session := &programSession{}
 	err = session.applyRootRequests(
-		newPlacementOwner(),
+		targetplacement.New(),
 		[]api.RootRequest{request},
 	)
 	var scheduleError *ScheduleError
@@ -179,7 +180,7 @@ func artifactTestImport(
 	return request
 }
 
-func artifactTestModules(placement *placementOwner) []string {
+func artifactTestModules(placement *targetplacement.Owner) []string {
 	modules := make([]string, 0)
 	for _, request := range placement.Requests() {
 		modules = append(modules, request.ModulePath())

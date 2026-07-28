@@ -9,6 +9,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/declaration/definedtype"
 	namedstruct "github.com/tsoniclang/gotots/internal/emit/declaration/namedstruct"
+	maprepresentation "github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -88,12 +89,12 @@ func Emit(
 		artifacts := make(
 			map[*api.GeneratedArtifact][]api.DeclarationRequirement,
 		)
-		for _, requirement := range context.LexicalAnonymousStructs(typeName) {
-			artifact, _, ok := requirement.AnonymousStruct()
+		for _, requirement := range context.LexicalGeneratedArtifacts(typeName) {
+			artifact, ok := requirement.GeneratedArtifact()
 			if !ok || artifact.LexicalAnchor() != typeName {
 				return api.StatementEmission{}, &api.InvariantError{
 					Role:   context.Role(),
-					Reason: "local type received an inconsistent anonymous-struct requirement",
+					Reason: "local type received an inconsistent generated-artifact requirement",
 				}
 			}
 			artifacts[artifact] = append(
@@ -109,26 +110,18 @@ func Emit(
 			return ordered[left].TargetName() < ordered[right].TargetName()
 		})
 		for _, artifact := range ordered {
-			operations, err := lexicalAnonymousStructOperations(
+			generated, err := emitLexicalGeneratedArtifact(
+				context,
+				children,
+				source,
 				artifact,
 				artifacts[artifact],
 			)
 			if err != nil {
 				return api.StatementEmission{}, err
 			}
-			target, err := namedstruct.EmitAnonymous(
-				context.WithRole(api.RoleLocalDeclaration),
-				children,
-				artifact.SourceType(),
-				artifact.TargetName(),
-				operations,
-				false,
-			)
-			if err != nil {
-				return api.StatementEmission{}, err
-			}
-			statements = append(statements, target.Declarations()...)
-			requests = append(requests, target.Requests()...)
+			statements = append(statements, generated.Declarations()...)
+			requests = append(requests, generated.Requests()...)
 		}
 	}
 	return api.NewStatementEmission(statements, requests)
@@ -139,13 +132,125 @@ func localTypeRequirements(
 	typeName *types.TypeName,
 ) []api.DeclarationRequirement {
 	var requirements []api.DeclarationRequirement
-	for _, requirement := range context.LexicalAnonymousStructs(typeName) {
-		if requirement.Kind() !=
-			api.DeclarationRequirementAnonymousStruct {
+	for _, requirement := range context.LexicalGeneratedArtifacts(typeName) {
+		if _, generated := requirement.GeneratedArtifact(); !generated {
 			requirements = append(requirements, requirement)
 		}
 	}
 	return requirements
+}
+
+func emitLexicalGeneratedArtifact(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	artifact *api.GeneratedArtifact,
+	requirements []api.DeclarationRequirement,
+) (api.DeclarationEmission, error) {
+	switch artifact.Kind() {
+	case api.GeneratedArtifactAnonymousStruct:
+		structType, ok := artifact.StructType()
+		if !ok {
+			return api.DeclarationEmission{}, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "lexical anonymous-struct artifact has no struct type",
+			}
+		}
+		operations, err := lexicalAnonymousStructOperations(
+			artifact,
+			requirements,
+		)
+		if err != nil {
+			return api.DeclarationEmission{}, err
+		}
+		return namedstruct.EmitAnonymous(
+			context.WithRole(api.RoleLocalDeclaration),
+			children,
+			structType,
+			artifact.TargetName(),
+			operations,
+			false,
+		)
+	case api.GeneratedArtifactMapSpecialization:
+		return emitLexicalMapSpecialization(
+			context,
+			children,
+			source,
+			artifact,
+			requirements,
+		)
+	default:
+		return api.DeclarationEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "lexical generated-artifact kind is invalid",
+		}
+	}
+}
+
+func emitLexicalMapSpecialization(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	artifact *api.GeneratedArtifact,
+	requirements []api.DeclarationRequirement,
+) (api.DeclarationEmission, error) {
+	mapType, ok := artifact.MapType()
+	if !ok {
+		return api.DeclarationEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "lexical map-specialization artifact has no map type",
+		}
+	}
+	for _, requirement := range requirements {
+		selected, _, valid := requirement.MapSpecialization()
+		if !valid || selected != artifact {
+			return api.DeclarationEmission{}, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "lexical map specialization received a foreign requirement",
+			}
+		}
+	}
+	keyType, err := children.RepresentedType(
+		context.WithRole(api.RoleMapKey),
+		source,
+		mapType.Key(),
+	)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	valueType, err := children.RepresentedType(
+		context.WithRole(api.RoleMapValue),
+		source,
+		mapType.Elem(),
+	)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	specialization, err := maprepresentation.BuildSpecialization(
+		context.WithRole(api.RoleLocalDeclaration),
+		source,
+		artifact.TargetName(),
+		mapType,
+		keyType.Value(),
+		valueType.Value(),
+	)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	return api.DirectDeclaration(
+		context.Factory().ClassDeclaration(
+			nil,
+			context.Factory().Identifier(artifact.TargetName()),
+			nil,
+			nil,
+			specialization.Members(),
+		),
+		api.CombineRequests(
+			keyType.Requests(),
+			valueType.Requests(),
+			specialization.Requests(),
+		)...,
+	), nil
 }
 
 func lexicalAnonymousStructOperations(
@@ -169,6 +274,8 @@ func lexicalAnonymousStructOperations(
 			operations = append(operations, api.NamedStructOperationCopy)
 		case api.AnonymousStructDemandEqual:
 			operations = append(operations, api.NamedStructOperationEqual)
+		case api.AnonymousStructDemandHash:
+			operations = append(operations, api.NamedStructOperationHash)
 		default:
 			return nil, &api.InvariantError{
 				Role:   api.RoleLocalDeclaration,

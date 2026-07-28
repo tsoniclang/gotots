@@ -1,4 +1,4 @@
-package emit
+package naming
 
 import (
 	"go/types"
@@ -16,7 +16,7 @@ type constantProjectionImport struct {
 // constant projection. Its import-local identity includes both the exact
 // constant object and target representation; source spelling is never an
 // import key.
-func (n *fileNames) ConstantProjection(
+func (n *File) ConstantProjection(
 	selected *types.Const,
 	projection types.BasicKind,
 ) (api.NameReference, error) {
@@ -108,7 +108,7 @@ func (n *fileNames) ConstantProjection(
 	return api.NewNameReference(localName, requests...)
 }
 
-func (n *fileNames) constantProjectionImportName(
+func (n *File) constantProjectionImportName(
 	identity constantProjectionImport,
 	preferred string,
 ) (string, error) {

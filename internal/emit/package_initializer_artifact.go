@@ -6,6 +6,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	packagevariable "github.com/tsoniclang/gotots/internal/emit/declaration/packagevariable"
+	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 )
 
@@ -13,24 +14,30 @@ func (s *programSession) emitPackageInitializer(
 	builder *packageTargetBuilder,
 	initializer *types.Initializer,
 ) error {
-	owner, owned := packageInitializerOwner(initializer)
-	if !owned {
+	anchor, anchored := packageInitializerAnchor(initializer)
+	if !anchored {
 		return &ScheduleError{
 			Object: builder.sourcePackage.Path(),
-			Reason: "package initializer has no exact source owner",
+			Reason: "package initializer has no source declaration anchor",
 		}
 	}
-	site, ok := s.sites[owner]
+	site, ok := s.sites[anchor]
 	if !ok || site.source != builder.sourcePackage {
 		return &ScheduleError{
-			Object: owner.Name(),
+			Object: anchor.Name(),
 			Reason: "package initializer has no exact source declaration",
 		}
 	}
-	artifactOwner := api.MustSourceArtifactOwner(owner)
+	artifactOwner, err := api.PackageInitializerArtifactOwner(
+		builder.sourcePackage.Types(),
+		initializer,
+	)
+	if err != nil {
+		return err
+	}
 	if _, duplicate := builder.initializerByOwner[artifactOwner]; duplicate {
 		return &ScheduleError{
-			Object: owner.Name(),
+			Object: artifactOwner.Name(),
 			Reason: "package initializer artifact was emitted more than once",
 		}
 	}
@@ -67,7 +74,7 @@ func (s *programSession) emitPackageInitializer(
 	return nil
 }
 
-func packageInitializerOwner(
+func packageInitializerAnchor(
 	initializer *types.Initializer,
 ) (*types.Var, bool) {
 	if initializer == nil {
@@ -86,10 +93,10 @@ func (s *programSession) buildPackageInitializerRevision(
 	initializer *types.Initializer,
 	site declarationSite,
 	owner api.ArtifactOwner,
-	temporaryStart temporarySnapshot,
+	temporaryStart emitnaming.TemporarySnapshot,
 	reconstruction bool,
 ) (artifactRevision, error) {
-	names, ok := builder.assemblyContext.Names().(*fileNames)
+	names, ok := builder.assemblyContext.Names().(*emitnaming.File)
 	if !ok {
 		return artifactRevision{}, &ScheduleError{
 			Object: owner.Name(),
@@ -97,11 +104,11 @@ func (s *programSession) buildPackageInitializerRevision(
 		}
 	}
 	if !reconstruction {
-		temporaryStart = names.snapshotTemporaries()
+		temporaryStart = names.SnapshotTemporaries()
 	} else {
-		current := names.snapshotTemporaries()
-		names.restoreTemporaries(temporaryStart)
-		defer names.restoreTemporaries(current)
+		current := names.SnapshotTemporaries()
+		names.RestoreTemporaries(temporaryStart)
+		defer names.RestoreTemporaries(current)
 	}
 	sourcePath, err := targetoutput.SourcePath(
 		site.source,
@@ -110,7 +117,7 @@ func (s *programSession) buildPackageInitializerRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
-	finish, err := names.beginArtifact(
+	finish, err := names.BeginArtifact(
 		owner,
 		site.declaration,
 		site.sourceFile.Syntax(),
@@ -121,7 +128,7 @@ func (s *programSession) buildPackageInitializerRevision(
 	}
 	defer finish()
 	requirements := s.requirements.appliedFor(owner)
-	context, err := withLexicalAnonymousStructs(
+	context, err := emitnaming.WithLexicalGeneratedArtifacts(
 		builder.assemblyContext,
 		site.declaration,
 		owner,
@@ -159,37 +166,43 @@ func (s *programSession) buildPackageInitializerRevision(
 }
 
 func (s *programSession) reconstructPackageInitializer(
-	variable *types.Var,
+	owner api.ArtifactOwner,
 ) error {
+	sourcePackage, initializer, owned := owner.PackageInitializer()
+	if !owned {
+		return &ScheduleError{
+			Object: owner.Name(),
+			Reason: "dirty package initializer owner is invalid",
+		}
+	}
 	if s.sealed {
 		return &ScheduleError{
-			Object: variable.Name(),
+			Object: owner.Name(),
 			Reason: "package initializer reconstructed after target files were sealed",
 		}
 	}
-	site, ok := s.sites[variable]
-	if !ok {
-		return &ScheduleError{
-			Object: variable.Name(),
-			Reason: "dirty package initializer lost its source declaration",
-		}
-	}
-	builder := s.packageBuilders[site.source]
+	loaded := s.source.PackageForTypes(sourcePackage)
+	builder := s.packageBuilders[loaded]
 	if builder == nil {
 		return &ScheduleError{
-			Object: variable.Name(),
+			Object: owner.Name(),
 			Reason: "dirty package initializer lost its package builder",
 		}
 	}
-	owner := api.MustSourceArtifactOwner(variable)
 	index, ok := builder.initializerByOwner[owner]
 	if !ok {
 		return &ScheduleError{
-			Object: variable.Name(),
+			Object: owner.Name(),
 			Reason: "dirty package initializer was not emitted first",
 		}
 	}
 	artifact := &builder.initialization[index]
+	if artifact.initializer != initializer {
+		return &ScheduleError{
+			Object: owner.Name(),
+			Reason: "dirty package initializer identity changed",
+		}
+	}
 	revision, err := s.buildPackageInitializerRevision(
 		builder,
 		artifact.initializer,

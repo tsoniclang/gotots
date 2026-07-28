@@ -47,6 +47,7 @@ general-purpose intermediate program.
 | external target node kinds, fields, encoding, protocol version | pinned TS-Go schema/protocol under `schema/tsgo` |
 | typed target protocol values and factories | generated `internal/target/tsgo` |
 | target lexical placement and deduplication | scoped builders in `internal/emit` |
+| canonical generated-type identity | one generated-artifact registry in `internal/emit/naming`, indexed and named by a full canonical Go-type digest that never includes generated target spelling, then exact-joined by `types.Identical` |
 | mutable package storage and package-local initialization bodies | package-state and passive package-assembly builders in `internal/emit`, driven by the selected `go/types.Info.InitOrder` |
 | whole-program package initialization order | one static program-initialization builder consuming the selected `types.Package` import graph |
 | target decoding and formatting | pinned `tsgo --api` `printNode` |
@@ -461,6 +462,16 @@ One placement service applies the policy:
 - demanded named-struct static operations are incorporated into their owning
   class in a fixed operation order; no top-level sibling helper or instance
   operation is emitted;
+- one canonical generated artifact represents each exact reached anonymous
+  struct or specialized map shape. A shape with no local named component enters
+  deterministic compilation support; a shape containing local named
+  components is emitted immediately after the deepest declaration that makes
+  every component legally nameable, inside the exact reconstructible source
+  artifact;
+- a package initializer is a first-class artifact owned by its selected
+  `(*types.Package, *types.Initializer)` identity. Its first LHS variable is
+  only a source-declaration anchor, never its owner; multi-result initializers
+  remain one artifact, and checker-produced blank LHS targets remain legal;
 - function-wide declarations enter the function prologue only when their
   lifetime is function-wide;
 - evaluation-dependent temporaries remain immediately inside the branch,
@@ -778,6 +789,11 @@ internal/emit/                      session, scheduling, closed dispatch only
   artifact/                         target-contract coordination authority
     contract.go                     mechanical TS-Go observable projections
     graph.go                        facet edges, revisions, and fixed point
+  naming/                           exact Go-identity target names and generated-artifact registry
+    registry.go                     immutable target lookup and canonical generated-artifact ownership
+    file_names.go                   one file/scope name service implementing `api.Names`
+  placement/                        deterministic static import/request placement
+  verification/                     public-surface program/session integration tests
   target_files.go                   source/support/program file sealing
   package_state.go                  package storage and initialization owner
   storage/                          exact identity-selected local cell access
@@ -791,6 +807,7 @@ internal/emit/                      session, scheduling, closed dispatch only
   <domain>/                         declaration, statement, expression, type
     <semantic-owner>/               assignment, call, index, function, ...
       <sub-owner>/                  only after an evidenced ownership split
+      verification/                 end-to-end construct tests when the owner has a substantial matrix
   expression/address/               address formation and location projection
   runtime/pointer/                  one typed canonical-location runtime owner
 

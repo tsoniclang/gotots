@@ -1,4 +1,4 @@
-package emit
+package naming
 
 import (
 	"go/ast"
@@ -42,7 +42,7 @@ func TestArtifactReferencesRecordExactConsumedFacet(t *testing.T) {
 		types.Typ[types.Int],
 		constant.MakeInt64(1),
 	)
-	registry := newDeclarationRegistry()
+	registry := NewRegistry()
 	for _, object := range []types.Object{function, typeName, value} {
 		if err := registry.reserve(object, targetBinding{
 			name:         object.Name(),
@@ -53,7 +53,7 @@ func TestArtifactReferencesRecordExactConsumedFacet(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	names := newNameOwnerWithRegistry(
+	names := NewOwner(
 		sourcePackage.Scope(),
 		&types.Info{Defs: make(map[*ast.Ident]types.Object)},
 		registry,
@@ -63,15 +63,15 @@ func TestArtifactReferencesRecordExactConsumedFacet(t *testing.T) {
 		tsgo.NewFactory(),
 		"modules/current/source.ts",
 		nil,
-	).(*fileNames)
+	).(*File)
 	consumer := types.NewFunc(
 		token.Pos(10),
 		sourcePackage,
 		"Consumer",
 		types.NewSignatureType(nil, nil, nil, nil, nil, false),
 	)
-	finish, err := names.beginArtifact(
-		sourceArtifactOwner(consumer),
+	finish, err := names.BeginArtifact(
+		api.MustSourceArtifactOwner(consumer),
 		consumerDeclaration,
 		sourceFile,
 		"modules/current/source.ts",

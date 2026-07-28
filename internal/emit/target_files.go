@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	runtimeemission "github.com/tsoniclang/gotots/internal/emit/runtime"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -78,7 +79,7 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 		)
 		kind := TargetFileSource
 		packageName := builder.sourcePackage.Name()
-		if outputPath == targetoutput.AnonymousStructSupportPath {
+		if builder.sourceFile.Syntax() == nil {
 			kind = TargetFileSupport
 			packageName = ""
 		}
@@ -136,13 +137,13 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 
 func committedTargetFilePlacement(
 	builder *targetFileBuilder,
-) (*placementOwner, error) {
+) (*targetplacement.Owner, error) {
 	if builder == nil || builder.placement == nil {
 		return nil, &ScheduleError{
 			Reason: "target file has no root placement owner",
 		}
 	}
-	placement := newPlacementOwner()
+	placement := targetplacement.New()
 	if err := placement.Apply(builder.placement.Requests()); err != nil {
 		return nil, err
 	}
@@ -165,13 +166,13 @@ func (s *programSession) programInitializationFile() (TargetFile, error) {
 	if err != nil {
 		return TargetFile{}, err
 	}
-	placement := newPlacementOwner()
+	placement := targetplacement.New()
 	var calls []tsgo.Statement
 	for _, builder := range order {
 		if !builder.hasInitializationWork() {
 			continue
 		}
-		qualifier := s.registry.importQualifierByPackage[builder.sourcePackage.Types()]
+		qualifier := s.registry.ImportQualifier(builder.sourcePackage.Types())
 		if qualifier == "" {
 			return TargetFile{}, &ScheduleError{
 				Object: builder.sourcePackage.Path(),
@@ -439,7 +440,7 @@ func (s *programSession) runtimeModuleImports(
 	module api.RuntimeModule,
 	symbols []api.RuntimeSymbol,
 ) ([]tsgo.Statement, error) {
-	placement := newPlacementOwner()
+	placement := targetplacement.New()
 	for _, symbol := range symbols {
 		contract, err := api.RuntimeContract(symbol)
 		if err != nil {

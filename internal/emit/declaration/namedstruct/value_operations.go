@@ -83,6 +83,9 @@ func hashMethod(
 	}
 	requests := runtime.Requests()
 	for _, field := range fields {
+		if field.blank {
+			continue
+		}
 		fieldHash, err := context.Values().Hash(
 			context.WithRole(api.RoleStructHashField),
 			field.source,

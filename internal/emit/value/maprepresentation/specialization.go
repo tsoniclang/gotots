@@ -150,7 +150,7 @@ func specializationOperations(
 	}
 	copyKey, err := context.Values().Copy(
 		context.WithRole(api.RoleMapKey),
-		source,
+		nil,
 		mapType.Key(),
 		api.DirectExpression(key),
 	)
@@ -160,7 +160,7 @@ func specializationOperations(
 	value := context.Factory().Identifier("$value")
 	copyValue, err := context.Values().Copy(
 		context.WithRole(api.RoleMapValue),
-		source,
+		nil,
 		mapType.Elem(),
 		api.DirectExpression(value),
 	)

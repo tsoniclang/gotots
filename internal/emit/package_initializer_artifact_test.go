@@ -38,6 +38,10 @@ var PackageValue = func() int32 {
 
 var Plain int32
 
+func pair() (int32, int32) { return 1, 2 }
+
+var PairLeft, PairRight = pair()
+
 func Result() int32 { return PackageValue }
 `),
 		0o600,
@@ -68,19 +72,54 @@ func Result() int32 { return PackageValue }
 
 	variable := program.Roots()[0].Types().Scope().
 		Lookup("PackageValue").(*types.Var)
-	owner := sourceArtifactOwner(variable)
+	initializer := packageInitializerForVariable(
+		t,
+		program.Roots()[0],
+		variable,
+	)
+	owner := api.MustPackageInitializerArtifactOwner(
+		program.Roots()[0].Types(),
+		initializer,
+	)
 	plain := program.Roots()[0].Types().Scope().
 		Lookup("Plain").(*types.Var)
-	if _, initializerOwner := session.packageInitializerOwners[plain]; initializerOwner {
-		t.Fatal("uninitialized package variable became an initializer artifact owner")
+	for _, candidate := range program.Roots()[0].TypesInfo().InitOrder {
+		for _, target := range candidate.Lhs {
+			if target == plain {
+				t.Fatal("uninitialized package variable entered the initializer order")
+			}
+		}
 	}
-	if _, initializerOwner := session.packageInitializerOwners[variable]; !initializerOwner {
-		t.Fatal("package initializer lost its exact source owner")
+	left := program.Roots()[0].Types().Scope().
+		Lookup("PairLeft").(*types.Var)
+	right := program.Roots()[0].Types().Scope().
+		Lookup("PairRight").(*types.Var)
+	leftInitializer := packageInitializerForVariable(
+		t,
+		program.Roots()[0],
+		left,
+	)
+	rightInitializer := packageInitializerForVariable(
+		t,
+		program.Roots()[0],
+		right,
+	)
+	if leftInitializer != rightInitializer {
+		t.Fatal("one multi-target initializer split into variable-owned artifacts")
 	}
 	builder := session.packageBuilders[program.Roots()[0]]
 	index, ok := builder.initializerByOwner[owner]
 	if !ok {
-		t.Fatal("package initializer has no source-artifact ownership")
+		t.Fatal("package initializer has no exact initializer ownership")
+	}
+	for _, sourceOwner := range []api.ArtifactOwner{
+		sourceArtifactOwner(variable),
+		sourceArtifactOwner(left),
+		sourceArtifactOwner(right),
+	} {
+		if _, exists := builder.initializerByOwner[sourceOwner]; exists {
+			t.Fatal("package initializer retained a variable-owner surrogate")
+		}
 	}
 	artifact := builder.initialization[index]
 	if artifact.reconstructions != 1 {
@@ -110,7 +149,7 @@ func Result() int32 { return PackageValue }
 	}
 }
 
-func TestPackageInitializerLocalIdentityUsesSourceArtifactPath(
+func TestPackageInitializerLocalIdentityUsesExactInitializer(
 	t *testing.T,
 ) {
 	directory := t.TempDir()
@@ -174,17 +213,22 @@ func OtherResult() int32 { return Other }
 	drainProgramSession(t, session)
 	keys := make(map[string]struct{})
 	owners := make(map[string]struct{})
-	for key, binding := range session.registry.anonymousStructs {
-		if binding.owner.Placement() !=
+	for _, artifact := range session.registry.GeneratedArtifacts(
+		api.GeneratedArtifactAnonymousStruct,
+	) {
+		if artifact.Placement() !=
 			api.GeneratedArtifactPlacementLexical {
 			continue
 		}
-		sourceOwner, sourceOwned := binding.owner.LexicalOwner().Source()
-		if !sourceOwned {
-			t.Fatal("lexical anonymous struct lost its source owner")
+		sourcePackage, initializer, initializerOwned :=
+			artifact.LexicalOwner().PackageInitializer()
+		if !initializerOwned ||
+			sourcePackage != program.Roots()[0].Types() ||
+			initializer == nil {
+			t.Fatal("lexical anonymous struct lost its exact initializer owner")
 		}
-		keys[key] = struct{}{}
-		owners[sourceOwner.Name()] = struct{}{}
+		keys[artifact.ArtifactKey()] = struct{}{}
+		owners[artifact.LexicalOwner().Name()] = struct{}{}
 	}
 	if len(keys) != 2 ||
 		len(owners) != 2 {
@@ -194,4 +238,34 @@ func OtherResult() int32 { return Other }
 			len(owners),
 		)
 	}
+}
+
+func packageInitializerForVariable(
+	t *testing.T,
+	sourcePackage *load.Package,
+	variable *types.Var,
+) *types.Initializer {
+	t.Helper()
+	var selected *types.Initializer
+	for _, initializer := range sourcePackage.TypesInfo().InitOrder {
+		for _, target := range initializer.Lhs {
+			if target != variable {
+				continue
+			}
+			if selected != nil {
+				t.Fatalf(
+					"variable %s belongs to multiple package initializers",
+					variable.Name(),
+				)
+			}
+			selected = initializer
+		}
+	}
+	if selected == nil {
+		t.Fatalf(
+			"variable %s has no package initializer",
+			variable.Name(),
+		)
+	}
+	return selected
 }

@@ -9,6 +9,8 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
+	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
+	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -37,20 +39,19 @@ type ProgramEmission struct {
 }
 
 type programSession struct {
-	source                   *load.Program
-	factory                  tsgo.Factory
-	integer                  api.IntegerRepresentation
-	registry                 *declarationRegistry
-	scheduler                *scheduler
-	requirements             *declarationRequirementScheduler
-	artifacts                *artifactstate.Graph
-	sites                    map[types.Object]declarationSite
-	emitters                 map[*load.Package]*emitter
-	builders                 map[string]*targetFileBuilder
-	packageBuilders          map[*load.Package]*packageTargetBuilder
-	packageInitializations   *packageInitializationScheduler
-	packageInitializerOwners map[types.Object]struct{}
-	sealed                   bool
+	source                 *load.Program
+	factory                tsgo.Factory
+	integer                api.IntegerRepresentation
+	registry               *emitnaming.Registry
+	scheduler              *scheduler
+	requirements           *declarationRequirementScheduler
+	artifacts              *artifactstate.Graph
+	sites                  map[types.Object]declarationSite
+	emitters               map[*load.Package]*emitter
+	builders               map[string]*targetFileBuilder
+	packageBuilders        map[*load.Package]*packageTargetBuilder
+	packageInitializations *packageInitializationScheduler
+	sealed                 bool
 }
 
 type targetDeclaration struct {
@@ -58,8 +59,8 @@ type targetDeclaration struct {
 	name            string
 	position        token.Pos
 	statements      []tsgo.Statement
-	placement       *placementOwner
-	temporaryStart  temporarySnapshot
+	placement       *targetplacement.Owner
+	temporaryStart  emitnaming.TemporarySnapshot
 	reconstructions uint64
 }
 
@@ -69,7 +70,7 @@ type targetFileBuilder struct {
 	outputPath    string
 	emitter       *emitter
 	context       api.Context
-	placement     *placementOwner
+	placement     *targetplacement.Owner
 	declarations  []targetDeclaration
 	byOwner       map[api.ArtifactOwner]struct{}
 	indexByOwner  map[api.ArtifactOwner]int
@@ -265,6 +266,29 @@ func compareArtifactOwners(
 	case rightIsSource:
 		return 1
 	}
+	leftPackage, leftInitializer, leftIsInitializer :=
+		left.PackageInitializer()
+	rightPackage, rightInitializer, rightIsInitializer :=
+		right.PackageInitializer()
+	switch {
+	case leftIsInitializer && rightIsInitializer:
+		switch {
+		case leftPackage.Path() < rightPackage.Path():
+			return -1
+		case leftPackage.Path() > rightPackage.Path():
+			return 1
+		case leftInitializer.Rhs.Pos() < rightInitializer.Rhs.Pos():
+			return -1
+		case leftInitializer.Rhs.Pos() > rightInitializer.Rhs.Pos():
+			return 1
+		default:
+			return 0
+		}
+	case leftIsInitializer:
+		return -1
+	case rightIsInitializer:
+		return 1
+	}
 	leftGenerated, leftOK := left.Generated()
 	rightGenerated, rightOK := right.Generated()
 	if !leftOK || !rightOK {
@@ -278,6 +302,10 @@ func compareArtifactOwners(
 		}
 	}
 	switch {
+	case leftGenerated.Kind() < rightGenerated.Kind():
+		return -1
+	case leftGenerated.Kind() > rightGenerated.Kind():
+		return 1
 	case leftGenerated.ArtifactKey() < rightGenerated.ArtifactKey():
 		return -1
 	case leftGenerated.ArtifactKey() > rightGenerated.ArtifactKey():
@@ -315,42 +343,23 @@ func newProgramSession(
 	if err != nil {
 		return nil, err
 	}
-	registry := newDeclarationRegistry()
-	if err := registry.indexPackageTargets(source.Packages()); err != nil {
+	registry := emitnaming.NewRegistry()
+	if err := registry.IndexPackageTargets(source.Packages()); err != nil {
 		return nil, err
 	}
 	session := &programSession{
-		source:                   source,
-		factory:                  tsgo.NewFactory(),
-		integer:                  options.IntegerRepresentation,
-		registry:                 registry,
-		scheduler:                newScheduler(),
-		requirements:             newDeclarationRequirementScheduler(),
-		artifacts:                artifactstate.NewGraph(compareArtifactOwners),
-		sites:                    sites,
-		emitters:                 make(map[*load.Package]*emitter),
-		builders:                 make(map[string]*targetFileBuilder),
-		packageBuilders:          make(map[*load.Package]*packageTargetBuilder),
-		packageInitializations:   newPackageInitializationScheduler(),
-		packageInitializerOwners: make(map[types.Object]struct{}),
-	}
-	for _, sourcePackage := range source.Packages() {
-		for _, initializer := range sourcePackage.TypesInfo().InitOrder {
-			owner, ok := packageInitializerOwner(initializer)
-			if !ok {
-				return nil, &ScheduleError{
-					Object: sourcePackage.Path(),
-					Reason: "package initializer has no exact source owner",
-				}
-			}
-			if _, indexed := sites[owner]; !indexed {
-				return nil, &ScheduleError{
-					Object: owner.Name(),
-					Reason: "package initializer source owner is not indexed",
-				}
-			}
-			session.packageInitializerOwners[owner] = struct{}{}
-		}
+		source:                 source,
+		factory:                tsgo.NewFactory(),
+		integer:                options.IntegerRepresentation,
+		registry:               registry,
+		scheduler:              newScheduler(),
+		requirements:           newDeclarationRequirementScheduler(),
+		artifacts:              artifactstate.NewGraph(compareArtifactOwners),
+		sites:                  sites,
+		emitters:               make(map[*load.Package]*emitter),
+		builders:               make(map[string]*targetFileBuilder),
+		packageBuilders:        make(map[*load.Package]*packageTargetBuilder),
+		packageInitializations: newPackageInitializationScheduler(),
 	}
 	for _, sourcePackage := range source.Packages() {
 		session.emitters[sourcePackage] = newEmitter(
@@ -387,7 +396,7 @@ func newProgramSession(
 				Reason: "package initializer has no emitter",
 			}
 		}
-		if err := emitter.names.preallocatePackageInitializers(objects); err != nil {
+		if err := emitter.names.PreallocatePackageInitializers(objects); err != nil {
 			return nil, err
 		}
 	}
@@ -514,7 +523,7 @@ func (s *programSession) emit(object types.Object) error {
 }
 
 func (s *programSession) applyRootRequests(
-	placement *placementOwner,
+	placement *targetplacement.Owner,
 	requests []api.RootRequest,
 ) error {
 	if s.sealed {
@@ -579,7 +588,7 @@ func (s *programSession) builderForFile(
 		outputPath:    outputPath,
 		emitter:       emitter,
 		context:       context,
-		placement:     newPlacementOwner(),
+		placement:     targetplacement.New(),
 		byOwner:       make(map[api.ArtifactOwner]struct{}),
 		indexByOwner:  make(map[api.ArtifactOwner]int),
 	}

@@ -85,6 +85,13 @@ func (unusedNames) AnonymousStruct(
 	panic("unused")
 }
 
+func (unusedNames) MapSpecialization(
+	types.Type,
+	api.MapSpecializationDemand,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (unusedNames) PackageVariable(
 	*types.Var,
 ) (api.PackageVariableReference, error) {

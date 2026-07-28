@@ -1452,17 +1452,21 @@ export function Lookup(values: GoMap<int32, gostring>, key: Count): gostring {
 
 Floating keys remain a typed boundary: JavaScript `Map` uses SameValueZero,
 while Go permits distinct stored NaN keys that cannot be retrieved by another
-NaN comparison. Aggregate comparable keys require the later exact hash/equality
-owner. Neither class may silently use object identity or serialization.
+NaN comparison. Interface keys remain a typed boundary until interface dynamic
+value identity and hashing exist. Admitted aggregate comparable keys and
+admitted non-basic values use the exact specialized owner below; neither class
+may silently use object identity or serialization.
 
-Aggregate-key maps select their key semantics once from the authoritative
-`go/types` key type. One canonical target artifact per exact represented map
+Specialized maps select key and value semantics once from the authoritative
+`go/types` map type. One canonical target artifact per exact represented map
 shape directly references the key family's static hash, equality, and copy
-operations. The map value does not store function-valued strategies, closures,
-operation objects, tags, or dynamic member names. A shared runtime primitive
-may own only non-semantic bucket, count, and nil storage; the canonical
-map-shape artifact owns typed lookup, store, and delete behavior and invokes
-the selected key operations directly.
+operations and the value family's zero and copy operations. This includes an
+aggregate key or any value whose Go copy/zero behavior cannot be represented by
+the scalar native-`Map` owner. The map value does not store function-valued
+strategies, closures, operation objects, tags, or dynamic member names. A
+shared runtime primitive may own only non-semantic bucket, count, and nil
+storage; the canonical map-shape artifact owns typed lookup, store, and delete
+behavior and invokes the selected operations directly.
 
 ```go
 type Key struct{ X int32 }
@@ -1480,13 +1484,24 @@ class map$Key$string {
 }
 ```
 
-The declaration cost is `O(key shape)` once, while every map operation site is
+The declaration cost is `O(map shape)` once, while every map operation site is
 constant-size. Two map values of the same exact semantic shape reuse the same
-owner. A deterministic artifact fingerprint may index candidates, but
-`go/types` identity remains authoritative and a fingerprint collision must
-never unify non-identical map or key types. Generated-artifact tests reject
+owner. A full deterministic canonical-type digest indexes one artifact, but
+`go/types` identity remains authoritative and a digest collision must never
+unify non-identical map types. The digest uses semantic package/declaration
+identity and source position for local named components; generated TypeScript
+names are outputs and never feed back into identity. Generated-artifact tests reject
 function-valued key-operation fields and mutations that restore callback
 storage.
+
+A specialization whose exact type contains no function-local named component
+is one compilation support module under `support/maps/`. A specialization that
+mentions a local named key or value cannot escape that name's scope: it is
+inserted as typed TS-Go class AST immediately after the deepest local type
+declaration required by the shape. This rule applies inside nested blocks,
+function literals, and package initializer expressions. Package initializer
+placement is owned by the exact `types.Initializer`, not by an arbitrarily
+chosen LHS variable. Unreachable shapes create no target name, file, or class.
 
 An admitted pointer is a typed reference to one canonical storage location.
 `new(T)` creates a fresh cell when `T` has a complete admitted value

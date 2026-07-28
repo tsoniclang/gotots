@@ -65,11 +65,25 @@ const (
 	AnonymousStructDemandZero
 	AnonymousStructDemandCopy
 	AnonymousStructDemandEqual
+	AnonymousStructDemandHash
 )
 
 func (d AnonymousStructDemand) Valid() bool {
 	return d >= AnonymousStructDemandDefinition &&
-		d <= AnonymousStructDemandEqual
+		d <= AnonymousStructDemandHash
+}
+
+type MapSpecializationDemand uint8
+
+const (
+	MapSpecializationDemandInvalid MapSpecializationDemand = iota
+	MapSpecializationDemandDefinition
+	MapSpecializationDemandStatic
+)
+
+func (d MapSpecializationDemand) Valid() bool {
+	return d == MapSpecializationDemandDefinition ||
+		d == MapSpecializationDemandStatic
 }
 
 type DeclarationRequirementKind uint8
@@ -82,6 +96,7 @@ const (
 	DeclarationRequirementLocalConstantProjection
 	DeclarationRequirementDefinedArrayOperation
 	DeclarationRequirementAnonymousStruct
+	DeclarationRequirementMapSpecialization
 )
 
 func (k DeclarationRequirementKind) Valid() bool {
@@ -90,7 +105,8 @@ func (k DeclarationRequirementKind) Valid() bool {
 		k == DeclarationRequirementConstantProjection ||
 		k == DeclarationRequirementLocalConstantProjection ||
 		k == DeclarationRequirementDefinedArrayOperation ||
-		k == DeclarationRequirementAnonymousStruct
+		k == DeclarationRequirementAnonymousStruct ||
+		k == DeclarationRequirementMapSpecialization
 }
 
 type DeclarationRequirement struct {
@@ -109,8 +125,9 @@ type DeclarationRequirement struct {
 	// unlike a types.Type interface value, whose pointer identity is not a
 	// stable projection key.
 	projection      types.BasicKind
-	anonymous       *GeneratedArtifact
+	generated       *GeneratedArtifact
 	anonymousDemand AnonymousStructDemand
+	mapDemand       MapSpecializationDemand
 }
 
 // ConstantProjectionType resolves a validated concrete constant-capable basic
@@ -286,7 +303,9 @@ func NewAnonymousStructRequirement(
 	artifact *GeneratedArtifact,
 	demand AnonymousStructDemand,
 ) (DeclarationRequirement, error) {
-	if !artifact.Valid() || !demand.Valid() {
+	if !artifact.Valid() ||
+		artifact.Kind() != GeneratedArtifactAnonymousStruct ||
+		!demand.Valid() {
 		return DeclarationRequirement{}, &RootRequestError{
 			Reason: "anonymous-struct requirement is invalid",
 		}
@@ -294,8 +313,27 @@ func NewAnonymousStructRequirement(
 	return DeclarationRequirement{
 		owner:           artifact.ReconstructionOwner(),
 		kind:            DeclarationRequirementAnonymousStruct,
-		anonymous:       artifact,
+		generated:       artifact,
 		anonymousDemand: demand,
+	}, nil
+}
+
+func NewMapSpecializationRequirement(
+	artifact *GeneratedArtifact,
+	demand MapSpecializationDemand,
+) (DeclarationRequirement, error) {
+	if !artifact.Valid() ||
+		artifact.Kind() != GeneratedArtifactMapSpecialization ||
+		!demand.Valid() {
+		return DeclarationRequirement{}, &RootRequestError{
+			Reason: "map-specialization requirement is invalid",
+		}
+	}
+	return DeclarationRequirement{
+		owner:     artifact.ReconstructionOwner(),
+		kind:      DeclarationRequirementMapSpecialization,
+		generated: artifact,
+		mapDemand: demand,
 	}, nil
 }
 
@@ -310,8 +348,9 @@ func (r DeclarationRequirement) Valid() bool {
 			r.variable != nil ||
 			r.constant != nil ||
 			r.projection != types.Invalid ||
-			r.anonymous != nil ||
-			r.anonymousDemand != AnonymousStructDemandInvalid {
+			r.generated != nil ||
+			r.anonymousDemand != AnonymousStructDemandInvalid ||
+			r.mapDemand != MapSpecializationDemandInvalid {
 			return false
 		}
 		source, sourceOK := r.owner.Source()
@@ -323,8 +362,9 @@ func (r DeclarationRequirement) Valid() bool {
 			r.variable != nil ||
 			r.constant != nil ||
 			r.projection != types.Invalid ||
-			r.anonymous != nil ||
-			r.anonymousDemand != AnonymousStructDemandInvalid {
+			r.generated != nil ||
+			r.anonymousDemand != AnonymousStructDemandInvalid ||
+			r.mapDemand != MapSpecializationDemandInvalid {
 			return false
 		}
 		source, sourceOK := r.owner.Source()
@@ -337,8 +377,9 @@ func (r DeclarationRequirement) Valid() bool {
 			r.variable.IsField() ||
 			r.constant != nil ||
 			r.projection != types.Invalid ||
-			r.anonymous != nil ||
-			r.anonymousDemand != AnonymousStructDemandInvalid {
+			r.generated != nil ||
+			r.anonymousDemand != AnonymousStructDemandInvalid ||
+			r.mapDemand != MapSpecializationDemandInvalid {
 			return false
 		}
 		source, sourceOK := r.owner.Source()
@@ -350,8 +391,9 @@ func (r DeclarationRequirement) Valid() bool {
 			r.variable != nil ||
 			r.constant != nil ||
 			!validConstantProjection(r.projection) ||
-			r.anonymous != nil ||
-			r.anonymousDemand != AnonymousStructDemandInvalid {
+			r.generated != nil ||
+			r.anonymousDemand != AnonymousStructDemandInvalid ||
+			r.mapDemand != MapSpecializationDemandInvalid {
 			return false
 		}
 		source, sourceOK := r.owner.Source()
@@ -363,8 +405,9 @@ func (r DeclarationRequirement) Valid() bool {
 			r.variable != nil ||
 			r.constant == nil ||
 			!validConstantProjection(r.projection) ||
-			r.anonymous != nil ||
-			r.anonymousDemand != AnonymousStructDemandInvalid {
+			r.generated != nil ||
+			r.anonymousDemand != AnonymousStructDemandInvalid ||
+			r.mapDemand != MapSpecializationDemandInvalid {
 			return false
 		}
 		source, sourceOK := r.owner.Source()
@@ -376,9 +419,22 @@ func (r DeclarationRequirement) Valid() bool {
 			r.variable == nil &&
 			r.constant == nil &&
 			r.projection == types.Invalid &&
-			r.anonymous.Valid() &&
+			r.generated.Valid() &&
+			r.generated.Kind() == GeneratedArtifactAnonymousStruct &&
 			r.anonymousDemand.Valid() &&
-			r.owner == r.anonymous.ReconstructionOwner()
+			r.mapDemand == MapSpecializationDemandInvalid &&
+			r.owner == r.generated.ReconstructionOwner()
+	case DeclarationRequirementMapSpecialization:
+		return r.operation == NamedStructOperationInvalid &&
+			r.array == DefinedArrayOperationInvalid &&
+			r.variable == nil &&
+			r.constant == nil &&
+			r.projection == types.Invalid &&
+			r.generated.Valid() &&
+			r.generated.Kind() == GeneratedArtifactMapSpecialization &&
+			r.anonymousDemand == AnonymousStructDemandInvalid &&
+			r.mapDemand.Valid() &&
+			r.owner == r.generated.ReconstructionOwner()
 	default:
 		return false
 	}
@@ -477,5 +533,33 @@ func (r DeclarationRequirement) AnonymousStruct() (
 		r.kind != DeclarationRequirementAnonymousStruct {
 		return nil, AnonymousStructDemandInvalid, false
 	}
-	return r.anonymous, r.anonymousDemand, true
+	return r.generated, r.anonymousDemand, true
+}
+
+func (r DeclarationRequirement) MapSpecialization() (
+	*GeneratedArtifact,
+	MapSpecializationDemand,
+	bool,
+) {
+	if !r.Valid() ||
+		r.kind != DeclarationRequirementMapSpecialization {
+		return nil, MapSpecializationDemandInvalid, false
+	}
+	return r.generated, r.mapDemand, true
+}
+
+func (r DeclarationRequirement) GeneratedArtifact() (
+	*GeneratedArtifact,
+	bool,
+) {
+	if !r.Valid() {
+		return nil, false
+	}
+	switch r.kind {
+	case DeclarationRequirementAnonymousStruct,
+		DeclarationRequirementMapSpecialization:
+		return r.generated, true
+	default:
+		return nil, false
+	}
 }

@@ -89,6 +89,24 @@ func StructKeyLifecycle() (int32, int32, bool, int) {
 	return found.Value, again.Pair[0], ok, len(values)
 }
 
+func AnonymousShapeLifecycle() (int32, int32, bool) {
+	values := map[struct {
+		Value int32
+	}]struct {
+		Number int32
+	}{
+		{Value: 8}: {Number: 89},
+	}
+	found, ok := values[struct {
+		Value int32
+	}{Value: 8}]
+	found.Number = 99
+	again := values[struct {
+		Value int32
+	}{Value: 8}]
+	return found.Number, again.Number, ok
+}
+
 func CollisionEquality() (int32, int32, int) {
 	values := map[CollisionKey]int32{
 		{Value: 1}:          10,

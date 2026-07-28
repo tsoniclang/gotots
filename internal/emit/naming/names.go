@@ -1,82 +1,36 @@
-package emit
+package naming
 
 import (
 	"go/ast"
 	"go/types"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/load"
-	"github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-type targetBinding struct {
-	name         string
-	sourceFile   *ast.File
-	sourcePath   string
-	moduleExport bool
-}
-
-type packageVariableBinding struct {
-	fieldName    string
-	statePath    string
-	assemblyPath string
-}
-
-type anonymousStructBinding struct {
-	owner       *api.GeneratedArtifact
-	fingerprint string
-	name        string
-}
-
-type declarationRegistry struct {
-	byObject                 map[types.Object]targetBinding
-	memberNameByObject       map[*types.Var]string
-	packageVariables         map[*types.Var]packageVariableBinding
-	assemblyPathByPackage    map[*types.Package]string
-	importQualifierByPackage map[*types.Package]string
-	anonymousStructs         map[string]anonymousStructBinding
-	anonymousStructBuckets   map[string][]string
-	anonymousStructNames     map[string]string
-}
-
-type nameOwner struct {
+type Owner struct {
 	byObject            map[types.Object]targetBinding
 	targetNameByObject  map[types.Object]string
 	sourceNameBases     map[string]struct{}
 	generatedSuffixes   map[string][]uint64
 	nextGeneratedSuffix map[string]uint64
 	memberNameByObject  map[*types.Var]string
-	registry            *declarationRegistry
+	registry            *Registry
 }
 
-func newNameOwner(packageScope *types.Scope, info *types.Info) *nameOwner {
-	return newNameOwnerWithRegistry(packageScope, info, newDeclarationRegistry())
+func newNameOwner(packageScope *types.Scope, info *types.Info) *Owner {
+	return NewOwner(packageScope, info, NewRegistry())
 }
 
-func newDeclarationRegistry() *declarationRegistry {
-	return &declarationRegistry{
-		byObject:                 make(map[types.Object]targetBinding),
-		memberNameByObject:       make(map[*types.Var]string),
-		packageVariables:         make(map[*types.Var]packageVariableBinding),
-		assemblyPathByPackage:    make(map[*types.Package]string),
-		importQualifierByPackage: make(map[*types.Package]string),
-		anonymousStructs:         make(map[string]anonymousStructBinding),
-		anonymousStructBuckets:   make(map[string][]string),
-		anonymousStructNames:     make(map[string]string),
-	}
-}
-
-func newNameOwnerWithRegistry(
+func NewOwner(
 	packageScope *types.Scope,
 	info *types.Info,
-	registry *declarationRegistry,
-) *nameOwner {
-	owner := &nameOwner{
+	registry *Registry,
+) *Owner {
+	owner := &Owner{
 		byObject:            make(map[types.Object]targetBinding),
 		targetNameByObject:  make(map[types.Object]string),
 		sourceNameBases:     make(map[string]struct{}),
@@ -117,7 +71,7 @@ func newNameOwnerWithRegistry(
 	return owner
 }
 
-func (n *nameOwner) Reserve(
+func (n *Owner) Reserve(
 	object types.Object,
 	sourceFile *ast.File,
 	sourcePath string,
@@ -145,7 +99,7 @@ func (n *nameOwner) Reserve(
 	return name, nil
 }
 
-func (n *nameOwner) preallocatePackageInitializers(
+func (n *Owner) PreallocatePackageInitializers(
 	objects []types.Object,
 ) error {
 	for index, object := range objects {
@@ -168,7 +122,7 @@ func (n *nameOwner) preallocatePackageInitializers(
 	return nil
 }
 
-func (n *nameOwner) declare(object types.Object, binding targetBinding) (string, error) {
+func (n *Owner) declare(object types.Object, binding targetBinding) (string, error) {
 	if object == nil {
 		return "", &api.NameError{Reason: "declaration object is nil"}
 	}
@@ -198,98 +152,7 @@ func (n *nameOwner) declare(object types.Object, binding targetBinding) (string,
 	return name, nil
 }
 
-func (r *declarationRegistry) reserve(
-	object types.Object,
-	binding targetBinding,
-) error {
-	if r == nil {
-		return &api.NameError{Name: objectName(object), Reason: "declaration registry is nil"}
-	}
-	if existing, ok := r.byObject[object]; ok {
-		if existing.sourceFile != binding.sourceFile ||
-			existing.sourcePath != binding.sourcePath ||
-			existing.name != binding.name {
-			return &api.NameError{
-				Name:   objectName(object),
-				Reason: "declaration has conflicting target ownership",
-			}
-		}
-		return nil
-	}
-	r.byObject[object] = binding
-	return nil
-}
-
-func (r *declarationRegistry) indexPackageTargets(
-	sourcePackages []*load.Package,
-) error {
-	if r == nil {
-		return &api.NameError{Reason: "declaration registry is nil"}
-	}
-	packages := make([]*types.Package, 0, len(sourcePackages))
-	for _, sourcePackage := range sourcePackages {
-		if sourcePackage == nil || sourcePackage.Types() == nil {
-			return &api.NameError{Reason: "source package identity is nil"}
-		}
-		typesPackage := sourcePackage.Types()
-		if _, duplicate := r.assemblyPathByPackage[typesPackage]; duplicate {
-			return &api.NameError{
-				Name:   typesPackage.Path(),
-				Reason: "source package identity is duplicated",
-			}
-		}
-		assemblyPath, err := output.PackageAssemblyPath(sourcePackage)
-		if err != nil {
-			return err
-		}
-		r.assemblyPathByPackage[typesPackage] = assemblyPath
-		packages = append(packages, typesPackage)
-	}
-	return r.indexPackageQualifiers(packages)
-}
-
-func (r *declarationRegistry) indexPackageQualifiers(
-	sourcePackages []*types.Package,
-) error {
-	if r == nil {
-		return &api.NameError{Reason: "declaration registry is nil"}
-	}
-	packages := slices.Clone(sourcePackages)
-	for _, sourcePackage := range packages {
-		if sourcePackage == nil ||
-			sourcePackage.Path() == "" ||
-			sourcePackage.Name() == "" {
-			return &api.NameError{Reason: "source package identity is nil"}
-		}
-	}
-	sort.Slice(packages, func(left, right int) bool {
-		return packages[left].Path() < packages[right].Path()
-	})
-	used := make(map[string]struct{}, len(packages))
-	paths := make(map[string]struct{}, len(packages))
-	for _, sourcePackage := range packages {
-		if _, duplicate := paths[sourcePackage.Path()]; duplicate {
-			return &api.NameError{
-				Name:   sourcePackage.Path(),
-				Reason: "source package path is duplicated",
-			}
-		}
-		paths[sourcePackage.Path()] = struct{}{}
-		base := portableIdentifier(sourcePackage.Name())
-		qualifier := base
-		for suffix := uint64(1); ; suffix++ {
-			if _, duplicate := used[qualifier]; !duplicate {
-				break
-			}
-			qualifier = base + "__package_" + strconv.FormatUint(suffix, 10)
-		}
-		used[qualifier] = struct{}{}
-		r.importQualifierByPackage[sourcePackage] = qualifier
-	}
-	return nil
-}
-
-func (n *nameOwner) ReservePackageVariable(
+func (n *Owner) ReservePackageVariable(
 	variable *types.Var,
 	statePath string,
 	assemblyPath string,
@@ -339,7 +202,7 @@ func (n *nameOwner) ReservePackageVariable(
 	return fieldName, nil
 }
 
-func (n *nameOwner) preallocateScope(
+func (n *Owner) preallocateScope(
 	scope *types.Scope,
 	objectsByScope map[*types.Scope][]types.Object,
 	activeCounts map[string]uint64,
@@ -394,7 +257,7 @@ func (n *nameOwner) preallocateScope(
 	}
 }
 
-func (n *nameOwner) generatedSuffix(base string, index uint64) uint64 {
+func (n *Owner) generatedSuffix(base string, index uint64) uint64 {
 	suffixes := n.generatedSuffixes[base]
 	next := n.nextGeneratedSuffix[base]
 	if next == 0 {
@@ -463,7 +326,7 @@ func portableIdentifier(source string) string {
 	return identifier
 }
 
-func (n *nameOwner) preallocateMethods(info *types.Info) {
+func (n *Owner) preallocateMethods(info *types.Info) {
 	var methods []*types.Func
 	for _, object := range info.Defs {
 		method, ok := object.(*types.Func)
@@ -513,7 +376,7 @@ func receiverTypeName(sourceType types.Type) string {
 	return named.Obj().Name()
 }
 
-func (n *nameOwner) preallocateMembers(packageScope *types.Scope) {
+func (n *Owner) preallocateMembers(packageScope *types.Scope) {
 	names := packageScope.Names()
 	slices.Sort(names)
 	for _, name := range names {

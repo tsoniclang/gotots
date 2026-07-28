@@ -8,6 +8,8 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	anonymousstructdeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/namedstruct"
+	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
+	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/output"
 )
@@ -18,12 +20,22 @@ func (s *programSession) validateAnonymousStructArtifact(
 	if !artifact.Valid() {
 		return &ScheduleError{Reason: "anonymous-struct artifact is invalid"}
 	}
-	binding, ok := s.registry.anonymousStructs[artifact.ArtifactKey()]
+	structType, structural := artifact.StructType()
+	if !structural {
+		return &ScheduleError{
+			Object: artifact.TargetName(),
+			Reason: "generated artifact is not an anonymous struct",
+		}
+	}
+	binding, ok := s.registry.GeneratedArtifact(
+		api.GeneratedArtifactAnonymousStruct,
+		artifact.ArtifactKey(),
+	)
 	if !ok ||
-		binding.owner != artifact ||
+		binding != artifact ||
 		!types.Identical(
-			binding.owner.SourceType(),
-			artifact.SourceType(),
+			binding.SourceType(),
+			structType,
 		) {
 		return &ScheduleError{
 			Object: artifact.TargetName(),
@@ -58,7 +70,7 @@ func (s *programSession) reconstructAnonymousStruct(
 	}
 	owner := api.MustGeneratedArtifactOwner(artifact)
 	index, exists := builder.indexByOwner[owner]
-	var temporaryStart temporarySnapshot
+	var temporaryStart emitnaming.TemporarySnapshot
 	if exists {
 		temporaryStart = builder.declarations[index].temporaryStart
 	}
@@ -102,10 +114,10 @@ func (s *programSession) reconstructAnonymousStruct(
 func (s *programSession) buildAnonymousStructRevision(
 	builder *targetFileBuilder,
 	artifact *api.GeneratedArtifact,
-	temporaryStart temporarySnapshot,
+	temporaryStart emitnaming.TemporarySnapshot,
 	reconstruction bool,
 ) (artifactRevision, error) {
-	names, ok := builder.context.Names().(*fileNames)
+	names, ok := builder.context.Names().(*emitnaming.File)
 	if !ok {
 		return artifactRevision{}, &ScheduleError{
 			Object: artifact.TargetName(),
@@ -113,14 +125,14 @@ func (s *programSession) buildAnonymousStructRevision(
 		}
 	}
 	if !reconstruction {
-		temporaryStart = names.snapshotTemporaries()
+		temporaryStart = names.SnapshotTemporaries()
 	} else {
-		current := names.snapshotTemporaries()
-		names.restoreTemporaries(temporaryStart)
-		defer names.restoreTemporaries(current)
+		current := names.SnapshotTemporaries()
+		names.RestoreTemporaries(temporaryStart)
+		defer names.RestoreTemporaries(current)
 	}
 	owner := api.MustGeneratedArtifactOwner(artifact)
-	finish, err := names.beginArtifact(owner, nil, nil, "")
+	finish, err := names.BeginArtifact(owner, nil, nil, "")
 	if err != nil {
 		return artifactRevision{}, err
 	}
@@ -133,10 +145,17 @@ func (s *programSession) buildAnonymousStructRevision(
 	if err != nil {
 		return artifactRevision{}, err
 	}
+	structType, ok := artifact.StructType()
+	if !ok {
+		return artifactRevision{}, &ScheduleError{
+			Object: artifact.TargetName(),
+			Reason: "generated artifact is not an anonymous struct",
+		}
+	}
 	emission, err := anonymousstructdeclaration.EmitAnonymous(
 		builder.context,
 		builder.emitter,
-		artifact.SourceType(),
+		structType,
 		artifact.TargetName(),
 		operations,
 		true,
@@ -198,6 +217,11 @@ func anonymousStructOperations(
 				operations,
 				api.NamedStructOperationEqual,
 			)
+		case api.AnonymousStructDemandHash:
+			operations = append(
+				operations,
+				api.NamedStructOperationHash,
+			)
 		default:
 			return nil, &ScheduleError{
 				Object: artifact.TargetName(),
@@ -239,7 +263,7 @@ func (s *programSession) anonymousStructBuilder() (
 		outputPath:    output.AnonymousStructSupportPath,
 		emitter:       emitter,
 		context:       context,
-		placement:     newPlacementOwner(),
+		placement:     targetplacement.New(),
 		byOwner:       make(map[api.ArtifactOwner]struct{}),
 		indexByOwner:  make(map[api.ArtifactOwner]int),
 	}

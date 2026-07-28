@@ -22,8 +22,7 @@ import (
 
 func TestDemandCompilerRejectsUnsupportedPackageVariableRepresentation(t *testing.T) {
 	projectDirectory := filepath.Join(
-		"..",
-		"..",
+		repositoryRoot(),
 		"testdata",
 		"constructs",
 		"declaration",
@@ -373,5 +372,5 @@ func demandProgramDirectory() string {
 }
 
 func repositoryRoot() string {
-	return filepath.Join("..", "..")
+	return filepath.Join("..", "..", "..")
 }

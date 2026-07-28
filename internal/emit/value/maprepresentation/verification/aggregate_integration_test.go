@@ -22,11 +22,12 @@ func TestScalarMapArtifactsStayAtTheImmutableBaseline(t *testing.T) {
 		t.TempDir(),
 	)
 	for path, expected := range map[string]string{
-		"source.ts":      "bd2834bffbb71bad243bbacc84620b2b9268222bfee16ca5990e3d1345033ff8",
+		"source.ts":      "0084fe0b66333cb1e54cf84f9b182ce720d65c56457c0c0992dab6db1dcc9e8a",
 		"runtime/map.ts": "b08ead3648e95400dc2aabe9727ff5dc07462e7177cec534e864f76f5abbdb2e",
 	} {
 		content := readFile(t, artifacts.file(t, path))
 		actual := fmt.Sprintf("%x", sha256.Sum256([]byte(content)))
+		t.Logf("%s bytes=%d sha256=%s", path, len(content), actual)
 		if actual != expected {
 			t.Fatalf(
 				"%s sha256 = %s, want immutable baseline %s",
@@ -56,15 +57,24 @@ func TestProductionAggregateKeyOperationsAreStaticAndTyped(t *testing.T) {
 		t.Fatal(err)
 	}
 	operations := make(map[string]int)
+	requirements := make(map[api.DeclarationRequirement]int)
 	for _, request := range specialization.Requests() {
 		requirement, ok := request.DeclarationRequirement()
 		if !ok {
 			continue
 		}
-		typeName, operation, ok := requirement.NamedStructOperation()
-		if ok {
-			operations[typeName.Name()+"/"+operation.String()]++
+		if requirement.Kind() != api.DeclarationRequirementNamedStructOperation {
+			t.Fatalf(
+				"aggregate specialization introduced requirement kind %d",
+				requirement.Kind(),
+			)
 		}
+		requirements[requirement]++
+		typeName, operation, ok := requirement.NamedStructOperation()
+		if !ok {
+			t.Fatal("named-struct requirement lost its typed operation")
+		}
+		operations[typeName.Name()+"/"+operation.String()]++
 	}
 	for _, operation := range []string{
 		"Key/copy",
@@ -81,6 +91,12 @@ func TestProductionAggregateKeyOperationsAreStaticAndTyped(t *testing.T) {
 			)
 		}
 	}
+	if len(requirements) != 5 {
+		t.Fatalf(
+			"aggregate declaration requirements = %d, want five",
+			len(requirements),
+		)
+	}
 	class := factory.ClassDeclaration(
 		nil,
 		factory.Identifier("AggregateMap"),
@@ -89,6 +105,13 @@ func TestProductionAggregateKeyOperationsAreStaticAndTyped(t *testing.T) {
 		specialization.Members(),
 	)
 	source := printAggregateSpecialization(t, factory, class)
+	t.Logf("production-shaped aggregate map bytes=%d", len(source))
+	if len(source) > 7_000 {
+		t.Fatalf(
+			"production-shaped aggregate map = %d bytes, want at most 7000",
+			len(source),
+		)
+	}
 	for _, required := range []string{
 		"return Box.$zero()",
 		"return Key.$hash($key)",
@@ -329,6 +352,13 @@ func (aggregateNames) NamedStructOperation(
 func (aggregateNames) AnonymousStruct(
 	*types.Struct,
 	api.AnonymousStructDemand,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (aggregateNames) MapSpecialization(
+	types.Type,
+	api.MapSpecializationDemand,
 ) (api.NameReference, error) {
 	panic("unused")
 }

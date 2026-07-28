@@ -119,7 +119,8 @@ func TestDeclarationRequirementKindIDsArePinned(t *testing.T) {
 		DeclarationRequirementLocalConstantProjection != 4 ||
 		DeclarationRequirementDefinedArrayOperation != 5 ||
 		DeclarationRequirementAnonymousStruct != 6 ||
-		DeclarationRequirementKind(7).Valid() {
+		DeclarationRequirementMapSpecialization != 7 ||
+		DeclarationRequirementKind(8).Valid() {
 		t.Fatal("declaration requirement kind IDs drifted")
 	}
 }

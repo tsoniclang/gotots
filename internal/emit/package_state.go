@@ -8,6 +8,8 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	packagevariable "github.com/tsoniclang/gotots/internal/emit/declaration/packagevariable"
+	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
+	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -32,8 +34,8 @@ type packageInitializationArtifact struct {
 	initializer     *types.Initializer
 	site            declarationSite
 	statements      []tsgo.Statement
-	placement       *placementOwner
-	temporaryStart  temporarySnapshot
+	placement       *targetplacement.Owner
+	temporaryStart  emitnaming.TemporarySnapshot
 	reconstructions uint64
 }
 
@@ -44,8 +46,8 @@ type packageTargetBuilder struct {
 	emitter            *emitter
 	stateContext       api.Context
 	assemblyContext    api.Context
-	statePlacement     *placementOwner
-	assemblyPlacement  *placementOwner
+	statePlacement     *targetplacement.Owner
+	assemblyPlacement  *targetplacement.Owner
 	storage            []packageStorage
 	storageByObject    map[*types.Var]struct{}
 	initialization     []packageInitializationArtifact
@@ -123,8 +125,8 @@ func (s *programSession) requirePackage(sourcePackage *load.Package) error {
 		emitter:            emitter,
 		stateContext:       stateContext,
 		assemblyContext:    assemblyContext,
-		statePlacement:     newPlacementOwner(),
-		assemblyPlacement:  newPlacementOwner(),
+		statePlacement:     targetplacement.New(),
+		assemblyPlacement:  targetplacement.New(),
 		storageByObject:    make(map[*types.Var]struct{}),
 		initializerByOwner: make(map[api.ArtifactOwner]int),
 	}
@@ -306,8 +308,8 @@ func (s *programSession) emitPackageInitFunctions(
 			if err := s.require(object); err != nil {
 				return err
 			}
-			binding, ok := s.registry.byObject[object]
-			if !ok || binding.name == "" || binding.sourcePath == "" {
+			binding, ok := s.registry.Target(object)
+			if !ok || binding.Name == "" || binding.SourcePath == "" {
 				return &ScheduleError{
 					Object: "init",
 					Reason: "package init has no target artifact binding",
@@ -315,7 +317,7 @@ func (s *programSession) emitPackageInitFunctions(
 			}
 			modulePath, err := targetoutput.ModuleSpecifier(
 				packageBuilder.assemblyPath,
-				binding.sourcePath,
+				binding.SourcePath,
 			)
 			if err != nil {
 				return err
@@ -324,8 +326,8 @@ func (s *programSession) emitPackageInitFunctions(
 				s.factory,
 				api.ImportPhaseValue,
 				modulePath,
-				binding.name,
-				binding.name,
+				binding.Name,
+				binding.Name,
 			)
 			if err != nil {
 				return err
@@ -339,7 +341,7 @@ func (s *programSession) emitPackageInitFunctions(
 				packageBuilder.initFunctions,
 				s.factory.ExpressionStatement(
 					s.factory.CallExpression(
-						s.factory.Identifier(binding.name),
+						s.factory.Identifier(binding.Name),
 						nil,
 						nil,
 						nil,

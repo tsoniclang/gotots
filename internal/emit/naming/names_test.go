@@ -1,4 +1,4 @@
-package emit
+package naming
 
 import (
 	"errors"
@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -34,7 +35,7 @@ func TestPackageQualifiersAreGloballyUniqueAfterPortableEscaping(t *testing.T) {
 		types.NewPackage("example.com/second", "__u3c0_"),
 		types.NewPackage("example.com/third", "π"),
 	}
-	registry := newDeclarationRegistry()
+	registry := NewRegistry()
 	if err := registry.indexPackageQualifiers(packages); err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +57,7 @@ func TestPackageQualifiersAreGloballyUniqueAfterPortableEscaping(t *testing.T) {
 	}
 
 	reversed := []*types.Package{packages[2], packages[1], packages[0]}
-	second := newDeclarationRegistry()
+	second := NewRegistry()
 	if err := second.indexPackageQualifiers(reversed); err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +115,7 @@ func TestNameOwnerSeparatesShadowAndTemporaryNamespaces(t *testing.T) {
 		name != "value__shadow_2" {
 		t.Fatalf("shadow = %q, %v", name, err)
 	}
-	file := &fileNames{
+	file := &File{
 		owner:       owner,
 		temporaries: make(map[api.TemporaryKind]uint64),
 	}
@@ -200,7 +201,7 @@ func TestCrossPackageReferenceRequiresItsExactObjectBeforeImporting(t *testing.T
 	importedPackage.Scope().Insert(object)
 	sourceFile := &ast.File{}
 	declarationFile := &ast.File{}
-	registry := newDeclarationRegistry()
+	registry := NewRegistry()
 	if err := registry.reserve(object, targetBinding{
 		name:         "Run",
 		sourceFile:   declarationFile,
@@ -210,7 +211,7 @@ func TestCrossPackageReferenceRequiresItsExactObjectBeforeImporting(t *testing.T
 		t.Fatal(err)
 	}
 	required := errors.New("enqueue mutation sentinel")
-	names := newNameOwnerWithRegistry(
+	names := NewOwner(
 		currentPackage.Scope(),
 		&types.Info{Defs: make(map[*ast.Ident]types.Object)},
 		registry,
@@ -243,7 +244,7 @@ func TestPackageStatePlacementRejectsRuntimeImports(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	placement := newPlacementOwner()
+	placement := targetplacement.New()
 	if err := placement.Apply([]api.RootRequest{typeRequest}); err != nil {
 		t.Fatal(err)
 	}
@@ -261,7 +262,7 @@ func TestPackageStatePlacementRejectsRuntimeImports(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	placement = newPlacementOwner()
+	placement = targetplacement.New()
 	if err := placement.Apply([]api.RootRequest{valueRequest}); err != nil {
 		t.Fatal(err)
 	}
@@ -300,7 +301,7 @@ func TestValueImportDominatesTypeRequestIndependentOfOrder(t *testing.T) {
 		{typeRequest, valueRequest},
 		{valueRequest, typeRequest},
 	} {
-		placement := newPlacementOwner()
+		placement := targetplacement.New()
 		if err := placement.Apply(requests); err != nil {
 			t.Fatal(err)
 		}
@@ -323,7 +324,7 @@ func TestValueImportDominatesTypeRequestIndependentOfOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	placement := newPlacementOwner()
+	placement := targetplacement.New()
 	if err := placement.Apply([]api.RootRequest{
 		typeRequest,
 		conflicting,
@@ -446,7 +447,7 @@ func TestRuntimeImportAvoidsSourceNamesAndRemainsOneTypedOwner(t *testing.T) {
 
 func TestPlacementRuntimeSymbolsAreExactAndSorted(t *testing.T) {
 	factory := tsgo.NewFactory()
-	placement := newPlacementOwner()
+	placement := targetplacement.New()
 	for _, symbol := range []api.RuntimeSymbol{
 		api.RuntimePointer,
 		api.RuntimeStringSlice,
