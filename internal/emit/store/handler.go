@@ -323,8 +323,15 @@ func field(
 			),
 		)
 	}
-	receiver, err := children.StoreTarget(
-		context.WithRole(api.RoleAssignmentTarget),
+	receiverType := context.TypesInfo().TypeOf(source.X)
+	if receiverType == nil {
+		return api.StoreTargetEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	receiver, err := children.Expression(
+		context.
+			WithRole(api.RoleAssignmentTarget).
+			WithExpectedType(receiverType),
 		source.X,
 	)
 	if err != nil {

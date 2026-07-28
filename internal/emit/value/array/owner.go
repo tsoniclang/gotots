@@ -17,6 +17,7 @@ type RuntimeArray struct {
 	source     *types.Array
 	defined    definedtype.Model
 	nominal    bool
+	aggregate  bool
 }
 
 func Resolve(
@@ -30,9 +31,7 @@ func Resolve(
 	} else {
 		source, _ = types.Unalias(sourceType).(*types.Array)
 	}
-	if source == nil ||
-		source.Len() < 0 ||
-		!directElement(context, source.Elem()) {
+	if source == nil || source.Len() < 0 {
 		return RuntimeArray{}, false
 	}
 	return RuntimeArray{
@@ -40,18 +39,11 @@ func Resolve(
 		source:     source,
 		defined:    defined,
 		nominal:    nominal,
+		aggregate: context.Values().RequiresStructuralCopy(
+			context,
+			source.Elem(),
+		),
 	}, true
-}
-
-func directElement(
-	context api.Context,
-	sourceType types.Type,
-) bool {
-	if _, ok := definedtype.ResolveBasic(sourceType); ok {
-		return true
-	}
-	_, ok := basictype.PrimitiveAlias(context.TypesSizes(), sourceType)
-	return ok
 }
 
 func (a RuntimeArray) ElementType() types.Type {
@@ -60,6 +52,10 @@ func (a RuntimeArray) ElementType() types.Type {
 
 func (a RuntimeArray) Length() int64 {
 	return a.source.Len()
+}
+
+func (a RuntimeArray) Aggregate() bool {
+	return a.aggregate
 }
 
 func (a RuntimeArray) EmitType(
@@ -163,6 +159,24 @@ func (a RuntimeArray) runtime(
 	phase api.ImportPhase,
 ) (api.NameReference, error) {
 	return context.Names().Runtime(api.RuntimeArray, phase)
+}
+
+func (a RuntimeArray) runtimeOperation(
+	context api.Context,
+	symbol api.RuntimeSymbol,
+	arguments ...tsgo.Expression,
+) (tsgo.CallExpression, []api.RootRequest, error) {
+	reference, err := context.Names().Runtime(symbol, api.ImportPhaseValue)
+	if err != nil {
+		return nil, nil, err
+	}
+	return context.Factory().CallExpression(
+		context.Factory().Identifier(reference.Name()),
+		nil,
+		nil,
+		arguments,
+		tsgo.NodeFlagsNone,
+	), reference.Requests(), nil
 }
 
 func (a RuntimeArray) callStatic(

@@ -31,6 +31,9 @@ const (
 	RuntimeStringMin        RuntimeSymbol = 4
 	RuntimePointer          RuntimeSymbol = 100
 	RuntimeArray            RuntimeSymbol = 200
+	RuntimeArrayZeroWith    RuntimeSymbol = 201
+	RuntimeArrayLiteralWith RuntimeSymbol = 202
+	RuntimeArrayCopyWith    RuntimeSymbol = 203
 	RuntimeSlice            RuntimeSymbol = 300
 	RuntimeSliceAddress     RuntimeSymbol = 301
 	RuntimeMap              RuntimeSymbol = 400
@@ -113,6 +116,30 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"GoArray",
 			true,
 			RuntimePanic,
+		), nil
+	case RuntimeArrayZeroWith:
+		return runtimeContract(
+			RuntimeModuleArray,
+			"runtime/array.ts",
+			"goArrayZeroWith",
+			false,
+			RuntimeArray,
+		), nil
+	case RuntimeArrayLiteralWith:
+		return runtimeContract(
+			RuntimeModuleArray,
+			"runtime/array.ts",
+			"goArrayLiteralWith",
+			false,
+			RuntimeArrayZeroWith,
+		), nil
+	case RuntimeArrayCopyWith:
+		return runtimeContract(
+			RuntimeModuleArray,
+			"runtime/array.ts",
+			"goArrayCopyWith",
+			false,
+			RuntimeArrayZeroWith,
 		), nil
 	case RuntimeSlice:
 		return runtimeContract(

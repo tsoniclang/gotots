@@ -46,6 +46,20 @@ func (Owner) RequiresExplicitType(
 	return pointerValue(sourceType)
 }
 
+func (Owner) RequiresStructuralCopy(
+	context api.Context,
+	sourceType types.Type,
+) bool {
+	if defined, ok := definedtype.Resolve(sourceType); ok {
+		return defined.Family() == definedtype.FamilyArray
+	}
+	if _, ok := arrayvalue.Resolve(context, sourceType); ok {
+		return true
+	}
+	_, _, ok := namedStruct(sourceType)
+	return ok
+}
+
 func (Owner) Zero(
 	context api.Context,
 	source ast.Node,

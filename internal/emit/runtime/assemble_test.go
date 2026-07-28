@@ -26,6 +26,54 @@ func TestArrayRuntimeAssemblyExactJoinsRequestedDefinition(t *testing.T) {
 	}
 }
 
+func TestAggregateArrayRuntimeAssemblyExactJoinsDemandedOperations(t *testing.T) {
+	factory := tsgo.NewFactory()
+	symbols := []api.RuntimeSymbol{
+		api.RuntimeArray,
+		api.RuntimeArrayZeroWith,
+		api.RuntimeArrayLiteralWith,
+		api.RuntimeArrayCopyWith,
+	}
+	definitions, err := Build(
+		factory,
+		api.RuntimeModuleArray,
+		symbols,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(definitions) != len(symbols) {
+		t.Fatalf(
+			"aggregate array definitions = %d, want %d",
+			len(definitions),
+			len(symbols),
+		)
+	}
+	for index, definition := range definitions {
+		if definition.Symbol() != symbols[index] {
+			t.Fatalf(
+				"aggregate definition %d = %d, want %d",
+				index,
+				definition.Symbol(),
+				symbols[index],
+			)
+		}
+		if index == 0 {
+			if _, ok := definition.Statement().(tsgo.ClassDeclaration); !ok {
+				t.Fatalf("array definition = %T, want class", definition.Statement())
+			}
+			continue
+		}
+		if _, ok := definition.Statement().(tsgo.FunctionDeclaration); !ok {
+			t.Fatalf(
+				"aggregate operation %d = %T, want function",
+				index,
+				definition.Statement(),
+			)
+		}
+	}
+}
+
 func TestArrayRuntimeAssemblyRejectsMissingDuplicateAndWrongDefinitions(
 	t *testing.T,
 ) {
@@ -50,5 +98,15 @@ func TestArrayRuntimeAssemblyRejectsMissingDuplicateAndWrongDefinitions(
 		[]api.RuntimeSymbol{api.RuntimePointer},
 	); err == nil {
 		t.Fatal("wrong-module runtime symbol passed array assembly")
+	}
+	if _, err := Build(
+		factory,
+		api.RuntimeModuleArray,
+		[]api.RuntimeSymbol{
+			api.RuntimeArrayZeroWith,
+			api.RuntimeArray,
+		},
+	); err == nil {
+		t.Fatal("aggregate operation preceding RuntimeArray passed assembly")
 	}
 }

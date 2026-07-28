@@ -114,9 +114,13 @@ func Build(
 		}
 		return []Definition{definition}, nil
 	}
-	if module == api.RuntimeModuleArray &&
-		len(symbols) == 1 &&
-		symbols[0] == api.RuntimeArray {
+	if module == api.RuntimeModuleArray {
+		if symbols[0] != api.RuntimeArray {
+			return nil, &AssemblyError{
+				Module: module,
+				Reason: "array runtime requires RuntimeArray first",
+			}
+		}
 		panicContract, err := api.RuntimeContract(api.RuntimePanic)
 		if err != nil {
 			return nil, err
@@ -135,7 +139,22 @@ func Build(
 		if err != nil {
 			return nil, err
 		}
-		return []Definition{definition}, nil
+		definitions := []Definition{definition}
+		for _, symbol := range symbols[1:] {
+			statement, err := runtimearray.BuildAggregateOperation(
+				factory,
+				symbol,
+			)
+			if err != nil {
+				return nil, err
+			}
+			definition, err := NewDefinition(symbol, statement)
+			if err != nil {
+				return nil, err
+			}
+			definitions = append(definitions, definition)
+		}
+		return definitions, nil
 	}
 	if module == api.RuntimeModuleSlice &&
 		(len(symbols) == 1 || len(symbols) == 2) &&

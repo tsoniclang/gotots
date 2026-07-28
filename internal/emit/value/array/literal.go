@@ -21,11 +21,10 @@ func (a RuntimeArray) EmitLiteral(
 	children api.ChildEmitter,
 	source *ast.CompositeLit,
 ) (api.ExpressionEmission, error) {
-	if source.Type == nil ||
-		!types.Identical(
-			context.TypesInfo().TypeOf(source),
-			a.sourceType,
-		) ||
+	if !types.Identical(
+		context.TypesInfo().TypeOf(source),
+		a.sourceType,
+	) ||
 		context.ExpectedType() == nil ||
 		!types.AssignableTo(a.sourceType, context.ExpectedType()) {
 		return api.ExpressionEmission{},
@@ -58,19 +57,33 @@ func (a RuntimeArray) EmitLiteral(
 			tsgo.TokenFlagsNone,
 		))
 	}
-	typeArguments, typeRequests, err := a.targetTypeArguments(context)
-	if err != nil {
-		return api.ExpressionEmission{}, err
+	var target tsgo.Expression
+	var typeRequests []api.RootRequest
+	var runtimeRequests []api.RootRequest
+	if a.aggregate {
+		target, runtimeRequests, err = a.runtimeOperation(
+			context,
+			api.RuntimeArrayLiteralWith,
+			a.lengthLiteral(context),
+			valueFactory(context, nil, elementZero.Value()),
+			context.Factory().ArrayLiteralExpression(indexes, false),
+			context.Factory().ArrayLiteralExpression(values, false),
+		)
+	} else {
+		var typeArguments []tsgo.TypeNode
+		typeArguments, typeRequests, err = a.targetTypeArguments(context)
+		if err == nil {
+			target, runtimeRequests, err = a.callStatic(
+				context,
+				arraymember.Literal,
+				typeArguments,
+				a.lengthLiteral(context),
+				elementZero.Value(),
+				context.Factory().ArrayLiteralExpression(indexes, false),
+				context.Factory().ArrayLiteralExpression(values, false),
+			)
+		}
 	}
-	target, runtimeRequests, err := a.callStatic(
-		context,
-		arraymember.Literal,
-		typeArguments,
-		a.lengthLiteral(context),
-		elementZero.Value(),
-		context.Factory().ArrayLiteralExpression(indexes, false),
-		context.Factory().ArrayLiteralExpression(values, false),
-	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}

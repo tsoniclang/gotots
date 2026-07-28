@@ -75,7 +75,7 @@ func structSourceType(
 ) (*types.Named, *types.Struct, bool) {
 	sourceType := context.TypesInfo().TypeOf(source)
 	named, ok := types.Unalias(sourceType).(*types.Named)
-	if !ok || named.TypeParams().Len() != 0 || source.Type == nil || source.Incomplete {
+	if !ok || named.TypeParams().Len() != 0 || source.Incomplete {
 		return nil, nil, false
 	}
 	structType, ok := named.Underlying().(*types.Struct)

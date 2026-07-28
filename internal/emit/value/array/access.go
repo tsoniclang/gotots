@@ -60,17 +60,21 @@ func (a RuntimeArray) EmitStoreTarget(
 	children api.ChildEmitter,
 	source *ast.IndexExpr,
 ) (api.StoreTargetEmission, error) {
-	receiver, err := children.StoreTarget(
-		context.WithRole(api.RoleArrayReceiver),
+	if !types.Identical(
+		context.TypesInfo().TypeOf(source.X),
+		a.sourceType,
+	) {
+		return api.StoreTargetEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	receiver, err := children.Expression(
+		context.
+			WithRole(api.RoleArrayReceiver).
+			WithExpectedType(a.sourceType),
 		source.X,
 	)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
-	}
-	if receiver.IsAccessor() ||
-		!types.Identical(receiver.SourceType(), a.sourceType) {
-		return api.StoreTargetEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	index, err := emitIndex(context, children, source.Index)
 	if err != nil {

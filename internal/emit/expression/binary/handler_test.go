@@ -135,6 +135,10 @@ func (unusedValues) RequiresExplicitType(api.Context, types.Type) bool {
 	panic("unused")
 }
 
+func (unusedValues) RequiresStructuralCopy(api.Context, types.Type) bool {
+	panic("unused")
+}
+
 func (unusedValues) Zero(
 	api.Context,
 	ast.Node,

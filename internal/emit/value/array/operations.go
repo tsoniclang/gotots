@@ -24,6 +24,25 @@ func (a RuntimeArray) Zero(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	if a.aggregate {
+		zeroFactory := valueFactory(context, nil, elementZero.Value())
+		target, runtimeRequests, err := a.runtimeOperation(
+			context,
+			api.RuntimeArrayZeroWith,
+			a.lengthLiteral(context),
+			zeroFactory,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return a.wrap(context, api.DirectExpression(
+			target,
+			api.CombineRequests(
+				elementZero.Requests(),
+				runtimeRequests,
+			)...,
+		))
+	}
 	typeArguments, typeRequests, err := a.targetTypeArguments(context)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -61,6 +80,73 @@ func (a RuntimeArray) Copy(
 			value.Requests(),
 		)
 	}
+	if a.aggregate {
+		elementZero, err := context.Values().Zero(
+			context.WithRole(api.RoleArrayElement),
+			nil,
+			a.ElementType(),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if len(elementZero.Before()) != 0 {
+			return api.ExpressionEmission{}, api.Unsupported(
+				context.WithRole(api.RoleArrayElement),
+				api.CategoryExpression,
+				nil,
+			)
+		}
+		element := context.Factory().Identifier("$value")
+		elementCopy, err := context.Values().Copy(
+			context.WithRole(api.RoleArrayElement),
+			nil,
+			a.ElementType(),
+			api.DirectExpression(element),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if len(elementCopy.Before()) != 0 {
+			return api.ExpressionEmission{}, api.Unsupported(
+				context.WithRole(api.RoleArrayElement),
+				api.CategoryExpression,
+				nil,
+			)
+		}
+		target, runtimeRequests, err := a.runtimeOperation(
+			context,
+			api.RuntimeArrayCopyWith,
+			a.storage(context, value.Value()),
+			valueFactory(context, nil, elementZero.Value()),
+			valueFactory(context, []tsgo.ParameterDeclaration{
+				context.Factory().ParameterDeclaration(
+					nil,
+					nil,
+					element,
+					nil,
+					nil,
+					nil,
+				),
+			}, elementCopy.Value()),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		copied, err := api.NewExpressionEmission(
+			value.Before(),
+			target,
+			api.CombineRequests(
+				value.Requests(),
+				elementZero.Requests(),
+				elementCopy.Requests(),
+				runtimeRequests,
+			),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return a.wrap(context, copied)
+	}
 	copied, err := api.NewExpressionEmission(
 		value.Before(),
 		callMember(
@@ -74,6 +160,24 @@ func (a RuntimeArray) Copy(
 		return api.ExpressionEmission{}, err
 	}
 	return a.wrap(context, copied)
+}
+
+func valueFactory(
+	context api.Context,
+	parameters []tsgo.ParameterDeclaration,
+	value tsgo.Expression,
+) tsgo.ArrowFunction {
+	return context.Factory().ArrowFunction(
+		nil,
+		nil,
+		parameters,
+		nil,
+		context.Factory().EqualsGreaterThanToken(),
+		context.Factory().Block(
+			[]tsgo.Statement{context.Factory().ReturnStatement(value)},
+			true,
+		),
+	)
 }
 
 func (a RuntimeArray) Equal(

@@ -12,6 +12,7 @@ type Values interface {
 	RequiresCustomEquality(Context, types.Type) bool
 	RequiresCustomUpdate(Context, types.Type) bool
 	RequiresExplicitType(Context, types.Type) bool
+	RequiresStructuralCopy(Context, types.Type) bool
 	Zero(Context, ast.Node, types.Type) (ExpressionEmission, error)
 	Copy(Context, ast.Node, types.Type, ExpressionEmission) (ExpressionEmission, error)
 	Assign(
