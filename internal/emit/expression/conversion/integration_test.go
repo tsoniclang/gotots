@@ -44,6 +44,31 @@ func TestConversionsExecuteDifferentially(t *testing.T) {
 					t.Fatalf("conversion artifact contains %q:\n%s", forbidden, printed)
 				}
 			}
+			for _, required := range []string{
+				"export function goSliceArrayPointer<",
+				"public static $view<T, N extends number>",
+				"private readonly $offset: number",
+				"static arrayRegion<L, T, S extends",
+				"GoPointer<Pair, GoArray<int32, 2>>",
+			} {
+				if !strings.Contains(printed, required) {
+					t.Fatalf(
+						"slice-array pointer artifact lacks %q:\n%s",
+						required,
+						printed,
+					)
+				}
+			}
+			if got := strings.Count(
+				printed,
+				"export function goSliceArrayPointer<",
+			); got != 1 {
+				t.Fatalf(
+					"slice-array pointer helpers = %d, want one:\n%s",
+					got,
+					printed,
+				)
+			}
 			if got := strings.Count(printed, "static $convert("); got != 2 {
 				t.Fatalf(
 					"struct conversion definitions = %d, want 2:\n%s",

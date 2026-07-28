@@ -128,10 +128,16 @@ func Build(
 		statement, err := runtimearray.BuildWithCapabilities(
 			factory,
 			panicContract.ExportedName(),
-			runtimearray.Capabilities{Allocate: slices.Contains(
-				symbols,
-				api.RuntimeArrayAllocate,
-			)},
+			runtimearray.Capabilities{
+				Allocate: slices.Contains(
+					symbols,
+					api.RuntimeArrayAllocate,
+				),
+				View: slices.Contains(
+					symbols,
+					api.RuntimeArrayView,
+				),
+			},
 		)
 		if err != nil {
 			return nil, err

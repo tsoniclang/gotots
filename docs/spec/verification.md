@@ -573,10 +573,17 @@ uses, recursively copies aggregate fields, ignores tags only where
 but Go-inconvertible source. Slice-to-array value tests prove short-length
 panic timing, one operand evaluation, fresh array identity, recursive element
 copy, defined source/destination composition, and zero callback/cast paths.
+Slice-to-array pointer tests separately prove short-length panic timing and
+one evaluation, nil-versus-empty length-zero results, canonical equality by
+backing plus offset, bidirectional aliasing, whole-array assignment, recursive
+element-copy isolation, defined slice/array composition, and the absence of
+nominal-wrapper forwarding methods.
 Mutations inline the field walk at every use, omit one field copy, admit an
 inconvertible struct, move the length check after allocation, alias slice
-backing, or evaluate the slice twice; each must fail its owning shape or
-differential gate.
+backing for the value conversion, copy backing for the pointer conversion,
+key the pointer by slice-descriptor identity, collapse nil and non-nil empty
+zero-length slices, restore defined-array forwarding methods, or evaluate the
+slice twice; each must fail its owning shape or differential gate.
 
 Pointer-conversion certification additionally proves:
 

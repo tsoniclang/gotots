@@ -168,25 +168,6 @@ func NewNamedStructOperationRequest(
 	}, nil
 }
 
-func NewDefinedArrayOperationRequest(
-	typeName *types.TypeName,
-	operation DefinedArrayOperation,
-) (RootRequest, error) {
-	requirement, err := NewDefinedArrayOperationRequirement(
-		typeName,
-		operation,
-	)
-	if err != nil {
-		return RootRequest{}, err
-	}
-	return RootRequest{
-		owner: RootRequestOwner{
-			kind:                   RootRequestDeclarationRequirement,
-			declarationRequirement: requirement,
-		},
-	}, nil
-}
-
 func NewAddressableStorageRequest(
 	owner *types.Func,
 	variable *types.Var,

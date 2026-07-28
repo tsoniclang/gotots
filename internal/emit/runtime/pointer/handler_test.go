@@ -34,8 +34,8 @@ func TestBuildCreatesOneTypedCanonicalLocationClass(t *testing.T) {
 		t.Fatalf("pointer type parameters = %v, want L and S", parameters)
 	}
 	members := class.Members()
-	if len(members) != 18 {
-		t.Fatalf("pointer class members = %d, want 18", len(members))
+	if len(members) != 19 {
+		t.Fatalf("pointer class members = %d, want 19", len(members))
 	}
 	constructor, ok := members[3].(tsgo.ConstructorDeclaration)
 	if !ok {
@@ -153,6 +153,7 @@ func TestBuildPrintsSourceShapedCanonicalLocations(t *testing.T) {
 		"static elementView<L, S, O>",
 		"static index<L, S, PL, O extends",
 		"static indexView<L, S, PL, V, O extends",
+		"static arrayRegion<L, T, S extends",
 		"const numericIndex = Number(index);",
 		"static equal<LL, LS, RL, RS>",
 		"static dereference<L, S>",

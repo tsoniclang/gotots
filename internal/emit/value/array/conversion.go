@@ -139,6 +139,59 @@ func (a RuntimeArray) FromSlice(
 	return a.wrap(context, emission)
 }
 
+func (a RuntimeArray) PointerFromSlice(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	operand api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	logical, err := a.EmitType(
+		context.WithRole(api.RoleConversionOperand),
+		children,
+		source,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	typeArguments, typeRequests, err := a.targetTypeArguments(
+		context.WithRole(api.RoleConversionOperand),
+		children,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	runtime, err := context.Names().Runtime(
+		api.RuntimeSliceArrayPointer,
+		api.ImportPhaseValue,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return api.NewExpressionEmission(
+		operand.Before(),
+		context.Factory().CallExpression(
+			context.Factory().Identifier(runtime.Name()),
+			nil,
+			[]tsgo.TypeNode{
+				logical.Value(),
+				typeArguments[0],
+				typeArguments[1],
+			},
+			[]tsgo.Expression{
+				operand.Value(),
+				a.lengthLiteral(context),
+			},
+			tsgo.NodeFlagsNone,
+		),
+		api.CombineRequests(
+			operand.Requests(),
+			logical.Requests(),
+			typeRequests,
+			runtime.Requests(),
+		),
+	)
+}
+
 func sliceProperty(
 	context api.Context,
 	receiver tsgo.Expression,

@@ -24,47 +24,49 @@ const (
 type RuntimeSymbol uint16
 
 const (
-	RuntimeInvalid          RuntimeSymbol = 0
-	RuntimeStringIndex      RuntimeSymbol = 1
-	RuntimeStringSlice      RuntimeSymbol = 2
-	RuntimeStringMax        RuntimeSymbol = 3
-	RuntimeStringMin        RuntimeSymbol = 4
-	RuntimeStringEncodeRune RuntimeSymbol = 5
-	RuntimeStringDecodeRune RuntimeSymbol = 6
-	RuntimePointer          RuntimeSymbol = 100
-	RuntimeArray            RuntimeSymbol = 200
-	RuntimeArrayAllocate    RuntimeSymbol = 201
-	RuntimeSlice            RuntimeSymbol = 300
-	RuntimeSliceAddress     RuntimeSymbol = 301
-	RuntimeSliceStorage     RuntimeSymbol = 302
-	RuntimeSliceAddressView RuntimeSymbol = 303
-	RuntimeSliceAppendSlice RuntimeSymbol = 307
-	RuntimeSliceClear       RuntimeSymbol = 308
-	RuntimeMap              RuntimeSymbol = 400
-	RuntimeMapHash          RuntimeSymbol = 401
-	RuntimeMapClear         RuntimeSymbol = 402
-	RuntimePanic            RuntimeSymbol = 500
-	RuntimeIntegerDivide    RuntimeSymbol = 600
-	RuntimeIntegerRemainder RuntimeSymbol = 601
-	RuntimeIntegerMax       RuntimeSymbol = 602
-	RuntimeIntegerMin       RuntimeSymbol = 603
-	RuntimeFloat32Round     RuntimeSymbol = 700
-	RuntimeComplex64        RuntimeSymbol = 800
-	RuntimeComplex128       RuntimeSymbol = 801
-	RuntimeComplexDivide    RuntimeSymbol = 802
-	RuntimeComplex64Add     RuntimeSymbol = 810
-	RuntimeComplex64Sub     RuntimeSymbol = 811
-	RuntimeComplex64Mul     RuntimeSymbol = 812
-	RuntimeComplex64Div     RuntimeSymbol = 813
-	RuntimeComplex64Neg     RuntimeSymbol = 814
-	RuntimeComplex64Equal   RuntimeSymbol = 815
-	RuntimeComplex128Add    RuntimeSymbol = 820
-	RuntimeComplex128Sub    RuntimeSymbol = 821
-	RuntimeComplex128Mul    RuntimeSymbol = 822
-	RuntimeComplex128Div    RuntimeSymbol = 823
-	RuntimeComplex128Neg    RuntimeSymbol = 824
-	RuntimeComplex128Equal  RuntimeSymbol = 825
-	RuntimeNumberToBigInt   RuntimeSymbol = 900
+	RuntimeInvalid           RuntimeSymbol = 0
+	RuntimeStringIndex       RuntimeSymbol = 1
+	RuntimeStringSlice       RuntimeSymbol = 2
+	RuntimeStringMax         RuntimeSymbol = 3
+	RuntimeStringMin         RuntimeSymbol = 4
+	RuntimeStringEncodeRune  RuntimeSymbol = 5
+	RuntimeStringDecodeRune  RuntimeSymbol = 6
+	RuntimePointer           RuntimeSymbol = 100
+	RuntimeArray             RuntimeSymbol = 200
+	RuntimeArrayAllocate     RuntimeSymbol = 201
+	RuntimeArrayView         RuntimeSymbol = 202
+	RuntimeSlice             RuntimeSymbol = 300
+	RuntimeSliceAddress      RuntimeSymbol = 301
+	RuntimeSliceStorage      RuntimeSymbol = 302
+	RuntimeSliceAddressView  RuntimeSymbol = 303
+	RuntimeSliceArrayPointer RuntimeSymbol = 304
+	RuntimeSliceAppendSlice  RuntimeSymbol = 307
+	RuntimeSliceClear        RuntimeSymbol = 308
+	RuntimeMap               RuntimeSymbol = 400
+	RuntimeMapHash           RuntimeSymbol = 401
+	RuntimeMapClear          RuntimeSymbol = 402
+	RuntimePanic             RuntimeSymbol = 500
+	RuntimeIntegerDivide     RuntimeSymbol = 600
+	RuntimeIntegerRemainder  RuntimeSymbol = 601
+	RuntimeIntegerMax        RuntimeSymbol = 602
+	RuntimeIntegerMin        RuntimeSymbol = 603
+	RuntimeFloat32Round      RuntimeSymbol = 700
+	RuntimeComplex64         RuntimeSymbol = 800
+	RuntimeComplex128        RuntimeSymbol = 801
+	RuntimeComplexDivide     RuntimeSymbol = 802
+	RuntimeComplex64Add      RuntimeSymbol = 810
+	RuntimeComplex64Sub      RuntimeSymbol = 811
+	RuntimeComplex64Mul      RuntimeSymbol = 812
+	RuntimeComplex64Div      RuntimeSymbol = 813
+	RuntimeComplex64Neg      RuntimeSymbol = 814
+	RuntimeComplex64Equal    RuntimeSymbol = 815
+	RuntimeComplex128Add     RuntimeSymbol = 820
+	RuntimeComplex128Sub     RuntimeSymbol = 821
+	RuntimeComplex128Mul     RuntimeSymbol = 822
+	RuntimeComplex128Div     RuntimeSymbol = 823
+	RuntimeComplex128Neg     RuntimeSymbol = 824
+	RuntimeComplex128Equal   RuntimeSymbol = 825
+	RuntimeNumberToBigInt    RuntimeSymbol = 900
 )
 
 type RuntimeSymbolContract struct {
@@ -145,6 +147,14 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			false,
 			RuntimeArray,
 		), nil
+	case RuntimeArrayView:
+		return runtimeContract(
+			RuntimeModuleArray,
+			"runtime/array.ts",
+			"goArrayView",
+			false,
+			RuntimeArray,
+		), nil
 	case RuntimeSlice:
 		return runtimeContract(
 			RuntimeModuleSlice,
@@ -178,6 +188,17 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			false,
 			RuntimeSlice,
 			RuntimePointer,
+		), nil
+	case RuntimeSliceArrayPointer:
+		return runtimeContract(
+			RuntimeModuleSlice,
+			"runtime/slice.ts",
+			"goSliceArrayPointer",
+			false,
+			RuntimeSlice,
+			RuntimePointer,
+			RuntimeArray,
+			RuntimeArrayView,
 		), nil
 	case RuntimeSliceAppendSlice:
 		return runtimeContract(

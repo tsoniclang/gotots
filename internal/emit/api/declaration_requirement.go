@@ -54,17 +54,6 @@ func NamedStructOperationMemberName(
 	return "$" + operation.String(), nil
 }
 
-type DefinedArrayOperation uint8
-
-const (
-	DefinedArrayOperationInvalid DefinedArrayOperation = iota
-	DefinedArrayOperationAddressIndex
-)
-
-func (o DefinedArrayOperation) Valid() bool {
-	return o == DefinedArrayOperationAddressIndex
-}
-
 type AnonymousStructDemand uint8
 
 const (
@@ -100,14 +89,13 @@ func (d MapSpecializationDemand) Valid() bool {
 type DeclarationRequirementKind uint8
 
 const (
-	DeclarationRequirementInvalid DeclarationRequirementKind = iota
-	DeclarationRequirementNamedStructOperation
-	DeclarationRequirementAddressableStorage
-	DeclarationRequirementConstantProjection
-	DeclarationRequirementLocalConstantProjection
-	DeclarationRequirementDefinedArrayOperation
-	DeclarationRequirementAnonymousStruct
-	DeclarationRequirementMapSpecialization
+	DeclarationRequirementInvalid                 DeclarationRequirementKind = 0
+	DeclarationRequirementNamedStructOperation    DeclarationRequirementKind = 1
+	DeclarationRequirementAddressableStorage      DeclarationRequirementKind = 2
+	DeclarationRequirementConstantProjection      DeclarationRequirementKind = 3
+	DeclarationRequirementLocalConstantProjection DeclarationRequirementKind = 4
+	DeclarationRequirementAnonymousStruct         DeclarationRequirementKind = 6
+	DeclarationRequirementMapSpecialization       DeclarationRequirementKind = 7
 )
 
 func (k DeclarationRequirementKind) Valid() bool {
@@ -115,7 +103,6 @@ func (k DeclarationRequirementKind) Valid() bool {
 		k == DeclarationRequirementAddressableStorage ||
 		k == DeclarationRequirementConstantProjection ||
 		k == DeclarationRequirementLocalConstantProjection ||
-		k == DeclarationRequirementDefinedArrayOperation ||
 		k == DeclarationRequirementAnonymousStruct ||
 		k == DeclarationRequirementMapSpecialization
 }
@@ -124,7 +111,6 @@ type DeclarationRequirement struct {
 	owner     ArtifactOwner
 	kind      DeclarationRequirementKind
 	operation NamedStructOperation
-	array     DefinedArrayOperation
 	variable  *types.Var
 	// constant is the untyped constant a local projection materializes. A
 	// package projection owns the constant directly (owner is the constant), so
@@ -264,27 +250,6 @@ func NewNamedStructOperationRequirement(
 	}, nil
 }
 
-func NewDefinedArrayOperationRequirement(
-	typeName *types.TypeName,
-	operation DefinedArrayOperation,
-) (DeclarationRequirement, error) {
-	switch {
-	case typeName == nil:
-		return DeclarationRequirement{}, &RootRequestError{
-			Reason: "defined-array operation type is nil",
-		}
-	case !operation.Valid():
-		return DeclarationRequirement{}, &RootRequestError{
-			Reason: "defined-array operation is invalid",
-		}
-	}
-	return DeclarationRequirement{
-		owner: MustSourceArtifactOwner(typeName),
-		kind:  DeclarationRequirementDefinedArrayOperation,
-		array: operation,
-	}, nil
-}
-
 func NewAddressableStorageRequirement(
 	owner *types.Func,
 	variable *types.Var,
@@ -355,21 +320,6 @@ func (r DeclarationRequirement) Valid() bool {
 	switch r.kind {
 	case DeclarationRequirementNamedStructOperation:
 		if !r.operation.Valid() ||
-			r.array != DefinedArrayOperationInvalid ||
-			r.variable != nil ||
-			r.constant != nil ||
-			r.projection != types.Invalid ||
-			r.generated != nil ||
-			r.anonymousDemand != AnonymousStructDemandInvalid ||
-			r.mapDemand != MapSpecializationDemandInvalid {
-			return false
-		}
-		source, sourceOK := r.owner.Source()
-		_, ok := source.(*types.TypeName)
-		return sourceOK && ok
-	case DeclarationRequirementDefinedArrayOperation:
-		if r.operation != NamedStructOperationInvalid ||
-			!r.array.Valid() ||
 			r.variable != nil ||
 			r.constant != nil ||
 			r.projection != types.Invalid ||
@@ -383,7 +333,6 @@ func (r DeclarationRequirement) Valid() bool {
 		return sourceOK && ok
 	case DeclarationRequirementAddressableStorage:
 		if r.operation != NamedStructOperationInvalid ||
-			r.array != DefinedArrayOperationInvalid ||
 			r.variable == nil ||
 			r.variable.IsField() ||
 			r.constant != nil ||
@@ -398,7 +347,6 @@ func (r DeclarationRequirement) Valid() bool {
 		return sourceOK && ok
 	case DeclarationRequirementConstantProjection:
 		if r.operation != NamedStructOperationInvalid ||
-			r.array != DefinedArrayOperationInvalid ||
 			r.variable != nil ||
 			r.constant != nil ||
 			!validConstantProjection(r.projection) ||
@@ -412,7 +360,6 @@ func (r DeclarationRequirement) Valid() bool {
 		return sourceOK && ok
 	case DeclarationRequirementLocalConstantProjection:
 		if r.operation != NamedStructOperationInvalid ||
-			r.array != DefinedArrayOperationInvalid ||
 			r.variable != nil ||
 			r.constant == nil ||
 			!validConstantProjection(r.projection) ||
@@ -426,7 +373,6 @@ func (r DeclarationRequirement) Valid() bool {
 		return sourceOK && ok
 	case DeclarationRequirementAnonymousStruct:
 		return r.operation == NamedStructOperationInvalid &&
-			r.array == DefinedArrayOperationInvalid &&
 			r.variable == nil &&
 			r.constant == nil &&
 			r.projection == types.Invalid &&
@@ -437,7 +383,6 @@ func (r DeclarationRequirement) Valid() bool {
 			r.owner == r.generated.ReconstructionOwner()
 	case DeclarationRequirementMapSpecialization:
 		return r.operation == NamedStructOperationInvalid &&
-			r.array == DefinedArrayOperationInvalid &&
 			r.variable == nil &&
 			r.constant == nil &&
 			r.projection == types.Invalid &&
@@ -476,20 +421,6 @@ func (r DeclarationRequirement) NamedStructOperation() (
 	source, sourceOK := r.owner.Source()
 	typeName, ok := source.(*types.TypeName)
 	return typeName, r.operation, sourceOK && ok
-}
-
-func (r DeclarationRequirement) DefinedArrayOperation() (
-	*types.TypeName,
-	DefinedArrayOperation,
-	bool,
-) {
-	if !r.Valid() ||
-		r.kind != DeclarationRequirementDefinedArrayOperation {
-		return nil, DefinedArrayOperationInvalid, false
-	}
-	source, sourceOK := r.owner.Source()
-	typeName, ok := source.(*types.TypeName)
-	return typeName, r.array, sourceOK && ok
 }
 
 func (r DeclarationRequirement) AddressableStorage() (

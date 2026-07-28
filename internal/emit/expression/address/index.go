@@ -194,14 +194,6 @@ func arrayIndex(
 			tsgo.NodeFlagsNone,
 		)
 	}
-	requirement, required, err := array.AddressIndexRequirement()
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	var requirementRequests []api.RootRequest
-	if required {
-		requirementRequests = []api.RootRequest{requirement}
-	}
 	method := pointerruntime.IndexName
 	elementStorage := elementTarget
 	typeArguments := []tsgo.TypeNode{
@@ -260,7 +252,6 @@ func arrayIndex(
 			arrayTarget.Requests(),
 			arrayStorage.Requests(),
 			runtime.Requests(),
-			requirementRequests,
 			projectionRequests,
 		),
 	)

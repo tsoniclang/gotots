@@ -37,6 +37,17 @@ func Emit(
 		); ok {
 			return array.EmitStoreTarget(context, children, source)
 		}
+		if element, ok := pointerArrayElement(
+			context,
+			context.TypesInfo().TypeOf(source.X),
+		); ok {
+			return pointerArrayIndex(
+				context,
+				children,
+				source,
+				element,
+			)
+		}
 		return sliceIndex(context, children, source)
 	case *ast.ParenExpr:
 		target, err := children.StoreTarget(context, source.X)
@@ -91,6 +102,78 @@ func dereference(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
+	if definedOK {
+		pointer, err = defined.Project(context, pointer)
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
+	}
+	return canonicalPointerTarget(
+		context,
+		children,
+		source,
+		pointer,
+		element,
+	)
+}
+
+func pointerArrayElement(
+	context api.Context,
+	sourceType types.Type,
+) (types.Type, bool) {
+	_, element, ok := pointertype.Resolve(sourceType)
+	if !ok {
+		if defined, definedOK := definedtype.ResolvePointer(sourceType); definedOK {
+			pointer, _ := defined.Pointer()
+			element = pointer.Elem()
+			ok = true
+		}
+	}
+	if !ok {
+		return nil, false
+	}
+	array, ok := arrayvalue.Resolve(context, element)
+	if !ok {
+		return nil, false
+	}
+	return array.ElementType(), true
+}
+
+func pointerArrayIndex(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.IndexExpr,
+	element types.Type,
+) (api.StoreTargetEmission, error) {
+	if !types.Identical(context.TypesInfo().TypeOf(source), element) {
+		return api.StoreTargetEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	pointer, err := children.Address(
+		context.
+			WithRole(api.RoleAssignmentTarget).
+			WithExpectedType(types.NewPointer(element)),
+		source,
+	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
+	return canonicalPointerTarget(
+		context,
+		children,
+		source,
+		pointer,
+		element,
+	)
+}
+
+func canonicalPointerTarget(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	pointer api.ExpressionEmission,
+	element types.Type,
+) (api.StoreTargetEmission, error) {
 	storageType, err := context.Values().StorageType(
 		context.WithRole(api.RoleStorageType),
 		source,
@@ -98,12 +181,6 @@ func dereference(
 	)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
-	}
-	if definedOK {
-		pointer, err = defined.Project(context, pointer)
-		if err != nil {
-			return api.StoreTargetEmission{}, err
-		}
 	}
 	targetElement, err := children.RepresentedType(
 		context.WithRole(api.RoleAssignmentTarget),

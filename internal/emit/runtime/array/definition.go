@@ -8,6 +8,7 @@ import (
 
 type Capabilities struct {
 	Allocate bool
+	View     bool
 }
 
 func Build(
@@ -54,6 +55,9 @@ func BuildWithCapabilities(
 	}
 	if capabilities.Allocate {
 		members = append(members, allocateMethod(factory, exportedName))
+	}
+	if capabilities.View {
+		members = append(members, viewMethod(factory, exportedName))
 	}
 	members = append(
 		members,
@@ -107,7 +111,11 @@ func allocateMethod(
 		[]tsgo.Statement{factory.ReturnStatement(factory.NewExpression(
 			factory.Identifier(exportedName),
 			[]tsgo.TypeNode{elementType, lengthType},
-			[]tsgo.Expression{values, length},
+			[]tsgo.Expression{
+				values,
+				factory.NumericLiteral("0", tsgo.TokenFlagsNone),
+				length,
+			},
 		))},
 	)
 }
@@ -129,6 +137,17 @@ func constructor(
 				},
 				"$values",
 				factory.ArrayTypeNode(elementType),
+			),
+			parameter(
+				factory,
+				[]tsgo.ModifierLike{
+					factory.PrivateKeyword(),
+					factory.ReadonlyKeyword(),
+				},
+				"$offset",
+				factory.KeywordTypeNode(
+					tsgo.KeywordTypeSyntaxKindNumberKeyword,
+				),
 			),
 			parameter(
 				factory,
@@ -194,7 +213,11 @@ func zeroMethod(
 		factory.ReturnStatement(factory.NewExpression(
 			factory.Identifier(exportedName),
 			[]tsgo.TypeNode{elementType, lengthType},
-			[]tsgo.Expression{values, length},
+			[]tsgo.Expression{
+				values,
+				factory.NumericLiteral("0", tsgo.TokenFlagsNone),
+				length,
+			},
 		)),
 	}
 	return runtimeMethod(
@@ -347,7 +370,24 @@ func copyMethod(
 						"slice",
 					),
 					nil,
+					property(factory, factory.ThisExpression(), "$offset"),
+					binary(
+						factory,
+						property(factory, factory.ThisExpression(), "$offset"),
+						tsgo.BinaryOperatorPlusToken,
+						call(
+							factory,
+							factory.Identifier("Number"),
+							nil,
+							runtimeProperty(
+								factory,
+								factory.ThisExpression(),
+								arraymember.Length,
+							),
+						),
+					),
 				),
+				factory.NumericLiteral("0", tsgo.TokenFlagsNone),
 				runtimeProperty(
 					factory,
 					factory.ThisExpression(),
@@ -393,7 +433,12 @@ func getMethod(
 			factory.ReturnStatement(element(
 				factory,
 				property(factory, factory.ThisExpression(), "$values"),
-				factory.Identifier("offset"),
+				binary(
+					factory,
+					property(factory, factory.ThisExpression(), "$offset"),
+					tsgo.BinaryOperatorPlusToken,
+					factory.Identifier("offset"),
+				),
 			)),
 		},
 	)
@@ -439,7 +484,12 @@ func setMethod(
 				element(
 					factory,
 					property(factory, factory.ThisExpression(), "$values"),
-					factory.Identifier("offset"),
+					binary(
+						factory,
+						property(factory, factory.ThisExpression(), "$offset"),
+						tsgo.BinaryOperatorPlusToken,
+						factory.Identifier("offset"),
+					),
 				),
 				tsgo.BinaryOperatorEqualsToken,
 				factory.Identifier("value"),

@@ -257,6 +257,55 @@ func SliceToArrayPanicCount() int32 {
 	return EvaluationCount
 }
 
+func SliceToArrayPointerAliases() int32 {
+	values := []int32{1, 2, 3}
+	pointer := (*[2]int32)(values)
+	pointer[0] = 7
+	values[1] = 8
+	before := pointer[0]*10 + pointer[1]
+	*pointer = [2]int32{9, 6}
+	after := values[0]*10 + values[1]
+	return before*100 + after
+}
+
+func DefinedSliceToArrayPointerAliases() int32 {
+	values := Numbers{3, 4}
+	pointer := (*Pair)(values)
+	pointer[0] = 5
+	values[1] = 6
+	*pointer = Pair{8, 9}
+	return values[0]*10 + values[1]
+}
+
+func AggregateSliceToArrayPointerCopies() int32 {
+	values := []TaggedLeft{{Value: 1}, {Value: 2}}
+	pointer := (*[2]TaggedLeft)(values)
+	replacement := [2]TaggedLeft{{Value: 7}, {Value: 8}}
+	*pointer = replacement
+	replacement[0].Value = 9
+	return values[0].Value*10 + values[1].Value
+}
+
+func SliceToArrayPointerIdentity() bool {
+	values := []int32{1, 2, 3}
+	first := (*[2]int32)(values)
+	same := (*[2]int32)(values)
+	different := (*[2]int32)(values[1:])
+	return first == same && first != different
+}
+
+func ZeroLengthSliceToArrayPointers() bool {
+	var nilValues []int32
+	emptyValues := []int32{}
+	return (*[0]int32)(nilValues) == nil &&
+		(*[0]int32)(emptyValues) != nil
+}
+
+func SliceToArrayPointerPanics() {
+	EvaluationCount = 0
+	_ = (*[3]int32)(shortSlice())
+}
+
 type PointerLeftInt int32
 type PointerRightInt int32
 

@@ -1232,12 +1232,12 @@ recognizes a conversion from callee spelling and never lets an unimplemented
 conversion fall through to ordinary-call emission.
 
 The conversion owner delegates by exact source and destination representation.
-Integer, floating-point, complex, byte-string, represented struct, and
-slice-to-array value conversions are admitted here. Pointer, interface,
-channel, and generic conversions retain separate semantic owners and fail
-typed until those owners land. Defined types project only through their
-declared representation owner before conversion and wrap only after the
-destination conversion succeeds.
+Integer, floating-point, complex, byte-string, represented struct,
+pointer-reinterpretation, and slice-to-array value/pointer conversions are
+admitted here. Interface, channel, and generic conversions retain separate
+semantic owners and fail typed until those owners land. Defined types project
+only through their declared representation owner before conversion and wrap
+only after the destination conversion succeeds.
 
 Constant conversions materialize the converted checker value directly:
 
@@ -1269,6 +1269,7 @@ Non-constant conversions have one closed destination-family decision:
 | `[]rune` to string or string to `[]rune` | encode or decode UTF-8 with Go's invalid-sequence width and `RuneError` rules |
 | represented struct to represented struct | call the destination class's one demand-owned structural conversion member; tags may differ, fields are copied recursively, and each use is O(1) |
 | slice to array value | evaluate the slice once, panic when its length is short, allocate a fresh array, and copy the first destination-length elements |
+| slice to pointer-to-array | evaluate the slice once, panic when its length is short, then return a canonical pointer to an offset-aware fixed-array view of the existing backing; writes alias both ways, defined arrays keep logical nominality over underlying array storage, and a zero-length nil slice alone yields nil |
 
 The selected GoToTS implementation-defined result for a non-finite
 floating-to-integer conversion is zero before width normalization. Finite
@@ -1661,6 +1662,31 @@ Unsupported aggregate representations fail before requesting storage.
 Address/index operands are evaluated once in Go order. Repeated formation of
 the same live location yields equal pointers; different cells with equal
 values do not.
+
+Slice-to-array pointers use the same location rule:
+
+```go
+type Pair [2]int32
+
+values := []int32{1, 2, 3}
+pair := (*Pair)(values)
+pair[0] = 7
+*pair = Pair{8, 9}
+```
+
+```ts
+const pair: GoPointer<Pair, GoArray<int32, 2>> | undefined =
+  goSliceArrayPointer<Pair, int32, 2>(values, 2);
+GoPointer.index(GoPointer.dereference(pair), 0).value = 7;
+GoPointer.dereference(pair).value = new Pair(
+  GoArray.literal(2, 0, [0, 1], [8, 9]),
+).$value;
+```
+
+`pair` and `values` share the same backing. Repeating the conversion at the
+same slice offset compares equal; converting a subslice at another offset does
+not. The `Pair` wrapper gains no forwarding methods: pointer storage is the
+underlying `GoArray<int32, 2>`.
 
 Each runtime call remains constant-size. Element/key/value representations are
 selected from the same `go/types` evidence. Pointer projection factories may

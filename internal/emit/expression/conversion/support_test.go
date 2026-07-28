@@ -123,6 +123,12 @@ func main() {
 	fmt.Println(values.DefinedSliceToArray())
 	fmt.Println(values.AggregateSliceToArrayCopies())
 	fmt.Println(panics(values.SliceToArrayPanics), values.SliceToArrayPanicCount())
+	fmt.Println(values.SliceToArrayPointerAliases())
+	fmt.Println(values.DefinedSliceToArrayPointerAliases())
+	fmt.Println(values.AggregateSliceToArrayPointerCopies())
+	fmt.Println(values.SliceToArrayPointerIdentity())
+	fmt.Println(values.ZeroLengthSliceToArrayPointers())
+	fmt.Println(panics(values.SliceToArrayPointerPanics), values.SliceToArrayPanicCount())
 	fmt.Println(values.PointerScalarConversion())
 	fmt.Println(values.PointerStructConversion())
 	fmt.Println(values.PointerRoundTripIdentity())
@@ -196,6 +202,12 @@ console.log(show(values.SliceToArrayCopies()));
 console.log(show(values.DefinedSliceToArray()));
 console.log(show(values.AggregateSliceToArrayCopies()));
 console.log(panics(values.SliceToArrayPanics), show(values.SliceToArrayPanicCount()));
+console.log(show(values.SliceToArrayPointerAliases()));
+console.log(show(values.DefinedSliceToArrayPointerAliases()));
+console.log(show(values.AggregateSliceToArrayPointerCopies()));
+console.log(values.SliceToArrayPointerIdentity());
+console.log(values.ZeroLengthSliceToArrayPointers());
+console.log(panics(values.SliceToArrayPointerPanics), show(values.SliceToArrayPanicCount()));
 console.log(show(values.PointerScalarConversion()));
 console.log(show(values.PointerStructConversion()));
 console.log(values.PointerRoundTripIdentity());

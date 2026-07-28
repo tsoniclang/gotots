@@ -310,7 +310,12 @@ restore storage at the typed load/store site, while the pointer runtime owns
 only address identity and storage access. Named/generated structs reconstruct
 to a storage-backed private layout only when the storage facet is demanded.
 Casts, erased payloads, shape tests, and semantic read/write adapters remain
-forbidden.
+forbidden. A defined array's canonical storage is its underlying `GoArray`,
+so its nominal wrapper never grows pointer-only forwarding methods.
+Slice-to-array pointers are offset-aware aliases of existing slice backing,
+preserve nil-versus-empty behavior at length zero, panic before construction
+when short, and copy only when Go later assigns an array value through the
+pointer.
 
 The checkpoint exits only when all six families:
 

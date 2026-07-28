@@ -14,6 +14,7 @@ const (
 	ElementViewName = "elementView"
 	IndexName       = "index"
 	IndexViewName   = "indexView"
+	ArrayRegionName = "arrayRegion"
 )
 
 type builder struct {
@@ -50,10 +51,11 @@ func Build(
 			target.cellMethod(),
 			target.fieldMethod(),
 			target.objectFieldMethod(),
-				target.elementMethod(),
-				target.elementViewMethod(),
-				target.indexMethod(),
-				target.indexViewMethod(),
+			target.elementMethod(),
+			target.elementViewMethod(),
+			target.indexMethod(),
+			target.indexViewMethod(),
+			target.arrayRegionMethod(),
 			target.equalMethod(),
 			target.dereferenceMethod(),
 			target.viewMethod(),

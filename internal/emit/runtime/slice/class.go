@@ -12,10 +12,11 @@ type builder struct {
 }
 
 type Capabilities struct {
-	Address     bool
-	Storage     bool
-	AppendSlice bool
-	Clear       bool
+	Address      bool
+	Storage      bool
+	AppendSlice  bool
+	Clear        bool
+	ArrayPointer bool
 }
 
 func Build(
@@ -80,6 +81,9 @@ func BuildWithCapabilities(
 	}
 	if capabilities.Address {
 		members = append(members, target.addressMethod())
+	}
+	if capabilities.ArrayPointer {
+		members = append(members, target.arrayLocationMethod())
 	}
 	return factory.ClassDeclaration(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},

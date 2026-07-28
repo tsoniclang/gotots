@@ -13,7 +13,7 @@ func (owner Owner) RequiresStorageProjection(
 	_ api.Context,
 	sourceType types.Type,
 ) bool {
-	if _, ok := definedtype.ResolveBasic(sourceType); ok {
+	if _, ok := definedStorageModel(sourceType); ok {
 		return true
 	}
 	if _, ok := isAnonymousStruct(sourceType); ok {
@@ -28,7 +28,7 @@ func (owner Owner) StorageType(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
-	if defined, ok := definedtype.ResolveBasic(sourceType); ok {
+	if defined, ok := definedStorageModel(sourceType); ok {
 		return owner.StorageType(
 			context.WithRole(api.RoleDefinedUnderlyingType),
 			source,
@@ -74,7 +74,7 @@ func (owner Owner) ToStorage(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	if defined, ok := definedtype.ResolveBasic(sourceType); ok {
+	if defined, ok := definedStorageModel(sourceType); ok {
 		projected, err := defined.Project(context, value)
 		if err != nil {
 			return api.ExpressionEmission{}, err
@@ -125,7 +125,7 @@ func (owner Owner) FromStorage(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	if defined, ok := definedtype.ResolveBasic(sourceType); ok {
+	if defined, ok := definedStorageModel(sourceType); ok {
 		restored, err := owner.FromStorage(
 			context.WithRole(api.RoleDefinedUnderlyingType),
 			source,
@@ -168,6 +168,15 @@ func (owner Owner) FromStorage(
 		)
 	}
 	return value, nil
+}
+
+func definedStorageModel(sourceType types.Type) (definedtype.Model, bool) {
+	defined, ok := definedtype.Resolve(sourceType)
+	if !ok {
+		return definedtype.Model{}, false
+	}
+	return defined, defined.Family() == definedtype.FamilyBasic ||
+		defined.Family() == definedtype.FamilyArray
 }
 
 func callStorageMember(

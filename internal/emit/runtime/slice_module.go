@@ -31,6 +31,8 @@ func buildSlice(
 		case api.RuntimeSlice:
 		case api.RuntimeSliceAddress, api.RuntimeSliceAddressView:
 			capabilities.Address = true
+		case api.RuntimeSliceArrayPointer:
+			capabilities.ArrayPointer = true
 		case api.RuntimeSliceStorage:
 			capabilities.Storage = true
 		case api.RuntimeSliceAppendSlice:
@@ -86,7 +88,8 @@ func buildSliceOperation(
 	sliceName string,
 ) (tsgo.Statement, error) {
 	if symbol != api.RuntimeSliceAddress &&
-		symbol != api.RuntimeSliceAddressView {
+		symbol != api.RuntimeSliceAddressView &&
+		symbol != api.RuntimeSliceArrayPointer {
 		return runtimeslice.BuildOperation(factory, symbol)
 	}
 	addressContract, err := api.RuntimeContract(symbol)
@@ -103,6 +106,24 @@ func buildSliceOperation(
 			addressContract.ExportedName(),
 			sliceName,
 			pointerContract.ExportedName(),
+		), nil
+	}
+	if symbol == api.RuntimeSliceArrayPointer {
+		arrayContract, err := api.RuntimeContract(api.RuntimeArray)
+		if err != nil {
+			return nil, err
+		}
+		arrayViewContract, err := api.RuntimeContract(api.RuntimeArrayView)
+		if err != nil {
+			return nil, err
+		}
+		return runtimeslice.BuildArrayPointer(
+			factory,
+			addressContract.ExportedName(),
+			sliceName,
+			pointerContract.ExportedName(),
+			arrayContract.ExportedName(),
+			arrayViewContract.ExportedName(),
 		), nil
 	}
 	return runtimeslice.BuildAddress(

@@ -201,6 +201,22 @@ func (b builder) newPointerWithWrite(
 	read tsgo.Expression,
 	write tsgo.Expression,
 ) tsgo.NewExpression {
+	return b.newPointerWithWriteBody(
+		logicalType,
+		storageType,
+		address,
+		read,
+		[]tsgo.Statement{b.factory.ExpressionStatement(write)},
+	)
+}
+
+func (b builder) newPointerWithWriteBody(
+	logicalType tsgo.TypeNode,
+	storageType tsgo.TypeNode,
+	address tsgo.Expression,
+	read tsgo.Expression,
+	write []tsgo.Statement,
+) tsgo.NewExpression {
 	readArrow := b.factory.ArrowFunction(
 		nil,
 		nil,
@@ -220,12 +236,7 @@ func (b builder) newPointerWithWrite(
 		},
 		nil,
 		b.factory.EqualsGreaterThanToken(),
-		b.factory.Block(
-			[]tsgo.Statement{
-				b.factory.ExpressionStatement(write),
-			},
-			true,
-		),
+		b.factory.Block(write, true),
 	)
 	return b.factory.NewExpression(
 		b.id(b.className),

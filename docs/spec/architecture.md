@@ -370,6 +370,23 @@ the same opaque canonical address and the same typed storage accessors. It
 does not copy the pointee, inspect a value shape, recover an erased payload, or
 carry a source/target conversion function.
 
+A defined array follows the same split without growing its nominal wrapper.
+Its generated class is the logical type and contains only its brand,
+constructor, and underlying value. Its canonical pointer storage is the
+underlying `GoArray<Element, Length>`. Indexing, pointer projection, and
+whole-array stores operate on that storage; they do not demand duplicate
+`get`/`set` methods on the nominal class.
+
+A slice-to-array pointer conversion is one typed region view over the slice's
+existing backing store. The slice runtime validates the requested length and
+returns canonical backing identity plus absolute offset; the array runtime
+constructs an offset-aware fixed-length view; the pointer runtime keys the
+location by that same backing and offset. A whole-array store copies the
+already value-copied source into the region. No layer copies the conversion
+operand, passes a semantic callback, or creates a second address identity.
+For length zero, a nil slice produces a nil pointer while a non-nil empty slice
+produces a non-nil pointer, matching Go.
+
 Every executable Go function body, including each package `init` declaration,
 is a reconstructible artifact. Package initialization may impose ordering and
 an exported generated entry name, but it does not own a second emission or

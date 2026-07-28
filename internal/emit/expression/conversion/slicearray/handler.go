@@ -19,6 +19,16 @@ func Convert(
 ) (api.ExpressionEmission, bool, error) {
 	sourceSlice, sourceElement, sourceOK := slicevalue.Resolve(sourceType)
 	targetArray, targetOK := arrayvalue.Resolve(context, targetType)
+	targetPointer := false
+	if !targetOK {
+		if pointer, ok := types.Unalias(targetType).(*types.Pointer); ok {
+			targetArray, targetOK = arrayvalue.Resolve(
+				context,
+				pointer.Elem(),
+			)
+			targetPointer = targetOK
+		}
+	}
 	if !sourceOK || !targetOK {
 		return api.ExpressionEmission{}, false, nil
 	}
@@ -27,11 +37,22 @@ func Convert(
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	target, err := targetArray.FromSlice(
-		context,
-		children,
-		source,
-		operand,
-	)
+	var target api.ExpressionEmission
+	var err error
+	if targetPointer {
+		target, err = targetArray.PointerFromSlice(
+			context,
+			children,
+			source,
+			operand,
+		)
+	} else {
+		target, err = targetArray.FromSlice(
+			context,
+			children,
+			source,
+			operand,
+		)
+	}
 	return target, true, err
 }

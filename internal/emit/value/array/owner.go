@@ -131,21 +131,6 @@ func (a RuntimeArray) wrap(
 	return a.defined.Wrap(context, value)
 }
 
-func (a RuntimeArray) AddressIndexRequirement() (
-	api.RootRequest,
-	bool,
-	error,
-) {
-	if !a.nominal {
-		return api.RootRequest{}, false, nil
-	}
-	request, err := api.NewDefinedArrayOperationRequest(
-		a.defined.TypeName(),
-		api.DefinedArrayOperationAddressIndex,
-	)
-	return request, true, err
-}
-
 func (a RuntimeArray) lengthLiteral(context api.Context) tsgo.NumericLiteral {
 	return context.Factory().NumericLiteral(
 		strconv.FormatInt(a.source.Len(), 10),
