@@ -304,6 +304,8 @@ The complex checkpoint additionally proves:
   signed zero, overflow-sensitive ratios, infinities, and NaNs;
 - `complex`, `real`, and `imag` dispatch by exact `*types.Builtin` identity and
   preserve argument evaluation order;
+- `real` and `imag` project a defined complex operand through its exact nominal
+  value member, while raw complex carriers remain nominality-agnostic;
 - each reached width emits exactly one nominal class, division emits one
   shared definition, and every use site remains O(1); and
 - mutations remove a width brand, omit component rounding, replace robust
@@ -675,6 +677,16 @@ Expression-completion certification also requires:
    assignability admission, stored semantic callbacks, host spreading, shared
    aggregate zeros, shallow aggregate growth/copy, or unconditional runtime
    members.
+
+The integrated Wave-3 matrix additionally compiles, TS-Go-encodes, prints,
+strict-typechecks, and executes one cross-family program under the default
+`number` profile and the `bigint` override. It includes a defined map literal
+at a call boundary, predeclared booleans projected to a defined boolean, and
+`real`/`imag` over a defined complex value. Artifact-shape checks require the
+single nominal map wrapper, nominal boolean construction, and explicit complex
+value projection; reverting any underlying-family decision fails before the
+differential comparison. The matrix freezes total and largest-file byte bounds
+and rejects erased types, casts, reflective call helpers, and dynamic imports.
 
 Addressability has an additional exact matrix:
 

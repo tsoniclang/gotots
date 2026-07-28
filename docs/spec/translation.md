@@ -1221,7 +1221,8 @@ spelling never determines either component. The predeclared `complex`, `real`,
 and `imag` functions are selected only from their exact `*types.Builtin`
 identity; `real` and `imag` become readonly component access, while `complex`
 evaluates its two arguments once in order and calls the width-owned
-constructor.
+constructor. A defined complex operand is unwrapped only at this operation
+boundary; the raw complex carrier never absorbs nominal-type semantics.
 
 ### Explicit conversions
 
@@ -1415,13 +1416,15 @@ The `||` branch executes only when the left result is false. Moving right-side
 work before the branch or evaluating either operand twice is forbidden.
 
 The predeclared `true` and `false` are literal booleans, not source-declared
-constants, so they materialize in place as the direct TypeScript boolean literal
-through the one constant-value owner. The parent still supplies the expected Go
-`bool`, the identifier handler verifies semantic object identity and
-assignability through `go/types`, and the basic-type owner supplies the one
-generated `bool` alias where a declaration boundary needs it. A source-declared
-untyped boolean constant is projected like any other untyped constant, not
-inlined. No operator handler guesses a carrier from spelling.
+constants, so they materialize in place through the one constant-value owner.
+The parent supplies the expected checker boolean type, including a defined type
+such as `type Flag bool`; the identifier handler verifies semantic object
+identity, assignability, and the checker-provided underlying `bool`. The value
+owner emits `false` for `bool` and the exact nominal construction for `Flag`.
+The basic-type owner supplies the one generated `bool` alias where a declaration
+boundary needs it. A source-declared untyped boolean constant is projected like
+any other untyped constant, not inlined. No operator handler guesses a carrier
+from spelling.
 
 An explicit Go parenthesized expression becomes one TS-Go
 `ParenthesizedExpression` around the directly emitted child. It preserves
@@ -1516,6 +1519,12 @@ such as `[][]Box{{{Value: 1}}}` is dispatched as a `[]Box` literal because
 `go/types.Info.TypeOf` supplies that contextual type. The handler must not
 fabricate source syntax, rediscover the parent by scanning, or reject a valid
 literal merely because `CompositeLit.Type` is absent.
+
+Composite family selection likewise uses the checker type's underlying family.
+For `type Table map[int32]int32`, `Table{0: 5}` enters the one map-literal owner,
+constructs the canonical map storage once, and applies the nominal `Table`
+wrapper. It does not fall through to struct classification or acquire a
+call-argument-specific path.
 
 An admitted slice is a descriptor over backing storage:
 

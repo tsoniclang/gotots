@@ -107,6 +107,9 @@ func emitPredeclaredBoolean(
 }
 
 func isBoolean(source types.Type) bool {
-	basic, ok := types.Unalias(source).(*types.Basic)
+	if source == nil {
+		return false
+	}
+	basic, ok := types.Unalias(source).Underlying().(*types.Basic)
 	return ok && basic.Kind() == types.Bool
 }

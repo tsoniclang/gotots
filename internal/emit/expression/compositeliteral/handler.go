@@ -21,14 +21,15 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.CompositeLit,
 ) (api.ExpressionEmission, error) {
-	if _, ok := types.Unalias(
-		context.TypesInfo().TypeOf(source),
-	).(*types.Map); ok {
-		return mapliteral.Emit(context, children, source)
+	sourceType := context.TypesInfo().TypeOf(source)
+	if sourceType != nil {
+		if _, ok := types.Unalias(sourceType).Underlying().(*types.Map); ok {
+			return mapliteral.Emit(context, children, source)
+		}
 	}
 	if array, ok := arrayvalue.Resolve(
 		context,
-		context.TypesInfo().TypeOf(source),
+		sourceType,
 	); ok {
 		return array.EmitLiteral(context, children, source)
 	}
