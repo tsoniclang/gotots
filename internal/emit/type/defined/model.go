@@ -15,8 +15,17 @@ const (
 type Model struct {
 	named      *types.Named
 	typeName   *types.TypeName
-	underlying *types.Basic
+	underlying types.Type
+	family     Family
 }
+
+type Family uint8
+
+const (
+	FamilyInvalid Family = iota
+	FamilyBasic
+	FamilyArray
+)
 
 func Resolve(sourceType types.Type) (Model, bool) {
 	if sourceType == nil {
@@ -26,15 +35,32 @@ func Resolve(sourceType types.Type) (Model, bool) {
 	if !ok || named.Obj() == nil || named.TypeParams().Len() != 0 {
 		return Model{}, false
 	}
-	underlying, ok := named.Underlying().(*types.Basic)
-	if !ok {
+	underlying := named.Underlying()
+	var family Family
+	switch underlying.(type) {
+	case *types.Basic:
+		family = FamilyBasic
+	case *types.Array:
+		family = FamilyArray
+	default:
 		return Model{}, false
 	}
 	return Model{
 		named:      named,
 		typeName:   named.Obj(),
 		underlying: underlying,
+		family:     family,
 	}, true
+}
+
+func ResolveBasic(sourceType types.Type) (Model, bool) {
+	model, ok := Resolve(sourceType)
+	return model, ok && model.family == FamilyBasic
+}
+
+func ResolveArray(sourceType types.Type) (Model, bool) {
+	model, ok := Resolve(sourceType)
+	return model, ok && model.family == FamilyArray
 }
 
 func (m Model) Type() *types.Named {
@@ -45,8 +71,22 @@ func (m Model) TypeName() *types.TypeName {
 	return m.typeName
 }
 
-func (m Model) Underlying() *types.Basic {
+func (m Model) Underlying() types.Type {
 	return m.underlying
+}
+
+func (m Model) Family() Family {
+	return m.family
+}
+
+func (m Model) Basic() (*types.Basic, bool) {
+	basic, ok := m.underlying.(*types.Basic)
+	return basic, ok && m.family == FamilyBasic
+}
+
+func (m Model) Array() (*types.Array, bool) {
+	array, ok := m.underlying.(*types.Array)
+	return array, ok && m.family == FamilyArray
 }
 
 func (m Model) Unwrap(

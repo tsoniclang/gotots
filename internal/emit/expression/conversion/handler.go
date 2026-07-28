@@ -93,6 +93,13 @@ func Emit(
 	}
 	var target api.ExpressionEmission
 	switch {
+	case directArrayConversion(sourceType, representedTargetType):
+		target, err = context.Values().Copy(
+			context.WithRole(api.RoleConversionOperand),
+			operand,
+			sourceType,
+			operandValue,
+		)
 	case isInteger(context, representedTargetType):
 		target, err = integerconversion.Convert(
 			context,
@@ -130,6 +137,12 @@ func Emit(
 		target, err = targetDefined.Wrap(context, target)
 	}
 	return target, true, err
+}
+
+func directArrayConversion(sourceType, targetType types.Type) bool {
+	source, sourceOK := types.Unalias(sourceType).(*types.Array)
+	target, targetOK := types.Unalias(targetType).(*types.Array)
+	return sourceOK && targetOK && types.Identical(source, target)
 }
 
 func isInteger(context api.Context, sourceType types.Type) bool {

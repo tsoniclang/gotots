@@ -49,10 +49,17 @@ func Emit(
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	underlying, valid := model.Basic()
+	if !valid {
+		return api.ExpressionEmission{}, true, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "defined basic operation has no basic underlying type",
+		}
+	}
 	target, handled, err := apply(
 		context,
 		source.Op,
-		model.Underlying(),
+		underlying,
 		left,
 		right,
 		rightConstant(context, source.Y),
@@ -77,7 +84,7 @@ func operationModel(
 	if source == nil {
 		return definedtype.Model{}, false, false
 	}
-	if model, ok := definedtype.Resolve(context.TypesInfo().TypeOf(source)); ok {
+	if model, ok := definedtype.ResolveBasic(context.TypesInfo().TypeOf(source)); ok {
 		return model, true, operandsBelong(context, source, model)
 	}
 	if !comparison(source.Op) {
@@ -87,7 +94,7 @@ func operationModel(
 		context.TypesInfo().TypeOf(source.X),
 		context.TypesInfo().TypeOf(source.Y),
 	} {
-		model, ok := definedtype.Resolve(candidate)
+		model, ok := definedtype.ResolveBasic(candidate)
 		if ok && operandsBelong(context, source, model) {
 			return model, false, true
 		}
@@ -138,7 +145,7 @@ func operand(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if sourceModel, ok := definedtype.Resolve(sourceType); ok {
+	if sourceModel, ok := definedtype.ResolveBasic(sourceType); ok {
 		target, err = api.NewExpressionEmission(
 			target.Before(),
 			sourceModel.Unwrap(context.Factory(), target.Value()),

@@ -14,7 +14,7 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.UnaryExpr,
 ) (api.ExpressionEmission, bool, error) {
-	model, ok := definedtype.Resolve(context.TypesInfo().TypeOf(source))
+	model, ok := definedtype.ResolveBasic(context.TypesInfo().TypeOf(source))
 	if !ok {
 		return api.ExpressionEmission{}, false, nil
 	}

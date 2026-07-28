@@ -80,8 +80,7 @@ func emitMake(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	if _, ok := source.Args[0].(*ast.MapType); !ok ||
-		!types.Identical(context.TypesInfo().TypeOf(source.Args[0]), sourceType) {
+	if argumentType := context.TypesInfo().TypeOf(source.Args[0]); argumentType == nil || !types.Identical(argumentType, sourceType) {
 		return api.ExpressionEmission{},
 			api.Unsupported(
 				context.WithRole(api.RoleCallArgumentType),

@@ -17,7 +17,7 @@ func (Owner) RequiresCustomUpdate(
 	_ api.Context,
 	sourceType types.Type,
 ) bool {
-	_, ok := definedtype.Resolve(sourceType)
+	_, ok := definedtype.ResolveBasic(sourceType)
 	return ok
 }
 
@@ -31,9 +31,16 @@ func (Owner) BinaryUpdate(
 	left tsgo.Expression,
 	right api.ExpressionEmission,
 ) (api.ExpressionEmission, bool, error) {
-	model, ok := definedtype.Resolve(sourceType)
+	model, ok := definedtype.ResolveBasic(sourceType)
 	if !ok {
 		return api.ExpressionEmission{}, false, nil
+	}
+	underlying, valid := model.Basic()
+	if !valid {
+		return api.ExpressionEmission{}, true, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "defined basic update has no basic underlying type",
+		}
 	}
 	rightBefore := right.Before()
 	rightRequests := right.Requests()
@@ -53,7 +60,7 @@ func (Owner) BinaryUpdate(
 			rightRequests,
 			right.Requests(),
 		)
-	} else if rightModel, wrapped := definedtype.Resolve(
+	} else if rightModel, wrapped := definedtype.ResolveBasic(
 		rightRepresentation,
 	); wrapped {
 		var err error
@@ -70,7 +77,7 @@ func (Owner) BinaryUpdate(
 	result, handled, err := definedbinary.ApplyUnderlying(
 		context,
 		operator,
-		model.Underlying(),
+		underlying,
 		api.DirectExpression(model.Unwrap(context.Factory(), left)),
 		right,
 		rightConstant,
@@ -97,9 +104,16 @@ func (Owner) Increment(
 	operator token.Token,
 	left tsgo.Expression,
 ) (api.ExpressionEmission, bool, error) {
-	model, ok := definedtype.Resolve(sourceType)
+	model, ok := definedtype.ResolveBasic(sourceType)
 	if !ok {
 		return api.ExpressionEmission{}, false, nil
+	}
+	underlying, valid := model.Basic()
+	if !valid {
+		return api.ExpressionEmission{}, true, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "defined basic increment has no basic underlying type",
+		}
 	}
 	binaryOperator := token.ILLEGAL
 	switch operator {
@@ -124,7 +138,7 @@ func (Owner) Increment(
 	result, handled, err := definedbinary.ApplyUnderlying(
 		context,
 		binaryOperator,
-		model.Underlying(),
+		underlying,
 		api.DirectExpression(model.Unwrap(context.Factory(), left)),
 		right,
 		one,

@@ -227,7 +227,7 @@ func emitClause(
 func directSwitchModel(
 	sourceType types.Type,
 ) (definedtype.Model, bool) {
-	model, ok := definedtype.Resolve(sourceType)
+	model, ok := definedtype.ResolveBasic(sourceType)
 	return model, ok
 }
 

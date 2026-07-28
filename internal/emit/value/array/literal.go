@@ -22,9 +22,12 @@ func (a RuntimeArray) EmitLiteral(
 	source *ast.CompositeLit,
 ) (api.ExpressionEmission, error) {
 	if source.Type == nil ||
-		!types.Identical(context.TypesInfo().TypeOf(source), a.source) ||
+		!types.Identical(
+			context.TypesInfo().TypeOf(source),
+			a.sourceType,
+		) ||
 		context.ExpectedType() == nil ||
-		!types.AssignableTo(a.source, context.ExpectedType()) {
+		!types.AssignableTo(a.sourceType, context.ExpectedType()) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
@@ -71,7 +74,7 @@ func (a RuntimeArray) EmitLiteral(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return api.NewExpressionEmission(
+	result, err := api.NewExpressionEmission(
 		before,
 		target,
 		api.CombineRequests(
@@ -81,6 +84,10 @@ func (a RuntimeArray) EmitLiteral(
 			runtimeRequests,
 		),
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return a.wrap(context, result)
 }
 
 func (a RuntimeArray) emitLiteralElements(

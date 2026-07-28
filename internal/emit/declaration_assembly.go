@@ -193,6 +193,18 @@ func compareDeclarationRequirements(
 		}
 		return compareBasicKinds(leftProjection, rightProjection)
 	}
+	if left.Kind() == api.DeclarationRequirementDefinedArrayOperation {
+		_, leftOperation, _ := left.DefinedArrayOperation()
+		_, rightOperation, _ := right.DefinedArrayOperation()
+		switch {
+		case leftOperation < rightOperation:
+			return -1
+		case leftOperation > rightOperation:
+			return 1
+		default:
+			return 0
+		}
+	}
 	_, leftOperation, _ := left.NamedStructOperation()
 	_, rightOperation, _ := right.NamedStructOperation()
 	switch {

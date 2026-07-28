@@ -38,14 +38,15 @@ func (a RuntimeArray) Zero(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return api.DirectExpression(
+	result := api.DirectExpression(
 		target,
 		api.CombineRequests(
 			elementZero.Requests(),
 			typeRequests,
 			requests,
 		)...,
-	), nil
+	)
+	return a.wrap(context, result)
 }
 
 func (a RuntimeArray) Copy(
@@ -60,11 +61,19 @@ func (a RuntimeArray) Copy(
 			value.Requests(),
 		)
 	}
-	return api.NewExpressionEmission(
+	copied, err := api.NewExpressionEmission(
 		value.Before(),
-		callMember(context, value.Value(), arraymember.Copy),
+		callMember(
+			context,
+			a.storage(context, value.Value()),
+			arraymember.Copy,
+		),
 		value.Requests(),
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return a.wrap(context, copied)
 }
 
 func (a RuntimeArray) Equal(
@@ -140,13 +149,13 @@ func (a RuntimeArray) Equal(
 			context,
 			tsgo.NodeFlagsConst,
 			leftName,
-			left,
+			a.storage(context, left),
 		),
 		arrayComparisonVariable(
 			context,
 			tsgo.NodeFlagsConst,
 			rightName,
-			right,
+			a.storage(context, right),
 		),
 		arrayComparisonVariable(
 			context,

@@ -183,7 +183,8 @@ func (Owner) Copy(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	if _, ok := definedtype.Resolve(sourceType); ok {
+	if defined, ok := definedtype.Resolve(sourceType); ok &&
+		defined.Family() == definedtype.FamilyBasic {
 		return api.NewExpressionEmission(
 			value.Before(),
 			value.Value(),

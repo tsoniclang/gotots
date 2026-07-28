@@ -22,7 +22,7 @@ func (a RuntimeArray) EmitIndex(
 	receiver, err := children.Expression(
 		context.
 			WithRole(api.RoleArrayReceiver).
-			WithExpectedType(a.source),
+			WithExpectedType(a.sourceType),
 		source.X,
 	)
 	if err != nil {
@@ -45,7 +45,12 @@ func (a RuntimeArray) EmitIndex(
 	before = append(before, index.Before()...)
 	return api.NewExpressionEmission(
 		before,
-		callMember(context, receiverValue, arraymember.Get, index.Value()),
+		callMember(
+			context,
+			a.storage(context, receiverValue),
+			arraymember.Get,
+			index.Value(),
+		),
 		api.CombineRequests(receiver.Requests(), index.Requests()),
 	)
 }
@@ -63,7 +68,7 @@ func (a RuntimeArray) EmitStoreTarget(
 		return api.StoreTargetEmission{}, err
 	}
 	if receiver.IsAccessor() ||
-		!types.Identical(receiver.SourceType(), a.source) {
+		!types.Identical(receiver.SourceType(), a.sourceType) {
 		return api.StoreTargetEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
@@ -73,7 +78,7 @@ func (a RuntimeArray) EmitStoreTarget(
 	}
 	targetReceiver, err := api.NewExpressionEmission(
 		receiver.Before(),
-		receiver.Value(),
+		a.storage(context, receiver.Value()),
 		receiver.Requests(),
 	)
 	if err != nil {
@@ -94,14 +99,17 @@ func (a RuntimeArray) EmitLength(
 	source *ast.CallExpr,
 ) (api.ExpressionEmission, error) {
 	if len(source.Args) != 1 ||
-		!types.Identical(context.TypesInfo().TypeOf(source.Args[0]), a.source) {
+		!types.Identical(
+			context.TypesInfo().TypeOf(source.Args[0]),
+			a.sourceType,
+		) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	value, err := children.Expression(
 		context.
 			WithRole(api.RoleBuiltinArgument).
-			WithExpectedType(a.source),
+			WithExpectedType(a.sourceType),
 		source.Args[0],
 	)
 	if err != nil {
@@ -109,7 +117,7 @@ func (a RuntimeArray) EmitLength(
 	}
 	target := tsgo.Expression(memberProperty(
 		context,
-		value.Value(),
+		a.storage(context, value.Value()),
 		arraymember.Length,
 	))
 	if context.IntegerRepresentation() == api.IntegerRepresentationBigInt {

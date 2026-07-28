@@ -149,7 +149,7 @@ func ProjectKey(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	if model, ok := definedtype.Resolve(sourceType); ok {
+	if model, ok := definedtype.ResolveBasic(sourceType); ok {
 		if expression, ok := source.(ast.Expr); ok {
 			facts, found := context.TypesInfo().Types[expression]
 			if found && facts.Value != nil {
@@ -175,8 +175,8 @@ func directKey(
 	sourceType types.Type,
 ) (*types.Basic, bool) {
 	var basic *types.Basic
-	if model, ok := definedtype.Resolve(sourceType); ok {
-		basic = model.Underlying()
+	if model, ok := definedtype.ResolveBasic(sourceType); ok {
+		basic, _ = model.Basic()
 	} else {
 		basic, _ = types.Unalias(sourceType).(*types.Basic)
 	}
@@ -193,7 +193,7 @@ func representedBasic(
 	context api.Context,
 	sourceType types.Type,
 ) bool {
-	if _, ok := definedtype.Resolve(sourceType); ok {
+	if _, ok := definedtype.ResolveBasic(sourceType); ok {
 		return true
 	}
 	_, ok := basictype.PrimitiveAlias(context.TypesSizes(), sourceType)
@@ -205,7 +205,7 @@ func representedType(
 	source ast.Node,
 	sourceType types.Type,
 ) (tsgo.TypeNode, []api.RootRequest, error) {
-	if model, ok := definedtype.Resolve(sourceType); ok {
+	if model, ok := definedtype.ResolveBasic(sourceType); ok {
 		reference, err := context.Names().TypeReference(model.TypeName())
 		if err != nil {
 			return nil, nil, err

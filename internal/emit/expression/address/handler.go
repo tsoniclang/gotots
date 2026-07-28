@@ -368,6 +368,14 @@ func arrayIndex(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	requirement, required, err := array.AddressIndexRequirement()
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	var requirementRequests []api.RootRequest
+	if required {
+		requirementRequests = []api.RootRequest{requirement}
+	}
 	return api.NewExpressionEmission(
 		before,
 		context.Factory().CallExpression(
@@ -388,6 +396,7 @@ func arrayIndex(
 			elementTarget.Requests(),
 			arrayTarget.Requests(),
 			runtime.Requests(),
+			requirementRequests,
 		),
 	)
 }

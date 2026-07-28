@@ -121,8 +121,8 @@ func TestMapValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 		t.Fatalf("TypeScript output = %q, Go output = %q", typeScriptOutput, goOutput)
 	}
 	lines := strings.Split(strings.TrimSpace(typeScriptOutput), "\n")
-	if len(lines) != 17 {
-		t.Fatalf("differential output lines = %d, want 17", len(lines))
+	if len(lines) != 18 {
+		t.Fatalf("differential output lines = %d, want 18", len(lines))
 	}
 	if lines[0] != "0" {
 		t.Fatalf("missing-value mutation guard = %q, want scalar zero", lines[0])
@@ -130,8 +130,8 @@ func TestMapValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	if lines[3] != "31" {
 		t.Fatalf("copy-on-assignment mutation guard = %q, want aliased store", lines[3])
 	}
-	if lines[16] != "true" {
-		t.Fatalf("nil-write mutation guard = %q, want failure", lines[16])
+	if lines[17] != "true" {
+		t.Fatalf("nil-write mutation guard = %q, want failure", lines[17])
 	}
 }
 
@@ -188,13 +188,6 @@ func TestMapBoundariesRemainTypedUnsupported(t *testing.T) {
 			source: `package boundary
 type Named map[int32]int32
 func F() Named { return make(Named) }
-`,
-		},
-		{
-			name: "map alias",
-			source: `package boundary
-type Alias = map[int32]int32
-func F() Alias { return make(Alias) }
 `,
 		},
 		{
@@ -382,6 +375,7 @@ func main() {
 	fmt.Println(mapvalues.Lookup(7))
 	fmt.Println(mapvalues.Alias())
 	fmt.Println(mapvalues.ThroughCall())
+	fmt.Println(mapvalues.AliasMake())
 	fmt.Println(mapvalues.DeleteAndLen())
 	fmt.Println(mapvalues.BoolKey())
 	fmt.Println(mapvalues.LiteralOrder())
@@ -407,7 +401,8 @@ func executeMapValuesTypeScript(
 	t.Helper()
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	writeFile(t, runnerPath, `import {
-    Alias,
+	    Alias,
+	    AliasMake,
     BoolKey,
     DeleteAndLen,
     ExplicitNil,
@@ -430,6 +425,7 @@ console.log(...Lookup(1));
 console.log(...Lookup(7));
 console.log(Alias());
 console.log(ThroughCall());
+console.log(AliasMake());
 console.log(...DeleteAndLen());
 console.log(BoolKey());
 console.log(LiteralOrder());

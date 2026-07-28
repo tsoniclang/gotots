@@ -70,7 +70,7 @@ func Emit(
 		return target, true, err
 	}
 	classifiedType := resultType
-	defined, definedResult := definedtype.Resolve(resultType)
+	defined, definedResult := definedtype.ResolveBasic(resultType)
 	if definedResult {
 		classifiedType = defined.Underlying()
 	}

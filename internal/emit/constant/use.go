@@ -127,7 +127,7 @@ func projectionType(
 	if projection, ok := ProjectionKind(sourceType); ok {
 		return projection, definedtype.Model{}, false, true
 	}
-	defined, ok := definedtype.Resolve(sourceType)
+	defined, ok := definedtype.ResolveBasic(sourceType)
 	if !ok {
 		return types.Invalid, definedtype.Model{}, false, false
 	}

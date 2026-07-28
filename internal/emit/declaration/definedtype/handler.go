@@ -27,13 +27,13 @@ func Emit(
 			return api.DeclarationEmission{}, false, nil
 		}
 	}
-	if len(requirements) != 0 {
-		return api.DeclarationEmission{}, true, &api.InvariantError{
-			Role:   context.Role(),
-			Reason: "defined type or alias received declaration requirements",
-		}
-	}
 	if typeName.IsAlias() {
+		if len(requirements) != 0 {
+			return api.DeclarationEmission{}, true, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "type alias received declaration requirements",
+			}
+		}
 		target, err := children.RepresentedType(
 			context.WithRole(api.RoleDefinedUnderlyingType),
 			source.Type,
@@ -102,6 +102,17 @@ func Emit(
 			context.Factory().Block(nil, true),
 		),
 	}
+	familyMembers, familyRequests, err := emitFamilyMembers(
+		context,
+		children,
+		source,
+		model,
+		requirements,
+	)
+	if err != nil {
+		return api.DeclarationEmission{}, true, err
+	}
+	members = append(members, familyMembers...)
 	return api.DirectDeclaration(
 		context.Factory().ClassDeclaration(
 			modifiers,
@@ -110,7 +121,10 @@ func Emit(
 			nil,
 			members,
 		),
-		underlying.Requests()...,
+		api.CombineRequests(
+			underlying.Requests(),
+			familyRequests,
+		)...,
 	), true, nil
 }
 

@@ -13,25 +13,41 @@ import (
 )
 
 type RuntimeArray struct {
-	source *types.Array
+	sourceType types.Type
+	source     *types.Array
+	defined    definedtype.Model
+	nominal    bool
 }
 
 func Resolve(
 	context api.Context,
 	sourceType types.Type,
 ) (RuntimeArray, bool) {
-	source, ok := types.Unalias(sourceType).(*types.Array)
-	if !ok || source.Len() < 0 || !directElement(context, source.Elem()) {
+	var source *types.Array
+	defined, nominal := definedtype.ResolveArray(sourceType)
+	if nominal {
+		source, _ = defined.Array()
+	} else {
+		source, _ = types.Unalias(sourceType).(*types.Array)
+	}
+	if source == nil ||
+		source.Len() < 0 ||
+		!directElement(context, source.Elem()) {
 		return RuntimeArray{}, false
 	}
-	return RuntimeArray{source: source}, true
+	return RuntimeArray{
+		sourceType: sourceType,
+		source:     source,
+		defined:    defined,
+		nominal:    nominal,
+	}, true
 }
 
 func directElement(
 	context api.Context,
 	sourceType types.Type,
 ) bool {
-	if _, ok := definedtype.Resolve(sourceType); ok {
+	if _, ok := definedtype.ResolveBasic(sourceType); ok {
 		return true
 	}
 	_, ok := basictype.PrimitiveAlias(context.TypesSizes(), sourceType)
@@ -56,6 +72,19 @@ func (a RuntimeArray) EmitType(
 			Role:   context.Role(),
 			Reason: "runtime array has no Go array type",
 		}
+	}
+	if a.nominal {
+		reference, err := context.Names().TypeReference(a.defined.TypeName())
+		if err != nil {
+			return api.TypeEmission{}, err
+		}
+		return api.DirectType(
+			context.Factory().TypeReferenceNode(
+				context.Factory().Identifier(reference.Name()),
+				nil,
+			),
+			reference.Requests()...,
+		), nil
 	}
 	element, err := children.RepresentedType(
 		context,
@@ -85,6 +114,41 @@ func (a RuntimeArray) EmitType(
 			reference.Requests(),
 		)...,
 	), nil
+}
+
+func (a RuntimeArray) storage(
+	context api.Context,
+	value tsgo.Expression,
+) tsgo.Expression {
+	if !a.nominal {
+		return value
+	}
+	return a.defined.Unwrap(context.Factory(), value)
+}
+
+func (a RuntimeArray) wrap(
+	context api.Context,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	if !a.nominal {
+		return value, nil
+	}
+	return a.defined.Wrap(context, value)
+}
+
+func (a RuntimeArray) AddressIndexRequirement() (
+	api.RootRequest,
+	bool,
+	error,
+) {
+	if !a.nominal {
+		return api.RootRequest{}, false, nil
+	}
+	request, err := api.NewDefinedArrayOperationRequest(
+		a.defined.TypeName(),
+		api.DefinedArrayOperationAddressIndex,
+	)
+	return request, true, err
 }
 
 func (a RuntimeArray) lengthLiteral(context api.Context) tsgo.NumericLiteral {

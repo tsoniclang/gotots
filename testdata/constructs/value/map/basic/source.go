@@ -1,5 +1,7 @@
 package mapvalues
 
+type IntMapAlias = map[int32]int32
+
 var Global map[int32]int32
 var Seeded = map[int32]int32{5: 6}
 
@@ -25,6 +27,12 @@ func ThroughCall() int32 {
 	values := make(map[int32]int32, 4)
 	Identity(values)[4] = 41
 	return values[4]
+}
+
+func AliasMake() int32 {
+	values := make(IntMapAlias)
+	values[8] = 81
+	return values[8]
 }
 
 func Identity(values map[int32]int32) map[int32]int32 {

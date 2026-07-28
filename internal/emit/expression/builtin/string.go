@@ -37,7 +37,7 @@ func emitStringLength(
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	expectedType := types.Type(types.Typ[types.String])
-	defined, definedArgument := definedtype.Resolve(argumentType)
+	defined, definedArgument := definedtype.ResolveBasic(argumentType)
 	if definedArgument {
 		expectedType = defined.Type()
 	}
@@ -86,6 +86,6 @@ func supportsStringArgument(sourceType types.Type) bool {
 	if basictype.SupportsString(sourceType) {
 		return true
 	}
-	defined, ok := definedtype.Resolve(sourceType)
+	defined, ok := definedtype.ResolveBasic(sourceType)
 	return ok && basictype.SupportsString(defined.Underlying())
 }
