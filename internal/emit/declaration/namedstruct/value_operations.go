@@ -141,9 +141,10 @@ func equalMethod(
 	classType tsgo.TypeNode,
 	fields []field,
 ) (tsgo.MethodDeclaration, []api.RootRequest, error) {
-	var expression tsgo.Expression = context.Factory().TrueLiteral()
+	equalities := make([]api.ExpressionEmission, 0, len(fields))
 	var requests []api.RootRequest
-	for index, field := range fields {
+	hasPrerequisites := false
+	for _, field := range fields {
 		equal, err := context.Values().Equal(
 			context.WithRole(api.RoleStructEqualField),
 			field.source,
@@ -154,19 +155,10 @@ func equalMethod(
 		if err != nil {
 			return nil, nil, err
 		}
-		if index == 0 {
-			expression = equal.Value()
-		} else {
-			expression = context.Factory().BinaryExpression(
-				nil,
-				expression,
-				nil,
-				context.Factory().BinaryOperatorToken(
-					tsgo.BinaryOperatorAmpersandAmpersandToken,
-				),
-				equal.Value(),
-			)
+		if len(equal.Before()) != 0 {
+			hasPrerequisites = true
 		}
+		equalities = append(equalities, equal)
 		requests = append(requests, equal.Requests()...)
 	}
 	resultType, err := children.RepresentedType(
@@ -178,6 +170,7 @@ func equalMethod(
 		return nil, nil, err
 	}
 	requests = append(requests, resultType.Requests()...)
+	body := structEqualityBody(context, equalities, hasPrerequisites)
 	return operationMethod(
 		context,
 		memberName,
@@ -186,8 +179,62 @@ func equalMethod(
 			parameter(context, "$right", classType),
 		},
 		resultType.Value(),
-		[]tsgo.Statement{context.Factory().ReturnStatement(expression)},
+		body,
 	), requests, nil
+}
+
+func structEqualityBody(
+	context api.Context,
+	equalities []api.ExpressionEmission,
+	hasPrerequisites bool,
+) []tsgo.Statement {
+	if !hasPrerequisites {
+		var expression tsgo.Expression = context.Factory().TrueLiteral()
+		for index, equal := range equalities {
+			if index == 0 {
+				expression = equal.Value()
+				continue
+			}
+			expression = context.Factory().BinaryExpression(
+				nil,
+				expression,
+				nil,
+				context.Factory().BinaryOperatorToken(
+					tsgo.BinaryOperatorAmpersandAmpersandToken,
+				),
+				equal.Value(),
+			)
+		}
+		return []tsgo.Statement{
+			context.Factory().ReturnStatement(expression),
+		}
+	}
+	var body []tsgo.Statement
+	for _, equal := range equalities {
+		body = append(body, equal.Before()...)
+		body = append(
+			body,
+			context.Factory().IfStatement(
+				context.Factory().PrefixUnaryExpression(
+					tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
+					equal.Value(),
+				),
+				context.Factory().Block(
+					[]tsgo.Statement{
+						context.Factory().ReturnStatement(
+							context.Factory().FalseLiteral(),
+						),
+					},
+					true,
+				),
+				nil,
+			),
+		)
+	}
+	return append(
+		body,
+		context.Factory().ReturnStatement(context.Factory().TrueLiteral()),
+	)
 }
 
 func operationMethod(

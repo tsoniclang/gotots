@@ -99,7 +99,7 @@ func TestMapValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 		}
 	}
 	for _, required := range []string{
-		"class GoMap<K extends boolean | number | bigint | string, V extends boolean | number | bigint | string>",
+		"class GoMap<K extends boolean | number | bigint | string, V>",
 		"Map<K, V>",
 		"const storedValue = storage.get(key);",
 		"storedValue === undefined",
@@ -201,6 +201,19 @@ func F() Alias { return make(Alias) }
 			name: "aggregate key",
 			source: `package boundary
 type Key struct { Value int32 }
+func F() map[Key]int32 { return make(map[Key]int32) }
+`,
+		},
+		{
+			name: "floating key",
+			source: `package boundary
+func F() map[float64]int32 { return make(map[float64]int32) }
+`,
+		},
+		{
+			name: "defined floating key",
+			source: `package boundary
+type Key float64
 func F() map[Key]int32 { return make(map[Key]int32) }
 `,
 		},

@@ -62,7 +62,7 @@ func (a RuntimeArray) EmitStoreTarget(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	if receiver.IsSetter() ||
+	if receiver.IsAccessor() ||
 		!types.Identical(receiver.SourceType(), a.source) {
 		return api.StoreTargetEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
@@ -79,8 +79,9 @@ func (a RuntimeArray) EmitStoreTarget(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	return api.NewSetterStoreTargetEmission(
+	return api.NewAccessorStoreTargetEmission(
 		targetReceiver,
+		arraymember.Get.Name(),
 		arraymember.Set.Name(),
 		[]api.ExpressionEmission{index},
 		a.ElementType(),

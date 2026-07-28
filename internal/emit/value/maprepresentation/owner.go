@@ -5,8 +5,10 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	constantvalue "github.com/tsoniclang/gotots/internal/emit/constant"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -18,16 +20,13 @@ func Source(
 	if !ok {
 		return nil, false
 	}
-	if _, keyOK := basictype.PrimitiveAlias(
-		context.TypesSizes(),
+	if _, keyOK := directKey(
+		context,
 		mapType.Key(),
 	); !keyOK || !types.Comparable(mapType.Key()) {
 		return nil, false
 	}
-	if _, valueOK := basictype.PrimitiveAlias(
-		context.TypesSizes(),
-		mapType.Elem(),
-	); !valueOK {
+	if !representedBasic(context, mapType.Elem()) {
 		return nil, false
 	}
 	return mapType, true
@@ -67,11 +66,16 @@ func Reference(
 		return api.NameReference{}, nil,
 			api.Unsupported(context, api.CategoryType, source)
 	}
-	key, keyRequests, err := scalarType(context, source, mapType.Key())
+	keyBasic, _ := directKey(context, mapType.Key())
+	key, keyRequests, err := primitiveType(context, source, keyBasic)
 	if err != nil {
 		return api.NameReference{}, nil, err
 	}
-	value, valueRequests, err := scalarType(context, source, mapType.Elem())
+	value, valueRequests, err := representedType(
+		context,
+		source,
+		mapType.Elem(),
+	)
 	if err != nil {
 		return api.NameReference{}, nil, err
 	}
@@ -135,12 +139,96 @@ func Make(
 	), api.CombineRequests(allRequests...), nil
 }
 
-func scalarType(
+func ProjectKey(
+	context api.Context,
+	source ast.Node,
+	sourceType types.Type,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	if _, ok := directKey(context, sourceType); !ok {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if model, ok := definedtype.Resolve(sourceType); ok {
+		if expression, ok := source.(ast.Expr); ok {
+			facts, found := context.TypesInfo().Types[expression]
+			if found && facts.Value != nil {
+				return constantvalue.EmitValue(
+					context,
+					expression,
+					model.Underlying(),
+					facts.Value,
+				)
+			}
+		}
+		return api.NewExpressionEmission(
+			value.Before(),
+			model.Unwrap(context.Factory(), value.Value()),
+			value.Requests(),
+		)
+	}
+	return value, nil
+}
+
+func directKey(
+	context api.Context,
+	sourceType types.Type,
+) (*types.Basic, bool) {
+	var basic *types.Basic
+	if model, ok := definedtype.Resolve(sourceType); ok {
+		basic = model.Underlying()
+	} else {
+		basic, _ = types.Unalias(sourceType).(*types.Basic)
+	}
+	if basic == nil ||
+		basic.Info()&types.IsUntyped != 0 ||
+		basic.Info()&(types.IsBoolean|types.IsInteger|types.IsString) == 0 {
+		return nil, false
+	}
+	_, represented := basictype.PrimitiveAlias(context.TypesSizes(), basic)
+	return basic, represented
+}
+
+func representedBasic(
+	context api.Context,
+	sourceType types.Type,
+) bool {
+	if _, ok := definedtype.Resolve(sourceType); ok {
+		return true
+	}
+	_, ok := basictype.PrimitiveAlias(context.TypesSizes(), sourceType)
+	return ok
+}
+
+func representedType(
 	context api.Context,
 	source ast.Node,
 	sourceType types.Type,
 ) (tsgo.TypeNode, []api.RootRequest, error) {
-	alias, ok := basictype.PrimitiveAlias(context.TypesSizes(), sourceType)
+	if model, ok := definedtype.Resolve(sourceType); ok {
+		reference, err := context.Names().TypeReference(model.TypeName())
+		if err != nil {
+			return nil, nil, err
+		}
+		return context.Factory().TypeReferenceNode(
+			context.Factory().Identifier(reference.Name()),
+			nil,
+		), reference.Requests(), nil
+	}
+	basic, ok := types.Unalias(sourceType).(*types.Basic)
+	if !ok {
+		return nil, nil,
+			api.Unsupported(context, api.CategoryType, source)
+	}
+	return primitiveType(context, source, basic)
+}
+
+func primitiveType(
+	context api.Context,
+	source ast.Node,
+	basic *types.Basic,
+) (tsgo.TypeNode, []api.RootRequest, error) {
+	alias, ok := basictype.PrimitiveAlias(context.TypesSizes(), basic)
 	if !ok {
 		return nil, nil,
 			api.Unsupported(context, api.CategoryType, source)

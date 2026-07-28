@@ -151,12 +151,6 @@ func TestCompoundIdentifierAssignmentUsesDirectTargetOperation(t *testing.T) {
 
 func TestCompoundAssignmentBoundaryMutationsFailClosed(t *testing.T) {
 	for name, mutate := range map[string]func(*ast.AssignStmt){
-		"store shape": func(source *ast.AssignStmt) {
-			source.Lhs[0] = &ast.IndexExpr{
-				X:     source.Lhs[0],
-				Index: source.Rhs[0],
-			}
-		},
 		"operator": func(source *ast.AssignStmt) {
 			source.Tok = token.SUB_ASSIGN
 		},
@@ -173,6 +167,35 @@ func TestCompoundAssignmentBoundaryMutationsFailClosed(t *testing.T) {
 				t.Fatalf("error = %#v, want owned assignment failure", err)
 			}
 		})
+	}
+}
+
+func TestPrimitiveAccessorCompoundFailsAtAssignmentOwner(t *testing.T) {
+	directory := t.TempDir()
+	writeFile(
+		t,
+		filepath.Join(directory, "go.mod"),
+		"module example.com/compoundboundary\n\ngo 1.26.4\n",
+	)
+	writeFile(t, filepath.Join(directory, "source.go"), `package compoundboundary
+
+func F(values []int32, delta int32) {
+	values[0] += delta
+}
+`)
+	loaded, err := load.One(context.Background(), load.Request{
+		Directory: directory,
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = emit.CompileFile(loaded, loaded.Files()[0].Syntax())
+	var unsupported *api.UnsupportedError
+	if !errors.As(err, &unsupported) ||
+		unsupported.Construct != "*ast.AssignStmt" ||
+		unsupported.Role != api.RoleBlockStatement {
+		t.Fatalf("error = %#v, want owned assignment failure", err)
 	}
 }
 

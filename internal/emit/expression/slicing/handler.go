@@ -23,7 +23,7 @@ func Emit(
 	source *ast.SliceExpr,
 ) (api.ExpressionEmission, error) {
 	sourceType := context.TypesInfo().TypeOf(source.X)
-	_, _, ok := slicevalue.Scalar(context.TypesSizes(), sourceType)
+	_, _, ok := slicevalue.Resolve(sourceType)
 	resultType := context.TypesInfo().TypeOf(source)
 	if !ok ||
 		resultType == nil ||

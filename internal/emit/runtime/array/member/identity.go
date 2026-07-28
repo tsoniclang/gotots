@@ -7,10 +7,9 @@ const (
 	Zero    Identity = 1
 	Literal Identity = 2
 	Copy    Identity = 3
-	Equal   Identity = 4
-	Get     Identity = 5
-	Set     Identity = 6
-	Length  Identity = 7
+	Get     Identity = 4
+	Set     Identity = 5
+	Length  Identity = 6
 )
 
 func All() []Identity {
@@ -18,7 +17,6 @@ func All() []Identity {
 		Zero,
 		Literal,
 		Copy,
-		Equal,
 		Get,
 		Set,
 		Length,
@@ -37,8 +35,6 @@ func (i Identity) Name() string {
 		return "literal"
 	case Copy:
 		return "copy"
-	case Equal:
-		return "equal"
 	case Get:
 		return "get"
 	case Set:

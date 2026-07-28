@@ -2,24 +2,29 @@ package slicevalue
 
 import (
 	"go/types"
-
-	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 )
 
-func Scalar(
-	sizes types.Sizes,
+func Resolve(
 	sourceType types.Type,
 ) (*types.Slice, types.Type, bool) {
-	if sizes == nil || sourceType == nil {
+	if sourceType == nil {
 		return nil, nil, false
 	}
 	sourceSlice, ok := types.Unalias(sourceType).(*types.Slice)
-	if !ok {
+	if !ok || !directElement(sourceSlice.Elem()) {
 		return nil, nil, false
 	}
-	elementType := sourceSlice.Elem()
-	if _, represented := basictype.PrimitiveAlias(sizes, elementType); !represented {
-		return nil, nil, false
+	return sourceSlice, sourceSlice.Elem(), true
+}
+
+func directElement(sourceType types.Type) bool {
+	switch source := types.Unalias(sourceType).(type) {
+	case *types.Basic, *types.Slice:
+		return true
+	case *types.Named:
+		_, ok := source.Underlying().(*types.Basic)
+		return ok
+	default:
+		return false
 	}
-	return sourceSlice, elementType, true
 }

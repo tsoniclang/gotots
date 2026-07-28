@@ -108,7 +108,7 @@ func assertDefinedClassCount(
 			continue
 		}
 		count++
-		assertMinimalDefinedClass(t, class)
+		assertDefinedClass(t, class)
 	}
 	if count != want {
 		t.Fatalf("defined scaling classes = %d, want %d", count, want)

@@ -57,10 +57,12 @@ import {
     LengthAndCapacity,
     LiteralValues,
     NotEqualValues,
+    MultiReturnArray,
     PackageValuesAreIsolated,
     PackageIndexStore,
     ReadEvaluationOrder,
     RuntimeNameCollision,
+    ShortCircuitArray,
     StructFieldCopyAndEquality,
     StoreEvaluationOrder,
     ZeroIsFresh,
@@ -83,6 +85,10 @@ console.log(PackageValuesAreIsolated());
 console.log(PackageIndexStore());
 console.log(ReadEvaluationOrder());
 console.log(RuntimeNameCollision());
+console.log(ShortCircuitArray(false).join(" "));
+console.log(ShortCircuitArray(true).join(" "));
+console.log(MultiReturnArray(false).join(" "));
+console.log(MultiReturnArray(true).join(" "));
 console.log(StructFieldCopyAndEquality());
 console.log(StoreEvaluationOrder());
 try {
@@ -265,6 +271,10 @@ func main() {
 	fmt.Println(values.PackageIndexStore())
 	fmt.Println(values.ReadEvaluationOrder())
 	fmt.Println(values.RuntimeNameCollision())
+	fmt.Println(values.ShortCircuitArray(false))
+	fmt.Println(values.ShortCircuitArray(true))
+	fmt.Println(values.MultiReturnArray(false))
+	fmt.Println(values.MultiReturnArray(true))
 	fmt.Println(values.StructFieldCopyAndEquality())
 	fmt.Println(values.StoreEvaluationOrder())
 	bounds(3)

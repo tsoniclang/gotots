@@ -8,14 +8,15 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func TestSetterStoreTargetOwnsTypedImmutableArguments(t *testing.T) {
+func TestAccessorStoreTargetOwnsTypedImmutableArguments(t *testing.T) {
 	factory := tsgo.NewFactory()
 	receiver := api.DirectExpression(factory.Identifier("values"))
 	arguments := []api.ExpressionEmission{api.DirectExpression(
 		factory.NumericLiteral("1", tsgo.TokenFlagsNone),
 	)}
-	target, err := api.NewSetterStoreTargetEmission(
+	target, err := api.NewAccessorStoreTargetEmission(
 		receiver,
+		"get",
 		"set",
 		arguments,
 		types.Typ[types.Int32],
@@ -26,18 +27,19 @@ func TestSetterStoreTargetOwnsTypedImmutableArguments(t *testing.T) {
 	arguments[0] = api.DirectExpression(
 		factory.NumericLiteral("2", tsgo.TokenFlagsNone),
 	)
-	if !target.IsSetter() ||
-		target.SetterReceiver().Value().(tsgo.Identifier).Text() != "values" ||
+	if !target.IsAccessor() ||
+		target.AccessorReceiver().Value().(tsgo.Identifier).Text() != "values" ||
+		target.GetterMember() != "get" ||
 		target.SetterMember() != "set" ||
-		target.SetterArguments()[0].Value().(tsgo.NumericLiteral).Text() != "1" {
-		t.Fatalf("setter target leaked mutable input: %#v", target)
+		target.AccessorArguments()[0].Value().(tsgo.NumericLiteral).Text() != "1" {
+		t.Fatalf("accessor target leaked mutable input: %#v", target)
 	}
-	exposed := target.SetterArguments()
+	exposed := target.AccessorArguments()
 	exposed[0] = api.DirectExpression(
 		factory.NumericLiteral("3", tsgo.TokenFlagsNone),
 	)
-	if target.SetterArguments()[0].Value().(tsgo.NumericLiteral).Text() != "1" {
-		t.Fatal("setter target exposed mutable argument backing")
+	if target.AccessorArguments()[0].Value().(tsgo.NumericLiteral).Text() != "1" {
+		t.Fatal("accessor target exposed mutable argument backing")
 	}
 }
 

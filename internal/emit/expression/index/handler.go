@@ -25,10 +25,7 @@ func Emit(
 	if array, ok := arrayvalue.Resolve(context, operandType); ok {
 		return array.EmitIndex(context, children, source)
 	}
-	if _, _, ok := slicevalue.Scalar(
-		context.TypesSizes(),
-		operandType,
-	); ok {
+	if _, _, ok := slicevalue.Resolve(operandType); ok {
 		return emitSliceIndex(context, children, source)
 	}
 	indexType := context.TypesInfo().TypeOf(source.Index)
@@ -121,10 +118,7 @@ func emitSliceIndex(
 	source *ast.IndexExpr,
 ) (api.ExpressionEmission, error) {
 	sourceType := context.TypesInfo().TypeOf(source.X)
-	_, elementType, ok := slicevalue.Scalar(
-		context.TypesSizes(),
-		sourceType,
-	)
+	_, elementType, ok := slicevalue.Resolve(sourceType)
 	if !ok ||
 		context.TypesInfo().TypeOf(source) == nil ||
 		!types.Identical(context.TypesInfo().TypeOf(source), elementType) ||

@@ -241,6 +241,15 @@ func emitDelete(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	key, err = maprepresentation.ProjectKey(
+		context.WithRole(api.RoleMapKey),
+		source.Args[1],
+		mapType.Key(),
+		key,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	values, before, requests, err := maprepresentation.ArrangeOperands(
 		context,
 		[]api.ExpressionEmission{receiver, key},

@@ -40,12 +40,6 @@ func emitCompound(
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	switch source.Lhs[0].(type) {
-	case *ast.Ident, *ast.SelectorExpr, *ast.StarExpr:
-	default:
-		return api.StatementEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
-	}
 	target, err := children.StoreTarget(
 		context.WithRole(api.RoleAssignmentTarget),
 		source.Lhs[0],
@@ -65,7 +59,7 @@ func emitCompound(
 			target,
 		)
 	}
-	if target.IsSetter() ||
+	if target.IsAccessor() ||
 		source.Tok != token.ADD_ASSIGN ||
 		!basictype.SupportsInteger(context.TypesSizes(), target.SourceType()) ||
 		!types.AssignableTo(
@@ -113,9 +107,17 @@ func emitCustomCompound(
 	operator token.Token,
 	target api.StoreTargetEmission,
 ) (api.StatementEmission, error) {
-	if target.IsSetter() {
-		return api.StatementEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
+	left := target.Value()
+	if target.IsAccessor() {
+		var err error
+		target, err = target.CaptureAccessorLocation(context)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		left, err = target.AccessorRead(context)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
 	}
 	rightType := context.TypesInfo().TypeOf(source.Rhs[0])
 	expectedRight := rightType
@@ -139,9 +141,11 @@ func emitCustomCompound(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	if len(right.Before()) != 0 {
-		return api.StatementEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
+	if context.EvaluationOrder() == api.EvaluationOrderPreserveGo {
+		right, err = captureCompoundRight(context, right)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
 	}
 	result, handled, err := context.Values().BinaryUpdate(
 		context,
@@ -150,7 +154,7 @@ func emitCustomCompound(
 		target.SourceType(),
 		expectedRight,
 		operator,
-		target.Value(),
+		left,
 		right,
 	)
 	if err != nil {
@@ -159,6 +163,17 @@ func emitCustomCompound(
 	if !handled {
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	if target.IsAccessor() {
+		stored, err := target.AccessorStore(context, result)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		statements := append(
+			stored.Before(),
+			context.Factory().ExpressionStatement(stored.Value()),
+		)
+		return api.NewStatementEmission(statements, stored.Requests())
 	}
 	assigned, err := context.Values().Assign(
 		context.WithRole(api.RoleAssignmentTarget),
@@ -179,6 +194,30 @@ func emitCustomCompound(
 	return api.NewStatementEmission(
 		statements,
 		api.CombineRequests(target.Requests(), assigned.Requests()),
+	)
+}
+
+func captureCompoundRight(
+	context api.Context,
+	right api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	name, err := context.Names().Temporary(api.TemporaryAssignmentValue)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	before := append(
+		right.Before(),
+		variableStatement(
+			context,
+			tsgo.NodeFlagsConst,
+			name,
+			right.Value(),
+		),
+	)
+	return api.NewExpressionEmission(
+		before,
+		context.Factory().Identifier(name),
+		right.Requests(),
 	)
 }
 
@@ -422,7 +461,7 @@ func emitAssignment(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	if target.IsSetter() {
+	if target.IsAccessor() {
 		return emitSetter(context, target, value)
 	}
 	assigned, err := context.Values().Assign(

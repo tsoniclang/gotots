@@ -311,10 +311,11 @@ semantic handler and generated source-file module containing that declaration,
 not by the first caller. The first admitted requirement family is a named
 struct's static zero/copy/equality operation, keyed by its exact
 `types.TypeName` and closed operation kind. The operation is incorporated into
-the owning class and is called through the statically selected Go type
-(`Box.$copy(value)`), never through an instance. Applying one requirement may
-produce further typed requests, such as `Box` copying requesting
-`Point.$copy`.
+the owning class and callers use the statically selected Go type
+(`Box.$copy(value)`), never an instance. A defined-basic wrapper instead
+composes equality directly from its underlying value and has no operation
+requirement. Applying one requirement may produce further typed requests, such
+as `Box` copying requesting `Point.$copy`.
 
 Addressable local storage is the second admitted requirement family. An
 address expression identifies the exact `*types.Var` whose storage becomes
@@ -457,9 +458,9 @@ One placement service applies the policy:
   import the program-initialization module before using a selected package
   surface;
 - reusable static declarations prefer file scope;
-- named-struct static operations are incorporated into their owning class in a
-  fixed operation order; no top-level sibling helper or instance operation is
-  emitted;
+- demanded named-struct static operations are incorporated into their owning
+  class in a fixed operation order; no top-level sibling helper or instance
+  operation is emitted;
 - function-wide declarations enter the function prologue only when their
   lifetime is function-wide;
 - evaluation-dependent temporaries remain immediately inside the branch,

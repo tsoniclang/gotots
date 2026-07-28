@@ -86,6 +86,7 @@ const (
 	RoleFieldReceiver         Role = "field-receiver"
 	RoleArrayReceiver         Role = "array-receiver"
 	RoleArrayIndex            Role = "array-index"
+	RoleArrayElement          Role = "array-element"
 	RoleBuiltinArgument       Role = "builtin-argument"
 	RoleAssignmentTarget      Role = "assignment-target"
 	RoleReceiverType          Role = "receiver-type"

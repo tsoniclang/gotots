@@ -284,8 +284,7 @@ func indexed(
 			)
 		}
 	}
-	if _, sliceElement, ok := slicevalue.Scalar(
-		context.TypesSizes(),
+	if _, sliceElement, ok := slicevalue.Resolve(
 		receiverType,
 	); ok && types.Identical(sliceElement, element) {
 		return sliceIndex(context, children, source, receiverType, element)

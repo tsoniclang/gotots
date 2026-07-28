@@ -12,10 +12,10 @@ import (
 )
 
 func scalarSlice(
-	context api.Context,
+	_ api.Context,
 	sourceType types.Type,
 ) (*types.Slice, types.Type, bool) {
-	return slicevalue.Scalar(context.TypesSizes(), sourceType)
+	return slicevalue.Resolve(sourceType)
 }
 
 func isScalarSlice(context api.Context, sourceType types.Type) bool {

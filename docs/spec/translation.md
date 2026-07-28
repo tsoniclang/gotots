@@ -468,19 +468,42 @@ total += delta;
 ```
 
 The assignment owner proves the exact store target, represented operand type,
-and assignability of the right side. It accepts the direct form only when the
-right-side emission has no prerequisite statements, so reading the left value
-cannot move across right-side effects. The target owner's prerequisite
-statements remain before the direct compound operation. Indexed and
-setter-backed targets, other compound operators, unsupported widths, and
-right-side prerequisite-statement cases remain separate typed failures until
-their single-evaluation rules are proved.
+and assignability of the right side. A direct primitive target accepts this
+form only when the right-side emission has no prerequisite statements, so
+reading the left value cannot move across right-side effects. The target
+owner's prerequisite statements remain before the direct compound operation.
+
+For a represented defined value behind an array, slice, or map accessor, one
+accessor-store transaction captures the receiver and index/key once. Under the
+`preserve-go` profile it then evaluates and captures the right side before
+calling the getter, applies the exact underlying-family operation, wraps the
+result, and calls the setter once:
+
+```go
+values[nextIndex()] += nextValue()
+```
+
+```ts
+const receiver = values;
+const index = nextIndex();
+const right = nextValue();
+receiver.set(index, new Count(receiver.get(index).$value + right.$value));
+```
+
+The `direct` profile retains its explicit target-order tradeoff and may keep a
+direct right expression. Primitive accessor compounds and every operation not
+owned by the represented value family remain typed failures; no generic host
+operator fallback is inferred.
 
 An ordinary Go function with two or more results has one direct TypeScript
 tuple carrier. Result declarations use `[T0, T1, ...]`; an explicit
 `return left, right` constructs `[left, right]`; and `return pair()` preserves
 the tuple-valued call directly. There is no generated result class, wrapper,
 out-parameter ABI, erased carrier, or per-function representation choice.
+When any explicit result has prerequisite statements, the return owner
+evaluates and copies every result left-to-right into one local constant before
+evaluating the next result, then returns the tuple of constants. Direct
+multi-result returns acquire no such captures.
 
 For one multi-valued right side, the assignment owner evaluates it exactly once
 into a typed tuple temporary and then performs target declarations/stores from
@@ -1215,9 +1238,27 @@ claims these deferred semantics. Explicit narrowing conversions and any future
 fixed-width profile are separate construct families rather than baggage in
 ordinary multiplication.
 
-Boolean `&&` and `||` emit direct binary expressions and retain native
-short-circuit evaluation. Neither operand may carry prerequisite statements:
-moving such work before a short-circuit operator would change behavior.
+Boolean `&&` and `||` emit direct binary expressions when the right operand has
+no prerequisite statements. Prerequisites of the always-evaluated left operand
+remain immediately before the expression. If the right operand has
+prerequisites, the binary owner emits one boolean temporary and places the
+right prerequisites inside the selected branch:
+
+```go
+left() && ([2]int32{1, 2} == right())
+```
+
+```ts
+let result = left();
+if (result) {
+  const rightArray = right();
+  // bounded generated array comparison
+  result = arraysEqual;
+}
+```
+
+The `||` branch executes only when the left result is false. Moving right-side
+work before the branch or evaluating either operand twice is forbidden.
 
 The predeclared `true` and `false` are literal booleans, not source-declared
 constants, so they materialize in place as the direct TypeScript boolean literal
@@ -1289,7 +1330,13 @@ return [goStringIndex(value, 1), goStringSlice(value, 0, 1)];
 
 An admitted fixed array retains its length in the target type. A `[2]int32`
 cannot become interchangeable with `[3]int32`. Array zero and copy create
-fresh storage; an indexed store mutates only that storage.
+fresh storage; an indexed store mutates only that storage. Equality is lowered
+at the source expression into one fixed-bound loop whose element comparison is
+selected statically from the exact element type. Both operands are evaluated
+once, nested comparisons compose recursively, and the loop stops at the first
+unequal element. The generic array runtime carries no equality callback,
+semantic tag, or implementer switch; comparison source size is independent of
+the array length.
 
 An admitted slice is a descriptor over backing storage:
 
@@ -1310,6 +1357,30 @@ aliases the same map. Lookup of a missing key returns the element zero;
 comma-ok additionally returns `false`; storing through nil fails. A plain
 object literal is forbidden because it changes key identity and prototype
 behavior.
+
+The current native-`Map` key family is exactly `bool`, represented integer, or
+string, plus defined-basic wrappers whose exact checker type unwraps to one of
+those primitives before every literal/store/lookup/delete operation. The map's
+target key type is the underlying primitive while its Go signature retains the
+defined wrapper at source boundaries:
+
+```go
+type Count int32
+func Lookup(values map[Count]string, key Count) string {
+	return values[key]
+}
+```
+
+```ts
+export function Lookup(values: GoMap<int32, gostring>, key: Count): gostring {
+  return values.lookup(key.$value);
+}
+```
+
+Floating keys remain a typed boundary: JavaScript `Map` uses SameValueZero,
+while Go permits distinct stored NaN keys that cannot be retrieved by another
+NaN comparison. Aggregate comparable keys require the later exact hash/equality
+owner. Neither class may silently use object identity or serialization.
 
 An admitted pointer is a typed reference to one canonical storage location.
 `new(T)` creates a fresh cell when `T` has a complete admitted value
@@ -1400,19 +1471,21 @@ observable contract here is panic occurrence plus the shared carrier identity.
 Recovered runtime-fault payload equivalence is installed with the later
 `panic`/`recover` family rather than guessed now.
 
-Array, slice, and map indexed stores use the same setter-store transaction.
+Array, slice, and map indexed stores use the same accessor-store transaction.
 For:
 
 ```go
 values[nextIndex()] = chooseSecond(resultPair())
 ```
 
-the store-target owner returns the receiver and index target expressions; the
-assignment owner evaluates and captures only operands that would otherwise
-move across prerequisite statements from `resultPair`, then emits one
-`.set(index, value)` or `.store(key, value)` call. The ordinary case remains a
-direct call with no temporary. A map-specific assignment route or unconditional
-capture policy is forbidden.
+the store-target owner returns the receiver, getter, setter, and index/key
+expressions. The assignment owner evaluates and captures only operands that
+would otherwise move across prerequisite statements from `resultPair`, then
+emits one `.set(index, value)` or `.store(key, value)` call. A compound defined
+value uses the same captured location for one later getter and one setter. The
+ordinary store remains a direct call with no temporary. A map-specific
+assignment route, write-only target model, or unconditional capture policy is
+forbidden.
 
 ## Packages, Standard Library, And Externals
 

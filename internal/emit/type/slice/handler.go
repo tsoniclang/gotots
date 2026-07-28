@@ -28,7 +28,7 @@ func EmitRepresented(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
-	_, elementType, ok := slicevalue.Scalar(context.TypesSizes(), sourceType)
+	_, elementType, ok := slicevalue.Resolve(sourceType)
 	if !ok {
 		return api.TypeEmission{},
 			api.Unsupported(context, api.CategoryType, source)

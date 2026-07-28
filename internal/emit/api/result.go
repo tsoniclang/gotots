@@ -58,14 +58,16 @@ func (e ExpressionEmission) Requests() []RootRequest {
 }
 
 type StoreTargetEmission struct {
-	setter          bool
-	before          []tsgo.Statement
-	value           tsgo.Expression
-	setterReceiver  ExpressionEmission
-	setterMember    string
-	setterArguments []ExpressionEmission
-	sourceType      types.Type
-	requests        []RootRequest
+	accessor          bool
+	before            []tsgo.Statement
+	value             tsgo.Expression
+	accessorReceiver  ExpressionEmission
+	getterMember      string
+	setterMember      string
+	accessorArguments []ExpressionEmission
+	locationCaptured  bool
+	sourceType        types.Type
+	requests          []RootRequest
 }
 
 func NewStoreTargetEmission(
@@ -107,48 +109,55 @@ func NewOrderedStoreTargetEmission(
 	}, nil
 }
 
-func NewSetterStoreTargetEmission(
+func NewAccessorStoreTargetEmission(
 	receiver ExpressionEmission,
-	member string,
+	getter string,
+	setter string,
 	arguments []ExpressionEmission,
 	sourceType types.Type,
 ) (StoreTargetEmission, error) {
 	switch {
 	case receiver.Value() == nil:
 		return StoreTargetEmission{}, &ResultError{
-			Result: "setter store target",
+			Result: "accessor store target",
 			Reason: "target receiver is nil",
 		}
-	case member == "":
+	case getter == "":
 		return StoreTargetEmission{}, &ResultError{
-			Result: "setter store target",
-			Reason: "target member is empty",
+			Result: "accessor store target",
+			Reason: "getter member is empty",
+		}
+	case setter == "":
+		return StoreTargetEmission{}, &ResultError{
+			Result: "accessor store target",
+			Reason: "setter member is empty",
 		}
 	case sourceType == nil:
 		return StoreTargetEmission{}, &ResultError{
-			Result: "setter store target",
+			Result: "accessor store target",
 			Reason: "source type is nil",
 		}
 	}
 	for _, argument := range arguments {
 		if argument.Value() == nil {
 			return StoreTargetEmission{}, &ResultError{
-				Result: "setter store target",
-				Reason: "setter argument is nil",
+				Result: "accessor store target",
+				Reason: "accessor argument is nil",
 			}
 		}
 	}
 	return StoreTargetEmission{
-		setter:          true,
-		setterReceiver:  receiver,
-		setterMember:    member,
-		setterArguments: slices.Clone(arguments),
-		sourceType:      sourceType,
+		accessor:          true,
+		accessorReceiver:  receiver,
+		getterMember:      getter,
+		setterMember:      setter,
+		accessorArguments: slices.Clone(arguments),
+		sourceType:        sourceType,
 	}, nil
 }
 
-func (e StoreTargetEmission) IsSetter() bool {
-	return e.setter
+func (e StoreTargetEmission) IsAccessor() bool {
+	return e.accessor
 }
 
 func (e StoreTargetEmission) Before() []tsgo.Statement {
@@ -159,16 +168,20 @@ func (e StoreTargetEmission) Value() tsgo.Expression {
 	return e.value
 }
 
-func (e StoreTargetEmission) SetterReceiver() ExpressionEmission {
-	return e.setterReceiver
+func (e StoreTargetEmission) AccessorReceiver() ExpressionEmission {
+	return e.accessorReceiver
+}
+
+func (e StoreTargetEmission) GetterMember() string {
+	return e.getterMember
 }
 
 func (e StoreTargetEmission) SetterMember() string {
 	return e.setterMember
 }
 
-func (e StoreTargetEmission) SetterArguments() []ExpressionEmission {
-	return slices.Clone(e.setterArguments)
+func (e StoreTargetEmission) AccessorArguments() []ExpressionEmission {
+	return slices.Clone(e.accessorArguments)
 }
 
 func (e StoreTargetEmission) SourceType() types.Type {
@@ -176,14 +189,14 @@ func (e StoreTargetEmission) SourceType() types.Type {
 }
 
 func (e StoreTargetEmission) Requests() []RootRequest {
-	if e.setter {
-		requests := e.setterReceiver.Requests()
-		for _, argument := range e.setterArguments {
+	requests := slices.Clone(e.requests)
+	if e.accessor {
+		requests = append(requests, e.accessorReceiver.Requests()...)
+		for _, argument := range e.accessorArguments {
 			requests = append(requests, argument.Requests()...)
 		}
-		return requests
 	}
-	return slices.Clone(e.requests)
+	return requests
 }
 
 type StatementEmission struct {

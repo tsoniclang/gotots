@@ -124,10 +124,7 @@ func sliceIndex(
 	source *ast.IndexExpr,
 ) (api.StoreTargetEmission, error) {
 	receiverType := context.TypesInfo().TypeOf(source.X)
-	_, elementType, ok := slicevalue.Scalar(
-		context.TypesSizes(),
-		receiverType,
-	)
+	_, elementType, ok := slicevalue.Resolve(receiverType)
 	indexType := context.TypesInfo().TypeOf(source.Index)
 	if !ok ||
 		!types.Identical(context.TypesInfo().TypeOf(source), elementType) ||
@@ -153,8 +150,9 @@ func sliceIndex(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	return api.NewSetterStoreTargetEmission(
+	return api.NewAccessorStoreTargetEmission(
 		receiver,
+		runtimeslice.MemberName(runtimeslice.MemberGet),
 		runtimeslice.MemberName(runtimeslice.MemberSet),
 		[]api.ExpressionEmission{index},
 		elementType,
@@ -197,12 +195,26 @@ func mapIndex(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
+	key, err = maprepresentation.ProjectKey(
+		context.WithRole(api.RoleMapKey),
+		source.Index,
+		mapType.Key(),
+		key,
+	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
 	member, err := mapruntime.Name(mapruntime.MemberStore)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	return api.NewSetterStoreTargetEmission(
+	getter, err := mapruntime.Name(mapruntime.MemberLookup)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
+	return api.NewAccessorStoreTargetEmission(
 		receiver,
+		getter,
 		member,
 		[]api.ExpressionEmission{key},
 		mapType.Elem(),

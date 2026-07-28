@@ -41,7 +41,7 @@ func TestDefinedBasicFamilyHasMinimalNominalShape(t *testing.T) {
 		if class == nil {
 			t.Fatalf("defined class %s is absent", name)
 		}
-		assertMinimalDefinedClass(t, class)
+		assertDefinedClass(t, class)
 		delete(classes, name)
 	}
 	if len(classes) != 0 {
@@ -146,6 +146,33 @@ func TestDefinedLiteralOperationHasNoTransientWrapper(t *testing.T) {
 	}
 }
 
+func TestDefinedContainersKeepNominalityAtSourceBoundaries(t *testing.T) {
+	workingDirectory := t.TempDir()
+	artifacts := printDefined(
+		t,
+		workingDirectory,
+		compileDefinedFixture(t, emit.DefaultOptions()),
+	)
+	for _, required := range []string{
+		"CountArrayValues(): [\n    GoArray<Count, 2>,",
+		"CountSliceValues(): RuntimeSlice<Count>",
+		"CountMapLookup(values: GoMap<int32, Label>, key: Count)",
+		"values.lookupOk(key.$value)",
+	} {
+		if !strings.Contains(artifacts.printed, required) {
+			t.Fatalf("defined container artifact lacks %q:\n%s", required, artifacts.printed)
+		}
+	}
+	for _, forbidden := range []string{
+		"GoMap<Count, Label>",
+		"values.lookupOk(key)",
+	} {
+		if strings.Contains(artifacts.printed, forbidden) {
+			t.Fatalf("defined container artifact contains %q:\n%s", forbidden, artifacts.printed)
+		}
+	}
+}
+
 func TestLocalDefinedTypeAndAliasUseThePackageOwners(t *testing.T) {
 	source := definedSourceFile(
 		t,
@@ -188,17 +215,23 @@ func TestLocalDefinedTypeAndAliasUseThePackageOwners(t *testing.T) {
 	}
 }
 
-func assertMinimalDefinedClass(
+func assertDefinedClass(
 	t *testing.T,
 	class tsgo.ClassDeclaration,
 ) {
 	t.Helper()
+	const wantMembers = 2
 	if kinds := modifierKinds(class.Modifiers()); len(kinds) != 1 ||
 		kinds[0] != tsgo.SyntaxKindExportKeyword ||
 		len(class.TypeParameters()) != 0 ||
 		len(class.HeritageClauses()) != 0 ||
-		len(class.Members()) != 2 {
-		t.Fatalf("class %s is not a minimal exported wrapper", class.Name().Text())
+		len(class.Members()) != wantMembers {
+		t.Fatalf(
+			"class %s members = %d, want %d",
+			class.Name().Text(),
+			len(class.Members()),
+			wantMembers,
+		)
 	}
 	brand, ok := class.Members()[0].(tsgo.PropertyDeclaration)
 	if !ok ||

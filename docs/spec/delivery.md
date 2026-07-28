@@ -269,9 +269,11 @@ remain a later semantic family, so this checkpoint proves failure occurrence
 and carrier identity, not yet recovered runtime-fault payload equivalence.
 
 One builtin-object dispatcher owns `new`, `make`, `len`, `cap`, `append`,
-`copy`, and `delete`. One setter-store transaction owns Go evaluation order
-for array, slice, and map stores. Family owners provide typed operands and
-members; they do not rediscover builtin identity or install assignment routes.
+`copy`, and `delete`. One accessor-store transaction owns Go evaluation order
+for array, slice, and map stores, including the captured getter/setter location
+used by compound defined-value updates. Family owners provide typed operands
+and members; they do not rediscover builtin identity or install assignment
+routes.
 No checked-in TypeScript, source fragment, template, raw export spelling,
 handler-local duplicate implementation, or family-specific store transaction
 is allowed.

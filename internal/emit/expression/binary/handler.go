@@ -102,20 +102,107 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if len(left.Before()) != 0 || len(right.Before()) != 0 {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
+	if isLogicalOperator(source.Op) {
+		return emitLogical(context, source.Op, operator, left, right)
 	}
+	before := left.Before()
+	leftValue := left.Value()
+	if len(right.Before()) != 0 {
+		leftName, err := context.Names().Temporary(api.TemporaryBinaryOperand)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		before = append(
+			before,
+			binaryVariable(
+				context,
+				tsgo.NodeFlagsConst,
+				leftName,
+				leftValue,
+			),
+		)
+		leftValue = context.Factory().Identifier(leftName)
+	}
+	before = append(before, right.Before()...)
 	target := tsgo.Expression(context.Factory().BinaryExpression(
 		nil,
-		left.Value(),
+		leftValue,
 		nil,
 		operator,
 		right.Value(),
 	))
 	return api.NewExpressionEmission(
-		nil,
+		before,
 		target,
+		api.CombineRequests(left.Requests(), right.Requests()),
+	)
+}
+
+func emitLogical(
+	context api.Context,
+	sourceOperator token.Token,
+	targetOperator tsgo.BinaryOperatorToken,
+	left api.ExpressionEmission,
+	right api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	if len(right.Before()) == 0 {
+		return api.NewExpressionEmission(
+			left.Before(),
+			context.Factory().BinaryExpression(
+				nil,
+				left.Value(),
+				nil,
+				targetOperator,
+				right.Value(),
+			),
+			api.CombineRequests(left.Requests(), right.Requests()),
+		)
+	}
+	resultName, err := context.Names().Temporary(api.TemporaryLogicalResult)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	result := context.Factory().Identifier(resultName)
+	condition := tsgo.Expression(result)
+	if sourceOperator == token.LOR {
+		condition = context.Factory().PrefixUnaryExpression(
+			tsgo.PrefixUnaryExpressionOperatorKindExclamationToken,
+			result,
+		)
+	}
+	branch := right.Before()
+	branch = append(
+		branch,
+		context.Factory().ExpressionStatement(
+			context.Factory().BinaryExpression(
+				nil,
+				result,
+				nil,
+				context.Factory().BinaryOperatorToken(
+					tsgo.BinaryOperatorEqualsToken,
+				),
+				right.Value(),
+			),
+		),
+	)
+	before := left.Before()
+	before = append(
+		before,
+		binaryVariable(
+			context,
+			tsgo.NodeFlagsLet,
+			resultName,
+			left.Value(),
+		),
+		context.Factory().IfStatement(
+			condition,
+			context.Factory().Block(branch, true),
+			nil,
+		),
+	)
+	return api.NewExpressionEmission(
+		before,
+		result,
 		api.CombineRequests(left.Requests(), right.Requests()),
 	)
 }
@@ -175,20 +262,33 @@ func emitValueEquality(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	if len(left.Before()) != 0 || len(right.Before()) != 0 {
-		return api.ExpressionEmission{}, true,
-			api.Unsupported(context, api.CategoryExpression, source)
+	before := left.Before()
+	leftValue := left.Value()
+	if len(right.Before()) != 0 {
+		leftName, err := context.Names().Temporary(
+			api.TemporaryEqualityOperand,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, true, err
+		}
+		before = append(
+			before,
+			equalityOperandStatement(context, leftName, leftValue),
+		)
+		leftValue = context.Factory().Identifier(leftName)
 	}
+	before = append(before, right.Before()...)
 	equal, err := context.Values().Equal(
 		context,
 		source,
 		operandType,
-		left.Value(),
+		leftValue,
 		right.Value(),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
+	before = append(before, equal.Before()...)
 	value := equal.Value()
 	if source.Op == token.NEQ {
 		value = context.Factory().PrefixUnaryExpression(
@@ -196,14 +296,46 @@ func emitValueEquality(
 			value,
 		)
 	}
-	return api.DirectExpression(
+	result, err := api.NewExpressionEmission(
+		before,
 		value,
 		api.CombineRequests(
 			left.Requests(),
 			right.Requests(),
 			equal.Requests(),
-		)...,
-	), true, nil
+		),
+	)
+	return result, true, err
+}
+
+func equalityOperandStatement(
+	context api.Context,
+	name string,
+	value tsgo.Expression,
+) tsgo.VariableStatement {
+	return binaryVariable(context, tsgo.NodeFlagsConst, name, value)
+}
+
+func binaryVariable(
+	context api.Context,
+	flags tsgo.NodeFlags,
+	name string,
+	value tsgo.Expression,
+) tsgo.VariableStatement {
+	return context.Factory().VariableStatement(
+		nil,
+		context.Factory().VariableDeclarationList(
+			[]tsgo.VariableDeclaration{
+				context.Factory().VariableDeclaration(
+					context.Factory().Identifier(name),
+					nil,
+					nil,
+					value,
+				),
+			},
+			flags,
+		),
+	)
 }
 
 func operationFor(

@@ -196,3 +196,48 @@ func CountSwitch(value Count) int32 {
 		return 30
 	}
 }
+
+func CountArrayValues() ([2]Count, [2]Count, bool) {
+	original := [2]Count{1, 2}
+	copied := original
+	copied[0]++
+	return original, copied, original == [2]Count{1, 2}
+}
+
+func CountArrayCompoundOrder() Count {
+	values := [1]Count{1}
+	next := func() Count {
+		values[0] = 10
+		return 2
+	}
+	values[0] += next()
+	return values[0]
+}
+
+func CountSliceValues() []Count {
+	values := []Count{1, 2}
+	values = append(values, 3)
+	values[0]++
+	copied := make([]Count, len(values))
+	copy(copied, values)
+	return copied
+}
+
+func CountMapValues() (Label, Label, bool) {
+	values := map[Count]Label{
+		1: "one",
+		2: "two",
+	}
+	key := Count(2)
+	found, ok := CountMapLookup(values, key)
+	missing := values[Count(3)]
+	return found, missing, ok
+}
+
+func CountMapLookup(
+	values map[Count]Label,
+	key Count,
+) (Label, bool) {
+	value, ok := values[key]
+	return value, ok
+}

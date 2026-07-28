@@ -330,7 +330,7 @@ func (Owner) Equal(
 		)
 	}
 	if array, ok := arrayvalue.Resolve(context, sourceType); ok {
-		return array.Equal(context, left, right), nil
+		return array.Equal(context, source, left, right)
 	}
 	if _, ok := primitive(context, sourceType); ok {
 		return api.DirectExpression(context.Factory().BinaryExpression(

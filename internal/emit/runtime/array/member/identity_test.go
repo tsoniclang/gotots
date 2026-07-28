@@ -10,7 +10,6 @@ func TestCatalogIsClosedAndPinned(t *testing.T) {
 		{Zero, "zero"},
 		{Literal, "literal"},
 		{Copy, "copy"},
-		{Equal, "equal"},
 		{Get, "get"},
 		{Set, "set"},
 		{Length, "length"},

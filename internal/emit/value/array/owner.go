@@ -8,6 +8,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	arraymember "github.com/tsoniclang/gotots/internal/emit/runtime/array/member"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -20,18 +21,21 @@ func Resolve(
 	sourceType types.Type,
 ) (RuntimeArray, bool) {
 	source, ok := types.Unalias(sourceType).(*types.Array)
-	if !ok || source.Len() < 0 {
+	if !ok || source.Len() < 0 || !directElement(context, source.Elem()) {
 		return RuntimeArray{}, false
 	}
-	array := RuntimeArray{source: source}
-	alias, represented := basictype.PrimitiveAlias(
-		context.TypesSizes(),
-		array.ElementType(),
-	)
-	if !represented || alias == api.PrimitiveInvalid {
-		return RuntimeArray{}, false
+	return RuntimeArray{source: source}, true
+}
+
+func directElement(
+	context api.Context,
+	sourceType types.Type,
+) bool {
+	if _, ok := definedtype.Resolve(sourceType); ok {
+		return true
 	}
-	return array, true
+	_, ok := basictype.PrimitiveAlias(context.TypesSizes(), sourceType)
+	return ok
 }
 
 func (a RuntimeArray) ElementType() types.Type {
@@ -129,10 +133,7 @@ func (a RuntimeArray) targetTypeArguments(
 		a.ElementType(),
 	)
 	if !ok {
-		return nil, nil, &api.InvariantError{
-			Role:   context.Role(),
-			Reason: "runtime array element lost its scalar representation",
-		}
+		return nil, nil, nil
 	}
 	element, err := context.Names().Primitive(alias)
 	if err != nil {

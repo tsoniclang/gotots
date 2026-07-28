@@ -35,10 +35,7 @@ func emitSliceNilEquality(
 		return api.ExpressionEmission{}, false, nil
 	}
 	valueType := context.TypesInfo().TypeOf(valueSource)
-	if _, _, represented := slicevalue.Scalar(
-		context.TypesSizes(),
-		valueType,
-	); !represented {
+	if _, _, represented := slicevalue.Resolve(valueType); !represented {
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}

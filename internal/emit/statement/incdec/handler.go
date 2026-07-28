@@ -48,7 +48,7 @@ func EmitExpression(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	if target.IsSetter() {
+	if target.IsAccessor() {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
@@ -76,16 +76,24 @@ func emitCustom(
 	source *ast.IncDecStmt,
 	target api.StoreTargetEmission,
 ) (api.ExpressionEmission, error) {
-	if target.IsSetter() {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
+	left := target.Value()
+	if target.IsAccessor() {
+		var err error
+		target, err = target.CaptureAccessorLocation(context)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		left, err = target.AccessorRead(context)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	}
 	result, handled, err := context.Values().Increment(
 		context,
 		source,
 		target.SourceType(),
 		source.Tok,
-		target.Value(),
+		left,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -93,6 +101,9 @@ func emitCustom(
 	if !handled {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	if target.IsAccessor() {
+		return target.AccessorStore(context, result)
 	}
 	assigned, err := context.Values().Assign(
 		context.WithRole(api.RoleAssignmentTarget),

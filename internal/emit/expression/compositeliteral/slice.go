@@ -23,10 +23,7 @@ func emitSlice(
 	source *ast.CompositeLit,
 ) (api.ExpressionEmission, bool, error) {
 	sourceType := context.TypesInfo().TypeOf(source)
-	_, elementType, represented := slicevalue.Scalar(
-		context.TypesSizes(),
-		sourceType,
-	)
+	_, elementType, represented := slicevalue.Resolve(sourceType)
 	if !represented {
 		return api.ExpressionEmission{}, false, nil
 	}

@@ -5,6 +5,7 @@ var PackageLiteral = [3]int32{1, 2, 3}
 var trace int32
 var storeTrace int32
 var readTrace int32
+var comparisonTrace int32
 
 type Holder struct {
 	Values [2]int32
@@ -80,6 +81,24 @@ func ZeroLength() bool {
 	var left [0]int32
 	var right [0]int32
 	return left == right && len(left) == 0 && cap(right) == 0
+}
+
+func comparisonArray() [1]int32 {
+	comparisonTrace++
+	return [1]int32{1}
+}
+
+func ShortCircuitArray(enabled bool) (bool, int32) {
+	comparisonTrace = 0
+	left := [1]int32{1}
+	result := enabled && left == comparisonArray()
+	return result, comparisonTrace
+}
+
+func MultiReturnArray(enabled bool) (bool, int32) {
+	comparisonTrace = 0
+	left := [1]int32{1}
+	return enabled && left == comparisonArray(), comparisonTrace
 }
 
 func PackageValuesAreIsolated() bool {

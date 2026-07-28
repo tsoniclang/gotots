@@ -35,6 +35,8 @@ func (Owner) BinaryUpdate(
 	if !ok {
 		return api.ExpressionEmission{}, false, nil
 	}
+	rightBefore := right.Before()
+	rightRequests := right.Requests()
 	rightConstant := constantEvidence(context, rightSource)
 	if rightConstant != nil {
 		var err error
@@ -47,6 +49,10 @@ func (Owner) BinaryUpdate(
 		if err != nil {
 			return api.ExpressionEmission{}, true, err
 		}
+		rightRequests = api.CombineRequests(
+			rightRequests,
+			right.Requests(),
+		)
 	} else if rightModel, wrapped := definedtype.Resolve(
 		rightRepresentation,
 	); wrapped {
@@ -60,6 +66,7 @@ func (Owner) BinaryUpdate(
 			return api.ExpressionEmission{}, true, err
 		}
 	}
+	right = api.DirectExpression(right.Value(), rightRequests...)
 	result, handled, err := definedbinary.ApplyUnderlying(
 		context,
 		operator,
@@ -72,6 +79,14 @@ func (Owner) BinaryUpdate(
 		return result, handled, err
 	}
 	result, err = model.Wrap(context, result)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	result, err = api.NewExpressionEmission(
+		rightBefore,
+		result.Value(),
+		result.Requests(),
+	)
 	return result, true, err
 }
 

@@ -155,6 +155,7 @@ func emitMultiple(
 	}
 
 	values := make([]tsgo.Expression, 0, results.Len())
+	emissions := make([]api.ExpressionEmission, 0, results.Len())
 	var requests []api.RootRequest
 	for index, sourceResult := range source.Results {
 		sourceType := context.TypesInfo().TypeOf(sourceResult)
@@ -180,17 +181,59 @@ func emitMultiple(
 		if err != nil {
 			return api.StatementEmission{}, err
 		}
-		if len(result.Before()) != 0 {
-			return api.StatementEmission{},
-				api.Unsupported(context, api.CategoryStatement, source)
-		}
-		values = append(values, result.Value())
+		emissions = append(emissions, result)
 		requests = append(requests, result.Requests()...)
 	}
-	return api.DirectStatement(
+	hasPrerequisites := false
+	for _, result := range emissions {
+		if len(result.Before()) != 0 {
+			hasPrerequisites = true
+			break
+		}
+	}
+	var statements []tsgo.Statement
+	for _, result := range emissions {
+		if !hasPrerequisites {
+			values = append(values, result.Value())
+			continue
+		}
+		statements = append(statements, result.Before()...)
+		name, err := context.Names().Temporary(api.TemporaryMultipleResults)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		statements = append(
+			statements,
+			capturedResultStatement(context, name, result.Value()),
+		)
+		values = append(values, context.Factory().Identifier(name))
+	}
+	statements = append(
+		statements,
 		context.Factory().ReturnStatement(
 			context.Factory().ArrayLiteralExpression(values, false),
 		),
-		requests...,
-	), nil
+	)
+	return api.NewStatementEmission(statements, requests)
+}
+
+func capturedResultStatement(
+	context api.Context,
+	name string,
+	value tsgo.Expression,
+) tsgo.VariableStatement {
+	return context.Factory().VariableStatement(
+		nil,
+		context.Factory().VariableDeclarationList(
+			[]tsgo.VariableDeclaration{
+				context.Factory().VariableDeclaration(
+					context.Factory().Identifier(name),
+					nil,
+					nil,
+					value,
+				),
+			},
+			tsgo.NodeFlagsConst,
+		),
+	)
 }

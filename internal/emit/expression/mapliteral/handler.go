@@ -46,6 +46,15 @@ func Emit(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
+		key, err = maprepresentation.ProjectKey(
+			context.WithRole(api.RoleMapKey),
+			entry.Key,
+			mapType.Key(),
+			key,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 		value, err := emitOperand(
 			context.WithRole(api.RoleMapValue),
 			children,

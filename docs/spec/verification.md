@@ -361,6 +361,10 @@ The first named-struct family additionally proves:
   solely for keyed source order, while `preserve-go` retains source evaluation
   order when field declaration order differs;
 - equality is field-wise and recursive rather than target object identity;
+- a field whose equality needs prerequisite statements, such as an array,
+  executes those statements inside the static struct equality operation and
+  short-circuits in field order; scalar-only structs retain the compact direct
+  conjunction;
 - concrete value-receiver calls use the exact `go/types.Selection` and a named
   receiver function, never a class method or virtual dispatch; and
 - tags, embedding, pointers, interfaces, method values/expressions, generics,
@@ -506,9 +510,9 @@ program. The required evidence includes:
 |---|---|---|
 | integers and numeric conversions | every source/destination width and profile disposition; narrowing, sign change, integer/float, float-width, and complex-width boundaries; constants; NaN, infinity, signed zero, and representability; BigInt division/remainder for nonzero and zero divisors | width alias collapse; unsafe number literal; missing narrowing/bounds operation; conversion spelling lookup; ordinary-call fallthrough; duplicated conversion operand; direct host divide/remainder or non-finite BigInt conversion bypass |
 | strings | arbitrary-byte literal, concat, comparison, byte length/index/slice and bounds | Unicode-code-point literal; UTF-16 indexing; missing bounds check |
-| arrays | length-distinct target types, fresh zero/copy, equality, index/store/len/cap | erased length; shared zero; shallow copy where element policy forbids it |
+| arrays | length-distinct target types, fresh zero/copy, compiler-lowered recursive equality, index/store/len/cap | erased length; shared zero; shallow copy where element policy forbids it; runtime equality callback or target object identity |
 | slices | nil/empty distinction, aliasing, reslice, append reuse/reallocation, copy overlap | bare-array substitution; lost capacity; always-reallocate append |
-| maps | nil write, missing zero, comma-ok, aliasing, scalar-key equality, delete/len | plain-object substitution; missing-value `undefined`; copy-on-assignment |
+| maps | nil write, missing zero, comma-ok, aliasing, direct bool/integer/string keys, defined-key projection, delete/len, and explicit floating-key rejection | plain-object substitution; missing-value `undefined`; copy-on-assignment; wrapper object identity; floating-key admission through native SameValueZero |
 | pointers | nil/new/read/store/alias/equality; local/parameter/result/receiver/package/field/array/slice addresses; reassignment through projections; pointer receiver nil/copy cases | fresh wrapper on copy; wrapper identity instead of canonical location; nil dereference success; unrelated-local cell wrapping; wrong requirement owner |
 
 For every family:

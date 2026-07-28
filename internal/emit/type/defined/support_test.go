@@ -125,6 +125,24 @@ func main() {
 	fmt.Println(values.CountSwitch(values.CountFromInt(1)))
 	fmt.Println(values.CountSwitch(values.CountFromInt(3)))
 	fmt.Println(values.CountSwitch(values.CountFromInt(5)))
+	original, copied, equal := values.CountArrayValues()
+	fmt.Println(
+		values.IntFromCount(original[0]),
+		values.IntFromCount(copied[0]),
+		equal,
+	)
+	slice := values.CountSliceValues()
+	fmt.Println(
+		values.IntFromCount(slice[0]),
+		values.IntFromCount(slice[1]),
+		values.IntFromCount(slice[2]),
+	)
+	found, missing, ok := values.CountMapValues()
+	fmt.Println(
+		values.StringFromLabel(found),
+		values.StringFromLabel(missing),
+		ok,
+	)
 }
 `)
 	return runDefinedCommand(
@@ -183,6 +201,20 @@ console.log(String(values.IntFromCount(values.CountPointer(values.CountFromInt(8
 console.log(String(values.CountSwitch(values.CountFromInt(1` + suffix + `))));
 console.log(String(values.CountSwitch(values.CountFromInt(3` + suffix + `))));
 console.log(String(values.CountSwitch(values.CountFromInt(5` + suffix + `))));
+const [original, copied, equal] = values.CountArrayValues();
+console.log(
+  String(values.IntFromCount(original.get(0` + suffix + `))),
+  String(values.IntFromCount(copied.get(0` + suffix + `))),
+  String(equal),
+);
+const slice = values.CountSliceValues();
+console.log(
+  String(values.IntFromCount(slice.get(0` + suffix + `))),
+  String(values.IntFromCount(slice.get(1` + suffix + `))),
+  String(values.IntFromCount(slice.get(2` + suffix + `))),
+);
+const [found, missing, ok] = values.CountMapValues();
+console.log(values.StringFromLabel(found), values.StringFromLabel(missing), String(ok));
 `
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	writeDefinedFile(t, runnerPath, runner)
