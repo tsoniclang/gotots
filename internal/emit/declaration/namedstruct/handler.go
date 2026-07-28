@@ -1,6 +1,7 @@
 package namedstruct
 
 import (
+	"fmt"
 	"go/ast"
 	"go/types"
 
@@ -9,10 +10,11 @@ import (
 )
 
 type field struct {
-	source     *ast.Ident
-	typeSource ast.Expr
+	source     ast.Node
+	typeSource ast.Node
 	object     *types.Var
 	name       string
+	blank      bool
 }
 
 func emitClass(
@@ -40,7 +42,82 @@ func emitClass(
 		return api.DeclarationEmission{}, err
 	}
 
-	members := make([]tsgo.ClassElement, 0, 2)
+	moduleExport, err := context.Names().ModuleExport(typeName)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	return emitStructClass(
+		context,
+		children,
+		sourceStruct,
+		className,
+		fields,
+		operations,
+		moduleExport,
+	)
+}
+
+func EmitAnonymous(
+	context api.Context,
+	children api.ChildEmitter,
+	structType *types.Struct,
+	className string,
+	operations []api.NamedStructOperation,
+	moduleExport bool,
+) (api.DeclarationEmission, error) {
+	if structType == nil || className == "" {
+		return api.DeclarationEmission{}, &api.GeneratedArtifactShapeError{
+			Artifact: className,
+			Reason:   "anonymous struct declaration input is invalid",
+		}
+	}
+	fields := make([]field, 0, structType.NumFields())
+	for index := range structType.NumFields() {
+		object := structType.Field(index)
+		if object.Embedded() {
+			return api.DeclarationEmission{}, &api.GeneratedArtifactShapeError{
+				Artifact: className,
+				Reason:   "embedded fields belong to the embedding lane",
+			}
+		}
+		blank := object.Name() == "_"
+		name := fmt.Sprintf("$blank%d", index)
+		if !blank {
+			var err error
+			name, err = context.Names().Member(object)
+			if err != nil {
+				return api.DeclarationEmission{}, err
+			}
+		}
+		fields = append(fields, field{
+			source:     nil,
+			typeSource: nil,
+			object:     object,
+			name:       name,
+			blank:      blank,
+		})
+	}
+	return emitStructClass(
+		context,
+		children,
+		nil,
+		className,
+		fields,
+		operations,
+		moduleExport,
+	)
+}
+
+func emitStructClass(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	className string,
+	fields []field,
+	operations []api.NamedStructOperation,
+	moduleExport bool,
+) (api.DeclarationEmission, error) {
+	members := make([]tsgo.ClassElement, 0, 2+len(operations))
 	members = append(members, context.Factory().PropertyDeclaration(
 		[]tsgo.ModifierLike{
 			context.Factory().DeclareKeyword(),
@@ -73,7 +150,7 @@ func emitClass(
 		member, operationRequests, err := emitValueOperation(
 			context,
 			children,
-			sourceStruct,
+			source,
 			className,
 			classType,
 			fields,
@@ -86,10 +163,6 @@ func emitClass(
 		requests = append(requests, operationRequests...)
 	}
 
-	moduleExport, err := context.Names().ModuleExport(typeName)
-	if err != nil {
-		return api.DeclarationEmission{}, err
-	}
 	var modifiers []tsgo.ModifierLike
 	if moduleExport {
 		modifiers = []tsgo.ModifierLike{context.Factory().ExportKeyword()}
@@ -144,8 +217,7 @@ func fields(
 	result := make([]field, 0, structType.NumFields())
 	fieldIndex := 0
 	for _, sourceField := range source.Fields.List {
-		if sourceField.Tag != nil ||
-			len(sourceField.Names) == 0 {
+		if len(sourceField.Names) == 0 {
 			return nil, api.Unsupported(
 				context.WithRole(api.RoleStructField),
 				api.CategoryDeclaration,
@@ -163,8 +235,6 @@ func fields(
 			}
 			object := structType.Field(fieldIndex)
 			if object.Embedded() ||
-				object.Name() == "_" ||
-				structType.Tag(fieldIndex) != "" ||
 				context.TypesInfo().Defs[sourceName] != object ||
 				sourceType == nil ||
 				!types.Identical(sourceType, object.Type()) {
@@ -174,15 +244,21 @@ func fields(
 					sourceName,
 				)
 			}
-			name, err := context.Names().Member(object)
-			if err != nil {
-				return nil, err
+			blank := object.Name() == "_"
+			name := fmt.Sprintf("$blank%d", fieldIndex)
+			if !blank {
+				var err error
+				name, err = context.Names().Member(object)
+				if err != nil {
+					return nil, err
+				}
 			}
 			result = append(result, field{
 				source:     sourceName,
 				typeSource: sourceField.Type,
 				object:     object,
 				name:       name,
+				blank:      blank,
 			})
 			fieldIndex++
 		}
@@ -209,8 +285,12 @@ func constructor(
 		if err != nil {
 			return nil, nil, err
 		}
+		var modifiers []tsgo.ModifierLike
+		if !field.blank {
+			modifiers = []tsgo.ModifierLike{context.Factory().PublicKeyword()}
+		}
 		parameters = append(parameters, context.Factory().ParameterDeclaration(
-			[]tsgo.ModifierLike{context.Factory().PublicKeyword()},
+			modifiers,
 			nil,
 			context.Factory().Identifier(field.name),
 			nil,

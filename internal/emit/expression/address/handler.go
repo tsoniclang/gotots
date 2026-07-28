@@ -7,6 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
@@ -269,6 +270,7 @@ func indexed(
 			array,
 			element,
 			false,
+			definedtype.Model{},
 		)
 	}
 	if _, pointedType, pointerOK := pointertype.Resolve(receiverType); pointerOK {
@@ -281,6 +283,23 @@ func indexed(
 				array,
 				element,
 				true,
+				definedtype.Model{},
+			)
+		}
+	}
+	if defined, pointerOK := definedtype.ResolvePointer(receiverType); pointerOK {
+		pointer, _ := defined.Pointer()
+		pointedType := pointer.Elem()
+		if array, arrayOK := arrayvalue.Resolve(context, pointedType); arrayOK {
+			return arrayIndex(
+				context,
+				children,
+				source,
+				pointedType,
+				array,
+				element,
+				true,
+				defined,
 			)
 		}
 	}
@@ -288,6 +307,18 @@ func indexed(
 		receiverType,
 	); ok && types.Identical(sliceElement, element) {
 		return sliceIndex(context, children, source, receiverType, element)
+	}
+	if defined, ok := definedtype.ResolveSlice(receiverType); ok {
+		sliceType, _ := defined.Slice()
+		if types.Identical(sliceType.Elem(), element) {
+			return sliceIndex(
+				context,
+				children,
+				source,
+				receiverType,
+				element,
+			)
+		}
 	}
 	return api.ExpressionEmission{},
 		api.Unsupported(context, api.CategoryExpression, source)
@@ -301,6 +332,7 @@ func arrayIndex(
 	array arrayvalue.RuntimeArray,
 	element types.Type,
 	throughPointer bool,
+	definedPointer definedtype.Model,
 ) (api.ExpressionEmission, error) {
 	if !types.Identical(array.ElementType(), element) ||
 		!basictype.SupportsInteger(
@@ -313,12 +345,19 @@ func arrayIndex(
 	var parent api.ExpressionEmission
 	var err error
 	if throughPointer {
+		expectedType := types.Type(types.NewPointer(arrayType))
+		if definedPointer.Type() != nil {
+			expectedType = definedPointer.Type()
+		}
 		parent, err = children.Expression(
 			context.
 				WithRole(api.RoleArrayReceiver).
-				WithExpectedType(types.NewPointer(arrayType)),
+				WithExpectedType(expectedType),
 			source.X,
 		)
+		if err == nil && definedPointer.Type() != nil {
+			parent, err = definedPointer.Project(context, parent)
+		}
 	} else {
 		parent, err = children.Address(
 			context.
@@ -367,6 +406,22 @@ func arrayIndex(
 	runtime, err := pointerRuntime(context)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	if throughPointer {
+		parentValue = context.Factory().CallExpression(
+			context.Factory().PropertyAccessExpression(
+				context.Factory().Identifier(runtime.Name()),
+				nil,
+				context.Factory().Identifier(
+					pointerruntime.DereferenceName,
+				),
+				tsgo.NodeFlagsNone,
+			),
+			nil,
+			[]tsgo.TypeNode{arrayTarget.Value()},
+			[]tsgo.Expression{parentValue},
+			tsgo.NodeFlagsNone,
+		)
 	}
 	requirement, required, err := array.AddressIndexRequirement()
 	if err != nil {
@@ -421,6 +476,12 @@ func sliceIndex(
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	if defined, ok := definedtype.ResolveSlice(receiverType); ok {
+		receiver, err = defined.Project(context, receiver)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	}
 	index, err := children.Expression(
 		context.

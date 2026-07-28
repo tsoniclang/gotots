@@ -12,10 +12,12 @@ type builder struct {
 }
 
 type Capabilities struct {
-	Address         bool
-	AggregateMake   bool
-	AggregateAppend bool
-	AggregateCopy   bool
+	AggregateNil     bool
+	Address          bool
+	AggregateMake    bool
+	AggregateLiteral bool
+	AggregateAppend  bool
+	AggregateCopy    bool
 }
 
 func Build(
@@ -56,7 +58,11 @@ func BuildWithCapabilities(
 		className: className,
 		panicName: panicName,
 	}
-	members := []tsgo.ClassElement{target.constructor()}
+	lazyZero := capabilities.AggregateNil ||
+		capabilities.AggregateMake ||
+		capabilities.AggregateLiteral ||
+		capabilities.AggregateAppend
+	members := []tsgo.ClassElement{target.constructor(lazyZero)}
 	if capabilities.AggregateMake {
 		members = append(members, target.shapeMethod())
 	}
@@ -65,18 +71,24 @@ func BuildWithCapabilities(
 	}
 	members = append(
 		members,
-		target.nilMethod(),
-		target.makeMethod(capabilities.AggregateMake),
-		target.literalMethod(),
+		target.nilMethod(lazyZero),
+		target.makeMethod(capabilities.AggregateMake, lazyZero),
+		target.literalMethod(lazyZero),
 		target.isNilMethod(),
 		target.getMethod(),
 		target.setMethod(),
 		target.sliceMethod(),
-		target.appendMethod(capabilities.AggregateAppend),
+		target.appendMethod(capabilities.AggregateAppend, lazyZero),
 		target.copyMethod(),
 	)
+	if capabilities.AggregateNil {
+		members = append(members, target.aggregateNilMethod())
+	}
 	if capabilities.AggregateMake {
 		members = append(members, target.aggregateMakeMethod())
+	}
+	if capabilities.AggregateLiteral {
+		members = append(members, target.aggregateLiteralMethod())
 	}
 	if capabilities.AggregateAppend {
 		members = append(members, target.aggregateAppendMethod())

@@ -58,7 +58,7 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 		for _, declaration := range builder.declarations {
 			chunks = append(chunks, declarationChunk{
 				position:   declaration.position,
-				name:       declaration.object.Name(),
+				name:       declaration.name,
 				statements: slices.Clone(declaration.statements),
 			})
 		}
@@ -76,10 +76,16 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 			placement.Statements(s.factory),
 			declarations...,
 		)
+		kind := TargetFileSource
+		packageName := builder.sourcePackage.Name()
+		if outputPath == targetoutput.AnonymousStructSupportPath {
+			kind = TargetFileSupport
+			packageName = ""
+		}
 		target, err := s.sourceFile(
 			outputPath,
-			builder.sourcePackage.Name(),
-			TargetFileSource,
+			packageName,
+			kind,
 			statements,
 		)
 		if err != nil {
@@ -142,12 +148,8 @@ func committedTargetFilePlacement(
 	}
 	for _, declaration := range builder.declarations {
 		if declaration.placement == nil {
-			name := ""
-			if declaration.object != nil {
-				name = declaration.object.Name()
-			}
 			return nil, &ScheduleError{
-				Object: name,
+				Object: declaration.name,
 				Reason: "target artifact has no committed placement",
 			}
 		}

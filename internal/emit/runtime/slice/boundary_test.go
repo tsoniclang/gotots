@@ -20,15 +20,6 @@ func TestScalarSliceNeighborsFailAtTypedOwners(t *testing.T) {
 		construct string
 	}{
 		{
-			name: "named slice",
-			source: `package boundary
-type Values []int32
-func F(values Values) int { return len(values) }
-`,
-			category:  api.CategoryType,
-			construct: "*ast.FuncType",
-		},
-		{
 			name: "append spread",
 			source: `package boundary
 func F(left, right []int32) []int32 { return append(left, right...) }

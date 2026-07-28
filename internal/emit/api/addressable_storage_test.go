@@ -23,8 +23,10 @@ func TestAddressableStorageRequestCarriesExactFunctionAndVariableIdentity(
 		t.Fatal(err)
 	}
 	requirement, ok := request.DeclarationRequirement()
+	sourceOwner, sourceOwned := requirement.Owner().Source()
 	if !ok ||
-		requirement.Owner() != owner ||
+		!sourceOwned ||
+		sourceOwner != owner ||
 		requirement.Kind() != DeclarationRequirementAddressableStorage {
 		t.Fatalf("declaration requirement = %#v, %t", requirement, ok)
 	}
@@ -116,7 +118,8 @@ func TestDeclarationRequirementKindIDsArePinned(t *testing.T) {
 		DeclarationRequirementConstantProjection != 3 ||
 		DeclarationRequirementLocalConstantProjection != 4 ||
 		DeclarationRequirementDefinedArrayOperation != 5 ||
-		DeclarationRequirementKind(6).Valid() {
+		DeclarationRequirementAnonymousStruct != 6 ||
+		DeclarationRequirementKind(7).Valid() {
 		t.Fatal("declaration requirement kind IDs drifted")
 	}
 }

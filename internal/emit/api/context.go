@@ -28,6 +28,7 @@ type Context struct {
 	artifactOwner            *types.Func
 	storageNames             map[*types.Var]string
 	localConstantProjections map[*types.Const][]types.BasicKind
+	lexicalAnonymousStructs  map[*types.TypeName][]DeclarationRequirement
 }
 
 func (c Context) WithAddressableStorage(
@@ -64,6 +65,36 @@ func (c Context) WithLocalConstantProjections(
 			panic("local-constant projection selection is invalid")
 		}
 		c.localConstantProjections[selected] = slices.Clone(kinds)
+	}
+	return c
+}
+
+func (c Context) WithLexicalAnonymousStructs(
+	owner ArtifactOwner,
+	requirements map[*types.TypeName][]DeclarationRequirement,
+) Context {
+	if _, sourceOwned := owner.Source(); !sourceOwned {
+		panic("lexical anonymous-struct owner is not source-backed")
+	}
+	c.lexicalAnonymousStructs = make(
+		map[*types.TypeName][]DeclarationRequirement,
+		len(requirements),
+	)
+	for anchor, selected := range requirements {
+		if anchor == nil || len(selected) == 0 {
+			panic("lexical anonymous-struct selection is invalid")
+		}
+		for _, requirement := range selected {
+			artifact, _, ok := requirement.AnonymousStruct()
+			if !ok ||
+				artifact.Placement() !=
+					GeneratedArtifactPlacementLexical ||
+				artifact.LexicalOwner() != owner ||
+				artifact.LexicalAnchor() != anchor {
+				panic("lexical anonymous-struct requirement is inconsistent")
+			}
+		}
+		c.lexicalAnonymousStructs[anchor] = slices.Clone(selected)
 	}
 	return c
 }
@@ -230,6 +261,12 @@ func (c Context) LocalConstantProjections(
 	selected *types.Const,
 ) []types.BasicKind {
 	return slices.Clone(c.localConstantProjections[selected])
+}
+
+func (c Context) LexicalAnonymousStructs(
+	anchor *types.TypeName,
+) []DeclarationRequirement {
+	return slices.Clone(c.lexicalAnonymousStructs[anchor])
 }
 
 func (c Context) AddressableStorageName(variable *types.Var) (string, bool) {

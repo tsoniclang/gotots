@@ -30,6 +30,7 @@ func TestAggregateSliceOperationsPrintTypecheckAndMatchGo(t *testing.T) {
 			paths, module, printed := materialize(t, directory, emission)
 			for _, helper := range []string{
 				"goSliceMakeWith",
+				"goSliceLiteralWith",
 				"goSliceAppendWith",
 				"goSliceCopyWith",
 			} {
@@ -97,9 +98,13 @@ func TestScalarSliceArtifactHasNoAggregateOperationSurface(t *testing.T) {
 	_, _, printed := materialize(t, directory, emission)
 	for _, forbidden := range []string{
 		"goSliceMakeWith",
+		"goSliceNilWith",
+		"goSliceLiteralWith",
 		"goSliceAppendWith",
 		"goSliceCopyWith",
 		"static makeWith",
+		"static nilWith",
+		"static literalWith",
 		"appendWith(",
 		"static copyWith",
 	} {

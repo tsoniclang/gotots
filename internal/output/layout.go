@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	ProgramInitializationPath = "program.ts"
-	ScalarSupportPath         = "support/scalars.ts"
+	ProgramInitializationPath  = "program.ts"
+	ScalarSupportPath          = "support/scalars.ts"
+	AnonymousStructSupportPath = "support/anonymous-structs.ts"
 )
 
 const (

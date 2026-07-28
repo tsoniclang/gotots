@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 )
 
@@ -20,6 +21,12 @@ func Emit(
 	}
 	pointerType := context.TypesInfo().TypeOf(source.X)
 	_, element, ok := pointertype.Resolve(pointerType)
+	defined, definedOK := definedtype.ResolvePointer(pointerType)
+	if definedOK {
+		pointer, _ := defined.Pointer()
+		element = pointer.Elem()
+		ok = true
+	}
 	if !ok ||
 		!types.Identical(context.TypesInfo().TypeOf(source), element) {
 		return api.ExpressionEmission{},
@@ -38,6 +45,12 @@ func Emit(
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	if definedOK {
+		pointer, err = defined.Project(context, pointer)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	}
 	targetElement, err := children.RepresentedType(
 		context.WithRole(api.RoleUnaryOperand),

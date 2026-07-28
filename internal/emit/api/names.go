@@ -15,6 +15,7 @@ const (
 	TemporaryAssignmentValue
 	TemporaryMultipleResults
 	TemporaryCompositeField
+	TemporaryStructSource
 	TemporaryReceiverValue
 	TemporaryCallArgument
 	TemporaryCallCallee
@@ -108,6 +109,10 @@ type Names interface {
 	TypeReference(types.Object) (NameReference, error)
 	PackageVariable(*types.Var) (PackageVariableReference, error)
 	NamedStructOperation(*types.TypeName, NamedStructOperation) (NameReference, error)
+	AnonymousStruct(
+		*types.Struct,
+		AnonymousStructDemand,
+	) (NameReference, error)
 	ConstantProjection(*types.Const, types.BasicKind) (NameReference, error)
 	Member(*types.Var) (string, error)
 	Primitive(PrimitiveAlias) (NameReference, error)
@@ -124,6 +129,8 @@ func TemporaryPrefix(kind TemporaryKind) (string, error) {
 		return "__gotots_results_", nil
 	case TemporaryCompositeField:
 		return "__gotots_field_", nil
+	case TemporaryStructSource:
+		return "__gotots_struct_", nil
 	case TemporaryReceiverValue:
 		return "__gotots_receiver_", nil
 	case TemporaryCallArgument:

@@ -9,6 +9,7 @@ import (
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
@@ -72,6 +73,12 @@ func dereference(
 	}
 	pointerType := context.TypesInfo().TypeOf(source.X)
 	_, element, ok := pointertype.Resolve(pointerType)
+	defined, definedOK := definedtype.ResolvePointer(pointerType)
+	if definedOK {
+		pointer, _ := defined.Pointer()
+		element = pointer.Elem()
+		ok = true
+	}
 	if !ok || !types.Identical(context.TypesInfo().TypeOf(source), element) {
 		return api.StoreTargetEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
@@ -84,6 +91,12 @@ func dereference(
 	)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
+	}
+	if definedOK {
+		pointer, err = defined.Project(context, pointer)
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
 	}
 	targetElement, err := children.RepresentedType(
 		context.WithRole(api.RoleAssignmentTarget),
@@ -125,6 +138,12 @@ func sliceIndex(
 ) (api.StoreTargetEmission, error) {
 	receiverType := context.TypesInfo().TypeOf(source.X)
 	_, elementType, ok := slicevalue.Resolve(receiverType)
+	defined, definedOK := definedtype.ResolveSlice(receiverType)
+	if definedOK {
+		sliceType, _ := defined.Slice()
+		elementType = sliceType.Elem()
+		ok = true
+	}
 	indexType := context.TypesInfo().TypeOf(source.Index)
 	if !ok ||
 		!types.Identical(context.TypesInfo().TypeOf(source), elementType) ||
@@ -140,6 +159,12 @@ func sliceIndex(
 	)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
+	}
+	if definedOK {
+		receiver, err = defined.Project(context, receiver)
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
 	}
 	index, err := children.Expression(
 		context.
@@ -273,6 +298,12 @@ func field(
 	if selection.Indirect() {
 		receiverType := context.TypesInfo().TypeOf(source.X)
 		_, element, ok := pointertype.Resolve(receiverType)
+		defined, definedOK := definedtype.ResolvePointer(receiverType)
+		if definedOK {
+			pointer, _ := defined.Pointer()
+			element = pointer.Elem()
+			ok = true
+		}
 		if !ok {
 			return api.StoreTargetEmission{},
 				api.Unsupported(context, api.CategoryExpression, source)
@@ -285,6 +316,12 @@ func field(
 		)
 		if err != nil {
 			return api.StoreTargetEmission{}, err
+		}
+		if definedOK {
+			receiver, err = defined.Project(context, receiver)
+			if err != nil {
+				return api.StoreTargetEmission{}, err
+			}
 		}
 		targetElement, err := children.RepresentedType(
 			context.WithRole(api.RoleAssignmentTarget),

@@ -19,8 +19,10 @@ func TestNamedStructOperationRequestCarriesTypedDeclarationRequirement(t *testin
 		t.Fatal(err)
 	}
 	requirement, ok := request.DeclarationRequirement()
+	sourceOwner, sourceOwned := requirement.Owner().Source()
 	if !ok ||
-		requirement.Owner() != typeName ||
+		!sourceOwned ||
+		sourceOwner != typeName ||
 		requirement.Kind() != DeclarationRequirementNamedStructOperation {
 		t.Fatalf("declaration requirement = %#v, %t", requirement, ok)
 	}

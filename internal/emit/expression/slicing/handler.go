@@ -7,6 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -24,6 +25,8 @@ func Emit(
 ) (api.ExpressionEmission, error) {
 	sourceType := context.TypesInfo().TypeOf(source.X)
 	_, _, ok := slicevalue.Resolve(sourceType)
+	defined, definedOK := definedtype.ResolveSlice(sourceType)
+	ok = ok || definedOK
 	resultType := context.TypesInfo().TypeOf(source)
 	if !ok ||
 		resultType == nil ||
@@ -42,6 +45,12 @@ func Emit(
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	if definedOK {
+		receiver, err = defined.Project(context, receiver)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	}
 	low, err := emitBound(
 		context.WithRole(api.RoleSliceLow),
@@ -83,7 +92,7 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return api.NewExpressionEmission(
+	result, err := api.NewExpressionEmission(
 		before,
 		context.Factory().CallExpression(
 			context.Factory().PropertyAccessExpression(
@@ -101,6 +110,13 @@ func Emit(
 		),
 		requests,
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if definedOK {
+		return defined.Wrap(context, result)
+	}
+	return result, nil
 }
 
 func emitBound(

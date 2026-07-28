@@ -7,6 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	slicingexpression "github.com/tsoniclang/gotots/internal/emit/expression/slicing"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -18,6 +19,9 @@ func Emit(
 ) (api.ExpressionEmission, error) {
 	operandType := context.TypesInfo().TypeOf(source.X)
 	if _, _, ok := slicevalue.Resolve(operandType); ok {
+		return slicingexpression.Emit(context, children, source)
+	}
+	if _, ok := definedtype.ResolveSlice(operandType); ok {
 		return slicingexpression.Emit(context, children, source)
 	}
 	resultType := context.TypesInfo().TypeOf(source)

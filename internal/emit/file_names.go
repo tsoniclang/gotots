@@ -11,19 +11,22 @@ import (
 )
 
 type fileNames struct {
-	owner         *nameOwner
-	sourceFile    *ast.File
-	packageScope  *types.Scope
-	factory       tsgo.Factory
-	targetPath    string
-	require       func(types.Object) error
-	temporaries   map[api.TemporaryKind]uint64
-	importNames   map[string]struct{}
-	importAliases map[types.Object]string
-	projections   map[constantProjectionImport]string
-	primitives    map[api.PrimitiveAlias]string
-	runtime       map[api.RuntimeSymbol]string
-	artifactOwner types.Object
+	owner          *nameOwner
+	sourceFile     *ast.File
+	packageScope   *types.Scope
+	factory        tsgo.Factory
+	targetPath     string
+	require        func(types.Object) error
+	temporaries    map[api.TemporaryKind]uint64
+	importNames    map[string]struct{}
+	importAliases  map[types.Object]string
+	projections    map[constantProjectionImport]string
+	primitives     map[api.PrimitiveAlias]string
+	runtime        map[api.RuntimeSymbol]string
+	artifactOwner  api.ArtifactOwner
+	artifactSource ast.Node
+	artifactFile   *ast.File
+	artifactPath   string
 }
 
 type temporarySnapshot map[api.TemporaryKind]uint64
@@ -135,14 +138,14 @@ func (n *fileNames) reference(
 		}
 	}
 	var requests []api.RootRequest
-	if binding.sourceFile != nil && n.artifactOwner != nil {
+	if binding.sourceFile != nil && n.artifactOwner.Valid() {
 		request, err := api.NewArtifactDependencyRequest(object, facet)
 		if err != nil {
 			return api.NameReference{}, err
 		}
 		requests = append(requests, request)
 	}
-	if binding.sourceFile != nil && binding.sourceFile != n.sourceFile {
+	if binding.sourceFile != nil && binding.sourcePath != n.targetPath {
 		referencePath := binding.sourcePath
 		if object.Pkg() != nil && object.Pkg().Scope() != n.packageScope {
 			referencePath = n.owner.registry.assemblyPathByPackage[object.Pkg()]
@@ -256,19 +259,58 @@ func (n *fileNames) NamedStructOperation(
 	return api.NewNameReference(reference.Name(), requests...)
 }
 
-func (n *fileNames) beginArtifact(owner types.Object) (func(), error) {
-	if owner == nil {
-		return nil, &api.NameError{Reason: "artifact owner is nil"}
+func (n *fileNames) beginArtifact(
+	owner api.ArtifactOwner,
+	source ast.Node,
+	sourceFile *ast.File,
+	sourcePath string,
+) (func(), error) {
+	if !owner.Valid() {
+		return nil, &api.NameError{Reason: "artifact owner is invalid"}
 	}
-	if n.artifactOwner != nil {
+	if n.artifactOwner.Valid() {
 		return nil, &api.NameError{
 			Name:   owner.Name(),
 			Reason: "artifact emission is already active",
 		}
 	}
+	sourceOwner, sourceOwned := owner.Source()
+	generatedOwner, generatedOwned := owner.Generated()
+	switch {
+	case sourceOwned:
+		if source == nil ||
+			sourceFile == nil ||
+			sourcePath == "" ||
+			sourceOwner.Pos() < source.Pos() ||
+			sourceOwner.Pos() > source.End() ||
+			source.Pos() < sourceFile.Pos() ||
+			source.End() > sourceFile.End() {
+			return nil, &api.NameError{
+				Name:   owner.Name(),
+				Reason: "source artifact has no exact declaration anchor",
+			}
+		}
+	case generatedOwned:
+		if source != nil || sourceFile != nil || sourcePath != "" ||
+			generatedOwner.Placement() !=
+				api.GeneratedArtifactPlacementCompilation {
+			return nil, &api.NameError{
+				Name:   owner.Name(),
+				Reason: "generated artifact received a source declaration",
+			}
+		}
+	default:
+		return nil, &api.NameError{Reason: "artifact owner is invalid"}
+	}
 	n.artifactOwner = owner
+	n.artifactSource = source
+	n.artifactFile = sourceFile
+	n.artifactPath = sourcePath
 	return func() {
-		n.artifactOwner = nil
+		n.artifactOwner = api.ArtifactOwner{}
+		n.artifactSource = nil
+		n.artifactFile = nil
+		n.artifactPath = ""
 	}, nil
 }
 
@@ -309,10 +351,13 @@ func (n *fileNames) Member(field *types.Var) (string, error) {
 	}
 	name := n.owner.memberNameByObject[field]
 	if name == "" {
-		return "", &api.NameError{
-			Name:   field.Name(),
-			Reason: "field object was not indexed from a named struct",
+		if !field.IsField() || field.Embedded() || field.Name() == "_" {
+			return "", &api.NameError{
+				Name:   field.Name(),
+				Reason: "field object has no target member identity",
+			}
 		}
+		name = portableIdentifier(field.Name())
 	}
 	return name, nil
 }
@@ -352,13 +397,17 @@ func (n *fileNames) packageImportQualifier(
 func (n *fileNames) allocateImportName(preferred string, qualifier string) string {
 	base := preferred + "__from_" + qualifier
 	candidate := base
-	for suffix := uint64(1); n.packageScope.Lookup(candidate) != nil ||
-		n.hasImportName(candidate) ||
-		n.owner.hasSourceName(candidate); suffix++ {
+	for suffix := uint64(1); n.sourceNameExists(candidate) ||
+		n.hasImportName(candidate); suffix++ {
 		candidate = base + "_" + strconv.FormatUint(suffix, 10)
 	}
 	n.importNames[candidate] = struct{}{}
 	return candidate
+}
+
+func (n *fileNames) sourceNameExists(name string) bool {
+	return (n.packageScope != nil && n.packageScope.Lookup(name) != nil) ||
+		n.owner.hasSourceName(name)
 }
 
 func (n *fileNames) hasImportName(name string) bool {
@@ -396,13 +445,11 @@ func (n *fileNames) Primitive(alias api.PrimitiveAlias) (api.NameReference, erro
 		return api.NameReference{}, err
 	}
 	localName := exportedName
-	if n.packageScope.Lookup(localName) != nil ||
-		n.owner.hasSourceName(localName) ||
+	if n.sourceNameExists(localName) ||
 		n.hasImportName(localName) {
 		base := exportedName + "__from_gotots_support"
 		localName = base
-		for suffix := uint64(1); n.packageScope.Lookup(localName) != nil ||
-			n.owner.hasSourceName(localName) ||
+		for suffix := uint64(1); n.sourceNameExists(localName) ||
 			n.hasImportName(localName); suffix++ {
 			localName = base + "_" + strconv.FormatUint(suffix, 10)
 		}
@@ -458,13 +505,11 @@ func (n *fileNames) Runtime(
 	}
 	exportedName := contract.ExportedName()
 	localName := exportedName
-	if n.packageScope.Lookup(localName) != nil ||
-		n.owner.hasSourceName(localName) ||
+	if n.sourceNameExists(localName) ||
 		n.hasImportName(localName) {
 		base := exportedName + "__from_gotots_runtime"
 		localName = base
-		for suffix := uint64(1); n.packageScope.Lookup(localName) != nil ||
-			n.owner.hasSourceName(localName) ||
+		for suffix := uint64(1); n.sourceNameExists(localName) ||
 			n.hasImportName(localName); suffix++ {
 			localName = base + "_" + strconv.FormatUint(suffix, 10)
 		}

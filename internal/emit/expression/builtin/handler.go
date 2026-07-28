@@ -10,6 +10,7 @@ import (
 	newvalue "github.com/tsoniclang/gotots/internal/emit/expression/builtin/newvalue"
 	orderedbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/ordered"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 )
@@ -144,7 +145,35 @@ func scalarSlice(
 	_ api.Context,
 	sourceType types.Type,
 ) (*types.Slice, types.Type, bool) {
+	if defined, ok := definedtype.ResolveSlice(sourceType); ok {
+		sliceType, _ := defined.Slice()
+		return sliceType, sliceType.Elem(), true
+	}
 	return slicevalue.Resolve(sourceType)
+}
+
+func projectDefinedSlice(
+	context api.Context,
+	sourceType types.Type,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	defined, ok := definedtype.ResolveSlice(sourceType)
+	if !ok {
+		return value, nil
+	}
+	return defined.Project(context, value)
+}
+
+func wrapDefinedSlice(
+	context api.Context,
+	sourceType types.Type,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	defined, ok := definedtype.ResolveSlice(sourceType)
+	if !ok {
+		return value, nil
+	}
+	return defined.Wrap(context, value)
 }
 
 func arrayArgument(

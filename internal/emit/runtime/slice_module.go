@@ -33,6 +33,10 @@ func buildSlice(
 			capabilities.Address = true
 		case api.RuntimeSliceMakeWith:
 			capabilities.AggregateMake = true
+		case api.RuntimeSliceNilWith:
+			capabilities.AggregateNil = true
+		case api.RuntimeSliceLiteralWith:
+			capabilities.AggregateLiteral = true
 		case api.RuntimeSliceAppendWith:
 			capabilities.AggregateAppend = true
 		case api.RuntimeSliceCopyWith:

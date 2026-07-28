@@ -98,13 +98,23 @@ func copyMethod(
 	arguments := make([]tsgo.Expression, 0, len(fields))
 	var requests []api.RootRequest
 	for _, field := range fields {
-		value := api.DirectExpression(property(context, "$source", field.name))
-		copied, err := context.Values().Copy(
-			context.WithRole(api.RoleStructCopyField),
-			field.source,
-			field.object.Type(),
-			value,
-		)
+		var copied api.ExpressionEmission
+		var err error
+		if field.blank {
+			copied, err = context.Values().Zero(
+				context.WithRole(api.RoleStructCopyField),
+				field.source,
+				field.object.Type(),
+			)
+		} else {
+			value := api.DirectExpression(property(context, "$source", field.name))
+			copied, err = context.Values().Copy(
+				context.WithRole(api.RoleStructCopyField),
+				field.source,
+				field.object.Type(),
+				value,
+			)
+		}
 		if err != nil {
 			return nil, nil, err
 		}
@@ -145,6 +155,9 @@ func equalMethod(
 	var requests []api.RootRequest
 	hasPrerequisites := false
 	for _, field := range fields {
+		if field.blank {
+			continue
+		}
 		equal, err := context.Values().Equal(
 			context.WithRole(api.RoleStructEqualField),
 			field.source,

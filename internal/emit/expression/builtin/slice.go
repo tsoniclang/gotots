@@ -69,7 +69,7 @@ func emitMake(
 			arguments,
 			sliceValueFactory(context, nil, zero.Value()),
 		)
-		return aggregateSliceCall(
+		target, err := aggregateSliceCall(
 			context,
 			children,
 			source,
@@ -79,13 +79,17 @@ func emitMake(
 			before,
 			api.CombineRequests(requests, zero.Requests()),
 		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return wrapDefinedSlice(context, result, target)
 	}
 	values = append(values, zero)
 	arguments, before, requests, err := arrangeValues(context, values)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return runtimeStaticCall(
+	target, err := runtimeStaticCall(
 		context,
 		children,
 		source,
@@ -95,6 +99,10 @@ func emitMake(
 		before,
 		requests,
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return wrapDefinedSlice(context, result, target)
 }
 
 func emitMeasure(
@@ -122,6 +130,10 @@ func emitMeasure(
 			WithExpectedType(sourceType),
 		source.Args[0],
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	value, err = projectDefinedSlice(context, sourceType, value)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -170,6 +182,10 @@ func emitAppend(
 			WithExpectedType(result),
 		source.Args[0],
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	receiver, err = projectDefinedSlice(context, result, receiver)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -228,7 +244,7 @@ func emitAppend(
 		arguments := make([]tsgo.Expression, 0, len(ordered)+2)
 		arguments = append(arguments, ordered[0], zero, copyValue)
 		arguments = append(arguments, ordered[1:]...)
-		return aggregateSliceCall(
+		target, err := aggregateSliceCall(
 			context,
 			children,
 			source,
@@ -238,8 +254,12 @@ func emitAppend(
 			before,
 			api.CombineRequests(requests, zeroRequests, copyRequests),
 		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return wrapDefinedSlice(context, result, target)
 	}
-	return api.NewExpressionEmission(
+	target, err := api.NewExpressionEmission(
 		before,
 		context.Factory().CallExpression(
 			context.Factory().PropertyAccessExpression(
@@ -257,6 +277,10 @@ func emitAppend(
 		),
 		requests,
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return wrapDefinedSlice(context, result, target)
 }
 
 func emitCopy(
@@ -292,6 +316,10 @@ func emitCopy(
 				WithExpectedType(expected),
 			argument,
 		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		value, err = projectDefinedSlice(context, expected, value)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}

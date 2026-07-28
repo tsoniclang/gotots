@@ -22,8 +22,12 @@ func BuildAggregateOperation(
 		className: sliceContract.ExportedName(),
 	}
 	switch symbol {
+	case api.RuntimeSliceNilWith:
+		return target.aggregateNilExport(contract.ExportedName()), nil
 	case api.RuntimeSliceMakeWith:
 		return target.aggregateMakeExport(contract.ExportedName()), nil
+	case api.RuntimeSliceLiteralWith:
+		return target.aggregateLiteralExport(contract.ExportedName()), nil
 	case api.RuntimeSliceAppendWith:
 		return target.aggregateAppendExport(contract.ExportedName()), nil
 	case api.RuntimeSliceCopyWith:
@@ -31,6 +35,23 @@ func BuildAggregateOperation(
 	default:
 		return nil, &api.RuntimeSymbolError{Symbol: symbol}
 	}
+}
+
+func (b builder) aggregateNilExport(name string) tsgo.FunctionDeclaration {
+	return b.aggregateExport(
+		name,
+		[]tsgo.ParameterDeclaration{
+			b.parameter("zero", b.valueFactoryType()),
+		},
+		b.sliceType(),
+		b.factory.CallExpression(
+			b.property(b.id(b.className), aggregateNilMember),
+			nil,
+			[]tsgo.TypeNode{b.typeT()},
+			[]tsgo.Expression{b.id("zero")},
+			tsgo.NodeFlagsNone,
+		),
+	)
 }
 
 func (b builder) aggregateMakeExport(name string) tsgo.FunctionDeclaration {
@@ -81,6 +102,35 @@ func (b builder) aggregateAppendExport(name string) tsgo.FunctionDeclaration {
 			[]tsgo.Expression{
 				b.id("zero"),
 				b.id("copyValue"),
+				b.factory.SpreadElement(b.id("values")),
+			},
+			tsgo.NodeFlagsNone,
+		),
+	)
+}
+
+func (b builder) aggregateLiteralExport(name string) tsgo.FunctionDeclaration {
+	values := b.factory.ParameterDeclaration(
+		nil,
+		b.factory.DotDotDotToken(),
+		b.id("values"),
+		nil,
+		b.factory.ArrayTypeNode(b.typeT()),
+		nil,
+	)
+	return b.aggregateExport(
+		name,
+		[]tsgo.ParameterDeclaration{
+			b.parameter("zero", b.valueFactoryType()),
+			values,
+		},
+		b.sliceType(),
+		b.factory.CallExpression(
+			b.property(b.id(b.className), aggregateLiteralMember),
+			nil,
+			[]tsgo.TypeNode{b.typeT()},
+			[]tsgo.Expression{
+				b.id("zero"),
 				b.factory.SpreadElement(b.id("values")),
 			},
 			tsgo.NodeFlagsNone,

@@ -32,6 +32,8 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimeSliceMakeWith, 302, api.RuntimeModuleSlice, "runtime/slice.ts", "goSliceMakeWith", false, []api.RuntimeSymbol{api.RuntimeSlice}},
 		{api.RuntimeSliceAppendWith, 303, api.RuntimeModuleSlice, "runtime/slice.ts", "goSliceAppendWith", false, []api.RuntimeSymbol{api.RuntimeSlice}},
 		{api.RuntimeSliceCopyWith, 304, api.RuntimeModuleSlice, "runtime/slice.ts", "goSliceCopyWith", false, []api.RuntimeSymbol{api.RuntimeSlice}},
+		{api.RuntimeSliceNilWith, 305, api.RuntimeModuleSlice, "runtime/slice.ts", "goSliceNilWith", false, []api.RuntimeSymbol{api.RuntimeSlice}},
+		{api.RuntimeSliceLiteralWith, 306, api.RuntimeModuleSlice, "runtime/slice.ts", "goSliceLiteralWith", false, []api.RuntimeSymbol{api.RuntimeSlice}},
 		{api.RuntimeMap, 400, api.RuntimeModuleMap, "runtime/map.ts", "GoMap", true, []api.RuntimeSymbol{api.RuntimePanic}},
 		{api.RuntimePanic, 500, api.RuntimeModulePanic, "runtime/panic.ts", "GoPanic", true, nil},
 		{api.RuntimeIntegerDivide, 600, api.RuntimeModuleInteger, "runtime/integer.ts", "goIntegerDivide", false, []api.RuntimeSymbol{api.RuntimePanic}},

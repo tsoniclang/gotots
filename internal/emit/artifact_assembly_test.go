@@ -29,7 +29,7 @@ func TestCommittedArtifactPlacementDropsSupersededImports(t *testing.T) {
 	builder := &targetFileBuilder{
 		placement: basePlacement,
 		declarations: []targetDeclaration{{
-			object:    artifactTestObject("Consumer", 10),
+			owner:     sourceArtifactOwner(artifactTestObject("Consumer", 10)),
 			placement: oldPlacement,
 		}},
 	}
@@ -109,7 +109,7 @@ func TestTargetFilesRejectPendingArtifactReconstruction(t *testing.T) {
 	}
 	drainProgramSession(t, session)
 	if err := session.artifacts.Commit(
-		trigger,
+		sourceArtifactOwner(trigger),
 		artifactstate.Contract{
 			api.ArtifactFacetCallableSignature: []byte("changed"),
 		},
@@ -117,10 +117,11 @@ func TestTargetFilesRejectPendingArtifactReconstruction(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
-	if dirty, ok := session.artifacts.NextDirty(); !ok || dirty != caller {
+	if dirty, ok := session.artifacts.NextDirty(); !ok ||
+		dirty != sourceArtifactOwner(caller) {
 		t.Fatalf("dirty = %v, %t; want Caller", dirty, ok)
 	} else if err := session.artifacts.Commit(
-		trigger,
+		sourceArtifactOwner(trigger),
 		artifactstate.Contract{
 			api.ArtifactFacetCallableSignature: []byte("changed-again"),
 		},

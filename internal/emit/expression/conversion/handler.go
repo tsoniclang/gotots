@@ -76,11 +76,15 @@ func Emit(
 	}
 	sourceType := operandFacts.Type
 	if defined, ok := definedtype.Resolve(sourceType); ok {
-		operandValue, err = api.NewExpressionEmission(
-			operandValue.Before(),
-			defined.Unwrap(context.Factory(), operandValue.Value()),
-			operandValue.Requests(),
-		)
+		if defined.NilCapable() {
+			operandValue, err = defined.Project(context, operandValue)
+		} else {
+			operandValue, err = api.NewExpressionEmission(
+				operandValue.Before(),
+				defined.Unwrap(context.Factory(), operandValue.Value()),
+				operandValue.Requests(),
+			)
+		}
 		if err != nil {
 			return api.ExpressionEmission{}, true, err
 		}
@@ -93,6 +97,8 @@ func Emit(
 	}
 	var target api.ExpressionEmission
 	switch {
+	case directReferenceConversion(sourceType, representedTargetType):
+		target = operandValue
 	case directArrayConversion(sourceType, representedTargetType):
 		target, err = context.Values().Copy(
 			context.WithRole(api.RoleConversionOperand),
@@ -137,6 +143,18 @@ func Emit(
 		target, err = targetDefined.Wrap(context, target)
 	}
 	return target, true, err
+}
+
+func directReferenceConversion(sourceType, targetType types.Type) bool {
+	if !types.Identical(sourceType, targetType) {
+		return false
+	}
+	switch types.Unalias(sourceType).(type) {
+	case *types.Slice, *types.Pointer:
+		return true
+	default:
+		return false
+	}
 }
 
 func directArrayConversion(sourceType, targetType types.Type) bool {

@@ -57,7 +57,7 @@ func TestAddressableStorageReconstructsOnlyOwningBodiesIncludingInit(
 			)
 		}
 		if session.artifacts.FacetRevision(
-			object,
+			sourceArtifactOwner(object),
 			api.ArtifactFacetCallableSignature,
 		) != 1 {
 			t.Fatalf(
@@ -66,9 +66,9 @@ func TestAddressableStorageReconstructsOnlyOwningBodiesIncludingInit(
 			)
 		}
 	}
-	if len(session.requirements.appliedFor(addressed)) != 1 ||
-		len(session.requirements.appliedFor(initializer)) != 1 ||
-		len(session.requirements.appliedFor(caller)) != 0 {
+	if len(session.requirements.appliedFor(sourceArtifactOwner(addressed))) != 1 ||
+		len(session.requirements.appliedFor(sourceArtifactOwner(initializer))) != 1 ||
+		len(session.requirements.appliedFor(sourceArtifactOwner(caller))) != 0 {
 		t.Fatal("addressable-storage requirements escaped their exact body owners")
 	}
 	if session.artifacts.HasPending() ||

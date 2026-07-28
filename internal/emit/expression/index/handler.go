@@ -6,8 +6,11 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	mapindexexpression "github.com/tsoniclang/gotots/internal/emit/expression/mapindex"
+	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -25,7 +28,24 @@ func Emit(
 	if array, ok := arrayvalue.Resolve(context, operandType); ok {
 		return array.EmitIndex(context, children, source)
 	}
+	if _, pointedType, ok := pointertype.Resolve(operandType); ok {
+		if array, arrayOK := arrayvalue.Resolve(context, pointedType); arrayOK {
+			return emitPointerArrayIndex(context, children, source, array)
+		}
+	}
+	if defined, ok := definedtype.ResolvePointer(operandType); ok {
+		pointer, _ := defined.Pointer()
+		if array, arrayOK := arrayvalue.Resolve(
+			context,
+			pointer.Elem(),
+		); arrayOK {
+			return emitPointerArrayIndex(context, children, source, array)
+		}
+	}
 	if _, _, ok := slicevalue.Resolve(operandType); ok {
+		return emitSliceIndex(context, children, source)
+	}
+	if _, ok := definedtype.ResolveSlice(operandType); ok {
 		return emitSliceIndex(context, children, source)
 	}
 	indexType := context.TypesInfo().TypeOf(source.Index)
@@ -100,6 +120,59 @@ func Emit(
 	), nil
 }
 
+func emitPointerArrayIndex(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.IndexExpr,
+	array arrayvalue.RuntimeArray,
+) (api.ExpressionEmission, error) {
+	elementType := array.ElementType()
+	if !types.Identical(context.TypesInfo().TypeOf(source), elementType) ||
+		context.ExpectedType() == nil ||
+		!types.AssignableTo(elementType, context.ExpectedType()) {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	address, err := children.Address(
+		context.
+			WithRole(api.RoleIndexOperand).
+			WithExpectedType(types.NewPointer(elementType)),
+		source,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	targetElement, err := children.RepresentedType(
+		context.WithRole(api.RoleIndexOperand),
+		source,
+		elementType,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	runtime, err := context.Names().Runtime(
+		api.RuntimePointer,
+		api.ImportPhaseValue,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return api.NewExpressionEmission(
+		address.Before(),
+		pointerruntime.CellValue(
+			context.Factory(),
+			runtime.Name(),
+			targetElement.Value(),
+			address.Value(),
+		),
+		api.CombineRequests(
+			address.Requests(),
+			targetElement.Requests(),
+			runtime.Requests(),
+		),
+	)
+}
+
 func isByte(sourceType types.Type) bool {
 	basic, ok := types.Unalias(sourceType).(*types.Basic)
 	return ok && basic.Kind() == types.Uint8
@@ -119,6 +192,12 @@ func emitSliceIndex(
 ) (api.ExpressionEmission, error) {
 	sourceType := context.TypesInfo().TypeOf(source.X)
 	_, elementType, ok := slicevalue.Resolve(sourceType)
+	defined, definedOK := definedtype.ResolveSlice(sourceType)
+	if definedOK {
+		sliceType, _ := defined.Slice()
+		elementType = sliceType.Elem()
+		ok = true
+	}
 	if !ok ||
 		context.TypesInfo().TypeOf(source) == nil ||
 		!types.Identical(context.TypesInfo().TypeOf(source), elementType) ||
@@ -144,6 +223,12 @@ func emitSliceIndex(
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	if definedOK {
+		receiver, err = defined.Project(context, receiver)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	}
 	index, err := children.Expression(
 		context.

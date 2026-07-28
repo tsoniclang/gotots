@@ -78,6 +78,13 @@ func (unusedNames) TypeReference(types.Object) (api.NameReference, error) {
 	panic("unused")
 }
 
+func (unusedNames) AnonymousStruct(
+	*types.Struct,
+	api.AnonymousStructDemand,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (unusedNames) PackageVariable(
 	*types.Var,
 ) (api.PackageVariableReference, error) {

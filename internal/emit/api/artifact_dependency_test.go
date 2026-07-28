@@ -28,8 +28,10 @@ func TestArtifactDependencyRequestIsClosedAndIdentityKeyed(t *testing.T) {
 		t.Fatalf("request kind = %v", request.Kind())
 	}
 	dependency, ok := request.ArtifactDependency()
+	sourceProvider, sourceOwned := dependency.Provider().Source()
 	if !ok ||
-		dependency.Provider() != provider ||
+		!sourceOwned ||
+		sourceProvider != provider ||
 		dependency.Facet() != api.ArtifactFacetCallableSignature {
 		t.Fatalf("dependency = %#v, %t", dependency, ok)
 	}

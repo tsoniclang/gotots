@@ -32,6 +32,9 @@ func (Owner) RequiresCustomEquality(
 	if _, ok := arrayvalue.Resolve(context, sourceType); ok {
 		return true
 	}
+	if _, ok := isAnonymousStruct(sourceType); ok {
+		return true
+	}
 	if pointerValue(sourceType) {
 		return true
 	}
@@ -43,6 +46,9 @@ func (Owner) RequiresExplicitType(
 	context api.Context,
 	sourceType types.Type,
 ) bool {
+	if defined, ok := definedtype.Resolve(sourceType); ok {
+		return defined.NilCapable()
+	}
 	return pointerValue(sourceType)
 }
 
@@ -54,6 +60,9 @@ func (Owner) RequiresStructuralCopy(
 		return defined.Family() == definedtype.FamilyArray
 	}
 	if _, ok := arrayvalue.Resolve(context, sourceType); ok {
+		return true
+	}
+	if _, ok := isAnonymousStruct(sourceType); ok {
 		return true
 	}
 	_, _, ok := namedStruct(sourceType)
@@ -132,6 +141,9 @@ func (Owner) Zero(
 	if array, ok := arrayvalue.Resolve(context, sourceType); ok {
 		return array.Zero(context, source)
 	}
+	if structType, ok := isAnonymousStruct(sourceType); ok {
+		return anonymousStructZero(context, source, structType)
+	}
 	if alias, ok := primitive(context, sourceType); ok {
 		var literal tsgo.Expression
 		switch alias {
@@ -198,7 +210,7 @@ func (Owner) Copy(
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
 	if defined, ok := definedtype.Resolve(sourceType); ok &&
-		defined.Family() == definedtype.FamilyBasic {
+		defined.Family() != definedtype.FamilyArray {
 		return api.NewExpressionEmission(
 			value.Before(),
 			value.Value(),
@@ -207,6 +219,12 @@ func (Owner) Copy(
 	}
 	if array, ok := arrayvalue.Resolve(context, sourceType); ok {
 		return array.Copy(context, ownsFreshValue(context, source), value)
+	}
+	if structType, ok := isAnonymousStruct(sourceType); ok {
+		if ownsFreshValue(context, source) {
+			return value, nil
+		}
+		return anonymousStructCopy(context, source, structType, value)
 	}
 	_, complexOK := complexvalue.Describe(sourceType)
 	_, primitiveOK := primitive(context, sourceType)
@@ -287,6 +305,7 @@ func (Owner) Assign(
 	_, complexOK := complexvalue.Describe(sourceType)
 	_, primitiveOK := primitive(context, sourceType)
 	_, _, structOK := namedStruct(sourceType)
+	_, anonymousStructOK := isAnonymousStruct(sourceType)
 	if !definedOK &&
 		!arrayOK &&
 		!complexOK &&
@@ -295,6 +314,7 @@ func (Owner) Assign(
 		!pointerValue(sourceType) &&
 		!isScalarSlice(context, sourceType) &&
 		!mapValue(context, sourceType) &&
+		!anonymousStructOK &&
 		!structOK {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
@@ -322,12 +342,43 @@ func (Owner) Equal(
 	right tsgo.Expression,
 ) (api.ExpressionEmission, error) {
 	if defined, ok := definedtype.Resolve(sourceType); ok {
-		return (Owner{}).Equal(
+		leftValue := api.DirectExpression(left)
+		rightValue := api.DirectExpression(right)
+		var err error
+		if defined.NilCapable() {
+			leftValue, err = defined.Project(context, leftValue)
+			if err == nil {
+				rightValue, err = defined.Project(context, rightValue)
+			}
+		} else {
+			leftValue = api.DirectExpression(
+				defined.Unwrap(context.Factory(), left),
+			)
+			rightValue = api.DirectExpression(
+				defined.Unwrap(context.Factory(), right),
+			)
+		}
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		result, err := (Owner{}).Equal(
 			context.WithRole(api.RoleDefinedValue),
 			source,
 			defined.Underlying(),
-			defined.Unwrap(context.Factory(), left),
-			defined.Unwrap(context.Factory(), right),
+			leftValue.Value(),
+			rightValue.Value(),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.NewExpressionEmission(
+			result.Before(),
+			result.Value(),
+			api.CombineRequests(
+				leftValue.Requests(),
+				rightValue.Requests(),
+				result.Requests(),
+			),
 		)
 	}
 	if carrier, ok := complexvalue.Describe(sourceType); ok {
@@ -346,6 +397,9 @@ func (Owner) Equal(
 	}
 	if array, ok := arrayvalue.Resolve(context, sourceType); ok {
 		return array.Equal(context, source, left, right)
+	}
+	if structType, ok := isAnonymousStruct(sourceType); ok {
+		return anonymousStructEqual(context, source, structType, left, right)
 	}
 	if _, ok := primitive(context, sourceType); ok {
 		return api.DirectExpression(context.Factory().BinaryExpression(

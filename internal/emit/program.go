@@ -37,23 +37,25 @@ type ProgramEmission struct {
 }
 
 type programSession struct {
-	source                 *load.Program
-	factory                tsgo.Factory
-	integer                api.IntegerRepresentation
-	registry               *declarationRegistry
-	scheduler              *scheduler
-	requirements           *declarationRequirementScheduler
-	artifacts              *artifactstate.Graph
-	sites                  map[types.Object]declarationSite
-	emitters               map[*load.Package]*emitter
-	builders               map[string]*targetFileBuilder
-	packageBuilders        map[*load.Package]*packageTargetBuilder
-	packageInitializations *packageInitializationScheduler
-	sealed                 bool
+	source                   *load.Program
+	factory                  tsgo.Factory
+	integer                  api.IntegerRepresentation
+	registry                 *declarationRegistry
+	scheduler                *scheduler
+	requirements             *declarationRequirementScheduler
+	artifacts                *artifactstate.Graph
+	sites                    map[types.Object]declarationSite
+	emitters                 map[*load.Package]*emitter
+	builders                 map[string]*targetFileBuilder
+	packageBuilders          map[*load.Package]*packageTargetBuilder
+	packageInitializations   *packageInitializationScheduler
+	packageInitializerOwners map[types.Object]struct{}
+	sealed                   bool
 }
 
 type targetDeclaration struct {
-	object          types.Object
+	owner           api.ArtifactOwner
+	name            string
 	position        token.Pos
 	statements      []tsgo.Statement
 	placement       *placementOwner
@@ -69,8 +71,8 @@ type targetFileBuilder struct {
 	context       api.Context
 	placement     *placementOwner
 	declarations  []targetDeclaration
-	byObject      map[types.Object]struct{}
-	indexByObject map[types.Object]int
+	byOwner       map[api.ArtifactOwner]struct{}
+	indexByOwner  map[api.ArtifactOwner]int
 }
 
 func Compile(source *load.Program, roots []Root) (ProgramEmission, error) {
@@ -126,7 +128,7 @@ func CompileWithOptions(
 			continue
 		}
 		if object, ok := session.artifacts.NextDirty(); ok {
-			if err := session.reconstructArtifact(object); err != nil {
+			if err := session.reconstructScheduledArtifact(object); err != nil {
 				return ProgramEmission{}, err
 			}
 			continue
@@ -196,7 +198,7 @@ func fileRoots(
 				case *ast.ValueSpec:
 					for _, name := range spec.Names {
 						object := sourcePackage.TypesInfo().Defs[name]
-						if object == nil {
+						if object == nil || object.Name() == "_" {
 							continue
 						}
 						root, err := newRoot(object, RootFileCoverage)
@@ -249,6 +251,42 @@ func compareObjects(left types.Object, right types.Object) int {
 	}
 }
 
+func compareArtifactOwners(
+	left api.ArtifactOwner,
+	right api.ArtifactOwner,
+) int {
+	leftSource, leftIsSource := left.Source()
+	rightSource, rightIsSource := right.Source()
+	switch {
+	case leftIsSource && rightIsSource:
+		return compareObjects(leftSource, rightSource)
+	case leftIsSource:
+		return -1
+	case rightIsSource:
+		return 1
+	}
+	leftGenerated, leftOK := left.Generated()
+	rightGenerated, rightOK := right.Generated()
+	if !leftOK || !rightOK {
+		switch {
+		case leftOK:
+			return 1
+		case rightOK:
+			return -1
+		default:
+			return 0
+		}
+	}
+	switch {
+	case leftGenerated.ArtifactKey() < rightGenerated.ArtifactKey():
+		return -1
+	case leftGenerated.ArtifactKey() > rightGenerated.ArtifactKey():
+		return 1
+	default:
+		return 0
+	}
+}
+
 func (e ProgramEmission) Files() []TargetFile {
 	return slices.Clone(e.files)
 }
@@ -282,18 +320,37 @@ func newProgramSession(
 		return nil, err
 	}
 	session := &programSession{
-		source:                 source,
-		factory:                tsgo.NewFactory(),
-		integer:                options.IntegerRepresentation,
-		registry:               registry,
-		scheduler:              newScheduler(),
-		requirements:           newDeclarationRequirementScheduler(),
-		artifacts:              artifactstate.NewGraph(compareObjects),
-		sites:                  sites,
-		emitters:               make(map[*load.Package]*emitter),
-		builders:               make(map[string]*targetFileBuilder),
-		packageBuilders:        make(map[*load.Package]*packageTargetBuilder),
-		packageInitializations: newPackageInitializationScheduler(),
+		source:                   source,
+		factory:                  tsgo.NewFactory(),
+		integer:                  options.IntegerRepresentation,
+		registry:                 registry,
+		scheduler:                newScheduler(),
+		requirements:             newDeclarationRequirementScheduler(),
+		artifacts:                artifactstate.NewGraph(compareArtifactOwners),
+		sites:                    sites,
+		emitters:                 make(map[*load.Package]*emitter),
+		builders:                 make(map[string]*targetFileBuilder),
+		packageBuilders:          make(map[*load.Package]*packageTargetBuilder),
+		packageInitializations:   newPackageInitializationScheduler(),
+		packageInitializerOwners: make(map[types.Object]struct{}),
+	}
+	for _, sourcePackage := range source.Packages() {
+		for _, initializer := range sourcePackage.TypesInfo().InitOrder {
+			owner, ok := packageInitializerOwner(initializer)
+			if !ok {
+				return nil, &ScheduleError{
+					Object: sourcePackage.Path(),
+					Reason: "package initializer has no exact source owner",
+				}
+			}
+			if _, indexed := sites[owner]; !indexed {
+				return nil, &ScheduleError{
+					Object: owner.Name(),
+					Reason: "package initializer source owner is not indexed",
+				}
+			}
+			session.packageInitializerOwners[owner] = struct{}{}
+		}
 	}
 	for _, sourcePackage := range source.Packages() {
 		session.emitters[sourcePackage] = newEmitter(
@@ -343,6 +400,9 @@ func newProgramSession(
 			}
 		}
 		if variable, ok := site.object.(*types.Var); ok {
+			if variable.Name() == "_" {
+				continue
+			}
 			assemblyPath, err := targetoutput.PackageAssemblyPath(site.source)
 			if err != nil {
 				return nil, err
@@ -416,7 +476,8 @@ func (s *programSession) emit(object types.Object) error {
 	if err != nil {
 		return err
 	}
-	if _, duplicate := builder.byObject[object]; duplicate {
+	owner := api.MustSourceArtifactOwner(object)
+	if _, duplicate := builder.byOwner[owner]; duplicate {
 		return &ScheduleError{
 			Object: object.Name(),
 			Reason: "object was emitted more than once",
@@ -433,16 +494,17 @@ func (s *programSession) emit(object types.Object) error {
 		return err
 	}
 	if err := s.artifacts.Commit(
-		object,
+		owner,
 		revision.contract,
 		revision.dependencies,
 	); err != nil {
 		return err
 	}
-	builder.byObject[object] = struct{}{}
-	builder.indexByObject[object] = len(builder.declarations)
+	builder.byOwner[owner] = struct{}{}
+	builder.indexByOwner[owner] = len(builder.declarations)
 	builder.declarations = append(builder.declarations, targetDeclaration{
-		object:         object,
+		owner:          owner,
+		name:           object.Name(),
 		position:       object.Pos(),
 		statements:     revision.statements,
 		placement:      revision.placement,
@@ -518,8 +580,8 @@ func (s *programSession) builderForFile(
 		emitter:       emitter,
 		context:       context,
 		placement:     newPlacementOwner(),
-		byObject:      make(map[types.Object]struct{}),
-		indexByObject: make(map[types.Object]int),
+		byOwner:       make(map[api.ArtifactOwner]struct{}),
+		indexByOwner:  make(map[api.ArtifactOwner]int),
 	}
 	s.builders[outputPath] = builder
 	return builder, nil

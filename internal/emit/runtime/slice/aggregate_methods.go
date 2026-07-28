@@ -3,11 +3,13 @@ package slice
 import "github.com/tsoniclang/gotots/internal/target/tsgo"
 
 const (
-	aggregateShapeMember  = "$shape"
-	aggregateGrowthMember = "$grownCapacity"
-	aggregateMakeMember   = "makeWith"
-	aggregateAppendMember = "appendWith"
-	aggregateCopyMember   = "copyWith"
+	aggregateShapeMember   = "$shape"
+	aggregateGrowthMember  = "$grownCapacity"
+	aggregateNilMember     = "nilWith"
+	aggregateMakeMember    = "makeWith"
+	aggregateLiteralMember = "literalWith"
+	aggregateAppendMember  = "appendWith"
+	aggregateCopyMember    = "copyWith"
 )
 
 func (b builder) shapeMethod() tsgo.MethodDeclaration {
@@ -68,7 +70,7 @@ func (b builder) shapeMethod() tsgo.MethodDeclaration {
 	)
 }
 
-func (b builder) makeMethodWithShape() tsgo.MethodDeclaration {
+func (b builder) makeMethodWithShape(lazyZero bool) tsgo.MethodDeclaration {
 	shape := b.call(
 		b.id(b.className),
 		aggregateShapeMember,
@@ -112,6 +114,27 @@ func (b builder) makeMethodWithShape() tsgo.MethodDeclaration {
 				b.number("0"),
 				b.id("numericLength"),
 				b.id("resolvedCapacity"),
+				b.zeroStorage(lazyZero, b.id("zero")),
+			),
+		),
+	)
+}
+
+func (b builder) aggregateNilMethod() tsgo.MethodDeclaration {
+	return b.method(
+		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
+		aggregateNilMember,
+		[]tsgo.TypeParameterDeclaration{b.typeParameter()},
+		[]tsgo.ParameterDeclaration{
+			b.parameter("zero", b.valueFactoryType()),
+		},
+		b.sliceType(),
+		b.returnStatement(
+			b.newSlice(
+				b.factory.NullLiteral(),
+				b.number("0"),
+				b.number("0"),
+				b.number("0"),
 				b.id("zero"),
 			),
 		),
@@ -168,7 +191,38 @@ func (b builder) aggregateMakeMethod() tsgo.MethodDeclaration {
 				b.number("0"),
 				b.id("numericLength"),
 				b.id("resolvedCapacity"),
-				b.invoke(b.id("zero")),
+				b.id("zero"),
+			),
+		),
+	)
+}
+
+func (b builder) aggregateLiteralMethod() tsgo.MethodDeclaration {
+	values := b.factory.ParameterDeclaration(
+		nil,
+		b.factory.DotDotDotToken(),
+		b.id("values"),
+		nil,
+		b.factory.ArrayTypeNode(b.typeT()),
+		nil,
+	)
+	length := b.property(b.id("values"), "length")
+	return b.method(
+		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
+		aggregateLiteralMember,
+		[]tsgo.TypeParameterDeclaration{b.typeParameter()},
+		[]tsgo.ParameterDeclaration{
+			b.parameter("zero", b.valueFactoryType()),
+			values,
+		},
+		b.sliceType(),
+		b.returnStatement(
+			b.newSlice(
+				b.id("values"),
+				b.number("0"),
+				length,
+				length,
+				b.id("zero"),
 			),
 		),
 	)
@@ -343,7 +397,7 @@ func (b builder) aggregateAppendMethod() tsgo.MethodDeclaration {
 				b.number("0"),
 				b.id("newLength"),
 				b.id("nextCapacity"),
-				b.invoke(b.id("zero")),
+				b.id("zero"),
 			),
 		),
 	)

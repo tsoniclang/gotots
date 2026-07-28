@@ -83,7 +83,7 @@ func Emit(
 			nil,
 		),
 		context.Factory().ConstructorDeclaration(
-			nil,
+			constructorModifiers(context, model),
 			nil,
 			[]tsgo.ParameterDeclaration{
 				context.Factory().ParameterDeclaration(
@@ -107,6 +107,8 @@ func Emit(
 		children,
 		source,
 		model,
+		name,
+		underlying.Value(),
 		requirements,
 	)
 	if err != nil {
@@ -126,6 +128,16 @@ func Emit(
 			familyRequests,
 		)...,
 	), true, nil
+}
+
+func constructorModifiers(
+	context api.Context,
+	model definedtype.Model,
+) []tsgo.ModifierLike {
+	if !model.NilCapable() {
+		return nil
+	}
+	return []tsgo.ModifierLike{context.Factory().PrivateKeyword()}
 }
 
 func sourceSpec(

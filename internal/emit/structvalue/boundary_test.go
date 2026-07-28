@@ -22,14 +22,6 @@ func TestNamedStructUnsupportedNeighborsFailAtTypedOwners(t *testing.T) {
 		construct string
 	}{
 		{
-			name: "tag",
-			source: "package boundary\n" +
-				"type Tagged struct { Value int32 `json:\"value\"` }\n",
-			role:      api.RoleStructField,
-			category:  api.CategoryDeclaration,
-			construct: "*ast.Field",
-		},
-		{
 			name: "embedding",
 			source: "package boundary\n" +
 				"type Base struct { Value int32 }\n" +

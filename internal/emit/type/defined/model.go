@@ -8,8 +8,10 @@ import (
 )
 
 const (
-	BrandMember = "$goType"
-	ValueMember = "$value"
+	BrandMember   = "$goType"
+	ValueMember   = "$value"
+	FromMember    = "$from"
+	ValueOfMember = "$valueOf"
 )
 
 type Model struct {
@@ -25,6 +27,8 @@ const (
 	FamilyInvalid Family = iota
 	FamilyBasic
 	FamilyArray
+	FamilySlice
+	FamilyPointer
 )
 
 func Resolve(sourceType types.Type) (Model, bool) {
@@ -42,6 +46,10 @@ func Resolve(sourceType types.Type) (Model, bool) {
 		family = FamilyBasic
 	case *types.Array:
 		family = FamilyArray
+	case *types.Slice:
+		family = FamilySlice
+	case *types.Pointer:
+		family = FamilyPointer
 	default:
 		return Model{}, false
 	}
@@ -63,6 +71,16 @@ func ResolveArray(sourceType types.Type) (Model, bool) {
 	return model, ok && model.family == FamilyArray
 }
 
+func ResolveSlice(sourceType types.Type) (Model, bool) {
+	model, ok := Resolve(sourceType)
+	return model, ok && model.family == FamilySlice
+}
+
+func ResolvePointer(sourceType types.Type) (Model, bool) {
+	model, ok := Resolve(sourceType)
+	return model, ok && model.family == FamilyPointer
+}
+
 func (m Model) Type() *types.Named {
 	return m.named
 }
@@ -79,6 +97,10 @@ func (m Model) Family() Family {
 	return m.family
 }
 
+func (m Model) NilCapable() bool {
+	return m.family == FamilySlice || m.family == FamilyPointer
+}
+
 func (m Model) Basic() (*types.Basic, bool) {
 	basic, ok := m.underlying.(*types.Basic)
 	return basic, ok && m.family == FamilyBasic
@@ -87,6 +109,16 @@ func (m Model) Basic() (*types.Basic, bool) {
 func (m Model) Array() (*types.Array, bool) {
 	array, ok := m.underlying.(*types.Array)
 	return array, ok && m.family == FamilyArray
+}
+
+func (m Model) Slice() (*types.Slice, bool) {
+	slice, ok := m.underlying.(*types.Slice)
+	return slice, ok && m.family == FamilySlice
+}
+
+func (m Model) Pointer() (*types.Pointer, bool) {
+	pointer, ok := m.underlying.(*types.Pointer)
+	return pointer, ok && m.family == FamilyPointer
 }
 
 func (m Model) Unwrap(
@@ -98,6 +130,39 @@ func (m Model) Unwrap(
 		nil,
 		factory.Identifier(ValueMember),
 		tsgo.NodeFlagsNone,
+	)
+}
+
+func (m Model) Project(
+	context api.Context,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	if m.NilCapable() {
+		reference, err := context.Names().Reference(m.typeName)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.NewExpressionEmission(
+			value.Before(),
+			context.Factory().CallExpression(
+				context.Factory().PropertyAccessExpression(
+					context.Factory().Identifier(reference.Name()),
+					nil,
+					context.Factory().Identifier(ValueOfMember),
+					tsgo.NodeFlagsNone,
+				),
+				nil,
+				nil,
+				[]tsgo.Expression{value.Value()},
+				tsgo.NodeFlagsNone,
+			),
+			api.CombineRequests(value.Requests(), reference.Requests()),
+		)
+	}
+	return api.NewExpressionEmission(
+		value.Before(),
+		m.Unwrap(context.Factory(), value.Value()),
+		value.Requests(),
 	)
 }
 
@@ -119,6 +184,24 @@ func (m Model) Wrap(
 	reference, err := context.Names().Reference(m.typeName)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	if m.NilCapable() {
+		return api.NewExpressionEmission(
+			value.Before(),
+			context.Factory().CallExpression(
+				context.Factory().PropertyAccessExpression(
+					context.Factory().Identifier(reference.Name()),
+					nil,
+					context.Factory().Identifier(FromMember),
+					tsgo.NodeFlagsNone,
+				),
+				nil,
+				nil,
+				[]tsgo.Expression{value.Value()},
+				tsgo.NodeFlagsNone,
+			),
+			api.CombineRequests(value.Requests(), reference.Requests()),
+		)
 	}
 	return api.NewExpressionEmission(
 		value.Before(),

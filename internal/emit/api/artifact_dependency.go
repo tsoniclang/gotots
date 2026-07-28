@@ -2,7 +2,6 @@ package api
 
 import (
 	"fmt"
-	"go/types"
 )
 
 type ArtifactFacet uint8
@@ -39,17 +38,17 @@ func (f ArtifactFacet) String() string {
 }
 
 type ArtifactDependency struct {
-	provider types.Object
+	provider ArtifactOwner
 	facet    ArtifactFacet
 }
 
 func NewArtifactDependency(
-	provider types.Object,
+	provider ArtifactOwner,
 	facet ArtifactFacet,
 ) (ArtifactDependency, error) {
-	if provider == nil {
+	if !provider.Valid() {
 		return ArtifactDependency{},
-			&RootRequestError{Reason: "artifact dependency provider is nil"}
+			&RootRequestError{Reason: "artifact dependency provider is invalid"}
 	}
 	if !facet.Valid() {
 		return ArtifactDependency{},
@@ -59,10 +58,10 @@ func NewArtifactDependency(
 }
 
 func (d ArtifactDependency) Valid() bool {
-	return d.provider != nil && d.facet.Valid()
+	return d.provider.Valid() && d.facet.Valid()
 }
 
-func (d ArtifactDependency) Provider() types.Object {
+func (d ArtifactDependency) Provider() ArtifactOwner {
 	return d.provider
 }
 

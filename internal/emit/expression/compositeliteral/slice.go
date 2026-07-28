@@ -8,6 +8,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -24,6 +25,12 @@ func emitSlice(
 ) (api.ExpressionEmission, bool, error) {
 	sourceType := context.TypesInfo().TypeOf(source)
 	_, elementType, represented := slicevalue.Resolve(sourceType)
+	defined, definedOK := definedtype.ResolveSlice(sourceType)
+	if definedOK {
+		sliceType, _ := defined.Slice()
+		elementType = sliceType.Elem()
+		represented = true
+	}
 	if !represented {
 		return api.ExpressionEmission{}, false, nil
 	}
@@ -81,6 +88,9 @@ func emitSlice(
 			elements,
 			length,
 		)
+		if err == nil && definedOK {
+			result, err = defined.Wrap(context, result)
+		}
 		return result, true, err
 	}
 	emissions := make([]api.ExpressionEmission, 0, len(elements))
@@ -97,24 +107,49 @@ func emitSlice(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
+	aggregate := context.Values().RequiresStructuralCopy(context, elementType)
 	values = append([]tsgo.Expression{zero.Value()}, values...)
-	target := runtimeSliceCall(
-		context,
-		runtime.Name(),
-		runtimeslice.MemberName(runtimeslice.MemberLiteral),
-		elementTarget.Value(),
-		values,
-	)
+	var target tsgo.Expression
+	runtimeRequests := runtime.Requests()
+	if aggregate {
+		aggregateRuntime, err := context.Names().Runtime(
+			api.RuntimeSliceLiteralWith,
+			api.ImportPhaseValue,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, true, err
+		}
+		values[0] = sliceElementFactory(context, zero.Value())
+		target = context.Factory().CallExpression(
+			context.Factory().Identifier(aggregateRuntime.Name()),
+			nil,
+			[]tsgo.TypeNode{elementTarget.Value()},
+			values,
+			tsgo.NodeFlagsNone,
+		)
+		runtimeRequests = aggregateRuntime.Requests()
+	} else {
+		target = runtimeSliceCall(
+			context,
+			runtime.Name(),
+			runtimeslice.MemberName(runtimeslice.MemberLiteral),
+			elementTarget.Value(),
+			values,
+		)
+	}
 	result, err := api.NewExpressionEmission(
 		before,
 		target,
 		api.CombineRequests(
 			requests,
 			elementTarget.Requests(),
-			runtime.Requests(),
+			runtimeRequests,
 			zero.Requests(),
 		),
 	)
+	if err == nil && definedOK {
+		result, err = defined.Wrap(context, result)
+	}
 	return result, true, err
 }
 

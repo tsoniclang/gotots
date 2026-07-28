@@ -39,6 +39,8 @@ const (
 	RuntimeSliceMakeWith    RuntimeSymbol = 302
 	RuntimeSliceAppendWith  RuntimeSymbol = 303
 	RuntimeSliceCopyWith    RuntimeSymbol = 304
+	RuntimeSliceNilWith     RuntimeSymbol = 305
+	RuntimeSliceLiteralWith RuntimeSymbol = 306
 	RuntimeMap              RuntimeSymbol = 400
 	RuntimePanic            RuntimeSymbol = 500
 	RuntimeIntegerDivide    RuntimeSymbol = 600
@@ -182,6 +184,22 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			RuntimeModuleSlice,
 			"runtime/slice.ts",
 			"goSliceCopyWith",
+			false,
+			RuntimeSlice,
+		), nil
+	case RuntimeSliceNilWith:
+		return runtimeContract(
+			RuntimeModuleSlice,
+			"runtime/slice.ts",
+			"goSliceNilWith",
+			false,
+			RuntimeSlice,
+		), nil
+	case RuntimeSliceLiteralWith:
+		return runtimeContract(
+			RuntimeModuleSlice,
+			"runtime/slice.ts",
+			"goSliceLiteralWith",
 			false,
 			RuntimeSlice,
 		), nil

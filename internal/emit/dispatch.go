@@ -41,6 +41,7 @@ import (
 	switchstatement "github.com/tsoniclang/gotots/internal/emit/statement/switchstatement"
 	"github.com/tsoniclang/gotots/internal/emit/storage"
 	storetarget "github.com/tsoniclang/gotots/internal/emit/store"
+	anonymousstructtype "github.com/tsoniclang/gotots/internal/emit/type/anonymousstruct"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	maptype "github.com/tsoniclang/gotots/internal/emit/type/map"
@@ -107,6 +108,28 @@ func (e *emitter) targetContext(
 		targetPath,
 		e.require,
 	)
+	return e.context(names)
+}
+
+func (e *emitter) generatedContext(
+	targetPath string,
+	registry *declarationRegistry,
+) (api.Context, error) {
+	names := newNameOwnerWithRegistry(
+		nil,
+		nil,
+		registry,
+	).ForFile(
+		nil,
+		nil,
+		e.factory,
+		targetPath,
+		e.require,
+	)
+	return e.context(names)
+}
+
+func (e *emitter) context(names api.Names) (api.Context, error) {
 	return api.NewContext(
 		api.RoleFileDeclaration,
 		e.source.FileSet(),
@@ -458,6 +481,19 @@ func (e *emitter) Type(
 				sliceType,
 			)
 		}
+		if _, ok := anonymousstructtype.Resolve(sourceType); ok {
+			structType, valid := source.(*ast.StructType)
+			if !valid {
+				return api.TypeEmission{},
+					api.Unsupported(context, api.CategoryType, source)
+			}
+			return anonymousstructtype.Emit(
+				context,
+				e,
+				structType,
+				sourceType,
+			)
+		}
 	}
 	return basictype.Emit(context, source)
 }
@@ -494,6 +530,9 @@ func (e *emitter) RepresentedType(
 	}
 	if _, ok := types.Unalias(sourceType).(*types.Slice); ok {
 		return slicetype.EmitRepresented(context, e, source, sourceType)
+	}
+	if _, ok := anonymousstructtype.Resolve(sourceType); ok {
+		return anonymousstructtype.Emit(context, e, source, sourceType)
 	}
 	return basictype.EmitRepresented(context, source, sourceType)
 }

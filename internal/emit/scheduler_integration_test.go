@@ -292,7 +292,7 @@ func emittedObjectCounts(
 			continue
 		}
 		if object, ok := session.artifacts.NextDirty(); ok {
-			if err := session.reconstructArtifact(object); err != nil {
+			if err := session.reconstructScheduledArtifact(object); err != nil {
 				t.Fatal(err)
 			}
 			continue
@@ -307,8 +307,11 @@ func emittedObjectCounts(
 	}
 	actual := make(map[types.Object]int)
 	for _, builder := range session.builders {
-		for object := range builder.byObject {
-			actual[object]++
+		for owner := range builder.byOwner {
+			object, sourceOwned := owner.Source()
+			if sourceOwned {
+				actual[object]++
+			}
 		}
 	}
 	for _, builder := range session.packageBuilders {

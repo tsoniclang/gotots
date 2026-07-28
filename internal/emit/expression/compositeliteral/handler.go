@@ -54,6 +54,24 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	if named == nil {
+		reference, err := context.Names().AnonymousStruct(
+			structType,
+			api.AnonymousStructDemandDefinition,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.NewExpressionEmission(
+			before,
+			context.Factory().NewExpression(
+				context.Factory().Identifier(reference.Name()),
+				nil,
+				values,
+			),
+			api.CombineRequests(requests, reference.Requests()),
+		)
+	}
 	reference, err := context.Names().Reference(named.Obj())
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -75,7 +93,16 @@ func structSourceType(
 ) (*types.Named, *types.Struct, bool) {
 	sourceType := context.TypesInfo().TypeOf(source)
 	named, ok := types.Unalias(sourceType).(*types.Named)
-	if !ok || named.TypeParams().Len() != 0 || source.Incomplete {
+	if !ok {
+		structType, structOK := types.Unalias(sourceType).(*types.Struct)
+		expected := context.ExpectedType()
+		return nil, structType,
+			structOK &&
+				!source.Incomplete &&
+				expected != nil &&
+				types.AssignableTo(sourceType, expected)
+	}
+	if named.TypeParams().Len() != 0 || source.Incomplete {
 		return nil, nil, false
 	}
 	structType, ok := named.Underlying().(*types.Struct)
@@ -188,7 +215,8 @@ func arrange(
 	for index, element := range elements {
 		reordersSource := element.fieldIndex != index &&
 			context.EvaluationOrder() == api.EvaluationOrderPreserveGo
-		if reordersSource || len(element.value.Before()) != 0 {
+		blankField := structType.Field(element.fieldIndex).Name() == "_"
+		if reordersSource || blankField || len(element.value.Before()) != 0 {
 			capture = true
 			break
 		}

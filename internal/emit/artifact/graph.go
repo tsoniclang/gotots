@@ -3,7 +3,6 @@ package artifact
 import (
 	"bytes"
 	"fmt"
-	"go/types"
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
@@ -19,25 +18,22 @@ type artifactRecord struct {
 }
 
 type Graph struct {
-	records map[types.Object]*artifactRecord
-	reverse map[api.ArtifactDependency]map[types.Object]struct{}
-	dirty   map[types.Object]struct{}
-	compare func(types.Object, types.Object) int
+	records map[api.ArtifactOwner]*artifactRecord
+	reverse map[api.ArtifactDependency]map[api.ArtifactOwner]struct{}
+	dirty   map[api.ArtifactOwner]struct{}
+	compare func(api.ArtifactOwner, api.ArtifactOwner) int
 }
 
 type GraphError struct {
-	Object   types.Object
-	Provider types.Object
+	Object   api.ArtifactOwner
+	Provider api.ArtifactOwner
 	Facet    api.ArtifactFacet
 	Reason   string
 }
 
 func (e *GraphError) Error() string {
-	name := ""
-	if e.Object != nil {
-		name = e.Object.Name()
-	}
-	if e.Provider != nil {
+	name := e.Object.Name()
+	if e.Provider.Valid() {
 		return fmt.Sprintf(
 			"coordinate target artifact %q dependency %q/%s: %s",
 			name,
@@ -50,43 +46,41 @@ func (e *GraphError) Error() string {
 }
 
 type ArtifactConvergenceError struct {
-	Object types.Object
+	Object api.ArtifactOwner
 	Facets []api.ArtifactFacet
 }
 
 func (e *ArtifactConvergenceError) Error() string {
-	name := ""
-	if e.Object != nil {
-		name = e.Object.Name()
-	}
 	return fmt.Sprintf(
 		"reconstruct target artifact %q: observable contract oscillates on facets %v",
-		name,
+		e.Object.Name(),
 		e.Facets,
 	)
 }
 
-func NewGraph(compare func(types.Object, types.Object) int) *Graph {
+func NewGraph(
+	compare func(api.ArtifactOwner, api.ArtifactOwner) int,
+) *Graph {
 	if compare == nil {
 		panic("artifact graph comparator is nil")
 	}
 	return &Graph{
-		records: make(map[types.Object]*artifactRecord),
+		records: make(map[api.ArtifactOwner]*artifactRecord),
 		reverse: make(
-			map[api.ArtifactDependency]map[types.Object]struct{},
+			map[api.ArtifactDependency]map[api.ArtifactOwner]struct{},
 		),
-		dirty:   make(map[types.Object]struct{}),
+		dirty:   make(map[api.ArtifactOwner]struct{}),
 		compare: compare,
 	}
 }
 
 func (g *Graph) Commit(
-	owner types.Object,
+	owner api.ArtifactOwner,
 	contract Contract,
 	dependencies []api.ArtifactDependency,
 ) error {
-	if owner == nil {
-		return &GraphError{Reason: "target artifact owner is nil"}
+	if !owner.Valid() {
+		return &GraphError{Reason: "target artifact owner is invalid"}
 	}
 	nextContract, err := validateArtifactContract(owner, contract)
 	if err != nil {
@@ -156,7 +150,7 @@ func (g *Graph) Commit(
 }
 
 func (g *Graph) removeReverseEdges(
-	consumer types.Object,
+	consumer api.ArtifactOwner,
 	dependencies map[api.ArtifactDependency]struct{},
 ) {
 	for dependency := range dependencies {
@@ -169,34 +163,36 @@ func (g *Graph) removeReverseEdges(
 }
 
 func (g *Graph) addReverseEdges(
-	consumer types.Object,
+	consumer api.ArtifactOwner,
 	dependencies map[api.ArtifactDependency]struct{},
 ) {
 	for dependency := range dependencies {
 		consumers := g.reverse[dependency]
 		if consumers == nil {
-			consumers = make(map[types.Object]struct{})
+			consumers = make(map[api.ArtifactOwner]struct{})
 			g.reverse[dependency] = consumers
 		}
 		consumers[consumer] = struct{}{}
 	}
 }
 
-func (g *Graph) NextDirty() (types.Object, bool) {
-	var selected types.Object
+func (g *Graph) NextDirty() (api.ArtifactOwner, bool) {
+	var selected api.ArtifactOwner
+	found := false
 	for object := range g.dirty {
-		if selected == nil || g.compare(object, selected) < 0 {
+		if !found || g.compare(object, selected) < 0 {
 			selected = object
+			found = true
 		}
 	}
-	if selected == nil {
-		return nil, false
+	if !found {
+		return api.ArtifactOwner{}, false
 	}
 	delete(g.dirty, selected)
 	return selected, true
 }
 
-func (g *Graph) DiscardDirty(owner types.Object) {
+func (g *Graph) DiscardDirty(owner api.ArtifactOwner) {
 	delete(g.dirty, owner)
 }
 
@@ -205,7 +201,7 @@ func (g *Graph) HasPending() bool {
 }
 
 func (g *Graph) VerifyClosure() error {
-	consumers := make([]types.Object, 0, len(g.records))
+	consumers := make([]api.ArtifactOwner, 0, len(g.records))
 	for consumer := range g.records {
 		consumers = append(consumers, consumer)
 	}
@@ -267,7 +263,7 @@ func (g *Graph) edgeCount() int {
 }
 
 func (g *Graph) FacetRevision(
-	owner types.Object,
+	owner api.ArtifactOwner,
 	facet api.ArtifactFacet,
 ) uint64 {
 	record := g.records[owner]
@@ -278,7 +274,7 @@ func (g *Graph) FacetRevision(
 }
 
 func validateArtifactContract(
-	owner types.Object,
+	owner api.ArtifactOwner,
 	contract Contract,
 ) (Contract, error) {
 	if contract == nil {

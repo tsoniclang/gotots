@@ -27,12 +27,21 @@ type packageVariableBinding struct {
 	assemblyPath string
 }
 
+type anonymousStructBinding struct {
+	owner       *api.GeneratedArtifact
+	fingerprint string
+	name        string
+}
+
 type declarationRegistry struct {
 	byObject                 map[types.Object]targetBinding
 	memberNameByObject       map[*types.Var]string
 	packageVariables         map[*types.Var]packageVariableBinding
 	assemblyPathByPackage    map[*types.Package]string
 	importQualifierByPackage map[*types.Package]string
+	anonymousStructs         map[string]anonymousStructBinding
+	anonymousStructBuckets   map[string][]string
+	anonymousStructNames     map[string]string
 }
 
 type nameOwner struct {
@@ -56,6 +65,9 @@ func newDeclarationRegistry() *declarationRegistry {
 		packageVariables:         make(map[*types.Var]packageVariableBinding),
 		assemblyPathByPackage:    make(map[*types.Package]string),
 		importQualifierByPackage: make(map[*types.Package]string),
+		anonymousStructs:         make(map[string]anonymousStructBinding),
+		anonymousStructBuckets:   make(map[string][]string),
+		anonymousStructNames:     make(map[string]string),
 	}
 }
 

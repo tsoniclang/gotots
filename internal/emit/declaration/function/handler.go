@@ -53,7 +53,6 @@ func Emit(
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
-
 	name, err := context.Names().Declare(functionObject)
 	if err != nil {
 		return api.DeclarationEmission{}, err

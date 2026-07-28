@@ -53,7 +53,7 @@ func (n *fileNames) ConstantProjection(
 			return api.NameReference{}, err
 		}
 	}
-	if binding.sourceFile != nil && n.artifactOwner != nil {
+	if binding.sourceFile != nil && n.artifactOwner.Valid() {
 		dependency, err := api.NewArtifactDependencyRequest(
 			selected,
 			api.ArtifactFacetValueSurface,

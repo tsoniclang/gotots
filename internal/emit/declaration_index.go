@@ -108,6 +108,7 @@ func indexGeneralDeclaration(
 			}
 		}
 	case token.VAR:
+		sourceOutputPath := outputPath
 		statePath, err := targetoutput.PackageStatePath(sourcePackage)
 		if err != nil {
 			return err
@@ -121,10 +122,29 @@ func indexGeneralDeclaration(
 				}
 			}
 			for _, name := range valueSpec.Names {
+				object, ok := sourcePackage.TypesInfo().Defs[name].(*types.Var)
 				if name.Name == "_" {
+					if !ok ||
+						object.Name() != "_" ||
+						object.Pkg() != sourcePackage.Types() ||
+						object.Parent() != nil {
+						return &api.InvariantError{
+							Role:   api.RoleFileDeclaration,
+							Reason: "blank package variable has no exact go/types object",
+						}
+					}
+					if err := addDeclarationSite(
+						sites,
+						object,
+						sourcePackage,
+						sourceFile,
+						declaration,
+						sourceOutputPath,
+					); err != nil {
+						return err
+					}
 					continue
 				}
-				object, ok := sourcePackage.TypesInfo().Defs[name].(*types.Var)
 				if !ok ||
 					object.IsField() ||
 					object.Parent() != sourcePackage.Types().Scope() {

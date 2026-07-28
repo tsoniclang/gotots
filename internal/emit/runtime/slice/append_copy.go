@@ -2,7 +2,10 @@ package slice
 
 import "github.com/tsoniclang/gotots/internal/target/tsgo"
 
-func (b builder) appendMethod(sharedGrowth bool) tsgo.MethodDeclaration {
+func (b builder) appendMethod(
+	sharedGrowth bool,
+	lazyZero bool,
+) tsgo.MethodDeclaration {
 	values := b.factory.ParameterDeclaration(
 		nil,
 		b.factory.DotDotDotToken(),
@@ -15,6 +18,10 @@ func (b builder) appendMethod(sharedGrowth bool) tsgo.MethodDeclaration {
 		b.thisProperty(MemberName(MemberLength)),
 		b.property(b.id("values"), "length"),
 	)
+	zero := tsgo.Expression(b.thisProperty("zero"))
+	if lazyZero {
+		zero = b.invoke(zero)
+	}
 	reuseLoop := b.loop(
 		b.property(b.id("values"), "length"),
 		b.factory.ExpressionStatement(
@@ -190,7 +197,7 @@ func (b builder) appendMethod(sharedGrowth bool) tsgo.MethodDeclaration {
 		b.variable(
 			tsgo.NodeFlagsConst,
 			"backing",
-			b.call(backing, "fill", b.thisProperty("zero")),
+			b.call(backing, "fill", zero),
 		),
 		b.factory.IfStatement(
 			b.binary(

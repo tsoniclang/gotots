@@ -53,6 +53,21 @@ func (o DefinedArrayOperation) Valid() bool {
 	return o == DefinedArrayOperationAddressIndex
 }
 
+type AnonymousStructDemand uint8
+
+const (
+	AnonymousStructDemandInvalid AnonymousStructDemand = iota
+	AnonymousStructDemandDefinition
+	AnonymousStructDemandZero
+	AnonymousStructDemandCopy
+	AnonymousStructDemandEqual
+)
+
+func (d AnonymousStructDemand) Valid() bool {
+	return d >= AnonymousStructDemandDefinition &&
+		d <= AnonymousStructDemandEqual
+}
+
 type DeclarationRequirementKind uint8
 
 const (
@@ -62,6 +77,7 @@ const (
 	DeclarationRequirementConstantProjection
 	DeclarationRequirementLocalConstantProjection
 	DeclarationRequirementDefinedArrayOperation
+	DeclarationRequirementAnonymousStruct
 )
 
 func (k DeclarationRequirementKind) Valid() bool {
@@ -69,11 +85,12 @@ func (k DeclarationRequirementKind) Valid() bool {
 		k == DeclarationRequirementAddressableStorage ||
 		k == DeclarationRequirementConstantProjection ||
 		k == DeclarationRequirementLocalConstantProjection ||
-		k == DeclarationRequirementDefinedArrayOperation
+		k == DeclarationRequirementDefinedArrayOperation ||
+		k == DeclarationRequirementAnonymousStruct
 }
 
 type DeclarationRequirement struct {
-	owner     types.Object
+	owner     ArtifactOwner
 	kind      DeclarationRequirementKind
 	operation NamedStructOperation
 	array     DefinedArrayOperation
@@ -87,7 +104,9 @@ type DeclarationRequirement struct {
 	// constant projection. A basic kind is a canonical, comparable dedup key —
 	// unlike a types.Type interface value, whose pointer identity is not a
 	// stable projection key.
-	projection types.BasicKind
+	projection      types.BasicKind
+	anonymous       *GeneratedArtifact
+	anonymousDemand AnonymousStructDemand
 }
 
 // ConstantProjectionType resolves a validated concrete constant-capable basic
@@ -153,7 +172,7 @@ func NewConstantProjectionRequirement(
 		}
 	}
 	return DeclarationRequirement{
-		owner:      constant,
+		owner:      MustSourceArtifactOwner(constant),
 		kind:       DeclarationRequirementConstantProjection,
 		projection: projection,
 	}, nil
@@ -185,7 +204,7 @@ func NewLocalConstantProjectionRequirement(
 		}
 	}
 	return DeclarationRequirement{
-		owner:      owner,
+		owner:      MustSourceArtifactOwner(owner),
 		kind:       DeclarationRequirementLocalConstantProjection,
 		constant:   constant,
 		projection: projection,
@@ -207,7 +226,7 @@ func NewNamedStructOperationRequirement(
 		}
 	}
 	return DeclarationRequirement{
-		owner:     typeName,
+		owner:     MustSourceArtifactOwner(typeName),
 		kind:      DeclarationRequirementNamedStructOperation,
 		operation: operation,
 	}, nil
@@ -228,7 +247,7 @@ func NewDefinedArrayOperationRequirement(
 		}
 	}
 	return DeclarationRequirement{
-		owner: typeName,
+		owner: MustSourceArtifactOwner(typeName),
 		kind:  DeclarationRequirementDefinedArrayOperation,
 		array: operation,
 	}, nil
@@ -253,9 +272,26 @@ func NewAddressableStorageRequirement(
 		}
 	}
 	return DeclarationRequirement{
-		owner:    owner,
+		owner:    MustSourceArtifactOwner(owner),
 		kind:     DeclarationRequirementAddressableStorage,
 		variable: variable,
+	}, nil
+}
+
+func NewAnonymousStructRequirement(
+	artifact *GeneratedArtifact,
+	demand AnonymousStructDemand,
+) (DeclarationRequirement, error) {
+	if !artifact.Valid() || !demand.Valid() {
+		return DeclarationRequirement{}, &RootRequestError{
+			Reason: "anonymous-struct requirement is invalid",
+		}
+	}
+	return DeclarationRequirement{
+		owner:           artifact.ReconstructionOwner(),
+		kind:            DeclarationRequirementAnonymousStruct,
+		anonymous:       artifact,
+		anonymousDemand: demand,
 	}, nil
 }
 
@@ -267,50 +303,78 @@ func (r DeclarationRequirement) Valid() bool {
 	case DeclarationRequirementNamedStructOperation:
 		if !r.operation.Valid() ||
 			r.array != DefinedArrayOperationInvalid ||
-			r.variable != nil {
+			r.variable != nil ||
+			r.constant != nil ||
+			r.projection != types.Invalid ||
+			r.anonymous != nil ||
+			r.anonymousDemand != AnonymousStructDemandInvalid {
 			return false
 		}
-		_, ok := r.owner.(*types.TypeName)
-		return ok
+		source, sourceOK := r.owner.Source()
+		_, ok := source.(*types.TypeName)
+		return sourceOK && ok
 	case DeclarationRequirementDefinedArrayOperation:
 		if r.operation != NamedStructOperationInvalid ||
 			!r.array.Valid() ||
 			r.variable != nil ||
 			r.constant != nil ||
-			r.projection != types.Invalid {
+			r.projection != types.Invalid ||
+			r.anonymous != nil ||
+			r.anonymousDemand != AnonymousStructDemandInvalid {
 			return false
 		}
-		_, ok := r.owner.(*types.TypeName)
-		return ok
+		source, sourceOK := r.owner.Source()
+		_, ok := source.(*types.TypeName)
+		return sourceOK && ok
 	case DeclarationRequirementAddressableStorage:
 		if r.operation != NamedStructOperationInvalid ||
 			r.array != DefinedArrayOperationInvalid ||
 			r.variable == nil ||
-			r.variable.IsField() {
+			r.variable.IsField() ||
+			r.constant != nil ||
+			r.projection != types.Invalid ||
+			r.anonymous != nil ||
+			r.anonymousDemand != AnonymousStructDemandInvalid {
 			return false
 		}
-		_, ok := r.owner.(*types.Func)
-		return ok
+		source, sourceOK := r.owner.Source()
+		_, ok := source.(*types.Func)
+		return sourceOK && ok
 	case DeclarationRequirementConstantProjection:
 		if r.operation != NamedStructOperationInvalid ||
 			r.array != DefinedArrayOperationInvalid ||
 			r.variable != nil ||
 			r.constant != nil ||
-			!validConstantProjection(r.projection) {
+			!validConstantProjection(r.projection) ||
+			r.anonymous != nil ||
+			r.anonymousDemand != AnonymousStructDemandInvalid {
 			return false
 		}
-		_, ok := r.owner.(*types.Const)
-		return ok
+		source, sourceOK := r.owner.Source()
+		_, ok := source.(*types.Const)
+		return sourceOK && ok
 	case DeclarationRequirementLocalConstantProjection:
 		if r.operation != NamedStructOperationInvalid ||
 			r.array != DefinedArrayOperationInvalid ||
 			r.variable != nil ||
 			r.constant == nil ||
-			!validConstantProjection(r.projection) {
+			!validConstantProjection(r.projection) ||
+			r.anonymous != nil ||
+			r.anonymousDemand != AnonymousStructDemandInvalid {
 			return false
 		}
-		_, ok := r.owner.(*types.Func)
-		return ok
+		source, sourceOK := r.owner.Source()
+		_, ok := source.(*types.Func)
+		return sourceOK && ok
+	case DeclarationRequirementAnonymousStruct:
+		return r.operation == NamedStructOperationInvalid &&
+			r.array == DefinedArrayOperationInvalid &&
+			r.variable == nil &&
+			r.constant == nil &&
+			r.projection == types.Invalid &&
+			r.anonymous.Valid() &&
+			r.anonymousDemand.Valid() &&
+			r.owner == r.anonymous.ReconstructionOwner()
 	default:
 		return false
 	}
@@ -321,7 +385,7 @@ func validConstantProjection(projection types.BasicKind) bool {
 	return ok
 }
 
-func (r DeclarationRequirement) Owner() types.Object {
+func (r DeclarationRequirement) Owner() ArtifactOwner {
 	return r.owner
 }
 
@@ -338,8 +402,9 @@ func (r DeclarationRequirement) NamedStructOperation() (
 		r.kind != DeclarationRequirementNamedStructOperation {
 		return nil, NamedStructOperationInvalid, false
 	}
-	typeName, ok := r.owner.(*types.TypeName)
-	return typeName, r.operation, ok
+	source, sourceOK := r.owner.Source()
+	typeName, ok := source.(*types.TypeName)
+	return typeName, r.operation, sourceOK && ok
 }
 
 func (r DeclarationRequirement) DefinedArrayOperation() (
@@ -351,8 +416,9 @@ func (r DeclarationRequirement) DefinedArrayOperation() (
 		r.kind != DeclarationRequirementDefinedArrayOperation {
 		return nil, DefinedArrayOperationInvalid, false
 	}
-	typeName, ok := r.owner.(*types.TypeName)
-	return typeName, r.array, ok
+	source, sourceOK := r.owner.Source()
+	typeName, ok := source.(*types.TypeName)
+	return typeName, r.array, sourceOK && ok
 }
 
 func (r DeclarationRequirement) AddressableStorage() (
@@ -364,8 +430,9 @@ func (r DeclarationRequirement) AddressableStorage() (
 		r.kind != DeclarationRequirementAddressableStorage {
 		return nil, nil, false
 	}
-	owner, ok := r.owner.(*types.Func)
-	return owner, r.variable, ok
+	source, sourceOK := r.owner.Source()
+	owner, ok := source.(*types.Func)
+	return owner, r.variable, sourceOK && ok
 }
 
 func (r DeclarationRequirement) ConstantProjection() (
@@ -377,8 +444,9 @@ func (r DeclarationRequirement) ConstantProjection() (
 		r.kind != DeclarationRequirementConstantProjection {
 		return nil, types.Invalid, false
 	}
-	constant, ok := r.owner.(*types.Const)
-	return constant, r.projection, ok
+	source, sourceOK := r.owner.Source()
+	constant, ok := source.(*types.Const)
+	return constant, r.projection, sourceOK && ok
 }
 
 func (r DeclarationRequirement) LocalConstantProjection() (
@@ -391,6 +459,19 @@ func (r DeclarationRequirement) LocalConstantProjection() (
 		r.kind != DeclarationRequirementLocalConstantProjection {
 		return nil, nil, types.Invalid, false
 	}
-	owner, ok := r.owner.(*types.Func)
-	return owner, r.constant, r.projection, ok
+	source, sourceOK := r.owner.Source()
+	owner, ok := source.(*types.Func)
+	return owner, r.constant, r.projection, sourceOK && ok
+}
+
+func (r DeclarationRequirement) AnonymousStruct() (
+	*GeneratedArtifact,
+	AnonymousStructDemand,
+	bool,
+) {
+	if !r.Valid() ||
+		r.kind != DeclarationRequirementAnonymousStruct {
+		return nil, AnonymousStructDemandInvalid, false
+	}
+	return r.anonymous, r.anonymousDemand, true
 }

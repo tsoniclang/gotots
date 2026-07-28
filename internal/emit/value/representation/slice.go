@@ -41,6 +41,10 @@ func sliceZero(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	aggregate := context.Values().RequiresStructuralCopy(
+		context,
+		sourceElementType,
+	)
 	var typeArguments []tsgo.TypeNode
 	var typeRequests []api.RootRequest
 	elementType, requests, represented, err := scalarSliceElementTarget(
@@ -54,33 +58,60 @@ func sliceZero(
 		typeArguments = []tsgo.TypeNode{elementType}
 		typeRequests = requests
 	}
+	runtimeSymbol := api.RuntimeSlice
+	if aggregate {
+		runtimeSymbol = api.RuntimeSliceNilWith
+	}
 	runtime, err := context.Names().Runtime(
-		api.RuntimeSlice,
+		runtimeSymbol,
 		api.ImportPhaseValue,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	callee := tsgo.Expression(context.Factory().PropertyAccessExpression(
+		context.Factory().Identifier(runtime.Name()),
+		nil,
+		context.Factory().Identifier(
+			runtimeslice.MemberName(runtimeslice.MemberNil),
+		),
+		tsgo.NodeFlagsNone,
+	))
+	arguments := []tsgo.Expression{zero.Value()}
+	if aggregate {
+		callee = context.Factory().Identifier(runtime.Name())
+		arguments[0] = sliceZeroFactory(context, zero.Value())
+	}
 	return api.NewExpressionEmission(
 		zero.Before(),
 		context.Factory().CallExpression(
-			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(runtime.Name()),
-				nil,
-				context.Factory().Identifier(
-					runtimeslice.MemberName(runtimeslice.MemberNil),
-				),
-				tsgo.NodeFlagsNone,
-			),
+			callee,
 			nil,
 			typeArguments,
-			[]tsgo.Expression{zero.Value()},
+			arguments,
 			tsgo.NodeFlagsNone,
 		),
 		api.CombineRequests(
 			typeRequests,
 			runtime.Requests(),
 			zero.Requests(),
+		),
+	)
+}
+
+func sliceZeroFactory(
+	context api.Context,
+	value tsgo.Expression,
+) tsgo.ArrowFunction {
+	return context.Factory().ArrowFunction(
+		nil,
+		nil,
+		nil,
+		nil,
+		context.Factory().EqualsGreaterThanToken(),
+		context.Factory().Block(
+			[]tsgo.Statement{context.Factory().ReturnStatement(value)},
+			true,
 		),
 	)
 }
