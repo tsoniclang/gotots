@@ -304,8 +304,13 @@ value conversion through one source-site typed loop. It also treats checker-
 constant `len`/`cap` as non-evaluating expressions, including array and
 pointer-to-array operands, while nonconstant pointer-to-array expressions are
 evaluated exactly once. Pointer reinterpretation and slice-to-array-pointer
-conversion remain blocked on the canonical pointer-storage representation;
-they must not be approximated with casts or semantic read/write adapters.
+conversion use the canonical pointer-storage representation. A pointer carries
+distinct logical and storage type arguments; value-family owners project and
+restore storage at the typed load/store site, while the pointer runtime owns
+only address identity and storage access. Named/generated structs reconstruct
+to a storage-backed private layout only when the storage facet is demanded.
+Casts, erased payloads, shape tests, and semantic read/write adapters remain
+forbidden.
 
 The checkpoint exits only when all six families:
 

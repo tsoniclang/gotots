@@ -158,6 +158,14 @@ func emitPointerArrayIndex(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	storageType, err := context.Values().StorageType(
+		context.WithRole(api.RoleStorageType),
+		source,
+		elementType,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	runtime, err := context.Names().Runtime(
 		api.RuntimePointer,
 		api.ImportPhaseValue,
@@ -165,19 +173,30 @@ func emitPointerArrayIndex(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return api.NewExpressionEmission(
+	stored, err := api.NewExpressionEmission(
 		address.Before(),
 		pointerruntime.CellValue(
 			context.Factory(),
 			runtime.Name(),
 			targetElement.Value(),
+			storageType.Value(),
 			address.Value(),
 		),
 		api.CombineRequests(
 			address.Requests(),
 			targetElement.Requests(),
+			storageType.Requests(),
 			runtime.Requests(),
 		),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return context.Values().FromStorage(
+		context,
+		source,
+		elementType,
+		stored,
 	)
 }
 

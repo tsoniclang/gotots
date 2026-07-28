@@ -1628,9 +1628,14 @@ The enclosing function first emits an addressable-storage requirement for the
 exact `value` object. Its reconstructed TS-Go body has one cell:
 
 ```ts
-const value$storage = GoPointer.cell(new Box(1));
-const pointer = GoPointer.field(value$storage, "Count");
-value$storage.value = new Box(7);
+const value$storage = GoPointer.cell<Box, Box$Storage>(
+  Box.$storageOf(Box.$make(1)),
+);
+const pointer = GoPointer.field<int32, Box, Box$Storage, "Count">(
+  value$storage,
+  "Count",
+);
+value$storage.value = Box.$storageOf(Box.$make(7));
 GoPointer.dereference(pointer).value++;
 ```
 
@@ -1663,6 +1668,54 @@ retain only typed location accessors plus opaque canonical address identity;
 runtime objects never carry erased `any`/`unknown` payloads or callbacks that
 rediscover Go semantics.
 
+Pointer representation has separate logical and storage type arguments:
+
+```go
+type Left struct {
+    Value int32 `json:"left"`
+}
+type Right struct {
+    Value int32 `json:"right"`
+}
+
+func Convert(value *Left) *Right {
+    return (*Right)(value)
+}
+```
+
+The selected checker proves that `Left` and `Right` have identical underlying
+base types when tags are ignored. Their logical classes remain distinct, but
+both storage facets are the same `{ Value: int32 }` shape:
+
+```ts
+class Left {
+  private constructor(private readonly $storage: Left$Storage) {}
+  static $make(Value: int32): Left {
+    return new Left({ Value });
+  }
+  static $storageOf(value: Left): Left$Storage {
+    return value.$storage;
+  }
+  static $fromStorage(storage: Left$Storage): Left {
+    return new Left(storage);
+  }
+  get Value(): int32 { return this.$storage.Value; }
+  set Value(value: int32) { this.$storage.Value = value; }
+}
+
+function Convert(
+  value: GoPointer<Left, Left$Storage> | undefined,
+): GoPointer<Right, Right$Storage> | undefined {
+  return GoPointer.view<Left, Right, Left$Storage>(value);
+}
+```
+
+`Right.$fromStorage(GoPointer.dereference(result).value)` therefore observes
+and mutates the original `Left` storage. No pointee copy, cast, object-shape
+test, semantic callback, or source-name lookup is involved. A pointer
+conversion whose canonical storage facets cannot yet be represented fails at
+the conversion owner rather than falling back to logical read/write adapters.
+
 Pointer receiver declarations remain named typed receiver functions rather
 than class members:
 
@@ -1672,10 +1725,11 @@ func (box *Box) Add(delta int32) { box.Count += delta }
 
 ```ts
 export function Box_Add(
-  box: GoPointer<Box> | undefined,
+  box: GoPointer<Box, Box$Storage> | undefined,
   delta: int32,
 ): void {
-  GoPointer.dereference(box).value.Count += delta;
+  const value = Box.$fromStorage(GoPointer.dereference(box).value);
+  value.Count += delta;
 }
 ```
 

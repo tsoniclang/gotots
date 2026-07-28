@@ -8,6 +8,13 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
+const (
+	StructMakeMember        = "$make"
+	StructStorageOfMember   = "$storageOf"
+	StructFromStorageMember = "$fromStorage"
+	StructStorageTypeSuffix = "$Storage"
+)
+
 type TemporaryKind uint8
 
 const (
@@ -112,10 +119,12 @@ type Names interface {
 	TypeReference(types.Object) (NameReference, error)
 	PackageVariable(*types.Var) (PackageVariableReference, error)
 	NamedStructOperation(*types.TypeName, NamedStructOperation) (NameReference, error)
+	NamedStructStorage(*types.TypeName) (NameReference, error)
 	AnonymousStruct(
 		*types.Struct,
 		AnonymousStructDemand,
 	) (NameReference, error)
+	AnonymousStructStorage(*types.Struct) (NameReference, error)
 	MapSpecialization(
 		types.Type,
 		MapSpecializationDemand,

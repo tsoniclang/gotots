@@ -67,6 +67,27 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	storageType, err := context.Values().StorageType(
+		context.WithRole(api.RoleStorageType),
+		source,
+		element,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	stored, err := context.Values().ToStorage(
+		context.WithRole(api.RoleCallArgument),
+		source,
+		element,
+		zero,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if len(stored.Before()) != 0 {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
 	reference, err := context.Names().Runtime(
 		api.RuntimePointer,
 		api.ImportPhaseValue,
@@ -83,13 +104,17 @@ func Emit(
 				tsgo.NodeFlagsNone,
 			),
 			nil,
-			[]tsgo.TypeNode{targetElement.Value()},
-			[]tsgo.Expression{zero.Value()},
+			[]tsgo.TypeNode{
+				targetElement.Value(),
+				storageType.Value(),
+			},
+			[]tsgo.Expression{stored.Value()},
 			tsgo.NodeFlagsNone,
 		),
 		api.CombineRequests(
 			targetElement.Requests(),
-			zero.Requests(),
+			storageType.Requests(),
+			stored.Requests(),
 			reference.Requests(),
 		)...,
 	), nil

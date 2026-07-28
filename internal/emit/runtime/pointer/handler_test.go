@@ -28,16 +28,18 @@ func TestBuildCreatesOneTypedCanonicalLocationClass(t *testing.T) {
 		t.Fatalf("pointer class modifiers = %v, want export", modifiers)
 	}
 	parameters := class.TypeParameters()
-	if len(parameters) != 1 || parameters[0].Name().Text() != "T" {
-		t.Fatalf("pointer type parameters = %v, want T", parameters)
+	if len(parameters) != 2 ||
+		parameters[0].Name().Text() != "L" ||
+		parameters[1].Name().Text() != "S" {
+		t.Fatalf("pointer type parameters = %v, want L and S", parameters)
 	}
 	members := class.Members()
-	if len(members) != 14 {
-		t.Fatalf("pointer class members = %d, want 14", len(members))
+	if len(members) != 18 {
+		t.Fatalf("pointer class members = %d, want 18", len(members))
 	}
-	constructor, ok := members[2].(tsgo.ConstructorDeclaration)
+	constructor, ok := members[3].(tsgo.ConstructorDeclaration)
 	if !ok {
-		t.Fatalf("pointer member = %T, want constructor", members[2])
+		t.Fatalf("pointer member = %T, want constructor", members[3])
 	}
 	constructorParameters := constructor.Parameters()
 	if len(constructorParameters) != 3 {
@@ -56,7 +58,7 @@ func TestBuildCreatesOneTypedCanonicalLocationClass(t *testing.T) {
 	if guard.Name().(tsgo.Identifier).Text() != pointer.DereferenceName ||
 		len(guard.Modifiers()) != 1 ||
 		guard.Modifiers()[0].Kind() != tsgo.SyntaxKindStaticKeyword ||
-		len(guard.TypeParameters()) != 1 ||
+		len(guard.TypeParameters()) != 2 ||
 		len(guard.Parameters()) != 1 {
 		t.Fatalf("pointer guard = %T, want static typed dereference", guard)
 	}
@@ -142,18 +144,21 @@ func TestBuildPrintsSourceShapedCanonicalLocations(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, required := range []string{
-		"export class GoPointer<T>",
+		"export class GoPointer<L, S>",
 		"private static readonly roots: WeakMap<object, object>",
 		"private constructor(private readonly address: object",
-		"static cell<T>(value: T): GoPointer<T>",
-		"static field<O extends object, K extends keyof O>",
-		"static objectField<O extends object, K extends keyof O>",
-		"static index<T, O extends",
+		"static cell<L, S>(value: S): GoPointer<L, S>",
+		"static field<L, PL, PS extends object, K extends keyof PS>",
+		"static objectField<L, O extends object, K extends keyof O>",
+		"static elementView<L, S, O>",
+		"static index<L, S, PL, O extends",
+		"static indexView<L, S, PL, V, O extends",
 		"const numericIndex = Number(index);",
-		"static equal<T>",
-		"static dereference<T>",
-		"get value(): T",
-		"set value(value: T)",
+		"static equal<LL, LS, RL, RS>",
+		"static dereference<L, S>",
+		"static view<F, T, S>",
+		"get value(): S",
+		"set value(value: S)",
 		`GoPanic.raise("nil pointer dereference")`,
 	} {
 		if !strings.Contains(printed, required) {

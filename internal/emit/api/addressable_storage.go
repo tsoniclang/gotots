@@ -7,7 +7,7 @@ import (
 
 type AddressableStorage interface {
 	Name(Context, *types.Var) (string, bool)
-	Read(Context, *types.Var) (ExpressionEmission, bool)
+	Read(Context, *types.Var) (ExpressionEmission, bool, error)
 	StoreTarget(Context, *types.Var) (StoreTargetEmission, bool, error)
 	Cell(
 		Context,

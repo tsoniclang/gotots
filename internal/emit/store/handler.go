@@ -91,6 +91,14 @@ func dereference(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
+	storageType, err := context.Values().StorageType(
+		context.WithRole(api.RoleStorageType),
+		source,
+		element,
+	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
 	if definedOK {
 		pointer, err = defined.Project(context, pointer)
 		if err != nil {
@@ -118,18 +126,20 @@ func dereference(
 			context.Factory(),
 			reference.Name(),
 			targetElement.Value(),
+			storageType.Value(),
 			pointer.Value(),
 		),
 		api.CombineRequests(
 			pointer.Requests(),
 			targetElement.Requests(),
+			storageType.Requests(),
 			reference.Requests(),
 		),
 	)
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	return api.NewPropertyStoreTargetEmission(
+	return api.NewCanonicalStoragePropertyStoreTargetEmission(
 		context.Factory(),
 		receiver,
 		pointerruntime.CellValueName,
@@ -341,6 +351,14 @@ func field(
 		if err != nil {
 			return api.StoreTargetEmission{}, err
 		}
+		storageType, err := context.Values().StorageType(
+			context.WithRole(api.RoleStorageType),
+			source.X,
+			element,
+		)
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
 		reference, err := context.Names().Runtime(
 			api.RuntimePointer,
 			api.ImportPhaseValue,
@@ -348,19 +366,30 @@ func field(
 		if err != nil {
 			return api.StoreTargetEmission{}, err
 		}
-		fieldReceiver, err := api.NewExpressionEmission(
+		stored, err := api.NewExpressionEmission(
 			receiver.Before(),
 			pointerruntime.CellValue(
 				context.Factory(),
 				reference.Name(),
 				targetElement.Value(),
+				storageType.Value(),
 				receiver.Value(),
 			),
 			api.CombineRequests(
 				receiver.Requests(),
 				targetElement.Requests(),
+				storageType.Requests(),
 				reference.Requests(),
 			),
+		)
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
+		fieldReceiver, err := context.Values().FromStorage(
+			context,
+			source.X,
+			element,
+			stored,
 		)
 		if err != nil {
 			return api.StoreTargetEmission{}, err
@@ -427,7 +456,7 @@ func packageVariable(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	return api.NewStoreTargetEmission(
+	return api.NewCanonicalStorageTargetEmission(
 		reference.Expression(context.Factory()),
 		variable.Type(),
 		reference.Requests(),

@@ -29,7 +29,7 @@ func buildSlice(
 		seen[symbol] = struct{}{}
 		switch symbol {
 		case api.RuntimeSlice:
-		case api.RuntimeSliceAddress:
+		case api.RuntimeSliceAddress, api.RuntimeSliceAddressView:
 			capabilities.Address = true
 		case api.RuntimeSliceStorage:
 			capabilities.Storage = true
@@ -85,16 +85,25 @@ func buildSliceOperation(
 	symbol api.RuntimeSymbol,
 	sliceName string,
 ) (tsgo.Statement, error) {
-	if symbol != api.RuntimeSliceAddress {
+	if symbol != api.RuntimeSliceAddress &&
+		symbol != api.RuntimeSliceAddressView {
 		return runtimeslice.BuildOperation(factory, symbol)
 	}
-	addressContract, err := api.RuntimeContract(api.RuntimeSliceAddress)
+	addressContract, err := api.RuntimeContract(symbol)
 	if err != nil {
 		return nil, err
 	}
 	pointerContract, err := api.RuntimeContract(api.RuntimePointer)
 	if err != nil {
 		return nil, err
+	}
+	if symbol == api.RuntimeSliceAddressView {
+		return runtimeslice.BuildAddressView(
+			factory,
+			addressContract.ExportedName(),
+			sliceName,
+			pointerContract.ExportedName(),
+		), nil
 	}
 	return runtimeslice.BuildAddress(
 		factory,

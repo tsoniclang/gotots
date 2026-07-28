@@ -117,7 +117,28 @@ func emitStructClass(
 	operations []api.NamedStructOperation,
 	moduleExport bool,
 ) (api.DeclarationEmission, error) {
-	members := make([]tsgo.ClassElement, 0, 2+len(operations))
+	storageLayout := false
+	valueOperations := make([]api.NamedStructOperation, 0, len(operations))
+	for _, operation := range operations {
+		if operation == api.NamedStructOperationStorage {
+			storageLayout = true
+			continue
+		}
+		valueOperations = append(valueOperations, operation)
+	}
+	layout, err := emitLayout(
+		context,
+		children,
+		source,
+		className,
+		fields,
+		storageLayout,
+		moduleExport,
+	)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	members := make([]tsgo.ClassElement, 0, 3+len(valueOperations))
 	members = append(members, context.Factory().PropertyDeclaration(
 		[]tsgo.ModifierLike{
 			context.Factory().DeclareKeyword(),
@@ -131,22 +152,14 @@ func emitStructClass(
 		),
 		nil,
 	))
-
-	constructor, requests, err := constructor(
-		context,
-		children,
-		fields,
-	)
-	if err != nil {
-		return api.DeclarationEmission{}, err
-	}
-	members = append(members, constructor)
+	members = append(members, layout.members...)
+	requests := layout.requests
 
 	classType := context.Factory().TypeReferenceNode(
 		context.Factory().Identifier(className),
 		nil,
 	)
-	for _, operation := range operations {
+	for _, operation := range valueOperations {
 		member, operationRequests, err := emitValueOperation(
 			context,
 			children,
@@ -167,7 +180,8 @@ func emitStructClass(
 	if moduleExport {
 		modifiers = []tsgo.ModifierLike{context.Factory().ExportKeyword()}
 	}
-	return api.DirectDeclaration(
+	declarations := append(
+		layout.declarations,
 		context.Factory().ClassDeclaration(
 			modifiers,
 			context.Factory().Identifier(className),
@@ -175,8 +189,8 @@ func emitStructClass(
 			nil,
 			members,
 		),
-		requests...,
-	), nil
+	)
+	return api.NewDeclarationEmission(declarations, requests)
 }
 
 func sourceType(
@@ -267,43 +281,4 @@ func fields(
 		return nil, api.Unsupported(context, api.CategoryDeclaration, source)
 	}
 	return result, nil
-}
-
-func constructor(
-	context api.Context,
-	children api.ChildEmitter,
-	fields []field,
-) (tsgo.ConstructorDeclaration, []api.RootRequest, error) {
-	parameters := make([]tsgo.ParameterDeclaration, 0, len(fields))
-	var requests []api.RootRequest
-	for _, field := range fields {
-		targetType, err := children.RepresentedType(
-			context.WithRole(api.RoleStructFieldType),
-			field.typeSource,
-			field.object.Type(),
-		)
-		if err != nil {
-			return nil, nil, err
-		}
-		var modifiers []tsgo.ModifierLike
-		if !field.blank {
-			modifiers = []tsgo.ModifierLike{context.Factory().PublicKeyword()}
-		}
-		parameters = append(parameters, context.Factory().ParameterDeclaration(
-			modifiers,
-			nil,
-			context.Factory().Identifier(field.name),
-			nil,
-			targetType.Value(),
-			nil,
-		))
-		requests = append(requests, targetType.Requests()...)
-	}
-	return context.Factory().ConstructorDeclaration(
-		nil,
-		nil,
-		parameters,
-		nil,
-		context.Factory().Block(nil, true),
-	), requests, nil
 }

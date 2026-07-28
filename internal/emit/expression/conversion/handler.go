@@ -12,6 +12,7 @@ import (
 	complexconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/complex"
 	floatconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/float"
 	integerconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/integer"
+	pointerconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/pointer"
 	slicearrayconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/slicearray"
 	stringconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/stringvalue"
 	structconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/structvalue"
@@ -84,6 +85,16 @@ func Emit(
 		if _, ok := callable.Signature(targetType); ok {
 			return operandValue, true, nil
 		}
+	}
+	if target, handled, pointerErr := pointerconversion.Convert(
+		context,
+		children,
+		source,
+		sourceType,
+		targetType,
+		operandValue,
+	); handled {
+		return target, true, pointerErr
 	}
 	if target, handled, mapErr := maprepresentation.Convert(
 		context,

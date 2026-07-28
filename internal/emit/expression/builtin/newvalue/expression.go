@@ -71,6 +71,23 @@ func emitExpression(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	storageType, err := context.Values().StorageType(
+		context.WithRole(api.RoleStorageType),
+		source,
+		element,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	value, err = context.Values().ToStorage(
+		context.WithRole(api.RoleCallArgument),
+		source,
+		element,
+		value,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	reference, err := context.Names().Runtime(
 		api.RuntimePointer,
 		api.ImportPhaseValue,
@@ -88,13 +105,17 @@ func emitExpression(
 				tsgo.NodeFlagsNone,
 			),
 			nil,
-			[]tsgo.TypeNode{represented.Value()},
+			[]tsgo.TypeNode{
+				represented.Value(),
+				storageType.Value(),
+			},
 			[]tsgo.Expression{value.Value()},
 			tsgo.NodeFlagsNone,
 		),
 		api.CombineRequests(
 			value.Requests(),
 			represented.Requests(),
+			storageType.Requests(),
 			reference.Requests(),
 		),
 	)

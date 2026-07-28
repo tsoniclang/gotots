@@ -93,7 +93,7 @@ func Zero() struct{ Value int32 } {
 		t,
 		support,
 		class.Name().Text(),
-		[]string{"$zero", "$copy", "$equal"},
+		[]string{"$make", "$zero", "$copy", "$equal"},
 	)
 }
 

@@ -37,6 +37,7 @@ const (
 	RuntimeSlice            RuntimeSymbol = 300
 	RuntimeSliceAddress     RuntimeSymbol = 301
 	RuntimeSliceStorage     RuntimeSymbol = 302
+	RuntimeSliceAddressView RuntimeSymbol = 303
 	RuntimeSliceAppendSlice RuntimeSymbol = 307
 	RuntimeSliceClear       RuntimeSymbol = 308
 	RuntimeMap              RuntimeSymbol = 400
@@ -168,6 +169,15 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"goSliceAllocate",
 			false,
 			RuntimeSlice,
+		), nil
+	case RuntimeSliceAddressView:
+		return runtimeContract(
+			RuntimeModuleSlice,
+			"runtime/slice.ts",
+			"goSliceAddressView",
+			false,
+			RuntimeSlice,
+			RuntimePointer,
 		), nil
 	case RuntimeSliceAppendSlice:
 		return runtimeContract(

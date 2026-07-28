@@ -1,10 +1,89 @@
 package api
 
 import (
+	"go/ast"
 	"slices"
 
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
+
+func (e StoreTargetEmission) ReadValue(
+	context Context,
+	source ast.Node,
+) (ExpressionEmission, error) {
+	var value ExpressionEmission
+	if e.accessor {
+		target, err := e.AccessorRead(context)
+		if err != nil {
+			return ExpressionEmission{}, err
+		}
+		value = DirectExpression(target)
+	} else {
+		value = DirectExpression(e.value)
+	}
+	if !e.canonicalStorage {
+		return value, nil
+	}
+	return context.Values().FromStorage(
+		context,
+		source,
+		e.sourceType,
+		value,
+	)
+}
+
+func (e StoreTargetEmission) StoreValue(
+	context Context,
+	source ast.Node,
+	value ExpressionEmission,
+) (ExpressionEmission, error) {
+	if e.accessor {
+		return e.AccessorStore(context, value)
+	}
+	if e.canonicalStorage {
+		var err error
+		value, err = context.Values().ToStorage(
+			context,
+			source,
+			e.sourceType,
+			value,
+		)
+		if err != nil {
+			return ExpressionEmission{}, err
+		}
+		return NewExpressionEmission(
+			append(
+				e.Before(),
+				value.Before()...,
+			),
+			context.Factory().BinaryExpression(
+				nil,
+				e.value,
+				nil,
+				context.Factory().BinaryOperatorToken(
+					tsgo.BinaryOperatorEqualsToken,
+				),
+				value.Value(),
+			),
+			CombineRequests(e.Requests(), value.Requests()),
+		)
+	}
+	assigned, err := context.Values().Assign(
+		context,
+		source,
+		e.sourceType,
+		e.value,
+		value,
+	)
+	if err != nil {
+		return ExpressionEmission{}, err
+	}
+	return NewExpressionEmission(
+		append(e.Before(), assigned.Before()...),
+		assigned.Value(),
+		CombineRequests(e.Requests(), assigned.Requests()),
+	)
+}
 
 func (e StoreTargetEmission) CaptureAccessorLocation(
 	context Context,
@@ -84,6 +163,7 @@ func (e StoreTargetEmission) preparePropertyLocation(
 		return StoreTargetEmission{}, nil, nil, err
 	}
 	captured.copiesValue = e.copiesValue
+	captured.canonicalStorage = e.canonicalStorage
 	captured.locationCaptured = true
 	return captured,
 		append(slices.Clone(e.before), before...),
@@ -132,6 +212,7 @@ func (e StoreTargetEmission) prepareAccessorLocation(
 		return StoreTargetEmission{}, nil, nil, err
 	}
 	captured.copiesValue = e.copiesValue
+	captured.canonicalStorage = e.canonicalStorage
 	captured.locationCaptured = true
 	return captured,
 		append(slices.Clone(e.before), before...),

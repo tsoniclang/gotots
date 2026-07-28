@@ -465,8 +465,8 @@ func TestExpressionNewPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	artifacts := materializeExportedProgram(t, project.loaded, workingDirectory)
 	source := readMaterializedSource(t, artifacts, "source.ts")
 	for _, fragment := range []string{
-		"GoPointer.cell<int32>",
-		"GoPointer.cell<Box>",
+		"GoPointer.cell<int32, int32>",
+		"GoPointer.cell<Box, Box$Storage>",
 		"$copy",
 	} {
 		if !strings.Contains(source, fragment) {

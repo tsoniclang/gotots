@@ -352,6 +352,18 @@ func (aggregateNames) NamedStructOperation(
 	return api.NewNameReference(typeName.Name(), request)
 }
 
+func (aggregateNames) NamedStructStorage(
+	*types.TypeName,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (aggregateNames) AnonymousStructStorage(
+	*types.Struct,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (aggregateNames) AnonymousStruct(
 	*types.Struct,
 	api.AnonymousStructDemand,

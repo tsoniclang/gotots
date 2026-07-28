@@ -75,7 +75,7 @@ func assertDefinedMapArtifacts(t *testing.T, artifacts materialized) {
 		"export type Alias = Values | undefined",
 		"export type PlainAlias = GoMap<",
 		"export class Other",
-		"GoPointer.cell<Values | undefined>(void 0)",
+		"GoPointer.cell<Values | undefined, Values | undefined>(void 0)",
 		"Values.$wrapMap(GoMap.make",
 		"Other.$wrapMap(",
 	} {

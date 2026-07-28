@@ -123,6 +123,10 @@ func main() {
 	fmt.Println(values.DefinedSliceToArray())
 	fmt.Println(values.AggregateSliceToArrayCopies())
 	fmt.Println(panics(values.SliceToArrayPanics), values.SliceToArrayPanicCount())
+	fmt.Println(values.PointerScalarConversion())
+	fmt.Println(values.PointerStructConversion())
+	fmt.Println(values.PointerRoundTripIdentity())
+	fmt.Println(values.PointerNestedFieldConversion())
 }
 `)
 	return runCommand(
@@ -192,6 +196,10 @@ console.log(show(values.SliceToArrayCopies()));
 console.log(show(values.DefinedSliceToArray()));
 console.log(show(values.AggregateSliceToArrayCopies()));
 console.log(panics(values.SliceToArrayPanics), show(values.SliceToArrayPanicCount()));
+console.log(show(values.PointerScalarConversion()));
+console.log(show(values.PointerStructConversion()));
+console.log(values.PointerRoundTripIdentity());
+console.log(show(values.PointerNestedFieldConversion()));
 `
 	return executeConversionTypeScript(
 		t,

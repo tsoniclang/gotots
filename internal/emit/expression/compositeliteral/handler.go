@@ -64,10 +64,17 @@ func Emit(
 		}
 		return api.NewExpressionEmission(
 			before,
-			context.Factory().NewExpression(
-				context.Factory().Identifier(reference.Name()),
+			context.Factory().CallExpression(
+				context.Factory().PropertyAccessExpression(
+					context.Factory().Identifier(reference.Name()),
+					nil,
+					context.Factory().Identifier(api.StructMakeMember),
+					tsgo.NodeFlagsNone,
+				),
+				nil,
 				nil,
 				values,
+				tsgo.NodeFlagsNone,
 			),
 			api.CombineRequests(requests, reference.Requests()),
 		)
@@ -78,10 +85,17 @@ func Emit(
 	}
 	return api.NewExpressionEmission(
 		before,
-		context.Factory().NewExpression(
-			context.Factory().Identifier(reference.Name()),
+		context.Factory().CallExpression(
+			context.Factory().PropertyAccessExpression(
+				context.Factory().Identifier(reference.Name()),
+				nil,
+				context.Factory().Identifier(api.StructMakeMember),
+				tsgo.NodeFlagsNone,
+			),
+			nil,
 			nil,
 			values,
+			tsgo.NodeFlagsNone,
 		),
 		api.CombineRequests(requests, reference.Requests()),
 	)

@@ -276,6 +276,10 @@ func lexicalAnonymousStructOperations(
 			operations = append(operations, api.NamedStructOperationEqual)
 		case api.AnonymousStructDemandHash:
 			operations = append(operations, api.NamedStructOperationHash)
+		case api.AnonymousStructDemandConvert:
+			operations = append(operations, api.NamedStructOperationConvert)
+		case api.AnonymousStructDemandStorage:
+			operations = append(operations, api.NamedStructOperationStorage)
 		default:
 			return nil, &api.InvariantError{
 				Role:   api.RoleLocalDeclaration,

@@ -13,6 +13,20 @@ type Values interface {
 	RequiresExplicitType(Context, types.Type) bool
 	RequiresStructuralCopy(Context, types.Type) bool
 	SupportsHash(Context, types.Type) bool
+	RequiresStorageProjection(Context, types.Type) bool
+	StorageType(Context, ast.Node, types.Type) (TypeEmission, error)
+	ToStorage(
+		Context,
+		ast.Node,
+		types.Type,
+		ExpressionEmission,
+	) (ExpressionEmission, error)
+	FromStorage(
+		Context,
+		ast.Node,
+		types.Type,
+		ExpressionEmission,
+	) (ExpressionEmission, error)
 	Zero(Context, ast.Node, types.Type) (ExpressionEmission, error)
 	Copy(Context, ast.Node, types.Type, ExpressionEmission) (ExpressionEmission, error)
 	Assign(

@@ -14,6 +14,7 @@ const (
 	NamedStructOperationEqual
 	NamedStructOperationHash
 	NamedStructOperationConvert
+	NamedStructOperationStorage
 )
 
 func (o NamedStructOperation) Valid() bool {
@@ -21,7 +22,8 @@ func (o NamedStructOperation) Valid() bool {
 		o == NamedStructOperationCopy ||
 		o == NamedStructOperationEqual ||
 		o == NamedStructOperationHash ||
-		o == NamedStructOperationConvert
+		o == NamedStructOperationConvert ||
+		o == NamedStructOperationStorage
 }
 
 func (o NamedStructOperation) String() string {
@@ -36,6 +38,8 @@ func (o NamedStructOperation) String() string {
 		return "hash"
 	case NamedStructOperationConvert:
 		return "convert"
+	case NamedStructOperationStorage:
+		return "storage"
 	default:
 		return fmt.Sprintf("named-struct-operation(%d)", o)
 	}
@@ -71,11 +75,12 @@ const (
 	AnonymousStructDemandEqual
 	AnonymousStructDemandHash
 	AnonymousStructDemandConvert
+	AnonymousStructDemandStorage
 )
 
 func (d AnonymousStructDemand) Valid() bool {
 	return d >= AnonymousStructDemandDefinition &&
-		d <= AnonymousStructDemandConvert
+		d <= AnonymousStructDemandStorage
 }
 
 type MapSpecializationDemand uint8

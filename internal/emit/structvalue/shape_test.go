@@ -10,9 +10,12 @@ import (
 func TestNamedStructValuesConstructExactTargetShape(t *testing.T) {
 	source := structTargetSource(t, compileStructFixture(t))
 	operations := map[string][]string{
-		"Point": {"$zero", "$copy", "$equal"},
-		"Box":   {"$zero", "$copy", "$equal"},
-		"Empty": {"$zero", "$equal"},
+		"Point":    {"$make", "$zero", "$copy", "$equal"},
+		"Box":      {"$make", "$zero", "$copy", "$equal"},
+		"Mirror":   {"$make"},
+		"Reserved": {"$make"},
+		"Grouped":  {"$make"},
+		"Empty":    {"$make", "$zero", "$equal"},
 	}
 	for _, name := range []string{
 		"Point",
@@ -51,22 +54,22 @@ func TestNamedStructOperationsAreUniqueAndOwnedByClass(t *testing.T) {
 		t,
 		source,
 		"Point",
-		[]string{"$zero", "$copy", "$equal"},
+		[]string{"$make", "$zero", "$copy", "$equal"},
 	)
 	assertStaticOperationSequence(
 		t,
 		source,
 		"Box",
-		[]string{"$zero", "$copy", "$equal"},
+		[]string{"$make", "$zero", "$copy", "$equal"},
 	)
 	assertStaticOperationSequence(
 		t,
 		source,
 		"Empty",
-		[]string{"$zero", "$equal"},
+		[]string{"$make", "$zero", "$equal"},
 	)
 	for _, name := range []string{"Mirror", "Reserved", "Grouped"} {
-		assertStaticOperationSequence(t, source, name, nil)
+		assertStaticOperationSequence(t, source, name, []string{"$make"})
 	}
 }
 
@@ -88,7 +91,12 @@ func TestNamedStructValuesDefaultToDirectConstruction(t *testing.T) {
 		}
 	}
 	direct := targetFunction(t, source, "CompositeCalls").
-		Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement).Expression().(tsgo.PropertyAccessExpression).Expression().(tsgo.NewExpression)
+		Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement).
+		Expression().(tsgo.PropertyAccessExpression).Expression().(tsgo.CallExpression)
+	if receiver, member := targetProperty(direct.Expression()); receiver != "Point" ||
+		member != "$make" {
+		t.Fatalf("direct constructor = %s.%s, want Point.$make", receiver, member)
+	}
 	if got := targetName(direct.Arguments()[0].(tsgo.CallExpression).Expression()); got != "DirectX" {
 		t.Fatalf("direct constructor argument 0 = %q, want declaration-order DirectX", got)
 	}
@@ -128,14 +136,16 @@ func TestNamedStructValuesPreserveConstructionOrderWhenSelected(t *testing.T) {
 	if targetName(captures[2].Initializer()) != "value" {
 		t.Fatal("third source initializer is not Point.X value")
 	}
-	point := captures[3].Initializer().(tsgo.NewExpression)
-	if targetName(point.Expression()) != "Point" ||
+	point := captures[3].Initializer().(tsgo.CallExpression)
+	if receiver, member := targetProperty(point.Expression()); receiver != "Point" ||
+		member != "$make" ||
 		targetName(point.Arguments()[0]) != targetName(captures[2].Name()) ||
 		targetName(point.Arguments()[1]) != targetName(captures[1].Name()) {
 		t.Fatal("nested Point construction does not consume source-ordered captures in field order")
 	}
-	result := statements[4].(tsgo.ReturnStatement).Expression().(tsgo.NewExpression)
-	if targetName(result.Expression()) != "Box" ||
+	result := statements[4].(tsgo.ReturnStatement).Expression().(tsgo.CallExpression)
+	if receiver, member := targetProperty(result.Expression()); receiver != "Box" ||
+		member != "$make" ||
 		targetName(result.Arguments()[0]) != targetName(captures[3].Name()) ||
 		targetName(result.Arguments()[1]) != targetName(captures[0].Name()) {
 		t.Fatal("Box construction does not consume source-ordered captures in field order")
@@ -268,7 +278,7 @@ func TestNamedStructCallArgumentsPlacePrerequisitesInSourceOrder(t *testing.T) {
 	}
 	secondCapture := statements[5].(tsgo.VariableStatement).
 		DeclarationList().Declarations()[0]
-	if _, ok := secondCapture.Initializer().(tsgo.NewExpression); !ok {
+	if _, ok := secondCapture.Initializer().(tsgo.CallExpression); !ok {
 		t.Fatal("second argument was not captured after its field prerequisites")
 	}
 	call := statements[6].(tsgo.ReturnStatement).Expression().(tsgo.CallExpression)

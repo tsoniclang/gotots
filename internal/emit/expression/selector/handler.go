@@ -42,10 +42,15 @@ func Emit(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		return api.DirectExpression(
-			reference.Expression(context.Factory()),
-			reference.Requests()...,
-		), nil
+		return context.Values().FromStorage(
+			context,
+			source,
+			variable.Type(),
+			api.DirectExpression(
+				reference.Expression(context.Factory()),
+				reference.Requests()...,
+			),
+		)
 	}
 	if constObject, ok := object.(*types.Const); ok &&
 		constantbinding.IsUntyped(constObject.Type()) {
@@ -119,6 +124,14 @@ func emitField(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
+		storageType, err := context.Values().StorageType(
+			context.WithRole(api.RoleStorageType),
+			source.X,
+			element,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 		if definedOK {
 			receiver, err = defined.Project(context, receiver)
 			if err != nil {
@@ -134,17 +147,36 @@ func emitField(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		receiverValue = pointerruntime.CellValue(
-			context.Factory(),
-			runtime.Name(),
-			targetElement.Value(),
-			receiverValue,
+		stored, err := api.NewExpressionEmission(
+			receiver.Before(),
+			pointerruntime.CellValue(
+				context.Factory(),
+				runtime.Name(),
+				targetElement.Value(),
+				storageType.Value(),
+				receiverValue,
+			),
+			api.CombineRequests(
+				requests,
+				targetElement.Requests(),
+				storageType.Requests(),
+				runtime.Requests(),
+			),
 		)
-		requests = api.CombineRequests(
-			requests,
-			targetElement.Requests(),
-			runtime.Requests(),
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		receiver, err = context.Values().FromStorage(
+			context,
+			source.X,
+			element,
+			stored,
 		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		receiverValue = receiver.Value()
+		requests = receiver.Requests()
 	}
 	name, err := context.Names().Member(field)
 	if err != nil {

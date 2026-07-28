@@ -165,9 +165,10 @@ func emitParallel(
 				),
 			)
 			requests = append(requests, typeRequests...)
-		} else if target.target.IsAccessor() {
-			stored, err := target.target.AccessorStore(
-				context,
+		} else {
+			stored, err := target.target.StoreValue(
+				context.WithRole(api.RoleAssignmentTarget),
+				target.source,
 				api.DirectExpression(temporary),
 			)
 			if err != nil {
@@ -179,23 +180,6 @@ func emitParallel(
 				context.Factory().ExpressionStatement(stored.Value()),
 			)
 			requests = append(requests, stored.Requests()...)
-		} else {
-			assigned, err := context.Values().Assign(
-				context.WithRole(api.RoleAssignmentTarget),
-				target.source,
-				target.target.SourceType(),
-				target.target.Value(),
-				api.DirectExpression(temporary),
-			)
-			if err != nil {
-				return api.StatementEmission{}, err
-			}
-			statements = append(statements, assigned.Before()...)
-			statements = append(
-				statements,
-				context.Factory().ExpressionStatement(assigned.Value()),
-			)
-			requests = append(requests, assigned.Requests()...)
 		}
 	}
 	return api.NewStatementEmission(statements, requests)

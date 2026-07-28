@@ -136,6 +136,14 @@ func dereference(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	storageType, err := context.Values().StorageType(
+		context.WithRole(api.RoleStorageType),
+		source,
+		element,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	runtime, err := pointerRuntime(context)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -150,13 +158,14 @@ func dereference(
 				tsgo.NodeFlagsNone,
 			),
 			nil,
-			[]tsgo.TypeNode{targetElement.Value()},
+			[]tsgo.TypeNode{targetElement.Value(), storageType.Value()},
 			[]tsgo.Expression{pointer.Value()},
 			tsgo.NodeFlagsNone,
 		),
 		api.CombineRequests(
 			pointer.Requests(),
 			targetElement.Requests(),
+			storageType.Requests(),
 			runtime.Requests(),
 		),
 	)

@@ -227,6 +227,11 @@ func anonymousStructOperations(
 				operations,
 				api.NamedStructOperationConvert,
 			)
+		case api.AnonymousStructDemandStorage:
+			operations = append(
+				operations,
+				api.NamedStructOperationStorage,
+			)
 		default:
 			return nil, &ScheduleError{
 				Object: artifact.TargetName(),

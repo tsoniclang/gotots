@@ -49,6 +49,11 @@ func emitCompound(
 	}
 	if !target.IsAccessor() &&
 		!target.IsProperty() &&
+		(!target.UsesCanonicalStorage() ||
+			!context.Values().RequiresStorageProjection(
+				context,
+				target.SourceType(),
+			)) &&
 		source.Tok == token.ADD_ASSIGN &&
 		basictype.SupportsInteger(context.TypesSizes(), target.SourceType()) &&
 		types.AssignableTo(
@@ -115,12 +120,9 @@ func emitCustomCompound(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	left := target.Value()
-	if target.IsAccessor() {
-		left, err = target.AccessorRead(context)
-		if err != nil {
-			return api.StatementEmission{}, err
-		}
+	left, err := target.ReadValue(context, source)
+	if err != nil {
+		return api.StatementEmission{}, err
 	}
 	rightType := context.TypesInfo().TypeOf(source.Rhs[0])
 	expectedRight := rightType
@@ -162,7 +164,7 @@ func emitCustomCompound(
 		target.SourceType(),
 		expectedRight,
 		operator,
-		left,
+		left.Value(),
 		right,
 	)
 	if err != nil {
@@ -172,37 +174,19 @@ func emitCustomCompound(
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	if target.IsAccessor() {
-		stored, err := target.AccessorStore(context, result)
-		if err != nil {
-			return api.StatementEmission{}, err
-		}
-		statements := append(
-			stored.Before(),
-			context.Factory().ExpressionStatement(stored.Value()),
-		)
-		return api.NewStatementEmission(statements, stored.Requests())
-	}
-	assigned, err := context.Values().Assign(
+	stored, err := target.StoreValue(
 		context.WithRole(api.RoleAssignmentTarget),
 		source,
-		target.SourceType(),
-		target.Value(),
 		result,
 	)
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	statements := target.Before()
-	statements = append(statements, assigned.Before()...)
-	statements = append(
-		statements,
-		context.Factory().ExpressionStatement(assigned.Value()),
+	statements := append(
+		stored.Before(),
+		context.Factory().ExpressionStatement(stored.Value()),
 	)
-	return api.NewStatementEmission(
-		statements,
-		api.CombineRequests(target.Requests(), assigned.Requests()),
-	)
+	return api.NewStatementEmission(statements, stored.Requests())
 }
 
 func captureCompoundRight(
@@ -475,29 +459,19 @@ func emitAssignment(
 			return api.StatementEmission{}, err
 		}
 	}
-	if target.IsAccessor() {
-		return emitSetter(context, target, value)
-	}
-	assigned, err := context.Values().Assign(
+	stored, err := target.StoreValue(
 		context.WithRole(api.RoleAssignmentTarget),
 		source,
-		target.SourceType(),
-		target.Value(),
 		value,
 	)
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	statements := target.Before()
-	statements = append(statements, assigned.Before()...)
-	statements = append(
-		statements,
-		context.Factory().ExpressionStatement(assigned.Value()),
+	statements := append(
+		stored.Before(),
+		context.Factory().ExpressionStatement(stored.Value()),
 	)
-	return api.NewStatementEmission(
-		statements,
-		api.CombineRequests(target.Requests(), assigned.Requests()),
-	)
+	return api.NewStatementEmission(statements, stored.Requests())
 }
 
 func variableStatement(

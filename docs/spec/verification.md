@@ -578,6 +578,27 @@ inconvertible struct, move the length check after allocation, alias slice
 backing, or evaluate the slice twice; each must fail its owning shape or
 differential gate.
 
+Pointer-conversion certification additionally proves:
+
+- the generated pointer contract has distinct logical and canonical-storage
+  type arguments, with no erased payload or runtime semantic callback;
+- conversions accepted by `go/types.ConvertibleTo` preserve one canonical
+  address and typed storage accessor pair across scalar, tagged-struct,
+  aggregate-field, and nested pointer-field base types;
+- writes through either logical view are visible through the other, and a
+  round trip compares equal by canonical location;
+- array- and slice-element addresses use direct storage when logical and
+  storage types coincide, and one compile-time-selected typed projection when
+  they differ;
+- cross-file storage aliases are imported as type-only bindings, emitted once
+  by their declaration owner, and absent when no address/conversion demands
+  them; and
+- mutations collapse the two pointer type arguments, copy the pointee during
+  conversion, compare facade identity, replace `go/types` convertibility with
+  a hand-recursive field rule, omit a storage projection, or expose storage
+  conversion as a runtime callback, and each fails its owning strict,
+  differential, artifact-shape, or broad-search gate.
+
 For every family:
 
 1. the focused test is first observed failing at the typed unsupported owner;

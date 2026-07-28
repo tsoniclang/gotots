@@ -12,13 +12,16 @@ func (b builder) cellMethod() tsgo.MethodDeclaration {
 	return b.method(
 		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
 		CellName,
-		[]tsgo.TypeParameterDeclaration{b.typeParameter("T", nil)},
-		[]tsgo.ParameterDeclaration{b.parameter("value", b.typeT())},
-		b.pointerType(b.typeT()),
+		[]tsgo.TypeParameterDeclaration{
+			b.typeParameter("L", nil),
+			b.typeParameter("S", nil),
+		},
+		[]tsgo.ParameterDeclaration{b.parameter("value", b.typeS())},
+		b.pointerType(b.typeL(), b.typeS()),
 		b.variable(
 			tsgo.NodeFlagsConst,
 			"storage",
-			b.factory.TupleTypeNode([]tsgo.TypeNode{b.typeT()}),
+			b.factory.TupleTypeNode([]tsgo.TypeNode{b.typeS()}),
 			b.factory.ArrayLiteralExpression(
 				[]tsgo.Expression{b.id("value")},
 				false,
@@ -26,7 +29,8 @@ func (b builder) cellMethod() tsgo.MethodDeclaration {
 		),
 		b.factory.ReturnStatement(
 			b.newPointer(
-				b.typeT(),
+				b.typeL(),
+				b.typeS(),
 				b.id("storage"),
 				storageValue,
 				storageValue,
@@ -36,7 +40,9 @@ func (b builder) cellMethod() tsgo.MethodDeclaration {
 }
 
 func (b builder) fieldMethod() tsgo.MethodDeclaration {
-	typeO := b.typeReference("O")
+	typeL := b.typeReference("L")
+	typePL := b.typeReference("PL")
+	typeO := b.typeReference("PS")
 	typeK := b.typeReference("K")
 	valueType := b.factory.IndexedAccessTypeNode(typeO, typeK)
 	parentValue := b.property(b.id("parent"), CellValueName)
@@ -56,7 +62,9 @@ func (b builder) fieldMethod() tsgo.MethodDeclaration {
 		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
 		FieldName,
 		[]tsgo.TypeParameterDeclaration{
-			b.typeParameter("O", b.objectType()),
+			b.typeParameter("L", nil),
+			b.typeParameter("PL", nil),
+			b.typeParameter("PS", b.objectType()),
 			b.typeParameter(
 				"K",
 				b.factory.TypeOperatorNode(
@@ -66,17 +74,18 @@ func (b builder) fieldMethod() tsgo.MethodDeclaration {
 			),
 		},
 		[]tsgo.ParameterDeclaration{
-			b.parameter("parent", b.pointerType(typeO)),
+			b.parameter("parent", b.pointerType(typePL, typeO)),
 			b.parameter("key", typeK),
 		},
-		b.pointerType(valueType),
+		b.pointerType(typeL, valueType),
 		b.factory.ReturnStatement(
-			b.newPointer(valueType, address, field, field),
+			b.newPointer(typeL, valueType, address, field, field),
 		),
 	)
 }
 
 func (b builder) objectFieldMethod() tsgo.MethodDeclaration {
+	typeL := b.typeReference("L")
 	typeO := b.typeReference("O")
 	typeK := b.typeReference("K")
 	valueType := b.factory.IndexedAccessTypeNode(typeO, typeK)
@@ -92,6 +101,7 @@ func (b builder) objectFieldMethod() tsgo.MethodDeclaration {
 		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
 		ObjectFieldName,
 		[]tsgo.TypeParameterDeclaration{
+			b.typeParameter("L", nil),
 			b.typeParameter("O", b.objectType()),
 			b.typeParameter(
 				"K",
@@ -105,15 +115,17 @@ func (b builder) objectFieldMethod() tsgo.MethodDeclaration {
 			b.parameter("owner", typeO),
 			b.parameter("key", typeK),
 		},
-		b.pointerType(valueType),
+		b.pointerType(typeL, valueType),
 		b.factory.ReturnStatement(
-			b.newPointer(valueType, address, field, field),
+			b.newPointer(typeL, valueType, address, field, field),
 		),
 	)
 }
 
 func (b builder) elementMethod() tsgo.MethodDeclaration {
-	arrayType := b.factory.ArrayTypeNode(b.typeT())
+	typeL := b.typeReference("L")
+	typeS := b.typeReference("S")
+	arrayType := b.factory.ArrayTypeNode(typeS)
 	locationType := b.factory.TypeOperatorNode(
 		tsgo.TypeOperatorNodeOperatorKindReadonlyKeyword,
 		b.factory.TupleTypeNode(
@@ -131,11 +143,14 @@ func (b builder) elementMethod() tsgo.MethodDeclaration {
 	return b.method(
 		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
 		ElementName,
-		[]tsgo.TypeParameterDeclaration{b.typeParameter("T", nil)},
+		[]tsgo.TypeParameterDeclaration{
+			b.typeParameter("L", nil),
+			b.typeParameter("S", nil),
+		},
 		[]tsgo.ParameterDeclaration{
 			b.parameter("location", locationType),
 		},
-		b.pointerType(b.typeT()),
+		b.pointerType(typeL, typeS),
 		b.variable(
 			tsgo.NodeFlagsConst,
 			"backing",
@@ -160,7 +175,8 @@ func (b builder) elementMethod() tsgo.MethodDeclaration {
 		),
 		b.factory.ReturnStatement(
 			b.newPointer(
-				b.typeT(),
+				typeL,
+				typeS,
 				b.call(
 					b.id(b.className),
 					"child",
@@ -175,7 +191,9 @@ func (b builder) elementMethod() tsgo.MethodDeclaration {
 }
 
 func (b builder) indexMethod() tsgo.MethodDeclaration {
-	typeT := b.typeReference("T")
+	typeL := b.typeReference("L")
+	typeS := b.typeReference("S")
+	typePL := b.typeReference("PL")
 	typeO := b.typeReference("O")
 	integerType := b.factory.UnionTypeNode(
 		[]tsgo.TypeNode{
@@ -195,7 +213,7 @@ func (b builder) indexMethod() tsgo.MethodDeclaration {
 				[]tsgo.ParameterDeclaration{
 					b.parameter("index", integerType),
 				},
-				typeT,
+				typeS,
 			),
 			b.factory.MethodSignatureDeclaration(
 				nil,
@@ -204,7 +222,7 @@ func (b builder) indexMethod() tsgo.MethodDeclaration {
 				nil,
 				[]tsgo.ParameterDeclaration{
 					b.parameter("index", integerType),
-					b.parameter("value", typeT),
+					b.parameter("value", typeS),
 				},
 				b.factory.KeywordTypeNode(
 					tsgo.KeywordTypeSyntaxKindVoidKeyword,
@@ -236,20 +254,23 @@ func (b builder) indexMethod() tsgo.MethodDeclaration {
 		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
 		IndexName,
 		[]tsgo.TypeParameterDeclaration{
-			b.typeParameter("T", nil),
+			b.typeParameter("L", nil),
+			b.typeParameter("S", nil),
+			b.typeParameter("PL", nil),
 			b.typeParameter("O", indexedType),
 		},
 		[]tsgo.ParameterDeclaration{
-			b.parameter("parent", b.pointerType(typeO)),
+			b.parameter("parent", b.pointerType(typePL, typeO)),
 			b.parameter("index", integerType),
 		},
-		b.pointerType(typeT),
+		b.pointerType(typeL, typeS),
 		b.variable(tsgo.NodeFlagsConst, "selected", nil, selected),
 		b.variable(tsgo.NodeFlagsConst, "numericIndex", nil, numericIndex),
 		b.factory.ExpressionStatement(read),
 		b.factory.ReturnStatement(
 			b.newPointerWithWrite(
-				typeT,
+				typeL,
+				typeS,
 				b.call(
 					b.id(b.className),
 					"child",

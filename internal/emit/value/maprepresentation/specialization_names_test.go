@@ -37,6 +37,18 @@ func (staticSpecializationNames) NamedStructOperation(
 	panic("unused")
 }
 
+func (staticSpecializationNames) NamedStructStorage(
+	*types.TypeName,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (staticSpecializationNames) AnonymousStructStorage(
+	*types.Struct,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (staticSpecializationNames) AnonymousStruct(
 	*types.Struct,
 	api.AnonymousStructDemand,

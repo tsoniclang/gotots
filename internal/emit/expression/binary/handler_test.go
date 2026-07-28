@@ -105,6 +105,18 @@ func (unusedNames) NamedStructOperation(
 	panic("unused")
 }
 
+func (unusedNames) NamedStructStorage(
+	*types.TypeName,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) AnonymousStructStorage(
+	*types.Struct,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (unusedNames) ConstantProjection(
 	*types.Const,
 	types.BasicKind,
@@ -150,6 +162,36 @@ func (unusedValues) RequiresStructuralCopy(api.Context, types.Type) bool {
 }
 
 func (unusedValues) SupportsHash(api.Context, types.Type) bool {
+	panic("unused")
+}
+
+func (unusedValues) RequiresStorageProjection(api.Context, types.Type) bool {
+	panic("unused")
+}
+
+func (unusedValues) StorageType(
+	api.Context,
+	ast.Node,
+	types.Type,
+) (api.TypeEmission, error) {
+	panic("unused")
+}
+
+func (unusedValues) ToStorage(
+	api.Context,
+	ast.Node,
+	types.Type,
+	api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	panic("unused")
+}
+
+func (unusedValues) FromStorage(
+	api.Context,
+	ast.Node,
+	types.Type,
+	api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
 	panic("unused")
 }
 

@@ -50,7 +50,12 @@ func EmitExpression(
 	}
 	if basictype.SupportsInteger(context.TypesSizes(), target.SourceType()) &&
 		!target.IsAccessor() &&
-		!target.IsProperty() {
+		!target.IsProperty() &&
+		(!target.UsesCanonicalStorage() ||
+			!context.Values().RequiresStorageProjection(
+				context,
+				target.SourceType(),
+			)) {
 		return api.DirectExpression(
 			context.Factory().PostfixUnaryExpression(
 				target.Value(),
@@ -71,19 +76,16 @@ func emitCustom(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	left := target.Value()
-	if target.IsAccessor() {
-		left, err = target.AccessorRead(context)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
+	left, err := target.ReadValue(context, source)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
 	result, handled, err := context.Values().Increment(
 		context,
 		source,
 		target.SourceType(),
 		source.Tok,
-		left,
+		left.Value(),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -92,22 +94,13 @@ func emitCustom(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	if target.IsAccessor() {
-		return target.AccessorStore(context, result)
-	}
-	assigned, err := context.Values().Assign(
+	stored, err := target.StoreValue(
 		context.WithRole(api.RoleAssignmentTarget),
 		source,
-		target.SourceType(),
-		target.Value(),
 		result,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return api.NewExpressionEmission(
-		append(target.Before(), assigned.Before()...),
-		assigned.Value(),
-		api.CombineRequests(target.Requests(), assigned.Requests()),
-	)
+	return stored, nil
 }

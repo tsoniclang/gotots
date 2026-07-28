@@ -121,21 +121,46 @@ func assertStructOperationWidths(
 	class := targetClass(t, source, "Record")
 	members := class.Members()
 	constructor := members[1].(tsgo.ConstructorDeclaration)
+	makeMethod := targetMethod(t, class, "$make")
 	zero := targetMethod(t, class, "$zero")
 	copyMethod := targetMethod(t, class, "$copy")
 	equal := targetMethod(t, class, "$equal")
-	if len(constructor.Parameters()) != fieldCount ||
-		newArgumentCount(zero) != fieldCount ||
-		newArgumentCount(copyMethod) != fieldCount ||
-		equalityLeafCount(
-			equal.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement).Expression(),
-		) != fieldCount {
-		t.Fatalf("Record operations do not each account for %d fields", fieldCount)
+	constructorWidth := len(constructor.Parameters())
+	makeWidth := makeFieldCount(makeMethod)
+	zeroWidth := callArgumentCount(zero)
+	copyWidth := callArgumentCount(copyMethod)
+	equalWidth := equalityLeafCount(
+		equal.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement).Expression(),
+	)
+	if constructorWidth != fieldCount ||
+		makeWidth != fieldCount ||
+		zeroWidth != fieldCount ||
+		copyWidth != fieldCount ||
+		equalWidth != fieldCount {
+		t.Fatalf(
+			"Record widths constructor/make/zero/copy/equal = %d/%d/%d/%d/%d, want %d",
+			constructorWidth,
+			makeWidth,
+			zeroWidth,
+			copyWidth,
+			equalWidth,
+			fieldCount,
+		)
 	}
 }
 
-func newArgumentCount(method tsgo.MethodDeclaration) int {
+func callArgumentCount(method tsgo.MethodDeclaration) int {
+	result := method.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement).Expression().(tsgo.CallExpression)
+	return len(result.Arguments())
+}
+
+func makeFieldCount(method tsgo.MethodDeclaration) int {
 	result := method.Body().(tsgo.Block).Statements()[0].(tsgo.ReturnStatement).Expression().(tsgo.NewExpression)
+	if len(result.Arguments()) == 1 {
+		if storage, ok := result.Arguments()[0].(tsgo.ObjectLiteralExpression); ok {
+			return len(storage.Properties())
+		}
+	}
 	return len(result.Arguments())
 }
 

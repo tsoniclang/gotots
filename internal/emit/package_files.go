@@ -145,6 +145,27 @@ func (s *programSession) exportedBindingNames(
 	object types.Object,
 	baseName string,
 ) ([]string, error) {
+	if typeName, ok := object.(*types.TypeName); ok {
+		named, namedOK := types.Unalias(typeName.Type()).(*types.Named)
+		if namedOK {
+			if _, structOK := named.Underlying().(*types.Struct); structOK {
+				names := []string{baseName}
+				for _, requirement := range s.requirements.appliedFor(
+					api.MustSourceArtifactOwner(typeName),
+				) {
+					_, operation, ok := requirement.NamedStructOperation()
+					if ok && operation == api.NamedStructOperationStorage {
+						names = append(
+							names,
+							baseName+api.StructStorageTypeSuffix,
+						)
+						break
+					}
+				}
+				return names, nil
+			}
+		}
+	}
 	constant, ok := object.(*types.Const)
 	if !ok || !constantbinding.IsUntyped(constant.Type()) {
 		return []string{baseName}, nil

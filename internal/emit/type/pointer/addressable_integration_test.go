@@ -32,7 +32,9 @@ func TestAddressablePointersPrintTypecheckAndExecuteDifferentially(t *testing.T)
 	for _, required := range []string{
 		"GoPointer.cell",
 		"GoPointer.field",
+		"GoPointer.indexView",
 		"goSliceAddress",
+		"goSliceAddressView",
 		"value$storage",
 		"export function Box_Add",
 		"export function Box_Nil",
@@ -67,6 +69,8 @@ import {
     CancelIdentity,
     Closure,
     Composite,
+    DefinedArrayAddress,
+    DefinedSliceAddress,
     EscapedValue,
     Field,
     FunctionVariable,
@@ -98,6 +102,8 @@ import {
     SliceAddress,
     SliceVariable,
     SliceReallocation,
+    StructArrayAddress,
+    StructSliceAddress,
     ValueReceiverThroughPointer,
 } from "`+artifacts.module(t, "source.ts")+`";
 
@@ -130,6 +136,10 @@ try {
 } catch {
     console.log(true);
 }
+console.log(...DefinedArrayAddress(51));
+console.log(...DefinedSliceAddress(52));
+console.log(...StructArrayAddress(53));
+console.log(...StructSliceAddress(54));
 console.log(...Package(60));
 console.log(Composite(70));
 console.log(PointerField(75));
@@ -327,9 +337,9 @@ class Indexed {
     }
 }
 
-const parent = GoPointer.cell<Indexed>(new Indexed());
-const numberIndex = GoPointer.index<number, Indexed>(parent, 1);
-const bigintIndex = GoPointer.index<number, Indexed>(parent, 1n);
+const parent = GoPointer.cell<Indexed, Indexed>(new Indexed());
+const numberIndex = GoPointer.index<number, number, Indexed, Indexed>(parent, 1);
+const bigintIndex = GoPointer.index<number, number, Indexed, Indexed>(parent, 1n);
 console.log(GoPointer.equal(numberIndex, bigintIndex));
 `)
 	if output := executeMaterializedTypeScript(
@@ -408,6 +418,10 @@ func main() {
         pointer.SliceAddress(1)
     }()
     fmt.Println(sliceAddressPanicked)
+    fmt.Println(pointer.DefinedArrayAddress(51))
+    fmt.Println(pointer.DefinedSliceAddress(52))
+    fmt.Println(pointer.StructArrayAddress(53))
+    fmt.Println(pointer.StructSliceAddress(54))
     fmt.Println(pointer.Package(60))
     fmt.Println(pointer.Composite(70))
     fmt.Println(pointer.PointerField(75))

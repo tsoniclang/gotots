@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -297,16 +296,6 @@ func compileAndRunSpecialization(t *testing.T, source string) string {
 	return string(output)
 }
 
-func specializationRepositoryRoot() string {
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		panic("resolve specialization repository root")
-	}
-	return filepath.Clean(
-		filepath.Join(filepath.Dir(file), "..", "..", "..", ".."),
-	)
-}
-
 func staticSpecializationContext(
 	t *testing.T,
 	integer api.IntegerRepresentation,
@@ -382,6 +371,56 @@ func (v staticSpecializationValues) SupportsHash(
 	sourceType types.Type,
 ) bool {
 	return sourceType == v.key
+}
+
+func (staticSpecializationValues) RequiresStorageProjection(
+	api.Context,
+	types.Type,
+) bool {
+	return false
+}
+
+func (v staticSpecializationValues) StorageType(
+	context api.Context,
+	_ ast.Node,
+	sourceType types.Type,
+) (api.TypeEmission, error) {
+	switch sourceType {
+	case v.key:
+		return api.DirectType(
+			context.Factory().TypeReferenceNode(
+				context.Factory().Identifier("Key"),
+				nil,
+			),
+		), nil
+	case v.value:
+		return api.DirectType(
+			context.Factory().TypeReferenceNode(
+				context.Factory().Identifier("Box"),
+				nil,
+			),
+		), nil
+	default:
+		panic("unexpected specialization storage type")
+	}
+}
+
+func (v staticSpecializationValues) ToStorage(
+	_ api.Context,
+	_ ast.Node,
+	_ types.Type,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	return value, nil
+}
+
+func (v staticSpecializationValues) FromStorage(
+	_ api.Context,
+	_ ast.Node,
+	_ types.Type,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	return value, nil
 }
 
 func (v staticSpecializationValues) Zero(
@@ -547,17 +586,4 @@ func (v staticSpecializationValues) Increment(
 	tsgo.Expression,
 ) (api.ExpressionEmission, bool, error) {
 	panic("unused")
-}
-
-func staticField(
-	context api.Context,
-	value tsgo.Expression,
-	name string,
-) tsgo.PropertyAccessExpression {
-	return context.Factory().PropertyAccessExpression(
-		value,
-		nil,
-		context.Factory().Identifier(name),
-		tsgo.NodeFlagsNone,
-	)
 }

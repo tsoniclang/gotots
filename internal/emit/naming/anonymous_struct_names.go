@@ -107,7 +107,8 @@ func anonymousStructDependencyFacets(
 		api.AnonymousStructDemandCopy,
 		api.AnonymousStructDemandEqual,
 		api.AnonymousStructDemandHash,
-		api.AnonymousStructDemandConvert:
+		api.AnonymousStructDemandConvert,
+		api.AnonymousStructDemandStorage:
 		return []api.ArtifactFacet{api.ArtifactFacetStaticSurface}
 	default:
 		return nil

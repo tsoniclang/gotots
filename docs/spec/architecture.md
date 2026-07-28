@@ -336,6 +336,40 @@ storage implementation nor the pointer runtime. This keeps assignment ordering
 independent of the selected value representation while retaining one storage
 truth owner.
 
+Logical value representation and addressable storage representation are
+separate facets of the same value-family owner. A pointer is represented as
+`GoPointer<Logical, Storage>`: `Logical` preserves Go's named-type identity,
+while `Storage` is the canonical mutable representation shared by every
+pointer type whose Go base types are identical under the selected toolchain's
+pointer-conversion rule. The runtime reads and writes only `Storage`; load and
+store sites ask the value-family owner to convert between `Logical` and
+`Storage`. The runtime never receives semantic conversion callbacks.
+
+For a named or generated struct that becomes addressable, its declaration is
+reconstructed once with one canonical storage record plus logical
+getters/setters. The ordinary construction surface remains a static `$make`
+member, so changing the private layout does not create a second constructor
+path or require source sites to predict later addressability. A pointer
+conversion requests the storage facet from both endpoint declarations and is
+admitted only when their independently constructed canonical storage types
+match the exact Go conversion evidence. Struct tags do not enter that storage
+facet; field identity, order, package identity, and recursively represented
+field storage do.
+
+```text
+Go *Left / *Right (underlying bases identical ignoring tags)
+        |
+        v
+GoPointer<Left, LeftStorage> --typed view--> GoPointer<Right, RightStorage>
+        |                                      |
+        +-------- LeftStorage == RightStorage--+
+```
+
+The view operation may allocate a constant-size pointer facade, but it reuses
+the same opaque canonical address and the same typed storage accessors. It
+does not copy the pointee, inspect a value shape, recover an erased payload, or
+carry a source/target conversion function.
+
 Every executable Go function body, including each package `init` declaration,
 is a reconstructible artifact. Package initialization may impose ordering and
 an exported generated entry name, but it does not own a second emission or

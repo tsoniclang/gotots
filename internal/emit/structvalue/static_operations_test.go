@@ -11,9 +11,9 @@ import (
 func TestNamedStructValueOperationsAreStaticClassMembers(t *testing.T) {
 	source := structTargetSource(t, compileStructFixture(t))
 	expected := map[string][]string{
-		"Point": {"$zero", "$copy", "$equal"},
-		"Box":   {"$zero", "$copy", "$equal"},
-		"Empty": {"$zero", "$equal"},
+		"Point": {"$make", "$zero", "$copy", "$equal"},
+		"Box":   {"$make", "$zero", "$copy", "$equal"},
+		"Empty": {"$make", "$zero", "$equal"},
 	}
 	for owner, want := range expected {
 		class := targetClass(t, source, owner)
@@ -23,11 +23,18 @@ func TestNamedStructValueOperationsAreStaticClassMembers(t *testing.T) {
 			if !ok || !strings.HasPrefix(targetName(method.Name()), "$") {
 				continue
 			}
-			if len(method.Modifiers()) != 1 ||
+			name := targetName(method.Name())
+			if name == "$make" {
+				if len(method.Modifiers()) != 2 ||
+					method.Modifiers()[0].Kind() != tsgo.SyntaxKindPublicKeyword ||
+					method.Modifiers()[1].Kind() != tsgo.SyntaxKindStaticKeyword {
+					t.Fatalf("%s.%s is not public static", owner, name)
+				}
+			} else if len(method.Modifiers()) != 1 ||
 				method.Modifiers()[0].Kind() != tsgo.SyntaxKindStaticKeyword {
-				t.Fatalf("%s.%s is not exactly static", owner, targetName(method.Name()))
+				t.Fatalf("%s.%s is not exactly static", owner, name)
 			}
-			actual = append(actual, targetName(method.Name()))
+			actual = append(actual, name)
 		}
 		if !slices.Equal(actual, want) {
 			t.Fatalf("%s static value operations = %v, want %v", owner, actual, want)
@@ -36,7 +43,9 @@ func TestNamedStructValueOperationsAreStaticClassMembers(t *testing.T) {
 	for _, owner := range []string{"Mirror", "Reserved", "Grouped"} {
 		for _, member := range targetClass(t, source, owner).Members() {
 			method, ok := member.(tsgo.MethodDeclaration)
-			if ok && strings.HasPrefix(targetName(method.Name()), "$") {
+			if ok &&
+				strings.HasPrefix(targetName(method.Name()), "$") &&
+				targetName(method.Name()) != "$make" {
 				t.Fatalf("undemanded static operation %s.%s was emitted", owner, targetName(method.Name()))
 			}
 		}

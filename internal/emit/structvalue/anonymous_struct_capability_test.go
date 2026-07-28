@@ -28,5 +28,10 @@ func Value(value struct{ Field int32 }) int32 {
 	if class == nil {
 		t.Fatal("anonymous-struct definition capability emitted no class")
 	}
-	assertStaticOperationSequence(t, support, class.Name().Text(), nil)
+	assertStaticOperationSequence(
+		t,
+		support,
+		class.Name().Text(),
+		[]string{"$make"},
+	)
 }

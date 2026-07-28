@@ -256,3 +256,55 @@ func SliceToArrayPanics() {
 func SliceToArrayPanicCount() int32 {
 	return EvaluationCount
 }
+
+type PointerLeftInt int32
+type PointerRightInt int32
+
+func PointerScalarConversion() int32 {
+	value := PointerLeftInt(3)
+	left := &value
+	right := (*PointerRightInt)(left)
+	*right = 8
+	return int32(value)
+}
+
+type PointerLeft struct {
+	Value int32
+	Pair  [2]int32 `json:"left"`
+}
+
+type PointerRight struct {
+	Value int32
+	Pair  [2]int32 `json:"right"`
+}
+
+func PointerStructConversion() int32 {
+	value := PointerLeft{Value: 2, Pair: [2]int32{3, 4}}
+	left := &value
+	right := (*PointerRight)(left)
+	right.Value = 7
+	right.Pair[0] = 9
+	return value.Value*100 + value.Pair[0]*10 + value.Pair[1]
+}
+
+func PointerRoundTripIdentity() bool {
+	value := PointerLeftInt(1)
+	left := &value
+	return (*PointerLeftInt)((*PointerRightInt)(left)) == left
+}
+
+type PointerNestedLeft struct {
+	Value *int32 `json:"left"`
+}
+
+type PointerNestedRight struct {
+	Value *int32 `json:"right"`
+}
+
+func PointerNestedFieldConversion() int32 {
+	number := int32(3)
+	value := PointerNestedLeft{Value: &number}
+	right := (*PointerNestedRight)(&value)
+	*right.Value = 8
+	return *value.Value
+}

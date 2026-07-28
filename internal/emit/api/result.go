@@ -70,6 +70,7 @@ type StoreTargetEmission struct {
 	accessorArguments []ExpressionEmission
 	locationCaptured  bool
 	copiesValue       bool
+	canonicalStorage  bool
 	sourceType        types.Type
 	requests          []RootRequest
 }
@@ -111,6 +112,25 @@ func NewPropertyStoreTargetEmission(
 	}, nil
 }
 
+func NewCanonicalStoragePropertyStoreTargetEmission(
+	factory tsgo.Factory,
+	receiver ExpressionEmission,
+	member string,
+	sourceType types.Type,
+) (StoreTargetEmission, error) {
+	target, err := NewPropertyStoreTargetEmission(
+		factory,
+		receiver,
+		member,
+		sourceType,
+	)
+	if err != nil {
+		return StoreTargetEmission{}, err
+	}
+	target.canonicalStorage = true
+	return target, nil
+}
+
 func NewStoreTargetEmission(
 	value tsgo.Expression,
 	sourceType types.Type,
@@ -133,6 +153,19 @@ func NewStoreTargetEmission(
 		sourceType: sourceType,
 		requests:   slices.Clone(requests),
 	}, nil
+}
+
+func NewCanonicalStorageTargetEmission(
+	value tsgo.Expression,
+	sourceType types.Type,
+	requests []RootRequest,
+) (StoreTargetEmission, error) {
+	target, err := NewStoreTargetEmission(value, sourceType, requests)
+	if err != nil {
+		return StoreTargetEmission{}, err
+	}
+	target.canonicalStorage = true
+	return target, nil
 }
 
 func NewAccessorStoreTargetEmission(
@@ -213,6 +246,10 @@ func (e StoreTargetEmission) IsProperty() bool {
 
 func (e StoreTargetEmission) CopiesValue() bool {
 	return e.copiesValue
+}
+
+func (e StoreTargetEmission) UsesCanonicalStorage() bool {
+	return e.canonicalStorage
 }
 
 func (e StoreTargetEmission) Before() []tsgo.Statement {

@@ -184,11 +184,7 @@ func zeroMethod(
 		nil,
 		classType,
 		[]tsgo.Statement{context.Factory().ReturnStatement(
-			context.Factory().NewExpression(
-				context.Factory().Identifier(className),
-				nil,
-				arguments,
-			),
+			construct(context, className, arguments),
 		)},
 	), requests, nil
 }
@@ -240,11 +236,7 @@ func copyMethod(
 		[]tsgo.ParameterDeclaration{parameter(context, "$source", classType)},
 		classType,
 		[]tsgo.Statement{context.Factory().ReturnStatement(
-			context.Factory().NewExpression(
-				context.Factory().Identifier(className),
-				nil,
-				arguments,
-			),
+			construct(context, className, arguments),
 		)},
 	), requests, nil
 }
@@ -372,6 +364,25 @@ func operationMethod(
 		parameters,
 		result,
 		context.Factory().Block(statements, true),
+	)
+}
+
+func construct(
+	context api.Context,
+	className string,
+	arguments []tsgo.Expression,
+) tsgo.CallExpression {
+	return context.Factory().CallExpression(
+		context.Factory().PropertyAccessExpression(
+			context.Factory().Identifier(className),
+			nil,
+			context.Factory().Identifier(api.StructMakeMember),
+			tsgo.NodeFlagsNone,
+		),
+		nil,
+		nil,
+		arguments,
+		tsgo.NodeFlagsNone,
 	)
 }
 

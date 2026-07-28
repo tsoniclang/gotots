@@ -83,11 +83,7 @@ func conversionMethod(
 		},
 		classType,
 		[]tsgo.Statement{context.Factory().ReturnStatement(
-			context.Factory().NewExpression(
-				context.Factory().Identifier(className),
-				nil,
-				arguments,
-			),
+			construct(context, className, arguments),
 		)},
 	), requests, nil
 }

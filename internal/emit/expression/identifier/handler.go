@@ -47,16 +47,24 @@ func Emit(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		return api.DirectExpression(
-			reference.Expression(context.Factory()),
-			reference.Requests()...,
-		), nil
+		return context.Values().FromStorage(
+			context,
+			source,
+			variable.Type(),
+			api.DirectExpression(
+				reference.Expression(context.Factory()),
+				reference.Requests()...,
+			),
+		)
 	}
 	if variable, ok := object.(*types.Var); ok {
-		if selected, exists := context.AddressableStorage().Read(
+		if selected, exists, err := context.AddressableStorage().Read(
 			context,
 			variable,
-		); exists {
+		); exists || err != nil {
+			if err != nil {
+				return api.ExpressionEmission{}, err
+			}
 			return selected, nil
 		}
 	}
