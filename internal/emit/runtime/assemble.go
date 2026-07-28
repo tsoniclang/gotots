@@ -12,7 +12,6 @@ import (
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
-	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	stringruntime "github.com/tsoniclang/gotots/internal/emit/runtime/string"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -156,58 +155,8 @@ func Build(
 		}
 		return definitions, nil
 	}
-	if module == api.RuntimeModuleSlice &&
-		(len(symbols) == 1 || len(symbols) == 2) &&
-		symbols[0] == api.RuntimeSlice &&
-		(len(symbols) == 1 || symbols[1] == api.RuntimeSliceAddress) {
-		contract, err := api.RuntimeContract(api.RuntimeSlice)
-		if err != nil {
-			return nil, err
-		}
-		panicContract, err := api.RuntimeContract(api.RuntimePanic)
-		if err != nil {
-			return nil, err
-		}
-		address := len(symbols) == 2
-		definition, err := NewDefinition(
-			api.RuntimeSlice,
-			runtimeslice.BuildWithAddress(
-				factory,
-				contract.ExportedName(),
-				panicContract.ExportedName(),
-				address,
-			),
-		)
-		if err != nil {
-			return nil, err
-		}
-		definitions := []Definition{definition}
-		if address {
-			addressContract, err := api.RuntimeContract(
-				api.RuntimeSliceAddress,
-			)
-			if err != nil {
-				return nil, err
-			}
-			pointerContract, err := api.RuntimeContract(api.RuntimePointer)
-			if err != nil {
-				return nil, err
-			}
-			addressDefinition, err := NewDefinition(
-				api.RuntimeSliceAddress,
-				runtimeslice.BuildAddress(
-					factory,
-					addressContract.ExportedName(),
-					contract.ExportedName(),
-					pointerContract.ExportedName(),
-				),
-			)
-			if err != nil {
-				return nil, err
-			}
-			definitions = append(definitions, addressDefinition)
-		}
-		return definitions, nil
+	if module == api.RuntimeModuleSlice {
+		return buildSlice(factory, symbols)
 	}
 	if module == api.RuntimeModuleMap {
 		return buildMap(factory, symbols)

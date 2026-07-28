@@ -110,3 +110,48 @@ func TestArrayRuntimeAssemblyRejectsMissingDuplicateAndWrongDefinitions(
 		t.Fatal("aggregate operation preceding RuntimeArray passed assembly")
 	}
 }
+
+func TestSliceAggregateDefinitionsExactJoinRequestedSymbols(t *testing.T) {
+	symbols := []api.RuntimeSymbol{
+		api.RuntimeSlice,
+		api.RuntimeSliceAddress,
+		api.RuntimeSliceMakeWith,
+		api.RuntimeSliceAppendWith,
+		api.RuntimeSliceCopyWith,
+	}
+	definitions, err := Build(
+		tsgo.NewFactory(),
+		api.RuntimeModuleSlice,
+		symbols,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(definitions) != len(symbols) {
+		t.Fatalf(
+			"slice definition count = %d, want %d",
+			len(definitions),
+			len(symbols),
+		)
+	}
+	for index, definition := range definitions {
+		if definition.Symbol() != symbols[index] {
+			t.Fatalf(
+				"slice definition %d = %d, want %d",
+				index,
+				definition.Symbol(),
+				symbols[index],
+			)
+		}
+	}
+}
+
+func TestSliceAggregateDefinitionsRequireRuntimeSliceFirst(t *testing.T) {
+	if _, err := Build(
+		tsgo.NewFactory(),
+		api.RuntimeModuleSlice,
+		[]api.RuntimeSymbol{api.RuntimeSliceMakeWith},
+	); err == nil {
+		t.Fatal("slice aggregate helper assembled without RuntimeSlice")
+	}
+}

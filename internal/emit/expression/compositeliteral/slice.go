@@ -77,6 +77,7 @@ func emitSlice(
 			elementType,
 			elementTarget,
 			runtime,
+			zero,
 			elements,
 			length,
 		)
@@ -208,17 +209,10 @@ func emitKeyedSlice(
 	elementType types.Type,
 	elementTarget api.TypeEmission,
 	runtime api.NameReference,
+	zero api.ExpressionEmission,
 	elements []sliceElement,
 	length int64,
 ) (api.ExpressionEmission, error) {
-	zero, err := context.Values().Zero(
-		context.WithRole(api.RoleSliceElement),
-		source,
-		elementType,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
 	if len(zero.Before()) != 0 {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
@@ -227,20 +221,45 @@ func emitKeyedSlice(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	makeSlice := runtimeSliceCall(
-		context,
-		runtime.Name(),
-		runtimeslice.MemberName(runtimeslice.MemberMake),
-		elementTarget.Value(),
-		[]tsgo.Expression{
-			context.Factory().NumericLiteral(
-				strconv.FormatInt(length, 10),
-				tsgo.TokenFlagsNone,
-			),
-			context.Factory().NullLiteral(),
-			zero.Value(),
-		},
+	lengthValue := context.Factory().NumericLiteral(
+		strconv.FormatInt(length, 10),
+		tsgo.TokenFlagsNone,
 	)
+	var makeSlice tsgo.Expression
+	runtimeRequests := runtime.Requests()
+	if context.Values().RequiresStructuralCopy(context, elementType) {
+		aggregate, err := context.Names().Runtime(
+			api.RuntimeSliceMakeWith,
+			api.ImportPhaseValue,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		makeSlice = context.Factory().CallExpression(
+			context.Factory().Identifier(aggregate.Name()),
+			nil,
+			[]tsgo.TypeNode{elementTarget.Value()},
+			[]tsgo.Expression{
+				lengthValue,
+				context.Factory().NullLiteral(),
+				sliceElementFactory(context, zero.Value()),
+			},
+			tsgo.NodeFlagsNone,
+		)
+		runtimeRequests = aggregate.Requests()
+	} else {
+		makeSlice = runtimeSliceCall(
+			context,
+			runtime.Name(),
+			runtimeslice.MemberName(runtimeslice.MemberMake),
+			elementTarget.Value(),
+			[]tsgo.Expression{
+				lengthValue,
+				context.Factory().NullLiteral(),
+				zero.Value(),
+			},
+		)
+	}
 	before := []tsgo.Statement{
 		context.Factory().VariableStatement(
 			nil,
@@ -259,7 +278,7 @@ func emitKeyedSlice(
 	}
 	requests := api.CombineRequests(
 		elementTarget.Requests(),
-		runtime.Requests(),
+		runtimeRequests,
 		zero.Requests(),
 	)
 	for _, element := range elements {
@@ -292,6 +311,23 @@ func emitKeyedSlice(
 		before,
 		context.Factory().Identifier(name),
 		requests,
+	)
+}
+
+func sliceElementFactory(
+	context api.Context,
+	value tsgo.Expression,
+) tsgo.ArrowFunction {
+	return context.Factory().ArrowFunction(
+		nil,
+		nil,
+		nil,
+		nil,
+		context.Factory().EqualsGreaterThanToken(),
+		context.Factory().Block(
+			[]tsgo.Statement{context.Factory().ReturnStatement(value)},
+			true,
+		),
 	)
 }
 

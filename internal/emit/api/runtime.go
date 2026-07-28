@@ -36,6 +36,9 @@ const (
 	RuntimeArrayCopyWith    RuntimeSymbol = 203
 	RuntimeSlice            RuntimeSymbol = 300
 	RuntimeSliceAddress     RuntimeSymbol = 301
+	RuntimeSliceMakeWith    RuntimeSymbol = 302
+	RuntimeSliceAppendWith  RuntimeSymbol = 303
+	RuntimeSliceCopyWith    RuntimeSymbol = 304
 	RuntimeMap              RuntimeSymbol = 400
 	RuntimePanic            RuntimeSymbol = 500
 	RuntimeIntegerDivide    RuntimeSymbol = 600
@@ -157,6 +160,30 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			false,
 			RuntimeSlice,
 			RuntimePointer,
+		), nil
+	case RuntimeSliceMakeWith:
+		return runtimeContract(
+			RuntimeModuleSlice,
+			"runtime/slice.ts",
+			"goSliceMakeWith",
+			false,
+			RuntimeSlice,
+		), nil
+	case RuntimeSliceAppendWith:
+		return runtimeContract(
+			RuntimeModuleSlice,
+			"runtime/slice.ts",
+			"goSliceAppendWith",
+			false,
+			RuntimeSlice,
+		), nil
+	case RuntimeSliceCopyWith:
+		return runtimeContract(
+			RuntimeModuleSlice,
+			"runtime/slice.ts",
+			"goSliceCopyWith",
+			false,
+			RuntimeSlice,
 		), nil
 	case RuntimeMap:
 		return runtimeContract(

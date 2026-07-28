@@ -11,16 +11,23 @@ type builder struct {
 	panicName string
 }
 
+type Capabilities struct {
+	Address         bool
+	AggregateMake   bool
+	AggregateAppend bool
+	AggregateCopy   bool
+}
+
 func Build(
 	factory tsgo.Factory,
 	className string,
 	panicName string,
 ) tsgo.ClassDeclaration {
-	return BuildWithAddress(
+	return BuildWithCapabilities(
 		factory,
 		className,
 		panicName,
-		false,
+		Capabilities{},
 	)
 }
 
@@ -30,24 +37,54 @@ func BuildWithAddress(
 	panicName string,
 	withAddress bool,
 ) tsgo.ClassDeclaration {
+	return BuildWithCapabilities(
+		factory,
+		className,
+		panicName,
+		Capabilities{Address: withAddress},
+	)
+}
+
+func BuildWithCapabilities(
+	factory tsgo.Factory,
+	className string,
+	panicName string,
+	capabilities Capabilities,
+) tsgo.ClassDeclaration {
 	target := builder{
 		factory:   factory,
 		className: className,
 		panicName: panicName,
 	}
-	members := []tsgo.ClassElement{
-		target.constructor(),
+	members := []tsgo.ClassElement{target.constructor()}
+	if capabilities.AggregateMake {
+		members = append(members, target.shapeMethod())
+	}
+	if capabilities.AggregateAppend {
+		members = append(members, target.grownCapacityMethod())
+	}
+	members = append(
+		members,
 		target.nilMethod(),
-		target.makeMethod(),
+		target.makeMethod(capabilities.AggregateMake),
 		target.literalMethod(),
 		target.isNilMethod(),
 		target.getMethod(),
 		target.setMethod(),
 		target.sliceMethod(),
-		target.appendMethod(),
+		target.appendMethod(capabilities.AggregateAppend),
 		target.copyMethod(),
+	)
+	if capabilities.AggregateMake {
+		members = append(members, target.aggregateMakeMethod())
 	}
-	if withAddress {
+	if capabilities.AggregateAppend {
+		members = append(members, target.aggregateAppendMethod())
+	}
+	if capabilities.AggregateCopy {
+		members = append(members, target.aggregateCopyMethod())
+	}
+	if capabilities.Address {
 		members = append(members, target.addressMethod())
 	}
 	return factory.ClassDeclaration(

@@ -80,7 +80,10 @@ func (b builder) nilMethod() tsgo.MethodDeclaration {
 	)
 }
 
-func (b builder) makeMethod() tsgo.MethodDeclaration {
+func (b builder) makeMethod(sharedShape bool) tsgo.MethodDeclaration {
+	if sharedShape {
+		return b.makeMethodWithShape()
+	}
 	invalidLength := b.binary(
 		b.id("numericLength"),
 		tsgo.BinaryOperatorLessThanToken,

@@ -29,15 +29,6 @@ func F(values Values) int { return len(values) }
 			construct: "*ast.FuncType",
 		},
 		{
-			name: "slice element is struct",
-			source: `package boundary
-type Item struct { Value int32 }
-func F(values []Item) int { return len(values) }
-`,
-			category:  api.CategoryType,
-			construct: "*ast.FuncType",
-		},
-		{
 			name: "append spread",
 			source: `package boundary
 func F(left, right []int32) []int32 { return append(left, right...) }

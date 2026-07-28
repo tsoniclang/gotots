@@ -2,7 +2,7 @@ package slice
 
 import "github.com/tsoniclang/gotots/internal/target/tsgo"
 
-func (b builder) appendMethod() tsgo.MethodDeclaration {
+func (b builder) appendMethod(sharedGrowth bool) tsgo.MethodDeclaration {
 	values := b.factory.ParameterDeclaration(
 		nil,
 		b.factory.DotDotDotToken(),
@@ -141,12 +141,7 @@ func (b builder) appendMethod() tsgo.MethodDeclaration {
 			),
 		}, true),
 	)
-	return b.method(
-		nil,
-		MemberName(MemberAppend),
-		nil,
-		[]tsgo.ParameterDeclaration{values},
-		b.sliceType(),
+	statements := []tsgo.Statement{
 		b.variable(tsgo.NodeFlagsConst, "newLength", newLength),
 		b.variable(
 			tsgo.NodeFlagsConst,
@@ -171,8 +166,27 @@ func (b builder) appendMethod() tsgo.MethodDeclaration {
 			reuse,
 			nil,
 		),
-		b.variable(tsgo.NodeFlagsLet, "nextCapacity", initialCapacity),
-		growCapacity,
+	}
+	if sharedGrowth {
+		statements = append(statements, b.variable(
+			tsgo.NodeFlagsConst,
+			"nextCapacity",
+			b.call(
+				b.id(b.className),
+				aggregateGrowthMember,
+				b.thisProperty(MemberName(MemberCapacity)),
+				b.id("newLength"),
+			),
+		))
+	} else {
+		statements = append(
+			statements,
+			b.variable(tsgo.NodeFlagsLet, "nextCapacity", initialCapacity),
+			growCapacity,
+		)
+	}
+	statements = append(
+		statements,
 		b.variable(
 			tsgo.NodeFlagsConst,
 			"backing",
@@ -197,6 +211,14 @@ func (b builder) appendMethod() tsgo.MethodDeclaration {
 				b.thisProperty("zero"),
 			),
 		),
+	)
+	return b.method(
+		nil,
+		MemberName(MemberAppend),
+		nil,
+		[]tsgo.ParameterDeclaration{values},
+		b.sliceType(),
+		statements...,
 	)
 }
 
