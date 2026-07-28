@@ -302,7 +302,10 @@ func emitCopy(
 	sourceType := context.TypesInfo().TypeOf(source.Args[1])
 	_, elementType, targetOK := scalarSlice(context, targetType)
 	_, sourceElement, sourceOK := scalarSlice(context, sourceType)
-	if !targetOK || !sourceOK || !types.Identical(elementType, sourceElement) {
+	stringSource := targetOK && appendStringSpread(elementType, sourceType)
+	if !targetOK ||
+		(!stringSource &&
+			(!sourceOK || !types.Identical(elementType, sourceElement))) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
@@ -321,7 +324,11 @@ func emitCopy(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		value, err = projectDefinedSlice(context, expected, value)
+		if index == 1 && stringSource {
+			value, err = projectDefinedString(context, expected, value)
+		} else {
+			value, err = projectDefinedSlice(context, expected, value)
+		}
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
@@ -332,7 +339,14 @@ func emitCopy(
 		return api.ExpressionEmission{}, err
 	}
 	var result api.ExpressionEmission
-	if context.Values().RequiresStructuralCopy(context, elementType) {
+	if stringSource {
+		result, err = slicevalue.CopyString(
+			context,
+			arguments,
+			before,
+			requests,
+		)
+	} else if context.Values().RequiresStructuralCopy(context, elementType) {
 		targetElement, typeErr := children.RepresentedType(
 			context.WithRole(api.RoleSliceElementType),
 			source,

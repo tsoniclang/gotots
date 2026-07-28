@@ -89,3 +89,22 @@ func supportsStringArgument(sourceType types.Type) bool {
 	defined, ok := definedtype.ResolveBasic(sourceType)
 	return ok && basictype.SupportsString(defined.Underlying())
 }
+
+func projectDefinedString(
+	context api.Context,
+	sourceType types.Type,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	defined, ok := definedtype.ResolveBasic(sourceType)
+	if !ok {
+		return value, nil
+	}
+	if !basictype.SupportsString(defined.Underlying()) {
+		return api.ExpressionEmission{},
+			&api.InvariantError{
+				Role:   context.Role(),
+				Reason: "defined-string projection received a non-string type",
+			}
+	}
+	return defined.Project(context, value)
+}

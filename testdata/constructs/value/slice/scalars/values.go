@@ -2,6 +2,7 @@ package slicevalues
 
 type DestinationValues []int32
 type SourceValues []int32
+type ByteText string
 
 var packageValues = []int32{2, 3}
 
@@ -142,6 +143,30 @@ func AppendStringBytes() int32 {
 	return int32(result[0])*10000 +
 		int32(result[1])*100 +
 		int32(result[2])
+}
+
+func AppendDefinedStringBytes() int32 {
+	result := append([]byte{1}, ByteText("é")...)
+	return int32(result[0])*10000 +
+		int32(result[1])*100 +
+		int32(result[2])
+}
+
+func CopyStringBytes() int32 {
+	result := []byte{9, 9, 9, 9}
+	count := copy(result[1:], "é")
+	return int32(count)*1000000 +
+		int32(result[0])*10000 +
+		int32(result[1])*100 +
+		int32(result[2])
+}
+
+func CopyDefinedStringBytes() int32 {
+	result := make([]byte, 3)
+	count := copy(result, ByteText("é"))
+	return int32(count)*10000 +
+		int32(result[0])*100 +
+		int32(result[1])
 }
 
 func AppendLargeSpread() int32 {

@@ -12,20 +12,8 @@ import (
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
-func TestStringFamilyRejectsDeferredNeighboringConstructs(t *testing.T) {
+func TestStringFamilyRejectsDeferredRange(t *testing.T) {
 	tests := map[string]string{
-		"integer to string conversion": `package boundary
-
-func Convert(value int32) string {
-	return string(value)
-}
-`,
-		"rune to string conversion": `package boundary
-
-func Convert(value rune) string {
-	return string(value)
-}
-`,
 		"rune iteration": `package boundary
 
 func Count(value string) int {

@@ -69,6 +69,11 @@ func emitAppendSpread(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
+	} else {
+		spread, err = projectDefinedString(context, spreadType, spread)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	}
 	operands, before, requests, err := arrangeValues(
 		context,

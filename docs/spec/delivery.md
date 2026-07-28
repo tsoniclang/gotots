@@ -221,10 +221,10 @@ create a value IR or a generic operation registry.
    checked runtime operations; the `number` profile keeps them unsupported
    rather than approximating Go integer truncation.
 2. Go strings use one byte-preserving target representation. Source literals,
-   concatenation, ordered/equality comparison, `len`, indexing, and two-index
-   slicing are exact over arbitrary Go string bytes. Rune conversion,
-   iteration, formatting, and external text encoding remain separate
-   boundaries.
+   concatenation, ordered/equality comparison, `len`, indexing, two-index
+   slicing, integer/rune encoding, and byte/rune slice conversions are exact
+   over arbitrary Go string bytes. String range, formatting, and external text
+   encoding remain separate boundaries.
 3. Fixed-length arrays of admitted recursively represented elements support
    zero, copy, equality, literals, indexing/stores, `len`, and `cap`. Target
    types retain the array length. A defined array has one minimal nominal
@@ -297,6 +297,15 @@ element-identity admission rather than slice assignability and includes the
 language-defined `[]byte` plus string case. `new(x)` evaluates `x` once and
 initializes a fresh pointer cell with the selected value copy; `new(T)` remains
 the distinct type-form zero-value operation.
+
+The same checkpoint admits represented struct conversion through one
+demand-owned `$convert` member on the destination class and slice-to-array
+value conversion through one source-site typed loop. It also treats checker-
+constant `len`/`cap` as non-evaluating expressions, including array and
+pointer-to-array operands, while nonconstant pointer-to-array expressions are
+evaluated exactly once. Pointer reinterpretation and slice-to-array-pointer
+conversion remain blocked on the canonical pointer-storage representation;
+they must not be approximated with casts or semantic read/write adapters.
 
 The checkpoint exits only when all six families:
 

@@ -213,8 +213,9 @@ func TestGeneratedArtifactDomainsArePinned(t *testing.T) {
 		AnonymousStructDemandCopy != 3 ||
 		AnonymousStructDemandEqual != 4 ||
 		AnonymousStructDemandHash != 5 ||
+		AnonymousStructDemandConvert != 6 ||
 		AnonymousStructDemandInvalid.Valid() ||
-		AnonymousStructDemand(6).Valid() {
+		AnonymousStructDemand(7).Valid() {
 		t.Fatal("anonymous-struct demand IDs drifted")
 	}
 	if MapSpecializationDemandDefinition != 1 ||

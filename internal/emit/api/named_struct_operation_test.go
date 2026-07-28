@@ -87,6 +87,7 @@ func TestNamedStructOperationMemberNamesAreClosed(t *testing.T) {
 		{operation: NamedStructOperationCopy, want: "$copy"},
 		{operation: NamedStructOperationEqual, want: "$equal"},
 		{operation: NamedStructOperationHash, want: "$hash"},
+		{operation: NamedStructOperationConvert, want: "$convert"},
 	} {
 		got, err := NamedStructOperationMemberName(testCase.operation)
 		if err != nil {

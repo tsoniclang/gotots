@@ -38,6 +38,16 @@ func emitValueOperation(
 		)
 	case api.NamedStructOperationHash:
 		return hashMethod(context, source, memberName, classType, fields)
+	case api.NamedStructOperationConvert:
+		return conversionMethod(
+			context,
+			children,
+			source,
+			memberName,
+			className,
+			classType,
+			fields,
+		)
 	default:
 		return nil, nil, &api.InvariantError{
 			Role:   context.Role(),

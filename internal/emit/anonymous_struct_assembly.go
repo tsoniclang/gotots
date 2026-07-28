@@ -222,6 +222,11 @@ func anonymousStructOperations(
 				operations,
 				api.NamedStructOperationHash,
 			)
+		case api.AnonymousStructDemandConvert:
+			operations = append(
+				operations,
+				api.NamedStructOperationConvert,
+			)
 		default:
 			return nil, &ScheduleError{
 				Object: artifact.TargetName(),

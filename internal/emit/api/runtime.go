@@ -29,6 +29,8 @@ const (
 	RuntimeStringSlice      RuntimeSymbol = 2
 	RuntimeStringMax        RuntimeSymbol = 3
 	RuntimeStringMin        RuntimeSymbol = 4
+	RuntimeStringEncodeRune RuntimeSymbol = 5
+	RuntimeStringDecodeRune RuntimeSymbol = 6
 	RuntimePointer          RuntimeSymbol = 100
 	RuntimeArray            RuntimeSymbol = 200
 	RuntimeArrayAllocate    RuntimeSymbol = 201
@@ -102,6 +104,20 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			RuntimeModuleString,
 			"runtime/string.ts",
 			"goStringMin",
+			false,
+		), nil
+	case RuntimeStringEncodeRune:
+		return runtimeContract(
+			RuntimeModuleString,
+			"runtime/string.ts",
+			"goStringEncodeRune",
+			false,
+		), nil
+	case RuntimeStringDecodeRune:
+		return runtimeContract(
+			RuntimeModuleString,
+			"runtime/string.ts",
+			"goStringDecodeRune",
 			false,
 		), nil
 	case RuntimePointer:

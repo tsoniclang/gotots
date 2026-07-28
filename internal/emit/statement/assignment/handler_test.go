@@ -194,6 +194,76 @@ func F(values []int32, delta int32) int32 {
 	}
 }
 
+func TestSingleBlankAssignmentEvaluatesRuntimeValuesAndErasesConstants(
+	t *testing.T,
+) {
+	directory := t.TempDir()
+	writeFile(
+		t,
+		filepath.Join(directory, "go.mod"),
+		"module example.com/blankassignment\n\ngo 1.26.4\n",
+	)
+	writeFile(t, filepath.Join(directory, "source.go"), `package blankassignment
+
+func Value() int32 { return 3 }
+
+func Use() int32 {
+	_ = 1 + 2
+	_ = Value()
+	return 4
+}
+`)
+	loaded, err := load.One(context.Background(), load.Request{
+		Directory: directory,
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	roots, err := emit.ExportedAPIRoots(loaded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	emission, err := emit.Compile(loaded.Program(), roots)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var use tsgo.FunctionDeclaration
+	for _, file := range emission.Files() {
+		if file.Kind() != emit.TargetFileSource {
+			continue
+		}
+		for _, statement := range file.SourceFile().Statements() {
+			function, ok := statement.(tsgo.FunctionDeclaration)
+			if ok && function.Name().Text() == "Use" {
+				use = function
+			}
+		}
+	}
+	if use == nil {
+		t.Fatal("Use target function is absent")
+	}
+	statements := use.Body().(tsgo.Block).Statements()
+	if len(statements) != 2 {
+		t.Fatalf(
+			"Use statements = %d, want runtime evaluation and return",
+			len(statements),
+		)
+	}
+	evaluated, ok := statements[0].(tsgo.ExpressionStatement)
+	if !ok {
+		t.Fatalf("blank runtime evaluation = %T, want expression", statements[0])
+	}
+	call, ok := evaluated.Expression().(tsgo.CallExpression)
+	if !ok {
+		t.Fatalf("blank runtime value = %T, want call", evaluated.Expression())
+	}
+	callee, ok := call.Expression().(tsgo.Identifier)
+	if !ok || callee.Text() != "Value" {
+		t.Fatalf("blank runtime callee = %T/%v, want Value", call.Expression(), call.Expression())
+	}
+}
+
 func identifierText(node tsgo.Node) string {
 	return node.(tsgo.Identifier).Text()
 }

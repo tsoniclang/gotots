@@ -439,6 +439,10 @@ func emitAssignment(
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
+	if identifier, ok := source.Lhs[0].(*ast.Ident); ok &&
+		identifier.Name == "_" {
+		return emitBlankAssignment(context, children, source)
+	}
 	target, err := children.StoreTarget(
 		context.WithRole(api.RoleAssignmentTarget),
 		source.Lhs[0],

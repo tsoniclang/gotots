@@ -107,3 +107,152 @@ func ConstantFloat() float32 {
 func ConstantComplex() complex64 {
 	return complex64(1.5 - 2.25i)
 }
+
+type Bytes []byte
+type Text string
+
+func IntegerStringSummary() int32 {
+	text := string(int32(0x1f600))
+	return int32(len(text))*100000000 +
+		int32(text[0])*1000000 +
+		int32(text[1])*10000 +
+		int32(text[2])*100 +
+		int32(text[3])
+}
+
+func BytesStringSummary() int32 {
+	text := string([]byte{0xff, 'A'})
+	return int32(len(text))*100000 +
+		int32(text[0])*100 +
+		int32(text[1])
+}
+
+func RunesStringSummary() int32 {
+	text := string([]rune{'A', 'é', '😀'})
+	return int32(len(text))*100000000 +
+		int32(text[0])*1000000 +
+		int32(text[1])*10000 +
+		int32(text[2])*100 +
+		int32(text[3])
+}
+
+func StringBytesSummary() int32 {
+	values := []byte("Aé")
+	return int32(len(values))*1000000 +
+		int32(values[0])*10000 +
+		int32(values[1])*100 +
+		int32(values[2])
+}
+
+func StringRunesSummary() int32 {
+	values := []rune("Aé😀")
+	return int32(len(values))*100000000 +
+		values[0]*1000000 +
+		values[1]*1000 +
+		values[2]
+}
+
+func InvalidStringRunesSummary() int64 {
+	values := []rune("\xffA\xc0")
+	return int64(values[0])*1000000 +
+		int64(values[1])*1000 +
+		int64(values[2])
+}
+
+func InvalidStringBoundarySummary() int64 {
+	values := []rune("\xe2\x82\xf0\x9f\x98\xed\xa0\x80\xf4\x90\x80\x80")
+	return int64(len(values))*100000 + int64(values[0])
+}
+
+func InvalidRuneStringSummary() int32 {
+	text := string(int32(0xd800))
+	return int32(len(text))*1000000 +
+		int32(text[0])*10000 +
+		int32(text[1])*100 +
+		int32(text[2])
+}
+
+func NilSlicesToString() bool {
+	var bytes []byte
+	var runes []rune
+	return string(bytes) == "" && string(runes) == ""
+}
+
+func DefinedStringConversions() int32 {
+	values := Bytes(Text("é"))
+	text := Text(values)
+	return int32(len(values))*1000000 +
+		int32(values[0])*10000 +
+		int32(values[1])*100 +
+		int32(len(text))
+}
+
+type TaggedLeft struct {
+	Value int32
+	Pair  [2]int32 `json:"left"`
+}
+
+type TaggedRight struct {
+	Value int32
+	Pair  [2]int32 `json:"right"`
+}
+
+func StructConversionCopies() int32 {
+	left := TaggedLeft{Value: 3, Pair: [2]int32{4, 5}}
+	right := TaggedRight(left)
+	right.Pair[0] = 9
+	return left.Pair[0]*100 + right.Value*10 + right.Pair[0]
+}
+
+func StructConversionReusesDefinition() int32 {
+	first := TaggedRight(TaggedLeft{Value: 2})
+	second := TaggedRight(TaggedLeft{Value: 5})
+	return first.Value*10 + second.Value
+}
+
+func AnonymousStructConversion() int32 {
+	left := struct {
+		Value int32 `json:"left"`
+	}{Value: 7}
+	right := struct {
+		Value int32 `json:"right"`
+	}(left)
+	return right.Value
+}
+
+type Pair [2]int32
+type Numbers []int32
+
+func SliceToArrayCopies() int32 {
+	values := []int32{1, 2, 3}
+	pair := [2]int32(values)
+	pair[0] = 9
+	return values[0]*10 + pair[0]
+}
+
+func DefinedSliceToArray() int32 {
+	values := Numbers{3, 4}
+	pair := Pair(values)
+	return pair[0]*10 + pair[1]
+}
+
+func AggregateSliceToArrayCopies() int32 {
+	values := []TaggedLeft{{Value: 4}, {Value: 5}}
+	pair := [2]TaggedLeft(values)
+	pair[0].Value = 9
+	return values[0].Value*10 + pair[0].Value
+}
+
+func shortSlice() []int32 {
+	EvaluationCount++
+	return []int32{1, 2}
+}
+
+func SliceToArrayPanics() {
+	EvaluationCount = 0
+	_ = [3]int32(shortSlice())
+}
+
+func SliceToArrayPanicCount() int32 {
+	return EvaluationCount
+}

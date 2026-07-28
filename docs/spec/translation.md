@@ -973,13 +973,14 @@ must carry or validate the exact Go type; it is not a second type-identity
 model.
 
 Each canonical anonymous declaration owns its field storage and demanded
-static zero, copy, equality, and hash members once. Ordinary construction may
-remain direct, but operation use sites are constant-size calls. Doubling uses
-must not duplicate field walks. Field tags participate in identity but emit no
-runtime metadata unless a later reflection consumer requests it. Blank fields
-participate in identity and required evaluation order but expose no mutable
-target property. Embedded fields remain storage composition here; promotion
-and method selection remain with their later semantic owner.
+static zero, copy, equality, hash, and structural-conversion members once.
+Ordinary construction may remain direct, but operation use sites are
+constant-size calls. Doubling uses must not duplicate field walks. Field tags
+participate in identity but emit no runtime metadata unless a later reflection
+consumer requests it. Blank fields participate in identity and required
+evaluation order but expose no mutable target property. Embedded fields remain
+storage composition here; promotion and method selection remain with their
+later semantic owner.
 
 Each zero, copy, or equality capability is emitted at most once and only when a
 selected occurrence requests it. Its typed request is routed to the defining
@@ -1222,7 +1223,7 @@ identity; `real` and `imag` become readonly component access, while `complex`
 evaluates its two arguments once in order and calls the width-owned
 constructor.
 
-### Explicit numeric conversions
+### Explicit conversions
 
 A `CallExpr` is a conversion only when the selected `go/types.TypeAndValue`
 for its callee reports `IsType()`. The conversion owner reads the checker's
@@ -1230,10 +1231,13 @@ source type, destination type, and converted constant value. It never
 recognizes a conversion from callee spelling and never lets an unimplemented
 conversion fall through to ordinary-call emission.
 
-This section closes conversions among the currently represented integer,
-floating-point, and complex types. String/container, defined-type, pointer,
-interface, channel, and generic conversions retain their separate semantic
-owners and remain typed unsupported until those families land.
+The conversion owner delegates by exact source and destination representation.
+Integer, floating-point, complex, byte-string, represented struct, and
+slice-to-array value conversions are admitted here. Pointer, interface,
+channel, and generic conversions retain separate semantic owners and fail
+typed until those owners land. Defined types project only through their
+declared representation owner before conversion and wrap only after the
+destination conversion succeeds.
 
 Constant conversions materialize the converted checker value directly:
 
@@ -1260,6 +1264,11 @@ Non-constant conversions have one closed destination-family decision:
 | `float32` to `float64` | the already-rounded operand directly |
 | `float64` to `float32` | the shared binary32 rounder |
 | `complex64` to `complex128` or the reverse | construct the destination nominal value from its two components; the `complex64` constructor rounds both |
+| integer to string | encode one Go rune as UTF-8 bytes, replacing an invalid scalar value with `RuneError` |
+| `[]byte` to string or string to `[]byte` | copy the exact Go string bytes; nil slices produce the empty string and destination slices never alias |
+| `[]rune` to string or string to `[]rune` | encode or decode UTF-8 with Go's invalid-sequence width and `RuneError` rules |
+| represented struct to represented struct | call the destination class's one demand-owned structural conversion member; tags may differ, fields are copied recursively, and each use is O(1) |
+| slice to array value | evaluate the slice once, panic when its length is short, allocate a fresh array, and copy the first destination-length elements |
 
 The selected GoToTS implementation-defined result for a non-finite
 floating-to-integer conversion is zero before width normalization. Finite
@@ -1276,6 +1285,43 @@ floating-to-integer conversion in the `bigint` profile and 64-bit sign/width
 boundaries in the `number` profile.
 Conversion output remains O(1) per occurrence and no generic conversion
 registry, erased carrier, cast, or source-text route exists.
+
+String conversion treats a target JavaScript string as a sequence of Go bytes,
+not UTF-16 text. The generated UTF-8 encoder/decoder is one typed runtime
+owner; it uses neither host text codecs nor source spelling. For example,
+`string([]byte{0xff, 'A'})` retains byte values `255, 65`, and
+`[]rune("\xff")` yields one `RuneError`.
+
+Represented struct conversion is definition-owned rather than expanded at the
+use:
+
+```go
+type Left struct{ Pair [2]int32 `json:"left"` }
+type Right struct{ Pair [2]int32 `json:"right"` }
+right := Right(left)
+```
+
+```ts
+class Right {
+  static $convert(source: { Pair: GoArray<int32, 2> }): Right {
+    return new Right(source.Pair.copy());
+  }
+}
+const right = Right.$convert(left);
+```
+
+The structural parameter intentionally excludes the source's private nominal
+brand. `go/types.ConvertibleTo` remains the admission authority; TypeScript
+structural assignability does not decide whether conversion is legal.
+Anonymous destinations receive the same demand on their canonical class.
+Exactly one `$convert` definition exists per reached destination class,
+regardless of source-use count.
+
+For a discarded assignment, the assignment owner preserves Go's evaluation
+rule. `_ = runtimeCall()` emits the call and discards its result, while
+`_ = len([4]int{})` emits nothing because the checker proves the complete
+expression constant and Go does not evaluate its operand. No fictitious blank
+storage location is created.
 
 ### Ordered `max` and `min`
 

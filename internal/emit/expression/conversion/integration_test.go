@@ -9,7 +9,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
-func TestNumericConversionsExecuteDifferentially(t *testing.T) {
+func TestConversionsExecuteDifferentially(t *testing.T) {
 	for _, testCase := range []struct {
 		name    string
 		options emit.Options
@@ -43,6 +43,23 @@ func TestNumericConversionsExecuteDifferentially(t *testing.T) {
 				if strings.Contains(printed, forbidden) {
 					t.Fatalf("conversion artifact contains %q:\n%s", forbidden, printed)
 				}
+			}
+			if got := strings.Count(printed, "static $convert("); got != 2 {
+				t.Fatalf(
+					"struct conversion definitions = %d, want 2:\n%s",
+					got,
+					printed,
+				)
+			}
+			if got := strings.Count(
+				printed,
+				"TaggedRight.$convert(",
+			); got != 3 {
+				t.Fatalf(
+					"TaggedRight conversion uses = %d, want 3:\n%s",
+					got,
+					printed,
+				)
 			}
 			goOutput := runConversionGo(t, workingDirectory)
 			targetOutput := runConversionTypeScript(

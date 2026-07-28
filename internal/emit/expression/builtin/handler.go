@@ -2,17 +2,22 @@ package builtin
 
 import (
 	"go/ast"
+	"go/constant"
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	constantvalue "github.com/tsoniclang/gotots/internal/emit/constant"
 	clearbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/clear"
 	complexbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/complex"
 	mapbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/map"
 	newvalue "github.com/tsoniclang/gotots/internal/emit/expression/builtin/newvalue"
 	orderedbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/ordered"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func Emit(
@@ -67,6 +72,9 @@ func Emit(
 	case types.Universe.Lookup("make"):
 		return emitMake(context, children, source, discarded)
 	case types.Universe.Lookup("len"):
+		if target, ok, err := emitConstantMeasure(context, source); ok {
+			return target, err
+		}
 		if len(source.Args) == 1 &&
 			supportsStringArgument(
 				context.TypesInfo().TypeOf(source.Args[0]),
@@ -87,6 +95,15 @@ func Emit(
 				discarded,
 			)
 		}
+		if array, ok := pointerArrayArgument(context, source); ok {
+			return emitPointerArrayMeasure(
+				context,
+				children,
+				source,
+				array,
+				discarded,
+			)
+		}
 		return emitMeasure(
 			context,
 			children,
@@ -95,8 +112,20 @@ func Emit(
 			runtimeslice.MemberLength,
 		)
 	case types.Universe.Lookup("cap"):
+		if target, ok, err := emitConstantMeasure(context, source); ok {
+			return target, err
+		}
 		if array, ok := arrayArgument(context, source); ok {
 			return emitArrayMeasure(
+				context,
+				children,
+				source,
+				array,
+				discarded,
+			)
+		}
+		if array, ok := pointerArrayArgument(context, source); ok {
+			return emitPointerArrayMeasure(
 				context,
 				children,
 				source,
@@ -122,6 +151,35 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+}
+
+func emitConstantMeasure(
+	context api.Context,
+	source *ast.CallExpr,
+) (api.ExpressionEmission, bool, error) {
+	if source == nil || len(source.Args) != 1 {
+		return api.ExpressionEmission{}, false, nil
+	}
+	facts, ok := context.TypesInfo().Types[source]
+	if !ok || facts.Type == nil || facts.Value == nil {
+		return api.ExpressionEmission{}, false, nil
+	}
+	if facts.Value.Kind() != constant.Int {
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if expected := context.ExpectedType(); expected != nil &&
+		!types.AssignableTo(facts.Type, expected) {
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	target, err := constantvalue.EmitValue(
+		context.WithRole(api.RoleBuiltinArgument),
+		source,
+		facts.Type,
+		facts.Value,
+	)
+	return target, true, err
 }
 
 func Object(
@@ -189,6 +247,28 @@ func arrayArgument(
 	)
 }
 
+func pointerArrayArgument(
+	context api.Context,
+	source *ast.CallExpr,
+) (arrayvalue.RuntimeArray, bool) {
+	if source == nil || len(source.Args) != 1 {
+		return arrayvalue.RuntimeArray{}, false
+	}
+	sourceType := context.TypesInfo().TypeOf(source.Args[0])
+	_, elementType, ok := pointertype.Resolve(sourceType)
+	if !ok {
+		if defined, definedOK := definedtype.ResolvePointer(sourceType); definedOK {
+			pointer, _ := defined.Pointer()
+			elementType = pointer.Elem()
+			ok = true
+		}
+	}
+	if !ok {
+		return arrayvalue.RuntimeArray{}, false
+	}
+	return arrayvalue.Resolve(context, elementType)
+}
+
 func emitArrayMeasure(
 	context api.Context,
 	children api.ChildEmitter,
@@ -197,12 +277,75 @@ func emitArrayMeasure(
 	discarded bool,
 ) (api.ExpressionEmission, error) {
 	result := context.TypesInfo().TypeOf(source)
-	if discarded ||
-		result == nil ||
-		context.ExpectedType() == nil ||
-		!types.AssignableTo(result, context.ExpectedType()) {
+	if result == nil ||
+		(!discarded &&
+			(context.ExpectedType() == nil ||
+				!types.AssignableTo(result, context.ExpectedType()))) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	return array.EmitLength(context, children, source)
+}
+
+func emitPointerArrayMeasure(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.CallExpr,
+	array arrayvalue.RuntimeArray,
+	discarded bool,
+) (api.ExpressionEmission, error) {
+	resultType := context.TypesInfo().TypeOf(source)
+	if resultType == nil ||
+		(!discarded &&
+			(context.ExpectedType() == nil ||
+				!types.AssignableTo(resultType, context.ExpectedType()))) {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	argumentType := context.TypesInfo().TypeOf(source.Args[0])
+	argument, err := children.Expression(
+		context.
+			WithRole(api.RoleBuiltinArgument).
+			WithExpectedType(argumentType),
+		source.Args[0],
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	name, err := context.Names().Temporary(api.TemporaryCallArgument)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	length, err := constantvalue.EmitValue(
+		context.WithRole(api.RoleBuiltinArgument),
+		source,
+		resultType,
+		constant.MakeInt64(array.Length()),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	before := append(
+		argument.Before(),
+		context.Factory().VariableStatement(
+			nil,
+			context.Factory().VariableDeclarationList(
+				[]tsgo.VariableDeclaration{
+					context.Factory().VariableDeclaration(
+						context.Factory().Identifier(name),
+						nil,
+						nil,
+						argument.Value(),
+					),
+				},
+				tsgo.NodeFlagsConst,
+			),
+		),
+	)
+	before = append(before, length.Before()...)
+	return api.NewExpressionEmission(
+		before,
+		length.Value(),
+		api.CombineRequests(argument.Requests(), length.Requests()),
+	)
 }

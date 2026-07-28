@@ -12,6 +12,9 @@ import (
 	complexconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/complex"
 	floatconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/float"
 	integerconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/integer"
+	slicearrayconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/slicearray"
+	stringconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/stringvalue"
+	structconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/structvalue"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
 	floatvalue "github.com/tsoniclang/gotots/internal/emit/value/float"
@@ -104,47 +107,75 @@ func Emit(
 		representedTargetType = targetDefined.Underlying()
 	}
 	var target api.ExpressionEmission
-	switch {
-	case directReferenceConversion(sourceType, representedTargetType):
-		target = operandValue
-	case directArrayConversion(sourceType, representedTargetType):
-		target, err = context.Values().Copy(
-			context.WithRole(api.RoleConversionOperand),
-			operand,
-			sourceType,
-			operandValue,
-		)
-	case directCallableConversion(sourceType, representedTargetType):
-		target = operandValue
-	case isInteger(context, representedTargetType):
-		target, err = integerconversion.Convert(
-			context,
-			source,
-			sourceType,
-			representedTargetType,
-			operandValue,
-		)
-	case isFloat(representedTargetType):
-		target, err = floatconversion.Convert(
-			context,
-			source,
-			sourceType,
-			representedTargetType,
-			operandValue,
-		)
-	case isComplex(representedTargetType):
-		target, err = complexconversion.Convert(
-			context,
-			source,
-			sourceType,
-			representedTargetType,
-			operandValue,
-		)
-	case directBasicConversion(sourceType, representedTargetType):
-		target = operandValue
-	default:
-		return api.ExpressionEmission{}, true,
-			api.Unsupported(context, api.CategoryExpression, source)
+	if arrayTarget, handled, arrayErr := slicearrayconversion.Convert(
+		context,
+		children,
+		source,
+		sourceType,
+		representedTargetType,
+		operandValue,
+	); handled {
+		target, err = arrayTarget, arrayErr
+	} else if structTarget, handled, structErr := structconversion.Convert(
+		context,
+		source,
+		sourceType,
+		representedTargetType,
+		operandValue,
+	); handled {
+		target, err = structTarget, structErr
+	} else if stringTarget, handled, stringErr := stringconversion.Convert(
+		context,
+		children,
+		source,
+		sourceType,
+		representedTargetType,
+		operandValue,
+	); handled {
+		target, err = stringTarget, stringErr
+	} else {
+		switch {
+		case directReferenceConversion(sourceType, representedTargetType):
+			target = operandValue
+		case directArrayConversion(sourceType, representedTargetType):
+			target, err = context.Values().Copy(
+				context.WithRole(api.RoleConversionOperand),
+				operand,
+				sourceType,
+				operandValue,
+			)
+		case directCallableConversion(sourceType, representedTargetType):
+			target = operandValue
+		case isInteger(context, representedTargetType):
+			target, err = integerconversion.Convert(
+				context,
+				source,
+				sourceType,
+				representedTargetType,
+				operandValue,
+			)
+		case isFloat(representedTargetType):
+			target, err = floatconversion.Convert(
+				context,
+				source,
+				sourceType,
+				representedTargetType,
+				operandValue,
+			)
+		case isComplex(representedTargetType):
+			target, err = complexconversion.Convert(
+				context,
+				source,
+				sourceType,
+				representedTargetType,
+				operandValue,
+			)
+		case directBasicConversion(sourceType, representedTargetType):
+			target = operandValue
+		default:
+			return api.ExpressionEmission{}, true,
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
 	}
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
