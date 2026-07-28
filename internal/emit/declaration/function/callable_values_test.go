@@ -39,8 +39,12 @@ func TestFunctionLiteralAndSignatureOwnersCreateNativeTargetTree(t *testing.T) {
 	if !ok {
 		t.Fatalf("Offset return = %T, want FunctionExpression", targetReturn(t, offset).Expression())
 	}
-	if _, ok := offset.Type().(tsgo.FunctionTypeNode); !ok {
-		t.Fatalf("Offset result type = %T, want FunctionTypeNode", offset.Type())
+	offsetType, ok := offset.Type().(tsgo.UnionTypeNode)
+	if !ok || len(offsetType.Types()) != 2 {
+		t.Fatalf("Offset result type = %T, want callable | undefined", offset.Type())
+	}
+	if _, ok := offsetType.Types()[0].(tsgo.FunctionTypeNode); !ok {
+		t.Fatalf("Offset non-nil result type = %T, want FunctionTypeNode", offsetType.Types()[0])
 	}
 	if len(literal.Parameters()) != 1 {
 		t.Fatalf("literal parameters = %d, want one", len(literal.Parameters()))
@@ -60,27 +64,33 @@ func TestCallableValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	}
 	if !strings.Contains(
 		printed,
-		"transform: ($0: int32) => int32",
+		"transform: (($0: int32) => int32) | undefined",
 	) || !strings.Contains(
 		printed,
 		"return function (value: int32): int32",
 	) || !strings.Contains(
 		printed,
-		"return Choose(positive)(value);",
+		`GoPanic.raise("call of nil function")`,
+	) || !strings.Contains(
+		printed,
+		"return Apply(Double, value);",
 	) {
 		t.Fatalf("printed callable artifact is not direct:\n%s", printed)
 	}
 	if strings.Contains(printed, "__gotots_parameter_") {
 		t.Fatalf("printed callable artifact contains wide synthetic parameter names:\n%s", printed)
 	}
-	calleeCapture := strings.Index(printed, "const __gotots_callee_")
-	argumentCapture := strings.Index(printed, "const __gotots_results_")
+	ordered := printedFunction(t, printed, "OrderedCalleeAndArguments")
+	calleeCapture := strings.Index(ordered, "const __gotots_callee_")
+	argumentCapture := strings.Index(ordered, "const __gotots_results_")
+	guard := strings.Index(ordered, "if (__gotots_callee_")
 	if calleeCapture < 0 ||
 		argumentCapture < 0 ||
-		calleeCapture >= argumentCapture {
+		guard < 0 ||
+		!(calleeCapture < argumentCapture && argumentCapture < guard) {
 		t.Fatalf(
-			"function-valued callee was not captured before argument prerequisites:\n%s",
-			printed,
+			"callee is not captured before argument prerequisites and guard:\n%s",
+			ordered,
 		)
 	}
 
@@ -96,13 +106,30 @@ func TestCallableValuesCreateNativeTargetTrees(t *testing.T) {
 	targetFile := compileSourceFile(t, loaded, loaded.Files()[0].Syntax())
 
 	apply := targetFunction(t, targetFile, "Apply")
-	call, ok := targetReturn(t, apply).Expression().(tsgo.CallExpression)
+	statements := apply.Body().(tsgo.Block).Statements()
+	if len(statements) != 4 {
+		t.Fatalf("Apply statements = %d, want callee, argument, guard, return", len(statements))
+	}
+	result, ok := statements[3].(tsgo.ReturnStatement)
 	if !ok {
-		t.Fatalf("Apply return = %T, want direct CallExpression", targetReturn(t, apply).Expression())
+		t.Fatalf("Apply final statement = %T, want return", statements[3])
+	}
+	call, ok := result.Expression().(tsgo.CallExpression)
+	if !ok {
+		t.Fatalf("Apply return = %T, want direct call", result.Expression())
 	}
 	callee, ok := call.Expression().(tsgo.Identifier)
-	if !ok || callee.Text() != "transform" {
-		t.Fatalf("Apply callee = %T %#v, want transform identifier", call.Expression(), call.Expression())
+	if !ok || !strings.HasPrefix(callee.Text(), "__gotots_callee_") {
+		t.Fatalf("Apply callee = %T %#v, want captured callable", call.Expression(), call.Expression())
+	}
+	if _, ok := statements[0].(tsgo.VariableStatement); !ok {
+		t.Fatalf("Apply callee capture = %T, want variable statement", statements[0])
+	}
+	if _, ok := statements[1].(tsgo.VariableStatement); !ok {
+		t.Fatalf("Apply argument capture = %T, want variable statement", statements[1])
+	}
+	if _, ok := statements[2].(tsgo.IfStatement); !ok {
+		t.Fatalf("Apply guard = %T, want if statement", statements[2])
 	}
 
 	offset := targetFunction(t, targetFile, "Offset")

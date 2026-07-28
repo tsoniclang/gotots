@@ -171,11 +171,17 @@ func assertCallableScalingTree(t *testing.T, source tsgo.SourceFile, count int) 
 	}
 	call, ok := result.Expression().(tsgo.CallExpression)
 	if !ok || len(call.Arguments()) != 1 {
-		t.Fatalf("Run return = %T, want one-argument direct call", result.Expression())
+		t.Fatalf("Run result = %T, want one-argument direct call", result.Expression())
 	}
 	callee, ok := call.Expression().(tsgo.Identifier)
-	if !ok || callee.Text() != "callback" {
-		t.Fatalf("Run callee = %T, want callback identifier", call.Expression())
+	if !ok || !strings.HasPrefix(callee.Text(), "__gotots_callee_") {
+		t.Fatalf("Run callee = %T, want captured callable", call.Expression())
+	}
+	if len(runStatements) != 5 {
+		t.Fatalf("Run statements = %d, want callback, callee, argument, guard, return", len(runStatements))
+	}
+	if _, ok := runStatements[len(runStatements)-2].(tsgo.IfStatement); !ok {
+		t.Fatalf("Run guard = %T, want IfStatement", runStatements[len(runStatements)-2])
 	}
 }
 

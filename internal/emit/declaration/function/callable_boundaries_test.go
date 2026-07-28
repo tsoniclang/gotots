@@ -57,41 +57,16 @@ func Accept(transform func(...int32) int32) int32 {
 			construct: "*ast.FuncType",
 		},
 		{
-			name: "nil function value",
+			name: "expression form new",
 			source: `package boundary
 
-func NilValue() func() int32 {
-	var callback func() int32
-	return callback
-}
-`,
-			role:      api.RoleLocalValue,
-			category:  api.CategoryExpression,
-			construct: "*ast.Ident",
-		},
-		{
-			name: "function nil comparison",
-			source: `package boundary
-
-func IsNil(callback func() int32) bool {
-	return callback == nil
+func NewValue(value int32) *int32 {
+	return new(value)
 }
 `,
 			role:      api.RoleReturnResult,
 			category:  api.CategoryExpression,
-			construct: "*ast.BinaryExpr",
-		},
-		{
-			name: "new function value requires nil callable representation",
-			source: `package boundary
-
-func NewCallback() *func() int32 {
-	return new(func() int32)
-}
-`,
-			role:      api.RoleCallArgument,
-			category:  api.CategoryExpression,
-			construct: "*ast.FuncType",
+			construct: "*ast.CallExpr",
 		},
 	}
 

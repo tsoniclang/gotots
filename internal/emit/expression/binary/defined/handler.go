@@ -12,6 +12,7 @@ import (
 	complexbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/complex"
 	floatbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/float"
 	integerbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/integer"
+	binaryoperands "github.com/tsoniclang/gotots/internal/emit/expression/binary/operands"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
 	floatvalue "github.com/tsoniclang/gotots/internal/emit/value/float"
@@ -45,9 +46,14 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	if len(left.Before()) != 0 || len(right.Before()) != 0 {
-		return api.ExpressionEmission{}, true,
-			api.Unsupported(context, api.CategoryExpression, source)
+	operands, err := binaryoperands.Preserve(
+		context,
+		left,
+		right,
+		api.TemporaryBinaryOperand,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
 	}
 	underlying, valid := model.Basic()
 	if !valid {
@@ -60,8 +66,8 @@ func Emit(
 		context,
 		source.Op,
 		underlying,
-		left,
-		right,
+		operands.Left(),
+		operands.Right(),
 		rightConstant(context, source.Y),
 	)
 	if err != nil {
@@ -74,6 +80,10 @@ func Emit(
 	if wrapsResult {
 		target, err = model.Wrap(context, target)
 	}
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	target, err = binaryoperands.Finish(operands, target)
 	return target, true, err
 }
 

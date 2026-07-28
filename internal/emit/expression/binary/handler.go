@@ -12,6 +12,7 @@ import (
 	definedbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/defined"
 	floatbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/float"
 	integerbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/integer"
+	binaryoperands "github.com/tsoniclang/gotots/internal/emit/expression/binary/operands"
 	"github.com/tsoniclang/gotots/internal/emit/expression/mapcomparison"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -105,36 +106,30 @@ func Emit(
 	if isLogicalOperator(source.Op) {
 		return emitLogical(context, source.Op, operator, left, right)
 	}
-	before := left.Before()
-	leftValue := left.Value()
-	if len(right.Before()) != 0 {
-		leftName, err := context.Names().Temporary(api.TemporaryBinaryOperand)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		before = append(
-			before,
-			binaryVariable(
-				context,
-				tsgo.NodeFlagsConst,
-				leftName,
-				leftValue,
-			),
-		)
-		leftValue = context.Factory().Identifier(leftName)
+	operands, err := binaryoperands.Preserve(
+		context,
+		left,
+		right,
+		api.TemporaryBinaryOperand,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
-	before = append(before, right.Before()...)
-	target := tsgo.Expression(context.Factory().BinaryExpression(
-		nil,
-		leftValue,
-		nil,
-		operator,
-		right.Value(),
-	))
-	return api.NewExpressionEmission(
-		before,
-		target,
-		api.CombineRequests(left.Requests(), right.Requests()),
+	return binaryoperands.Finish(
+		operands,
+		api.DirectExpression(
+			context.Factory().BinaryExpression(
+				nil,
+				operands.Left().Value(),
+				nil,
+				operator,
+				operands.Right().Value(),
+			),
+			api.CombineRequests(
+				operands.Left().Requests(),
+				operands.Right().Requests(),
+			)...,
+		),
 	)
 }
 

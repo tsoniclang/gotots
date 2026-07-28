@@ -38,6 +38,9 @@ func (Owner) RequiresCustomEquality(
 	if pointerValue(sourceType) {
 		return true
 	}
+	if callableValue(sourceType) {
+		return true
+	}
 	_, _, ok := namedStruct(sourceType)
 	return ok
 }
@@ -49,7 +52,7 @@ func (Owner) RequiresExplicitType(
 	if defined, ok := definedtype.Resolve(sourceType); ok {
 		return defined.NilCapable()
 	}
-	return pointerValue(sourceType)
+	return pointerValue(sourceType) || callableValue(sourceType)
 }
 
 func (Owner) RequiresStructuralCopy(
@@ -82,6 +85,9 @@ func (Owner) Zero(
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
+		}
+		if defined.Family() == definedtype.FamilyCallable {
+			return zero, nil
 		}
 		return defined.Wrap(context, zero)
 	}
@@ -173,6 +179,13 @@ func (Owner) Zero(
 			),
 		), nil
 	}
+	if callableValue(sourceType) {
+		return api.DirectExpression(
+			context.Factory().VoidExpression(
+				context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
+			),
+		), nil
+	}
 	if _, _, ok := scalarSlice(context, sourceType); ok {
 		return sliceZero(context, source, sourceType)
 	}
@@ -209,6 +222,23 @@ func (Owner) Copy(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
+	if target, ok := definedtype.ResolveCallable(sourceType); ok {
+		actual := expressionType(context, source)
+		if actual == nil || types.Identical(actual, sourceType) {
+			return api.NewExpressionEmission(
+				value.Before(),
+				value.Value(),
+				value.Requests(),
+			)
+		}
+		return target.Wrap(context, value)
+	}
+	if expression := expressionType(context, source); expression != nil &&
+		!types.Identical(expression, sourceType) {
+		if actual, ok := definedtype.ResolveCallable(expression); ok {
+			return actual.Project(context, value)
+		}
+	}
 	if defined, ok := definedtype.Resolve(sourceType); ok &&
 		defined.Family() != definedtype.FamilyArray {
 		return api.NewExpressionEmission(
@@ -293,6 +323,14 @@ func ownsFreshValue(context api.Context, source ast.Node) bool {
 	}
 }
 
+func expressionType(context api.Context, source ast.Node) types.Type {
+	expression, ok := source.(ast.Expr)
+	if !ok {
+		return nil
+	}
+	return context.TypesInfo().TypeOf(expression)
+}
+
 func (Owner) Assign(
 	context api.Context,
 	source ast.Node,
@@ -342,6 +380,19 @@ func (Owner) Equal(
 	right tsgo.Expression,
 ) (api.ExpressionEmission, error) {
 	if defined, ok := definedtype.Resolve(sourceType); ok {
+		if defined.Family() == definedtype.FamilyCallable {
+			return api.DirectExpression(
+				context.Factory().BinaryExpression(
+					nil,
+					left,
+					nil,
+					context.Factory().BinaryOperatorToken(
+						tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+					),
+					right,
+				),
+			), nil
+		}
 		leftValue := api.DirectExpression(left)
 		rightValue := api.DirectExpression(right)
 		var err error
@@ -434,6 +485,19 @@ func (Owner) Equal(
 				tsgo.NodeFlagsNone,
 			),
 			reference.Requests()...,
+		), nil
+	}
+	if callableValue(sourceType) {
+		return api.DirectExpression(
+			context.Factory().BinaryExpression(
+				nil,
+				left,
+				nil,
+				context.Factory().BinaryOperatorToken(
+					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+				),
+				right,
+			),
 		), nil
 	}
 	typeName, _, ok := namedStruct(sourceType)

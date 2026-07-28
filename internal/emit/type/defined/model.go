@@ -4,6 +4,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/callable"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -29,6 +30,7 @@ const (
 	FamilyArray
 	FamilySlice
 	FamilyPointer
+	FamilyCallable
 )
 
 func Resolve(sourceType types.Type) (Model, bool) {
@@ -50,6 +52,12 @@ func Resolve(sourceType types.Type) (Model, bool) {
 		family = FamilySlice
 	case *types.Pointer:
 		family = FamilyPointer
+	case *types.Signature:
+		signature := underlying.(*types.Signature)
+		if !callable.Supports(signature) || signature.Recv() != nil {
+			return Model{}, false
+		}
+		family = FamilyCallable
 	default:
 		return Model{}, false
 	}
@@ -81,6 +89,11 @@ func ResolvePointer(sourceType types.Type) (Model, bool) {
 	return model, ok && model.family == FamilyPointer
 }
 
+func ResolveCallable(sourceType types.Type) (Model, bool) {
+	model, ok := Resolve(sourceType)
+	return model, ok && model.family == FamilyCallable
+}
+
 func (m Model) Type() *types.Named {
 	return m.named
 }
@@ -98,7 +111,9 @@ func (m Model) Family() Family {
 }
 
 func (m Model) NilCapable() bool {
-	return m.family == FamilySlice || m.family == FamilyPointer
+	return m.family == FamilySlice ||
+		m.family == FamilyPointer ||
+		m.family == FamilyCallable
 }
 
 func (m Model) Basic() (*types.Basic, bool) {
@@ -121,6 +136,11 @@ func (m Model) Pointer() (*types.Pointer, bool) {
 	return pointer, ok && m.family == FamilyPointer
 }
 
+func (m Model) Callable() (*types.Signature, bool) {
+	signature, ok := m.underlying.(*types.Signature)
+	return signature, ok && m.family == FamilyCallable
+}
+
 func (m Model) Unwrap(
 	factory tsgo.Factory,
 	value tsgo.Expression,
@@ -137,7 +157,8 @@ func (m Model) Project(
 	context api.Context,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	if m.NilCapable() {
+	switch m.family {
+	case FamilySlice, FamilyPointer:
 		reference, err := context.Names().Reference(m.typeName)
 		if err != nil {
 			return api.ExpressionEmission{}, err
@@ -158,12 +179,29 @@ func (m Model) Project(
 			),
 			api.CombineRequests(value.Requests(), reference.Requests()),
 		)
+	case FamilyCallable:
+		temporary, before, err := captureCallable(context, value)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.NewExpressionEmission(
+			before,
+			context.Factory().ConditionalExpression(
+				callableIsNil(context.Factory(), temporary),
+				context.Factory().QuestionToken(),
+				callableNil(context.Factory()),
+				context.Factory().ColonToken(),
+				m.Unwrap(context.Factory(), temporary),
+			),
+			value.Requests(),
+		)
+	default:
+		return api.NewExpressionEmission(
+			value.Before(),
+			m.Unwrap(context.Factory(), value.Value()),
+			value.Requests(),
+		)
 	}
-	return api.NewExpressionEmission(
-		value.Before(),
-		m.Unwrap(context.Factory(), value.Value()),
-		value.Requests(),
-	)
 }
 
 func (m Model) Construct(
@@ -185,7 +223,8 @@ func (m Model) Wrap(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if m.NilCapable() {
+	switch m.family {
+	case FamilySlice, FamilyPointer:
 		return api.NewExpressionEmission(
 			value.Before(),
 			context.Factory().CallExpression(
@@ -202,6 +241,26 @@ func (m Model) Wrap(
 			),
 			api.CombineRequests(value.Requests(), reference.Requests()),
 		)
+	case FamilyCallable:
+		temporary, before, err := captureCallable(context, value)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.NewExpressionEmission(
+			before,
+			context.Factory().ConditionalExpression(
+				callableIsNil(context.Factory(), temporary),
+				context.Factory().QuestionToken(),
+				callableNil(context.Factory()),
+				context.Factory().ColonToken(),
+				context.Factory().NewExpression(
+					context.Factory().Identifier(reference.Name()),
+					nil,
+					[]tsgo.Expression{temporary},
+				),
+			),
+			api.CombineRequests(value.Requests(), reference.Requests()),
+		)
 	}
 	return api.NewExpressionEmission(
 		value.Before(),
@@ -211,5 +270,58 @@ func (m Model) Wrap(
 			[]tsgo.Expression{value.Value()},
 		),
 		api.CombineRequests(value.Requests(), reference.Requests()),
+	)
+}
+
+func captureCallable(
+	context api.Context,
+	value api.ExpressionEmission,
+) (tsgo.Identifier, []tsgo.Statement, error) {
+	temporaryName, err := context.Names().Temporary(
+		api.TemporaryConversionOperand,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	temporary := context.Factory().Identifier(temporaryName)
+	before := value.Before()
+	before = append(
+		before,
+		context.Factory().VariableStatement(
+			nil,
+			context.Factory().VariableDeclarationList(
+				[]tsgo.VariableDeclaration{
+					context.Factory().VariableDeclaration(
+						temporary,
+						nil,
+						nil,
+						value.Value(),
+					),
+				},
+				tsgo.NodeFlagsConst,
+			),
+		),
+	)
+	return temporary, before, nil
+}
+
+func callableNil(factory tsgo.Factory) tsgo.Expression {
+	return factory.VoidExpression(
+		factory.NumericLiteral("0", tsgo.TokenFlagsNone),
+	)
+}
+
+func callableIsNil(
+	factory tsgo.Factory,
+	value tsgo.Expression,
+) tsgo.Expression {
+	return factory.BinaryExpression(
+		nil,
+		value,
+		nil,
+		factory.BinaryOperatorToken(
+			tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+		),
+		callableNil(factory),
 	)
 }

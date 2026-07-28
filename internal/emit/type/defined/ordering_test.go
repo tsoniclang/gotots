@@ -70,9 +70,15 @@ func assertCompoundArtifactShape(t *testing.T, printed string) {
 	if got := strings.Count(body, "const __gotots_assign_"); got != 1 {
 		t.Fatalf("accessor compound right captures = %d, want 1:\n%s", got, body)
 	}
-	right := strings.Index(body, " = next();")
-	if right < 0 {
-		t.Fatalf("accessor compound has no captured right operand:\n%s", body)
+	right := strings.Index(body, "const __gotots_assign_")
+	rightEnd := -1
+	if right >= 0 {
+		rightEnd = strings.Index(body[right:], ";")
+	}
+	if right < 0 ||
+		rightEnd < 0 ||
+		!strings.Contains(body[right:right+rightEnd], "= __gotots_callee_") {
+		t.Fatalf("accessor compound has no captured guarded-call result:\n%s", body)
 	}
 	compound := body[right:]
 	read := strings.Index(compound, ".get(")

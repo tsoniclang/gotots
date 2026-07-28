@@ -7,6 +7,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/callable"
 	constantvalue "github.com/tsoniclang/gotots/internal/emit/constant"
 	complexconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/complex"
 	floatconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/float"
@@ -75,16 +76,13 @@ func Emit(
 		return api.ExpressionEmission{}, true, err
 	}
 	sourceType := operandFacts.Type
-	if defined, ok := definedtype.Resolve(sourceType); ok {
-		if defined.NilCapable() {
-			operandValue, err = defined.Project(context, operandValue)
-		} else {
-			operandValue, err = api.NewExpressionEmission(
-				operandValue.Before(),
-				defined.Unwrap(context.Factory(), operandValue.Value()),
-				operandValue.Requests(),
-			)
+	if types.Identical(sourceType, targetType) {
+		if _, ok := callable.Signature(targetType); ok {
+			return operandValue, true, nil
 		}
+	}
+	if defined, ok := definedtype.Resolve(sourceType); ok {
+		operandValue, err = defined.Project(context, operandValue)
 		if err != nil {
 			return api.ExpressionEmission{}, true, err
 		}
@@ -106,6 +104,8 @@ func Emit(
 			sourceType,
 			operandValue,
 		)
+	case directCallableConversion(sourceType, representedTargetType):
+		target = operandValue
 	case isInteger(context, representedTargetType):
 		target, err = integerconversion.Convert(
 			context,
@@ -155,6 +155,12 @@ func directReferenceConversion(sourceType, targetType types.Type) bool {
 	default:
 		return false
 	}
+}
+
+func directCallableConversion(sourceType, targetType types.Type) bool {
+	source, sourceOK := callable.Signature(sourceType)
+	target, targetOK := callable.Signature(targetType)
+	return sourceOK && targetOK && types.Identical(source, target)
 }
 
 func directArrayConversion(sourceType, targetType types.Type) bool {

@@ -213,6 +213,14 @@ func emitFamilyMembers(
 			return nil, nil, err
 		}
 		return emitArrayMembers(context, children, source, model)
+	case definedtype.FamilyCallable:
+		if len(requirements) != 0 {
+			return nil, nil, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "defined callable received declaration requirements",
+			}
+		}
+		return nil, nil, nil
 	default:
 		return nil, nil, &api.InvariantError{
 			Role:   context.Role(),

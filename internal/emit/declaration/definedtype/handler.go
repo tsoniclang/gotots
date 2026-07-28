@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/callable"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -56,13 +57,35 @@ func Emit(
 			target.Requests()...,
 		), true, nil
 	}
-	underlying, err := children.RepresentedType(
-		context.WithRole(api.RoleDefinedUnderlyingType),
-		source.Type,
-		model.Underlying(),
-	)
-	if err != nil {
-		return api.DeclarationEmission{}, true, err
+	var underlying api.TypeEmission
+	if model.Family() == definedtype.FamilyCallable {
+		signature, valid := model.Callable()
+		if !valid {
+			return api.DeclarationEmission{}, true, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "defined callable declaration is invalid",
+			}
+		}
+		var err error
+		underlying, err = callable.EmitNonNilType(
+			context.WithRole(api.RoleDefinedUnderlyingType),
+			children,
+			source.Type,
+			signature,
+		)
+		if err != nil {
+			return api.DeclarationEmission{}, true, err
+		}
+	} else {
+		var err error
+		underlying, err = children.RepresentedType(
+			context.WithRole(api.RoleDefinedUnderlyingType),
+			source.Type,
+			model.Underlying(),
+		)
+		if err != nil {
+			return api.DeclarationEmission{}, true, err
+		}
 	}
 	name, modifiers, err := declarationIdentity(context, typeName)
 	if err != nil {
@@ -134,10 +157,12 @@ func constructorModifiers(
 	context api.Context,
 	model definedtype.Model,
 ) []tsgo.ModifierLike {
-	if !model.NilCapable() {
+	switch model.Family() {
+	case definedtype.FamilySlice, definedtype.FamilyPointer:
+		return []tsgo.ModifierLike{context.Factory().PrivateKeyword()}
+	default:
 		return nil
 	}
-	return []tsgo.ModifierLike{context.Factory().PrivateKeyword()}
 }
 
 func sourceSpec(

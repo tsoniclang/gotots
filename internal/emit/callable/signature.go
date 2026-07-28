@@ -60,6 +60,27 @@ func EmitType(
 	source ast.Node,
 	signature *types.Signature,
 ) (api.TypeEmission, error) {
+	target, err := EmitNonNilType(context, children, source, signature)
+	if err != nil {
+		return api.TypeEmission{}, err
+	}
+	return api.DirectType(
+		context.Factory().UnionTypeNode([]tsgo.TypeNode{
+			target.Value(),
+			context.Factory().KeywordTypeNode(
+				tsgo.KeywordTypeSyntaxKindUndefinedKeyword,
+			),
+		}),
+		target.Requests()...,
+	), nil
+}
+
+func EmitNonNilType(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	signature *types.Signature,
+) (api.TypeEmission, error) {
 	target, err := emitRepresented(
 		context,
 		children,
@@ -288,7 +309,11 @@ func Signature(sourceType types.Type) (*types.Signature, bool) {
 	if sourceType == nil {
 		return nil, false
 	}
-	signature, ok := types.Unalias(sourceType).(*types.Signature)
+	sourceType = types.Unalias(sourceType)
+	if named, ok := sourceType.(*types.Named); ok {
+		sourceType = named.Underlying()
+	}
+	signature, ok := sourceType.(*types.Signature)
 	return signature, ok && Supports(signature)
 }
 

@@ -6,6 +6,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	binaryoperands "github.com/tsoniclang/gotots/internal/emit/expression/binary/operands"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -38,18 +39,27 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	if len(left.Before()) != 0 || len(right.Before()) != 0 {
-		return api.ExpressionEmission{}, true,
-			api.Unsupported(context, api.CategoryExpression, source)
+	operands, err := binaryoperands.Preserve(
+		context,
+		left,
+		right,
+		api.TemporaryBinaryOperand,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
 	}
 	target, handled, err := Apply(
 		context,
 		source.Op,
 		carrier,
-		left,
-		right,
+		operands.Left(),
+		operands.Right(),
 	)
-	return target, handled, err
+	if err != nil || !handled {
+		return target, handled, err
+	}
+	target, err = binaryoperands.Finish(operands, target)
+	return target, true, err
 }
 
 func Apply(

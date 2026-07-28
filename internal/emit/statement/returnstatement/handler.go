@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/callable"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -105,7 +106,9 @@ func emitSingle(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	if _, ok := arrayvalue.Resolve(context, resultType); ok {
+	sourceType := context.TypesInfo().TypeOf(source.Results[0])
+	if _, ok := arrayvalue.Resolve(context, resultType); ok ||
+		callableRepresentationBoundary(sourceType, resultType) {
 		result, err = context.Values().Copy(
 			context.WithRole(api.RoleReturnResult),
 			source.Results[0],
@@ -122,6 +125,14 @@ func emitSingle(
 		context.Factory().ReturnStatement(result.Value()),
 	)
 	return api.NewStatementEmission(statements, result.Requests())
+}
+
+func callableRepresentationBoundary(sourceType, resultType types.Type) bool {
+	_, sourceCallable := callable.Signature(sourceType)
+	_, resultCallable := callable.Signature(resultType)
+	return sourceCallable &&
+		resultCallable &&
+		!types.Identical(sourceType, resultType)
 }
 
 func emitMultiple(

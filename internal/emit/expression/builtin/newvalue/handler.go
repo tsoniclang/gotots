@@ -27,6 +27,11 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	argumentFacts, ok := context.TypesInfo().Types[source.Args[0]]
+	if !ok || !argumentFacts.IsType() {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
 	resultType := context.TypesInfo().TypeOf(source)
 	pointer, element, represented := pointertype.Resolve(resultType)
 	if !represented ||

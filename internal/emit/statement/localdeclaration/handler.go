@@ -6,6 +6,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/callable"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -21,7 +22,7 @@ func Emit(
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
 
-	statements := make([]tsgo.Statement, 0, len(declaration.Specs))
+	var statements []tsgo.Statement
 	var requests []api.RootRequest
 	for _, sourceSpec := range declaration.Specs {
 		spec, ok := sourceSpec.(*ast.ValueSpec)
@@ -37,7 +38,7 @@ func Emit(
 		if err != nil {
 			return api.StatementEmission{}, err
 		}
-		statements = append(statements, target)
+		statements = append(statements, target...)
 		requests = append(requests, targetRequests...)
 	}
 	return api.NewStatementEmission(statements, requests)
@@ -47,7 +48,7 @@ func emitSpec(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.ValueSpec,
-) (tsgo.VariableStatement, []api.RootRequest, error) {
+) ([]tsgo.Statement, []api.RootRequest, error) {
 	if source.Doc != nil || source.Comment != nil ||
 		len(source.Names) == 0 ||
 		(len(source.Values) != 0 && len(source.Names) != len(source.Values)) ||
@@ -60,7 +61,12 @@ func emitSpec(
 			)
 	}
 
-	declarations := make([]tsgo.VariableDeclaration, 0, len(source.Names))
+	type binding struct {
+		sourceName *ast.Ident
+		object     *types.Var
+		value      api.ExpressionEmission
+	}
+	bindings := make([]binding, 0, len(source.Names))
 	var requests []api.RootRequest
 	for index, sourceName := range source.Names {
 		if sourceName.Name == "_" {
@@ -90,19 +96,87 @@ func emitSpec(
 				)
 		}
 
-		value, err := localValue(context, children, source, sourceName, index, object)
-		if err != nil {
-			return nil, nil, err
+		_, callableZero := callable.Signature(object.Type())
+		callableZero = callableZero && len(source.Values) == 0
+		var value api.ExpressionEmission
+		var err error
+		if callableZero {
+			value = api.DirectExpression(
+				context.Factory().VoidExpression(
+					context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
+				),
+			)
+		} else {
+			value, err = localValue(
+				context,
+				children,
+				source,
+				sourceName,
+				index,
+				object,
+			)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
-		if len(value.Before()) != 0 {
-			return nil, nil,
-				api.Unsupported(
-					context.WithRole(api.RoleLocalValue),
-					api.CategoryExpression,
-					sourceName,
-				)
+		bindings = append(bindings, binding{
+			sourceName: sourceName,
+			object:     object,
+			value:      value,
+		})
+	}
+
+	hasPrerequisites := false
+	for _, binding := range bindings {
+		if len(binding.value.Before()) != 0 {
+			hasPrerequisites = true
+			break
 		}
+	}
+	var statements []tsgo.Statement
+	if hasPrerequisites {
+		for index := range bindings {
+			binding := &bindings[index]
+			statements = append(statements, binding.value.Before()...)
+			temporaryName, err := context.Names().Temporary(
+				api.TemporaryAssignmentValue,
+			)
+			if err != nil {
+				return nil, nil, err
+			}
+			statements = append(
+				statements,
+				context.Factory().VariableStatement(
+					nil,
+					context.Factory().VariableDeclarationList(
+						[]tsgo.VariableDeclaration{
+							context.Factory().VariableDeclaration(
+								context.Factory().Identifier(temporaryName),
+								nil,
+								nil,
+								binding.value.Value(),
+							),
+						},
+						tsgo.NodeFlagsConst,
+					),
+				),
+			)
+			binding.value = api.DirectExpression(
+				context.Factory().Identifier(temporaryName),
+				binding.value.Requests()...,
+			)
+		}
+	}
+
+	declarations := make([]tsgo.VariableDeclaration, 0, len(bindings))
+	for _, binding := range bindings {
+		sourceName := binding.sourceName
+		object := binding.object
+		value := binding.value
+		_, callableZero := callable.Signature(object.Type())
+		callableZero = callableZero && len(source.Values) == 0
 		targetName, selected := context.AddressableStorage().Name(context, object)
+		var err error
 		if !selected {
 			targetName, err = context.Names().Declare(object)
 		} else {
@@ -131,13 +205,17 @@ func emitSpec(
 			targetType = represented.Value()
 			requests = append(requests, represented.Requests()...)
 		}
+		var initializer tsgo.Expression = value.Value()
+		if callableZero && !selected {
+			initializer = nil
+		}
 		declarations = append(
 			declarations,
 			context.Factory().VariableDeclaration(
 				context.Factory().Identifier(targetName),
 				nil,
 				targetType,
-				value.Value(),
+				initializer,
 			),
 		)
 		requests = append(
@@ -145,13 +223,17 @@ func emitSpec(
 			value.Requests()...,
 		)
 	}
-	return context.Factory().VariableStatement(
-		nil,
-		context.Factory().VariableDeclarationList(
-			declarations,
-			tsgo.NodeFlagsLet,
+	statements = append(
+		statements,
+		context.Factory().VariableStatement(
+			nil,
+			context.Factory().VariableDeclarationList(
+				declarations,
+				tsgo.NodeFlagsLet,
+			),
 		),
-	), requests, nil
+	)
+	return statements, requests, nil
 }
 
 func localValue(

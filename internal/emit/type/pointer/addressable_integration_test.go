@@ -109,6 +109,9 @@ console.log(...NamedAggregate(14));
 console.log(...Parallel(15));
 console.log(...MultipleResult(16));
 const closure = Closure(20);
+if (closure === undefined) {
+    throw new Error("Closure returned nil");
+}
 console.log(closure(), closure());
 console.log(...Field(30));
 console.log(...NestedField(35));

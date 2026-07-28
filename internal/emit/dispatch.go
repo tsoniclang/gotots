@@ -447,14 +447,6 @@ func (e *emitter) Type(
 				sourceType,
 			)
 		}
-		if signature, ok := types.Unalias(sourceType).(*types.Signature); ok {
-			functionType, valid := source.(*ast.FuncType)
-			if !valid {
-				return api.TypeEmission{},
-					api.Unsupported(context, api.CategoryType, source)
-			}
-			return callable.EmitSyntaxType(context, e, functionType, signature)
-		}
 		if _, ok := types.Unalias(sourceType).(*types.Named); ok {
 			if target, handled, err := definedtype.Emit(
 				context,
@@ -464,6 +456,14 @@ func (e *emitter) Type(
 				return target, err
 			}
 			return namedstructtype.Emit(context, source, sourceType)
+		}
+		if signature, ok := types.Unalias(sourceType).(*types.Signature); ok {
+			functionType, valid := source.(*ast.FuncType)
+			if !valid {
+				return api.TypeEmission{},
+					api.Unsupported(context, api.CategoryType, source)
+			}
+			return callable.EmitSyntaxType(context, e, functionType, signature)
 		}
 		if _, ok := types.Unalias(sourceType).(*types.Map); ok {
 			return maptype.Emit(context, source, sourceType)
@@ -509,9 +509,6 @@ func (e *emitter) RepresentedType(
 	if tuple, ok := types.Unalias(sourceType).(*types.Tuple); ok {
 		return tupletype.Emit(context, e, source, tuple)
 	}
-	if signature, ok := types.Unalias(sourceType).(*types.Signature); ok {
-		return callable.EmitType(context, e, source, signature)
-	}
 	if _, _, ok := pointertype.Resolve(sourceType); ok {
 		return pointertype.EmitRepresented(context, e, source, sourceType)
 	}
@@ -524,6 +521,9 @@ func (e *emitter) RepresentedType(
 			return target, err
 		}
 		return namedstructtype.Emit(context, source, sourceType)
+	}
+	if signature, ok := types.Unalias(sourceType).(*types.Signature); ok {
+		return callable.EmitType(context, e, source, signature)
 	}
 	if _, ok := types.Unalias(sourceType).(*types.Map); ok {
 		return maptype.Emit(context, source, sourceType)
