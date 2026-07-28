@@ -127,6 +127,10 @@ func (unusedValues) RequiresCustomEquality(api.Context, types.Type) bool {
 	panic("unused")
 }
 
+func (unusedValues) RequiresCustomUpdate(api.Context, types.Type) bool {
+	panic("unused")
+}
+
 func (unusedValues) RequiresExplicitType(api.Context, types.Type) bool {
 	panic("unused")
 }
@@ -165,5 +169,28 @@ func (unusedValues) Equal(
 	tsgo.Expression,
 	tsgo.Expression,
 ) (api.ExpressionEmission, error) {
+	panic("unused")
+}
+
+func (unusedValues) BinaryUpdate(
+	api.Context,
+	ast.Node,
+	ast.Expr,
+	types.Type,
+	types.Type,
+	token.Token,
+	tsgo.Expression,
+	api.ExpressionEmission,
+) (api.ExpressionEmission, bool, error) {
+	panic("unused")
+}
+
+func (unusedValues) Increment(
+	api.Context,
+	ast.Node,
+	types.Type,
+	token.Token,
+	tsgo.Expression,
+) (api.ExpressionEmission, bool, error) {
 	panic("unused")
 }

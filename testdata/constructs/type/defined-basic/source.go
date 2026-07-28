@@ -150,3 +150,49 @@ func CountWithLiteral(value Count) Count {
 func FoldedCount() Count {
 	return Count(2) + 3
 }
+
+func LocalTypes(value int32) int32 {
+	type (
+		Count int32
+		Alias = Count
+	)
+	var left Count = Count(value)
+	var right Alias = left
+	return int32(left + right)
+}
+
+func CountUpdate(value Count) Count {
+	value++
+	value += 2
+	value *= 3
+	value--
+	value &= 15
+	value |= 16
+	value ^= 3
+	value &^= 1
+	value <<= 1
+	value >>= 1
+	return value
+}
+
+func DefinedBuiltins(left, right Count, label Label) (Count, Count, int) {
+	return min(left, right), max(left, right), len(label)
+}
+
+func CountPointer(value Count) Count {
+	target := new(Count)
+	*target = value
+	(*target)++
+	return *target
+}
+
+func CountSwitch(value Count) int32 {
+	switch value {
+	case 1:
+		return 10
+	case 2, 3:
+		return 20
+	default:
+		return 30
+	}
+}

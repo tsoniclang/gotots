@@ -10,7 +10,6 @@ import (
 	newvalue "github.com/tsoniclang/gotots/internal/emit/expression/builtin/newvalue"
 	orderedbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/ordered"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
-	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 )
@@ -59,7 +58,7 @@ func Emit(
 		return emitMake(context, children, source, discarded)
 	case types.Universe.Lookup("len"):
 		if len(source.Args) == 1 &&
-			basictype.SupportsString(
+			supportsStringArgument(
 				context.TypesInfo().TypeOf(source.Args[0]),
 			) {
 			return emitStringLength(

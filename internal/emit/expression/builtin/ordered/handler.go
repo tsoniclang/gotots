@@ -8,6 +8,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	constantvalue "github.com/tsoniclang/gotots/internal/emit/constant"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	floatvalue "github.com/tsoniclang/gotots/internal/emit/value/float"
 	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -68,7 +69,12 @@ func Emit(
 		)
 		return target, true, err
 	}
-	family, ok := classify(context, resultType)
+	classifiedType := resultType
+	defined, definedResult := definedtype.Resolve(resultType)
+	if definedResult {
+		classifiedType = defined.Underlying()
+	}
+	family, ok := classify(context, classifiedType)
 	if !ok {
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryExpression, source)
@@ -93,6 +99,19 @@ func Emit(
 	}
 	if len(emissions) == 1 {
 		return emissions[0], true, nil
+	}
+	if definedResult {
+		for index, emission := range emissions {
+			unwrapped, unwrapErr := api.NewExpressionEmission(
+				emission.Before(),
+				defined.Unwrap(context.Factory(), emission.Value()),
+				emission.Requests(),
+			)
+			if unwrapErr != nil {
+				return api.ExpressionEmission{}, true, unwrapErr
+			}
+			emissions[index] = unwrapped
+		}
 	}
 	values, before, requests, err := arrange(context, emissions)
 	if err != nil {
@@ -121,6 +140,9 @@ func Emit(
 			}
 	}
 	result, err := api.NewExpressionEmission(before, target, requests)
+	if err == nil && definedResult {
+		result, err = defined.Wrap(context, result)
+	}
 	return result, true, err
 }
 

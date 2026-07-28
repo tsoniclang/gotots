@@ -38,6 +38,19 @@ func Emit(
 			return array.EmitStoreTarget(context, children, source)
 		}
 		return sliceIndex(context, children, source)
+	case *ast.ParenExpr:
+		target, err := children.StoreTarget(context, source.X)
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
+		if !types.Identical(
+			context.TypesInfo().TypeOf(source),
+			target.SourceType(),
+		) {
+			return api.StoreTargetEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		return target, nil
 	case *ast.SelectorExpr:
 		return field(context, children, source)
 	case *ast.StarExpr:

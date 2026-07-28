@@ -113,6 +113,18 @@ func main() {
 	fmt.Println(values.IntFromCount(values.UntypedConstantValue()))
 	fmt.Println(values.IntFromCount(values.CountWithLiteral(values.CountFromInt(5))))
 	fmt.Println(values.IntFromCount(values.FoldedCount()))
+	fmt.Println(values.LocalTypes(6))
+	fmt.Println(values.IntFromCount(values.CountUpdate(values.CountFromInt(4))))
+	minimum, maximum, length := values.DefinedBuiltins(
+		values.CountFromInt(9),
+		values.CountFromInt(4),
+		values.LabelFromString("hello"),
+	)
+	fmt.Println(values.IntFromCount(minimum), values.IntFromCount(maximum), length)
+	fmt.Println(values.IntFromCount(values.CountPointer(values.CountFromInt(8))))
+	fmt.Println(values.CountSwitch(values.CountFromInt(1)))
+	fmt.Println(values.CountSwitch(values.CountFromInt(3)))
+	fmt.Println(values.CountSwitch(values.CountFromInt(5)))
 }
 `)
 	return runDefinedCommand(
@@ -159,6 +171,18 @@ console.log(String(values.IntFromCount(values.ConstantValue())));
 console.log(String(values.IntFromCount(values.UntypedConstantValue())));
 console.log(String(values.IntFromCount(values.CountWithLiteral(values.CountFromInt(5` + suffix + `)))));
 console.log(String(values.IntFromCount(values.FoldedCount())));
+console.log(String(values.LocalTypes(6` + suffix + `)));
+console.log(String(values.IntFromCount(values.CountUpdate(values.CountFromInt(4` + suffix + `)))));
+const [minimum, maximum, length] = values.DefinedBuiltins(
+  values.CountFromInt(9` + suffix + `),
+  values.CountFromInt(4` + suffix + `),
+  values.LabelFromString("hello"),
+);
+console.log(String(values.IntFromCount(minimum)), String(values.IntFromCount(maximum)), String(length));
+console.log(String(values.IntFromCount(values.CountPointer(values.CountFromInt(8` + suffix + `)))));
+console.log(String(values.CountSwitch(values.CountFromInt(1` + suffix + `))));
+console.log(String(values.CountSwitch(values.CountFromInt(3` + suffix + `))));
+console.log(String(values.CountSwitch(values.CountFromInt(5` + suffix + `))));
 `
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	writeDefinedFile(t, runnerPath, runner)

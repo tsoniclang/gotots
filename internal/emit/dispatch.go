@@ -36,6 +36,7 @@ import (
 	incdecstatement "github.com/tsoniclang/gotots/internal/emit/statement/incdec"
 	localconstant "github.com/tsoniclang/gotots/internal/emit/statement/localconstant"
 	localdeclaration "github.com/tsoniclang/gotots/internal/emit/statement/localdeclaration"
+	localtype "github.com/tsoniclang/gotots/internal/emit/statement/localtype"
 	returnstatement "github.com/tsoniclang/gotots/internal/emit/statement/returnstatement"
 	switchstatement "github.com/tsoniclang/gotots/internal/emit/statement/switchstatement"
 	"github.com/tsoniclang/gotots/internal/emit/storage"
@@ -300,6 +301,8 @@ func (e *emitter) Statement(
 			return localdeclaration.Emit(context, e, source)
 		case token.CONST:
 			return localconstant.Emit(context, e, source)
+		case token.TYPE:
+			return localtype.Emit(context, e, source)
 		default:
 			return api.StatementEmission{},
 				api.Unsupported(context, api.CategoryStatement, source)

@@ -2,6 +2,7 @@ package defined
 
 import (
 	"go/ast"
+	"go/constant"
 	"go/token"
 	"go/types"
 
@@ -50,10 +51,11 @@ func Emit(
 	}
 	target, handled, err := apply(
 		context,
-		source,
+		source.Op,
 		model.Underlying(),
 		left,
 		right,
+		rightConstant(context, source.Y),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
@@ -166,21 +168,27 @@ func literalConstant(source ast.Expr) bool {
 
 func apply(
 	context api.Context,
-	source *ast.BinaryExpr,
+	operator token.Token,
 	underlying *types.Basic,
 	left api.ExpressionEmission,
 	right api.ExpressionEmission,
+	rightConstant constant.Value,
 ) (api.ExpressionEmission, bool, error) {
 	if carrier, ok := integervalue.Describe(
 		context.TypesSizes(),
 		underlying,
 	); ok {
-		if !integerOperation(context, source, carrier) {
+		if !integerOperation(
+			context,
+			operator,
+			carrier,
+			rightConstant,
+		) {
 			return api.ExpressionEmission{}, false, nil
 		}
 		return integerbinary.Apply(
 			context,
-			source.Op,
+			operator,
 			carrier,
 			left,
 			right,
@@ -189,7 +197,7 @@ func apply(
 	if carrier, ok := floatvalue.Describe(underlying); ok {
 		return floatbinary.Apply(
 			context,
-			source.Op,
+			operator,
 			carrier,
 			left,
 			right,
@@ -198,7 +206,7 @@ func apply(
 	if carrier, ok := complexvalue.Describe(underlying); ok {
 		return complexbinary.Apply(
 			context,
-			source.Op,
+			operator,
 			carrier,
 			left,
 			right,
@@ -207,43 +215,69 @@ func apply(
 	target, handled := basicbinary.Apply(
 		context,
 		underlying,
-		source.Op,
+		operator,
 		left,
 		right,
 	)
 	return target, handled, nil
 }
 
+func ApplyUnderlying(
+	context api.Context,
+	operator token.Token,
+	underlying *types.Basic,
+	left api.ExpressionEmission,
+	right api.ExpressionEmission,
+	rightConstant constant.Value,
+) (api.ExpressionEmission, bool, error) {
+	return apply(
+		context,
+		operator,
+		underlying,
+		left,
+		right,
+		rightConstant,
+	)
+}
+
 func integerOperation(
 	context api.Context,
-	source *ast.BinaryExpr,
+	operator token.Token,
 	carrier integervalue.Carrier,
+	rightConstant constant.Value,
 ) bool {
 	switch {
-	case comparison(source.Op):
+	case comparison(operator):
 		return true
 	case integervalue.SupportsArithmetic(
 		context.IntegerRepresentation(),
-		source.Op,
+		operator,
 	):
 		return true
 	case integervalue.SupportsBitwise(
 		context.IntegerRepresentation(),
 		carrier,
-		source.Op,
+		operator,
 	):
 		return true
-	case source.Op == token.SHL || source.Op == token.SHR:
-		facts, ok := context.TypesInfo().Types[source.Y]
-		return ok && integervalue.SupportsShift(
+	case operator == token.SHL || operator == token.SHR:
+		return integervalue.SupportsShift(
 			context.IntegerRepresentation(),
 			carrier,
-			source.Op,
-			facts.Value,
+			operator,
+			rightConstant,
 		)
 	default:
 		return false
 	}
+}
+
+func rightConstant(context api.Context, source ast.Expr) constant.Value {
+	facts, ok := context.TypesInfo().Types[source]
+	if !ok {
+		return nil
+	}
+	return facts.Value
 }
 
 func comparison(operator token.Token) bool {

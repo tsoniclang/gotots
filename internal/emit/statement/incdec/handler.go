@@ -38,6 +38,12 @@ func EmitExpression(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	if context.Values().RequiresCustomUpdate(
+		context,
+		target.SourceType(),
+	) {
+		return emitCustom(context, source, target)
+	}
 	if !basictype.SupportsInteger(context.TypesSizes(), target.SourceType()) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
@@ -63,4 +69,44 @@ func EmitExpression(
 		),
 		target.Requests()...,
 	), nil
+}
+
+func emitCustom(
+	context api.Context,
+	source *ast.IncDecStmt,
+	target api.StoreTargetEmission,
+) (api.ExpressionEmission, error) {
+	if target.IsSetter() {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	result, handled, err := context.Values().Increment(
+		context,
+		source,
+		target.SourceType(),
+		source.Tok,
+		target.Value(),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if !handled {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	assigned, err := context.Values().Assign(
+		context.WithRole(api.RoleAssignmentTarget),
+		source,
+		target.SourceType(),
+		target.Value(),
+		result,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return api.NewExpressionEmission(
+		append(target.Before(), assigned.Before()...),
+		assigned.Value(),
+		api.CombineRequests(target.Requests(), assigned.Requests()),
+	)
 }

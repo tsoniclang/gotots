@@ -146,6 +146,48 @@ func TestDefinedLiteralOperationHasNoTransientWrapper(t *testing.T) {
 	}
 }
 
+func TestLocalDefinedTypeAndAliasUseThePackageOwners(t *testing.T) {
+	source := definedSourceFile(
+		t,
+		compileDefinedFixture(t, emit.DefaultOptions()),
+	)
+	var localTypes tsgo.FunctionDeclaration
+	for _, statement := range source.Statements() {
+		function, ok := statement.(tsgo.FunctionDeclaration)
+		if ok && function.Name().Text() == "LocalTypes" {
+			localTypes = function
+			break
+		}
+	}
+	if localTypes == nil {
+		t.Fatal("LocalTypes target function is absent")
+	}
+	statements := localTypes.Body().(tsgo.Block).Statements()
+	if len(statements) != 5 {
+		t.Fatalf("LocalTypes statements = %d, want 5", len(statements))
+	}
+	class, ok := statements[0].(tsgo.ClassDeclaration)
+	if !ok {
+		t.Fatalf("local defined declaration = %#v", statements[0])
+	}
+	localName := class.Name().Text()
+	if localName == "Count" {
+		t.Fatal("local defined type collided with the package Count declaration")
+	}
+	if len(class.Modifiers()) != 0 || len(class.Members()) != 2 {
+		t.Fatalf("local defined class has package-level shape: %#v", class)
+	}
+	alias, ok := statements[1].(tsgo.TypeAliasDeclaration)
+	if !ok || alias.Name().Text() == "Alias" || len(alias.Modifiers()) != 0 {
+		t.Fatalf("local alias declaration = %#v", statements[1])
+	}
+	target, ok := alias.Type().(tsgo.TypeReferenceNode)
+	if !ok ||
+		target.TypeName().(tsgo.Identifier).Text() != localName {
+		t.Fatalf("local alias target = %#v", alias.Type())
+	}
+}
+
 func assertMinimalDefinedClass(
 	t *testing.T,
 	class tsgo.ClassDeclaration,
