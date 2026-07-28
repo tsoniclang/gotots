@@ -38,7 +38,6 @@ func emitMethod(
 	signature, ok := method.Type().(*types.Signature)
 	if !ok ||
 		signature.Recv() == nil ||
-		signature.Variadic() ||
 		signature.TypeParams().Len() != 0 ||
 		signature.RecvTypeParams().Len() != 0 ||
 		len(selection.Index()) != 1 ||

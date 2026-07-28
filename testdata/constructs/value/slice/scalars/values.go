@@ -113,6 +113,13 @@ func AppendReallocationZeroTail() int32 {
 	return expanded[3]
 }
 
+func AppendSpread() int32 {
+	values := []int32{1, 2}
+	suffix := []int32{3, 4}
+	result := append(values, suffix...)
+	return result[3]
+}
+
 func CopyOverlapping() int32 {
 	values := []int32{1, 2, 3, 4}
 	copy(values[1:], values)

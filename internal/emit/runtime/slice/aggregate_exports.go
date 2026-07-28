@@ -30,11 +30,33 @@ func BuildAggregateOperation(
 		return target.aggregateLiteralExport(contract.ExportedName()), nil
 	case api.RuntimeSliceAppendWith:
 		return target.aggregateAppendExport(contract.ExportedName()), nil
+	case api.RuntimeSliceAppendSliceWith:
+		return target.aggregateAppendSliceExport(contract.ExportedName()), nil
 	case api.RuntimeSliceCopyWith:
 		return target.aggregateCopyExport(contract.ExportedName()), nil
 	default:
 		return nil, &api.RuntimeSymbolError{Symbol: symbol}
 	}
+}
+
+func (b builder) aggregateAppendSliceExport(name string) tsgo.FunctionDeclaration {
+	return b.aggregateExport(
+		name,
+		[]tsgo.ParameterDeclaration{
+			b.parameter("source", b.sliceType()),
+			b.parameter("zero", b.valueFactoryType()),
+			b.parameter("copyValue", b.valueCopyType()),
+			b.parameter("appended", b.sliceType()),
+		},
+		b.sliceType(),
+		b.call(
+			b.id("source"),
+			MemberName(MemberAppendSliceWith),
+			b.id("zero"),
+			b.id("copyValue"),
+			b.id("appended"),
+		),
+	)
 }
 
 func (b builder) aggregateNilExport(name string) tsgo.FunctionDeclaration {

@@ -2,7 +2,6 @@ package call
 
 import (
 	"go/ast"
-	"go/token"
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
@@ -53,10 +52,6 @@ func emit(
 			builtin,
 			discarded,
 		)
-	}
-	if source.Ellipsis != token.NoPos {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	if selector, method, selection, ok := selectedMethod(
 		context.TypesInfo(),
@@ -306,6 +301,15 @@ func emitArguments(
 				requests,
 			)
 		}
+	}
+	if signature.Variadic() {
+		return emitVariadicArguments(
+			context,
+			children,
+			source,
+			signature,
+			captureAll,
+		)
 	}
 	if signature.Params().Len() != len(source.Args) {
 		return nil, nil, nil,

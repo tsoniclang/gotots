@@ -62,6 +62,16 @@ func AppendTailZerosAreFresh() bool {
 	return expanded[3].Value == 0
 }
 
+func AppendSpreadCopiesValues() bool {
+	values := []Box{{Value: 1}}
+	appended := []Box{{Value: 2}}
+	grown := append(values, appended...)
+	appended[0].Value = 8
+	grown[0].Value = 9
+	grown[1].Value = 7
+	return values[0].Value == 9 && appended[0].Value == 8 && grown[1].Value == 7
+}
+
 func CopyDistinctCopiesValues() bool {
 	source := []Box{{Value: 1}, {Value: 2}}
 	target := make([]Box, 2)

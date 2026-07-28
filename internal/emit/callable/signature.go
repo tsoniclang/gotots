@@ -145,6 +145,22 @@ func emitRepresented(
 	var requests []api.RootRequest
 	for index := range signature.Params().Len() {
 		parameter := signature.Params().At(index)
+		if signature.Variadic() && index == signature.Params().Len()-1 {
+			parameterDeclaration, parameterRequests, err := emitVariadicParameter(
+				context,
+				children,
+				source,
+				parameter,
+				index,
+				parameterRole,
+			)
+			if err != nil {
+				return SignatureEmission{}, err
+			}
+			parameters = append(parameters, parameterDeclaration)
+			requests = append(requests, parameterRequests...)
+			continue
+		}
 		targetType, err := children.RepresentedType(
 			context.WithRole(parameterRole),
 			source,
@@ -283,9 +299,12 @@ func validateFields(
 		}
 		fieldType := context.TypesInfo().TypeOf(field.Type)
 		for fieldIndex := range fieldCount {
-			if index >= count ||
-				fieldType == nil ||
-				!types.Identical(fieldType, variables.At(index).Type()) {
+			if index >= count || !fieldMatchesVariable(
+				context,
+				field,
+				fieldType,
+				variables.At(index),
+			) {
 				return api.Unsupported(context, api.CategoryType, field)
 			}
 			variable := variables.At(index)
@@ -319,7 +338,30 @@ func Signature(sourceType types.Type) (*types.Signature, bool) {
 
 func Supports(signature *types.Signature) bool {
 	return signature != nil &&
-		!signature.Variadic() &&
 		signature.TypeParams().Len() == 0 &&
 		signature.RecvTypeParams().Len() == 0
+}
+
+func fieldMatchesVariable(
+	context api.Context,
+	field *ast.Field,
+	fieldType types.Type,
+	variable *types.Var,
+) bool {
+	if field == nil || variable == nil {
+		return false
+	}
+	if ellipsis, ok := field.Type.(*ast.Ellipsis); ok {
+		if ellipsis.Elt == nil {
+			return false
+		}
+		parameterType, ok := types.Unalias(variable.Type()).(*types.Slice)
+		if !ok {
+			return false
+		}
+		elementType := context.TypesInfo().TypeOf(ellipsis.Elt)
+		return elementType != nil &&
+			types.Identical(elementType, parameterType.Elem())
+	}
+	return fieldType != nil && types.Identical(fieldType, variable.Type())
 }

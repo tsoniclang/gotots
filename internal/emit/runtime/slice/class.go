@@ -79,6 +79,7 @@ func BuildWithCapabilities(
 		target.setMethod(),
 		target.sliceMethod(),
 		target.appendMethod(capabilities.AggregateAppend, lazyZero),
+		target.appendSliceMethod(),
 		target.copyMethod(),
 	)
 	if capabilities.AggregateNil {
@@ -92,6 +93,7 @@ func BuildWithCapabilities(
 	}
 	if capabilities.AggregateAppend {
 		members = append(members, target.aggregateAppendMethod())
+		members = append(members, target.aggregateAppendSliceMethod())
 	}
 	if capabilities.AggregateCopy {
 		members = append(members, target.aggregateCopyMethod())

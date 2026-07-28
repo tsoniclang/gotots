@@ -76,8 +76,8 @@ func TestRuntimeSliceOwnsOneClosedGenericDescriptor(t *testing.T) {
 		t.Fatalf("runtime slice declaration = %#v", class)
 	}
 	members := class.Members()
-	if len(members) != 10 {
-		t.Fatalf("runtime slice members = %d, want constructor plus nine operations", len(members))
+	if len(members) != 11 {
+		t.Fatalf("runtime slice members = %d, want constructor plus ten operations", len(members))
 	}
 	constructor, ok := members[0].(tsgo.ConstructorDeclaration)
 	if !ok {
@@ -115,6 +115,7 @@ func TestRuntimeSliceOwnsOneClosedGenericDescriptor(t *testing.T) {
 		"set",
 		"slice",
 		"append",
+		"appendSlice",
 		"copy",
 	}
 	if !slices.Equal(methods, want) {

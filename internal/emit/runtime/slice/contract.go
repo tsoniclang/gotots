@@ -16,6 +16,8 @@ const (
 	MemberAddress
 	MemberLength
 	MemberCapacity
+	MemberAppendSlice
+	MemberAppendSliceWith
 )
 
 func MemberName(member Member) string {
@@ -44,6 +46,10 @@ func MemberName(member Member) string {
 		return "length"
 	case MemberCapacity:
 		return "capacity"
+	case MemberAppendSlice:
+		return "appendSlice"
+	case MemberAppendSliceWith:
+		return "appendSliceWith"
 	default:
 		panic("invalid RuntimeSlice member")
 	}

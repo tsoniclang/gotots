@@ -7,6 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -67,7 +68,7 @@ func emitMake(
 		}
 		arguments = append(
 			arguments,
-			sliceValueFactory(context, nil, zero.Value()),
+			slicevalue.ValueFactory(context, nil, zero.Value()),
 		)
 		target, err := aggregateSliceCall(
 			context,
@@ -225,7 +226,7 @@ func emitAppend(
 		return api.ExpressionEmission{}, err
 	}
 	if context.Values().RequiresStructuralCopy(context, elementType) {
-		zero, zeroRequests, err := aggregateSliceZeroFactory(
+		zero, zeroRequests, err := slicevalue.AggregateZeroFactory(
 			context,
 			source,
 			elementType,
@@ -233,7 +234,7 @@ func emitAppend(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		copyValue, copyRequests, err := aggregateSliceCopyFactory(
+		copyValue, copyRequests, err := slicevalue.AggregateCopyFactory(
 			context,
 			source,
 			elementType,
@@ -331,7 +332,7 @@ func emitCopy(
 	}
 	var result api.ExpressionEmission
 	if context.Values().RequiresStructuralCopy(context, elementType) {
-		copyValue, copyRequests, err := aggregateSliceCopyFactory(
+		copyValue, copyRequests, err := slicevalue.AggregateCopyFactory(
 			context,
 			source,
 			elementType,

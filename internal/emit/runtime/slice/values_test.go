@@ -60,6 +60,7 @@ import {
     AppendNoValues,
     AppendGrowthCapacity,
     AppendReallocationZeroTail,
+    AppendSpread,
     BoolElements,
     CopyCount,
     CopyDistinct,
@@ -99,6 +100,7 @@ console.log(AppendReallocates());
 console.log(AppendNoValues());
 console.log(AppendGrowthCapacity());
 console.log(AppendReallocationZeroTail());
+console.log(AppendSpread());
 console.log(CopyOverlapping());
 console.log(CopyDistinct());
 console.log(CopyCount());
@@ -129,7 +131,7 @@ for (const operation of [
 		filepath.Join(workingDirectory, "out", "runner.js"),
 	)
 	goOutput := executeGo(t, workingDirectory)
-	const expected = "true\ntrue\n7\ntrue\nfalse\n25\n5\n57\n9\n15\n13\n934\n1\n24\n4\n0\n1123\n78\n2\ntrue\ntrue\n5\npanic\npanic\npanic\npanic\n"
+	const expected = "true\ntrue\n7\ntrue\nfalse\n25\n5\n57\n9\n15\n13\n934\n1\n24\n4\n0\n4\n1123\n78\n2\ntrue\ntrue\n5\npanic\npanic\npanic\npanic\n"
 	if goOutput != expected {
 		t.Fatalf("Go output = %q, want exact slice mutation sentinel output", goOutput)
 	}
@@ -333,6 +335,7 @@ func main() {
 	fmt.Println(values.AppendNoValues())
 	fmt.Println(values.AppendGrowthCapacity())
 	fmt.Println(values.AppendReallocationZeroTail())
+	fmt.Println(values.AppendSpread())
 	fmt.Println(values.CopyOverlapping())
 	fmt.Println(values.CopyDistinct())
 	fmt.Println(values.CopyCount())

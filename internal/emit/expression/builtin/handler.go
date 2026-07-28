@@ -103,6 +103,9 @@ func Emit(
 			runtimeslice.MemberCapacity,
 		)
 	case types.Universe.Lookup("append"):
+		if source.Ellipsis.IsValid() {
+			return emitAppendSpread(context, children, source, discarded)
+		}
 		return emitAppend(context, children, source, discarded)
 	case types.Universe.Lookup("copy"):
 		return emitCopy(context, children, source, discarded)

@@ -10,10 +10,37 @@ import (
 
 func emitVariadicParameter(
 	context api.Context,
-	_ api.ChildEmitter,
+	children api.ChildEmitter,
 	source ast.Node,
-	_ *types.Var,
-	_ api.Role,
+	parameter *types.Var,
+	index int,
+	parameterRole api.Role,
 ) (tsgo.ParameterDeclaration, []api.RootRequest, error) {
-	return nil, nil, api.Unsupported(context, api.CategoryType, source)
+	if parameter == nil {
+		return nil, nil, api.Unsupported(context, api.CategoryType, source)
+	}
+	parameterType, ok := types.Unalias(parameter.Type()).(*types.Slice)
+	if !ok {
+		return nil, nil, api.Unsupported(context, api.CategoryType, source)
+	}
+	targetType, err := children.RepresentedType(
+		context.WithRole(parameterRole),
+		source,
+		parameterType,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	name, err := context.Names().Parameter(parameter, index)
+	if err != nil {
+		return nil, nil, err
+	}
+	return context.Factory().ParameterDeclaration(
+		nil,
+		nil,
+		context.Factory().Identifier(name),
+		nil,
+		targetType.Value(),
+		nil,
+	), targetType.Requests(), nil
 }

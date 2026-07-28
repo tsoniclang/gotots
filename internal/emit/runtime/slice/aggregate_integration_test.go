@@ -32,6 +32,7 @@ func TestAggregateSliceOperationsPrintTypecheckAndMatchGo(t *testing.T) {
 				"goSliceMakeWith",
 				"goSliceLiteralWith",
 				"goSliceAppendWith",
+				"goSliceAppendSliceWith",
 				"goSliceCopyWith",
 			} {
 				if strings.Count(printed.runtime, "function "+helper) != 1 {
@@ -66,6 +67,7 @@ console.log(values.SparseLiteralZerosAreFresh());
 console.log(values.AppendReuseAliasesBackingAndCopiesArgument());
 console.log(values.AppendReallocationCopiesExisting());
 console.log(values.AppendTailZerosAreFresh());
+console.log(values.AppendSpreadCopiesValues());
 console.log(values.CopyDistinctCopiesValues());
 console.log(values.CopyOverlapSnapshotsValues());
 console.log(values.AddressTargetsBackingElement());
@@ -167,6 +169,7 @@ func main() {
 	fmt.Println(values.AppendReuseAliasesBackingAndCopiesArgument())
 	fmt.Println(values.AppendReallocationCopiesExisting())
 	fmt.Println(values.AppendTailZerosAreFresh())
+	fmt.Println(values.AppendSpreadCopiesValues())
 	fmt.Println(values.CopyDistinctCopiesValues())
 	fmt.Println(values.CopyOverlapSnapshotsValues())
 	fmt.Println(values.AddressTargetsBackingElement())

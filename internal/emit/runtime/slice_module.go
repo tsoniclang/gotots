@@ -39,6 +39,8 @@ func buildSlice(
 			capabilities.AggregateLiteral = true
 		case api.RuntimeSliceAppendWith:
 			capabilities.AggregateAppend = true
+		case api.RuntimeSliceAppendSliceWith:
+			capabilities.AggregateAppend = true
 		case api.RuntimeSliceCopyWith:
 			capabilities.AggregateCopy = true
 		default:
