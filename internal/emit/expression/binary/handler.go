@@ -7,6 +7,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	constantvalue "github.com/tsoniclang/gotots/internal/emit/constant"
+	complexbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/complex"
 	floatbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/float"
 	integerbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/integer"
 	"github.com/tsoniclang/gotots/internal/emit/expression/mapcomparison"
@@ -47,6 +48,13 @@ func Emit(
 		if target, ok, err := emitValueEquality(context, children, source); ok || err != nil {
 			return target, err
 		}
+	}
+	if target, ok, err := complexbinary.Emit(
+		context,
+		children,
+		source,
+	); ok || err != nil {
+		return target, err
 	}
 	if target, ok, err := integerbinary.Emit(
 		context,

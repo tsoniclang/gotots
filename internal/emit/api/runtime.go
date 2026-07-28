@@ -17,6 +17,7 @@ const (
 	RuntimeModulePanic
 	RuntimeModuleInteger
 	RuntimeModuleFloat
+	RuntimeModuleComplex
 )
 
 type RuntimeSymbol uint16
@@ -34,6 +35,21 @@ const (
 	RuntimeIntegerDivide    RuntimeSymbol = 600
 	RuntimeIntegerRemainder RuntimeSymbol = 601
 	RuntimeFloat32Round     RuntimeSymbol = 700
+	RuntimeComplex64        RuntimeSymbol = 800
+	RuntimeComplex128       RuntimeSymbol = 801
+	RuntimeComplexDivide    RuntimeSymbol = 802
+	RuntimeComplex64Add     RuntimeSymbol = 810
+	RuntimeComplex64Sub     RuntimeSymbol = 811
+	RuntimeComplex64Mul     RuntimeSymbol = 812
+	RuntimeComplex64Div     RuntimeSymbol = 813
+	RuntimeComplex64Neg     RuntimeSymbol = 814
+	RuntimeComplex64Equal   RuntimeSymbol = 815
+	RuntimeComplex128Add    RuntimeSymbol = 820
+	RuntimeComplex128Sub    RuntimeSymbol = 821
+	RuntimeComplex128Mul    RuntimeSymbol = 822
+	RuntimeComplex128Div    RuntimeSymbol = 823
+	RuntimeComplex128Neg    RuntimeSymbol = 824
+	RuntimeComplex128Equal  RuntimeSymbol = 825
 )
 
 type RuntimeSymbolContract struct {
@@ -133,9 +149,106 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"goFloat32",
 			false,
 		), nil
+	case RuntimeComplex64:
+		return runtimeContract(
+			RuntimeModuleComplex,
+			"runtime/complex.ts",
+			"GoComplex64",
+			true,
+			RuntimeFloat32Round,
+		), nil
+	case RuntimeComplex128:
+		return runtimeContract(
+			RuntimeModuleComplex,
+			"runtime/complex.ts",
+			"GoComplex128",
+			true,
+		), nil
+	case RuntimeComplexDivide:
+		return runtimeContract(
+			RuntimeModuleComplex,
+			"runtime/complex.ts",
+			"goComplexDivide",
+			false,
+		), nil
+	case RuntimeComplex64Add:
+		return complexOperationContract(
+			"goComplex64Add",
+			RuntimeComplex64,
+		)
+	case RuntimeComplex64Sub:
+		return complexOperationContract(
+			"goComplex64Subtract",
+			RuntimeComplex64,
+		)
+	case RuntimeComplex64Mul:
+		return complexOperationContract(
+			"goComplex64Multiply",
+			RuntimeComplex64,
+		)
+	case RuntimeComplex64Div:
+		return complexOperationContract(
+			"goComplex64Divide",
+			RuntimeComplex64,
+			RuntimeComplexDivide,
+		)
+	case RuntimeComplex64Neg:
+		return complexOperationContract(
+			"goComplex64Negate",
+			RuntimeComplex64,
+		)
+	case RuntimeComplex64Equal:
+		return complexOperationContract(
+			"goComplex64Equal",
+			RuntimeComplex64,
+		)
+	case RuntimeComplex128Add:
+		return complexOperationContract(
+			"goComplex128Add",
+			RuntimeComplex128,
+		)
+	case RuntimeComplex128Sub:
+		return complexOperationContract(
+			"goComplex128Subtract",
+			RuntimeComplex128,
+		)
+	case RuntimeComplex128Mul:
+		return complexOperationContract(
+			"goComplex128Multiply",
+			RuntimeComplex128,
+		)
+	case RuntimeComplex128Div:
+		return complexOperationContract(
+			"goComplex128Divide",
+			RuntimeComplex128,
+			RuntimeComplexDivide,
+		)
+	case RuntimeComplex128Neg:
+		return complexOperationContract(
+			"goComplex128Negate",
+			RuntimeComplex128,
+		)
+	case RuntimeComplex128Equal:
+		return complexOperationContract(
+			"goComplex128Equal",
+			RuntimeComplex128,
+		)
 	default:
 		return RuntimeSymbolContract{}, &RuntimeSymbolError{Symbol: symbol}
 	}
+}
+
+func complexOperationContract(
+	exportedName string,
+	dependencies ...RuntimeSymbol,
+) (RuntimeSymbolContract, error) {
+	return runtimeContract(
+		RuntimeModuleComplex,
+		"runtime/complex.ts",
+		exportedName,
+		false,
+		dependencies...,
+	), nil
 }
 
 func runtimeContract(

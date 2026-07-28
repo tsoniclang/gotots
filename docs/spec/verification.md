@@ -291,6 +291,25 @@ float32 rounding, swap each operator class, and substitute source spelling for
 checker value. Tests invoke generated Go-shaped call sites so arbitrary host
 numbers cannot bypass an input conversion boundary.
 
+The complex checkpoint additionally proves:
+
+- `complex64` and `complex128` are statically incompatible without casts;
+- imaginary literals and complex constants use checker values despite
+  alternate source spellings;
+- zero, construction, `real`, `imag`, unary `+`/`-`, `+`, `-`, `*`, `/`,
+  `==`, and `!=` match the selected Go toolchain for both widths;
+- `complex64` rounds each construction/result component and `complex128`
+  preserves binary64 components;
+- division matches the selected runtime algorithm for ordinary values, zero,
+  signed zero, overflow-sensitive ratios, infinities, and NaNs;
+- `complex`, `real`, and `imag` dispatch by exact `*types.Builtin` identity and
+  preserve argument evaluation order;
+- each reached width emits exactly one nominal class, division emits one
+  shared definition, and every use site remains O(1); and
+- mutations remove a width brand, omit component rounding, replace robust
+  division with the naive formula, swap real/imaginary parts, or dispatch a
+  built-in by spelling, and each fails its owning gate.
+
 Examples include:
 
 - one-result versus comma-ok map indexing;

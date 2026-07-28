@@ -47,14 +47,6 @@ func TestNamedStructUnsupportedNeighborsFailAtTypedOwners(t *testing.T) {
 			construct: "*ast.InterfaceType",
 		},
 		{
-			name: "complex field",
-			source: "package boundary\n" +
-				"type Complex struct { Value complex64 }\n",
-			role:      api.RoleStructFieldType,
-			category:  api.CategoryType,
-			construct: "*ast.Ident",
-		},
-		{
 			name: "generic struct",
 			source: "package boundary\n" +
 				"type Generic[T any] struct { Value T }\n",

@@ -1,18 +1,15 @@
 package constant_test
 
 import (
-	"context"
 	"errors"
 	"go/ast"
 	"go/token"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit"
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -281,32 +278,6 @@ func TestConstantBindingMutationFailsAtItsGate(t *testing.T) {
 	var invariant *api.InvariantError
 	if !errors.As(err, &unsupported) && !errors.As(err, &invariant) {
 		t.Fatalf("mutation error = %#v, want a typed emit error", err)
-	}
-}
-
-// TestConstantTypeNeighborsFailAtTypeOwner proves the still-unsupported constant
-// TYPE (complex) remains a typed boundary, so the handler did not widen silently
-// when the float value family landed. Float is now supported and no longer
-// belongs here.
-func TestConstantTypeNeighborsFailAtTypeOwner(t *testing.T) {
-	dir := filepath.Join(repositoryRoot(), "testdata", "constructs", "value", "constant-boundaries")
-	loaded, err := load.One(context.Background(), load.Request{Directory: dir, Pattern: "."})
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, name := range []string{"Complex"} {
-		t.Run(name, func(t *testing.T) {
-			object := loaded.Types().Scope().Lookup(name)
-			root, err := emit.NewRoot(object)
-			if err != nil {
-				t.Fatal(err)
-			}
-			_, err = emit.Compile(loaded.Program(), []emit.Root{root})
-			var unsupported *api.UnsupportedError
-			if !errors.As(err, &unsupported) || unsupported.Category != api.CategoryType {
-				t.Fatalf("%s error = %#v, want type UnsupportedError", name, err)
-			}
-		})
 	}
 }
 

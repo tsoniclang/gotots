@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	complexbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/complex"
 	mapbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/map"
 	newvalue "github.com/tsoniclang/gotots/internal/emit/expression/builtin/newvalue"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
@@ -23,6 +24,15 @@ func Emit(
 	if source == nil || builtin == nil {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if target, handled, err := complexbuiltin.Emit(
+		context,
+		children,
+		source,
+		builtin,
+		discarded,
+	); handled {
+		return target, err
 	}
 	if target, handled, err := mapbuiltin.Emit(
 		context,

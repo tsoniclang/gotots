@@ -7,6 +7,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	constantvalue "github.com/tsoniclang/gotots/internal/emit/constant"
+	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
 	floatvalue "github.com/tsoniclang/gotots/internal/emit/value/float"
 	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -29,6 +30,9 @@ func Emit(
 	if unaryConstantEvidenceIsIncomplete(context, source) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if result, ok, err := emitComplex(context, children, source); ok || err != nil {
+		return result, err
 	}
 	if result, ok, err := emitInteger(context, children, source); ok || err != nil {
 		return result, err
@@ -63,6 +67,56 @@ func Emit(
 		),
 		operand.Requests(),
 	)
+}
+
+func emitComplex(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.UnaryExpr,
+) (api.ExpressionEmission, bool, error) {
+	if source.Op != token.ADD && source.Op != token.SUB {
+		return api.ExpressionEmission{}, false, nil
+	}
+	resultType := context.TypesInfo().TypeOf(source)
+	operandType := context.TypesInfo().TypeOf(source.X)
+	carrier, ok := complexvalue.Describe(resultType)
+	if !ok || !types.AssignableTo(operandType, resultType) {
+		return api.ExpressionEmission{}, false, nil
+	}
+	operand, err := children.Expression(
+		context.WithRole(api.RoleUnaryOperand).WithExpectedType(resultType),
+		source.X,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	if source.Op == token.ADD {
+		result, err := api.NewExpressionEmission(
+			operand.Before(),
+			operand.Value(),
+			operand.Requests(),
+		)
+		return result, true, err
+	}
+	if len(operand.Before()) != 0 {
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	symbol, ok := complexvalue.NegateSymbol(carrier)
+	if !ok {
+		return api.ExpressionEmission{}, true,
+			&api.InvariantError{
+				Role:   context.Role(),
+				Reason: "complex negation has no runtime symbol",
+			}
+	}
+	target, err := complexvalue.Call(
+		context,
+		symbol,
+		[]tsgo.Expression{operand.Value()},
+		operand.Requests()...,
+	)
+	return target, true, err
 }
 
 func unaryConstantEvidenceIsIncomplete(

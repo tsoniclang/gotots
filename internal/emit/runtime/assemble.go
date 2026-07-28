@@ -5,6 +5,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	runtimearray "github.com/tsoniclang/gotots/internal/emit/runtime/array"
+	complexruntime "github.com/tsoniclang/gotots/internal/emit/runtime/complex"
 	floatruntime "github.com/tsoniclang/gotots/internal/emit/runtime/float"
 	integerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/integer"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
@@ -216,6 +217,21 @@ func Build(
 	}
 	if module == api.RuntimeModuleFloat {
 		statements, err := floatruntime.Build(factory, symbols)
+		if err != nil {
+			return nil, err
+		}
+		definitions := make([]Definition, 0, len(symbols))
+		for index, symbol := range symbols {
+			definition, err := NewDefinition(symbol, statements[index])
+			if err != nil {
+				return nil, err
+			}
+			definitions = append(definitions, definition)
+		}
+		return definitions, nil
+	}
+	if module == api.RuntimeModuleComplex {
+		statements, err := complexruntime.Build(factory, symbols)
 		if err != nil {
 			return nil, err
 		}

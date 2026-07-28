@@ -981,6 +981,54 @@ equals that rounded value, so the emitted literal is bit-identical to Go's
 different `number`. A runtime `float32` operation rounds through a generated
 helper at each Go-required boundary; a `float64` operation is direct.
 
+`complex64` and `complex128` use distinct immutable GoToTS-owned nominal
+classes. A bare object or tuple is insufficient because TypeScript would make
+the two widths structurally interchangeable; an assertion-based brand is
+forbidden. Each class therefore has a distinct private, declared-only brand,
+readonly `real` and `imag` number components, a private constructor, and a
+closed static construction surface. The brand emits no JavaScript. Construction
+is the sole component-rounding boundary: `complex64` rounds both components
+through `goFloat32`, while `complex128` preserves binary64 values. The runtime
+module owns demand-driven, statically typed standalone operation functions;
+unused operations are absent rather than widening each class or each call site.
+
+```go
+func Product(left, right complex64) complex64 {
+    return left * right
+}
+```
+
+```ts
+export function Product(
+    left: GoComplex64,
+    right: GoComplex64,
+): GoComplex64 {
+    return goComplex64Multiply(left, right);
+}
+```
+
+The classes own construction and readonly component access. Typed standalone
+functions own unary negation, addition, subtraction, multiplication, equality,
+and division. Complex division is not expanded at use sites: one shared runtime
+operation ports the selected Go toolchain's
+robust `runtime.complex128div` algorithm, including zero, infinity, and NaN
+corrections. `complex64` division widens through that operation and rounds the
+two result components on construction, matching the selected toolchain's
+complex-division lowering. Every source operation is therefore one
+constant-size typed call, and a complex runtime definition is emitted only
+when its width is reached. Immutable complex objects need no copy operation:
+sharing the object preserves Go value behavior because no component can be
+mutated.
+
+Imaginary and complex constants are read only from `go/constant`. Their real
+and imaginary parts are materialized independently at the selected complex
+width and passed through the same constructor as runtime values. Source token
+spelling never determines either component. The predeclared `complex`, `real`,
+and `imag` functions are selected only from their exact `*types.Builtin`
+identity; `real` and `imag` become readonly component access, while `complex`
+evaluates its two arguments once in order and calls the width-owned
+constructor.
+
 Ordinary integer syntax is source-shaped under both initial profiles:
 
 | Go source | TS-Go AST decision | Printed TypeScript |

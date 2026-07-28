@@ -28,6 +28,22 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimePanic, 500, api.RuntimeModulePanic, "runtime/panic.ts", "GoPanic", true, nil},
 		{api.RuntimeIntegerDivide, 600, api.RuntimeModuleInteger, "runtime/integer.ts", "goIntegerDivide", false, []api.RuntimeSymbol{api.RuntimePanic}},
 		{api.RuntimeIntegerRemainder, 601, api.RuntimeModuleInteger, "runtime/integer.ts", "goIntegerRemainder", false, []api.RuntimeSymbol{api.RuntimePanic}},
+		{api.RuntimeFloat32Round, 700, api.RuntimeModuleFloat, "runtime/float.ts", "goFloat32", false, nil},
+		{api.RuntimeComplex64, 800, api.RuntimeModuleComplex, "runtime/complex.ts", "GoComplex64", true, []api.RuntimeSymbol{api.RuntimeFloat32Round}},
+		{api.RuntimeComplex128, 801, api.RuntimeModuleComplex, "runtime/complex.ts", "GoComplex128", true, nil},
+		{api.RuntimeComplexDivide, 802, api.RuntimeModuleComplex, "runtime/complex.ts", "goComplexDivide", false, nil},
+		{api.RuntimeComplex64Add, 810, api.RuntimeModuleComplex, "runtime/complex.ts", "goComplex64Add", false, []api.RuntimeSymbol{api.RuntimeComplex64}},
+		{api.RuntimeComplex64Sub, 811, api.RuntimeModuleComplex, "runtime/complex.ts", "goComplex64Subtract", false, []api.RuntimeSymbol{api.RuntimeComplex64}},
+		{api.RuntimeComplex64Mul, 812, api.RuntimeModuleComplex, "runtime/complex.ts", "goComplex64Multiply", false, []api.RuntimeSymbol{api.RuntimeComplex64}},
+		{api.RuntimeComplex64Div, 813, api.RuntimeModuleComplex, "runtime/complex.ts", "goComplex64Divide", false, []api.RuntimeSymbol{api.RuntimeComplex64, api.RuntimeComplexDivide}},
+		{api.RuntimeComplex64Neg, 814, api.RuntimeModuleComplex, "runtime/complex.ts", "goComplex64Negate", false, []api.RuntimeSymbol{api.RuntimeComplex64}},
+		{api.RuntimeComplex64Equal, 815, api.RuntimeModuleComplex, "runtime/complex.ts", "goComplex64Equal", false, []api.RuntimeSymbol{api.RuntimeComplex64}},
+		{api.RuntimeComplex128Add, 820, api.RuntimeModuleComplex, "runtime/complex.ts", "goComplex128Add", false, []api.RuntimeSymbol{api.RuntimeComplex128}},
+		{api.RuntimeComplex128Sub, 821, api.RuntimeModuleComplex, "runtime/complex.ts", "goComplex128Subtract", false, []api.RuntimeSymbol{api.RuntimeComplex128}},
+		{api.RuntimeComplex128Mul, 822, api.RuntimeModuleComplex, "runtime/complex.ts", "goComplex128Multiply", false, []api.RuntimeSymbol{api.RuntimeComplex128}},
+		{api.RuntimeComplex128Div, 823, api.RuntimeModuleComplex, "runtime/complex.ts", "goComplex128Divide", false, []api.RuntimeSymbol{api.RuntimeComplex128, api.RuntimeComplexDivide}},
+		{api.RuntimeComplex128Neg, 824, api.RuntimeModuleComplex, "runtime/complex.ts", "goComplex128Negate", false, []api.RuntimeSymbol{api.RuntimeComplex128}},
+		{api.RuntimeComplex128Equal, 825, api.RuntimeModuleComplex, "runtime/complex.ts", "goComplex128Equal", false, []api.RuntimeSymbol{api.RuntimeComplex128}},
 	}
 	for _, test := range tests {
 		if uint16(test.symbol) != test.id {

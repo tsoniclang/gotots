@@ -11,6 +11,7 @@ import (
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
+	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -21,6 +22,9 @@ func (Owner) RequiresCustomEquality(
 	context api.Context,
 	sourceType types.Type,
 ) bool {
+	if _, ok := complexvalue.Describe(sourceType); ok {
+		return true
+	}
 	if _, ok := arrayvalue.Resolve(context, sourceType); ok {
 		return true
 	}
@@ -43,6 +47,14 @@ func (Owner) Zero(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.ExpressionEmission, error) {
+	if carrier, ok := complexvalue.Describe(sourceType); ok {
+		return complexvalue.Construct(
+			context,
+			carrier,
+			context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
+			context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
+		)
+	}
 	if mapType, ok := maprepresentation.Source(context, sourceType); ok {
 		zero, err := (Owner{}).Zero(
 			context.WithRole(api.RoleMapValue),
@@ -159,7 +171,10 @@ func (Owner) Copy(
 	if array, ok := arrayvalue.Resolve(context, sourceType); ok {
 		return array.Copy(context, ownsFreshValue(context, source), value)
 	}
-	if _, ok := primitive(context, sourceType); ok ||
+	_, complexOK := complexvalue.Describe(sourceType)
+	_, primitiveOK := primitive(context, sourceType)
+	if complexOK ||
+		primitiveOK ||
 		callableValue(sourceType) ||
 		pointerValue(sourceType) ||
 		isScalarSlice(context, sourceType) ||
@@ -231,9 +246,11 @@ func (Owner) Assign(
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
 	_, arrayOK := arrayvalue.Resolve(context, sourceType)
+	_, complexOK := complexvalue.Describe(sourceType)
 	_, primitiveOK := primitive(context, sourceType)
 	_, _, structOK := namedStruct(sourceType)
 	if !arrayOK &&
+		!complexOK &&
 		!primitiveOK &&
 		!callableValue(sourceType) &&
 		!pointerValue(sourceType) &&
@@ -265,6 +282,20 @@ func (Owner) Equal(
 	left tsgo.Expression,
 	right tsgo.Expression,
 ) (api.ExpressionEmission, error) {
+	if carrier, ok := complexvalue.Describe(sourceType); ok {
+		symbol, valid := complexvalue.EqualSymbol(carrier)
+		if !valid {
+			return api.ExpressionEmission{}, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "complex equality has no runtime symbol",
+			}
+		}
+		return complexvalue.Call(
+			context,
+			symbol,
+			[]tsgo.Expression{left, right},
+		)
+	}
 	if array, ok := arrayvalue.Resolve(context, sourceType); ok {
 		return array.Equal(context, left, right), nil
 	}

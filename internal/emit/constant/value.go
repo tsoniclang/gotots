@@ -7,6 +7,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/stringvalue"
+	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
 	floatvalue "github.com/tsoniclang/gotots/internal/emit/value/float"
 	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 )
@@ -16,8 +17,7 @@ import (
 // only; it never evaluates the source spelling. This is the single owner of
 // constant-value materialization: a typed constant's binding projects its own
 // type here, and every use of an untyped constant projects its exact contextual
-// type here. Complex constants remain a typed unsupported boundary until their
-// value family exists.
+// type here.
 func EmitValue(
 	context api.Context,
 	source ast.Node,
@@ -34,6 +34,9 @@ func EmitValue(
 	// target below never sees one.
 	if _, ok := floatvalue.Describe(targetType); ok {
 		return floatvalue.EmitConstant(context, source, targetType, value)
+	}
+	if _, ok := complexvalue.Describe(targetType); ok {
+		return complexvalue.EmitConstant(context, source, targetType, value)
 	}
 	if _, ok := integervalue.Describe(context.TypesSizes(), targetType); ok {
 		if value.Kind() == constant.Float {
