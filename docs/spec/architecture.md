@@ -705,9 +705,11 @@ Runtime classes may encapsulate JavaScript storage only when that storage is
 the smallest exact representation of a Go value family. They may expose
 ordinary statically typed methods, but no reflection, dynamic operation name,
 erased payload recovery, target non-null assertion, `.call`/`.apply`/`.bind`,
-or per-use semantic closure. Nullable storage is narrowed by explicit control
-flow at the runtime owner; a generated `value!` may not substitute for a
-proved invariant.
+per-use semantic closure, or stored semantic callback/strategy. Passing a
+statically typed hash, equality, copy, zero, conversion, or dispatch function
+into a runtime value still constitutes runtime semantic dispatch and is
+forbidden. Nullable storage is narrowed by explicit control flow at the
+runtime owner; a generated `value!` may not substitute for a proved invariant.
 Compiler handlers still own Go evaluation order and copy boundaries; runtime
 code does not rediscover source semantics.
 

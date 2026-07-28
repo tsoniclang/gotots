@@ -1382,6 +1382,39 @@ while Go permits distinct stored NaN keys that cannot be retrieved by another
 NaN comparison. Aggregate comparable keys require the later exact hash/equality
 owner. Neither class may silently use object identity or serialization.
 
+Aggregate-key maps select their key semantics once from the authoritative
+`go/types` key type. One canonical target artifact per exact represented map
+shape directly references the key family's static hash, equality, and copy
+operations. The map value does not store function-valued strategies, closures,
+operation objects, tags, or dynamic member names. A shared runtime primitive
+may own only non-semantic bucket, count, and nil storage; the canonical
+map-shape artifact owns typed lookup, store, and delete behavior and invokes
+the selected key operations directly.
+
+```go
+type Key struct{ X int32 }
+var values map[Key]string
+```
+
+```ts
+// Schematic shape; production output is constructed as TS-Go AST.
+class map$Key$string {
+  static lookup(storage: GoMapBuckets<Key, gostring>, key: Key): gostring {
+    const bucket = storage.bucket(Key.$hash(key));
+    // The generated owner calls Key.$equal directly while resolving collisions.
+    return map$Key$string.lookupBucket(bucket, key);
+  }
+}
+```
+
+The declaration cost is `O(key shape)` once, while every map operation site is
+constant-size. Two map values of the same exact semantic shape reuse the same
+owner. A deterministic artifact fingerprint may index candidates, but
+`go/types` identity remains authoritative and a fingerprint collision must
+never unify non-identical map or key types. Generated-artifact tests reject
+function-valued key-operation fields and mutations that restore callback
+storage.
+
 An admitted pointer is a typed reference to one canonical storage location.
 `new(T)` creates a fresh cell when `T` has a complete admitted value
 representation including its Go zero value; assignment copies the pointer;
