@@ -71,6 +71,18 @@ func emitMultipleResults(
 			context.Factory().NumericLiteral(strconv.Itoa(index), tsgo.TokenFlagsNone),
 			tsgo.NodeFlagsNone,
 		))
+		copied, err := context.Values().Copy(
+			context.WithRole(role),
+			target.source,
+			target.object.Type(),
+			api.DirectExpression(element),
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		statements = append(statements, copied.Before()...)
+		element = copied.Value()
+		requests = append(requests, copied.Requests()...)
 		if target.declaration {
 			if target.storage {
 				cell, err := context.AddressableStorage().Cell(
