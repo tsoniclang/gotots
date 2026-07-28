@@ -342,6 +342,35 @@ size are measured over doubled parameters, nested literals, captures, and call
 sites; call-site size must remain constant per argument and must not grow with
 the number of possible function values.
 
+The nil/defined-callable extension additionally proves that callee and
+arguments execute in Go order before the nil panic, known non-nil calls remain
+byte-stable and direct, aliases add no wrapper, and distinct defined callables
+remain statically incompatible. Mutations remove the nil guard, move it before
+argument evaluation, replace the nominal wrapper with an intersection/string
+brand, mutate the function object with `Object.assign`, or invoke through
+`.call`; each must fail its owning shape, differential, or broad-search gate.
+
+The recursive-struct extension additionally proves:
+
+- same-spelled local named component types in different lexical declarations
+  never canonicalize together;
+- identical anonymous structs reuse one declaration, while field tag, blank
+  field, unexported-field package, embeddedness, and named-component changes
+  remain distinct exactly where `types.Identical` says they do;
+- a forced fingerprint collision cannot unify non-identical Go types;
+- a shape containing a local named type is emitted only where that type is
+  nameable;
+- legal pointer/slice/map recursion converges, while definitions grow with
+  shape once and zero/copy/equality/hash use sites remain constant-size; and
+- mutations restore spelling-only identity, choose first-encounter placement,
+  expose a blank field, or inline a field walk at every use, and each fails.
+
+The aggregate-map extension additionally proves key copy on insertion, value
+copy on store and lookup, exact collision equality, nil operations, comma-ok,
+and one operation owner reused by multiple values. Generated artifacts and a
+mutation gate reject function-valued hash/equality/copy fields, strategy
+objects, JSON/text keys, reflection, and target object identity.
+
 The first named-struct family additionally proves:
 
 - empty structs and grouped field declarations use the same single

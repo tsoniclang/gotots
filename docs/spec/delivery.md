@@ -305,6 +305,38 @@ artifact when address sites are added elsewhere, storage reconstruction
 converges, its unchanged callable contract triggers zero reverse-consumer
 reconstructions, and package `init` uses no non-artifact requirement path.
 
+### 3B. Defined And Recursive Values
+
+The next value checkpoint completes aliases and defined types whose underlying
+value families are represented here, anonymous and legal recursive structs,
+recursive arrays/slices/maps, aggregate map keys and values, and
+nil-capable/defined callable values. Interfaces, channels, and generic
+underlying families retain their later explicit boundaries.
+
+It extends the existing family owners rather than introducing a value IR,
+generic operation registry, runtime strategy object, or second type-identity
+model:
+
+- exact `*types.TypeName` identity owns each defined nominal class; aliases add
+  no runtime owner;
+- `types.Identical` owns anonymous-struct canonicalization, with fingerprints
+  used only for indexed lookup and collision-checked artifact naming;
+- zero/copy/equality/hash/address capabilities are static demanded members
+  owned once per exact represented type;
+- aggregate-map lookup/store/delete use one canonical statically specialized
+  owner per represented map shape; map instances carry storage, never semantic
+  callbacks;
+- nil callable values use `undefined`; defined non-nil callables use one
+  minimal wrapper whose `$value` is invoked directly after the nil guard; and
+- local component types constrain generated declarations to the highest scope
+  where every referenced type is legally nameable.
+
+This checkpoint exits only when recursive requirements converge, scalar
+artifacts remain byte-identical, definitions grow `O(type shape)`, use sites
+remain constant-size, aggregate stores/lookups preserve Go copies, and the
+twenty largest changed type and operation artifacts pass strict, differential,
+mutation, source-size, typecheck, runtime, and broad-deletion review.
+
 ## 4. Environment And Completion
 
 Add deterministic module output, minimal runtime modules, selected-`GOROOT`

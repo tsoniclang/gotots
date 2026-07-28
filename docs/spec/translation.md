@@ -642,12 +642,45 @@ function types, function literals, values, and calls consume the same signature
 owner. JavaScript lexical capture directly represents admitted Go variable
 capture; no environment object, callback registry, hidden receiver, or callable
 side table is introduced. Copying an admitted function value is a direct
-reference-value copy. A nil function value, comparison with nil, variadic or
-generic signature, method value/expression, or interface callable remains at
-its own typed boundary. A defined or declared-alias function type is also
-deferred: preserving two distinct named Go function types requires the
-named-value representation family rather than silently making TypeScript
-structural aliases interchangeable.
+reference-value copy.
+
+An unnamed callable value that may contain Go nil has the static target type
+`((parameters) => results) | undefined`. Known non-nil declarations and
+literals remain direct functions. Calls evaluate the callee once, evaluate and
+capture arguments left-to-right, then perform the nil guard at the invocation
+boundary; this preserves the fact that Go evaluates arguments before a nil
+function call panics. The non-nil branch invokes the function directly, never
+through `.call`, `.apply`, `.bind`, reflection, or an erased carrier.
+
+A defined callable has one minimal nominal class for its non-nil value:
+
+```go
+type Transform func(int32) int32
+type Alias = Transform
+```
+
+```ts
+export class Transform {
+  declare private readonly $goType: void;
+  constructor(public readonly $value: (value: int32) => int32) {}
+}
+export type Alias = Transform | undefined;
+```
+
+Every Go use of `Transform` is represented as `Transform | undefined`; the
+class itself represents only the non-nil member. Conversion from an unnamed
+non-nil function constructs `new Transform(value)` once. Conversion between
+distinct defined callable types unwraps the exact source and constructs the
+exact destination. Calling a defined callable checks the wrapper for
+`undefined` and then invokes `wrapper.$value(arguments)` directly. The class
+contains no string brand, runtime property mutation, `Object.assign`, callback
+registry, or speculative method protocol. A declared alias reuses the same
+representation and emits no class.
+
+Nil equality compares only with `undefined`, as selected by the checker.
+`new(func(...))` creates a fresh pointer cell whose value is `undefined`.
+Variadic or generic signatures, method values/expressions, and interface
+callables remain at their separately owned boundaries.
 
 ## Calls
 
@@ -867,12 +900,52 @@ incompatible even when their fields match. A requested nested struct operation
 requests the corresponding static operation from the nested type's owner. The
 erased brand must produce no JavaScript instance field.
 
-Tags, embedding, interfaces, method values/expressions, generics, reflection
-entry, pointers to unrepresented targets, and fields whose complete standalone
+Interface behavior, method values/expressions, generics, reflection entry,
+pointers to unrepresented targets, and fields whose complete standalone
 representation is not yet exact are neighboring typed-unsupported families.
-They may be admitted only by extending or replacing this representation under
-their own complete proof. They must not be approximated by structural
-assignment or virtual dispatch.
+Embedding may contribute exact storage in the recursive-value extension, but
+promotion and method selection remain deferred. Tags and blank fields may
+participate in exact type identity without implying reflection metadata or
+ordinary mutable storage. No neighboring family may be approximated by
+structural assignment or virtual dispatch.
+
+The recursive-value extension admits represented fields through arrays,
+slices, maps, pointers, callables, and other structs. A direct infinitely sized
+cycle is invalid Go and never reaches emission; every legal recursive cycle
+crosses a reference-capable representation. Static zero, copy, equality, hash,
+and address operations therefore request one another by exact type identity
+and converge instead of recursively expanding source at each use.
+
+An anonymous struct receives one canonical nominal target declaration because
+plain TypeScript structural typing cannot preserve Go field tags, blank
+fields, unexported-field package identity, or exact anonymous-type identity.
+`go/types` and `types.Identical` are the sole identity authority. A stable
+structural fingerprint may select a candidate bucket and target artifact name,
+but every reuse decision exact-checks `types.Identical`; a fingerprint collision
+must retain two declarations. A named component's stable key is derived from
+its authoritative declaration object's semantic package and deterministic
+lexical declaration identity, while the selected object remains the in-memory
+truth for the decision. Package path plus source spelling alone is never
+identity.
+
+The canonical declaration is placed at the highest preferred lexical scope
+that can name every component representation. Shapes whose components are all
+module-nameable use one compilation-owned shared artifact, so identical
+anonymous structs in different Go packages remain one target type. A shape
+depending on a local named type remains in the owning lexical scope; it is
+never hoisted to a module that cannot name that type. The first encounter does
+not decide placement. A root request or digest is only an artifact key and
+must carry or validate the exact Go type; it is not a second type-identity
+model.
+
+Each canonical anonymous declaration owns its field storage and demanded
+static zero, copy, equality, and hash members once. Ordinary construction may
+remain direct, but operation use sites are constant-size calls. Doubling uses
+must not duplicate field walks. Field tags participate in identity but emit no
+runtime metadata unless a later reflection consumer requests it. Blank fields
+participate in identity and required evaluation order but expose no mutable
+target property. Embedded fields remain storage composition here; promotion
+and method selection remain with their later semantic owner.
 
 Each zero, copy, or equality capability is emitted at most once and only when a
 selected occurrence requests it. Its typed request is routed to the defining
