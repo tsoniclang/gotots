@@ -8,7 +8,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	builtinexpression "github.com/tsoniclang/gotots/internal/emit/expression/builtin"
-	integerconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/integer"
+	conversionexpression "github.com/tsoniclang/gotots/internal/emit/expression/conversion"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -34,7 +34,7 @@ func emit(
 	source *ast.CallExpr,
 	discarded bool,
 ) (api.ExpressionEmission, error) {
-	if target, ok, err := integerconversion.Emit(
+	if target, ok, err := conversionexpression.Emit(
 		context,
 		children,
 		source,

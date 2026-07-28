@@ -18,6 +18,7 @@ const (
 	RuntimeModuleInteger
 	RuntimeModuleFloat
 	RuntimeModuleComplex
+	RuntimeModuleConversion
 )
 
 type RuntimeSymbol uint16
@@ -50,6 +51,7 @@ const (
 	RuntimeComplex128Div    RuntimeSymbol = 823
 	RuntimeComplex128Neg    RuntimeSymbol = 824
 	RuntimeComplex128Equal  RuntimeSymbol = 825
+	RuntimeNumberToBigInt   RuntimeSymbol = 900
 )
 
 type RuntimeSymbolContract struct {
@@ -233,6 +235,13 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"goComplex128Equal",
 			RuntimeComplex128,
 		)
+	case RuntimeNumberToBigInt:
+		return runtimeContract(
+			RuntimeModuleConversion,
+			"runtime/conversion.ts",
+			"goNumberToBigInt",
+			false,
+		), nil
 	default:
 		return RuntimeSymbolContract{}, &RuntimeSymbolError{Symbol: symbol}
 	}

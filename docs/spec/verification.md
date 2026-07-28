@@ -504,7 +504,7 @@ program. The required evidence includes:
 
 | Family | Independent behavioral proofs | Required mutations |
 |---|---|---|
-| integers | every admitted width/profile/operator/conversion at boundary values; BigInt division/remainder for nonzero and zero divisors | width alias collapse; unsafe number literal; missing narrowing/bounds operation; direct host divide/remainder bypass |
+| integers and numeric conversions | every source/destination width and profile disposition; narrowing, sign change, integer/float, float-width, and complex-width boundaries; constants; NaN, infinity, signed zero, and representability; BigInt division/remainder for nonzero and zero divisors | width alias collapse; unsafe number literal; missing narrowing/bounds operation; conversion spelling lookup; ordinary-call fallthrough; duplicated conversion operand; direct host divide/remainder or non-finite BigInt conversion bypass |
 | strings | arbitrary-byte literal, concat, comparison, byte length/index/slice and bounds | Unicode-code-point literal; UTF-16 indexing; missing bounds check |
 | arrays | length-distinct target types, fresh zero/copy, equality, index/store/len/cap | erased length; shared zero; shallow copy where element policy forbids it |
 | slices | nil/empty distinction, aliasing, reslice, append reuse/reallocation, copy overlap | bare-array substitution; lost capacity; always-reallocate append |

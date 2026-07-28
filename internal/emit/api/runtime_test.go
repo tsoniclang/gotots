@@ -44,6 +44,7 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimeComplex128Div, 823, api.RuntimeModuleComplex, "runtime/complex.ts", "goComplex128Divide", false, []api.RuntimeSymbol{api.RuntimeComplex128, api.RuntimeComplexDivide}},
 		{api.RuntimeComplex128Neg, 824, api.RuntimeModuleComplex, "runtime/complex.ts", "goComplex128Negate", false, []api.RuntimeSymbol{api.RuntimeComplex128}},
 		{api.RuntimeComplex128Equal, 825, api.RuntimeModuleComplex, "runtime/complex.ts", "goComplex128Equal", false, []api.RuntimeSymbol{api.RuntimeComplex128}},
+		{api.RuntimeNumberToBigInt, 900, api.RuntimeModuleConversion, "runtime/conversion.ts", "goNumberToBigInt", false, nil},
 	}
 	for _, test := range tests {
 		if uint16(test.symbol) != test.id {

@@ -25,6 +25,7 @@ const (
 	TemporaryStoreOperand
 	TemporaryMapOperand
 	TemporaryAddressOperand
+	TemporaryConversionOperand
 )
 
 type NameReference struct {
@@ -139,6 +140,8 @@ func TemporaryPrefix(kind TemporaryKind) (string, error) {
 		return "__gotots_map_", nil
 	case TemporaryAddressOperand:
 		return "__gotots_address_", nil
+	case TemporaryConversionOperand:
+		return "__gotots_conversion_", nil
 	default:
 		return "", &NameError{
 			Reason: fmt.Sprintf("temporary kind %d is invalid", kind),

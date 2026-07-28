@@ -1029,6 +1029,61 @@ identity; `real` and `imag` become readonly component access, while `complex`
 evaluates its two arguments once in order and calls the width-owned
 constructor.
 
+### Explicit numeric conversions
+
+A `CallExpr` is a conversion only when the selected `go/types.TypeAndValue`
+for its callee reports `IsType()`. The conversion owner reads the checker's
+source type, destination type, and converted constant value. It never
+recognizes a conversion from callee spelling and never lets an unimplemented
+conversion fall through to ordinary-call emission.
+
+This section closes conversions among the currently represented integer,
+floating-point, and complex types. String/container, defined-type, pointer,
+interface, channel, and generic conversions retain their separate semantic
+owners and remain typed unsupported until those families land.
+
+Constant conversions materialize the converted checker value directly:
+
+```go
+func F() float32 { return float32(16777217) }
+```
+
+```ts
+export function F(): float32 {
+    return 16777216;
+}
+```
+
+Non-constant conversions have one closed destination-family decision:
+
+| Go conversion | TS-Go AST/output decision |
+|---|---|
+| lossless integer widening | the emitted operand directly |
+| integer narrowing or sign change, `bigint` profile | `BigInt.asIntN` or `BigInt.asUintN` at the destination width |
+| integer narrowing to 8/16/32 bits, `number` profile | one width-owned bitwise normalization |
+| integer conversion requiring a 64-bit sign boundary, `number` profile | a demand-only number-to-BigInt boundary, static width normalization, then `Number` |
+| integer to float | `Number` only from a BigInt carrier; `float32` additionally uses the shared binary32 rounder |
+| float to integer | truncate once, select deterministic non-finite result zero, then apply the destination integer normalization |
+| `float32` to `float64` | the already-rounded operand directly |
+| `float64` to `float32` | the shared binary32 rounder |
+| `complex64` to `complex128` or the reverse | construct the destination nominal value from its two components; the `complex64` constructor rounds both |
+
+The selected GoToTS implementation-defined result for a non-finite
+floating-to-integer conversion is zero before width normalization. Finite
+out-of-range values are truncated and reduced to the destination width. This
+choice is explicit, deterministic, and non-panicking as required by Go; tests
+do not misreport implementation-defined cases as a differential match to a
+particular host Go backend.
+
+Every conversion evaluates its operand once. Direct cases add no helper.
+Only a conversion that must cross from a `number` carrier into BigInt
+normalization requests the one standalone number-to-BigInt operation needed
+to avoid duplicated evaluation and a host exception. This includes
+floating-to-integer conversion in the `bigint` profile and 64-bit sign/width
+boundaries in the `number` profile.
+Conversion output remains O(1) per occurrence and no generic conversion
+registry, erased carrier, cast, or source-text route exists.
+
 Ordinary integer syntax is source-shaped under both initial profiles:
 
 | Go source | TS-Go AST decision | Printed TypeScript |

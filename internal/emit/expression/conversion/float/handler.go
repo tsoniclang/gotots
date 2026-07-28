@@ -1,0 +1,82 @@
+package float
+
+import (
+	"go/ast"
+	"go/types"
+
+	"github.com/tsoniclang/gotots/internal/emit/api"
+	floatvalue "github.com/tsoniclang/gotots/internal/emit/value/float"
+	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
+
+func Emit(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.CallExpr,
+	sourceType types.Type,
+	targetType types.Type,
+) (api.ExpressionEmission, error) {
+	if source == nil || len(source.Args) != 1 {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	targetCarrier, ok := floatvalue.Describe(targetType)
+	if !ok {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	sourceCarrier, floatSource := floatvalue.Describe(sourceType)
+	_, integerSource := integervalue.Describe(
+		context.TypesSizes(),
+		sourceType,
+	)
+	if !floatSource && !integerSource {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	operand, err := children.Expression(
+		context.
+			WithRole(api.RoleConversionOperand).
+			WithExpectedType(sourceType),
+		source.Args[0],
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	value := operand.Value()
+	requests := operand.Requests()
+	if integerSource &&
+		context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
+		value = context.Factory().CallExpression(
+			context.Factory().Identifier("Number"),
+			nil,
+			nil,
+			[]tsgo.Expression{value},
+			tsgo.NodeFlagsNone,
+		)
+	}
+	if targetCarrier.Bits() == 32 &&
+		(!floatSource || sourceCarrier.Bits() != 32) {
+		reference, err := context.Names().Runtime(
+			api.RuntimeFloat32Round,
+			api.ImportPhaseValue,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		value = context.Factory().CallExpression(
+			context.Factory().Identifier(reference.Name()),
+			nil,
+			nil,
+			[]tsgo.Expression{value},
+			tsgo.NodeFlagsNone,
+		)
+		requests = api.CombineRequests(requests, reference.Requests())
+	}
+	return api.NewExpressionEmission(
+		operand.Before(),
+		value,
+		requests,
+	)
+}

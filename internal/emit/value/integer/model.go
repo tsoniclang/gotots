@@ -233,7 +233,7 @@ func RequiresUint32Normalization(
 		carrier.width == 32
 }
 
-func CanConvert(source Carrier, target Carrier) bool {
+func CanConvertDirectly(source Carrier, target Carrier) bool {
 	switch {
 	case source.width == 0 || target.width == 0:
 		return false
