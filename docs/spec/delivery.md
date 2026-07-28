@@ -225,14 +225,21 @@ create a value IR or a generic operation registry.
    slicing are exact over arbitrary Go string bytes. Rune conversion,
    iteration, formatting, and external text encoding remain separate
    boundaries.
-3. Unnamed fixed-length arrays of represented scalar elements support zero,
-   copy, equality, literals, indexing/stores, `len`, and `cap`. Target types
-   retain the array length. Named arrays and recursively aggregate elements
-   remain unsupported until their identity and copy contracts are proved.
-4. Unnamed slices of represented scalar elements support nil, `make`, literals,
-   indexing/stores, two- and three-index slicing, `len`, `cap`, `append`, and
-   `copy`. The representation preserves backing-store aliasing, offset, length,
-   capacity, append reallocation, and fresh zero slices.
+3. Fixed-length arrays of admitted recursively represented elements support
+   zero, copy, equality, literals, indexing/stores, `len`, and `cap`. Target
+   types retain the array length. A defined array has one minimal nominal
+   wrapper around the same exact array storage; aliases add no wrapper.
+   Aggregate-element zero, literal, and copy operations are requested only
+   when the element representation requires structural copying, while the
+   scalar-only runtime artifact remains byte-identical.
+4. Unnamed slices of admitted recursively represented elements support nil,
+   `make`, literals, indexing/stores, two- and three-index slicing, `len`,
+   `cap`, `append`, and `copy`. The representation preserves backing-store
+   aliasing, offset, length, capacity, append reallocation, fresh zero values,
+   aggregate-element copying, and overlap-safe copy. Aggregate operations are
+   demand-selected; scalar-only slice artifacts do not acquire aggregate
+   callbacks or methods. Defined slice identity remains a separate named-type
+   obligation.
 5. Unnamed maps with represented scalar comparable keys and represented scalar
    values support nil, `make`, literals, lookup, comma-ok lookup, stores,
    `delete`, and `len`. Missing lookup returns the exact value zero; writes to a
