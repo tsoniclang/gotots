@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
 	slicingexpression "github.com/tsoniclang/gotots/internal/emit/expression/slicing"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
@@ -55,8 +56,10 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	arguments := []tsgo.Expression{operand.Value(), low.Value()}
-	requests := api.CombineRequests(operand.Requests(), low.Requests())
+	operands := []expressionoperands.Item{
+		expressionoperands.Present(operand),
+		expressionoperands.Present(low),
+	}
 	var high api.ExpressionEmission
 	if source.High != nil {
 		high, err = bound(
@@ -68,14 +71,15 @@ func Emit(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		arguments = append(arguments, high.Value())
-		requests = api.CombineRequests(requests, high.Requests())
+		operands = append(operands, expressionoperands.Present(high))
 	}
-	if len(operand.Before()) != 0 ||
-		len(low.Before()) != 0 ||
-		len(high.Before()) != 0 {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
+	ordered, err := expressionoperands.Preserve(
+		context,
+		api.TemporarySliceOperand,
+		operands...,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
 	reference, err := context.Names().Runtime(
 		api.RuntimeStringSlice,
@@ -84,19 +88,20 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return api.DirectExpression(
+	return api.NewExpressionEmission(
+		ordered.Before(),
 		context.Factory().CallExpression(
 			context.Factory().Identifier(reference.Name()),
 			nil,
 			nil,
-			arguments,
+			ordered.Values(),
 			tsgo.NodeFlagsNone,
 		),
 		api.CombineRequests(
-			requests,
+			ordered.Requests(),
 			reference.Requests(),
-		)...,
-	), nil
+		),
+	)
 }
 
 func bound(

@@ -12,8 +12,8 @@ import (
 	definedbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/defined"
 	floatbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/float"
 	integerbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/integer"
-	binaryoperands "github.com/tsoniclang/gotots/internal/emit/expression/binary/operands"
 	"github.com/tsoniclang/gotots/internal/emit/expression/mapcomparison"
+	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -106,7 +106,7 @@ func Emit(
 	if isLogicalOperator(source.Op) {
 		return emitLogical(context, source.Op, operator, left, right)
 	}
-	operands, err := binaryoperands.Preserve(
+	operands, err := expressionoperands.PreservePair(
 		context,
 		left,
 		right,
@@ -115,7 +115,7 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return binaryoperands.Finish(
+	return expressionoperands.Finish(
 		operands,
 		api.DirectExpression(
 			context.Factory().BinaryExpression(

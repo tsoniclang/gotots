@@ -12,7 +12,7 @@ import (
 	complexbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/complex"
 	floatbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/float"
 	integerbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/integer"
-	binaryoperands "github.com/tsoniclang/gotots/internal/emit/expression/binary/operands"
+	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
 	floatvalue "github.com/tsoniclang/gotots/internal/emit/value/float"
@@ -46,7 +46,7 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	operands, err := binaryoperands.Preserve(
+	operands, err := expressionoperands.PreservePair(
 		context,
 		left,
 		right,
@@ -83,7 +83,7 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	target, err = binaryoperands.Finish(operands, target)
+	target, err = expressionoperands.Finish(operands, target)
 	return target, true, err
 }
 

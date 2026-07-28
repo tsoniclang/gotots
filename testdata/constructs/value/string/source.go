@@ -101,3 +101,12 @@ func SuffixCall(low int) (string, int32) {
 	}
 	return next()[low:], calls
 }
+
+func IndexCall(index int) (byte, int32) {
+	var calls int32
+	next := func() string {
+		calls++
+		return "ab"
+	}
+	return next()[index], calls
+}

@@ -6,7 +6,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	binaryoperands "github.com/tsoniclang/gotots/internal/emit/expression/binary/operands"
+	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
 	floatvalue "github.com/tsoniclang/gotots/internal/emit/value/float"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -43,7 +43,7 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	operands, err := binaryoperands.Preserve(
+	operands, err := expressionoperands.PreservePair(
 		context,
 		left,
 		right,
@@ -62,7 +62,7 @@ func Emit(
 	if err != nil || !handled {
 		return target, handled, err
 	}
-	target, err = binaryoperands.Finish(operands, target)
+	target, err = expressionoperands.Finish(operands, target)
 	return target, true, err
 }
 

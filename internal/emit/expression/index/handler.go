@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	mapindexexpression "github.com/tsoniclang/gotots/internal/emit/expression/mapindex"
+	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
@@ -83,9 +84,14 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if len(operand.Before()) != 0 || len(index.Before()) != 0 {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
+	ordered, err := expressionoperands.Preserve(
+		context,
+		api.TemporarySliceOperand,
+		expressionoperands.Present(operand),
+		expressionoperands.Present(index),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
 	reference, err := context.Names().Runtime(
 		api.RuntimeStringIndex,
@@ -94,11 +100,12 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	values := ordered.Values()
 	target := tsgo.Expression(context.Factory().CallExpression(
 		context.Factory().Identifier(reference.Name()),
 		nil,
 		nil,
-		[]tsgo.Expression{operand.Value(), index.Value()},
+		values,
 		tsgo.NodeFlagsNone,
 	))
 	if context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
@@ -110,14 +117,14 @@ func Emit(
 			tsgo.NodeFlagsNone,
 		)
 	}
-	return api.DirectExpression(
+	return api.NewExpressionEmission(
+		ordered.Before(),
 		target,
 		api.CombineRequests(
-			operand.Requests(),
-			index.Requests(),
+			ordered.Requests(),
 			reference.Requests(),
-		)...,
-	), nil
+		),
+	)
 }
 
 func emitPointerArrayIndex(
@@ -239,33 +246,19 @@ func emitSliceIndex(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	targetReceiver := receiver.Value()
-	before := receiver.Before()
-	if len(index.Before()) != 0 {
-		name, err := context.Names().Temporary(api.TemporarySliceReceiver)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		before = append(before, context.Factory().VariableStatement(
-			nil,
-			context.Factory().VariableDeclarationList(
-				[]tsgo.VariableDeclaration{
-					context.Factory().VariableDeclaration(
-						context.Factory().Identifier(name),
-						nil,
-						nil,
-						targetReceiver,
-					),
-				},
-				tsgo.NodeFlagsConst,
-			),
-		))
-		targetReceiver = context.Factory().Identifier(name)
+	ordered, err := expressionoperands.Preserve(
+		context,
+		api.TemporarySliceOperand,
+		expressionoperands.Present(receiver),
+		expressionoperands.Present(index),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
-	before = append(before, index.Before()...)
+	values := ordered.Values()
 	target := context.Factory().CallExpression(
 		context.Factory().PropertyAccessExpression(
-			targetReceiver,
+			values[0],
 			nil,
 			context.Factory().Identifier(
 				runtimeslice.MemberName(runtimeslice.MemberGet),
@@ -274,12 +267,12 @@ func emitSliceIndex(
 		),
 		nil,
 		nil,
-		[]tsgo.Expression{index.Value()},
+		[]tsgo.Expression{values[1]},
 		tsgo.NodeFlagsNone,
 	)
 	return api.NewExpressionEmission(
-		before,
+		ordered.Before(),
 		target,
-		api.CombineRequests(receiver.Requests(), index.Requests()),
+		ordered.Requests(),
 	)
 }

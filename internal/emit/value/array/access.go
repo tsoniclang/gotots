@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
 	arraymember "github.com/tsoniclang/gotots/internal/emit/runtime/array/member"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -32,26 +33,25 @@ func (a RuntimeArray) EmitIndex(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	before := receiver.Before()
-	receiverValue := receiver.Value()
-	if len(index.Before()) != 0 {
-		name, err := context.Names().Temporary(api.TemporaryArrayReceiver)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		before = append(before, variable(context, name, receiverValue))
-		receiverValue = context.Factory().Identifier(name)
+	ordered, err := expressionoperands.Preserve(
+		context,
+		api.TemporaryArrayReceiver,
+		expressionoperands.Present(receiver),
+		expressionoperands.Present(index),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
-	before = append(before, index.Before()...)
+	values := ordered.Values()
 	return api.NewExpressionEmission(
-		before,
+		ordered.Before(),
 		callMember(
 			context,
-			a.storage(context, receiverValue),
+			a.storage(context, values[0]),
 			arraymember.Get,
-			index.Value(),
+			values[1],
 		),
-		api.CombineRequests(receiver.Requests(), index.Requests()),
+		ordered.Requests(),
 	)
 }
 
