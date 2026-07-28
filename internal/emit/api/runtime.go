@@ -42,6 +42,7 @@ const (
 	RuntimeSliceNilWith         RuntimeSymbol = 305
 	RuntimeSliceLiteralWith     RuntimeSymbol = 306
 	RuntimeSliceAppendSliceWith RuntimeSymbol = 307
+	RuntimeSliceClearWith       RuntimeSymbol = 308
 	RuntimeMap                  RuntimeSymbol = 400
 	RuntimeMapHash              RuntimeSymbol = 401
 	RuntimePanic                RuntimeSymbol = 500
@@ -210,6 +211,14 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			RuntimeModuleSlice,
 			"runtime/slice.ts",
 			"goSliceAppendSliceWith",
+			false,
+			RuntimeSlice,
+		), nil
+	case RuntimeSliceClearWith:
+		return runtimeContract(
+			RuntimeModuleSlice,
+			"runtime/slice.ts",
+			"goSliceClearWith",
 			false,
 			RuntimeSlice,
 		), nil

@@ -52,7 +52,7 @@ func testStaticSpecialization(
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(specialization.Members()) != 15 {
+	if len(specialization.Members()) != 16 {
 		t.Fatalf(
 			"specialization members = %d, want constructor, static operations, and map API",
 			len(specialization.Members()),

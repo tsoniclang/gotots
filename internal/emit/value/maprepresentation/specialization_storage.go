@@ -423,3 +423,31 @@ func (b specializationBuilder) isNilMethod() tsgo.MethodDeclaration {
 		),
 	)
 }
+
+func (b specializationBuilder) clearMethod() tsgo.MethodDeclaration {
+	return b.method(
+		nil,
+		b.members.clear,
+		nil,
+		b.voidType(),
+		b.factory.IfStatement(
+			b.undefined(b.property(b.factory.ThisExpression(), "buckets")),
+			b.factory.Block([]tsgo.Statement{
+				b.factory.ReturnStatement(nil),
+			}, true),
+			nil,
+		),
+		b.factory.ExpressionStatement(
+			b.call(
+				b.property(b.factory.ThisExpression(), "buckets"),
+				"clear",
+			),
+		),
+		b.factory.ExpressionStatement(
+			b.assign(
+				b.property(b.factory.ThisExpression(), "count"),
+				b.number("0"),
+			),
+		),
+	)
+}

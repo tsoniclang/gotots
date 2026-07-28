@@ -26,11 +26,12 @@ type memberNames struct {
 	delete     string
 	length     string
 	isNil      string
+	clear      string
 }
 
 func resolveMemberNames() (memberNames, error) {
-	resolved := make([]string, 0, MemberIsNil)
-	for member := MemberNil; member <= MemberIsNil; member++ {
+	resolved := make([]string, 0, MemberClear)
+	for member := MemberNil; member <= MemberClear; member++ {
 		name, err := Name(member)
 		if err != nil {
 			return memberNames{}, err
@@ -46,6 +47,7 @@ func resolveMemberNames() (memberNames, error) {
 		delete:     resolved[5],
 		length:     resolved[6],
 		isNil:      resolved[7],
+		clear:      resolved[8],
 	}, nil
 }
 
@@ -91,6 +93,7 @@ func Build(
 			deleteMethod(factory, members.delete),
 			lengthMethod(factory, members.length),
 			nilStateMethod(factory, members.isNil),
+			clearMethod(factory, members.clear),
 		},
 	), nil
 }

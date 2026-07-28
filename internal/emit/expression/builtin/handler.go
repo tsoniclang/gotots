@@ -5,12 +5,12 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	clearbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/clear"
 	complexbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/complex"
 	mapbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/map"
 	newvalue "github.com/tsoniclang/gotots/internal/emit/expression/builtin/newvalue"
 	orderedbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/ordered"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
-	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 )
@@ -36,6 +36,15 @@ func Emit(
 		return target, err
 	}
 	if target, handled, err := mapbuiltin.Emit(
+		context,
+		children,
+		source,
+		builtin,
+		discarded,
+	); handled {
+		return target, err
+	}
+	if target, handled, err := clearbuiltin.Emit(
 		context,
 		children,
 		source,
@@ -148,11 +157,7 @@ func scalarSlice(
 	_ api.Context,
 	sourceType types.Type,
 ) (*types.Slice, types.Type, bool) {
-	if defined, ok := definedtype.ResolveSlice(sourceType); ok {
-		sliceType, _ := defined.Slice()
-		return sliceType, sliceType.Elem(), true
-	}
-	return slicevalue.Resolve(sourceType)
+	return slicevalue.Source(sourceType)
 }
 
 func projectDefinedSlice(
@@ -160,11 +165,7 @@ func projectDefinedSlice(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	defined, ok := definedtype.ResolveSlice(sourceType)
-	if !ok {
-		return value, nil
-	}
-	return defined.Project(context, value)
+	return slicevalue.Project(context, sourceType, value)
 }
 
 func wrapDefinedSlice(
@@ -172,11 +173,7 @@ func wrapDefinedSlice(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	defined, ok := definedtype.ResolveSlice(sourceType)
-	if !ok {
-		return value, nil
-	}
-	return defined.Wrap(context, value)
+	return slicevalue.Wrap(context, sourceType, value)
 }
 
 func arrayArgument(

@@ -69,7 +69,7 @@ func TestMapValuesCreateTypedTargetAST(t *testing.T) {
 	}
 	if class.Name().Text() != "GoMap" ||
 		len(class.TypeParameters()) != 2 ||
-		len(class.Members()) != 9 {
+		len(class.Members()) != 10 {
 		t.Fatalf(
 			"runtime class = %q with %d parameters and %d members",
 			class.Name().Text(),

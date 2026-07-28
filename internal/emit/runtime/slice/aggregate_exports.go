@@ -34,9 +34,27 @@ func BuildAggregateOperation(
 		return target.aggregateAppendSliceExport(contract.ExportedName()), nil
 	case api.RuntimeSliceCopyWith:
 		return target.aggregateCopyExport(contract.ExportedName()), nil
+	case api.RuntimeSliceClearWith:
+		return target.aggregateClearExport(contract.ExportedName()), nil
 	default:
 		return nil, &api.RuntimeSymbolError{Symbol: symbol}
 	}
+}
+
+func (b builder) aggregateClearExport(name string) tsgo.FunctionDeclaration {
+	return b.aggregateExport(
+		name,
+		[]tsgo.ParameterDeclaration{
+			b.parameter("source", b.sliceType()),
+			b.parameter("zero", b.valueFactoryType()),
+		},
+		b.factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindVoidKeyword),
+		b.call(
+			b.id("source"),
+			MemberName(MemberClearWith),
+			b.id("zero"),
+		),
+	)
 }
 
 func (b builder) aggregateAppendSliceExport(name string) tsgo.FunctionDeclaration {

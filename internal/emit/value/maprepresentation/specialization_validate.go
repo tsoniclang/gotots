@@ -47,6 +47,7 @@ func validateSpecialization(
 		names.deleteMember: nil,
 		names.length:       nil,
 		names.isNil:        nil,
+		names.clear:        nil,
 	}
 	if len(members) != len(expected)+1 {
 		return specializationShapeError(

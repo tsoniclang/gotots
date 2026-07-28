@@ -121,6 +121,7 @@ func TestSliceAggregateDefinitionsExactJoinRequestedSymbols(t *testing.T) {
 		api.RuntimeSliceNilWith,
 		api.RuntimeSliceLiteralWith,
 		api.RuntimeSliceAppendSliceWith,
+		api.RuntimeSliceClearWith,
 	}
 	definitions, err := Build(
 		tsgo.NewFactory(),

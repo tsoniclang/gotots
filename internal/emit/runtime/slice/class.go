@@ -18,6 +18,7 @@ type Capabilities struct {
 	AggregateLiteral bool
 	AggregateAppend  bool
 	AggregateCopy    bool
+	AggregateClear   bool
 }
 
 func Build(
@@ -80,6 +81,7 @@ func BuildWithCapabilities(
 		target.sliceMethod(),
 		target.appendMethod(capabilities.AggregateAppend, lazyZero),
 		target.appendSliceMethod(),
+		target.clearMethod(),
 		target.copyMethod(),
 	)
 	if capabilities.AggregateNil {
@@ -97,6 +99,9 @@ func BuildWithCapabilities(
 	}
 	if capabilities.AggregateCopy {
 		members = append(members, target.aggregateCopyMethod())
+	}
+	if capabilities.AggregateClear {
+		members = append(members, target.aggregateClearMethod())
 	}
 	if capabilities.Address {
 		members = append(members, target.addressMethod())

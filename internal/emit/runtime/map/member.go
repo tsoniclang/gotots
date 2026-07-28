@@ -14,6 +14,7 @@ const (
 	MemberDelete   Member = 6
 	MemberLength   Member = 7
 	MemberIsNil    Member = 8
+	MemberClear    Member = 9
 )
 
 func Name(member Member) (string, error) {
@@ -34,6 +35,8 @@ func Name(member Member) (string, error) {
 		return "length", nil
 	case MemberIsNil:
 		return "isNil", nil
+	case MemberClear:
+		return "clear", nil
 	default:
 		return "", &MemberError{Member: member}
 	}

@@ -26,8 +26,8 @@ func TestBuildCreatesOneTypedGenericMapClass(t *testing.T) {
 	if len(class.TypeParameters()) != 2 {
 		t.Fatalf("type parameters = %d, want key and value", len(class.TypeParameters()))
 	}
-	if len(class.Members()) != 9 {
-		t.Fatalf("members = %d, want one constructor and eight operations", len(class.Members()))
+	if len(class.Members()) != 10 {
+		t.Fatalf("members = %d, want one constructor and nine operations", len(class.Members()))
 	}
 }
 

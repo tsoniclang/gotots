@@ -18,6 +18,8 @@ const (
 	MemberCapacity
 	MemberAppendSlice
 	MemberAppendSliceWith
+	MemberClear
+	MemberClearWith
 )
 
 func MemberName(member Member) string {
@@ -50,6 +52,10 @@ func MemberName(member Member) string {
 		return "appendSlice"
 	case MemberAppendSliceWith:
 		return "appendSliceWith"
+	case MemberClear:
+		return "clear"
+	case MemberClearWith:
+		return "clearWith"
 	default:
 		panic("invalid RuntimeSlice member")
 	}

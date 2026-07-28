@@ -62,6 +62,7 @@ func (b specializationBuilder) build() []tsgo.ClassElement {
 		b.deleteMethod(),
 		b.lengthMethod(),
 		b.isNilMethod(),
+		b.clearMethod(),
 	}
 }
 

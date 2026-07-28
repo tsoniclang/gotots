@@ -85,8 +85,8 @@ func BuildSpecialization(
 }
 
 func specializationNames() (specializationMemberNames, error) {
-	resolved := make([]string, 0, mapruntime.MemberIsNil)
-	for member := mapruntime.MemberNil; member <= mapruntime.MemberIsNil; member++ {
+	resolved := make([]string, 0, mapruntime.MemberClear)
+	for member := mapruntime.MemberNil; member <= mapruntime.MemberClear; member++ {
 		name, err := mapruntime.Name(member)
 		if err != nil {
 			return specializationMemberNames{}, err
@@ -102,6 +102,7 @@ func specializationNames() (specializationMemberNames, error) {
 		deleteMember: resolved[5],
 		length:       resolved[6],
 		isNil:        resolved[7],
+		clear:        resolved[8],
 	}, nil
 }
 
