@@ -1496,6 +1496,27 @@ element zero or copy structure. The runtime array exposes only typed storage
 allocation and access. It never receives or stores an element-zero or
 element-copy function.
 
+Array and pointer-to-array slicing evaluates the operand and bounds once,
+obtains the array's canonical backing plus offset, and creates one slice
+descriptor over that same region. For:
+
+```go
+array := [4]int32{1, 2, 3, 4}
+view := (&array)[1:3:4]
+view[0] = 9
+```
+
+the target decision is a demand-only `goArrayLocation(array)` followed by one
+typed slice view and the ordinary slice bounds operation; `array[1]` becomes
+`9`. No element is copied and no second bounds implementation exists.
+
+Composite-literal element handlers use the checker-selected expression type,
+not the presence of an explicit child type node. Thus an elided nested literal
+such as `[][]Box{{{Value: 1}}}` is dispatched as a `[]Box` literal because
+`go/types.Info.TypeOf` supplies that contextual type. The handler must not
+fabricate source syntax, rediscover the parent by scanning, or reject a valid
+literal merely because `CompositeLit.Type` is absent.
+
 An admitted slice is a descriptor over backing storage:
 
 ```text

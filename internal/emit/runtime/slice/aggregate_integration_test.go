@@ -78,6 +78,7 @@ console.log(values.CopyDistinctCopiesValues());
 console.log(values.CopyOverlapSnapshotsValues());
 console.log(values.AddressTargetsBackingElement());
 console.log(values.ArrayElementsCopyOnAppend());
+console.log(values.ElidedNestedLiterals());
 `)
 			writeFile(t, filepath.Join(directory, "package.json"), "{\"type\":\"module\"}\n")
 			paths = append(paths, runner)
@@ -234,6 +235,7 @@ func main() {
 	fmt.Println(values.CopyOverlapSnapshotsValues())
 	fmt.Println(values.AddressTargetsBackingElement())
 	fmt.Println(values.ArrayElementsCopyOnAppend())
+	fmt.Println(values.ElidedNestedLiterals())
 }
 `)
 	return run(t, runnerDirectory, "go", "run", ".")

@@ -49,6 +49,39 @@ func TestAggregateArrayZeroCopyLiteralEqualityAndAddressMatchGo(
 			if strings.Count(runtime, "function goArrayAllocate") != 1 {
 				t.Fatalf("aggregate storage allocator is not emitted exactly once:\n%s", runtime)
 			}
+			sliceRuntime := target.printed["runtime/slice.ts"]
+			for artifact, fragments := range map[string][]string{
+				"runtime/array.ts": {
+					"public $location():",
+					"function goArrayLocation",
+				},
+				"runtime/slice.ts": {
+					"public static $view<T>",
+					"function goArraySlice",
+				},
+			} {
+				printed := target.printed[artifact]
+				for _, fragment := range fragments {
+					if strings.Count(printed, fragment) != 1 {
+						t.Fatalf(
+							"%s count(%q) = %d, want one:\n%s",
+							artifact,
+							fragment,
+							strings.Count(printed, fragment),
+							printed,
+						)
+					}
+				}
+			}
+			if !strings.Contains(
+				sliceRuntime,
+				"return RuntimeSlice.$view<T>(",
+			) {
+				t.Fatalf(
+					"array slicing does not construct one canonical slice view:\n%s",
+					sliceRuntime,
+				)
+			}
 			for path, artifact := range target.printed {
 				for _, forbidden := range []string{
 					": any",
@@ -93,16 +126,26 @@ func TestAggregateArrayZeroCopyLiteralEqualityAndAddressMatchGo(
 func TestScalarArrayArtifactHasNoAggregateOperationSurface(t *testing.T) {
 	directory := t.TempDir()
 	target := materializeArrayProgram(t, directory, compileArrayFixture(t))
-	runtime := target.printed["runtime/array.ts"]
 	for _, forbidden := range []string{
 		"goArrayZeroWith",
 		"goArrayLiteralWith",
 		"goArrayCopyWith",
 		"goArrayAllocate",
 		"$allocate",
+		"goArrayLocation",
+		"$location",
+		"goArraySlice",
+		"static $view<T>",
 	} {
-		if strings.Contains(runtime, forbidden) {
-			t.Fatalf("scalar array runtime contains %q:\n%s", forbidden, runtime)
+		for path, artifact := range target.printed {
+			if strings.Contains(artifact, forbidden) {
+				t.Fatalf(
+					"scalar array artifact %s contains %q:\n%s",
+					path,
+					forbidden,
+					artifact,
+				)
+			}
 		}
 	}
 }
@@ -135,6 +178,7 @@ func aggregateArrayRunner(
 	suffix string,
 ) string {
 	return `import "` + target.programInit + `";
+import { GoPanic } from "./runtime/panic.js";
 import * as values from "` + target.sourceModule + `";
 
 console.log(values.ZeroFresh().map(String).join(" "));
@@ -153,6 +197,22 @@ console.log(
     String(values.First(copied)),
     String(values.Second(original)),
 );
+console.log(values.SliceDefinedArrayAliases(right));
+console.log(values.SlicePointerArrayAliasesValue(right));
+console.log(values.SlicePlainArrayAliasesValue(right));
+console.log(values.SliceEvaluationOrder().map(String).join(" "));
+for (const action of [
+    values.SliceHighPanic,
+    values.SliceMaxPanic,
+    values.SliceLowPanic,
+]) {
+    try {
+        action();
+        console.log("bounds-missing");
+    } catch (error) {
+        console.log(error instanceof GoPanic ? "bounds" : "wrong-error");
+    }
+}
 `
 }
 
@@ -174,6 +234,16 @@ import (
 	values "example.com/aggregatearray"
 )
 
+func reportBounds(action func()) {
+	defer func() {
+		if recover() != nil {
+			fmt.Println("bounds")
+		}
+	}()
+	action()
+	fmt.Println("bounds-missing")
+}
+
 func main() {
 	fmt.Println(values.ZeroFresh())
 	fmt.Println(values.CopyIsDeep())
@@ -187,6 +257,13 @@ func main() {
 	fmt.Println(values.First(pointed), values.Second(pointed))
 	original, copied := values.CallIsolation(right)
 	fmt.Println(values.First(original), values.First(copied), values.Second(original))
+	fmt.Println(values.SliceDefinedArrayAliases(right))
+	fmt.Println(values.SlicePointerArrayAliasesValue(right))
+	fmt.Println(values.SlicePlainArrayAliasesValue(right))
+	fmt.Println(values.SliceEvaluationOrder())
+	reportBounds(values.SliceHighPanic)
+	reportBounds(values.SliceMaxPanic)
+	reportBounds(values.SliceLowPanic)
 }
 `)
 	return run(t, runnerDirectory, "go", "run", ".")

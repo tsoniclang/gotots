@@ -35,11 +35,13 @@ const (
 	RuntimeArray             RuntimeSymbol = 200
 	RuntimeArrayAllocate     RuntimeSymbol = 201
 	RuntimeArrayView         RuntimeSymbol = 202
+	RuntimeArrayLocation     RuntimeSymbol = 203
 	RuntimeSlice             RuntimeSymbol = 300
 	RuntimeSliceAddress      RuntimeSymbol = 301
 	RuntimeSliceStorage      RuntimeSymbol = 302
 	RuntimeSliceAddressView  RuntimeSymbol = 303
 	RuntimeSliceArrayPointer RuntimeSymbol = 304
+	RuntimeArraySlice        RuntimeSymbol = 305
 	RuntimeSliceAppendSlice  RuntimeSymbol = 307
 	RuntimeSliceClear        RuntimeSymbol = 308
 	RuntimeMap               RuntimeSymbol = 400
@@ -155,6 +157,14 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			false,
 			RuntimeArray,
 		), nil
+	case RuntimeArrayLocation:
+		return runtimeContract(
+			RuntimeModuleArray,
+			"runtime/array.ts",
+			"goArrayLocation",
+			false,
+			RuntimeArray,
+		), nil
 	case RuntimeSlice:
 		return runtimeContract(
 			RuntimeModuleSlice,
@@ -199,6 +209,16 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			RuntimePointer,
 			RuntimeArray,
 			RuntimeArrayView,
+		), nil
+	case RuntimeArraySlice:
+		return runtimeContract(
+			RuntimeModuleSlice,
+			"runtime/slice.ts",
+			"goArraySlice",
+			false,
+			RuntimeSlice,
+			RuntimeArray,
+			RuntimeArrayLocation,
 		), nil
 	case RuntimeSliceAppendSlice:
 		return runtimeContract(

@@ -137,6 +137,10 @@ func Build(
 					symbols,
 					api.RuntimeArrayView,
 				),
+				Location: slices.Contains(
+					symbols,
+					api.RuntimeArrayLocation,
+				),
 			},
 		)
 		if err != nil {

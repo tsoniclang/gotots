@@ -9,6 +9,7 @@ import (
 type Capabilities struct {
 	Allocate bool
 	View     bool
+	Location bool
 }
 
 func Build(
@@ -58,6 +59,9 @@ func BuildWithCapabilities(
 	}
 	if capabilities.View {
 		members = append(members, viewMethod(factory, exportedName))
+	}
+	if capabilities.Location {
+		members = append(members, locationMethod(factory))
 	}
 	members = append(
 		members,

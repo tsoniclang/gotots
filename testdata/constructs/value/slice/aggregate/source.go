@@ -116,3 +116,17 @@ func ArrayElementsCopyOnAppend() bool {
 	values[0][0].Value = 9
 	return value[0].Value == 1 && values[0][1].Value == 2
 }
+
+func ElidedNestedLiterals() bool {
+	slices := [][]Box{
+		{{Value: 1}},
+		{{Value: 2}},
+	}
+	maps := []map[int32]Box{
+		{1: {Value: 3}},
+	}
+	slices[0][0].Value = 9
+	copied := maps[0][1]
+	copied.Value = 8
+	return slices[1][0].Value == 2 && maps[0][1].Value == 3
+}

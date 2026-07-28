@@ -75,3 +75,78 @@ func First(value Boxes) int32 {
 func Second(value Boxes) int32 {
 	return value[1].Value
 }
+
+func SliceDefinedArrayAliases(value Boxes) bool {
+	view := value[:1:2]
+	view[0].Value = 21
+	expanded := view[:2]
+	expanded[1].Value = 22
+	return value[0].Value == 21 && value[1].Value == 22
+}
+
+func SlicePointerArrayAliases(value *Boxes) bool {
+	view := value[1:]
+	view[0].Value = 23
+	return value[1].Value == 23
+}
+
+func SlicePointerArrayAliasesValue(value Boxes) bool {
+	return SlicePointerArrayAliases(&value)
+}
+
+func SlicePlainArrayAliases(value [2]Box) bool {
+	view := value[:]
+	view[0].Value = 24
+	return value[0].Value == 24
+}
+
+func SlicePlainArrayAliasesValue(value Boxes) bool {
+	return SlicePlainArrayAliases([2]Box(value))
+}
+
+func SliceEvaluationOrder() (int32, int32, int32, int32) {
+	array := [4]int32{1, 2, 3, 4}
+	events := [4]int32{}
+	next := int32(0)
+	_ = sliceOperand(&array, &events, &next)[sliceBound(&events, &next, 2, 0):sliceBound(&events, &next, 3, 3):sliceBound(&events, &next, 4, 4)]
+	return events[0], events[1], events[2], events[3]
+}
+
+func sliceOperand(
+	value *[4]int32,
+	events *[4]int32,
+	next *int32,
+) *[4]int32 {
+	events[*next] = 1
+	*next++
+	return value
+}
+
+func sliceBound(
+	events *[4]int32,
+	next *int32,
+	marker int32,
+	value int32,
+) int32 {
+	events[*next] = marker
+	*next++
+	return value
+}
+
+func SliceHighPanic() {
+	value := [2]int32{}
+	high := int32(3)
+	_ = value[:high]
+}
+
+func SliceMaxPanic() {
+	value := [2]int32{}
+	maximum := int32(3)
+	_ = value[:1:maximum]
+}
+
+func SliceLowPanic() {
+	value := [2]int32{}
+	low := int32(-1)
+	_ = value[low:]
+}

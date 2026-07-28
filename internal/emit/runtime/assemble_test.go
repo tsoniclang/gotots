@@ -32,6 +32,7 @@ func TestAggregateArrayRuntimeAssemblyExactJoinsDemandedOperations(t *testing.T)
 		api.RuntimeArray,
 		api.RuntimeArrayAllocate,
 		api.RuntimeArrayView,
+		api.RuntimeArrayLocation,
 	}
 	definitions, err := Build(
 		factory,
@@ -116,6 +117,7 @@ func TestSliceAggregateDefinitionsExactJoinRequestedSymbols(t *testing.T) {
 		api.RuntimeSliceAddress,
 		api.RuntimeSliceStorage,
 		api.RuntimeSliceArrayPointer,
+		api.RuntimeArraySlice,
 		api.RuntimeSliceAppendSlice,
 		api.RuntimeSliceClear,
 	}

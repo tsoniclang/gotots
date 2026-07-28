@@ -17,6 +17,7 @@ type Capabilities struct {
 	AppendSlice  bool
 	Clear        bool
 	ArrayPointer bool
+	ArrayView    bool
 }
 
 func Build(
@@ -84,6 +85,9 @@ func BuildWithCapabilities(
 	}
 	if capabilities.ArrayPointer {
 		members = append(members, target.arrayLocationMethod())
+	}
+	if capabilities.ArrayView {
+		members = append(members, target.arrayViewMethod())
 	}
 	return factory.ClassDeclaration(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},

@@ -387,6 +387,14 @@ operand, passes a semantic callback, or creates a second address identity.
 For length zero, a nil slice produces a nil pointer while a non-nil empty slice
 produces a non-nil pointer, matching Go.
 
+Slicing an array value or pointer-to-array uses the inverse view over that same
+canonical storage. The array owner exposes one demand-only typed
+`backing + offset` location; the slice owner constructs one descriptor with
+the array length as its initial length and capacity, then applies the ordinary
+slice-bounds operation. The result aliases the array in both directions and
+does not copy elements. Programs without array slicing emit neither the array
+location facet nor the array-to-slice view facet.
+
 Every executable Go function body, including each package `init` declaration,
 is a reconstructible artifact. Package initialization may impose ordering and
 an exported generated entry name, but it does not own a second emission or

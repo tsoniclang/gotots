@@ -561,8 +561,8 @@ program. The required evidence includes:
 |---|---|---|
 | integers and numeric conversions | every source/destination width and profile disposition; narrowing, sign change, integer/float, float-width, and complex-width boundaries; constants; NaN, infinity, signed zero, and representability; BigInt division/remainder for nonzero and zero divisors | width alias collapse; unsafe number literal; missing narrowing/bounds operation; conversion spelling lookup; ordinary-call fallthrough; duplicated conversion operand; direct host divide/remainder or non-finite BigInt conversion bypass |
 | strings | arbitrary-byte literal, concat, comparison, byte length/index/slice and bounds; integer/rune UTF-8 encoding; `[]byte`/`[]rune` conversions including invalid and truncated sequences | Unicode-code-point literal; UTF-16 indexing; host text codec; invalid-sequence width drift; missing bounds check |
-| arrays | length-distinct target types, fresh zero/copy, compiler-lowered recursive equality, index/store/len/cap | erased length; shared zero; shallow copy where element policy forbids it; runtime zero/copy/equality callback or target object identity |
-| slices | nil/empty distinction, aliasing, reslice, append reuse/reallocation, copy overlap, aggregate fresh zero/copy/clear, distinct-defined spread, `[]byte` plus string spread, and large spread without host argument expansion | bare-array substitution; lost capacity; always-reallocate append; semantic strategy field/parameter; JavaScript spread of a Go slice; unconditional append-spread/clear surface |
+| arrays | length-distinct target types, fresh zero/copy, compiler-lowered recursive equality, index/store/len/cap, direct and pointer-to-array slicing with bidirectional aliasing | erased length; shared zero; shallow copy where element policy forbids it; copied array slice; duplicate bounds owner; runtime zero/copy/equality callback or target object identity |
+| slices | nil/empty distinction, aliasing, reslice, append reuse/reallocation, copy overlap, aggregate fresh zero/copy/clear, contextual elided nested literals, distinct-defined spread, `[]byte` plus string spread, and large spread without host argument expansion | bare-array substitution; lost capacity; always-reallocate append; explicit-type requirement for an elided literal; semantic strategy field/parameter; JavaScript spread of a Go slice; unconditional append-spread/clear surface |
 | maps | nil write, missing zero, comma-ok, aliasing, direct bool/integer/string keys, defined-key projection, delete/len, and explicit floating-key rejection | plain-object substitution; missing-value `undefined`; copy-on-assignment; wrapper object identity; floating-key admission through native SameValueZero |
 | pointers | nil/new/read/store/alias/equality; local/parameter/result/receiver/package/field/array/slice addresses; reassignment through projections; pointer receiver nil/copy cases | fresh wrapper on copy; wrapper identity instead of canonical location; nil dereference success; unrelated-local cell wrapping; wrong requirement owner |
 
@@ -578,12 +578,21 @@ one evaluation, nil-versus-empty length-zero results, canonical equality by
 backing plus offset, bidirectional aliasing, whole-array assignment, recursive
 element-copy isolation, defined slice/array composition, and the absence of
 nominal-wrapper forwarding methods.
+Array-slicing tests prove direct, defined, plain, pointer, and defined-result
+forms; low/high/max evaluation order; ordinary slice-bound panic behavior;
+bidirectional aliasing; and exact demand shape for one array-location facet
+and one array-to-slice helper. A no-array-slicing artifact contains neither
+facet. Contextual-literal tests prove nested elided slice and map elements use
+checker types and produce the same strict target structure and behavior as
+their explicit-type equivalents.
 Mutations inline the field walk at every use, omit one field copy, admit an
 inconvertible struct, move the length check after allocation, alias slice
 backing for the value conversion, copy backing for the pointer conversion,
 key the pointer by slice-descriptor identity, collapse nil and non-nil empty
-zero-length slices, restore defined-array forwarding methods, or evaluate the
-slice twice; each must fail its owning shape or differential gate.
+zero-length slices, copy an array during slicing, add a second array-bounds
+path, require explicit nested literal syntax, restore defined-array forwarding
+methods, or evaluate the slice twice; each must fail its owning shape or
+differential gate.
 
 Pointer-conversion certification additionally proves:
 
@@ -658,8 +667,11 @@ Expression-completion certification also requires:
 4. aggregate array/slice artifacts containing direct element operation calls
    and no function-valued zero/copy parameter, field, or argument;
 5. runtime artifact pairs proving append-spread and clear declarations are
-   absent without demand and present exactly once with demand; and
-6. mutations that restore tuple-before-variadic rejection, slice
+   absent without demand and present exactly once with demand;
+6. logical `&&`/`||` expressions whose right operand has prerequisite
+   statements, proving those statements remain inside the selected
+   short-circuit branch; and
+7. mutations that restore tuple-before-variadic rejection, slice
    assignability admission, stored semantic callbacks, host spreading, shared
    aggregate zeros, shallow aggregate growth/copy, or unconditional runtime
    members.

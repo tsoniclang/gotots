@@ -34,8 +34,7 @@ func emitSlice(
 	if !represented {
 		return api.ExpressionEmission{}, false, nil
 	}
-	if source.Type == nil ||
-		source.Incomplete ||
+	if source.Incomplete ||
 		context.ExpectedType() == nil ||
 		!types.AssignableTo(sourceType, context.ExpectedType()) {
 		return api.ExpressionEmission{}, true,
@@ -50,9 +49,13 @@ func emitSlice(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
+	typeOwner := ast.Node(source)
+	if source.Type != nil {
+		typeOwner = source.Type
+	}
 	elementTarget, err := children.RepresentedType(
 		context.WithRole(api.RoleSliceElementType),
-		source.Type,
+		typeOwner,
 		elementType,
 	)
 	if err != nil {

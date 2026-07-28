@@ -18,7 +18,6 @@ func Emit(
 	sourceType := context.TypesInfo().TypeOf(source)
 	mapType, ok := maprepresentation.Source(context, sourceType)
 	if !ok ||
-		source.Type == nil ||
 		source.Incomplete ||
 		context.ExpectedType() == nil ||
 		!types.AssignableTo(sourceType, context.ExpectedType()) {
