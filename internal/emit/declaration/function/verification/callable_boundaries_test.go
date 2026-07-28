@@ -36,18 +36,6 @@ func Identity[T any](value T) T {
 			category:  api.CategoryDeclaration,
 			construct: "*ast.FuncDecl",
 		},
-		{
-			name: "expression form new",
-			source: `package boundary
-
-func NewValue(value int32) *int32 {
-	return new(value)
-}
-`,
-			role:      api.RoleReturnResult,
-			category:  api.CategoryExpression,
-			construct: "*ast.CallExpr",
-		},
 	}
 
 	for _, testCase := range testCases {
@@ -413,6 +401,133 @@ func main() {
 	fmt.Println(variadic.UseAggregate())
 	fmt.Println(variadic.UseEmpty())
 	fmt.Println(variadic.UseAggregateEmpty())
+}
+`)
+	return run(t, workingDirectory, "go", "run", ".")
+}
+
+func TestExpressionNewPrintTypecheckAndExecuteDifferentially(t *testing.T) {
+	project := loadExpressionNewProject(t)
+	workingDirectory := t.TempDir()
+	artifacts := materializeExportedProgram(t, project.loaded, workingDirectory)
+	source := readMaterializedSource(t, artifacts, "source.ts")
+	for _, fragment := range []string{
+		"GoPointer.cell<int32>",
+		"GoPointer.cell<Box>",
+		"$copy",
+	} {
+		if !strings.Contains(source, fragment) {
+			t.Fatalf("expression-form new output lacks %q:\n%s", fragment, source)
+		}
+	}
+	for _, forbidden := range []string{".call(", ".apply(", ": any", ": unknown"} {
+		if strings.Contains(source, forbidden) {
+			t.Fatalf("expression-form new output contains %q:\n%s", forbidden, source)
+		}
+	}
+	runnerPath := filepath.Join(workingDirectory, "runner.ts")
+	writeFile(t, runnerPath, `import { Use } from "`+artifacts.module(t, "source.ts")+`";
+
+console.log(Use());
+`)
+	targetOutput := executeMaterializedTypeScript(t, workingDirectory, artifacts, runnerPath)
+	goOutput := runExpressionNewGo(t, project.directory)
+	if targetOutput != goOutput {
+		t.Fatalf("expression-form new TypeScript output = %q, Go output = %q", targetOutput, goOutput)
+	}
+}
+
+func TestExpressionNewMissingOperandFactFailsAtBuiltinOwner(t *testing.T) {
+	project := loadExpressionNewProject(t)
+	function := sourceFunction(t, project.loaded.Files()[0].Syntax(), "NewScalar")
+	call := function.Body.List[0].(*ast.ReturnStmt).Results[0].(*ast.CallExpr)
+	delete(project.loaded.TypesInfo().Types, call.Args[0])
+	_, err := emit.CompileFile(project.loaded, project.loaded.Files()[0].Syntax())
+	var unsupported *api.UnsupportedError
+	if !errors.As(err, &unsupported) ||
+		unsupported.Category != api.CategoryExpression ||
+		unsupported.Construct != "*ast.CallExpr" {
+		t.Fatalf("expression-form new missing fact error = %#v, want call unsupported", err)
+	}
+}
+
+type expressionNewProject struct {
+	directory string
+	loaded    *load.Package
+}
+
+func loadExpressionNewProject(t *testing.T) expressionNewProject {
+	t.Helper()
+	directory := t.TempDir()
+	writeFile(t, filepath.Join(directory, "go.mod"), "module example.com/expressionnew\n\ngo 1.26.4\n")
+	writeFile(t, filepath.Join(directory, "source.go"), `package expressionnew
+
+type Box struct {
+	Value int32
+}
+
+func makeBox() Box {
+	return Box{Value: 8}
+}
+
+func NewScalar(value int32) *int32 {
+	return new(value)
+}
+
+func NewBox(value Box) *Box {
+	return new(value)
+}
+
+func NewFreshBox() *Box {
+	return new(makeBox())
+}
+
+func NewUntyped() *int {
+	return new(1 + 1)
+}
+
+func Use() int32 {
+	scalar := NewScalar(4)
+	box := NewBox(Box{Value: 7})
+	fresh := NewFreshBox()
+	return *scalar + box.Value + fresh.Value
+}
+`)
+	loaded, err := load.One(context.Background(), load.Request{
+		Directory: directory,
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return expressionNewProject{directory: directory, loaded: loaded}
+}
+
+func runExpressionNewGo(t *testing.T, projectDirectory string) string {
+	t.Helper()
+	workingDirectory := t.TempDir()
+	absPath, err := filepath.Abs(projectDirectory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(workingDirectory, "go.mod"), fmt.Sprintf(`module example.com/runner
+
+go 1.26.4
+
+require example.com/expressionnew v0.0.0
+
+replace example.com/expressionnew => %s
+`, filepath.ToSlash(absPath)))
+	writeFile(t, filepath.Join(workingDirectory, "main.go"), `package main
+
+import (
+	"fmt"
+
+	"example.com/expressionnew"
+)
+
+func main() {
+	fmt.Println(expressionnew.Use())
 }
 `)
 	return run(t, workingDirectory, "go", "run", ".")
