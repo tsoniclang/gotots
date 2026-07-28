@@ -10,7 +10,6 @@ import (
 
 type Values interface {
 	RequiresCustomEquality(Context, types.Type) bool
-	RequiresCustomUpdate(Context, types.Type) bool
 	RequiresExplicitType(Context, types.Type) bool
 	RequiresStructuralCopy(Context, types.Type) bool
 	SupportsHash(Context, types.Type) bool

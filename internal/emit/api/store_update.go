@@ -15,24 +15,106 @@ func (e StoreTargetEmission) CaptureAccessorLocation(
 			Reason: "store target is not accessor-backed",
 		}
 	}
+	return e.CaptureLocation(context)
+}
+
+func (e StoreTargetEmission) CaptureLocation(
+	context Context,
+) (StoreTargetEmission, error) {
+	captured, before, requests, err := e.PrepareLocation(context)
+	if err != nil {
+		return StoreTargetEmission{}, err
+	}
+	captured.before = before
+	captured.requests = requests
+	return captured, nil
+}
+
+func (e StoreTargetEmission) PrepareLocation(
+	context Context,
+) (
+	StoreTargetEmission,
+	[]tsgo.Statement,
+	[]RootRequest,
+	error,
+) {
+	if e.locationCaptured {
+		return StoreTargetEmission{}, nil, nil, &ResultError{
+			Result: "store location",
+			Reason: "target location is already captured",
+		}
+	}
+	if !e.accessor && !e.property {
+		captured := e
+		before := captured.Before()
+		requests := captured.Requests()
+		captured.before = nil
+		captured.requests = nil
+		captured.locationCaptured = true
+		return captured, before, requests, nil
+	}
+	if e.property {
+		return e.preparePropertyLocation(context)
+	}
+	return e.prepareAccessorLocation(context)
+}
+
+func (e StoreTargetEmission) preparePropertyLocation(
+	context Context,
+) (
+	StoreTargetEmission,
+	[]tsgo.Statement,
+	[]RootRequest,
+	error,
+) {
+	before, value, requests, err := captureStoreOperand(
+		context,
+		e.propertyReceiver,
+	)
+	if err != nil {
+		return StoreTargetEmission{}, nil, nil, err
+	}
+	captured, err := NewPropertyStoreTargetEmission(
+		context.Factory(),
+		DirectExpression(value),
+		e.propertyMember,
+		e.sourceType,
+	)
+	if err != nil {
+		return StoreTargetEmission{}, nil, nil, err
+	}
+	captured.copiesValue = e.copiesValue
+	captured.locationCaptured = true
+	return captured,
+		append(slices.Clone(e.before), before...),
+		append(slices.Clone(e.requests), requests...),
+		nil
+}
+
+func (e StoreTargetEmission) prepareAccessorLocation(
+	context Context,
+) (
+	StoreTargetEmission,
+	[]tsgo.Statement,
+	[]RootRequest,
+	error,
+) {
 	operands := []ExpressionEmission{e.accessorReceiver}
 	operands = append(operands, e.accessorArguments...)
 	values := make([]tsgo.Expression, 0, len(operands))
 	var before []tsgo.Statement
 	var requests []RootRequest
 	for _, operand := range operands {
-		before = append(before, operand.Before()...)
-		name, err := context.Names().Temporary(TemporaryStoreOperand)
-		if err != nil {
-			return StoreTargetEmission{}, err
-		}
-		before = append(before, constantStatement(
+		operandBefore, value, operandRequests, err := captureStoreOperand(
 			context,
-			name,
-			operand.Value(),
-		))
-		values = append(values, context.Factory().Identifier(name))
-		requests = append(requests, operand.Requests()...)
+			operand,
+		)
+		if err != nil {
+			return StoreTargetEmission{}, nil, nil, err
+		}
+		before = append(before, operandBefore...)
+		values = append(values, value)
+		requests = append(requests, operandRequests...)
 	}
 	receiver := DirectExpression(values[0])
 	arguments := make([]ExpressionEmission, 0, len(values)-1)
@@ -47,13 +129,32 @@ func (e StoreTargetEmission) CaptureAccessorLocation(
 		e.sourceType,
 	)
 	if err != nil {
-		return StoreTargetEmission{}, err
+		return StoreTargetEmission{}, nil, nil, err
 	}
 	captured.copiesValue = e.copiesValue
-	captured.before = before
-	captured.requests = requests
 	captured.locationCaptured = true
-	return captured, nil
+	return captured,
+		append(slices.Clone(e.before), before...),
+		append(slices.Clone(e.requests), requests...),
+		nil
+}
+
+func captureStoreOperand(
+	context Context,
+	operand ExpressionEmission,
+) ([]tsgo.Statement, tsgo.Expression, []RootRequest, error) {
+	name, err := context.Names().Temporary(TemporaryStoreOperand)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	before := append(
+		operand.Before(),
+		constantStatement(context, name, operand.Value()),
+	)
+	return before,
+		context.Factory().Identifier(name),
+		operand.Requests(),
+		nil
 }
 
 func (e StoreTargetEmission) AccessorRead(

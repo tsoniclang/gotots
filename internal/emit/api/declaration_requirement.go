@@ -79,11 +79,12 @@ const (
 	MapSpecializationDemandInvalid MapSpecializationDemand = iota
 	MapSpecializationDemandDefinition
 	MapSpecializationDemandStatic
+	MapSpecializationDemandClear
 )
 
 func (d MapSpecializationDemand) Valid() bool {
-	return d == MapSpecializationDemandDefinition ||
-		d == MapSpecializationDemandStatic
+	return d >= MapSpecializationDemandDefinition &&
+		d <= MapSpecializationDemandClear
 }
 
 type DeclarationRequirementKind uint8

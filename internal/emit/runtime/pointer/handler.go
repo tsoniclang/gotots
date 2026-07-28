@@ -59,7 +59,21 @@ func CellValue(
 	elementType tsgo.TypeNode,
 	pointer tsgo.Expression,
 ) tsgo.PropertyAccessExpression {
-	dereference := factory.CallExpression(
+	return factory.PropertyAccessExpression(
+		Dereference(factory, runtimeName, elementType, pointer),
+		nil,
+		factory.Identifier(CellValueName),
+		tsgo.NodeFlagsNone,
+	)
+}
+
+func Dereference(
+	factory tsgo.Factory,
+	runtimeName string,
+	elementType tsgo.TypeNode,
+	pointer tsgo.Expression,
+) tsgo.CallExpression {
+	return factory.CallExpression(
 		factory.PropertyAccessExpression(
 			factory.Identifier(runtimeName),
 			nil,
@@ -69,12 +83,6 @@ func CellValue(
 		nil,
 		[]tsgo.TypeNode{elementType},
 		[]tsgo.Expression{pointer},
-		tsgo.NodeFlagsNone,
-	)
-	return factory.PropertyAccessExpression(
-		dereference,
-		nil,
-		factory.Identifier(CellValueName),
 		tsgo.NodeFlagsNone,
 	)
 }

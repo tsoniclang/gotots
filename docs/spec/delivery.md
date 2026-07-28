@@ -231,15 +231,19 @@ create a value IR or a generic operation registry.
    wrapper around the same exact array storage; aliases add no wrapper.
    Aggregate-element zero, literal, and copy operations are requested only
    when the element representation requires structural copying, while the
-   scalar-only runtime artifact remains byte-identical.
+   scalar-only runtime artifact remains byte-identical. The compiler emits
+   direct typed loops that call the selected element operations; runtime array
+   values receive no semantic function.
 4. Unnamed slices of admitted recursively represented elements support nil,
    `make`, literals, indexing/stores, two- and three-index slicing, `len`,
    `cap`, `append`, and `copy`. The representation preserves backing-store
    aliasing, offset, length, capacity, append reallocation, fresh zero values,
    aggregate-element copying, and overlap-safe copy. Aggregate operations are
    demand-selected; scalar-only slice artifacts do not acquire aggregate
-   callbacks or methods. Defined slice identity remains a separate named-type
-   obligation.
+   methods, strategy fields, or helper declarations. Aggregate behavior is
+   emitted as direct typed TS-Go AST at the source operation and uses only
+   structural descriptor members. Defined slice identity remains a separate
+   named-type obligation.
 5. Unnamed maps with represented scalar comparable keys and represented scalar
    values support nil, `make`, literals, lookup, comma-ok lookup, stores,
    `delete`, and `len`. Missing lookup returns the exact value zero; writes to a
@@ -276,7 +280,7 @@ remain a later semantic family, so this checkpoint proves failure occurrence
 and carrier identity, not yet recovered runtime-fault payload equivalence.
 
 One builtin-object dispatcher owns `new`, `make`, `len`, `cap`, `append`,
-`copy`, and `delete`. One accessor-store transaction owns Go evaluation order
+`copy`, `delete`, and `clear`. One accessor-store transaction owns Go evaluation order
 for array, slice, and map stores, including the captured getter/setter location
 used by compound defined-value updates. Family owners provide typed operands
 and members; they do not rediscover builtin identity or install assignment
@@ -284,6 +288,15 @@ routes.
 No checked-in TypeScript, source fragment, template, raw export spelling,
 handler-local duplicate implementation, or family-specific store transaction
 is allowed.
+
+The expression-completion checkpoint additionally treats a variadic signature
+as one represented Go-slice parameter. Calls perform Go's tuple adjustment
+before variadic packing, project defined slices for `slice...`, and never use
+host argument spreading for a source slice. `append` spread follows Go
+element-identity admission rather than slice assignability and includes the
+language-defined `[]byte` plus string case. `new(x)` evaluates `x` once and
+initializes a fresh pointer cell with the selected value copy; `new(T)` remains
+the distinct type-form zero-value operation.
 
 The checkpoint exits only when all six families:
 

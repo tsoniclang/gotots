@@ -7,7 +7,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	arraymember "github.com/tsoniclang/gotots/internal/emit/runtime/array/member"
-	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -163,9 +162,17 @@ func (a RuntimeArray) runtime(
 
 func (a RuntimeArray) runtimeOperation(
 	context api.Context,
+	children api.ChildEmitter,
 	symbol api.RuntimeSymbol,
 	arguments ...tsgo.Expression,
 ) (tsgo.CallExpression, []api.RootRequest, error) {
+	typeArguments, typeRequests, err := a.targetTypeArguments(
+		context,
+		children,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
 	reference, err := context.Names().Runtime(symbol, api.ImportPhaseValue)
 	if err != nil {
 		return nil, nil, err
@@ -173,10 +180,10 @@ func (a RuntimeArray) runtimeOperation(
 	return context.Factory().CallExpression(
 		context.Factory().Identifier(reference.Name()),
 		nil,
-		nil,
+		typeArguments,
 		arguments,
 		tsgo.NodeFlagsNone,
-	), reference.Requests(), nil
+	), api.CombineRequests(typeRequests, reference.Requests()), nil
 }
 
 func (a RuntimeArray) callStatic(
@@ -205,23 +212,18 @@ func (a RuntimeArray) callStatic(
 
 func (a RuntimeArray) targetTypeArguments(
 	context api.Context,
+	children api.ChildEmitter,
 ) ([]tsgo.TypeNode, []api.RootRequest, error) {
-	alias, ok := basictype.PrimitiveAlias(
-		context.TypesSizes(),
+	element, err := children.RepresentedType(
+		context.WithRole(api.RoleArrayElement),
+		nil,
 		a.ElementType(),
 	)
-	if !ok {
-		return nil, nil, nil
-	}
-	element, err := context.Names().Primitive(alias)
 	if err != nil {
 		return nil, nil, err
 	}
 	return []tsgo.TypeNode{
-		context.Factory().TypeReferenceNode(
-			context.Factory().Identifier(element.Name()),
-			nil,
-		),
+		element.Value(),
 		context.Factory().LiteralTypeNode(a.lengthLiteral(context)),
 	}, element.Requests(), nil
 }

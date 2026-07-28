@@ -16,6 +16,7 @@ type specializationBuilder struct {
 	copyKey   operationBody
 	copyValue operationBody
 	members   specializationMemberNames
+	clear     bool
 }
 
 type operationBody struct {

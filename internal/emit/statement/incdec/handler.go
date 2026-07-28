@@ -38,20 +38,6 @@ func EmitExpression(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if context.Values().RequiresCustomUpdate(
-		context,
-		target.SourceType(),
-	) {
-		return emitCustom(context, source, target)
-	}
-	if !basictype.SupportsInteger(context.TypesSizes(), target.SourceType()) {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
-	}
-	if target.IsAccessor() {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
-	}
 	var operator tsgo.PostfixUnaryExpressionOperatorKind
 	switch source.Tok {
 	case token.INC:
@@ -62,13 +48,18 @@ func EmitExpression(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	return api.DirectExpression(
-		context.Factory().PostfixUnaryExpression(
-			target.Value(),
-			operator,
-		),
-		target.Requests()...,
-	), nil
+	if basictype.SupportsInteger(context.TypesSizes(), target.SourceType()) &&
+		!target.IsAccessor() &&
+		!target.IsProperty() {
+		return api.DirectExpression(
+			context.Factory().PostfixUnaryExpression(
+				target.Value(),
+				operator,
+			),
+			target.Requests()...,
+		), nil
+	}
+	return emitCustom(context, source, target)
 }
 
 func emitCustom(
@@ -76,13 +67,12 @@ func emitCustom(
 	source *ast.IncDecStmt,
 	target api.StoreTargetEmission,
 ) (api.ExpressionEmission, error) {
+	target, err := target.CaptureLocation(context)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	left := target.Value()
 	if target.IsAccessor() {
-		var err error
-		target, err = target.CaptureAccessorLocation(context)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
 		left, err = target.AccessorRead(context)
 		if err != nil {
 			return api.ExpressionEmission{}, err

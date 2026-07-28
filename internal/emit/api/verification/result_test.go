@@ -65,7 +65,7 @@ func TestCopyingAccessorOwnsTheValueCopyBoundary(t *testing.T) {
 	}
 }
 
-func TestOrderedStoreTargetOwnsTypedImmutablePrerequisites(t *testing.T) {
+func TestPropertyStoreTargetOwnsTypedImmutablePrerequisites(t *testing.T) {
 	factory := tsgo.NewFactory()
 	before := []tsgo.Statement{
 		factory.ExpressionStatement(factory.Identifier("prepare")),
@@ -81,11 +81,19 @@ func TestOrderedStoreTargetOwnsTypedImmutablePrerequisites(t *testing.T) {
 		t.Fatal(err)
 	}
 	requests := []api.RootRequest{request}
-	target, err := api.NewOrderedStoreTargetEmission(
+	receiver, err := api.NewExpressionEmission(
 		before,
-		factory.Identifier("value"),
-		types.Typ[types.Int32],
+		factory.Identifier("owner"),
 		requests,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, err := api.NewPropertyStoreTargetEmission(
+		factory,
+		receiver,
+		"value",
+		types.Typ[types.Int32],
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -97,7 +105,8 @@ func TestOrderedStoreTargetOwnsTypedImmutablePrerequisites(t *testing.T) {
 		Expression().(tsgo.Identifier).Text(); name != "prepare" {
 		t.Fatalf("store prerequisite = %q, want prepare", name)
 	}
-	if target.Requests()[0].ExportedName() != "cell" {
+	if !target.IsProperty() ||
+		target.Requests()[0].ExportedName() != "cell" {
 		t.Fatal("store target leaked mutable request input")
 	}
 
@@ -109,15 +118,16 @@ func TestOrderedStoreTargetOwnsTypedImmutablePrerequisites(t *testing.T) {
 	}
 }
 
-func TestOrderedStoreTargetRejectsNilPrerequisite(t *testing.T) {
-	_, err := api.NewOrderedStoreTargetEmission(
-		[]tsgo.Statement{nil},
-		tsgo.NewFactory().Identifier("value"),
+func TestPropertyStoreTargetRejectsEmptyMember(t *testing.T) {
+	factory := tsgo.NewFactory()
+	_, err := api.NewPropertyStoreTargetEmission(
+		factory,
+		api.DirectExpression(factory.Identifier("owner")),
+		"",
 		types.Typ[types.Int32],
-		nil,
 	)
 	if err == nil {
-		t.Fatal("nil store prerequisite was accepted")
+		t.Fatal("empty property member was accepted")
 	}
 }
 

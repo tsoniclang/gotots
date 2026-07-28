@@ -165,10 +165,12 @@ func (s *programSession) buildMapSpecializationRevision(
 		return artifactRevision{}, err
 	}
 	defer finish()
-	if err := validateMapSpecializationRequirements(
+	capabilities, err := maprepresentation.CapabilitiesFromRequirements(
+		api.RoleFileDeclaration,
 		artifact,
 		s.requirements.appliedFor(owner),
-	); err != nil {
+	)
+	if err != nil {
 		return artifactRevision{}, err
 	}
 	mapType, ok := artifact.MapType()
@@ -201,6 +203,7 @@ func (s *programSession) buildMapSpecializationRevision(
 		mapType,
 		keyType.Value(),
 		valueType.Value(),
+		capabilities,
 	)
 	if err != nil {
 		return artifactRevision{}, err
@@ -235,22 +238,6 @@ func (s *programSession) buildMapSpecializationRevision(
 		contract:       contract,
 		temporaryStart: temporaryStart,
 	}, nil
-}
-
-func validateMapSpecializationRequirements(
-	artifact *api.GeneratedArtifact,
-	requirements []api.DeclarationRequirement,
-) error {
-	for _, requirement := range requirements {
-		selected, _, ok := requirement.MapSpecialization()
-		if !ok || selected != artifact {
-			return &ScheduleError{
-				Object: artifact.TargetName(),
-				Reason: "map-specialization artifact received a foreign requirement",
-			}
-		}
-	}
-	return nil
 }
 
 func (s *programSession) mapSpecializationBuilder(

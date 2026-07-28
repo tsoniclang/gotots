@@ -561,8 +561,8 @@ program. The required evidence includes:
 |---|---|---|
 | integers and numeric conversions | every source/destination width and profile disposition; narrowing, sign change, integer/float, float-width, and complex-width boundaries; constants; NaN, infinity, signed zero, and representability; BigInt division/remainder for nonzero and zero divisors | width alias collapse; unsafe number literal; missing narrowing/bounds operation; conversion spelling lookup; ordinary-call fallthrough; duplicated conversion operand; direct host divide/remainder or non-finite BigInt conversion bypass |
 | strings | arbitrary-byte literal, concat, comparison, byte length/index/slice and bounds | Unicode-code-point literal; UTF-16 indexing; missing bounds check |
-| arrays | length-distinct target types, fresh zero/copy, compiler-lowered recursive equality, index/store/len/cap | erased length; shared zero; shallow copy where element policy forbids it; runtime equality callback or target object identity |
-| slices | nil/empty distinction, aliasing, reslice, append reuse/reallocation, copy overlap | bare-array substitution; lost capacity; always-reallocate append |
+| arrays | length-distinct target types, fresh zero/copy, compiler-lowered recursive equality, index/store/len/cap | erased length; shared zero; shallow copy where element policy forbids it; runtime zero/copy/equality callback or target object identity |
+| slices | nil/empty distinction, aliasing, reslice, append reuse/reallocation, copy overlap, aggregate fresh zero/copy/clear, distinct-defined spread, `[]byte` plus string spread, and large spread without host argument expansion | bare-array substitution; lost capacity; always-reallocate append; semantic strategy field/parameter; JavaScript spread of a Go slice; unconditional append-spread/clear surface |
 | maps | nil write, missing zero, comma-ok, aliasing, direct bool/integer/string keys, defined-key projection, delete/len, and explicit floating-key rejection | plain-object substitution; missing-value `undefined`; copy-on-assignment; wrapper object identity; floating-key admission through native SameValueZero |
 | pointers | nil/new/read/store/alias/equality; local/parameter/result/receiver/package/field/array/slice addresses; reassignment through projections; pointer receiver nil/copy cases | fresh wrapper on copy; wrapper identity instead of canonical location; nil dereference success; unrelated-local cell wrapping; wrong requirement owner |
 
@@ -604,6 +604,25 @@ The cross-family owners have additional blocking proofs:
 Deletion mutations restore a family-specific assignment route, a second
 builtin resolver, a native family throw, or an undeclared runtime dependency;
 each must fail at the owning architecture, artifact, or differential gate.
+
+Expression-completion certification also requires:
+
+1. a variadic declaration artifact with one represented slice parameter and no
+   target rest parameter;
+2. differential calls for zero/one/many variadic arguments, defined
+   `slice...`, a tuple supplying fixed plus variadic positions, and a valid
+   large slice that would exceed a host spread-call limit;
+3. `append` spread differentials for aliasing reuse, reallocation, two
+   distinct defined slice types with identical elements, aggregate elements,
+   and `append([]byte, string...)`;
+4. aggregate array/slice artifacts containing direct element operation calls
+   and no function-valued zero/copy parameter, field, or argument;
+5. runtime artifact pairs proving append-spread and clear declarations are
+   absent without demand and present exactly once with demand; and
+6. mutations that restore tuple-before-variadic rejection, slice
+   assignability admission, stored semantic callbacks, host spreading, shared
+   aggregate zeros, shallow aggregate growth/copy, or unconditional runtime
+   members.
 
 Addressability has an additional exact matrix:
 

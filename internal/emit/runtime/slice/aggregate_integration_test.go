@@ -35,13 +35,16 @@ func TestAggregateSliceOperationsPrintTypecheckAndMatchGo(t *testing.T) {
 				"goSliceAppendSliceWith",
 				"goSliceCopyWith",
 			} {
-				if strings.Count(printed.runtime, "function "+helper) != 1 {
+				if strings.Contains(printed.runtime, helper) {
 					t.Fatalf(
-						"aggregate runtime helper %s is not emitted exactly once:\n%s",
+						"aggregate runtime retains semantic callback helper %s:\n%s",
 						helper,
 						printed.runtime,
 					)
 				}
+			}
+			if strings.Count(printed.runtime, "function goSliceAllocate") != 1 {
+				t.Fatalf("aggregate storage allocator is not emitted exactly once:\n%s", printed.runtime)
 			}
 			for _, forbidden := range []string{
 				": any",
@@ -50,6 +53,8 @@ func TestAggregateSliceOperationsPrintTypecheckAndMatchGo(t *testing.T) {
 				".apply(",
 				".bind(",
 				"import(",
+				"zero: () =>",
+				"copyValue:",
 			} {
 				if strings.Contains(printed.source, forbidden) ||
 					strings.Contains(printed.runtime, forbidden) {
@@ -68,6 +73,7 @@ console.log(values.AppendReuseAliasesBackingAndCopiesArgument());
 console.log(values.AppendReallocationCopiesExisting());
 console.log(values.AppendTailZerosAreFresh());
 console.log(values.AppendSpreadCopiesValues());
+console.log(values.AppendSpreadOverlapSnapshotsValues());
 console.log(values.CopyDistinctCopiesValues());
 console.log(values.CopyOverlapSnapshotsValues());
 console.log(values.AddressTargetsBackingElement());
@@ -94,7 +100,7 @@ console.log(values.ArrayElementsCopyOnAppend());
 	}
 }
 
-func TestScalarSliceArtifactHasNoAggregateOperationSurface(t *testing.T) {
+func TestScalarSliceArtifactHasNoSemanticCallbackSurface(t *testing.T) {
 	emission := compileFixture(t)
 	directory := t.TempDir()
 	_, _, printed := materialize(t, directory, emission)
@@ -113,6 +119,59 @@ func TestScalarSliceArtifactHasNoAggregateOperationSurface(t *testing.T) {
 		if strings.Contains(printed.runtime, forbidden) {
 			t.Fatalf("scalar slice runtime contains %q:\n%s", forbidden, printed.runtime)
 		}
+	}
+}
+
+func TestAppendSpreadSurfaceIsDemandedByTheExactValueFamily(t *testing.T) {
+	without := compileSliceSource(t, `package demand
+
+func Use(values []int32) []int32 {
+	return append(values, 1)
+}
+`)
+	withScalarSpread := compileSliceSource(t, `package demand
+
+func Use(values []int32) []int32 {
+	return append(values, values...)
+}
+`)
+	withAggregateSpread := compileSliceSource(t, `package demand
+
+type Box struct {
+	Value int32
+}
+
+func Use(values []Box) []Box {
+	return append(values, values...)
+}
+`)
+	_, _, withoutPrinted := materialize(t, t.TempDir(), without)
+	_, _, scalarPrinted := materialize(t, t.TempDir(), withScalarSpread)
+	_, _, aggregatePrinted := materialize(t, t.TempDir(), withAggregateSpread)
+	for _, fragment := range []string{
+		"appendSlice(zero: T, source: RuntimeSlice<T>): RuntimeSlice<T>",
+		"export function goSliceAppendSlice<T>",
+	} {
+		if strings.Contains(withoutPrinted.runtime, fragment) {
+			t.Fatalf("ordinary append emitted undemanded %q", fragment)
+		}
+		if strings.Count(scalarPrinted.runtime, fragment) != 1 {
+			t.Fatalf(
+				"scalar spread count(%q) = %d, want one:\n%s",
+				fragment,
+				strings.Count(scalarPrinted.runtime, fragment),
+				scalarPrinted.runtime,
+			)
+		}
+		if strings.Contains(aggregatePrinted.runtime, fragment) {
+			t.Fatalf("aggregate spread emitted scalar runtime operation %q", fragment)
+		}
+	}
+	if !strings.Contains(aggregatePrinted.runtime, "static $allocate<T>") {
+		t.Fatalf(
+			"aggregate spread did not demand structural storage:\n%s",
+			aggregatePrinted.runtime,
+		)
 	}
 }
 
@@ -170,6 +229,7 @@ func main() {
 	fmt.Println(values.AppendReallocationCopiesExisting())
 	fmt.Println(values.AppendTailZerosAreFresh())
 	fmt.Println(values.AppendSpreadCopiesValues())
+	fmt.Println(values.AppendSpreadOverlapSnapshotsValues())
 	fmt.Println(values.CopyDistinctCopiesValues())
 	fmt.Println(values.CopyOverlapSnapshotsValues())
 	fmt.Println(values.AddressTargetsBackingElement())

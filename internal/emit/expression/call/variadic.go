@@ -62,6 +62,14 @@ func emitVariadicArguments(
 		if err != nil {
 			return nil, nil, nil, err
 		}
+		emission, err = slicevalue.Project(
+			context,
+			context.TypesInfo().TypeOf(source.Args[fixedCount]),
+			emission,
+		)
+		if err != nil {
+			return nil, nil, nil, err
+		}
 		emissions = append(emissions, emission)
 	} else {
 		values := make([]api.ExpressionEmission, 0, len(source.Args)-fixedCount)
@@ -181,90 +189,39 @@ func emitVariadicSlice(
 			requests = append(requests, value.Requests()...)
 		}
 	}
-	aggregate := context.Values().RequiresStructuralCopy(context, elementType)
-	var zeroValue tsgo.Expression
-	var zeroRequests []api.RootRequest
-	if aggregate {
-		zeroFactory, requestsForZero, err := slicevalue.AggregateZeroFactory(
-			context,
-			source,
-			elementType,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		zeroValue = zeroFactory
-		zeroRequests = requestsForZero
-	} else {
-		zero, err := context.Values().Zero(
-			context.WithRole(api.RoleCallArgument),
-			source,
-			elementType,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		if len(zero.Before()) != 0 {
-			return api.ExpressionEmission{}, api.Unsupported(
-				context,
-				api.CategoryExpression,
-				source,
-			)
-		}
-		zeroValue = zero.Value()
-		zeroRequests = zero.Requests()
-	}
-	var runtimeSymbol api.RuntimeSymbol
 	var member runtimeslice.Member
-	switch {
-	case aggregate && len(values) == 0:
-		runtimeSymbol = api.RuntimeSliceNilWith
-	case aggregate:
-		runtimeSymbol = api.RuntimeSliceLiteralWith
-	case len(values) == 0:
-		runtimeSymbol = api.RuntimeSlice
+	if len(values) == 0 {
 		member = runtimeslice.MemberNil
-	default:
-		runtimeSymbol = api.RuntimeSlice
+	} else {
 		member = runtimeslice.MemberLiteral
+		arguments = []tsgo.Expression{
+			context.Factory().ArrayLiteralExpression(arguments, false),
+		}
 	}
 	runtime, err := context.Names().Runtime(
-		runtimeSymbol,
+		api.RuntimeSlice,
 		api.ImportPhaseValue,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	arguments = append([]tsgo.Expression{zeroValue}, arguments...)
-	var target tsgo.Expression
-	if aggregate {
-		target = context.Factory().CallExpression(
+	target := context.Factory().CallExpression(
+		context.Factory().PropertyAccessExpression(
 			context.Factory().Identifier(runtime.Name()),
 			nil,
-			[]tsgo.TypeNode{element.Value()},
-			arguments,
+			context.Factory().Identifier(runtimeslice.MemberName(member)),
 			tsgo.NodeFlagsNone,
-		)
-	} else {
-		target = context.Factory().CallExpression(
-			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(runtime.Name()),
-				nil,
-				context.Factory().Identifier(runtimeslice.MemberName(member)),
-				tsgo.NodeFlagsNone,
-			),
-			nil,
-			[]tsgo.TypeNode{element.Value()},
-			arguments,
-			tsgo.NodeFlagsNone,
-		)
-	}
+		),
+		nil,
+		[]tsgo.TypeNode{element.Value()},
+		arguments,
+		tsgo.NodeFlagsNone,
+	)
 	return api.NewExpressionEmission(
 		before,
 		target,
 		api.CombineRequests(
 			requests,
-			zeroRequests,
 			element.Requests(),
 			runtime.Requests(),
 		),

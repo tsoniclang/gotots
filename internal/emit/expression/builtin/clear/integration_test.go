@@ -29,14 +29,15 @@ func TestClearBuiltinsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 		".call(",
 		".apply(",
 		".bind(",
+		"goSliceClearWith",
 	} {
 		if strings.Contains(printed, forbidden) {
 			t.Fatalf("clear artifact contains %q:\n%s", forbidden, printed)
 		}
 	}
 	for _, required := range []string{
-		"clear(0)",
-		"goSliceClearWith",
+		"goSliceClear(values, 0)",
+		"goMapClear(values)",
 		"clear()",
 	} {
 		if !strings.Contains(printed, required) {
@@ -77,6 +78,71 @@ console.log(String(ClearNilValues()));
 			targetOutput,
 			goOutput,
 		)
+	}
+}
+
+func TestClearRuntimeSurfacesAreDemandedBySourceUse(t *testing.T) {
+	without := printClearEmission(t, compileClearSource(t, `package demand
+
+func Use() int {
+	values := []int32{1}
+	entries := map[int32]int32{1: 2}
+	return len(values) + len(entries)
+}
+`))
+	with := printClearEmission(t, compileClearSource(t, `package demand
+
+func Use() int32 {
+	values := []int32{1}
+	entries := map[int32]int32{1: 2}
+	clear(values)
+	clear(entries)
+	return values[0] + entries[1]
+}
+`))
+	for _, testCase := range []struct {
+		path      string
+		fragments []string
+	}{
+		{
+			path: "runtime/slice.ts",
+			fragments: []string{
+				"clear(zero: T): void",
+				"export function goSliceClear<T>",
+			},
+		},
+		{
+			path: "runtime/map.ts",
+			fragments: []string{
+				"clear(): void",
+				"export function goMapClear",
+			},
+		},
+	} {
+		withoutSource := without[testCase.path]
+		withSource := with[testCase.path]
+		if withoutSource == "" || withSource == "" {
+			t.Fatalf("runtime artifact %s is absent from demand pair", testCase.path)
+		}
+		for _, fragment := range testCase.fragments {
+			if strings.Contains(withoutSource, fragment) {
+				t.Fatalf(
+					"runtime artifact %s contains undemanded %q:\n%s",
+					testCase.path,
+					fragment,
+					withoutSource,
+				)
+			}
+			if strings.Count(withSource, fragment) != 1 {
+				t.Fatalf(
+					"runtime artifact %s count(%q) = %d, want one:\n%s",
+					testCase.path,
+					fragment,
+					strings.Count(withSource, fragment),
+					withSource,
+				)
+			}
+		}
 	}
 }
 

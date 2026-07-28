@@ -80,15 +80,16 @@ func newEmitter(
 		typesInfo = source.TypesInfo()
 		packageScope = source.Types().Scope()
 	}
-	return &emitter{
+	target := &emitter{
 		source:  source,
 		factory: factory,
 		names:   emitnaming.NewOwner(packageScope, typesInfo, registry),
-		values:  representation.Owner{},
 		integer: integer,
 		order:   order,
 		require: require,
 	}
+	target.values = representation.NewOwner(target)
+	return target
 }
 
 func (e *emitter) fileContext(

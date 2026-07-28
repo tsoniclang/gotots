@@ -30,9 +30,7 @@ func TestAggregateArrayRuntimeAssemblyExactJoinsDemandedOperations(t *testing.T)
 	factory := tsgo.NewFactory()
 	symbols := []api.RuntimeSymbol{
 		api.RuntimeArray,
-		api.RuntimeArrayZeroWith,
-		api.RuntimeArrayLiteralWith,
-		api.RuntimeArrayCopyWith,
+		api.RuntimeArrayAllocate,
 	}
 	definitions, err := Build(
 		factory,
@@ -103,7 +101,7 @@ func TestArrayRuntimeAssemblyRejectsMissingDuplicateAndWrongDefinitions(
 		factory,
 		api.RuntimeModuleArray,
 		[]api.RuntimeSymbol{
-			api.RuntimeArrayZeroWith,
+			api.RuntimeArrayAllocate,
 			api.RuntimeArray,
 		},
 	); err == nil {
@@ -115,13 +113,9 @@ func TestSliceAggregateDefinitionsExactJoinRequestedSymbols(t *testing.T) {
 	symbols := []api.RuntimeSymbol{
 		api.RuntimeSlice,
 		api.RuntimeSliceAddress,
-		api.RuntimeSliceMakeWith,
-		api.RuntimeSliceAppendWith,
-		api.RuntimeSliceCopyWith,
-		api.RuntimeSliceNilWith,
-		api.RuntimeSliceLiteralWith,
-		api.RuntimeSliceAppendSliceWith,
-		api.RuntimeSliceClearWith,
+		api.RuntimeSliceStorage,
+		api.RuntimeSliceAppendSlice,
+		api.RuntimeSliceClear,
 	}
 	definitions, err := Build(
 		tsgo.NewFactory(),
@@ -154,8 +148,37 @@ func TestSliceAggregateDefinitionsRequireRuntimeSliceFirst(t *testing.T) {
 	if _, err := Build(
 		tsgo.NewFactory(),
 		api.RuntimeModuleSlice,
-		[]api.RuntimeSymbol{api.RuntimeSliceMakeWith},
+		[]api.RuntimeSymbol{api.RuntimeSliceStorage},
 	); err == nil {
 		t.Fatal("slice aggregate helper assembled without RuntimeSlice")
+	}
+}
+
+func TestMapClearDefinitionRequiresOneRuntimeMapOwner(t *testing.T) {
+	for _, symbols := range [][]api.RuntimeSymbol{
+		{api.RuntimeMapClear},
+		{api.RuntimeMap, api.RuntimeMap},
+		{api.RuntimeMap, api.RuntimeMapClear, api.RuntimeMapClear},
+	} {
+		if _, err := Build(
+			tsgo.NewFactory(),
+			api.RuntimeModuleMap,
+			symbols,
+		); err == nil {
+			t.Fatalf("map runtime accepted invalid symbol set %v", symbols)
+		}
+	}
+	definitions, err := Build(
+		tsgo.NewFactory(),
+		api.RuntimeModuleMap,
+		[]api.RuntimeSymbol{api.RuntimeMap, api.RuntimeMapClear},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(definitions) != 2 ||
+		definitions[0].Symbol() != api.RuntimeMap ||
+		definitions[1].Symbol() != api.RuntimeMapClear {
+		t.Fatalf("map clear definitions = %#v", definitions)
 	}
 }

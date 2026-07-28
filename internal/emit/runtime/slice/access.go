@@ -185,7 +185,6 @@ func (b builder) sliceMethod() tsgo.MethodDeclaration {
 				b.add(b.thisProperty("offset"), b.id("numericLow")),
 				b.subtract(b.id("resolvedHigh"), b.id("numericLow")),
 				b.subtract(b.id("resolvedMax"), b.id("numericLow")),
-				b.thisProperty("zero"),
 			),
 		),
 	)

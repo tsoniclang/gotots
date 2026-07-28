@@ -201,14 +201,13 @@ func emitLexicalMapSpecialization(
 			Reason: "lexical map-specialization artifact has no map type",
 		}
 	}
-	for _, requirement := range requirements {
-		selected, _, valid := requirement.MapSpecialization()
-		if !valid || selected != artifact {
-			return api.DeclarationEmission{}, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "lexical map specialization received a foreign requirement",
-			}
-		}
+	capabilities, err := maprepresentation.CapabilitiesFromRequirements(
+		context.Role(),
+		artifact,
+		requirements,
+	)
+	if err != nil {
+		return api.DeclarationEmission{}, err
 	}
 	keyType, err := children.RepresentedType(
 		context.WithRole(api.RoleMapKey),
@@ -233,6 +232,7 @@ func emitLexicalMapSpecialization(
 		mapType,
 		keyType.Value(),
 		valueType.Value(),
+		capabilities,
 	)
 	if err != nil {
 		return api.DeclarationEmission{}, err

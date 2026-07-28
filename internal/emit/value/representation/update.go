@@ -8,18 +8,17 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	constantvalue "github.com/tsoniclang/gotots/internal/emit/constant"
+	basicbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/basic"
+	complexbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/complex"
 	definedbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/defined"
+	floatbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/float"
+	integerbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/integer"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
+	floatvalue "github.com/tsoniclang/gotots/internal/emit/value/float"
+	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
-
-func (Owner) RequiresCustomUpdate(
-	_ api.Context,
-	sourceType types.Type,
-) bool {
-	_, ok := definedtype.ResolveBasic(sourceType)
-	return ok
-}
 
 func (Owner) BinaryUpdate(
 	context api.Context,
@@ -33,7 +32,14 @@ func (Owner) BinaryUpdate(
 ) (api.ExpressionEmission, bool, error) {
 	model, ok := definedtype.ResolveBasic(sourceType)
 	if !ok {
-		return api.ExpressionEmission{}, false, nil
+		return primitiveBinaryUpdate(
+			context,
+			sourceType,
+			operator,
+			left,
+			right,
+			constantEvidence(context, rightSource),
+		)
 	}
 	underlying, valid := model.Basic()
 	if !valid {
@@ -106,7 +112,29 @@ func (Owner) Increment(
 ) (api.ExpressionEmission, bool, error) {
 	model, ok := definedtype.ResolveBasic(sourceType)
 	if !ok {
-		return api.ExpressionEmission{}, false, nil
+		binaryOperator, valid := incrementOperator(operator)
+		if !valid {
+			return api.ExpressionEmission{}, true,
+				api.Unsupported(context, api.CategoryStatement, source)
+		}
+		one := constant.MakeInt64(1)
+		right, err := constantvalue.EmitValue(
+			context.WithRole(api.RoleAssignmentValue),
+			source,
+			sourceType,
+			one,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, false, nil
+		}
+		return primitiveBinaryUpdate(
+			context,
+			sourceType,
+			binaryOperator,
+			left,
+			right,
+			one,
+		)
 	}
 	underlying, valid := model.Basic()
 	if !valid {
@@ -115,13 +143,8 @@ func (Owner) Increment(
 			Reason: "defined basic increment has no basic underlying type",
 		}
 	}
-	binaryOperator := token.ILLEGAL
-	switch operator {
-	case token.INC:
-		binaryOperator = token.ADD
-	case token.DEC:
-		binaryOperator = token.SUB
-	default:
+	binaryOperator, valid := incrementOperator(operator)
+	if !valid {
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
@@ -147,6 +170,101 @@ func (Owner) Increment(
 		return result, handled, err
 	}
 	result, err = model.Wrap(context, result)
+	return result, true, err
+}
+
+func incrementOperator(operator token.Token) (token.Token, bool) {
+	switch operator {
+	case token.INC:
+		return token.ADD, true
+	case token.DEC:
+		return token.SUB, true
+	default:
+		return token.ILLEGAL, false
+	}
+}
+
+func primitiveBinaryUpdate(
+	context api.Context,
+	sourceType types.Type,
+	operator token.Token,
+	left tsgo.Expression,
+	right api.ExpressionEmission,
+	rightConstant constant.Value,
+) (api.ExpressionEmission, bool, error) {
+	rightValue := api.DirectExpression(
+		right.Value(),
+		right.Requests()...,
+	)
+	leftValue := api.DirectExpression(left)
+	var (
+		result  api.ExpressionEmission
+		handled bool
+		err     error
+	)
+	if carrier, ok := integervalue.Describe(
+		context.TypesSizes(),
+		sourceType,
+	); ok {
+		switch {
+		case integervalue.SupportsArithmetic(
+			context.IntegerRepresentation(),
+			operator,
+		),
+			integervalue.SupportsBitwise(
+				context.IntegerRepresentation(),
+				carrier,
+				operator,
+			),
+			integervalue.SupportsShift(
+				context.IntegerRepresentation(),
+				carrier,
+				operator,
+				rightConstant,
+			):
+			result, handled, err = integerbinary.Apply(
+				context,
+				operator,
+				carrier,
+				leftValue,
+				rightValue,
+			)
+		default:
+			return api.ExpressionEmission{}, false, nil
+		}
+	} else if carrier, ok := floatvalue.Describe(sourceType); ok {
+		result, handled, err = floatbinary.Apply(
+			context,
+			operator,
+			carrier,
+			leftValue,
+			rightValue,
+		)
+	} else if carrier, ok := complexvalue.Describe(sourceType); ok {
+		result, handled, err = complexbinary.Apply(
+			context,
+			operator,
+			carrier,
+			leftValue,
+			rightValue,
+		)
+	} else {
+		result, handled = basicbinary.Apply(
+			context,
+			sourceType,
+			operator,
+			leftValue,
+			rightValue,
+		)
+	}
+	if err != nil || !handled {
+		return result, handled, err
+	}
+	result, err = api.NewExpressionEmission(
+		right.Before(),
+		result.Value(),
+		result.Requests(),
+	)
 	return result, true, err
 }
 

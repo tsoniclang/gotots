@@ -284,6 +284,16 @@ func emitArguments(
 ) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
 	if len(source.Args) == 1 {
 		if results, ok := context.TypesInfo().TypeOf(source.Args[0]).(*types.Tuple); ok {
+			if signature.Variadic() {
+				return emitVariadicMultipleArgument(
+					context,
+					children,
+					source,
+					signature,
+					results,
+					captureAll,
+				)
+			}
 			arguments, before, requests, err := emitMultipleArgument(
 				context,
 				children,

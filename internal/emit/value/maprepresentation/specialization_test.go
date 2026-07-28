@@ -48,6 +48,7 @@ func testStaticSpecialization(
 		mapType,
 		factory.TypeReferenceNode(factory.Identifier("Key"), nil),
 		factory.TypeReferenceNode(factory.Identifier("Box"), nil),
+		SpecializationCapabilities{Clear: true},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -137,6 +138,7 @@ func TestStaticSpecializationRejectsStoredSemanticCallbacks(t *testing.T) {
 		types.NewMap(key, value),
 		factory.TypeReferenceNode(factory.Identifier("Key"), nil),
 		factory.TypeReferenceNode(factory.Identifier("Box"), nil),
+		SpecializationCapabilities{Clear: true},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -169,7 +171,11 @@ func TestStaticSpecializationRejectsStoredSemanticCallbacks(t *testing.T) {
 			nil,
 		),
 	)
-	if err := validateSpecialization(api.RoleMapReceiver, mutated); err == nil {
+	if err := validateSpecialization(
+		api.RoleMapReceiver,
+		mutated,
+		SpecializationCapabilities{Clear: true},
+	); err == nil {
 		t.Fatal("stored hash callback mutation passed the specialization gate")
 	}
 }
@@ -351,13 +357,6 @@ type staticSpecializationValues struct {
 }
 
 func (v staticSpecializationValues) RequiresCustomEquality(
-	api.Context,
-	types.Type,
-) bool {
-	return false
-}
-
-func (v staticSpecializationValues) RequiresCustomUpdate(
 	api.Context,
 	types.Type,
 ) bool {

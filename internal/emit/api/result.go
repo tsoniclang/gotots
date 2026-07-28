@@ -59,8 +59,11 @@ func (e ExpressionEmission) Requests() []RootRequest {
 
 type StoreTargetEmission struct {
 	accessor          bool
+	property          bool
 	before            []tsgo.Statement
 	value             tsgo.Expression
+	propertyReceiver  ExpressionEmission
+	propertyMember    string
 	accessorReceiver  ExpressionEmission
 	getterMember      string
 	setterMember      string
@@ -71,26 +74,49 @@ type StoreTargetEmission struct {
 	requests          []RootRequest
 }
 
+func NewPropertyStoreTargetEmission(
+	factory tsgo.Factory,
+	receiver ExpressionEmission,
+	member string,
+	sourceType types.Type,
+) (StoreTargetEmission, error) {
+	switch {
+	case receiver.Value() == nil:
+		return StoreTargetEmission{}, &ResultError{
+			Result: "property store target",
+			Reason: "target receiver is nil",
+		}
+	case member == "":
+		return StoreTargetEmission{}, &ResultError{
+			Result: "property store target",
+			Reason: "target member is empty",
+		}
+	case sourceType == nil:
+		return StoreTargetEmission{}, &ResultError{
+			Result: "property store target",
+			Reason: "source type is nil",
+		}
+	}
+	return StoreTargetEmission{
+		property: true,
+		value: factory.PropertyAccessExpression(
+			receiver.Value(),
+			nil,
+			factory.Identifier(member),
+			tsgo.NodeFlagsNone,
+		),
+		propertyReceiver: receiver,
+		propertyMember:   member,
+		sourceType:       sourceType,
+	}, nil
+}
+
 func NewStoreTargetEmission(
 	value tsgo.Expression,
 	sourceType types.Type,
 	requests []RootRequest,
 ) (StoreTargetEmission, error) {
-	return NewOrderedStoreTargetEmission(nil, value, sourceType, requests)
-}
-
-func NewOrderedStoreTargetEmission(
-	before []tsgo.Statement,
-	value tsgo.Expression,
-	sourceType types.Type,
-	requests []RootRequest,
-) (StoreTargetEmission, error) {
 	switch {
-	case slices.Contains(before, nil):
-		return StoreTargetEmission{}, &ResultError{
-			Result: "store target",
-			Reason: "prerequisite statement is nil",
-		}
 	case value == nil:
 		return StoreTargetEmission{}, &ResultError{
 			Result: "store target",
@@ -103,7 +129,6 @@ func NewOrderedStoreTargetEmission(
 		}
 	}
 	return StoreTargetEmission{
-		before:     slices.Clone(before),
 		value:      value,
 		sourceType: sourceType,
 		requests:   slices.Clone(requests),
@@ -182,12 +207,20 @@ func (e StoreTargetEmission) IsAccessor() bool {
 	return e.accessor
 }
 
+func (e StoreTargetEmission) IsProperty() bool {
+	return e.property
+}
+
 func (e StoreTargetEmission) CopiesValue() bool {
 	return e.copiesValue
 }
 
 func (e StoreTargetEmission) Before() []tsgo.Statement {
-	return slices.Clone(e.before)
+	before := slices.Clone(e.before)
+	if e.property && !e.locationCaptured {
+		before = append(before, e.propertyReceiver.Before()...)
+	}
+	return before
 }
 
 func (e StoreTargetEmission) Value() tsgo.Expression {
@@ -216,6 +249,9 @@ func (e StoreTargetEmission) SourceType() types.Type {
 
 func (e StoreTargetEmission) Requests() []RootRequest {
 	requests := slices.Clone(e.requests)
+	if e.property {
+		requests = append(requests, e.propertyReceiver.Requests()...)
+	}
 	if e.accessor {
 		requests = append(requests, e.accessorReceiver.Requests()...)
 		for _, argument := range e.accessorArguments {

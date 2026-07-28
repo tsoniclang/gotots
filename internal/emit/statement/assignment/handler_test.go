@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"go/ast"
-	"go/token"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -105,27 +104,45 @@ func TestParallelAssignmentCreatesCapturesBeforeStores(t *testing.T) {
 	}
 }
 
-func TestParallelAssignmentRejectsUnownedTargetAndMultiResultCases(t *testing.T) {
-	for _, mutate := range []func(*ast.AssignStmt){
-		func(source *ast.AssignStmt) {
-			source.Lhs[0] = &ast.IndexExpr{X: source.Lhs[0], Index: source.Rhs[0]}
+func TestParallelAssignmentBoundaryMutationsFailAtTheirOwners(t *testing.T) {
+	for _, testCase := range []struct {
+		mutate    func(*ast.AssignStmt)
+		category  api.Category
+		role      api.Role
+		construct string
+	}{
+		{
+			mutate: func(source *ast.AssignStmt) {
+				source.Lhs[0] = &ast.IndexExpr{
+					X:     source.Lhs[0],
+					Index: source.Rhs[0],
+				}
+			},
+			category:  api.CategoryExpression,
+			role:      api.RoleAssignmentTarget,
+			construct: "*ast.IndexExpr",
 		},
-		func(source *ast.AssignStmt) {
-			source.Rhs = source.Rhs[:1]
+		{
+			mutate: func(source *ast.AssignStmt) {
+				source.Rhs = source.Rhs[:1]
+			},
+			category:  api.CategoryStatement,
+			role:      api.RoleBlockStatement,
+			construct: "*ast.AssignStmt",
 		},
 	} {
 		loaded := loadProject(t)
 		function := loaded.Files()[0].Syntax().Decls[0].(*ast.FuncDecl)
-		mutate(function.Body.List[0].(*ast.AssignStmt))
+		testCase.mutate(function.Body.List[0].(*ast.AssignStmt))
 
 		_, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 		var unsupported *api.UnsupportedError
 		if !errors.As(err, &unsupported) {
 			t.Fatalf("error = %v, want *api.UnsupportedError", err)
 		}
-		if unsupported.Category != api.CategoryStatement ||
-			unsupported.Construct != "*ast.AssignStmt" ||
-			unsupported.Role != api.RoleBlockStatement {
+		if unsupported.Category != testCase.category ||
+			unsupported.Construct != testCase.construct ||
+			unsupported.Role != testCase.role {
 			t.Fatalf("unsupported error = %#v", unsupported)
 		}
 	}
@@ -149,28 +166,7 @@ func TestCompoundIdentifierAssignmentUsesDirectTargetOperation(t *testing.T) {
 	}
 }
 
-func TestCompoundAssignmentBoundaryMutationsFailClosed(t *testing.T) {
-	for name, mutate := range map[string]func(*ast.AssignStmt){
-		"operator": func(source *ast.AssignStmt) {
-			source.Tok = token.SUB_ASSIGN
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			loaded := loadProject(t)
-			function := loaded.Files()[0].Syntax().Decls[4].(*ast.FuncDecl)
-			mutate(function.Body.List[0].(*ast.AssignStmt))
-			_, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
-			var unsupported *api.UnsupportedError
-			if !errors.As(err, &unsupported) ||
-				unsupported.Construct != "*ast.AssignStmt" ||
-				unsupported.Role != api.RoleBlockStatement {
-				t.Fatalf("error = %#v, want owned assignment failure", err)
-			}
-		})
-	}
-}
-
-func TestPrimitiveAccessorCompoundFailsAtAssignmentOwner(t *testing.T) {
+func TestPrimitiveAccessorCompoundAndIncrementAreOwned(t *testing.T) {
 	directory := t.TempDir()
 	writeFile(
 		t,
@@ -179,8 +175,10 @@ func TestPrimitiveAccessorCompoundFailsAtAssignmentOwner(t *testing.T) {
 	)
 	writeFile(t, filepath.Join(directory, "source.go"), `package compoundboundary
 
-func F(values []int32, delta int32) {
+func F(values []int32, delta int32) int32 {
 	values[0] += delta
+	values[0]--
+	return values[0]
 }
 `)
 	loaded, err := load.One(context.Background(), load.Request{
@@ -191,11 +189,8 @@ func F(values []int32, delta int32) {
 		t.Fatal(err)
 	}
 	_, err = emit.CompileFile(loaded, loaded.Files()[0].Syntax())
-	var unsupported *api.UnsupportedError
-	if !errors.As(err, &unsupported) ||
-		unsupported.Construct != "*ast.AssignStmt" ||
-		unsupported.Role != api.RoleBlockStatement {
-		t.Fatalf("error = %#v, want owned assignment failure", err)
+	if err != nil {
+		t.Fatalf("accessor update was rejected: %v", err)
 	}
 }
 

@@ -724,6 +724,16 @@ runtime owner; a generated `value!` may not substitute for a proved invariant.
 Compiler handlers still own Go evaluation order and copy boundaries; runtime
 code does not rediscover source semantics.
 
+Aggregate container operations therefore compose at the source operation
+owner. That owner emits typed TS-Go loops which call the already-selected
+zero/copy/equality/hash structures directly. Runtime array and slice classes
+may expose only typed structural primitives needed to allocate, validate,
+grow, and access storage. They may not receive a semantic operation as a
+function parameter, retain one as a field, or create a second per-element-type
+dispatch owner. Runtime members used only by `clear` or slice-spread append are
+selected by closed demand and are absent from an artifact that does not use
+the operation.
+
 The pointer runtime is the one exception for typed location accessors because a
 Go pointer is itself a first-class reference to mutable storage rather than a
 copied value. Its closed factories may capture only statically typed read and

@@ -141,10 +141,6 @@ func (unusedValues) RequiresCustomEquality(api.Context, types.Type) bool {
 	panic("unused")
 }
 
-func (unusedValues) RequiresCustomUpdate(api.Context, types.Type) bool {
-	panic("unused")
-}
-
 func (unusedValues) RequiresExplicitType(api.Context, types.Type) bool {
 	panic("unused")
 }

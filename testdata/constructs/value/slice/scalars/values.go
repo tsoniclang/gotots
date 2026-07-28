@@ -1,5 +1,8 @@
 package slicevalues
 
+type DestinationValues []int32
+type SourceValues []int32
+
 var packageValues = []int32{2, 3}
 
 func Identity(values []int32) []int32 {
@@ -118,6 +121,74 @@ func AppendSpread() int32 {
 	suffix := []int32{3, 4}
 	result := append(values, suffix...)
 	return result[3]
+}
+
+func AppendSpreadOverlap() int32 {
+	values := make([]int32, 3, 6)
+	values[0], values[1], values[2] = 1, 2, 3
+	result := append(values[:1], values[1:3]...)
+	return result[0]*100 + result[1]*10 + result[2]
+}
+
+func AppendDistinctNamedSlices() int32 {
+	values := DestinationValues{1}
+	suffix := SourceValues{2, 3}
+	result := append(values, suffix...)
+	return result[0]*100 + result[1]*10 + result[2]
+}
+
+func AppendStringBytes() int32 {
+	result := append([]byte{1}, "é"...)
+	return int32(result[0])*10000 +
+		int32(result[1])*100 +
+		int32(result[2])
+}
+
+func AppendLargeSpread() int32 {
+	suffix := make([]int32, 200000)
+	suffix[len(suffix)-1] = 7
+	result := append([]int32{}, suffix...)
+	return result[len(result)-1]
+}
+
+func IndexUpdates() int32 {
+	values := []int32{2}
+	values[0] += 3
+	values[0] *= 4
+	values[0]--
+	return values[0]
+}
+
+func StringIndexCompound() string {
+	values := []string{"a"}
+	values[0] += "b"
+	return values[0]
+}
+
+var storeTrace int32
+
+func markSlice(values []int32, mark int32) []int32 {
+	storeTrace = storeTrace*10 + mark
+	return values
+}
+
+func markIndex(mark int32, index int) int {
+	storeTrace = storeTrace*10 + mark
+	return index
+}
+
+func markValue(mark int32, value int32) int32 {
+	storeTrace = storeTrace*10 + mark
+	return value
+}
+
+func ParallelStoreOrder() int32 {
+	storeTrace = 0
+	values := []int32{0, 0}
+	markSlice(values, 1)[markIndex(2, 0)],
+		markSlice(values, 3)[markIndex(4, 1)] =
+		markValue(5, 7), markValue(6, 8)
+	return storeTrace*100 + values[0]*10 + values[1]
 }
 
 func CopyOverlapping() int32 {

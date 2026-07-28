@@ -47,56 +47,59 @@ func emitCompound(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	if context.Values().RequiresCustomUpdate(
-		context,
-		target.SourceType(),
-	) {
+	if !target.IsAccessor() &&
+		!target.IsProperty() &&
+		source.Tok == token.ADD_ASSIGN &&
+		basictype.SupportsInteger(context.TypesSizes(), target.SourceType()) &&
+		types.AssignableTo(
+			context.TypesInfo().TypeOf(source.Rhs[0]),
+			target.SourceType(),
+		) {
+		value, err := children.Expression(
+			context.
+				WithRole(api.RoleAssignmentValue).
+				WithExpectedType(target.SourceType()),
+			source.Rhs[0],
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		if len(value.Before()) == 0 {
+			expression := context.Factory().BinaryExpression(
+				nil,
+				target.Value(),
+				nil,
+				context.Factory().BinaryOperatorToken(
+					tsgo.BinaryOperatorPlusEqualsToken,
+				),
+				value.Value(),
+			)
+			statements := target.Before()
+			statements = append(
+				statements,
+				context.Factory().ExpressionStatement(expression),
+			)
+			return api.NewStatementEmission(
+				statements,
+				api.CombineRequests(target.Requests(), value.Requests()),
+			)
+		}
 		return emitCustomCompound(
 			context,
 			children,
 			source,
 			operator,
 			target,
+			&value,
 		)
 	}
-	if target.IsAccessor() ||
-		source.Tok != token.ADD_ASSIGN ||
-		!basictype.SupportsInteger(context.TypesSizes(), target.SourceType()) ||
-		!types.AssignableTo(
-			context.TypesInfo().TypeOf(source.Rhs[0]),
-			target.SourceType(),
-		) {
-		return api.StatementEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
-	}
-	value, err := children.Expression(
-		context.
-			WithRole(api.RoleAssignmentValue).
-			WithExpectedType(target.SourceType()),
-		source.Rhs[0],
-	)
-	if err != nil {
-		return api.StatementEmission{}, err
-	}
-	if len(value.Before()) != 0 {
-		return api.StatementEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
-	}
-	expression := context.Factory().BinaryExpression(
+	return emitCustomCompound(
+		context,
+		children,
+		source,
+		operator,
+		target,
 		nil,
-		target.Value(),
-		nil,
-		context.Factory().BinaryOperatorToken(tsgo.BinaryOperatorPlusEqualsToken),
-		value.Value(),
-	)
-	statements := target.Before()
-	statements = append(
-		statements,
-		context.Factory().ExpressionStatement(expression),
-	)
-	return api.NewStatementEmission(
-		statements,
-		api.CombineRequests(target.Requests(), value.Requests()),
 	)
 }
 
@@ -106,14 +109,14 @@ func emitCustomCompound(
 	source *ast.AssignStmt,
 	operator token.Token,
 	target api.StoreTargetEmission,
+	preparedRight *api.ExpressionEmission,
 ) (api.StatementEmission, error) {
+	target, err := target.CaptureLocation(context)
+	if err != nil {
+		return api.StatementEmission{}, err
+	}
 	left := target.Value()
 	if target.IsAccessor() {
-		var err error
-		target, err = target.CaptureAccessorLocation(context)
-		if err != nil {
-			return api.StatementEmission{}, err
-		}
 		left, err = target.AccessorRead(context)
 		if err != nil {
 			return api.StatementEmission{}, err
@@ -132,14 +135,19 @@ func emitCustomCompound(
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	right, err := children.Expression(
-		context.
-			WithRole(api.RoleAssignmentValue).
-			WithExpectedType(expectedRight),
-		source.Rhs[0],
-	)
-	if err != nil {
-		return api.StatementEmission{}, err
+	var right api.ExpressionEmission
+	if preparedRight != nil {
+		right = *preparedRight
+	} else {
+		right, err = children.Expression(
+			context.
+				WithRole(api.RoleAssignmentValue).
+				WithExpectedType(expectedRight),
+			source.Rhs[0],
+		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
 	}
 	if context.EvaluationOrder() == api.EvaluationOrderPreserveGo {
 		right, err = captureCompoundRight(context, right)

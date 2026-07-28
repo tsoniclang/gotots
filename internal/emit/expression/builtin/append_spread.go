@@ -5,7 +5,6 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -34,11 +33,13 @@ func emitAppendSpread(
 	receiverType := context.TypesInfo().TypeOf(source.Args[0])
 	spreadType := context.TypesInfo().TypeOf(source.Args[1])
 	_, spreadElementType, spreadOK := scalarSlice(context, spreadType)
+	stringSpread := appendStringSpread(elementType, spreadType)
+	sliceSpread := spreadOK &&
+		types.Identical(elementType, spreadElementType) &&
+		types.AssignableTo(spreadType, types.NewSlice(elementType))
 	if !resultOK ||
 		!types.Identical(receiverType, result) ||
-		!spreadOK ||
-		!types.Identical(elementType, spreadElementType) ||
-		!types.AssignableTo(spreadType, result) {
+		(!sliceSpread && !stringSpread) {
 		return api.ExpressionEmission{}, api.Unsupported(
 			context,
 			api.CategoryExpression,
@@ -63,9 +64,11 @@ func emitAppendSpread(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	spread, err = projectDefinedSlice(context, spreadType, spread)
-	if err != nil {
-		return api.ExpressionEmission{}, err
+	if sliceSpread {
+		spread, err = projectDefinedSlice(context, spreadType, spread)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	}
 	operands, before, requests, err := arrangeValues(
 		context,
@@ -74,18 +77,48 @@ func emitAppendSpread(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	var target tsgo.Expression
-	if context.Values().RequiresStructuralCopy(context, elementType) {
-		zero, zeroRequests, err := slicevalue.AggregateZeroFactory(
+	targetElement, err := children.RepresentedType(
+		context.WithRole(api.RoleSliceElementType),
+		source,
+		elementType,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	requests = api.CombineRequests(requests, targetElement.Requests())
+	if stringSpread {
+		emission, err := slicevalue.AppendString(
 			context,
+			targetElement,
 			source,
 			elementType,
+			operands,
+			before,
+			requests,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		copyValue, copyRequests, err := slicevalue.AggregateCopyFactory(
+		return wrapDefinedSlice(context, result, emission)
+	}
+	var target tsgo.Expression
+	if context.Values().RequiresStructuralCopy(context, elementType) {
+		emission, err := slicevalue.AppendSpreadAggregate(
 			context,
+			targetElement,
+			source,
+			elementType,
+			operands,
+			before,
+			requests,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return wrapDefinedSlice(context, result, emission)
+	} else {
+		zero, err := context.Values().Zero(
+			context.WithRole(api.RoleSliceElement),
 			source,
 			elementType,
 		)
@@ -93,39 +126,28 @@ func emitAppendSpread(
 			return api.ExpressionEmission{}, err
 		}
 		runtime, err := context.Names().Runtime(
-			api.RuntimeSliceAppendSliceWith,
+			api.RuntimeSliceAppendSlice,
 			api.ImportPhaseValue,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
+		before = append(before, zero.Before()...)
 		target = context.Factory().CallExpression(
 			context.Factory().Identifier(runtime.Name()),
 			nil,
-			nil,
-			[]tsgo.Expression{operands[0], zero, copyValue, operands[1]},
+			[]tsgo.TypeNode{targetElement.Value()},
+			[]tsgo.Expression{
+				operands[0],
+				operands[1],
+				zero.Value(),
+			},
 			tsgo.NodeFlagsNone,
 		)
 		requests = api.CombineRequests(
 			requests,
-			zeroRequests,
-			copyRequests,
+			zero.Requests(),
 			runtime.Requests(),
-		)
-	} else {
-		target = context.Factory().CallExpression(
-			context.Factory().PropertyAccessExpression(
-				operands[0],
-				nil,
-				context.Factory().Identifier(
-					runtimeslice.MemberName(runtimeslice.MemberAppendSlice),
-				),
-				tsgo.NodeFlagsNone,
-			),
-			nil,
-			nil,
-			[]tsgo.Expression{operands[1]},
-			tsgo.NodeFlagsNone,
 		)
 	}
 	emission, err := api.NewExpressionEmission(before, target, requests)
@@ -137,4 +159,13 @@ func emitAppendSpread(
 		result,
 		emission,
 	)
+}
+
+func appendStringSpread(elementType, spreadType types.Type) bool {
+	element, ok := types.Unalias(elementType).(*types.Basic)
+	spread, spreadOK := types.Unalias(spreadType).Underlying().(*types.Basic)
+	return ok &&
+		element.Kind() == types.Uint8 &&
+		spreadOK &&
+		spread.Info()&types.IsString != 0
 }

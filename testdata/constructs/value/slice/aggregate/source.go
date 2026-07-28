@@ -72,6 +72,20 @@ func AppendSpreadCopiesValues() bool {
 	return values[0].Value == 9 && appended[0].Value == 8 && grown[1].Value == 7
 }
 
+func AppendSpreadOverlapSnapshotsValues() bool {
+	values := make([]Box, 3, 6)
+	values[0].Value = 1
+	values[1].Value = 2
+	values[2].Value = 3
+	grown := append(values[:1], values[1:3]...)
+	grown[1].Value = 9
+	return grown[0].Value == 1 &&
+		grown[1].Value == 9 &&
+		grown[2].Value == 3 &&
+		values[1].Value == 9 &&
+		values[2].Value == 3
+}
+
 func CopyDistinctCopiesValues() bool {
 	source := []Box{{Value: 1}, {Value: 2}}
 	target := make([]Box, 2)

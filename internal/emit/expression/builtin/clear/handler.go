@@ -6,7 +6,6 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
-	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	mapvalue "github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -100,10 +99,43 @@ func emitMap(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	if mapType.Storage() == mapvalue.StorageScalar {
+		runtime, err := context.Names().Runtime(
+			api.RuntimeMapClear,
+			api.ImportPhaseValue,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.NewExpressionEmission(
+			receiver.Before(),
+			context.Factory().CallExpression(
+				context.Factory().Identifier(runtime.Name()),
+				nil,
+				nil,
+				[]tsgo.Expression{receiver.Value()},
+				tsgo.NodeFlagsNone,
+			),
+			api.CombineRequests(
+				receiver.Requests(),
+				runtime.Requests(),
+			),
+		)
+	}
+	reference, err := context.Names().MapSpecialization(
+		mapType.Type(),
+		api.MapSpecializationDemandClear,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	return api.NewExpressionEmission(
 		receiver.Before(),
 		methodCall(context, receiver.Value(), name),
-		receiver.Requests(),
+		api.CombineRequests(
+			receiver.Requests(),
+			reference.Requests(),
+		),
 	)
 }
 
@@ -127,35 +159,11 @@ func emitSlice(
 		return api.ExpressionEmission{}, err
 	}
 	if context.Values().RequiresStructuralCopy(context, elementType) {
-		zero, requests, err := slicevalue.AggregateZeroFactory(
+		return slicevalue.ClearAggregate(
 			context,
 			source,
 			elementType,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		runtime, err := context.Names().Runtime(
-			api.RuntimeSliceClearWith,
-			api.ImportPhaseValue,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		return api.NewExpressionEmission(
-			receiver.Before(),
-			context.Factory().CallExpression(
-				context.Factory().Identifier(runtime.Name()),
-				nil,
-				nil,
-				[]tsgo.Expression{receiver.Value(), zero},
-				tsgo.NodeFlagsNone,
-			),
-			api.CombineRequests(
-				receiver.Requests(),
-				requests,
-				runtime.Requests(),
-			),
+			receiver,
 		)
 	}
 	zero, err := context.Values().Zero(
@@ -173,15 +181,28 @@ func emitSlice(
 			source,
 		)
 	}
+	runtime, err := context.Names().Runtime(
+		api.RuntimeSliceClear,
+		api.ImportPhaseValue,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	before := append(receiver.Before(), zero.Before()...)
 	return api.NewExpressionEmission(
-		receiver.Before(),
-		methodCall(
-			context,
-			receiver.Value(),
-			runtimeslice.MemberName(runtimeslice.MemberClear),
-			zero.Value(),
+		before,
+		context.Factory().CallExpression(
+			context.Factory().Identifier(runtime.Name()),
+			nil,
+			nil,
+			[]tsgo.Expression{receiver.Value(), zero.Value()},
+			tsgo.NodeFlagsNone,
 		),
-		api.CombineRequests(receiver.Requests(), zero.Requests()),
+		api.CombineRequests(
+			receiver.Requests(),
+			zero.Requests(),
+			runtime.Requests(),
+		),
 	)
 }
 

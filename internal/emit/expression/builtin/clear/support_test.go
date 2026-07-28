@@ -37,6 +37,58 @@ func compileClear(t *testing.T) emit.ProgramEmission {
 	return emission
 }
 
+func compileClearSource(
+	t *testing.T,
+	source string,
+) emit.ProgramEmission {
+	t.Helper()
+	directory := t.TempDir()
+	writeClearFile(
+		t,
+		filepath.Join(directory, "go.mod"),
+		"module example.com/demand\n\ngo 1.26.4\n",
+	)
+	writeClearFile(t, filepath.Join(directory, "source.go"), source)
+	loaded, err := load.One(context.Background(), load.Request{
+		Directory: directory,
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	roots, err := emit.ExportedAPIRoots(loaded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	emission, err := emit.Compile(loaded.Program(), roots)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return emission
+}
+
+func printClearEmission(
+	t *testing.T,
+	emission emit.ProgramEmission,
+) map[string]string {
+	t.Helper()
+	workingDirectory := t.TempDir()
+	client, err := tsgo.StartClient(repositoryRoot(), workingDirectory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = client.Close() })
+	printed := make(map[string]string, len(emission.Files()))
+	for _, file := range emission.Files() {
+		source, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		printed[file.OutputPath()] = source
+	}
+	return printed
+}
+
 func materializeClear(
 	t *testing.T,
 	emission emit.ProgramEmission,

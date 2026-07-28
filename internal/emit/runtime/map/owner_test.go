@@ -12,6 +12,7 @@ func TestBuildCreatesOneTypedGenericMapClass(t *testing.T) {
 		tsgo.NewFactory(),
 		api.RuntimeMap,
 		panicClassName(t),
+		Capabilities{},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -26,8 +27,33 @@ func TestBuildCreatesOneTypedGenericMapClass(t *testing.T) {
 	if len(class.TypeParameters()) != 2 {
 		t.Fatalf("type parameters = %d, want key and value", len(class.TypeParameters()))
 	}
+	if len(class.Members()) != 9 {
+		t.Fatalf("members = %d, want one constructor and eight core operations", len(class.Members()))
+	}
+}
+
+func TestClearSurfaceIsDemandedAsOneCapability(t *testing.T) {
+	factory := tsgo.NewFactory()
+	statement, err := Build(
+		factory,
+		api.RuntimeMap,
+		panicClassName(t),
+		Capabilities{Clear: true},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	class := statement.(tsgo.ClassDeclaration)
 	if len(class.Members()) != 10 {
-		t.Fatalf("members = %d, want one constructor and nine operations", len(class.Members()))
+		t.Fatalf("clear-capable members = %d, want core plus clear", len(class.Members()))
+	}
+	operation, err := BuildOperation(factory, api.RuntimeMapClear)
+	if err != nil {
+		t.Fatal(err)
+	}
+	function, ok := operation.(tsgo.FunctionDeclaration)
+	if !ok || function.Name().Text() != "goMapClear" {
+		t.Fatalf("clear operation = %T", operation)
 	}
 }
 
@@ -36,6 +62,7 @@ func TestBuildCreatesOneStaticHashPrimitiveOwner(t *testing.T) {
 		tsgo.NewFactory(),
 		api.RuntimeMapHash,
 		panicClassName(t),
+		Capabilities{},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -78,6 +105,7 @@ func TestRuntimeMapMutationGuardsOwnMissingAndNilWriteSemantics(t *testing.T) {
 		tsgo.NewFactory(),
 		api.RuntimeMap,
 		panicClassName(t),
+		Capabilities{},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -177,6 +205,7 @@ func TestBuildRejectsSiblingRuntimeSymbols(t *testing.T) {
 			tsgo.NewFactory(),
 			symbol,
 			panicClassName(t),
+			Capabilities{},
 		); err == nil {
 			t.Fatalf("symbol %d was accepted by map owner", symbol)
 		}

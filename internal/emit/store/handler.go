@@ -14,7 +14,6 @@ import (
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func Emit(
@@ -113,21 +112,28 @@ func dereference(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	target := pointerruntime.CellValue(
-		context.Factory(),
-		reference.Name(),
-		targetElement.Value(),
-		pointer.Value(),
-	)
-	return api.NewOrderedStoreTargetEmission(
+	receiver, err := api.NewExpressionEmission(
 		pointer.Before(),
-		target,
-		element,
+		pointerruntime.Dereference(
+			context.Factory(),
+			reference.Name(),
+			targetElement.Value(),
+			pointer.Value(),
+		),
 		api.CombineRequests(
 			pointer.Requests(),
 			targetElement.Requests(),
 			reference.Requests(),
 		),
+	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
+	return api.NewPropertyStoreTargetEmission(
+		context.Factory(),
+		receiver,
+		pointerruntime.CellValueName,
+		element,
 	)
 }
 
@@ -342,26 +348,28 @@ func field(
 		if err != nil {
 			return api.StoreTargetEmission{}, err
 		}
-		value := pointerruntime.CellValue(
-			context.Factory(),
-			reference.Name(),
-			targetElement.Value(),
-			receiver.Value(),
-		)
-		return api.NewOrderedStoreTargetEmission(
+		fieldReceiver, err := api.NewExpressionEmission(
 			receiver.Before(),
-			context.Factory().PropertyAccessExpression(
-				value,
-				nil,
-				context.Factory().Identifier(name),
-				tsgo.NodeFlagsNone,
+			pointerruntime.CellValue(
+				context.Factory(),
+				reference.Name(),
+				targetElement.Value(),
+				receiver.Value(),
 			),
-			field.Type(),
 			api.CombineRequests(
 				receiver.Requests(),
 				targetElement.Requests(),
 				reference.Requests(),
 			),
+		)
+		if err != nil {
+			return api.StoreTargetEmission{}, err
+		}
+		return api.NewPropertyStoreTargetEmission(
+			context.Factory(),
+			fieldReceiver,
+			name,
+			field.Type(),
 		)
 	}
 	receiverType := context.TypesInfo().TypeOf(source.X)
@@ -378,16 +386,11 @@ func field(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	return api.NewOrderedStoreTargetEmission(
-		receiver.Before(),
-		context.Factory().PropertyAccessExpression(
-			receiver.Value(),
-			nil,
-			context.Factory().Identifier(name),
-			tsgo.NodeFlagsNone,
-		),
+	return api.NewPropertyStoreTargetEmission(
+		context.Factory(),
+		receiver,
+		name,
 		field.Type(),
-		receiver.Requests(),
 	)
 }
 

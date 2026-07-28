@@ -10,13 +10,14 @@ import (
 )
 
 type parallelTarget struct {
-	source      *ast.Ident
+	source      ast.Expr
+	identifier  *ast.Ident
 	object      *types.Var
 	name        string
 	declaration bool
 	discard     bool
-	requests    []api.RootRequest
 	storage     bool
+	target      api.StoreTargetEmission
 }
 
 func emitParallel(
@@ -37,13 +38,23 @@ func emitParallel(
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	targets, err := parallelTargets(context, source)
+	targets, locationBefore, locationRequests, err := parallelTargets(
+		context,
+		children,
+		source,
+	)
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
 
-	statements := make([]tsgo.Statement, 0, len(targets)*2)
-	requests := make([]api.RootRequest, 0, len(targets)*2)
+	statements := append(
+		make([]tsgo.Statement, 0, len(locationBefore)+len(targets)*2),
+		locationBefore...,
+	)
+	requests := append(
+		make([]api.RootRequest, 0, len(locationRequests)+len(targets)*2),
+		locationRequests...,
+	)
 	temporaryNames := make([]string, len(targets))
 	for index, target := range targets {
 		sourceValue := source.Rhs[index]
@@ -54,7 +65,11 @@ func emitParallel(
 		}
 		expectedType := sourceType
 		if !target.discard {
-			expectedType = target.object.Type()
+			if target.declaration {
+				expectedType = target.object.Type()
+			} else {
+				expectedType = target.target.SourceType()
+			}
 			if !types.AssignableTo(sourceType, expectedType) {
 				return api.StatementEmission{},
 					api.Unsupported(context, api.CategoryStatement, source)
@@ -73,7 +88,8 @@ func emitParallel(
 		if err != nil {
 			return api.StatementEmission{}, err
 		}
-		if !target.discard {
+		if !target.discard &&
+			(target.declaration || !target.target.CopiesValue()) {
 			value, err = context.Values().Copy(
 				context.WithRole(role),
 				sourceValue,
@@ -115,7 +131,7 @@ func emitParallel(
 				value, err = context.AddressableStorage().Cell(
 					context,
 					children,
-					target.source,
+					target.identifier,
 					target.object.Type(),
 					value,
 				)
@@ -128,7 +144,7 @@ func emitParallel(
 			targetType, typeRequests, err := pointerAnnotation(
 				context.WithRole(api.RoleLocalType),
 				children,
-				target.source,
+				target.identifier,
 				target.object.Type(),
 			)
 			if err != nil {
@@ -149,16 +165,26 @@ func emitParallel(
 				),
 			)
 			requests = append(requests, typeRequests...)
-		} else {
-			targetExpression, err := parallelTargetExpression(context, target)
+		} else if target.target.IsAccessor() {
+			stored, err := target.target.AccessorStore(
+				context,
+				api.DirectExpression(temporary),
+			)
 			if err != nil {
 				return api.StatementEmission{}, err
 			}
+			statements = append(statements, stored.Before()...)
+			statements = append(
+				statements,
+				context.Factory().ExpressionStatement(stored.Value()),
+			)
+			requests = append(requests, stored.Requests()...)
+		} else {
 			assigned, err := context.Values().Assign(
 				context.WithRole(api.RoleAssignmentTarget),
 				target.source,
-				target.object.Type(),
-				targetExpression,
+				target.target.SourceType(),
+				target.target.Value(),
 				api.DirectExpression(temporary),
 			)
 			if err != nil {
@@ -171,29 +197,33 @@ func emitParallel(
 			)
 			requests = append(requests, assigned.Requests()...)
 		}
-		requests = append(requests, target.requests...)
 	}
 	return api.NewStatementEmission(statements, requests)
 }
 
 func parallelTargets(
 	context api.Context,
+	children api.ChildEmitter,
 	source *ast.AssignStmt,
-) ([]parallelTarget, error) {
+) (
+	[]parallelTarget,
+	[]tsgo.Statement,
+	[]api.RootRequest,
+	error,
+) {
 	targets := make([]parallelTarget, 0, len(source.Lhs))
+	var before []tsgo.Statement
+	var requests []api.RootRequest
 	for _, expression := range source.Lhs {
-		identifier, ok := expression.(*ast.Ident)
-		if !ok {
-			return nil, api.Unsupported(context, api.CategoryStatement, source)
-		}
-		if identifier.Name == "_" {
+		identifier, identifierOK := expression.(*ast.Ident)
+		if identifierOK && identifier.Name == "_" {
 			targets = append(targets, parallelTarget{
 				source:  identifier,
 				discard: true,
 			})
 			continue
 		}
-		if source.Tok == token.DEFINE {
+		if source.Tok == token.DEFINE && identifierOK {
 			if object, ok := context.TypesInfo().Defs[identifier].(*types.Var); ok {
 				name, selected := context.AddressableStorage().Name(
 					context,
@@ -204,10 +234,11 @@ func parallelTargets(
 					name, err = context.Names().Declare(object)
 				}
 				if err != nil {
-					return nil, err
+					return nil, nil, nil, err
 				}
 				targets = append(targets, parallelTarget{
 					source:      identifier,
+					identifier:  identifier,
 					object:      object,
 					name:        name,
 					declaration: true,
@@ -216,51 +247,23 @@ func parallelTargets(
 				continue
 			}
 		}
-		object, ok := context.TypesInfo().Uses[identifier].(*types.Var)
-		if !ok {
-			return nil, api.Unsupported(context, api.CategoryStatement, source)
-		}
-		name, selected := context.AddressableStorage().Name(context, object)
-		var requests []api.RootRequest
-		if !selected {
-			reference, err := context.Names().Reference(object)
-			if err != nil {
-				return nil, err
-			}
-			name = reference.Name()
-			requests = reference.Requests()
-		}
-		targets = append(targets, parallelTarget{
-			source:   identifier,
-			object:   object,
-			name:     name,
-			requests: requests,
-			storage:  selected,
-		})
-	}
-	return targets, nil
-}
-
-func parallelTargetExpression(
-	context api.Context,
-	target parallelTarget,
-) (tsgo.Expression, error) {
-	value := tsgo.Expression(context.Factory().Identifier(target.name))
-	if target.storage {
-		selected, ok, err := context.AddressableStorage().StoreTarget(
-			context,
-			target.object,
+		target, err := children.StoreTarget(
+			context.WithRole(api.RoleAssignmentTarget),
+			expression,
 		)
 		if err != nil {
-			return nil, err
+			return nil, nil, nil, err
 		}
-		if !ok {
-			return nil, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "selected parallel target has no addressable storage",
-			}
+		target, targetBefore, targetRequests, err := target.PrepareLocation(context)
+		if err != nil {
+			return nil, nil, nil, err
 		}
-		value = selected.Value()
+		before = append(before, targetBefore...)
+		requests = append(requests, targetRequests...)
+		targets = append(targets, parallelTarget{
+			source: expression,
+			target: target,
+		})
 	}
-	return value, nil
+	return targets, before, requests, nil
 }

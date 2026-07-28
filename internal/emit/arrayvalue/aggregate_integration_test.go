@@ -38,13 +38,16 @@ func TestAggregateArrayZeroCopyLiteralEqualityAndAddressMatchGo(
 				"goArrayLiteralWith",
 				"goArrayCopyWith",
 			} {
-				if strings.Count(runtime, "function "+helper) != 1 {
+				if strings.Contains(runtime, helper) {
 					t.Fatalf(
-						"aggregate runtime helper %s is not emitted exactly once:\n%s",
+						"aggregate runtime retains semantic callback helper %s:\n%s",
 						helper,
 						runtime,
 					)
 				}
+			}
+			if strings.Count(runtime, "function goArrayAllocate") != 1 {
+				t.Fatalf("aggregate storage allocator is not emitted exactly once:\n%s", runtime)
 			}
 			for path, artifact := range target.printed {
 				for _, forbidden := range []string{
@@ -54,6 +57,8 @@ func TestAggregateArrayZeroCopyLiteralEqualityAndAddressMatchGo(
 					".apply(",
 					".bind(",
 					"import(",
+					"zero: () =>",
+					"copyValue:",
 				} {
 					if strings.Contains(artifact, forbidden) {
 						t.Fatalf("%s contains forbidden %q:\n%s", path, forbidden, artifact)
@@ -93,6 +98,8 @@ func TestScalarArrayArtifactHasNoAggregateOperationSurface(t *testing.T) {
 		"goArrayZeroWith",
 		"goArrayLiteralWith",
 		"goArrayCopyWith",
+		"goArrayAllocate",
+		"$allocate",
 	} {
 		if strings.Contains(runtime, forbidden) {
 			t.Fatalf("scalar array runtime contains %q:\n%s", forbidden, runtime)

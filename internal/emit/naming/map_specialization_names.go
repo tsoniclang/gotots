@@ -106,6 +106,9 @@ func mapSpecializationFacet(
 	if demand == api.MapSpecializationDemandDefinition {
 		return api.ArtifactFacetInstanceTypeSurface
 	}
+	if demand == api.MapSpecializationDemandClear {
+		return api.ArtifactFacetInstanceTypeSurface
+	}
 	return api.ArtifactFacetStaticSurface
 }
 

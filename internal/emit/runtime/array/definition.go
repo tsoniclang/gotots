@@ -6,9 +6,25 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
+type Capabilities struct {
+	Allocate bool
+}
+
 func Build(
 	factory tsgo.Factory,
 	panicName string,
+) (tsgo.ClassDeclaration, error) {
+	return BuildWithCapabilities(
+		factory,
+		panicName,
+		Capabilities{},
+	)
+}
+
+func BuildWithCapabilities(
+	factory tsgo.Factory,
+	panicName string,
+	capabilities Capabilities,
 ) (tsgo.ClassDeclaration, error) {
 	contract, err := api.RuntimeContract(api.RuntimeArray)
 	if err != nil {
@@ -35,13 +51,19 @@ func Build(
 	}
 	members := []tsgo.ClassElement{
 		constructor(factory, elementType, lengthType),
+	}
+	if capabilities.Allocate {
+		members = append(members, allocateMethod(factory, exportedName))
+	}
+	members = append(
+		members,
 		zeroMethod(factory, exportedName),
 		literalMethod(factory, exportedName, panicName),
 		copyMethod(factory, exportedName, elementType, lengthType),
 		getMethod(factory, elementType),
 		setMethod(factory, elementType),
 		checkMethod(factory, panicName),
-	}
+	)
 	return factory.ClassDeclaration(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
 		factory.Identifier(exportedName),
@@ -49,6 +71,45 @@ func Build(
 		nil,
 		members,
 	), nil
+}
+
+const StorageAllocateMember = "$allocate"
+
+func allocateMethod(
+	factory tsgo.Factory,
+	exportedName string,
+) tsgo.MethodDeclaration {
+	elementType := typeReference(factory, "T")
+	lengthType := typeReference(factory, "N")
+	length := factory.Identifier("length")
+	values := factory.NewExpression(
+		factory.Identifier("Array"),
+		[]tsgo.TypeNode{elementType},
+		[]tsgo.Expression{call(
+			factory,
+			factory.Identifier("Number"),
+			nil,
+			length,
+		)},
+	)
+	return method(
+		factory,
+		[]tsgo.ModifierLike{
+			factory.PublicKeyword(),
+			factory.StaticKeyword(),
+		},
+		StorageAllocateMember,
+		typeParameters(factory),
+		[]tsgo.ParameterDeclaration{
+			parameter(factory, nil, "length", lengthType),
+		},
+		arrayType(factory, exportedName, elementType, lengthType),
+		[]tsgo.Statement{factory.ReturnStatement(factory.NewExpression(
+			factory.Identifier(exportedName),
+			[]tsgo.TypeNode{elementType, lengthType},
+			[]tsgo.Expression{values, length},
+		))},
+	)
 }
 
 func constructor(

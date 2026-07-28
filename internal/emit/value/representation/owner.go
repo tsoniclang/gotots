@@ -16,7 +16,16 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-type Owner struct{}
+type Owner struct {
+	children api.ChildEmitter
+}
+
+func NewOwner(children api.ChildEmitter) Owner {
+	if children == nil {
+		panic("value representation owner has no child emitter")
+	}
+	return Owner{children: children}
+}
 
 func (Owner) RequiresCustomEquality(
 	context api.Context,
@@ -71,7 +80,7 @@ func (Owner) RequiresStructuralCopy(
 	return ok
 }
 
-func (Owner) Zero(
+func (owner Owner) Zero(
 	context api.Context,
 	source ast.Node,
 	sourceType types.Type,
@@ -87,7 +96,7 @@ func (Owner) Zero(
 				),
 			), nil
 		}
-		zero, err := (Owner{}).Zero(
+		zero, err := owner.Zero(
 			context.WithRole(api.RoleDefinedValue),
 			source,
 			defined.Underlying(),
@@ -116,7 +125,7 @@ func (Owner) Zero(
 		)
 	}
 	if array, ok := arrayvalue.Resolve(context, sourceType); ok {
-		return array.Zero(context, source)
+		return array.Zero(context, owner.children, source)
 	}
 	if structType, ok := isAnonymousStruct(sourceType); ok {
 		return anonymousStructZero(context, source, structType)
@@ -158,7 +167,7 @@ func (Owner) Zero(
 		), nil
 	}
 	if _, _, ok := scalarSlice(context, sourceType); ok {
-		return sliceZero(context, source, sourceType)
+		return sliceZero(context, owner.children, source, sourceType)
 	}
 	typeName, _, ok := namedStruct(sourceType)
 	if !ok {
@@ -187,7 +196,7 @@ func (Owner) Zero(
 	), nil
 }
 
-func (Owner) Copy(
+func (owner Owner) Copy(
 	context api.Context,
 	source ast.Node,
 	sourceType types.Type,
@@ -219,7 +228,12 @@ func (Owner) Copy(
 		)
 	}
 	if array, ok := arrayvalue.Resolve(context, sourceType); ok {
-		return array.Copy(context, ownsFreshValue(context, source), value)
+		return array.Copy(
+			context,
+			owner.children,
+			ownsFreshValue(context, source),
+			value,
+		)
 	}
 	if structType, ok := isAnonymousStruct(sourceType); ok {
 		if ownsFreshValue(context, source) {

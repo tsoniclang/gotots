@@ -31,22 +31,6 @@ func F(values []int32) int32 {
 			category:  api.CategoryStatement,
 			construct: "*ast.RangeStmt",
 		},
-		{
-			name: "index increment",
-			source: `package boundary
-func F(values []int32) { values[0]++ }
-`,
-			category:  api.CategoryStatement,
-			construct: "*ast.IncDecStmt",
-		},
-		{
-			name: "index compound assignment",
-			source: `package boundary
-func F(values []int32) { values[0] += 1 }
-`,
-			category:  api.CategoryStatement,
-			construct: "*ast.AssignStmt",
-		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

@@ -20,13 +20,23 @@ func emitMultipleResults(
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	targets, err := parallelTargets(context, source)
+	targets, locationBefore, locationRequests, err := parallelTargets(
+		context,
+		children,
+		source,
+	)
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
 	for index, target := range targets {
-		if !target.discard &&
-			!types.AssignableTo(results.At(index).Type(), target.object.Type()) {
+		if target.discard {
+			continue
+		}
+		targetType := target.target.SourceType()
+		if target.declaration {
+			targetType = target.object.Type()
+		}
+		if !types.AssignableTo(results.At(index).Type(), targetType) {
 			return api.StatementEmission{},
 				api.Unsupported(context, api.CategoryStatement, source)
 		}
@@ -49,7 +59,7 @@ func emitMultipleResults(
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	statements := value.Before()
+	statements := append(locationBefore, value.Before()...)
 	statements = append(
 		statements,
 		variableStatement(
@@ -59,7 +69,7 @@ func emitMultipleResults(
 			value.Value(),
 		),
 	)
-	requests := value.Requests()
+	requests := api.CombineRequests(locationRequests, value.Requests())
 
 	for index, target := range targets {
 		if target.discard {
@@ -71,24 +81,30 @@ func emitMultipleResults(
 			context.Factory().NumericLiteral(strconv.Itoa(index), tsgo.TokenFlagsNone),
 			tsgo.NodeFlagsNone,
 		))
-		copied, err := context.Values().Copy(
-			context.WithRole(role),
-			source.Rhs[0],
-			target.object.Type(),
-			api.DirectExpression(element),
-		)
-		if err != nil {
-			return api.StatementEmission{}, err
+		targetType := target.target.SourceType()
+		if target.declaration {
+			targetType = target.object.Type()
 		}
-		statements = append(statements, copied.Before()...)
-		element = copied.Value()
-		requests = append(requests, copied.Requests()...)
+		if target.declaration || !target.target.CopiesValue() {
+			copied, err := context.Values().Copy(
+				context.WithRole(role),
+				source.Rhs[0],
+				targetType,
+				api.DirectExpression(element),
+			)
+			if err != nil {
+				return api.StatementEmission{}, err
+			}
+			statements = append(statements, copied.Before()...)
+			element = copied.Value()
+			requests = append(requests, copied.Requests()...)
+		}
 		if target.declaration {
 			if target.storage {
 				cell, err := context.AddressableStorage().Cell(
 					context,
 					children,
-					target.source,
+					target.identifier,
 					target.object.Type(),
 					api.DirectExpression(element),
 				)
@@ -101,7 +117,7 @@ func emitMultipleResults(
 			targetType, typeRequests, err := pointerAnnotation(
 				context.WithRole(api.RoleLocalType),
 				children,
-				target.source,
+				target.identifier,
 				target.object.Type(),
 			)
 			if err != nil {
@@ -122,16 +138,26 @@ func emitMultipleResults(
 				),
 			)
 			requests = append(requests, typeRequests...)
-		} else {
-			targetExpression, err := parallelTargetExpression(context, target)
+		} else if target.target.IsAccessor() {
+			stored, err := target.target.AccessorStore(
+				context,
+				api.DirectExpression(element),
+			)
 			if err != nil {
 				return api.StatementEmission{}, err
 			}
+			statements = append(statements, stored.Before()...)
+			statements = append(
+				statements,
+				context.Factory().ExpressionStatement(stored.Value()),
+			)
+			requests = append(requests, stored.Requests()...)
+		} else {
 			assigned, err := context.Values().Assign(
 				context.WithRole(api.RoleAssignmentTarget),
 				target.source,
-				target.object.Type(),
-				targetExpression,
+				target.target.SourceType(),
+				target.target.Value(),
 				api.DirectExpression(element),
 			)
 			if err != nil {
@@ -144,7 +170,6 @@ func emitMultipleResults(
 			)
 			requests = append(requests, assigned.Requests()...)
 		}
-		requests = append(requests, target.requests...)
 	}
 	return api.NewStatementEmission(statements, requests)
 }

@@ -11,8 +11,80 @@ import (
 
 func (a RuntimeArray) Zero(
 	context api.Context,
+	children api.ChildEmitter,
 	source ast.Node,
 ) (api.ExpressionEmission, error) {
+	if a.aggregate {
+		loopZero, err := context.Values().Zero(
+			context,
+			source,
+			a.ElementType(),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		resultName, err := context.Names().Temporary(
+			api.TemporaryArrayConstruction,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		indexName, err := context.Names().Temporary(
+			api.TemporaryArrayConstruction,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		target, runtimeRequests, err := a.runtimeOperation(
+			context,
+			children,
+			api.RuntimeArrayAllocate,
+			a.lengthLiteral(context),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		result := context.Factory().Identifier(resultName)
+		index := context.Factory().Identifier(indexName)
+		body := append(
+			loopZero.Before(),
+			context.Factory().ExpressionStatement(callMember(
+				context,
+				result,
+				arraymember.Set,
+				index,
+				loopZero.Value(),
+			)),
+		)
+		before := append(
+			[]tsgo.Statement{},
+			arrayComparisonVariable(
+				context,
+				tsgo.NodeFlagsConst,
+				resultName,
+				target,
+			),
+			arrayConstructionLoop(
+				context,
+				index,
+				a.lengthLiteral(context),
+				"0",
+				body,
+			),
+		)
+		emission, err := api.NewExpressionEmission(
+			before,
+			result,
+			api.CombineRequests(
+				loopZero.Requests(),
+				runtimeRequests,
+			),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return a.wrap(context, emission)
+	}
 	elementZero, err := context.Values().Zero(
 		context,
 		source,
@@ -25,26 +97,7 @@ func (a RuntimeArray) Zero(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	if a.aggregate {
-		zeroFactory := valueFactory(context, nil, elementZero.Value())
-		target, runtimeRequests, err := a.runtimeOperation(
-			context,
-			api.RuntimeArrayZeroWith,
-			a.lengthLiteral(context),
-			zeroFactory,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		return a.wrap(context, api.DirectExpression(
-			target,
-			api.CombineRequests(
-				elementZero.Requests(),
-				runtimeRequests,
-			)...,
-		))
-	}
-	typeArguments, typeRequests, err := a.targetTypeArguments(context)
+	typeArguments, typeRequests, err := a.targetTypeArguments(context, children)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -71,6 +124,7 @@ func (a RuntimeArray) Zero(
 
 func (a RuntimeArray) Copy(
 	context api.Context,
+	children api.ChildEmitter,
 	fresh bool,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
@@ -82,63 +136,89 @@ func (a RuntimeArray) Copy(
 		)
 	}
 	if a.aggregate {
-		elementZero, err := context.Values().Zero(
-			context.WithRole(api.RoleArrayElement),
-			nil,
-			a.ElementType(),
+		sourceName, err := context.Names().Temporary(
+			api.TemporaryArrayConstruction,
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		if len(elementZero.Before()) != 0 {
-			return api.ExpressionEmission{}, api.Unsupported(
-				context.WithRole(api.RoleArrayElement),
-				api.CategoryExpression,
-				nil,
-			)
+		resultName, err := context.Names().Temporary(
+			api.TemporaryArrayConstruction,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
 		}
-		element := context.Factory().Identifier("$value")
+		indexName, err := context.Names().Temporary(
+			api.TemporaryArrayConstruction,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		source := context.Factory().Identifier(sourceName)
+		result := context.Factory().Identifier(resultName)
+		index := context.Factory().Identifier(indexName)
 		elementCopy, err := context.Values().Copy(
 			context.WithRole(api.RoleArrayElement),
 			nil,
 			a.ElementType(),
-			api.DirectExpression(element),
+			api.DirectExpression(callMember(
+				context,
+				source,
+				arraymember.Get,
+				index,
+			)),
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
-		}
-		if len(elementCopy.Before()) != 0 {
-			return api.ExpressionEmission{}, api.Unsupported(
-				context.WithRole(api.RoleArrayElement),
-				api.CategoryExpression,
-				nil,
-			)
 		}
 		target, runtimeRequests, err := a.runtimeOperation(
 			context,
-			api.RuntimeArrayCopyWith,
-			a.storage(context, value.Value()),
-			valueFactory(context, nil, elementZero.Value()),
-			valueFactory(context, []tsgo.ParameterDeclaration{
-				context.Factory().ParameterDeclaration(
-					nil,
-					nil,
-					element,
-					nil,
-					nil,
-					nil,
-				),
-			}, elementCopy.Value()),
+			children,
+			api.RuntimeArrayAllocate,
+			a.lengthLiteral(context),
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		copied, err := api.NewExpressionEmission(
+		before := append(
 			value.Before(),
-			target,
+			arrayComparisonVariable(
+				context,
+				tsgo.NodeFlagsConst,
+				sourceName,
+				a.storage(context, value.Value()),
+			),
+		)
+		before = append(
+			before,
+			arrayComparisonVariable(
+				context,
+				tsgo.NodeFlagsConst,
+				resultName,
+				target,
+			),
+			arrayConstructionLoop(
+				context,
+				index,
+				a.lengthLiteral(context),
+				"0",
+				append(
+					elementCopy.Before(),
+					context.Factory().ExpressionStatement(callMember(
+						context,
+						result,
+						arraymember.Set,
+						index,
+						elementCopy.Value(),
+					)),
+				),
+			),
+		)
+		copied, err := api.NewExpressionEmission(
+			before,
+			result,
 			api.CombineRequests(
 				value.Requests(),
-				elementZero.Requests(),
 				elementCopy.Requests(),
 				runtimeRequests,
 			),
@@ -163,21 +243,42 @@ func (a RuntimeArray) Copy(
 	return a.wrap(context, copied)
 }
 
-func valueFactory(
+func arrayConstructionLoop(
 	context api.Context,
-	parameters []tsgo.ParameterDeclaration,
-	value tsgo.Expression,
-) tsgo.ArrowFunction {
-	return context.Factory().ArrowFunction(
-		nil,
-		nil,
-		parameters,
-		nil,
-		context.Factory().EqualsGreaterThanToken(),
-		context.Factory().Block(
-			[]tsgo.Statement{context.Factory().ReturnStatement(value)},
-			true,
+	index tsgo.Identifier,
+	length tsgo.Expression,
+	start string,
+	body []tsgo.Statement,
+) tsgo.ForStatement {
+	return context.Factory().ForStatement(
+		context.Factory().VariableDeclarationList(
+			[]tsgo.VariableDeclaration{
+				context.Factory().VariableDeclaration(
+					index,
+					nil,
+					nil,
+					context.Factory().NumericLiteral(
+						start,
+						tsgo.TokenFlagsNone,
+					),
+				),
+			},
+			tsgo.NodeFlagsLet,
 		),
+		context.Factory().BinaryExpression(
+			nil,
+			index,
+			nil,
+			context.Factory().BinaryOperatorToken(
+				tsgo.BinaryOperatorLessThanToken,
+			),
+			length,
+		),
+		context.Factory().PostfixUnaryExpression(
+			index,
+			tsgo.PostfixUnaryExpressionOperatorKindPlusPlusToken,
+		),
+		context.Factory().Block(body, true),
 	)
 }
 

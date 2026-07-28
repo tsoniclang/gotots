@@ -12,13 +12,10 @@ type builder struct {
 }
 
 type Capabilities struct {
-	AggregateNil     bool
-	Address          bool
-	AggregateMake    bool
-	AggregateLiteral bool
-	AggregateAppend  bool
-	AggregateCopy    bool
-	AggregateClear   bool
+	Address     bool
+	Storage     bool
+	AppendSlice bool
+	Clear       bool
 }
 
 func Build(
@@ -59,49 +56,27 @@ func BuildWithCapabilities(
 		className: className,
 		panicName: panicName,
 	}
-	lazyZero := capabilities.AggregateNil ||
-		capabilities.AggregateMake ||
-		capabilities.AggregateLiteral ||
-		capabilities.AggregateAppend
-	members := []tsgo.ClassElement{target.constructor(lazyZero)}
-	if capabilities.AggregateMake {
-		members = append(members, target.shapeMethod())
-	}
-	if capabilities.AggregateAppend {
-		members = append(members, target.grownCapacityMethod())
-	}
+	members := []tsgo.ClassElement{target.constructor()}
 	members = append(
 		members,
-		target.nilMethod(lazyZero),
-		target.makeMethod(capabilities.AggregateMake, lazyZero),
-		target.literalMethod(lazyZero),
+		target.nilMethod(),
+		target.makeMethod(),
+		target.literalMethod(),
 		target.isNilMethod(),
 		target.getMethod(),
 		target.setMethod(),
 		target.sliceMethod(),
-		target.appendMethod(capabilities.AggregateAppend, lazyZero),
-		target.appendSliceMethod(),
-		target.clearMethod(),
+		target.appendMethod(),
 		target.copyMethod(),
 	)
-	if capabilities.AggregateNil {
-		members = append(members, target.aggregateNilMethod())
+	if capabilities.Storage {
+		members = append(members, target.storageMethods()...)
 	}
-	if capabilities.AggregateMake {
-		members = append(members, target.aggregateMakeMethod())
+	if capabilities.AppendSlice {
+		members = append(members, target.appendSliceMethod())
 	}
-	if capabilities.AggregateLiteral {
-		members = append(members, target.aggregateLiteralMethod())
-	}
-	if capabilities.AggregateAppend {
-		members = append(members, target.aggregateAppendMethod())
-		members = append(members, target.aggregateAppendSliceMethod())
-	}
-	if capabilities.AggregateCopy {
-		members = append(members, target.aggregateCopyMethod())
-	}
-	if capabilities.AggregateClear {
-		members = append(members, target.aggregateClearMethod())
+	if capabilities.Clear {
+		members = append(members, target.clearMethod())
 	}
 	if capabilities.Address {
 		members = append(members, target.addressMethod())
@@ -298,12 +273,11 @@ func (b builder) newSlice(
 	offset tsgo.Expression,
 	length tsgo.Expression,
 	capacity tsgo.Expression,
-	zero tsgo.Expression,
 ) tsgo.NewExpression {
 	return b.factory.NewExpression(
 		b.id(b.className),
 		[]tsgo.TypeNode{b.typeT()},
-		[]tsgo.Expression{backing, offset, length, capacity, zero},
+		[]tsgo.Expression{backing, offset, length, capacity},
 	)
 }
 

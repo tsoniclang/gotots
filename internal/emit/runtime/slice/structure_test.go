@@ -76,16 +76,16 @@ func TestRuntimeSliceOwnsOneClosedGenericDescriptor(t *testing.T) {
 		t.Fatalf("runtime slice declaration = %#v", class)
 	}
 	members := class.Members()
-	if len(members) != 12 {
-		t.Fatalf("runtime slice members = %d, want constructor plus eleven operations", len(members))
+	if len(members) != 10 {
+		t.Fatalf("runtime slice members = %d, want constructor plus nine core operations", len(members))
 	}
 	constructor, ok := members[0].(tsgo.ConstructorDeclaration)
 	if !ok {
 		t.Fatalf("runtime slice member 0 = %T, want constructor", members[0])
 	}
 	parameters := constructor.Parameters()
-	if len(parameters) != 5 {
-		t.Fatalf("runtime slice constructor parameters = %d, want five", len(parameters))
+	if len(parameters) != 4 {
+		t.Fatalf("runtime slice constructor parameters = %d, want four", len(parameters))
 	}
 	backing, ok := parameters[0].Type().(tsgo.UnionTypeNode)
 	if !ok || len(backing.Types()) != 2 {
@@ -93,10 +93,6 @@ func TestRuntimeSliceOwnsOneClosedGenericDescriptor(t *testing.T) {
 	}
 	if _, ok := backing.Types()[0].(tsgo.ArrayTypeNode); !ok {
 		t.Fatalf("runtime slice internal backing = %T, want typed array", backing.Types()[0])
-	}
-	zeroName, ok := parameters[4].Name().(tsgo.Identifier)
-	if !ok || zeroName.Text() != "zero" {
-		t.Fatalf("runtime slice parameter 4 = %T, want typed zero", parameters[4].Name())
 	}
 	var methods []string
 	for _, member := range members[1:] {
@@ -115,8 +111,6 @@ func TestRuntimeSliceOwnsOneClosedGenericDescriptor(t *testing.T) {
 		"set",
 		"slice",
 		"append",
-		"appendSlice",
-		"clear",
 		"copy",
 	}
 	if !slices.Equal(methods, want) {

@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	runtimearray "github.com/tsoniclang/gotots/internal/emit/runtime/array"
@@ -124,9 +125,13 @@ func Build(
 		if err != nil {
 			return nil, err
 		}
-		statement, err := runtimearray.Build(
+		statement, err := runtimearray.BuildWithCapabilities(
 			factory,
 			panicContract.ExportedName(),
+			runtimearray.Capabilities{Allocate: slices.Contains(
+				symbols,
+				api.RuntimeArrayAllocate,
+			)},
 		)
 		if err != nil {
 			return nil, err
@@ -260,12 +265,39 @@ func buildMap(
 		return nil, err
 	}
 	result := make([]Definition, 0, len(symbols))
+	capabilities := mapruntime.Capabilities{
+		Clear: slices.Contains(symbols, api.RuntimeMapClear),
+	}
+	if capabilities.Clear &&
+		(len(symbols) == 0 || symbols[0] != api.RuntimeMap) {
+		return nil, &AssemblyError{
+			Module: api.RuntimeModuleMap,
+			Symbol: api.RuntimeMapClear,
+			Reason: "map clear requires RuntimeMap first",
+		}
+	}
+	seen := make(map[api.RuntimeSymbol]struct{}, len(symbols))
 	for _, symbol := range symbols {
-		statement, err := mapruntime.Build(
-			factory,
-			symbol,
-			panicContract.ExportedName(),
-		)
+		if _, duplicate := seen[symbol]; duplicate {
+			return nil, &AssemblyError{
+				Module: api.RuntimeModuleMap,
+				Symbol: symbol,
+				Reason: "map runtime symbol is duplicated",
+			}
+		}
+		seen[symbol] = struct{}{}
+		var statement tsgo.Statement
+		var err error
+		if symbol == api.RuntimeMapClear {
+			statement, err = mapruntime.BuildOperation(factory, symbol)
+		} else {
+			statement, err = mapruntime.Build(
+				factory,
+				symbol,
+				panicContract.ExportedName(),
+				capabilities,
+			)
+		}
 		if err != nil {
 			return nil, err
 		}

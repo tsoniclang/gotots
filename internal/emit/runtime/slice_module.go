@@ -31,20 +31,12 @@ func buildSlice(
 		case api.RuntimeSlice:
 		case api.RuntimeSliceAddress:
 			capabilities.Address = true
-		case api.RuntimeSliceMakeWith:
-			capabilities.AggregateMake = true
-		case api.RuntimeSliceNilWith:
-			capabilities.AggregateNil = true
-		case api.RuntimeSliceLiteralWith:
-			capabilities.AggregateLiteral = true
-		case api.RuntimeSliceAppendWith:
-			capabilities.AggregateAppend = true
-		case api.RuntimeSliceAppendSliceWith:
-			capabilities.AggregateAppend = true
-		case api.RuntimeSliceClearWith:
-			capabilities.AggregateClear = true
-		case api.RuntimeSliceCopyWith:
-			capabilities.AggregateCopy = true
+		case api.RuntimeSliceStorage:
+			capabilities.Storage = true
+		case api.RuntimeSliceAppendSlice:
+			capabilities.AppendSlice = true
+		case api.RuntimeSliceClear:
+			capabilities.Clear = true
 		default:
 			return nil, &api.RuntimeSymbolError{Symbol: symbol}
 		}
@@ -94,7 +86,7 @@ func buildSliceOperation(
 	sliceName string,
 ) (tsgo.Statement, error) {
 	if symbol != api.RuntimeSliceAddress {
-		return runtimeslice.BuildAggregateOperation(factory, symbol)
+		return runtimeslice.BuildOperation(factory, symbol)
 	}
 	addressContract, err := api.RuntimeContract(api.RuntimeSliceAddress)
 	if err != nil {

@@ -695,6 +695,40 @@ The call handler uses `go/types` to distinguish:
 - method expressions and method values; and
 - variadic expansion.
 
+A represented variadic callable has one ordinary final parameter whose target
+type is the represented Go slice. It is not emitted as a JavaScript rest
+parameter. A non-spread call evaluates and copies its arguments in Go order,
+then constructs that one slice argument. A spread call projects the exact
+source slice descriptor, including a defined-slice wrapper, and passes the
+descriptor directly. The multiple-result adjustment is applied before the
+variadic partition, so a final call returning the remaining fixed and
+variadic arguments is accepted exactly when the selected Go signature accepts
+it. No valid Go call is lowered through target `...` argument spreading; this
+keeps call behavior independent of host argument-count limits.
+
+```go
+type Values []int32
+func Sum(prefix int32, values ...int32) int32
+func Pair() (int32, int32)
+
+func A() int32         { return Sum(Pair()) }
+func B(values Values) int32 { return Sum(1, values...) }
+```
+
+```ts
+export function Sum(prefix: int32, values: GoSlice<int32>): int32;
+export function A(): int32 {
+  const pair = Pair();
+  return Sum(pair[0], GoSlice.literal<int32>(pair[1]));
+}
+export function B(values: Values): int32 {
+  return Sum(1, values.$value);
+}
+```
+
+The schematic target omits prerequisite temporaries that are unnecessary for
+the shown operands; production output is constructed only as TS-Go AST.
+
 Ordinary calls remain source-shaped whenever exact:
 
 ```go
@@ -1409,7 +1443,11 @@ selected statically from the exact element type. Both operands are evaluated
 once, nested comparisons compose recursively, and the loop stops at the first
 unequal element. The generic array runtime carries no equality callback,
 semantic tag, or implementer switch; comparison source size is independent of
-the array length.
+the array length. Aggregate zero, literal, and copy follow the same rule: the
+array operation owner emits a bounded loop that directly invokes the selected
+element zero or copy structure. The runtime array exposes only typed storage
+allocation and access. It never receives or stores an element-zero or
+element-copy function.
 
 An admitted slice is a descriptor over backing storage:
 
@@ -1424,6 +1462,24 @@ forbidden because it cannot distinguish nil, preserve capacity, or model
 subslice append aliasing.
 Runtime methods narrow nullable backing storage through explicit branches.
 They do not emit TypeScript non-null assertions to recover a storage invariant.
+The descriptor stores no zero/copy/equality/hash strategy and no function
+whose behavior depends on the element type. For aggregate elements, the
+source `make`, literal, `append`, `copy`, and `clear` owners emit typed loops
+that directly construct or copy each element. Runtime slice members are
+limited to descriptor validation, allocation, bounds, backing access, and
+capacity growth. This preserves recursive fresh-zero and deep-copy behavior
+without semantic callbacks or per-element-type runtime specialization.
+
+`append(left, right...)` consumes the right descriptor through indexed reads;
+it never expands the slice into a JavaScript argument list. Distinct named
+slice types are accepted when Go accepts their identical element types.
+`append([]byte, string...)` is the one language-defined string expansion and
+copies the string's Go bytes. Reallocation copies existing aggregate elements
+with their selected copy owner; reuse preserves the existing backing identity.
+`clear(slice)` writes a fresh zero at every live aggregate element, while
+`clear(map)` removes entries. The clear and slice-spread runtime surfaces are
+demanded only by source uses; a program without either operation does not gain
+their target members or helper declarations.
 
 An admitted map is a reference value with an explicit nil state. Map assignment
 aliases the same map. Lookup of a missing key returns the element zero;

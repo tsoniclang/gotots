@@ -194,10 +194,21 @@ func TestVariadicCallablesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	if !strings.Contains(source, "RuntimeSlice.nil<int32>") {
 		t.Fatalf("empty scalar variadic calls did not preserve a nil slice:\n%s", source)
 	}
-	for _, helper := range []string{"goSliceLiteralWith", "goSliceNilWith"} {
-		if !strings.Contains(source, helper) {
-			t.Fatalf("aggregate variadic path does not request %s:\n%s", helper, source)
+	for _, forbidden := range []string{
+		"goSliceLiteralWith",
+		"goSliceNilWith",
+		"...values.$value",
+	} {
+		if strings.Contains(source, forbidden) {
+			t.Fatalf("aggregate variadic path contains %q:\n%s", forbidden, source)
 		}
+	}
+	if !strings.Contains(source, "return Sum(1, Values.$valueOf(values));") {
+		t.Fatalf("defined-slice spread was not projected directly:\n%s", source)
+	}
+	if !strings.Contains(source, "const __gotots_results_") ||
+		!strings.Contains(source, "RuntimeSlice.literal<int32>") {
+		t.Fatalf("tuple-adjusted variadic call was not packed after tuple expansion:\n%s", source)
 	}
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	writeFile(t, runnerPath, `import {
@@ -205,12 +216,18 @@ func TestVariadicCallablesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
     UseAggregate,
     UseAggregateEmpty,
     UseEmpty,
+    UseEvaluationOrder,
+    UseNamedSpread,
+    UseTuple,
 } from "`+artifacts.module(t, "source.ts")+`";
 
 console.log(Use());
 console.log(UseAggregate());
 console.log(UseEmpty());
 console.log(UseAggregateEmpty());
+console.log(UseNamedSpread());
+console.log(UseTuple());
+console.log(UseEvaluationOrder());
 `)
 	targetOutput := executeMaterializedTypeScript(t, workingDirectory, artifacts, runnerPath)
 	goOutput := runVariadicGo(t, project.directory)
@@ -282,8 +299,41 @@ type Accumulator struct {
 	Base int32
 }
 
+type Values []int32
+
 func Sum(prefix int32, values ...int32) int32 {
 	return prefix + values[0] + values[1]
+}
+
+func Pair() (int32, int32, int32) {
+	return 11, 12, 13
+}
+
+var evaluationTrace int32
+
+func Mark(value int32) int32 {
+	evaluationTrace = evaluationTrace*10 + value
+	return value
+}
+
+func Select() func(int32, ...int32) int32 {
+	evaluationTrace = evaluationTrace*10 + 1
+	return Sum
+}
+
+func UseEvaluationOrder() int32 {
+	evaluationTrace = 0
+	result := Select()(Mark(2), Mark(3), Mark(4))
+	return evaluationTrace*1000 + result
+}
+
+func UseTuple() int32 {
+	return Sum(Pair())
+}
+
+func UseNamedSpread() int32 {
+	values := Values{14, 15}
+	return Sum(1, values...)
 }
 
 func Forward(values ...int32) int32 {
@@ -401,6 +451,9 @@ func main() {
 	fmt.Println(variadic.UseAggregate())
 	fmt.Println(variadic.UseEmpty())
 	fmt.Println(variadic.UseAggregateEmpty())
+	fmt.Println(variadic.UseNamedSpread())
+	fmt.Println(variadic.UseTuple())
+	fmt.Println(variadic.UseEvaluationOrder())
 }
 `)
 	return run(t, workingDirectory, "go", "run", ".")

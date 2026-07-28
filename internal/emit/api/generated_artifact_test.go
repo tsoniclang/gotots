@@ -219,8 +219,9 @@ func TestGeneratedArtifactDomainsArePinned(t *testing.T) {
 	}
 	if MapSpecializationDemandDefinition != 1 ||
 		MapSpecializationDemandStatic != 2 ||
+		MapSpecializationDemandClear != 3 ||
 		MapSpecializationDemandInvalid.Valid() ||
-		MapSpecializationDemand(3).Valid() {
+		MapSpecializationDemand(4).Valid() {
 		t.Fatal("map-specialization demand IDs drifted")
 	}
 }
