@@ -21,6 +21,31 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	operand, err := children.Expression(
+		context.
+			WithRole(api.RoleConversionOperand).
+			WithExpectedType(sourceType),
+		source.Args[0],
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return Convert(
+		context,
+		source,
+		sourceType,
+		targetType,
+		operand,
+	)
+}
+
+func Convert(
+	context api.Context,
+	source ast.Node,
+	sourceType types.Type,
+	targetType types.Type,
+	operand api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
 	targetCarrier, ok := floatvalue.Describe(targetType)
 	if !ok {
 		return api.ExpressionEmission{},
@@ -34,15 +59,6 @@ func Emit(
 	if !floatSource && !integerSource {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
-	}
-	operand, err := children.Expression(
-		context.
-			WithRole(api.RoleConversionOperand).
-			WithExpectedType(sourceType),
-		source.Args[0],
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
 	}
 	value := operand.Value()
 	requests := operand.Requests()

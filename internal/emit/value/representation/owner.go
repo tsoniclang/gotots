@@ -9,6 +9,7 @@ import (
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
@@ -22,6 +23,9 @@ func (Owner) RequiresCustomEquality(
 	context api.Context,
 	sourceType types.Type,
 ) bool {
+	if _, ok := definedtype.Resolve(sourceType); ok {
+		return true
+	}
 	if _, ok := complexvalue.Describe(sourceType); ok {
 		return true
 	}
@@ -47,6 +51,17 @@ func (Owner) Zero(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.ExpressionEmission, error) {
+	if defined, ok := definedtype.Resolve(sourceType); ok {
+		zero, err := (Owner{}).Zero(
+			context.WithRole(api.RoleDefinedValue),
+			source,
+			defined.Underlying(),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return defined.Wrap(context, zero)
+	}
 	if carrier, ok := complexvalue.Describe(sourceType); ok {
 		return complexvalue.Construct(
 			context,
@@ -168,6 +183,13 @@ func (Owner) Copy(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
+	if _, ok := definedtype.Resolve(sourceType); ok {
+		return api.NewExpressionEmission(
+			value.Before(),
+			value.Value(),
+			value.Requests(),
+		)
+	}
 	if array, ok := arrayvalue.Resolve(context, sourceType); ok {
 		return array.Copy(context, ownsFreshValue(context, source), value)
 	}
@@ -245,11 +267,13 @@ func (Owner) Assign(
 	target tsgo.Expression,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
+	_, definedOK := definedtype.Resolve(sourceType)
 	_, arrayOK := arrayvalue.Resolve(context, sourceType)
 	_, complexOK := complexvalue.Describe(sourceType)
 	_, primitiveOK := primitive(context, sourceType)
 	_, _, structOK := namedStruct(sourceType)
-	if !arrayOK &&
+	if !definedOK &&
+		!arrayOK &&
 		!complexOK &&
 		!primitiveOK &&
 		!callableValue(sourceType) &&
@@ -282,6 +306,15 @@ func (Owner) Equal(
 	left tsgo.Expression,
 	right tsgo.Expression,
 ) (api.ExpressionEmission, error) {
+	if defined, ok := definedtype.Resolve(sourceType); ok {
+		return (Owner{}).Equal(
+			context.WithRole(api.RoleDefinedValue),
+			source,
+			defined.Underlying(),
+			defined.Unwrap(context.Factory(), left),
+			defined.Unwrap(context.Factory(), right),
+		)
+	}
 	if carrier, ok := complexvalue.Describe(sourceType); ok {
 		symbol, valid := complexvalue.EqualSymbol(carrier)
 		if !valid {

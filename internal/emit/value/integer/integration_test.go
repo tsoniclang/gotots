@@ -150,7 +150,6 @@ func TestIntegerUnsupportedNeighborsFailAtTheirExactOwner(t *testing.T) {
 		{"number int64 bits", "NumberInt64Bits", emit.IntegerRepresentationNumber, "*ast.BinaryExpr", api.CategoryExpression},
 		{"number variable shift", "VariableShift", emit.IntegerRepresentationNumber, "*ast.BinaryExpr", api.CategoryExpression},
 		{"bigint variable shift", "VariableShift", emit.IntegerRepresentationBigInt, "*ast.BinaryExpr", api.CategoryExpression},
-		{"named integer", "NamedValue", emit.IntegerRepresentationNumber, "*ast.FuncType", api.CategoryType},
 		{"unsafe number literal", "UnsafeNumber", emit.IntegerRepresentationNumber, "*ast.BasicLit", api.CategoryExpression},
 		{"unsafe number conversion", "UnsafeConversion", emit.IntegerRepresentationNumber, "*ast.CallExpr", api.CategoryExpression},
 	}

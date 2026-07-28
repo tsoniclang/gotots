@@ -35,14 +35,6 @@ func Emit(
 		!types.AssignableTo(rightType, resultType) {
 		return api.ExpressionEmission{}, false, nil
 	}
-	symbol, ok := complexvalue.BinarySymbol(resultCarrier, source.Op)
-	if !ok {
-		return api.ExpressionEmission{}, true,
-			&api.InvariantError{
-				Role:   context.Role(),
-				Reason: "complex binary operation has no runtime symbol",
-			}
-	}
 	left, err := children.Expression(
 		context.WithRole(api.RoleBinaryLeft).WithExpectedType(resultType),
 		source.X,
@@ -60,6 +52,27 @@ func Emit(
 	if len(left.Before()) != 0 || len(right.Before()) != 0 {
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	target, handled, err := Apply(
+		context,
+		source.Op,
+		resultCarrier,
+		left,
+		right,
+	)
+	return target, handled, err
+}
+
+func Apply(
+	context api.Context,
+	operator token.Token,
+	carrier complexvalue.Carrier,
+	left api.ExpressionEmission,
+	right api.ExpressionEmission,
+) (api.ExpressionEmission, bool, error) {
+	symbol, ok := complexvalue.BinarySymbol(carrier, operator)
+	if !ok {
+		return api.ExpressionEmission{}, false, nil
 	}
 	target, err := complexvalue.Call(
 		context,

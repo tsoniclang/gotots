@@ -28,10 +28,6 @@ func Emit(
 	if !ok {
 		return api.ExpressionEmission{}, false, nil
 	}
-	operator, ok := targetOperator(source.Op)
-	if !ok {
-		return api.ExpressionEmission{}, false, nil
-	}
 	left, err := children.Expression(
 		context.WithRole(api.RoleBinaryLeft).WithExpectedType(operandType),
 		source.X,
@@ -50,15 +46,36 @@ func Emit(
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	target, handled, err := Apply(
+		context,
+		source.Op,
+		carrier,
+		left,
+		right,
+	)
+	return target, handled, err
+}
+
+func Apply(
+	context api.Context,
+	operator token.Token,
+	carrier floatvalue.Carrier,
+	left api.ExpressionEmission,
+	right api.ExpressionEmission,
+) (api.ExpressionEmission, bool, error) {
+	targetOperator, ok := targetOperator(operator)
+	if !ok {
+		return api.ExpressionEmission{}, false, nil
+	}
 	value := tsgo.Expression(context.Factory().BinaryExpression(
 		nil,
 		left.Value(),
 		nil,
-		context.Factory().BinaryOperatorToken(operator),
+		context.Factory().BinaryOperatorToken(targetOperator),
 		right.Value(),
 	))
 	requests := api.CombineRequests(left.Requests(), right.Requests())
-	if carrier.Bits() == 32 && isArithmetic(source.Op) {
+	if carrier.Bits() == 32 && isArithmetic(operator) {
 		reference, err := context.Names().Runtime(
 			api.RuntimeFloat32Round,
 			api.ImportPhaseValue,

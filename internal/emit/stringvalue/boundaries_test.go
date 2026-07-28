@@ -36,22 +36,6 @@ func Count(value string) int {
 	return count
 }
 `,
-		"defined string type": `package boundary
-
-type Text string
-
-func Identity(value Text) Text {
-	return value
-}
-`,
-		"string alias declaration": `package boundary
-
-type Text = string
-
-func Identity(value Text) Text {
-	return value
-}
-`,
 	}
 	for name, source := range tests {
 		t.Run(name, func(t *testing.T) {

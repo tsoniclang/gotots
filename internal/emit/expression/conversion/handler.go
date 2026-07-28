@@ -11,6 +11,7 @@ import (
 	complexconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/complex"
 	floatconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/float"
 	integerconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/integer"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
 	floatvalue "github.com/tsoniclang/gotots/internal/emit/value/float"
 	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
@@ -64,47 +65,86 @@ func Emit(
 		)
 		return target, true, err
 	}
-	if _, ok := integervalue.Describe(context.TypesSizes(), targetType); ok {
-		target, err := integerconversion.Emit(
+	operandValue, err := children.Expression(
+		context.
+			WithRole(api.RoleConversionOperand).
+			WithExpectedType(operandFacts.Type),
+		operand,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	sourceType := operandFacts.Type
+	if defined, ok := definedtype.Resolve(sourceType); ok {
+		operandValue, err = api.NewExpressionEmission(
+			operandValue.Before(),
+			defined.Unwrap(context.Factory(), operandValue.Value()),
+			operandValue.Requests(),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, true, err
+		}
+		sourceType = defined.Underlying()
+	}
+	representedTargetType := targetType
+	targetDefined, wrapsTarget := definedtype.Resolve(targetType)
+	if wrapsTarget {
+		representedTargetType = targetDefined.Underlying()
+	}
+	var target api.ExpressionEmission
+	switch {
+	case isInteger(context, representedTargetType):
+		target, err = integerconversion.Convert(
 			context,
-			children,
 			source,
-			operandFacts.Type,
-			targetType,
+			sourceType,
+			representedTargetType,
+			operandValue,
 		)
-		return target, true, err
-	}
-	if _, ok := floatvalue.Describe(targetType); ok {
-		target, err := floatconversion.Emit(
+	case isFloat(representedTargetType):
+		target, err = floatconversion.Convert(
 			context,
-			children,
 			source,
-			operandFacts.Type,
-			targetType,
+			sourceType,
+			representedTargetType,
+			operandValue,
 		)
-		return target, true, err
-	}
-	if _, ok := complexvalue.Describe(targetType); ok {
-		target, err := complexconversion.Emit(
+	case isComplex(representedTargetType):
+		target, err = complexconversion.Convert(
 			context,
-			children,
 			source,
-			operandFacts.Type,
-			targetType,
+			sourceType,
+			representedTargetType,
+			operandValue,
 		)
-		return target, true, err
+	case directBasicConversion(sourceType, representedTargetType):
+		target = operandValue
+	default:
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	if directBasicConversion(operandFacts.Type, targetType) {
-		target, err := children.Expression(
-			context.
-				WithRole(api.RoleConversionOperand).
-				WithExpectedType(operandFacts.Type),
-			operand,
-		)
-		return target, true, err
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
 	}
-	return api.ExpressionEmission{}, true,
-		api.Unsupported(context, api.CategoryExpression, source)
+	if wrapsTarget {
+		target, err = targetDefined.Wrap(context, target)
+	}
+	return target, true, err
+}
+
+func isInteger(context api.Context, sourceType types.Type) bool {
+	_, ok := integervalue.Describe(context.TypesSizes(), sourceType)
+	return ok
+}
+
+func isFloat(sourceType types.Type) bool {
+	_, ok := floatvalue.Describe(sourceType)
+	return ok
+}
+
+func isComplex(sourceType types.Type) bool {
+	_, ok := complexvalue.Describe(sourceType)
+	return ok
 }
 
 func supportedConstantKind(kind constant.Kind) bool {

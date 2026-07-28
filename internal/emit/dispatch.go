@@ -7,6 +7,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	definedtypedeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/definedtype"
 	functiondeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/function"
 	namedstructdeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/namedstruct"
 	packageconstant "github.com/tsoniclang/gotots/internal/emit/declaration/packageconstant"
@@ -40,6 +41,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/storage"
 	storetarget "github.com/tsoniclang/gotots/internal/emit/store"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	maptype "github.com/tsoniclang/gotots/internal/emit/type/map"
 	namedstructtype "github.com/tsoniclang/gotots/internal/emit/type/namedstruct"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
@@ -143,6 +145,15 @@ func (e *emitter) declarationObject(
 		)
 	case *ast.GenDecl:
 		if typeName, ok := object.(*types.TypeName); ok {
+			if target, handled, err := definedtypedeclaration.Emit(
+				context,
+				e,
+				source,
+				typeName,
+				requirements,
+			); handled {
+				return target, err
+			}
 			return namedstructdeclaration.EmitAssembly(
 				context,
 				e,
@@ -419,6 +430,13 @@ func (e *emitter) Type(
 			return callable.EmitSyntaxType(context, e, functionType, signature)
 		}
 		if _, ok := types.Unalias(sourceType).(*types.Named); ok {
+			if target, handled, err := definedtype.Emit(
+				context,
+				source,
+				sourceType,
+			); handled {
+				return target, err
+			}
 			return namedstructtype.Emit(context, source, sourceType)
 		}
 		if _, ok := types.Unalias(sourceType).(*types.Map); ok {
@@ -459,6 +477,13 @@ func (e *emitter) RepresentedType(
 		return pointertype.EmitRepresented(context, e, source, sourceType)
 	}
 	if _, ok := types.Unalias(sourceType).(*types.Named); ok {
+		if target, handled, err := definedtype.Emit(
+			context,
+			source,
+			sourceType,
+		); handled {
+			return target, err
+		}
 		return namedstructtype.Emit(context, source, sourceType)
 	}
 	if _, ok := types.Unalias(sourceType).(*types.Map); ok {

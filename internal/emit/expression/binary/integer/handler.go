@@ -42,9 +42,26 @@ func Emit(
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	target, handled, err := Apply(
+		context,
+		source.Op,
+		carrier,
+		left,
+		right,
+	)
+	return target, handled, err
+}
+
+func Apply(
+	context api.Context,
+	operator token.Token,
+	carrier integervalue.Carrier,
+	left api.ExpressionEmission,
+	right api.ExpressionEmission,
+) (api.ExpressionEmission, bool, error) {
 	if symbol, ok := runtimeOperation(
 		context.IntegerRepresentation(),
-		source.Op,
+		operator,
 	); ok {
 		reference, err := context.Names().Runtime(
 			symbol,
@@ -70,7 +87,7 @@ func Emit(
 	}
 	target, ok := target(
 		context,
-		source.Op,
+		operator,
 		carrier,
 		left.Value(),
 		right.Value(),

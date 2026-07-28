@@ -21,6 +21,31 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	operand, err := children.Expression(
+		context.
+			WithRole(api.RoleConversionOperand).
+			WithExpectedType(sourceType),
+		source.Args[0],
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return Convert(
+		context,
+		source,
+		sourceType,
+		targetType,
+		operand,
+	)
+}
+
+func Convert(
+	context api.Context,
+	source ast.Node,
+	sourceType types.Type,
+	targetType types.Type,
+	operand api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
 	targetCarrier, ok := integervalue.Describe(
 		context.TypesSizes(),
 		targetType,
@@ -38,21 +63,13 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	operand, err := children.Expression(
-		context.
-			WithRole(api.RoleConversionOperand).
-			WithExpectedType(sourceType),
-		source.Args[0],
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
 	if integerSource &&
 		integervalue.CanConvertDirectly(sourceInteger, targetCarrier) {
 		return operand, nil
 	}
 	value := operand.Value()
 	requests := operand.Requests()
+	var err error
 	switch context.IntegerRepresentation() {
 	case api.IntegerRepresentationNumber:
 		if targetCarrier.Width() <= 32 {

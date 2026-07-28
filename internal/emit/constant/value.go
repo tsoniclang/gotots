@@ -7,6 +7,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/stringvalue"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
 	floatvalue "github.com/tsoniclang/gotots/internal/emit/value/float"
 	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
@@ -27,6 +28,18 @@ func EmitValue(
 	if value == nil {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if defined, ok := definedtype.Resolve(targetType); ok {
+		underlying, err := EmitValue(
+			context,
+			source,
+			defined.Underlying(),
+			value,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return defined.Wrap(context, underlying)
 	}
 	// A float target owns its materialization regardless of the constant's value
 	// kind: `const x float64 = 5` carries an Int value that must still render as a

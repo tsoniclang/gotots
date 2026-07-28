@@ -730,6 +730,69 @@ The capture is requested only by this execution-boundary requirement; a direct
 call remains a direct call and possible-function count never expands the call
 site.
 
+## Defined Types And Aliases
+
+The exact `*types.TypeName` and its `go/types` type decide whether a declaration
+is an alias or a defined type. Source spelling, underlying-type text, and
+structural target assignability never make that decision.
+
+An alias adds no runtime identity. Its exported target declaration is a
+TypeScript type alias to the already selected representation:
+
+```go
+type Count int32
+type Alias = Count
+```
+
+```ts
+export class Count {
+  declare private readonly $goType: void;
+  constructor(public readonly $value: int32) {}
+}
+export type Alias = Count;
+```
+
+A non-struct defined type has one minimal nominal wrapper class keyed by its
+exact `*types.TypeName`. The erased private brand prevents unrelated defined
+types with the same underlying type from becoming assignable. The public
+readonly `$value` carries the exact represented underlying value. The class
+contains no operator table, callback, dynamic tag, source node, or speculative
+zero/copy/equality method.
+
+The containing semantic owner composes the underlying value operation directly:
+
+```go
+type Count int32
+func Add(left, right Count) Count { return left + right }
+```
+
+```ts
+export function Add(left: Count, right: Count): Count {
+  return new Count(left.$value + right.$value);
+}
+```
+
+Zero, copy, equality, hashing, addressing, conversion, and container operations
+follow the same rule: unwrap once, invoke the exact existing underlying-family
+operation, and wrap the result only when the Go result has the defined type.
+Immutable underlying values may share their immutable wrapper on copy.
+Aggregate underlying values request their recursive copy operation before
+wrapping. Use sites remain O(1), and each defined type contributes exactly one
+class definition.
+
+Named struct definitions keep the direct nominal record class described below;
+they do not acquire a redundant wrapper around that class. Nil-capable defined
+types use `Defined | undefined`; `undefined` remains the sole nil value and only
+a non-nil underlying value is wrapped. Aliases reuse that same union without a
+new class.
+
+Type conversions are the only bridges between a defined type and its
+underlying or another defined type. The conversion owner strips only the exact
+source wrapper, applies the existing source-to-destination representation
+conversion, then constructs only the exact destination wrapper. Constants are
+materialized from the checker value at the destination underlying type before
+wrapping. No conversion falls through to an ordinary call.
+
 ## Structs, Receivers, And Classes
 
 An ordinary named Go struct is a value type. TypeScript objects and classes are
