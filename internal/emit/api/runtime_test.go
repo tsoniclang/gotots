@@ -20,6 +20,8 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 	}{
 		{api.RuntimeStringIndex, 1, api.RuntimeModuleString, "runtime/string.ts", "goStringIndex", false, []api.RuntimeSymbol{api.RuntimePanic}},
 		{api.RuntimeStringSlice, 2, api.RuntimeModuleString, "runtime/string.ts", "goStringSlice", false, []api.RuntimeSymbol{api.RuntimePanic}},
+		{api.RuntimeStringMax, 3, api.RuntimeModuleString, "runtime/string.ts", "goStringMax", false, nil},
+		{api.RuntimeStringMin, 4, api.RuntimeModuleString, "runtime/string.ts", "goStringMin", false, nil},
 		{api.RuntimePointer, 100, api.RuntimeModulePointer, "runtime/pointer.ts", "GoPointer", true, []api.RuntimeSymbol{api.RuntimePanic}},
 		{api.RuntimeArray, 200, api.RuntimeModuleArray, "runtime/array.ts", "GoArray", true, []api.RuntimeSymbol{api.RuntimePanic}},
 		{api.RuntimeSlice, 300, api.RuntimeModuleSlice, "runtime/slice.ts", "RuntimeSlice", true, []api.RuntimeSymbol{api.RuntimePanic}},
@@ -28,6 +30,8 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimePanic, 500, api.RuntimeModulePanic, "runtime/panic.ts", "GoPanic", true, nil},
 		{api.RuntimeIntegerDivide, 600, api.RuntimeModuleInteger, "runtime/integer.ts", "goIntegerDivide", false, []api.RuntimeSymbol{api.RuntimePanic}},
 		{api.RuntimeIntegerRemainder, 601, api.RuntimeModuleInteger, "runtime/integer.ts", "goIntegerRemainder", false, []api.RuntimeSymbol{api.RuntimePanic}},
+		{api.RuntimeIntegerMax, 602, api.RuntimeModuleInteger, "runtime/integer.ts", "goIntegerMax", false, nil},
+		{api.RuntimeIntegerMin, 603, api.RuntimeModuleInteger, "runtime/integer.ts", "goIntegerMin", false, nil},
 		{api.RuntimeFloat32Round, 700, api.RuntimeModuleFloat, "runtime/float.ts", "goFloat32", false, nil},
 		{api.RuntimeComplex64, 800, api.RuntimeModuleComplex, "runtime/complex.ts", "GoComplex64", true, []api.RuntimeSymbol{api.RuntimeFloat32Round}},
 		{api.RuntimeComplex128, 801, api.RuntimeModuleComplex, "runtime/complex.ts", "GoComplex128", true, nil},

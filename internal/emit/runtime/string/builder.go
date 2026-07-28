@@ -13,8 +13,16 @@ func Build(
 	symbols []api.RuntimeSymbol,
 	panicName string,
 ) ([]tsgo.Statement, error) {
+	if len(symbols) == 0 {
+		return nil, &BuildError{}
+	}
+	seen := make(map[api.RuntimeSymbol]struct{}, len(symbols))
 	statements := make([]tsgo.Statement, 0, len(symbols))
 	for _, symbol := range symbols {
+		if _, duplicate := seen[symbol]; duplicate {
+			return nil, &BuildError{Symbol: symbol}
+		}
+		seen[symbol] = struct{}{}
 		contract, err := api.RuntimeContract(symbol)
 		if err != nil {
 			return nil, err
@@ -33,12 +41,54 @@ func Build(
 				contract.ExportedName(),
 				panicName,
 			)
+		case api.RuntimeStringMax:
+			statement = orderedString(
+				factory,
+				contract.ExportedName(),
+				tsgo.BinaryOperatorGreaterThanEqualsToken,
+			)
+		case api.RuntimeStringMin:
+			statement = orderedString(
+				factory,
+				contract.ExportedName(),
+				tsgo.BinaryOperatorLessThanEqualsToken,
+			)
 		default:
 			return nil, &BuildError{Symbol: symbol}
 		}
 		statements = append(statements, statement)
 	}
 	return statements, nil
+}
+
+func orderedString(
+	factory tsgo.Factory,
+	exportedName string,
+	operator tsgo.BinaryOperator,
+) tsgo.FunctionDeclaration {
+	left := factory.Identifier("left")
+	right := factory.Identifier("right")
+	targetType := stringType(factory)
+	return factory.FunctionDeclaration(
+		[]tsgo.ModifierLike{factory.ExportKeyword()},
+		nil,
+		factory.Identifier(exportedName),
+		nil,
+		[]tsgo.ParameterDeclaration{
+			parameter(factory, left, targetType, false),
+			parameter(factory, right, targetType, false),
+		},
+		targetType,
+		factory.Block([]tsgo.Statement{
+			factory.ReturnStatement(factory.ConditionalExpression(
+				binary(factory, left, operator, right),
+				factory.QuestionToken(),
+				left,
+				factory.ColonToken(),
+				right,
+			)),
+		}, true),
+	)
 }
 
 func stringIndex(

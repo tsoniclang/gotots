@@ -27,6 +27,8 @@ const (
 	RuntimeInvalid          RuntimeSymbol = 0
 	RuntimeStringIndex      RuntimeSymbol = 1
 	RuntimeStringSlice      RuntimeSymbol = 2
+	RuntimeStringMax        RuntimeSymbol = 3
+	RuntimeStringMin        RuntimeSymbol = 4
 	RuntimePointer          RuntimeSymbol = 100
 	RuntimeArray            RuntimeSymbol = 200
 	RuntimeSlice            RuntimeSymbol = 300
@@ -35,6 +37,8 @@ const (
 	RuntimePanic            RuntimeSymbol = 500
 	RuntimeIntegerDivide    RuntimeSymbol = 600
 	RuntimeIntegerRemainder RuntimeSymbol = 601
+	RuntimeIntegerMax       RuntimeSymbol = 602
+	RuntimeIntegerMin       RuntimeSymbol = 603
 	RuntimeFloat32Round     RuntimeSymbol = 700
 	RuntimeComplex64        RuntimeSymbol = 800
 	RuntimeComplex128       RuntimeSymbol = 801
@@ -79,6 +83,20 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"goStringSlice",
 			false,
 			RuntimePanic,
+		), nil
+	case RuntimeStringMax:
+		return runtimeContract(
+			RuntimeModuleString,
+			"runtime/string.ts",
+			"goStringMax",
+			false,
+		), nil
+	case RuntimeStringMin:
+		return runtimeContract(
+			RuntimeModuleString,
+			"runtime/string.ts",
+			"goStringMin",
+			false,
 		), nil
 	case RuntimePointer:
 		return runtimeContract(
@@ -143,6 +161,20 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"goIntegerRemainder",
 			false,
 			RuntimePanic,
+		), nil
+	case RuntimeIntegerMax:
+		return runtimeContract(
+			RuntimeModuleInteger,
+			"runtime/integer.ts",
+			"goIntegerMax",
+			false,
+		), nil
+	case RuntimeIntegerMin:
+		return runtimeContract(
+			RuntimeModuleInteger,
+			"runtime/integer.ts",
+			"goIntegerMin",
+			false,
 		), nil
 	case RuntimeFloat32Round:
 		return runtimeContract(

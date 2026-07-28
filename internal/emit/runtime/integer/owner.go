@@ -36,27 +36,33 @@ func Build(
 				Reason: "runtime symbol belongs to another module",
 			}
 		}
-		operator, ok := operator(symbol)
-		if !ok {
+		switch symbol {
+		case api.RuntimeIntegerDivide, api.RuntimeIntegerRemainder:
+			operator, _ := operator(symbol)
+			statements = append(statements, divisionOperation(
+				factory,
+				contract.ExportedName(),
+				panicName,
+				operator,
+			))
+		case api.RuntimeIntegerMax, api.RuntimeIntegerMin:
+			operator, _ := ordering(symbol)
+			statements = append(statements, orderedOperation(
+				factory,
+				contract.ExportedName(),
+				operator,
+			))
+		default:
 			return nil, &BuildError{
 				Symbol: symbol,
 				Reason: "runtime integer operation is not installed",
 			}
 		}
-		statements = append(
-			statements,
-			operation(
-				factory,
-				contract.ExportedName(),
-				panicName,
-				operator,
-			),
-		)
 	}
 	return statements, nil
 }
 
-func operation(
+func divisionOperation(
 	factory tsgo.Factory,
 	name string,
 	panicName string,
@@ -111,6 +117,44 @@ func operation(
 	)
 }
 
+func orderedOperation(
+	factory tsgo.Factory,
+	name string,
+	operator tsgo.BinaryOperator,
+) tsgo.FunctionDeclaration {
+	left := factory.Identifier("left")
+	right := factory.Identifier("right")
+	bigintType := factory.KeywordTypeNode(
+		tsgo.KeywordTypeSyntaxKindBigIntKeyword,
+	)
+	return factory.FunctionDeclaration(
+		[]tsgo.ModifierLike{factory.ExportKeyword()},
+		nil,
+		factory.Identifier(name),
+		nil,
+		[]tsgo.ParameterDeclaration{
+			parameter(factory, left, bigintType),
+			parameter(factory, right, bigintType),
+		},
+		bigintType,
+		factory.Block([]tsgo.Statement{
+			factory.ReturnStatement(factory.ConditionalExpression(
+				factory.BinaryExpression(
+					nil,
+					left,
+					nil,
+					factory.BinaryOperatorToken(operator),
+					right,
+				),
+				factory.QuestionToken(),
+				left,
+				factory.ColonToken(),
+				right,
+			)),
+		}, true),
+	)
+}
+
 func parameter(
 	factory tsgo.Factory,
 	name tsgo.Identifier,
@@ -134,6 +178,19 @@ func operator(
 		return tsgo.BinaryOperatorSlashToken, true
 	case api.RuntimeIntegerRemainder:
 		return tsgo.BinaryOperatorPercentToken, true
+	default:
+		return 0, false
+	}
+}
+
+func ordering(
+	symbol api.RuntimeSymbol,
+) (tsgo.BinaryOperator, bool) {
+	switch symbol {
+	case api.RuntimeIntegerMax:
+		return tsgo.BinaryOperatorGreaterThanEqualsToken, true
+	case api.RuntimeIntegerMin:
+		return tsgo.BinaryOperatorLessThanEqualsToken, true
 	default:
 		return 0, false
 	}

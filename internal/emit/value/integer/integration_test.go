@@ -7,6 +7,7 @@ import (
 	"go/ast"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
 	"strings"
@@ -20,6 +21,8 @@ import (
 
 var integerCarrierRoots = []string{
 	"Byte",
+	"CompareSigned",
+	"CompareUnsigned",
 	"ConstantConversion",
 	"Int8",
 	"Int16",
@@ -348,7 +351,7 @@ func assertDirectIntegerArtifact(t *testing.T, printed string, bigint bool) {
 	if bigint && (!strings.Contains(printed, "1n") || strings.Contains(printed, " = number;")) {
 		t.Fatalf("BigInt artifact mixes carriers:\n%s", printed)
 	}
-	if !bigint && strings.Contains(printed, "n;") {
+	if !bigint && regexp.MustCompile(`[0-9]n(?:\W|$)`).MatchString(printed) {
 		t.Fatalf("number artifact contains BigInt syntax:\n%s", printed)
 	}
 }
@@ -415,6 +418,8 @@ console.log(row(values.BigShifts(-9007199254740993n)));
 console.log(row(values.BigUnary(9007199254740993n)));
 console.log(show(values.WidenSigned(-8n)));
 console.log(show(values.WidenUnsigned(4000000000n)));
+console.log(values.CompareSigned(-8n, 4n).join(" "));
+console.log(values.CompareUnsigned(8n, 4n).join(" "));
 `
 	} else {
 		runner += `
@@ -427,6 +432,8 @@ console.log(row(values.NumberUnary(-123456)));
 console.log(show(values.NumberUnaryUint(4042322160)));
 console.log(show(values.WidenSigned(-8)));
 console.log(show(values.WidenUnsigned(4000000000)));
+console.log(values.CompareSigned(-8, 4).join(" "));
+console.log(values.CompareUnsigned(8, 4).join(" "));
 `
 	}
 	runner += `
@@ -500,6 +507,8 @@ replace example.com/integerfamily => %s
 	fmt.Println(values.NumberUnaryUint(4042322160))
 	fmt.Println(values.WidenSigned(-8))
 	fmt.Println(values.WidenUnsigned(4000000000))
+	fmt.Println(values.CompareSigned(-8, 4))
+	fmt.Println(values.CompareUnsigned(8, 4))
 `
 	if bigint {
 		body = `
@@ -509,6 +518,8 @@ replace example.com/integerfamily => %s
 	fmt.Println(values.BigUnary(9007199254740993))
 	fmt.Println(values.WidenSigned(-8))
 	fmt.Println(values.WidenUnsigned(4000000000))
+	fmt.Println(values.CompareSigned(-8, 4))
+	fmt.Println(values.CompareUnsigned(8, 4))
 `
 	}
 	writeFile(t, filepath.Join(runnerDirectory, "main.go"), `package main

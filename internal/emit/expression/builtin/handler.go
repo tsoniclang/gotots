@@ -8,6 +8,7 @@ import (
 	complexbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/complex"
 	mapbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/map"
 	newvalue "github.com/tsoniclang/gotots/internal/emit/expression/builtin/newvalue"
+	orderedbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/ordered"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
@@ -40,6 +41,14 @@ func Emit(
 		source,
 		builtin,
 		discarded,
+	); handled {
+		return target, err
+	}
+	if target, handled, err := orderedbuiltin.Emit(
+		context,
+		children,
+		source,
+		builtin,
 	); handled {
 		return target, err
 	}

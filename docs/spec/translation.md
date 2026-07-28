@@ -1084,6 +1084,28 @@ boundaries in the `number` profile.
 Conversion output remains O(1) per occurrence and no generic conversion
 registry, erased carrier, cast, or source-text route exists.
 
+### Ordered `max` and `min`
+
+The predeclared `max` and `min` functions are selected only from their exact
+`*types.Builtin` objects. Checker-folded calls materialize the result constant
+directly. Runtime calls admit the currently represented predeclared integer,
+floating-point, and byte-preserving string types; defined ordered types remain
+with the defined-type family.
+
+Number-carrier integers and floats use one `Math.max` or `Math.min` call.
+Those host operations have the required NaN propagation, infinity behavior,
+and `-0`/`+0` ordering. BigInt integers and byte strings use demand-only typed
+pair operations folded left-to-right; the string operation uses `>=` for
+`max` and `<=` for `min`, preserving the first equal argument and Go's
+byte-wise order. A one-argument call is the argument directly.
+
+All arguments evaluate once in Go order. If a child has prerequisite
+statements, the owner captures the argument list at the call boundary before
+forming the target operation. Use-site size is O(source arguments), each
+runtime pair definition is emitted once, and neither implementation depends
+on source spelling, arity-specific helpers, erased values, or runtime type
+dispatch.
+
 Ordinary integer syntax is source-shaped under both initial profiles:
 
 | Go source | TS-Go AST decision | Printed TypeScript |

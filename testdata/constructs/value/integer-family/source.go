@@ -116,3 +116,21 @@ func WidenSigned(value int8) int64 {
 func WidenUnsigned(value uint32) int64 {
 	return int64(value)
 }
+
+func CompareSigned(left, right int32) (bool, bool, bool, bool, bool, bool) {
+	return left == right,
+		left != right,
+		left < right,
+		left <= right,
+		left > right,
+		left >= right
+}
+
+func CompareUnsigned(left, right uint64) (bool, bool, bool, bool, bool, bool) {
+	return left == right,
+		left != right,
+		left < right,
+		left <= right,
+		left > right,
+		left >= right
+}
