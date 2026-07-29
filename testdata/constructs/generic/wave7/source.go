@@ -262,6 +262,144 @@ func ConstructedValues[T any](value T) ([]T, *T, [2]T) {
 	return items, pointer, array
 }
 
+func ZeroIterator(yield func() bool) {
+	for index := int32(0); index < 4; index++ {
+		if !yield() {
+			return
+		}
+	}
+}
+
+func OneIterator(yield func(int32) bool) {
+	for value := int32(1); value <= 4; value++ {
+		if !yield(value) {
+			return
+		}
+	}
+}
+
+func TwoIterator(yield func(int32, string) bool) {
+	for key := int32(1); key <= 3; key++ {
+		if !yield(key, "x") {
+			return
+		}
+	}
+}
+
+func SelectOneIterator(counter *int32) func(func(int32) bool) {
+	*counter++
+	return OneIterator
+}
+
+func GenericIteratorSum[T Integer](
+	iterator func(func(T) bool),
+) T {
+	var result T
+	for value := range iterator {
+		result += value
+	}
+	return result
+}
+
+func BoxIterator[T any](value Box[T]) func(func(Box[T]) bool) {
+	return func(yield func(Box[T]) bool) {
+		yield(value)
+	}
+}
+
+func GenericIteratorCopy[T any](value T) T {
+	original := Box[T]{Value: value}
+	for current := range BoxIterator(original) {
+		var zero T
+		current.Value = zero
+	}
+	return original.Value
+}
+
+func BadIterator(yield func(int32) bool) {
+	if !yield(1) {
+		yield(2)
+	}
+}
+
+func BreaksBadIterator() {
+	for range BadIterator {
+		break
+	}
+}
+
+func CallsYieldAfterExit() {
+	var saved func(int32) bool
+	iterator := func(yield func(int32) bool) {
+		saved = yield
+	}
+	for range iterator {
+	}
+	saved(1)
+}
+
+func RangesNilIterator(iterator func(func() bool)) {
+	for range iterator {
+	}
+}
+
+func IteratorReturnBoundary() int32 {
+	for range ZeroIterator {
+		return 1
+	}
+	return 0
+}
+
+func IteratorLabelBoundary() {
+iterator:
+	for range ZeroIterator {
+		continue iterator
+	}
+}
+
+func AuditIteratorRanges() []int32 {
+	zeroCount := int32(0)
+	for range ZeroIterator {
+		zeroCount++
+		if zeroCount == 1 {
+			continue
+		}
+		break
+	}
+
+	evaluations := int32(0)
+	oneSum := int32(0)
+	for value := range SelectOneIterator(&evaluations) {
+		if value == 2 {
+			continue
+		}
+		if value == 4 {
+			break
+		}
+		oneSum += value
+	}
+
+	twoSum := int32(0)
+	for key, value := range TwoIterator {
+		twoSum += key + int32(len(value))
+	}
+
+	assigned := int32(0)
+	for assigned = range OneIterator {
+		break
+	}
+
+	return []int32{
+		zeroCount,
+		evaluations,
+		oneSum,
+		twoSum,
+		assigned,
+		GenericIteratorSum[int32](OneIterator),
+		GenericIteratorCopy(int32(23)),
+	}
+}
+
 func RecursiveAdd[T Integer](value, increment T, remaining int32) T {
 	if remaining == 0 {
 		return value

@@ -1506,6 +1506,10 @@ The range expression is evaluated once. Its yield callback is a typed arrow;
 each invocation copies yielded values into the exact per-iteration declaration
 or assignment targets, executes the body, returns `true` to continue, and
 returns `false` for a source `break`. A source `continue` returns `true`.
+Invocation reuses the ordinary callable nil guard. One callback-local state
+tracks ready, body-panic, body-false, and whole-loop-exit conditions; it
+reproduces the selected toolchain's distinct misuse panics when an iterator
+calls yield in any forbidden state or suppresses a body panic.
 Returning from the enclosing function, panic/recover, defer, labels, and
 cooperative calls compose through their owning later control capabilities; the
 iterator owner never approximates them with an illegal target branch.

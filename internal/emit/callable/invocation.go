@@ -1,25 +1,46 @@
-package call
+package callable
 
 import (
 	"go/ast"
+	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func knownNonNil(source ast.Expr) bool {
+func StaticallyNonNil(info *types.Info, source ast.Expr) bool {
 	switch source := source.(type) {
 	case *ast.FuncLit:
 		return true
 	case *ast.ParenExpr:
-		return knownNonNil(source.X)
+		return StaticallyNonNil(info, source.X)
+	case *ast.Ident:
+		if info == nil {
+			return false
+		}
+		_, ok := info.Uses[source].(*types.Func)
+		return ok
+	case *ast.SelectorExpr:
+		if info == nil || info.Selections[source] != nil {
+			return false
+		}
+		qualifier, ok := source.X.(*ast.Ident)
+		if !ok {
+			return false
+		}
+		packageName, ok := info.Uses[qualifier].(*types.PkgName)
+		if !ok {
+			return false
+		}
+		function, ok := info.Uses[source.Sel].(*types.Func)
+		return ok && function.Pkg() == packageName.Imported()
 	default:
 		return false
 	}
 }
 
-func nilGuard(
+func NilGuard(
 	context api.Context,
 	callee tsgo.Expression,
 ) (tsgo.Statement, []api.RootRequest, error) {

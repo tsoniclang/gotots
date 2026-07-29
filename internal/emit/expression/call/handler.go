@@ -97,7 +97,8 @@ func emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	guardNil := !static && !knownNonNil(source.Fun)
+	guardNil := !static &&
+		!callable.StaticallyNonNil(context.TypesInfo(), source.Fun)
 	arguments, argumentBefore, argumentRequests, err := emitArguments(
 		context,
 		children,
@@ -144,7 +145,7 @@ func emit(
 	before = append(before, argumentBefore...)
 	var guardRequests []api.RootRequest
 	if guardNil {
-		guard, requests, err := nilGuard(context, targetCallee)
+		guard, requests, err := callable.NilGuard(context, targetCallee)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}

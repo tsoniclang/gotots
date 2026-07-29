@@ -52,6 +52,7 @@ const (
 	TemporaryTypeSwitchValue
 	TemporaryForCondition
 	TemporaryForPost
+	TemporaryRangeState
 )
 
 type NameReference struct {
@@ -268,6 +269,8 @@ func TemporaryPrefix(kind TemporaryKind) (string, error) {
 		return "__gotots_for_condition_", nil
 	case TemporaryForPost:
 		return "__gotots_for_post_", nil
+	case TemporaryRangeState:
+		return "__gotots_range_state_", nil
 	default:
 		return "", &NameError{
 			Reason: fmt.Sprintf("temporary kind %d is invalid", kind),

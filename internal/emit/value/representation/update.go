@@ -13,6 +13,7 @@ import (
 	definedbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/defined"
 	floatbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/float"
 	integerbinary "github.com/tsoniclang/gotots/internal/emit/expression/binary/integer"
+	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
 	floatvalue "github.com/tsoniclang/gotots/internal/emit/value/float"
@@ -30,6 +31,33 @@ func (Owner) BinaryUpdate(
 	left tsgo.Expression,
 	right api.ExpressionEmission,
 ) (api.ExpressionEmission, bool, error) {
+	if _, leftGeneric := api.GenericTypeParameter(sourceType); leftGeneric {
+		operation, ok := api.BinaryGenericOperation(operator)
+		if !ok {
+			return api.ExpressionEmission{}, true, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "generic binary update operation is invalid",
+			}
+		}
+		target, err := genericoperation.Call(
+			context,
+			source,
+			operation,
+			[]types.Type{sourceType, rightRepresentation},
+			[]types.Type{sourceType},
+			[]tsgo.Expression{left, right.Value()},
+			right.Requests()...,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, true, err
+		}
+		target, err = api.NewExpressionEmission(
+			right.Before(),
+			target.Value(),
+			target.Requests(),
+		)
+		return target, true, err
+	}
 	model, ok := definedtype.ResolveBasic(sourceType)
 	if !ok {
 		return primitiveBinaryUpdate(

@@ -49,6 +49,7 @@ type Context struct {
 	genericResolver          GenericCallableResolver
 	genericConsumer          GenericOperationConsumer
 	genericParameters        map[*types.TypeParam]string
+	iteratorRangeStateName   string
 }
 
 func (c Context) WithAddressableStorage(
@@ -216,6 +217,7 @@ func (c Context) EnterFunction(results *types.Tuple) Context {
 	c.continueDepth = 0
 	c.controlLabels = nil
 	c.statementLabel = ""
+	c.iteratorRangeStateName = ""
 	return c
 }
 
@@ -227,6 +229,18 @@ func (c Context) EnterLoop() Context {
 
 func (c Context) EnterBreakable() Context {
 	c.breakDepth++
+	return c
+}
+
+func (c Context) EnterIteratorRange(stateName string) Context {
+	if stateName == "" {
+		panic("iterator-range state name is empty")
+	}
+	c.breakDepth = 0
+	c.continueDepth = 0
+	c.controlLabels = nil
+	c.statementLabel = ""
+	c.iteratorRangeStateName = stateName
 	return c
 }
 
@@ -332,6 +346,15 @@ func (c Context) ControlLabel(label *types.Label) (ControlLabel, bool) {
 	return target, ok
 }
 
+func (c Context) IteratorRangeControl() (IteratorRangeControl, bool) {
+	if c.iteratorRangeStateName == "" {
+		return IteratorRangeControl{}, false
+	}
+	return IteratorRangeControl{
+		stateName: c.iteratorRangeStateName,
+	}, true
+}
+
 func (c Context) FunctionArtifactOwner() (*types.Func, bool) {
 	source, ok := c.currentArtifactOwner.Source()
 	owner, functionOwned := source.(*types.Func)
@@ -396,6 +419,42 @@ func (l ControlLabel) Breakable() bool {
 
 func (l ControlLabel) Continuable() bool {
 	return l.continuable
+}
+
+type IteratorRangeState int8
+
+const (
+	IteratorRangeStateExhausted IteratorRangeState = -2
+	IteratorRangeStatePanicked  IteratorRangeState = -1
+	IteratorRangeStateDone      IteratorRangeState = 0
+	IteratorRangeStateReady     IteratorRangeState = 1
+)
+
+func (s IteratorRangeState) Literal() string {
+	switch s {
+	case IteratorRangeStateExhausted:
+		return "-2"
+	case IteratorRangeStatePanicked:
+		return "-1"
+	case IteratorRangeStateDone:
+		return "0"
+	case IteratorRangeStateReady:
+		return "1"
+	default:
+		return ""
+	}
+}
+
+type IteratorRangeControl struct {
+	stateName string
+}
+
+func (c IteratorRangeControl) StateName() string {
+	return c.stateName
+}
+
+func (c IteratorRangeControl) Valid() bool {
+	return c.stateName != ""
 }
 
 type ChildEmitter interface {

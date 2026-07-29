@@ -15,6 +15,10 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.ReturnStmt,
 ) (api.StatementEmission, error) {
+	if control, inIteratorRange := context.IteratorRangeControl(); inIteratorRange && control.Valid() {
+		return api.StatementEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
 	results := context.FunctionResults()
 	resultCount := 0
 	if results != nil {

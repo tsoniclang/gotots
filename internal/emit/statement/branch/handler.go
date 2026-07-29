@@ -6,6 +6,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func Emit(
@@ -43,19 +44,72 @@ func Emit(
 	}
 	switch source.Tok {
 	case token.BREAK:
-		if !context.CanBreak() {
-			return api.StatementEmission{},
-				api.Unsupported(context, api.CategoryStatement, source)
+		if context.CanBreak() {
+			return api.DirectStatement(
+				context.Factory().BreakStatement(nil),
+			), nil
 		}
-		return api.DirectStatement(context.Factory().BreakStatement(nil)), nil
+		if control, ok := context.IteratorRangeControl(); ok {
+			return iteratorBranch(
+				context,
+				control,
+				api.IteratorRangeStateDone,
+				false,
+			)
+		}
 	case token.CONTINUE:
-		if !context.CanContinue() {
-			return api.StatementEmission{},
-				api.Unsupported(context, api.CategoryStatement, source)
+		if context.CanContinue() {
+			return api.DirectStatement(
+				context.Factory().ContinueStatement(nil),
+			), nil
 		}
-		return api.DirectStatement(context.Factory().ContinueStatement(nil)), nil
-	default:
-		return api.StatementEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
+		if control, ok := context.IteratorRangeControl(); ok {
+			return iteratorBranch(
+				context,
+				control,
+				api.IteratorRangeStateReady,
+				true,
+			)
+		}
 	}
+	return api.StatementEmission{},
+		api.Unsupported(context, api.CategoryStatement, source)
+}
+
+func iteratorBranch(
+	context api.Context,
+	control api.IteratorRangeControl,
+	state api.IteratorRangeState,
+	result bool,
+) (api.StatementEmission, error) {
+	if !control.Valid() || state.Literal() == "" {
+		return api.StatementEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "iterator-range branch control is invalid",
+		}
+	}
+	resultValue := tsgo.Expression(context.Factory().FalseLiteral())
+	if result {
+		resultValue = context.Factory().TrueLiteral()
+	}
+	return api.NewStatementEmission(
+		[]tsgo.Statement{
+			context.Factory().ExpressionStatement(
+				context.Factory().BinaryExpression(
+					nil,
+					context.Factory().Identifier(control.StateName()),
+					nil,
+					context.Factory().BinaryOperatorToken(
+						tsgo.BinaryOperatorEqualsToken,
+					),
+					context.Factory().NumericLiteral(
+						state.Literal(),
+						tsgo.TokenFlagsNone,
+					),
+				),
+			),
+			context.Factory().ReturnStatement(resultValue),
+		},
+		nil,
+	)
 }

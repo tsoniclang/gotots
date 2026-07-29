@@ -6,6 +6,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/callable"
 	"github.com/tsoniclang/gotots/internal/emit/statement/assignment"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
@@ -30,6 +31,16 @@ func Emit(
 	if sourceType == nil {
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryExpression, source.X)
+	}
+	if signature, ok := callable.Signature(sourceType); ok {
+		return emitIterator(
+			context,
+			children,
+			source,
+			sourceType,
+			signature,
+			targetLabel,
+		)
 	}
 	if array, ok := arrayvalue.Resolve(context, sourceType); ok {
 		return emitArray(context, children, source, array, targetLabel)
