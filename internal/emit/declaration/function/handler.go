@@ -239,7 +239,9 @@ func cooperativeRequirement(
 		}
 		if requirementFacet != facet {
 			if requirementFacet.Kind() ==
-				api.CallableFacetFunctionLiteral {
+				api.CallableFacetFunctionLiteral ||
+				requirementFacet.Kind() ==
+					api.CallableFacetGenericOperation {
 				continue
 			}
 			return false, &api.InvariantError{

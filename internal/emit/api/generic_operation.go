@@ -341,7 +341,7 @@ func (c Context) ProjectGenericOperation(
 	source ast.Node,
 	origin *GenericOperationContract,
 	signature *types.Signature,
-) (NameReference, error) {
+) (GenericOperationReference, error) {
 	owner, ownerOK := c.genericSourceOwner()
 	if !ownerOK ||
 		!c.genericConsumer.Valid() ||
@@ -349,7 +349,7 @@ func (c Context) ProjectGenericOperation(
 		source == nil ||
 		!origin.Valid() ||
 		!validGenericOperationSignature(signature) {
-		return NameReference{}, &ContextError{
+		return GenericOperationReference{}, &ContextError{
 			Reason: "projected generic operation is unavailable",
 		}
 	}
@@ -360,13 +360,17 @@ func (c Context) ProjectGenericOperation(
 		signature,
 	)
 	if err != nil {
-		return NameReference{}, err
+		return GenericOperationReference{}, err
 	}
 	request, err := NewGenericOperationRequest(owner, contract)
 	if err != nil {
-		return NameReference{}, err
+		return GenericOperationReference{}, err
 	}
-	return NewNameReference(contract.TargetName(), request)
+	return NewGenericOperationReference(
+		contract,
+		contract.TargetName(),
+		request,
+	)
 }
 
 func (c Context) WithGenericParameters(
@@ -422,10 +426,10 @@ func (c Context) GenericOperation(
 	source ast.Node,
 	operation GenericOperation,
 	signature *types.Signature,
-) (NameReference, error) {
+) (GenericOperationReference, error) {
 	selection, err := SelectGenericOperation(operation)
 	if err != nil {
-		return NameReference{}, err
+		return GenericOperationReference{}, err
 	}
 	return c.genericOperation(source, selection, signature)
 }
@@ -434,10 +438,10 @@ func (c Context) GenericConstraintMethod(
 	source ast.Node,
 	method *types.Func,
 	signature *types.Signature,
-) (NameReference, error) {
+) (GenericOperationReference, error) {
 	selection, err := SelectGenericConstraintMethod(method)
 	if err != nil {
-		return NameReference{}, err
+		return GenericOperationReference{}, err
 	}
 	return c.genericOperation(source, selection, signature)
 }
@@ -446,31 +450,31 @@ func (c Context) genericOperation(
 	source ast.Node,
 	selection GenericOperationSelection,
 	signature *types.Signature,
-) (NameReference, error) {
+) (GenericOperationReference, error) {
 	owner, ownerOK := c.genericSourceOwner()
 	switch {
 	case !ownerOK:
-		return NameReference{}, &ContextError{
+		return GenericOperationReference{}, &ContextError{
 			Reason: "generic operation has no source artifact owner",
 		}
 	case !c.genericConsumer.Valid():
-		return NameReference{}, &ContextError{
+		return GenericOperationReference{}, &ContextError{
 			Reason: "generic operation has no target consumer",
 		}
 	case c.genericResolver == nil:
-		return NameReference{}, &ContextError{
+		return GenericOperationReference{}, &ContextError{
 			Reason: "generic operation has no resolver",
 		}
 	case source == nil:
-		return NameReference{}, &ContextError{
+		return GenericOperationReference{}, &ContextError{
 			Reason: "generic operation has no source construct",
 		}
 	case !selection.Valid():
-		return NameReference{}, &ContextError{
+		return GenericOperationReference{}, &ContextError{
 			Reason: "generic operation selection is invalid",
 		}
 	case !validGenericOperationSignature(signature):
-		return NameReference{}, &ContextError{
+		return GenericOperationReference{}, &ContextError{
 			Reason: "generic operation signature is invalid",
 		}
 	}
@@ -481,13 +485,17 @@ func (c Context) genericOperation(
 		signature,
 	)
 	if err != nil {
-		return NameReference{}, err
+		return GenericOperationReference{}, err
 	}
 	request, err := NewGenericOperationRequest(owner, contract)
 	if err != nil {
-		return NameReference{}, err
+		return GenericOperationReference{}, err
 	}
-	return NewNameReference(contract.TargetName(), request)
+	return NewGenericOperationReference(
+		contract,
+		contract.TargetName(),
+		request,
+	)
 }
 
 func (c Context) ResolveGenericCallable(

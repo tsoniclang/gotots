@@ -9,22 +9,26 @@ import (
 type CallableFacetKind uint8
 
 const (
-	CallableFacetInvalid         CallableFacetKind = 0
-	CallableFacetSource          CallableFacetKind = 1
-	CallableFacetFunctionLiteral CallableFacetKind = 2
-	CallableFacetABI             CallableFacetKind = 3
+	CallableFacetInvalid           CallableFacetKind = 0
+	CallableFacetSource            CallableFacetKind = 1
+	CallableFacetFunctionLiteral   CallableFacetKind = 2
+	CallableFacetABI               CallableFacetKind = 3
+	CallableFacetGenericCapability CallableFacetKind = 4
+	CallableFacetGenericOperation  CallableFacetKind = 5
 )
 
 func (k CallableFacetKind) Valid() bool {
-	return k >= CallableFacetSource && k <= CallableFacetABI
+	return k >= CallableFacetSource &&
+		k <= CallableFacetGenericOperation
 }
 
 type CallableFacet struct {
-	owner    ArtifactOwner
-	kind     CallableFacetKind
-	function *types.Func
-	literal  *ast.FuncLit
-	abi      *GeneratedArtifact
+	owner     ArtifactOwner
+	kind      CallableFacetKind
+	function  *types.Func
+	literal   *ast.FuncLit
+	generated *GeneratedArtifact
+	operation *GenericOperationContract
 }
 
 func NewSourceCallableFacet(function *types.Func) (CallableFacet, error) {
@@ -79,9 +83,44 @@ func NewCallableABIFacet(
 		}
 	}
 	return CallableFacet{
-		owner: MustGeneratedArtifactOwner(artifact),
-		kind:  CallableFacetABI,
-		abi:   artifact,
+		owner:     MustGeneratedArtifactOwner(artifact),
+		kind:      CallableFacetABI,
+		generated: artifact,
+	}, nil
+}
+
+func NewGenericCapabilityCallableFacet(
+	artifact *GeneratedArtifact,
+) (CallableFacet, error) {
+	if artifact == nil ||
+		artifact.Kind() != GeneratedArtifactGenericCapability ||
+		!artifact.Valid() {
+		return CallableFacet{}, &RootRequestError{
+			Reason: "generic-capability callable facet is invalid",
+		}
+	}
+	return CallableFacet{
+		owner:     MustGeneratedArtifactOwner(artifact),
+		kind:      CallableFacetGenericCapability,
+		generated: artifact,
+	}, nil
+}
+
+func NewGenericOperationCallableFacet(
+	operation *GenericOperationContract,
+) (CallableFacet, error) {
+	function, functionOwned := operationOwnerFunction(operation)
+	if !operation.Valid() ||
+		!functionOwned ||
+		operation.Consumer() != GenericFunctionOperationConsumer() {
+		return CallableFacet{}, &RootRequestError{
+			Reason: "generic-operation callable facet is invalid",
+		}
+	}
+	return CallableFacet{
+		owner:     MustSourceArtifactOwner(function),
+		kind:      CallableFacetGenericOperation,
+		operation: operation,
 	}, nil
 }
 
@@ -100,7 +139,8 @@ func (f CallableFacet) Valid() bool {
 			function.Origin() == function &&
 			f.function == function &&
 			f.literal == nil &&
-			f.abi == nil &&
+			f.generated == nil &&
+			f.operation == nil &&
 			signature != nil
 	case CallableFacetFunctionLiteral:
 		_, sourceOwned := f.owner.Source()
@@ -110,15 +150,38 @@ func (f CallableFacet) Valid() bool {
 			f.literal != nil &&
 			f.literal.Type != nil &&
 			f.literal.Body != nil &&
-			f.abi == nil
+			f.generated == nil &&
+			f.operation == nil
 	case CallableFacetABI:
 		generated, generatedOwned := f.owner.Generated()
 		return generatedOwned &&
 			f.function == nil &&
 			f.literal == nil &&
-			f.abi == generated &&
-			f.abi.Kind() == GeneratedArtifactCallableABI &&
-			f.abi.Valid()
+			f.generated == generated &&
+			f.generated.Kind() == GeneratedArtifactCallableABI &&
+			f.generated.Valid() &&
+			f.operation == nil
+	case CallableFacetGenericCapability:
+		generated, generatedOwned := f.owner.Generated()
+		return generatedOwned &&
+			f.function == nil &&
+			f.literal == nil &&
+			f.generated == generated &&
+			f.generated.Kind() == GeneratedArtifactGenericCapability &&
+			f.generated.Valid() &&
+			f.operation == nil
+	case CallableFacetGenericOperation:
+		source, sourceOwned := f.owner.Source()
+		function, functionOwned := operationOwnerFunction(f.operation)
+		return sourceOwned &&
+			functionOwned &&
+			source == function &&
+			f.operation.Valid() &&
+			f.function == nil &&
+			f.literal == nil &&
+			f.generated == nil &&
+			f.operation.Consumer() ==
+				GenericFunctionOperationConsumer()
 	default:
 		return false
 	}
@@ -129,7 +192,8 @@ func (f CallableFacet) empty() bool {
 		f.kind == CallableFacetInvalid &&
 		f.function == nil &&
 		f.literal == nil &&
-		f.abi == nil
+		f.generated == nil &&
+		f.operation == nil
 }
 
 func (f CallableFacet) Owner() ArtifactOwner {
@@ -149,7 +213,20 @@ func (f CallableFacet) FunctionLiteral() (*ast.FuncLit, bool) {
 }
 
 func (f CallableFacet) ABI() (*GeneratedArtifact, bool) {
-	return f.abi, f.Valid() && f.kind == CallableFacetABI
+	return f.generated, f.Valid() && f.kind == CallableFacetABI
+}
+
+func (f CallableFacet) GenericCapability() (*GeneratedArtifact, bool) {
+	return f.generated,
+		f.Valid() && f.kind == CallableFacetGenericCapability
+}
+
+func (f CallableFacet) GenericOperation() (
+	*GenericOperationContract,
+	bool,
+) {
+	return f.operation,
+		f.Valid() && f.kind == CallableFacetGenericOperation
 }
 
 func functionType(function *types.Func) (*types.Signature, bool) {
@@ -158,6 +235,106 @@ func functionType(function *types.Func) (*types.Signature, bool) {
 	}
 	signature, ok := function.Type().(*types.Signature)
 	return signature, ok
+}
+
+func operationOwnerFunction(
+	operation *GenericOperationContract,
+) (*types.Func, bool) {
+	if operation == nil {
+		return nil, false
+	}
+	function, ok := operation.Owner().(*types.Func)
+	return function, ok && function != nil && function.Origin() == function
+}
+
+type GenericCapabilityReference struct {
+	artifact *GeneratedArtifact
+	name     string
+	requests []RootRequest
+}
+
+func NewGenericCapabilityReference(
+	artifact *GeneratedArtifact,
+	name string,
+	requests ...RootRequest,
+) (GenericCapabilityReference, error) {
+	if artifact == nil ||
+		artifact.Kind() != GeneratedArtifactGenericCapability ||
+		!artifact.Valid() ||
+		name == "" ||
+		name != artifact.TargetName() {
+		return GenericCapabilityReference{}, &NameError{
+			Reason: "generic-capability reference is invalid",
+		}
+	}
+	for _, request := range requests {
+		if request.Kind() == RootRequestInvalid {
+			return GenericCapabilityReference{}, &RootRequestError{
+				Reason: "generic-capability reference request is invalid",
+			}
+		}
+	}
+	return GenericCapabilityReference{
+		artifact: artifact,
+		name:     name,
+		requests: slices.Clone(requests),
+	}, nil
+}
+
+func (r GenericCapabilityReference) Artifact() *GeneratedArtifact {
+	return r.artifact
+}
+
+func (r GenericCapabilityReference) Name() string {
+	return r.name
+}
+
+func (r GenericCapabilityReference) Requests() []RootRequest {
+	return slices.Clone(r.requests)
+}
+
+type GenericOperationReference struct {
+	contract *GenericOperationContract
+	name     string
+	requests []RootRequest
+}
+
+func NewGenericOperationReference(
+	contract *GenericOperationContract,
+	name string,
+	requests ...RootRequest,
+) (GenericOperationReference, error) {
+	if !contract.Valid() ||
+		name == "" ||
+		name != contract.TargetName() {
+		return GenericOperationReference{}, &NameError{
+			Reason: "generic-operation reference is invalid",
+		}
+	}
+	for _, request := range requests {
+		if request.Kind() == RootRequestInvalid {
+			return GenericOperationReference{}, &RootRequestError{
+				Reason: "generic-operation reference request is invalid",
+			}
+		}
+	}
+	return GenericOperationReference{
+		contract: contract,
+		name:     name,
+		requests: slices.Clone(requests),
+	}, nil
+}
+
+func (r GenericOperationReference) Contract() *GenericOperationContract {
+	return r.contract
+}
+
+func (r GenericOperationReference) Name() string {
+	return r.name
+}
+
+func (r GenericOperationReference) Requests() []RootRequest {
+	return slices.Clone(r.requests)
 }
 
 type CallableABIReference struct {

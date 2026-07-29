@@ -190,7 +190,7 @@ func (unusedNames) InterfaceMethodToken(
 func (unusedNames) GenericCapability(
 	api.GenericOperationSelection,
 	*types.Signature,
-) (api.NameReference, error) {
+) (api.GenericCapabilityReference, error) {
 	panic("unused")
 }
 

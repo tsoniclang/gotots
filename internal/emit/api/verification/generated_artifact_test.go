@@ -252,6 +252,153 @@ func TestGenericCapabilityUsesItsExactValidatingConstructor(t *testing.T) {
 	}
 }
 
+func TestGenericCooperativeFacetsCarryExactCallableIdentity(t *testing.T) {
+	valueSignature := types.NewSignatureType(
+		nil,
+		nil,
+		nil,
+		types.NewTuple(
+			types.NewVar(token.NoPos, nil, "value", types.Typ[types.Int32]),
+		),
+		types.NewTuple(
+			types.NewVar(token.NoPos, nil, "", types.Typ[types.Int32]),
+		),
+		false,
+	)
+	selection, err := SelectGenericOperation(GenericOperationCopy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := NewCompilationGenericCapabilityArtifact(
+		selection,
+		valueSignature,
+		"copy-int32",
+		"$goCapability_copy_int32",
+		"support/generics/capabilities/copy-int32.ts",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	capabilityFacet, err := NewGenericCapabilityCallableFacet(artifact)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedArtifact, capability := capabilityFacet.GenericCapability()
+	if !capabilityFacet.Valid() ||
+		capabilityFacet.Kind() != CallableFacetGenericCapability ||
+		!capability ||
+		selectedArtifact != artifact ||
+		capabilityFacet.Owner() != MustGeneratedArtifactOwner(artifact) {
+		t.Fatalf("generic-capability facet = %#v", capabilityFacet)
+	}
+	reference, err := NewGenericCapabilityReference(
+		artifact,
+		artifact.TargetName(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reference.Artifact() != artifact ||
+		reference.Name() != artifact.TargetName() {
+		t.Fatalf("generic-capability reference = %#v", reference)
+	}
+	if _, err := NewGenericCapabilityReference(
+		artifact,
+		"$foreign",
+	); err == nil {
+		t.Fatal("generic-capability reference accepted a foreign target name")
+	}
+
+	constraint := types.NewInterfaceType(nil, nil)
+	constraint.Complete()
+	parameter := types.NewTypeParam(
+		types.NewTypeName(token.NoPos, nil, "T", nil),
+		constraint,
+	)
+	operationSignature := types.NewSignatureType(
+		nil,
+		nil,
+		nil,
+		types.NewTuple(
+			types.NewVar(token.NoPos, nil, "value", parameter),
+		),
+		types.NewTuple(
+			types.NewVar(token.NoPos, nil, "", parameter),
+		),
+		false,
+	)
+	owner := types.NewFunc(
+		token.NoPos,
+		nil,
+		"Copy",
+		types.NewSignatureType(
+			nil,
+			nil,
+			[]*types.TypeParam{parameter},
+			operationSignature.Params(),
+			operationSignature.Results(),
+			false,
+		),
+	)
+	operation, err := NewGenericOperationContract(
+		owner,
+		"function|copy|(T)->T",
+		"$go$copy_operation",
+		GenericFunctionOperationConsumer(),
+		selection,
+		operationSignature,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	operationFacet, err := NewGenericOperationCallableFacet(operation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedOperation, selected := operationFacet.GenericOperation()
+	if !operationFacet.Valid() ||
+		operationFacet.Kind() != CallableFacetGenericOperation ||
+		!selected ||
+		selectedOperation != operation ||
+		operationFacet.Owner() != MustSourceArtifactOwner(owner) {
+		t.Fatalf("generic-operation facet = %#v", operationFacet)
+	}
+	operationReference, err := NewGenericOperationReference(
+		operation,
+		operation.TargetName(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if operationReference.Contract() != operation ||
+		operationReference.Name() != operation.TargetName() {
+		t.Fatalf("generic-operation reference = %#v", operationReference)
+	}
+	for _, facet := range []CallableFacet{
+		capabilityFacet,
+		operationFacet,
+	} {
+		request, requestErr := NewCooperativeCallableRequest(facet)
+		if requestErr != nil {
+			t.Fatal(requestErr)
+		}
+		requirement, ok := request.DeclarationRequirement()
+		selectedFacet, cooperative := requirement.CooperativeCallable()
+		if !ok || !cooperative || selectedFacet != facet {
+			t.Fatalf("cooperative facet request = %#v", request)
+		}
+	}
+	if CallableFacetSource != 1 ||
+		CallableFacetFunctionLiteral != 2 ||
+		CallableFacetABI != 3 ||
+		CallableFacetGenericCapability != 4 ||
+		CallableFacetGenericOperation != 5 ||
+		CallableFacetInvalid.Valid() ||
+		CallableFacetKind(6).Valid() {
+		t.Fatal("callable-facet kind IDs drifted")
+	}
+}
+
 func TestInterfaceDynamicTypeRequestCarriesExactGoType(t *testing.T) {
 	sourceType := types.Typ[types.Int32]
 	artifact, err := NewCompilationGeneratedArtifact(

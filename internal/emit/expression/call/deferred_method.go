@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -110,15 +111,22 @@ func emitDeferredMethod(
 		arguments,
 		tsgo.NodeFlagsNone,
 	)
+	cooperative, contractRequests, err :=
+		cooperativecall.SourceContract(context, method)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	return deferredInvocation(
 		context,
 		before,
 		nil,
 		call,
+		cooperative,
 		api.CombineRequests(
 			receiver.Requests(),
 			argumentRequests,
 			reference.Requests(),
+			contractRequests,
 			[]api.RootRequest{control},
 		),
 	)
@@ -210,16 +218,33 @@ func emitDeferredInterfaceMethod(
 		arguments,
 		tsgo.NodeFlagsNone,
 	)
+	selectedSignature, ok := selection.Type().(*types.Signature)
+	if !ok {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	valueSignature, ok := callable.ValueSignature(selectedSignature)
+	if !ok {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	cooperative, contractRequests, err :=
+		cooperativecall.ValueContract(context, valueSignature)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	return deferredInvocation(
 		context,
 		before,
 		nil,
 		call,
+		cooperative,
 		api.CombineRequests(
 			receiver.Requests(),
 			argumentRequests,
 			nonNil.Requests(),
 			receiverContract.Requests(),
+			contractRequests,
 		),
 	)
 }

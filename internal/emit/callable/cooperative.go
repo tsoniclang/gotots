@@ -45,6 +45,51 @@ func EmitInlineNonNilType(
 	signature *types.Signature,
 	cooperative bool,
 ) (api.TypeEmission, error) {
+	return emitInlineNonNilType(
+		context,
+		children,
+		source,
+		signature,
+		func(result tsgo.TypeNode) tsgo.TypeNode {
+			if cooperative {
+				return PromiseResult(context.Factory(), result)
+			}
+			return result
+		},
+	)
+}
+
+func EmitInlineAwaitableType(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	signature *types.Signature,
+	awaitable bool,
+) (api.TypeEmission, error) {
+	return emitInlineNonNilType(
+		context,
+		children,
+		source,
+		signature,
+		func(result tsgo.TypeNode) tsgo.TypeNode {
+			if awaitable {
+				return context.Factory().UnionTypeNode([]tsgo.TypeNode{
+					result,
+					PromiseResult(context.Factory(), result),
+				})
+			}
+			return result
+		},
+	)
+}
+
+func emitInlineNonNilType(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	signature *types.Signature,
+	resultType func(tsgo.TypeNode) tsgo.TypeNode,
+) (api.TypeEmission, error) {
 	target, err := emitRepresented(
 		context,
 		children,
@@ -64,15 +109,11 @@ func EmitInlineNonNilType(
 	if err != nil {
 		return api.TypeEmission{}, err
 	}
-	result := target.Result()
-	if cooperative {
-		result = PromiseResult(context.Factory(), result)
-	}
 	return api.DirectType(
 		context.Factory().FunctionTypeNode(
 			nil,
 			target.Parameters(),
-			result,
+			resultType(target.Result()),
 		),
 		target.Requests()...,
 	), nil

@@ -266,7 +266,10 @@ func (s *programSession) ObserveCooperativeCallable(
 	var requests []api.RootRequest
 	if consumer != facet.Owner() {
 		switch facet.Kind() {
-		case api.CallableFacetSource, api.CallableFacetABI:
+		case api.CallableFacetSource,
+			api.CallableFacetABI,
+			api.CallableFacetGenericCapability,
+			api.CallableFacetGenericOperation:
 			request, err := api.NewOwnedArtifactDependencyRequest(
 				facet.Owner(),
 				api.ArtifactFacetCallableSignature,

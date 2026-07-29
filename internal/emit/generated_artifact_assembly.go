@@ -391,6 +391,18 @@ func (s *programSession) buildGenericCapabilityRevision(
 	); err != nil {
 		return artifactRevision{}, err
 	}
+	facet, err := api.NewGenericCapabilityCallableFacet(artifact)
+	if err != nil {
+		return artifactRevision{}, err
+	}
+	observation, err := context.ObserveCooperativeCallable(facet)
+	if err != nil {
+		return artifactRevision{}, err
+	}
+	context = context.WithCooperativeCallable(
+		facet,
+		observation.Cooperative(),
+	)
 	statement, requests, err := genericcapability.Build(
 		context,
 		builder.emitter,
@@ -400,7 +412,10 @@ func (s *programSession) buildGenericCapabilityRevision(
 		return artifactRevision{}, err
 	}
 	statements := []tsgo.Statement{statement}
-	placement, dependencies, err := s.consumeArtifactRequests(owner, requests)
+	placement, dependencies, err := s.consumeArtifactRequests(
+		owner,
+		api.CombineRequests(requests, observation.Requests()),
+	)
 	if err != nil {
 		return artifactRevision{}, err
 	}
@@ -421,17 +436,33 @@ func exactGenericCapabilityRequirement(
 	requirements []api.DeclarationRequirement,
 	artifact *api.GeneratedArtifact,
 ) error {
-	if len(requirements) != 1 {
+	definitions := 0
+	cooperative := false
+	for _, requirement := range requirements {
+		if selected, ok := requirement.GenericCapability(); ok {
+			if selected != artifact {
+				return &ScheduleError{
+					Object: artifact.TargetName(),
+					Reason: "generic capability received a foreign definition",
+				}
+			}
+			definitions++
+			continue
+		}
+		facet, ok := requirement.CooperativeCallable()
+		selected, capability := facet.GenericCapability()
+		if !ok || !capability || selected != artifact || cooperative {
+			return &ScheduleError{
+				Object: artifact.TargetName(),
+				Reason: "generic capability received a foreign requirement",
+			}
+		}
+		cooperative = true
+	}
+	if definitions != 1 {
 		return &ScheduleError{
 			Object: artifact.TargetName(),
 			Reason: "generic capability requires exactly one definition request",
-		}
-	}
-	selected, ok := requirements[0].GenericCapability()
-	if !ok || selected != artifact {
-		return &ScheduleError{
-			Object: artifact.TargetName(),
-			Reason: "generic capability received a foreign requirement",
 		}
 	}
 	return nil

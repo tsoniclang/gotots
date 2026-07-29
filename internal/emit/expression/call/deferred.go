@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	builtinexpression "github.com/tsoniclang/gotots/internal/emit/expression/builtin"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -73,6 +74,8 @@ func EmitDeferred(
 	targetCallee := callee.Value()
 	before := callee.Before()
 	var requests []api.RootRequest
+	var contractRequests []api.RootRequest
+	cooperative := false
 	if static {
 		owner, direct := calleeObject(context.TypesInfo(), source.Fun)
 		if !direct {
@@ -89,6 +92,11 @@ func EmitDeferred(
 			return api.ExpressionEmission{}, err
 		}
 		requests = append(requests, control)
+		cooperative, contractRequests, err =
+			cooperativecall.SourceContract(context, owner)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	} else {
 		targetType, err := children.RepresentedType(
 			context.WithRole(api.RoleCallCallee),
@@ -113,7 +121,13 @@ func EmitDeferred(
 		)
 		targetCallee = context.Factory().Identifier(name)
 		requests = append(requests, targetType.Requests()...)
+		cooperative, contractRequests, err =
+			cooperativecall.ValueContract(context, signature)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	}
+	requests = append(requests, contractRequests...)
 	arguments, argumentBefore, argumentRequests, err := emitArguments(
 		context,
 		children,
@@ -161,6 +175,7 @@ func EmitDeferred(
 		before,
 		invocationBefore,
 		call,
+		cooperative,
 		api.CombineRequests(
 			callee.Requests(),
 			argumentRequests,
@@ -189,6 +204,7 @@ func emitDeferredBuiltin(
 			target.Before(),
 			nil,
 			target.Value(),
+			false,
 			target.Requests(),
 		)
 	}
@@ -207,6 +223,7 @@ func deferredInvocation(
 	before []tsgo.Statement,
 	invocationBefore []tsgo.Statement,
 	call tsgo.Expression,
+	targetCooperative bool,
 	requests []api.RootRequest,
 ) (api.ExpressionEmission, error) {
 	recovery, recoveryRequests, err :=
@@ -214,16 +231,31 @@ func deferredInvocation(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	if targetCooperative {
+		request, requestErr := context.CooperativeRequest()
+		if requestErr != nil {
+			return api.ExpressionEmission{}, requestErr
+		}
+		requests = append(requests, request)
+		call = context.Factory().AwaitExpression(call)
+	}
+	cooperative := targetCooperative || context.IsCooperative()
 	body := append(invocationBefore, context.Factory().ExpressionStatement(call))
+	var modifiers []tsgo.ModifierLike
+	var resultType tsgo.TypeNode = context.Factory().KeywordTypeNode(
+		tsgo.KeywordTypeSyntaxKindVoidKeyword,
+	)
+	if cooperative {
+		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
+		resultType = callable.PromiseResult(context.Factory(), resultType)
+	}
 	return api.NewExpressionEmission(
 		before,
 		context.Factory().ArrowFunction(
-			nil,
+			modifiers,
 			nil,
 			[]tsgo.ParameterDeclaration{recovery},
-			context.Factory().KeywordTypeNode(
-				tsgo.KeywordTypeSyntaxKindVoidKeyword,
-			),
+			resultType,
 			context.Factory().EqualsGreaterThanToken(),
 			context.Factory().Block(body, true),
 		),
@@ -238,15 +270,21 @@ func deferredNoop(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	var modifiers []tsgo.ModifierLike
+	var resultType tsgo.TypeNode = context.Factory().KeywordTypeNode(
+		tsgo.KeywordTypeSyntaxKindVoidKeyword,
+	)
+	if context.IsCooperative() {
+		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
+		resultType = callable.PromiseResult(context.Factory(), resultType)
+	}
 	return api.NewExpressionEmission(
 		nil,
 		context.Factory().ArrowFunction(
-			nil,
+			modifiers,
 			nil,
 			[]tsgo.ParameterDeclaration{recovery},
-			context.Factory().KeywordTypeNode(
-				tsgo.KeywordTypeSyntaxKindVoidKeyword,
-			),
+			resultType,
 			context.Factory().EqualsGreaterThanToken(),
 			context.Factory().Block(nil, true),
 		),

@@ -202,15 +202,42 @@ func EmitOperationParameters(
 				Reason: "generic operation parameter is invalid",
 			}
 		}
-		target, err := callable.EmitInlineNonNilType(
-			context.WithRole(api.RoleParameterType),
-			children,
-			source,
-			operation.Signature(),
-			false,
+		var (
+			target        api.TypeEmission
+			targetErr     error
+			facetRequests []api.RootRequest
 		)
-		if err != nil {
-			return nil, nil, err
+		if operation.Operation() ==
+			api.GenericOperationConstraintMethod {
+			facet, facetErr :=
+				api.NewGenericOperationCallableFacet(operation)
+			if facetErr != nil {
+				return nil, nil, facetErr
+			}
+			observation, observationErr :=
+				context.ObserveCooperativeCallable(facet)
+			if observationErr != nil {
+				return nil, nil, observationErr
+			}
+			target, targetErr = callable.EmitInlineAwaitableType(
+				context.WithRole(api.RoleParameterType),
+				children,
+				source,
+				operation.Signature(),
+				observation.Cooperative(),
+			)
+			facetRequests = observation.Requests()
+		} else {
+			target, targetErr = callable.EmitInlineNonNilType(
+				context.WithRole(api.RoleParameterType),
+				children,
+				source,
+				operation.Signature(),
+				false,
+			)
+		}
+		if targetErr != nil {
+			return nil, nil, targetErr
 		}
 		parameter := context.Factory().ParameterDeclaration(
 			nil,
@@ -225,7 +252,13 @@ func EmitOperationParameters(
 			return nil, nil, err
 		}
 		capabilities = append(capabilities, binding)
-		requests = append(requests, target.Requests()...)
+		requests = append(
+			requests,
+			api.CombineRequests(
+				target.Requests(),
+				facetRequests,
+			)...,
+		)
 	}
 	return capabilities, requests, nil
 }

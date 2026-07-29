@@ -59,31 +59,95 @@ func EmitCapabilities(
 		if err != nil {
 			return nil, nil, err
 		}
-		var reference api.NameReference
+		var (
+			referenceName     string
+			referenceRequests []api.RootRequest
+			providerFacet     api.CallableFacet
+		)
+		cooperativeCapability :=
+			operation.Consumer() ==
+				api.GenericFunctionOperationConsumer() &&
+				operation.Operation() ==
+					api.GenericOperationConstraintMethod
 		if api.ContainsGenericTypeParameter(signature) {
-			reference, err = context.ProjectGenericOperation(
+			reference, referenceErr := context.ProjectGenericOperation(
 				source,
 				operation,
 				signature,
 			)
+			err = referenceErr
+			if err == nil {
+				referenceName = reference.Name()
+				referenceRequests = reference.Requests()
+				if cooperativeCapability {
+					providerFacet, err =
+						api.NewGenericOperationCallableFacet(
+							reference.Contract(),
+						)
+				}
+			}
 		} else {
-			reference, err = context.Names().GenericCapability(
-				operation.Selection(),
-				signature,
-			)
+			reference, referenceErr :=
+				context.Names().GenericCapability(
+					operation.Selection(),
+					signature,
+				)
+			err = referenceErr
+			if err == nil {
+				referenceName = reference.Name()
+				referenceRequests = reference.Requests()
+				if cooperativeCapability {
+					providerFacet, err =
+						api.NewGenericCapabilityCallableFacet(
+							reference.Artifact(),
+						)
+				}
+			}
 		}
 		if err != nil {
 			return nil, nil, err
 		}
+		contractRequests := referenceRequests
+		if cooperativeCapability {
+			consumerFacet, facetErr :=
+				api.NewGenericOperationCallableFacet(operation)
+			if facetErr != nil {
+				return nil, nil, facetErr
+			}
+			providerObservation, observationErr :=
+				context.ObserveCooperativeCallable(providerFacet)
+			if observationErr != nil {
+				return nil, nil, observationErr
+			}
+			consumerObservation, observationErr :=
+				context.ObserveCooperativeCallable(consumerFacet)
+			if observationErr != nil {
+				return nil, nil, observationErr
+			}
+			contractRequests = api.CombineRequests(
+				referenceRequests,
+				providerObservation.Requests(),
+				consumerObservation.Requests(),
+			)
+			if providerObservation.Cooperative() &&
+				!consumerObservation.Cooperative() {
+				request, requestErr :=
+					api.NewCooperativeCallableRequest(consumerFacet)
+				if requestErr != nil {
+					return nil, nil, requestErr
+				}
+				contractRequests = append(contractRequests, request)
+			}
+		}
 		binding, err := genericabi.Capability[tsgo.Expression](
 			operation,
-			context.Factory().Identifier(reference.Name()),
+			context.Factory().Identifier(referenceName),
 		)
 		if err != nil {
 			return nil, nil, err
 		}
 		targets = append(targets, binding)
-		requests = append(requests, reference.Requests()...)
+		requests = append(requests, contractRequests...)
 	}
 	return targets, requests, nil
 }

@@ -299,6 +299,11 @@ func Audit() (
 	int32,
 	int32,
 	int32,
+	int32,
+	int32,
+	int16,
+	int64,
+	int32,
 ) {
 	return Buffered(),
 		Unbuffered(),
@@ -322,5 +327,10 @@ func Audit() (
 		GoroutineEvaluation(),
 		GoroutineForms(),
 		SelectEvaluation(),
-		SelectControl()
+		SelectControl(),
+		DeferCooperative(),
+		GenericConstraintChannel(),
+		GenericConstraintForward(),
+		GenericConstraintSynchronous(),
+		DeferRecoverCooperative()
 }

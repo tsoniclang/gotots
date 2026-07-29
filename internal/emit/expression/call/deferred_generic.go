@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -90,6 +91,11 @@ func emitDeferredGeneric(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
+	cooperative, contractRequests, err :=
+		cooperativecall.SourceContract(context, owner)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
 	call := context.Factory().CallExpression(
 		context.Factory().Identifier(reference.Name()),
 		nil,
@@ -102,11 +108,13 @@ func emitDeferredGeneric(
 		before,
 		nil,
 		call,
+		cooperative,
 		api.CombineRequests(
 			reference.Requests(),
 			typeRequests,
 			capabilityRequests,
 			argumentRequests,
+			contractRequests,
 			[]api.RootRequest{control},
 		),
 	)

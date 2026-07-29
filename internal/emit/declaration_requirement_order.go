@@ -101,6 +101,15 @@ func compareDeclarationRequirements(
 				return 1
 			}
 		}
+		if leftOperation, ok := leftFacet.GenericOperation(); ok {
+			rightOperation, _ := rightFacet.GenericOperation()
+			switch {
+			case leftOperation.Key() < rightOperation.Key():
+				return -1
+			case leftOperation.Key() > rightOperation.Key():
+				return 1
+			}
+		}
 		return 0
 	}
 	if left.Kind() == api.DeclarationRequirementAnonymousStruct {

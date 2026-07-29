@@ -23,6 +23,19 @@ func SourceCall(
 	return facetCall(context, source, facet, target, true)
 }
 
+func GenericOperationCall(
+	context api.Context,
+	source ast.Node,
+	operation *api.GenericOperationContract,
+	target api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	facet, err := api.NewGenericOperationCallableFacet(operation)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return facetCall(context, source, facet, target, true)
+}
+
 func DetachedSourceCall(
 	context api.Context,
 	source ast.Node,
@@ -42,7 +55,15 @@ func ValueCall(
 	signature *types.Signature,
 	target api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	return valueCall(context, source, signature, target, true)
+	return valueCall(context, source, signature, target, true, false)
+}
+
+func GeneratedValueCall(
+	context api.Context,
+	signature *types.Signature,
+	target api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	return valueCall(context, nil, signature, target, true, true)
 }
 
 func DetachedValueCall(
@@ -51,7 +72,7 @@ func DetachedValueCall(
 	signature *types.Signature,
 	target api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
-	return valueCall(context, source, signature, target, false)
+	return valueCall(context, source, signature, target, false, false)
 }
 
 func valueCall(
@@ -60,6 +81,7 @@ func valueCall(
 	signature *types.Signature,
 	target api.ExpressionEmission,
 	propagate bool,
+	generated bool,
 ) (api.ExpressionEmission, error) {
 	reference, observation, err := observeABI(context, signature)
 	if err != nil {
@@ -80,7 +102,7 @@ func valueCall(
 	if !observation.Cooperative() {
 		return target, nil
 	}
-	return await(context, source, target, propagate)
+	return await(context, source, target, propagate, generated)
 }
 
 func AdaptSourceValue(
@@ -159,7 +181,7 @@ func Operation(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return await(context, source, target, true)
+	return await(context, source, target, true, false)
 }
 
 func ValueContract(
@@ -227,7 +249,7 @@ func facetCall(
 	if err != nil || !observation.Cooperative() {
 		return target, err
 	}
-	return await(context, source, target, propagate)
+	return await(context, source, target, propagate, false)
 }
 
 func adaptProviderValue(
@@ -409,8 +431,10 @@ func await(
 	source ast.Node,
 	target api.ExpressionEmission,
 	propagate bool,
+	generated bool,
 ) (api.ExpressionEmission, error) {
-	if source == nil {
+	_, generatedOwner := context.ArtifactOwner().Generated()
+	if source == nil && (!generated || !generatedOwner) {
 		return api.ExpressionEmission{}, &api.InvariantError{
 			Role:   context.Role(),
 			Reason: "cooperative operation source is nil",

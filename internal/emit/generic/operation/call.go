@@ -6,6 +6,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -107,7 +108,7 @@ func call(
 		false,
 	)
 	method, constraintMethod := selection.Method()
-	var reference api.NameReference
+	var reference api.GenericOperationReference
 	var err error
 	if constraintMethod {
 		reference, err = context.GenericConstraintMethod(
@@ -125,7 +126,7 @@ func call(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return api.DirectExpression(
+	target := api.DirectExpression(
 		context.Factory().CallExpression(
 			context.Factory().Identifier(reference.Name()),
 			nil,
@@ -134,5 +135,17 @@ func call(
 			tsgo.NodeFlagsNone,
 		),
 		api.CombineRequests(requests, reference.Requests())...,
-	), nil
+	)
+	if reference.Contract().Consumer() !=
+		api.GenericFunctionOperationConsumer() ||
+		reference.Contract().Operation() !=
+			api.GenericOperationConstraintMethod {
+		return target, nil
+	}
+	return cooperativecall.GenericOperationCall(
+		context,
+		source,
+		reference.Contract(),
+		target,
+	)
 }

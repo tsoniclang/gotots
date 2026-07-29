@@ -155,6 +155,12 @@ func deferStackDeclaration(
 		context.Factory().Identifier(recoveryName),
 		nil,
 	)
+	var resultType tsgo.TypeNode = context.Factory().KeywordTypeNode(
+		tsgo.KeywordTypeSyntaxKindVoidKeyword,
+	)
+	if context.IsCooperative() {
+		resultType = PromiseResult(context.Factory(), resultType)
+	}
 	callableType := context.Factory().FunctionTypeNode(
 		nil,
 		[]tsgo.ParameterDeclaration{
@@ -167,9 +173,7 @@ func deferStackDeclaration(
 				nil,
 			),
 		},
-		context.Factory().KeywordTypeNode(
-			tsgo.KeywordTypeSyntaxKindVoidKeyword,
-		),
+		resultType,
 	)
 	return variableStatement(
 		context,
@@ -395,15 +399,7 @@ func drainDefers(
 		context.Factory().TryStatement(
 			context.Factory().Block(
 				[]tsgo.Statement{
-					context.Factory().ExpressionStatement(
-						context.Factory().CallExpression(
-							deferred,
-							nil,
-							nil,
-							[]tsgo.Expression{recovery},
-							tsgo.NodeFlagsNone,
-						),
-					),
+					deferredCallStatement(context, deferred, recovery),
 					context.Factory().IfStatement(
 						context.Factory().CallExpression(
 							context.Factory().PropertyAccessExpression(
@@ -481,6 +477,24 @@ func drainDefers(
 		),
 		context.Factory().Block(body, true),
 	)
+}
+
+func deferredCallStatement(
+	context api.Context,
+	deferred tsgo.Expression,
+	recovery tsgo.Expression,
+) tsgo.Statement {
+	var call tsgo.Expression = context.Factory().CallExpression(
+		deferred,
+		nil,
+		nil,
+		[]tsgo.Expression{recovery},
+		tsgo.NodeFlagsNone,
+	)
+	if context.IsCooperative() {
+		call = context.Factory().AwaitExpression(call)
+	}
+	return context.Factory().ExpressionStatement(call)
 }
 
 func finalPanicStatement(

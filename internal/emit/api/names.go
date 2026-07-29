@@ -206,7 +206,7 @@ type Names interface {
 	GenericCapability(
 		GenericOperationSelection,
 		*types.Signature,
-	) (NameReference, error)
+	) (GenericCapabilityReference, error)
 	CallableABI(*types.Signature) (CallableABIReference, error)
 	ConstantProjection(*types.Const, types.BasicKind) (NameReference, error)
 	Member(*types.Var) (string, error)

@@ -42,14 +42,14 @@ func TestWaveNineConcurrencyCompilesThroughPublicPipeline(t *testing.T) {
 	}
 	workingDirectory := t.TempDir()
 	artifacts := materializeArtifacts(t, emission, workingDirectory)
-	if artifacts.bytes > 120_000 || artifacts.largest > 32_000 {
+	if artifacts.bytes > 140_000 || artifacts.largest > 32_000 {
 		t.Fatalf(
 			"Wave 9 artifact bounds exceeded: total=%d largest=%d",
 			artifacts.bytes,
 			artifacts.largest,
 		)
 	}
-	if artifacts.nodes > 24_000 {
+	if artifacts.nodes > 25_000 {
 		t.Fatalf(
 			"Wave 9 artifact AST bound exceeded: nodes=%d",
 			artifacts.nodes,
@@ -340,6 +340,90 @@ func assertWaveNineArtifactShape(t *testing.T, printed string) {
 			valueRecursive,
 		)
 	}
+	deferred := waveNineFunctionText(t, printed, "deferredOnly")
+	for _, required := range []string{
+		"export async function deferredOnly(",
+		"await __gotots_deferred_",
+	} {
+		if !strings.Contains(deferred, required) {
+			t.Fatalf(
+				"cooperative defer lacks %q:\n%s",
+				required,
+				deferred,
+			)
+		}
+	}
+	deferredRecover := waveNineFunctionText(
+		t,
+		printed,
+		"cooperativeDeferredRecover",
+	)
+	for _, required := range []string{
+		"export async function cooperativeDeferredRecover(",
+		"Promise<void>",
+		"await __gotots_deferred_",
+	} {
+		if !strings.Contains(deferredRecover, required) {
+			t.Fatalf(
+				"cooperative deferred recover lacks %q:\n%s",
+				required,
+				deferredRecover,
+			)
+		}
+	}
+	genericConstraint := waveNineFunctionText(
+		t,
+		printed,
+		"pullConstraint",
+	)
+	for _, required := range []string{
+		"export async function pullConstraint<",
+		"return await $go$constraint_method_",
+	} {
+		if !strings.Contains(genericConstraint, required) {
+			t.Fatalf(
+				"cooperative constraint method lacks %q:\n%s",
+				required,
+				genericConstraint,
+			)
+		}
+	}
+	forwardLeaf := waveNineFunctionText(t, printed, "forwardLeaf")
+	for _, required := range []string{
+		"export async function forwardLeaf<",
+		"return await $go$constraint_method_",
+	} {
+		if !strings.Contains(forwardLeaf, required) {
+			t.Fatalf(
+				"cooperative generic leaf lacks %q:\n%s",
+				required,
+				forwardLeaf,
+			)
+		}
+	}
+	forwardBridge := waveNineFunctionText(t, printed, "forwardBridge")
+	for _, required := range []string{
+		"export async function forwardBridge<",
+		"return await forwardLeaf<T>(",
+	} {
+		if !strings.Contains(forwardBridge, required) {
+			t.Fatalf(
+				"cooperative generic forwarding lacks %q:\n%s",
+				required,
+				forwardBridge,
+			)
+		}
+	}
+	staticConstraint := waveNineFunctionText(t, printed, "readStatic")
+	for _, forbidden := range []string{"async", "Promise<", "await "} {
+		if strings.Contains(staticConstraint, forbidden) {
+			t.Fatalf(
+				"synchronous generic constraint acquired %q:\n%s",
+				forbidden,
+				staticConstraint,
+			)
+		}
+	}
 	if !strings.Contains(printed, "PackageReceiver") ||
 		!strings.Contains(printed, "Promise<int32>") {
 		t.Fatal("function-valued package storage lacks its cooperative ABI")
@@ -348,9 +432,9 @@ func assertWaveNineArtifactShape(t *testing.T, printed string) {
 
 func waveNineFunctionText(t *testing.T, printed, name string) string {
 	t.Helper()
-	start := strings.Index(printed, "export function "+name+"(")
+	start := strings.Index(printed, "export function "+name)
 	if start < 0 {
-		start = strings.Index(printed, "export async function "+name+"(")
+		start = strings.Index(printed, "export async function "+name)
 	}
 	if start < 0 {
 		t.Fatalf("Wave 9 artifacts lack function %s", name)

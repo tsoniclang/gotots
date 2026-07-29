@@ -18,9 +18,9 @@ const (
 func (n *File) GenericCapability(
 	selection api.GenericOperationSelection,
 	signature *types.Signature,
-) (api.NameReference, error) {
+) (api.GenericCapabilityReference, error) {
 	if !selection.Valid() || signature == nil {
-		return api.NameReference{}, &api.NameError{
+		return api.GenericCapabilityReference{}, &api.NameError{
 			Reason: "generic-capability contract is invalid",
 		}
 	}
@@ -29,11 +29,11 @@ func (n *File) GenericCapability(
 		n.generatedNamedObjectIdentity,
 	)
 	if err != nil {
-		return api.NameReference{}, err
+		return api.GenericCapabilityReference{}, err
 	}
 	operationKey, err := selection.IdentityPrefix()
 	if err != nil {
-		return api.NameReference{}, err
+		return api.GenericCapabilityReference{}, err
 	}
 	digest := sha256.Sum256(
 		[]byte(operationKey + "|" + signatureKey),
@@ -41,7 +41,7 @@ func (n *File) GenericCapability(
 	artifactKey := hex.EncodeToString(digest[:])
 	placement, err := n.generatedArtifactPlacement(signature)
 	if err != nil {
-		return api.NameReference{}, err
+		return api.GenericCapabilityReference{}, err
 	}
 	binding, err := n.owner.registry.internGenericCapability(
 		artifactKey,
@@ -50,17 +50,25 @@ func (n *File) GenericCapability(
 		placement,
 	)
 	if err != nil {
-		return api.NameReference{}, err
+		return api.GenericCapabilityReference{}, err
 	}
 	definition, err := api.NewGenericCapabilityRequest(binding.owner)
 	if err != nil {
-		return api.NameReference{}, err
+		return api.GenericCapabilityReference{}, err
 	}
-	return n.generatedValueReference(
+	reference, err := n.generatedValueReference(
 		binding.owner,
 		binding.name,
 		definition,
 		api.ArtifactFacetCallableSignature,
+	)
+	if err != nil {
+		return api.GenericCapabilityReference{}, err
+	}
+	return api.NewGenericCapabilityReference(
+		binding.owner,
+		reference.Name(),
+		reference.Requests()...,
 	)
 }
 
