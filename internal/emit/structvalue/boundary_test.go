@@ -22,15 +22,6 @@ func TestNamedStructUnsupportedNeighborsFailAtTypedOwners(t *testing.T) {
 		construct string
 	}{
 		{
-			name: "embedding",
-			source: "package boundary\n" +
-				"type Base struct { Value int32 }\n" +
-				"type Embedded struct { Base }\n",
-			role:      api.RoleStructField,
-			category:  api.CategoryDeclaration,
-			construct: "*ast.Field",
-		},
-		{
 			name: "interface field",
 			source: "package boundary\n" +
 				"type Interface struct { Value interface{ Read() int32 } }\n",
@@ -45,26 +36,6 @@ func TestNamedStructUnsupportedNeighborsFailAtTypedOwners(t *testing.T) {
 			role:      api.RoleFileDeclaration,
 			category:  api.CategoryDeclaration,
 			construct: "*ast.GenDecl",
-		},
-		{
-			name: "method expression",
-			source: "package boundary\n" +
-				"type Value struct { X int32 }\n" +
-				"func (value Value) WithX(next int32) Value { value.X = next; return value }\n" +
-				"func Use(value Value) Value { return Value.WithX(value, 1) }\n",
-			role:      api.RoleCallCallee,
-			category:  api.CategoryExpression,
-			construct: "*ast.SelectorExpr",
-		},
-		{
-			name: "method value",
-			source: "package boundary\n" +
-				"type Value struct { X int32 }\n" +
-				"func (value Value) WithX(next int32) Value { value.X = next; return value }\n" +
-				"func Use(value Value) Value { method := value.WithX; return method(1) }\n",
-			role:      api.RoleLocalValue,
-			category:  api.CategoryExpression,
-			construct: "*ast.SelectorExpr",
 		},
 	}
 	for _, testCase := range testCases {

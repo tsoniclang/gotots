@@ -146,22 +146,19 @@ func (n *File) reference(
 		requests = append(requests, request)
 	}
 	if binding.sourceFile != nil && binding.sourcePath != n.targetPath {
-		referencePath := binding.sourcePath
-		if object.Pkg() != nil && object.Pkg().Scope() != n.packageScope {
-			referencePath = n.owner.registry.assemblyPathByPackage[object.Pkg()]
-			if referencePath == "" {
-				return api.NameReference{}, &api.NameError{
-					Name:   object.Name(),
-					Reason: "cross-package declaration has no assembly path",
-				}
-			}
+		referencePath, crossPackage, err := n.sourceReferencePath(
+			object,
+			binding,
+		)
+		if err != nil {
+			return api.NameReference{}, err
 		}
 		modulePath, err := output.ModuleSpecifier(n.targetPath, referencePath)
 		if err != nil {
 			return api.NameReference{}, err
 		}
 		localName := binding.name
-		if object.Parent() != n.packageScope {
+		if crossPackage {
 			localName, err = n.importName(object, binding.name)
 			if err != nil {
 				return api.NameReference{}, err
@@ -365,7 +362,7 @@ func (n *File) Member(field *types.Var) (string, error) {
 	}
 	name := n.owner.memberNameByObject[field]
 	if name == "" {
-		if !field.IsField() || field.Embedded() || field.Name() == "_" {
+		if !field.IsField() || field.Name() == "_" {
 			return "", &api.NameError{
 				Name:   field.Name(),
 				Reason: "field object has no target member identity",

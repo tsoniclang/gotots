@@ -2,7 +2,6 @@ package pointer_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit"
-	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
@@ -214,38 +212,6 @@ func TestAddressabilityDoesNotWrapUnrelatedLocals(t *testing.T) {
 	if strings.Contains(source, "result$storage") &&
 		!strings.Contains(source, "function NamedResult") {
 		t.Fatal("storage evidence was not scoped to the selected declaration")
-	}
-}
-
-func TestReceiverMethodValueAndExpressionRemainTypedBoundaries(t *testing.T) {
-	for _, testCase := range []struct {
-		name   string
-		source string
-	}{
-		{
-			name: "method value",
-			source: `package boundary
-type Box struct { Count int32 }
-func (box *Box) Add(delta int32) { box.Count += delta }
-func MethodValue(box *Box) func(int32) { return box.Add }
-`,
-		},
-		{
-			name: "method expression",
-			source: `package boundary
-type Box struct { Count int32 }
-func (box *Box) Add(delta int32) { box.Count += delta }
-func MethodExpression(box *Box) { (*Box).Add(box, 1) }
-`,
-		},
-	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			err := compileTemporaryFunctionSource(t, testCase.source)
-			var unsupported *api.UnsupportedError
-			if !errors.As(err, &unsupported) {
-				t.Fatalf("error = %v, want *api.UnsupportedError", err)
-			}
-		})
 	}
 }
 

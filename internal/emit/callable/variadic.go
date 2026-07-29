@@ -13,10 +13,10 @@ func emitVariadicParameter(
 	children api.ChildEmitter,
 	source ast.Node,
 	parameter *types.Var,
-	index int,
+	name string,
 	parameterRole api.Role,
 ) (tsgo.ParameterDeclaration, []api.RootRequest, error) {
-	if parameter == nil {
+	if parameter == nil || name == "" {
 		return nil, nil, api.Unsupported(context, api.CategoryType, source)
 	}
 	parameterType, ok := types.Unalias(parameter.Type()).(*types.Slice)
@@ -28,10 +28,6 @@ func emitVariadicParameter(
 		source,
 		parameterType,
 	)
-	if err != nil {
-		return nil, nil, err
-	}
-	name, err := context.Names().Parameter(parameter, index)
 	if err != nil {
 		return nil, nil, err
 	}

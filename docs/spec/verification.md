@@ -420,8 +420,8 @@ The first named-struct family additionally proves:
   conjunction;
 - concrete value-receiver calls use the exact `go/types.Selection` and a named
   receiver function, never a class method or virtual dispatch; and
-- tags, embedding, pointers, interfaces, method values/expressions, generics,
-  and unsupported field representations fail at their typed owner.
+- tags, pointers, interfaces, generics, and unsupported field representations
+  fail at their typed owner.
 
 Mutations replace a requested copy with direct assignment, replace requested
 field equality with `===`, remove the private brand, add source-order captures
@@ -758,6 +758,48 @@ omit the value-receiver copy,
 bypass package-`init` artifact reconstruction, or dirty callers after an
 unchanged callable facet. Each fails at its owning structure, artifact,
 strict-type, or differential gate.
+
+### Milestone 3D Concrete-Method Gate
+
+The integrated fixture runs under the `number` and `bigint` integer profiles.
+It must encode and print through pinned TS-Go, strict-typecheck before
+execution, and match Go for methods on represented defined and struct types,
+embedded values and pointers, nested promotion, field read/store/address,
+direct calls, method values, method expressions, anonymous embedding,
+variadics, and nil-sensitive receiver adjustment.
+
+Blocking evidence includes:
+
+1. every concrete selector exact-validates `Selection.Kind`, `Obj`, `Recv`,
+   result type, and complete `Index()` path against the selected checker graph;
+2. mutating only selector spelling leaves encoded target AST byte-identical,
+   while substituting another valid selection object fails at the selector
+   owner;
+3. a promoted call from `Base.CallName` remains `Base_Name(base)` even when the
+   embedding type declares its own `Name`, proving no accidental virtual
+   dispatch;
+4. method-value formation evaluates and captures the receiver once, copies
+   value receivers once, and preserves pointer identity;
+5. nil-safe pointer receiver values may form and execute, while a value method
+   selected through a nil pointer and a promoted field through a nil embedded
+   pointer panic at the same boundary as Go;
+6. direct method expressions are direct receiver-function references and
+   promoted method expressions are typed arrows with an explicit first
+   receiver parameter;
+7. embedded fields remain owned class fields, including anonymous structs and
+   reserved/unexported member names; generated support imports their defining
+   source modules with collision-safe package-qualified aliases; and
+8. generated artifacts contain no `extends`, `.call`, `.apply`, `.bind`,
+   erased carrier, reflection, or per-method/per-implementer dispatch switch.
+
+A 1x/2x/4x embedding-depth fixture independently measures source bytes,
+printed target bytes, and encoded TS-Go nodes. Each use contains one selected
+receiver-function call, and all three measures grow linearly with source
+depth. Production mutations remove an index component, replace the selected
+object, select by spelling, omit a value copy, skip an embedded-pointer nil
+check, reevaluate a receiver, attach methods to classes, or route generated
+private declarations through a public assembly; each fails its identity,
+differential, strict-type, shape, naming, or scaling owner.
 
 ## Heavy Runs
 

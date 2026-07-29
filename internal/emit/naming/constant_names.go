@@ -64,17 +64,14 @@ func (n *File) ConstantProjection(
 		requests = append(requests, dependency)
 	}
 	if binding.sourceFile != nil && binding.sourceFile != n.sourceFile {
-		referencePath := binding.sourcePath
-		if selected.Pkg() != nil &&
-			selected.Pkg().Scope() != n.packageScope {
-			referencePath = n.owner.registry.
-				assemblyPathByPackage[selected.Pkg()]
-			if referencePath == "" {
-				return api.NameReference{}, &api.NameError{
-					Name:   selected.Name(),
-					Reason: "cross-package constant has no assembly path",
-				}
-			}
+		referencePath, crossPackage, err := n.sourceReferencePath(
+			selected,
+			binding,
+		)
+		if err != nil {
+			return api.NameReference{}, err
+		}
+		if crossPackage {
 			localName, err = n.constantProjectionImportName(
 				constantProjectionImport{
 					constant:   selected,

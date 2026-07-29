@@ -36,7 +36,10 @@ func emitReceiver(
 		baseType = pointer.Elem()
 	}
 	named, ok := types.Unalias(baseType).(*types.Named)
-	if !ok || named.TypeParams().Len() != 0 {
+	if !ok ||
+		named.Obj() == nil ||
+		named.Obj().Pkg() != signature.Recv().Pkg() ||
+		named.TypeParams().Len() != 0 {
 		return nil, nil,
 			api.Unsupported(
 				context.WithRole(api.RoleReceiverType),
@@ -44,11 +47,10 @@ func emitReceiver(
 				field.Type,
 			)
 	}
-	if _, ok := named.Underlying().(*types.Struct); !ok ||
-		!types.Identical(
-			context.TypesInfo().TypeOf(field.Type),
-			receiverType,
-		) ||
+	if !types.Identical(
+		context.TypesInfo().TypeOf(field.Type),
+		receiverType,
+	) ||
 		context.TypesInfo().Defs[field.Names[0]] != signature.Recv() {
 		return nil, nil,
 			api.Unsupported(context, api.CategoryDeclaration, field)

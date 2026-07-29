@@ -4,19 +4,50 @@ import (
 	"go/ast"
 	"go/types"
 	"slices"
+	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type SignatureEmission struct {
-	parameters []tsgo.ParameterDeclaration
-	result     tsgo.TypeNode
-	requests   []api.RootRequest
+	parameters     []tsgo.ParameterDeclaration
+	parameterNames []string
+	result         tsgo.TypeNode
+	requests       []api.RootRequest
+}
+
+func EmitAdapter(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	signature *types.Signature,
+) (SignatureEmission, error) {
+	return emitRepresented(
+		context,
+		children,
+		source,
+		signature,
+		api.RoleCallableParameter,
+		api.RoleCallableResult,
+		func(_ *types.Var, index int) (string, error) {
+			return "$argument" + strconv.Itoa(index), nil
+		},
+	)
 }
 
 func (e SignatureEmission) Parameters() []tsgo.ParameterDeclaration {
 	return slices.Clone(e.parameters)
+}
+
+func (e SignatureEmission) ParameterReferences(
+	factory tsgo.Factory,
+) []tsgo.Expression {
+	result := make([]tsgo.Expression, 0, len(e.parameterNames))
+	for _, name := range e.parameterNames {
+		result = append(result, factory.Identifier(name))
+	}
+	return result
 }
 
 func (e SignatureEmission) Result() tsgo.TypeNode {
@@ -51,6 +82,7 @@ func Emit(
 		signature,
 		parameterRole,
 		resultRole,
+		context.Names().Parameter,
 	)
 }
 
@@ -88,6 +120,9 @@ func EmitNonNilType(
 		signature,
 		api.RoleCallableParameter,
 		api.RoleCallableResult,
+		func(_ *types.Var, index int) (string, error) {
+			return "$" + strconv.Itoa(index), nil
+		},
 	)
 	if err != nil {
 		return api.TypeEmission{}, err
@@ -136,28 +171,35 @@ func emitRepresented(
 	signature *types.Signature,
 	parameterRole api.Role,
 	resultRole api.Role,
+	parameterName func(*types.Var, int) (string, error),
 ) (SignatureEmission, error) {
-	if !Supports(signature) {
+	if !Supports(signature) || parameterName == nil {
 		return SignatureEmission{},
 			api.Unsupported(context, api.CategoryType, source)
 	}
 	parameters := make([]tsgo.ParameterDeclaration, 0, signature.Params().Len())
+	parameterNames := make([]string, 0, signature.Params().Len())
 	var requests []api.RootRequest
 	for index := range signature.Params().Len() {
 		parameter := signature.Params().At(index)
+		name, err := parameterName(parameter, index)
+		if err != nil {
+			return SignatureEmission{}, err
+		}
 		if signature.Variadic() && index == signature.Params().Len()-1 {
 			parameterDeclaration, parameterRequests, err := emitVariadicParameter(
 				context,
 				children,
 				source,
 				parameter,
-				index,
+				name,
 				parameterRole,
 			)
 			if err != nil {
 				return SignatureEmission{}, err
 			}
 			parameters = append(parameters, parameterDeclaration)
+			parameterNames = append(parameterNames, name)
 			requests = append(requests, parameterRequests...)
 			continue
 		}
@@ -169,10 +211,6 @@ func emitRepresented(
 		if err != nil {
 			return SignatureEmission{}, err
 		}
-		name, err := context.Names().Parameter(parameter, index)
-		if err != nil {
-			return SignatureEmission{}, err
-		}
 		parameters = append(parameters, context.Factory().ParameterDeclaration(
 			nil,
 			nil,
@@ -181,6 +219,7 @@ func emitRepresented(
 			targetType.Value(),
 			nil,
 		))
+		parameterNames = append(parameterNames, name)
 		requests = append(requests, targetType.Requests()...)
 	}
 	result, resultRequests, err := emitResultType(
@@ -194,9 +233,10 @@ func emitRepresented(
 	}
 	requests = append(requests, resultRequests...)
 	return SignatureEmission{
-		parameters: parameters,
-		result:     result,
-		requests:   requests,
+		parameters:     parameters,
+		parameterNames: parameterNames,
+		result:         result,
+		requests:       requests,
 	}, nil
 }
 

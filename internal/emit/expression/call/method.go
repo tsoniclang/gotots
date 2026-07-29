@@ -5,8 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
-	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
+	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -39,38 +38,25 @@ func emitMethod(
 	if !ok ||
 		signature.Recv() == nil ||
 		signature.TypeParams().Len() != 0 ||
-		signature.RecvTypeParams().Len() != 0 ||
-		len(selection.Index()) != 1 ||
-		!receiverTypesMatch(selection.Recv(), signature.Recv().Type()) {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
-	declaredReceiver := signature.Recv().Type()
-	receiverBase := declaredReceiver
-	if pointer, _, ok := pointertype.Resolve(receiverBase); ok {
-		receiverBase = pointer.Elem()
-	}
-	named, ok := types.Unalias(receiverBase).(*types.Named)
-	if !ok || named.TypeParams().Len() != 0 {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
-	if _, ok := named.Underlying().(*types.Struct); !ok {
+		signature.RecvTypeParams().Len() != 0 {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	if err := validateResults(context, source, signature, discarded); err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	receiver, err := emitSelectedReceiver(
+	receiver, resolvedMethod, err := selectionvalue.MethodReceiver(
 		context,
 		children,
 		selector,
 		selection,
-		declaredReceiver,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	if resolvedMethod != method {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	arguments, argumentBefore, argumentRequests, err := emitArguments(
 		context,
@@ -115,162 +101,6 @@ func emitMethod(
 			argumentRequests,
 			reference.Requests(),
 		),
-	)
-}
-
-func receiverTypesMatch(actual types.Type, declared types.Type) bool {
-	if types.Identical(actual, declared) {
-		return true
-	}
-	if pointer, _, ok := pointertype.Resolve(actual); ok &&
-		types.Identical(pointer.Elem(), declared) {
-		return true
-	}
-	if pointer, _, ok := pointertype.Resolve(declared); ok &&
-		types.Identical(actual, pointer.Elem()) {
-		return true
-	}
-	return false
-}
-
-func emitSelectedReceiver(
-	context api.Context,
-	children api.ChildEmitter,
-	selector *ast.SelectorExpr,
-	selection *types.Selection,
-	declared types.Type,
-) (api.ExpressionEmission, error) {
-	actual := selection.Recv()
-	_, declaredElement, declaredPointer := pointertype.Resolve(declared)
-	_, actualElement, actualPointer := pointertype.Resolve(actual)
-	switch {
-	case declaredPointer && actualPointer:
-		if !types.Identical(declaredElement, actualElement) {
-			break
-		}
-		return children.Expression(
-			context.
-				WithRole(api.RoleReceiverValue).
-				WithExpectedType(declared),
-			selector.X,
-		)
-	case declaredPointer:
-		if !types.Identical(actual, declaredElement) {
-			break
-		}
-		return children.Address(
-			context.
-				WithRole(api.RoleReceiverValue).
-				WithExpectedType(declared),
-			selector.X,
-		)
-	case actualPointer:
-		if !types.Identical(actualElement, declared) {
-			break
-		}
-		pointer, err := children.Expression(
-			context.
-				WithRole(api.RoleReceiverValue).
-				WithExpectedType(actual),
-			selector.X,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		value, err := dereferenceReceiver(
-			context,
-			children,
-			selector.X,
-			declared,
-			pointer,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		return context.Values().Copy(
-			context.WithRole(api.RoleReceiverValue),
-			selector.X,
-			declared,
-			value,
-		)
-	default:
-		if !types.Identical(actual, declared) {
-			break
-		}
-		value, err := children.Expression(
-			context.
-				WithRole(api.RoleReceiverValue).
-				WithExpectedType(declared),
-			selector.X,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		return context.Values().Copy(
-			context.WithRole(api.RoleReceiverValue),
-			selector.X,
-			declared,
-			value,
-		)
-	}
-	return api.ExpressionEmission{},
-		api.Unsupported(context, api.CategoryExpression, selector)
-}
-
-func dereferenceReceiver(
-	context api.Context,
-	children api.ChildEmitter,
-	source ast.Node,
-	element types.Type,
-	pointer api.ExpressionEmission,
-) (api.ExpressionEmission, error) {
-	targetElement, err := children.RepresentedType(
-		context.WithRole(api.RoleReceiverValue),
-		source,
-		element,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	storageType, err := context.Values().StorageType(
-		context.WithRole(api.RoleStorageType),
-		source,
-		element,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	reference, err := context.Names().Runtime(
-		api.RuntimePointer,
-		api.ImportPhaseValue,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	stored, err := api.NewExpressionEmission(
-		pointer.Before(),
-		pointerruntime.CellValue(
-			context.Factory(),
-			reference.Name(),
-			targetElement.Value(),
-			storageType.Value(),
-			pointer.Value(),
-		),
-		api.CombineRequests(
-			pointer.Requests(),
-			targetElement.Requests(),
-			storageType.Requests(),
-			reference.Requests(),
-		),
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	return context.Values().FromStorage(
-		context,
-		source,
-		element,
-		stored,
 	)
 }
 

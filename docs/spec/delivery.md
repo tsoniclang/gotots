@@ -261,9 +261,8 @@ create a value IR or a generic operation registry.
    composite literals, and `&*pointer`. Only exact addressed variables become
    cells. Package `init` bodies use the same reconstructible artifact
    lifecycle. Direct pointer-receiver calls and value-receiver calls through
-   pointers preserve Go nil, addressability, and copy behavior; method values,
-   method expressions, embedding/promotion, and interface dispatch remain
-   their separately proved families.
+   pointers preserve Go nil, addressability, and copy behavior. Interface
+   dispatch remains its separately proved family.
 
 The generated runtime boundary is demand-driven and typed. Each family owns
 its runtime module and exported operations; source handlers request imports by
@@ -399,6 +398,36 @@ Generated loop size is independent of collection length, switch construction is
 linear in source cases, each body is emitted once, exact label identity ignores
 source-spelling mutations, and the superseded target-header-only result API is
 absent.
+
+### 3D. Concrete Methods, Embedding, And Promotion
+
+Complete methods on represented non-generic named types, named and anonymous
+embedded fields, promoted field reads/stores/addresses, promoted concrete
+calls, method values, and method expressions.
+
+One selection-path owner consumes exact `go/types.Selection` evidence for all
+of those contexts. Receiver declarations remain named top-level functions.
+Embedding remains class-field composition; ordinary concrete calls never
+become target virtual dispatch. Method values capture their selected receiver
+once, while method expressions use the existing receiver function directly or
+one typed adapter when promotion/receiver adjustment requires it.
+
+This checkpoint exits only when:
+
+- every `types.SelectionKind` used by the admitted concrete family has one
+  contextual owner;
+- selection kind, object identity, receiver/result types, and complete index
+  path are exact-joined to checker evidence;
+- value-receiver copy, implicit address-taking, embedded-pointer dereference,
+  and nil panic timing match Go;
+- source-spelling mutation is byte-stable and mismatched selection identity
+  fails closed;
+- generated output contains no `extends`, `.call`, `.apply`, `.bind`, erased
+  payload, or implementer switch;
+- each use is constant-size apart from its selected embedding depth, and
+  1x/2x/4x depth fixtures grow linearly; and
+- both integer profiles pass TS-Go encode/print, strict typechecking, and
+  Go-versus-generated-ESM differential execution.
 
 ## 4. Environment And Completion
 

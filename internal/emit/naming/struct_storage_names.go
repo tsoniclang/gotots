@@ -49,15 +49,9 @@ func (n *File) NamedStructStorage(
 	if binding.sourceFile == nil || binding.sourcePath == n.targetPath {
 		return api.NewNameReference(localName, requests...)
 	}
-	referencePath := binding.sourcePath
-	if typeName.Pkg() != nil && typeName.Pkg().Scope() != n.packageScope {
-		referencePath = n.owner.registry.assemblyPathByPackage[typeName.Pkg()]
-		if referencePath == "" {
-			return api.NameReference{}, &api.NameError{
-				Name:   typeName.Name(),
-				Reason: "cross-package struct storage has no assembly path",
-			}
-		}
+	referencePath, _, err := n.sourceReferencePath(typeName, binding)
+	if err != nil {
+		return api.NameReference{}, err
 	}
 	modulePath, err := output.ModuleSpecifier(n.targetPath, referencePath)
 	if err != nil {

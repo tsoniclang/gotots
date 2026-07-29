@@ -308,7 +308,6 @@ func ownsFreshValue(context api.Context, source ast.Node) bool {
 		return selection != nil &&
 			selection.Kind() == types.FieldVal &&
 			!selection.Indirect() &&
-			len(selection.Index()) == 1 &&
 			ownsFreshValue(context, source.X)
 	default:
 		return false

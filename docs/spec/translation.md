@@ -721,8 +721,10 @@ representation and emits no class.
 
 Nil equality compares only with `undefined`, as selected by the checker.
 `new(func(...))` creates a fresh pointer cell whose value is `undefined`.
-Variadic or generic signatures, method values/expressions, and interface
-callables remain at their separately owned boundaries.
+Generic signatures and interface callables remain at their separately owned
+boundaries. Variadic method values and method expressions use the same
+represented final Go-slice parameter as every other variadic callable; they
+never acquire a JavaScript rest-parameter convention.
 
 ## Calls
 
@@ -933,11 +935,10 @@ GoToTS makes an observably required zero, copy, or equality operation explicit
 through one representation owner; it does not assume that a later compiler,
 plugin, or runtime will reinterpret ordinary TypeScript assignment.
 
-The first supported struct family is narrower and selects one nominal record
-class for non-generic, non-embedded named structs whose fields recursively
-contain only `bool`, profile-represented `int32` (including a selected 32-bit
-`int`), and members of the same supported struct family. A generated record
-class has:
+The supported struct family selects one nominal record class for non-generic
+named structs whose fields have admitted representations. An embedded field is
+ordinary owned storage in that class; it does not imply target inheritance.
+A generated record class has:
 
 - one erased private brand, which makes distinct named Go structs nominally
   distinct to strict TypeScript without adding an instance field;
@@ -976,14 +977,13 @@ incompatible even when their fields match. A requested nested struct operation
 requests the corresponding static operation from the nested type's owner. The
 erased brand must produce no JavaScript instance field.
 
-Interface behavior, method values/expressions, generics, reflection entry,
-pointers to unrepresented targets, and fields whose complete standalone
-representation is not yet exact are neighboring typed-unsupported families.
-Embedding may contribute exact storage in the recursive-value extension, but
-promotion and method selection remain deferred. Tags and blank fields may
-participate in exact type identity without implying reflection metadata or
-ordinary mutable storage. No neighboring family may be approximated by
-structural assignment or virtual dispatch.
+Interface behavior, generics, reflection entry, pointers to unrepresented
+targets, and fields whose complete standalone representation is not yet exact
+are neighboring typed-unsupported families. Tags and blank fields participate
+in exact type identity without implying reflection metadata or ordinary
+mutable storage. Embedded storage, promoted field selection, and promoted
+concrete methods use the exact `go/types.Selection` path. No neighboring family
+may be approximated by structural assignment or virtual dispatch.
 
 The recursive-value extension admits represented fields through arrays,
 slices, maps, pointers, callables, and other structs. A direct infinitely sized
@@ -1021,8 +1021,8 @@ constant-size calls. Doubling uses must not duplicate field walks. Field tags
 participate in identity but emit no runtime metadata unless a later reflection
 consumer requests it. Blank fields participate in identity and required
 evaluation order but expose no mutable target property. Embedded fields remain
-storage composition here; promotion and method selection remain with their
-later semantic owner.
+storage composition. Their later read, address, store, and concrete-method
+consumers all use the same exact selection-path owner.
 
 Each zero, copy, or equality capability is emitted at most once and only when a
 selected occurrence requests it. Its typed request is routed to the defining
@@ -1108,6 +1108,62 @@ receivers, method values, and interface calls select their own exact checked
 entry shape from `go/types`; they do not reuse a value-receiver entry when its
 copy or nil behavior differs. Generated code never uses `.call`, `.apply`, or
 `.bind`.
+
+Every concrete field or method selector is validated against the exact
+`*types.Selection`: kind, selected object identity, receiver type, result type,
+and every `Index()` component must agree with the selected checker graph.
+Source spelling is not a selection key. The one selection-path owner projects
+embedded fields for reads, stores, addresses, direct calls, method values, and
+method expressions.
+
+For example:
+
+```go
+type Base struct{ Value int32 }
+func (base Base) Read() int32 { return base.Value }
+func (base *Base) Add(delta int32) { base.Value += delta }
+
+type Derived struct{ Base }
+
+read := value.Read
+add := value.Add
+method := Derived.Read
+```
+
+The semantic decisions are:
+
+- `value.Read` captures one copied `Base` value at method-value formation;
+- `value.Add` captures the canonical address of the promoted `Base` storage;
+- `Derived.Read` is a typed adapter whose first explicit argument is
+  `Derived`, projects its selected `Base`, copies it once, and calls
+  `Base_Read`; and
+- a direct unpromoted method expression is the existing receiver-function
+  reference, with no adapter.
+
+A representative target shape is:
+
+```ts
+const readReceiver = Base.$copy(value.Base);
+const read = (): int32 => Base_Read(readReceiver);
+
+const addReceiver = GoPointer.field(valueAddress, "Base");
+const add = (delta: int32): void => Base_Add(addReceiver, delta);
+
+const method = (receiver: Derived): int32 =>
+  Base_Read(Base.$copy(receiver.Base));
+```
+
+Each receiver expression is evaluated once. A nil pointer passed to a
+pointer-receiver method may be captured and used by a nil-safe body. Forming a
+value-receiver method value through a nil pointer performs the required
+dereference and panics at formation. Promoted pointer fields are dereferenced
+only at the selected path boundary, preserving the corresponding Go panic
+timing.
+
+Method calls and method values remain constant-size as embedding depth grows:
+only the selected field path grows. They never expand with method count or
+possible receiver count. Anonymous and named embedded fields share this same
+path owner and their exact member names come from field-object identity.
 
 A TypeScript class outside this bounded nominal-record family is selected only
 when reference identity and all relevant Go call, nil, copy, promotion,

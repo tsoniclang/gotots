@@ -6,7 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
-	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -202,118 +202,15 @@ func selector(
 	field, ok := selection.Obj().(*types.Var)
 	if !ok ||
 		selection.Kind() != types.FieldVal ||
-		field.Embedded() ||
-		len(selection.Index()) != 1 ||
 		!types.Identical(field.Type(), element) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	receiverType := context.TypesInfo().TypeOf(source.X)
-	parentType := receiverType
-	if selection.Indirect() {
-		_, pointerElement, pointerOK := pointertype.Resolve(receiverType)
-		if defined, ok := definedtype.ResolvePointer(receiverType); ok {
-			pointer, _ := defined.Pointer()
-			pointerElement = pointer.Elem()
-			pointerOK = true
-		}
-		if !pointerOK {
-			return api.ExpressionEmission{},
-				api.Unsupported(context, api.CategoryExpression, source)
-		}
-		parentType = pointerElement
-	}
-	var receiver api.ExpressionEmission
-	var err error
-	if selection.Indirect() {
-		receiver, err = children.Expression(
-			context.
-				WithRole(api.RoleFieldReceiver).
-				WithExpectedType(receiverType),
-			source.X,
-		)
-		if err == nil {
-			receiver, err = dereference(
-				context,
-				children,
-				source.X,
-				receiverType,
-				receiver,
-			)
-		}
-	} else {
-		receiver, err = children.Address(
-			context.
-				WithRole(api.RoleFieldReceiver).
-				WithExpectedType(types.NewPointer(receiverType)),
-			source.X,
-		)
-	}
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	elementTarget, err := children.RepresentedType(
-		context.WithRole(api.RoleFieldReceiver),
+	return selectionvalue.FieldAddress(
+		context,
+		children,
 		source,
+		selection,
 		element,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	parentTarget, err := children.RepresentedType(
-		context.WithRole(api.RoleFieldReceiver),
-		source.X,
-		parentType,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	parentStorage, err := context.Values().StorageType(
-		context.WithRole(api.RoleStorageType),
-		source.X,
-		parentType,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	name, err := context.Names().Member(field)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	runtime, err := pointerRuntime(context)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	return api.NewExpressionEmission(
-		receiver.Before(),
-		context.Factory().CallExpression(
-			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(runtime.Name()),
-				nil,
-				context.Factory().Identifier(pointerruntime.FieldName),
-				tsgo.NodeFlagsNone,
-			),
-			nil,
-			[]tsgo.TypeNode{
-				elementTarget.Value(),
-				parentTarget.Value(),
-				parentStorage.Value(),
-				context.Factory().LiteralTypeNode(
-					context.Factory().StringLiteral(name, tsgo.TokenFlagsNone),
-				),
-			},
-			[]tsgo.Expression{
-				receiver.Value(),
-				context.Factory().StringLiteral(name, tsgo.TokenFlagsNone),
-			},
-			tsgo.NodeFlagsNone,
-		),
-		api.CombineRequests(
-			receiver.Requests(),
-			elementTarget.Requests(),
-			parentTarget.Requests(),
-			parentStorage.Requests(),
-			runtime.Requests(),
-		),
 	)
 }

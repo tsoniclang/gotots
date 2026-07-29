@@ -74,12 +74,6 @@ func EmitAnonymous(
 	fields := make([]field, 0, structType.NumFields())
 	for index := range structType.NumFields() {
 		object := structType.Field(index)
-		if object.Embedded() {
-			return api.DeclarationEmission{}, &api.GeneratedArtifactShapeError{
-				Artifact: className,
-				Reason:   "embedded fields belong to the embedding lane",
-			}
-		}
 		blank := object.Name() == "_"
 		name := fmt.Sprintf("$blank%d", index)
 		if !blank {
@@ -232,11 +226,36 @@ func fields(
 	fieldIndex := 0
 	for _, sourceField := range source.Fields.List {
 		if len(sourceField.Names) == 0 {
-			return nil, api.Unsupported(
-				context.WithRole(api.RoleStructField),
-				api.CategoryDeclaration,
-				sourceField,
-			)
+			if fieldIndex >= structType.NumFields() {
+				return nil, api.Unsupported(
+					context.WithRole(api.RoleStructField),
+					api.CategoryDeclaration,
+					sourceField,
+				)
+			}
+			object := structType.Field(fieldIndex)
+			sourceType := context.TypesInfo().TypeOf(sourceField.Type)
+			if !object.Embedded() ||
+				sourceType == nil ||
+				!types.Identical(sourceType, object.Type()) {
+				return nil, api.Unsupported(
+					context.WithRole(api.RoleStructField),
+					api.CategoryDeclaration,
+					sourceField,
+				)
+			}
+			name, err := context.Names().Member(object)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, field{
+				source:     sourceField,
+				typeSource: sourceField.Type,
+				object:     object,
+				name:       name,
+			})
+			fieldIndex++
+			continue
 		}
 		sourceType := context.TypesInfo().TypeOf(sourceField.Type)
 		for _, sourceName := range sourceField.Names {
