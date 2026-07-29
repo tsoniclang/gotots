@@ -40,6 +40,8 @@ const (
 	GenericOperationConvert
 	GenericOperationIndex
 	GenericOperationConstraintMethod
+	GenericOperationMapConstruct
+	GenericOperationInterfaceAdapt
 )
 
 var genericOperationIdentifiers = [...]string{
@@ -74,11 +76,13 @@ var genericOperationIdentifiers = [...]string{
 	GenericOperationConvert:            "convert",
 	GenericOperationIndex:              "index",
 	GenericOperationConstraintMethod:   "constraint_method",
+	GenericOperationMapConstruct:       "map_construct",
+	GenericOperationInterfaceAdapt:     "interface_adapt",
 }
 
 func (o GenericOperation) Valid() bool {
 	return o >= GenericOperationZero &&
-		o <= GenericOperationConstraintMethod
+		o <= GenericOperationInterfaceAdapt
 }
 
 func (o GenericOperation) Identifier() string {
@@ -116,6 +120,10 @@ func (o GenericOperation) String() string {
 		return "index"
 	case GenericOperationConstraintMethod:
 		return "constraint-method"
+	case GenericOperationMapConstruct:
+		return "map-construct"
+	case GenericOperationInterfaceAdapt:
+		return "interface-adapt"
 	default:
 		if source, ok := o.BinaryToken(); ok {
 			return "binary-" + source.String()

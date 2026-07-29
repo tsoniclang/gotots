@@ -331,17 +331,6 @@ func buildMap(
 		return nil, err
 	}
 	result := make([]Definition, 0, len(symbols))
-	capabilities := mapruntime.Capabilities{
-		Clear: slices.Contains(symbols, api.RuntimeMapClear),
-		Keys:  slices.Contains(symbols, api.RuntimeMapKeys),
-	}
-	if (capabilities.Clear || capabilities.Keys) &&
-		(len(symbols) == 0 || symbols[0] != api.RuntimeMap) {
-		return nil, &AssemblyError{
-			Module: api.RuntimeModuleMap,
-			Reason: "map capability requires RuntimeMap first",
-		}
-	}
 	seen := make(map[api.RuntimeSymbol]struct{}, len(symbols))
 	for _, symbol := range symbols {
 		if _, duplicate := seen[symbol]; duplicate {
@@ -352,19 +341,11 @@ func buildMap(
 			}
 		}
 		seen[symbol] = struct{}{}
-		var statement tsgo.Statement
-		var err error
-		if symbol == api.RuntimeMapClear ||
-			symbol == api.RuntimeMapKeys {
-			statement, err = mapruntime.BuildOperation(factory, symbol)
-		} else {
-			statement, err = mapruntime.Build(
-				factory,
-				symbol,
-				panicContract.ExportedName(),
-				capabilities,
-			)
-		}
+		statement, err := mapruntime.Build(
+			factory,
+			symbol,
+			panicContract.ExportedName(),
+		)
 		if err != nil {
 			return nil, err
 		}

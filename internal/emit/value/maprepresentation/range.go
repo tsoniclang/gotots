@@ -20,44 +20,11 @@ func RangeKeys(
 			Reason: "map range has no source model",
 		}
 	}
-	if model.storage == StorageScalar {
-		reference, err := context.Names().Runtime(
-			api.RuntimeMapKeys,
-			api.ImportPhaseValue,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		return api.DirectExpression(
-			context.Factory().CallExpression(
-				context.Factory().Identifier(reference.Name()),
-				nil,
-				nil,
-				[]tsgo.Expression{receiver},
-				tsgo.NodeFlagsNone,
-			),
-			reference.Requests()...,
-		), nil
+	name, err := mapruntime.Name(mapruntime.MemberKeys)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
-	if model.storage == StorageSpecialized {
-		reference, err := context.Names().MapSpecialization(
-			model.sourceType,
-			api.MapSpecializationDemandRange,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		name, err := mapruntime.Name(mapruntime.MemberKeys)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		return api.DirectExpression(
-			methodCall(context, receiver, name),
-			reference.Requests()...,
-		), nil
-	}
-	return api.ExpressionEmission{},
-		api.Unsupported(context, api.CategoryExpression, source)
+	return api.DirectExpression(methodCall(context, receiver, name)), nil
 }
 
 func RangeLookupOK(

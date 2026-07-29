@@ -15,11 +15,6 @@ type Specialization struct {
 	requests []api.RootRequest
 }
 
-type SpecializationCapabilities struct {
-	Clear bool
-	Range bool
-}
-
 func (s Specialization) Members() []tsgo.ClassElement {
 	return slices.Clone(s.members)
 }
@@ -35,7 +30,6 @@ func BuildSpecialization(
 	mapType *types.Map,
 	keyType tsgo.TypeNode,
 	valueType tsgo.TypeNode,
-	capabilities SpecializationCapabilities,
 ) (Specialization, error) {
 	if className == "" ||
 		mapType == nil ||
@@ -79,14 +73,11 @@ func BuildSpecialization(
 		copyKey:   operations.copyKey,
 		copyValue: operations.copyValue,
 		members:   memberNames,
-		clear:     capabilities.Clear,
-		rangeKeys: capabilities.Range,
 	}
 	members := builder.build()
 	if err := validateSpecialization(
 		context.Role(),
 		members,
-		capabilities,
 	); err != nil {
 		return Specialization{}, err
 	}
@@ -96,35 +87,28 @@ func BuildSpecialization(
 	}, nil
 }
 
-func CapabilitiesFromRequirements(
+func ValidateRequirements(
 	role api.Role,
 	artifact *api.GeneratedArtifact,
 	requirements []api.DeclarationRequirement,
-) (SpecializationCapabilities, error) {
+) error {
 	if !artifact.Valid() ||
 		artifact.Kind() != api.GeneratedArtifactMapSpecialization {
-		return SpecializationCapabilities{}, &api.InvariantError{
+		return &api.InvariantError{
 			Role:   role,
-			Reason: "map specialization capability owner is invalid",
+			Reason: "map specialization requirement owner is invalid",
 		}
 	}
-	var capabilities SpecializationCapabilities
 	for _, requirement := range requirements {
-		selected, demand, valid := requirement.MapSpecialization()
+		selected, _, valid := requirement.MapSpecialization()
 		if !valid || selected != artifact {
-			return SpecializationCapabilities{}, &api.InvariantError{
+			return &api.InvariantError{
 				Role:   role,
 				Reason: "map specialization received a foreign requirement",
 			}
 		}
-		if demand == api.MapSpecializationDemandClear {
-			capabilities.Clear = true
-		}
-		if demand == api.MapSpecializationDemandRange {
-			capabilities.Range = true
-		}
 	}
-	return capabilities, nil
+	return nil
 }
 
 func specializationNames() (specializationMemberNames, error) {

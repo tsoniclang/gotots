@@ -7,13 +7,15 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type Parameters struct {
 	context      api.Context
 	typeNodes    []tsgo.TypeParameterDeclaration
-	capabilities []tsgo.ParameterDeclaration
+	operations   []*api.GenericOperationContract
+	capabilities []genericabi.Binding[tsgo.ParameterDeclaration]
 	requests     []api.RootRequest
 }
 
@@ -171,6 +173,7 @@ func Enter(
 	return Parameters{
 		context:      context,
 		typeNodes:    typeNodes,
+		operations:   operations,
 		capabilities: capabilities,
 		requests:     requests,
 	}, nil
@@ -181,9 +184,13 @@ func EmitOperationParameters(
 	children api.ChildEmitter,
 	source ast.Node,
 	operations []*api.GenericOperationContract,
-) ([]tsgo.ParameterDeclaration, []api.RootRequest, error) {
+) (
+	[]genericabi.Binding[tsgo.ParameterDeclaration],
+	[]api.RootRequest,
+	error,
+) {
 	capabilities := make(
-		[]tsgo.ParameterDeclaration,
+		[]genericabi.Binding[tsgo.ParameterDeclaration],
 		0,
 		len(operations),
 	)
@@ -204,17 +211,19 @@ func EmitOperationParameters(
 		if err != nil {
 			return nil, nil, err
 		}
-		capabilities = append(
-			capabilities,
-			context.Factory().ParameterDeclaration(
-				nil,
-				nil,
-				context.Factory().Identifier(operation.TargetName()),
-				nil,
-				target.Value(),
-				nil,
-			),
+		parameter := context.Factory().ParameterDeclaration(
+			nil,
+			nil,
+			context.Factory().Identifier(operation.TargetName()),
+			nil,
+			target.Value(),
+			nil,
 		)
+		binding, err := genericabi.Capability(operation, parameter)
+		if err != nil {
+			return nil, nil, err
+		}
+		capabilities = append(capabilities, binding)
 		requests = append(requests, target.Requests()...)
 	}
 	return capabilities, requests, nil
@@ -228,8 +237,15 @@ func (p Parameters) TypeNodes() []tsgo.TypeParameterDeclaration {
 	return append([]tsgo.TypeParameterDeclaration(nil), p.typeNodes...)
 }
 
-func (p Parameters) Capabilities() []tsgo.ParameterDeclaration {
-	return append([]tsgo.ParameterDeclaration(nil), p.capabilities...)
+func (p Parameters) Operations() []*api.GenericOperationContract {
+	return append([]*api.GenericOperationContract(nil), p.operations...)
+}
+
+func (p Parameters) Capabilities() []genericabi.Binding[tsgo.ParameterDeclaration] {
+	return append(
+		[]genericabi.Binding[tsgo.ParameterDeclaration](nil),
+		p.capabilities...,
+	)
 }
 
 func (p Parameters) Requests() []api.RootRequest {

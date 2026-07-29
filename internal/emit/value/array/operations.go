@@ -125,6 +125,7 @@ func (a RuntimeArray) Zero(
 func (a RuntimeArray) Copy(
 	context api.Context,
 	children api.ChildEmitter,
+	source ast.Node,
 	fresh bool,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
@@ -154,16 +155,16 @@ func (a RuntimeArray) Copy(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		source := context.Factory().Identifier(sourceName)
+		sourceValue := context.Factory().Identifier(sourceName)
 		result := context.Factory().Identifier(resultName)
 		index := context.Factory().Identifier(indexName)
 		elementCopy, err := context.Values().Copy(
 			context.WithRole(api.RoleArrayElement),
-			nil,
+			source,
 			a.ElementType(),
 			api.DirectExpression(callMember(
 				context,
-				source,
+				sourceValue,
 				arraymember.Get,
 				index,
 			)),

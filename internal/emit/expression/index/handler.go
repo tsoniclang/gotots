@@ -7,8 +7,8 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	mapindexexpression "github.com/tsoniclang/gotots/internal/emit/expression/mapindex"
 	expressionoperands "github.com/tsoniclang/gotots/internal/emit/expression/operands"
+	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
-	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
@@ -26,6 +26,9 @@ func Emit(
 	operandType := context.TypesInfo().TypeOf(source.X)
 	if _, ok := maprepresentation.Source(context, operandType); ok {
 		return mapindexexpression.Emit(context, children, source)
+	}
+	if api.ContainsGenericTypeParameter(operandType) {
+		return emitGeneric(context, children, source, operandType)
 	}
 	if array, ok := arrayvalue.Resolve(context, operandType); ok {
 		return array.EmitIndex(context, children, source)
@@ -85,47 +88,23 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	ordered, err := expressionoperands.Preserve(
+	target, handled, err := Apply(
 		context,
-		api.TemporarySliceOperand,
-		expressionoperands.Present(operand),
-		expressionoperands.Present(index),
+		source,
+		operandType,
+		indexType,
+		resultType,
+		operand,
+		index,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	reference, err := context.Names().Runtime(
-		api.RuntimeStringIndex,
-		api.ImportPhaseValue,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
+	if !handled {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	values := ordered.Values()
-	target := tsgo.Expression(context.Factory().CallExpression(
-		context.Factory().Identifier(reference.Name()),
-		nil,
-		nil,
-		values,
-		tsgo.NodeFlagsNone,
-	))
-	if context.IntegerRepresentation() == api.IntegerRepresentationBigInt {
-		target = context.Factory().CallExpression(
-			context.Factory().Identifier("BigInt"),
-			nil,
-			nil,
-			[]tsgo.Expression{target},
-			tsgo.NodeFlagsNone,
-		)
-	}
-	return api.NewExpressionEmission(
-		ordered.Before(),
-		target,
-		api.CombineRequests(
-			ordered.Requests(),
-			reference.Requests(),
-		),
-	)
+	return target, nil
 }
 
 func emitPointerArrayIndex(
@@ -251,12 +230,6 @@ func emitSliceIndex(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if definedOK {
-		receiver, err = defined.Project(context, receiver)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-	}
 	index, err := children.Expression(
 		context.
 			WithRole(api.RoleSliceIndex).
@@ -266,33 +239,83 @@ func emitSliceIndex(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	target, handled, err := Apply(
+		context,
+		source,
+		sourceType,
+		indexType,
+		elementType,
+		receiver,
+		index,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if !handled {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	return target, nil
+}
+
+func emitGeneric(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.IndexExpr,
+	operandType types.Type,
+) (api.ExpressionEmission, error) {
+	indexType := context.TypesInfo().TypeOf(source.Index)
+	resultType := context.TypesInfo().TypeOf(source)
+	if indexType == nil ||
+		resultType == nil ||
+		context.ExpectedType() == nil ||
+		!types.AssignableTo(resultType, context.ExpectedType()) {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	operand, err := children.Expression(
+		context.
+			WithRole(api.RoleIndexOperand).
+			WithExpectedType(operandType),
+		source.X,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	index, err := children.Expression(
+		context.
+			WithRole(api.RoleIndexValue).
+			WithExpectedType(indexType),
+		source.Index,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	ordered, err := expressionoperands.Preserve(
 		context,
 		api.TemporarySliceOperand,
-		expressionoperands.Present(receiver),
+		expressionoperands.Present(operand),
 		expressionoperands.Present(index),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
 	values := ordered.Values()
-	target := context.Factory().CallExpression(
-		context.Factory().PropertyAccessExpression(
-			values[0],
-			nil,
-			context.Factory().Identifier(
-				runtimeslice.MemberName(runtimeslice.MemberGet),
-			),
-			tsgo.NodeFlagsNone,
-		),
-		nil,
-		nil,
-		[]tsgo.Expression{values[1]},
-		tsgo.NodeFlagsNone,
+	target, err := genericoperation.Call(
+		context,
+		source,
+		api.GenericOperationIndex,
+		[]types.Type{operandType, indexType},
+		[]types.Type{resultType},
+		[]tsgo.Expression{values[0], values[1]},
+		ordered.Requests()...,
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	return api.NewExpressionEmission(
 		ordered.Before(),
-		target,
-		ordered.Requests(),
+		target.Value(),
+		target.Requests(),
 	)
 }

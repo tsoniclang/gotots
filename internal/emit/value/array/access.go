@@ -33,6 +33,20 @@ func (a RuntimeArray) EmitIndex(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	return a.ApplyIndex(context, receiver, index)
+}
+
+func (a RuntimeArray) ApplyIndex(
+	context api.Context,
+	receiver api.ExpressionEmission,
+	index api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	if a.source == nil {
+		return api.ExpressionEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "runtime array index has no source model",
+		}
+	}
 	ordered, err := expressionoperands.Preserve(
 		context,
 		api.TemporaryArrayReceiver,
@@ -119,6 +133,13 @@ func (a RuntimeArray) EmitLength(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	return a.Measure(context, value)
+}
+
+func (a RuntimeArray) Measure(
+	context api.Context,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
 	target := tsgo.Expression(memberProperty(
 		context,
 		a.storage(context, value.Value()),

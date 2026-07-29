@@ -199,38 +199,28 @@ func TestSliceAggregateDefinitionsRequireRuntimeSliceFirst(t *testing.T) {
 	}
 }
 
-func TestMapOptionalOperationsRequireOneRuntimeMapOwner(t *testing.T) {
-	for _, symbols := range [][]api.RuntimeSymbol{
-		{api.RuntimeMapClear},
-		{api.RuntimeMapKeys},
-		{api.RuntimeMap, api.RuntimeMap},
-		{api.RuntimeMap, api.RuntimeMapClear, api.RuntimeMapClear},
-		{api.RuntimeMap, api.RuntimeMapKeys, api.RuntimeMapKeys},
-	} {
-		if _, err := Build(
-			tsgo.NewFactory(),
-			api.RuntimeModuleMap,
-			symbols,
-		); err == nil {
-			t.Fatalf("map runtime accepted invalid symbol set %v", symbols)
-		}
+func TestMapRuntimeRejectsDuplicateOwners(t *testing.T) {
+	if _, err := Build(
+		tsgo.NewFactory(),
+		api.RuntimeModuleMap,
+		[]api.RuntimeSymbol{api.RuntimeMap, api.RuntimeMap},
+	); err == nil {
+		t.Fatal("map runtime accepted a duplicate owner")
 	}
 	definitions, err := Build(
 		tsgo.NewFactory(),
 		api.RuntimeModuleMap,
 		[]api.RuntimeSymbol{
 			api.RuntimeMap,
-			api.RuntimeMapClear,
-			api.RuntimeMapKeys,
+			api.RuntimeMapValue,
 		},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(definitions) != 3 ||
+	if len(definitions) != 2 ||
 		definitions[0].Symbol() != api.RuntimeMap ||
-		definitions[1].Symbol() != api.RuntimeMapClear ||
-		definitions[2].Symbol() != api.RuntimeMapKeys {
-		t.Fatalf("map optional definitions = %#v", definitions)
+		definitions[1].Symbol() != api.RuntimeMapValue {
+		t.Fatalf("map definitions = %#v", definitions)
 	}
 }

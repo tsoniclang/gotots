@@ -74,9 +74,7 @@ func (n *File) MapSpecialization(
 		return api.NameReference{}, err
 	}
 	phase := api.ImportPhaseValue
-	if demand == api.MapSpecializationDemandDefinition ||
-		demand == api.MapSpecializationDemandClear ||
-		demand == api.MapSpecializationDemandRange {
+	if demand == api.MapSpecializationDemandDefinition {
 		phase = api.ImportPhaseType
 	}
 	importRequest, err := api.NewImportRequest(
@@ -106,10 +104,6 @@ func mapSpecializationFacet(
 	demand api.MapSpecializationDemand,
 ) api.ArtifactFacet {
 	if demand == api.MapSpecializationDemandDefinition {
-		return api.ArtifactFacetInstanceTypeSurface
-	}
-	if demand == api.MapSpecializationDemandClear ||
-		demand == api.MapSpecializationDemandRange {
 		return api.ArtifactFacetInstanceTypeSurface
 	}
 	return api.ArtifactFacetStaticSurface

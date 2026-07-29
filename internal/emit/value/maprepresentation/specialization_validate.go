@@ -10,7 +10,6 @@ import (
 func validateSpecialization(
 	role api.Role,
 	members []tsgo.ClassElement,
-	capabilities SpecializationCapabilities,
 ) error {
 	names, err := specializationNames()
 	if err != nil {
@@ -48,12 +47,8 @@ func validateSpecialization(
 		names.deleteMember: nil,
 		names.length:       nil,
 		names.isNil:        nil,
-	}
-	if capabilities.Clear {
-		expected[names.clear] = nil
-	}
-	if capabilities.Range {
-		expected[names.keys] = nil
+		names.clear:        nil,
+		names.keys:         nil,
 	}
 	if len(members) != len(expected)+1 {
 		return specializationShapeError(

@@ -31,6 +31,15 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	if target, handled, err := emitGenericMeasure(
+		context,
+		children,
+		source,
+		builtin,
+		discarded,
+	); handled {
+		return target, err
+	}
 	if target, handled, err := complexbuiltin.Emit(
 		context,
 		children,

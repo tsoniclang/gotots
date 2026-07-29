@@ -87,7 +87,7 @@ func EmitRangeIteration(
 			var err error
 			copied, err = context.Values().Copy(
 				context.WithRole(api.RoleRangeValue),
-				nil,
+				binding.source,
 				binding.valueType(),
 				binding.value,
 			)

@@ -30,11 +30,6 @@ type memberNames struct {
 	keys       string
 }
 
-type Capabilities struct {
-	Clear bool
-	Keys  bool
-}
-
 func resolveMemberNames() (memberNames, error) {
 	resolved := make([]string, 0, MemberKeys)
 	for member := MemberNil; member <= MemberKeys; member++ {
@@ -62,7 +57,6 @@ func Build(
 	factory tsgo.Factory,
 	symbol api.RuntimeSymbol,
 	panicName string,
-	capabilities Capabilities,
 ) (tsgo.Statement, error) {
 	if symbol == api.RuntimeMapHash {
 		return buildHash(factory)
@@ -71,13 +65,16 @@ func Build(
 	if err != nil {
 		return nil, err
 	}
-	if symbol != api.RuntimeMap ||
+	if (symbol != api.RuntimeMap && symbol != api.RuntimeMapValue) ||
 		contract.Module() != api.RuntimeModuleMap {
 		return nil, &api.RuntimeSymbolError{Symbol: symbol}
 	}
 	members, err := resolveMemberNames()
 	if err != nil {
 		return nil, err
+	}
+	if symbol == api.RuntimeMapValue {
+		return valueContract(factory, contract.ExportedName(), members), nil
 	}
 	className := contract.ExportedName()
 	keyType := typeName(factory, keyTypeName)
@@ -94,12 +91,11 @@ func Build(
 		lengthMethod(factory, members.length),
 		nilStateMethod(factory, members.isNil),
 	}
-	if capabilities.Clear {
-		classMembers = append(classMembers, clearMethod(factory, members.clear))
-	}
-	if capabilities.Keys {
-		classMembers = append(classMembers, keysMethod(factory, members.keys))
-	}
+	classMembers = append(
+		classMembers,
+		clearMethod(factory, members.clear),
+		keysMethod(factory, members.keys),
+	)
 	return factory.ClassDeclaration(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
 		factory.Identifier(className),

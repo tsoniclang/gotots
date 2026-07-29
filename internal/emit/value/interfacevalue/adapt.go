@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -22,6 +23,25 @@ func AdaptExpected(
 	if actual == nil || !types.AssignableTo(actual, expected) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if api.ContainsGenericTypeParameter(actual) {
+		adapted, err := genericoperation.Call(
+			context,
+			source,
+			api.GenericOperationInterfaceAdapt,
+			[]types.Type{actual},
+			[]types.Type{expected},
+			[]tsgo.Expression{target.Value()},
+			target.Requests()...,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.NewExpressionEmission(
+			target.Before(),
+			adapted.Value(),
+			adapted.Requests(),
+		)
 	}
 	if _, ok := interfacetype.Resolve(actual); ok {
 		return target, nil
@@ -76,6 +96,9 @@ func OperandContext(
 	actual := context.TypesInfo().TypeOf(source)
 	if actual == nil {
 		return context
+	}
+	if api.ContainsGenericTypeParameter(actual) {
+		return context.WithExpectedType(actual)
 	}
 	if _, ok := interfacetype.Resolve(actual); ok {
 		return context

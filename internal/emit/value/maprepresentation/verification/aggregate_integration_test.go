@@ -22,8 +22,8 @@ func TestScalarMapArtifactsStayAtTheImmutableBaseline(t *testing.T) {
 		t.TempDir(),
 	)
 	for path, expected := range map[string]string{
-		"source.ts":      "039d67c3463d6034acf6a4dda7364e61e6555c75eb31ab520011eae0ea29e656",
-		"runtime/map.ts": "b08ead3648e95400dc2aabe9727ff5dc07462e7177cec534e864f76f5abbdb2e",
+		"source.ts":      "73f863daa621c0bb72ec362df109b4c23ca0c71b41b45ed8a8e979ec82307aa6",
+		"runtime/map.ts": "21b010c40cd912a3c4f5f1d44fc5d375e830928252bd848ce4f62a2f59e30526",
 	} {
 		content := readFile(t, artifacts.file(t, path))
 		actual := fmt.Sprintf("%x", sha256.Sum256([]byte(content)))
@@ -52,7 +52,6 @@ func TestProductionAggregateKeyOperationsAreStaticAndTyped(t *testing.T) {
 		types.NewMap(key, value),
 		factory.TypeReferenceNode(factory.Identifier("Key"), nil),
 		factory.TypeReferenceNode(factory.Identifier("Box"), nil),
-		maprepresentation.SpecializationCapabilities{},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -133,10 +132,14 @@ func TestProductionAggregateKeyOperationsAreStaticAndTyped(t *testing.T) {
 		"private readonly copyKey",
 		"any",
 		"unknown",
-		"clear(): void",
 	} {
 		if strings.Contains(source, forbidden) {
 			t.Fatalf("aggregate specialization contains %q:\n%s", forbidden, source)
+		}
+	}
+	for _, required := range []string{"clear(): void", "keys(): Key[]"} {
+		if !strings.Contains(source, required) {
+			t.Fatalf("aggregate specialization lacks %q:\n%s", required, source)
 		}
 	}
 }
@@ -172,7 +175,6 @@ func TestUnnamedArrayKeyOperationsInlineStaticTypedSemantics(t *testing.T) {
 				types.NewMap(key, value),
 				factory.TypeReferenceNode(factory.Identifier("ArrayKey"), nil),
 				factory.TypeReferenceNode(factory.Identifier("Box"), nil),
-				maprepresentation.SpecializationCapabilities{},
 			)
 			if err != nil {
 				t.Fatal(err)

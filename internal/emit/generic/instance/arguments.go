@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -42,9 +43,9 @@ func EmitCapabilities(
 	source ast.Node,
 	operationSet api.GenericOperationSet,
 	arguments *types.TypeList,
-) ([]tsgo.Expression, []api.RootRequest, error) {
+) ([]genericabi.Binding[tsgo.Expression], []api.RootRequest, error) {
 	targets := make(
-		[]tsgo.Expression,
+		[]genericabi.Binding[tsgo.Expression],
 		0,
 		len(operationSet.Operations()),
 	)
@@ -74,10 +75,14 @@ func EmitCapabilities(
 		if err != nil {
 			return nil, nil, err
 		}
-		targets = append(
-			targets,
+		binding, err := genericabi.Capability[tsgo.Expression](
+			operation,
 			context.Factory().Identifier(reference.Name()),
 		)
+		if err != nil {
+			return nil, nil, err
+		}
+		targets = append(targets, binding)
 		requests = append(requests, reference.Requests()...)
 	}
 	return targets, requests, nil

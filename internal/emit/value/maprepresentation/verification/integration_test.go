@@ -42,9 +42,9 @@ func TestMapValuesCreateTypedTargetAST(t *testing.T) {
 	if !ok {
 		t.Fatalf("map parameter type = %T, want TypeReferenceNode", identity.Parameters()[0].Type())
 	}
-	if mapType.TypeName().(tsgo.Identifier).Text() != "GoMap" ||
+	if mapType.TypeName().(tsgo.Identifier).Text() != "GoMapValue" ||
 		len(mapType.TypeArguments()) != 2 {
-		t.Fatal("map type is not the typed two-argument runtime class")
+		t.Fatal("map type is not the typed two-argument value contract")
 	}
 	missing := targetFunction(t, sourceFile, "Missing")
 	missingStatements := missing.Body().(tsgo.Block).Statements()
@@ -67,7 +67,7 @@ func TestMapValuesCreateTypedTargetAST(t *testing.T) {
 	}
 	if class.Name().Text() != "GoMap" ||
 		len(class.TypeParameters()) != 2 ||
-		len(class.Members()) != 9 {
+		len(class.Members()) != 11 {
 		t.Fatalf(
 			"runtime class = %q with %d parameters and %d members",
 			class.Name().Text(),
@@ -91,7 +91,6 @@ func TestMapValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 		".apply(",
 		".bind(",
 		"get(key)!",
-		"clear(): void",
 		"goMapClear",
 	} {
 		if strings.Contains(runtimeSource, forbidden) {
@@ -100,7 +99,10 @@ func TestMapValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	}
 	for _, required := range []string{
 		"class GoMap<K extends boolean | number | bigint | string, V>",
+		"interface GoMapValue<K, V>",
 		"Map<K, V>",
+		"clear(): void",
+		"keys(): K[]",
 		"const storedValue = storage.get(key);",
 		"storedValue === undefined",
 		"return this.zeroValue;",

@@ -82,8 +82,19 @@ func Emit(
 		return api.DeclarationEmission{}, err
 	}
 	sourceParameters := targetSignature.Parameters()
+	var capabilityParameters []tsgo.ParameterDeclaration
+	if len(api.GenericDeclarationParameters(functionObject)) != 0 {
+		capabilityParameters, err = genericabi.JoinCapabilities(
+			functionObject,
+			genericParameters.Operations(),
+			genericParameters.Capabilities(),
+		)
+		if err != nil {
+			return api.DeclarationEmission{}, err
+		}
+	}
 	parameters := append(
-		genericParameters.Capabilities(),
+		capabilityParameters,
 		sourceParameters...,
 	)
 	parameterRequests := api.CombineRequests(
@@ -101,11 +112,34 @@ func Emit(
 			return api.DeclarationEmission{}, err
 		}
 		if signature.RecvTypeParams().Len() != 0 {
-			parameters = genericabi.Method(
-				genericParameters.Capabilities(),
+			receiverBinding, bindErr := genericabi.Receiver(
+				functionObject,
 				receiver,
+			)
+			if bindErr != nil {
+				return api.DeclarationEmission{}, bindErr
+			}
+			sourceBindings, bindErr := genericabi.SourceParameters(
+				functionObject,
 				sourceParameters,
 			)
+			if bindErr != nil {
+				return api.DeclarationEmission{}, bindErr
+			}
+			parameters, err = genericabi.JoinMethod(
+				functionObject,
+				genericParameters.Operations(),
+				genericabi.Combine(
+					genericParameters.Capabilities(),
+					[]genericabi.Binding[tsgo.ParameterDeclaration]{
+						receiverBinding,
+					},
+					sourceBindings,
+				),
+			)
+			if err != nil {
+				return api.DeclarationEmission{}, err
+			}
 		} else {
 			parameters = append(
 				[]tsgo.ParameterDeclaration{receiver},

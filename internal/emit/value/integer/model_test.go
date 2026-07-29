@@ -174,7 +174,28 @@ func TestIntegerCapabilityMatrixRejectsUnprovedNeighbors(t *testing.T) {
 		t.Fatal("constant BigInt shift was rejected")
 	}
 	if SupportsShift(api.IntegerRepresentationBigInt, int64Carrier, token.SHL, nil) {
-		t.Fatal("variable BigInt shift was admitted")
+		t.Fatal("constant-count capability accepted absent evidence")
+	}
+	if !SupportsVariableShift(
+		api.IntegerRepresentationBigInt,
+		int64Carrier,
+		token.SHL,
+	) {
+		t.Fatal("exact BigInt variable shift was rejected")
+	}
+	if SupportsVariableShift(
+		api.IntegerRepresentationNumber,
+		int64Carrier,
+		token.SHL,
+	) {
+		t.Fatal("number int64 variable shift was admitted")
+	}
+	if !SupportsVariableShift(
+		api.IntegerRepresentationNumber,
+		int32Carrier,
+		token.SHR,
+	) {
+		t.Fatal("exact number int32 variable shift was rejected")
 	}
 	if SupportsUnary(api.IntegerRepresentationBigInt, uint32Carrier, token.SUB) {
 		t.Fatal("unsigned negation was admitted without fixed-width overflow")

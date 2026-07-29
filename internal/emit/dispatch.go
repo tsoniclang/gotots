@@ -496,7 +496,7 @@ func (e *emitter) Type(
 			return callable.EmitSyntaxType(context, e, functionType, signature)
 		}
 		if _, ok := types.Unalias(sourceType).(*types.Map); ok {
-			return maptype.Emit(context, source, sourceType)
+			return maptype.Emit(context, e, source, sourceType)
 		}
 		if sliceType, ok := types.Unalias(sourceType).(*types.Slice); ok {
 			arrayType, valid := source.(*ast.ArrayType)
@@ -567,7 +567,7 @@ func (e *emitter) RepresentedType(
 		return callable.EmitType(context, e, source, signature)
 	}
 	if _, ok := types.Unalias(sourceType).(*types.Map); ok {
-		return maptype.Emit(context, source, sourceType)
+		return maptype.Emit(context, e, source, sourceType)
 	}
 	if _, ok := types.Unalias(sourceType).(*types.Slice); ok {
 		return slicetype.EmitRepresented(context, e, source, sourceType)

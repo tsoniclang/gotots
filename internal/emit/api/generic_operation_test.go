@@ -11,7 +11,7 @@ import (
 func TestGenericOperationIdentifiersAreTotalUniqueTargetIdentifiers(t *testing.T) {
 	targetIdentifier := regexp.MustCompile(`^[A-Za-z_$][A-Za-z0-9_$]*$`)
 	seen := make(map[string]GenericOperation)
-	for operation := GenericOperationZero; operation <= GenericOperationConstraintMethod; operation++ {
+	for operation := GenericOperationZero; operation <= GenericOperationInterfaceAdapt; operation++ {
 		identifier := operation.Identifier()
 		if !targetIdentifier.MatchString(identifier) {
 			t.Fatalf(
@@ -31,7 +31,7 @@ func TestGenericOperationIdentifiersAreTotalUniqueTargetIdentifiers(t *testing.T
 		seen[identifier] = operation
 	}
 	if GenericOperationInvalid.Identifier() != "" ||
-		GenericOperation(GenericOperationConstraintMethod+1).Identifier() != "" {
+		GenericOperation(GenericOperationInterfaceAdapt+1).Identifier() != "" {
 		t.Fatal("invalid generic operation has a target identifier")
 	}
 }

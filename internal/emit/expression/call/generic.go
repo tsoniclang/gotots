@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -62,6 +63,14 @@ func emitGeneric(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
+	capabilityArguments, err := genericabi.JoinCapabilities(
+		owner,
+		callable.Operations(),
+		capabilities,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
 	arguments, before, argumentRequests, err := emitArguments(
 		context,
 		children,
@@ -72,7 +81,7 @@ func emitGeneric(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	arguments = append(capabilities, arguments...)
+	arguments = append(capabilityArguments, arguments...)
 	result, err := api.NewExpressionEmission(
 		before,
 		context.Factory().CallExpression(

@@ -207,6 +207,20 @@ func primitiveBinaryUpdate(
 		sourceType,
 	); ok {
 		switch {
+		case (operator == token.SHL || operator == token.SHR) &&
+			rightConstant == nil &&
+			integervalue.SupportsVariableShift(
+				context.IntegerRepresentation(),
+				carrier,
+				operator,
+			):
+			result, handled, err = integerbinary.ApplyVariableShift(
+				context,
+				operator,
+				carrier,
+				leftValue,
+				rightValue,
+			)
 		case integervalue.SupportsArithmetic(
 			context.IntegerRepresentation(),
 			operator,

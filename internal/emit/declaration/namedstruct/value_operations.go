@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
 	genericdeclaration "github.com/tsoniclang/gotots/internal/emit/generic/declaration"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -37,15 +38,26 @@ func emitValueOperation(
 		}
 	} else {
 		context = context.WithGenericNamedStructOperation(operation)
-		capabilities, capabilityRequests, err =
+		bindings, requests, emitErr :=
 			genericdeclaration.EmitOperationParameters(
 				context,
 				children,
 				source,
 				assembly.capabilities,
 			)
-		if err != nil {
-			return nil, nil, err
+		if emitErr != nil {
+			return nil, nil, emitErr
+		}
+		capabilityRequests = requests
+		if len(assembly.capabilities) != 0 {
+			capabilities, err = genericabi.JoinCapabilities(
+				assembly.capabilities[0].Owner(),
+				assembly.capabilities,
+				bindings,
+			)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 	}
 	var member tsgo.MethodDeclaration

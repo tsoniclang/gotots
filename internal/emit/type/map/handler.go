@@ -10,8 +10,9 @@ import (
 
 func Emit(
 	context api.Context,
+	children api.ChildEmitter,
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
-	return maprepresentation.EmitType(context, source, sourceType)
+	return maprepresentation.EmitType(context, children, source, sourceType)
 }

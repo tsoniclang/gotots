@@ -18,6 +18,54 @@ func Call(
 	arguments []tsgo.Expression,
 	requests ...api.RootRequest,
 ) (api.ExpressionEmission, error) {
+	selection, err := api.SelectGenericOperation(operation)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return call(
+		context,
+		source,
+		selection,
+		parameterTypes,
+		resultTypes,
+		arguments,
+		requests...,
+	)
+}
+
+func ConstraintMethod(
+	context api.Context,
+	source ast.Node,
+	method *types.Func,
+	parameterTypes []types.Type,
+	resultTypes []types.Type,
+	arguments []tsgo.Expression,
+	requests ...api.RootRequest,
+) (api.ExpressionEmission, error) {
+	selection, err := api.SelectGenericConstraintMethod(method)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return call(
+		context,
+		source,
+		selection,
+		parameterTypes,
+		resultTypes,
+		arguments,
+		requests...,
+	)
+}
+
+func call(
+	context api.Context,
+	source ast.Node,
+	selection api.GenericOperationSelection,
+	parameterTypes []types.Type,
+	resultTypes []types.Type,
+	arguments []tsgo.Expression,
+	requests ...api.RootRequest,
+) (api.ExpressionEmission, error) {
 	if len(parameterTypes) != len(arguments) {
 		return api.ExpressionEmission{}, &api.InvariantError{
 			Role:   context.Role(),
@@ -58,11 +106,22 @@ func Call(
 		types.NewTuple(results...),
 		false,
 	)
-	reference, err := context.GenericOperation(
-		source,
-		operation,
-		signature,
-	)
+	method, constraintMethod := selection.Method()
+	var reference api.NameReference
+	var err error
+	if constraintMethod {
+		reference, err = context.GenericConstraintMethod(
+			source,
+			method,
+			signature,
+		)
+	} else {
+		reference, err = context.GenericOperation(
+			source,
+			selection.Operation(),
+			signature,
+		)
+	}
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}

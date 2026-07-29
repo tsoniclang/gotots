@@ -95,11 +95,14 @@ func Emit(
 	}
 	var targetTypeArguments []tsgo.TypeNode
 	var typeRequests []api.RootRequest
-	var capabilities []tsgo.Expression
+	var capabilities []genericabi.Binding[tsgo.Expression]
 	var capabilityRequests []api.RootRequest
+	var operationSet api.GenericOperationSet
+	owner := method.Origin()
 	if generic {
-		owner := method.Origin()
-		operationSet, resolved, resolveErr :=
+		var resolved bool
+		var resolveErr error
+		operationSet, resolved, resolveErr =
 			context.ResolveGenericCallable(owner)
 		if resolveErr != nil {
 			return api.ExpressionEmission{}, resolveErr
@@ -131,11 +134,40 @@ func Emit(
 			return api.ExpressionEmission{}, err
 		}
 	}
-	callArguments := genericabi.Method[tsgo.Expression](
-		capabilities,
-		context.Factory().Identifier(receiverName),
-		arguments,
+	callArguments := append(
+		[]tsgo.Expression{
+			context.Factory().Identifier(receiverName),
+		},
+		arguments...,
 	)
+	if generic {
+		receiverBinding, bindErr := genericabi.Receiver[tsgo.Expression](
+			owner,
+			context.Factory().Identifier(receiverName),
+		)
+		if bindErr != nil {
+			return api.ExpressionEmission{}, bindErr
+		}
+		sourceBindings, bindErr := genericabi.SourceParameters(
+			owner,
+			arguments,
+		)
+		if bindErr != nil {
+			return api.ExpressionEmission{}, bindErr
+		}
+		callArguments, err = genericabi.JoinMethod(
+			owner,
+			operationSet.Operations(),
+			genericabi.Combine(
+				capabilities,
+				[]genericabi.Binding[tsgo.Expression]{receiverBinding},
+				sourceBindings,
+			),
+		)
+	}
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	call := context.Factory().CallExpression(
 		context.Factory().Identifier(reference.Name()),
 		nil,

@@ -12,7 +12,6 @@ func TestBuildCreatesOneTypedGenericMapClass(t *testing.T) {
 		tsgo.NewFactory(),
 		api.RuntimeMap,
 		panicClassName(t),
-		Capabilities{},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -27,62 +26,48 @@ func TestBuildCreatesOneTypedGenericMapClass(t *testing.T) {
 	if len(class.TypeParameters()) != 2 {
 		t.Fatalf("type parameters = %d, want key and value", len(class.TypeParameters()))
 	}
-	if len(class.Members()) != 9 {
-		t.Fatalf("members = %d, want one constructor and eight core operations", len(class.Members()))
+	if len(class.Members()) != 11 {
+		t.Fatalf("members = %d, want one constructor and ten map operations", len(class.Members()))
 	}
 }
 
-func TestClearSurfaceIsDemandedAsOneCapability(t *testing.T) {
+func TestClearSurfaceBelongsToCompleteMapContract(t *testing.T) {
 	factory := tsgo.NewFactory()
 	statement, err := Build(
 		factory,
 		api.RuntimeMap,
 		panicClassName(t),
-		Capabilities{Clear: true},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	class := statement.(tsgo.ClassDeclaration)
-	if len(class.Members()) != 10 {
-		t.Fatalf("clear-capable members = %d, want core plus clear", len(class.Members()))
-	}
-	operation, err := BuildOperation(factory, api.RuntimeMapClear)
-	if err != nil {
-		t.Fatal(err)
-	}
-	function, ok := operation.(tsgo.FunctionDeclaration)
-	if !ok || function.Name().Text() != "goMapClear" {
-		t.Fatalf("clear operation = %T", operation)
-	}
-}
-
-func TestKeysSurfaceIsDemandedAsOneCapability(t *testing.T) {
-	factory := tsgo.NewFactory()
-	statement, err := Build(
-		factory,
-		api.RuntimeMap,
-		panicClassName(t),
-		Capabilities{Keys: true},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	class := statement.(tsgo.ClassDeclaration)
-	if len(class.Members()) != 10 {
-		t.Fatalf("keys-capable members = %d, want core plus keys", len(class.Members()))
+	if len(class.Members()) != 11 {
+		t.Fatalf("map members = %d, want the complete value contract", len(class.Members()))
 	}
 	method := class.Members()[9].(tsgo.MethodDeclaration)
-	if method.Name().(tsgo.Identifier).Text() != "keys" {
-		t.Fatalf("demanded member = %v, want keys", method.Name())
+	if method.Name().(tsgo.Identifier).Text() != "clear" {
+		t.Fatalf("map member = %v, want clear", method.Name())
 	}
-	operation, err := BuildOperation(factory, api.RuntimeMapKeys)
+}
+
+func TestKeysSurfaceBelongsToCompleteMapContract(t *testing.T) {
+	factory := tsgo.NewFactory()
+	statement, err := Build(
+		factory,
+		api.RuntimeMap,
+		panicClassName(t),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	function, ok := operation.(tsgo.FunctionDeclaration)
-	if !ok || function.Name().Text() != "goMapKeys" {
-		t.Fatalf("keys operation = %T", operation)
+	class := statement.(tsgo.ClassDeclaration)
+	if len(class.Members()) != 11 {
+		t.Fatalf("map members = %d, want the complete value contract", len(class.Members()))
+	}
+	method := class.Members()[10].(tsgo.MethodDeclaration)
+	if method.Name().(tsgo.Identifier).Text() != "keys" {
+		t.Fatalf("map member = %v, want keys", method.Name())
 	}
 }
 
@@ -91,7 +76,6 @@ func TestBuildCreatesOneStaticHashPrimitiveOwner(t *testing.T) {
 		tsgo.NewFactory(),
 		api.RuntimeMapHash,
 		panicClassName(t),
-		Capabilities{},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -134,7 +118,6 @@ func TestRuntimeMapMutationGuardsOwnMissingAndNilWriteSemantics(t *testing.T) {
 		tsgo.NewFactory(),
 		api.RuntimeMap,
 		panicClassName(t),
-		Capabilities{},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -234,7 +217,6 @@ func TestBuildRejectsSiblingRuntimeSymbols(t *testing.T) {
 			tsgo.NewFactory(),
 			symbol,
 			panicClassName(t),
-			Capabilities{},
 		); err == nil {
 			t.Fatalf("symbol %d was accepted by map owner", symbol)
 		}

@@ -37,7 +37,7 @@ func TestClearBuiltinsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	}
 	for _, required := range []string{
 		"goSliceClear(values, 0)",
-		"goMapClear(values)",
+		"values.clear()",
 		"clear()",
 	} {
 		if !strings.Contains(printed, required) {
@@ -81,7 +81,7 @@ console.log(String(ClearNilValues()));
 	}
 }
 
-func TestClearRuntimeSurfacesAreDemandedBySourceUse(t *testing.T) {
+func TestClearRuntimeSurfacesFollowValueContracts(t *testing.T) {
 	without := printClearEmission(t, compileClearSource(t, `package demand
 
 func Use() int {
@@ -100,49 +100,60 @@ func Use() int32 {
 	return values[0] + entries[1]
 }
 `))
-	for _, testCase := range []struct {
-		path      string
-		fragments []string
-	}{
-		{
-			path: "runtime/slice.ts",
-			fragments: []string{
-				"clear(zero: T): void",
-				"export function goSliceClear<T>",
-			},
-		},
-		{
-			path: "runtime/map.ts",
-			fragments: []string{
-				"clear(): void",
-				"export function goMapClear",
-			},
-		},
+	withoutSlice := without["runtime/slice.ts"]
+	withSlice := with["runtime/slice.ts"]
+	if withoutSlice == "" || withSlice == "" {
+		t.Fatal("slice runtime artifact is absent from demand pair")
+	}
+	for _, fragment := range []string{
+		"clear(zero: T): void",
+		"export function goSliceClear<T>",
 	} {
-		withoutSource := without[testCase.path]
-		withSource := with[testCase.path]
-		if withoutSource == "" || withSource == "" {
-			t.Fatalf("runtime artifact %s is absent from demand pair", testCase.path)
+		if strings.Contains(withoutSlice, fragment) {
+			t.Fatalf("slice runtime contains undemanded %q:\n%s", fragment, withoutSlice)
 		}
-		for _, fragment := range testCase.fragments {
-			if strings.Contains(withoutSource, fragment) {
-				t.Fatalf(
-					"runtime artifact %s contains undemanded %q:\n%s",
-					testCase.path,
-					fragment,
-					withoutSource,
-				)
-			}
-			if strings.Count(withSource, fragment) != 1 {
-				t.Fatalf(
-					"runtime artifact %s count(%q) = %d, want one:\n%s",
-					testCase.path,
-					fragment,
-					strings.Count(withSource, fragment),
-					withSource,
-				)
-			}
+		if strings.Count(withSlice, fragment) != 1 {
+			t.Fatalf(
+				"slice runtime count(%q) = %d, want one:\n%s",
+				fragment,
+				strings.Count(withSlice, fragment),
+				withSlice,
+			)
 		}
+	}
+	withoutMap := without["runtime/map.ts"]
+	withMap := with["runtime/map.ts"]
+	for name, source := range map[string]string{
+		"without clear use": withoutMap,
+		"with clear use":    withMap,
+	} {
+		if source == "" {
+			t.Fatalf("map runtime is absent %s", name)
+		}
+		if strings.Count(source, "clear(): void") != 1 {
+			t.Fatalf("map runtime %s lacks one clear contract:\n%s", name, source)
+		}
+		if strings.Contains(source, "goMapClear") {
+			t.Fatalf("map runtime %s retained the superseded clear helper:\n%s", name, source)
+		}
+	}
+	var withoutProgram strings.Builder
+	var withProgram strings.Builder
+	for path, source := range without {
+		if path != "runtime/map.ts" {
+			withoutProgram.WriteString(source)
+		}
+	}
+	for path, source := range with {
+		if path != "runtime/map.ts" {
+			withProgram.WriteString(source)
+		}
+	}
+	if strings.Contains(withoutProgram.String(), ".clear();") {
+		t.Fatalf("source without clear contains a map clear call:\n%s", withoutProgram.String())
+	}
+	if !strings.Contains(withProgram.String(), ".clear();") {
+		t.Fatalf("source with clear lacks a direct map clear call:\n%s", withProgram.String())
 	}
 }
 

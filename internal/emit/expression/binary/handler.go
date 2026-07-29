@@ -159,6 +159,10 @@ func emitGeneric(
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	switch source.Op {
+	case token.EQL, token.NEQ, token.LSS, token.LEQ, token.GTR, token.GEQ:
+		resultType = types.Typ[types.Bool]
+	}
 	left, err := children.Expression(
 		context.
 			WithRole(api.RoleBinaryLeft).

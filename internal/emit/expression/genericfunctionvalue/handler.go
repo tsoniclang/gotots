@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -67,12 +68,20 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
+	capabilityArguments, err := genericabi.JoinCapabilities(
+		owner,
+		operationSet.Operations(),
+		capabilities,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
 	reference, err := context.Names().Reference(owner)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
 	arguments := append(
-		capabilities,
+		capabilityArguments,
 		target.ParameterReferences(context.Factory())...,
 	)
 	return api.DirectExpression(

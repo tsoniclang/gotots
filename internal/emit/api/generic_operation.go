@@ -448,14 +448,30 @@ func (c Context) genericOperation(
 	signature *types.Signature,
 ) (NameReference, error) {
 	owner, ownerOK := c.genericSourceOwner()
-	if !ownerOK ||
-		!c.genericConsumer.Valid() ||
-		c.genericResolver == nil ||
-		source == nil ||
-		!selection.Valid() ||
-		!validGenericOperationSignature(signature) {
+	switch {
+	case !ownerOK:
 		return NameReference{}, &ContextError{
-			Reason: "generic operation is unavailable",
+			Reason: "generic operation has no source artifact owner",
+		}
+	case !c.genericConsumer.Valid():
+		return NameReference{}, &ContextError{
+			Reason: "generic operation has no target consumer",
+		}
+	case c.genericResolver == nil:
+		return NameReference{}, &ContextError{
+			Reason: "generic operation has no resolver",
+		}
+	case source == nil:
+		return NameReference{}, &ContextError{
+			Reason: "generic operation has no source construct",
+		}
+	case !selection.Valid():
+		return NameReference{}, &ContextError{
+			Reason: "generic operation selection is invalid",
+		}
+	case !validGenericOperationSignature(signature):
+		return NameReference{}, &ContextError{
+			Reason: "generic operation signature is invalid",
 		}
 	}
 	contract, err := c.genericResolver.ResolveGenericOperation(

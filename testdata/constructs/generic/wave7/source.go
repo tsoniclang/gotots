@@ -10,6 +10,46 @@ type ShiftCount interface {
 	~uint8 | ~uint16
 }
 
+type Signed interface {
+	~int32 | ~int64
+}
+
+type Unsigned interface {
+	~uint32 | ~uint64
+}
+
+type Boolean interface {
+	~bool
+}
+
+type Floating interface {
+	~float32 | ~float64
+}
+
+type ComplexNumber interface {
+	~complex64 | ~complex128
+}
+
+type Text interface {
+	~string
+}
+
+type Sequence[E any] interface {
+	~[]E
+}
+
+type Pair[E any] interface {
+	~[2]E
+}
+
+type ByteSequence interface {
+	~string | ~[]byte
+}
+
+type ValueReader interface {
+	ReadValue() int32
+}
+
 type Box[T any] struct {
 	Value T
 }
@@ -33,6 +73,14 @@ type Right[T any] struct {
 
 type ComparableBox[T comparable] struct {
 	Value T
+}
+
+type ReaderValue struct {
+	Value int32
+}
+
+func (value ReaderValue) ReadValue() int32 {
+	return value.Value
 }
 
 func Identity[T any](value T) T {
@@ -107,6 +155,113 @@ func EqualBox[T comparable](left, right Box[T]) bool {
 	return left == right
 }
 
+func Negate[T Signed](value T) T {
+	return -value
+}
+
+func Positive[T Signed](value T) T {
+	return +value
+}
+
+func Complement[T Unsigned](value T) T {
+	return ^value
+}
+
+func LogicalNot[T Boolean](value T) T {
+	return !value
+}
+
+func FloatArithmetic[T Floating](left, right T) T {
+	return -(+left + right) * right / right
+}
+
+func ComplexArithmetic[T ComplexNumber](left, right T) T {
+	return -(left + right*left/right)
+}
+
+func TextOperations[T Text](left, right T) (T, bool) {
+	return left + right, left < right
+}
+
+func Arithmetic[T Integer](left, right T) T {
+	return (left-right)*right/right%left | left&right ^ left&^right
+}
+
+func AuditBigIntOperations() int32 {
+	return Arithmetic(int32(6), int32(3))
+}
+
+func Ordered[T Integer](left, right T) bool {
+	return left < right &&
+		left <= right &&
+		right > left &&
+		right >= left &&
+		left != right
+}
+
+func ConvertValue[T Signed, U Signed](value T) U {
+	return U(value)
+}
+
+func SequenceValue[S Sequence[E], E any](values S, index int) E {
+	return values[index]
+}
+
+func SequenceSize[S Sequence[E], E any](values S) int32 {
+	return int32(len(values) + cap(values))
+}
+
+func PairValue[P Pair[E], E any](values P, index int) E {
+	return values[index]
+}
+
+func ByteSequenceValue[S ByteSequence](values S, index int) byte {
+	return values[index]
+}
+
+func ByteSequenceSize[S ByteSequence](values S) int32 {
+	return int32(len(values))
+}
+
+func GenericMapValue[T comparable](key T) int32 {
+	values := map[T]int32{key: 12}
+	return values[key]
+}
+
+func GenericMapOperations[K comparable, V any](
+	key K,
+	value V,
+) (V, bool, int32) {
+	values := make(map[K]V, 1)
+	values[key] = value
+	result, present := values[key]
+	count := int32(0)
+	for current := range values {
+		if current == key {
+			count++
+		}
+	}
+	delete(values, key)
+	values[key] = value
+	clear(values)
+	return result, present, count + int32(len(values))
+}
+
+func ReadConstraint[T ValueReader](value T) int32 {
+	return value.ReadValue()
+}
+
+func InterfaceValue[T any](value T) any {
+	return value
+}
+
+func ConstructedValues[T any](value T) ([]T, *T, [2]T) {
+	items := []T{value}
+	pointer := &value
+	array := [2]T{value, value}
+	return items, pointer, array
+}
+
 func RecursiveAdd[T Integer](value, increment T, remaining int32) T {
 	if remaining == 0 {
 		return value
@@ -144,6 +299,21 @@ func CallableValues() []int32 {
 	}
 }
 
+func AuditGenericMethodAdapters() []int32 {
+	first := ComparableBox[int32]{Value: 17}
+	equal := ComparableBox[int32]{Value: 17}
+	different := ComparableBox[int32]{Value: 18}
+	methodValue := first.Same
+	methodExpression := ComparableBox[int32].Same
+	if !methodValue(equal) ||
+		methodValue(different) ||
+		!methodExpression(first, equal) ||
+		methodExpression(first, different) {
+		return []int32{-1}
+	}
+	return []int32{first.Value, equal.Value, different.Value}
+}
+
 func AuditFunctions() []int32 {
 	first := Identity(int32(4))
 	second := Add[int32](first, 5)
@@ -167,6 +337,12 @@ func Audit() []int32 {
 	boundSame := firstComparable.Same
 	unboundSame := ComparableBox[int32].Same
 	external := support.Make(int32(6))
+	constructedSlice, constructedPointer, constructedArray :=
+		ConstructedValues(int32(11))
+	mapValue, mapPresent, mapCount :=
+		GenericMapOperations(int32(15), int32(17))
+	textValue, textOrdered := TextOperations("go", "ts")
+	interfaceValue := InterfaceValue(int32(10))
 	zero := Zero[int32]()
 	if !Equal(copied.Get(), int32(9)) ||
 		!Equal(alias.Get(), int32(9)) ||
@@ -175,6 +351,13 @@ func Audit() []int32 {
 		!firstComparable.Same(secondComparable) ||
 		!boundSame(secondComparable) ||
 		!unboundSame(firstComparable, secondComparable) ||
+		!mapPresent ||
+		!textOrdered ||
+		textValue != "gots" ||
+		FloatArithmetic(float64(6), float64(3)) != float64(-9) ||
+		ComplexArithmetic(complex128(2+3i), complex128(1-1i)) !=
+			complex128(-4-2i) ||
+		interfaceValue != int32(10) ||
 		!Equal(external.Get(), int32(6)) {
 		return []int32{-1}
 	}
@@ -190,5 +373,33 @@ func Audit() []int32 {
 		CallableValues()[1],
 		CallableValues()[2],
 		CallableValues()[3],
+		Positive(int32(2)),
+		Negate(int32(2)),
+		int32(Complement(uint32(1))),
+		boolToInt32(LogicalNot(false)),
+		Shift(int32(1), uint8(3)),
+		boolToInt32(Ordered(int32(2), int32(3))),
+		int32(ConvertValue[int32, int64](int32(13))),
+		SequenceValue([]int32{14}, 0),
+		SequenceSize(make([]int32, 1, 2)),
+		PairValue([2]int32{18, 19}, 1),
+		int32(ByteSequenceValue("A", 0)),
+		int32(ByteSequenceValue([]byte{66}, 0)),
+		ByteSequenceSize("abc"),
+		ByteSequenceSize([]byte{1, 2}),
+		GenericMapValue(int32(15)),
+		mapValue,
+		mapCount,
+		ReadConstraint(ReaderValue{Value: 16}),
+		constructedSlice[0],
+		*constructedPointer,
+		constructedArray[1],
 	}
+}
+
+func boolToInt32(value bool) int32 {
+	if value {
+		return 1
+	}
+	return 0
 }

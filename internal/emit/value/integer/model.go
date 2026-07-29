@@ -196,6 +196,18 @@ func SupportsShift(
 	return exact && unsigned < uint64(carrier.width)
 }
 
+func SupportsVariableShift(
+	representation api.IntegerRepresentation,
+	carrier Carrier,
+	operator token.Token,
+) bool {
+	if operator != token.SHL && operator != token.SHR {
+		return false
+	}
+	return representation == api.IntegerRepresentationBigInt ||
+		representation == api.IntegerRepresentationNumber && carrier.width <= 32
+}
+
 func SupportsUnary(
 	representation api.IntegerRepresentation,
 	carrier Carrier,

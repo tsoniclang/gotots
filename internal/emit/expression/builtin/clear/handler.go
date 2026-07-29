@@ -99,43 +99,10 @@ func emitMap(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if mapType.Storage() == mapvalue.StorageScalar {
-		runtime, err := context.Names().Runtime(
-			api.RuntimeMapClear,
-			api.ImportPhaseValue,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		return api.NewExpressionEmission(
-			receiver.Before(),
-			context.Factory().CallExpression(
-				context.Factory().Identifier(runtime.Name()),
-				nil,
-				nil,
-				[]tsgo.Expression{receiver.Value()},
-				tsgo.NodeFlagsNone,
-			),
-			api.CombineRequests(
-				receiver.Requests(),
-				runtime.Requests(),
-			),
-		)
-	}
-	reference, err := context.Names().MapSpecialization(
-		mapType.Type(),
-		api.MapSpecializationDemandClear,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
 	return api.NewExpressionEmission(
 		receiver.Before(),
 		methodCall(context, receiver.Value(), name),
-		api.CombineRequests(
-			receiver.Requests(),
-			reference.Requests(),
-		),
+		receiver.Requests(),
 	)
 }
 

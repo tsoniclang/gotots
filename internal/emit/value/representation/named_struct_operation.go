@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -55,7 +56,7 @@ func (owner Owner) namedStructOperationMember(
 	}
 	var typeArguments []tsgo.TypeNode
 	var typeRequests []api.RootRequest
-	var capabilities []tsgo.Expression
+	var capabilityArguments []tsgo.Expression
 	var capabilityRequests []api.RootRequest
 	if named.TypeParams().Len() != 0 {
 		if named.TypeArgs().Len() != named.TypeParams().Len() {
@@ -85,18 +86,27 @@ func (owner Owner) namedStructOperationMember(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		capabilities, capabilityRequests, err =
+		capabilities, requests, emitErr :=
 			genericinstance.EmitCapabilities(
 				context,
 				source,
 				operationSet,
 				named.TypeArgs(),
 			)
+		if emitErr != nil {
+			return api.ExpressionEmission{}, emitErr
+		}
+		capabilityRequests = requests
+		capabilityArguments, err = genericabi.JoinCapabilities(
+			typeName,
+			operationSet.Operations(),
+			capabilities,
+		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
 	}
-	arguments = append(capabilities, arguments...)
+	arguments = append(capabilityArguments, arguments...)
 	return api.DirectExpression(
 		context.Factory().CallExpression(
 			context.Factory().PropertyAccessExpression(

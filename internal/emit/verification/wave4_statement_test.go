@@ -198,7 +198,7 @@ func assertWaveFourArtifactShape(t *testing.T, printed string) {
 	for _, required := range []string{
 		"__gotots_switch_selection_",
 		"__gotots_range_keys_",
-		"goMapKeys",
+		".keys()",
 		"outer:",
 		"continue outer;",
 	} {

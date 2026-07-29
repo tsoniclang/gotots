@@ -319,7 +319,7 @@ func emitLexicalMapSpecialization(
 			Reason: "lexical map-specialization artifact has no map type",
 		}
 	}
-	capabilities, err := maprepresentation.CapabilitiesFromRequirements(
+	err := maprepresentation.ValidateRequirements(
 		context.Role(),
 		artifact,
 		requirements,
@@ -350,7 +350,6 @@ func emitLexicalMapSpecialization(
 		mapType,
 		keyType.Value(),
 		valueType.Value(),
-		capabilities,
 	)
 	if err != nil {
 		return api.DeclarationEmission{}, err

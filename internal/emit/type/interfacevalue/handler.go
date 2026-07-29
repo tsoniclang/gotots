@@ -12,7 +12,11 @@ func Resolve(sourceType types.Type) (*types.Interface, bool) {
 	if sourceType == nil {
 		return nil, false
 	}
-	source, ok := types.Unalias(sourceType).Underlying().(*types.Interface)
+	sourceType = types.Unalias(sourceType)
+	if _, parameter := sourceType.(*types.TypeParam); parameter {
+		return nil, false
+	}
+	source, ok := sourceType.Underlying().(*types.Interface)
 	if !ok {
 		return nil, false
 	}

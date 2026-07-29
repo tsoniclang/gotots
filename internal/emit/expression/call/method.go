@@ -7,6 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
+	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -43,6 +44,17 @@ func emitMethod(
 		signature.TypeParams().Len() != 0 {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if api.ContainsGenericTypeParameter(selection.Recv()) {
+		return emitConstraintMethod(
+			context,
+			children,
+			source,
+			selector,
+			method,
+			selection,
+			discarded,
+		)
 	}
 	if signature.RecvTypeParams().Len() != 0 {
 		return emitGenericReceiverMethod(
@@ -218,11 +230,32 @@ func emitGenericReceiverMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	callArguments := genericabi.Method(
-		capabilities,
+	receiverBinding, err := genericabi.Receiver(
+		owner,
 		receiverValue,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	sourceBindings, err := genericabi.SourceParameters(
+		owner,
 		sourceArguments,
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	callArguments, err := genericabi.JoinMethod(
+		owner,
+		callable.Operations(),
+		genericabi.Combine(
+			capabilities,
+			[]genericabi.Binding[tsgo.Expression]{receiverBinding},
+			sourceBindings,
+		),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	return api.NewExpressionEmission(
 		before,
 		context.Factory().CallExpression(
@@ -271,70 +304,104 @@ func emitInterfaceMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	receiverName, err := context.Names().Temporary(
-		api.TemporaryReceiverValue,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	before := append(
-		receiver.Before(),
-		context.Factory().VariableStatement(
-			nil,
-			context.Factory().VariableDeclarationList(
-				[]tsgo.VariableDeclaration{
-					context.Factory().VariableDeclaration(
-						context.Factory().Identifier(receiverName),
-						nil,
-						nil,
-						receiver.Value(),
-					),
-				},
-				tsgo.NodeFlagsConst,
-			),
-		),
-	)
-	before = append(before, argumentBefore...)
-	nonNil, err := context.Names().Runtime(
-		api.RuntimeInterfaceNonNil,
-		api.ImportPhaseValue,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	member, err := context.Names().InterfaceMethodName(method)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	guarded := context.Factory().CallExpression(
-		context.Factory().Identifier(nonNil.Name()),
-		nil,
-		nil,
-		[]tsgo.Expression{
-			context.Factory().Identifier(receiverName),
-		},
-		tsgo.NodeFlagsNone,
-	)
-	call := context.Factory().CallExpression(
-		context.Factory().PropertyAccessExpression(
-			guarded,
-			nil,
-			context.Factory().Identifier(member),
-			tsgo.NodeFlagsNone,
-		),
-		nil,
-		nil,
+	return ApplyInterfaceMethod(
+		context,
+		receiver,
+		method,
 		arguments,
-		tsgo.NodeFlagsNone,
+		argumentBefore,
+		argumentRequests,
 	)
-	return api.NewExpressionEmission(
-		before,
-		call,
+}
+
+func emitConstraintMethod(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.CallExpr,
+	selector *ast.SelectorExpr,
+	method *types.Func,
+	selection *types.Selection,
+	discarded bool,
+) (api.ExpressionEmission, error) {
+	signature, ok := selection.Type().(*types.Signature)
+	if !ok ||
+		signature.Recv() == nil ||
+		!types.Identical(signature.Recv().Type(), selection.Recv()) ||
+		signature.TypeParams().Len() != 0 ||
+		signature.RecvTypeParams().Len() != 0 {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if err := validateResults(context, source, signature, discarded); err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	receiver, err := children.Expression(
+		context.
+			WithRole(api.RoleReceiverValue).
+			WithExpectedType(selection.Recv()),
+		selector.X,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	arguments, argumentBefore, argumentRequests, err := emitArguments(
+		context,
+		children,
+		source,
+		signature,
+		false,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	receiverValue := receiver.Value()
+	before := receiver.Before()
+	var receiverRequests []api.RootRequest
+	if len(argumentBefore) != 0 {
+		receiverValue, receiverRequests, before, err = captureReceiver(
+			context,
+			receiver,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	}
+	before = append(before, argumentBefore...)
+	parameterTypes := make([]types.Type, 0, signature.Params().Len()+1)
+	parameterTypes = append(parameterTypes, selection.Recv())
+	for index := range signature.Params().Len() {
+		parameterTypes = append(
+			parameterTypes,
+			signature.Params().At(index).Type(),
+		)
+	}
+	resultTypes := make([]types.Type, 0, signature.Results().Len())
+	for index := range signature.Results().Len() {
+		resultTypes = append(
+			resultTypes,
+			signature.Results().At(index).Type(),
+		)
+	}
+	target, err := genericoperation.ConstraintMethod(
+		context,
+		source,
+		method,
+		parameterTypes,
+		resultTypes,
+		append([]tsgo.Expression{receiverValue}, arguments...),
 		api.CombineRequests(
 			receiver.Requests(),
+			receiverRequests,
 			argumentRequests,
-			nonNil.Requests(),
-		),
+		)...,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return api.NewExpressionEmission(
+		before,
+		target.Value(),
+		target.Requests(),
 	)
 }
 

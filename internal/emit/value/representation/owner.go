@@ -278,6 +278,7 @@ func (owner Owner) Copy(
 		return array.Copy(
 			context,
 			owner.children,
+			source,
 			ownsFreshValue(context, source),
 			value,
 		)

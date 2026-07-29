@@ -48,13 +48,28 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	target, handled, err := Apply(
-		context,
-		source.Op,
-		carrier,
-		operands.Left(),
-		operands.Right(),
-	)
+	facts, hasFacts := context.TypesInfo().Types[source.Y]
+	var target api.ExpressionEmission
+	var handled bool
+	if (source.Op == token.SHL || source.Op == token.SHR) &&
+		hasFacts &&
+		facts.Value == nil {
+		target, handled, err = ApplyVariableShift(
+			context,
+			source.Op,
+			carrier,
+			operands.Left(),
+			operands.Right(),
+		)
+	} else {
+		target, handled, err = Apply(
+			context,
+			source.Op,
+			carrier,
+			operands.Left(),
+			operands.Right(),
+		)
+	}
 	if err != nil || !handled {
 		return target, handled, err
 	}
@@ -163,13 +178,27 @@ func operationTypes(
 		return resultType, resultType, carrier, true
 	case source.Op == token.SHL || source.Op == token.SHR:
 		typeAndValue, ok := context.TypesInfo().Types[source.Y]
-		if !ok ||
-			!integervalue.SupportsShift(
-				context.IntegerRepresentation(),
-				carrier,
-				source.Op,
-				typeAndValue.Value,
-			) {
+		if !ok {
+			return nil, nil, integervalue.Carrier{}, false
+		}
+		if typeAndValue.Value == nil {
+			if _, rightOK := integervalue.Describe(
+				context.TypesSizes(),
+				rightType,
+			); !rightOK ||
+				!integervalue.SupportsVariableShift(
+					context.IntegerRepresentation(),
+					carrier,
+					source.Op,
+				) {
+				return nil, nil, integervalue.Carrier{}, false
+			}
+		} else if !integervalue.SupportsShift(
+			context.IntegerRepresentation(),
+			carrier,
+			source.Op,
+			typeAndValue.Value,
+		) {
 			return nil, nil, integervalue.Carrier{}, false
 		}
 		expectedRight := rightType

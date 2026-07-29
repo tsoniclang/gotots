@@ -183,7 +183,7 @@ func (s *programSession) buildMapSpecializationRevision(
 		return artifactRevision{}, err
 	}
 	defer finish()
-	capabilities, err := maprepresentation.CapabilitiesFromRequirements(
+	err = maprepresentation.ValidateRequirements(
 		api.RoleFileDeclaration,
 		artifact,
 		s.requirements.appliedFor(owner),
@@ -221,7 +221,6 @@ func (s *programSession) buildMapSpecializationRevision(
 		mapType,
 		keyType.Value(),
 		valueType.Value(),
-		capabilities,
 	)
 	if err != nil {
 		return artifactRevision{}, err

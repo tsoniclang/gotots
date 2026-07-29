@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -123,6 +124,34 @@ func emitMake(
 	if len(zero.Before()) != 0 {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if api.ContainsGenericTypeParameter(sourceType) {
+		parameterTypes := []types.Type{mapType.Element()}
+		arguments := []tsgo.Expression{zero.Value()}
+		if len(source.Args) == 2 {
+			parameterTypes = append(
+				parameterTypes,
+				context.TypesInfo().TypeOf(source.Args[1]),
+			)
+			arguments = append(arguments, size.Value())
+		}
+		target, err := genericoperation.Call(
+			context,
+			source,
+			api.GenericOperationMapConstruct,
+			parameterTypes,
+			[]types.Type{sourceType},
+			arguments,
+			api.CombineRequests(size.Requests(), zero.Requests())...,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.NewExpressionEmission(
+			append(size.Before(), zero.Before()...),
+			target.Value(),
+			target.Requests(),
+		)
 	}
 	target, err := maprepresentation.Make(
 		context,

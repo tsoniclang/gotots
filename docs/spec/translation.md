@@ -1427,6 +1427,12 @@ storing descriptors in every value. Methods on instantiated generic receiver
 types receive and forward the same hidden function ABI; ordinary values remain
 free of operation metadata.
 
+Generic methods use one exact ABI derived from the method origin and its
+canonical operation contracts: hidden operation functions first, then the
+receiver, then source parameters. Declarations, direct calls, method values,
+and method expressions all exact-join those identities; no caller separately
+constructs or orders the same list.
+
 ### Instantiation And Calls
 
 Every explicit or inferred instantiation is selected from the exact
@@ -1746,6 +1752,14 @@ Ordinary integer syntax is source-shaped under both initial profiles:
 | `value++` / `value--` | direct update | `value++` / `value--` |
 | ordered/equality comparison or expression switch | direct comparison/switch | `left < right`, `switch (value)` |
 
+Constant and variable shifts are selected by the exact left carrier and
+checker-typed count. A negative variable count enters `GoPanic.raise`; a count
+at least the left width yields zero, except signed right shift yields the sign
+fill. The `number` profile admits only fixed-width carriers representable by
+JavaScript bitwise operators and normalizes at the selected width. The
+`bigint` profile uses `BigInt.asIntN`/`asUintN` and never emits unsigned
+BigInt `>>>`. Generic shift capabilities delegate this same integer owner.
+
 BigInt division and remainder are the bounded exception to direct operators.
 JavaScript BigInt has the required truncation behavior, but division by zero
 throws a host exception. The integer-expression owner therefore requests one
@@ -1942,9 +1956,14 @@ slice types are accepted when Go accepts their identical element types.
 copies the string's Go bytes. Reallocation copies existing aggregate elements
 with their selected copy owner; reuse preserves the existing backing identity.
 `clear(slice)` writes a fresh zero at every live aggregate element, while
-`clear(map)` removes entries. The clear and slice-spread runtime surfaces are
-demanded only by source uses; a program without either operation does not gain
-their target members or helper declarations.
+`clear(map)` removes entries. The slice clear and slice-spread helpers are
+demanded only by source uses. Every admitted map representation implements one
+closed `GoMapValue<K, V>` source contract containing lookup, store, delete,
+length, nil, clear, and key iteration. Source map operations call those typed
+members directly; no separate `goMapClear`/`goMapKeys` helper or
+operation-specific map specialization exists. This complete contract is
+necessary because a generic map value must remain statically substitutable
+across scalar and generated aggregate-key implementations.
 
 An admitted map is a reference value with an explicit nil state. Map assignment
 aliases the same map. Lookup of a missing key returns the element zero;

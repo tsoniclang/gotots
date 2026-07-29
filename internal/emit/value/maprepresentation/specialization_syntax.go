@@ -16,8 +16,6 @@ type specializationBuilder struct {
 	copyKey   operationBody
 	copyValue operationBody
 	members   specializationMemberNames
-	clear     bool
-	rangeKeys bool
 }
 
 type operationBody struct {

@@ -63,12 +63,7 @@ func (b specializationBuilder) build() []tsgo.ClassElement {
 		b.lengthMethod(),
 		b.isNilMethod(),
 	}
-	if b.clear {
-		members = append(members, b.clearMethod())
-	}
-	if b.rangeKeys {
-		members = append(members, b.keysMethod())
-	}
+	members = append(members, b.clearMethod(), b.keysMethod())
 	return members
 }
 
