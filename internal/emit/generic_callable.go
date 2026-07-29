@@ -3,6 +3,7 @@ package emit
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"go/ast"
 	"go/types"
 	"sort"
 	"strconv"
@@ -164,7 +165,7 @@ func (s *programSession) genericOperationNamedIdentity(
 			}
 		}
 		if object.Parent() == object.Pkg().Scope() {
-			return typeidentity.NamedObjectKey(object, nil, "")
+			return typeidentity.NamedObjectKey(object)
 		}
 		site, ok := s.sites[owner]
 		if !ok {
@@ -173,20 +174,21 @@ func (s *programSession) genericOperationNamedIdentity(
 				Reason: "generic operation local type has no owning declaration",
 			}
 		}
-		sourceFile := site.sourceFile.Syntax()
-		if owner.Pkg() != object.Pkg() ||
-			sourceFile == nil ||
-			object.Pos() < sourceFile.Pos() ||
-			object.Pos() > sourceFile.End() {
+		function, functionOwner := site.declaration.(*ast.FuncDecl)
+		var root *types.Scope
+		if functionOwner {
+			root = site.source.TypesInfo().Scopes[function.Type]
+		}
+		if owner.Pkg() != object.Pkg() || root == nil {
 			return "", &api.NameError{
 				Name:   object.Name(),
 				Reason: "generic operation local type has no owning declaration",
 			}
 		}
-		return typeidentity.NamedObjectKey(
+		return typeidentity.LexicalNamedObjectKey(
 			object,
-			sourceFile,
-			site.outputPath,
+			api.MustSourceArtifactOwner(owner),
+			root,
 		)
 	}
 }

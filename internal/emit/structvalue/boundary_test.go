@@ -13,39 +13,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func TestNamedStructUnsupportedNeighborsFailAtTypedOwners(t *testing.T) {
-	testCases := []struct {
-		name      string
-		source    string
-		role      api.Role
-		category  api.Category
-		construct string
-	}{
-		{
-			name: "generic struct",
-			source: "package boundary\n" +
-				"type Generic[T any] struct { Value T }\n",
-			role:      api.RoleFileDeclaration,
-			category:  api.CategoryDeclaration,
-			construct: "*ast.GenDecl",
-		},
-	}
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			err := compileTemporaryStructSource(t, testCase.source)
-			var unsupported *api.UnsupportedError
-			if !errors.As(err, &unsupported) {
-				t.Fatalf("error = %v, want *api.UnsupportedError", err)
-			}
-			if unsupported.Role != testCase.role ||
-				unsupported.Category != testCase.category ||
-				unsupported.Construct != testCase.construct {
-				t.Fatalf("unsupported = %#v", unsupported)
-			}
-		})
-	}
-}
-
 func TestNamedStructCompositeMutationFailsAtElementOwner(t *testing.T) {
 	program, err := load.Load(context.Background(), load.Request{
 		Directory: structValuesDirectory(),

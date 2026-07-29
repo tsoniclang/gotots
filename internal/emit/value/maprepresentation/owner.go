@@ -44,7 +44,7 @@ func EmitType(
 	key, err := children.RepresentedType(
 		context.WithRole(api.RoleMapKey),
 		source,
-		model.Key(),
+		StorageKeyType(model.Key()),
 	)
 	if err != nil {
 		return api.TypeEmission{}, err

@@ -919,6 +919,12 @@ call yield after false, reevaluate the iterator, or move yielded copy work
 outside the callback. Each must fail its identity, contract, strict-type,
 differential, convergence, shape, or scaling owner.
 
+Lexical generic-operation identity mutations give two functions the same local
+type spelling and scope shape, relocate one function across unrelated source
+lines, and pair a local type with a foreign function root. Exact
+owner-qualified keys must respectively differ, remain stable, and reject the
+foreign root.
+
 ## Heavy Runs
 
 Heavy tests run one process group at a time with:

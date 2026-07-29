@@ -1420,6 +1420,12 @@ result identity: `Add[T ~int32]` calls `$go$binary_add` returning `T` rather
 than using target `+`, whose result would be `number` and would lose a defined
 actual type.
 
+A local named type inside an operation signature is keyed by the canonical
+enclosing source `ArtifactOwner` followed by its exact subordinate scope-child
+path. Thus identical lexical shapes in two functions remain distinct, moving
+one declaration across unrelated source lines is identity-neutral, and a
+scope rooted in another source artifact is rejected.
+
 Generic aliases create no runtime identity. Generic named values use one
 generic representation declaration. Their demanded zero/copy/equality/hash
 functions accept exact operations for constituent type parameters rather than
@@ -2033,10 +2039,11 @@ constant-size. Two map values of the same exact semantic shape reuse the same
 owner. A full deterministic canonical-type digest indexes one artifact, but
 `go/types` identity remains authoritative and a digest collision must never
 unify non-identical map types. The digest uses semantic package/declaration
-identity and source position for local named components; generated TypeScript
-names are outputs and never feed back into identity. Generated-artifact tests reject
-function-valued key-operation fields and mutations that restore callback
-storage.
+identity; a local named component additionally carries its canonical enclosing
+`ArtifactOwner` and exact lexical scope-child path. Source positions, source
+paths, and generated TypeScript names never feed back into identity.
+Generated-artifact tests reject function-valued key-operation fields and
+mutations that restore callback storage.
 
 A specialization whose exact type contains no function-local named component
 is one compilation support module under `support/maps/`. A specialization that

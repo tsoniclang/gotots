@@ -3,7 +3,6 @@ package typeidentity
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"go/ast"
 	"go/types"
 	"strconv"
 	"strings"
@@ -22,31 +21,20 @@ type identityOwner struct {
 
 func NamedObjectKey(
 	object *types.TypeName,
-	sourceFile *ast.File,
-	sourcePath string,
 ) (string, error) {
 	if object == nil || object.Pkg() == nil {
 		return "", &api.NameError{
 			Reason: "generated-artifact named component has no package identity",
 		}
 	}
-	if object.Parent() == object.Pkg().Scope() {
-		return object.Pkg().Path() + "|" + object.Name(), nil
-	}
-	if sourceFile == nil ||
-		sourcePath == "" ||
-		object.Pos() < sourceFile.Pos() ||
-		object.Pos() > sourceFile.End() {
+	if object.Parent() != object.Pkg().Scope() ||
+		object.Parent().Lookup(object.Name()) != object {
 		return "", &api.NameError{
 			Name:   object.Name(),
-			Reason: "generated-artifact local component has no lexical identity",
+			Reason: "generated-artifact named component is not package-owned",
 		}
 	}
-	offset := int64(object.Pos() - sourceFile.Pos())
-	return object.Pkg().Path() + "|" +
-		sourcePath + "|" +
-		object.Name() + "|" +
-		strconv.FormatInt(offset, 10), nil
+	return object.Pkg().Path() + "|" + object.Name(), nil
 }
 
 func LocalComponent(sourceType types.Type) (*types.TypeName, bool) {

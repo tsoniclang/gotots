@@ -313,19 +313,19 @@ func (n *File) generatedNamedObjectIdentity(
 				Reason: "generated-artifact named component has no declaration identity",
 			}
 		}
-		return typeidentity.NamedObjectKey(object, nil, "")
+		return typeidentity.NamedObjectKey(object)
 	}
 	_, indexed := n.owner.targetNameByObject[object]
-	sourceFile := n.artifactFile
 	if !indexed ||
-		n.artifactPath == "" ||
-		sourceFile == nil ||
-		object.Pos() < sourceFile.Pos() ||
-		object.Pos() > sourceFile.End() {
+		n.packageScope == nil {
 		return "", &api.NameError{
 			Name:   object.Name(),
 			Reason: "generated-artifact local component has no lexical declaration identity",
 		}
 	}
-	return typeidentity.NamedObjectKey(object, sourceFile, n.artifactPath)
+	return typeidentity.LexicalNamedObjectKey(
+		object,
+		n.artifactOwner,
+		n.packageScope,
+	)
 }
