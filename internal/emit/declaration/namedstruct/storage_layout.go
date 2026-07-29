@@ -25,11 +25,12 @@ func emitLayout(
 	source ast.Node,
 	className string,
 	fields []field,
-	storage bool,
+	storageOperation *operationAssembly,
 	moduleExport bool,
 	typeParameters []tsgo.TypeParameterDeclaration,
 	typeArguments []tsgo.TypeNode,
 ) (layoutEmission, error) {
+	storage := storageOperation != nil
 	selected, requests, err := emitLayoutFields(
 		context,
 		children,
@@ -57,17 +58,16 @@ func emitLayout(
 		}
 		return layoutEmission{members: members, requests: requests}, nil
 	}
-	if len(typeParameters) != 0 {
-		return layoutEmission{}, api.Unsupported(
-			context,
-			api.CategoryDeclaration,
-			source,
-		)
+	if len(storageOperation.capabilities) != 0 {
+		return layoutEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "storage projection cannot own primitive generic capabilities",
+		}
 	}
 	storageName := className + "$Storage"
 	storageType := context.Factory().TypeReferenceNode(
 		context.Factory().Identifier(storageName),
-		nil,
+		typeArguments,
 	)
 	members, memberRequests, err := storageMembers(
 		context,
@@ -75,6 +75,8 @@ func emitLayout(
 		className,
 		storageType,
 		selected,
+		typeParameters,
+		typeArguments,
 	)
 	if err != nil {
 		return layoutEmission{}, err
@@ -85,6 +87,7 @@ func emitLayout(
 			storageName,
 			selected,
 			moduleExport,
+			typeParameters,
 		)},
 		members:  members,
 		requests: api.CombineRequests(requests, memberRequests),
@@ -233,6 +236,7 @@ func storageAlias(
 	name string,
 	fields []layoutField,
 	moduleExport bool,
+	typeParameters []tsgo.TypeParameterDeclaration,
 ) tsgo.TypeAliasDeclaration {
 	members := make([]tsgo.TypeElement, 0, len(fields))
 	for _, selected := range fields {
@@ -253,7 +257,7 @@ func storageAlias(
 	return context.Factory().TypeAliasDeclaration(
 		modifiers,
 		context.Factory().Identifier(name),
-		nil,
+		typeParameters,
 		context.Factory().TypeLiteralNode(members),
 	)
 }
@@ -264,6 +268,8 @@ func storageMembers(
 	className string,
 	storageType tsgo.TypeNode,
 	fields []layoutField,
+	typeParameters []tsgo.TypeParameterDeclaration,
+	typeArguments []tsgo.TypeNode,
 ) ([]tsgo.ClassElement, []api.RootRequest, error) {
 	constructor := context.Factory().ConstructorDeclaration(
 		[]tsgo.ModifierLike{context.Factory().PrivateKeyword()},
@@ -287,6 +293,8 @@ func storageMembers(
 		source,
 		className,
 		fields,
+		typeParameters,
+		typeArguments,
 	)
 	if err != nil {
 		return nil, nil, err
@@ -294,8 +302,20 @@ func storageMembers(
 	members := []tsgo.ClassElement{
 		constructor,
 		makeMember,
-		storageOfMethod(context, className, storageType),
-		fromStorageMethod(context, className, storageType),
+		storageOfMethod(
+			context,
+			className,
+			storageType,
+			typeParameters,
+			typeArguments,
+		),
+		fromStorageMethod(
+			context,
+			className,
+			storageType,
+			typeParameters,
+			typeArguments,
+		),
 	}
 	requests := makeRequests
 	for _, selected := range fields {

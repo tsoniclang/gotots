@@ -127,11 +127,12 @@ func emitStructClass(
 	typeParameters []tsgo.TypeParameterDeclaration,
 	typeArguments []tsgo.TypeNode,
 ) (api.DeclarationEmission, error) {
-	storageLayout := false
+	var storageOperation *operationAssembly
 	valueOperations := make([]operationAssembly, 0, len(operations))
 	for _, operation := range operations {
 		if operation.operation == api.NamedStructOperationStorage {
-			storageLayout = true
+			selected := operation
+			storageOperation = &selected
 			continue
 		}
 		valueOperations = append(valueOperations, operation)
@@ -142,7 +143,7 @@ func emitStructClass(
 		source,
 		className,
 		fields,
-		storageLayout,
+		storageOperation,
 		moduleExport,
 		typeParameters,
 		typeArguments,

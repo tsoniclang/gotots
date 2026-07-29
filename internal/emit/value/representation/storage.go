@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -53,12 +54,36 @@ func (owner Owner) StorageType(
 		if err != nil {
 			return api.TypeEmission{}, err
 		}
+		var typeArguments []tsgo.TypeNode
+		var argumentRequests []api.RootRequest
+		named, namedOK := types.Unalias(sourceType).(*types.Named)
+		if !namedOK {
+			return api.TypeEmission{}, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "named-struct storage source type is invalid",
+			}
+		}
+		if named.TypeArgs().Len() != 0 {
+			typeArguments, argumentRequests, err =
+				genericinstance.EmitTypeArguments(
+					context,
+					owner.children,
+					source,
+					named.TypeArgs(),
+				)
+			if err != nil {
+				return api.TypeEmission{}, err
+			}
+		}
 		return api.DirectType(
 			context.Factory().TypeReferenceNode(
 				context.Factory().Identifier(reference.Name()),
-				nil,
+				typeArguments,
 			),
-			reference.Requests()...,
+			api.CombineRequests(
+				reference.Requests(),
+				argumentRequests,
+			)...,
 		), nil
 	}
 	return owner.children.RepresentedType(
@@ -101,19 +126,22 @@ func (owner Owner) ToStorage(
 			value,
 		)
 	}
-	if typeName, _, ok := namedStruct(sourceType); ok {
-		reference, err := context.Names().NamedStructOperation(
-			typeName,
+	if _, _, ok := namedStruct(sourceType); ok {
+		converted, err := owner.namedStructOperationMember(
+			context,
+			source,
+			sourceType,
 			api.NamedStructOperationStorage,
+			api.StructStorageOfMember,
+			[]tsgo.Expression{value.Value()},
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		return callStorageMember(
-			context,
-			reference,
-			api.StructStorageOfMember,
-			value,
+		return api.NewExpressionEmission(
+			value.Before(),
+			converted.Value(),
+			api.CombineRequests(value.Requests(), converted.Requests()),
 		)
 	}
 	return value, nil
@@ -152,19 +180,22 @@ func (owner Owner) FromStorage(
 			value,
 		)
 	}
-	if typeName, _, ok := namedStruct(sourceType); ok {
-		reference, err := context.Names().NamedStructOperation(
-			typeName,
+	if _, _, ok := namedStruct(sourceType); ok {
+		converted, err := owner.namedStructOperationMember(
+			context,
+			source,
+			sourceType,
 			api.NamedStructOperationStorage,
+			api.StructFromStorageMember,
+			[]tsgo.Expression{value.Value()},
 		)
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		return callStorageMember(
-			context,
-			reference,
-			api.StructFromStorageMember,
-			value,
+		return api.NewExpressionEmission(
+			value.Before(),
+			converted.Value(),
+			api.CombineRequests(value.Requests(), converted.Requests()),
 		)
 	}
 	return value, nil

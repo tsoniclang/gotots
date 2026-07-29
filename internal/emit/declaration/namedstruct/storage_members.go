@@ -13,6 +13,8 @@ func storageMakeMethod(
 	source ast.Node,
 	className string,
 	fields []layoutField,
+	typeParameters []tsgo.TypeParameterDeclaration,
+	typeArguments []tsgo.TypeNode,
 ) (tsgo.MethodDeclaration, []api.RootRequest, error) {
 	parameters := make([]tsgo.ParameterDeclaration, 0, len(fields))
 	properties := make([]tsgo.ObjectLiteralElementLike, 0, len(fields))
@@ -56,7 +58,7 @@ func storageMakeMethod(
 	}
 	value := context.Factory().NewExpression(
 		context.Factory().Identifier(className),
-		nil,
+		typeArguments,
 		[]tsgo.Expression{
 			context.Factory().ObjectLiteralExpression(properties, true),
 		},
@@ -69,11 +71,11 @@ func storageMakeMethod(
 		nil,
 		context.Factory().Identifier(api.StructMakeMember),
 		nil,
-		nil,
+		typeParameters,
 		parameters,
 		context.Factory().TypeReferenceNode(
 			context.Factory().Identifier(className),
-			nil,
+			typeArguments,
 		),
 		context.Factory().Block(
 			[]tsgo.Statement{context.Factory().ReturnStatement(value)},
@@ -86,6 +88,8 @@ func storageOfMethod(
 	context api.Context,
 	className string,
 	storageType tsgo.TypeNode,
+	typeParameters []tsgo.TypeParameterDeclaration,
+	typeArguments []tsgo.TypeNode,
 ) tsgo.MethodDeclaration {
 	source := context.Factory().Identifier("$source")
 	return context.Factory().MethodDeclaration(
@@ -96,7 +100,7 @@ func storageOfMethod(
 		nil,
 		context.Factory().Identifier(api.StructStorageOfMember),
 		nil,
-		nil,
+		typeParameters,
 		[]tsgo.ParameterDeclaration{context.Factory().ParameterDeclaration(
 			nil,
 			nil,
@@ -104,7 +108,7 @@ func storageOfMethod(
 			nil,
 			context.Factory().TypeReferenceNode(
 				context.Factory().Identifier(className),
-				nil,
+				typeArguments,
 			),
 			nil,
 		)},
@@ -127,6 +131,8 @@ func fromStorageMethod(
 	context api.Context,
 	className string,
 	storageType tsgo.TypeNode,
+	typeParameters []tsgo.TypeParameterDeclaration,
+	typeArguments []tsgo.TypeNode,
 ) tsgo.MethodDeclaration {
 	source := context.Factory().Identifier("$source")
 	return context.Factory().MethodDeclaration(
@@ -137,7 +143,7 @@ func fromStorageMethod(
 		nil,
 		context.Factory().Identifier(api.StructFromStorageMember),
 		nil,
-		nil,
+		typeParameters,
 		[]tsgo.ParameterDeclaration{context.Factory().ParameterDeclaration(
 			nil,
 			nil,
@@ -148,13 +154,13 @@ func fromStorageMethod(
 		)},
 		context.Factory().TypeReferenceNode(
 			context.Factory().Identifier(className),
-			nil,
+			typeArguments,
 		),
 		context.Factory().Block(
 			[]tsgo.Statement{context.Factory().ReturnStatement(
 				context.Factory().NewExpression(
 					context.Factory().Identifier(className),
-					nil,
+					typeArguments,
 					[]tsgo.Expression{source},
 				),
 			)},

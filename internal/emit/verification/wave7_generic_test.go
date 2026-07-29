@@ -3,6 +3,7 @@ package emit_test
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -134,9 +135,15 @@ func TestWaveSevenGenericNamedTypesCompileThroughPublicPipeline(t *testing.T) {
 			}
 			workingDirectory := t.TempDir()
 			artifacts := materializeArtifacts(t, emission, workingDirectory)
+			sourceModule := sourceModuleForExport(
+				t,
+				artifacts,
+				workingDirectory,
+				"Audit",
+			)
 			runner := filepath.Join(workingDirectory, "runner.ts")
 			writeProgramFile(t, runner, `import "./program.js";
-import { Audit } from "`+artifacts.sourceModule+`";
+import { Audit } from "`+sourceModule+`";
 
 const values = Audit();
 const output: string[] = [];
@@ -172,6 +179,38 @@ console.log(output.join(" "));
 			}
 		})
 	}
+}
+
+func sourceModuleForExport(
+	t *testing.T,
+	artifacts waveFourArtifacts,
+	workingDirectory string,
+	name string,
+) string {
+	t.Helper()
+	marker := "export function " + name
+	var selected string
+	for _, path := range artifacts.paths {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(content), marker) {
+			continue
+		}
+		if selected != "" {
+			t.Fatalf("multiple source modules export %s", name)
+		}
+		selected = path
+	}
+	if selected == "" {
+		t.Fatalf("no source module exports %s", name)
+	}
+	relative, err := filepath.Rel(workingDirectory, selected)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return "./" + strings.TrimSuffix(filepath.ToSlash(relative), ".ts") + ".js"
 }
 
 func assertWaveSevenGenericFoundationShape(t *testing.T, printed string) {

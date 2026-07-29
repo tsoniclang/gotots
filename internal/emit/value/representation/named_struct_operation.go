@@ -16,8 +16,30 @@ func (owner Owner) namedStructOperation(
 	operation api.NamedStructOperation,
 	arguments []tsgo.Expression,
 ) (api.ExpressionEmission, error) {
+	memberName, err := api.NamedStructOperationMemberName(operation)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return owner.namedStructOperationMember(
+		context,
+		source,
+		sourceType,
+		operation,
+		memberName,
+		arguments,
+	)
+}
+
+func (owner Owner) namedStructOperationMember(
+	context api.Context,
+	source ast.Node,
+	sourceType types.Type,
+	operation api.NamedStructOperation,
+	memberName string,
+	arguments []tsgo.Expression,
+) (api.ExpressionEmission, error) {
 	named, ok := types.Unalias(sourceType).(*types.Named)
-	if !ok {
+	if !ok || memberName == "" {
 		return api.ExpressionEmission{}, &api.InvariantError{
 			Role:   context.Role(),
 			Reason: "named-struct operation source type is invalid",
@@ -73,10 +95,6 @@ func (owner Owner) namedStructOperation(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-	}
-	memberName, err := api.NamedStructOperationMemberName(operation)
-	if err != nil {
-		return api.ExpressionEmission{}, err
 	}
 	arguments = append(capabilities, arguments...)
 	return api.DirectExpression(

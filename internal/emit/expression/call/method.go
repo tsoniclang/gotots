@@ -221,7 +221,7 @@ func emitGenericReceiverMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	callArguments := append(capabilities, receiverValue)
+	callArguments := append([]tsgo.Expression{receiverValue}, capabilities...)
 	callArguments = append(callArguments, sourceArguments...)
 	return api.NewExpressionEmission(
 		before,
