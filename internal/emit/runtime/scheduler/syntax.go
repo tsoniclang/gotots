@@ -1,6 +1,9 @@
 package scheduler
 
-import "github.com/tsoniclang/gotots/internal/target/tsgo"
+import (
+	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
 
 type builder struct {
 	factory       tsgo.Factory
@@ -341,5 +344,13 @@ func (b builder) panicValue(message string) tsgo.CallExpression {
 		b.id(b.panicName),
 		"createRuntime",
 		b.string(message),
+	)
+}
+
+func (b builder) rethrow(value tsgo.Expression) tsgo.CallExpression {
+	return b.methodCall(
+		b.id(b.panicName),
+		panicruntime.RethrowName,
+		value,
 	)
 }

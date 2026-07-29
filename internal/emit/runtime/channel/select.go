@@ -43,7 +43,7 @@ func (b builder) selectReadyBody() tsgo.Block {
 		b.factory.IfStatement(
 			b.strictDefined(b.id("failure")),
 			b.factory.Block([]tsgo.Statement{
-				b.factory.ThrowStatement(b.id("failure")),
+				b.expression(b.rethrow(b.id("failure"))),
 			}, true),
 			nil,
 		),

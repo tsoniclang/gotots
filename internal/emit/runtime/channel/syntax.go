@@ -1,6 +1,9 @@
 package channel
 
-import "github.com/tsoniclang/gotots/internal/target/tsgo"
+import (
+	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
+)
 
 type builder struct {
 	factory           tsgo.Factory
@@ -404,6 +407,14 @@ func (b builder) panicValue(value string) tsgo.CallExpression {
 		b.panicName,
 		"createRuntime",
 		b.string(value),
+	)
+}
+
+func (b builder) rethrow(value tsgo.Expression) tsgo.CallExpression {
+	return b.staticCall(
+		b.panicName,
+		panicruntime.RethrowName,
+		value,
 	)
 }
 

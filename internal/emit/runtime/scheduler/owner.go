@@ -291,7 +291,7 @@ func (b builder) blockMethod() tsgo.MethodDeclaration {
 		b.factory.IfStatement(
 			b.schedulerProperty("settled"),
 			b.factory.Block([]tsgo.Statement{
-				b.factory.ThrowStatement(b.id("failure")),
+				b.expression(b.rethrow(b.id("failure"))),
 			}, true),
 			nil,
 		),
@@ -300,7 +300,7 @@ func (b builder) blockMethod() tsgo.MethodDeclaration {
 			b.subtract(blocked, b.number("1")),
 		)),
 		b.expression(b.schedulerCall("check")),
-		b.factory.ThrowStatement(b.id("failure")),
+		b.expression(b.rethrow(b.id("failure"))),
 	)
 	settled := b.methodCall(
 		b.id("operation"),

@@ -9,6 +9,7 @@ const (
 	RaiseName         = "raise"
 	RaiseRuntimeName  = "raiseRuntime"
 	CreateRuntimeName = "createRuntime"
+	RethrowName       = "rethrow"
 	TakeName          = "take"
 	RecoveredName     = "recovered"
 )
@@ -123,7 +124,23 @@ func panicCarrier(
 			createRuntime(factory, className, runtimeValueName),
 			raiseValue(factory, className, valueType),
 			raiseRuntime(factory, className, runtimeValueName),
+			rethrow(factory),
 		},
+	)
+}
+
+func rethrow(factory tsgo.Factory) tsgo.MethodDeclaration {
+	return staticNeverMethod(
+		factory,
+		RethrowName,
+		parameter(
+			factory,
+			"failure",
+			factory.KeywordTypeNode(
+				tsgo.KeywordTypeSyntaxKindObjectKeyword,
+			),
+		),
+		factory.Identifier("failure"),
 	)
 }
 

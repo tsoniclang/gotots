@@ -25,7 +25,7 @@ func TestBuildCreatesOneNonErasedPanicCarrierAndRecoveryAuthority(t *testing.T) 
 	carrier := carrierTarget.(tsgo.ClassDeclaration)
 	if className(carrier) != "GoPanic" ||
 		len(carrier.TypeParameters()) != 0 ||
-		len(carrier.Members()) != 4 {
+		len(carrier.Members()) != 5 {
 		t.Fatalf(
 			"panic class = %q, type parameters %d, members %d",
 			className(carrier),
@@ -33,7 +33,7 @@ func TestBuildCreatesOneNonErasedPanicCarrierAndRecoveryAuthority(t *testing.T) 
 			len(carrier.Members()),
 		)
 	}
-	for _, index := range []int{2, 3} {
+	for _, index := range []int{2, 3, 4} {
 		method := carrier.Members()[index].(tsgo.MethodDeclaration)
 		body := method.Body().(tsgo.Block).Statements()
 		if len(body) != 1 || body[0].Kind() != tsgo.SyntaxKindThrowStatement {
