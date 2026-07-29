@@ -9,7 +9,7 @@ func BuildOperation(
 	factory tsgo.Factory,
 	symbol api.RuntimeSymbol,
 ) (tsgo.Statement, error) {
-	if symbol != api.RuntimeMapClear {
+	if symbol != api.RuntimeMapClear && symbol != api.RuntimeMapKeys {
 		return nil, &api.RuntimeSymbolError{Symbol: symbol}
 	}
 	contract, err := api.RuntimeContract(symbol)
@@ -22,11 +22,35 @@ func BuildOperation(
 	}
 	keyType := typeName(factory, keyTypeName)
 	valueType := typeName(factory, valueTypeName)
-	clearName, err := Name(MemberClear)
+	member := MemberClear
+	if symbol == api.RuntimeMapKeys {
+		member = MemberKeys
+	}
+	memberName, err := Name(member)
 	if err != nil {
 		return nil, err
 	}
 	target := factory.Identifier("target")
+	resultType := tsgo.TypeNode(
+		factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindVoidKeyword),
+	)
+	bodyExpression := tsgo.Expression(factory.CallExpression(
+		factory.PropertyAccessExpression(
+			target,
+			nil,
+			factory.Identifier(memberName),
+			tsgo.NodeFlagsNone,
+		),
+		nil,
+		nil,
+		nil,
+		tsgo.NodeFlagsNone,
+	))
+	body := tsgo.Statement(factory.ExpressionStatement(bodyExpression))
+	if symbol == api.RuntimeMapKeys {
+		resultType = factory.ArrayTypeNode(keyType)
+		body = factory.ReturnStatement(bodyExpression)
+	}
 	return factory.FunctionDeclaration(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
 		nil,
@@ -45,20 +69,7 @@ func BuildOperation(
 				valueType,
 			),
 		)},
-		factory.KeywordTypeNode(tsgo.KeywordTypeSyntaxKindVoidKeyword),
-		factory.Block([]tsgo.Statement{factory.ExpressionStatement(
-			factory.CallExpression(
-				factory.PropertyAccessExpression(
-					target,
-					nil,
-					factory.Identifier(clearName),
-					tsgo.NodeFlagsNone,
-				),
-				nil,
-				nil,
-				nil,
-				tsgo.NodeFlagsNone,
-			),
-		)}, true),
+		resultType,
+		factory.Block([]tsgo.Statement{body}, true),
 	), nil
 }

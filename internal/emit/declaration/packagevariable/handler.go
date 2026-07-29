@@ -4,9 +4,9 @@ import (
 	"go/ast"
 	"go/types"
 	"slices"
-	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/resulttuple"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -278,40 +278,18 @@ func emitMultipleInitializer(
 				)
 		}
 	}
-	value, err := children.Expression(
-		context.
-			WithRole(api.RolePackageVariableValue).
-			WithExpectedResults(results),
+	capture, err := resulttuple.Emit(
+		context,
+		children,
 		initializer.Rhs,
+		results,
+		api.RolePackageVariableValue,
 	)
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	temporaryName, err := context.Names().Temporary(
-		api.TemporaryMultipleResults,
-	)
-	if err != nil {
-		return api.StatementEmission{}, err
-	}
-	statements := value.Before()
-	statements = append(
-		statements,
-		context.Factory().VariableStatement(
-			nil,
-			context.Factory().VariableDeclarationList(
-				[]tsgo.VariableDeclaration{
-					context.Factory().VariableDeclaration(
-						context.Factory().Identifier(temporaryName),
-						nil,
-						nil,
-						value.Value(),
-					),
-				},
-				tsgo.NodeFlagsConst,
-			),
-		),
-	)
-	requests := value.Requests()
+	statements := capture.Statements()
+	requests := capture.Requests()
 	for index, variable := range initializer.Lhs {
 		if variable.Name() == "_" {
 			continue
@@ -320,15 +298,10 @@ func emitMultipleInitializer(
 		if err != nil {
 			return api.StatementEmission{}, err
 		}
-		element := context.Factory().ElementAccessExpression(
-			context.Factory().Identifier(temporaryName),
-			nil,
-			context.Factory().NumericLiteral(
-				strconv.Itoa(index),
-				tsgo.TokenFlagsNone,
-			),
-			tsgo.NodeFlagsNone,
-		)
+		element, err := capture.Element(context, index)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
 		target, err := api.NewCanonicalStorageTargetEmission(
 			reference.Expression(context.Factory()),
 			variable.Type(),

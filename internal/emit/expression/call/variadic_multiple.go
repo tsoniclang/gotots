@@ -4,9 +4,9 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
-	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/resulttuple"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -39,55 +39,32 @@ func emitVariadicMultipleArgument(
 				api.Unsupported(context, api.CategoryExpression, source)
 		}
 	}
-	value, err := children.Expression(
-		context.
-			WithRole(api.RoleCallArgument).
-			WithExpectedResults(results),
+	capture, err := resulttuple.Emit(
+		context,
+		children,
 		source.Args[0],
+		results,
+		api.RoleCallArgument,
 	)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	temporaryName, err := context.Names().Temporary(
-		api.TemporaryMultipleResults,
-	)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	before := append([]tsgo.Statement(nil), value.Before()...)
-	before = append(before, context.Factory().VariableStatement(
-		nil,
-		context.Factory().VariableDeclarationList(
-			[]tsgo.VariableDeclaration{context.Factory().VariableDeclaration(
-				context.Factory().Identifier(temporaryName),
-				nil,
-				nil,
-				value.Value(),
-			)},
-			tsgo.NodeFlagsConst,
-		),
-	))
 	emissions := make([]api.ExpressionEmission, 0, fixedCount+1)
 	variadicValues := make(
 		[]api.ExpressionEmission,
 		0,
 		results.Len()-fixedCount,
 	)
-	requests := value.Requests()
+	requests := capture.Requests()
 	for index := range results.Len() {
 		expected := variadicType.Elem()
 		if index < fixedCount {
 			expected = signature.Params().At(index).Type()
 		}
-		element := context.Factory().ElementAccessExpression(
-			context.Factory().Identifier(temporaryName),
-			nil,
-			context.Factory().NumericLiteral(
-				strconv.Itoa(index),
-				tsgo.TokenFlagsNone,
-			),
-			tsgo.NodeFlagsNone,
-		)
+		element, err := capture.Element(context, index)
+		if err != nil {
+			return nil, nil, nil, err
+		}
 		copied, err := context.Values().Copy(
 			context.WithRole(api.RoleCallArgument),
 			source.Args[0],
@@ -123,7 +100,7 @@ func emitVariadicMultipleArgument(
 			emissions,
 		)
 		return arguments,
-			append(before, captured...),
+			append(capture.Statements(), captured...),
 			api.CombineRequests(requests, capturedRequests),
 			err
 	}
@@ -132,5 +109,5 @@ func emitVariadicMultipleArgument(
 		arguments = append(arguments, emission.Value())
 		requests = append(requests, emission.Requests()...)
 	}
-	return arguments, before, requests, nil
+	return arguments, capture.Statements(), requests, nil
 }

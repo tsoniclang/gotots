@@ -150,10 +150,52 @@ default: {
 
 Its case expressions are dispatched as conditions in source order. No source
 node, spelling check, or fabricated semantic record represents the absent tag.
-Case-expression prerequisite statements, fallthrough, type switches, and types
-whose target equality is not yet proved remain distinct typed-unsupported
-cases. They are not approximated by re-evaluation, loose equality, or a generic
-statement walk.
+The switch owner selects one of two target shapes. Primitive tags whose Go
+equality is exactly target strict equality and whose cases have no prerequisite
+statements retain the native switch above. Every other represented comparable
+tag is copied once, and ordered case expressions select one numeric clause
+before one native execution switch runs the clause bodies. This keeps case
+evaluation lazy, preserves custom equality, and emits each body once.
+`fallthrough` removes only the implicit break from the selected clause,
+including a non-final default clause. Type switches remain owned by the
+interface family; they are not approximated by this expression-switch owner.
+
+### Structured Loops, Range, And Labels
+
+A three-clause `for` remains a direct target `for` whenever its initializer and
+post each fit one target header and its condition has no prerequisite
+statements. Otherwise the loop owner emits one enclosing lexical block:
+initializer statements execute there once, and a prerequisite-bearing
+condition or multi-statement post receives one typed arrow declaration created
+once before the loop. The target `for` calls those declarations from the exact
+condition or post positions, so `continue` still executes the post and no work
+is moved out of an iteration.
+
+Range is one parent-owned family selected from the checked range-expression
+type. Arrays, pointers to arrays, slices, strings, maps, and integers each
+construct typed TS-Go loops directly; no generic loop or operation IR exists.
+The array owner applies Go's constant-length rule exactly: with at most one
+iteration variable, an array or pointer-to-array operand containing no
+function call or channel receive is not evaluated; otherwise it is captured
+once. Conversions recurse into their operands and are not misclassified as
+ordinary calls. Array values are copied where value iteration requires the
+range copy, pointer arrays remain aliases, strings use UTF-8 byte indexes and
+invalid-byte `RuneError`, and integer ranges preserve the selected integer
+carrier.
+
+Map range snapshots the initial key set once and performs a live lookup before
+each body. A deleted unseen entry is skipped, each snapshotted key is considered
+at most once, and additions may be omitted as Go permits. Keys and values enter
+the same represented-value copy and range-assignment owners as ordinary
+assignment. Output size depends on source syntax, never the runtime collection
+length.
+
+Per-iteration declarations use the exact `types.Var` definitions and create
+fresh target bindings or addressable cells. Assignment-form range prepares
+non-blank target locations once per iteration after the iteration values exist,
+then stores left-to-right. Labels and labeled branches use exact
+`*types.Label` definitions/uses. A loop label is attached to the actual target
+loop, not an enclosing prerequisite block.
 
 A local `var` declaration is owned by its enclosing declaration statement:
 

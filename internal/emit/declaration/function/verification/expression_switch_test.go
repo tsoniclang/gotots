@@ -124,10 +124,10 @@ func TestExpressionSwitchChildBoundaryMutationsFailClosed(t *testing.T) {
 			role:      api.RoleSwitchCaseExpression,
 		},
 		{
-			name: "fallthrough",
+			name: "non-final fallthrough",
 			mutate: func(source *ast.SwitchStmt) {
 				clause := source.Body.List[0].(*ast.CaseClause)
-				clause.Body[1] = &ast.BranchStmt{Tok: token.FALLTHROUGH}
+				clause.Body[0] = &ast.BranchStmt{Tok: token.FALLTHROUGH}
 			},
 			category:  api.CategoryStatement,
 			construct: "*ast.BranchStmt",

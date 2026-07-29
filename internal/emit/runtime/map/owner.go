@@ -27,15 +27,17 @@ type memberNames struct {
 	length     string
 	isNil      string
 	clear      string
+	keys       string
 }
 
 type Capabilities struct {
 	Clear bool
+	Keys  bool
 }
 
 func resolveMemberNames() (memberNames, error) {
-	resolved := make([]string, 0, MemberClear)
-	for member := MemberNil; member <= MemberClear; member++ {
+	resolved := make([]string, 0, MemberKeys)
+	for member := MemberNil; member <= MemberKeys; member++ {
 		name, err := Name(member)
 		if err != nil {
 			return memberNames{}, err
@@ -52,6 +54,7 @@ func resolveMemberNames() (memberNames, error) {
 		length:     resolved[6],
 		isNil:      resolved[7],
 		clear:      resolved[8],
+		keys:       resolved[9],
 	}, nil
 }
 
@@ -93,6 +96,9 @@ func Build(
 	}
 	if capabilities.Clear {
 		classMembers = append(classMembers, clearMethod(factory, members.clear))
+	}
+	if capabilities.Keys {
+		classMembers = append(classMembers, keysMethod(factory, members.keys))
 	}
 	return factory.ClassDeclaration(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},

@@ -52,6 +52,9 @@ func validateSpecialization(
 	if capabilities.Clear {
 		expected[names.clear] = nil
 	}
+	if capabilities.Range {
+		expected[names.keys] = nil
+	}
 	if len(members) != len(expected)+1 {
 		return specializationShapeError(
 			role,

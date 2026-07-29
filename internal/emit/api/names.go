@@ -41,6 +41,16 @@ const (
 	TemporaryArrayHash
 	TemporaryArrayConstruction
 	TemporarySliceConstruction
+	TemporaryRangeOperand
+	TemporaryRangeIndex
+	TemporaryRangeValue
+	TemporaryRangeKeys
+	TemporaryRangeDecode
+	TemporarySwitchTag
+	TemporarySwitchSelection
+	TemporarySwitchMatch
+	TemporaryForCondition
+	TemporaryForPost
 )
 
 type NameReference struct {
@@ -183,6 +193,26 @@ func TemporaryPrefix(kind TemporaryKind) (string, error) {
 		return "__gotots_array_build_", nil
 	case TemporarySliceConstruction:
 		return "__gotots_slice_build_", nil
+	case TemporaryRangeOperand:
+		return "__gotots_range_", nil
+	case TemporaryRangeIndex:
+		return "__gotots_range_index_", nil
+	case TemporaryRangeValue:
+		return "__gotots_range_value_", nil
+	case TemporaryRangeKeys:
+		return "__gotots_range_keys_", nil
+	case TemporaryRangeDecode:
+		return "__gotots_range_decode_", nil
+	case TemporarySwitchTag:
+		return "__gotots_switch_tag_", nil
+	case TemporarySwitchSelection:
+		return "__gotots_switch_selection_", nil
+	case TemporarySwitchMatch:
+		return "__gotots_switch_match_", nil
+	case TemporaryForCondition:
+		return "__gotots_for_condition_", nil
+	case TemporaryForPost:
+		return "__gotots_for_post_", nil
 	default:
 		return "", &NameError{
 			Reason: fmt.Sprintf("temporary kind %d is invalid", kind),

@@ -125,6 +125,7 @@ func verifyProductionFile(relative string, sourcePath string) error {
 		) && strings.HasPrefix(importPath, internalPrefix) {
 			switch importPath {
 			case modulePath + "/internal/emit/api",
+				modulePath + "/internal/emit/resulttuple",
 				modulePath + "/internal/emit/type/basic",
 				modulePath + "/internal/target/tsgo":
 			default:

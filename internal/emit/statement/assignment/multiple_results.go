@@ -4,9 +4,9 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
-	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/resulttuple"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -46,41 +46,27 @@ func emitMultipleResults(
 	if source.Tok == token.DEFINE {
 		role = api.RoleLocalValue
 	}
-	value, err := children.Expression(
-		context.
-			WithRole(role).
-			WithExpectedResults(results),
+	capture, err := resulttuple.Emit(
+		context,
+		children,
 		source.Rhs[0],
+		results,
+		role,
 	)
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	temporaryName, err := context.Names().Temporary(api.TemporaryMultipleResults)
-	if err != nil {
-		return api.StatementEmission{}, err
-	}
-	statements := append(locationBefore, value.Before()...)
-	statements = append(
-		statements,
-		variableStatement(
-			context,
-			tsgo.NodeFlagsConst,
-			temporaryName,
-			value.Value(),
-		),
-	)
-	requests := api.CombineRequests(locationRequests, value.Requests())
+	statements := append(locationBefore, capture.Statements()...)
+	requests := api.CombineRequests(locationRequests, capture.Requests())
 
 	for index, target := range targets {
 		if target.discard {
 			continue
 		}
-		element := tsgo.Expression(context.Factory().ElementAccessExpression(
-			context.Factory().Identifier(temporaryName),
-			nil,
-			context.Factory().NumericLiteral(strconv.Itoa(index), tsgo.TokenFlagsNone),
-			tsgo.NodeFlagsNone,
-		))
+		element, err := capture.Element(context, index)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
 		targetType := target.target.SourceType()
 		if target.declaration {
 			targetType = target.object.Type()

@@ -44,11 +44,19 @@ func NewOwner(
 	}
 	objectsByScope := make(map[*types.Scope][]types.Object)
 	seen := make(map[types.Object]struct{})
+	var labels []*types.Label
 	for _, object := range info.Defs {
 		if object == nil || object.Name() == "_" {
 			continue
 		}
 		owner.sourceNameBases[portableIdentifier(object.Name())] = struct{}{}
+		if label, ok := object.(*types.Label); ok {
+			if _, exists := seen[label]; !exists {
+				seen[label] = struct{}{}
+				labels = append(labels, label)
+			}
+			continue
+		}
 		if object.Parent() == nil {
 			continue
 		}
@@ -68,7 +76,25 @@ func NewOwner(
 		owner.preallocateMethods(info)
 		owner.preallocateMembers(packageScope)
 	}
+	owner.preallocateLabels(labels)
 	return owner
+}
+
+func (n *Owner) preallocateLabels(labels []*types.Label) {
+	slices.SortFunc(labels, func(left, right *types.Label) int {
+		return compareNameObjects(left, right)
+	})
+	counts := make(map[string]uint64)
+	for _, label := range labels {
+		base := portableIdentifier(label.Name())
+		index := counts[base]
+		counts[base]++
+		name := base
+		if index != 0 {
+			name += "__label_" + strconv.FormatUint(index, 10)
+		}
+		n.targetNameByObject[label] = name
+	}
 }
 
 func (n *Owner) Reserve(

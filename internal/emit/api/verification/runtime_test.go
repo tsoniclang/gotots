@@ -40,6 +40,7 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimeMap, 400, api.RuntimeModuleMap, "runtime/map.ts", "GoMap", true, []api.RuntimeSymbol{api.RuntimePanic}},
 		{api.RuntimeMapHash, 401, api.RuntimeModuleMap, "runtime/map.ts", "GoMapHash", false, nil},
 		{api.RuntimeMapClear, 402, api.RuntimeModuleMap, "runtime/map.ts", "goMapClear", false, []api.RuntimeSymbol{api.RuntimeMap}},
+		{api.RuntimeMapKeys, 403, api.RuntimeModuleMap, "runtime/map.ts", "goMapKeys", false, []api.RuntimeSymbol{api.RuntimeMap}},
 		{api.RuntimePanic, 500, api.RuntimeModulePanic, "runtime/panic.ts", "GoPanic", true, nil},
 		{api.RuntimeIntegerDivide, 600, api.RuntimeModuleInteger, "runtime/integer.ts", "goIntegerDivide", false, []api.RuntimeSymbol{api.RuntimePanic}},
 		{api.RuntimeIntegerRemainder, 601, api.RuntimeModuleInteger, "runtime/integer.ts", "goIntegerRemainder", false, []api.RuntimeSymbol{api.RuntimePanic}},

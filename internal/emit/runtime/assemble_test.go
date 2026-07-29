@@ -158,11 +158,13 @@ func TestSliceAggregateDefinitionsRequireRuntimeSliceFirst(t *testing.T) {
 	}
 }
 
-func TestMapClearDefinitionRequiresOneRuntimeMapOwner(t *testing.T) {
+func TestMapOptionalOperationsRequireOneRuntimeMapOwner(t *testing.T) {
 	for _, symbols := range [][]api.RuntimeSymbol{
 		{api.RuntimeMapClear},
+		{api.RuntimeMapKeys},
 		{api.RuntimeMap, api.RuntimeMap},
 		{api.RuntimeMap, api.RuntimeMapClear, api.RuntimeMapClear},
+		{api.RuntimeMap, api.RuntimeMapKeys, api.RuntimeMapKeys},
 	} {
 		if _, err := Build(
 			tsgo.NewFactory(),
@@ -175,14 +177,19 @@ func TestMapClearDefinitionRequiresOneRuntimeMapOwner(t *testing.T) {
 	definitions, err := Build(
 		tsgo.NewFactory(),
 		api.RuntimeModuleMap,
-		[]api.RuntimeSymbol{api.RuntimeMap, api.RuntimeMapClear},
+		[]api.RuntimeSymbol{
+			api.RuntimeMap,
+			api.RuntimeMapClear,
+			api.RuntimeMapKeys,
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(definitions) != 2 ||
+	if len(definitions) != 3 ||
 		definitions[0].Symbol() != api.RuntimeMap ||
-		definitions[1].Symbol() != api.RuntimeMapClear {
-		t.Fatalf("map clear definitions = %#v", definitions)
+		definitions[1].Symbol() != api.RuntimeMapClear ||
+		definitions[2].Symbol() != api.RuntimeMapKeys {
+		t.Fatalf("map optional definitions = %#v", definitions)
 	}
 }

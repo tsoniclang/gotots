@@ -15,6 +15,7 @@ const (
 	MemberLength   Member = 7
 	MemberIsNil    Member = 8
 	MemberClear    Member = 9
+	MemberKeys     Member = 10
 )
 
 func Name(member Member) (string, error) {
@@ -37,6 +38,8 @@ func Name(member Member) (string, error) {
 		return "isNil", nil
 	case MemberClear:
 		return "clear", nil
+	case MemberKeys:
+		return "keys", nil
 	default:
 		return "", &MemberError{Member: member}
 	}

@@ -49,6 +49,10 @@ func (a RuntimeArray) ElementType() types.Type {
 	return a.source.Elem()
 }
 
+func (a RuntimeArray) SourceType() types.Type {
+	return a.sourceType
+}
+
 func (a RuntimeArray) Length() int64 {
 	return a.source.Len()
 }

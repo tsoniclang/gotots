@@ -247,7 +247,8 @@ create a value IR or a generic operation registry.
 5. Unnamed maps with represented scalar comparable keys and represented scalar
    values support nil, `make`, literals, lookup, comma-ok lookup, stores,
    `delete`, and `len`. Missing lookup returns the exact value zero; writes to a
-   nil map fail at runtime; map iteration remains deferred.
+   nil map fail at runtime; map iteration is deferred from this checkpoint to
+   Milestone 3C.
 6. Pointers whose element has an admitted complete value representation
    support nil, `new`, dereference read and store, assignment,
    return/argument passing, and canonical-location equality. The current
@@ -368,6 +369,36 @@ artifacts remain byte-identical, definitions grow `O(type shape)`, use sites
 remain constant-size, aggregate stores/lookups preserve Go copies, and the
 twenty largest changed type and operation artifacts pass strict, differential,
 mutation, source-size, typecheck, runtime, and broad-deletion review.
+
+### 3C. Structured Control And Range
+
+Complete classic `for`, expression switch, local declaration transactions,
+empty statements, labeled break/continue, and range over arrays,
+pointer-to-arrays, slices, strings, maps, and integers. Channel and iterator
+range remain with their semantic dependencies.
+
+This checkpoint replaces narrow header-only and primitive-switch boundaries
+atomically. Parent statement owners select direct target forms when exact and
+construct one source-proportional structured form otherwise. It introduces no
+control-flow IR, generic statement visitor, unrolled collection loop, or
+parallel clause-emission route.
+
+Exit requires both integer profiles to pass typed TS-Go encode/print, strict
+TypeScript, and Go-versus-generated-ESM differential tests for:
+
+- constant and evaluated array-range operands, copy versus alias behavior,
+  per-iteration addresses, blanks, assignment targets, and integer limits;
+- UTF-8 string byte indexes including invalid encodings;
+- map nil/deletion/copy behavior using a key snapshot plus live lookup;
+- direct and prerequisite-bearing loop clauses, including labeled continue;
+- direct and custom-equality expression switches, ordered case prerequisites,
+  default placement, and fallthrough; and
+- local multi-result and blank declaration transactions.
+
+Generated loop size is independent of collection length, switch construction is
+linear in source cases, each body is emitted once, exact label identity ignores
+source-spelling mutations, and the superseded target-header-only result API is
+absent.
 
 ## 4. Environment And Completion
 

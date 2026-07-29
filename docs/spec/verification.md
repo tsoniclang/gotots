@@ -688,6 +688,40 @@ value projection; reverting any underlying-family decision fails before the
 differential comparison. The matrix freezes total and largest-file byte bounds
 and rejects erased types, casts, reflective call helpers, and dynamic imports.
 
+### Milestone 3C Structured-Control Gate
+
+The integrated fixture runs under the `number` and `bigint` integer profiles.
+It must encode and print through pinned TS-Go, strict-typecheck before
+execution, and match Go for arrays, pointer arrays, slices, arbitrary-byte
+strings, maps, integer ranges, structured `for`, labels, expression switches,
+fallthrough, and local multi-result declarations.
+
+Blocking structural evidence includes:
+
+1. a constant-length one-variable pointer-array range contains no operand
+   evaluation, while an array-returning call is captured and invoked exactly
+   once;
+2. map range materializes one key snapshot and performs one live comma-ok
+   lookup per considered key, with deletion suppressing an unseen entry;
+3. exact `*types.Label` identity survives source-spelling mutation and missing
+   label-use evidence fails at the branch owner;
+4. custom-equality and prerequisite-bearing switches use one selection
+   variable and one execution switch, and each clause body occurs once;
+5. a default clause may fall through when it is not last, while every
+   non-fallthrough clause receives one implicit target break;
+6. structured loop prerequisites are declared once outside the target loop,
+   but invoked only at their Go condition/post boundary; and
+7. no `ForInitializerEmission`, alternate clause dispatcher, generic control
+   IR, or collection-sized generated loop remains.
+
+A 1x/2x/4x fixture independently measures source bytes, printed target bytes,
+and encoded TS-Go nodes. Range-loop count remains one as source collection
+length grows; custom switch checks and output grow linearly with source case
+count. Mutations restore operand skipping for a real call, remove the key
+snapshot or live lookup, route labels by spelling, duplicate a switch body,
+lose fallthrough, or restore the superseded header-only API; each must fail its
+own differential, shape, identity, scaling, or broad-search gate.
+
 Addressability has an additional exact matrix:
 
 1. direct local, parameter, named-result, receiver, package-state, nested

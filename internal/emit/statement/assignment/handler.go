@@ -265,65 +265,6 @@ func emitDefinition(
 	return api.NewStatementEmission(statements, requests)
 }
 
-func EmitForInitializer(
-	context api.Context,
-	children api.ChildEmitter,
-	source *ast.AssignStmt,
-) (api.ForInitializerEmission, error) {
-	if source.Tok != token.DEFINE {
-		expression, err := EmitExpression(context, children, source)
-		if err != nil {
-			return api.ForInitializerEmission{}, err
-		}
-		if len(expression.Before()) != 0 {
-			return api.ForInitializerEmission{},
-				api.Unsupported(context, api.CategoryStatement, source)
-		}
-		return api.ExpressionForInitializer(
-			expression.Value(),
-			expression.Requests()...,
-		)
-	}
-	declarations, before, requests, err := emitDefinitionList(
-		context,
-		children,
-		source,
-	)
-	if err != nil {
-		return api.ForInitializerEmission{}, err
-	}
-	if len(before) != 0 {
-		return api.ForInitializerEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
-	}
-	return api.DirectForInitializer(declarations, requests...), nil
-}
-
-func EmitExpression(
-	context api.Context,
-	children api.ChildEmitter,
-	source *ast.AssignStmt,
-) (api.ExpressionEmission, error) {
-	target, err := Emit(context, children, source)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	statements := target.Statements()
-	if len(statements) != 1 {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
-	}
-	statement, ok := statements[0].(tsgo.ExpressionStatement)
-	if !ok {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
-	}
-	return api.DirectExpression(
-		statement.Expression(),
-		target.Requests()...,
-	), nil
-}
-
 func emitDefinitionList(
 	context api.Context,
 	children api.ChildEmitter,

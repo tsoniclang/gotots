@@ -57,6 +57,35 @@ func TestClearSurfaceIsDemandedAsOneCapability(t *testing.T) {
 	}
 }
 
+func TestKeysSurfaceIsDemandedAsOneCapability(t *testing.T) {
+	factory := tsgo.NewFactory()
+	statement, err := Build(
+		factory,
+		api.RuntimeMap,
+		panicClassName(t),
+		Capabilities{Keys: true},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	class := statement.(tsgo.ClassDeclaration)
+	if len(class.Members()) != 10 {
+		t.Fatalf("keys-capable members = %d, want core plus keys", len(class.Members()))
+	}
+	method := class.Members()[9].(tsgo.MethodDeclaration)
+	if method.Name().(tsgo.Identifier).Text() != "keys" {
+		t.Fatalf("demanded member = %v, want keys", method.Name())
+	}
+	operation, err := BuildOperation(factory, api.RuntimeMapKeys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	function, ok := operation.(tsgo.FunctionDeclaration)
+	if !ok || function.Name().Text() != "goMapKeys" {
+		t.Fatalf("keys operation = %T", operation)
+	}
+}
+
 func TestBuildCreatesOneStaticHashPrimitiveOwner(t *testing.T) {
 	statement, err := Build(
 		tsgo.NewFactory(),

@@ -97,6 +97,11 @@ const (
 	RoleMapValue              Role = "map-value"
 	RoleMapSize               Role = "map-size"
 	RoleMapReceiver           Role = "map-receiver"
+	RoleRangeExpression       Role = "range-expression"
+	RoleRangeKey              Role = "range-key"
+	RoleRangeValue            Role = "range-value"
+	RoleRangeBody             Role = "range-body"
+	RoleLabelTarget           Role = "label-target"
 )
 
 type UnsupportedError struct {

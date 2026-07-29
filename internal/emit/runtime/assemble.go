@@ -277,13 +277,13 @@ func buildMap(
 	result := make([]Definition, 0, len(symbols))
 	capabilities := mapruntime.Capabilities{
 		Clear: slices.Contains(symbols, api.RuntimeMapClear),
+		Keys:  slices.Contains(symbols, api.RuntimeMapKeys),
 	}
-	if capabilities.Clear &&
+	if (capabilities.Clear || capabilities.Keys) &&
 		(len(symbols) == 0 || symbols[0] != api.RuntimeMap) {
 		return nil, &AssemblyError{
 			Module: api.RuntimeModuleMap,
-			Symbol: api.RuntimeMapClear,
-			Reason: "map clear requires RuntimeMap first",
+			Reason: "map capability requires RuntimeMap first",
 		}
 	}
 	seen := make(map[api.RuntimeSymbol]struct{}, len(symbols))
@@ -298,7 +298,8 @@ func buildMap(
 		seen[symbol] = struct{}{}
 		var statement tsgo.Statement
 		var err error
-		if symbol == api.RuntimeMapClear {
+		if symbol == api.RuntimeMapClear ||
+			symbol == api.RuntimeMapKeys {
 			statement, err = mapruntime.BuildOperation(factory, symbol)
 		} else {
 			statement, err = mapruntime.Build(

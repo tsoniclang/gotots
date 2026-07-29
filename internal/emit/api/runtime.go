@@ -47,6 +47,7 @@ const (
 	RuntimeMap               RuntimeSymbol = 400
 	RuntimeMapHash           RuntimeSymbol = 401
 	RuntimeMapClear          RuntimeSymbol = 402
+	RuntimeMapKeys           RuntimeSymbol = 403
 	RuntimePanic             RuntimeSymbol = 500
 	RuntimeIntegerDivide     RuntimeSymbol = 600
 	RuntimeIntegerRemainder  RuntimeSymbol = 601
@@ -256,6 +257,14 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			RuntimeModuleMap,
 			"runtime/map.ts",
 			"goMapClear",
+			false,
+			RuntimeMap,
+		), nil
+	case RuntimeMapKeys:
+		return runtimeContract(
+			RuntimeModuleMap,
+			"runtime/map.ts",
+			"goMapKeys",
 			false,
 			RuntimeMap,
 		), nil

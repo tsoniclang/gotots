@@ -140,6 +140,19 @@ func (a RuntimeArray) EmitLength(
 	)
 }
 
+func (a RuntimeArray) RangeElement(
+	context api.Context,
+	receiver tsgo.Expression,
+	index tsgo.Expression,
+) api.ExpressionEmission {
+	return api.DirectExpression(callMember(
+		context,
+		a.storage(context, receiver),
+		arraymember.Get,
+		index,
+	))
+}
+
 func emitIndex(
 	context api.Context,
 	children api.ChildEmitter,

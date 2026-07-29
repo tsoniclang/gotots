@@ -17,6 +17,7 @@ type specializationBuilder struct {
 	copyValue operationBody
 	members   specializationMemberNames
 	clear     bool
+	rangeKeys bool
 }
 
 type operationBody struct {
@@ -34,6 +35,7 @@ type specializationMemberNames struct {
 	length       string
 	isNil        string
 	clear        string
+	keys         string
 }
 
 func (b specializationBuilder) id(name string) tsgo.Identifier {

@@ -17,6 +17,7 @@ type Specialization struct {
 
 type SpecializationCapabilities struct {
 	Clear bool
+	Range bool
 }
 
 func (s Specialization) Members() []tsgo.ClassElement {
@@ -79,6 +80,7 @@ func BuildSpecialization(
 		copyValue: operations.copyValue,
 		members:   memberNames,
 		clear:     capabilities.Clear,
+		rangeKeys: capabilities.Range,
 	}
 	members := builder.build()
 	if err := validateSpecialization(
@@ -118,13 +120,16 @@ func CapabilitiesFromRequirements(
 		if demand == api.MapSpecializationDemandClear {
 			capabilities.Clear = true
 		}
+		if demand == api.MapSpecializationDemandRange {
+			capabilities.Range = true
+		}
 	}
 	return capabilities, nil
 }
 
 func specializationNames() (specializationMemberNames, error) {
-	resolved := make([]string, 0, mapruntime.MemberClear)
-	for member := mapruntime.MemberNil; member <= mapruntime.MemberClear; member++ {
+	resolved := make([]string, 0, mapruntime.MemberKeys)
+	for member := mapruntime.MemberNil; member <= mapruntime.MemberKeys; member++ {
 		name, err := mapruntime.Name(member)
 		if err != nil {
 			return specializationMemberNames{}, err
@@ -141,6 +146,7 @@ func specializationNames() (specializationMemberNames, error) {
 		length:       resolved[6],
 		isNil:        resolved[7],
 		clear:        resolved[8],
+		keys:         resolved[9],
 	}, nil
 }
 

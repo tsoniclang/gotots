@@ -25,6 +25,8 @@ type Context struct {
 	functionResults           *types.Tuple
 	breakDepth                uint32
 	continueDepth             uint32
+	controlLabels             map[*types.Label]ControlLabel
+	statementLabel            string
 	artifactOwner             *types.Func
 	storageNames              map[*types.Var]string
 	localConstantProjections  map[*types.Const][]types.BasicKind
@@ -177,6 +179,8 @@ func (c Context) EnterFunction(results *types.Tuple) Context {
 	c.expectedResults = nil
 	c.breakDepth = 0
 	c.continueDepth = 0
+	c.controlLabels = nil
+	c.statementLabel = ""
 	return c
 }
 
@@ -189,6 +193,36 @@ func (c Context) EnterLoop() Context {
 func (c Context) EnterBreakable() Context {
 	c.breakDepth++
 	return c
+}
+
+func (c Context) WithControlLabel(
+	label *types.Label,
+	target ControlLabel,
+) Context {
+	if label == nil || !target.Valid() {
+		panic("control-label capability is invalid")
+	}
+	labels := make(map[*types.Label]ControlLabel, len(c.controlLabels)+1)
+	for existing, capability := range c.controlLabels {
+		labels[existing] = capability
+	}
+	labels[label] = target
+	c.controlLabels = labels
+	return c
+}
+
+func (c Context) WithStatementLabel(name string) Context {
+	if name == "" || c.statementLabel != "" {
+		panic("statement-label capability is invalid")
+	}
+	c.statementLabel = name
+	return c
+}
+
+func (c Context) TakeStatementLabel() (Context, string) {
+	name := c.statementLabel
+	c.statementLabel = ""
+	return c, name
 }
 
 func (c Context) Role() Role {
@@ -255,6 +289,14 @@ func (c Context) CanContinue() bool {
 	return c.continueDepth != 0
 }
 
+func (c Context) ControlLabel(label *types.Label) (ControlLabel, bool) {
+	if label == nil {
+		return ControlLabel{}, false
+	}
+	target, ok := c.controlLabels[label]
+	return target, ok
+}
+
 func (c Context) ArtifactOwner() *types.Func {
 	return c.artifactOwner
 }
@@ -277,4 +319,44 @@ func (c Context) AddressableStorageName(variable *types.Var) (string, bool) {
 	}
 	name, ok := c.storageNames[variable]
 	return name, ok
+}
+
+type ControlLabel struct {
+	name        string
+	breakable   bool
+	continuable bool
+}
+
+func NewControlLabel(
+	name string,
+	breakable bool,
+	continuable bool,
+) (ControlLabel, error) {
+	if name == "" || continuable && !breakable {
+		return ControlLabel{}, &InvariantError{
+			Role:   RoleLabelTarget,
+			Reason: "control-label target is invalid",
+		}
+	}
+	return ControlLabel{
+		name:        name,
+		breakable:   breakable,
+		continuable: continuable,
+	}, nil
+}
+
+func (l ControlLabel) Valid() bool {
+	return l.name != "" && (!l.continuable || l.breakable)
+}
+
+func (l ControlLabel) Name() string {
+	return l.name
+}
+
+func (l ControlLabel) Breakable() bool {
+	return l.breakable
+}
+
+func (l ControlLabel) Continuable() bool {
+	return l.continuable
 }

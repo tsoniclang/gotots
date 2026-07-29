@@ -26,6 +26,8 @@ func TestDirectSeamsPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 		"switch (true)",
 		"for (current = 0; current < limit; current = current + 1)",
 		"for (Touch(); value < 2; Touch())",
+		"const __gotots_for_post_",
+		"const __gotots_for_condition_",
 	} {
 		if !strings.Contains(printed, expected) {
 			t.Fatalf("printed direct-seam artifact lacks %q:\n%s", expected, printed)
@@ -50,62 +52,6 @@ func TestExpressionlessSwitchUsesNativeBooleanTarget(t *testing.T) {
 	}
 	if targetSwitch.Expression().Kind() != tsgo.SyntaxKindTrueKeyword {
 		t.Fatalf("switch tag kind = %d, want true keyword", targetSwitch.Expression().Kind())
-	}
-}
-
-func TestDirectSeamUnsupportedNeighborsFailAtContextOwners(t *testing.T) {
-	testCases := []struct {
-		name      string
-		source    string
-		role      api.Role
-		category  api.Category
-		construct string
-	}{
-		{
-			name: "parallel for initializer",
-			source: `package boundary
-
-func Swap() int32 {
-	var left int32 = 1
-	var right int32 = 2
-	for left, right = right, left; left < 2; left++ {
-	}
-	return right
-}
-`,
-			role:      api.RoleForInitializer,
-			category:  api.CategoryStatement,
-			construct: "*ast.AssignStmt",
-		},
-		{
-			name: "parallel for post",
-			source: `package boundary
-
-func Swap() int32 {
-	var left int32 = 1
-	var right int32 = 2
-	for ; left < 2; left, right = right, left {
-	}
-	return right
-}
-`,
-			role:      api.RoleForPost,
-			category:  api.CategoryStatement,
-			construct: "*ast.AssignStmt",
-		},
-	}
-
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			err := compileTemporaryFunctionSource(t, testCase.source)
-			assertUnsupported(
-				t,
-				err,
-				testCase.role,
-				testCase.category,
-				testCase.construct,
-			)
-		})
 	}
 }
 
@@ -180,6 +126,9 @@ func main() {
 	fmt.Println(seams.Loop(5))
 	fmt.Println(seams.CallClauses(0))
 	fmt.Println(seams.IncInitializers(0))
+	fmt.Println(seams.ParallelInitializer())
+	fmt.Println(seams.ParallelPost(7))
+	fmt.Println(seams.ConditionPrerequisite(4))
 }
 `)
 	return run(t, runnerDirectory, filepath.Join(runtime.GOROOT(), "bin", "go"), "run", ".")
@@ -199,6 +148,9 @@ func executeDirectSeamsTypeScript(
 	    Constants,
 	    IncInitializers,
 	    Loop,
+	    ParallelInitializer,
+	    ParallelPost,
+	    ConditionPrerequisite,
 	    Scoped,
 	    ScopedParallel,
 	} from "`+artifacts.module(t, "source.ts")+`";
@@ -213,6 +165,9 @@ console.log(ScopedParallel(3));
 console.log(Loop(5));
 console.log(CallClauses(0));
 console.log(IncInitializers(0));
+console.log(ParallelInitializer());
+console.log(ParallelPost(7));
+console.log(ConditionPrerequisite(4));
 `)
 	return executeMaterializedTypeScript(t, workingDirectory, artifacts, runnerPath)
 }

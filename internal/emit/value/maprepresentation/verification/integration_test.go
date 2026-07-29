@@ -204,15 +204,6 @@ func F() map[Key]int32 { return make(map[Key]int32) }
 func F() map[any]int32 { return make(map[any]int32) }
 `,
 		},
-		{
-			name: "range",
-			source: `package boundary
-func F(values map[int32]int32) int32 {
-	for _, value := range values { return value }
-	return 0
-}
-`,
-		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			directory := t.TempDir()

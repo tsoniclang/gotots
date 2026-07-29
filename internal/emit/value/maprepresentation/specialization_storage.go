@@ -451,3 +451,75 @@ func (b specializationBuilder) clearMethod() tsgo.MethodDeclaration {
 		),
 	)
 }
+
+func (b specializationBuilder) keysMethod() tsgo.MethodDeclaration {
+	result := b.id("result")
+	buckets := b.id("buckets")
+	bucket := b.id("bucket")
+	entry := b.id("entry")
+	return b.method(
+		nil,
+		b.members.keys,
+		nil,
+		b.factory.ArrayTypeNode(b.keyType),
+		b.variable(
+			tsgo.NodeFlagsConst,
+			"result",
+			b.factory.ArrayTypeNode(b.keyType),
+			b.factory.ArrayLiteralExpression(nil, false),
+		),
+		b.variable(
+			tsgo.NodeFlagsConst,
+			"buckets",
+			b.storageType(),
+			b.property(b.factory.ThisExpression(), "buckets"),
+		),
+		b.factory.IfStatement(
+			b.undefined(buckets),
+			b.returnBlock(result),
+			nil,
+		),
+		b.factory.ForOfStatement(
+			nil,
+			b.factory.VariableDeclarationList(
+				[]tsgo.VariableDeclaration{
+					b.factory.VariableDeclaration(
+						bucket,
+						nil,
+						nil,
+						nil,
+					),
+				},
+				tsgo.NodeFlagsConst,
+			),
+			b.call(buckets, "values"),
+			b.factory.Block([]tsgo.Statement{
+				b.factory.ForOfStatement(
+					nil,
+					b.factory.VariableDeclarationList(
+						[]tsgo.VariableDeclaration{
+							b.factory.VariableDeclaration(
+								entry,
+								nil,
+								nil,
+								nil,
+							),
+						},
+						tsgo.NodeFlagsConst,
+					),
+					bucket,
+					b.factory.Block([]tsgo.Statement{
+						b.factory.ExpressionStatement(
+							b.call(
+								result,
+								"push",
+								b.element(entry, b.number("0")),
+							),
+						),
+					}, true),
+				),
+			}, true),
+		),
+		b.factory.ReturnStatement(result),
+	)
+}

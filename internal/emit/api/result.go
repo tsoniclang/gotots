@@ -464,46 +464,6 @@ func (e BlockEmission) Requests() []RootRequest {
 	return slices.Clone(e.requests)
 }
 
-type ForInitializerEmission struct {
-	value    tsgo.ForInitializer
-	requests []RootRequest
-}
-
-func DirectForInitializer(
-	value tsgo.ForInitializer,
-	requests ...RootRequest,
-) ForInitializerEmission {
-	if value == nil {
-		panic("direct for initializer target is nil")
-	}
-	return ForInitializerEmission{
-		value:    value,
-		requests: slices.Clone(requests),
-	}
-}
-
-func ExpressionForInitializer(
-	value tsgo.Expression,
-	requests ...RootRequest,
-) (ForInitializerEmission, error) {
-	target, ok := value.(tsgo.ForInitializer)
-	if !ok {
-		return ForInitializerEmission{}, &ResultError{
-			Result: "for initializer",
-			Reason: "target expression is not admitted by the TS-Go contract",
-		}
-	}
-	return DirectForInitializer(target, requests...), nil
-}
-
-func (e ForInitializerEmission) Value() tsgo.ForInitializer {
-	return e.value
-}
-
-func (e ForInitializerEmission) Requests() []RootRequest {
-	return slices.Clone(e.requests)
-}
-
 func CombineRequests(groups ...[]RootRequest) []RootRequest {
 	size := 0
 	for _, group := range groups {

@@ -35,9 +35,11 @@ import (
 	forstatement "github.com/tsoniclang/gotots/internal/emit/statement/forstatement"
 	ifstatement "github.com/tsoniclang/gotots/internal/emit/statement/ifstatement"
 	incdecstatement "github.com/tsoniclang/gotots/internal/emit/statement/incdec"
+	labelstatement "github.com/tsoniclang/gotots/internal/emit/statement/label"
 	localconstant "github.com/tsoniclang/gotots/internal/emit/statement/localconstant"
 	localdeclaration "github.com/tsoniclang/gotots/internal/emit/statement/localdeclaration"
 	localtype "github.com/tsoniclang/gotots/internal/emit/statement/localtype"
+	rangestatement "github.com/tsoniclang/gotots/internal/emit/statement/range"
 	returnstatement "github.com/tsoniclang/gotots/internal/emit/statement/returnstatement"
 	switchstatement "github.com/tsoniclang/gotots/internal/emit/statement/switchstatement"
 	"github.com/tsoniclang/gotots/internal/emit/storage"
@@ -334,12 +336,18 @@ func (e *emitter) Statement(
 		}
 	case *ast.ExprStmt:
 		return expressionstatement.Emit(context, e, source)
+	case *ast.EmptyStmt:
+		return api.NewStatementEmission(nil, nil)
 	case *ast.ForStmt:
 		return forstatement.Emit(context, e, source)
 	case *ast.IfStmt:
 		return ifstatement.Emit(context, e, source)
 	case *ast.IncDecStmt:
 		return incdecstatement.Emit(context, e, source)
+	case *ast.LabeledStmt:
+		return labelstatement.Emit(context, e, source)
+	case *ast.RangeStmt:
+		return rangestatement.Emit(context, e, source)
 	case *ast.ReturnStmt:
 		return returnstatement.Emit(context, e, source)
 	case *ast.SwitchStmt:
@@ -372,60 +380,6 @@ func (e *emitter) IfAlternate(
 	source *ast.IfStmt,
 ) (api.StatementEmission, error) {
 	return ifstatement.Emit(context, e, source)
-}
-
-func (e *emitter) ForInitializer(
-	context api.Context,
-	source ast.Stmt,
-) (api.ForInitializerEmission, error) {
-	switch source := source.(type) {
-	case *ast.AssignStmt:
-		return assignment.EmitForInitializer(context, e, source)
-	case *ast.ExprStmt:
-		target, err := expressionstatement.EmitExpression(context, e, source)
-		if err != nil {
-			return api.ForInitializerEmission{}, err
-		}
-		if len(target.Before()) != 0 {
-			return api.ForInitializerEmission{},
-				api.Unsupported(context, api.CategoryStatement, source)
-		}
-		return api.ExpressionForInitializer(target.Value(), target.Requests()...)
-	case *ast.IncDecStmt:
-		target, err := incdecstatement.EmitExpression(context, e, source)
-		if err != nil {
-			return api.ForInitializerEmission{}, err
-		}
-		return api.ExpressionForInitializer(target.Value(), target.Requests()...)
-	default:
-		return api.ForInitializerEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
-	}
-}
-
-func (e *emitter) ForPost(
-	context api.Context,
-	source ast.Stmt,
-) (api.ExpressionEmission, error) {
-	switch source := source.(type) {
-	case *ast.AssignStmt:
-		return assignment.EmitExpression(context, e, source)
-	case *ast.ExprStmt:
-		target, err := expressionstatement.EmitExpression(context, e, source)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		if len(target.Before()) != 0 {
-			return api.ExpressionEmission{},
-				api.Unsupported(context, api.CategoryStatement, source)
-		}
-		return target, nil
-	case *ast.IncDecStmt:
-		return incdecstatement.EmitExpression(context, e, source)
-	default:
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
-	}
 }
 
 func (e *emitter) Type(

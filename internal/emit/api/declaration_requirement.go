@@ -79,11 +79,12 @@ const (
 	MapSpecializationDemandDefinition
 	MapSpecializationDemandStatic
 	MapSpecializationDemandClear
+	MapSpecializationDemandRange
 )
 
 func (d MapSpecializationDemand) Valid() bool {
 	return d >= MapSpecializationDemandDefinition &&
-		d <= MapSpecializationDemandClear
+		d <= MapSpecializationDemandRange
 }
 
 type DeclarationRequirementKind uint8

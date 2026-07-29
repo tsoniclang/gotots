@@ -4,7 +4,9 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func Resolve(
@@ -18,6 +20,41 @@ func Resolve(
 		return nil, nil, false
 	}
 	return sourceSlice, sourceSlice.Elem(), true
+}
+
+func RangeLength(
+	context api.Context,
+	receiver tsgo.Expression,
+) tsgo.Expression {
+	return context.Factory().PropertyAccessExpression(
+		receiver,
+		nil,
+		context.Factory().Identifier(
+			runtimeslice.MemberName(runtimeslice.MemberLength),
+		),
+		tsgo.NodeFlagsNone,
+	)
+}
+
+func RangeElement(
+	context api.Context,
+	receiver tsgo.Expression,
+	index tsgo.Expression,
+) api.ExpressionEmission {
+	return api.DirectExpression(context.Factory().CallExpression(
+		context.Factory().PropertyAccessExpression(
+			receiver,
+			nil,
+			context.Factory().Identifier(
+				runtimeslice.MemberName(runtimeslice.MemberGet),
+			),
+			tsgo.NodeFlagsNone,
+		),
+		nil,
+		nil,
+		[]tsgo.Expression{index},
+		tsgo.NodeFlagsNone,
+	))
 }
 
 func Source(
