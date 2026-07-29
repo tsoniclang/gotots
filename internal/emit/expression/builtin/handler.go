@@ -7,6 +7,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	constantvalue "github.com/tsoniclang/gotots/internal/emit/constant"
+	channelbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/channel"
 	clearbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/clear"
 	complexbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/complex"
 	mapbuiltin "github.com/tsoniclang/gotots/internal/emit/expression/builtin/map"
@@ -58,6 +59,15 @@ func Emit(
 		return target, err
 	}
 	if target, handled, err := complexbuiltin.Emit(
+		context,
+		children,
+		source,
+		builtin,
+		discarded,
+	); handled {
+		return target, err
+	}
+	if target, handled, err := channelbuiltin.Emit(
 		context,
 		children,
 		source,

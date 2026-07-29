@@ -333,6 +333,9 @@ func Build(
 		}
 		return definitions, nil
 	}
+	if module == api.RuntimeModuleChannel {
+		return buildChannel(factory, symbols)
+	}
 	if module == api.RuntimeModulePanic {
 		panicContract, err := api.RuntimeContract(api.RuntimePanic)
 		if err != nil {

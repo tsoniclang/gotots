@@ -1,0 +1,219 @@
+package emit_test
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/tsoniclang/gotots/internal/emit"
+	"github.com/tsoniclang/gotots/internal/load"
+)
+
+func TestWaveNineTerminationMatchesGo(t *testing.T) {
+	testCases := []struct {
+		name     string
+		function string
+		want     string
+	}{
+		{"send-closed", "PanicSendClosed", "panic:send on closed channel"},
+		{"close-nil", "PanicCloseNil", "panic:close of nil channel"},
+		{"close-closed", "PanicCloseClosed", "panic:close of closed channel"},
+		{
+			"nil-receive-deadlock",
+			"DeadlockNilReceive",
+			"panic:all goroutines are asleep - deadlock!",
+		},
+		{
+			"uncaught-goroutine-panic",
+			"PanicGoroutine",
+			"panic:send on closed channel",
+		},
+		{
+			"main-return",
+			"ReturnWithBlockedGoroutine",
+			"return",
+		},
+	}
+	program, err := load.Load(context.Background(), load.Request{
+		Directory: waveNineConcurrencyDirectory(),
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	scope := program.Roots()[0].Types().Scope()
+	roots := make([]emit.Root, 0, len(testCases))
+	for _, testCase := range testCases {
+		root, rootErr := emit.NewRoot(scope.Lookup(testCase.function))
+		if rootErr != nil {
+			t.Fatal(rootErr)
+		}
+		roots = append(roots, root)
+	}
+	emission, err := emit.CompileWithOptions(
+		program,
+		roots,
+		waveNineOptions(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workingDirectory := t.TempDir()
+	artifacts := materializeArtifacts(t, emission, workingDirectory)
+	writeProgramFile(
+		t,
+		filepath.Join(workingDirectory, "package.json"),
+		"{\"type\":\"module\"}\n",
+	)
+	targetRunners := make([]string, 0, len(testCases))
+	for _, testCase := range testCases {
+		runner := filepath.Join(
+			workingDirectory,
+			"runner-"+testCase.name+".ts",
+		)
+		writeProgramFile(t, runner, waveNineTargetRunner(
+			artifacts.sourceModule,
+			testCase.function,
+		))
+		targetRunners = append(targetRunners, runner)
+	}
+	waveThreeTypecheck(
+		t,
+		workingDirectory,
+		append(artifacts.paths, targetRunners...),
+	)
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			targetOutput, targetErr := runWaveNineCommand(
+				workingDirectory,
+				"node",
+				filepath.Join(
+					workingDirectory,
+					"out",
+					"runner-"+testCase.name+".js",
+				),
+			)
+			targetOutcome := waveNineOutcome(targetOutput, targetErr)
+			goOutput, goErr := executeWaveNineFailureGo(
+				t,
+				testCase.name,
+				testCase.function,
+			)
+			goOutcome := waveNineOutcome(goOutput, goErr)
+			if targetOutcome != testCase.want ||
+				goOutcome != testCase.want {
+				t.Fatalf(
+					"termination differs: target=%q Go=%q want=%q\n"+
+						"target output:\n%s\nGo output:\n%s",
+					targetOutcome,
+					goOutcome,
+					testCase.want,
+					targetOutput,
+					goOutput,
+				)
+			}
+		})
+	}
+}
+
+func waveNineTargetRunner(module, function string) string {
+	return `import "./program.js";
+import { ` + function + ` } from "` + module + `";
+import { GoScheduler } from "./runtime/channel.js";
+import { GoPanic, GoRuntimePanicValue } from "./runtime/panic.js";
+
+try {
+    await GoScheduler.run(async () => {
+        await ` + function + `();
+    });
+    console.log("return");
+} catch (failure) {
+    console.log(
+        failure instanceof GoPanic &&
+            failure.value instanceof GoRuntimePanicValue
+            ? "panic:" + failure.value.message
+            : "wrong failure",
+    );
+}
+`
+}
+
+func executeWaveNineFailureGo(
+	t *testing.T,
+	name string,
+	function string,
+) (string, error) {
+	t.Helper()
+	modulePath, err := filepath.Abs(waveNineConcurrencyDirectory())
+	if err != nil {
+		t.Fatal(err)
+	}
+	runnerDirectory := filepath.Join(t.TempDir(), "go-runner-"+name)
+	writeProgramFile(t, filepath.Join(runnerDirectory, "go.mod"), fmt.Sprintf(
+		`module example.com/runner
+
+go 1.26.4
+
+require example.com/wave9concurrency v0.0.0
+
+replace example.com/wave9concurrency => %s
+`,
+		filepath.ToSlash(modulePath),
+	))
+	writeProgramFile(t, filepath.Join(runnerDirectory, "main.go"), `package main
+
+import (
+	"fmt"
+
+	values "example.com/wave9concurrency"
+)
+
+func main() {
+	values.`+function+`()
+	fmt.Println("return")
+}
+`)
+	return runWaveNineCommand(
+		runnerDirectory,
+		filepath.Join(runtime.GOROOT(), "bin", "go"),
+		"run",
+		".",
+	)
+}
+
+func runWaveNineCommand(
+	directory string,
+	name string,
+	arguments ...string,
+) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	command := exec.CommandContext(ctx, name, arguments...)
+	command.Dir = directory
+	command.Env = append(os.Environ(), "GOMEMLIMIT=1GiB")
+	output, err := command.CombinedOutput()
+	return string(output), err
+}
+
+func waveNineOutcome(output string, runError error) string {
+	for _, failure := range []string{
+		"all goroutines are asleep - deadlock!",
+		"send on closed channel",
+		"close of nil channel",
+		"close of closed channel",
+	} {
+		if strings.Contains(output, failure) {
+			return "panic:" + failure
+		}
+	}
+	if runError == nil && strings.Contains(output, "return") {
+		return "return"
+	}
+	return "unclassified"
+}

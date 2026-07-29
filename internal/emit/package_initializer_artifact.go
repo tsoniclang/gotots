@@ -129,7 +129,7 @@ func (s *programSession) buildPackageInitializerRevision(
 	defer finish()
 	requirements := s.requirements.appliedFor(owner)
 	context, err := emitnaming.WithLexicalTypeRequirements(
-		builder.assemblyContext,
+		builder.assemblyContext.WithArtifactOwner(owner),
 		site.declaration,
 		owner,
 		requirements,

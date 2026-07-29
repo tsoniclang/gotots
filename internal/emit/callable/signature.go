@@ -183,32 +183,35 @@ func EmitNonNilType(
 	source ast.Node,
 	signature *types.Signature,
 ) (api.TypeEmission, error) {
-	target, err := emitRepresented(
+	reference, err := context.Names().CallableABI(signature)
+	if err != nil {
+		return api.TypeEmission{}, err
+	}
+	facet, err := api.NewCallableABIFacet(reference.Artifact())
+	if err != nil {
+		return api.TypeEmission{}, err
+	}
+	observation, err := context.ObserveCooperativeCallable(facet)
+	if err != nil {
+		return api.TypeEmission{}, err
+	}
+	target, err := EmitInlineNonNilType(
 		context,
 		children,
 		source,
 		signature,
-		api.RoleCallableParameter,
-		api.RoleCallableResult,
-		func(_ *types.Var, index int) (string, error) {
-			return "$" + strconv.Itoa(index), nil
-		},
-		false,
+		observation.Cooperative(),
 	)
 	if err != nil {
 		return api.TypeEmission{}, err
 	}
-	target, err = withRecoveryAuthority(context, target)
-	if err != nil {
-		return api.TypeEmission{}, err
-	}
 	return api.DirectType(
-		context.Factory().FunctionTypeNode(
-			nil,
-			target.Parameters(),
-			target.Result(),
-		),
-		target.Requests()...,
+		target.Value(),
+		api.CombineRequests(
+			reference.Requests(),
+			observation.Requests(),
+			target.Requests(),
+		)...,
 	), nil
 }
 
@@ -273,29 +276,17 @@ func EmitSyntaxType(
 	source *ast.FuncType,
 	signature *types.Signature,
 ) (api.TypeEmission, error) {
-	target, err := Emit(
+	if err := validateSyntax(
 		context,
-		children,
 		source,
 		signature,
 		api.RoleCallableParameter,
 		api.RoleCallableResult,
-	)
-	if err != nil {
+		false,
+	); err != nil {
 		return api.TypeEmission{}, err
 	}
-	target, err = withRecoveryAuthority(context, target)
-	if err != nil {
-		return api.TypeEmission{}, err
-	}
-	return api.DirectType(
-		context.Factory().FunctionTypeNode(
-			nil,
-			target.Parameters(),
-			target.Result(),
-		),
-		target.Requests()...,
-	), nil
+	return EmitNonNilType(context, children, source, signature)
 }
 
 func emitRepresented(

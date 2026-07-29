@@ -330,6 +330,7 @@ func staticSpecializationContext(
 		storage.Owner{},
 		integer,
 		api.EvaluationOrderPreserveGo,
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)

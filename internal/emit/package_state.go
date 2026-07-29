@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	packagevariable "github.com/tsoniclang/gotots/internal/emit/declaration/packagevariable"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
@@ -24,9 +25,23 @@ type packageInitializationScheduler struct {
 }
 
 type packageStorage struct {
-	variable       *types.Var
-	field          tsgo.PropertyDeclaration
-	zeroStatements []tsgo.Statement
+	owner             api.ArtifactOwner
+	variable          *types.Var
+	source            ast.Node
+	field             tsgo.PropertyDeclaration
+	zeroStatements    []tsgo.Statement
+	statePlacement    *targetplacement.Owner
+	assemblyPlacement *targetplacement.Owner
+	reconstructions   uint64
+}
+
+type packageStorageRevision struct {
+	field             tsgo.PropertyDeclaration
+	zeroStatements    []tsgo.Statement
+	statePlacement    *targetplacement.Owner
+	assemblyPlacement *targetplacement.Owner
+	dependencies      []api.ArtifactDependency
+	contract          artifactstate.Contract
 }
 
 type packageInitializationArtifact struct {
@@ -49,7 +64,7 @@ type packageTargetBuilder struct {
 	statePlacement     *targetplacement.Owner
 	assemblyPlacement  *targetplacement.Owner
 	storage            []packageStorage
-	storageByObject    map[*types.Var]struct{}
+	storageByObject    map[*types.Var]int
 	initialization     []packageInitializationArtifact
 	initializerByOwner map[api.ArtifactOwner]int
 	initFunctions      []tsgo.Statement
@@ -127,7 +142,7 @@ func (s *programSession) requirePackage(sourcePackage *load.Package) error {
 		assemblyContext:    assemblyContext,
 		statePlacement:     targetplacement.New(),
 		assemblyPlacement:  targetplacement.New(),
-		storageByObject:    make(map[*types.Var]struct{}),
+		storageByObject:    make(map[*types.Var]int),
 		initializerByOwner: make(map[api.ArtifactOwner]int),
 	}
 	s.packageBuilders[sourcePackage] = builder
@@ -193,34 +208,155 @@ func (s *programSession) emitPackageStorage(
 	if err != nil {
 		return err
 	}
-	emission, err := packagevariable.EmitStorage(
-		builder.stateContext,
-		builder.assemblyContext,
-		builder.emitter,
+	owner := api.MustSourceArtifactOwner(variable)
+	revision, err := s.buildPackageStorageRevision(
+		builder,
+		owner,
 		source,
 		variable,
 	)
 	if err != nil {
 		return err
 	}
-	if err := s.applyRootRequests(
-		builder.statePlacement,
-		emission.StateRequests(),
+	if err := s.artifacts.Commit(
+		owner,
+		revision.contract,
+		revision.dependencies,
 	); err != nil {
 		return err
 	}
-	if err := s.applyRootRequests(
-		builder.assemblyPlacement,
-		emission.AssemblyRequests(),
-	); err != nil {
-		return err
-	}
-	builder.storageByObject[variable] = struct{}{}
+	builder.storageByObject[variable] = len(builder.storage)
 	builder.storage = append(builder.storage, packageStorage{
-		variable:       variable,
-		field:          emission.Field(),
-		zeroStatements: emission.ZeroStatements(),
+		owner:             owner,
+		variable:          variable,
+		source:            source,
+		field:             revision.field,
+		zeroStatements:    revision.zeroStatements,
+		statePlacement:    revision.statePlacement,
+		assemblyPlacement: revision.assemblyPlacement,
 	})
+	return nil
+}
+
+func (s *programSession) buildPackageStorageRevision(
+	builder *packageTargetBuilder,
+	owner api.ArtifactOwner,
+	source ast.Node,
+	variable *types.Var,
+) (packageStorageRevision, error) {
+	emission, err := packagevariable.EmitStorage(
+		builder.stateContext.WithArtifactOwner(owner),
+		builder.assemblyContext.WithArtifactOwner(owner),
+		builder.emitter,
+		source,
+		variable,
+	)
+	if err != nil {
+		return packageStorageRevision{}, err
+	}
+	statePlacement, stateDependencies, err := s.consumeArtifactRequests(
+		owner,
+		emission.StateRequests(),
+	)
+	if err != nil {
+		return packageStorageRevision{}, err
+	}
+	if err := statePlacement.RequireTypeOnly(); err != nil {
+		return packageStorageRevision{}, err
+	}
+	assemblyPlacement, assemblyDependencies, err :=
+		s.consumeArtifactRequests(
+			owner,
+			emission.AssemblyRequests(),
+		)
+	if err != nil {
+		return packageStorageRevision{}, err
+	}
+	contract, err := packageStorageContract(emission.Field())
+	if err != nil {
+		return packageStorageRevision{}, err
+	}
+	return packageStorageRevision{
+		field:             emission.Field(),
+		zeroStatements:    emission.ZeroStatements(),
+		statePlacement:    statePlacement,
+		assemblyPlacement: assemblyPlacement,
+		dependencies: append(
+			stateDependencies,
+			assemblyDependencies...,
+		),
+		contract: contract,
+	}, nil
+}
+
+func packageStorageContract(
+	field tsgo.PropertyDeclaration,
+) (artifactstate.Contract, error) {
+	encoded, err := tsgo.EncodeNode(field)
+	if err != nil {
+		return nil, err
+	}
+	return artifactstate.Contract{
+		api.ArtifactFacetValueSurface: encoded,
+	}, nil
+}
+
+func (s *programSession) reconstructPackageStorage(
+	owner api.ArtifactOwner,
+	variable *types.Var,
+) error {
+	if s.sealed {
+		return &ScheduleError{
+			Object: owner.Name(),
+			Reason: "package storage reconstructed after target files were sealed",
+		}
+	}
+	site, ok := s.sites[variable]
+	if !ok {
+		return &ScheduleError{
+			Object: owner.Name(),
+			Reason: "package storage lost its source declaration",
+		}
+	}
+	builder := s.packageBuilders[site.source]
+	index, found := builder.storageByObject[variable]
+	if builder == nil || !found || index >= len(builder.storage) {
+		return &ScheduleError{
+			Object: owner.Name(),
+			Reason: "package storage was not emitted first",
+		}
+	}
+	storage := &builder.storage[index]
+	if storage.owner != owner ||
+		storage.variable != variable ||
+		storage.source == nil {
+		return &ScheduleError{
+			Object: owner.Name(),
+			Reason: "package storage identity changed",
+		}
+	}
+	revision, err := s.buildPackageStorageRevision(
+		builder,
+		owner,
+		storage.source,
+		variable,
+	)
+	if err != nil {
+		return err
+	}
+	if err := s.artifacts.Commit(
+		owner,
+		revision.contract,
+		revision.dependencies,
+	); err != nil {
+		return err
+	}
+	s.artifacts.DiscardDirty(owner)
+	storage.field = revision.field
+	storage.zeroStatements = revision.zeroStatements
+	storage.statePlacement = revision.statePlacement
+	storage.assemblyPlacement = revision.assemblyPlacement
+	storage.reconstructions++
 	return nil
 }
 

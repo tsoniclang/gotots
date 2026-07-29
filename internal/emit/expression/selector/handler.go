@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
 	methodexpression "github.com/tsoniclang/gotots/internal/emit/expression/methodexpression"
 	methodvalue "github.com/tsoniclang/gotots/internal/emit/expression/methodvalue"
@@ -80,8 +81,18 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return api.DirectExpression(
+	target := api.DirectExpression(
 		context.Factory().Identifier(reference.Name()),
 		reference.Requests()...,
-	), nil
+	)
+	if function, ok := object.(*types.Func); ok {
+		return cooperativecall.AdaptSourceValue(
+			context,
+			children,
+			source,
+			function,
+			target,
+		)
+	}
+	return target, nil
 }

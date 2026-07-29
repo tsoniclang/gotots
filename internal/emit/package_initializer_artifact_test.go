@@ -9,6 +9,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/load"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func TestPackageInitializerUsesDeclarationRequirementFixedPoint(
@@ -237,6 +238,102 @@ func OtherResult() int32 { return Other }
 			len(keys),
 			len(owners),
 		)
+	}
+}
+
+func TestFunctionValuedPackageStorageReconstructsFromCallableABI(
+	t *testing.T,
+) {
+	directory := t.TempDir()
+	if err := os.WriteFile(
+		filepath.Join(directory, "go.mod"),
+		[]byte("module example.com/packagecallable\n\ngo 1.26.4\n"),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(directory, "source.go"),
+		[]byte(`package packagecallable
+
+func receive(values <-chan int32) int32 { return <-values }
+
+var PackageReceiver = receive
+
+func Run() int32 {
+	values := make(chan int32, 1)
+	values <- 7
+	return PackageReceiver(values)
+}
+`),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	program, err := load.Load(context.Background(), load.Request{
+		Directory: directory,
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	roots, err := ExportedAPIRoots(program.Roots()[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	options := DefaultOptions()
+	options.ConcurrencySemantics = ConcurrencySemanticsCooperative
+	session, err := newProgramSession(program, options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, root := range roots {
+		if err := session.requireRoot(root); err != nil {
+			t.Fatal(err)
+		}
+	}
+	drainProgramSession(t, session)
+
+	variable := program.Roots()[0].Types().Scope().
+		Lookup("PackageReceiver").(*types.Var)
+	builder := session.packageBuilders[program.Roots()[0]]
+	index, ok := builder.storageByObject[variable]
+	if !ok || index >= len(builder.storage) {
+		t.Fatal("function-valued package storage has no exact artifact")
+	}
+	storage := builder.storage[index]
+	if storage.owner != api.MustSourceArtifactOwner(variable) ||
+		storage.reconstructions != 1 {
+		t.Fatalf(
+			"package callable owner/reconstructions = %q/%d, want exact owner/1",
+			storage.owner.Name(),
+			storage.reconstructions,
+		)
+	}
+	union, ok := storage.field.Type().(tsgo.UnionTypeNode)
+	if !ok || len(union.Types()) != 2 {
+		t.Fatalf(
+			"package callable storage type = %T, want callable | undefined",
+			storage.field.Type(),
+		)
+	}
+	callable, ok := union.Types()[0].(tsgo.FunctionTypeNode)
+	if !ok {
+		t.Fatalf(
+			"package callable non-nil type = %T, want function",
+			union.Types()[0],
+		)
+	}
+	result, ok := callable.Type().(tsgo.TypeReferenceNode)
+	if !ok || result.TypeName().(tsgo.Identifier).Text() != "Promise" {
+		t.Fatalf(
+			"package callable result = %T, want Promise",
+			callable.Type(),
+		)
+	}
+	if session.requirements.hasPending() ||
+		session.artifacts.HasPending() {
+		t.Fatal("package callable ABI fixed point did not converge")
 	}
 }
 

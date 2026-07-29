@@ -54,6 +54,9 @@ func (Owner) RequiresCustomEquality(
 	if pointerValue(sourceType) {
 		return true
 	}
+	if channelValue(sourceType) {
+		return true
+	}
 	if callableValue(sourceType) {
 		return true
 	}
@@ -77,7 +80,9 @@ func (Owner) RequiresExplicitType(
 	if defined, ok := definedtype.Resolve(sourceType); ok {
 		return defined.NilCapable()
 	}
-	return pointerValue(sourceType) || callableValue(sourceType)
+	return pointerValue(sourceType) ||
+		callableValue(sourceType) ||
+		channelValue(sourceType)
 }
 
 func (Owner) RequiresStructuralCopy(
@@ -205,6 +210,11 @@ func (owner Owner) Zero(
 			),
 		), nil
 	}
+	if channelValue(sourceType) {
+		return api.DirectExpression(
+			context.Factory().Identifier("undefined"),
+		), nil
+	}
 	if callableValue(sourceType) {
 		return api.DirectExpression(
 			context.Factory().VoidExpression(
@@ -310,6 +320,7 @@ func (owner Owner) Copy(
 		primitiveOK ||
 		callableValue(sourceType) ||
 		pointerValue(sourceType) ||
+		channelValue(sourceType) ||
 		isScalarSlice(context, sourceType) ||
 		mapValue(context, sourceType) {
 		return api.NewExpressionEmission(
@@ -414,6 +425,7 @@ func (Owner) Assign(
 		!primitiveOK &&
 		!callableValue(sourceType) &&
 		!pointerValue(sourceType) &&
+		!channelValue(sourceType) &&
 		!isScalarSlice(context, sourceType) &&
 		!mapValue(context, sourceType) &&
 		!interfaceOK &&

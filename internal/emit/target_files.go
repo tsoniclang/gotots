@@ -106,6 +106,14 @@ func (s *programSession) targetFiles() ([]TargetFile, error) {
 		for _, symbol := range builder.assemblyPlacement.RuntimeSymbols() {
 			runtimeSymbols[symbol] = struct{}{}
 		}
+		for _, storage := range builder.storage {
+			for _, symbol := range storage.statePlacement.RuntimeSymbols() {
+				runtimeSymbols[symbol] = struct{}{}
+			}
+			for _, symbol := range storage.assemblyPlacement.RuntimeSymbols() {
+				runtimeSymbols[symbol] = struct{}{}
+			}
+		}
 	}
 	programFile, err := s.programInitializationFile()
 	if err != nil {

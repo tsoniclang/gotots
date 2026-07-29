@@ -9,7 +9,10 @@ import (
 	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
+	"github.com/tsoniclang/gotots/internal/emit/callable"
 	"github.com/tsoniclang/gotots/internal/emit/type/typeidentity"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type genericOperationIdentity struct {
@@ -229,4 +232,193 @@ func genericOperationParameterIdentity(
 		}
 		return identity, nil
 	}
+}
+
+func (s *programSession) ObserveCooperativeCallable(
+	consumer api.ArtifactOwner,
+	facet api.CallableFacet,
+) (api.CooperativeCallableObservation, error) {
+	if !consumer.Valid() || !facet.Valid() {
+		return api.CooperativeCallableObservation{}, &ScheduleError{
+			Reason: "cooperative callable facet is invalid",
+		}
+	}
+	cooperative := false
+	for _, requirement := range s.requirements.appliedFor(
+		facet.Owner(),
+	) {
+		selected, selectedCooperative :=
+			requirement.CooperativeCallable()
+		if !selectedCooperative {
+			continue
+		}
+		if selected.Owner() != facet.Owner() {
+			return api.CooperativeCallableObservation{}, &ScheduleError{
+				Object: facet.Owner().Name(),
+				Reason: "cooperative callable has inconsistent ownership",
+			}
+		}
+		if selected == facet {
+			cooperative = true
+			break
+		}
+	}
+	var requests []api.RootRequest
+	if consumer != facet.Owner() {
+		switch facet.Kind() {
+		case api.CallableFacetSource, api.CallableFacetABI:
+			request, err := api.NewOwnedArtifactDependencyRequest(
+				facet.Owner(),
+				api.ArtifactFacetCallableSignature,
+			)
+			if err != nil {
+				return api.CooperativeCallableObservation{}, err
+			}
+			requests = append(requests, request)
+		case api.CallableFacetFunctionLiteral:
+			return api.CooperativeCallableObservation{}, &ScheduleError{
+				Object: facet.Owner().Name(),
+				Reason: "function-literal facet escaped its source artifact",
+			}
+		default:
+			return api.CooperativeCallableObservation{}, &ScheduleError{
+				Object: facet.Owner().Name(),
+				Reason: "cooperative callable facet kind is invalid",
+			}
+		}
+	}
+	return api.NewCooperativeCallableObservation(
+		cooperative,
+		requests...,
+	)
+}
+
+func (s *programSession) validateCallableABIArtifact(
+	artifact *api.GeneratedArtifact,
+) error {
+	signature, ok := artifact.CallableABI()
+	binding, found := s.registry.GeneratedArtifact(
+		api.GeneratedArtifactCallableABI,
+		artifact.ArtifactKey(),
+	)
+	boundSignature, bound := binding.CallableABI()
+	if !ok ||
+		!found ||
+		binding != artifact ||
+		!bound ||
+		!types.Identical(boundSignature, signature) ||
+		artifact.Placement() != api.GeneratedArtifactPlacementContract {
+		return &ScheduleError{
+			Object: artifact.TargetName(),
+			Reason: "callable ABI artifact has no exact canonical binding",
+		}
+	}
+	return nil
+}
+
+func (s *programSession) reconstructCallableABIArtifact(
+	artifact *api.GeneratedArtifact,
+) error {
+	if s.sealed {
+		return &ScheduleError{
+			Object: artifact.TargetName(),
+			Reason: "callable ABI reconstructed after target files were sealed",
+		}
+	}
+	if err := s.validateCallableABIArtifact(artifact); err != nil {
+		return err
+	}
+	owner := api.MustGeneratedArtifactOwner(artifact)
+	cooperative, err := callableABIRequirements(
+		s.requirements.appliedFor(owner),
+		artifact,
+	)
+	if err != nil {
+		return err
+	}
+	contract, err := s.callableABIContract(cooperative)
+	if err != nil {
+		return err
+	}
+	if err := s.artifacts.Commit(owner, contract, nil); err != nil {
+		return err
+	}
+	s.artifacts.DiscardDirty(owner)
+	return nil
+}
+
+func (s *programSession) ensureCallableABIBaseline(
+	artifact *api.GeneratedArtifact,
+) error {
+	owner := api.MustGeneratedArtifactOwner(artifact)
+	if s.artifacts.FacetRevision(
+		owner,
+		api.ArtifactFacetCallableSignature,
+	) != 0 {
+		return nil
+	}
+	if err := s.validateCallableABIArtifact(artifact); err != nil {
+		return err
+	}
+	contract, err := s.callableABIContract(false)
+	if err != nil {
+		return err
+	}
+	return s.artifacts.Commit(owner, contract, nil)
+}
+
+func (s *programSession) callableABIContract(
+	cooperative bool,
+) (artifactstate.Contract, error) {
+	var result tsgo.TypeNode = s.factory.KeywordTypeNode(
+		tsgo.KeywordTypeSyntaxKindVoidKeyword,
+	)
+	if cooperative {
+		result = callable.PromiseResult(s.factory, result)
+	}
+	encoded, err := tsgo.EncodeNode(
+		s.factory.FunctionTypeNode(nil, nil, result),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return artifactstate.Contract{
+		api.ArtifactFacetCallableSignature: encoded,
+	}, nil
+}
+
+func callableABIRequirements(
+	requirements []api.DeclarationRequirement,
+	artifact *api.GeneratedArtifact,
+) (bool, error) {
+	definitions := 0
+	cooperative := false
+	for _, requirement := range requirements {
+		if selected, ok := requirement.CallableABI(); ok {
+			if selected != artifact {
+				return false, &ScheduleError{
+					Object: artifact.TargetName(),
+					Reason: "callable ABI received a foreign definition",
+				}
+			}
+			definitions++
+			continue
+		}
+		facet, ok := requirement.CooperativeCallable()
+		selected, abi := facet.ABI()
+		if !ok || !abi || selected != artifact || cooperative {
+			return false, &ScheduleError{
+				Object: artifact.TargetName(),
+				Reason: "callable ABI received a foreign requirement",
+			}
+		}
+		cooperative = true
+	}
+	if definitions != 1 {
+		return false, &ScheduleError{
+			Object: artifact.TargetName(),
+			Reason: "callable ABI requires exactly one definition request",
+		}
+	}
+	return cooperative, nil
 }

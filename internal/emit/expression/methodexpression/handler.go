@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
@@ -40,10 +41,17 @@ func Emit(
 		if err != nil {
 			return api.ExpressionEmission{}, err
 		}
-		return api.DirectExpression(
+		target := api.DirectExpression(
 			context.Factory().Identifier(reference.Name()),
 			reference.Requests()...,
-		), nil
+		)
+		return cooperativecall.AdaptSourceValue(
+			context,
+			children,
+			source,
+			method,
+			target,
+		)
 	}
 	signature, ok := selected.Type().(*types.Signature)
 	if !ok ||
@@ -84,6 +92,11 @@ func Emit(
 		selected,
 		api.DirectExpression(parameters[0]),
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	cooperative, sourceRequests, err :=
+		cooperativecall.SourceContract(context, method)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -205,12 +218,18 @@ func Emit(
 		}
 		body = context.Factory().Block(statements, true)
 	}
-	return api.DirectExpression(
+	var modifiers []tsgo.ModifierLike
+	resultType := targetSignature.Result()
+	if cooperative {
+		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
+		resultType = callable.PromiseResult(context.Factory(), resultType)
+	}
+	target := api.DirectExpression(
 		context.Factory().ArrowFunction(
-			nil,
+			modifiers,
 			nil,
 			targetSignature.Parameters(),
-			targetSignature.Result(),
+			resultType,
 			context.Factory().EqualsGreaterThanToken(),
 			body,
 		),
@@ -221,8 +240,16 @@ func Emit(
 			capabilityRequests,
 			reference.Requests(),
 			[]api.RootRequest{controlRequest},
+			sourceRequests,
 		)...,
-	), nil
+	)
+	return cooperativecall.AdaptSourceValue(
+		context,
+		children,
+		source,
+		method,
+		target,
+	)
 }
 
 func emitInterface(
@@ -248,6 +275,11 @@ func emitInterface(
 		source,
 		signature,
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	cooperative, contractRequests, err :=
+		cooperativecall.ValueContract(context, signature)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -287,18 +319,25 @@ func emitInterface(
 		arguments[1:],
 		tsgo.NodeFlagsNone,
 	)
+	var modifiers []tsgo.ModifierLike
+	resultType := target.Result()
+	if cooperative {
+		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
+		resultType = callable.PromiseResult(context.Factory(), resultType)
+	}
 	return api.DirectExpression(
 		context.Factory().ArrowFunction(
-			nil,
+			modifiers,
 			nil,
 			target.Parameters(),
-			target.Result(),
+			resultType,
 			context.Factory().EqualsGreaterThanToken(),
 			call,
 		),
 		api.CombineRequests(
 			target.Requests(),
 			nonNil.Requests(),
+			contractRequests,
 		)...,
 	), nil
 }

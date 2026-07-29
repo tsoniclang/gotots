@@ -1593,6 +1593,84 @@ The iterator function is invoked exactly once. Calling yield after it returned
 `false` must reproduce the selected Go runtime panic. Output size depends on
 the source range body, not the number of yields or generic instantiations.
 
+## Channels, Goroutines, And `select`
+
+Channel syntax is projected from the exact `*types.Chan`:
+
+```go
+values := make(chan Box, 2)
+values <- Box{Count: 1}
+value, ok := <-values
+```
+
+The type owner first requires the explicitly selected `cooperative`
+concurrency profile, then emits `GoChannel<Box> | undefined`; directional
+source types emit the corresponding typed send or receive view. `make`
+requests the channel-value owner and supplies capacity plus exact `Box`
+zero/copy functions.
+Send evaluates the channel and value in Go order, copies `Box` once, then
+awaits the O(1) runtime send. Receive awaits one typed `[Box, boolean]` result;
+single-result receive selects element zero, comma-ok consumes both elements,
+and a discarded receive still performs the communication. `close` selects only
+the predeclared builtin object and calls the runtime close owner. Channel
+equality is direct canonical-identity equality, including nil.
+
+```go
+go worker(next(), value())
+```
+
+The statement owner emits prerequisites that evaluate and copy `worker`,
+`next()`, and `value()` immediately in source order. It then passes one typed
+closure to the scheduler. The closure invokes the captured callable directly
+and awaits it only when its concrete source facet or exact-signature generated
+callable ABI is cooperative. The ABI does not depend on the value's storage
+location. No
+`.call`, `.apply`, `.bind`, erased argument array, or runtime signature lookup
+is emitted.
+
+```go
+select {
+case output() <- value():
+    sent()
+case item, ok := <-input():
+    use(item, ok)
+default:
+    idle()
+}
+```
+
+The select owner first captures `output()`, `value()`, and `input()` in source
+order. It constructs typed send/receive alternatives. Because this example has
+a default, it calls the channel owner's synchronous fair ready-choice/commit
+operation: a ready communication returns its clause index, while no ready
+communication selects the default. This selection adds no `Promise`, `async`,
+`await`, scheduler request, or cooperative callable facet. If `output()`,
+`value()`, or `input()` independently blocks, that operand's existing
+cooperative requirement still propagates normally. A select without a default
+uses the blocking Promise-returning selection operation and awaits it.
+Receive assignment locations are not evaluated until the receive alternative
+wins. One target switch dispatches the chosen clause. Every registered
+alternative is canceled after one atomic commit, and nil alternatives cannot
+become ready.
+
+Blocking alternatives enter one fair registration permutation and then the
+channel's ordinary live sender/receiver queues. A direct receive queued before
+a selected receive therefore receives first, and the inverse order stays
+inverse; senders obey the same rule. Two blocking selects on opposite sides of
+one unbuffered channel rendezvous through those typed offers without polling.
+Multiple alternatives of one select on the same channel are not registered in
+source order. Closing a channel completes each selected send with the
+send-on-closed panic at the selecting goroutine's Promise boundary, while the
+goroutine executing `close` returns normally. Cancellation removes the exact
+offer from its insertion-ordered set; no listener side table or historical
+queue entry remains.
+
+Channel range is a receive loop. Each iteration performs one receive;
+`ok == false` exits before assignment and body execution. The received value is
+already the channel owner's exact copy. Existing break, continue, label,
+return, panic, method, function-value, interface, and generic owners remain
+authoritative.
+
 ## Values, Control Flow, And Implicit Semantics
 
 Handlers preserve within the selected profile:

@@ -67,6 +67,9 @@ func supportsHash(
 	if pointerValue(sourceType) {
 		return true
 	}
+	if channelValue(sourceType) {
+		return true
+	}
 	if array, ok := arrayvalue.Resolve(context, sourceType); ok {
 		return types.Comparable(sourceType) &&
 			supportsHash(context, array.ElementType(), visiting)
@@ -233,6 +236,50 @@ func (owner Owner) Hash(
 				nil,
 				[]tsgo.Expression{value},
 				tsgo.NodeFlagsNone,
+			),
+			reference.Requests()...,
+		), nil
+	}
+	if channelValue(sourceType) {
+		reference, err := context.Names().Runtime(
+			api.RuntimeMapHash,
+			api.ImportPhaseValue,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		undefined := context.Factory().Identifier("undefined")
+		return api.DirectExpression(
+			context.Factory().ConditionalExpression(
+				context.Factory().BinaryExpression(
+					nil,
+					value,
+					nil,
+					context.Factory().BinaryOperatorToken(
+						tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+					),
+					undefined,
+				),
+				context.Factory().QuestionToken(),
+				context.Factory().NumericLiteral(
+					"0",
+					tsgo.TokenFlagsNone,
+				),
+				context.Factory().ColonToken(),
+				context.Factory().CallExpression(
+					context.Factory().PropertyAccessExpression(
+						context.Factory().Identifier(reference.Name()),
+						nil,
+						context.Factory().Identifier(
+							mapruntime.HashObjectMember,
+						),
+						tsgo.NodeFlagsNone,
+					),
+					nil,
+					nil,
+					[]tsgo.Expression{value},
+					tsgo.NodeFlagsNone,
+				),
 			),
 			reference.Requests()...,
 		), nil

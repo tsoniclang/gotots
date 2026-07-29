@@ -6,6 +6,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	channeltype "github.com/tsoniclang/gotots/internal/emit/type/channel"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -25,6 +26,11 @@ func callableValue(sourceType types.Type) bool {
 
 func pointerValue(sourceType types.Type) bool {
 	_, _, ok := pointertype.Resolve(sourceType)
+	return ok
+}
+
+func channelValue(sourceType types.Type) bool {
+	_, ok := channeltype.Resolve(sourceType)
 	return ok
 }
 

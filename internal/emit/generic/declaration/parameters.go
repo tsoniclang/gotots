@@ -202,11 +202,12 @@ func EmitOperationParameters(
 				Reason: "generic operation parameter is invalid",
 			}
 		}
-		target, err := callable.EmitNonNilType(
+		target, err := callable.EmitInlineNonNilType(
 			context.WithRole(api.RoleParameterType),
 			children,
 			source,
 			operation.Signature(),
+			false,
 		)
 		if err != nil {
 			return nil, nil, err

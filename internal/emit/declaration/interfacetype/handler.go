@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -109,9 +110,21 @@ func Build(
 		if err != nil {
 			return nil, nil, err
 		}
+		cooperative, contractRequests, err :=
+			cooperativecall.ValueContract(context, signature)
+		if err != nil {
+			return nil, nil, err
+		}
 		memberName, err := context.Names().InterfaceMethodName(method)
 		if err != nil {
 			return nil, nil, err
+		}
+		resultType := target.Result()
+		if cooperative {
+			resultType = callable.PromiseResult(
+				context.Factory(),
+				resultType,
+			)
 		}
 		members = append(
 			members,
@@ -121,7 +134,7 @@ func Build(
 				nil,
 				nil,
 				target.Parameters(),
-				target.Result(),
+				resultType,
 			),
 		)
 		token, err := context.Names().InterfaceMethodToken(method)
@@ -136,6 +149,7 @@ func Build(
 			requests,
 			target.Requests()...,
 		)
+		requests = append(requests, contractRequests...)
 		requests = append(requests, token.Requests()...)
 	}
 	statements := []tsgo.Statement{

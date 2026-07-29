@@ -36,6 +36,7 @@ type Context struct {
 	integer                  IntegerRepresentation
 	evaluationOrder          EvaluationOrder
 	goRuntime                GoRuntimeContract
+	concurrency              ConcurrencySemantics
 	expectedType             types.Type
 	expectedResults          *types.Tuple
 	functionResults          *types.Tuple
@@ -60,6 +61,10 @@ type Context struct {
 	lexicalTypeRequirements  map[*types.TypeName][]DeclarationRequirement
 	genericResolver          GenericCallableResolver
 	genericConsumer          GenericOperationConsumer
+	cooperativeResolver      CooperativeCallableResolver
+	callableFacet            CallableFacet
+	cooperative              bool
+	detachedInvocation       bool
 	genericParameters        map[*types.TypeParam]string
 	iteratorRangeStateName   string
 }
@@ -120,7 +125,7 @@ func (c Context) WithLexicalTypeRequirements(
 	if !sourceOwned && !initializerOwned {
 		panic("lexical type-requirement owner has no source reconstruction")
 	}
-	c = c.withArtifactOwner(owner)
+	c = c.WithArtifactOwner(owner)
 	c.lexicalTypeRequirements = make(
 		map[*types.TypeName][]DeclarationRequirement,
 		len(requirements),
@@ -164,6 +169,7 @@ func NewContext(
 	storage AddressableStorage,
 	integer IntegerRepresentation,
 	evaluationOrder EvaluationOrder,
+	concurrency ConcurrencySemantics,
 ) (Context, error) {
 	switch {
 	case role == "":
@@ -186,6 +192,8 @@ func NewContext(
 		return Context{}, &ContextError{Reason: "integer representation is invalid"}
 	case !evaluationOrder.Valid():
 		return Context{}, &ContextError{Reason: "evaluation order is invalid"}
+	case !concurrency.Valid():
+		return Context{}, &ContextError{Reason: "concurrency semantics are invalid"}
 	}
 	return Context{
 		role:            role,
@@ -199,6 +207,7 @@ func NewContext(
 		storage:         storage,
 		integer:         integer,
 		evaluationOrder: evaluationOrder,
+		concurrency:     concurrency,
 	}, nil
 }
 
@@ -410,14 +419,8 @@ func (c Context) IteratorRangeControl() (IteratorRangeControl, bool) {
 	}, true
 }
 
-func (c Context) ArtifactOwner() ArtifactOwner {
-	return c.artifactOwner
-}
-
-func (c Context) FunctionArtifactOwner() (*types.Func, bool) {
-	source, ok := c.artifactOwner.Source()
-	owner, function := source.(*types.Func)
-	return owner, ok && function
+func (c Context) ConcurrencySemantics() ConcurrencySemantics {
+	return c.concurrency
 }
 
 func (c Context) LocalConstantProjections(
@@ -530,15 +533,4 @@ type ChildEmitter interface {
 	IfAlternate(Context, *ast.IfStmt) (StatementEmission, error)
 	Type(Context, ast.Expr) (TypeEmission, error)
 	RepresentedType(Context, ast.Node, types.Type) (TypeEmission, error)
-}
-
-func (c Context) withArtifactOwner(owner ArtifactOwner) Context {
-	if !owner.Valid() {
-		panic("artifact owner is invalid")
-	}
-	if c.artifactOwner.Valid() && c.artifactOwner != owner {
-		panic("artifact owner is inconsistent")
-	}
-	c.artifactOwner = owner
-	return c
 }

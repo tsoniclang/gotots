@@ -35,9 +35,11 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/statement/assignment"
 	blockstatement "github.com/tsoniclang/gotots/internal/emit/statement/block"
 	branchstatement "github.com/tsoniclang/gotots/internal/emit/statement/branch"
+	channelsend "github.com/tsoniclang/gotots/internal/emit/statement/channelsend"
 	deferstatement "github.com/tsoniclang/gotots/internal/emit/statement/deferstatement"
 	expressionstatement "github.com/tsoniclang/gotots/internal/emit/statement/expressionstatement"
 	forstatement "github.com/tsoniclang/gotots/internal/emit/statement/forstatement"
+	goroutinestatement "github.com/tsoniclang/gotots/internal/emit/statement/goroutine"
 	ifstatement "github.com/tsoniclang/gotots/internal/emit/statement/ifstatement"
 	incdecstatement "github.com/tsoniclang/gotots/internal/emit/statement/incdec"
 	labelstatement "github.com/tsoniclang/gotots/internal/emit/statement/label"
@@ -46,13 +48,14 @@ import (
 	localtype "github.com/tsoniclang/gotots/internal/emit/statement/localtype"
 	rangestatement "github.com/tsoniclang/gotots/internal/emit/statement/range"
 	returnstatement "github.com/tsoniclang/gotots/internal/emit/statement/returnstatement"
+	selectstatement "github.com/tsoniclang/gotots/internal/emit/statement/selectstatement"
 	statementsequence "github.com/tsoniclang/gotots/internal/emit/statement/sequence"
 	switchstatement "github.com/tsoniclang/gotots/internal/emit/statement/switchstatement"
 	typeswitchstatement "github.com/tsoniclang/gotots/internal/emit/statement/typeswitchstatement"
-	"github.com/tsoniclang/gotots/internal/emit/storage"
 	storetarget "github.com/tsoniclang/gotots/internal/emit/store"
 	anonymousstructtype "github.com/tsoniclang/gotots/internal/emit/type/anonymousstruct"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	channeltype "github.com/tsoniclang/gotots/internal/emit/type/channel"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	generictype "github.com/tsoniclang/gotots/internal/emit/type/generic"
 	goruntimetype "github.com/tsoniclang/gotots/internal/emit/type/goruntime"
@@ -70,15 +73,17 @@ import (
 )
 
 type emitter struct {
-	source    *load.Package
-	factory   tsgo.Factory
-	names     *emitnaming.Owner
-	values    api.Values
-	integer   api.IntegerRepresentation
-	order     api.EvaluationOrder
-	require   func(types.Object) error
-	generic   api.GenericCallableResolver
-	goRuntime api.GoRuntimeContract
+	source      *load.Package
+	factory     tsgo.Factory
+	names       *emitnaming.Owner
+	values      api.Values
+	integer     api.IntegerRepresentation
+	order       api.EvaluationOrder
+	concurrency api.ConcurrencySemantics
+	require     func(types.Object) error
+	generic     api.GenericCallableResolver
+	cooperative api.CooperativeCallableResolver
+	goRuntime   api.GoRuntimeContract
 }
 
 func newEmitter(
@@ -87,8 +92,10 @@ func newEmitter(
 	registry *emitnaming.Registry,
 	integer api.IntegerRepresentation,
 	order api.EvaluationOrder,
+	concurrency api.ConcurrencySemantics,
 	require func(types.Object) error,
 	generic api.GenericCallableResolver,
+	cooperative api.CooperativeCallableResolver,
 	goRuntime api.GoRuntimeContract,
 ) *emitter {
 	var typesInfo *types.Info
@@ -98,39 +105,19 @@ func newEmitter(
 		packageScope = source.Types().Scope()
 	}
 	target := &emitter{
-		source:    source,
-		factory:   factory,
-		names:     emitnaming.NewOwner(packageScope, typesInfo, registry),
-		integer:   integer,
-		order:     order,
-		require:   require,
-		generic:   generic,
-		goRuntime: goRuntime,
+		source:      source,
+		factory:     factory,
+		names:       emitnaming.NewOwner(packageScope, typesInfo, registry),
+		integer:     integer,
+		order:       order,
+		concurrency: concurrency,
+		require:     require,
+		generic:     generic,
+		cooperative: cooperative,
+		goRuntime:   goRuntime,
 	}
 	target.values = representation.NewOwner(target)
 	return target
-}
-
-func (e *emitter) context(names api.Names) (api.Context, error) {
-	context, err := api.NewContext(
-		api.RoleFileDeclaration,
-		e.source.FileSet(),
-		e.source.Types(),
-		e.source.TypesInfo(),
-		e.source.TypesSizes(),
-		e.factory,
-		names,
-		e.values,
-		storage.Owner{},
-		e.integer,
-		e.order,
-	)
-	if err != nil {
-		return api.Context{}, err
-	}
-	return context.
-		WithGenericCallableResolver(e.generic).
-		WithGoRuntimeContract(e.goRuntime), nil
 }
 
 func (e *emitter) declarationObject(
@@ -358,6 +345,8 @@ func (e *emitter) Statement(
 		return api.DirectStatement(target.Value(), target.Requests()...), nil
 	case *ast.BranchStmt:
 		return branchstatement.Emit(context, source)
+	case *ast.SendStmt:
+		return channelsend.Emit(context, e, source)
 	case *ast.DeclStmt:
 		declaration, ok := source.Decl.(*ast.GenDecl)
 		if !ok {
@@ -383,6 +372,8 @@ func (e *emitter) Statement(
 		return api.NewStatementEmission(nil, nil)
 	case *ast.ForStmt:
 		return forstatement.Emit(context, e, source)
+	case *ast.GoStmt:
+		return goroutinestatement.Emit(context, e, source)
 	case *ast.IfStmt:
 		return ifstatement.Emit(context, e, source)
 	case *ast.IncDecStmt:
@@ -393,6 +384,8 @@ func (e *emitter) Statement(
 		return rangestatement.Emit(context, e, source)
 	case *ast.ReturnStmt:
 		return returnstatement.Emit(context, e, source)
+	case *ast.SelectStmt:
+		return selectstatement.Emit(context, e, source)
 	case *ast.SwitchStmt:
 		return switchstatement.Emit(context, e, source)
 	case *ast.TypeSwitchStmt:
@@ -481,6 +474,19 @@ func (e *emitter) Type(
 			}
 			return callable.EmitSyntaxType(context, e, functionType, signature)
 		}
+		if _, ok := channeltype.Resolve(sourceType); ok {
+			channelSyntax, valid := source.(*ast.ChanType)
+			if !valid {
+				return api.TypeEmission{},
+					api.Unsupported(context, api.CategoryType, source)
+			}
+			return channeltype.EmitSyntax(
+				context,
+				e,
+				channelSyntax,
+				sourceType,
+			)
+		}
 		if _, ok := types.Unalias(sourceType).(*types.Map); ok {
 			return maptype.Emit(context, e, source, sourceType)
 		}
@@ -558,6 +564,9 @@ func (e *emitter) RepresentedType(
 	}
 	if signature, ok := types.Unalias(sourceType).(*types.Signature); ok {
 		return callable.EmitType(context, e, source, signature)
+	}
+	if _, ok := channeltype.Resolve(sourceType); ok {
+		return channeltype.EmitRepresented(context, e, source, sourceType)
 	}
 	if _, ok := types.Unalias(sourceType).(*types.Map); ok {
 		return maptype.Emit(context, e, source, sourceType)

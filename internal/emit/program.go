@@ -377,7 +377,9 @@ func newProgramSession(
 			session.registry,
 			options.IntegerRepresentation,
 			options.EvaluationOrder,
+			options.ConcurrencySemantics,
 			session.require,
+			session,
 			session,
 			goRuntime,
 		)

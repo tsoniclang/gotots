@@ -31,6 +31,8 @@ func (s *programSession) validateGeneratedArtifact(
 		return s.validateInterfaceArtifact(artifact)
 	case api.GeneratedArtifactGenericCapability:
 		return s.validateGenericCapabilityArtifact(artifact)
+	case api.GeneratedArtifactCallableABI:
+		return s.validateCallableABIArtifact(artifact)
 	default:
 		return &ScheduleError{
 			Object: artifact.TargetName(),
@@ -54,6 +56,8 @@ func (s *programSession) reconstructGeneratedArtifact(
 		return s.reconstructInterfaceArtifact(artifact)
 	case api.GeneratedArtifactGenericCapability:
 		return s.reconstructGenericCapabilityArtifact(artifact)
+	case api.GeneratedArtifactCallableABI:
+		return s.reconstructCallableABIArtifact(artifact)
 	default:
 		return &ScheduleError{
 			Object: artifact.TargetName(),
@@ -183,6 +187,7 @@ func (s *programSession) buildMapSpecializationRevision(
 		return artifactRevision{}, err
 	}
 	defer finish()
+	context := builder.context.WithArtifactOwner(owner)
 	err = maprepresentation.ValidateRequirements(
 		api.RoleFileDeclaration,
 		artifact,
@@ -199,7 +204,7 @@ func (s *programSession) buildMapSpecializationRevision(
 		}
 	}
 	keyType, err := builder.emitter.RepresentedType(
-		builder.context.WithRole(api.RoleMapKey),
+		context.WithRole(api.RoleMapKey),
 		nil,
 		maprepresentation.StorageKeyType(mapType.Key()),
 	)
@@ -207,7 +212,7 @@ func (s *programSession) buildMapSpecializationRevision(
 		return artifactRevision{}, err
 	}
 	valueType, err := builder.emitter.RepresentedType(
-		builder.context.WithRole(api.RoleMapValue),
+		context.WithRole(api.RoleMapValue),
 		nil,
 		mapType.Elem(),
 	)
@@ -215,7 +220,7 @@ func (s *programSession) buildMapSpecializationRevision(
 		return artifactRevision{}, err
 	}
 	specialization, err := maprepresentation.BuildSpecialization(
-		builder.context,
+		context,
 		nil,
 		artifact.TargetName(),
 		mapType,
@@ -379,6 +384,7 @@ func (s *programSession) buildGenericCapabilityRevision(
 		return artifactRevision{}, err
 	}
 	defer finish()
+	context := builder.context.WithArtifactOwner(owner)
 	if err := exactGenericCapabilityRequirement(
 		s.requirements.appliedFor(owner),
 		artifact,
@@ -386,7 +392,7 @@ func (s *programSession) buildGenericCapabilityRevision(
 		return artifactRevision{}, err
 	}
 	statement, requests, err := genericcapability.Build(
-		builder.context,
+		context,
 		builder.emitter,
 		artifact,
 	)

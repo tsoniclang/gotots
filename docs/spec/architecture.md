@@ -207,10 +207,12 @@ Compilation policy is selected once at the compilation entry point and is
 immutable for the complete dependency closure. Each axis is a closed typed
 choice. The initial integer-representation axis selects `number` (the default)
 or `bigint`. The initial evaluation-order axis selects `direct` (the default)
-or `preserve-go`. Handlers query the typed profile carried by their context;
-they never inspect CLI flags or independently select behavior. A generated file
-set may not mix selections. Every selected axis is part of reproducibility
-evidence and any eventual output manifest.
+or `preserve-go`. The initial concurrency-semantics axis selects `disabled`
+(the default) or the explicitly requested `cooperative` profile. Handlers query
+the typed profile carried by their context; they never inspect CLI flags or
+independently select behavior. A generated file set may not mix selections.
+Every selected axis is part of reproducibility evidence and any eventual
+output manifest.
 
 `direct` evaluation emits target expressions without introducing temporaries
 solely to preserve the source order of expressions that target reshaping
@@ -632,6 +634,122 @@ graph's exact initialization order and append their TS-Go statements to one
 package-assembly function body. Whole-program order consumes the selected
 package import graph directly; it does not infer order from target imports or
 construct a parallel semantic graph.
+
+## Cooperative Concurrency
+
+Concurrency is disabled unless the compilation entry explicitly selects the
+**race-free cooperative Go** profile. Disabled compilation fails at the exact
+channel, goroutine, or select construct owner. Selecting the cooperative
+profile is an explicit source-program precondition, not an inferred property:
+execution may switch at modeled synchronization operations, but the compiler
+does not claim asynchronous Go preemption.
+
+For example, this race-free program is outside the cooperative profile:
+
+```go
+started := make(chan struct{})
+go func() {
+    close(started)
+    for {
+    }
+}()
+<-started
+```
+
+Go may preempt the looping goroutine and let the receiver return; the
+cooperative target cannot. Soundly detecting that requirement would need the
+forbidden whole-program effect/dataflow analysis, and emulating it would need
+preemption. GoToTS therefore neither admits a hidden yield heuristic nor
+describes this program as exact under the cooperative selection.
+
+Two separate semantic owners assemble declarations into the same
+demand-selected `runtime/channel.ts` output module:
+
+- the channel owner controls channel identity, value transfer, queues, close,
+  direction views, and select alternatives; and
+- the scheduler owner controls goroutine lifecycle, blocked/runnable counts,
+  program settlement, first uncaught panic, main return, and deadlock.
+
+Sharing an output module does not merge these responsibilities.
+`GoChannel<T>` is the canonical runtime identity for a channel value.
+Send-only and receive-only target views expose only operations admitted by the
+selected `types.ChanDir`; conversion between views does not allocate or change
+identity. The channel owner contains:
+
+- capacity, a FIFO buffer, one insertion-ordered live sender-offer set, one
+  insertion-ordered live receiver-offer set, and closed state. Direct
+  operations and `select` alternatives enter the same typed queues, so arrival
+  order cannot be changed by operation kind;
+- exact element zero and copy functions selected from the ordinary value
+  owner, including generic operation functions when `T` is a type parameter;
+- send, receive, close, equality-by-canonical-identity, and select
+  registration/commit operations.
+
+Each queued sender owns typed success and close-failure commits; each queued
+receiver owns one typed value/`ok` commit. A select alternative adds its
+atomic claim and O(1) cancellation to that same offer. There is no parallel
+listener registry, direct-versus-select queue, historical head-index storage,
+operation tag, or erased task. Removing a selected alternative deletes its
+live offer, so storage is bounded by current buffer contents and current
+blocked operations rather than historical traffic.
+
+Nil channels are represented by `undefined`. Send or receive on nil blocks;
+closing nil, sending on closed, and closing closed channels raise the one Go
+panic carrier. Closing wakes blocked receivers with buffered values first and
+then `(zero, false)`, and wakes blocked senders with the send-on-closed panic.
+No payload crosses `any`, `unknown`, a cast, or an erased task queue.
+
+Blocking changes existing observable artifact facets rather than creating a
+call graph. A concrete source function, method, or literal body owns one source
+callable facet. A body that directly blocks, or calls a cooperative callable,
+receives one closed declaration requirement; its `CallableSignature` becomes
+`Promise`-returning and its body becomes `async`. Exact direct source calls
+subscribe to that concrete source facet and add `await` only in its reverse
+closure.
+
+First-class function values use one different owner: a canonical generated
+callable ABI artifact keyed by the exact receiver-free `go/types.Signature`
+after represented generic arguments are selected. Every value call subscribes
+to that ABI once, regardless of whether the value came through a local,
+parameter, result, package variable, field, pointer, array, slice, map,
+interface assertion, method value/expression, or generic aggregate. A blocking
+provider used as a value selects the ABI cooperative. Synchronous providers
+adapt statically when that exact ABI is cooperative. Storage locations never
+receive callable facets and no AST-shape resolver, dataflow graph, or effect IR
+tracks transport. Structural contract equality terminates recursive cycles.
+Functions and callable ABIs that remain nonblocking retain byte-identical
+synchronous declarations and calls.
+
+A `go` statement evaluates and value-copies the callee and every argument
+immediately in source order, then schedules exactly one typed
+`() => Promise<void>` closure. Main return stops the selected program without
+waiting for remaining goroutines. A panic escaping any goroutine terminates the
+selected program with the shared panic carrier.
+
+`select` evaluates channel operands and send values exactly once in source
+order. It creates one typed alternative per communication clause. The runtime
+uniformly chooses one currently ready alternative, commits it once, and
+cancels all other registrations. If no case is initially ready, alternatives
+are registered in a fair permutation as active offers in the same channel
+queues used by direct operations. This preserves FIFO ordering across direct
+and selected waiters, permits select-to-select rendezvous, and prevents
+same-channel source-arm bias. Closing a channel rejects a queued selected send
+through that select's own typed completion path; it does not throw from the
+goroutine performing `close`. A receive target location is evaluated only
+after its clause wins. A select with a default invokes the channel owner's
+synchronous fair ready-choice/commit operation: one ready communication wins,
+or `default` wins when none is ready. Selection itself adds no `Promise`,
+`async`, `await`, scheduler dependency, or cooperative callable requirement;
+operand or send-value evaluation may independently require cooperation. A
+select without a default invokes the blocking operation only when no
+communication is ready and then participates in scheduler deadlock detection.
+Nil-channel alternatives never become ready.
+
+Channel send and receive call sites are O(1), apart from the selected element
+copy. A select site and registration are O(number of clauses). Runtime source
+size is independent of element type, channel count, goroutine count, and
+select-site count. Queue storage is O(buffer capacity plus live blocked
+operations), never O(historical operations).
 
 ## Package State And Assembly
 

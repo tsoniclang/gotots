@@ -227,6 +227,8 @@ func Apply(
 		target, err = stringTarget, stringErr
 	} else {
 		switch {
+		case directChannelConversion(sourceType, representedTargetType):
+			target = operandValue
 		case directReferenceConversion(sourceType, representedTargetType):
 			target = operandValue
 		case directArrayConversion(sourceType, representedTargetType):
@@ -275,6 +277,15 @@ func Apply(
 		target, err = targetDefined.Wrap(context, target)
 	}
 	return target, true, err
+}
+
+func directChannelConversion(sourceType, targetType types.Type) bool {
+	source, sourceOK := types.Unalias(sourceType).(*types.Chan)
+	target, targetOK := types.Unalias(targetType).(*types.Chan)
+	return sourceOK &&
+		targetOK &&
+		types.Identical(source.Elem(), target.Elem()) &&
+		types.ConvertibleTo(source, target)
 }
 
 func directReferenceConversion(sourceType, targetType types.Type) bool {

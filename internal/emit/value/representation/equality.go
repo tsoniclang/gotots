@@ -161,6 +161,19 @@ func (owner Owner) Equal(
 			reference.Requests()...,
 		), nil
 	}
+	if channelValue(sourceType) {
+		return api.DirectExpression(
+			context.Factory().BinaryExpression(
+				nil,
+				left,
+				nil,
+				context.Factory().BinaryOperatorToken(
+					tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+				),
+				right,
+			),
+		), nil
+	}
 	if callableValue(sourceType) {
 		return api.DirectExpression(
 			context.Factory().BinaryExpression(

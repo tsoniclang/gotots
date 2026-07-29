@@ -46,6 +46,19 @@ func Emit(
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
+	callableFacet, err := api.NewSourceCallableFacet(functionObject)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	cooperative, err := cooperativeRequirement(
+		context,
+		callableFacet,
+		requirements,
+	)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	context = context.WithCooperativeCallable(callableFacet, cooperative)
 	context, err = applyLocalConstantProjections(
 		context,
 		source,
@@ -184,13 +197,18 @@ func Emit(
 	if moduleExport {
 		modifiers = []tsgo.ModifierLike{context.Factory().ExportKeyword()}
 	}
+	resultType := targetSignature.Result()
+	if cooperative {
+		modifiers = append(modifiers, context.Factory().AsyncKeyword())
+		resultType = callable.PromiseResult(context.Factory(), resultType)
+	}
 	target := context.Factory().FunctionDeclaration(
 		modifiers,
 		nil,
 		context.Factory().Identifier(name),
 		genericParameters.TypeNodes(),
 		parameters,
-		targetSignature.Result(),
+		resultType,
 		body.Value(),
 	)
 	return api.DirectDeclaration(
@@ -200,6 +218,44 @@ func Emit(
 			body.Requests(),
 		)...,
 	), nil
+}
+
+func cooperativeRequirement(
+	context api.Context,
+	facet api.CallableFacet,
+	requirements []api.DeclarationRequirement,
+) (bool, error) {
+	selected := false
+	for _, requirement := range requirements {
+		if requirement.Kind() != api.DeclarationRequirementCooperativeCallable {
+			continue
+		}
+		requirementFacet, ok := requirement.CooperativeCallable()
+		if !ok || requirementFacet.Owner() != facet.Owner() {
+			return false, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "function received an invalid cooperative requirement",
+			}
+		}
+		if requirementFacet != facet {
+			if requirementFacet.Kind() ==
+				api.CallableFacetFunctionLiteral {
+				continue
+			}
+			return false, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "function received a foreign cooperative requirement",
+			}
+		}
+		if selected {
+			return false, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "function received a duplicate cooperative requirement",
+			}
+		}
+		selected = true
+	}
+	return selected, nil
 }
 
 func applyLocalConstantProjections(

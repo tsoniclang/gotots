@@ -117,7 +117,7 @@ func referenceNilCondition(
 	value tsgo.Expression,
 ) (tsgo.Expression, error) {
 	switch model.Family() {
-	case definedtype.FamilyPointer:
+	case definedtype.FamilyPointer, definedtype.FamilyChannel:
 		return strictUndefined(context, value), nil
 	case definedtype.FamilySlice:
 		return context.Factory().CallExpression(
@@ -135,7 +135,7 @@ func referenceNilCondition(
 	default:
 		return nil, &api.InvariantError{
 			Role:   context.Role(),
-			Reason: "defined reference family is neither slice nor pointer",
+			Reason: "defined reference family has no nil condition",
 		}
 	}
 }
@@ -188,7 +188,9 @@ func emitFamilyMembers(
 			}
 		}
 		return nil, nil, nil
-	case definedtype.FamilySlice, definedtype.FamilyPointer:
+	case definedtype.FamilySlice,
+		definedtype.FamilyPointer,
+		definedtype.FamilyChannel:
 		if len(requirements) != 0 {
 			return nil, nil, &api.InvariantError{
 				Role:   context.Role(),

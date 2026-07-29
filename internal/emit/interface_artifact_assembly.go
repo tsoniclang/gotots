@@ -170,6 +170,7 @@ func (s *programSession) buildInterfaceArtifactRevision(
 		return artifactRevision{}, err
 	}
 	defer finish()
+	context := builder.context.WithArtifactOwner(owner)
 	if err := exactInterfaceRequirement(
 		s.requirements.appliedFor(owner),
 		artifact,
@@ -178,6 +179,7 @@ func (s *programSession) buildInterfaceArtifactRevision(
 	}
 	statements, requests, err := buildInterfaceArtifact(
 		builder,
+		context,
 		artifact,
 	)
 	if err != nil {
@@ -205,6 +207,7 @@ func (s *programSession) buildInterfaceArtifactRevision(
 
 func buildInterfaceArtifact(
 	builder *targetFileBuilder,
+	context api.Context,
 	artifact *api.GeneratedArtifact,
 ) ([]tsgo.Statement, []api.RootRequest, error) {
 	switch artifact.Kind() {
@@ -231,7 +234,7 @@ func buildInterfaceArtifact(
 			}
 		}
 		return interfacetypedeclaration.Build(
-			builder.context,
+			context,
 			builder.emitter,
 			nil,
 			artifact.TargetName(),
@@ -249,7 +252,7 @@ func buildInterfaceArtifact(
 			}
 		}
 		return interfaceadapterdeclaration.Build(
-			builder.context,
+			context,
 			builder.emitter,
 			artifact.TargetName(),
 			source,

@@ -7,6 +7,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	channelmodel "github.com/tsoniclang/gotots/internal/emit/concurrency/channel"
 	"github.com/tsoniclang/gotots/internal/emit/statement/assignment"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
@@ -43,6 +44,15 @@ func Emit(
 			source,
 			sourceType,
 			signature,
+			targetLabel,
+		)
+	}
+	if channel, ok := channelmodel.Resolve(sourceType); ok {
+		return emitChannel(
+			context,
+			children,
+			source,
+			channel,
 			targetLabel,
 		)
 	}

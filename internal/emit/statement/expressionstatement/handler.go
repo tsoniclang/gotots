@@ -2,6 +2,7 @@ package expressionstatement
 
 import (
 	"go/ast"
+	"go/token"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
@@ -29,16 +30,26 @@ func EmitExpression(
 	source *ast.ExprStmt,
 ) (api.ExpressionEmission, error) {
 	call, ok := source.X.(*ast.CallExpr)
-	if !ok {
+	if ok {
+		return children.DiscardedCall(
+			context.WithRole(api.RoleExpressionStatement),
+			call,
+		)
+	}
+	receive, ok := source.X.(*ast.UnaryExpr)
+	if !ok || receive.Op != token.ARROW {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	target, err := children.DiscardedCall(
-		context.WithRole(api.RoleExpressionStatement),
-		call,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
+	sourceType := context.TypesInfo().TypeOf(receive)
+	if sourceType == nil {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, receive)
 	}
-	return target, nil
+	return children.Expression(
+		context.
+			WithRole(api.RoleExpressionStatement).
+			WithExpectedType(sourceType),
+		receive,
+	)
 }

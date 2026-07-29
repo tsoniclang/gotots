@@ -5,6 +5,8 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/callable"
+	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
@@ -37,6 +39,7 @@ func emitMethod(
 	method *types.Func,
 	selection *types.Selection,
 	discarded bool,
+	detached bool,
 ) (api.ExpressionEmission, error) {
 	signature, ok := method.Type().(*types.Signature)
 	if !ok ||
@@ -54,6 +57,7 @@ func emitMethod(
 			method,
 			selection,
 			discarded,
+			detached,
 		)
 	}
 	if signature.RecvTypeParams().Len() != 0 {
@@ -66,6 +70,7 @@ func emitMethod(
 			selection,
 			signature,
 			discarded,
+			detached,
 		)
 	}
 	if err := validateResults(context, source, signature, discarded); err != nil {
@@ -74,6 +79,15 @@ func emitMethod(
 	if _, interfaceReceiver := interfacetype.Resolve(
 		selection.Recv(),
 	); interfaceReceiver {
+		valueSignature, valueOK := selection.Type().(*types.Signature)
+		if valueOK {
+			valueSignature, valueOK =
+				callable.ValueSignature(valueSignature)
+		}
+		if !valueOK {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
 		return emitInterfaceMethod(
 			context,
 			children,
@@ -82,6 +96,8 @@ func emitMethod(
 			method,
 			selection,
 			signature,
+			valueSignature,
+			detached,
 		)
 	}
 	receiver, resolvedMethod, err := selectionvalue.MethodReceiver(
@@ -102,7 +118,7 @@ func emitMethod(
 		children,
 		source,
 		signature,
-		false,
+		detached,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -110,7 +126,7 @@ func emitMethod(
 	before := receiver.Before()
 	receiverValue := receiver.Value()
 	var receiverRequests []api.RootRequest
-	if len(argumentBefore) != 0 {
+	if len(argumentBefore) != 0 || detached {
 		receiverValue, receiverRequests, before, err = captureReceiver(
 			context,
 			receiver,
@@ -125,7 +141,7 @@ func emitMethod(
 		return api.ExpressionEmission{}, err
 	}
 	arguments = append([]tsgo.Expression{receiverValue}, arguments...)
-	return api.NewExpressionEmission(
+	target, err := api.NewExpressionEmission(
 		before,
 		context.Factory().CallExpression(
 			context.Factory().Identifier(reference.Name()),
@@ -141,6 +157,18 @@ func emitMethod(
 			reference.Requests(),
 		),
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if detached {
+		return cooperativecall.DetachedSourceCall(
+			context,
+			source,
+			method,
+			target,
+		)
+	}
+	return cooperativecall.SourceCall(context, source, method, target)
 }
 
 func emitGenericReceiverMethod(
@@ -152,6 +180,7 @@ func emitGenericReceiverMethod(
 	selection *types.Selection,
 	signature *types.Signature,
 	discarded bool,
+	detached bool,
 ) (api.ExpressionEmission, error) {
 	owner := method.Origin()
 	callable, ok, err := context.ResolveGenericCallable(owner)
@@ -190,7 +219,7 @@ func emitGenericReceiverMethod(
 		children,
 		source,
 		concrete,
-		false,
+		detached,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -198,7 +227,7 @@ func emitGenericReceiverMethod(
 	before := receiver.Before()
 	receiverValue := receiver.Value()
 	var receiverRequests []api.RootRequest
-	if len(argumentBefore) != 0 {
+	if len(argumentBefore) != 0 || detached {
 		receiverValue, receiverRequests, before, err = captureReceiver(
 			context,
 			receiver,
@@ -256,7 +285,7 @@ func emitGenericReceiverMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return api.NewExpressionEmission(
+	target, err := api.NewExpressionEmission(
 		before,
 		context.Factory().CallExpression(
 			context.Factory().Identifier(reference.Name()),
@@ -274,6 +303,18 @@ func emitGenericReceiverMethod(
 			reference.Requests(),
 		),
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if detached {
+		return cooperativecall.DetachedSourceCall(
+			context,
+			source,
+			method,
+			target,
+		)
+	}
+	return cooperativecall.SourceCall(context, source, method, target)
 }
 
 func emitInterfaceMethod(
@@ -284,6 +325,8 @@ func emitInterfaceMethod(
 	method *types.Func,
 	selection *types.Selection,
 	signature *types.Signature,
+	valueSignature *types.Signature,
+	detached bool,
 ) (api.ExpressionEmission, error) {
 	receiver, err := children.Expression(
 		context.
@@ -304,7 +347,7 @@ func emitInterfaceMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return ApplyInterfaceMethod(
+	target, err := ApplyInterfaceMethod(
 		context,
 		selector.X,
 		selection.Recv(),
@@ -313,6 +356,23 @@ func emitInterfaceMethod(
 		arguments,
 		argumentBefore,
 		argumentRequests,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if detached {
+		return cooperativecall.DetachedValueCall(
+			context,
+			source,
+			valueSignature,
+			target,
+		)
+	}
+	return cooperativecall.ValueCall(
+		context,
+		source,
+		valueSignature,
+		target,
 	)
 }
 
@@ -324,7 +384,12 @@ func emitConstraintMethod(
 	method *types.Func,
 	selection *types.Selection,
 	discarded bool,
+	detached bool,
 ) (api.ExpressionEmission, error) {
+	if detached {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
 	signature, ok := selection.Type().(*types.Signature)
 	if !ok ||
 		signature.Recv() == nil ||

@@ -276,6 +276,7 @@ func productionAggregateContext(
 		storage.Owner{},
 		integer,
 		api.EvaluationOrderPreserveGo,
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -420,6 +421,12 @@ func (aggregateNames) GenericCapability(
 	api.GenericOperationSelection,
 	*types.Signature,
 ) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (aggregateNames) CallableABI(
+	*types.Signature,
+) (api.CallableABIReference, error) {
 	panic("unused")
 }
 

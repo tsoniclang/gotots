@@ -492,6 +492,45 @@ adapter, and must not introduce a storage/dataflow graph.
 Functions without control demand remain byte-identical. State-machine size is
 linear in source statements and is absent when direct target control suffices.
 
+### 3H. Channels And Cooperative Concurrency
+
+Add the closed concurrency-semantics profile axis, disabled by default and
+explicitly selecting `cooperative`. Install separate typed channel-value and
+scheduler-lifecycle truth owners that may assemble into one output module,
+plus exact channel type/direction projection, `make`,
+send/receive/close/equality/range, goroutine launch, and atomic `select`.
+The channel owner uses one insertion-ordered typed live queue per direction
+for both direct operations and selected alternatives, fair blocked-select
+registration, O(1) cancellation, select-to-select rendezvous, and storage
+bounded by live operations; separate direct/select queues or listener
+registries do not satisfy this checkpoint.
+
+Concrete bodies retain source callable facets. First-class function values use
+one exact-signature generated callable ABI artifact independent of every
+storage shape. Closed cooperative requirements on the existing artifact graph
+make only exact blocking consumers and selected ABI contracts
+Promise-returning; recursive cycles converge. Cover functions, methods,
+locals, parameters, results, package variables, fields, pointers,
+arrays/slices/maps, interface assertions/calls, and generic aggregates without
+a call graph, prewalk, storage-facet hierarchy, erased queue, all-function
+async tax, or yield heuristic.
+
+The same cooperative facet applies to hidden generic constraint-method
+functions and deferred invocations. A concrete blocking constraint method
+reconstructs its exact hidden operation function, the generic caller, and only
+their reverse consumers. A deferred blocking call is captured immediately,
+stored as a typed async defer entry, and awaited in LIFO order before function
+exit; recovery authority remains invocation-local across the await. Neither
+case may introduce an alternate generic body, call graph, erased defer stack,
+or unconditional async tax.
+
+Exit requires the complete Milestone 3H differential, mutation, staticness,
+artifact, scaling, runtime-cost, deadlock, panic, and synchronous-byte-stability
+evidence under the selected race-free cooperative profile. A pure select with
+a default must remain synchronous and scheduler-free; only a select without a
+default may select the blocking operation, unless operand evaluation
+independently requires cooperation.
+
 ## 4. Environment And Completion
 
 Add deterministic module output, minimal runtime modules, selected-`GOROOT`

@@ -72,6 +72,14 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimeInterfaceEqual, 1002, api.RuntimeModuleInterface, "runtime/interface.ts", "goInterfaceEqual", false, []api.RuntimeSymbol{api.RuntimeInterfaceValue}},
 		{api.RuntimeErrorMethodToken, 1003, api.RuntimeModuleInterfaceValue, "runtime/interface-value.ts", "GoErrorMethodToken", false, nil},
 		{api.RuntimeRuntimeErrorToken, 1004, api.RuntimeModuleInterfaceValue, "runtime/interface-value.ts", "GoRuntimeErrorMethodToken", false, nil},
+		{api.RuntimeChannel, 1100, api.RuntimeModuleChannel, "runtime/channel.ts", "GoChannel", true, []api.RuntimeSymbol{api.RuntimeReceiveChannel, api.RuntimeSendChannel, api.RuntimeSelectCase, api.RuntimePanic}},
+		{api.RuntimeReceiveChannel, 1101, api.RuntimeModuleChannel, "runtime/channel.ts", "GoReceiveChannel", true, []api.RuntimeSymbol{api.RuntimeSelectCase}},
+		{api.RuntimeSendChannel, 1102, api.RuntimeModuleChannel, "runtime/channel.ts", "GoSendChannel", true, []api.RuntimeSymbol{api.RuntimeSelectCase}},
+		{api.RuntimeSelectCase, 1103, api.RuntimeModuleChannel, "runtime/channel.ts", "GoSelectCase", true, nil},
+		{api.RuntimeSelect, 1104, api.RuntimeModuleChannel, "runtime/channel.ts", "goSelect", false, []api.RuntimeSymbol{api.RuntimeSelectReady, api.RuntimeSelectAttempt}},
+		{api.RuntimeScheduler, 1105, api.RuntimeModuleChannel, "runtime/channel.ts", "GoScheduler", true, []api.RuntimeSymbol{api.RuntimePanic}},
+		{api.RuntimeSelectReady, 1106, api.RuntimeModuleChannel, "runtime/channel.ts", "goSelectReady", false, []api.RuntimeSymbol{api.RuntimeSelectAttempt}},
+		{api.RuntimeSelectAttempt, 1107, api.RuntimeModuleChannel, "runtime/channel.ts", "goSelectAttempt", false, []api.RuntimeSymbol{api.RuntimeSelectCase}},
 	}
 	for _, test := range tests {
 		if uint16(test.symbol) != test.id {

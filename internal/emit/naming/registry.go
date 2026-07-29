@@ -61,6 +61,11 @@ type genericCapabilityBinding struct {
 	name  string
 }
 
+type callableABIBinding struct {
+	owner *api.GeneratedArtifact
+	name  string
+}
+
 type Target struct {
 	Name       string
 	SourcePath string
@@ -86,6 +91,8 @@ type Registry struct {
 	interfaceDynamicNames    map[string]string
 	genericCapabilities      map[string]genericCapabilityBinding
 	genericCapabilityNames   map[string]string
+	callableABIs             map[string]callableABIBinding
+	callableABINames         map[string]string
 }
 
 func NewRegistry() *Registry {
@@ -109,6 +116,8 @@ func NewRegistry() *Registry {
 		interfaceDynamicNames:    make(map[string]string),
 		genericCapabilities:      make(map[string]genericCapabilityBinding),
 		genericCapabilityNames:   make(map[string]string),
+		callableABIs:             make(map[string]callableABIBinding),
+		callableABINames:         make(map[string]string),
 	}
 }
 
@@ -162,6 +171,9 @@ func (r *Registry) GeneratedArtifact(
 	case api.GeneratedArtifactGenericCapability:
 		binding, ok := r.genericCapabilities[artifactKey]
 		return binding.owner, ok && binding.owner != nil
+	case api.GeneratedArtifactCallableABI:
+		binding, ok := r.callableABIs[artifactKey]
+		return binding.owner, ok && binding.owner != nil
 	default:
 		return nil, false
 	}
@@ -201,6 +213,10 @@ func (r *Registry) GeneratedArtifacts(
 		}
 	case api.GeneratedArtifactGenericCapability:
 		for _, binding := range r.genericCapabilities {
+			artifacts = append(artifacts, binding.owner)
+		}
+	case api.GeneratedArtifactCallableABI:
+		for _, binding := range r.callableABIs {
 			artifacts = append(artifacts, binding.owner)
 		}
 	}

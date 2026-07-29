@@ -64,6 +64,9 @@ const (
 	TemporaryGotoTarget
 	TemporaryGotoState
 	TemporaryGotoDispatch
+	TemporaryChannelOperand
+	TemporaryChannelResult
+	TemporarySelectCase
 )
 
 type NameReference struct {
@@ -204,6 +207,7 @@ type Names interface {
 		GenericOperationSelection,
 		*types.Signature,
 	) (NameReference, error)
+	CallableABI(*types.Signature) (CallableABIReference, error)
 	ConstantProjection(*types.Const, types.BasicKind) (NameReference, error)
 	Member(*types.Var) (string, error)
 	Primitive(PrimitiveAlias) (NameReference, error)
@@ -304,6 +308,12 @@ func TemporaryPrefix(kind TemporaryKind) (string, error) {
 		return "__gotots_goto_state_", nil
 	case TemporaryGotoDispatch:
 		return "__gotots_goto_dispatch_", nil
+	case TemporaryChannelOperand:
+		return "__gotots_channel_", nil
+	case TemporaryChannelResult:
+		return "__gotots_receive_", nil
+	case TemporarySelectCase:
+		return "__gotots_select_", nil
 	default:
 		return "", &NameError{
 			Reason: fmt.Sprintf("temporary kind %d is invalid", kind),

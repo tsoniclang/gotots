@@ -109,6 +109,7 @@ type waveFourArtifacts struct {
 	paths        []string
 	sourceModule string
 	bytes        int
+	nodes        int
 	largest      int
 	sizes        []artifactSize
 	printed      string
@@ -117,6 +118,7 @@ type waveFourArtifacts struct {
 type artifactSize struct {
 	path  string
 	bytes int
+	nodes int
 }
 
 func materializeArtifacts(
@@ -140,9 +142,11 @@ func materializeArtifacts(
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := tsgo.EncodeSourceFile(file.SourceFile()); err != nil {
+		encoded, err := tsgo.EncodeSourceFile(file.SourceFile())
+		if err != nil {
 			t.Fatal(err)
 		}
+		nodes := waveFourEncodedNodes(t, encoded)
 		for _, forbidden := range []string{
 			": any",
 			": unknown",
@@ -169,10 +173,12 @@ func materializeArtifacts(
 		writeProgramFile(t, targetPath, printed)
 		result.paths = append(result.paths, targetPath)
 		result.bytes += len(printed)
+		result.nodes += nodes
 		result.printed += "\n// " + file.OutputPath() + "\n" + printed
 		result.sizes = append(result.sizes, artifactSize{
 			path:  file.OutputPath(),
 			bytes: len(printed),
+			nodes: nodes,
 		})
 		if file.Kind() == emit.TargetFileSource {
 			result.sourceModule = "./" +

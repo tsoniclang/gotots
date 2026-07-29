@@ -16,6 +16,7 @@ const (
 	GeneratedArtifactInterfaceMethodToken
 	GeneratedArtifactInterfaceDynamicTypeToken
 	GeneratedArtifactGenericCapability
+	GeneratedArtifactCallableABI
 )
 
 func (k GeneratedArtifactKind) Valid() bool {
@@ -25,7 +26,8 @@ func (k GeneratedArtifactKind) Valid() bool {
 		k == GeneratedArtifactAnonymousInterface ||
 		k == GeneratedArtifactInterfaceMethodToken ||
 		k == GeneratedArtifactInterfaceDynamicTypeToken ||
-		k == GeneratedArtifactGenericCapability
+		k == GeneratedArtifactGenericCapability ||
+		k == GeneratedArtifactCallableABI
 }
 
 type GeneratedArtifactPlacement uint8
@@ -34,11 +36,13 @@ const (
 	GeneratedArtifactPlacementInvalid GeneratedArtifactPlacement = iota
 	GeneratedArtifactPlacementCompilation
 	GeneratedArtifactPlacementLexical
+	GeneratedArtifactPlacementContract
 )
 
 func (p GeneratedArtifactPlacement) Valid() bool {
 	return p == GeneratedArtifactPlacementCompilation ||
-		p == GeneratedArtifactPlacementLexical
+		p == GeneratedArtifactPlacementLexical ||
+		p == GeneratedArtifactPlacementContract
 }
 
 type GeneratedArtifact struct {
@@ -61,6 +65,7 @@ func NewCompilationGeneratedArtifact(
 	outputPath string,
 ) (*GeneratedArtifact, error) {
 	if kind == GeneratedArtifactGenericCapability ||
+		kind == GeneratedArtifactCallableABI ||
 		!validGeneratedArtifactType(kind, sourceType) ||
 		artifact == "" ||
 		targetName == "" ||
@@ -79,6 +84,29 @@ func NewCompilationGeneratedArtifact(
 	}, nil
 }
 
+func NewContractGeneratedArtifact(
+	kind GeneratedArtifactKind,
+	sourceType types.Type,
+	artifact string,
+	targetName string,
+) (*GeneratedArtifact, error) {
+	if kind != GeneratedArtifactCallableABI ||
+		!validGeneratedArtifactType(kind, sourceType) ||
+		artifact == "" ||
+		targetName == "" {
+		return nil, &RootRequestError{
+			Reason: "contract generated artifact is invalid",
+		}
+	}
+	return &GeneratedArtifact{
+		kind:       kind,
+		sourceType: sourceType,
+		artifact:   artifact,
+		targetName: targetName,
+		placement:  GeneratedArtifactPlacementContract,
+	}, nil
+}
+
 func NewLexicalGeneratedArtifact(
 	kind GeneratedArtifactKind,
 	sourceType types.Type,
@@ -91,6 +119,7 @@ func NewLexicalGeneratedArtifact(
 	_, sourceOwned := lexicalOwner.Source()
 	_, _, initializerOwned := lexicalOwner.PackageInitializer()
 	if kind == GeneratedArtifactGenericCapability ||
+		kind == GeneratedArtifactCallableABI ||
 		!validGeneratedArtifactType(kind, sourceType) ||
 		artifact == "" ||
 		targetName == "" ||
@@ -251,6 +280,14 @@ func (o *GeneratedArtifact) GenericCapability() (
 	return signature, o.generic, ok && o.generic.Valid()
 }
 
+func (o *GeneratedArtifact) CallableABI() (*types.Signature, bool) {
+	if o == nil || o.kind != GeneratedArtifactCallableABI {
+		return nil, false
+	}
+	signature, ok := types.Unalias(o.sourceType).(*types.Signature)
+	return signature, ok && signature.Recv() == nil
+}
+
 func (o *GeneratedArtifact) ArtifactKey() string {
 	if o == nil {
 		return ""
@@ -328,6 +365,11 @@ func (o *GeneratedArtifact) Valid() bool {
 			o.anchor.Pkg() == sourcePackage &&
 			o.anchor.Parent() != nil &&
 			o.anchor.Parent() != o.anchor.Pkg().Scope()
+	case GeneratedArtifactPlacementContract:
+		return o.kind == GeneratedArtifactCallableABI &&
+			o.outputPath == "" &&
+			!o.lexicalOwner.Valid() &&
+			o.anchor == nil
 	default:
 		return false
 	}
@@ -360,6 +402,9 @@ func validGeneratedArtifactType(
 	case GeneratedArtifactGenericCapability:
 		source, ok := types.Unalias(sourceType).(*types.Signature)
 		return ok && validGenericOperationSignature(source)
+	case GeneratedArtifactCallableABI:
+		source, ok := types.Unalias(sourceType).(*types.Signature)
+		return ok && source.Recv() == nil
 	default:
 		return false
 	}

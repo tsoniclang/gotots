@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	channelruntime "github.com/tsoniclang/gotots/internal/emit/runtime/channel"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -222,5 +223,63 @@ func TestMapRuntimeRejectsDuplicateOwners(t *testing.T) {
 		definitions[0].Symbol() != api.RuntimeMap ||
 		definitions[1].Symbol() != api.RuntimeMapValue {
 		t.Fatalf("map definitions = %#v", definitions)
+	}
+}
+
+func TestPanicRuntimeCreationStaysOnTheCanonicalCarrier(t *testing.T) {
+	definitions, err := Build(
+		tsgo.NewFactory(),
+		api.RuntimeModulePanic,
+		[]api.RuntimeSymbol{api.RuntimePanic},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(definitions) != 1 {
+		t.Fatalf("panic definitions = %d, want 1", len(definitions))
+	}
+	carrier := definitions[0].Statement().(tsgo.ClassDeclaration)
+	constructor := carrier.Members()[0].(tsgo.ConstructorDeclaration)
+	create := carrier.Members()[1].(tsgo.MethodDeclaration)
+	if constructor.Modifiers()[0].Kind() != tsgo.SyntaxKindPrivateKeyword ||
+		create.Name().(tsgo.Identifier).Text() != "createRuntime" {
+		t.Fatal("runtime panic creation escaped the canonical panic carrier")
+	}
+}
+
+func TestSchedulerRoutesOnlyThroughItsSemanticOwner(t *testing.T) {
+	factory := tsgo.NewFactory()
+	if _, err := channelruntime.Build(
+		factory,
+		api.RuntimeScheduler,
+		"GoChannel",
+		"GoReceiveChannel",
+		"GoSendChannel",
+		"GoSelectCase",
+		"goSelect",
+		"goSelectReady",
+		"goSelectAttempt",
+		"GoPanic",
+	); err == nil {
+		t.Fatal("channel owner accepted RuntimeScheduler")
+	}
+	definitions, err := Build(
+		factory,
+		api.RuntimeModuleChannel,
+		[]api.RuntimeSymbol{api.RuntimeScheduler},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(definitions) != 1 ||
+		definitions[0].Symbol() != api.RuntimeScheduler {
+		t.Fatalf("scheduler definitions = %#v", definitions)
+	}
+	class, ok := definitions[0].Statement().(tsgo.ClassDeclaration)
+	if !ok || class.Name().Text() != "GoScheduler" {
+		t.Fatalf(
+			"scheduler semantic owner produced %T",
+			definitions[0].Statement(),
+		)
 	}
 }

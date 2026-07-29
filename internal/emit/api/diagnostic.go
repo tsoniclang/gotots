@@ -103,6 +103,14 @@ const (
 	RoleMapValue              Role = "map-value"
 	RoleMapSize               Role = "map-size"
 	RoleMapReceiver           Role = "map-receiver"
+	RoleChannelElementType    Role = "channel-element-type"
+	RoleChannelElement        Role = "channel-element"
+	RoleChannelCapacity       Role = "channel-capacity"
+	RoleChannelOperand        Role = "channel-operand"
+	RoleGoroutineCall         Role = "goroutine-call"
+	RoleSelectClause          Role = "select-clause"
+	RoleSelectBody            Role = "select-body"
+	RoleSelectReceiveTarget   Role = "select-receive-target"
 	RoleRangeExpression       Role = "range-expression"
 	RoleRangeKey              Role = "range-key"
 	RoleRangeValue            Role = "range-value"
@@ -132,11 +140,15 @@ func (e *UnsupportedError) Error() string {
 }
 
 func Unsupported(context Context, category Category, source ast.Node) *UnsupportedError {
+	var position token.Position
+	if source != nil {
+		position = context.FileSet().Position(source.Pos())
+	}
 	return &UnsupportedError{
 		Category:  category,
 		Construct: fmt.Sprintf("%T", source),
 		Role:      context.Role(),
-		Position:  context.FileSet().Position(source.Pos()),
+		Position:  position,
 	}
 }
 

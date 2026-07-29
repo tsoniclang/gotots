@@ -297,6 +297,7 @@ func (s *programSession) verifyRootObligations(
 
 type IntegerRepresentation = api.IntegerRepresentation
 type EvaluationOrder = api.EvaluationOrder
+type ConcurrencySemantics = api.ConcurrencySemantics
 
 const (
 	IntegerRepresentationInvalid = api.IntegerRepresentationInvalid
@@ -306,17 +307,23 @@ const (
 	EvaluationOrderInvalid    = api.EvaluationOrderInvalid
 	EvaluationOrderDirect     = api.EvaluationOrderDirect
 	EvaluationOrderPreserveGo = api.EvaluationOrderPreserveGo
+
+	ConcurrencySemanticsDisabled    = api.ConcurrencySemanticsDisabled
+	ConcurrencySemanticsCooperative = api.ConcurrencySemanticsCooperative
+	ConcurrencySemanticsInvalid     = api.ConcurrencySemanticsInvalid
 )
 
 type Options struct {
 	IntegerRepresentation IntegerRepresentation
 	EvaluationOrder       EvaluationOrder
+	ConcurrencySemantics  ConcurrencySemantics
 }
 
 func DefaultOptions() Options {
 	return Options{
 		IntegerRepresentation: IntegerRepresentationNumber,
 		EvaluationOrder:       EvaluationOrderDirect,
+		ConcurrencySemantics:  ConcurrencySemanticsDisabled,
 	}
 }
 
@@ -348,6 +355,20 @@ func ParseEvaluationOrder(value string) (EvaluationOrder, error) {
 	}
 }
 
+func ParseConcurrencySemantics(value string) (ConcurrencySemantics, error) {
+	switch value {
+	case ConcurrencySemanticsDisabled.String():
+		return ConcurrencySemanticsDisabled, nil
+	case ConcurrencySemanticsCooperative.String():
+		return ConcurrencySemanticsCooperative, nil
+	default:
+		return ConcurrencySemanticsInvalid, &OptionsError{
+			Field:  "concurrency semantics",
+			Reason: fmt.Sprintf("%q is not disabled or cooperative", value),
+		}
+	}
+}
+
 func (o Options) validate() error {
 	if !o.IntegerRepresentation.Valid() {
 		return &OptionsError{
@@ -358,6 +379,12 @@ func (o Options) validate() error {
 	if !o.EvaluationOrder.Valid() {
 		return &OptionsError{
 			Field:  "evaluation order",
+			Reason: "value is invalid",
+		}
+	}
+	if !o.ConcurrencySemantics.Valid() {
+		return &OptionsError{
+			Field:  "concurrency semantics",
 			Reason: "value is invalid",
 		}
 	}

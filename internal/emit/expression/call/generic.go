@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -15,6 +16,7 @@ func emitGeneric(
 	children api.ChildEmitter,
 	source *ast.CallExpr,
 	discarded bool,
+	detached bool,
 ) (api.ExpressionEmission, bool, error) {
 	owner, instance, ok := genericFunctionInstance(
 		context,
@@ -76,7 +78,7 @@ func emitGeneric(
 		children,
 		source,
 		signature,
-		false,
+		detached,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
@@ -98,6 +100,24 @@ func emitGeneric(
 			argumentRequests,
 		),
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	if detached {
+		result, err = cooperativecall.DetachedSourceCall(
+			context,
+			source,
+			owner,
+			result,
+		)
+	} else {
+		result, err = cooperativecall.SourceCall(
+			context,
+			source,
+			owner,
+			result,
+		)
+	}
 	return result, true, err
 }
 

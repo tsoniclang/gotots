@@ -215,7 +215,8 @@ func (r DeclarationRequirement) GeneratedArtifact() (
 		DeclarationRequirementAnonymousInterface,
 		DeclarationRequirementInterfaceMethodToken,
 		DeclarationRequirementInterfaceDynamicTypeToken,
-		DeclarationRequirementGenericCapability:
+		DeclarationRequirementGenericCapability,
+		DeclarationRequirementCallableABI:
 		return r.generated, true
 	default:
 		return nil, false
@@ -319,6 +320,8 @@ const (
 	DeclarationRequirementInterfaceDynamicTypeToken DeclarationRequirementKind = 11
 	DeclarationRequirementGenericCapability         DeclarationRequirementKind = 12
 	DeclarationRequirementCallableControl           DeclarationRequirementKind = 13
+	DeclarationRequirementCooperativeCallable       DeclarationRequirementKind = 14
+	DeclarationRequirementCallableABI               DeclarationRequirementKind = 15
 )
 
 func (k DeclarationRequirementKind) Valid() bool {
@@ -334,7 +337,9 @@ func (k DeclarationRequirementKind) Valid() bool {
 		k == DeclarationRequirementInterfaceMethodToken ||
 		k == DeclarationRequirementInterfaceDynamicTypeToken ||
 		k == DeclarationRequirementGenericCapability ||
-		k == DeclarationRequirementCallableControl
+		k == DeclarationRequirementCallableControl ||
+		k == DeclarationRequirementCooperativeCallable ||
+		k == DeclarationRequirementCallableABI
 }
 
 type CallableControlFacet uint8

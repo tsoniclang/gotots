@@ -316,6 +316,13 @@ func NewGeneratedArtifactDependencyRequest(
 	return newArtifactDependencyRequest(owner, facet)
 }
 
+func NewOwnedArtifactDependencyRequest(
+	provider ArtifactOwner,
+	facet ArtifactFacet,
+) (RootRequest, error) {
+	return newArtifactDependencyRequest(provider, facet)
+}
+
 func newArtifactDependencyRequest(
 	provider ArtifactOwner,
 	facet ArtifactFacet,
@@ -421,8 +428,10 @@ func (r RootRequest) LegalScope() PlacementScope {
 	if r.owner.kind == RootRequestDeclarationRequirement {
 		if artifact, ok := r.owner.declarationRequirement.
 			GeneratedArtifact(); ok &&
-			artifact.Placement() ==
-				GeneratedArtifactPlacementCompilation {
+			(artifact.Placement() ==
+				GeneratedArtifactPlacementCompilation ||
+				artifact.Placement() ==
+					GeneratedArtifactPlacementContract) {
 			return ScopeCompilationSupport
 		}
 		return ScopeOwningFile

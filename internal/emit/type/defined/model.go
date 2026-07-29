@@ -35,6 +35,7 @@ const (
 	FamilyPointer
 	FamilyCallable
 	FamilyMap
+	FamilyChannel
 )
 
 func Resolve(sourceType types.Type) (Model, bool) {
@@ -64,6 +65,8 @@ func Resolve(sourceType types.Type) (Model, bool) {
 		family = FamilyCallable
 	case *types.Map:
 		family = FamilyMap
+	case *types.Chan:
+		family = FamilyChannel
 	default:
 		return Model{}, false
 	}
@@ -105,6 +108,11 @@ func ResolveMap(sourceType types.Type) (Model, bool) {
 	return model, ok && model.family == FamilyMap
 }
 
+func ResolveChannel(sourceType types.Type) (Model, bool) {
+	model, ok := Resolve(sourceType)
+	return model, ok && model.family == FamilyChannel
+}
+
 func (m Model) Type() *types.Named {
 	return m.named
 }
@@ -125,7 +133,8 @@ func (m Model) NilCapable() bool {
 	return m.family == FamilySlice ||
 		m.family == FamilyPointer ||
 		m.family == FamilyCallable ||
-		m.family == FamilyMap
+		m.family == FamilyMap ||
+		m.family == FamilyChannel
 }
 
 func (m Model) Basic() (*types.Basic, bool) {
@@ -158,6 +167,11 @@ func (m Model) Map() (*types.Map, bool) {
 	return mapType, ok && m.family == FamilyMap
 }
 
+func (m Model) Channel() (*types.Chan, bool) {
+	channel, ok := m.underlying.(*types.Chan)
+	return channel, ok && m.family == FamilyChannel
+}
+
 func (m Model) Unwrap(
 	factory tsgo.Factory,
 	value tsgo.Expression,
@@ -175,7 +189,7 @@ func (m Model) Project(
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
 	switch m.family {
-	case FamilySlice, FamilyPointer:
+	case FamilySlice, FamilyPointer, FamilyChannel:
 		reference, err := context.Names().Reference(m.typeName)
 		if err != nil {
 			return api.ExpressionEmission{}, err
@@ -241,7 +255,7 @@ func (m Model) Wrap(
 		return api.ExpressionEmission{}, err
 	}
 	switch m.family {
-	case FamilySlice, FamilyPointer:
+	case FamilySlice, FamilyPointer, FamilyChannel:
 		return api.NewExpressionEmission(
 			value.Before(),
 			context.Factory().CallExpression(

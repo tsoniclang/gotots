@@ -189,6 +189,12 @@ func (s *programSession) scheduleDeclarationRequirement(
 			Reason: "declaration requirement owner is invalid",
 		}
 	}
+	if generated, generatedOwned := owner.Generated(); generatedOwned &&
+		generated.Kind() == api.GeneratedArtifactCallableABI {
+		if err := s.ensureCallableABIBaseline(generated); err != nil {
+			return err
+		}
+	}
 	s.requirements.enqueue(requirement)
 	return nil
 }
@@ -211,10 +217,14 @@ func (s *programSession) applyDeclarationRequirements(
 	if generatedOwner, ok := owner.Generated(); ok {
 		for _, requirement := range requirements {
 			selectedOwner, generated := requirement.GeneratedArtifact()
+			facet, cooperative := requirement.CooperativeCallable()
+			cooperativeABI, abiFacet := facet.ABI()
 			if !requirement.Valid() ||
-				!generated ||
-				selectedOwner != generatedOwner ||
-				requirement.Owner() != owner {
+				requirement.Owner() != owner ||
+				(!generated && !cooperative) ||
+				(generated && selectedOwner != generatedOwner) ||
+				(cooperative &&
+					(!abiFacet || cooperativeABI != generatedOwner)) {
 				return &ScheduleError{
 					Object: owner.Name(),
 					Reason: "generated-artifact requirement batch has mixed or invalid ownership",
@@ -414,8 +424,10 @@ func (s *programSession) consumeArtifactRequests(
 			if generatedProvider {
 				generatedProvider =
 					s.validateGeneratedArtifact(generated) == nil &&
-						generated.Placement() ==
-							api.GeneratedArtifactPlacementCompilation
+						(generated.Placement() ==
+							api.GeneratedArtifactPlacementCompilation ||
+							generated.Placement() ==
+								api.GeneratedArtifactPlacementContract)
 			}
 			if !sourceProvider && !generatedProvider {
 				return nil, nil, &ScheduleError{
@@ -505,6 +517,9 @@ func (s *programSession) reconstructScheduledArtifact(
 	source, ok := owner.Source()
 	if !ok {
 		return &ScheduleError{Reason: "dirty target artifact owner is invalid"}
+	}
+	if variable, ok := source.(*types.Var); ok {
+		return s.reconstructPackageStorage(owner, variable)
 	}
 	return s.reconstructArtifact(source)
 }

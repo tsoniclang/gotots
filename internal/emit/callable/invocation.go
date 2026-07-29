@@ -81,3 +81,45 @@ func NilGuard(
 		nil,
 	), reference.Requests(), nil
 }
+
+func DetachedNilGuard(
+	context api.Context,
+	callee tsgo.Expression,
+	nonNil tsgo.Expression,
+) (tsgo.Expression, []api.RootRequest, error) {
+	reference, err := context.Names().Runtime(
+		api.RuntimePanic,
+		api.ImportPhaseValue,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	condition := context.Factory().BinaryExpression(
+		nil,
+		callee,
+		nil,
+		context.Factory().BinaryOperatorToken(
+			tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+		),
+		context.Factory().VoidExpression(
+			context.Factory().NumericLiteral("0", tsgo.TokenFlagsNone),
+		),
+	)
+	raise := panicruntime.Call(
+		context.Factory(),
+		reference.Name(),
+		context.Factory().StringLiteral(
+			"call of nil function",
+			tsgo.TokenFlagsNone,
+		),
+	)
+	return context.Factory().ParenthesizedExpression(
+		context.Factory().ConditionalExpression(
+			condition,
+			context.Factory().QuestionToken(),
+			raise,
+			context.Factory().ColonToken(),
+			nonNil,
+		),
+	), reference.Requests(), nil
+}

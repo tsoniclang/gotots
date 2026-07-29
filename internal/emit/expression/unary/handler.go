@@ -7,6 +7,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	constantvalue "github.com/tsoniclang/gotots/internal/emit/constant"
+	channelreceive "github.com/tsoniclang/gotots/internal/emit/expression/channelreceive"
 	definedunary "github.com/tsoniclang/gotots/internal/emit/expression/unary/defined"
 	unaryoperation "github.com/tsoniclang/gotots/internal/emit/expression/unary/operation"
 	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
@@ -20,6 +21,9 @@ func Emit(
 ) (api.ExpressionEmission, error) {
 	if source.Op == token.AND {
 		return children.Address(context, source)
+	}
+	if source.Op == token.ARROW {
+		return channelreceive.Emit(context, children, source)
 	}
 	if target, handled, err := constantvalue.EmitFolded(
 		context,

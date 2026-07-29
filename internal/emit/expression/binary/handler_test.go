@@ -47,6 +47,7 @@ func TestParentOperatorOwnerDoesNotCreateAnIntegerFallback(t *testing.T) {
 				storage.Owner{},
 				api.IntegerRepresentationNumber,
 				api.EvaluationOrderDirect,
+				api.ConcurrencySemanticsDisabled,
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -73,6 +74,7 @@ func TestLogicalRightPrerequisitesStayInsideTheSelectedBranch(t *testing.T) {
 		storage.Owner{},
 		api.IntegerRepresentationNumber,
 		api.EvaluationOrderDirect,
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -189,6 +191,12 @@ func (unusedNames) GenericCapability(
 	api.GenericOperationSelection,
 	*types.Signature,
 ) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) CallableABI(
+	*types.Signature,
+) (api.CallableABIReference, error) {
 	panic("unused")
 }
 

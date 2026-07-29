@@ -6,10 +6,11 @@ import (
 )
 
 const (
-	RaiseName        = "raise"
-	RaiseRuntimeName = "raiseRuntime"
-	TakeName         = "take"
-	RecoveredName    = "recovered"
+	RaiseName         = "raise"
+	RaiseRuntimeName  = "raiseRuntime"
+	CreateRuntimeName = "createRuntime"
+	TakeName          = "take"
+	RecoveredName     = "recovered"
 )
 
 func Build(
@@ -54,6 +55,14 @@ func CallValue(
 	value tsgo.Expression,
 ) tsgo.CallExpression {
 	return staticCall(factory, className, RaiseName, value)
+}
+
+func CreateRuntime(
+	factory tsgo.Factory,
+	className string,
+	message tsgo.Expression,
+) tsgo.CallExpression {
+	return staticCall(factory, className, CreateRuntimeName, message)
 }
 
 func Rethrow(
@@ -111,9 +120,54 @@ func panicCarrier(
 				nil,
 				factory.Block(nil, true),
 			),
+			createRuntime(factory, className, runtimeValueName),
 			raiseValue(factory, className, valueType),
 			raiseRuntime(factory, className, runtimeValueName),
 		},
+	)
+}
+
+func createRuntime(
+	factory tsgo.Factory,
+	className string,
+	runtimeValueName string,
+) tsgo.MethodDeclaration {
+	return factory.MethodDeclaration(
+		[]tsgo.ModifierLike{factory.StaticKeyword()},
+		nil,
+		factory.Identifier(CreateRuntimeName),
+		nil,
+		nil,
+		[]tsgo.ParameterDeclaration{
+			parameter(
+				factory,
+				"message",
+				factory.KeywordTypeNode(
+					tsgo.KeywordTypeSyntaxKindStringKeyword,
+				),
+			),
+		},
+		factory.TypeReferenceNode(factory.Identifier(className), nil),
+		factory.Block(
+			[]tsgo.Statement{
+				factory.ReturnStatement(
+					factory.NewExpression(
+						factory.Identifier(className),
+						nil,
+						[]tsgo.Expression{
+							factory.NewExpression(
+								factory.Identifier(runtimeValueName),
+								nil,
+								[]tsgo.Expression{
+									factory.Identifier("message"),
+								},
+							),
+						},
+					),
+				),
+			},
+			true,
+		),
 	)
 }
 

@@ -141,7 +141,8 @@ artifacts reach a fixed point.
   operation.
 - **compilation profile:** the immutable compilation-wide selection of every
   semantic tradeoff axis. The initial axes are integer representation
-  (`number` or `bigint`) and evaluation order (`direct` or `preserve-go`).
+  (`number` or `bigint`), evaluation order (`direct` or `preserve-go`), and
+  concurrency semantics (`disabled` or explicitly selected `cooperative`).
   Generated files in one compilation cannot mix selections.
 - **manual obligation:** an exact generated declaration whose implementation
   must be supplied manually.

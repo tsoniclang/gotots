@@ -21,6 +21,82 @@ func runtimeContract(
 	}
 }
 
+func concurrencyRuntimeContract(
+	symbol RuntimeSymbol,
+) (RuntimeSymbolContract, error) {
+	switch symbol {
+	case RuntimeChannel:
+		return runtimeContract(
+			RuntimeModuleChannel,
+			"runtime/channel.ts",
+			"GoChannel",
+			true,
+			RuntimeReceiveChannel,
+			RuntimeSendChannel,
+			RuntimeSelectCase,
+			RuntimePanic,
+		), nil
+	case RuntimeReceiveChannel:
+		return runtimeContract(
+			RuntimeModuleChannel,
+			"runtime/channel.ts",
+			"GoReceiveChannel",
+			true,
+			RuntimeSelectCase,
+		), nil
+	case RuntimeSendChannel:
+		return runtimeContract(
+			RuntimeModuleChannel,
+			"runtime/channel.ts",
+			"GoSendChannel",
+			true,
+			RuntimeSelectCase,
+		), nil
+	case RuntimeSelectCase:
+		return runtimeContract(
+			RuntimeModuleChannel,
+			"runtime/channel.ts",
+			"GoSelectCase",
+			true,
+		), nil
+	case RuntimeSelect:
+		return runtimeContract(
+			RuntimeModuleChannel,
+			"runtime/channel.ts",
+			"goSelect",
+			false,
+			RuntimeSelectReady,
+			RuntimeSelectAttempt,
+		), nil
+	case RuntimeScheduler:
+		return runtimeContract(
+			RuntimeModuleChannel,
+			"runtime/channel.ts",
+			"GoScheduler",
+			true,
+			RuntimePanic,
+		), nil
+	case RuntimeSelectReady:
+		return runtimeContract(
+			RuntimeModuleChannel,
+			"runtime/channel.ts",
+			"goSelectReady",
+			false,
+			RuntimeSelectAttempt,
+		), nil
+	case RuntimeSelectAttempt:
+		return runtimeContract(
+			RuntimeModuleChannel,
+			"runtime/channel.ts",
+			"goSelectAttempt",
+			false,
+			RuntimeSelectCase,
+		), nil
+	default:
+		return RuntimeSymbolContract{}, &RuntimeSymbolError{Symbol: symbol}
+	}
+}
+
 func (c RuntimeSymbolContract) Module() RuntimeModule {
 	return c.module
 }

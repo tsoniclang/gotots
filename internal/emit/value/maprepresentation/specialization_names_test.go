@@ -106,6 +106,12 @@ func (staticSpecializationNames) GenericCapability(
 	panic("unused")
 }
 
+func (staticSpecializationNames) CallableABI(
+	*types.Signature,
+) (api.CallableABIReference, error) {
+	panic("unused")
+}
+
 func (staticSpecializationNames) ConstantProjection(
 	*types.Const,
 	types.BasicKind,

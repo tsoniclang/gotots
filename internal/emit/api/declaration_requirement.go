@@ -31,6 +31,7 @@ type DeclarationRequirement struct {
 	control          CallableControlFacet
 	controlLabel     *types.Label
 	controlPosition  token.Pos
+	callableFacet    CallableFacet
 }
 
 func NewNamedStructOperationRequirement(
@@ -216,6 +217,10 @@ func (r DeclarationRequirement) Valid() bool {
 		r.genericOperation != nil {
 		return false
 	}
+	if r.kind != DeclarationRequirementCooperativeCallable &&
+		!r.callableFacet.empty() {
+		return false
+	}
 	switch r.kind {
 	case DeclarationRequirementNamedStructOperation:
 		if !r.operation.Valid() ||
@@ -366,6 +371,12 @@ func (r DeclarationRequirement) Valid() bool {
 				r.controlPosition <= r.callable.End()
 		}
 		return r.controlLabel == nil && !r.controlPosition.IsValid()
+	case DeclarationRequirementCooperativeCallable:
+		return r.validCooperativeCallable()
+	case DeclarationRequirementCallableABI:
+		return r.validGeneratedDefinition(
+			GeneratedArtifactCallableABI,
+		)
 	default:
 		return false
 	}

@@ -5,6 +5,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	interfacecontract "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue/contract"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -180,6 +181,15 @@ func emitMethod(
 	if err != nil {
 		return nil, nil, err
 	}
+	providerCooperative, contractCooperative, contractRequests, err :=
+		cooperativecall.SourceValueContract(
+			context,
+			method,
+			signature,
+		)
+	if err != nil {
+		return nil, nil, err
+	}
 	root := api.DirectExpression(
 		context.Factory().PropertyAccessExpression(
 			context.Factory().ThisExpression(),
@@ -239,19 +249,31 @@ func emitMethod(
 	if err != nil {
 		return nil, nil, err
 	}
+	var modifiers []tsgo.ModifierLike
+	resultType := target.Result()
+	if contractCooperative {
+		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
+		resultType = callable.PromiseResult(context.Factory(), resultType)
+	}
+	if providerCooperative && !contractCooperative {
+		return nil, nil, &api.GeneratedArtifactShapeError{
+			Reason: "cooperative adapter provider has a synchronous contract",
+		}
+	}
 	return context.Factory().MethodDeclaration(
-			nil,
+			modifiers,
 			nil,
 			context.Factory().Identifier(memberName),
 			nil,
 			nil,
 			target.Parameters(),
-			target.Result(),
+			resultType,
 			context.Factory().Block(body, true),
 		), api.CombineRequests(
 			target.Requests(),
 			receiver.Requests(),
 			reference.Requests(),
 			[]api.RootRequest{controlRequest},
+			contractRequests,
 		), nil
 }

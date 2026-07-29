@@ -5,12 +5,13 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
 )
 
 func Emit(
 	context api.Context,
-	_ api.ChildEmitter,
+	children api.ChildEmitter,
 	source *ast.Ident,
 ) (api.ExpressionEmission, error) {
 	object := context.TypesInfo().Uses[source]
@@ -72,10 +73,20 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return api.DirectExpression(
+	target := api.DirectExpression(
 		context.Factory().Identifier(reference.Name()),
 		reference.Requests()...,
-	), nil
+	)
+	if function, ok := object.(*types.Func); ok {
+		return cooperativecall.AdaptSourceValue(
+			context,
+			children,
+			source,
+			function,
+			target,
+		)
+	}
+	return target, nil
 }
 
 // emitPredeclaredBoolean projects the predeclared true/false constant through

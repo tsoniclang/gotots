@@ -128,7 +128,9 @@ func TestDeclarationRequirementKindIDsArePinned(t *testing.T) {
 		DeclarationRequirementInterfaceDynamicTypeToken != 11 ||
 		DeclarationRequirementGenericCapability != 12 ||
 		DeclarationRequirementCallableControl != 13 ||
-		DeclarationRequirementKind(14).Valid() {
+		DeclarationRequirementCooperativeCallable != 14 ||
+		DeclarationRequirementCallableABI != 15 ||
+		DeclarationRequirementKind(16).Valid() {
 		t.Fatal("declaration requirement kind IDs drifted")
 	}
 }

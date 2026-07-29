@@ -17,6 +17,7 @@ const (
 	RuntimeModuleInterface
 	RuntimeModuleInterfaceValue
 	RuntimeModulePanicNil
+	RuntimeModuleChannel
 )
 
 type RuntimeSymbol uint16
@@ -85,6 +86,14 @@ const (
 	RuntimeErrorType            RuntimeSymbol = 1008
 	RuntimeErrorContract        RuntimeSymbol = 1009
 	RuntimeErrorGuard           RuntimeSymbol = 1010
+	RuntimeChannel              RuntimeSymbol = 1100
+	RuntimeReceiveChannel       RuntimeSymbol = 1101
+	RuntimeSendChannel          RuntimeSymbol = 1102
+	RuntimeSelectCase           RuntimeSymbol = 1103
+	RuntimeSelect               RuntimeSymbol = 1104
+	RuntimeScheduler            RuntimeSymbol = 1105
+	RuntimeSelectReady          RuntimeSymbol = 1106
+	RuntimeSelectAttempt        RuntimeSymbol = 1107
 )
 
 type RuntimeSymbolContract struct {
@@ -566,7 +575,7 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			RuntimeErrorContract,
 		), nil
 	default:
-		return RuntimeSymbolContract{}, &RuntimeSymbolError{Symbol: symbol}
+		return concurrencyRuntimeContract(symbol)
 	}
 }
 

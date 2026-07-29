@@ -290,14 +290,16 @@ func TestGeneratedArtifactDomainsArePinned(t *testing.T) {
 		GeneratedArtifactInterfaceMethodToken != 5 ||
 		GeneratedArtifactInterfaceDynamicTypeToken != 6 ||
 		GeneratedArtifactGenericCapability != 7 ||
+		GeneratedArtifactCallableABI != 8 ||
 		GeneratedArtifactInvalid.Valid() ||
-		GeneratedArtifactKind(8).Valid() {
+		GeneratedArtifactKind(9).Valid() {
 		t.Fatal("generated-artifact kind IDs drifted")
 	}
 	if GeneratedArtifactPlacementCompilation != 1 ||
 		GeneratedArtifactPlacementLexical != 2 ||
+		GeneratedArtifactPlacementContract != 3 ||
 		GeneratedArtifactPlacementInvalid.Valid() ||
-		GeneratedArtifactPlacement(3).Valid() {
+		GeneratedArtifactPlacement(4).Valid() {
 		t.Fatal("generated-artifact placement IDs drifted")
 	}
 	if AnonymousStructDemandDefinition != 1 ||
@@ -316,6 +318,50 @@ func TestGeneratedArtifactDomainsArePinned(t *testing.T) {
 		MapSpecializationDemandInvalid.Valid() ||
 		MapSpecializationDemand(3).Valid() {
 		t.Fatal("map-specialization demand IDs drifted")
+	}
+}
+
+func TestCallableABIIsContractOnlyCompilationSupport(t *testing.T) {
+	signature := types.NewSignatureType(
+		nil,
+		nil,
+		nil,
+		types.NewTuple(types.NewVar(
+			token.NoPos,
+			nil,
+			"value",
+			types.Typ[types.Int],
+		)),
+		types.NewTuple(),
+		false,
+	)
+	artifact, err := NewContractGeneratedArtifact(
+		GeneratedArtifactCallableABI,
+		signature,
+		"callable-signature",
+		"$goCallable_signature",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request, err := NewCallableABIRequest(artifact)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !artifact.Valid() ||
+		artifact.Placement() != GeneratedArtifactPlacementContract ||
+		artifact.OutputPath() != "" ||
+		request.LegalScope() != ScopeCompilationSupport {
+		t.Fatalf("contract-only callable ABI = %#v / %#v", artifact, request)
+	}
+	if _, err := NewCompilationGeneratedArtifact(
+		GeneratedArtifactCallableABI,
+		signature,
+		"callable-signature",
+		"$goCallable_signature",
+		"support/callable.ts",
+	); err == nil {
+		t.Fatal("callable ABI accepted a materialized support file")
 	}
 }
 

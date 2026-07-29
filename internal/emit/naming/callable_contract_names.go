@@ -10,7 +10,10 @@ import (
 	"github.com/tsoniclang/gotots/internal/output"
 )
 
-const genericCapabilityTargetNameHexLength = 20
+const (
+	genericCapabilityTargetNameHexLength = 20
+	callableABITargetNameHexLength       = 20
+)
 
 func (n *File) GenericCapability(
 	selection api.GenericOperationSelection,
@@ -153,4 +156,105 @@ func newGenericCapabilityArtifact(
 		name,
 		outputPath,
 	)
+}
+
+func (n *File) CallableABI(
+	signature *types.Signature,
+) (api.CallableABIReference, error) {
+	if signature == nil || signature.Recv() != nil {
+		return api.CallableABIReference{}, &api.NameError{
+			Reason: "callable ABI signature is invalid",
+		}
+	}
+	signatureKey, err := typeidentity.BuildParameterizedKey(
+		signature,
+		n.generatedNamedObjectIdentity,
+		func(parameter *types.TypeParam) (string, error) {
+			if parameter == nil || parameter.Obj() == nil {
+				return "", &api.NameError{
+					Reason: "callable ABI has an unbound type parameter",
+				}
+			}
+			return n.generatedNamedObjectIdentity(parameter.Obj())
+		},
+	)
+	if err != nil {
+		return api.CallableABIReference{}, err
+	}
+	digest := sha256.Sum256([]byte("callable-abi|" + signatureKey))
+	artifactKey := hex.EncodeToString(digest[:])
+	binding, err := n.owner.registry.internCallableABI(
+		artifactKey,
+		signature,
+	)
+	if err != nil {
+		return api.CallableABIReference{}, err
+	}
+	definition, err := api.NewCallableABIRequest(binding.owner)
+	if err != nil {
+		return api.CallableABIReference{}, err
+	}
+	requests := []api.RootRequest{definition}
+	owner := api.MustGeneratedArtifactOwner(binding.owner)
+	if n.artifactOwner.Valid() && n.artifactOwner != owner {
+		dependency, dependencyErr :=
+			api.NewGeneratedArtifactDependencyRequest(
+				binding.owner,
+				api.ArtifactFacetCallableSignature,
+			)
+		if dependencyErr != nil {
+			return api.CallableABIReference{}, dependencyErr
+		}
+		requests = append(requests, dependency)
+	}
+	return api.NewCallableABIReference(
+		binding.owner,
+		requests...,
+	)
+}
+
+func (r *Registry) internCallableABI(
+	artifactKey string,
+	signature *types.Signature,
+) (callableABIBinding, error) {
+	if r == nil ||
+		len(artifactKey) != sha256.Size*2 ||
+		signature == nil ||
+		signature.Recv() != nil {
+		return callableABIBinding{}, &api.NameError{
+			Reason: "callable ABI canonicalization input is invalid",
+		}
+	}
+	if existing, ok := r.callableABIs[artifactKey]; ok {
+		existingSignature, valid := existing.owner.CallableABI()
+		if !valid || !types.Identical(existingSignature, signature) {
+			return callableABIBinding{}, &api.NameError{
+				Name:   existing.name,
+				Reason: "callable ABI key joined non-identical signatures",
+			}
+		}
+		return existing, nil
+	}
+	name := "$goCallable_" +
+		artifactKey[len(artifactKey)-callableABITargetNameHexLength:]
+	if err := reserveGeneratedName(
+		r.callableABINames,
+		name,
+		artifactKey,
+		"callable ABI",
+	); err != nil {
+		return callableABIBinding{}, err
+	}
+	owner, err := api.NewContractGeneratedArtifact(
+		api.GeneratedArtifactCallableABI,
+		signature,
+		artifactKey,
+		name,
+	)
+	if err != nil {
+		return callableABIBinding{}, err
+	}
+	binding := callableABIBinding{owner: owner, name: name}
+	r.callableABIs[artifactKey] = binding
+	return binding, nil
 }
