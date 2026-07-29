@@ -15,6 +15,14 @@ per AST type. Category dispatchers route one requested node and never recurse.
 The selected handler explicitly emits meaningful direct children in Go
 evaluation order and supplies each child's role.
 
+Package clauses, import syntax, comments, semicolon insertion, and punctuation
+are parent- or loader-owned source structure, not independent target
+constructs. Ordinary comments—including `//go:generate`, which does not affect
+compilation—produce no target node. Build selection remains owned by the
+selected Go loader. A compiler directive with an emitted semantic effect must
+be handled by its named language or environment owner before publication; it
+must not be inferred from comment spelling by an unrelated handler.
+
 ## Closed Child Contracts
 
 Production translation does not use the conventional automatic visitor
@@ -1917,10 +1925,12 @@ JavaScript bitwise operators and normalizes at the selected width. The
 `bigint` profile uses `BigInt.asIntN`/`asUintN` and never emits unsigned
 BigInt `>>>`. Generic shift capabilities delegate this same integer owner.
 
-BigInt division and remainder are the bounded exception to direct operators.
-JavaScript BigInt has the required truncation behavior, but division by zero
-throws a host exception. The integer-expression owner therefore requests one
-of two constant-size runtime operations:
+Integer division and remainder are the bounded exception to direct operators.
+JavaScript BigInt already truncates toward zero, while JavaScript `number`
+division does not; both host carriers also throw or produce a host value rather
+than the selected Go panic on division by zero. The integer-expression owner
+therefore requests one of two profile-specific, constant-size runtime
+operations:
 
 ```go
 quotient := left / right
@@ -1932,10 +1942,13 @@ const quotient = goIntegerDivide(left, right);
 const remainder = goIntegerRemainder(left, right);
 ```
 
-Each helper checks `right === 0n`, enters the shared `GoPanic.raise` ABI, and
-otherwise performs exactly one `/` or `%`. The default `number` profile keeps
-integer division and remainder unsupported because direct JavaScript number
-division does not implement Go integer truncation.
+BigInt helpers check `right === 0n`, enter the shared
+`GoPanic.raiseRuntime` ABI, and otherwise perform exactly one `/` or `%`.
+Number helpers check `right === 0`, enter the same panic ABI, then use
+`Math.trunc(left / right)` or direct `left % right`, and normalize a `-0`
+result to integer zero. Expressions and compound assignments request the same
+runtime symbols; no per-site overflow framework or alternate assignment path
+exists.
 
 The `number` profile prints ordinary numeric literals such as `1`; the
 `bigint` profile prints `1n`. Contextual parameter, result, field, and
@@ -2399,11 +2412,21 @@ routing then binds that declaration to the reusable `gostdlib/fmt` contract.
 The call itself is emitted like any other typed call; no source spelling
 special-case exists.
 
-For unavailable behavior, output contains an exact declaration and a throwing
-placeholder at the declaration/body owner. Reachable placeholders block
-publication. Manual completion replaces bodies or declarations through
-structural typed TS-Go protocol ownership, never textual patches or per-file
-ownership.
+The language stage does not guess an implementation for a bodyless source
+function. Its callable owner records the exact selected `*types.Func`,
+`*types.Signature`, source role, and position in a typed unresolved-obligation
+diagnostic. The environment stage later converts that identity into an exact
+declaration and throwing placeholder or a selected provider implementation.
+Reachable placeholders block publication. Manual completion replaces bodies
+or declarations through structural typed TS-Go protocol ownership, never
+textual patches or per-file ownership.
+
+The predeclared `print` and `println` functions are implementation-defined by
+Go. Their call owner selects them only by exact `*types.Builtin` identity and
+returns a typed environment-boundary diagnostic in ordinary and deferred call
+contexts. The language stage does not silently map them to `console`, stdout,
+or stderr. A later selected environment contract may install one behavior and
+its differential proof.
 
 ## Failure
 

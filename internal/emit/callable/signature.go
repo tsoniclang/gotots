@@ -456,8 +456,6 @@ func validateFields(
 	index := 0
 	for _, field := range fields.List {
 		if field == nil ||
-			field.Doc != nil ||
-			field.Comment != nil ||
 			field.Tag != nil ||
 			field.Type == nil {
 			return api.Unsupported(context, api.CategoryType, field)

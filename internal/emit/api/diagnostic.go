@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"go/types"
 )
 
 type Category string
@@ -149,6 +150,100 @@ func Unsupported(context Context, category Category, source ast.Node) *Unsupport
 		Construct: fmt.Sprintf("%T", source),
 		Role:      context.Role(),
 		Position:  position,
+	}
+}
+
+type BuiltinBoundaryError struct {
+	Builtin  *types.Builtin
+	Role     Role
+	Position token.Position
+	Reason   string
+}
+
+func (e *BuiltinBoundaryError) Error() string {
+	name := "<unknown>"
+	if e.Builtin != nil {
+		name = e.Builtin.Name()
+	}
+	location := e.Position.String()
+	if !e.Position.IsValid() {
+		location = "<unknown>"
+	}
+	return fmt.Sprintf(
+		"selected Go built-in %s is a boundary in role %s at %s: %s",
+		name,
+		e.Role,
+		location,
+		e.Reason,
+	)
+}
+
+func BuiltinBoundary(
+	context Context,
+	source ast.Node,
+	builtin *types.Builtin,
+	reason string,
+) error {
+	if builtin == nil || reason == "" {
+		return &InvariantError{
+			Role:   context.Role(),
+			Reason: "built-in boundary lacks exact identity or reason",
+		}
+	}
+	var position token.Position
+	if source != nil {
+		position = context.FileSet().Position(source.Pos())
+	}
+	return &BuiltinBoundaryError{
+		Builtin:  builtin,
+		Role:     context.Role(),
+		Position: position,
+		Reason:   reason,
+	}
+}
+
+type ExternalFunctionObligationError struct {
+	Function  *types.Func
+	Signature *types.Signature
+	Role      Role
+	Position  token.Position
+}
+
+func (e *ExternalFunctionObligationError) Error() string {
+	name := "<unknown>"
+	if e.Function != nil {
+		name = e.Function.FullName()
+	}
+	location := e.Position.String()
+	if !e.Position.IsValid() {
+		location = "<unknown>"
+	}
+	return fmt.Sprintf(
+		"unresolved external Go function obligation %s in role %s at %s",
+		name,
+		e.Role,
+		location,
+	)
+}
+
+func ExternalFunctionObligation(
+	context Context,
+	source *ast.FuncDecl,
+	function *types.Func,
+	signature *types.Signature,
+) error {
+	if source == nil || function == nil || signature == nil ||
+		function.Type() != signature {
+		return &InvariantError{
+			Role:   context.Role(),
+			Reason: "external function obligation lacks coherent identity",
+		}
+	}
+	return &ExternalFunctionObligationError{
+		Function:  function,
+		Signature: signature,
+		Role:      context.Role(),
+		Position:  context.FileSet().Position(source.Pos()),
 	}
 }
 

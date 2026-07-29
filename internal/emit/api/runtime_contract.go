@@ -5,6 +5,26 @@ import (
 	"slices"
 )
 
+type RuntimeModule uint8
+
+const (
+	RuntimeModuleInvalid RuntimeModule = iota
+	RuntimeModuleString
+	RuntimeModulePointer
+	RuntimeModuleArray
+	RuntimeModuleSlice
+	RuntimeModuleMap
+	RuntimeModulePanic
+	RuntimeModuleInteger
+	RuntimeModuleFloat
+	RuntimeModuleComplex
+	RuntimeModuleConversion
+	RuntimeModuleInterface
+	RuntimeModuleInterfaceValue
+	RuntimeModulePanicNil
+	RuntimeModuleChannel
+)
+
 func runtimeContract(
 	module RuntimeModule,
 	outputPath string,

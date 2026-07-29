@@ -153,10 +153,8 @@ func SupportsArithmetic(
 		return false
 	}
 	switch operator {
-	case token.ADD, token.SUB, token.MUL:
+	case token.ADD, token.SUB, token.MUL, token.QUO, token.REM:
 		return true
-	case token.QUO, token.REM:
-		return representation == api.IntegerRepresentationBigInt
 	default:
 		return false
 	}

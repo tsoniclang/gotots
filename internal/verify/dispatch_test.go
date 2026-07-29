@@ -35,9 +35,9 @@ func TestSelectedToolchainASTUniverseHasTotalTypedDispatch(t *testing.T) {
 	}
 	wantCounts := map[nodeCategory]int{
 		categoryDeclaration: 3,
-		categoryExpression:  23,
-		categoryParentOwned: 10,
-		categoryStatement:   21,
+		categoryExpression:  15,
+		categoryParentOwned: 20,
+		categoryStatement:   19,
 	}
 	for category, expected := range wantCounts {
 		if counts[category] != expected {
@@ -60,7 +60,7 @@ func TestSelectedToolchainASTUniverseHasTotalTypedDispatch(t *testing.T) {
 	}{
 		"go/ast": {
 			actual:   astContract,
-			expected: "e6b7c7c1534cbbe58eed5c8589be26f0c6bafdeb8b2e18e1a1206fe441f903e5",
+			expected: "3bc8fb3e649a7c8f059ae19d60c68471503f52b6adaf9325fd1cff529987f7e7",
 		},
 		"go/token": {
 			actual:   tokenContract,
@@ -89,22 +89,60 @@ func TestSelectedToolchainASTUniverseHasTotalTypedDispatch(t *testing.T) {
 		categoryStatement:   "Statement",
 	} {
 		cases := dispatchCases(t, dispatchPath, functionName)
-		for _, name := range cases {
-			if actual, exists := universe[name]; !exists || actual.category != category {
-				t.Errorf(
-					"%s dispatches %s, selected go/ast category is %s",
-					functionName,
-					name,
-					actual.category,
-				)
-			}
-		}
-		for _, bad := range []string{"BadDecl", "BadExpr", "BadStmt"} {
-			if contains(cases, bad) {
-				t.Errorf("%s handles parser recovery form %s", functionName, bad)
-			}
+		if err := verifyDispatchTotality(universe, category, cases); err != nil {
+			t.Errorf("%s: %v", functionName, err)
 		}
 	}
+}
+
+func verifyDispatchTotality(
+	universe map[string]selectedASTForm,
+	category nodeCategory,
+	cases []string,
+) error {
+	expected := make(map[string]struct{})
+	for name, form := range universe {
+		if form.category == category &&
+			name != "BadDecl" &&
+			name != "BadExpr" &&
+			name != "BadStmt" {
+			expected[name] = struct{}{}
+		}
+	}
+	actual := make(map[string]struct{}, len(cases))
+	var wrong []string
+	for _, name := range cases {
+		form, exists := universe[name]
+		if !exists || form.category != category {
+			wrong = append(wrong, name)
+			continue
+		}
+		actual[name] = struct{}{}
+	}
+	var missing []string
+	var extra []string
+	for name := range expected {
+		if _, exists := actual[name]; !exists {
+			missing = append(missing, name)
+		}
+	}
+	for name := range actual {
+		if _, exists := expected[name]; !exists {
+			extra = append(extra, name)
+		}
+	}
+	sort.Strings(wrong)
+	sort.Strings(missing)
+	sort.Strings(extra)
+	if len(wrong) != 0 || len(missing) != 0 || len(extra) != 0 {
+		return fmt.Errorf(
+			"selected dispatch mismatch: wrong=%v missing=%v extra=%v",
+			wrong,
+			missing,
+			extra,
+		)
+	}
+	return nil
 }
 
 func selectedTokenContract(t *testing.T) []string {
@@ -187,12 +225,33 @@ func selectedASTUniverse(t *testing.T) map[string]selectedASTForm {
 		case types.Implements(pointer, statement):
 			category = categoryStatement
 		}
+		if contextOwnedASTForm(name) {
+			category = categoryParentOwned
+		}
 		result[name] = selectedASTForm{
 			category: category,
 			shape:    types.TypeString(named.Underlying(), packagePath),
 		}
 	}
 	return result
+}
+
+func contextOwnedASTForm(name string) bool {
+	switch name {
+	case "ArrayType",
+		"CaseClause",
+		"ChanType",
+		"CommClause",
+		"Ellipsis",
+		"FuncType",
+		"InterfaceType",
+		"KeyValueExpr",
+		"MapType",
+		"StructType":
+		return true
+	default:
+		return false
+	}
 }
 
 func packagePath(sourcePackage *types.Package) string {
@@ -462,13 +521,32 @@ func dispatch(source ast.Expr) {
 			}
 		})
 	}
-}
 
-func contains(values []string, expected string) bool {
-	for _, value := range values {
-		if value == expected {
-			return true
+	t.Run("missing selected arm", func(t *testing.T) {
+		universe := map[string]selectedASTForm{
+			"BinaryExpr": {category: categoryExpression},
+			"Ident":      {category: categoryExpression},
 		}
-	}
-	return false
+		if err := verifyDispatchTotality(
+			universe,
+			categoryExpression,
+			[]string{"Ident"},
+		); err == nil {
+			t.Fatal("missing selected dispatch arm passed its owning gate")
+		}
+	})
+
+	t.Run("widened neighboring category", func(t *testing.T) {
+		universe := map[string]selectedASTForm{
+			"Ident":      {category: categoryExpression},
+			"ReturnStmt": {category: categoryStatement},
+		}
+		if err := verifyDispatchTotality(
+			universe,
+			categoryExpression,
+			[]string{"Ident", "ReturnStmt"},
+		); err == nil {
+			t.Fatal("widened neighboring dispatch arm passed its owning gate")
+		}
+	})
 }

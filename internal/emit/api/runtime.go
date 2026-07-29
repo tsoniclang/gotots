@@ -1,25 +1,5 @@
 package api
 
-type RuntimeModule uint8
-
-const (
-	RuntimeModuleInvalid RuntimeModule = iota
-	RuntimeModuleString
-	RuntimeModulePointer
-	RuntimeModuleArray
-	RuntimeModuleSlice
-	RuntimeModuleMap
-	RuntimeModulePanic
-	RuntimeModuleInteger
-	RuntimeModuleFloat
-	RuntimeModuleComplex
-	RuntimeModuleConversion
-	RuntimeModuleInterface
-	RuntimeModuleInterfaceValue
-	RuntimeModulePanicNil
-	RuntimeModuleChannel
-)
-
 type RuntimeSymbol uint16
 
 const (
@@ -58,6 +38,8 @@ const (
 	RuntimeIntegerRemainder     RuntimeSymbol = 601
 	RuntimeIntegerMax           RuntimeSymbol = 602
 	RuntimeIntegerMin           RuntimeSymbol = 603
+	RuntimeNumberIntDivide      RuntimeSymbol = 604
+	RuntimeNumberIntRemainder   RuntimeSymbol = 605
 	RuntimeFloat32Round         RuntimeSymbol = 700
 	RuntimeComplex64            RuntimeSymbol = 800
 	RuntimeComplex128           RuntimeSymbol = 801
@@ -383,6 +365,22 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"runtime/integer.ts",
 			"goIntegerMin",
 			false,
+		), nil
+	case RuntimeNumberIntDivide:
+		return runtimeContract(
+			RuntimeModuleInteger,
+			"runtime/integer.ts",
+			"goNumberIntegerDivide",
+			false,
+			RuntimePanic,
+		), nil
+	case RuntimeNumberIntRemainder:
+		return runtimeContract(
+			RuntimeModuleInteger,
+			"runtime/integer.ts",
+			"goNumberIntegerRemainder",
+			false,
+			RuntimePanic,
 		), nil
 	case RuntimeFloat32Round:
 		return runtimeContract(

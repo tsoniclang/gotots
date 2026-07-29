@@ -17,10 +17,9 @@ func Emit(
 	source *ast.FuncDecl,
 	requirements []api.DeclarationRequirement,
 ) (api.DeclarationEmission, error) {
-	if source.Doc != nil ||
-		source.Type == nil ||
+	if source.Type == nil ||
 		source.Type.Params == nil ||
-		source.Body == nil {
+		source.Name == nil {
 		return api.DeclarationEmission{},
 			api.Unsupported(context, api.CategoryDeclaration, source)
 	}
@@ -36,6 +35,15 @@ func Emit(
 		(source.Recv == nil) != (signature.Recv() == nil) {
 		return api.DeclarationEmission{},
 			api.Unsupported(context, api.CategoryDeclaration, source)
+	}
+	if source.Body == nil {
+		return api.DeclarationEmission{},
+			api.ExternalFunctionObligation(
+				context,
+				source,
+				functionObject,
+				signature,
+			)
 	}
 	context, err := applyAddressableStorage(
 		context,

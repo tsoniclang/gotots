@@ -34,6 +34,10 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	if err := selectedEnvironmentBoundary(context, source, builtin); err != nil {
+		return api.ExpressionEmission{},
+			err
+	}
 	if target, handled, err := emitGenericMeasure(
 		context,
 		children,
@@ -198,6 +202,9 @@ func EmitDeferred(
 	if source == nil || builtin == nil {
 		return api.ExpressionEmission{}, false, nil
 	}
+	if err := selectedEnvironmentBoundary(context, source, builtin); err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
 	if target, handled, err := panicbuiltin.EmitDeferred(
 		context,
 		children,
@@ -227,6 +234,23 @@ func EmitDeferred(
 		return target, true, err
 	}
 	return api.ExpressionEmission{}, false, nil
+}
+
+func selectedEnvironmentBoundary(
+	context api.Context,
+	source *ast.CallExpr,
+	builtin *types.Builtin,
+) error {
+	if types.Object(builtin) != types.Universe.Lookup("print") &&
+		types.Object(builtin) != types.Universe.Lookup("println") {
+		return nil
+	}
+	return api.BuiltinBoundary(
+		context,
+		source,
+		builtin,
+		"implementation-defined output belongs to the selected environment contract",
+	)
 }
 
 func emitConstantMeasure(

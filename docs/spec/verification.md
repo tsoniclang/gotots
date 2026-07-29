@@ -1054,6 +1054,38 @@ Queue evidence additionally proves O(1) live-offer cancellation and storage
 bounded by buffered values plus currently blocked operations, not historical
 send/receive/select traffic.
 
+### Milestone 3I Language-Closure Gate
+
+Verification derives the selected toolchain's complete `go/ast`, `go/token`,
+and `types.Universe` domains at test time. It exact-joins every non-recovery
+declaration, expression, and statement form to the one root dispatcher,
+fingerprints upstream shapes and identities, and classifies type syntax,
+clauses, fields, comments, and punctuation as parent/toolchain-owned rather
+than adding duplicate root handlers. Mutations remove a selected arm and add a
+neighboring-category arm; each must fail the exact join.
+
+Valid construct fixtures must contain every selected AST form and every
+semantic operator token. Command-package proof includes alias, dot, and blank
+imports, local scopes, comments, and reached blank-import initialization.
+Every supported predeclared function is selected by exact `*types.Builtin`
+identity and passes TS-Go encode/print plus strict typecheck. `print` and
+`println` must instead return their exact typed environment boundary in both
+ordinary and deferred contexts; changing source spelling while retaining
+checker identity must not change that decision.
+
+Bodyless functions must return an unresolved obligation carrying the exact
+`*types.Func` and `*types.Signature`, not a guessed body. Number-profile `/`,
+`%`, `/=`, and `%=` must share one runtime owner, truncate toward zero, preserve
+remainder sign, and enter the common Go panic ABI on zero; Go-versus-generated
+ESM tests cover positive, negative, expression, compound-update, and panic
+paths, including signed-zero normalization.
+
+The gate reports actual file/byte/encoded-node/largest-artifact values and
+enforces absolute bounds. It broad-searches for production inventories,
+alternate dispatch, raw target text, forbidden dynamic/erased operations, and
+stale unsupported paths. Environment implementations remain outside this
+milestone.
+
 ## Heavy Runs
 
 Heavy tests run one process group at a time with:

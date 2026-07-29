@@ -23,7 +23,7 @@ func Emit(
 	source *ast.DeclStmt,
 ) (api.StatementEmission, error) {
 	declaration, ok := source.Decl.(*ast.GenDecl)
-	if !ok || declaration.Doc != nil || declaration.Tok != token.VAR ||
+	if !ok || declaration.Tok != token.VAR ||
 		len(declaration.Specs) == 0 {
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
@@ -56,8 +56,7 @@ func emitSpec(
 	children api.ChildEmitter,
 	source *ast.ValueSpec,
 ) ([]tsgo.Statement, []api.RootRequest, error) {
-	if source.Doc != nil || source.Comment != nil ||
-		len(source.Names) == 0 ||
+	if len(source.Names) == 0 ||
 		(len(source.Values) == 0 && source.Type == nil) {
 		return nil, nil,
 			api.Unsupported(

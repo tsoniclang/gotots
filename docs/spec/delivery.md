@@ -531,6 +531,28 @@ a default must remain synchronous and scheduler-free; only a select without a
 default may select the blocking operation, unless operand evaluation
 independently requires cooperation.
 
+### 3I. Language Closure
+
+Derive the selected Go toolchain's AST forms, tokens, and predeclared
+identities in verification code and exact-join them to production root
+dispatch. This is not a production inventory. Parent-owned type/clause/field
+forms remain with their semantic owners, parser-recovery forms remain rejected,
+and every semantic operator and predeclared function has one admitted profile
+or typed boundary.
+
+Close package aliases, dot and blank imports, command packages, local scopes,
+ordinary source comments, number-profile integer division/remainder, and the
+selected bodyless-function and implementation-defined built-in boundaries.
+Language closure identifies exact unresolved environment obligations but does
+not install standard-library, external, `print`/`println`, cgo, or `unsafe`
+implementations.
+
+Exit requires exact selected-universe/dispatch joins, valid construct fixtures,
+strict TS-Go-printed ESM artifacts, focused Go-versus-TypeScript differentials,
+missing/widened-dispatch and spelling mutations, zero unknown valid in-scope
+forms, no duplicate owner, and frozen source/generated/typecheck/runtime
+bounds.
+
 ## 4. Environment And Completion
 
 Add deterministic module output, minimal runtime modules, selected-`GOROOT`

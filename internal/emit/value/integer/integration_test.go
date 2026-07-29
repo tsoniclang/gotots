@@ -151,8 +151,6 @@ func TestIntegerUnsupportedNeighborsFailAtTheirExactOwner(t *testing.T) {
 		construct      string
 		category       api.Category
 	}{
-		{"number division", "NumberDivide", emit.IntegerRepresentationNumber, "*ast.BinaryExpr", api.CategoryExpression},
-		{"number remainder", "NumberRemainder", emit.IntegerRepresentationNumber, "*ast.BinaryExpr", api.CategoryExpression},
 		{"number int64 bits", "NumberInt64Bits", emit.IntegerRepresentationNumber, "*ast.BinaryExpr", api.CategoryExpression},
 		{"unsafe number literal", "UnsafeNumber", emit.IntegerRepresentationNumber, "*ast.BasicLit", api.CategoryExpression},
 		{"unsafe number conversion", "UnsafeConversion", emit.IntegerRepresentationNumber, "*ast.CallExpr", api.CategoryExpression},

@@ -26,7 +26,7 @@ func emitReceiver(
 			api.Unsupported(context, api.CategoryDeclaration, source)
 	}
 	field := source.Recv.List[0]
-	if field.Doc != nil || field.Comment != nil || field.Tag != nil {
+	if field.Tag != nil {
 		return nil, nil,
 			api.Unsupported(context, api.CategoryDeclaration, field)
 	}

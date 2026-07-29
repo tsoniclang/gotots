@@ -130,17 +130,24 @@ func runtimeOperation(
 	representation api.IntegerRepresentation,
 	operator token.Token,
 ) (api.RuntimeSymbol, bool) {
-	if representation != api.IntegerRepresentationBigInt {
-		return api.RuntimeInvalid, false
-	}
-	switch operator {
-	case token.QUO:
-		return api.RuntimeIntegerDivide, true
-	case token.REM:
-		return api.RuntimeIntegerRemainder, true
+	switch representation {
+	case api.IntegerRepresentationBigInt:
+		switch operator {
+		case token.QUO:
+			return api.RuntimeIntegerDivide, true
+		case token.REM:
+			return api.RuntimeIntegerRemainder, true
+		}
+	case api.IntegerRepresentationNumber:
+		switch operator {
+		case token.QUO:
+			return api.RuntimeNumberIntDivide, true
+		case token.REM:
+			return api.RuntimeNumberIntRemainder, true
+		}
 	default:
-		return api.RuntimeInvalid, false
 	}
+	return api.RuntimeInvalid, false
 }
 
 func operationTypes(

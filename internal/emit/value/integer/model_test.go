@@ -149,14 +149,15 @@ func TestEveryCarrierBoundaryIsCheckedAgainstItsSelectedProfile(t *testing.T) {
 	}
 }
 
-func TestIntegerCapabilityMatrixRejectsUnprovedNeighbors(t *testing.T) {
+func TestIntegerCapabilityMatrixAdmitsExactOperationsOnly(t *testing.T) {
 	sizes := types.SizesFor("gc", "amd64")
 	int32Carrier, _ := Describe(sizes, types.Typ[types.Int32])
 	int64Carrier, _ := Describe(sizes, types.Typ[types.Int64])
 	uint32Carrier, _ := Describe(sizes, types.Typ[types.Uint32])
 	two := constant.MakeInt64(2)
-	if SupportsArithmetic(api.IntegerRepresentationNumber, token.QUO) {
-		t.Fatal("number division was admitted without exact zero/truncation behavior")
+	if !SupportsArithmetic(api.IntegerRepresentationNumber, token.QUO) ||
+		!SupportsArithmetic(api.IntegerRepresentationNumber, token.REM) {
+		t.Fatal("number integer division or remainder was rejected")
 	}
 	if !SupportsArithmetic(api.IntegerRepresentationBigInt, token.QUO) {
 		t.Fatal("BigInt division was rejected")

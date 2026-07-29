@@ -10,6 +10,14 @@ func NumberRemainder(left, right int32) int32 {
 	return left % right
 }
 
+func NumberCompound(left, right int32) (int32, int32) {
+	quotient := left
+	quotient /= right
+	remainder := left
+	remainder %= right
+	return quotient, remainder
+}
+
 func NumberInt64Bits(left, right int64) int64 {
 	return left & right
 }
