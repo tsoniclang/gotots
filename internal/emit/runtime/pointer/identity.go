@@ -79,6 +79,7 @@ func (b builder) constructor() tsgo.ConstructorDeclaration {
 		b.factory.PrivateKeyword(),
 		b.factory.ReadonlyKeyword(),
 	}
+	readonly := []tsgo.ModifierLike{b.factory.ReadonlyKeyword()}
 	readType := b.factory.FunctionTypeNode(nil, nil, b.typeS())
 	writeType := b.factory.FunctionTypeNode(
 		nil,
@@ -92,9 +93,9 @@ func (b builder) constructor() tsgo.ConstructorDeclaration {
 		nil,
 		[]tsgo.ParameterDeclaration{
 			b.factory.ParameterDeclaration(
-				privateReadonly,
+				readonly,
 				nil,
-				b.id("address"),
+				b.id(AddressName),
 				nil,
 				b.objectType(),
 				nil,

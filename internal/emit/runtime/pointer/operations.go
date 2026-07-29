@@ -1,6 +1,7 @@
 package pointer
 
 import (
+	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -40,9 +41,9 @@ func (b builder) equalMethod() tsgo.MethodDeclaration {
 		),
 	)
 	sameAddress := b.binary(
-		b.property(left, "address"),
+		b.property(left, AddressName),
 		tsgo.BinaryOperatorEqualsEqualsEqualsToken,
-		b.property(right, "address"),
+		b.property(right, AddressName),
 	)
 	return b.method(
 		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
@@ -72,6 +73,57 @@ func (b builder) equalMethod() tsgo.MethodDeclaration {
 					sameAddress,
 				),
 			),
+		),
+	)
+}
+
+func Hash(
+	factory tsgo.Factory,
+	functionName string,
+	pointerName string,
+	mapHashName string,
+) tsgo.FunctionDeclaration {
+	b := builder{factory: factory, className: pointerName}
+	pointerType := b.pointerType(b.typeL(), b.typeS())
+	pointer := b.id("pointer")
+	return factory.FunctionDeclaration(
+		[]tsgo.ModifierLike{factory.ExportKeyword()},
+		nil,
+		factory.Identifier(functionName),
+		[]tsgo.TypeParameterDeclaration{
+			b.typeParameter("L", nil),
+			b.typeParameter("S", nil),
+		},
+		[]tsgo.ParameterDeclaration{
+			b.parameter(
+				"pointer",
+				b.factory.UnionTypeNode(
+					[]tsgo.TypeNode{pointerType, b.undefinedType()},
+				),
+			),
+		},
+		b.numberType(),
+		factory.Block(
+			[]tsgo.Statement{
+				factory.ReturnStatement(
+					factory.ConditionalExpression(
+						b.binary(
+							pointer,
+							tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+							b.undefined(),
+						),
+						factory.QuestionToken(),
+						factory.NumericLiteral("0", tsgo.TokenFlagsNone),
+						factory.ColonToken(),
+						b.call(
+							b.id(mapHashName),
+							mapruntime.HashObjectMember,
+							b.property(pointer, AddressName),
+						),
+					),
+				),
+			},
+			true,
 		),
 	)
 }
@@ -285,7 +337,7 @@ func (b builder) viewMethod() tsgo.MethodDeclaration {
 				b.id(b.className),
 				[]tsgo.TypeNode{to, storage},
 				[]tsgo.Expression{
-					b.property(pointer, "address"),
+					b.property(pointer, AddressName),
 					b.property(pointer, "read"),
 					b.property(pointer, "write"),
 				},

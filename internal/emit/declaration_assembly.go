@@ -322,7 +322,7 @@ func (s *programSession) buildArtifactRevision(
 	defer finish()
 
 	requirements := s.requirements.appliedFor(artifactOwner)
-	context, err := emitnaming.WithLexicalGeneratedArtifacts(
+	context, err := emitnaming.WithLexicalTypeRequirements(
 		builder.context,
 		site.declaration,
 		artifactOwner,

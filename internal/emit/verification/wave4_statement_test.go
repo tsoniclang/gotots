@@ -50,11 +50,18 @@ func TestWaveFourStatementsPrintTypecheckAndMatchGo(t *testing.T) {
 				t.Fatal(err)
 			}
 			workingDirectory := t.TempDir()
-			artifacts := materializeWaveFour(
+			artifacts := materializeArtifacts(
 				t,
 				emission,
 				workingDirectory,
 			)
+			if artifacts.bytes > 65_000 || artifacts.largest > 28_000 {
+				t.Fatalf(
+					"Wave 4 artifact bounds exceeded: total=%d largest=%d",
+					artifacts.bytes,
+					artifacts.largest,
+				)
+			}
 			assertWaveFourArtifactShape(t, artifacts.printed)
 			runner := filepath.Join(workingDirectory, "runner.ts")
 			writeProgramFile(t, runner, `import "./program.js";
@@ -103,10 +110,16 @@ type waveFourArtifacts struct {
 	sourceModule string
 	bytes        int
 	largest      int
+	sizes        []artifactSize
 	printed      string
 }
 
-func materializeWaveFour(
+type artifactSize struct {
+	path  string
+	bytes int
+}
+
+func materializeArtifacts(
 	t *testing.T,
 	emission emit.ProgramEmission,
 	workingDirectory string,
@@ -122,7 +135,6 @@ func materializeWaveFour(
 		}
 	})
 	result := waveFourArtifacts{}
-	var sizes []int
 	for _, file := range emission.Files() {
 		printed, err := client.PrintNode(file.SourceFile(), tsgo.PrintOptions{})
 		if err != nil {
@@ -158,25 +170,26 @@ func materializeWaveFour(
 		result.paths = append(result.paths, targetPath)
 		result.bytes += len(printed)
 		result.printed += "\n// " + file.OutputPath() + "\n" + printed
-		sizes = append(sizes, len(printed))
+		result.sizes = append(result.sizes, artifactSize{
+			path:  file.OutputPath(),
+			bytes: len(printed),
+		})
 		if file.Kind() == emit.TargetFileSource {
 			result.sourceModule = "./" +
 				strings.TrimSuffix(file.OutputPath(), ".ts") +
 				".js"
 		}
 	}
-	if result.sourceModule == "" || len(sizes) == 0 {
+	if result.sourceModule == "" || len(result.sizes) == 0 {
 		t.Fatal("Wave 4 fixture emitted no source module")
 	}
-	sort.Sort(sort.Reverse(sort.IntSlice(sizes)))
-	result.largest = sizes[0]
-	if result.bytes > 65_000 || result.largest > 28_000 {
-		t.Fatalf(
-			"Wave 4 artifact bounds exceeded: total=%d largest=%d",
-			result.bytes,
-			result.largest,
-		)
-	}
+	sort.Slice(result.sizes, func(left, right int) bool {
+		if result.sizes[left].bytes != result.sizes[right].bytes {
+			return result.sizes[left].bytes > result.sizes[right].bytes
+		}
+		return result.sizes[left].path < result.sizes[right].path
+	})
+	result.largest = result.sizes[0].bytes
 	return result
 }
 

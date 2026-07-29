@@ -801,6 +801,67 @@ check, reevaluate a receiver, attach methods to classes, or route generated
 private declarations through a public assembly; each fails its identity,
 differential, strict-type, shape, naming, or scaling owner.
 
+### Milestone 3E Interface Gate
+
+The integrated interface fixture runs under both integer profiles and covers
+named and anonymous interfaces, embedding, exported and package-private
+methods, value and pointer dynamic types, promoted methods, implicit and
+explicit conversions, calls, method values, method expressions, assertions,
+comma-ok, panicking assertions, ordered type switches, equality, and interface
+map keys.
+
+Blocking evidence includes:
+
+1. nil interface and interface-containing-typed-nil remain distinct in emitted
+   AST and differential execution;
+2. concrete boxing copies value payloads once and preserves reference payload
+   identity;
+3. each exact concrete dynamic type has one adapter class regardless of
+   interface count or call count, plus one canonical compilation-scope
+   non-string dynamic-type token;
+4. every adapter payload, method parameter, and result is statically typed,
+   and every native method directly invokes the exact top-level receiver
+   function selected from `go/types`;
+5. exported and package-private method contracts exact-join by semantic
+   identity and receiver-free signature, never source spelling;
+6. interface calls contain one nil guard and one native call, with no
+   implementer-count switch;
+7. concrete assertions use a typed predicate over exact canonical dynamic-type
+   token identity, interface assertions use the target contract's type
+   predicate, and type-switch cases preserve source order and case-variable
+   type;
+8. same-type comparable payloads use their existing equality/hash owner,
+   different dynamic types compare unequal, and non-comparable dynamic values
+   panic only at the Go-required equality or map-key boundary; and
+9. generated method-token, dynamic-type-token, anonymous-interface, and
+   adapter artifacts reconstruct transactionally and expose only the facets
+   their consumers subscribe to; and
+10. the same local Go type boxed by separate invocations asserts equal in
+    dynamic type, compares by its payload owner, and resolves as the same
+    interface map key even though its lexical adapter class declaration
+    executes separately; and
+11. pointer-only fixtures that never hash a pointer contain neither
+    `goPointerHash` nor `GoMapHash`, while an interface-map fixture with a
+    pointer dynamic key exact-joins one optional pointer-hash definition and
+    executes alias-equivalent pointer lookups correctly.
+
+Production mutations collapse typed nil, omit the boxing copy, substitute a
+same-spelling private method from another package, change a method signature,
+drop a method token, enumerate implementers at a call or assertion, read an
+adapter payload before token-predicate narrowing, substitute adapter
+constructor identity for the canonical token, replace the token object with a
+string or truncated hash, reorder type-switch cases, return false instead of
+panicking for equal dynamic uncomparable types, or hash an uncomparable
+payload. Each must fail its owning identity, strict-type, differential,
+mutation, shape, or artifact gate.
+
+A 1x/2x/4x fixture varies implementer count while holding interface call sites
+constant. Call-site printed bytes and TS-Go node counts must remain constant;
+adapter bytes may grow only with the reached concrete method sets. A separate
+method-count fixture proves assertion work grows with the asserted interface
+contract, not with possible implementers. The twenty largest changed target
+declarations and calls are inspected before closure.
+
 ## Heavy Runs
 
 Heavy tests run one process group at a time with:

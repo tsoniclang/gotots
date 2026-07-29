@@ -157,6 +157,34 @@ func (unusedNames) MapSpecialization(
 	panic("unused")
 }
 
+func (unusedNames) InterfaceAdapter(types.Type) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) InterfaceDynamicType(types.Type) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) InterfaceType(types.Type) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) InterfaceContract(
+	types.Type,
+) (api.InterfaceContractReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) InterfaceMethodName(*types.Func) (string, error) {
+	panic("unused")
+}
+
+func (unusedNames) InterfaceMethodToken(
+	*types.Func,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (unusedNames) PackageVariable(
 	*types.Var,
 ) (api.PackageVariableReference, error) {

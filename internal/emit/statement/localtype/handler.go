@@ -8,6 +8,8 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/declaration/definedtype"
+	interfaceadapter "github.com/tsoniclang/gotots/internal/emit/declaration/interfaceadapter"
+	interfacetype "github.com/tsoniclang/gotots/internal/emit/declaration/interfacetype"
 	namedstruct "github.com/tsoniclang/gotots/internal/emit/declaration/namedstruct"
 	maprepresentation "github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -53,13 +55,25 @@ func Emit(
 	var requests []api.RootRequest
 	for _, typeName := range typeNames {
 		requirements := localTypeRequirements(context, typeName)
-		target, handled, err := definedtype.Emit(
+		target, handled, err := interfacetype.Emit(
 			context.WithRole(api.RoleLocalDeclaration),
 			children,
 			declaration,
 			typeName,
 			requirements,
 		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
+		if !handled {
+			target, handled, err = definedtype.Emit(
+				context.WithRole(api.RoleLocalDeclaration),
+				children,
+				declaration,
+				typeName,
+				requirements,
+			)
+		}
 		if err != nil {
 			return api.StatementEmission{}, err
 		}
@@ -89,9 +103,12 @@ func Emit(
 		artifacts := make(
 			map[*api.GeneratedArtifact][]api.DeclarationRequirement,
 		)
-		for _, requirement := range context.LexicalGeneratedArtifacts(typeName) {
+		for _, requirement := range context.LexicalTypeRequirements(typeName) {
 			artifact, ok := requirement.GeneratedArtifact()
-			if !ok || artifact.LexicalAnchor() != typeName {
+			if !ok {
+				continue
+			}
+			if artifact.LexicalAnchor() != typeName {
 				return api.StatementEmission{}, &api.InvariantError{
 					Role:   context.Role(),
 					Reason: "local type received an inconsistent generated-artifact requirement",
@@ -132,7 +149,7 @@ func localTypeRequirements(
 	typeName *types.TypeName,
 ) []api.DeclarationRequirement {
 	var requirements []api.DeclarationRequirement
-	for _, requirement := range context.LexicalGeneratedArtifacts(typeName) {
+	for _, requirement := range context.LexicalTypeRequirements(typeName) {
 		if _, generated := requirement.GeneratedArtifact(); !generated {
 			requirements = append(requirements, requirement)
 		}
@@ -179,12 +196,113 @@ func emitLexicalGeneratedArtifact(
 			artifact,
 			requirements,
 		)
+	case api.GeneratedArtifactInterfaceAdapter:
+		return emitLexicalInterfaceAdapter(
+			context,
+			children,
+			artifact,
+			requirements,
+		)
+	case api.GeneratedArtifactAnonymousInterface:
+		return emitLexicalAnonymousInterface(
+			context,
+			children,
+			source,
+			artifact,
+			requirements,
+		)
 	default:
 		return api.DeclarationEmission{}, &api.InvariantError{
 			Role:   context.Role(),
 			Reason: "lexical generated-artifact kind is invalid",
 		}
 	}
+}
+
+func emitLexicalInterfaceAdapter(
+	context api.Context,
+	children api.ChildEmitter,
+	artifact *api.GeneratedArtifact,
+	requirements []api.DeclarationRequirement,
+) (api.DeclarationEmission, error) {
+	sourceType, ok := artifact.InterfaceAdapterType()
+	if !ok {
+		return api.DeclarationEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "lexical interface adapter has no concrete type",
+		}
+	}
+	if err := exactLexicalInterfaceRequirement(
+		artifact,
+		requirements,
+	); err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	statements, requests, err := interfaceadapter.Build(
+		context.WithRole(api.RoleLocalDeclaration),
+		children,
+		artifact.TargetName(),
+		sourceType,
+		nil,
+	)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	return api.NewDeclarationEmission(statements, requests)
+}
+
+func emitLexicalAnonymousInterface(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	artifact *api.GeneratedArtifact,
+	requirements []api.DeclarationRequirement,
+) (api.DeclarationEmission, error) {
+	interfaceType, ok := artifact.InterfaceType()
+	if !ok {
+		return api.DeclarationEmission{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "lexical anonymous interface has no interface type",
+		}
+	}
+	if err := exactLexicalInterfaceRequirement(
+		artifact,
+		requirements,
+	); err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	statements, requests, err := interfacetype.Build(
+		context.WithRole(api.RoleLocalDeclaration),
+		children,
+		source,
+		artifact.TargetName(),
+		interfaceType,
+		nil,
+	)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	return api.NewDeclarationEmission(statements, requests)
+}
+
+func exactLexicalInterfaceRequirement(
+	artifact *api.GeneratedArtifact,
+	requirements []api.DeclarationRequirement,
+) error {
+	if len(requirements) != 1 {
+		return &api.InvariantError{
+			Role:   api.RoleLocalDeclaration,
+			Reason: "lexical interface artifact requires one exact request",
+		}
+	}
+	selected, ok := requirements[0].GeneratedArtifact()
+	if !ok || selected != artifact {
+		return &api.InvariantError{
+			Role:   api.RoleLocalDeclaration,
+			Reason: "lexical interface artifact received a foreign request",
+		}
+	}
+	return nil
 }
 
 func emitLexicalMapSpecialization(
@@ -212,7 +330,7 @@ func emitLexicalMapSpecialization(
 	keyType, err := children.RepresentedType(
 		context.WithRole(api.RoleMapKey),
 		source,
-		mapType.Key(),
+		maprepresentation.StorageKeyType(mapType.Key()),
 	)
 	if err != nil {
 		return api.DeclarationEmission{}, err

@@ -105,14 +105,14 @@ func TestBuildCreatesOneStaticHashPrimitiveOwner(t *testing.T) {
 		t.Fatal(err)
 	}
 	if class.Name().Text() != contract.ExportedName() ||
-		len(class.Members()) != 5 {
+		len(class.Members()) != 8 {
 		t.Fatalf(
 			"hash owner = %q with %d members",
 			class.Name().Text(),
 			len(class.Members()),
 		)
 	}
-	for _, member := range class.Members() {
+	for _, member := range class.Members()[2:] {
 		method, ok := member.(tsgo.MethodDeclaration)
 		if !ok {
 			t.Fatalf("hash owner member = %T, want static method", member)

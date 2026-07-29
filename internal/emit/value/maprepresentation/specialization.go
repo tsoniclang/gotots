@@ -163,6 +163,7 @@ func specializationOperations(
 	source ast.Node,
 	mapType *types.Map,
 ) (specializationOperationSet, []api.RootRequest, error) {
+	keyType := StorageKeyType(mapType.Key())
 	zero, err := context.Values().Zero(
 		context.WithRole(api.RoleMapValue),
 		source,
@@ -175,7 +176,7 @@ func specializationOperations(
 	hash, err := context.Values().Hash(
 		context.WithRole(api.RoleMapKey),
 		source,
-		mapType.Key(),
+		keyType,
 		key,
 	)
 	if err != nil {
@@ -186,7 +187,7 @@ func specializationOperations(
 	equal, err := context.Values().Equal(
 		context.WithRole(api.RoleMapKey),
 		source,
-		mapType.Key(),
+		keyType,
 		left,
 		right,
 	)
@@ -196,7 +197,7 @@ func specializationOperations(
 	copyKey, err := context.Values().Copy(
 		context.WithRole(api.RoleMapKey),
 		nil,
-		mapType.Key(),
+		keyType,
 		api.DirectExpression(key),
 	)
 	if err != nil {

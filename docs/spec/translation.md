@@ -1218,6 +1218,158 @@ Ordinary concrete method selection remains owner-specific. Representation
 decisions query the authoritative Go type graph directly and create target
 declarations immediately; they are not stored in a later-consumed plan.
 
+### Exact Value Shape
+
+The one interface representation is:
+
+```text
+nil interface        -> undefined
+non-nil interface    -> one immutable adapter instance
+dynamic Go type      -> one canonical non-string token per exact Go type
+dynamic Go value     -> exact statically typed readonly adapter payload
+```
+
+There is one adapter class per reached exact concrete dynamic type, not per
+interface and not per call. A concrete-to-interface conversion copies a Go
+value once before storing it in the adapter. Pointer, slice, map, channel, and
+function payloads retain their Go reference identity. An interface copy shares
+the immutable adapter. A typed nil pointer is therefore a non-nil adapter whose
+payload is the represented nil pointer; it is never collapsed into
+`undefined`.
+
+Adapter constructor identity is not Go dynamic-type identity. A local Go type
+declared inside a function has one compile-time identity but its lexical
+TypeScript adapter class declaration executes once per function invocation.
+Two values boxed by two invocations must still have the same Go dynamic type.
+The target-name owner therefore interns one compilation-scope frozen object
+token by the exact `go/types.Type` identity. Every adapter instance carries
+that token in the readonly `$go$type` member. No string, constructor,
+`Symbol.for`, source spelling, or truncated hash is semantic identity.
+
+Each adapter contains the concrete type's complete `go/types` method set as
+native TypeScript methods. Those methods call the already-owned top-level
+receiver functions directly. The payload, parameter, and result types remain
+exact; no method body uses `any`, `unknown`, a cast, `.call`, `.apply`, or
+`.bind`. Ordinary concrete calls continue to call receiver functions and never
+become virtual.
+
+For example:
+
+```go
+type Reader interface{ Read(int32) int32 }
+type Counter int32
+func (counter Counter) Read(delta int32) int32 { return int32(counter) + delta }
+
+var reader Reader = Counter(4)
+```
+
+has the conceptual target shape:
+
+```ts
+export interface Reader extends GoInterfaceValue {
+    Read(delta: int32): int32;
+}
+
+export const Counter$DynamicType: object = Object.freeze({});
+
+export class Counter$InterfaceAdapter implements GoInterfaceValue {
+    constructor(public readonly $go$value: Counter) {}
+    readonly $go$type: object = Counter$DynamicType;
+
+    static $is(
+        value: GoInterfaceValue | undefined,
+    ): value is Counter$InterfaceAdapter {
+        return value !== undefined &&
+            value.$go$type === Counter$DynamicType;
+    }
+
+    Read(delta: int32): int32 {
+        return Counter_Read(this.$go$value, delta);
+    }
+}
+
+const reader: Reader | undefined =
+    new Counter$InterfaceAdapter(Counter.$copy(new Counter(4)));
+```
+
+The actual declarations are constructed as TS-Go AST and printed by pinned
+TS-Go; this source is explanatory, not a text template.
+
+### Method Contracts And Open-World Assertions
+
+Interface satisfaction is not encoded as an implementer union. One canonical
+generated token object represents one exact Go method contract:
+
+- exported identity is method name plus exact receiver-free signature;
+- unexported identity additionally includes declaring package identity;
+- parameter names do not affect identity;
+- aliases and named types follow `go/types` identity.
+
+Tokens are interned by the deterministic target-name owner and compared only by
+object identity at runtime. They are not strings, source spellings, property
+probes, or hashes used without collision validation.
+
+Each completed interface owns an immutable contract containing its required
+method tokens. Each adapter class owns one module-level `ReadonlySet<object>`
+containing the tokens for its complete concrete method set. The shared runtime
+tests whether every contract token is present in that set. A generated
+interface-specific function exposes the result as a TypeScript type predicate:
+
+```ts
+export function Reader$is(
+    value: GoInterfaceValue,
+): value is Reader {
+    return value.$go$implements(Reader$contract);
+}
+```
+
+This is open-world: a later translated package can emit another statically
+typed adapter using the same method-contract ABI without editing a central
+implementer list. Assertion cost is O(target interface method count), and an
+ordinary interface call is one direct native method call, O(1).
+
+### Calls, Assertions, Equality, And Hashing
+
+The interface-call owner guards `undefined` at the Go call boundary and then
+calls the native member. Forming an interface method value evaluates, guards,
+and captures the adapter exactly once. A method expression takes the interface
+receiver explicitly and performs the guard when invoked.
+
+Concrete assertions call the adapter's statically typed `$is` predicate, which
+compares the canonical dynamic-type token and narrows the payload without a
+cast. Interface assertions call the target interface's typed predicate and
+retain the same adapter. Comma-ok and panicking forms share these primitives.
+Type switches evaluate the source once and test cases in source order; each
+case variable receives the exact Go case type.
+
+Interface equality is:
+
+1. both `undefined`: true;
+2. exactly one `undefined`: false;
+3. different canonical dynamic-type tokens: false;
+4. the same token with a non-comparable dynamic Go type: panic;
+5. otherwise: call that payload type's exact equality owner.
+
+Interface hashing mixes the runtime object-identity hash of the same canonical
+token with the payload hash owner. A non-comparable dynamic type panics when
+used as an interface map key. Adapter classes implement equality and hashing
+without erased payload recovery: the token-backed type predicate narrows the
+other adapter to the exact class before its payload is read.
+
+Pointer payload hashing requests one standalone `goPointerHash` runtime
+definition, which hashes the pointer's readonly canonical address. The base
+`GoPointer` declaration does not depend on map hashing; a program that only
+creates, compares, or dereferences pointers emits neither `goPointerHash` nor
+`GoMapHash`. This demand boundary prevents interface support from enlarging
+ordinary pointer artifacts.
+
+Named interface declarations remain source-owned. Anonymous interface
+contracts, concrete adapters, canonical method tokens, and canonical
+dynamic-type tokens are typed generated artifacts with deterministic
+compilation or lexical placement. They use the existing transactional
+reconstruction graph and observable facets; no side-table representation, text
+patch, or post-seal mutation is introduced.
+
 ## Values, Control Flow, And Implicit Semantics
 
 Handlers preserve within the selected profile:

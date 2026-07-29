@@ -160,12 +160,34 @@ func NewNamedStructOperationRequest(
 	if err != nil {
 		return RootRequest{}, err
 	}
+	return newDeclarationRequirementRequest(requirement), nil
+}
+
+func NewLexicalNamedStructOperationRequest(
+	owner ArtifactOwner,
+	typeName *types.TypeName,
+	operation NamedStructOperation,
+) (RootRequest, error) {
+	requirement, err := NewLexicalNamedStructOperationRequirement(
+		owner,
+		typeName,
+		operation,
+	)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return newDeclarationRequirementRequest(requirement), nil
+}
+
+func newDeclarationRequirementRequest(
+	requirement DeclarationRequirement,
+) RootRequest {
 	return RootRequest{
 		owner: RootRequestOwner{
 			kind:                   RootRequestDeclarationRequirement,
 			declarationRequirement: requirement,
 		},
-	}, nil
+	}
 }
 
 func NewAddressableStorageRequest(
@@ -283,6 +305,49 @@ func NewMapSpecializationRequest(
 	demand MapSpecializationDemand,
 ) (RootRequest, error) {
 	requirement, err := NewMapSpecializationRequirement(artifact, demand)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return RootRequest{
+		owner: RootRequestOwner{
+			kind:                   RootRequestDeclarationRequirement,
+			declarationRequirement: requirement,
+		},
+	}, nil
+}
+
+func NewInterfaceAdapterRequest(
+	artifact *GeneratedArtifact,
+) (RootRequest, error) {
+	requirement, err := NewInterfaceAdapterRequirement(artifact)
+	return generatedDefinitionRequest(requirement, err)
+}
+
+func NewAnonymousInterfaceRequest(
+	artifact *GeneratedArtifact,
+) (RootRequest, error) {
+	requirement, err := NewAnonymousInterfaceRequirement(artifact)
+	return generatedDefinitionRequest(requirement, err)
+}
+
+func NewInterfaceMethodTokenRequest(
+	artifact *GeneratedArtifact,
+) (RootRequest, error) {
+	requirement, err := NewInterfaceMethodTokenRequirement(artifact)
+	return generatedDefinitionRequest(requirement, err)
+}
+
+func NewInterfaceDynamicTypeTokenRequest(
+	artifact *GeneratedArtifact,
+) (RootRequest, error) {
+	requirement, err := NewInterfaceDynamicTypeTokenRequirement(artifact)
+	return generatedDefinitionRequest(requirement, err)
+}
+
+func generatedDefinitionRequest(
+	requirement DeclarationRequirement,
+	err error,
+) (RootRequest, error) {
 	if err != nil {
 		return RootRequest{}, err
 	}

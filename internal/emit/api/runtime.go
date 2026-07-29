@@ -19,6 +19,7 @@ const (
 	RuntimeModuleFloat
 	RuntimeModuleComplex
 	RuntimeModuleConversion
+	RuntimeModuleInterface
 )
 
 type RuntimeSymbol uint16
@@ -32,6 +33,7 @@ const (
 	RuntimeStringEncodeRune  RuntimeSymbol = 5
 	RuntimeStringDecodeRune  RuntimeSymbol = 6
 	RuntimePointer           RuntimeSymbol = 100
+	RuntimePointerHash       RuntimeSymbol = 101
 	RuntimeArray             RuntimeSymbol = 200
 	RuntimeArrayAllocate     RuntimeSymbol = 201
 	RuntimeArrayView         RuntimeSymbol = 202
@@ -70,6 +72,9 @@ const (
 	RuntimeComplex128Neg     RuntimeSymbol = 824
 	RuntimeComplex128Equal   RuntimeSymbol = 825
 	RuntimeNumberToBigInt    RuntimeSymbol = 900
+	RuntimeInterfaceValue    RuntimeSymbol = 1000
+	RuntimeInterfaceNonNil   RuntimeSymbol = 1001
+	RuntimeInterfaceEqual    RuntimeSymbol = 1002
 )
 
 type RuntimeSymbolContract struct {
@@ -133,6 +138,15 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"GoPointer",
 			true,
 			RuntimePanic,
+		), nil
+	case RuntimePointerHash:
+		return runtimeContract(
+			RuntimeModulePointer,
+			"runtime/pointer.ts",
+			"goPointerHash",
+			false,
+			RuntimePointer,
+			RuntimeMapHash,
 		), nil
 	case RuntimeArray:
 		return runtimeContract(
@@ -402,6 +416,30 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"runtime/conversion.ts",
 			"goNumberToBigInt",
 			false,
+		), nil
+	case RuntimeInterfaceValue:
+		return runtimeContract(
+			RuntimeModuleInterface,
+			"runtime/interface.ts",
+			"GoInterfaceValue",
+			true,
+		), nil
+	case RuntimeInterfaceNonNil:
+		return runtimeContract(
+			RuntimeModuleInterface,
+			"runtime/interface.ts",
+			"goInterfaceNonNil",
+			false,
+			RuntimeInterfaceValue,
+			RuntimePanic,
+		), nil
+	case RuntimeInterfaceEqual:
+		return runtimeContract(
+			RuntimeModuleInterface,
+			"runtime/interface.ts",
+			"goInterfaceEqual",
+			false,
+			RuntimeInterfaceValue,
 		), nil
 	default:
 		return RuntimeSymbolContract{}, &RuntimeSymbolError{Symbol: symbol}

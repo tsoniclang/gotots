@@ -7,6 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
+	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -19,6 +20,11 @@ func Emit(
 	if selected == nil || selected.Kind() != types.MethodExpr {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if _, interfaceReceiver := interfacetype.Resolve(
+		selected.Recv(),
+	); interfaceReceiver {
+		return emitInterface(context, children, source, selected)
 	}
 	if method, direct := selectionvalue.DirectMethodExpression(
 		context,
@@ -109,6 +115,84 @@ func Emit(
 			receiver.Requests(),
 			targetSignature.Requests(),
 			reference.Requests(),
+		)...,
+	), nil
+}
+
+func emitInterface(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.SelectorExpr,
+	selected *types.Selection,
+) (api.ExpressionEmission, error) {
+	signature, ok := selected.Type().(*types.Signature)
+	if !ok ||
+		!callable.Supports(signature) ||
+		signature.Params().Len() == 0 ||
+		!types.Identical(
+			signature.Params().At(0).Type(),
+			selected.Recv(),
+		) {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	target, err := callable.EmitAdapter(
+		context,
+		children,
+		source,
+		signature,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	arguments := target.ParameterReferences(context.Factory())
+	method, ok := selected.Obj().(*types.Func)
+	if !ok {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	member, err := context.Names().InterfaceMethodName(method)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	nonNil, err := context.Names().Runtime(
+		api.RuntimeInterfaceNonNil,
+		api.ImportPhaseValue,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	receiver := context.Factory().CallExpression(
+		context.Factory().Identifier(nonNil.Name()),
+		nil,
+		nil,
+		[]tsgo.Expression{arguments[0]},
+		tsgo.NodeFlagsNone,
+	)
+	call := context.Factory().CallExpression(
+		context.Factory().PropertyAccessExpression(
+			receiver,
+			nil,
+			context.Factory().Identifier(member),
+			tsgo.NodeFlagsNone,
+		),
+		nil,
+		nil,
+		arguments[1:],
+		tsgo.NodeFlagsNone,
+	)
+	return api.DirectExpression(
+		context.Factory().ArrowFunction(
+			nil,
+			nil,
+			target.Parameters(),
+			target.Result(),
+			context.Factory().EqualsGreaterThanToken(),
+			call,
+		),
+		api.CombineRequests(
+			target.Requests(),
+			nonNil.Requests(),
 		)...,
 	), nil
 }

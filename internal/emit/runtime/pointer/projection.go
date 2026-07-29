@@ -55,7 +55,7 @@ func (b builder) fieldMethod() tsgo.MethodDeclaration {
 	address := b.call(
 		b.id(b.className),
 		"child",
-		b.property(b.id("parent"), "address"),
+		b.property(b.id("parent"), AddressName),
 		b.id("key"),
 	)
 	return b.method(
@@ -274,7 +274,7 @@ func (b builder) indexMethod() tsgo.MethodDeclaration {
 				b.call(
 					b.id(b.className),
 					"child",
-					b.property(b.id("selected"), "address"),
+					b.property(b.id("selected"), AddressName),
 					b.id("numericIndex"),
 				),
 				read,

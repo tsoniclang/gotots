@@ -9,6 +9,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	definedtypedeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/definedtype"
 	functiondeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/function"
+	interfacetypedeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/interfacetype"
 	namedstructdeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/namedstruct"
 	packageconstant "github.com/tsoniclang/gotots/internal/emit/declaration/packageconstant"
 	addressexpression "github.com/tsoniclang/gotots/internal/emit/expression/address"
@@ -26,6 +27,7 @@ import (
 	parenthesizedexpression "github.com/tsoniclang/gotots/internal/emit/expression/parenthesized"
 	selectorexpression "github.com/tsoniclang/gotots/internal/emit/expression/selector"
 	sliceexpression "github.com/tsoniclang/gotots/internal/emit/expression/slice"
+	typeassertion "github.com/tsoniclang/gotots/internal/emit/expression/typeassertion"
 	unaryexpression "github.com/tsoniclang/gotots/internal/emit/expression/unary"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	"github.com/tsoniclang/gotots/internal/emit/statement/assignment"
@@ -42,17 +44,20 @@ import (
 	rangestatement "github.com/tsoniclang/gotots/internal/emit/statement/range"
 	returnstatement "github.com/tsoniclang/gotots/internal/emit/statement/returnstatement"
 	switchstatement "github.com/tsoniclang/gotots/internal/emit/statement/switchstatement"
+	typeswitchstatement "github.com/tsoniclang/gotots/internal/emit/statement/typeswitchstatement"
 	"github.com/tsoniclang/gotots/internal/emit/storage"
 	storetarget "github.com/tsoniclang/gotots/internal/emit/store"
 	anonymousstructtype "github.com/tsoniclang/gotots/internal/emit/type/anonymousstruct"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	maptype "github.com/tsoniclang/gotots/internal/emit/type/map"
 	namedstructtype "github.com/tsoniclang/gotots/internal/emit/type/namedstruct"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	slicetype "github.com/tsoniclang/gotots/internal/emit/type/slice"
 	tupletype "github.com/tsoniclang/gotots/internal/emit/type/tuple"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
+	interfacevalue "github.com/tsoniclang/gotots/internal/emit/value/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/emit/value/representation"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -173,6 +178,15 @@ func (e *emitter) declarationObject(
 		)
 	case *ast.GenDecl:
 		if typeName, ok := object.(*types.TypeName); ok {
+			if target, handled, err := interfacetypedeclaration.Emit(
+				context,
+				e,
+				source,
+				typeName,
+				requirements,
+			); handled {
+				return target, err
+			}
 			if target, handled, err := definedtypedeclaration.Emit(
 				context,
 				e,
@@ -217,43 +231,56 @@ func (e *emitter) Expression(
 	context api.Context,
 	source ast.Expr,
 ) (api.ExpressionEmission, error) {
+	operandContext := interfacevalue.OperandContext(context, source)
+	adapt := func(
+		target api.ExpressionEmission,
+		err error,
+	) (api.ExpressionEmission, error) {
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return interfacevalue.AdaptExpected(context, source, target)
+	}
+
 	switch source := source.(type) {
 	case *ast.BinaryExpr:
-		return binaryexpression.Emit(context, e, source)
+		return adapt(binaryexpression.Emit(operandContext, e, source))
 	case *ast.CallExpr:
-		return callexpression.Emit(context, e, source)
+		return adapt(callexpression.Emit(operandContext, e, source))
 	case *ast.CompositeLit:
-		return compositeliteral.Emit(context, e, source)
+		return adapt(compositeliteral.Emit(operandContext, e, source))
 	case *ast.FuncLit:
-		return functionliteral.Emit(context, e, source)
+		return adapt(functionliteral.Emit(operandContext, e, source))
 	case *ast.Ident:
-		return identifierexpression.Emit(context, e, source)
+		return adapt(identifierexpression.Emit(operandContext, e, source))
 	case *ast.IndexExpr:
-		return indexexpression.Emit(context, e, source)
+		return adapt(indexexpression.Emit(operandContext, e, source))
 	case *ast.ParenExpr:
-		return parenthesizedexpression.Emit(context, e, source)
+		return adapt(parenthesizedexpression.Emit(operandContext, e, source))
 	case *ast.SelectorExpr:
-		return selectorexpression.Emit(context, e, source)
+		return adapt(selectorexpression.Emit(operandContext, e, source))
 	case *ast.SliceExpr:
-		return sliceexpression.Emit(context, e, source)
+		return adapt(sliceexpression.Emit(operandContext, e, source))
 	case *ast.StarExpr:
-		return dereferenceexpression.Emit(context, e, source)
+		return adapt(dereferenceexpression.Emit(operandContext, e, source))
+	case *ast.TypeAssertExpr:
+		return adapt(typeassertion.Emit(operandContext, e, source))
 	case *ast.BasicLit:
 		if source.Kind == token.STRING {
-			return stringliteral.Emit(context, e, source)
+			return adapt(stringliteral.Emit(operandContext, e, source))
 		}
 		if source.Kind == token.IMAG {
-			return complexliteral.Emit(context, e, source)
+			return adapt(complexliteral.Emit(operandContext, e, source))
 		}
 		if source.Kind == token.FLOAT {
-			return floatliteral.Emit(context, e, source)
+			return adapt(floatliteral.Emit(operandContext, e, source))
 		}
-		return e.IntegerConstant(context, source)
+		return adapt(e.IntegerConstant(operandContext, source))
 	case *ast.UnaryExpr:
-		return unaryexpression.Emit(context, e, source)
+		return adapt(unaryexpression.Emit(operandContext, e, source))
 	default:
 		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
+			api.Unsupported(operandContext, api.CategoryExpression, source)
 	}
 }
 
@@ -352,6 +379,8 @@ func (e *emitter) Statement(
 		return returnstatement.Emit(context, e, source)
 	case *ast.SwitchStmt:
 		return switchstatement.Emit(context, e, source)
+	case *ast.TypeSwitchStmt:
+		return typeswitchstatement.Emit(context, e, source)
 	default:
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
@@ -467,6 +496,9 @@ func (e *emitter) RepresentedType(
 	}
 	if _, _, ok := pointertype.Resolve(sourceType); ok {
 		return pointertype.EmitRepresented(context, e, source, sourceType)
+	}
+	if _, ok := interfacetype.Resolve(sourceType); ok {
+		return interfacetype.Emit(context, source, sourceType)
 	}
 	if _, ok := types.Unalias(sourceType).(*types.Named); ok {
 		if target, handled, err := definedtype.Emit(

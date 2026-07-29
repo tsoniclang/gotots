@@ -58,8 +58,14 @@ func compareDeclarationRequirements(
 		return compareBasicKinds(leftProjection, rightProjection)
 	}
 	if left.Kind() == api.DeclarationRequirementAnonymousStruct {
-		_, leftDemand, _ := left.AnonymousStruct()
-		_, rightDemand, _ := right.AnonymousStruct()
+		leftArtifact, leftDemand, _ := left.AnonymousStruct()
+		rightArtifact, rightDemand, _ := right.AnonymousStruct()
+		if order := compareGeneratedArtifacts(
+			leftArtifact,
+			rightArtifact,
+		); order != 0 {
+			return order
+		}
 		switch {
 		case leftDemand < rightDemand:
 			return -1
@@ -70,8 +76,14 @@ func compareDeclarationRequirements(
 		}
 	}
 	if left.Kind() == api.DeclarationRequirementMapSpecialization {
-		_, leftDemand, _ := left.MapSpecialization()
-		_, rightDemand, _ := right.MapSpecialization()
+		leftArtifact, leftDemand, _ := left.MapSpecialization()
+		rightArtifact, rightDemand, _ := right.MapSpecialization()
+		if order := compareGeneratedArtifacts(
+			leftArtifact,
+			rightArtifact,
+		); order != 0 {
+			return order
+		}
 		switch {
 		case leftDemand < rightDemand:
 			return -1
@@ -81,12 +93,47 @@ func compareDeclarationRequirements(
 			return 0
 		}
 	}
-	_, leftOperation, _ := left.NamedStructOperation()
-	_, rightOperation, _ := right.NamedStructOperation()
+	if artifactKinds(left.Kind()) {
+		leftArtifact, _ := left.GeneratedArtifact()
+		rightArtifact, _ := right.GeneratedArtifact()
+		return compareGeneratedArtifacts(leftArtifact, rightArtifact)
+	}
+	leftType, leftOperation, _ := left.NamedStructOperation()
+	rightType, rightOperation, _ := right.NamedStructOperation()
+	if order := compareObjects(leftType, rightType); order != 0 {
+		return order
+	}
 	switch {
 	case leftOperation < rightOperation:
 		return -1
 	case leftOperation > rightOperation:
+		return 1
+	default:
+		return 0
+	}
+}
+
+func artifactKinds(kind api.DeclarationRequirementKind) bool {
+	return kind == api.DeclarationRequirementInterfaceAdapter ||
+		kind == api.DeclarationRequirementAnonymousInterface ||
+		kind == api.DeclarationRequirementInterfaceMethodToken ||
+		kind == api.DeclarationRequirementInterfaceDynamicTypeToken
+}
+
+func compareGeneratedArtifacts(
+	left *api.GeneratedArtifact,
+	right *api.GeneratedArtifact,
+) int {
+	switch {
+	case left == nil && right != nil:
+		return -1
+	case left != nil && right == nil:
+		return 1
+	case left == nil:
+		return 0
+	case left.ArtifactKey() < right.ArtifactKey():
+		return -1
+	case left.ArtifactKey() > right.ArtifactKey():
 		return 1
 	default:
 		return 0

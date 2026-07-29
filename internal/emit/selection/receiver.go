@@ -21,33 +21,10 @@ func MethodReceiver(
 	signature := method.Type().(*types.Signature)
 	declared := signature.Recv().Type()
 	_, declaredElement, _, declaredPointer := pointerType(declared)
-	_, effectiveElement, _, effectivePointer :=
-		pointerType(resolved.effective)
-
-	switch {
-	case declaredPointer &&
-		effectivePointer &&
-		types.Identical(declaredElement, effectiveElement):
-		root, err := children.Expression(
-			context.
-				WithRole(api.RoleReceiverValue).
-				WithExpectedType(resolved.root),
-			source.X,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, nil, err
-		}
-		receiver, err := projectValue(
-			context,
-			children,
-			source,
-			resolved,
-			root,
-		)
-		return receiver, method, err
-	case declaredPointer &&
+	_, _, _, effectivePointer := pointerType(resolved.effective)
+	if declaredPointer &&
 		!effectivePointer &&
-		types.Identical(declaredElement, resolved.effective):
+		types.Identical(declaredElement, resolved.effective) {
 		receiver, err := addressSource(
 			context,
 			children,
@@ -55,78 +32,111 @@ func MethodReceiver(
 			resolved,
 		)
 		return receiver, method, err
+	}
+	root, err := children.Expression(
+		context.
+			WithRole(api.RoleReceiverValue).
+			WithExpectedType(resolved.root),
+		source.X,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, nil, err
+	}
+	receiver, err := methodSetReceiver(
+		context,
+		children,
+		source,
+		resolved,
+		method,
+		root,
+	)
+	return receiver, method, err
+}
+
+func MethodSetReceiver(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	selected *types.Selection,
+	root api.ExpressionEmission,
+) (api.ExpressionEmission, *types.Func, error) {
+	resolved, method, ok := methodPath(selected)
+	if !ok ||
+		selected.Kind() != types.MethodVal ||
+		!types.Identical(selected.Recv(), resolved.root) {
+		return api.ExpressionEmission{}, nil,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	receiver, err := methodSetReceiver(
+		context,
+		children,
+		source,
+		resolved,
+		method,
+		root,
+	)
+	return receiver, method, err
+}
+
+func methodSetReceiver(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	resolved path,
+	method *types.Func,
+	root api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	signature := method.Type().(*types.Signature)
+	declared := signature.Recv().Type()
+	_, declaredElement, _, declaredPointer := pointerType(declared)
+	_, effectiveElement, _, effectivePointer :=
+		pointerType(resolved.effective)
+	value, err := projectValue(
+		context,
+		children,
+		source,
+		resolved,
+		root,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	switch {
+	case declaredPointer &&
+		effectivePointer &&
+		types.Identical(declaredElement, effectiveElement):
+		return value, nil
+	case declaredPointer &&
+		!effectivePointer &&
+		types.Identical(declaredElement, resolved.effective):
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
 	case !declaredPointer &&
 		effectivePointer &&
 		types.Identical(declared, effectiveElement):
-		root, err := children.Expression(
-			context.
-				WithRole(api.RoleReceiverValue).
-				WithExpectedType(resolved.root),
-			source.X,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, nil, err
-		}
-		pointer, err := projectValue(
-			context,
-			children,
-			source,
-			resolved,
-			root,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, nil, err
-		}
-		value, _, err := dereferenceValue(
+		value, _, err = dereferenceValue(
 			context,
 			children,
 			source,
 			resolved.effective,
-			pointer,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, nil, err
-		}
-		receiver, err := context.Values().Copy(
-			context.WithRole(api.RoleReceiverValue),
-			source,
-			declared,
 			value,
 		)
-		return receiver, method, err
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
 	case !declaredPointer &&
 		!effectivePointer &&
 		types.Identical(declared, resolved.effective):
-		root, err := children.Expression(
-			context.
-				WithRole(api.RoleReceiverValue).
-				WithExpectedType(resolved.root),
-			source.X,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, nil, err
-		}
-		value, err := projectValue(
-			context,
-			children,
-			source,
-			resolved,
-			root,
-		)
-		if err != nil {
-			return api.ExpressionEmission{}, nil, err
-		}
-		receiver, err := context.Values().Copy(
-			context.WithRole(api.RoleReceiverValue),
-			source,
-			declared,
-			value,
-		)
-		return receiver, method, err
 	default:
-		return api.ExpressionEmission{}, nil,
+		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	return context.Values().Copy(
+		context.WithRole(api.RoleReceiverValue),
+		source,
+		declared,
+		value,
+	)
 }
 
 func MethodExpressionReceiver(

@@ -120,7 +120,11 @@ func TestDeclarationRequirementKindIDsArePinned(t *testing.T) {
 		DeclarationRequirementKind(5).Valid() ||
 		DeclarationRequirementAnonymousStruct != 6 ||
 		DeclarationRequirementMapSpecialization != 7 ||
-		DeclarationRequirementKind(8).Valid() {
+		DeclarationRequirementInterfaceAdapter != 8 ||
+		DeclarationRequirementAnonymousInterface != 9 ||
+		DeclarationRequirementInterfaceMethodToken != 10 ||
+		DeclarationRequirementInterfaceDynamicTypeToken != 11 ||
+		DeclarationRequirementKind(12).Valid() {
 		t.Fatal("declaration requirement kind IDs drifted")
 	}
 }

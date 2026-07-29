@@ -63,6 +63,42 @@ func (staticSpecializationNames) MapSpecialization(
 	panic("unused")
 }
 
+func (staticSpecializationNames) InterfaceAdapter(
+	types.Type,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (staticSpecializationNames) InterfaceDynamicType(
+	types.Type,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (staticSpecializationNames) InterfaceType(
+	types.Type,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (staticSpecializationNames) InterfaceContract(
+	types.Type,
+) (api.InterfaceContractReference, error) {
+	panic("unused")
+}
+
+func (staticSpecializationNames) InterfaceMethodName(
+	*types.Func,
+) (string, error) {
+	panic("unused")
+}
+
+func (staticSpecializationNames) InterfaceMethodToken(
+	*types.Func,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (staticSpecializationNames) ConstantProjection(
 	*types.Const,
 	types.BasicKind,

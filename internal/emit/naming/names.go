@@ -45,9 +45,9 @@ func NewOwner(
 	objectsByScope := make(map[*types.Scope][]types.Object)
 	seen := make(map[types.Object]struct{})
 	var labels []*types.Label
-	for _, object := range info.Defs {
+	record := func(object types.Object) {
 		if object == nil || object.Name() == "_" {
-			continue
+			return
 		}
 		owner.sourceNameBases[portableIdentifier(object.Name())] = struct{}{}
 		if label, ok := object.(*types.Label); ok {
@@ -55,16 +55,22 @@ func NewOwner(
 				seen[label] = struct{}{}
 				labels = append(labels, label)
 			}
-			continue
+			return
 		}
 		if object.Parent() == nil {
-			continue
+			return
 		}
 		if _, exists := seen[object]; exists {
-			continue
+			return
 		}
 		seen[object] = struct{}{}
 		objectsByScope[object.Parent()] = append(objectsByScope[object.Parent()], object)
+	}
+	for _, object := range info.Defs {
+		record(object)
+	}
+	for _, object := range info.Implicits {
+		record(object)
 	}
 	if packageScope != nil {
 		owner.preallocateScope(

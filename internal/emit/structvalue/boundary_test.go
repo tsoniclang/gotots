@@ -22,14 +22,6 @@ func TestNamedStructUnsupportedNeighborsFailAtTypedOwners(t *testing.T) {
 		construct string
 	}{
 		{
-			name: "interface field",
-			source: "package boundary\n" +
-				"type Interface struct { Value interface{ Read() int32 } }\n",
-			role:      api.RoleStructFieldType,
-			category:  api.CategoryType,
-			construct: "*ast.InterfaceType",
-		},
-		{
 			name: "generic struct",
 			source: "package boundary\n" +
 				"type Generic[T any] struct { Value T }\n",

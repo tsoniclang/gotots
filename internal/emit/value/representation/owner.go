@@ -5,10 +5,9 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
-	"github.com/tsoniclang/gotots/internal/emit/callable"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
-	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
@@ -31,6 +30,9 @@ func (Owner) RequiresCustomEquality(
 	context api.Context,
 	sourceType types.Type,
 ) bool {
+	if _, ok := interfacetype.Resolve(sourceType); ok {
+		return true
+	}
 	if _, ok := definedtype.Resolve(sourceType); ok {
 		return true
 	}
@@ -57,6 +59,9 @@ func (Owner) RequiresExplicitType(
 	context api.Context,
 	sourceType types.Type,
 ) bool {
+	if _, ok := interfacetype.Resolve(sourceType); ok {
+		return true
+	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
 		return defined.NilCapable()
 	}
@@ -85,6 +90,16 @@ func (owner Owner) Zero(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.ExpressionEmission, error) {
+	if _, ok := interfacetype.Resolve(sourceType); ok {
+		return api.DirectExpression(
+			context.Factory().VoidExpression(
+				context.Factory().NumericLiteral(
+					"0",
+					tsgo.TokenFlagsNone,
+				),
+			),
+		), nil
+	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
 		if defined.NilCapable() {
 			return api.DirectExpression(
@@ -202,6 +217,13 @@ func (owner Owner) Copy(
 	sourceType types.Type,
 	value api.ExpressionEmission,
 ) (api.ExpressionEmission, error) {
+	if _, ok := interfacetype.Resolve(sourceType); ok {
+		return api.NewExpressionEmission(
+			value.Before(),
+			value.Value(),
+			value.Requests(),
+		)
+	}
 	if target, ok := definedtype.ResolveCallable(sourceType); ok {
 		actual := expressionType(context, source)
 		if actual == nil || types.Identical(actual, sourceType) {
@@ -335,6 +357,7 @@ func (Owner) Assign(
 	_, primitiveOK := primitive(context, sourceType)
 	_, _, structOK := namedStruct(sourceType)
 	_, anonymousStructOK := isAnonymousStruct(sourceType)
+	_, interfaceOK := interfacetype.Resolve(sourceType)
 	if !definedOK &&
 		!arrayOK &&
 		!complexOK &&
@@ -343,6 +366,7 @@ func (Owner) Assign(
 		!pointerValue(sourceType) &&
 		!isScalarSlice(context, sourceType) &&
 		!mapValue(context, sourceType) &&
+		!interfaceOK &&
 		!anonymousStructOK &&
 		!structOK {
 		return api.ExpressionEmission{},
@@ -370,6 +394,25 @@ func (Owner) Equal(
 	left tsgo.Expression,
 	right tsgo.Expression,
 ) (api.ExpressionEmission, error) {
+	if _, ok := interfacetype.Resolve(sourceType); ok {
+		reference, err := context.Names().Runtime(
+			api.RuntimeInterfaceEqual,
+			api.ImportPhaseValue,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.DirectExpression(
+			context.Factory().CallExpression(
+				context.Factory().Identifier(reference.Name()),
+				nil,
+				nil,
+				[]tsgo.Expression{left, right},
+				tsgo.NodeFlagsNone,
+			),
+			reference.Requests()...,
+		), nil
+	}
 	if defined, ok := definedtype.Resolve(sourceType); ok {
 		if defined.Family() == definedtype.FamilyCallable {
 			return api.DirectExpression(
@@ -515,68 +558,5 @@ func (Owner) Equal(
 	return api.DirectExpression(
 		call,
 		reference.Requests()...,
-	), nil
-}
-
-func primitive(
-	context api.Context,
-	sourceType types.Type,
-) (api.PrimitiveAlias, bool) {
-	return basictype.PrimitiveAlias(context.TypesSizes(), sourceType)
-}
-
-func callableValue(sourceType types.Type) bool {
-	_, ok := callable.Signature(sourceType)
-	return ok
-}
-
-func pointerValue(sourceType types.Type) bool {
-	_, _, ok := pointertype.Resolve(sourceType)
-	return ok
-}
-
-func mapValue(context api.Context, sourceType types.Type) bool {
-	_, ok := maprepresentation.Source(context, sourceType)
-	return ok
-}
-
-func namedStruct(
-	sourceType types.Type,
-) (*types.TypeName, *types.Struct, bool) {
-	if sourceType == nil {
-		return nil, nil, false
-	}
-	named, ok := types.Unalias(sourceType).(*types.Named)
-	if !ok || named.TypeParams().Len() != 0 {
-		return nil, nil, false
-	}
-	structType, ok := named.Underlying().(*types.Struct)
-	if !ok || named.Obj() == nil {
-		return nil, nil, false
-	}
-	return named.Obj(), structType, true
-}
-
-func namedStructOperationCall(
-	context api.Context,
-	className string,
-	operation api.NamedStructOperation,
-	arguments []tsgo.Expression,
-) (tsgo.CallExpression, error) {
-	memberName, err := api.NamedStructOperationMemberName(operation)
-	if err != nil {
-		return nil, err
-	}
-	return context.Factory().CallExpression(
-		context.Factory().PropertyAccessExpression(
-			context.Factory().Identifier(className),
-			nil,
-			context.Factory().Identifier(memberName),
-			tsgo.NodeFlagsNone,
-		),
-		nil,
-		nil,
-		arguments,
-		tsgo.NodeFlagsNone,
 	), nil
 }

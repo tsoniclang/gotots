@@ -25,6 +25,7 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimeStringEncodeRune, 5, api.RuntimeModuleString, "runtime/string.ts", "goStringEncodeRune", false, nil},
 		{api.RuntimeStringDecodeRune, 6, api.RuntimeModuleString, "runtime/string.ts", "goStringDecodeRune", false, nil},
 		{api.RuntimePointer, 100, api.RuntimeModulePointer, "runtime/pointer.ts", "GoPointer", true, []api.RuntimeSymbol{api.RuntimePanic}},
+		{api.RuntimePointerHash, 101, api.RuntimeModulePointer, "runtime/pointer.ts", "goPointerHash", false, []api.RuntimeSymbol{api.RuntimePointer, api.RuntimeMapHash}},
 		{api.RuntimeArray, 200, api.RuntimeModuleArray, "runtime/array.ts", "GoArray", true, []api.RuntimeSymbol{api.RuntimePanic}},
 		{api.RuntimeArrayAllocate, 201, api.RuntimeModuleArray, "runtime/array.ts", "goArrayAllocate", false, []api.RuntimeSymbol{api.RuntimeArray}},
 		{api.RuntimeArrayView, 202, api.RuntimeModuleArray, "runtime/array.ts", "goArrayView", false, []api.RuntimeSymbol{api.RuntimeArray}},
@@ -63,6 +64,9 @@ func TestRuntimeSymbolContractsArePinnedAndClosed(t *testing.T) {
 		{api.RuntimeComplex128Neg, 824, api.RuntimeModuleComplex, "runtime/complex.ts", "goComplex128Negate", false, []api.RuntimeSymbol{api.RuntimeComplex128}},
 		{api.RuntimeComplex128Equal, 825, api.RuntimeModuleComplex, "runtime/complex.ts", "goComplex128Equal", false, []api.RuntimeSymbol{api.RuntimeComplex128}},
 		{api.RuntimeNumberToBigInt, 900, api.RuntimeModuleConversion, "runtime/conversion.ts", "goNumberToBigInt", false, nil},
+		{api.RuntimeInterfaceValue, 1000, api.RuntimeModuleInterface, "runtime/interface.ts", "GoInterfaceValue", true, nil},
+		{api.RuntimeInterfaceNonNil, 1001, api.RuntimeModuleInterface, "runtime/interface.ts", "goInterfaceNonNil", false, []api.RuntimeSymbol{api.RuntimeInterfaceValue, api.RuntimePanic}},
+		{api.RuntimeInterfaceEqual, 1002, api.RuntimeModuleInterface, "runtime/interface.ts", "goInterfaceEqual", false, []api.RuntimeSymbol{api.RuntimeInterfaceValue}},
 	}
 	for _, test := range tests {
 		if uint16(test.symbol) != test.id {

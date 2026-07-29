@@ -195,11 +195,45 @@ func TestGeneratedArtifactRejectsStringOnlyIdentity(t *testing.T) {
 	}
 }
 
+func TestInterfaceDynamicTypeRequestCarriesExactGoType(t *testing.T) {
+	sourceType := types.Typ[types.Int32]
+	artifact, err := NewCompilationGeneratedArtifact(
+		GeneratedArtifactInterfaceDynamicTypeToken,
+		sourceType,
+		"artifact",
+		"$goDynamicType_artifact",
+		"support/interface-types.ts",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request, err := NewInterfaceDynamicTypeTokenRequest(artifact)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requirement, ok := request.DeclarationRequirement()
+	selected, selectedOK := requirement.InterfaceDynamicTypeToken()
+	dynamicType, typeOK := selected.InterfaceDynamicType()
+	if !ok ||
+		!selectedOK ||
+		!typeOK ||
+		selected != artifact ||
+		dynamicType != sourceType ||
+		request.LegalScope() != ScopeCompilationSupport ||
+		request.Execution() != ExecutionStatic {
+		t.Fatalf("dynamic-type request = %#v", request)
+	}
+}
+
 func TestGeneratedArtifactDomainsArePinned(t *testing.T) {
 	if GeneratedArtifactAnonymousStruct != 1 ||
 		GeneratedArtifactMapSpecialization != 2 ||
+		GeneratedArtifactInterfaceAdapter != 3 ||
+		GeneratedArtifactAnonymousInterface != 4 ||
+		GeneratedArtifactInterfaceMethodToken != 5 ||
+		GeneratedArtifactInterfaceDynamicTypeToken != 6 ||
 		GeneratedArtifactInvalid.Valid() ||
-		GeneratedArtifactKind(3).Valid() {
+		GeneratedArtifactKind(7).Valid() {
 		t.Fatal("generated-artifact kind IDs drifted")
 	}
 	if GeneratedArtifactPlacementCompilation != 1 ||

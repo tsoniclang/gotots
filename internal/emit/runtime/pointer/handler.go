@@ -3,6 +3,7 @@ package pointer
 import "github.com/tsoniclang/gotots/internal/target/tsgo"
 
 const (
+	AddressName     = "$go$address"
 	CellName        = "cell"
 	CellValueName   = "value"
 	DereferenceName = "dereference"

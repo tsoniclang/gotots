@@ -11,11 +11,19 @@ const (
 	GeneratedArtifactInvalid GeneratedArtifactKind = iota
 	GeneratedArtifactAnonymousStruct
 	GeneratedArtifactMapSpecialization
+	GeneratedArtifactInterfaceAdapter
+	GeneratedArtifactAnonymousInterface
+	GeneratedArtifactInterfaceMethodToken
+	GeneratedArtifactInterfaceDynamicTypeToken
 )
 
 func (k GeneratedArtifactKind) Valid() bool {
 	return k == GeneratedArtifactAnonymousStruct ||
-		k == GeneratedArtifactMapSpecialization
+		k == GeneratedArtifactMapSpecialization ||
+		k == GeneratedArtifactInterfaceAdapter ||
+		k == GeneratedArtifactAnonymousInterface ||
+		k == GeneratedArtifactInterfaceMethodToken ||
+		k == GeneratedArtifactInterfaceDynamicTypeToken
 }
 
 type GeneratedArtifactPlacement uint8
@@ -132,6 +140,36 @@ func (o *GeneratedArtifact) MapType() (*types.Map, bool) {
 	return source, ok
 }
 
+func (o *GeneratedArtifact) InterfaceAdapterType() (types.Type, bool) {
+	if o == nil || o.kind != GeneratedArtifactInterfaceAdapter {
+		return nil, false
+	}
+	return o.sourceType, interfaceAdapterType(o.sourceType)
+}
+
+func (o *GeneratedArtifact) InterfaceType() (*types.Interface, bool) {
+	if o == nil || o.kind != GeneratedArtifactAnonymousInterface {
+		return nil, false
+	}
+	source, ok := types.Unalias(o.sourceType).Underlying().(*types.Interface)
+	return source, ok && source.IsMethodSet()
+}
+
+func (o *GeneratedArtifact) InterfaceMethodSignature() (*types.Signature, bool) {
+	if o == nil || o.kind != GeneratedArtifactInterfaceMethodToken {
+		return nil, false
+	}
+	source, ok := types.Unalias(o.sourceType).(*types.Signature)
+	return source, ok && source.Recv() == nil
+}
+
+func (o *GeneratedArtifact) InterfaceDynamicType() (types.Type, bool) {
+	if o == nil || o.kind != GeneratedArtifactInterfaceDynamicTypeToken {
+		return nil, false
+	}
+	return o.sourceType, interfaceAdapterType(o.sourceType)
+}
+
 func (o *GeneratedArtifact) ArtifactKey() string {
 	if o == nil {
 		return ""
@@ -227,8 +265,30 @@ func validGeneratedArtifactType(
 	case GeneratedArtifactMapSpecialization:
 		source, ok := types.Unalias(sourceType).(*types.Map)
 		return ok && types.Comparable(source.Key())
+	case GeneratedArtifactInterfaceAdapter:
+		return interfaceAdapterType(sourceType)
+	case GeneratedArtifactAnonymousInterface:
+		source, ok := types.Unalias(sourceType).Underlying().(*types.Interface)
+		return ok && source.IsMethodSet()
+	case GeneratedArtifactInterfaceMethodToken:
+		source, ok := types.Unalias(sourceType).(*types.Signature)
+		return ok && source.Recv() == nil
+	case GeneratedArtifactInterfaceDynamicTypeToken:
+		return interfaceAdapterType(sourceType)
 	default:
 		return false
+	}
+}
+
+func interfaceAdapterType(sourceType types.Type) bool {
+	if sourceType == nil {
+		return false
+	}
+	switch types.Unalias(sourceType).Underlying().(type) {
+	case *types.Interface, *types.Tuple, *types.TypeParam, *types.Union:
+		return false
+	default:
+		return true
 	}
 }
 

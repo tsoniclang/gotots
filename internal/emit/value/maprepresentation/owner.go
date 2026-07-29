@@ -319,6 +319,13 @@ func ProjectKey(
 	return value, nil
 }
 
+func StorageKeyType(sourceType types.Type) types.Type {
+	if model, ok := definedtype.ResolveBasic(sourceType); ok {
+		return model.Underlying()
+	}
+	return sourceType
+}
+
 func directKey(
 	context api.Context,
 	sourceType types.Type,

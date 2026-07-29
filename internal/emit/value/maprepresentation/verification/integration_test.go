@@ -2,7 +2,6 @@ package maprepresentation_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"go/types"
 	"os"
@@ -14,7 +13,6 @@ import (
 	"time"
 
 	"github.com/tsoniclang/gotots/internal/emit"
-	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -177,55 +175,6 @@ func TestMapBuiltinSelectionUsesGoObjectIdentity(t *testing.T) {
 	}
 	if _, err := compileExportedResult(loaded); err != nil {
 		t.Fatalf("identity-preserving spelling mutation failed: %v", err)
-	}
-}
-
-func TestMapBoundariesRemainTypedUnsupported(t *testing.T) {
-	for _, test := range []struct {
-		name   string
-		source string
-	}{
-		{
-			name: "floating key",
-			source: `package boundary
-func F() map[float64]int32 { return make(map[float64]int32) }
-`,
-		},
-		{
-			name: "defined floating key",
-			source: `package boundary
-type Key float64
-func F() map[Key]int32 { return make(map[Key]int32) }
-`,
-		},
-		{
-			name: "interface key",
-			source: `package boundary
-func F() map[any]int32 { return make(map[any]int32) }
-`,
-		},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			directory := t.TempDir()
-			writeFile(t, filepath.Join(directory, "go.mod"), "module example.com/boundary\n\ngo 1.26.4\n")
-			writeFile(t, filepath.Join(directory, "source.go"), test.source)
-			loaded, err := load.One(context.Background(), load.Request{
-				Directory: directory,
-				Pattern:   ".",
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			root, err := emit.NewRoot(loaded.Types().Scope().Lookup("F"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			_, err = emit.Compile(loaded.Program(), []emit.Root{root})
-			var unsupported *api.UnsupportedError
-			if !errors.As(err, &unsupported) {
-				t.Fatalf("error = %v, want typed unsupported", err)
-			}
-		})
 	}
 }
 

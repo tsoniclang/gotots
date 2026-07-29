@@ -23,6 +23,11 @@ func (s *programSession) validateGeneratedArtifact(
 		return s.validateAnonymousStructArtifact(artifact)
 	case api.GeneratedArtifactMapSpecialization:
 		return s.validateMapSpecializationArtifact(artifact)
+	case api.GeneratedArtifactInterfaceAdapter,
+		api.GeneratedArtifactAnonymousInterface,
+		api.GeneratedArtifactInterfaceMethodToken,
+		api.GeneratedArtifactInterfaceDynamicTypeToken:
+		return s.validateInterfaceArtifact(artifact)
 	default:
 		return &ScheduleError{
 			Object: artifact.TargetName(),
@@ -39,6 +44,11 @@ func (s *programSession) reconstructGeneratedArtifact(
 		return s.reconstructAnonymousStruct(artifact)
 	case api.GeneratedArtifactMapSpecialization:
 		return s.reconstructMapSpecialization(artifact)
+	case api.GeneratedArtifactInterfaceAdapter,
+		api.GeneratedArtifactAnonymousInterface,
+		api.GeneratedArtifactInterfaceMethodToken,
+		api.GeneratedArtifactInterfaceDynamicTypeToken:
+		return s.reconstructInterfaceArtifact(artifact)
 	default:
 		return &ScheduleError{
 			Object: artifact.TargetName(),
@@ -183,7 +193,7 @@ func (s *programSession) buildMapSpecializationRevision(
 	keyType, err := builder.emitter.RepresentedType(
 		builder.context.WithRole(api.RoleMapKey),
 		nil,
-		mapType.Key(),
+		maprepresentation.StorageKeyType(mapType.Key()),
 	)
 	if err != nil {
 		return artifactRevision{}, err

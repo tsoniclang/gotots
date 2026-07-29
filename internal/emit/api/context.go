@@ -1,6 +1,7 @@
 package api
 
 import (
+	"go/ast"
 	"go/token"
 	"go/types"
 	"slices"
@@ -8,29 +9,43 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
+type AddressableStorage interface {
+	Name(Context, *types.Var) (string, bool)
+	Read(Context, *types.Var) (ExpressionEmission, bool, error)
+	StoreTarget(Context, *types.Var) (StoreTargetEmission, bool, error)
+	Cell(
+		Context,
+		ChildEmitter,
+		ast.Node,
+		types.Type,
+		ExpressionEmission,
+	) (ExpressionEmission, error)
+	Requirement(Context, *types.Var) (RootRequest, error)
+}
+
 type Context struct {
-	role                      Role
-	fileSet                   *token.FileSet
-	typesPackage              *types.Package
-	typesInfo                 *types.Info
-	typesSizes                types.Sizes
-	factory                   tsgo.Factory
-	names                     Names
-	values                    Values
-	storage                   AddressableStorage
-	integer                   IntegerRepresentation
-	evaluationOrder           EvaluationOrder
-	expectedType              types.Type
-	expectedResults           *types.Tuple
-	functionResults           *types.Tuple
-	breakDepth                uint32
-	continueDepth             uint32
-	controlLabels             map[*types.Label]ControlLabel
-	statementLabel            string
-	artifactOwner             *types.Func
-	storageNames              map[*types.Var]string
-	localConstantProjections  map[*types.Const][]types.BasicKind
-	lexicalGeneratedArtifacts map[*types.TypeName][]DeclarationRequirement
+	role                     Role
+	fileSet                  *token.FileSet
+	typesPackage             *types.Package
+	typesInfo                *types.Info
+	typesSizes               types.Sizes
+	factory                  tsgo.Factory
+	names                    Names
+	values                   Values
+	storage                  AddressableStorage
+	integer                  IntegerRepresentation
+	evaluationOrder          EvaluationOrder
+	expectedType             types.Type
+	expectedResults          *types.Tuple
+	functionResults          *types.Tuple
+	breakDepth               uint32
+	continueDepth            uint32
+	controlLabels            map[*types.Label]ControlLabel
+	statementLabel           string
+	artifactOwner            *types.Func
+	storageNames             map[*types.Var]string
+	localConstantProjections map[*types.Const][]types.BasicKind
+	lexicalTypeRequirements  map[*types.TypeName][]DeclarationRequirement
 }
 
 func (c Context) WithAddressableStorage(
@@ -71,34 +86,42 @@ func (c Context) WithLocalConstantProjections(
 	return c
 }
 
-func (c Context) WithLexicalGeneratedArtifacts(
+func (c Context) WithLexicalTypeRequirements(
 	owner ArtifactOwner,
 	requirements map[*types.TypeName][]DeclarationRequirement,
 ) Context {
 	_, sourceOwned := owner.Source()
 	_, _, initializerOwned := owner.PackageInitializer()
 	if !sourceOwned && !initializerOwned {
-		panic("lexical generated-artifact owner has no source reconstruction")
+		panic("lexical type-requirement owner has no source reconstruction")
 	}
-	c.lexicalGeneratedArtifacts = make(
+	c.lexicalTypeRequirements = make(
 		map[*types.TypeName][]DeclarationRequirement,
 		len(requirements),
 	)
 	for anchor, selected := range requirements {
 		if anchor == nil || len(selected) == 0 {
-			panic("lexical generated-artifact selection is invalid")
+			panic("lexical type-requirement selection is invalid")
 		}
 		for _, requirement := range selected {
-			artifact, ok := requirement.GeneratedArtifact()
-			if !ok ||
-				artifact.Placement() !=
+			if requirement.Owner() != owner {
+				panic("lexical type-requirement owner is inconsistent")
+			}
+			if artifact, ok := requirement.GeneratedArtifact(); ok {
+				if artifact.Placement() !=
 					GeneratedArtifactPlacementLexical ||
-				artifact.LexicalOwner() != owner ||
-				artifact.LexicalAnchor() != anchor {
-				panic("lexical generated-artifact requirement is inconsistent")
+					artifact.LexicalOwner() != owner ||
+					artifact.LexicalAnchor() != anchor {
+					panic("lexical generated-artifact requirement is inconsistent")
+				}
+				continue
+			}
+			typeName, _, ok := requirement.NamedStructOperation()
+			if !ok || typeName != anchor {
+				panic("lexical named-type requirement is inconsistent")
 			}
 		}
-		c.lexicalGeneratedArtifacts[anchor] = slices.Clone(selected)
+		c.lexicalTypeRequirements[anchor] = slices.Clone(selected)
 	}
 	return c
 }
@@ -307,10 +330,10 @@ func (c Context) LocalConstantProjections(
 	return slices.Clone(c.localConstantProjections[selected])
 }
 
-func (c Context) LexicalGeneratedArtifacts(
+func (c Context) LexicalTypeRequirements(
 	anchor *types.TypeName,
 ) []DeclarationRequirement {
-	return slices.Clone(c.lexicalGeneratedArtifacts[anchor])
+	return slices.Clone(c.lexicalTypeRequirements[anchor])
 }
 
 func (c Context) AddressableStorageName(variable *types.Var) (string, bool) {

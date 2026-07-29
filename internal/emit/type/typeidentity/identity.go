@@ -73,6 +73,15 @@ func collectLocalComponents(
 	case *types.Signature:
 		collectLocalTupleComponents(source.Params(), seen, components)
 		collectLocalTupleComponents(source.Results(), seen, components)
+	case *types.Interface:
+		source = source.Complete()
+		for index := range source.NumMethods() {
+			collectLocalComponents(
+				source.Method(index).Type(),
+				seen,
+				components,
+			)
+		}
 	}
 }
 
@@ -212,12 +221,56 @@ func appendTypeDescriptor(
 			source.Results(),
 			namedObjectIdentity,
 		)
+	case *types.Interface:
+		source = source.Complete()
+		if !source.IsMethodSet() {
+			return &api.NameError{
+				Reason: "constraint interface has no runtime generated-artifact identity",
+			}
+		}
+		appendPart(target, "interface")
+		appendPart(target, strconv.Itoa(source.NumMethods()))
+		for index := range source.NumMethods() {
+			method := source.Method(index)
+			appendPart(target, method.Name())
+			packagePath := ""
+			if !method.Exported() && method.Pkg() != nil {
+				packagePath = method.Pkg().Path()
+			}
+			appendPart(target, packagePath)
+			signature, ok := method.Type().(*types.Signature)
+			if !ok {
+				return &api.NameError{
+					Reason: "interface method has no signature identity",
+				}
+			}
+			if err := appendTypeDescriptor(
+				target,
+				receiverFreeSignature(signature),
+				namedObjectIdentity,
+			); err != nil {
+				return err
+			}
+		}
 	default:
 		return &api.NameError{
 			Reason: "Go type has no deterministic generated-artifact key",
 		}
 	}
 	return nil
+}
+
+func receiverFreeSignature(
+	signature *types.Signature,
+) *types.Signature {
+	return types.NewSignatureType(
+		nil,
+		nil,
+		nil,
+		signature.Params(),
+		signature.Results(),
+		signature.Variadic(),
+	)
 }
 
 func appendTupleDescriptor(

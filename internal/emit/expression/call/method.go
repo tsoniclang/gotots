@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
+	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -44,6 +45,19 @@ func emitMethod(
 	}
 	if err := validateResults(context, source, signature, discarded); err != nil {
 		return api.ExpressionEmission{}, err
+	}
+	if _, interfaceReceiver := interfacetype.Resolve(
+		selection.Recv(),
+	); interfaceReceiver {
+		return emitInterfaceMethod(
+			context,
+			children,
+			source,
+			selector,
+			method,
+			selection,
+			signature,
+		)
 	}
 	receiver, resolvedMethod, err := selectionvalue.MethodReceiver(
 		context,
@@ -100,6 +114,101 @@ func emitMethod(
 			receiverRequests,
 			argumentRequests,
 			reference.Requests(),
+		),
+	)
+}
+
+func emitInterfaceMethod(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.CallExpr,
+	selector *ast.SelectorExpr,
+	method *types.Func,
+	selection *types.Selection,
+	signature *types.Signature,
+) (api.ExpressionEmission, error) {
+	receiver, err := children.Expression(
+		context.
+			WithRole(api.RoleReceiverValue).
+			WithExpectedType(selection.Recv()),
+		selector.X,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	arguments, argumentBefore, argumentRequests, err := emitArguments(
+		context,
+		children,
+		source,
+		signature,
+		true,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	receiverName, err := context.Names().Temporary(
+		api.TemporaryReceiverValue,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	before := append(
+		receiver.Before(),
+		context.Factory().VariableStatement(
+			nil,
+			context.Factory().VariableDeclarationList(
+				[]tsgo.VariableDeclaration{
+					context.Factory().VariableDeclaration(
+						context.Factory().Identifier(receiverName),
+						nil,
+						nil,
+						receiver.Value(),
+					),
+				},
+				tsgo.NodeFlagsConst,
+			),
+		),
+	)
+	before = append(before, argumentBefore...)
+	nonNil, err := context.Names().Runtime(
+		api.RuntimeInterfaceNonNil,
+		api.ImportPhaseValue,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	member, err := context.Names().InterfaceMethodName(method)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	guarded := context.Factory().CallExpression(
+		context.Factory().Identifier(nonNil.Name()),
+		nil,
+		nil,
+		[]tsgo.Expression{
+			context.Factory().Identifier(receiverName),
+		},
+		tsgo.NodeFlagsNone,
+	)
+	call := context.Factory().CallExpression(
+		context.Factory().PropertyAccessExpression(
+			guarded,
+			nil,
+			context.Factory().Identifier(member),
+			tsgo.NodeFlagsNone,
+		),
+		nil,
+		nil,
+		arguments,
+		tsgo.NodeFlagsNone,
+	)
+	return api.NewExpressionEmission(
+		before,
+		call,
+		api.CombineRequests(
+			receiver.Requests(),
+			argumentRequests,
+			nonNil.Requests(),
 		),
 	)
 }

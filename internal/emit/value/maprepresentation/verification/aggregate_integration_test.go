@@ -378,6 +378,42 @@ func (aggregateNames) MapSpecialization(
 	panic("unused")
 }
 
+func (aggregateNames) InterfaceAdapter(
+	types.Type,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (aggregateNames) InterfaceDynamicType(
+	types.Type,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (aggregateNames) InterfaceType(
+	types.Type,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (aggregateNames) InterfaceContract(
+	types.Type,
+) (api.InterfaceContractReference, error) {
+	panic("unused")
+}
+
+func (aggregateNames) InterfaceMethodName(
+	*types.Func,
+) (string, error) {
+	panic("unused")
+}
+
+func (aggregateNames) InterfaceMethodToken(
+	*types.Func,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (aggregateNames) ConstantProjection(
 	*types.Const,
 	types.BasicKind,

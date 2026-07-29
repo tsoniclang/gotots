@@ -26,6 +26,47 @@ func TestArrayRuntimeAssemblyExactJoinsRequestedDefinition(t *testing.T) {
 	}
 }
 
+func TestPointerHashIsAnOptionalExactRuntimeDefinition(t *testing.T) {
+	base, err := Build(
+		tsgo.NewFactory(),
+		api.RuntimeModulePointer,
+		[]api.RuntimeSymbol{api.RuntimePointer},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(base) != 1 || base[0].Symbol() != api.RuntimePointer {
+		t.Fatalf("base pointer definitions = %#v", base)
+	}
+	class, ok := base[0].Statement().(tsgo.ClassDeclaration)
+	if !ok || len(class.Members()) != 19 {
+		t.Fatalf("base pointer owner = %T with unexpected members", base[0].Statement())
+	}
+
+	withHash, err := Build(
+		tsgo.NewFactory(),
+		api.RuntimeModulePointer,
+		[]api.RuntimeSymbol{
+			api.RuntimePointer,
+			api.RuntimePointerHash,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(withHash) != 2 ||
+		withHash[0].Symbol() != api.RuntimePointer ||
+		withHash[1].Symbol() != api.RuntimePointerHash {
+		t.Fatalf("pointer hash definitions = %#v", withHash)
+	}
+	if _, ok := withHash[1].Statement().(tsgo.FunctionDeclaration); !ok {
+		t.Fatalf(
+			"pointer hash definition = %T, want function",
+			withHash[1].Statement(),
+		)
+	}
+}
+
 func TestAggregateArrayRuntimeAssemblyExactJoinsDemandedOperations(t *testing.T) {
 	factory := tsgo.NewFactory()
 	symbols := []api.RuntimeSymbol{

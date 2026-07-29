@@ -14,7 +14,11 @@ import (
 
 func TestBuildCreatesOneTypedCanonicalLocationClass(t *testing.T) {
 	factory := tsgo.NewFactory()
-	statement := pointer.Build(factory, pointerClassName(t), panicClassName(t))
+	statement := pointer.Build(
+		factory,
+		pointerClassName(t),
+		panicClassName(t),
+	)
 
 	class, ok := statement.(tsgo.ClassDeclaration)
 	if !ok {
@@ -45,12 +49,18 @@ func TestBuildCreatesOneTypedCanonicalLocationClass(t *testing.T) {
 	if len(constructorParameters) != 3 {
 		t.Fatalf("pointer constructor parameters = %d, want 3", len(constructorParameters))
 	}
-	for index, name := range []string{"address", "read", "write"} {
+	for index, name := range []string{pointer.AddressName, "read", "write"} {
 		parameter := constructorParameters[index]
+		modifiers := parameter.Modifiers()
+		validModifiers := len(modifiers) == 2 &&
+			modifiers[0].Kind() == tsgo.SyntaxKindPrivateKeyword &&
+			modifiers[1].Kind() == tsgo.SyntaxKindReadonlyKeyword
+		if index == 0 {
+			validModifiers = len(modifiers) == 1 &&
+				modifiers[0].Kind() == tsgo.SyntaxKindReadonlyKeyword
+		}
 		if parameter.Name().(tsgo.Identifier).Text() != name ||
-			len(parameter.Modifiers()) != 2 ||
-			parameter.Modifiers()[0].Kind() != tsgo.SyntaxKindPrivateKeyword ||
-			parameter.Modifiers()[1].Kind() != tsgo.SyntaxKindReadonlyKeyword {
+			!validModifiers {
 			t.Fatalf("pointer constructor parameter %d = %#v", index, parameter)
 		}
 	}
@@ -137,7 +147,11 @@ func TestBuildPrintsSourceShapedCanonicalLocations(t *testing.T) {
 		}
 	})
 	printed, err := client.PrintNode(
-		pointer.Build(factory, pointerClassName(t), panicClassName(t)),
+		pointer.Build(
+			factory,
+			pointerClassName(t),
+			panicClassName(t),
+		),
 		tsgo.PrintOptions{},
 	)
 	if err != nil {
@@ -146,7 +160,7 @@ func TestBuildPrintsSourceShapedCanonicalLocations(t *testing.T) {
 	for _, required := range []string{
 		"export class GoPointer<L, S>",
 		"private static readonly roots: WeakMap<object, object>",
-		"private constructor(private readonly address: object",
+		"private constructor(readonly $go$address: object",
 		"static cell<L, S>(value: S): GoPointer<L, S>",
 		"static field<L, PL, PS extends object, K extends keyof PS>",
 		"static objectField<L, O extends object, K extends keyof O>",

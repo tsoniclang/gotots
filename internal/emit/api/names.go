@@ -49,6 +49,7 @@ const (
 	TemporarySwitchTag
 	TemporarySwitchSelection
 	TemporarySwitchMatch
+	TemporaryTypeSwitchValue
 	TemporaryForCondition
 	TemporaryForPost
 )
@@ -70,6 +71,48 @@ func (r NameReference) Name() string {
 }
 
 func (r NameReference) Requests() []RootRequest {
+	return slices.Clone(r.requests)
+}
+
+type InterfaceContractReference struct {
+	typeName     string
+	contractName string
+	guardName    string
+	requests     []RootRequest
+}
+
+func NewInterfaceContractReference(
+	typeName string,
+	contractName string,
+	guardName string,
+	requests ...RootRequest,
+) (InterfaceContractReference, error) {
+	if typeName == "" || contractName == "" || guardName == "" {
+		return InterfaceContractReference{}, &NameError{
+			Reason: "interface-contract reference name is empty",
+		}
+	}
+	return InterfaceContractReference{
+		typeName:     typeName,
+		contractName: contractName,
+		guardName:    guardName,
+		requests:     slices.Clone(requests),
+	}, nil
+}
+
+func (r InterfaceContractReference) TypeName() string {
+	return r.typeName
+}
+
+func (r InterfaceContractReference) ContractName() string {
+	return r.contractName
+}
+
+func (r InterfaceContractReference) GuardName() string {
+	return r.guardName
+}
+
+func (r InterfaceContractReference) Requests() []RootRequest {
 	return slices.Clone(r.requests)
 }
 
@@ -139,6 +182,12 @@ type Names interface {
 		types.Type,
 		MapSpecializationDemand,
 	) (NameReference, error)
+	InterfaceAdapter(types.Type) (NameReference, error)
+	InterfaceDynamicType(types.Type) (NameReference, error)
+	InterfaceType(types.Type) (NameReference, error)
+	InterfaceContract(types.Type) (InterfaceContractReference, error)
+	InterfaceMethodName(*types.Func) (string, error)
+	InterfaceMethodToken(*types.Func) (NameReference, error)
 	ConstantProjection(*types.Const, types.BasicKind) (NameReference, error)
 	Member(*types.Var) (string, error)
 	Primitive(PrimitiveAlias) (NameReference, error)
@@ -209,6 +258,8 @@ func TemporaryPrefix(kind TemporaryKind) (string, error) {
 		return "__gotots_switch_selection_", nil
 	case TemporarySwitchMatch:
 		return "__gotots_switch_match_", nil
+	case TemporaryTypeSwitchValue:
+		return "__gotots_type_switch_", nil
 	case TemporaryForCondition:
 		return "__gotots_for_condition_", nil
 	case TemporaryForPost:

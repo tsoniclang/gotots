@@ -10,6 +10,7 @@ import (
 	conversionruntime "github.com/tsoniclang/gotots/internal/emit/runtime/conversion"
 	floatruntime "github.com/tsoniclang/gotots/internal/emit/runtime/float"
 	integerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/integer"
+	interfaceruntime "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	panicruntime "github.com/tsoniclang/gotots/internal/emit/runtime/panic"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
@@ -87,7 +88,10 @@ func Build(
 		return definitions, nil
 	}
 	if module == api.RuntimeModulePointer {
-		if len(symbols) != 1 || symbols[0] != api.RuntimePointer {
+		if len(symbols) == 0 ||
+			len(symbols) > 2 ||
+			symbols[0] != api.RuntimePointer ||
+			(len(symbols) == 2 && symbols[1] != api.RuntimePointerHash) {
 			return nil, &AssemblyError{
 				Module: module,
 				Reason: "pointer runtime requires exactly RuntimePointer",
@@ -112,7 +116,31 @@ func Build(
 		if err != nil {
 			return nil, err
 		}
-		return []Definition{definition}, nil
+		definitions := []Definition{definition}
+		if len(symbols) == 1 {
+			return definitions, nil
+		}
+		hashContract, err := api.RuntimeContract(api.RuntimePointerHash)
+		if err != nil {
+			return nil, err
+		}
+		mapHashContract, err := api.RuntimeContract(api.RuntimeMapHash)
+		if err != nil {
+			return nil, err
+		}
+		hashDefinition, err := NewDefinition(
+			api.RuntimePointerHash,
+			pointerruntime.Hash(
+				factory,
+				hashContract.ExportedName(),
+				contract.ExportedName(),
+				mapHashContract.ExportedName(),
+			),
+		)
+		if err != nil {
+			return nil, err
+		}
+		return append(definitions, hashDefinition), nil
 	}
 	if module == api.RuntimeModuleArray {
 		if symbols[0] != api.RuntimeArray {
@@ -237,6 +265,34 @@ func Build(
 		definitions := make([]Definition, 0, len(symbols))
 		for index, symbol := range symbols {
 			definition, err := NewDefinition(symbol, statements[index])
+			if err != nil {
+				return nil, err
+			}
+			definitions = append(definitions, definition)
+		}
+		return definitions, nil
+	}
+	if module == api.RuntimeModuleInterface {
+		valueContract, err := api.RuntimeContract(api.RuntimeInterfaceValue)
+		if err != nil {
+			return nil, err
+		}
+		panicContract, err := api.RuntimeContract(api.RuntimePanic)
+		if err != nil {
+			return nil, err
+		}
+		definitions := make([]Definition, 0, len(symbols))
+		for _, symbol := range symbols {
+			statement, err := interfaceruntime.Build(
+				factory,
+				symbol,
+				valueContract.ExportedName(),
+				panicContract.ExportedName(),
+			)
+			if err != nil {
+				return nil, err
+			}
+			definition, err := NewDefinition(symbol, statement)
 			if err != nil {
 				return nil, err
 			}

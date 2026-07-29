@@ -17,9 +17,11 @@ import (
 	stringconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/stringvalue"
 	structconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/structvalue"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
 	floatvalue "github.com/tsoniclang/gotots/internal/emit/value/float"
 	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
+	interfacevalue "github.com/tsoniclang/gotots/internal/emit/value/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 )
 
@@ -71,16 +73,29 @@ func Emit(
 		)
 		return target, true, err
 	}
+	operandExpected := operandFacts.Type
+	if _, interfaceTarget := interfacetype.Resolve(targetType); interfaceTarget {
+		operandExpected = interfacevalue.DynamicType(operandExpected)
+	}
 	operandValue, err := children.Expression(
 		context.
 			WithRole(api.RoleConversionOperand).
-			WithExpectedType(operandFacts.Type),
+			WithExpectedType(operandExpected),
 		operand,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
 	sourceType := operandFacts.Type
+	if target, handled, interfaceErr := interfacevalue.Convert(
+		context,
+		source,
+		sourceType,
+		targetType,
+		operandValue,
+	); handled {
+		return target, true, interfaceErr
+	}
 	if types.Identical(sourceType, targetType) {
 		if _, ok := callable.Signature(targetType); ok {
 			return operandValue, true, nil

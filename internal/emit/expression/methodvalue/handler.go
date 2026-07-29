@@ -7,6 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
+	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -24,6 +25,11 @@ func Emit(
 	if !ok || !callable.Supports(signature) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if _, interfaceReceiver := interfacetype.Resolve(
+		selected.Recv(),
+	); interfaceReceiver {
+		return emitInterface(context, children, source, selected, signature)
 	}
 	receiver, method, err := selectionvalue.MethodReceiver(
 		context,
@@ -96,6 +102,103 @@ func Emit(
 			receiver.Requests(),
 			targetSignature.Requests(),
 			reference.Requests(),
+		),
+	)
+}
+
+func emitInterface(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.SelectorExpr,
+	selected *types.Selection,
+	signature *types.Signature,
+) (api.ExpressionEmission, error) {
+	receiver, err := children.Expression(
+		context.
+			WithRole(api.RoleReceiverValue).
+			WithExpectedType(selected.Recv()),
+		source.X,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	targetSignature, err := callable.EmitAdapter(
+		context,
+		children,
+		source,
+		signature,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	nonNil, err := context.Names().Runtime(
+		api.RuntimeInterfaceNonNil,
+		api.ImportPhaseValue,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	member, err := context.Names().InterfaceMethodName(
+		selected.Obj().(*types.Func),
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	receiverName, err := context.Names().Temporary(
+		api.TemporaryReceiverValue,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	before := append(
+		receiver.Before(),
+		context.Factory().VariableStatement(
+			nil,
+			context.Factory().VariableDeclarationList(
+				[]tsgo.VariableDeclaration{
+					context.Factory().VariableDeclaration(
+						context.Factory().Identifier(receiverName),
+						nil,
+						nil,
+						context.Factory().CallExpression(
+							context.Factory().Identifier(nonNil.Name()),
+							nil,
+							nil,
+							[]tsgo.Expression{receiver.Value()},
+							tsgo.NodeFlagsNone,
+						),
+					),
+				},
+				tsgo.NodeFlagsConst,
+			),
+		),
+	)
+	call := context.Factory().CallExpression(
+		context.Factory().PropertyAccessExpression(
+			context.Factory().Identifier(receiverName),
+			nil,
+			context.Factory().Identifier(member),
+			tsgo.NodeFlagsNone,
+		),
+		nil,
+		nil,
+		targetSignature.ParameterReferences(context.Factory()),
+		tsgo.NodeFlagsNone,
+	)
+	return api.NewExpressionEmission(
+		before,
+		context.Factory().ArrowFunction(
+			nil,
+			nil,
+			targetSignature.Parameters(),
+			targetSignature.Result(),
+			context.Factory().EqualsGreaterThanToken(),
+			call,
+		),
+		api.CombineRequests(
+			receiver.Requests(),
+			targetSignature.Requests(),
+			nonNil.Requests(),
 		),
 	)
 }

@@ -97,7 +97,7 @@ func TestWaveFiveMethodsPrintTypecheckAndMatchGo(t *testing.T) {
 				t.Fatal(err)
 			}
 			workingDirectory := t.TempDir()
-			artifacts := materializeWaveFour(
+			artifacts := materializeArtifacts(
 				t,
 				emission,
 				workingDirectory,
@@ -230,6 +230,8 @@ func assertWaveFiveShape(t *testing.T, printed string) {
 		".bind(",
 		".call(",
 		".apply(",
+		"goPointerHash",
+		"class GoMapHash",
 	} {
 		if strings.Contains(printed, forbidden) {
 			t.Fatalf("Wave 5 artifacts contain %q:\n%s", forbidden, printed)

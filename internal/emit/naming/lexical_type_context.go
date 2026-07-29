@@ -7,7 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
 
-func WithLexicalGeneratedArtifacts(
+func WithLexicalTypeRequirements(
 	context api.Context,
 	source ast.Node,
 	owner api.ArtifactOwner,
@@ -38,19 +38,29 @@ func WithLexicalGeneratedArtifacts(
 		map[*types.TypeName][]api.DeclarationRequirement,
 	)
 	for _, requirement := range requirements {
-		artifact, generated := requirement.GeneratedArtifact()
-		if !generated {
+		var anchor *types.TypeName
+		if artifact, generated := requirement.GeneratedArtifact(); generated {
+			if artifact.Placement() !=
+				api.GeneratedArtifactPlacementLexical ||
+				artifact.ReconstructionOwner() != owner {
+				return api.Context{}, &api.InvariantError{
+					Role:   context.Role(),
+					Reason: "source artifact received a foreign lexical generated artifact",
+				}
+			}
+			anchor = artifact.LexicalAnchor()
+		} else if typeName, _, namedStruct :=
+			requirement.NamedStructOperation(); namedStruct {
+			if requirement.Owner() != owner {
+				return api.Context{}, &api.InvariantError{
+					Role:   context.Role(),
+					Reason: "source artifact received a foreign lexical named-type requirement",
+				}
+			}
+			anchor = typeName
+		} else {
 			continue
 		}
-		if artifact.Placement() !=
-			api.GeneratedArtifactPlacementLexical ||
-			artifact.ReconstructionOwner() != owner {
-			return api.Context{}, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "source artifact received a foreign lexical generated artifact",
-			}
-		}
-		anchor := artifact.LexicalAnchor()
 		if anchor == nil ||
 			anchor.Pos() < source.Pos() ||
 			anchor.Pos() > source.End() {
@@ -61,5 +71,5 @@ func WithLexicalGeneratedArtifacts(
 		}
 		byAnchor[anchor] = append(byAnchor[anchor], requirement)
 	}
-	return context.WithLexicalGeneratedArtifacts(owner, byAnchor), nil
+	return context.WithLexicalTypeRequirements(owner, byAnchor), nil
 }
