@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
 	genericdeclaration "github.com/tsoniclang/gotots/internal/emit/generic/declaration"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -80,8 +81,11 @@ func Emit(
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
-	parameters := targetSignature.Parameters()
-	parameters = append(genericParameters.Capabilities(), parameters...)
+	sourceParameters := targetSignature.Parameters()
+	parameters := append(
+		genericParameters.Capabilities(),
+		sourceParameters...,
+	)
 	parameterRequests := api.CombineRequests(
 		genericParameters.Requests(),
 		targetSignature.Requests(),
@@ -96,7 +100,18 @@ func Emit(
 		if err != nil {
 			return api.DeclarationEmission{}, err
 		}
-		parameters = append([]tsgo.ParameterDeclaration{receiver}, parameters...)
+		if signature.RecvTypeParams().Len() != 0 {
+			parameters = genericabi.Method(
+				genericParameters.Capabilities(),
+				receiver,
+				sourceParameters,
+			)
+		} else {
+			parameters = append(
+				[]tsgo.ParameterDeclaration{receiver},
+				sourceParameters...,
+			)
+		}
 		parameterRequests = append(receiverRequests, parameterRequests...)
 	}
 	body, err := callable.EmitBody(

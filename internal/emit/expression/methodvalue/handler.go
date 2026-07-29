@@ -6,6 +6,8 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
+	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -22,7 +24,21 @@ func Emit(
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	signature, ok := selected.Type().(*types.Signature)
-	if !ok || !callable.Supports(signature) {
+	if !ok {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	targetSignatureSource := signature
+	typeArguments := genericinstance.ReceiverTypeArguments(selected.Recv())
+	generic := signature.RecvTypeParams().Len() != 0
+	if generic {
+		var err error
+		targetSignatureSource, err =
+			genericinstance.ConcreteCallableSignature(signature)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	} else if !callable.Supports(signature) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
@@ -44,7 +60,7 @@ func Emit(
 		context,
 		children,
 		source,
-		signature,
+		targetSignatureSource,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -77,14 +93,53 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	callArguments := append(
-		[]tsgo.Expression{context.Factory().Identifier(receiverName)},
-		arguments...,
+	var targetTypeArguments []tsgo.TypeNode
+	var typeRequests []api.RootRequest
+	var capabilities []tsgo.Expression
+	var capabilityRequests []api.RootRequest
+	if generic {
+		owner := method.Origin()
+		operationSet, resolved, resolveErr :=
+			context.ResolveGenericCallable(owner)
+		if resolveErr != nil {
+			return api.ExpressionEmission{}, resolveErr
+		}
+		if !resolved ||
+			typeArguments == nil ||
+			typeArguments.Len() != len(operationSet.Parameters()) {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		targetTypeArguments, typeRequests, err =
+			genericinstance.EmitTypeArguments(
+				context,
+				children,
+				source,
+				typeArguments,
+			)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		capabilities, capabilityRequests, err =
+			genericinstance.EmitCapabilities(
+				context,
+				source,
+				operationSet,
+				typeArguments,
+			)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	}
+	callArguments := genericabi.Method[tsgo.Expression](
+		capabilities,
+		context.Factory().Identifier(receiverName),
+		arguments,
 	)
 	call := context.Factory().CallExpression(
 		context.Factory().Identifier(reference.Name()),
 		nil,
-		nil,
+		targetTypeArguments,
 		callArguments,
 		tsgo.NodeFlagsNone,
 	)
@@ -101,6 +156,8 @@ func Emit(
 		api.CombineRequests(
 			receiver.Requests(),
 			targetSignature.Requests(),
+			typeRequests,
+			capabilityRequests,
 			reference.Requests(),
 		),
 	)

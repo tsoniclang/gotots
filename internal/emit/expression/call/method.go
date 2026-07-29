@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
@@ -145,21 +146,17 @@ func emitGenericReceiverMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	arguments := receiverTypeArguments(signature.Recv().Type())
+	arguments := genericinstance.ReceiverTypeArguments(signature.Recv().Type())
 	if !ok ||
 		arguments == nil ||
 		arguments.Len() != len(callable.Parameters()) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	concrete := types.NewSignatureType(
-		signature.Recv(),
-		nil,
-		nil,
-		signature.Params(),
-		signature.Results(),
-		signature.Variadic(),
-	)
+	concrete, err := genericinstance.ConcreteCallableSignature(signature)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	if err := validateResults(context, source, concrete, discarded); err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -221,8 +218,11 @@ func emitGenericReceiverMethod(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	callArguments := append([]tsgo.Expression{receiverValue}, capabilities...)
-	callArguments = append(callArguments, sourceArguments...)
+	callArguments := genericabi.Method(
+		capabilities,
+		receiverValue,
+		sourceArguments,
+	)
 	return api.NewExpressionEmission(
 		before,
 		context.Factory().CallExpression(
@@ -241,19 +241,6 @@ func emitGenericReceiverMethod(
 			reference.Requests(),
 		),
 	)
-}
-
-func receiverTypeArguments(sourceType types.Type) *types.TypeList {
-	if pointer, ok := types.Unalias(sourceType).(*types.Pointer); ok {
-		sourceType = pointer.Elem()
-	}
-	named, ok := types.Unalias(sourceType).(*types.Named)
-	if !ok ||
-		named.TypeParams().Len() == 0 ||
-		named.TypeArgs().Len() != named.TypeParams().Len() {
-		return nil
-	}
-	return named.TypeArgs()
 }
 
 func emitInterfaceMethod(

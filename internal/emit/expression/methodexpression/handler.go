@@ -6,6 +6,8 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
+	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -26,11 +28,14 @@ func Emit(
 	); interfaceReceiver {
 		return emitInterface(context, children, source, selected)
 	}
-	if method, direct := selectionvalue.DirectMethodExpression(
+	method, direct := selectionvalue.DirectMethodExpression(
 		context,
 		source,
 		selected,
-	); direct {
+	)
+	typeArguments := genericinstance.ReceiverTypeArguments(selected.Recv())
+	generic := typeArguments != nil
+	if direct && !generic {
 		reference, err := context.Names().Reference(method)
 		if err != nil {
 			return api.ExpressionEmission{}, err
@@ -42,7 +47,6 @@ func Emit(
 	}
 	signature, ok := selected.Type().(*types.Signature)
 	if !ok ||
-		!callable.Supports(signature) ||
 		signature.Params().Len() == 0 ||
 		!types.Identical(
 			signature.Params().At(0).Type(),
@@ -51,11 +55,23 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	targetSignatureSource := signature
+	if generic {
+		var err error
+		targetSignatureSource, err =
+			genericinstance.ConcreteCallableSignature(signature)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	} else if !callable.Supports(signature) {
+		return api.ExpressionEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
 	targetSignature, err := callable.EmitAdapter(
 		context,
 		children,
 		source,
-		signature,
+		targetSignatureSource,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -75,14 +91,52 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	arguments := append(
-		[]tsgo.Expression{receiver.Value()},
-		parameters[1:]...,
+	var targetTypeArguments []tsgo.TypeNode
+	var typeRequests []api.RootRequest
+	var capabilities []tsgo.Expression
+	var capabilityRequests []api.RootRequest
+	if generic {
+		owner := method.Origin()
+		operationSet, resolved, resolveErr :=
+			context.ResolveGenericCallable(owner)
+		if resolveErr != nil {
+			return api.ExpressionEmission{}, resolveErr
+		}
+		if !resolved ||
+			typeArguments.Len() != len(operationSet.Parameters()) {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		targetTypeArguments, typeRequests, err =
+			genericinstance.EmitTypeArguments(
+				context,
+				children,
+				source,
+				typeArguments,
+			)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		capabilities, capabilityRequests, err =
+			genericinstance.EmitCapabilities(
+				context,
+				source,
+				operationSet,
+				typeArguments,
+			)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+	}
+	arguments := genericabi.Method(
+		capabilities,
+		receiver.Value(),
+		parameters[1:],
 	)
 	call := context.Factory().CallExpression(
 		context.Factory().Identifier(reference.Name()),
 		nil,
-		nil,
+		targetTypeArguments,
 		arguments,
 		tsgo.NodeFlagsNone,
 	)
@@ -114,6 +168,8 @@ func Emit(
 		api.CombineRequests(
 			receiver.Requests(),
 			targetSignature.Requests(),
+			typeRequests,
+			capabilityRequests,
 			reference.Requests(),
 		)...,
 	), nil

@@ -19,6 +19,7 @@ import (
 	compositeliteral "github.com/tsoniclang/gotots/internal/emit/expression/compositeliteral"
 	dereferenceexpression "github.com/tsoniclang/gotots/internal/emit/expression/dereference"
 	functionliteral "github.com/tsoniclang/gotots/internal/emit/expression/functionliteral"
+	genericfunctionvalue "github.com/tsoniclang/gotots/internal/emit/expression/genericfunctionvalue"
 	identifierexpression "github.com/tsoniclang/gotots/internal/emit/expression/identifier"
 	indexexpression "github.com/tsoniclang/gotots/internal/emit/expression/index"
 	complexliteral "github.com/tsoniclang/gotots/internal/emit/expression/literal/complex"
@@ -272,7 +273,25 @@ func (e *emitter) Expression(
 	case *ast.Ident:
 		return adapt(identifierexpression.Emit(operandContext, e, source))
 	case *ast.IndexExpr:
+		if target, handled, err := genericfunctionvalue.Emit(
+			operandContext,
+			e,
+			source,
+		); handled {
+			return adapt(target, err)
+		}
 		return adapt(indexexpression.Emit(operandContext, e, source))
+	case *ast.IndexListExpr:
+		target, handled, err := genericfunctionvalue.Emit(
+			operandContext,
+			e,
+			source,
+		)
+		if !handled {
+			return api.ExpressionEmission{},
+				api.Unsupported(operandContext, api.CategoryExpression, source)
+		}
+		return adapt(target, err)
 	case *ast.ParenExpr:
 		return adapt(parenthesizedexpression.Emit(operandContext, e, source))
 	case *ast.SelectorExpr:

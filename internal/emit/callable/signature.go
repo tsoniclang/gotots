@@ -415,9 +415,26 @@ func Signature(sourceType types.Type) (*types.Signature, bool) {
 }
 
 func Supports(signature *types.Signature) bool {
-	return signature != nil &&
-		signature.TypeParams().Len() == 0 &&
-		signature.RecvTypeParams().Len() == 0
+	if signature == nil || signature.TypeParams().Len() != 0 {
+		return false
+	}
+	if signature.RecvTypeParams().Len() == 0 {
+		return true
+	}
+	if api.ContainsGenericTypeParameter(signature) {
+		return false
+	}
+	if signature.Recv() == nil {
+		return true
+	}
+	receiverType := signature.Recv().Type()
+	if pointer, ok := types.Unalias(receiverType).(*types.Pointer); ok {
+		receiverType = pointer.Elem()
+	}
+	named, ok := types.Unalias(receiverType).(*types.Named)
+	return ok &&
+		named.TypeParams().Len() != 0 &&
+		named.TypeArgs().Len() == named.TypeParams().Len()
 }
 
 func fieldMatchesVariable(

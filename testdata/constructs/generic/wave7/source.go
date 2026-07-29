@@ -107,6 +107,43 @@ func EqualBox[T comparable](left, right Box[T]) bool {
 	return left == right
 }
 
+func RecursiveAdd[T Integer](value, increment T, remaining int32) T {
+	if remaining == 0 {
+		return value
+	}
+	return RecursiveAdd(value+increment, increment, remaining-1)
+}
+
+func MutualAddA[T Integer](value, increment T, remaining int32) T {
+	if remaining == 0 {
+		return value
+	}
+	return MutualAddB(value+increment, increment, remaining-1)
+}
+
+func MutualAddB[T Integer](value, increment T, remaining int32) T {
+	if remaining == 0 {
+		return value
+	}
+	return MutualAddA(value+increment, increment, remaining-1)
+}
+
+func CallableValues() []int32 {
+	identity := Identity[int32]
+	box := Box[int32]{Value: 8}
+	boundGet := box.Get
+	unboundGet := Box[int32].Get
+	externalMake := support.Make[int32]
+	external := externalMake(9)
+	externalGet := external.Get
+	return []int32{
+		identity(7),
+		boundGet(),
+		unboundGet(box),
+		externalGet(),
+	}
+}
+
 func AuditFunctions() []int32 {
 	first := Identity(int32(4))
 	second := Add[int32](first, 5)
@@ -127,6 +164,8 @@ func Audit() []int32 {
 	empty := ZeroBox[int32]()
 	firstComparable := ComparableBox[int32]{Value: 5}
 	secondComparable := ComparableBox[int32]{Value: 5}
+	boundSame := firstComparable.Same
+	unboundSame := ComparableBox[int32].Same
 	external := support.Make(int32(6))
 	zero := Zero[int32]()
 	if !Equal(copied.Get(), int32(9)) ||
@@ -134,6 +173,8 @@ func Audit() []int32 {
 		!Equal(empty.Get(), int32(0)) ||
 		!EqualBox(box, copied) ||
 		!firstComparable.Same(secondComparable) ||
+		!boundSame(secondComparable) ||
+		!unboundSame(firstComparable, secondComparable) ||
 		!Equal(external.Get(), int32(6)) {
 		return []int32{-1}
 	}
@@ -143,5 +184,11 @@ func Audit() []int32 {
 		RecursiveValue(),
 		MutualValue(),
 		external.Get(),
+		RecursiveAdd(int32(1), int32(1), 2),
+		MutualAddA(int32(1), int32(1), 2),
+		CallableValues()[0],
+		CallableValues()[1],
+		CallableValues()[2],
+		CallableValues()[3],
 	}
 }

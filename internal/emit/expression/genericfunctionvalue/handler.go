@@ -1,46 +1,51 @@
-package call
+package genericfunctionvalue
 
 import (
 	"go/ast"
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/callable"
 	genericinstance "github.com/tsoniclang/gotots/internal/emit/generic/instance"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func emitGeneric(
+func Emit(
 	context api.Context,
 	children api.ChildEmitter,
-	source *ast.CallExpr,
-	discarded bool,
+	source ast.Expr,
 ) (api.ExpressionEmission, bool, error) {
-	owner, instance, ok := genericFunctionInstance(
-		context,
+	switch source.(type) {
+	case *ast.IndexExpr, *ast.IndexListExpr:
+	default:
+		return api.ExpressionEmission{}, false, nil
+	}
+	owner, instance, ok := genericinstance.FunctionEvidence(
+		context.TypesInfo(),
 		source,
 	)
 	if !ok {
 		return api.ExpressionEmission{}, false, nil
 	}
 	signature, ok := instance.Type.(*types.Signature)
-	if !ok || signature.Recv() != nil {
+	if !ok ||
+		signature.Recv() != nil ||
+		!callable.Supports(signature) ||
+		!types.Identical(context.TypesInfo().TypeOf(source), signature) {
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	callable, ok, err := context.ResolveGenericCallable(owner)
+	operationSet, resolved, err := context.ResolveGenericCallable(owner)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	if !ok ||
+	if !resolved ||
 		instance.TypeArgs == nil ||
-		instance.TypeArgs.Len() != len(callable.Parameters()) {
+		instance.TypeArgs.Len() != len(operationSet.Parameters()) {
 		return api.ExpressionEmission{}, true,
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	if err := validateResults(context, source, signature, discarded); err != nil {
-		return api.ExpressionEmission{}, true, err
-	}
-	reference, err := context.Names().Reference(owner)
+	target, err := callable.EmitAdapter(context, children, source, signature)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
@@ -56,48 +61,40 @@ func emitGeneric(
 	capabilities, capabilityRequests, err := genericinstance.EmitCapabilities(
 		context,
 		source,
-		callable,
+		operationSet,
 		instance.TypeArgs,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	arguments, before, argumentRequests, err := emitArguments(
-		context,
-		children,
-		source,
-		signature,
-		false,
-	)
+	reference, err := context.Names().Reference(owner)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	arguments = append(capabilities, arguments...)
-	result, err := api.NewExpressionEmission(
-		before,
-		context.Factory().CallExpression(
-			context.Factory().Identifier(reference.Name()),
+	arguments := append(
+		capabilities,
+		target.ParameterReferences(context.Factory())...,
+	)
+	return api.DirectExpression(
+		context.Factory().ArrowFunction(
 			nil,
-			typeArguments,
-			arguments,
-			tsgo.NodeFlagsNone,
+			nil,
+			target.Parameters(),
+			target.Result(),
+			context.Factory().EqualsGreaterThanToken(),
+			context.Factory().CallExpression(
+				context.Factory().Identifier(reference.Name()),
+				nil,
+				typeArguments,
+				arguments,
+				tsgo.NodeFlagsNone,
+			),
 		),
 		api.CombineRequests(
-			reference.Requests(),
+			target.Requests(),
 			typeRequests,
 			capabilityRequests,
-			argumentRequests,
-		),
-	)
-	return result, true, err
-}
-
-func genericFunctionInstance(
-	context api.Context,
-	source *ast.CallExpr,
-) (*types.Func, types.Instance, bool) {
-	if source == nil {
-		return nil, types.Instance{}, false
-	}
-	return genericinstance.FunctionEvidence(context.TypesInfo(), source.Fun)
+			reference.Requests(),
+		)...,
+	), true, nil
 }
