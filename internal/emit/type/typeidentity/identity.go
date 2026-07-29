@@ -12,6 +12,31 @@ import (
 
 type NamedObjectIdentity func(*types.TypeName) (string, error)
 
+type TypeParameterIdentity func(*types.TypeParam) (string, error)
+
+type identityOwner struct {
+	namedObject   NamedObjectIdentity
+	typeParameter TypeParameterIdentity
+}
+
+func NamedObjectKey(
+	object *types.TypeName,
+) (string, error) {
+	if object == nil || object.Pkg() == nil {
+		return "", &api.NameError{
+			Reason: "generated-artifact named component has no package identity",
+		}
+	}
+	if object.Parent() != object.Pkg().Scope() ||
+		object.Parent().Lookup(object.Name()) != object {
+		return "", &api.NameError{
+			Name:   object.Name(),
+			Reason: "generated-artifact named component is not package-owned",
+		}
+	}
+	return object.Pkg().Path() + "|" + object.Name(), nil
+}
+
 func LocalComponent(sourceType types.Type) (*types.TypeName, bool) {
 	components := LocalComponents(sourceType)
 	if len(components) == 0 {
@@ -73,6 +98,15 @@ func collectLocalComponents(
 	case *types.Signature:
 		collectLocalTupleComponents(source.Params(), seen, components)
 		collectLocalTupleComponents(source.Results(), seen, components)
+	case *types.Interface:
+		source = source.Complete()
+		for index := range source.NumMethods() {
+			collectLocalComponents(
+				source.Method(index).Type(),
+				seen,
+				components,
+			)
+		}
 	}
 }
 
@@ -97,12 +131,37 @@ func BuildKey(
 	sourceType types.Type,
 	namedObjectIdentity NamedObjectIdentity,
 ) (string, error) {
+	return buildKey(sourceType, identityOwner{
+		namedObject: namedObjectIdentity,
+	})
+}
+
+func BuildParameterizedKey(
+	sourceType types.Type,
+	namedObjectIdentity NamedObjectIdentity,
+	typeParameterIdentity TypeParameterIdentity,
+) (string, error) {
+	if typeParameterIdentity == nil {
+		return "", &api.NameError{
+			Reason: "generated-artifact type-parameter identity owner is nil",
+		}
+	}
+	return buildKey(sourceType, identityOwner{
+		namedObject:   namedObjectIdentity,
+		typeParameter: typeParameterIdentity,
+	})
+}
+
+func buildKey(
+	sourceType types.Type,
+	owner identityOwner,
+) (string, error) {
 	if sourceType == nil {
 		return "", &api.NameError{
 			Reason: "generated-artifact Go type is nil",
 		}
 	}
-	if namedObjectIdentity == nil {
+	if owner.namedObject == nil {
 		return "", &api.NameError{
 			Reason: "generated-artifact named-object identity owner is nil",
 		}
@@ -111,7 +170,7 @@ func BuildKey(
 	if err := appendTypeDescriptor(
 		&descriptor,
 		sourceType,
-		namedObjectIdentity,
+		owner,
 	); err != nil {
 		return "", err
 	}
@@ -122,7 +181,7 @@ func BuildKey(
 func appendTypeDescriptor(
 	target *strings.Builder,
 	sourceType types.Type,
-	namedObjectIdentity NamedObjectIdentity,
+	owner identityOwner,
 ) error {
 	sourceType = types.Unalias(sourceType)
 	switch source := sourceType.(type) {
@@ -137,7 +196,7 @@ func appendTypeDescriptor(
 				Reason: "generated-artifact named type has no declaration",
 			}
 		}
-		identity, err := namedObjectIdentity(object)
+		identity, err := owner.namedObject(object)
 		if err != nil {
 			return err
 		}
@@ -147,35 +206,62 @@ func appendTypeDescriptor(
 			if err := appendTypeDescriptor(
 				target,
 				source.TypeArgs().At(index),
-				namedObjectIdentity,
+				owner,
 			); err != nil {
 				return err
 			}
 		}
+	case *types.TypeParam:
+		if owner.typeParameter == nil {
+			name := ""
+			if source.Obj() != nil {
+				name = source.Obj().Name()
+			}
+			return &api.NameError{
+				Name:   name,
+				Reason: "generated-artifact type parameter has no identity owner",
+			}
+		}
+		identity, err := owner.typeParameter(source)
+		if err != nil {
+			return err
+		}
+		if identity == "" {
+			name := ""
+			if source.Obj() != nil {
+				name = source.Obj().Name()
+			}
+			return &api.NameError{
+				Name:   name,
+				Reason: "generated-artifact type parameter has empty identity",
+			}
+		}
+		appendPart(target, "type-parameter")
+		appendPart(target, identity)
 	case *types.Pointer:
 		appendPart(target, "pointer")
-		return appendTypeDescriptor(target, source.Elem(), namedObjectIdentity)
+		return appendTypeDescriptor(target, source.Elem(), owner)
 	case *types.Slice:
 		appendPart(target, "slice")
-		return appendTypeDescriptor(target, source.Elem(), namedObjectIdentity)
+		return appendTypeDescriptor(target, source.Elem(), owner)
 	case *types.Array:
 		appendPart(target, "array")
 		appendPart(target, strconv.FormatInt(source.Len(), 10))
-		return appendTypeDescriptor(target, source.Elem(), namedObjectIdentity)
+		return appendTypeDescriptor(target, source.Elem(), owner)
 	case *types.Map:
 		appendPart(target, "map")
 		if err := appendTypeDescriptor(
 			target,
 			source.Key(),
-			namedObjectIdentity,
+			owner,
 		); err != nil {
 			return err
 		}
-		return appendTypeDescriptor(target, source.Elem(), namedObjectIdentity)
+		return appendTypeDescriptor(target, source.Elem(), owner)
 	case *types.Chan:
 		appendPart(target, "channel")
 		appendPart(target, strconv.Itoa(int(source.Dir())))
-		return appendTypeDescriptor(target, source.Elem(), namedObjectIdentity)
+		return appendTypeDescriptor(target, source.Elem(), owner)
 	case *types.Struct:
 		appendPart(target, "struct")
 		appendPart(target, strconv.Itoa(source.NumFields()))
@@ -192,7 +278,7 @@ func appendTypeDescriptor(
 			if err := appendTypeDescriptor(
 				target,
 				field.Type(),
-				namedObjectIdentity,
+				owner,
 			); err != nil {
 				return err
 			}
@@ -203,15 +289,46 @@ func appendTypeDescriptor(
 		if err := appendTupleDescriptor(
 			target,
 			source.Params(),
-			namedObjectIdentity,
+			owner,
 		); err != nil {
 			return err
 		}
 		return appendTupleDescriptor(
 			target,
 			source.Results(),
-			namedObjectIdentity,
+			owner,
 		)
+	case *types.Interface:
+		source = source.Complete()
+		if !source.IsMethodSet() {
+			return &api.NameError{
+				Reason: "constraint interface has no runtime generated-artifact identity",
+			}
+		}
+		appendPart(target, "interface")
+		appendPart(target, strconv.Itoa(source.NumMethods()))
+		for index := range source.NumMethods() {
+			method := source.Method(index)
+			appendPart(target, method.Name())
+			packagePath := ""
+			if !method.Exported() && method.Pkg() != nil {
+				packagePath = method.Pkg().Path()
+			}
+			appendPart(target, packagePath)
+			signature, ok := method.Type().(*types.Signature)
+			if !ok {
+				return &api.NameError{
+					Reason: "interface method has no signature identity",
+				}
+			}
+			if err := appendTypeDescriptor(
+				target,
+				receiverFreeSignature(signature),
+				owner,
+			); err != nil {
+				return err
+			}
+		}
 	default:
 		return &api.NameError{
 			Reason: "Go type has no deterministic generated-artifact key",
@@ -220,10 +337,23 @@ func appendTypeDescriptor(
 	return nil
 }
 
+func receiverFreeSignature(
+	signature *types.Signature,
+) *types.Signature {
+	return types.NewSignatureType(
+		nil,
+		nil,
+		nil,
+		signature.Params(),
+		signature.Results(),
+		signature.Variadic(),
+	)
+}
+
 func appendTupleDescriptor(
 	target *strings.Builder,
 	tuple *types.Tuple,
-	namedObjectIdentity NamedObjectIdentity,
+	owner identityOwner,
 ) error {
 	if tuple == nil {
 		appendPart(target, "0")
@@ -234,7 +364,7 @@ func appendTupleDescriptor(
 		if err := appendTypeDescriptor(
 			target,
 			tuple.At(index).Type(),
-			namedObjectIdentity,
+			owner,
 		); err != nil {
 			return err
 		}

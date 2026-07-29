@@ -85,21 +85,11 @@ func TestDefinedArrayHasOneMinimalNominalTargetClass(t *testing.T) {
 		}
 	}
 	pair := classes["Pair"]
-	if pair == nil || len(pair.Members()) != 4 {
+	if pair == nil || len(pair.Members()) != 2 {
 		t.Fatalf(
-			"addressed Pair members = %d, want brand, constructor, get, set",
+			"Pair members = %d, want brand and constructor only",
 			classMemberCount(pair),
 		)
-	}
-	methods := map[string]bool{}
-	for _, member := range pair.Members() {
-		method, ok := member.(tsgo.MethodDeclaration)
-		if ok {
-			methods[method.Name().(tsgo.Identifier).Text()] = true
-		}
-	}
-	if !methods["get"] || !methods["set"] {
-		t.Fatalf("addressed Pair methods = %v", methods)
 	}
 	other := classes["Other"]
 	if other == nil || len(other.Members()) != 2 {

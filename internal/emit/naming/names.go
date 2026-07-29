@@ -44,19 +44,33 @@ func NewOwner(
 	}
 	objectsByScope := make(map[*types.Scope][]types.Object)
 	seen := make(map[types.Object]struct{})
-	for _, object := range info.Defs {
+	var labels []*types.Label
+	record := func(object types.Object) {
 		if object == nil || object.Name() == "_" {
-			continue
+			return
 		}
 		owner.sourceNameBases[portableIdentifier(object.Name())] = struct{}{}
+		if label, ok := object.(*types.Label); ok {
+			if _, exists := seen[label]; !exists {
+				seen[label] = struct{}{}
+				labels = append(labels, label)
+			}
+			return
+		}
 		if object.Parent() == nil {
-			continue
+			return
 		}
 		if _, exists := seen[object]; exists {
-			continue
+			return
 		}
 		seen[object] = struct{}{}
 		objectsByScope[object.Parent()] = append(objectsByScope[object.Parent()], object)
+	}
+	for _, object := range info.Defs {
+		record(object)
+	}
+	for _, object := range info.Implicits {
+		record(object)
 	}
 	if packageScope != nil {
 		owner.preallocateScope(
@@ -67,8 +81,27 @@ func NewOwner(
 		)
 		owner.preallocateMethods(info)
 		owner.preallocateMembers(packageScope)
+		owner.preallocateAnonymousMembers(info)
 	}
+	owner.preallocateLabels(labels)
 	return owner
+}
+
+func (n *Owner) preallocateLabels(labels []*types.Label) {
+	slices.SortFunc(labels, func(left, right *types.Label) int {
+		return compareNameObjects(left, right)
+	})
+	counts := make(map[string]uint64)
+	for _, label := range labels {
+		base := portableIdentifier(label.Name())
+		index := counts[base]
+		counts[base]++
+		name := base
+		if index != 0 {
+			name += "__label_" + strconv.FormatUint(index, 10)
+		}
+		n.targetNameByObject[label] = name
+	}
 }
 
 func (n *Owner) Reserve(
@@ -392,21 +425,47 @@ func (n *Owner) preallocateMembers(packageScope *types.Scope) {
 		if !ok {
 			continue
 		}
-		used := map[string]struct{}{
-			"constructor": {},
+		n.preallocateStructMembers(structType)
+	}
+}
+
+func (n *Owner) preallocateAnonymousMembers(info *types.Info) {
+	seen := make(map[*types.Struct]struct{})
+	for _, typeAndValue := range info.Types {
+		structType, ok := types.Unalias(typeAndValue.Type).(*types.Struct)
+		if !ok {
+			continue
 		}
-		for index := range structType.NumFields() {
-			field := structType.Field(index)
-			base := portableIdentifier(field.Name())
-			candidate := base
-			for suffix := uint64(1); ; suffix++ {
-				if _, duplicate := used[candidate]; !duplicate {
-					break
-				}
-				candidate = base + "__field_" + strconv.FormatUint(suffix, 10)
+		if _, exists := seen[structType]; exists {
+			continue
+		}
+		seen[structType] = struct{}{}
+		n.preallocateStructMembers(structType)
+	}
+}
+
+func (n *Owner) preallocateStructMembers(structType *types.Struct) {
+	if structType == nil {
+		return
+	}
+	used := map[string]struct{}{
+		"constructor": {},
+	}
+	for index := range structType.NumFields() {
+		field := structType.Field(index)
+		if existing := n.memberNameByObject[field]; existing != "" {
+			used[existing] = struct{}{}
+			continue
+		}
+		base := portableIdentifier(field.Name())
+		candidate := base
+		for suffix := uint64(1); ; suffix++ {
+			if _, duplicate := used[candidate]; !duplicate {
+				break
 			}
-			used[candidate] = struct{}{}
-			n.memberNameByObject[field] = candidate
+			candidate = base + "__field_" + strconv.FormatUint(suffix, 10)
 		}
+		used[candidate] = struct{}{}
+		n.memberNameByObject[field] = candidate
 	}
 }

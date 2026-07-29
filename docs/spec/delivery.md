@@ -221,29 +221,34 @@ create a value IR or a generic operation registry.
    checked runtime operations; the `number` profile keeps them unsupported
    rather than approximating Go integer truncation.
 2. Go strings use one byte-preserving target representation. Source literals,
-   concatenation, ordered/equality comparison, `len`, indexing, and two-index
-   slicing are exact over arbitrary Go string bytes. Rune conversion,
-   iteration, formatting, and external text encoding remain separate
-   boundaries.
+   concatenation, ordered/equality comparison, `len`, indexing, two-index
+   slicing, integer/rune encoding, and byte/rune slice conversions are exact
+   over arbitrary Go string bytes. String range, formatting, and external text
+   encoding remain separate boundaries.
 3. Fixed-length arrays of admitted recursively represented elements support
    zero, copy, equality, literals, indexing/stores, `len`, and `cap`. Target
    types retain the array length. A defined array has one minimal nominal
    wrapper around the same exact array storage; aliases add no wrapper.
    Aggregate-element zero, literal, and copy operations are requested only
    when the element representation requires structural copying, while the
-   scalar-only runtime artifact remains byte-identical.
+   scalar-only runtime artifact remains byte-identical. The compiler emits
+   direct typed loops that call the selected element operations; runtime array
+   values receive no semantic function.
 4. Unnamed slices of admitted recursively represented elements support nil,
    `make`, literals, indexing/stores, two- and three-index slicing, `len`,
    `cap`, `append`, and `copy`. The representation preserves backing-store
    aliasing, offset, length, capacity, append reallocation, fresh zero values,
    aggregate-element copying, and overlap-safe copy. Aggregate operations are
    demand-selected; scalar-only slice artifacts do not acquire aggregate
-   callbacks or methods. Defined slice identity remains a separate named-type
-   obligation.
+   methods, strategy fields, or helper declarations. Aggregate behavior is
+   emitted as direct typed TS-Go AST at the source operation and uses only
+   structural descriptor members. Defined slice identity remains a separate
+   named-type obligation.
 5. Unnamed maps with represented scalar comparable keys and represented scalar
    values support nil, `make`, literals, lookup, comma-ok lookup, stores,
    `delete`, and `len`. Missing lookup returns the exact value zero; writes to a
-   nil map fail at runtime; map iteration remains deferred.
+   nil map fail at runtime; map iteration is deferred from this checkpoint to
+   Milestone 3C.
 6. Pointers whose element has an admitted complete value representation
    support nil, `new`, dereference read and store, assignment,
    return/argument passing, and canonical-location equality. The current
@@ -256,9 +261,8 @@ create a value IR or a generic operation registry.
    composite literals, and `&*pointer`. Only exact addressed variables become
    cells. Package `init` bodies use the same reconstructible artifact
    lifecycle. Direct pointer-receiver calls and value-receiver calls through
-   pointers preserve Go nil, addressability, and copy behavior; method values,
-   method expressions, embedding/promotion, and interface dispatch remain
-   their separately proved families.
+   pointers preserve Go nil, addressability, and copy behavior. Interface
+   dispatch remains its separately proved family.
 
 The generated runtime boundary is demand-driven and typed. Each family owns
 its runtime module and exported operations; source handlers request imports by
@@ -268,15 +272,17 @@ computes the cycle-free transitive closure, emits each symbol once, and creates
 canonical static ESM imports between runtime modules. Runtime files are
 constructed as TS-Go AST and printed by the pinned TS-Go printer.
 
-All admitted runtime failures enter one generated `GoPanic<T>` carrier.
-`runtime/panic.ts` is the only runtime module that constructs a target
-`ThrowStatement`; integer, string, pointer, array, slice, and map modules
-request it through the dependency graph. Source-level `panic` and `recover`
-remain a later semantic family, so this checkpoint proves failure occurrence
-and carrier identity, not yet recovered runtime-fault payload equivalence.
+All admitted runtime failures enter one generated non-generic `GoPanic`
+carrier. `runtime/panic.ts` is the only runtime module that creates and
+initially throws that carrier; integer, string, pointer, array, slice, and map
+modules request it through the dependency graph. The function-control
+milestone adds source `panic`/`recover`, exact recovered runtime-error
+contracts, and a distinct canonical `*runtime.PanicNilError` dynamic identity.
+A callable envelope may rethrow an unrecognized host exception unchanged, but
+may not interpret it as a Go panic.
 
 One builtin-object dispatcher owns `new`, `make`, `len`, `cap`, `append`,
-`copy`, and `delete`. One accessor-store transaction owns Go evaluation order
+`copy`, `delete`, and `clear`. One accessor-store transaction owns Go evaluation order
 for array, slice, and map stores, including the captured getter/setter location
 used by compound defined-value updates. Family owners provide typed operands
 and members; they do not rediscover builtin identity or install assignment
@@ -284,6 +290,34 @@ routes.
 No checked-in TypeScript, source fragment, template, raw export spelling,
 handler-local duplicate implementation, or family-specific store transaction
 is allowed.
+
+The expression-completion checkpoint additionally treats a variadic signature
+as one represented Go-slice parameter. Calls perform Go's tuple adjustment
+before variadic packing, project defined slices for `slice...`, and never use
+host argument spreading for a source slice. `append` spread follows Go
+element-identity admission rather than slice assignability and includes the
+language-defined `[]byte` plus string case. `new(x)` evaluates `x` once and
+initializes a fresh pointer cell with the selected value copy; `new(T)` remains
+the distinct type-form zero-value operation.
+
+The same checkpoint admits represented struct conversion through one
+demand-owned `$convert` member on the destination class and slice-to-array
+value conversion through one source-site typed loop. It also treats checker-
+constant `len`/`cap` as non-evaluating expressions, including array and
+pointer-to-array operands, while nonconstant pointer-to-array expressions are
+evaluated exactly once. Pointer reinterpretation and slice-to-array-pointer
+conversion use the canonical pointer-storage representation. A pointer carries
+distinct logical and storage type arguments; value-family owners project and
+restore storage at the typed load/store site, while the pointer runtime owns
+only address identity and storage access. Named/generated structs reconstruct
+to a storage-backed private layout only when the storage facet is demanded.
+Casts, erased payloads, shape tests, and semantic read/write adapters remain
+forbidden. A defined array's canonical storage is its underlying `GoArray`,
+so its nominal wrapper never grows pointer-only forwarding methods.
+Slice-to-array pointers are offset-aware aliases of existing slice backing,
+preserve nil-versus-empty behavior at length zero, panic before construction
+when short, and copy only when Go later assigns an array value through the
+pointer.
 
 The checkpoint exits only when all six families:
 
@@ -336,6 +370,188 @@ artifacts remain byte-identical, definitions grow `O(type shape)`, use sites
 remain constant-size, aggregate stores/lookups preserve Go copies, and the
 twenty largest changed type and operation artifacts pass strict, differential,
 mutation, source-size, typecheck, runtime, and broad-deletion review.
+
+### 3C. Structured Control And Range
+
+Complete classic `for`, expression switch, local declaration transactions,
+empty statements, labeled break/continue, and range over arrays,
+pointer-to-arrays, slices, strings, maps, and integers. Channel and iterator
+range remain with their semantic dependencies.
+
+This checkpoint replaces narrow header-only and primitive-switch boundaries
+atomically. Parent statement owners select direct target forms when exact and
+construct one source-proportional structured form otherwise. It introduces no
+control-flow IR, generic statement visitor, unrolled collection loop, or
+parallel clause-emission route.
+
+Exit requires both integer profiles to pass typed TS-Go encode/print, strict
+TypeScript, and Go-versus-generated-ESM differential tests for:
+
+- constant and evaluated array-range operands, copy versus alias behavior,
+  per-iteration addresses, blanks, assignment targets, and integer limits;
+- UTF-8 string byte indexes including invalid encodings;
+- map nil/deletion/copy behavior using a key snapshot plus live lookup;
+- direct and prerequisite-bearing loop clauses, including labeled continue;
+- direct and custom-equality expression switches, ordered case prerequisites,
+  default placement, and fallthrough; and
+- local multi-result and blank declaration transactions.
+
+Generated loop size is independent of collection length, switch construction is
+linear in source cases, each body is emitted once, exact label identity ignores
+source-spelling mutations, and the superseded target-header-only result API is
+absent.
+
+### 3D. Concrete Methods, Embedding, And Promotion
+
+Complete methods on represented non-generic named types, named and anonymous
+embedded fields, promoted field reads/stores/addresses, promoted concrete
+calls, method values, and method expressions.
+
+One selection-path owner consumes exact `go/types.Selection` evidence for all
+of those contexts. Receiver declarations remain named top-level functions.
+Embedding remains class-field composition; ordinary concrete calls never
+become target virtual dispatch. Method values capture their selected receiver
+once, while method expressions use the existing receiver function directly or
+one typed adapter when promotion/receiver adjustment requires it.
+
+This checkpoint exits only when:
+
+- every `types.SelectionKind` used by the admitted concrete family has one
+  contextual owner;
+- selection kind, object identity, receiver/result types, and complete index
+  path are exact-joined to checker evidence;
+- value-receiver copy, implicit address-taking, embedded-pointer dereference,
+  and nil panic timing match Go;
+- source-spelling mutation is byte-stable and mismatched selection identity
+  fails closed;
+- generated output contains no `extends`, `.call`, `.apply`, `.bind`, erased
+  payload, or implementer switch;
+- each use is constant-size apart from its selected embedding depth, and
+  1x/2x/4x depth fixtures grow linearly; and
+- both integer profiles pass TS-Go encode/print, strict typechecking, and
+  Go-versus-generated-ESM differential execution.
+
+### 3E. Interfaces
+
+Install one open-world typed adapter per reached concrete dynamic type,
+canonical non-string dynamic-type metadata, O(1) native method dispatch,
+assertions, comma-ok, type switches, interface equality, and interface map
+keys. Concrete receiver calls remain statically selected top-level functions.
+Exit requires the complete nil/typed-nil/copy/assertion/panic/equality matrix,
+constant-size call sites as implementer count grows, and zero erased payload,
+constructor-identity, reflection, or implementer switches.
+
+### 3F. Generics And Iterator Functions
+
+Install generic functions, aliases, named types, instantiated methods,
+explicit/inferred instantiation, instantiated function values, type-parameter
+operations, and range-over-function.
+
+One source declaration produces one strict target generic body. The body emits
+typed operation-signature requirements into the existing
+declaration-reconstruction fixed point. Repeated identical operation selections
+exact-join one hidden function parameter. Concrete instantiations supply one
+canonical function artifact per exact operation-selection/signature, and
+generic callers project and forward the same typed functions.
+`go/types.Info.Instances` and selected method/type evidence are the only
+inference and constraint authority; constraint-method selections retain the
+exact selected `*types.Func`.
+There is no monomorphized alternate path, source-position identity, capability
+object, source prewalk, copied type-set algebra, universal operation bag,
+runtime registry, or erased payload.
+
+Exit requires exact instance/capability joins; recursive generic convergence;
+generic aliases and recursive instantiated types; generic receiver methods and
+function values; operations over basic, defined, aggregate, interface, and
+constructed type arguments; all three iterator signatures; and strict,
+differential, mutation, tail-size, and scaling proof. Generic body bytes remain
+constant as instantiation count grows, and capability definitions grow only
+with distinct exact operation-selection/signature pairs.
+
+### 3G. Function Control, Defer, Panic, And Goto
+
+Install source `panic`, exact direct-call `recover`, immediate defer
+registration with Go copies, LIFO unwind, named-result mutation, replacement
+panic behavior, exact labels, and arbitrary valid goto. The exact callable
+artifact owns one demand-selected target assembly; no control IR, CFG, source
+inventory, or alternate walker is introduced.
+
+Exit requires direct and function-valued calls, receiver and interface method
+values, generic functions, nested function literals, ordinary and named
+returns, panic replacement and recovery directness, labels, fallthrough,
+labeled break/continue, direct structural goto, non-structural goto, and
+goto/defer/range/switch/type-switch composition. Block and clause statement
+lists share one control owner, and nested generated dispatch must not capture
+an unlabeled source break or continue. The only exception carrier is
+`runtime/panic.ts`; recovery authority is invocation-local and typed.
+Deferred callable-value invocation consumes the one exact-signature callable
+ABI installed by the callable-storage milestone: ordinary invocation omits its
+optional recovery facet and deferred invocation supplies it. Function-control
+must not create an ABI identity per variable, field, pointer, container, or
+adapter, and must not introduce a storage/dataflow graph.
+Functions without control demand remain byte-identical. State-machine size is
+linear in source statements and is absent when direct target control suffices.
+
+### 3H. Channels And Cooperative Concurrency
+
+Add the closed concurrency-semantics profile axis, disabled by default and
+explicitly selecting `cooperative`. Install separate typed channel-value and
+scheduler-lifecycle truth owners that may assemble into one output module,
+plus exact channel type/direction projection, `make`,
+send/receive/close/equality/range, goroutine launch, and atomic `select`.
+The channel owner uses one insertion-ordered typed live queue per direction
+for both direct operations and selected alternatives, fair blocked-select
+registration, O(1) cancellation, select-to-select rendezvous, and storage
+bounded by live operations; separate direct/select queues or listener
+registries do not satisfy this checkpoint.
+
+Concrete bodies retain source callable facets. First-class function values use
+one exact-signature generated callable ABI artifact independent of every
+storage shape. Closed cooperative requirements on the existing artifact graph
+make only exact blocking consumers and selected ABI contracts
+Promise-returning; recursive cycles converge. Cover functions, methods,
+locals, parameters, results, package variables, fields, pointers,
+arrays/slices/maps, interface assertions/calls, and generic aggregates without
+a call graph, prewalk, storage-facet hierarchy, erased queue, all-function
+async tax, or yield heuristic.
+
+The same cooperative facet applies to hidden generic constraint-method
+functions and deferred invocations. A concrete blocking constraint method
+reconstructs its exact hidden operation function, the generic caller, and only
+their reverse consumers. A deferred blocking call is captured immediately,
+stored as a typed async defer entry, and awaited in LIFO order before function
+exit; recovery authority remains invocation-local across the await. Neither
+case may introduce an alternate generic body, call graph, erased defer stack,
+or unconditional async tax.
+
+Exit requires the complete Milestone 3H differential, mutation, staticness,
+artifact, scaling, runtime-cost, deadlock, panic, and synchronous-byte-stability
+evidence under the selected race-free cooperative profile. A pure select with
+a default must remain synchronous and scheduler-free; only a select without a
+default may select the blocking operation, unless operand evaluation
+independently requires cooperation.
+
+### 3I. Language Closure
+
+Derive the selected Go toolchain's AST forms, tokens, and predeclared
+identities in verification code and exact-join them to production root
+dispatch. This is not a production inventory. Parent-owned type/clause/field
+forms remain with their semantic owners, parser-recovery forms remain rejected,
+and every semantic operator and predeclared function has one admitted profile
+or typed boundary.
+
+Close package aliases, dot and blank imports, command packages, local scopes,
+ordinary source comments, number-profile integer division/remainder, and the
+selected bodyless-function and implementation-defined built-in boundaries.
+Language closure identifies exact unresolved environment obligations but does
+not install standard-library, external, `print`/`println`, cgo, or `unsafe`
+implementations.
+
+Exit requires exact selected-universe/dispatch joins, valid construct fixtures,
+strict TS-Go-printed ESM artifacts, focused Go-versus-TypeScript differentials,
+missing/widened-dispatch and spelling mutations, zero unknown valid in-scope
+forms, no duplicate owner, and frozen source/generated/typecheck/runtime
+bounds.
 
 ## 4. Environment And Completion
 

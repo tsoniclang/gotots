@@ -77,12 +77,12 @@ func TestBasicExpressionBoundaryMutationsFailClosed(t *testing.T) {
 		role      api.Role
 	}{
 		{
-			name: "division remains unsupported",
+			name: "integer logical operator remains unsupported",
 			mutate: func(file *ast.File) {
 				function := sourceFunction(t, file, "WrapMultiply")
 				function.Body.List[0].(*ast.ReturnStmt).
 					Results[0].(*ast.BinaryExpr).
-					Op = token.QUO
+					Op = token.LAND
 			},
 			construct: "*ast.BinaryExpr",
 			role:      api.RoleReturnResult,

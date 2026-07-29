@@ -1,6 +1,7 @@
 package api
 
 import (
+	"go/ast"
 	"go/token"
 	"go/types"
 	"slices"
@@ -8,53 +9,97 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
+type AddressableStorage interface {
+	Name(Context, *types.Var) (string, bool)
+	Read(Context, *types.Var) (ExpressionEmission, bool, error)
+	StoreTarget(Context, *types.Var) (StoreTargetEmission, bool, error)
+	Cell(
+		Context,
+		ChildEmitter,
+		ast.Node,
+		types.Type,
+		ExpressionEmission,
+	) (ExpressionEmission, error)
+	Requirement(Context, *types.Var) (RootRequest, error)
+}
+
 type Context struct {
-	role                      Role
-	fileSet                   *token.FileSet
-	typesPackage              *types.Package
-	typesInfo                 *types.Info
-	typesSizes                types.Sizes
-	factory                   tsgo.Factory
-	names                     Names
-	values                    Values
-	storage                   AddressableStorage
-	integer                   IntegerRepresentation
-	evaluationOrder           EvaluationOrder
-	expectedType              types.Type
-	expectedResults           *types.Tuple
-	functionResults           *types.Tuple
-	breakDepth                uint32
-	continueDepth             uint32
-	artifactOwner             *types.Func
-	storageNames              map[*types.Var]string
-	localConstantProjections  map[*types.Const][]types.BasicKind
-	lexicalGeneratedArtifacts map[*types.TypeName][]DeclarationRequirement
+	role                     Role
+	fileSet                  *token.FileSet
+	typesPackage             *types.Package
+	typesInfo                *types.Info
+	typesSizes               types.Sizes
+	factory                  tsgo.Factory
+	names                    Names
+	values                   Values
+	storage                  AddressableStorage
+	integer                  IntegerRepresentation
+	evaluationOrder          EvaluationOrder
+	goRuntime                GoRuntimeContract
+	concurrency              ConcurrencySemantics
+	expectedType             types.Type
+	expectedResults          *types.Tuple
+	functionResults          *types.Tuple
+	breakDepth               uint32
+	continueDepth            uint32
+	breakTarget              string
+	continueTarget           string
+	controlLabels            map[*types.Label]ControlLabel
+	statementLabel           string
+	artifactOwner            ArtifactOwner
+	callableControls         map[ast.Node]CallableControlDemand
+	callableEnclosing        ast.Node
+	currentCallable          ast.Node
+	currentControl           CallableControlDemand
+	deferControl             DeferControl
+	returnControl            ReturnControl
+	gotoUses                 map[*types.Label][]token.Pos
+	gotoTargets              map[*types.Label]GotoTarget
+	gotoLocals               map[*types.Var]struct{}
+	storageNames             map[*types.Var]string
+	localConstantProjections map[*types.Const][]types.BasicKind
+	lexicalTypeRequirements  map[*types.TypeName][]DeclarationRequirement
+	genericResolver          GenericCallableResolver
+	genericConsumer          GenericOperationConsumer
+	cooperativeResolver      CooperativeCallableResolver
+	callableFacet            CallableFacet
+	cooperative              bool
+	detachedInvocation       bool
+	genericParameters        map[*types.TypeParam]string
+	iteratorRangeStateName   string
 }
 
 func (c Context) WithAddressableStorage(
 	owner *types.Func,
 	storageNames map[*types.Var]string,
-) Context {
-	if owner == nil {
-		panic("addressable-storage owner is nil")
+) (Context, error) {
+	current, ok := c.FunctionArtifactOwner()
+	if owner == nil || !ok || current != owner {
+		return Context{}, &ContextError{
+			Reason: "addressable-storage owner differs from source artifact owner",
+		}
 	}
-	c.artifactOwner = owner
 	c.storageNames = make(map[*types.Var]string, len(storageNames))
 	for variable, name := range storageNames {
 		if variable == nil || variable.IsField() || name == "" {
-			panic("addressable-storage selection is invalid")
+			return Context{}, &ContextError{
+				Reason: "addressable-storage selection is invalid",
+			}
 		}
 		c.storageNames[variable] = name
 	}
-	return c
+	return c, nil
 }
 
 func (c Context) WithLocalConstantProjections(
 	owner *types.Func,
 	projections map[*types.Const][]types.BasicKind,
-) Context {
-	if owner == nil || c.artifactOwner != owner {
-		panic("local-constant projection owner differs from artifact owner")
+) (Context, error) {
+	current, ok := c.FunctionArtifactOwner()
+	if owner == nil || !ok || current != owner {
+		return Context{}, &ContextError{
+			Reason: "local-constant projection owner differs from source artifact owner",
+		}
 	}
 	c.localConstantProjections = make(
 		map[*types.Const][]types.BasicKind,
@@ -62,41 +107,52 @@ func (c Context) WithLocalConstantProjections(
 	)
 	for selected, kinds := range projections {
 		if selected == nil || len(kinds) == 0 {
-			panic("local-constant projection selection is invalid")
+			return Context{}, &ContextError{
+				Reason: "local-constant projection selection is invalid",
+			}
 		}
 		c.localConstantProjections[selected] = slices.Clone(kinds)
 	}
-	return c
+	return c, nil
 }
 
-func (c Context) WithLexicalGeneratedArtifacts(
+func (c Context) WithLexicalTypeRequirements(
 	owner ArtifactOwner,
 	requirements map[*types.TypeName][]DeclarationRequirement,
 ) Context {
 	_, sourceOwned := owner.Source()
 	_, _, initializerOwned := owner.PackageInitializer()
 	if !sourceOwned && !initializerOwned {
-		panic("lexical generated-artifact owner has no source reconstruction")
+		panic("lexical type-requirement owner has no source reconstruction")
 	}
-	c.lexicalGeneratedArtifacts = make(
+	c = c.WithArtifactOwner(owner)
+	c.lexicalTypeRequirements = make(
 		map[*types.TypeName][]DeclarationRequirement,
 		len(requirements),
 	)
 	for anchor, selected := range requirements {
 		if anchor == nil || len(selected) == 0 {
-			panic("lexical generated-artifact selection is invalid")
+			panic("lexical type-requirement selection is invalid")
 		}
 		for _, requirement := range selected {
-			artifact, ok := requirement.GeneratedArtifact()
-			if !ok ||
-				artifact.Placement() !=
+			if requirement.Owner() != owner {
+				panic("lexical type-requirement owner is inconsistent")
+			}
+			if artifact, ok := requirement.GeneratedArtifact(); ok {
+				if artifact.Placement() !=
 					GeneratedArtifactPlacementLexical ||
-				artifact.LexicalOwner() != owner ||
-				artifact.LexicalAnchor() != anchor {
-				panic("lexical generated-artifact requirement is inconsistent")
+					artifact.LexicalOwner() != owner ||
+					artifact.LexicalAnchor() != anchor {
+					panic("lexical generated-artifact requirement is inconsistent")
+				}
+				continue
+			}
+			typeName, _, ok := requirement.NamedStructOperation()
+			if !ok || typeName != anchor {
+				panic("lexical named-type requirement is inconsistent")
 			}
 		}
-		c.lexicalGeneratedArtifacts[anchor] = slices.Clone(selected)
+		c.lexicalTypeRequirements[anchor] = slices.Clone(selected)
 	}
 	return c
 }
@@ -113,6 +169,7 @@ func NewContext(
 	storage AddressableStorage,
 	integer IntegerRepresentation,
 	evaluationOrder EvaluationOrder,
+	concurrency ConcurrencySemantics,
 ) (Context, error) {
 	switch {
 	case role == "":
@@ -135,6 +192,8 @@ func NewContext(
 		return Context{}, &ContextError{Reason: "integer representation is invalid"}
 	case !evaluationOrder.Valid():
 		return Context{}, &ContextError{Reason: "evaluation order is invalid"}
+	case !concurrency.Valid():
+		return Context{}, &ContextError{Reason: "concurrency semantics are invalid"}
 	}
 	return Context{
 		role:            role,
@@ -148,6 +207,7 @@ func NewContext(
 		storage:         storage,
 		integer:         integer,
 		evaluationOrder: evaluationOrder,
+		concurrency:     concurrency,
 	}, nil
 }
 
@@ -177,6 +237,17 @@ func (c Context) EnterFunction(results *types.Tuple) Context {
 	c.expectedResults = nil
 	c.breakDepth = 0
 	c.continueDepth = 0
+	c.breakTarget = ""
+	c.continueTarget = ""
+	c.controlLabels = nil
+	c.statementLabel = ""
+	c.iteratorRangeStateName = ""
+	c.currentCallable = nil
+	c.currentControl = CallableControlDemand{}
+	c.deferControl = DeferControl{}
+	c.returnControl = ReturnControl{}
+	c.gotoTargets = nil
+	c.gotoLocals = nil
 	return c
 }
 
@@ -186,9 +257,70 @@ func (c Context) EnterLoop() Context {
 	return c
 }
 
+func (c Context) EnterLoopTarget(name string) Context {
+	if name == "" {
+		panic("loop control target is empty")
+	}
+	c = c.EnterLoop()
+	c.breakTarget = name
+	c.continueTarget = name
+	return c
+}
+
 func (c Context) EnterBreakable() Context {
 	c.breakDepth++
 	return c
+}
+
+func (c Context) EnterIteratorRange(stateName string) Context {
+	if stateName == "" {
+		panic("iterator-range state name is empty")
+	}
+	c.breakDepth = 0
+	c.continueDepth = 0
+	c.controlLabels = nil
+	c.statementLabel = ""
+	c.iteratorRangeStateName = stateName
+	return c
+}
+
+func (c Context) EnterBreakableTarget(name string) Context {
+	if name == "" {
+		panic("breakable control target is empty")
+	}
+	c = c.EnterBreakable()
+	c.breakTarget = name
+	return c
+}
+
+func (c Context) WithControlLabel(
+	label *types.Label,
+	target ControlLabel,
+) Context {
+	if label == nil || !target.Valid() {
+		panic("control-label capability is invalid")
+	}
+	labels := make(map[*types.Label]ControlLabel, len(c.controlLabels)+1)
+	for existing, capability := range c.controlLabels {
+		labels[existing] = capability
+	}
+	labels[label] = target
+	c.controlLabels = labels
+	return c
+}
+
+func (c Context) WithStatementLabel(name string) Context {
+	if name == "" || c.statementLabel != "" {
+		panic("statement-label capability is invalid")
+	}
+	c.statementLabel = name
+	return c
+}
+
+func (c Context) TakeStatementLabel() (Context, string) {
+	name := c.statementLabel
+	c.statementLabel = ""
+	return c, name
 }
 
 func (c Context) Role() Role {
@@ -255,8 +387,40 @@ func (c Context) CanContinue() bool {
 	return c.continueDepth != 0
 }
 
-func (c Context) ArtifactOwner() *types.Func {
-	return c.artifactOwner
+func (c Context) BreakTarget() string {
+	return c.breakTarget
+}
+
+func (c Context) ContinueTarget() string {
+	return c.continueTarget
+}
+
+func (c Context) SelectControlTarget(existing string) (string, error) {
+	if existing != "" || !c.currentControl.Goto() {
+		return existing, nil
+	}
+	return c.names.Temporary(TemporaryControlTarget)
+}
+
+func (c Context) ControlLabel(label *types.Label) (ControlLabel, bool) {
+	if label == nil {
+		return ControlLabel{}, false
+	}
+	target, ok := c.controlLabels[label]
+	return target, ok
+}
+
+func (c Context) IteratorRangeControl() (IteratorRangeControl, bool) {
+	if c.iteratorRangeStateName == "" {
+		return IteratorRangeControl{}, false
+	}
+	return IteratorRangeControl{
+		stateName: c.iteratorRangeStateName,
+	}, true
+}
+
+func (c Context) ConcurrencySemantics() ConcurrencySemantics {
+	return c.concurrency
 }
 
 func (c Context) LocalConstantProjections(
@@ -265,10 +429,10 @@ func (c Context) LocalConstantProjections(
 	return slices.Clone(c.localConstantProjections[selected])
 }
 
-func (c Context) LexicalGeneratedArtifacts(
+func (c Context) LexicalTypeRequirements(
 	anchor *types.TypeName,
 ) []DeclarationRequirement {
-	return slices.Clone(c.lexicalGeneratedArtifacts[anchor])
+	return slices.Clone(c.lexicalTypeRequirements[anchor])
 }
 
 func (c Context) AddressableStorageName(variable *types.Var) (string, bool) {
@@ -277,4 +441,96 @@ func (c Context) AddressableStorageName(variable *types.Var) (string, bool) {
 	}
 	name, ok := c.storageNames[variable]
 	return name, ok
+}
+
+type ControlLabel struct {
+	name        string
+	breakable   bool
+	continuable bool
+}
+
+func NewControlLabel(
+	name string,
+	breakable bool,
+	continuable bool,
+) (ControlLabel, error) {
+	if name == "" || continuable && !breakable {
+		return ControlLabel{}, &InvariantError{
+			Role:   RoleLabelTarget,
+			Reason: "control-label target is invalid",
+		}
+	}
+	return ControlLabel{
+		name:        name,
+		breakable:   breakable,
+		continuable: continuable,
+	}, nil
+}
+
+func (l ControlLabel) Valid() bool {
+	return l.name != "" && (!l.continuable || l.breakable)
+}
+
+func (l ControlLabel) Name() string {
+	return l.name
+}
+
+func (l ControlLabel) Breakable() bool {
+	return l.breakable
+}
+
+func (l ControlLabel) Continuable() bool {
+	return l.continuable
+}
+
+type IteratorRangeState int8
+
+const (
+	IteratorRangeStateExhausted IteratorRangeState = -2
+	IteratorRangeStatePanicked  IteratorRangeState = -1
+	IteratorRangeStateDone      IteratorRangeState = 0
+	IteratorRangeStateReady     IteratorRangeState = 1
+)
+
+func (s IteratorRangeState) Literal() string {
+	switch s {
+	case IteratorRangeStateExhausted:
+		return "-2"
+	case IteratorRangeStatePanicked:
+		return "-1"
+	case IteratorRangeStateDone:
+		return "0"
+	case IteratorRangeStateReady:
+		return "1"
+	default:
+		return ""
+	}
+}
+
+type IteratorRangeControl struct {
+	stateName string
+}
+
+func (c IteratorRangeControl) StateName() string {
+	return c.stateName
+}
+
+func (c IteratorRangeControl) Valid() bool {
+	return c.stateName != ""
+}
+
+type ChildEmitter interface {
+	Block(Context, *ast.BlockStmt) (BlockEmission, error)
+	Statements(Context, ast.Node, []ast.Stmt) (StatementEmission, error)
+	Statement(Context, ast.Stmt) (StatementEmission, error)
+	Expression(Context, ast.Expr) (ExpressionEmission, error)
+	Address(Context, ast.Expr) (ExpressionEmission, error)
+	StoreTarget(Context, ast.Expr) (StoreTargetEmission, error)
+	DiscardedCall(Context, *ast.CallExpr) (ExpressionEmission, error)
+	Condition(Context, ast.Expr) (ExpressionEmission, error)
+	IntegerConstant(Context, ast.Expr) (ExpressionEmission, error)
+	ScopedInitializer(Context, ast.Stmt) (StatementEmission, error)
+	IfAlternate(Context, *ast.IfStmt) (StatementEmission, error)
+	Type(Context, ast.Expr) (TypeEmission, error)
+	RepresentedType(Context, ast.Node, types.Type) (TypeEmission, error)
 }

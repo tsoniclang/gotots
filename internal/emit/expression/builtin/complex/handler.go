@@ -7,6 +7,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	constantvalue "github.com/tsoniclang/gotots/internal/emit/constant"
 	runtimecomplex "github.com/tsoniclang/gotots/internal/emit/runtime/complex"
+	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -63,10 +64,6 @@ func emitConstruct(
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	if factsOK && sourceFacts.Value != nil {
-		if _, ok := complexvalue.Describe(expectedType); !ok {
-			return api.ExpressionEmission{},
-				api.Unsupported(context, api.CategoryExpression, source)
-		}
 		return constantvalue.EmitValue(
 			context,
 			source,
@@ -185,7 +182,12 @@ func emitComponent(
 		)
 	}
 	argumentType := context.TypesInfo().TypeOf(source.Args[0])
-	carrier, ok := complexvalue.Describe(argumentType)
+	carrierType := argumentType
+	defined, definedArgument := definedtype.ResolveBasic(argumentType)
+	if definedArgument {
+		carrierType = defined.Underlying()
+	}
+	carrier, ok := complexvalue.Describe(carrierType)
 	if !ok ||
 		!types.Identical(resultType, carrier.ComponentType()) ||
 		!types.AssignableTo(resultType, expectedType) {
@@ -199,10 +201,14 @@ func emitComponent(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	argumentValue := argument.Value()
+	if definedArgument {
+		argumentValue = defined.Unwrap(context.Factory(), argumentValue)
+	}
 	return api.NewExpressionEmission(
 		argument.Before(),
 		context.Factory().PropertyAccessExpression(
-			argument.Value(),
+			argumentValue,
 			nil,
 			context.Factory().Identifier(member),
 			tsgo.NodeFlagsNone,

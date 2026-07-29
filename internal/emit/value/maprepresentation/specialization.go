@@ -75,7 +75,10 @@ func BuildSpecialization(
 		members:   memberNames,
 	}
 	members := builder.build()
-	if err := validateSpecialization(context.Role(), members); err != nil {
+	if err := validateSpecialization(
+		context.Role(),
+		members,
+	); err != nil {
 		return Specialization{}, err
 	}
 	return Specialization{
@@ -84,9 +87,33 @@ func BuildSpecialization(
 	}, nil
 }
 
+func ValidateRequirements(
+	role api.Role,
+	artifact *api.GeneratedArtifact,
+	requirements []api.DeclarationRequirement,
+) error {
+	if !artifact.Valid() ||
+		artifact.Kind() != api.GeneratedArtifactMapSpecialization {
+		return &api.InvariantError{
+			Role:   role,
+			Reason: "map specialization requirement owner is invalid",
+		}
+	}
+	for _, requirement := range requirements {
+		selected, _, valid := requirement.MapSpecialization()
+		if !valid || selected != artifact {
+			return &api.InvariantError{
+				Role:   role,
+				Reason: "map specialization received a foreign requirement",
+			}
+		}
+	}
+	return nil
+}
+
 func specializationNames() (specializationMemberNames, error) {
-	resolved := make([]string, 0, mapruntime.MemberIsNil)
-	for member := mapruntime.MemberNil; member <= mapruntime.MemberIsNil; member++ {
+	resolved := make([]string, 0, mapruntime.MemberKeys)
+	for member := mapruntime.MemberNil; member <= mapruntime.MemberKeys; member++ {
 		name, err := mapruntime.Name(member)
 		if err != nil {
 			return specializationMemberNames{}, err
@@ -102,6 +129,8 @@ func specializationNames() (specializationMemberNames, error) {
 		deleteMember: resolved[5],
 		length:       resolved[6],
 		isNil:        resolved[7],
+		clear:        resolved[8],
+		keys:         resolved[9],
 	}, nil
 }
 
@@ -118,6 +147,7 @@ func specializationOperations(
 	source ast.Node,
 	mapType *types.Map,
 ) (specializationOperationSet, []api.RootRequest, error) {
+	keyType := StorageKeyType(mapType.Key())
 	zero, err := context.Values().Zero(
 		context.WithRole(api.RoleMapValue),
 		source,
@@ -130,7 +160,7 @@ func specializationOperations(
 	hash, err := context.Values().Hash(
 		context.WithRole(api.RoleMapKey),
 		source,
-		mapType.Key(),
+		keyType,
 		key,
 	)
 	if err != nil {
@@ -141,7 +171,7 @@ func specializationOperations(
 	equal, err := context.Values().Equal(
 		context.WithRole(api.RoleMapKey),
 		source,
-		mapType.Key(),
+		keyType,
 		left,
 		right,
 	)
@@ -151,7 +181,7 @@ func specializationOperations(
 	copyKey, err := context.Values().Copy(
 		context.WithRole(api.RoleMapKey),
 		nil,
-		mapType.Key(),
+		keyType,
 		api.DirectExpression(key),
 	)
 	if err != nil {

@@ -35,6 +35,37 @@ type mapSpecializationBinding struct {
 	name  string
 }
 
+type interfaceAdapterBinding struct {
+	owner *api.GeneratedArtifact
+	name  string
+}
+
+type anonymousInterfaceBinding struct {
+	owner *api.GeneratedArtifact
+	name  string
+}
+
+type interfaceMethodTokenBinding struct {
+	owner  *api.GeneratedArtifact
+	method *types.Func
+	name   string
+}
+
+type interfaceDynamicTypeTokenBinding struct {
+	owner *api.GeneratedArtifact
+	name  string
+}
+
+type genericCapabilityBinding struct {
+	owner *api.GeneratedArtifact
+	name  string
+}
+
+type callableABIBinding struct {
+	owner *api.GeneratedArtifact
+	name  string
+}
+
 type Target struct {
 	Name       string
 	SourcePath string
@@ -50,6 +81,18 @@ type Registry struct {
 	anonymousStructNames     map[string]string
 	mapSpecializations       map[string]mapSpecializationBinding
 	mapSpecializationNames   map[string]string
+	interfaceAdapters        map[string]interfaceAdapterBinding
+	interfaceAdapterNames    map[string]string
+	anonymousInterfaces      map[string]anonymousInterfaceBinding
+	anonymousInterfaceNames  map[string]string
+	interfaceMethodTokens    map[string]interfaceMethodTokenBinding
+	interfaceMethodNames     map[string]string
+	interfaceDynamicTypes    map[string]interfaceDynamicTypeTokenBinding
+	interfaceDynamicNames    map[string]string
+	genericCapabilities      map[string]genericCapabilityBinding
+	genericCapabilityNames   map[string]string
+	callableABIs             map[string]callableABIBinding
+	callableABINames         map[string]string
 }
 
 func NewRegistry() *Registry {
@@ -63,6 +106,18 @@ func NewRegistry() *Registry {
 		anonymousStructNames:     make(map[string]string),
 		mapSpecializations:       make(map[string]mapSpecializationBinding),
 		mapSpecializationNames:   make(map[string]string),
+		interfaceAdapters:        make(map[string]interfaceAdapterBinding),
+		interfaceAdapterNames:    make(map[string]string),
+		anonymousInterfaces:      make(map[string]anonymousInterfaceBinding),
+		anonymousInterfaceNames:  make(map[string]string),
+		interfaceMethodTokens:    make(map[string]interfaceMethodTokenBinding),
+		interfaceMethodNames:     make(map[string]string),
+		interfaceDynamicTypes:    make(map[string]interfaceDynamicTypeTokenBinding),
+		interfaceDynamicNames:    make(map[string]string),
+		genericCapabilities:      make(map[string]genericCapabilityBinding),
+		genericCapabilityNames:   make(map[string]string),
+		callableABIs:             make(map[string]callableABIBinding),
+		callableABINames:         make(map[string]string),
 	}
 }
 
@@ -101,6 +156,24 @@ func (r *Registry) GeneratedArtifact(
 	case api.GeneratedArtifactMapSpecialization:
 		binding, ok := r.mapSpecializations[artifactKey]
 		return binding.owner, ok && binding.owner != nil
+	case api.GeneratedArtifactInterfaceAdapter:
+		binding, ok := r.interfaceAdapters[artifactKey]
+		return binding.owner, ok && binding.owner != nil
+	case api.GeneratedArtifactAnonymousInterface:
+		binding, ok := r.anonymousInterfaces[artifactKey]
+		return binding.owner, ok && binding.owner != nil
+	case api.GeneratedArtifactInterfaceMethodToken:
+		binding, ok := r.interfaceMethodTokens[artifactKey]
+		return binding.owner, ok && binding.owner != nil
+	case api.GeneratedArtifactInterfaceDynamicTypeToken:
+		binding, ok := r.interfaceDynamicTypes[artifactKey]
+		return binding.owner, ok && binding.owner != nil
+	case api.GeneratedArtifactGenericCapability:
+		binding, ok := r.genericCapabilities[artifactKey]
+		return binding.owner, ok && binding.owner != nil
+	case api.GeneratedArtifactCallableABI:
+		binding, ok := r.callableABIs[artifactKey]
+		return binding.owner, ok && binding.owner != nil
 	default:
 		return nil, false
 	}
@@ -120,6 +193,30 @@ func (r *Registry) GeneratedArtifacts(
 		}
 	case api.GeneratedArtifactMapSpecialization:
 		for _, binding := range r.mapSpecializations {
+			artifacts = append(artifacts, binding.owner)
+		}
+	case api.GeneratedArtifactInterfaceAdapter:
+		for _, binding := range r.interfaceAdapters {
+			artifacts = append(artifacts, binding.owner)
+		}
+	case api.GeneratedArtifactAnonymousInterface:
+		for _, binding := range r.anonymousInterfaces {
+			artifacts = append(artifacts, binding.owner)
+		}
+	case api.GeneratedArtifactInterfaceMethodToken:
+		for _, binding := range r.interfaceMethodTokens {
+			artifacts = append(artifacts, binding.owner)
+		}
+	case api.GeneratedArtifactInterfaceDynamicTypeToken:
+		for _, binding := range r.interfaceDynamicTypes {
+			artifacts = append(artifacts, binding.owner)
+		}
+	case api.GeneratedArtifactGenericCapability:
+		for _, binding := range r.genericCapabilities {
+			artifacts = append(artifacts, binding.owner)
+		}
+	case api.GeneratedArtifactCallableABI:
+		for _, binding := range r.callableABIs {
 			artifacts = append(artifacts, binding.owner)
 		}
 	}

@@ -156,7 +156,7 @@ func TestDefinedContainersKeepNominalityAtSourceBoundaries(t *testing.T) {
 	for _, required := range []string{
 		"CountArrayValues(): [\n    GoArray<Count, 2>,",
 		"CountSliceValues(): RuntimeSlice<Count>",
-		"CountMapLookup(values: GoMap<int32, Label>, key: Count)",
+		"CountMapLookup(values: GoMapValue<int32, Label>, key: Count)",
 		"values.lookupOk(key.$value)",
 	} {
 		if !strings.Contains(artifacts.printed, required) {
@@ -165,6 +165,7 @@ func TestDefinedContainersKeepNominalityAtSourceBoundaries(t *testing.T) {
 	}
 	for _, forbidden := range []string{
 		"GoMap<Count, Label>",
+		"GoMapValue<Count, Label>",
 		"values.lookupOk(key)",
 	} {
 		if strings.Contains(artifacts.printed, forbidden) {

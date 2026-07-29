@@ -21,19 +21,29 @@ func (Owner) Name(
 func (owner Owner) Read(
 	context api.Context,
 	variable *types.Var,
-) (api.ExpressionEmission, bool) {
+) (api.ExpressionEmission, bool, error) {
 	name, selected := owner.Name(context, variable)
 	if !selected {
-		return api.ExpressionEmission{}, false
+		return api.ExpressionEmission{}, false, nil
 	}
-	return api.DirectExpression(
+	value := api.DirectExpression(
 		context.Factory().PropertyAccessExpression(
 			context.Factory().Identifier(name),
 			nil,
 			context.Factory().Identifier(pointerruntime.CellValueName),
 			tsgo.NodeFlagsNone,
 		),
-	), true
+	)
+	restored, err := context.Values().FromStorage(
+		context,
+		nil,
+		variable.Type(),
+		value,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	return restored, true, nil
 }
 
 func (owner Owner) StoreTarget(
@@ -44,7 +54,7 @@ func (owner Owner) StoreTarget(
 	if !selected {
 		return api.StoreTargetEmission{}, false, nil
 	}
-	target, err := api.NewStoreTargetEmission(
+	target, err := api.NewCanonicalStorageTargetEmission(
 		context.Factory().PropertyAccessExpression(
 			context.Factory().Identifier(name),
 			nil,
@@ -72,6 +82,23 @@ func (Owner) Cell(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	storageType, err := context.Values().StorageType(
+		context.WithRole(api.RoleStorageType),
+		source,
+		sourceType,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	stored, err := context.Values().ToStorage(
+		context,
+		source,
+		sourceType,
+		value,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	reference, err := context.Names().Runtime(
 		api.RuntimePointer,
 		api.ImportPhaseValue,
@@ -80,16 +107,18 @@ func (Owner) Cell(
 		return api.ExpressionEmission{}, err
 	}
 	return api.NewExpressionEmission(
-		value.Before(),
+		stored.Before(),
 		pointerruntime.Cell(
 			context.Factory(),
 			reference.Name(),
 			targetType.Value(),
-			value.Value(),
+			storageType.Value(),
+			stored.Value(),
 		),
 		api.CombineRequests(
-			value.Requests(),
+			stored.Requests(),
 			targetType.Requests(),
+			storageType.Requests(),
 			reference.Requests(),
 		),
 	)
@@ -99,8 +128,12 @@ func (Owner) Requirement(
 	context api.Context,
 	variable *types.Var,
 ) (api.RootRequest, error) {
-	return api.NewAddressableStorageRequest(
-		context.ArtifactOwner(),
-		variable,
-	)
+	owner, ok := context.FunctionArtifactOwner()
+	if !ok {
+		return api.RootRequest{}, &api.InvariantError{
+			Role:   context.Role(),
+			Reason: "addressable storage has no function artifact owner",
+		}
+	}
+	return api.NewAddressableStorageRequest(owner, variable)
 }

@@ -53,6 +53,13 @@ func BoolKey() int32 {
 	return values[false] + values[true]
 }
 
+func IndexedUpdates() int32 {
+	values := map[int32]int32{1: 2}
+	values[1] += 3
+	values[1]++
+	return values[1]
+}
+
 func LiteralOrder() int32 {
 	var next int32
 	step := func() int32 {

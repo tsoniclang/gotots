@@ -47,6 +47,7 @@ func TestParentOperatorOwnerDoesNotCreateAnIntegerFallback(t *testing.T) {
 				storage.Owner{},
 				api.IntegerRepresentationNumber,
 				api.EvaluationOrderDirect,
+				api.ConcurrencySemanticsDisabled,
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -57,6 +58,72 @@ func TestParentOperatorOwnerDoesNotCreateAnIntegerFallback(t *testing.T) {
 				t.Fatal("parent binary owner admitted an integer fallback")
 			}
 		})
+	}
+}
+
+func TestLogicalRightPrerequisitesStayInsideTheSelectedBranch(t *testing.T) {
+	context, err := api.NewContext(
+		api.RoleReturnResult,
+		token.NewFileSet(),
+		types.NewPackage("example.com/expression", "expression"),
+		&types.Info{},
+		types.SizesFor("gc", "amd64"),
+		tsgo.Factory{},
+		unusedNames{},
+		unusedValues{},
+		storage.Owner{},
+		api.IntegerRepresentationNumber,
+		api.EvaluationOrderDirect,
+		api.ConcurrencySemanticsDisabled,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	factory := context.Factory()
+	rightPrerequisite := factory.ExpressionStatement(
+		factory.Identifier("rightPrerequisite"),
+	)
+	right, err := api.NewExpressionEmission(
+		[]tsgo.Statement{rightPrerequisite},
+		factory.Identifier("rightValue"),
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := emitLogical(
+		context,
+		token.LAND,
+		factory.BinaryOperatorToken(
+			tsgo.BinaryOperatorAmpersandAmpersandToken,
+		),
+		api.DirectExpression(factory.Identifier("leftValue")),
+		right,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := result.Before()
+	if len(before) != 2 {
+		t.Fatalf("logical prerequisite statements = %d, want 2", len(before))
+	}
+	if before[0] == rightPrerequisite || before[1] == rightPrerequisite {
+		t.Fatal("right prerequisite escaped to the eager outer statement list")
+	}
+	branch, ok := before[1].(tsgo.IfStatement)
+	if !ok {
+		t.Fatalf("logical second prerequisite = %T, want tsgo.IfStatement", before[1])
+	}
+	block, ok := branch.ThenStatement().(tsgo.Block)
+	if !ok {
+		t.Fatalf("logical branch = %T, want tsgo.Block", branch.ThenStatement())
+	}
+	statements := block.Statements()
+	if len(statements) != 2 || statements[0] != rightPrerequisite {
+		t.Fatalf(
+			"logical branch prerequisites = %#v, want right prerequisite then assignment",
+			statements,
+		)
 	}
 }
 
@@ -92,6 +159,47 @@ func (unusedNames) MapSpecialization(
 	panic("unused")
 }
 
+func (unusedNames) InterfaceAdapter(types.Type) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) InterfaceDynamicType(types.Type) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) InterfaceType(types.Type) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) InterfaceContract(
+	types.Type,
+) (api.InterfaceContractReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) InterfaceMethodName(*types.Func) (string, error) {
+	panic("unused")
+}
+
+func (unusedNames) InterfaceMethodToken(
+	*types.Func,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) GenericCapability(
+	api.GenericOperationSelection,
+	*types.Signature,
+) (api.GenericCapabilityReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) CallableABI(
+	*types.Signature,
+) (api.CallableABIReference, error) {
+	panic("unused")
+}
+
 func (unusedNames) PackageVariable(
 	*types.Var,
 ) (api.PackageVariableReference, error) {
@@ -101,6 +209,18 @@ func (unusedNames) PackageVariable(
 func (unusedNames) NamedStructOperation(
 	*types.TypeName,
 	api.NamedStructOperation,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) NamedStructStorage(
+	*types.TypeName,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (unusedNames) AnonymousStructStorage(
+	*types.Struct,
 ) (api.NameReference, error) {
 	panic("unused")
 }
@@ -128,7 +248,7 @@ func (unusedNames) Runtime(
 }
 
 func (unusedNames) Temporary(api.TemporaryKind) (string, error) {
-	panic("unused")
+	return "__logical", nil
 }
 
 func (unusedNames) ModuleExport(types.Object) (bool, error) {
@@ -141,10 +261,6 @@ func (unusedValues) RequiresCustomEquality(api.Context, types.Type) bool {
 	panic("unused")
 }
 
-func (unusedValues) RequiresCustomUpdate(api.Context, types.Type) bool {
-	panic("unused")
-}
-
 func (unusedValues) RequiresExplicitType(api.Context, types.Type) bool {
 	panic("unused")
 }
@@ -154,6 +270,36 @@ func (unusedValues) RequiresStructuralCopy(api.Context, types.Type) bool {
 }
 
 func (unusedValues) SupportsHash(api.Context, types.Type) bool {
+	panic("unused")
+}
+
+func (unusedValues) RequiresStorageProjection(api.Context, types.Type) bool {
+	panic("unused")
+}
+
+func (unusedValues) StorageType(
+	api.Context,
+	ast.Node,
+	types.Type,
+) (api.TypeEmission, error) {
+	panic("unused")
+}
+
+func (unusedValues) ToStorage(
+	api.Context,
+	ast.Node,
+	types.Type,
+	api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	panic("unused")
+}
+
+func (unusedValues) FromStorage(
+	api.Context,
+	ast.Node,
+	types.Type,
+	api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
 	panic("unused")
 }
 

@@ -77,6 +77,14 @@ import (
 	values "example.com/conversion"
 )
 
+func panics(action func()) (panicked bool) {
+	defer func() {
+		panicked = recover() != nil
+	}()
+	action()
+	return false
+}
+
 func main() {
 	fmt.Println(values.NarrowSigned(130))
 	fmt.Println(values.NarrowUnsigned(-1))
@@ -98,6 +106,33 @@ func main() {
 	fmt.Println(values.ConstantInteger())
 	fmt.Println(strconv.FormatFloat(float64(values.ConstantFloat()), 'f', -1, 64))
 	fmt.Println(real(values.ConstantComplex()), imag(values.ConstantComplex()))
+	fmt.Println(values.IntegerStringSummary())
+	fmt.Println(values.BytesStringSummary())
+	fmt.Println(values.RunesStringSummary())
+	fmt.Println(values.StringBytesSummary())
+	fmt.Println(values.StringRunesSummary())
+	fmt.Println(values.InvalidStringRunesSummary())
+	fmt.Println(values.InvalidStringBoundarySummary())
+	fmt.Println(values.InvalidRuneStringSummary())
+	fmt.Println(values.NilSlicesToString())
+	fmt.Println(values.DefinedStringConversions())
+	fmt.Println(values.StructConversionCopies())
+	fmt.Println(values.StructConversionReusesDefinition())
+	fmt.Println(values.AnonymousStructConversion())
+	fmt.Println(values.SliceToArrayCopies())
+	fmt.Println(values.DefinedSliceToArray())
+	fmt.Println(values.AggregateSliceToArrayCopies())
+	fmt.Println(panics(values.SliceToArrayPanics), values.SliceToArrayPanicCount())
+	fmt.Println(values.SliceToArrayPointerAliases())
+	fmt.Println(values.DefinedSliceToArrayPointerAliases())
+	fmt.Println(values.AggregateSliceToArrayPointerCopies())
+	fmt.Println(values.SliceToArrayPointerIdentity())
+	fmt.Println(values.ZeroLengthSliceToArrayPointers())
+	fmt.Println(panics(values.SliceToArrayPointerPanics), values.SliceToArrayPanicCount())
+	fmt.Println(values.PointerScalarConversion())
+	fmt.Println(values.PointerStructConversion())
+	fmt.Println(values.PointerRoundTripIdentity())
+	fmt.Println(values.PointerNestedFieldConversion())
 }
 `)
 	return runCommand(
@@ -118,7 +153,17 @@ func runConversionTypeScript(
 ) string {
 	t.Helper()
 	runner := `import * as values from "` + sourceModule + `";
+import { GoPanic } from "./runtime/panic.js";
 const show = (value: number | bigint): string => String(value);
+const panics = (action: () => void): boolean => {
+    try {
+        action();
+        return false;
+    } catch (error) {
+        if (error instanceof GoPanic) return true;
+        throw error;
+    }
+};
 console.log(show(values.NarrowSigned(130` + suffix + `)));
 console.log(show(values.NarrowUnsigned(-1` + suffix + `)));
 console.log(show(values.Sign32(-1` + suffix + `)));
@@ -140,6 +185,33 @@ console.log(show(values.ConstantInteger()));
 console.log(show(values.ConstantFloat()));
 const constantComplex = values.ConstantComplex();
 console.log(constantComplex.real, constantComplex.imag);
+console.log(show(values.IntegerStringSummary()));
+console.log(show(values.BytesStringSummary()));
+console.log(show(values.RunesStringSummary()));
+console.log(show(values.StringBytesSummary()));
+console.log(show(values.StringRunesSummary()));
+console.log(show(values.InvalidStringRunesSummary()));
+console.log(show(values.InvalidStringBoundarySummary()));
+console.log(show(values.InvalidRuneStringSummary()));
+console.log(values.NilSlicesToString());
+console.log(show(values.DefinedStringConversions()));
+console.log(show(values.StructConversionCopies()));
+console.log(show(values.StructConversionReusesDefinition()));
+console.log(show(values.AnonymousStructConversion()));
+console.log(show(values.SliceToArrayCopies()));
+console.log(show(values.DefinedSliceToArray()));
+console.log(show(values.AggregateSliceToArrayCopies()));
+console.log(panics(values.SliceToArrayPanics), show(values.SliceToArrayPanicCount()));
+console.log(show(values.SliceToArrayPointerAliases()));
+console.log(show(values.DefinedSliceToArrayPointerAliases()));
+console.log(show(values.AggregateSliceToArrayPointerCopies()));
+console.log(values.SliceToArrayPointerIdentity());
+console.log(values.ZeroLengthSliceToArrayPointers());
+console.log(panics(values.SliceToArrayPointerPanics), show(values.SliceToArrayPanicCount()));
+console.log(show(values.PointerScalarConversion()));
+console.log(show(values.PointerStructConversion()));
+console.log(values.PointerRoundTripIdentity());
+console.log(show(values.PointerNestedFieldConversion()));
 `
 	return executeConversionTypeScript(
 		t,

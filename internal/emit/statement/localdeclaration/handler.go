@@ -10,13 +10,20 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
+type binding struct {
+	sourceName      *ast.Ident
+	object          *types.Var
+	value           api.ExpressionEmission
+	omitInitializer bool
+}
+
 func Emit(
 	context api.Context,
 	children api.ChildEmitter,
 	source *ast.DeclStmt,
 ) (api.StatementEmission, error) {
 	declaration, ok := source.Decl.(*ast.GenDecl)
-	if !ok || declaration.Doc != nil || declaration.Tok != token.VAR ||
+	if !ok || declaration.Tok != token.VAR ||
 		len(declaration.Specs) == 0 {
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
@@ -49,9 +56,7 @@ func emitSpec(
 	children api.ChildEmitter,
 	source *ast.ValueSpec,
 ) ([]tsgo.Statement, []api.RootRequest, error) {
-	if source.Doc != nil || source.Comment != nil ||
-		len(source.Names) == 0 ||
-		(len(source.Values) != 0 && len(source.Names) != len(source.Values)) ||
+	if len(source.Names) == 0 ||
 		(len(source.Values) == 0 && source.Type == nil) {
 		return nil, nil,
 			api.Unsupported(
@@ -60,23 +65,26 @@ func emitSpec(
 				source,
 			)
 	}
-
-	type binding struct {
-		sourceName *ast.Ident
-		object     *types.Var
-		value      api.ExpressionEmission
+	if len(source.Values) == 1 && len(source.Names) > 1 {
+		if results, ok := context.TypesInfo().TypeOf(source.Values[0]).(*types.Tuple); ok {
+			return emitMultipleResultSpec(context, children, source, results)
+		}
 	}
+	if len(source.Values) != 0 && len(source.Names) != len(source.Values) {
+		return nil, nil,
+			api.Unsupported(
+				context.WithRole(api.RoleLocalDeclaration),
+				api.CategoryStatement,
+				source,
+			)
+	}
+	if hasBlankName(source.Names) {
+		return emitBlankAwareSpec(context, children, source)
+	}
+
 	bindings := make([]binding, 0, len(source.Names))
 	var requests []api.RootRequest
 	for index, sourceName := range source.Names {
-		if sourceName.Name == "_" {
-			return nil, nil,
-				api.Unsupported(
-					context.WithRole(api.RoleLocalDeclaration),
-					api.CategoryStatement,
-					sourceName,
-				)
-		}
 		object, ok := context.TypesInfo().Defs[sourceName].(*types.Var)
 		if !ok {
 			return nil, nil,
@@ -120,9 +128,10 @@ func emitSpec(
 			}
 		}
 		bindings = append(bindings, binding{
-			sourceName: sourceName,
-			object:     object,
-			value:      value,
+			sourceName:      sourceName,
+			object:          object,
+			value:           value,
+			omitInitializer: callableZero,
 		})
 	}
 
@@ -168,60 +177,38 @@ func emitSpec(
 		}
 	}
 
-	declarations := make([]tsgo.VariableDeclaration, 0, len(bindings))
-	for _, binding := range bindings {
-		sourceName := binding.sourceName
-		object := binding.object
-		value := binding.value
-		_, callableZero := callable.Signature(object.Type())
-		callableZero = callableZero && len(source.Values) == 0
-		targetName, selected := context.AddressableStorage().Name(context, object)
-		var err error
-		if !selected {
-			targetName, err = context.Names().Declare(object)
-		} else {
-			value, err = context.AddressableStorage().Cell(
+	if len(bindings) != 0 && context.IsGotoLocal(bindings[0].object) {
+		for _, binding := range bindings {
+			target, targetRequests, selected, err := gotoLocalAssignment(
 				context,
 				children,
-				sourceName,
-				object.Type(),
-				value,
-			)
-		}
-		if err != nil {
-			return nil, nil, err
-		}
-		var targetType tsgo.TypeNode
-		if !selected &&
-			context.Values().RequiresExplicitType(context, object.Type()) {
-			represented, err := children.RepresentedType(
-				context.WithRole(api.RoleLocalType),
-				sourceName,
-				object.Type(),
+				binding,
 			)
 			if err != nil {
 				return nil, nil, err
 			}
-			targetType = represented.Value()
-			requests = append(requests, represented.Requests()...)
+			if !selected {
+				return nil, nil, &api.InvariantError{
+					Role:   api.RoleLocalDeclaration,
+					Reason: "goto declaration has mixed storage ownership",
+				}
+			}
+			statements = append(statements, target...)
+			requests = append(requests, targetRequests...)
 		}
-		var initializer tsgo.Expression = value.Value()
-		if callableZero && !selected {
-			initializer = nil
+		return statements, requests, nil
+	}
+
+	declarations := make([]tsgo.VariableDeclaration, 0, len(bindings))
+	for _, binding := range bindings {
+		declaration, declarationBefore, declarationRequests, err :=
+			localVariableDeclaration(context, children, binding)
+		if err != nil {
+			return nil, nil, err
 		}
-		declarations = append(
-			declarations,
-			context.Factory().VariableDeclaration(
-				context.Factory().Identifier(targetName),
-				nil,
-				targetType,
-				initializer,
-			),
-		)
-		requests = append(
-			requests,
-			value.Requests()...,
-		)
+		statements = append(statements, declarationBefore...)
+		declarations = append(declarations, declaration)
+		requests = append(requests, declarationRequests...)
 	}
 	statements = append(
 		statements,
@@ -234,6 +221,71 @@ func emitSpec(
 		),
 	)
 	return statements, requests, nil
+}
+
+func localVariableDeclaration(
+	context api.Context,
+	children api.ChildEmitter,
+	binding binding,
+) (
+	tsgo.VariableDeclaration,
+	[]tsgo.Statement,
+	[]api.RootRequest,
+	error,
+) {
+	sourceName := binding.sourceName
+	object := binding.object
+	value := binding.value
+	targetName, selected := context.AddressableStorage().Name(context, object)
+	var err error
+	if !selected {
+		targetName, err = context.Names().Declare(object)
+	} else {
+		value, err = context.AddressableStorage().Cell(
+			context,
+			children,
+			sourceName,
+			object.Type(),
+			value,
+		)
+	}
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	var targetType tsgo.TypeNode
+	requests := value.Requests()
+	if !selected &&
+		context.Values().RequiresExplicitType(context, object.Type()) {
+		represented, err := children.RepresentedType(
+			context.WithRole(api.RoleLocalType),
+			sourceName,
+			object.Type(),
+		)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		targetType = represented.Value()
+		requests = append(requests, represented.Requests()...)
+	}
+	var initializer tsgo.Expression = value.Value()
+	if binding.omitInitializer && !selected {
+		initializer = nil
+	}
+	return context.Factory().VariableDeclaration(
+		context.Factory().Identifier(targetName),
+		nil,
+		targetType,
+		initializer,
+	), value.Before(), requests, nil
+}
+
+func hasBlankName(names []*ast.Ident) bool {
+	for _, name := range names {
+		if name != nil && name.Name == "_" {
+			return true
+		}
+	}
+	return false
 }
 
 func localValue(

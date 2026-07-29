@@ -21,7 +21,7 @@ func TestScalarSlicesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	workingDirectory := t.TempDir()
 	targetPaths, module, printed := materialize(t, workingDirectory, emission)
 
-	if strings.Contains(printed.source, "[]") {
+	if strings.Contains(printed.source, ": int32[]") {
 		t.Fatal("source module exposed a bare TypeScript array as a Go slice")
 	}
 	for _, fragment := range []string{
@@ -55,18 +55,27 @@ func TestScalarSlicesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	runnerPath := filepath.Join(workingDirectory, "runner.ts")
 	writeFile(t, runnerPath, `import "./program.js";
 import {
+    AppendDistinctNamedSlices,
+    AppendDefinedStringBytes,
     AppendReallocates,
     AppendReusesBacking,
+    AppendLargeSpread,
     AppendNoValues,
     AppendGrowthCapacity,
     AppendReallocationZeroTail,
+    AppendSpread,
+    AppendSpreadOverlap,
+    AppendStringBytes,
     BoolElements,
     CopyCount,
+    CopyDefinedStringBytes,
     CopyDistinct,
     CopyOverlapping,
+    CopyStringBytes,
     DescriptorAliasesBacking,
     EmptyIsNil,
     IndexBoundsPanic,
+    IndexUpdates,
     KeyedLiteral,
     LiteralIndex,
     MakeShape,
@@ -76,9 +85,11 @@ import {
     NilSliceStaysNil,
     PackageSliceAliasesBacking,
     ParameterDescriptorIsIndependent,
+    ParallelStoreOrder,
     ShadowedLenIsOrdinaryCall,
     SliceBoundsPanic,
     StoreBoundsPanic,
+    StringIndexCompound,
     ThreeIndexSlice,
     TwoIndexSlice,
 } from "`+module+`";
@@ -99,9 +110,20 @@ console.log(AppendReallocates());
 console.log(AppendNoValues());
 console.log(AppendGrowthCapacity());
 console.log(AppendReallocationZeroTail());
+console.log(AppendSpread());
+console.log(AppendSpreadOverlap());
+console.log(AppendDistinctNamedSlices());
+console.log(AppendStringBytes());
+console.log(AppendDefinedStringBytes());
+console.log(AppendLargeSpread());
+console.log(IndexUpdates());
+console.log(StringIndexCompound());
+console.log(ParallelStoreOrder());
 console.log(CopyOverlapping());
 console.log(CopyDistinct());
 console.log(CopyCount());
+console.log(CopyStringBytes());
+console.log(CopyDefinedStringBytes());
 console.log(NilSliceStaysNil());
 console.log(BoolElements());
 console.log(ShadowedLenIsOrdinaryCall());
@@ -129,7 +151,7 @@ for (const operation of [
 		filepath.Join(workingDirectory, "out", "runner.js"),
 	)
 	goOutput := executeGo(t, workingDirectory)
-	const expected = "true\ntrue\n7\ntrue\nfalse\n25\n5\n57\n9\n15\n13\n934\n1\n24\n4\n0\n1123\n78\n2\ntrue\ntrue\n5\npanic\npanic\npanic\npanic\n"
+	const expected = "true\ntrue\n7\ntrue\nfalse\n25\n5\n57\n9\n15\n13\n934\n1\n24\n4\n0\n4\n123\n123\n29669\n29669\n7\n19\nab\n12345678\n1123\n78\n2\n2109669\n39669\ntrue\ntrue\n5\npanic\npanic\npanic\npanic\n"
 	if goOutput != expected {
 		t.Fatalf("Go output = %q, want exact slice mutation sentinel output", goOutput)
 	}
@@ -200,6 +222,36 @@ func compileFixtureWithOptions(
 		t.Fatal(err)
 	}
 	emission, err := emit.CompileWithOptions(program, roots, options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return emission
+}
+
+func compileSliceSource(
+	t *testing.T,
+	source string,
+) emit.ProgramEmission {
+	t.Helper()
+	directory := t.TempDir()
+	writeFile(
+		t,
+		filepath.Join(directory, "go.mod"),
+		"module example.com/demand\n\ngo 1.26.4\n",
+	)
+	writeFile(t, filepath.Join(directory, "source.go"), source)
+	loaded, err := load.One(context.Background(), load.Request{
+		Directory: directory,
+		Pattern:   ".",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	roots, err := emit.ExportedAPIRoots(loaded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	emission, err := emit.Compile(loaded.Program(), roots)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -333,9 +385,20 @@ func main() {
 	fmt.Println(values.AppendNoValues())
 	fmt.Println(values.AppendGrowthCapacity())
 	fmt.Println(values.AppendReallocationZeroTail())
+	fmt.Println(values.AppendSpread())
+	fmt.Println(values.AppendSpreadOverlap())
+	fmt.Println(values.AppendDistinctNamedSlices())
+	fmt.Println(values.AppendStringBytes())
+	fmt.Println(values.AppendDefinedStringBytes())
+	fmt.Println(values.AppendLargeSpread())
+	fmt.Println(values.IndexUpdates())
+	fmt.Println(values.StringIndexCompound())
+	fmt.Println(values.ParallelStoreOrder())
 	fmt.Println(values.CopyOverlapping())
 	fmt.Println(values.CopyDistinct())
 	fmt.Println(values.CopyCount())
+	fmt.Println(values.CopyStringBytes())
+	fmt.Println(values.CopyDefinedStringBytes())
 	fmt.Println(values.NilSliceStaysNil())
 	fmt.Println(values.BoolElements())
 	fmt.Println(values.ShadowedLenIsOrdinaryCall())

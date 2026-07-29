@@ -6,6 +6,8 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func Emit(
@@ -30,6 +32,21 @@ func Emit(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
+	facet, err := api.NewFunctionLiteralCallableFacet(
+		context.ArtifactOwner(),
+		source,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	observation, err := context.ObserveCooperativeCallable(facet)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	context = context.WithCooperativeCallable(
+		facet,
+		observation.Cooperative(),
+	)
 	targetSignature, err := callable.Emit(
 		context,
 		children,
@@ -41,9 +58,21 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	parameters := targetSignature.Parameters()
+	requests := targetSignature.Requests()
+	if context.CallableControlFor(source).Recovery() {
+		recovery, recoveryRequests, err :=
+			callable.RecoveryAuthorityParameter(context)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		parameters = append(parameters, recovery)
+		requests = append(requests, recoveryRequests...)
+	}
 	body, err := callable.EmitBody(
 		context,
 		children,
+		source,
 		source.Type,
 		source.Body,
 		signature,
@@ -52,19 +81,32 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return api.DirectExpression(
+	var modifiers []tsgo.ModifierLike
+	resultType := targetSignature.Result()
+	if observation.Cooperative() {
+		modifiers = []tsgo.ModifierLike{context.Factory().AsyncKeyword()}
+		resultType = callable.PromiseResult(context.Factory(), resultType)
+	}
+	target := api.DirectExpression(
 		context.Factory().FunctionExpression(
+			modifiers,
 			nil,
 			nil,
 			nil,
-			nil,
-			targetSignature.Parameters(),
-			targetSignature.Result(),
+			parameters,
+			resultType,
 			body.Value(),
 		),
 		api.CombineRequests(
-			targetSignature.Requests(),
+			requests,
 			body.Requests(),
+			observation.Requests(),
 		)...,
-	), nil
+	)
+	return cooperativecall.AdaptLiteralValue(
+		context,
+		children,
+		source,
+		target,
+	)
 }

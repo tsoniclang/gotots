@@ -80,3 +80,47 @@ func IncInitializers(value int32) int32 {
 	}
 	return value
 }
+
+func pair() (int32, int32) {
+	return 3, 5
+}
+
+func add(left, right int32) int32 {
+	return left + right
+}
+
+func ParallelInitializer() int32 {
+	left := int32(1)
+	right := int32(2)
+	for left, right = right, left; left < 2; left++ {
+	}
+	return right
+}
+
+func ParallelPost(limit int32) int32 {
+	left := int32(0)
+	right := int32(1)
+	total := int32(0)
+outer:
+	for ; left < limit; left, right = left+1, right+2 {
+		if left == 1 {
+			continue outer
+		}
+		total += right
+		if left == 3 {
+			break outer
+		}
+	}
+	return total*100 + left*10 + right
+}
+
+func ConditionPrerequisite(limit int32) int32 {
+	count := int32(0)
+	for add(pair()) > count {
+		count++
+		if count == limit {
+			break
+		}
+	}
+	return count
+}

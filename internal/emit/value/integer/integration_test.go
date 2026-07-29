@@ -49,6 +49,9 @@ func TestIntegerNumberProfilePrintsTypechecksAndExecutesDifferentially(t *testin
 		"NumberUnary",
 		"NumberUnaryUint",
 		"NumberUnsignedShift",
+		"NumberVariableShift",
+		"NumberVariableSignedShift",
+		"NumberVariableUnsignedShift",
 		"WidenSigned",
 		"WidenUnsigned",
 	)
@@ -72,6 +75,9 @@ func TestIntegerBigIntProfilePrintsTypechecksAndExecutesDifferentially(t *testin
 		"BigSigned",
 		"BigUnary",
 		"BigUnsigned",
+		"BigVariableShift",
+		"BigVariableSignedShift",
+		"BigVariableUnsignedShift",
 		"WidenSigned",
 		"WidenUnsigned",
 	)
@@ -145,11 +151,7 @@ func TestIntegerUnsupportedNeighborsFailAtTheirExactOwner(t *testing.T) {
 		construct      string
 		category       api.Category
 	}{
-		{"number division", "NumberDivide", emit.IntegerRepresentationNumber, "*ast.BinaryExpr", api.CategoryExpression},
-		{"number remainder", "NumberRemainder", emit.IntegerRepresentationNumber, "*ast.BinaryExpr", api.CategoryExpression},
 		{"number int64 bits", "NumberInt64Bits", emit.IntegerRepresentationNumber, "*ast.BinaryExpr", api.CategoryExpression},
-		{"number variable shift", "VariableShift", emit.IntegerRepresentationNumber, "*ast.BinaryExpr", api.CategoryExpression},
-		{"bigint variable shift", "VariableShift", emit.IntegerRepresentationBigInt, "*ast.BinaryExpr", api.CategoryExpression},
 		{"unsafe number literal", "UnsafeNumber", emit.IntegerRepresentationNumber, "*ast.BasicLit", api.CategoryExpression},
 		{"unsafe number conversion", "UnsafeConversion", emit.IntegerRepresentationNumber, "*ast.CallExpr", api.CategoryExpression},
 	}
@@ -241,13 +243,11 @@ func TestIntegerSemanticEvidenceMutationsFailAtExpressionOwners(t *testing.T) {
 		delete(loaded.TypesInfo().Types, call)
 		assertIntegerExpressionMutationFails(t, loaded, function, "*ast.CallExpr")
 	})
-	t.Run("constant shift count", func(t *testing.T) {
+	t.Run("shift count evidence", func(t *testing.T) {
 		loaded := loadIntegerFamily(t)
 		function := sourceFunction(t, loaded.Files()[0].Syntax(), "NumberShifts")
 		shift := function.Body.List[0].(*ast.ReturnStmt).Results[0].(*ast.BinaryExpr)
-		facts := loaded.TypesInfo().Types[shift.Y]
-		facts.Value = nil
-		loaded.TypesInfo().Types[shift.Y] = facts
+		delete(loaded.TypesInfo().Types, shift.Y)
 		assertIntegerExpressionMutationFails(t, loaded, function, "*ast.BinaryExpr")
 	})
 }
@@ -408,12 +408,24 @@ func executeIntegerFamilyTS(
 
 const show = (value: number | bigint): string => value.toString();
 const row = (value: readonly (number | bigint)[]): string => value.map(show).join(" ");
+const panics = (operation: () => void): boolean => {
+    try {
+        operation();
+        return false;
+    } catch {
+        return true;
+    }
+};
 `
 	if bigint {
 		runner += `
 console.log(row(values.BigSigned(9007199254740993n, 7n)));
 console.log(row(values.BigUnsigned(18446744073709551600n, 15n)));
 console.log(row(values.BigShifts(-9007199254740993n)));
+console.log(row(values.BigVariableShift(-9n, 3n)));
+console.log(row(values.BigVariableShift(-9n, 64n)));
+console.log(String(panics(() => { values.BigVariableSignedShift(1n, -1n); })));
+console.log(row(values.BigVariableUnsignedShift(15n, 80n)));
 console.log(row(values.BigUnary(9007199254740993n)));
 console.log(show(values.WidenSigned(-8n)));
 console.log(show(values.WidenUnsigned(4000000000n)));
@@ -427,6 +439,10 @@ console.log(row(values.NumberBits16(60000, 3855)));
 console.log(row(values.NumberBits32(4042322160, 252645135)));
 console.log(row(values.NumberShifts(-128)));
 console.log(row(values.NumberUnsignedShift(4042322160)));
+console.log(row(values.NumberVariableShift(-9, 3)));
+console.log(row(values.NumberVariableShift(-9, 32)));
+console.log(String(panics(() => { values.NumberVariableSignedShift(1, -1); })));
+console.log(row(values.NumberVariableUnsignedShift(15, 40)));
 console.log(row(values.NumberUnary(-123456)));
 console.log(show(values.NumberUnaryUint(4042322160)));
 console.log(show(values.WidenSigned(-8)));
@@ -502,6 +518,10 @@ replace example.com/integerfamily => %s
 	fmt.Println(values.NumberBits32(4042322160, 252645135))
 	fmt.Println(values.NumberShifts(-128))
 	fmt.Println(values.NumberUnsignedShift(4042322160))
+	fmt.Println(values.NumberVariableShift(-9, 3))
+	fmt.Println(values.NumberVariableShift(-9, 32))
+	fmt.Println(panics(func() { values.NumberVariableSignedShift(1, -1) }))
+	fmt.Println(values.NumberVariableUnsignedShift(15, 40))
 	fmt.Println(values.NumberUnary(-123456))
 	fmt.Println(values.NumberUnaryUint(4042322160))
 	fmt.Println(values.WidenSigned(-8))
@@ -514,6 +534,10 @@ replace example.com/integerfamily => %s
 	fmt.Println(values.BigSigned(9007199254740993, 7))
 	fmt.Println(values.BigUnsigned(18446744073709551600, 15))
 	fmt.Println(values.BigShifts(-9007199254740993))
+	fmt.Println(values.BigVariableShift(-9, 3))
+	fmt.Println(values.BigVariableShift(-9, 64))
+	fmt.Println(panics(func() { values.BigVariableSignedShift(1, -1) }))
+	fmt.Println(values.BigVariableUnsignedShift(15, 80))
 	fmt.Println(values.BigUnary(9007199254740993))
 	fmt.Println(values.WidenSigned(-8))
 	fmt.Println(values.WidenUnsigned(4000000000))
@@ -534,6 +558,14 @@ func main() {
 	fmt.Println(values.UnsignedComplement8(240))
 	fmt.Println(values.Int8(-5, 3))
 	fmt.Println(values.Uint64(40, 2))
+}
+
+func panics(operation func()) (result bool) {
+	defer func() {
+		result = recover() != nil
+	}()
+	operation()
+	return false
 }
 `)
 	return run(t, runnerDirectory, filepath.Join(runtime.GOROOT(), "bin", "go"), "run", ".")

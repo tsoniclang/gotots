@@ -2,81 +2,13 @@ package slice_test
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit"
-	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/load"
 )
-
-func TestScalarSliceNeighborsFailAtTypedOwners(t *testing.T) {
-	tests := []struct {
-		name      string
-		source    string
-		category  api.Category
-		construct string
-	}{
-		{
-			name: "append spread",
-			source: `package boundary
-func F(left, right []int32) []int32 { return append(left, right...) }
-`,
-			category:  api.CategoryExpression,
-			construct: "*ast.CallExpr",
-		},
-		{
-			name: "range",
-			source: `package boundary
-func F(values []int32) int32 {
-	var total int32
-	for _, value := range values { total += value }
-	return total
-}
-`,
-			category:  api.CategoryStatement,
-			construct: "*ast.RangeStmt",
-		},
-		{
-			name: "index increment",
-			source: `package boundary
-func F(values []int32) { values[0]++ }
-`,
-			category:  api.CategoryStatement,
-			construct: "*ast.IncDecStmt",
-		},
-		{
-			name: "index compound assignment",
-			source: `package boundary
-func F(values []int32) { values[0] += 1 }
-`,
-			category:  api.CategoryStatement,
-			construct: "*ast.AssignStmt",
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			err := compileBoundary(t, test.source)
-			var unsupported *api.UnsupportedError
-			if !errors.As(err, &unsupported) {
-				t.Fatalf("error = %#v, want typed unsupported boundary", err)
-			}
-			if unsupported.Category != test.category ||
-				unsupported.Construct != test.construct {
-				t.Fatalf(
-					"unsupported = (%s, %s, %s), want (%s, %s)",
-					unsupported.Category,
-					unsupported.Construct,
-					unsupported.Role,
-					test.category,
-					test.construct,
-				)
-			}
-		})
-	}
-}
 
 func TestNestedSliceTypeUsesRecursiveDescriptor(t *testing.T) {
 	err := compileBoundary(t, `package boundary

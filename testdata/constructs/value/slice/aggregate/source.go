@@ -62,6 +62,30 @@ func AppendTailZerosAreFresh() bool {
 	return expanded[3].Value == 0
 }
 
+func AppendSpreadCopiesValues() bool {
+	values := []Box{{Value: 1}}
+	appended := []Box{{Value: 2}}
+	grown := append(values, appended...)
+	appended[0].Value = 8
+	grown[0].Value = 9
+	grown[1].Value = 7
+	return values[0].Value == 9 && appended[0].Value == 8 && grown[1].Value == 7
+}
+
+func AppendSpreadOverlapSnapshotsValues() bool {
+	values := make([]Box, 3, 6)
+	values[0].Value = 1
+	values[1].Value = 2
+	values[2].Value = 3
+	grown := append(values[:1], values[1:3]...)
+	grown[1].Value = 9
+	return grown[0].Value == 1 &&
+		grown[1].Value == 9 &&
+		grown[2].Value == 3 &&
+		values[1].Value == 9 &&
+		values[2].Value == 3
+}
+
 func CopyDistinctCopiesValues() bool {
 	source := []Box{{Value: 1}, {Value: 2}}
 	target := make([]Box, 2)
@@ -91,4 +115,18 @@ func ArrayElementsCopyOnAppend() bool {
 	values := append([]Pair{}, value)
 	values[0][0].Value = 9
 	return value[0].Value == 1 && values[0][1].Value == 2
+}
+
+func ElidedNestedLiterals() bool {
+	slices := [][]Box{
+		{{Value: 1}},
+		{{Value: 2}},
+	}
+	maps := []map[int32]Box{
+		{1: {Value: 3}},
+	}
+	slices[0][0].Value = 9
+	copied := maps[0][1]
+	copied.Value = 8
+	return slices[1][0].Value == 2 && maps[0][1].Value == 3
 }

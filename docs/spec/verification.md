@@ -304,6 +304,8 @@ The complex checkpoint additionally proves:
   signed zero, overflow-sensitive ratios, infinities, and NaNs;
 - `complex`, `real`, and `imag` dispatch by exact `*types.Builtin` identity and
   preserve argument evaluation order;
+- `real` and `imag` project a defined complex operand through its exact nominal
+  value member, while raw complex carriers remain nominality-agnostic;
 - each reached width emits exactly one nominal class, division emits one
   shared definition, and every use site remains O(1); and
 - mutations remove a width brand, omit component rounding, replace robust
@@ -418,8 +420,8 @@ The first named-struct family additionally proves:
   conjunction;
 - concrete value-receiver calls use the exact `go/types.Selection` and a named
   receiver function, never a class method or virtual dispatch; and
-- tags, embedding, pointers, interfaces, method values/expressions, generics,
-  and unsupported field representations fail at their typed owner.
+- tags, pointers, interfaces, generics, and unsupported field representations
+  fail at their typed owner.
 
 Mutations replace a requested copy with direct assignment, replace requested
 field equality with `===`, remove the private brand, add source-order captures
@@ -560,11 +562,60 @@ program. The required evidence includes:
 | Family | Independent behavioral proofs | Required mutations |
 |---|---|---|
 | integers and numeric conversions | every source/destination width and profile disposition; narrowing, sign change, integer/float, float-width, and complex-width boundaries; constants; NaN, infinity, signed zero, and representability; BigInt division/remainder for nonzero and zero divisors | width alias collapse; unsafe number literal; missing narrowing/bounds operation; conversion spelling lookup; ordinary-call fallthrough; duplicated conversion operand; direct host divide/remainder or non-finite BigInt conversion bypass |
-| strings | arbitrary-byte literal, concat, comparison, byte length/index/slice and bounds | Unicode-code-point literal; UTF-16 indexing; missing bounds check |
-| arrays | length-distinct target types, fresh zero/copy, compiler-lowered recursive equality, index/store/len/cap | erased length; shared zero; shallow copy where element policy forbids it; runtime equality callback or target object identity |
-| slices | nil/empty distinction, aliasing, reslice, append reuse/reallocation, copy overlap | bare-array substitution; lost capacity; always-reallocate append |
+| strings | arbitrary-byte literal, concat, comparison, byte length/index/slice and bounds; integer/rune UTF-8 encoding; `[]byte`/`[]rune` conversions including invalid and truncated sequences | Unicode-code-point literal; UTF-16 indexing; host text codec; invalid-sequence width drift; missing bounds check |
+| arrays | length-distinct target types, fresh zero/copy, compiler-lowered recursive equality, index/store/len/cap, direct and pointer-to-array slicing with bidirectional aliasing | erased length; shared zero; shallow copy where element policy forbids it; copied array slice; duplicate bounds owner; runtime zero/copy/equality callback or target object identity |
+| slices | nil/empty distinction, aliasing, reslice, append reuse/reallocation, copy overlap, aggregate fresh zero/copy/clear, contextual elided nested literals, distinct-defined spread, `[]byte` plus string spread, and large spread without host argument expansion | bare-array substitution; lost capacity; always-reallocate append; explicit-type requirement for an elided literal; semantic strategy field/parameter; JavaScript spread of a Go slice; unconditional append-spread/clear surface |
 | maps | nil write, missing zero, comma-ok, aliasing, direct bool/integer/string keys, defined-key projection, delete/len, and explicit floating-key rejection | plain-object substitution; missing-value `undefined`; copy-on-assignment; wrapper object identity; floating-key admission through native SameValueZero |
 | pointers | nil/new/read/store/alias/equality; local/parameter/result/receiver/package/field/array/slice addresses; reassignment through projections; pointer receiver nil/copy cases | fresh wrapper on copy; wrapper identity instead of canonical location; nil dereference success; unrelated-local cell wrapping; wrong requirement owner |
+
+Conversion certification additionally proves that represented struct
+conversion emits one destination-owned `$convert` definition under repeated
+uses, recursively copies aggregate fields, ignores tags only where
+`go/types.ConvertibleTo` permits it, and never accepts a structurally similar
+but Go-inconvertible source. Slice-to-array value tests prove short-length
+panic timing, one operand evaluation, fresh array identity, recursive element
+copy, defined source/destination composition, and zero callback/cast paths.
+Slice-to-array pointer tests separately prove short-length panic timing and
+one evaluation, nil-versus-empty length-zero results, canonical equality by
+backing plus offset, bidirectional aliasing, whole-array assignment, recursive
+element-copy isolation, defined slice/array composition, and the absence of
+nominal-wrapper forwarding methods.
+Array-slicing tests prove direct, defined, plain, pointer, and defined-result
+forms; low/high/max evaluation order; ordinary slice-bound panic behavior;
+bidirectional aliasing; and exact demand shape for one array-location facet
+and one array-to-slice helper. A no-array-slicing artifact contains neither
+facet. Contextual-literal tests prove nested elided slice and map elements use
+checker types and produce the same strict target structure and behavior as
+their explicit-type equivalents.
+Mutations inline the field walk at every use, omit one field copy, admit an
+inconvertible struct, move the length check after allocation, alias slice
+backing for the value conversion, copy backing for the pointer conversion,
+key the pointer by slice-descriptor identity, collapse nil and non-nil empty
+zero-length slices, copy an array during slicing, add a second array-bounds
+path, require explicit nested literal syntax, restore defined-array forwarding
+methods, or evaluate the slice twice; each must fail its owning shape or
+differential gate.
+
+Pointer-conversion certification additionally proves:
+
+- the generated pointer contract has distinct logical and canonical-storage
+  type arguments, with no erased payload or runtime semantic callback;
+- conversions accepted by `go/types.ConvertibleTo` preserve one canonical
+  address and typed storage accessor pair across scalar, tagged-struct,
+  aggregate-field, and nested pointer-field base types;
+- writes through either logical view are visible through the other, and a
+  round trip compares equal by canonical location;
+- array- and slice-element addresses use direct storage when logical and
+  storage types coincide, and one compile-time-selected typed projection when
+  they differ;
+- cross-file storage aliases are imported as type-only bindings, emitted once
+  by their declaration owner, and absent when no address/conversion demands
+  them; and
+- mutations collapse the two pointer type arguments, copy the pointee during
+  conversion, compare facade identity, replace `go/types` convertibility with
+  a hand-recursive field rule, omit a storage projection, or expose storage
+  conversion as a runtime callback, and each fails its owning strict,
+  differential, artifact-shape, or broad-search gate.
 
 For every family:
 
@@ -587,8 +638,10 @@ The cross-family owners have additional blocking proofs:
 1. the runtime dependency closure emits one `runtime/panic.ts`, and each
    demanded integer/string/pointer/array/slice/map module imports exactly one
    `GoPanic` binding through its contract;
-2. only the panic runtime owner constructs a target `ThrowStatement`; replacing
-   one family guard with a host exception or removing one dependency fails;
+2. only the panic runtime owner creates or initially throws a `GoPanic`;
+   replacing one family guard with a host exception or removing one dependency
+   fails; the only other admitted target throw is a callable envelope rethrowing
+   an unrecognized caught host exception unchanged;
 3. array, slice, and map stores all enter the same setter transaction, which
    differentially proves receiver/index/key/right-side order with both direct
    and prerequisite-bearing operands;
@@ -604,6 +657,72 @@ The cross-family owners have additional blocking proofs:
 Deletion mutations restore a family-specific assignment route, a second
 builtin resolver, a native family throw, or an undeclared runtime dependency;
 each must fail at the owning architecture, artifact, or differential gate.
+
+Expression-completion certification also requires:
+
+1. a variadic declaration artifact with one represented slice parameter and no
+   target rest parameter;
+2. differential calls for zero/one/many variadic arguments, defined
+   `slice...`, a tuple supplying fixed plus variadic positions, and a valid
+   large slice that would exceed a host spread-call limit;
+3. `append` spread differentials for aliasing reuse, reallocation, two
+   distinct defined slice types with identical elements, aggregate elements,
+   and `append([]byte, string...)`;
+4. aggregate array/slice artifacts containing direct element operation calls
+   and no function-valued zero/copy parameter, field, or argument;
+5. runtime artifact pairs proving append-spread and clear declarations are
+   absent without demand and present exactly once with demand;
+6. logical `&&`/`||` expressions whose right operand has prerequisite
+   statements, proving those statements remain inside the selected
+   short-circuit branch; and
+7. mutations that restore tuple-before-variadic rejection, slice
+   assignability admission, stored semantic callbacks, host spreading, shared
+   aggregate zeros, shallow aggregate growth/copy, or unconditional runtime
+   members.
+
+The integrated Wave-3 matrix additionally compiles, TS-Go-encodes, prints,
+strict-typechecks, and executes one cross-family program under the default
+`number` profile and the `bigint` override. It includes a defined map literal
+at a call boundary, predeclared booleans projected to a defined boolean, and
+`real`/`imag` over a defined complex value. Artifact-shape checks require the
+single nominal map wrapper, nominal boolean construction, and explicit complex
+value projection; reverting any underlying-family decision fails before the
+differential comparison. The matrix freezes total and largest-file byte bounds
+and rejects erased types, casts, reflective call helpers, and dynamic imports.
+
+### Milestone 3C Structured-Control Gate
+
+The integrated fixture runs under the `number` and `bigint` integer profiles.
+It must encode and print through pinned TS-Go, strict-typecheck before
+execution, and match Go for arrays, pointer arrays, slices, arbitrary-byte
+strings, maps, integer ranges, structured `for`, labels, expression switches,
+fallthrough, and local multi-result declarations.
+
+Blocking structural evidence includes:
+
+1. a constant-length one-variable pointer-array range contains no operand
+   evaluation, while an array-returning call is captured and invoked exactly
+   once;
+2. map range materializes one key snapshot and performs one live comma-ok
+   lookup per considered key, with deletion suppressing an unseen entry;
+3. exact `*types.Label` identity survives source-spelling mutation and missing
+   label-use evidence fails at the branch owner;
+4. custom-equality and prerequisite-bearing switches use one selection
+   variable and one execution switch, and each clause body occurs once;
+5. a default clause may fall through when it is not last, while every
+   non-fallthrough clause receives one implicit target break;
+6. structured loop prerequisites are declared once outside the target loop,
+   but invoked only at their Go condition/post boundary; and
+7. no `ForInitializerEmission`, alternate clause dispatcher, generic control
+   IR, or collection-sized generated loop remains.
+
+A 1x/2x/4x fixture independently measures source bytes, printed target bytes,
+and encoded TS-Go nodes. Range-loop count remains one as source collection
+length grows; custom switch checks and output grow linearly with source case
+count. Mutations restore operand skipping for a real call, remove the key
+snapshot or live lookup, route labels by spelling, duplicate a switch body,
+lose fallthrough, or restore the superseded header-only API; each must fail its
+own differential, shape, identity, scaling, or broad-search gate.
 
 Addressability has an additional exact matrix:
 
@@ -641,6 +760,331 @@ omit the value-receiver copy,
 bypass package-`init` artifact reconstruction, or dirty callers after an
 unchanged callable facet. Each fails at its owning structure, artifact,
 strict-type, or differential gate.
+
+### Milestone 3D Concrete-Method Gate
+
+The integrated fixture runs under the `number` and `bigint` integer profiles.
+It must encode and print through pinned TS-Go, strict-typecheck before
+execution, and match Go for methods on represented defined and struct types,
+embedded values and pointers, nested promotion, field read/store/address,
+direct calls, method values, method expressions, anonymous embedding,
+variadics, and nil-sensitive receiver adjustment.
+
+Blocking evidence includes:
+
+1. every concrete selector exact-validates `Selection.Kind`, `Obj`, `Recv`,
+   result type, and complete `Index()` path against the selected checker graph;
+2. mutating only selector spelling leaves encoded target AST byte-identical,
+   while substituting another valid selection object fails at the selector
+   owner;
+3. a promoted call from `Base.CallName` remains `Base_Name(base)` even when the
+   embedding type declares its own `Name`, proving no accidental virtual
+   dispatch;
+4. method-value formation evaluates and captures the receiver once, copies
+   value receivers once, and preserves pointer identity;
+5. nil-safe pointer receiver values may form and execute, while a value method
+   selected through a nil pointer and a promoted field through a nil embedded
+   pointer panic at the same boundary as Go;
+6. direct method expressions are direct receiver-function references and
+   promoted method expressions are typed arrows with an explicit first
+   receiver parameter;
+7. embedded fields remain owned class fields, including anonymous structs and
+   reserved/unexported member names; generated support imports their defining
+   source modules with collision-safe package-qualified aliases; and
+8. generated artifacts contain no `extends`, `.call`, `.apply`, `.bind`,
+   erased carrier, reflection, or per-method/per-implementer dispatch switch.
+
+A 1x/2x/4x embedding-depth fixture independently measures source bytes,
+printed target bytes, and encoded TS-Go nodes. Each use contains one selected
+receiver-function call, and all three measures grow linearly with source
+depth. Production mutations remove an index component, replace the selected
+object, select by spelling, omit a value copy, skip an embedded-pointer nil
+check, reevaluate a receiver, attach methods to classes, or route generated
+private declarations through a public assembly; each fails its identity,
+differential, strict-type, shape, naming, or scaling owner.
+
+### Milestone 3E Interface Gate
+
+The integrated interface fixture runs under both integer profiles and covers
+named and anonymous interfaces, embedding, exported and package-private
+methods, value and pointer dynamic types, promoted methods, implicit and
+explicit conversions, calls, method values, method expressions, assertions,
+comma-ok, panicking assertions, ordered type switches, equality, and interface
+map keys.
+
+Blocking evidence includes:
+
+1. nil interface and interface-containing-typed-nil remain distinct in emitted
+   AST and differential execution;
+2. concrete boxing copies value payloads once and preserves reference payload
+   identity;
+3. each exact concrete dynamic type has one adapter class regardless of
+   interface count or call count, plus one canonical compilation-scope
+   non-string dynamic-type token;
+4. every adapter payload, method parameter, and result is statically typed,
+   and every native method directly invokes the exact top-level receiver
+   function selected from `go/types`;
+5. exported and package-private method contracts exact-join by semantic
+   identity and receiver-free signature, never source spelling;
+6. interface calls contain one nil guard and one native call, with no
+   implementer-count switch;
+7. concrete assertions use a typed predicate over exact canonical dynamic-type
+   token identity, interface assertions use the target contract's type
+   predicate, and type-switch cases preserve source order and case-variable
+   type;
+8. same-type comparable payloads use their existing equality/hash owner,
+   different dynamic types compare unequal, and non-comparable dynamic values
+   panic only at the Go-required equality or map-key boundary; and
+9. generated method-token, dynamic-type-token, anonymous-interface, and
+   adapter artifacts reconstruct transactionally and expose only the facets
+   their consumers subscribe to; and
+10. the same local Go type boxed by separate invocations asserts equal in
+    dynamic type, compares by its payload owner, and resolves as the same
+    interface map key even though its lexical adapter class declaration
+    executes separately; and
+11. pointer-only fixtures that never hash a pointer contain neither
+    `goPointerHash` nor `GoMapHash`, while an interface-map fixture with a
+    pointer dynamic key exact-joins one optional pointer-hash definition and
+    executes alias-equivalent pointer lookups correctly.
+
+Production mutations collapse typed nil, omit the boxing copy, substitute a
+same-spelling private method from another package, change a method signature,
+drop a method token, enumerate implementers at a call or assertion, read an
+adapter payload before token-predicate narrowing, substitute adapter
+constructor identity for the canonical token, replace the token object with a
+string or truncated hash, reorder type-switch cases, return false instead of
+panicking for equal dynamic uncomparable types, or hash an uncomparable
+payload. Each must fail its owning identity, strict-type, differential,
+mutation, shape, or artifact gate.
+
+A 1x/2x/4x fixture varies implementer count while holding interface call sites
+constant. Call-site printed bytes and TS-Go node counts must remain constant;
+adapter bytes may grow only with the reached concrete method sets. A separate
+method-count fixture proves assertion work grows with the asserted interface
+contract, not with possible implementers. The twenty largest changed target
+declarations and calls are inspected before closure.
+
+### Milestone 3F Generic And Iterator Gate
+
+The integrated generic fixture covers generic functions, aliases, named and
+recursive types, generic receiver methods, explicit and inferred
+instantiations, instantiated function values, recursive and mutually recursive
+generic calls, cross-package calls, type-parameter zero/copy/equality/hash,
+operators/conversions/indexing/methods/interfaces, and all three
+range-over-function signatures.
+
+Blocking evidence includes:
+
+1. every generic identifier occurrence exact-joins one
+   `types.Info.Instances` record to the selected declaration, ordered type
+   arguments, and instantiated signature/type;
+2. each declaration has one target generic body and one hidden function
+   parameter per distinct `(typed operation selection, exact signature)`
+   emitted by that body; repeated source sites exact-join, same-signature
+   distinct constraint methods remain distinct, and a cross-parameter operation
+   remains one function rather than a per-parameter object;
+3. a concrete operation-selection/instantiated-signature pair has one
+   reconstructible function definition, while a still-generic signature
+   projects and forwards the enclosing function without boxing or runtime
+   lookup;
+4. recursive capability propagation converges through callable-facet
+   dependencies; an unchanged facet performs zero downstream reconstruction
+   and an oscillating contract fails;
+5. every operation function delegates to the existing concrete semantic owner,
+   and mutations that replace it with direct target arithmetic, shallow copy,
+   object identity, spelling selection, or a throwing unsupported member fail;
+6. aliases add no runtime identity, instantiated named values retain exact
+   nominal/copy behavior, and generic receiver methods use the same ordered
+   capability ABI;
+7. instantiated function values are typed arrows capturing capabilities once
+   and contain no `.bind`, `.call`, or `.apply`;
+8. iterator range evaluates its source once, copies yielded values at the
+   iteration boundary, maps continue/break to true/false, rejects a post-false
+   yield, and composes with represented generic values; and
+9. encoded TS-Go AST reparses, strict TypeScript passes under both integer
+   profiles, and Go-versus-generated-ESM output and panic classes match.
+
+A 1x/2x/4x instantiation fixture holds one generic body fixed and proves its
+printed and encoded size is constant. Concrete capability growth is bounded by
+distinct exact operation-selection/signature pairs, not call count or
+source-site count.
+A separate recursive-call fixture records contract revisions and proves
+convergence. The twenty largest generic bodies, capability declarations,
+instantiated types, and calls plus strict-typecheck time/RSS are inspected.
+
+Production mutations drop or reorder an instance argument, use a defaulted or
+spelling-derived type, omit or add an operation function, key an operation by
+source position or diagnostic token spelling, duplicate same-signature hidden
+parameters, duplicate a body per instantiation, erase a payload, replace
+forwarding with a concrete descriptor, suppress a callable-facet dependency,
+call yield after false, reevaluate the iterator, or move yielded copy work
+outside the callback. Each must fail its identity, contract, strict-type,
+differential, convergence, shape, or scaling owner.
+
+Lexical generic-operation identity mutations give two functions the same local
+type spelling and scope shape, relocate one function across unrelated source
+lines, and pair a local type with a foreign function root. Exact
+owner-qualified keys must respectively differ, remain stable, and reject the
+foreign root.
+
+### Milestone 3G Function-Control Gate
+
+The integrated control fixture covers source `panic`, recover outside defer,
+direct deferred recover, recover one call below, nested and replacement
+panics, immediate callee/receiver/argument evaluation, value copies, LIFO
+order, ordinary and named results, receiver functions, function and method
+values, interface calls, generic functions, labels, fallthrough, labeled
+break/continue, forward and backward goto, non-structural goto, and
+goto/defer/range composition.
+
+Blocking evidence includes:
+
+1. the source call and every admitted runtime fault throw the same non-erased
+   `GoPanic` class; only `runtime/panic.ts` creates or initially throws that
+   carrier, while a callable envelope may only rethrow an unrecognized caught
+   host exception unchanged;
+2. recovered `panic(nil)` and generated runtime faults satisfy the canonical
+   `error`, `interface { Error() string }`, and `runtime.Error` contracts;
+   only `panic(nil)` has the canonical `*runtime.PanicNilError` dynamic identity
+   and represented payload;
+3. `recover` consumes one typed invocation-local authority only in the direct
+   deferred invocation; ordinary calls and one-call-below cases return nil;
+   every direct, function-value, method-value/expression, interface, generic,
+   field, pointer, and container transport consumes the same exact-signature
+   callable ABI rather than a carrier-specific recovery identity;
+4. defer registration evaluates the callee, selected receiver, and copied
+   arguments once and in source order, while invocation is LIFO at every exit;
+5. a deferred panic replaces the pending panic without skipping older
+   deferred calls, and named results are stored before and read after unwind;
+6. exact `*types.Label` identity survives spelling mutation and missing or
+   mismatched definition/use evidence fails at the label or branch owner;
+7. direct structural edges contain no state machine; genuinely
+   non-structural goto contains one callable-local linear machine and no
+   persisted source/control model;
+8. block, switch-clause, and type-switch-clause statement lists use the same
+   sequence owner; a nested state machine preserves source loop/range
+   `continue`, switch `break`, and switch `fallthrough` targets rather than
+   capturing them in its generated dispatch;
+9. a no-demand function's encoded TS-Go AST is byte-identical to its parent
+   checkpoint artifact; and
+10. TS-Go encode/print/reparse, strict TypeScript, and Go-versus-ESM behavior
+   and panic classes pass under both integer profiles.
+
+Mutation gates remove immediate capture, reverse the defer stack, shallow-copy
+an argument or value receiver, make recovery ambient, forward authority to an
+ordinary nested call, swallow or fail to replace a panic, return named results
+before unwind, alias panic-nil and generic-runtime dynamic identities, replace
+the canonical runtime method contract with spelling/signature matching, key a
+recovery contract by a variable/field/pointer/container identity, key a label
+by spelling, bypass the shared clause-sequence owner, let generated dispatch
+capture source `break`/`continue`, misroute a goto, force all functions through
+the envelope, or restore dynamic invocation. Each fails its owning shape, identity,
+strict-staticness, differential, byte-stability, or artifact gate.
+
+A 1x/2x/4x source fixture measures emitted bytes and TS-Go nodes for defer
+registrations, labels, and non-structural states. Growth is linear; one source
+statement is emitted once; runtime support remains constant. Inspect every
+runtime control declaration and the twenty largest changed functions.
+
+### Milestone 3H Cooperative Concurrency Gate
+
+The selected race-free cooperative profile exits only when focused fixtures
+prove through TS-Go encode/print, strict TypeScript, and Go-versus-generated
+execution:
+
+1. channel directions; nil, unbuffered, and buffered construction; capacity;
+   canonical equality; and exact zero/copy transfer;
+2. FIFO ordering within and across direct/select senders and receivers,
+   receive expression, comma-ok and discarded receive, close/drain/zero/ok
+   behavior, and close/send panic classes;
+3. channel range and its break/continue/label integration;
+4. immediate source-order goroutine callee/argument evaluation and copying,
+   cooperative execution, main-return abandonment, uncaught goroutine panic,
+   and deadlock detection;
+5. ready, blocking, default, nil, cancellation, one-commit, and fairness
+   properties for `select`, including delayed receive-target evaluation,
+   select-to-select unbuffered rendezvous, fair same-channel blocked-case
+   registration, and selected-send close failure attributed to the selecting
+   operation rather than the closer. A
+   pure default-bearing select's strict artifact is a synchronous,
+   non-`Promise`, non-`async`, non-`await`, scheduler-free function; a
+   no-default select retains the blocking cooperative path, while independently
+   blocking operand evaluation still propagates cooperation;
+6. source-facet propagation for direct functions/methods/literals and one
+   storage-independent exact-signature callable ABI for first-class values
+   transported through locals, parameters, results, package variables,
+   fields, pointers, arrays/slices/maps, interface assertions/calls, generic
+   aggregates, and recursive cycles, while deterministic synchronous
+   contracts remain byte-identical;
+7. cooperative constraint-method capabilities reconstruct the exact hidden
+   operation function and generic caller, while synchronous instantiations
+   retain one adapted typed path and no second generic body;
+8. deferred cooperative direct, function-value, method, interface, and generic
+   calls are captured immediately, awaited in LIFO order, complete before
+   return or panic propagation, and retain direct-only recovery authority; and
+9. the selected-profile boundary: concurrency fails while the profile is
+   disabled; the cooperative selection and all output evidence name that it
+   does not reproduce asynchronous preemption. The checked-in busy-goroutine
+   counterexample receives no yield/preemption workaround and is never run as
+   if it were admitted exact behavior.
+
+Production mutations catch transfer without copy, LIFO queueing, close that
+drops buffered values, incorrect closed-channel `ok`, eager receive-LHS
+evaluation, duplicate select commit, uncanceled alternatives, default beating
+ready communication, split direct/select queues that reorder live waiters,
+source-order blocked-case registration, nil becoming ready, omitted
+cooperative dependency,
+all-function async conversion, a storage-shaped callable facet, scheduler
+routing through the channel semantic builder, deadlock checking before Promise
+settlement cleanup, swallowed goroutine panic, absent deadlock detection, and
+routing a pure default-bearing select through the blocking Promise path.
+Additional mutations remove the hidden-operation cooperative dependency,
+leave a blocking generic capability synchronous, invoke a deferred Promise
+without awaiting it, or widen every defer stack to Promise-returning; each
+must fail its contract, strict-type, differential, byte-stability, or scaling
+owner.
+
+Static checks reject `any`, `unknown`, casts, reflection,
+`.call`/`.apply`/`.bind`, dynamic imports, text fragments, runtime operation
+tags, alternate task runtimes, and semantic spelling dispatch. Measurements
+report source/generated bytes and AST nodes, typecheck time/RSS, generation and
+runtime time, largest changed bodies, runtime size, O(1) send/receive sites,
+and O(case-count) select growth.
+Queue evidence additionally proves O(1) live-offer cancellation and storage
+bounded by buffered values plus currently blocked operations, not historical
+send/receive/select traffic.
+
+### Milestone 3I Language-Closure Gate
+
+Verification derives the selected toolchain's complete `go/ast`, `go/token`,
+and `types.Universe` domains at test time. It exact-joins every non-recovery
+declaration, expression, and statement form to the one root dispatcher,
+fingerprints upstream shapes and identities, and classifies type syntax,
+clauses, fields, comments, and punctuation as parent/toolchain-owned rather
+than adding duplicate root handlers. Mutations remove a selected arm and add a
+neighboring-category arm; each must fail the exact join.
+
+Valid construct fixtures must contain every selected AST form and every
+semantic operator token. Command-package proof includes alias, dot, and blank
+imports, local scopes, comments, and reached blank-import initialization.
+Every supported predeclared function is selected by exact `*types.Builtin`
+identity and passes TS-Go encode/print plus strict typecheck. `print` and
+`println` must instead return their exact typed environment boundary in both
+ordinary and deferred contexts; changing source spelling while retaining
+checker identity must not change that decision.
+
+Bodyless functions must return an unresolved obligation carrying the exact
+`*types.Func` and `*types.Signature`, not a guessed body. Number-profile `/`,
+`%`, `/=`, and `%=` must share one runtime owner, truncate toward zero, preserve
+remainder sign, and enter the common Go panic ABI on zero; Go-versus-generated
+ESM tests cover positive, negative, expression, compound-update, and panic
+paths, including signed-zero normalization.
+
+The gate reports actual file/byte/encoded-node/largest-artifact values and
+enforces absolute bounds. It broad-searches for production inventories,
+alternate dispatch, raw target text, forbidden dynamic/erased operations, and
+stale unsupported paths. Environment implementations remain outside this
+milestone.
 
 ## Heavy Runs
 

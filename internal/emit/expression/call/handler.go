@@ -2,11 +2,11 @@ package call
 
 import (
 	"go/ast"
-	"go/token"
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	cooperativecall "github.com/tsoniclang/gotots/internal/emit/concurrency/cooperative"
 	builtinexpression "github.com/tsoniclang/gotots/internal/emit/expression/builtin"
 	conversionexpression "github.com/tsoniclang/gotots/internal/emit/expression/conversion"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
@@ -35,17 +35,35 @@ func emit(
 	source *ast.CallExpr,
 	discarded bool,
 ) (api.ExpressionEmission, error) {
+	context, detached := context.TakeDetachedInvocation()
+	if target, handled, err := emitGeneric(
+		context,
+		children,
+		source,
+		discarded,
+		detached,
+	); handled {
+		return target, err
+	}
 	if target, ok, err := conversionexpression.Emit(
 		context,
 		children,
 		source,
 	); ok || err != nil {
+		if detached && err == nil {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryStatement, source)
+		}
 		return target, err
 	}
 	if builtin, ok := builtinexpression.Object(
 		context.TypesInfo(),
 		source.Fun,
 	); ok {
+		if detached {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryStatement, source)
+		}
 		return builtinexpression.Emit(
 			context,
 			children,
@@ -53,10 +71,6 @@ func emit(
 			builtin,
 			discarded,
 		)
-	}
-	if source.Ellipsis != token.NoPos {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	if selector, method, selection, ok := selectedMethod(
 		context.TypesInfo(),
@@ -70,6 +84,7 @@ func emit(
 			method,
 			selection,
 			discarded,
+			detached,
 		)
 	}
 	signature, ok := callable.Signature(
@@ -94,13 +109,14 @@ func emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	guardNil := !static && !knownNonNil(source.Fun)
+	guardNil := !static &&
+		!callable.StaticallyNonNil(context.TypesInfo(), source.Fun)
 	arguments, argumentBefore, argumentRequests, err := emitArguments(
 		context,
 		children,
 		source,
 		signature,
-		guardNil,
+		guardNil || detached,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -114,7 +130,7 @@ func emit(
 				Reason: "static callee produced prerequisite statements",
 			}
 	}
-	if guardNil || (!static && len(argumentBefore) != 0) {
+	if guardNil || (!static && (len(argumentBefore) != 0 || detached)) {
 		temporaryName, err := context.Names().Temporary(api.TemporaryCallCallee)
 		if err != nil {
 			return api.ExpressionEmission{}, err
@@ -141,21 +157,47 @@ func emit(
 	before = append(before, argumentBefore...)
 	var guardRequests []api.RootRequest
 	if guardNil {
-		guard, requests, err := nilGuard(context, targetCallee)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		before = append(before, guard)
-		guardRequests = requests
+		defined := false
 		if _, ok := definedtype.ResolveCallable(
 			context.TypesInfo().TypeOf(source.Fun),
 		); ok {
-			targetCallee = context.Factory().PropertyAccessExpression(
-				targetCallee,
-				nil,
-				context.Factory().Identifier(definedtype.ValueMember),
-				tsgo.NodeFlagsNone,
-			)
+			defined = true
+		}
+		if detached {
+			nonNil := targetCallee
+			if defined {
+				nonNil = context.Factory().PropertyAccessExpression(
+					targetCallee,
+					nil,
+					context.Factory().Identifier(definedtype.ValueMember),
+					tsgo.NodeFlagsNone,
+				)
+			}
+			targetCallee, guardRequests, err =
+				callable.DetachedNilGuard(
+					context,
+					targetCallee,
+					nonNil,
+				)
+			if err != nil {
+				return api.ExpressionEmission{}, err
+			}
+		} else {
+			guard, requests, guardErr :=
+				callable.NilGuard(context, targetCallee)
+			if guardErr != nil {
+				return api.ExpressionEmission{}, guardErr
+			}
+			before = append(before, guard)
+			guardRequests = requests
+			if defined {
+				targetCallee = context.Factory().PropertyAccessExpression(
+					targetCallee,
+					nil,
+					context.Factory().Identifier(definedtype.ValueMember),
+					tsgo.NodeFlagsNone,
+				)
+			}
 		}
 	}
 	call := context.Factory().CallExpression(
@@ -170,7 +212,43 @@ func emit(
 		argumentRequests,
 		guardRequests,
 	)
-	return api.NewExpressionEmission(before, call, requests)
+	target, err := api.NewExpressionEmission(before, call, requests)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	if provider, direct := calleeObject(
+		context.TypesInfo(),
+		source.Fun,
+	); direct {
+		if detached {
+			return cooperativecall.DetachedSourceCall(
+				context,
+				source,
+				provider,
+				target,
+			)
+		}
+		return cooperativecall.SourceCall(
+			context,
+			source,
+			provider,
+			target,
+		)
+	}
+	if detached {
+		return cooperativecall.DetachedValueCall(
+			context,
+			source,
+			signature,
+			target,
+		)
+	}
+	return cooperativecall.ValueCall(
+		context,
+		source,
+		signature,
+		target,
+	)
 }
 
 func validateResults(
@@ -247,7 +325,14 @@ func emitCallee(
 					source,
 				)
 		}
-		static = true
+		reference, err := context.Names().Reference(object)
+		if err != nil {
+			return api.ExpressionEmission{}, false, err
+		}
+		return api.DirectExpression(
+			context.Factory().Identifier(reference.Name()),
+			reference.Requests()...,
+		), true, nil
 	} else if identifier, ok := source.(*ast.Ident); ok {
 		variable, valid := context.TypesInfo().Uses[identifier].(*types.Var)
 		if !valid {
@@ -289,6 +374,16 @@ func emitArguments(
 ) ([]tsgo.Expression, []tsgo.Statement, []api.RootRequest, error) {
 	if len(source.Args) == 1 {
 		if results, ok := context.TypesInfo().TypeOf(source.Args[0]).(*types.Tuple); ok {
+			if signature.Variadic() {
+				return emitVariadicMultipleArgument(
+					context,
+					children,
+					source,
+					signature,
+					results,
+					captureAll,
+				)
+			}
 			arguments, before, requests, err := emitMultipleArgument(
 				context,
 				children,
@@ -306,6 +401,15 @@ func emitArguments(
 				requests,
 			)
 		}
+	}
+	if signature.Variadic() {
+		return emitVariadicArguments(
+			context,
+			children,
+			source,
+			signature,
+			captureAll,
+		)
 	}
 	if signature.Params().Len() != len(source.Args) {
 		return nil, nil, nil,

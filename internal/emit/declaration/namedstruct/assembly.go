@@ -3,11 +3,15 @@ package namedstruct
 import (
 	"go/ast"
 	"go/types"
-	"slices"
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 )
+
+type operationAssembly struct {
+	operation    api.NamedStructOperation
+	capabilities []*api.GenericOperationContract
+}
 
 func EmitAssembly(
 	context api.Context,
@@ -16,16 +20,10 @@ func EmitAssembly(
 	typeName *types.TypeName,
 	requirements []api.DeclarationRequirement,
 ) (api.DeclarationEmission, error) {
-	ordered := slices.Clone(requirements)
-	seen := make(map[api.DeclarationRequirement]struct{}, len(ordered))
-	for _, requirement := range ordered {
-		owner, _, ok := requirement.NamedStructOperation()
-		if !ok || owner != typeName {
-			return api.DeclarationEmission{}, &api.InvariantError{
-				Role:   context.Role(),
-				Reason: "named struct received a foreign declaration requirement",
-			}
-		}
+	seen := make(map[api.DeclarationRequirement]struct{}, len(requirements))
+	operations := make(map[api.NamedStructOperation]operationAssembly)
+	demanded := make(map[api.NamedStructOperation]bool)
+	for _, requirement := range requirements {
 		if _, duplicate := seen[requirement]; duplicate {
 			return api.DeclarationEmission{}, &api.InvariantError{
 				Role:   context.Role(),
@@ -33,16 +31,54 @@ func EmitAssembly(
 			}
 		}
 		seen[requirement] = struct{}{}
+		if owner, operation, ok := requirement.NamedStructOperation(); ok {
+			if owner != typeName {
+				return api.DeclarationEmission{}, &api.InvariantError{
+					Role:   context.Role(),
+					Reason: "named struct received a foreign operation",
+				}
+			}
+			selected := operations[operation]
+			selected.operation = operation
+			operations[operation] = selected
+			demanded[operation] = true
+			continue
+		}
+		owner, capability, ok := requirement.GenericOperation()
+		if !ok || owner != typeName {
+			return api.DeclarationEmission{}, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "named struct received a foreign declaration requirement",
+			}
+		}
+		operation, ok := capability.Consumer().NamedStructOperation()
+		if !ok {
+			return api.DeclarationEmission{}, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "named struct received a non-member generic operation",
+			}
+		}
+		selected := operations[operation]
+		selected.operation = operation
+		selected.capabilities = append(selected.capabilities, capability)
+		operations[operation] = selected
+	}
+	ordered := make([]operationAssembly, 0, len(operations))
+	for operation, selected := range operations {
+		if !demanded[operation] {
+			return api.DeclarationEmission{}, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "generic member operation has no owning struct operation",
+			}
+		}
+		sort.Slice(selected.capabilities, func(left, right int) bool {
+			return selected.capabilities[left].Key() <
+				selected.capabilities[right].Key()
+		})
+		ordered = append(ordered, selected)
 	}
 	sort.Slice(ordered, func(left, right int) bool {
-		_, leftOperation, _ := ordered[left].NamedStructOperation()
-		_, rightOperation, _ := ordered[right].NamedStructOperation()
-		return leftOperation < rightOperation
+		return ordered[left].operation < ordered[right].operation
 	})
-	operations := make([]api.NamedStructOperation, 0, len(ordered))
-	for _, requirement := range ordered {
-		_, operation, _ := requirement.NamedStructOperation()
-		operations = append(operations, operation)
-	}
-	return emitClass(context, children, declaration, typeName, operations)
+	return emitClass(context, children, declaration, typeName, ordered)
 }

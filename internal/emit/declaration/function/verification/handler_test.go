@@ -108,11 +108,11 @@ func TestAddConstructPrintsTypechecksAndExecutesDifferentially(t *testing.T) {
 	}
 }
 
-func TestAddRejectsUnsupportedBinaryOperator(t *testing.T) {
+func TestAddRejectsIncoherentLogicalOperator(t *testing.T) {
 	loaded := loadAddProject(t)
 	function := loaded.Files()[0].Syntax().Decls[0].(*ast.FuncDecl)
 	binary := function.Body.List[0].(*ast.ReturnStmt).Results[0].(*ast.BinaryExpr)
-	binary.Op = token.QUO
+	binary.Op = token.LAND
 
 	_, err := emit.CompileFile(loaded, loaded.Files()[0].Syntax())
 	var unsupported *api.UnsupportedError

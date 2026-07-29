@@ -2,7 +2,6 @@ package maprepresentation_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"go/types"
 	"os"
@@ -14,7 +13,6 @@ import (
 	"time"
 
 	"github.com/tsoniclang/gotots/internal/emit"
-	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -44,9 +42,9 @@ func TestMapValuesCreateTypedTargetAST(t *testing.T) {
 	if !ok {
 		t.Fatalf("map parameter type = %T, want TypeReferenceNode", identity.Parameters()[0].Type())
 	}
-	if mapType.TypeName().(tsgo.Identifier).Text() != "GoMap" ||
+	if mapType.TypeName().(tsgo.Identifier).Text() != "GoMapValue" ||
 		len(mapType.TypeArguments()) != 2 {
-		t.Fatal("map type is not the typed two-argument runtime class")
+		t.Fatal("map type is not the typed two-argument value contract")
 	}
 	missing := targetFunction(t, sourceFile, "Missing")
 	missingStatements := missing.Body().(tsgo.Block).Statements()
@@ -69,7 +67,7 @@ func TestMapValuesCreateTypedTargetAST(t *testing.T) {
 	}
 	if class.Name().Text() != "GoMap" ||
 		len(class.TypeParameters()) != 2 ||
-		len(class.Members()) != 9 {
+		len(class.Members()) != 11 {
 		t.Fatalf(
 			"runtime class = %q with %d parameters and %d members",
 			class.Name().Text(),
@@ -93,6 +91,7 @@ func TestMapValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 		".apply(",
 		".bind(",
 		"get(key)!",
+		"goMapClear",
 	} {
 		if strings.Contains(runtimeSource, forbidden) {
 			t.Fatalf("runtime map artifact contains %q:\n%s", forbidden, runtimeSource)
@@ -100,7 +99,10 @@ func TestMapValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	}
 	for _, required := range []string{
 		"class GoMap<K extends boolean | number | bigint | string, V>",
+		"interface GoMapValue<K, V>",
 		"Map<K, V>",
+		"clear(): void",
+		"keys(): K[]",
 		"const storedValue = storage.get(key);",
 		"storedValue === undefined",
 		"return this.zeroValue;",
@@ -121,8 +123,8 @@ func TestMapValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 		t.Fatalf("TypeScript output = %q, Go output = %q", typeScriptOutput, goOutput)
 	}
 	lines := strings.Split(strings.TrimSpace(typeScriptOutput), "\n")
-	if len(lines) != 18 {
-		t.Fatalf("differential output lines = %d, want 18", len(lines))
+	if len(lines) != 19 {
+		t.Fatalf("differential output lines = %d, want 19", len(lines))
 	}
 	if lines[0] != "0" {
 		t.Fatalf("missing-value mutation guard = %q, want scalar zero", lines[0])
@@ -130,8 +132,8 @@ func TestMapValuesPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	if lines[3] != "31" {
 		t.Fatalf("copy-on-assignment mutation guard = %q, want aliased store", lines[3])
 	}
-	if lines[17] != "true" {
-		t.Fatalf("nil-write mutation guard = %q, want failure", lines[17])
+	if lines[18] != "true" {
+		t.Fatalf("nil-write mutation guard = %q, want failure", lines[18])
 	}
 }
 
@@ -175,70 +177,6 @@ func TestMapBuiltinSelectionUsesGoObjectIdentity(t *testing.T) {
 	}
 	if _, err := compileExportedResult(loaded); err != nil {
 		t.Fatalf("identity-preserving spelling mutation failed: %v", err)
-	}
-}
-
-func TestMapBoundariesRemainTypedUnsupported(t *testing.T) {
-	for _, test := range []struct {
-		name   string
-		source string
-	}{
-		{
-			name: "floating key",
-			source: `package boundary
-func F() map[float64]int32 { return make(map[float64]int32) }
-`,
-		},
-		{
-			name: "defined floating key",
-			source: `package boundary
-type Key float64
-func F() map[Key]int32 { return make(map[Key]int32) }
-`,
-		},
-		{
-			name: "interface key",
-			source: `package boundary
-func F() map[any]int32 { return make(map[any]int32) }
-`,
-		},
-		{
-			name: "range",
-			source: `package boundary
-func F(values map[int32]int32) int32 {
-	for _, value := range values { return value }
-	return 0
-}
-`,
-		},
-		{
-			name: "compound indexed update",
-			source: `package boundary
-func F(values map[int32]int32) { values[1] += 2 }
-`,
-		},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			directory := t.TempDir()
-			writeFile(t, filepath.Join(directory, "go.mod"), "module example.com/boundary\n\ngo 1.26.4\n")
-			writeFile(t, filepath.Join(directory, "source.go"), test.source)
-			loaded, err := load.One(context.Background(), load.Request{
-				Directory: directory,
-				Pattern:   ".",
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			root, err := emit.NewRoot(loaded.Types().Scope().Lookup("F"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			_, err = emit.Compile(loaded.Program(), []emit.Root{root})
-			var unsupported *api.UnsupportedError
-			if !errors.As(err, &unsupported) {
-				t.Fatalf("error = %v, want typed unsupported", err)
-			}
-		})
 	}
 }
 
@@ -363,6 +301,7 @@ func main() {
 	fmt.Println(mapvalues.AliasMake())
 	fmt.Println(mapvalues.DeleteAndLen())
 	fmt.Println(mapvalues.BoolKey())
+	fmt.Println(mapvalues.IndexedUpdates())
 	fmt.Println(mapvalues.LiteralOrder())
 	fmt.Println(mapvalues.NilLength())
 	fmt.Println(mapvalues.ExplicitNil() == nil)
@@ -391,6 +330,7 @@ func executeMapValuesTypeScript(
     BoolKey,
     DeleteAndLen,
     ExplicitNil,
+    IndexedUpdates,
     LiteralOrder,
     Lookup,
     MakeSized,
@@ -413,6 +353,7 @@ console.log(ThroughCall());
 console.log(AliasMake());
 console.log(...DeleteAndLen());
 console.log(BoolKey());
+console.log(IndexedUpdates());
 console.log(LiteralOrder());
 console.log(NilLength());
 console.log(ExplicitNil().isNil());

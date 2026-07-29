@@ -15,6 +15,14 @@ per AST type. Category dispatchers route one requested node and never recurse.
 The selected handler explicitly emits meaningful direct children in Go
 evaluation order and supplies each child's role.
 
+Package clauses, import syntax, comments, semicolon insertion, and punctuation
+are parent- or loader-owned source structure, not independent target
+constructs. Ordinary comments—including `//go:generate`, which does not affect
+compilation—produce no target node. Build selection remains owned by the
+selected Go loader. A compiler directive with an emitted semantic effect must
+be handled by its named language or environment owner before publication; it
+must not be inferred from comment spelling by an unrelated handler.
+
 ## Closed Child Contracts
 
 Production translation does not use the conventional automatic visitor
@@ -150,10 +158,113 @@ default: {
 
 Its case expressions are dispatched as conditions in source order. No source
 node, spelling check, or fabricated semantic record represents the absent tag.
-Case-expression prerequisite statements, fallthrough, type switches, and types
-whose target equality is not yet proved remain distinct typed-unsupported
-cases. They are not approximated by re-evaluation, loose equality, or a generic
-statement walk.
+The switch owner selects one of two target shapes. Primitive tags whose Go
+equality is exactly target strict equality and whose cases have no prerequisite
+statements retain the native switch above. Every other represented comparable
+tag is copied once, and ordered case expressions select one numeric clause
+before one native execution switch runs the clause bodies. This keeps case
+evaluation lazy, preserves custom equality, and emits each body once.
+`fallthrough` removes only the implicit break from the selected clause,
+including a non-final default clause. Type switches remain owned by the
+interface family; they are not approximated by this expression-switch owner.
+
+### Structured Loops, Range, And Labels
+
+A three-clause `for` remains a direct target `for` whenever its initializer and
+post each fit one target header and its condition has no prerequisite
+statements. Otherwise the loop owner emits one enclosing lexical block:
+initializer statements execute there once, and a prerequisite-bearing
+condition or multi-statement post receives one typed arrow declaration created
+once before the loop. The target `for` calls those declarations from the exact
+condition or post positions, so `continue` still executes the post and no work
+is moved out of an iteration.
+
+Range is one parent-owned family selected from the checked range-expression
+type. Arrays, pointers to arrays, slices, strings, maps, and integers each
+construct typed TS-Go loops directly; no generic loop or operation IR exists.
+The array owner applies Go's constant-length rule exactly: with at most one
+iteration variable, an array or pointer-to-array operand containing no
+function call or channel receive is not evaluated; otherwise it is captured
+once. Conversions recurse into their operands and are not misclassified as
+ordinary calls. Array values are copied where value iteration requires the
+range copy, pointer arrays remain aliases, strings use UTF-8 byte indexes and
+invalid-byte `RuneError`, and integer ranges preserve the selected integer
+carrier.
+
+Map range snapshots the initial key set once and performs a live lookup before
+each body. A deleted unseen entry is skipped, each snapshotted key is considered
+at most once, and additions may be omitted as Go permits. Keys and values enter
+the same represented-value copy and range-assignment owners as ordinary
+assignment. Output size depends on source syntax, never the runtime collection
+length.
+
+Per-iteration declarations use the exact `types.Var` definitions and create
+fresh target bindings or addressable cells. Assignment-form range prepares
+non-blank target locations once per iteration after the iteration values exist,
+then stores left-to-right. Labels and labeled branches use exact
+`*types.Label` definitions/uses. A loop label is attached to the actual target
+loop, not an enclosing prerequisite block.
+
+Function-exit control is assembled once by the exact callable owner. For
+example:
+
+```go
+func read() (result int) {
+	defer func() { result++ }()
+	result = source()
+	return result
+}
+```
+
+The defer statement first captures its function value. The explicit return
+stores a copied value into `result`, exits the lexical body, drains the
+invocation-local LIFO stack, and only then reads `result` for the target return.
+Ordinary functions with no `defer`, `recover`, or non-structural `goto` keep
+their existing direct body byte-for-byte.
+
+`panic(value)` converts a non-nil `value` to the represented empty interface
+and throws the one `GoPanic` carrier. `panic(nil)` creates a distinct
+runtime-error value with canonical `*runtime.PanicNilError` dynamic identity
+and payload; ordinary generated runtime faults retain their separate runtime
+dynamic identity. Both satisfy canonical `error`,
+`interface { Error() string }`, and `runtime.Error` contracts. Consequently,
+recovered concrete/interface assertions and `Error()` calls observe Go
+behavior rather than an empty-interface-only placeholder. `recover()` reads
+only an optional hidden
+`GoRecovery` parameter on the directly invoked deferred callable:
+
+```go
+func direct() any { return recover() }  // non-nil only when called by defer
+func indirect() any { return direct() } // nil: one call below
+```
+
+Deferred direct functions, receiver functions, function and method values,
+interface method adapters, and generic functions forward that parameter
+statically. Ordinary calls omit it. No global state or dynamic invocation is
+permitted.
+
+A defer-site call is not emitted as the original call expression. Its owner
+evaluates the callee, receiver, and arguments in Go order, applies the ordinary
+Go copy owner to value receivers and arguments, and stores one typed
+zero-argument closure. Invocation happens only during LIFO unwind. A deferred
+nil function therefore panics during unwind, while a nil pointer implicit
+dereference needed for a value receiver panics at registration.
+
+Exact label definitions and uses come from `go/types.Info.Defs` and `Uses`.
+Labeled `break`/`continue` and switch `fallthrough` retain their direct target
+forms. A forward edge representable by a target label and a backward edge
+representable by one target loop remain direct. Crossing or multi-entry goto
+regions select the smallest enclosing callable state machine: one numeric
+state, one linear switch, and no persisted CFG. Go's type checker has already
+rejected jumps into scopes; target assembly preserves source initialization
+boundaries and composes with defer and range.
+
+The same ordered-statement owner handles block, switch-clause, and
+type-switch-clause lists. If its generated dispatch is nested in a source loop,
+range, switch, or type switch, unlabeled source `break` and `continue` target a
+generated label on that source construct rather than the nearer dispatch
+loop/switch. A source `fallthrough` remains owned by the enclosing switch
+clause and executes after the clause-local state machine exits.
 
 A local `var` declaration is owned by its enclosing declaration statement:
 
@@ -644,6 +755,14 @@ capture; no environment object, callback registry, hidden receiver, or callable
 side table is introduced. Copying an admitted function value is a direct
 reference-value copy.
 
+The generated callable ABI is canonical per exact signature, not per place
+that stores a callable. For example, `var f func(int)`, `box.F`, `pointer.F`,
+and `values[0]` all carry the same signature-owned target callable contract.
+An ordinary `f(1)` omits the optional recovery-authority facet; a captured
+`defer f(1)` invokes that same callable value with the authority. The field,
+pointer, and slice paths do not create recovery identities or a storage-flow
+model.
+
 An unnamed callable value that may contain Go nil has the static target type
 `((parameters) => results) | undefined`. Known non-nil declarations and
 literals remain direct functions. Calls evaluate the callee once, evaluate and
@@ -679,8 +798,10 @@ representation and emits no class.
 
 Nil equality compares only with `undefined`, as selected by the checker.
 `new(func(...))` creates a fresh pointer cell whose value is `undefined`.
-Variadic or generic signatures, method values/expressions, and interface
-callables remain at their separately owned boundaries.
+Generic signatures and interface callables remain at their separately owned
+boundaries. Variadic method values and method expressions use the same
+represented final Go-slice parameter as every other variadic callable; they
+never acquire a JavaScript rest-parameter convention.
 
 ## Calls
 
@@ -694,6 +815,40 @@ The call handler uses `go/types` to distinguish:
 - interface dispatch;
 - method expressions and method values; and
 - variadic expansion.
+
+A represented variadic callable has one ordinary final parameter whose target
+type is the represented Go slice. It is not emitted as a JavaScript rest
+parameter. A non-spread call evaluates and copies its arguments in Go order,
+then constructs that one slice argument. A spread call projects the exact
+source slice descriptor, including a defined-slice wrapper, and passes the
+descriptor directly. The multiple-result adjustment is applied before the
+variadic partition, so a final call returning the remaining fixed and
+variadic arguments is accepted exactly when the selected Go signature accepts
+it. No valid Go call is lowered through target `...` argument spreading; this
+keeps call behavior independent of host argument-count limits.
+
+```go
+type Values []int32
+func Sum(prefix int32, values ...int32) int32
+func Pair() (int32, int32)
+
+func A() int32         { return Sum(Pair()) }
+func B(values Values) int32 { return Sum(1, values...) }
+```
+
+```ts
+export function Sum(prefix: int32, values: GoSlice<int32>): int32;
+export function A(): int32 {
+  const pair = Pair();
+  return Sum(pair[0], GoSlice.literal<int32>(pair[1]));
+}
+export function B(values: Values): int32 {
+  return Sum(1, values.$value);
+}
+```
+
+The schematic target omits prerequisite temporaries that are unnecessary for
+the shown operands; production output is constructed only as TS-Go AST.
 
 Ordinary calls remain source-shaped whenever exact:
 
@@ -857,11 +1012,10 @@ GoToTS makes an observably required zero, copy, or equality operation explicit
 through one representation owner; it does not assume that a later compiler,
 plugin, or runtime will reinterpret ordinary TypeScript assignment.
 
-The first supported struct family is narrower and selects one nominal record
-class for non-generic, non-embedded named structs whose fields recursively
-contain only `bool`, profile-represented `int32` (including a selected 32-bit
-`int`), and members of the same supported struct family. A generated record
-class has:
+The supported struct family selects one nominal record class for non-generic
+named structs whose fields have admitted representations. An embedded field is
+ordinary owned storage in that class; it does not imply target inheritance.
+A generated record class has:
 
 - one erased private brand, which makes distinct named Go structs nominally
   distinct to strict TypeScript without adding an instance field;
@@ -900,14 +1054,13 @@ incompatible even when their fields match. A requested nested struct operation
 requests the corresponding static operation from the nested type's owner. The
 erased brand must produce no JavaScript instance field.
 
-Interface behavior, method values/expressions, generics, reflection entry,
-pointers to unrepresented targets, and fields whose complete standalone
-representation is not yet exact are neighboring typed-unsupported families.
-Embedding may contribute exact storage in the recursive-value extension, but
-promotion and method selection remain deferred. Tags and blank fields may
-participate in exact type identity without implying reflection metadata or
-ordinary mutable storage. No neighboring family may be approximated by
-structural assignment or virtual dispatch.
+Interface behavior, generics, reflection entry, pointers to unrepresented
+targets, and fields whose complete standalone representation is not yet exact
+are neighboring typed-unsupported families. Tags and blank fields participate
+in exact type identity without implying reflection metadata or ordinary
+mutable storage. Embedded storage, promoted field selection, and promoted
+concrete methods use the exact `go/types.Selection` path. No neighboring family
+may be approximated by structural assignment or virtual dispatch.
 
 The recursive-value extension admits represented fields through arrays,
 slices, maps, pointers, callables, and other structs. A direct infinitely sized
@@ -939,13 +1092,14 @@ must carry or validate the exact Go type; it is not a second type-identity
 model.
 
 Each canonical anonymous declaration owns its field storage and demanded
-static zero, copy, equality, and hash members once. Ordinary construction may
-remain direct, but operation use sites are constant-size calls. Doubling uses
-must not duplicate field walks. Field tags participate in identity but emit no
-runtime metadata unless a later reflection consumer requests it. Blank fields
-participate in identity and required evaluation order but expose no mutable
-target property. Embedded fields remain storage composition here; promotion
-and method selection remain with their later semantic owner.
+static zero, copy, equality, hash, and structural-conversion members once.
+Ordinary construction may remain direct, but operation use sites are
+constant-size calls. Doubling uses must not duplicate field walks. Field tags
+participate in identity but emit no runtime metadata unless a later reflection
+consumer requests it. Blank fields participate in identity and required
+evaluation order but expose no mutable target property. Embedded fields remain
+storage composition. Their later read, address, store, and concrete-method
+consumers all use the same exact selection-path owner.
 
 Each zero, copy, or equality capability is emitted at most once and only when a
 selected occurrence requests it. Its typed request is routed to the defining
@@ -1032,6 +1186,62 @@ entry shape from `go/types`; they do not reuse a value-receiver entry when its
 copy or nil behavior differs. Generated code never uses `.call`, `.apply`, or
 `.bind`.
 
+Every concrete field or method selector is validated against the exact
+`*types.Selection`: kind, selected object identity, receiver type, result type,
+and every `Index()` component must agree with the selected checker graph.
+Source spelling is not a selection key. The one selection-path owner projects
+embedded fields for reads, stores, addresses, direct calls, method values, and
+method expressions.
+
+For example:
+
+```go
+type Base struct{ Value int32 }
+func (base Base) Read() int32 { return base.Value }
+func (base *Base) Add(delta int32) { base.Value += delta }
+
+type Derived struct{ Base }
+
+read := value.Read
+add := value.Add
+method := Derived.Read
+```
+
+The semantic decisions are:
+
+- `value.Read` captures one copied `Base` value at method-value formation;
+- `value.Add` captures the canonical address of the promoted `Base` storage;
+- `Derived.Read` is a typed adapter whose first explicit argument is
+  `Derived`, projects its selected `Base`, copies it once, and calls
+  `Base_Read`; and
+- a direct unpromoted method expression is the existing receiver-function
+  reference, with no adapter.
+
+A representative target shape is:
+
+```ts
+const readReceiver = Base.$copy(value.Base);
+const read = (): int32 => Base_Read(readReceiver);
+
+const addReceiver = GoPointer.field(valueAddress, "Base");
+const add = (delta: int32): void => Base_Add(addReceiver, delta);
+
+const method = (receiver: Derived): int32 =>
+  Base_Read(Base.$copy(receiver.Base));
+```
+
+Each receiver expression is evaluated once. A nil pointer passed to a
+pointer-receiver method may be captured and used by a nil-safe body. Forming a
+value-receiver method value through a nil pointer performs the required
+dereference and panics at formation. Promoted pointer fields are dereferenced
+only at the selected path boundary, preserving the corresponding Go panic
+timing.
+
+Method calls and method values remain constant-size as embedding depth grows:
+only the selected field path grows. They never expand with method count or
+possible receiver count. Anonymous and named embedded fields share this same
+path owner and their exact member names come from field-object identity.
+
 A TypeScript class outside this bounded nominal-record family is selected only
 when reference identity and all relevant Go call, nil, copy, promotion,
 equality, construction, and runtime-type rules remain exact. Its constructor
@@ -1084,6 +1294,390 @@ Native class dispatch is allowed only for genuine virtual interface methods.
 Ordinary concrete method selection remains owner-specific. Representation
 decisions query the authoritative Go type graph directly and create target
 declarations immediately; they are not stored in a later-consumed plan.
+
+### Exact Value Shape
+
+The one interface representation is:
+
+```text
+nil interface        -> undefined
+non-nil interface    -> one immutable adapter instance
+dynamic Go type      -> one canonical non-string token per exact Go type
+dynamic Go value     -> exact statically typed readonly adapter payload
+```
+
+There is one adapter class per reached exact concrete dynamic type, not per
+interface and not per call. A concrete-to-interface conversion copies a Go
+value once before storing it in the adapter. Pointer, slice, map, channel, and
+function payloads retain their Go reference identity. An interface copy shares
+the immutable adapter. A typed nil pointer is therefore a non-nil adapter whose
+payload is the represented nil pointer; it is never collapsed into
+`undefined`.
+
+Adapter constructor identity is not Go dynamic-type identity. A local Go type
+declared inside a function has one compile-time identity but its lexical
+TypeScript adapter class declaration executes once per function invocation.
+Two values boxed by two invocations must still have the same Go dynamic type.
+The target-name owner therefore interns one compilation-scope frozen object
+token by the exact `go/types.Type` identity. Every adapter instance carries
+that token in the readonly `$go$type` member. No string, constructor,
+`Symbol.for`, source spelling, or truncated hash is semantic identity.
+
+Each adapter contains the concrete type's complete `go/types` method set as
+native TypeScript methods. Those methods call the already-owned top-level
+receiver functions directly. The payload, parameter, and result types remain
+exact; no method body uses `any`, `unknown`, a cast, `.call`, `.apply`, or
+`.bind`. Ordinary concrete calls continue to call receiver functions and never
+become virtual.
+
+For example:
+
+```go
+type Reader interface{ Read(int32) int32 }
+type Counter int32
+func (counter Counter) Read(delta int32) int32 { return int32(counter) + delta }
+
+var reader Reader = Counter(4)
+```
+
+has the conceptual target shape:
+
+```ts
+export interface Reader extends GoInterfaceValue {
+    Read(delta: int32): int32;
+}
+
+export const Counter$DynamicType: object = Object.freeze({});
+
+export class Counter$InterfaceAdapter implements GoInterfaceValue {
+    constructor(public readonly $go$value: Counter) {}
+    readonly $go$type: object = Counter$DynamicType;
+
+    static $is(
+        value: GoInterfaceValue | undefined,
+    ): value is Counter$InterfaceAdapter {
+        return value !== undefined &&
+            value.$go$type === Counter$DynamicType;
+    }
+
+    Read(delta: int32): int32 {
+        return Counter_Read(this.$go$value, delta);
+    }
+}
+
+const reader: Reader | undefined =
+    new Counter$InterfaceAdapter(Counter.$copy(new Counter(4)));
+```
+
+The actual declarations are constructed as TS-Go AST and printed by pinned
+TS-Go; this source is explanatory, not a text template.
+
+### Method Contracts And Open-World Assertions
+
+Interface satisfaction is not encoded as an implementer union. One canonical
+generated token object represents one exact Go method contract:
+
+- exported identity is method name plus exact receiver-free signature;
+- unexported identity additionally includes declaring package identity;
+- parameter names do not affect identity;
+- aliases and named types follow `go/types` identity.
+
+Tokens are interned by the deterministic target-name owner and compared only by
+object identity at runtime. They are not strings, source spellings, property
+probes, or hashes used without collision validation.
+
+Each completed interface owns an immutable contract containing its required
+method tokens. Each adapter class owns one module-level `ReadonlySet<object>`
+containing the tokens for its complete concrete method set. The shared runtime
+tests whether every contract token is present in that set. A generated
+interface-specific function exposes the result as a TypeScript type predicate:
+
+```ts
+export function Reader$is(
+    value: GoInterfaceValue,
+): value is Reader {
+    return value.$go$implements(Reader$contract);
+}
+```
+
+This is open-world: a later translated package can emit another statically
+typed adapter using the same method-contract ABI without editing a central
+implementer list. Assertion cost is O(target interface method count), and an
+ordinary interface call is one direct native method call, O(1).
+
+### Calls, Assertions, Equality, And Hashing
+
+The interface-call owner guards `undefined` at the Go call boundary and then
+calls the native member. Forming an interface method value evaluates, guards,
+and captures the adapter exactly once. A method expression takes the interface
+receiver explicitly and performs the guard when invoked.
+
+Concrete assertions call the adapter's statically typed `$is` predicate, which
+compares the canonical dynamic-type token and narrows the payload without a
+cast. Interface assertions call the target interface's typed predicate and
+retain the same adapter. Comma-ok and panicking forms share these primitives.
+Type switches evaluate the source once and test cases in source order; each
+case variable receives the exact Go case type.
+
+Interface equality is:
+
+1. both `undefined`: true;
+2. exactly one `undefined`: false;
+3. different canonical dynamic-type tokens: false;
+4. the same token with a non-comparable dynamic Go type: panic;
+5. otherwise: call that payload type's exact equality owner.
+
+Interface hashing mixes the runtime object-identity hash of the same canonical
+token with the payload hash owner. A non-comparable dynamic type panics when
+used as an interface map key. Adapter classes implement equality and hashing
+without erased payload recovery: the token-backed type predicate narrows the
+other adapter to the exact class before its payload is read.
+
+Pointer payload hashing requests one standalone `goPointerHash` runtime
+definition, which hashes the pointer's readonly canonical address. The base
+`GoPointer` declaration does not depend on map hashing; a program that only
+creates, compares, or dereferences pointers emits neither `goPointerHash` nor
+`GoMapHash`. This demand boundary prevents interface support from enlarging
+ordinary pointer artifacts.
+
+Named interface declarations remain source-owned. Anonymous interface
+contracts, concrete adapters, canonical method tokens, and canonical
+dynamic-type tokens are typed generated artifacts with deterministic
+compilation or lexical placement. They use the existing transactional
+reconstruction graph and observable facets; no side-table representation, text
+patch, or post-seal mutation is introduced.
+
+## Generics And Iterator Functions
+
+### Generic Declarations And Types
+
+The declaration owner emits one TypeScript generic declaration for each exact
+Go generic function, alias, or named type. Type-parameter names come from their
+`*types.TypeName` identities. A use of a type parameter emits that target type
+reference; an instantiated type emits the same declaration with explicit
+target type arguments.
+
+Go constraints are not translated into an approximate TypeScript `extends`
+clause. The selected `go/types` graph has already checked type sets, inference,
+method sets, and operation legality. The target declaration instead receives
+one exact typed function for each distinct operation signature required by its
+emitted body:
+
+```go
+func Clone[T any](value T) T {
+	return value
+}
+
+func Equal[T comparable](left, right T) bool {
+	return left == right
+}
+```
+
+```ts
+export function Clone<T>(
+  $go$copy: (value: T) => T,
+  value: T,
+): T {
+  return $go$copy(value);
+}
+
+export function Equal<T>(
+  $go$equal: (left: T, right: T) => boolean,
+  left: T,
+  right: T,
+): boolean {
+  return $go$equal(left, right);
+}
+```
+
+The snippets are schematic printed output; production creates every node
+through the pinned TS-Go factories. Operation functions use closed enum-owned
+identifier stems, not diagnostic/source token spellings. They preserve Go
+result identity: `Add[T ~int32]` calls `$go$binary_add` returning `T` rather
+than using target `+`, whose result would be `number` and would lose a defined
+actual type.
+
+A local named type inside an operation signature is keyed by the canonical
+enclosing source `ArtifactOwner` followed by its exact subordinate scope-child
+path. Thus identical lexical shapes in two functions remain distinct, moving
+one declaration across unrelated source lines is identity-neutral, and a
+scope rooted in another source artifact is rejected.
+
+Generic aliases create no runtime identity. Generic named values use one
+generic representation declaration. Their demanded zero/copy/equality/hash
+functions accept exact operations for constituent type parameters rather than
+storing descriptors in every value. Methods on instantiated generic receiver
+types receive and forward the same hidden function ABI; ordinary values remain
+free of operation metadata.
+
+Generic methods use one exact ABI derived from the method origin and its
+canonical operation contracts: hidden operation functions first, then the
+receiver, then source parameters. Declarations, direct calls, method values,
+and method expressions all exact-join those identities; no caller separately
+constructs or orders the same list.
+
+### Instantiation And Calls
+
+Every explicit or inferred instantiation is selected from the exact
+`types.Info.Instances` entry on its identifier. `IndexExpr` and
+`IndexListExpr` are generic instantiations only when that evidence exists;
+otherwise their existing index-expression owners remain authoritative.
+Emission exact-joins:
+
+1. the selected generic object;
+2. its ordered declared type parameters;
+3. the instance's ordered concrete type arguments; and
+4. the instantiated signature or named type reported by `go/types`.
+
+The target call writes explicit TypeScript type arguments even when Go inferred
+them and passes the declaration's ordered hidden operation functions before
+source arguments:
+
+```go
+result := Add(int32(2), int32(3))
+```
+
+```ts
+const result = Add<int32>($goCapability_binary_add_int32, 2, 3);
+```
+
+A generic caller forwards its own same-signature operation function. A
+cross-parameter operation remains one function such as `(T, U) => T`; there is
+no artificial choice of which parameter “owns” it. If the callee needs an
+operation absent from the caller, the caller's declaration contract grows
+through the facet-specific reconstruction graph and its callers are revisited
+only when the callable surface changes. An instantiated function value is one
+typed arrow that captures the functions once; `.bind`, `.call`, `.apply`,
+runtime inference, and monomorphized duplicate bodies are forbidden.
+
+### Generic Operations
+
+Zero, copy, equality, hash, unary/binary operators, conversions, indexing,
+range, built-ins, selected methods, interface adaptation, channels, and
+iterator calls enter the same closed capability mechanism only when their
+source occurrence uses a type parameter. A concrete occurrence continues to
+use the existing direct owner. Concrete operation-function artifacts delegate
+back to those owners, so there is one semantic implementation for each
+operation.
+
+An operation selection is typed, not merely a broad enum value. Most selections
+need only their closed operation kind and exact function signature. A
+constraint-method selection additionally carries the selected `*types.Func`;
+its identity uses Go method identity (name, unexported package when applicable)
+plus the exact receiver-free instantiated signature. Thus `Read() int32` and
+`Write() int32` never collapse merely because their signatures match, while
+structurally equivalent exported interface methods exact-join.
+
+For example, `var zero T` demands `$zero`; `items[index]` demands the exact
+index operation proved by the checked core type; and `value.Method()` demands
+the exact selected constraint method identity and receiver-free signature.
+No handler switches on `~int`, `comparable`, method spelling, or a runtime type
+tag. If `go/types` evidence does not prove the operation and its exact result,
+translation fails at that occurrence.
+
+### Range Over Iterator Functions
+
+The range owner accepts only the three checker-approved iterator shapes:
+
+```go
+func(func() bool)
+func(func(V) bool)
+func(func(K, V) bool)
+```
+
+The range expression is evaluated once. Its yield callback is a typed arrow;
+each invocation copies yielded values into the exact per-iteration declaration
+or assignment targets, executes the body, returns `true` to continue, and
+returns `false` for a source `break`. A source `continue` returns `true`.
+Invocation reuses the ordinary callable nil guard. One callback-local state
+tracks ready, body-panic, body-false, and whole-loop-exit conditions; it
+reproduces the selected toolchain's distinct misuse panics when an iterator
+calls yield in any forbidden state or suppresses a body panic.
+Returning from the enclosing function, panic/recover, defer, labels, and
+cooperative calls compose through their owning later control capabilities; the
+iterator owner never approximates them with an illegal target branch.
+
+The iterator function is invoked exactly once. Calling yield after it returned
+`false` must reproduce the selected Go runtime panic. Output size depends on
+the source range body, not the number of yields or generic instantiations.
+
+## Channels, Goroutines, And `select`
+
+Channel syntax is projected from the exact `*types.Chan`:
+
+```go
+values := make(chan Box, 2)
+values <- Box{Count: 1}
+value, ok := <-values
+```
+
+The type owner first requires the explicitly selected `cooperative`
+concurrency profile, then emits `GoChannel<Box> | undefined`; directional
+source types emit the corresponding typed send or receive view. `make`
+requests the channel-value owner and supplies capacity plus exact `Box`
+zero/copy functions.
+Send evaluates the channel and value in Go order, copies `Box` once, then
+awaits the O(1) runtime send. Receive awaits one typed `[Box, boolean]` result;
+single-result receive selects element zero, comma-ok consumes both elements,
+and a discarded receive still performs the communication. `close` selects only
+the predeclared builtin object and calls the runtime close owner. Channel
+equality is direct canonical-identity equality, including nil.
+
+```go
+go worker(next(), value())
+```
+
+The statement owner emits prerequisites that evaluate and copy `worker`,
+`next()`, and `value()` immediately in source order. It then passes one typed
+closure to the scheduler. The closure invokes the captured callable directly
+and awaits it only when its concrete source facet or exact-signature generated
+callable ABI is cooperative. The ABI does not depend on the value's storage
+location. No
+`.call`, `.apply`, `.bind`, erased argument array, or runtime signature lookup
+is emitted.
+
+```go
+select {
+case output() <- value():
+    sent()
+case item, ok := <-input():
+    use(item, ok)
+default:
+    idle()
+}
+```
+
+The select owner first captures `output()`, `value()`, and `input()` in source
+order. It constructs typed send/receive alternatives. Because this example has
+a default, it calls the channel owner's synchronous fair ready-choice/commit
+operation: a ready communication returns its clause index, while no ready
+communication selects the default. This selection adds no `Promise`, `async`,
+`await`, scheduler request, or cooperative callable facet. If `output()`,
+`value()`, or `input()` independently blocks, that operand's existing
+cooperative requirement still propagates normally. A select without a default
+uses the blocking Promise-returning selection operation and awaits it.
+Receive assignment locations are not evaluated until the receive alternative
+wins. One target switch dispatches the chosen clause. Every registered
+alternative is canceled after one atomic commit, and nil alternatives cannot
+become ready.
+
+Blocking alternatives enter one fair registration permutation and then the
+channel's ordinary live sender/receiver queues. A direct receive queued before
+a selected receive therefore receives first, and the inverse order stays
+inverse; senders obey the same rule. Two blocking selects on opposite sides of
+one unbuffered channel rendezvous through those typed offers without polling.
+Multiple alternatives of one select on the same channel are not registered in
+source order. Closing a channel completes each selected send with the
+send-on-closed panic at the selecting goroutine's Promise boundary, while the
+goroutine executing `close` returns normally. Cancellation removes the exact
+offer from its insertion-ordered set; no listener side table or historical
+queue entry remains.
+
+Channel range is a receive loop. Each iteration performs one receive;
+`ok == false` exits before assignment and body execution. The received value is
+already the channel owner's exact copy. Existing break, continue, label,
+return, panic, method, function-value, interface, and generic owners remain
+authoritative.
 
 ## Values, Control Flow, And Implicit Semantics
 
@@ -1186,9 +1780,10 @@ spelling never determines either component. The predeclared `complex`, `real`,
 and `imag` functions are selected only from their exact `*types.Builtin`
 identity; `real` and `imag` become readonly component access, while `complex`
 evaluates its two arguments once in order and calls the width-owned
-constructor.
+constructor. A defined complex operand is unwrapped only at this operation
+boundary; the raw complex carrier never absorbs nominal-type semantics.
 
-### Explicit numeric conversions
+### Explicit conversions
 
 A `CallExpr` is a conversion only when the selected `go/types.TypeAndValue`
 for its callee reports `IsType()`. The conversion owner reads the checker's
@@ -1196,10 +1791,13 @@ source type, destination type, and converted constant value. It never
 recognizes a conversion from callee spelling and never lets an unimplemented
 conversion fall through to ordinary-call emission.
 
-This section closes conversions among the currently represented integer,
-floating-point, and complex types. String/container, defined-type, pointer,
-interface, channel, and generic conversions retain their separate semantic
-owners and remain typed unsupported until those families land.
+The conversion owner delegates by exact source and destination representation.
+Integer, floating-point, complex, byte-string, represented struct,
+pointer-reinterpretation, and slice-to-array value/pointer conversions are
+admitted here. Interface, channel, and generic conversions retain separate
+semantic owners and fail typed until those owners land. Defined types project
+only through their declared representation owner before conversion and wrap
+only after the destination conversion succeeds.
 
 Constant conversions materialize the converted checker value directly:
 
@@ -1226,6 +1824,12 @@ Non-constant conversions have one closed destination-family decision:
 | `float32` to `float64` | the already-rounded operand directly |
 | `float64` to `float32` | the shared binary32 rounder |
 | `complex64` to `complex128` or the reverse | construct the destination nominal value from its two components; the `complex64` constructor rounds both |
+| integer to string | encode one Go rune as UTF-8 bytes, replacing an invalid scalar value with `RuneError` |
+| `[]byte` to string or string to `[]byte` | copy the exact Go string bytes; nil slices produce the empty string and destination slices never alias |
+| `[]rune` to string or string to `[]rune` | encode or decode UTF-8 with Go's invalid-sequence width and `RuneError` rules |
+| represented struct to represented struct | call the destination class's one demand-owned structural conversion member; tags may differ, fields are copied recursively, and each use is O(1) |
+| slice to array value | evaluate the slice once, panic when its length is short, allocate a fresh array, and copy the first destination-length elements |
+| slice to pointer-to-array | evaluate the slice once, panic when its length is short, then return a canonical pointer to an offset-aware fixed-array view of the existing backing; writes alias both ways, defined arrays keep logical nominality over underlying array storage, and a zero-length nil slice alone yields nil |
 
 The selected GoToTS implementation-defined result for a non-finite
 floating-to-integer conversion is zero before width normalization. Finite
@@ -1242,6 +1846,43 @@ floating-to-integer conversion in the `bigint` profile and 64-bit sign/width
 boundaries in the `number` profile.
 Conversion output remains O(1) per occurrence and no generic conversion
 registry, erased carrier, cast, or source-text route exists.
+
+String conversion treats a target JavaScript string as a sequence of Go bytes,
+not UTF-16 text. The generated UTF-8 encoder/decoder is one typed runtime
+owner; it uses neither host text codecs nor source spelling. For example,
+`string([]byte{0xff, 'A'})` retains byte values `255, 65`, and
+`[]rune("\xff")` yields one `RuneError`.
+
+Represented struct conversion is definition-owned rather than expanded at the
+use:
+
+```go
+type Left struct{ Pair [2]int32 `json:"left"` }
+type Right struct{ Pair [2]int32 `json:"right"` }
+right := Right(left)
+```
+
+```ts
+class Right {
+  static $convert(source: { Pair: GoArray<int32, 2> }): Right {
+    return new Right(source.Pair.copy());
+  }
+}
+const right = Right.$convert(left);
+```
+
+The structural parameter intentionally excludes the source's private nominal
+brand. `go/types.ConvertibleTo` remains the admission authority; TypeScript
+structural assignability does not decide whether conversion is legal.
+Anonymous destinations receive the same demand on their canonical class.
+Exactly one `$convert` definition exists per reached destination class,
+regardless of source-use count.
+
+For a discarded assignment, the assignment owner preserves Go's evaluation
+rule. `_ = runtimeCall()` emits the call and discards its result, while
+`_ = len([4]int{})` emits nothing because the checker proves the complete
+expression constant and Go does not evaluate its operand. No fictitious blank
+storage location is created.
 
 ### Ordered `max` and `min`
 
@@ -1276,10 +1917,20 @@ Ordinary integer syntax is source-shaped under both initial profiles:
 | `value++` / `value--` | direct update | `value++` / `value--` |
 | ordered/equality comparison or expression switch | direct comparison/switch | `left < right`, `switch (value)` |
 
-BigInt division and remainder are the bounded exception to direct operators.
-JavaScript BigInt has the required truncation behavior, but division by zero
-throws a host exception. The integer-expression owner therefore requests one
-of two constant-size runtime operations:
+Constant and variable shifts are selected by the exact left carrier and
+checker-typed count. A negative variable count enters `GoPanic.raise`; a count
+at least the left width yields zero, except signed right shift yields the sign
+fill. The `number` profile admits only fixed-width carriers representable by
+JavaScript bitwise operators and normalizes at the selected width. The
+`bigint` profile uses `BigInt.asIntN`/`asUintN` and never emits unsigned
+BigInt `>>>`. Generic shift capabilities delegate this same integer owner.
+
+Integer division and remainder are the bounded exception to direct operators.
+JavaScript BigInt already truncates toward zero, while JavaScript `number`
+division does not; both host carriers also throw or produce a host value rather
+than the selected Go panic on division by zero. The integer-expression owner
+therefore requests one of two profile-specific, constant-size runtime
+operations:
 
 ```go
 quotient := left / right
@@ -1291,10 +1942,13 @@ const quotient = goIntegerDivide(left, right);
 const remainder = goIntegerRemainder(left, right);
 ```
 
-Each helper checks `right === 0n`, enters the shared `GoPanic.raise` ABI, and
-otherwise performs exactly one `/` or `%`. The default `number` profile keeps
-integer division and remainder unsupported because direct JavaScript number
-division does not implement Go integer truncation.
+BigInt helpers check `right === 0n`, enter the shared
+`GoPanic.raiseRuntime` ABI, and otherwise perform exactly one `/` or `%`.
+Number helpers check `right === 0`, enter the same panic ABI, then use
+`Math.trunc(left / right)` or direct `left % right`, and normalize a `-0`
+result to integer zero. Expressions and compound assignments request the same
+runtime symbols; no per-site overflow framework or alternate assignment path
+exists.
 
 The `number` profile prints ordinary numeric literals such as `1`; the
 `bigint` profile prints `1n`. Contextual parameter, result, field, and
@@ -1334,13 +1988,15 @@ The `||` branch executes only when the left result is false. Moving right-side
 work before the branch or evaluating either operand twice is forbidden.
 
 The predeclared `true` and `false` are literal booleans, not source-declared
-constants, so they materialize in place as the direct TypeScript boolean literal
-through the one constant-value owner. The parent still supplies the expected Go
-`bool`, the identifier handler verifies semantic object identity and
-assignability through `go/types`, and the basic-type owner supplies the one
-generated `bool` alias where a declaration boundary needs it. A source-declared
-untyped boolean constant is projected like any other untyped constant, not
-inlined. No operator handler guesses a carrier from spelling.
+constants, so they materialize in place through the one constant-value owner.
+The parent supplies the expected checker boolean type, including a defined type
+such as `type Flag bool`; the identifier handler verifies semantic object
+identity, assignability, and the checker-provided underlying `bool`. The value
+owner emits `false` for `bool` and the exact nominal construction for `Flag`.
+The basic-type owner supplies the one generated `bool` alias where a declaration
+boundary needs it. A source-declared untyped boolean constant is projected like
+any other untyped constant, not inlined. No operator handler guesses a carrier
+from spelling.
 
 An explicit Go parenthesized expression becomes one TS-Go
 `ParenthesizedExpression` around the directly emitted child. It preserves
@@ -1409,7 +2065,38 @@ selected statically from the exact element type. Both operands are evaluated
 once, nested comparisons compose recursively, and the loop stops at the first
 unequal element. The generic array runtime carries no equality callback,
 semantic tag, or implementer switch; comparison source size is independent of
-the array length.
+the array length. Aggregate zero, literal, and copy follow the same rule: the
+array operation owner emits a bounded loop that directly invokes the selected
+element zero or copy structure. The runtime array exposes only typed storage
+allocation and access. It never receives or stores an element-zero or
+element-copy function.
+
+Array and pointer-to-array slicing evaluates the operand and bounds once,
+obtains the array's canonical backing plus offset, and creates one slice
+descriptor over that same region. For:
+
+```go
+array := [4]int32{1, 2, 3, 4}
+view := (&array)[1:3:4]
+view[0] = 9
+```
+
+the target decision is a demand-only `goArrayLocation(array)` followed by one
+typed slice view and the ordinary slice bounds operation; `array[1]` becomes
+`9`. No element is copied and no second bounds implementation exists.
+
+Composite-literal element handlers use the checker-selected expression type,
+not the presence of an explicit child type node. Thus an elided nested literal
+such as `[][]Box{{{Value: 1}}}` is dispatched as a `[]Box` literal because
+`go/types.Info.TypeOf` supplies that contextual type. The handler must not
+fabricate source syntax, rediscover the parent by scanning, or reject a valid
+literal merely because `CompositeLit.Type` is absent.
+
+Composite family selection likewise uses the checker type's underlying family.
+For `type Table map[int32]int32`, `Table{0: 5}` enters the one map-literal owner,
+constructs the canonical map storage once, and applies the nominal `Table`
+wrapper. It does not fall through to struct classification or acquire a
+call-argument-specific path.
 
 An admitted slice is a descriptor over backing storage:
 
@@ -1424,6 +2111,29 @@ forbidden because it cannot distinguish nil, preserve capacity, or model
 subslice append aliasing.
 Runtime methods narrow nullable backing storage through explicit branches.
 They do not emit TypeScript non-null assertions to recover a storage invariant.
+The descriptor stores no zero/copy/equality/hash strategy and no function
+whose behavior depends on the element type. For aggregate elements, the
+source `make`, literal, `append`, `copy`, and `clear` owners emit typed loops
+that directly construct or copy each element. Runtime slice members are
+limited to descriptor validation, allocation, bounds, backing access, and
+capacity growth. This preserves recursive fresh-zero and deep-copy behavior
+without semantic callbacks or per-element-type runtime specialization.
+
+`append(left, right...)` consumes the right descriptor through indexed reads;
+it never expands the slice into a JavaScript argument list. Distinct named
+slice types are accepted when Go accepts their identical element types.
+`append([]byte, string...)` is the one language-defined string expansion and
+copies the string's Go bytes. Reallocation copies existing aggregate elements
+with their selected copy owner; reuse preserves the existing backing identity.
+`clear(slice)` writes a fresh zero at every live aggregate element, while
+`clear(map)` removes entries. The slice clear and slice-spread helpers are
+demanded only by source uses. Every admitted map representation implements one
+closed `GoMapValue<K, V>` source contract containing lookup, store, delete,
+length, nil, clear, and key iteration. Source map operations call those typed
+members directly; no separate `goMapClear`/`goMapKeys` helper or
+operation-specific map specialization exists. This complete contract is
+necessary because a generic map value must remain statically substitutable
+across scalar and generated aggregate-key implementations.
 
 An admitted map is a reference value with an explicit nil state. Map assignment
 aliases the same map. Lookup of a missing key returns the element zero;
@@ -1489,10 +2199,11 @@ constant-size. Two map values of the same exact semantic shape reuse the same
 owner. A full deterministic canonical-type digest indexes one artifact, but
 `go/types` identity remains authoritative and a digest collision must never
 unify non-identical map types. The digest uses semantic package/declaration
-identity and source position for local named components; generated TypeScript
-names are outputs and never feed back into identity. Generated-artifact tests reject
-function-valued key-operation fields and mutations that restore callback
-storage.
+identity; a local named component additionally carries its canonical enclosing
+`ArtifactOwner` and exact lexical scope-child path. Source positions, source
+paths, and generated TypeScript names never feed back into identity.
+Generated-artifact tests reject function-valued key-operation fields and
+mutations that restore callback storage.
 
 A specialization whose exact type contains no function-local named component
 is one compilation support module under `support/maps/`. A specialization that
@@ -1526,9 +2237,14 @@ The enclosing function first emits an addressable-storage requirement for the
 exact `value` object. Its reconstructed TS-Go body has one cell:
 
 ```ts
-const value$storage = GoPointer.cell(new Box(1));
-const pointer = GoPointer.field(value$storage, "Count");
-value$storage.value = new Box(7);
+const value$storage = GoPointer.cell<Box, Box$Storage>(
+  Box.$storageOf(Box.$make(1)),
+);
+const pointer = GoPointer.field<int32, Box, Box$Storage, "Count">(
+  value$storage,
+  "Count",
+);
+value$storage.value = Box.$storageOf(Box.$make(7));
 GoPointer.dereference(pointer).value++;
 ```
 
@@ -1555,11 +2271,84 @@ Address/index operands are evaluated once in Go order. Repeated formation of
 the same live location yields equal pointers; different cells with equal
 values do not.
 
+Slice-to-array pointers use the same location rule:
+
+```go
+type Pair [2]int32
+
+values := []int32{1, 2, 3}
+pair := (*Pair)(values)
+pair[0] = 7
+*pair = Pair{8, 9}
+```
+
+```ts
+const pair: GoPointer<Pair, GoArray<int32, 2>> | undefined =
+  goSliceArrayPointer<Pair, int32, 2>(values, 2);
+GoPointer.index(GoPointer.dereference(pair), 0).value = 7;
+GoPointer.dereference(pair).value = new Pair(
+  GoArray.literal(2, 0, [0, 1], [8, 9]),
+).$value;
+```
+
+`pair` and `values` share the same backing. Repeating the conversion at the
+same slice offset compares equal; converting a subslice at another offset does
+not. The `Pair` wrapper gains no forwarding methods: pointer storage is the
+underlying `GoArray<int32, 2>`.
+
 Each runtime call remains constant-size. Element/key/value representations are
 selected from the same `go/types` evidence. Pointer projection factories may
 retain only typed location accessors plus opaque canonical address identity;
 runtime objects never carry erased `any`/`unknown` payloads or callbacks that
 rediscover Go semantics.
+
+Pointer representation has separate logical and storage type arguments:
+
+```go
+type Left struct {
+    Value int32 `json:"left"`
+}
+type Right struct {
+    Value int32 `json:"right"`
+}
+
+func Convert(value *Left) *Right {
+    return (*Right)(value)
+}
+```
+
+The selected checker proves that `Left` and `Right` have identical underlying
+base types when tags are ignored. Their logical classes remain distinct, but
+both storage facets are the same `{ Value: int32 }` shape:
+
+```ts
+class Left {
+  private constructor(private readonly $storage: Left$Storage) {}
+  static $make(Value: int32): Left {
+    return new Left({ Value });
+  }
+  static $storageOf(value: Left): Left$Storage {
+    return value.$storage;
+  }
+  static $fromStorage(storage: Left$Storage): Left {
+    return new Left(storage);
+  }
+  get Value(): int32 { return this.$storage.Value; }
+  set Value(value: int32) { this.$storage.Value = value; }
+}
+
+function Convert(
+  value: GoPointer<Left, Left$Storage> | undefined,
+): GoPointer<Right, Right$Storage> | undefined {
+  return GoPointer.view<Left, Right, Left$Storage>(value);
+}
+```
+
+`Right.$fromStorage(GoPointer.dereference(result).value)` therefore observes
+and mutates the original `Left` storage. No pointee copy, cast, object-shape
+test, semantic callback, or source-name lookup is involved. A pointer
+conversion whose canonical storage facets cannot yet be represented fails at
+the conversion owner rather than falling back to logical read/write adapters.
 
 Pointer receiver declarations remain named typed receiver functions rather
 than class members:
@@ -1570,10 +2359,11 @@ func (box *Box) Add(delta int32) { box.Count += delta }
 
 ```ts
 export function Box_Add(
-  box: GoPointer<Box> | undefined,
+  box: GoPointer<Box, Box$Storage> | undefined,
   delta: int32,
 ): void {
-  GoPointer.dereference(box).value.Count += delta;
+  const value = Box.$fromStorage(GoPointer.dereference(box).value);
+  value.Count += delta;
 }
 ```
 
@@ -1584,13 +2374,13 @@ through a pointer nil-checks, dereferences, and copies once. Selection uses the
 exact `go/types.Selection`; target virtual dispatch is never substituted.
 
 Bounds failures, nil pointer dereference, nil map store, and BigInt
-divide-by-zero all enter the one generated `GoPanic<T>` carrier. Family
+divide-by-zero all enter the one generated non-generic `GoPanic` carrier. Family
 runtime modules import that carrier through the closed runtime dependency
 graph; they never throw `Error`/`RangeError` independently.
-Because source-level `recover` is not admitted in this checkpoint, the
-observable contract here is panic occurrence plus the shared carrier identity.
-Recovered runtime-fault payload equivalence is installed with the later
-`panic`/`recover` family rather than guessed now.
+The function-control family adds source `panic`/`recover` and preserves each
+runtime fault's represented dynamic value. A recovered `panic(nil)` therefore
+asserts to `*runtime.PanicNilError`; a generic runtime fault does not. Both
+retain the exact canonical error-method contracts.
 
 Array, slice, and map indexed stores use the same accessor-store transaction.
 For:
@@ -1622,11 +2412,21 @@ routing then binds that declaration to the reusable `gostdlib/fmt` contract.
 The call itself is emitted like any other typed call; no source spelling
 special-case exists.
 
-For unavailable behavior, output contains an exact declaration and a throwing
-placeholder at the declaration/body owner. Reachable placeholders block
-publication. Manual completion replaces bodies or declarations through
-structural typed TS-Go protocol ownership, never textual patches or per-file
-ownership.
+The language stage does not guess an implementation for a bodyless source
+function. Its callable owner records the exact selected `*types.Func`,
+`*types.Signature`, source role, and position in a typed unresolved-obligation
+diagnostic. The environment stage later converts that identity into an exact
+declaration and throwing placeholder or a selected provider implementation.
+Reachable placeholders block publication. Manual completion replaces bodies
+or declarations through structural typed TS-Go protocol ownership, never
+textual patches or per-file ownership.
+
+The predeclared `print` and `println` functions are implementation-defined by
+Go. Their call owner selects them only by exact `*types.Builtin` identity and
+returns a typed environment-boundary diagnostic in ordinary and deferred call
+contexts. The language stage does not silently map them to `console`, stdout,
+or stderr. A later selected environment contract may install one behavior and
+its differential proof.
 
 ## Failure
 

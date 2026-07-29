@@ -128,10 +128,18 @@ func (s *programSession) buildPackageInitializerRevision(
 	}
 	defer finish()
 	requirements := s.requirements.appliedFor(owner)
-	context, err := emitnaming.WithLexicalGeneratedArtifacts(
-		builder.assemblyContext,
+	context, err := emitnaming.WithLexicalTypeRequirements(
+		builder.assemblyContext.WithArtifactOwner(owner),
 		site.declaration,
 		owner,
+		requirements,
+	)
+	if err != nil {
+		return artifactRevision{}, err
+	}
+	context, err = context.WithCallableControls(
+		owner,
+		initializer.Rhs,
 		requirements,
 	)
 	if err != nil {

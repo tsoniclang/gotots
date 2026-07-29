@@ -59,6 +59,26 @@ func LengthAndCapacity() int {
 	return len(values) + cap(values)
 }
 
+func ArrayLengthConstant() int {
+	return len([7]int32{})
+}
+
+func PointerArrayLengthConstant() int {
+	return len((*[9]int32)(nil))
+}
+
+func nextArrayPointer() *[4]int32 {
+	readTrace++
+	return nil
+}
+
+func PointerArrayMeasureEvaluates() int {
+	readTrace = 0
+	length := len(nextArrayPointer())
+	capacity := cap(nextArrayPointer())
+	return int(readTrace)*100 + length*10 + capacity
+}
+
 func InferredLength() int {
 	values := [...]int32{3: 7}
 	return len(values) + cap(values)

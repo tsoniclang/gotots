@@ -29,18 +29,18 @@ func buildSlice(
 		seen[symbol] = struct{}{}
 		switch symbol {
 		case api.RuntimeSlice:
-		case api.RuntimeSliceAddress:
+		case api.RuntimeSliceAddress, api.RuntimeSliceAddressView:
 			capabilities.Address = true
-		case api.RuntimeSliceMakeWith:
-			capabilities.AggregateMake = true
-		case api.RuntimeSliceNilWith:
-			capabilities.AggregateNil = true
-		case api.RuntimeSliceLiteralWith:
-			capabilities.AggregateLiteral = true
-		case api.RuntimeSliceAppendWith:
-			capabilities.AggregateAppend = true
-		case api.RuntimeSliceCopyWith:
-			capabilities.AggregateCopy = true
+		case api.RuntimeSliceArrayPointer:
+			capabilities.ArrayPointer = true
+		case api.RuntimeArraySlice:
+			capabilities.ArrayView = true
+		case api.RuntimeSliceStorage:
+			capabilities.Storage = true
+		case api.RuntimeSliceAppendSlice:
+			capabilities.AppendSlice = true
+		case api.RuntimeSliceClear:
+			capabilities.Clear = true
 		default:
 			return nil, &api.RuntimeSymbolError{Symbol: symbol}
 		}
@@ -89,16 +89,62 @@ func buildSliceOperation(
 	symbol api.RuntimeSymbol,
 	sliceName string,
 ) (tsgo.Statement, error) {
-	if symbol != api.RuntimeSliceAddress {
-		return runtimeslice.BuildAggregateOperation(factory, symbol)
+	if symbol != api.RuntimeSliceAddress &&
+		symbol != api.RuntimeSliceAddressView &&
+		symbol != api.RuntimeSliceArrayPointer &&
+		symbol != api.RuntimeArraySlice {
+		return runtimeslice.BuildOperation(factory, symbol)
 	}
-	addressContract, err := api.RuntimeContract(api.RuntimeSliceAddress)
+	addressContract, err := api.RuntimeContract(symbol)
 	if err != nil {
 		return nil, err
 	}
 	pointerContract, err := api.RuntimeContract(api.RuntimePointer)
 	if err != nil {
 		return nil, err
+	}
+	if symbol == api.RuntimeSliceAddressView {
+		return runtimeslice.BuildAddressView(
+			factory,
+			addressContract.ExportedName(),
+			sliceName,
+			pointerContract.ExportedName(),
+		), nil
+	}
+	if symbol == api.RuntimeSliceArrayPointer {
+		arrayContract, err := api.RuntimeContract(api.RuntimeArray)
+		if err != nil {
+			return nil, err
+		}
+		arrayViewContract, err := api.RuntimeContract(api.RuntimeArrayView)
+		if err != nil {
+			return nil, err
+		}
+		return runtimeslice.BuildArrayPointer(
+			factory,
+			addressContract.ExportedName(),
+			sliceName,
+			pointerContract.ExportedName(),
+			arrayContract.ExportedName(),
+			arrayViewContract.ExportedName(),
+		), nil
+	}
+	if symbol == api.RuntimeArraySlice {
+		arrayContract, err := api.RuntimeContract(api.RuntimeArray)
+		if err != nil {
+			return nil, err
+		}
+		locationContract, err := api.RuntimeContract(api.RuntimeArrayLocation)
+		if err != nil {
+			return nil, err
+		}
+		return runtimeslice.BuildArraySlice(
+			factory,
+			addressContract.ExportedName(),
+			sliceName,
+			arrayContract.ExportedName(),
+			locationContract.ExportedName(),
+		), nil
 	}
 	return runtimeslice.BuildAddress(
 		factory,

@@ -8,6 +8,13 @@ import (
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
+const (
+	StructMakeMember        = "$make"
+	StructStorageOfMember   = "$storageOf"
+	StructFromStorageMember = "$fromStorage"
+	StructStorageTypeSuffix = "$Storage"
+)
+
 type TemporaryKind uint8
 
 const (
@@ -32,6 +39,34 @@ const (
 	TemporaryBinaryOperand
 	TemporaryLogicalResult
 	TemporaryArrayHash
+	TemporaryArrayConstruction
+	TemporarySliceConstruction
+	TemporaryRangeOperand
+	TemporaryRangeIndex
+	TemporaryRangeValue
+	TemporaryRangeKeys
+	TemporaryRangeDecode
+	TemporarySwitchTag
+	TemporarySwitchSelection
+	TemporarySwitchMatch
+	TemporaryTypeSwitchValue
+	TemporaryForCondition
+	TemporaryForPost
+	TemporaryRangeState
+	TemporaryDeferStack
+	TemporaryDeferredCall
+	TemporaryRecoveryAuthority
+	TemporaryActivePanic
+	TemporaryCaughtPanic
+	TemporaryReturnResult
+	TemporaryReturnLabel
+	TemporaryControlTarget
+	TemporaryGotoTarget
+	TemporaryGotoState
+	TemporaryGotoDispatch
+	TemporaryChannelOperand
+	TemporaryChannelResult
+	TemporarySelectCase
 )
 
 type NameReference struct {
@@ -51,6 +86,48 @@ func (r NameReference) Name() string {
 }
 
 func (r NameReference) Requests() []RootRequest {
+	return slices.Clone(r.requests)
+}
+
+type InterfaceContractReference struct {
+	typeName     string
+	contractName string
+	guardName    string
+	requests     []RootRequest
+}
+
+func NewInterfaceContractReference(
+	typeName string,
+	contractName string,
+	guardName string,
+	requests ...RootRequest,
+) (InterfaceContractReference, error) {
+	if typeName == "" || contractName == "" || guardName == "" {
+		return InterfaceContractReference{}, &NameError{
+			Reason: "interface-contract reference name is empty",
+		}
+	}
+	return InterfaceContractReference{
+		typeName:     typeName,
+		contractName: contractName,
+		guardName:    guardName,
+		requests:     slices.Clone(requests),
+	}, nil
+}
+
+func (r InterfaceContractReference) TypeName() string {
+	return r.typeName
+}
+
+func (r InterfaceContractReference) ContractName() string {
+	return r.contractName
+}
+
+func (r InterfaceContractReference) GuardName() string {
+	return r.guardName
+}
+
+func (r InterfaceContractReference) Requests() []RootRequest {
 	return slices.Clone(r.requests)
 }
 
@@ -110,14 +187,27 @@ type Names interface {
 	TypeReference(types.Object) (NameReference, error)
 	PackageVariable(*types.Var) (PackageVariableReference, error)
 	NamedStructOperation(*types.TypeName, NamedStructOperation) (NameReference, error)
+	NamedStructStorage(*types.TypeName) (NameReference, error)
 	AnonymousStruct(
 		*types.Struct,
 		AnonymousStructDemand,
 	) (NameReference, error)
+	AnonymousStructStorage(*types.Struct) (NameReference, error)
 	MapSpecialization(
 		types.Type,
 		MapSpecializationDemand,
 	) (NameReference, error)
+	InterfaceAdapter(types.Type) (NameReference, error)
+	InterfaceDynamicType(types.Type) (NameReference, error)
+	InterfaceType(types.Type) (NameReference, error)
+	InterfaceContract(types.Type) (InterfaceContractReference, error)
+	InterfaceMethodName(*types.Func) (string, error)
+	InterfaceMethodToken(*types.Func) (NameReference, error)
+	GenericCapability(
+		GenericOperationSelection,
+		*types.Signature,
+	) (GenericCapabilityReference, error)
+	CallableABI(*types.Signature) (CallableABIReference, error)
 	ConstantProjection(*types.Const, types.BasicKind) (NameReference, error)
 	Member(*types.Var) (string, error)
 	Primitive(PrimitiveAlias) (NameReference, error)
@@ -168,6 +258,62 @@ func TemporaryPrefix(kind TemporaryKind) (string, error) {
 		return "__gotots_logical_result_", nil
 	case TemporaryArrayHash:
 		return "__gotots_array_hash_", nil
+	case TemporaryArrayConstruction:
+		return "__gotots_array_build_", nil
+	case TemporarySliceConstruction:
+		return "__gotots_slice_build_", nil
+	case TemporaryRangeOperand:
+		return "__gotots_range_", nil
+	case TemporaryRangeIndex:
+		return "__gotots_range_index_", nil
+	case TemporaryRangeValue:
+		return "__gotots_range_value_", nil
+	case TemporaryRangeKeys:
+		return "__gotots_range_keys_", nil
+	case TemporaryRangeDecode:
+		return "__gotots_range_decode_", nil
+	case TemporarySwitchTag:
+		return "__gotots_switch_tag_", nil
+	case TemporarySwitchSelection:
+		return "__gotots_switch_selection_", nil
+	case TemporarySwitchMatch:
+		return "__gotots_switch_match_", nil
+	case TemporaryTypeSwitchValue:
+		return "__gotots_type_switch_", nil
+	case TemporaryForCondition:
+		return "__gotots_for_condition_", nil
+	case TemporaryForPost:
+		return "__gotots_for_post_", nil
+	case TemporaryRangeState:
+		return "__gotots_range_state_", nil
+	case TemporaryDeferStack:
+		return "__gotots_defers_", nil
+	case TemporaryDeferredCall:
+		return "__gotots_deferred_", nil
+	case TemporaryRecoveryAuthority:
+		return "__gotots_recovery_", nil
+	case TemporaryActivePanic:
+		return "__gotots_panic_", nil
+	case TemporaryCaughtPanic:
+		return "__gotots_caught_", nil
+	case TemporaryReturnResult:
+		return "__gotots_return_", nil
+	case TemporaryReturnLabel:
+		return "__gotots_return_block_", nil
+	case TemporaryControlTarget:
+		return "__gotots_control_target_", nil
+	case TemporaryGotoTarget:
+		return "__gotots_goto_target_", nil
+	case TemporaryGotoState:
+		return "__gotots_goto_state_", nil
+	case TemporaryGotoDispatch:
+		return "__gotots_goto_dispatch_", nil
+	case TemporaryChannelOperand:
+		return "__gotots_channel_", nil
+	case TemporaryChannelResult:
+		return "__gotots_receive_", nil
+	case TemporarySelectCase:
+		return "__gotots_select_", nil
 	default:
 		return "", &NameError{
 			Reason: fmt.Sprintf("temporary kind %d is invalid", kind),

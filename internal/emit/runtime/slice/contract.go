@@ -16,6 +16,16 @@ const (
 	MemberAddress
 	MemberLength
 	MemberCapacity
+	MemberAppendSlice
+	MemberClear
+	MemberArrayLocation
+)
+
+const (
+	StorageAllocateMember      = "$allocate"
+	StorageGrownCapacityMember = "$grownCapacity"
+	StorageInitializeMember    = "$initialize"
+	StorageWithLengthMember    = "$withLength"
 )
 
 func MemberName(member Member) string {
@@ -44,6 +54,12 @@ func MemberName(member Member) string {
 		return "length"
 	case MemberCapacity:
 		return "capacity"
+	case MemberAppendSlice:
+		return "appendSlice"
+	case MemberClear:
+		return "clear"
+	case MemberArrayLocation:
+		return "$arrayLocation"
 	default:
 		panic("invalid RuntimeSlice member")
 	}

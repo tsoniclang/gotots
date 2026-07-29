@@ -14,6 +14,7 @@ import (
 
 func EmitType(
 	context api.Context,
+	children api.ChildEmitter,
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
@@ -40,42 +41,40 @@ func EmitType(
 			reference.Requests()...,
 		), nil
 	}
-	if model.Storage() == StorageScalar {
-		reference, typeArguments, err := Reference(
-			context,
-			source,
-			sourceType,
-			api.ImportPhaseType,
-		)
-		if err != nil {
-			return api.TypeEmission{}, err
-		}
-		return api.DirectType(
-			context.Factory().TypeReferenceNode(
-				context.Factory().Identifier(reference.Name()),
-				typeArguments,
-			),
-			reference.Requests()...,
-		), nil
+	key, err := children.RepresentedType(
+		context.WithRole(api.RoleMapKey),
+		source,
+		StorageKeyType(model.Key()),
+	)
+	if err != nil {
+		return api.TypeEmission{}, err
 	}
-	if model.Storage() == StorageSpecialized {
-		reference, err := context.Names().MapSpecialization(
-			sourceType,
-			api.MapSpecializationDemandDefinition,
-		)
-		if err != nil {
-			return api.TypeEmission{}, err
-		}
-		return api.DirectType(
-			context.Factory().TypeReferenceNode(
-				context.Factory().Identifier(reference.Name()),
-				nil,
-			),
-			reference.Requests()...,
-		), nil
+	value, err := children.RepresentedType(
+		context.WithRole(api.RoleMapValue),
+		source,
+		model.Element(),
+	)
+	if err != nil {
+		return api.TypeEmission{}, err
 	}
-	return api.TypeEmission{},
-		api.Unsupported(context, api.CategoryType, source)
+	reference, err := context.Names().Runtime(
+		api.RuntimeMapValue,
+		api.ImportPhaseType,
+	)
+	if err != nil {
+		return api.TypeEmission{}, err
+	}
+	return api.DirectType(
+		context.Factory().TypeReferenceNode(
+			context.Factory().Identifier(reference.Name()),
+			[]tsgo.TypeNode{key.Value(), value.Value()},
+		),
+		api.CombineRequests(
+			key.Requests(),
+			value.Requests(),
+			reference.Requests(),
+		)...,
+	), nil
 }
 
 func Nil(
@@ -317,6 +316,13 @@ func ProjectKey(
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
 	return value, nil
+}
+
+func StorageKeyType(sourceType types.Type) types.Type {
+	if model, ok := definedtype.ResolveBasic(sourceType); ok {
+		return model.Underlying()
+	}
+	return sourceType
 }
 
 func directKey(

@@ -43,6 +43,8 @@ func TestBuildEmitsOnlyTheDemandedStringDefinition(t *testing.T) {
 		api.RuntimeStringSlice,
 		api.RuntimeStringMax,
 		api.RuntimeStringMin,
+		api.RuntimeStringEncodeRune,
+		api.RuntimeStringDecodeRune,
 	} {
 		t.Run(apiName(t, symbol), func(t *testing.T) {
 			definitions, err := runtimeemission.Build(

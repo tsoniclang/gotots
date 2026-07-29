@@ -26,11 +26,13 @@ type memberNames struct {
 	delete     string
 	length     string
 	isNil      string
+	clear      string
+	keys       string
 }
 
 func resolveMemberNames() (memberNames, error) {
-	resolved := make([]string, 0, MemberIsNil)
-	for member := MemberNil; member <= MemberIsNil; member++ {
+	resolved := make([]string, 0, MemberKeys)
+	for member := MemberNil; member <= MemberKeys; member++ {
 		name, err := Name(member)
 		if err != nil {
 			return memberNames{}, err
@@ -46,6 +48,8 @@ func resolveMemberNames() (memberNames, error) {
 		delete:     resolved[5],
 		length:     resolved[6],
 		isNil:      resolved[7],
+		clear:      resolved[8],
+		keys:       resolved[9],
 	}, nil
 }
 
@@ -61,7 +65,7 @@ func Build(
 	if err != nil {
 		return nil, err
 	}
-	if symbol != api.RuntimeMap ||
+	if (symbol != api.RuntimeMap && symbol != api.RuntimeMapValue) ||
 		contract.Module() != api.RuntimeModuleMap {
 		return nil, &api.RuntimeSymbolError{Symbol: symbol}
 	}
@@ -69,10 +73,29 @@ func Build(
 	if err != nil {
 		return nil, err
 	}
+	if symbol == api.RuntimeMapValue {
+		return valueContract(factory, contract.ExportedName(), members), nil
+	}
 	className := contract.ExportedName()
 	keyType := typeName(factory, keyTypeName)
 	valueType := typeName(factory, valueTypeName)
 
+	classMembers := []tsgo.ClassElement{
+		constructor(factory, keyType, valueType),
+		nilMethod(factory, className, members.nilMember),
+		makeMethod(factory, className, members.makeMember),
+		lookupMethod(factory, valueType, members.lookup),
+		lookupOKMethod(factory, valueType, members.lookupOK),
+		storeMethod(factory, valueType, members.store, panicName),
+		deleteMethod(factory, members.delete),
+		lengthMethod(factory, members.length),
+		nilStateMethod(factory, members.isNil),
+	}
+	classMembers = append(
+		classMembers,
+		clearMethod(factory, members.clear),
+		keysMethod(factory, members.keys),
+	)
 	return factory.ClassDeclaration(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
 		factory.Identifier(className),
@@ -81,17 +104,7 @@ func Build(
 			typeParameter(factory, valueTypeName),
 		},
 		nil,
-		[]tsgo.ClassElement{
-			constructor(factory, keyType, valueType),
-			nilMethod(factory, className, members.nilMember),
-			makeMethod(factory, className, members.makeMember),
-			lookupMethod(factory, valueType, members.lookup),
-			lookupOKMethod(factory, valueType, members.lookupOK),
-			storeMethod(factory, valueType, members.store, panicName),
-			deleteMethod(factory, members.delete),
-			lengthMethod(factory, members.length),
-			nilStateMethod(factory, members.isNil),
-		},
+		classMembers,
 	), nil
 }
 

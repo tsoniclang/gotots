@@ -137,6 +137,7 @@ func (s *programSession) buildAnonymousStructRevision(
 		return artifactRevision{}, err
 	}
 	defer finish()
+	context := builder.context.WithArtifactOwner(owner)
 
 	operations, err := anonymousStructOperations(
 		s.requirements.appliedFor(owner),
@@ -153,7 +154,7 @@ func (s *programSession) buildAnonymousStructRevision(
 		}
 	}
 	emission, err := anonymousstructdeclaration.EmitAnonymous(
-		builder.context,
+		context,
 		builder.emitter,
 		structType,
 		artifact.TargetName(),
@@ -221,6 +222,16 @@ func anonymousStructOperations(
 			operations = append(
 				operations,
 				api.NamedStructOperationHash,
+			)
+		case api.AnonymousStructDemandConvert:
+			operations = append(
+				operations,
+				api.NamedStructOperationConvert,
+			)
+		case api.AnonymousStructDemandStorage:
+			operations = append(
+				operations,
+				api.NamedStructOperationStorage,
 			)
 		default:
 			return nil, &ScheduleError{

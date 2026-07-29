@@ -10,6 +10,7 @@ const (
 	HashNumberMember  = "number"
 	HashBigIntMember  = "bigint"
 	HashStringMember  = "string"
+	HashObjectMember  = "object"
 	HashMixMember     = "mix"
 )
 
@@ -25,13 +26,62 @@ func buildHash(factory tsgo.Factory) (tsgo.Statement, error) {
 		nil,
 		nil,
 		[]tsgo.ClassElement{
+			hashObjectStorage(factory),
+			hashObjectSequence(factory),
 			hashBooleanMethod(factory),
 			hashNumberMethod(factory),
 			hashBigIntMethod(factory),
 			hashStringMethod(factory, className),
+			hashObjectMethod(factory, className),
 			hashMixMethod(factory),
 		},
 	), nil
+}
+
+func hashObjectStorage(
+	factory tsgo.Factory,
+) tsgo.PropertyDeclaration {
+	objectType := factory.KeywordTypeNode(
+		tsgo.KeywordTypeSyntaxKindObjectKeyword,
+	)
+	numberType := factory.KeywordTypeNode(
+		tsgo.KeywordTypeSyntaxKindNumberKeyword,
+	)
+	return factory.PropertyDeclaration(
+		[]tsgo.ModifierLike{
+			factory.PrivateKeyword(),
+			factory.StaticKeyword(),
+			factory.ReadonlyKeyword(),
+		},
+		factory.Identifier("objects"),
+		nil,
+		factory.TypeReferenceNode(
+			factory.Identifier("WeakMap"),
+			[]tsgo.TypeNode{objectType, numberType},
+		),
+		factory.NewExpression(
+			factory.Identifier("WeakMap"),
+			[]tsgo.TypeNode{objectType, numberType},
+			nil,
+		),
+	)
+}
+
+func hashObjectSequence(
+	factory tsgo.Factory,
+) tsgo.PropertyDeclaration {
+	return factory.PropertyDeclaration(
+		[]tsgo.ModifierLike{
+			factory.PrivateKeyword(),
+			factory.StaticKeyword(),
+		},
+		factory.Identifier("nextObject"),
+		nil,
+		factory.KeywordTypeNode(
+			tsgo.KeywordTypeSyntaxKindNumberKeyword,
+		),
+		factory.NumericLiteral("1", tsgo.TokenFlagsNone),
+	)
 }
 
 func hashBooleanMethod(factory tsgo.Factory) tsgo.MethodDeclaration {
@@ -160,6 +210,86 @@ func hashStringMethod(
 				}, true),
 			),
 			factory.ReturnStatement(hash),
+		},
+	)
+}
+
+func hashObjectMethod(
+	factory tsgo.Factory,
+	className string,
+) tsgo.MethodDeclaration {
+	owner := factory.Identifier(className)
+	value := factory.Identifier("value")
+	result := factory.Identifier("result")
+	objects := factory.PropertyAccessExpression(
+		owner,
+		nil,
+		factory.Identifier("objects"),
+		tsgo.NodeFlagsNone,
+	)
+	next := factory.PropertyAccessExpression(
+		owner,
+		nil,
+		factory.Identifier("nextObject"),
+		tsgo.NodeFlagsNone,
+	)
+	return hashMethod(
+		factory,
+		HashObjectMember,
+		factory.KeywordTypeNode(
+			tsgo.KeywordTypeSyntaxKindObjectKeyword,
+		),
+		[]tsgo.Statement{
+			hashVariable(
+				factory,
+				tsgo.NodeFlagsLet,
+				"result",
+				runtimeCall(factory, objects, "get", value),
+			),
+			factory.IfStatement(
+				factory.BinaryExpression(
+					nil,
+					result,
+					nil,
+					factory.BinaryOperatorToken(
+						tsgo.BinaryOperatorEqualsEqualsEqualsToken,
+					),
+					factory.Identifier("undefined"),
+				),
+				factory.Block(
+					[]tsgo.Statement{
+						factory.ExpressionStatement(
+							factory.BinaryExpression(
+								nil,
+								result,
+								nil,
+								factory.BinaryOperatorToken(
+									tsgo.BinaryOperatorEqualsToken,
+								),
+								next,
+							),
+						),
+						factory.ExpressionStatement(
+							factory.PostfixUnaryExpression(
+								next,
+								tsgo.PostfixUnaryExpressionOperatorKindPlusPlusToken,
+							),
+						),
+						factory.ExpressionStatement(
+							runtimeCall(
+								factory,
+								objects,
+								"set",
+								value,
+								result,
+							),
+						),
+					},
+					true,
+				),
+				nil,
+			),
+			factory.ReturnStatement(result),
 		},
 	)
 }

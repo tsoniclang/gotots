@@ -26,8 +26,48 @@ func TestBuildCreatesOneTypedGenericMapClass(t *testing.T) {
 	if len(class.TypeParameters()) != 2 {
 		t.Fatalf("type parameters = %d, want key and value", len(class.TypeParameters()))
 	}
-	if len(class.Members()) != 9 {
-		t.Fatalf("members = %d, want one constructor and eight operations", len(class.Members()))
+	if len(class.Members()) != 11 {
+		t.Fatalf("members = %d, want one constructor and ten map operations", len(class.Members()))
+	}
+}
+
+func TestClearSurfaceBelongsToCompleteMapContract(t *testing.T) {
+	factory := tsgo.NewFactory()
+	statement, err := Build(
+		factory,
+		api.RuntimeMap,
+		panicClassName(t),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	class := statement.(tsgo.ClassDeclaration)
+	if len(class.Members()) != 11 {
+		t.Fatalf("map members = %d, want the complete value contract", len(class.Members()))
+	}
+	method := class.Members()[9].(tsgo.MethodDeclaration)
+	if method.Name().(tsgo.Identifier).Text() != "clear" {
+		t.Fatalf("map member = %v, want clear", method.Name())
+	}
+}
+
+func TestKeysSurfaceBelongsToCompleteMapContract(t *testing.T) {
+	factory := tsgo.NewFactory()
+	statement, err := Build(
+		factory,
+		api.RuntimeMap,
+		panicClassName(t),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	class := statement.(tsgo.ClassDeclaration)
+	if len(class.Members()) != 11 {
+		t.Fatalf("map members = %d, want the complete value contract", len(class.Members()))
+	}
+	method := class.Members()[10].(tsgo.MethodDeclaration)
+	if method.Name().(tsgo.Identifier).Text() != "keys" {
+		t.Fatalf("map member = %v, want keys", method.Name())
 	}
 }
 
@@ -49,14 +89,14 @@ func TestBuildCreatesOneStaticHashPrimitiveOwner(t *testing.T) {
 		t.Fatal(err)
 	}
 	if class.Name().Text() != contract.ExportedName() ||
-		len(class.Members()) != 5 {
+		len(class.Members()) != 8 {
 		t.Fatalf(
 			"hash owner = %q with %d members",
 			class.Name().Text(),
 			len(class.Members()),
 		)
 	}
-	for _, member := range class.Members() {
+	for _, member := range class.Members()[2:] {
 		method, ok := member.(tsgo.MethodDeclaration)
 		if !ok {
 			t.Fatalf("hash owner member = %T, want static method", member)

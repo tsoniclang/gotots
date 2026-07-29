@@ -21,14 +21,15 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.CompositeLit,
 ) (api.ExpressionEmission, error) {
-	if _, ok := types.Unalias(
-		context.TypesInfo().TypeOf(source),
-	).(*types.Map); ok {
-		return mapliteral.Emit(context, children, source)
+	sourceType := context.TypesInfo().TypeOf(source)
+	if sourceType != nil {
+		if _, ok := types.Unalias(sourceType).Underlying().(*types.Map); ok {
+			return mapliteral.Emit(context, children, source)
+		}
 	}
 	if array, ok := arrayvalue.Resolve(
 		context,
-		context.TypesInfo().TypeOf(source),
+		sourceType,
 	); ok {
 		return array.EmitLiteral(context, children, source)
 	}
@@ -64,10 +65,17 @@ func Emit(
 		}
 		return api.NewExpressionEmission(
 			before,
-			context.Factory().NewExpression(
-				context.Factory().Identifier(reference.Name()),
+			context.Factory().CallExpression(
+				context.Factory().PropertyAccessExpression(
+					context.Factory().Identifier(reference.Name()),
+					nil,
+					context.Factory().Identifier(api.StructMakeMember),
+					tsgo.NodeFlagsNone,
+				),
+				nil,
 				nil,
 				values,
+				tsgo.NodeFlagsNone,
 			),
 			api.CombineRequests(requests, reference.Requests()),
 		)
@@ -78,10 +86,17 @@ func Emit(
 	}
 	return api.NewExpressionEmission(
 		before,
-		context.Factory().NewExpression(
-			context.Factory().Identifier(reference.Name()),
+		context.Factory().CallExpression(
+			context.Factory().PropertyAccessExpression(
+				context.Factory().Identifier(reference.Name()),
+				nil,
+				context.Factory().Identifier(api.StructMakeMember),
+				tsgo.NodeFlagsNone,
+			),
+			nil,
 			nil,
 			values,
+			tsgo.NodeFlagsNone,
 		),
 		api.CombineRequests(requests, reference.Requests()),
 	)
@@ -102,7 +117,9 @@ func structSourceType(
 				expected != nil &&
 				types.AssignableTo(sourceType, expected)
 	}
-	if named.TypeParams().Len() != 0 || source.Incomplete {
+	if source.Incomplete ||
+		(named.TypeParams().Len() != 0 &&
+			named.TypeArgs().Len() != named.TypeParams().Len()) {
 		return nil, nil, false
 	}
 	structType, ok := named.Underlying().(*types.Struct)

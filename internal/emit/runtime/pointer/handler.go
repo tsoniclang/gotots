@@ -3,14 +3,19 @@ package pointer
 import "github.com/tsoniclang/gotots/internal/target/tsgo"
 
 const (
+	AddressName     = "$go$address"
 	CellName        = "cell"
 	CellValueName   = "value"
 	DereferenceName = "dereference"
 	EqualName       = "equal"
+	ViewName        = "view"
 	FieldName       = "field"
 	ObjectFieldName = "objectField"
 	ElementName     = "element"
+	ElementViewName = "elementView"
 	IndexName       = "index"
+	IndexViewName   = "indexView"
+	ArrayRegionName = "arrayRegion"
 )
 
 type builder struct {
@@ -32,9 +37,13 @@ func Build(
 	return factory.ClassDeclaration(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
 		target.id(className),
-		[]tsgo.TypeParameterDeclaration{target.typeParameter("T", nil)},
+		[]tsgo.TypeParameterDeclaration{
+			target.typeParameter("L", nil),
+			target.typeParameter("S", nil),
+		},
 		nil,
 		[]tsgo.ClassElement{
+			target.logicalProperty(),
 			target.rootsProperty(),
 			target.childrenProperty(),
 			target.constructor(),
@@ -44,9 +53,13 @@ func Build(
 			target.fieldMethod(),
 			target.objectFieldMethod(),
 			target.elementMethod(),
+			target.elementViewMethod(),
 			target.indexMethod(),
+			target.indexViewMethod(),
+			target.arrayRegionMethod(),
 			target.equalMethod(),
 			target.dereferenceMethod(),
+			target.viewMethod(),
 			target.valueGetter(),
 			target.valueSetter(),
 		},
@@ -56,10 +69,32 @@ func Build(
 func CellValue(
 	factory tsgo.Factory,
 	runtimeName string,
-	elementType tsgo.TypeNode,
+	logicalType tsgo.TypeNode,
+	storageType tsgo.TypeNode,
 	pointer tsgo.Expression,
 ) tsgo.PropertyAccessExpression {
-	dereference := factory.CallExpression(
+	return factory.PropertyAccessExpression(
+		Dereference(
+			factory,
+			runtimeName,
+			logicalType,
+			storageType,
+			pointer,
+		),
+		nil,
+		factory.Identifier(CellValueName),
+		tsgo.NodeFlagsNone,
+	)
+}
+
+func Dereference(
+	factory tsgo.Factory,
+	runtimeName string,
+	logicalType tsgo.TypeNode,
+	storageType tsgo.TypeNode,
+	pointer tsgo.Expression,
+) tsgo.CallExpression {
+	return factory.CallExpression(
 		factory.PropertyAccessExpression(
 			factory.Identifier(runtimeName),
 			nil,
@@ -67,14 +102,8 @@ func CellValue(
 			tsgo.NodeFlagsNone,
 		),
 		nil,
-		[]tsgo.TypeNode{elementType},
+		[]tsgo.TypeNode{logicalType, storageType},
 		[]tsgo.Expression{pointer},
-		tsgo.NodeFlagsNone,
-	)
-	return factory.PropertyAccessExpression(
-		dereference,
-		nil,
-		factory.Identifier(CellValueName),
 		tsgo.NodeFlagsNone,
 	)
 }
@@ -82,7 +111,8 @@ func CellValue(
 func Cell(
 	factory tsgo.Factory,
 	runtimeName string,
-	elementType tsgo.TypeNode,
+	logicalType tsgo.TypeNode,
+	storageType tsgo.TypeNode,
 	value tsgo.Expression,
 ) tsgo.CallExpression {
 	return factory.CallExpression(
@@ -93,7 +123,7 @@ func Cell(
 			tsgo.NodeFlagsNone,
 		),
 		nil,
-		[]tsgo.TypeNode{elementType},
+		[]tsgo.TypeNode{logicalType, storageType},
 		[]tsgo.Expression{value},
 		tsgo.NodeFlagsNone,
 	)
@@ -123,12 +153,19 @@ func (b builder) typeReference(
 	return b.factory.TypeReferenceNode(b.id(name), arguments)
 }
 
-func (b builder) typeT() tsgo.TypeNode {
-	return b.typeReference("T")
+func (b builder) typeL() tsgo.TypeNode {
+	return b.typeReference("L")
 }
 
-func (b builder) pointerType(element tsgo.TypeNode) tsgo.TypeNode {
-	return b.typeReference(b.className, element)
+func (b builder) typeS() tsgo.TypeNode {
+	return b.typeReference("S")
+}
+
+func (b builder) pointerType(
+	logical tsgo.TypeNode,
+	storage tsgo.TypeNode,
+) tsgo.TypeNode {
+	return b.typeReference(b.className, logical, storage)
 }
 
 func (b builder) objectType() tsgo.TypeNode {

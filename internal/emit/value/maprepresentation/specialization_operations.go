@@ -12,7 +12,7 @@ const (
 )
 
 func (b specializationBuilder) build() []tsgo.ClassElement {
-	return []tsgo.ClassElement{
+	members := []tsgo.ClassElement{
 		b.constructor(),
 		b.operationMethod(
 			specializationZeroOperation,
@@ -63,6 +63,8 @@ func (b specializationBuilder) build() []tsgo.ClassElement {
 		b.lengthMethod(),
 		b.isNilMethod(),
 	}
+	members = append(members, b.clearMethod(), b.keysMethod())
+	return members
 }
 
 func (b specializationBuilder) constructor() tsgo.ConstructorDeclaration {

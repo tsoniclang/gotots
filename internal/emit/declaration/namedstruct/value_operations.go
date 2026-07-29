@@ -5,6 +5,8 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericabi "github.com/tsoniclang/gotots/internal/emit/generic/abi"
+	genericdeclaration "github.com/tsoniclang/gotots/internal/emit/generic/declaration"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
@@ -16,34 +18,119 @@ func emitValueOperation(
 	className string,
 	classType tsgo.TypeNode,
 	fields []field,
-	operation api.NamedStructOperation,
+	assembly operationAssembly,
+	typeParameters []tsgo.TypeParameterDeclaration,
+	typeArguments []tsgo.TypeNode,
 ) (tsgo.MethodDeclaration, []api.RootRequest, error) {
+	operation := assembly.operation
 	memberName, err := api.NamedStructOperationMemberName(operation)
 	if err != nil {
 		return nil, nil, err
 	}
+	var capabilities []tsgo.ParameterDeclaration
+	var capabilityRequests []api.RootRequest
+	if len(typeParameters) == 0 {
+		if len(assembly.capabilities) != 0 {
+			return nil, nil, &api.InvariantError{
+				Role:   context.Role(),
+				Reason: "non-generic struct operation received generic capabilities",
+			}
+		}
+	} else {
+		context = context.WithGenericNamedStructOperation(operation)
+		bindings, requests, emitErr :=
+			genericdeclaration.EmitOperationParameters(
+				context,
+				children,
+				source,
+				assembly.capabilities,
+			)
+		if emitErr != nil {
+			return nil, nil, emitErr
+		}
+		capabilityRequests = requests
+		if len(assembly.capabilities) != 0 {
+			capabilities, err = genericabi.JoinCapabilities(
+				assembly.capabilities[0].Owner(),
+				assembly.capabilities,
+				bindings,
+			)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+	}
+	var member tsgo.MethodDeclaration
+	var requests []api.RootRequest
 	switch operation {
 	case api.NamedStructOperationZero:
-		return zeroMethod(context, source, memberName, className, classType, fields)
+		member, requests, err = zeroMethod(
+			context,
+			source,
+			memberName,
+			className,
+			classType,
+			fields,
+			capabilities,
+			typeParameters,
+			typeArguments,
+		)
 	case api.NamedStructOperationCopy:
-		return copyMethod(context, source, memberName, className, classType, fields)
+		member, requests, err = copyMethod(
+			context,
+			source,
+			memberName,
+			className,
+			classType,
+			fields,
+			capabilities,
+			typeParameters,
+			typeArguments,
+		)
 	case api.NamedStructOperationEqual:
-		return equalMethod(
+		member, requests, err = equalMethod(
 			context,
 			children,
 			source,
 			memberName,
 			classType,
 			fields,
+			capabilities,
+			typeParameters,
 		)
 	case api.NamedStructOperationHash:
-		return hashMethod(context, source, memberName, classType, fields)
+		member, requests, err = hashMethod(
+			context,
+			source,
+			memberName,
+			classType,
+			fields,
+			capabilities,
+			typeParameters,
+		)
+	case api.NamedStructOperationConvert:
+		member, requests, err = conversionMethod(
+			context,
+			children,
+			source,
+			memberName,
+			className,
+			classType,
+			fields,
+			capabilities,
+			typeParameters,
+			typeArguments,
+		)
 	default:
 		return nil, nil, &api.InvariantError{
 			Role:   context.Role(),
 			Reason: "named-struct operation is invalid",
 		}
 	}
+	if err != nil {
+		return nil, nil, err
+	}
+	return member, api.CombineRequests(capabilityRequests, requests), nil
 }
 
 func hashMethod(
@@ -52,6 +139,8 @@ func hashMethod(
 	memberName string,
 	classType tsgo.TypeNode,
 	fields []field,
+	capabilities []tsgo.ParameterDeclaration,
+	typeParameters []tsgo.TypeParameterDeclaration,
 ) (tsgo.MethodDeclaration, []api.RootRequest, error) {
 	runtime, err := context.Names().Runtime(
 		api.RuntimeMapHash,
@@ -136,6 +225,8 @@ func hashMethod(
 			tsgo.KeywordTypeSyntaxKindNumberKeyword,
 		),
 		body,
+		capabilities,
+		typeParameters,
 	), requests, nil
 }
 
@@ -146,6 +237,9 @@ func zeroMethod(
 	className string,
 	classType tsgo.TypeNode,
 	fields []field,
+	capabilities []tsgo.ParameterDeclaration,
+	typeParameters []tsgo.TypeParameterDeclaration,
+	typeArguments []tsgo.TypeNode,
 ) (tsgo.MethodDeclaration, []api.RootRequest, error) {
 	arguments := make([]tsgo.Expression, 0, len(fields))
 	var requests []api.RootRequest
@@ -174,12 +268,10 @@ func zeroMethod(
 		nil,
 		classType,
 		[]tsgo.Statement{context.Factory().ReturnStatement(
-			context.Factory().NewExpression(
-				context.Factory().Identifier(className),
-				nil,
-				arguments,
-			),
+			construct(context, className, typeArguments, arguments),
 		)},
+		capabilities,
+		typeParameters,
 	), requests, nil
 }
 
@@ -190,6 +282,9 @@ func copyMethod(
 	className string,
 	classType tsgo.TypeNode,
 	fields []field,
+	capabilities []tsgo.ParameterDeclaration,
+	typeParameters []tsgo.TypeParameterDeclaration,
+	typeArguments []tsgo.TypeNode,
 ) (tsgo.MethodDeclaration, []api.RootRequest, error) {
 	arguments := make([]tsgo.Expression, 0, len(fields))
 	var requests []api.RootRequest
@@ -230,12 +325,10 @@ func copyMethod(
 		[]tsgo.ParameterDeclaration{parameter(context, "$source", classType)},
 		classType,
 		[]tsgo.Statement{context.Factory().ReturnStatement(
-			context.Factory().NewExpression(
-				context.Factory().Identifier(className),
-				nil,
-				arguments,
-			),
+			construct(context, className, typeArguments, arguments),
 		)},
+		capabilities,
+		typeParameters,
 	), requests, nil
 }
 
@@ -246,6 +339,8 @@ func equalMethod(
 	memberName string,
 	classType tsgo.TypeNode,
 	fields []field,
+	capabilities []tsgo.ParameterDeclaration,
+	typeParameters []tsgo.TypeParameterDeclaration,
 ) (tsgo.MethodDeclaration, []api.RootRequest, error) {
 	equalities := make([]api.ExpressionEmission, 0, len(fields))
 	var requests []api.RootRequest
@@ -289,6 +384,8 @@ func equalMethod(
 		},
 		resultType.Value(),
 		body,
+		capabilities,
+		typeParameters,
 	), requests, nil
 }
 
@@ -352,16 +449,42 @@ func operationMethod(
 	parameters []tsgo.ParameterDeclaration,
 	result tsgo.TypeNode,
 	statements []tsgo.Statement,
+	capabilities []tsgo.ParameterDeclaration,
+	typeParameters []tsgo.TypeParameterDeclaration,
 ) tsgo.MethodDeclaration {
+	parameters = append(
+		append([]tsgo.ParameterDeclaration(nil), capabilities...),
+		parameters...,
+	)
 	return context.Factory().MethodDeclaration(
 		[]tsgo.ModifierLike{context.Factory().StaticKeyword()},
 		nil,
 		context.Factory().Identifier(name),
 		nil,
-		nil,
+		typeParameters,
 		parameters,
 		result,
 		context.Factory().Block(statements, true),
+	)
+}
+
+func construct(
+	context api.Context,
+	className string,
+	typeArguments []tsgo.TypeNode,
+	arguments []tsgo.Expression,
+) tsgo.CallExpression {
+	return context.Factory().CallExpression(
+		context.Factory().PropertyAccessExpression(
+			context.Factory().Identifier(className),
+			nil,
+			context.Factory().Identifier(api.StructMakeMember),
+			tsgo.NodeFlagsNone,
+		),
+		nil,
+		typeArguments,
+		arguments,
+		tsgo.NodeFlagsNone,
 	)
 }
 

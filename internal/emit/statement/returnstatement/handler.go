@@ -15,6 +15,13 @@ func Emit(
 	children api.ChildEmitter,
 	source *ast.ReturnStmt,
 ) (api.StatementEmission, error) {
+	if control, inIteratorRange := context.IteratorRangeControl(); inIteratorRange && control.Valid() {
+		return api.StatementEmission{},
+			api.Unsupported(context, api.CategoryStatement, source)
+	}
+	if control, selected := context.ReturnControl(); selected {
+		return emitControlled(context, children, source, control)
+	}
 	results := context.FunctionResults()
 	resultCount := 0
 	if results != nil {
@@ -50,10 +57,13 @@ func emitNamed(
 			return api.StatementEmission{},
 				api.Unsupported(context, api.CategoryStatement, source)
 		}
-		value, selected := context.AddressableStorage().Read(
+		value, selected, err := context.AddressableStorage().Read(
 			context,
 			result,
 		)
+		if err != nil {
+			return api.StatementEmission{}, err
+		}
 		if !selected {
 			reference, err := context.Names().Reference(result)
 			if err != nil {
@@ -64,7 +74,7 @@ func emitNamed(
 				reference.Requests()...,
 			)
 		}
-		value, err := context.Values().Copy(
+		value, err = context.Values().Copy(
 			context.WithRole(api.RoleReturnResult),
 			source,
 			result.Type(),

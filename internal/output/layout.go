@@ -15,6 +15,8 @@ const (
 	ProgramInitializationPath  = "program.ts"
 	ScalarSupportPath          = "support/scalars.ts"
 	AnonymousStructSupportPath = "support/anonymous-structs.ts"
+	InterfaceMethodSupportPath = "support/interface-methods.ts"
+	InterfaceTypeSupportPath   = "support/interface-types.ts"
 )
 
 const (
@@ -80,10 +82,29 @@ func PackageStatePath(sourcePackage *load.Package) (string, error) {
 }
 
 func MapSpecializationPath(artifactKey string) (string, error) {
+	return generatedArtifactPath("maps", artifactKey)
+}
+
+func InterfaceAdapterPath(artifactKey string) (string, error) {
+	return generatedArtifactPath("interfaces/adapters", artifactKey)
+}
+
+func GenericCapabilityPath(artifactKey string) (string, error) {
+	return generatedArtifactPath("generics/capabilities", artifactKey)
+}
+
+func AnonymousInterfacePath(artifactKey string) (string, error) {
+	return generatedArtifactPath("interfaces/contracts", artifactKey)
+}
+
+func generatedArtifactPath(
+	directory string,
+	artifactKey string,
+) (string, error) {
 	if len(artifactKey) != sha256.Size*2 {
 		return "", &PathError{
 			Source: artifactKey,
-			Reason: "map-specialization artifact key is invalid",
+			Reason: "generated artifact key is invalid",
 		}
 	}
 	for _, character := range artifactKey {
@@ -91,11 +112,11 @@ func MapSpecializationPath(artifactKey string) (string, error) {
 			character < 'a' || character > 'f' {
 			return "", &PathError{
 				Source: artifactKey,
-				Reason: "map-specialization artifact key is invalid",
+				Reason: "generated artifact key is invalid",
 			}
 		}
 	}
-	return path.Join("support", "maps", artifactKey+".ts"), nil
+	return path.Join("support", directory, artifactKey+".ts"), nil
 }
 
 func packageArtifactPath(

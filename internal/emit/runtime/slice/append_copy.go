@@ -2,26 +2,12 @@ package slice
 
 import "github.com/tsoniclang/gotots/internal/target/tsgo"
 
-func (b builder) appendMethod(
-	sharedGrowth bool,
-	lazyZero bool,
-) tsgo.MethodDeclaration {
-	values := b.factory.ParameterDeclaration(
-		nil,
-		b.factory.DotDotDotToken(),
-		b.id("values"),
-		nil,
-		b.factory.ArrayTypeNode(b.typeT()),
-		nil,
-	)
+func (b builder) appendMethod() tsgo.MethodDeclaration {
 	newLength := b.add(
 		b.thisProperty(MemberName(MemberLength)),
 		b.property(b.id("values"), "length"),
 	)
-	zero := tsgo.Expression(b.thisProperty("zero"))
-	if lazyZero {
-		zero = b.invoke(zero)
-	}
+	zero := tsgo.Expression(b.id("zero"))
 	reuseLoop := b.loop(
 		b.property(b.id("values"), "length"),
 		b.factory.ExpressionStatement(
@@ -57,7 +43,6 @@ func (b builder) appendMethod(
 				b.thisProperty("offset"),
 				b.id("newLength"),
 				b.thisProperty(MemberName(MemberCapacity)),
-				b.thisProperty("zero"),
 			),
 		),
 	}, true)
@@ -174,24 +159,11 @@ func (b builder) appendMethod(
 			nil,
 		),
 	}
-	if sharedGrowth {
-		statements = append(statements, b.variable(
-			tsgo.NodeFlagsConst,
-			"nextCapacity",
-			b.call(
-				b.id(b.className),
-				aggregateGrowthMember,
-				b.thisProperty(MemberName(MemberCapacity)),
-				b.id("newLength"),
-			),
-		))
-	} else {
-		statements = append(
-			statements,
-			b.variable(tsgo.NodeFlagsLet, "nextCapacity", initialCapacity),
-			growCapacity,
-		)
-	}
+	statements = append(
+		statements,
+		b.variable(tsgo.NodeFlagsLet, "nextCapacity", initialCapacity),
+		growCapacity,
+	)
 	statements = append(
 		statements,
 		b.variable(
@@ -215,7 +187,6 @@ func (b builder) appendMethod(
 				b.number("0"),
 				b.id("newLength"),
 				b.id("nextCapacity"),
-				b.thisProperty("zero"),
 			),
 		),
 	)
@@ -223,7 +194,10 @@ func (b builder) appendMethod(
 		nil,
 		MemberName(MemberAppend),
 		nil,
-		[]tsgo.ParameterDeclaration{values},
+		[]tsgo.ParameterDeclaration{
+			b.parameter("zero", b.typeT()),
+			b.parameter("values", b.factory.ArrayTypeNode(b.typeT())),
+		},
 		b.sliceType(),
 		statements...,
 	)

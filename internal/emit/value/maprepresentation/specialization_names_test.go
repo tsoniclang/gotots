@@ -37,6 +37,18 @@ func (staticSpecializationNames) NamedStructOperation(
 	panic("unused")
 }
 
+func (staticSpecializationNames) NamedStructStorage(
+	*types.TypeName,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (staticSpecializationNames) AnonymousStructStorage(
+	*types.Struct,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (staticSpecializationNames) AnonymousStruct(
 	*types.Struct,
 	api.AnonymousStructDemand,
@@ -48,6 +60,55 @@ func (staticSpecializationNames) MapSpecialization(
 	types.Type,
 	api.MapSpecializationDemand,
 ) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (staticSpecializationNames) InterfaceAdapter(
+	types.Type,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (staticSpecializationNames) InterfaceDynamicType(
+	types.Type,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (staticSpecializationNames) InterfaceType(
+	types.Type,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (staticSpecializationNames) InterfaceContract(
+	types.Type,
+) (api.InterfaceContractReference, error) {
+	panic("unused")
+}
+
+func (staticSpecializationNames) InterfaceMethodName(
+	*types.Func,
+) (string, error) {
+	panic("unused")
+}
+
+func (staticSpecializationNames) InterfaceMethodToken(
+	*types.Func,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (staticSpecializationNames) GenericCapability(
+	api.GenericOperationSelection,
+	*types.Signature,
+) (api.GenericCapabilityReference, error) {
+	panic("unused")
+}
+
+func (staticSpecializationNames) CallableABI(
+	*types.Signature,
+) (api.CallableABIReference, error) {
 	panic("unused")
 }
 

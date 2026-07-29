@@ -38,20 +38,6 @@ func EmitExpression(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	if context.Values().RequiresCustomUpdate(
-		context,
-		target.SourceType(),
-	) {
-		return emitCustom(context, source, target)
-	}
-	if !basictype.SupportsInteger(context.TypesSizes(), target.SourceType()) {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
-	}
-	if target.IsAccessor() {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
-	}
 	var operator tsgo.PostfixUnaryExpressionOperatorKind
 	switch source.Tok {
 	case token.INC:
@@ -62,13 +48,23 @@ func EmitExpression(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	return api.DirectExpression(
-		context.Factory().PostfixUnaryExpression(
-			target.Value(),
-			operator,
-		),
-		target.Requests()...,
-	), nil
+	if basictype.SupportsInteger(context.TypesSizes(), target.SourceType()) &&
+		!target.IsAccessor() &&
+		!target.IsProperty() &&
+		(!target.UsesCanonicalStorage() ||
+			!context.Values().RequiresStorageProjection(
+				context,
+				target.SourceType(),
+			)) {
+		return api.DirectExpression(
+			context.Factory().PostfixUnaryExpression(
+				target.Value(),
+				operator,
+			),
+			target.Requests()...,
+		), nil
+	}
+	return emitCustom(context, source, target)
 }
 
 func emitCustom(
@@ -76,24 +72,20 @@ func emitCustom(
 	source *ast.IncDecStmt,
 	target api.StoreTargetEmission,
 ) (api.ExpressionEmission, error) {
-	left := target.Value()
-	if target.IsAccessor() {
-		var err error
-		target, err = target.CaptureAccessorLocation(context)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		left, err = target.AccessorRead(context)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
+	target, err := target.CaptureLocation(context)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	left, err := target.ReadValue(context, source)
+	if err != nil {
+		return api.ExpressionEmission{}, err
 	}
 	result, handled, err := context.Values().Increment(
 		context,
 		source,
 		target.SourceType(),
 		source.Tok,
-		left,
+		left.Value(),
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
@@ -102,22 +94,13 @@ func emitCustom(
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	if target.IsAccessor() {
-		return target.AccessorStore(context, result)
-	}
-	assigned, err := context.Values().Assign(
+	stored, err := target.StoreValue(
 		context.WithRole(api.RoleAssignmentTarget),
 		source,
-		target.SourceType(),
-		target.Value(),
 		result,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return api.NewExpressionEmission(
-		append(target.Before(), assigned.Before()...),
-		assigned.Value(),
-		api.CombineRequests(target.Requests(), assigned.Requests()),
-	)
+	return stored, nil
 }

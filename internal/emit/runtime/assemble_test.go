@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	channelruntime "github.com/tsoniclang/gotots/internal/emit/runtime/channel"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -26,13 +27,54 @@ func TestArrayRuntimeAssemblyExactJoinsRequestedDefinition(t *testing.T) {
 	}
 }
 
+func TestPointerHashIsAnOptionalExactRuntimeDefinition(t *testing.T) {
+	base, err := Build(
+		tsgo.NewFactory(),
+		api.RuntimeModulePointer,
+		[]api.RuntimeSymbol{api.RuntimePointer},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(base) != 1 || base[0].Symbol() != api.RuntimePointer {
+		t.Fatalf("base pointer definitions = %#v", base)
+	}
+	class, ok := base[0].Statement().(tsgo.ClassDeclaration)
+	if !ok || len(class.Members()) != 19 {
+		t.Fatalf("base pointer owner = %T with unexpected members", base[0].Statement())
+	}
+
+	withHash, err := Build(
+		tsgo.NewFactory(),
+		api.RuntimeModulePointer,
+		[]api.RuntimeSymbol{
+			api.RuntimePointer,
+			api.RuntimePointerHash,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(withHash) != 2 ||
+		withHash[0].Symbol() != api.RuntimePointer ||
+		withHash[1].Symbol() != api.RuntimePointerHash {
+		t.Fatalf("pointer hash definitions = %#v", withHash)
+	}
+	if _, ok := withHash[1].Statement().(tsgo.FunctionDeclaration); !ok {
+		t.Fatalf(
+			"pointer hash definition = %T, want function",
+			withHash[1].Statement(),
+		)
+	}
+}
+
 func TestAggregateArrayRuntimeAssemblyExactJoinsDemandedOperations(t *testing.T) {
 	factory := tsgo.NewFactory()
 	symbols := []api.RuntimeSymbol{
 		api.RuntimeArray,
-		api.RuntimeArrayZeroWith,
-		api.RuntimeArrayLiteralWith,
-		api.RuntimeArrayCopyWith,
+		api.RuntimeArrayAllocate,
+		api.RuntimeArrayView,
+		api.RuntimeArrayLocation,
 	}
 	definitions, err := Build(
 		factory,
@@ -103,7 +145,7 @@ func TestArrayRuntimeAssemblyRejectsMissingDuplicateAndWrongDefinitions(
 		factory,
 		api.RuntimeModuleArray,
 		[]api.RuntimeSymbol{
-			api.RuntimeArrayZeroWith,
+			api.RuntimeArrayAllocate,
 			api.RuntimeArray,
 		},
 	); err == nil {
@@ -115,11 +157,11 @@ func TestSliceAggregateDefinitionsExactJoinRequestedSymbols(t *testing.T) {
 	symbols := []api.RuntimeSymbol{
 		api.RuntimeSlice,
 		api.RuntimeSliceAddress,
-		api.RuntimeSliceMakeWith,
-		api.RuntimeSliceAppendWith,
-		api.RuntimeSliceCopyWith,
-		api.RuntimeSliceNilWith,
-		api.RuntimeSliceLiteralWith,
+		api.RuntimeSliceStorage,
+		api.RuntimeSliceArrayPointer,
+		api.RuntimeArraySlice,
+		api.RuntimeSliceAppendSlice,
+		api.RuntimeSliceClear,
 	}
 	definitions, err := Build(
 		tsgo.NewFactory(),
@@ -152,8 +194,92 @@ func TestSliceAggregateDefinitionsRequireRuntimeSliceFirst(t *testing.T) {
 	if _, err := Build(
 		tsgo.NewFactory(),
 		api.RuntimeModuleSlice,
-		[]api.RuntimeSymbol{api.RuntimeSliceMakeWith},
+		[]api.RuntimeSymbol{api.RuntimeSliceStorage},
 	); err == nil {
 		t.Fatal("slice aggregate helper assembled without RuntimeSlice")
+	}
+}
+
+func TestMapRuntimeRejectsDuplicateOwners(t *testing.T) {
+	if _, err := Build(
+		tsgo.NewFactory(),
+		api.RuntimeModuleMap,
+		[]api.RuntimeSymbol{api.RuntimeMap, api.RuntimeMap},
+	); err == nil {
+		t.Fatal("map runtime accepted a duplicate owner")
+	}
+	definitions, err := Build(
+		tsgo.NewFactory(),
+		api.RuntimeModuleMap,
+		[]api.RuntimeSymbol{
+			api.RuntimeMap,
+			api.RuntimeMapValue,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(definitions) != 2 ||
+		definitions[0].Symbol() != api.RuntimeMap ||
+		definitions[1].Symbol() != api.RuntimeMapValue {
+		t.Fatalf("map definitions = %#v", definitions)
+	}
+}
+
+func TestPanicRuntimeCreationStaysOnTheCanonicalCarrier(t *testing.T) {
+	definitions, err := Build(
+		tsgo.NewFactory(),
+		api.RuntimeModulePanic,
+		[]api.RuntimeSymbol{api.RuntimePanic},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(definitions) != 1 {
+		t.Fatalf("panic definitions = %d, want 1", len(definitions))
+	}
+	carrier := definitions[0].Statement().(tsgo.ClassDeclaration)
+	constructor := carrier.Members()[0].(tsgo.ConstructorDeclaration)
+	create := carrier.Members()[1].(tsgo.MethodDeclaration)
+	if constructor.Modifiers()[0].Kind() != tsgo.SyntaxKindPrivateKeyword ||
+		create.Name().(tsgo.Identifier).Text() != "createRuntime" {
+		t.Fatal("runtime panic creation escaped the canonical panic carrier")
+	}
+}
+
+func TestSchedulerRoutesOnlyThroughItsSemanticOwner(t *testing.T) {
+	factory := tsgo.NewFactory()
+	if _, err := channelruntime.Build(
+		factory,
+		api.RuntimeScheduler,
+		"GoChannel",
+		"GoReceiveChannel",
+		"GoSendChannel",
+		"GoSelectCase",
+		"goSelect",
+		"goSelectReady",
+		"goSelectAttempt",
+		"GoPanic",
+	); err == nil {
+		t.Fatal("channel owner accepted RuntimeScheduler")
+	}
+	definitions, err := Build(
+		factory,
+		api.RuntimeModuleChannel,
+		[]api.RuntimeSymbol{api.RuntimeScheduler},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(definitions) != 1 ||
+		definitions[0].Symbol() != api.RuntimeScheduler {
+		t.Fatalf("scheduler definitions = %#v", definitions)
+	}
+	class, ok := definitions[0].Statement().(tsgo.ClassDeclaration)
+	if !ok || class.Name().Text() != "GoScheduler" {
+		t.Fatalf(
+			"scheduler semantic owner produced %T",
+			definitions[0].Statement(),
+		)
 	}
 }

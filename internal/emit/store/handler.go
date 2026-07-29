@@ -8,13 +8,13 @@ import (
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
 	runtimeslice "github.com/tsoniclang/gotots/internal/emit/runtime/slice"
+	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
-	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func Emit(
@@ -37,6 +37,17 @@ func Emit(
 			context.TypesInfo().TypeOf(source.X),
 		); ok {
 			return array.EmitStoreTarget(context, children, source)
+		}
+		if element, ok := pointerArrayElement(
+			context,
+			context.TypesInfo().TypeOf(source.X),
+		); ok {
+			return pointerArrayIndex(
+				context,
+				children,
+				source,
+				element,
+			)
 		}
 		return sliceIndex(context, children, source)
 	case *ast.ParenExpr:
@@ -98,6 +109,80 @@ func dereference(
 			return api.StoreTargetEmission{}, err
 		}
 	}
+	return canonicalPointerTarget(
+		context,
+		children,
+		source,
+		pointer,
+		element,
+	)
+}
+
+func pointerArrayElement(
+	context api.Context,
+	sourceType types.Type,
+) (types.Type, bool) {
+	_, element, ok := pointertype.Resolve(sourceType)
+	if !ok {
+		if defined, definedOK := definedtype.ResolvePointer(sourceType); definedOK {
+			pointer, _ := defined.Pointer()
+			element = pointer.Elem()
+			ok = true
+		}
+	}
+	if !ok {
+		return nil, false
+	}
+	array, ok := arrayvalue.Resolve(context, element)
+	if !ok {
+		return nil, false
+	}
+	return array.ElementType(), true
+}
+
+func pointerArrayIndex(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.IndexExpr,
+	element types.Type,
+) (api.StoreTargetEmission, error) {
+	if !types.Identical(context.TypesInfo().TypeOf(source), element) {
+		return api.StoreTargetEmission{},
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	pointer, err := children.Address(
+		context.
+			WithRole(api.RoleAssignmentTarget).
+			WithExpectedType(types.NewPointer(element)),
+		source,
+	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
+	return canonicalPointerTarget(
+		context,
+		children,
+		source,
+		pointer,
+		element,
+	)
+}
+
+func canonicalPointerTarget(
+	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
+	pointer api.ExpressionEmission,
+	element types.Type,
+) (api.StoreTargetEmission, error) {
+	storageType, err := context.Values().StorageType(
+		context.WithRole(api.RoleStorageType),
+		source,
+		element,
+	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
 	targetElement, err := children.RepresentedType(
 		context.WithRole(api.RoleAssignmentTarget),
 		source,
@@ -113,21 +198,30 @@ func dereference(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	target := pointerruntime.CellValue(
-		context.Factory(),
-		reference.Name(),
-		targetElement.Value(),
-		pointer.Value(),
-	)
-	return api.NewOrderedStoreTargetEmission(
+	receiver, err := api.NewExpressionEmission(
 		pointer.Before(),
-		target,
-		element,
+		pointerruntime.Dereference(
+			context.Factory(),
+			reference.Name(),
+			targetElement.Value(),
+			storageType.Value(),
+			pointer.Value(),
+		),
 		api.CombineRequests(
 			pointer.Requests(),
 			targetElement.Requests(),
+			storageType.Requests(),
 			reference.Requests(),
 		),
+	)
+	if err != nil {
+		return api.StoreTargetEmission{}, err
+	}
+	return api.NewCanonicalStoragePropertyStoreTargetEmission(
+		context.Factory(),
+		receiver,
+		pointerruntime.CellValueName,
+		element,
 	)
 }
 
@@ -290,104 +384,15 @@ func field(
 	if selection == nil {
 		return packageVariableSelector(context, source)
 	}
-	field, ok := selectedField(selection)
-	if !ok {
+	if selection.Kind() != types.FieldVal {
 		return api.StoreTargetEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	name, err := context.Names().Member(field)
-	if err != nil {
-		return api.StoreTargetEmission{}, err
-	}
-	if selection.Indirect() {
-		receiverType := context.TypesInfo().TypeOf(source.X)
-		_, element, ok := pointertype.Resolve(receiverType)
-		defined, definedOK := definedtype.ResolvePointer(receiverType)
-		if definedOK {
-			pointer, _ := defined.Pointer()
-			element = pointer.Elem()
-			ok = true
-		}
-		if !ok {
-			return api.StoreTargetEmission{},
-				api.Unsupported(context, api.CategoryExpression, source)
-		}
-		receiver, err := children.Expression(
-			context.
-				WithRole(api.RoleAssignmentTarget).
-				WithExpectedType(receiverType),
-			source.X,
-		)
-		if err != nil {
-			return api.StoreTargetEmission{}, err
-		}
-		if definedOK {
-			receiver, err = defined.Project(context, receiver)
-			if err != nil {
-				return api.StoreTargetEmission{}, err
-			}
-		}
-		targetElement, err := children.RepresentedType(
-			context.WithRole(api.RoleAssignmentTarget),
-			source.X,
-			element,
-		)
-		if err != nil {
-			return api.StoreTargetEmission{}, err
-		}
-		reference, err := context.Names().Runtime(
-			api.RuntimePointer,
-			api.ImportPhaseValue,
-		)
-		if err != nil {
-			return api.StoreTargetEmission{}, err
-		}
-		value := pointerruntime.CellValue(
-			context.Factory(),
-			reference.Name(),
-			targetElement.Value(),
-			receiver.Value(),
-		)
-		return api.NewOrderedStoreTargetEmission(
-			receiver.Before(),
-			context.Factory().PropertyAccessExpression(
-				value,
-				nil,
-				context.Factory().Identifier(name),
-				tsgo.NodeFlagsNone,
-			),
-			field.Type(),
-			api.CombineRequests(
-				receiver.Requests(),
-				targetElement.Requests(),
-				reference.Requests(),
-			),
-		)
-	}
-	receiverType := context.TypesInfo().TypeOf(source.X)
-	if receiverType == nil {
-		return api.StoreTargetEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
-	receiver, err := children.Expression(
-		context.
-			WithRole(api.RoleAssignmentTarget).
-			WithExpectedType(receiverType),
-		source.X,
-	)
-	if err != nil {
-		return api.StoreTargetEmission{}, err
-	}
-	return api.NewOrderedStoreTargetEmission(
-		receiver.Before(),
-		context.Factory().PropertyAccessExpression(
-			receiver.Value(),
-			nil,
-			context.Factory().Identifier(name),
-			tsgo.NodeFlagsNone,
-		),
-		field.Type(),
-		receiver.Requests(),
+	return selectionvalue.FieldStoreTarget(
+		context,
+		children,
+		source,
+		selection,
 	)
 }
 
@@ -424,19 +429,9 @@ func packageVariable(
 	if err != nil {
 		return api.StoreTargetEmission{}, err
 	}
-	return api.NewStoreTargetEmission(
+	return api.NewCanonicalStorageTargetEmission(
 		reference.Expression(context.Factory()),
 		variable.Type(),
 		reference.Requests(),
 	)
-}
-
-func selectedField(selection *types.Selection) (*types.Var, bool) {
-	if selection == nil ||
-		selection.Kind() != types.FieldVal ||
-		len(selection.Index()) != 1 {
-		return nil, false
-	}
-	field, ok := selection.Obj().(*types.Var)
-	return field, ok && field.IsField() && !field.Embedded()
 }

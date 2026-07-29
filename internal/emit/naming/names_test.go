@@ -170,6 +170,43 @@ func TestNameOwnerSeparatesNestedButNotSiblingDeclarationSpaces(t *testing.T) {
 	}
 }
 
+func TestNameOwnerIndexesCheckerImplicitDeclarations(t *testing.T) {
+	packageScope := types.NewScope(nil, token.NoPos, token.NoPos, "package")
+	functionScope := types.NewScope(
+		packageScope,
+		token.NoPos,
+		token.NoPos,
+		"function",
+	)
+	caseScope := types.NewScope(
+		functionScope,
+		token.NoPos,
+		token.NoPos,
+		"type switch case",
+	)
+	implicit := types.NewVar(
+		token.NoPos,
+		nil,
+		"selected",
+		types.Typ[types.Int],
+	)
+	caseScope.Insert(implicit)
+	owner := newNameOwner(packageScope, &types.Info{
+		Defs: make(map[*ast.Ident]types.Object),
+		Implicits: map[ast.Node]types.Object{
+			&ast.CaseClause{}: implicit,
+		},
+	})
+
+	name, err := owner.declare(implicit, targetBinding{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if name != "selected" {
+		t.Fatalf("implicit declaration = %q, want selected", name)
+	}
+}
+
 func TestNameOwnerRejectsDeclarationOutsideIndexedTypeGraph(t *testing.T) {
 	packageScope := types.NewScope(nil, token.NoPos, token.NoPos, "package")
 	fileScope := types.NewScope(packageScope, token.NoPos, token.NoPos, "file")

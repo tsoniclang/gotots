@@ -16,6 +16,8 @@ func TestMemberIdentitiesAndNamesArePinned(t *testing.T) {
 		{MemberDelete, 6, "delete"},
 		{MemberLength, 7, "length"},
 		{MemberIsNil, 8, "isNil"},
+		{MemberClear, 9, "clear"},
+		{MemberKeys, 10, "keys"},
 	} {
 		if uint8(test.member) != test.id {
 			t.Fatalf("%q identity = %d, want %d", test.name, test.member, test.id)
@@ -31,7 +33,7 @@ func TestMemberIdentitiesAndNamesArePinned(t *testing.T) {
 }
 
 func TestMemberOwnerRejectsInvalidIdentity(t *testing.T) {
-	for _, member := range []Member{MemberInvalid, Member(9), Member(255)} {
+	for _, member := range []Member{MemberInvalid, Member(11), Member(255)} {
 		if _, err := Name(member); err == nil {
 			t.Fatalf("member %d was accepted", member)
 		}

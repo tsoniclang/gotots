@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -40,11 +41,33 @@ func Emit(
 		if !mapArgument(context, source, 0) {
 			return api.ExpressionEmission{}, false, nil
 		}
-		target, err := emitDelete(context, children, source, discarded)
+		target, err := emitDelete(
+			context,
+			children,
+			source,
+			discarded,
+			false,
+		)
 		return target, true, err
 	default:
 		return api.ExpressionEmission{}, false, nil
 	}
+}
+
+func EmitDeferred(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.CallExpr,
+	builtin *types.Builtin,
+) (api.ExpressionEmission, bool, error) {
+	if source == nil ||
+		builtin == nil ||
+		types.Object(builtin) != types.Universe.Lookup("delete") ||
+		!mapArgument(context, source, 0) {
+		return api.ExpressionEmission{}, false, nil
+	}
+	target, err := emitDelete(context, children, source, true, true)
+	return target, true, err
 }
 
 func mapArgument(
@@ -123,6 +146,34 @@ func emitMake(
 	if len(zero.Before()) != 0 {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if api.ContainsGenericTypeParameter(sourceType) {
+		parameterTypes := []types.Type{mapType.Element()}
+		arguments := []tsgo.Expression{zero.Value()}
+		if len(source.Args) == 2 {
+			parameterTypes = append(
+				parameterTypes,
+				context.TypesInfo().TypeOf(source.Args[1]),
+			)
+			arguments = append(arguments, size.Value())
+		}
+		target, err := genericoperation.Call(
+			context,
+			source,
+			api.GenericOperationMapConstruct,
+			parameterTypes,
+			[]types.Type{sourceType},
+			arguments,
+			api.CombineRequests(size.Requests(), zero.Requests())...,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.NewExpressionEmission(
+			append(size.Before(), zero.Before()...),
+			target.Value(),
+			target.Requests(),
+		)
 	}
 	target, err := maprepresentation.Make(
 		context,
@@ -211,6 +262,7 @@ func emitDelete(
 	children api.ChildEmitter,
 	source *ast.CallExpr,
 	discarded bool,
+	capture bool,
 ) (api.ExpressionEmission, error) {
 	if !discarded ||
 		source.Ellipsis.IsValid() ||
@@ -261,7 +313,11 @@ func emitDelete(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	values, before, requests, err := maprepresentation.ArrangeOperands(
+	arrange := maprepresentation.ArrangeOperands
+	if capture {
+		arrange = maprepresentation.ArrangeCapturedOperands
+	}
+	values, before, requests, err := arrange(
 		context,
 		[]api.ExpressionEmission{receiver, key},
 	)

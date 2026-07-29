@@ -297,6 +297,7 @@ func (s *programSession) verifyRootObligations(
 
 type IntegerRepresentation = api.IntegerRepresentation
 type EvaluationOrder = api.EvaluationOrder
+type ConcurrencySemantics = api.ConcurrencySemantics
 
 const (
 	IntegerRepresentationInvalid = api.IntegerRepresentationInvalid
@@ -306,17 +307,23 @@ const (
 	EvaluationOrderInvalid    = api.EvaluationOrderInvalid
 	EvaluationOrderDirect     = api.EvaluationOrderDirect
 	EvaluationOrderPreserveGo = api.EvaluationOrderPreserveGo
+
+	ConcurrencySemanticsDisabled    = api.ConcurrencySemanticsDisabled
+	ConcurrencySemanticsCooperative = api.ConcurrencySemanticsCooperative
+	ConcurrencySemanticsInvalid     = api.ConcurrencySemanticsInvalid
 )
 
 type Options struct {
 	IntegerRepresentation IntegerRepresentation
 	EvaluationOrder       EvaluationOrder
+	ConcurrencySemantics  ConcurrencySemantics
 }
 
 func DefaultOptions() Options {
 	return Options{
 		IntegerRepresentation: IntegerRepresentationNumber,
 		EvaluationOrder:       EvaluationOrderDirect,
+		ConcurrencySemantics:  ConcurrencySemanticsDisabled,
 	}
 }
 
@@ -348,6 +355,20 @@ func ParseEvaluationOrder(value string) (EvaluationOrder, error) {
 	}
 }
 
+func ParseConcurrencySemantics(value string) (ConcurrencySemantics, error) {
+	switch value {
+	case ConcurrencySemanticsDisabled.String():
+		return ConcurrencySemanticsDisabled, nil
+	case ConcurrencySemanticsCooperative.String():
+		return ConcurrencySemanticsCooperative, nil
+	default:
+		return ConcurrencySemanticsInvalid, &OptionsError{
+			Field:  "concurrency semantics",
+			Reason: fmt.Sprintf("%q is not disabled or cooperative", value),
+		}
+	}
+}
+
 func (o Options) validate() error {
 	if !o.IntegerRepresentation.Valid() {
 		return &OptionsError{
@@ -358,6 +379,12 @@ func (o Options) validate() error {
 	if !o.EvaluationOrder.Valid() {
 		return &OptionsError{
 			Field:  "evaluation order",
+			Reason: "value is invalid",
+		}
+	}
+	if !o.ConcurrencySemantics.Valid() {
+		return &OptionsError{
+			Field:  "concurrency semantics",
 			Reason: "value is invalid",
 		}
 	}
@@ -374,4 +401,41 @@ func (e *OptionsError) Error() string {
 		return "validate compilation options: " + e.Reason
 	}
 	return fmt.Sprintf("validate compilation option %q: %s", e.Field, e.Reason)
+}
+
+func (s *programSession) require(object types.Object) error {
+	if s.sealed {
+		objectName := ""
+		if object != nil {
+			objectName = object.Name()
+		}
+		return &ScheduleError{
+			Object: objectName,
+			Reason: "declaration requested after target files were sealed",
+		}
+	}
+	if object == nil {
+		return &ScheduleError{Reason: "referenced object is nil"}
+	}
+	if function, ok := object.(*types.Func); ok {
+		object = function.Origin()
+	}
+	if _, ok := s.sites[object]; !ok {
+		return &ScheduleError{
+			Object: object.Name(),
+			Reason: "object has no supported source declaration",
+		}
+	}
+	sourcePackage := s.source.PackageForTypes(object.Pkg())
+	if sourcePackage == nil {
+		return &ScheduleError{
+			Object: object.Name(),
+			Reason: "object package has no source owner",
+		}
+	}
+	if err := s.requirePackage(sourcePackage); err != nil {
+		return err
+	}
+	s.scheduler.enqueue(object)
+	return nil
 }

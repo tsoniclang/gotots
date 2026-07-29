@@ -59,16 +59,76 @@ func (e ExpressionEmission) Requests() []RootRequest {
 
 type StoreTargetEmission struct {
 	accessor          bool
+	property          bool
 	before            []tsgo.Statement
 	value             tsgo.Expression
+	propertyReceiver  ExpressionEmission
+	propertyMember    string
 	accessorReceiver  ExpressionEmission
 	getterMember      string
 	setterMember      string
 	accessorArguments []ExpressionEmission
 	locationCaptured  bool
 	copiesValue       bool
+	canonicalStorage  bool
 	sourceType        types.Type
 	requests          []RootRequest
+}
+
+func NewPropertyStoreTargetEmission(
+	factory tsgo.Factory,
+	receiver ExpressionEmission,
+	member string,
+	sourceType types.Type,
+) (StoreTargetEmission, error) {
+	switch {
+	case receiver.Value() == nil:
+		return StoreTargetEmission{}, &ResultError{
+			Result: "property store target",
+			Reason: "target receiver is nil",
+		}
+	case member == "":
+		return StoreTargetEmission{}, &ResultError{
+			Result: "property store target",
+			Reason: "target member is empty",
+		}
+	case sourceType == nil:
+		return StoreTargetEmission{}, &ResultError{
+			Result: "property store target",
+			Reason: "source type is nil",
+		}
+	}
+	return StoreTargetEmission{
+		property: true,
+		value: factory.PropertyAccessExpression(
+			receiver.Value(),
+			nil,
+			factory.Identifier(member),
+			tsgo.NodeFlagsNone,
+		),
+		propertyReceiver: receiver,
+		propertyMember:   member,
+		sourceType:       sourceType,
+	}, nil
+}
+
+func NewCanonicalStoragePropertyStoreTargetEmission(
+	factory tsgo.Factory,
+	receiver ExpressionEmission,
+	member string,
+	sourceType types.Type,
+) (StoreTargetEmission, error) {
+	target, err := NewPropertyStoreTargetEmission(
+		factory,
+		receiver,
+		member,
+		sourceType,
+	)
+	if err != nil {
+		return StoreTargetEmission{}, err
+	}
+	target.canonicalStorage = true
+	return target, nil
 }
 
 func NewStoreTargetEmission(
@@ -76,21 +136,7 @@ func NewStoreTargetEmission(
 	sourceType types.Type,
 	requests []RootRequest,
 ) (StoreTargetEmission, error) {
-	return NewOrderedStoreTargetEmission(nil, value, sourceType, requests)
-}
-
-func NewOrderedStoreTargetEmission(
-	before []tsgo.Statement,
-	value tsgo.Expression,
-	sourceType types.Type,
-	requests []RootRequest,
-) (StoreTargetEmission, error) {
 	switch {
-	case slices.Contains(before, nil):
-		return StoreTargetEmission{}, &ResultError{
-			Result: "store target",
-			Reason: "prerequisite statement is nil",
-		}
 	case value == nil:
 		return StoreTargetEmission{}, &ResultError{
 			Result: "store target",
@@ -103,11 +149,23 @@ func NewOrderedStoreTargetEmission(
 		}
 	}
 	return StoreTargetEmission{
-		before:     slices.Clone(before),
 		value:      value,
 		sourceType: sourceType,
 		requests:   slices.Clone(requests),
 	}, nil
+}
+
+func NewCanonicalStorageTargetEmission(
+	value tsgo.Expression,
+	sourceType types.Type,
+	requests []RootRequest,
+) (StoreTargetEmission, error) {
+	target, err := NewStoreTargetEmission(value, sourceType, requests)
+	if err != nil {
+		return StoreTargetEmission{}, err
+	}
+	target.canonicalStorage = true
+	return target, nil
 }
 
 func NewAccessorStoreTargetEmission(
@@ -182,12 +240,24 @@ func (e StoreTargetEmission) IsAccessor() bool {
 	return e.accessor
 }
 
+func (e StoreTargetEmission) IsProperty() bool {
+	return e.property
+}
+
 func (e StoreTargetEmission) CopiesValue() bool {
 	return e.copiesValue
 }
 
+func (e StoreTargetEmission) UsesCanonicalStorage() bool {
+	return e.canonicalStorage
+}
+
 func (e StoreTargetEmission) Before() []tsgo.Statement {
-	return slices.Clone(e.before)
+	before := slices.Clone(e.before)
+	if e.property && !e.locationCaptured {
+		before = append(before, e.propertyReceiver.Before()...)
+	}
+	return before
 }
 
 func (e StoreTargetEmission) Value() tsgo.Expression {
@@ -216,6 +286,9 @@ func (e StoreTargetEmission) SourceType() types.Type {
 
 func (e StoreTargetEmission) Requests() []RootRequest {
 	requests := slices.Clone(e.requests)
+	if e.property {
+		requests = append(requests, e.propertyReceiver.Requests()...)
+	}
 	if e.accessor {
 		requests = append(requests, e.accessorReceiver.Requests()...)
 		for _, argument := range e.accessorArguments {
@@ -388,46 +461,6 @@ func (e BlockEmission) Value() tsgo.Block {
 }
 
 func (e BlockEmission) Requests() []RootRequest {
-	return slices.Clone(e.requests)
-}
-
-type ForInitializerEmission struct {
-	value    tsgo.ForInitializer
-	requests []RootRequest
-}
-
-func DirectForInitializer(
-	value tsgo.ForInitializer,
-	requests ...RootRequest,
-) ForInitializerEmission {
-	if value == nil {
-		panic("direct for initializer target is nil")
-	}
-	return ForInitializerEmission{
-		value:    value,
-		requests: slices.Clone(requests),
-	}
-}
-
-func ExpressionForInitializer(
-	value tsgo.Expression,
-	requests ...RootRequest,
-) (ForInitializerEmission, error) {
-	target, ok := value.(tsgo.ForInitializer)
-	if !ok {
-		return ForInitializerEmission{}, &ResultError{
-			Result: "for initializer",
-			Reason: "target expression is not admitted by the TS-Go contract",
-		}
-	}
-	return DirectForInitializer(target, requests...), nil
-}
-
-func (e ForInitializerEmission) Value() tsgo.ForInitializer {
-	return e.value
-}
-
-func (e ForInitializerEmission) Requests() []RootRequest {
 	return slices.Clone(e.requests)
 }
 

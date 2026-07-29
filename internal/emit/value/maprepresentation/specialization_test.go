@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -52,7 +51,7 @@ func testStaticSpecialization(
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(specialization.Members()) != 15 {
+	if len(specialization.Members()) != 17 {
 		t.Fatalf(
 			"specialization members = %d, want constructor, static operations, and map API",
 			len(specialization.Members()),
@@ -84,7 +83,7 @@ func testStaticSpecialization(
     constructor(public x: ` + keyType + `, public y: ` + keyType + `) {}
 }
 class GoPanic {
-    static raise(message: string): never { throw new Error(message); }
+    static raiseRuntime(message: string): never { throw new Error(message); }
 }
 class Box {
     constructor(public value: number) {}
@@ -169,7 +168,10 @@ func TestStaticSpecializationRejectsStoredSemanticCallbacks(t *testing.T) {
 			nil,
 		),
 	)
-	if err := validateSpecialization(api.RoleMapReceiver, mutated); err == nil {
+	if err := validateSpecialization(
+		api.RoleMapReceiver,
+		mutated,
+	); err == nil {
 		t.Fatal("stored hash callback mutation passed the specialization gate")
 	}
 }
@@ -291,16 +293,6 @@ func compileAndRunSpecialization(t *testing.T, source string) string {
 	return string(output)
 }
 
-func specializationRepositoryRoot() string {
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		panic("resolve specialization repository root")
-	}
-	return filepath.Clean(
-		filepath.Join(filepath.Dir(file), "..", "..", "..", ".."),
-	)
-}
-
 func staticSpecializationContext(
 	t *testing.T,
 	integer api.IntegerRepresentation,
@@ -338,6 +330,7 @@ func staticSpecializationContext(
 		storage.Owner{},
 		integer,
 		api.EvaluationOrderPreserveGo,
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -351,13 +344,6 @@ type staticSpecializationValues struct {
 }
 
 func (v staticSpecializationValues) RequiresCustomEquality(
-	api.Context,
-	types.Type,
-) bool {
-	return false
-}
-
-func (v staticSpecializationValues) RequiresCustomUpdate(
 	api.Context,
 	types.Type,
 ) bool {
@@ -383,6 +369,56 @@ func (v staticSpecializationValues) SupportsHash(
 	sourceType types.Type,
 ) bool {
 	return sourceType == v.key
+}
+
+func (staticSpecializationValues) RequiresStorageProjection(
+	api.Context,
+	types.Type,
+) bool {
+	return false
+}
+
+func (v staticSpecializationValues) StorageType(
+	context api.Context,
+	_ ast.Node,
+	sourceType types.Type,
+) (api.TypeEmission, error) {
+	switch sourceType {
+	case v.key:
+		return api.DirectType(
+			context.Factory().TypeReferenceNode(
+				context.Factory().Identifier("Key"),
+				nil,
+			),
+		), nil
+	case v.value:
+		return api.DirectType(
+			context.Factory().TypeReferenceNode(
+				context.Factory().Identifier("Box"),
+				nil,
+			),
+		), nil
+	default:
+		panic("unexpected specialization storage type")
+	}
+}
+
+func (v staticSpecializationValues) ToStorage(
+	_ api.Context,
+	_ ast.Node,
+	_ types.Type,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	return value, nil
+}
+
+func (v staticSpecializationValues) FromStorage(
+	_ api.Context,
+	_ ast.Node,
+	_ types.Type,
+	value api.ExpressionEmission,
+) (api.ExpressionEmission, error) {
+	return value, nil
 }
 
 func (v staticSpecializationValues) Zero(
@@ -548,17 +584,4 @@ func (v staticSpecializationValues) Increment(
 	tsgo.Expression,
 ) (api.ExpressionEmission, bool, error) {
 	panic("unused")
-}
-
-func staticField(
-	context api.Context,
-	value tsgo.Expression,
-	name string,
-) tsgo.PropertyAccessExpression {
-	return context.Factory().PropertyAccessExpression(
-		value,
-		nil,
-		context.Factory().Identifier(name),
-		tsgo.NodeFlagsNone,
-	)
 }

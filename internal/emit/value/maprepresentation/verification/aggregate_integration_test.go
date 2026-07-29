@@ -22,8 +22,8 @@ func TestScalarMapArtifactsStayAtTheImmutableBaseline(t *testing.T) {
 		t.TempDir(),
 	)
 	for path, expected := range map[string]string{
-		"source.ts":      "0084fe0b66333cb1e54cf84f9b182ce720d65c56457c0c0992dab6db1dcc9e8a",
-		"runtime/map.ts": "b08ead3648e95400dc2aabe9727ff5dc07462e7177cec534e864f76f5abbdb2e",
+		"source.ts":      "03b88afbe335259cd53706f7dda8a150d51b9c7d5211a0b0bb2c067e843bf6de",
+		"runtime/map.ts": "7f26493efc6f9213e59853a6e485061ae24fa2d0cd41a277f6d54e9399c3fc6e",
 	} {
 		content := readFile(t, artifacts.file(t, path))
 		actual := fmt.Sprintf("%x", sha256.Sum256([]byte(content)))
@@ -135,6 +135,11 @@ func TestProductionAggregateKeyOperationsAreStaticAndTyped(t *testing.T) {
 	} {
 		if strings.Contains(source, forbidden) {
 			t.Fatalf("aggregate specialization contains %q:\n%s", forbidden, source)
+		}
+	}
+	for _, required := range []string{"clear(): void", "keys(): Key[]"} {
+		if !strings.Contains(source, required) {
+			t.Fatalf("aggregate specialization lacks %q:\n%s", required, source)
 		}
 	}
 }
@@ -271,6 +276,7 @@ func productionAggregateContext(
 		storage.Owner{},
 		integer,
 		api.EvaluationOrderPreserveGo,
+		api.ConcurrencySemanticsDisabled,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -349,6 +355,18 @@ func (aggregateNames) NamedStructOperation(
 	return api.NewNameReference(typeName.Name(), request)
 }
 
+func (aggregateNames) NamedStructStorage(
+	*types.TypeName,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (aggregateNames) AnonymousStructStorage(
+	*types.Struct,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (aggregateNames) AnonymousStruct(
 	*types.Struct,
 	api.AnonymousStructDemand,
@@ -360,6 +378,55 @@ func (aggregateNames) MapSpecialization(
 	types.Type,
 	api.MapSpecializationDemand,
 ) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (aggregateNames) InterfaceAdapter(
+	types.Type,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (aggregateNames) InterfaceDynamicType(
+	types.Type,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (aggregateNames) InterfaceType(
+	types.Type,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (aggregateNames) InterfaceContract(
+	types.Type,
+) (api.InterfaceContractReference, error) {
+	panic("unused")
+}
+
+func (aggregateNames) InterfaceMethodName(
+	*types.Func,
+) (string, error) {
+	panic("unused")
+}
+
+func (aggregateNames) InterfaceMethodToken(
+	*types.Func,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
+func (aggregateNames) GenericCapability(
+	api.GenericOperationSelection,
+	*types.Signature,
+) (api.GenericCapabilityReference, error) {
+	panic("unused")
+}
+
+func (aggregateNames) CallableABI(
+	*types.Signature,
+) (api.CallableABIReference, error) {
 	panic("unused")
 }
 

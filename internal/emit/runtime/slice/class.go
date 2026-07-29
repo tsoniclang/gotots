@@ -12,12 +12,12 @@ type builder struct {
 }
 
 type Capabilities struct {
-	AggregateNil     bool
-	Address          bool
-	AggregateMake    bool
-	AggregateLiteral bool
-	AggregateAppend  bool
-	AggregateCopy    bool
+	Address      bool
+	Storage      bool
+	AppendSlice  bool
+	Clear        bool
+	ArrayPointer bool
+	ArrayView    bool
 }
 
 func Build(
@@ -58,46 +58,36 @@ func BuildWithCapabilities(
 		className: className,
 		panicName: panicName,
 	}
-	lazyZero := capabilities.AggregateNil ||
-		capabilities.AggregateMake ||
-		capabilities.AggregateLiteral ||
-		capabilities.AggregateAppend
-	members := []tsgo.ClassElement{target.constructor(lazyZero)}
-	if capabilities.AggregateMake {
-		members = append(members, target.shapeMethod())
-	}
-	if capabilities.AggregateAppend {
-		members = append(members, target.grownCapacityMethod())
-	}
+	members := []tsgo.ClassElement{target.constructor()}
 	members = append(
 		members,
-		target.nilMethod(lazyZero),
-		target.makeMethod(capabilities.AggregateMake, lazyZero),
-		target.literalMethod(lazyZero),
+		target.nilMethod(),
+		target.makeMethod(),
+		target.literalMethod(),
 		target.isNilMethod(),
 		target.getMethod(),
 		target.setMethod(),
 		target.sliceMethod(),
-		target.appendMethod(capabilities.AggregateAppend, lazyZero),
+		target.appendMethod(),
 		target.copyMethod(),
 	)
-	if capabilities.AggregateNil {
-		members = append(members, target.aggregateNilMethod())
+	if capabilities.Storage {
+		members = append(members, target.storageMethods()...)
 	}
-	if capabilities.AggregateMake {
-		members = append(members, target.aggregateMakeMethod())
+	if capabilities.AppendSlice {
+		members = append(members, target.appendSliceMethod())
 	}
-	if capabilities.AggregateLiteral {
-		members = append(members, target.aggregateLiteralMethod())
-	}
-	if capabilities.AggregateAppend {
-		members = append(members, target.aggregateAppendMethod())
-	}
-	if capabilities.AggregateCopy {
-		members = append(members, target.aggregateCopyMethod())
+	if capabilities.Clear {
+		members = append(members, target.clearMethod())
 	}
 	if capabilities.Address {
 		members = append(members, target.addressMethod())
+	}
+	if capabilities.ArrayPointer {
+		members = append(members, target.arrayLocationMethod())
+	}
+	if capabilities.ArrayView {
+		members = append(members, target.arrayViewMethod())
 	}
 	return factory.ClassDeclaration(
 		[]tsgo.ModifierLike{factory.ExportKeyword()},
@@ -291,12 +281,11 @@ func (b builder) newSlice(
 	offset tsgo.Expression,
 	length tsgo.Expression,
 	capacity tsgo.Expression,
-	zero tsgo.Expression,
 ) tsgo.NewExpression {
 	return b.factory.NewExpression(
 		b.id(b.className),
 		[]tsgo.TypeNode{b.typeT()},
-		[]tsgo.Expression{backing, offset, length, capacity, zero},
+		[]tsgo.Expression{backing, offset, length, capacity},
 	)
 }
 
@@ -309,6 +298,37 @@ func (b builder) throwBounds() tsgo.ExpressionStatement {
 				"slice bounds out of range",
 				tsgo.TokenFlagsNone,
 			),
+		),
+	)
+}
+
+func (b builder) throwIndexBounds(
+	index tsgo.Expression,
+) tsgo.ExpressionStatement {
+	message := b.add(
+		b.add(
+			b.add(
+				b.factory.StringLiteral(
+					"runtime error: index out of range [",
+					tsgo.TokenFlagsNone,
+				),
+				b.globalCall("String", index),
+			),
+			b.factory.StringLiteral(
+				"] with length ",
+				tsgo.TokenFlagsNone,
+			),
+		),
+		b.globalCall(
+			"String",
+			b.thisProperty(MemberName(MemberLength)),
+		),
+	)
+	return b.factory.ExpressionStatement(
+		panicruntime.Call(
+			b.factory,
+			b.panicName,
+			message,
 		),
 	)
 }

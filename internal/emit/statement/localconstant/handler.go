@@ -17,7 +17,6 @@ func Emit(
 ) (api.StatementEmission, error) {
 	declaration, ok := source.Decl.(*ast.GenDecl)
 	if !ok ||
-		declaration.Doc != nil ||
 		declaration.Tok != token.CONST ||
 		len(declaration.Specs) == 0 {
 		return api.StatementEmission{},
@@ -28,8 +27,6 @@ func Emit(
 	for _, sourceSpec := range declaration.Specs {
 		spec, ok := sourceSpec.(*ast.ValueSpec)
 		if !ok ||
-			spec.Doc != nil ||
-			spec.Comment != nil ||
 			len(spec.Names) == 0 {
 			return api.StatementEmission{},
 				api.Unsupported(

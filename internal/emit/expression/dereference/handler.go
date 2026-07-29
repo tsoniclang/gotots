@@ -46,6 +46,14 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	storageType, err := context.Values().StorageType(
+		context.WithRole(api.RoleStorageType),
+		source,
+		element,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
 	if definedOK {
 		pointer, err = defined.Project(context, pointer)
 		if err != nil {
@@ -67,18 +75,24 @@ func Emit(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	return api.NewExpressionEmission(
+	stored, err := api.NewExpressionEmission(
 		pointer.Before(),
 		pointerruntime.CellValue(
 			context.Factory(),
 			reference.Name(),
 			targetElement.Value(),
+			storageType.Value(),
 			pointer.Value(),
 		),
 		api.CombineRequests(
 			pointer.Requests(),
 			targetElement.Requests(),
+			storageType.Requests(),
 			reference.Requests(),
 		),
 	)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	return context.Values().FromStorage(context, source, element, stored)
 }

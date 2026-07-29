@@ -12,6 +12,8 @@ type Container struct {
 	Box Box
 }
 
+type Count int32
+
 var Shared = Box{Count: 1}
 var InitValue int32
 
@@ -153,6 +155,38 @@ func Slice(value int32) (int32, bool, bool) {
 func SliceAddress(index int) *int32 {
 	values := []int32{1}
 	return &values[index]
+}
+
+func DefinedArrayAddress(value int32) (int32, bool) {
+	values := [1]Count{Count(value)}
+	pointer := &values[0]
+	*pointer++
+	return int32(values[0]), pointer == &values[0]
+}
+
+func DefinedSliceAddress(value int32) (int32, bool) {
+	values := []Count{Count(value)}
+	alias := values[:]
+	pointer := &values[0]
+	*pointer++
+	return int32(alias[0]), pointer == &alias[0]
+}
+
+func StructArrayAddress(value int32) (int32, bool) {
+	values := [1]Box{{Count: value}}
+	pointer := &values[0]
+	*pointer = Box{Count: value + 1}
+	pointer.Count++
+	return values[0].Count, pointer == &values[0]
+}
+
+func StructSliceAddress(value int32) (int32, bool) {
+	values := []Box{{Count: value}}
+	alias := values[:]
+	pointer := &values[0]
+	*pointer = Box{Count: value + 1}
+	pointer.Count++
+	return alias[0].Count, pointer == &alias[0]
 }
 
 func SliceReallocation(value int32) (bool, int32, int32) {

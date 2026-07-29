@@ -31,7 +31,7 @@ func EmitObject(
 				Reason: "selected package constant is nil",
 			}
 	}
-	if source.Doc != nil || source.Tok != token.CONST || len(source.Specs) == 0 {
+	if source.Tok != token.CONST || len(source.Specs) == 0 {
 		return api.DeclarationEmission{},
 			api.Unsupported(context, api.CategoryDeclaration, source)
 	}
@@ -66,7 +66,7 @@ func locateName(
 		if !ok {
 			return nil, api.Unsupported(context, api.CategoryDeclaration, sourceSpec)
 		}
-		if spec.Doc != nil || spec.Comment != nil || len(spec.Names) == 0 {
+		if len(spec.Names) == 0 {
 			return nil, api.Unsupported(context, api.CategoryDeclaration, spec)
 		}
 		for _, name := range spec.Names {

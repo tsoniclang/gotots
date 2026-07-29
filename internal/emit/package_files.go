@@ -1,16 +1,82 @@
 package emit
 
 import (
+	"go/ast"
 	"go/types"
 	"sort"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	constantbinding "github.com/tsoniclang/gotots/internal/emit/constant"
 	packagevariable "github.com/tsoniclang/gotots/internal/emit/declaration/packagevariable"
+	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
+	"github.com/tsoniclang/gotots/internal/emit/storage"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
+
+func (e *emitter) context(names api.Names) (api.Context, error) {
+	context, err := api.NewContext(
+		api.RoleFileDeclaration,
+		e.source.FileSet(),
+		e.source.Types(),
+		e.source.TypesInfo(),
+		e.source.TypesSizes(),
+		e.factory,
+		names,
+		e.values,
+		storage.Owner{},
+		e.integer,
+		e.order,
+		e.concurrency,
+	)
+	if err != nil {
+		return api.Context{}, err
+	}
+	return context.
+		WithGenericCallableResolver(e.generic).
+		WithCooperativeCallableResolver(e.cooperative).
+		WithGoRuntimeContract(e.goRuntime), nil
+}
+
+func (e *emitter) fileContext(
+	sourceFile *ast.File,
+	targetPath string,
+) (api.Context, error) {
+	return e.targetContext(sourceFile, targetPath)
+}
+
+func (e *emitter) targetContext(
+	sourceFile *ast.File,
+	targetPath string,
+) (api.Context, error) {
+	names := e.names.ForFile(
+		sourceFile,
+		e.source.Types().Scope(),
+		e.factory,
+		targetPath,
+		e.require,
+	)
+	return e.context(names)
+}
+
+func (e *emitter) generatedContext(
+	targetPath string,
+	registry *emitnaming.Registry,
+) (api.Context, error) {
+	names := emitnaming.NewOwner(
+		nil,
+		nil,
+		registry,
+	).ForFile(
+		nil,
+		nil,
+		e.factory,
+		targetPath,
+		e.require,
+	)
+	return e.context(names)
+}
 
 func (s *programSession) packageTargetFiles(
 	primitiveAliases map[api.PrimitiveAlias]struct{},
@@ -36,6 +102,14 @@ func (s *programSession) packageTargetFiles(
 		for _, alias := range builder.assemblyPlacement.PrimitiveAliases() {
 			primitiveAliases[alias] = struct{}{}
 		}
+		for _, storage := range builder.storage {
+			for _, alias := range storage.statePlacement.PrimitiveAliases() {
+				primitiveAliases[alias] = struct{}{}
+			}
+			for _, alias := range storage.assemblyPlacement.PrimitiveAliases() {
+				primitiveAliases[alias] = struct{}{}
+			}
+		}
 		if len(builder.storage) != 0 {
 			stateFile, err := s.packageStateFile(builder)
 			if err != nil {
@@ -55,7 +129,22 @@ func (s *programSession) packageTargetFiles(
 func (s *programSession) packageStateFile(
 	builder *packageTargetBuilder,
 ) (TargetFile, error) {
-	if err := builder.statePlacement.RequireTypeOnly(); err != nil {
+	placement := targetplacement.New()
+	if err := placement.Apply(builder.statePlacement.Requests()); err != nil {
+		return TargetFile{}, err
+	}
+	for _, storage := range builder.storage {
+		if storage.statePlacement == nil {
+			return TargetFile{}, &ScheduleError{
+				Object: storage.owner.Name(),
+				Reason: "package storage has no committed state placement",
+			}
+		}
+		if err := placement.Apply(storage.statePlacement.Requests()); err != nil {
+			return TargetFile{}, err
+		}
+	}
+	if err := placement.RequireTypeOnly(); err != nil {
 		return TargetFile{}, err
 	}
 	sort.Slice(builder.storage, func(left, right int) bool {
@@ -71,7 +160,7 @@ func (s *programSession) packageStateFile(
 		return TargetFile{}, err
 	}
 	statements := append(
-		builder.statePlacement.Statements(s.factory),
+		placement.Statements(s.factory),
 		declarations...,
 	)
 	return s.sourceFile(
@@ -88,6 +177,19 @@ func (s *programSession) packageAssemblyFile(
 	placement := targetplacement.New()
 	if err := placement.Apply(builder.assemblyPlacement.Requests()); err != nil {
 		return TargetFile{}, err
+	}
+	for _, storage := range builder.storage {
+		if storage.assemblyPlacement == nil {
+			return TargetFile{}, &ScheduleError{
+				Object: storage.owner.Name(),
+				Reason: "package storage has no committed assembly placement",
+			}
+		}
+		if err := placement.Apply(
+			storage.assemblyPlacement.Requests(),
+		); err != nil {
+			return TargetFile{}, err
+		}
 	}
 	for _, artifact := range builder.initialization {
 		if artifact.placement == nil {
@@ -145,6 +247,27 @@ func (s *programSession) exportedBindingNames(
 	object types.Object,
 	baseName string,
 ) ([]string, error) {
+	if typeName, ok := object.(*types.TypeName); ok {
+		named, namedOK := types.Unalias(typeName.Type()).(*types.Named)
+		if namedOK {
+			if _, structOK := named.Underlying().(*types.Struct); structOK {
+				names := []string{baseName}
+				for _, requirement := range s.requirements.appliedFor(
+					api.MustSourceArtifactOwner(typeName),
+				) {
+					_, operation, ok := requirement.NamedStructOperation()
+					if ok && operation == api.NamedStructOperationStorage {
+						names = append(
+							names,
+							baseName+api.StructStorageTypeSuffix,
+						)
+						break
+					}
+				}
+				return names, nil
+			}
+		}
+	}
 	constant, ok := object.(*types.Const)
 	if !ok || !constantbinding.IsUntyped(constant.Type()) {
 		return []string{baseName}, nil

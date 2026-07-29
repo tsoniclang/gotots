@@ -2,6 +2,8 @@ package api
 
 import (
 	"fmt"
+	"go/ast"
+	"go/token"
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -160,31 +162,34 @@ func NewNamedStructOperationRequest(
 	if err != nil {
 		return RootRequest{}, err
 	}
-	return RootRequest{
-		owner: RootRequestOwner{
-			kind:                   RootRequestDeclarationRequirement,
-			declarationRequirement: requirement,
-		},
-	}, nil
+	return newDeclarationRequirementRequest(requirement), nil
 }
 
-func NewDefinedArrayOperationRequest(
+func NewLexicalNamedStructOperationRequest(
+	owner ArtifactOwner,
 	typeName *types.TypeName,
-	operation DefinedArrayOperation,
+	operation NamedStructOperation,
 ) (RootRequest, error) {
-	requirement, err := NewDefinedArrayOperationRequirement(
+	requirement, err := NewLexicalNamedStructOperationRequirement(
+		owner,
 		typeName,
 		operation,
 	)
 	if err != nil {
 		return RootRequest{}, err
 	}
+	return newDeclarationRequirementRequest(requirement), nil
+}
+
+func newDeclarationRequirementRequest(
+	requirement DeclarationRequirement,
+) RootRequest {
 	return RootRequest{
 		owner: RootRequestOwner{
 			kind:                   RootRequestDeclarationRequirement,
 			declarationRequirement: requirement,
 		},
-	}, nil
+	}
 }
 
 func NewAddressableStorageRequest(
@@ -201,6 +206,55 @@ func NewAddressableStorageRequest(
 			declarationRequirement: requirement,
 		},
 	}, nil
+}
+
+func NewCallableControlRequest(
+	owner ArtifactOwner,
+	enclosing ast.Node,
+	callable ast.Node,
+	control CallableControlFacet,
+) (RootRequest, error) {
+	requirement, err := NewCallableControlRequirement(
+		owner,
+		enclosing,
+		callable,
+		control,
+	)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return newDeclarationRequirementRequest(requirement), nil
+}
+
+func NewGotoControlRequest(
+	owner ArtifactOwner,
+	enclosing ast.Node,
+	callable ast.Node,
+	label *types.Label,
+	position token.Pos,
+) (RootRequest, error) {
+	requirement, err := NewGotoControlRequirement(
+		owner,
+		enclosing,
+		callable,
+		label,
+		position,
+	)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return newDeclarationRequirementRequest(requirement), nil
+}
+
+func NewDirectCallableControlRequest(
+	owner *types.Func,
+	control CallableControlFacet,
+) (RootRequest, error) {
+	requirement, err := NewDirectCallableControlRequirement(owner, control)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return newDeclarationRequirementRequest(requirement), nil
 }
 
 func NewConstantProjectionRequest(
@@ -262,6 +316,13 @@ func NewGeneratedArtifactDependencyRequest(
 	return newArtifactDependencyRequest(owner, facet)
 }
 
+func NewOwnedArtifactDependencyRequest(
+	provider ArtifactOwner,
+	facet ArtifactFacet,
+) (RootRequest, error) {
+	return newArtifactDependencyRequest(provider, facet)
+}
+
 func newArtifactDependencyRequest(
 	provider ArtifactOwner,
 	facet ArtifactFacet,
@@ -313,6 +374,49 @@ func NewMapSpecializationRequest(
 	}, nil
 }
 
+func NewInterfaceAdapterRequest(
+	artifact *GeneratedArtifact,
+) (RootRequest, error) {
+	requirement, err := NewInterfaceAdapterRequirement(artifact)
+	return generatedDefinitionRequest(requirement, err)
+}
+
+func NewAnonymousInterfaceRequest(
+	artifact *GeneratedArtifact,
+) (RootRequest, error) {
+	requirement, err := NewAnonymousInterfaceRequirement(artifact)
+	return generatedDefinitionRequest(requirement, err)
+}
+
+func NewInterfaceMethodTokenRequest(
+	artifact *GeneratedArtifact,
+) (RootRequest, error) {
+	requirement, err := NewInterfaceMethodTokenRequirement(artifact)
+	return generatedDefinitionRequest(requirement, err)
+}
+
+func NewInterfaceDynamicTypeTokenRequest(
+	artifact *GeneratedArtifact,
+) (RootRequest, error) {
+	requirement, err := NewInterfaceDynamicTypeTokenRequirement(artifact)
+	return generatedDefinitionRequest(requirement, err)
+}
+
+func generatedDefinitionRequest(
+	requirement DeclarationRequirement,
+	err error,
+) (RootRequest, error) {
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return RootRequest{
+		owner: RootRequestOwner{
+			kind:                   RootRequestDeclarationRequirement,
+			declarationRequirement: requirement,
+		},
+	}, nil
+}
+
 func (r RootRequest) Kind() RootRequestKind {
 	return r.owner.kind
 }
@@ -324,8 +428,10 @@ func (r RootRequest) LegalScope() PlacementScope {
 	if r.owner.kind == RootRequestDeclarationRequirement {
 		if artifact, ok := r.owner.declarationRequirement.
 			GeneratedArtifact(); ok &&
-			artifact.Placement() ==
-				GeneratedArtifactPlacementCompilation {
+			(artifact.Placement() ==
+				GeneratedArtifactPlacementCompilation ||
+				artifact.Placement() ==
+					GeneratedArtifactPlacementContract) {
 			return ScopeCompilationSupport
 		}
 		return ScopeOwningFile

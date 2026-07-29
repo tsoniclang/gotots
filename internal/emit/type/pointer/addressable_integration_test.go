@@ -2,7 +2,6 @@ package pointer_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/tsoniclang/gotots/internal/emit"
-	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
@@ -32,7 +30,9 @@ func TestAddressablePointersPrintTypecheckAndExecuteDifferentially(t *testing.T)
 	for _, required := range []string{
 		"GoPointer.cell",
 		"GoPointer.field",
+		"GoPointer.indexView",
 		"goSliceAddress",
+		"goSliceAddressView",
 		"value$storage",
 		"export function Box_Add",
 		"export function Box_Nil",
@@ -67,6 +67,8 @@ import {
     CancelIdentity,
     Closure,
     Composite,
+    DefinedArrayAddress,
+    DefinedSliceAddress,
     EscapedValue,
     Field,
     FunctionVariable,
@@ -98,6 +100,8 @@ import {
     SliceAddress,
     SliceVariable,
     SliceReallocation,
+    StructArrayAddress,
+    StructSliceAddress,
     ValueReceiverThroughPointer,
 } from "`+artifacts.module(t, "source.ts")+`";
 
@@ -130,6 +134,10 @@ try {
 } catch {
     console.log(true);
 }
+console.log(...DefinedArrayAddress(51));
+console.log(...DefinedSliceAddress(52));
+console.log(...StructArrayAddress(53));
+console.log(...StructSliceAddress(54));
 console.log(...Package(60));
 console.log(Composite(70));
 console.log(PointerField(75));
@@ -204,38 +212,6 @@ func TestAddressabilityDoesNotWrapUnrelatedLocals(t *testing.T) {
 	if strings.Contains(source, "result$storage") &&
 		!strings.Contains(source, "function NamedResult") {
 		t.Fatal("storage evidence was not scoped to the selected declaration")
-	}
-}
-
-func TestReceiverMethodValueAndExpressionRemainTypedBoundaries(t *testing.T) {
-	for _, testCase := range []struct {
-		name   string
-		source string
-	}{
-		{
-			name: "method value",
-			source: `package boundary
-type Box struct { Count int32 }
-func (box *Box) Add(delta int32) { box.Count += delta }
-func MethodValue(box *Box) func(int32) { return box.Add }
-`,
-		},
-		{
-			name: "method expression",
-			source: `package boundary
-type Box struct { Count int32 }
-func (box *Box) Add(delta int32) { box.Count += delta }
-func MethodExpression(box *Box) { (*Box).Add(box, 1) }
-`,
-		},
-	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			err := compileTemporaryFunctionSource(t, testCase.source)
-			var unsupported *api.UnsupportedError
-			if !errors.As(err, &unsupported) {
-				t.Fatalf("error = %v, want *api.UnsupportedError", err)
-			}
-		})
 	}
 }
 
@@ -327,9 +303,9 @@ class Indexed {
     }
 }
 
-const parent = GoPointer.cell<Indexed>(new Indexed());
-const numberIndex = GoPointer.index<number, Indexed>(parent, 1);
-const bigintIndex = GoPointer.index<number, Indexed>(parent, 1n);
+const parent = GoPointer.cell<Indexed, Indexed>(new Indexed());
+const numberIndex = GoPointer.index<number, number, Indexed, Indexed>(parent, 1);
+const bigintIndex = GoPointer.index<number, number, Indexed, Indexed>(parent, 1n);
 console.log(GoPointer.equal(numberIndex, bigintIndex));
 `)
 	if output := executeMaterializedTypeScript(
@@ -408,6 +384,10 @@ func main() {
         pointer.SliceAddress(1)
     }()
     fmt.Println(sliceAddressPanicked)
+    fmt.Println(pointer.DefinedArrayAddress(51))
+    fmt.Println(pointer.DefinedSliceAddress(52))
+    fmt.Println(pointer.StructArrayAddress(53))
+    fmt.Println(pointer.StructSliceAddress(54))
     fmt.Println(pointer.Package(60))
     fmt.Println(pointer.Composite(70))
     fmt.Println(pointer.PointerField(75))

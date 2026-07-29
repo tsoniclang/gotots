@@ -34,44 +34,115 @@ func (a RuntimeArray) EmitLiteral(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	elementZero, err := context.Values().Zero(
-		context.WithRole(api.RoleCompositeElement),
-		source,
-		a.ElementType(),
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	if len(elementZero.Before()) != 0 {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
 	before, values, requests, err := arrangeLiteralElements(context, elements)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
-	indexes := make([]tsgo.Expression, 0, len(elements))
-	for _, element := range elements {
-		indexes = append(indexes, context.Factory().NumericLiteral(
-			strconv.FormatInt(element.index, 10),
-			tsgo.TokenFlagsNone,
-		))
-	}
+	var elementZero api.ExpressionEmission
 	var target tsgo.Expression
 	var typeRequests []api.RootRequest
 	var runtimeRequests []api.RootRequest
 	if a.aggregate {
+		loopZero, zeroErr := context.Values().Zero(
+			context.WithRole(api.RoleCompositeElement),
+			source,
+			a.ElementType(),
+		)
+		if zeroErr != nil {
+			return api.ExpressionEmission{}, zeroErr
+		}
+		resultName, nameErr := context.Names().Temporary(
+			api.TemporaryArrayConstruction,
+		)
+		if nameErr != nil {
+			return api.ExpressionEmission{}, nameErr
+		}
+		indexName, nameErr := context.Names().Temporary(
+			api.TemporaryArrayConstruction,
+		)
+		if nameErr != nil {
+			return api.ExpressionEmission{}, nameErr
+		}
 		target, runtimeRequests, err = a.runtimeOperation(
 			context,
-			api.RuntimeArrayLiteralWith,
+			children,
+			api.RuntimeArrayAllocate,
 			a.lengthLiteral(context),
-			valueFactory(context, nil, elementZero.Value()),
-			context.Factory().ArrayLiteralExpression(indexes, false),
-			context.Factory().ArrayLiteralExpression(values, false),
 		)
+		if err == nil {
+			result := context.Factory().Identifier(resultName)
+			index := context.Factory().Identifier(indexName)
+			before = append(
+				before,
+				arrayComparisonVariable(
+					context,
+					tsgo.NodeFlagsConst,
+					resultName,
+					target,
+				),
+				arrayConstructionLoop(
+					context,
+					index,
+					a.lengthLiteral(context),
+					"0",
+					append(
+						loopZero.Before(),
+						context.Factory().ExpressionStatement(callMember(
+							context,
+							result,
+							arraymember.Set,
+							index,
+							loopZero.Value(),
+						)),
+					),
+				),
+			)
+			for index, element := range elements {
+				before = append(
+					before,
+					context.Factory().ExpressionStatement(callMember(
+						context,
+						result,
+						arraymember.Set,
+						context.Factory().NumericLiteral(
+							strconv.FormatInt(element.index, 10),
+							tsgo.TokenFlagsNone,
+						),
+						values[index],
+					)),
+				)
+			}
+			target = result
+			requests = api.CombineRequests(
+				requests,
+				loopZero.Requests(),
+			)
+		}
 	} else {
+		elementZero, err = context.Values().Zero(
+			context.WithRole(api.RoleCompositeElement),
+			source,
+			a.ElementType(),
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		if len(elementZero.Before()) != 0 {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		indexes := make([]tsgo.Expression, 0, len(elements))
+		for _, element := range elements {
+			indexes = append(indexes, context.Factory().NumericLiteral(
+				strconv.FormatInt(element.index, 10),
+				tsgo.TokenFlagsNone,
+			))
+		}
 		var typeArguments []tsgo.TypeNode
-		typeArguments, typeRequests, err = a.targetTypeArguments(context)
+		typeArguments, typeRequests, err = a.targetTypeArguments(
+			context,
+			children,
+		)
 		if err == nil {
 			target, runtimeRequests, err = a.callStatic(
 				context,

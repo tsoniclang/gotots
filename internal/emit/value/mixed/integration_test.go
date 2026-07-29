@@ -313,7 +313,9 @@ func assertRuntimeGraph(
 ) {
 	t.Helper()
 	panicSource := artifacts.printed["runtime/panic.ts"]
-	if strings.Count(panicSource, "export class GoPanic<T>") != 1 {
+	if strings.Count(panicSource, "export class GoPanic") != 1 ||
+		!strings.Contains(panicSource, "export class GoRuntimePanicValue") ||
+		strings.Contains(panicSource, "export class GoPanic<") {
 		t.Fatalf("panic runtime definitions are not exact:\n%s", panicSource)
 	}
 	for _, path := range familyPaths {

@@ -20,6 +20,7 @@ type File struct {
 	temporaries    map[api.TemporaryKind]uint64
 	importNames    map[string]struct{}
 	importAliases  map[types.Object]string
+	derivedImports map[string]string
 	projections    map[constantProjectionImport]string
 	primitives     map[api.PrimitiveAlias]string
 	runtime        map[api.RuntimeSymbol]string
@@ -39,18 +40,19 @@ func (n *Owner) ForFile(
 	require func(types.Object) error,
 ) api.Names {
 	return &File{
-		owner:         n,
-		sourceFile:    sourceFile,
-		packageScope:  packageScope,
-		factory:       factory,
-		targetPath:    targetPath,
-		require:       require,
-		temporaries:   make(map[api.TemporaryKind]uint64),
-		importNames:   make(map[string]struct{}),
-		importAliases: make(map[types.Object]string),
-		projections:   make(map[constantProjectionImport]string),
-		primitives:    make(map[api.PrimitiveAlias]string),
-		runtime:       make(map[api.RuntimeSymbol]string),
+		owner:          n,
+		sourceFile:     sourceFile,
+		packageScope:   packageScope,
+		factory:        factory,
+		targetPath:     targetPath,
+		require:        require,
+		temporaries:    make(map[api.TemporaryKind]uint64),
+		importNames:    make(map[string]struct{}),
+		importAliases:  make(map[types.Object]string),
+		derivedImports: make(map[string]string),
+		projections:    make(map[constantProjectionImport]string),
+		primitives:     make(map[api.PrimitiveAlias]string),
+		runtime:        make(map[api.RuntimeSymbol]string),
 	}
 }
 
@@ -113,6 +115,9 @@ func (n *File) reference(
 	if object == nil {
 		return api.NameReference{}, &api.NameError{Reason: "reference object is nil"}
 	}
+	if function, ok := object.(*types.Func); ok {
+		object = function.Origin()
+	}
 	if variable, ok := object.(*types.Var); ok &&
 		!variable.IsField() &&
 		variable.Pkg() != nil &&
@@ -146,22 +151,19 @@ func (n *File) reference(
 		requests = append(requests, request)
 	}
 	if binding.sourceFile != nil && binding.sourcePath != n.targetPath {
-		referencePath := binding.sourcePath
-		if object.Pkg() != nil && object.Pkg().Scope() != n.packageScope {
-			referencePath = n.owner.registry.assemblyPathByPackage[object.Pkg()]
-			if referencePath == "" {
-				return api.NameReference{}, &api.NameError{
-					Name:   object.Name(),
-					Reason: "cross-package declaration has no assembly path",
-				}
-			}
+		referencePath, crossPackage, err := n.sourceReferencePath(
+			object,
+			binding,
+		)
+		if err != nil {
+			return api.NameReference{}, err
 		}
 		modulePath, err := output.ModuleSpecifier(n.targetPath, referencePath)
 		if err != nil {
 			return api.NameReference{}, err
 		}
 		localName := binding.name
-		if object.Parent() != n.packageScope {
+		if crossPackage {
 			localName, err = n.importName(object, binding.name)
 			if err != nil {
 				return api.NameReference{}, err
@@ -243,7 +245,36 @@ func (n *File) NamedStructOperation(
 	typeName *types.TypeName,
 	operation api.NamedStructOperation,
 ) (api.NameReference, error) {
-	request, err := api.NewNamedStructOperationRequest(typeName, operation)
+	var request api.RootRequest
+	var err error
+	if typeName != nil &&
+		typeName.Pkg() != nil &&
+		typeName.Parent() != nil &&
+		typeName.Parent() != typeName.Pkg().Scope() {
+		placement, placementErr := n.generatedArtifactPlacement(
+			typeName.Type(),
+		)
+		if placementErr != nil {
+			return api.NameReference{}, placementErr
+		}
+		if placement.kind != api.GeneratedArtifactPlacementLexical ||
+			placement.anchor != typeName {
+			return api.NameReference{}, &api.NameError{
+				Name:   typeName.Name(),
+				Reason: "local named-struct operation has no exact lexical owner",
+			}
+		}
+		request, err = api.NewLexicalNamedStructOperationRequest(
+			placement.lexicalOwner,
+			typeName,
+			operation,
+		)
+	} else {
+		request, err = api.NewNamedStructOperationRequest(
+			typeName,
+			operation,
+		)
+	}
 	if err != nil {
 		return api.NameReference{}, err
 	}
@@ -365,7 +396,7 @@ func (n *File) Member(field *types.Var) (string, error) {
 	}
 	name := n.owner.memberNameByObject[field]
 	if name == "" {
-		if !field.IsField() || field.Embedded() || field.Name() == "_" {
+		if !field.IsField() || field.Name() == "_" {
 			return "", &api.NameError{
 				Name:   field.Name(),
 				Reason: "field object has no target member identity",
@@ -432,115 +463,6 @@ func (n *File) hasImportName(name string) bool {
 func (n *Owner) hasSourceName(name string) bool {
 	_, exists := n.sourceNameBases[name]
 	return exists
-}
-
-func (n *File) Primitive(alias api.PrimitiveAlias) (api.NameReference, error) {
-	if existing := n.primitives[alias]; existing != "" {
-		modulePath, err := output.ModuleSpecifier(
-			n.targetPath,
-			output.ScalarSupportPath,
-		)
-		if err != nil {
-			return api.NameReference{}, err
-		}
-		request, err := api.NewPrimitiveAliasRequest(
-			n.factory,
-			modulePath,
-			alias,
-			existing,
-		)
-		if err != nil {
-			return api.NameReference{}, err
-		}
-		return api.NewNameReference(existing, request)
-	}
-	exportedName, err := api.PrimitiveAliasName(alias)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	localName := exportedName
-	if n.sourceNameExists(localName) ||
-		n.hasImportName(localName) {
-		base := exportedName + "__from_gotots_support"
-		localName = base
-		for suffix := uint64(1); n.sourceNameExists(localName) ||
-			n.hasImportName(localName); suffix++ {
-			localName = base + "_" + strconv.FormatUint(suffix, 10)
-		}
-	}
-	n.importNames[localName] = struct{}{}
-	n.primitives[alias] = localName
-	modulePath, err := output.ModuleSpecifier(
-		n.targetPath,
-		output.ScalarSupportPath,
-	)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	request, err := api.NewPrimitiveAliasRequest(
-		n.factory,
-		modulePath,
-		alias,
-		localName,
-	)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	return api.NewNameReference(localName, request)
-}
-
-func (n *File) Runtime(
-	symbol api.RuntimeSymbol,
-	phase api.ImportPhase,
-) (api.NameReference, error) {
-	contract, err := api.RuntimeContract(symbol)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	modulePath, err := output.ModuleSpecifier(
-		n.targetPath,
-		contract.OutputPath(),
-	)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	if existing := n.runtime[symbol]; existing != "" {
-		request, err := api.NewRuntimeImportRequest(
-			n.factory,
-			phase,
-			modulePath,
-			symbol,
-			existing,
-		)
-		if err != nil {
-			return api.NameReference{}, err
-		}
-		return api.NewNameReference(existing, request)
-	}
-	exportedName := contract.ExportedName()
-	localName := exportedName
-	if n.sourceNameExists(localName) ||
-		n.hasImportName(localName) {
-		base := exportedName + "__from_gotots_runtime"
-		localName = base
-		for suffix := uint64(1); n.sourceNameExists(localName) ||
-			n.hasImportName(localName); suffix++ {
-			localName = base + "_" + strconv.FormatUint(suffix, 10)
-		}
-	}
-	n.importNames[localName] = struct{}{}
-	n.runtime[symbol] = localName
-	request, err := api.NewRuntimeImportRequest(
-		n.factory,
-		phase,
-		modulePath,
-		symbol,
-		localName,
-	)
-	if err != nil {
-		return api.NameReference{}, err
-	}
-	return api.NewNameReference(localName, request)
 }
 
 func (n *File) Temporary(kind api.TemporaryKind) (string, error) {

@@ -189,6 +189,12 @@ func (s *programSession) scheduleDeclarationRequirement(
 			Reason: "declaration requirement owner is invalid",
 		}
 	}
+	if generated, generatedOwned := owner.Generated(); generatedOwned &&
+		generated.Kind() == api.GeneratedArtifactCallableABI {
+		if err := s.ensureCallableABIBaseline(generated); err != nil {
+			return err
+		}
+	}
 	s.requirements.enqueue(requirement)
 	return nil
 }
@@ -211,10 +217,16 @@ func (s *programSession) applyDeclarationRequirements(
 	if generatedOwner, ok := owner.Generated(); ok {
 		for _, requirement := range requirements {
 			selectedOwner, generated := requirement.GeneratedArtifact()
+			facet, cooperative := requirement.CooperativeCallable()
 			if !requirement.Valid() ||
-				!generated ||
-				selectedOwner != generatedOwner ||
-				requirement.Owner() != owner {
+				requirement.Owner() != owner ||
+				(!generated && !cooperative) ||
+				(generated && selectedOwner != generatedOwner) ||
+				(cooperative &&
+					!generatedCallableFacetMatches(
+						facet,
+						generatedOwner,
+					)) {
 				return &ScheduleError{
 					Object: owner.Name(),
 					Reason: "generated-artifact requirement batch has mixed or invalid ownership",
@@ -276,6 +288,19 @@ func (s *programSession) applyDeclarationRequirements(
 	return s.reconstructScheduledArtifact(owner)
 }
 
+func generatedCallableFacetMatches(
+	facet api.CallableFacet,
+	artifact *api.GeneratedArtifact,
+) bool {
+	if selected, ok := facet.ABI(); ok {
+		return selected == artifact
+	}
+	if selected, ok := facet.GenericCapability(); ok {
+		return selected == artifact
+	}
+	return false
+}
+
 func requirementOwnerName(requirement api.DeclarationRequirement) string {
 	return requirement.Owner().Name()
 }
@@ -322,8 +347,12 @@ func (s *programSession) buildArtifactRevision(
 	defer finish()
 
 	requirements := s.requirements.appliedFor(artifactOwner)
-	context, err := emitnaming.WithLexicalGeneratedArtifacts(
-		builder.context,
+	context, err := builder.context.WithSourceArtifactOwner(artifactOwner)
+	if err != nil {
+		return artifactRevision{}, err
+	}
+	context, err = emitnaming.WithLexicalTypeRequirements(
+		context,
 		site.declaration,
 		artifactOwner,
 		requirements,
@@ -410,8 +439,10 @@ func (s *programSession) consumeArtifactRequests(
 			if generatedProvider {
 				generatedProvider =
 					s.validateGeneratedArtifact(generated) == nil &&
-						generated.Placement() ==
-							api.GeneratedArtifactPlacementCompilation
+						(generated.Placement() ==
+							api.GeneratedArtifactPlacementCompilation ||
+							generated.Placement() ==
+								api.GeneratedArtifactPlacementContract)
 			}
 			if !sourceProvider && !generatedProvider {
 				return nil, nil, &ScheduleError{
@@ -501,6 +532,9 @@ func (s *programSession) reconstructScheduledArtifact(
 	source, ok := owner.Source()
 	if !ok {
 		return &ScheduleError{Reason: "dirty target artifact owner is invalid"}
+	}
+	if variable, ok := source.(*types.Var); ok {
+		return s.reconstructPackageStorage(owner, variable)
 	}
 	return s.reconstructArtifact(source)
 }

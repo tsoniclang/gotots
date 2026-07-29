@@ -6,6 +6,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericdeclaration "github.com/tsoniclang/gotots/internal/emit/generic/declaration"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -22,9 +23,9 @@ func emitClass(
 	children api.ChildEmitter,
 	declaration *ast.GenDecl,
 	typeName *types.TypeName,
-	operations []api.NamedStructOperation,
+	operations []operationAssembly,
 ) (api.DeclarationEmission, error) {
-	sourceStruct, structType, ok := sourceType(
+	spec, sourceStruct, structType, ok := sourceType(
 		context,
 		declaration,
 		typeName,
@@ -33,6 +34,11 @@ func emitClass(
 		return api.DeclarationEmission{},
 			api.Unsupported(context, api.CategoryDeclaration, declaration)
 	}
+	parameters, err := genericdeclaration.EnterType(context, spec, typeName)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	context = parameters.Context()
 	fields, err := fields(context, sourceStruct, structType)
 	if err != nil {
 		return api.DeclarationEmission{}, err
@@ -54,6 +60,8 @@ func emitClass(
 		fields,
 		operations,
 		moduleExport,
+		parameters.Nodes(),
+		parameters.References(),
 	)
 }
 
@@ -74,12 +82,6 @@ func EmitAnonymous(
 	fields := make([]field, 0, structType.NumFields())
 	for index := range structType.NumFields() {
 		object := structType.Field(index)
-		if object.Embedded() {
-			return api.DeclarationEmission{}, &api.GeneratedArtifactShapeError{
-				Artifact: className,
-				Reason:   "embedded fields belong to the embedding lane",
-			}
-		}
 		blank := object.Name() == "_"
 		name := fmt.Sprintf("$blank%d", index)
 		if !blank {
@@ -97,14 +99,20 @@ func EmitAnonymous(
 			blank:      blank,
 		})
 	}
+	selected := make([]operationAssembly, 0, len(operations))
+	for _, operation := range operations {
+		selected = append(selected, operationAssembly{operation: operation})
+	}
 	return emitStructClass(
 		context,
 		children,
 		nil,
 		className,
 		fields,
-		operations,
+		selected,
 		moduleExport,
+		nil,
+		nil,
 	)
 }
 
@@ -114,10 +122,36 @@ func emitStructClass(
 	source ast.Node,
 	className string,
 	fields []field,
-	operations []api.NamedStructOperation,
+	operations []operationAssembly,
 	moduleExport bool,
+	typeParameters []tsgo.TypeParameterDeclaration,
+	typeArguments []tsgo.TypeNode,
 ) (api.DeclarationEmission, error) {
-	members := make([]tsgo.ClassElement, 0, 2+len(operations))
+	var storageOperation *operationAssembly
+	valueOperations := make([]operationAssembly, 0, len(operations))
+	for _, operation := range operations {
+		if operation.operation == api.NamedStructOperationStorage {
+			selected := operation
+			storageOperation = &selected
+			continue
+		}
+		valueOperations = append(valueOperations, operation)
+	}
+	layout, err := emitLayout(
+		context,
+		children,
+		source,
+		className,
+		fields,
+		storageOperation,
+		moduleExport,
+		typeParameters,
+		typeArguments,
+	)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	members := make([]tsgo.ClassElement, 0, 3+len(valueOperations))
 	members = append(members, context.Factory().PropertyDeclaration(
 		[]tsgo.ModifierLike{
 			context.Factory().DeclareKeyword(),
@@ -131,22 +165,14 @@ func emitStructClass(
 		),
 		nil,
 	))
-
-	constructor, requests, err := constructor(
-		context,
-		children,
-		fields,
-	)
-	if err != nil {
-		return api.DeclarationEmission{}, err
-	}
-	members = append(members, constructor)
+	members = append(members, layout.members...)
+	requests := layout.requests
 
 	classType := context.Factory().TypeReferenceNode(
 		context.Factory().Identifier(className),
-		nil,
+		typeArguments,
 	)
-	for _, operation := range operations {
+	for _, operation := range valueOperations {
 		member, operationRequests, err := emitValueOperation(
 			context,
 			children,
@@ -155,6 +181,8 @@ func emitStructClass(
 			classType,
 			fields,
 			operation,
+			typeParameters,
+			typeArguments,
 		)
 		if err != nil {
 			return api.DeclarationEmission{}, err
@@ -167,25 +195,26 @@ func emitStructClass(
 	if moduleExport {
 		modifiers = []tsgo.ModifierLike{context.Factory().ExportKeyword()}
 	}
-	return api.DirectDeclaration(
+	declarations := append(
+		layout.declarations,
 		context.Factory().ClassDeclaration(
 			modifiers,
 			context.Factory().Identifier(className),
-			nil,
+			typeParameters,
 			nil,
 			members,
 		),
-		requests...,
-	), nil
+	)
+	return api.NewDeclarationEmission(declarations, requests)
 }
 
 func sourceType(
 	context api.Context,
 	declaration *ast.GenDecl,
 	typeName *types.TypeName,
-) (*ast.StructType, *types.Struct, bool) {
+) (*ast.TypeSpec, *ast.StructType, *types.Struct, bool) {
 	if declaration == nil || typeName == nil {
-		return nil, nil, false
+		return nil, nil, nil, false
 	}
 	for _, sourceSpec := range declaration.Specs {
 		spec, ok := sourceSpec.(*ast.TypeSpec)
@@ -196,14 +225,13 @@ func sourceType(
 		named, namedOK := types.Unalias(typeName.Type()).(*types.Named)
 		if !syntaxOK || !namedOK ||
 			spec.Assign.IsValid() ||
-			spec.TypeParams != nil ||
-			named.TypeParams().Len() != 0 {
-			return nil, nil, false
+			(spec.TypeParams == nil) != (named.TypeParams().Len() == 0) {
+			return nil, nil, nil, false
 		}
 		structType, structOK := named.Underlying().(*types.Struct)
-		return sourceStruct, structType, structOK
+		return spec, sourceStruct, structType, structOK
 	}
-	return nil, nil, false
+	return nil, nil, nil, false
 }
 
 func fields(
@@ -218,11 +246,36 @@ func fields(
 	fieldIndex := 0
 	for _, sourceField := range source.Fields.List {
 		if len(sourceField.Names) == 0 {
-			return nil, api.Unsupported(
-				context.WithRole(api.RoleStructField),
-				api.CategoryDeclaration,
-				sourceField,
-			)
+			if fieldIndex >= structType.NumFields() {
+				return nil, api.Unsupported(
+					context.WithRole(api.RoleStructField),
+					api.CategoryDeclaration,
+					sourceField,
+				)
+			}
+			object := structType.Field(fieldIndex)
+			sourceType := context.TypesInfo().TypeOf(sourceField.Type)
+			if !object.Embedded() ||
+				sourceType == nil ||
+				!types.Identical(sourceType, object.Type()) {
+				return nil, api.Unsupported(
+					context.WithRole(api.RoleStructField),
+					api.CategoryDeclaration,
+					sourceField,
+				)
+			}
+			name, err := context.Names().Member(object)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, field{
+				source:     sourceField,
+				typeSource: sourceField.Type,
+				object:     object,
+				name:       name,
+			})
+			fieldIndex++
+			continue
 		}
 		sourceType := context.TypesInfo().TypeOf(sourceField.Type)
 		for _, sourceName := range sourceField.Names {
@@ -267,43 +320,4 @@ func fields(
 		return nil, api.Unsupported(context, api.CategoryDeclaration, source)
 	}
 	return result, nil
-}
-
-func constructor(
-	context api.Context,
-	children api.ChildEmitter,
-	fields []field,
-) (tsgo.ConstructorDeclaration, []api.RootRequest, error) {
-	parameters := make([]tsgo.ParameterDeclaration, 0, len(fields))
-	var requests []api.RootRequest
-	for _, field := range fields {
-		targetType, err := children.RepresentedType(
-			context.WithRole(api.RoleStructFieldType),
-			field.typeSource,
-			field.object.Type(),
-		)
-		if err != nil {
-			return nil, nil, err
-		}
-		var modifiers []tsgo.ModifierLike
-		if !field.blank {
-			modifiers = []tsgo.ModifierLike{context.Factory().PublicKeyword()}
-		}
-		parameters = append(parameters, context.Factory().ParameterDeclaration(
-			modifiers,
-			nil,
-			context.Factory().Identifier(field.name),
-			nil,
-			targetType.Value(),
-			nil,
-		))
-		requests = append(requests, targetType.Requests()...)
-	}
-	return context.Factory().ConstructorDeclaration(
-		nil,
-		nil,
-		parameters,
-		nil,
-		context.Factory().Block(nil, true),
-	), requests, nil
 }

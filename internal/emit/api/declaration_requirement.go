@@ -1,119 +1,16 @@
 package api
 
 import (
-	"fmt"
+	"go/ast"
+	"go/token"
 	"go/types"
 )
-
-type NamedStructOperation uint8
-
-const (
-	NamedStructOperationInvalid NamedStructOperation = iota
-	NamedStructOperationZero
-	NamedStructOperationCopy
-	NamedStructOperationEqual
-	NamedStructOperationHash
-)
-
-func (o NamedStructOperation) Valid() bool {
-	return o == NamedStructOperationZero ||
-		o == NamedStructOperationCopy ||
-		o == NamedStructOperationEqual ||
-		o == NamedStructOperationHash
-}
-
-func (o NamedStructOperation) String() string {
-	switch o {
-	case NamedStructOperationZero:
-		return "zero"
-	case NamedStructOperationCopy:
-		return "copy"
-	case NamedStructOperationEqual:
-		return "equal"
-	case NamedStructOperationHash:
-		return "hash"
-	default:
-		return fmt.Sprintf("named-struct-operation(%d)", o)
-	}
-}
-
-func NamedStructOperationMemberName(
-	operation NamedStructOperation,
-) (string, error) {
-	if !operation.Valid() {
-		return "", &NameError{Reason: "named-struct operation is invalid"}
-	}
-	return "$" + operation.String(), nil
-}
-
-type DefinedArrayOperation uint8
-
-const (
-	DefinedArrayOperationInvalid DefinedArrayOperation = iota
-	DefinedArrayOperationAddressIndex
-)
-
-func (o DefinedArrayOperation) Valid() bool {
-	return o == DefinedArrayOperationAddressIndex
-}
-
-type AnonymousStructDemand uint8
-
-const (
-	AnonymousStructDemandInvalid AnonymousStructDemand = iota
-	AnonymousStructDemandDefinition
-	AnonymousStructDemandZero
-	AnonymousStructDemandCopy
-	AnonymousStructDemandEqual
-	AnonymousStructDemandHash
-)
-
-func (d AnonymousStructDemand) Valid() bool {
-	return d >= AnonymousStructDemandDefinition &&
-		d <= AnonymousStructDemandHash
-}
-
-type MapSpecializationDemand uint8
-
-const (
-	MapSpecializationDemandInvalid MapSpecializationDemand = iota
-	MapSpecializationDemandDefinition
-	MapSpecializationDemandStatic
-)
-
-func (d MapSpecializationDemand) Valid() bool {
-	return d == MapSpecializationDemandDefinition ||
-		d == MapSpecializationDemandStatic
-}
-
-type DeclarationRequirementKind uint8
-
-const (
-	DeclarationRequirementInvalid DeclarationRequirementKind = iota
-	DeclarationRequirementNamedStructOperation
-	DeclarationRequirementAddressableStorage
-	DeclarationRequirementConstantProjection
-	DeclarationRequirementLocalConstantProjection
-	DeclarationRequirementDefinedArrayOperation
-	DeclarationRequirementAnonymousStruct
-	DeclarationRequirementMapSpecialization
-)
-
-func (k DeclarationRequirementKind) Valid() bool {
-	return k == DeclarationRequirementNamedStructOperation ||
-		k == DeclarationRequirementAddressableStorage ||
-		k == DeclarationRequirementConstantProjection ||
-		k == DeclarationRequirementLocalConstantProjection ||
-		k == DeclarationRequirementDefinedArrayOperation ||
-		k == DeclarationRequirementAnonymousStruct ||
-		k == DeclarationRequirementMapSpecialization
-}
 
 type DeclarationRequirement struct {
 	owner     ArtifactOwner
 	kind      DeclarationRequirementKind
 	operation NamedStructOperation
-	array     DefinedArrayOperation
+	typeName  *types.TypeName
 	variable  *types.Var
 	// constant is the untyped constant a local projection materializes. A
 	// package projection owns the constant directly (owner is the constant), so
@@ -124,112 +21,17 @@ type DeclarationRequirement struct {
 	// constant projection. A basic kind is a canonical, comparable dedup key —
 	// unlike a types.Type interface value, whose pointer identity is not a
 	// stable projection key.
-	projection      types.BasicKind
-	generated       *GeneratedArtifact
-	anonymousDemand AnonymousStructDemand
-	mapDemand       MapSpecializationDemand
-}
-
-// ConstantProjectionType resolves a validated concrete constant-capable basic
-// representation. Raw types.BasicKind values are representable outside this
-// package, so every public projection boundary uses this owner before indexing
-// types.Typ. Untyped kinds and unsafe.Pointer are not projection types.
-func ConstantProjectionType(
-	projection types.BasicKind,
-) (*types.Basic, bool) {
-	index := int(projection)
-	if projection == types.Invalid ||
-		index < 0 ||
-		index >= len(types.Typ) {
-		return nil, false
-	}
-	selected := types.Typ[index]
-	if selected == nil ||
-		selected.Info()&types.IsUntyped != 0 ||
-		selected.Info()&(types.IsBoolean|
-			types.IsInteger|
-			types.IsFloat|
-			types.IsComplex|
-			types.IsString) == 0 {
-		return nil, false
-	}
-	return selected, true
-}
-
-// ConstantProjectionName is the exported name of an untyped constant's
-// projection at one target basic representation. The `$` separator cannot occur
-// in a Go source identifier, so a projection name never collides with a user
-// declaration, and distinct (constant, representation) pairs never collide with
-// each other. Both the declaration owner and every use site derive the name
-// through this one function.
-func ConstantProjectionName(
-	base string,
-	projection types.BasicKind,
-) (string, error) {
-	selected, ok := ConstantProjectionType(projection)
-	if base == "" || !ok {
-		return "", &NameError{
-			Name:   base,
-			Reason: "constant projection identity is invalid",
-		}
-	}
-	return base + "$" + selected.Name(), nil
-}
-
-// NewConstantProjectionRequirement requires one untyped constant to be projected
-// once at the given target basic representation.
-func NewConstantProjectionRequirement(
-	constant *types.Const,
-	projection types.BasicKind,
-) (DeclarationRequirement, error) {
-	switch {
-	case constant == nil:
-		return DeclarationRequirement{}, &RootRequestError{
-			Reason: "constant projection constant is nil",
-		}
-	case !validConstantProjection(projection):
-		return DeclarationRequirement{}, &RootRequestError{
-			Reason: "constant projection target representation is invalid",
-		}
-	}
-	return DeclarationRequirement{
-		owner:      MustSourceArtifactOwner(constant),
-		kind:       DeclarationRequirementConstantProjection,
-		projection: projection,
-	}, nil
-}
-
-// NewLocalConstantProjectionRequirement requires one untyped constant declared
-// inside a function to be projected once, at the given target basic
-// representation, at its original lexical declaration. The enclosing function
-// owns reconstruction because a function-local constant has no package
-// declaration artifact; the dedup key is the
-// (function, constant, representation) triple.
-func NewLocalConstantProjectionRequirement(
-	owner *types.Func,
-	constant *types.Const,
-	projection types.BasicKind,
-) (DeclarationRequirement, error) {
-	switch {
-	case owner == nil:
-		return DeclarationRequirement{}, &RootRequestError{
-			Reason: "local constant projection owner is nil",
-		}
-	case constant == nil:
-		return DeclarationRequirement{}, &RootRequestError{
-			Reason: "local constant projection constant is nil",
-		}
-	case !validConstantProjection(projection):
-		return DeclarationRequirement{}, &RootRequestError{
-			Reason: "local constant projection target representation is invalid",
-		}
-	}
-	return DeclarationRequirement{
-		owner:      MustSourceArtifactOwner(owner),
-		kind:       DeclarationRequirementLocalConstantProjection,
-		constant:   constant,
-		projection: projection,
-	}, nil
+	projection       types.BasicKind
+	generated        *GeneratedArtifact
+	anonymousDemand  AnonymousStructDemand
+	mapDemand        MapSpecializationDemand
+	genericOperation *GenericOperationContract
+	enclosing        ast.Node
+	callable         ast.Node
+	control          CallableControlFacet
+	controlLabel     *types.Label
+	controlPosition  token.Pos
+	callableFacet    CallableFacet
 }
 
 func NewNamedStructOperationRequirement(
@@ -250,27 +52,26 @@ func NewNamedStructOperationRequirement(
 		owner:     MustSourceArtifactOwner(typeName),
 		kind:      DeclarationRequirementNamedStructOperation,
 		operation: operation,
+		typeName:  typeName,
 	}, nil
 }
 
-func NewDefinedArrayOperationRequirement(
+func NewLexicalNamedStructOperationRequirement(
+	owner ArtifactOwner,
 	typeName *types.TypeName,
-	operation DefinedArrayOperation,
+	operation NamedStructOperation,
 ) (DeclarationRequirement, error) {
-	switch {
-	case typeName == nil:
+	if !validLexicalNamedStructOwner(owner, typeName) ||
+		!operation.Valid() {
 		return DeclarationRequirement{}, &RootRequestError{
-			Reason: "defined-array operation type is nil",
-		}
-	case !operation.Valid():
-		return DeclarationRequirement{}, &RootRequestError{
-			Reason: "defined-array operation is invalid",
+			Reason: "lexical named-struct operation is invalid",
 		}
 	}
 	return DeclarationRequirement{
-		owner: MustSourceArtifactOwner(typeName),
-		kind:  DeclarationRequirementDefinedArrayOperation,
-		array: operation,
+		owner:     owner,
+		kind:      DeclarationRequirementNamedStructOperation,
+		operation: operation,
+		typeName:  typeName,
 	}, nil
 }
 
@@ -337,14 +138,93 @@ func NewMapSpecializationRequirement(
 	}, nil
 }
 
+func NewInterfaceAdapterRequirement(
+	artifact *GeneratedArtifact,
+) (DeclarationRequirement, error) {
+	return newGeneratedDefinitionRequirement(
+		artifact,
+		GeneratedArtifactInterfaceAdapter,
+		DeclarationRequirementInterfaceAdapter,
+		"interface-adapter",
+	)
+}
+
+func NewAnonymousInterfaceRequirement(
+	artifact *GeneratedArtifact,
+) (DeclarationRequirement, error) {
+	return newGeneratedDefinitionRequirement(
+		artifact,
+		GeneratedArtifactAnonymousInterface,
+		DeclarationRequirementAnonymousInterface,
+		"anonymous-interface",
+	)
+}
+
+func NewInterfaceMethodTokenRequirement(
+	artifact *GeneratedArtifact,
+) (DeclarationRequirement, error) {
+	return newGeneratedDefinitionRequirement(
+		artifact,
+		GeneratedArtifactInterfaceMethodToken,
+		DeclarationRequirementInterfaceMethodToken,
+		"interface-method-token",
+	)
+}
+
+func NewInterfaceDynamicTypeTokenRequirement(
+	artifact *GeneratedArtifact,
+) (DeclarationRequirement, error) {
+	return newGeneratedDefinitionRequirement(
+		artifact,
+		GeneratedArtifactInterfaceDynamicTypeToken,
+		DeclarationRequirementInterfaceDynamicTypeToken,
+		"interface-dynamic-type-token",
+	)
+}
+
+func newGeneratedDefinitionRequirement(
+	artifact *GeneratedArtifact,
+	artifactKind GeneratedArtifactKind,
+	requirementKind DeclarationRequirementKind,
+	name string,
+) (DeclarationRequirement, error) {
+	if !artifact.Valid() || artifact.Kind() != artifactKind {
+		return DeclarationRequirement{}, &RootRequestError{
+			Reason: name + " requirement is invalid",
+		}
+	}
+	return DeclarationRequirement{
+		owner:     artifact.ReconstructionOwner(),
+		kind:      requirementKind,
+		generated: artifact,
+	}, nil
+}
+
 func (r DeclarationRequirement) Valid() bool {
 	if !r.kind.Valid() {
+		return false
+	}
+	if r.kind != DeclarationRequirementCallableControl &&
+		(r.enclosing != nil ||
+			r.callable != nil ||
+			r.control != CallableControlInvalid ||
+			r.controlLabel != nil ||
+			r.controlPosition.IsValid()) {
+		return false
+	}
+	if r.kind != DeclarationRequirementGenericOperation &&
+		r.kind != DeclarationRequirementGenericCapability &&
+		r.genericOperation != nil {
+		return false
+	}
+	if r.kind != DeclarationRequirementCooperativeCallable &&
+		!r.callableFacet.empty() {
 		return false
 	}
 	switch r.kind {
 	case DeclarationRequirementNamedStructOperation:
 		if !r.operation.Valid() ||
-			r.array != DefinedArrayOperationInvalid ||
+			r.typeName == nil ||
 			r.variable != nil ||
 			r.constant != nil ||
 			r.projection != types.Invalid ||
@@ -354,25 +234,13 @@ func (r DeclarationRequirement) Valid() bool {
 			return false
 		}
 		source, sourceOK := r.owner.Source()
-		_, ok := source.(*types.TypeName)
-		return sourceOK && ok
-	case DeclarationRequirementDefinedArrayOperation:
-		if r.operation != NamedStructOperationInvalid ||
-			!r.array.Valid() ||
-			r.variable != nil ||
-			r.constant != nil ||
-			r.projection != types.Invalid ||
-			r.generated != nil ||
-			r.anonymousDemand != AnonymousStructDemandInvalid ||
-			r.mapDemand != MapSpecializationDemandInvalid {
-			return false
+		if sourceType, ok := source.(*types.TypeName); sourceOK && ok {
+			return sourceType == r.typeName
 		}
-		source, sourceOK := r.owner.Source()
-		_, ok := source.(*types.TypeName)
-		return sourceOK && ok
+		return validLexicalNamedStructOwner(r.owner, r.typeName)
 	case DeclarationRequirementAddressableStorage:
 		if r.operation != NamedStructOperationInvalid ||
-			r.array != DefinedArrayOperationInvalid ||
+			r.typeName != nil ||
 			r.variable == nil ||
 			r.variable.IsField() ||
 			r.constant != nil ||
@@ -387,7 +255,7 @@ func (r DeclarationRequirement) Valid() bool {
 		return sourceOK && ok
 	case DeclarationRequirementConstantProjection:
 		if r.operation != NamedStructOperationInvalid ||
-			r.array != DefinedArrayOperationInvalid ||
+			r.typeName != nil ||
 			r.variable != nil ||
 			r.constant != nil ||
 			!validConstantProjection(r.projection) ||
@@ -401,7 +269,7 @@ func (r DeclarationRequirement) Valid() bool {
 		return sourceOK && ok
 	case DeclarationRequirementLocalConstantProjection:
 		if r.operation != NamedStructOperationInvalid ||
-			r.array != DefinedArrayOperationInvalid ||
+			r.typeName != nil ||
 			r.variable != nil ||
 			r.constant == nil ||
 			!validConstantProjection(r.projection) ||
@@ -413,9 +281,26 @@ func (r DeclarationRequirement) Valid() bool {
 		source, sourceOK := r.owner.Source()
 		_, ok := source.(*types.Func)
 		return sourceOK && ok
+	case DeclarationRequirementGenericOperation:
+		if r.operation != NamedStructOperationInvalid ||
+			r.typeName != nil ||
+			r.variable != nil ||
+			r.constant != nil ||
+			r.projection != types.Invalid ||
+			r.generated != nil ||
+			r.anonymousDemand != AnonymousStructDemandInvalid ||
+			r.mapDemand != MapSpecializationDemandInvalid ||
+			!r.genericOperation.Valid() {
+			return false
+		}
+		source, sourceOK := r.owner.Source()
+		return sourceOK &&
+			GenericDeclarationOrigin(source) == source &&
+			len(GenericDeclarationParameters(source)) != 0 &&
+			r.genericOperation.Owner() == source
 	case DeclarationRequirementAnonymousStruct:
 		return r.operation == NamedStructOperationInvalid &&
-			r.array == DefinedArrayOperationInvalid &&
+			r.typeName == nil &&
 			r.variable == nil &&
 			r.constant == nil &&
 			r.projection == types.Invalid &&
@@ -426,7 +311,7 @@ func (r DeclarationRequirement) Valid() bool {
 			r.owner == r.generated.ReconstructionOwner()
 	case DeclarationRequirementMapSpecialization:
 		return r.operation == NamedStructOperationInvalid &&
-			r.array == DefinedArrayOperationInvalid &&
+			r.typeName == nil &&
 			r.variable == nil &&
 			r.constant == nil &&
 			r.projection == types.Invalid &&
@@ -435,131 +320,222 @@ func (r DeclarationRequirement) Valid() bool {
 			r.anonymousDemand == AnonymousStructDemandInvalid &&
 			r.mapDemand.Valid() &&
 			r.owner == r.generated.ReconstructionOwner()
+	case DeclarationRequirementInterfaceAdapter:
+		return r.validGeneratedDefinition(
+			GeneratedArtifactInterfaceAdapter,
+		)
+	case DeclarationRequirementAnonymousInterface:
+		return r.validGeneratedDefinition(
+			GeneratedArtifactAnonymousInterface,
+		)
+	case DeclarationRequirementInterfaceMethodToken:
+		return r.validGeneratedDefinition(
+			GeneratedArtifactInterfaceMethodToken,
+		)
+	case DeclarationRequirementInterfaceDynamicTypeToken:
+		return r.validGeneratedDefinition(
+			GeneratedArtifactInterfaceDynamicTypeToken,
+		)
+	case DeclarationRequirementGenericCapability:
+		return r.operation == NamedStructOperationInvalid &&
+			r.typeName == nil &&
+			r.variable == nil &&
+			r.constant == nil &&
+			r.projection == types.Invalid &&
+			r.generated.Valid() &&
+			r.generated.Kind() == GeneratedArtifactGenericCapability &&
+			r.anonymousDemand == AnonymousStructDemandInvalid &&
+			r.mapDemand == MapSpecializationDemandInvalid &&
+			r.genericOperation == nil &&
+			r.owner == r.generated.ReconstructionOwner()
+	case DeclarationRequirementCallableControl:
+		if !r.owner.Valid() ||
+			r.operation != NamedStructOperationInvalid ||
+			r.typeName != nil ||
+			r.variable != nil ||
+			r.constant != nil ||
+			r.projection != types.Invalid ||
+			r.generated != nil ||
+			r.anonymousDemand != AnonymousStructDemandInvalid ||
+			r.mapDemand != MapSpecializationDemandInvalid ||
+			r.genericOperation != nil ||
+			!validCallableControlOwner(r.owner, r.enclosing, r.callable) ||
+			!r.control.Valid() {
+			return false
+		}
+		if r.control == CallableControlGoto {
+			return r.controlLabel != nil &&
+				r.controlPosition.IsValid() &&
+				r.callable != nil &&
+				r.controlPosition >= r.callable.Pos() &&
+				r.controlPosition <= r.callable.End()
+		}
+		return r.controlLabel == nil && !r.controlPosition.IsValid()
+	case DeclarationRequirementCooperativeCallable:
+		return r.validCooperativeCallable()
+	case DeclarationRequirementCallableABI:
+		return r.validGeneratedDefinition(
+			GeneratedArtifactCallableABI,
+		)
 	default:
 		return false
 	}
 }
 
-func validConstantProjection(projection types.BasicKind) bool {
-	_, ok := ConstantProjectionType(projection)
-	return ok
-}
-
-func (r DeclarationRequirement) Owner() ArtifactOwner {
-	return r.owner
-}
-
-func (r DeclarationRequirement) Kind() DeclarationRequirementKind {
-	return r.kind
-}
-
-func (r DeclarationRequirement) NamedStructOperation() (
-	*types.TypeName,
-	NamedStructOperation,
-	bool,
-) {
-	if !r.Valid() ||
-		r.kind != DeclarationRequirementNamedStructOperation {
-		return nil, NamedStructOperationInvalid, false
+func NewDirectCallableControlRequirement(
+	owner *types.Func,
+	control CallableControlFacet,
+) (DeclarationRequirement, error) {
+	if owner == nil ||
+		owner.Origin() != owner ||
+		!control.Valid() ||
+		control == CallableControlGoto {
+		return DeclarationRequirement{}, &RootRequestError{
+			Reason: "direct callable-control requirement is invalid",
+		}
 	}
-	source, sourceOK := r.owner.Source()
-	typeName, ok := source.(*types.TypeName)
-	return typeName, r.operation, sourceOK && ok
+	return DeclarationRequirement{
+		owner:   MustSourceArtifactOwner(owner),
+		kind:    DeclarationRequirementCallableControl,
+		control: control,
+	}, nil
 }
 
-func (r DeclarationRequirement) DefinedArrayOperation() (
-	*types.TypeName,
-	DefinedArrayOperation,
-	bool,
-) {
-	if !r.Valid() ||
-		r.kind != DeclarationRequirementDefinedArrayOperation {
-		return nil, DefinedArrayOperationInvalid, false
+func NewCallableControlRequirement(
+	owner ArtifactOwner,
+	enclosing ast.Node,
+	callable ast.Node,
+	control CallableControlFacet,
+) (DeclarationRequirement, error) {
+	if !validCallableControlAnchor(owner, enclosing, callable) ||
+		!control.Valid() ||
+		control == CallableControlGoto {
+		return DeclarationRequirement{}, &RootRequestError{
+			Reason: "callable-control requirement is invalid",
+		}
 	}
-	source, sourceOK := r.owner.Source()
-	typeName, ok := source.(*types.TypeName)
-	return typeName, r.array, sourceOK && ok
+	return DeclarationRequirement{
+		owner:     owner,
+		kind:      DeclarationRequirementCallableControl,
+		enclosing: enclosing,
+		callable:  callable,
+		control:   control,
+	}, nil
 }
 
-func (r DeclarationRequirement) AddressableStorage() (
-	*types.Func,
-	*types.Var,
-	bool,
-) {
-	if !r.Valid() ||
-		r.kind != DeclarationRequirementAddressableStorage {
-		return nil, nil, false
+func NewGotoControlRequirement(
+	owner ArtifactOwner,
+	enclosing ast.Node,
+	callable ast.Node,
+	label *types.Label,
+	position token.Pos,
+) (DeclarationRequirement, error) {
+	if !validCallableControlAnchor(owner, enclosing, callable) ||
+		label == nil ||
+		!position.IsValid() ||
+		position < callable.Pos() ||
+		position > callable.End() {
+		return DeclarationRequirement{}, &RootRequestError{
+			Reason: "goto control requirement is invalid",
+		}
 	}
-	source, sourceOK := r.owner.Source()
-	owner, ok := source.(*types.Func)
-	return owner, r.variable, sourceOK && ok
+	return DeclarationRequirement{
+		owner:           owner,
+		kind:            DeclarationRequirementCallableControl,
+		enclosing:       enclosing,
+		callable:        callable,
+		control:         CallableControlGoto,
+		controlLabel:    label,
+		controlPosition: position,
+	}, nil
 }
 
-func (r DeclarationRequirement) ConstantProjection() (
-	*types.Const,
-	types.BasicKind,
-	bool,
-) {
-	if !r.Valid() ||
-		r.kind != DeclarationRequirementConstantProjection {
-		return nil, types.Invalid, false
+func validCallableControlAnchor(
+	owner ArtifactOwner,
+	enclosing ast.Node,
+	callable ast.Node,
+) bool {
+	if !owner.Valid() ||
+		enclosing == nil ||
+		callable == nil ||
+		callable.Pos() < enclosing.Pos() ||
+		callable.End() > enclosing.End() {
+		return false
 	}
-	source, sourceOK := r.owner.Source()
-	constant, ok := source.(*types.Const)
-	return constant, r.projection, sourceOK && ok
-}
-
-func (r DeclarationRequirement) LocalConstantProjection() (
-	*types.Func,
-	*types.Const,
-	types.BasicKind,
-	bool,
-) {
-	if !r.Valid() ||
-		r.kind != DeclarationRequirementLocalConstantProjection {
-		return nil, nil, types.Invalid, false
-	}
-	source, sourceOK := r.owner.Source()
-	owner, ok := source.(*types.Func)
-	return owner, r.constant, r.projection, sourceOK && ok
-}
-
-func (r DeclarationRequirement) AnonymousStruct() (
-	*GeneratedArtifact,
-	AnonymousStructDemand,
-	bool,
-) {
-	if !r.Valid() ||
-		r.kind != DeclarationRequirementAnonymousStruct {
-		return nil, AnonymousStructDemandInvalid, false
-	}
-	return r.generated, r.anonymousDemand, true
-}
-
-func (r DeclarationRequirement) MapSpecialization() (
-	*GeneratedArtifact,
-	MapSpecializationDemand,
-	bool,
-) {
-	if !r.Valid() ||
-		r.kind != DeclarationRequirementMapSpecialization {
-		return nil, MapSpecializationDemandInvalid, false
-	}
-	return r.generated, r.mapDemand, true
-}
-
-func (r DeclarationRequirement) GeneratedArtifact() (
-	*GeneratedArtifact,
-	bool,
-) {
-	if !r.Valid() {
-		return nil, false
-	}
-	switch r.kind {
-	case DeclarationRequirementAnonymousStruct,
-		DeclarationRequirementMapSpecialization:
-		return r.generated, true
+	switch callable := callable.(type) {
+	case *ast.FuncDecl:
+		source, ok := owner.Source()
+		function, functionOK := source.(*types.Func)
+		return ok &&
+			functionOK &&
+			enclosing == callable &&
+			callable.Type != nil &&
+			callable.Body != nil &&
+			function.Pos() >= callable.Pos() &&
+			function.Pos() <= callable.End()
+	case *ast.FuncLit:
+		if callable.Type == nil || callable.Body == nil {
+			return false
+		}
+		if source, ok := owner.Source(); ok {
+			function, functionOK := source.(*types.Func)
+			return functionOK &&
+				function.Pos() >= enclosing.Pos() &&
+				function.Pos() <= enclosing.End()
+		}
+		_, initializer, ok := owner.PackageInitializer()
+		return ok &&
+			initializer.Rhs != nil &&
+			enclosing == initializer.Rhs
 	default:
-		return nil, false
+		return false
 	}
+}
+
+func validCallableControlOwner(
+	owner ArtifactOwner,
+	enclosing ast.Node,
+	callable ast.Node,
+) bool {
+	if enclosing != nil || callable != nil {
+		return validCallableControlAnchor(owner, enclosing, callable)
+	}
+	source, ok := owner.Source()
+	function, functionOK := source.(*types.Func)
+	return ok && functionOK && function.Origin() == function
+}
+
+func (r DeclarationRequirement) validGeneratedDefinition(
+	kind GeneratedArtifactKind,
+) bool {
+	return r.operation == NamedStructOperationInvalid &&
+		r.typeName == nil &&
+		r.variable == nil &&
+		r.constant == nil &&
+		r.projection == types.Invalid &&
+		r.generated.Valid() &&
+		r.generated.Kind() == kind &&
+		r.anonymousDemand == AnonymousStructDemandInvalid &&
+		r.mapDemand == MapSpecializationDemandInvalid &&
+		r.owner == r.generated.ReconstructionOwner()
+}
+
+func validLexicalNamedStructOwner(
+	owner ArtifactOwner,
+	typeName *types.TypeName,
+) bool {
+	if !owner.Valid() ||
+		typeName == nil ||
+		typeName.Pkg() == nil ||
+		typeName.Parent() == nil ||
+		typeName.Parent() == typeName.Pkg().Scope() ||
+		owner.Package() != typeName.Pkg() {
+		return false
+	}
+	if source, ok := owner.Source(); ok {
+		_, function := source.(*types.Func)
+		return function
+	}
+	_, _, initializer := owner.PackageInitializer()
+	return initializer
 }

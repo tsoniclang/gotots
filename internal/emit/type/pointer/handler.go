@@ -58,6 +58,14 @@ func EmitRepresented(
 	if err != nil {
 		return api.TypeEmission{}, err
 	}
+	storageType, err := context.Values().StorageType(
+		context.WithRole(api.RoleStorageType),
+		source,
+		element,
+	)
+	if err != nil {
+		return api.TypeEmission{}, err
+	}
 	reference, err := context.Names().Runtime(
 		api.RuntimePointer,
 		api.ImportPhaseType,
@@ -67,7 +75,7 @@ func EmitRepresented(
 	}
 	cell := context.Factory().TypeReferenceNode(
 		context.Factory().Identifier(reference.Name()),
-		[]tsgo.TypeNode{elementType.Value()},
+		[]tsgo.TypeNode{elementType.Value(), storageType.Value()},
 	)
 	return api.DirectType(
 		context.Factory().UnionTypeNode([]tsgo.TypeNode{
@@ -78,6 +86,7 @@ func EmitRepresented(
 		}),
 		api.CombineRequests(
 			elementType.Requests(),
+			storageType.Requests(),
 			reference.Requests(),
 		)...,
 	), nil

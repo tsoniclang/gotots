@@ -3,49 +3,109 @@ package panicruntime
 import (
 	"testing"
 
+	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
-func TestBuildCreatesOneTypedPanicCarrier(t *testing.T) {
-	class := Build(tsgo.NewFactory(), "GoPanic").(tsgo.ClassDeclaration)
-	if class.Name().Text() != "GoPanic" ||
-		len(class.TypeParameters()) != 1 ||
-		len(class.Members()) != 2 {
+func TestBuildCreatesOneNonErasedPanicCarrierAndRecoveryAuthority(t *testing.T) {
+	factory := tsgo.NewFactory()
+	carrierTarget, err := Build(
+		factory,
+		api.RuntimePanic,
+		"GoPanic",
+		"GoInterfaceValue",
+		"GoRuntimePanicValue",
+		"GoRecovery",
+		"GoErrorMethodToken",
+		"GoRuntimeErrorMethodToken",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	carrier := carrierTarget.(tsgo.ClassDeclaration)
+	if className(carrier) != "GoPanic" ||
+		len(carrier.TypeParameters()) != 0 ||
+		len(carrier.Members()) != 5 {
 		t.Fatalf(
 			"panic class = %q, type parameters %d, members %d",
-			class.Name().Text(),
-			len(class.TypeParameters()),
-			len(class.Members()),
+			className(carrier),
+			len(carrier.TypeParameters()),
+			len(carrier.Members()),
 		)
 	}
-	constructor := class.Members()[0].(tsgo.ConstructorDeclaration)
-	if len(constructor.Modifiers()) != 1 ||
-		constructor.Modifiers()[0].Kind() != tsgo.SyntaxKindPrivateKeyword ||
-		len(constructor.Parameters()) != 1 {
-		t.Fatal("panic carrier constructor is not private and typed")
+	for _, index := range []int{2, 3, 4} {
+		method := carrier.Members()[index].(tsgo.MethodDeclaration)
+		body := method.Body().(tsgo.Block).Statements()
+		if len(body) != 1 || body[0].Kind() != tsgo.SyntaxKindThrowStatement {
+			t.Fatalf("panic method %d does not throw exactly once", index)
+		}
 	}
-	raise := class.Members()[1].(tsgo.MethodDeclaration)
-	if raise.Name().(tsgo.Identifier).Text() != RaiseName ||
-		len(raise.TypeParameters()) != 1 ||
-		raise.Type().Kind() != tsgo.SyntaxKindNeverKeyword {
-		t.Fatal("panic carrier lacks one generic static never-returning raise method")
+
+	recoveryTarget, err := Build(
+		factory,
+		api.RuntimeRecovery,
+		"GoPanic",
+		"GoInterfaceValue",
+		"GoRuntimePanicValue",
+		"GoRecovery",
+		"GoErrorMethodToken",
+		"GoRuntimeErrorMethodToken",
+	)
+	if err != nil {
+		t.Fatal(err)
 	}
-	body := raise.Body().(tsgo.Block).Statements()
-	if len(body) != 1 || body[0].Kind() != tsgo.SyntaxKindThrowStatement {
-		t.Fatal("panic raise path does not throw exactly once")
+	recovery := recoveryTarget.(tsgo.ClassDeclaration)
+	if className(recovery) != "GoRecovery" || len(recovery.Members()) != 3 {
+		t.Fatalf(
+			"recovery class = %q with %d members",
+			className(recovery),
+			len(recovery.Members()),
+		)
 	}
 }
 
-func TestCallUsesTheClosedRaiseMember(t *testing.T) {
+func TestCallsUseClosedSourceAndRuntimeRaiseMembers(t *testing.T) {
 	factory := tsgo.NewFactory()
-	call := Call(
-		factory,
-		"GoPanic",
-		factory.StringLiteral("boom", tsgo.TokenFlagsNone),
-	)
-	member := call.Expression().(tsgo.PropertyAccessExpression)
-	if member.Expression().(tsgo.Identifier).Text() != "GoPanic" ||
-		member.Name().(tsgo.Identifier).Text() != RaiseName {
-		t.Fatal("panic call bypasses the closed runtime member")
+	for _, test := range []struct {
+		call tsgo.CallExpression
+		want string
+	}{
+		{
+			call: CreateRuntime(
+				factory,
+				"GoPanic",
+				factory.StringLiteral("boom", tsgo.TokenFlagsNone),
+			),
+			want: CreateRuntimeName,
+		},
+		{
+			call: Call(
+				factory,
+				"GoPanic",
+				factory.StringLiteral("boom", tsgo.TokenFlagsNone),
+			),
+			want: RaiseRuntimeName,
+		},
+		{
+			call: CallValue(
+				factory,
+				"GoPanic",
+				factory.Identifier("payload"),
+			),
+			want: RaiseName,
+		},
+	} {
+		member := test.call.Expression().(tsgo.PropertyAccessExpression)
+		if member.Expression().(tsgo.Identifier).Text() != "GoPanic" ||
+			member.Name().(tsgo.Identifier).Text() != test.want {
+			t.Fatalf("panic call bypasses %s", test.want)
+		}
 	}
+}
+
+func className(class tsgo.ClassDeclaration) string {
+	if class.Name() == nil {
+		return ""
+	}
+	return class.Name().Text()
 }

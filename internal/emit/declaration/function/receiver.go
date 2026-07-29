@@ -26,7 +26,7 @@ func emitReceiver(
 			api.Unsupported(context, api.CategoryDeclaration, source)
 	}
 	field := source.Recv.List[0]
-	if field.Doc != nil || field.Comment != nil || field.Tag != nil {
+	if field.Tag != nil {
 		return nil, nil,
 			api.Unsupported(context, api.CategoryDeclaration, field)
 	}
@@ -36,7 +36,11 @@ func emitReceiver(
 		baseType = pointer.Elem()
 	}
 	named, ok := types.Unalias(baseType).(*types.Named)
-	if !ok || named.TypeParams().Len() != 0 {
+	if !ok ||
+		named.Obj() == nil ||
+		named.Origin().Obj().Pkg() != signature.Recv().Pkg() ||
+		(named.TypeParams().Len() != 0 &&
+			named.TypeArgs().Len() != named.TypeParams().Len()) {
 		return nil, nil,
 			api.Unsupported(
 				context.WithRole(api.RoleReceiverType),
@@ -44,11 +48,10 @@ func emitReceiver(
 				field.Type,
 			)
 	}
-	if _, ok := named.Underlying().(*types.Struct); !ok ||
-		!types.Identical(
-			context.TypesInfo().TypeOf(field.Type),
-			receiverType,
-		) ||
+	if !types.Identical(
+		context.TypesInfo().TypeOf(field.Type),
+		receiverType,
+	) ||
 		context.TypesInfo().Defs[field.Names[0]] != signature.Recv() {
 		return nil, nil,
 			api.Unsupported(context, api.CategoryDeclaration, field)

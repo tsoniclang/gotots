@@ -81,6 +81,18 @@ func NumberUnsignedShift(value uint32) (uint32, uint32) {
 	return value << 1, value >> 3
 }
 
+func NumberVariableShift(value int32, count uint8) (int32, int32) {
+	return value << count, value >> count
+}
+
+func NumberVariableSignedShift(value int32, count int32) int32 {
+	return value << count
+}
+
+func NumberVariableUnsignedShift(value uint32, count uint8) (uint32, uint32) {
+	return value << count, value >> count
+}
+
 func NumberUnary(value int32) (int32, int32, int32) {
 	return +value, -value, ^value
 }
@@ -103,6 +115,18 @@ func BigUnsigned(left, right uint64) (uint64, uint64, uint64, uint64) {
 
 func BigShifts(value int64) (int64, int64) {
 	return value << 2, value >> 3
+}
+
+func BigVariableShift(value int64, count uint8) (int64, int64) {
+	return value << count, value >> count
+}
+
+func BigVariableSignedShift(value int64, count int32) int64 {
+	return value << count
+}
+
+func BigVariableUnsignedShift(value uint64, count uint8) (uint64, uint64) {
+	return value << count, value >> count
 }
 
 func BigUnary(value int64) (int64, int64, int64) {

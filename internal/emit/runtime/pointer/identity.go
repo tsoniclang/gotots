@@ -2,6 +2,27 @@ package pointer
 
 import "github.com/tsoniclang/gotots/internal/target/tsgo"
 
+func (b builder) logicalProperty() tsgo.PropertyDeclaration {
+	identityType := b.factory.FunctionTypeNode(
+		nil,
+		[]tsgo.ParameterDeclaration{
+			b.parameter("value", b.typeL()),
+		},
+		b.typeL(),
+	)
+	return b.factory.PropertyDeclaration(
+		[]tsgo.ModifierLike{
+			b.factory.DeclareKeyword(),
+			b.factory.PrivateKeyword(),
+			b.factory.ReadonlyKeyword(),
+		},
+		b.id("logical"),
+		nil,
+		identityType,
+		nil,
+	)
+}
+
 func (b builder) rootsProperty() tsgo.PropertyDeclaration {
 	targetType := b.typeReference(
 		"WeakMap",
@@ -58,10 +79,11 @@ func (b builder) constructor() tsgo.ConstructorDeclaration {
 		b.factory.PrivateKeyword(),
 		b.factory.ReadonlyKeyword(),
 	}
-	readType := b.factory.FunctionTypeNode(nil, nil, b.typeT())
+	readonly := []tsgo.ModifierLike{b.factory.ReadonlyKeyword()}
+	readType := b.factory.FunctionTypeNode(nil, nil, b.typeS())
 	writeType := b.factory.FunctionTypeNode(
 		nil,
-		[]tsgo.ParameterDeclaration{b.parameter("value", b.typeT())},
+		[]tsgo.ParameterDeclaration{b.parameter("value", b.typeS())},
 		b.factory.KeywordTypeNode(
 			tsgo.KeywordTypeSyntaxKindVoidKeyword,
 		),
@@ -71,9 +93,9 @@ func (b builder) constructor() tsgo.ConstructorDeclaration {
 		nil,
 		[]tsgo.ParameterDeclaration{
 			b.factory.ParameterDeclaration(
-				privateReadonly,
+				readonly,
 				nil,
-				b.id("address"),
+				b.id(AddressName),
 				nil,
 				b.objectType(),
 				nil,

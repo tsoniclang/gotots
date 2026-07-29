@@ -160,6 +160,7 @@ func constructorModifiers(
 	switch model.Family() {
 	case definedtype.FamilySlice,
 		definedtype.FamilyPointer,
+		definedtype.FamilyChannel,
 		definedtype.FamilyMap:
 		return []tsgo.ModifierLike{context.Factory().PrivateKeyword()}
 	default:

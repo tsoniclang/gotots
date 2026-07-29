@@ -4,9 +4,9 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
-	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	"github.com/tsoniclang/gotots/internal/emit/resulttuple"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -20,13 +20,23 @@ func emitMultipleResults(
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
 	}
-	targets, err := parallelTargets(context, source)
+	targets, locationBefore, locationRequests, err := parallelTargets(
+		context,
+		children,
+		source,
+	)
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
 	for index, target := range targets {
-		if !target.discard &&
-			!types.AssignableTo(results.At(index).Type(), target.object.Type()) {
+		if target.discard {
+			continue
+		}
+		targetType := target.target.SourceType()
+		if target.declaration {
+			targetType = target.object.Type()
+		}
+		if !types.AssignableTo(results.At(index).Type(), targetType) {
 			return api.StatementEmission{},
 				api.Unsupported(context, api.CategoryStatement, source)
 		}
@@ -36,59 +46,51 @@ func emitMultipleResults(
 	if source.Tok == token.DEFINE {
 		role = api.RoleLocalValue
 	}
-	value, err := children.Expression(
-		context.
-			WithRole(role).
-			WithExpectedResults(results),
+	capture, err := resulttuple.Emit(
+		context,
+		children,
 		source.Rhs[0],
+		results,
+		role,
 	)
 	if err != nil {
 		return api.StatementEmission{}, err
 	}
-	temporaryName, err := context.Names().Temporary(api.TemporaryMultipleResults)
-	if err != nil {
-		return api.StatementEmission{}, err
-	}
-	statements := value.Before()
-	statements = append(
-		statements,
-		variableStatement(
-			context,
-			tsgo.NodeFlagsConst,
-			temporaryName,
-			value.Value(),
-		),
-	)
-	requests := value.Requests()
+	statements := append(locationBefore, capture.Statements()...)
+	requests := api.CombineRequests(locationRequests, capture.Requests())
 
 	for index, target := range targets {
 		if target.discard {
 			continue
 		}
-		element := tsgo.Expression(context.Factory().ElementAccessExpression(
-			context.Factory().Identifier(temporaryName),
-			nil,
-			context.Factory().NumericLiteral(strconv.Itoa(index), tsgo.TokenFlagsNone),
-			tsgo.NodeFlagsNone,
-		))
-		copied, err := context.Values().Copy(
-			context.WithRole(role),
-			source.Rhs[0],
-			target.object.Type(),
-			api.DirectExpression(element),
-		)
+		element, err := capture.Element(context, index)
 		if err != nil {
 			return api.StatementEmission{}, err
 		}
-		statements = append(statements, copied.Before()...)
-		element = copied.Value()
-		requests = append(requests, copied.Requests()...)
+		targetType := target.target.SourceType()
+		if target.declaration {
+			targetType = target.object.Type()
+		}
+		if target.declaration || !target.target.CopiesValue() {
+			copied, err := context.Values().Copy(
+				context.WithRole(role),
+				source.Rhs[0],
+				targetType,
+				api.DirectExpression(element),
+			)
+			if err != nil {
+				return api.StatementEmission{}, err
+			}
+			statements = append(statements, copied.Before()...)
+			element = copied.Value()
+			requests = append(requests, copied.Requests()...)
+		}
 		if target.declaration {
 			if target.storage {
 				cell, err := context.AddressableStorage().Cell(
 					context,
 					children,
-					target.source,
+					target.identifier,
 					target.object.Type(),
 					api.DirectExpression(element),
 				)
@@ -98,10 +100,17 @@ func emitMultipleResults(
 				element = cell.Value()
 				requests = append(requests, cell.Requests()...)
 			}
+			if context.IsGotoLocal(target.object) {
+				statements = append(
+					statements,
+					assignmentStatement(context, target.name, element),
+				)
+				continue
+			}
 			targetType, typeRequests, err := pointerAnnotation(
 				context.WithRole(api.RoleLocalType),
 				children,
-				target.source,
+				target.identifier,
 				target.object.Type(),
 			)
 			if err != nil {
@@ -123,28 +132,21 @@ func emitMultipleResults(
 			)
 			requests = append(requests, typeRequests...)
 		} else {
-			targetExpression, err := parallelTargetExpression(context, target)
-			if err != nil {
-				return api.StatementEmission{}, err
-			}
-			assigned, err := context.Values().Assign(
+			stored, err := target.target.StoreValue(
 				context.WithRole(api.RoleAssignmentTarget),
 				target.source,
-				target.object.Type(),
-				targetExpression,
 				api.DirectExpression(element),
 			)
 			if err != nil {
 				return api.StatementEmission{}, err
 			}
-			statements = append(statements, assigned.Before()...)
+			statements = append(statements, stored.Before()...)
 			statements = append(
 				statements,
-				context.Factory().ExpressionStatement(assigned.Value()),
+				context.Factory().ExpressionStatement(stored.Value()),
 			)
-			requests = append(requests, assigned.Requests()...)
+			requests = append(requests, stored.Requests()...)
 		}
-		requests = append(requests, target.requests...)
 	}
 	return api.NewStatementEmission(statements, requests)
 }

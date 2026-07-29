@@ -9,6 +9,8 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	definedtypedeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/definedtype"
 	functiondeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/function"
+	generictypedeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/generic"
+	interfacetypedeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/interfacetype"
 	namedstructdeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/namedstruct"
 	packageconstant "github.com/tsoniclang/gotots/internal/emit/declaration/packageconstant"
 	addressexpression "github.com/tsoniclang/gotots/internal/emit/expression/address"
@@ -17,6 +19,7 @@ import (
 	compositeliteral "github.com/tsoniclang/gotots/internal/emit/expression/compositeliteral"
 	dereferenceexpression "github.com/tsoniclang/gotots/internal/emit/expression/dereference"
 	functionliteral "github.com/tsoniclang/gotots/internal/emit/expression/functionliteral"
+	genericfunctionvalue "github.com/tsoniclang/gotots/internal/emit/expression/genericfunctionvalue"
 	identifierexpression "github.com/tsoniclang/gotots/internal/emit/expression/identifier"
 	indexexpression "github.com/tsoniclang/gotots/internal/emit/expression/index"
 	complexliteral "github.com/tsoniclang/gotots/internal/emit/expression/literal/complex"
@@ -26,44 +29,61 @@ import (
 	parenthesizedexpression "github.com/tsoniclang/gotots/internal/emit/expression/parenthesized"
 	selectorexpression "github.com/tsoniclang/gotots/internal/emit/expression/selector"
 	sliceexpression "github.com/tsoniclang/gotots/internal/emit/expression/slice"
+	typeassertion "github.com/tsoniclang/gotots/internal/emit/expression/typeassertion"
 	unaryexpression "github.com/tsoniclang/gotots/internal/emit/expression/unary"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	"github.com/tsoniclang/gotots/internal/emit/statement/assignment"
 	blockstatement "github.com/tsoniclang/gotots/internal/emit/statement/block"
 	branchstatement "github.com/tsoniclang/gotots/internal/emit/statement/branch"
+	channelsend "github.com/tsoniclang/gotots/internal/emit/statement/channelsend"
+	deferstatement "github.com/tsoniclang/gotots/internal/emit/statement/deferstatement"
 	expressionstatement "github.com/tsoniclang/gotots/internal/emit/statement/expressionstatement"
 	forstatement "github.com/tsoniclang/gotots/internal/emit/statement/forstatement"
+	goroutinestatement "github.com/tsoniclang/gotots/internal/emit/statement/goroutine"
 	ifstatement "github.com/tsoniclang/gotots/internal/emit/statement/ifstatement"
 	incdecstatement "github.com/tsoniclang/gotots/internal/emit/statement/incdec"
+	labelstatement "github.com/tsoniclang/gotots/internal/emit/statement/label"
 	localconstant "github.com/tsoniclang/gotots/internal/emit/statement/localconstant"
 	localdeclaration "github.com/tsoniclang/gotots/internal/emit/statement/localdeclaration"
 	localtype "github.com/tsoniclang/gotots/internal/emit/statement/localtype"
+	rangestatement "github.com/tsoniclang/gotots/internal/emit/statement/range"
 	returnstatement "github.com/tsoniclang/gotots/internal/emit/statement/returnstatement"
+	selectstatement "github.com/tsoniclang/gotots/internal/emit/statement/selectstatement"
+	statementsequence "github.com/tsoniclang/gotots/internal/emit/statement/sequence"
 	switchstatement "github.com/tsoniclang/gotots/internal/emit/statement/switchstatement"
-	"github.com/tsoniclang/gotots/internal/emit/storage"
+	typeswitchstatement "github.com/tsoniclang/gotots/internal/emit/statement/typeswitchstatement"
 	storetarget "github.com/tsoniclang/gotots/internal/emit/store"
 	anonymousstructtype "github.com/tsoniclang/gotots/internal/emit/type/anonymousstruct"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
+	channeltype "github.com/tsoniclang/gotots/internal/emit/type/channel"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	generictype "github.com/tsoniclang/gotots/internal/emit/type/generic"
+	goruntimetype "github.com/tsoniclang/gotots/internal/emit/type/goruntime"
+	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	maptype "github.com/tsoniclang/gotots/internal/emit/type/map"
 	namedstructtype "github.com/tsoniclang/gotots/internal/emit/type/namedstruct"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
 	slicetype "github.com/tsoniclang/gotots/internal/emit/type/slice"
 	tupletype "github.com/tsoniclang/gotots/internal/emit/type/tuple"
 	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
+	interfacevalue "github.com/tsoniclang/gotots/internal/emit/value/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/emit/value/representation"
 	"github.com/tsoniclang/gotots/internal/load"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 type emitter struct {
-	source  *load.Package
-	factory tsgo.Factory
-	names   *emitnaming.Owner
-	values  api.Values
-	integer api.IntegerRepresentation
-	order   api.EvaluationOrder
-	require func(types.Object) error
+	source      *load.Package
+	factory     tsgo.Factory
+	names       *emitnaming.Owner
+	values      api.Values
+	integer     api.IntegerRepresentation
+	order       api.EvaluationOrder
+	concurrency api.ConcurrencySemantics
+	require     func(types.Object) error
+	generic     api.GenericCallableResolver
+	cooperative api.CooperativeCallableResolver
+	goRuntime   api.GoRuntimeContract
 }
 
 func newEmitter(
@@ -72,7 +92,11 @@ func newEmitter(
 	registry *emitnaming.Registry,
 	integer api.IntegerRepresentation,
 	order api.EvaluationOrder,
+	concurrency api.ConcurrencySemantics,
 	require func(types.Object) error,
+	generic api.GenericCallableResolver,
+	cooperative api.CooperativeCallableResolver,
+	goRuntime api.GoRuntimeContract,
 ) *emitter {
 	var typesInfo *types.Info
 	var packageScope *types.Scope
@@ -80,70 +104,20 @@ func newEmitter(
 		typesInfo = source.TypesInfo()
 		packageScope = source.Types().Scope()
 	}
-	return &emitter{
-		source:  source,
-		factory: factory,
-		names:   emitnaming.NewOwner(packageScope, typesInfo, registry),
-		values:  representation.Owner{},
-		integer: integer,
-		order:   order,
-		require: require,
+	target := &emitter{
+		source:      source,
+		factory:     factory,
+		names:       emitnaming.NewOwner(packageScope, typesInfo, registry),
+		integer:     integer,
+		order:       order,
+		concurrency: concurrency,
+		require:     require,
+		generic:     generic,
+		cooperative: cooperative,
+		goRuntime:   goRuntime,
 	}
-}
-
-func (e *emitter) fileContext(
-	sourceFile *ast.File,
-	targetPath string,
-) (api.Context, error) {
-	return e.targetContext(sourceFile, targetPath)
-}
-
-func (e *emitter) targetContext(
-	sourceFile *ast.File,
-	targetPath string,
-) (api.Context, error) {
-	names := e.names.ForFile(
-		sourceFile,
-		e.source.Types().Scope(),
-		e.factory,
-		targetPath,
-		e.require,
-	)
-	return e.context(names)
-}
-
-func (e *emitter) generatedContext(
-	targetPath string,
-	registry *emitnaming.Registry,
-) (api.Context, error) {
-	names := emitnaming.NewOwner(
-		nil,
-		nil,
-		registry,
-	).ForFile(
-		nil,
-		nil,
-		e.factory,
-		targetPath,
-		e.require,
-	)
-	return e.context(names)
-}
-
-func (e *emitter) context(names api.Names) (api.Context, error) {
-	return api.NewContext(
-		api.RoleFileDeclaration,
-		e.source.FileSet(),
-		e.source.Types(),
-		e.source.TypesInfo(),
-		e.source.TypesSizes(),
-		e.factory,
-		names,
-		e.values,
-		storage.Owner{},
-		e.integer,
-		e.order,
-	)
+	target.values = representation.NewOwner(target)
+	return target
 }
 
 func (e *emitter) declarationObject(
@@ -170,6 +144,24 @@ func (e *emitter) declarationObject(
 		)
 	case *ast.GenDecl:
 		if typeName, ok := object.(*types.TypeName); ok {
+			if target, handled, err := generictypedeclaration.Emit(
+				context,
+				e,
+				source,
+				typeName,
+				requirements,
+			); handled {
+				return target, err
+			}
+			if target, handled, err := interfacetypedeclaration.Emit(
+				context,
+				e,
+				source,
+				typeName,
+				requirements,
+			); handled {
+				return target, err
+			}
 			if target, handled, err := definedtypedeclaration.Emit(
 				context,
 				e,
@@ -214,43 +206,74 @@ func (e *emitter) Expression(
 	context api.Context,
 	source ast.Expr,
 ) (api.ExpressionEmission, error) {
+	operandContext := interfacevalue.OperandContext(context, source)
+	adapt := func(
+		target api.ExpressionEmission,
+		err error,
+	) (api.ExpressionEmission, error) {
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return interfacevalue.AdaptExpected(context, source, target)
+	}
+
 	switch source := source.(type) {
 	case *ast.BinaryExpr:
-		return binaryexpression.Emit(context, e, source)
+		return adapt(binaryexpression.Emit(operandContext, e, source))
 	case *ast.CallExpr:
-		return callexpression.Emit(context, e, source)
+		return adapt(callexpression.Emit(operandContext, e, source))
 	case *ast.CompositeLit:
-		return compositeliteral.Emit(context, e, source)
+		return adapt(compositeliteral.Emit(operandContext, e, source))
 	case *ast.FuncLit:
-		return functionliteral.Emit(context, e, source)
+		return adapt(functionliteral.Emit(operandContext, e, source))
 	case *ast.Ident:
-		return identifierexpression.Emit(context, e, source)
+		return adapt(identifierexpression.Emit(operandContext, e, source))
 	case *ast.IndexExpr:
-		return indexexpression.Emit(context, e, source)
+		if target, handled, err := genericfunctionvalue.Emit(
+			operandContext,
+			e,
+			source,
+		); handled {
+			return adapt(target, err)
+		}
+		return adapt(indexexpression.Emit(operandContext, e, source))
+	case *ast.IndexListExpr:
+		target, handled, err := genericfunctionvalue.Emit(
+			operandContext,
+			e,
+			source,
+		)
+		if !handled {
+			return api.ExpressionEmission{},
+				api.Unsupported(operandContext, api.CategoryExpression, source)
+		}
+		return adapt(target, err)
 	case *ast.ParenExpr:
-		return parenthesizedexpression.Emit(context, e, source)
+		return adapt(parenthesizedexpression.Emit(operandContext, e, source))
 	case *ast.SelectorExpr:
-		return selectorexpression.Emit(context, e, source)
+		return adapt(selectorexpression.Emit(operandContext, e, source))
 	case *ast.SliceExpr:
-		return sliceexpression.Emit(context, e, source)
+		return adapt(sliceexpression.Emit(operandContext, e, source))
 	case *ast.StarExpr:
-		return dereferenceexpression.Emit(context, e, source)
+		return adapt(dereferenceexpression.Emit(operandContext, e, source))
+	case *ast.TypeAssertExpr:
+		return adapt(typeassertion.Emit(operandContext, e, source))
 	case *ast.BasicLit:
 		if source.Kind == token.STRING {
-			return stringliteral.Emit(context, e, source)
+			return adapt(stringliteral.Emit(operandContext, e, source))
 		}
 		if source.Kind == token.IMAG {
-			return complexliteral.Emit(context, e, source)
+			return adapt(complexliteral.Emit(operandContext, e, source))
 		}
 		if source.Kind == token.FLOAT {
-			return floatliteral.Emit(context, e, source)
+			return adapt(floatliteral.Emit(operandContext, e, source))
 		}
-		return e.IntegerConstant(context, source)
+		return adapt(e.IntegerConstant(operandContext, source))
 	case *ast.UnaryExpr:
-		return unaryexpression.Emit(context, e, source)
+		return adapt(unaryexpression.Emit(operandContext, e, source))
 	default:
 		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
+			api.Unsupported(operandContext, api.CategoryExpression, source)
 	}
 }
 
@@ -299,6 +322,14 @@ func (e *emitter) Block(
 	return blockstatement.Emit(context, e, source)
 }
 
+func (e *emitter) Statements(
+	context api.Context,
+	owner ast.Node,
+	source []ast.Stmt,
+) (api.StatementEmission, error) {
+	return statementsequence.Emit(context, e, owner, source)
+}
+
 func (e *emitter) Statement(
 	context api.Context,
 	source ast.Stmt,
@@ -314,6 +345,8 @@ func (e *emitter) Statement(
 		return api.DirectStatement(target.Value(), target.Requests()...), nil
 	case *ast.BranchStmt:
 		return branchstatement.Emit(context, source)
+	case *ast.SendStmt:
+		return channelsend.Emit(context, e, source)
 	case *ast.DeclStmt:
 		declaration, ok := source.Decl.(*ast.GenDecl)
 		if !ok {
@@ -331,18 +364,32 @@ func (e *emitter) Statement(
 			return api.StatementEmission{},
 				api.Unsupported(context, api.CategoryStatement, source)
 		}
+	case *ast.DeferStmt:
+		return deferstatement.Emit(context, e, source)
 	case *ast.ExprStmt:
 		return expressionstatement.Emit(context, e, source)
+	case *ast.EmptyStmt:
+		return api.NewStatementEmission(nil, nil)
 	case *ast.ForStmt:
 		return forstatement.Emit(context, e, source)
+	case *ast.GoStmt:
+		return goroutinestatement.Emit(context, e, source)
 	case *ast.IfStmt:
 		return ifstatement.Emit(context, e, source)
 	case *ast.IncDecStmt:
 		return incdecstatement.Emit(context, e, source)
+	case *ast.LabeledStmt:
+		return labelstatement.Emit(context, e, source)
+	case *ast.RangeStmt:
+		return rangestatement.Emit(context, e, source)
 	case *ast.ReturnStmt:
 		return returnstatement.Emit(context, e, source)
+	case *ast.SelectStmt:
+		return selectstatement.Emit(context, e, source)
 	case *ast.SwitchStmt:
 		return switchstatement.Emit(context, e, source)
+	case *ast.TypeSwitchStmt:
+		return typeswitchstatement.Emit(context, e, source)
 	default:
 		return api.StatementEmission{},
 			api.Unsupported(context, api.CategoryStatement, source)
@@ -373,65 +420,26 @@ func (e *emitter) IfAlternate(
 	return ifstatement.Emit(context, e, source)
 }
 
-func (e *emitter) ForInitializer(
-	context api.Context,
-	source ast.Stmt,
-) (api.ForInitializerEmission, error) {
-	switch source := source.(type) {
-	case *ast.AssignStmt:
-		return assignment.EmitForInitializer(context, e, source)
-	case *ast.ExprStmt:
-		target, err := expressionstatement.EmitExpression(context, e, source)
-		if err != nil {
-			return api.ForInitializerEmission{}, err
-		}
-		if len(target.Before()) != 0 {
-			return api.ForInitializerEmission{},
-				api.Unsupported(context, api.CategoryStatement, source)
-		}
-		return api.ExpressionForInitializer(target.Value(), target.Requests()...)
-	case *ast.IncDecStmt:
-		target, err := incdecstatement.EmitExpression(context, e, source)
-		if err != nil {
-			return api.ForInitializerEmission{}, err
-		}
-		return api.ExpressionForInitializer(target.Value(), target.Requests()...)
-	default:
-		return api.ForInitializerEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
-	}
-}
-
-func (e *emitter) ForPost(
-	context api.Context,
-	source ast.Stmt,
-) (api.ExpressionEmission, error) {
-	switch source := source.(type) {
-	case *ast.AssignStmt:
-		return assignment.EmitExpression(context, e, source)
-	case *ast.ExprStmt:
-		target, err := expressionstatement.EmitExpression(context, e, source)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-		if len(target.Before()) != 0 {
-			return api.ExpressionEmission{},
-				api.Unsupported(context, api.CategoryStatement, source)
-		}
-		return target, nil
-	case *ast.IncDecStmt:
-		return incdecstatement.EmitExpression(context, e, source)
-	default:
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryStatement, source)
-	}
-}
-
 func (e *emitter) Type(
 	context api.Context,
 	source ast.Expr,
 ) (api.TypeEmission, error) {
 	if sourceType := context.TypesInfo().TypeOf(source); sourceType != nil {
+		if target, handled, err := goruntimetype.Emit(
+			context,
+			source,
+			sourceType,
+		); handled {
+			return target, err
+		}
+		if target, handled, err := generictype.Emit(
+			context,
+			e,
+			source,
+			sourceType,
+		); handled {
+			return target, err
+		}
 		if array, ok := arrayvalue.Resolve(context, sourceType); ok {
 			return array.EmitType(context, e, source)
 		}
@@ -466,8 +474,21 @@ func (e *emitter) Type(
 			}
 			return callable.EmitSyntaxType(context, e, functionType, signature)
 		}
+		if _, ok := channeltype.Resolve(sourceType); ok {
+			channelSyntax, valid := source.(*ast.ChanType)
+			if !valid {
+				return api.TypeEmission{},
+					api.Unsupported(context, api.CategoryType, source)
+			}
+			return channeltype.EmitSyntax(
+				context,
+				e,
+				channelSyntax,
+				sourceType,
+			)
+		}
 		if _, ok := types.Unalias(sourceType).(*types.Map); ok {
-			return maptype.Emit(context, source, sourceType)
+			return maptype.Emit(context, e, source, sourceType)
 		}
 		if sliceType, ok := types.Unalias(sourceType).(*types.Slice); ok {
 			arrayType, valid := source.(*ast.ArrayType)
@@ -504,6 +525,21 @@ func (e *emitter) RepresentedType(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
+	if target, handled, err := goruntimetype.Emit(
+		context,
+		source,
+		sourceType,
+	); handled {
+		return target, err
+	}
+	if target, handled, err := generictype.Emit(
+		context,
+		e,
+		source,
+		sourceType,
+	); handled {
+		return target, err
+	}
 	if array, ok := arrayvalue.Resolve(context, sourceType); ok {
 		return array.EmitType(context, e, source)
 	}
@@ -512,6 +548,9 @@ func (e *emitter) RepresentedType(
 	}
 	if _, _, ok := pointertype.Resolve(sourceType); ok {
 		return pointertype.EmitRepresented(context, e, source, sourceType)
+	}
+	if _, ok := interfacetype.Resolve(sourceType); ok {
+		return interfacetype.Emit(context, source, sourceType)
 	}
 	if _, ok := types.Unalias(sourceType).(*types.Named); ok {
 		if target, handled, err := definedtype.Emit(
@@ -526,8 +565,11 @@ func (e *emitter) RepresentedType(
 	if signature, ok := types.Unalias(sourceType).(*types.Signature); ok {
 		return callable.EmitType(context, e, source, signature)
 	}
+	if _, ok := channeltype.Resolve(sourceType); ok {
+		return channeltype.EmitRepresented(context, e, source, sourceType)
+	}
 	if _, ok := types.Unalias(sourceType).(*types.Map); ok {
-		return maptype.Emit(context, source, sourceType)
+		return maptype.Emit(context, e, source, sourceType)
 	}
 	if _, ok := types.Unalias(sourceType).(*types.Slice); ok {
 		return slicetype.EmitRepresented(context, e, source, sourceType)

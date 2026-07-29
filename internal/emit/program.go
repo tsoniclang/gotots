@@ -11,6 +11,7 @@ import (
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
+	"github.com/tsoniclang/gotots/internal/emit/runtime/gocontract"
 	"github.com/tsoniclang/gotots/internal/load"
 	targetoutput "github.com/tsoniclang/gotots/internal/output"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
@@ -51,6 +52,8 @@ type programSession struct {
 	builders               map[string]*targetFileBuilder
 	packageBuilders        map[*load.Package]*packageTargetBuilder
 	packageInitializations *packageInitializationScheduler
+	genericOperations      map[genericOperationIdentity]*api.GenericOperationContract
+	goRuntime              *gocontract.Contract
 	sealed                 bool
 }
 
@@ -347,6 +350,10 @@ func newProgramSession(
 	if err := registry.IndexPackageTargets(source.Packages()); err != nil {
 		return nil, err
 	}
+	goRuntime, err := gocontract.Resolve(source)
+	if err != nil {
+		return nil, err
+	}
 	session := &programSession{
 		source:                 source,
 		factory:                tsgo.NewFactory(),
@@ -360,6 +367,8 @@ func newProgramSession(
 		builders:               make(map[string]*targetFileBuilder),
 		packageBuilders:        make(map[*load.Package]*packageTargetBuilder),
 		packageInitializations: newPackageInitializationScheduler(),
+		genericOperations:      make(map[genericOperationIdentity]*api.GenericOperationContract),
+		goRuntime:              goRuntime,
 	}
 	for _, sourcePackage := range source.Packages() {
 		session.emitters[sourcePackage] = newEmitter(
@@ -368,7 +377,11 @@ func newProgramSession(
 			session.registry,
 			options.IntegerRepresentation,
 			options.EvaluationOrder,
+			options.ConcurrencySemantics,
 			session.require,
+			session,
+			session,
+			goRuntime,
 		)
 	}
 	orderedSites := make([]declarationSite, 0, len(sites))
@@ -434,40 +447,6 @@ func newProgramSession(
 		}
 	}
 	return session, nil
-}
-
-func (s *programSession) require(object types.Object) error {
-	if s.sealed {
-		objectName := ""
-		if object != nil {
-			objectName = object.Name()
-		}
-		return &ScheduleError{
-			Object: objectName,
-			Reason: "declaration requested after target files were sealed",
-		}
-	}
-	if object == nil {
-		return &ScheduleError{Reason: "referenced object is nil"}
-	}
-	if _, ok := s.sites[object]; !ok {
-		return &ScheduleError{
-			Object: object.Name(),
-			Reason: "object has no supported source declaration",
-		}
-	}
-	sourcePackage := s.source.PackageForTypes(object.Pkg())
-	if sourcePackage == nil {
-		return &ScheduleError{
-			Object: object.Name(),
-			Reason: "object package has no source owner",
-		}
-	}
-	if err := s.requirePackage(sourcePackage); err != nil {
-		return err
-	}
-	s.scheduler.enqueue(object)
-	return nil
 }
 
 func (s *programSession) emit(object types.Object) error {

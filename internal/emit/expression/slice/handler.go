@@ -19,6 +19,13 @@ func Emit(
 	source *ast.SliceExpr,
 ) (api.ExpressionEmission, error) {
 	operandType := context.TypesInfo().TypeOf(source.X)
+	if target, handled, err := slicingexpression.EmitArray(
+		context,
+		children,
+		source,
+	); handled || err != nil {
+		return target, err
+	}
 	if _, _, ok := slicevalue.Resolve(operandType); ok {
 		return slicingexpression.Emit(context, children, source)
 	}

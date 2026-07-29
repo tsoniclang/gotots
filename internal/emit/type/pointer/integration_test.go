@@ -38,9 +38,9 @@ func TestPointerCopyAndOrdinaryLocalsUseOnlyRequiredStorage(t *testing.T) {
 		callee.Name().(tsgo.Identifier).Text() != "cell" {
 		t.Fatalf("pointer constructor = %T, want GoPointer.cell", created.Expression())
 	}
-	if len(created.TypeArguments()) != 1 || len(created.Arguments()) != 1 {
+	if len(created.TypeArguments()) != 2 || len(created.Arguments()) != 1 {
 		t.Fatalf(
-			"pointer construction = %d type arguments, %d values; want one each",
+			"pointer construction = %d type arguments, %d values; want two and one",
 			len(created.TypeArguments()),
 			len(created.Arguments()),
 		)
@@ -104,11 +104,11 @@ func TestScalarPointersPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 	}
 	target := string(printed)
 	for _, required := range []string{
-		"GoPointer.cell<int32>(0)",
-		"GoPointer.dereference<int32>(pointer).value",
+		"GoPointer.cell<int32, int32>(0)",
+		"GoPointer.dereference<int32, int32>(pointer).value",
 		"GoPointer.equal(original, alias)",
 		"!GoPointer.equal(original, void 0)",
-		"let assigned: GoPointer<int32> | undefined",
+		"let assigned: GoPointer<int32, int32> | undefined",
 	} {
 		if !strings.Contains(target, required) {
 			t.Fatalf("pointer artifact lacks %q:\n%s", required, target)
@@ -121,7 +121,7 @@ func TestScalarPointersPrintTypecheckAndExecuteDifferentially(t *testing.T) {
 		".apply(",
 		".bind(",
 		"!.",
-		"new GoPointer<int32>(original)",
+		"new GoPointer<int32, int32>(original)",
 	} {
 		if strings.Contains(target, forbidden) {
 			t.Fatalf("pointer artifact contains %q:\n%s", forbidden, target)
@@ -227,10 +227,10 @@ func TestScalarPointerUseSitesScaleLinearly(t *testing.T) {
 		source, target := compilePointerScaling(t, count)
 		sourceBytes[index] = len(source)
 		targetBytes[index] = len(target)
-		if strings.Count(target, "GoPointer.cell<int32>(0)") != count {
+		if strings.Count(target, "GoPointer.cell<int32, int32>(0)") != count {
 			t.Fatalf(
 				"pointer constructors = %d, want %d",
-				strings.Count(target, "GoPointer.cell<int32>(0)"),
+				strings.Count(target, "GoPointer.cell<int32, int32>(0)"),
 				count,
 			)
 		}
@@ -309,7 +309,7 @@ func assertPointerCellAccess(
 	if !ok ||
 		callee.Expression().(tsgo.Identifier).Text() != "GoPointer" ||
 		callee.Name().(tsgo.Identifier).Text() != "dereference" ||
-		len(call.TypeArguments()) != 1 ||
+		len(call.TypeArguments()) != 2 ||
 		len(call.Arguments()) != 1 {
 		t.Fatalf("pointer guard = %T, want GoPointer.dereference", call.Expression())
 	}

@@ -12,11 +12,19 @@ import (
 	complexconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/complex"
 	floatconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/float"
 	integerconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/integer"
+	pointerconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/pointer"
+	slicearrayconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/slicearray"
+	stringconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/stringvalue"
+	structconversion "github.com/tsoniclang/gotots/internal/emit/expression/conversion/structvalue"
+	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	complexvalue "github.com/tsoniclang/gotots/internal/emit/value/complex"
 	floatvalue "github.com/tsoniclang/gotots/internal/emit/value/float"
 	integervalue "github.com/tsoniclang/gotots/internal/emit/value/integer"
+	interfacevalue "github.com/tsoniclang/gotots/internal/emit/value/interfacevalue"
 	"github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func Emit(
@@ -67,20 +75,107 @@ func Emit(
 		)
 		return target, true, err
 	}
+	sourceType := operandFacts.Type
+	if api.ContainsGenericTypeParameter(sourceType) ||
+		api.ContainsGenericTypeParameter(targetType) {
+		operandValue, err := children.Expression(
+			context.
+				WithRole(api.RoleConversionOperand).
+				WithExpectedType(sourceType),
+			operand,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, true, err
+		}
+		target, err := genericoperation.Call(
+			context,
+			source,
+			api.GenericOperationConvert,
+			[]types.Type{sourceType},
+			[]types.Type{targetType},
+			[]tsgo.Expression{operandValue.Value()},
+			operandValue.Requests()...,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, true, err
+		}
+		target, err = api.NewExpressionEmission(
+			operandValue.Before(),
+			target.Value(),
+			target.Requests(),
+		)
+		return target, true, err
+	}
+	operandExpected := operandFacts.Type
+	if _, interfaceTarget := interfacetype.Resolve(targetType); interfaceTarget {
+		operandExpected = interfacevalue.DynamicType(operandExpected)
+	}
 	operandValue, err := children.Expression(
 		context.
 			WithRole(api.RoleConversionOperand).
-			WithExpectedType(operandFacts.Type),
+			WithExpectedType(operandExpected),
 		operand,
 	)
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
 	}
-	sourceType := operandFacts.Type
+	target, handled, err := Apply(
+		context,
+		children,
+		source,
+		operand,
+		sourceType,
+		targetType,
+		operandValue,
+	)
+	if err != nil {
+		return api.ExpressionEmission{}, true, err
+	}
+	if !handled {
+		return api.ExpressionEmission{}, true,
+			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	return target, true, nil
+}
+
+func Apply(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.CallExpr,
+	operandSource ast.Node,
+	sourceType types.Type,
+	targetType types.Type,
+	operandValue api.ExpressionEmission,
+) (api.ExpressionEmission, bool, error) {
+	if sourceType == nil ||
+		targetType == nil ||
+		!types.ConvertibleTo(sourceType, targetType) {
+		return api.ExpressionEmission{}, false, nil
+	}
+	var err error
+	if target, handled, interfaceErr := interfacevalue.Convert(
+		context,
+		source,
+		sourceType,
+		targetType,
+		operandValue,
+	); handled {
+		return target, true, interfaceErr
+	}
 	if types.Identical(sourceType, targetType) {
 		if _, ok := callable.Signature(targetType); ok {
 			return operandValue, true, nil
 		}
+	}
+	if target, handled, pointerErr := pointerconversion.Convert(
+		context,
+		children,
+		source,
+		sourceType,
+		targetType,
+		operandValue,
+	); handled {
+		return target, true, pointerErr
 	}
 	if target, handled, mapErr := maprepresentation.Convert(
 		context,
@@ -104,47 +199,76 @@ func Emit(
 		representedTargetType = targetDefined.Underlying()
 	}
 	var target api.ExpressionEmission
-	switch {
-	case directReferenceConversion(sourceType, representedTargetType):
-		target = operandValue
-	case directArrayConversion(sourceType, representedTargetType):
-		target, err = context.Values().Copy(
-			context.WithRole(api.RoleConversionOperand),
-			operand,
-			sourceType,
-			operandValue,
-		)
-	case directCallableConversion(sourceType, representedTargetType):
-		target = operandValue
-	case isInteger(context, representedTargetType):
-		target, err = integerconversion.Convert(
-			context,
-			source,
-			sourceType,
-			representedTargetType,
-			operandValue,
-		)
-	case isFloat(representedTargetType):
-		target, err = floatconversion.Convert(
-			context,
-			source,
-			sourceType,
-			representedTargetType,
-			operandValue,
-		)
-	case isComplex(representedTargetType):
-		target, err = complexconversion.Convert(
-			context,
-			source,
-			sourceType,
-			representedTargetType,
-			operandValue,
-		)
-	case directBasicConversion(sourceType, representedTargetType):
-		target = operandValue
-	default:
-		return api.ExpressionEmission{}, true,
-			api.Unsupported(context, api.CategoryExpression, source)
+	if arrayTarget, handled, arrayErr := slicearrayconversion.Convert(
+		context,
+		children,
+		source,
+		sourceType,
+		representedTargetType,
+		operandValue,
+	); handled {
+		target, err = arrayTarget, arrayErr
+	} else if structTarget, handled, structErr := structconversion.Convert(
+		context,
+		source,
+		sourceType,
+		representedTargetType,
+		operandValue,
+	); handled {
+		target, err = structTarget, structErr
+	} else if stringTarget, handled, stringErr := stringconversion.Convert(
+		context,
+		children,
+		source,
+		sourceType,
+		representedTargetType,
+		operandValue,
+	); handled {
+		target, err = stringTarget, stringErr
+	} else {
+		switch {
+		case directChannelConversion(sourceType, representedTargetType):
+			target = operandValue
+		case directReferenceConversion(sourceType, representedTargetType):
+			target = operandValue
+		case directArrayConversion(sourceType, representedTargetType):
+			target, err = context.Values().Copy(
+				context.WithRole(api.RoleConversionOperand),
+				operandSource,
+				sourceType,
+				operandValue,
+			)
+		case directCallableConversion(sourceType, representedTargetType):
+			target = operandValue
+		case isInteger(context, representedTargetType):
+			target, err = integerconversion.Convert(
+				context,
+				source,
+				sourceType,
+				representedTargetType,
+				operandValue,
+			)
+		case isFloat(representedTargetType):
+			target, err = floatconversion.Convert(
+				context,
+				source,
+				sourceType,
+				representedTargetType,
+				operandValue,
+			)
+		case isComplex(representedTargetType):
+			target, err = complexconversion.Convert(
+				context,
+				source,
+				sourceType,
+				representedTargetType,
+				operandValue,
+			)
+		case directBasicConversion(sourceType, representedTargetType):
+			target = operandValue
+		default:
+			return api.ExpressionEmission{}, false, nil
+		}
 	}
 	if err != nil {
 		return api.ExpressionEmission{}, true, err
@@ -153,6 +277,15 @@ func Emit(
 		target, err = targetDefined.Wrap(context, target)
 	}
 	return target, true, err
+}
+
+func directChannelConversion(sourceType, targetType types.Type) bool {
+	source, sourceOK := types.Unalias(sourceType).(*types.Chan)
+	target, targetOK := types.Unalias(targetType).(*types.Chan)
+	return sourceOK &&
+		targetOK &&
+		types.Identical(source.Elem(), target.Elem()) &&
+		types.ConvertibleTo(source, target)
 }
 
 func directReferenceConversion(sourceType, targetType types.Type) bool {

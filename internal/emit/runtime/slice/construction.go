@@ -2,7 +2,7 @@ package slice
 
 import "github.com/tsoniclang/gotots/internal/target/tsgo"
 
-func (b builder) constructor(lazyZero bool) tsgo.ConstructorDeclaration {
+func (b builder) constructor() tsgo.ConstructorDeclaration {
 	privateReadonly := []tsgo.ModifierLike{
 		b.factory.PrivateKeyword(),
 		b.factory.ReadonlyKeyword(),
@@ -10,10 +10,6 @@ func (b builder) constructor(lazyZero bool) tsgo.ConstructorDeclaration {
 	publicReadonly := []tsgo.ModifierLike{
 		b.factory.PublicKeyword(),
 		b.factory.ReadonlyKeyword(),
-	}
-	zeroType := tsgo.TypeNode(b.typeT())
-	if lazyZero {
-		zeroType = b.valueFactoryType()
 	}
 	return b.factory.ConstructorDeclaration(
 		[]tsgo.ModifierLike{b.factory.PrivateKeyword()},
@@ -51,26 +47,18 @@ func (b builder) constructor(lazyZero bool) tsgo.ConstructorDeclaration {
 				b.numberType(),
 				nil,
 			),
-			b.factory.ParameterDeclaration(
-				privateReadonly,
-				nil,
-				b.id("zero"),
-				nil,
-				zeroType,
-				nil,
-			),
 		},
 		nil,
 		b.factory.Block(nil, true),
 	)
 }
 
-func (b builder) nilMethod(lazyZero bool) tsgo.MethodDeclaration {
+func (b builder) nilMethod() tsgo.MethodDeclaration {
 	return b.method(
 		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
 		MemberName(MemberNil),
 		[]tsgo.TypeParameterDeclaration{b.typeParameter()},
-		[]tsgo.ParameterDeclaration{b.parameter("zero", b.typeT())},
+		nil,
 		b.sliceType(),
 		b.returnStatement(
 			b.newSlice(
@@ -78,19 +66,12 @@ func (b builder) nilMethod(lazyZero bool) tsgo.MethodDeclaration {
 				b.number("0"),
 				b.number("0"),
 				b.number("0"),
-				b.zeroStorage(lazyZero, b.id("zero")),
 			),
 		),
 	)
 }
 
-func (b builder) makeMethod(
-	sharedShape bool,
-	lazyZero bool,
-) tsgo.MethodDeclaration {
-	if sharedShape {
-		return b.makeMethodWithShape(lazyZero)
-	}
+func (b builder) makeMethod() tsgo.MethodDeclaration {
 	invalidLength := b.binary(
 		b.id("numericLength"),
 		tsgo.BinaryOperatorLessThanToken,
@@ -160,29 +141,19 @@ func (b builder) makeMethod(
 				b.number("0"),
 				b.id("numericLength"),
 				b.id("resolvedCapacity"),
-				b.zeroStorage(lazyZero, b.id("zero")),
 			),
 		),
 	)
 }
 
-func (b builder) literalMethod(lazyZero bool) tsgo.MethodDeclaration {
-	values := b.factory.ParameterDeclaration(
-		nil,
-		b.factory.DotDotDotToken(),
-		b.id("values"),
-		nil,
-		b.factory.ArrayTypeNode(b.typeT()),
-		nil,
-	)
+func (b builder) literalMethod() tsgo.MethodDeclaration {
 	length := b.property(b.id("values"), "length")
 	return b.method(
 		[]tsgo.ModifierLike{b.factory.StaticKeyword()},
 		MemberName(MemberLiteral),
 		[]tsgo.TypeParameterDeclaration{b.typeParameter()},
 		[]tsgo.ParameterDeclaration{
-			b.parameter("zero", b.typeT()),
-			values,
+			b.parameter("values", b.factory.ArrayTypeNode(b.typeT())),
 		},
 		b.sliceType(),
 		b.returnStatement(
@@ -191,28 +162,7 @@ func (b builder) literalMethod(lazyZero bool) tsgo.MethodDeclaration {
 				b.number("0"),
 				length,
 				length,
-				b.zeroStorage(lazyZero, b.id("zero")),
 			),
-		),
-	)
-}
-
-func (b builder) zeroStorage(
-	lazyZero bool,
-	value tsgo.Expression,
-) tsgo.Expression {
-	if !lazyZero {
-		return value
-	}
-	return b.factory.ArrowFunction(
-		nil,
-		nil,
-		nil,
-		nil,
-		b.factory.EqualsGreaterThanToken(),
-		b.factory.Block(
-			[]tsgo.Statement{b.returnStatement(value)},
-			true,
 		),
 	)
 }

@@ -207,10 +207,12 @@ Compilation policy is selected once at the compilation entry point and is
 immutable for the complete dependency closure. Each axis is a closed typed
 choice. The initial integer-representation axis selects `number` (the default)
 or `bigint`. The initial evaluation-order axis selects `direct` (the default)
-or `preserve-go`. Handlers query the typed profile carried by their context;
-they never inspect CLI flags or independently select behavior. A generated file
-set may not mix selections. Every selected axis is part of reproducibility
-evidence and any eventual output manifest.
+or `preserve-go`. The initial concurrency-semantics axis selects `disabled`
+(the default) or the explicitly requested `cooperative` profile. Handlers query
+the typed profile carried by their context; they never inspect CLI flags or
+independently select behavior. A generated file set may not mix selections.
+Every selected axis is part of reproducibility evidence and any eventual
+output manifest.
 
 `direct` evaluation emits target expressions without introducing temporaries
 solely to preserve the source order of expressions that target reshaping
@@ -336,6 +338,65 @@ storage implementation nor the pointer runtime. This keeps assignment ordering
 independent of the selected value representation while retaining one storage
 truth owner.
 
+Logical value representation and addressable storage representation are
+separate facets of the same value-family owner. A pointer is represented as
+`GoPointer<Logical, Storage>`: `Logical` preserves Go's named-type identity,
+while `Storage` is the canonical mutable representation shared by every
+pointer type whose Go base types are identical under the selected toolchain's
+pointer-conversion rule. The runtime reads and writes only `Storage`; load and
+store sites ask the value-family owner to convert between `Logical` and
+`Storage`. The runtime never receives semantic conversion callbacks.
+
+For a named or generated struct that becomes addressable, its declaration is
+reconstructed once with one canonical storage record plus logical
+getters/setters. The ordinary construction surface remains a static `$make`
+member, so changing the private layout does not create a second constructor
+path or require source sites to predict later addressability. A pointer
+conversion requests the storage facet from both endpoint declarations and is
+admitted only when their independently constructed canonical storage types
+match the exact Go conversion evidence. Struct tags do not enter that storage
+facet; field identity, order, package identity, and recursively represented
+field storage do.
+
+```text
+Go *Left / *Right (underlying bases identical ignoring tags)
+        |
+        v
+GoPointer<Left, LeftStorage> --typed view--> GoPointer<Right, RightStorage>
+        |                                      |
+        +-------- LeftStorage == RightStorage--+
+```
+
+The view operation may allocate a constant-size pointer facade, but it reuses
+the same opaque canonical address and the same typed storage accessors. It
+does not copy the pointee, inspect a value shape, recover an erased payload, or
+carry a source/target conversion function.
+
+A defined array follows the same split without growing its nominal wrapper.
+Its generated class is the logical type and contains only its brand,
+constructor, and underlying value. Its canonical pointer storage is the
+underlying `GoArray<Element, Length>`. Indexing, pointer projection, and
+whole-array stores operate on that storage; they do not demand duplicate
+`get`/`set` methods on the nominal class.
+
+A slice-to-array pointer conversion is one typed region view over the slice's
+existing backing store. The slice runtime validates the requested length and
+returns canonical backing identity plus absolute offset; the array runtime
+constructs an offset-aware fixed-length view; the pointer runtime keys the
+location by that same backing and offset. A whole-array store copies the
+already value-copied source into the region. No layer copies the conversion
+operand, passes a semantic callback, or creates a second address identity.
+For length zero, a nil slice produces a nil pointer while a non-nil empty slice
+produces a non-nil pointer, matching Go.
+
+Slicing an array value or pointer-to-array uses the inverse view over that same
+canonical storage. The array owner exposes one demand-only typed
+`backing + offset` location; the slice owner constructs one descriptor with
+the array length as its initial length and capacity, then applies the ordinary
+slice-bounds operation. The result aliases the array in both directions and
+does not copy elements. Programs without array slicing emit neither the array
+location facet nor the array-to-slice view facet.
+
 Every executable Go function body, including each package `init` declaration,
 is a reconstructible artifact. Package initialization may impose ordering and
 an exported generated entry name, but it does not own a second emission or
@@ -442,6 +503,68 @@ facets, and reverse invalidation edges discovered while constructing actual
 TS-Go references. It does not copy source statements, infer whole-program
 meaning, perform name lookup, or decide reachability.
 
+## Generic Capability Fixed Point
+
+Go type parameters remain TypeScript type parameters. They are never erased,
+boxed into a universal payload, or expanded into one body per reached
+instantiation. Operations that TypeScript cannot perform while preserving the
+exact Go type travel through a statically typed target capability parameter:
+
+```go
+func Add[T ~int32](left, right T) T { return left + right }
+```
+
+```ts
+export function Add<T>(
+  $go$binary_add: (left: T, right: T) => T,
+  left: T,
+  right: T,
+): T {
+  return $go$binary_add(left, right);
+}
+```
+
+This operation function is target ABI, not source analysis. The one ordinary
+emission walk discovers a closed operation demand while constructing the actual
+TS-Go body. That demand is a typed declaration requirement owned by the exact
+generic `types.Object`. Its identity is `(typed operation selection, exact
+receiver-free signature)` within that owner. The selection is the closed
+operation kind plus exact semantic evidence that kind requires; a constraint
+method includes its selected `*types.Func`, so two same-signature methods do not
+collapse. Source position is not identity, so repeated uses exact-join one
+hidden parameter. Reconstruction adds the corresponding hidden function
+parameter to the same declaration. No prewalk, copied constraint model,
+operation IR, capability object, or runtime registry exists.
+
+The program session exposes only the current canonical generic callable
+contract to a call handler. A call records a `CallableSignature` dependency,
+reads the exact ordered `types.Info.Instances` arguments, and supplies one
+hidden operation function per demanded semantic signature before ordinary
+arguments. A concrete instantiation requests one reconstructible function
+artifact keyed by `(typed operation selection, exact instantiated signature)`.
+A signature
+still containing the caller's type parameters projects one hidden operation
+function on that caller and forwards it. Cross-parameter operations such as
+`Shift[T, U](T, U) T` therefore remain one exact `(T, U) => T` function; they
+are not forced into a per-parameter object. Recursive and mutually recursive
+calls use the ordinary artifact fixed point. Identical contracts do not
+propagate, and a repeated non-current contract remains a convergence failure.
+
+Each concrete operation artifact delegates to the existing authoritative
+value/operator/method owner. It may not restate zero, copy, equality, hashing,
+numeric, conversion, indexing, method, interface, channel, or iterator
+behavior. Constructed signatures containing type parameters compose by
+forwarding exact enclosing operation functions; they do not create an erased
+descriptor, growing object, capability factory, or per-use semantic closure.
+
+`go/types` remains the sole authority for constraints, type sets, inference,
+core types, method selection, and admissible operations. Target constraints are
+not reconstructed from Go syntax. The hidden callable list contains exactly the
+distinct operations demanded by the emitted declaration body. An unused
+function, duplicate same-signature function, optional operation, throwing
+invalid-operation function, string lookup, or universal operation bag is
+forbidden.
+
 One placement service applies the policy:
 
 - imports always enter file import scope; dynamic imports are forbidden;
@@ -511,6 +634,122 @@ graph's exact initialization order and append their TS-Go statements to one
 package-assembly function body. Whole-program order consumes the selected
 package import graph directly; it does not infer order from target imports or
 construct a parallel semantic graph.
+
+## Cooperative Concurrency
+
+Concurrency is disabled unless the compilation entry explicitly selects the
+**race-free cooperative Go** profile. Disabled compilation fails at the exact
+channel, goroutine, or select construct owner. Selecting the cooperative
+profile is an explicit source-program precondition, not an inferred property:
+execution may switch at modeled synchronization operations, but the compiler
+does not claim asynchronous Go preemption.
+
+For example, this race-free program is outside the cooperative profile:
+
+```go
+started := make(chan struct{})
+go func() {
+    close(started)
+    for {
+    }
+}()
+<-started
+```
+
+Go may preempt the looping goroutine and let the receiver return; the
+cooperative target cannot. Soundly detecting that requirement would need the
+forbidden whole-program effect/dataflow analysis, and emulating it would need
+preemption. GoToTS therefore neither admits a hidden yield heuristic nor
+describes this program as exact under the cooperative selection.
+
+Two separate semantic owners assemble declarations into the same
+demand-selected `runtime/channel.ts` output module:
+
+- the channel owner controls channel identity, value transfer, queues, close,
+  direction views, and select alternatives; and
+- the scheduler owner controls goroutine lifecycle, blocked/runnable counts,
+  program settlement, first uncaught panic, main return, and deadlock.
+
+Sharing an output module does not merge these responsibilities.
+`GoChannel<T>` is the canonical runtime identity for a channel value.
+Send-only and receive-only target views expose only operations admitted by the
+selected `types.ChanDir`; conversion between views does not allocate or change
+identity. The channel owner contains:
+
+- capacity, a FIFO buffer, one insertion-ordered live sender-offer set, one
+  insertion-ordered live receiver-offer set, and closed state. Direct
+  operations and `select` alternatives enter the same typed queues, so arrival
+  order cannot be changed by operation kind;
+- exact element zero and copy functions selected from the ordinary value
+  owner, including generic operation functions when `T` is a type parameter;
+- send, receive, close, equality-by-canonical-identity, and select
+  registration/commit operations.
+
+Each queued sender owns typed success and close-failure commits; each queued
+receiver owns one typed value/`ok` commit. A select alternative adds its
+atomic claim and O(1) cancellation to that same offer. There is no parallel
+listener registry, direct-versus-select queue, historical head-index storage,
+operation tag, or erased task. Removing a selected alternative deletes its
+live offer, so storage is bounded by current buffer contents and current
+blocked operations rather than historical traffic.
+
+Nil channels are represented by `undefined`. Send or receive on nil blocks;
+closing nil, sending on closed, and closing closed channels raise the one Go
+panic carrier. Closing wakes blocked receivers with buffered values first and
+then `(zero, false)`, and wakes blocked senders with the send-on-closed panic.
+No payload crosses `any`, `unknown`, a cast, or an erased task queue.
+
+Blocking changes existing observable artifact facets rather than creating a
+call graph. A concrete source function, method, or literal body owns one source
+callable facet. A body that directly blocks, or calls a cooperative callable,
+receives one closed declaration requirement; its `CallableSignature` becomes
+`Promise`-returning and its body becomes `async`. Exact direct source calls
+subscribe to that concrete source facet and add `await` only in its reverse
+closure.
+
+First-class function values use one different owner: a canonical generated
+callable ABI artifact keyed by the exact receiver-free `go/types.Signature`
+after represented generic arguments are selected. Every value call subscribes
+to that ABI once, regardless of whether the value came through a local,
+parameter, result, package variable, field, pointer, array, slice, map,
+interface assertion, method value/expression, or generic aggregate. A blocking
+provider used as a value selects the ABI cooperative. Synchronous providers
+adapt statically when that exact ABI is cooperative. Storage locations never
+receive callable facets and no AST-shape resolver, dataflow graph, or effect IR
+tracks transport. Structural contract equality terminates recursive cycles.
+Functions and callable ABIs that remain nonblocking retain byte-identical
+synchronous declarations and calls.
+
+A `go` statement evaluates and value-copies the callee and every argument
+immediately in source order, then schedules exactly one typed
+`() => Promise<void>` closure. Main return stops the selected program without
+waiting for remaining goroutines. A panic escaping any goroutine terminates the
+selected program with the shared panic carrier.
+
+`select` evaluates channel operands and send values exactly once in source
+order. It creates one typed alternative per communication clause. The runtime
+uniformly chooses one currently ready alternative, commits it once, and
+cancels all other registrations. If no case is initially ready, alternatives
+are registered in a fair permutation as active offers in the same channel
+queues used by direct operations. This preserves FIFO ordering across direct
+and selected waiters, permits select-to-select rendezvous, and prevents
+same-channel source-arm bias. Closing a channel rejects a queued selected send
+through that select's own typed completion path; it does not throw from the
+goroutine performing `close`. A receive target location is evaluated only
+after its clause wins. A select with a default invokes the channel owner's
+synchronous fair ready-choice/commit operation: one ready communication wins,
+or `default` wins when none is ready. Selection itself adds no `Promise`,
+`async`, `await`, scheduler dependency, or cooperative callable requirement;
+operand or send-value evaluation may independently require cooperation. A
+select without a default invokes the blocking operation only when no
+communication is ready and then participates in scheduler deadlock detection.
+Nil-channel alternatives never become ready.
+
+Channel send and receive call sites are O(1), apart from the selected element
+copy. A select site and registration are O(number of clauses). Runtime source
+size is independent of element type, channel count, goroutine count, and
+select-site count. Queue storage is O(buffer capacity plus live blocked
+operations), never O(historical operations).
 
 ## Package State And Assembly
 
@@ -696,21 +935,91 @@ contextual family handler
     -> runtime/<family>.ts
 ```
 
-All generated runtime failures use one closed Go panic ABI:
+All generated runtime failures and source `panic` use one closed Go panic ABI:
 
 ```text
-family runtime guard
-    -> GoPanic.raise(typed value)
+family runtime guard or source panic(value)
+    -> GoPanic.raiseRuntime(message) or GoPanic.raise(value)
     -> one runtime/panic.ts owner
-    -> one thrown GoPanic<T> carrier
+    -> one statically typed thrown GoPanic carrier
 ```
 
 A family runtime must not throw a host `Error`/`RangeError` or depend on an
 implicit JavaScript exception for Go panic behavior. The panic module is the
-only generated runtime owner allowed to construct a target `ThrowStatement`.
-This boundary does not implement source-level `panic`/`recover`; it gives every
-already-admitted runtime guard one stable carrier that those later constructs
-can consume without replacing six family-specific exception protocols.
+only generated runtime owner allowed to create and initially throw a
+`GoPanic`. A callable unwind envelope may only rethrow an unrecognized caught
+host exception unchanged; it may not inspect, convert, or recover that value.
+The carrier owns one exact represented empty-interface payload. Runtime faults
+and `panic(nil)` enter through distinct GoToTS-owned runtime-error dynamic
+values. Both implement the canonical `error`, `interface { Error() string }`,
+and `runtime.Error` method contracts, while `panic(nil)` alone carries the
+canonical `*runtime.PanicNilError` dynamic identity and represented payload.
+Source non-nil values enter through ordinary represented-interface conversion.
+There is no generic or erased carrier payload.
+
+`recover` consumes an invocation-local `GoRecovery` authority. Only the direct
+call of a deferred function receives that optional, statically typed authority.
+An ordinary call, a call made by that deferred function, and `recover` outside
+deferred execution receive no authority and return nil. Function and method
+values consume one canonical generated callable ABI contract keyed by their
+exact `go/types.Signature`. Recovery is one optional final facet of that
+contract: direct ordinary calls omit it and deferred invocation supplies it.
+The ABI is not re-keyed for a variable, field, pointer, slice, map, interface
+adapter, defined callable wrapper, or other carrier. Those locations store the
+same callable value; they do not own recovery semantics. No per-storage
+recovery identity, storage/dataflow graph, ambient global, module flag,
+async-local store, dynamic property, cast, `.call`, `.apply`, or `.bind` may
+select recovery.
+
+Callable control is a demand-selected facet of the exact source function
+artifact. Encountering `defer`, `recover`, or non-structural `goto` requests
+reconstruction of that exact callable, including an independently anchored
+function literal. The final callable owner assembles typed TS-Go AST in this
+order:
+
+```text
+lexical declarations and addressable storage
+    -> optional goto control structure
+    -> return and named-result normalization
+    -> defer/panic unwind envelope
+    -> final typed TS-Go function body
+```
+
+This is target assembly in the existing declaration fixed point, not a source
+prewalk or retained control model. No CFG, lowering IR, semantic plan, source
+inventory, second checker, or second Go-AST traversal is retained. A callable
+without a selected control facet has byte-identical target AST.
+
+Emission context carries exactly one canonical `ArtifactOwner`. Addressable
+storage derives its `*types.Func` from that owner rather than retaining a second
+function-owner field. Callable-control requirements use the same owner and
+carry the exact enclosing source artifact plus callable anchor; both the start
+and end of a function literal must be contained by that enclosing artifact.
+The selected callable map and current callable/facets are ephemeral
+reconstruction facts only and are discarded with the emission context.
+
+A `defer f(x)` registration evaluates and captures the callee, selected
+receiver, and copied arguments immediately at the source statement. It pushes
+one typed closure onto an invocation-local stack. The callable envelope drains
+that stack LIFO on every normal return and panic exit. A later panic replaces
+the pending panic without skipping older deferred calls; a direct successful
+`recover` consumes the pending panic. Explicit returns in a named-result
+function assign copied values to the named result locations before unwind, and
+one trailing result read occurs after deferred mutation.
+
+Labels are keyed only by exact `*types.Label` definition/use identity. Native
+target labels own labeled `break` and `continue`, switch fallthrough remains at
+the switch-clause owner, and structurally representable goto edges use direct
+target labels. Only genuinely non-structural edges select a whole-function
+linear state machine assembled from the already-created TS-Go statements.
+State and generated size are linear in source statements and exact labels.
+Every ordered statement list, including a block and a switch or type-switch
+clause body, delegates to the same statement-sequence control owner. When a
+generated state machine is nested inside a source loop, range, switch, or type
+switch, that source construct receives a typed lexical target label so an
+unlabeled source `break` or `continue` cannot be captured by the generated
+dispatch loop or switch. This target is target-assembly context only; it is not
+a persisted source-control graph.
 
 Runtime classes may encapsulate JavaScript storage only when that storage is
 the smallest exact representation of a Go value family. They may expose
@@ -723,6 +1032,16 @@ forbidden. Nullable storage is narrowed by explicit control flow at the
 runtime owner; a generated `value!` may not substitute for a proved invariant.
 Compiler handlers still own Go evaluation order and copy boundaries; runtime
 code does not rediscover source semantics.
+
+Aggregate container operations therefore compose at the source operation
+owner. That owner emits typed TS-Go loops which call the already-selected
+zero/copy/equality/hash structures directly. Runtime array and slice classes
+may expose only typed structural primitives needed to allocate, validate,
+grow, and access storage. They may not receive a semantic operation as a
+function parameter, retain one as a field, or create a second per-element-type
+dispatch owner. Runtime members used only by `clear` or slice-spread append are
+selected by closed demand and are absent from an artifact that does not use
+the operation.
 
 The pointer runtime is the one exception for typed location accessors because a
 Go pointer is itself a first-class reference to mutable storage rather than a

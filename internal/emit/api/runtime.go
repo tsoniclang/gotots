@@ -1,70 +1,81 @@
 package api
 
-import (
-	"fmt"
-	"slices"
-)
-
-type RuntimeModule uint8
-
-const (
-	RuntimeModuleInvalid RuntimeModule = iota
-	RuntimeModuleString
-	RuntimeModulePointer
-	RuntimeModuleArray
-	RuntimeModuleSlice
-	RuntimeModuleMap
-	RuntimeModulePanic
-	RuntimeModuleInteger
-	RuntimeModuleFloat
-	RuntimeModuleComplex
-	RuntimeModuleConversion
-)
-
 type RuntimeSymbol uint16
 
 const (
-	RuntimeInvalid          RuntimeSymbol = 0
-	RuntimeStringIndex      RuntimeSymbol = 1
-	RuntimeStringSlice      RuntimeSymbol = 2
-	RuntimeStringMax        RuntimeSymbol = 3
-	RuntimeStringMin        RuntimeSymbol = 4
-	RuntimePointer          RuntimeSymbol = 100
-	RuntimeArray            RuntimeSymbol = 200
-	RuntimeArrayZeroWith    RuntimeSymbol = 201
-	RuntimeArrayLiteralWith RuntimeSymbol = 202
-	RuntimeArrayCopyWith    RuntimeSymbol = 203
-	RuntimeSlice            RuntimeSymbol = 300
-	RuntimeSliceAddress     RuntimeSymbol = 301
-	RuntimeSliceMakeWith    RuntimeSymbol = 302
-	RuntimeSliceAppendWith  RuntimeSymbol = 303
-	RuntimeSliceCopyWith    RuntimeSymbol = 304
-	RuntimeSliceNilWith     RuntimeSymbol = 305
-	RuntimeSliceLiteralWith RuntimeSymbol = 306
-	RuntimeMap              RuntimeSymbol = 400
-	RuntimeMapHash          RuntimeSymbol = 401
-	RuntimePanic            RuntimeSymbol = 500
-	RuntimeIntegerDivide    RuntimeSymbol = 600
-	RuntimeIntegerRemainder RuntimeSymbol = 601
-	RuntimeIntegerMax       RuntimeSymbol = 602
-	RuntimeIntegerMin       RuntimeSymbol = 603
-	RuntimeFloat32Round     RuntimeSymbol = 700
-	RuntimeComplex64        RuntimeSymbol = 800
-	RuntimeComplex128       RuntimeSymbol = 801
-	RuntimeComplexDivide    RuntimeSymbol = 802
-	RuntimeComplex64Add     RuntimeSymbol = 810
-	RuntimeComplex64Sub     RuntimeSymbol = 811
-	RuntimeComplex64Mul     RuntimeSymbol = 812
-	RuntimeComplex64Div     RuntimeSymbol = 813
-	RuntimeComplex64Neg     RuntimeSymbol = 814
-	RuntimeComplex64Equal   RuntimeSymbol = 815
-	RuntimeComplex128Add    RuntimeSymbol = 820
-	RuntimeComplex128Sub    RuntimeSymbol = 821
-	RuntimeComplex128Mul    RuntimeSymbol = 822
-	RuntimeComplex128Div    RuntimeSymbol = 823
-	RuntimeComplex128Neg    RuntimeSymbol = 824
-	RuntimeComplex128Equal  RuntimeSymbol = 825
-	RuntimeNumberToBigInt   RuntimeSymbol = 900
+	RuntimeInvalid              RuntimeSymbol = 0
+	RuntimeStringIndex          RuntimeSymbol = 1
+	RuntimeStringSlice          RuntimeSymbol = 2
+	RuntimeStringMax            RuntimeSymbol = 3
+	RuntimeStringMin            RuntimeSymbol = 4
+	RuntimeStringEncodeRune     RuntimeSymbol = 5
+	RuntimeStringDecodeRune     RuntimeSymbol = 6
+	RuntimePointer              RuntimeSymbol = 100
+	RuntimePointerHash          RuntimeSymbol = 101
+	RuntimeArray                RuntimeSymbol = 200
+	RuntimeArrayAllocate        RuntimeSymbol = 201
+	RuntimeArrayView            RuntimeSymbol = 202
+	RuntimeArrayLocation        RuntimeSymbol = 203
+	RuntimeSlice                RuntimeSymbol = 300
+	RuntimeSliceAddress         RuntimeSymbol = 301
+	RuntimeSliceStorage         RuntimeSymbol = 302
+	RuntimeSliceAddressView     RuntimeSymbol = 303
+	RuntimeSliceArrayPointer    RuntimeSymbol = 304
+	RuntimeArraySlice           RuntimeSymbol = 305
+	RuntimeSliceAppendSlice     RuntimeSymbol = 307
+	RuntimeSliceClear           RuntimeSymbol = 308
+	RuntimeMap                  RuntimeSymbol = 400
+	RuntimeMapHash              RuntimeSymbol = 401
+	RuntimeMapClear             RuntimeSymbol = 402
+	RuntimeMapKeys              RuntimeSymbol = 403
+	RuntimeMapValue             RuntimeSymbol = 404
+	RuntimePanic                RuntimeSymbol = 500
+	RuntimePanicValue           RuntimeSymbol = 501
+	RuntimeRecovery             RuntimeSymbol = 502
+	RuntimePanicNilError        RuntimeSymbol = 503
+	RuntimePanicNilValue        RuntimeSymbol = 504
+	RuntimeIntegerDivide        RuntimeSymbol = 600
+	RuntimeIntegerRemainder     RuntimeSymbol = 601
+	RuntimeIntegerMax           RuntimeSymbol = 602
+	RuntimeIntegerMin           RuntimeSymbol = 603
+	RuntimeNumberIntDivide      RuntimeSymbol = 604
+	RuntimeNumberIntRemainder   RuntimeSymbol = 605
+	RuntimeFloat32Round         RuntimeSymbol = 700
+	RuntimeComplex64            RuntimeSymbol = 800
+	RuntimeComplex128           RuntimeSymbol = 801
+	RuntimeComplexDivide        RuntimeSymbol = 802
+	RuntimeComplex64Add         RuntimeSymbol = 810
+	RuntimeComplex64Sub         RuntimeSymbol = 811
+	RuntimeComplex64Mul         RuntimeSymbol = 812
+	RuntimeComplex64Div         RuntimeSymbol = 813
+	RuntimeComplex64Neg         RuntimeSymbol = 814
+	RuntimeComplex64Equal       RuntimeSymbol = 815
+	RuntimeComplex128Add        RuntimeSymbol = 820
+	RuntimeComplex128Sub        RuntimeSymbol = 821
+	RuntimeComplex128Mul        RuntimeSymbol = 822
+	RuntimeComplex128Div        RuntimeSymbol = 823
+	RuntimeComplex128Neg        RuntimeSymbol = 824
+	RuntimeComplex128Equal      RuntimeSymbol = 825
+	RuntimeNumberToBigInt       RuntimeSymbol = 900
+	RuntimeInterfaceValue       RuntimeSymbol = 1000
+	RuntimeInterfaceNonNil      RuntimeSymbol = 1001
+	RuntimeInterfaceEqual       RuntimeSymbol = 1002
+	RuntimeErrorMethodToken     RuntimeSymbol = 1003
+	RuntimeRuntimeErrorToken    RuntimeSymbol = 1004
+	RuntimeBuiltinErrorType     RuntimeSymbol = 1005
+	RuntimeBuiltinErrorContract RuntimeSymbol = 1006
+	RuntimeBuiltinErrorGuard    RuntimeSymbol = 1007
+	RuntimeErrorType            RuntimeSymbol = 1008
+	RuntimeErrorContract        RuntimeSymbol = 1009
+	RuntimeErrorGuard           RuntimeSymbol = 1010
+	RuntimeChannel              RuntimeSymbol = 1100
+	RuntimeReceiveChannel       RuntimeSymbol = 1101
+	RuntimeSendChannel          RuntimeSymbol = 1102
+	RuntimeSelectCase           RuntimeSymbol = 1103
+	RuntimeSelect               RuntimeSymbol = 1104
+	RuntimeScheduler            RuntimeSymbol = 1105
+	RuntimeSelectReady          RuntimeSymbol = 1106
+	RuntimeSelectAttempt        RuntimeSymbol = 1107
 )
 
 type RuntimeSymbolContract struct {
@@ -107,6 +118,20 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"goStringMin",
 			false,
 		), nil
+	case RuntimeStringEncodeRune:
+		return runtimeContract(
+			RuntimeModuleString,
+			"runtime/string.ts",
+			"goStringEncodeRune",
+			false,
+		), nil
+	case RuntimeStringDecodeRune:
+		return runtimeContract(
+			RuntimeModuleString,
+			"runtime/string.ts",
+			"goStringDecodeRune",
+			false,
+		), nil
 	case RuntimePointer:
 		return runtimeContract(
 			RuntimeModulePointer,
@@ -114,6 +139,15 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"GoPointer",
 			true,
 			RuntimePanic,
+		), nil
+	case RuntimePointerHash:
+		return runtimeContract(
+			RuntimeModulePointer,
+			"runtime/pointer.ts",
+			"goPointerHash",
+			false,
+			RuntimePointer,
+			RuntimeMapHash,
 		), nil
 	case RuntimeArray:
 		return runtimeContract(
@@ -123,29 +157,29 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			true,
 			RuntimePanic,
 		), nil
-	case RuntimeArrayZeroWith:
+	case RuntimeArrayAllocate:
 		return runtimeContract(
 			RuntimeModuleArray,
 			"runtime/array.ts",
-			"goArrayZeroWith",
+			"goArrayAllocate",
 			false,
 			RuntimeArray,
 		), nil
-	case RuntimeArrayLiteralWith:
+	case RuntimeArrayView:
 		return runtimeContract(
 			RuntimeModuleArray,
 			"runtime/array.ts",
-			"goArrayLiteralWith",
+			"goArrayView",
 			false,
-			RuntimeArrayZeroWith,
+			RuntimeArray,
 		), nil
-	case RuntimeArrayCopyWith:
+	case RuntimeArrayLocation:
 		return runtimeContract(
 			RuntimeModuleArray,
 			"runtime/array.ts",
-			"goArrayCopyWith",
+			"goArrayLocation",
 			false,
-			RuntimeArrayZeroWith,
+			RuntimeArray,
 		), nil
 	case RuntimeSlice:
 		return runtimeContract(
@@ -164,43 +198,57 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			RuntimeSlice,
 			RuntimePointer,
 		), nil
-	case RuntimeSliceMakeWith:
+	case RuntimeSliceStorage:
 		return runtimeContract(
 			RuntimeModuleSlice,
 			"runtime/slice.ts",
-			"goSliceMakeWith",
+			"goSliceAllocate",
 			false,
 			RuntimeSlice,
 		), nil
-	case RuntimeSliceAppendWith:
+	case RuntimeSliceAddressView:
 		return runtimeContract(
 			RuntimeModuleSlice,
 			"runtime/slice.ts",
-			"goSliceAppendWith",
+			"goSliceAddressView",
+			false,
+			RuntimeSlice,
+			RuntimePointer,
+		), nil
+	case RuntimeSliceArrayPointer:
+		return runtimeContract(
+			RuntimeModuleSlice,
+			"runtime/slice.ts",
+			"goSliceArrayPointer",
+			false,
+			RuntimeSlice,
+			RuntimePointer,
+			RuntimeArray,
+			RuntimeArrayView,
+		), nil
+	case RuntimeArraySlice:
+		return runtimeContract(
+			RuntimeModuleSlice,
+			"runtime/slice.ts",
+			"goArraySlice",
+			false,
+			RuntimeSlice,
+			RuntimeArray,
+			RuntimeArrayLocation,
+		), nil
+	case RuntimeSliceAppendSlice:
+		return runtimeContract(
+			RuntimeModuleSlice,
+			"runtime/slice.ts",
+			"goSliceAppendSlice",
 			false,
 			RuntimeSlice,
 		), nil
-	case RuntimeSliceCopyWith:
+	case RuntimeSliceClear:
 		return runtimeContract(
 			RuntimeModuleSlice,
 			"runtime/slice.ts",
-			"goSliceCopyWith",
-			false,
-			RuntimeSlice,
-		), nil
-	case RuntimeSliceNilWith:
-		return runtimeContract(
-			RuntimeModuleSlice,
-			"runtime/slice.ts",
-			"goSliceNilWith",
-			false,
-			RuntimeSlice,
-		), nil
-	case RuntimeSliceLiteralWith:
-		return runtimeContract(
-			RuntimeModuleSlice,
-			"runtime/slice.ts",
-			"goSliceLiteralWith",
+			"goSliceClear",
 			false,
 			RuntimeSlice,
 		), nil
@@ -219,12 +267,74 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"GoMapHash",
 			false,
 		), nil
+	case RuntimeMapClear:
+		return runtimeContract(
+			RuntimeModuleMap,
+			"runtime/map.ts",
+			"goMapClear",
+			false,
+			RuntimeMap,
+		), nil
+	case RuntimeMapKeys:
+		return runtimeContract(
+			RuntimeModuleMap,
+			"runtime/map.ts",
+			"goMapKeys",
+			false,
+			RuntimeMap,
+		), nil
+	case RuntimeMapValue:
+		return runtimeContract(
+			RuntimeModuleMap,
+			"runtime/map.ts",
+			"GoMapValue",
+			true,
+		), nil
 	case RuntimePanic:
 		return runtimeContract(
 			RuntimeModulePanic,
 			"runtime/panic.ts",
 			"GoPanic",
 			true,
+			RuntimeInterfaceValue,
+			RuntimePanicValue,
+		), nil
+	case RuntimePanicValue:
+		return runtimeContract(
+			RuntimeModulePanic,
+			"runtime/panic.ts",
+			"GoRuntimePanicValue",
+			true,
+			RuntimeInterfaceValue,
+			RuntimeErrorMethodToken,
+			RuntimeRuntimeErrorToken,
+		), nil
+	case RuntimeRecovery:
+		return runtimeContract(
+			RuntimeModulePanic,
+			"runtime/panic.ts",
+			"GoRecovery",
+			true,
+			RuntimePanic,
+			RuntimeInterfaceValue,
+		), nil
+	case RuntimePanicNilError:
+		return runtimeContract(
+			RuntimeModulePanicNil,
+			"runtime/panic-nil.ts",
+			"GoPanicNilError",
+			true,
+		), nil
+	case RuntimePanicNilValue:
+		return runtimeContract(
+			RuntimeModulePanicNil,
+			"runtime/panic-nil.ts",
+			"GoPanicNilValue",
+			true,
+			RuntimePanicNilError,
+			RuntimePanicValue,
+			RuntimeInterfaceValue,
+			RuntimePointer,
 		), nil
 	case RuntimeIntegerDivide:
 		return runtimeContract(
@@ -255,6 +365,22 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"runtime/integer.ts",
 			"goIntegerMin",
 			false,
+		), nil
+	case RuntimeNumberIntDivide:
+		return runtimeContract(
+			RuntimeModuleInteger,
+			"runtime/integer.ts",
+			"goNumberIntegerDivide",
+			false,
+			RuntimePanic,
+		), nil
+	case RuntimeNumberIntRemainder:
+		return runtimeContract(
+			RuntimeModuleInteger,
+			"runtime/integer.ts",
+			"goNumberIntegerRemainder",
+			false,
+			RuntimePanic,
 		), nil
 	case RuntimeFloat32Round:
 		return runtimeContract(
@@ -354,8 +480,100 @@ func RuntimeContract(symbol RuntimeSymbol) (RuntimeSymbolContract, error) {
 			"goNumberToBigInt",
 			false,
 		), nil
+	case RuntimeInterfaceValue:
+		return runtimeContract(
+			RuntimeModuleInterfaceValue,
+			"runtime/interface-value.ts",
+			"GoInterfaceValue",
+			true,
+		), nil
+	case RuntimeInterfaceNonNil:
+		return runtimeContract(
+			RuntimeModuleInterface,
+			"runtime/interface.ts",
+			"goInterfaceNonNil",
+			false,
+			RuntimeInterfaceValue,
+			RuntimePanic,
+		), nil
+	case RuntimeInterfaceEqual:
+		return runtimeContract(
+			RuntimeModuleInterface,
+			"runtime/interface.ts",
+			"goInterfaceEqual",
+			false,
+			RuntimeInterfaceValue,
+		), nil
+	case RuntimeErrorMethodToken:
+		return runtimeContract(
+			RuntimeModuleInterfaceValue,
+			"runtime/interface-value.ts",
+			"GoErrorMethodToken",
+			false,
+		), nil
+	case RuntimeRuntimeErrorToken:
+		return runtimeContract(
+			RuntimeModuleInterfaceValue,
+			"runtime/interface-value.ts",
+			"GoRuntimeErrorMethodToken",
+			false,
+		), nil
+	case RuntimeBuiltinErrorType:
+		return runtimeContract(
+			RuntimeModuleInterfaceValue,
+			"runtime/interface-value.ts",
+			"GoError",
+			true,
+			RuntimeInterfaceValue,
+			RuntimeErrorMethodToken,
+		), nil
+	case RuntimeBuiltinErrorContract:
+		return runtimeContract(
+			RuntimeModuleInterfaceValue,
+			"runtime/interface-value.ts",
+			"GoError$contract",
+			false,
+			RuntimeErrorMethodToken,
+		), nil
+	case RuntimeBuiltinErrorGuard:
+		return runtimeContract(
+			RuntimeModuleInterfaceValue,
+			"runtime/interface-value.ts",
+			"GoError$is",
+			false,
+			RuntimeBuiltinErrorType,
+			RuntimeBuiltinErrorContract,
+		), nil
+	case RuntimeErrorType:
+		return runtimeContract(
+			RuntimeModuleInterfaceValue,
+			"runtime/interface-value.ts",
+			"GoRuntimeError",
+			true,
+			RuntimeInterfaceValue,
+			RuntimeErrorMethodToken,
+			RuntimeRuntimeErrorToken,
+		), nil
+	case RuntimeErrorContract:
+		return runtimeContract(
+			RuntimeModuleInterfaceValue,
+			"runtime/interface-value.ts",
+			"GoRuntimeError$contract",
+			false,
+			RuntimeErrorMethodToken,
+			RuntimeRuntimeErrorToken,
+		), nil
+	case RuntimeErrorGuard:
+		return runtimeContract(
+			RuntimeModuleInterfaceValue,
+			"runtime/interface-value.ts",
+			"GoRuntimeError$is",
+			false,
+			RuntimeErrorType,
+			RuntimeErrorContract,
+		), nil
 	default:
-		return RuntimeSymbolContract{}, &RuntimeSymbolError{Symbol: symbol}
+		return concurrencyRuntimeContract(symbol)
 	}
 }
 
@@ -370,49 +588,4 @@ func complexOperationContract(
 		false,
 		dependencies...,
 	), nil
-}
-
-func runtimeContract(
-	module RuntimeModule,
-	outputPath string,
-	exportedName string,
-	typeUsable bool,
-	dependencies ...RuntimeSymbol,
-) RuntimeSymbolContract {
-	return RuntimeSymbolContract{
-		module:       module,
-		outputPath:   outputPath,
-		exportedName: exportedName,
-		typeUsable:   typeUsable,
-		dependencies: slices.Clone(dependencies),
-	}
-}
-
-func (c RuntimeSymbolContract) Module() RuntimeModule {
-	return c.module
-}
-
-func (c RuntimeSymbolContract) OutputPath() string {
-	return c.outputPath
-}
-
-func (c RuntimeSymbolContract) ExportedName() string {
-	return c.exportedName
-}
-
-func (c RuntimeSymbolContract) Dependencies() []RuntimeSymbol {
-	return slices.Clone(c.dependencies)
-}
-
-func (c RuntimeSymbolContract) AllowsImportPhase(phase ImportPhase) bool {
-	return phase == ImportPhaseValue ||
-		(phase == ImportPhaseType && c.typeUsable)
-}
-
-type RuntimeSymbolError struct {
-	Symbol RuntimeSymbol
-}
-
-func (e *RuntimeSymbolError) Error() string {
-	return fmt.Sprintf("runtime symbol %d is invalid", e.Symbol)
 }

@@ -6,11 +6,8 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	pointerruntime "github.com/tsoniclang/gotots/internal/emit/runtime/pointer"
-	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
-	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	selectionvalue "github.com/tsoniclang/gotots/internal/emit/selection"
 	pointertype "github.com/tsoniclang/gotots/internal/emit/type/pointer"
-	arrayvalue "github.com/tsoniclang/gotots/internal/emit/value/array"
-	slicevalue "github.com/tsoniclang/gotots/internal/emit/value/slice"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -81,7 +78,7 @@ func identifier(
 	}
 	if variable.Pkg() != nil &&
 		variable.Parent() == variable.Pkg().Scope() {
-		return packageVariable(context, variable)
+		return packageVariable(context, children, source, variable)
 	}
 	if name, selected := context.AddressableStorage().Name(
 		context,
@@ -124,9 +121,19 @@ func identifier(
 
 func packageVariable(
 	context api.Context,
+	children api.ChildEmitter,
+	source ast.Node,
 	variable *types.Var,
 ) (api.ExpressionEmission, error) {
 	target, err := context.Names().PackageVariable(variable)
+	if err != nil {
+		return api.ExpressionEmission{}, err
+	}
+	logicalType, err := children.RepresentedType(
+		context.WithRole(api.RoleUnaryOperand),
+		source,
+		variable.Type(),
+	)
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
@@ -134,6 +141,11 @@ func packageVariable(
 	if err != nil {
 		return api.ExpressionEmission{}, err
 	}
+	state := context.Factory().Identifier(target.StateName())
+	field := context.Factory().StringLiteral(
+		target.FieldName(),
+		tsgo.TokenFlagsNone,
+	)
 	return api.DirectExpression(
 		context.Factory().CallExpression(
 			context.Factory().PropertyAccessExpression(
@@ -143,18 +155,20 @@ func packageVariable(
 				tsgo.NodeFlagsNone,
 			),
 			nil,
-			nil,
+			[]tsgo.TypeNode{
+				logicalType.Value(),
+				context.Factory().TypeQueryNode(state, nil),
+				context.Factory().LiteralTypeNode(field),
+			},
 			[]tsgo.Expression{
-				context.Factory().Identifier(target.StateName()),
-				context.Factory().StringLiteral(
-					target.FieldName(),
-					tsgo.TokenFlagsNone,
-				),
+				state,
+				field,
 			},
 			tsgo.NodeFlagsNone,
 		),
 		api.CombineRequests(
 			target.Requests(),
+			logicalType.Requests(),
 			runtime.Requests(),
 		)...,
 	), nil
@@ -183,352 +197,20 @@ func selector(
 			return api.ExpressionEmission{},
 				api.Unsupported(context, api.CategoryExpression, source)
 		}
-		return packageVariable(context, variable)
+		return packageVariable(context, children, source, variable)
 	}
 	field, ok := selection.Obj().(*types.Var)
 	if !ok ||
 		selection.Kind() != types.FieldVal ||
-		field.Embedded() ||
-		len(selection.Index()) != 1 ||
 		!types.Identical(field.Type(), element) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
 	}
-	var receiver api.ExpressionEmission
-	var err error
-	if selection.Indirect() {
-		receiverType := context.TypesInfo().TypeOf(source.X)
-		receiver, err = children.Expression(
-			context.
-				WithRole(api.RoleFieldReceiver).
-				WithExpectedType(receiverType),
-			source.X,
-		)
-		if err == nil {
-			receiver, err = dereference(
-				context,
-				children,
-				source.X,
-				receiverType,
-				receiver,
-			)
-		}
-	} else {
-		receiverType := context.TypesInfo().TypeOf(source.X)
-		receiver, err = children.Address(
-			context.
-				WithRole(api.RoleFieldReceiver).
-				WithExpectedType(types.NewPointer(receiverType)),
-			source.X,
-		)
-	}
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	name, err := context.Names().Member(field)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	runtime, err := pointerRuntime(context)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	return api.NewExpressionEmission(
-		receiver.Before(),
-		context.Factory().CallExpression(
-			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(runtime.Name()),
-				nil,
-				context.Factory().Identifier(pointerruntime.FieldName),
-				tsgo.NodeFlagsNone,
-			),
-			nil,
-			nil,
-			[]tsgo.Expression{
-				receiver.Value(),
-				context.Factory().StringLiteral(name, tsgo.TokenFlagsNone),
-			},
-			tsgo.NodeFlagsNone,
-		),
-		api.CombineRequests(receiver.Requests(), runtime.Requests()),
-	)
-}
-
-func indexed(
-	context api.Context,
-	children api.ChildEmitter,
-	source *ast.IndexExpr,
-	element types.Type,
-) (api.ExpressionEmission, error) {
-	receiverType := context.TypesInfo().TypeOf(source.X)
-	if array, ok := arrayvalue.Resolve(context, receiverType); ok {
-		return arrayIndex(
-			context,
-			children,
-			source,
-			receiverType,
-			array,
-			element,
-			false,
-			definedtype.Model{},
-		)
-	}
-	if _, pointedType, pointerOK := pointertype.Resolve(receiverType); pointerOK {
-		if array, arrayOK := arrayvalue.Resolve(context, pointedType); arrayOK {
-			return arrayIndex(
-				context,
-				children,
-				source,
-				pointedType,
-				array,
-				element,
-				true,
-				definedtype.Model{},
-			)
-		}
-	}
-	if defined, pointerOK := definedtype.ResolvePointer(receiverType); pointerOK {
-		pointer, _ := defined.Pointer()
-		pointedType := pointer.Elem()
-		if array, arrayOK := arrayvalue.Resolve(context, pointedType); arrayOK {
-			return arrayIndex(
-				context,
-				children,
-				source,
-				pointedType,
-				array,
-				element,
-				true,
-				defined,
-			)
-		}
-	}
-	if _, sliceElement, ok := slicevalue.Resolve(
-		receiverType,
-	); ok && types.Identical(sliceElement, element) {
-		return sliceIndex(context, children, source, receiverType, element)
-	}
-	if defined, ok := definedtype.ResolveSlice(receiverType); ok {
-		sliceType, _ := defined.Slice()
-		if types.Identical(sliceType.Elem(), element) {
-			return sliceIndex(
-				context,
-				children,
-				source,
-				receiverType,
-				element,
-			)
-		}
-	}
-	return api.ExpressionEmission{},
-		api.Unsupported(context, api.CategoryExpression, source)
-}
-
-func arrayIndex(
-	context api.Context,
-	children api.ChildEmitter,
-	source *ast.IndexExpr,
-	arrayType types.Type,
-	array arrayvalue.RuntimeArray,
-	element types.Type,
-	throughPointer bool,
-	definedPointer definedtype.Model,
-) (api.ExpressionEmission, error) {
-	if !types.Identical(array.ElementType(), element) ||
-		!basictype.SupportsInteger(
-			context.TypesSizes(),
-			context.TypesInfo().TypeOf(source.Index),
-		) {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
-	var parent api.ExpressionEmission
-	var err error
-	if throughPointer {
-		expectedType := types.Type(types.NewPointer(arrayType))
-		if definedPointer.Type() != nil {
-			expectedType = definedPointer.Type()
-		}
-		parent, err = children.Expression(
-			context.
-				WithRole(api.RoleArrayReceiver).
-				WithExpectedType(expectedType),
-			source.X,
-		)
-		if err == nil && definedPointer.Type() != nil {
-			parent, err = definedPointer.Project(context, parent)
-		}
-	} else {
-		parent, err = children.Address(
-			context.
-				WithRole(api.RoleArrayReceiver).
-				WithExpectedType(types.NewPointer(arrayType)),
-			source.X,
-		)
-	}
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	indexType := context.TypesInfo().TypeOf(source.Index)
-	index, err := children.Expression(
-		context.
-			WithRole(api.RoleArrayIndex).
-			WithExpectedType(indexType),
-		source.Index,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	parentValue, before, err := captureBefore(
+	return selectionvalue.FieldAddress(
 		context,
-		parent,
-		index.Before(),
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	elementTarget, err := children.RepresentedType(
-		context.WithRole(api.RoleArrayIndex),
-		source,
-		element,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	arrayTarget, err := array.EmitType(
-		context.WithRole(api.RoleArrayReceiver),
 		children,
-		source.X,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	runtime, err := pointerRuntime(context)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	if throughPointer {
-		parentValue = context.Factory().CallExpression(
-			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(runtime.Name()),
-				nil,
-				context.Factory().Identifier(
-					pointerruntime.DereferenceName,
-				),
-				tsgo.NodeFlagsNone,
-			),
-			nil,
-			[]tsgo.TypeNode{arrayTarget.Value()},
-			[]tsgo.Expression{parentValue},
-			tsgo.NodeFlagsNone,
-		)
-	}
-	requirement, required, err := array.AddressIndexRequirement()
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	var requirementRequests []api.RootRequest
-	if required {
-		requirementRequests = []api.RootRequest{requirement}
-	}
-	return api.NewExpressionEmission(
-		before,
-		context.Factory().CallExpression(
-			context.Factory().PropertyAccessExpression(
-				context.Factory().Identifier(runtime.Name()),
-				nil,
-				context.Factory().Identifier(pointerruntime.IndexName),
-				tsgo.NodeFlagsNone,
-			),
-			nil,
-			[]tsgo.TypeNode{elementTarget.Value(), arrayTarget.Value()},
-			[]tsgo.Expression{parentValue, index.Value()},
-			tsgo.NodeFlagsNone,
-		),
-		api.CombineRequests(
-			parent.Requests(),
-			index.Requests(),
-			elementTarget.Requests(),
-			arrayTarget.Requests(),
-			runtime.Requests(),
-			requirementRequests,
-		),
-	)
-}
-
-func sliceIndex(
-	context api.Context,
-	children api.ChildEmitter,
-	source *ast.IndexExpr,
-	receiverType types.Type,
-	element types.Type,
-) (api.ExpressionEmission, error) {
-	indexType := context.TypesInfo().TypeOf(source.Index)
-	if !basictype.SupportsInteger(context.TypesSizes(), indexType) {
-		return api.ExpressionEmission{},
-			api.Unsupported(context, api.CategoryExpression, source)
-	}
-	receiver, err := children.Expression(
-		context.
-			WithRole(api.RoleSliceReceiver).
-			WithExpectedType(receiverType),
-		source.X,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	if defined, ok := definedtype.ResolveSlice(receiverType); ok {
-		receiver, err = defined.Project(context, receiver)
-		if err != nil {
-			return api.ExpressionEmission{}, err
-		}
-	}
-	index, err := children.Expression(
-		context.
-			WithRole(api.RoleSliceIndex).
-			WithExpectedType(indexType),
-		source.Index,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	receiverValue, before, err := captureBefore(
-		context,
-		receiver,
-		index.Before(),
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	elementTarget, err := children.RepresentedType(
-		context.WithRole(api.RoleSliceElement),
 		source,
+		selection,
 		element,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	runtime, err := context.Names().Runtime(
-		api.RuntimeSliceAddress,
-		api.ImportPhaseValue,
-	)
-	if err != nil {
-		return api.ExpressionEmission{}, err
-	}
-	return api.NewExpressionEmission(
-		before,
-		context.Factory().CallExpression(
-			context.Factory().Identifier(runtime.Name()),
-			nil,
-			[]tsgo.TypeNode{elementTarget.Value()},
-			[]tsgo.Expression{receiverValue, index.Value()},
-			tsgo.NodeFlagsNone,
-		),
-		api.CombineRequests(
-			receiver.Requests(),
-			index.Requests(),
-			elementTarget.Requests(),
-			runtime.Requests(),
-		),
 	)
 }

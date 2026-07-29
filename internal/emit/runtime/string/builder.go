@@ -53,6 +53,10 @@ func Build(
 				contract.ExportedName(),
 				tsgo.BinaryOperatorLessThanEqualsToken,
 			)
+		case api.RuntimeStringEncodeRune:
+			statement = encodeRune(factory, contract.ExportedName())
+		case api.RuntimeStringDecodeRune:
+			statement = decodeRune(factory, contract.ExportedName())
 		default:
 			return nil, &BuildError{Symbol: symbol}
 		}

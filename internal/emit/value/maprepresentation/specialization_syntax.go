@@ -32,6 +32,8 @@ type specializationMemberNames struct {
 	deleteMember string
 	length       string
 	isNil        string
+	clear        string
+	keys         string
 }
 
 func (b specializationBuilder) id(name string) tsgo.Identifier {

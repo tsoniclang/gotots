@@ -48,6 +48,7 @@ func TestArrayZeroCopyEqualityLiteralAccessAndBoundsMatchGo(t *testing.T) {
 import { GoPanic } from "./runtime/panic.js";
 import {
     ArgumentAndResultCopy,
+    ArrayLengthConstant,
     BoolValues,
     CopyIsValue,
     EqualValues,
@@ -59,6 +60,8 @@ import {
     NotEqualValues,
     MultiReturnArray,
     PackageValuesAreIsolated,
+    PointerArrayLengthConstant,
+    PointerArrayMeasureEvaluates,
     PackageIndexStore,
     ReadEvaluationOrder,
     RuntimeNameCollision,
@@ -79,6 +82,9 @@ console.log(IndexStore(1, 9));
 console.log(InferredLength());
 console.log(KeyedEvaluationOrder());
 console.log(LengthAndCapacity());
+console.log(ArrayLengthConstant());
+console.log(PointerArrayLengthConstant());
+console.log(PointerArrayMeasureEvaluates());
 console.log(ArgumentAndResultCopy());
 console.log(ZeroLength());
 console.log(PackageValuesAreIsolated());
@@ -163,6 +169,8 @@ func TestArrayFamilyStrictTypechecksUnderTheBigIntProfile(t *testing.T) {
 		t.Fatalf("BigInt-compatible runtime array artifact:\n%s", runtime)
 	}
 	assertBigIntConstantReturn(t, emission, "LengthAndCapacity", "10n")
+	assertBigIntConstantReturn(t, emission, "ArrayLengthConstant", "7n")
+	assertBigIntConstantReturn(t, emission, "PointerArrayLengthConstant", "9n")
 	assertBigIntConstantReturn(t, emission, "InferredLength", "8n")
 }
 
@@ -265,6 +273,9 @@ func main() {
 	fmt.Println(values.InferredLength())
 	fmt.Println(values.KeyedEvaluationOrder())
 	fmt.Println(values.LengthAndCapacity())
+	fmt.Println(values.ArrayLengthConstant())
+	fmt.Println(values.PointerArrayLengthConstant())
+	fmt.Println(values.PointerArrayMeasureEvaluates())
 	fmt.Println(values.ArgumentAndResultCopy())
 	fmt.Println(values.ZeroLength())
 	fmt.Println(values.PackageValuesAreIsolated())

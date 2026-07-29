@@ -2,7 +2,6 @@ package naming
 
 import (
 	"go/types"
-	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	anonymousstruct "github.com/tsoniclang/gotots/internal/emit/type/anonymousstruct"
@@ -106,7 +105,9 @@ func anonymousStructDependencyFacets(
 	case api.AnonymousStructDemandZero,
 		api.AnonymousStructDemandCopy,
 		api.AnonymousStructDemandEqual,
-		api.AnonymousStructDemandHash:
+		api.AnonymousStructDemandHash,
+		api.AnonymousStructDemandConvert,
+		api.AnonymousStructDemandStorage:
 		return []api.ArtifactFacet{api.ArtifactFacetStaticSurface}
 	default:
 		return nil
@@ -312,23 +313,19 @@ func (n *File) generatedNamedObjectIdentity(
 				Reason: "generated-artifact named component has no declaration identity",
 			}
 		}
-		return object.Pkg().Path() + "|" + object.Name(), nil
+		return typeidentity.NamedObjectKey(object)
 	}
 	_, indexed := n.owner.targetNameByObject[object]
-	sourceFile := n.artifactFile
 	if !indexed ||
-		n.artifactPath == "" ||
-		sourceFile == nil ||
-		object.Pos() < sourceFile.Pos() ||
-		object.Pos() > sourceFile.End() {
+		n.packageScope == nil {
 		return "", &api.NameError{
 			Name:   object.Name(),
 			Reason: "generated-artifact local component has no lexical declaration identity",
 		}
 	}
-	offset := int64(object.Pos() - sourceFile.Pos())
-	return object.Pkg().Path() + "|" +
-		n.artifactPath + "|" +
-		object.Name() + "|" +
-		strconv.FormatInt(offset, 10), nil
+	return typeidentity.LexicalNamedObjectKey(
+		object,
+		n.artifactOwner,
+		n.packageScope,
+	)
 }

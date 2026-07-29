@@ -153,10 +153,8 @@ func SupportsArithmetic(
 		return false
 	}
 	switch operator {
-	case token.ADD, token.SUB, token.MUL:
+	case token.ADD, token.SUB, token.MUL, token.QUO, token.REM:
 		return true
-	case token.QUO, token.REM:
-		return representation == api.IntegerRepresentationBigInt
 	default:
 		return false
 	}
@@ -194,6 +192,18 @@ func SupportsShift(
 	}
 	unsigned, exact := constant.Uint64Val(count)
 	return exact && unsigned < uint64(carrier.width)
+}
+
+func SupportsVariableShift(
+	representation api.IntegerRepresentation,
+	carrier Carrier,
+	operator token.Token,
+) bool {
+	if operator != token.SHL && operator != token.SHR {
+		return false
+	}
+	return representation == api.IntegerRepresentationBigInt ||
+		representation == api.IntegerRepresentationNumber && carrier.width <= 32
 }
 
 func SupportsUnary(
