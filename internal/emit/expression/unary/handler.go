@@ -9,6 +9,8 @@ import (
 	constantvalue "github.com/tsoniclang/gotots/internal/emit/constant"
 	definedunary "github.com/tsoniclang/gotots/internal/emit/expression/unary/defined"
 	unaryoperation "github.com/tsoniclang/gotots/internal/emit/expression/unary/operation"
+	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
+	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
 func Emit(
@@ -43,6 +45,39 @@ func Emit(
 		!types.AssignableTo(operandType, resultType) {
 		return api.ExpressionEmission{},
 			api.Unsupported(context, api.CategoryExpression, source)
+	}
+	if _, generic := api.GenericTypeParameter(operandType); generic {
+		operation, ok := api.UnaryGenericOperation(source.Op)
+		if !ok {
+			return api.ExpressionEmission{},
+				api.Unsupported(context, api.CategoryExpression, source)
+		}
+		operand, err := children.Expression(
+			context.
+				WithRole(api.RoleUnaryOperand).
+				WithExpectedType(operandType),
+			source.X,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		target, err := genericoperation.Call(
+			context,
+			source,
+			operation,
+			[]types.Type{operandType},
+			[]types.Type{resultType},
+			[]tsgo.Expression{operand.Value()},
+			operand.Requests()...,
+		)
+		if err != nil {
+			return api.ExpressionEmission{}, err
+		}
+		return api.NewExpressionEmission(
+			operand.Before(),
+			target.Value(),
+			target.Requests(),
+		)
 	}
 	operand, err := children.Expression(
 		context.

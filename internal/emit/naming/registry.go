@@ -56,6 +56,11 @@ type interfaceDynamicTypeTokenBinding struct {
 	name  string
 }
 
+type genericCapabilityBinding struct {
+	owner *api.GeneratedArtifact
+	name  string
+}
+
 type Target struct {
 	Name       string
 	SourcePath string
@@ -79,6 +84,8 @@ type Registry struct {
 	interfaceMethodNames     map[string]string
 	interfaceDynamicTypes    map[string]interfaceDynamicTypeTokenBinding
 	interfaceDynamicNames    map[string]string
+	genericCapabilities      map[string]genericCapabilityBinding
+	genericCapabilityNames   map[string]string
 }
 
 func NewRegistry() *Registry {
@@ -100,6 +107,8 @@ func NewRegistry() *Registry {
 		interfaceMethodNames:     make(map[string]string),
 		interfaceDynamicTypes:    make(map[string]interfaceDynamicTypeTokenBinding),
 		interfaceDynamicNames:    make(map[string]string),
+		genericCapabilities:      make(map[string]genericCapabilityBinding),
+		genericCapabilityNames:   make(map[string]string),
 	}
 }
 
@@ -150,6 +159,9 @@ func (r *Registry) GeneratedArtifact(
 	case api.GeneratedArtifactInterfaceDynamicTypeToken:
 		binding, ok := r.interfaceDynamicTypes[artifactKey]
 		return binding.owner, ok && binding.owner != nil
+	case api.GeneratedArtifactGenericCapability:
+		binding, ok := r.genericCapabilities[artifactKey]
+		return binding.owner, ok && binding.owner != nil
 	default:
 		return nil, false
 	}
@@ -185,6 +197,10 @@ func (r *Registry) GeneratedArtifacts(
 		}
 	case api.GeneratedArtifactInterfaceDynamicTypeToken:
 		for _, binding := range r.interfaceDynamicTypes {
+			artifacts = append(artifacts, binding.owner)
+		}
+	case api.GeneratedArtifactGenericCapability:
+		for _, binding := range r.genericCapabilities {
 			artifacts = append(artifacts, binding.owner)
 		}
 	}

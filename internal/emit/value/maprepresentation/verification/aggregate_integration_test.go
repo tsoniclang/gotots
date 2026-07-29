@@ -414,6 +414,13 @@ func (aggregateNames) InterfaceMethodToken(
 	panic("unused")
 }
 
+func (aggregateNames) GenericCapability(
+	api.GenericOperationSelection,
+	*types.Signature,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (aggregateNames) ConstantProjection(
 	*types.Const,
 	types.BasicKind,

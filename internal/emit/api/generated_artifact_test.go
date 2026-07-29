@@ -195,6 +195,61 @@ func TestGeneratedArtifactRejectsStringOnlyIdentity(t *testing.T) {
 	}
 }
 
+func TestGenericCapabilityUsesItsExactValidatingConstructor(t *testing.T) {
+	signature := types.NewSignatureType(
+		nil,
+		nil,
+		nil,
+		types.NewTuple(
+			types.NewVar(token.NoPos, nil, "left", types.Typ[types.Int32]),
+			types.NewVar(token.NoPos, nil, "right", types.Typ[types.Int32]),
+		),
+		types.NewTuple(
+			types.NewVar(token.NoPos, nil, "", types.Typ[types.Int32]),
+		),
+		false,
+	)
+	if _, err := NewCompilationGeneratedArtifact(
+		GeneratedArtifactGenericCapability,
+		signature,
+		"artifact",
+		"$goCapability_artifact",
+		"support/generics/capabilities/artifact.ts",
+	); err == nil {
+		t.Fatal("generic constructor accepted a capability without its operation")
+	}
+	selection, err := SelectGenericOperation(GenericOperationBinaryAdd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := NewCompilationGenericCapabilityArtifact(
+		selection,
+		signature,
+		"artifact",
+		"$goCapability_artifact",
+		"support/generics/capabilities/artifact.ts",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected, operation, ok := artifact.GenericCapability()
+	if !artifact.Valid() ||
+		!ok ||
+		operation != selection ||
+		!types.Identical(selected, signature) {
+		t.Fatalf("generic-capability artifact = %#v", artifact)
+	}
+	request, err := NewGenericCapabilityRequest(artifact)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requirement, ok := request.DeclarationRequirement()
+	selectedArtifact, capability := requirement.GenericCapability()
+	if !ok || !capability || selectedArtifact != artifact {
+		t.Fatalf("generic-capability requirement = %#v", requirement)
+	}
+}
+
 func TestInterfaceDynamicTypeRequestCarriesExactGoType(t *testing.T) {
 	sourceType := types.Typ[types.Int32]
 	artifact, err := NewCompilationGeneratedArtifact(
@@ -232,8 +287,9 @@ func TestGeneratedArtifactDomainsArePinned(t *testing.T) {
 		GeneratedArtifactAnonymousInterface != 4 ||
 		GeneratedArtifactInterfaceMethodToken != 5 ||
 		GeneratedArtifactInterfaceDynamicTypeToken != 6 ||
+		GeneratedArtifactGenericCapability != 7 ||
 		GeneratedArtifactInvalid.Valid() ||
-		GeneratedArtifactKind(7).Valid() {
+		GeneratedArtifactKind(8).Valid() {
 		t.Fatal("generated-artifact kind IDs drifted")
 	}
 	if GeneratedArtifactPlacementCompilation != 1 ||

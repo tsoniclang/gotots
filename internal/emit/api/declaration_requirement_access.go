@@ -1,6 +1,9 @@
 package api
 
-import "go/types"
+import (
+	"fmt"
+	"go/types"
+)
 
 func (r DeclarationRequirement) Owner() ArtifactOwner {
 	return r.owner
@@ -63,6 +66,22 @@ func (r DeclarationRequirement) LocalConstantProjection() (
 	source, sourceOK := r.owner.Source()
 	owner, ok := source.(*types.Func)
 	return owner, r.constant, r.projection, sourceOK && ok
+}
+
+func (r DeclarationRequirement) GenericOperation() (
+	*types.Func,
+	*GenericOperationContract,
+	bool,
+) {
+	if !r.Valid() ||
+		r.kind != DeclarationRequirementGenericOperation {
+		return nil, nil, false
+	}
+	source, sourceOK := r.owner.Source()
+	owner, ok := source.(*types.Func)
+	return owner,
+		r.genericOperation,
+		sourceOK && ok
 }
 
 func (r DeclarationRequirement) AnonymousStruct() (
@@ -129,6 +148,18 @@ func (r DeclarationRequirement) InterfaceDynamicTypeToken() (
 	)
 }
 
+func (r DeclarationRequirement) GenericCapability() (
+	*GeneratedArtifact,
+	bool,
+) {
+	if !r.Valid() ||
+		r.kind != DeclarationRequirementGenericCapability ||
+		r.generated.Kind() != GeneratedArtifactGenericCapability {
+		return nil, false
+	}
+	return r.generated, true
+}
+
 func (r DeclarationRequirement) generatedDefinition(
 	requirementKind DeclarationRequirementKind,
 	artifactKind GeneratedArtifactKind,
@@ -154,9 +185,207 @@ func (r DeclarationRequirement) GeneratedArtifact() (
 		DeclarationRequirementInterfaceAdapter,
 		DeclarationRequirementAnonymousInterface,
 		DeclarationRequirementInterfaceMethodToken,
-		DeclarationRequirementInterfaceDynamicTypeToken:
+		DeclarationRequirementInterfaceDynamicTypeToken,
+		DeclarationRequirementGenericCapability:
 		return r.generated, true
 	default:
 		return nil, false
 	}
+}
+
+type NamedStructOperation uint8
+
+const (
+	NamedStructOperationInvalid NamedStructOperation = iota
+	NamedStructOperationZero
+	NamedStructOperationCopy
+	NamedStructOperationEqual
+	NamedStructOperationHash
+	NamedStructOperationConvert
+	NamedStructOperationStorage
+)
+
+func (o NamedStructOperation) Valid() bool {
+	return o == NamedStructOperationZero ||
+		o == NamedStructOperationCopy ||
+		o == NamedStructOperationEqual ||
+		o == NamedStructOperationHash ||
+		o == NamedStructOperationConvert ||
+		o == NamedStructOperationStorage
+}
+
+func (o NamedStructOperation) String() string {
+	switch o {
+	case NamedStructOperationZero:
+		return "zero"
+	case NamedStructOperationCopy:
+		return "copy"
+	case NamedStructOperationEqual:
+		return "equal"
+	case NamedStructOperationHash:
+		return "hash"
+	case NamedStructOperationConvert:
+		return "convert"
+	case NamedStructOperationStorage:
+		return "storage"
+	default:
+		return fmt.Sprintf("named-struct-operation(%d)", o)
+	}
+}
+
+func NamedStructOperationMemberName(
+	operation NamedStructOperation,
+) (string, error) {
+	if !operation.Valid() {
+		return "", &NameError{Reason: "named-struct operation is invalid"}
+	}
+	return "$" + operation.String(), nil
+}
+
+type AnonymousStructDemand uint8
+
+const (
+	AnonymousStructDemandInvalid AnonymousStructDemand = iota
+	AnonymousStructDemandDefinition
+	AnonymousStructDemandZero
+	AnonymousStructDemandCopy
+	AnonymousStructDemandEqual
+	AnonymousStructDemandHash
+	AnonymousStructDemandConvert
+	AnonymousStructDemandStorage
+)
+
+func (d AnonymousStructDemand) Valid() bool {
+	return d >= AnonymousStructDemandDefinition &&
+		d <= AnonymousStructDemandStorage
+}
+
+type MapSpecializationDemand uint8
+
+const (
+	MapSpecializationDemandInvalid MapSpecializationDemand = iota
+	MapSpecializationDemandDefinition
+	MapSpecializationDemandStatic
+	MapSpecializationDemandClear
+	MapSpecializationDemandRange
+)
+
+func (d MapSpecializationDemand) Valid() bool {
+	return d >= MapSpecializationDemandDefinition &&
+		d <= MapSpecializationDemandRange
+}
+
+type DeclarationRequirementKind uint8
+
+const (
+	DeclarationRequirementInvalid                   DeclarationRequirementKind = 0
+	DeclarationRequirementNamedStructOperation      DeclarationRequirementKind = 1
+	DeclarationRequirementAddressableStorage        DeclarationRequirementKind = 2
+	DeclarationRequirementConstantProjection        DeclarationRequirementKind = 3
+	DeclarationRequirementLocalConstantProjection   DeclarationRequirementKind = 4
+	DeclarationRequirementGenericOperation          DeclarationRequirementKind = 5
+	DeclarationRequirementAnonymousStruct           DeclarationRequirementKind = 6
+	DeclarationRequirementMapSpecialization         DeclarationRequirementKind = 7
+	DeclarationRequirementInterfaceAdapter          DeclarationRequirementKind = 8
+	DeclarationRequirementAnonymousInterface        DeclarationRequirementKind = 9
+	DeclarationRequirementInterfaceMethodToken      DeclarationRequirementKind = 10
+	DeclarationRequirementInterfaceDynamicTypeToken DeclarationRequirementKind = 11
+	DeclarationRequirementGenericCapability         DeclarationRequirementKind = 12
+)
+
+func (k DeclarationRequirementKind) Valid() bool {
+	return k == DeclarationRequirementNamedStructOperation ||
+		k == DeclarationRequirementAddressableStorage ||
+		k == DeclarationRequirementConstantProjection ||
+		k == DeclarationRequirementLocalConstantProjection ||
+		k == DeclarationRequirementGenericOperation ||
+		k == DeclarationRequirementAnonymousStruct ||
+		k == DeclarationRequirementMapSpecialization ||
+		k == DeclarationRequirementInterfaceAdapter ||
+		k == DeclarationRequirementAnonymousInterface ||
+		k == DeclarationRequirementInterfaceMethodToken ||
+		k == DeclarationRequirementInterfaceDynamicTypeToken ||
+		k == DeclarationRequirementGenericCapability
+}
+
+func NewGenericCapabilityRequirement(
+	artifact *GeneratedArtifact,
+) (DeclarationRequirement, error) {
+	if !artifact.Valid() ||
+		artifact.Kind() != GeneratedArtifactGenericCapability {
+		return DeclarationRequirement{}, &RootRequestError{
+			Reason: "generic capability requirement is invalid",
+		}
+	}
+	return DeclarationRequirement{
+		owner:     artifact.ReconstructionOwner(),
+		kind:      DeclarationRequirementGenericCapability,
+		generated: artifact,
+	}, nil
+}
+
+func NewGenericCapabilityRequest(
+	artifact *GeneratedArtifact,
+) (RootRequest, error) {
+	requirement, err := NewGenericCapabilityRequirement(artifact)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return newDeclarationRequirementRequest(requirement), nil
+}
+
+func NewGenericOperationRequirement(
+	owner *types.Func,
+	operation *GenericOperationContract,
+) (DeclarationRequirement, error) {
+	if owner == nil {
+		return DeclarationRequirement{}, &RootRequestError{
+			Reason: "generic operation owner is nil",
+		}
+	}
+	owner = owner.Origin()
+	if operation == nil ||
+		!operation.Valid() ||
+		operation.Owner() != owner ||
+		len(genericTypeParameters(owner)) == 0 {
+		return DeclarationRequirement{}, &RootRequestError{
+			Reason: "generic operation requirement is invalid",
+		}
+	}
+	return DeclarationRequirement{
+		owner:            MustSourceArtifactOwner(owner),
+		kind:             DeclarationRequirementGenericOperation,
+		genericOperation: operation,
+	}, nil
+}
+
+func NewGenericOperationRequest(
+	owner *types.Func,
+	operation *GenericOperationContract,
+) (RootRequest, error) {
+	requirement, err := NewGenericOperationRequirement(owner, operation)
+	if err != nil {
+		return RootRequest{}, err
+	}
+	return newDeclarationRequirementRequest(requirement), nil
+}
+
+func genericTypeParameters(owner *types.Func) []*types.TypeParam {
+	if owner == nil {
+		return nil
+	}
+	signature, ok := owner.Type().(*types.Signature)
+	if !ok {
+		return nil
+	}
+	var parameters []*types.TypeParam
+	for _, list := range []*types.TypeParamList{
+		signature.RecvTypeParams(),
+		signature.TypeParams(),
+	} {
+		for index := range list.Len() {
+			parameters = append(parameters, list.At(index))
+		}
+	}
+	return parameters
 }

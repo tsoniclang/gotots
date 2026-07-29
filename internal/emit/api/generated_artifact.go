@@ -15,6 +15,7 @@ const (
 	GeneratedArtifactAnonymousInterface
 	GeneratedArtifactInterfaceMethodToken
 	GeneratedArtifactInterfaceDynamicTypeToken
+	GeneratedArtifactGenericCapability
 )
 
 func (k GeneratedArtifactKind) Valid() bool {
@@ -23,7 +24,8 @@ func (k GeneratedArtifactKind) Valid() bool {
 		k == GeneratedArtifactInterfaceAdapter ||
 		k == GeneratedArtifactAnonymousInterface ||
 		k == GeneratedArtifactInterfaceMethodToken ||
-		k == GeneratedArtifactInterfaceDynamicTypeToken
+		k == GeneratedArtifactInterfaceDynamicTypeToken ||
+		k == GeneratedArtifactGenericCapability
 }
 
 type GeneratedArtifactPlacement uint8
@@ -48,6 +50,7 @@ type GeneratedArtifact struct {
 	outputPath   string
 	lexicalOwner ArtifactOwner
 	anchor       *types.TypeName
+	generic      GenericOperationSelection
 }
 
 func NewCompilationGeneratedArtifact(
@@ -57,7 +60,8 @@ func NewCompilationGeneratedArtifact(
 	targetName string,
 	outputPath string,
 ) (*GeneratedArtifact, error) {
-	if !validGeneratedArtifactType(kind, sourceType) ||
+	if kind == GeneratedArtifactGenericCapability ||
+		!validGeneratedArtifactType(kind, sourceType) ||
 		artifact == "" ||
 		targetName == "" ||
 		outputPath == "" {
@@ -86,7 +90,8 @@ func NewLexicalGeneratedArtifact(
 	sourcePackage := lexicalOwner.Package()
 	_, sourceOwned := lexicalOwner.Source()
 	_, _, initializerOwned := lexicalOwner.PackageInitializer()
-	if !validGeneratedArtifactType(kind, sourceType) ||
+	if kind == GeneratedArtifactGenericCapability ||
+		!validGeneratedArtifactType(kind, sourceType) ||
 		artifact == "" ||
 		targetName == "" ||
 		(!sourceOwned && !initializerOwned) ||
@@ -107,6 +112,70 @@ func NewLexicalGeneratedArtifact(
 		placement:    GeneratedArtifactPlacementLexical,
 		lexicalOwner: lexicalOwner,
 		anchor:       anchor,
+	}, nil
+}
+
+func NewCompilationGenericCapabilityArtifact(
+	selection GenericOperationSelection,
+	signature *types.Signature,
+	artifact string,
+	targetName string,
+	outputPath string,
+) (*GeneratedArtifact, error) {
+	if !selection.Valid() ||
+		!validGenericOperationSignature(signature) ||
+		artifact == "" ||
+		targetName == "" ||
+		outputPath == "" {
+		return nil, &RootRequestError{
+			Reason: "compilation generic-capability artifact is invalid",
+		}
+	}
+	return &GeneratedArtifact{
+		kind:       GeneratedArtifactGenericCapability,
+		sourceType: signature,
+		artifact:   artifact,
+		targetName: targetName,
+		placement:  GeneratedArtifactPlacementCompilation,
+		outputPath: outputPath,
+		generic:    selection,
+	}, nil
+}
+
+func NewLexicalGenericCapabilityArtifact(
+	selection GenericOperationSelection,
+	signature *types.Signature,
+	artifact string,
+	targetName string,
+	lexicalOwner ArtifactOwner,
+	anchor *types.TypeName,
+) (*GeneratedArtifact, error) {
+	sourcePackage := lexicalOwner.Package()
+	_, sourceOwned := lexicalOwner.Source()
+	_, _, initializerOwned := lexicalOwner.PackageInitializer()
+	if !selection.Valid() ||
+		!validGenericOperationSignature(signature) ||
+		artifact == "" ||
+		targetName == "" ||
+		(!sourceOwned && !initializerOwned) ||
+		anchor == nil ||
+		sourcePackage == nil ||
+		anchor.Pkg() != sourcePackage ||
+		anchor.Parent() == nil ||
+		anchor.Parent() == anchor.Pkg().Scope() {
+		return nil, &RootRequestError{
+			Reason: "lexical generic-capability artifact is invalid",
+		}
+	}
+	return &GeneratedArtifact{
+		kind:         GeneratedArtifactGenericCapability,
+		sourceType:   signature,
+		artifact:     artifact,
+		targetName:   targetName,
+		placement:    GeneratedArtifactPlacementLexical,
+		lexicalOwner: lexicalOwner,
+		anchor:       anchor,
+		generic:      selection,
 	}, nil
 }
 
@@ -170,6 +239,18 @@ func (o *GeneratedArtifact) InterfaceDynamicType() (types.Type, bool) {
 	return o.sourceType, interfaceAdapterType(o.sourceType)
 }
 
+func (o *GeneratedArtifact) GenericCapability() (
+	*types.Signature,
+	GenericOperationSelection,
+	bool,
+) {
+	if o == nil || o.kind != GeneratedArtifactGenericCapability {
+		return nil, GenericOperationSelection{}, false
+	}
+	signature, ok := types.Unalias(o.sourceType).(*types.Signature)
+	return signature, o.generic, ok && o.generic.Valid()
+}
+
 func (o *GeneratedArtifact) ArtifactKey() string {
 	if o == nil {
 		return ""
@@ -227,7 +308,8 @@ func (o *GeneratedArtifact) Valid() bool {
 		!validGeneratedArtifactType(o.kind, o.sourceType) ||
 		o.artifact == "" ||
 		o.targetName == "" ||
-		!o.placement.Valid() {
+		!o.placement.Valid() ||
+		(o.kind == GeneratedArtifactGenericCapability) != o.generic.Valid() {
 		return false
 	}
 	switch o.placement {
@@ -275,6 +357,9 @@ func validGeneratedArtifactType(
 		return ok && source.Recv() == nil
 	case GeneratedArtifactInterfaceDynamicTypeToken:
 		return interfaceAdapterType(sourceType)
+	case GeneratedArtifactGenericCapability:
+		source, ok := types.Unalias(sourceType).(*types.Signature)
+		return ok && validGenericOperationSignature(source)
 	default:
 		return false
 	}

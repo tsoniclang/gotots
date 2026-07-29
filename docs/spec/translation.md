@@ -1370,6 +1370,144 @@ compilation or lexical placement. They use the existing transactional
 reconstruction graph and observable facets; no side-table representation, text
 patch, or post-seal mutation is introduced.
 
+## Generics And Iterator Functions
+
+### Generic Declarations And Types
+
+The declaration owner emits one TypeScript generic declaration for each exact
+Go generic function, alias, or named type. Type-parameter names come from their
+`*types.TypeName` identities. A use of a type parameter emits that target type
+reference; an instantiated type emits the same declaration with explicit
+target type arguments.
+
+Go constraints are not translated into an approximate TypeScript `extends`
+clause. The selected `go/types` graph has already checked type sets, inference,
+method sets, and operation legality. The target declaration instead receives
+one exact typed function for each distinct operation signature required by its
+emitted body:
+
+```go
+func Clone[T any](value T) T {
+	return value
+}
+
+func Equal[T comparable](left, right T) bool {
+	return left == right
+}
+```
+
+```ts
+export function Clone<T>(
+  $go$copy: (value: T) => T,
+  value: T,
+): T {
+  return $go$copy(value);
+}
+
+export function Equal<T>(
+  $go$equal: (left: T, right: T) => boolean,
+  left: T,
+  right: T,
+): boolean {
+  return $go$equal(left, right);
+}
+```
+
+The snippets are schematic printed output; production creates every node
+through the pinned TS-Go factories. Operation functions use closed enum-owned
+identifier stems, not diagnostic/source token spellings. They preserve Go
+result identity: `Add[T ~int32]` calls `$go$binary_add` returning `T` rather
+than using target `+`, whose result would be `number` and would lose a defined
+actual type.
+
+Generic aliases create no runtime identity. Generic named values use one
+generic representation declaration. Their demanded zero/copy/equality/hash
+functions accept exact operations for constituent type parameters rather than
+storing descriptors in every value. Methods on instantiated generic receiver
+types receive and forward the same hidden function ABI; ordinary values remain
+free of operation metadata.
+
+### Instantiation And Calls
+
+Every explicit or inferred instantiation is selected from the exact
+`types.Info.Instances` entry on its identifier. `IndexExpr` and
+`IndexListExpr` are generic instantiations only when that evidence exists;
+otherwise their existing index-expression owners remain authoritative.
+Emission exact-joins:
+
+1. the selected generic object;
+2. its ordered declared type parameters;
+3. the instance's ordered concrete type arguments; and
+4. the instantiated signature or named type reported by `go/types`.
+
+The target call writes explicit TypeScript type arguments even when Go inferred
+them and passes the declaration's ordered hidden operation functions before
+source arguments:
+
+```go
+result := Add(int32(2), int32(3))
+```
+
+```ts
+const result = Add<int32>($goCapability_binary_add_int32, 2, 3);
+```
+
+A generic caller forwards its own same-signature operation function. A
+cross-parameter operation remains one function such as `(T, U) => T`; there is
+no artificial choice of which parameter “owns” it. If the callee needs an
+operation absent from the caller, the caller's declaration contract grows
+through the facet-specific reconstruction graph and its callers are revisited
+only when the callable surface changes. An instantiated function value is one
+typed arrow that captures the functions once; `.bind`, `.call`, `.apply`,
+runtime inference, and monomorphized duplicate bodies are forbidden.
+
+### Generic Operations
+
+Zero, copy, equality, hash, unary/binary operators, conversions, indexing,
+range, built-ins, selected methods, interface adaptation, channels, and
+iterator calls enter the same closed capability mechanism only when their
+source occurrence uses a type parameter. A concrete occurrence continues to
+use the existing direct owner. Concrete operation-function artifacts delegate
+back to those owners, so there is one semantic implementation for each
+operation.
+
+An operation selection is typed, not merely a broad enum value. Most selections
+need only their closed operation kind and exact function signature. A
+constraint-method selection additionally carries the selected `*types.Func`;
+its identity uses Go method identity (name, unexported package when applicable)
+plus the exact receiver-free instantiated signature. Thus `Read() int32` and
+`Write() int32` never collapse merely because their signatures match, while
+structurally equivalent exported interface methods exact-join.
+
+For example, `var zero T` demands `$zero`; `items[index]` demands the exact
+index operation proved by the checked core type; and `value.Method()` demands
+the exact selected constraint method identity and receiver-free signature.
+No handler switches on `~int`, `comparable`, method spelling, or a runtime type
+tag. If `go/types` evidence does not prove the operation and its exact result,
+translation fails at that occurrence.
+
+### Range Over Iterator Functions
+
+The range owner accepts only the three checker-approved iterator shapes:
+
+```go
+func(func() bool)
+func(func(V) bool)
+func(func(K, V) bool)
+```
+
+The range expression is evaluated once. Its yield callback is a typed arrow;
+each invocation copies yielded values into the exact per-iteration declaration
+or assignment targets, executes the body, returns `true` to continue, and
+returns `false` for a source `break`. A source `continue` returns `true`.
+Returning from the enclosing function, panic/recover, defer, labels, and
+cooperative calls compose through their owning later control capabilities; the
+iterator owner never approximates them with an illegal target branch.
+
+The iterator function is invoked exactly once. Calling yield after it returned
+`false` must reproduce the selected Go runtime panic. Output size depends on
+the source range body, not the number of yields or generic instantiations.
+
 ## Values, Control Flow, And Implicit Semantics
 
 Handlers preserve within the selected profile:

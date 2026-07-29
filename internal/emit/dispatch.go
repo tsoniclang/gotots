@@ -9,6 +9,7 @@ import (
 	"github.com/tsoniclang/gotots/internal/emit/callable"
 	definedtypedeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/definedtype"
 	functiondeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/function"
+	generictypedeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/generic"
 	interfacetypedeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/interfacetype"
 	namedstructdeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/namedstruct"
 	packageconstant "github.com/tsoniclang/gotots/internal/emit/declaration/packageconstant"
@@ -50,6 +51,7 @@ import (
 	anonymousstructtype "github.com/tsoniclang/gotots/internal/emit/type/anonymousstruct"
 	basictype "github.com/tsoniclang/gotots/internal/emit/type/basic"
 	definedtype "github.com/tsoniclang/gotots/internal/emit/type/defined"
+	generictype "github.com/tsoniclang/gotots/internal/emit/type/generic"
 	interfacetype "github.com/tsoniclang/gotots/internal/emit/type/interfacevalue"
 	maptype "github.com/tsoniclang/gotots/internal/emit/type/map"
 	namedstructtype "github.com/tsoniclang/gotots/internal/emit/type/namedstruct"
@@ -71,6 +73,7 @@ type emitter struct {
 	integer api.IntegerRepresentation
 	order   api.EvaluationOrder
 	require func(types.Object) error
+	generic api.GenericCallableResolver
 }
 
 func newEmitter(
@@ -80,6 +83,7 @@ func newEmitter(
 	integer api.IntegerRepresentation,
 	order api.EvaluationOrder,
 	require func(types.Object) error,
+	generic api.GenericCallableResolver,
 ) *emitter {
 	var typesInfo *types.Info
 	var packageScope *types.Scope
@@ -94,6 +98,7 @@ func newEmitter(
 		integer: integer,
 		order:   order,
 		require: require,
+		generic: generic,
 	}
 	target.values = representation.NewOwner(target)
 	return target
@@ -139,7 +144,7 @@ func (e *emitter) generatedContext(
 }
 
 func (e *emitter) context(names api.Names) (api.Context, error) {
-	return api.NewContext(
+	context, err := api.NewContext(
 		api.RoleFileDeclaration,
 		e.source.FileSet(),
 		e.source.Types(),
@@ -152,6 +157,10 @@ func (e *emitter) context(names api.Names) (api.Context, error) {
 		e.integer,
 		e.order,
 	)
+	if err != nil {
+		return api.Context{}, err
+	}
+	return context.WithGenericCallableResolver(e.generic), nil
 }
 
 func (e *emitter) declarationObject(
@@ -178,6 +187,14 @@ func (e *emitter) declarationObject(
 		)
 	case *ast.GenDecl:
 		if typeName, ok := object.(*types.TypeName); ok {
+			if target, handled, err := generictypedeclaration.Emit(
+				context,
+				source,
+				typeName,
+				requirements,
+			); handled {
+				return target, err
+			}
 			if target, handled, err := interfacetypedeclaration.Emit(
 				context,
 				e,
@@ -416,6 +433,13 @@ func (e *emitter) Type(
 	source ast.Expr,
 ) (api.TypeEmission, error) {
 	if sourceType := context.TypesInfo().TypeOf(source); sourceType != nil {
+		if target, handled, err := generictype.Emit(
+			context,
+			source,
+			sourceType,
+		); handled {
+			return target, err
+		}
 		if array, ok := arrayvalue.Resolve(context, sourceType); ok {
 			return array.EmitType(context, e, source)
 		}
@@ -488,6 +512,13 @@ func (e *emitter) RepresentedType(
 	source ast.Node,
 	sourceType types.Type,
 ) (api.TypeEmission, error) {
+	if target, handled, err := generictype.Emit(
+		context,
+		source,
+		sourceType,
+	); handled {
+		return target, err
+	}
 	if array, ok := arrayvalue.Resolve(context, sourceType); ok {
 		return array.EmitType(context, e, source)
 	}

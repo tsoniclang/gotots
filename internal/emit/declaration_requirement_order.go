@@ -57,6 +57,26 @@ func compareDeclarationRequirements(
 		}
 		return compareBasicKinds(leftProjection, rightProjection)
 	}
+	if left.Kind() == api.DeclarationRequirementGenericOperation {
+		_, leftOperation, leftOK := left.GenericOperation()
+		_, rightOperation, rightOK := right.GenericOperation()
+		switch {
+		case !leftOK && rightOK:
+			return -1
+		case leftOK && !rightOK:
+			return 1
+		case !leftOK:
+			return 0
+		}
+		switch {
+		case leftOperation.Key() < rightOperation.Key():
+			return -1
+		case leftOperation.Key() > rightOperation.Key():
+			return 1
+		default:
+			return 0
+		}
+	}
 	if left.Kind() == api.DeclarationRequirementAnonymousStruct {
 		leftArtifact, leftDemand, _ := left.AnonymousStruct()
 		rightArtifact, rightDemand, _ := right.AnonymousStruct()
@@ -117,7 +137,8 @@ func artifactKinds(kind api.DeclarationRequirementKind) bool {
 	return kind == api.DeclarationRequirementInterfaceAdapter ||
 		kind == api.DeclarationRequirementAnonymousInterface ||
 		kind == api.DeclarationRequirementInterfaceMethodToken ||
-		kind == api.DeclarationRequirementInterfaceDynamicTypeToken
+		kind == api.DeclarationRequirementInterfaceDynamicTypeToken ||
+		kind == api.DeclarationRequirementGenericCapability
 }
 
 func compareGeneratedArtifacts(

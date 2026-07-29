@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	artifactstate "github.com/tsoniclang/gotots/internal/emit/artifact"
+	genericcapability "github.com/tsoniclang/gotots/internal/emit/generic/capability"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
 	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	maprepresentation "github.com/tsoniclang/gotots/internal/emit/value/maprepresentation"
@@ -28,6 +29,8 @@ func (s *programSession) validateGeneratedArtifact(
 		api.GeneratedArtifactInterfaceMethodToken,
 		api.GeneratedArtifactInterfaceDynamicTypeToken:
 		return s.validateInterfaceArtifact(artifact)
+	case api.GeneratedArtifactGenericCapability:
+		return s.validateGenericCapabilityArtifact(artifact)
 	default:
 		return &ScheduleError{
 			Object: artifact.TargetName(),
@@ -49,6 +52,8 @@ func (s *programSession) reconstructGeneratedArtifact(
 		api.GeneratedArtifactInterfaceMethodToken,
 		api.GeneratedArtifactInterfaceDynamicTypeToken:
 		return s.reconstructInterfaceArtifact(artifact)
+	case api.GeneratedArtifactGenericCapability:
+		return s.reconstructGenericCapabilityArtifact(artifact)
 	default:
 		return &ScheduleError{
 			Object: artifact.TargetName(),
@@ -102,7 +107,10 @@ func (s *programSession) reconstructMapSpecialization(
 			Reason: "lexical map specialization must reconstruct through its source artifact",
 		}
 	}
-	builder, err := s.mapSpecializationBuilder(artifact)
+	builder, err := s.compilationGeneratedArtifactBuilder(
+		artifact,
+		"map specialization",
+	)
 	if err != nil {
 		return err
 	}
@@ -250,8 +258,183 @@ func (s *programSession) buildMapSpecializationRevision(
 	}, nil
 }
 
-func (s *programSession) mapSpecializationBuilder(
+func (s *programSession) validateGenericCapabilityArtifact(
 	artifact *api.GeneratedArtifact,
+) error {
+	signature, selection, ok := artifact.GenericCapability()
+	if !ok {
+		return &ScheduleError{
+			Object: artifact.TargetName(),
+			Reason: "generated artifact is not a generic capability",
+		}
+	}
+	binding, found := s.registry.GeneratedArtifact(
+		api.GeneratedArtifactGenericCapability,
+		artifact.ArtifactKey(),
+	)
+	boundSignature, boundSelection, bound := binding.GenericCapability()
+	if !found ||
+		binding != artifact ||
+		!bound ||
+		boundSelection != selection ||
+		!types.Identical(boundSignature, signature) {
+		return &ScheduleError{
+			Object: artifact.TargetName(),
+			Reason: "generic-capability artifact has no exact canonical binding",
+		}
+	}
+	return nil
+}
+
+func (s *programSession) reconstructGenericCapabilityArtifact(
+	artifact *api.GeneratedArtifact,
+) error {
+	if s.sealed {
+		return &ScheduleError{
+			Object: artifact.TargetName(),
+			Reason: "generic capability reconstructed after target files were sealed",
+		}
+	}
+	if err := s.validateGenericCapabilityArtifact(artifact); err != nil {
+		return err
+	}
+	if artifact.Placement() != api.GeneratedArtifactPlacementCompilation {
+		return &ScheduleError{
+			Object: artifact.TargetName(),
+			Reason: "lexical generic capability must reconstruct through its source artifact",
+		}
+	}
+	builder, err := s.compilationGeneratedArtifactBuilder(
+		artifact,
+		"generic capability",
+	)
+	if err != nil {
+		return err
+	}
+	owner := api.MustGeneratedArtifactOwner(artifact)
+	index, exists := builder.indexByOwner[owner]
+	var temporaryStart emitnaming.TemporarySnapshot
+	if exists {
+		temporaryStart = builder.declarations[index].temporaryStart
+	}
+	revision, err := s.buildGenericCapabilityRevision(
+		builder,
+		artifact,
+		temporaryStart,
+		exists,
+	)
+	if err != nil {
+		return err
+	}
+	if err := s.artifacts.Commit(
+		owner,
+		revision.contract,
+		revision.dependencies,
+	); err != nil {
+		return err
+	}
+	s.artifacts.DiscardDirty(owner)
+	declaration := targetDeclaration{
+		owner:          owner,
+		name:           artifact.TargetName(),
+		position:       token.NoPos,
+		statements:     revision.statements,
+		placement:      revision.placement,
+		temporaryStart: revision.temporaryStart,
+	}
+	if exists {
+		declaration.reconstructions =
+			builder.declarations[index].reconstructions + 1
+		builder.declarations[index] = declaration
+		return nil
+	}
+	builder.byOwner[owner] = struct{}{}
+	builder.indexByOwner[owner] = len(builder.declarations)
+	builder.declarations = append(builder.declarations, declaration)
+	return nil
+}
+
+func (s *programSession) buildGenericCapabilityRevision(
+	builder *targetFileBuilder,
+	artifact *api.GeneratedArtifact,
+	temporaryStart emitnaming.TemporarySnapshot,
+	reconstruction bool,
+) (artifactRevision, error) {
+	names, ok := builder.context.Names().(*emitnaming.File)
+	if !ok {
+		return artifactRevision{}, &ScheduleError{
+			Object: artifact.TargetName(),
+			Reason: "generic capability has no concrete name owner",
+		}
+	}
+	if !reconstruction {
+		temporaryStart = names.SnapshotTemporaries()
+	} else {
+		current := names.SnapshotTemporaries()
+		names.RestoreTemporaries(temporaryStart)
+		defer names.RestoreTemporaries(current)
+	}
+	owner := api.MustGeneratedArtifactOwner(artifact)
+	finish, err := names.BeginArtifact(owner, nil, nil, "")
+	if err != nil {
+		return artifactRevision{}, err
+	}
+	defer finish()
+	if err := exactGenericCapabilityRequirement(
+		s.requirements.appliedFor(owner),
+		artifact,
+	); err != nil {
+		return artifactRevision{}, err
+	}
+	statement, requests, err := genericcapability.Build(
+		builder.context,
+		builder.emitter,
+		artifact,
+	)
+	if err != nil {
+		return artifactRevision{}, err
+	}
+	statements := []tsgo.Statement{statement}
+	placement, dependencies, err := s.consumeArtifactRequests(owner, requests)
+	if err != nil {
+		return artifactRevision{}, err
+	}
+	contract, err := artifactstate.ProjectContract(s.factory, statements)
+	if err != nil {
+		return artifactRevision{}, err
+	}
+	return artifactRevision{
+		statements:     statements,
+		placement:      placement,
+		dependencies:   dependencies,
+		contract:       contract,
+		temporaryStart: temporaryStart,
+	}, nil
+}
+
+func exactGenericCapabilityRequirement(
+	requirements []api.DeclarationRequirement,
+	artifact *api.GeneratedArtifact,
+) error {
+	if len(requirements) != 1 {
+		return &ScheduleError{
+			Object: artifact.TargetName(),
+			Reason: "generic capability requires exactly one definition request",
+		}
+	}
+	selected, ok := requirements[0].GenericCapability()
+	if !ok || selected != artifact {
+		return &ScheduleError{
+			Object: artifact.TargetName(),
+			Reason: "generic capability received a foreign requirement",
+		}
+	}
+	return nil
+}
+
+func (s *programSession) compilationGeneratedArtifactBuilder(
+	artifact *api.GeneratedArtifact,
+	kind string,
 ) (*targetFileBuilder, error) {
 	if existing := s.builders[artifact.OutputPath()]; existing != nil {
 		return existing, nil
@@ -260,14 +443,14 @@ func (s *programSession) mapSpecializationBuilder(
 	if !ok {
 		return nil, &ScheduleError{
 			Object: artifact.TargetName(),
-			Reason: "map-specialization support has no deterministic source context",
+			Reason: kind + " support has no deterministic source context",
 		}
 	}
 	emitter := s.emitters[sourcePackage]
 	if emitter == nil {
 		return nil, &ScheduleError{
 			Object: artifact.TargetName(),
-			Reason: "map-specialization support package has no emitter",
+			Reason: kind + " support package has no emitter",
 		}
 	}
 	context, err := emitter.generatedContext(

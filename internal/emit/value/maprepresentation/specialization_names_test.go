@@ -99,6 +99,13 @@ func (staticSpecializationNames) InterfaceMethodToken(
 	panic("unused")
 }
 
+func (staticSpecializationNames) GenericCapability(
+	api.GenericOperationSelection,
+	*types.Signature,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (staticSpecializationNames) ConstantProjection(
 	*types.Const,
 	types.BasicKind,

@@ -11,7 +11,6 @@ import (
 	interfacemethodtoken "github.com/tsoniclang/gotots/internal/emit/declaration/interfacemethodtoken"
 	interfacetypedeclaration "github.com/tsoniclang/gotots/internal/emit/declaration/interfacetype"
 	emitnaming "github.com/tsoniclang/gotots/internal/emit/naming"
-	targetplacement "github.com/tsoniclang/gotots/internal/emit/placement"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -95,7 +94,10 @@ func (s *programSession) reconstructInterfaceArtifact(
 			Reason: "lexical interface artifact must reconstruct through its source artifact",
 		}
 	}
-	builder, err := s.interfaceArtifactBuilder(artifact)
+	builder, err := s.compilationGeneratedArtifactBuilder(
+		artifact,
+		"interface artifact",
+	)
 	if err != nil {
 		return err
 	}
@@ -281,44 +283,4 @@ func exactInterfaceRequirement(
 		}
 	}
 	return nil
-}
-
-func (s *programSession) interfaceArtifactBuilder(
-	artifact *api.GeneratedArtifact,
-) (*targetFileBuilder, error) {
-	if existing := s.builders[artifact.OutputPath()]; existing != nil {
-		return existing, nil
-	}
-	sourcePackage, ok := deterministicSupportPackage(s.source.Packages())
-	if !ok {
-		return nil, &ScheduleError{
-			Object: artifact.TargetName(),
-			Reason: "interface support has no deterministic source context",
-		}
-	}
-	emitter := s.emitters[sourcePackage]
-	if emitter == nil {
-		return nil, &ScheduleError{
-			Object: artifact.TargetName(),
-			Reason: "interface support package has no emitter",
-		}
-	}
-	context, err := emitter.generatedContext(
-		artifact.OutputPath(),
-		s.registry,
-	)
-	if err != nil {
-		return nil, err
-	}
-	builder := &targetFileBuilder{
-		sourcePackage: sourcePackage,
-		outputPath:    artifact.OutputPath(),
-		emitter:       emitter,
-		context:       context,
-		placement:     targetplacement.New(),
-		byOwner:       make(map[api.ArtifactOwner]struct{}),
-		indexByOwner:  make(map[api.ArtifactOwner]int),
-	}
-	s.builders[artifact.OutputPath()] = builder
-	return builder, nil
 }

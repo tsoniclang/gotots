@@ -16,44 +16,6 @@ import (
 	"github.com/tsoniclang/gotots/internal/load"
 )
 
-func TestCallableUnsupportedNeighborsFailAtTypedOwners(t *testing.T) {
-	testCases := []struct {
-		name      string
-		source    string
-		role      api.Role
-		category  api.Category
-		construct string
-	}{
-		{
-			name: "generic declaration",
-			source: `package boundary
-
-func Identity[T any](value T) T {
-	return value
-}
-`,
-			role:      api.RoleFileDeclaration,
-			category:  api.CategoryDeclaration,
-			construct: "*ast.FuncDecl",
-		},
-	}
-
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			err := compileTemporaryFunctionSource(t, testCase.source)
-			var unsupported *api.UnsupportedError
-			if !errors.As(err, &unsupported) {
-				t.Fatalf("error = %v, want *api.UnsupportedError", err)
-			}
-			if unsupported.Role != testCase.role ||
-				unsupported.Category != testCase.category ||
-				unsupported.Construct != testCase.construct {
-				t.Fatalf("unsupported = %#v", unsupported)
-			}
-		})
-	}
-}
-
 func TestCallableSyntaxAndTypeMutationsFailAtSignatureOwner(t *testing.T) {
 	t.Run("named parameter loses syntax binding", func(t *testing.T) {
 		loaded := loadCallableValuesProject(t)
@@ -122,25 +84,6 @@ func TestCallableSyntaxAndTypeMutationsFailAtSignatureOwner(t *testing.T) {
 			"*ast.Ident",
 		)
 	})
-}
-
-func compileTemporaryFunctionSource(t *testing.T, source string) error {
-	t.Helper()
-	directory := t.TempDir()
-	writeFile(
-		t,
-		filepath.Join(directory, "go.mod"),
-		"module example.com/callableboundary\n\ngo 1.26.4\n",
-	)
-	writeFile(t, filepath.Join(directory, "source.go"), source)
-	loaded, err := load.One(context.Background(), load.Request{
-		Directory: directory,
-		Pattern:   ".",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return compileLoadedPackage(t, loaded)
 }
 
 func compileLoadedPackage(t *testing.T, loaded *load.Package) error {

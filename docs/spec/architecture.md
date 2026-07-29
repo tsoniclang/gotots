@@ -501,6 +501,68 @@ facets, and reverse invalidation edges discovered while constructing actual
 TS-Go references. It does not copy source statements, infer whole-program
 meaning, perform name lookup, or decide reachability.
 
+## Generic Capability Fixed Point
+
+Go type parameters remain TypeScript type parameters. They are never erased,
+boxed into a universal payload, or expanded into one body per reached
+instantiation. Operations that TypeScript cannot perform while preserving the
+exact Go type travel through a statically typed target capability parameter:
+
+```go
+func Add[T ~int32](left, right T) T { return left + right }
+```
+
+```ts
+export function Add<T>(
+  $go$binary_add: (left: T, right: T) => T,
+  left: T,
+  right: T,
+): T {
+  return $go$binary_add(left, right);
+}
+```
+
+This operation function is target ABI, not source analysis. The one ordinary
+emission walk discovers a closed operation demand while constructing the actual
+TS-Go body. That demand is a typed declaration requirement owned by the exact
+generic `types.Object`. Its identity is `(typed operation selection, exact
+receiver-free signature)` within that owner. The selection is the closed
+operation kind plus exact semantic evidence that kind requires; a constraint
+method includes its selected `*types.Func`, so two same-signature methods do not
+collapse. Source position is not identity, so repeated uses exact-join one
+hidden parameter. Reconstruction adds the corresponding hidden function
+parameter to the same declaration. No prewalk, copied constraint model,
+operation IR, capability object, or runtime registry exists.
+
+The program session exposes only the current canonical generic callable
+contract to a call handler. A call records a `CallableSignature` dependency,
+reads the exact ordered `types.Info.Instances` arguments, and supplies one
+hidden operation function per demanded semantic signature before ordinary
+arguments. A concrete instantiation requests one reconstructible function
+artifact keyed by `(typed operation selection, exact instantiated signature)`.
+A signature
+still containing the caller's type parameters projects one hidden operation
+function on that caller and forwards it. Cross-parameter operations such as
+`Shift[T, U](T, U) T` therefore remain one exact `(T, U) => T` function; they
+are not forced into a per-parameter object. Recursive and mutually recursive
+calls use the ordinary artifact fixed point. Identical contracts do not
+propagate, and a repeated non-current contract remains a convergence failure.
+
+Each concrete operation artifact delegates to the existing authoritative
+value/operator/method owner. It may not restate zero, copy, equality, hashing,
+numeric, conversion, indexing, method, interface, channel, or iterator
+behavior. Constructed signatures containing type parameters compose by
+forwarding exact enclosing operation functions; they do not create an erased
+descriptor, growing object, capability factory, or per-use semantic closure.
+
+`go/types` remains the sole authority for constraints, type sets, inference,
+core types, method selection, and admissible operations. Target constraints are
+not reconstructed from Go syntax. The hidden callable list contains exactly the
+distinct operations demanded by the emitted declaration body. An unused
+function, duplicate same-signature function, optional operation, throwing
+invalid-operation function, string lookup, or universal operation bag is
+forbidden.
+
 One placement service applies the policy:
 
 - imports always enter file import scope; dynamic imports are forbidden;

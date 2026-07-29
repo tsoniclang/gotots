@@ -51,6 +51,7 @@ type programSession struct {
 	builders               map[string]*targetFileBuilder
 	packageBuilders        map[*load.Package]*packageTargetBuilder
 	packageInitializations *packageInitializationScheduler
+	genericOperations      map[genericOperationIdentity]*api.GenericOperationContract
 	sealed                 bool
 }
 
@@ -360,6 +361,7 @@ func newProgramSession(
 		builders:               make(map[string]*targetFileBuilder),
 		packageBuilders:        make(map[*load.Package]*packageTargetBuilder),
 		packageInitializations: newPackageInitializationScheduler(),
+		genericOperations:      make(map[genericOperationIdentity]*api.GenericOperationContract),
 	}
 	for _, sourcePackage := range source.Packages() {
 		session.emitters[sourcePackage] = newEmitter(
@@ -369,6 +371,7 @@ func newProgramSession(
 			options.IntegerRepresentation,
 			options.EvaluationOrder,
 			session.require,
+			session,
 		)
 	}
 	orderedSites := make([]declarationSite, 0, len(sites))
@@ -434,40 +437,6 @@ func newProgramSession(
 		}
 	}
 	return session, nil
-}
-
-func (s *programSession) require(object types.Object) error {
-	if s.sealed {
-		objectName := ""
-		if object != nil {
-			objectName = object.Name()
-		}
-		return &ScheduleError{
-			Object: objectName,
-			Reason: "declaration requested after target files were sealed",
-		}
-	}
-	if object == nil {
-		return &ScheduleError{Reason: "referenced object is nil"}
-	}
-	if _, ok := s.sites[object]; !ok {
-		return &ScheduleError{
-			Object: object.Name(),
-			Reason: "object has no supported source declaration",
-		}
-	}
-	sourcePackage := s.source.PackageForTypes(object.Pkg())
-	if sourcePackage == nil {
-		return &ScheduleError{
-			Object: object.Name(),
-			Reason: "object package has no source owner",
-		}
-	}
-	if err := s.requirePackage(sourcePackage); err != nil {
-		return err
-	}
-	s.scheduler.enqueue(object)
-	return nil
 }
 
 func (s *programSession) emit(object types.Object) error {

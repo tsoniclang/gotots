@@ -33,6 +33,7 @@ func EmitAdapter(
 		func(_ *types.Var, index int) (string, error) {
 			return "$argument" + strconv.Itoa(index), nil
 		},
+		false,
 	)
 }
 
@@ -72,6 +73,7 @@ func Emit(
 		signature,
 		parameterRole,
 		resultRole,
+		false,
 	); err != nil {
 		return SignatureEmission{}, err
 	}
@@ -83,6 +85,37 @@ func Emit(
 		parameterRole,
 		resultRole,
 		context.Names().Parameter,
+		false,
+	)
+}
+
+func EmitDeclaration(
+	context api.Context,
+	children api.ChildEmitter,
+	source *ast.FuncType,
+	signature *types.Signature,
+	parameterRole api.Role,
+	resultRole api.Role,
+) (SignatureEmission, error) {
+	if err := validateSyntax(
+		context,
+		source,
+		signature,
+		parameterRole,
+		resultRole,
+		true,
+	); err != nil {
+		return SignatureEmission{}, err
+	}
+	return emitRepresented(
+		context,
+		children,
+		source,
+		signature,
+		parameterRole,
+		resultRole,
+		context.Names().Parameter,
+		true,
 	)
 }
 
@@ -123,6 +156,7 @@ func EmitNonNilType(
 		func(_ *types.Var, index int) (string, error) {
 			return "$" + strconv.Itoa(index), nil
 		},
+		false,
 	)
 	if err != nil {
 		return api.TypeEmission{}, err
@@ -172,8 +206,11 @@ func emitRepresented(
 	parameterRole api.Role,
 	resultRole api.Role,
 	parameterName func(*types.Var, int) (string, error),
+	allowTypeParameters bool,
 ) (SignatureEmission, error) {
-	if !Supports(signature) || parameterName == nil {
+	if (!allowTypeParameters && !Supports(signature)) ||
+		signature == nil ||
+		parameterName == nil {
 		return SignatureEmission{},
 			api.Unsupported(context, api.CategoryType, source)
 	}
@@ -277,6 +314,7 @@ func validateSyntax(
 	signature *types.Signature,
 	parameterRole api.Role,
 	resultRole api.Role,
+	allowTypeParameters bool,
 ) error {
 	if source == nil {
 		return &api.InvariantError{
@@ -285,8 +323,8 @@ func validateSyntax(
 		}
 	}
 	if source.Params == nil ||
-		source.TypeParams != nil ||
-		!Supports(signature) {
+		(!allowTypeParameters && source.TypeParams != nil) ||
+		(!allowTypeParameters && !Supports(signature)) {
 		return api.Unsupported(context, api.CategoryType, source)
 	}
 	if err := validateFields(

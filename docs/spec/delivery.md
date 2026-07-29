@@ -429,6 +429,43 @@ This checkpoint exits only when:
 - both integer profiles pass TS-Go encode/print, strict typechecking, and
   Go-versus-generated-ESM differential execution.
 
+### 3E. Interfaces
+
+Install one open-world typed adapter per reached concrete dynamic type,
+canonical non-string dynamic-type metadata, O(1) native method dispatch,
+assertions, comma-ok, type switches, interface equality, and interface map
+keys. Concrete receiver calls remain statically selected top-level functions.
+Exit requires the complete nil/typed-nil/copy/assertion/panic/equality matrix,
+constant-size call sites as implementer count grows, and zero erased payload,
+constructor-identity, reflection, or implementer switches.
+
+### 3F. Generics And Iterator Functions
+
+Install generic functions, aliases, named types, instantiated methods,
+explicit/inferred instantiation, instantiated function values, type-parameter
+operations, and range-over-function.
+
+One source declaration produces one strict target generic body. The body emits
+typed operation-signature requirements into the existing
+declaration-reconstruction fixed point. Repeated identical operation selections
+exact-join one hidden function parameter. Concrete instantiations supply one
+canonical function artifact per exact operation-selection/signature, and
+generic callers project and forward the same typed functions.
+`go/types.Info.Instances` and selected method/type evidence are the only
+inference and constraint authority; constraint-method selections retain the
+exact selected `*types.Func`.
+There is no monomorphized alternate path, source-position identity, capability
+object, source prewalk, copied type-set algebra, universal operation bag,
+runtime registry, or erased payload.
+
+Exit requires exact instance/capability joins; recursive generic convergence;
+generic aliases and recursive instantiated types; generic receiver methods and
+function values; operations over basic, defined, aggregate, interface, and
+constructed type arguments; all three iterator signatures; and strict,
+differential, mutation, tail-size, and scaling proof. Generic body bytes remain
+constant as instantiation count grows, and capability definitions grow only
+with distinct exact operation-selection/signature pairs.
+
 ## 4. Environment And Completion
 
 Add deterministic module output, minimal runtime modules, selected-`GOROOT`

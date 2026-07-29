@@ -89,6 +89,10 @@ func InterfaceAdapterPath(artifactKey string) (string, error) {
 	return generatedArtifactPath("interfaces/adapters", artifactKey)
 }
 
+func GenericCapabilityPath(artifactKey string) (string, error) {
+	return generatedArtifactPath("generics/capabilities", artifactKey)
+}
+
 func AnonymousInterfacePath(artifactKey string) (string, error) {
 	return generatedArtifactPath("interfaces/contracts", artifactKey)
 }

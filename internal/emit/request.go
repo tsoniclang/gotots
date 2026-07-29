@@ -375,3 +375,40 @@ func (e *OptionsError) Error() string {
 	}
 	return fmt.Sprintf("validate compilation option %q: %s", e.Field, e.Reason)
 }
+
+func (s *programSession) require(object types.Object) error {
+	if s.sealed {
+		objectName := ""
+		if object != nil {
+			objectName = object.Name()
+		}
+		return &ScheduleError{
+			Object: objectName,
+			Reason: "declaration requested after target files were sealed",
+		}
+	}
+	if object == nil {
+		return &ScheduleError{Reason: "referenced object is nil"}
+	}
+	if function, ok := object.(*types.Func); ok {
+		object = function.Origin()
+	}
+	if _, ok := s.sites[object]; !ok {
+		return &ScheduleError{
+			Object: object.Name(),
+			Reason: "object has no supported source declaration",
+		}
+	}
+	sourcePackage := s.source.PackageForTypes(object.Pkg())
+	if sourcePackage == nil {
+		return &ScheduleError{
+			Object: object.Name(),
+			Reason: "object package has no source owner",
+		}
+	}
+	if err := s.requirePackage(sourcePackage); err != nil {
+		return err
+	}
+	s.scheduler.enqueue(object)
+	return nil
+}

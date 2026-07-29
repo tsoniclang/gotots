@@ -297,3 +297,7 @@ func artifactTestObject(name string, position token.Pos) types.Object {
 		types.NewSignatureType(nil, nil, nil, nil, nil, false),
 	)
 }
+
+func sourceArtifactOwner(object types.Object) api.ArtifactOwner {
+	return api.MustSourceArtifactOwner(object)
+}

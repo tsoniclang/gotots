@@ -2,7 +2,6 @@ package naming
 
 import (
 	"go/types"
-	"strconv"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	anonymousstruct "github.com/tsoniclang/gotots/internal/emit/type/anonymousstruct"
@@ -314,7 +313,7 @@ func (n *File) generatedNamedObjectIdentity(
 				Reason: "generated-artifact named component has no declaration identity",
 			}
 		}
-		return object.Pkg().Path() + "|" + object.Name(), nil
+		return typeidentity.NamedObjectKey(object, nil, "")
 	}
 	_, indexed := n.owner.targetNameByObject[object]
 	sourceFile := n.artifactFile
@@ -328,9 +327,5 @@ func (n *File) generatedNamedObjectIdentity(
 			Reason: "generated-artifact local component has no lexical declaration identity",
 		}
 	}
-	offset := int64(object.Pos() - sourceFile.Pos())
-	return object.Pkg().Path() + "|" +
-		n.artifactPath + "|" +
-		object.Name() + "|" +
-		strconv.FormatInt(offset, 10), nil
+	return typeidentity.NamedObjectKey(object, sourceFile, n.artifactPath)
 }

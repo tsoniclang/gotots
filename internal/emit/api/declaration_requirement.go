@@ -1,120 +1,8 @@
 package api
 
 import (
-	"fmt"
 	"go/types"
 )
-
-type NamedStructOperation uint8
-
-const (
-	NamedStructOperationInvalid NamedStructOperation = iota
-	NamedStructOperationZero
-	NamedStructOperationCopy
-	NamedStructOperationEqual
-	NamedStructOperationHash
-	NamedStructOperationConvert
-	NamedStructOperationStorage
-)
-
-func (o NamedStructOperation) Valid() bool {
-	return o == NamedStructOperationZero ||
-		o == NamedStructOperationCopy ||
-		o == NamedStructOperationEqual ||
-		o == NamedStructOperationHash ||
-		o == NamedStructOperationConvert ||
-		o == NamedStructOperationStorage
-}
-
-func (o NamedStructOperation) String() string {
-	switch o {
-	case NamedStructOperationZero:
-		return "zero"
-	case NamedStructOperationCopy:
-		return "copy"
-	case NamedStructOperationEqual:
-		return "equal"
-	case NamedStructOperationHash:
-		return "hash"
-	case NamedStructOperationConvert:
-		return "convert"
-	case NamedStructOperationStorage:
-		return "storage"
-	default:
-		return fmt.Sprintf("named-struct-operation(%d)", o)
-	}
-}
-
-func NamedStructOperationMemberName(
-	operation NamedStructOperation,
-) (string, error) {
-	if !operation.Valid() {
-		return "", &NameError{Reason: "named-struct operation is invalid"}
-	}
-	return "$" + operation.String(), nil
-}
-
-type AnonymousStructDemand uint8
-
-const (
-	AnonymousStructDemandInvalid AnonymousStructDemand = iota
-	AnonymousStructDemandDefinition
-	AnonymousStructDemandZero
-	AnonymousStructDemandCopy
-	AnonymousStructDemandEqual
-	AnonymousStructDemandHash
-	AnonymousStructDemandConvert
-	AnonymousStructDemandStorage
-)
-
-func (d AnonymousStructDemand) Valid() bool {
-	return d >= AnonymousStructDemandDefinition &&
-		d <= AnonymousStructDemandStorage
-}
-
-type MapSpecializationDemand uint8
-
-const (
-	MapSpecializationDemandInvalid MapSpecializationDemand = iota
-	MapSpecializationDemandDefinition
-	MapSpecializationDemandStatic
-	MapSpecializationDemandClear
-	MapSpecializationDemandRange
-)
-
-func (d MapSpecializationDemand) Valid() bool {
-	return d >= MapSpecializationDemandDefinition &&
-		d <= MapSpecializationDemandRange
-}
-
-type DeclarationRequirementKind uint8
-
-const (
-	DeclarationRequirementInvalid                   DeclarationRequirementKind = 0
-	DeclarationRequirementNamedStructOperation      DeclarationRequirementKind = 1
-	DeclarationRequirementAddressableStorage        DeclarationRequirementKind = 2
-	DeclarationRequirementConstantProjection        DeclarationRequirementKind = 3
-	DeclarationRequirementLocalConstantProjection   DeclarationRequirementKind = 4
-	DeclarationRequirementAnonymousStruct           DeclarationRequirementKind = 6
-	DeclarationRequirementMapSpecialization         DeclarationRequirementKind = 7
-	DeclarationRequirementInterfaceAdapter          DeclarationRequirementKind = 8
-	DeclarationRequirementAnonymousInterface        DeclarationRequirementKind = 9
-	DeclarationRequirementInterfaceMethodToken      DeclarationRequirementKind = 10
-	DeclarationRequirementInterfaceDynamicTypeToken DeclarationRequirementKind = 11
-)
-
-func (k DeclarationRequirementKind) Valid() bool {
-	return k == DeclarationRequirementNamedStructOperation ||
-		k == DeclarationRequirementAddressableStorage ||
-		k == DeclarationRequirementConstantProjection ||
-		k == DeclarationRequirementLocalConstantProjection ||
-		k == DeclarationRequirementAnonymousStruct ||
-		k == DeclarationRequirementMapSpecialization ||
-		k == DeclarationRequirementInterfaceAdapter ||
-		k == DeclarationRequirementAnonymousInterface ||
-		k == DeclarationRequirementInterfaceMethodToken ||
-		k == DeclarationRequirementInterfaceDynamicTypeToken
-}
 
 type DeclarationRequirement struct {
 	owner     ArtifactOwner
@@ -131,10 +19,11 @@ type DeclarationRequirement struct {
 	// constant projection. A basic kind is a canonical, comparable dedup key —
 	// unlike a types.Type interface value, whose pointer identity is not a
 	// stable projection key.
-	projection      types.BasicKind
-	generated       *GeneratedArtifact
-	anonymousDemand AnonymousStructDemand
-	mapDemand       MapSpecializationDemand
+	projection       types.BasicKind
+	generated        *GeneratedArtifact
+	anonymousDemand  AnonymousStructDemand
+	mapDemand        MapSpecializationDemand
+	genericOperation *GenericOperationContract
 }
 
 // ConstantProjectionType resolves a validated concrete constant-capable basic
@@ -409,6 +298,11 @@ func (r DeclarationRequirement) Valid() bool {
 	if !r.kind.Valid() {
 		return false
 	}
+	if r.kind != DeclarationRequirementGenericOperation &&
+		r.kind != DeclarationRequirementGenericCapability &&
+		r.genericOperation != nil {
+		return false
+	}
 	switch r.kind {
 	case DeclarationRequirementNamedStructOperation:
 		if !r.operation.Valid() ||
@@ -469,6 +363,25 @@ func (r DeclarationRequirement) Valid() bool {
 		source, sourceOK := r.owner.Source()
 		_, ok := source.(*types.Func)
 		return sourceOK && ok
+	case DeclarationRequirementGenericOperation:
+		if r.operation != NamedStructOperationInvalid ||
+			r.typeName != nil ||
+			r.variable != nil ||
+			r.constant != nil ||
+			r.projection != types.Invalid ||
+			r.generated != nil ||
+			r.anonymousDemand != AnonymousStructDemandInvalid ||
+			r.mapDemand != MapSpecializationDemandInvalid ||
+			!r.genericOperation.Valid() {
+			return false
+		}
+		source, sourceOK := r.owner.Source()
+		owner, ok := source.(*types.Func)
+		return sourceOK &&
+			ok &&
+			owner.Origin() == owner &&
+			len(genericTypeParameters(owner)) != 0 &&
+			r.genericOperation.Owner() == owner
 	case DeclarationRequirementAnonymousStruct:
 		return r.operation == NamedStructOperationInvalid &&
 			r.typeName == nil &&
@@ -507,6 +420,18 @@ func (r DeclarationRequirement) Valid() bool {
 		return r.validGeneratedDefinition(
 			GeneratedArtifactInterfaceDynamicTypeToken,
 		)
+	case DeclarationRequirementGenericCapability:
+		return r.operation == NamedStructOperationInvalid &&
+			r.typeName == nil &&
+			r.variable == nil &&
+			r.constant == nil &&
+			r.projection == types.Invalid &&
+			r.generated.Valid() &&
+			r.generated.Kind() == GeneratedArtifactGenericCapability &&
+			r.anonymousDemand == AnonymousStructDemandInvalid &&
+			r.mapDemand == MapSpecializationDemandInvalid &&
+			r.genericOperation == nil &&
+			r.owner == r.generated.ReconstructionOwner()
 	default:
 		return false
 	}

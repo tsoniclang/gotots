@@ -185,6 +185,13 @@ func (unusedNames) InterfaceMethodToken(
 	panic("unused")
 }
 
+func (unusedNames) GenericCapability(
+	api.GenericOperationSelection,
+	*types.Signature,
+) (api.NameReference, error) {
+	panic("unused")
+}
+
 func (unusedNames) PackageVariable(
 	*types.Var,
 ) (api.PackageVariableReference, error) {

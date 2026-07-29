@@ -188,6 +188,10 @@ type Names interface {
 	InterfaceContract(types.Type) (InterfaceContractReference, error)
 	InterfaceMethodName(*types.Func) (string, error)
 	InterfaceMethodToken(*types.Func) (NameReference, error)
+	GenericCapability(
+		GenericOperationSelection,
+		*types.Signature,
+	) (NameReference, error)
 	ConstantProjection(*types.Const, types.BasicKind) (NameReference, error)
 	Member(*types.Var) (string, error)
 	Primitive(PrimitiveAlias) (NameReference, error)

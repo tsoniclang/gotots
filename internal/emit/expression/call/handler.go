@@ -34,6 +34,14 @@ func emit(
 	source *ast.CallExpr,
 	discarded bool,
 ) (api.ExpressionEmission, error) {
+	if target, handled, err := emitGeneric(
+		context,
+		children,
+		source,
+		discarded,
+	); handled {
+		return target, err
+	}
 	if target, ok, err := conversionexpression.Emit(
 		context,
 		children,

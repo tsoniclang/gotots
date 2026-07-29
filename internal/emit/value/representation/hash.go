@@ -5,6 +5,7 @@ import (
 	"go/types"
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
+	genericoperation "github.com/tsoniclang/gotots/internal/emit/generic/operation"
 	runtimecomplex "github.com/tsoniclang/gotots/internal/emit/runtime/complex"
 	interfaceruntime "github.com/tsoniclang/gotots/internal/emit/runtime/interfacevalue"
 	mapruntime "github.com/tsoniclang/gotots/internal/emit/runtime/map"
@@ -20,6 +21,9 @@ func (Owner) SupportsHash(
 	context api.Context,
 	sourceType types.Type,
 ) bool {
+	if _, ok := api.GenericTypeParameter(sourceType); ok {
+		return true
+	}
 	return supportsHash(context, sourceType, make(map[types.Type]bool))
 }
 
@@ -107,6 +111,16 @@ func (Owner) Hash(
 	sourceType types.Type,
 	value tsgo.Expression,
 ) (api.ExpressionEmission, error) {
+	if parameter, ok := api.GenericTypeParameter(sourceType); ok {
+		return genericoperation.Call(
+			context,
+			source,
+			api.GenericOperationHash,
+			[]types.Type{parameter},
+			[]types.Type{types.Typ[types.Uint32]},
+			[]tsgo.Expression{value},
+		)
+	}
 	if _, ok := interfacetype.Resolve(sourceType); ok {
 		undefined := context.Factory().Identifier("undefined")
 		return api.DirectExpression(

@@ -862,6 +862,63 @@ method-count fixture proves assertion work grows with the asserted interface
 contract, not with possible implementers. The twenty largest changed target
 declarations and calls are inspected before closure.
 
+### Milestone 3F Generic And Iterator Gate
+
+The integrated generic fixture covers generic functions, aliases, named and
+recursive types, generic receiver methods, explicit and inferred
+instantiations, instantiated function values, recursive and mutually recursive
+generic calls, cross-package calls, type-parameter zero/copy/equality/hash,
+operators/conversions/indexing/methods/interfaces, and all three
+range-over-function signatures.
+
+Blocking evidence includes:
+
+1. every generic identifier occurrence exact-joins one
+   `types.Info.Instances` record to the selected declaration, ordered type
+   arguments, and instantiated signature/type;
+2. each declaration has one target generic body and one hidden function
+   parameter per distinct `(typed operation selection, exact signature)`
+   emitted by that body; repeated source sites exact-join, same-signature
+   distinct constraint methods remain distinct, and a cross-parameter operation
+   remains one function rather than a per-parameter object;
+3. a concrete operation-selection/instantiated-signature pair has one
+   reconstructible function definition, while a still-generic signature
+   projects and forwards the enclosing function without boxing or runtime
+   lookup;
+4. recursive capability propagation converges through callable-facet
+   dependencies; an unchanged facet performs zero downstream reconstruction
+   and an oscillating contract fails;
+5. every operation function delegates to the existing concrete semantic owner,
+   and mutations that replace it with direct target arithmetic, shallow copy,
+   object identity, spelling selection, or a throwing unsupported member fail;
+6. aliases add no runtime identity, instantiated named values retain exact
+   nominal/copy behavior, and generic receiver methods use the same ordered
+   capability ABI;
+7. instantiated function values are typed arrows capturing capabilities once
+   and contain no `.bind`, `.call`, or `.apply`;
+8. iterator range evaluates its source once, copies yielded values at the
+   iteration boundary, maps continue/break to true/false, rejects a post-false
+   yield, and composes with represented generic values; and
+9. encoded TS-Go AST reparses, strict TypeScript passes under both integer
+   profiles, and Go-versus-generated-ESM output and panic classes match.
+
+A 1x/2x/4x instantiation fixture holds one generic body fixed and proves its
+printed and encoded size is constant. Concrete capability growth is bounded by
+distinct exact operation-selection/signature pairs, not call count or
+source-site count.
+A separate recursive-call fixture records contract revisions and proves
+convergence. The twenty largest generic bodies, capability declarations,
+instantiated types, and calls plus strict-typecheck time/RSS are inspected.
+
+Production mutations drop or reorder an instance argument, use a defaulted or
+spelling-derived type, omit or add an operation function, key an operation by
+source position or diagnostic token spelling, duplicate same-signature hidden
+parameters, duplicate a body per instantiation, erase a payload, replace
+forwarding with a concrete descriptor, suppress a callable-facet dependency,
+call yield after false, reevaluate the iterator, or move yielded copy work
+outside the callback. Each must fail its identity, contract, strict-type,
+differential, convergence, shape, or scaling owner.
+
 ## Heavy Runs
 
 Heavy tests run one process group at a time with:

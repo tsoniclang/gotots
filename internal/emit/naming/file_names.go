@@ -115,6 +115,9 @@ func (n *File) reference(
 	if object == nil {
 		return api.NameReference{}, &api.NameError{Reason: "reference object is nil"}
 	}
+	if function, ok := object.(*types.Func); ok {
+		object = function.Origin()
+	}
 	if variable, ok := object.(*types.Var); ok &&
 		!variable.IsField() &&
 		variable.Pkg() != nil &&

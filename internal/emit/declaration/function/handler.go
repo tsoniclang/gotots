@@ -6,6 +6,7 @@ import (
 
 	"github.com/tsoniclang/gotots/internal/emit/api"
 	"github.com/tsoniclang/gotots/internal/emit/callable"
+	genericdeclaration "github.com/tsoniclang/gotots/internal/emit/generic/declaration"
 	"github.com/tsoniclang/gotots/internal/target/tsgo"
 )
 
@@ -18,7 +19,6 @@ func Emit(
 	if source.Doc != nil ||
 		source.Type == nil ||
 		source.Type.Params == nil ||
-		source.Type.TypeParams != nil ||
 		source.Body == nil {
 		return api.DeclarationEmission{},
 			api.Unsupported(context, api.CategoryDeclaration, source)
@@ -29,6 +29,7 @@ func Emit(
 		return api.DeclarationEmission{},
 			api.Unsupported(context, api.CategoryDeclaration, source)
 	}
+	functionObject = functionObject.Origin()
 	signature, ok := functionObject.Type().(*types.Signature)
 	if !ok ||
 		(source.Recv == nil) != (signature.Recv() == nil) {
@@ -53,11 +54,22 @@ func Emit(
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
+	genericParameters, err := genericdeclaration.Enter(
+		context,
+		children,
+		source,
+		functionObject,
+		requirements,
+	)
+	if err != nil {
+		return api.DeclarationEmission{}, err
+	}
+	context = genericParameters.Context()
 	name, err := context.Names().Declare(functionObject)
 	if err != nil {
 		return api.DeclarationEmission{}, err
 	}
-	targetSignature, err := callable.Emit(
+	targetSignature, err := callable.EmitDeclaration(
 		context,
 		children,
 		source.Type,
@@ -69,7 +81,11 @@ func Emit(
 		return api.DeclarationEmission{}, err
 	}
 	parameters := targetSignature.Parameters()
-	parameterRequests := targetSignature.Requests()
+	parameters = append(genericParameters.Capabilities(), parameters...)
+	parameterRequests := api.CombineRequests(
+		genericParameters.Requests(),
+		targetSignature.Requests(),
+	)
 	if signature.Recv() != nil {
 		receiver, receiverRequests, err := emitReceiver(
 			context,
@@ -106,7 +122,7 @@ func Emit(
 		modifiers,
 		nil,
 		context.Factory().Identifier(name),
-		nil,
+		genericParameters.TypeNodes(),
 		parameters,
 		targetSignature.Result(),
 		body.Value(),
